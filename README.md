@@ -28,6 +28,52 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ⚡ Estratégia de Shorts + estrutura de referência (v84_46)
+
+- Roteiro **curto** (Shorts/Reels/TikTok — Modelos de vídeo no formato curto, Roteiro do YouTube "mais curto", Vídeos
+  modelados até 60 s, e Vídeo de venda até 60 s — Short = no máximo 60 s, ~130-160 palavras) ganha a parte de Shorts do `metodo_roteiro.py`: **gancho com o espectador
+  dentro da história** ("Você é… e tem um problema") e algo em jogo · tema de dopamina rápida (curiosidade, "parece burrice
+  até explicarem") · solução revelada em passos · **final com recompensa** (a revelação, não só uma piada; se der, em loop)
+  · simples · frases curtas (legenda curta, cena nova a cada 1-2 s) · narração **transformadora** (nunca só descrever cena
+  de outro — conteúdo reutilizado é desmonetizado) · meta: taxa de visualização > 80% e retenção > 90% · com a sua cara.
+  As dicas de edição (efeito sonoro + algo chamativo no 1º segundo, legendas de 1-3 palavras…) vão no plano.
+- **📐 Estrutura de referência** (Vídeo de venda e Modelos de vídeo): cole a transcrição de um vídeo que viralizou — a IA
+  copia a ESTRUTURA (gancho, ordem das revelações, ritmo, final) com o seu tema, sem copiar frases.
+
+## 🧭 Método de roteiro em todo prompt de roteiro (v84_45)
+
+`metodo_roteiro.py` entra em TODO prompt que escreve ou reescreve roteiro: Roteiro do YouTube (1º passo e, quando
+reescreve, o 2º), 🛒 Vídeo de venda, 🕵️ Modelos de vídeo e 🎞️ Vídeos modelados. A IA segue:
+objetivo comum com o espectador · problema de superfície + **problema profundo** (plantado cedo, revelado no fim) ·
+entregar a promessa do título · público certo · a lacuna que as fontes não explicam · começo e fim claros
+(transformação) · **jornada do herói** adaptada (mini-jornada na venda e nos Shorts) · complexidade crescente ·
+"mostrar sem contar" (laços abertos que se fecham) · **"mas / portanto"** · ritmo com frases de tamanhos diferentes ·
+autocrítica do esboço antes da versão final · **sem manipulação** (nada de isca de raiva ou promessa falsa).
+A IA devolve também um **"plano"** (objetivo, problemas, público, começo→fim, jornada, laços abertos, notas de edição),
+que aparece em **🧭 Plano do roteiro** na página. Notas de edição nunca vão no texto narrado.
+
+## 📄 Fontes por arquivo, filtro de conteúdo pessoal, marcas de like/venda e produto sugerido (v84_44)
+
+Nos 🕵️ Modelos de vídeo:
+- **Fontes por arquivo**: TXT/MD, **PDF** (com intervalo de páginas, ex.: `10-45, 50` — pra livros grandes), **EPUB**,
+  **DOCX**, SRT/VTT (sem os tempos), HTML, RTF. Até 150 mil caracteres por arquivo. Precisa do `pypdf` (no requirements).
+- **🙅 Tirar experiências pessoais / citações a outros vídeos / detalhes muito pessoais** das fontes (marcado por padrão).
+  No Vídeo de venda virou o filtro "Sem experiências pessoais / citações a outros vídeos".
+- **📣 [[INSCREVA]] e [[VENDA]] nos pontos mais oportunos** (marcado por padrão; não nos Shorts) — vão pro Gerar voz como
+  as pausas dos vídeos de like e de venda. **✏️ Editar roteiro**: mude as marcas de lugar ou corrija o texto; a voz, os
+  momentos das imagens e os capítulos são recalculados.
+- **🛒 A IA sugere um produto** adequado ao tema (opcional): aparece separado (nome, por quê, chamada) e **não entra no
+  roteiro**; botão pra criar um projeto de 🛒 Vídeo de venda com ele + busca na Amazon.
+
+## 🌐 Idioma de saída no Vídeo de venda e nos Modelos de vídeo (v84_42)
+
+- **🌐 Idioma de saída** (em "Como vender" / "Tema e modelo", e repetido do lado do 📝 Gerar prompt): o prompt manda a
+  IA escrever TUDO nesse idioma — roteiro, títulos, descrição, capítulos, tags, CTA, textos na tela — mesmo que a
+  página do produto ou as matérias estejam em outro (traduzindo os fatos; nomes próprios ficam).
+- O aviso de afiliado da Amazon sai no idioma escolhido; o 🎙️ Gerar voz já abre com o idioma do projeto.
+- Saída em **inglês**: o prompt também pede as **tags de voz do Chatterbox Turbo** no roteiro (`[chuckle]`, `[sigh]`,
+  `[dramatic]`, `[whispering]`…, `roteiros_yt.regra_tags_turbo`). Elas ficam no texto que vai pro Gerar voz.
+
 ## 🎬 6 modelos novos + vídeos transcritos que a IA corta (v84_41)
 
 - **Modelos de vídeo** novos (além do True Crime), cada um com formatos e regras próprias: 📜 História, 👤 Biografias,

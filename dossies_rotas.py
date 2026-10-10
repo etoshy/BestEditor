@@ -116,7 +116,7 @@ def registrar(app, base_dir: str) -> None:
                 cfg["formato"] = next(iter(fmts))
             if c.get("formato_video") in ("16:9", "9:16", "1:1"):
                 cfg["formato_video"] = c["formato_video"]
-            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20)):
+            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20), ("referencia", 12000)):
                 if k in c:
                     cfg[k] = str(c.get(k) or "").strip()[:lim]
             if "minutos" in c:
@@ -124,6 +124,9 @@ def registrar(app, base_dir: str) -> None:
                     cfg["minutos"] = max(0.5, min(120.0, float(c["minutos"])))
                 except (TypeError, ValueError):
                     pass
+            for k in ("sem_experiencias", "marcar_chamadas", "sugerir_produto"):
+                if k in c:
+                    cfg[k] = bool(c[k])
             if "tema" in c:
                 p["tema"] = str(c.get("tema") or "").strip()[:300]
             if "roteiro_base" in c:
@@ -153,6 +156,28 @@ def registrar(app, base_dir: str) -> None:
             _processar(pid, fid)
         return jsonify({"ok": bool(novas), "novas": novas, "erros": erros})
 
+    @app.route("/modelos-video/<pid>/fonte-arquivo", methods=["POST"])
+    def dossie_fonte_arquivo(pid: str):
+        """📄 Fontes por arquivo: TXT, PDF (com páginas), EPUB, DOCX, SRT… (pode mandar vários)."""
+        arqs = [a for a in request.files.getlist("arquivo") if a and a.filename]
+        if not arqs:
+            return jsonify({"erro": "Escolha o arquivo."}), 400
+        paginas = (request.form.get("paginas") or "").strip()
+        novas, erros = [], []
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            for a in arqs[:20]:
+                try:
+                    novas.append(ds.adicionar_fonte_arquivo(base_dir, p, a.filename, a.read(), paginas)["id"])
+                except ds.DossieError as exc:
+                    erros.append(f"{a.filename}: {exc}")
+            ds.salvar(base_dir, p)
+        for fid in novas:
+            _processar(pid, fid)
+        return jsonify({"ok": bool(novas), "novas": novas, "erros": erros}), (200 if novas else 400)
+
     @app.route("/modelos-video/<pid>/fonte/<fid>", methods=["POST", "DELETE"])
     def dossie_fonte(pid: str, fid: str):
         with _TRAVA:
@@ -163,6 +188,11 @@ def registrar(app, base_dir: str) -> None:
             if request.method == "DELETE":
                 apagar_imgs = (request.args.get("imagens") == "1")
                 p["fontes"] = [x for x in p["fontes"] if x is not f]
+                if f.get("arquivo"):
+                    try:
+                        os.remove(os.path.join(ds._pasta(base_dir, pid), "fontes", os.path.basename(f["arquivo"])))
+                    except OSError:
+                        pass
                 if apagar_imgs:
                     for m in [m for m in p["midias"] if m.get("fonte") == fid]:
                         cam = ds.caminho_midia(base_dir, p, m)
@@ -174,6 +204,9 @@ def registrar(app, base_dir: str) -> None:
                     p["midias"] = [m for m in p["midias"] if m.get("fonte") != fid]
                 ds.salvar(base_dir, p)
                 return jsonify({"ok": True})
+            c = request.get_json(silent=True) or {}
+            if "paginas" in c:
+                f["paginas"] = str(c.get("paginas") or "").strip()[:60]
             f.update(estado="na fila", erro=None)
             ds.salvar(base_dir, p)
         _processar(pid, fid)  # ler de novo
@@ -343,6 +376,39 @@ def registrar(app, base_dir: str) -> None:
                 return jsonify({"erro": str(exc)}), 400
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/roteiro-editado", methods=["POST"])
+    def dossie_roteiro_editado(pid: str):
+        """✏️ Roteiro mexido à mão (ex.: mudar o [[VENDA]] / [[INSCREVA]] de lugar)."""
+        with _TRAVA:
+            p = _proj(pid)
+            if not p or not p.get("resultado"):
+                return jsonify({"erro": "Ainda não tem roteiro."}), 404
+            try:
+                p["resultado"] = ds.roteiro_editado(p, str((request.get_json(silent=True) or {}).get("roteiro") or ""))
+            except ds.DossieError as exc:
+                return jsonify({"erro": str(exc)}), 400
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/produto-para-venda", methods=["POST"])
+    def dossie_produto_para_venda(pid: str):
+        """🛒 O produto que a IA sugeriu vira um projeto de Vídeo de venda (pra fazer o vídeo da [[VENDA]])."""
+        p = _proj(pid)
+        prod = ((p or {}).get("resultado") or {}).get("produto_sugerido")
+        if not prod:
+            return jsonify({"erro": "A IA não sugeriu produto neste roteiro."}), 404
+        from urllib.parse import quote_plus
+        v = vd.criar(base_dir, nome=f"{prod['nome']} — {p.get('tema') or ''}"[:160])
+        v["produto"]["titulo"] = prod["nome"]
+        v["produto"]["descricao"] = prod.get("por_que") or ""
+        v["config"]["idioma"] = p["config"].get("idioma") or "pt"
+        v["config"]["publico"] = f"quem assiste vídeos de {(ds.MODELOS.get(p['config']['modelo']) or {}).get('nome', '')} sobre {p.get('tema') or ''}"[:400]
+        if prod.get("chamada"):
+            vd.adicionar_midia(v, tipo="texto", origem="pc", conteudo=prod["chamada"], descricao="ideia de chamada de venda sugerida pela IA")
+        vd.salvar(base_dir, v)
+        return jsonify({"ok": True, "url": f"/vendas/{v['id']}",
+                        "amazon": "https://www.amazon.com.br/s?k=" + quote_plus(prod.get("busca") or prod["nome"])})
 
     @app.route("/modelos-video/<pid>/excluir", methods=["POST"])
     def dossie_excluir(pid: str):

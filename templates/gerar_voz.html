@@ -98,8 +98,8 @@ E no final...</pre>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.88rem;">
     <span>🌐 Idioma da narração (vai junto no .zip — o vídeo inteiro segue ele):</span>
     <select name="idioma_narracao" style="width:auto;margin:0;padding:4px 8px;">
-      <option value="auto" selected>Automático (pela voz escolhida / pelo texto)</option>
-      {% for cod, nome in idiomas_lista %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}
+      <option value="auto" {% if not idioma_inicial %}selected{% endif %}>Automático (pela voz escolhida / pelo texto)</option>
+      {% for cod, nome in idiomas_lista %}<option value="{{ cod }}" {% if cod == idioma_inicial %}selected{% endif %}>{{ nome }}</option>{% endfor %}
     </select>
   </div>
   <div class="mv-modo">

@@ -60,3 +60,6 @@ keyring>=24.0.0
 # lá de cima (`playwright install chromium`).
 fastapi>=0.115
 uvicorn>=0.34
+
+# --- 🕵️ Modelos de vídeo: fontes em PDF ---
+pypdf>=4.0

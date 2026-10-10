@@ -526,6 +526,7 @@ def gerar_voz_page():
         roteiro_id=request.args.get("roteiro") if _texto_do_roteiro_yt(request.args.get("roteiro")) else "",
         venda_id=request.args.get("venda") if _texto_da_venda(request.args.get("venda")) else "",
         dossie_id=request.args.get("dossie") if _texto_do_dossie(request.args.get("dossie")) else "",
+        idioma_inicial=_idioma_do_projeto(request.args.get("venda"), request.args.get("dossie")),
     )
 
 
@@ -8124,6 +8125,18 @@ def _texto_do_dossie(pid: Optional[str]) -> str:
         return dossies.roteiro_para_voz(dossies.carregar(BASE_DIR, pid))
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _idioma_do_projeto(venda: Optional[str], dossie: Optional[str]) -> str:
+    """Idioma de saída escolhido no projeto (🛒/🕵️) — o Gerar voz já abre nele."""
+    import importlib
+    for mod_nome, pid in (("vendas", venda), ("dossies", dossie)):
+        if pid:
+            try:
+                return importlib.import_module(mod_nome).carregar(BASE_DIR, pid)["config"].get("idioma") or ""
+            except Exception:  # noqa: BLE001
+                return ""
+    return ""
 
 
 def _texto_da_venda(pid: Optional[str]) -> str:

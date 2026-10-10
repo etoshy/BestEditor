@@ -452,6 +452,7 @@ Responda **apenas** com um JSON válido (sem texto antes ou depois), assim:
     }
   ],
   "removidos": ["o que você tirou ou trocou e por quê (curto)"],
+  "plano": {"objetivo_comum": "...", "problema_superficie": "...", "problema_profundo": "...", "publico": "...", "comeco_e_fim": "...", "jornada": ["..."], "lacos_abertos": ["..."]},
   "observacoes": "algo importante pra quem vai editar (opcional)"
 }
 
@@ -646,6 +647,18 @@ REGRA_MANTER_MARCAS = ("MANTENHA todas as marcas [[INSCREVA]] e [[VENDA]] que j�
                        "Não traduza, não reescreva e não apague essas marcas.")
 
 
+def regra_tags_turbo() -> str:
+    """Instrução das TAGS DE VOZ do Chatterbox Turbo (só funcionam com a voz em INGLÊS) — usada nos prompts
+    do 🛒 Vídeo de venda e dos 🕵️ Modelos de vídeo quando o idioma de saída é inglês."""
+    return ("TAGS DE VOZ (o roteiro vai ser narrado em inglês pelo Chatterbox Turbo): insira tags especiais DIRETO no texto do "
+            "roteiro, entre colchetes, onde quiser que aconteçam. Exemplo: \"Hi there [chuckle], welcome back!\". "
+            "Sons (no ponto exato do som): " + " ".join(f"[{t}]" for t in TAGS_SOM) + ". "
+            "Estilo (funcionam melhor no INÍCIO da frase): " + " ".join(f"[{t}]" for t in TAGS_ESTILO) + ". "
+            "Use com bom senso, onde um narrador de verdade faria aquilo ([whispering] num segredo, [dramatic] numa virada, "
+            "[chuckle] depois de uma ironia, [sigh] num lamento) — em média uma tag a cada 2-4 frases. Escreva exatamente "
+            "assim, em inglês, e nunca invente tags fora dessa lista. Não confunda com as marcas de mídia ([M2], [I4]).")
+
+
 def marcas_no_texto(texto: str) -> Dict[str, int]:
     import chamadas as _ch
     out = {"inscreva": 0, "venda": 0}
@@ -669,6 +682,10 @@ def prompt_analise(p: Dict[str, Any], modelo: Dict[str, Any], idioma: str = "o m
     texto = modelo["texto"]
     for k, v in campos.items():
         texto = texto.replace("{" + k + "}", str(v))
+    import metodo_roteiro  # 🧭 método de roteiro em todo prompt que escreve roteiro
+    if modelo.get("id") != "so_cenas":  # "só listar as cenas" não reescreve nada
+        curto = modelo.get("id") == "reescrever_curto" or "short" in str(modelo.get("nome") or "").lower()
+        texto = texto.strip() + "\n\n" + metodo_roteiro.bloco("curto" if curto else "reescrita")
     if sem_experiencias:
         texto = texto.strip() + "\n\n" + REGRA_SEM_EXPERIENCIAS
     if marcar_chamadas:
@@ -723,7 +740,8 @@ def ler_analise(texto: str) -> Dict[str, Any]:
     return {"titulo": str(d.get("titulo") or "").strip()[:200], "idioma": str(d.get("idioma") or "").strip()[:20],
             "roteiro": roteiro, "cenas": cenas, "marcas": marcas_no_texto(roteiro),
             "removidos": [str(x)[:300] for x in (d.get("removidos") or []) if str(x).strip()][:60],
-            "observacoes": str(d.get("observacoes") or "").strip()[:1500]}
+            "observacoes": str(d.get("observacoes") or "").strip()[:1500],
+            "plano": __import__("metodo_roteiro").ler_plano(d.get("plano"))}
 
 
 # ------------------------------------------------------------------ passo 2: o que fazer com o roteiro
@@ -817,6 +835,10 @@ def prompt_acoes(p: Dict[str, Any], acoes: List[str], idioma: str = "en", extra:
             + f"sugira 5 TÍTULOS alternativos em \"titulos\" ({idioma_desc}; fortes, até ~70 caracteres, sem clickbait mentiroso).")
     if (extra or "").strip():
         tarefas.append("Pedido extra de quem está editando (siga com prioridade): " + extra.strip()[:1500])
+    if {"sem_cenas", "sem_experiencias", "traduzir"} & set(acoes) or (extra or "").strip():
+        import metodo_roteiro  # reescrevendo o texto: o mesmo método de roteiro do 1º passo
+        tarefas.append("Ao mexer no texto do roteiro, siga o MÉTODO DE ROTEIRO abaixo (sem mudar os fatos):\n"
+                       + metodo_roteiro.bloco("reescrita").split("\n", 1)[1])
     cenas_txt = "\n".join(
         f"{c['id']}. {c['obra']} ({c['tipo']}{', ' + c['ano'] if c.get('ano') else ''}) — {c['momento']}"
         + (f" | entra em: \"{c['trecho_do_roteiro']}\"" if c.get("trecho_do_roteiro") else "")

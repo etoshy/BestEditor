@@ -74,6 +74,8 @@ FILTROS = [
     ("sem_promessa", "Não prometer resultado", "nada de \"garantido\", \"cura\", \"emagreça X kg\", resultado financeiro"),
     ("sem_pressao", "Sem pressão agressiva", "nada de \"compre AGORA\", \"última chance\" gritado, contagem regressiva falsa"),
     ("sem_concorrente", "Não citar concorrentes", "nenhuma marca concorrente pelo nome"),
+    ("sem_pessoal", "Sem experiências pessoais / citações a outros vídeos",
+     "nada de \"quando eu era criança\", \"como falei no vídeo passado\", histórias de quem gravou os vídeos/avaliações usados como material"),
     ("aviso_afiliado", "Aviso de link de afiliado", "a descrição avisa que o link é de afiliado (\"Como associado da Amazon, ganho com compras qualificadas.\")"),
 ]
 
@@ -81,21 +83,32 @@ CONFIG_PADRAO: Dict[str, Any] = {
     "tecnicas": ["beneficios", "dor_solucao", "percepcao_valor", "demonstracao", "objecoes", "cta_forte"],
     "tom": "",
     "duracao_s": 60,
-    "idioma": "pt-BR",
+    "idioma": "pt",
     "formato": "9:16",
     "link_onde": "descricao",
     "preco_modo": "falar",
     "tipo_produto": "pago",
     "oferta": "",
     "publico": "",
-    "filtros": ["nao_publi", "sem_promessa", "aviso_afiliado"],
+    "filtros": ["nao_publi", "sem_promessa", "aviso_afiliado", "sem_pessoal"],
     "proibidos": "",
     "apoio_criador": "nao",
+    "referencia": "",  # 📐 transcrição de um vídeo que viralizou: a IA copia a estrutura
 }
 APOIO_CRIADOR = {
     "sim": "diga, de forma natural e honesta (uma vez, perto do fim), que comprando pelo link a pessoa AJUDA o canal/criador "
            "— ele ganha uma pequena comissão e ela não paga nada a mais por isso",
     "nao": "NÃO fale de comissão nem que a compra ajuda o criador",
+}
+
+
+AVISO_AFILIADO = {
+    "pt": "Como associado da Amazon, ganho com compras qualificadas.",
+    "en": "As an Amazon Associate I earn from qualifying purchases.",
+    "es": "Como afiliado de Amazon, gano con las compras que cumplen los requisitos.",
+    "fr": "En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises.",
+    "de": "Als Amazon-Partner verdiene ich an qualifizierten Verkäufen.",
+    "it": "In qualità di Affiliato Amazon, ricevo un guadagno dagli acquisti idonei.",
 }
 
 
@@ -136,6 +149,8 @@ def carregar(base: str, pid: str) -> Dict[str, Any]:
     with open(_arquivo(base, pid), encoding="utf-8") as f:
         p = json.load(f)
     p["config"] = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    import idiomas
+    p["config"]["idioma"] = idiomas.normalizar(p["config"].get("idioma")) or "pt"  # "pt-BR" antigo -> "pt"
     return p
 
 
@@ -496,7 +511,15 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
 
     L.append("")
     L.append("## Como vender")
-    L.append(f"- Duração: ~{dur} s de narração (~{palavras} palavras). Idioma: {cfg.get('idioma') or 'pt-BR'}. "
+    import idiomas
+    nome_idioma = idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt")
+    if (idiomas.normalizar(cfg.get("idioma")) or "pt") == "en":
+        import roteiros_yt
+        L.insert(1, roteiros_yt.regra_tags_turbo())
+    L.insert(1, f"IDIOMA DE SAÍDA: escreva TUDO em {nome_idioma} — roteiro, gancho, CTA, textos na tela, descrição, títulos e "
+                "hashtags —, mesmo que a página do produto e os materiais estejam em outro idioma (traduza as informações; "
+                "nomes de marca e de produto ficam como são).")
+    L.append(f"- Duração: ~{dur} s de narração (~{palavras} palavras). Idioma: {nome_idioma}. "
              f"Formato do vídeo: {cfg.get('formato') or '9:16'}.")
     if (cfg.get("tom") or "").strip():
         L.append(f"- Tom: {cfg['tom'].strip()[:400]}")
@@ -523,9 +546,16 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
     if (extra or "").strip():
         L.append(f"- Pedido extra (siga com prioridade): {extra.strip()[:1500]}")
 
+    import metodo_roteiro
+    L.append("")
+    L.append(metodo_roteiro.bloco("venda_curto" if dur <= 60 else "venda"))
+    if (cfg.get("referencia") or "").strip():
+        L.append("")
+        L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
     L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
+        "plano": metodo_roteiro.PLANO_JSON,
         "titulo_video": "título curto e chamativo",
         "gancho": "a 1ª frase do vídeo",
         "roteiro": "[M1] Primeira frase... [M3] Outra frase...",
@@ -562,14 +592,15 @@ def ler_roteiro(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     desc = str(d.get("descricao") or "").strip()
     if p.get("link"):
         desc = desc.replace("{LINK}", p["link"])
-    if "aviso_afiliado" in ((p.get("config") or {}).get("filtros") or []) and p.get("link") and "associado" not in desc.lower():
-        desc = (desc + "\n\nComo associado da Amazon, ganho com compras qualificadas.").strip()
+    if "aviso_afiliado" in ((p.get("config") or {}).get("filtros") or []) and p.get("link") and not any(a.lower()[:20] in desc.lower() for a in AVISO_AFILIADO.values()):
+        desc = (desc + "\n\n" + AVISO_AFILIADO.get(str((p.get("config") or {}).get("idioma") or "pt")[:2], AVISO_AFILIADO["en"])).strip()
     return {"titulo_video": str(d.get("titulo_video") or d.get("titulo") or "").strip()[:200],
             "gancho": str(d.get("gancho") or "").strip()[:400], "roteiro": rot, "momentos": momentos,
             "cta": str(d.get("cta") or "").strip()[:400], "descricao": desc[:5000],
             "titulos": [str(x)[:150] for x in (d.get("titulos") or []) if str(x).strip()][:10],
             "hashtags": [str(x)[:60] for x in (d.get("hashtags") or []) if str(x).strip()][:20],
-            "observacoes": str(d.get("observacoes") or "").strip()[:1500], "avisos": avisos, "gerado_em": time.time()}
+            "observacoes": str(d.get("observacoes") or "").strip()[:1500], "avisos": avisos, "gerado_em": time.time(),
+            "plano": __import__("metodo_roteiro").ler_plano(d.get("plano"))}
 
 
 def roteiro_para_voz(p: Dict[str, Any]) -> str:

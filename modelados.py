@@ -443,6 +443,8 @@ CENAS ("cenas", em ordem) — cerca de {n} cenas de ~{dc:g}s cada (uma cena nova
 - "movimento": como ANIMAR a imagem, em INGLÊS: movimento de câmera + o que se mexe na cena (curto, 1 frase), pensado pra ~{dc:g}s.{ex_mov}
 - "duracao": segundos estimados da cena.
 
+{__import__("metodo_roteiro").bloco("curto" if alvo <= 60 else "longo")}
+
 Molde que o site usa na imagem: "{estilo['prompt_imagem']}"
 Molde que o site usa na animação: "{estilo['prompt_animacao']}"
 

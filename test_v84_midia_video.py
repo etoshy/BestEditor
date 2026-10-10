@@ -113,3 +113,28 @@ def test_venda_com_video_no_prompt_e_no_editor(A, tmp_path):
         assert not [it for it in A._youtube_itens_sincronizar(job) if it.get("tipo") == "corte"]
     finally:
         vd.excluir(A.BASE_DIR, p["id"])
+
+
+def test_idioma_de_saida(A):
+    """Venda e modelo: o idioma escolhido manda em TUDO que a IA escreve; o Gerar voz já abre nele."""
+    c = A.app.test_client()
+    p = vd.criar(A.BASE_DIR, nome="x")
+    d = ds.criar(A.BASE_DIR, tema="Caso", modelo="historia")
+    try:
+        assert vd.carregar(A.BASE_DIR, p["id"])["config"]["idioma"] == "pt"
+        c.post(f"/vendas/{p['id']}/produto", json={"titulo": "Garrafa", "link": "https://www.amazon.com/dp/X"})
+        c.post(f"/vendas/{p['id']}/config", json={"idioma": "en"})
+        pr = c.post(f"/vendas/{p['id']}/prompt", json={}).get_json()["prompt"]
+        assert pr.splitlines()[1].startswith("IDIOMA DE SAÍDA: escreva TUDO em inglês — English (en)") and "Idioma: inglês" in pr
+        assert '"Hi there [chuckle], welcome back!"' in pr and "[whispering]" in pr and "[clear throat]" in pr  # tags do Turbo
+        r = c.post(f"/vendas/{p['id']}/roteiro", json={"texto": json.dumps({"roteiro": "[dramatic] Hi. [M9] Wow [laugh]!", "descricao": "Buy: {LINK}"})}).get_json()
+        assert r["voz"] == "[dramatic] Hi. Wow [laugh]!"  # as tags de voz ficam no texto narrado
+        assert "As an Amazon Associate" in r["roteiro"]["descricao"] and "associado" not in r["roteiro"]["descricao"]
+        html = c.get(f"/gerar-voz?venda={p['id']}").get_data(as_text=True)
+        assert '<option value="en" selected>' in html and '<option value="auto" selected>' not in html
+        c.post(f"/modelos-video/{d['id']}/config", json={"idioma": "es", "roteiro_base": "notas"})
+        pr = c.post(f"/modelos-video/{d['id']}/prompt", json={}).get_json()["prompt"]
+        assert "IDIOMA DE SAÍDA: escreva TUDO em espanhol" in pr and "[chuckle]" not in pr  # tags só em inglês and "cIdioma2" in c.get(f"/modelos-video/{d['id']}").get_data(as_text=True)
+    finally:
+        vd.excluir(A.BASE_DIR, p["id"])
+        ds.excluir(A.BASE_DIR, d["id"])

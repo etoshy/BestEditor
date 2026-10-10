@@ -173,3 +173,97 @@ def test_prompt_pede_fonte_ou_texto():
         ds.prompt_roteiro(p)
     p["roteiro_base"] = "minhas anotações"
     assert "minhas anotações" in ds.prompt_roteiro(p)
+
+
+# ------------------------------------------------------------------ fontes por arquivo + filtros + produto
+def _pdf_simples(caminho, paginas):
+    """PDF mínimo com texto (uma página por item de `paginas`)."""
+    objs, kids = [], []
+    objs.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    objs.append(None)  # pages, depois
+    objs.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    for txt in paginas:
+        stream = f"BT /F1 12 Tf 72 720 Td ({txt}) Tj ET".encode("latin-1")
+        objs.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+        cont = len(objs)
+        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {cont} 0 R /Resources << /Font << /F1 3 0 R >> >> >>".encode())
+        kids.append(len(objs))
+    objs[1] = f"<< /Type /Pages /Kids [{' '.join(f'{k} 0 R' for k in kids)}] /Count {len(kids)} >>".encode()
+    out, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, start=1):
+        offs.append(len(out))
+        out += f"{i} 0 obj\n".encode() + o + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode() + b"".join(f"{o:010d} 00000 n \n".encode() for o in offs)
+    out += f"trailer << /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+    open(caminho, "wb").write(out)
+
+
+def test_le_arquivos_de_fonte(tmp_path):
+    pdf = tmp_path / "livro.pdf"
+    _pdf_simples(str(pdf), ["Capitulo um: o comeco do caso.", "Pagina dois: a investigacao.", "Pagina tres: o juri."])
+    d = ds.ler_arquivo(str(pdf), "2-3")
+    assert "investigacao" in d["texto"] and "comeco" not in d["texto"] and "[pág. 2]" in d["texto"] and "usadas: 2-3" in d["site"]
+    assert "comeco" in ds.ler_arquivo(str(pdf))["texto"]
+    docx = tmp_path / "notas.docx"
+    with zipfile.ZipFile(docx, "w") as z:
+        z.writestr("word/document.xml", '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+                   '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Linha do tempo</w:t></w:r></w:p>'
+                   '<w:p><w:r><w:t>12/03: ela saiu do trabalho.</w:t></w:r></w:p></w:body></w:document>')
+    d = ds.ler_arquivo(str(docx))
+    assert d["secoes"][0]["titulo"] == "Linha do tempo" and "ela saiu" in d["texto"]
+    ep = tmp_path / "livro.epub"
+    with zipfile.ZipFile(ep, "w") as z:
+        z.writestr("OEBPS/content.opf", '<package><metadata><dc:title>O Livro do Caso</dc:title></metadata><manifest>'
+                   '<item id="c1" href="c1.xhtml"/><item id="c2" href="c2.xhtml"/></manifest><spine><itemref idref="c1"/><itemref idref="c2"/></spine></package>')
+        z.writestr("OEBPS/c1.xhtml", "<html><body><h1>Capítulo 1</h1><p>Era uma noite fria.</p></body></html>")
+        z.writestr("OEBPS/c2.xhtml", "<html><body><h1>Capítulo 2</h1><p>O detetive chegou.</p></body></html>")
+    d = ds.ler_arquivo(str(ep))
+    assert d["titulo"] == "O Livro do Caso" and d["texto"].index("noite fria") < d["texto"].index("detetive")
+    srt = tmp_path / "leg.srt"
+    srt.write_text("1\n00:00:01,000 --> 00:00:02,000\nOlá pessoal\n\n2\n00:00:02,500 --> 00:00:04,000\nhoje o caso\n", encoding="utf-8")
+    assert ds.ler_arquivo(str(srt))["texto"].split() == ["Olá", "pessoal", "hoje", "o", "caso"]
+
+
+def test_arquivo_filtros_marcas_produto_e_edicao(A, tmp_path):
+    c = A.app.test_client()
+    p = ds.criar(A.BASE_DIR, tema="O caso Y", modelo="true_crime")
+    try:
+        pdf = tmp_path / "doc.pdf"
+        _pdf_simples(str(pdf), ["Pagina um do processo.", "Pagina dois do processo."])
+        r = c.post(f"/modelos-video/{p['id']}/fonte-arquivo", data={"arquivo": (open(pdf, "rb"), "processo.pdf"), "paginas": "2"},
+                   content_type="multipart/form-data")
+        assert r.status_code == 200
+        d = _espera_fontes(c, p["id"])
+        f = d["fontes"][0]
+        assert f["estado"] == "pronta" and "dois" in f["texto"] and "um do" not in f["texto"] and f["arquivo"].endswith("processo.pdf")
+        assert c.post(f"/modelos-video/{p['id']}/fonte-arquivo", data={"arquivo": (io.BytesIO(b"x"), "a.exe")},
+                      content_type="multipart/form-data").status_code == 400
+        c.post(f"/modelos-video/{p['id']}/config", json={"sugerir_produto": True})
+        pr = c.post(f"/modelos-video/{p['id']}/prompt", json={}).get_json()["prompt"]
+        assert "(arquivo: F1_processo.pdf)" in pr and "Pagina dois do processo" in pr
+        assert "experiências e histórias pessoais deles" in pr and "[[VENDA]] = momento de anúncio" in pr and "PRODUTO SUGERIDO" in pr
+        assert '"produto_sugerido"' in pr
+        c.post(f"/modelos-video/{p['id']}/config", json={"sem_experiencias": False, "marcar_chamadas": False, "sugerir_produto": False})
+        pr2 = c.post(f"/modelos-video/{p['id']}/prompt", json={}).get_json()["prompt"]
+        assert "histórias pessoais deles" not in pr2 and "[[VENDA]] = momento" not in pr2 and "PRODUTO SUGERIDO" not in pr2
+        resp = json.dumps({"titulos": ["T"], "descricao": "D", "capitulos": [{"titulo": "A", "comeca_em": "Tudo começou"}],
+                           "roteiro": "Tudo começou numa noite.\n\n[[INSCREVA]]\n\nO processo andou.\n\n[[VENDA]]\n\nFim.",
+                           "produto_sugerido": {"nome": "Livro: O caso Y", "por_que": "aprofunda o caso", "busca": "livro caso y",
+                                                "chamada": "Quer saber tudo? O livro conta."}})
+        R = c.post(f"/modelos-video/{p['id']}/resultado", json={"texto": resp}).get_json()["projeto"]["resultado"]
+        assert R["chamadas"] == {"inscreva": 1, "venda": 1} and R["produto_sugerido"]["nome"] == "Livro: O caso Y"
+        assert "[[VENDA]]" in R["roteiro_final"]  # a marca vai pro Gerar voz (vira a pausa do vídeo de venda)
+        novo = "Tudo começou numa noite.\n\n[[VENDA]]\n\nO processo andou.\n\nFim."
+        R2 = c.post(f"/modelos-video/{p['id']}/roteiro-editado", json={"roteiro": novo}).get_json()["projeto"]["resultado"]
+        assert R2["chamadas"] == {"inscreva": 0, "venda": 1} and R2["titulos"] == ["T"] and R2["produto_sugerido"]["nome"].startswith("Livro")
+        v = c.post(f"/modelos-video/{p['id']}/produto-para-venda", json={}).get_json()
+        assert v["url"].startswith("/vendas/") and "amazon.com.br/s?k=livro+caso+y" in v["amazon"]
+        import vendas as vd
+        vp = vd.carregar(A.BASE_DIR, v["url"].split("/")[-1])
+        assert vp["produto"]["titulo"] == "Livro: O caso Y" and vp["midias"][0]["tipo"] == "texto"
+        vd.excluir(A.BASE_DIR, vp["id"])
+        c.delete(f"/modelos-video/{p['id']}/fonte/F1")
+        assert not os.listdir(os.path.join(A.BASE_DIR, "dossies", p["id"], "fontes"))
+    finally:
+        ds.excluir(A.BASE_DIR, p["id"])

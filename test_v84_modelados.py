@@ -88,6 +88,7 @@ def test_prompt_master_lista_vozes_genero_e_tags(ambiente):
     assert "ACEITA tags" in texto and "whispering" in texto
     assert "cerca de 10 cenas" in texto and "9:16" in texto and "A lenda do poço" in texto
     assert "estas vozes não têm gênero definido" in texto and "ghost" in texto
+    assert "🧭 Método de roteiro" in texto and "FORMATO CURTO" in texto  # 40 s: versão curta do método
     assert md.obter_estilo("kamishibai")["idioma"] == "English"
 
 

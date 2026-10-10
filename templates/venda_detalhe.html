@@ -101,7 +101,7 @@
   <div class="vd-row" style="margin-top:10px;">
     <label style="flex:2;min-width:240px;">Tom <span style="font-weight:400;color:#888;">(opcional)</span><input type="text" id="cTom" value="{{ p.config.tom }}" placeholder="ex.: animado e próximo, como amigo indicando"></label>
     <label style="flex:1;min-width:120px;">Duração (s)<input type="number" id="cDur" min="10" max="900" value="{{ p.config.duracao_s }}"></label>
-    <label style="flex:1;min-width:140px;">Idioma<select id="cIdioma">{% for cod, nome in idiomas %}<option value="{{ cod }}" {% if cod == p.config.idioma %}selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
+    <label style="flex:1;min-width:150px;">🌐 Idioma de saída<select id="cIdioma">{% for cod, nome in idiomas %}<option value="{{ cod }}" {% if cod == p.config.idioma %}selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
     <label style="flex:1;min-width:110px;">Formato<select id="cFormato">{% for f in ['9:16', '16:9', '1:1'] %}<option {% if f == p.config.formato %}selected{% endif %}>{{ f }}</option>{% endfor %}</select></label>
   </div>
   <div class="vd-row">
@@ -122,6 +122,10 @@
   </div>
   <label>Palavras / temas proibidos <span style="font-weight:400;color:#888;">(opcional)</span></label>
   <input type="text" id="cProib" value="{{ p.config.proibidos }}" placeholder="ex.: barato, milagre, nome da marca X">
+  <details style="margin-top:8px;"{% if p.config.referencia %} open{% endif %}>
+    <summary style="cursor:pointer;font-size:0.88rem;">📐 Estrutura de referência <span style="font-weight:400;color:#888;">(opcional — cole a transcrição de um vídeo/short que viralizou: a IA copia a ESTRUTURA — gancho, ordem das revelações, ritmo, final — com o seu tema)</span></summary>
+    <textarea id="cRef" rows="4" placeholder="Transcrição de um vídeo que viralizou no seu nicho…">{{ p.config.referencia or '' }}</textarea>
+  </details>
   <p class="vd-hint" id="cfgSt">As escolhas salvam sozinhas.</p>
 </div>
 
@@ -130,7 +134,7 @@
   <h2><span class="vd-num">4</span>Prompt pra IA → roteiro do vídeo</h2>
   <label>Pedido extra <span style="font-weight:400;color:#888;">(opcional)</span></label>
   <textarea id="extra" rows="2" placeholder="ex.: começar mostrando o problema; terminar com uma pergunta"></textarea>
-  <div class="vd-row"><button class="vd-mini" id="btnPrompt">📝 Gerar prompt</button><button class="vd-mini vd-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="vd-hint" id="promptSt"></span></div>
+  <div class="vd-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="vd-mini" id="btnPrompt">📝 Gerar prompt</button><button class="vd-mini vd-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="vd-hint" id="promptSt"></span></div>
   <textarea id="prompt" rows="6" readonly class="vd-mono" style="display:none;margin-top:6px;"></textarea>
   <label style="margin-top:10px;">Resposta da IA (JSON)</label>
   <textarea id="resp" rows="6" class="vd-mono" placeholder='{ "roteiro": "[M1] ...", "momentos": [ ... ] }'></textarea>
@@ -251,13 +255,13 @@ let tCfg = null;
 function cfgAgora() {
   return { tecnicas: [...document.querySelectorAll('.cTec')].filter(x => x.checked).map(x => x.value), filtros: [...document.querySelectorAll('.cFil')].filter(x => x.checked).map(x => x.value),
     tom: $('cTom').value, duracao_s: $('cDur').value, idioma: $('cIdioma').value, formato: $('cFormato').value, tipo_produto: $('cTipo').value,
-    link_onde: $('cLink').value, preco_modo: $('cPreco').value, apoio_criador: $('cApoio').value, oferta: $('cOferta').value, publico: $('cPublico').value, proibidos: $('cProib').value };
+    link_onde: $('cLink').value, preco_modo: $('cPreco').value, apoio_criador: $('cApoio').value, referencia: $('cRef').value, oferta: $('cOferta').value, publico: $('cPublico').value, proibidos: $('cProib').value };
 }
 function salvarCfg() {
   clearTimeout(tCfg); $('lPreco').style.display = $('lApoio').style.display = $('cTipo').value === 'gratuito' ? 'none' : '';
   tCfg = setTimeout(async () => { try { await api(`/vendas/${PID}/config`, cfgAgora()); $('cfgSt').innerHTML = '<span class="vd-ok">✔ salvo</span>'; } catch (e) { $('cfgSt').innerHTML = `<span class="vd-erro">⚠ ${esc(e.message)}</span>`; } }, 400);
 }
-document.querySelectorAll('.cTec,.cFil,#cTom,#cDur,#cIdioma,#cFormato,#cTipo,#cLink,#cPreco,#cApoio,#cOferta,#cPublico,#cProib').forEach(el => el.addEventListener(el.type === 'text' || el.type === 'number' ? 'input' : 'change', salvarCfg));
+document.querySelectorAll('.cTec,.cFil,#cTom,#cDur,#cIdioma,#cFormato,#cTipo,#cLink,#cPreco,#cApoio,#cOferta,#cPublico,#cProib,#cRef').forEach(el => el.addEventListener(el.type === 'text' || el.type === 'number' ? 'input' : 'change', salvarCfg));
 $('lPreco').style.display = $('lApoio').style.display = $('cTipo').value === 'gratuito' ? 'none' : '';
 
 // 4 · prompt → roteiro
@@ -270,6 +274,14 @@ $('btnPrompt').addEventListener('click', async () => {
   } catch (e) { $('promptSt').innerHTML = `<span class="vd-erro">⚠ ${esc(e.message)}</span>`; }
 });
 $('btnCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('prompt').value); } catch (_) { $('prompt').select(); document.execCommand('copy'); } $('promptSt').textContent = '✅ Copiado — cole no ChatGPT/Claude/Gemini e traga a resposta.'; });
+
+const ROT_PLANO = {objetivo_comum: '🎯 Objetivo comum', problema_superficie: '📌 Problema de superfície', problema_profundo: '💔 Problema profundo', publico: '👤 Público', comeco_e_fim: '🔁 Começo → fim', jornada: '🗺 Jornada', lacos_abertos: '❓ Laços abertos', notas_edicao: '🎬 Notas de edição'};
+function planoHtml(pl) {
+  if (!pl || !Object.keys(pl).length) return '';
+  const esc2 = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return `<details style="margin:10px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;"><summary style="cursor:pointer;font-weight:600;">🧭 Plano do roteiro (método)</summary>` +
+    Object.entries(ROT_PLANO).filter(([k]) => pl[k] && (!Array.isArray(pl[k]) || pl[k].length)).map(([k, n]) => `<div style="margin:6px 0;font-size:0.86rem;"><b>${n}:</b> ${Array.isArray(pl[k]) ? '<ul style="margin:2px 0 0 18px;">' + pl[k].map(x => `<li>${esc2(x)}</li>`).join('') + '</ul>' : esc2(pl[k])}</div>`).join('') + `</details>`;
+}
 function desenharRoteiro(R, voz) {
   if (!R) { $('rotBox').innerHTML = ''; return; }
   const mid = (id) => (P.midias || []).find(m => m.id === id) || {};
@@ -278,6 +290,7 @@ function desenharRoteiro(R, voz) {
     ${(R.avisos || []).map(a => `<p class="vd-erro">⚠ ${esc(a)}</p>`).join('')}
     <h3 style="margin:12px 0 4px;">🎬 ${esc(R.titulo_video || 'Roteiro')}</h3>
     ${R.gancho ? `<p class="vd-hint">Gancho: <b>${esc(R.gancho)}</b></p>` : ''}
+    ${planoHtml(R.plano)}
     <div class="vd-rot">${rot}</div>
     <div class="vd-row" style="margin-top:8px;">
       <a class="vd-mini" href="/gerar-voz?venda=${PID}" style="background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">🎙️ Gerar voz com este roteiro</a>
@@ -300,5 +313,12 @@ $('btnLerResp').addEventListener('click', async () => {
   catch (e) { $('rotBox').innerHTML = `<p class="vd-erro">⚠ ${esc(e.message)}</p>`; }
 });
 desenharRoteiro(P.roteiro, null);
+// 🌐 o idioma de saída aparece também do lado do "Gerar prompt" (os dois ficam iguais)
+(function () {
+  const a = $('cIdioma'), b = $('cIdioma2'); if (!a || !b) return;
+  b.innerHTML = a.innerHTML; b.value = a.value;
+  b.addEventListener('change', () => { a.value = b.value; a.dispatchEvent(new Event('change')); });
+  a.addEventListener('change', () => { b.value = a.value; });
+})();
 </script>
 {% endblock %}

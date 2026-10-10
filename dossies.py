@@ -30,6 +30,8 @@ import vendas as _vd  # baixar páginas/arquivos, OG
 PASTA = "dossies"
 MAX_IMAGENS_POR_FONTE = 40
 MAX_TEXTO_POR_FONTE = 40000
+MAX_TEXTO_ARQUIVO = 150000  # livros/PDFs: bem mais que uma matéria (o site avisa se o prompt ficar grande)
+EXT_ARQUIVO_FONTE = (".txt", ".md", ".pdf", ".epub", ".docx", ".srt", ".vtt", ".html", ".htm", ".rtf")
 
 MODELOS: Dict[str, Dict[str, Any]] = {
     "true_crime": {
@@ -246,8 +248,28 @@ MODELOS: Dict[str, Dict[str, Any]] = {
 
 TIPOS_MIDIA = {"foto": "🖼 Foto", "video": "🎥 Vídeo", "texto": "📝 Texto", "link": "🔗 Link/página"}
 
-CONFIG_PADRAO: Dict[str, Any] = {"modelo": "true_crime", "formato": "caso_completo", "idioma": "pt-BR", "minutos": 18,
-                                 "tom": "", "extra": "", "formato_video": "16:9"}
+CONFIG_PADRAO: Dict[str, Any] = {"modelo": "true_crime", "formato": "caso_completo", "idioma": "pt", "minutos": 18,
+                                 "tom": "", "extra": "", "formato_video": "16:9",
+                                 # 🙅 tirar experiências pessoais / citações a outros vídeos das fontes
+                                 "sem_experiencias": True,
+                                 # 📣 marcas [[INSCREVA]] / [[VENDA]] nos pontos mais oportunos (viram as pausas do Gerar voz)
+                                 "marcar_chamadas": True,
+                                 # 🛒 a IA sugere um produto adequado ao tema (aparece separado)
+                                 "sugerir_produto": False,
+                                 # 📐 transcrição de um vídeo que viralizou: a IA copia a estrutura
+                                 "referencia": ""}
+
+REGRA_SEM_PESSOAL = (
+    "CONTEÚDO DAS FONTES: muitas fontes são textos ou transcrições de OUTROS criadores. NÃO traga pro roteiro as experiências "
+    "e histórias pessoais deles (\"quando eu era criança\", \"aconteceu comigo\", \"minha mãe\", \"no meu trabalho\"), "
+    "citações a vídeos e conteúdos anteriores (\"como falei no vídeo passado\", \"no meu canal\", \"parte 2\", \"link aqui em "
+    "cima\"), menções a inscritos, lives, patrocinadores ou ao canal deles, nem detalhes muito pessoais/íntimos de alguém que "
+    "não são necessários pra contar a história. Use só os FATOS; se uma ideia importa, reescreva de forma neutra e geral.")
+REGRA_PRODUTO = (
+    "PRODUTO SUGERIDO: sugira UM produto real que combine de verdade com o tema e com o público deste vídeo (ex.: um livro sobre "
+    "o caso/assunto, um documentário, um item útil ligado ao tema — nunca algo de mau gosto em relação às vítimas). Ele "
+    "aparece SEPARADO, em \"produto_sugerido\" — NÃO fale dele no roteiro (a chamada de venda é um vídeo à parte, que entra "
+    "na marca [[VENDA]]).")
 
 
 class DossieError(Exception):
@@ -288,6 +310,8 @@ def carregar(base: str, pid: str) -> Dict[str, Any]:
     with open(_arquivo(base, pid), encoding="utf-8") as f:
         p = json.load(f)
     p["config"] = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    import idiomas
+    p["config"]["idioma"] = idiomas.normalizar(p["config"].get("idioma")) or "pt"  # "pt-BR" antigo -> "pt"
     return p
 
 
@@ -513,12 +537,16 @@ def processar_fonte(base: str, pid: str, fid: str, trava=None) -> Dict[str, Any]
             out = fn(p, f)
             salvar(base, p)
             return out
-    url = mexer(lambda p, f: (f.update(estado="lendo a matéria", erro=None), f["url"])[1])
+    url = mexer(lambda p, f: (f.update(estado="lendo", erro=None), f.get("arquivo") and ("arquivo:" + f["arquivo"]) or f["url"])[1])
     if not url:
         raise DossieError("Fonte não encontrada.")
     try:
-        html, final = _vd.baixar_html(url)
-        dados = ler_materia(html, final)
+        if url.startswith("arquivo:"):  # 📄 arquivo enviado (txt, pdf, livro…)
+            paginas = mexer(lambda p, f: f.get("paginas") or "")
+            dados = ler_arquivo(os.path.join(_pasta(base, pid), "fontes", os.path.basename(url[8:])), paginas)
+        else:
+            html, final = _vd.baixar_html(url)
+            dados = ler_materia(html, final)
     except (_vd.VendaError, DossieError) as exc:
         mexer(lambda p, f: f.update(estado="erro", erro=str(exc)))
         return {"erro": str(exc)}
@@ -558,6 +586,156 @@ def processar_fonte(base: str, pid: str, fid: str, trava=None) -> Dict[str, Any]
     return {"ok": True, "imagens": n}
 
 
+# ------------------------------------------------------------------ fontes por ARQUIVO (txt, pdf, livro…)
+def _intervalo(paginas: str, total: int) -> List[int]:
+    """"10-45, 50" -> índices (0-based) das páginas; vazio -> todas."""
+    out: List[int] = []
+    for parte in re.split(r"[,;\s]+", str(paginas or "").strip()):
+        m = re.fullmatch(r"(\d+)(?:-(\d+))?", parte)
+        if not m:
+            continue
+        a, b = int(m.group(1)), int(m.group(2) or m.group(1))
+        out.extend(range(max(1, a) - 1, min(total, max(a, b))))
+    return sorted(set(out)) or list(range(total))
+
+
+def _texto_pdf(caminho: str, paginas: str) -> Tuple[str, List[Dict[str, Any]], int]:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:
+        raise DossieError("Pra ler PDF instale o pypdf:  pip install pypdf") from exc
+    leitor = PdfReader(caminho)
+    total = len(leitor.pages)
+    secoes = []
+    for i in _intervalo(paginas, total):
+        try:
+            t = leitor.pages[i].extract_text() or ""
+        except Exception:  # noqa: BLE001
+            t = ""
+        t = re.sub(r"[ \t]+", " ", t)
+        t = re.sub(r"-\n(\w)", r"\1", t)  # palavra quebrada no fim da linha
+        t = re.sub(r"(?<![.!?:])\n(?!\n)", " ", t).strip()
+        if t:
+            secoes.append({"titulo": f"Página {i + 1}", "texto": t})
+    if not secoes:
+        raise DossieError("Não achei texto nesse PDF (pode ser só imagem escaneada — precisaria de OCR).")
+    return "\n\n".join(f"[pág. {s['titulo'].split()[-1]}] {s['texto']}" for s in secoes), secoes, total
+
+
+def _texto_epub(caminho: str) -> Tuple[str, List[Dict[str, Any]], str]:
+    import zipfile
+    from bs4 import BeautifulSoup
+    with zipfile.ZipFile(caminho) as z:
+        nomes = z.namelist()
+        cont = next((n for n in nomes if n.endswith(".opf")), None)
+        ordem, titulo = [], ""
+        if cont:
+            opf = BeautifulSoup(z.read(cont).decode("utf-8", "replace"), "html.parser")
+            t = opf.find(["dc:title", "title"])
+            titulo = t.get_text(strip=True) if t else ""
+            itens = {i.get("id"): i.get("href") for i in opf.find_all("item")}
+            raiz = os.path.dirname(cont)
+            for ref in opf.find_all("itemref"):
+                h = itens.get(ref.get("idref"))
+                if h:
+                    ordem.append(os.path.normpath(os.path.join(raiz, h)).replace("\\", "/"))
+        ordem = [n for n in ordem if n in nomes] or sorted(n for n in nomes if n.lower().endswith((".xhtml", ".html", ".htm")))
+        secoes = []
+        for n in ordem:
+            sopa = BeautifulSoup(z.read(n).decode("utf-8", "replace"), "html.parser")
+            h = sopa.find(["h1", "h2", "h3"])
+            texto = "\n".join(x.get_text(" ", strip=True) for x in sopa.find_all(["p", "blockquote", "li"]) if x.get_text(strip=True))
+            if texto:
+                secoes.append({"titulo": h.get_text(" ", strip=True)[:150] if h else "", "texto": texto})
+    return "\n\n".join(((f"## {s['titulo']}\n" if s["titulo"] else "") + s["texto"]) for s in secoes), secoes, titulo
+
+
+def _texto_docx(caminho: str) -> Tuple[str, List[Dict[str, Any]]]:
+    import zipfile
+    from xml.etree import ElementTree as ET
+    w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    with zipfile.ZipFile(caminho) as z:
+        raiz = ET.fromstring(z.read("word/document.xml"))
+    secoes: List[Dict[str, Any]] = [{"titulo": "", "texto": []}]
+    for par in raiz.iter(w + "p"):
+        txt = "".join(t.text or "" for t in par.iter(w + "t")).strip()
+        if not txt:
+            continue
+        estilo = par.find(f"{w}pPr/{w}pStyle")
+        val = (estilo.get(w + "val") if estilo is not None else "") or ""
+        if re.match(r"(Heading|Ttulo|Título|Titulo)\s*\d?", val, re.I) and len(txt) < 160:
+            secoes.append({"titulo": txt, "texto": []})
+        else:
+            secoes[-1]["texto"].append(txt)
+    secoes = [{"titulo": s["titulo"], "texto": "\n".join(s["texto"])} for s in secoes if s["texto"] or s["titulo"]]
+    return "\n\n".join(((f"## {s['titulo']}\n" if s["titulo"] else "") + s["texto"]) for s in secoes), secoes
+
+
+def _ler_texto_solto(caminho: str) -> str:
+    bruto = open(caminho, "rb").read()
+    for cod in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return bruto.decode(cod)
+        except UnicodeDecodeError:
+            continue
+    return bruto.decode("utf-8", "replace")
+
+
+def ler_arquivo(caminho: str, paginas: str = "") -> Dict[str, Any]:
+    """Texto (e seções) de um arquivo de fonte: TXT/MD, PDF (com intervalo de páginas),
+    EPUB, DOCX, SRT/VTT (sem os tempos), HTML, RTF (texto simples)."""
+    nome = os.path.basename(caminho)
+    ext = os.path.splitext(nome)[1].lower()
+    titulo, secoes, extra = os.path.splitext(nome)[0].split("_", 1)[-1], [], ""
+    if ext == ".pdf":
+        texto, secoes, total = _texto_pdf(caminho, paginas)
+        extra = f"PDF de {total} páginas" + (f", usadas: {paginas}" if paginas else "")
+    elif ext == ".epub":
+        texto, secoes, t = _texto_epub(caminho)
+        titulo = t or titulo
+        extra = f"livro (EPUB), {len(secoes)} capítulos"
+    elif ext == ".docx":
+        texto, secoes = _texto_docx(caminho)
+    elif ext in (".html", ".htm"):
+        return dict(ler_materia(_ler_texto_solto(caminho), "file:///" + nome), imagens=[])
+    else:
+        texto = _ler_texto_solto(caminho)
+        if ext in (".srt", ".vtt"):
+            texto = re.sub(r"^\s*\d+\s*$|^\s*[\d:.,]+\s*-->\s*[\d:.,]+.*$|^WEBVTT.*$", "", texto, flags=re.M)
+            texto = re.sub(r"<[^>]+>", "", texto)
+        elif ext == ".rtf":
+            texto = re.sub(r"\\[a-z]+-?\d* ?|[{}]", "", texto)
+        texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
+    if not texto.strip():
+        raise DossieError("Não achei texto nesse arquivo.")
+    cortado = len(texto) > MAX_TEXTO_ARQUIVO
+    texto = texto[:MAX_TEXTO_ARQUIVO]
+    return {"url": "", "site": extra or ext.lstrip(".").upper(), "titulo": titulo[:300],
+            "linha_fina": (f"⚠ só os primeiros {MAX_TEXTO_ARQUIVO // 1000} mil caracteres (arquivo grande — escolha as páginas)" if cortado else ""),
+            "autor": "", "data": "", "secoes": secoes[:400], "texto": texto, "imagens": [], "og": {}}
+
+
+def adicionar_fonte_arquivo(base: str, p: Dict[str, Any], nome: str, conteudo: bytes, paginas: str = "") -> Dict[str, Any]:
+    ext = os.path.splitext(nome or "")[1].lower()
+    if ext not in EXT_ARQUIVO_FONTE:
+        raise DossieError("Arquivo de fonte: " + ", ".join(EXT_ARQUIVO_FONTE) + ".")
+    usados = {x["id"] for x in p.get("fontes") or []}
+    k = 1
+    while f"F{k}" in usados:
+        k += 1
+    pasta = os.path.join(_pasta(base, p["id"]), "fontes")
+    os.makedirs(pasta, exist_ok=True)
+    seguro = re.sub(r"[^\w.\- ]+", "_", os.path.basename(nome))[:120] or f"fonte{ext}"
+    destino = os.path.join(pasta, f"F{k}_{seguro}")
+    with open(destino, "wb") as fh:
+        fh.write(conteudo)
+    f = {"id": f"F{k}", "url": "", "arquivo": os.path.basename(destino), "paginas": str(paginas or "").strip()[:60],
+         "estado": "na fila", "erro": None, "titulo": os.path.splitext(seguro)[0], "linha_fina": "", "autor": "", "data": "",
+         "site": "arquivo", "secoes": [], "texto": "", "imagens": 0, "imagens_achadas": 0, "og": {}}
+    p.setdefault("fontes", []).append(f)
+    return f
+
+
 def adicionar_fonte(p: Dict[str, Any], url: str) -> Dict[str, Any]:
     url = _vd._checar_url(url)
     if any(x["url"] == url for x in p.get("fontes") or []):
@@ -593,7 +771,15 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.append("")
     L.append(f"## Tema\n{p['tema'].strip()}")
     L.append("")
-    L.append(f"## Formato: {fmt['nome'].split(' ', 1)[1]} — ~{minutos:g} min (~{palavras} palavras), idioma {cfg.get('idioma') or 'pt-BR'}")
+    import idiomas
+    nome_idioma = idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt")
+    if (idiomas.normalizar(cfg.get("idioma")) or "pt") == "en":
+        import roteiros_yt
+        L.insert(1, roteiros_yt.regra_tags_turbo())
+    L.insert(1, f"IDIOMA DE SAÍDA: escreva TUDO em {nome_idioma} — roteiro, títulos, ideias, descrição, capítulos e tags —, "
+                "mesmo que as fontes estejam em outro idioma (traduza os fatos com fidelidade; nomes próprios, de lugares e de "
+                "obras ficam como são, com a tradução oficial quando existir).")
+    L.append(f"## Formato: {fmt['nome'].split(' ', 1)[1]} — ~{minutos:g} min (~{palavras} palavras), em {nome_idioma}")
     L.append("Estrutura (siga a ordem; cada parte pode virar um ou mais capítulos):")
     L.extend(f"{k}. {e}" for k, e in enumerate(fmt["estrutura"], start=1))
     L.append("")
@@ -603,6 +789,15 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append(f"- Tom: {cfg['tom'].strip()[:400]}")
     if (cfg.get("extra") or "").strip():
         L.append(f"- Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
+    if cfg.get("sem_experiencias", True):
+        L.append("- " + REGRA_SEM_PESSOAL)
+    if cfg.get("marcar_chamadas", True) and fmt.get("minutos", 10) > 1:
+        import roteiros_yt
+        L.append("")
+        L.append(roteiros_yt.REGRA_MARCAS)
+        L.append("")
+    if cfg.get("sugerir_produto"):
+        L.append("- " + REGRA_PRODUTO)
     if (p.get("roteiro_base") or "").strip():
         L.append("")
         L.append("## Meu roteiro / anotações (use como base, corrigindo e completando com as fontes)")
@@ -611,9 +806,9 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append("")
         L.append("## Fontes (matérias que eu salvei — cite o site quando usar um fato importante)")
         for f in fontes:
-            cab = f"### {f['id']} — {f.get('titulo') or f['url']}"
+            cab = f"### {f['id']} — {f.get('titulo') or f.get('url') or f.get('arquivo')}"
             info = " · ".join(x for x in (f.get("site"), f.get("autor"), f.get("data")) if x)
-            L.append(cab + (f"\n({info})" if info else "") + f"\n{f['url']}")
+            L.append(cab + (f"\n({info})" if info else "") + (f"\n{f['url']}" if f.get("url") else f"\n(arquivo: {f.get('arquivo')})"))
             if f.get("linha_fina"):
                 L.append(f"Linha fina: {f['linha_fina']}")
             L.append(f.get("texto") or "")
@@ -637,8 +832,15 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         if any(m["tipo"] == "video" for m in vis):
             L.append(mt.instrucao_roteiro("I7"))
     L.append("")
+    import metodo_roteiro
+    L.append(metodo_roteiro.bloco("curto" if (minutos <= 1 or cfg.get("formato") == "curto") else "longo"))
+    if (cfg.get("referencia") or "").strip():
+        L.append("")
+        L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
+    L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
+        "plano": metodo_roteiro.PLANO_JSON,
         "titulos": ["5 títulos fortes pro YouTube (até ~70 caracteres, sem mentir)"],
         "ideias": ["ideias de thumbnail / ganchos / vídeos derivados"],
         "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
@@ -648,6 +850,9 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         "tags": ["tags do YouTube"],
         "fontes_usadas": ["F1", "F2"],
         "observacoes": "pontos que eu devo conferir (fatos duvidosos, fontes que discordam)",
+        **({"produto_sugerido": {"nome": "nome do produto", "por_que": "por que combina com este vídeo e com o público",
+                                 "busca": "o que digitar na Amazon pra achar", "chamada": "2-3 frases de venda pro vídeo da [[VENDA]]"}}
+           if cfg.get("sugerir_produto") else {}),
     }, ensure_ascii=False, indent=2))
     L.append("O 1º capítulo começa no início do roteiro. 5 a 15 capítulos (Shorts: nenhum).")
     return "\n".join(L)
@@ -685,7 +890,32 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             "roteiro": rot, "roteiro_final": voz, "momentos": momentos,
             "tags": [str(x)[:60] for x in d.get("tags") or [] if str(x).strip()][:30],
             "fontes_usadas": [str(x)[:10] for x in d.get("fontes_usadas") or []][:30],
-            "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time()}
+            "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time(),
+            "produto_sugerido": _produto(d.get("produto_sugerido")),
+            "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
+            "chamadas": {"inscreva": len(re.findall(r"\[\[\s*INSCREVA", rot, re.I)), "venda": len(re.findall(r"\[\[\s*VENDA", rot, re.I))}}
+
+
+def _produto(x: Any) -> Optional[Dict[str, str]]:
+    if isinstance(x, str) and x.strip():
+        x = {"nome": x}
+    if not isinstance(x, dict) or not str(x.get("nome") or "").strip():
+        return None
+    return {k: str(x.get(k) or "").strip()[:lim] for k, lim in (("nome", 200), ("por_que", 800), ("busca", 200), ("chamada", 800))}
+
+
+def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
+    """O roteiro mexido à mão (ex.: [[VENDA]] em outro lugar): refaz a voz, os momentos e as
+    posições dos capítulos, mantendo títulos, descrição etc."""
+    import json as _json
+    res = p.get("resultado") or {}
+    if not str(novo or "").strip():
+        raise DossieError("O roteiro ficou vazio.")
+    d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano")}
+    d["capitulos"] = [{"titulo": c["titulo"], "comeca_em": c.get("comeca_em")} for c in res.get("capitulos") or []]
+    d["momentos"] = [m for m in res.get("momentos") or [] if not m.get("inicio")]
+    d["roteiro"] = novo
+    return ler_resultado(_json.dumps(d, ensure_ascii=False), p)
 
 
 def roteiro_para_voz(p: Dict[str, Any]) -> str:
@@ -700,7 +930,8 @@ def descricao_completa(p: Dict[str, Any]) -> str:
     usadas = set(res.get("fontes_usadas") or [])
     fontes = [f for f in p.get("fontes") or [] if f.get("titulo") and (not usadas or f["id"] in usadas)]
     if fontes:
-        txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']} ({f.get('site') or ''}): {f['url']}" for f in fontes)
+        txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']}" + (f" ({f.get('site') or ''}): {f['url']}" if f.get("url") else "")
+                                             for f in fontes)
     return txt.strip()
 
 

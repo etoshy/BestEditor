@@ -287,6 +287,7 @@ function desenharResultado() {
   }
   if (R && R.ads.length) h += `<h3 style="margin:14px 0 4px;">💰 Momentos pra anúncio</h3><ul class="ry-lista">${R.ads.map(a => `<li>${a.posicao != null ? `<b>${Math.round(a.posicao * 100)}%</b> do roteiro${R.minutos ? ' (~' + fmtMin(a.posicao * R.minutos) + ')' : ''} — ` : ''}depois de “…${esc(a.depois_de.slice(-80))}”${a.motivo ? ` <span style="color:#777;">· ${esc(a.motivo)}</span>` : ''}</li>`).join('')}</ul>`;
   if (R && R.ctas.length) h += `<h3 style="margin:14px 0 4px;">👍 Chamadas pra ação</h3><ul class="ry-lista">${R.ctas.map(a => `<li><b>${esc(a.tipo || 'cta')}</b>${a.posicao != null ? ` · ${Math.round(a.posicao * 100)}%` : ''}: “${esc(a.texto)}”${a.depois_de ? ` <span style="color:#777;">(depois de “…${esc(a.depois_de.slice(-60))}”)</span>` : ''}</li>`).join('')}</ul>`;
+  if (A && A.plano && Object.keys(A.plano).length) h += `<details style="margin-top:10px;"><summary style="cursor:pointer;">🧭 Plano do roteiro (método)</summary><ul class="ry-lista">${Object.entries(A.plano).map(([k, v]) => `<li><b>${esc(k.replace(/_/g, ' '))}:</b> ${esc(Array.isArray(v) ? v.join(' · ') : v)}</li>`).join('')}</ul></details>`;
   if (A && A.removidos && A.removidos.length && !R) h += `<details style="margin-top:10px;"><summary style="cursor:pointer;">✂️ O que a IA tirou/trocou (${A.removidos.length})</summary><ul class="ry-lista">${A.removidos.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>`;
   const obs = (R && R.observacoes) || (A && A.observacoes);
   if (obs) h += `<p class="ry-hint">💬 ${esc(obs)}</p>`;

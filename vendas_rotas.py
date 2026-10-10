@@ -280,7 +280,7 @@ def registrar(app, base_dir: str) -> None:
                        ("formato", {"9:16": 1, "16:9": 1, "1:1": 1}), ("apoio_criador", vd.APOIO_CRIADOR)):
             if c.get(k) in opc:
                 cfg[k] = c[k]
-        for k, lim in (("tom", 400), ("oferta", 600), ("publico", 400), ("proibidos", 600), ("idioma", 20)):
+        for k, lim in (("tom", 400), ("oferta", 600), ("publico", 400), ("proibidos", 600), ("idioma", 20), ("referencia", 12000)):
             if k in c:
                 cfg[k] = str(c.get(k) or "").strip()[:lim]
         if "duracao_s" in c:
