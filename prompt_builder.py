@@ -1711,6 +1711,12 @@ def parse_ai_response(
         cut_query = str(cut.get("query") or "").strip()
         if cut_query:
             cut_entry["query"] = cut_query
+        # vídeo do PRÓPRIO projeto (🛒 venda / 🕵️ modelo) tocado com o áudio original: o site recorta e já resolve
+        if str(cut.get("midia") or "").strip():
+            cut_entry["midia"] = str(cut["midia"]).strip()[:10]
+            for k in ("inicio", "fim"):
+                if cut.get(k) not in (None, ""):
+                    cut_entry[k] = str(cut[k]).strip()[:12]
         parsed_cutaways.append(cut_entry)
 
     try:

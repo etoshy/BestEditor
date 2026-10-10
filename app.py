@@ -521,8 +521,11 @@ def gerar_voz_page():
         gpu_diagnostico=_gpu_cache()["diag"],
         gpu_verificando=not _gpu_cache()["pronto"],
         idiomas=[(k, v[0]) for k, v in __import__("idiomas").IDIOMAS.items()],
-        texto_inicial=_texto_do_roteiro_yt(request.args.get("roteiro")),
+        texto_inicial=(_texto_do_roteiro_yt(request.args.get("roteiro")) or _texto_da_venda(request.args.get("venda"))
+                       or _texto_do_dossie(request.args.get("dossie"))),
         roteiro_id=request.args.get("roteiro") if _texto_do_roteiro_yt(request.args.get("roteiro")) else "",
+        venda_id=request.args.get("venda") if _texto_da_venda(request.args.get("venda")) else "",
+        dossie_id=request.args.get("dossie") if _texto_do_dossie(request.args.get("dossie")) else "",
     )
 
 
@@ -662,6 +665,9 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
 def _capitulos_do_roteiro(status: Dict[str, Any], audio: str, palavras: List[Dict[str, Any]], log) -> None:
     """Áudio gerado a partir do Roteiro do YouTube: põe nos capítulos da descrição o
     tempo em que cada um começa DE VERDADE no áudio."""
+    if status.get("dossie_id") and not status.get("roteiro_id"):
+        _capitulos_do_dossie(status, audio, palavras, log)
+        return
     pid = status.get("roteiro_id")
     if not pid:
         return
@@ -682,6 +688,26 @@ def _capitulos_do_roteiro(status: Dict[str, Any], audio: str, palavras: List[Dic
                 + ", ".join(f"{int(c.get('segundos_audio') or 0) // 60}:{int(c.get('segundos_audio') or 0) % 60:02d} {c['titulo']}" for c in res["capitulos"][:12]))
     except Exception as exc:  # noqa: BLE001
         log(f"(não consegui ajustar os capítulos do roteiro ao áudio: {exc})")
+
+
+def _capitulos_do_dossie(status: Dict[str, Any], audio: str, palavras: List[Dict[str, Any]], log) -> None:
+    """Áudio do 🕵️ Modelo de vídeo: capítulos da descrição com o tempo real do áudio."""
+    try:
+        import dossies
+        dur = None
+        try:
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", audio],
+                               capture_output=True, text=True, timeout=30)
+            dur = float(r.stdout.strip())
+        except Exception:  # noqa: BLE001
+            pass
+        res = dossies.aplicar_tempos_do_audio(BASE_DIR, status["dossie_id"], palavras, dur, origem=os.path.basename(audio))
+        if res and res.get("capitulos"):
+            status["capitulos"] = [{"titulo": c["titulo"], "segundos": c.get("segundos_audio")} for c in res["capitulos"]]
+            status["roteiro_descricao"] = dossies.descricao_completa(dossies.carregar(BASE_DIR, status["dossie_id"]))
+            log(f"📝 Capítulos ajustados ao áudio ({len(res['capitulos'])}).")
+    except Exception as exc:  # noqa: BLE001
+        log(f"(não consegui ajustar os capítulos ao áudio: {exc})")
 
 
 @app.route("/gerar-voz/gerar", methods=["POST"])
@@ -850,6 +876,9 @@ def gerar_voz_gerar():
         "criado_em": time.time(), "texto_inicio": " ".join(texto.split())[:90], "palavras": len(texto.split()),
         # veio do Roteiro do YouTube: no fim, os capítulos ganham o tempo REAL do áudio
         "roteiro_id": (request.form.get("roteiro_id") or "").strip() if re.fullmatch(r"[0-9a-f]{6,40}", (request.form.get("roteiro_id") or "").strip()) else None,
+        # 🛒 projeto de venda: vai no info.json do .zip — o Novo vídeo já escolhe o projeto sozinho
+        "venda_id": (request.form.get("venda_id") or "").strip() if re.fullmatch(r"[0-9a-f]{10}", (request.form.get("venda_id") or "").strip()) else None,
+        "dossie_id": (request.form.get("dossie_id") or "").strip() if re.fullmatch(r"[0-9a-f]{10}", (request.form.get("dossie_id") or "").strip()) else None,
     }
     if multivoz_on:
         import multivoz as mv
@@ -1025,7 +1054,8 @@ def gerar_voz_status(job_id: str):
             resultado["chamadas"] = [dict(c, rotulo=_chm.rotulo(c["tipo"])) for c in status["chamadas"]]
         if status.get("roteiro_descricao"):
             resultado["roteiro_descricao"] = status["roteiro_descricao"]
-            resultado["roteiro_url"] = f"/roteiros-yt/{status.get('roteiro_id')}"
+            resultado["roteiro_url"] = (f"/roteiros-yt/{status.get('roteiro_id')}" if status.get("roteiro_id")
+                                        else f"/modelos-video/{status.get('dossie_id')}")
     return jsonify({
         "running": status["running"], "log": status["log"], "erro": status["erro"],
         "pronto": status["pronto"], "resultado": resultado,
@@ -1467,7 +1497,9 @@ def gerar_voz_baixar_zip(job_id: str):
             zf.write(audio_path, arcname="narracao.wav")
             # idioma da narração: ao gerar o vídeo com este .zip, o site usa sozinho (ver _idioma_do_zip)
             zf.writestr("info.json", idiomas.info_json(status.get("idioma"), motor=status.get("engine"),
-                                                        origem_idioma=status.get("idioma_origem")))
+                                                        origem_idioma=status.get("idioma_origem"),
+                                                        **({"venda_id": status["venda_id"]} if status.get("venda_id") else {}),
+                                                        **({"dossie_id": status["dossie_id"]} if status.get("dossie_id") else {})))
             if status.get("resultado_chamadas_filename"):
                 ch_path = os.path.join(VOZES_DIR, secure_filename(status["resultado_chamadas_filename"]))
                 if os.path.exists(ch_path):
@@ -2356,6 +2388,186 @@ def _cortes_com_chamadas(job: dict, cortes: List[Dict[str, Any]]) -> List[Dict[s
     return list(cortes) + (ja or __import__("chamadas").para_cortes(job.get("chamadas")))
 
 
+# 🛒 projeto de venda e 🕵️ modelo de vídeo: mídias do próprio projeto que entram no vídeo
+# {tipo: (módulo, provider que a IA usa nos trechos, chave no job, chave no info.json, rótulo)}
+_PROJETOS_MIDIA = {
+    "venda": ("vendas", "produto", "venda_id", "🛒 projeto de venda"),
+    "dossie": ("dossies", "material", "dossie_id", "🕵️ modelo de vídeo"),
+}
+
+
+def _projeto_do_zip(zip_path: str) -> Tuple[str, str]:
+    """(tipo, id) gravado no info.json do .zip do Gerador de voz (("", "") se não tem)."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            info = next((n for n in zf.namelist() if os.path.basename(n).lower() == "info.json"), None)
+            if info:
+                d = json.loads(zf.read(info).decode("utf-8", "replace")) or {}
+                for tipo, (_m, _p, chave, _r) in _PROJETOS_MIDIA.items():
+                    vid = str(d.get(chave) or "")
+                    if re.fullmatch(r"[0-9a-f]{10}", vid):
+                        return tipo, vid
+    except (zipfile.BadZipFile, OSError, KeyError, ValueError, AttributeError):
+        pass
+    return "", ""
+
+
+def _venda_do_zip(zip_path: str) -> str:
+    tipo, vid = _projeto_do_zip(zip_path)
+    return vid if tipo == "venda" else ""
+
+
+def _projeto_do_job(job: dict):
+    """(tipo, módulo, projeto, provider) do projeto ligado ao vídeo, ou None."""
+    import importlib
+    for tipo, (mod_nome, prov, chave, _r) in _PROJETOS_MIDIA.items():
+        if job.get(chave):
+            mod = importlib.import_module(mod_nome)
+            try:
+                return tipo, mod, mod.carregar(BASE_DIR, job[chave]), prov
+            except Exception:  # noqa: BLE001
+                return None
+    return None
+
+
+def _ligar_projeto(job: dict, tipo: str, pid: str) -> bool:
+    """Liga o projeto (venda ou modelo) ao vídeo: guarda o id e põe as fotos/vídeos
+    dele na biblioteca do Estúdio (arrastáveis pra qualquer trecho)."""
+    import importlib
+    if tipo not in _PROJETOS_MIDIA:
+        return False
+    mod_nome, _prov, chave, _r = _PROJETOS_MIDIA[tipo]
+    mod = importlib.import_module(mod_nome)
+    try:
+        p = mod.carregar(BASE_DIR, pid)
+    except Exception:  # noqa: BLE001
+        return False
+    for _t, (_m, _p, ch, _r2) in _PROJETOS_MIDIA.items():
+        job.pop(ch, None)
+    job[chave] = pid
+    lib = job.setdefault("media_library", [])
+    ja = {it.get("path") for it in lib}
+    for m in mod.midias_para_editor(BASE_DIR, p):
+        if m["caminho"] in ja:
+            continue
+        lib.append({"id": "v" + uuid.uuid4().hex[:7], "filename": f"{m['id']} · {m['o_que_e'][:60]}", "path": m["caminho"],
+                    "media_type": "image" if m["tipo"] == "foto" else "video", "venda_midia": m["id"]})
+    return True
+
+
+def _ligar_venda(job: dict, venda_id: str) -> bool:
+    return _ligar_projeto(job, "venda", venda_id)
+
+
+def _com_produto(job: dict, prompt_text: str) -> str:
+    """Prompt do editor + o bloco das mídias do projeto ligado (venda ou modelo)."""
+    pj = _projeto_do_job(job)
+    if not pj:
+        return prompt_text
+    _t, mod, p, _prov = pj
+    bloco = mod.bloco_prompt_editor(BASE_DIR, p)
+    return prompt_text + ("\n" + bloco if bloco else "")
+
+
+def _provider_do_projeto(job: dict) -> List[str]:
+    for _t, (_m, prov, chave, _r) in _PROJETOS_MIDIA.items():
+        if job.get(chave):
+            return [prov]
+    return []
+
+
+def _recortar_midia(job: dict, caminho: str, ini: Optional[float], fim: Optional[float], com_audio: bool = True) -> str:
+    """Pedaço [ini, fim] (segundos do próprio vídeo) de uma mídia do projeto, num arquivo
+    do job. Sem início/fim (ou inválido): o arquivo inteiro."""
+    if ini is None and fim is None:
+        return caminho
+    try:
+        dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", caminho],
+                                   capture_output=True, text=True, timeout=30).stdout.strip() or 0)
+    except Exception:  # noqa: BLE001
+        dur = 0.0
+    ini = max(0.0, float(ini or 0))
+    fim = float(fim) if fim is not None else (dur or ini + 5)
+    if dur:
+        fim = min(fim, dur)
+    if fim - ini < 0.3:
+        return caminho
+    pasta = os.path.join(_job_dir(job["job_id"]), "midias_projeto")
+    os.makedirs(pasta, exist_ok=True)
+    dest = os.path.join(pasta, f"{os.path.splitext(os.path.basename(caminho))[0][:40]}_{ini:.1f}_{fim:.1f}{'' if com_audio else '_mudo'}.mp4")
+    if not os.path.isfile(dest):
+        cmd = ["ffmpeg", "-y", "-v", "error", "-ss", f"{ini:.3f}", "-i", caminho, "-t", f"{fim - ini:.3f}",
+               "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p"]
+        cmd += (["-c:a", "aac", "-b:a", "192k"] if com_audio else ["-an"]) + [dest]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if r.returncode != 0 or not os.path.isfile(dest):
+            return caminho
+    return dest
+
+
+def _aplicar_cortes_do_projeto(job: dict) -> int:
+    """Cortes da IA com "midia" (vídeo do projeto com o ÁUDIO ORIGINAL, a narração pausa):
+    recorta o pedaço e já deixa o corte resolvido. Devolve quantos."""
+    pj = _projeto_do_job(job)
+    if not pj:
+        return 0
+    import midia_transcricao as mt
+    _t, mod, p, _prov = pj
+    por_id = {m["id"].upper(): m for m in mod.midias_para_editor(BASE_DIR, p)}
+    n = 0
+    for c in job.get("cutaway_suggestions") or []:
+        m = por_id.get(str(c.get("midia") or "").upper())
+        if not m or c.get("resolved_path"):
+            continue
+        c["resolved_path"] = _recortar_midia(job, m["caminho"], mt.segundos(c.get("inicio")), mt.segundos(c.get("fim")))
+        c["audio_mode"] = c.get("audio_mode") or "pause"
+        c["do_projeto"] = m["id"]
+        n += 1
+    return n
+
+
+def _aplicar_produto(job: dict, segmentos: list) -> int:
+    """Trechos com provider "produto"/"material" (query = ID da mídia) viram o arquivo
+    do projeto (override local). ID desconhecido: o trecho cai pros bancos marcados
+    com a busca do "visual". Devolve quantos usaram arquivo do projeto."""
+    pj = _projeto_do_job(job)
+    if not pj:
+        return 0
+    _t, mod, p, prov_proj = pj
+    por_id = {m["id"].upper(): m for m in mod.midias_para_editor(BASE_DIR, p)}
+    reserva = next((x for x in job.get("providers") or [] if x not in ("produto", "material", "youtube", "flow", "wikipedia")), "pexels")
+    n = 0
+    for s in segmentos:
+        d = s if isinstance(s, dict) else None
+        prov = d.get("provider") if d is not None else getattr(s, "provider", None)
+        if prov not in ("produto", "material"):
+            continue
+        bruto = str((d.get("query") if d is not None else s.query) or "").strip().upper()
+        q, _, pedaco = bruto.partition("@")  # "M3@12-25": só esse pedaço do vídeo (sem o som, sob a narração)
+        q = re.sub(r"[^A-Z0-9]", "", q)
+        m = por_id.get(q)
+        if m:
+            arquivo = m["caminho"]
+            if pedaco and m["tipo"] == "video":
+                import midia_transcricao as mt
+                a_, _, b_ = pedaco.replace("–", "-").partition("-")
+                arquivo = _recortar_midia(job, arquivo, mt.segundos(a_), mt.segundos(b_), com_audio=False)
+            ov = {"source": "local_file", "value": arquivo, "kind": "image" if m["tipo"] == "foto" else "video"}
+            mt = "image" if m["tipo"] == "foto" else "video"
+            if d is not None:
+                d["override_source"], d["media_type"], d["venda_midia"] = ov, mt, m["id"]
+            else:
+                s.override_source, s.media_type = ov, mt
+            n += 1
+        else:
+            vis = (d.get("visual") if d is not None else getattr(s, "visual", None)) or ("product close up" if prov_proj == "produto" else "dark city street night")
+            if d is not None:
+                d["provider"], d["query"] = reserva, vis
+            else:
+                s.provider, s.query = reserva, vis
+    return n
+
+
 def _idioma_do_zip(zip_path: str) -> Dict[str, Any]:
     """Idioma de um .zip de narração: o `info.json` do Gerador de voz; sem ele,
     adivinha pelo texto da legenda. {"codigo", "origem"} (codigo None = não sei)."""
@@ -2495,6 +2707,16 @@ def transcribe():
         "bibliotecas": _bibliotecas_do_form(request.form, selected_providers),
         "chamadas": chamadas_do_zip,
     }
+    # 🛒 venda / 🕵️ modelo de vídeo: o escolhido aqui ("venda:ID" / "dossie:ID"), ou o que veio no
+    # info.json do .zip do Gerar voz
+    _pm = (request.form.get("projeto_midias") or "").strip()
+    _tipo, _, _pid = _pm.partition(":")
+    if not _pid and (request.form.get("venda_id") or "").strip():
+        _tipo, _pid = "venda", request.form["venda_id"].strip()
+    if not _pid and segments_do_zip is not None:
+        _tipo, _pid = _projeto_do_zip(os.path.join(job_dir, "upload.zip"))
+    if _pid:
+        _ligar_projeto(_JOBS[job_id], _tipo, _pid)
     if _formato_do_form(request.form):
         _JOBS[job_id]["orientation"] = _formato_do_form(request.form)
     perf = PerfLog(_job_dir(job_id), job_id=job_id)
@@ -2586,7 +2808,7 @@ def transcribe():
                             language_hint=_hint_idioma(_JOBS[job_id]["language"]),
                             extra_instructions=extra_instructions, usar_templates=_usa_templates_cena(),
                             mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
-                job["prompt"] = prompt_text
+                job["prompt"] = _com_produto(job, prompt_text)
                 job["status"] = "aguardando_json"
                 job["fase"] = "Pronto!"
         except TranscriptionError as exc:
@@ -2681,7 +2903,7 @@ def submit_termos_wikipedia(job_id: str):
                         extra_instructions=job["extra_instructions"],
                         wikipedia_entidades_confirmadas=confirmadas, usar_templates=_usa_templates_cena(),
                         mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
-            job["prompt"] = prompt_text
+            job["prompt"] = _com_produto(job, prompt_text)
             job["status"] = "aguardando_json"
             job["fase"] = "Pronto!"
         except Exception:  # noqa: BLE001
@@ -2758,7 +2980,7 @@ def submit_termos_buscadores(job_id: str):
                         extra_instructions=job["extra_instructions"],
                         buscadores_confirmados=confirmados, usar_templates=_usa_templates_cena(),
                         mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
-            job["prompt"] = prompt_text
+            job["prompt"] = _com_produto(job, prompt_text)
             job["status"] = "aguardando_json"
             job["fase"] = "Pronto!"
         except Exception:  # noqa: BLE001
@@ -2833,7 +3055,7 @@ def _remontar_prompt(job_id: str, job: dict) -> None:
             extra_instructions=job["extra_instructions"],
             wikipedia_entidades_confirmadas=job.get("wikipedia_entidades"), usar_templates=_usa_templates_cena(),
             mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
-    job["prompt"] = prompt_text
+    job["prompt"] = _com_produto(job, prompt_text)
     _save_state(job_id)
 
 
@@ -3231,12 +3453,13 @@ def submit_json(job_id: str):
     try:
         parsed = parse_ai_response(
             raw_json,
-            valid_providers=job["providers"],
+            valid_providers=job["providers"] + _provider_do_projeto(job),
             total_duration=job["total_duration"],
         )
     except PromptBuilderError as exc:
         return render_template("prompt.html", job=job, json_error=str(exc), previous_json=raw_json, opcoes=_opcoes_do_job(job), all_providers=DEFAULT_PROVIDERS)
 
+    _aplicar_produto(job, parsed.segments)  # 🛒 "produto" -> arquivo do projeto de venda
     job["pending_segments"] = [s.to_dict() for s in parsed.segments]
     _aplicar_mix_midia(job, parsed)
     _aplicar_padroes_biblioteca(job, parsed)
@@ -3260,6 +3483,7 @@ def submit_json(job_id: str):
         cut["id"] = uuid.uuid4().hex[:8]
         cut["resolved_path"] = None
     job["cutaway_suggestions"] = _cortes_com_chamadas(job, parsed.cutaway_suggestions)
+    _aplicar_cortes_do_projeto(job)  # 🛒/🕵️ vídeo do projeto com o áudio original: já recortado e resolvido
 
     # tudo que a IA pediu do YouTube já começa a ser pesquisado AGORA, em
     # paralelo com as prévias — quando o editor abrir, os resultados já estão lá.
@@ -3344,6 +3568,16 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 completed += 1
                 job["preview_progress"] = {"current": completed, "total": len(segments)}
 
+        # 0) 🛒 mídias do produto (projeto de venda): o arquivo já está aqui — prévia na hora
+        produto_idx = [i for i, s in enumerate(segments) if s.provider in ("produto", "material") and s.override_source]
+        for i in produto_idx:
+            _publicar(i, {
+                "index": i, "ok": True, "thumbnail_url": f"/job/{job_id}/segment-thumb/{i}", "result_url": None,
+                "label": f"{'🛒 mídia do produto' if segments[i].provider == 'produto' else '🕵️ imagem do tema'} {segments[i].query}",
+                "error": None, "video_preview_url": None,
+                "provider": segments[i].provider, "original_provider": segments[i].provider,
+            })
+
         # 1) trechos do YouTube: sem prévia automática — o vídeo e a faixa de
         #    tempo são escolhidos no painel do editor (a busca já está rodando).
         youtube_idx = [i for i, s in enumerate(segments) if s.provider == "youtube" and not s.override_source]
@@ -3394,7 +3628,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             imagem_thread.start()
 
         # 3) o resto: como sempre, em paralelo
-        especiais = set(youtube_idx) | {i for i, _s in imagem_items}
+        especiais = set(youtube_idx) | set(produto_idx) | {i for i, _s in imagem_items}
         restantes = [(i, s) for i, s in enumerate(segments) if i not in especiais]
         concurrency = max(1, min(cfg.get("preview_fetch_concurrency", 3), max(1, len(restantes))))
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -5339,7 +5573,7 @@ def _youtube_itens_sincronizar(job: dict) -> List[Dict[str, Any]]:
         novos.append(item)
 
     for cut in job.get("cutaway_suggestions") or []:
-        if cut.get("chamada"):  # chamada de inscreva-se/venda/link: o clipe é seu, não vem do YouTube
+        if cut.get("chamada") or cut.get("do_projeto"):  # clipe seu (chamada / vídeo do projeto), não vem do YouTube
             continue
         item_id = f"cut-{cut['id']}"
         termo = (cut.get("query") or cut.get("description") or "").strip()
@@ -7871,6 +8105,36 @@ import roteiros_yt_rotas  # noqa: E402
 
 roteiros_yt_rotas.registrar(app, BASE_DIR)
 
+# 🛒 Vídeo de venda (produto -> materiais -> como vender -> roteiro -> voz -> editor)
+import vendas_rotas  # noqa: E402
+
+vendas_rotas.registrar(app, BASE_DIR)
+
+# 🕵️ Modelos de vídeo (True Crime…): tema + fontes (matérias + imagens) -> roteiro -> voz -> editor
+import dossies_rotas  # noqa: E402
+
+dossies_rotas.registrar(app, BASE_DIR)
+
+
+def _texto_do_dossie(pid: Optional[str]) -> str:
+    if not pid:
+        return ""
+    import dossies
+    try:
+        return dossies.roteiro_para_voz(dossies.carregar(BASE_DIR, pid))
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _texto_da_venda(pid: Optional[str]) -> str:
+    if not pid:
+        return ""
+    import vendas
+    try:
+        return vendas.roteiro_para_voz(vendas.carregar(BASE_DIR, pid))
+    except Exception:  # noqa: BLE001
+        return ""
+
 
 def _texto_do_roteiro_yt(pid: Optional[str]) -> str:
     if not pid:
@@ -7895,6 +8159,8 @@ def _padroes_excluidos_do_reloader() -> list:
         os.path.join(BASE_DIR, "conversas"),
         os.path.join(BASE_DIR, "modelados"),
         os.path.join(BASE_DIR, "roteiros_yt"),
+        os.path.join(BASE_DIR, "vendas"),
+        os.path.join(BASE_DIR, "dossies"),
         os.path.join(BASE_DIR, "toolkit", "tts", "models"),  # inclui os perfis de voz salvos (models/perfis_de_voz)
     ]
     return [os.path.join(p, "*") for p in pastas_sem_codigo]

@@ -28,6 +28,68 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎬 6 modelos novos + vídeos transcritos que a IA corta (v84_41)
+
+- **Modelos de vídeo** novos (além do True Crime), cada um com formatos e regras próprias: 📜 História, 👤 Biografias,
+  💼 Negócios e marcas, 🌋 Desastres e tragédias, 👽 Mistérios e inexplicáveis, 🔬 Ciência e curiosidades.
+- **Vídeos dos projetos** (🛒 venda e 🕵️ modelos — do PC, de links ou das matérias) são **transcritos com os tempos**
+  em segundo plano (`midia_transcricao.py`, `<vídeo>.transcricao.json`). A transcrição aparece no cartão e vai no
+  prompt do roteiro e no do editor.
+- A IA decide como cada vídeo entra:
+  - **com o áudio original** (a narração pausa, o vídeo final fica mais longo): no roteiro `[M3 0:12-0:25 áudio]`;
+    no editor, em `cutaway_suggestions` com `"midia"`, `"inicio"`, `"fim"` — o site recorta o pedaço e o corte já
+    sai resolvido (não vai pra busca do YouTube);
+  - **sem o som, sob a narração**: no roteiro `[M3 0:12-0:25]`; no editor, `"query": "M3@12-25"` — o site recorta
+    esse pedaço (mudo) e usa no trecho.
+
+## 🕵️ Modelos de vídeo — começando pelo True Crime (v84_40)
+
+Aba nova **🕵️ Modelos de vídeo** (`dossies.py`, `dossies_rotas.py`, projetos em `dossies/`):
+
+1. **Tema e modelo** — modelo (True Crime), formato (📁 caso completo, ❓ mistério não resolvido, ⚡ Shorts,
+   🔢 lista), minutos, idioma, tom, pedido extra e um roteiro/anotações seus (opcional).
+2. **Fontes** — links de matérias de QUALQUER site (vários de uma vez). Em segundo plano o sistema salva título,
+   linha fina, autor, data, subtítulos e o texto inteiro, e **baixa todas as imagens** da matéria com a legenda
+   (figcaption/alt) e a OG; ícones e logos pequenos ficam de fora. Cada imagem vira um material `I1, I2…` ligado à
+   fonte `F1…`.
+3. **Materiais** — fotos/vídeos do PC (descrição obrigatória), links (OG) e textos (com "o que é"). Filtro por
+   fonte e apagar várias de uma vez.
+4. **Prompt → JSON** — estrutura do formato + regras do modelo (só fatos das fontes, presunção de inocência,
+   respeito às vítimas, sem detalhe gráfico, linguagem amigável à monetização, sem nome de menores) + o texto de
+   todas as fontes + a lista de imagens. A IA devolve títulos, ideias, descrição do caso, capítulos, o roteiro com
+   `[I3]` onde cada imagem entra, tags, fontes usadas e o que conferir. A descrição sai pronta: caso + `0:00`
+   capítulos + lista de fontes.
+5. **🎙️ Gerar voz** (`/gerar-voz?dossie=ID`) — os capítulos ganham o **tempo real do áudio**; o `.zip` leva o
+   projeto → **Novo vídeo** já escolhe (seletor 📦 junta 🕵️ modelos e 🛒 vendas). O prompt do editor recebe as
+   imagens do caso; trechos com `"provider": "material"` + `"query": "I4"` usam o arquivo; as imagens também ficam
+   na biblioteca do Estúdio.
+
+Vídeo de venda: nova opção **💚 comprar pelo link ajuda o criador?** (fala da comissão sem custo a mais, ou não fala).
+
+## 🛒 Vídeo de venda (v84_39)
+
+Aba nova **🛒 Vídeo de venda** (`vendas.py`, `vendas_rotas.py`, projetos em `vendas/`):
+
+1. **Produto** — link da Amazon (também `amzn.to`): título, preço, tópicos, descrição, avaliação e fotos (as fotos viram
+   materiais). Se a Amazon pedir captcha, tenta com o Chromium do Playwright; se ainda assim bloquear, preencha na mão.
+2. **Materiais** — do PC (foto/vídeo, **descrição obrigatória**), de link (página → OG: título, descrição e imagem
+   baixada; foto/vídeo direto → baixado) ou texto (com "o que é"). IDs M1, M2… e T1… Em cada um: usar a OG, a
+   descrição ou as duas.
+3. **Como vender** — técnicas (benefícios, dor→solução, percepção de valor, ancoragem, urgência, escassez, prova
+   social, autoridade, demonstração, história, objeções, garantia, comparação, bônus, curiosidade, CTA forte), tom,
+   duração, idioma, formato, pago/gratuito, onde está o link, preço (falar/só na tela/não citar), oferta real,
+   público, filtros (não parecer propaganda paga, não prometer resultado, sem pressão, sem concorrentes, aviso de
+   afiliado) e palavras proibidas. A IA é proibida de inventar dados, avaliações ou promoções.
+4. **Prompt → JSON** — roteiro narrado com marcas `[M2]` onde cada mídia entra, momentos, CTA, descrição (com o
+   link no `{LINK}`), títulos e hashtags.
+5. **🎙️ Gerar voz** (`/gerar-voz?venda=ID`, sem as marcas) → o `.zip` leva o projeto no `info.json` →
+   **Novo vídeo** já escolhe o projeto (ou escolha no seletor 🛒). O prompt do editor ganha o bloco das mídias do
+   produto; trechos com `"provider": "produto"` + `"query": "M2"` usam o arquivo do projeto (ID que não existe cai
+   pros bancos marcados). As mídias também entram na biblioteca do Estúdio. Depois, a edição com IA do Estúdio é a
+   de sempre.
+
+Também: as fontes online do Anime Pexels não entram mais como reserva de trecho de banco de estoque.
+
 ## 🌐 Anime Pexels online — duas fontes novas com chave de API (v84_38)
 
 - Fontes novas **animepexels_online** e **moviepexels_online**: o mesmo Anime Pexels em modo servidor

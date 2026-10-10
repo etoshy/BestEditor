@@ -285,7 +285,7 @@ def test_rotas(ambiente, monkeypatch):
         return "ok"
     for nome in ("gerar_voz_page", "narracoes_page", "perfis_de_voz_page", "capturar_pagina_page", "cortar_youtube_page",
                  "redes_sociais_page", "extrair_links_canal_page", "transcrever_page", "contas_google_page",
-                 "jobs_history_page", "textos_avulsos_page", "roteiros_yt_page"):
+                 "jobs_history_page", "textos_avulsos_page", "roteiros_yt_page", "vendas_page", "dossies_page"):
         app.add_url_rule("/" + nome, nome, lambda: "")
     modelados_rotas.registrar(app, str(ambiente), jobs, lambda j: None, lambda j: str(ambiente / "jobs" / j), lambda: {})
     c = app.test_client()

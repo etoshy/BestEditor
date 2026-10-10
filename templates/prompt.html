@@ -36,6 +36,20 @@
 </div>
 {% endif %}
 
+{% if job.get('dossie_id') %}
+<div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;">
+  🕵️ <strong>Modelo de vídeo ligado</strong> — as imagens do tema (com legenda/descrição e o momento sugerido) estão no fim do prompt;
+  a IA usa <code>"provider": "material"</code> com o ID (I1, I2…) e o editor põe o arquivo certo nesses trechos.
+  <a href="/modelos-video/{{ job.dossie_id }}" target="_blank">abrir o projeto</a>
+</div>
+{% endif %}
+{% if job.get('venda_id') %}
+<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;">
+  🛒 <strong>Projeto de venda ligado</strong> — as fotos e vídeos do produto (com as descrições e o momento sugerido) estão no fim do prompt;
+  a IA usa <code>"provider": "produto"</code> com o ID (M1, M2…) e o editor põe o arquivo certo nesses trechos.
+  <a href="/vendas/{{ job.venda_id }}" target="_blank">abrir o projeto</a>
+</div>
+{% endif %}
 {% for prov, inf in (job.get('bibliotecas_info') or {}).items() %}
 {% if inf.obra or inf.erro %}
 <div style="background:{{ '#fef2f2' if inf.erro or not inf.personagens else '#f5f3ff' }};border:1px solid {{ '#fecaca' if inf.erro or not inf.personagens else '#ddd6fe' }};border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;">

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Vídeo de venda{% endblock %}
+{% block content %}
+<style>
+  .vd-card input[type=url], .vd-card input[type=file] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
+  body { max-width: 1000px; }
+  .vd-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .vd-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .vd-passos span { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; }
+  .vd-proj { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .vd-tag { font-size: 0.75rem; background: #ecfdf5; color: #065f46; border-radius: 999px; padding: 2px 8px; }
+</style>
+
+<h1>🛒 Vídeo de venda</h1>
+<p style="color:#555;">Cole o link do produto (por enquanto, <b>Amazon</b>): o site pega título, preço, tópicos, descrição e as fotos. Junte
+  textos, fotos e vídeos (do PC ou de links), diga <b>o que é cada um</b>, escolha <b>como vender</b> (urgência, benefícios, percepção de
+  valor…), onde fica o link e o preço. A IA devolve o <b>roteiro narrado</b> com o momento de cada mídia. Depois: 🎙️ Gerar voz →
+  🎬 Novo vídeo escolhendo este projeto — o editor já põe as mídias do produto nos momentos certos e completa o resto.</p>
+<div class="vd-passos"><span>1 · produto</span><span>2 · materiais</span><span>3 · como vender</span><span>4 · prompt → roteiro</span><span>5 · voz → vídeo</span></div>
+
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="vd-card">
+  <h2 style="margin:0;">+ Novo projeto de venda</h2>
+  <form method="post" action="{{ url_for('vendas_novo') }}" id="formNovo">
+    <label>Link do produto <span style="font-weight:400;color:#888;">(Amazon — ou deixe vazio e preencha na mão)</span></label>
+    <input type="url" name="link" placeholder="https://www.amazon.com.br/dp/...">
+    <label>Nome do projeto <span style="font-weight:400;color:#888;">(opcional — vem do produto)</span></label>
+    <input type="text" name="nome" placeholder="ex.: Fone bluetooth - vídeo curto">
+    <button type="submit" id="btnNovo">🛒 Começar</button>
+    <span class="hint" id="novoSt" style="color:#666;font-size:0.85rem;"></span>
+  </form>
+</div>
+
+<div class="vd-card">
+  <h2 style="margin:0;">Seus projetos de venda</h2>
+  {% for p in projetos %}
+  <div class="vd-proj">
+    <div style="min-width:0;">
+      <a href="{{ url_for('venda_detalhe', pid=p.id) }}" style="font-weight:600;">{{ p.nome }}</a>
+      <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ p.midias }} materiais {% if p.tem_roteiro %}<span class="vd-tag">✔ roteiro pronto</span>{% endif %}</div>
+    </div>
+    <form method="post" action="{{ url_for('venda_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este projeto e os arquivos dele?')">
+      <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:0.8rem;">🗑</button>
+    </form>
+  </div>
+  {% else %}
+  <p style="color:#888;">Nenhum ainda.</p>
+  {% endfor %}
+</div>
+<script>
+document.getElementById('formNovo').addEventListener('submit', () => {
+  document.getElementById('btnNovo').disabled = true;
+  if (document.querySelector('#formNovo [name=link]').value) document.getElementById('novoSt').textContent = '⏳ lendo a página do produto e baixando as fotos…';
+});
+</script>
+{% endblock %}

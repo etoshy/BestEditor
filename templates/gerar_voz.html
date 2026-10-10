@@ -58,6 +58,8 @@
 <form id="form-gerar-voz" enctype="multipart/form-data" style="margin-top:20px;">
   <label>Texto a narrar</label>
   {% if roteiro_id %}<input type="hidden" name="roteiro_id" value="{{ roteiro_id }}">{% endif %}
+  {% if dossie_id %}<input type="hidden" name="dossie_id" value="{{ dossie_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#334155;">🕵️ Roteiro do modelo de vídeo — os capítulos ganham o tempo real do áudio, e o .zip leva o projeto: no <b>Novo vídeo</b> as imagens do tema entram sozinhas.</p>{% endif %}
+  {% if venda_id %}<input type="hidden" name="venda_id" value="{{ venda_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#047857;">🛒 Roteiro do projeto de venda — o .zip leva o projeto junto: no <b>Novo vídeo</b> as mídias do produto entram sozinhas.</p>{% endif %}
   <textarea name="texto" id="texto-narrar" rows="6" placeholder="Cole ou escreva aqui o texto que vai virar áudio...">{{ texto_inicial or '' }}</textarea>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:0.82rem;">
     <button type="button" id="btn-tirar-cenas" style="width:auto;padding:4px 10px;font-size:0.8rem;">🧹 Tirar marcas de cena ([CENA 3]…)</button>

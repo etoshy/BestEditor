@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block title %}Modelo de vídeo{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1150px; }
+  .ds-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+  .ds-card h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  .ds-card input[type=url], .ds-card input[type=file] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
+  .ds-num { display: inline-block; background: #334155; color: #fff; border-radius: 999px; width: 24px; height: 24px; text-align: center; line-height: 24px; font-size: 0.85rem; margin-right: 6px; }
+  .ds-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+  .ds-row > * { margin: 0; }
+  .ds-mini { width: auto; padding: 5px 12px; font-size: 0.85rem; }
+  .ds-sec { background: #6b7280; }
+  .ds-hint { color: #666; font-size: 0.82rem; margin: 4px 0; }
+  .ds-ok { color: #047857; } .ds-erro { color: #b91c1c; }
+  .ds-fonte { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: 0.85rem; }
+  .ds-fonte summary { cursor: pointer; }
+  .ds-fonte .txt { white-space: pre-wrap; max-height: 260px; overflow: auto; background: #fafafa; border-radius: 6px; padding: 6px 8px; font-size: 0.8rem; }
+  .ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 8px; }
+  .ds-m { border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px; font-size: 0.8rem; background: #fafafa; position: relative; }
+  .ds-m.falta { border-color: #f59e0b; background: #fffbeb; }
+  .ds-m .th { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; background: #e5e7eb; display: block; }
+  .ds-m .txt { height: 120px; overflow: auto; background: #fff; border-radius: 6px; padding: 6px; white-space: pre-wrap; border: 1px solid #eee; }
+  .ds-m textarea { font-size: 0.78rem; margin: 4px 0; }
+  .ds-m select { font-size: 0.76rem; padding: 3px; margin: 2px 0; }
+  .ds-m .sel { position: absolute; top: 10px; left: 10px; width: 18px; height: 18px; }
+  .ds-id { font-weight: 700; background: #334155; color: #fff; border-radius: 4px; padding: 0 6px; }
+  .ds-leg { color: #444; font-size: 0.74rem; margin: 3px 0; max-height: 46px; overflow: hidden; }
+  .ds-tabs button { width: auto; padding: 5px 12px; font-size: 0.85rem; background: #e5e7eb; color: #111; }
+  .ds-tabs button.on { background: #334155; color: #fff; }
+  .ds-mono { font-family: ui-monospace, monospace; font-size: 0.8rem; }
+  .ds-rot { white-space: pre-wrap; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; line-height: 1.6; max-height: 520px; overflow: auto; }
+  .ds-rot .mk { background: #334155; color: #fff; border-radius: 4px; padding: 0 5px; font-size: 0.78rem; font-weight: 700; }
+</style>
+
+<p><a href="{{ url_for('dossies_page') }}">← Modelos de vídeo</a></p>
+<h1 id="titulo">🕵️ {{ p.tema or 'Projeto' }}</h1>
+
+<!-- 1 · tema e modelo -->
+<div class="ds-card">
+  <h2><span class="ds-num">1</span>Tema e modelo</h2>
+  <label>Tema</label>
+  <input type="text" id="tema" value="{{ p.tema }}">
+  <div class="ds-row">
+    <label style="flex:2;min-width:200px;">Modelo<select id="cModelo">{% for k, m in modelos.items() %}<option value="{{ k }}" {% if k == p.config.modelo %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}</select></label>
+    <label style="flex:2;min-width:220px;">Formato<select id="cFormato"></select></label>
+    <label style="flex:1;min-width:100px;">Minutos<input type="number" id="cMin" min="0.5" max="120" step="0.5" value="{{ p.config.minutos }}"></label>
+    <label style="flex:1;min-width:140px;">Idioma<select id="cIdioma">{% for cod, nome in idiomas %}<option value="{{ cod }}" {% if cod == p.config.idioma %}selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
+    <label style="flex:1;min-width:100px;">Vídeo<select id="cVid">{% for f in ['16:9', '9:16', '1:1'] %}<option {% if f == p.config.formato_video %}selected{% endif %}>{{ f }}</option>{% endfor %}</select></label>
+  </div>
+  <div id="estrutura" class="ds-hint"></div>
+  <label>Tom <span style="font-weight:400;color:#888;">(opcional)</span></label>
+  <input type="text" id="cTom" value="{{ p.config.tom }}" placeholder="ex.: sóbrio e investigativo, como documentário">
+  <label>Pedido extra <span style="font-weight:400;color:#888;">(opcional)</span></label>
+  <input type="text" id="cExtra" value="{{ p.config.extra }}" placeholder="ex.: dar mais tempo pra investigação; terminar com a situação atual">
+  <label>Roteiro / anotações seus <span style="font-weight:400;color:#888;">(opcional — a IA usa como base)</span></label>
+  <textarea id="rotBase" rows="4">{{ p.roteiro_base }}</textarea>
+  <p class="ds-hint" id="cfgSt">Salva sozinho.</p>
+</div>
+
+<!-- 2 · fontes -->
+<div class="ds-card">
+  <h2><span class="ds-num">2</span>Fontes (matérias de qualquer site)</h2>
+  <p class="ds-hint">Cole um ou vários links (um por linha). De cada matéria o sistema salva título, linha fina, autor, data, subtítulos e o texto inteiro — e baixa as imagens com a legenda (elas aparecem nos materiais com o código da fonte). Ícones e logos pequenos ficam de fora.</p>
+  <textarea id="urls" rows="3" placeholder="https://...&#10;https://..."></textarea>
+  <div class="ds-row"><button class="ds-mini" id="btnFontes">➕ Adicionar fontes</button><span class="ds-hint" id="fontesSt"></span></div>
+  <div id="fontes"></div>
+</div>
+
+<!-- 3 · materiais -->
+<div class="ds-card">
+  <h2><span class="ds-num">3</span>Materiais (imagens, vídeos, textos)</h2>
+  <div class="ds-row ds-tabs" id="abasAdd">
+    <button class="on" data-a="pc">💻 Do PC</button><button data-a="url">🔗 De um link</button><button data-a="texto">📝 Texto</button>
+  </div>
+  <div id="addPc" style="margin-top:8px;">
+    <div class="ds-row">
+      <input type="file" id="arqPc" accept="image/*,video/*" style="flex:1;min-width:220px;">
+      <input type="text" id="descPc" placeholder="O que é? (obrigatório) ex.: foto da casa onde aconteceu" style="flex:2;min-width:260px;">
+      <button class="ds-mini" id="btnPc">⬆ Enviar</button>
+    </div>
+  </div>
+  <div id="addUrl" style="margin-top:8px;display:none;">
+    <div class="ds-row">
+      <input type="url" id="urlM" placeholder="link de uma foto, vídeo ou página" style="flex:2;min-width:260px;">
+      <input type="text" id="descUrl" placeholder="O que é? (opcional se a página tiver OG)" style="flex:2;min-width:220px;">
+      <button class="ds-mini" id="btnUrl">➕ Adicionar</button>
+    </div>
+  </div>
+  <div id="addTexto" style="margin-top:8px;display:none;">
+    <input type="text" id="descTx" placeholder="O que é esse texto? (obrigatório) ex.: trecho do processo, depoimento, linha do tempo">
+    <textarea id="txConteudo" rows="4" placeholder="Cole ou escreva o texto"></textarea>
+    <button class="ds-mini" id="btnTexto">➕ Adicionar texto</button>
+  </div>
+  <p class="ds-hint" id="addSt"></p>
+  <div class="ds-row">
+    <label style="font-weight:400;">Mostrar <select id="filtro" style="width:auto;"></select></label>
+    <button class="ds-mini ds-sec" id="btnApagarSel">🗑 Apagar as marcadas</button>
+    <span class="ds-hint" id="contagem"></span>
+  </div>
+  <div class="ds-grid" id="midias"></div>
+</div>
+
+<!-- 4 · prompt e resultado -->
+<div class="ds-card">
+  <h2><span class="ds-num">4</span>Prompt pra IA → roteiro</h2>
+  <div class="ds-row"><button class="ds-mini" id="btnPrompt">📝 Gerar prompt</button><button class="ds-mini ds-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="ds-hint" id="promptSt"></span></div>
+  <textarea id="prompt" rows="6" readonly class="ds-mono" style="display:none;margin-top:6px;"></textarea>
+  <label style="margin-top:10px;">Resposta da IA (JSON)</label>
+  <textarea id="resp" rows="6" class="ds-mono" placeholder='{ "titulos": [...], "capitulos": [...], "roteiro": "..." }'></textarea>
+  <button class="ds-mini" id="btnLerResp">✅ Ler resposta</button>
+  <div id="resBox"></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }};
+let P = {{ p|tojson }};
+const MODELOS = {{ modelos|tojson }};
+const ORDEM = {{ ordem|tojson }};  // ordem dos formatos (o tojson ordena as chaves)
+const TIPOS = {{ tipos|tojson }};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(url, body, method) {
+  const r = await fetch(url, { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.erro) throw new Error(d.erro || ('erro ' + r.status));
+  return d;
+}
+
+function trBloco(t) {
+  const st = t.estado === 'pronta' ? (t.sem_fala ? '🔇 sem fala' : '🎙 transcrição') : t.estado === 'erro' ? '⚠ transcrição falhou' : '⏳ transcrevendo…';
+  return `<details style="margin:3px 0;font-size:0.75rem;"><summary style="cursor:pointer;">${st}${t.duracao ? ' · ' + Math.round(t.duracao) + ' s' : ''}</summary>${t.texto ? `<div style="white-space:pre-wrap;max-height:140px;overflow:auto;background:#fff;border:1px solid #eee;border-radius:4px;padding:4px;">${esc(t.texto)}</div>` : (t.erro ? esc(t.erro) : '')}</details>`;
+}
+let tTr = null;
+function vigiarTranscricoes() {
+  clearTimeout(tTr);
+  if ((P.midias || []).some(m => m.transcricao && ['na fila', 'transcrevendo'].includes(m.transcricao.estado))) tTr = setTimeout(recarregar, 4000);
+}
+async function recarregar() { P = await api(`/modelos-video/${PID}/dados`, undefined, 'GET'); desenharFontes(); desenharMidias(); }
+
+// 1 · tema e modelo
+function opcoesFormato() {
+  const m = MODELOS[$('cModelo').value] || {}; const fs = m.formatos || {};
+  $('cFormato').innerHTML = (ORDEM[$('cModelo').value] || Object.keys(fs)).map(k => [k, fs[k]]).map(([k, f]) => `<option value="${k}" ${k === P.config.formato ? 'selected' : ''}>${esc(f.nome)} (~${f.minutos} min)</option>`).join('');
+  mostrarEstrutura();
+}
+function mostrarEstrutura() {
+  const f = ((MODELOS[$('cModelo').value] || {}).formatos || {})[$('cFormato').value];
+  $('estrutura').innerHTML = f ? 'Estrutura: ' + f.estrutura.map((e, k) => `<b>${k + 1}.</b> ${esc(e)}`).join(' · ') : '';
+}
+let tCfg = null;
+function salvarCfg(extra) {
+  clearTimeout(tCfg);
+  tCfg = setTimeout(async () => {
+    try {
+      const d = await api(`/modelos-video/${PID}/config`, Object.assign({ tema: $('tema').value, modelo: $('cModelo').value, formato: $('cFormato').value,
+        minutos: $('cMin').value, idioma: $('cIdioma').value, formato_video: $('cVid').value, tom: $('cTom').value, extra: $('cExtra').value,
+        roteiro_base: $('rotBase').value }, extra || {}));
+      P.config = d.config; $('cfgSt').innerHTML = '<span class="ds-ok">✔ salvo</span>'; $('titulo').textContent = '🕵️ ' + ($('tema').value || 'Projeto');
+    } catch (e) { $('cfgSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
+  }, 450);
+}
+$('cModelo').addEventListener('change', () => { opcoesFormato(); const f = ((MODELOS[$('cModelo').value] || {}).formatos || {})[$('cFormato').value]; if (f) $('cMin').value = f.minutos; salvarCfg(); });
+$('cFormato').addEventListener('change', () => {
+  mostrarEstrutura();
+  const f = ((MODELOS[$('cModelo').value] || {}).formatos || {})[$('cFormato').value]; if (f) $('cMin').value = f.minutos;
+  salvarCfg();
+});
+['tema', 'cMin', 'cTom', 'cExtra', 'rotBase'].forEach(id => $(id).addEventListener('input', () => salvarCfg()));
+['cIdioma', 'cVid'].forEach(id => $(id).addEventListener('change', () => salvarCfg()));
+opcoesFormato();
+
+// 2 · fontes
+let tPoll = null;
+function desenharFontes() {
+  const fs = P.fontes || [];
+  $('fontes').innerHTML = fs.length ? fs.map(f => {
+    const st = f.estado === 'pronta' ? `<span class="ds-ok">✔ ${f.imagens || 0} imagens</span>` : f.estado === 'erro' ? `<span class="ds-erro">✖ ${esc(f.erro)}</span>` : `⏳ ${esc(f.estado)}`;
+    const meta = [f.site, f.autor, f.data].filter(Boolean).map(esc).join(' · ');
+    return `<details class="ds-fonte"><summary><b>${esc(f.id)}</b> ${esc(f.titulo || f.url)} — ${st} <span style="color:#888">${meta}</span></summary>
+      <div class="ds-hint"><a href="${esc(f.url)}" target="_blank">${esc(f.url)}</a></div>
+      ${f.linha_fina ? `<p style="margin:4px 0;"><i>${esc(f.linha_fina)}</i></p>` : ''}
+      ${(f.secoes || []).filter(s => s.titulo).length ? `<div class="ds-hint">Subtítulos: ${(f.secoes || []).filter(s => s.titulo).map(s => esc(s.titulo)).join(' · ')}</div>` : ''}
+      ${f.texto ? `<div class="txt">${esc(f.texto)}</div>` : ''}
+      <div class="ds-row"><button class="ds-mini ds-sec" data-rele="${esc(f.id)}">🔄 Ler de novo</button><button class="ds-mini" style="background:#ef4444" data-tira="${esc(f.id)}">🗑 Tirar a fonte</button></div>
+    </details>`;
+  }).join('') : '<p class="ds-hint">Nenhuma fonte ainda.</p>';
+  $('fontes').querySelectorAll('[data-rele]').forEach(b => b.addEventListener('click', async () => { await api(`/modelos-video/${PID}/fonte/${b.dataset.rele}`, {}); recarregar(); }));
+  $('fontes').querySelectorAll('[data-tira]').forEach(b => b.addEventListener('click', async () => {
+    const fid = b.dataset.tira; if (!confirm(`Tirar a fonte ${fid}?`)) return;
+    const imgs = confirm(`Apagar também as imagens baixadas da ${fid}?`);
+    await api(`/modelos-video/${PID}/fonte/${fid}${imgs ? '?imagens=1' : ''}`, undefined, 'DELETE'); recarregar();
+  }));
+  clearTimeout(tPoll);
+  if (fs.some(f => f.estado !== 'pronta' && f.estado !== 'erro')) tPoll = setTimeout(recarregar, 2500);
+}
+$('btnFontes').addEventListener('click', async () => {
+  try {
+    const d = await api(`/modelos-video/${PID}/fontes`, { urls: $('urls').value });
+    $('fontesSt').innerHTML = `<span class="ds-ok">✔ ${d.novas.length} na fila</span>` + (d.erros.length ? ` <span class="ds-erro">⚠ ${esc(d.erros.join(' · '))}</span>` : '');
+    $('urls').value = ''; recarregar();
+  } catch (e) { $('fontesSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
+});
+
+// 3 · materiais
+document.querySelectorAll('#abasAdd button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#abasAdd button').forEach(x => x.classList.toggle('on', x === b));
+  $('addPc').style.display = b.dataset.a === 'pc' ? '' : 'none'; $('addUrl').style.display = b.dataset.a === 'url' ? '' : 'none'; $('addTexto').style.display = b.dataset.a === 'texto' ? '' : 'none';
+}));
+$('btnPc').addEventListener('click', async () => {
+  const f = $('arqPc').files[0], desc = $('descPc').value.trim();
+  if (!f) { $('addSt').textContent = 'Escolha o arquivo.'; return; }
+  if (!desc) { $('addSt').innerHTML = '<span class="ds-erro">Diga o que é esse arquivo antes de enviar.</span>'; $('descPc').focus(); return; }
+  const fd = new FormData(); fd.append('arquivo', f); fd.append('descricao', desc);
+  $('addSt').textContent = '⏳ enviando…';
+  const r = await fetch(`/modelos-video/${PID}/midia`, { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
+  if (!r.ok) { $('addSt').innerHTML = `<span class="ds-erro">⚠ ${esc(d.erro || r.status)}</span>`; return; }
+  $('addSt').innerHTML = `<span class="ds-ok">✔ ${esc(d.midia.id)} adicionado</span>`; $('arqPc').value = ''; $('descPc').value = ''; recarregar();
+});
+$('btnUrl').addEventListener('click', async () => {
+  $('addSt').textContent = '⏳ abrindo o link…';
+  try {
+    const d = await api(`/modelos-video/${PID}/midia-url`, { url: $('urlM').value.trim(), descricao: $('descUrl').value.trim() });
+    $('addSt').innerHTML = `<span class="ds-ok">✔ ${esc(d.midia.id)} adicionado${d.precisa_descricao ? ' — <b>descreva o que é</b> no cartão dele' : ''}</span>`;
+    $('urlM').value = ''; $('descUrl').value = ''; recarregar();
+  } catch (e) { $('addSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
+});
+$('btnTexto').addEventListener('click', async () => {
+  try {
+    const d = await api(`/modelos-video/${PID}/texto`, { conteudo: $('txConteudo').value, descricao: $('descTx').value });
+    $('addSt').innerHTML = `<span class="ds-ok">✔ ${esc(d.midia.id)} adicionado</span>`; $('txConteudo').value = ''; $('descTx').value = ''; recarregar();
+  } catch (e) { $('addSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
+});
+function desenharFiltro() {
+  const atual = $('filtro').value || 'todas';
+  const ops = [['todas', 'todas'], ['meus', 'do PC / links meus'], ['textos', 'textos']].concat((P.fontes || []).map(f => [f.id, `${f.id} — ${(f.titulo || f.url).slice(0, 40)}`]));
+  $('filtro').innerHTML = ops.map(([v, n]) => `<option value="${esc(v)}" ${v === atual ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
+$('filtro').addEventListener('change', desenharMidias);
+function desenharMidias() {
+  vigiarTranscricoes();
+  desenharFiltro();
+  const f = $('filtro').value || 'todas';
+  const ms = (P.midias || []).filter(m => f === 'todas' || (f === 'meus' && !m.fonte) || (f === 'textos' && m.tipo === 'texto') || m.fonte === f);
+  $('contagem').textContent = `${ms.length} de ${(P.midias || []).length}`;
+  const box = $('midias');
+  if (!ms.length) { box.innerHTML = '<p class="ds-hint">Nada aqui ainda. As imagens das matérias entram sozinhas quando as fontes terminam de baixar.</p>'; return; }
+  box.innerHTML = ms.map(m => {
+    const og = m.og || {};
+    const vis = m.tipo === 'texto' ? `<div class="txt">${esc(m.conteudo)}</div>`
+      : m.url_arquivo ? (m.tipo === 'video' ? `<video class="th" src="${esc(m.url_arquivo)}" muted controls preload="metadata"></video>` : `<img class="th" src="${esc(m.url_arquivo)}" loading="lazy" alt="">`)
+      : `<div class="th" style="display:flex;align-items:center;justify-content:center;color:#666;">🔗 página (sem imagem)</div>`;
+    const falta = !(m.descricao || m.og || m.legenda);
+    return `<div class="ds-m ${falta ? 'falta' : ''}" data-id="${esc(m.id)}">
+      <input type="checkbox" class="sel" title="marcar pra apagar">
+      ${vis}
+      <div style="margin-top:4px;"><span class="ds-id">${esc(m.id)}</span> ${esc(TIPOS[m.tipo] || m.tipo)}${m.fonte ? ' · ' + esc(m.fonte) : (m.origem === 'pc' ? ' · 💻' : ' · 🔗')}</div>
+      ${m.transcricao ? trBloco(m.transcricao) : ''}
+      ${m.legenda ? `<div class="ds-leg" title="${esc(m.legenda)}">📝 ${esc(m.legenda)}</div>` : ''}
+      ${!m.legenda && og.titulo ? `<div class="ds-leg">🏷 ${esc(og.titulo)}</div>` : ''}
+      <textarea rows="2" class="mDesc" placeholder="${falta ? '⚠ Diga o que é' : 'Sua descrição (opcional)'}">${esc(m.descricao || '')}</textarea>
+      ${(m.og || m.legenda) ? `<select class="mUsar"><option value="ambos" ${m.usar === 'ambos' ? 'selected' : ''}>usar legenda/OG + descrição</option><option value="og" ${m.usar === 'og' ? 'selected' : ''}>usar só legenda/OG</option><option value="descricao" ${m.usar === 'descricao' ? 'selected' : ''}>usar só a descrição</option></select>` : ''}
+      <div class="ds-row" style="margin-top:2px;"><button class="ds-mini mDel" style="padding:3px 8px;background:#ef4444;">🗑</button><span class="mSt ds-hint"></span></div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.ds-m').forEach(c => {
+    const id = c.dataset.id, st = c.querySelector('.mSt');
+    const salvar = async () => {
+      try { await api(`/modelos-video/${PID}/midia/${id}`, { descricao: c.querySelector('.mDesc').value, usar: c.querySelector('.mUsar') ? c.querySelector('.mUsar').value : undefined }); st.innerHTML = '<span class="ds-ok">✔</span>'; }
+      catch (e) { st.innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
+    };
+    c.querySelector('.mDesc').addEventListener('change', salvar);
+    if (c.querySelector('.mUsar')) c.querySelector('.mUsar').addEventListener('change', salvar);
+    c.querySelector('.mDel').addEventListener('click', async () => { await api(`/modelos-video/${PID}/midia/${id}`, undefined, 'DELETE'); recarregar(); });
+  });
+}
+$('btnApagarSel').addEventListener('click', async () => {
+  const ids = [...document.querySelectorAll('.ds-m')].filter(c => c.querySelector('.sel').checked).map(c => c.dataset.id);
+  if (!ids.length) { $('contagem').textContent = 'Marque as imagens (caixinha no canto) pra apagar.'; return; }
+  if (!confirm(`Apagar ${ids.length} materiais?`)) return;
+  await api(`/modelos-video/${PID}/apagar-midias`, { ids }); recarregar();
+});
+desenharFontes(); desenharMidias();
+
+// 4 · prompt → resultado
+$('btnPrompt').addEventListener('click', async () => {
+  try {
+    const d = await api(`/modelos-video/${PID}/prompt`, {});
+    $('prompt').value = d.prompt; $('prompt').style.display = ''; $('btnCopiar').style.display = '';
+    $('promptSt').innerHTML = `${Math.round(d.caracteres / 1000)} mil caracteres${d.aviso ? ` · <span class="ds-erro">⚠ ${esc(d.aviso)}</span>` : ''}`;
+  } catch (e) { $('promptSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
+});
+$('btnCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('prompt').value); } catch (_) { $('prompt').select(); document.execCommand('copy'); } $('promptSt').textContent = '✅ Copiado — cole numa IA com bastante contexto (ChatGPT/Claude/Gemini) e traga o JSON.'; });
+function desenharResultado() {
+  const R = P.resultado; if (!R) { $('resBox').innerHTML = ''; return; }
+  const rot = esc(R.roteiro).replace(/\[\s*([MIT]\d+[^\]]{0,30})\]/gi, '<span class="mk">$1</span>');
+  const mid = (id) => (P.midias || []).find(m => m.id === id) || {};
+  $('resBox').innerHTML = `
+    ${(R.avisos || []).map(a => `<p class="ds-erro">⚠ ${esc(a)}</p>`).join('')}
+    ${R.observacoes ? `<p style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;">🔎 <b>Conferir:</b> ${esc(R.observacoes)}</p>` : ''}
+    <h3 style="margin:12px 0 4px;">Títulos</h3><ol>${(R.titulos || []).map(t => `<li>${esc(t)}</li>`).join('')}</ol>
+    ${(R.ideias || []).length ? `<h4 style="margin:8px 0 4px;">💡 Ideias</h4><ul>${R.ideias.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+    <div class="ds-row" style="margin-top:8px;">
+      <a class="ds-mini" href="/gerar-voz?dossie=${PID}" style="background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">🎙️ Gerar voz com este roteiro</a>
+      <a class="ds-mini" href="/?dossie=${PID}" style="background:#334155;color:#fff;border-radius:6px;text-decoration:none;">🎬 Criar o vídeo com este projeto</a>
+    </div>
+    <label style="margin-top:10px;">Descrição do YouTube (caso + capítulos${R.audio ? ' com o tempo REAL do áudio' : ' estimados — depois de gerar a voz ficam exatos'} + fontes)</label>
+    <textarea id="rDesc" rows="9">${esc(P.descricao_pronta || '')}</textarea>
+    <div class="ds-row"><button class="ds-mini ds-sec" id="cpDesc">📋 Copiar descrição</button>${(R.tags || []).length ? `<button class="ds-mini ds-sec" id="cpTags">📋 Copiar tags</button>` : ''}</div>
+    <h3 style="margin:12px 0 4px;">Roteiro (${R.palavras || 0} palavras ≈ ${Math.round((R.palavras || 0) / 150)} min)</h3>
+    <div class="ds-rot">${rot}</div>
+    ${(R.momentos || []).length ? `<h4 style="margin:12px 0 4px;">Onde entra cada imagem (${R.momentos.length})</h4><div class="ds-grid">${R.momentos.map(mo => { const m = mid(mo.midia); return `<div class="ds-m">${m.url_arquivo && m.tipo === 'foto' ? `<img class="th" style="height:90px" src="${esc(m.url_arquivo)}" loading="lazy">` : ''}<span class="ds-id">${esc(mo.midia)}</span>${mo.inicio != null ? ` <b>${Math.round(mo.inicio)}–${mo.fim != null ? Math.round(mo.fim) : ''} s</b>` : ''}${mo.audio ? ' 🔊 com áudio original' : ''} “${esc(mo.trecho)}”</div>`; }).join('')}</div>` : ''}`;
+  const copiar = async (t, b) => { try { await navigator.clipboard.writeText(t); b.textContent = '✅ Copiado'; } catch (_) {} };
+  $('cpDesc').addEventListener('click', (e) => copiar($('rDesc').value, e.target));
+  if ($('cpTags')) $('cpTags').addEventListener('click', (e) => copiar((R.tags || []).join(', '), e.target));
+}
+$('btnLerResp').addEventListener('click', async () => {
+  try { const d = await api(`/modelos-video/${PID}/resultado`, { texto: $('resp').value }); P = d.projeto; desenharResultado(); }
+  catch (e) { $('resBox').innerHTML = `<p class="ds-erro">⚠ ${esc(e.message)}</p>`; }
+});
+desenharResultado();
+</script>
+{% endblock %}

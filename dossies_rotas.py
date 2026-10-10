@@ -1,0 +1,351 @@
+"""
+Rotas da aba 🕵️ Modelos de vídeo (ver dossies.py). Registradas pelo app.py com
+`registrar(app, base_dir)`.
+"""
+from __future__ import annotations
+
+import os
+import threading
+import uuid
+from typing import Any, Dict
+
+from flask import abort, jsonify, redirect, render_template, request, send_file, url_for
+from werkzeug.utils import secure_filename
+
+import dossies as ds
+import vendas as vd
+
+_TRAVA = threading.RLock()  # o projeto é mexido por rotas e pelas fontes baixando em segundo plano
+
+
+def registrar(app, base_dir: str) -> None:
+
+    def _proj(pid: str):
+        try:
+            return ds.carregar(base_dir, pid)
+        except ds.DossieError:
+            return None
+
+    def _json_proj(p: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(p)
+        import midia_transcricao as mt
+        out["midias"] = []
+        for m in p.get("midias") or []:
+            cam = ds.caminho_midia(base_dir, p, m)
+            item = dict(m, url_arquivo=(f"/modelos-video/{p['id']}/arquivo/{m['id']}" if cam else ""))
+            if cam and mt.eh_video(cam):
+                mt.agendar(cam)  # sem transcrição ainda (ou interrompida): faz em segundo plano
+                item["transcricao"] = mt.resumo(cam)
+            out["midias"].append(item)
+        if p.get("resultado"):
+            out["descricao_pronta"] = ds.descricao_completa(p)
+        return out
+
+    @app.context_processor
+    def _dossies_no_template():
+        return {"dossies_lista": lambda: ds.listar(base_dir)}
+
+    @app.route("/modelos-video")
+    def dossies_page():
+        return render_template("dossies.html", projetos=ds.listar(base_dir), modelos=ds.MODELOS, erro=request.args.get("erro"))
+
+    @app.route("/modelos-video/novo", methods=["POST"])
+    def dossies_novo():
+        tema = (request.form.get("tema") or "").strip()
+        if not tema:
+            return redirect(url_for("dossies_page", erro="Escreva o tema do vídeo."))
+        with _TRAVA:
+            p = ds.criar(base_dir, tema=tema, modelo=request.form.get("modelo") or "true_crime")
+            urls = [u.strip() for u in (request.form.get("fontes") or "").split("\n") if u.strip()]
+            novas = []
+            for u in urls[:30]:
+                try:
+                    novas.append(ds.adicionar_fonte(p, u)["id"])
+                except (ds.DossieError, vd.VendaError):
+                    continue
+            ds.salvar(base_dir, p)
+        for fid in novas:
+            _processar(p["id"], fid)
+        return redirect(url_for("dossie_detalhe", pid=p["id"]))
+
+    _fila = threading.Semaphore(2)  # até 2 matérias baixando ao mesmo tempo
+
+    def _processar(pid: str, fid: str) -> None:
+        def rodar():
+            with _fila:
+                try:
+                    ds.processar_fonte(base_dir, pid, fid, _TRAVA)
+                except Exception as exc:  # noqa: BLE001
+                    with _TRAVA:
+                        p = _proj(pid)
+                        f = next((x for x in (p or {}).get("fontes") or [] if x["id"] == fid), None)
+                        if f is not None:
+                            f.update(estado="erro", erro=f"Erro inesperado: {exc}")
+                            ds.salvar(base_dir, p)
+        threading.Thread(target=rodar, daemon=True).start()
+
+    @app.route("/modelos-video/<pid>")
+    def dossie_detalhe(pid: str):
+        p = _proj(pid)
+        if not p:
+            return redirect(url_for("dossies_page", erro="Projeto não encontrado."))
+        import idiomas
+        return render_template("dossie_detalhe.html", p=_json_proj(p), modelos=ds.MODELOS, tipos=ds.TIPOS_MIDIA,
+                               ordem={k: list(m["formatos"]) for k, m in ds.MODELOS.items()},
+                               idiomas=[(k, v[0]) for k, v in idiomas.IDIOMAS.items()])
+
+    @app.route("/modelos-video/<pid>/dados")
+    def dossie_dados(pid: str):
+        p = _proj(pid)
+        return jsonify(_json_proj(p)) if p else (jsonify({"erro": "Projeto não encontrado."}), 404)
+
+    @app.route("/modelos-video/<pid>/config", methods=["POST"])
+    def dossie_config(pid: str):
+        c = request.get_json(silent=True) or {}
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            cfg = p["config"]
+            if c.get("modelo") in ds.MODELOS:
+                cfg["modelo"] = c["modelo"]
+            fmts = ds.MODELOS[cfg["modelo"]]["formatos"]
+            if c.get("formato") in fmts:
+                cfg["formato"] = c["formato"]
+            elif cfg.get("formato") not in fmts:
+                cfg["formato"] = next(iter(fmts))
+            if c.get("formato_video") in ("16:9", "9:16", "1:1"):
+                cfg["formato_video"] = c["formato_video"]
+            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20)):
+                if k in c:
+                    cfg[k] = str(c.get(k) or "").strip()[:lim]
+            if "minutos" in c:
+                try:
+                    cfg["minutos"] = max(0.5, min(120.0, float(c["minutos"])))
+                except (TypeError, ValueError):
+                    pass
+            if "tema" in c:
+                p["tema"] = str(c.get("tema") or "").strip()[:300]
+            if "roteiro_base" in c:
+                p["roteiro_base"] = str(c.get("roteiro_base") or "")[:60000]
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "config": cfg})
+
+    @app.route("/modelos-video/<pid>/fontes", methods=["POST"])
+    def dossie_fontes(pid: str):
+        """Um ou vários links (um por linha) de matérias — cada um é lido e tem as imagens baixadas em segundo plano."""
+        c = request.get_json(silent=True) or {}
+        urls = [u.strip() for u in str(c.get("urls") or "").split("\n") if u.strip()]
+        if not urls:
+            return jsonify({"erro": "Cole pelo menos um link."}), 400
+        novas, erros = [], []
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            for u in urls[:30]:
+                try:
+                    novas.append(ds.adicionar_fonte(p, u)["id"])
+                except (ds.DossieError, vd.VendaError) as exc:
+                    erros.append(f"{u[:60]}: {exc}")
+            ds.salvar(base_dir, p)
+        for fid in novas:
+            _processar(pid, fid)
+        return jsonify({"ok": bool(novas), "novas": novas, "erros": erros})
+
+    @app.route("/modelos-video/<pid>/fonte/<fid>", methods=["POST", "DELETE"])
+    def dossie_fonte(pid: str, fid: str):
+        with _TRAVA:
+            p = _proj(pid)
+            f = next((x for x in (p or {}).get("fontes") or [] if x["id"] == fid), None)
+            if not f:
+                return jsonify({"erro": "Fonte não encontrada."}), 404
+            if request.method == "DELETE":
+                apagar_imgs = (request.args.get("imagens") == "1")
+                p["fontes"] = [x for x in p["fontes"] if x is not f]
+                if apagar_imgs:
+                    for m in [m for m in p["midias"] if m.get("fonte") == fid]:
+                        cam = ds.caminho_midia(base_dir, p, m)
+                        if cam:
+                            try:
+                                os.remove(cam)
+                            except OSError:
+                                pass
+                    p["midias"] = [m for m in p["midias"] if m.get("fonte") != fid]
+                ds.salvar(base_dir, p)
+                return jsonify({"ok": True})
+            f.update(estado="na fila", erro=None)
+            ds.salvar(base_dir, p)
+        _processar(pid, fid)  # ler de novo
+        return jsonify({"ok": True})
+
+    @app.route("/modelos-video/<pid>/midia", methods=["POST"])
+    def dossie_midia_pc(pid: str):
+        arq = request.files.get("arquivo")
+        desc = (request.form.get("descricao") or "").strip()
+        if not arq or not arq.filename:
+            return jsonify({"erro": "Escolha o arquivo."}), 400
+        if not desc:
+            return jsonify({"erro": "Diga o que é esse arquivo (ex.: \"foto da casa onde o crime aconteceu\")."}), 400
+        tipo = vd.tipo_do_arquivo(arq.filename)
+        if not tipo:
+            return jsonify({"erro": "Só fotos (jpg, png, webp…) e vídeos (mp4, mov, webm…)."}), 400
+        os.makedirs(ds.pasta_midias(base_dir, pid), exist_ok=True)
+        dest = os.path.join(ds.pasta_midias(base_dir, pid), f"pc_{uuid.uuid4().hex[:6]}_{secure_filename(arq.filename) or 'arquivo'}")
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            arq.save(dest)
+            m = ds.adicionar_midia(p, tipo=tipo, origem="pc", arquivo=os.path.basename(dest), nome=arq.filename, descricao=desc, usar="descricao")
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "midia": m})
+
+    @app.route("/modelos-video/<pid>/midia-url", methods=["POST"])
+    def dossie_midia_url(pid: str):
+        """Link de foto/vídeo (baixa) ou de página (OG + imagem da página)."""
+        c = request.get_json(silent=True) or {}
+        url, desc = str(c.get("url") or "").strip(), str(c.get("descricao") or "").strip()
+        if not url.lower().startswith(("http://", "https://")):
+            return jsonify({"erro": "Cole um link que comece com http:// ou https://."}), 400
+        pasta, nome_base = ds.pasta_midias(base_dir, pid), f"url_{uuid.uuid4().hex[:6]}"
+        og, arquivo, tipo = None, "", "link"
+        if vd.tipo_do_arquivo(url.split("?")[0]):
+            try:
+                cam, tipo = vd.baixar_arquivo(url, pasta, nome_base)
+                arquivo = os.path.basename(cam)
+            except vd.VendaError as exc:
+                return jsonify({"erro": str(exc)}), 502
+        else:
+            try:
+                html, final = vd.baixar_html(url, navegador=False)
+                og = vd.ler_og(html, final)
+            except vd.VendaError:
+                if not desc:
+                    return jsonify({"erro": "Não consegui abrir esse link. Descreva o que ele é pra usar mesmo assim."}), 502
+            for u in ((og or {}).get("video"), (og or {}).get("imagem")):
+                if not u:
+                    continue
+                try:
+                    cam, tipo = vd.baixar_arquivo(u, pasta, nome_base)
+                    arquivo = os.path.basename(cam)
+                    break
+                except vd.VendaError:
+                    continue
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            m = ds.adicionar_midia(p, tipo=tipo if arquivo else "link", origem="url", url=url, arquivo=arquivo,
+                                   nome=(og or {}).get("titulo") or url[-80:],
+                                   og={"titulo": og.get("titulo"), "descricao": og.get("descricao")} if og and (og.get("titulo") or og.get("descricao")) else None,
+                                   descricao=desc, usar=c.get("usar"))
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "midia": m, "precisa_descricao": not (m.get("descricao") or m.get("og"))})
+
+    @app.route("/modelos-video/<pid>/texto", methods=["POST"])
+    def dossie_texto(pid: str):
+        c = request.get_json(silent=True) or {}
+        conteudo, desc = str(c.get("conteudo") or "").strip(), str(c.get("descricao") or "").strip()
+        if not conteudo:
+            return jsonify({"erro": "Escreva o texto."}), 400
+        if not desc:
+            return jsonify({"erro": "Diga o que é esse texto (ex.: \"trecho do processo\", \"depoimento\", \"linha do tempo\")."}), 400
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            m = ds.adicionar_midia(p, tipo="texto", origem="pc", conteudo=conteudo, descricao=desc, usar="descricao")
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "midia": m})
+
+    @app.route("/modelos-video/<pid>/midia/<mid>", methods=["POST", "DELETE"])
+    def dossie_midia_editar(pid: str, mid: str):
+        with _TRAVA:
+            p = _proj(pid)
+            m = ds.midia(p, mid) if p else None
+            if not m:
+                return jsonify({"erro": "Mídia não encontrada."}), 404
+            if request.method == "DELETE":
+                cam = ds.caminho_midia(base_dir, p, m)
+                p["midias"] = [x for x in p["midias"] if x is not m]
+                if cam:
+                    try:
+                        os.remove(cam)
+                    except OSError:
+                        pass
+            else:
+                c = request.get_json(silent=True) or {}
+                if "descricao" in c:
+                    m["descricao"] = str(c.get("descricao") or "").strip()[:2000]
+                if "conteudo" in c and m["tipo"] == "texto":
+                    m["conteudo"] = str(c.get("conteudo") or "").strip()[:12000]
+                if c.get("usar") in ("og", "descricao", "ambos"):
+                    m["usar"] = c["usar"]
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True})
+
+    @app.route("/modelos-video/<pid>/apagar-midias", methods=["POST"])
+    def dossie_apagar_varias(pid: str):
+        ids = {str(x).upper() for x in (request.get_json(silent=True) or {}).get("ids") or []}
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            for m in [m for m in p["midias"] if m["id"].upper() in ids]:
+                cam = ds.caminho_midia(base_dir, p, m)
+                if cam:
+                    try:
+                        os.remove(cam)
+                    except OSError:
+                        pass
+            p["midias"] = [m for m in p["midias"] if m["id"].upper() not in ids]
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True})
+
+    @app.route("/modelos-video/<pid>/arquivo/<mid>")
+    def dossie_arquivo(pid: str, mid: str):
+        p = _proj(pid)
+        cam = ds.caminho_midia(base_dir, p, ds.midia(p, mid)) if p else None
+        if not cam:
+            abort(404)
+        return send_file(cam, conditional=True)
+
+    @app.route("/modelos-video/<pid>/prompt", methods=["POST"])
+    def dossie_prompt(pid: str):
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            texto = ds.prompt_roteiro(p, base=base_dir)
+        except ds.DossieError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        pend = [f["id"] for f in p.get("fontes") or [] if f.get("estado") not in ("pronta", "erro")]
+        sem = [m["id"] for m in p.get("midias") or [] if not (m.get("descricao") or m.get("og") or m.get("legenda"))]
+        avisos = []
+        if pend:
+            avisos.append("Ainda baixando: " + ", ".join(pend) + " (gere de novo quando terminar).")
+        if sem:
+            avisos.append("Sem descrição: " + ", ".join(sem[:20]) + ".")
+        if len(texto) > 180000:
+            avisos.append(f"Prompt grande ({len(texto) // 1000} mil caracteres) — algumas IAs cortam; tire fontes repetidas se precisar.")
+        return jsonify({"ok": True, "prompt": texto, "caracteres": len(texto), "aviso": " ".join(avisos)})
+
+    @app.route("/modelos-video/<pid>/resultado", methods=["POST"])
+    def dossie_resultado(pid: str):
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            try:
+                p["resultado"] = ds.ler_resultado(str((request.get_json(silent=True) or {}).get("texto") or ""), p)
+            except ds.DossieError as exc:
+                return jsonify({"erro": str(exc)}), 400
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/excluir", methods=["POST"])
+    def dossie_excluir(pid: str):
+        with _TRAVA:
+            ds.excluir(base_dir, pid)
+        return redirect(url_for("dossies_page"))

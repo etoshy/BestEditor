@@ -239,7 +239,12 @@ def _sem_flow_no_fallback(provider_priority: List[str], provider_do_trecho: str)
     """Bancos reserva de um trecho de vídeo: a prioridade sem o próprio banco do
     trecho e SEM o "flow" (gerar vídeo com IA leva minutos e gasta créditos —
     só quando o trecho pediu "flow" de propósito)."""
-    return [p for p in (provider_priority or []) if p != provider_do_trecho and p != "flow"]
+    # acervos ONLINE (anime/filmes com chave) não entram de reserva pra um trecho de banco de
+    # estoque — senão uma cena de anime aparecia num vídeo que não é de anime só porque o
+    # Pexels falhou. Entre acervos (local <-> online) continua valendo.
+    acervo = provider_do_trecho in BIBLIOTECAS_LOCAIS
+    return [p for p in (provider_priority or []) if p != provider_do_trecho and p != "flow"
+            and (acervo or not p.endswith("_online"))]
 
 
 def _provider_timeout_seconds(cfg: Dict[str, Any], provider: str) -> float:
@@ -2454,6 +2459,10 @@ class ClientFactory:
                 "'wikipedia' só busca FOTOS (media_type='image') — não tem busca de vídeo. "
                 "Um segmento com provider='wikipedia' precisa também ter media_type='image'."
             )
+        if provider in ("produto", "material"):
+            # 🛒 mídia do projeto de venda: o trecho usa o arquivo do projeto (override); sem ele não tem o que buscar
+            raise VideoAssemblyError("'produto' é uma mídia do projeto de venda — esse trecho perdeu o arquivo; "
+                                     "escolha outra mídia na biblioteca do Estúdio.")
         if provider in BIBLIOTECAS_LOCAIS:
             # banco LOCAL (roda na própria máquina do usuário) — sempre
             # o mesmo cliente HTTP simples, nunca navegador, nunca

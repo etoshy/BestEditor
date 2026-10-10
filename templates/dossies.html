@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Modelos de vídeo{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1000px; }
+  .ds-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .ds-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .ds-passos span { background: #f1f5f9; border: 1px solid #cbd5e1; color: #1e293b; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; }
+  .ds-proj { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .ds-tag { font-size: 0.75rem; background: #f1f5f9; color: #1e293b; border-radius: 999px; padding: 2px 8px; }
+</style>
+
+<h1>🕵️ Modelos de vídeo</h1>
+<p style="color:#555;">Escolha um modelo — <b>True Crime, História, Biografias, Negócios e marcas, Desastres, Mistérios, Ciência</b> —, o <b>tema</b> e cole os <b>links das matérias</b> — de qualquer site.
+  O sistema salva título, subtítulos e o texto inteiro de cada uma e <b>baixa todas as imagens</b> com a legenda e a OG. Junte também
+  fotos, vídeos e textos seus. Sai um prompt no formato do modelo; a IA devolve títulos, ideias, descrição do caso, capítulos e o
+  roteiro completo. Depois: 🎙️ Gerar voz → 🎬 Novo vídeo escolhendo este projeto (as imagens do tema entram nos momentos certos).</p>
+<div class="ds-passos"><span>1 · tema e modelo</span><span>2 · fontes (matérias)</span><span>3 · materiais</span><span>4 · prompt → roteiro</span><span>5 · voz → vídeo</span></div>
+
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="ds-card">
+  <h2 style="margin:0;">+ Novo projeto</h2>
+  <form method="post" action="{{ url_for('dossies_novo') }}" id="formNovo">
+    <label>Modelo</label>
+    <select name="modelo">{% for k, m in modelos.items() %}<option value="{{ k }}">{{ m.nome }} — {{ m.descricao }}</option>{% endfor %}</select>
+    <label>Tema do vídeo</label>
+    <input type="text" name="tema" required placeholder="ex.: O caso Isabella Nardoni / O desaparecimento de ...">
+    <label>Links das matérias <span style="font-weight:400;color:#888;">(opcional agora — um por linha)</span></label>
+    <textarea name="fontes" rows="4" placeholder="https://g1.globo.com/...&#10;https://www.bbc.com/portuguese/..."></textarea>
+    <button type="submit" id="btnNovo">🕵️ Começar</button>
+  </form>
+</div>
+
+<div class="ds-card">
+  <h2 style="margin:0;">Seus projetos</h2>
+  {% for p in projetos %}
+  <div class="ds-proj">
+    <div style="min-width:0;">
+      <a href="{{ url_for('dossie_detalhe', pid=p.id) }}" style="font-weight:600;">{{ p.nome }}</a>
+      <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ p.modelo }} · {{ p.fontes }} fontes · {{ p.midias }} materiais {% if p.tem_roteiro %}<span class="ds-tag">✔ roteiro pronto</span>{% endif %}</div>
+    </div>
+    <form method="post" action="{{ url_for('dossie_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este projeto e TODAS as imagens baixadas?')">
+      <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:0.8rem;">🗑</button>
+    </form>
+  </div>
+  {% else %}
+  <p style="color:#888;">Nenhum ainda.</p>
+  {% endfor %}
+</div>
+<script>document.getElementById('formNovo').addEventListener('submit', () => { document.getElementById('btnNovo').disabled = true; });</script>
+{% endblock %}

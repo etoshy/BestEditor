@@ -1,0 +1,753 @@
+"""
+🕵️ Modelos de vídeo — começa pelo TRUE CRIME.
+
+A pessoa dá um TEMA (o caso), um roteiro opcional e junta materiais:
+  - fontes: links de matérias de QUALQUER site. O sistema salva título,
+    linha fina, autor, data, subtítulos e o texto inteiro (por seção), e
+    baixa TODAS as imagens da matéria com a legenda/alt e a OG da página;
+  - fotos, vídeos e textos do PC (dizendo o que é cada um) ou de links (OG).
+Tudo vira um prompt no FORMATO do modelo (ex.: caso completo, mistério não
+resolvido, Shorts). A IA devolve um JSON com títulos, ideias, descrição do
+caso, capítulos, o roteiro completo (marcas [I3] onde cada imagem entra) e
+tags. Depois: Gerar voz (os capítulos ganham o tempo real do áudio) e Novo
+vídeo escolhendo o projeto — o editor recebe as imagens (provider
+"material", query = ID) e põe nos momentos certos.
+
+Projetos em <base>/dossies/<id>/projeto.json, arquivos em .../midias/.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+import uuid
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urljoin, urlparse
+
+import vendas as _vd  # baixar páginas/arquivos, OG
+
+PASTA = "dossies"
+MAX_IMAGENS_POR_FONTE = 40
+MAX_TEXTO_POR_FONTE = 40000
+
+MODELOS: Dict[str, Dict[str, Any]] = {
+    "true_crime": {
+        "nome": "🕵️ True Crime",
+        "descricao": "Casos criminais reais contados como documentário: fatos, linha do tempo, investigação, julgamento.",
+        "formatos": {
+            "caso_completo": {
+                "nome": "📁 Caso completo (cronológico)", "minutos": 18,
+                "estrutura": [
+                    "GANCHO (0-30 s): o momento mais intrigante do caso, sem entregar o desfecho; termine com uma pergunta",
+                    "Apresentação da(s) vítima(s) como pessoas — quem eram, família, sonhos (com respeito)",
+                    "Contexto: lugar, época, o dia em que tudo aconteceu",
+                    "O crime / o desaparecimento: os fatos, na ordem, sem detalhe gráfico",
+                    "A investigação: pistas, suspeitos, reviravoltas, erros e acertos da polícia",
+                    "Prisão, julgamento e sentença (ou onde o caso parou)",
+                    "Desdobramentos: o que aconteceu depois, como está hoje",
+                    "Fechamento: reflexão respeitosa + pergunta pro público comentar",
+                ],
+            },
+            "misterio": {
+                "nome": "❓ Mistério não resolvido", "minutos": 15,
+                "estrutura": [
+                    "GANCHO: o detalhe mais estranho do caso",
+                    "Quem era a pessoa / o que se sabe com certeza",
+                    "Linha do tempo das últimas horas / dos fatos conhecidos",
+                    "As pistas e as perguntas sem resposta",
+                    "As teorias (cada uma com o que a sustenta e o que a enfraquece) — SEM acusar ninguém",
+                    "Onde o caso está hoje",
+                    "Fechamento: o que você acha? (pergunta pro público)",
+                ],
+            },
+            "curto": {
+                "nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1,
+                "estrutura": [
+                    "Gancho na 1ª frase (o fato mais chocante, sem detalhe gráfico)",
+                    "3-5 fatos-chave em frases curtas",
+                    "Reviravolta ou desfecho",
+                    "Chamada: 'o caso completo está no canal' ou uma pergunta",
+                ],
+            },
+            "lista": {
+                "nome": "🔢 Lista de casos (top N)", "minutos": 15,
+                "estrutura": [
+                    "Gancho: o que une os casos da lista",
+                    "Cada caso: quem, o que aconteceu, a reviravolta, como terminou (2-4 min cada)",
+                    "Do menos ao mais impactante",
+                    "Fechamento: qual caso mais te marcou?",
+                ],
+            },
+        },
+        "regras": [
+            "Só FATOS que estão nas fontes abaixo. Não invente nomes, datas, falas, provas, números nem cenas. Se as fontes "
+            "discordam, diga que discordam. O que for suposição, deixe claro que é suposição.",
+            "Presunção de inocência: quem não foi condenado é 'suspeito', 'acusado', 'investigado'. Nunca afirme culpa sem condenação.",
+            "Respeito às vítimas e às famílias: sem sensacionalismo, sem detalhe gráfico de violência, sem glamourizar o criminoso.",
+            "Linguagem amigável à monetização do YouTube: evite descrições explícitas; prefira 'tirou a vida', 'foi encontrada sem vida', "
+            "'violência', em vez de detalhes crus.",
+            "Narração de documentário: frases claras, ritmo de suspense, ganchos no fim de cada capítulo pra segurar até o próximo.",
+            "Nomes de menores de idade envolvidos: não cite (diga 'uma criança de 9 anos', por exemplo).",
+        ],
+    },
+    "historia": {
+        "nome": "📜 História",
+        "descricao": "Fatos e mistérios históricos contados como documentário — guerras, impérios, eventos que mudaram o mundo.",
+        "formatos": {
+            "documentario": {"nome": "🎞 Documentário (cronológico)", "minutos": 18, "estrutura": [
+                "GANCHO: o momento mais dramático ou surpreendente da história, sem entregar o fim",
+                "Contexto: época, lugar, como era a vida e o que estava em jogo",
+                "As pessoas centrais (quem eram, o que queriam)",
+                "Os acontecimentos em ordem, com as viradas principais",
+                "O clímax / o ponto sem volta",
+                "Consequências: o que mudou depois e o que ficou até hoje",
+                "Fechamento: a lição ou a pergunta que fica"]},
+            "verdade": {"nome": "🔍 O que realmente aconteceu (mito × fato)", "minutos": 14, "estrutura": [
+                "GANCHO: a versão que todo mundo conhece",
+                "De onde veio essa versão (filme, livro, boato)",
+                "O que as fontes dizem de verdade, ponto a ponto",
+                "O que ainda é debatido pelos historiadores",
+                "Fechamento: por que o mito pegou"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "Fato surpreendente na 1ª frase", "Contexto em 2-3 frases", "A virada", "Pergunta ou 'história completa no canal'"]},
+            "lista": {"nome": "🔢 Lista (top N fatos/eventos)", "minutos": 12, "estrutura": [
+                "Gancho: o que une os itens", "Cada item: o fato, o contexto curto e por que importa", "Do menos ao mais impressionante",
+                "Fechamento: qual te surpreendeu mais?"]},
+        },
+        "regras": [
+            "Só fatos que estão nas fontes; datas, nomes e números exatos como nas fontes. Onde os historiadores discordam, diga.",
+            "Diferencie fato, interpretação e lenda ('segundo a tradição', 'há quem diga').",
+            "Sem anacronismo: explique os valores da época sem justificar violências.",
+            "Narração de documentário: imagens mentais fortes, frases claras, ganchos no fim de cada capítulo.",
+        ],
+    },
+    "biografia": {
+        "nome": "👤 Biografias",
+        "descricao": "A vida de uma pessoa famosa ou histórica: origem, ascensão, crises, legado.",
+        "formatos": {
+            "completa": {"nome": "📖 Biografia completa", "minutos": 16, "estrutura": [
+                "GANCHO: o momento-chave da vida dela (o auge ou a queda)",
+                "Infância e origem (família, onde cresceu, o que a marcou)",
+                "O começo da carreira / da jornada",
+                "A ascensão: as conquistas, com números e datas das fontes",
+                "Crises, polêmicas e viradas (com o que é fato e o que é acusação)",
+                "Hoje / o fim da vida e o legado",
+                "Fechamento: o que essa história ensina"]},
+            "ascensao_queda": {"nome": "📉 Ascensão e queda", "minutos": 14, "estrutura": [
+                "GANCHO: o auge e a queda lado a lado", "Como chegou ao topo", "Os sinais do problema", "A queda",
+                "Onde está hoje", "Fechamento: o que deu errado"]},
+            "o_que_aconteceu": {"nome": "❓ O que aconteceu com…", "minutos": 10, "estrutura": [
+                "GANCHO: quem era e por que sumiu dos holofotes", "O auge", "O que fez a pessoa sumir", "A vida hoje", "Fechamento"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "Fato chocante ou inspirador na 1ª frase", "3-4 marcos da vida", "Onde está hoje", "Pergunta"]},
+        },
+        "regras": [
+            "Só fatos das fontes. Fofoca, boato e 'dizem que' NÃO entram como fato — se citar, diga que é boato não confirmado.",
+            "Acusações sem condenação são acusações. Nada de diagnóstico de saúde ou de vida íntima que as fontes não confirmem.",
+            "Respeito: sem deboche da aparência, da família ou de tragédias pessoais.",
+            "Pessoa viva: tom equilibrado, mostrando mais de um lado das polêmicas.",
+        ],
+    },
+    "negocios": {
+        "nome": "💼 Negócios e marcas",
+        "descricao": "Como empresas e marcas cresceram, quebraram ou mudaram o mercado.",
+        "formatos": {
+            "historia_empresa": {"nome": "🏢 A história da empresa", "minutos": 15, "estrutura": [
+                "GANCHO: o número ou a virada mais impressionante (faturamento, falência, aposta maluca)",
+                "Os fundadores e o problema que queriam resolver", "Os primeiros anos e o produto que deu certo",
+                "O crescimento: estratégia, números, concorrentes", "Crises e viradas", "Onde a empresa está hoje",
+                "Fechamento: a lição de negócio"]},
+            "ascensao_queda": {"nome": "📉 Ascensão e queda", "minutos": 14, "estrutura": [
+                "GANCHO: o valor no auge × hoje", "Como dominou o mercado", "Os erros (decisões, concorrência, mudanças)",
+                "A queda", "O que sobrou / o que fazem hoje", "Fechamento: o que outras empresas aprenderam"]},
+            "estrategia": {"nome": "🧠 Estratégia explicada", "minutos": 10, "estrutura": [
+                "GANCHO: a jogada que ninguém entende", "Como o modelo de negócio funciona de verdade", "Os números por trás",
+                "Por que funciona (e os riscos)", "Fechamento: o que dá pra aplicar"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "Número ou fato chocante", "A história em 3 passos", "A lição", "Pergunta"]},
+        },
+        "regras": [
+            "Números (valor de mercado, faturamento, datas) exatamente como nas fontes, dizendo o ano de cada número.",
+            "Nada de conselho de investimento ('compre ações de…'). Opinião é opinião; fato é fato.",
+            "Acusações contra empresas e executivos: só o que está nas fontes, dizendo o estado do processo.",
+            "Explique termos de negócio em linguagem simples.",
+        ],
+    },
+    "desastres": {
+        "nome": "🌋 Desastres e tragédias",
+        "descricao": "Acidentes aéreos, de engenharia e desastres naturais: o que aconteceu, o que deu errado e o que mudou.",
+        "formatos": {
+            "reconstrucao": {"nome": "🛠 Reconstrução (o que deu errado)", "minutos": 16, "estrutura": [
+                "GANCHO: o último momento normal antes do desastre (sem detalhe gráfico)",
+                "Contexto: o lugar, a máquina/estrutura, as pessoas envolvidas",
+                "A linha do tempo, minuto a minuto quando as fontes permitem",
+                "A investigação: as causas técnicas e humanas (relatórios oficiais)",
+                "As vítimas e sobreviventes (com respeito)",
+                "O que mudou depois: leis, normas, engenharia",
+                "Fechamento: a lição que salva vidas hoje"]},
+            "natural": {"nome": "🌪 Desastre natural", "minutos": 14, "estrutura": [
+                "GANCHO", "Como o fenômeno funciona (explicação simples)", "Os sinais antes", "O dia do desastre",
+                "Resposta e resgate", "Consequências e prevenção hoje"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "O fato em 1 frase", "A causa", "O que mudou depois", "Pergunta"]},
+        },
+        "regras": [
+            "Base nos relatórios oficiais e nas fontes; causa 'provável' é provável. Não culpe pessoas antes da conclusão oficial.",
+            "Respeito às vítimas: sem sensacionalismo, sem detalhe gráfico de ferimentos, sem 'entretenimento' com a dor.",
+            "Linguagem amigável à monetização do YouTube.",
+            "Explique a parte técnica de forma que um leigo entenda.",
+        ],
+    },
+    "misterios": {
+        "nome": "👽 Mistérios e inexplicáveis",
+        "descricao": "OVNIs, lugares assombrados, enigmas e fenômenos estranhos — com investigação honesta.",
+        "formatos": {
+            "investigacao": {"nome": "🔦 Investigação de um mistério", "minutos": 14, "estrutura": [
+                "GANCHO: o relato mais arrepiante", "O caso: quando, onde, quem viu",
+                "As evidências (fotos, documentos, testemunhos) — o que cada uma prova e o que não prova",
+                "As explicações: das sobrenaturais às científicas, com o peso de cada uma",
+                "O que se sabe hoje", "Fechamento: e você, acredita?"]},
+            "lista": {"nome": "🔢 Lista de mistérios", "minutos": 12, "estrutura": [
+                "Gancho", "Cada mistério: o relato, a evidência, a melhor explicação conhecida", "Do mais leve ao mais estranho",
+                "Fechamento: qual é o mais difícil de explicar?"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "Relato estranho na 1ª frase", "O detalhe que ninguém explica", "A explicação mais provável (ou falta dela)", "Pergunta"]},
+        },
+        "regras": [
+            "Clima de mistério, mas honesto: nunca apresente boato ou relato como prova; diga o que foi verificado e o que não.",
+            "Sempre mostre a explicação científica/cética mais aceita quando existir.",
+            "Nada de inventar testemunhas, documentos ou datas. Nada que incentive alguém a se arriscar (invadir lugares, etc.).",
+        ],
+    },
+    "ciencia": {
+        "nome": "🔬 Ciência e curiosidades",
+        "descricao": "Explicações de 'por que…', 'como funciona', 'e se…?' — ciência, corpo humano, espaço, tecnologia.",
+        "formatos": {
+            "explicacao": {"nome": "💡 Explicação (por que / como funciona)", "minutos": 10, "estrutura": [
+                "GANCHO: a pergunta curiosa ou o fato que parece impossível", "A resposta curta",
+                "A explicação passo a passo, com analogias do dia a dia", "Um detalhe surpreendente a mais",
+                "Onde isso aparece na vida real", "Fechamento: a próxima pergunta"]},
+            "e_se": {"nome": "🤔 E se…? (cenário hipotético)", "minutos": 10, "estrutura": [
+                "GANCHO: a pergunta 'e se…'", "O que a ciência diz que aconteceria primeiro", "Em minutos, dias, anos",
+                "O limite do que sabemos", "Fechamento"]},
+            "lista": {"nome": "🔢 Lista de curiosidades", "minutos": 10, "estrutura": [
+                "Gancho", "Cada curiosidade: o fato + a explicação em 2-3 frases", "Fechamento: qual você não sabia?"]},
+            "curto": {"nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1, "estrutura": [
+                "Pergunta ou fato surpreendente", "A explicação simples", "O detalhe extra", "Pergunta"]},
+        },
+        "regras": [
+            "Só ciência que está nas fontes e é consenso; o que é hipótese, diga que é hipótese.",
+            "Nada de conselho médico ou de saúde como orientação; números com a unidade e a fonte.",
+            "Analogias simples, sem errar a ciência pra simplificar.",
+        ],
+    },
+}
+
+TIPOS_MIDIA = {"foto": "🖼 Foto", "video": "🎥 Vídeo", "texto": "📝 Texto", "link": "🔗 Link/página"}
+
+CONFIG_PADRAO: Dict[str, Any] = {"modelo": "true_crime", "formato": "caso_completo", "idioma": "pt-BR", "minutos": 18,
+                                 "tom": "", "extra": "", "formato_video": "16:9"}
+
+
+class DossieError(Exception):
+    pass
+
+
+# ------------------------------------------------------------------ projetos
+def _pasta(base: str, pid: str = "") -> str:
+    return os.path.join(base, PASTA, pid) if pid else os.path.join(base, PASTA)
+
+
+def pasta_midias(base: str, pid: str) -> str:
+    return os.path.join(_pasta(base, pid), "midias")
+
+
+def _arquivo(base: str, pid: str) -> str:
+    return os.path.join(_pasta(base, pid), "projeto.json")
+
+
+def valido(pid: Any) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{10}", str(pid or "")))
+
+
+def criar(base: str, tema: str = "", modelo: str = "true_crime") -> Dict[str, Any]:
+    pid = uuid.uuid4().hex[:10]
+    cfg = dict(CONFIG_PADRAO, modelo=modelo if modelo in MODELOS else "true_crime")
+    fk, fv = next(iter(MODELOS[cfg["modelo"]]["formatos"].items()))
+    cfg.update(formato=fk, minutos=fv["minutos"])
+    p = {"id": pid, "criado": time.time(), "atualizado": time.time(), "tema": (tema or "").strip()[:300],
+         "roteiro_base": "", "config": cfg, "fontes": [], "midias": [], "resultado": None}
+    salvar(base, p)
+    return p
+
+
+def carregar(base: str, pid: str) -> Dict[str, Any]:
+    if not valido(pid) or not os.path.exists(_arquivo(base, pid)):
+        raise DossieError("Projeto não encontrado.")
+    with open(_arquivo(base, pid), encoding="utf-8") as f:
+        p = json.load(f)
+    p["config"] = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    return p
+
+
+def salvar(base: str, p: Dict[str, Any]) -> None:
+    os.makedirs(_pasta(base, p["id"]), exist_ok=True)
+    p["atualizado"] = time.time()
+    tmp = _arquivo(base, p["id"]) + f".{uuid.uuid4().hex[:6]}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(p, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _arquivo(base, p["id"]))
+
+
+def listar(base: str) -> List[Dict[str, Any]]:
+    out = []
+    if not os.path.isdir(_pasta(base)):
+        return out
+    for pid in os.listdir(_pasta(base)):
+        try:
+            p = carregar(base, pid)
+        except Exception:  # noqa: BLE001
+            continue
+        out.append({"id": p["id"], "nome": nome_do_projeto(p), "modelo": (MODELOS.get(p["config"]["modelo"]) or {}).get("nome", ""),
+                    "atualizado": p.get("atualizado") or 0, "fontes": len(p.get("fontes") or []),
+                    "midias": len(p.get("midias") or []), "tem_roteiro": bool(p.get("resultado"))})
+    return sorted(out, key=lambda x: -x["atualizado"])
+
+
+def excluir(base: str, pid: str) -> None:
+    import shutil
+    if valido(pid) and os.path.isdir(_pasta(base, pid)):
+        shutil.rmtree(_pasta(base, pid), ignore_errors=True)
+
+
+def nome_do_projeto(p: Dict[str, Any]) -> str:
+    return (p.get("tema") or ((p.get("resultado") or {}).get("titulos") or [""])[0] or "Projeto sem tema")[:120]
+
+
+# ------------------------------------------------------------------ matérias (qualquer site)
+_LIXO_IMG = re.compile(r"logo|icon|avatar|sprite|pixel|spinner|placeholder|blank\.|1x1|badge|banner-ad|/ads?/|emoji|gravatar|"
+                       r"facebook\.com/tr|doubleclick|share|whatsapp|twitter|selo|favicon", re.IGNORECASE)
+_LIXO_TXT = re.compile(r"^(leia (também|mais)|veja (também|mais)|publicidade|anúncio|compartilh|siga[- ]nos|inscreva-se|"
+                       r"assine|clique aqui|newsletter|receba (as )?not[ií]cias|copiar link|comentários?$|tags?:|"
+                       r"advertisement|related|read more|sign up|subscribe)", re.IGNORECASE)
+
+
+def _maior_do_srcset(srcset: str) -> str:
+    melhor, w = "", -1
+    for parte in (srcset or "").split(","):
+        bits = parte.strip().split()
+        if not bits:
+            continue
+        val = 0
+        if len(bits) > 1:
+            m = re.match(r"(\d+(?:\.\d+)?)[wx]", bits[1])
+            val = float(m.group(1)) if m else 0
+        if val > w:
+            melhor, w = bits[0], val
+    return melhor
+
+
+def ler_materia(html: str, url: str) -> Dict[str, Any]:
+    """Título, linha fina, autor, data, seções (subtítulo + texto), texto inteiro
+    e imagens (url + legenda/alt) de uma matéria/página."""
+    from bs4 import BeautifulSoup
+    og = _vd.ler_og(html, url)
+    sopa = BeautifulSoup(html, "html.parser")
+
+    def meta(*nomes):
+        for n in nomes:
+            t = sopa.find("meta", attrs={"property": n}) or sopa.find("meta", attrs={"name": n})
+            if t and t.get("content"):
+                return t["content"].strip()
+        return ""
+    autor = meta("article:author", "author", "parsely-author", "sailthru.author")
+    data = meta("article:published_time", "datePublished", "pubdate", "date", "parsely-pub-date")
+    if not data:
+        tm = sopa.find("time")
+        data = (tm.get("datetime") or tm.get_text(" ", strip=True)) if tm else ""
+    for t in sopa(["script", "style", "noscript", "iframe", "form", "svg", "button", "nav", "footer", "aside"]):
+        t.decompose()
+    for t in sopa.find_all(attrs={"class": re.compile(r"(^|\s|-)(related|newsletter|share|social|comment|advert|ads?|promo|"
+                                                      r"recommend|outbrain|taboola|cookie|footer|menu|breadcrumb)(\s|-|$)", re.I)}):
+        t.decompose()
+    cands = sopa.find_all(["article", "main"]) or []
+    if not cands:
+        cands = sopa.find_all(["div", "section"])
+
+    def pontos(el):
+        return sum(len(p.get_text(" ", strip=True)) for p in el.find_all("p", recursive=True))
+    raiz = max(cands, key=pontos) if cands else sopa.body or sopa
+    if pontos(raiz) < 200 and sopa.body is not None:
+        raiz = sopa.body
+    h1 = raiz.find("h1") or sopa.find("h1")
+    titulo = (h1.get_text(" ", strip=True) if h1 else "") or og["titulo"]
+    linha_fina = og["descricao"]
+    sub = raiz.find(attrs={"class": re.compile(r"subtitle|subtit|lead|linha-fina|standfirst|dek|summary", re.I)})
+    if sub and 20 < len(sub.get_text(" ", strip=True)) < 600:
+        linha_fina = sub.get_text(" ", strip=True)
+    secoes: List[Dict[str, Any]] = [{"titulo": "", "texto": []}]
+    vistos = set()
+    for el in raiz.find_all(["h2", "h3", "h4", "p", "li", "blockquote"]):
+        txt = re.sub(r"\s+", " ", el.get_text(" ", strip=True)).strip()
+        if not txt or txt in vistos or _LIXO_TXT.match(txt):
+            continue
+        if el.name == "li" and (len(txt) < 25 or el.find_parent(["nav", "header"])):
+            continue
+        if el.name == "p" and el.find_parent("blockquote"):
+            continue
+        vistos.add(txt)
+        if el.name in ("h2", "h3", "h4"):
+            if len(txt) < 160:
+                secoes.append({"titulo": txt, "texto": []})
+            continue
+        if el.name == "blockquote":
+            txt = f"“{txt}”"
+        secoes[-1]["texto"].append(txt)
+    secoes = [{"titulo": s["titulo"], "texto": "\n".join(s["texto"])} for s in secoes if s["texto"] or s["titulo"]]
+    texto = "\n\n".join(((f"## {s['titulo']}\n" if s["titulo"] else "") + s["texto"]) for s in secoes).strip()[:MAX_TEXTO_POR_FONTE]
+    imagens: List[Dict[str, str]] = []
+    vist = set()
+
+    def add_img(src, legenda):
+        if not src or src.startswith("data:"):
+            return
+        u = urljoin(url, src.strip())
+        if not u.lower().startswith(("http://", "https://")) or u in vist or _LIXO_IMG.search(u) or u.lower().split("?")[0].endswith(".svg"):
+            return
+        vist.add(u)
+        imagens.append({"url": u, "legenda": re.sub(r"\s+", " ", legenda or "").strip()[:400]})
+    if og["imagem"]:
+        add_img(og["imagem"], og["titulo"])
+    for img in raiz.find_all("img"):
+        src = (_maior_do_srcset(img.get("srcset") or img.get("data-srcset") or "")
+               or img.get("data-src") or img.get("data-lazy-src") or img.get("data-original") or img.get("src") or "")
+        fig = img.find_parent("figure")
+        cap = fig.find("figcaption") if fig else None
+        leg = (cap.get_text(" ", strip=True) if cap else "") or img.get("alt") or img.get("title") or ""
+        try:
+            if int(img.get("width") or 999) < 120 or int(img.get("height") or 999) < 90:
+                continue
+        except ValueError:
+            pass
+        add_img(src, leg)
+    for v in raiz.find_all(["video", "source"]):
+        src = v.get("src") or ""
+        if src and re.search(r"\.(mp4|webm|mov)(\?|$)", src, re.I):
+            add_img(src, v.get("title") or "vídeo da matéria")
+    if not texto and not imagens:
+        raise DossieError("Não achei texto nem imagens nessa página.")
+    return {"url": url, "site": og.get("site") or urlparse(url).netloc, "titulo": titulo[:300], "linha_fina": linha_fina[:800],
+            "autor": autor[:120], "data": data[:40], "secoes": secoes[:80], "texto": texto, "imagens": imagens[:MAX_IMAGENS_POR_FONTE],
+            "og": {k: og.get(k) for k in ("titulo", "descricao", "imagem", "site")}}
+
+
+# ------------------------------------------------------------------ mídias
+def _novo_id(p: Dict[str, Any], prefixo: str) -> str:
+    usados = {m["id"] for m in p.get("midias") or []}
+    k = 1
+    while f"{prefixo}{k}" in usados:
+        k += 1
+    return f"{prefixo}{k}"
+
+
+def adicionar_midia(p: Dict[str, Any], **c: Any) -> Dict[str, Any]:
+    tipo = c.get("tipo") if c.get("tipo") in TIPOS_MIDIA else "foto"
+    desc = (c.get("descricao") or "").strip()[:2000]
+    m = {"id": _novo_id(p, "T" if tipo == "texto" else "I"), "tipo": tipo, "origem": c.get("origem") or "pc",
+         "arquivo": c.get("arquivo") or "", "url": c.get("url") or "", "nome": (c.get("nome") or "")[:200],
+         "og": c.get("og") or None, "legenda": (c.get("legenda") or "").strip()[:400], "fonte": c.get("fonte") or "",
+         "descricao": desc, "conteudo": (c.get("conteudo") or "").strip()[:12000],
+         "usar": c.get("usar") if c.get("usar") in ("og", "descricao", "ambos") else ("ambos" if desc else "og"),
+         "criado": time.time()}
+    p.setdefault("midias", []).append(m)
+    return m
+
+
+def midia(p: Dict[str, Any], mid: str) -> Optional[Dict[str, Any]]:
+    return next((m for m in p.get("midias") or [] if m["id"].upper() == str(mid or "").strip().upper()), None)
+
+
+def caminho_midia(base: str, p: Dict[str, Any], m: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not m or not m.get("arquivo"):
+        return None
+    c = os.path.join(pasta_midias(base, p["id"]), os.path.basename(m["arquivo"]))
+    return c if os.path.isfile(c) else None
+
+
+def o_que_e(m: Dict[str, Any], p: Optional[Dict[str, Any]] = None) -> str:
+    og = m.get("og") or {}
+    partes_og = [x for x in (m.get("legenda"), og.get("titulo") and f"da página “{og.get('titulo')}”",
+                             og.get("descricao") if not m.get("legenda") else "") if x]
+    og_txt = " — ".join(partes_og)
+    desc = m.get("descricao") or ""
+    if m.get("usar") == "og" and og_txt:
+        return og_txt
+    if m.get("usar") == "descricao" and desc:
+        return desc
+    return " | ".join(x for x in (desc, og_txt) if x) or (m.get("nome") or "(sem descrição)")
+
+
+def _imagem_pequena(caminho: str) -> bool:
+    try:
+        from PIL import Image
+        with Image.open(caminho) as im:
+            return im.width < 220 or im.height < 160
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def processar_fonte(base: str, pid: str, fid: str, trava=None) -> Dict[str, Any]:
+    """Lê a matéria da fonte `fid` e baixa as imagens dela (cada uma vira uma mídia I…).
+    A parte lenta (rede) roda SEM a trava; o projeto só é mexido com ela (a pessoa
+    pode continuar editando a página enquanto isso)."""
+    import contextlib
+    trava = trava or contextlib.nullcontext()
+
+    def mexer(fn):
+        with trava:
+            p = carregar(base, pid)
+            f = next((x for x in p.get("fontes") or [] if x["id"] == fid), None)
+            if f is None:
+                return None
+            out = fn(p, f)
+            salvar(base, p)
+            return out
+    url = mexer(lambda p, f: (f.update(estado="lendo a matéria", erro=None), f["url"])[1])
+    if not url:
+        raise DossieError("Fonte não encontrada.")
+    try:
+        html, final = _vd.baixar_html(url)
+        dados = ler_materia(html, final)
+    except (_vd.VendaError, DossieError) as exc:
+        mexer(lambda p, f: f.update(estado="erro", erro=str(exc)))
+        return {"erro": str(exc)}
+    mexer(lambda p, f: f.update({**{k: dados[k] for k in ("site", "titulo", "linha_fina", "autor", "data", "secoes", "texto", "og")},
+                                 "estado": f"baixando {len(dados['imagens'])} imagens", "imagens_achadas": len(dados["imagens"])}))
+    baixadas = []
+    for im in dados["imagens"]:
+        try:
+            cam, tipo = _vd.baixar_arquivo(im["url"], pasta_midias(base, pid), f"{fid.lower()}_{uuid.uuid4().hex[:6]}")
+        except _vd.VendaError:
+            continue
+        if tipo == "foto" and _imagem_pequena(cam):
+            os.remove(cam)
+            continue
+        baixadas.append((im, cam, tipo))
+
+    def juntar(p, f):
+        ja = {m.get("url") for m in p.get("midias") or []}
+        n = 0
+        for im, cam, tipo in baixadas:
+            if im["url"] in ja:
+                try:
+                    os.remove(cam)
+                except OSError:
+                    pass
+                continue
+            n += 1
+            adicionar_midia(p, tipo=tipo, origem="url", url=im["url"], arquivo=os.path.basename(cam), nome=os.path.basename(cam),
+                            legenda=im["legenda"], fonte=fid, og={"titulo": dados["titulo"], "descricao": dados["linha_fina"]}, usar="og")
+        f.update(estado="pronta", imagens=n)
+        return n
+    n = mexer(juntar)
+    import midia_transcricao as mt
+    for _im, cam, tipo in baixadas:  # vídeos da matéria: transcrição com os tempos (segundo plano)
+        if tipo == "video" and os.path.isfile(cam):
+            mt.agendar(cam)
+    return {"ok": True, "imagens": n}
+
+
+def adicionar_fonte(p: Dict[str, Any], url: str) -> Dict[str, Any]:
+    url = _vd._checar_url(url)
+    if any(x["url"] == url for x in p.get("fontes") or []):
+        raise DossieError("Essa fonte já está no projeto.")
+    usados = {x["id"] for x in p.get("fontes") or []}
+    k = 1
+    while f"F{k}" in usados:
+        k += 1
+    f = {"id": f"F{k}", "url": url, "estado": "na fila", "erro": None, "titulo": "", "linha_fina": "", "autor": "", "data": "",
+         "site": urlparse(url).netloc, "secoes": [], "texto": "", "imagens": 0, "imagens_achadas": 0, "og": {}}
+    p.setdefault("fontes", []).append(f)
+    return f
+
+
+# ------------------------------------------------------------------ prompt do roteiro
+def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
+    cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    mod = MODELOS.get(cfg["modelo"]) or MODELOS["true_crime"]
+    fmt = mod["formatos"].get(cfg["formato"]) or next(iter(mod["formatos"].values()))
+    fontes = [f for f in p.get("fontes") or [] if f.get("texto")]
+    if not (p.get("tema") or "").strip():
+        raise DossieError("Escreva o tema do vídeo (ex.: o nome do caso).")
+    if not fontes and not (p.get("roteiro_base") or "").strip() and not any(m["tipo"] == "texto" for m in p.get("midias") or []):
+        raise DossieError("Adicione pelo menos uma fonte (link de matéria), um texto ou o roteiro base — sem isso a IA inventaria.")
+    try:
+        minutos = max(0.5, min(120, float(cfg.get("minutos") or fmt["minutos"])))
+    except (TypeError, ValueError):
+        minutos = fmt["minutos"]
+    palavras = int(minutos * 150)
+    L: List[str] = []
+    L.append(f"Você é roteirista de um canal de {mod['nome'].split(' ', 1)[1]} no YouTube. Escreva o roteiro NARRADO completo "
+             f"(alguém vai ler em voz alta) de um vídeo sobre o tema abaixo, usando SÓ as fontes e materiais que eu juntei.")
+    L.append("")
+    L.append(f"## Tema\n{p['tema'].strip()}")
+    L.append("")
+    L.append(f"## Formato: {fmt['nome'].split(' ', 1)[1]} — ~{minutos:g} min (~{palavras} palavras), idioma {cfg.get('idioma') or 'pt-BR'}")
+    L.append("Estrutura (siga a ordem; cada parte pode virar um ou mais capítulos):")
+    L.extend(f"{k}. {e}" for k, e in enumerate(fmt["estrutura"], start=1))
+    L.append("")
+    L.append("## Regras do modelo (obrigatórias)")
+    L.extend(f"- {r}" for r in mod["regras"])
+    if (cfg.get("tom") or "").strip():
+        L.append(f"- Tom: {cfg['tom'].strip()[:400]}")
+    if (cfg.get("extra") or "").strip():
+        L.append(f"- Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
+    if (p.get("roteiro_base") or "").strip():
+        L.append("")
+        L.append("## Meu roteiro / anotações (use como base, corrigindo e completando com as fontes)")
+        L.append(p["roteiro_base"].strip()[:30000])
+    if fontes:
+        L.append("")
+        L.append("## Fontes (matérias que eu salvei — cite o site quando usar um fato importante)")
+        for f in fontes:
+            cab = f"### {f['id']} — {f.get('titulo') or f['url']}"
+            info = " · ".join(x for x in (f.get("site"), f.get("autor"), f.get("data")) if x)
+            L.append(cab + (f"\n({info})" if info else "") + f"\n{f['url']}")
+            if f.get("linha_fina"):
+                L.append(f"Linha fina: {f['linha_fina']}")
+            L.append(f.get("texto") or "")
+    textos = [m for m in p.get("midias") or [] if m["tipo"] == "texto"]
+    if textos:
+        L.append("")
+        L.append("## Textos de apoio")
+        for m in textos:
+            L.append(f"### {m['id']}" + (f" — {m['descricao']}" if m.get("descricao") else "") + f"\n{m.get('conteudo') or ''}")
+    vis = [m for m in p.get("midias") or [] if m["tipo"] in ("foto", "video")]
+    if vis:
+        L.append("")
+        L.append("## Imagens e vídeos que eu tenho (vão aparecer no vídeo — use os IDs)")
+        import midia_transcricao as mt
+        for m in vis[:300]:
+            cam = caminho_midia(base, p, m) if base else None
+            L.append(f"- {m['id']} ({'vídeo' if m['tipo'] == 'video' else 'foto'}{', ' + m['fonte'] if m.get('fonte') else ''}): {o_que_e(m)}"
+                     + (mt.para_prompt(cam) if cam and m["tipo"] == "video" else ""))
+        L.append("No ROTEIRO, ponha a marca do ID (ex.: [I4]) sozinha logo ANTES da frase em que aquela imagem deve aparecer — "
+                 "só imagens que mostram MESMO o que a frase fala (pessoa, lugar, objeto, documento). As marcas não são lidas.")
+        if any(m["tipo"] == "video" for m in vis):
+            L.append(mt.instrucao_roteiro("I7"))
+    L.append("")
+    L.append("## Resposta — SOMENTE um JSON válido, assim:")
+    L.append(json.dumps({
+        "titulos": ["5 títulos fortes pro YouTube (até ~70 caracteres, sem mentir)"],
+        "ideias": ["ideias de thumbnail / ganchos / vídeos derivados"],
+        "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
+        "capitulos": [{"titulo": "Título curto do capítulo", "comeca_em": "as primeiras 6-10 palavras EXATAS do roteiro onde ele começa"}],
+        "roteiro": "Texto narrado completo... [I3] frase em que a imagem I3 aparece...",
+        "momentos": [{"midia": "I3", "trecho": "frase exata do roteiro em que a imagem entra"}],
+        "tags": ["tags do YouTube"],
+        "fontes_usadas": ["F1", "F2"],
+        "observacoes": "pontos que eu devo conferir (fatos duvidosos, fontes que discordam)",
+    }, ensure_ascii=False, indent=2))
+    L.append("O 1º capítulo começa no início do roteiro. 5 a 15 capítulos (Shorts: nenhum).")
+    return "\n".join(L)
+
+
+def _texto_voz(roteiro: str) -> str:
+    import midia_transcricao as mt
+    return mt.tirar_marcas(roteiro)
+
+
+def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
+    import json_ia
+    import roteiros_yt
+    try:
+        d = json_ia.carregar(texto)
+    except ValueError as exc:
+        raise DossieError(str(exc)) from exc
+    if isinstance(d, list) and len(d) == 1 and isinstance(d[0], dict):
+        d = d[0]
+    if not isinstance(d, dict) or not str(d.get("roteiro") or "").strip():
+        raise DossieError("O JSON não tem o \"roteiro\".")
+    rot = str(d["roteiro"]).strip()
+    ids = {m["id"].upper() for m in p.get("midias") or []}
+    avisos: List[str] = []
+    import midia_transcricao as mt
+    momentos, sem = mt.momentos_do_roteiro(rot, ids, d.get("momentos"))
+    if sem:
+        avisos.append("A IA citou imagens que não existem: " + ", ".join(sem) + " (ignoradas).")
+    voz = _texto_voz(rot)
+    n_pal = len(voz.split())
+    caps = roteiros_yt._capitulos(d.get("capitulos") or [], voz, n_pal, avisos)
+    return {"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
+            "ideias": [str(x)[:300] for x in d.get("ideias") or [] if str(x).strip()][:15],
+            "descricao": str(d.get("descricao") or "").strip()[:5000], "capitulos": caps, "palavras": n_pal,
+            "roteiro": rot, "roteiro_final": voz, "momentos": momentos,
+            "tags": [str(x)[:60] for x in d.get("tags") or [] if str(x).strip()][:30],
+            "fontes_usadas": [str(x)[:10] for x in d.get("fontes_usadas") or []][:30],
+            "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time()}
+
+
+def roteiro_para_voz(p: Dict[str, Any]) -> str:
+    return ((p.get("resultado") or {}).get("roteiro_final") or "").strip()
+
+
+def descricao_completa(p: Dict[str, Any]) -> str:
+    """Descrição + capítulos (0:00 …) + fontes, pronta pro YouTube."""
+    import roteiros_yt
+    res = p.get("resultado") or {}
+    txt = roteiros_yt.descricao_com_capitulos(res)
+    usadas = set(res.get("fontes_usadas") or [])
+    fontes = [f for f in p.get("fontes") or [] if f.get("titulo") and (not usadas or f["id"] in usadas)]
+    if fontes:
+        txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']} ({f.get('site') or ''}): {f['url']}" for f in fontes)
+    return txt.strip()
+
+
+def aplicar_tempos_do_audio(base: str, pid: str, palavras: List[Dict[str, Any]], duracao: Optional[float], origem: str = "") -> Optional[Dict[str, Any]]:
+    """Depois de gerar a voz: o tempo REAL de cada capítulo no áudio."""
+    import roteiros_yt
+    p = carregar(base, pid)
+    res = p.get("resultado") or {}
+    if not res.get("capitulos"):
+        return None
+    res["capitulos"] = roteiros_yt.capitulos_pelo_audio({"resultado": res}, palavras, duracao)
+    res["audio"] = {"duracao": round(duracao, 1) if duracao else None, "gerado_em": time.time(), "origem": origem,
+                    "com_palavras": bool(palavras)}
+    p["resultado"] = res
+    salvar(base, p)
+    return res
+
+
+# ------------------------------------------------------------------ editor
+def midias_para_editor(base: str, p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []  # mesma forma da venda (vendas.linhas_editor)
+    momentos = (p.get("resultado") or {}).get("momentos") or []
+    import midia_transcricao as mt
+    for m in p.get("midias") or []:
+        cam = caminho_midia(base, p, m)
+        tipo = _vd.tipo_do_arquivo(cam or "")
+        if not cam or not tipo:
+            continue
+        usos = [mo for mo in momentos if mo.get("midia") == m["id"]]
+        out.append({"id": m["id"], "tipo": tipo, "caminho": cam, "o_que_e": o_que_e(m), "usos": usos,
+                    "trecho": (usos[0] if usos else {}).get("trecho") or "", "texto_na_tela": "",
+                    "transcricao": mt.para_prompt(cam) if tipo == "video" else ""})
+    return out
+
+
+def bloco_prompt_editor(base: str, p: Dict[str, Any]) -> str:
+    ms = midias_para_editor(base, p)
+    if not ms:
+        return ""
+    no_roteiro = [m for m in ms if m["trecho"]]
+    outras = [m for m in ms if not m["trecho"]]
+    L = ["", f"## 🕵️ Imagens e vídeos do TEMA (projeto “{nome_do_projeto(p)}”) — use primeiro!",
+         "Estas são fotos e vídeos REAIS do tema (das matérias e dos meus arquivos). Nos trechos em que a narração fala de uma "
+         "pessoa, lugar, objeto ou documento que uma delas mostra, use-a com `\"provider\": \"material\"` e `\"query\": \"<ID>\"` "
+         "(ex.: `{\"start\": 12.0, \"end\": 16.5, \"provider\": \"material\", \"query\": \"I4\"}`) — sem \"alternativas\". "
+         "O \"trecho\" sugerido é onde o roteiro planejou cada uma: ache esse momento na transcrição. Prefira essas imagens "
+         "sempre que combinarem; nos outros trechos, use os bancos normais pra clima (cidade à noite, fita de isolamento, "
+         "documentos, viatura) — nunca uma pessoa de banco de imagem no lugar de uma pessoa real do caso."]
+    L.extend(_vd.linhas_editor(no_roteiro + outras[:150]))
+    return "\n".join(L)

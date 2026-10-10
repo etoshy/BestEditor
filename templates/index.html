@@ -29,6 +29,16 @@
   </select>
   <p style="color:#666;font-size:0.8rem;margin:2px 0 8px;">Dá pra trocar depois no Estúdio (📐 no topo). A busca de vídeos e imagens já procura no formato escolhido.</p>
 
+  {% set _vendas = vendas_lista() %}{% set _dossies = dossies_lista() %}{% if _vendas or _dossies %}
+  <label>📦 Projeto com as mídias <span style="font-weight:400;color:#888;">(opcional — 🛒 venda ou 🕵️ modelo de vídeo)</span></label>
+  <select name="projeto_midias">
+    <option value="">— nenhum (ou o que veio no .zip do Gerar voz) —</option>
+    {% if _dossies %}<optgroup label="🕵️ Modelos de vídeo">{% for v in _dossies %}<option value="dossie:{{ v.id }}" {% if request.args.get('dossie') == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
+    {% if _vendas %}<optgroup label="🛒 Vídeos de venda">{% for v in _vendas %}<option value="venda:{{ v.id }}" {% if request.args.get('venda') == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
+  </select>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 8px;">O prompt da IA recebe as fotos e vídeos do projeto com as descrições: ela põe cada um no momento certo da narração e completa o resto com os bancos marcados abaixo. As mídias também ficam na biblioteca do Estúdio.</p>
+  {% endif %}
+
   <label>Idioma da narração</label>
   <select name="language">
     <option value="auto" selected>🌐 Automático — o idioma gravado no .zip da narração (ou detectado no áudio)</option>
