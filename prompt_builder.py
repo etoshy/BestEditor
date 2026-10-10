@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "wikipedia", "bing", "brave", "yandex", "startpage", "flow", "youtube"]
+DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "bing", "brave", "yandex", "startpage", "flow", "youtube"]
 PHOTO_SEARCH_PROVIDERS = {"pexels", "wikipedia", "bing", "brave", "yandex", "startpage", "flow"}  # provedores que suportam media_type="image" (busca de fotos de verdade)
 # os 4 buscadores de imagem por navegador (bing/brave/yandex/startpage) --
 # usado tanto aqui (build_prompt) quanto em app.py (checkbox "usar
@@ -162,8 +162,12 @@ def _format_timestamp(seconds: float) -> str:
 
 
 # Acervos LOCAIS (anime-pexels-local): um servidor, dois catálogos.
-BIBLIOTECAS_LOCAIS = ("animepexels", "moviepexels")
+BIBLIOTECAS_LOCAIS = ("animepexels", "moviepexels", "animepexels_online", "moviepexels_online")  # + as online (acervos.py)
 _BIB_INFO = {
+    "animepexels_online": {"nome": "acervo ONLINE de clipes de ANIME", "obra": "anime", "pessoa": "personagem",
+                           "pessoas": "personagens"},
+    "moviepexels_online": {"nome": "acervo ONLINE de clipes de FILMES E SÉRIES, live-action", "obra": "filme/série",
+                           "pessoa": "personagem/ator", "pessoas": "personagens/atores"},
     "animepexels": {"nome": "acervo local de clipes de ANIME", "obra": "anime", "pessoa": "personagem",
                     "pessoas": "personagens"},
     "moviepexels": {"nome": "acervo local de clipes de FILMES E SÉRIES, live-action", "obra": "filme/série",
@@ -208,7 +212,7 @@ def _regra_bibliotecas(bibliotecas: Optional[Dict[str, Any]], providers: List[st
                 f"   - {c['nome']}" + (f" ({c.get('clipes')} clipes)" if c.get("clipes") else (" (do elenco)" if c.get("do_elenco") else ""))
                 for c in itens)
             extra_ator = (" No acervo de filmes o nome vem como \"Personagem (Ator)\" — dá pra usar só o personagem ou só o "
-                          "ator.") if prov == "moviepexels" else ""
+                          "ator.") if prov in ("moviepexels", "moviepexels_online") else ""
             def _linha_p(c):
                 return (f"   - {c['nome']}" + (f" — {c['obra']}" if len(obras_v) > 1 and c.get("obra") else "")
                         + (f" ({c.get('clipes')} clipes)" if c.get("clipes") else (" (do elenco)" if c.get("do_elenco") else "")))
@@ -233,7 +237,7 @@ def _regra_bibliotecas(bibliotecas: Optional[Dict[str, Any]], providers: List[st
         elif b.get("personagens"):
             lista = ", ".join(f"{c['nome']} ({c.get('clipes', 0)})" for c in list(b["personagens"])[:60] if c.get("nome"))
             extra_ator = (" No acervo de filmes o nome vem como \"Personagem (Ator)\" — dá pra usar só o personagem ou só o "
-                          "ator.") if prov == "moviepexels" else ""
+                          "ator.") if prov in ("moviepexels", "moviepexels_online") else ""
             partes.append(f"{info['pessoas']} identificados nos clipes{' dessa obra' if obra else ''} (com quantos clipes cada "
                           f"um tem): {lista}. Quando o trecho falar de um deles, ponha `\"personagem\": \"nome\"` no segmento "
                           "(como está na lista) — o site traz só clipes em que ele aparece; se não tiver nenhum com aquela ação, "
@@ -308,7 +312,7 @@ def build_animepexels_prompt(
         )
     transcript_block = "\n".join(transcript_lines)
 
-    filmes = provider == "moviepexels"
+    filmes = provider in ("moviepexels", "moviepexels_online")
     tipo_clipe = "filmes e séries (live-action)" if filmes else "anime"
     ex_nome = ("**Nomes de filme/série/personagem ajudam quando você tem certeza** (ex: a narração já cita \"Breaking Bad\") — se a "
                "obra não estiver fixada abaixo, inclua o nome na query quando tiver confiança razoável na cena (ex: \"Walter White "
@@ -338,7 +342,7 @@ def build_animepexels_prompt(
     regras_bib = _regra_bibliotecas(bibliotecas, [provider])
     regra_bib = ("\n\n4b. " + regras_bib[0] + " Campos opcionais no segmento: `\"obra\"` e `\"personagem\"`.") if regras_bib else ""
 
-    prompt = f"""Você vai me ajudar a montar um roteiro de vídeo usando SOMENTE clipes de {tipo_clipe} de um acervo local ({provider}), sincronizado com uma narração em áudio.
+    prompt = f"""Você vai me ajudar a montar um roteiro de vídeo usando SOMENTE clipes de {tipo_clipe} de um acervo {"online" if provider.endswith("_online") else "local"} ({provider}), sincronizado com uma narração em áudio.
 
 ## Contexto
 
@@ -815,6 +819,15 @@ def build_prompt(
             "um vídeo de estoque. A query é em inglês e descreve a AÇÃO/cena (\"man cooking in lab\", \"car chase at night\"); "
             "pode incluir o nome do filme/personagem quando você tiver certeza."
         )
+    for _on, _base in (("animepexels_online", "animepexels"), ("moviepexels_online", "moviepexels")):
+        if _on in providers:
+            rules.append(
+                f"O provedor \"{_on}\" é o MESMO tipo de acervo do \"{_base}\" ("
+                + ("clipes de FILMES E SÉRIES, cenas reais de obras específicas" if _base == "moviepexels" else "clipes de ANIME")
+                + "), só que num servidor ONLINE. Mesmas regras: só escolha quando uma cena "
+                + ("de filme/série" if _base == "moviepexels" else "de anime")
+                + " realmente combina com o trecho; a query é em inglês e descreve a AÇÃO/cena; aceita \"obra\", \"personagem\", "
+                "\"keyword_weight\" e \"semantic_weight\". Escreva o provider exatamente \"" + _on + "\".")
     rules.extend(_regra_bibliotecas(bibliotecas, providers))
     if usar_templates:
         try:
@@ -907,7 +920,7 @@ def build_prompt(
     # typing on laptop") não são entidades reais/nomeadas, então usá-lo
     # como exemplo contradiria a própria regra que acabamos de dar sobre
     # ele (nome preciso de algo real + media_type "image" obrigatório).
-    _non_wiki_providers = [p for p in providers if p not in (("wikipedia", "flow", "moviepexels") + BROWSER_IMAGE_SEARCH_PROVIDERS + MANUAL_VIDEO_PROVIDERS)] or providers
+    _non_wiki_providers = [p for p in providers if p not in (("wikipedia", "flow", "moviepexels", "moviepexels_online") + BROWSER_IMAGE_SEARCH_PROVIDERS + MANUAL_VIDEO_PROVIDERS)] or providers
     example_provider_a = _non_wiki_providers[0]
     example_provider_b = _non_wiki_providers[1] if len(_non_wiki_providers) > 1 else _non_wiki_providers[0]
     example_photo_line = (
@@ -1296,7 +1309,7 @@ def _graficos_da_ia(data: Any) -> List[Dict[str, Any]]:
 # Provedores em que a "query" é uma busca por etiquetas (dá pra tirar o lixo
 # tipo "4k footage" sem mudar o sentido) e onde não existe busca de reserva
 # (flow gera, youtube a pessoa escolhe, wikipedia é o nome exato).
-_PROVEDORES_COM_LIMPEZA = STOCK_PROVIDERS + ("animepexels", "moviepexels")
+_PROVEDORES_COM_LIMPEZA = STOCK_PROVIDERS + ("animepexels", "moviepexels", "animepexels_online", "moviepexels_online")
 _PROVEDORES_SEM_ALTERNATIVA = ("flow", "youtube", "wikipedia")
 
 _RUIDO_BUSCA = re.compile(
@@ -1746,6 +1759,10 @@ def _motivo_fixo(seg: Dict[str, Any]) -> str:
         return "acervo de anime"
     if prov == "moviepexels":
         return "acervo de filmes e séries"
+    if prov == "animepexels_online":
+        return "acervo online de anime"
+    if prov == "moviepexels_online":
+        return "acervo online de filmes e séries"
     return f"provedor {prov}"
 
 

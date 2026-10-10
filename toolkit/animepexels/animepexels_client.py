@@ -90,12 +90,18 @@ class AnimePexelsVideo:
         }
 
 
-def _full_url(base_url: str, relative_or_absolute: Optional[str]) -> Optional[str]:
+def _full_url(base_url: str, relative_or_absolute: Optional[str], api_key: Optional[str] = None) -> Optional[str]:
     if not relative_or_absolute:
         return None
     if relative_or_absolute.startswith("http://") or relative_or_absolute.startswith("https://"):
-        return relative_or_absolute
-    return base_url + relative_or_absolute
+        url = relative_or_absolute
+    else:
+        url = base_url + relative_or_absolute
+    if api_key and url.startswith(base_url) and "api_key=" not in url:
+        # <video>/<img> do navegador não mandam header: o servidor aceita a chave na URL
+        from urllib.parse import quote
+        url += ("&" if "?" in url else "?") + "api_key=" + quote(api_key, safe="")
+    return url
 
 
 # Catálogos do MESMO servidor (anime-pexels-local >= v62): o de anime em
@@ -115,6 +121,8 @@ class AnimePexelsClient:
         session: Optional[requests.Session] = None,
         timeout: int = DEFAULT_TIMEOUT,
         catalog: Optional[str] = None,
+        api_key: Optional[str] = None,
+        online: Optional[bool] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.session = session or requests.Session()
@@ -125,6 +133,20 @@ class AnimePexelsClient:
             self.catalog = catalog
         self.prefixo = CATALOGOS[self.catalog]["prefixo"]
         self.esquema = CATALOGOS[self.catalog]["esquema"]
+        # servidor ONLINE (modo servidor do Anime Pexels, com chave de API): mesmas rotas,
+        # a chave vai no header (e na URL dos vídeos/fotos, que o navegador abre sem header)
+        self.online = bool(self.online if online is None else online)
+        self.api_key = (api_key or "").strip() or None
+        if self.online:
+            self.esquema += "_online"
+        if self.api_key:
+            self.session.headers["Authorization"] = f"Bearer {self.api_key}"
+            self.session.headers["X-API-Key"] = self.api_key
+
+    online = False
+
+    def _url(self, rel: Optional[str]) -> Optional[str]:
+        return _full_url(self.base_url, rel, self.api_key)
 
     def _request(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         # as rotas são sempre "/api/..."; o catálogo de filmes fica em /movie/api/...
@@ -134,10 +156,23 @@ class AnimePexelsClient:
         try:
             resp = self.session.get(url, params=params, timeout=self.timeout)
         except requests.RequestException as exc:
-            raise AnimePexelsClientError(
-                f"Não consegui conectar em {self.base_url} — o app.py do "
-                f"anime-pexels-local está rodando? ({exc})"
-            ) from exc
+            onde = ("o servidor online está no ar? (confira o endereço em Configurações)" if self.online
+                    else "o app.py do anime-pexels-local está rodando?")
+            raise AnimePexelsClientError(f"Não consegui conectar em {self.base_url} — {onde} ({exc})") from exc
+        if resp.status_code in (401, 403, 429):
+            try:
+                det = resp.json()
+                msg = det.get("error") or ""
+            except ValueError:
+                msg = ""
+            dica = {401: "confira a chave de API (aba de escolher a fonte ou Configurações)",
+                    403: "a chave não tem permissão pra isso — no /dashboard do servidor, marque 'ler' e o catálogo "
+                         + ("de filmes e séries" if self.catalog == "movie" else "de anime"),
+                    429: "limite de requisições por minuto da chave — espere um pouco"}[resp.status_code]
+            if not msg:  # resposta que não é do Anime Pexels (proxy, firewall, outro site nesse endereço)
+                raise AnimePexelsClientError(f"Acesso negado ({resp.status_code}) em {url} — a resposta não veio do Anime Pexels: "
+                                             "confira o endereço do servidor e se a sua rede/antivírus não está bloqueando.")
+            raise AnimePexelsClientError(f"Servidor recusou ({resp.status_code}: {msg}) — {dica}.")
         if resp.status_code == 404:
             raise AnimePexelsClientError(f"Não encontrado (404): {url}")
         if resp.status_code != 200:
@@ -155,8 +190,8 @@ class AnimePexelsClient:
             title=str(title)[:120],
             description=data.get("description") or "",
             url=f"{self.esquema}://clip/{clip_id}",
-            clip_url=_full_url(self.base_url, data.get("clip_url")) or "",
-            thumbnail_url=_full_url(self.base_url, data.get("thumbnail_url")),
+            clip_url=self._url(data.get("clip_url")) or "",
+            thumbnail_url=self._url(data.get("thumbnail_url")),
             duration_seconds=data.get("duration_seconds"),
             orientation=data.get("orientation"),
             resolution_name=data.get("resolution_name"),
@@ -326,7 +361,7 @@ class AnimePexelsClient:
         for c in (data.get("characters") or [])[:limit]:
             saida.append({"id": c.get("id"), "nome": c.get("name"), "obra": c.get("anime_name"),
                           "clipes": c.get("clip_count") or 0,
-                          "foto": _full_url(self.base_url, c.get("photo_url"))})
+                          "foto": self._url(c.get("photo_url"))})
         return saida
 
     def work_credits(self, obra: str) -> Optional[Dict[str, Any]]:
@@ -393,3 +428,13 @@ class AnimePexelsClient:
 class MoviePexelsClient(AnimePexelsClient):
     """Catálogo de FILMES E SÉRIES do mesmo servidor (http://localhost:5000/movie/)."""
     catalog = "movie"
+
+
+class AnimePexelsOnlineClient(AnimePexelsClient):
+    """Catálogo de ANIME do servidor ONLINE (modo servidor, com chave de API)."""
+    online = True
+
+
+class MoviePexelsOnlineClient(MoviePexelsClient):
+    """Catálogo de FILMES E SÉRIES do servidor ONLINE (/movie/, com chave de API)."""
+    online = True

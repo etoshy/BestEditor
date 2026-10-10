@@ -231,6 +231,14 @@
   <input type="text" name="animepexels_base_url" value="{{ config.animepexels_base_url }}" placeholder="http://localhost:5000">
   <p style="color:#666;font-size:0.85rem;">Só muda se você rodar esse servidor numa porta diferente, ou em outra máquina da sua rede local.</p>
 
+  <h2 style="margin-top:32px;">🌐 Anime Pexels online (servidor com chave de API)</h2>
+  <p style="color:#666;font-size:0.85rem;">Duas fontes a mais, <b>animepexels_online</b> e <b>moviepexels_online</b> — não substituem as locais. Uma chave só pras duas (gere no <code>/dashboard</code> do servidor, com a permissão de <b>ler</b> e os catálogos que quiser). Também dá pra pôr a chave direto na página inicial, quando marca uma fonte online.</p>
+  <label>Endereço do servidor online</label>
+  <input type="text" name="animepexels_online_url" value="{{ config.animepexels_online_url }}" placeholder="http://84.247.133.185">
+  <label>Chave de API {% if config.animepexels_online_api_key %}<span style="font-weight:normal;color:#15803d;">(✔ salva: {{ config.animepexels_online_api_key[:8] }}… — em branco mantém)</span>{% endif %}</label>
+  <input type="password" name="animepexels_online_api_key" value="" placeholder="apx_…" autocomplete="off">
+  {% if config.animepexels_online_api_key %}<label style="font-weight:normal;"><input type="checkbox" name="animepexels_online_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
+
   <button type="submit">Salvar configurações</button>
 </form>
 

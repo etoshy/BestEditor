@@ -1879,6 +1879,12 @@ def save_settings():
         "provider_attempt_timeout_seconds": request.form.get("provider_attempt_timeout_seconds", 25),
         "animepexels_base_url": request.form.get("animepexels_base_url", "http://localhost:5000"),
     }
+    if "animepexels_online_url" in request.form:  # formulários antigos não têm: mantém o que já estava salvo
+        new_values["animepexels_online_url"] = request.form["animepexels_online_url"]
+    if (request.form.get("animepexels_online_api_key") or "").strip():  # em branco = mantém a chave salva
+        new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
+    if request.form.get("animepexels_online_apagar_chave") == "on":
+        new_values["animepexels_online_api_key"] = ""
     for chave_flow in ("flow_navegador", "flow_exe", "flow_timeout_seconds", "flow_seletor_configuracoes",
                        "flow_horas_ate_liberar", "flow_palavras_limite", "flow_modelo_video", "flow_seletor_video"):
         if chave_flow in request.form:  # formulários antigos não têm: mantém o que já estava salvo
@@ -2562,7 +2568,7 @@ def transcribe():
                 job["fase"] = "Pronto! Cole a resposta da IA com os termos de busca pros buscadores de imagem."
             else:
                 with perf.timed("montar_prompt"):
-                    if selected_providers in (["animepexels"], ["moviepexels"]):
+                    if __import__("acervos").so_acervo(selected_providers):
                         # único banco marcado é o acervo local de anime —
                         # usa o prompt DEDICADO (orientação sobre queries
                         # concretas, keyword_weight/semantic_weight, etc.)
@@ -2663,7 +2669,7 @@ def submit_termos_wikipedia(job_id: str):
 
             segments = job["segments"]
             with (perf.timed("montar_prompt") if perf else nullcontext()):
-                if job["providers"] in (["animepexels"], ["moviepexels"]):
+                if __import__("acervos").so_acervo(job["providers"]):
                     prompt_text = build_animepexels_prompt(
                         segments, interval_seconds=job["interval_seconds"], ritmo=job.get("ritmo_cenas", "livre"),
                         language_hint=_hint_idioma(job["language"]),
@@ -2740,7 +2746,7 @@ def submit_termos_buscadores(job_id: str):
 
             segments = job["segments"]
             with (perf.timed("montar_prompt") if perf else nullcontext()):
-                if job["providers"] in (["animepexels"], ["moviepexels"]):
+                if __import__("acervos").so_acervo(job["providers"]):
                     prompt_text = build_animepexels_prompt(
                         segments, interval_seconds=job["interval_seconds"], ritmo=job.get("ritmo_cenas", "livre"),
                         language_hint=_hint_idioma(job["language"]),
@@ -2815,7 +2821,7 @@ def _remontar_prompt(job_id: str, job: dict) -> None:
     """Monta de novo o texto do prompt com os bancos/acervos atuais do job."""
     novos_providers = job["providers"]
     segments = job["segments"]
-    if novos_providers in (["animepexels"], ["moviepexels"]):
+    if __import__("acervos").so_acervo(novos_providers):
         prompt_text = build_animepexels_prompt(
             segments, interval_seconds=job["interval_seconds"], ritmo=job.get("ritmo_cenas", "livre"),
             language_hint=_hint_idioma(job["language"]),
@@ -2930,7 +2936,7 @@ def _aplicar_mix_midia(job: dict, parsed=None) -> None:
 
 
 # ------------------------------------------------------------------ acervos locais (anime / filmes e séries)
-_BIBLIOTECAS_LOCAIS = ("animepexels", "moviepexels")
+_BIBLIOTECAS_LOCAIS = ("animepexels", "moviepexels", "animepexels_online", "moviepexels_online")  # acervos.TODOS
 
 
 def _juntar_varios(valor) -> str:
@@ -2958,13 +2964,11 @@ def _bibliotecas_do_form(form, providers: List[str], sufixo: str = "") -> dict:
 
 
 def _cliente_biblioteca(prov: str, timeout: int = 4):
-    import sys as _sys
-    _tk = os.path.join(BASE_DIR, "toolkit")
-    if _tk not in _sys.path:
-        _sys.path.insert(0, _tk)
-    from animepexels.animepexels_client import AnimePexelsClient, MoviePexelsClient
-    classe = MoviePexelsClient if prov == "moviepexels" else AnimePexelsClient
-    return classe(base_url=load_site_config().get("animepexels_base_url") or "http://localhost:5000", timeout=timeout)
+    """Cliente do acervo `prov` — local (animepexels/moviepexels) ou online (…_online, com a chave)."""
+    import acervos
+    if acervos.eh_online(prov):
+        timeout = max(timeout, 12)  # servidor na internet: mais folga que o do próprio PC
+    return acervos.cliente(prov, load_site_config(), timeout=timeout)
 
 
 def _personagens_da_obra(cli, prov: str, obra: Optional[str]) -> List[Dict[str, Any]]:
@@ -2974,7 +2978,7 @@ def _personagens_da_obra(cli, prov: str, obra: Optional[str]) -> List[Dict[str, 
     lista = [c for c in cli.list_characters(obra=obra or None, limit=400) if c.get("nome")]
     if not lista and obra:
         lista = [c for c in cli.list_characters(obra=obra, with_clips=False, limit=400) if c.get("nome")]
-    if not lista and obra and prov == "moviepexels":
+    if not lista and obra and prov in ("moviepexels", "moviepexels_online"):
         try:
             fic = cli.work_credits(obra) or {}
         except Exception:  # noqa: BLE001
@@ -3090,7 +3094,7 @@ def _lista_para_copiar(cli, prov: str, oque: str, obra: str) -> Dict[str, Any]:
     """Texto (uma por linha) com todas as obras do acervo, ou todos os
     personagens — das obras escolhidas ou do acervo inteiro, agrupados por obra."""
     from animepexels.animepexels_client import varios
-    rot = "Anime" if prov == "animepexels" else "Filme/série"
+    rot = "Filme/série" if prov in ("moviepexels", "moviepexels_online") else "Anime"
     if oque == "obras":
         obras = cli.list_works()
         linhas = [o["nome"] + (f" — {', '.join(o.get('generos') or [])}" if o.get("generos") else "") for o in obras]
@@ -3138,6 +3142,45 @@ def biblioteca_local_copiar(prov: str):
         texto = (f"{pedido}\n\nResponda em português. Use só nomes que estão na lista abaixo (é o que eu tenho de cenas no meu acervo).\n\n"
                  f"=== {d['titulo']} ===\n\n{d['texto']}")
     return jsonify({"ok": True, "texto": texto, "quantos": d["quantos"], "titulo": d["titulo"]})
+
+
+@app.route("/acervo-online/config", methods=["GET", "POST"])
+def acervo_online_config():
+    """🌐 Anime Pexels ONLINE: endereço + chave de API (uma chave pras duas fontes
+    online). POST {"chave", "url"} salva no site_config.json (fica só no seu PC).
+    A chave nunca volta inteira pro navegador — só o começo, pra você reconhecer."""
+    import acervos
+    if request.method == "POST":
+        corpo = request.get_json(silent=True) or request.form
+        novos = {}
+        if "url" in corpo:
+            novos["animepexels_online_url"] = str(corpo.get("url") or "").strip() or acervos.URL_ONLINE_PADRAO
+        if "chave" in corpo and (str(corpo.get("chave") or "").strip() or corpo.get("apagar")):
+            novos["animepexels_online_api_key"] = "" if corpo.get("apagar") else str(corpo.get("chave")).strip()
+        try:
+            save_site_config(novos)
+        except SiteConfigError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        for j in _JOBS.values():  # listas de obras/personagens em cache foram pegas com a chave antiga
+            if isinstance(j, dict):
+                j.pop("_bibliotecas_cache", None)
+    on = acervos.config_online(load_site_config())
+    ch = on["chave"]
+    return jsonify({"ok": True, "url": on["url"], "tem_chave": bool(ch),
+                    "chave_inicio": (ch[:8] + "…") if ch else ""})
+
+
+@app.route("/acervo-online/testar")
+def acervo_online_testar():
+    """Testa a chave nos dois catálogos online (anime e filmes/séries)."""
+    out = {}
+    for prov in ("animepexels_online", "moviepexels_online"):
+        try:
+            obras = _cliente_biblioteca(prov, timeout=15).list_works()
+            out[prov] = {"ok": True, "obras": len(obras)}
+        except Exception as exc:  # noqa: BLE001
+            out[prov] = {"ok": False, "erro": str(exc)[:300]}
+    return jsonify({"ok": any(v["ok"] for v in out.values()), "catalogos": out})
 
 
 @app.route("/biblioteca-local/<prov>/creditos")
@@ -4362,7 +4405,7 @@ def _render_estudio(job_id: str, job: dict):
         cenas=_cenas_catalogo_editor(), dp_cat=_catalogo_dp_editor(), estilos_destaque=_estilos_destaque_editor(),
         sons_cat=_sons_editor(),
         youtube_itens=youtube_itens_lista,
-        video_providers=["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "youtube"],
+        video_providers=["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "youtube"],
         photo_providers=[p for p in DEFAULT_PROVIDERS if p in PHOTO_SEARCH_PROVIDERS],
         providers_with_url_support=sorted(PROVIDERS_WITH_URL_RESOLUTION),
         transicoes=TRANSITION_LABELS,
@@ -4587,7 +4630,7 @@ def _render_editor_classico(job_id: str, job: dict):
     return render_template(
         "edit_segments.html", job=job, segments=job["pending_segments"],
         youtube_itens=youtube_itens_lista,
-        video_providers=["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "youtube"],
+        video_providers=["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "youtube"],
         photo_providers=[p for p in DEFAULT_PROVIDERS if p in PHOTO_SEARCH_PROVIDERS],
         browser_image_providers=list(BROWSER_IMAGE_SEARCH_PROVIDERS),
         transicoes=TRANSITION_LABELS,

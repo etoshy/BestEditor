@@ -4,9 +4,22 @@
 {% macro bibliotecas(sufixo="", nome_checkbox="providers", valores=None) %}
 {% set valores = valores or {} %}
 <div class="bibbox" data-sufixo="{{ sufixo }}" data-checkbox="{{ nome_checkbox }}">
+  <div class="bib-chave" style="display:none;margin:10px 0;padding:10px 12px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
+    <strong style="font-size:0.9rem;">🌐🔑 Anime Pexels online — chave de API</strong>
+    <span style="color:#666;font-size:0.8rem;">(uma chave só pras duas fontes online: anime e filmes/séries; as locais continuam iguais)</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+      <input type="password" class="bib-chave-in" placeholder="apx_… (gere no /dashboard do servidor)" autocomplete="off" style="flex:2;min-width:220px;margin:0;padding:8px 10px;font-size:0.9rem;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;">
+      <input type="text" class="bib-url-in" placeholder="http://84.247.133.185" style="flex:1;min-width:170px;margin:0;padding:8px 10px;font-size:0.9rem;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;" title="Endereço do servidor online">
+      <button type="button" class="bib-chave-salvar" style="width:auto;margin:0;padding:5px 12px;">💾 Salvar</button>
+      <button type="button" class="bib-chave-testar" style="width:auto;margin:0;padding:5px 12px;">🔌 Testar</button>
+    </div>
+    <p class="bib-chave-st" style="color:#555;font-size:0.8rem;margin:5px 0 0;"></p>
+  </div>
   {% for prov, icone, titulo, rot_obra, rot_pessoa, ex_obra, ex_pessoa in [
       ('animepexels', '🎌', 'Anime Pexels', 'Anime', 'Personagem', 'ex.: Death Note', 'ex.: Light'),
-      ('moviepexels', '🎬', 'Filmes e Séries Pexels', 'Filme ou série', 'Personagem ou ator', 'ex.: Breaking Bad', 'ex.: Walter White ou Bryan Cranston')] %}
+      ('moviepexels', '🎬', 'Filmes e Séries Pexels', 'Filme ou série', 'Personagem ou ator', 'ex.: Breaking Bad', 'ex.: Walter White ou Bryan Cranston'),
+      ('animepexels_online', '🌐🎌', 'Anime Pexels online', 'Anime', 'Personagem', 'ex.: Death Note', 'ex.: Light'),
+      ('moviepexels_online', '🌐🎬', 'Filmes e Séries Pexels online', 'Filme ou série', 'Personagem ou ator', 'ex.: Breaking Bad', 'ex.: Walter White ou Bryan Cranston')] %}
   {% set v = valores.get(prov) or {} %}
   <div class="bib-prov" data-prov="{{ prov }}" style="display:none;margin:10px 0;padding:10px 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;">
     <strong style="font-size:0.9rem;">{{ icone }} {{ titulo }} — de onde tirar as cenas <span style="font-weight:normal;color:#666;">(opcional)</span></strong>
@@ -72,7 +85,41 @@
       lp.textContent = obra ? (nomes.length ? `📋 Vão listados no prompt pra IA (${nomes.length}): ${nomes.slice(0, 40).join(', ')}${nomes.length > 40 ? '…' : ''}` : `⚠ O acervo não tem personagens cadastrados pra “${obra}”.`) : '';
     } catch (_) {}
   }
+  // 🌐🔑 chave do servidor online (fica salva no site_config.json do seu PC)
+  const caixaChave = box.querySelector('.bib-chave'), stChave = box.querySelector('.bib-chave-st');
+  let chaveCarregada = false;
+  async function carregarChave() {
+    if (chaveCarregada) return; chaveCarregada = true;
+    try {
+      const d = await (await fetch('/acervo-online/config')).json();
+      box.querySelector('.bib-url-in').value = d.url || '';
+      stChave.textContent = d.tem_chave ? `✔ Chave salva (${d.chave_inicio}). Pra trocar, cole outra e salve.` : '⚠ Nenhuma chave salva ainda — cole a sua e clique em Salvar.';
+    } catch (_) { chaveCarregada = false; }
+  }
+  async function testarChave() {
+    stChave.textContent = '⏳ testando no servidor…';
+    try {
+      const d = await (await fetch('/acervo-online/testar')).json();
+      const c = d.catalogos || {}, nome = { animepexels_online: 'anime', moviepexels_online: 'filmes e séries' };
+      stChave.textContent = Object.entries(c).map(([k, v]) => v.ok ? `✅ ${nome[k]}: ${v.obras} obras` : `✖ ${nome[k]}: ${v.erro}`).join('  ·  ');
+    } catch (e) { stChave.textContent = '⚠ ' + e.message; }
+  }
+  box.querySelector('.bib-chave-salvar').addEventListener('click', async () => {
+    const chave = box.querySelector('.bib-chave-in').value.trim(), url = box.querySelector('.bib-url-in').value.trim();
+    try {
+      const r = await fetch('/acervo-online/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chave, url }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      box.querySelector('.bib-chave-in').value = '';
+      // as listas de obras/personagens das fontes online são buscadas de novo com a chave nova
+      ['animepexels_online', 'moviepexels_online'].forEach(p => { carregado[p] = false; });
+      atualizar(); await testarChave();
+    } catch (e) { stChave.textContent = '⚠ ' + e.message; }
+  });
+  box.querySelector('.bib-chave-testar').addEventListener('click', testarChave);
   function atualizar() {
+    const algumOnline = [...form.querySelectorAll(`input[name="${nome}"]`)].some(c => c.checked && c.value.endsWith('_online'));
+    caixaChave.style.display = algumOnline ? '' : 'none';
+    if (algumOnline) carregarChave();
     box.querySelectorAll('.bib-prov').forEach(bloco => {
       const prov = bloco.dataset.prov;
       const marcado = [...form.querySelectorAll(`input[name="${nome}"]`)].some(c => c.value === prov && c.checked);

@@ -28,6 +28,21 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🌐 Anime Pexels online — duas fontes novas com chave de API (v84_38)
+
+- Fontes novas **animepexels_online** e **moviepexels_online**: o mesmo Anime Pexels em modo servidor
+  (padrão `http://84.247.133.185`). Não substituem as locais — são alternativas; dá pra marcar junto.
+- Tudo das locais vale nelas: obra e personagem/ator (várias com " | "), lista de personagens no prompt,
+  📋 copiar a lista, prompt dedicado quando é a única fonte, pesos da busca, Estúdio, clipes curtos.
+- **Chave de API**: ao marcar uma fonte online, aparece a caixa **🌐🔑** com a chave e o endereço
+  (💾 Salvar / 🔌 Testar). Uma chave só pras duas. Fica no `site_config.json` (no `.gitignore`); a página
+  nunca recebe a chave inteira de volta. Também em Configurações.
+- A chave vai no header `Authorization: Bearer` e, nos vídeos/miniaturas (que o navegador abre sem header),
+  em `?api_key=`. Erros 401/403/429 do servidor viram mensagens claras (chave errada, sem permissão de
+  ler o catálogo, limite por minuto).
+- Código: `acervos.py` (qual fonte é local/online/filmes e o cliente certo), `AnimePexelsOnlineClient` /
+  `MoviePexelsOnlineClient` no `toolkit/animepexels/animepexels_client.py`.
+
 ## 📣 Uma chamada por tipo + marcas de cena fora da voz (v84_36)
 
 - Várias [[VENDA]] / [[INSCREVA]]: o vídeo padrão entra **só na 1ª marca de cada tipo**; as outras ficam

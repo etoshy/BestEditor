@@ -84,6 +84,8 @@ _ORIENTATION_FILTERS = {
     "magnific": {"16:9": {"orientations": ["horizontal"]}, "9:16": {"orientations": ["vertical"]}},
     "animepexels": {"16:9": {"orientation": "horizontal"}, "9:16": {"orientation": "vertical"}},
     "moviepexels": {"16:9": {"orientation": "horizontal"}, "9:16": {"orientation": "vertical"}},
+    "animepexels_online": {"16:9": {"orientation": "horizontal"}, "9:16": {"orientation": "vertical"}},
+    "moviepexels_online": {"16:9": {"orientation": "horizontal"}, "9:16": {"orientation": "vertical"}},
     # vistacreate não expõe filtro de orientação na busca (confirmado no toolkit)
 }
 
@@ -107,11 +109,14 @@ _DURATION_FILTER_PARAMS = {
     "magnific": ("duration_from", "duration_to"),
     "animepexels": ("min_duration", "max_duration"),
     "moviepexels": ("min_duration", "max_duration"),
+    "animepexels_online": ("min_duration", "max_duration"),
+    "moviepexels_online": ("min_duration", "max_duration"),
 }
 
 # Acervos LOCAIS (anime-pexels-local): um servidor, dois catálogos. Entendem
 # os pesos da busca e os filtros de obra (anime/filme/série) e personagem/ator.
-BIBLIOTECAS_LOCAIS = ("animepexels", "moviepexels")
+# + as versões ONLINE do mesmo projeto (modo servidor, com chave de API) — ver acervos.py
+BIBLIOTECAS_LOCAIS = ("animepexels", "moviepexels", "animepexels_online", "moviepexels_online")
 
 
 def _weight_filter_kwargs(segment: VideoSegment) -> Dict[str, Any]:
@@ -2256,6 +2261,8 @@ _PROVIDER_MODULES = {
     "vistacreate": ("vistacreate.vistacreate_client", "VistaCreateClient"),
     "animepexels": ("animepexels.animepexels_client", "AnimePexelsClient"),
     "moviepexels": ("animepexels.animepexels_client", "MoviePexelsClient"),
+    "animepexels_online": ("animepexels.animepexels_client", "AnimePexelsOnlineClient"),
+    "moviepexels_online": ("animepexels.animepexels_client", "MoviePexelsOnlineClient"),
 }
 
 
@@ -2452,10 +2459,9 @@ class ClientFactory:
             # o mesmo cliente HTTP simples, nunca navegador, nunca
             # fallback API->browser (não existe essa distinção aqui).
             # Filmes/séries = o MESMO servidor, catálogo /movie.
-            module = importlib.import_module("animepexels.animepexels_client")
-            base_url = self.cfg.get("animepexels_base_url") or module.DEFAULT_BASE_URL
-            classe = module.MoviePexelsClient if provider == "moviepexels" else module.AnimePexelsClient
-            return classe(base_url=base_url)
+            # As versões "_online" vão no servidor online, com a chave de API.
+            import acervos
+            return acervos.cliente(provider, self.cfg)
 
         if provider in _API_ENABLED_PROVIDERS and provider not in self._use_browser_for:
             module_name, class_name = _API_ENABLED_PROVIDERS[provider]
@@ -2531,7 +2537,7 @@ def garantir_imagem_compativel(path: str) -> str:
         return converter_para_jpg(path)
     except ValueError as exc:
         raise VideoAssemblyError(f"Não consegui ler a imagem {os.path.basename(path)!r}: {exc}") from exc
-_PROVIDERS_WITH_URL_RESOLUTION = {"pexels", "pixabay", "mixkit", "animepexels", "moviepexels"}
+_PROVIDERS_WITH_URL_RESOLUTION = {"pexels", "pixabay", "mixkit", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online"}
 
 
 def _infer_media_kind(path_or_url: str) -> str:

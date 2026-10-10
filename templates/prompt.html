@@ -39,11 +39,11 @@
 {% for prov, inf in (job.get('bibliotecas_info') or {}).items() %}
 {% if inf.obra or inf.erro %}
 <div style="background:{{ '#fef2f2' if inf.erro or not inf.personagens else '#f5f3ff' }};border:1px solid {{ '#fecaca' if inf.erro or not inf.personagens else '#ddd6fe' }};border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;">
-  {{ '🎬' if prov == 'moviepexels' else '🎌' }} <strong>{{ inf.obra or prov }}</strong>
+  {{ ('🌐' if prov.endswith('_online') else '') ~ ('🎬' if prov.startswith('moviepexels') else '🎌') }} <strong>{{ inf.obra or prov }}</strong>
   {% if inf.erro %}
   — ⚠ não consegui ler os personagens do acervo ({{ inf.erro }}). O app.py do anime-pexels-local está rodando?
   {% elif inf.personagens %}
-  — {{ inf.personagens|length }} {{ 'personagens/atores' if prov == 'moviepexels' else 'personagens' }} listados no prompt pra IA:
+  — {{ inf.personagens|length }} {{ 'personagens/atores' if prov.startswith('moviepexels') else 'personagens' }} listados no prompt pra IA:
   <span style="color:#444;">{{ inf.personagens[:40]|join(', ') }}{% if inf.personagens|length > 40 %}… (+{{ inf.personagens|length - 40 }}){% endif %}</span>
   {% else %}
   — o acervo não devolveu nenhum personagem pra essa obra (confira o nome da obra ou cadastre os personagens no acervo).

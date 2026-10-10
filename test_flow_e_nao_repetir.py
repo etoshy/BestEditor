@@ -63,12 +63,12 @@ class TestConfigFlow:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump({"provider_priority": antiga}, f)
         carregada = load_site_config(config_path)
-        assert carregada["provider_priority"] == antiga + ["flow", "moviepexels"]  # v84: moviepexels também completa sozinho
+        assert carregada["provider_priority"] == antiga + ["flow", "moviepexels", "animepexels_online", "moviepexels_online"]  # v84: moviepexels também completa sozinho
 
     def test_salvar_lista_antiga_sem_flow_completa_em_vez_de_dar_erro(self, config_path):
         antiga = ["mixkit", "pexels", "pixabay", "magnific", "vistacreate", "animepexels", "wikipedia"]
         salvo = save_site_config({"provider_priority": antiga}, config_path)
-        assert salvo["provider_priority"] == antiga + ["flow", "moviepexels"]  # v84: moviepexels também completa sozinho
+        assert salvo["provider_priority"] == antiga + ["flow", "moviepexels", "animepexels_online", "moviepexels_online"]  # v84: moviepexels também completa sozinho
 
     def test_lista_realmente_incompleta_continua_sendo_rejeitada(self, config_path):
         # falta "pixabay" etc — só o "flow" é completado sozinho
@@ -585,7 +585,7 @@ class TestPaginaConfiguracoes:
     def test_prioridade_antiga_sem_flow_salva_sem_erro(self, client):
         antiga = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "wikipedia"]
         r = client.post("/settings", data={"provider_priority": antiga})
-        assert r.status_code == 200 and load_site_config()["provider_priority"][-2:] == ["flow", "moviepexels"]
+        assert r.status_code == 200 and load_site_config()["provider_priority"][-4:] == ["flow", "moviepexels", "animepexels_online", "moviepexels_online"]
 
 
 class TestPaginaInicialEPrompt:

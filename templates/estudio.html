@@ -2705,7 +2705,7 @@ function mostrarCandidatoNoMonitor(c) {
 }
 
 // ------------------------------------------------------------------ acervos locais: obra e personagem/ator
-const BIB_LOCAIS = ['animepexels', 'moviepexels'];
+const BIB_LOCAIS = ['animepexels', 'moviepexels', 'animepexels_online', 'moviepexels_online'];  // + as online (com chave)
 const bibCache = {};
 async function listaBib(prov, tipo, obra) {
   const chave = prov + tipo + (obra || '');
@@ -2720,7 +2720,7 @@ async function mostrarBib() {
   const prov = $('bBanco').value, local = BIB_LOCAIS.includes(prov);
   $('bBib').style.display = local ? '' : 'none';
   if (!local) return;
-  const filmes = prov === 'moviepexels';
+  const filmes = prov === 'moviepexels' || prov === 'moviepexels_online';
   $('bObraRot').textContent = filmes ? 'Filme ou série' : 'Anime';
   $('bPessoaRot').textContent = filmes ? 'Personagem ou ator' : 'Personagem';
   const obras = await listaBib(prov, 'obras');
@@ -2952,7 +2952,7 @@ function propsTrecho(P, i) {
       ${s._preview && s._preview.nao_fixa ? '<div class="aviso">Esse banco não deixa fixar um resultado específico: na montagem ele busca de novo e pode trazer a 1ª opção. Pra garantir, escolha em 🔍 Ver opções ou envie o arquivo.</div>' : ''}
       ${fonte ? `<div class="aviso" style="background:#0f2e2a;border-color:#155e55;color:#a7f3e7;">✓ ${esc(fonte)}</div><button class="mini" id="pVoltarAuto">↩ Voltar à busca automática</button>` : ''}
       ${campo('Termo de busca', `<input type="text" id="pTermo" value="${esc(s.query)}">`)}
-      ${BIB_LOCAIS.includes(s.provider) ? campo(s.provider === 'moviepexels' ? 'Filme ou série' : 'Anime', `<input type="text" id="pObra" list="bObras" value="${esc(s.obra || '')}" placeholder="todas · várias: A | B">`) + campo(s.provider === 'moviepexels' ? 'Personagem ou ator' : 'Personagem', `<input type="text" id="pPessoa" list="bPessoas" value="${esc(s.personagem || '')}" placeholder="qualquer um · vários: A | B">`) : ''}
+      ${BIB_LOCAIS.includes(s.provider) ? campo((s.provider === 'moviepexels' || s.provider === 'moviepexels_online') ? 'Filme ou série' : 'Anime', `<input type="text" id="pObra" list="bObras" value="${esc(s.obra || '')}" placeholder="todas · várias: A | B">`) + campo((s.provider === 'moviepexels' || s.provider === 'moviepexels_online') ? 'Personagem ou ator' : 'Personagem', `<input type="text" id="pPessoa" list="bPessoas" value="${esc(s.personagem || '')}" placeholder="qualquer um · vários: A | B">`) : ''}
       ${campo(s.media_type === 'image' ? 'Banco de foto' : 'Banco de vídeo', `<select id="pBanco">${opcoes(bancos.map(p => [p, p === 'youtube' ? 'youtube (escolha manual)' : p]).concat(bancos.includes(s.provider) ? [] : [[s.provider, s.provider]]), s.provider)}</select>`)}
       ${s.provider === 'youtube' ? '<p class="hint">🎬 Escolha o vídeo e o trecho na aba <a href="#" id="pIrYt">YouTube</a>.</p>' : ''}
       <label class="f"><span>🔗 Link do YouTube + tempo</span><div class="row" style="gap:4px"><input type="text" id="pYtLink" placeholder="https://youtu.be/ID 1:35-1:42" value="${s.youtube_link ? esc(textoYtLink(s.youtube_link)) : ''}"><button class="mini" id="pYtUsar" style="flex:0 0 auto">⬇ Usar</button></div></label>
