@@ -1,0 +1,27 @@
+# texto com fim de linha normalizado (Windows/Linux sem bagunçar o diff)
+* text=auto
+*.py text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.bat text eol=crlf
+
+# binários
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.mp3 binary
+*.wav binary
+*.mp4 binary
+*.webm binary
+*.rnnn binary

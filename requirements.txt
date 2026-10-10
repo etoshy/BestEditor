@@ -1,0 +1,62 @@
+flask>=3.0.0
+# watchdog (opcional, mas recomendado): sem ele, o modo debug do Flask
+# usa o reloader "stat" (mais lento -- fica checando a data de
+# modificação de cada arquivo em intervalos, em vez de ser avisado
+# direto pelo sistema operacional quando algo muda). Se no terminal
+# aparecer "Restarting with stat" ao iniciar o site, é sinal de que
+# esse pacote não está instalado -- instale pra um site mais responsivo
+# durante o desenvolvimento (não afeta nada em produção/uso normal).
+watchdog>=4.0.0
+# openai-whisper puxa PyTorch como dependência automaticamente -- se
+# você tem GPU NVIDIA e quer a transcrição rodando nela (bem mais
+# rápida), veja a seção de GPU em toolkit/tts/requirements.txt: o
+# comando de instalar torch com suporte a CUDA é o mesmo pra Whisper e
+# pro XTTS v2 (é o mesmo PyTorch usado pelos dois).
+openai-whisper
+selenium>=4.20.0
+requests>=2.31.0
+
+# --- Baixar de outras redes (Kwai, na "Baixar de outras redes") ---
+# TikTok/Instagram/Twitter(X)/Facebook usam o yt-dlp já listado acima; só o
+# Kwai precisa disso, pra ler o JSON embutido na própria página do vídeo.
+beautifulsoup4>=4.12.0
+
+# --- "Capturar página" (webpage_capture.py/webpage_animator.py) ---
+# Print/mapa de qualquer site + clipe animado (rolagem/foco). Depois
+# de instalar o pacote, baixe o navegador que ele usa por baixo dos
+# panos (só precisa rodar uma vez):
+#     playwright install chromium
+playwright>=1.40.0
+Pillow>=11.3.0  # 11.3+ lê AVIF (imagens dos buscadores) sem plugin extra
+
+# --- "Cortar do YouTube" (youtube_clipper.py) ---
+# O YouTube muda a forma de autenticar com frequência, e o yt-dlp
+# precisa de atualizações constantes pra acompanhar -- uma versão
+# desatualizada é a causa mais comum de "HTTP Error 403: Forbidden" ao
+# baixar. Se isso acontecer, rode:
+#   pip install -U "yt-dlp[default]" --break-system-packages
+# (o [default] traz o yt-dlp-ejs, que resolve boa parte dos desafios
+# de JavaScript que o YouTube usa; o site já tenta de novo sozinho com
+# o cliente "android" do YouTube se a tentativa padrão falhar — mas
+# isso só ajuda até certo ponto se o yt-dlp em si estiver desatualizado).
+# Instalar o Deno (https://deno.com) também ajuda, no mesmo motivo.
+yt-dlp[default]>=2026.8.19
+# Outros jeitos quando o YouTube bloqueia o yt-dlp ("Sign in to confirm you're not a bot"):
+# legenda por outro caminho e download de áudio/vídeo por outra biblioteca (yt_alternativas.py)
+youtube-transcript-api>=1.2
+pytubefix>=9.0
+
+# --- Google Flow: contas (login automático, troca de senha, exportar/importar) ---
+# Guarda a senha no Gerenciador de Credenciais do Windows (ou o cofre
+# equivalente do seu sistema) -- sem esse pacote, "salvar a senha" e "Ver
+# senha" na página Contas Google não funcionam (a tela avisa isso, se faltar).
+keyring>=24.0.0
+
+# --- Buscadores de imagem (Bing/Brave/Yandex/Startpage) ---
+# Usam a "Busca de Imagens Unificada" (toolkit/unified_images/): os motores
+# originais importam FastAPI/uvicorn no topo do arquivo (cada um também roda
+# sozinho como API), então os dois precisam estar instalados mesmo o site não
+# subindo servidor nenhum deles. O navegador é o mesmo Chromium do Playwright
+# lá de cima (`playwright install chromium`).
+fastapi>=0.115
+uvicorn>=0.34

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Textos animados</title>
+<link rel="stylesheet" href="{{ url_for('dp_fontes_css') }}">
+<style>
+:root{--bg:#0d0e12;--panel:#16181f;--panel2:#1c1f28;--line:#2a2e3a;--text:#e8e9ee;--dim:#8c92a4;--accent:#00d4b4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Inter,Roboto,sans-serif;font-size:13px}
+a{color:var(--accent)}
+header{display:flex;gap:12px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header b{font-size:15px}
+.wrap{display:grid;grid-template-columns:340px 1fr;gap:0;min-height:calc(100vh - 46px)}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:14px;overflow:auto;max-height:calc(100vh - 46px)}
+main{padding:16px;overflow:auto;max-height:calc(100vh - 46px)}
+label.f{display:block;margin-top:10px;font-size:11px;color:var(--dim)} label.f>span{display:block;margin-bottom:3px}
+input,select,textarea{font-family:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;width:100%}
+input[type=color]{width:46px;height:30px;padding:2px}
+button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:6px;padding:8px 12px;font-size:13px}
+button.primary{background:var(--accent);color:#04231d;border-color:var(--accent);font-weight:700;width:100%;margin-top:12px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.hint{color:var(--dim);font-size:11.5px;line-height:1.45}
+#palco{position:relative;width:100%;max-width:820px;aspect-ratio:16/9;background:#000 repeating-conic-gradient(#1a1a1a 0 25%,#111 0 50%) 0 0/24px 24px;border-radius:8px;overflow:hidden;margin-bottom:12px}
+#palco .t{position:absolute;color:#fff;font-weight:800;line-height:1.1;text-shadow:0 2px 6px rgba(0,0,0,.6);white-space:pre-wrap;max-width:86%}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.est{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:6px;cursor:pointer}
+.est:hover,.est.sel{border-color:var(--accent)}
+.est .am{height:54px;display:flex;align-items:center;justify-content:center;background:#20232c;border-radius:5px;overflow:hidden;font-size:16px;text-align:center;padding:0 6px;white-space:nowrap}
+.est .nm{font-size:10.5px;color:var(--dim);margin-top:4px;display:flex;justify-content:space-between;gap:6px}
+h3{margin:14px 0 8px;font-size:11px;letter-spacing:.04em;color:var(--dim);text-transform:uppercase}
+#res{margin-top:12px}
+video{max-width:100%;border-radius:6px;background:#000}
+</style>
+</head>
+<body>
+<header><b>🔤 Textos animados</b><span class="hint">os mesmos 207 estilos do Estúdio — pra baixar como vídeo e usar em qualquer editor</span><span style="flex:1"></span><a href="{{ url_for('jobs_history_page') }}">🗂️ Galeria</a><a href="/">Início</a></header>
+<div class="wrap">
+<aside>
+  <label class="f"><span>Texto</span><textarea id="texto" rows="3" placeholder="ex: 3 MILHÕES DE PESSOAS">Tudo estava conectado</textarea></label>
+  <div id="campos"></div>
+  <div class="row">
+    <label class="f"><span>Duração (s)</span><input type="number" id="dur" value="3" min="0.8" max="60" step="0.1"></label>
+    <label class="f"><span>Cor de destaque</span><input type="color" id="cor" value="{{ estilos.paleta.primaria }}"></label>
+  </div>
+  <div class="row">
+    <label class="f"><span>Formato</span><select id="orient"><option value="16:9">16:9 (horizontal)</option><option value="9:16">9:16 (vertical)</option><option value="1:1">1:1 (quadrado)</option></select></label>
+    <label class="f"><span>Qualidade</span><select id="qual"><option>1080p</option><option>720p</option></select></label>
+  </div>
+  <label class="f"><span>Posição</span><select id="zona"><option value="">do estilo</option><option value="centro">Centro</option><option value="alto">Topo</option><option value="baixo">Base</option><option value="terco_inf">Terço inferior</option><option value="esq">Esquerda</option><option value="dir">Direita</option><option value="canto_tl">Canto sup. esq.</option><option value="canto_tr">Canto sup. dir.</option><option value="canto_bl">Canto inf. esq.</option></select></label>
+  <label class="f"><span>Fundo</span><select id="fundo">{% for k, v in fundos.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}</select></label>
+  <label class="f" style="display:flex;gap:6px;align-items:center;color:var(--text)"><input type="checkbox" id="trat" checked style="width:auto"> Efeito de fundo do estilo (só no fundo preto)</label>
+  <button class="primary" id="gerar">🎬 Gerar vídeo</button>
+  <div id="res" class="hint"></div>
+</aside>
+<main>
+  <div id="palco"><div class="t" id="prev"></div></div>
+  <div style="display:flex;gap:8px;margin-bottom:8px;max-width:820px"><input id="busca" placeholder="procurar estilo… (ano, citação, glow, nome, capítulo…)"><select id="papel" style="width:auto"><option value="">todos</option><option value="abertura">abertura</option><option value="secao">seção</option><option value="destaque">destaque</option><option value="enfase">ênfase</option><option value="info">info (dados)</option><option value="apoio">apoio</option></select></div>
+  <div id="lista"></div>
+</main>
+</div>
+<script>
+(function () {
+const C = {{ estilos|tojson }};
+const E = Object.fromEntries(C.estilos.map(e => [e.id, e]));
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+let atual = C.estilos[0].id;
+const POS = { centro: [50, 50, 'c'], metade: [50, 50, 'c'], full_bleed: [50, 50, 'c'], terco_inf: [6, 84, 'l'], terco_sup: [6, 12, 'l'], canto_bl: [5, 90, 'l'], canto_tl: [5, 9, 'l'], canto_tr: [95, 9, 'r'], canto_br: [95, 90, 'r'], esq: [7, 50, 'l'], dir: [93, 50, 'r'], painel_esq: [6, 50, 'l'], painel_dir: [94, 50, 'r'], baixo: [50, 88, 'c'], alto: [50, 10, 'c'], inline: [50, 86, 'c'] };
+const TAM = { centro_titulo: 0.12, centro_frase: 0.082, palavra: 0.18, marca: 0.085, terco: 0.055, selo_canto: 0.05, cartao_dado: 0.11, citacao: 0.07, cascata: 0.085, digitacao: 0.068, sublinhado: 0.08, slab: 0.1, painel_meio: 0.08, carimbo: 0.095, doc: 0.06 };
+function lista() {
+  const box = $('lista'); box.innerHTML = '';
+  const q = $('busca').value.trim().toLowerCase(), papel = $('papel').value, meu = $('texto').value.trim();
+  let cat = null, grade = null;
+  C.estilos.filter(e => (!papel || e.papel === papel) && (!q || (e.nome + ' ' + e.id + ' ' + e.categoria + ' ' + (e.subtipos || []).join(' ') + ' ' + (e.quando || '')).toLowerCase().includes(q))).forEach(e => {
+    if (e.categoria !== cat) { cat = e.categoria; const h = document.createElement('h3'); h.textContent = cat; box.appendChild(h); grade = document.createElement('div'); grade.className = 'grade'; box.appendChild(grade); }
+    const d = document.createElement('div'); d.className = 'est' + (e.id === atual ? ' sel' : '');
+    let am = meu || e.amostra || e.nome; if (e.caixa_alta) am = am.toUpperCase();
+    const caixa = ['selo_canto', 'cartao_dado', 'slab', 'marca'].includes(e.forma);
+    d.innerHTML = `<div class="am" style="font-family:'${esc(e.fonte)}';font-style:${e.italico ? 'italic' : 'normal'}"><span style="${caixa ? `background:${$('cor').value};color:#111;padding:1px 6px;` : ''}${e.forma === 'terco' ? `border-left:4px solid ${$('cor').value};background:#111a;padding:1px 6px;` : ''}">${esc(am.slice(0, 30))}</span></div><div class="nm"><span>${esc(e.nome)}</span><span>${esc(e.papel)}</span></div>`;
+    d.title = (e.quando || '') + (e.palavras ? `\n${e.palavras[0]}–${e.palavras[1]} palavras` : '');
+    d.addEventListener('click', () => { atual = e.id; document.querySelectorAll('.est').forEach(x => x.classList.toggle('sel', x === d)); campos(); prev(); });
+    grade.appendChild(d);
+  });
+}
+function campos() {
+  const e = E[atual]; const box = $('campos');
+  box.innerHTML = (e.campos || []).filter(c => !c.principal).map(c => `<label class="f"><span>${esc(c.rotulo || c.id)} (opcional)</span><input data-k="${esc(c.id)}" class="cp"></label>`).join('');
+  box.querySelectorAll('input').forEach(i => i.addEventListener('input', prev));
+}
+function prev() {
+  const e = E[atual]; const p = $('palco'); const t = $('prev');
+  p.style.aspectRatio = $('orient').value === '9:16' ? '9/16' : $('orient').value === '1:1' ? '1/1' : '16/9';
+  p.style.maxWidth = $('orient').value === '16:9' ? '820px' : '420px';
+  p.style.background = $('fundo').value === 'preto' ? '#000' : $('fundo').value === 'verde' ? '#00b140' : '';
+  const H = p.clientHeight; let [x, y, al] = POS[$('zona').value || e.zona] || POS.centro;
+  if ((e.forma === 'terco' || e.forma === 'doc') && !$('zona').value && e.zona === 'centro') [x, y, al] = [6, 84, 'l'];
+  let txt = $('texto').value || e.amostra || ''; if (e.caixa_alta) txt = txt.toUpperCase();
+  const caixa = ['selo_canto', 'cartao_dado', 'slab', 'marca'].includes(e.forma);
+  const tam = (TAM[e.forma] || 0.075) * H * (txt.length > 40 ? 0.7 : 1);
+  const tr = al === 'c' ? 'translate(-50%,-50%)' : al === 'r' ? 'translate(-100%,-50%)' : 'translate(0,-50%)';
+  const cor = $('cor').value;
+  t.style.cssText = `left:${x}%;top:${y}%;transform:${tr};font-family:'${e.fonte}';font-style:${e.italico ? 'italic' : 'normal'};font-size:${tam}px;text-align:${al === 'c' ? 'center' : al === 'r' ? 'right' : 'left'};` + (caixa ? `background:${cor};color:#111;padding:.1em .35em;text-shadow:none;` : '') + (e.forma === 'terco' || e.forma === 'doc' ? `border-left:.18em solid ${cor};background:rgba(16,16,16,.75);padding:.15em .4em;` : '') + (e.forma === 'carimbo' ? `color:${cor};border:.08em solid ${cor};padding:.05em .3em;transform:${tr} rotate(-6deg);` : '');
+  t.textContent = txt;
+}
+let tmr = null;
+['texto'].forEach(id => $(id).addEventListener('input', () => { prev(); clearTimeout(tmr); tmr = setTimeout(lista, 300); }));
+['orient', 'zona', 'fundo', 'cor'].forEach(id => $(id).addEventListener('input', () => { prev(); if (id === 'cor') lista(); }));
+$('busca').addEventListener('input', lista); $('papel').addEventListener('change', lista);
+window.addEventListener('resize', prev);
+$('gerar').addEventListener('click', async () => {
+  const b = $('gerar'); b.disabled = true; b.textContent = '⏳ Gerando…'; $('res').textContent = '';
+  const campos = {}; document.querySelectorAll('#campos .cp').forEach(i => { if (i.value.trim()) campos[i.dataset.k] = i.value.trim(); });
+  try {
+    const r = await fetch('{{ url_for("textos_avulsos_gerar") }}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estilo: atual, texto: $('texto').value, duracao: $('dur').value, cor: $('cor').value, orientacao: $('orient').value, qualidade: $('qual').value, zona: $('zona').value, fundo: $('fundo').value, tratamento: $('trat').checked, campos }) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+    const ver = d.url + '?ver=1';
+    $('res').innerHTML = `✅ Pronto: <a href="${d.url}">⬇ baixar ${esc(d.arquivo)}</a>` + (/\.mp4$|\.webm$/.test(d.arquivo) ? `<br><video src="${ver}" controls autoplay loop muted style="margin-top:8px"></video>` : '<br><span class="hint">(MOV com transparência — o navegador não mostra, abra no seu editor)</span>');
+  } catch (e) { $('res').textContent = '⚠ ' + e.message; }
+  b.disabled = false; b.textContent = '🎬 Gerar vídeo';
+});
+lista(); campos(); prev();
+})();
+</script>
+</body>
+</html>

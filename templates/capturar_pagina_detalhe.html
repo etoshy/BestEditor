@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ captura.titulo or captura.url }}{% endblock %}
+{% block content %}
+<h1>🖼️ {{ captura.titulo or captura.url }}</h1>
+<p style="color:#666;font-size:0.85rem;"><a href="{{ captura.url }}" target="_blank">{{ captura.url }}</a> — <a href="{{ url_for('capturar_pagina_page') }}">&larr; nova captura</a></p>
+
+<img src="{{ url_for('capturar_pagina_screenshot', captura_id=captura.id) }}" style="max-width:100%;border:1px solid #ddd;border-radius:8px;margin:10px 0;">
+
+<h2>Gerar clipe de vídeo</h2>
+<div id="error-box" class="error" style="display:none;"></div>
+
+<form id="form-renderizar">
+  <label>Modo</label>
+  <select name="modo" id="select-modo" onchange="alternarModo()">
+    <option value="scroll">Rolagem (mostra a página inteira, de cima a baixo ou vice-versa)</option>
+    <option value="foco">Foco num trecho específico</option>
+  </select>
+
+  <div id="opcoes-scroll">
+    <label>Direção</label>
+    <select name="direcao_scroll">
+      <option value="baixo">De cima pra baixo</option>
+      <option value="cima">De baixo pra cima</option>
+    </select>
+  </div>
+
+  <div id="opcoes-foco" style="display:none;">
+    <label>Trecho a focar</label>
+    <select name="bloco_id">
+      {% for b in captura.blocos %}
+      <option value="{{ b.id }}">[{{ b.tipo }}] {{ b.texto[:80] }}{% if b.texto|length > 80 %}...{% endif %}</option>
+      {% endfor %}
+    </select>
+    <label>Efeito de destaque (opcional)</label>
+    <select name="efeito">
+      <option value="">Nenhum (só a câmera aproximando)</option>
+      <option value="highlight">Tarja de destaque atrás do texto</option>
+      <option value="dim_rest">Escurecer tudo ao redor</option>
+    </select>
+    <label>Zoom</label>
+    <input type="number" name="zoom_foco" value="1.4" min="1.0" max="3.0" step="0.1">
+  </div>
+
+  <label>Duração (segundos)</label>
+  <input type="number" name="duracao" value="8" min="1" max="60" step="0.5">
+
+  <button type="submit" id="btn-renderizar">Gerar clipe</button>
+</form>
+
+<div id="resultado-box" style="display:none;background:#d1fae5;color:#065f46;padding:14px;border-radius:8px;margin-top:14px;">
+  <strong>Clipe gerado!</strong>
+  <video controls id="video-resultado" style="width:100%;margin-top:10px;border-radius:6px;"></video>
+  <p style="margin-top:8px;"><a id="link-download" download>⬇ Baixar o clipe</a></p>
+  <p style="color:#065f46;font-size:0.82rem;">Pra usar no vídeo final: baixe esse clipe e anexe como origem manual (upload/override) de um segmento no editor, na posição da timeline que você quiser.</p>
+</div>
+
+<h2 style="margin-top:28px;">Blocos de texto encontrados ({{ captura.blocos|length }})</h2>
+<div style="max-height:300px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:10px;">
+  {% for b in captura.blocos %}
+  <p style="font-size:0.82rem;margin:4px 0;"><code style="color:#888;">[{{ b.tipo }}]</code> {{ b.texto }}</p>
+  {% endfor %}
+</div>
+
+{% if captura.clipes_gerados %}
+<h2 style="margin-top:28px;">Clipes já gerados ({{ captura.clipes_gerados|length }})</h2>
+<div style="max-height:260px;overflow:auto;">
+  {% for c in captura.clipes_gerados|reverse %}
+  <div style="border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+    <div>
+      <p style="margin:0;font-size:0.85rem;">{{ c.descricao }} — {{ c.duracao }}s</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a href="{{ url_for('capturar_pagina_clipe', captura_id=captura.id, nome_arquivo=c.arquivo) }}" download style="font-size:0.8rem;">⬇ baixar</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<p style="color:#666;font-size:0.8rem;">Pra usar um desses clipes num vídeo: vá no editor do vídeo (aba "Editar trechos"), na seção de biblioteca de mídia, e clique em "Importar de Capturar página / Cortar do YouTube".</p>
+{% endif %}
+
+{% if captura.galeria %}
+<h2 style="margin-top:28px;">Galeria de imagens ({{ captura.galeria|length }})</h2>
+<div style="display:flex;flex-wrap:wrap;gap:12px;">
+  {% for g in captura.galeria %}
+  <div style="width:180px;">
+    <img src="{{ url_for('capturar_pagina_galeria_arquivo', captura_id=captura.id, nome_arquivo=g.arquivo) }}" style="width:100%;border-radius:6px;border:1px solid #ddd;">
+    <p style="font-size:0.75rem;color:#666;margin:4px 0 0;">{{ g.legenda or '(sem legenda)' }}</p>
+    <a href="{{ url_for('capturar_pagina_galeria_arquivo', captura_id=captura.id, nome_arquivo=g.arquivo) }}" download style="font-size:0.75rem;">⬇ baixar</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+function alternarModo() {
+  var modo = document.getElementById('select-modo').value;
+  document.getElementById('opcoes-scroll').style.display = modo === 'scroll' ? '' : 'none';
+  document.getElementById('opcoes-foco').style.display = modo === 'foco' ? '' : 'none';
+}
+alternarModo();
+
+document.getElementById('form-renderizar').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  document.getElementById('error-box').style.display = 'none';
+  document.getElementById('resultado-box').style.display = 'none';
+  document.getElementById('btn-renderizar').disabled = true;
+  document.getElementById('btn-renderizar').textContent = 'Gerando...';
+
+  const formData = new FormData(ev.target);
+  let resp, data;
+  try {
+    resp = await fetch("{{ url_for('capturar_pagina_renderizar', captura_id=captura.id) }}", { method: 'POST', body: formData });
+    data = await resp.json();
+  } catch (e) {
+    mostrarErro('Falha ao gerar: ' + e);
+    return;
+  }
+  document.getElementById('btn-renderizar').disabled = false;
+  document.getElementById('btn-renderizar').textContent = 'Gerar clipe';
+  if (!resp.ok) {
+    mostrarErro(data.erro || 'Falha ao gerar o clipe.');
+    return;
+  }
+  document.getElementById('video-resultado').src = data.clipe_url;
+  document.getElementById('link-download').href = data.clipe_url;
+  document.getElementById('resultado-box').style.display = '';
+});
+
+function mostrarErro(msg) {
+  document.getElementById('error-box').textContent = msg;
+  document.getElementById('error-box').style.display = '';
+  document.getElementById('btn-renderizar').disabled = false;
+  document.getElementById('btn-renderizar').textContent = 'Gerar clipe';
+}
+</script>
+{% endblock %}

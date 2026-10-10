@@ -1,0 +1,169 @@
+{
+ "abril-fatface": {
+  "familia": "DP Abril Fatface",
+  "arquivos": {
+   "Bold": "abril-fatface-Bold.ttf"
+  }
+ },
+ "alfa-slab-one": {
+  "familia": "DP Alfa Slab One",
+  "arquivos": {
+   "Bold": "alfa-slab-one-Bold.ttf",
+   "Regular": "alfa-slab-one-Regular.ttf"
+  }
+ },
+ "anton": {
+  "familia": "DP Anton",
+  "arquivos": {
+   "Bold": "anton-Bold.ttf"
+  }
+ },
+ "archivo": {
+  "familia": "DP Archivo",
+  "arquivos": {
+   "Bold": "archivo-Bold.ttf",
+   "Italic": "archivo-Italic.ttf",
+   "Regular": "archivo-Regular.ttf"
+  }
+ },
+ "barlow-condensed": {
+  "familia": "DP Barlow Condensed",
+  "arquivos": {
+   "Bold": "barlow-condensed-Bold.ttf",
+   "Italic": "barlow-condensed-Italic.ttf",
+   "Regular": "barlow-condensed-Regular.ttf"
+  }
+ },
+ "bebas-neue": {
+  "familia": "DP Bebas Neue",
+  "arquivos": {
+   "Bold": "bebas-neue-Bold.ttf"
+  }
+ },
+ "cinzel": {
+  "familia": "DP Cinzel",
+  "arquivos": {
+   "Bold": "cinzel-Bold.ttf",
+   "Regular": "cinzel-Regular.ttf"
+  }
+ },
+ "eb-garamond": {
+  "familia": "DP Eb Garamond",
+  "arquivos": {
+   "Bold": "eb-garamond-Bold.ttf",
+   "Italic": "eb-garamond-Italic.ttf",
+   "Regular": "eb-garamond-Regular.ttf"
+  }
+ },
+ "fjalla-one": {
+  "familia": "DP Fjalla One",
+  "arquivos": {
+   "Bold": "fjalla-one-Bold.ttf"
+  }
+ },
+ "inter": {
+  "familia": "DP Inter",
+  "arquivos": {
+   "Bold": "inter-Bold.ttf",
+   "Italic": "inter-Italic.ttf",
+   "Regular": "inter-Regular.ttf"
+  }
+ },
+ "jetbrains-mono": {
+  "familia": "DP Jetbrains Mono",
+  "arquivos": {
+   "Bold": "jetbrains-mono-Bold.ttf",
+   "Italic": "jetbrains-mono-Italic.ttf",
+   "Regular": "jetbrains-mono-Regular.ttf"
+  }
+ },
+ "lora": {
+  "familia": "DP Lora",
+  "arquivos": {
+   "Bold": "lora-Bold.ttf",
+   "Italic": "lora-Italic.ttf",
+   "Regular": "lora-Regular.ttf"
+  }
+ },
+ "merriweather": {
+  "familia": "DP Merriweather",
+  "arquivos": {
+   "Bold": "merriweather-Bold.ttf",
+   "Italic": "merriweather-Italic.ttf",
+   "Regular": "merriweather-Regular.ttf"
+  }
+ },
+ "montserrat": {
+  "familia": "DP Montserrat",
+  "arquivos": {
+   "Bold": "montserrat-Bold.ttf",
+   "Italic": "montserrat-Italic.ttf",
+   "Regular": "montserrat-Regular.ttf"
+  }
+ },
+ "oswald": {
+  "familia": "DP Oswald",
+  "arquivos": {
+   "Bold": "oswald-Bold.ttf",
+   "Regular": "oswald-Regular.ttf"
+  }
+ },
+ "playfair-display": {
+  "familia": "DP Playfair Display",
+  "arquivos": {
+   "Bold": "playfair-display-Bold.ttf",
+   "Italic": "playfair-display-Italic.ttf",
+   "Regular": "playfair-display-Regular.ttf"
+  }
+ },
+ "poppins": {
+  "familia": "DP Poppins",
+  "arquivos": {
+   "Bold": "poppins-Bold.ttf",
+   "Italic": "poppins-Italic.ttf",
+   "Regular": "poppins-Regular.ttf"
+  }
+ },
+ "rajdhani": {
+  "familia": "DP Rajdhani",
+  "arquivos": {
+   "Bold": "rajdhani-Bold.ttf",
+   "Regular": "rajdhani-Regular.ttf"
+  }
+ },
+ "roboto-condensed": {
+  "familia": "DP Roboto Condensed",
+  "arquivos": {
+   "Bold": "roboto-condensed-Bold.ttf",
+   "Italic": "roboto-condensed-Italic.ttf",
+   "Regular": "roboto-condensed-Regular.ttf"
+  }
+ },
+ "special-elite": {
+  "familia": "DP Special Elite",
+  "arquivos": {
+   "Bold": "special-elite-Bold.ttf"
+  }
+ },
+ "staatliches": {
+  "familia": "DP Staatliches",
+  "arquivos": {
+   "Bold": "staatliches-Bold.ttf"
+  }
+ },
+ "teko": {
+  "familia": "DP Teko",
+  "arquivos": {
+   "Bold": "teko-Bold.ttf",
+   "Regular": "teko-Regular.ttf"
+  }
+ },
+ "work-sans": {
+  "familia": "DP Work Sans",
+  "arquivos": {
+   "Bold": "work-sans-Bold.ttf",
+   "Italic": "work-sans-Italic.ttf",
+   "Regular": "work-sans-Regular.ttf"
+  }
+ }
+}

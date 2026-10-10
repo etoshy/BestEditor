@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Transcrever{% endblock %}
+{% block content %}
+<h1>📝 Transcrever</h1>
+<p style="color:#666;">Baixa um vídeo de qualquer fonte suportada (YouTube, TikTok, Twitter/X, Instagram, Facebook, Kwai) — sempre na maior qualidade disponível — ou usa um arquivo que você já tem, e opcionalmente transcreve a fala com Whisper. Ferramenta avulsa: não usa o pipeline de "Roteiro para Áudio".</p>
+
+<div id="error-box" class="error" style="display:none;"></div>
+
+<label>Link do vídeo</label>
+<input type="text" id="campo-url" placeholder="https://...">
+<p style="color:#666;font-size:0.85rem;margin:6px 0 0;">— ou —</p>
+<label style="margin-top:8px;">Envie um arquivo de vídeo</label>
+<input type="file" id="campo-arquivo" accept="video/*">
+
+<label style="margin-top:16px;">O que fazer</label>
+<select id="select-modo">
+  <option value="transcrever" selected>Baixar e transcrever (Whisper)</option>
+  <option value="baixar">Só baixar (sem transcrever)</option>
+</select>
+
+<div id="opcoes-transcricao">
+  <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;">
+    <div>
+      <label style="margin-top:0;">Modelo do Whisper</label>
+      <select id="select-whisper-model">
+        <option value="tiny">tiny (mais rápido)</option>
+        <option value="base" selected>base</option>
+        <option value="small">small</option>
+        <option value="medium">medium</option>
+        <option value="large">large (mais preciso)</option>
+      </select>
+    </div>
+    <div>
+      <label style="margin-top:0;">Idioma</label>
+      <select id="select-idioma">
+        <option value="" selected>Detectar automaticamente</option>
+        <option value="pt">Português</option>
+        <option value="en">Inglês</option>
+        <option value="es">Espanhol</option>
+      </select>
+    </div>
+    <div>
+      <label style="margin-top:0;">Processamento</label>
+      <select id="select-device">
+        <option value="auto" selected>Automático (GPU se tiver)</option>
+        <option value="cpu">Forçar CPU</option>
+        <option value="gpu">Forçar GPU</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<label style="margin-top:16px;">Limitar altura do download (só afeta links do YouTube) — opcional</label>
+<input type="number" id="campo-max-height" placeholder="ex: 1080" min="144" step="1">
+
+<button type="button" id="btn-processar" onclick="processar()" style="margin-top:18px;display:block;">Começar</button>
+
+<div id="progresso-box" style="display:none;margin-top:16px;">
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill-tr" style="width:40%;"></div></div>
+  <pre id="log-box" style="max-height:220px;overflow:auto;background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.78rem;margin-top:8px;"></pre>
+</div>
+
+<div id="resultado-box" style="display:none;margin-top:20px;">
+  <h2 style="margin-top:0;">Pronto!</h2>
+  <div id="resultado-info" style="color:#444;font-size:0.9rem;"></div>
+  <div id="resultado-links" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;"></div>
+  <div id="resultado-texto" style="margin-top:14px;"></div>
+</div>
+
+<style>
+#progress-fill-tr { animation: indeterminate-tr 1.4s infinite ease-in-out; }
+@keyframes indeterminate-tr { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+</style>
+
+<script>
+document.getElementById('select-modo').addEventListener('change', function () {
+  document.getElementById('opcoes-transcricao').style.display = this.value === 'transcrever' ? 'block' : 'none';
+});
+
+let jobIdAtual = null;
+
+async function processar() {
+  const erroBox = document.getElementById('error-box');
+  erroBox.style.display = 'none';
+  document.getElementById('resultado-box').style.display = 'none';
+
+  const url = document.getElementById('campo-url').value.trim();
+  const arquivoInput = document.getElementById('campo-arquivo');
+  const arquivo = arquivoInput.files[0];
+  if (!url && !arquivo) { erroBox.style.display = 'block'; erroBox.textContent = 'Cole um link ou envie um arquivo.'; return; }
+  if (url && arquivo) { erroBox.style.display = 'block'; erroBox.textContent = 'Escolha só um: link OU arquivo, não os dois.'; return; }
+
+  const dados = new FormData();
+  if (url) dados.append('url', url);
+  if (arquivo) dados.append('arquivo', arquivo);
+  dados.append('modo', document.getElementById('select-modo').value);
+  dados.append('whisper_model', document.getElementById('select-whisper-model').value);
+  dados.append('idioma', document.getElementById('select-idioma').value);
+  dados.append('device', document.getElementById('select-device').value);
+  const maxHeight = document.getElementById('campo-max-height').value.trim();
+  if (maxHeight) dados.append('max_height', maxHeight);
+
+  document.getElementById('btn-processar').disabled = true;
+  document.getElementById('progresso-box').style.display = 'block';
+  document.getElementById('log-box').textContent = '';
+
+  try {
+    const r = await fetch('{{ url_for("transcrever_submit") }}', {method: 'POST', body: dados});
+    const j = await r.json();
+    if (!r.ok) {
+      document.getElementById('btn-processar').disabled = false;
+      document.getElementById('progresso-box').style.display = 'none';
+      erroBox.style.display = 'block'; erroBox.textContent = j.erro || 'Falha ao começar.';
+      return;
+    }
+    jobIdAtual = j.job_id;
+    acompanhar(j.job_id);
+  } catch (e) {
+    document.getElementById('btn-processar').disabled = false;
+    document.getElementById('progresso-box').style.display = 'none';
+    erroBox.style.display = 'block'; erroBox.textContent = e.message;
+  }
+}
+
+function acompanhar(jobId) {
+  const logBox = document.getElementById('log-box');
+  const t = setInterval(async function () {
+    const r = await fetch(`/transcrever/${jobId}/status`);
+    const j = await r.json();
+    logBox.textContent = j.log || '';
+    logBox.scrollTop = logBox.scrollHeight;
+    if (j.status === 'processando') return;
+    clearInterval(t);
+    document.getElementById('btn-processar').disabled = false;
+    if (j.status === 'pronto') {
+      mostrarResultado(jobId, j.resultado);
+    } else {
+      document.getElementById('error-box').style.display = 'block';
+      document.getElementById('error-box').textContent = j.erro || 'Falhou.';
+    }
+  }, 1500);
+}
+
+function mostrarResultado(jobId, resultado) {
+  const info = document.getElementById('resultado-info');
+  const partes = [];
+  if (resultado.largura && resultado.altura) partes.push(resultado.largura + '×' + resultado.altura);
+  if (resultado.aviso_resolucao_baixa) partes.push('⚠️ resolução baixa');
+  if (resultado.total_segmentos) partes.push(resultado.total_segmentos + ' trecho(s) transcrito(s)');
+  if (resultado.idioma) partes.push('idioma forçado: ' + resultado.idioma);
+  info.textContent = partes.join(' · ');
+
+  const links = document.getElementById('resultado-links');
+  links.innerHTML = '';
+  const arquivos = [['video.mp4', '⬇ Vídeo']];
+  if (resultado.arquivo_texto) arquivos.push([resultado.arquivo_texto, '⬇ Texto (.txt)']);
+  if (resultado.arquivo_srt) arquivos.push([resultado.arquivo_srt, '⬇ Legenda (.srt)']);
+  if (resultado.arquivo_segmentos) arquivos.push([resultado.arquivo_segmentos, '⬇ Trechos (.json)']);
+  arquivos.forEach(function ([nome, rotulo]) {
+    const a = document.createElement('a');
+    a.href = `/transcrever/${jobId}/arquivo/${nome}`;
+    a.textContent = rotulo;
+    a.style.cssText = 'display:inline-block;background:#2563eb;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:0.85rem;';
+    links.appendChild(a);
+  });
+
+  const textoBox = document.getElementById('resultado-texto');
+  if (resultado.segmentos && resultado.segmentos.length) {
+    textoBox.innerHTML = '<label style="margin-top:0;">Transcrição</label><textarea readonly style="height:200px;">'
+      + resultado.segmentos.map(s => s.text.trim()).join('\n') + '</textarea>';
+  } else {
+    textoBox.innerHTML = '';
+  }
+
+  document.getElementById('resultado-box').style.display = 'block';
+}
+</script>
+{% endblock %}

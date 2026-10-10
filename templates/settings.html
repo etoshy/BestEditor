@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Configurações</h1>
+<p><a href="{{ url_for('index') }}">&larr; voltar</a></p>
+
+{% if success %}<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px;margin-top:16px;">Configuração salva.</div>{% endif %}
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('save_settings') }}">
+
+  <h2 style="margin-top:32px;">Vídeo</h2>
+  <label>Proporção do vídeo gerado</label>
+  <label style="font-weight:normal;"><input type="radio" name="orientation" value="16:9" {% if config.orientation == '16:9' %}checked{% endif %} style="width:auto;"> 16:9 (paisagem — YouTube normal)</label><br>
+  <label style="font-weight:normal;"><input type="radio" name="orientation" value="9:16" {% if config.orientation == '9:16' %}checked{% endif %} style="width:auto;"> 9:16 (retrato — Shorts / Reels / TikTok)</label><br>
+  <label style="font-weight:normal;"><input type="radio" name="orientation" value="1:1" {% if config.orientation == '1:1' %}checked{% endif %} style="width:auto;"> 1:1 (quadrado — feed do Instagram/Facebook)</label>
+
+  <label style="margin-top:16px;">Orientação dos vídeos BUSCADOS (independente da proporção final acima)</label>
+  <select name="search_orientation">
+    <option value="match_export" {% if config.search_orientation == 'match_export' %}selected{% endif %}>Mesma da exportação (padrão)</option>
+    <option value="16:9" {% if config.search_orientation == '16:9' %}selected{% endif %}>Sempre 16:9 (paisagem), mesmo exportando 9:16</option>
+    <option value="9:16" {% if config.search_orientation == '9:16' %}selected{% endif %}>Sempre 9:16 (retrato), mesmo exportando 16:9</option>
+    <option value="1:1" {% if config.search_orientation == '1:1' %}selected{% endif %}>Sempre 1:1 (quadrado)</option>
+    <option value="mixed" {% if config.search_orientation == 'mixed' %}selected{% endif %}>Misturado — não filtra, aceita qualquer orientação</option>
+  </select>
+  <p style="color:#666;font-size:0.85rem;">"Misturado" pode trazer cenas de paisagem e retrato no mesmo vídeo — o preenchimento de borda (abaixo) cuida de encaixar cada uma na moldura final.</p>
+
+  <label style="margin-top:16px;">Qualidade de exportação</label>
+  <select name="export_quality">
+    {% for q in ['480p', '720p', '1080p', '1440p', '2160p'] %}
+    <option value="{{ q }}" {% if config.export_quality == q %}selected{% endif %}>{{ q }}</option>
+    {% endfor %}
+  </select>
+
+  <label style="margin-top:16px;">Como preencher as bordas quando a proporção do clipe não bater com o vídeo?</label>
+  <select name="aspect_fill">
+    <option value="black" {% if config.aspect_fill == "black" %}selected{% endif %}>⬛ Bordas pretas</option>
+    <option value="mosaic" {% if config.aspect_fill == "mosaic" %}selected{% endif %}>🧩 Mosaico do próprio clipe</option>
+    <option value="zoom" {% if config.aspect_fill == "zoom" %}selected{% endif %}>🔎 Zoom central</option>
+    <option value="smart" {% if config.aspect_fill == "smart" %}selected{% endif %}>✨ Preencher inteligente — tira barras pretas que já vêm no vídeo e aumenta sem distorcer</option>
+  </select>
+
+  <label style="margin-top:16px;">Cortar quantos frames do início de cada clipe por padrão?</label>
+  <input type="number" name="trim_start_frames" value="{{ config.trim_start_frames }}" min="0" max="120" step="1">
+  <p style="color:#666;font-size:.82rem;">Padrão: 10 frames. Use 0 para não cortar. Cada trecho pode sobrescrever essa configuração no editor.</p>
+
+  <label style="margin-top:16px;">Quando o vídeo baixado for mais longo que o trecho necessário, cortar a partir de</label>
+  <select name="clip_trim_position">
+    <option value="start" {% if config.clip_trim_position == 'start' %}selected{% endif %}>Início do vídeo</option>
+    <option value="middle" {% if config.clip_trim_position == 'middle' %}selected{% endif %}>Meio do vídeo</option>
+    <option value="random" {% if config.clip_trim_position == 'random' %}selected{% endif %}>Ponto aleatório</option>
+  </select>
+
+  <label style="margin-top:12px;">⚡ Codificar o vídeo com
+    <select name="encoder_video" style="width:auto;">
+      {% for v, r in [('auto', 'automático — a placa de vídeo se tiver (NVIDIA/Intel/AMD), bem mais rápido'), ('cpu', 'só o processador (libx264)'), ('h264_nvenc', 'NVIDIA (NVENC)'), ('h264_qsv', 'Intel (Quick Sync)'), ('h264_amf', 'AMD (AMF)')] %}
+      <option value="{{ v }}" {% if (config.encoder_video or 'auto') == v %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select></label>
+  <p style="color:#666;font-size:0.8rem;margin:4px 0 0;">Se a placa falhar em algum passo, aquele passo é refeito no processador sozinho. No log da montagem aparece “⚡ codificando o vídeo na placa: …”.</p>
+
+  <h2 style="margin-top:32px;">Fontes de vídeo</h2>
+  <label>Ordem de preferência (arraste pra reordenar) — se a fonte que a IA escolheu pra um trecho não encontrar nada, tenta a próxima desta lista</label>
+  <ul id="priority-list" style="list-style:none;padding:0;margin-top:8px;">
+    {% for p in config.provider_priority %}
+    <li draggable="true" class="priority-item" style="background:#f3f4f6;border:1px solid #ccc;border-radius:6px;padding:10px 14px;margin-bottom:6px;cursor:grab;user-select:none;">
+      <span style="color:#999;margin-right:8px;">☰</span>{{ p }}
+      <input type="hidden" name="provider_priority" value="{{ p }}">
+    </li>
+    {% endfor %}
+  </ul>
+
+  <label style="margin-top:20px;"><input type="checkbox" name="pexels_api_fallback_to_browser" {% if config.pexels_api_fallback_to_browser %}checked{% endif %} style="width:auto;"> Se a chave da API do Pexels falhar (inválida ou todas em rate limit), usar o navegador como alternativa automaticamente</label>
+
+  <label style="margin-top:16px;"><input type="checkbox" name="pixabay_api_fallback_to_browser" {% if config.pixabay_api_fallback_to_browser %}checked{% endif %} style="width:auto;"> O mesmo, para a API do Pixabay</label>
+
+  <label style="margin-top:16px;"><input type="checkbox" name="magnific_only_free" {% if config.magnific_only_free %}checked{% endif %} style="width:auto;"> No Magnific, buscar só vídeos gratuitos (nunca premium/com marca d'água)</label>
+
+  <label style="margin-top:8px;"><input type="checkbox" name="evitar_repeticao_clipes" {% if config.evitar_repeticao_clipes %}checked{% endif %} style="width:auto;"> Evitar repetição de cenas/fotos — nunca deixar a mesma cena aparecer em dois trechos do vídeo (prefere sempre uma nova, só repete se a busca esgotar de verdade)</label>
+
+  <input type="hidden" name="buscadores_imagem_paralelo_enviado" value="1">
+  <label style="margin-top:8px;"><input type="checkbox" name="buscadores_imagem_paralelo" {% if config.buscadores_imagem_paralelo %}checked{% endif %} style="width:auto;"> Buscadores de imagem (Bing/Brave/Yandex/Startpage): rodar os buscadores ao mesmo tempo — cada um usa só 1 navegador e pesquisa todos os termos nele. Desmarcado = um buscador de cada vez (1 navegador aberto no total: mais lento, menos RAM)</label>
+  <label style="margin-top:8px;">Proporção das imagens dos buscadores (Bing/Brave/Yandex/Startpage)</label>
+  <select name="buscadores_proporcao">
+    {% for v, rot in [("auto", "Automática — segue o vídeo (16:9 → horizontal ou quadrada; 9:16 → vertical ou quadrada)"), ("horizontal_quadrada", "Horizontal, e quadrada se faltar"), ("horizontal", "Só horizontal"), ("quadrada", "Só quadrada"), ("vertical_quadrada", "Vertical, e quadrada se faltar"), ("vertical", "Só vertical"), ("qualquer", "Qualquer (sem filtro, como antes)")] %}
+    <option value="{{ v }}" {% if (config.buscadores_proporcao or 'auto') == v %}selected{% endif %}>{{ rot }}</option>
+    {% endfor %}
+  </select>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Usa o filtro de proporção do próprio buscador (no Bing, o filtro "largura/quadrada" da busca). Se um termo não tiver NENHUMA imagem na proporção pedida, entra uma busca sem filtro como reserva — a foto em pé ainda aparece, com fundo desfocado/bordas.</p>
+
+  <label style="margin-top:16px;">Transição entre os trechos do vídeo</label>
+  <select name="transition_type">
+    <option value="none" {% if config.transition_type == 'none' %}selected{% endif %}>✂️ Corte seco (padrão — sem transição)</option>
+    <option value="fade" {% if config.transition_type == 'fade' %}selected{% endif %}>🌗 Fade (mistura suave)</option>
+    <option value="dissolve" {% if config.transition_type == 'dissolve' %}selected{% endif %}>💫 Dissolve</option>
+    <option value="fadeblack" {% if config.transition_type == 'fadeblack' %}selected{% endif %}>⬛ Fade pra preto</option>
+    <option value="fadewhite" {% if config.transition_type == 'fadewhite' %}selected{% endif %}>⬜ Fade pra branco</option>
+    <option value="wipeleft" {% if config.transition_type == 'wipeleft' %}selected{% endif %}>◀️ Wipe (esquerda)</option>
+    <option value="wiperight" {% if config.transition_type == 'wiperight' %}selected{% endif %}>▶️ Wipe (direita)</option>
+    <option value="wipeup" {% if config.transition_type == 'wipeup' %}selected{% endif %}>🔼 Wipe (cima)</option>
+    <option value="wipedown" {% if config.transition_type == 'wipedown' %}selected{% endif %}>🔽 Wipe (baixo)</option>
+    <option value="slideleft" {% if config.transition_type == 'slideleft' %}selected{% endif %}>⬅️ Slide (esquerda)</option>
+    <option value="slideright" {% if config.transition_type == 'slideright' %}selected{% endif %}>➡️ Slide (direita)</option>
+    <option value="slideup" {% if config.transition_type == 'slideup' %}selected{% endif %}>⬆️ Slide (cima)</option>
+    <option value="slidedown" {% if config.transition_type == 'slidedown' %}selected{% endif %}>⬇️ Slide (baixo)</option>
+    <option value="circleopen" {% if config.transition_type == 'circleopen' %}selected{% endif %}>⭕ Círculo abrindo</option>
+    <option value="circleclose" {% if config.transition_type == 'circleclose' %}selected{% endif %}>⚫ Círculo fechando</option>
+    <option value="circlecrop" {% if config.transition_type == 'circlecrop' %}selected{% endif %}>⭕ Círculo (corte)</option>
+    <option value="rectcrop" {% if config.transition_type == 'rectcrop' %}selected{% endif %}>▭ Retângulo (corte)</option>
+    <option value="smoothleft" {% if config.transition_type == 'smoothleft' %}selected{% endif %}>〰️ Suave (esquerda)</option>
+    <option value="smoothright" {% if config.transition_type == 'smoothright' %}selected{% endif %}>〰️ Suave (direita)</option>
+    <option value="smoothup" {% if config.transition_type == 'smoothup' %}selected{% endif %}>〰️ Suave (cima)</option>
+    <option value="smoothdown" {% if config.transition_type == 'smoothdown' %}selected{% endif %}>〰️ Suave (baixo)</option>
+    <option value="vertopen" {% if config.transition_type == 'vertopen' %}selected{% endif %}>↕️ Vertical abrindo</option>
+    <option value="vertclose" {% if config.transition_type == 'vertclose' %}selected{% endif %}>↕️ Vertical fechando</option>
+    <option value="horzopen" {% if config.transition_type == 'horzopen' %}selected{% endif %}>↔️ Horizontal abrindo</option>
+    <option value="horzclose" {% if config.transition_type == 'horzclose' %}selected{% endif %}>↔️ Horizontal fechando</option>
+    <option value="wipetl" {% if config.transition_type == 'wipetl' %}selected{% endif %}>↖️ Wipe (diagonal sup. esq.)</option>
+    <option value="wipetr" {% if config.transition_type == 'wipetr' %}selected{% endif %}>↗️ Wipe (diagonal sup. dir.)</option>
+    <option value="wipebl" {% if config.transition_type == 'wipebl' %}selected{% endif %}>↙️ Wipe (diagonal inf. esq.)</option>
+    <option value="wipebr" {% if config.transition_type == 'wipebr' %}selected{% endif %}>↘️ Wipe (diagonal inf. dir.)</option>
+    <option value="diagtl" {% if config.transition_type == 'diagtl' %}selected{% endif %}>◤ Diagonal (sup. esq.)</option>
+    <option value="diagtr" {% if config.transition_type == 'diagtr' %}selected{% endif %}>◥ Diagonal (sup. dir.)</option>
+    <option value="diagbl" {% if config.transition_type == 'diagbl' %}selected{% endif %}>◣ Diagonal (inf. esq.)</option>
+    <option value="diagbr" {% if config.transition_type == 'diagbr' %}selected{% endif %}>◢ Diagonal (inf. dir.)</option>
+    <option value="hlslice" {% if config.transition_type == 'hlslice' %}selected{% endif %}>▤ Fatias horizontais (esq.)</option>
+    <option value="hrslice" {% if config.transition_type == 'hrslice' %}selected{% endif %}>▤ Fatias horizontais (dir.)</option>
+    <option value="vuslice" {% if config.transition_type == 'vuslice' %}selected{% endif %}>▥ Fatias verticais (cima)</option>
+    <option value="vdslice" {% if config.transition_type == 'vdslice' %}selected{% endif %}>▥ Fatias verticais (baixo)</option>
+    <option value="pixelize" {% if config.transition_type == 'pixelize' %}selected{% endif %}>▦ Pixelizar</option>
+    <option value="hblur" {% if config.transition_type == 'hblur' %}selected{% endif %}>💨 Desfoque horizontal</option>
+    <option value="fadegrays" {% if config.transition_type == 'fadegrays' %}selected{% endif %}>◐ Fade (preto e branco)</option>
+    <option value="fadefast" {% if config.transition_type == 'fadefast' %}selected{% endif %}>⚡ Fade rápido</option>
+    <option value="fadeslow" {% if config.transition_type == 'fadeslow' %}selected{% endif %}>🐢 Fade lento</option>
+    <option value="distance" {% if config.transition_type == 'distance' %}selected{% endif %}>🌫️ Distância</option>
+    <option value="radial" {% if config.transition_type == 'radial' %}selected{% endif %}>🕐 Radial (ponteiro)</option>
+    <option value="squeezeh" {% if config.transition_type == 'squeezeh' %}selected{% endif %}>↔️ Espremer horizontal</option>
+    <option value="squeezev" {% if config.transition_type == 'squeezev' %}selected{% endif %}>↕️ Espremer vertical</option>
+    <option value="zoomin" {% if config.transition_type == 'zoomin' %}selected{% endif %}>🔍 Zoom in</option>
+    <option value="hlwind" {% if config.transition_type == 'hlwind' %}selected{% endif %}>🍃 Vento (esquerda)</option>
+    <option value="hrwind" {% if config.transition_type == 'hrwind' %}selected{% endif %}>🍃 Vento (direita)</option>
+    <option value="vuwind" {% if config.transition_type == 'vuwind' %}selected{% endif %}>🍃 Vento (cima)</option>
+    <option value="vdwind" {% if config.transition_type == 'vdwind' %}selected{% endif %}>🍃 Vento (baixo)</option>
+    <option value="coverleft" {% if config.transition_type == 'coverleft' %}selected{% endif %}>🔲 Cobrir (esquerda)</option>
+    <option value="coverright" {% if config.transition_type == 'coverright' %}selected{% endif %}>🔲 Cobrir (direita)</option>
+    <option value="coverup" {% if config.transition_type == 'coverup' %}selected{% endif %}>🔲 Cobrir (cima)</option>
+    <option value="coverdown" {% if config.transition_type == 'coverdown' %}selected{% endif %}>🔲 Cobrir (baixo)</option>
+    <option value="revealleft" {% if config.transition_type == 'revealleft' %}selected{% endif %}>🔳 Revelar (esquerda)</option>
+    <option value="revealright" {% if config.transition_type == 'revealright' %}selected{% endif %}>🔳 Revelar (direita)</option>
+    <option value="revealup" {% if config.transition_type == 'revealup' %}selected{% endif %}>🔳 Revelar (cima)</option>
+    <option value="revealdown" {% if config.transition_type == 'revealdown' %}selected{% endif %}>🔳 Revelar (baixo)</option>
+    <option value="blinds_h" {% if config.transition_type == 'blinds_h' %}selected{% endif %}>🎞️ Persianas (horizontal)</option>
+    <option value="blinds_v" {% if config.transition_type == 'blinds_v' %}selected{% endif %}>🎞️ Persianas (vertical)</option>
+    <option value="checkerboard" {% if config.transition_type == 'checkerboard' %}selected{% endif %}>▦ Xadrez</option>
+    <option value="noise_dissolve" {% if config.transition_type == 'noise_dissolve' %}selected{% endif %}>✨ Dissolve com ruído</option>
+    <option value="iris_blur" {% if config.transition_type == 'iris_blur' %}selected{% endif %}>🔮 Íris (borda suave)</option>
+    <option value="diamond_iris" {% if config.transition_type == 'diamond_iris' %}selected{% endif %}>💎 Íris em losango</option>
+    <option value="pinwheel" {% if config.transition_type == 'pinwheel' %}selected{% endif %}>🌀 Cata-vento</option>
+    <option value="wave_wipe" {% if config.transition_type == 'wave_wipe' %}selected{% endif %}>🌊 Varredura ondulada</option>
+    <option value="fade_grayscale" {% if config.transition_type == 'fade_grayscale' %}selected{% endif %}>⚫ Dissolve com passagem por cinza</option>
+  </select>
+  <label style="margin-top:8px;">Duração da transição (segundos)</label>
+  <input type="number" name="transition_duration" value="{{ config.transition_duration }}" min="0.05" max="5" step="0.05" style="width:100px;">
+  <p style="color:#666;font-size:0.8rem;">Aplicada entre TODOS os trechos do vídeo. Com transição diferente de "corte seco", a montagem recodifica ao concatenar (um pouco mais lenta que o corte seco, que só cola os arquivos).</p>
+
+  <h2 style="margin-top:32px;">Navegador (buscas nos bancos, captura de página e Google Flow)</h2>
+  <input type="hidden" name="ocultar_navegador_enviado" value="1">
+  <label><input type="checkbox" name="ocultar_navegador" {% if not config.browser_visible %}checked{% endif %} style="width:auto;"> <strong>Ocultar o navegador</strong> — roda em segundo plano, sem abrir janela, em TODOS os processos (buscas por scraping nos bancos, captura de página e geração de imagens no Google Flow). Desmarque só pra depurar. Também dá pra mudar por vídeo, na página do prompt.</label>
+
+  <label style="margin-top:16px;"><input type="checkbox" name="browser_shared_across_providers" {% if config.browser_shared_across_providers %}checked{% endif %} style="width:auto;"> Usar um único navegador para todas as fontes (economiza bastante memória, mas as buscas ficam sequenciais entre fontes em vez de paralelas)</label>
+
+  <label style="margin-top:16px;">Entre um download e o próximo, dentro da mesma fonte</label>
+  <label style="font-weight:normal;"><input type="radio" name="browser_mode" value="reuse_session" {% if config.browser_mode == 'reuse_session' %}checked{% endif %} style="width:auto;"> Reaproveitar a mesma sessão/aba (mais rápido — só muda o termo de busca)</label><br>
+  <label style="font-weight:normal;"><input type="radio" name="browser_mode" value="close_each_download" {% if config.browser_mode == 'close_each_download' %}checked{% endif %} style="width:auto;"> Fechar e abrir o navegador de novo depois de cada download (mais lento, mas isola cada download por completo)</label>
+
+  <label style="margin-top:16px;">Buscar quantas prévias ao mesmo tempo, ao colar o JSON da IA (1 = uma de cada vez/mais lento e leve, até 10 = bem mais rápido em narrações com muitos trechos, mas usa mais memória/CPU)</label>
+  <input type="number" name="preview_fetch_concurrency" value="{{ config.preview_fetch_concurrency }}" min="1" max="10" step="1">
+
+  <h2 style="margin-top:32px;">Google Flow (imagens geradas por IA)</h2>
+  <p style="color:#666;font-size:0.82rem;">Fonte <code>flow</code>: gera imagens no <a href="https://flow.google.com/" target="_blank" rel="noopener">Google Flow</a> automatizando o navegador com a sua conta Google (precisa do Playwright: <code>pip install playwright</code> e <code>playwright install chromium</code>). É lenta, então aparece desmarcada na página inicial. Com o navegador oculto, o login precisa ser feito uma vez com uma janela visível — use o botão abaixo. A sessão fica salva em <code>flow_dados/</code> (não compartilhe essa pasta: quem a tiver acessa sua conta).</p>
+  <label>Navegador usado pelo Flow</label>
+  <select name="flow_navegador">
+    {% for opcao, rotulo in [('auto', 'Automático (tenta Chrome, Edge, Chromium, Firefox, WebKit)'), ('chrome', 'Google Chrome'), ('edge', 'Microsoft Edge'), ('chromium', 'Chromium do Playwright'), ('firefox', 'Firefox'), ('webkit', 'WebKit'), ('cdp', 'Meu Chrome já aberto (porta 9222 — a janela é a sua, "ocultar" não se aplica)')] %}
+    <option value="{{ opcao }}" {% if config.flow_navegador == opcao %}selected{% endif %}>{{ rotulo }}</option>
+    {% endfor %}
+  </select>
+  <label style="margin-top:8px;">Caminho de outro navegador baseado em Chromium (Brave, Opera, Vivaldi…) — opcional, tem prioridade sobre a escolha acima</label>
+  <input type="text" name="flow_exe" value="{{ config.flow_exe }}" placeholder="C:\caminho\brave.exe">
+  <label style="margin-top:8px;"><input type="checkbox" name="flow_configurar_projeto" {% if config.flow_configurar_projeto %}checked{% endif %} style="width:auto;"> Configurar o projeto antes de gerar — ao criar o projeto, abre as configurações do agente e escolhe <em>Confirmar antes de gerar: Nunca</em> e <em>1 imagem</em>, depois salva. Todas as imagens do vídeo são geradas em sequência na MESMA conversa.</label>
+  <label style="margin-top:8px;">Seletor CSS do botão que abre as configurações do agente — opcional</label>
+  <input type="text" name="flow_seletor_configuracoes" value="{{ config.flow_seletor_configuracoes }}" placeholder="deixe vazio: o site tenta achar sozinho">
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Só preencha se aparecer o erro "não achei o botão de configurações" — ele lista os botões da tela; copie o seletor do certo (botão direito → Inspecionar → Copiar → Copiar seletor).</p>
+  <label style="margin-top:8px;">Seletor CSS do VÍDEO gerado na conversa — opcional</label>
+  <input type="text" name="flow_seletor_video" value="{{ config.flow_seletor_video }}" placeholder="deixe vazio: flow-a2ui-video-option video, ... (padrão)">
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Usado nos trechos "flow" de VÍDEO (Veo, ~8 s; o tempo de espera é de no mínimo 10 min). Só preencha se o vídeo aparecer na tela do Flow mas o site der "tempo esgotado esperando o vídeo": inspecione o elemento &lt;video&gt; e cole o seletor dele. Se o vídeo não sair, o trecho vira uma IMAGEM gerada da mesma cena.</p>
+  <label style="margin-top:8px;">Tempo máximo esperando UMA imagem (segundos)</label>
+  <input type="number" name="flow_timeout_seconds" value="{{ config.flow_timeout_seconds }}" min="30" max="1800" step="10" style="width:120px;">
+  <label style="margin-top:8px;">Horas até uma conta esgotada voltar a ser usada (24 é o tempo real do Google — só mude se tiver certeza)</label>
+  <input type="number" name="flow_horas_ate_liberar" value="{{ config.flow_horas_ate_liberar }}" min="1" max="720" step="1" style="width:120px;">
+  <label style="margin-top:8px;">Palavras extras que indicam "limite esgotado" na resposta do Flow — opcional (separe por vírgula)</label>
+  <input type="text" name="flow_palavras_limite" value="{{ config.flow_palavras_limite }}" placeholder="o site já reconhece: crédito, cota, limite, quota, credits, limit reached...">
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Se uma conta esgotar e o site não trocar, veja o texto que o Flow mostrou (aparece no erro "respondeu sem gerar imagem") e acrescente uma palavra dele. Você também pode marcar a conta como esgotada à mão na página de Contas Google.</p>
+  <label style="margin-top:8px;">Modelo padrão de vídeo do Flow (configurado junto com o resto na primeira vez que uma conta usa o Flow)</label>
+  <input type="text" name="flow_modelo_video" value="{{ config.flow_modelo_video }}" list="flow-modelos-video" placeholder="deixe vazio pra não mexer">
+  <datalist id="flow-modelos-video">
+    <option value="Veo 3.1 - Lite">
+    <option value="Veo 3.1 - Fast">
+    <option value="Veo 3.1 - Quality">
+    <option value="Omni 1.1 Flash">
+  </datalist>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">O site ainda não gera vídeo pelo Flow (só imagem) — isso só deixa o projeto configurado do jeito certo pra quando essa capacidade existir, e ajuda quem usa o Flow por fora do site com a mesma conta. Se o nome do modelo mudar no Flow, digite o novo nome aqui (texto livre, não precisa ser um dos sugeridos).</p>
+  <h3 style="margin-top:20px;">Contas do Google Flow</h3>
+  <p style="color:#666;font-size:0.82rem;">O cadastro de contas, login e troca de senha foram pra própria página <a href="{{ url_for('contas_google_page') }}">🔑 Contas Google</a>.</p>
+
+  <h2 style="margin-top:32px;">Transcrição (Whisper)</h2>
+  <label>Processador usado pra transcrever o áudio</label>
+  <select name="whisper_device">
+    <option value="auto" {% if config.whisper_device == 'auto' %}selected{% endif %}>Automático (detecta a placa de vídeo instalada e usa ela se houver)</option>
+    <option value="gpu" {% if config.whisper_device == 'gpu' %}selected{% endif %}>Forçar GPU (cai pra CPU sozinho se a GPU falhar)</option>
+    <option value="cpu" {% if config.whisper_device == 'cpu' %}selected{% endif %}>Forçar CPU (mais lento, mas não usa a placa de vídeo)</option>
+  </select>
+
+  <label style="margin-top:16px;">Processar quantos trechos ao mesmo tempo na montagem final (só importa pros trechos que precisam buscar de novo — os que reaproveitam a prévia já são rápidos de qualquer jeito)</label>
+  <input type="number" name="assembly_fetch_concurrency" value="{{ config.assembly_fetch_concurrency }}" min="1" max="10" step="1">
+
+  <label style="margin-top:16px;">Tempo limite (segundos) esperando UM banco de vídeo antes de desistir dele e tentar o próximo (se um banco estiver lento/travado, isso evita que ele segure um trecho inteiro por muito tempo)</label>
+  <input type="number" name="provider_attempt_timeout_seconds" value="{{ config.provider_attempt_timeout_seconds }}" min="5" max="300" step="5">
+
+  <h2 style="margin-top:32px;">Anime Pexels Local (acervo próprio de anime + filmes e séries)</h2>
+  <p style="color:#666;font-size:0.85rem;">O mesmo servidor serve os dois acervos: <b>animepexels</b> (anime, em <code>/</code>) e <b>moviepexels</b> (filmes e séries, em <code>/movie/</code>). Um endereço só pros dois.</p>
+  <label>Endereço do servidor local (o <code>app.py</code> do projeto original precisa estar rodando nessa porta)</label>
+  <input type="text" name="animepexels_base_url" value="{{ config.animepexels_base_url }}" placeholder="http://localhost:5000">
+  <p style="color:#666;font-size:0.85rem;">Só muda se você rodar esse servidor numa porta diferente, ou em outra máquina da sua rede local.</p>
+
+  <button type="submit">Salvar configurações</button>
+</form>
+
+<h2 style="margin-top:32px;" id="youtube-cookies">YouTube — “Sign in to confirm you’re not a bot”</h2>
+<p style="color:#555;font-size:0.85rem;">Quando o YouTube pede login (Roteiro do YouTube, Cortar do YouTube, painel do YouTube no editor), o site usa os cookies de um navegador em que você está logado no YouTube. Se você não escolher nada, ele tenta sozinho Firefox, Edge, Chrome, Brave, Opera e Vivaldi e guarda o que funcionou. O mais garantido: <strong>Firefox logado no YouTube</strong>, ou um <strong>cookies.txt</strong> (extensão “Get cookies.txt LOCALLY” no Chrome/Edge, com youtube.com aberto e logado → Export). Feche o Chrome antes — aberto, ele bloqueia a leitura dos cookies.</p>
+<p style="font-size:0.85rem;">Agora: <strong id="ytck-agora">…</strong></p>
+<form method="post" action="{{ url_for('youtube_cookies_salvar') }}" enctype="multipart/form-data" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;">
+  <label style="font-weight:normal;">Navegador
+    <select name="navegador" style="width:auto;">
+      {% for v, r in [('', 'automático (tenta todos quando precisar)'), ('firefox', 'Firefox'), ('edge', 'Edge'), ('chrome', 'Chrome'), ('brave', 'Brave'), ('opera', 'Opera'), ('vivaldi', 'Vivaldi'), ('nenhum', 'nenhum (sem cookies)')] %}
+      <option value="{{ v }}">{{ r }}</option>
+      {% endfor %}
+    </select></label>
+  <label style="font-weight:normal;margin-top:8px;">Arquivo cookies.txt (opcional — tem prioridade sobre o navegador)
+    <input type="file" name="arquivo" accept=".txt"></label>
+  <label style="font-weight:normal;margin-top:6px;"><input type="checkbox" name="apagar_arquivo" style="width:auto;"> Apagar o cookies.txt guardado</label>
+  <button type="submit" style="margin-top:8px;">Salvar cookies do YouTube</button>
+</form>
+<script>
+fetch("{{ url_for('youtube_cookies_status') }}").then(r => r.json()).then(d => {
+  document.getElementById('ytck-agora').textContent = d.descricao + (d.navegador_que_funcionou ? ` (último que funcionou: ${d.navegador_que_funcionou})` : '');
+  const s = document.querySelector('select[name="navegador"]'); if (s) s.value = d.navegador || '';
+}).catch(() => {});
+</script>
+
+<script>
+// Drag-and-drop simples pra reordenar a lista de prioridade de fontes.
+// Não usa nenhuma biblioteca — só a API nativa de drag-and-drop do HTML5.
+// Os <input type="hidden"> dentro de cada <li> são enviados no formulário
+// na ordem em que os elementos aparecem no DOM — reordenar visualmente
+// já reordena o que é submetido.
+(function () {
+  const list = document.getElementById('priority-list');
+  let draggedItem = null;
+
+  list.querySelectorAll('.priority-item').forEach(item => {
+    item.addEventListener('dragstart', () => {
+      draggedItem = item;
+      setTimeout(() => item.style.opacity = '0.4', 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.style.opacity = '1';
+      draggedItem = null;
+    });
+  });
+
+  list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const afterElement = getDragAfterElement(list, e.clientY);
+    if (!draggedItem) return;
+    if (afterElement == null) {
+      list.appendChild(draggedItem);
+    } else {
+      list.insertBefore(draggedItem, afterElement);
+    }
+  });
+
+  function getDragAfterElement(container, y) {
+    const items = [...container.querySelectorAll('.priority-item:not([style*="opacity: 0.4"])')];
+    return items.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+})();
+</script>
+{% endblock %}

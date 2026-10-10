@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8"><style>.cdk-overlay-container{position:fixed;top:0;right:0;width:320px;background:#eee}</style></head><body>
+<!-- igual ao Flow real: outra caixa de comando ESCONDIDA antes da visível (com botão de config e editor) -->
+<div class="base-prompt-box" style="display:none"><div contenteditable="true" class="ProseMirror"><p><br></p></div>
+ <button class="settings-trigger-button" aria-label="Gatilho de configurações">cfg escondido</button>
+ <button class="generate-icon-button" aria-label="Iniciar geração">→</button></div>
+<flow-prompt-box-settings style="display:none"><flow-toggles aria-label="Modo"><button class="mat-button-toggle-button" aria-checked="true"><span class="toggle-text">Imagem</span></button></flow-toggles></flow-prompt-box-settings>
+<div class="base-prompt-box">
+ <flow-ingredient-bar id="barra" style="display:none"><div class="frame-trigger"><button class="empty-chip" id="chipInicio">Início</button></div><div class="frame-trigger"><button class="empty-chip">Fim</button></div></flow-ingredient-bar>
+ <flow-rich-text-editor><div contenteditable="true" class="ProseMirror" id="ed" style="min-height:30px;border:1px solid #ccc"><p><br></p></div></flow-rich-text-editor>
+ <button class="settings-trigger-button" aria-label="Gatilho de configurações" id="gat" onclick="abreCfg()">🍌 Nano Banana 2.1 x1</button>
+ <flow-generate-icon-button><button class="generate-icon-button" aria-label="Iniciar geração" id="gerar" disabled onclick="gera()">→</button></flow-generate-icon-button>
+</div>
+<div id="galeria"></div>
+<div class="cdk-overlay-container" id="ov"></div>
+<script>
+let modo='Imagem', tipo='Elementos', N=0;
+function atualiza(){
+  document.getElementById('barra').style.display = (modo=='Vídeo' && tipo=='Frames') ? '' : 'none'; }
+function grupo(label, ops, atual, cb){ return `<flow-toggles aria-label="${label}">`+ops.map(o=>`<button class="mat-button-toggle-button" aria-checked="${o==atual}" onclick="${cb}('${o}', this)"><span class="toggle-text">${o}</span></button>`).join('')+`</flow-toggles>`; }
+let prop='16:9', res='360p', dur='8s', qtd='x2', modelo='Veo 3.1 - Lite';
+function marca(el){ el.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked','false')); el.setAttribute('aria-checked','true'); }
+function setModo(o,el){ modo=o; marca(el); abreCfg(); atualiza(); } function setTipo(o,el){ tipo=o; marca(el); atualiza(); }
+function setX(o,el){ marca(el); }
+function abreCfg(){ const ov=document.getElementById('ov');
+  ov.innerHTML = `<flow-prompt-box-settings>${grupo('Modo',['Imagem','Vídeo'],modo,'setModo')}` + (modo=='Vídeo'? grupo('Tipo de vídeo',['Frames','Elementos'],tipo,'setTipo'):'')
+   + grupo('Proporção', modo=='Vídeo'?['16:9','9:16']:['16:9','4:3','1:1','3:4','9:16'], prop, 'setX')
+   + `<button aria-label="Selecionar família de modelos" onclick="menu()">${modelo}</button>`
+   + (modo=='Vídeo'? grupo('Resolução do vídeo',['360p','720p'],res,'setX') + grupo('Duração do vídeo',['4s','6s','8s','10s'],dur,'setX') : '')
+   + grupo('Quantidade de resultados',['x1','x2','x3','x4'],qtd,'setX') + `</flow-prompt-box-settings>`; }
+function menu(){ const d=document.createElement('div'); d.innerHTML=['Omni 1.1 Flash','Veo 3.1 - Lite','🍌 Nano Banana 2.1'].map(m=>`<flow-menu-item><button onclick="modelo='${m}'; this.closest('div').remove()">${m}</button></flow-menu-item>`).join(''); document.getElementById('ov').appendChild(d); }
+document.addEventListener('keydown', e=>{ if(e.key=='Escape' && !document.querySelector('.asset-picker')) document.getElementById('ov').innerHTML=''; });
+// lista de mídias do projeto: as imagens geradas aqui + os arquivos enviados (como no Flow real)
+window.ASSETS = []; window.UPLOADS = 0; window.REUSO = 0;
+function itensLista(){ return window.ASSETS.map(a => `<div class="asset-item-container"><button type="button" role="option" class="asset-item" onclick="detalhe('${a.titulo}', ${a.enviado ? 0 : 1})"><flow-add-menu-asset-item><div class="asset-thumbnail"><img class="asset-thumbnail-image" src="${a.src}" style="width:30px"></div><div class="asset-text"><span class="asset-title">${a.titulo}</span></div></flow-add-menu-asset-item></button></div>`).join(''); }
+function recebeArquivo(nome){
+  const add = () => setTimeout(()=>{ window.UPLOADS++; window.ASSETS.unshift({titulo: nome, src: '/asb/img.png?up=' + Math.random(), enviado: 1});
+    const l = document.getElementById('lista'); if (l) l.innerHTML = itensLista(); }, 600);
+  if (!window.CONSENTIMENTO) return add();
+  document.body.insertAdjacentHTML('beforeend', `<flow-upload-consent-dialog id="consent"><h2>Direitos de uso desta imagem</h2>
+    <button onclick="document.getElementById('consent').remove()"><span class="mdc-button__label">Cancelar</span></button>
+    <div class="agree-actions-group"><button id="concordo"><span class="mdc-button__label">Concordo</span></button></div></flow-upload-consent-dialog>`);
+  document.getElementById('concordo').onclick = () => { document.getElementById('consent').remove(); add(); };
+}
+document.getElementById('chipInicio').onclick = ()=>{
+  const corpo = `<input type="file" id="up" style="display:none"><div id="lista">${itensLista()}</div>`;
+  if (window.MOBILE) {  // layout compacto: a lista ocupa a tela, fora do pop-up, com botão "Enviar mídia"
+    document.body.insertAdjacentHTML('beforeend', `<div class="mobile-add-menu-container asset-picker" id="mob">
+      <button aria-label="Fechar" onclick="document.getElementById('mob').remove()">close</button>
+      <button class="upload-button" aria-label="Enviar mídia" onclick="document.getElementById('up').click()"><mat-icon>upload</mat-icon></button>${corpo}</div>`);
+  } else {
+    document.getElementById('ov').innerHTML = `<div class="asset-picker">${corpo}</div>`;
+  }
+  document.getElementById('up').onchange = (e)=>{ recebeArquivo(e.target.files[0].name); };
+};
+function detalhe(nome, doProjeto){ if (doProjeto) window.REUSO++; const m = document.getElementById('mob'); if (m) m.remove();
+  document.getElementById('ov').innerHTML = `<img class="detail-preview-image" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" style="width:20px"><button class="detail-add-to-prompt-btn" onclick="incluir('${nome}')"> Incluir no comando </button>`; }
+function incluir(nome){ const c=document.getElementById('chipInicio'); c.className='filled'; c.textContent=nome; document.getElementById('ov').innerHTML=''; }
+document.getElementById('ed').addEventListener('input', ()=>{ document.getElementById('gerar').disabled = !document.getElementById('ed').innerText.trim(); });
+function gera(){ const txt=document.getElementById('ed').innerText; document.getElementById('ed').innerHTML='<p><br></p>'; document.getElementById('gerar').disabled=true; N++;
+  if (modo=='Vídeo' && document.getElementById('chipInicio').className!='filled') { alert('sem frame'); return; }
+  setTimeout(()=>{ const g=document.getElementById('galeria');
+    if (modo=='Vídeo') g.insertAdjacentHTML('beforeend', `<video src="/v.mp4?${N}${Math.random()}"></video>`);
+    else { const id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + 'abcdefabcdef');
+      const i=new Image(); i.width=200; i.src='/image/' + id + '?Expires=1&Signature=x'; g.appendChild(i);
+      window.ASSETS.push({titulo: 'Empty Japanese street ' + N, src: '/image/' + id + '?Expires=2&Signature=y', enviado: 0}); }
+  }, 2500); }
+</script></body></html>

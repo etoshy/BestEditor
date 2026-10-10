@@ -1,0 +1,1292 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>3.5. Timeline — revise antes de montar</h1>
+<div style="margin:6px 0 14px;padding:12px 14px;background:#0d0e12;color:#e8e9ee;border-radius:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+  <span style="flex:1;min-width:220px;">✨ Este é o <b>editor clássico</b>. O editor novo (<b>Estúdio</b>), com timeline arrastável, transições e efeitos por arrastar, está a um clique.</span>
+  <a href="{{ url_for('edit_segments_page', job_id=job.job_id, modo='estudio') }}" style="background:#00d4b4;color:#04231d;font-weight:700;padding:8px 14px;border-radius:8px;text-decoration:none;">Abrir no Estúdio →</a>
+</div>
+{% if job.word_timestamps %}
+<p style="font-size:0.85rem;"><a href="{{ url_for('edit_captions_page', job_id=job.job_id) }}">🔤 Editar legendas manualmente (palavra por palavra)</a></p>
+{% endif %}
+<p style="font-size:0.85rem;"><a href="{{ url_for('download_timing_log', job_id=job.job_id) }}" style="color:#666;">📊 Baixar log de tempo até agora (pra identificar gargalos)</a></p>
+
+{% if job.assembly_error %}
+<div class="error" style="margin-top:8px;">
+  <strong>A montagem anterior falhou:</strong> {{ job.assembly_error }}<br>
+  {% if job.assembly_error_segment_index is not none %}
+  O trecho problemático já está selecionado e destacado em vermelho abaixo — escolha outra fonte (banco, upload, ou link) pra ele e confirme de novo.
+  {% else %}
+  Escolha outra fonte (banco, upload, ou link) pro trecho indicado acima e confirme de novo.
+  {% endif %}
+  {% if job.assembly_error_segment_index is not none %}
+  <form method="post" action="{{ url_for('corrigir_trecho', job_id=job.job_id) }}" style="margin-top:8px;">
+    <input type="hidden" name="indice" value="{{ job.assembly_error_segment_index }}">
+    <button type="submit" style="background:#16a34a;">🔧 Corrigir automaticamente</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% set correcao = job.pop('ultima_correcao', None) %}
+{% if correcao %}<div style="margin-top:8px;padding:10px 12px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;">🔧 {{ correcao }} Confira e confirme de novo.</div>{% endif %}
+<p>Clique num bloco do vídeo pra trocar o termo, subir seu próprio arquivo, colar um link, ou usar uma foto com efeito de zoom. Os blocos já mostram a prévia real do que seria usado.</p>
+
+<div style="background:#f0f4ff;border:2px solid #c7d6ff;border-radius:8px;padding:14px;margin-bottom:16px;">
+  <h3 style="margin-top:0;">📁 Biblioteca de mídia</h3>
+  <p style="color:#666;font-size:0.85rem;margin-top:-6px;">
+    Envie arquivos aqui a qualquer momento e <strong>arraste o cartão</strong>
+    pra qualquer trecho, pra área de overlays, ou pra uma sugestão de
+    corte — sem precisar reenviar o mesmo arquivo em cada lugar.
+  </p>
+  <form method="POST" action="{{ url_for('upload_to_library', job_id=job.job_id) }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+    <input type="file" name="library_file" accept="image/*,video/*" required>
+    <button type="submit">Adicionar à biblioteca</button>
+    <a href="{{ url_for('importar_biblioteca_page', job_id=job.job_id) }}" style="margin-left:6px;">📥 Importar de Capturar página / Cortar do YouTube</a>
+  </form>
+  <div id="media_library_cards" style="display:flex;gap:10px;flex-wrap:wrap;">
+    {% for item in media_library %}
+    <div class="library-card" draggable="true" data-item-id="{{ item.id }}" ondragstart="handleLibraryDragStart(event)"
+         style="width:110px;background:#fff;border:1px solid #ccc;border-radius:6px;padding:6px;cursor:grab;text-align:center;">
+      {% if item.media_type == 'image' %}
+      <img src="{{ url_for('serve_library_file', job_id=job.job_id, item_id=item.id) }}" style="width:100%;height:70px;object-fit:cover;border-radius:4px;">
+      {% else %}
+      <video src="{{ url_for('serve_library_file', job_id=job.job_id, item_id=item.id) }}" style="width:100%;height:70px;object-fit:cover;border-radius:4px;background:#000;" muted></video>
+      {% endif %}
+      <div style="font-size:0.7rem;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ item.filename }}">{{ item.filename }}</div>
+      <form method="POST" action="{{ url_for('remove_from_library', job_id=job.job_id, item_id=item.id) }}" style="margin:2px 0 0;">
+        <button type="submit" style="font-size:0.7rem;color:#c00;padding:1px 4px;">remover</button>
+      </form>
+    </div>
+    {% else %}
+    <p style="color:#888;font-size:0.85rem;">Nenhum arquivo na biblioteca ainda.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+.kb-box { margin-top:10px; padding:10px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; }
+.kb-presets { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.kb-chip { margin-top:0; padding:5px 10px; font-size:.8rem; background:#fff; color:#4c1d95; border:1px solid #c4b5fd; border-radius:999px; cursor:pointer; }
+.kb-chip.ativo { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+  .timeline-wrap { overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; margin-top: 16px; background: #fafafa; }
+  .timeline-inner { position: relative; height: auto; padding: 10px 0; }
+  .track { position: relative; height: 64px; margin: 4px 0; }
+  .track-label { position: absolute; left: -1px; top: 0; width: 90px; height: 100%; display: flex; align-items: center; font-size: 0.75rem; color: #666; background: #f0f0f0; border-right: 1px solid #ddd; padding-left: 6px; box-sizing: border-box; z-index: 2; }
+  .track-content { margin-left: 90px; position: relative; height: 100%; }
+  .block { position: absolute; top: 2px; bottom: 2px; border-radius: 4px; overflow: hidden; cursor: pointer; border: 2px solid transparent; background-size: cover; background-position: center; background-color: #999; }
+  .block.selected { border-color: #2563eb; }
+  .block.has-error { border-color: #dc2626; border-width: 3px; animation: pulse-error 1.5s ease-in-out 3; }
+  @keyframes pulse-error { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.5); } 50% { box-shadow: 0 0 0 6px rgba(220,38,38,0); } }
+  .block-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; font-size: 0.65rem; padding: 2px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block-noprev { display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #333; text-align: center; padding: 2px; }
+  .text-block { background: #fbbf24; }
+  .caption-block { background: #34d399; cursor: pointer; border-color: #059669; }
+  .caption-block:hover { background: #10b981; }
+  .waveform-track { background-image: url("{{ url_for('waveform_image', job_id=job.job_id) if has_waveform else '' }}"); background-repeat: no-repeat; background-size: 100% 100%; }
+  .music-track { background: repeating-linear-gradient(45deg, #a78bfa, #a78bfa 10px, #8b5cf6 10px, #8b5cf6 20px); }
+  .ruler { margin-left: 90px; height: 18px; position: relative; font-size: 0.65rem; color: #999; }
+  .ruler span { position: absolute; top: 0; border-left: 1px solid #ccc; padding-left: 3px; }
+  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: red; z-index: 5; pointer-events: none; }
+  .panel { display: none; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px; background: #fff; }
+  .panel.active { display: block; }
+
+  .composition-editor{margin-top:18px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start}
+  .monitor-shell{background:#111827;border:1px solid #374151;border-radius:10px;padding:12px;color:#fff}
+  .monitor-stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;overflow:hidden;border-radius:6px;user-select:none}
+  .monitor-stage .stage-bg,.monitor-stage .stage-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .monitor-stage .stage-bg{object-fit:cover;filter:blur(22px);transform:scale(1.12);opacity:.8;display:none}
+  .monitor-stage .stage-video{z-index:2}
+  .stage-text,.stage-overlay{position:absolute;z-index:4;left:50%;top:50%;transform:translate(-50%,-50%);cursor:move;touch-action:none}
+  .stage-text{font-weight:700;color:white;text-align:center;text-shadow:0 2px 5px #000;max-width:90%;padding:6px 10px;white-space:pre-wrap}
+  .stage-overlay{max-width:none;max-height:none;object-fit:contain;outline:1px dashed rgba(255,255,255,.35)}
+  .stage-overlay.selected,.stage-text.selected{outline:2px solid #60a5fa}
+  .resize-handle{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border-radius:50%;background:#60a5fa;border:2px solid #fff;cursor:nwse-resize;z-index:8}
+  .monitor-controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:9px}
+  .monitor-controls button{min-height:34px}
+  .monitor-time{font-variant-numeric:tabular-nums;color:#d1d5db}
+  .inspector{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:12px}
+  .inspector h3{margin:0 0 10px}
+  .inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .inspector input,.inspector select{width:100%;box-sizing:border-box}
+  .trim-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+  .trim-row input{width:100%;box-sizing:border-box}
+  .trim-help{font-size:.78rem;color:#6b7280;margin:5px 0 0}
+  @media(max-width:800px){.composition-editor{grid-template-columns:1fr}}
+</style>
+
+<div class="composition-editor">
+  <div class="monitor-shell">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+      <strong>🎬 Monitor de composição</strong><span id="monitor-status" style="font-size:.75rem;color:#9ca3af;">Selecione um trecho</span>
+    </div>
+    <div class="monitor-stage" id="composition-stage">
+      <video id="composition-bg" class="stage-bg" muted playsinline></video>
+      <video id="composition-video" class="stage-video" muted playsinline preload="auto" controls></video>
+      <img id="composition-poster" class="stage-video" style="display:none;object-fit:cover;" alt="Prévia do trecho">
+      <div id="composition-text" class="stage-text" style="display:none;"></div>
+      <div id="composition-overlay" class="stage-overlay" style="display:none;"></div>
+    </div>
+    <div class="monitor-controls">
+      <button type="button" id="monitor-play">▶️ Play</button>
+      <button type="button" id="monitor-back">↶ 5s</button>
+      <button type="button" id="monitor-forward">5s ↷</button>
+      <input id="monitor-time-input" type="number" min="0" step="0.1" value="0" style="width:85px;">
+      <span class="monitor-time" id="monitor-time">0.0s / 0.0s</span>
+    </div>
+    <p style="font-size:.76rem;color:#9ca3af;margin:7px 0 0;">Arraste texto/overlay diretamente no monitor. Use o canto azul para redimensionar. O cursor da timeline controla o instante exibido.</p>
+  </div>
+  <div class="inspector">
+    <h3>Inspector</h3>
+    <div id="inspector-empty" style="font-size:.82rem;color:#6b7280;">Selecione texto ou overlay no monitor.</div>
+    <div id="inspector-fields" style="display:none;">
+      <strong id="inspector-title">Elemento</strong>
+      <div class="inspector-grid" style="margin-top:9px;">
+        <label>X %<input id="inspector-x" type="number" min="0" max="100" step="0.5"></label>
+        <label>Y %<input id="inspector-y" type="number" min="0" max="100" step="0.5"></label>
+        <label>Tamanho %<input id="inspector-size" type="number" min="1" max="100" step="1"></label>
+      </div>
+      <button type="button" id="inspector-apply" style="margin-top:10px;">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<div class="timeline-wrap">
+  <div class="timeline-inner" id="timeline-inner">
+    <div class="ruler" id="ruler"></div>
+
+    <div class="track">
+      <div class="track-label">Vídeo</div>
+      <div class="track-content" id="video-track">
+        {% for seg in segments %}
+        {% set preview = previews[loop.index0] if previews and loop.index0 < previews|length else None %}
+        <div class="block{% if job.assembly_error_segment_index is not none and job.assembly_error_segment_index == loop.index0 %} has-error{% endif %}" id="block_{{ loop.index0 }}"
+             data-start="{{ seg.start }}" data-end="{{ seg.end }}"
+             onclick="selectSegment({{ loop.index0 }})"
+             {% if preview and preview.ok and preview.thumbnail_url %}
+             style="background-image:url('{{ preview.thumbnail_url }}');"
+             {% endif %}>
+          {% if not preview or not preview.ok %}
+          <div class="block-noprev">{% if seg.media_type == 'image' %}📷 {% endif %}{{ seg.provider }}: {{ seg.query }}{% if preview and not preview.ok %} (sem prévia){% endif %}</div>
+          {% endif %}
+          <div class="block-label">{% if seg.media_type == 'image' %}📷 foto: {% endif %}{{ seg.provider }}: {{ seg.query }}{% if preview and preview.provider and preview.original_provider and preview.provider != preview.original_provider %} (usando {{ preview.provider }}){% endif %}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="track">
+      <div class="track-label">Texto na tela</div>
+      <div class="track-content" id="text-track">
+        {% for seg in segments %}
+        {% if seg.on_screen_text %}
+        {% set style = seg.on_screen_text_style or {} %}
+        {% set txt_abs_start = seg.start + style.get('start_offset', 0) %}
+        {% set txt_abs_end = seg.start + style.get('end_offset', seg.end - seg.start) %}
+        <div class="block text-block" id="text_block_{{ loop.index0 }}" data-index="{{ loop.index0 }}"
+             data-start="{{ txt_abs_start }}" data-end="{{ txt_abs_end }}"
+             onclick="selectSegment({{ loop.index0 }})">
+          <div class="block-label">{{ seg.on_screen_text }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="track">
+      <div class="track-label">Narração</div>
+      <div class="track-content waveform-track" id="narration-track"></div>
+    </div>
+
+    {% if job.music_path %}
+    <div class="track">
+      <div class="track-label">Trilha sonora</div>
+      <div class="track-content">
+        <div class="block music-track" style="left:0; width:100%;"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if job.word_timestamps %}
+    <div class="track">
+      <div class="track-label">Legenda</div>
+      <div class="track-content" id="caption-track">
+        {% for w in job.word_timestamps %}
+        <div class="block caption-block" data-start="{{ w.start }}" data-end="{{ w.end }}" title="{{ w.word }}"
+             onclick="window.location.href='{{ url_for('edit_captions_page', job_id=job.job_id) }}'"></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="playhead" id="playhead" style="left:90px;"></div>
+  </div>
+</div>
+
+<audio id="player" controls style="width:100%;margin-top:10px;" src="{{ url_for('narration_audio', job_id=job.job_id) }}"></audio>
+
+<form method="post" action="{{ url_for('confirm_segments', job_id=job.job_id) }}" enctype="multipart/form-data" id="segments-form" novalidate>
+  <div style="margin:12px 0;padding:14px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;">
+    <strong>⚙️ Configuração global dos clipes</strong>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:end;">
+      <label style="min-width:260px;">Bordas para TODOS os clipes
+        <select name="global_aspect_fill" id="global_aspect_fill">
+          <option value="black" {% if editor_defaults.aspect_fill == 'black' %}selected{% endif %}>⬛ Bordas pretas</option>
+          <option value="mosaic" {% if editor_defaults.aspect_fill == 'mosaic' %}selected{% endif %}>🧩 Mosaico do próprio clipe</option>
+          <option value="zoom" {% if editor_defaults.aspect_fill == 'zoom' %}selected{% endif %}>🔎 Zoom central</option>
+          <option value="smart" {% if editor_defaults.aspect_fill == 'smart' %}selected{% endif %}>✨ Preencher inteligente (tira barras embutidas)</option>
+        </select>
+      </label>
+      <label style="min-width:220px;">Cortar frames iniciais de TODOS
+        <input type="number" name="global_trim_start_frames" id="global_trim_start_frames" value="{{ editor_defaults.trim_start_frames }}" min="0" max="120" step="1">
+      </label>
+      {% set trans_global = editor_defaults.get('transition_type', 'site') %}
+      <label style="min-width:260px;">🎞️ Transição entre TODOS os trechos
+        <select name="global_transition_type" id="global_transition_type">
+          <option value="site" {% if trans_global == 'site' %}selected{% endif %}>⚙️ A das Configurações ({{ transicao_do_site }})</option>
+          {% for v, rotulo in transicoes %}<option value="{{ v }}" {% if trans_global == v %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+        </select>
+      </label>
+      <label style="min-width:140px;">Duração (s)
+        <input type="number" name="global_transition_duration" value="{{ editor_defaults.get('transition_duration', 0.6) }}" min="0.1" max="3" step="0.1">
+      </label>
+    </div>
+    <p style="margin:7px 0 0;color:#475569;font-size:.8rem;">Esses valores valem para todos. Em cada trecho abaixo você pode escolher <b>Usar global</b> ou sobrescrever individualmente.</p>
+  </div>
+  {% for seg in segments %}
+  <div class="panel" id="panel_{{ loop.index0 }}" data-segment-index="{{ loop.index0 }}" ondragover="allowDrop(event)" ondrop="handleDropOnSegment(event, {{ loop.index0 }})">
+    <strong>Trecho {{ loop.index }}</strong>
+    <div class="trim-row">
+      <label>Início (s)<input class="seg-start-input" data-index="{{ loop.index0 }}" type="number" name="seg_{{ loop.index0 }}_start" value="{{ '%.3f'|format(seg.start) }}" min="0" step="0.1"></label>
+      <label>Fim (s)<input class="seg-end-input" data-index="{{ loop.index0 }}" type="number" name="seg_{{ loop.index0 }}_end" value="{{ '%.3f'|format(seg.end) }}" min="0.1" step="0.1"></label>
+    </div>
+    <p class="trim-help">💡 Você também pode arrastar as extremidades do bloco na timeline para encurtar/aumentar este trecho.</p>
+    {% if seg.media_type == 'image' %}
+    <p style="color:#b45309;font-size:0.85rem;margin:4px 0;">📷 A IA sugeriu uma FOTO parada (com zoom) pra esse trecho, buscada em <strong>{{ seg.provider }}</strong>.{% if seg.provider in browser_image_providers %} Os buscadores de imagem pegam a 1ª imagem do resultado; se esse buscador não achar, o site tenta o termo nos outros (Bing/Brave/Yandex/Startpage) automaticamente.{% endif %} Pra usar vídeo aqui, escolha "usar um arquivo"/"colar link" abaixo.</p>
+    {% set img_fade_in = seg.image_fade_in or False %}
+    {% set img_fade_out = seg.image_fade_out or False %}
+    <div style="margin:8px 0;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">
+      <label style="margin-top:0;">Animação da foto (entrada/saída)</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;">
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="seg_{{ loop.index0 }}_image_fade_in" {% if img_fade_in %}checked{% endif %}> Surge suavemente (fade in)</label>
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="seg_{{ loop.index0 }}_image_fade_out" {% if img_fade_out %}checked{% endif %}> Desaparece suavemente (fade out)</label>
+        <label style="font-size:0.8rem;">Duração (s)<input type="number" name="seg_{{ loop.index0 }}_image_fade_duration" value="{{ seg.image_fade_duration or 0.5 }}" min="0.1" max="3" step="0.1" style="width:70px;"></label>
+      </div>
+    </div>
+    {% endif %}
+
+    <label>Como conseguir o vídeo/imagem pra esse trecho</label>
+    <select name="seg_{{ loop.index0 }}_source_mode" onchange="toggleSourceFields({{ loop.index0 }}, this.value)">
+      <option value="auto" {% if not seg.override_source or seg.override_source.source == 'provider_url' %}selected{% endif %}>Buscar automaticamente (termo + banco abaixo)</option>
+      <option value="upload" {% if seg.override_source and seg.override_source.source == 'local_file' %}selected{% endif %}>Usar um arquivo do meu computador</option>
+      <option value="url" {% if seg.override_source and seg.override_source.source == 'url' %}selected{% endif %}>Colar o link direto de um arquivo (vídeo ou imagem)</option>
+      <option value="post_url">Colar o link de um post do Pexels/Pixabay/Mixkit</option>
+    </select>
+
+    <div id="auto_fields_{{ loop.index0 }}">
+      <label>Termo de busca (ou categoria, se o banco for o Mixkit)</label>
+      <input type="text" name="seg_{{ loop.index0 }}_query" id="seg_{{ loop.index0 }}_query_input" value="{{ seg.query }}" onchange="markChanged({{ loop.index0 }})">
+
+      <label>{{ 'Banco de foto' if seg.media_type == 'image' else 'Banco de vídeo' }}</label>
+      <select name="seg_{{ loop.index0 }}_provider" id="seg_{{ loop.index0 }}_provider_select" onchange="markChanged({{ loop.index0 }})">
+        {% set opcoes_banco = photo_providers if seg.media_type == 'image' else video_providers %}
+        {% for p in opcoes_banco %}
+        <option value="{{ p }}" {% if seg.provider == p %}selected{% endif %}>{{ p }}{% if p == 'youtube' %} (escolha manual no painel do YouTube){% endif %}</option>
+        {% endfor %}
+        {% if seg.provider not in opcoes_banco %}<option value="{{ seg.provider }}" selected>{{ seg.provider }}</option>{% endif %}
+      </select>
+      {% if seg.provider == 'youtube' and seg.media_type != 'image' %}
+      <p style="font-size:0.82rem;color:#7c2d12;margin:6px 0 0;">🎬 Trecho do YouTube — o vídeo e a faixa de tempo são escolhidos no <a href="#painel-youtube">painel "Vídeos do YouTube"</a> no fim da página.{% if not seg.override_source %} Sem escolha, esse trecho usa os bancos normais na montagem.{% endif %}</p>
+      {% endif %}
+
+      <button type="button" onclick="searchCandidates({{ loop.index0 }})" style="margin-top:10px;background:#059669;">🔍 Buscar e ver opções</button>
+      <p id="search_status_{{ loop.index0 }}" style="color:#666;font-size:0.85rem;"></p>
+      <div id="candidates_grid_{{ loop.index0 }}" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
+
+      <div id="source_monitor_{{ loop.index0 }}" style="margin-top:12px;display:none;">
+        <label style="margin-top:0;">🎬 Monitor de Origem — prévia do candidato antes de escolher</label>
+        <video id="source_monitor_video_{{ loop.index0 }}" controls muted style="width:400px;max-width:100%;max-height:240px;background:#000;border-radius:6px;"></video>
+        <div id="source_monitor_fallback_{{ loop.index0 }}" style="display:none;text-align:center;background:#f3f4f6;border-radius:6px;padding:12px;">
+          <img id="source_monitor_fallback_img_{{ loop.index0 }}" style="max-width:100%;max-height:180px;border-radius:4px;" />
+          <p style="color:#666;font-size:0.8rem;margin:6px 0 0;">Esse banco não fornece prévia em vídeo na busca — mostrando a miniatura estática.</p>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button type="button" id="usar_candidato_btn_{{ loop.index0 }}" style="background:#16a34a;margin-top:0;" onclick="usarCandidato({{ loop.index0 }})">✅ Usar esta no trecho</button>
+          <span id="usar_candidato_status_{{ loop.index0 }}" style="font-size:.82rem;color:#555;"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="upload_fields_{{ loop.index0 }}" style="display:none;">
+      <label>Arquivo (vídeo ou imagem)</label>
+      <input type="file" name="seg_{{ loop.index0 }}_file" accept="video/*,image/*">
+      {% if seg.override_source and seg.override_source.source == 'local_file' %}
+      <p style="color:#666;font-size:0.8rem;margin:4px 0 0;">Já tem um arquivo enviado anteriormente pra esse trecho — só escolha outro aqui se quiser trocá-lo (senão, o anterior continua valendo).</p>
+      {% endif %}
+    </div>
+
+    <div id="url_fields_{{ loop.index0 }}" style="display:none;">
+      <label>Link direto do arquivo</label>
+      <input type="text" name="seg_{{ loop.index0 }}_url" placeholder="https://.../video.mp4 ou .../foto.jpg" value="{{ seg.override_source.value if seg.override_source and seg.override_source.source == 'url' else '' }}">
+    </div>
+
+    <div id="post_url_fields_{{ loop.index0 }}" style="display:none;">
+      <label>Banco</label>
+      <select name="seg_{{ loop.index0 }}_post_provider" id="seg_{{ loop.index0 }}_post_provider_select">
+        {% for p in providers_with_url_support %}
+        <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+      </select>
+      <label>Link do post (a página do vídeo no site)</label>
+      <input type="text" name="seg_{{ loop.index0 }}_post_url" id="seg_{{ loop.index0 }}_post_url_input" placeholder="https://www.pexels.com/video/...">
+      <p style="color:#999;font-size:0.85rem;">Magnific e VistaCreate não suportam isso — só Pexels, Pixabay e Mixkit.</p>
+    </div>
+
+    {% set ov = seg.override_source or {} %}
+    {% set zd = ov.zoom_direction or seg.zoom_direction or 'in' %}
+    <div id="ken_burns_fields_{{ loop.index0 }}" class="kb-box" style="{% if seg.media_type != 'image' and not (ov.kind == 'image') %}display:none;{% endif %}">
+      <label style="margin-top:0;">🎥 Animação da imagem</label>
+      {% set seg_i = loop.index0 %}
+      <div class="kb-presets">
+        {% for v, rot in [('in','🔍 Zoom in'), ('out','🔎 Zoom out'), ('pan_left','⬅️ Pan esq.'), ('pan_right','➡️ Pan dir.'), ('pan_up','⬆️ Pan cima'), ('pan_down','⬇️ Pan baixo'), ('static','⏸️ Parado')] %}
+        <button type="button" class="kb-chip{% if zd == v %} ativo{% endif %}" data-valor="{{ v }}" onclick="kbEscolher({{ seg_i }}, this)">{{ rot }}</button>
+        {% endfor %}
+      </div>
+      <select name="seg_{{ loop.index0 }}_zoom_direction" id="seg_{{ loop.index0 }}_zoom_direction" style="display:none;">
+        {% for v in ['in','out','pan_left','pan_right','pan_up','pan_down','static'] %}<option value="{{ v }}" {% if zd == v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+      </select>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;">
+        <label style="font-size:.8rem;margin-top:0;">Foco horizontal (0 esq. → 1 dir.)<input type="range" name="seg_{{ loop.index0 }}_focus_x" value="{{ ov.focus_x if ov.focus_x is not none else (seg.focus_x if seg.focus_x is not none else 0.5) }}" min="0" max="1" step="0.05"></label>
+        <label style="font-size:.8rem;margin-top:0;">Foco vertical (0 topo → 1 base)<input type="range" name="seg_{{ loop.index0 }}_focus_y" value="{{ ov.focus_y if ov.focus_y is not none else (seg.focus_y if seg.focus_y is not none else 0.5) }}" min="0" max="1" step="0.05"></label>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label>Desfoque (0 = nenhum; funciona em foto ou vídeo)</label>
+      <input type="number" name="seg_{{ loop.index0 }}_blur_sigma" value="{{ seg.blur_sigma or 0 }}" min="0" max="50" step="1" style="width:100px;">
+    </div>
+
+    <div style="margin-top:14px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;">
+      <label><strong>Bordas deste trecho</strong></label>
+      <select name="seg_{{ loop.index0 }}_aspect_fill" style="margin-top:5px;">
+        <option value="global" selected>⚙️ Usar configuração global</option>
+        <option value="black">⬛ Bordas pretas</option>
+        <option value="mosaic">🧩 Mosaico do próprio clipe</option>
+        <option value="zoom">🔎 Zoom central até eliminar as bordas</option>
+        <option value="smart">✨ Preencher inteligente (tira barras embutidas)</option>
+      </select>
+      <label style="margin-top:8px;"><strong>Frames iniciais deste trecho</strong></label>
+      <select name="seg_{{ loop.index0 }}_trim_frames">
+        <option value="global" selected>⚙️ Usar global ({{ editor_defaults.trim_start_frames }} frames)</option>
+        {% for n in [0,5,10,15,20,30,60] %}<option value="{{ n }}">{{ n }} frames</option>{% endfor %}
+      </select>
+      <p style="color:#666;font-size:0.8rem;margin:5px 0 0;">O global é aplicado uma vez a todos os trechos; só altere aqui quando um clipe específico precisar de outro valor.</p>
+      {% if not loop.last %}
+      <label style="margin-top:8px;"><strong>🎞️ Transição para o próximo trecho</strong></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+        <select name="seg_{{ loop.index0 }}_transition" style="flex:1;min-width:200px;">
+          <option value="global" {% if not seg.transition %}selected{% endif %}>⚙️ Usar a global</option>
+          {% for v, rotulo in transicoes %}<option value="{{ v }}" {% if seg.transition == v %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+        </select>
+        <label style="font-size:.8rem;margin-top:0;">Duração (s)<input type="number" name="seg_{{ loop.index0 }}_transition_duration" value="{{ seg.transition_duration if seg.transition_duration is not none else '' }}" placeholder="global" min="0.1" max="3" step="0.1" style="width:90px;"></label>
+      </div>
+      {% endif %}
+    </div>
+
+    <label>Texto na tela (opcional)</label>
+    <input type="text" name="seg_{{ loop.index0 }}_on_screen_text" value="{{ seg.on_screen_text or '' }}">
+
+    {% set style = seg.on_screen_text_style or {} %}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+      <div>
+        <label style="font-size:0.8rem;">Posição</label><br>
+        <select name="seg_{{ loop.index0 }}_text_position">
+          {% for pos, label in [('top-left','Topo esquerda'), ('top-center','Topo centro'), ('top-right','Topo direita'), ('middle-left','Meio esquerda'), ('middle-center','Meio centro'), ('middle-right','Meio direita'), ('bottom-left','Base esquerda'), ('bottom-center','Base centro (padrão)'), ('bottom-right','Base direita')] %}
+          <option value="{{ pos }}" {% if style.get('position', 'bottom-center') == pos %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Tamanho (px)</label><br>
+        <input type="number" name="seg_{{ loop.index0 }}_text_size" value="{{ style.get('font_size', '') }}" placeholder="auto" min="10" max="300" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Fonte</label><br>
+        <select name="seg_{{ loop.index0 }}_text_font">
+          <option value="bold" {% if style.get('font', 'bold') == 'bold' %}selected{% endif %}>Negrito</option>
+          <option value="regular" {% if style.get('font', 'bold') == 'regular' %}selected{% endif %}>Normal</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Cor do texto</label><br>
+        <input type="color" name="seg_{{ loop.index0 }}_text_font_color" value="{{ style.get('font_color', '#ffffff') }}" style="width:60px;height:34px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">&nbsp;</label><br>
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="seg_{{ loop.index0 }}_text_border" {% if style.get('border', False) %}checked{% endif %}> Borda</label>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">&nbsp;</label><br>
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="seg_{{ loop.index0 }}_text_background" {% if style.get('background', True) %}checked{% endif %}> Fundo</label>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">&nbsp;</label><br>
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="seg_{{ loop.index0 }}_text_shadow" {% if style.get('shadow', False) %}checked{% endif %}> Sombra</label>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+      <div>
+        <label style="font-size:0.8rem;">Cor da borda</label><br>
+        <input type="color" name="seg_{{ loop.index0 }}_text_border_color" value="{{ style.get('border_color', '#000000') }}" style="width:60px;height:34px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Espessura da borda (px)</label><br>
+        <input type="number" name="seg_{{ loop.index0 }}_text_border_width" value="{{ style.get('border_width', 3) }}" min="1" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Cor da sombra</label><br>
+        <input type="color" name="seg_{{ loop.index0 }}_text_shadow_color" value="{{ style.get('shadow_color', '#000000') }}" style="width:60px;height:34px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Deslocamento da sombra (px)</label><br>
+        <input type="number" name="seg_{{ loop.index0 }}_text_shadow_offset" value="{{ style.get('shadow_offset', 2) }}" min="0" max="20" style="width:80px;">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+      <div>
+        <label style="font-size:0.8rem;">Animação do texto</label><br>
+        <select name="seg_{{ loop.index0 }}_text_animation" onchange="toggleSlideDirectionField({{ loop.index0 }}, this.value)">
+          <option value="none" {% if style.get('animation', 'none') == 'none' %}selected{% endif %}>Sem animação (aparece direto)</option>
+          <option value="fade" {% if style.get('animation', 'none') == 'fade' %}selected{% endif %}>Fade (surge/desaparece suavemente)</option>
+          <option value="slide" {% if style.get('animation', 'none') == 'slide' %}selected{% endif %}>Deslizar (entra de uma direção)</option>
+          <option value="zoom" {% if style.get('animation', 'none') == 'zoom' %}selected{% endif %}>Zoom (cresce até o tamanho normal)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Duração da animação (s)</label><br>
+        <input type="number" name="seg_{{ loop.index0 }}_text_animation_duration" value="{{ style.get('animation_duration', 0.4) }}" min="0.1" max="3" step="0.1" style="width:80px;">
+      </div>
+      <div id="slide_direction_field_{{ loop.index0 }}" style="{% if style.get('animation') != 'slide' %}display:none;{% endif %}">
+        <label style="font-size:0.8rem;">Direção do deslizar</label><br>
+        <select name="seg_{{ loop.index0 }}_text_slide_direction">
+          <option value="bottom" {% if style.get('slide_direction', 'bottom') == 'bottom' %}selected{% endif %}>De baixo pra cima</option>
+          <option value="top" {% if style.get('slide_direction') == 'top' %}selected{% endif %}>De cima pra baixo</option>
+          <option value="left" {% if style.get('slide_direction') == 'left' %}selected{% endif %}>Da esquerda</option>
+          <option value="right" {% if style.get('slide_direction') == 'right' %}selected{% endif %}>Da direita</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+      <label style="font-size:.8rem;">X (%)<input type="number" name="seg_{{ loop.index0 }}_text_x" value="{{ style.get('x_percent', 50) }}" min="0" max="100" step="0.5" style="width:80px;"></label>
+      <label style="font-size:.8rem;">Y (%)<input type="number" name="seg_{{ loop.index0 }}_text_y" value="{{ style.get('y_percent', 88) }}" min="0" max="100" step="0.5" style="width:80px;"></label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+      <label style="font-size:.8rem;">Texto aparece a partir de (s, dentro do trecho)<br>
+        <input type="number" class="text-start-input" data-index="{{ loop.index0 }}" name="seg_{{ loop.index0 }}_text_start_offset" value="{{ style.get('start_offset', '') }}" min="0" step="0.1" placeholder="início do trecho" style="width:150px;"></label>
+      <label style="font-size:.8rem;">até (s, dentro do trecho)<br>
+        <input type="number" class="text-end-input" data-index="{{ loop.index0 }}" name="seg_{{ loop.index0 }}_text_end_offset" value="{{ style.get('end_offset', '') }}" min="0" step="0.1" placeholder="fim do trecho" style="width:150px;"></label>
+    </div>
+    <p style="color:#666;font-size:0.78rem;margin:5px 0 0;">Deixe os dois em branco pra o texto cobrir o trecho inteiro (padrão). Também dá pra arrastar as bordas do bloco amarelo na timeline.</p>
+    <input type="hidden" name="seg_{{ loop.index0 }}_text_style_submitted" value="1">
+  </div>
+  {% endfor %}
+
+  {% include "_painel_youtube.html" %}
+
+  <button type="submit" style="margin-top:20px;">Confirmar e montar o vídeo</button>
+</form>
+
+<div style="margin-top:40px;border-top:2px solid #ddd;padding-top:20px;">
+  <h2>Overlays (imagem/vídeo sobreposto ao vídeo final)</h2>
+  <p style="color:#666;font-size:0.9rem;">
+    Diferente do texto na tela (que pertence a UM trecho), um overlay tem
+    tempo, posição e tamanho PRÓPRIOS — pode ficar restrito a uma janela
+    específica ou atravessar o vídeo inteiro, independente de onde os
+    trechos da narração começam/terminam. Útil pra um logo, uma marca
+    d'água, ou um elemento gráfico que você quer controlar à parte.
+  </p>
+
+  {% if overlays %}
+  <form method="POST" action="{{ url_for('bulk_update_overlays', job_id=job.job_id) }}" id="bulk_overlay_form">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+    <tr style="text-align:left;border-bottom:1px solid #ccc;">
+      <th style="padding:6px;"><input type="checkbox" onclick="document.querySelectorAll('.overlay-checkbox').forEach(c => c.checked = this.checked)"></th>
+      <th style="padding:6px;">Fonte</th>
+      <th style="padding:6px;">Tempo</th>
+      <th style="padding:6px;">Posição</th>
+      <th style="padding:6px;">Tamanho</th>
+      <th style="padding:6px;"></th>
+    </tr>
+    {% for ov in overlays %}
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:6px;"><input type="checkbox" name="overlay_ids" value="{{ ov.id }}" class="overlay-checkbox"></td>
+      <td style="padding:6px;">
+        {% if ov.media_type == 'text' %}🔤 "{{ ov.text[:30] }}"
+        {% elif ov.source.source == 'local_file' %}📁 Arquivo enviado
+        {% elif ov.source.source == 'url' %}🔗 {{ ov.source.value[:40] }}
+        {% elif ov.source.source == 'provider_search' %}🔍 "{{ ov.source.query }}" em {{ ov.source.provider }}
+        {% else %}{{ ov.source.source }}{% endif %}
+      </td>
+      <td style="padding:6px;">{{ "%.1f"|format(ov.start) }}s – {{ "%.1f"|format(ov.end) }}s</td>
+      <td style="padding:6px;">{{ (ov.style.position if ov.media_type == 'text' else ov.position) or '—' }}</td>
+      <td style="padding:6px;">{{ (ov.size_percent ~ '%') if ov.media_type != 'text' else '—' }}</td>
+      <td style="padding:6px;">
+        <button type="submit" formaction="{{ url_for('remove_overlay', job_id=job.job_id, overlay_id=ov.id) }}" style="color:#c00;">Remover</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div style="background:#fff8e6;padding:12px;border-radius:8px;margin-bottom:16px;">
+    <strong style="font-size:0.9rem;">Aplicar a mesma configuração aos overlays marcados acima</strong>
+    <p style="color:#666;font-size:0.8rem;margin:4px 0 10px;">
+      Marque as caixas na tabela e preencha só os campos abaixo que quer mudar —
+      um campo vazio não altera aquele aspecto dos overlays selecionados. O
+      "Tamanho" se aplica automaticamente como tamanho de fonte (texto) ou %
+      da largura (imagem/vídeo), conforme o tipo de cada um.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+      <div>
+        <label style="font-size:0.8rem;">X (%)</label><br>
+        <input type="number" name="x_percent" min="0" max="100" placeholder="não mudar" style="width:100px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Y (%)</label><br>
+        <input type="number" name="y_percent" min="0" max="100" placeholder="não mudar" style="width:100px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Tamanho</label><br>
+        <input type="number" name="size" min="1" placeholder="não mudar" style="width:100px;">
+      </div>
+      <button type="submit">Aplicar aos marcados</button>
+    </div>
+  </div>
+  </form>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('add_text_overlay', job_id=job.job_id) }}" style="background:#f0f4ff;padding:16px;border-radius:8px;margin-bottom:16px;">
+    <h3 style="margin-top:0;">Adicionar overlay de TEXTO (título/chamada)</h3>
+    <p style="color:#666;font-size:0.85rem;margin-top:-8px;">
+      Diferente do texto de um trecho, esse tem tempo/posição próprios —
+      pode atravessar vários trechos ou o vídeo inteiro.
+    </p>
+
+    <label>Texto</label>
+    <input type="text" name="text" placeholder="Ex: Inscreva-se no canal" required>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <div>
+        <label style="font-size:0.8rem;">Início (segundos)</label><br>
+        <input type="number" name="start" value="0" min="0" step="0.1" style="width:100px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Fim (segundos)</label><br>
+        <input type="number" name="end" value="5" min="0" step="0.1" style="width:100px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Posição</label><br>
+        <select name="position">
+          {% for pos, label in [('top-left','Topo esquerda'), ('top-center','Topo centro'), ('top-right','Topo direita'), ('middle-left','Meio esquerda'), ('middle-center','Meio centro'), ('middle-right','Meio direita'), ('bottom-left','Base esquerda'), ('bottom-center','Base centro (padrão)'), ('bottom-right','Base direita')] %}
+          <option value="{{ pos }}" {% if pos == 'bottom-center' %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Tamanho (px)</label><br>
+        <input type="number" name="font_size" placeholder="auto" min="10" max="300" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Fonte</label><br>
+        <select name="font">
+          <option value="bold">Negrito</option>
+          <option value="regular">Normal</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">&nbsp;</label><br>
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="border"> Borda</label>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">&nbsp;</label><br>
+        <label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" name="background" checked> Fundo</label>
+      </div>
+    </div>
+
+    <button type="submit" style="margin-top:14px;">Adicionar título/chamada</button>
+  </form>
+
+  <form method="POST" action="{{ url_for('add_overlay', job_id=job.job_id) }}" enctype="multipart/form-data" style="background:#f7f7f7;padding:16px;border-radius:8px;" id="overlay_drop_zone" ondragover="allowDrop(event)" ondrop="handleDropOnOverlayArea(event)">
+    <h3 style="margin-top:0;">Adicionar overlay de imagem/vídeo</h3>
+    <p style="color:#888;font-size:0.8rem;margin-top:-8px;">💡 Ou arraste um cartão da biblioteca de mídia direto pra cá.</p>
+
+    <label>De onde vem</label>
+    <select name="source_mode" onchange="toggleOverlaySourceFields(this.value)">
+      <option value="upload">Arquivo do meu computador</option>
+      <option value="url">Link direto de um arquivo</option>
+      <option value="search">Buscar num banco de vídeo</option>
+    </select>
+
+    <div id="overlay_upload_fields">
+      <label>Arquivo (imagem ou vídeo)</label>
+      <input type="file" name="overlay_file" accept="image/*,video/*">
+    </div>
+    <div id="overlay_url_fields" style="display:none;">
+      <label>Link direto</label>
+      <input type="text" name="overlay_url" placeholder="https://.../logo.png ou .mp4">
+    </div>
+    <div id="overlay_search_fields" style="display:none;">
+      <label>Banco</label>
+      <select name="overlay_provider">
+        {% for p in all_providers %}
+        <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+      </select>
+      <label>Termo de busca (em inglês)</label>
+      <input type="text" name="overlay_query" placeholder="logo animation, particles, etc.">
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <div>
+        <label style="font-size:0.8rem;">Início (segundos)</label><br>
+        <input type="number" name="start" value="0" min="0" step="0.1" style="width:100px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Fim (segundos)</label><br>
+        <input type="number" name="end" value="5" min="0" step="0.1" style="width:100px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Posição</label><br>
+        <select name="position">
+          {% for pos, label in [('top-left','Topo esquerda'), ('top-center','Topo centro'), ('top-right','Topo direita (padrão)'), ('middle-left','Meio esquerda'), ('middle-center','Meio centro'), ('middle-right','Meio direita'), ('bottom-left','Base esquerda'), ('bottom-center','Base centro'), ('bottom-right','Base direita')] %}
+          <option value="{{ pos }}" {% if pos == 'top-right' %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Tamanho (% da largura)</label><br>
+        <input type="number" name="size_percent" value="20" min="1" max="100" style="width:100px;">
+      </div>
+      <div><label style="font-size:0.8rem;">X (%)</label><br><input type="number" name="x_percent" value="80" min="0" max="100" step="0.5" style="width:80px;"></div>
+      <div><label style="font-size:0.8rem;">Y (%)</label><br><input type="number" name="y_percent" value="20" min="0" max="100" step="0.5" style="width:80px;"></div>
+    </div>
+
+    <button type="submit" style="margin-top:14px;">Adicionar overlay</button>
+  </form>
+</div>
+
+{% if cutaway_suggestions %}
+<div style="margin-top:30px;border-top:2px solid #ddd;padding-top:20px;">
+  <h2>Cortes reais sugeridos pela IA</h2>
+  <p style="color:#666;font-size:0.9rem;">
+    Diferente de overlay (uma camada por cima), um corte CORTA o vídeo
+    e o áudio no ponto indicado e insere o clipe que você enviar ali de
+    verdade — o vídeo final fica mais longo. Sem enviar um arquivo, a
+    sugestão simplesmente não é usada na montagem.
+  </p>
+  {% for cut in cutaway_suggestions %}
+  <div style="background:{{ '#eefbea' if cut.resolved_path else '#fff8e6' }};padding:14px;border-radius:8px;margin-bottom:12px;" ondragover="allowDrop(event)" ondrop="handleDropOnCutaway(event, '{{ cut.id }}')">
+    <strong>Em {{ "%.1f"|format(cut.insertion_point) }}s:</strong> {{ cut.description }}
+    {% if cut.resolved_path %}
+    <span style="color:#2a7a2a;font-weight:bold;"> ✓ Arquivo enviado</span>
+    {% endif %}
+    <p style="color:#888;font-size:0.75rem;margin:4px 0;">💡 Ou arraste um cartão da biblioteca de mídia direto pra cá.</p>
+    <p style="margin:6px 0 10px;font-size:0.85rem;">🎬 <a href="#painel-youtube">Buscar no YouTube</a> — os resultados pra esse corte já estão no painel "Vídeos do YouTube" (logo acima do botão de montar){% if cut.query %}, pesquisados com o termo <em>{{ cut.query }}</em>{% endif %}.</p>
+    <form method="POST" action="{{ url_for('upload_cutaway', job_id=job.job_id, cutaway_id=cut.id) }}" enctype="multipart/form-data" style="margin-top:8px;display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+      <div>
+        <label style="font-size:0.8rem;">{{ 'Trocar arquivo' if cut.resolved_path else 'Arquivo (vídeo)' }}</label><br>
+        <input type="file" name="cutaway_file" accept="video/*" {{ 'required' if not cut.resolved_path else '' }}>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Áudio durante o corte</label><br>
+        <select name="audio_mode">
+          <option value="pause" {% if cut.audio_mode == 'pause' %}selected{% endif %}>Pausar narração (toca só o áudio do clipe)</option>
+          <option value="continue" {% if cut.audio_mode == 'continue' %}selected{% endif %}>Continuar (mantém a narração/trilha)</option>
+        </select>
+      </div>
+      <button type="submit">{{ 'Trocar arquivo' if cut.resolved_path else 'Enviar' }}</button>
+    </form>
+    <form method="POST" action="{{ url_for('remove_cutaway', job_id=job.job_id, cutaway_id=cut.id) }}" style="margin-top:6px;">
+      <button type="submit" style="color:#c00;">Descartar esta sugestão</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+function toggleOverlaySourceFields(mode) {
+  document.getElementById('overlay_upload_fields').style.display = mode === 'upload' ? '' : 'none';
+  document.getElementById('overlay_url_fields').style.display = mode === 'url' ? '' : 'none';
+  document.getElementById('overlay_search_fields').style.display = mode === 'search' ? '' : 'none';
+}
+</script>
+<script>
+// --- Biblioteca de mídia: arrastar cartões pra trecho/overlay/corte ---
+function handleLibraryDragStart(event) {
+  event.dataTransfer.setData('text/plain', event.target.closest('.library-card').dataset.itemId);
+  event.dataTransfer.effectAllowed = 'copy';
+}
+
+function allowDrop(event) {
+  event.preventDefault();  // sem isso, o navegador recusa o "drop" por padrão
+}
+
+async function _assignLibraryItem(url, itemId) {
+  if (!itemId) return;
+  const body = new URLSearchParams({item_id: itemId});
+  const res = await fetch(url, {method: 'POST', body});
+  if (res.ok || res.redirected) {
+    location.reload();  // reflete a atribuição nova recarregando a pagina
+  } else {
+    alert('Não consegui atribuir esse arquivo — tente de novo.');
+  }
+}
+
+function handleDropOnSegment(event, segmentIndex) {
+  event.preventDefault();
+  const itemId = event.dataTransfer.getData('text/plain');
+  _assignLibraryItem(`/job/{{ job.job_id }}/assign-library-to-segment/${segmentIndex}`, itemId);
+}
+
+function handleDropOnOverlayArea(event) {
+  event.preventDefault();
+  const itemId = event.dataTransfer.getData('text/plain');
+  _assignLibraryItem(`/job/{{ job.job_id }}/assign-library-to-overlay`, itemId);
+}
+
+function handleDropOnCutaway(event, cutawayId) {
+  event.preventDefault();
+  const itemId = event.dataTransfer.getData('text/plain');
+  _assignLibraryItem(`/job/{{ job.job_id }}/assign-library-to-cutaway/${cutawayId}`, itemId);
+}
+</script>
+<script>
+const segments = {{ segments | tojson }};
+const initialPreviews = {{ previews | tojson }};
+const overlays = {{ overlays | tojson }};
+const PPX = 40; // pixels por segundo
+
+function layout() {
+  const totalDuration = Math.max(...segments.map(s => s.end));
+  const totalWidth = Math.max(600, totalDuration * PPX);
+  document.getElementById('timeline-inner').style.width = (totalWidth + 90) + 'px';
+
+  document.querySelectorAll('.track-content .block, .track-content > div').forEach(el => {
+    const start = parseFloat(el.dataset.start);
+    const end = parseFloat(el.dataset.end);
+    if (!isNaN(start) && !isNaN(end)) {
+      el.style.left = (start * PPX) + 'px';
+      el.style.width = Math.max(4, (end - start) * PPX) + 'px';
+    }
+  });
+
+  document.getElementById('narration-track').style.width = (totalDuration * PPX) + 'px';
+
+  const ruler = document.getElementById('ruler');
+  ruler.innerHTML = '';
+  ruler.style.width = (totalDuration * PPX) + 'px';
+  for (let t = 0; t <= totalDuration; t += 5) {
+    const mark = document.createElement('span');
+    mark.style.left = (t * PPX) + 'px';
+    mark.textContent = t + 's';
+    ruler.appendChild(mark);
+  }
+}
+
+function selectSegment(i) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.block').forEach(b => b.classList.remove('selected'));
+  document.getElementById('panel_' + i).classList.add('active');
+  const block = document.getElementById('block_' + i);
+  if (block) {
+    block.classList.add('selected');
+    // rola a TIMELINE (horizontal) pra trazer o bloco pra vista, alem
+    // do painel de edicao — sem isso, num video com muitos trechos, o
+    // bloco que deu erro pode estar fora da area visivel da timeline.
+    block.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+  document.getElementById('panel_' + i).scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // mostra o Monitor de Origem AUTOMATICAMENTE com a prévia que já foi
+  // buscada pra esse trecho (sem precisar clicar em "Buscar e ver
+  // opções" primeiro) — se o segmento já tem uma prévia com vídeo
+  // tocável, ela já aparece assim que você clica no trecho.
+  const preview = initialPreviews[i];
+  if (preview && preview.ok) {
+    showInSourceMonitor(i, {
+      thumbnail: preview.thumbnail_url,
+      video_preview_url: preview.video_preview_url,
+      label: preview.label,
+    });
+  }
+}
+
+function markChanged(i) {
+  const select = document.querySelector(`select[name="seg_${i}_source_mode"]`);
+  if (select) select.value = 'auto';
+}
+
+function toggleSourceFields(i, mode) {
+  document.getElementById('auto_fields_' + i).style.display = (mode === 'auto') ? 'block' : 'none';
+  document.getElementById('upload_fields_' + i).style.display = (mode === 'upload') ? 'block' : 'none';
+  document.getElementById('url_fields_' + i).style.display = (mode === 'url') ? 'block' : 'none';
+  document.getElementById('post_url_fields_' + i).style.display = (mode === 'post_url') ? 'block' : 'none';
+  const ehImagem = (segments[i] && segments[i].media_type === 'image');
+  document.getElementById('ken_burns_fields_' + i).style.display = (ehImagem || mode === 'upload' || mode === 'url') ? 'block' : 'none';
+}
+
+// animação da imagem: os botões ("chips") só escolhem o valor do <select> escondido
+function kbEscolher(i, botao) {
+  const sel = document.getElementById('seg_' + i + '_zoom_direction');
+  sel.value = botao.dataset.valor;
+  botao.parentElement.querySelectorAll('.kb-chip').forEach(function (b) { b.classList.toggle('ativo', b === botao); });
+  // não chama markChanged(): trocar a animação não pode desfazer a imagem escolhida
+}
+
+// estado inicial dos campos de cada trecho (o seletor já vem com o modo salvo)
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('select[name$="_source_mode"]').forEach(function (sel) {
+    const m = /^seg_(\d+)_source_mode$/.exec(sel.name);
+    if (m) toggleSourceFields(Number(m[1]), sel.value);
+  });
+});
+
+// "✅ Usar esta no trecho": troca a mídia do trecho pelo resultado escolhido na busca
+const candidatoEscolhido = {};
+async function usarCandidato(i) {
+  const escolha = candidatoEscolhido[i];
+  const status = document.getElementById('usar_candidato_status_' + i);
+  if (!escolha) { status.textContent = 'Clique num resultado primeiro.'; return; }
+  const c = escolha.candidato;
+  status.textContent = escolha.mediaType === 'image' ? '⏬ Baixando a imagem…' : 'Aplicando…';
+  let data;
+  try {
+    const resp = await fetch(`/job/{{ job.job_id }}/segmento/${i}/usar-candidato`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: escolha.provider, media_type: escolha.mediaType, image_url: c.image_url || '',
+        thumbnail: c.thumbnail || '', url: c.url || '', video_url: c.video_preview_url || '', label: c.label || '',
+      }),
+    });
+    data = await resp.json();
+    if (!resp.ok || !data.ok) { status.textContent = '⚠️ ' + (data.erro || 'falhou'); return; }
+  } catch (e) { status.textContent = '⚠️ ' + e; return; }
+  const modo = document.querySelector(`select[name="seg_${i}_source_mode"]`);
+  if (data.modo === 'post_url') {
+    pinCandidate(i, escolha.provider, c.url);
+  } else if (data.modo === 'url') {
+    modo.value = 'url'; toggleSourceFields(i, 'url');
+    const campo = document.querySelector(`input[name="seg_${i}_url"]`); if (campo) campo.value = c.video_preview_url;
+  } else {
+    modo.value = 'upload'; toggleSourceFields(i, 'upload');
+  }
+  segments[i].override_source = data.override_source;
+  const bloco = document.getElementById('block_' + i);
+  if (bloco && data.thumbnail_url) {
+    bloco.style.backgroundImage = `url('${data.thumbnail_url}?t=${Date.now()}')`;
+    const sem = bloco.querySelector('.block-noprev'); if (sem) sem.style.display = 'none';
+  }
+  if (typeof previews !== 'undefined' && previews) {
+    previews[i] = Object.assign({}, previews[i] || {}, { ok: true, thumbnail_url: data.thumbnail_url, label: c.label || '' });
+  }
+  status.textContent = '✅ Pronto — esse trecho vai usar exatamente esse resultado.';
+}
+
+function toggleSlideDirectionField(i, animationType) {
+  const el = document.getElementById('slide_direction_field_' + i);
+  if (el) el.style.display = (animationType === 'slide') ? 'block' : 'none';
+}
+
+async function searchCandidates(i) {
+  const query = document.getElementById('seg_' + i + '_query_input').value;
+  const provider = document.getElementById('seg_' + i + '_provider_select').value;
+  const mediaType = segments[i].media_type || 'video';
+  const statusEl = document.getElementById('search_status_' + i);
+  const gridEl = document.getElementById('candidates_grid_' + i);
+
+  statusEl.textContent = 'Buscando...';
+  gridEl.innerHTML = '';
+
+  try {
+    const res = await fetch("{{ url_for('search_candidates_api', job_id=job.job_id) }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: query, provider: provider, media_type: mediaType }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      statusEl.textContent = 'Erro: ' + data.error;
+      return;
+    }
+    if (!data.candidates || data.candidates.length === 0) {
+      statusEl.textContent = 'Nenhum resultado encontrado.';
+      return;
+    }
+
+    statusEl.textContent = 'Clique numa opção pra ver e depois em "✅ Usar esta no trecho":';
+
+    data.candidates.forEach(function (c) {
+      const thumb = document.createElement('img');
+      thumb.src = c.thumbnail || '';
+      thumb.title = c.label || '';
+      thumb.style.cssText = 'width:100px;height:70px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid transparent;';
+      thumb.onclick = function () {
+        gridEl.querySelectorAll('img').forEach(function (img) { img.style.borderColor = 'transparent'; });
+        thumb.style.borderColor = '#2563eb';
+        candidatoEscolhido[i] = { candidato: c, provider: provider, mediaType: mediaType };
+        document.getElementById('usar_candidato_status_' + i).textContent = 'Clique em "Usar esta" pra aplicar no trecho.';
+        showInSourceMonitor(i, c);
+      };
+      gridEl.appendChild(thumb);
+    });
+
+    // mostra o primeiro candidato no Monitor de Origem automaticamente,
+    // sem precisar clicar — assim já dá pra ver/ouvir algo assim que a
+    // busca termina.
+    if (data.candidates[0]) {
+      candidatoEscolhido[i] = { candidato: data.candidates[0], provider: provider, mediaType: mediaType };
+      gridEl.querySelector('img').style.borderColor = '#2563eb';
+      showInSourceMonitor(i, data.candidates[0]);
+    }
+  } catch (err) {
+    statusEl.textContent = 'Erro ao buscar: ' + err;
+  }
+}
+
+function showInSourceMonitor(i, candidate) {
+  // "Monitor de Origem": mostra o candidato tocando de verdade (vídeo
+  // real, streamado direto do provedor, sem baixar nada) antes de você
+  // decidir se quer usar ele — quando o provedor não expõe um vídeo
+  // tocável na busca (hoje, só o Pixabay), mostra a imagem estática
+  // como alternativa, avisando que não há prévia em movimento.
+  const wrapper = document.getElementById('source_monitor_' + i);
+  const video = document.getElementById('source_monitor_video_' + i);
+  const fallback = document.getElementById('source_monitor_fallback_' + i);
+  const fallbackImg = document.getElementById('source_monitor_fallback_img_' + i);
+  if (candidate.video_preview_url) {
+    video.src = candidate.video_preview_url;
+    video.style.display = 'block';
+    fallback.style.display = 'none';
+    video.load();
+    video.play().catch(function () {}); // autoplay pode ser bloqueado, tudo bem, os controles ainda funcionam
+  } else {
+    video.removeAttribute('src');
+    video.style.display = 'none';
+    fallbackImg.src = candidate.thumbnail || '';
+    fallback.style.display = 'block';
+  }
+  wrapper.style.display = 'block';
+}
+
+function pinCandidate(i, provider, url) {
+  // "fixa" o resultado escolhido: muda o modo pra "colar link de post"
+  // por baixo dos panos, preenchendo os campos automaticamente — assim
+  // a montagem final usa EXATAMENTE o vídeo que a pessoa clicou, não
+  // uma busca nova que poderia trazer outra coisa.
+  const modeSelect = document.querySelector(`select[name="seg_${i}_source_mode"]`);
+  const postProviderSelect = document.getElementById('seg_' + i + '_post_provider_select');
+  const postUrlInput = document.getElementById('seg_' + i + '_post_url_input');
+
+  modeSelect.value = 'post_url';
+  postProviderSelect.value = provider;
+  postUrlInput.value = url;
+  toggleSourceFields(i, 'post_url');
+
+  document.getElementById('search_status_' + i).textContent = '✓ Opção fixada — vai usar exatamente esse vídeo na montagem.';
+}
+
+const player = document.getElementById('player');
+const playhead = document.getElementById('playhead');
+const compVideo = document.getElementById('composition-video');
+const compPoster = document.getElementById('composition-poster');
+const compBg = document.getElementById('composition-bg');
+const compText = document.getElementById('composition-text');
+let compOverlay = document.getElementById('composition-overlay');
+const stage = document.getElementById('composition-stage');
+// Resolução real do vídeo de saída (largura/altura em px), calculada no
+// servidor a partir da orientação/qualidade do job — usada pra: (1)
+// deixar o palco da prévia com a MESMA proporção do vídeo final (senão
+// um vídeo vertical, por exemplo, ficaria espremido numa caixa 16:9), e
+// (2) escalar o tamanho do texto pro mesmo tamanho RELATIVO que ele sai
+// no vídeo renderizado, já que o font-size configurado é em px da
+// resolução final, não em px da tela do navegador.
+const VIDEO_TARGET_WIDTH = {{ video_target_width }};
+const VIDEO_TARGET_HEIGHT = {{ video_target_height }};
+stage.style.aspectRatio = VIDEO_TARGET_WIDTH + '/' + VIDEO_TARGET_HEIGHT;
+let currentSegment = 0;
+let currentElement = null;
+let monitorPlaying = false;
+
+function totalDuration(){ return Math.max(0, ...segments.map(s => Number(s.end)||0)); }
+function segmentAt(t){
+  for(let i=0;i<segments.length;i++) if(t >= Number(segments[i].start) && t < Number(segments[i].end)) return i;
+  return segments.length ? Math.min(segments.length-1, Math.max(0, segments.findIndex(s => Number(s.start)>t)-1)) : -1;
+}
+function setCompositionTime(t, seekNarration=true){
+  const dur=totalDuration(); t=Math.max(0,Math.min(dur,t));
+  if(seekNarration && Number.isFinite(player.duration)) player.currentTime=Math.min(t,player.duration);
+  const i=segmentAt(t); currentSegment=i>=0?i:0;
+  if(i>=0){
+    const p=initialPreviews[i]||{};
+    const localSrc = ((segments[i].override_source||{}).source==='local_file') ? `{{ url_for('serve_segment_media', job_id=job.job_id, index=0) }}`.replace(/\/0$/, '/'+i) : '';
+    const src=p.video_preview_url || localSrc;
+    if(src && compVideo.dataset.src!==src){
+      compVideo.dataset.src=src; compVideo.src=src; compVideo.poster=p.thumbnail_url||'';
+      compVideo.style.display='block'; compPoster.style.display='none'; compVideo.load();
+    } else if(!src && p.thumbnail_url){
+      compVideo.pause(); compVideo.removeAttribute('src'); compVideo.style.display='none';
+      compPoster.src=p.thumbnail_url; compPoster.style.display='block';
+    }
+    const local=Math.max(0,t-Number(segments[i].start));
+    if(compVideo.readyState>=1 && compVideo.duration && Number.isFinite(compVideo.duration)){ try{compVideo.currentTime=Math.min(local, Math.max(0,compVideo.duration-.01));}catch(e){} }
+    renderSegmentVisuals(i);
+    document.getElementById('monitor-status').textContent=`Trecho ${i+1}`;
+  }
+  document.getElementById('monitor-time').textContent=`${t.toFixed(1)}s / ${dur.toFixed(1)}s`;
+  document.getElementById('monitor-time-input').value=t.toFixed(1);
+  playhead.style.left=(90+t*PPX)+'px';
+}
+compVideo.addEventListener('error', function(){
+  const i=currentSegment, p=initialPreviews[i]||{};
+  if(p.thumbnail_url){ compVideo.style.display='none'; compPoster.src=p.thumbnail_url; compPoster.style.display='block'; document.getElementById('monitor-status').textContent='Prévia em vídeo indisponível — mostrando thumbnail'; }
+});
+compVideo.addEventListener('loadeddata', function(){ compPoster.style.display='none'; compVideo.style.display='block'; });
+
+function renderSegmentVisuals(i){
+  const s=segments[i]||{}; const style=s.on_screen_text_style||{};
+  if(s.aspect_fill==='mosaic'){
+    compBg.style.display='block'; compBg.src=compVideo.currentSrc||compVideo.src;
+  } else compBg.style.display='none';
+  if(s.on_screen_text){
+    const segDur=Math.max(0.05,Number(s.end||0)-Number(s.start||0));
+    const so=Number(style.start_offset ?? 0), eo=Number(style.end_offset ?? segDur);
+    const localT=(player.currentTime||0)-Number(s.start||0);
+    const withinWindow = localT >= so-0.001 && localT <= eo+0.001;
+    if(withinWindow){
+      compText.style.display='block'; compText.textContent=s.on_screen_text;
+      // O font_size (explícito ou o padrão) é sempre em px da resolução
+      // FINAL do vídeo (mesma fórmula do backend: video_assembler.py usa
+      // target_height*0.055 quando não há valor explícito) — pra
+      // aparecer do mesmo tamanho relativo aqui na prévia, escala pelo
+      // tanto que o palco (em px de tela) representa da largura real do
+      // vídeo de saída.
+      const finalPx = style.font_size || Math.max(18, VIDEO_TARGET_HEIGHT*.055);
+      const previewScale = stage.clientWidth / VIDEO_TARGET_WIDTH;
+      compText.style.fontSize=(finalPx*previewScale)+'px';
+      compText.style.fontWeight=style.font==='regular'?'400':'700';
+      compText.style.left=(style.x_percent ?? 50)+'%'; compText.style.top=(style.y_percent ?? 88)+'%';
+      compText.style.transform='translate(-50%,-50%)';
+    } else compText.style.display='none';
+  } else compText.style.display='none';
+  renderActiveOverlay(player.currentTime||Number(s.start)||0);
+}
+function renderActiveOverlay(t){
+  const ov=overlays.find(o=>t>=Number(o.start||0)&&t<Number(o.end||0));
+  if(!ov){compOverlay.style.display='none';return;}
+  const src=((ov.source||{}).source==='local_file') ? `{{ url_for('serve_overlay', job_id=job.job_id, overlay_id='__ID__') }}`.replace('__ID__',ov.id) : ((ov.source||{}).value||'');
+  if(!src){compOverlay.style.display='none';return;}
+  let node=compOverlay;
+  if((ov.source||{}).kind==='video' || ov.media_type==='video' || /\.(mp4|webm|mov)(\?|$)/i.test(src)){
+    if(node.tagName!=='VIDEO'){ const v=document.createElement('video'); v.id=compOverlay.id; v.className=compOverlay.className; v.muted=true; v.playsInline=true; v.controls=false; compOverlay.replaceWith(v); compOverlay=v; bindOverlayStageInteractions(); }
+  } else if(compOverlay.tagName==='VIDEO'){
+    const img=document.createElement('img'); img.id=compOverlay.id; img.className=compOverlay.className; compOverlay.replaceWith(img); compOverlay=img; bindOverlayStageInteractions();
+  }
+  node=compOverlay;
+  if(node.dataset.src!==src){node.dataset.src=src;node.src=src;node.load();}
+  node.style.display='block'; node.style.width=Math.max(1,Number(ov.size_percent||20))+'%'; node.style.height='auto';
+  node.style.left=(ov.x_percent ?? 80)+'%'; node.style.top=(ov.y_percent ?? 20)+'%'; node.style.transform='translate(-50%,-50%)';
+  node.dataset.overlayId=ov.id;
+  node.classList.toggle('selected',currentElement && currentElement.type==='overlay' && currentElement.id===ov.id);
+}
+function toggleMonitorPlay(){
+  monitorPlaying=!monitorPlaying; document.getElementById('monitor-play').textContent=monitorPlaying?'⏸️ Pause':'▶️ Play';
+  if(monitorPlaying){ const t=Number(document.getElementById('monitor-time-input').value)||0; player.currentTime=t; player.play().catch(()=>{}); }
+  else player.pause();
+}
+player.addEventListener('timeupdate',()=>{ setCompositionTime(player.currentTime,false); });
+player.addEventListener('play',()=>{monitorPlaying=true;document.getElementById('monitor-play').textContent='⏸️ Pause';});
+player.addEventListener('pause',()=>{monitorPlaying=false;document.getElementById('monitor-play').textContent='▶️ Play';});
+compVideo.addEventListener('loadedmetadata',()=>setCompositionTime(player.currentTime,false));
+document.getElementById('monitor-play').addEventListener('click',toggleMonitorPlay);
+document.getElementById('monitor-back').addEventListener('click',()=>setCompositionTime(player.currentTime-5));
+document.getElementById('monitor-forward').addEventListener('click',()=>setCompositionTime(player.currentTime+5));
+document.getElementById('monitor-time-input').addEventListener('change',e=>setCompositionTime(Number(e.target.value)||0));
+document.getElementById('timeline-inner').addEventListener('click',(e)=>{
+  if(e.target.closest('.block') && !e.target.closest('.text-block')) return;
+  const rect=document.getElementById('timeline-inner').getBoundingClientRect(); const x=e.clientX-rect.left-90; if(x>=0)setCompositionTime(x/PPX);
+});
+
+function updateSegmentInput(i){
+  const s=segments[i]; const b=document.getElementById('block_'+i); if(!b)return;
+  b.dataset.start=s.start;b.dataset.end=s.end;
+  const a=document.querySelector(`.seg-start-input[data-index="${i}"]`), z=document.querySelector(`.seg-end-input[data-index="${i}"]`);
+  if(a)a.value=Number(s.start).toFixed(3); if(z)z.value=Number(s.end).toFixed(3);
+  updateTextBlockInput(i); // o bloco de texto é posicionado a partir do início do vídeo + offset -- precisa reajustar se o vídeo mudou
+  layout();
+}
+function updateTextBlockInput(i){
+  const s=segments[i]; if(!s)return;
+  const style=s.on_screen_text_style||{};
+  const segDur=Math.max(0.05,Number(s.end)-Number(s.start));
+  const so=Math.max(0,Math.min(segDur,Number(style.start_offset ?? 0)));
+  const eo=Math.max(so+.05,Math.min(segDur,Number(style.end_offset ?? segDur)));
+  const b=document.getElementById('text_block_'+i);
+  if(b){ b.dataset.start=Number(s.start)+so; b.dataset.end=Number(s.start)+eo; }
+  const a=document.querySelector(`.text-start-input[data-index="${i}"]`), z=document.querySelector(`.text-end-input[data-index="${i}"]`);
+  if(a) a.value=(style.start_offset!=null) ? so.toFixed(3) : '';
+  if(z) z.value=(style.end_offset!=null) ? eo.toFixed(3) : '';
+  layout();
+}
+document.querySelectorAll('.text-start-input,.text-end-input').forEach(inp=>inp.addEventListener('change',()=>{
+  const i=Number(inp.dataset.index); const s=segments[i]; if(!s)return;
+  const style=s.on_screen_text_style||(s.on_screen_text_style={});
+  const a=document.querySelector(`.text-start-input[data-index="${i}"]`), z=document.querySelector(`.text-end-input[data-index="${i}"]`);
+  const aVal=a.value.trim(), zVal=z.value.trim();
+  if(aVal==='' && zVal===''){ delete style.start_offset; delete style.end_offset; }
+  else {
+    const segDur=Math.max(0.05,Number(s.end)-Number(s.start));
+    let so=aVal===''?0:parseFloat(aVal), eo=zVal===''?segDur:parseFloat(zVal);
+    if(!Number.isFinite(so))so=0; if(!Number.isFinite(eo))eo=segDur;
+    so=Math.max(0,Math.min(segDur-.05,so)); eo=Math.max(so+.05,Math.min(segDur,eo));
+    style.start_offset=so; style.end_offset=eo;
+  }
+  updateTextBlockInput(i); renderSegmentVisuals(i);
+}));
+function bindTrimInputs(){
+  document.querySelectorAll('.seg-start-input,.seg-end-input').forEach(inp=>inp.addEventListener('change',()=>{
+    const i=Number(inp.dataset.index); let a=parseFloat(document.querySelector(`.seg-start-input[data-index="${i}"]`).value); let z=parseFloat(document.querySelector(`.seg-end-input[data-index="${i}"]`).value);
+    if(!Number.isFinite(a)||!Number.isFinite(z))return; a=Math.max(0,a); z=Math.max(a+.05,z); segments[i].start=a;segments[i].end=z;updateSegmentInput(i);setCompositionTime(a);
+  }));
+}
+function makeTrimHandles(){
+  document.querySelectorAll('#video-track .block').forEach((b,i)=>{
+    if(b.querySelector('.trim-left'))return;
+    ['trim-left','trim-right'].forEach(side=>{const h=document.createElement('div');h.className=side;h.style.cssText='position:absolute;top:0;bottom:0;width:9px;background:rgba(255,255,255,.75);cursor:ew-resize;z-index:6;'+(side==='trim-left'?'left:0':'right:0');b.appendChild(h);
+      h.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();h.setPointerCapture(ev.pointerId);const i=Number(b.id.split('_')[1]);const startX=ev.clientX;const oldA=Number(segments[i].start),oldZ=Number(segments[i].end);
+        const move=e=>{const d=(e.clientX-startX)/PPX;if(side==='trim-left')segments[i].start=Math.max(0,Math.min(oldZ-.05,oldA+d));else segments[i].end=Math.max(oldA+.05,oldZ+d);updateSegmentInput(i);setCompositionTime(segments[i].start,false);};
+        const up=()=>{h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);};h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);});
+    });
+  });
+  // bloco de texto (amarelo): arrasta a janela PRÓPRIA do texto dentro
+  // do trecho (start_offset/end_offset, relativos ao início do vídeo),
+  // sem alterar a duração do vídeo em si.
+  document.querySelectorAll('#text-track .block').forEach(b=>{
+    if(b.querySelector('.trim-left'))return;
+    ['trim-left','trim-right'].forEach(side=>{const h=document.createElement('div');h.className=side;h.style.cssText='position:absolute;top:0;bottom:0;width:9px;background:rgba(255,255,255,.75);cursor:ew-resize;z-index:6;'+(side==='trim-left'?'left:0':'right:0');b.appendChild(h);
+      h.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();h.setPointerCapture(ev.pointerId);
+        const i=Number(b.dataset.index); const s=segments[i]; const segDur=Math.max(0.05,Number(s.end)-Number(s.start));
+        const style=s.on_screen_text_style||(s.on_screen_text_style={});
+        const startX=ev.clientX; const oldSO=Number(style.start_offset ?? 0), oldEO=Number(style.end_offset ?? segDur);
+        const move=e=>{const d=(e.clientX-startX)/PPX;
+          if(side==='trim-left')style.start_offset=Math.max(0,Math.min(oldEO-.05,oldSO+d));
+          else style.end_offset=Math.max(oldSO+.05,Math.min(segDur,oldEO+d));
+          updateTextBlockInput(i);renderSegmentVisuals(i);};
+        const up=()=>{h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);};h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);});
+    });
+  });
+}
+
+function selectStageElement(type,id){ currentElement={type,id};
+  const empty=document.getElementById('inspector-empty'),fields=document.getElementById('inspector-fields'); empty.style.display='none';fields.style.display='block';
+  let obj, title;
+  if(type==='text'){obj=segments[currentSegment].on_screen_text_style||{};title='Texto';document.getElementById('inspector-size').value=obj.font_size||40;document.getElementById('inspector-x').value=obj.x_percent??50;document.getElementById('inspector-y').value=obj.y_percent??88;}
+  else {obj=overlays.find(o=>o.id===id)||{};title='Overlay';document.getElementById('inspector-size').value=obj.size_percent||20;document.getElementById('inspector-x').value=obj.x_percent??80;document.getElementById('inspector-y').value=obj.y_percent??20;}
+  document.getElementById('inspector-title').textContent=title;
+}
+compText.addEventListener('pointerdown',e=>{
+  if(e.target.classList.contains('resize-handle'))return; // o handle cuida do próprio drag (ver abaixo)
+  e.preventDefault();selectStageElement('text',currentSegment);
+  compText.setPointerCapture(e.pointerId);
+  const rect=stage.getBoundingClientRect();
+  const style=segments[currentSegment].on_screen_text_style||(segments[currentSegment].on_screen_text_style={});
+  const startX=e.clientX,startY=e.clientY; const oldX=style.x_percent??50,oldY=style.y_percent??88;
+  const move=ev=>{
+    style.x_percent=Math.max(0,Math.min(100,oldX+(ev.clientX-startX)/rect.width*100));
+    style.y_percent=Math.max(0,Math.min(100,oldY+(ev.clientY-startY)/rect.height*100));
+    renderSegmentVisuals(currentSegment);
+    document.getElementById('inspector-x').value=style.x_percent.toFixed(1);
+    document.getElementById('inspector-y').value=style.y_percent.toFixed(1);
+  };
+  const up=()=>{
+    compText.removeEventListener('pointermove',move);compText.removeEventListener('pointerup',up);
+    const xi=document.querySelector(`input[name="seg_${currentSegment}_text_x"]`),yi=document.querySelector(`input[name="seg_${currentSegment}_text_y"]`);
+    if(xi)xi.value=style.x_percent.toFixed(1); if(yi)yi.value=style.y_percent.toFixed(1);
+  };
+  compText.addEventListener('pointermove',move);compText.addEventListener('pointerup',up);
+});
+const textResizeHandle=document.createElement('div'); textResizeHandle.className='resize-handle'; compText.appendChild(textResizeHandle);
+textResizeHandle.addEventListener('pointerdown',e=>{
+  e.preventDefault();e.stopPropagation();textResizeHandle.setPointerCapture(e.pointerId);
+  selectStageElement('text',currentSegment);
+  const style=segments[currentSegment].on_screen_text_style||(segments[currentSegment].on_screen_text_style={});
+  const startY=e.clientY;
+  const previewScale=stage.clientWidth/VIDEO_TARGET_WIDTH; // converte px de tela <-> px da resolução final
+  const oldSize=style.font_size||Math.max(18,VIDEO_TARGET_HEIGHT*.055);
+  const move=ev=>{
+    style.font_size=Math.max(10,Math.min(300,Math.round(oldSize+(ev.clientY-startY)/previewScale)));
+    renderSegmentVisuals(currentSegment);
+    document.getElementById('inspector-size').value=style.font_size;
+  };
+  const up=()=>{
+    textResizeHandle.removeEventListener('pointermove',move);textResizeHandle.removeEventListener('pointerup',up);
+    const si=document.querySelector(`input[name="seg_${currentSegment}_text_size"]`); if(si)si.value=style.font_size;
+  };
+  textResizeHandle.addEventListener('pointermove',move);textResizeHandle.addEventListener('pointerup',up);
+});
+function bindOverlayStageInteractions(){
+  compOverlay.addEventListener('pointerdown',e=>{
+    if(e.target.classList.contains('resize-handle'))return;
+    e.preventDefault();const ovId=compOverlay.dataset.overlayId;selectStageElement('overlay',ovId);
+    compOverlay.setPointerCapture(e.pointerId);
+    const ov=overlays.find(o=>o.id===ovId); if(!ov)return;
+    const rect=stage.getBoundingClientRect();
+    const startX=e.clientX,startY=e.clientY; const oldX=ov.x_percent??80,oldY=ov.y_percent??20;
+    const move=ev=>{
+      ov.x_percent=Math.max(0,Math.min(100,oldX+(ev.clientX-startX)/rect.width*100));
+      ov.y_percent=Math.max(0,Math.min(100,oldY+(ev.clientY-startY)/rect.height*100));
+      renderActiveOverlay(player.currentTime);
+      document.getElementById('inspector-x').value=ov.x_percent.toFixed(1);
+      document.getElementById('inspector-y').value=ov.y_percent.toFixed(1);
+    };
+    const up=()=>{
+      compOverlay.removeEventListener('pointermove',move);compOverlay.removeEventListener('pointerup',up);
+      fetch(`{{ url_for('update_overlay',job_id=job.job_id,overlay_id='__ID__') }}`.replace('__ID__',ov.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x_percent:ov.x_percent,y_percent:ov.y_percent})}).catch(()=>{});
+    };
+    compOverlay.addEventListener('pointermove',move);compOverlay.addEventListener('pointerup',up);
+  });
+  const overlayResizeHandle=document.createElement('div'); overlayResizeHandle.className='resize-handle'; compOverlay.appendChild(overlayResizeHandle);
+  overlayResizeHandle.addEventListener('pointerdown',e=>{
+    e.preventDefault();e.stopPropagation();overlayResizeHandle.setPointerCapture(e.pointerId);
+    const ovId=compOverlay.dataset.overlayId;selectStageElement('overlay',ovId);
+    const ov=overlays.find(o=>o.id===ovId); if(!ov)return;
+    const startX=e.clientX; const oldSize=Number(ov.size_percent||20);
+    const move=ev=>{
+      ov.size_percent=Math.max(1,Math.min(100,oldSize+(ev.clientX-startX)/stage.clientWidth*100));
+      renderActiveOverlay(player.currentTime);
+      document.getElementById('inspector-size').value=ov.size_percent.toFixed(1);
+    };
+    const up=()=>{
+      overlayResizeHandle.removeEventListener('pointermove',move);overlayResizeHandle.removeEventListener('pointerup',up);
+      fetch(`{{ url_for('update_overlay',job_id=job.job_id,overlay_id='__ID__') }}`.replace('__ID__',ov.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({size_percent:ov.size_percent})}).catch(()=>{});
+    };
+    overlayResizeHandle.addEventListener('pointermove',move);overlayResizeHandle.addEventListener('pointerup',up);
+  });
+}
+bindOverlayStageInteractions();
+document.getElementById('inspector-apply').addEventListener('click',()=>{
+  if(!currentElement)return; const x=Math.max(0,Math.min(100,Number(document.getElementById('inspector-x').value)||0));const y=Math.max(0,Math.min(100,Number(document.getElementById('inspector-y').value)||0));const size=Math.max(1,Math.min(100,Number(document.getElementById('inspector-size').value)||20));
+  if(currentElement.type==='text'){const st=segments[currentSegment].on_screen_text_style||(segments[currentSegment].on_screen_text_style={});st.x_percent=x;st.y_percent=y;st.font_size=size;renderSegmentVisuals(currentSegment);document.querySelector(`input[name="seg_${currentSegment}_text_x"]`).value=x;document.querySelector(`input[name="seg_${currentSegment}_text_y"]`).value=y;document.querySelector(`input[name="seg_${currentSegment}_text_size"]`).value=size;}
+  else {const ov=overlays.find(o=>o.id===currentElement.id);if(ov){ov.x_percent=x;ov.y_percent=y;ov.size_percent=size;renderActiveOverlay(player.currentTime);fetch(`{{ url_for('update_overlay',job_id=job.job_id,overlay_id='__ID__') }}`.replace('__ID__',ov.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x_percent:x,y_percent:y,size_percent:size})}).catch(()=>{});}}
+});
+layout();
+bindTrimInputs();
+makeTrimHandles();
+setCompositionTime(0);
+const errorSegmentIndex = {{ job.assembly_error_segment_index | default(none) | tojson }};
+if (errorSegmentIndex !== null && errorSegmentIndex >= 0 && errorSegmentIndex < segments.length) {
+  selectSegment(errorSegmentIndex);
+} else if (segments.length > 0) {
+  selectSegment(0);
+}
+</script>
+
+{% endblock %}

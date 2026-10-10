@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🔑 Contas Google</h1>
+<p><a href="{{ url_for('index') }}">&larr; voltar</a> &middot; <a href="{{ url_for('settings_page') }}">⚙ Configurações</a></p>
+
+{% if not keyring_disponivel %}
+<div style="background:#fef2f2;color:#991b1b;padding:12px 16px;border-radius:6px;margin:12px 0;border:1px solid #fecaca;">
+  ⚠️ <strong>O pacote "keyring" não está instalado</strong> — sem ele, "salvar a senha" e "Ver senha" não funcionam
+  (o login em si funciona normalmente, mas a senha nunca fica guardada). Pra corrigir, rode no terminal do site:<br>
+  <code style="display:inline-block;margin-top:6px;">pip install keyring</code>
+  (ou <code>pip install keyring --break-system-packages</code>, se pedir isso) — depois reinicie o site.
+</div>
+{% endif %}
+
+
+  <p style="color:#666;font-size:0.82rem;">Cada conta tem o seu <strong>próprio perfil de navegador</strong>. Quando o Flow avisar que o limite/créditos da conta acabou, o site marca a conta como <em>esgotada</em>, abre a <strong>próxima da lista</strong> e refaz a mesma imagem. A ordem é a da lista; a <em>principal</em> é a conta de sempre. ⚠️ Usar várias contas para contornar limites pode contrariar os termos do Google — por sua conta e risco.</p>
+  <p style="color:#666;font-size:0.82rem;"><strong>Login manual</strong> (padrão): abre uma janela e você mesmo digita e-mail/senha. <strong>Login automático</strong> (👤🔑, opcional): você informa e-mail e senha uma vez e o site preenche sozinho; "salvar a senha" já vem marcado (fica no cofre de credenciais do sistema operacional — nunca num arquivo do projeto), desmarque se não quiser guardar. O Google costuma desconfiar de login automatizado (pode pedir verificação em duas etapas ou bloquear); nesse caso a mesma janela fica aberta pra você terminar à mão.</p>
+  <table id="flow-contas" style="width:100%;border-collapse:collapse;font-size:0.9rem;"><tbody></tbody></table>
+  <h3 style="margin-top:20px;">Adicionar conta</h3>
+  <p style="color:#666;font-size:0.82rem;">Preencha e-mail e senha e clique em <strong>Adicionar conta</strong>: o site cadastra a conta, faz o login sozinho (numa janela visível) e guarda a sessão no perfil do navegador dela — as próximas gerações usam esse perfil sem precisar logar de novo. "Salvar a senha" já vem marcado, pra também poder repetir o login com um clique e ver a senha depois (fica no cofre de credenciais do sistema, nunca num arquivo do projeto) — desmarque se não quiser isso. Se preferir só cadastrar e fazer o login você mesmo depois, deixe a senha em branco.</p>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <input type="text" id="flow-conta-nome" placeholder="rótulo (opcional — usa o e-mail se ficar em branco)" style="width:220px;margin-top:0;">
+    <input type="email" id="flow-conta-email" placeholder="e-mail" style="width:220px;margin-top:0;">
+    <input type="password" id="flow-conta-senha" placeholder="senha (opcional)" style="width:160px;margin-top:0;">
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+    <label style="font-weight:normal;font-size:0.85rem;margin:0;"><input type="checkbox" id="flow-conta-salvar-senha" checked style="width:auto;"> salvar a senha</label>
+    <button type="button" id="flow-conta-add" style="margin-top:0;">Adicionar conta</button>
+    <span id="flow-login-msg" style="font-size:0.85rem;"></span>
+  </div>
+  <script>
+  (function () {
+    const msg = document.getElementById('flow-login-msg');
+    const corpo = document.querySelector('#flow-contas tbody');
+    let abertoPara = null;  // nome da conta com o mini-formulário de login automático aberto
+    let abertoTrocarSenha = null;  // nome da conta com o mini-formulário de troca de senha aberto
+    function botao(texto, aoClicar, cor) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = texto;
+      b.style.cssText = 'margin:0 4px 4px 0;padding:3px 8px;font-size:0.8rem;background:' + (cor || '#4b5563') + ';';
+      b.addEventListener('click', aoClicar); return b;
+    }
+    async function api(url, dados) {
+      const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(dados || {})});
+      const j = await r.json();
+      if (!r.ok) { msg.textContent = '❌ ' + (j.erro || 'Falhou.'); return null; }
+      return j;
+    }
+    function desenhar(contas) {
+      corpo.innerHTML = '';
+      contas.forEach(function (c) {
+        const tr = document.createElement('tr'); tr.style.borderBottom = '1px solid #e5e7eb';
+        const nome = document.createElement('td'); nome.style.padding = '6px 4px'; nome.textContent = c.nome;
+
+        const emailTd = document.createElement('td');
+        {
+          const emailInput = document.createElement('input');
+          emailInput.type = 'email'; emailInput.value = c.email || ''; emailInput.placeholder = 'e-mail (p/ login automático)';
+          emailInput.style.cssText = 'width:200px;margin:0;font-size:0.85rem;';
+          emailInput.addEventListener('change', async function () {
+            const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/email', {email: emailInput.value});
+            if (j) { msg.textContent = '✅ E-mail salvo.'; desenhar(j); }
+          });
+          emailTd.appendChild(emailInput);
+        }
+
+        const estado = document.createElement('td');
+        let txt = c.esgotada ? ('⛔ esgotada até ' + c.esgotada_ate.replace('T', ' ')) : (c.logada ? '✅ pronta' : '⚠️ sem login ainda');
+        if (c.logada && !c.tem_senha_salva) txt += ' — sem senha salva (login manual, ou "salvar a senha" não foi marcado)';
+        if (c.tem_senha_salva) txt += ' 🔑';
+        estado.textContent = txt;
+
+        const acoes = document.createElement('td'); acoes.style.textAlign = 'right';
+        acoes.appendChild(botao('Fazer login', function () { entrar(c.nome); }));
+        acoes.appendChild(botao(abertoPara === c.nome ? 'Fechar' : (c.tem_senha_salva ? 'Atualizar credenciais' : 'Login automático'), function () {
+          abertoPara = abertoPara === c.nome ? null : c.nome; abertoTrocarSenha = null; desenhar(contas);
+        }));
+        acoes.appendChild(botao(abertoTrocarSenha === c.nome ? 'Fechar' : 'Trocar senha no Google', function () {
+          abertoTrocarSenha = abertoTrocarSenha === c.nome ? null : c.nome; abertoPara = null; desenhar(contas);
+        }, '#7c3aed'));
+        if (c.tem_senha_salva) acoes.appendChild(botao('👁 Ver senha', async function () {
+          const r = await fetch('/flow/contas/' + encodeURIComponent(c.nome) + '/senha');
+          const j = await r.json();
+          msg.textContent = r.ok ? ('🔑 Senha de ' + c.nome + ': ' + j.senha) : ('❌ ' + (j.erro || 'Falhou.'));
+        }, '#0e7490'));
+        if (c.tem_senha_salva) acoes.appendChild(botao('Esquecer senha', async function () {
+          const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/senha/remover'); if (j) { msg.textContent = '✅ Senha esquecida.'; desenhar(j); }
+        }, '#92400e'));
+        acoes.appendChild(botao(c.esgotada ? 'Liberar' : 'Marcar esgotada', async function () {
+          const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/esgotada', {esgotada: !c.esgotada}); if (j) desenhar(j);
+        }));
+        if (c.nome !== 'principal') acoes.appendChild(botao('Remover', async function () {
+          const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/remover'); if (j) desenhar(j);
+        }, '#dc2626'));
+
+        tr.appendChild(nome); tr.appendChild(emailTd); tr.appendChild(estado); tr.appendChild(acoes);
+        corpo.appendChild(tr);
+
+        if (abertoTrocarSenha === c.nome) {
+          const trTroca = document.createElement('tr'); trTroca.style.borderBottom = '1px solid #e5e7eb';
+          const tdTroca = document.createElement('td'); tdTroca.colSpan = 4; tdTroca.style.padding = '4px 4px 10px';
+          const aviso = document.createElement('p');
+          aviso.style.cssText = 'font-size:0.8rem;color:#666;margin:4px 0;';
+          aviso.textContent = 'Troca a senha DE VERDADE nessa conta Google, por uma gerada (10 caracteres, letras minúsculas e números). Precisa da senha ATUAL pra confirmar identidade. Se o Google pedir um captcha, o site não tenta resolver — a janela fica aberta pra você terminar à mão.';
+          const senhaAtualInput = document.createElement('input');
+          senhaAtualInput.type = 'password'; senhaAtualInput.placeholder = 'senha atual';
+          senhaAtualInput.style.cssText = 'width:180px;margin:0 4px 4px 0;font-size:0.85rem;';
+          const btnTrocar = botao('Trocar agora', async function () {
+            if (!senhaAtualInput.value) { msg.textContent = '❌ Informe a senha atual.'; return; }
+            abertoTrocarSenha = null;
+            await trocarSenha(c.nome, senhaAtualInput.value);
+          }, '#7c3aed');
+          tdTroca.appendChild(aviso); tdTroca.appendChild(senhaAtualInput); tdTroca.appendChild(document.createElement('br')); tdTroca.appendChild(btnTrocar);
+          trTroca.appendChild(tdTroca); corpo.appendChild(trTroca);
+        }
+
+        if (abertoPara === c.nome) {
+          const trForm = document.createElement('tr'); trForm.style.borderBottom = '1px solid #e5e7eb';
+          const td = document.createElement('td'); td.colSpan = 4; td.style.padding = '4px 4px 10px';
+          const emailAuto = document.createElement('input');
+          emailAuto.type = 'email'; emailAuto.placeholder = 'e-mail do Google'; emailAuto.value = c.email || '';
+          emailAuto.style.cssText = 'width:200px;margin:0 4px 4px 0;font-size:0.85rem;';
+          const senhaAuto = document.createElement('input');
+          senhaAuto.type = 'password'; senhaAuto.placeholder = 'senha';
+          senhaAuto.style.cssText = 'width:160px;margin:0 4px 4px 0;font-size:0.85rem;';
+          const labelSalvar = document.createElement('label');
+          labelSalvar.style.cssText = 'font-weight:normal;font-size:0.8rem;margin-right:8px;';
+          const cbSalvar = document.createElement('input'); cbSalvar.type = 'checkbox'; cbSalvar.checked = true; cbSalvar.style.width = 'auto';
+          labelSalvar.appendChild(cbSalvar); labelSalvar.append(' salvar a senha (cofre do sistema)');
+          const btnEntrar = botao('Entrar', async function () {
+            if (!emailAuto.value || !senhaAuto.value) { msg.textContent = '❌ Preencha e-mail e senha.'; return; }
+            if (emailAuto.value !== c.email) await api('/flow/contas/' + encodeURIComponent(c.nome) + '/email', {email: emailAuto.value});
+            abertoPara = null;
+            await entrarAutomatico(c.nome, emailAuto.value, senhaAuto.value, cbSalvar.checked);
+          }, '#166534');
+          td.appendChild(emailAuto); td.appendChild(senhaAuto); td.appendChild(labelSalvar); td.appendChild(document.createElement('br')); td.appendChild(btnEntrar);
+          trForm.appendChild(td); corpo.appendChild(trForm);
+        }
+      });
+    }
+    function acompanharLogin() {
+      const t = setInterval(async function () {
+        const s = await (await fetch('/flow/login/status')).json();
+        if (s.status === 'aguardando_login') { msg.textContent = 'Aguardando o login na janela que abriu…'; return; }
+        clearInterval(t);
+        msg.textContent = s.status === 'ok' ? '✅ Login salvo.' : ('❌ ' + (s.erro || 'Falhou.'));
+        carregar();
+      }, 2000);
+    }
+    async function entrar(conta) {
+      msg.textContent = 'Abrindo a janela de login…';
+      const r = await fetch('/flow/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({conta: conta})});
+      if (!r.ok) { msg.textContent = '❌ ' + ((await r.json()).erro || 'Falha ao abrir.'); return; }
+      acompanharLogin();
+    }
+    async function entrarAutomatico(conta, email, senha, salvarSenha) {
+      msg.textContent = 'Preenchendo o login automaticamente…';
+      const r = await fetch('/flow/login', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conta: conta, email: email, senha: senha, salvar_senha: salvarSenha})});
+      if (!r.ok) { msg.textContent = '❌ ' + ((await r.json()).erro || 'Falha ao abrir.'); return; }
+      acompanharLogin();
+    }
+    async function trocarSenha(conta, senhaAtual) {
+      msg.textContent = 'Trocando a senha (uma janela vai abrir)…';
+      const r = await fetch('/flow/contas/' + encodeURIComponent(conta) + '/trocar-senha', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({senha_atual: senhaAtual}),
+      });
+      if (!r.ok) { msg.textContent = '❌ ' + ((await r.json()).erro || 'Falha ao começar.'); return; }
+      const t = setInterval(async function () {
+        const s = await (await fetch('/flow/trocar-senha/status')).json();
+        if (s.status === 'trocando') { msg.textContent = 'Trocando a senha de ' + s.conta + '…'; return; }
+        clearInterval(t);
+        msg.textContent = s.status === 'ok' ? ('✅ Senha trocada e salva: ' + s.nova_senha) : ('❌ ' + (s.erro || 'Falhou.'));
+        carregar();
+      }, 2000);
+    }
+    async function carregar() { desenhar(await (await fetch('/flow/contas')).json()); }
+    async function adicionar() {
+      const campo = document.getElementById('flow-conta-nome');
+      const emailCampo = document.getElementById('flow-conta-email');
+      const senhaCampo = document.getElementById('flow-conta-senha');
+      const salvarCampo = document.getElementById('flow-conta-salvar-senha');
+      const email = emailCampo.value.trim();
+      const nome = campo.value.trim() || email;
+      const senha = senhaCampo.value;
+      if (!nome) { msg.textContent = '❌ Informe pelo menos o e-mail.'; return; }
+      if (senha && !email) { msg.textContent = '❌ Informe o e-mail pra poder entrar automaticamente (ou deixe a senha em branco).'; return; }
+      const j = await api('/flow/contas', {nome: nome, email: email});
+      if (!j) return;
+      desenhar(j);
+      campo.value = ''; emailCampo.value = ''; senhaCampo.value = '';
+      const salvarSenha = salvarCampo.checked; salvarCampo.checked = false;
+      if (senha) {
+        await entrarAutomatico(nome, email, senha, salvarSenha);
+      } else {
+        msg.textContent = '✅ Conta adicionada — clique em "Fazer login" nela.';
+      }
+    }
+    document.getElementById('flow-conta-add').addEventListener('click', adicionar);
+    ['flow-conta-nome', 'flow-conta-email', 'flow-conta-senha'].forEach(function (id) {
+      document.getElementById(id).addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); adicionar(); }  // Enter não pode enviar o formulário de configurações
+      });
+    });
+    carregar();
+  })();
+  </script>
+<h3 style="margin-top:32px;">Exportar / importar contas</h3>
+<p style="color:#666;font-size:0.82rem;">Guarda/repõe a lista de contas (e-mail + senha) num arquivo JSON. ⚠️ O arquivo fica com as senhas em <strong>texto puro</strong> — trate como um documento sensível (não suba pra nuvem sem criptografar, não mande por e-mail, apague depois de usar). Só entram contas com senha salva; a principal fica de fora (não tem e-mail cadastrado).</p>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <a id="flow-exportar" href="{{ url_for('flow_contas_exportar') }}" download="contas_flow.json"><button type="button">⬇ Exportar todas (JSON)</button></a>
+  <input type="file" id="flow-importar-arquivo" accept="application/json" style="display:none;">
+  <button type="button" id="flow-importar-btn">⬆ Importar (JSON)</button>
+  <span id="flow-importar-msg" style="font-size:0.85rem;"></span>
+</div>
+<script>
+document.getElementById('flow-importar-btn').addEventListener('click', function () {
+  document.getElementById('flow-importar-arquivo').click();
+});
+document.getElementById('flow-importar-arquivo').addEventListener('change', async function (e) {
+  const msg = document.getElementById('flow-importar-msg');
+  const arquivo = e.target.files[0];
+  if (!arquivo) return;
+  msg.textContent = 'Importando…';
+  try {
+    const dados = JSON.parse(await arquivo.text());
+    const r = await fetch('/flow/contas/importar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(dados)});
+    const j = await r.json();
+    if (!r.ok) { msg.textContent = '❌ ' + (j.erro || 'Falhou.'); return; }
+    let texto = '✅ ' + j.importadas.length + ' conta(s) importada(s).';
+    if (j.erros.length) texto += ' ⚠️ ' + j.erros.join('; ');
+    msg.textContent = texto;
+    location.reload();  // recarrega pra mostrar as contas novas na tabela
+  } catch (err) {
+    msg.textContent = '❌ Arquivo inválido: ' + err.message;
+  }
+  e.target.value = '';
+});
+</script>
+{% endblock %}

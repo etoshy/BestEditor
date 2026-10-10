@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% from "_mix_midia.html" import mix_midia %}
+{% from "_bibliotecas.html" import bibliotecas %}
+{% block content %}
+<h1>2. Copie o prompt e cole em outra IA</h1>
+<p>Áudio transcrito ({{ job.total_duration | round(1) }}s). Copie o texto abaixo inteiro e cole em outra IA (ChatGPT, Claude, etc.). Ela vai te devolver um JSON.</p>
+<p style="font-size:0.88rem;color:#334155;">🌐 Idioma do vídeo: <b>{{ {'pt':'Português','en':'Inglês','es':'Espanhol','fr':'Francês','it':'Italiano','de':'Alemão','ja':'Japonês','ko':'Coreano','zh':'Chinês','ru':'Russo'}.get(job.language, job.language) }}</b>{% if job.language_origem %} <span style="color:#666">({{ {'zip':'gravado no .zip da narração','legenda':'detectado na legenda do .zip','whisper':'detectado no áudio','escolhido':'escolhido no envio'}.get(job.language_origem, job.language_origem) }})</span>{% endif %} — o prompt manda a IA escrever todos os textos do vídeo nesse idioma.</p>
+
+{% if job.aviso_legenda_palavra_desligada %}
+<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 14px;margin-bottom:14px;color:#92400e;font-size:0.85rem;">
+  ⚠️ {{ job.aviso_legenda_palavra_desligada }}
+</div>
+{% endif %}
+
+{% if job.wikipedia_entidades %}
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px 14px;margin-bottom:14px;">
+  <strong>🧠 Entidades confirmadas na Wikipedia:</strong>
+  <span style="color:#333;">{{ job.wikipedia_entidades | map(attribute='termo') | join(', ') }}</span>
+  <p style="color:#555;font-size:0.82rem;margin:6px 0 0;">Já incluídas no prompt abaixo como termos garantidos pro provedor "wikipedia".</p>
+</div>
+{% elif job.get('wikipedia_entidades') is not none %}
+<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px 14px;margin-bottom:14px;color:#7f1d1d;font-size:0.85rem;">
+  🧠 Nenhuma entidade com foto confirmada foi encontrada na Wikipedia pra esse roteiro — o prompt segue normal, usando os outros bancos de vídeo.
+</div>
+{% endif %}
+
+{% if job.buscadores_confirmados %}
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px 14px;margin-bottom:14px;">
+  <strong>🔎 Termos confirmados nos buscadores de imagem:</strong>
+  <span style="color:#333;">{{ job.buscadores_confirmados | map(attribute='termo') | join(', ') }}</span>
+  <p style="color:#555;font-size:0.82rem;margin:6px 0 0;">Já incluídos no prompt abaixo como termos garantidos.</p>
+</div>
+{% elif job.get('buscadores_confirmados') is not none %}
+<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px 14px;margin-bottom:14px;color:#7f1d1d;font-size:0.85rem;">
+  🔎 Nenhum termo com resultado confirmado foi encontrado nos buscadores de imagem pra esse roteiro — o prompt segue normal, usando os outros bancos de vídeo.
+</div>
+{% endif %}
+
+{% for prov, inf in (job.get('bibliotecas_info') or {}).items() %}
+{% if inf.obra or inf.erro %}
+<div style="background:{{ '#fef2f2' if inf.erro or not inf.personagens else '#f5f3ff' }};border:1px solid {{ '#fecaca' if inf.erro or not inf.personagens else '#ddd6fe' }};border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;">
+  {{ '🎬' if prov == 'moviepexels' else '🎌' }} <strong>{{ inf.obra or prov }}</strong>
+  {% if inf.erro %}
+  — ⚠ não consegui ler os personagens do acervo ({{ inf.erro }}). O app.py do anime-pexels-local está rodando?
+  {% elif inf.personagens %}
+  — {{ inf.personagens|length }} {{ 'personagens/atores' if prov == 'moviepexels' else 'personagens' }} listados no prompt pra IA:
+  <span style="color:#444;">{{ inf.personagens[:40]|join(', ') }}{% if inf.personagens|length > 40 %}… (+{{ inf.personagens|length - 40 }}){% endif %}</span>
+  {% else %}
+  — o acervo não devolveu nenhum personagem pra essa obra (confira o nome da obra ou cadastre os personagens no acervo).
+  {% endif %}
+  <form method="post" action="{{ url_for('recarregar_bibliotecas', job_id=job.job_id) }}" style="display:inline;margin-left:8px;">
+    <button type="submit" style="padding:2px 10px;font-size:0.8rem;width:auto;">🔄 Ler de novo e atualizar o prompt</button>
+  </form>
+</div>
+{% endif %}
+{% endfor %}
+
+<textarea id="prompt-box" rows="20" readonly>{{ job.prompt }}</textarea>
+<button type="button" class="copy-btn" onclick="copyPrompt()">Copiar prompt</button>
+<span id="copy-feedback"></span>
+
+<details style="margin-top:14px;">
+  <summary style="cursor:pointer;color:#374151;font-size:0.9rem;">Mudou de ideia sobre os bancos (ou a proporção de fotos × vídeos)? Troque aqui sem re-transcrever o áudio</summary>
+  <form method="post" action="{{ url_for('atualizar_providers', job_id=job.job_id) }}" style="margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;">
+    <p style="color:#666;font-size:0.82rem;margin:0 0 8px;">O prompt acima foi montado só com os bancos marcados antes da transcrição. Marque outros abaixo e clique em "Atualizar prompt" — reaproveita a transcrição já pronta, sem gerar tudo de novo.</p>
+    {% for p in all_providers %}
+    <label style="display:inline-block;margin:2px 10px 2px 0;font-weight:normal;"><input type="checkbox" name="providers" value="{{ p }}" {% if p in job.providers %}checked{% endif %} style="width:auto;"> {{ p }}</label>
+    {% endfor %}
+    {{ bibliotecas("", "providers", job.bibliotecas) }}
+    {{ mix_midia("", "providers", job.mix_midia) }}
+    <button type="submit" style="margin-top:10px;">Atualizar prompt</button>
+  </form>
+</details>
+
+<h1>3. Cole aqui a resposta (JSON) da IA</h1>
+
+{% if json_error %}<div class="error">{{ json_error }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('submit_json', job_id=job.job_id) }}">
+  <textarea name="ai_response" rows="12" placeholder='[{"start": 0.0, "end": 6.8, "provider": "pexels", "query": "sunrise over mountains"}, ...]' required>{{ previous_json or "" }}</textarea>
+
+  <fieldset style="border:1px solid #d1d5db;border-radius:6px;padding:10px 14px;margin:12px 0;">
+    <legend style="font-size:0.9rem;color:#374151;">Opções só deste vídeo</legend>
+    <input type="hidden" name="opcoes_job_enviadas" value="1">
+    <label style="font-weight:normal;"><input type="checkbox" name="ocultar_navegador" {% if opcoes.ocultar_navegador %}checked{% endif %} style="width:auto;"> Ocultar o navegador nas buscas e na geração de imagens (desmarque pra ver a janela e depurar)</label>
+    <label style="font-weight:normal;margin-top:6px;"><input type="checkbox" name="nao_repetir_midia" {% if opcoes.nao_repetir_midia %}checked{% endif %} style="width:auto;"> Não repetir vídeos/imagens dos bancos de conteúdo — se o melhor resultado já foi usado em outro trecho, usa o 2º melhor, depois o 3º, e assim por diante (fotos da Wikipedia podem repetir)</label>
+    <p style="font-size:.8rem;color:#666;margin:6px 0 0;">Os valores iniciais vêm de Configurações; aqui você muda só para este vídeo.</p>
+  </fieldset>
+
+  <button type="submit">Gerar vídeo</button>
+</form>
+
+<script>
+function copyPrompt() {
+  const box = document.getElementById('prompt-box');
+  box.select();
+  navigator.clipboard.writeText(box.value).then(() => {
+    document.getElementById('copy-feedback').textContent = ' Copiado!';
+  });
+}
+</script>
+{% endblock %}

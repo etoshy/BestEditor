@@ -1,0 +1,133 @@
+{# Acervos LOCAIS (anime-pexels-local): obra e personagem/ator pro vídeo inteiro.
+   uso: {% from "_bibliotecas.html" import bibliotecas %} {{ bibliotecas(sufixo, nome_checkbox, valores) }}
+   Cada bloco aparece quando o provedor está marcado; as listas vêm do próprio acervo. #}
+{% macro bibliotecas(sufixo="", nome_checkbox="providers", valores=None) %}
+{% set valores = valores or {} %}
+<div class="bibbox" data-sufixo="{{ sufixo }}" data-checkbox="{{ nome_checkbox }}">
+  {% for prov, icone, titulo, rot_obra, rot_pessoa, ex_obra, ex_pessoa in [
+      ('animepexels', '🎌', 'Anime Pexels', 'Anime', 'Personagem', 'ex.: Death Note', 'ex.: Light'),
+      ('moviepexels', '🎬', 'Filmes e Séries Pexels', 'Filme ou série', 'Personagem ou ator', 'ex.: Breaking Bad', 'ex.: Walter White ou Bryan Cranston')] %}
+  {% set v = valores.get(prov) or {} %}
+  <div class="bib-prov" data-prov="{{ prov }}" style="display:none;margin:10px 0;padding:10px 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;">
+    <strong style="font-size:0.9rem;">{{ icone }} {{ titulo }} — de onde tirar as cenas <span style="font-weight:normal;color:#666;">(opcional)</span></strong>
+    <p style="color:#666;font-size:0.8rem;margin:4px 0 6px;">Em branco, a IA escolhe por trecho (o prompt já leva a lista do que existe no seu acervo). Dá pra pôr <b>várias</b> obras e vários nomes de {{ rot_pessoa|lower }} (Enter adiciona cada um): toda busca nesse acervo fica só dentro delas, misturando as cenas; com {{ rot_pessoa|lower }}, só clipes em que um deles aparece — se nada bater, cai pra outra cena das mesmas obras.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:200px;margin:0;font-weight:400;font-size:0.85rem;">{{ rot_obra }}
+        <input type="hidden" name="bib_{{ prov }}_obra{{ sufixo }}" class="bib-obra" value="{{ v.obra or '' }}">
+        <span class="bib-chips" data-alvo="bib-obra"></span>
+        <input type="text" class="bib-add" data-alvo="bib-obra" list="bib-obras-{{ prov }}{{ sufixo }}" placeholder="{{ ex_obra }} — Enter adiciona; dá pra pôr várias" autocomplete="off"></label>
+      <label style="flex:1;min-width:200px;margin:0;font-weight:400;font-size:0.85rem;">{{ rot_pessoa }}
+        <input type="hidden" name="bib_{{ prov }}_personagem{{ sufixo }}" class="bib-pessoa" value="{{ v.personagem or '' }}">
+        <span class="bib-chips" data-alvo="bib-pessoa"></span>
+        <input type="text" class="bib-add" data-alvo="bib-pessoa" list="bib-pessoas-{{ prov }}{{ sufixo }}" placeholder="{{ ex_pessoa }} — Enter adiciona; dá pra pôr vários" autocomplete="off"></label>
+    </div>
+    <datalist id="bib-obras-{{ prov }}{{ sufixo }}"></datalist><datalist id="bib-pessoas-{{ prov }}{{ sufixo }}"></datalist>
+    <p class="bib-status" style="color:#888;font-size:0.76rem;margin:4px 0 0;"></p>
+    <details class="bib-copiar" style="margin-top:6px;">
+      <summary style="cursor:pointer;font-size:0.8rem;color:#6d28d9;">📋 Copiar a lista inteira (pra mandar pra uma IA analisar)</summary>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:0.8rem;">
+        <select class="bib-pedido" style="width:auto;margin:0;font-size:0.8rem;" title="Junto com a lista vai este pedido pra IA (ou escolha só a lista)">
+          <option value="">só a lista</option>
+          <option value="viloes" selected>+ pedido: quais são vilões</option>
+          <option value="herois">+ pedido: quais são heróis</option>
+          <option value="classificar">+ pedido: classificar todos (vilão/herói/anti-herói…)</option>
+          <option value="temas">+ pedido: ideias de vídeo com essas obras</option>
+          <option value="livre">+ pedido escrito por mim…</option>
+        </select>
+        <input type="text" class="bib-pedido-livre" placeholder="ex.: quais desses lutam com espada?" style="display:none;flex:1;min-width:180px;margin:0;font-size:0.8rem;">
+        <button type="button" class="bib-copiar-btn" data-o="personagens" style="width:auto;margin:0;padding:4px 10px;font-size:0.8rem;">📋 Copiar {{ rot_pessoa|lower }}s</button>
+        <button type="button" class="bib-copiar-btn" data-o="obras" style="width:auto;margin:0;padding:4px 10px;font-size:0.8rem;">📋 Copiar {{ rot_obra|lower }}s</button>
+      </div>
+      <p class="bib-copiar-st" style="color:#666;font-size:0.76rem;margin:4px 0 0;">{{ rot_pessoa }}s: das obras escolhidas acima — ou, sem nenhuma escolhida, do acervo inteiro (agrupados por obra).</p>
+      <textarea class="bib-copiar-txt" rows="6" readonly style="display:none;font-family:monospace;font-size:0.78rem;margin-top:4px;"></textarea>
+    </details>
+  </div>
+  {% endfor %}
+</div>
+<script>
+(function () {
+  const box = document.currentScript.previousElementSibling;
+  const nome = box.dataset.checkbox, form = box.closest('form') || document;
+  const carregado = {};
+  async function obras(bloco, prov) {
+    if (carregado[prov]) return; carregado[prov] = true;
+    const st = bloco.querySelector('.bib-status');
+    try {
+      const d = await (await fetch(`/biblioteca-local/${prov}/obras`)).json();
+      if (d.erro) throw new Error(d.erro);
+      bloco.querySelector('datalist[id^="bib-obras"]').innerHTML = d.obras.map(o => `<option value="${o.nome.replace(/"/g, '&quot;')}">`).join('');
+      st.textContent = `${d.obras.length} obras no acervo — comece a digitar pra escolher.`;
+      pessoas(bloco, prov);
+    } catch (e) { st.textContent = '⚠ ' + e.message; carregado[prov] = false; }
+  }
+  async function pessoas(bloco, prov) {
+    const obra = bloco.querySelector('.bib-obra').value.trim();
+    try {
+      const d = await (await fetch(`/biblioteca-local/${prov}/personagens?obra=${encodeURIComponent(obra)}`)).json();
+      if (d.erro) return;
+      bloco.querySelector('datalist[id^="bib-pessoas"]').innerHTML = d.personagens.map(c => `<option value="${String(c.nome).replace(/"/g, '&quot;')}">${c.clipes} clipes${c.obra && !obra ? ' · ' + c.obra : ''}</option>`).join('');
+      // obra escolhida: mostra os personagens que vão listados no prompt da IA
+      let lp = bloco.querySelector('.bib-lista'); if (!lp) { lp = document.createElement('p'); lp.className = 'bib-lista'; lp.style.cssText = 'color:#555;font-size:0.78rem;margin:4px 0 0;'; bloco.appendChild(lp); }
+      const nomes = d.personagens.filter(c => c.nome).map(c => `${c.nome} (${c.clipes})`);
+      lp.textContent = obra ? (nomes.length ? `📋 Vão listados no prompt pra IA (${nomes.length}): ${nomes.slice(0, 40).join(', ')}${nomes.length > 40 ? '…' : ''}` : `⚠ O acervo não tem personagens cadastrados pra “${obra}”.`) : '';
+    } catch (_) {}
+  }
+  function atualizar() {
+    box.querySelectorAll('.bib-prov').forEach(bloco => {
+      const prov = bloco.dataset.prov;
+      const marcado = [...form.querySelectorAll(`input[name="${nome}"]`)].some(c => c.value === prov && c.checked);
+      bloco.style.display = marcado ? '' : 'none';
+      if (marcado) obras(bloco, prov);
+    });
+  }
+  form.querySelectorAll(`input[name="${nome}"]`).forEach(c => c.addEventListener('change', atualizar));
+  // várias obras / personagens: cada um vira uma etiqueta; o campo enviado leva "A | B"
+  const lista = (v) => String(v || '').split('|').map(x => x.trim()).filter(Boolean);
+  function chips(bloco) {
+    bloco.querySelectorAll('.bib-chips').forEach(sp => {
+      const h = bloco.querySelector('.' + sp.dataset.alvo);
+      sp.innerHTML = lista(h.value).map((x, k) => `<span style="display:inline-block;background:#ede9fe;border:1px solid #c4b5fd;border-radius:12px;padding:1px 8px;margin:3px 4px 3px 0;font-size:0.8rem;">${x.replace(/</g, '&lt;')} <a href="#" data-k="${k}" style="text-decoration:none;color:#7c3aed;">×</a></span>`).join('');
+      sp.querySelectorAll('a').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); const l = lista(h.value); l.splice(Number(a.dataset.k), 1); h.value = l.join(' | '); chips(bloco); if (h.classList.contains('bib-obra')) pessoas(bloco, bloco.dataset.prov); }));
+    });
+  }
+  box.querySelectorAll('.bib-prov').forEach(bloco => {
+    chips(bloco);
+    bloco.querySelectorAll('.bib-add').forEach(inp => {
+      const add = () => {
+        const h = bloco.querySelector('.' + inp.dataset.alvo); const v = inp.value.replace(/\|/g, ' ').trim(); if (!v) return;
+        const l = lista(h.value); if (!l.includes(v)) l.push(v); h.value = l.join(' | '); inp.value = ''; chips(bloco);
+        if (h.classList.contains('bib-obra')) pessoas(bloco, bloco.dataset.prov);
+      };
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+      inp.addEventListener('change', add);  // escolheu da lista
+    });
+  });
+  // 📋 copiar a lista inteira (obras ou personagens) com um pedido pra IA
+  async function copiarTexto(t, ta) {
+    try { await navigator.clipboard.writeText(t); return true; } catch (_) {}
+    ta.select(); try { return document.execCommand('copy'); } catch (_) { return false; }
+  }
+  box.querySelectorAll('.bib-prov').forEach(bloco => {
+    const sel = bloco.querySelector('.bib-pedido'), livre = bloco.querySelector('.bib-pedido-livre');
+    sel.addEventListener('change', () => { livre.style.display = sel.value === 'livre' ? '' : 'none'; });
+    bloco.querySelectorAll('.bib-copiar-btn').forEach(b => b.addEventListener('click', async () => {
+      const st = bloco.querySelector('.bib-copiar-st'), ta = bloco.querySelector('.bib-copiar-txt');
+      const pedido = sel.value === 'livre' ? livre.value.trim() : sel.value;
+      st.textContent = '⏳ pegando a lista no acervo…'; b.disabled = true;
+      try {
+        const q = new URLSearchParams({ o: b.dataset.o, obra: b.dataset.o === 'personagens' ? bloco.querySelector('.bib-obra').value : '', pedido });
+        const d = await (await fetch(`/biblioteca-local/${bloco.dataset.prov}/copiar?${q}`)).json();
+        if (d.erro) throw new Error(d.erro);
+        ta.value = d.texto; ta.style.display = '';
+        const ok = await copiarTexto(d.texto, ta);
+        st.textContent = (ok ? '✅ Copiado: ' : '📋 Selecione e copie: ') + d.titulo + (pedido ? ' + o pedido pra IA. Cole no ChatGPT/Claude/Gemini.' : '.');
+      } catch (e) { st.textContent = '⚠ ' + e.message; }
+      b.disabled = false;
+    }));
+  });
+  // enviou o formulário com algo digitado e sem Enter: entra também
+  if (form.addEventListener) form.addEventListener('submit', () => box.querySelectorAll('.bib-add').forEach(inp => { if (inp.value.trim()) inp.dispatchEvent(new Event('change')); }));
+  atualizar();
+})();
+</script>
+{% endmacro %}

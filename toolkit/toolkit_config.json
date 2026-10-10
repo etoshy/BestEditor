@@ -1,0 +1,49 @@
+{
+  "browser": {
+    "headless": false,
+    "show_browser": true,
+    "download_dir": "downloads"
+  },
+  "downloads": {
+    "enabled": true,
+    "max_workers": 3,
+    "per_provider_workers": 1,
+    "skip_existing": true,
+    "retries": 3,
+    "retry_backoff_seconds": 2,
+    "manifest": "downloads_manifest.json"
+  },
+  "providers": {
+    "pexels": {
+      "enabled": true,
+      "query": "dog",
+      "max_pages": 1,
+      "download_count": 2
+    },
+    "pixabay": {
+      "enabled": true,
+      "query": "dog",
+      "max_pages": 1,
+      "download_count": 2
+    },
+    "magnific": {
+      "enabled": true,
+      "query": "dog",
+      "only_free": true,
+      "max_pages": 1,
+      "download_count": 2
+    },
+    "mixkit": {
+      "enabled": true,
+      "category": "animal-nature",
+      "max_pages": 1,
+      "download_count": 2
+    },
+    "vistacreate": {
+      "enabled": true,
+      "query": "dog",
+      "max_pages": 1,
+      "download_count": 2
+    }
+  }
+}

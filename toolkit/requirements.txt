@@ -1,0 +1,6 @@
+selenium>=4.20.0
+requests>=2.31.0
+# buscadores de imagem (unified_images/): Playwright + os imports dos motores
+playwright>=1.50
+fastapi>=0.115
+uvicorn>=0.34

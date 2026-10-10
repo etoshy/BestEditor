@@ -1,0 +1,81 @@
+# Dependências do gerador de voz (toolkit/tts/voice_generator.py).
+#
+# Ficam separadas do requirements.txt principal do site de propósito:
+# são pesadas (XTTS sozinho traz PyTorch) e você pode querer usar só
+# UM dos três motores, não os três. Instale só o que for usar:
+#
+#   pip install -r toolkit/tts/requirements.txt          # os três motores
+#   pip install piper-tts onnxruntime                     # só Piper
+#   pip install kokoro-onnx soundfile onnxruntime          # só Kokoro
+#   pip install coqui-tts torch torchaudio                 # só XTTS v2
+#
+# ============================================================
+# GPU — "tenho placa de vídeo mas não está sendo usada"
+# ============================================================
+# A causa quase sempre é a mesma: `pip install torch` (ou `onnxruntime`)
+# "pelado", sem indicar o índice de pacotes certo, instala por padrão a
+# build CPU-ONLY — mesmo com uma GPU NVIDIA de verdade na máquina e o
+# driver certinho, essa build nunca vai usar ela.
+#
+# Rode `python -m voice_generator` não ajuda por si só a diagnosticar --
+# em vez disso, chame `diagnosticar_gpu()` (em voice_generator.py) ou
+# veja o quadro de diagnóstico que já aparece sozinho na aba "Gerador
+# de voz" do site quando uma GPU é detectada mas algum motor não está
+# usando ela — ele aponta exatamente qual pacote reinstalar e o comando
+# certo pra sua GPU.
+#
+# Resumo dos dois casos:
+#   - Piper/Kokoro (onnxruntime): troque o pacote `onnxruntime` pelo
+#     `onnxruntime-gpu` (veja a versão de CUDA compatível em
+#     https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
+#         pip uninstall onnxruntime -y && pip install onnxruntime-gpu
+#   - XTTS (PyTorch): instale torch/torchaudio com suporte a CUDA
+#     seguindo https://pytorch.org/get-started/locally/ em vez da
+#     versão CPU-only listada abaixo, ex (CUDA 12.1):
+#         pip uninstall torch torchaudio -y
+#         pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+#     Esse mesmo PyTorch também acelera a transcrição por Whisper (é a
+#     mesma checagem de GPU) — corrigir aqui acelera as duas coisas.
+
+# --- Piper TTS ---
+piper-tts>=1.3.0
+
+# --- Kokoro (via kokoro-onnx) ---
+# Mantenha sempre a versão mais recente — houve um bug real em versões
+# anteriores à 0.6.0 (github.com/thewh1teagle/kokoro-onnx/issues/155)
+# em que o parâmetro "speed" era convertido pro tipo de dado errado
+# internamente e a geração falhava com "ONNXRuntimeError ...
+# Unexpected input data type ... tensor(int32) ... expected
+# tensor(float)". Se isso acontecer mesmo com a versão instalada aqui
+# sendo recente, rode `pip install -U kokoro-onnx` e apague a pasta
+# `toolkit/tts/models/kokoro/` pra forçar o download de novo.
+kokoro-onnx>=0.6.0
+soundfile>=0.12.1
+
+# --- onnxruntime (motor de inferência usado por Piper e Kokoro) ---
+# Listado explicitamente (em vez de só confiar que piper-tts/kokoro-onnx
+# puxam ele sozinhos como dependência) porque é o pacote que precisa
+# ser TROCADO pra `onnxruntime-gpu` quando você tem GPU (ver acima) --
+# deixar implícito dificultava saber qual pacote reinstalar.
+onnxruntime>=1.16.0
+
+# --- numpy (usado direto por voice_generator.py, não só como dependência
+# transitiva do torch/onnxruntime) ---
+numpy>=1.24.0
+
+# --- XTTS v2 (fork mantido idiap/coqui-ai-TTS; continua importável como TTS.api) ---
+# ⚠️ NÃO instale o pacote "TTS" (nome antigo, sem manutenção desde 2024) — use "coqui-tts".
+# ⚠️ Windows: versões recentes do torchaudio (torch >= 2.9) passaram a
+# EXIGIR o pacote "torchcodec" pra carregar áudio, que por sua vez
+# exige DLLs específicas do FFmpeg ("torchcodec_coreN.dll") que muita
+# instalação de FFmpeg no Windows não tem — a geração falha com um
+# erro de "libtorchcodec"/DLL na hora de carregar o modelo. O
+# `voice_generator.py` já contorna isso automaticamente (troca
+# `torchaudio.load` por uma versão via `soundfile`, que não depende
+# dessas DLLs) — mas se mesmo assim der esse erro, o jeito mais
+# simples é instalar o FFmpeg "full-shared" (com as DLLs) e garantir
+# que ele está no PATH, ou trocar pra uma dupla torch/torchaudio mais
+# antiga (ex: 2.8.*), que não tem essa exigência.
+coqui-tts>=0.27.0
+torch>=2.1.0
+torchaudio>=2.1.0

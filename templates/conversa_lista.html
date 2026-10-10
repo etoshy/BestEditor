@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Simular Conversa{% endblock %}
+{% block content %}
+<h1>💬 Simular Conversa</h1>
+<p style="color:#666;">Monte uma conversa fala por fala — cada uma pode usar um motor e uma voz diferentes (útil pra simular um diálogo entre duas ou mais "pessoas"). Gere cada fala separadamente e baixe uma por uma, ou combine tudo num único áudio no final.</p>
+<p><a href="{{ url_for('gerar_voz_page') }}">&larr; Gerador de voz (uma fala só)</a></p>
+
+<form method="post" action="{{ url_for('conversa_criar') }}" style="margin-top:16px;">
+  <label>Nome da conversa (opcional)</label>
+  <input type="text" name="nome" placeholder="Ex: Entrevista, Diálogo do vídeo 3...">
+  <button type="submit">+ Nova conversa</button>
+</form>
+
+{% if conversas %}
+<h2 style="margin-top:28px;">Conversas</h2>
+<div>
+  {% for c in conversas %}
+  <div style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+    <a href="{{ url_for('conversa_detalhe', conversa_id=c.conversaId) }}"><strong>{{ c.nome }}</strong></a>
+    <span style="color:#666;font-size:0.8rem;">{{ c.falas|length }} fala(s)</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p style="color:#666;margin-top:20px;">Nenhuma conversa criada ainda.</p>
+{% endif %}
+{% endblock %}

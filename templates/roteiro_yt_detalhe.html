@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block title %}{{ p.titulo or 'Roteiro do YouTube' }}{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1050px; }
+  .ry-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+  .ry-card h2 { margin: 0 0 4px; font-size: 1.15rem; }
+  .ry-num { display: inline-block; background: #b91c1c; color: #fff; border-radius: 999px; width: 24px; height: 24px; text-align: center; line-height: 24px; font-size: 0.85rem; margin-right: 6px; }
+  .ry-hint { color: #666; font-size: 0.85rem; margin: 4px 0; }
+  .ry-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ry-row > * { margin-top: 6px; }
+  .ry-mini { margin-top: 0; padding: 5px 10px; font-size: 0.82rem; width: auto; }
+  .ry-sec { background: #fff; color: #333; border: 1px solid #ccc; }
+  .ry-mono { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; }
+  .ry-log { background: #111827; color: #d1fae5; border-radius: 6px; padding: 8px 10px; font-size: 0.78rem; max-height: 160px; overflow: auto; white-space: pre-wrap; }
+  .ry-aviso { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; margin-top: 8px; }
+  .ry-ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; margin-top: 8px; }
+  .ry-erro { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; margin-top: 8px; white-space: pre-wrap; }
+  .ry-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 6px; }
+  .ry-acoes label { font-weight: 400; font-size: 0.88rem; margin: 0; display: flex; gap: 6px; align-items: flex-start; }
+  .ry-acoes label input { width: auto; margin: 3px 0 0; }
+  .ry-acoes small { display: block; color: #777; font-size: 0.76rem; }
+  .ry-cena { border: 1px solid #e5e7eb; border-left: 6px solid #b91c1c; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 0.88rem; }
+  .ry-cena .tipo { font-size: 0.72rem; background: #fef2f2; color: #991b1b; border-radius: 999px; padding: 1px 8px; margin-left: 4px; }
+  .ry-cena .meta { color: #666; font-size: 0.8rem; margin-top: 3px; }
+  .ry-cena input { margin: 0; padding: 4px 8px; font-size: 0.82rem; }
+  .ry-yt { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+  .ry-yt div { border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; font-size: 0.75rem; cursor: pointer; }
+  .ry-yt div:hover { border-color: #b91c1c; }
+  .ry-yt img { width: 100%; border-radius: 4px; aspect-ratio: 16/9; object-fit: cover; }
+  .ry-lista li { margin: 4px 0; font-size: 0.88rem; }
+  .ry-tag { background: #ede9fe; color: #5b21b6; border-radius: 4px; padding: 0 3px; }
+  .ry-cenatag { background: #fee2e2; color: #991b1b; border-radius: 4px; padding: 0 3px; font-weight: 600; }
+  .ry-ad { background: #fef3c7; color: #92400e; border-radius: 4px; padding: 0 3px; font-weight: 600; }
+  .ry-preview { white-space: pre-wrap; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; max-height: 420px; overflow: auto; font-size: 0.9rem; line-height: 1.5; background: #fafafa; }
+  @media (max-width: 700px) { .ry-acoes { grid-template-columns: 1fr; } }
+</style>
+
+<p><a href="{{ url_for('roteiros_yt_page') }}">← Roteiros do YouTube</a></p>
+<h1 style="margin-bottom:2px;">📜 {{ p.titulo or 'Roteiro do YouTube' }}</h1>
+{% if p.url %}<p class="ry-hint"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.url }}</a></p>{% endif %}
+
+<!-- 1 · transcrição -->
+<div class="ry-card" id="etapa1">
+  <h2><span class="ry-num">1</span>Transcrição</h2>
+  <div id="trStatus">
+    {% if p.transcricao %}
+    <p class="ry-hint">✔ {{ p.transcricao.fonte }}{% if p.transcricao.idioma %} · idioma: {{ p.transcricao.idioma }}{% endif %} · {{ p.transcricao.blocos|length }} blocos{% if p.transcricao.duracao %} · vídeo de {{ (p.transcricao.duracao // 60)|int }} min{% endif %}</p>
+    {% endif %}
+  </div>
+  <div id="trLog" class="ry-log" style="display:none;"></div>
+  <div id="trErro" class="ry-erro" style="display:none;"></div>
+  <details {% if not p.transcricao %}open{% endif %} style="margin-top:6px;">
+    <summary style="cursor:pointer;font-size:0.88rem;">{{ 'Ver / trocar a transcrição' if p.transcricao else 'Colar a transcrição à mão' }}</summary>
+    <textarea id="trTexto" rows="8" class="ry-mono" placeholder="Cole a transcrição (com ou sem tempos)">{{ transcricao_txt }}</textarea>
+    <div class="ry-row">
+      <button class="ry-mini" id="trSalvar">💾 Usar este texto</button>
+      {% if p.url %}<button class="ry-mini ry-sec" id="trRefazer">🔁 Pegar de novo do YouTube</button>{% endif %}
+      {% if p.transcricao %}<a class="ry-mini" href="{{ url_for('roteiro_yt_baixar', pid=p.id, tipo='transcricao') }}">⬇ .txt</a>{% endif %}
+    </div>
+  </details>
+</div>
+
+<!-- 2 · prompt: reescrever + cenas -->
+<div class="ry-card" id="etapa2">
+  <h2><span class="ry-num">2</span>Reescrever o roteiro e listar as cenas</h2>
+  <p class="ry-hint">Escolha o modelo do prompt, gere, cole na sua IA (ChatGPT, Claude, Gemini…) e cole aqui o JSON que ela devolver.</p>
+  <div class="ry-row">
+    <select id="modelo" style="flex:1;min-width:240px;margin:0;">
+      {% for m in modelos %}<option value="{{ m.id }}" {% if m.id == p.modelo_id %}selected{% endif %}>{{ m.nome }}{% if not m.fabrica %} ★{% endif %}</option>{% endfor %}
+    </select>
+    <select id="idiomaRoteiro" style="width:auto;margin:0;" title="Idioma em que a IA escreve o roteiro reescrito">
+      <option value="">roteiro no idioma do vídeo</option>
+      {% set p1 = usadas.passo1 or {} %}{% set idr = p.idioma_roteiro if p.idioma_roteiro is defined else (p1.idioma or '') %}{% for cod, nome in idiomas %}<option value="{{ cod }}" {% if cod == idr %}selected{% endif %}>roteiro em {{ nome }}</option>{% endfor %}
+    </select>
+    <button class="ry-mini" id="p1Gerar">📝 Gerar prompt</button>
+  </div>
+  <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;display:block;"><input type="checkbox" id="semExperiencias" style="width:auto;" {% if (p.sem_experiencias if p.sem_experiencias is defined else p1.sem_experiencias) != false %}checked{% endif %}> 🙅 Tirar do roteiro experiências pessoais de quem gravou e citações a outros vídeos/ao canal ("como falei no vídeo passado", "quando eu era criança"…)</label>
+  <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;display:block;"><input type="checkbox" id="marcarChamadas" style="width:auto;" {% if (p.marcar_chamadas if p.marcar_chamadas is defined else p1.marcar_chamadas) != false %}checked{% endif %}> 📣 A IA marca no roteiro <code>[[INSCREVA]]</code> (chamada pra like/inscreva-se) e <code>[[VENDA]]</code> (momento do anúncio) nos pontos mais oportunos — ali entram os seus vídeos prontos</label>
+  <details style="margin-top:8px;">
+    <summary style="cursor:pointer;font-size:0.85rem;">✏️ Editar / criar modelos de prompt</summary>
+    <p class="ry-hint">Use <code>{transcricao}</code>, <code>{titulo}</code>, <code>{titulo_entre}</code>, <code>{idioma}</code>, <code>{url}</code> e <code>{canal}</code> — o site troca pelos dados do vídeo. O formato do JSON de resposta é colocado no fim sozinho (pra resposta sempre dar pra ler aqui). Mexer num modelo de fábrica guarda a sua versão por cima; excluir ela volta a de fábrica.</p>
+    <input type="text" id="mNome" placeholder="Nome do modelo">
+    <textarea id="mTexto" rows="9" class="ry-mono"></textarea>
+    <div class="ry-row">
+      <button class="ry-mini" id="mSalvar">💾 Salvar este modelo</button>
+      <button class="ry-mini ry-sec" id="mNovo">➕ Salvar como novo</button>
+      <button class="ry-mini ry-sec" id="mExcluir">🗑 Excluir / voltar ao de fábrica</button>
+    </div>
+  </details>
+  <div id="p1Box" style="display:none;margin-top:8px;">
+    <div class="ry-row"><button class="ry-mini" id="p1Copiar">📋 Copiar prompt</button><span class="ry-hint" id="p1Tam"></span></div>
+    <textarea id="p1Prompt" rows="6" readonly class="ry-mono"></textarea>
+  </div>
+  <label style="margin-top:10px;">Resposta da IA (JSON)</label>
+  <textarea id="p1Resp" rows="6" class="ry-mono" placeholder='{ "roteiro": "...", "cenas": [ ... ] }'></textarea>
+  <button class="ry-mini" id="p1Ler">✅ Ler resposta</button>
+  <div id="p1Res"></div>
+</div>
+
+<!-- 3 · o que fazer -->
+<div class="ry-card" id="etapa3">
+  <h2><span class="ry-num">3</span>O que fazer com o roteiro</h2>
+  <p class="ry-hint">Marque o que quer — dá pra combinar (ex.: traduzir + tags + anúncios + likes). Gere o prompt, mande pra IA e cole a resposta.</p>
+  {% set op = p.acoes or usadas.ultima or none %}
+  {% if usadas.historico %}
+  <div class="ry-row" style="margin:4px 0 2px;">
+    <select id="histAcoes" style="width:auto;max-width:100%;margin:0;" title="Marca de novo uma combinação que você já usou">
+      <option value="">🕘 Usar de novo uma combinação anterior ({{ usadas.historico|length }})…</option>
+      {% for h in usadas.historico %}<option value="{{ loop.index0 }}">{{ h.rotulo }}</option>{% endfor %}
+    </select>
+    <button class="ry-mini ry-sec" id="histLimpar" title="Apaga o histórico de combinações (o que está marcado agora fica)">🗑 limpar histórico</button>
+  </div>
+  {% if not p.acoes and usadas.ultima %}<p class="ry-hint" style="margin:2px 0;">✔ Já veio marcado como você usou da última vez.</p>{% endif %}
+  {% endif %}
+  <div class="ry-acoes">
+    {% for k, nome, desc in acoes %}
+    <label><input type="checkbox" class="acao" value="{{ k }}" {% if op and k in (op.acoes or []) %}checked{% elif not op and k in ('traduzir', 'tags', 'sem_experiencias') %}checked{% endif %}><span>{{ nome }}<small>{{ desc }}</small></span></label>
+    {% endfor %}
+  </div>
+  <div class="ry-row">
+    <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;">Traduzir pra</label>
+    <select id="idiomaAlvo" style="width:auto;margin:6px 0 0;">
+      {% for cod, nome in idiomas %}<option value="{{ cod }}" {% if (op and op.idioma == cod) or (not (op and op.idioma) and cod == 'en') %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;"><input type="checkbox" id="ctaNoTexto" style="width:auto;" {% if not op or op.cta_no_texto != false %}checked{% endif %}> escrever no roteiro as marcas <code>[[INSCREVA]]</code> (chamadas) e <code>[[VENDA]]</code> (anúncio)</label>
+  </div>
+  <p class="ry-hint" style="margin-top:6px;">Tags do Chatterbox Turbo — sons: {% for t in tags_som %}<span class="ry-tag">[{{ t }}]</span> {% endfor %}<br>estilo (melhor no início da frase): {% for t in tags_estilo %}<span class="ry-tag">[{{ t }}]</span> {% endfor %}</p>
+  <label>Pedido extra <span style="font-weight:400;color:#888;">(opcional)</span></label>
+  <textarea id="extra" rows="2" placeholder="ex.: tom mais misterioso; no máximo 8 minutos; trocar o final">{{ (op.extra if op else '') or '' }}</textarea>
+  <button class="ry-mini" id="p2Gerar">📝 Gerar prompt</button>
+  <div id="p2Box" style="display:none;margin-top:8px;">
+    <div class="ry-row"><button class="ry-mini" id="p2Copiar">📋 Copiar prompt</button><span class="ry-hint" id="p2Tam"></span></div>
+    <textarea id="p2Prompt" rows="6" readonly class="ry-mono"></textarea>
+  </div>
+  <label style="margin-top:10px;">Resposta da IA (JSON)</label>
+  <textarea id="p2Resp" rows="6" class="ry-mono" placeholder='{ "roteiro_final": "...", "ads": [...], "ctas": [...] }'></textarea>
+  <button class="ry-mini" id="p2Ler">✅ Ler resposta</button>
+  <div id="p2Erro"></div>
+</div>
+
+<!-- 4 · resultado -->
+<div class="ry-card" id="etapa4">
+  <h2><span class="ry-num">4</span>Resultado</h2>
+  <div id="resultado"><p class="ry-hint">Aparece aqui depois do passo 2 (cenas) e do passo 3 (roteiro final).</p></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }};
+let P = {{ p|tojson }};
+const MODELOS = {{ modelos|tojson }};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(url, corpo, metodo) {
+  const r = await fetch(url, { method: metodo || 'POST', headers: { 'Content-Type': 'application/json' }, body: corpo ? JSON.stringify(corpo) : undefined });
+  const d = await r.json().catch(() => ({ erro: 'resposta inválida do servidor' }));
+  if (!r.ok || d.erro) throw new Error(d.erro || r.status);
+  return d;
+}
+function copiar(id) { const t = $(id); t.select(); (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).catch(() => document.execCommand('copy')); }
+function tempoSeg(t) { if (!t) return null; const p = String(t).split(':').map(Number); return p.reduce((a, b) => a * 60 + b, 0); }
+
+// ---------------------------------------------------------------- 1 · transcrição
+async function acompanhar() {
+  const d = await (await fetch(`/roteiros-yt/${PID}/status`)).json();
+  $('trLog').style.display = d.log.length ? '' : 'none'; $('trLog').textContent = d.log.join('\n'); $('trLog').scrollTop = 1e9;
+  if (d.erro) { $('trErro').style.display = ''; $('trErro').textContent = d.erro; }
+  if (d.rodando) { $('trStatus').innerHTML = '<p class="ry-hint">⏳ Pegando a transcrição…</p>'; setTimeout(acompanhar, 1500); }
+  else if (d.transcrito && !P.transcricao) location.reload();
+}
+{% if tarefa.rodando %}acompanhar();{% endif %}
+$('trSalvar').addEventListener('click', async () => {
+  try { await api(`/roteiros-yt/${PID}/transcrever`, { texto: $('trTexto').value }); location.reload(); } catch (e) { alert(e.message); }
+});
+if ($('trRefazer')) $('trRefazer').addEventListener('click', async () => {
+  try { await api(`/roteiros-yt/${PID}/transcrever`, { url: P.url }); $('trErro').style.display = 'none'; acompanhar(); } catch (e) { alert(e.message); }
+});
+
+// ---------------------------------------------------------------- 2 · modelos + prompt 1
+function carregarModelo() { const m = MODELOS.find(x => x.id === $('modelo').value) || MODELOS[0]; $('mNome').value = m.nome; $('mTexto').value = m.texto; }
+$('modelo').addEventListener('change', carregarModelo); carregarModelo();
+async function salvarModelo(novo) {
+  try {
+    const d = await api('/roteiros-yt/modelos', { id: novo ? '' : $('modelo').value, nome: $('mNome').value, texto: $('mTexto').value });
+    MODELOS.splice(0, MODELOS.length, ...d.modelos);
+    $('modelo').innerHTML = MODELOS.map(m => `<option value="${esc(m.id)}">${esc(m.nome)}${m.fabrica ? '' : ' ★'}</option>`).join('');
+    $('modelo').value = d.modelo.id; carregarModelo(); alert('Modelo salvo.');
+  } catch (e) { alert(e.message); }
+}
+$('mSalvar').addEventListener('click', () => salvarModelo(false));
+$('mNovo').addEventListener('click', () => salvarModelo(true));
+$('mExcluir').addEventListener('click', async () => {
+  const m = MODELOS.find(x => x.id === $('modelo').value);
+  if (!m || m.fabrica) { alert('Esse é o modelo de fábrica (sem versão sua pra excluir).'); return; }
+  if (!confirm('Excluir o modelo “' + m.nome + '”?')) return;
+  const d = await api('/roteiros-yt/modelos', { excluir: m.id });
+  MODELOS.splice(0, MODELOS.length, ...d.modelos);
+  $('modelo').innerHTML = MODELOS.map(x => `<option value="${esc(x.id)}">${esc(x.nome)}${x.fabrica ? '' : ' ★'}</option>`).join(''); carregarModelo();
+});
+$('p1Gerar').addEventListener('click', async () => {
+  try {
+    const d = await api(`/roteiros-yt/${PID}/prompt-analise`, { modelo_id: $('modelo').value, idioma: $('idiomaRoteiro').value, marcar_chamadas: $('marcarChamadas').checked, sem_experiencias: $('semExperiencias').checked });
+    $('p1Prompt').value = d.prompt; $('p1Box').style.display = ''; $('p1Tam').textContent = d.caracteres.toLocaleString('pt-BR') + ' caracteres';
+  } catch (e) { alert(e.message); }
+});
+$('p1Copiar').addEventListener('click', () => copiar('p1Prompt'));
+$('p1Ler').addEventListener('click', async () => {
+  try {
+    const d = await api(`/roteiros-yt/${PID}/analise`, { texto: $('p1Resp').value });
+    P.analise = d.analise; P.resultado = null;
+    $('p1Res').innerHTML = `<div class="ry-ok">✔ Roteiro com ${d.analise.roteiro.split(/\s+/).filter(Boolean).length} palavras e ${d.analise.cenas.length} cenas${d.analise.marcas ? ` · 📣 ${d.analise.marcas.inscreva}× [[INSCREVA]] e ${d.analise.marcas.venda}× [[VENDA]]` : ''}. Agora escolha o que fazer (passo 3) — ou use as cenas aqui embaixo.</div>`;
+    desenharResultado(); $('etapa3').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { $('p1Res').innerHTML = `<div class="ry-erro">⚠ ${esc(e.message)}</div>`; }
+});
+
+// ---------------------------------------------------------------- 3 · ações + prompt 2
+const HIST_ACOES = {{ (usadas.historico or [])|tojson }};
+if ($('histAcoes')) $('histAcoes').addEventListener('change', () => {
+  const h = HIST_ACOES[+$('histAcoes').value]; if (!h) return;
+  document.querySelectorAll('.acao').forEach(c => { c.checked = (h.acoes || []).includes(c.value); });
+  if (h.idioma) $('idiomaAlvo').value = h.idioma;
+  $('ctaNoTexto').checked = h.cta_no_texto !== false;
+  $('extra').value = h.extra || '';
+  $('histAcoes').value = '';
+});
+if ($('histLimpar')) $('histLimpar').addEventListener('click', async () => {
+  if (!confirm('Apagar o histórico de combinações?')) return;
+  await fetch('/roteiros-yt/opcoes-usadas', { method: 'DELETE' });
+  $('histAcoes').closest('.ry-row').remove();
+});
+function acoesMarcadas() { return [...document.querySelectorAll('.acao')].filter(c => c.checked).map(c => c.value); }
+$('p2Gerar').addEventListener('click', async () => {
+  try {
+    const d = await api(`/roteiros-yt/${PID}/prompt-acoes`, { acoes: acoesMarcadas(), idioma: $('idiomaAlvo').value, extra: $('extra').value, cta_no_texto: $('ctaNoTexto').checked });
+    $('p2Prompt').value = d.prompt; $('p2Box').style.display = ''; $('p2Tam').textContent = d.caracteres.toLocaleString('pt-BR') + ' caracteres';
+  } catch (e) { alert(e.message); }
+});
+$('p2Copiar').addEventListener('click', () => copiar('p2Prompt'));
+$('p2Ler').addEventListener('click', async () => {
+  try {
+    const d = await api(`/roteiros-yt/${PID}/resultado`, { texto: $('p2Resp').value });
+    P.resultado = d.resultado; ultimaLimpeza = d.limpeza ? d.limpeza.mudancas : null; $('p2Erro').innerHTML = ''; desenharResultado(); $('etapa4').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { $('p2Erro').innerHTML = `<div class="ry-erro">⚠ ${esc(e.message)}</div>`; }
+});
+
+// ---------------------------------------------------------------- 4 · resultado
+const TAGS_OK = new Set({{ (tags_som + tags_estilo)|tojson }});
+function realcar(txt) {
+  return esc(txt).replace(/\[(CENA \d+)\]/gi, '<span class="ry-cenatag">[$1]</span>')
+    .replace(/\[([a-z ]{2,20})\]/g, (m, t) => TAGS_OK.has(t) ? `<span class="ry-tag">[${t}]</span>` : `<span class="ry-ad" title="o Chatterbox Turbo não conhece essa tag — vai ser lida em voz alta">[${t}] ⚠</span>`);
+}
+let ultimaLimpeza = null;
+function resumoLimpeza(m) {
+  if (!m || !m.length) return '<div class="ry-ok">🧹 Nada pra limpar — o texto já estava limpo.</div>';
+  return '<div class="ry-ok">🧹 Limpo: ' + m.map(x => `${esc(x.tipo)} (${x.quantas})`).join(' · ') + '</div>';
+}
+function cenas() { return (P.resultado && P.resultado.cenas && P.resultado.cenas.length ? P.resultado.cenas : (P.analise && P.analise.cenas) || []); }
+function desenharResultado() {
+  const R = P.resultado, A = P.analise;
+  if (!R && !A) return;
+  let h = '';
+  if (R) {
+    h += `<p class="ry-hint"><b>${R.palavras}</b> palavras · ~<b>${R.minutos}</b> min de narração${R.idioma ? ' · ' + esc(R.idioma) : ''}${R.tags.length ? ' · tags: ' + R.tags.map(t => '<span class="ry-tag">[' + esc(t) + ']</span>').join(' ') : ''}</p>`;
+    (R.avisos || []).forEach(a => { h += `<div class="ry-aviso">⚠ ${esc(a)}</div>`; });
+    if (R.gancho) h += `<p style="margin:8px 0 0;"><b>Gancho:</b> ${esc(R.gancho)}</p>`;
+    if (R.titulo_original) h += `<p style="margin:8px 0 0;"><b>Título original${R.idioma ? ' (' + esc(R.idioma) + ')' : ''}:</b> ${esc(R.titulo_original)} <button class="ry-mini ry-copia" data-t="${esc(R.titulo_original)}">📋</button></p>`;
+    if (R.titulos.length) h += `<p style="margin:8px 0 0;"><b>Títulos alternativos:</b></p><ul class="ry-lista">${R.titulos.map(t => `<li>${esc(t)} <button class="ry-mini ry-copia" data-t="${esc(t)}">📋</button></li>`).join('')}</ul>`;
+    if (R.descricao || (R.capitulos && R.capitulos.length)) {
+      h += `<h3 style="margin:14px 0 4px;">📝 Descrição pro YouTube${R.capitulos && R.capitulos.length ? ` com ${R.capitulos.length} capítulos` : ''}</h3>
+        ${R.audio ? `<p class="ry-ok" style="margin:4px 0;">🎙️ <label style="display:inline;font-weight:400;"><input type="checkbox" id="rUsarAudio" checked style="width:auto;"> usar os tempos REAIS do áudio gerado no Gerar voz</label> (${R.audio.duracao ? fmtMin(R.audio.duracao / 60) : '?'} de áudio${R.audio.com_palavras ? ', cada capítulo achado nas palavras faladas' : ', estimado pela duração'}${R.audio.gerado_em ? ' · ' + new Date(R.audio.gerado_em * 1000).toLocaleString().slice(0, 16) : ''})</p>` : ''}
+        <p class="ry-hint">Tempos estimados pelo ritmo da narração: <input type="number" id="rWpm" value="${Number(localStorage.getItem('ryWpm') || 150)}" min="80" max="260" style="width:70px;"> palavras/min
+        ou duração do áudio: <input type="text" id="rDurAudio" placeholder="ex.: 12:34" style="width:80px;"> (gerando a voz pelo botão 🎙️ daqui, os tempos reais do áudio entram sozinhos).</p>
+        <textarea id="rDesc" rows="12" style="width:100%;font-family:inherit;"></textarea>
+        <div class="ry-row"><button class="ry-mini" id="rCopiarDesc">📋 Copiar descrição</button><a class="ry-mini" href="/roteiros-yt/${PID}/baixar/descricao">⬇ títulos + descrição (.txt)</a></div>`;
+    }
+  }
+  const roteiro = R && R.roteiro_final ? R.roteiro_final : (A ? A.roteiro : '');
+  if (roteiro) {
+    h += `<h3 style="margin:12px 0 4px;">${R && R.roteiro_final ? 'Roteiro final' : 'Roteiro reescrito (passo 2)'}</h3><div class="ry-preview">${realcar(roteiro)}</div>
+      <textarea id="rFinal" style="position:absolute;left:-9999px;">${esc(roteiro)}</textarea>
+      <div class="ry-row"><button class="ry-mini" id="rCopiar">📋 Copiar roteiro</button>
+      <a class="ry-mini" href="/gerar-voz?roteiro=${PID}" style="background:#5b21b6;color:#fff;border-radius:6px;text-decoration:none;padding:6px 10px;">🎙️ Gerar voz com este roteiro</a>
+      <a class="ry-mini" href="/roteiros-yt/${PID}/baixar/txt">⬇ .txt</a><a class="ry-mini" href="/roteiros-yt/${PID}/baixar/json">⬇ JSON completo</a></div>
+      <div class="ry-row"><button class="ry-mini ry-sec" id="rLimpar" title="Tira emojis, caracteres invisíveis, [Música]/(risos), links, @/#, markdown, aspas/travessões tipográficos, !!!, muuuito e tags que o TTS não conhece — sem IA, na hora">🧹 Limpar pro TTS (caracteres estranhos)</button>
+      ${((R && R.antes_da_limpeza) || (!R && A && A.antes_da_limpeza)) ? '<button class="ry-mini ry-sec" id="rDesfazerLimpeza">↩ Desfazer limpeza</button>' : ''}</div>
+      <div id="rLimpeza">${ultimaLimpeza ? resumoLimpeza(ultimaLimpeza) : ''}</div>`;
+  }
+  if (R && R.ads.length) h += `<h3 style="margin:14px 0 4px;">💰 Momentos pra anúncio</h3><ul class="ry-lista">${R.ads.map(a => `<li>${a.posicao != null ? `<b>${Math.round(a.posicao * 100)}%</b> do roteiro${R.minutos ? ' (~' + fmtMin(a.posicao * R.minutos) + ')' : ''} — ` : ''}depois de “…${esc(a.depois_de.slice(-80))}”${a.motivo ? ` <span style="color:#777;">· ${esc(a.motivo)}</span>` : ''}</li>`).join('')}</ul>`;
+  if (R && R.ctas.length) h += `<h3 style="margin:14px 0 4px;">👍 Chamadas pra ação</h3><ul class="ry-lista">${R.ctas.map(a => `<li><b>${esc(a.tipo || 'cta')}</b>${a.posicao != null ? ` · ${Math.round(a.posicao * 100)}%` : ''}: “${esc(a.texto)}”${a.depois_de ? ` <span style="color:#777;">(depois de “…${esc(a.depois_de.slice(-60))}”)</span>` : ''}</li>`).join('')}</ul>`;
+  if (A && A.removidos && A.removidos.length && !R) h += `<details style="margin-top:10px;"><summary style="cursor:pointer;">✂️ O que a IA tirou/trocou (${A.removidos.length})</summary><ul class="ry-lista">${A.removidos.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>`;
+  const obs = (R && R.observacoes) || (A && A.observacoes);
+  if (obs) h += `<p class="ry-hint">💬 ${esc(obs)}</p>`;
+  const cs = cenas();
+  h += `<h3 style="margin:16px 0 4px;">🎬 Cenas (${cs.length})</h3>`;
+  if (!cs.length) h += '<p class="ry-hint">Nenhuma cena de filme/série/anime listada.</p>';
+  else {
+    h += `<p class="ry-hint">Pra cada cena: <b>🔎 Buscar no YouTube</b> e clicar no vídeo certo, ajustar início/fim, e no fim mandar tudo pro <b>✂️ Cortar do YouTube</b>. Se o vídeo original mostrava a cena, dá pra cortar direto dele pelos tempos.</p>`;
+    h += cs.map(c => `<div class="ry-cena" data-id="${c.id}">
+      <div><b>${c.id}. ${esc(c.obra)}</b><span class="tipo">${esc(c.tipo)}${c.ano ? ' · ' + esc(c.ano) : ''}</span>${c.certeza ? ` <span style="font-size:0.72rem;color:${c.certeza === 'alta' ? '#065f46' : c.certeza === 'baixa' ? '#b91c1c' : '#92400e'};">certeza ${esc(c.certeza)}</span>` : ''}${c.marcador ? ` <span class="ry-cenatag">${esc(c.marcador)}</span>` : ''}${c.como_ficou ? ` <span style="font-size:0.75rem;color:#555;">(${esc(c.como_ficou)})</span>` : ''}</div>
+      <div>${esc(c.momento)}${c.episodio_ou_tempo ? ` <span style="color:#777;">· ${esc(c.episodio_ou_tempo)}</span>` : ''}</div>
+      ${c.trecho_do_roteiro ? `<div class="meta">entra em: “${esc(c.trecho_do_roteiro)}”</div>` : ''}
+      ${c.inicio && P.url ? `<div class="meta">no vídeo original: <a href="${esc(P.url)}${P.url.includes('?') ? '&' : '?'}t=${tempoSeg(c.inicio)}" target="_blank" rel="noopener">${esc(c.inicio)}${c.fim ? '–' + esc(c.fim) : ''} ▶</a></div>` : ''}
+      <div class="ry-row">
+        <input type="text" class="cBusca" value="${esc(c.busca_youtube)}" style="flex:1;min-width:200px;">
+        <button class="ry-mini ry-sec cBuscar">🔎 Buscar no YouTube</button>
+      </div>
+      <div class="ry-yt"></div>
+      <div class="ry-row">
+        <input type="url" class="cLink" placeholder="link do vídeo da cena" value="${esc(c.link || '')}" style="flex:1;min-width:220px;">
+        <input type="text" class="cIni" placeholder="início 0:00" value="${esc(c.link_inicio || '')}" style="width:90px;">
+        <input type="text" class="cFim" placeholder="fim 0:10" value="${esc(c.link_fim || '')}" style="width:90px;">
+        <button class="ry-mini cSalvar">💾</button>
+      </div>
+    </div>`).join('');
+    const comLink = cs.filter(c => c.link).length, comTempo = cs.filter(c => c.inicio).length;
+    h += `<div class="ry-row" style="margin-top:10px;">
+      <a class="ry-mini" href="/cortar-youtube?roteiro=${PID}" style="background:#b91c1c;color:#fff;border-radius:6px;text-decoration:none;padding:6px 10px;${comLink ? '' : 'opacity:.5;pointer-events:none;'}">✂️ Cortar as ${comLink} cenas com link</a>
+      ${P.url ? `<a class="ry-mini" href="/cortar-youtube?roteiro=${PID}&original=1" style="${comTempo ? '' : 'opacity:.5;pointer-events:none;'}">✂️ Cortar do vídeo original (${comTempo} com tempo)</a>` : ''}
+    </div>`;
+  }
+  $('resultado').innerHTML = h;
+  ligarDescricao();
+  if ($('rCopiar')) $('rCopiar').addEventListener('click', () => copiar('rFinal'));
+  if ($('rLimpar')) $('rLimpar').addEventListener('click', async () => {
+    try { const d = await api(`/roteiros-yt/${PID}/limpar-tts`, {}); P.analise = d.analise; P.resultado = d.resultado; ultimaLimpeza = d.mudancas; desenharResultado(); }
+    catch (e) { alert(e.message); }
+  });
+  if ($('rDesfazerLimpeza')) $('rDesfazerLimpeza').addEventListener('click', async () => {
+    try { const d = await api(`/roteiros-yt/${PID}/limpar-tts`, { desfazer: true }); P.analise = d.analise; P.resultado = d.resultado; ultimaLimpeza = null; desenharResultado(); }
+    catch (e) { alert(e.message); }
+  });
+  document.querySelectorAll('.ry-cena').forEach(el => {
+    const id = Number(el.dataset.id);
+    el.querySelector('.cBuscar').addEventListener('click', async () => {
+      const box = el.querySelector('.ry-yt'); box.innerHTML = '<span class="ry-hint">Buscando…</span>';
+      try {
+        const d = await api(`/roteiros-yt/${PID}/buscar-cena?termo=${encodeURIComponent(el.querySelector('.cBusca').value)}`, null, 'GET');
+        box.innerHTML = d.resultados.map(r => `<div data-url="${esc(r.url)}"><img src="${esc(r.miniatura_url)}" loading="lazy" alt=""><b>${esc(r.titulo)}</b><br>${esc(r.canal)}${r.duracao_formatada ? ' · ' + esc(r.duracao_formatada) : ''}</div>`).join('') || '<span class="ry-hint">Nada achado.</span>';
+        box.querySelectorAll('[data-url]').forEach(v => v.addEventListener('click', () => { el.querySelector('.cLink').value = v.dataset.url; salvarCena(el, id); box.innerHTML = ''; }));
+      } catch (e) { box.innerHTML = `<span class="ry-erro">⚠ ${esc(e.message)}</span>`; }
+    });
+    el.querySelector('.cSalvar').addEventListener('click', () => salvarCena(el, id));
+  });
+}
+function textoDescricao() {
+  const R = P.resultado || {}; const caps = R.capitulos || [];
+  const wpm = Number(($('rWpm') || {}).value) || 150;
+  const d = String(($('rDurAudio') || {}).value || '').trim();
+  let total = (R.palavras || 0) / wpm * 60;
+  const m = d.match(/^(?:(\d+):)?(\d+):(\d{1,2})$/) || d.match(/^(\d+)$/);
+  if (m) total = m.length === 2 ? Number(m[1]) : (Number(m[1] || 0) * 3600 + Number(m[2]) * 60 + Number(m[3]));
+  const doAudio = R.audio && !m && $('rUsarAudio') && $('rUsarAudio').checked;  // tempos reais do áudio do Gerar voz
+  if (doAudio && R.audio.duracao) total = R.audio.duracao;
+  const fmtT = (s) => { s = Math.round(s); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60), se = s % 60; return (total >= 3600 ? h + ':' + String(mi).padStart(2, '0') : mi) + ':' + String(se).padStart(2, '0'); };
+  const linhas = caps.map((c, k) => `${fmtT(k === 0 ? 0 : (doAudio && c.segundos_audio != null ? c.segundos_audio : (c.posicao || 0) * total))} ${c.titulo}`);
+  return [R.descricao || '', linhas.join('\n')].filter(Boolean).join('\n\n');
+}
+function ligarDescricao() {
+  if (!$('rDesc')) return;
+  const atual = () => { $('rDesc').value = textoDescricao(); try { localStorage.setItem('ryWpm', $('rWpm').value); } catch (_) {} };
+  atual(); $('rWpm').addEventListener('input', atual); $('rDurAudio').addEventListener('input', atual);
+  if ($('rUsarAudio')) $('rUsarAudio').addEventListener('change', atual);
+  $('rCopiarDesc').addEventListener('click', () => { navigator.clipboard.writeText($('rDesc').value); $('rCopiarDesc').textContent = '✔ Copiado'; });
+  document.querySelectorAll('.ry-copia').forEach(b => b.addEventListener('click', () => { navigator.clipboard.writeText(b.dataset.t); b.textContent = '✔'; }));
+}
+function fmtMin(m) { const s = Math.round(m * 60); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+async function salvarCena(el, id) {
+  const dados = { link: el.querySelector('.cLink').value, link_inicio: el.querySelector('.cIni').value, link_fim: el.querySelector('.cFim').value };
+  try {
+    await api(`/roteiros-yt/${PID}/cena/${id}`, dados);
+    [P.analise && P.analise.cenas, P.resultado && P.resultado.cenas].forEach(l => (l || []).forEach(c => { if (c.id === id) Object.assign(c, dados); }));
+    const scroll = window.scrollY; desenharResultado(); window.scrollTo(0, scroll);
+  } catch (e) { alert(e.message); }
+}
+desenharResultado();
+</script>
+{% endblock %}

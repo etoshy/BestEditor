@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Vídeos modelados{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1000px; }
+  .md-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .md-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .md-passos span { background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; }
+  .md-voz { display: flex; gap: 10px; align-items: center; border-left: 6px solid #999; background: #fafafa; border-radius: 6px; padding: 6px 10px; margin-top: 6px; flex-wrap: wrap; font-size: 0.88rem; }
+  .md-voz code { cursor: default; }
+  .md-voz select { width: auto; margin: 0; padding: 3px 6px; font-size: 0.82rem; }
+  .md-voz input { width: auto; flex: 1; min-width: 160px; margin: 0; padding: 4px 8px; font-size: 0.82rem; }
+  .md-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .md-estilo { border: 1px solid #e5e7eb; border-left: 6px solid #7c3aed; border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+  .md-estilo small { color: #666; }
+  .md-proj { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .md-etapa { font-size: 0.75rem; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 2px 8px; }
+  .md-mini { margin-top: 0; padding: 5px 10px; font-size: 0.82rem; }
+  .md-aviso { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; margin-top: 8px; }
+  textarea.md-molde { font-size: 0.8rem; }
+</style>
+
+<h1>🎞️ Vídeos modelados</h1>
+<p style="color:#555;">Escolha um <b>estilo</b> (ex.: Kamishibai), escreva o <b>tema ou a lenda</b>, e o site conduz: a IA escreve o roteiro com narração, diálogos, vozes, tags de áudio e uma cena a cada ~4 s (imagem inicial + animação) → o site gera o <b>áudio completo</b> e o <b>.srt</b> exato → a IA ajusta as cenas aos tempos reais → o Flow gera os <b>frames</b> e <b>anima</b> cada um → tudo vai sincronizado pro <b>Estúdio</b>, onde você escolhe a legenda e monta o Short.</p>
+<div class="md-passos"><span>1 · prompt master</span><span>2 · áudio + .srt</span><span>3 · ajuste de tempos</span><span>4 · frames (Flow)</span><span>5 · animação (Flow)</span><span>6 · Estúdio</span></div>
+
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="md-card">
+  <h2 style="margin:0;">+ Novo vídeo</h2>
+  <form method="post" action="{{ url_for('modelados_novo') }}">
+    <label>Tema / lenda</label>
+    <textarea name="tema" rows="3" required placeholder="ex.: A lenda da Kuchisake-onna, a mulher da boca cortada que pergunta: 'Eu sou bonita?'" style="font-family:inherit;font-size:0.95rem;">{{ form.tema if form else '' }}</textarea>
+    <div class="md-grid2">
+      <div>
+        <label>Estilo</label>
+        <select name="estilo_id" id="novo-estilo">
+          {% for e in estilos %}<option value="{{ e.id }}" data-formato="{{ e.formato }}" data-duracao="{{ e.duracao_alvo }}" data-idioma="{{ e.idioma }}">{{ e.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Nome (opcional — senão usa o título que a IA der)</label>
+        <input type="text" name="nome" maxlength="80">
+      </div>
+      <div>
+        <label>Duração alvo (segundos)</label>
+        <input type="number" name="duracao_alvo" id="novo-duracao" min="10" max="600" step="5" value="{{ estilos[0].duracao_alvo if estilos else 60 }}">
+      </div>
+      <div>
+        <label>Formato</label>
+        <select name="formato" id="novo-formato">
+          {% for f in formatos %}<option value="{{ f }}" {% if f == '9:16' %}selected{% endif %}>{{ f }}{% if f == '9:16' %} (Shorts/Reels/TikTok){% elif f == '16:9' %} (YouTube){% else %} (feed){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Idioma da narração</label>
+        <input type="text" name="idioma" id="novo-idioma" value="{{ estilos[0].idioma if estilos else 'português do Brasil' }}">
+      </div>
+      <div>
+        <label>Instruções extras pra IA (opcional)</label>
+        <input type="text" name="instrucoes_extra" placeholder="ex.: final com reviravolta; 2 personagens no máximo">
+      </div>
+    </div>
+    <button type="submit">Criar e ir pro roteiro →</button>
+  </form>
+</div>
+
+<div class="md-card">
+  <h2 style="margin:0;">🎭 Vozes (gênero, idade e descrição vão pro prompt da IA)</h2>
+  <p style="color:#666;font-size:0.85rem;margin:4px 0;">As vozes são as do <a href="{{ url_for('gerar_voz_page') }}">🎙️ Gerador de voz → 🎭 Vozes com slug</a> <b>mais cada perfil de voz</b> (vira uma voz Chatterbox Turbo sozinho) e a voz embutida <code>[narrator]</code>. Defina o <b>gênero</b> e a <b>idade</b> de cada uma (ou no <a href="{{ url_for('perfis_de_voz_page') }}">🗣️ perfil de voz</a> — as vozes que usam o perfil herdam): a IA usa pra dar voz feminina idosa à avó, voz de criança ao menino etc. Só as vozes do <b>Chatterbox Turbo</b> transformam as tags (<code>[whispering]</code>, <code>[gasp]</code>…) em som — e falam inglês; nas outras, a tag sai e vira intensidade (emoção).</p>
+  <div id="md-vozes">
+  {% set so_padrao = vozes|length == 1 and vozes[0].virtual and not vozes[0].do_perfil %}
+  {% if so_padrao %}
+    <div class="md-aviso" style="background:#f5f3ff;border-color:#ddd6fe;color:#4c1d95;">
+      Só a <b>voz embutida do Chatterbox Turbo</b> (inglês, com tags) está disponível. Pra ter vozes diferentes por personagem,
+      crie perfis em <a href="{{ url_for('perfis_de_voz_page') }}">🗣️ Perfis de voz</a> (um áudio de referência por voz, com gênero e idade) — eles aparecem aqui sozinhos.
+    </div>
+  {% endif %}
+  {% for v in vozes %}
+    {% set alvo = ('data-perfil="' ~ v.perfil ~ '"') if v.do_perfil else ('data-slug="' ~ v.slug ~ '"') %}
+    <div class="md-voz" style="border-left-color:{{ v.cor }}">
+      <b>{{ v.nome }}</b> <code>[{{ v.slug }}]</code>
+      {% if v.do_perfil %}<small style="color:#7c3aed;" title="voz automática criada a partir do perfil de voz — gênero/idade ficam salvos no perfil">🗣️ perfil de voz</small>{% elif v.virtual %}<small style="color:#7c3aed;">voz embutida</small>{% endif %}
+      {% if not (v.virtual and not v.do_perfil) %}
+      <select {{ alvo|safe }} class="md-genero" {% if not v.genero %}style="border-color:#f59e0b;background:#fffbeb"{% endif %}>
+        <option value="" {% if not v.genero %}selected{% endif %}>⚠ gênero?</option>
+        <option value="masculino" {% if v.genero == 'masculino' %}selected{% endif %}>♂ masculino</option>
+        <option value="feminino" {% if v.genero == 'feminino' %}selected{% endif %}>♀ feminino</option>
+        <option value="neutro" {% if v.genero == 'neutro' %}selected{% endif %}>◌ neutro</option>
+      </select>
+      <select {{ alvo|safe }} class="md-idade" {% if not v.idade %}style="border-color:#f59e0b;background:#fffbeb"{% endif %}>
+        <option value="" {% if not v.idade %}selected{% endif %}>⚠ idade?</option>
+        {% for k, n in [('crianca','👧 criança'),('jovem','🧑 jovem'),('adulto','🧔 adulto'),('idoso','👴 idoso')] %}<option value="{{ k }}" {% if v.idade == k %}selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+      {% if v.herdado %}<small style="color:#7c3aed" title="gênero/idade vêm do perfil de voz {{ v.config.vozPerfil }} — mude aqui pra esta voz ter os próprios">↳ do perfil</small>{% endif %}
+      <input type="text" class="md-desc" {{ alvo|safe }} value="{{ v.descricao or '' }}" maxlength="120" placeholder="descrição (ex.: narrador grave, idoso)">
+      {% endif %}
+      <small style="color:#666;">{{ v.resumo }}{% if v.motor == 'chatterbox_turbo' %} · <b style="color:#7c3aed">aceita tags</b>{% endif %}</small>
+    </div>
+  {% endfor %}
+  </div>
+</div>
+
+<div class="md-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+    <h2 style="margin:0;">🎨 Estilos de vídeo</h2>
+    <button type="button" class="md-mini" onclick="mdEditarEstilo(null)">+ Novo estilo</button>
+  </div>
+  <p style="color:#666;font-size:0.85rem;margin:4px 0;">Um estilo guarda como contar a história e os moldes dos prompts. No molde da imagem, <code>{cena}</code> recebe a descrição de cada cena e <code>{ar}</code> a proporção; no da animação, <code>{movimento}</code> recebe o movimento de câmera de cada cena.</p>
+  <div id="md-estilos">
+  {% for e in estilos %}
+    <div class="md-estilo">
+      <b>{{ e.nome }}</b> {% if e.embutido %}<small>(embutido{% if e.editado %}, editado{% endif %})</small>{% endif %}
+      <small> · {{ e.formato }} · cena ~{{ e.duracao_cena }}s · Flow: {{ e.flow.modelo_imagem or 'modelo padrão' }} → {{ e.flow.modelo_video }} {{ e.flow.resolucao }} {{ e.flow.duracao_video }}</small>
+      <div style="font-size:0.85rem;color:#555;margin-top:2px;">{{ e.descricao }}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" class="md-mini" onclick='mdEditarEstilo({{ e|tojson }})'>✏️ Editar</button>
+        <button type="button" class="md-mini" style="background:#475569" onclick='mdDuplicar({{ e|tojson }})'>⧉ Duplicar</button>
+        {% if not e.embutido %}<button type="button" class="md-mini" style="background:#dc2626" onclick="mdExcluirEstilo('{{ e.id }}', false)">Excluir</button>
+        {% elif e.editado %}<button type="button" class="md-mini" style="background:#b45309" onclick="mdExcluirEstilo('{{ e.id }}', true)">↺ Restaurar padrão</button>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+
+  <div id="md-form-estilo" style="display:none;border-top:1px dashed #ccc;margin-top:14px;padding-top:6px;">
+    <h3 id="md-form-titulo" style="margin:6px 0;">Estilo</h3>
+    <input type="hidden" id="e-id-antigo">
+    <div class="md-grid2">
+      <div><label>Nome</label><input type="text" id="e-nome" maxlength="60"></div>
+      <div><label>Idioma padrão da narração</label><input type="text" id="e-idioma" maxlength="60"></div>
+    </div>
+    <label>Descrição (vai pro prompt master)</label>
+    <textarea id="e-descricao" rows="2" style="font-family:inherit;"></textarea>
+    <label>Como contar a história (instruções de roteiro e narração)</label>
+    <textarea id="e-instrucoes" rows="4" style="font-family:inherit;"></textarea>
+    <label>Molde do prompt da IMAGEM (frame inicial) — use {cena} e {ar}</label>
+    <textarea id="e-pimg" rows="4" class="md-molde"></textarea>
+    <label>Molde do prompt da ANIMAÇÃO — use {movimento}</label>
+    <textarea id="e-panim" rows="3" class="md-molde"></textarea>
+    <label>Exemplos de movimento (um por linha — ajudam a IA a acertar o tipo de animação)</label>
+    <textarea id="e-exemplos" rows="3" class="md-molde"></textarea>
+    <div class="md-grid2">
+      <div><label>Formato padrão</label><select id="e-formato">{% for f in formatos %}<option>{{ f }}</option>{% endfor %}</select></div>
+      <div><label>Duração de cada cena (s)</label><input type="number" id="e-dcena" min="2" max="10" step="0.5"></div>
+      <div><label>Duração alvo do vídeo (s)</label><input type="number" id="e-dalvo" min="10" max="600" step="5"></div>
+      <div><label>Legenda padrão no Estúdio</label><select id="e-legenda">{% for l in legendas %}<option value="{{ l.id }}">{{ l.nome }} ({{ l.tipo }})</option>{% endfor %}</select></div>
+      <div><label>Flow: modelo de imagem</label><input type="text" id="e-mimg" list="md-modelos-img" placeholder="vazio = não mexe"></div>
+      <div><label>Flow: modelo do vídeo (frames)</label><input type="text" id="e-mvid" list="md-modelos-vid"></div>
+      <div><label>Flow: resolução do vídeo</label><select id="e-res">{% for r in resolucoes %}<option>{{ r }}</option>{% endfor %}</select></div>
+      <div><label>Flow: duração de cada vídeo</label><select id="e-dvid">{% for d in duracoes %}<option value="{{ d }}">{{ d if d != 'auto' else 'auto (a menor que cobre a cena — gasta mais créditos)' }}</option>{% endfor %}</select></div>
+    </div>
+    <datalist id="md-modelos-img"><option value="Nano Banana 2.1"><option value="Nano Banana Pro"><option value="Nano Banana 2 Lite"></datalist>
+    <datalist id="md-modelos-vid"><option value="Omni 1.1 Flash"><option value="Veo 3.1 - Lite"><option value="Veo 3.1 - Fast"><option value="Veo 3.1 - Quality"></datalist>
+    <div id="md-estilo-erro" class="error" style="display:none;"></div>
+    <button type="button" onclick="mdSalvarEstilo()">💾 Salvar estilo</button>
+    <button type="button" style="background:#64748b" onclick="document.getElementById('md-form-estilo').style.display='none'">Cancelar</button>
+  </div>
+</div>
+
+<h2 style="margin-top:28px;">Projetos</h2>
+{% for p in projetos %}
+  <div class="md-proj">
+    <div>
+      <a href="{{ url_for('modelado_detalhe', pid=p.id) }}" style="font-weight:600;color:#2563eb;text-decoration:none;">{{ p.nome }}</a>
+      <span class="md-etapa">{{ {'roteiro':'1 · roteiro','audio':'2 · áudio','ajuste':'3 · ajuste','frames':'4 · frames','animacao':'5 · animação','pronto':'✔ pronto'}.get(p.etapa, p.etapa) }}</span>
+      <div style="color:#666;font-size:0.82rem;">{{ p.estilo_id }} · {{ p.formato }}{% if p.duracao %} · {{ '%.0f'|format(p.duracao) }}s{% endif %}{% if p.cenas %} · {{ p.videos }}/{{ p.cenas }} cenas animadas{% endif %}{% if p.job_id %} · no Estúdio{% endif %}</div>
+    </div>
+    <form method="post" action="{{ url_for('modelado_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este projeto (áudio, frames e vídeos)?');">
+      <button type="submit" class="md-mini" style="background:#dc2626;">Excluir</button>
+    </form>
+  </div>
+{% else %}
+  <p style="color:#666;">Nenhum ainda — crie acima.</p>
+{% endfor %}
+
+<script>
+document.getElementById('novo-estilo').addEventListener('change', (ev) => {
+  const o = ev.target.selectedOptions[0];
+  document.getElementById('novo-formato').value = o.dataset.formato || '9:16';
+  document.getElementById('novo-duracao').value = o.dataset.duracao || 60;
+  document.getElementById('novo-idioma').value = o.dataset.idioma || 'português do Brasil';
+});
+async function mdSalvarVoz(el, campo, valor) {
+  if (el.dataset.perfil) {  // voz automática do perfil: salva no perfil (gênero/idade/descrição)
+    const box = el.closest('.md-voz'), corpo = {
+      genero: box.querySelector('.md-genero').value, idade: box.querySelector('.md-idade').value, descricao: box.querySelector('.md-desc').value };
+    const r = await fetch('/perfis-de-voz/' + encodeURIComponent(el.dataset.perfil) + '/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json(); if (d.erro) alert(d.erro); return;
+  }
+  return mdGenero(el.dataset.slug, campo === 'genero' ? valor : undefined, campo === 'descricao' ? valor : undefined, campo === 'idade' ? valor : undefined);
+}
+async function mdGenero(slug, genero, descricao, idade) {
+  const corpo = {};
+  if (genero !== undefined) corpo.genero = genero;
+  if (descricao !== undefined) corpo.descricao = descricao;
+  if (idade !== undefined) corpo.idade = idade;
+  const r = await fetch('/gerar-voz/vozes/' + encodeURIComponent(slug) + '/genero', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+  const d = await r.json(); if (d.erro) alert(d.erro);
+}
+document.querySelectorAll('.md-genero').forEach(s => s.addEventListener('change', () => {
+  s.style.borderColor = s.value ? '' : '#f59e0b'; s.style.background = s.value ? '' : '#fffbeb';
+  mdSalvarVoz(s, 'genero', s.value);
+}));
+document.querySelectorAll('.md-idade').forEach(s => s.addEventListener('change', () => {
+  s.style.borderColor = s.value ? '' : '#f59e0b'; s.style.background = s.value ? '' : '#fffbeb';
+  mdSalvarVoz(s, 'idade', s.value);
+}));
+document.querySelectorAll('.md-desc').forEach(i => i.addEventListener('change', () => mdSalvarVoz(i, 'descricao', i.value)));
+async function mdVozesPadrao() {
+  const r = await fetch('/modelados/vozes-padrao', { method: 'POST' }); const d = await r.json();
+  if (d.erro) { alert(d.erro); return; }
+  alert(d.criadas.length ? 'Vozes cadastradas: ' + d.criadas.map(s => '[' + s + ']').join(', ') + '. Agora defina o gênero de cada uma.' : 'Todas já estavam cadastradas.');
+  location.reload();
+}
+const $ = (id) => document.getElementById(id);
+function mdPreencher(e, titulo, idAntigo) {
+  $('md-form-titulo').textContent = titulo; $('e-id-antigo').value = idAntigo || '';
+  $('e-nome').value = e.nome || ''; $('e-idioma').value = e.idioma || 'português do Brasil';
+  $('e-descricao').value = e.descricao || ''; $('e-instrucoes').value = e.instrucoes_roteiro || '';
+  $('e-pimg').value = e.prompt_imagem || '{cena}, --ar {ar}'; $('e-panim').value = e.prompt_animacao || '{movimento}';
+  $('e-exemplos').value = (e.exemplos_movimento || []).join('\n'); $('e-formato').value = e.formato || '9:16';
+  $('e-dcena').value = e.duracao_cena || 4; $('e-dalvo').value = e.duracao_alvo || 60; $('e-legenda').value = e.legenda || 'classico';
+  const fl = e.flow || {}; $('e-mimg').value = fl.modelo_imagem || ''; $('e-mvid').value = fl.modelo_video || 'Omni 1.1 Flash';
+  $('e-res').value = fl.resolucao || '720p'; $('e-dvid').value = fl.duracao_video || '4s';
+  $('md-estilo-erro').style.display = 'none'; $('md-form-estilo').style.display = ''; $('md-form-estilo').scrollIntoView({ behavior: 'smooth' });
+}
+function mdEditarEstilo(e) { e ? mdPreencher(e, '✏️ Editar: ' + e.nome, e.id) : mdPreencher({}, '+ Novo estilo', ''); }
+function mdDuplicar(e) { mdPreencher(Object.assign({}, e, { nome: e.nome + ' (cópia)' }), '⧉ Novo estilo a partir de ' + e.nome, ''); }
+async function mdSalvarEstilo() {
+  const idAntigo = $('e-id-antigo').value;
+  const corpo = { nome: $('e-nome').value, idioma: $('e-idioma').value, descricao: $('e-descricao').value,
+    instrucoes_roteiro: $('e-instrucoes').value, prompt_imagem: $('e-pimg').value, prompt_animacao: $('e-panim').value,
+    exemplos_movimento: $('e-exemplos').value, formato: $('e-formato').value, duracao_cena: $('e-dcena').value,
+    duracao_alvo: $('e-dalvo').value, legenda: $('e-legenda').value,
+    flow: { modelo_imagem: $('e-mimg').value, modelo_video: $('e-mvid').value, resolucao: $('e-res').value, duracao_video: $('e-dvid').value } };
+  if (idAntigo) { corpo.id_antigo = idAntigo; corpo.id = idAntigo; }
+  const r = await fetch('/modelados/estilos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+  const d = await r.json();
+  if (d.erro) { $('md-estilo-erro').textContent = d.erro; $('md-estilo-erro').style.display = ''; return; }
+  location.reload();
+}
+async function mdExcluirEstilo(id, restaurar) {
+  if (!confirm(restaurar ? 'Voltar este estilo ao padrão de fábrica?' : 'Excluir este estilo?')) return;
+  await fetch('/modelados/estilos/' + encodeURIComponent(id) + '/excluir', { method: 'POST' }); location.reload();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Roteiro para Áudio{% endblock %}
+{% block content %}
+<h1>📝 Roteiro para Áudio</h1>
+<p>Cole um texto bruto, separe em falas, e gere um único áudio narrado — sem vídeo nenhum envolvido. <a href="{{ url_for('index') }}">&larr; voltar pro início</a></p>
+
+<form method="post" action="{{ url_for('narracoes_criar') }}" style="margin-top:20px;">
+  <label>Nome do projeto (opcional)</label>
+  <input type="text" name="nome" placeholder="ex: Roteiro do vídeo de terça">
+  <button type="submit">+ Novo projeto</button>
+</form>
+
+<h2 style="margin-top:32px;">Projetos</h2>
+{% if not projetos %}
+<p style="color:#666;">Nenhum projeto ainda — crie um acima.</p>
+{% else %}
+<div style="margin-top:12px;">
+  {% for p in projetos %}
+  <div style="border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+    <a href="{{ url_for('narracao_detalhe', projeto_id=p.projetoId) }}" style="font-weight:600;text-decoration:none;color:#2563eb;">{{ p.nome }}</a>
+    <p style="color:#666;font-size:0.85rem;margin:6px 0 0;">
+      {{ p.quantidadeFalas }} fala(s) · {{ p.quantidadeGeracoes }} áudio(s) gerado(s) · motor: {{ p.motor }}
+    </p>
+    <form method="post" action="{{ url_for('narracoes_excluir', projeto_id=p.projetoId) }}" onsubmit="return confirm('Excluir este projeto e todos os áudios gerados dele?');" style="margin-top:8px;">
+      <button type="submit" style="background:#dc2626;padding:6px 12px;font-size:0.85rem;margin-top:0;">Excluir</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

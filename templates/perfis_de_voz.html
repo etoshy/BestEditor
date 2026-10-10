@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% block title %}Perfis de voz{% endblock %}
+{% block content %}
+<h1>🗣️ Perfis de voz</h1>
+<p>Grave (ou envie um áudio que já tem) a voz de alguém, dê um nome, e reuse pra clonar essa voz em quantas narrações quiser — sem precisar enviar o áudio de novo toda vez. <a href="{{ url_for('gerar_voz_page') }}">&larr; voltar pro Gerador de Voz</a></p>
+
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px 14px;margin:16px 0;font-size:0.85rem;color:#1e3a5f;">
+  <strong>Isso não é "treinar" no sentido de ajustar um modelo</strong> — é clonagem: o XTTS v2 lê os áudios de referência e imita a voz na hora, sem processo de treinamento nenhum (isso leva segundos, não horas). Por isso um único áudio de <em>minutos</em> de duração não ajuda em nada — o modelo só usa um trechinho mesmo. O que ajuda de verdade é mandar <strong>alguns clipes curtos (5-15s) e variados</strong> da mesma pessoa, com frases/entonações diferentes — o XTTS usa todos juntos, sem ficar mais lento por isso. Se você mandar só UM áudio longo, o site já divide ele sozinho em pedaços espalhados (começo, meio, fim) em vez de só aproveitar o começo.
+</div>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<h2 style="margin-top:24px;">Novo perfil</h2>
+<form method="post" action="{{ url_for('perfis_de_voz_criar') }}" enctype="multipart/form-data">
+  <label>Nome do perfil</label>
+  <input type="text" name="nome" placeholder="ex: minha_voz, locutor_joao" required>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:150px;"><label>Gênero da voz</label>
+      <select name="genero"><option value="">— não definido —</option><option value="masculino">♂ masculino</option><option value="feminino">♀ feminino</option><option value="neutro">◌ neutro</option></select></div>
+    <div style="flex:1;min-width:150px;"><label>Idade da voz</label>
+      <select name="idade"><option value="">— não definida —</option><option value="crianca">👧 criança</option><option value="jovem">🧑 jovem</option><option value="adulto">🧔 adulto</option><option value="idoso">👴 idoso</option></select></div>
+    <div style="flex:2;min-width:220px;"><label>Descrição (opcional)</label>
+      <input type="text" name="descricao" maxlength="120" placeholder="ex.: grave e rouca, sotaque nordestino, tom sombrio"></div>
+  </div>
+  <p style="color:#666;font-size:0.8rem;margin:4px 0 0;">Gênero e idade vão pro prompt da IA (🎞️ Vídeos modelados e 🎭 multi voice): ela escolhe voz de criança pra personagem criança, voz feminina idosa pra avó, etc. As vozes com slug que usam este perfil herdam isso.</p>
+
+  <label>Áudio(s) ou vídeo(s) da voz</label>
+  <input type="file" name="audios" accept="audio/*,video/*" multiple required>
+  <p style="color:#666;font-size:0.8rem;">Pode selecionar vários arquivos de uma vez (até {{ max_clipes }}) — cada um vira um clipe de referência separado. Ou selecione só UM áudio/vídeo (mesmo que longo) e deixe a divisão automática abaixo ligada. Vídeo também funciona — o site extrai só o áudio dele automaticamente.</p>
+
+  <label style="margin-top:12px;"><input type="checkbox" name="dividir_automaticamente" checked style="width:auto;"> Se eu enviar só um áudio e ele for longo, dividir automaticamente em vários trechos espalhados (recomendado)</label>
+
+  <button type="submit">Salvar perfil</button>
+</form>
+
+<h2 style="margin-top:32px;">🎬 Ou extrair de um vídeo do YouTube</h2>
+<p style="color:#666;font-size:0.85rem;">Busque um vídeo, assista ele aqui mesmo, e marque os trechos onde a pessoa fala — cada trecho vira um clipe de referência do perfil (pode ser vários trechos do mesmo vídeo, ou de vídeos diferentes). Deixe início/fim em branco pra pegar o vídeo inteiro — se o trecho sair longo, ele é dividido automaticamente em clipes menores. Baixa em 480p só pra ser mais rápido — não afeta a qualidade do áudio extraído.</p>
+
+<div id="yt-error-box" class="error" style="display:none;"></div>
+
+<label>Nome do perfil</label>
+<input type="text" id="yt-nome-perfil" placeholder="ex: minha_voz, locutor_joao">
+
+<h3 style="margin-top:20px;">🔍 Buscar no YouTube</h3>
+<div style="display:flex;gap:8px;">
+  <input type="text" id="yt-campo-busca" placeholder="ex: entrevista fulano de tal" style="flex:1;margin-top:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();ytBuscar();}">
+  <button type="button" onclick="ytBuscar()" style="margin-top:0;">Buscar</button>
+</div>
+<div id="yt-busca-carregando" style="display:none;color:#666;margin-top:8px;">Buscando…</div>
+<div id="yt-busca-resultados" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px;"></div>
+
+<h3 style="margin-top:24px;">Vídeos e trechos</h3>
+<div id="yt-lista-videos" style="margin-top:12px;"></div>
+<button type="button" onclick="ytAdicionarVideo()" style="background:#666;">+ Adicionar outro vídeo (colar link na mão)</button>
+
+<button type="button" id="yt-btn-extrair" onclick="ytExtrair()" style="margin-top:18px;display:block;">Baixar e criar perfil</button>
+
+<div id="yt-progresso-box" style="display:none;margin-top:16px;">
+  <div class="progress-bar"><div class="progress-fill" id="yt-progress-fill" style="width:40%;"></div></div>
+  <pre id="yt-log-box" style="max-height:200px;overflow:auto;background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.78rem;margin-top:8px;"></pre>
+</div>
+<style>
+#yt-progress-fill { animation: yt-perfil-indeterminate 1.4s infinite ease-in-out; }
+@keyframes yt-perfil-indeterminate { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+.yt-resultado-card { border:1px solid #ddd; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
+.yt-resultado-card img { width:100%; aspect-ratio:16/9; object-fit:cover; cursor:pointer; }
+.yt-resultado-card .corpo { padding:10px 12px; display:flex; flex-direction:column; gap:4px; flex:1; }
+.yt-resultado-card .titulo { font-weight:600; font-size:0.9rem; cursor:pointer; }
+.yt-resultado-card .titulo:hover { color:#2563eb; }
+.yt-resultado-card .meta { color:#666; font-size:0.78rem; }
+.yt-player-embutido { margin-top:10px; }
+.yt-player-embutido iframe { width:100%; aspect-ratio:16/9; border:0; border-radius:6px; }
+</style>
+
+<div id="yt-resultado-box" style="display:none;background:#d1fae5;color:#065f46;padding:14px;border-radius:8px;margin-top:14px;">
+  <strong id="yt-texto-resultado"></strong>
+</div>
+
+<template id="yt-template-video">
+  <div class="yt-bloco-video" style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="url" class="yt-campo-url" placeholder="https://www.youtube.com/watch?v=..." style="flex:1;" required>
+      <button type="button" class="yt-btn-assistir" style="margin-top:0;background:#666;">▶ Assistir aqui</button>
+      <button type="button" onclick="this.closest('.yt-bloco-video').remove()" style="margin-top:0;background:#dc2626;">Remover vídeo</button>
+    </div>
+    <div class="yt-player-embutido" style="display:none;"></div>
+    <div class="yt-lista-trechos" style="margin-top:10px;"></div>
+    <button type="button" class="yt-btn-add-trecho" style="margin-top:6px;font-size:0.8rem;padding:5px 10px;background:#666;">+ Adicionar trecho</button>
+  </div>
+</template>
+
+<template id="yt-template-trecho">
+  <div class="yt-bloco-trecho" style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+    <input type="text" class="yt-campo-inicio" placeholder="início (vazio = começo)" style="width:170px;margin-top:0;">
+    <button type="button" class="yt-btn-pegar-inicio" title="Usar o tempo atual do player como início" style="margin-top:0;font-size:0.75rem;padding:4px 6px;background:#666;">⏱→início</button>
+    <span>até</span>
+    <input type="text" class="yt-campo-fim" placeholder="fim (vazio = fim do vídeo)" style="width:170px;margin-top:0;">
+    <button type="button" class="yt-btn-pegar-fim" title="Usar o tempo atual do player como fim" style="margin-top:0;font-size:0.75rem;padding:4px 6px;background:#666;">⏱→fim</button>
+    <button type="button" onclick="this.closest('.yt-bloco-trecho').remove()" style="margin-top:0;background:#dc2626;padding:4px 10px;">✕</button>
+  </div>
+</template>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+let ytPerfilApiPronta = false;
+let ytPerfilProximoPlayerId = 0;
+const ytPerfilPlayers = {};
+
+if (window.onYouTubeIframeAPIReady) {
+  const original = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = function () { original(); ytPerfilApiPronta = true; };
+} else {
+  window.onYouTubeIframeAPIReady = function () { ytPerfilApiPronta = true; };
+}
+
+function ytPerfilExtrairId(url) {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/);
+  return m ? m[1] : null;
+}
+
+function ytPerfilFormatarTempo(segundosTotais) {
+  segundosTotais = Math.round(segundosTotais);
+  const h = Math.floor(segundosTotais / 3600);
+  const m = Math.floor((segundosTotais % 3600) / 60);
+  const s = segundosTotais % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+function ytAdicionarVideo(urlInicial) {
+  const tpl = document.getElementById('yt-template-video').content.cloneNode(true);
+  const bloco = tpl.querySelector('.yt-bloco-video');
+  if (urlInicial) bloco.querySelector('.yt-campo-url').value = urlInicial;
+  bloco.querySelector('.yt-btn-add-trecho').addEventListener('click', function () { ytAdicionarTrecho(bloco); });
+  bloco.querySelector('.yt-btn-assistir').addEventListener('click', function () { ytAssistirAqui(bloco); });
+  document.getElementById('yt-lista-videos').appendChild(tpl);
+  ytAdicionarTrecho(bloco);
+  return bloco;
+}
+
+function ytAssistirAqui(blocoVideo) {
+  const url = blocoVideo.querySelector('.yt-campo-url').value.trim();
+  const videoId = ytPerfilExtrairId(url);
+  if (!videoId) {
+    ytMostrarErro('Não consegui identificar o vídeo nesse link — cole um link válido do YouTube antes de assistir.');
+    return;
+  }
+  const container = blocoVideo.querySelector('.yt-player-embutido');
+  container.style.display = '';
+
+  if (!container.dataset.playerElId) {
+    const elId = 'yt-perfil-player-' + (ytPerfilProximoPlayerId++);
+    container.dataset.playerElId = elId;
+    const div = document.createElement('div');
+    div.id = elId;
+    container.appendChild(div);
+  }
+  const elId = container.dataset.playerElId;
+
+  const criarOuTrocarVideo = function () {
+    if (ytPerfilPlayers[elId]) {
+      ytPerfilPlayers[elId].loadVideoById(videoId);
+    } else {
+      ytPerfilPlayers[elId] = new YT.Player(elId, { videoId: videoId, playerVars: { rel: 0 } });
+    }
+  };
+  if (ytPerfilApiPronta && window.YT && window.YT.Player) {
+    criarOuTrocarVideo();
+  } else {
+    const esperar = setInterval(function () {
+      if (ytPerfilApiPronta && window.YT && window.YT.Player) {
+        clearInterval(esperar);
+        criarOuTrocarVideo();
+      }
+    }, 200);
+  }
+}
+
+function ytPegarTempoAtual(blocoVideo) {
+  const container = blocoVideo.querySelector('.yt-player-embutido');
+  const elId = container.dataset.playerElId;
+  if (!elId || !ytPerfilPlayers[elId] || typeof ytPerfilPlayers[elId].getCurrentTime !== 'function') {
+    ytMostrarErro('Clique em "▶ Assistir aqui" primeiro pra poder pegar o tempo atual do vídeo.');
+    return null;
+  }
+  return ytPerfilPlayers[elId].getCurrentTime();
+}
+
+function ytAdicionarTrecho(blocoVideo) {
+  const tpl = document.getElementById('yt-template-trecho').content.cloneNode(true);
+  const blocoTrecho = tpl.querySelector('.yt-bloco-trecho');
+  blocoTrecho.querySelector('.yt-btn-pegar-inicio').addEventListener('click', function () {
+    const t = ytPegarTempoAtual(blocoVideo);
+    if (t !== null) blocoTrecho.querySelector('.yt-campo-inicio').value = ytPerfilFormatarTempo(t);
+  });
+  blocoTrecho.querySelector('.yt-btn-pegar-fim').addEventListener('click', function () {
+    const t = ytPegarTempoAtual(blocoVideo);
+    if (t !== null) blocoTrecho.querySelector('.yt-campo-fim').value = ytPerfilFormatarTempo(t);
+  });
+  blocoVideo.querySelector('.yt-lista-trechos').appendChild(tpl);
+}
+
+ytAdicionarVideo();
+
+async function ytBuscar() {
+  const termo = document.getElementById('yt-campo-busca').value.trim();
+  if (!termo) return;
+  document.getElementById('yt-error-box').style.display = 'none';
+  document.getElementById('yt-busca-carregando').style.display = '';
+  document.getElementById('yt-busca-resultados').innerHTML = '';
+
+  let resp, data;
+  try {
+    resp = await fetch(`/perfis-de-voz/youtube/buscar?termo=${encodeURIComponent(termo)}`);
+    data = await resp.json();
+  } catch (e) {
+    document.getElementById('yt-busca-carregando').style.display = 'none';
+    ytMostrarErro('Falha ao buscar: ' + e);
+    return;
+  }
+  document.getElementById('yt-busca-carregando').style.display = 'none';
+  if (!resp.ok) {
+    ytMostrarErro(data.erro || 'Falha na busca.');
+    return;
+  }
+
+  const cont = document.getElementById('yt-busca-resultados');
+  data.resultados.forEach(function (v) {
+    const card = document.createElement('div');
+    card.className = 'yt-resultado-card';
+    const img = document.createElement('img');
+    img.src = v.miniatura_url;
+    img.alt = v.titulo;
+    img.addEventListener('click', function () { ytUsarVideoDaBusca(v); });
+    card.appendChild(img);
+
+    const corpo = document.createElement('div');
+    corpo.className = 'corpo';
+    const titulo = document.createElement('div');
+    titulo.className = 'titulo';
+    titulo.textContent = v.titulo;
+    titulo.addEventListener('click', function () { ytUsarVideoDaBusca(v); });
+    corpo.appendChild(titulo);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = [v.canal, v.duracao_formatada].filter(Boolean).join(' · ');
+    corpo.appendChild(meta);
+    const btnUsar = document.createElement('button');
+    btnUsar.type = 'button';
+    btnUsar.textContent = '▶ Usar este vídeo';
+    btnUsar.style.marginTop = '4px';
+    btnUsar.addEventListener('click', function () { ytUsarVideoDaBusca(v); });
+    corpo.appendChild(btnUsar);
+    card.appendChild(corpo);
+    cont.appendChild(card);
+  });
+}
+
+function ytUsarVideoDaBusca(v) {
+  const bloco = ytAdicionarVideo(v.url);
+  ytAssistirAqui(bloco);
+  bloco.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function ytMontarItens() {
+  const itens = [];
+  document.querySelectorAll('.yt-bloco-video').forEach(function (blocoVideo) {
+    const url = blocoVideo.querySelector('.yt-campo-url').value.trim();
+    const trechos = [];
+    blocoVideo.querySelectorAll('.yt-bloco-trecho').forEach(function (blocoTrecho) {
+      const inicio = blocoTrecho.querySelector('.yt-campo-inicio').value.trim();
+      const fim = blocoTrecho.querySelector('.yt-campo-fim').value.trim();
+      // inicio/fim vazios viram o vídeo inteiro (resolvido no servidor,
+      // e dividido em vários clipes automaticamente se sair longo)
+      trechos.push({ inicio: inicio, fim: fim });
+    });
+    if (url && trechos.length) itens.push({ url: url, trechos: trechos });
+  });
+  return itens;
+}
+
+async function ytExtrair() {
+  document.getElementById('yt-error-box').style.display = 'none';
+  document.getElementById('yt-resultado-box').style.display = 'none';
+  const nome = document.getElementById('yt-nome-perfil').value.trim();
+  if (!nome) {
+    ytMostrarErro('Dê um nome pro perfil antes de extrair.');
+    return;
+  }
+  const itens = ytMontarItens();
+  if (!itens.length) {
+    ytMostrarErro('Adicione pelo menos um vídeo com URL e um trecho (início/fim).');
+    return;
+  }
+
+  document.getElementById('yt-btn-extrair').disabled = true;
+  document.getElementById('yt-progresso-box').style.display = '';
+  document.getElementById('yt-log-box').textContent = '';
+
+  let resp, data;
+  try {
+    resp = await fetch("{{ url_for('perfis_de_voz_youtube_extrair') }}", {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: nome, itens: itens, qualidade: '480p' }),
+    });
+    data = await resp.json();
+  } catch (e) {
+    ytMostrarErro('Falha ao falar com o servidor: ' + e);
+    return;
+  }
+  if (!resp.ok) {
+    ytMostrarErro(data.erro || 'Falha ao iniciar.');
+    return;
+  }
+  ytPollStatus(data.job_id);
+}
+
+async function ytPollStatus(jobId) {
+  let data;
+  try {
+    const r = await fetch(`/perfis-de-voz/youtube/${jobId}/status`);
+    data = await r.json();
+  } catch (e) {
+    setTimeout(function () { ytPollStatus(jobId); }, 2000);
+    return;
+  }
+  document.getElementById('yt-log-box').textContent = data.log || '';
+  document.getElementById('yt-log-box').scrollTop = document.getElementById('yt-log-box').scrollHeight;
+
+  if (data.status === 'processando') {
+    setTimeout(function () { ytPollStatus(jobId); }, 1500);
+    return;
+  }
+  document.getElementById('yt-btn-extrair').disabled = false;
+  document.getElementById('yt-progresso-box').style.display = 'none';
+  if (data.status === 'erro') {
+    ytMostrarErro(data.erro || 'Falha ao extrair.');
+    return;
+  }
+  document.getElementById('yt-texto-resultado').textContent =
+    `Pronto! Perfil "${data.nome_perfil}" criado com ${data.quantidade_clipes} clipe(s).`;
+  document.getElementById('yt-resultado-box').style.display = '';
+  setTimeout(function () { window.location.reload(); }, 1800);
+}
+
+function ytMostrarErro(msg) {
+  document.getElementById('yt-error-box').textContent = msg;
+  document.getElementById('yt-error-box').style.display = '';
+  document.getElementById('yt-btn-extrair').disabled = false;
+  document.getElementById('yt-progresso-box').style.display = 'none';
+}
+</script>
+
+<h2 style="margin-top:32px;">Perfis salvos</h2>
+{% if not perfis %}
+<p style="color:#666;">Nenhum perfil ainda — crie um acima.</p>
+{% else %}
+<div>
+  {% for p in perfis %}
+  <div style="border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong>{{ p.nome }}</strong>
+      <form method="post" action="{{ url_for('perfis_de_voz_excluir', nome=p.nome) }}" onsubmit="return confirm('Excluir o perfil {{ p.nome }} e todos os clipes dele?');" style="margin:0;">
+        <button type="submit" style="background:#dc2626;padding:5px 10px;font-size:0.8rem;margin-top:0;">Excluir</button>
+      </form>
+    </div>
+    <div class="pf-info" data-perfil="{{ p.nome }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+      <select class="pf-genero" style="width:auto;margin:0;{% if not p.genero %}border-color:#f59e0b;background:#fffbeb{% endif %}">
+        <option value="" {% if not p.genero %}selected{% endif %}>⚠ gênero?</option>
+        <option value="masculino" {% if p.genero == 'masculino' %}selected{% endif %}>♂ masculino</option>
+        <option value="feminino" {% if p.genero == 'feminino' %}selected{% endif %}>♀ feminino</option>
+        <option value="neutro" {% if p.genero == 'neutro' %}selected{% endif %}>◌ neutro</option>
+      </select>
+      <select class="pf-idade" style="width:auto;margin:0;{% if not p.idade %}border-color:#f59e0b;background:#fffbeb{% endif %}">
+        <option value="" {% if not p.idade %}selected{% endif %}>⚠ idade?</option>
+        <option value="crianca" {% if p.idade == 'crianca' %}selected{% endif %}>👧 criança</option>
+        <option value="jovem" {% if p.idade == 'jovem' %}selected{% endif %}>🧑 jovem</option>
+        <option value="adulto" {% if p.idade == 'adulto' %}selected{% endif %}>🧔 adulto</option>
+        <option value="idoso" {% if p.idade == 'idoso' %}selected{% endif %}>👴 idoso</option>
+      </select>
+      <input type="text" class="pf-desc" value="{{ p.descricao }}" maxlength="120" placeholder="descrição (ex.: grave, rouca)" style="flex:1;min-width:180px;margin:0;">
+      <span class="pf-salvo" style="color:#059669;font-size:0.8rem;display:none;">✓ salvo</span>
+    </div>
+    <p style="color:#666;font-size:0.85rem;margin:6px 0 8px;">{{ p.quantidade_clipes }} clipe(s) de referência{% if p.vozes_slug %} · usado pelas vozes {% for s in p.vozes_slug %}<code>[{{ s }}]</code> {% endfor %}{% endif %}</p>
+    {% for i in range(p.quantidade_clipes) %}
+    <audio controls style="width:100%;margin-bottom:4px;" src="{{ url_for('perfis_de_voz_clipe', nome=p.nome, indice=i) }}"></audio>
+    {% endfor %}
+    <p style="color:#666;font-size:0.8rem;margin-top:8px;">Pra usar: vá no <a href="{{ url_for('gerar_voz_page') }}">Gerador de voz</a>, escolha o motor XTTS v2, Chatterbox ou Chatterbox Turbo, e selecione "{{ p.nome }}" no campo "Usar um perfil de voz salvo" — ou, nos <a href="{{ url_for('modelados_page') }}">🎞️ Vídeos modelados</a>, use "➕ Cadastrar vozes Chatterbox Turbo" pra virar uma voz com slug (herda o gênero e a idade daqui).</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+<script>
+document.querySelectorAll('.pf-info').forEach(box => {
+  const salvar = async () => {
+    const g = box.querySelector('.pf-genero'), i = box.querySelector('.pf-idade');
+    [g, i].forEach(s => { s.style.borderColor = s.value ? '' : '#f59e0b'; s.style.background = s.value ? '' : '#fffbeb'; });
+    const r = await fetch('/perfis-de-voz/' + encodeURIComponent(box.dataset.perfil) + '/info', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ genero: g.value, idade: i.value, descricao: box.querySelector('.pf-desc').value }) });
+    const d = await r.json();
+    if (d.erro) { alert(d.erro); return; }
+    const ok = box.querySelector('.pf-salvo'); ok.style.display = ''; setTimeout(() => { ok.style.display = 'none'; }, 1500);
+  };
+  box.querySelectorAll('select').forEach(s => s.addEventListener('change', salvar));
+  box.querySelector('.pf-desc').addEventListener('change', salvar);
+});
+</script>
+{% endblock %}

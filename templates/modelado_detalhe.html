@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}{{ d.projeto.nome }} — Vídeo modelado{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1150px; }
+  .et { border: 1px solid #ddd; border-radius: 10px; padding: 12px 16px; margin-top: 14px; }
+  .et h2 { margin: 0 0 6px; font-size: 1.15rem; display: flex; gap: 8px; align-items: center; }
+  .et.ok h2::after { content: "✔"; color: #16a34a; }
+  .et.inativa { opacity: .55; }
+  .mini { margin-top: 0; padding: 6px 11px; font-size: 0.84rem; }
+  .cinza { background: #475569; } .verde { background: #059669; } .roxo { background: #7c3aed; } .verm { background: #dc2626; }
+  .linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .log { background: #0f172a; color: #e2e8f0; font: 12px/1.45 ui-monospace, monospace; border-radius: 8px; padding: 8px 10px; max-height: 220px; overflow: auto; white-space: pre-wrap; margin-top: 8px; }
+  .aviso { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 6px; padding: 6px 10px; font-size: 0.84rem; margin-top: 6px; }
+  .fala { display: grid; grid-template-columns: 72px 150px 1fr 120px; gap: 6px; align-items: start; border-left: 5px solid #999; background: #fafafa; border-radius: 6px; padding: 6px 8px; margin-top: 5px; font-size: 0.86rem; }
+  .fala select, .fala input, .fala textarea { margin: 0; padding: 3px 6px; font-size: 0.84rem; }
+  .fala textarea { font-family: inherit; min-height: 34px; }
+  .papel { display: grid; grid-template-columns: 200px 230px 1fr; gap: 8px; align-items: center; border-left: 6px solid #999; background: #f5f3ff; border-radius: 6px; padding: 6px 10px; margin-top: 5px; font-size: 0.88rem; }
+  .papel select { margin: 0; padding: 4px 6px; font-size: 0.86rem; }
+  .tipo { font-size: 0.72rem; border-radius: 999px; padding: 1px 7px; background: #e0e7ff; color: #3730a3; display: inline-block; }
+  .tipo.dialogo { background: #fee2e2; color: #991b1b; } .tipo.pensamento { background: #ecfccb; color: #3f6212; }
+  .cenas { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 10px; }
+  .cena { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+  .cena .midia { background: #111; aspect-ratio: var(--ar, 9/16); max-height: 360px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.8rem; position: relative; }
+  .cena .midia img, .cena .midia video { width: 100%; height: 100%; object-fit: contain; }
+  .cena .corpo { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; }
+  .cena textarea { font-size: 0.78rem; margin: 0; padding: 4px 6px; min-height: 52px; }
+  .cena .st { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.65); color: #fff; border-radius: 6px; padding: 1px 7px; font-size: 0.72rem; }
+  .cena .err { color: #b91c1c; font-size: 0.76rem; white-space: pre-wrap; }
+  .cena .acoes { display: flex; gap: 4px; flex-wrap: wrap; }
+  .cena .acoes button, .cena .acoes label { margin: 0; padding: 4px 8px; font-size: 0.75rem; }
+  .cena .acoes label { background: #e2e8f0; border-radius: 6px; cursor: pointer; font-weight: 400; display: inline-block; }
+  details.prompt summary { cursor: pointer; color: #475569; font-size: 0.76rem; }
+  details.prompt div { font: 11px/1.4 ui-monospace, monospace; color: #334155; background: #f8fafc; padding: 4px 6px; border-radius: 4px; }
+  .ao-vivo { border: 2px solid #16a34a; background: #f0fdf4; border-radius: 10px; padding: 10px 14px; margin-top: 10px; }
+  .ao-vivo .topo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-weight: 600; color: #14532d; }
+  .pulso { width: 12px; height: 12px; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 0 rgba(22,163,74,.7); animation: pulso 1.4s infinite; display: inline-block; }
+  @keyframes pulso { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.7); } 70% { box-shadow: 0 0 0 12px rgba(22,163,74,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
+  .abas-vivo { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 8px; }
+  .aba-vivo { background: #fff; border: 1px solid #bbf7d0; border-radius: 8px; overflow: hidden; }
+  .aba-vivo img { width: 100%; display: block; background: #111; min-height: 120px; }
+  .aba-vivo div { padding: 5px 8px; font-size: 0.8rem; color: #14532d; }
+  .girando { display: inline-block; width: 26px; height: 26px; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: gira 0.9s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  .cena .gerando { position: absolute; inset: 0; background: rgba(15,23,42,.72); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 0.85rem; text-align: center; padding: 8px; }
+  .cena .nafila { position: absolute; bottom: 6px; left: 6px; right: 6px; background: rgba(124,58,237,.9); color: #fff; border-radius: 6px; padding: 3px 7px; font-size: 0.75rem; text-align: center; }
+  .cena.ativa { outline: 3px solid #16a34a; }
+  .flow-opcoes { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.84rem; margin-top: 8px; background: #f8fafc; border-radius: 8px; padding: 6px 10px; }
+  .flow-opcoes select, .flow-opcoes input { width: auto; margin: 0; padding: 3px 6px; font-size: 0.84rem; }
+  .timeline { position: relative; height: 46px; background: #f1f5f9; border-radius: 6px; margin-top: 8px; overflow: hidden; }
+  .timeline .f { position: absolute; top: 4px; height: 16px; border-radius: 3px; opacity: .85; }
+  .timeline .c { position: absolute; top: 24px; height: 18px; border-right: 2px solid #fff; background: #7c3aed; color: #fff; font-size: 10px; line-height: 18px; padding-left: 3px; overflow: hidden; box-sizing: border-box; }
+  .timeline .c.longa { background: #b45309; }
+</style>
+
+<p><a href="{{ url_for('modelados_page') }}">&larr; Vídeos modelados</a></p>
+<h1 id="titulo" style="margin-bottom:2px;">🎞️ {{ d.projeto.nome }}</h1>
+<div style="color:#555;font-size:0.9rem;">Estilo <b>{{ d.estilo.nome }}</b> · {{ d.projeto.formato }} · alvo ~{{ d.projeto.duracao_alvo }}s</div>
+
+<div id="tarefa" style="display:none;" class="et">
+  <div class="linha" style="margin-top:0;justify-content:space-between;"><b id="tarefa-fase"></b>
+    <button type="button" class="mini verm" id="btn-parar" onclick="post('parar')">⏹ Parar (termina o que já está gerando)</button></div>
+  <div id="tarefa-erro" class="error" style="display:none;"></div>
+  <div id="tarefa-log" class="log"></div>
+</div>
+
+<!-- 1) roteiro -->
+<div class="et" id="et1">
+  <h2>1 · Roteiro (prompt master)</h2>
+  <details id="cfg-box"><summary style="cursor:pointer;color:#475569;font-size:0.88rem;">Tema e configuração</summary>
+    <label>Tema / lenda</label><textarea id="cfg-tema" rows="3" style="font-family:inherit;"></textarea>
+    <div class="linha">
+      <label style="margin:0">Duração (s) <input type="number" id="cfg-duracao" min="10" max="600" style="width:90px"></label>
+      <label style="margin:0">Formato <select id="cfg-formato" style="width:auto">{% for f in ['9:16','16:9','1:1'] %}<option>{{ f }}</option>{% endfor %}</select></label>
+      <label style="margin:0;flex:1">Idioma <input type="text" id="cfg-idioma"></label>
+    </div>
+    <label>Instruções extras</label><input type="text" id="cfg-extra">
+    <button type="button" class="mini cinza" onclick="salvarCfg()">💾 Salvar configuração</button>
+  </details>
+  <div class="linha">
+    <button type="button" class="mini roxo" onclick="copiarPrompt('prompt-roteiro', 'p1')">📋 Gerar e copiar o prompt master</button>
+    <span style="font-size:0.82rem;color:#666;">cole na IA (ChatGPT, Claude, Gemini…) e cole a resposta JSON abaixo</span>
+  </div>
+  <textarea id="p1" rows="5" readonly style="display:none;margin-top:6px;font-size:0.76rem;"></textarea>
+  <textarea id="json1" rows="6" placeholder='Cole aqui o JSON do roteiro: {"titulo": ..., "falas": [...], "cenas": [...]}'></textarea>
+  <div class="linha"><button type="button" class="mini" onclick="enviarJson('roteiro', 'json1')">✅ Aplicar roteiro</button></div>
+  <div id="avisos"></div>
+  <div id="falas"></div>
+</div>
+
+<!-- 2) áudio -->
+<div class="et" id="et2">
+  <h2>2 · Áudio completo + legenda</h2>
+  <p style="font-size:0.85rem;color:#555;margin:0;">Cada fala é gerada com a voz do slug (tags viram som nas vozes Chatterbox Turbo; nas outras viram intensidade), o silêncio das pontas é cortado e as falas são juntadas com as pausas do roteiro — por isso os tempos e o .srt são exatos. Falas que não mudaram não são geradas de novo.</p>
+  <div class="linha"><button type="button" class="mini" id="btn-audio" onclick="post('audio')">🎙️ Gerar áudio</button>
+    <span id="audio-links"></span></div>
+  <div id="aviso-audio" class="aviso" style="display:none;">⚠ Você mudou falas depois de gerar o áudio — gere de novo (só as alteradas são refeitas). Depois confira o ajuste das cenas (etapa 3), porque os tempos mudam.</div>
+  <audio id="player" controls style="width:100%;margin-top:8px;display:none;"></audio>
+  <div id="tl-falas"></div>
+</div>
+
+<!-- 3) ajuste -->
+<div class="et" id="et3">
+  <h2>3 · Ajuste das cenas aos tempos reais</h2>
+  <p style="font-size:0.85rem;color:#555;margin:0;">Manda pra IA os tempos de cada fala no áudio pronto: ela devolve as cenas com início/fim (cada uma no máximo do tamanho do vídeo gerado), pode dividir/juntar cenas e corrige a animação. Ou distribua sem IA.</p>
+  <div class="linha">
+    <button type="button" class="mini roxo" onclick="copiarPrompt('prompt-ajuste', 'p3')">📋 Gerar e copiar o prompt de ajuste</button>
+    <button type="button" class="mini cinza" onclick="post('ajuste-auto', {}, true)">⚡ Distribuir automático (sem IA)</button>
+  </div>
+  <textarea id="p3" rows="5" readonly style="display:none;margin-top:6px;font-size:0.76rem;"></textarea>
+  <textarea id="json3" rows="5" placeholder='Cole aqui o JSON das cenas finais: {"cenas": [{"id":1, "inicio":0, "fim":3.8, ...}]}'></textarea>
+  <div class="linha"><button type="button" class="mini" onclick="enviarJson('ajuste', 'json3')">✅ Aplicar cenas</button></div>
+  <div id="tl-cenas"></div>
+</div>
+
+<!-- 4/5) Flow -->
+<div class="et" id="et4">
+  <h2>4–5 · Frames e animação (Google Flow)</h2>
+  <p style="font-size:0.85rem;color:#555;margin:0;">Frame: <b>{{ d.estilo.flow.modelo_imagem or 'modelo padrão' }}</b> em {{ d.projeto.formato }}. Animação (Frames): <b>{{ d.estilo.flow.modelo_video }}</b> · {{ d.estilo.flow.resolucao }} · {{ d.estilo.flow.duracao_video }} · x1. Uma conversa do Flow pro vídeo inteiro; confira os frames antes de animar (animar gasta créditos). Mude o modelo/duração no estilo.</p>
+  <div class="flow-opcoes">
+    <label style="margin:0">Abas do Flow trabalhando juntas <select id="op-abas"><option>1</option><option selected>2</option><option>3</option></select></label>
+    <label style="margin:0">Intervalo entre envios <input type="number" id="op-cdmin" value="2" min="0" max="60" step="1" style="width:56px">–<input type="number" id="op-cdmax" value="9" min="0" max="120" step="1" style="width:56px"> s (sorteado)</label>
+    <label style="margin:0"><input type="checkbox" id="op-visivel" checked style="width:auto;margin:0"> 👁 mostrar o navegador</label>
+    <label style="margin:0" title="abre o Flow no layout estreito (como a janela reduzida)"><input type="checkbox" id="op-compacta" checked style="width:auto;margin:0"> 📱 janela compacta</label>
+  </div>
+  <div class="linha">
+    <button type="button" class="mini" onclick="flow('frames')">🖼 Gerar os frames que faltam</button>
+    <button type="button" class="mini roxo" onclick="flow('animar')">🎬 Animar os que faltam</button>
+    <button type="button" class="mini verde" onclick="flow('tudo')">⚡ Frames + animação de tudo</button>
+    <span style="font-size:0.8rem;color:#666">no ⚡ cada cena é animada assim que o frame dela fica pronto · clicar enquanto roda põe na fila</span>
+  </div>
+  <div id="ao-vivo"></div>
+  <div class="cenas" id="cenas" style="--ar: {{ d.projeto.formato.replace(':', '/') }};"></div>
+</div>
+
+<!-- 6) editor -->
+<div class="et" id="et6">
+  <h2>6 · Estúdio</h2>
+  <p style="font-size:0.85rem;color:#555;margin:0;">Cria um projeto do Estúdio com o áudio completo como narração e cada cena como um trecho no tempo certo (vídeo mais curto que a cena é desacelerado até 2×). A legenda <b>{{ d.estilo.legenda }}</b> já vem ligada — troque no painel de legendas — e é só montar.</p>
+  <div class="linha"><button type="button" class="mini verde" onclick="paraEditor()">🎬 Enviar pro Estúdio</button><span id="editor-link"></span></div>
+</div>
+
+<script>
+const PID = {{ pid|tojson }};
+let D = {{ d|tojson }};
+let pollTimer = null;
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (s) => (Math.floor(s / 60) ? Math.floor(s / 60) + ':' + String((s % 60).toFixed(1)).padStart(4, '0') : (+s).toFixed(1) + 's');
+
+async function api(caminho, corpo, metodo) {
+  const r = await fetch('/modelados/' + encodeURIComponent(PID) + '/' + caminho, metodo === 'GET' ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+  let d = {}; try { d = await r.json(); } catch (_) { d = { erro: 'Resposta inválida do servidor (' + r.status + ').' }; }
+  return d;
+}
+async function post(caminho, corpo, atualiza) {
+  const d = await api(caminho, corpo);
+  if (d.erro) { alert(d.erro); return null; }
+  if (d.projeto) { D = d; desenhar(); } else { recarregar(); }
+  return d;
+}
+function opcoesFlow(extra) {
+  return Object.assign({ abas: v('op-abas'), cooldown_min: v('op-cdmin'), cooldown_max: v('op-cdmax'),
+    visivel: document.getElementById('op-visivel').checked, compacta: document.getElementById('op-compacta').checked }, extra || {});
+}
+async function flow(etapa, extra) {
+  const d = await api(etapa, opcoesFlow(extra));
+  if (d.erro) { alert(d.erro); return; }
+  if (d.projeto) { D = d; desenhar(); } else { recarregar(); }
+}
+let DESVIO = 0;  // relógio do servidor - relógio do navegador
+const segDesde = (t) => Math.max(0, Math.round((Date.now() / 1000 + DESVIO) - t));
+const fmtSeg = (n) => n >= 60 ? Math.floor(n / 60) + 'min ' + String(n % 60).padStart(2, '0') + 's' : n + 's';
+setInterval(() => document.querySelectorAll('[data-desde]').forEach(el => { el.textContent = fmtSeg(segDesde(+el.dataset.desde)); }), 1000);
+async function recarregar() {
+  const d = await api('dados', null, 'GET'); if (!d.erro) { D = d; desenhar(); }
+}
+async function copiarPrompt(rota, alvo) {
+  const d = await api(rota, null, 'GET');
+  if (d.erro) { alert(d.erro); return; }
+  const t = document.getElementById(alvo); t.value = d.prompt; t.style.display = '';
+  t.select(); try { await navigator.clipboard.writeText(d.prompt); } catch (_) { document.execCommand('copy'); }
+  t.previousElementSibling && 0;
+}
+async function enviarJson(rota, campo) {
+  const json = document.getElementById(campo).value;
+  const d = await post(rota, { json });
+  if (d) document.getElementById(campo).value = '';
+}
+function salvarCfg() {
+  post('config', { tema: v('cfg-tema'), duracao_alvo: v('cfg-duracao'), formato: v('cfg-formato'), idioma: v('cfg-idioma'), instrucoes_extra: v('cfg-extra') });
+}
+const v = (id) => document.getElementById(id).value;
+async function paraEditor() {
+  const d = await api('editor');
+  if (d.erro) { alert(d.erro); return; }
+  if (d.sem_video && d.sem_video.length) alert('Atenção: a(s) cena(s) ' + d.sem_video.join(', ') + ' foram sem vídeo animado (vão como imagem com zoom ou vazias).');
+  location.href = d.url;
+}
+
+function corVoz(slug) { const vz = (D.vozes || []).find(x => x.slug === slug); return vz ? vz.cor : '#999'; }
+function desenharFalas() {
+  const r = D.projeto.roteiro;
+  const box = document.getElementById('falas');
+  if (!r) { box.innerHTML = ''; return; }
+  const opVoz = (sel) => (D.vozes || []).map(vz => `<option value="${esc(vz.slug)}" ${vz.slug === sel ? 'selected' : ''}>${esc(vz.nome)} ${vz.genero === 'feminino' ? '♀' : vz.genero === 'masculino' ? '♂' : ''}</option>`).join('');
+  const rotG = { feminino: '♀ feminino', masculino: '♂ masculino', neutro: '◌ neutro' };
+  const rotI = { crianca: '👧 criança', jovem: '🧑 jovem', adulto: '🧔 adulto', idoso: '👴 idoso' };
+  const vozInfo = (slug) => (D.vozes || []).find(x => x.slug === slug) || {};
+  const papeis = (D.personagens || []).map(p => {
+    const vz = vozInfo(p.voz);
+    const difG = p.genero && vz.genero && p.genero !== vz.genero && p.genero !== 'neutro';
+    const difI = p.idade && vz.idade && p.idade !== vz.idade;
+    return `<div class="papel" style="border-left-color:${corVoz(p.voz)}">
+      <div><b>${esc(p.nome)}</b><div style="font-size:0.76rem;color:#555">${p.falas} fala(s)${p.genero ? ' · ' + (rotG[p.genero] || esc(p.genero)) : ''}${p.idade ? ' · ' + (rotI[p.idade] || esc(p.idade)) : ''}</div></div>
+      <select data-papel="${esc(p.nome)}" title="muda a voz em TODAS as falas deste personagem">${opVoz(p.voz)}</select>
+      <div style="font-size:0.76rem;color:${difG || difI || p.misturado ? '#b45309' : '#555'}">
+        ${p.misturado ? '⚠ as falas deste papel usam vozes diferentes — escolher aqui deixa todas iguais<br>' : ''}
+        ${difG ? '⚠ personagem ' + esc(rotG[p.genero] || p.genero) + ', voz ' + esc(rotG[vz.genero] || vz.genero) + '<br>' : ''}
+        ${difI ? '⚠ personagem ' + esc(rotI[p.idade] || p.idade) + ', voz ' + esc(rotI[vz.idade] || vz.idade) : ''}
+        ${!(difG || difI || p.misturado) ? esc(vz.resumo || '') : ''}</div></div>`;
+  }).join('');
+  box.innerHTML = `<h3 style="margin:12px 0 2px;font-size:1rem;">${esc(r.titulo || 'Roteiro')} <small style="font-weight:400;color:#666">${r.falas.length} falas · ${r.cenas.length} cenas planejadas</small></h3>
+    ${r.sinopse ? `<div style="font-size:0.85rem;color:#555">${esc(r.sinopse)}</div>` : ''}
+    ${papeis ? `<h4 style="margin:12px 0 4px;font-size:0.95rem;">🎭 Personagens <small style="font-weight:400;color:#666">— trocar a voz aqui muda todas as falas do personagem</small></h4>${papeis}
+    <h4 style="margin:14px 0 2px;font-size:0.95rem;">💬 Falas <small style="font-weight:400;color:#666">— dá pra trocar a voz de uma fala só, se quiser</small></h4>` : ''}` +
+    r.falas.map(f => `<div class="fala" style="border-left-color:${corVoz(f.voz)}">
+      <div><b>#${f.id}</b><br><span class="tipo ${f.tipo}">${f.tipo}</span></div>
+      <div><div style="font-size:0.8rem;color:#444">${esc(f.personagem)}</div><select data-f="${f.id}" data-k="voz">${opVoz(f.voz)}</select></div>
+      <textarea data-f="${f.id}" data-k="texto" rows="2">${esc(f.texto)}</textarea>
+      <div style="font-size:0.76rem;color:#555">${(f.tags || []).map(t => '<code>[' + esc(t) + ']</code>').join(' ') || '<i>sem tags</i>'}<br>
+        emoção <input type="number" data-f="${f.id}" data-k="emocao" value="${f.emocao}" min="0" max="1" step="0.1" style="width:52px">
+        pausa <input type="number" data-f="${f.id}" data-k="pausa_depois" value="${f.pausa_depois}" min="0" max="3" step="0.05" style="width:56px"></div>
+    </div>`).join('');
+  box.querySelectorAll('select[data-papel]').forEach(sel => sel.addEventListener('change', async () => {
+    const d = await api('personagem', { nome: sel.dataset.papel, voz: sel.value });
+    if (d.erro) { alert(d.erro); return; }
+    D = d; desenhar();
+  }));
+  box.querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', () => {
+    api('fala/' + el.dataset.f, { [el.dataset.k]: el.value }).then(d => { if (d.erro) alert(d.erro); else { D = d; document.getElementById('aviso-audio').style.display = D.projeto.audio_desatualizado ? '' : 'none'; if (el.dataset.k === 'voz') desenhar(); } });
+  }));
+}
+function desenharAudio() {
+  const a = D.projeto.audio, p = document.getElementById('player');
+  if (!a) { p.style.display = 'none'; document.getElementById('audio-links').innerHTML = ''; document.getElementById('tl-falas').innerHTML = ''; return; }
+  if (!p.src.endsWith(D.audio_url)) p.src = D.audio_url;
+  p.style.display = '';
+  document.getElementById('audio-links').innerHTML = `<b>${fmt(a.duracao)}</b> · <a href="/modelados/${PID}/audio.mp3" download>⬇ .mp3</a> · <a href="/modelados/${PID}/legenda.srt">⬇ legenda.srt</a> · <a href="/modelados/${PID}/legenda_personagens.srt">⬇ .srt com personagens</a>`;
+  const tot = a.duracao || 1;
+  const cenas = D.projeto.cenas || [];
+  document.getElementById('tl-falas').innerHTML = `<div class="timeline" title="em cima: falas · embaixo: cenas">` +
+    a.falas.map(f => `<div class="f" title="#${f.id} ${esc(f.personagem)} ${fmt(f.inicio)}–${fmt(f.fim)}: ${esc(f.texto)}" style="left:${f.inicio / tot * 100}%;width:${(f.fim - f.inicio) / tot * 100}%;background:${f.cor || '#999'}"></div>`).join('') +
+    cenas.map(c => `<div class="c ${c.duracao > parseFloat(c.duracao_clipe) + 0.05 ? 'longa' : ''}" title="cena ${c.id}: ${fmt(c.inicio)}–${fmt(c.fim)}" style="left:${c.inicio / tot * 100}%;width:${(c.fim - c.inicio) / tot * 100}%">${c.id}</div>`).join('') + `</div>`;
+}
+function desenharCenas() {
+  const box = document.getElementById('cenas');
+  const cenas = D.projeto.cenas || [];
+  document.getElementById('tl-cenas').innerHTML = cenas.length ? `<div style="font-size:0.84rem;color:#555;margin-top:6px;">${cenas.length} cenas definidas (veja a linha do tempo na etapa 2).</div>` : '';
+  box.innerHTML = cenas.length ? cenas.map(c => {
+    const st = { gerando_frame: '⏳ gerando frame', animando: '⏳ animando', fila_frame: '🕒 frame na fila', fila_animacao: '🕒 animação na fila',
+      frame: '🖼 frame', video: '🎬 animada', erro: '✖ erro' }[c.status] || '— vazia';
+    const ativa = c.status === 'gerando_frame' || c.status === 'animando';
+    const sobre = ativa ? `<div class="gerando"><span class="girando"></span><b>${c.status === 'animando' ? 'ANIMANDO NO FLOW' : 'GERANDO O FRAME NO FLOW'}</b>
+        <span>aba ${c.aba || '?'} · <span data-desde="${c.gerando_desde || D.agora}">${fmtSeg(segDesde(c.gerando_desde || D.agora))}</span></span></div>`
+      : (c.status === 'fila_frame' || c.status === 'fila_animacao') ? `<div class="nafila">🕒 na fila do Flow (${c.status === 'fila_frame' ? 'frame' : 'animação'})</div>` : '';
+    const midia = c.url_video ? `<video src="${c.url_video}" muted loop playsinline controls preload="metadata"></video>`
+      : c.url_imagem ? `<img src="${c.url_imagem}" alt="frame">` : 'sem frame';
+    return `<div class="cena ${ativa ? 'ativa' : ''}"><div class="midia">${midia}${sobre}<span class="st">#${c.id} · ${fmt(c.inicio)}–${fmt(c.fim)} (${(+c.duracao).toFixed(1)}s) · ${st}</span></div>
+      <div class="corpo">
+        ${c.falas && c.falas.length ? `<div style="color:#666">falas ${c.falas.join(', ')}${c.continuacao ? ' · continuação' : ''}</div>` : ''}
+        <b style="font-size:0.75rem">Cena (imagem)</b><textarea data-c="${c.id}" data-k="cena">${esc(c.cena)}</textarea>
+        <b style="font-size:0.75rem">Movimento (animação · ${esc(c.duracao_clipe)})</b><textarea data-c="${c.id}" data-k="movimento">${esc(c.movimento)}</textarea>
+        <details class="prompt"><summary>prompts enviados ao Flow</summary><div>🖼 ${esc(c.prompt_imagem_final)}</div><div style="margin-top:3px">🎬 ${esc(c.prompt_animacao_final)}</div></details>
+        ${c.erro ? `<div class="err">${esc(c.erro)}</div>` : ''}
+        <div class="acoes">
+          <button type="button" onclick="flow('frames', {indices:[${c.id}]})">🖼 ${c.imagem ? 'Outro frame' : 'Gerar frame'}</button>
+          ${c.imagem ? `<button type="button" class="roxo" onclick="flow('animar', {indices:[${c.id}]})">🎬 ${c.video ? 'Reanimar' : 'Animar'}</button>` : ''}
+          <label>⬆ seu arquivo<input type="file" accept="image/*,video/*" data-up="${c.id}" style="display:none"></label>
+        </div>
+      </div></div>`;
+  }).join('') : '<p style="color:#666;font-size:0.88rem;">As cenas aparecem aqui depois da etapa 3.</p>';
+  box.querySelectorAll('textarea[data-c]').forEach(t => t.addEventListener('change', () => {
+    if (!confirm('Mudar ' + (t.dataset.k === 'cena' ? 'a cena descarta o frame e o vídeo dela' : 'o movimento descarta o vídeo dela') + '. Continuar?')) { desenharCenas(); return; }
+    post('cena/' + t.dataset.c, { [t.dataset.k]: t.value });
+  }));
+  box.querySelectorAll('input[data-up]').forEach(inp => inp.addEventListener('change', async () => {
+    if (!inp.files[0]) return;
+    const fd = new FormData(); fd.append('arquivo', inp.files[0]);
+    const r = await fetch('/modelados/' + PID + '/cena/' + inp.dataset.up + '/arquivo', { method: 'POST', body: fd });
+    const d = await r.json(); if (d.erro) alert(d.erro); else { D = d; desenhar(); }
+  }));
+}
+function desenharTarefa() {
+  const t = D.tarefa || {}, box = document.getElementById('tarefa');
+  const tem = t.rodando || (t.log && t.log.length) || t.erro;
+  box.style.display = tem ? '' : 'none';
+  document.getElementById('tarefa-fase').textContent = (t.rodando ? '⏳ ' : t.erro ? '✖ ' : '✔ ') + (t.fase || '');
+  document.getElementById('btn-parar').style.display = t.rodando ? '' : 'none';
+  const e = document.getElementById('tarefa-erro'); e.style.display = t.erro ? '' : 'none'; e.textContent = t.erro || '';
+  const lg = document.getElementById('tarefa-log'); const fim = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 10;
+  lg.textContent = (t.log || []).join('\n'); if (fim) lg.scrollTop = lg.scrollHeight;
+  desenharAoVivo(t);
+  clearTimeout(pollTimer);
+  if (t.rodando) pollTimer = setTimeout(recarregar, 2500);
+}
+function desenharAoVivo(t) {
+  const box = document.getElementById('ao-vivo');
+  if (!t.rodando || !t.flow) { box.innerHTML = ''; return; }
+  const cenas = D.projeto.cenas || [];
+  const gerando = cenas.filter(c => c.status === 'gerando_frame' || c.status === 'animando').length;
+  const fila = cenas.filter(c => c.status === 'fila_frame' || c.status === 'fila_animacao').length;
+  const prontas = cenas.filter(c => c.video).length, frames = cenas.filter(c => c.imagem).length;
+  const cd = t.cooldown_ate && t.cooldown_ate > D.agora ? Math.ceil(t.cooldown_ate - D.agora) : 0;
+  const abas = Object.entries(t.abas || {}).sort();
+  const ts = Date.now();
+  box.innerHTML = `<div class="ao-vivo"><div class="topo"><span class="pulso"></span> GERANDO NO GOOGLE FLOW AGORA
+      <span style="font-weight:400">· há <span data-desde="${t.inicio}">${fmtSeg(segDesde(t.inicio))}</span>
+      · ${gerando} gerando · ${fila} na fila · ${frames}/${cenas.length} frames · ${prontas}/${cenas.length} animadas
+      ${cd ? '· próximo envio em ' + cd + 's (intervalo sorteado)' : ''}
+      ${t.opcoes && !t.opcoes.visivel ? '· navegador oculto' : '· navegador aberto na sua tela'}</span></div>
+    <div class="abas-vivo">${abas.length ? abas.map(([n, a]) => `<div class="aba-vivo">
+        <img src="/modelados/flow-ao-vivo/${n}.jpg?t=${ts}" alt="aba ${n}" onerror="this.style.visibility='hidden'">
+        <div><b>Aba ${n}</b> · ${esc(a.estado || '')} · <span data-desde="${a.desde}">${fmtSeg(segDesde(a.desde))}</span></div></div>`).join('')
+      : '<div style="font-size:0.85rem;color:#14532d">Abrindo o navegador e o projeto do Flow…</div>'}</div>
+    <div style="font-size:0.78rem;color:#166534;margin-top:4px;">As imagens acima são capturas da tela de cada aba do Flow (a cada ~3 s).</div></div>`;
+}
+function desenhar() {
+  if (D.agora) DESVIO = D.agora - Date.now() / 1000;
+  const p = D.projeto, et = p.etapa;
+  const ordem = ['roteiro', 'audio', 'ajuste', 'frames', 'animacao', 'pronto'], n = ordem.indexOf(et);
+  document.getElementById('titulo').textContent = '🎞️ ' + p.nome;
+  document.getElementById('et1').classList.toggle('ok', !!p.roteiro);
+  document.getElementById('et2').classList.toggle('ok', !!p.audio);
+  document.getElementById('et2').classList.toggle('inativa', !p.roteiro);
+  document.getElementById('et3').classList.toggle('ok', !!(p.cenas && p.cenas.length));
+  document.getElementById('et3').classList.toggle('inativa', !p.audio);
+  document.getElementById('et4').classList.toggle('ok', !!(p.cenas && p.cenas.length && p.cenas.every(c => c.video)));
+  document.getElementById('et4').classList.toggle('inativa', !(p.cenas && p.cenas.length));
+  document.getElementById('et6').classList.toggle('inativa', !(p.cenas && p.cenas.some(c => c.video || c.imagem)));
+  document.getElementById('btn-audio').textContent = p.audio ? '🎙️ Gerar áudio de novo (só as falas que mudaram)' : '🎙️ Gerar áudio';
+  document.getElementById('editor-link').innerHTML = D.editor_url ? `<a href="${D.editor_url}">abrir o último enviado →</a>` : '';
+  document.getElementById('avisos').innerHTML = (p.avisos || []).map(a => `<div class="aviso">⚠ ${esc(a)}</div>`).join('');
+  if (!document.getElementById('cfg-box').open) {
+    document.getElementById('cfg-tema').value = p.tema || ''; document.getElementById('cfg-duracao').value = p.duracao_alvo;
+    document.getElementById('cfg-formato').value = p.formato; document.getElementById('cfg-idioma').value = p.idioma || '';
+    document.getElementById('cfg-extra').value = p.instrucoes_extra || '';
+  }
+  if (!p.roteiro) document.getElementById('cfg-box').open = true;
+  const foco = document.activeElement, editando = (id) => foco && foco.closest && foco.closest('#' + id) && /^(TEXTAREA|INPUT|SELECT)$/.test(foco.tagName);
+  document.getElementById('aviso-audio').style.display = p.audio && p.audio_desatualizado ? '' : 'none';
+  if (!editando('falas')) desenharFalas();
+  desenharAudio();
+  if (!editando('cenas')) desenharCenas();
+  desenharTarefa();
+}
+desenhar();
+</script>
+{% endblock %}

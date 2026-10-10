@@ -1,0 +1,12 @@
+Fonte incluída: DejaVu Sans (DejaVuSans.ttf, DejaVuSans-Bold.ttf)
+
+Licença: Bitstream Vera License + regras de nomeação DejaVu — permite
+uso, cópia, modificação e redistribuição livremente (inclusive
+embutida em outros produtos/software), sem exigir atribuição visível
+no produto final. Texto completo da licença: https://dejavu-fonts.github.io/License.html
+
+Essa fonte é incluída aqui pra garantir que o texto na tela e as
+legendas renderizem de forma consistente em qualquer sistema
+operacional (Windows, Linux, Mac) — sem depender do fontconfig do
+sistema estar configurado (no Windows, em especial, isso costuma faltar
+e quebra o "font=Sans" que dependeria dele).

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Importar pra biblioteca{% endblock %}
+{% block content %}
+<h1>📥 Importar clipe pra biblioteca</h1>
+<p style="color:#666;">Escolha um clipe já gerado em <a href="{{ url_for('capturar_pagina_page') }}">Capturar página</a> ou <a href="{{ url_for('cortar_youtube_page') }}">Cortar do YouTube</a> — ele é copiado direto pra biblioteca de mídia deste vídeo, sem precisar baixar e reenviar na mão.</p>
+<p><a href="{{ url_for('edit_segments_page', job_id=job_id) }}">&larr; voltar pro editor</a></p>
+
+{% if itens %}
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
+  {% for item in itens %}
+  <form method="post" action="{{ url_for('importar_biblioteca_submit', job_id=job_id) }}" style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+    <input type="hidden" name="origem" value="{{ item.origem }}">
+    <input type="hidden" name="origem_id" value="{{ item.origem_id }}">
+    <input type="hidden" name="arquivo" value="{{ item.arquivo }}">
+    <span style="font-size:0.88rem;">{{ item.label }}</span>
+    <button type="submit" style="margin-top:0;white-space:nowrap;">Importar</button>
+  </form>
+  {% endfor %}
+</div>
+{% else %}
+<p style="color:#666;margin-top:20px;">Nenhum clipe disponível ainda — gere um em <a href="{{ url_for('capturar_pagina_page') }}">Capturar página</a> ou <a href="{{ url_for('cortar_youtube_page') }}">Cortar do YouTube</a> primeiro.</p>
+{% endif %}
+{% endblock %}

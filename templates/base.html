@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Narração para Vídeo{% endblock %}</title>
+  <style>
+    body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.5; }
+    h1 { font-size: 1.5rem; }
+    label { display: block; margin-top: 16px; font-weight: 600; }
+    input[type="file"], input[type="number"], input[type="text"], select, textarea {
+      width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box;
+      border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 1rem;
+    }
+    textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; }
+    button { margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-top: 16px; white-space: pre-wrap; }
+    .checkboxes label { display: inline-block; font-weight: normal; margin-right: 16px; }
+    .checkboxes input { width: auto; margin-right: 4px; }
+    .copy-btn { background: #059669; }
+    .progress-bar { height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin-top: 12px; }
+    .progress-fill { height: 100%; background: #2563eb; transition: width 0.3s; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <p style="text-align:right;font-size:0.8rem;margin:0 0 10px;">
+    <a href="{{ url_for('modelados_page') }}" style="color:#7c3aed;margin-right:14px;font-weight:600;">🎞️ Vídeos modelados</a>
+    <a href="{{ url_for('roteiros_yt_page') }}" style="color:#b91c1c;margin-right:14px;font-weight:600;">📜 Roteiro do YouTube</a>
+    <a href="{{ url_for('narracoes_page') }}" style="color:#666;margin-right:14px;">📝 Roteiro para Áudio</a>
+    <a href="{{ url_for('gerar_voz_page') }}" style="color:#666;margin-right:14px;">🎙️ Gerador de voz</a>
+    <a href="{{ url_for('perfis_de_voz_page') }}" style="color:#666;margin-right:14px;">🗣️ Perfis de voz</a>
+    <a href="{{ url_for('capturar_pagina_page') }}" style="color:#666;margin-right:14px;">🖼️ Capturar página</a>
+    <a href="{{ url_for('cortar_youtube_page') }}" style="color:#666;margin-right:14px;">✂️ Cortar do YouTube</a>
+    <a href="{{ url_for('redes_sociais_page') }}" style="color:#666;margin-right:14px;">📲 Baixar de outras redes</a>
+    <a href="{{ url_for('extrair_links_canal_page') }}" style="color:#666;margin-right:14px;">🔗 Extrair links de canal</a>
+    <a href="{{ url_for('transcrever_page') }}" style="color:#666;margin-right:14px;">📝 Transcrever</a>
+    <a href="{{ url_for('contas_google_page') }}" style="color:#666;margin-right:14px;">🔑 Contas Google</a>
+    <a href="{{ url_for('jobs_history_page') }}" style="color:#666;">🗂️ Galeria de projetos</a> · <a href="{{ url_for('textos_avulsos_page') }}" style="color:#666;">🔤 Textos animados</a>
+  </p>
+  {% block content %}{% endblock %}
+</body>
+</html>

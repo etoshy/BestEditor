@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🧠 Etapa Wikipedia — 1 de 2: busque os termos com a IA</h1>
+<p>Antes de montar o prompt principal de edição, precisamos saber quais entidades reais (pessoas, lugares, objetos, eventos) do seu roteiro valem a pena pesquisar na Wikipedia. Copie o prompt abaixo, cole em outra IA (ChatGPT, Claude, etc.), e cole a resposta dela mais abaixo.</p>
+
+<textarea id="prompt-termos-box" rows="16" readonly>{{ job.prompt_termos_wikipedia }}</textarea>
+<button type="button" class="copy-btn" onclick="copyPromptTermos()">Copiar prompt</button>
+<span id="copy-feedback-termos"></span>
+
+<h1>2. Cole aqui a resposta (JSON) da IA</h1>
+<p style="color:#666;font-size:0.85rem;">Depois de colar, o site pesquisa esses termos DE VERDADE na Wikipedia (pode levar alguns segundos) e só então monta o prompt principal — já com as fotos confirmadas embutidas.</p>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('submit_termos_wikipedia', job_id=job.job_id) }}">
+  <textarea name="resposta_termos" rows="8" placeholder='{"termos": ["Albert Einstein", "Torre Eiffel"]}' required></textarea>
+  <button type="submit">Buscar na Wikipedia e continuar</button>
+</form>
+
+<p style="color:#666;font-size:0.8rem;margin-top:10px;">Se o roteiro não menciona nenhuma entidade real específica, a IA pode devolver uma lista vazia (<code>{"termos": []}</code>) — o site segue normalmente pro prompt principal, só sem entidades confirmadas da Wikipedia.</p>
+
+<script>
+function copyPromptTermos() {
+  const box = document.getElementById('prompt-termos-box');
+  box.select();
+  navigator.clipboard.writeText(box.value).then(() => {
+    document.getElementById('copy-feedback-termos').textContent = ' Copiado!';
+  });
+}
+</script>
+{% endblock %}

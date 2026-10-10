@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 id="fase-titulo">Transcrevendo o áudio...</h1>
+<p>Isso pode levar de alguns segundos a alguns minutos, dependendo do tamanho do áudio. Não feche esta página.</p>
+
+<div class="progress-bar"><div class="progress-fill" id="progress-fill-indeterminate"></div></div>
+<p id="elapsed-text" style="color:#666;font-size:0.9rem;">0s</p>
+
+<div id="error-box" class="error" style="display:none"></div>
+
+<style>
+/* Barra "indeterminada": o Whisper não dá progresso incremental de verdade
+   (ele processa o áudio inteiro numa chamada só), então em vez de fingir
+   uma porcentagem que não significa nada, mostramos uma barra animada que
+   só indica "está funcionando", junto com o tempo decorrido — assim a
+   pessoa sabe que não travou. */
+#progress-fill-indeterminate {
+  width: 40%;
+  animation: indeterminate 1.4s infinite ease-in-out;
+}
+@keyframes indeterminate {
+  0%   { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+</style>
+
+<script>
+let elapsedSeconds = 0;
+const elapsedEl = document.getElementById('elapsed-text');
+setInterval(() => {
+  elapsedSeconds += 1;
+  elapsedEl.textContent = elapsedSeconds + 's';
+}, 1000);
+
+async function poll() {
+  let data;
+  try {
+    const res = await fetch("{{ url_for('transcribing_status_api', job_id=job.job_id) }}");
+    data = await res.json();
+  } catch (e) {
+    setTimeout(poll, 2500);  // falha de rede passageira: tenta de novo em vez de parar
+    return;
+  }
+
+  if (data.fase) {
+    document.getElementById('fase-titulo').textContent = data.fase;
+  }
+  if (data.status === 'aguardando_json') {
+    window.location.href = "{{ url_for('show_prompt', job_id=job.job_id) }}";
+    return;
+  }
+  if (data.status === 'aguardando_termos_wikipedia') {
+    window.location.href = "{{ url_for('show_termos_wikipedia', job_id=job.job_id) }}";
+    return;
+  }
+  if (data.status === 'aguardando_termos_buscadores') {
+    window.location.href = "{{ url_for('show_termos_buscadores', job_id=job.job_id) }}";
+    return;
+  }
+  if (data.status === 'erro_transcricao') {
+    document.getElementById('progress-fill-indeterminate').style.animation = 'none';
+    document.getElementById('progress-fill-indeterminate').style.background = '#dc2626';
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.textContent = data.error;
+    return;
+  }
+  setTimeout(poll, 1500);
+}
+poll();
+</script>
+{% endblock %}

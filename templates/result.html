@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>4. Montando o vídeo</h1>
+<p id="status-text">Status: {{ job.status }}</p>
+
+{% if job.soundtrack_suggestion %}
+<p style="color:#666;">🎵 Sugestão de trilha sonora da IA: <em>{{ job.soundtrack_suggestion }}</em> (ainda não é aplicada automaticamente — adicione manualmente se quiser usar essa direção)</p>
+{% endif %}
+
+<div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
+<p id="progress-text"></p>
+
+<div id="error-box" class="error" style="display:none"></div>
+
+<div id="program-monitor" style="display:none;margin-top:16px;">
+  <label style="font-weight:600;">🎬 Monitor de Programa — resultado montado</label>
+  <video id="program-monitor-video" controls style="width:100%;max-height:480px;background:#000;border-radius:8px;margin-top:6px;"></video>
+  <div id="program-monitor-toggle" style="display:none;margin-top:6px;">
+    <label style="font-weight:normal;display:inline;"><input type="radio" name="monitor_version" value="normal" checked onchange="switchProgramMonitorVersion(this.value)" style="width:auto;"> Sem legenda</label>
+    &nbsp;&nbsp;
+    <label style="font-weight:normal;display:inline;"><input type="radio" name="monitor_version" value="legendado" onchange="switchProgramMonitorVersion(this.value)" style="width:auto;"> Com legenda</label>
+  </div>
+</div>
+
+<p id="download-link" style="display:none">
+  <a href="{{ url_for('download_result', job_id=job.job_id) }}"><button type="button">Baixar vídeo final</button></a>
+  {% if job.captioned_output_path %}
+  <a href="{{ url_for('download_captioned_result', job_id=job.job_id) }}"><button type="button">Baixar versão com legenda</button></a>
+  {% elif job.add_word_captions and job.captions_error %}
+  <p style="color:#b91c1c;font-size:0.85rem;">A versão com legenda falhou ao gerar — o vídeo sem legenda acima está normal.</p>
+  {% endif %}
+  {% if job.overlay_errors %}
+  <div style="color:#b91c1c;font-size:0.85rem;margin-top:8px;">
+    <p style="margin-bottom:4px;">⚠️ {{ job.overlay_errors|length }} overlay(s) não puderam ser aplicados (o resto do vídeo está normal):</p>
+    <ul style="margin:0;padding-left:20px;">
+      {% for err in job.overlay_errors %}
+      <li>{{ err }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <br>
+  <a href="{{ url_for('download_timing_log', job_id=job.job_id) }}" style="font-size:0.85rem;color:#666;">📊 Baixar log de tempo (pra identificar gargalos)</a>
+  <br>
+  <a href="{{ url_for('download_diagnostico', job_id=job.job_id) }}" style="font-size:0.85rem;color:#666;">🩺 Baixar diagnóstico: vídeo final × telinha do Estúdio (.txt)</a>
+  · <a href="{{ url_for('download_diagnostico', job_id=job.job_id, ver=1) }}" target="_blank" style="font-size:0.85rem;color:#666;">ver aqui</a>
+  · <a href="{{ url_for('download_diagnostico', job_id=job.job_id, ver=1, refazer=1) }}" target="_blank" style="font-size:0.85rem;color:#666;">gerar de novo</a>
+</p>
+
+<script>
+async function poll() {
+  const res = await fetch("{{ url_for('job_status_api', job_id=job.job_id) }}");
+  const data = await res.json();
+  document.getElementById('status-text').textContent = 'Status: ' + data.status;
+
+  if (data.progress) {
+    const pct = data.progress.total ? Math.round(100 * data.progress.current / data.progress.total) : 0;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = data.progress.stage + ' (' + data.progress.current + '/' + data.progress.total + ')';
+  }
+
+  if (data.status === 'concluido') {
+    document.getElementById('download-link').style.display = 'block';
+    const monitor = document.getElementById('program-monitor');
+    const video = document.getElementById('program-monitor-video');
+    monitor.style.display = 'block';
+    video.src = "{{ url_for('stream_result', job_id=job.job_id) }}";
+    {% if job.captioned_output_path %}
+    document.getElementById('program-monitor-toggle').style.display = 'block';
+    {% endif %}
+    return;
+  }
+  if (data.status === 'erro') {
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.textContent = data.error;
+    return;
+  }
+  if (data.status === 'pronto_para_editar' && data.assembly_error) {
+    // a montagem falhou num trecho específico -- volta pro editor pra
+    // trocar a fonte desse trecho, em vez de travar num beco sem saída
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.textContent = 'A montagem falhou: ' + data.assembly_error + ' — voltando pro editor pra você trocar a fonte desse trecho...';
+    setTimeout(function () {
+      window.location.href = "{{ url_for('edit_segments_page', job_id=job.job_id) }}";
+    }, 2500);
+    return;
+  }
+  setTimeout(poll, 2000);
+}
+poll();
+
+function switchProgramMonitorVersion(version) {
+  const video = document.getElementById('program-monitor-video');
+  const wasPlaying = !video.paused;
+  const currentTime = video.currentTime;
+  video.src = version === 'legendado'
+    ? "{{ url_for('stream_captioned_result', job_id=job.job_id) }}"
+    : "{{ url_for('stream_result', job_id=job.job_id) }}";
+  video.load();
+  video.addEventListener('loadedmetadata', function onLoaded() {
+    video.currentTime = currentTime;
+    if (wasPlaying) video.play().catch(function () {});
+    video.removeEventListener('loadedmetadata', onLoaded);
+  });
+}
+</script>
+{% endblock %}

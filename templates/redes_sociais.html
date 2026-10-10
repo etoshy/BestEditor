@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Baixar de outras redes{% endblock %}
+{% block content %}
+<h1>📲 Baixar de outras redes</h1>
+<p style="color:#666;">Baixa vídeos do <strong>TikTok, Instagram, Twitter/X, Facebook e Kwai</strong> — sempre na maior qualidade disponível (pro YouTube, use a aba <a href="{{ url_for('cortar_youtube_page') }}">✂️ Cortar do YouTube</a>). Cada link pode ser checado antes de baixar, pra ver a resolução sem esperar o download inteiro.</p>
+
+<div id="error-box" class="error" style="display:none;"></div>
+
+<div id="lista-links"></div>
+<button type="button" onclick="adicionarLink()" style="background:#666;">+ Adicionar outro link</button>
+
+<button type="button" id="btn-processar" onclick="processar()" style="margin-top:18px;display:block;">Baixar tudo</button>
+
+<div id="progresso-box" style="display:none;margin-top:16px;">
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill-rs" style="width:40%;"></div></div>
+  <pre id="log-box" style="max-height:200px;overflow:auto;background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.78rem;margin-top:8px;"></pre>
+</div>
+<style>
+#progress-fill-rs { animation: indeterminate-rs 1.4s infinite ease-in-out; }
+@keyframes indeterminate-rs { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+.bloco-link { display:flex; gap:8px; align-items:flex-start; margin-top:10px; flex-wrap:wrap; }
+.bloco-link input[type=text] { flex:1; min-width:260px; margin-top:0; }
+.qualidade-resultado { font-size:0.82rem; color:#444; background:#f3f4f6; padding:6px 10px; border-radius:6px; margin-top:6px; width:100%; }
+</style>
+
+<script>
+function novoBlocoLink() {
+  const tpl = document.getElementById('template-link');
+  const bloco = tpl.content.cloneNode(true);
+  document.getElementById('lista-links').appendChild(bloco);
+}
+function adicionarLink() { novoBlocoLink(); }
+
+async function checarQualidade(botao) {
+  const bloco = botao.closest('.bloco-link');
+  const url = bloco.querySelector('.campo-url').value.trim();
+  const resultadoDiv = bloco.querySelector('.qualidade-resultado');
+  if (!url) { resultadoDiv.style.display = 'block'; resultadoDiv.textContent = 'Cole um link primeiro.'; return; }
+  resultadoDiv.style.display = 'block';
+  resultadoDiv.textContent = 'Checando…';
+  try {
+    const r = await fetch('{{ url_for("redes_sociais_checar_qualidade") }}', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: url}),
+    });
+    const j = await r.json();
+    if (!r.ok) { resultadoDiv.textContent = '❌ ' + (j.erro || 'Falhou.'); return; }
+    const q = j.resultado;
+    const partes = [];
+    if (q.titulo) partes.push(q.titulo);
+    if (q.largura && q.altura) partes.push(q.largura + '×' + q.altura);
+    if (q.fps) partes.push(q.fps + ' fps');
+    if (q.duracao_segundos) partes.push(Math.round(q.duracao_segundos) + 's');
+    if (q.tamanho_aproximado_mb) partes.push('~' + q.tamanho_aproximado_mb + ' MB');
+    resultadoDiv.textContent = '✅ ' + partes.join(' · ');
+  } catch (e) {
+    resultadoDiv.textContent = '❌ ' + e.message;
+  }
+}
+
+function coletarUrls() {
+  return Array.from(document.querySelectorAll('.campo-url')).map(i => i.value.trim()).filter(Boolean);
+}
+
+async function processar() {
+  const erroBox = document.getElementById('error-box');
+  erroBox.style.display = 'none';
+  const urls = coletarUrls();
+  if (!urls.length) { erroBox.style.display = 'block'; erroBox.textContent = 'Adicione pelo menos um link.'; return; }
+
+  document.getElementById('btn-processar').disabled = true;
+  document.getElementById('progresso-box').style.display = 'block';
+  const logBox = document.getElementById('log-box');
+  logBox.textContent = '';
+
+  const r = await fetch('{{ url_for("redes_sociais_submit") }}', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({urls: urls}),
+  });
+  const j = await r.json();
+  if (!r.ok) {
+    document.getElementById('btn-processar').disabled = false;
+    document.getElementById('progresso-box').style.display = 'none';
+    erroBox.style.display = 'block'; erroBox.textContent = j.erro || 'Falha ao começar.';
+    return;
+  }
+  acompanhar(j.job_id);
+}
+
+function acompanhar(jobId) {
+  const logBox = document.getElementById('log-box');
+  const t = setInterval(async function () {
+    const r = await fetch(`/redes-sociais/${jobId}/status`);
+    const j = await r.json();
+    logBox.textContent = j.log || '';
+    logBox.scrollTop = logBox.scrollHeight;
+    if (j.status === 'processando') return;
+    clearInterval(t);
+    document.getElementById('btn-processar').disabled = false;
+    if (j.status === 'pronto') {
+      window.location.href = `/redes-sociais/${jobId}/download`;
+    } else {
+      document.getElementById('error-box').style.display = 'block';
+      document.getElementById('error-box').textContent = j.erro || 'Falhou.';
+    }
+  }, 1500);
+}
+
+document.addEventListener('DOMContentLoaded', function () { novoBlocoLink(); });
+</script>
+
+<template id="template-link">
+  <div class="bloco-link">
+    <input type="text" class="campo-url" placeholder="https://www.tiktok.com/... (ou Instagram, Twitter/X, Facebook, Kwai)">
+    <button type="button" onclick="checarQualidade(this)" style="margin-top:0;background:#666;">Checar qualidade</button>
+    <button type="button" onclick="this.closest('.bloco-link').remove()" style="margin-top:0;background:#dc2626;">✕</button>
+    <div class="qualidade-resultado" style="display:none;"></div>
+  </div>
+</template>
+{% endblock %}

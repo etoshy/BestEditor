@@ -1,0 +1,733 @@
+{% extends "base.html" %}
+{% block title %}Gerador de voz{% endblock %}
+{% block content %}
+<h1>🎙️ Gerador de voz</h1>
+<p style="margin-top:-8px;"><a href="{{ url_for('conversa_lista') }}">💬 Simular Conversa — várias falas, cada uma com uma voz diferente &rarr;</a></p>
+<p>Escreva um texto, escolha o motor e a voz, e gere um áudio narrado localmente — sem depender de nenhuma API paga. <a href="{{ url_for('index') }}">&larr; voltar pro início</a></p>
+
+<p style="color:#666;font-size:0.85rem;" id="gpu-linha">
+  {% if gpu_verificando %}⏳ Verificando a GPU em segundo plano (só na primeira vez depois de abrir o site)…{% else %}
+  GPU detectada — Piper/Kokoro (onnxruntime): <strong>{{ "sim" if gpu.get("onnx_gpu (piper/kokoro)") else "não" }}</strong> ·
+  XTTS v2 (PyTorch): <strong>{{ "sim" if gpu.get("torch_gpu (xtts)") else "não" }}</strong>.
+  Sem GPU os três motores ainda funcionam, só que mais devagar (principalmente o XTTS).
+  {% if gpu_diagnostico.gpu_nvidia_detectada and not (gpu.get("onnx_gpu (piper/kokoro)") and gpu.get("torch_gpu (xtts)")) %}
+  <a href="#diagnostico-gpu" onclick="document.getElementById('diagnostico-gpu-caixa').style.display='';return false;">Sua GPU não está sendo usada por algum motor — ver diagnóstico</a>.
+  {% endif %}{% endif %}
+</p>
+{% if gpu_verificando %}
+<script>
+(function poll() {
+  fetch('/gerar-voz/gpu').then(r => r.json()).then(d => {
+    if (!d.pronto) { setTimeout(poll, 2000); return; }
+    const g = d.gpu || {}, sim = (k) => g[k] ? 'sim' : 'não';
+    const el = document.getElementById('gpu-linha');
+    if (el) el.innerHTML = 'GPU detectada — Piper/Kokoro (onnxruntime): <strong>' + sim('onnx_gpu (piper/kokoro)') + '</strong> · XTTS v2 / Chatterbox (PyTorch): <strong>' + sim('torch_gpu (xtts)') + '</strong>.'
+      + ((d.diag || {}).gpu_nvidia_detectada && !(g['onnx_gpu (piper/kokoro)'] && g['torch_gpu (xtts)']) ? ' Sua GPU não está sendo usada por algum motor — recarregue a página pra ver o diagnóstico.' : '');
+  }).catch(() => setTimeout(poll, 4000));
+})();
+</script>
+{% endif %}
+
+{% if gpu_diagnostico %}
+<div id="diagnostico-gpu-caixa" style="{% if not gpu_diagnostico.gpu_nvidia_detectada or (gpu.get('onnx_gpu (piper/kokoro)') and gpu.get('torch_gpu (xtts)')) %}display:none;{% endif %}background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 14px;margin-top:10px;font-size:0.85rem;white-space:pre-wrap;">{{ gpu_diagnostico.diagnostico }}</div>
+{% endif %}
+
+<div id="error-box" style="display:none;" class="error"></div>
+<div id="geracoes-box" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:0.88rem;"></div>
+
+<div id="resultado-box" style="display:none;background:#d1fae5;color:#065f46;padding:14px;border-radius:8px;margin-top:16px;">
+  <strong id="resultado-titulo"></strong>
+  <audio controls id="resultado-audio" style="width:100%;margin-top:10px;"></audio>
+  <p style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;">
+    <a id="resultado-download" download>⬇ Baixar o áudio</a>
+    <a id="resultado-download-srt" download style="display:none;">⬇ Baixar a legenda (.srt)</a>
+    <a id="resultado-download-zip" download style="display:none;">⬇ Baixar tudo (.zip)</a>
+  </p>
+  <div id="resultado-chamadas" style="display:none;margin-top:8px;padding:8px 10px;background:#ede9fe;color:#4c1d95;border-radius:6px;font-size:0.85rem;"></div>
+  <div id="resultado-capitulos" style="display:none;margin-top:8px;padding:8px 10px;background:#ecfdf5;color:#065f46;border-radius:6px;font-size:0.85rem;">
+    📝 <b>Capítulos com o tempo real deste áudio</b> (já gravados no Roteiro do YouTube — <a id="resultado-roteiro-link" href="#">abrir o roteiro</a>):
+    <textarea id="resultado-descricao" rows="8" readonly style="width:100%;margin-top:6px;font-family:inherit;"></textarea>
+    <button type="button" id="resultado-copiar-desc" style="width:auto;padding:3px 10px;font-size:0.8rem;">📋 Copiar descrição</button>
+  </div>
+  <p id="resultado-sem-legenda" style="display:none;color:#92400e;font-size:0.85rem;">A legenda não pôde ser gerada dessa vez (veja o log acima) — mas o áudio está pronto normalmente.</p>
+  <p style="color:#065f46;font-size:0.85rem;">
+    Pra usar esse áudio no restante do pipeline (transcrever e montar o vídeo), baixe o arquivo acima e envie ele normalmente na <a href="{{ url_for('index') }}">página inicial</a>, no campo de upload de áudio.
+  </p>
+</div>
+
+<form id="form-gerar-voz" enctype="multipart/form-data" style="margin-top:20px;">
+  <label>Texto a narrar</label>
+  {% if roteiro_id %}<input type="hidden" name="roteiro_id" value="{{ roteiro_id }}">{% endif %}
+  <textarea name="texto" id="texto-narrar" rows="6" placeholder="Cole ou escreva aqui o texto que vai virar áudio...">{{ texto_inicial or '' }}</textarea>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:0.82rem;">
+    <button type="button" id="btn-tirar-cenas" style="width:auto;padding:4px 10px;font-size:0.8rem;">🧹 Tirar marcas de cena ([CENA 3]…)</button>
+    <span id="tirar-cenas-info" style="color:#666;">As marcas de cena nunca são faladas — mesmo sem clicar, o site tira antes de gerar a voz.</span>
+  </div>
+  <script>
+  (function () {
+    const re = /(?:\[{1,2}|\()\s*(?:cena|scene|escena)\b[^\]\)\n]{0,160}(?:\]{1,2}|\))/gi;
+    const ta = document.getElementById('texto-narrar'), info = document.getElementById('tirar-cenas-info');
+    function contar() { const n = (ta.value.match(re) || []).length; document.getElementById('btn-tirar-cenas').textContent = '🧹 Tirar marcas de cena' + (n ? ` (${n})` : ' ([CENA 3]…)'); }
+    document.getElementById('btn-tirar-cenas').addEventListener('click', () => {
+      const n = (ta.value.match(re) || []).length;
+      if (!n) { info.textContent = 'Nenhuma marca de cena no texto.'; return; }
+      ta.value = ta.value.replace(new RegExp('^[ \\t]*(?:' + re.source + ')[ \\t]*(?:\\n|$)', 'gim'), '').replace(re, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      info.textContent = `✅ ${n} marca(s) de cena tirada(s).`; contar();
+    });
+    ta.addEventListener('input', contar); contar();
+  })();
+  </script>
+  <details class="chamadas-ajuda" style="margin-top:6px;font-size:0.85rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:6px 10px;">
+    <summary style="cursor:pointer;color:#5b21b6;font-weight:600;">📣 Pausa pra vídeo de like/inscreva-se ou de venda</summary>
+    <p style="margin:6px 0;">Ponha a marca numa linha, no ponto onde o seu vídeo pronto deve entrar. Ela <b>não é lida</b>; o site guarda o ponto exato no áudio. No editor (aba ✂️ Cortes) você envia o vídeo uma vez: ali a narração pausa, o vídeo toca com o áudio dele e a narração continua. Sem vídeo, nada muda.</p>
+    <pre style="white-space:pre-wrap;background:#fff;border-radius:6px;padding:6px 8px;margin:4px 0;font-size:0.8rem;">E foi assim que tudo começou.
+[[INSCREVA]]
+Mas a história não para por aí...
+[[VENDA]]
+E no final...</pre>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+      <button type="button" class="ins-chamada" data-t="INSCREVA" style="width:auto;padding:4px 10px;font-size:0.8rem;">+ 👍 [[INSCREVA]]</button>
+      <button type="button" class="ins-chamada" data-t="VENDA" style="width:auto;padding:4px 10px;font-size:0.8rem;">+ 🛒 [[VENDA]]</button>
+    </div>
+    <p style="margin:6px 0 0;">Depois baixe <b>Tudo (.zip)</b> e crie o vídeo com o .zip na página inicial: as pausas aparecem sozinhas no editor.</p>
+  </details>
+  {% if texto_inicial %}<p style="font-size:0.82rem;color:#5b21b6;margin:4px 0 0;">📜 Texto vindo da aba Roteiro do YouTube.{% if '[[' in texto_inicial %} 📣 Ele tem marcas <code>[[INSCREVA]]</code>/<code>[[VENDA]]</code>: não são lidas — viram pausas onde entram os seus vídeos no editor (baixe o .zip).{% endif %}{% if '[' in texto_inicial.replace('[[', '').replace(']]', '') %} Ele tem tags de voz ([laugh], [whispering]…): use o motor <b>Chatterbox Turbo</b> (inglês) pra elas virarem som/estilo.{% endif %}</p>{% endif %}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.88rem;">
+    <span>🌐 Idioma da narração (vai junto no .zip — o vídeo inteiro segue ele):</span>
+    <select name="idioma_narracao" style="width:auto;margin:0;padding:4px 8px;">
+      <option value="auto" selected>Automático (pela voz escolhida / pelo texto)</option>
+      {% for cod, nome in idiomas_lista %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="mv-modo">
+    <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600;"><input type="checkbox" name="multivoz" id="mv-ativo" style="width:auto;margin:0;"> 🎭 Modo multi voice — <span style="font-weight:400;color:#555">as tags <code>[slug]</code> trocam a voz e não são lidas</span></label>
+    <div id="mv-detalhes" style="display:none;margin-top:8px;">
+      <p class="mv-hint">Ex.: <code>[narrador] Era noite em Berlim. [ricardo] Você ouviu isso? [ana] Ouvi.</code> — o que vem antes da primeira tag usa a voz escolhida abaixo. A voz continua até a próxima tag. Clique numa voz em <b>🎭 Vozes com slug</b> pra inserir a tag no cursor.</p>
+      <label style="font-size:0.85rem;">Pausa quando troca de voz: <span id="mv-pausa-valor">0.35</span>s</label>
+      <input type="range" name="multivoz_pausa" min="0" max="1.5" step="0.05" value="0.35" style="width:100%;" oninput="document.getElementById('mv-pausa-valor').textContent=this.value">
+      <div id="mv-previa"></div>
+    </div>
+  </div>
+
+  <label>Motor de voz</label>
+  <select name="engine" id="engine-select" onchange="mostrarOpcoesDoMotor()">
+    {% for key, info in engines.items() %}
+    <option value="{{ key }}">{{ info.label }}</option>
+    {% endfor %}
+  </select>
+  <div id="engine-descriptions" style="margin-top:6px;">
+    {% for key, info in engines.items() %}
+    <p class="engine-desc" data-engine="{{ key }}" style="color:#666;font-size:0.82rem;display:none;">
+      {{ info.descricao }} Se não estiver instalado: <code>{{ info.instalar }}</code>
+    </p>
+    {% endfor %}
+  </div>
+
+  <!-- Opções específicas do Piper -->
+  <div id="opcoes-piper" class="engine-opcoes">
+    <label>Voz (Piper)</label>
+    <select name="piper_voz" id="piper-voz-select">
+      {% for nome, desc in piper_vozes.items() %}
+      <option value="{{ nome }}" {% if nome == 'pt_BR-faber-medium' %}selected{% endif %}>{{ nome }} — {{ desc }}</option>
+      {% endfor %}
+    </select>
+
+    <div style="margin-top:8px;padding:10px;background:#f7f7f7;border-radius:6px;">
+      <label style="margin-top:0;">🔍 Buscar no catálogo completo (centenas de vozes, todos os idiomas)</label>
+      <input type="text" id="piper-busca-input" placeholder="ex: pt, spanish, kathleen..." autocomplete="off" oninput="buscarVozesPiper()">
+      <div id="piper-busca-status" style="color:#666;font-size:0.8rem;margin-top:4px;"></div>
+      <div id="piper-busca-resultados" style="max-height:260px;overflow:auto;margin-top:6px;"></div>
+    </div>
+    <p style="color:#666;font-size:0.8rem;">A busca acima baixa o catálogo (~1-2MB, uma vez só, fica em cache) direto do repositório oficial do Piper — precisa de internet na primeira busca. Clique num resultado pra usar essa voz; "Baixar agora" deixa ela pronta antes de gerar, pra não esperar na hora.</p>
+  </div>
+
+  <!-- Opções específicas do XTTS v2 -->
+  <div id="opcoes-xtts" class="engine-opcoes">
+    <label>Idioma (XTTS v2)</label>
+    <select name="xtts_idioma">
+      {% for cod in xtts_idiomas %}
+      <option value="{{ cod }}" {% if cod == 'pt' %}selected{% endif %}>{{ cod }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Checkpoint</label>
+    <select name="xtts_checkpoint">
+      {% for chave, info in xtts_checkpoints.items() %}
+      <option value="{{ chave }}" {% if chave == 'padrao' %}selected{% endif %}>{{ info.label }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">Diferente do Piper, não existe um catálogo único pesquisável de vozes pro XTTS — a lista acima é só uma curadoria de alguns fine-tunes conhecidos da comunidade no Hugging Face (baixam sozinhos na primeira vez, alguns GB cada). Achou outro que quer usar? Baixe manualmente com <code>xtts_download_checkpoint("usuario/repositorio")</code> e aponte pro caminho com <code>model_path</code>/<code>config_path</code> — ver o docstring de <code>xtts_synthesize</code> no código.</p>
+
+    {% if perfis_de_voz %}
+    <label>Usar um perfil de voz salvo</label>
+    <select name="xtts_perfil" id="xtts-perfil-select" onchange="document.getElementById('bloco-upload-referencia').style.display = this.value ? 'none' : '';">
+      <option value="">— nenhum (escolher abaixo) —</option>
+      {% for perfil in perfis_de_voz %}
+      <option value="{{ perfil }}">{{ perfil }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">Gerencie os perfis salvos mais abaixo, no fim da página.</p>
+    {% endif %}
+
+    <div id="bloco-upload-referencia">
+      <label>Nome de uma voz pronta do modelo (opcional)</label>
+      <input type="text" name="xtts_speaker" placeholder="deixe em branco pra usar a primeira voz disponível">
+
+      <label>OU: áudio de referência pra clonar uma voz (opcional, ~6-20s, tem prioridade sobre o campo acima)</label>
+      <input type="file" name="xtts_speaker_wav" accept="audio/*" onchange="document.getElementById('bloco-salvar-perfil').style.display = this.files.length ? '' : 'none';">
+      <div id="bloco-salvar-perfil" style="display:none;margin-top:8px;padding:10px;background:#f7f7f7;border-radius:6px;">
+        <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="xtts_salvar_perfil" style="width:auto;" onchange="document.getElementById('campo-nome-perfil').style.display = this.checked ? '' : 'none';"> Salvar esse áudio como um perfil de voz reutilizável (não precisa reenviar da próxima vez)</label>
+        <div id="campo-nome-perfil" style="display:none;margin-top:6px;">
+          <label style="font-size:0.85rem;">Nome do perfil</label>
+          <input type="text" name="xtts_nome_novo_perfil" placeholder="ex: minha_voz, locutor_joao">
+        </div>
+      </div>
+    </div>
+    <p style="color:#666;font-size:0.8rem;">O XTTS v2 é o motor mais pesado dos três — em CPU a geração pode demorar bem mais que os outros dois. Modelo de alguns GB, baixado sozinho na primeira vez. Áudios de referência longos são cortados automaticamente pros primeiros ~25s.</p>
+  </div>
+
+  <!-- Opções específicas do Chatterbox -->
+  <div id="opcoes-chatterbox" class="engine-opcoes">
+    <label>Idioma (Chatterbox)</label>
+    <select name="chatterbox_idioma">
+      {% for cod in chatterbox_idiomas %}
+      <option value="{{ cod }}" {% if cod == 'pt' %}selected{% endif %}>{{ cod }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Intensidade emocional (exaggeration)</label>
+    <input type="number" name="chatterbox_exaggeration" value="0.5" min="0" max="1" step="0.05">
+    <label>Aderência ao estilo da referência (cfg_weight)</label>
+    <input type="number" name="chatterbox_cfg_weight" value="0.5" min="0" max="1" step="0.05">
+    <p style="color:#666;font-size:0.8rem;">Valores mais altos de intensidade deixam a fala mais expressiva/dramática (e tendem a acelerar). Diminua a aderência (ex: 0.3) se a voz de referência falar rápido, ou se o idioma do texto for diferente do idioma da voz de referência.</p>
+
+    {% if perfis_de_voz %}
+    <label>Usar um perfil de voz salvo</label>
+    <select name="chatterbox_perfil" id="chatterbox-perfil-select" onchange="document.getElementById('bloco-upload-referencia-chatterbox').style.display = this.value ? 'none' : '';">
+      <option value="">— nenhum (escolher abaixo) —</option>
+      {% for perfil in perfis_de_voz %}
+      <option value="{{ perfil }}">{{ perfil }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">O mesmo perfil salvo funciona tanto pro XTTS quanto pro Chatterbox — não precisa gravar/enviar a referência duas vezes. Gerencie os perfis salvos mais abaixo, no fim da página.</p>
+    {% endif %}
+
+    <div id="bloco-upload-referencia-chatterbox">
+      <label>Áudio de referência pra clonar uma voz (opcional, ~6-20s)</label>
+      <input type="file" name="chatterbox_speaker_wav" accept="audio/*" onchange="document.getElementById('bloco-salvar-perfil-chatterbox').style.display = this.files.length ? '' : 'none';">
+      <div id="bloco-salvar-perfil-chatterbox" style="display:none;margin-top:8px;padding:10px;background:#f7f7f7;border-radius:6px;">
+        <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="chatterbox_salvar_perfil" style="width:auto;" onchange="document.getElementById('campo-nome-perfil-chatterbox').style.display = this.checked ? '' : 'none';"> Salvar esse áudio como um perfil de voz reutilizável (não precisa reenviar da próxima vez)</label>
+        <div id="campo-nome-perfil-chatterbox" style="display:none;margin-top:6px;">
+          <label style="font-size:0.85rem;">Nome do perfil</label>
+          <input type="text" name="chatterbox_nome_novo_perfil" placeholder="ex: minha_voz, locutor_joao">
+        </div>
+      </div>
+    </div>
+    <p style="color:#666;font-size:0.8rem;">Sem áudio nenhum, gera com a voz "neutra" padrão do modelo. Assim como o XTTS, o Chatterbox é pesado — GPU muito recomendada.</p>
+  </div>
+
+  <div id="opcoes-chatterbox_turbo" class="engine-opcoes">
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:0.82rem;color:#78350f;">
+      <strong>Só funciona em inglês</strong> — esse motor não tem seletor de idioma porque o modelo é treinado só pra isso. Pra português, use o "Chatterbox TTS" (multilíngue) acima.
+    </div>
+
+    <p style="color:#666;font-size:0.85rem;"><strong>Tags especiais direto no texto</strong> — insira entre colchetes onde quiser que aconteça. Exemplo: <code>"Hi there [chuckle], welcome back!"</code></p>
+    <p style="color:#666;font-size:0.8rem;margin-top:6px;"><strong>Sons:</strong> <code>[laugh]</code> <code>[chuckle]</code> <code>[gasp]</code> <code>[cough]</code> <code>[sigh]</code> <code>[groan]</code> <code>[sniff]</code> <code>[shush]</code> <code>[clear throat]</code></p>
+    <p style="color:#666;font-size:0.8rem;"><strong>Estilo</strong> (funcionam melhor no início da frase): <code>[angry]</code> <code>[crying]</code> <code>[dramatic]</code> <code>[fear]</code> <code>[happy]</code> <code>[narration]</code> <code>[sarcastic]</code> <code>[surprised]</code> <code>[whispering]</code> <code>[advertisement]</code></p>
+
+    {% if perfis_de_voz %}
+    <label style="margin-top:12px;">Usar um perfil de voz salvo</label>
+    <select name="chatterbox_turbo_perfil" onchange="document.getElementById('bloco-upload-referencia-chatterbox-turbo').style.display = this.value ? 'none' : '';">
+      <option value="">— nenhum (escolher abaixo) —</option>
+      {% for perfil in perfis_de_voz %}
+      <option value="{{ perfil }}">{{ perfil }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">O mesmo perfil salvo funciona nos três motores de clonagem (XTTS, Chatterbox e Chatterbox Turbo). Gerencie os perfis mais abaixo, no fim da página.</p>
+    {% endif %}
+
+    <div id="bloco-upload-referencia-chatterbox-turbo">
+      <label>Áudio de referência pra clonar uma voz (opcional, ~6-20s)</label>
+      <input type="file" name="chatterbox_turbo_speaker_wav" accept="audio/*" onchange="document.getElementById('bloco-salvar-perfil-chatterbox-turbo').style.display = this.files.length ? '' : 'none';">
+      <div id="bloco-salvar-perfil-chatterbox-turbo" style="display:none;margin-top:8px;padding:10px;background:#f7f7f7;border-radius:6px;">
+        <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="chatterbox_turbo_salvar_perfil" style="width:auto;" onchange="document.getElementById('campo-nome-perfil-chatterbox-turbo').style.display = this.checked ? '' : 'none';"> Salvar esse áudio como um perfil de voz reutilizável (não precisa reenviar da próxima vez)</label>
+        <div id="campo-nome-perfil-chatterbox-turbo" style="display:none;margin-top:6px;">
+          <label style="font-size:0.85rem;">Nome do perfil</label>
+          <input type="text" name="chatterbox_turbo_nome_novo_perfil" placeholder="ex: minha_voz, locutor_joao">
+        </div>
+      </div>
+    </div>
+    <p style="color:#666;font-size:0.8rem;">Sem áudio nenhum, gera com a voz "neutra" padrão do modelo. Não aceita ajuste de intensidade emocional/aderência (o Turbo ignora esses dois parâmetros) — as tags acima é que controlam a expressividade.</p>
+  </div>
+
+  <!-- Opções específicas do Kokoro -->
+  <div id="opcoes-kokoro" class="engine-opcoes">
+    <label>Modelo (Kokoro)</label>
+    <select name="kokoro_variante">
+      {% for chave, info in kokoro_variantes.items() %}
+      <option value="{{ chave }}" {% if chave == 'v1.0' %}selected{% endif %}>{{ info.label }}</option>
+      {% endfor %}
+    </select>
+    <select name="kokoro_precisao">
+      {% for chave, info in kokoro_precisoes.items() %}
+      <option value="{{ chave }}" {% if chave == 'fp32' %}selected{% endif %}>{{ info.label }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">"v1.1-zh" adiciona chinês/mandarim e mais 3 vozes em inglês (103 no total, contra 54 do v1.0) — arquivo maior. As duas variantes baixam sozinhas na primeira vez que forem usadas, e ficam salvas separadamente (trocar de uma pra outra depois não baixa tudo de novo).</p>
+
+    <label>Voz (Kokoro)</label>
+    <select name="kokoro_voz">
+      {% for nome, info in kokoro_vozes.items() %}
+      <option value="{{ nome }}" {% if nome == 'pf_dora' %}selected{% endif %}>{{ nome }} ({{ info[0] }}) — {{ info[1] }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">Lista curada — o modelo "v1.1-zh" tem mais ~50 vozes em mandarim e outras 3 em inglês fora desta lista; qualquer nome de voz válido do modelo escolhido funciona, mesmo digitando um que não esteja aqui.</p>
+    <label>Forçar idioma (opcional — por padrão usa o idioma da voz escolhida acima)</label>
+    <input type="text" name="kokoro_idioma" placeholder='ex: "pt-br", "en-us"'>
+  </div>
+
+  <label>Velocidade da fala (Piper e Kokoro — 1.0 é o ritmo normal)</label>
+  <input type="number" name="velocidade" value="1.0" min="0.5" max="2.0" step="0.05">
+
+  <label style="margin-top:16px;"><input type="checkbox" name="forcar_cpu" style="width:auto;"> Forçar CPU mesmo se houver GPU disponível (Piper e XTTS)</label>
+
+  <div style="margin-top:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="legenda-avancado-toggle" style="width:auto;">
+      <span>⚙️ Opções avançadas de legenda (SRT)</span>
+    </label>
+    <p style="color:#666;font-size:0.82rem;margin:6px 0 0;">Toda geração agora também produz uma legenda .srt automaticamente (transcrevendo o próprio áudio já pronto). Sem mexer aqui, ela sai no formato "Legenda" abaixo, com no máximo 5 palavras por linha — abra as opções avançadas só se quiser um formato diferente.</p>
+
+    <div id="legenda-avancado-opcoes" style="display:none;margin-top:14px;">
+      <div class="legenda-modo-card" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="radio" name="legenda_modo" value="tempo" style="width:auto;"> ⏱ Por tempo
+        </label>
+        <p style="color:#666;font-size:0.8rem;margin:4px 0 8px;">Divide a narração em blocos de X segundos — pensado pra sincronizar com vídeo gerado em blocos (você cria os prompts por bloco e depois sincroniza com os vídeos).</p>
+        <label style="font-size:0.8rem;">Duração do bloco: <span id="legenda-duracao-valor">5</span>s</label>
+        <input type="range" name="legenda_duracao_alvo_s" min="3" max="8" step="1" value="5" style="width:100%;" oninput="document.getElementById('legenda-duracao-valor').textContent=this.value">
+      </div>
+
+      <div class="legenda-modo-card" style="border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#eff6ff;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="radio" name="legenda_modo" value="legenda" checked style="width:auto;"> 💬 Legenda (padrão)
+        </label>
+        <p style="color:#666;font-size:0.8rem;margin:4px 0 8px;">Quebra no ritmo da fala, respeitando pausas naturais. Leitura confortável — é o formato recomendado pra maioria dos casos.</p>
+        <label style="font-size:0.8rem;">Máximo de palavras por linha: <span id="legenda-max-palavras-valor">5</span></label>
+        <input type="range" name="legenda_max_palavras" min="1" max="12" step="1" value="5" style="width:100%;" oninput="document.getElementById('legenda-max-palavras-valor').textContent=this.value">
+      </div>
+
+      <div class="legenda-modo-card" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="radio" name="legenda_modo" value="palavra" style="width:auto;"> # Por palavra
+        </label>
+        <p style="color:#666;font-size:0.8rem;margin:4px 0 8px;">Toda linha com a MESMA quantidade de palavras, sem variar pelo ritmo da fala. Visual uniforme.</p>
+        <label style="font-size:0.8rem;">Palavras por linha: <span id="legenda-palavras-por-linha-valor">5</span></label>
+        <input type="range" name="legenda_palavras_por_linha" min="1" max="12" step="1" value="5" style="width:100%;" oninput="document.getElementById('legenda-palavras-por-linha-valor').textContent=this.value">
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" id="btn-gerar">Gerar áudio</button>
+</form>
+
+<h2 style="margin-top:32px;">🎭 Vozes com slug (multi voice)</h2>
+<p style="color:#555;font-size:0.88rem;margin-top:-6px;">Configure uma voz no formulário acima (motor, voz/perfil, velocidade…), dê um nome e salve — ela ganha um <b>slug</b> (ex.: <code>[ricardo]</code>) pra usar no texto. Funciona também no <a href="{{ url_for('narracoes_page') }}">📝 Roteiro para Áudio</a>.</p>
+<div class="mv-salvar">
+  <input type="text" id="mv-nome" placeholder="Nome (ex.: Ricardo)" maxlength="40">
+  <input type="text" id="mv-slug" placeholder="slug (automático)" maxlength="30">
+  <select id="mv-genero" style="width:auto;margin:0;" title="gênero da voz (vai pra instrução da IA)">
+    <option value="">gênero…</option><option value="masculino">♂ masculino</option><option value="feminino">♀ feminino</option><option value="neutro">◌ neutro</option>
+  </select>
+  <select id="mv-idade" style="width:auto;margin:0;" title="idade da voz (vai pra instrução da IA)">
+    <option value="">idade…</option><option value="crianca">👧 criança</option><option value="jovem">🧑 jovem</option><option value="adulto">🧔 adulto</option><option value="idoso">👴 idoso</option>
+  </select>
+  <input type="text" id="mv-descricao" placeholder="descrição (ex.: grave, rouca, sombria)" maxlength="120">
+  <input type="color" id="mv-cor" value="#3E8EFF" title="cor na prévia">
+  <button type="button" id="mv-btn-salvar" style="margin-top:0;">💾 Salvar a voz configurada acima</button>
+</div>
+<div id="mv-erro" class="error" style="display:none;"></div>
+<div id="mv-lista"></div>
+<div id="mv-ia-box" style="display:none;margin-top:10px;">
+  <button type="button" id="mv-btn-ia" style="margin-top:0;background:#475569;">📋 Copiar instrução pra IA escrever o roteiro com essas vozes</button>
+  <textarea id="mv-ia-texto" rows="5" readonly style="margin-top:6px;font-size:0.8rem;"></textarea>
+</div>
+<style>
+.mv-modo{border:1px solid #c7d2fe;background:#eef2ff;border-radius:8px;padding:10px 12px;margin-top:8px}
+.mv-hint{font-size:0.82rem;color:#555;margin:0 0 6px}
+#mv-previa{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.mv-fala{border-left:4px solid #999;background:#fff;border-radius:4px;padding:5px 8px;font-size:0.85rem}
+.mv-fala b{display:inline-block;min-width:90px}
+.mv-aviso{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;font-size:0.85rem}
+.mv-salvar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mv-salvar input[type=text]{width:auto;flex:1;min-width:140px;margin:0}
+.mv-salvar input[type=color]{width:44px;height:36px;padding:2px;margin:0}
+.mv-voz{display:flex;align-items:center;gap:10px;border:1px solid #ddd;border-left:6px solid #999;border-radius:8px;padding:8px 12px;margin-top:8px;flex-wrap:wrap}
+.mv-voz .tag{font-family:ui-monospace,monospace;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:5px;padding:2px 7px;cursor:pointer}
+.mv-voz .tag:hover{background:#e0e7ff}
+.mv-voz .info{flex:1;min-width:160px;font-size:0.85rem;color:#555}
+.mv-voz button{margin-top:0;padding:5px 10px;font-size:0.8rem}
+.mv-voz audio{height:32px;max-width:220px}
+</style>
+
+<div id="progresso-box" style="display:none;margin-top:14px;">
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill-indeterminate" style="width:40%;"></div></div>
+  <pre id="log-box" style="background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.8rem;max-height:220px;overflow:auto;margin-top:10px;white-space:pre-wrap;"></pre>
+</div>
+<style>
+#progress-fill-indeterminate { animation: indeterminate-gerar-voz 1.4s infinite ease-in-out; }
+@keyframes indeterminate-gerar-voz { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+</style>
+
+{% if perfis_de_voz %}
+<h2 style="margin-top:32px;">Perfis de voz salvos (XTTS)</h2>
+<div>
+  {% for perfil in perfis_de_voz %}
+  <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+    <span>{{ perfil }}</span>
+    <form method="post" action="{{ url_for('gerar_voz_excluir_perfil', nome=perfil) }}" onsubmit="return confirm('Excluir o perfil {{ perfil }}?');" style="margin:0;">
+      <button type="submit" style="background:#dc2626;padding:5px 10px;font-size:0.8rem;margin-top:0;">Excluir</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+function mostrarOpcoesDoMotor() {
+  var motor = document.getElementById('engine-select').value;
+  document.querySelectorAll('.engine-opcoes').forEach(function (el) { el.style.display = 'none'; });
+  document.querySelectorAll('.engine-desc').forEach(function (el) { el.style.display = 'none'; });
+  var bloco = document.getElementById('opcoes-' + motor);
+  if (bloco) bloco.style.display = '';
+  var desc = document.querySelector('.engine-desc[data-engine="' + motor + '"]');
+  if (desc) desc.style.display = '';
+}
+mostrarOpcoesDoMotor();
+
+let buscaPiperTimeout = null;
+function buscarVozesPiper() {
+  clearTimeout(buscaPiperTimeout);
+  const termo = document.getElementById('piper-busca-input').value.trim();
+  const statusEl = document.getElementById('piper-busca-status');
+  const resultadosEl = document.getElementById('piper-busca-resultados');
+  if (!termo) {
+    statusEl.textContent = '';
+    resultadosEl.innerHTML = '';
+    return;
+  }
+  statusEl.textContent = 'Buscando...';
+  buscaPiperTimeout = setTimeout(async () => {
+    let data;
+    try {
+      const r = await fetch("{{ url_for('gerar_voz_piper_buscar_vozes') }}?q=" + encodeURIComponent(termo));
+      data = await r.json();
+    } catch (e) {
+      statusEl.textContent = 'Falha ao buscar: ' + e;
+      return;
+    }
+    if (data.erro) {
+      statusEl.textContent = data.erro;
+      resultadosEl.innerHTML = '';
+      return;
+    }
+    statusEl.textContent = data.resultados.length + ' voz(es) encontrada(s).';
+    resultadosEl.innerHTML = '';
+    data.resultados.forEach(v => {
+      const linha = document.createElement('div');
+      linha.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 4px;border-bottom:1px solid #e5e5e5;font-size:0.85rem;';
+      const info = document.createElement('span');
+      info.textContent = `${v.key} — ${v.idioma_nome} (${v.pais}), ${v.qualidade}` + (v.tamanho_mb ? `, ${v.tamanho_mb}MB` : '');
+      const botoes = document.createElement('span');
+      const btnUsar = document.createElement('button');
+      btnUsar.type = 'button';
+      btnUsar.textContent = 'Usar essa voz';
+      btnUsar.style.cssText = 'margin:0 4px 0 0;padding:4px 8px;font-size:0.78rem;';
+      btnUsar.onclick = () => usarVozPiper(v.key, `${v.key} — ${v.idioma_nome}, ${v.qualidade}`);
+      const btnBaixar = document.createElement('button');
+      btnBaixar.type = 'button';
+      btnBaixar.textContent = 'Baixar agora';
+      btnBaixar.style.cssText = 'padding:4px 8px;font-size:0.78rem;background:#666;';
+      btnBaixar.onclick = () => baixarVozPiperAgora(v.key, btnBaixar);
+      botoes.appendChild(btnUsar);
+      botoes.appendChild(btnBaixar);
+      linha.appendChild(info);
+      linha.appendChild(botoes);
+      resultadosEl.appendChild(linha);
+    });
+  }, 400);
+}
+
+function usarVozPiper(key, rotulo) {
+  const select = document.getElementById('piper-voz-select');
+  let opcaoExistente = Array.from(select.options).find(o => o.value === key);
+  if (!opcaoExistente) {
+    opcaoExistente = document.createElement('option');
+    opcaoExistente.value = key;
+    opcaoExistente.textContent = rotulo;
+    select.appendChild(opcaoExistente);
+  }
+  select.value = key;
+  document.getElementById('piper-busca-status').textContent = `Voz "${key}" selecionada acima.`;
+}
+
+async function baixarVozPiperAgora(key, botao) {
+  botao.disabled = true;
+  const textoOriginal = botao.textContent;
+  botao.textContent = 'Baixando...';
+  try {
+    const formData = new FormData();
+    formData.append('nome_voz', key);
+    const r = await fetch("{{ url_for('gerar_voz_piper_baixar_voz') }}", { method: 'POST', body: formData });
+    const data = await r.json();
+    botao.textContent = data.erro ? 'Falhou' : `Baixada (${data.resultado.tamanho_mb}MB)`;
+    if (data.erro) alert('Falha ao baixar: ' + data.erro);
+  } catch (e) {
+    botao.textContent = 'Falhou';
+    alert('Falha ao baixar: ' + e);
+  } finally {
+    setTimeout(() => { botao.disabled = false; botao.textContent = textoOriginal; }, 3000);
+  }
+}
+
+document.getElementById('form-gerar-voz').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  document.getElementById('error-box').style.display = 'none';
+  document.getElementById('resultado-box').style.display = 'none';
+  document.getElementById('btn-gerar').disabled = true;
+  document.getElementById('progresso-box').style.display = '';
+  document.getElementById('log-box').textContent = '';
+
+  const formData = new FormData(ev.target);
+  let resp, data;
+  try {
+    resp = await fetch("{{ url_for('gerar_voz_gerar') }}", { method: 'POST', body: formData });
+    data = await resp.json();
+  } catch (e) {
+    mostrarErro('Não consegui falar com o servidor: ' + e);
+    return;
+  }
+  if (!resp.ok) {
+    mostrarErro(data.erro || 'Falha ao iniciar a geração.');
+    return;
+  }
+  try { localStorage.setItem('gerarVozUltimo', data.job_id); } catch (_) {}
+  pollStatus(data.job_id);
+});
+
+// ---------------- voltar a acompanhar uma geração em andamento (recarregou / fechou a aba)
+let acompanhando = null;
+function acompanhar(jobId) {
+  acompanhando = jobId;
+  document.getElementById('error-box').style.display = 'none';
+  document.getElementById('resultado-box').style.display = 'none';
+  document.getElementById('progresso-box').style.display = '';
+  document.getElementById('btn-gerar').disabled = true;
+  try { localStorage.setItem('gerarVozUltimo', jobId); } catch (_) {}
+  pollStatus(jobId);
+  const pb = document.getElementById('progresso-box'); if (pb && pb.scrollIntoView) pb.scrollIntoView({ block: 'nearest' });
+}
+async function verGeracoes() {
+  let d;
+  try { d = await (await fetch("{{ url_for('gerar_voz_em_andamento') }}")).json(); } catch (_) { return; }
+  const box = document.getElementById('geracoes-box');
+  const lista = (d.geracoes || []);
+  let ultimo = null; try { ultimo = localStorage.getItem('gerarVozUltimo'); } catch (_) {}
+  if (!lista.length) { box.style.display = 'none'; return; }
+  const hora = (t) => new Date(t * 1000).toLocaleTimeString().slice(0, 5);
+  box.innerHTML = '<b>🎙 Gerações recentes</b> (continuam rodando no servidor mesmo se você fechar a página):' + lista.map(g =>
+    `<div style="margin-top:6px;">${g.running ? '⏳ <b>gerando</b>' : g.erro ? '⚠ deu erro' : '✅ pronta'} · ${hora(g.criado_em)} · ${g.engine || ''} · ${g.palavras || '?'} palavras · <i>“${(g.texto_inicio || '').replace(/</g, '&lt;')}…”</i>
+      <button type="button" class="ver-geracao" data-id="${g.job_id}" style="width:auto;padding:2px 10px;font-size:0.8rem;margin-left:6px;">${g.running ? 'Acompanhar' : 'Ver resultado'}</button></div>`).join('');
+  box.style.display = '';
+  box.querySelectorAll('.ver-geracao').forEach(b => b.addEventListener('click', () => acompanhar(b.dataset.id)));
+  // abriu a página com a SUA última geração ainda rodando: já volta a acompanhar sozinho
+  const rodando = lista.find(g => g.running && g.job_id === ultimo) || (lista.filter(g => g.running).length === 1 ? lista.find(g => g.running) : null);
+  if (rodando && !acompanhando) acompanhar(rodando.job_id);
+}
+verGeracoes();
+setInterval(() => { if (!document.hidden) verGeracoes(); }, 15000);
+
+function mostrarErro(msg) {
+  document.getElementById('error-box').textContent = msg;
+  document.getElementById('error-box').style.display = '';
+  document.getElementById('progresso-box').style.display = 'none';
+  document.getElementById('btn-gerar').disabled = false;
+}
+
+async function pollStatus(jobId) {
+  let data;
+  try {
+    const r = await fetch("{{ url_for('gerar_voz_status', job_id='__JOB__') }}".replace('__JOB__', jobId));
+    data = await r.json();
+  } catch (e) {
+    setTimeout(function () { pollStatus(jobId); }, 2000);
+    return;
+  }
+  document.getElementById('log-box').textContent = data.log || '';
+  document.getElementById('log-box').scrollTop = document.getElementById('log-box').scrollHeight;
+
+  if (data.running) {
+    setTimeout(function () { pollStatus(jobId); }, 1200);
+    return;
+  }
+  document.getElementById('btn-gerar').disabled = false;
+  if (data.erro) {
+    mostrarErro(data.erro);
+    return;
+  }
+  if (data.resultado) {
+    document.getElementById('progresso-box').style.display = 'none';
+    document.getElementById('resultado-titulo').textContent = 'Áudio gerado!' + (data.resultado.idioma_nome
+      ? ' · 🌐 ' + data.resultado.idioma_nome + ({ escolhido: ' (escolhido)', voz: ' (pela voz)', texto: ' (detectado no texto)' }[data.resultado.idioma_origem] || '') : '');
+    document.getElementById('resultado-audio').src = data.resultado.audio_url;
+    document.getElementById('resultado-download').href = data.resultado.audio_url;
+
+    const linkSrt = document.getElementById('resultado-download-srt');
+    const linkZip = document.getElementById('resultado-download-zip');
+    const avisoSemLegenda = document.getElementById('resultado-sem-legenda');
+    if (data.resultado.srt_url) {
+      linkSrt.href = data.resultado.srt_url;
+      linkSrt.style.display = '';
+      avisoSemLegenda.style.display = 'none';
+    } else {
+      linkSrt.style.display = 'none';
+      avisoSemLegenda.style.display = '';
+    }
+    if (data.resultado.zip_url) { linkZip.href = data.resultado.zip_url; linkZip.style.display = ''; } else linkZip.style.display = 'none';
+    const boxCh = document.getElementById('resultado-chamadas');
+    const chs = data.resultado.chamadas || [];
+    const fmtT = (t) => Math.floor(t / 60) + ':' + String((t % 60).toFixed(1)).padStart(4, '0');
+    boxCh.innerHTML = chs.length ? '📣 <b>' + chs.length + ' pausa(s) pra vídeo</b> — vão junto no .zip:<br>' + chs.map(c => `${c.rotulo} · em ${fmtT(c.inicio)}${c.fim > c.inicio ? '–' + fmtT(c.fim) : ''}`).join('<br>') : '';
+    boxCh.style.display = chs.length ? '' : 'none';
+    const boxCap = document.getElementById('resultado-capitulos');
+    if (data.resultado.roteiro_descricao) {
+      document.getElementById('resultado-descricao').value = data.resultado.roteiro_descricao;
+      document.getElementById('resultado-roteiro-link').href = data.resultado.roteiro_url;
+      document.getElementById('resultado-copiar-desc').onclick = () => navigator.clipboard.writeText(data.resultado.roteiro_descricao);
+      boxCap.style.display = '';
+    } else boxCap.style.display = 'none';
+
+    document.getElementById('resultado-box').style.display = '';
+  }
+}
+
+// ---------------- 📣 chamadas: insere a marca no cursor, numa linha própria
+document.querySelectorAll('.ins-chamada').forEach(b => b.addEventListener('click', () => {
+  const ta = document.getElementById('texto-narrar');
+  const ini = ta.selectionStart, fim = ta.selectionEnd;
+  const marca = `[[${b.dataset.t}]]`;
+  const antes = ta.value.slice(0, ini), depois = ta.value.slice(fim);
+  const pre = antes && !/\n$/.test(antes) ? '\n' : '', pos = depois && !/^\n/.test(depois) ? '\n' : '';
+  ta.value = antes + pre + marca + pos + depois;
+  ta.focus(); const p = (antes + pre + marca).length; ta.setSelectionRange(p, p);
+}));
+
+// ---------------- 🎭 multi voice
+let mvVozes = [];
+const mvEsc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function mvSlug(n) { return String(n || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30); }
+function mvDesenhar(dados) {
+  mvVozes = dados.vozes || [];
+  const box = document.getElementById('mv-lista');
+  box.innerHTML = mvVozes.length ? mvVozes.map(v => `<div class="mv-voz" style="border-left-color:${v.cor}"><b>${mvEsc(v.nome)}</b>
+      <span class="tag" data-slug="${mvEsc(v.slug)}" title="clique: copia e insere no texto">[${mvEsc(v.slug)}]</span>
+      <select class="mv-genero-sel" data-slug="${mvEsc(v.slug)}" title="gênero da voz" style="width:auto;margin:0;padding:3px 6px;font-size:0.8rem;${v.genero ? '' : 'border-color:#f59e0b;background:#fffbeb'}">
+        <option value="" ${!v.genero ? 'selected' : ''}>⚠ gênero?</option><option value="masculino" ${v.genero === 'masculino' ? 'selected' : ''}>♂ masculino</option>
+        <option value="feminino" ${v.genero === 'feminino' ? 'selected' : ''}>♀ feminino</option><option value="neutro" ${v.genero === 'neutro' ? 'selected' : ''}>◌ neutro</option></select>
+      <select class="mv-idade-sel" data-slug="${mvEsc(v.slug)}" title="idade da voz${(v.herdado || []).includes('idade') ? ' (do perfil de voz)' : ''}" style="width:auto;margin:0;padding:3px 6px;font-size:0.8rem;${v.idade ? '' : 'border-color:#f59e0b;background:#fffbeb'}">
+        <option value="" ${!v.idade ? 'selected' : ''}>⚠ idade?</option>${[['crianca', '👧 criança'], ['jovem', '🧑 jovem'], ['adulto', '🧔 adulto'], ['idoso', '👴 idoso']].map(([k, n]) => `<option value="${k}" ${v.idade === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      ${(v.herdado || []).length ? '<small style="color:#7c3aed" title="vem do perfil de voz — mude aqui pra esta voz ter o próprio">↳ do perfil</small>' : ''}
+      <span class="info">${mvEsc(v.resumo)}${v.descricao ? ' · <i>' + mvEsc(v.descricao) + '</i>' : ''}</span>
+      <button type="button" class="mv-testar" data-slug="${mvEsc(v.slug)}">▶ Testar</button><audio class="mv-audio" data-slug="${mvEsc(v.slug)}" controls style="display:none"></audio>
+      <button type="button" class="mv-editar" data-slug="${mvEsc(v.slug)}" style="background:#475569" title="substitui pela voz configurada acima">↻ Atualizar com a voz de cima</button>
+      <button type="button" class="mv-excluir" data-slug="${mvEsc(v.slug)}" style="background:#dc2626">Excluir</button></div>`).join('')
+    : '<p style="color:#666;font-size:0.88rem;">Nenhuma voz salva ainda.</p>';
+  document.getElementById('mv-ia-box').style.display = mvVozes.length ? '' : 'none';
+  document.getElementById('mv-ia-texto').value = dados.instrucao_ia || '';
+  box.querySelectorAll('.tag').forEach(el => el.addEventListener('click', () => mvInserirTag(el.dataset.slug)));
+  box.querySelectorAll('.mv-genero-sel, .mv-idade-sel').forEach(sel => sel.addEventListener('change', async () => {
+    const corpo = sel.classList.contains('mv-idade-sel') ? { idade: sel.value } : { genero: sel.value };
+    const r = await fetch('/gerar-voz/vozes/' + encodeURIComponent(sel.dataset.slug) + '/genero', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json(); if (d.erro) { alert(d.erro); return; } mvDesenhar(d);
+  }));
+  box.querySelectorAll('.mv-excluir').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Excluir a voz [' + b.dataset.slug + ']?')) return;
+    const r = await fetch('/gerar-voz/vozes/' + encodeURIComponent(b.dataset.slug) + '/excluir', { method: 'POST' }); mvDesenhar(await r.json()); mvPrevia();
+  }));
+  box.querySelectorAll('.mv-editar').forEach(b => b.addEventListener('click', () => {
+    const v = mvVozes.find(x => x.slug === b.dataset.slug); if (!v) return;
+    if (!confirm('Trocar a configuração de "' + v.nome + '" pelo motor/voz escolhidos no formulário acima?')) return;
+    mvSalvar(v.nome, v.slug, v.cor, v.slug);
+  }));
+  box.querySelectorAll('.mv-testar').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true; b.textContent = '⏳ Gerando…';
+    try {
+      const r = await fetch('/gerar-voz/vozes/' + encodeURIComponent(b.dataset.slug) + '/testar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      for (;;) {
+        await new Promise(ok => setTimeout(ok, 1200));
+        const st = await (await fetch("{{ url_for('gerar_voz_status', job_id='__JOB__') }}".replace('__JOB__', d.job_id))).json();
+        if (st.running) continue;
+        if (st.erro) throw new Error(st.erro);
+        const a = document.querySelector('.mv-audio[data-slug="' + b.dataset.slug + '"]'); a.src = st.resultado.audio_url; a.style.display = ''; a.play().catch(() => {}); break;
+      }
+    } catch (e) { alert('Não consegui testar: ' + e.message); }
+    b.disabled = false; b.textContent = '▶ Testar';
+  }));
+}
+function mvInserirTag(slug) {
+  const t = document.getElementById('texto-narrar'), tag = '[' + slug + '] ';
+  try { navigator.clipboard.writeText('[' + slug + ']').catch(() => {}); } catch (_) {}
+  const a = t.selectionStart || 0, b = t.selectionEnd || 0;
+  const antes = t.value.slice(0, a), depois = t.value.slice(b);
+  const pre = antes && !/\s$/.test(antes) ? '\n' : '';
+  t.value = antes + pre + tag + depois; t.focus(); t.selectionStart = t.selectionEnd = a + pre.length + tag.length;
+  const chk = document.getElementById('mv-ativo'); if (!chk.checked) { chk.checked = true; chk.dispatchEvent(new Event('change')); }
+  mvPrevia();
+}
+async function mvSalvar(nome, slug, cor, slugAntigo) {
+  const fd = new FormData(document.getElementById('form-gerar-voz'));
+  fd.delete('texto'); fd.set('mv_nome', nome); fd.set('mv_slug', slug || mvSlug(nome)); fd.set('mv_cor', cor || '');
+  if (!slugAntigo) { fd.set('mv_genero', document.getElementById('mv-genero').value); fd.set('mv_idade', document.getElementById('mv-idade').value); fd.set('mv_descricao', document.getElementById('mv-descricao').value); }
+  if (slugAntigo) fd.set('mv_slug_antigo', slugAntigo);
+  const r = await fetch('/gerar-voz/vozes', { method: 'POST', body: fd }); const d = await r.json();
+  const err = document.getElementById('mv-erro');
+  if (!r.ok) { err.textContent = d.erro || 'Falha ao salvar.'; err.style.display = ''; return; }
+  err.style.display = 'none'; mvDesenhar(d); mvPrevia();
+  document.getElementById('mv-nome').value = ''; document.getElementById('mv-slug').value = ''; document.getElementById('mv-descricao').value = ''; document.getElementById('mv-genero').value = ''; document.getElementById('mv-idade').value = '';
+}
+document.getElementById('mv-nome').addEventListener('input', (e) => { document.getElementById('mv-slug').placeholder = mvSlug(e.target.value) || 'slug (automático)'; });
+document.getElementById('mv-btn-salvar').addEventListener('click', () => {
+  const nome = document.getElementById('mv-nome').value.trim();
+  if (!nome) { document.getElementById('mv-erro').textContent = 'Dê um nome pra voz (ex.: Ricardo).'; document.getElementById('mv-erro').style.display = ''; return; }
+  mvSalvar(nome, document.getElementById('mv-slug').value.trim(), document.getElementById('mv-cor').value);
+});
+document.getElementById('mv-btn-ia').addEventListener('click', () => {
+  const t = document.getElementById('mv-ia-texto'); t.select();
+  try { navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); } catch (_) { document.execCommand('copy'); }
+  document.getElementById('mv-btn-ia').textContent = '✓ Copiado!'; setTimeout(() => { document.getElementById('mv-btn-ia').textContent = '📋 Copiar instrução pra IA escrever o roteiro com essas vozes'; }, 2000);
+});
+let mvTimer = null;
+function mvPrevia() {
+  clearTimeout(mvTimer);
+  mvTimer = setTimeout(async () => {
+    const box = document.getElementById('mv-previa');
+    if (!document.getElementById('mv-ativo').checked) { box.innerHTML = ''; return; }
+    const texto = document.getElementById('texto-narrar').value;
+    if (!texto.trim()) { box.innerHTML = ''; return; }
+    const r = await fetch('/gerar-voz/vozes/conferir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) });
+    const d = await r.json();
+    box.innerHTML = (d.desconhecidas && d.desconhecidas.length ? `<div class="mv-aviso">⚠ Tag sem voz cadastrada: ${d.desconhecidas.map(x => '<code>[' + mvEsc(x) + ']</code>').join(', ')} — cadastre a voz com esse slug ou corrija (senão não dá pra gerar).</div>` : '')
+      + (d.falas || []).map(f => `<div class="mv-fala" style="border-left-color:${f.cor}"><b style="color:${f.cor}">${mvEsc(f.nome)}</b> ${mvEsc(f.texto.length > 160 ? f.texto.slice(0, 160) + '…' : f.texto)}</div>`).join('');
+  }, 350);
+}
+document.getElementById('texto-narrar').addEventListener('input', mvPrevia);
+document.getElementById('mv-ativo').addEventListener('change', (e) => { document.getElementById('mv-detalhes').style.display = e.target.checked ? '' : 'none'; mvPrevia(); });
+fetch('/gerar-voz/vozes').then(r => r.json()).then(mvDesenhar);
+
+document.getElementById('legenda-avancado-toggle').addEventListener('change', function () {
+  document.getElementById('legenda-avancado-opcoes').style.display = this.checked ? '' : 'none';
+});
+</script>
+{% endblock %}

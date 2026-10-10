@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  body { max-width: 1100px; }
+  .word-card {
+    display: inline-block; background: #f7f7f7; border: 1px solid #ddd; border-radius: 8px;
+    padding: 8px; margin: 4px; vertical-align: top; width: 130px;
+  }
+  .word-card input[type="text"] { font-weight: bold; text-align: center; margin-top: 0; }
+  .word-card .time-row { display: flex; gap: 4px; margin-top: 4px; }
+  .word-card .time-row input { width: 100%; font-size: 0.75rem; padding: 4px; margin-top: 0; }
+  .word-card label { font-size: 0.7rem; font-weight: normal; margin: 0; color: #888; }
+</style>
+
+<h1>Editar legendas manualmente</h1>
+<p style="font-size:0.85rem;color:#666;">
+  Cada cartão é uma palavra da legenda — edite o texto ou os tempos
+  (em segundos) individualmente. Apagar o texto de um cartão remove
+  aquela palavra da legenda. Isso não muda a narração em si, só como a
+  legenda por palavra é exibida por cima do vídeo.
+</p>
+<p><a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}">← Voltar pro editor de trechos</a></p>
+
+<form method="POST" action="{{ url_for('save_captions', job_id=job.job_id) }}">
+  {% for w in words %}
+  <div class="word-card">
+    <input type="text" name="word_{{ loop.index0 }}_text" value="{{ w.word }}">
+    <div class="time-row">
+      <div>
+        <label>Início</label>
+        <input type="number" name="word_{{ loop.index0 }}_start" value="{{ '%.2f'|format(w.start) }}" step="0.01" min="0">
+      </div>
+      <div>
+        <label>Fim</label>
+        <input type="number" name="word_{{ loop.index0 }}_end" value="{{ '%.2f'|format(w.end) }}" step="0.01" min="0">
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div style="clear:both;"></div>
+  <button type="submit" style="margin-top:20px;">Salvar edições</button>
+</form>
+{% endblock %}

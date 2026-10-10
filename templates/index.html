@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% from "_mix_midia.html" import mix_midia %}
+{% from "_bibliotecas.html" import bibliotecas %}
+{% block content %}
+<h1>1. Envie a narração</h1>
+<p>Suba o áudio da narração para transcrever com Whisper e gerar o prompt.</p>
+<p><a href="{{ url_for('settings_page') }}">⚙ Configurações (proporção do vídeo, fontes, navegador)</a></p>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('transcribe') }}" enctype="multipart/form-data">
+  <label>Arquivo de áudio (mp3, wav, m4a...) — ou um .zip com áudio + legenda (.srt), tipo o que o Gerador de Voz baixa: pula a transcrição e usa a legenda já pronta</label>
+  <input type="file" name="audio" accept="audio/*,.zip" required>
+
+  <label>Trocar de vídeo a cada quantos segundos (em média)</label>
+  <input type="number" name="interval_seconds" value="7" min="2" step="0.5">
+  <label>Ritmo das cenas</label>
+  <select name="ritmo_cenas">
+    <option value="livre" selected>🎬 Livre — a IA decide o tamanho de cada cena (curta na ação/listas, longa nas explicações e momentos calmos; o número acima vira a média)</option>
+    <option value="fixo">⏱ Fixo — todas as cenas com mais ou menos o número acima</option>
+  </select>
+
+  <label>Formato do vídeo</label>
+  <select name="formato">
+    <option value="">⚙️ O das Configurações ({{ formato_padrao or '16:9' }})</option>
+    <option value="16:9">▭ Horizontal 16:9 — YouTube</option>
+    <option value="9:16">▯ Vertical 9:16 — Shorts, Reels, TikTok</option>
+    <option value="1:1">◻ Quadrado 1:1 — feed</option>
+  </select>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 8px;">Dá pra trocar depois no Estúdio (📐 no topo). A busca de vídeos e imagens já procura no formato escolhido.</p>
+
+  <label>Idioma da narração</label>
+  <select name="language">
+    <option value="auto" selected>🌐 Automático — o idioma gravado no .zip da narração (ou detectado no áudio)</option>
+    {% for cod, nome in idiomas_lista %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}
+  </select>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 8px;">Tudo que a IA escrever no vídeo (textos na tela, destaques, títulos, gráficos) sai nesse idioma. Escolha um aqui só se quiser forçar.</p>
+
+  <label>Bancos de vídeo disponíveis pra IA escolher</label>
+  <div class="checkboxes">
+    {% for p in providers %}
+    <label><input type="checkbox" name="providers" value="{{ p }}" {% if p not in ('animepexels', 'moviepexels', 'wikipedia', 'bing', 'brave', 'yandex', 'startpage', 'flow', 'youtube') %}checked{% endif %}> {{ p }}{% if p == 'animepexels' %} (acervo local de anime){% elif p == 'moviepexels' %} (acervo local de filmes e séries — mesmo servidor do anime, em /movie){% elif p == 'wikipedia' %} (Wikipedia — só fotos reais de pessoas, lugares, obras e objetos que existem/existiram){% elif p in ('bing', 'brave', 'yandex', 'startpage') %} (busca por navegador, mais lento que os bancos com API){% elif p == 'flow' %} (Google Flow — imagens e vídeos gerados por IA; lento, usa sua conta Google){% elif p == 'youtube' %} (YouTube — filmagem real específica; o site já pesquisa os termos e você escolhe o vídeo e o trecho no editor){% endif %}</label>
+    {% endfor %}
+  </div>
+  {{ bibliotecas("", "providers") }}
+  {{ mix_midia("", "providers") }}
+
+  <div style="margin:10px 0;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">
+    <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="usar_wikipedia_inteligente" style="width:auto;"> 🧠 Este vídeo tem fontes de imagens da Wikipedia (pessoas, lugares, objetos, eventos reais)</label>
+    <p style="color:#666;font-size:0.8rem;margin:6px 0 0;">Depois de transcrever, o site monta um prompt pedindo pra IA sugerir os termos de busca (ela lê o roteiro inteiro com contexto — bem mais preciso que uma busca automática por palavras capitalizadas). Você cola essa resposta, o site pesquisa esses termos DE VERDADE na Wikipedia, e só então monta o prompt principal de edição — já com as fotos confirmadas embutidas, pra IA usar com confiança nos momentos certos e usar os outros bancos pro resto. Ativa o provedor "wikipedia" automaticamente, mesmo que a caixa dele acima esteja desmarcada. Adiciona uma etapa extra de copiar/colar ao processo.</p>
+  </div>
+
+  <div style="margin:10px 0;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">
+    <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="usar_buscadores_inteligente" style="width:auto;"> 🔎 Este vídeo usa buscadores de imagem (Bing/Brave/Yandex/Startpage — coisas específicas que um banco de estoque não teria)</label>
+    <p style="color:#666;font-size:0.8rem;margin:6px 0 0;">Mesma ideia do modo Wikipedia acima, mas pros 4 buscadores de imagem por navegador — pensados pra coisas específicas demais pra um banco de estoque (uma pessoa real, uma marca, um produto, uma captura de tela), não só entidades históricas/enciclopédicas. Ativa o provedor "bing" automaticamente se nenhum dos 4 estiver marcado acima. Se os dois checkboxes forem marcados juntos, o modo Wikipedia tem prioridade (só uma etapa de confirmação roda por vez). Adiciona uma etapa extra de copiar/colar ao processo.</p>
+  </div>
+
+  <label>Instruções extras pra IA (opcional)</label>
+  <textarea name="extra_instructions" rows="3"></textarea>
+
+  <label>Trilha sonora de fundo (opcional)</label>
+  <input type="file" name="music" accept="audio/*">
+
+  <label>Volume da trilha</label>
+  <input type="number" name="music_volume" value="0.18" min="0" max="1" step="0.02">
+
+  <label style="margin-top:16px;"><input type="checkbox" name="add_word_captions" style="width:auto;" onchange="document.getElementById('caption_style_box').style.display = this.checked ? '' : 'none'"> Gerar também uma versão com legenda estilo uma palavra por vez</label>
+
+  <div id="caption_style_box" style="display:none;background:#f7f7f7;padding:14px;border-radius:8px;margin-top:8px;">
+    <strong style="font-size:0.9rem;">Estilo da legenda (opcional — em branco usa o padrão de sempre)</strong>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+      <div>
+        <label style="font-size:0.8rem;">Cor do texto</label><br>
+        <input type="color" name="caption_primary_color" value="#FFFFFF">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Cor da borda</label><br>
+        <input type="color" name="caption_border_color" value="#000000">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Espessura da borda</label><br>
+        <input type="number" name="caption_border_width" placeholder="4" min="0" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Sombra (profundidade)</label><br>
+        <input type="number" name="caption_shadow_depth" placeholder="0" min="0" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Brilho (glow)</label><br>
+        <input type="number" name="caption_glow" placeholder="0" min="0" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Fonte</label><br>
+        <select name="caption_font">
+          <option value="bold">Negrito</option>
+          <option value="regular">Normal</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Tamanho (px)</label><br>
+        <input type="number" name="caption_font_size" placeholder="auto" min="10" max="200" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Posição</label><br>
+        <select name="caption_position">
+          <option value="bottom">Base (padrão)</option>
+          <option value="middle">Meio</option>
+          <option value="top">Topo</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit">Transcrever e gerar prompt</button>
+</form>
+
+<hr style="margin:32px 0;">
+
+<h1>⚡ Usar áudio + JSON existente</h1>
+<p>
+  <strong>Este botão NÃO usa Whisper.</strong> Use quando você já tem o JSON de uma tentativa anterior.
+  O sistema salva o áudio, valida o JSON pela duração do áudio e vai <strong>direto para a extração/busca dos clipes</strong>.
+</p>
+
+<form id="reuse-json-form" method="post" action="{{ url_for('reuse_json') }}" enctype="multipart/form-data">
+  <label>Áudio</label>
+  <input id="reuse-audio" type="file" name="audio_reuse" accept="audio/*" required>
+
+  <label style="margin-top:16px;">JSON da tentativa anterior</label>
+  <div style="display:flex;gap:16px;margin:6px 0 10px;">
+    <label style="width:auto;"><input type="radio" name="json_reuse_mode" value="file" checked style="width:auto;"> Enviar arquivo .json</label>
+    <label style="width:auto;"><input type="radio" name="json_reuse_mode" value="text" style="width:auto;"> Colar o texto do JSON</label>
+  </div>
+  <div id="reuse-json-file-wrap">
+    <input id="reuse-json" type="file" name="json_reuse" accept=".json,application/json">
+    <small id="reuse-json-name" style="display:block;margin-top:6px;color:#666;">Nenhum JSON selecionado.</small>
+  </div>
+  <div id="reuse-json-text-wrap" style="display:none;">
+    <textarea id="reuse-json-text" name="json_reuse_text" rows="10" placeholder='Cole aqui o JSON completo, ex: {"segments": [...]}'></textarea>
+  </div>
+
+  <label>Formato do vídeo</label>
+  <select name="formato_reuse">
+    <option value="">⚙️ O das Configurações</option>
+    <option value="16:9">▭ Horizontal 16:9</option>
+    <option value="9:16">▯ Vertical 9:16</option>
+    <option value="1:1">◻ Quadrado 1:1</option>
+  </select>
+
+  <label>Bancos de vídeo usados nesse JSON</label>
+  <div class="checkboxes">
+    {% for p in providers %}
+    <label><input type="checkbox" name="providers_reuse" value="{{ p }}" {% if p not in ('animepexels', 'moviepexels', 'wikipedia', 'bing', 'brave', 'yandex', 'startpage', 'flow', 'youtube') %}checked{% endif %}> {{ p }}</label>
+    {% endfor %}
+  </div>
+  {{ bibliotecas("_reuse", "providers_reuse") }}
+  {{ mix_midia("_reuse", "providers_reuse") }}
+
+  <label style="margin-top:16px;"><input type="checkbox" name="add_word_captions_reuse" style="width:auto;" onchange="document.getElementById('caption_style_box_reuse').style.display = this.checked ? '' : 'none'"> Gerar versão com legenda palavra por vez</label>
+
+  <div id="caption_style_box_reuse" style="display:none;background:#f7f7f7;padding:14px;border-radius:8px;margin-top:8px;">
+    <strong style="font-size:0.9rem;">Estilo da legenda (opcional — em branco usa o padrão de sempre)</strong>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+      <div>
+        <label style="font-size:0.8rem;">Cor do texto</label><br>
+        <input type="color" name="caption_primary_color_reuse" value="#FFFFFF">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Cor da borda</label><br>
+        <input type="color" name="caption_border_color_reuse" value="#000000">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Espessura da borda</label><br>
+        <input type="number" name="caption_border_width_reuse" placeholder="4" min="0" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Sombra (profundidade)</label><br>
+        <input type="number" name="caption_shadow_depth_reuse" placeholder="0" min="0" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Brilho (glow)</label><br>
+        <input type="number" name="caption_glow_reuse" placeholder="0" min="0" max="20" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Fonte</label><br>
+        <select name="caption_font_reuse">
+          <option value="bold">Negrito</option>
+          <option value="regular">Normal</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Tamanho (px)</label><br>
+        <input type="number" name="caption_font_size_reuse" placeholder="auto" min="10" max="200" style="width:80px;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;">Posição</label><br>
+        <select name="caption_position_reuse">
+          <option value="bottom">Base (padrão)</option>
+          <option value="middle">Meio</option>
+          <option value="top">Topo</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button id="reuse-json-button" type="submit" disabled style="opacity:.5;cursor:not-allowed;">
+    ⚡ Usar JSON e ir direto para busca de clipes
+  </button>
+</form>
+
+<script>
+const audioInput = document.getElementById('reuse-audio');
+const jsonInput = document.getElementById('reuse-json');
+const jsonName = document.getElementById('reuse-json-name');
+const jsonTextArea = document.getElementById('reuse-json-text');
+const jsonFileWrap = document.getElementById('reuse-json-file-wrap');
+const jsonTextWrap = document.getElementById('reuse-json-text-wrap');
+const reuseButton = document.getElementById('reuse-json-button');
+const jsonModeRadios = document.querySelectorAll('input[name="json_reuse_mode"]');
+
+function currentJsonMode() {
+  return document.querySelector('input[name="json_reuse_mode"]:checked').value;
+}
+
+function updateJsonModeVisibility() {
+  const mode = currentJsonMode();
+  jsonFileWrap.style.display = mode === 'file' ? 'block' : 'none';
+  jsonTextWrap.style.display = mode === 'text' ? 'block' : 'none';
+  // limpa o campo escondido pra não mandar os dois ao mesmo tempo
+  if (mode === 'file') { jsonTextArea.value = jsonTextArea.value; jsonInput.disabled = false; jsonTextArea.disabled = true; }
+  else { jsonInput.disabled = true; jsonTextArea.disabled = false; }
+  updateReuseButton();
+}
+
+function updateReuseButton() {
+  const mode = currentJsonMode();
+  const jsonOk = mode === 'file' ? jsonInput.files.length > 0 : jsonTextArea.value.trim().length > 0;
+  const ok = audioInput.files.length > 0 && jsonOk;
+  reuseButton.disabled = !ok;
+  reuseButton.style.opacity = ok ? '1' : '.5';
+  reuseButton.style.cursor = ok ? 'pointer' : 'not-allowed';
+}
+
+jsonModeRadios.forEach(r => r.addEventListener('change', updateJsonModeVisibility));
+jsonInput.addEventListener('change', () => {
+  jsonName.textContent = jsonInput.files.length ? 'JSON selecionado: ' + jsonInput.files[0].name : 'Nenhum JSON selecionado.';
+  updateReuseButton();
+});
+jsonTextArea.addEventListener('input', updateReuseButton);
+audioInput.addEventListener('change', updateReuseButton);
+updateJsonModeVisibility();
+
+document.getElementById('reuse-json-form').addEventListener('submit', (e) => {
+  const mode = currentJsonMode();
+  const jsonOk = mode === 'file' ? jsonInput.files.length > 0 : jsonTextArea.value.trim().length > 0;
+  if (!audioInput.files.length || !jsonOk) {
+    e.preventDefault();
+    alert('Selecione o áudio, e o JSON (arquivo ou texto colado) antes de continuar.');
+    return;
+  }
+  reuseButton.disabled = true;
+  reuseButton.textContent = 'Processando JSON existente...';
+});
+</script>
+{% endblock %}

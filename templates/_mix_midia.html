@@ -1,0 +1,56 @@
+{# Proporção FOTOS × VÍDEOS (opcional) — ver mix_midia.py.
+   uso: {% from "_mix_midia.html" import mix_midia %} {{ mix_midia(sufixo, nome_checkbox, mix) }} #}
+{% macro mix_midia(sufixo="", nome_checkbox="providers", mix=None) %}
+{% set mix = mix or {} %}
+{% set prov = mix.get('provedores') or {} %}
+<div class="mixbox" data-sufixo="{{ sufixo }}" data-checkbox="{{ nome_checkbox }}" style="margin:10px 0;padding:10px 12px;background:#eef6ff;border:1px solid #c7ddf7;border-radius:8px;">
+  <input type="hidden" name="mix_enviado" value="1">
+  <label style="margin:0;font-weight:600;"><input type="checkbox" name="mix_ativo{{ sufixo }}" class="mix-ativo" style="width:auto;" {% if mix %}checked{% endif %}> 🎚 Definir a proporção de fotos × vídeos <span style="font-weight:normal;color:#666;">(opcional — desmarcado, a IA decide)</span></label>
+  <div class="mix-corpo" style="{% if not mix %}display:none;{% endif %}margin-top:8px;">
+    <p style="color:#555;font-size:0.8rem;margin:0 0 8px;">% de <b>fotos</b> (o resto vira vídeo). Em branco = livre. A regra vai no prompt e, quando a resposta da IA chega, o site confere e ajusta os trechos que fugirem da proporção.</p>
+    <div class="mix-linha" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0;">
+      <span style="min-width:170px;">🎞 No vídeo todo <span style="color:#777;font-size:0.78rem;">(vale pros demais bancos)</span></span>
+      <input type="number" name="mix_global{{ sufixo }}" min="0" max="100" step="5" placeholder="livre" value="{{ mix.get('global', '') }}" style="width:80px;"> % fotos
+      <span class="mix-presets"></span>
+      <span class="mix-vid" style="color:#666;font-size:0.8rem;"></span>
+    </div>
+    <div class="mix-linha" data-prov="flow" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0;">
+      <span style="min-width:170px;">✨ flow <span style="color:#777;font-size:0.78rem;">(gerado por IA)</span></span>
+      <input type="number" name="mix_flow{{ sufixo }}" min="0" max="100" step="5" placeholder="livre" value="{{ prov.get('flow', '') }}" style="width:80px;"> % fotos
+      <span class="mix-presets"></span>
+      <span class="mix-vid" style="color:#666;font-size:0.8rem;"></span>
+    </div>
+    <div class="mix-linha" data-prov="pexels" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0;">
+      <span style="min-width:170px;">📷 pexels</span>
+      <input type="number" name="mix_pexels{{ sufixo }}" min="0" max="100" step="5" placeholder="livre" value="{{ prov.get('pexels', '') }}" style="width:80px;"> % fotos
+      <span class="mix-presets"></span>
+      <span class="mix-vid" style="color:#666;font-size:0.8rem;"></span>
+    </div>
+    <p class="mix-info" style="color:#666;font-size:0.78rem;margin:6px 0 0;">Só vídeo: pixabay, magnific, mixkit, vistacreate, animepexels, moviepexels, youtube · Só foto: wikipedia, bing, brave, yandex, startpage. No geral, trecho de banco só-vídeo de estoque pode virar <b>foto do pexels</b> (mesmo termo) quando o pexels estiver marcado. No flow, vídeo é gerado com IA (~8 s, bem mais lento que imagem).</p>
+  </div>
+</div>
+<script>
+(function () {
+  const box = document.currentScript.previousElementSibling;
+  const form = box.closest('form') || document;
+  const presets = [100, 90, 75, 50, 25, 10, 0];
+  box.querySelector('.mix-ativo').addEventListener('change', e => { box.querySelector('.mix-corpo').style.display = e.target.checked ? '' : 'none'; });
+  box.querySelectorAll('.mix-linha').forEach(l => {
+    const inp = l.querySelector('input[type=number]'); const vid = l.querySelector('.mix-vid');
+    const atual = () => { const v = inp.value === '' ? null : Math.max(0, Math.min(100, Number(inp.value))); vid.textContent = v === null ? '' : `→ ${v}% fotos · ${100 - v}% vídeos`; };
+    presets.forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.textContent = p + '%'; b.style.cssText = 'width:auto;padding:2px 7px;margin:0 2px;font-size:0.75rem;cursor:pointer;';
+      b.addEventListener('click', () => { inp.value = p; atual(); }); l.querySelector('.mix-presets').appendChild(b); });
+    const limpar = document.createElement('button'); limpar.type = 'button'; limpar.textContent = 'livre'; limpar.style.cssText = 'width:auto;padding:2px 7px;margin:0 2px;font-size:0.75rem;cursor:pointer;';
+    limpar.addEventListener('click', () => { inp.value = ''; atual(); }); l.querySelector('.mix-presets').appendChild(limpar);
+    inp.addEventListener('input', atual); atual();
+  });
+  // linhas de banco só aparecem com o banco marcado
+  const nome = box.dataset.checkbox;
+  const sync = () => box.querySelectorAll('.mix-linha[data-prov]').forEach(l => {
+    const cb = form.querySelector(`input[name="${nome}"][value="${l.dataset.prov}"]`);
+    l.style.display = (!cb || cb.checked) ? 'flex' : 'none';
+  });
+  form.querySelectorAll(`input[name="${nome}"]`).forEach(cb => cb.addEventListener('change', sync)); sync();
+})();
+</script>
+{% endmacro %}

@@ -1,0 +1,79 @@
+# ==========================================================
+#  BestEditor — o que NÃO vai pro GitHub
+#  (dados pessoais, senhas/cookies, vídeos gerados, modelos
+#   pesados e lixo do Python)
+# ==========================================================
+
+# ---------- PESSOAL / SENHAS — nunca versionar ----------
+# sessão da conta Google usada pelo Google Flow
+flow_dados/
+# cookies do YouTube
+cookies_youtube.txt
+youtube_cookies.json
+cookies*.txt
+# configurações do site (pode ter chaves de API, caminhos do seu PC)
+site_config.json
+# chaves de API em arquivo .env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------- seus dados / o que o site gera ao usar ----------
+jobs/
+uploads/
+outputs/
+narracoes/
+conversas/
+roteiros_yt/
+modelados/
+chamadas_padrao/
+downloads/
+.chrome_downloads/
+estilos_modelados.json
+perfis_info.json
+vozes_multi.json
+predefinicoes_usuario.json
+toolkit/toolkit_config.local.json
+downloads_manifest.json
+*_batch_results.json
+
+# modelos de voz baixados (Piper/Kokoro/XTTS) e perfis de voz (áudio da sua voz)
+toolkit/tts/models/
+
+# vídeos/áudios/zips soltos na RAIZ do projeto (os de assets/ continuam versionados)
+/*.mp4
+/*.mov
+/*.mkv
+/*.webm
+/*.wav
+/*.mp3
+/*.m4a
+/*.zip
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.python-version
+
+# ---------- testes / cobertura ----------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ---------- editores / sistema ----------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

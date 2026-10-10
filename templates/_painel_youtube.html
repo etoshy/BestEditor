@@ -1,0 +1,381 @@
+{# Painel "Vídeos do YouTube pedidos pela IA" — usado no editor e na tela de prévias. #}
+{% if youtube_itens %}
+  <div id="painel-youtube" class="yt-painel">
+    <h2 style="margin-top:0;">🎬 Vídeos do YouTube pedidos pela IA</h2>
+    <label class="yt-auto"><input type="checkbox" id="yt-auto-escolha" {% if job.get('youtube_auto', True) %}checked{% endif %} onchange="ytAutoMudou(this.checked)"> ⚡ Se eu não escolher, usar automaticamente o <strong>1º resultado</strong>, do começo do vídeo, com a duração do trecho (na hora de montar)</label>
+    <p class="yt-ajuda">O site já pesquisou cada termo abaixo. Escolha o vídeo mais promissor, assista, marque o início/fim do trecho e clique em <strong>Usar esse trecho</strong> — ele é baixado e cortado sozinho. Se os resultados não servirem, troque o termo e clique em <strong>Buscar de novo</strong>.</p>
+    <div id="yt-lista">
+      {% for it in youtube_itens %}
+      <div class="yt-item" id="yt-item-{{ it.id }}" data-item-id="{{ it.id }}" data-duracao="{{ it.duracao_alvo or '' }}">
+        <div class="yt-item-topo" onclick="ytAlternar('{{ it.id }}')" title="Clique pra minimizar/abrir">
+          <strong><span class="yt-seta" id="yt-seta-{{ it.id }}">▾</span> {{ it.descricao }}</strong>
+          <span class="yt-estado" id="yt-estado-{{ it.id }}"></span>
+        </div>
+        <div class="yt-corpo" id="yt-corpo-{{ it.id }}">
+        {% if it.duracao_alvo %}<div class="yt-sub">Duração do trecho no vídeo: <strong>{{ '%.1f'|format(it.duracao_alvo) }}s</strong> (o fim é preenchido sozinho a partir do início)</div>{% endif %}
+        <div class="yt-busca">
+          <input type="text" id="yt-termo-{{ it.id }}" value="{{ it.termo }}" placeholder="termo de busca no YouTube" onkeydown="if(event.key==='Enter'){event.preventDefault();ytBuscarDeNovo('{{ it.id }}');}">
+          <button type="button" onclick="ytBuscarDeNovo('{{ it.id }}')">🔍 Buscar de novo</button>
+          <button type="button" class="yt-sec" id="yt-original-{{ it.id }}" style="display:none;" onclick="ytVoltarOriginal('{{ it.id }}')" title="{{ it.termo_original }}">↩ Termo original</button>
+          {% if it.tipo == 'segmento' %}<button type="button" class="yt-sec" onclick="ytUsarPrimeiro('{{ it.id }}')" title="1º resultado, do começo do vídeo, com a duração do trecho">⚡ Usar o 1º</button>{% endif %}
+        </div>
+        <div class="yt-resultados" id="yt-resultados-{{ it.id }}"><p class="yt-sub">Carregando resultados…</p></div>
+        <div class="yt-trecho" id="yt-trecho-{{ it.id }}" style="display:none;">
+          <div class="yt-player-wrap"><div id="yt-player-{{ it.id }}"></div></div>
+          <p class="yt-sub" style="margin:6px 0;">Vídeo escolhido: <strong id="yt-titulo-{{ it.id }}"></strong> <span id="yt-duracao-{{ it.id }}"></span></p>
+          <div class="yt-tempos">
+            <label>Início (s)<input type="number" id="yt-inicio-{{ it.id }}" value="0" min="0" step="0.5" oninput="ytInicioMudou('{{ it.id }}')"></label>
+            <button type="button" onclick="ytPegarTempo('{{ it.id }}','inicio')">⏱ início = agora</button>
+            <label>Fim (s)<input type="number" id="yt-fim-{{ it.id }}" value="10" min="0" step="0.5" oninput="ytAtualizarResumo('{{ it.id }}')"></label>
+            <button type="button" onclick="ytPegarTempo('{{ it.id }}','fim')">⏱ fim = agora</button>
+            <button type="button" onclick="ytTocarTrecho('{{ it.id }}')">▶ ver o trecho</button>
+          </div>
+          <p class="yt-sub" id="yt-resumo-{{ it.id }}"></p>
+          <button type="button" class="yt-usar" onclick="ytUsar('{{ it.id }}')">✅ Usar esse trecho</button>
+          <p class="yt-sub" id="yt-status-{{ it.id }}"></p>
+        </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  
+<style>
+.yt-painel { margin-top:28px; padding:16px; border:2px solid #fecaca; background:#fff7f7; border-radius:10px; }
+.yt-ajuda { font-size:.88rem; color:#555; margin:0 0 12px; }
+.yt-item { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin-bottom:12px; }
+.yt-item.escolhido { border-color:#16a34a; box-shadow:0 0 0 1px #16a34a inset; }
+.yt-item-topo { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline; }
+.yt-estado { font-size:.8rem; color:#555; }
+.yt-sub { font-size:.8rem; color:#666; margin:4px 0; }
+.yt-item-topo { cursor:pointer; user-select:none; }
+.yt-item.fechado .yt-corpo { display:none; }
+.yt-item.fechado { padding:8px 12px; }
+.yt-seta { display:inline-block; width:1em; color:#888; }
+.yt-sec { background:#fff; color:#374151; border:1px solid #d1d5db; }
+.yt-auto { display:block; font-size:.86rem; margin:0 0 10px; padding:8px 10px; background:#fff; border:1px dashed #fca5a5; border-radius:6px; }
+.yt-auto input { width:auto; margin-right:6px; }
+.yt-busca { display:flex; gap:8px; margin-top:8px; }
+.yt-busca input { flex:1; margin-top:0; min-width:0; }
+.yt-busca button { margin-top:0; white-space:nowrap; }
+.yt-resultados { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-top:10px; }
+.yt-card { border:2px solid #e5e7eb; border-radius:6px; overflow:hidden; cursor:pointer; background:#fff; }
+.yt-card:hover { border-color:#f87171; }
+.yt-card.selecionado { border-color:#dc2626; }
+.yt-card img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:#111; }
+.yt-card-info { padding:6px 8px; }
+.yt-card-titulo { font-size:.76rem; font-weight:600; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.yt-card-meta { font-size:.7rem; color:#666; margin-top:3px; }
+.yt-trecho { margin-top:10px; padding-top:10px; border-top:1px solid #e5e7eb; }
+.yt-player-wrap { max-width:560px; }
+.yt-player-wrap iframe, .yt-player-wrap > div { width:100%; aspect-ratio:16/9; border:0; border-radius:6px; background:#000; }
+.yt-tempos { display:flex; gap:8px; align-items:end; flex-wrap:wrap; }
+.yt-tempos label { font-size:.78rem; margin-top:0; }
+.yt-tempos input { width:95px; }
+.yt-tempos button { margin-top:0; }
+.yt-usar { margin-top:8px; background:#16a34a; }
+@media (max-width: 600px) { .yt-busca { flex-direction:column; } }
+</style>
+<script>
+// Painel "Vídeos do YouTube": os termos já foram pesquisados no servidor;
+// aqui só mostra os resultados, deixa escolher o vídeo + faixa de tempo
+// (com o player do YouTube pra marcar início/fim) e manda baixar/cortar.
+(function () {
+  const JOB_ID = {{ job.job_id|tojson }};
+  const escolhido = {};      // itemId -> vídeo (resultado da busca)
+  const players = {};        // itemId -> YT.Player
+  const assinatura = {};     // itemId -> o que já foi desenhado (evita redesenhar à toa)
+  const paradas = {};        // itemId -> intervalo do "ver o trecho"
+  let apiPronta = false;
+  let pollTimer = null;
+
+  const anterior = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = function () { apiPronta = true; if (typeof anterior === 'function') anterior(); };
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+
+  function el(id) { return document.getElementById(id); }
+  function fmt(seg) {
+    if (seg === null || seg === undefined || isNaN(seg)) return '';
+    seg = Math.max(0, Math.round(seg * 10) / 10);
+    const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg - h * 3600 - m * 60;
+    const mm = String(m).padStart(h ? 2 : 1, '0');
+    const ss = (Number.isInteger(s) ? String(s) : s.toFixed(1)).padStart(Number.isInteger(s) ? 2 : 4, '0');
+    return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+  function idDoVideo(v) {
+    if (v.id && /^[\w-]{11}$/.test(v.id)) return v.id;
+    const m = String(v.url || '').match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/);
+    return m ? m[1] : null;
+  }
+  function duracaoAlvo(itemId) {
+    const d = parseFloat(el('yt-item-' + itemId).dataset.duracao);
+    return isNaN(d) ? null : d;
+  }
+
+  const fechadoManual = {};   // itemId -> true/false quando a pessoa clicou no cabeçalho
+  function ytAlternar(itemId) {
+    const box = el('yt-item-' + itemId);
+    const fechar = !box.classList.contains('fechado');
+    fechadoManual[itemId] = fechar;
+    aplicarFechado(itemId, fechar);
+  }
+  function aplicarFechado(itemId, fechar) {
+    const box = el('yt-item-' + itemId);
+    box.classList.toggle('fechado', fechar);
+    el('yt-seta-' + itemId).textContent = fechar ? '▸' : '▾';
+  }
+
+  function desenharItem(it) {
+    const box = el('yt-item-' + it.id);
+    if (!box) return;
+    // depois de escolhido, minimiza sozinho (a não ser que a pessoa tenha aberto de novo)
+    aplicarFechado(it.id, it.id in fechadoManual ? fechadoManual[it.id] : !!it.escolha);
+    const btnOriginal = el('yt-original-' + it.id);
+    if (btnOriginal) {
+      btnOriginal.style.display = (it.termo_original && it.termo !== it.termo_original) ? '' : 'none';
+      btnOriginal.dataset.termo = it.termo_original || '';
+    }
+    const estado = el('yt-estado-' + it.id);
+    const esc = it.escolha;
+    box.classList.toggle('escolhido', !!esc);
+    if (esc && esc.url) {
+      estado.textContent = `✅ ${esc.automatico ? 'automático' : 'escolhido'}: ${esc.titulo || 'vídeo'} (${fmt(esc.inicio)} – ${fmt(esc.fim)}) — clique pra alterar`;
+    } else if (esc) {
+      estado.textContent = '✅ arquivo enviado';
+    } else if (it.status === 'pendente' || it.status === 'buscando') {
+      estado.textContent = '🔄 pesquisando…';
+    } else if (it.status === 'erro') {
+      estado.textContent = '⚠️ busca falhou';
+    } else {
+      estado.textContent = `${(it.resultados || []).length} resultado(s) — escolha um`;
+    }
+
+    const termoInput = el('yt-termo-' + it.id);
+    if (termoInput && document.activeElement !== termoInput && it.status !== 'pronto') termoInput.value = it.termo;
+
+    const sig = [it.status, it.termo, (it.resultados || []).length, it.erro || ''].join('|');
+    if (assinatura[it.id] === sig) return;
+    assinatura[it.id] = sig;
+
+    const cont = el('yt-resultados-' + it.id);
+    cont.textContent = '';
+    if (it.status === 'pendente' || it.status === 'buscando') {
+      const p = document.createElement('p'); p.className = 'yt-sub';
+      p.textContent = `Pesquisando “${it.termo}” no YouTube…`;
+      cont.appendChild(p); return;
+    }
+    if (it.status === 'erro' || !(it.resultados || []).length) {
+      const p = document.createElement('p'); p.className = 'yt-sub'; p.style.color = '#b91c1c';
+      p.textContent = it.erro || 'Nenhum vídeo encontrado — tente outro termo.';
+      cont.appendChild(p); return;
+    }
+    it.resultados.forEach(function (v) {
+      const card = document.createElement('div');
+      card.className = 'yt-card';
+      card.title = v.titulo || '';
+      if (v.miniatura_url) {
+        const img = document.createElement('img');
+        img.src = v.miniatura_url; img.loading = 'lazy'; img.alt = '';
+        card.appendChild(img);
+      }
+      const info = document.createElement('div'); info.className = 'yt-card-info';
+      const t = document.createElement('div'); t.className = 'yt-card-titulo'; t.textContent = v.titulo || '(sem título)';
+      const meta = document.createElement('div'); meta.className = 'yt-card-meta';
+      meta.textContent = [v.canal, v.duracao_formatada].filter(Boolean).join(' · ');
+      info.appendChild(t); info.appendChild(meta); card.appendChild(info);
+      card.addEventListener('click', function () {
+        cont.querySelectorAll('.yt-card').forEach(function (c) { c.classList.remove('selecionado'); });
+        card.classList.add('selecionado');
+        escolher(it.id, v);
+      });
+      cont.appendChild(card);
+    });
+  }
+
+  async function carregar() {
+    clearTimeout(pollTimer);
+    let data;
+    try {
+      const resp = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/itens`);
+      data = await resp.json();
+      if (!resp.ok) throw new Error(data.erro || resp.status);
+    } catch (e) {
+      pollTimer = setTimeout(carregar, 4000);
+      return;
+    }
+    (data.itens || []).forEach(desenharItem);
+    if (data.buscando) pollTimer = setTimeout(carregar, 2000);
+  }
+
+  function escolher(itemId, v) {
+    escolhido[itemId] = v;
+    el('yt-trecho-' + itemId).style.display = '';
+    el('yt-titulo-' + itemId).textContent = v.titulo || '';
+    el('yt-duracao-' + itemId).textContent = v.duracao_formatada ? `(${v.duracao_formatada})` : '';
+    el('yt-status-' + itemId).textContent = '';
+    const inicio = el('yt-inicio-' + itemId), fim = el('yt-fim-' + itemId);
+    inicio.value = '0';
+    if (v.duracao_segundos) { inicio.max = String(v.duracao_segundos); fim.max = String(v.duracao_segundos); }
+    inicioMudou(itemId);
+    const videoId = idDoVideo(v);
+    const alvo = 'yt-player-' + itemId;
+    const criar = function () {
+      if (!videoId) return;
+      if (players[itemId] && typeof players[itemId].loadVideoById === 'function') {
+        players[itemId].cueVideoById(videoId);
+      } else {
+        players[itemId] = new YT.Player(alvo, { videoId: videoId, playerVars: { rel: 0, modestbranding: 1 } });
+      }
+    };
+    if (apiPronta && window.YT && window.YT.Player) { criar(); }
+    else {
+      const espera = setInterval(function () {
+        if (apiPronta && window.YT && window.YT.Player) { clearInterval(espera); criar(); }
+      }, 300);
+      setTimeout(function () { clearInterval(espera); }, 15000);
+    }
+  }
+
+  function inicioMudou(itemId) {
+    const inicio = parseFloat(el('yt-inicio-' + itemId).value) || 0;
+    const v = escolhido[itemId];
+    const alvo = duracaoAlvo(itemId) || 10;
+    let fim = inicio + alvo;
+    if (v && v.duracao_segundos) fim = Math.min(fim, v.duracao_segundos);
+    el('yt-fim-' + itemId).value = fim.toFixed(1);
+    atualizarResumo(itemId);
+  }
+
+  function atualizarResumo(itemId) {
+    const inicio = parseFloat(el('yt-inicio-' + itemId).value) || 0;
+    const fim = parseFloat(el('yt-fim-' + itemId).value) || 0;
+    const sel = fim - inicio;
+    const alvo = duracaoAlvo(itemId);
+    let txt = sel > 0 ? `Trecho: ${fmt(inicio)} → ${fmt(fim)} (${sel.toFixed(1)}s)` : '⚠️ O fim precisa vir depois do início.';
+    if (sel > 0 && alvo && sel < alvo - 0.05) txt += ` — mais curto que o trecho do vídeo (${alvo.toFixed(1)}s): o resto é completado na montagem.`;
+    if (sel > 0 && alvo && sel > alvo + 0.05) txt += ` — mais longo que o trecho do vídeo (${alvo.toFixed(1)}s): o excesso é cortado na montagem.`;
+    el('yt-resumo-' + itemId).textContent = txt;
+  }
+
+  function pegarTempo(itemId, campo) {
+    const p = players[itemId];
+    if (!p || typeof p.getCurrentTime !== 'function') {
+      el('yt-status-' + itemId).textContent = 'O player ainda não carregou — dê play no vídeo e tente de novo (ou digite o tempo).';
+      return;
+    }
+    const t = Math.round(p.getCurrentTime() * 10) / 10;
+    el('yt-' + campo + '-' + itemId).value = t.toFixed(1);
+    if (campo === 'inicio') inicioMudou(itemId); else atualizarResumo(itemId);
+  }
+
+  function tocarTrecho(itemId) {
+    const p = players[itemId];
+    if (!p || typeof p.seekTo !== 'function') return;
+    const inicio = parseFloat(el('yt-inicio-' + itemId).value) || 0;
+    const fim = parseFloat(el('yt-fim-' + itemId).value) || 0;
+    clearInterval(paradas[itemId]);
+    p.seekTo(inicio, true); p.playVideo();
+    paradas[itemId] = setInterval(function () {
+      if (typeof p.getCurrentTime === 'function' && p.getCurrentTime() >= fim) { p.pauseVideo(); clearInterval(paradas[itemId]); }
+    }, 200);
+  }
+
+  async function buscarDeNovo(itemId) {
+    const termo = el('yt-termo-' + itemId).value.trim();
+    if (!termo) return;
+    delete assinatura[itemId];
+    el('yt-trecho-' + itemId).style.display = 'none';
+    delete escolhido[itemId];
+    try {
+      const resp = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/item/${encodeURIComponent(itemId)}/buscar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ termo: termo }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { el('yt-estado-' + itemId).textContent = '⚠️ ' + (data.erro || 'falha'); return; }
+    } catch (e) { el('yt-estado-' + itemId).textContent = '⚠️ ' + e; return; }
+    carregar();
+  }
+
+  async function usar(itemId) {
+    const v = escolhido[itemId];
+    const status = el('yt-status-' + itemId);
+    if (!v) { status.textContent = 'Escolha um vídeo primeiro.'; return; }
+    const inicio = parseFloat(el('yt-inicio-' + itemId).value);
+    const fim = parseFloat(el('yt-fim-' + itemId).value);
+    if (!(fim > inicio)) { status.textContent = 'O fim precisa vir depois do início.'; return; }
+    status.textContent = '⏬ Baixando e cortando o trecho… (pode levar um pouco, depende do tamanho do vídeo)';
+    let data;
+    try {
+      const resp = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/item/${encodeURIComponent(itemId)}/usar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: v.url, inicio: inicio, fim: fim, titulo: v.titulo, miniatura_url: v.miniatura_url }),
+      });
+      data = await resp.json();
+      if (!resp.ok || !data.ok) { status.textContent = '⚠️ ' + (data.erro || 'Falha ao processar.'); return; }
+    } catch (e) { status.textContent = '⚠️ ' + e; return; }
+    const timer = setInterval(async function () {
+      let st;
+      try { st = await (await fetch(`/cutaway-youtube-status/${encodeURIComponent(data.yt_job_id)}`)).json(); }
+      catch (e) { return; }
+      if (st.status === 'pronto') {
+        clearInterval(timer);
+        status.textContent = '✅ Pronto! Esse trecho vai entrar no vídeo.';
+        document.dispatchEvent(new CustomEvent('yt-escolhido', { detail: { itemId: itemId, miniatura: v.miniatura_url || '' } }));
+        delete fechadoManual[itemId];  // minimiza de novo sozinho
+        const m = /^seg-(\d+)$/.exec(itemId);
+        if (m) {
+          // o trecho passa a usar o arquivo cortado (igual a um upload manual)
+          const sel = document.querySelector(`select[name="seg_${m[1]}_source_mode"]`);
+          if (sel) { sel.value = 'upload'; if (typeof toggleSourceFields === 'function') toggleSourceFields(Number(m[1]), 'upload'); }
+        }
+        delete assinatura[itemId];
+        carregar();
+      } else if (st.status === 'erro') {
+        clearInterval(timer);
+        status.textContent = '⚠️ Erro: ' + (st.erro || 'falha desconhecida');
+      }
+    }, 1500);
+  }
+
+  function voltarOriginal(itemId) {
+    const termo = el('yt-original-' + itemId).dataset.termo;
+    if (!termo) return;
+    el('yt-termo-' + itemId).value = termo;
+    buscarDeNovo(itemId);
+  }
+
+  async function usarPrimeiro(itemId) {
+    const cont = el('yt-resultados-' + itemId);
+    const primeiro = cont.querySelector('.yt-card');
+    if (!primeiro) { el('yt-estado-' + itemId).textContent = '⚠️ ainda sem resultados'; return; }
+    fechadoManual[itemId] = false; aplicarFechado(itemId, false);
+    primeiro.click();
+    el('yt-inicio-' + itemId).value = '0';
+    inicioMudou(itemId);
+    usar(itemId);
+  }
+
+  async function autoMudou(ativo) {
+    try {
+      await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/auto`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ativo: ativo }),
+      });
+    } catch (e) { /* tenta de novo na próxima mudança */ }
+  }
+
+  window.ytAlternar = ytAlternar;
+  window.ytVoltarOriginal = voltarOriginal;
+  window.ytUsarPrimeiro = usarPrimeiro;
+  window.ytAutoMudou = autoMudou;
+  window.ytBuscarDeNovo = buscarDeNovo;
+  window.ytUsar = usar;
+  window.ytPegarTempo = pegarTempo;
+  window.ytTocarTrecho = tocarTrecho;
+  window.ytInicioMudou = inicioMudou;
+  window.ytAtualizarResumo = atualizarResumo;
+  carregar();
+})();
+</script>
+{% endif %}

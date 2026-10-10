@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Capturar página{% endblock %}
+{% block content %}
+<h1>🖼️ Capturar página</h1>
+<p>Cole a URL de qualquer página — notícia, blog, post — e o site vai tirar um print, mapear os blocos de texto (título, parágrafos, citações, listas), e baixar as imagens numa galeria com legenda. Depois dá pra gerar um clipe de vídeo com a câmera rolando pela página ou focando num trecho específico.</p>
+
+<p style="color:#666;font-size:0.85rem;">⚠️ Não funciona (ainda) com posts do X/Twitter ou Instagram — essas plataformas exigem uma abordagem diferente (não é possível tirar print direto). Funciona bem com a maioria dos outros sites: notícias, blogs, páginas institucionais, etc.</p>
+
+<div id="error-box" class="error" style="display:none;"></div>
+
+<form id="form-capturar">
+  <label>URL da página</label>
+  <input type="url" name="url" placeholder="https://exemplo.com/materia" required>
+  <button type="submit" id="btn-capturar">Capturar</button>
+</form>
+
+<div id="progresso-box" style="display:none;margin-top:14px;">
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill-indeterminate" style="width:40%;"></div></div>
+  <p style="color:#666;font-size:0.85rem;margin-top:8px;">Capturando... pode levar de 10 a 40 segundos, dependendo do tamanho da página.</p>
+</div>
+<style>
+#progress-fill-indeterminate { animation: indeterminate-captura 1.4s infinite ease-in-out; }
+@keyframes indeterminate-captura { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+</style>
+
+{% if capturas %}
+<h2 style="margin-top:32px;">Capturas recentes</h2>
+<div>
+  {% for c in capturas %}
+  <div style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+    <a href="{{ url_for('capturar_pagina_detalhe', captura_id=c.id) }}"><strong>{{ c.titulo or c.url }}</strong></a>
+    <p style="color:#666;font-size:0.8rem;margin:4px 0 0;">{{ c.url }} — status: {{ c.status }}{% if c.erro %} — {{ c.erro[:120] }}{% endif %}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+document.getElementById('form-capturar').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  document.getElementById('error-box').style.display = 'none';
+  document.getElementById('btn-capturar').disabled = true;
+  document.getElementById('progresso-box').style.display = '';
+
+  const formData = new FormData(ev.target);
+  let resp, data;
+  try {
+    resp = await fetch("{{ url_for('capturar_pagina_submit') }}", { method: 'POST', body: formData });
+    data = await resp.json();
+  } catch (e) {
+    mostrarErro('Não consegui falar com o servidor: ' + e);
+    return;
+  }
+  if (!resp.ok) {
+    mostrarErro(data.erro || 'Falha ao iniciar a captura.');
+    return;
+  }
+  pollStatus(data.captura_id);
+});
+
+function mostrarErro(msg) {
+  document.getElementById('error-box').textContent = msg;
+  document.getElementById('error-box').style.display = '';
+  document.getElementById('progresso-box').style.display = 'none';
+  document.getElementById('btn-capturar').disabled = false;
+}
+
+async function pollStatus(capturaId) {
+  let data;
+  try {
+    const r = await fetch(`/capturar-pagina/${capturaId}/status`);
+    data = await r.json();
+  } catch (e) {
+    setTimeout(function () { pollStatus(capturaId); }, 2000);
+    return;
+  }
+  if (data.status === 'capturando') {
+    setTimeout(function () { pollStatus(capturaId); }, 1500);
+    return;
+  }
+  document.getElementById('btn-capturar').disabled = false;
+  if (data.status === 'erro') {
+    mostrarErro(data.erro || 'Falha na captura.');
+    return;
+  }
+  window.location.href = `/capturar-pagina/${capturaId}`;
+}
+</script>
+{% endblock %}

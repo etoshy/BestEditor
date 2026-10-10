@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+{% block title %}Cortar do YouTube{% endblock %}
+{% block content %}
+<h1>✂️ Cortar do YouTube</h1>
+<p style="color:#666;">Busque um vídeo, assista ele aqui mesmo, e marque os trechos que quer cortar — pode ser vários trechos do mesmo vídeo, ou vários vídeos diferentes de uma vez. No final, um <code>.zip</code> com os clipes + um <code>info.json</code> dizendo o título original, o link, e os trechos de cada vídeo.</p>
+
+<div id="error-box" class="error" style="display:none;"></div>
+
+<h2 style="margin-top:24px;">🔍 Buscar no YouTube</h2>
+<div style="display:flex;gap:8px;">
+  <input type="text" id="campo-busca" placeholder="ex: Sweet Home (1989) gameplay" style="flex:1;margin-top:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();buscarYoutube();}">
+  <button type="button" onclick="buscarYoutube()" style="margin-top:0;">Buscar</button>
+</div>
+<div id="busca-carregando" style="display:none;color:#666;margin-top:8px;">Buscando…</div>
+<div id="busca-resultados" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px;"></div>
+
+<h2 style="margin-top:32px;">📋 Colar texto com os links e os tempos</h2>
+<p style="color:#555;font-size:0.88rem;margin-top:-6px;">Cole do jeito que tiver (anotação, resposta de IA, capítulos do vídeo). O site acha os links, os tempos e as descrições sozinho. Descrição é opcional; link sem tempo = vídeo inteiro.</p>
+<details style="font-size:0.82rem;color:#475569;margin-bottom:6px;"><summary style="cursor:pointer;">ver exemplos de formato</summary>
+<pre style="background:#f8fafc;padding:8px 10px;border-radius:6px;white-space:pre-wrap;">https://youtu.be/abc123
+0:15 - 0:42 chegada do herói
+1:10 a 1:30 | a luta
+de 2:00 até 2:20 - final
+2:40 até o fim
+
+https://www.youtube.com/watch?v=xyz 00:05-00:20 abertura
+explosão: 45s - 1m20s
+[1:02:03 -> 1:02:30] epílogo
+
+Entrevista com a Ana            ← título antes do link vira a descrição
+https://youtu.be/aaa
+0:00 Introdução                 ← lista de capítulos: cada um vai até o próximo
+1:23 A infância
+5:40 Carreira
+
+https://youtu.be/qqq            ← sem tempo: o vídeo inteiro</pre></details>
+<textarea id="texto-colado" rows="8" placeholder="Cole aqui: links do YouTube + tempos (0:15 - 0:42) + descrição opcional..." style="font-family:inherit;font-size:0.92rem;">{{ texto_inicial or '' }}</textarea>
+{% if texto_inicial %}<p style="font-size:0.82rem;color:#5b21b6;margin:4px 0 0;">📜 Cenas vindas da aba Roteiro do YouTube — confira os tempos e clique em <b>👁 Conferir</b> ou <b>⚡ Criar e cortar tudo</b>.</p>{% endif %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+  <button type="button" onclick="colarTexto(false)" style="margin-top:0;background:#475569;">👁 Conferir (monta os campos abaixo)</button>
+  <button type="button" onclick="colarTexto(true)" style="margin-top:0;background:#059669;">⚡ Criar e cortar tudo</button>
+  <label style="margin:0;font-weight:400;font-size:0.85rem;"><input type="checkbox" id="colar-substituir" checked style="width:auto;margin:0;"> substituir o que já está abaixo</label>
+</div>
+<div id="colar-resumo" style="display:none;margin-top:8px;font-size:0.88rem;"></div>
+
+<h2 style="margin-top:32px;">Vídeos pra cortar</h2>
+<label>Qualidade do download</label>
+<select id="select-qualidade">
+  {% for q in qualidades %}
+  <option value="{{ q }}" {% if q == qualidade_padrao %}selected{% endif %}>{{ q }}{% if q == '1080p' %} (Full HD — padrão){% endif %}{% if q == 'melhor' %} (a melhor disponível, pode passar de 1080p){% endif %}</option>
+  {% endfor %}
+</select>
+
+<div id="lista-videos" style="margin-top:16px;"></div>
+<button type="button" onclick="adicionarVideo()" style="background:#666;">+ Adicionar outro vídeo (colar link na mão)</button>
+
+<button type="button" id="btn-processar" onclick="processar()" style="margin-top:18px;display:block;">Baixar e cortar tudo</button>
+
+<div id="progresso-box" style="display:none;margin-top:16px;">
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill-yt" style="width:40%;"></div></div>
+  <pre id="log-box" style="max-height:200px;overflow:auto;background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.78rem;margin-top:8px;"></pre>
+</div>
+<style>
+#progress-fill-yt { animation: indeterminate-yt 1.4s infinite ease-in-out; }
+@keyframes indeterminate-yt { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+.resultado-busca-card { border:1px solid #ddd; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
+.resultado-busca-card img { width:100%; aspect-ratio:16/9; object-fit:cover; cursor:pointer; }
+.resultado-busca-card .corpo { padding:10px 12px; display:flex; flex-direction:column; gap:4px; flex:1; }
+.resultado-busca-card .titulo { font-weight:600; font-size:0.9rem; cursor:pointer; }
+.resultado-busca-card .titulo:hover { color:#2563eb; }
+.resultado-busca-card .meta { color:#666; font-size:0.78rem; }
+.resultado-busca-card .descricao { color:#666; font-size:0.78rem; max-height:3.2em; overflow:hidden; }
+.resultado-busca-card .acoes { display:flex; gap:6px; margin-top:auto; }
+.resultado-busca-card .acoes button { margin-top:0; font-size:0.78rem; padding:5px 8px; }
+.player-embutido { margin-top:10px; }
+.player-embutido iframe { width:100%; aspect-ratio:16/9; border:0; border-radius:6px; }
+</style>
+
+<div id="resultado-box" style="display:none;background:#d1fae5;color:#065f46;padding:14px;border-radius:8px;margin-top:14px;">
+  <strong id="texto-resultado"></strong>
+  <p><a id="link-download-zip" download>⬇ Baixar o .zip com os clipes</a></p>
+</div>
+
+{% if jobs %}
+<h2 style="margin-top:32px;">Processamentos recentes</h2>
+<div>
+  {% for j in jobs %}
+  <div style="border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.85rem;">
+    {{ j.quantidade_videos }} vídeo(s), qualidade {{ j.qualidade }} — status: {{ j.status }}
+    {% if j.status == 'pronto' %}<a href="{{ url_for('cortar_youtube_download', job_id=j.id) }}" style="margin-left:10px;">⬇ baixar</a>{% endif %}
+    {% if j.erro %} — {{ j.erro[:150] }}{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<template id="template-video">
+  <div class="bloco-video" style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="url" class="campo-url" placeholder="https://www.youtube.com/watch?v=..." style="flex:1;" required>
+      <button type="button" class="btn-assistir" style="margin-top:0;background:#666;">▶ Assistir aqui</button>
+      <button type="button" onclick="this.closest('.bloco-video').remove()" style="margin-top:0;background:#dc2626;">Remover vídeo</button>
+    </div>
+    <div class="player-embutido" style="display:none;"></div>
+    <div class="lista-trechos" style="margin-top:10px;"></div>
+    <button type="button" class="btn-add-trecho" style="margin-top:6px;font-size:0.8rem;padding:5px 10px;background:#666;">+ Adicionar trecho</button>
+  </div>
+</template>
+
+<template id="template-trecho">
+  <div class="bloco-trecho" style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+    <input type="text" class="campo-inicio" placeholder="início (vazio = começo do vídeo)" style="width:190px;margin-top:0;">
+    <button type="button" class="btn-pegar-inicio" title="Usar o tempo atual do player como início" style="margin-top:0;font-size:0.75rem;padding:4px 6px;background:#666;">⏱→início</button>
+    <span>até</span>
+    <input type="text" class="campo-fim" placeholder="fim (vazio = fim do vídeo)" style="width:190px;margin-top:0;">
+    <button type="button" class="btn-pegar-fim" title="Usar o tempo atual do player como fim" style="margin-top:0;font-size:0.75rem;padding:4px 6px;background:#666;">⏱→fim</button>
+    <input type="text" class="campo-descricao" placeholder="descrição (opcional)" style="flex:1;min-width:120px;margin-top:0;">
+    <button type="button" onclick="this.closest('.bloco-trecho').remove()" style="margin-top:0;background:#dc2626;padding:4px 10px;">✕</button>
+  </div>
+</template>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+let ytApiPronta = false;
+let proximoPlayerId = 0;
+const players = {};  // id do elemento do player -> instancia YT.Player
+
+function onYouTubeIframeAPIReady() { ytApiPronta = true; }
+
+function extrairIdYoutube(url) {
+  const padroes = [
+    /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/,
+  ];
+  for (const p of padroes) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function formatarSegundosParaTempo(segundosTotais) {
+  segundosTotais = Math.round(segundosTotais);
+  const h = Math.floor(segundosTotais / 3600);
+  const m = Math.floor((segundosTotais % 3600) / 60);
+  const s = segundosTotais % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+function adicionarVideo(urlInicial) {
+  const tpl = document.getElementById('template-video').content.cloneNode(true);
+  const bloco = tpl.querySelector('.bloco-video');
+  if (urlInicial) bloco.querySelector('.campo-url').value = urlInicial;
+  bloco.querySelector('.btn-add-trecho').addEventListener('click', function () { adicionarTrecho(bloco); });
+  bloco.querySelector('.btn-assistir').addEventListener('click', function () { assistirAqui(bloco); });
+  document.getElementById('lista-videos').appendChild(tpl);
+  adicionarTrecho(bloco);  // já começa com um trecho em branco, pra não precisar de um clique extra
+  return bloco;
+}
+
+function assistirAqui(blocoVideo) {
+  const url = blocoVideo.querySelector('.campo-url').value.trim();
+  const videoId = extrairIdYoutube(url);
+  if (!videoId) {
+    mostrarErro('Não consegui identificar o vídeo nesse link — cole um link válido do YouTube antes de assistir.');
+    return;
+  }
+  const container = blocoVideo.querySelector('.player-embutido');
+  container.style.display = '';
+
+  if (!container.dataset.playerElId) {
+    const elId = 'yt-player-' + (proximoPlayerId++);
+    container.dataset.playerElId = elId;
+    const div = document.createElement('div');
+    div.id = elId;
+    container.appendChild(div);
+  }
+  const elId = container.dataset.playerElId;
+
+  const criarOuTrocarVideo = function () {
+    if (players[elId]) {
+      players[elId].loadVideoById(videoId);
+    } else {
+      players[elId] = new YT.Player(elId, {
+        videoId: videoId,
+        playerVars: { rel: 0 },
+      });
+    }
+  };
+  if (ytApiPronta && window.YT && window.YT.Player) {
+    criarOuTrocarVideo();
+  } else {
+    // a API do YouTube ainda não carregou -- tenta de novo em breve
+    const esperar = setInterval(function () {
+      if (ytApiPronta && window.YT && window.YT.Player) {
+        clearInterval(esperar);
+        criarOuTrocarVideo();
+      }
+    }, 200);
+  }
+}
+
+function pegarTempoAtual(blocoVideo) {
+  const container = blocoVideo.querySelector('.player-embutido');
+  const elId = container.dataset.playerElId;
+  if (!elId || !players[elId] || typeof players[elId].getCurrentTime !== 'function') {
+    mostrarErro('Clique em "▶ Assistir aqui" primeiro pra poder pegar o tempo atual do vídeo.');
+    return null;
+  }
+  return players[elId].getCurrentTime();
+}
+
+function adicionarTrecho(blocoVideo) {
+  const tpl = document.getElementById('template-trecho').content.cloneNode(true);
+  const blocoTrecho = tpl.querySelector('.bloco-trecho');
+  blocoTrecho.querySelector('.btn-pegar-inicio').addEventListener('click', function () {
+    const t = pegarTempoAtual(blocoVideo);
+    if (t !== null) blocoTrecho.querySelector('.campo-inicio').value = formatarSegundosParaTempo(t);
+  });
+  blocoTrecho.querySelector('.btn-pegar-fim').addEventListener('click', function () {
+    const t = pegarTempoAtual(blocoVideo);
+    if (t !== null) blocoTrecho.querySelector('.campo-fim').value = formatarSegundosParaTempo(t);
+  });
+  blocoVideo.querySelector('.lista-trechos').appendChild(tpl);
+}
+
+// começa já com um vídeo em branco
+adicionarVideo();
+
+async function buscarYoutube() {
+  const termo = document.getElementById('campo-busca').value.trim();
+  if (!termo) return;
+  document.getElementById('error-box').style.display = 'none';
+  document.getElementById('busca-carregando').style.display = '';
+  document.getElementById('busca-resultados').innerHTML = '';
+
+  let resp, data;
+  try {
+    resp = await fetch(`/cortar-youtube/buscar?termo=${encodeURIComponent(termo)}`);
+    data = await resp.json();
+  } catch (e) {
+    document.getElementById('busca-carregando').style.display = 'none';
+    mostrarErro('Falha ao buscar: ' + e);
+    return;
+  }
+  document.getElementById('busca-carregando').style.display = 'none';
+  if (!resp.ok) {
+    mostrarErro(data.erro || 'Falha na busca.');
+    return;
+  }
+
+  const cont = document.getElementById('busca-resultados');
+  data.resultados.forEach(function (v) {
+    const card = document.createElement('div');
+    card.className = 'resultado-busca-card';
+    const img = document.createElement('img');
+    img.src = v.miniatura_url;
+    img.alt = v.titulo;
+    img.addEventListener('click', function () { usarVideoDaBusca(v); });
+    card.appendChild(img);
+
+    const corpo = document.createElement('div');
+    corpo.className = 'corpo';
+
+    const titulo = document.createElement('div');
+    titulo.className = 'titulo';
+    titulo.textContent = v.titulo;
+    titulo.addEventListener('click', function () { usarVideoDaBusca(v); });
+    corpo.appendChild(titulo);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = [v.canal, v.duracao_formatada].filter(Boolean).join(' · ');
+    corpo.appendChild(meta);
+
+    if (v.descricao) {
+      const desc = document.createElement('div');
+      desc.className = 'descricao';
+      desc.textContent = v.descricao;
+      corpo.appendChild(desc);
+    }
+
+    const acoes = document.createElement('div');
+    acoes.className = 'acoes';
+    const btnUsar = document.createElement('button');
+    btnUsar.type = 'button';
+    btnUsar.textContent = '▶ Usar este vídeo';
+    btnUsar.addEventListener('click', function () { usarVideoDaBusca(v); });
+    acoes.appendChild(btnUsar);
+    const btnCopiar = document.createElement('button');
+    btnCopiar.type = 'button';
+    btnCopiar.textContent = '🔗 Copiar link';
+    btnCopiar.style.background = '#666';
+    btnCopiar.addEventListener('click', function () {
+      navigator.clipboard.writeText(v.url).then(function () {
+        btnCopiar.textContent = 'Copiado!';
+        setTimeout(function () { btnCopiar.textContent = '🔗 Copiar link'; }, 1500);
+      });
+    });
+    acoes.appendChild(btnCopiar);
+    corpo.appendChild(acoes);
+
+    card.appendChild(corpo);
+    cont.appendChild(card);
+  });
+}
+
+function usarVideoDaBusca(v) {
+  const bloco = adicionarVideo(v.url);
+  assistirAqui(bloco);
+  bloco.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function colarTexto(cortarJa) {
+  const texto = document.getElementById('texto-colado').value;
+  const resumo = document.getElementById('colar-resumo');
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let d;
+  try {
+    const r = await fetch("{{ url_for('cortar_youtube_interpretar') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: texto }) });
+    d = await r.json();
+  } catch (e) { d = { erro: 'Falha ao falar com o servidor: ' + e }; }
+  if (d.erro) { resumo.style.display = ''; resumo.innerHTML = '<div class="error" style="margin:0">' + esc(d.erro) + '</div>'; return; }
+  if (!d.itens.length) { resumo.style.display = ''; resumo.innerHTML = '<div class="error" style="margin:0">Não achei nenhum link no texto.</div>'; return; }
+  if (document.getElementById('colar-substituir').checked) document.getElementById('lista-videos').innerHTML = '';
+  d.itens.forEach(function (item) {
+    const bloco = adicionarVideo(item.url);           // já vem com 1 trecho em branco
+    bloco.querySelector('.lista-trechos').innerHTML = '';
+    item.trechos.forEach(function (t) {
+      adicionarTrecho(bloco);
+      const tr = bloco.querySelectorAll('.bloco-trecho');
+      const ultimo = tr[tr.length - 1];
+      ultimo.querySelector('.campo-inicio').value = t.inicio || '';
+      ultimo.querySelector('.campo-fim').value = t.fim || '';
+      ultimo.querySelector('.campo-descricao').value = t.descricao || '';
+    });
+  });
+  resumo.style.display = '';
+  resumo.innerHTML = '<div style="background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:6px;padding:8px 10px;">✔ '
+    + d.resumo.videos + ' vídeo(s), ' + d.resumo.trechos + ' trecho(s) montados abaixo' + (cortarJa ? ' — começando a baixar e cortar…' : ' — confira e clique em "Baixar e cortar tudo".') + '</div>'
+    + (d.avisos.length ? '<div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:6px;padding:8px 10px;margin-top:6px;">' + d.avisos.map(a => '⚠ ' + esc(a)).join('<br>') + '</div>' : '');
+  if (cortarJa) processar(); else document.getElementById('lista-videos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function montarItens() {
+  const itens = [];
+  document.querySelectorAll('.bloco-video').forEach(function (blocoVideo) {
+    const url = blocoVideo.querySelector('.campo-url').value.trim();
+    const trechos = [];
+    blocoVideo.querySelectorAll('.bloco-trecho').forEach(function (blocoTrecho) {
+      const inicio = blocoTrecho.querySelector('.campo-inicio').value.trim();
+      const fim = blocoTrecho.querySelector('.campo-fim').value.trim();
+      const descricao = blocoTrecho.querySelector('.campo-descricao').value.trim();
+      // inicio/fim vazios viram o vídeo inteiro (resolvido no servidor) --
+      // só não manda o trecho se o bloco inteiro estiver vazio.
+      trechos.push({ inicio: inicio, fim: fim, descricao: descricao });
+    });
+    if (url && trechos.length) itens.push({ url: url, trechos: trechos });
+  });
+  return itens;
+}
+
+async function processar() {
+  document.getElementById('error-box').style.display = 'none';
+  document.getElementById('resultado-box').style.display = 'none';
+  const itens = montarItens();
+  if (!itens.length) {
+    mostrarErro('Adicione pelo menos um vídeo com URL e um trecho (início/fim).');
+    return;
+  }
+
+  document.getElementById('btn-processar').disabled = true;
+  document.getElementById('progresso-box').style.display = '';
+  document.getElementById('log-box').textContent = '';
+
+  let resp, data;
+  try {
+    resp = await fetch("{{ url_for('cortar_youtube_submit') }}", {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itens: itens, qualidade: document.getElementById('select-qualidade').value }),
+    });
+    data = await resp.json();
+  } catch (e) {
+    mostrarErro('Falha ao falar com o servidor: ' + e);
+    return;
+  }
+  if (!resp.ok) {
+    mostrarErro(data.erro || 'Falha ao iniciar.');
+    return;
+  }
+  pollStatus(data.job_id);
+}
+
+async function pollStatus(jobId) {
+  let data;
+  try {
+    const r = await fetch(`/cortar-youtube/${jobId}/status`);
+    data = await r.json();
+  } catch (e) {
+    setTimeout(function () { pollStatus(jobId); }, 2000);
+    return;
+  }
+  document.getElementById('log-box').textContent = data.log || '';
+  document.getElementById('log-box').scrollTop = document.getElementById('log-box').scrollHeight;
+
+  if (data.status === 'processando') {
+    setTimeout(function () { pollStatus(jobId); }, 1500);
+    return;
+  }
+  document.getElementById('btn-processar').disabled = false;
+  document.getElementById('progresso-box').style.display = 'none';
+  if (data.status === 'erro') {
+    mostrarErro(data.erro || 'Falha no processamento.');
+    return;
+  }
+  document.getElementById('texto-resultado').textContent =
+    `Pronto! ${data.quantidade_clipes} clipe(s) de ${data.quantidade_videos} vídeo(s).`;
+  document.getElementById('link-download-zip').href = `/cortar-youtube/${jobId}/download`;
+  document.getElementById('resultado-box').style.display = '';
+}
+
+function mostrarErro(msg) {
+  document.getElementById('error-box').textContent = msg;
+  document.getElementById('error-box').style.display = '';
+  document.getElementById('btn-processar').disabled = false;
+  document.getElementById('progresso-box').style.display = 'none';
+}
+</script>
+{% endblock %}

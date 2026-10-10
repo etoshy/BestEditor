@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ conversa.nome }}{% endblock %}
+{% block content %}
+<h1>💬 {{ conversa.nome }}</h1>
+<p><a href="{{ url_for('conversa_lista') }}">&larr; todas as conversas</a></p>
+
+<form method="post" action="{{ url_for('conversa_renomear', conversa_id=conversa.conversaId) }}" style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+  <input type="text" name="nome" value="{{ conversa.nome }}" style="flex:1;">
+  <button type="submit" style="margin-top:0;">Renomear</button>
+</form>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<h2 style="margin-top:24px;">Falas ({{ conversa.falas|length }})</h2>
+<div id="lista-falas">
+  {% for f in conversa.falas %}
+  <div class="fala-card" data-fala-id="{{ f.id }}" style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+    <p style="margin:0 0 8px;"><strong>{{ loop.index }}.</strong> {{ f.texto }}</p>
+    <p style="color:#666;font-size:0.8rem;margin:0 0 8px;">Motor: <strong>{{ f.motor }}</strong>{% if f.voz %} · Voz: <strong>{{ f.voz }}</strong>{% endif %}{% if f.duracaoSegundos %} · {{ f.duracaoSegundos }}s{% endif %}</p>
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <button type="button" class="btn-gerar-fala" style="margin-top:0;font-size:0.8rem;padding:5px 10px;" onclick="gerarFala('{{ f.id }}', this)">
+        {% if f.status == 'pronto' %}🔁 Gerar de novo{% else %}▶ Gerar áudio{% endif %}
+      </button>
+      {% if f.status == 'pronto' %}
+      <audio controls style="height:28px;" src="{{ url_for('conversa_audio_fala', conversa_id=conversa.conversaId, fala_id=f.id) }}"></audio>
+      <a href="{{ url_for('conversa_audio_fala', conversa_id=conversa.conversaId, fala_id=f.id) }}" download style="font-size:0.78rem;">⬇ baixar</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('conversa_mover_fala', conversa_id=conversa.conversaId, fala_id=f.id) }}" style="display:inline;">
+        <input type="hidden" name="direcao" value="cima">
+        <button type="submit" style="margin-top:0;font-size:0.8rem;padding:5px 8px;background:#666;">↑</button>
+      </form>
+      <form method="post" action="{{ url_for('conversa_mover_fala', conversa_id=conversa.conversaId, fala_id=f.id) }}" style="display:inline;">
+        <input type="hidden" name="direcao" value="baixo">
+        <button type="submit" style="margin-top:0;font-size:0.8rem;padding:5px 8px;background:#666;">↓</button>
+      </form>
+      <form method="post" action="{{ url_for('conversa_excluir_fala', conversa_id=conversa.conversaId, fala_id=f.id) }}" style="display:inline;">
+        <button type="submit" style="margin-top:0;font-size:0.8rem;padding:5px 8px;background:#dc2626;">Excluir</button>
+      </form>
+    </div>
+    <p class="fala-status" style="color:#666;font-size:0.78rem;margin:6px 0 0;">{% if f.status == 'erro' %}Erro: {{ f.erro }}{% endif %}</p>
+
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;color:#666;font-size:0.8rem;">Editar essa fala</summary>
+      <form method="post" action="{{ url_for('conversa_editar_fala', conversa_id=conversa.conversaId, fala_id=f.id) }}" style="margin-top:8px;">
+        <textarea name="texto" rows="2">{{ f.texto }}</textarea>
+        <div style="display:flex;gap:8px;">
+          <select name="motor" style="flex:1;">
+            <option value="piper" {% if f.motor == 'piper' %}selected{% endif %}>Piper</option>
+            <option value="xtts" {% if f.motor == 'xtts' %}selected{% endif %}>XTTS v2</option>
+            <option value="chatterbox" {% if f.motor == 'chatterbox' %}selected{% endif %}>Chatterbox</option>
+            <option value="chatterbox_turbo" {% if f.motor == 'chatterbox_turbo' %}selected{% endif %}>Chatterbox Turbo (EN)</option>
+            <option value="kokoro" {% if f.motor == 'kokoro' %}selected{% endif %}>Kokoro</option>
+          </select>
+          <input type="text" name="voz" value="{{ f.voz }}" placeholder="nome da voz/speaker/perfil" style="flex:1;">
+        </div>
+        <button type="submit" style="font-size:0.85rem;">Salvar edição</button>
+        <p style="color:#666;font-size:0.75rem;">Editar reseta o áudio já gerado dessa fala (precisa gerar de novo).</p>
+      </form>
+    </details>
+  </div>
+  {% endfor %}
+</div>
+
+<h2 style="margin-top:24px;">Adicionar fala</h2>
+<form method="post" action="{{ url_for('conversa_adicionar_fala', conversa_id=conversa.conversaId) }}">
+  <label>Texto</label>
+  <textarea name="texto" rows="2" required></textarea>
+
+  <div style="display:flex;gap:8px;">
+    <div style="flex:1;">
+      <label>Motor</label>
+      <select name="motor">
+        <option value="piper">Piper (leve/rápido)</option>
+        <option value="xtts">XTTS v2 (clonagem de voz)</option>
+        <option value="chatterbox">Chatterbox (clonagem de voz)</option>
+        <option value="chatterbox_turbo">Chatterbox Turbo (só inglês, tags de emoção)</option>
+        <option value="kokoro">Kokoro</option>
+      </select>
+    </div>
+    <div style="flex:1;">
+      <label>Voz</label>
+      <input type="text" name="voz" placeholder="ex: pt_BR-faber-medium (piper), pf_dora (kokoro), ou nome de um perfil salvo (xtts/chatterbox)">
+    </div>
+  </div>
+  <p style="color:#666;font-size:0.78rem;margin-top:-4px;">
+    Piper: nomes como <code>{{ piper_vozes.keys()|list|first if piper_vozes else 'pt_BR-faber-medium' }}</code>.
+    Kokoro: nomes como <code>{{ kokoro_vozes.keys()|list|first if kokoro_vozes else 'pf_dora' }}</code>.
+    XTTS: o nome de um <a href="{{ url_for('perfis_de_voz_page') }}">perfil de voz salvo</a> (clona essa voz), ou deixe em branco pra voz padrão.
+    {% if perfis_de_voz %}Perfis salvos: {{ perfis_de_voz|join(', ') }}.{% endif %}
+  </p>
+
+  <button type="submit">+ Adicionar fala</button>
+</form>
+
+<h2 style="margin-top:28px;">Áudio combinado</h2>
+<form id="form-pausa" method="post" action="{{ url_for('conversa_salvar_pausa', conversa_id=conversa.conversaId) }}" style="display:flex;gap:8px;align-items:center;">
+  <label style="margin:0;">Pausa entre falas (segundos)</label>
+  <input type="number" name="pausa_segundos" value="{{ conversa.pausaSegundos }}" min="0" max="10" step="0.1" style="width:80px;">
+  <button type="submit" style="margin-top:0;">Salvar</button>
+</form>
+
+<button type="button" id="btn-gerar-tudo" onclick="gerarTudo()" style="margin-top:12px;">🔗 Combinar todas as falas geradas num único áudio</button>
+<div id="resultado-combinado" style="display:none;margin-top:10px;background:#d1fae5;color:#065f46;padding:12px 14px;border-radius:8px;">
+  <span id="texto-resultado-combinado"></span>
+  <a id="link-baixar-combinado" href="{{ url_for('conversa_audio_completo', conversa_id=conversa.conversaId) }}" download style="display:block;margin-top:6px;">⬇ Baixar o áudio combinado</a>
+</div>
+<div id="erro-combinado" class="error" style="display:none;margin-top:10px;"></div>
+
+<script>
+async function gerarFala(falaId, botao) {
+  botao.disabled = true;
+  botao.textContent = 'Gerando...';
+  const card = document.querySelector('.fala-card[data-fala-id="' + falaId + '"]');
+  const statusEl = card.querySelector('.fala-status');
+  statusEl.textContent = '';
+
+  await fetch(`/gerar-voz/conversa/{{ conversa.conversaId }}/fala/${falaId}/gerar`, { method: 'POST' });
+  pollStatusFala(falaId, botao);
+}
+
+async function pollStatusFala(falaId, botao) {
+  const r = await fetch(`/gerar-voz/conversa/{{ conversa.conversaId }}/fala/${falaId}/status`);
+  const data = await r.json();
+  if (data.running) {
+    setTimeout(function () { pollStatusFala(falaId, botao); }, 1200);
+    return;
+  }
+  if (data.erro) {
+    const card = document.querySelector('.fala-card[data-fala-id="' + falaId + '"]');
+    card.querySelector('.fala-status').textContent = 'Erro: ' + data.erro;
+    botao.disabled = false;
+    botao.textContent = '▶ Gerar áudio';
+    return;
+  }
+  window.location.reload();
+}
+
+async function gerarTudo() {
+  const btn = document.getElementById('btn-gerar-tudo');
+  btn.disabled = true;
+  btn.textContent = 'Combinando...';
+  document.getElementById('resultado-combinado').style.display = 'none';
+  document.getElementById('erro-combinado').style.display = 'none';
+
+  const r = await fetch(`/gerar-voz/conversa/{{ conversa.conversaId }}/gerar-tudo`, { method: 'POST' });
+  const data = await r.json();
+  btn.disabled = false;
+  btn.textContent = '🔗 Combinar todas as falas geradas num único áudio';
+
+  if (!r.ok) {
+    document.getElementById('erro-combinado').textContent = data.erro || 'Falha ao combinar.';
+    document.getElementById('erro-combinado').style.display = '';
+    return;
+  }
+  document.getElementById('texto-resultado-combinado').textContent =
+    `Combinado! ${data.quantidadeFalas} fala(s), ${data.duracaoSegundos}s.`;
+  document.getElementById('resultado-combinado').style.display = '';
+}
+</script>
+{% endblock %}

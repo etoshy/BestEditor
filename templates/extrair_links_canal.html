@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Extrair links de canal{% endblock %}
+{% block content %}
+<h1>🔗 Extrair links de canal</h1>
+<p style="color:#666;">Cola o link de um canal do YouTube e pega título + link de todos os Shorts (ou vídeos normais) dele, sem baixar nada — útil pra montar rapidamente uma lista grande de URLs pra colar em <a href="{{ url_for('cortar_youtube_page') }}">✂️ Cortar do YouTube</a> ou <a href="{{ url_for('transcrever_page') }}">📝 Transcrever</a>.</p>
+
+<div id="error-box" class="error" style="display:none;"></div>
+
+<label>Link do canal</label>
+<input type="text" id="campo-canal" placeholder="youtube.com/@canal" onkeydown="if(event.key==='Enter'){event.preventDefault();buscar();}">
+
+<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;">
+  <div>
+    <label style="margin-top:0;">Tipo</label>
+    <select id="select-tipo">
+      <option value="shorts" selected>Shorts</option>
+      <option value="videos">Vídeos normais</option>
+    </select>
+  </div>
+  <div>
+    <label style="margin-top:0;">Ordem</label>
+    <select id="select-ordem">
+      <option value="mais_novos" selected>Mais novos primeiro</option>
+      <option value="mais_antigos">Mais antigos primeiro</option>
+    </select>
+  </div>
+</div>
+
+<button type="button" onclick="buscar()" style="margin-top:16px;">Buscar links</button>
+<div id="carregando" style="display:none;color:#666;margin-top:8px;">Buscando… pode demorar um pouco em canais grandes.</div>
+
+<div id="resultado-box" style="display:none;margin-top:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <span id="resumo" style="color:#666;font-size:0.9rem;"></span>
+    <button type="button" onclick="copiarTudo()" style="margin-top:0;background:#059669;">📋 Copiar todos os links</button>
+  </div>
+  <div id="lista-itens" style="margin-top:12px;"></div>
+</div>
+
+<style>
+.item-canal { display:flex; gap:10px; align-items:baseline; padding:8px 0; border-bottom:1px solid #eee; }
+.item-canal .indice { color:#999; font-size:0.82rem; min-width:28px; }
+.item-canal .titulo { flex:1; font-size:0.9rem; }
+.item-canal a { font-size:0.82rem; color:#2563eb; text-decoration:none; word-break:break-all; }
+</style>
+
+<script>
+async function buscar() {
+  const erroBox = document.getElementById('error-box');
+  erroBox.style.display = 'none';
+  document.getElementById('resultado-box').style.display = 'none';
+  const url = document.getElementById('campo-canal').value.trim();
+  if (!url) { erroBox.style.display = 'block'; erroBox.textContent = 'Cole o link do canal primeiro.'; return; }
+
+  document.getElementById('carregando').style.display = 'block';
+  try {
+    const r = await fetch('{{ url_for("extrair_links_canal_buscar") }}', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        url: url,
+        tipo: document.getElementById('select-tipo').value,
+        ordem: document.getElementById('select-ordem').value,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) { erroBox.style.display = 'block'; erroBox.textContent = j.erro || 'Falhou.'; return; }
+    mostrarResultado(j);
+  } catch (e) {
+    erroBox.style.display = 'block'; erroBox.textContent = e.message;
+  } finally {
+    document.getElementById('carregando').style.display = 'none';
+  }
+}
+
+function mostrarResultado(j) {
+  document.getElementById('resumo').textContent = `${j.total} link(s) encontrado(s) em ${j.canal}`;
+  const lista = document.getElementById('lista-itens');
+  lista.innerHTML = '';
+  j.itens.forEach(function (item) {
+    const div = document.createElement('div');
+    div.className = 'item-canal';
+    div.innerHTML = `<span class="indice">${item.indice}.</span><span class="titulo">${item.titulo}</span><a href="${item.link}" target="_blank" rel="noopener">${item.link}</a>`;
+    lista.appendChild(div);
+  });
+  document.getElementById('resultado-box').style.display = 'block';
+  document.getElementById('resultado-box').dataset.links = j.itens.map(i => i.link).join('\n');
+}
+
+async function copiarTudo() {
+  const links = document.getElementById('resultado-box').dataset.links || '';
+  try {
+    await navigator.clipboard.writeText(links);
+    alert('Links copiados!');
+  } catch (e) {
+    prompt('Copie manualmente:', links);
+  }
+}
+</script>
+{% endblock %}

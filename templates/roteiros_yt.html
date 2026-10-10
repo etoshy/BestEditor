@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Roteiro do YouTube{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1000px; }
+  .ry-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .ry-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .ry-passos span { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; }
+  .ry-proj { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .ry-etapa { font-size: 0.75rem; background: #fef2f2; color: #991b1b; border-radius: 999px; padding: 2px 8px; }
+  .ry-ou { text-align: center; color: #999; font-size: 0.85rem; margin: 6px 0; }
+</style>
+
+<h1>📜 Roteiro do YouTube</h1>
+<p style="color:#555;">Cole o link de um vídeo: o site pega a <b>transcrição</b> (legenda do vídeo, ou Whisper se não tiver). Você escolhe um <b>modelo de prompt</b> e a IA <b>reescreve o roteiro</b> (troca exemplos específicos demais, tira o que só fazia sentido no vídeo original) e <b>lista as cenas</b> de filmes, séries e animes com a obra e o momento. Depois você escolhe o que fazer com ele: traduzir, pôr <b>tags de voz</b>, achar os momentos de <b>anúncio</b>, criar <b>chamadas pra like/inscrição</b>, adaptar pra não precisar das cenas… e leva o resultado pro Gerador de voz e as cenas pro Cortar do YouTube.</p>
+<div class="ry-passos"><span>1 · transcrição</span><span>2 · prompt: reescrever + cenas</span><span>3 · escolher o que fazer</span><span>4 · roteiro final, cenas, anúncios</span></div>
+
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="ry-card">
+  <h2 style="margin:0;">+ Novo roteiro</h2>
+  <form method="post" action="{{ url_for('roteiros_yt_novo') }}">
+    <label>Link do vídeo do YouTube</label>
+    <input type="url" name="url" placeholder="https://www.youtube.com/watch?v=...">
+    <label style="font-weight:400;font-size:0.85rem;"><input type="checkbox" name="whisper" checked style="width:auto;"> Se o vídeo não tiver legenda, transcrever o áudio com o Whisper (demora mais)</label>
+    <div class="ry-ou">— ou —</div>
+    <label>Cole a transcrição <span style="font-weight:400;color:#888;">(com ou sem tempos: "0:12 texto", .srt, .vtt ou texto corrido)</span></label>
+    <textarea name="texto" rows="4" placeholder="[0:00] Hoje eu vou mostrar as cenas mais..." style="font-size:0.9rem;"></textarea>
+    <label>Título <span style="font-weight:400;color:#888;">(opcional)</span></label>
+    <input type="text" name="titulo" placeholder="vem do vídeo se ficar vazio">
+    <button type="submit">📜 Começar</button>
+  </form>
+</div>
+
+<div class="ry-card">
+  <h2 style="margin:0;">Seus roteiros</h2>
+  {% for p in projetos %}
+  <div class="ry-proj">
+    <div style="min-width:0;">
+      <a href="{{ url_for('roteiro_yt_detalhe', pid=p.id) }}" style="font-weight:600;">{{ p.titulo }}</a>
+      <span class="ry-etapa">{{ p.etapa }}</span>
+      {% if p.url %}<div style="font-size:0.78rem;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.url }}</div>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('roteiro_yt_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este roteiro?')" style="margin:0;">
+      <button type="submit" class="secondary" style="margin:0;padding:5px 10px;font-size:0.8rem;background:#fff;color:#b91c1c;border:1px solid #fecaca;">🗑</button>
+    </form>
+  </div>
+  {% else %}
+  <p style="color:#888;">Nenhum ainda.</p>
+  {% endfor %}
+</div>
+{% endblock %}

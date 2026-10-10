@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 id="titulo-previas">Buscando uma prévia de cada trecho...</h1>
+<p>Isso busca o vídeo/imagem real de cada trecho, pra você ver de verdade na timeline antes de montar tudo. Pode levar um tempinho — cada trecho é uma busca. Os buscadores de imagem (Bing/Brave/Yandex/Startpage) usam um navegador cada e vão entregando as imagens em blocos.</p>
+
+<div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
+<p id="progress-text"></p>
+<p id="resumo-text" style="font-size:0.8rem;color:#555;"></p>
+
+<div id="pronto-box" style="display:none;margin:12px 0;padding:12px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;">
+  ✅ Prévias prontas. <a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}"><strong>Ir para o editor →</strong></a>
+  <span style="font-size:0.8rem;color:#555;">(as escolhas do YouTube feitas aqui já ficam salvas)</span>
+</div>
+
+<div id="thumbs-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;"></div>
+
+<div id="error-box" class="error" style="display:none"></div>
+
+{% if youtube_itens %}
+<p style="margin-top:20px;font-size:0.9rem;">🎬 Enquanto as prévias carregam, já dá pra escolher os vídeos do YouTube aqui embaixo (o site <strong>não</strong> vai sair desta página sozinho enquanto o painel estiver aberto).</p>
+{% endif %}
+{% include "_painel_youtube.html" %}
+
+<script>
+const shownIndexes = new Set();
+const temPainelYoutube = {{ 'true' if youtube_itens else 'false' }};
+
+function addThumb(p) {
+  if (shownIndexes.has(p.index)) return;
+  shownIndexes.add(p.index);
+  const thumbnailUrl = p.ok ? p.thumbnail_url : null;
+  const box = document.createElement('div');
+  box.style.cssText = 'width:100px;text-align:center;';
+  if (thumbnailUrl) {
+    const img = document.createElement('img');
+    img.src = thumbnailUrl;
+    img.style.cssText = 'width:100px;height:70px;object-fit:cover;border-radius:4px;';
+    box.appendChild(img);
+  } else {
+    const youtube = p.provider === 'youtube';
+    box.style.cssText += 'height:70px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.68rem;padding:2px;box-sizing:border-box;'
+      + (youtube ? 'background:#fee2e2;color:#991b1b;cursor:pointer;' : 'background:#f3f4f6;color:#999;');
+    box.textContent = youtube ? '🎬 YouTube: escolha abaixo' : 'sem prévia';
+    if (youtube) box.addEventListener('click', function () { const el = document.getElementById('painel-youtube'); if (el) el.scrollIntoView({behavior: 'smooth'}); });
+  }
+  box.title = p.ok ? (p.label || '') : (p.error || '');
+  const label = document.createElement('div');
+  label.style.cssText = 'font-size:0.65rem;color:#999;';
+  label.textContent = 'trecho ' + (p.index + 1) + (p.provider && p.provider !== 'youtube' ? ' · ' + p.provider : '');
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'width:100px;';
+  wrapper.appendChild(box);
+  wrapper.appendChild(label);
+  if (!p.ok && p.error && p.provider !== 'youtube') {
+    const err = document.createElement('div');
+    err.style.cssText = 'font-size:0.6rem;color:#b91c1c;max-height:3.6em;overflow:hidden;';
+    err.textContent = p.error;
+    wrapper.appendChild(err);
+  }
+  document.getElementById('thumbs-grid').appendChild(wrapper);
+}
+
+async function poll() {
+  let data;
+  try {
+    const res = await fetch("{{ url_for('fetching_previews_status_api', job_id=job.job_id) }}");
+    data = await res.json();
+  } catch (e) {
+    setTimeout(poll, 2500);
+    return;
+  }
+
+  if (data.progress) {
+    const pct = data.progress.total ? Math.round(100 * data.progress.current / data.progress.total) : 0;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = 'Trecho ' + data.progress.current + ' de ' + data.progress.total;
+  }
+
+  const previews = data.previews || [];
+  previews.forEach(addThumb);
+  const comImagem = previews.filter(p => p.ok).length;
+  const youtube = previews.filter(p => !p.ok && p.provider === 'youtube').length;
+  const falhas = previews.length - comImagem - youtube;
+  document.getElementById('resumo-text').textContent =
+    `${comImagem} com prévia · ${youtube} do YouTube (escolha manual) · ${falhas} sem prévia`;
+
+  if (data.status === 'pronto_para_editar') {
+    if (temPainelYoutube) {
+      document.getElementById('pronto-box').style.display = '';
+      document.getElementById('titulo-previas').textContent = 'Prévias prontas';
+      return;  // não sai da página: a pessoa pode estar escolhendo um vídeo do YouTube
+    }
+    window.location.href = "{{ url_for('edit_segments_page', job_id=job.job_id) }}";
+    return;
+  }
+  if (data.status === 'cancelado') {
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.textContent = 'Busca de prévias cancelada.';
+    return;
+  }
+  setTimeout(poll, 800);
+}
+poll();
+</script>
+{% endblock %}

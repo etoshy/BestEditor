@@ -1,0 +1,5 @@
+[run]
+omit =
+    toolkit/*
+    test_*.py
+    conftest.py

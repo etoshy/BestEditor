@@ -1,0 +1,36 @@
+ÁUDIOS NECESSÁRIOS PARA TEMPLATES/DESTAQUES
+============================================================
+
+1. camera_1.mp3
+2. camera_14.wav
+3. catraca_1.mp3
+4. click_ms_2.mp3
+5. key_click_1.mp3
+6. matchcut_1.mp3
+7. matchcut_2.mp3
+8. matchcut_3.mp3
+9. matchcut_4.mp3
+10. musica_doc.mp3
+11. pop_click_1.mp3
+12. pop_click_2.mp3
+13. pop_click_3.mp3
+14. typing_5.mp3
+15. typing_6.mp3
+16. wh_breath_2.mp3
+17. wh_breath_3.mp3
+18. wh_breath_4.mp3
+19. wh_cinema_1.mp3
+20. wh_cinema_12.mp3
+21. wh_cinema_14.mp3
+22. wh_cinema_4.mp3
+23. wh_cinema_6.mp3
+24. wh_hit_11.mp3
+25. wh_hit_5.mp3
+26. wh_solto_1.mp3
+27. woosh_24.mp3
+28. woosh_29.wav
+
+Coloque os arquivos nesta pasta:
+/mnt/data/narration_video_site_v51/narration_video_site/assets/darkplanner/audio_templates
+
+O renderer usa o nome do arquivo exatamente como listado acima.

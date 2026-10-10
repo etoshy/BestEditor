@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Galeria de projetos</h1>
+<p style="color:#666;">Todos os projetos ficam salvos (inclusive depois de reiniciar o servidor) — abra pra continuar ou editar de novo, dê um nome, ou apague quando não precisar mais (apaga a narração e todos os arquivos do servidor). <a href="{{ url_for('index') }}">← Começar um vídeo novo</a></p>
+{% if apagado %}<p style="background:#ecfdf5;border:1px solid #6ee7b7;padding:8px 12px;border-radius:6px;">🗑 Projeto “{{ apagado }}” apagado, junto com os arquivos dele.</p>{% endif %}
+
+{% if not jobs %}
+<p>Nenhum job ainda. <a href="{{ url_for('index') }}">Comece um vídeo novo</a>.</p>
+{% else %}
+
+<style>
+  .galeria { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; margin-top:16px; }
+  .proj { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; background:#fff; display:flex; flex-direction:column; }
+  .proj-capa { aspect-ratio:16/9; background:#111 center/cover no-repeat; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:2rem; }
+  .proj-corpo { padding:10px 12px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .proj-nome { font-weight:600; font-size:.95rem; word-break:break-word; }
+  .proj-meta { font-size:.75rem; color:#6b7280; }
+  .proj-acoes { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:auto; font-size:.85rem; }
+  .proj-acoes form { margin:0; }
+  .proj-acoes button { margin-top:0; padding:4px 10px; font-size:.8rem; }
+  .btn-apagar { background:#fff; color:#b91c1c; border:1px solid #fca5a5; }
+  .renomear { display:flex; gap:6px; }
+  .renomear input { margin-top:0; font-size:.8rem; padding:4px 6px; }
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+  .status-concluido { background: #dcfce7; color: #166534; }
+  .status-erro, .status-erro_transcricao { background: #fee2e2; color: #991b1b; }
+  .status-transcrevendo, .status-buscando_previas, .status-montando, .status-buscando_termos_wikipedia, .status-buscando_termos_buscadores { background: #dbeafe; color: #1e40af; }
+  .status-aguardando_json, .status-pronto_para_editar, .status-aguardando_termos_wikipedia, .status-aguardando_termos_buscadores { background: #fef3c7; color: #92400e; }
+</style>
+
+<div class="galeria">
+  {% for job in jobs %}
+  <div class="proj">
+    <div class="proj-capa" {% if job.capa_url %}style="background-image:url('{{ job.capa_url }}');"{% endif %}>{% if not job.capa_url %}🎬{% endif %}</div>
+    <div class="proj-corpo">
+      <div class="proj-nome">{{ job.nome_projeto or job.original_filename or job.job_id }}</div>
+      <div class="proj-meta">{{ job.created_at_display or "—" }}{% if job.duracao_display %} · {{ job.duracao_display }}{% endif %}{% if job.num_trechos %} · {{ job.num_trechos }} trechos{% endif %}</div>
+      <div><span class="status-badge status-{{ job.status }}">{{ job.status }}</span>
+        {% if job.status == 'pronto_para_editar' and job.assembly_error %}
+        <br><span style="color:#991b1b;font-size:0.75rem;">montagem anterior falhou</span>
+        {% endif %}
+      </div>
+      <div class="proj-acoes">
+        {% if job.status == 'transcrevendo' %}
+        <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">Ver progresso</a>
+        {% elif job.status == 'aguardando_termos_wikipedia' %}
+        <a href="{{ url_for('show_termos_wikipedia', job_id=job.job_id) }}">Colar termos da Wikipedia</a>
+        {% elif job.status == 'buscando_termos_wikipedia' %}
+        <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">Ver progresso</a>
+        {% elif job.status == 'aguardando_termos_buscadores' %}
+        <a href="{{ url_for('show_termos_buscadores', job_id=job.job_id) }}">Colar termos dos buscadores</a>
+        {% elif job.status == 'buscando_termos_buscadores' %}
+        <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">Ver progresso</a>
+        {% elif job.status == 'aguardando_json' %}
+        <a href="{{ url_for('show_prompt', job_id=job.job_id) }}">Ver prompt</a>
+        {% elif job.status == 'buscando_previas' %}
+        <a href="{{ url_for('fetching_previews_page', job_id=job.job_id) }}">Ver progresso</a>
+        {% elif job.status == 'pronto_para_editar' %}
+        <a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}">Editar timeline</a>
+        {% elif job.status in ('montando', 'concluido', 'erro') %}
+        <a href="{{ url_for('job_status_page', job_id=job.job_id) }}">Ver resultado</a>
+        {% elif job.status == 'erro_transcricao' %}
+        <span style="color:#991b1b;font-size:0.85rem;">{{ job.error[:80] if job.error else 'erro na transcrição' }}</span>
+        {% endif %}
+        {% if job.pending_segments and job.status in ('concluido', 'erro') %}
+        <a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}">✏️ Editar de novo</a>
+        {% endif %}
+      </div>
+      <form class="renomear" method="post" action="{{ url_for('projeto_renomear', job_id=job.job_id) }}">
+        <input type="text" name="nome" value="{{ job.nome_projeto or '' }}" placeholder="dar um nome…">
+        <button type="submit" class="yt-sec" style="margin-top:0;padding:4px 8px;font-size:.75rem;">Salvar</button>
+      </form>
+      {% if not job.em_andamento %}
+      <form method="post" action="{{ url_for('projeto_apagar', job_id=job.job_id) }}" onsubmit="return confirm('Apagar o projeto “{{ (job.nome_projeto or job.original_filename or job.job_id)|e }}”?\n\nIsso remove do servidor a narração, os clipes/imagens baixados, os cortes do YouTube e os vídeos gerados. Não dá pra desfazer.');">
+        <button type="submit" class="btn-apagar">🗑 Apagar projeto e arquivos</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
