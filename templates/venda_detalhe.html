@@ -41,10 +41,11 @@
 <div class="vd-card">
   <h2><span class="vd-num">1</span>Produto</h2>
   <div class="vd-row">
-    <input type="url" id="link" value="{{ p.link }}" placeholder="https://www.amazon.com.br/dp/..." style="flex:1;min-width:260px;">
+    <input type="url" id="link" value="{{ p.link }}" placeholder="Amazon, Gumroad, landing page, Hotmart/Kiwify, loja…" style="flex:1;min-width:260px;">
     <button class="vd-mini" id="btnLer">🔄 Ler o link</button>
+    <label class="vd-mini vd-sec" style="cursor:pointer;margin:0;" title="Página que pede login ou bloqueia robôs: abra no navegador, Ctrl+S (Página da Web, completa ou só HTML) e envie aqui">📄 Enviar página salva (.html)<input type="file" id="arqHtml" accept=".html,.htm,.mhtml" style="display:none;"></label>
   </div>
-  <p class="vd-hint" id="lerSt">{% if p.produto_erro %}<span class="vd-erro">⚠ {{ p.produto_erro }}</span>{% else %}Puxa título, preço, tópicos, descrição e as fotos (que entram nos materiais). Dá pra corrigir tudo aqui embaixo.{% endif %}</p>
+  <p class="vd-hint" id="lerSt">{% if p.produto_erro %}<span class="vd-erro">⚠ {{ p.produto_erro }}</span>{% else %}Amazon: puxa título, preço, tópicos, descrição e fotos. Gumroad / landing page / outra loja: puxa isso e também <b>o conteúdo inteiro da página</b> (promessa, benefícios, bônus, garantia, depoimentos, FAQ…) — a IA separa o que vende. As fotos entram nos materiais. Dá pra corrigir tudo aqui embaixo.{% endif %}</p>
   <div class="vd-row">
     <label style="flex:3;min-width:240px;">Nome do produto<input type="text" id="pTitulo" value="{{ p.produto.titulo }}"></label>
     <label style="flex:1;min-width:120px;">Preço<input type="text" id="pPreco" value="{{ p.produto.preco }}" placeholder="R$ 99,90"></label>
@@ -56,6 +57,11 @@
   <textarea id="pDesc" rows="4">{{ p.produto.descricao }}</textarea>
   <label>Detalhes <span style="font-weight:400;color:#888;">(ficha técnica, avaliação, o que vem na caixa…)</span></label>
   <textarea id="pDet" rows="3">{{ p.produto.detalhes }}</textarea>
+  <details id="boxConteudo" {% if p.produto.conteudo %}open{% endif %} style="margin-top:6px;">
+    <summary style="cursor:pointer;font-weight:600;">📄 Conteúdo da página de venda <span class="vd-hint" id="contN">{% if p.produto.conteudo %}({{ p.produto.conteudo|length }} caracteres){% endif %}</span></summary>
+    <p class="vd-hint">Texto da landing page/Gumroad, por seções. Vai inteiro pro prompt — a IA tira a promessa, os benefícios, bônus, garantia e depoimentos (só os que estão aqui). Pode apagar o que não interessa ou colar o texto da página na mão.</p>
+    <textarea id="pConteudo" rows="8">{{ p.produto.conteudo or '' }}</textarea>
+  </details>
   <div class="vd-row"><button class="vd-mini" id="btnSalvarProd">💾 Salvar produto</button><span class="vd-hint" id="prodSt"></span></div>
 </div>
 
@@ -172,16 +178,34 @@ $('btnLer').addEventListener('click', async () => {
   try {
     const d = await api(`/vendas/${PID}/ler-link`, { link: $('link').value.trim() });
     P = d.projeto; const pr = P.produto || {};
-    $('pTitulo').value = pr.titulo || ''; $('pPreco').value = pr.preco || ''; $('pTopicos').value = (pr.topicos || []).join('\n');
-    $('pDesc').value = pr.descricao || ''; $('pDet').value = pr.detalhes || '';
-    $('lerSt').innerHTML = `<span class="vd-ok">✔ Lido: ${(pr.imagens || []).length} fotos achadas.</span>`; desenharMidias();
+    preencherProduto(pr);
   } catch (e) { $('lerSt').innerHTML = `<span class="vd-erro">⚠ ${esc(e.message)}</span>`; }
   $('btnLer').disabled = false;
+});
+function preencherProduto(pr) {
+  $('pTitulo').value = pr.titulo || ''; $('pPreco').value = pr.preco || ''; $('pTopicos').value = (pr.topicos || []).join('\n');
+  $('pDesc').value = pr.descricao || ''; $('pDet').value = pr.detalhes || ''; $('pConteudo').value = pr.conteudo || '';
+  $('contN').textContent = pr.conteudo ? `(${pr.conteudo.length} caracteres)` : '';
+  if (pr.conteudo) $('boxConteudo').open = true;
+  $('link').value = P.link || $('link').value;
+  $('lerSt').innerHTML = `<span class="vd-ok">✔ Lido${P.loja === 'gumroad' ? ' (Gumroad)' : P.loja === 'pagina' ? ' (página de venda)' : ''}: ${(pr.imagens || []).length} fotos achadas${pr.conteudo ? ' + conteúdo da página' : ''}.</span>`;
+  desenharMidias();
+}
+$('arqHtml').addEventListener('change', async () => {
+  const f = $('arqHtml').files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f); fd.append('link', $('link').value.trim());
+  $('lerSt').textContent = '⏳ lendo a página enviada e baixando as fotos…';
+  try {
+    const r = await fetch(`/vendas/${PID}/ler-html`, { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.erro || `erro ${r.status}`);
+    P = d.projeto; preencherProduto(P.produto || {});
+  } catch (e) { $('lerSt').innerHTML = `<span class="vd-erro">⚠ ${esc(e.message)}</span>`; }
+  $('arqHtml').value = '';
 });
 $('btnSalvarProd').addEventListener('click', async () => {
   try {
     await api(`/vendas/${PID}/produto`, { titulo: $('pTitulo').value, preco: $('pPreco').value, topicos: $('pTopicos').value,
-      descricao: $('pDesc').value, detalhes: $('pDet').value, nome: $('pNome').value, link: $('link').value.trim() });
+      descricao: $('pDesc').value, detalhes: $('pDet').value, conteudo: $('pConteudo').value, nome: $('pNome').value, link: $('link').value.trim() });
     $('prodSt').innerHTML = '<span class="vd-ok">✔ Salvo</span>';
   } catch (e) { $('prodSt').innerHTML = `<span class="vd-erro">⚠ ${esc(e.message)}</span>`; }
 });
@@ -219,7 +243,7 @@ function desenharMidias() {
   vigiarTranscricoes();
   const box = $('midias');
   const ms = P.midias || [];
-  if (!ms.length) { box.innerHTML = '<p class="vd-hint">Nenhum material ainda. As fotos da Amazon entram aqui quando o link é lido.</p>'; return; }
+  if (!ms.length) { box.innerHTML = '<p class="vd-hint">Nenhum material ainda. As fotos da página (Amazon, Gumroad, landing page…) entram aqui quando o link é lido.</p>'; return; }
   box.innerHTML = ms.map(m => {
     const og = m.og || {};
     const vis = m.tipo === 'texto' ? `<div class="txt">${esc(m.conteudo)}</div>`
@@ -230,6 +254,7 @@ function desenharMidias() {
       ${vis}
       <div style="margin-top:5px;"><span class="vd-id">${esc(m.id)}</span> ${esc(TIPOS[m.tipo] || m.tipo)} · ${m.origem === 'pc' ? '💻 do PC' : '🔗 de link'}${m.do_produto ? ' · da loja' : ''}</div>
       ${m.transcricao ? trBloco(m.transcricao) : ''}
+      ${m.tipo !== 'texto' && m.conteudo ? `<details style="font-size:0.75rem;margin:3px 0;"><summary style="cursor:pointer;">📄 conteúdo da página (${m.conteudo.length} caracteres — vai pro prompt)</summary><div style="white-space:pre-wrap;max-height:140px;overflow:auto;background:#fff;border:1px solid #eee;border-radius:4px;padding:4px;">${esc(m.conteudo)}</div></details>` : ''}
       ${m.og ? `<div class="vd-og" title="${esc((og.titulo || '') + ' — ' + (og.descricao || ''))}">🏷 OG: <b>${esc(og.titulo || '')}</b> ${esc(og.descricao || '')}</div>` : ''}
       <textarea rows="2" class="mDesc" placeholder="${falta ? '⚠ Diga o que é (obrigatório pra IA entender)' : 'O que é'}">${esc(m.descricao || '')}</textarea>
       ${m.og ? `<select class="mUsar"><option value="ambos" ${m.usar === 'ambos' ? 'selected' : ''}>usar OG + descrição</option><option value="og" ${m.usar === 'og' ? 'selected' : ''}>usar só a OG</option><option value="descricao" ${m.usar === 'descricao' ? 'selected' : ''}>usar só a descrição</option></select>` : ''}

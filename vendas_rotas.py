@@ -5,6 +5,7 @@ Rotas da aba 🛒 Vídeo de venda (ver vendas.py). Registradas pelo app.py com
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from typing import Any, Dict
 
@@ -55,23 +56,28 @@ def registrar(app, base_dir: str) -> None:
         vd.salvar(base_dir, p)
         return redirect(url_for("venda_detalhe", pid=p["id"]))
 
-    def _ler_link(p: Dict[str, Any], com_fotos: bool = True) -> None:
-        """Lê a página do produto e (opcional) baixa as fotos como mídias do projeto."""
+    def _guardar_produto(p: Dict[str, Any], dados: Dict[str, Any]) -> None:
+        p["produto"] = {k: dados.get(k) or ([] if k in ("topicos", "imagens", "videos") else ({} if k == "legendas" else ""))
+                        for k in ("titulo", "preco", "topicos", "descricao", "detalhes", "imagens", "videos", "conteudo", "legendas")}
+        p["loja"] = dados.get("loja") or p.get("loja") or "outro"
+        p["produto_erro"] = None
+
+    def _ler_link(p: Dict[str, Any], com_fotos: bool = True, html: str = None) -> None:
+        """Lê a página do produto (Amazon, Gumroad, landing page… — ou o HTML enviado) e
+        (opcional) baixa as fotos como mídias do projeto."""
         try:
-            html, final = vd.baixar_html(p["link"])
-            dados = vd.ler_amazon(html, final) if vd._eh_amazon(final) or vd._eh_amazon(p["link"]) else None
-            if dados is None:
-                og = vd.ler_og(html, final)
-                dados = {"titulo": og["titulo"], "preco": "", "topicos": [], "descricao": og["descricao"], "detalhes": "",
-                         "imagens": [og["imagem"]] if og["imagem"] else [], "videos": [og["video"]] if og["video"] else []}
-            p["produto"] = {k: dados.get(k) or ([] if k in ("topicos", "imagens", "videos") else "")
-                            for k in ("titulo", "preco", "topicos", "descricao", "detalhes", "imagens", "videos")}
-            p["produto_erro"] = None
+            if html is None:
+                html, final = vd.baixar_html(p["link"])
+            else:
+                final = p.get("link") or ""
+            dados = vd.ler_produto(html, final, p.get("link") or "")
+            _guardar_produto(p, dados)
         except vd.VendaError as exc:
             p["produto_erro"] = str(exc)
             return
         if not com_fotos:
             return
+        leg = p["produto"].get("legendas") or {}
         ja = {m.get("url") for m in p.get("midias") or []}
         n = sum(1 for m in p.get("midias") or [] if m.get("do_produto"))
         for u in (p["produto"].get("imagens") or [])[:8] + (p["produto"].get("videos") or [])[:2]:
@@ -85,7 +91,8 @@ def registrar(app, base_dir: str) -> None:
             vd.adicionar_midia(p, tipo=tipo, origem="url", url=u, arquivo=os.path.basename(cam), do_produto=True,
                                nome=os.path.basename(cam),
                                descricao=f"{'Foto' if tipo == 'foto' else 'Vídeo'} {n} do produto (página da loja): "
-                                         f"{(p['produto'].get('titulo') or '')[:120]}", usar="descricao")
+                                         f"{(p['produto'].get('titulo') or '')[:120]}"
+                                         + (f" — na página: {leg[u][:300]}" if leg.get(u) else ""), usar="descricao")
 
     @app.route("/vendas/<pid>")
     def venda_detalhe(pid: str):
@@ -121,6 +128,34 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": p["produto_erro"], "projeto": _json_proj(p)}), 502
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
+    @app.route("/vendas/<pid>/ler-html", methods=["POST"])
+    def venda_ler_html(pid: str):
+        """Página salva no navegador (Ctrl+S → .html) — pra páginas que pedem login ou bloqueiam robôs."""
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        arq = request.files.get("arquivo")
+        if not arq or not arq.filename or not arq.filename.lower().endswith((".html", ".htm", ".mhtml", ".txt")):
+            return jsonify({"erro": "Envie a página salva (.html)."}), 400
+        bruto = arq.read(15 * 1024 * 1024)
+        html = bruto.decode("utf-8", errors="replace")
+        if arq.filename.lower().endswith(".mhtml"):
+            import quopri
+            html = quopri.decodestring(bruto).decode("utf-8", errors="replace")
+        link = (request.form.get("link") or "").strip()
+        if link.lower().startswith(("http://", "https://")):
+            p["link"] = link[:2000]
+        elif not p.get("link"):
+            m = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]*href=["\'](https?://[^"\']+)', html, re.I) or \
+                re.search(r'<meta[^>]+property=["\']og:url["\'][^>]*content=["\'](https?://[^"\']+)', html, re.I)
+            if m:
+                p["link"] = m.group(1)[:2000]
+        _ler_link(p, com_fotos=request.form.get("fotos", "1") != "0", html=html)
+        vd.salvar(base_dir, p)
+        if p.get("produto_erro"):
+            return jsonify({"erro": p["produto_erro"], "projeto": _json_proj(p)}), 422
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
     @app.route("/vendas/<pid>/produto", methods=["POST"])
     def venda_produto(pid: str):
         p = _proj(pid)
@@ -128,7 +163,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         c = request.get_json(silent=True) or {}
         pr = p.setdefault("produto", {})
-        for k, lim in (("titulo", 300), ("preco", 40), ("descricao", 6000), ("detalhes", 3000)):
+        for k, lim in (("titulo", 300), ("preco", 40), ("descricao", 6000), ("detalhes", 3000), ("conteudo", vd.MAX_CONTEUDO_PAGINA)):
             if k in c:
                 pr[k] = str(c.get(k) or "").strip()[:lim]
         if "topicos" in c:
@@ -197,6 +232,12 @@ def registrar(app, base_dir: str) -> None:
             except vd.VendaError:
                 html, final = "", url
             og = vd.ler_og(html, final) if html else {"titulo": "", "descricao": "", "imagem": "", "video": "", "site": "", "url": url}
+            conteudo = ""
+            if html and c.get("conteudo", True) is not False:
+                try:
+                    conteudo = vd.ler_pagina(html, final).get("conteudo") or ""
+                except Exception:  # noqa: BLE001
+                    conteudo = ""
             if not html and not desc:
                 return jsonify({"erro": "Não consegui abrir esse link. Descreva o que ele é pra usar mesmo assim."}), 502
             arquivo, tipo = "", "link"
@@ -211,7 +252,7 @@ def registrar(app, base_dir: str) -> None:
                     continue
             m = vd.adicionar_midia(p, tipo=tipo if arquivo else "link", origem="url", url=url, arquivo=arquivo,
                                    nome=og.get("titulo") or url[-80:], og=og if (og.get("titulo") or og.get("descricao")) else None,
-                                   descricao=desc, usar=c.get("usar"))
+                                   descricao=desc, usar=c.get("usar"), conteudo=conteudo)
         vd.salvar(base_dir, p)
         return jsonify({"ok": True, "midia": m, "precisa_descricao": not (m.get("descricao") or m.get("og"))})
 

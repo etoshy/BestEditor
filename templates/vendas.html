@@ -12,7 +12,7 @@
 </style>
 
 <h1>🛒 Vídeo de venda</h1>
-<p style="color:#555;">Cole o link do produto (por enquanto, <b>Amazon</b>): o site pega título, preço, tópicos, descrição e as fotos. Junte
+<p style="color:#555;">Cole o link do produto — <b>Amazon</b>, <b>Gumroad</b>, uma <b>landing page</b> ou outra loja: o site pega título, preço, tópicos, descrição, as fotos e (fora da Amazon) o conteúdo inteiro da página. Junte
   textos, fotos e vídeos (do PC ou de links), diga <b>o que é cada um</b>, escolha <b>como vender</b> (urgência, benefícios, percepção de
   valor…), onde fica o link e o preço. A IA devolve o <b>roteiro narrado</b> com o momento de cada mídia. Depois: 🎙️ Gerar voz →
   🎬 Novo vídeo escolhendo este projeto — o editor já põe as mídias do produto nos momentos certos e completa o resto.</p>
@@ -23,8 +23,8 @@
 <div class="vd-card">
   <h2 style="margin:0;">+ Novo projeto de venda</h2>
   <form method="post" action="{{ url_for('vendas_novo') }}" id="formNovo">
-    <label>Link do produto <span style="font-weight:400;color:#888;">(Amazon — ou deixe vazio e preencha na mão)</span></label>
-    <input type="url" name="link" placeholder="https://www.amazon.com.br/dp/...">
+    <label>Link do produto <span style="font-weight:400;color:#888;">(Amazon, Gumroad, landing page… — ou deixe vazio e preencha na mão)</span></label>
+    <input type="url" name="link" placeholder="https://… (Amazon, Gumroad, landing page)">
     <label>Nome do projeto <span style="font-weight:400;color:#888;">(opcional — vem do produto)</span></label>
     <input type="text" name="nome" placeholder="ex.: Fone bluetooth - vídeo curto">
     <button type="submit" id="btnNovo">🛒 Começar</button>

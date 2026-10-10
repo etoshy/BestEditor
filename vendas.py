@@ -137,7 +137,8 @@ def criar(base: str, link: str = "", nome: str = "") -> Dict[str, Any]:
     pid = uuid.uuid4().hex[:10]
     p = {"id": pid, "criado": time.time(), "atualizado": time.time(), "nome": (nome or "").strip()[:160],
          "link": (link or "").strip()[:2000], "loja": "amazon" if _eh_amazon(link) else ("outro" if link else ""),
-         "produto": {"titulo": "", "preco": "", "topicos": [], "descricao": "", "detalhes": "", "imagens": [], "videos": []},
+         "produto": {"titulo": "", "preco": "", "topicos": [], "descricao": "", "detalhes": "", "imagens": [], "videos": [],
+                     "conteudo": "", "legendas": {}},
          "produto_erro": None, "midias": [], "config": dict(CONFIG_PADRAO), "roteiro": None}
     salvar(base, p)
     return p
@@ -344,6 +345,199 @@ def ler_amazon(html: str, url: str = "") -> Dict[str, Any]:
             "detalhes": "\n".join(detalhes)[:3000], "imagens": unicas[:12], "videos": videos[:4], "url": url}
 
 
+# ------------------------------------------------------------------ Gumroad / landing page / qualquer página de venda
+MAX_CONTEUDO_PAGINA = 15000
+_PRECO_RE = re.compile(r"(?:R\$|US\$|\$|€|£|¥|₹)\s?\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{2})?\s?(?:€|reais|USD|BRL|EUR)",
+                       re.IGNORECASE)
+
+
+def _eh_gumroad(url: Any, html: str = "") -> bool:
+    host = urlparse(str(url or "")).netloc.lower()
+    return bool(re.search(r"(^|\.)gumroad\.com$|(^|\.)gum\.co$", host)) or "assets.gumroad.com" in (html or "")[:200000]
+
+
+def _jsons_da_pagina(html: str) -> List[Any]:
+    """JSON-LD + JSONs embutidos (Gumroad/React, Next.js, Nuxt…)."""
+    out: List[Any] = []
+    for m in re.finditer(r"<script\b([^>]*)>(.*?)</script>", html, re.S | re.IGNORECASE):
+        attrs, corpo = m.group(1), m.group(2).strip()
+        if not corpo or not re.search(r"application/(ld\+)?json|js-react-on-rails-component|__NEXT_DATA__|data-component-name", attrs, re.I):
+            continue
+        try:
+            out.append(json.loads(_html.unescape(corpo) if corpo.startswith("{&quot;") else corpo))
+        except ValueError:
+            continue
+    for m in re.finditer(r"data-(?:react-props|page)=[\"']({.*?})[\"']", html, re.S):  # props em atributo (React/Inertia)
+        try:
+            out.append(json.loads(_html.unescape(m.group(1))))
+        except ValueError:
+            continue
+    return out
+
+
+def _andar(x: Any, prof: int = 0):
+    if prof > 12:
+        return
+    if isinstance(x, dict):
+        yield x
+        for v in x.values():
+            yield from _andar(v, prof + 1)
+    elif isinstance(x, list):
+        for v in x[:200]:
+            yield from _andar(v, prof + 1)
+
+
+def _preco_gumroad(d: Dict[str, Any]) -> str:
+    cents = d.get("price_cents")
+    if cents is None:
+        return ""
+    try:
+        valor = int(cents) / 100
+    except (TypeError, ValueError):
+        return ""
+    if valor == 0:
+        return "grátis (ou pague quanto quiser)" if d.get("customizable_price") or d.get("is_pay_what_you_want") else "grátis"
+    moeda = str(d.get("currency_code") or d.get("currency") or "usd").upper()
+    simb = {"USD": "US$", "BRL": "R$", "EUR": "€", "GBP": "£"}.get(moeda, moeda + " ")
+    txt = f"{simb}{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if moeda == "BRL" else f"{simb}{valor:,.2f}"
+    return txt + ("+" if d.get("customizable_price") or d.get("is_pay_what_you_want") else "")
+
+
+def _preco_ld(valor: Any, moeda: Any) -> str:
+    """197.00 + BRL -> "R$ 197,00"; 19 + USD -> "US$ 19.00"; o resto fica como veio."""
+    moeda = str(moeda or "").upper()
+    try:
+        v = float(str(valor).replace(",", "."))
+    except ValueError:
+        return f"{moeda} {valor}".strip()
+    if moeda == "BRL":
+        return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    simb = {"USD": "US$ ", "EUR": "€ ", "GBP": "£ "}.get(moeda, (moeda + " ") if moeda else "")
+    return f"{simb}{v:,.2f}"
+
+
+def ler_pagina(html: str, url: str = "") -> Dict[str, Any]:
+    """Página de venda que não é Amazon (Gumroad, landing page, Hotmart/Kiwify, loja Shopify…):
+    nome, preço, tópicos, descrição, detalhes, o CONTEÚDO inteiro da página (seções) e as
+    imagens com legenda. A IA é que separa promessa, benefícios, bônus, garantia, depoimentos…"""
+    import dossies  # ler_materia (texto por seções + imagens com legenda) — import aqui (dossies importa vendas)
+    og = ler_og(html, url)
+    titulo, preco, descricao, imagens, videos, detalhes, topicos = "", "", "", [], [], [], []
+    legendas: Dict[str, str] = {}
+    # 1) dados estruturados
+    for bloco in _jsons_da_pagina(html):
+        for d in _andar(bloco):
+            tipo = d.get("@type")
+            tipo = " ".join(tipo) if isinstance(tipo, list) else str(tipo or "")
+            if re.search(r"\bProduct\b|\bCourse\b|\bBook\b|\bSoftwareApplication\b", tipo):  # JSON-LD
+                titulo = titulo or _texto(d.get("name"))
+                descricao = descricao or _texto(d.get("description"))
+                ofs = d.get("offers")
+                for of in (ofs if isinstance(ofs, list) else [ofs]):
+                    if isinstance(of, dict) and not preco:
+                        v = of.get("price") or of.get("lowPrice")
+                        if v not in (None, ""):
+                            preco = _preco_ld(v, of.get("priceCurrency"))
+                img = d.get("image")
+                for u in (img if isinstance(img, list) else [img]):
+                    u = u.get("url") if isinstance(u, dict) else u
+                    if isinstance(u, str) and u.startswith("http"):
+                        imagens.append(u)
+                ag = d.get("aggregateRating")
+                if isinstance(ag, dict) and ag.get("ratingValue"):
+                    detalhes.append(f"Avaliação na página: {ag.get('ratingValue')}" + (f" ({ag.get('reviewCount') or ag.get('ratingCount')} avaliações)" if ag.get('reviewCount') or ag.get('ratingCount') else ""))
+            elif "price_cents" in d and (d.get("name") or d.get("description_html")):  # Gumroad
+                titulo = titulo or _texto(d.get("name"))
+                preco = preco or _preco_gumroad(d)
+                descricao = descricao or _texto(re.sub(r"</(p|li|h\d)>", "\n", str(d.get("description_html") or d.get("description") or "")))
+                if d.get("summary"):
+                    topicos.append(_texto(d["summary"])[:500])
+                for cov in d.get("covers") or []:
+                    if isinstance(cov, dict) and str(cov.get("url") or "").startswith("http"):
+                        (videos if str(cov.get("type")) == "video" else imagens).append(cov["url"])
+                for at in d.get("attributes") or []:
+                    if isinstance(at, dict) and at.get("name") and at.get("value"):
+                        detalhes.append(f"{_texto(at['name'])}: {_texto(at['value'])}")
+                rt = d.get("ratings")
+                if isinstance(rt, dict) and rt.get("count"):
+                    detalhes.append(f"Avaliação no Gumroad: {rt.get('average')} de 5 ({rt.get('count')} avaliações)")
+                vend = d.get("sales_count")
+                if vend:
+                    detalhes.append(f"Vendas mostradas na página: {vend}")
+                sel = d.get("seller") or d.get("creator")
+                if isinstance(sel, dict) and sel.get("name"):
+                    detalhes.append(f"Criador: {_texto(sel['name'])}")
+    # 2) meta de preço
+    if not preco:
+        for n in ("product:price:amount", "og:price:amount"):
+            m = re.search(r'<meta[^>]+(?:property|name)=["\']' + re.escape(n) + r'["\'][^>]*content=["\']([^"\']+)["\']', html, re.I)
+            if m:
+                moeda = re.search(r'<meta[^>]+(?:property|name)=["\'](?:product|og):price:currency["\'][^>]*content=["\']([^"\']+)["\']', html, re.I)
+                preco = _preco_ld(m.group(1), moeda.group(1) if moeda else "")
+                break
+    # 3) conteúdo da página (seções + imagens com legenda)
+    try:
+        mat = dossies.ler_materia(html, url)
+    except Exception:  # noqa: BLE001
+        mat = {"titulo": "", "linha_fina": "", "texto": "", "imagens": []}
+    conteudo = (mat.get("texto") or "").strip()
+    for im in mat.get("imagens") or []:
+        if im["url"].lower().split("?")[0].endswith((".mp4", ".webm", ".mov")):
+            videos.append(im["url"])
+        else:
+            imagens.append(im["url"])
+            if im.get("legenda"):
+                legendas[im["url"]] = im["legenda"]
+    if og["imagem"]:
+        imagens.insert(0, og["imagem"])
+    if og["video"]:
+        videos.append(og["video"])
+    titulo = (titulo or og["titulo"] or mat.get("titulo") or "").strip()
+    descricao = (descricao or og["descricao"] or mat.get("linha_fina") or "").strip()
+    if not preco:
+        achados = []
+        for m in _PRECO_RE.finditer(conteudo):
+            v = re.sub(r"\s+", " ", m.group(0)).strip()
+            if v not in achados:
+                achados.append(v)
+        if achados:
+            preco = achados[0]
+            if len(achados) > 1:
+                detalhes.append("Preços que aparecem na página: " + ", ".join(achados[:8]))
+    if not topicos:  # listas curtas da página costumam ser os benefícios
+        for linha in conteudo.split("\n"):
+            linha = linha.strip()
+            if 15 <= len(linha) <= 160 and not linha.startswith("##") and len(topicos) < 12:
+                topicos.append(linha)
+        topicos = topicos if len(topicos) >= 3 else []
+    # vídeo de vendas (YouTube/Vimeo/Wistia/Panda…) — não baixa, só avisa
+    for src in re.findall(r"<iframe[^>]+src=[\"']([^\"']+)[\"']", html, re.I):
+        if re.search(r"youtube|youtu\.be|vimeo|wistia|pandavideo|vturb|loom|vidalytics", src, re.I):
+            detalhes.append(f"Vídeo na página: {urljoin(url, src)}")
+    vistas, unicas = set(), []
+    for u in imagens:
+        u = urljoin(url, u)
+        if u not in vistas:
+            vistas.add(u)
+            unicas.append(u)
+    if not (titulo or conteudo or descricao):
+        raise VendaError("Não achei o conteúdo dessa página. Se ela pede login ou bloqueia robôs, salve a página no navegador "
+                         "(Ctrl+S → .html) e envie o arquivo.")
+    return {"titulo": titulo[:300], "preco": preco[:40], "topicos": topicos[:15], "descricao": descricao[:4000],
+            "detalhes": "\n".join(dict.fromkeys(detalhes))[:3000], "imagens": unicas[:12], "videos": list(dict.fromkeys(videos))[:4],
+            "conteudo": conteudo[:MAX_CONTEUDO_PAGINA], "legendas": {u: legendas[u] for u in unicas[:12] if u in legendas},
+            "loja": "gumroad" if _eh_gumroad(url, html) else "pagina", "url": url}
+
+
+def ler_produto(html: str, url: str = "", link_original: str = "") -> Dict[str, Any]:
+    """Amazon → ler_amazon; qualquer outra página → ler_pagina."""
+    if _eh_amazon(url) or _eh_amazon(link_original):
+        d = ler_amazon(html, url)
+        d.setdefault("loja", "amazon")
+        return d
+    return ler_pagina(html, url)
+
+
 def baixar_arquivo(url: str, pasta: str, nome_base: str, timeout: int = 60) -> Tuple[str, str]:
     """Baixa uma foto/vídeo. (caminho, tipo "foto"|"video")."""
     import requests
@@ -414,7 +608,7 @@ def adicionar_midia(p: Dict[str, Any], **campos: Any) -> Dict[str, Any]:
     m = {"id": _novo_id_texto(p) if tipo == "texto" else _novo_id(p), "tipo": tipo,
          "origem": campos.get("origem") or "pc", "arquivo": campos.get("arquivo") or "", "url": campos.get("url") or "",
          "nome": (campos.get("nome") or "")[:200], "og": campos.get("og") or None,
-         "descricao": (campos.get("descricao") or "").strip()[:2000], "conteudo": (campos.get("conteudo") or "").strip()[:8000],
+         "descricao": (campos.get("descricao") or "").strip()[:2000], "conteudo": (campos.get("conteudo") or "").strip()[:MAX_CONTEUDO_PAGINA if campos.get("tipo") != "texto" else 8000],
          "usar": campos.get("usar") if campos.get("usar") in ("og", "descricao", "ambos") else
                  ("ambos" if campos.get("og") and (campos.get("descricao") or "").strip() else ("og" if campos.get("og") else "descricao")),
          "do_produto": bool(campos.get("do_produto")), "criado": time.time()}
@@ -490,6 +684,14 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
         L.append("Descrição da página:\n" + pr["descricao"][:3000])
     if pr.get("detalhes"):
         L.append("Detalhes:\n" + pr["detalhes"][:2000])
+    if (pr.get("conteudo") or "").strip():
+        L.append("")
+        L.append("## Conteúdo da página de venda (extraído do link — Gumroad/landing page)")
+        L.append("Leia tudo e tire daqui o que vende: a promessa principal, pra quem é, o problema que resolve, os benefícios "
+                 "(transforme característica em benefício), o que vem/o que tem dentro, bônus, garantia, prova (números, "
+                 "depoimentos e avaliações QUE ESTÃO na página — cite como estão, sem inventar nem aumentar), objeções "
+                 "respondidas/FAQ e a oferta. Ignore menu, rodapé, termos e o que não tiver a ver com o produto.\n\n"
+                 + pr["conteudo"][:12000])
     if (cfg.get("publico") or "").strip():
         L.append(f"Público-alvo: {cfg['publico'].strip()[:400]}")
 
@@ -503,6 +705,12 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
             cam = caminho_midia(base, p, m) if base else None
             L.append(f"- {m['id']} ({TIPOS_MIDIA[m['tipo']].split(' ', 1)[1].lower()}): {o_que_e(m)}"
                      + (mt.para_prompt(cam) if cam and m["tipo"] == "video" else ""))
+    pags = [m for m in vis if (m.get("conteudo") or "").strip()]
+    if pags:
+        L.append("")
+        L.append("## Conteúdo das páginas enviadas como material (use as informações; não invente o que não está aqui)")
+        for m in pags:
+            L.append(f"- {m['id']} ({m.get('url') or m.get('nome') or ''}):\n{m['conteudo'][:6000]}")
     if txt:
         L.append("")
         L.append("## Textos de apoio (informação pra você usar no roteiro)")
@@ -535,7 +743,9 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
         L.append("- Filtros (obrigatórios):")
         L.extend("  " + f for f in filtros)
     L.append("- HONESTIDADE (obrigatório): use só as informações acima. Não invente especificações, números de vendas, "
-             "avaliações, depoimentos, prêmios, garantias ou promoções. Urgência e escassez só com fato real informado.")
+             "avaliações, depoimentos, prêmios, garantias ou promoções. Urgência e escassez só com fato real informado"
+             + (" (se a página cita prazo, vagas ou bônus por tempo limitado, diga que é \"segundo a página\" — pode ter mudado)."
+                if (pr.get("conteudo") or pags) else "."))
     L.append("- Comece com um GANCHO forte nos primeiros 3 segundos. Frases curtas, fáceis de falar.")
     L.append("- No ROTEIRO, ponha a marca do ID (ex.: [M2]) sozinha logo ANTES da frase em que aquela foto/vídeo deve "
              "aparecer. Use todas as mídias que fizerem sentido; uma mídia pode voltar mais de uma vez. As marcas não "

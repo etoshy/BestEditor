@@ -28,6 +28,17 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🌐 Vídeo de venda com Gumroad / landing page (v84_48)
+
+- O link do produto aceita **qualquer página de venda**, não só Amazon: Gumroad, landing page, Hotmart/Kiwify, loja
+  Shopify… (`vendas.ler_pagina`). Pega nome, preço (dados do Gumroad, JSON-LD, meta de preço ou o preço escrito no texto),
+  tópicos, descrição, avaliações, as fotos (com a legenda que estava na página) e o **conteúdo inteiro da página** por
+  seções — fica no campo "📄 Conteúdo da página de venda" (dá pra editar ou colar na mão).
+- No prompt, a IA recebe esse conteúdo e separa o que vende: promessa, pra quem é, benefícios, o que tem dentro, bônus,
+  garantia, provas/depoimentos (só os que estão na página) e FAQ. Prazo/vagas da página aparecem como "segundo a página".
+- Página que pede login ou bloqueia robôs: **📄 Enviar página salva (.html)** (no navegador: Ctrl+S).
+- Uma página adicionada como **material** (link) também tem o conteúdo extraído e levado pro prompt.
+
 ## ⚡ Estratégia de Shorts + estrutura de referência (v84_46)
 
 - Roteiro **curto** (Shorts/Reels/TikTok — Modelos de vídeo no formato curto, Roteiro do YouTube "mais curto", Vídeos
