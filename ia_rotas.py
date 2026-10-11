@@ -34,12 +34,20 @@ def registrar(app, base_dir: str) -> None:
             "recursos": {k: f.get(f"rec_{k}") == "on" for k in ia.RECURSOS},
             "nota_minima": f.get("nota_minima", 7), "candidatos": f.get("candidatos", 10), "limite_usd": f.get("limite_usd", 5),
         }
-        if (f.get("chave") or "").strip():  # em branco = mantém a salva
-            novos["chave"] = f["chave"].strip()
+        aviso = None
+        chave = (f.get("chave") or "").strip()
+        if chave:  # em branco = mantém a salva
+            prefixo = ia.PROVEDORES.get(novos["provedor"], {}).get("prefixo_chave") or ""
+            if prefixo and not chave.startswith(prefixo):
+                # quase sempre é o navegador preenchendo sozinho com uma senha salva: não troca a chave boa
+                aviso = (f"Isso não parece uma chave do {ia.PROVEDORES[novos['provedor']]['nome']} (ela começa com {prefixo}). "
+                         "A chave salva foi mantida — se o navegador preencheu o campo sozinho, apague e cole a chave de novo.")
+            else:
+                novos["chave"] = chave
         if f.get("apagar_chave") == "on":
             novos["chave"] = ""
         ia.salvar_config(novos)
-        return _pagina(salvo=True)
+        return _pagina(salvo=not aviso, aviso=aviso)
 
     @app.route("/ia/testar", methods=["POST"])
     def ia_testar():

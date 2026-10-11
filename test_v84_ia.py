@@ -398,3 +398,15 @@ def test_direcao_de_arte_da_parte1_vai_pras_outras(api):
     d = c.post(f"/job/{jid}/edicao/prompt", json={"direcao": "sys_tudo", "segmentos": segs, "partes_min": 10, "resposta_parte1": "isso não é json {"}).get_json()
     assert d["erro_arte"] and d["arte"] == ""
     assert pe.arte_da_parte1({}) == ""
+
+
+def test_chave_errada_do_navegador_nao_substitui_a_boa(api):
+    import app as A
+    A.app.config["TESTING"] = True
+    c = A.app.test_client()
+    html = c.post("/ia", data={"ativo": "on", "provedor": "claude", "modelo": "claude-haiku-5-5", "chave": "AQ.Ab8RNsenhaDoNavegador"}).get_data(as_text=True)
+    assert ia.config()["chave"] == "sk-ant-teste-123456789" and "não parece uma chave" in html
+    ia.salvar_config({"chave": "AQ.Ab8RNantiga"})
+    assert "não parece uma chave do Claude" in c.get("/ia").get_data(as_text=True)
+    c.post("/ia", data={"ativo": "on", "provedor": "claude", "modelo": "claude-haiku-5-5", "chave": "sk-ant-nova-chave"})
+    assert ia.config()["chave"] == "sk-ant-nova-chave" and 'type="password"' not in c.get("/ia").get_data(as_text=True)

@@ -29,6 +29,8 @@ vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PD
   <br><span class="hint">Coloque crédito em <a href="{{ provedores[r.provedor].console }}" target="_blank" rel="noopener">{{ provedores[r.provedor].console }}</a> ou troque a chave.</span></div>
 {% endif %}
 {% if salvo %}<div class="ok">💾 Salvo.</div>{% endif %}
+{% if aviso %}<div class="error">⚠ {{ aviso }}</div>{% endif %}
+{% if r.chave_suspeita and not aviso %}<div class="error">⚠ A chave salva ({{ r.chave }}) não parece uma chave do Claude — ela começa com <code>{{ provedores[r.provedor].prefixo_chave }}</code>. Provavelmente o navegador preencheu o campo com uma senha salva. Cole a chave certa de novo e salve.</div>{% endif %}
 
 <form method="post" action="{{ url_for('ia_salvar') }}">
   <div class="ia-card">
@@ -39,7 +41,8 @@ vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PD
       <label>Modelo <select name="modelo">{% for m in provedores[r.provedor].modelos %}<option value="{{ m.id }}" {% if m.id == r.modelo %}selected{% endif %}>{{ m.nome }} — {{ m.id }}</option>{% endfor %}</select></label>
     </div>
     <label>Chave da API {% if r.chave %}<span style="font-weight:normal;color:#15803d;">(✔ {{ 'do ambiente ANTHROPIC_API_KEY' if r.chave_do_ambiente else 'salva' }}: {{ r.chave }} — em branco mantém)</span>{% endif %}</label>
-    <input type="password" name="chave" value="" style="width:100%;padding:8px;margin-top:6px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:1rem" placeholder="{{ provedores[r.provedor].chave_dica }}" autocomplete="off">
+    <input type="text" name="chave" id="iaChave" value="" readonly onfocus="this.removeAttribute('readonly')" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other"
+      style="width:100%;padding:8px;margin-top:6px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:1rem;-webkit-text-security:disc;text-security:disc" placeholder="{{ provedores[r.provedor].chave_dica }}">
     {% if r.chave and not r.chave_do_ambiente %}<label style="font-weight:normal;"><input type="checkbox" name="apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
     <p class="hint">A chave fica no arquivo <code>ia_config.json</code> da pasta do site (fora do GitHub). Também vale a variável de ambiente <code>ANTHROPIC_API_KEY</code>.
       Dica: ponha um limite de gasto mensal no <a href="{{ provedores[r.provedor].console }}" target="_blank" rel="noopener">Console</a>.</p>

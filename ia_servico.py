@@ -47,6 +47,7 @@ PROVEDORES: Dict[str, Dict[str, Any]] = {
         "nome": "Claude (Anthropic)",
         "chave_env": "ANTHROPIC_API_KEY",
         "chave_dica": "sk-ant-…  (platform.claude.com → API keys)",
+        "prefixo_chave": "sk-ant-",
         "console": "https://platform.claude.com/settings/billing",
         "modelos": [
             # preços em US$ por 1 milhão de tokens (até 100 mil tokens no pedido; acima: *_longo)
@@ -492,5 +493,6 @@ def resumo_publico() -> Dict[str, Any]:
     g = gasto()
     return {"ativo": c["ativo"], "provedor": c["provedor"], "modelo": c["modelo"], "chave": chave_mascarada(c),
             "chave_do_ambiente": bool(not c.get("chave") and chave(c)),
+            "chave_suspeita": bool(chave(c)) and not chave(c).startswith(PROVEDORES[c["provedor"]].get("prefixo_chave") or ""),
             "recursos": c["recursos"], "nota_minima": c["nota_minima"], "candidatos": c["candidatos"], "limite_usd": c["limite_usd"],
             "sem_credito": c["sem_credito"], "motivo": motivo_desligado(None, c), "gasto": g}
