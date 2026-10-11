@@ -3501,6 +3501,91 @@ def submit_json(job_id: str):
     return redirect(url_for("fetching_previews_page", job_id=job_id))
 
 
+_IA_PULA_BUSCA = {"youtube", "flow", "produto", "material"}
+
+
+def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) -> Optional[List[Dict[str, Any]]]:
+    """🤖 Fases 0 e 1 (com a IA ligada): a FICHA do vídeo (lida do roteiro uma vez) e as buscas
+    melhores de cada trecho (query = a 1ª, alternativas = as outras + a busca original). Devolve o
+    contexto de cada trecho pro juiz (ou None sem IA). Qualquer falha: segue com as buscas de sempre."""
+    import ia_servico
+    if not (ia_servico.ativo("juiz") or ia_servico.ativo("buscas")):
+        return None
+    info = job.setdefault("ia", {})
+    blocos = [b for b in job.get("segments") or [] if (b.get("text") or "").strip()]
+    roteiro = " ".join(str(b["text"]).strip() for b in blocos)
+    try:
+        falas, _p = _falas_por_trecho(job, segments)
+    except Exception:  # noqa: BLE001
+        falas = [""] * len(segments)
+    for k, sg in enumerate(segments):
+        if not falas[k]:
+            falas[k] = " ".join(str(b["text"]).strip() for b in blocos if float(b["start"]) < sg.end and float(b["end"]) > sg.start)
+    try:
+        import ia_midia
+        if info.get("ficha") is None and ia_servico.ativo("buscas"):
+            job["preview_ia"] = "🤖 lendo o roteiro (ficha do vídeo)…"
+            info["ficha"] = ia_midia.ficha_visual(roteiro, job.get("titulo") or job.get("nome") or "", job.get("language") or "", job=job_id)
+        if not info.get("buscas_feitas") and ia_servico.ativo("buscas"):
+            elegiveis = [k for k, sg in enumerate(segments)
+                         if not sg.override_source and sg.provider not in _IA_PULA_BUSCA
+                         and not (sg.provider in _BIBLIOTECAS_LOCAIS and (getattr(sg, "obra", None) or getattr(sg, "personagem", None)))]
+            if elegiveis:
+                job["preview_ia"] = "🤖 escrevendo buscas melhores…"
+                novas = ia_midia.buscas_melhores([{"n": k + 1, "fala": falas[k], "visual": getattr(segments[k], "visual", None),
+                                                   "query": segments[k].query} for k in elegiveis], info.get("ficha"), roteiro, job=job_id)
+                pend = job.get("pending_segments") or []
+                mudou = 0
+                for k in elegiveis:
+                    nb = novas.get(k + 1)
+                    if not nb:
+                        continue
+                    sg = segments[k]
+                    original = sg.query
+                    sg.query = nb["buscas"][0]
+                    sg.alternativas = [b for b in nb["buscas"][1:] + [original] if b and b != sg.query][:5]
+                    if nb.get("visual"):
+                        sg.visual = nb["visual"]
+                    if k < len(pend):
+                        pend[k].update(query=sg.query, alternativas=sg.alternativas, ia_busca_original=original,
+                                       ia_midia=nb.get("midia") or None, **({"visual": sg.visual} if nb.get("visual") else {}))
+                    mudou += 1
+                info["buscas_feitas"] = True
+                info["buscas_trocadas"] = mudou
+    except Exception as exc:  # noqa: BLE001 — a IA nunca trava a prévia
+        info["erro"] = str(exc)[:300]
+    job.pop("preview_ia", None)
+    ficha = info.get("ficha")
+    return [{"ficha": ficha, "fala": falas[k], "anterior": falas[k - 1] if k else "",
+             "seguinte": falas[k + 1] if k + 1 < len(falas) else "", "visual": getattr(segments[k], "visual", None) or "",
+             "job": job_id} for k in range(len(segments))]
+
+
+def _ia_escolher_imagem(res: dict, ctx: Optional[dict], cache: dict, termo: str, termo_unico: bool) -> dict:
+    """🤖 buscadores de imagem (Bing, Brave…: onde mais vem lixo): o juiz olha as imagens já baixadas
+    (a 1ª e as extras) e fica com a melhor. Com o termo usado só por esse trecho, a escolha vai pro
+    cache (a montagem reaproveita a mesma)."""
+    if not ctx or not res.get("ok") or not res.get("extras"):
+        return res
+    from video_assembler import julgar_candidatos_ia
+    variantes = [dict(res, extras=None)] + [dict(res, **{c: v.get(c) for c in ("path", "engine", "title", "original_url", "thumbnail_url", "source_page", "assinatura")})
+                                         for v in res.get("extras") or [] if v.get("path") and os.path.exists(v["path"])]
+    cands = [{"path": v["path"], "label": f"{v.get('engine')}: {v.get('title') or ''}", "_v": k} for k, v in enumerate(variantes)]
+    j = julgar_candidatos_ia(cands, ctx, termo, miniatura="path")
+    if not j or not j["lista"]:
+        return res
+    melhor = j["lista"][0]
+    escolhida = dict(variantes[melhor["_v"]], extras=res.get("extras"))
+    escolhida.update(ia_nota=melhor.get("ia_nota"), ia_motivo=melhor.get("ia_motivo"),
+                     ia_aviso=melhor.get("ia_nota", 0) < int((__import__("ia_servico").config() or {}).get("nota_minima") or 7))
+    if termo_unico and melhor["_v"] and termo in cache:
+        antigo = dict(cache[termo])
+        outras = [dict(antigo, extras=None)] + [v for k, v in enumerate(antigo.get("extras") or []) if k != melhor["_v"] - 1]
+        cache[termo] = dict(antigo, **{c: escolhida.get(c) for c in ("path", "engine", "title", "original_url", "thumbnail_url", "source_page", "assinatura")},
+                                   extras=[{c: o.get(c) for c in ("path", "engine", "title", "original_url", "thumbnail_url", "source_page", "assinatura")} for o in outras])
+    return escolhida
+
+
 def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> None:
     """Dispara em segundo plano: busca (SEM baixar nada) uma prévia de
     cada segmento, usando o thumbnail que o próprio provedor já entrega
@@ -3526,6 +3611,8 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
     job["segment_previews"] = [None] * len(segments)
     _save_state(job_id)
 
+    ia_ctxs: List[Optional[dict]] = [None] * len(segments)
+
     def _fetch_one(i: int, segment: VideoSegment, cfg: dict, tracker=None) -> dict:
         factory = ClientFactory(cfg)
         perf = _PERF_LOGS.get(job_id)
@@ -3534,11 +3621,12 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             with pl(f"previa:segmento_{i}:busca", provider=segment.provider, query=segment.query):
                 result = fetch_segment_preview_lightweight(
                     segment, site_cfg=cfg, client_factory=factory, used_tracker=tracker,
+                    **({"ia_ctx": ia_ctxs[i]} if ia_ctxs[i] is not None else {}),
                 )
         finally:
             factory.close_all()
 
-        return {
+        out = {
             "index": i, "ok": result["ok"], "thumbnail_url": result["thumbnail_url"],
             "result_url": result["result_url"], "label": result["label"], "error": result["error"],
             "video_preview_url": result.get("video_preview_url"),
@@ -3546,6 +3634,10 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             "original_provider": segment.provider,
             "query": segment.query, "media_type": segment.media_type,
         }
+        for k in ("ia_nota", "ia_motivo", "ia_aviso", "ia_busca"):
+            if result.get(k) is not None:
+                out[k] = result[k]
+        return out
 
     def _run():
         job_dir = _job_dir(job_id)
@@ -3555,6 +3647,11 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
         # resultado já apareceu num trecho, o próximo mostra o 2º melhor, etc.
         tracker = UsedClipsTracker() if cfg.get("evitar_repeticao_clipes", True) else None
         perf = _PERF_LOGS.get(job_id)
+        # 🤖 com a IA ligada: ficha do vídeo + buscas melhores ANTES de buscar; contexto pro juiz
+        ctxs = _ia_preparar_buscas(job_id, job, segments)
+        if ctxs:
+            ia_ctxs[:] = ctxs
+            _save_state(job_id)
 
         completed = 0
         cancelled = False
@@ -3601,13 +3698,22 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
         if imagem_items:
             pasta_imagens = os.path.join(job_dir, "buscadores_imagens")
 
+            _termos = [" ".join((s.query or "").split()) for _i, s in imagem_items]
+
             def _on_imagem(i: int, res: dict) -> None:
+                if ia_ctxs[i] is not None:
+                    try:
+                        _t = " ".join((segments[i].query or "").split())
+                        res = _ia_escolher_imagem(res, ia_ctxs[i], job.setdefault("imagens_buscadores", {}), _t, _termos.count(_t) == 1)
+                    except Exception:  # noqa: BLE001
+                        pass
                 _publicar(i, {
                     "index": i, "ok": bool(res.get("ok")),
                     "thumbnail_url": f"/job/{job_id}/thumbnail/{i}" if res.get("ok") else None,
                     "thumbnail_path": res.get("path") if res.get("ok") else None,
                     "result_url": res.get("source_page") or None,
-                    "label": (f"{res.get('engine')}: {res.get('title') or res.get('query')}" + (" (⚠ repetida: nenhum buscador achou outra)" if res.get("repetida") else "") if res.get("ok") else None),
+                    "label": (("⚠ " if res.get("ia_aviso") else "") + f"{res.get('engine')}: {res.get('title') or res.get('query')}" + (" (⚠ repetida: nenhum buscador achou outra)" if res.get("repetida") else "") if res.get("ok") else None),
+                    **({k: res[k] for k in ("ia_nota", "ia_motivo", "ia_aviso") if res.get(k) is not None}),
                     "error": None if res.get("ok") else res.get("erro"),
                     "video_preview_url": None, "provider": res.get("engine"),
                     "original_provider": segments[i].provider,
@@ -3711,13 +3817,14 @@ def fetching_previews_status_api(job_id: str):
     previews_summary = [
         {"index": p["index"], "ok": p["ok"], "thumbnail_url": p.get("thumbnail_url"),
          "provider": p.get("provider") or p.get("original_provider"), "error": p.get("error"),
-         "label": p.get("label")}
+         "label": p.get("label"), "ia_nota": p.get("ia_nota"), "ia_motivo": p.get("ia_motivo")}
         for p in previews if p is not None
     ]
     return jsonify({
         "status": job.get("status"),
         "progress": job.get("preview_progress"),
         "previews": previews_summary,
+        "ia": job.get("preview_ia"),
     })
 
 
@@ -4237,6 +4344,8 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 palavras_narracao=_palavras_da_narracao(job),
                 sfx=job.get("sfx") or None,
                 graficos=job.get("graficos") or None,
+                editoriais=job.get("editoriais") or None,
+                imagens_editorial=_imagens_da_biblioteca(job),
                 censura=job.get("censura") or None,
             )
             job["output_path"] = output_path
@@ -4465,6 +4574,8 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         "legendas": job.get("legendas") or {},
         "kit": (job.get("editor_defaults") or {}).get("kit") or {},
         "graficos": job.get("graficos") or [],
+        "editoriais": job.get("editoriais") or [],
+        "editorial_tipos": __import__("dp_editorial").para_editor(),
         "censura": job.get("censura") or [],
         "graficos_tipos": __import__("dp_graficos").TIPOS, "graficos_posicoes": __import__("dp_graficos").POSICOES,
         "exportacao": {"resolucao": job.get("export_quality", "1080p"), "qualidade": job.get("qualidade_exportacao") or "normal",
@@ -4558,7 +4669,7 @@ def _catalogo_dp_editor() -> dict:
     import dp_direcao
     import dp_visual
     return {
-        "filtros": [{k: f[k] for k in ("id", "rotulo", "grupo")} for f in dp_visual.filtros()],
+        "filtros": [{k: f[k] for k in ("id", "rotulo", "grupo", "css")} for f in dp_visual.filtros()],
         "efeitos": dp_visual.efeitos(), "entradas": dp_visual.entradas(),
         "transicoes": dp_visual.transicoes(), "direcoes": dp_direcao.direcoes(),
         "paletas": __import__("dp_cores").PALETAS, "paletas_usuario": dp_direcao.paletas_usuario(), "paleta_padrao": __import__("dp_cores").padrao(),
@@ -4610,8 +4721,7 @@ def dp_fonte(nome: str):
 @app.route("/dp-fontes.css")
 def dp_fontes_css():
     import dp_destaques
-    with open(os.path.join(dp_destaques.FONTES_DIR, "fontes.json"), encoding="utf-8") as f:
-        mapa = json.load(f)
+    mapa = dp_destaques.fontes_json()  # fontes.json + fontes dos extras
     css = []
     for info in mapa.values():
         for est, arq in info["arquivos"].items():
@@ -5543,6 +5653,55 @@ def cutaway_youtube_status(yt_job_id: str):
 # --------------------------------------------------------------------- #
 
 YOUTUBE_RESULTADOS_POR_TERMO = 8
+YOUTUBE_RESULTADOS_COM_IA = 20
+
+
+def _youtube_fala_do_item(job: dict, item: dict) -> str:
+    """O que a narração diz no trecho do item (ou a descrição do corte)."""
+    if item.get("tipo") == "segmento" and item.get("indice") is not None:
+        segs = job.get("pending_segments") or []
+        i = item["indice"]
+        if 0 <= i < len(segs):
+            try:
+                falas, _p = _falas_por_trecho(job, [segs[i]])
+                if falas and falas[0]:
+                    return falas[0]
+            except Exception:  # noqa: BLE001
+                pass
+            return " ".join(str(b.get("text") or "").strip() for b in job.get("segments") or []
+                            if float(b.get("start", 0)) < float(segs[i]["end"]) and float(b.get("end", 0)) > float(segs[i]["start"]))
+    return str(item.get("descricao") or item.get("termo") or "")
+
+
+def _legenda_com_tempos(url: str, pasta: str) -> Dict[str, Any]:
+    """Legenda de um vídeo do YouTube em linhas curtas com os tempos (pra achar o momento).
+    youtube-transcript-api → painel "Mostrar transcrição" → a transcrição do Roteiro do YouTube."""
+    import yt_alternativas as alt
+    erros = []
+    try:
+        r = alt.legenda_transcript_api(url, ["pt", "en", "es"])
+        if r and r.get("linhas"):
+            return {"linhas": r["linhas"], "fonte": "youtube-transcript-api"}
+    except Exception as exc:  # noqa: BLE001
+        erros.append(str(exc)[:120])
+    for headless in (True, False):
+        try:
+            r = alt.legenda_painel(url, headless=headless)
+            if r and r.get("linhas"):
+                return {"linhas": r["linhas"], "fonte": "painel de transcrição", "titulo": r.get("titulo"), "canal": r.get("canal")}
+            if r and r.get("tem_legenda") is False:
+                break
+        except Exception as exc:  # noqa: BLE001
+            erros.append(str(exc)[:120])
+    try:
+        import roteiros_yt
+        tr = roteiros_yt.extrair_transcricao(url, pasta, usar_whisper=False, painel_primeiro=False)
+        linhas = [{"inicio": b["inicio"], "fim": b.get("fim", b["inicio"]), "texto": b["texto"]} for b in tr.get("blocos") or []]
+        if linhas:
+            return {"linhas": linhas, "fonte": tr.get("fonte") or "legenda", "titulo": tr.get("titulo"), "canal": tr.get("canal")}
+    except Exception as exc:  # noqa: BLE001
+        erros.append(str(exc)[:160])
+    return {"linhas": [], "erro": "; ".join(erros) or "o vídeo não tem legenda"}
 _YOUTUBE_BUSCAS_RODANDO: set = set()
 _YOUTUBE_BUSCAS_LOCK = threading.Lock()
 
@@ -5618,9 +5777,24 @@ def _youtube_buscar_pendentes(job_id: str) -> None:
                 try:
                     if not termo:
                         raise YoutubeClipperError("Termo de busca vazio — digite um termo e clique em Buscar.")
-                    resultados = buscar_videos_youtube(termo, quantidade=YOUTUBE_RESULTADOS_POR_TERMO)
+                    import ia_servico
+                    com_ia = ia_servico.ativo("youtube_ordem")
+                    # 🤖 com a IA: 20 de uma vez (uma consulta só), ordenados pela nota; o painel mostra 8 + "Outros vídeos"
+                    resultados = buscar_videos_youtube(termo, quantidade=YOUTUBE_RESULTADOS_COM_IA if com_ia else YOUTUBE_RESULTADOS_POR_TERMO)
                     if pendente.get("termo", "").strip() != termo:
                         continue  # termo mudou durante a busca: o item já voltou a "pendente"
+                    pendente["ia_ordenado"] = False
+                    if com_ia and resultados:
+                        try:
+                            import ia_midia
+                            o = ia_midia.ordenar_youtube(resultados, _youtube_fala_do_item(job, pendente), termo,
+                                                         (job.get("ia") or {}).get("ficha"), job=job_id)
+                        except Exception:  # noqa: BLE001
+                            o = None
+                        if o:
+                            resultados = o["resultados"]
+                            pendente["ia_ordenado"] = True
+                            pendente["ia_busca_melhor"] = o.get("busca_melhor") or ""
                     pendente["resultados"] = resultados
                     pendente["erro"] = None if resultados else "Nenhum vídeo encontrado — tente outro termo."
                     pendente["status"] = "pronto"
@@ -5690,6 +5864,44 @@ def youtube_item_buscar(job_id: str, item_id: str):
     _save_state(job_id)
     _youtube_buscar_pendentes(job_id)
     return jsonify({"ok": True})
+
+
+@app.route("/job/<job_id>/youtube/item/<item_id>/momento", methods=["POST"])
+def youtube_item_momento(job_id: str, item_id: str):
+    """🤖 Acha, pela legenda do vídeo escolhido, o momento que fala o que a narração pede
+    (início e fim já preenchidos; você confere e clica em Usar)."""
+    import ia_servico
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    motivo = ia_servico.motivo_desligado("youtube_momento")
+    if motivo:
+        return jsonify({"erro": "IA: " + motivo}), 400
+    item = _youtube_item(job, item_id)
+    if item is None:
+        return jsonify({"erro": "Esse item não existe mais."}), 404
+    corpo = request.get_json(silent=True) or {}
+    url = (corpo.get("url") or "").strip()
+    if not url:
+        return jsonify({"erro": "Escolha um vídeo primeiro."}), 400
+    cache = job.setdefault("ia_legendas", {})
+    leg = cache.get(url)
+    if not leg or not leg.get("linhas"):
+        leg = _legenda_com_tempos(url, os.path.join(_job_dir(job_id), "youtube_legendas"))
+        if leg.get("linhas"):
+            cache[url] = leg
+            if len(cache) > 8:
+                cache.pop(next(iter(cache)))
+    if not leg.get("linhas"):
+        return jsonify({"erro": "Não consegui a legenda desse vídeo (" + str(leg.get("erro") or "sem legenda") + ") — marque o trecho à mão."}), 200
+    import ia_midia
+    r = ia_midia.achar_momento(leg["linhas"], _youtube_fala_do_item(job, item), str(corpo.get("titulo") or leg.get("titulo") or ""),
+                               str(corpo.get("canal") or leg.get("canal") or ""), item.get("duracao_alvo"),
+                               (job.get("ia") or {}).get("ficha"), job=job_id)
+    if r is None:
+        return jsonify({"erro": "A IA não respondeu agora (" + (ia_servico.motivo_desligado("youtube_momento") or "tente de novo") + ")."}), 200
+    _save_state(job_id)
+    return jsonify({"ok": True, **r, "fonte_legenda": leg.get("fonte")})
 
 
 @app.route("/job/<job_id>/youtube/item/<item_id>/usar", methods=["POST"])
@@ -5791,10 +6003,46 @@ def edicao_prompt(job_id: str):
         for sg, f in zip(estado["segmentos"], falas):
             sg["_fala"] = f
     try:
+        if estado.get("partes_min"):  # ✂️ opcional: vídeo longo em partes (ex.: 12 min cada), um prompt por parte
+            segs = estado.get("segmentos") or job.get("pending_segments") or []
+            total = float(job.get("total_duration") or (segs[-1]["end"] if segs else 0))
+            # 🎨 a direção de arte vem da resposta da PARTE 1 e entra nos prompts das outras (o vídeo tem uma cara só)
+            arte, erro_arte = "", None
+            if str(estado.get("resposta_parte1") or "").strip():
+                try:
+                    p1 = prompt_edicao.ler_resposta(str(estado["resposta_parte1"]), len(segs), total, _palavras_da_narracao(job))
+                    arte = prompt_edicao.arte_da_parte1(p1)
+                except ValueError as exc:
+                    erro_arte = f"Não li a resposta da parte 1: {exc}"
+            partes = []
+            for pt in prompt_edicao.dividir_partes(segs, total, float(estado["partes_min"])):
+                txt = prompt_edicao.montar_prompt(job, dict(estado, parte=pt, arte=arte))
+                partes.append(dict(pt, prompt=txt, caracteres=len(txt)))
+            return jsonify({"ok": True, "partes": partes, "prompt": partes[0]["prompt"], "caracteres": sum(x["caracteres"] for x in partes),
+                            "arte": arte, "erro_arte": erro_arte})
         texto = prompt_edicao.montar_prompt(job, estado)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"erro": f"Não consegui montar o prompt: {exc}"}), 400
     return jsonify({"ok": True, "prompt": texto, "caracteres": len(texto)})
+
+
+@app.route("/job/<job_id>/edicao/ia", methods=["POST"])
+def edicao_ia(job_id: str):
+    """🤖 Manda o prompt de edição (ou UMA parte dele) direto pra IA configurada em /ia e devolve a resposta."""
+    import ia_servico
+    if not _JOBS.get(job_id):
+        return jsonify({"erro": "Job não encontrado."}), 404
+    motivo = ia_servico.motivo_desligado("edicao")
+    if motivo:
+        return jsonify({"erro": "IA: " + motivo}), 400
+    prompt = str((request.get_json(silent=True) or {}).get("prompt") or "")
+    if not prompt.strip():
+        return jsonify({"erro": "Gere o prompt primeiro."}), 400
+    texto = ia_servico.chamar("edicao", "Você é editor de vídeo. Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois.",
+                              prompt, schema=None, max_tokens=20000, effort="medium", job=job_id, timeout=300)
+    if not texto:
+        return jsonify({"erro": "A IA não respondeu (" + (ia_servico.motivo_desligado("edicao") or "veja os detalhes em 🤖 IA") + ") — copie o prompt e use outra IA."}), 200
+    return jsonify({"ok": True, "texto": texto})
 
 
 @app.route("/job/<job_id>/edicao/resposta", methods=["POST"])
@@ -5806,12 +6054,22 @@ def edicao_resposta(job_id: str):
         return jsonify({"erro": "Job não encontrado."}), 404
     corpo = request.get_json(silent=True) or {}
     n = int(corpo.get("n_trechos") or len(job.get("pending_segments") or []))
+    textos = [str(t) for t in corpo.get("textos") or [] if str(t or "").strip()]  # ✂️ uma resposta por parte
     try:
-        plano = prompt_edicao.ler_resposta(str(corpo.get("texto") or ""), n, float(job.get("total_duration") or 0),
-                                           _palavras_da_narracao(job), corpo.get("foto"))
+        if textos:
+            planos = []
+            for k, t in enumerate(textos, start=1):
+                try:
+                    planos.append(prompt_edicao.ler_resposta(t, n, float(job.get("total_duration") or 0), _palavras_da_narracao(job), corpo.get("foto")))
+                except ValueError as exc:
+                    raise ValueError(f"Parte {k}: {exc}") from exc
+            plano = prompt_edicao.juntar_planos(planos)
+        else:
+            plano = prompt_edicao.ler_resposta(str(corpo.get("texto") or ""), n, float(job.get("total_duration") or 0),
+                                               _palavras_da_narracao(job), corpo.get("foto"))
     except ValueError as exc:
         return jsonify({"erro": str(exc)}), 400
-    for d in plano.get("destaques") or []:
+    for d in (plano.get("destaques") or []) + (plano.get("editoriais") or []):
         d["id"] = uuid.uuid4().hex[:8]
     return jsonify({"ok": True, **plano})
 
@@ -5938,6 +6196,59 @@ def buscas_previa(job_id: str, indice: int):
     job["segment_previews"] = previews
     _save_state(job_id)
     return jsonify({"ok": True, "preview": previa})
+
+
+def _imagens_da_biblioteca(job: dict) -> Dict[str, str]:
+    """"bib:<id>" -> caminho, pros quadros editoriais (prints, fotos do mural, recortes…)."""
+    return {"bib:" + it["id"]: it["path"] for it in job.get("media_library") or [] if it.get("path") and os.path.exists(it["path"])}
+
+
+@app.route("/editorial/exemplo/<tipo>")
+def editorial_exemplo(tipo: str):
+    import dp_editorial
+    if tipo not in dp_editorial.TIPOS:
+        return jsonify({"erro": "Tipo desconhecido."}), 404
+    return jsonify(dp_editorial.exemplo(tipo))
+
+
+@app.route("/editorial/sons", methods=["POST"])
+def editorial_sons():
+    """Os sons dos quadros (para tocar junto na prévia do Estúdio)."""
+    import dp_editorial
+    itens = [q for q in (dp_editorial.normalizar(x) for x in ((request.get_json(silent=True) or {}).get("itens") or [])[:200]) if q]
+    return jsonify({"eventos": dp_editorial.eventos_sonoros(itens)})
+
+
+@app.route("/job/<job_id>/editorial/previa", methods=["POST"])
+def editorial_previa(job_id: str):
+    """Um quadro do quadro editorial (o MESMO desenho do vídeo final) pra telinha do Estúdio."""
+    import dp_editorial
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    corpo = request.get_json(silent=True) or {}
+    it = dp_editorial.normalizar(corpo.get("item") or {})
+    if not it:
+        return jsonify({"erro": "Quadro inválido."}), 400
+    orient = corpo.get("orientacao") if corpo.get("orientacao") in ("16:9", "9:16", "1:1") else _orientacao_do_job(job)
+    W, H = {"16:9": (960, 540), "9:16": (540, 960), "1:1": (720, 720)}[orient]
+    try:
+        t = max(0.0, float(corpo.get("t") or 0))
+    except (TypeError, ValueError):
+        t = 0.0
+    pasta = os.path.join(_job_dir(job_id), "editorial_previa")
+    imagens = _imagens_da_biblioteca(job)
+    prints = {}
+    if it["tipo"] == "pagina" and it.get("url") and not it.get("imagem"):
+        p = dp_editorial.capturar_print(it["url"], os.path.join(_job_dir(job_id), "editorial_prints"))
+        if p:
+            prints[it["url"]] = p
+    chave = hashlib.md5(json.dumps([it, W, H, round(t, 2), sorted(imagens.items()), prints], sort_keys=True, default=str).encode()).hexdigest()[:14]
+    destino = os.path.join(pasta, chave + ".png")
+    if not os.path.exists(destino):
+        os.makedirs(pasta, exist_ok=True)
+        dp_editorial.previa_png(it, t, W, H, destino, dp_editorial.novo_ctx(imagens, prints, pasta))
+    return send_file(destino, mimetype="image/png", max_age=3600)
 
 
 @app.route("/job/<job_id>/grafico/previa", methods=["POST"])
@@ -6398,14 +6709,38 @@ def search_candidates_api(job_id: str):
     if not query or not provider:
         return jsonify({"error": "Faltou 'query' ou 'provider'."}), 400
 
+    import ia_servico
+    indice = (request.json or {}).get("indice")
+    usar_ia = isinstance(indice, int) and ia_servico.ativo("juiz_manual") and 0 <= indice < len(job.get("pending_segments") or [])
     try:
-        candidates = search_candidates(provider, query, media_type=media_type, max_results=6, site_cfg=_job_site_cfg(job),
+        candidates = search_candidates(provider, query, media_type=media_type,
+                                       max_results=int(ia_servico.config().get("candidatos") or 10) if usar_ia else 6, site_cfg=_job_site_cfg(job),
                                        obra=((request.json or {}).get("obra") or "").strip() or None,
                                        personagem=((request.json or {}).get("personagem") or "").strip() or None)
     except VideoAssemblyError as exc:
         return jsonify({"error": str(exc)}), 200  # erro de busca, não de servidor — mostra na tela
 
-    return jsonify({"candidates": candidates, "can_pin": provider in PROVIDERS_WITH_URL_RESOLUTION})
+    julgado = False
+    if usar_ia and candidates:  # 🤖 os resultados na ordem da nota do juiz, com o motivo
+        from video_assembler import julgar_candidatos_ia
+        ctx = _ia_ctx_do_trecho(job_id, job, indice)
+        j = julgar_candidatos_ia([c for c in candidates if c.get("thumbnail")], ctx, query, recurso="juiz_manual")
+        if j:
+            candidates, julgado = j["lista"], True
+    return jsonify({"candidates": candidates, "can_pin": provider in PROVIDERS_WITH_URL_RESOLUTION, "ia": julgado})
+
+
+def _ia_ctx_do_trecho(job_id: str, job: dict, indice: int) -> dict:
+    """Contexto do juiz pra UM trecho (fala dele + a anterior e a seguinte, ficha do vídeo)."""
+    segs = job.get("pending_segments") or []
+    vizinhos = [k for k in (indice - 1, indice, indice + 1) if 0 <= k < len(segs)]
+    try:
+        falas, _p = _falas_por_trecho(job, [segs[k] for k in vizinhos])
+    except Exception:  # noqa: BLE001
+        falas = [""] * len(vizinhos)
+    f = dict(zip(vizinhos, falas))
+    return {"ficha": (job.get("ia") or {}).get("ficha"), "fala": f.get(indice, ""), "anterior": f.get(indice - 1, ""),
+            "seguinte": f.get(indice + 1, ""), "visual": segs[indice].get("visual") or "", "job": job_id}
 
 
 def _duracao_de_url(url: Optional[str], job_id: str = "") -> Optional[float]:
@@ -7018,7 +7353,7 @@ def confirm_segments(job_id: str):
     elif _defaults_antes.get("filtro_cor"):
         job["editor_defaults"]["filtro_cor"] = _defaults_antes["filtro_cor"]
     if "global_sons_enviados" in request.form:
-        job["editor_defaults"]["sons_auto"] = {k: request.form.get(f"global_sons_{k}") == "on" for k in ("transicoes", "cenas", "destaques")}
+        job["editor_defaults"]["sons_auto"] = {k: request.form.get(f"global_sons_{k}") == "on" for k in ("transicoes", "cenas", "destaques", "editoriais")}
         try:
             job["editor_defaults"]["sons_volume"] = max(0.0, min(2.0, float(request.form.get("global_sons_volume", 0.55))))
         except (TypeError, ValueError):
@@ -7332,6 +7667,14 @@ def confirm_segments(job_id: str):
             _cz = None
         if isinstance(_cz, list):
             job["censura"] = dp_censura.normalizar(_cz[:80], job.get("total_duration"))
+    if "editoriais_json" in request.form:
+        import dp_editorial
+        try:
+            _eds = json.loads(request.form.get("editoriais_json") or "[]")
+        except ValueError:
+            _eds = None
+        if isinstance(_eds, list):
+            job["editoriais"] = [e for e in (dp_editorial.normalizar(x, job.get("total_duration")) for x in _eds[:60]) if e]
     if "graficos_json" in request.form:
         import dp_graficos
         try:
@@ -8115,6 +8458,11 @@ vendas_rotas.registrar(app, BASE_DIR)
 import dossies_rotas  # noqa: E402
 
 dossies_rotas.registrar(app, BASE_DIR)
+
+import guia as _guia  # noqa: E402
+_guia.registrar(app, BASE_DIR)
+import ia_rotas as _ia_rotas  # noqa: E402  🤖 IA nas buscas e modelos (v84_53)
+_ia_rotas.registrar(app, BASE_DIR)
 
 
 def _texto_do_dossie(pid: Optional[str]) -> str:

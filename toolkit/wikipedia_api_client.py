@@ -84,6 +84,21 @@ class WikipediaAPIClientError(Exception):
     """Erro genérico do cliente (rede, parsing, página não encontrada etc.)."""
 
 
+# arquivos que quase nunca são "a foto" do assunto (bandeira, brasão, mapa, logo…)
+_LIXO_ARQUIVO = re.compile(r"flag|bandeira|coat[ _]of[ _]arms|bras[aã]o|(?<![a-z])map(?![a-z])|mapa|locator|location[ _]map|logo|signature|assinatura|"
+                           r"icon|[ií]cone|(?<![a-z])seal(?![a-z])|symbol|emblem|blank|commons-logo|wiki(?:pedia|media|source|quote)|question[ _]book|"
+                           r"edit-clear|padlock|crystal[ _]clear|portal", re.I)
+
+
+def _ia_melhorada() -> bool:
+    """O site liga o caminho melhorado (foto principal + filtro + lote) com a 🤖 IA (recurso "wikipedia")."""
+    try:
+        import ia_servico  # só existe dentro do site
+        return ia_servico.ativo("wikipedia")
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _limpar_html(texto: Optional[str]) -> str:
     if not texto:
         return ""
@@ -382,7 +397,78 @@ class WikipediaAPIClient:
         artigo/UMA lista de imagens por termo); `max_images` limita
         quantas imagens do artigo são trazidas (padrão: todas).
         """
+        if _ia_melhorada():
+            try:
+                return self.search_all_filtrada(query, max_images=max_images)
+            except WikipediaAPIClientError:
+                pass
         return self.search_all(query, max_images=max_images)
+
+    # ------------------------------------------------------------------ #
+    # Caminho melhorado (o site usa com a 🤖 IA ligada — recurso "wikipedia")
+    # ------------------------------------------------------------------ #
+
+    def buscar_titulos(self, termo: str, n: int = 5) -> List[Dict[str, str]]:
+        """Os `n` primeiros artigos da busca, com o trecho (pra desfazer ambiguidade)."""
+        dados = self._get(WIKIPEDIA_API, {"action": "query", "format": "json", "list": "search", "srsearch": termo, "srlimit": n})
+        return [{"titulo": r.get("title", ""), "descricao": _limpar_html(r.get("snippet"))[:200]}
+                for r in dados.get("query", {}).get("search", [])]
+
+    def imagem_principal(self, titulo: str) -> str:
+        """A imagem do TOPO do artigo (a da caixa de informações) — `prop=images` vem em ordem
+        alfabética e a "1ª" costuma ser bandeira/brasão/mapa."""
+        dados = self._get(WIKIPEDIA_API, {"action": "query", "format": "json", "prop": "pageimages", "piprop": "name", "titles": titulo})
+        for p in dados.get("query", {}).get("pages", {}).values():
+            if p.get("pageimage"):
+                return "File:" + p["pageimage"].replace("_", " ")
+        return ""
+
+    def metadados_em_lote(self, arquivos: List[str], pagina_origem: str = "", largura_max: int = 2000) -> List[WikipediaImage]:
+        """`imageinfo` de até 50 arquivos por pedido (em vez de 1 por pedido + pausa)."""
+        saida: Dict[str, WikipediaImage] = {}
+        for k in range(0, len(arquivos), 50):
+            dados = self._get(COMMONS_API, {"action": "query", "format": "json", "prop": "imageinfo", "titles": "|".join(arquivos[k:k + 50]),
+                                            "iiprop": "url|size|mime|extmetadata", "iiextmetadatalanguage": "en", "iiurlwidth": largura_max})
+            normalizados = {n.get("to"): n.get("from") for n in dados.get("query", {}).get("normalized", [])}
+            for p in dados.get("query", {}).get("pages", {}).values():
+                infos = p.get("imageinfo") or []
+                if not infos:
+                    continue
+                titulo = normalizados.get(p.get("title"), p.get("title"))
+                info, meta = infos[0], infos[0].get("extmetadata", {})
+
+                def campo(nome: str) -> str:
+                    v = meta.get(nome, {})
+                    return _limpar_html(v.get("value", "") if isinstance(v, dict) else v)
+                saida[titulo] = WikipediaImage(
+                    arquivo=titulo, url_original=info.get("url", ""),
+                    url_pagina="https://commons.wikimedia.org/wiki/" + quote(str(titulo).replace(" ", "_")),
+                    mime=info.get("mime", ""), largura=info.get("width", 0) or 0, altura=info.get("height", 0) or 0,
+                    descricao=campo("ImageDescription"), legenda=campo("ObjectName"), data=campo("DateTimeOriginal"),
+                    autor=campo("Artist"), fonte=campo("Credit"), localizacao=campo("LocationCreated"),
+                    licenca=campo("LicenseShortName"), uso=campo("UsageTerms"), categorias=campo("Categories"),
+                    pagina_origem=pagina_origem, thumb_url=info.get("thumburl", ""), raw=info)
+            if k + 50 < len(arquivos):
+                time.sleep(self.delay)
+        return [saida[a] for a in arquivos if a in saida]
+
+    def get_images_filtradas(self, titulo: str, max_images: Optional[int] = None) -> List[WikipediaImage]:
+        """Foto principal primeiro, sem bandeira/brasão/mapa/logo/assinatura/ícone, metadados em lote,
+        nada menor que 400 px."""
+        principal = ""
+        try:
+            principal = self.imagem_principal(titulo)
+        except WikipediaAPIClientError:
+            pass
+        arquivos = [a for a in self.list_image_titles(titulo) if not _LIXO_ARQUIVO.search(a)]
+        if principal:
+            arquivos = [principal] + [a for a in arquivos if a != principal]
+        imagens = [i for i in self.metadados_em_lote(arquivos[:150], pagina_origem=titulo)
+                   if min(i.largura or 0, i.altura or 0) >= 400 and not _LIXO_ARQUIVO.search(i.categorias or "")]
+        return imagens[:max_images] if max_images else imagens
+
+    def search_all_filtrada(self, termo: str, max_images: Optional[int] = None) -> List[WikipediaImage]:
+        return self.get_images_filtradas(self.find_page_title(termo), max_images=max_images)
 
     # ------------------------------------------------------------------ #
     # Download

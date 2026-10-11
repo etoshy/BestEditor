@@ -1,0 +1,7 @@
+{
+  "filtros": [
+    {"id": "noite_azul", "rotulo": "Noite azul", "grupo": "meus",
+     "cadeia": "colorbalance=bs=0.18:bm=0.1:rh=-0.04,eq=brightness=-0.06:saturation=0.85,vignette=angle=PI/5",
+     "css": "saturate(.85) brightness(.94) hue-rotate(12deg)"}
+  ]
+}

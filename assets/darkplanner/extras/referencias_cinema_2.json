@@ -1,0 +1,3760 @@
+{
+ "_leia": "200 extras (Tarantino, séries, diretores e documentários). As miniaturas já estão em assets/darkplanner/galeria. Confira com  python dp_guia.py verificar  e reinicie o site (transição nova só vale depois de reiniciar). O campo \"direcoes\" de cada item diz em quais Direções do sistema ele entra (o site usa isso desde a v84_51); \"_direcoes\" no fim é só um resumo.",
+ "transicoes": [
+  {
+   "id": "kill_bill_split",
+   "rotulo": "Tela dividida em dois tempos (Kill Bill)",
+   "familia": "corte",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "expr": "if(lt(X,W/2),if(gt(P,0.3),B,A),if(gt(P,0.7),B,A))",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "bastardos_fim_capitulo",
+   "rotulo": "Fim de capítulo no preto (Bastardos Inglórios)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "xfade": "fadeblack",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "pulp_fiction_flash",
+   "rotulo": "Flash seco (Pulp Fiction)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "gl_flash",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "django_zoom_western",
+   "rotulo": "Zoom de faroeste (Django Livre)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "zoom_in_out",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "death_proof_rolo_perdido",
+   "rotulo": "Rolo queimado (À Prova de Morte)",
+   "familia": "luz",
+   "int": 4,
+   "energia": 0.7,
+   "ritmo": "medio",
+   "igual_a": "ft_filmburn4",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "hollywood_dissolve_60s",
+   "rotulo": "Dissolve anos 60 (Era Uma Vez em Hollywood)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "xfade": "dissolve",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "jackie_brown_split_vertical",
+   "rotulo": "Divisão em cima e embaixo (Jackie Brown)",
+   "familia": "corte",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "expr": "if(lt(Y,H/2),if(gt(P,0.35),B,A),if(gt(P,0.65),B,A))",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "caes_corte_preto_rapido",
+   "rotulo": "Corte rápido no preto (Cães de Aluguel)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.5,
+   "ritmo": "rapido",
+   "xfade": "fadefast",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "odiados_nevasca_branca",
+   "rotulo": "Branco de nevasca (Os Oito Odiados)",
+   "familia": "luz",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "xfade": "fadewhite",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kill_bill_clarao_vermelho",
+   "rotulo": "Clarão vermelho (Kill Bill)",
+   "familia": "impacto",
+   "int": 5,
+   "energia": 0.9,
+   "ritmo": "rapido",
+   "expr": "clip((A*(1-P)+B*P)*(1-max(0,1-abs(2*P-1)*1.4))+if(eq(PLANE,0),81,if(eq(PLANE,1),90,240))*max(0,1-abs(2*P-1)*1.4),0,255)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "breaking_bad_timelapse",
+   "rotulo": "Varredura de timelapse (Breaking Bad)",
+   "familia": "varredura",
+   "int": 2,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "smoothleft",
+   "direcoes": [
+    "sys_cinema",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "stranger_things_invertido",
+   "rotulo": "Mundo invertido (Stranger Things)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "distance",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "mr_robot_pixelado",
+   "rotulo": "Pixelado de hacker (Mr. Robot)",
+   "familia": "glitch",
+   "int": 4,
+   "energia": 0.7,
+   "ritmo": "rapido",
+   "xfade": "pixelize",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "dark_tunel_tempo",
+   "rotulo": "Túnel do tempo (Dark)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "xfade": "circlecrop",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "peaky_blinders_ambar",
+   "rotulo": "Passagem âmbar (Peaky Blinders)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "igual_a": "ft_dourado",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "succession_snap_zoom",
+   "rotulo": "Snap zoom (Succession)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "gl_zoom_cross",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "the_bear_corte_nervoso",
+   "rotulo": "Corte nervoso (The Bear)",
+   "familia": "impacto",
+   "int": 5,
+   "energia": 0.9,
+   "ritmo": "rapido",
+   "igual_a": "gl_punch",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "black_mirror_tela_falha",
+   "rotulo": "Tela falhando (Black Mirror)",
+   "familia": "glitch",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "ft_pk_glitch",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "sherlock_deducao",
+   "rotulo": "Deslize de dedução (Sherlock)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "rapido",
+   "xfade": "slideleft",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "the_crown_dissolve_ouro",
+   "rotulo": "Dissolve dourado (The Crown)",
+   "familia": "luz",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "igual_a": "gl_fade_brilho",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "narcos_ficha_arquivo",
+   "rotulo": "Ficha de arquivo (Narcos)",
+   "familia": "combo",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "dp_shutter_dossie",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "chernobyl_ruido",
+   "rotulo": "Ruído de radiação (Chernobyl)",
+   "familia": "glitch",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "noise_dissolve",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "wandavision_tv_fecha",
+   "rotulo": "TV antiga fechando (WandaVision)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "squeezev",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "lost_flash_branco",
+   "rotulo": "Flash branco (Lost)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "expr": "clip((A*(1-P)+B*P)*(1-max(0,1-abs(2*P-1)*1.4))+if(eq(PLANE,0),235,128)*max(0,1-abs(2*P-1)*1.4),0,255)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "got_fade_frio",
+   "rotulo": "Fade frio com grão (Game of Thrones)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "igual_a": "gl_fade_grao",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "round6_iris_forma",
+   "rotulo": "Íris de forma (Round 6)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "diamond_iris",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "casa_de_papel_cortina",
+   "rotulo": "Cortina fechando (La Casa de Papel)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "vertclose",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "euphoria_iridescente",
+   "rotulo": "Brilho iridescente (Euphoria)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "igual_a": "ft_arcoiris",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "wong_kar_wai_borrao",
+   "rotulo": "Borrão de movimento (Wong Kar-wai)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "xfade": "hblur",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "ritchie_zoom_impacto",
+   "rotulo": "Zoom de impacto (Guy Ritchie)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "xfade": "zoomin",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "nolan_respiro_escuro",
+   "rotulo": "Respiro no escuro (Nolan)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "igual_a": "gl_fade_escuro",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "kubrick_abertura_simetrica",
+   "rotulo": "Abertura simétrica (Kubrick)",
+   "familia": "forma",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "xfade": "horzopen",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "spielberg_flare",
+   "rotulo": "Flare de lente (Spielberg)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "igual_a": "ft_pk_leak1",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "fincher_foco_seco",
+   "rotulo": "Foco seco (Fincher)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "medio",
+   "igual_a": "cb_foco",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "scorsese_chicote",
+   "rotulo": "Chicote rápido (Scorsese)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.9,
+   "ritmo": "rapido",
+   "xfade": "hrwind",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "planeta_terra_dissolve_lento",
+   "rotulo": "Dissolve lento (Planeta Terra)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.2,
+   "ritmo": "cinema",
+   "xfade": "fadeslow",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "last_dance_fita",
+   "rotulo": "Corte de fita (Arremesso Final)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "igual_a": "ft_pk_film",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "drive_to_survive_telemetria",
+   "rotulo": "Varredura de telemetria (Drive to Survive)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.7,
+   "ritmo": "rapido",
+   "expr": "if(lt(X/W+0.03*mod(Y,24)/24,P*1.03),B,A)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "tiger_king_splash",
+   "rotulo": "Splash de tabloide (A Máfia dos Tigres)",
+   "familia": "splash",
+   "int": 4,
+   "energia": 0.7,
+   "ritmo": "rapido",
+   "igual_a": "ft_splash_2",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "chefs_table_respiro",
+   "rotulo": "Respiro de foco (Chef's Table)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "igual_a": "cb_respiro",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "efeitos": [
+  {
+   "id": "leone_zoom_olhos",
+   "rotulo": "Zoom rápido nos olhos (Sergio Leone)",
+   "camera": "rapido",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "vertigo_recua",
+   "rotulo": "Recuo de vertigem (Hitchcock)",
+   "camera": "out",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kubrick_avanco",
+   "rotulo": "Avanço lento central (Kubrick)",
+   "camera": "in",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "planeta_terra_pan",
+   "rotulo": "Pan de paisagem (Planeta Terra)",
+   "camera": "pan_left",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "nolan_imax_sobe",
+   "rotulo": "Tilt para cima (Nolan IMAX)",
+   "camera": "pan_up",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "snyder_respiro",
+   "rotulo": "Câmera respirando (Zack Snyder)",
+   "camera": "respiro",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "drive_survive_giro",
+   "rotulo": "Zoom com giro (Drive to Survive)",
+   "camera": "giro",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "fincher_travelling",
+   "rotulo": "Travelling preciso (Fincher)",
+   "camera": "zoom_pan_right",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "grindhouse_pelicula",
+   "rotulo": "Película grindhouse (À Prova de Morte)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "filtro": "[base]noise=alls=28:allf=t+u,eq=brightness='0.04*sin(2*PI*t*7)':saturation=0.85:eval=frame,vignette=angle=PI/4[base]",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "steadicam_leve",
+   "rotulo": "Steadicam leve",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "filtro": "[base]scale=iw+12:ih+12,crop=iw-12:ih-12:'6+4*sin(t*3)':'6+4*cos(t*2.3)'[base]",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "tremor_explosao_forte",
+   "rotulo": "Tremor de explosão forte",
+   "familia": "atmosfera",
+   "int": 5,
+   "energia": 1.0,
+   "filtro": "[base]scale=iw+40:ih+40,crop=iw-40:ih-40:'20+16*sin(t*31)':'20+16*cos(t*27)'[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "camera_succession",
+   "rotulo": "Câmera nervosa (Succession)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "filtro": "[base]scale=iw+30:ih+30,crop=iw-30:ih-30:'15+10*sin(t*7)+4*sin(t*23)':'15+9*cos(t*5)'[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "wong_kar_wai_smear",
+   "rotulo": "Rastro de câmera lenta (Wong Kar-wai)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.5,
+   "filtro": "[base]tmix=frames=5,eq=saturation=1.3[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "euphoria_brilho_roxo",
+   "rotulo": "Brilho roxo pulsando (Euphoria)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.5,
+   "filtro": "[base]colorbalance=rs=0.08:bs=0.15:rh=0.1:bh=0.12,eq=saturation=1.3:brightness='0.03*sin(2*PI*t*0.8)':eval=frame[base]",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "last_dance_vhs",
+   "rotulo": "Fita VHS dos anos 90 (Arremesso Final)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]rgbashift=rh=3:bh=-3,noise=alls=10:allf=t,eq=saturation=0.8:contrast=1.05,gblur=sigma=0.6[base]",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "wandavision_sitcom",
+   "rotulo": "TV de sitcom P&B (WandaVision)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.3,
+   "filtro": "[base]hue=s=0,eq=contrast=1.15,noise=alls=8:allf=t,vignette=angle=PI/4[base]",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "neon_respirando",
+   "rotulo": "Neon mudando de tom",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]hue=h='12*sin(2*PI*t*0.5)':s=1.2[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "estrobo_balada",
+   "rotulo": "Estroboscópio de balada",
+   "familia": "atmosfera",
+   "int": 4,
+   "energia": 0.9,
+   "filtro": "[base]eq=brightness='0.25*lt(mod(t,0.6),0.05)':eval=frame[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "respiro_luz_doc",
+   "rotulo": "Luz respirando (documentário)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.2,
+   "filtro": "[base]eq=brightness='0.025*sin(2*PI*t/4)':eval=frame[base]",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "chiaroscuro",
+   "rotulo": "Claro-escuro (Caravaggio / O Poderoso Chefão)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]eq=contrast=1.4:brightness=-0.04,vignette=angle=PI/3.2[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "aberracao_forte",
+   "rotulo": "Aberração cromática forte",
+   "familia": "atmosfera",
+   "int": 4,
+   "energia": 0.7,
+   "filtro": "[base]rgbashift=rh=10:bh=-10[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "terremoto_lento",
+   "rotulo": "Terremoto lento",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "filtro": "[base]scale=iw+50:ih+50,crop=iw-50:ih-50:'25+20*sin(t*2.1)':'25+18*sin(t*1.7)'[base]",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "dark_nevoa",
+   "rotulo": "Névoa da floresta (Dark)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.3,
+   "igual_a": "ov_neblina",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "peaky_fumaca",
+   "rotulo": "Fumaça de fábrica (Peaky Blinders)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "ov_fumaca_rasteira",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "odiados_neve",
+   "rotulo": "Neve caindo (Os Oito Odiados)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_particulas_lentas",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "drive_bokeh_noturno",
+   "rotulo": "Bokeh noturno (Drive)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_bokeh_suave",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "mr_robot_scanlines",
+   "rotulo": "Scanlines de monitor (Mr. Robot)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "ov_scanlines",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "spielberg_luz",
+   "rotulo": "Luz entrando pela janela (Spielberg)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "ov_leak",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "cosmos_estrelas",
+   "rotulo": "Céu estrelado (Cosmos)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.3,
+   "igual_a": "fv_galaxy",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "hollywood_veu_dourado",
+   "rotulo": "Véu dourado (Era Uma Vez em Hollywood)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_veu_dourado",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "projetor_tremulando",
+   "rotulo": "Projetor tremulando",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "flicker",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "poeira_faroeste",
+   "rotulo": "Poeira de faroeste (Django Livre)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_poeira",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "suspense_vinheta_pulso",
+   "rotulo": "Vinheta de suspense (true crime)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "ov_vinheta_pulso",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "paparazzi_bordas",
+   "rotulo": "Flashes de paparazzi",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.7,
+   "igual_a": "ov_flash_borda",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "black_mirror_aberracao",
+   "rotulo": "Aberração digital (Black Mirror)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "igual_a": "chroma",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  }
+ ],
+ "entradas": [
+  {
+   "id": "leone_crash_zoom",
+   "rotulo": "Crash zoom (Sergio Leone)",
+   "igual_a": "zoom_in",
+   "durAlvoS": 0.25,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "ritchie_freeze_nome",
+   "rotulo": "Congela no nome (Guy Ritchie)",
+   "igual_a": "pop",
+   "durAlvoS": 0.2,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "tarantino_porta_malas",
+   "rotulo": "Vista do porta-malas (Tarantino)",
+   "igual_a": "ergue_suave",
+   "durAlvoS": 0.8,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kill_bill_impacto",
+   "rotulo": "Impacto de katana (Kill Bill)",
+   "igual_a": "shockwave",
+   "durAlvoS": 0.3,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "django_queda",
+   "rotulo": "Queda seca (Django Livre)",
+   "igual_a": "drop",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "hollywood_tv_60s",
+   "rotulo": "TV dos anos 60 ligando (Era Uma Vez em Hollywood)",
+   "igual_a": "tv_on",
+   "durAlvoS": 0.5,
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "bastardos_letreiro",
+   "rotulo": "Letreiro com flash (Bastardos Inglórios)",
+   "igual_a": "flash",
+   "durAlvoS": 0.25,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "grindhouse_vibracao",
+   "rotulo": "Vibração grindhouse",
+   "igual_a": "vibration",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "succession_snap",
+   "rotulo": "Snap de câmera (Succession)",
+   "igual_a": "punch_in",
+   "durAlvoS": 0.18,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "the_bear_tremor",
+   "rotulo": "Tremor de cozinha (The Bear)",
+   "igual_a": "shake",
+   "durAlvoS": 0.25,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "peaky_slowmo",
+   "rotulo": "Câmera lenta (Peaky Blinders)",
+   "igual_a": "zoom_soft",
+   "durAlvoS": 1.0,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "stranger_virada",
+   "rotulo": "Virada para o mundo invertido (Stranger Things)",
+   "igual_a": "flip_3d",
+   "durAlvoS": 0.6,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "mr_robot_falha",
+   "rotulo": "Entrada com falha (Mr. Robot)",
+   "igual_a": "vibration",
+   "durAlvoS": 0.25,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "dark_pendulo",
+   "rotulo": "Pêndulo do tempo (Dark)",
+   "igual_a": "swing",
+   "durAlvoS": 0.6,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "wandavision_pulo",
+   "rotulo": "Pulo de sitcom (WandaVision)",
+   "igual_a": "stretch",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "sherlock_foco",
+   "rotulo": "Foco de dedução (Sherlock)",
+   "igual_a": "focus",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "wong_kar_wai_rastro",
+   "rotulo": "Rastro fantasma (Wong Kar-wai)",
+   "igual_a": "ghost_trail",
+   "durAlvoS": 0.9,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "snyder_pouso",
+   "rotulo": "Pouso em câmera lenta (Zack Snyder)",
+   "igual_a": "soft_land",
+   "durAlvoS": 1.1,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "spielberg_revela",
+   "rotulo": "Revelação lateral (Spielberg)",
+   "igual_a": "revela_esq",
+   "durAlvoS": 0.9,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "nolan_assenta",
+   "rotulo": "Assenta com peso (Nolan)",
+   "igual_a": "assenta",
+   "durAlvoS": 0.8,
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "foto_arquivo_lenta",
+   "rotulo": "Foto de arquivo aparecendo",
+   "igual_a": "dissolve_foco",
+   "durAlvoS": 1.1,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "planeta_terra_ergue",
+   "rotulo": "Ergue devagar (Planeta Terra)",
+   "igual_a": "ergue_suave",
+   "durAlvoS": 1.2,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "drive_survive_estilingue",
+   "rotulo": "Estilingue (Drive to Survive)",
+   "igual_a": "slingshot",
+   "durAlvoS": 0.35,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "tiger_king_mola",
+   "rotulo": "Mola de tabloide (A Máfia dos Tigres)",
+   "igual_a": "spring_in",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "true_crime_fumaca",
+   "rotulo": "Surge da fumaça (true crime)",
+   "igual_a": "smoke",
+   "durAlvoS": 0.8,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  }
+ ],
+ "filtros": [
+  {
+   "id": "pulp_fiction_ambar",
+   "rotulo": "Âmbar sujo (Pulp Fiction)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=rs=0.08:rm=0.1:bm=-0.1:bh=-0.06,eq=contrast=1.15:saturation=1.1,noise=alls=6:allf=t",
+   "css": "sepia(.3) contrast(1.15) saturate(1.15)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kill_bill_amarelo",
+   "rotulo": "Amarelo e sangue (Kill Bill)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=rh=0.1:gh=0.06:bh=-0.15:rs=0.06,eq=saturation=1.4:contrast=1.2",
+   "css": "saturate(1.4) contrast(1.2) sepia(.15)",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kill_bill_pb_duro",
+   "rotulo": "P&B duro (Kill Bill · Casa das Folhas Azuis)",
+   "grupo": "tarantino",
+   "cadeia": "hue=s=0,eq=contrast=1.6:brightness=-0.05",
+   "css": "grayscale(1) contrast(1.6) brightness(.95)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "bastardos_paris_40",
+   "rotulo": "Paris anos 40 (Bastardos Inglórios)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=rm=0.06:gm=0.03:bm=-0.08,eq=saturation=0.8:contrast=1.1,vignette=angle=PI/5",
+   "css": "sepia(.3) saturate(.8) contrast(1.1)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "django_terra_vermelha",
+   "rotulo": "Terra vermelha (Django Livre)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=rs=0.12:rm=0.1:bm=-0.12:gs=-0.04,eq=saturation=1.25:contrast=1.15",
+   "css": "sepia(.35) saturate(1.3) contrast(1.15) hue-rotate(-10deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "hollywood_kodak_69",
+   "rotulo": "Kodak 1969 (Era Uma Vez em Hollywood)",
+   "grupo": "tarantino",
+   "cadeia": "curves=preset=vintage,colorbalance=rh=0.06:bh=-0.05,eq=saturation=1.15:brightness=0.03",
+   "css": "sepia(.25) saturate(1.15) brightness(1.03)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "odiados_70mm_frio",
+   "rotulo": "70 mm frio (Os Oito Odiados)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=bs=0.1:bm=0.05:rh=0.04,eq=saturation=0.85:contrast=1.1",
+   "css": "saturate(.85) contrast(1.1) hue-rotate(8deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "jackie_brown_70s",
+   "rotulo": "Blaxploitation anos 70 (Jackie Brown)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=rm=0.1:gm=0.04:bm=-0.1,eq=saturation=1.2:gamma=1.05,noise=alls=7:allf=t",
+   "css": "sepia(.3) saturate(1.25)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "death_proof_grindhouse",
+   "rotulo": "Grindhouse riscado (À Prova de Morte)",
+   "grupo": "tarantino",
+   "cadeia": "curves=preset=cross_process,eq=saturation=1.1:contrast=1.1,noise=alls=18:allf=t+u,vignette=angle=PI/4",
+   "css": "contrast(1.1) saturate(1.1) sepia(.2)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "caes_terno_frio",
+   "rotulo": "Terno frio (Cães de Aluguel)",
+   "grupo": "tarantino",
+   "cadeia": "colorbalance=bs=0.06:rh=0.04,eq=saturation=0.75:contrast=1.2",
+   "css": "saturate(.75) contrast(1.2)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "breaking_bad_albuquerque",
+   "rotulo": "Céu de Albuquerque (Breaking Bad)",
+   "grupo": "series",
+   "cadeia": "colorbalance=bh=0.08:rs=0.06:rm=0.06,eq=saturation=1.2:contrast=1.1",
+   "css": "saturate(1.2) contrast(1.1) sepia(.12)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "better_call_saul_pb",
+   "rotulo": "P&B de Omaha (Better Call Saul)",
+   "grupo": "series",
+   "cadeia": "hue=s=0,eq=contrast=1.25:brightness=-0.02,vignette=angle=PI/5",
+   "css": "grayscale(1) contrast(1.25)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "stranger_things_80s",
+   "rotulo": "Anos 80 (Stranger Things)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rs=0.06:bs=0.08:rh=0.08,eq=saturation=1.15:contrast=1.08,noise=alls=6:allf=t",
+   "css": "saturate(1.15) contrast(1.08) sepia(.1)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "mr_robot_verde_frio",
+   "rotulo": "Verde frio (Mr. Robot)",
+   "grupo": "series",
+   "cadeia": "colorbalance=gs=0.06:bs=0.06:rm=-0.06,eq=saturation=0.7:contrast=1.15",
+   "css": "saturate(.7) contrast(1.15) hue-rotate(25deg)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "peaky_ambar_fumaca",
+   "rotulo": "Âmbar e fumaça (Peaky Blinders)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rm=0.1:gm=0.04:bm=-0.12:bs=0.04,eq=saturation=0.85:contrast=1.25:brightness=-0.04",
+   "css": "sepia(.4) saturate(.85) contrast(1.25) brightness(.96)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "dark_verde_azul",
+   "rotulo": "Verde-azulado chuvoso (Dark)",
+   "grupo": "series",
+   "cadeia": "colorbalance=gs=0.05:bs=0.08:gm=0.04:rh=-0.05,eq=saturation=0.6:contrast=1.1:brightness=-0.03",
+   "css": "saturate(.6) contrast(1.1) hue-rotate(20deg) brightness(.97)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "true_detective_ocre",
+   "rotulo": "Ocre da Louisiana (True Detective)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rm=0.08:gm=0.07:bm=-0.12,eq=saturation=0.9:contrast=1.15",
+   "css": "sepia(.45) contrast(1.15)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "succession_neutro_rico",
+   "rotulo": "Neutro de bilionário (Succession)",
+   "grupo": "series",
+   "cadeia": "eq=saturation=0.85:contrast=1.05:gamma=1.03,colorbalance=rh=0.03:bs=0.02",
+   "css": "saturate(.85) contrast(1.05)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "the_bear_cozinha",
+   "rotulo": "Cozinha quente (The Bear)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rm=0.06:gm=0.03:bm=-0.06,eq=contrast=1.2:saturation=1.05,noise=alls=8:allf=t",
+   "css": "contrast(1.2) sepia(.15)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "euphoria_roxo_neon",
+   "rotulo": "Roxo neon (Euphoria)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rs=0.1:bs=0.18:rh=0.08:bh=0.1:gm=-0.06,eq=saturation=1.35",
+   "css": "saturate(1.35) hue-rotate(-25deg)",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "severance_clinico",
+   "rotulo": "Branco clínico (Ruptura)",
+   "grupo": "series",
+   "cadeia": "colorbalance=gm=0.04:bm=0.03:rm=-0.03,eq=saturation=0.7:brightness=0.05:contrast=0.95",
+   "css": "saturate(.7) brightness(1.05) contrast(.95) hue-rotate(15deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "mindhunter_amarelo_verde",
+   "rotulo": "Amarelo-esverdeado (Mindhunter / Fincher)",
+   "grupo": "series",
+   "cadeia": "colorbalance=gs=0.05:gm=0.06:rm=0.03:bm=-0.1,eq=saturation=0.8:contrast=1.15",
+   "css": "sepia(.3) saturate(.8) contrast(1.15) hue-rotate(15deg)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "ozark_azul",
+   "rotulo": "Azul de Ozark",
+   "grupo": "series",
+   "cadeia": "colorbalance=bs=0.15:bm=0.1:bh=0.06:rh=-0.04,eq=saturation=0.75:contrast=1.15:brightness=-0.03",
+   "css": "saturate(.75) contrast(1.15) hue-rotate(20deg) brightness(.97)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "the_crown_regal",
+   "rotulo": "Calor real (The Crown)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rm=0.05:gm=0.02:bm=-0.05:bs=0.03,eq=saturation=0.95:contrast=1.08:gamma=1.04",
+   "css": "sepia(.15) contrast(1.08)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "got_norte_frio",
+   "rotulo": "Norte gelado (Game of Thrones)",
+   "grupo": "series",
+   "cadeia": "colorbalance=bs=0.12:bm=0.08:bh=0.06:rm=-0.04,eq=saturation=0.6:contrast=1.1",
+   "css": "saturate(.6) contrast(1.1) hue-rotate(15deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "last_of_us_musgo",
+   "rotulo": "Verde-musgo (The Last of Us)",
+   "grupo": "series",
+   "cadeia": "colorbalance=gs=0.06:gm=0.05:bm=-0.04:rh=0.03,eq=saturation=0.7:contrast=1.08",
+   "css": "saturate(.7) contrast(1.08) sepia(.2) hue-rotate(20deg)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "chernobyl_cinza_verde",
+   "rotulo": "Cinza-verde soviético (Chernobyl)",
+   "grupo": "series",
+   "cadeia": "colorbalance=gs=0.05:gm=0.05:bm=-0.02,eq=saturation=0.5:contrast=1.1:brightness=-0.03",
+   "css": "saturate(.5) contrast(1.1) hue-rotate(25deg)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "narcos_80s_quente",
+   "rotulo": "Calor colombiano anos 80 (Narcos)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rm=0.1:gm=0.06:bm=-0.1,eq=saturation=1.15:contrast=1.08,noise=alls=6:allf=t",
+   "css": "sepia(.3) saturate(1.2) contrast(1.08)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "casa_de_papel_vermelho",
+   "rotulo": "Vermelho do macacão (La Casa de Papel)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rh=0.06:rm=0.05:bm=-0.03,eq=saturation=1.25:contrast=1.12",
+   "css": "saturate(1.25) contrast(1.12)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "round6_rosa_verde",
+   "rotulo": "Rosa e verde (Round 6)",
+   "grupo": "series",
+   "cadeia": "colorbalance=rh=0.06:bh=0.04:gs=0.06,eq=saturation=1.3:contrast=1.05",
+   "css": "saturate(1.3) contrast(1.05)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "wandavision_sitcom_pb",
+   "rotulo": "Sitcom P&B suave (WandaVision)",
+   "grupo": "series",
+   "cadeia": "hue=s=0,eq=contrast=1.1:brightness=0.03,gblur=sigma=0.5",
+   "css": "grayscale(1) contrast(1.1) brightness(1.03)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "black_mirror_azul_frio",
+   "rotulo": "Azul clínico (Black Mirror)",
+   "grupo": "series",
+   "cadeia": "colorbalance=bs=0.1:bm=0.08:bh=0.05,eq=saturation=0.8:contrast=1.15",
+   "css": "saturate(.8) contrast(1.15) hue-rotate(15deg)",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "fargo_neve",
+   "rotulo": "Branco de neve (Fargo)",
+   "grupo": "series",
+   "cadeia": "eq=brightness=0.06:contrast=0.92:saturation=0.75,colorbalance=bh=0.06:bm=0.03",
+   "css": "brightness(1.06) contrast(.92) saturate(.75)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "wong_kar_wai_neon",
+   "rotulo": "Neon verde e vermelho (Wong Kar-wai)",
+   "grupo": "diretores",
+   "cadeia": "colorbalance=gs=0.08:rh=0.08:bm=-0.05,eq=saturation=1.4:contrast=1.15,noise=alls=8:allf=t",
+   "css": "saturate(1.4) contrast(1.15) hue-rotate(-10deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "nolan_imax_neutro",
+   "rotulo": "Película neutra (Nolan)",
+   "grupo": "diretores",
+   "cadeia": "eq=contrast=1.1:saturation=0.9,colorbalance=bs=0.03:rh=0.03,noise=alls=5:allf=t",
+   "css": "contrast(1.1) saturate(.9)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "michael_bay_laranja",
+   "rotulo": "Pôr do sol explosivo (Michael Bay)",
+   "grupo": "diretores",
+   "cadeia": "colorbalance=rs=-0.06:bs=0.1:rh=0.15:gh=0.05:bh=-0.12,eq=saturation=1.35:contrast=1.2",
+   "css": "saturate(1.35) contrast(1.2) sepia(.2)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "snyder_dessaturado",
+   "rotulo": "Dessaturado épico (Zack Snyder)",
+   "grupo": "diretores",
+   "cadeia": "eq=saturation=0.45:contrast=1.3,colorbalance=bs=0.05:rh=0.05",
+   "css": "saturate(.45) contrast(1.3)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "scorsese_70s",
+   "rotulo": "Nova York anos 70 (Scorsese)",
+   "grupo": "diretores",
+   "cadeia": "curves=preset=vintage,eq=contrast=1.12:saturation=1.05,noise=alls=9:allf=t",
+   "css": "sepia(.3) contrast(1.12)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "planeta_terra_vivido",
+   "rotulo": "Natureza vívida (Planeta Terra)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.3:contrast=1.08,unsharp=5:5:0.6",
+   "css": "saturate(1.3) contrast(1.08)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "last_dance_vhs_90",
+   "rotulo": "Arquivo de TV anos 90 (Arremesso Final)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=0.85:contrast=0.95:gamma=1.05,colorbalance=rm=0.04:bm=-0.03,gblur=sigma=0.7,noise=alls=8:allf=t",
+   "css": "saturate(.85) contrast(.95) blur(.4px)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "chefs_table_comida",
+   "rotulo": "Comida suculenta (Chef's Table)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=rm=0.05:gm=0.02:bm=-0.05,eq=saturation=1.25:contrast=1.12,vignette=angle=PI/5",
+   "css": "saturate(1.25) contrast(1.12) sepia(.1)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "tiger_king_tabloide",
+   "rotulo": "Tabloide saturado (A Máfia dos Tigres)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.45:contrast=1.15:brightness=0.02",
+   "css": "saturate(1.45) contrast(1.15)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "drive_survive_contraste",
+   "rotulo": "Contraste de pista (Drive to Survive)",
+   "grupo": "documentarios",
+   "cadeia": "eq=contrast=1.25:saturation=1.1,colorbalance=bs=0.05:rh=0.05,unsharp=5:5:0.5",
+   "css": "contrast(1.25) saturate(1.1)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "cosmos_azul",
+   "rotulo": "Azul espacial (Cosmos)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=bs=0.15:bm=0.08:rh=0.04,eq=saturation=1.1:contrast=1.1:brightness=-0.04",
+   "css": "contrast(1.1) brightness(.96) hue-rotate(20deg) saturate(1.1)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "true_crime_interrogatorio",
+   "rotulo": "Sala de interrogatório (true crime)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=gm=0.04:gs=0.03:bm=-0.02,eq=saturation=0.65:contrast=1.15:brightness=-0.02,vignette=angle=PI/4",
+   "css": "saturate(.65) contrast(1.15) hue-rotate(15deg)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "destaques": {
+  "tarantino_capitulo": {
+   "base": "capitulo",
+   "label": "Capítulo em letreiro (Tarantino)",
+   "categoria": "meus",
+   "amostra": "CAPÍTULO 2: A VINGANÇA",
+   "tipografia": {
+    "fonte": "abril",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "fade",
+    "saida": "fade"
+   },
+   "cena": {
+    "fundo": "cor_solida",
+    "cor": "#0A0A0A"
+   },
+   "maxPorVideo": 6,
+   "whenToUse": [
+    "Dividir o vídeo em capítulos com títulos"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "bastardos_nome_congelado": {
+   "base": "hera_nome",
+   "label": "Nome em quadro congelado (Bastardos Inglórios)",
+   "categoria": "meus",
+   "amostra": "HUGO STIGLITZ",
+   "tipografia": {
+    "fonte": "abril",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "stamp"
+   },
+   "audio": {
+    "assets": [
+     "impacto/impacto_11"
+    ],
+    "evento": "assentamento"
+   },
+   "whenToUse": [
+    "Apresentar um personagem pela primeira vez"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  "pulp_fiction_titulo_70s": {
+   "base": "cartaz_classico",
+   "label": "Título de cartaz anos 70 (Pulp Fiction)",
+   "categoria": "meus",
+   "amostra": "PULP",
+   "tipografia": {
+    "fonte": "abril",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "cor_gradiente",
+    "cor": "#C8A100"
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Título de abertura com cara de filme"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "kill_bill_lista": {
+   "base": "v2_caneta",
+   "label": "Lista riscada (Kill Bill)",
+   "categoria": "meus",
+   "amostra": "O-REN ISHII",
+   "coreografia": {
+    "saida": "riscar"
+   },
+   "whenToUse": [
+    "Itens sendo eliminados de uma lista"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "django_titulo_vermelho": {
+   "base": "cartaz_vivo",
+   "label": "Título de faroeste vermelho (Django Livre)",
+   "categoria": "meus",
+   "amostra": "O ACERTO DE CONTAS",
+   "tipografia": {
+    "fonte": "alfaslab",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "banho_cor",
+    "cor": "#9B0000"
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Título dramático de virada"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "hollywood_letreiro_dourado": {
+   "base": "dourado",
+   "label": "Letreiro dourado (Era Uma Vez em Hollywood)",
+   "categoria": "meus",
+   "amostra": "HOLLYWOOD, 1969",
+   "tipografia": {
+    "fonte": "playfair"
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Lugar e ano com clima de época"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "odiados_capitulo_neve": {
+   "base": "ed_selo_capitulo",
+   "label": "Capítulo na neve (Os Oito Odiados)",
+   "categoria": "meus",
+   "amostra": "CAPÍTULO 3",
+   "tipografia": {
+    "fonte": "cinzel",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Capítulo de narrativa lenta e tensa"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "grindhouse_em_breve": {
+   "base": "trailer",
+   "label": "Letreiro de trailer grindhouse",
+   "categoria": "meus",
+   "amostra": "EM BREVE",
+   "tipografia": {
+    "fonte": "anton",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "filme_queimado"
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Teaser ou chamada para o próximo vídeo"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "jackie_brown_hierarquia": {
+   "base": "hl_split_hierarchy",
+   "label": "Nome em dois pesos (Jackie Brown)",
+   "categoria": "meus",
+   "amostra": "JACKIE BROWN",
+   "tipografia": {
+    "fonte": "bebas",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Nome de pessoa com destaque forte"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "caes_nome_codigo": {
+   "base": "selo_nome",
+   "label": "Nome em código (Cães de Aluguel)",
+   "categoria": "meus",
+   "amostra": "SR. ROSA",
+   "tipografia": {
+    "fonte": "oswald",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Apelidos ou codinomes"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  "breaking_bad_elemento": {
+   "base": "selo_faixa",
+   "label": "Selo químico (Breaking Bad)",
+   "categoria": "meus",
+   "amostra": "Br  Ba",
+   "tipografia": {
+    "fonte": "robotocond",
+    "caixaAlta": false
+   },
+   "cena": {
+    "cor": "#1E5B3A"
+   },
+   "whenToUse": [
+    "Uma palavra-chave técnica ou científica"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "saul_neon": {
+   "base": "glow_02",
+   "label": "Letreiro neon (Better Call Saul)",
+   "categoria": "meus",
+   "amostra": "BETTER CALL",
+   "tipografia": {
+    "fonte": "staatliches",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "acende"
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Frase de efeito com clima de outdoor"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  "succession_corte_titulo": {
+   "base": "ed_corte_preto",
+   "label": "Título em corte preto (Succession)",
+   "categoria": "meus",
+   "amostra": "SUCESSÃO",
+   "tipografia": {
+    "fonte": "garamond",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "cor_solida",
+    "cor": "#000000"
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Virada seca no meio do vídeo"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  "the_bear_comanda": {
+   "base": "digitacao",
+   "label": "Comanda digitada (The Bear)",
+   "categoria": "meus",
+   "amostra": "SIM, CHEF!",
+   "tipografia": {
+    "fonte": "mono",
+    "caixaAlta": true
+   },
+   "audio": {
+    "assets": [
+     "foley/digitacao_6_curta"
+    ],
+    "evento": "tipagem"
+   },
+   "whenToUse": [
+    "Frase curta e urgente"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "mr_robot_terminal": {
+   "base": "doc_scanner",
+   "label": "Terminal de hacker (Mr. Robot)",
+   "categoria": "meus",
+   "amostra": "> sudo rm -rf /",
+   "tipografia": {
+    "fonte": "mono",
+    "caixaAlta": false
+   },
+   "cena": {
+    "fundo": "crt"
+   },
+   "whenToUse": [
+    "Comandos, códigos, sistemas"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "peaky_proclamacao": {
+   "base": "ed_proclamacao_2l",
+   "label": "Proclamação (Peaky Blinders)",
+   "categoria": "meus",
+   "amostra": "POR ORDEM DOS PEAKY BLINDERS",
+   "tipografia": {
+    "fonte": "cinzel",
+    "caixaAlta": true
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Frase de autoridade ou ameaça"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "dark_tres_anos": {
+   "base": "selo_ano",
+   "label": "Três épocas (Dark)",
+   "categoria": "meus",
+   "amostra": "1986 · 2019 · 2052",
+   "tipografia": {
+    "fonte": "worksans",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Saltos no tempo entre épocas"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "true_detective_local": {
+   "base": "hl_location_tag",
+   "label": "Local na estrada (True Detective)",
+   "categoria": "meus",
+   "amostra": "ERATH, LOUISIANA",
+   "tipografia": {
+    "fonte": "barlowcond",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Identificar o lugar de uma cena"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "narcos_ficha": {
+   "base": "painel_arquivo",
+   "label": "Ficha policial (Narcos)",
+   "categoria": "meus",
+   "amostra": "PABLO ESCOBAR · 1949",
+   "tipografia": {
+    "fonte": "specialelite",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "papel"
+   },
+   "whenToUse": [
+    "Dados de uma pessoa real"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "casa_de_papel_contador": {
+   "base": "v2_odometro",
+   "label": "Contador de dinheiro (La Casa de Papel)",
+   "categoria": "meus",
+   "amostra": "€ 984.000.000",
+   "tipografia": {
+    "fonte": "anton"
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Valores em dinheiro crescendo"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "round6_numero": {
+   "base": "ed_numero_monumental",
+   "label": "Número de jogador (Round 6)",
+   "categoria": "meus",
+   "amostra": "456",
+   "tipografia": {
+    "fonte": "teko"
+   },
+   "cena": {
+    "cor": "#E6006E"
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Um número curto e simbólico"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "sherlock_deducao": {
+   "base": "hl_inline_focus",
+   "label": "Dedução na tela (Sherlock)",
+   "categoria": "meus",
+   "amostra": "canhoto · militar · Afeganistão",
+   "tipografia": {
+    "fonte": "montserrat",
+    "caixaAlta": false
+   },
+   "coreografia": {
+    "entrada": "type"
+   },
+   "whenToUse": [
+    "Pistas e detalhes listados rapidamente"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  "chernobyl_dose": {
+   "base": "doc_numero",
+   "label": "Leitura do dosímetro (Chernobyl)",
+   "categoria": "meus",
+   "amostra": "3,6 RÖNTGEN",
+   "tipografia": {
+    "fonte": "mono",
+    "caixaAlta": true
+   },
+   "audio": {
+    "assets": [
+     "digital/digital_curto_9"
+    ],
+    "evento": "assentamento"
+   },
+   "whenToUse": [
+    "Medidas técnicas e números de impacto"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "the_crown_ano": {
+   "base": "doc_serif",
+   "label": "Ano em serifa real (The Crown)",
+   "categoria": "meus",
+   "amostra": "LONDRES, 1953",
+   "tipografia": {
+    "fonte": "garamond",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Data e lugar com elegância"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "black_mirror_alerta": {
+   "base": "selo_alerta",
+   "label": "Alerta de sistema (Black Mirror)",
+   "categoria": "meus",
+   "amostra": "CONEXÃO PERDIDA",
+   "tipografia": {
+    "fonte": "rajdhani",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "glitch"
+   },
+   "whenToUse": [
+    "Avisos, alertas, falhas de tecnologia"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "wandavision_episodio": {
+   "base": "v2_cartela_epoca",
+   "label": "Cartela de episódio (WandaVision)",
+   "categoria": "meus",
+   "amostra": "EPISÓDIO 1 · 1958",
+   "tipografia": {
+    "fonte": "playfair"
+   },
+   "whenToUse": [
+    "Mudança de época ou de episódio"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "ritchie_cracha": {
+   "base": "hera_cracha",
+   "label": "Crachá congelado (Guy Ritchie)",
+   "categoria": "meus",
+   "amostra": "TURCO",
+   "tipografia": {
+    "fonte": "fjalla",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "stamp"
+   },
+   "audio": {
+    "assets": [
+     "pop/pop_click_2_escala"
+    ],
+    "evento": "assentamento"
+   },
+   "whenToUse": [
+    "Apresentar vários personagens rapidinho"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "wong_kar_wai_hora": {
+   "base": "hl_date_stamp",
+   "label": "Hora exata (Amores Expressos)",
+   "categoria": "meus",
+   "amostra": "23:59 · 1º DE MAIO",
+   "tipografia": {
+    "fonte": "robotocond",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Momento exato em que algo aconteceu"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "kubrick_titulo_centro": {
+   "base": "minimal",
+   "label": "Título central seco (Kubrick)",
+   "categoria": "meus",
+   "amostra": "A JORNADA",
+   "tipografia": {
+    "fonte": "montserrat",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "cor_solida",
+    "cor": "#000000"
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Título curto e solene"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "nolan_tempo": {
+   "base": "doc_tempo",
+   "label": "Salto de tempo (Nolan)",
+   "categoria": "meus",
+   "amostra": "3 HORAS ANTES",
+   "tipografia": {
+    "fonte": "worksans",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Flashbacks e saltos no tempo"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "last_dance_ano": {
+   "base": "v2_ano",
+   "label": "Ano de arquivo (Arremesso Final)",
+   "categoria": "meus",
+   "amostra": "1998",
+   "tipografia": {
+    "fonte": "anton"
+   },
+   "whenToUse": [
+    "Ano de uma imagem de arquivo"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "drive_survive_tempo_volta": {
+   "base": "doc_contador",
+   "label": "Tempo de volta (Drive to Survive)",
+   "categoria": "meus",
+   "amostra": "1:23.456",
+   "tipografia": {
+    "fonte": "rajdhani"
+   },
+   "audio": {
+    "assets": [
+     "foley/catraca_rolagem"
+    ],
+    "evento": "rolagem"
+   },
+   "whenToUse": [
+    "Tempos, recordes e marcas"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "tiger_king_manchete": {
+   "base": "impacto_red",
+   "label": "Manchete de tabloide (A Máfia dos Tigres)",
+   "categoria": "meus",
+   "amostra": "ESCÂNDALO!",
+   "tipografia": {
+    "fonte": "anton",
+    "caixaAlta": true
+   },
+   "maxPorVideo": 2,
+   "whenToUse": [
+    "Revelação chocante"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "planeta_terra_especie": {
+   "base": "doc_lower",
+   "label": "Nome da espécie (Planeta Terra)",
+   "categoria": "meus",
+   "amostra": "Leopardo-das-neves · Panthera uncia",
+   "tipografia": {
+    "fonte": "lora",
+    "italico": true
+   },
+   "whenToUse": [
+    "Identificar um animal, planta ou lugar natural"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "true_crime_linha_tempo": {
+   "base": "doc_tempo_marcos",
+   "label": "Linha do tempo do caso (true crime)",
+   "categoria": "meus",
+   "amostra": "12 JUN · 14 JUN · 02 JUL",
+   "tipografia": {
+    "fonte": "specialelite",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Sequência de datas de uma investigação"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ },
+ "cenas": {
+  "TARANTINO_SPLIT": {
+   "nome": "Tela dividida (Kill Bill / Jackie Brown)",
+   "arranjo": "lado_a_lado",
+   "motion": [
+    "slide_left",
+    "slide_right"
+   ],
+   "whenToUse": [
+    "Duas ações acontecendo ao mesmo tempo"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  "JACKIE_BROWN_DIAGONAL": {
+   "nome": "Ângulos em diagonal (Jackie Brown)",
+   "arranjo": "diagonal",
+   "whenToUse": [
+    "Mesmo momento visto de dois ângulos"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "BASTARDOS_FICHA_NOME": {
+   "nome": "Ficha com nome (Bastardos Inglórios)",
+   "arranjo": "nome",
+   "whenToUse": [
+    "Apresentar um personagem com foto e nome"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "KILL_BILL_CONFRONTO": {
+   "nome": "Confronto frente a frente (Kill Bill)",
+   "arranjo": "confronto",
+   "whenToUse": [
+    "Dois lados de um conflito"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "DJANGO_CARTAZ": {
+   "nome": "Cartaz de procurado (Django Livre)",
+   "arranjo": "cartao",
+   "whenToUse": [
+    "Mostrar uma pessoa como alvo ou destaque"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "HOLLYWOOD_MOLDURA_60S": {
+   "nome": "Moldura larga anos 60 (Era Uma Vez em Hollywood)",
+   "arranjo": "moldura_larga",
+   "whenToUse": [
+    "Imagem de época emoldurada"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "WALTER_HEISENBERG": {
+   "nome": "Antes e depois (Breaking Bad)",
+   "arranjo": "antes_depois",
+   "whenToUse": [
+    "Transformação de uma pessoa ou lugar"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "MR_ROBOT_PAINEL": {
+   "nome": "Painel lateral (Mr. Robot)",
+   "arranjo": "painel_dir",
+   "whenToUse": [
+    "Imagem com informações técnicas ao lado"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "TRUE_DETECTIVE_MURAL": {
+   "nome": "Mural de pistas (True Detective)",
+   "arranjo": "mosaico",
+   "motion": [
+    "queda",
+    "assenta",
+    "queda",
+    "assenta"
+   ],
+   "whenToUse": [
+    "Várias pistas ou fotos de um caso"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "SHERLOCK_PALACIO_MENTAL": {
+   "nome": "Palácio mental (Sherlock)",
+   "arranjo": "cascata",
+   "motion": [
+    "zoom_soft",
+    "zoom_soft",
+    "zoom_soft"
+   ],
+   "whenToUse": [
+    "Raciocínio passo a passo"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  "THE_BEAR_SEQUENCIA": {
+   "nome": "Sequência de preparo (The Bear)",
+   "arranjo": "sequencia4",
+   "motion": [
+    "slide_left",
+    "slide_left",
+    "slide_left",
+    "slide_left"
+   ],
+   "whenToUse": [
+    "Passos rápidos de um processo"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "NARCOS_LINHA_TEMPO": {
+   "nome": "Linha do tempo (Narcos)",
+   "arranjo": "linha_tempo",
+   "whenToUse": [
+    "Eventos em ordem cronológica"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "THE_CROWN_RETRATO": {
+   "nome": "Retrato oficial (The Crown)",
+   "arranjo": "retrato_dir",
+   "whenToUse": [
+    "Retrato de uma pessoa importante com texto"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "DARK_TRES_EPOCAS": {
+   "nome": "Três épocas (Dark)",
+   "arranjo": "triade",
+   "motion": [
+    "dissolve_foco",
+    "dissolve_foco",
+    "dissolve_foco"
+   ],
+   "whenToUse": [
+    "A mesma coisa em três tempos diferentes"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "DRIVE_SURVIVE_FRENTE_FUNDO": {
+   "nome": "Piloto e pista (Drive to Survive)",
+   "arranjo": "ff_zoom",
+   "whenToUse": [
+    "Pessoa em primeiro plano com contexto atrás"
+   ],
+   "autoEligible": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  }
+ },
+ "paletas": [
+  {
+   "id": "pulp_fiction",
+   "nome": "Pulp Fiction",
+   "primaria": "#F2B705",
+   "secundaria": "#1A1A1A",
+   "acento": "#C1121F",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kill_bill",
+   "nome": "Kill Bill",
+   "primaria": "#FFD400",
+   "secundaria": "#111111",
+   "acento": "#D00000",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "stranger_things",
+   "nome": "Stranger Things",
+   "primaria": "#E3001B",
+   "secundaria": "#0B0B0B",
+   "acento": "#F5C542",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "breaking_bad",
+   "nome": "Breaking Bad",
+   "primaria": "#2E7D32",
+   "secundaria": "#F2E8CF",
+   "acento": "#F4A300",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "peaky_blinders",
+   "nome": "Peaky Blinders",
+   "primaria": "#C9A66B",
+   "secundaria": "#2B2B2B",
+   "acento": "#8B0000",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "_direcoes": {
+  "sys_tudo": {
+   "nome": "Padrão do sistema",
+   "transicoes": [
+    {
+     "id": "caes_corte_preto_rapido",
+     "peso": 1
+    },
+    {
+     "id": "breaking_bad_timelapse",
+     "peso": 1
+    },
+    {
+     "id": "sherlock_deducao",
+     "peso": 1
+    },
+    {
+     "id": "wandavision_tv_fecha",
+     "peso": 1
+    },
+    {
+     "id": "casa_de_papel_cortina",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "ken_burns_doc",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "respiro_luz_doc",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "wandavision_pulo",
+     "peso": 1
+    },
+    {
+     "id": "sherlock_foco",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "succession_neutro_rico",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "SHERLOCK_PALACIO_MENTAL",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "recorte_jornal_vox",
+    "marca_texto_explainer",
+    "sherlock_deducao"
+   ],
+   "paletas_sugeridas": []
+  },
+  "sys_doc_classico": {
+   "nome": "Documentário clássico",
+   "transicoes": [
+    {
+     "id": "iris_cinema_mudo",
+     "peso": 1
+    },
+    {
+     "id": "queima_super8",
+     "peso": 1
+    },
+    {
+     "id": "corte_pro_preto_doc",
+     "peso": 1
+    },
+    {
+     "id": "persiana_scanner",
+     "peso": 1
+    },
+    {
+     "id": "bastardos_fim_capitulo",
+     "peso": 1
+    },
+    {
+     "id": "hollywood_dissolve_60s",
+     "peso": 1
+    },
+    {
+     "id": "the_crown_dissolve_ouro",
+     "peso": 1
+    },
+    {
+     "id": "narcos_ficha_arquivo",
+     "peso": 1
+    },
+    {
+     "id": "chernobyl_ruido",
+     "peso": 1
+    },
+    {
+     "id": "got_fade_frio",
+     "peso": 1
+    },
+    {
+     "id": "nolan_respiro_escuro",
+     "peso": 1
+    },
+    {
+     "id": "fincher_foco_seco",
+     "peso": 1
+    },
+    {
+     "id": "planeta_terra_dissolve_lento",
+     "peso": 1
+    },
+    {
+     "id": "last_dance_fita",
+     "peso": 1
+    },
+    {
+     "id": "chefs_table_respiro",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "ken_burns_doc",
+     "peso": 1
+    },
+    {
+     "id": "ken_burns_recua",
+     "peso": 1
+    },
+    {
+     "id": "travelling_arquivo",
+     "peso": 1
+    },
+    {
+     "id": "kubrick_avanco",
+     "peso": 1
+    },
+    {
+     "id": "planeta_terra_pan",
+     "peso": 1
+    },
+    {
+     "id": "fincher_travelling",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "grao_16mm",
+     "peso": 1
+    },
+    {
+     "id": "vinheta_suspense",
+     "peso": 1
+    },
+    {
+     "id": "pelicula_suja_arquivo",
+     "peso": 1
+    },
+    {
+     "id": "steadicam_leve",
+     "peso": 1
+    },
+    {
+     "id": "last_dance_vhs",
+     "peso": 1
+    },
+    {
+     "id": "wandavision_sitcom",
+     "peso": 1
+    },
+    {
+     "id": "respiro_luz_doc",
+     "peso": 1
+    },
+    {
+     "id": "dark_nevoa",
+     "peso": 1
+    },
+    {
+     "id": "odiados_neve",
+     "peso": 1
+    },
+    {
+     "id": "cosmos_estrelas",
+     "peso": 1
+    },
+    {
+     "id": "projetor_tremulando",
+     "peso": 1
+    },
+    {
+     "id": "suspense_vinheta_pulso",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "tv_tubo_antiga",
+     "peso": 1
+    },
+    {
+     "id": "foto_cai_mesa",
+     "peso": 1
+    },
+    {
+     "id": "revela_documento",
+     "peso": 1
+    },
+    {
+     "id": "hollywood_tv_60s",
+     "peso": 1
+    },
+    {
+     "id": "nolan_assenta",
+     "peso": 1
+    },
+    {
+     "id": "foto_arquivo_lenta",
+     "peso": 1
+    },
+    {
+     "id": "planeta_terra_ergue",
+     "peso": 1
+    },
+    {
+     "id": "true_crime_fumaca",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "noir_classico",
+     "peso": 1
+    },
+    {
+     "id": "arquivo_desbotado",
+     "peso": 1
+    },
+    {
+     "id": "frio_true_crime",
+     "peso": 1
+    },
+    {
+     "id": "bastardos_paris_40",
+     "peso": 1
+    },
+    {
+     "id": "better_call_saul_pb",
+     "peso": 1
+    },
+    {
+     "id": "dark_verde_azul",
+     "peso": 1
+    },
+    {
+     "id": "true_detective_ocre",
+     "peso": 1
+    },
+    {
+     "id": "mindhunter_amarelo_verde",
+     "peso": 1
+    },
+    {
+     "id": "the_crown_regal",
+     "peso": 1
+    },
+    {
+     "id": "last_of_us_musgo",
+     "peso": 1
+    },
+    {
+     "id": "chernobyl_cinza_verde",
+     "peso": 1
+    },
+    {
+     "id": "narcos_80s_quente",
+     "peso": 1
+    },
+    {
+     "id": "wandavision_sitcom_pb",
+     "peso": 1
+    },
+    {
+     "id": "fargo_neve",
+     "peso": 1
+    },
+    {
+     "id": "nolan_imax_neutro",
+     "peso": 1
+    },
+    {
+     "id": "scorsese_70s",
+     "peso": 1
+    },
+    {
+     "id": "planeta_terra_vivido",
+     "peso": 1
+    },
+    {
+     "id": "last_dance_vhs_90",
+     "peso": 1
+    },
+    {
+     "id": "chefs_table_comida",
+     "peso": 1
+    },
+    {
+     "id": "cosmos_azul",
+     "peso": 1
+    },
+    {
+     "id": "true_crime_interrogatorio",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "TRUE_CRIME_FICHA",
+     "peso": 1
+    },
+    {
+     "id": "PROJETOR_DOC",
+     "peso": 1
+    },
+    {
+     "id": "ANTES_DEPOIS_DOC",
+     "peso": 1
+    },
+    {
+     "id": "QUADRO_INVESTIGACAO",
+     "peso": 1
+    },
+    {
+     "id": "HOLLYWOOD_MOLDURA_60S",
+     "peso": 1
+    },
+    {
+     "id": "WALTER_HEISENBERG",
+     "peso": 1
+    },
+    {
+     "id": "TRUE_DETECTIVE_MURAL",
+     "peso": 1
+    },
+    {
+     "id": "NARCOS_LINHA_TEMPO",
+     "peso": 1
+    },
+    {
+     "id": "THE_CROWN_RETRATO",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "dossie_maquina_escrever",
+    "carimbo_confidencial",
+    "recorte_jornal_vox",
+    "marca_texto_explainer",
+    "pino_mapa_viagem",
+    "contador_numero_doc",
+    "odiados_capitulo_neve",
+    "dark_tres_anos",
+    "true_detective_local",
+    "narcos_ficha",
+    "chernobyl_dose",
+    "the_crown_ano",
+    "wandavision_episodio",
+    "nolan_tempo",
+    "last_dance_ano",
+    "planeta_terra_especie",
+    "true_crime_linha_tempo"
+   ],
+   "paletas_sugeridas": [
+    "netflix_doc",
+    "arquivo_sepia",
+    "peaky_blinders"
+   ]
+  },
+  "sys_cinema": {
+   "nome": "Cinema premium",
+   "transicoes": [
+    {
+     "id": "starwars_wipe",
+     "peso": 1
+    },
+    {
+     "id": "queima_super8",
+     "peso": 1
+    },
+    {
+     "id": "luz_vazando_indie",
+     "peso": 1
+    },
+    {
+     "id": "corte_pro_preto_doc",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_split",
+     "peso": 1
+    },
+    {
+     "id": "bastardos_fim_capitulo",
+     "peso": 1
+    },
+    {
+     "id": "django_zoom_western",
+     "peso": 1
+    },
+    {
+     "id": "death_proof_rolo_perdido",
+     "peso": 1
+    },
+    {
+     "id": "hollywood_dissolve_60s",
+     "peso": 1
+    },
+    {
+     "id": "jackie_brown_split_vertical",
+     "peso": 1
+    },
+    {
+     "id": "odiados_nevasca_branca",
+     "peso": 1
+    },
+    {
+     "id": "breaking_bad_timelapse",
+     "peso": 1
+    },
+    {
+     "id": "stranger_things_invertido",
+     "peso": 1
+    },
+    {
+     "id": "dark_tunel_tempo",
+     "peso": 1
+    },
+    {
+     "id": "peaky_blinders_ambar",
+     "peso": 1
+    },
+    {
+     "id": "the_crown_dissolve_ouro",
+     "peso": 1
+    },
+    {
+     "id": "narcos_ficha_arquivo",
+     "peso": 1
+    },
+    {
+     "id": "chernobyl_ruido",
+     "peso": 1
+    },
+    {
+     "id": "lost_flash_branco",
+     "peso": 1
+    },
+    {
+     "id": "got_fade_frio",
+     "peso": 1
+    },
+    {
+     "id": "euphoria_iridescente",
+     "peso": 1
+    },
+    {
+     "id": "wong_kar_wai_borrao",
+     "peso": 1
+    },
+    {
+     "id": "nolan_respiro_escuro",
+     "peso": 1
+    },
+    {
+     "id": "kubrick_abertura_simetrica",
+     "peso": 1
+    },
+    {
+     "id": "spielberg_flare",
+     "peso": 1
+    },
+    {
+     "id": "fincher_foco_seco",
+     "peso": 1
+    },
+    {
+     "id": "planeta_terra_dissolve_lento",
+     "peso": 1
+    },
+    {
+     "id": "chefs_table_respiro",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "leone_zoom_olhos",
+     "peso": 1
+    },
+    {
+     "id": "vertigo_recua",
+     "peso": 1
+    },
+    {
+     "id": "kubrick_avanco",
+     "peso": 1
+    },
+    {
+     "id": "planeta_terra_pan",
+     "peso": 1
+    },
+    {
+     "id": "nolan_imax_sobe",
+     "peso": 1
+    },
+    {
+     "id": "snyder_respiro",
+     "peso": 1
+    },
+    {
+     "id": "fincher_travelling",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "grao_16mm",
+     "peso": 1
+    },
+    {
+     "id": "luz_de_vela",
+     "peso": 1
+    },
+    {
+     "id": "vinheta_suspense",
+     "peso": 1
+    },
+    {
+     "id": "facho_projetor",
+     "peso": 1
+    },
+    {
+     "id": "grindhouse_pelicula",
+     "peso": 1
+    },
+    {
+     "id": "steadicam_leve",
+     "peso": 1
+    },
+    {
+     "id": "wong_kar_wai_smear",
+     "peso": 1
+    },
+    {
+     "id": "euphoria_brilho_roxo",
+     "peso": 1
+    },
+    {
+     "id": "wandavision_sitcom",
+     "peso": 1
+    },
+    {
+     "id": "chiaroscuro",
+     "peso": 1
+    },
+    {
+     "id": "terremoto_lento",
+     "peso": 1
+    },
+    {
+     "id": "dark_nevoa",
+     "peso": 1
+    },
+    {
+     "id": "peaky_fumaca",
+     "peso": 1
+    },
+    {
+     "id": "odiados_neve",
+     "peso": 1
+    },
+    {
+     "id": "drive_bokeh_noturno",
+     "peso": 1
+    },
+    {
+     "id": "spielberg_luz",
+     "peso": 1
+    },
+    {
+     "id": "hollywood_veu_dourado",
+     "peso": 1
+    },
+    {
+     "id": "projetor_tremulando",
+     "peso": 1
+    },
+    {
+     "id": "poeira_faroeste",
+     "peso": 1
+    },
+    {
+     "id": "suspense_vinheta_pulso",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "foco_de_lente",
+     "peso": 1
+    },
+    {
+     "id": "tarantino_porta_malas",
+     "peso": 1
+    },
+    {
+     "id": "hollywood_tv_60s",
+     "peso": 1
+    },
+    {
+     "id": "bastardos_letreiro",
+     "peso": 1
+    },
+    {
+     "id": "peaky_slowmo",
+     "peso": 1
+    },
+    {
+     "id": "dark_pendulo",
+     "peso": 1
+    },
+    {
+     "id": "wong_kar_wai_rastro",
+     "peso": 1
+    },
+    {
+     "id": "snyder_pouso",
+     "peso": 1
+    },
+    {
+     "id": "spielberg_revela",
+     "peso": 1
+    },
+    {
+     "id": "nolan_assenta",
+     "peso": 1
+    },
+    {
+     "id": "true_crime_fumaca",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "teal_orange_madmax",
+     "peso": 1
+    },
+    {
+     "id": "bleach_bypass_guerra",
+     "peso": 1
+    },
+    {
+     "id": "noir_classico",
+     "peso": 1
+    },
+    {
+     "id": "deserto_amarelo",
+     "peso": 1
+    },
+    {
+     "id": "laranja_neblina_2049",
+     "peso": 1
+    },
+    {
+     "id": "pastel_simetrico",
+     "peso": 1
+    },
+    {
+     "id": "verde_dourado_amelie",
+     "peso": 1
+    },
+    {
+     "id": "pulp_fiction_ambar",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_amarelo",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_pb_duro",
+     "peso": 1
+    },
+    {
+     "id": "bastardos_paris_40",
+     "peso": 1
+    },
+    {
+     "id": "django_terra_vermelha",
+     "peso": 1
+    },
+    {
+     "id": "hollywood_kodak_69",
+     "peso": 1
+    },
+    {
+     "id": "odiados_70mm_frio",
+     "peso": 1
+    },
+    {
+     "id": "jackie_brown_70s",
+     "peso": 1
+    },
+    {
+     "id": "caes_terno_frio",
+     "peso": 1
+    },
+    {
+     "id": "breaking_bad_albuquerque",
+     "peso": 1
+    },
+    {
+     "id": "better_call_saul_pb",
+     "peso": 1
+    },
+    {
+     "id": "stranger_things_80s",
+     "peso": 1
+    },
+    {
+     "id": "peaky_ambar_fumaca",
+     "peso": 1
+    },
+    {
+     "id": "dark_verde_azul",
+     "peso": 1
+    },
+    {
+     "id": "true_detective_ocre",
+     "peso": 1
+    },
+    {
+     "id": "succession_neutro_rico",
+     "peso": 1
+    },
+    {
+     "id": "euphoria_roxo_neon",
+     "peso": 1
+    },
+    {
+     "id": "severance_clinico",
+     "peso": 1
+    },
+    {
+     "id": "mindhunter_amarelo_verde",
+     "peso": 1
+    },
+    {
+     "id": "ozark_azul",
+     "peso": 1
+    },
+    {
+     "id": "the_crown_regal",
+     "peso": 1
+    },
+    {
+     "id": "got_norte_frio",
+     "peso": 1
+    },
+    {
+     "id": "last_of_us_musgo",
+     "peso": 1
+    },
+    {
+     "id": "chernobyl_cinza_verde",
+     "peso": 1
+    },
+    {
+     "id": "narcos_80s_quente",
+     "peso": 1
+    },
+    {
+     "id": "black_mirror_azul_frio",
+     "peso": 1
+    },
+    {
+     "id": "fargo_neve",
+     "peso": 1
+    },
+    {
+     "id": "wong_kar_wai_neon",
+     "peso": 1
+    },
+    {
+     "id": "nolan_imax_neutro",
+     "peso": 1
+    },
+    {
+     "id": "snyder_dessaturado",
+     "peso": 1
+    },
+    {
+     "id": "scorsese_70s",
+     "peso": 1
+    },
+    {
+     "id": "chefs_table_comida",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "TARANTINO_SPLIT",
+     "peso": 1
+    },
+    {
+     "id": "JACKIE_BROWN_DIAGONAL",
+     "peso": 1
+    },
+    {
+     "id": "BASTARDOS_FICHA_NOME",
+     "peso": 1
+    },
+    {
+     "id": "DJANGO_CARTAZ",
+     "peso": 1
+    },
+    {
+     "id": "HOLLYWOOD_MOLDURA_60S",
+     "peso": 1
+    },
+    {
+     "id": "WALTER_HEISENBERG",
+     "peso": 1
+    },
+    {
+     "id": "THE_CROWN_RETRATO",
+     "peso": 1
+    },
+    {
+     "id": "DARK_TRES_EPOCAS",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "titulo_neon_80s",
+    "tarantino_capitulo",
+    "bastardos_nome_congelado",
+    "pulp_fiction_titulo_70s",
+    "django_titulo_vermelho",
+    "hollywood_letreiro_dourado",
+    "odiados_capitulo_neve",
+    "jackie_brown_hierarquia",
+    "caes_nome_codigo",
+    "saul_neon",
+    "succession_corte_titulo",
+    "peaky_proclamacao",
+    "dark_tres_anos",
+    "true_detective_local",
+    "the_crown_ano",
+    "wandavision_episodio",
+    "wong_kar_wai_hora",
+    "kubrick_titulo_centro",
+    "nolan_tempo"
+   ],
+   "paletas_sugeridas": [
+    "pulp_fiction",
+    "stranger_things",
+    "breaking_bad",
+    "peaky_blinders"
+   ]
+  },
+  "sys_dinamico": {
+   "nome": "Cortes dinâmicos",
+   "transicoes": [
+    {
+     "id": "starwars_wipe",
+     "peso": 1
+    },
+    {
+     "id": "starwars_relogio",
+     "peso": 1
+    },
+    {
+     "id": "whip_pan_wright",
+     "peso": 1
+    },
+    {
+     "id": "flash_paparazzi",
+     "peso": 1
+    },
+    {
+     "id": "glitch_mr_robot",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_split",
+     "peso": 1
+    },
+    {
+     "id": "pulp_fiction_flash",
+     "peso": 1
+    },
+    {
+     "id": "django_zoom_western",
+     "peso": 1
+    },
+    {
+     "id": "death_proof_rolo_perdido",
+     "peso": 1
+    },
+    {
+     "id": "jackie_brown_split_vertical",
+     "peso": 1
+    },
+    {
+     "id": "caes_corte_preto_rapido",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_clarao_vermelho",
+     "peso": 1
+    },
+    {
+     "id": "stranger_things_invertido",
+     "peso": 1
+    },
+    {
+     "id": "mr_robot_pixelado",
+     "peso": 1
+    },
+    {
+     "id": "succession_snap_zoom",
+     "peso": 1
+    },
+    {
+     "id": "the_bear_corte_nervoso",
+     "peso": 1
+    },
+    {
+     "id": "black_mirror_tela_falha",
+     "peso": 1
+    },
+    {
+     "id": "sherlock_deducao",
+     "peso": 1
+    },
+    {
+     "id": "wandavision_tv_fecha",
+     "peso": 1
+    },
+    {
+     "id": "lost_flash_branco",
+     "peso": 1
+    },
+    {
+     "id": "round6_iris_forma",
+     "peso": 1
+    },
+    {
+     "id": "casa_de_papel_cortina",
+     "peso": 1
+    },
+    {
+     "id": "euphoria_iridescente",
+     "peso": 1
+    },
+    {
+     "id": "ritchie_zoom_impacto",
+     "peso": 1
+    },
+    {
+     "id": "scorsese_chicote",
+     "peso": 1
+    },
+    {
+     "id": "drive_to_survive_telemetria",
+     "peso": 1
+    },
+    {
+     "id": "tiger_king_splash",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "leone_zoom_olhos",
+     "peso": 1
+    },
+    {
+     "id": "drive_survive_giro",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "camera_na_mao",
+     "peso": 1
+    },
+    {
+     "id": "vhs_desalinhado",
+     "peso": 1
+    },
+    {
+     "id": "grindhouse_pelicula",
+     "peso": 1
+    },
+    {
+     "id": "tremor_explosao_forte",
+     "peso": 1
+    },
+    {
+     "id": "camera_succession",
+     "peso": 1
+    },
+    {
+     "id": "euphoria_brilho_roxo",
+     "peso": 1
+    },
+    {
+     "id": "neon_respirando",
+     "peso": 1
+    },
+    {
+     "id": "estrobo_balada",
+     "peso": 1
+    },
+    {
+     "id": "aberracao_forte",
+     "peso": 1
+    },
+    {
+     "id": "terremoto_lento",
+     "peso": 1
+    },
+    {
+     "id": "mr_robot_scanlines",
+     "peso": 1
+    },
+    {
+     "id": "paparazzi_bordas",
+     "peso": 1
+    },
+    {
+     "id": "black_mirror_aberracao",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "crash_zoom",
+     "peso": 1
+    },
+    {
+     "id": "foto_cai_mesa",
+     "peso": 1
+    },
+    {
+     "id": "tremor_explosao",
+     "peso": 1
+    },
+    {
+     "id": "leone_crash_zoom",
+     "peso": 1
+    },
+    {
+     "id": "ritchie_freeze_nome",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_impacto",
+     "peso": 1
+    },
+    {
+     "id": "django_queda",
+     "peso": 1
+    },
+    {
+     "id": "bastardos_letreiro",
+     "peso": 1
+    },
+    {
+     "id": "grindhouse_vibracao",
+     "peso": 1
+    },
+    {
+     "id": "succession_snap",
+     "peso": 1
+    },
+    {
+     "id": "the_bear_tremor",
+     "peso": 1
+    },
+    {
+     "id": "stranger_virada",
+     "peso": 1
+    },
+    {
+     "id": "mr_robot_falha",
+     "peso": 1
+    },
+    {
+     "id": "wandavision_pulo",
+     "peso": 1
+    },
+    {
+     "id": "sherlock_foco",
+     "peso": 1
+    },
+    {
+     "id": "drive_survive_estilingue",
+     "peso": 1
+    },
+    {
+     "id": "tiger_king_mola",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "teal_orange_madmax",
+     "peso": 1
+    },
+    {
+     "id": "matrix_verde",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_amarelo",
+     "peso": 1
+    },
+    {
+     "id": "kill_bill_pb_duro",
+     "peso": 1
+    },
+    {
+     "id": "jackie_brown_70s",
+     "peso": 1
+    },
+    {
+     "id": "death_proof_grindhouse",
+     "peso": 1
+    },
+    {
+     "id": "stranger_things_80s",
+     "peso": 1
+    },
+    {
+     "id": "mr_robot_verde_frio",
+     "peso": 1
+    },
+    {
+     "id": "the_bear_cozinha",
+     "peso": 1
+    },
+    {
+     "id": "euphoria_roxo_neon",
+     "peso": 1
+    },
+    {
+     "id": "casa_de_papel_vermelho",
+     "peso": 1
+    },
+    {
+     "id": "round6_rosa_verde",
+     "peso": 1
+    },
+    {
+     "id": "black_mirror_azul_frio",
+     "peso": 1
+    },
+    {
+     "id": "michael_bay_laranja",
+     "peso": 1
+    },
+    {
+     "id": "tiger_king_tabloide",
+     "peso": 1
+    },
+    {
+     "id": "drive_survive_contraste",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "TARANTINO_SPLIT",
+     "peso": 1
+    },
+    {
+     "id": "BASTARDOS_FICHA_NOME",
+     "peso": 1
+    },
+    {
+     "id": "KILL_BILL_CONFRONTO",
+     "peso": 1
+    },
+    {
+     "id": "MR_ROBOT_PAINEL",
+     "peso": 1
+    },
+    {
+     "id": "SHERLOCK_PALACIO_MENTAL",
+     "peso": 1
+    },
+    {
+     "id": "THE_BEAR_SEQUENCIA",
+     "peso": 1
+    },
+    {
+     "id": "DRIVE_SURVIVE_FRENTE_FUNDO",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "carimbo_confidencial",
+    "titulo_neon_80s",
+    "glitch_hacker",
+    "contador_numero_doc",
+    "bastardos_nome_congelado",
+    "kill_bill_lista",
+    "django_titulo_vermelho",
+    "grindhouse_em_breve",
+    "caes_nome_codigo",
+    "breaking_bad_elemento",
+    "saul_neon",
+    "succession_corte_titulo",
+    "the_bear_comanda",
+    "mr_robot_terminal",
+    "casa_de_papel_contador",
+    "round6_numero",
+    "sherlock_deducao",
+    "black_mirror_alerta",
+    "ritchie_cracha",
+    "drive_survive_tempo_volta",
+    "tiger_king_manchete"
+   ],
+   "paletas_sugeridas": [
+    "netflix_doc",
+    "kill_bill",
+    "stranger_things"
+   ]
+  }
+ }
+}

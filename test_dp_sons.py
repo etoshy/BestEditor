@@ -152,7 +152,7 @@ class TestApp:
         assert r.status_code == 200
         job = A._JOBS[jid]
         assert job["sfx"] == [{"id": job["sfx"][0]["id"], "som": "pop/pop_4", "start": 1.2, "volume": 0.8}]
-        assert job["editor_defaults"]["sons_auto"] == {"transicoes": True, "cenas": False, "destaques": False}
+        assert job["editor_defaults"]["sons_auto"] == {"transicoes": True, "cenas": False, "destaques": False, "editoriais": False}
         assert A._job_site_cfg(job)["sons_volume"] == 0.7
         assert job["pending_segments"][0]["transition_som"] == "nenhum"
         d = job["destaques"][0]

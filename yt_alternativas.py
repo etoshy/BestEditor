@@ -8,7 +8,8 @@ Na ordem em que o site tenta:
   2. youtube-transcript-api — só a legenda, por outro caminho (pip install youtube-transcript-api);
   3. um NAVEGADOR de verdade (o Chromium do Playwright que o site já usa): abre o vídeo
      como uma pessoa, liga a legenda e lê o que o próprio player baixou — ou o painel
-     "Mostrar transcrição";
+     "Mostrar transcrição" (o jeito do projeto transcript-youtube-video, que o site
+     tenta PRIMEIRO desde a v84_52: `legenda_painel`);
   4. pytubefix — baixa o áudio (pro Whisper) ou o vídeo por outra biblioteca
      (pip install pytubefix).
 Tudo opcional: o que não estiver instalado é pulado com um aviso no log.
@@ -204,32 +205,137 @@ def legenda_navegador(url: str, preferidos: List[str], log: Callable[[str], None
             nav.close()
 
 
-def _painel_transcricao(pg) -> List[Dict[str, Any]]:
-    try:
-        pg.evaluate("() => { const b = document.querySelector('tp-yt-paper-button#expand, #description-inline-expander #expand'); if (b) b.click(); }")
-        pg.wait_for_timeout(800)
-        for seletor in ("ytd-video-description-transcript-section-renderer button", "button[aria-label*='ranscri']"):
-            loc = pg.locator(seletor)
-            if loc.count():
-                loc.first.click(timeout=3000)
-                break
-        pg.wait_for_selector("ytd-transcript-segment-renderer", timeout=10000)
-        segs = pg.evaluate("""() => [...document.querySelectorAll('ytd-transcript-segment-renderer')].map(e => [
-            (e.querySelector('.segment-timestamp') || {}).textContent || '', (e.querySelector('.segment-text') || {}).textContent || ''])""")
-    except Exception:  # noqa: BLE001
-        return []
+# ------------------------------------------------------------------ painel "Mostrar transcrição"
+# Do projeto transcript-youtube-video (github.com/flameastro/transcript-youtube-video), que funciona:
+# abre o vídeo, clica em "…mais" na descrição e em "Mostrar transcrição" e lê o painel. O YouTube
+# trocou o painel: os trechos agora são <transcript-segment-view-model> (o tempo num <div>, o texto
+# num <span>) dentro de <macro-markers-panel-item-view-model>; o antigo era <ytd-transcript-segment-renderer>.
+_JS_PAINEL = """() => {
+  const out = [];
+  document.querySelectorAll('transcript-segment-view-model').forEach(e => {
+    const div = e.querySelector(':scope > div') || e.querySelector('div');
+    const sp = e.querySelector('span');
+    out.push([div ? div.innerText : '', sp ? sp.innerText : '']);
+  });
+  if (!out.length) document.querySelectorAll('ytd-transcript-segment-renderer').forEach(e => out.push([
+    (e.querySelector('.segment-timestamp') || {}).textContent || '', (e.querySelector('.segment-text') || {}).textContent || '']));
+  return out;
+}"""
+_SELETOR_TRECHOS = "transcript-segment-view-model, ytd-transcript-segment-renderer"
+_BOTOES_TRANSCRICAO = (
+    "ytd-video-description-transcript-section-renderer #primary-button button",  # o do transcript-youtube-video
+    "#primary-button ytd-button-renderer yt-button-shape button",
+    "ytd-video-description-transcript-section-renderer button",
+    "button[aria-label*='ranscri']",
+)
+
+
+def _segundos(ts: str) -> Optional[float]:
+    partes = [int(x) for x in re.findall(r"\d+", ts or "")]
+    if not partes:
+        return None
+    seg = 0
+    for x in partes[-3:]:
+        seg = seg * 60 + x
+    return float(seg)
+
+
+def linhas_do_painel(segs: List[Any]) -> List[Dict[str, Any]]:
+    """[[tempo, texto], …] do painel -> [{"inicio", "fim", "texto"}] (o fim = começo da próxima)."""
     out = []
-    for ts, tx in segs:
-        partes = [int(x) for x in re.findall(r"\d+", ts)]
-        if not partes or not tx.strip():
-            continue
-        seg = 0
-        for x in partes:
-            seg = seg * 60 + x
-        out.append({"inicio": float(seg), "fim": float(seg) + 3.0, "texto": " ".join(tx.split())})
+    for ts, tx in segs or []:
+        ini = _segundos(ts)
+        tx = " ".join(str(tx or "").split())
+        if ini is None or not tx:
+            continue  # cabeçalho de capítulo, linha vazia
+        out.append({"inicio": ini, "fim": ini + 3.0, "texto": tx})
+    out.sort(key=lambda l: l["inicio"])
     for k in range(len(out) - 1):
         out[k]["fim"] = max(out[k]["inicio"] + 0.5, out[k + 1]["inicio"])
     return out
+
+
+def _painel_transcricao(pg, timeout_ms: int = 15000) -> List[Dict[str, Any]]:
+    """Na página do vídeo já aberta: "…mais" → "Mostrar transcrição" → lê o painel."""
+    try:
+        if not pg.locator(_SELETOR_TRECHOS).count():
+            for sel in ("#description-inline-expander #expand", "tp-yt-paper-button#expand", "#expand"):
+                try:
+                    loc = pg.locator(sel)
+                    if loc.count():
+                        loc.first.click(timeout=3000)
+                        break
+                except Exception:  # noqa: BLE001
+                    continue
+            pg.wait_for_timeout(800)
+            for sel in _BOTOES_TRANSCRICAO:
+                try:
+                    loc = pg.locator(sel)
+                    if loc.count():
+                        loc.first.scroll_into_view_if_needed(timeout=2000)
+                        loc.first.click(timeout=3000)
+                        break
+                except Exception:  # noqa: BLE001
+                    continue
+        pg.wait_for_selector(_SELETOR_TRECHOS, timeout=timeout_ms)
+        pg.wait_for_timeout(1500)  # o painel termina de encher
+        anterior = -1
+        for _ in range(40):  # painel comprido: rola até parar de aparecer trecho novo
+            n = pg.locator(_SELETOR_TRECHOS).count()
+            if n == anterior:
+                break
+            anterior = n
+            pg.evaluate("() => { const l = document.querySelectorAll('transcript-segment-view-model, ytd-transcript-segment-renderer'); if (l.length) l[l.length - 1].scrollIntoView(); }")
+            pg.wait_for_timeout(400)
+        return linhas_do_painel(pg.evaluate(_JS_PAINEL))
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def legenda_painel(url: str, log: Callable[[str], None] = lambda _m: None, headless: bool = True,
+                   timeout_s: int = 60) -> Optional[Dict[str, Any]]:
+    """O jeito do transcript-youtube-video: abre o vídeo num Chromium, como uma pessoa, e lê o
+    painel "Mostrar transcrição" (a legenda que o YouTube mostra, automática ou do vídeo)."""
+    try:
+        from playwright.sync_api import sync_playwright  # type: ignore
+    except ImportError:
+        raise RuntimeError("playwright não está instalado (pip install playwright && playwright install chromium)")
+    vid = video_id(url)
+    if not vid:
+        return None
+    with sync_playwright() as p:
+        nav = p.chromium.launch(headless=headless, args=["--mute-audio", "--disable-blink-features=AutomationControlled"])
+        try:
+            ctx = nav.new_context(locale="pt-BR", viewport={"width": 1366, "height": 900},
+                                  user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+            pg = ctx.new_page()
+            pg.goto(f"https://www.youtube.com/watch?v={vid}", timeout=timeout_s * 1000, wait_until="domcontentloaded")
+            for rot in ("Aceitar tudo", "Accept all", "Rejeitar tudo", "Reject all"):  # aviso de cookies (Europa)
+                try:
+                    pg.get_by_role("button", name=rot).first.click(timeout=1500)
+                    break
+                except Exception:  # noqa: BLE001
+                    pass
+            info = None
+            for _ in range(20):
+                info = pg.evaluate(_JS_INFO)
+                if info:
+                    break
+                pg.wait_for_timeout(500)
+            base = {"titulo": (info or {}).get("titulo") or "", "canal": (info or {}).get("canal") or "", "duracao": (info or {}).get("duracao")}
+            pg.wait_for_timeout(1500)
+            linhas = _painel_transcricao(pg)
+            if not linhas:
+                pg.wait_for_timeout(2500)  # 2ª tentativa (o transcript-youtube-video também pede "tente de novo")
+                linhas = _painel_transcricao(pg)
+            trilhas = (info or {}).get("trilhas") or []
+            auto = all(t.get("auto") for t in trilhas) if trilhas else None
+            lang = (trilhas[0].get("lang") if len(trilhas) == 1 else None) if trilhas else None
+            if linhas:
+                log(f"  painel de transcrição: {len(linhas)} trechos")
+            return dict(base, linhas=linhas, lang=lang, auto=auto, tem_legenda=bool(trilhas) if info else None)
+        finally:
+            nav.close()
 
 
 # ------------------------------------------------------------------ 4. pytubefix (áudio / vídeo)

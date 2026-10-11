@@ -120,6 +120,51 @@ def bloco(tipo: str = "longo") -> str:
             "- Notas de edição (imagem, música, efeito) NÃO vão no texto narrado — se tiver, ponha em \"plano\".\"notas_edicao\".")
 
 
+# ------------------------------------------------------------------ títulos (Kit Iniciante YouTube · cap. 05)
+# "Títulos que dão vontade de clicar": curto (até ~60 caracteres), palavra principal no começo e
+# uma promessa que o vídeo cumpre. Todo título gerado pelo site segue uma destas fórmulas.
+FORMULAS_TITULO = [
+    ("[Tema] Explicado em [N] Minutos", "A Segunda Guerra Explicada em 12 Minutos"),
+    ("O Fim de [algo famoso]", "O Fim da Blockbuster"),
+    ("Por que [fato surpreendente]?", "Por que os Faraós Odiavam Moscas?"),
+    ("[A] vs [B]: Quem Vence?", "Leão vs Tigre: Quem Vence?"),
+    ("O que Ninguém te Conta sobre [tema]", "O que Ninguém te Conta sobre Tubarões"),
+    ("A Verdade sobre [mito]", "A Verdade sobre os Gladiadores"),
+    ("[N] [coisas] Mais [adjetivo] de [tema]", "7 Animais Mais Perigosos da Amazônia"),
+    ("Por que Ninguém Mais [ação]", "Por que Ninguém Mais Usa Orkut"),
+    ("Você Sobreviveria [situação]?", "Você Sobreviveria 24h em Pompeia?"),
+    ("O Maior Erro de [pessoa/empresa]", "O Maior Erro da Nokia"),
+    ("O Dia em que [evento]", "O Dia em que a Internet Parou"),
+    ("[Tema] do Pior ao Melhor", "Todos os Shreks do Pior ao Melhor"),
+    ("[Tema]: a História Real", "Titanic: a História Real"),
+    ("O Mistério de [caso]", "O Mistério do Navio Fantasma"),
+    ("Como [algo] Realmente Funciona", "Como a Bolsa Realmente Funciona"),
+    ("[N] Sinais de que [situação]", "7 Sinais de que Seu Cachorro te Ama"),
+    ("Eu Testei [X] por [tempo]", "Eu Testei Acordar às 5h por 30 Dias"),
+    ("Isso Mudou [tema] para Sempre", "Isso Mudou os Games para Sempre"),
+    ("[Coisa] que Você Usa Errado", "5 Coisas que Você Usa Errado na Cozinha"),
+    ("O Lado Sombrio de [algo]", "O Lado Sombrio da Disney"),
+]
+TITULO_MAX = 60
+
+
+def bloco_titulos(qtd: int = 5, idioma: str = "") -> str:
+    """Regras + fórmulas de título pra pôr no prompt (todo título que o site pede à IA)."""
+    formulas = "\n".join(f"  - {f}  (ex.: {e})" for f, e in FORMULAS_TITULO)
+    return ("## 🏷 Títulos — SEMPRE nesta estrutura\n"
+            f"- Cada título: curto (até ~{TITULO_MAX} caracteres), com a PALAVRA PRINCIPAL no começo e uma PROMESSA que o vídeo "
+            "cumpre de verdade.\n"
+            f"- Os {qtd} títulos usam fórmulas DIFERENTES desta lista (escolha as que combinam com o assunto; troque os "
+            "colchetes pelo tema real"
+            + (f"; escreva em {idioma}, adaptando a fórmula ao idioma" if idioma else "") + "):\n" + formulas + "\n"
+            "- NUNCA minta no título: clique enganado vira saída rápida, e o YouTube para de recomendar o vídeo. Só prometa o "
+            "que o roteiro entrega (números, nomes e fatos que estão no vídeo).")
+
+
+def titulo_ok(t: str) -> bool:
+    return 0 < len(str(t or "").strip()) <= TITULO_MAX + 10
+
+
 def bloco_referencia(texto: str) -> str:
     """Transcrição de um vídeo/short que viralizou: a IA copia a ESTRUTURA (não o conteúdo)."""
     t = str(texto or "").strip()

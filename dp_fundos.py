@@ -90,6 +90,9 @@ def do_estilo(cena: Dict[str, Any]) -> Tuple[str, Optional[str]]:
     f = str((cena or {}).get("fundo") or "")
     if f in _DO_DARKPLANNER:
         return _DO_DARKPLANNER[f]
+    if f in IDS_DESTAQUE:  # id daqui direto (o que os extras usam), com "cor" opcional
+        cor = str((cena or {}).get("cor") or "")
+        return (f, cor.upper() if re.fullmatch(r"#[0-9a-fA-F]{6}", cor) else COR_PADRAO.get(f))
     if f.startswith("corte_"):
         return ("escurecer", None)
     if f.startswith("grade"):

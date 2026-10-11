@@ -112,6 +112,7 @@
   <div class="ds-row">
     <label style="font-weight:400;">Mostrar <select id="filtro" style="width:auto;"></select></label>
     <button class="ds-mini ds-sec" id="btnApagarSel">🗑 Apagar as marcadas</button>
+    <button class="ds-mini" id="btnIaImg" style="display:none;background:#4338ca;" title="O que é cada imagem, quem aparece (pela legenda), texto na imagem, lixo/anúncio, sensível">🤖 Descrever as imagens com IA</button>
     <span class="ds-hint" id="contagem"></span>
   </div>
   <div class="ds-grid" id="midias"></div>
@@ -136,6 +137,7 @@ const ORDEM = {{ ordem|tojson }};  // ordem dos formatos (o tojson ordena as cha
 const TIPOS = {{ tipos|tojson }};
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const IA = {};  // 🤖 o que a IA pode fazer agora (vem de /ia/status)
 async function api(url, body, method) {
   const r = await fetch(url, { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
@@ -240,12 +242,13 @@ document.querySelectorAll('#abasAdd button').forEach(b => b.addEventListener('cl
 $('btnPc').addEventListener('click', async () => {
   const f = $('arqPc').files[0], desc = $('descPc').value.trim();
   if (!f) { $('addSt').textContent = 'Escolha o arquivo.'; return; }
-  if (!desc) { $('addSt').innerHTML = '<span class="ds-erro">Diga o que é esse arquivo antes de enviar.</span>'; $('descPc').focus(); return; }
+  if (!desc && !IA.dossie_imagens) { $('addSt').innerHTML = '<span class="ds-erro">Diga o que é esse arquivo antes de enviar.</span>'; $('descPc').focus(); return; }
   const fd = new FormData(); fd.append('arquivo', f); fd.append('descricao', desc);
   $('addSt').textContent = '⏳ enviando…';
   const r = await fetch(`/modelos-video/${PID}/midia`, { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
   if (!r.ok) { $('addSt').innerHTML = `<span class="ds-erro">⚠ ${esc(d.erro || r.status)}</span>`; return; }
-  $('addSt').innerHTML = `<span class="ds-ok">✔ ${esc(d.midia.id)} adicionado</span>`; $('arqPc').value = ''; $('descPc').value = ''; recarregar();
+  $('addSt').innerHTML = `<span class="ds-ok">✔ ${esc(d.midia.id)} adicionado${d.ia ? ' — 🤖 a IA está descrevendo' : ''}</span>`; $('arqPc').value = ''; $('descPc').value = ''; recarregar();
+  if (d.ia) setTimeout(recarregar, 8000);
 });
 $('btnUrl').addEventListener('click', async () => {
   $('addSt').textContent = '⏳ abrindo o link…';
@@ -280,12 +283,18 @@ function desenharMidias() {
     const vis = m.tipo === 'texto' ? `<div class="txt">${esc(m.conteudo)}</div>`
       : m.url_arquivo ? (m.tipo === 'video' ? `<video class="th" src="${esc(m.url_arquivo)}" muted controls preload="metadata"></video>` : `<img class="th" src="${esc(m.url_arquivo)}" loading="lazy" alt="">`)
       : `<div class="th" style="display:flex;align-items:center;justify-content:center;color:#666;">🔗 página (sem imagem)</div>`;
-    const falta = !(m.descricao || m.og || m.legenda);
-    return `<div class="ds-m ${falta ? 'falta' : ''}" data-id="${esc(m.id)}">
+    const falta = !(m.descricao || m.og || m.legenda || m.ia);
+    const fi = m.ia;
+    const iaHtml = fi ? `<div class="ds-leg" style="white-space:normal;color:#3730a3" title="ficha da IA">🤖 ${esc(fi.descricao)}${fi.quem_ou_o_que ? ' — <b>' + esc(fi.quem_ou_o_que) + '</b>' : ''}${fi.texto_na_imagem ? ' · “' + esc(fi.texto_na_imagem) + '”' : ''}
+        <span style="color:#666">[${esc(fi.tipo)}${fi.qualidade ? ', ' + esc(fi.qualidade) : ''}]</span>${fi.sensivel && fi.sensivel !== 'nao' ? ` <b style="color:#b91c1c">⚠ sensível: ${esc(fi.sensivel)}</b>` : ''}</div>` : '';
+    const fora = m.descartada || m.duplicada_de;
+    const foraHtml = fora ? `<div class="ds-erro" style="font-size:.8rem">${m.duplicada_de ? '🔁 igual à ' + esc(m.duplicada_de) : '🗑 a IA tirou do roteiro (lixo/anúncio/não serve)'} <button class="ds-mini mVolta" style="padding:1px 6px">♻ usar mesmo assim</button></div>` : '';
+    return `<div class="ds-m ${falta ? 'falta' : ''}" data-id="${esc(m.id)}" style="${fora ? 'opacity:.55' : ''}">
       <input type="checkbox" class="sel" title="marcar pra apagar">
       ${vis}
       <div style="margin-top:4px;"><span class="ds-id">${esc(m.id)}</span> ${esc(TIPOS[m.tipo] || m.tipo)}${m.fonte ? ' · ' + esc(m.fonte) : (m.origem === 'pc' ? ' · 💻' : ' · 🔗')}</div>
       ${m.transcricao ? trBloco(m.transcricao) : ''}
+      ${iaHtml}${foraHtml}
       ${m.legenda ? `<div class="ds-leg" title="${esc(m.legenda)}">📝 ${esc(m.legenda)}</div>` : ''}
       ${!m.legenda && og.titulo ? `<div class="ds-leg">🏷 ${esc(og.titulo)}</div>` : ''}
       <textarea rows="2" class="mDesc" placeholder="${falta ? '⚠ Diga o que é' : 'Sua descrição (opcional)'}">${esc(m.descricao || '')}</textarea>
@@ -302,6 +311,7 @@ function desenharMidias() {
     c.querySelector('.mDesc').addEventListener('change', salvar);
     if (c.querySelector('.mUsar')) c.querySelector('.mUsar').addEventListener('change', salvar);
     c.querySelector('.mDel').addEventListener('click', async () => { await api(`/modelos-video/${PID}/midia/${id}`, undefined, 'DELETE'); recarregar(); });
+    if (c.querySelector('.mVolta')) c.querySelector('.mVolta').addEventListener('click', async () => { await api(`/modelos-video/${PID}/midia/${id}`, { descartada: false }); recarregar(); });
   });
 }
 $('btnApagarSel').addEventListener('click', async () => {
@@ -311,6 +321,24 @@ $('btnApagarSel').addEventListener('click', async () => {
   await api(`/modelos-video/${PID}/apagar-midias`, { ids }); recarregar();
 });
 desenharFontes(); desenharMidias();
+
+// 🤖 IA (ligada em /ia): ficha das imagens e conferência das marcas
+fetch('/ia/status').then(r => r.json()).then(j => {
+  Object.assign(IA, j.pode || {});
+  if (IA.dossie_imagens) $('btnIaImg').style.display = '';
+  if (IA.dossie_imagens) $('descPc').placeholder = 'O que é? (opcional — a 🤖 IA descreve)';
+  desenharResultado();
+}).catch(() => {});
+$('btnIaImg').addEventListener('click', async () => {
+  try {
+    await api(`/modelos-video/${PID}/ia/imagens`, {});
+    $('contagem').textContent = '🤖 descrevendo as imagens…';
+    const t = setInterval(async () => {
+      const e = await (await fetch(`/modelos-video/${PID}/ia/estado`)).json();
+      if (!e.rodando) { clearInterval(t); $('contagem').textContent = e.ok ? `🤖 ${e.fichas} fichas, ${e.duplicadas} duplicadas, ${e.descartadas} tiradas do roteiro` : '⚠ ' + (e.erro || 'falhou'); recarregar(); }
+    }, 2500);
+  } catch (e) { $('contagem').textContent = '⚠ ' + e.message; }
+});
 
 // 4 · prompt → resultado
 $('btnPrompt').addEventListener('click', async () => {
@@ -329,6 +357,17 @@ function planoHtml(pl) {
   return `<details style="margin:10px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;"><summary style="cursor:pointer;font-weight:600;">🧭 Plano do roteiro (método)</summary>` +
     Object.entries(ROT_PLANO).filter(([k]) => pl[k] && (!Array.isArray(pl[k]) || pl[k].length)).map(([k, n]) => `<div style="margin:6px 0;font-size:0.86rem;"><b>${n}:</b> ${Array.isArray(pl[k]) ? '<ul style="margin:2px 0 0 18px;">' + pl[k].map(x => `<li>${esc2(x)}</li>`).join('') + '</ul>' : esc2(pl[k])}</div>`).join('') + `</details>`;
 }
+function marcasHtml(lista) {
+  if (!lista) return '';
+  if (!lista.length) return '<p class="ds-ok">🤖 Todas as marcas combinam com as imagens.</p>';
+  return '<ul>' + lista.map(x => `<li><b>[${esc(x.marca)}]</b> “${esc(x.frase)}” — ${esc(x.motivo)}${x.sugestao ? ` → sugestão: <b>[${esc(x.sugestao)}]</b>` : ''}</li>`).join('') + '</ul>';
+}
+document.addEventListener('click', async (ev) => {
+  if (!ev.target || ev.target.id !== 'btnIaMarcas') return;
+  $('iaMarcasSt').textContent = '🤖 conferindo…';
+  try { const d = await api(`/modelos-video/${PID}/ia/marcas`, {}); $('iaMarcas').innerHTML = marcasHtml(d.problemas || []); $('iaMarcasSt').textContent = ''; }
+  catch (e) { $('iaMarcasSt').textContent = '⚠ ' + e.message; }
+});
 function desenharResultado() {
   const R = P.resultado; if (!R) { $('resBox').innerHTML = ''; return; }
   const rot = esc(R.roteiro).replace(/\[\s*([MIT]\d+[^\]]{0,30})\]/gi, '<span class="mk">$1</span>');
@@ -337,6 +376,8 @@ function desenharResultado() {
     ${(R.avisos || []).map(a => `<p class="ds-erro">⚠ ${esc(a)}</p>`).join('')}
     ${R.observacoes ? `<p style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;">🔎 <b>Conferir:</b> ${esc(R.observacoes)}</p>` : ''}
     ${planoHtml(R.plano)}
+    ${IA.dossie_marcas ? `<div class="ds-row" style="margin-top:8px"><button class="ds-mini" id="btnIaMarcas" style="background:#4338ca">🤖 Conferir onde cada imagem entrou</button><span class="ds-hint" id="iaMarcasSt"></span></div>
+      <div id="iaMarcas">${marcasHtml(P.ia_marcas)}</div>` : ''}
     <h3 style="margin:12px 0 4px;">Títulos</h3><ol>${(R.titulos || []).map(t => `<li>${esc(t)}</li>`).join('')}</ol>
     ${(R.ideias || []).length ? `<h4 style="margin:8px 0 4px;">💡 Ideias</h4><ul>${R.ideias.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
     <div class="ds-row" style="margin-top:8px;">

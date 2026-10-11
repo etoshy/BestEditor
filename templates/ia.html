@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}🤖 IA nas buscas e modelos{% endblock %}
+{% block content %}
+<style>
+  .ia-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-top: 16px; background: #fff; }
+  .ia-estado { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+  .ia-on { background: #dcfce7; color: #166534; } .ia-off { background: #f3f4f6; color: #4b5563; } .ia-erro { background: #fee2e2; color: #991b1b; }
+  .ia-rec { display: grid; grid-template-columns: 24px 1fr; gap: 4px 8px; margin: 8px 0; align-items: start; }
+  .ia-rec input { width: auto; margin-top: 4px; } .ia-rec label { margin: 0; font-weight: 600; }
+  .ia-rec p { grid-column: 2; margin: 0 0 6px; font-size: .84rem; color: #555; }
+  .ia-num { display: flex; gap: 14px; flex-wrap: wrap; } .ia-num label { flex: 1; min-width: 160px; }
+  table.ia-t { border-collapse: collapse; width: 100%; font-size: .82rem; } .ia-t td, .ia-t th { border-bottom: 1px solid #eee; padding: 4px 6px; text-align: left; }
+  .hint { font-size: .84rem; color: #666; }
+  .ok { background: #dcfce7; color: #166534; padding: 10px; border-radius: 6px; margin-top: 12px; }
+</style>
+<h1>🤖 IA nas buscas, no editor e nos Modelos de vídeo</h1>
+<p class="hint">Com a IA ligada, o site <b>entende o roteiro</b> antes de buscar: monta a ficha do vídeo (quem é quem, lugares, época),
+escreve buscas melhores, <b>olha as miniaturas</b> e escolhe a melhor (não a 1ª), corrige a busca quando nada presta, ordena os
+vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PDFs dos 🕵️ Modelos de vídeo.
+<b>Desligada, sem chave, sem crédito ou com erro, tudo funciona como antes</b> — a IA melhora, mas nunca trava nada.</p>
+
+<p>Estado:
+  {% if r.motivo %}<span class="ia-estado {{ 'ia-erro' if r.sem_credito else 'ia-off' }}">⏸ não está em uso — {{ r.motivo }}</span>
+  {% else %}<span class="ia-estado ia-on">✅ ligada — {{ r.modelo }}</span>{% endif %}
+</p>
+{% if r.sem_credito %}
+<div class="error">A IA foi desligada sozinha porque a API recusou: {{ r.sem_credito.erro }}
+  <form method="post" action="{{ url_for('ia_tentar_de_novo') }}" style="display:inline"><button type="submit" style="margin:8px 0 0">🔁 Tentar de novo</button></form>
+  <br><span class="hint">Coloque crédito em <a href="{{ provedores[r.provedor].console }}" target="_blank" rel="noopener">{{ provedores[r.provedor].console }}</a> ou troque a chave.</span></div>
+{% endif %}
+{% if salvo %}<div class="ok">💾 Salvo.</div>{% endif %}
+
+<form method="post" action="{{ url_for('ia_salvar') }}">
+  <div class="ia-card">
+    <label style="margin-top:0"><input type="checkbox" name="ativo" style="width:auto" {% if r.ativo %}checked{% endif %}> Ligar a IA</label>
+    <div class="ia-num">
+      <label>IA <select name="provedor">{% for k, p in provedores.items() %}<option value="{{ k }}" {% if k == r.provedor %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select>
+        <span class="hint">Outras IAs vão entrar aqui depois.</span></label>
+      <label>Modelo <select name="modelo">{% for m in provedores[r.provedor].modelos %}<option value="{{ m.id }}" {% if m.id == r.modelo %}selected{% endif %}>{{ m.nome }} — {{ m.id }}</option>{% endfor %}</select></label>
+    </div>
+    <label>Chave da API {% if r.chave %}<span style="font-weight:normal;color:#15803d;">(✔ {{ 'do ambiente ANTHROPIC_API_KEY' if r.chave_do_ambiente else 'salva' }}: {{ r.chave }} — em branco mantém)</span>{% endif %}</label>
+    <input type="password" name="chave" value="" style="width:100%;padding:8px;margin-top:6px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:1rem" placeholder="{{ provedores[r.provedor].chave_dica }}" autocomplete="off">
+    {% if r.chave and not r.chave_do_ambiente %}<label style="font-weight:normal;"><input type="checkbox" name="apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
+    <p class="hint">A chave fica no arquivo <code>ia_config.json</code> da pasta do site (fora do GitHub). Também vale a variável de ambiente <code>ANTHROPIC_API_KEY</code>.
+      Dica: ponha um limite de gasto mensal no <a href="{{ provedores[r.provedor].console }}" target="_blank" rel="noopener">Console</a>.</p>
+    <button type="button" id="iaTestar" style="margin-top:6px;background:#059669">🔌 Testar a chave</button> <span id="iaTesteRes" class="hint">(salve antes de testar uma chave nova)</span>
+  </div>
+
+  <div class="ia-card">
+    <h3 style="margin-top:0">O que a IA faz</h3>
+    {% for k, rec in recursos.items() %}
+    <div class="ia-rec"><input type="checkbox" id="rec_{{ k }}" name="rec_{{ k }}" {% if r.recursos.get(k) %}checked{% endif %}>
+      <label for="rec_{{ k }}">{{ rec[0] }}</label><p>{{ rec[1] }}</p></div>
+    {% endfor %}
+  </div>
+
+  <div class="ia-card">
+    <h3 style="margin-top:0">Ajustes</h3>
+    <div class="ia-num">
+      <label>Nota mínima pra aceitar sem ⚠ <input type="number" name="nota_minima" min="3" max="10" value="{{ r.nota_minima }}"></label>
+      <label>Candidatos por trecho (o juiz olha) <input type="number" name="candidatos" min="4" max="12" value="{{ r.candidatos }}"></label>
+      <label>Limite de gasto (US$, 0 = sem limite) <input type="number" name="limite_usd" min="0" step="0.5" value="{{ r.limite_usd }}"></label>
+    </div>
+    <p class="hint">Passou do limite, a IA para sozinha e o site segue sem ela.</p>
+  </div>
+  <button type="submit">💾 Salvar</button>
+</form>
+
+<div class="ia-card">
+  <h3 style="margin-top:0">Gasto</h3>
+  <p>Total: <b>US$ {{ '%.4f'|format(r.gasto.usd) }}</b> em {{ r.gasto.chamadas }} chamadas
+    {% if r.limite_usd %}— limite US$ {{ '%.2f'|format(r.limite_usd) }}{% endif %}</p>
+  {% if r.gasto.por_recurso %}
+  <table class="ia-t"><tr><th>Recurso</th><th>Chamadas</th><th>US$</th><th>Tokens do cache lidos</th></tr>
+    {% for k, v in r.gasto.por_recurso.items() %}<tr><td>{{ recursos[k][0] if k in recursos else k }}</td><td>{{ v.chamadas }}</td><td>{{ '%.4f'|format(v.usd) }}</td><td>{{ v.cache_lido }}</td></tr>{% endfor %}
+  </table>{% endif %}
+  <form method="post" action="{{ url_for('ia_zerar_gasto') }}" onsubmit="return confirm('Zerar a contagem de gasto?')"><button type="submit" style="background:#6b7280;font-size:.85rem;padding:6px 12px">Zerar a contagem</button></form>
+  {% if recentes %}
+  <h4>Últimas chamadas</h4>
+  <table class="ia-t"><tr><th>Recurso</th><th>OK</th><th>Entrada</th><th>Saída</th><th>Cache</th><th>US$</th><th>Erro</th></tr>
+    {% for x in recentes %}<tr><td>{{ x.recurso }}</td><td>{{ '💾' if x.cache_local else ('✔' if x.ok else '✖') }}</td><td>{{ x.entrada }}</td><td>{{ x.saida }}</td><td>{{ x.cache_lido }}</td><td>{{ '%.5f'|format(x.usd) }}</td><td>{{ x.erro }}</td></tr>{% endfor %}
+  </table>
+  <p class="hint">💾 = resposta guardada (cache local, de graça). "Cache" = tokens lidos do cache da API (quase de graça).</p>
+  {% endif %}
+</div>
+<script>
+document.getElementById('iaTestar').addEventListener('click', async () => {
+  const s = document.getElementById('iaTesteRes'); s.textContent = 'testando…';
+  try { const r = await fetch('{{ url_for("ia_testar") }}', { method: 'POST' }); const j = await r.json();
+    s.textContent = j.ok ? '✅ a chave funciona' : '⚠ ' + j.erro; } catch (e) { s.textContent = '⚠ ' + e.message; }
+});
+</script>
+{% endblock %}

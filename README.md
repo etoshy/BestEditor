@@ -28,6 +28,71 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🤖 IA nas buscas, no editor e nos Modelos de vídeo — Claude Haiku 5.5 (v84_53)
+
+- Página nova **🤖 IA nas buscas e modelos** (`/ia`, nos links do topo e em ⚙️ Configurações): liga a IA, chave, o que
+  ela faz (cada recurso liga/desliga), nota mínima, candidatos e limite de gasto, com o gasto por recurso.
+- Com ela ligada: **ficha do vídeo + buscas melhores**, **juiz visual** que escolhe a melhor miniatura (não a 1ª) e
+  reescreve a busca quando nada presta, **nota no Buscar** do editor, **YouTube** com 20 resultados ordenados +
+  "Outros vídeos" e **🎯 momento certo pela legenda**, **Wikipedia** com a foto principal e sem bandeira/mapa/brasão,
+  **Modelos de vídeo**: ficha de cada imagem, duplicadas, PDF escaneado, dossiê condensado e conferência das marcas
+  [I3]; **Vídeo de venda**: ficha das fotos do produto; **🤖 Fazer com a IA** no prompt de edição.
+- **Desligada, sem chave ou sem crédito, tudo funciona como antes** (a IA se desliga sozinha quando a API recusa).
+- **✂️ Prompt de edição em partes (opcional)**: vídeo longo vira N prompts (ex.: 5 × 12 min); cole cada resposta e
+  confira tudo junto. A **parte 1 decide a direção de arte** (cores, fontes, estilos, transições…) e as partes 2…N
+  recebem isso no prompt e seguem igual (ficam 🔒 até a parte 1 ter resposta).
+- Guia: `docs/guia/19-ia-nas-buscas-e-modelos.md`.
+
+## 🏷 Títulos nas fórmulas do Kit + 📜 transcrição do YouTube pelo painel (v84_52)
+
+- **Títulos**: todo prompt que pede título (Roteiros do YouTube, Dossiês, Vendas, Modelados) manda a IA usar as 20
+  fórmulas do *Kit Iniciante YouTube* (cap. 05): até ~60 caracteres, palavra principal no começo, promessa que o vídeo
+  cumpre, cada título numa fórmula diferente, nunca mentir. As fórmulas ficam em `metodo_roteiro.FORMULAS_TITULO`.
+- **Transcrição do YouTube**: o 1º caminho agora é o do projeto *transcript-youtube-video*: abre o vídeo num navegador,
+  clica em "…mais" → "Mostrar transcrição" e lê o painel (o layout novo do YouTube, `transcript-segment-view-model`,
+  e o antigo). Se não der escondido, tenta com a janela visível; só depois vêm o yt-dlp e os outros caminhos.
+- **Sons dos quadros editoriais**: saíram os sons tirados dos vídeos de referência. Agora os quadros usam os sons da
+  biblioteca do site (whoosh, folha seca, digitação, tecla, câmera, riser, impacto…) — a tabela fica em
+  `dp_editorial.SONS`.
+
+## 🔊 Sons dos quadros editoriais + 🎨 extras de referência nas Direções (v84_51)
+
+- Cada quadro editorial toca o seu som sozinho, alinhado com a animação. No painel do quadro: **Som = auto | nenhum**.
+  Na aba 🔊 Áudios: ☑ *Sons dos quadros editoriais*. A prévia do Estúdio toca junto. (Na v84_52 os sons passaram a ser
+  os da biblioteca.)
+- **450 extras de referência** (filmes, séries e documentários) em `assets/darkplanner/extras/referencias_*.json`,
+  com miniaturas. O campo `"direcoes"` de cada item agora **vale**: o item entra nas Direções do sistema que ele
+  cita (o que já existia fica com pelo menos metade do peso).
+- **Editoriais nas Direções**: cada Direção diz se usa quadros editoriais, a densidade (1 a cada 60/40/25/15 s) e
+  quais tipos. A IA segue isso no prompt. No editor de Direção há o eixo novo **Editoriais**.
+
+## 🗞 Quadros editoriais — o estilo documentário dos vídeos de referência (v84_50)
+
+14 quadros recriados quadro a quadro a partir dos vídeos que você mandou (papel bege com vinheta, serifada,
+versalete espaçado, acento vermelho), numa faixa nova **Editorial** do Estúdio (aba **🗞 Editorial**):
+ficha de pessoa (linha do rosto até o cartão), nome do entrevistado, post sobre o vídeo desfocado com tradução,
+título com o vídeo dentro das letras, terminal digitando, print de página em 3D (de imagem, link ou só da manchete),
+linha do tempo deslizante, grade de pontos com contadores, recortes caindo na mesa + número, mural de fotos com
+citações, foto/vídeo + bilhetes, reescrita (riscar e refazer), número grande contando e texto que explode em tinta.
+Painel montado sozinho pelos campos, prévia = o mesmo desenho do vídeo final, IA pode mandar `"editoriais"` no
+prompt de edição. Montagem por pedaços (sem estourar memória em 1080p). Guia: `docs/guia/18-quadros-editoriais.md`.
+
+## 📘 Guia: como criar efeitos, transições, destaques, textos, legendas… + ➕ extras sem programar (v84_49)
+
+- **Guia completo** em `docs/guia/` (17 capítulos) e no site: rodapé → **📘 Guia** (`/guia`). Cada capítulo diz o que
+  dá pra criar **sem programar** e, quando precisa de código, **onde mexer** (ffmpeg + prévia do Estúdio) e como testar.
+- **➕ Extras** (`assets/darkplanner/extras/*.json`, ver `dp_extras.py`): transições (`xfade` nativa, fórmula `expr` ou
+  `igual_a`), efeitos (`camera`, `filtro` do ffmpeg ou `igual_a`), entradas/saídas (gesto existente com outra
+  duração), filtros (cadeia + CSS da prévia), destaques (`base` + o que muda: fonte, animação, fundo, som…), cenas
+  (`base`, `arranjo` ou `janelas` próprias), paletas, sons e fontes. Entram nas galerias, no prompt da IA, nas
+  Direções e na montagem — e atualizar o site não apaga. Exemplos prontos em `docs/guia/exemplos/`.
+- **`python dp_guia.py`**: `verificar` (erros dos extras + o que falta), `miniaturas` (gera só as que faltam,
+  `--refazer id`), `listar <tipo>` (ids pra `base`/`igual_a`), `som arquivo.mp3` (converte, mede o pico e registra),
+  `fonte arquivo.ttf --chave x` (renomeia a família pra "DP …" e registra; precisa de `pip install fonttools`).
+- Pequenas melhorias que vieram junto: prévia no monitor das transições `dp:` que são nativas (antes tudo era fade),
+  `coreografia.entrada` aceita direto o nome da família de animação (mira, linha_tempo, versus, grade, pino caíam
+  no fade), `cena.fundo` do estilo aceita os ids de fundo do site e `audio.assets` aceita ids de som do site.
+
 ## 🌐 Vídeo de venda com Gumroad / landing page (v84_48)
 
 - O link do produto aceita **qualquer página de venda**, não só Amazon: Gumroad, landing page, Hotmart/Kiwify, loja

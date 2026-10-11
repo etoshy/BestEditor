@@ -73,7 +73,7 @@ async function poll() {
   if (data.progress) {
     const pct = data.progress.total ? Math.round(100 * data.progress.current / data.progress.total) : 0;
     document.getElementById('progress-fill').style.width = pct + '%';
-    document.getElementById('progress-text').textContent = 'Trecho ' + data.progress.current + ' de ' + data.progress.total;
+    document.getElementById('progress-text').textContent = data.ia ? data.ia : ('Trecho ' + data.progress.current + ' de ' + data.progress.total);
   }
 
   const previews = data.previews || [];

@@ -1,0 +1,6 @@
+{
+  "entradas": [
+    {"id": "pop_rapido", "rotulo": "Pop rápido", "igual_a": "pop", "durAlvoS": 0.25},
+    {"id": "ergue_lento", "rotulo": "Ergue lento", "igual_a": "ergue_suave", "durAlvoS": 1.0}
+  ]
+}

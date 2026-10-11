@@ -88,6 +88,7 @@ def test_prompt_master_lista_vozes_genero_e_tags(ambiente):
     assert "ACEITA tags" in texto and "whispering" in texto
     assert "cerca de 10 cenas" in texto and "9:16" in texto and "A lenda do poço" in texto
     assert "estas vozes não têm gênero definido" in texto and "ghost" in texto
+    assert "🏷 Títulos" in texto and "O Mistério de [caso]" in texto  # v84_52: título numa das fórmulas
     assert "🧭 Método de roteiro" in texto and "FORMATO CURTO" in texto  # 40 s: versão curta do método
     assert md.obter_estilo("kamishibai")["idioma"] == "English"
 
@@ -286,7 +287,7 @@ def test_rotas(ambiente, monkeypatch):
         return "ok"
     for nome in ("gerar_voz_page", "narracoes_page", "perfis_de_voz_page", "capturar_pagina_page", "cortar_youtube_page",
                  "redes_sociais_page", "extrair_links_canal_page", "transcrever_page", "contas_google_page",
-                 "jobs_history_page", "textos_avulsos_page", "roteiros_yt_page", "vendas_page", "dossies_page"):
+                 "jobs_history_page", "textos_avulsos_page", "roteiros_yt_page", "vendas_page", "dossies_page", "guia_page", "settings_page", "ia_page"):
         app.add_url_rule("/" + nome, nome, lambda: "")
     modelados_rotas.registrar(app, str(ambiente), jobs, lambda j: None, lambda j: str(ambiente / "jobs" / j), lambda: {})
     c = app.test_client()

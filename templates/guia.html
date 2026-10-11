@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Guia — {{ titulo }}{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1180px; }
+  .gu-wrap { display: grid; grid-template-columns: 250px 1fr; gap: 22px; align-items: start; margin-top: 10px; }
+  .gu-menu { position: sticky; top: 10px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; font-size: 0.88rem; background: #fafafa; }
+  .gu-menu a { display: block; padding: 4px 6px; border-radius: 6px; color: #1f2937; text-decoration: none; }
+  .gu-menu a.on { background: #1f2937; color: #fff; }
+  .gu-menu a:hover:not(.on) { background: #eef2ff; }
+  .gu-menu h4 { margin: 10px 0 4px; font-size: 0.75rem; text-transform: uppercase; color: #6b7280; letter-spacing: .04em; }
+  .gu-doc { min-width: 0; line-height: 1.55; }
+  .gu-doc h1 { margin-top: 0; }
+  .gu-doc h2 { border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-top: 28px; }
+  .gu-doc pre { background: #0f172a; color: #e2e8f0; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; }
+  .gu-doc code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+  .gu-doc pre code { background: none; padding: 0; font-size: inherit; }
+  .gu-doc table { border-collapse: collapse; margin: 10px 0; font-size: 0.88rem; width: 100%; }
+  .gu-doc th, .gu-doc td { border: 1px solid #e5e7eb; padding: 5px 8px; text-align: left; vertical-align: top; }
+  .gu-doc th { background: #f8fafc; }
+  .gu-doc blockquote { border-left: 4px solid #f59e0b; background: #fffbeb; margin: 10px 0; padding: 8px 12px; border-radius: 0 8px 8px 0; }
+  .gu-ex { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; margin-top: 10px; font-size: 0.82rem; background: #fff; }
+  .gu-ex .erro { color: #b91c1c; margin: 3px 0; }
+  .gu-ex .ok { color: #047857; }
+  .gu-ex button { margin-top: 6px; font-size: 0.8rem; }
+  @media (max-width: 800px) { .gu-wrap { grid-template-columns: 1fr; } .gu-menu { position: static; } }
+</style>
+
+<div class="gu-wrap">
+  <nav class="gu-menu">
+    <a href="/guia" class="{{ 'on' if not atual else '' }}">📘 Começo (índice)</a>
+    <h4>Como criar</h4>
+    {% for pg in paginas %}<a href="/guia/{{ pg.slug }}" class="{{ 'on' if atual == pg.slug else '' }}">{{ pg.titulo }}</a>{% endfor %}
+    <div class="gu-ex" id="guEx">
+      <b>➕ Seus extras</b><br>
+      <span style="color:#6b7280;">{{ extras.pasta }}</span><br>
+      {% if extras.arquivos %}{{ extras.arquivos|length }} arquivo(s): {{ extras.arquivos|join(', ') }}{% else %}nenhum arquivo ainda{% endif %}
+      <div>{% for k, n in (extras.contagem or {}).items() if n %}{{ k }}: <b>{{ n }}</b>{% if not loop.last %} · {% endif %}{% endfor %}</div>
+      {% for e in extras.erros %}<div class="erro">⚠ {{ e }}</div>{% else %}{% if extras.arquivos %}<div class="ok">✔ sem erros</div>{% endif %}{% endfor %}
+      <button id="guRecarregar">🔄 Reler os extras</button> <span id="guSt"></span>
+    </div>
+  </nav>
+  <article class="gu-doc">{{ corpo|safe }}</article>
+</div>
+<script>
+document.getElementById('guRecarregar').addEventListener('click', async () => {
+  const st = document.getElementById('guSt'); st.textContent = '⏳';
+  try {
+    const r = await fetch('/guia/extras/recarregar', { method: 'POST' }); const d = await r.json();
+    st.textContent = (d.erros && d.erros.length ? `⚠ ${d.erros.length} erro(s)` : '✔ relido') + ' — ' + (d.aviso || '');
+    setTimeout(() => location.reload(), 1800);
+  } catch (e) { st.textContent = '⚠ ' + e.message; }
+});
+</script>
+{% endblock %}

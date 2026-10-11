@@ -63,3 +63,6 @@ uvicorn>=0.34
 
 # --- 🕵️ Modelos de vídeo: fontes em PDF ---
 pypdf>=4.0
+
+# --- 📘 Guia: python dp_guia.py fonte (renomeia a família da fonte pra "DP …") ---
+fonttools>=4.40

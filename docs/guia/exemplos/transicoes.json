@@ -1,0 +1,11 @@
+{
+  "_leia": "Copie este arquivo pra assets/darkplanner/extras/ (tire o _leia se quiser). Cada transição usa UM de: xfade, expr ou igual_a.",
+  "transicoes": [
+    {"id": "cortina_central", "rotulo": "Cortina fechando no centro", "familia": "varredura", "int": 2, "energia": 0.5, "ritmo": "medio",
+     "xfade": "horzclose"},
+    {"id": "varredura_diagonal_suave", "rotulo": "Varredura diagonal suave", "familia": "varredura", "int": 2, "energia": 0.4, "ritmo": "medio",
+     "expr": "if(lt((X/W+Y/H)/2+0.05*sin(Y/H*18),P*1.1),B,A)"},
+    {"id": "luz_dourada_2", "rotulo": "Luz dourada (cópia)", "familia": "luz", "int": 3, "energia": 0.6, "ritmo": "cinema",
+     "igual_a": "ft_pk_leak3"}
+  ]
+}

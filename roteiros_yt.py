@@ -246,14 +246,22 @@ def _escolher_legenda(info: Dict[str, Any], preferidos: List[str]) -> Optional[D
 
 def extrair_transcricao(url: str, pasta: str, preferidos: Optional[List[str]] = None, ytdlp_module: Any = None,
                         on_log: Callable[[str], None] = lambda _m: None, whisper_fn: Optional[Callable] = None,
-                        usar_whisper: bool = True, alternativas: Optional[Any] = None) -> Dict[str, Any]:
+                        usar_whisper: bool = True, alternativas: Optional[Any] = None,
+                        painel_primeiro: Optional[bool] = None) -> Dict[str, Any]:
     """Transcrição de um vídeo do YouTube. 1º a legenda do próprio vídeo (não
     baixa o vídeo, é rápido); sem legenda, baixa só o áudio e usa o Whisper.
+
+    Desde a v84_52 o 1º caminho é o do projeto transcript-youtube-video: abrir o vídeo num
+    navegador e ler o painel "Mostrar transcrição" (yt_alternativas.legenda_painel). Só se
+    ele não der é que vêm o yt-dlp e os outros. `painel_primeiro` (padrão: sim, menos nos
+    testes, que passam um yt-dlp falso).
 
     Se o YouTube bloquear o yt-dlp ("Sign in to confirm you're not a bot"):
     outros clientes do YouTube → cookies dos navegadores → youtube-transcript-api →
     um navegador de verdade lendo a legenda do player → pytubefix pro áudio (ver
     yt_alternativas.py). `alternativas` = módulo (pra teste)."""
+    if painel_primeiro is None:
+        painel_primeiro = ytdlp_module is None
     if ytdlp_module is None:
         try:
             import yt_dlp as ytdlp_module  # type: ignore
@@ -265,6 +273,10 @@ def extrair_transcricao(url: str, pasta: str, preferidos: Optional[List[str]] = 
         import yt_alternativas as alt
     preferidos = preferidos or ["pt", "en", "es"]
     os.makedirs(pasta, exist_ok=True)
+    if painel_primeiro and hasattr(alt, "legenda_painel"):
+        r = _pelo_painel(url, alt, on_log)
+        if r:
+            return r
     on_log("Lendo as informações do vídeo…")
 
     def _abrir(ck):
@@ -339,6 +351,35 @@ def extrair_transcricao(url: str, pasta: str, preferidos: Optional[List[str]] = 
         on_log("  o YouTube bloqueou o download do áudio — tentando com o pytubefix…")
         caminho, _inf = alt.audio_pytubefix(url, pasta, on_log)
     return dict(base, **_whisper(caminho, whisper_fn, on_log))
+
+
+def _pelo_painel(url: str, alt: Any, on_log: Callable[[str], None]) -> Optional[Dict[str, Any]]:
+    """O painel "Mostrar transcrição" num navegador (escondido; se não der, com a janela visível,
+    como o transcript-youtube-video faz). None = não deu (o resto da fila continua)."""
+    import yt_cookies
+    try:
+        import site_config
+        oculto = not bool(site_config.load_site_config().get("browser_visible"))
+    except Exception:  # noqa: BLE001
+        oculto = True
+    for headless in ([True, False] if oculto else [False]):
+        on_log("📜 Abrindo o vídeo no navegador pra ler o painel “Mostrar transcrição”…" if headless else
+               "📜 De novo, com a janela do navegador visível…")
+        try:
+            r = alt.legenda_painel(url, on_log, headless=headless)
+        except Exception as exc:  # noqa: BLE001
+            on_log(f"  painel de transcrição não deu: {yt_cookies.limpar(exc)[:160]}")
+            continue
+        if r and r.get("linhas"):
+            on_log(f"✔ {len(r['linhas'])} linhas da transcrição do YouTube")
+            idioma = (r.get("lang") or "").replace("-orig", "") or None
+            return {"titulo": r.get("titulo") or "", "canal": r.get("canal") or "", "duracao": r.get("duracao"), "url": url,
+                    "fonte": "transcrição do YouTube" + (" (automática)" if r.get("auto") else ""), "idioma": idioma,
+                    "blocos": _juntar_linhas(r["linhas"]), "com_tempo": True}
+        if r and r.get("tem_legenda") is False:
+            on_log("  o vídeo não tem legenda/transcrição no YouTube")
+            return None
+    return None
 
 
 def _whisper(caminho: str, whisper_fn: Optional[Callable], on_log: Callable[[str], None]) -> Dict[str, Any]:
@@ -820,7 +861,8 @@ def prompt_acoes(p: Dict[str, Any], acoes: List[str], idioma: str = "en", extra:
             "por pontuação simples; nada de letras repetidas (\"muuuito\"). NÃO mexa nas tags de voz da lista (colchetes "
             "com as palavras exatas) nem nos [CENA n], nem nas marcas [[INSCREVA]] e [[VENDA]].")
     if "titulos" in acoes:
-        tarefas.append("Sugira 5 TÍTULOS fortes pro vídeo e uma 1ª frase (gancho) mais forte, em \"titulos\" e \"gancho\".")
+        tarefas.append("Sugira 5 TÍTULOS fortes pro vídeo (seguindo as fórmulas de título abaixo) e uma 1ª frase (gancho) mais forte, "
+                       "em \"titulos\" e \"gancho\".")
     titulo_orig = (p.get("titulo") or ((p.get("transcricao") or {}).get("titulo")) or "").strip()
     if "descricao" in acoes:
         idioma_desc = alvo if "traduzir" in acoes else "o mesmo idioma do roteiro_final"
@@ -832,7 +874,10 @@ def prompt_acoes(p: Dict[str, Any], acoes: List[str], idioma: str = "en", extra:
             "6-10 palavras EXATAS do roteiro_final onde o capítulo começa (cópia exata, pra o site achar e calcular o tempo). "
             + (f"Traduza também o título do vídeo original (“{titulo_orig}”) em \"titulo_original\" e " if titulo_orig and "traduzir" in acoes else
                (f"Em \"titulo_original\" repita o título original (“{titulo_orig}”) e " if titulo_orig else ""))
-            + f"sugira 5 TÍTULOS alternativos em \"titulos\" ({idioma_desc}; fortes, até ~70 caracteres, sem clickbait mentiroso).")
+            + f"sugira 5 TÍTULOS alternativos em \"titulos\" ({idioma_desc}; seguindo as fórmulas de título abaixo).")
+    if {"titulos", "descricao"} & set(acoes):
+        import metodo_roteiro
+        tarefas.append("Títulos:\n" + metodo_roteiro.bloco_titulos(5).split("\n", 1)[1])
     if (extra or "").strip():
         tarefas.append("Pedido extra de quem está editando (siga com prioridade): " + extra.strip()[:1500])
     if {"sem_cenas", "sem_experiencias", "traduzir"} & set(acoes) or (extra or "").strip():

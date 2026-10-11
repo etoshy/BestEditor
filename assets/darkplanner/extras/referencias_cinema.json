@@ -1,0 +1,644 @@
+{
+ "_leia": "50 extras inspirados em efeitos conhecidos de filmes, séries e documentários. As miniaturas já estão em assets/darkplanner/galeria. Confira com  python dp_guia.py verificar  e reinicie o site (transição nova só vale depois de reiniciar). O campo \"direcoes\" de cada item diz em quais Direções do sistema ele entra (o site usa isso desde a v84_51); \"_direcoes\" no fim é só um resumo.",
+ "transicoes": [
+  {
+   "id": "starwars_wipe",
+   "rotulo": "Wipe Star Wars (cortina lateral)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "wiperight",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "starwars_relogio",
+   "rotulo": "Wipe de relógio (Star Wars)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "radial",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "iris_cinema_mudo",
+   "rotulo": "Íris fechando (cinema mudo)",
+   "familia": "forma",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "xfade": "circleclose",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "whip_pan_wright",
+   "rotulo": "Whip pan (Edgar Wright)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.9,
+   "ritmo": "rapido",
+   "xfade": "hlwind",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "flash_paparazzi",
+   "rotulo": "Flash de câmera (true crime)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "camera_flash",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "queima_super8",
+   "rotulo": "Película queimando (Super 8)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "cinema",
+   "igual_a": "ft_pk_burn2",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "luz_vazando_indie",
+   "rotulo": "Luz vazando (indie / clipe)",
+   "familia": "luz",
+   "int": 2,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "igual_a": "ft_pk2_leak3",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "glitch_mr_robot",
+   "rotulo": "Glitch digital (Mr. Robot)",
+   "familia": "glitch",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "ft_pk2_glitch",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "corte_pro_preto_doc",
+   "rotulo": "Mergulho no preto (documentário)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.2,
+   "ritmo": "cinema",
+   "xfade": "fadeblack",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "persiana_scanner",
+   "rotulo": "Persianas de scanner (arquivo)",
+   "familia": "varredura",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "medio",
+   "expr": "if(lt(mod(Y,40)/40,P),B,A)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "efeitos": [
+  {
+   "id": "ken_burns_doc",
+   "rotulo": "Ken Burns clássico (foto)",
+   "camera": "in",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "ken_burns_recua",
+   "rotulo": "Ken Burns recuando (foto)",
+   "camera": "out",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "travelling_arquivo",
+   "rotulo": "Travelling lateral em foto de arquivo",
+   "camera": "pan_right",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "camera_na_mao",
+   "rotulo": "Câmera na mão (Bourne / Greengrass)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.6,
+   "filtro": "[base]scale=iw+24:ih+24,crop=iw-24:ih-24:'12+8*sin(t*13)':'12+8*cos(t*11)'[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "grao_16mm",
+   "rotulo": "Grão de 16 mm",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "filtro": "[base]noise=alls=18:allf=t+u[base]",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "vhs_desalinhado",
+   "rotulo": "VHS desalinhado (found footage)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "filtro": "[base]rgbashift=rh=5:bh=-5,noise=alls=12:allf=t,eq=saturation=1.2[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "luz_de_vela",
+   "rotulo": "Luz de vela tremulando (Barry Lyndon)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "filtro": "[base]eq=brightness='0.035*sin(2*PI*t*1.7)+0.02*sin(2*PI*t*4.3)':eval=frame,colorbalance=rm=0.06:bm=-0.06[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "vinheta_suspense",
+   "rotulo": "Vinheta respirando (suspense)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]vignette=angle='PI/4+0.1*sin(t)':eval=frame[base]",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "pelicula_suja_arquivo",
+   "rotulo": "Película suja (arquivo histórico)",
+   "familia": "atmosfera",
+   "igual_a": "ov_sujeira",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "facho_projetor",
+   "rotulo": "Facho de projetor de cinema",
+   "familia": "atmosfera",
+   "igual_a": "ov_facho_suave",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  }
+ ],
+ "entradas": [
+  {
+   "id": "crash_zoom",
+   "rotulo": "Crash zoom (anos 70 / Tarantino)",
+   "igual_a": "punch_in",
+   "durAlvoS": 0.2,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "tv_tubo_antiga",
+   "rotulo": "TV de tubo ligando (lenta)",
+   "igual_a": "tv_on",
+   "durAlvoS": 0.7,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "foto_cai_mesa",
+   "rotulo": "Foto caindo na mesa (true crime)",
+   "igual_a": "drop",
+   "durAlvoS": 0.6,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "tremor_explosao",
+   "rotulo": "Tremor de explosão",
+   "igual_a": "shake",
+   "durAlvoS": 0.35,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "foco_de_lente",
+   "rotulo": "Puxada de foco de lente",
+   "igual_a": "focus",
+   "durAlvoS": 0.9,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "revela_documento",
+   "rotulo": "Documento revelado devagar",
+   "igual_a": "revela_cima",
+   "durAlvoS": 1.0,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "filtros": [
+  {
+   "id": "teal_orange_madmax",
+   "rotulo": "Teal & orange (blockbuster)",
+   "grupo": "cinema",
+   "cadeia": "colorbalance=rs=-0.1:bs=0.15:rh=0.12:bh=-0.1,eq=contrast=1.12:saturation=1.15",
+   "css": "contrast(1.12) saturate(1.15) sepia(.12) hue-rotate(-8deg)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "bleach_bypass_guerra",
+   "rotulo": "Bleach bypass (filme de guerra)",
+   "grupo": "cinema",
+   "cadeia": "eq=contrast=1.35:saturation=0.45:brightness=-0.02,noise=alls=8:allf=t",
+   "css": "contrast(1.35) saturate(.45) brightness(.98)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "noir_classico",
+   "rotulo": "Noir clássico (anos 40)",
+   "grupo": "cinema",
+   "cadeia": "hue=s=0,eq=contrast=1.45:brightness=-0.03,vignette=angle=PI/4",
+   "css": "grayscale(1) contrast(1.45) brightness(.97)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "matrix_verde",
+   "rotulo": "Verde digital (Matrix)",
+   "grupo": "cinema",
+   "cadeia": "colorbalance=gs=0.12:gm=0.1:rm=-0.06:bm=-0.04,eq=contrast=1.15:saturation=0.8",
+   "css": "sepia(.25) hue-rotate(55deg) saturate(.9) contrast(1.15)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "deserto_amarelo",
+   "rotulo": "Amarelo do deserto (Breaking Bad México)",
+   "grupo": "cinema",
+   "cadeia": "colorbalance=rm=0.08:gm=0.05:bm=-0.15:bh=-0.08,eq=saturation=1.1:contrast=1.08",
+   "css": "sepia(.35) saturate(1.2) contrast(1.08)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "laranja_neblina_2049",
+   "rotulo": "Neblina laranja (Blade Runner 2049)",
+   "grupo": "cinema",
+   "cadeia": "colorbalance=rs=0.12:rm=0.15:bm=-0.15:bs=-0.08,eq=contrast=0.9:brightness=0.03:saturation=1.2",
+   "css": "sepia(.5) saturate(1.4) contrast(.9) brightness(1.03) hue-rotate(-12deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "pastel_simetrico",
+   "rotulo": "Pastel simétrico (Wes Anderson)",
+   "grupo": "cinema",
+   "cadeia": "eq=saturation=0.85:brightness=0.05:contrast=0.92,colorbalance=rm=0.05:gm=0.02:bh=-0.04",
+   "css": "saturate(.85) brightness(1.05) contrast(.92) sepia(.12)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "verde_dourado_amelie",
+   "rotulo": "Verde e dourado (Amélie)",
+   "grupo": "cinema",
+   "cadeia": "colorbalance=gs=0.08:rm=0.1:gm=0.06:bm=-0.12,eq=saturation=1.3:contrast=1.1",
+   "css": "saturate(1.3) contrast(1.1) sepia(.2) hue-rotate(10deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "arquivo_desbotado",
+   "rotulo": "Arquivo desbotado (doc histórico)",
+   "grupo": "documentario",
+   "cadeia": "curves=preset=vintage,eq=saturation=0.7:contrast=0.95,noise=alls=10:allf=t,vignette=angle=PI/5",
+   "css": "sepia(.4) saturate(.7) contrast(.95)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "frio_true_crime",
+   "rotulo": "Frio azulado (true crime Netflix)",
+   "grupo": "documentario",
+   "cadeia": "colorbalance=bs=0.12:bm=0.06:rh=-0.04,eq=saturation=0.75:contrast=1.15:brightness=-0.04,vignette=angle=PI/5",
+   "css": "saturate(.75) contrast(1.15) brightness(.96) hue-rotate(10deg)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "destaques": {
+  "dossie_maquina_escrever": {
+   "base": "v2_maquina",
+   "label": "Dossiê datilografado (true crime)",
+   "categoria": "meus",
+   "amostra": "CASO Nº 1987-042",
+   "tipografia": {
+    "fonte": "specialelite",
+    "caixaAlta": true
+   },
+   "cena": {
+    "tratamento": "archive",
+    "fundo": "papel"
+   },
+   "whenToUse": [
+    "Nomes de casos, arquivos e datas de investigação"
+   ],
+   "maxPorVideo": 3,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "carimbo_confidencial": {
+   "base": "carimbo",
+   "label": "Carimbo CONFIDENCIAL",
+   "categoria": "meus",
+   "amostra": "CONFIDENCIAL",
+   "tipografia": {
+    "fonte": "staatliches",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "stamp"
+   },
+   "audio": {
+    "assets": [
+     "impacto/impacto_5"
+    ],
+    "evento": "assentamento"
+   },
+   "whenToUse": [
+    "Revelar algo secreto ou proibido"
+   ],
+   "maxPorVideo": 2,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "titulo_neon_80s": {
+   "base": "epico",
+   "label": "Título neon anos 80 (Stranger Things)",
+   "categoria": "meus",
+   "amostra": "CAPÍTULO UM",
+   "tipografia": {
+    "fonte": "cinzel",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "acende",
+    "saida": "blur"
+   },
+   "cena": {
+    "tratamento": "dim",
+    "fundo": "cor_gradiente",
+    "cor": "#B0001A"
+   },
+   "whenToUse": [
+    "Abertura de capítulo com clima de mistério"
+   ],
+   "maxPorVideo": 2,
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "glitch_hacker": {
+   "base": "glitch",
+   "label": "Texto hacker (Mr. Robot)",
+   "categoria": "meus",
+   "amostra": "ACESSO NEGADO",
+   "tipografia": {
+    "fonte": "mono",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "glitch",
+    "saida": "blur"
+   },
+   "cena": {
+    "tratamento": "front_grid",
+    "fundo": "crt"
+   },
+   "whenToUse": [
+    "Tecnologia, hackers, vazamentos de dados"
+   ],
+   "maxPorVideo": 2,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "recorte_jornal_vox": {
+   "base": "v2_recorte_jornal",
+   "label": "Recorte de jornal (Vox)",
+   "categoria": "meus",
+   "amostra": "GOVERNO ANUNCIA NOVO PLANO",
+   "cena": {
+    "fundo": "jornal"
+   },
+   "whenToUse": [
+    "Citar uma manchete ou notícia real"
+   ],
+   "maxPorVideo": 3,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_tudo"
+   ]
+  },
+  "marca_texto_explainer": {
+   "base": "ed_marker",
+   "label": "Marca-texto amarelo (explainer)",
+   "categoria": "meus",
+   "amostra": "o ponto principal",
+   "coreografia": {
+    "entrada": "marca"
+   },
+   "cena": {
+    "cor": "#FFE14D"
+   },
+   "whenToUse": [
+    "Sublinhar a palavra-chave de uma frase explicativa"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_tudo"
+   ]
+  },
+  "pino_mapa_viagem": {
+   "base": "v2_pino_mapa",
+   "label": "Pino no mapa (Johnny Harris)",
+   "categoria": "meus",
+   "amostra": "KIEV, UCRÂNIA",
+   "cena": {
+    "fundo": "mapa"
+   },
+   "whenToUse": [
+    "Apresentar um lugar quando a narração muda de cenário"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "contador_numero_doc": {
+   "base": "numerao",
+   "label": "Número gigante contando (doc de dados)",
+   "categoria": "meus",
+   "amostra": "8.000.000",
+   "tipografia": {
+    "fonte": "anton"
+   },
+   "coreografia": {
+    "entrada": "contador"
+   },
+   "audio": {
+    "assets": [
+     "foley/catraca_rolagem"
+    ],
+    "evento": "rolagem"
+   },
+   "whenToUse": [
+    "Um número impressionante dito na narração"
+   ],
+   "maxPorVideo": 2,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  }
+ },
+ "cenas": {
+  "TRUE_CRIME_FICHA": {
+   "base": "ED_FICHA_ARQUIVO",
+   "nome": "Ficha de suspeito (true crime)",
+   "fundo_fixo": "papel",
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "PROJETOR_DOC": {
+   "base": "C30_PROJETOR",
+   "nome": "Projetor de slides (doc histórico)",
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "ANTES_DEPOIS_DOC": {
+   "nome": "Antes e depois (reportagem)",
+   "arranjo": "antes_depois",
+   "whenToUse": [
+    "Mostrar o mesmo lugar ou pessoa em duas épocas"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "QUADRO_INVESTIGACAO": {
+   "nome": "Quadro de investigação (fotos espalhadas)",
+   "arranjo": "mosaico",
+   "motion": [
+    "queda",
+    "assenta",
+    "queda",
+    "assenta"
+   ],
+   "whenToUse": [
+    "Vários suspeitos, provas ou personagens de uma vez"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ },
+ "paletas": [
+  {
+   "id": "netflix_doc",
+   "nome": "Doc vermelho e preto",
+   "primaria": "#E50914",
+   "secundaria": "#F5F5F1",
+   "acento": "#B81D24",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "arquivo_sepia",
+   "nome": "Arquivo sépia",
+   "primaria": "#A67C52",
+   "secundaria": "#F2E6D0",
+   "acento": "#3B2A1A",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ]
+}

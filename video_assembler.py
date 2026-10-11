@@ -2785,12 +2785,46 @@ def _escolher_candidato_previa(candidates: List[Dict[str, Any]], tracker: Option
     return com_thumb[0] if com_thumb else None
 
 
+def _ia_pode(recurso: str) -> bool:
+    try:
+        import ia_servico
+        return ia_servico.ativo(recurso)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _ia_cfg() -> Dict[str, Any]:
+    try:
+        import ia_servico
+        return ia_servico.config()
+    except Exception:  # noqa: BLE001
+        return {"nota_minima": 7, "candidatos": 10}
+
+
+def julgar_candidatos_ia(candidates: List[Dict[str, Any]], ia_ctx: Optional[Dict[str, Any]], busca: str,
+                         recurso: str = "juiz", miniatura: str = "thumbnail") -> Optional[Dict[str, Any]]:
+    """🤖 Fase 2 (juiz visual): None sem IA; senão {"lista": candidatos na ordem da nota (com ia_nota/ia_motivo),
+    "nova_busca": str}."""
+    if not candidates or not ia_ctx or not _ia_pode(recurso):
+        return None
+    try:
+        import ia_midia
+        j = ia_midia.julgar(candidates, ia_ctx.get("fala") or "", ia_ctx.get("ficha"), ia_ctx.get("anterior") or "",
+                            ia_ctx.get("seguinte") or "", ia_ctx.get("visual") or "", busca, recurso, ia_ctx.get("job"), miniatura)
+    except Exception:  # noqa: BLE001
+        return None
+    if not j:
+        return None
+    return {"lista": ia_midia.reordenar(candidates, j), "nova_busca": j.get("nova_busca") or ""}
+
+
 def fetch_segment_preview_lightweight(
     segment: VideoSegment,
     site_cfg: Optional[Dict[str, Any]] = None,
     client_factory: Optional["ClientFactory"] = None,
     used_tracker: Optional["UsedClipsTracker"] = None,
     evitar: Optional[set] = None,
+    ia_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Versão RÁPIDA da prévia: busca (sem baixar nada) e devolve a URL
     do thumbnail já hospedado no próprio provedor (CDN de imagens) —
@@ -2811,9 +2845,14 @@ def fetch_segment_preview_lightweight(
     sempre tentou os outros bancos) daria certo tranquilamente —
     mostrando uma falsa impressão de que aquele trecho não tem solução.
 
+    🤖 `ia_ctx` ({"ficha", "fala", "anterior", "seguinte", "visual", "job"}) com a IA ligada: pede
+    mais candidatos e o JUIZ escolhe pela miniatura (nota ≥ mínima = usa; 5–6 = usa com ⚠;
+    < 5 = busca de novo com a sugestão dele, no máximo 2 vezes, e no fim a melhor das
+    reprovadas com ⚠). Sem IA, igual a antes.
+
     Devolve: {"ok": bool, "thumbnail_url": str|None, "result_url": str|None,
     "label": str|None, "error": str|None, "video_preview_url": str|None,
-    "provider": str|None}. "provider" é o banco que de fato funcionou —
+    "provider": str|None} (+ "ia_nota"/"ia_motivo"/"ia_aviso"/"ia_busca" quando a IA julgou). "provider" é o banco que de fato funcionou —
     pode ser DIFERENTE do banco original do segmento, se esse tiver
     falhado e a busca caiu pro próximo da lista de prioridade.
     "result_url" é a URL da página do resultado escolhido — guardada
@@ -2839,14 +2878,38 @@ def fetch_segment_preview_lightweight(
         provider_priority = cfg.get("provider_priority") or ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels"]
         providers_to_try = [segment.provider] + _sem_flow_no_fallback(provider_priority, segment.provider)
 
+    # acervo local com obra/personagem: o metadado já é confiável, pula o juiz
+    acervo_confiavel = segment.provider in BIBLIOTECAS_LOCAIS and bool(getattr(segment, "obra", None) or getattr(segment, "personagem", None))
+    usar_ia = bool(ia_ctx) and not acervo_confiavel and _ia_pode("juiz")
+    ia_c = _ia_cfg() if usar_ia else {}
+    reprovada: Optional[Dict[str, Any]] = None
+    novas_buscas = 0
+
+    def _resultado(c: Dict[str, Any], provider: str, query: str, aviso: bool = False) -> Dict[str, Any]:
+        out = {
+            "ok": True, "thumbnail_url": c["thumbnail"], "result_url": c.get("url") or None,
+            "label": ("⚠ " if aviso else "") + (c.get("label") or ""), "error": None,
+            "video_preview_url": c.get("video_preview_url") or None,
+            "provider": provider,
+        }
+        if "ia_nota" in c:
+            out.update(ia_nota=c["ia_nota"], ia_motivo=c.get("ia_motivo") or "", ia_aviso=bool(aviso),
+                       ia_busca=query if query != segment.query else None)
+        return out
+
     for provider in providers_to_try:
         provider_timeout = _provider_timeout_seconds(cfg, provider)
         # "não repetir": pede vários candidatos (não só o 1º) pra poder cair
         # no 2º, 3º... quando o melhor já foi usado em outro trecho.
         tracker = _tracker_para(provider, used_tracker)
         max_results = 8 if (tracker is not None or evitar) else 1
+        if usar_ia:
+            max_results = max(max_results, int(ia_c.get("candidatos") or 10))
         queries_to_try = [segment.query] + _fallback_queries_for(segment)
-        for query in queries_to_try:
+        qi = 0
+        while qi < len(queries_to_try):
+            query = queries_to_try[qi]
+            qi += 1
             try:
                 candidates = _run_with_timeout(
                     lambda: search_candidates(
@@ -2866,15 +2929,32 @@ def fetch_segment_preview_lightweight(
                 last_error = str(exc)
                 continue
 
+            if usar_ia and candidates:
+                j = julgar_candidatos_ia([c for c in candidates if c.get("thumbnail")], ia_ctx, query)
+                if j:
+                    minima = int(ia_c.get("nota_minima") or 7)
+                    aprovados = [c for c in j["lista"] if c.get("ia_nota", 0) >= 5]
+                    if aprovados:
+                        # "não repetir" vem DEPOIS da nota: entre as aprovadas, a melhor ainda não usada
+                        c = _escolher_candidato_previa(aprovados, tracker, provider, evitar)
+                        if c is not None:
+                            return _resultado(c, provider, query, aviso=c.get("ia_nota", 0) < minima)
+                    melhor = j["lista"][0] if j["lista"] else None
+                    if melhor is not None and (reprovada is None or melhor.get("ia_nota", 0) > reprovada["nota"]):
+                        reprovada = {"nota": melhor.get("ia_nota", 0), "res": _resultado(melhor, provider, query, aviso=True)}
+                    nova = (j.get("nova_busca") or "").strip()
+                    if nova and novas_buscas < 2 and _ia_pode("nova_busca") and nova not in queries_to_try:
+                        queries_to_try.insert(qi, nova)  # Fase 3: a busca reescrita pelo juiz, logo em seguida
+                        novas_buscas += 1
+                    last_error = f"a IA reprovou os resultados de '{query}' em {provider}"
+                    continue
             c = _escolher_candidato_previa(candidates, tracker, provider, evitar)
             if c is not None:
-                return {
-                    "ok": True, "thumbnail_url": c["thumbnail"], "result_url": c.get("url") or None,
-                    "label": c.get("label") or "", "error": None,
-                    "video_preview_url": c.get("video_preview_url") or None,
-                    "provider": provider,
-                }
+                return _resultado(c, provider, query)
             last_error = f"nenhum resultado com thumbnail pra '{query}' em {provider}"
+
+    if reprovada is not None:  # nada passou: a melhor das reprovadas, com ⚠ pra você trocar
+        return reprovada["res"]
 
     return {
         "ok": False, "thumbnail_url": None, "result_url": None, "label": None,
@@ -3450,6 +3530,8 @@ def assemble_video(
     destaques: Optional[List[Dict[str, Any]]] = None,
     palavras_narracao: Optional[List[Dict[str, Any]]] = None,
     graficos: Optional[List[Dict[str, Any]]] = None,
+    editoriais: Optional[List[Dict[str, Any]]] = None,
+    imagens_editorial: Optional[Dict[str, str]] = None,
     paleta: Optional[Dict[str, str]] = None,
     sfx: Optional[List[Dict[str, Any]]] = None,
     censura: Optional[List[Dict[str, Any]]] = None,
@@ -4015,8 +4097,9 @@ def assemble_video(
 
     # efeitos sonoros (sons do editor original): automáticos + os da timeline
     import dp_sons
-    opcoes_sons = cfg.get("sons_auto") or {"transicoes": True, "cenas": True, "destaques": True}
-    eventos_sons = dp_sons.eventos_automaticos(segments, plano_transicoes, grupos, destaques, dict(opcoes_sons, palavras=palavras_narracao or []))
+    opcoes_sons = cfg.get("sons_auto") or {"transicoes": True, "cenas": True, "destaques": True, "editoriais": True}
+    eventos_sons = dp_sons.eventos_automaticos(segments, plano_transicoes, grupos, destaques, dict(opcoes_sons, palavras=palavras_narracao or []),
+                                               editoriais=editoriais)
     for item in sfx or []:
         if dp_sons.som(item.get("som")):
             eventos_sons.append({"som": item["som"], "inicio": max(0.0, float(item.get("start", 0))), "volume": float(item.get("volume", 1.0))})
@@ -4057,6 +4140,21 @@ def assemble_video(
         shutil.move(overlaid_path, output_path)
 
     # destaques de texto do DarkPlanner (legenda ASS animada + tratamento da cena)
+    # 🗞 quadros editoriais (ficha, post, terminal, recortes…) — antes dos destaques (eles ficam por cima)
+    if editoriais:
+        import dp_editorial
+        if on_progress:
+            on_progress("editoriais", total, total)
+        com_ed = os.path.join(work_dir, "_com_editoriais.mp4")
+        with (perf_log.timed("montagem:editoriais", quantidade=len(editoriais)) if perf_log else nullcontext()):
+            try:
+                r_ed = dp_editorial.aplicar_editoriais(output_path, com_ed, editoriais, target_width, target_height,
+                                                       os.path.join(work_dir, "editoriais"), imagens=imagens_editorial, paleta=paleta_textos)
+            except Exception as exc:  # noqa: BLE001
+                raise VideoAssemblyError(f"Os quadros editoriais falharam: {str(exc)[-400:]} — confira o quadro no editor.") from exc
+        if r_ed == com_ed:
+            shutil.move(com_ed, output_path)
+
     if destaques:
         import dp_destaques
         if on_progress:

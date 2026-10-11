@@ -1,0 +1,8 @@
+{
+  "efeitos": [
+    {"id": "zoom_lento_foto", "rotulo": "Zoom lento (foto)", "camera": "in"},
+    {"id": "calor_suave", "rotulo": "Calor suave", "familia": "atmosfera", "int": 1, "energia": 0.3,
+     "filtro": "[base]eq=gamma=1.06:saturation=1.12,colorbalance=rm=0.05:bm=-0.04[base]"},
+    {"id": "poeira_dourada", "rotulo": "Poeira dourada", "igual_a": "ov_poeira"}
+  ]
+}

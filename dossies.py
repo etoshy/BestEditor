@@ -500,6 +500,11 @@ def caminho_midia(base: str, p: Dict[str, Any], m: Optional[Dict[str, Any]]) -> 
 
 
 def o_que_e(m: Dict[str, Any], p: Optional[Dict[str, Any]] = None) -> str:
+    if m.get("ia") and not (m.get("descricao") and m.get("usar") == "descricao"):  # 🤖 ficha da imagem (descrição de verdade)
+        import ia_dossies
+        txt = ia_dossies.texto_da_ficha(m["ia"])
+        if txt:
+            return txt + (f" (legenda: {m['legenda']})" if m.get("legenda") else "") + (f" | {m['descricao']}" if m.get("descricao") else "")
     og = m.get("og") or {}
     partes_og = [x for x in (m.get("legenda"), og.get("titulo") and f"da página “{og.get('titulo')}”",
                              og.get("descricao") if not m.get("legenda") else "") if x]
@@ -543,7 +548,7 @@ def processar_fonte(base: str, pid: str, fid: str, trava=None) -> Dict[str, Any]
     try:
         if url.startswith("arquivo:"):  # 📄 arquivo enviado (txt, pdf, livro…)
             paginas = mexer(lambda p, f: f.get("paginas") or "")
-            dados = ler_arquivo(os.path.join(_pasta(base, pid), "fontes", os.path.basename(url[8:])), paginas)
+            dados = ler_arquivo(os.path.join(_pasta(base, pid), "fontes", os.path.basename(url[8:])), paginas, job=pid)
         else:
             html, final = _vd.baixar_html(url)
             dados = ler_materia(html, final)
@@ -579,6 +584,18 @@ def processar_fonte(base: str, pid: str, fid: str, trava=None) -> Dict[str, Any]
         f.update(estado="pronta", imagens=n)
         return n
     n = mexer(juntar)
+    # 🤖 arquivo grande → dossiê condensado (fatos com a página de cada um) em vez de jogar tudo no prompt
+    if url.startswith("arquivo:") and len(dados.get("texto") or "") > LIMITE_CONDENSAR:
+        try:
+            import ia_dossies
+            mexer(lambda p, f: f.update(estado="🤖 condensando com a IA…"))
+            cond = ia_dossies.condensar(dados["texto"], dados.get("titulo") or "", job=pid)
+            if cond:
+                mexer(lambda p, f: f.update(condensado=cond))
+        except Exception:  # noqa: BLE001
+            pass
+        mexer(lambda p, f: f.update(estado="pronta"))
+    ia_analisar_imagens(base, pid, trava=trava, fonte=fid)  # 🤖 ficha das imagens (sem IA não faz nada)
     import midia_transcricao as mt
     for _im, cam, tipo in baixadas:  # vídeos da matéria: transcrição com os tempos (segundo plano)
         if tipo == "video" and os.path.isfile(cam):
@@ -597,6 +614,60 @@ def _intervalo(paginas: str, total: int) -> List[int]:
         a, b = int(m.group(1)), int(m.group(2) or m.group(1))
         out.extend(range(max(1, a) - 1, min(total, max(a, b))))
     return sorted(set(out)) or list(range(total))
+
+
+LIMITE_CONDENSAR = 40000  # caracteres: acima disso, com a IA ligada, a fonte vira um dossiê condensado
+
+
+def ia_analisar_imagens(base: str, pid: str, trava=None, fonte: Optional[str] = None, ids: Optional[List[str]] = None,
+                        refazer: bool = False) -> Dict[str, Any]:
+    """🤖 Duplicadas (hash, de graça) + ficha de cada imagem (o que é, quem, texto, lixo/anúncio, sensível).
+    Sem IA: não faz nada. As descartadas/duplicadas ficam no projeto (dá pra recuperar), só saem do prompt."""
+    import contextlib
+    import ia_dossies
+    import ia_servico
+    if not ia_servico.ativo("dossie_imagens"):
+        return {"ok": False, "erro": ia_servico.motivo_desligado("dossie_imagens")}
+    trava = trava or contextlib.nullcontext()
+    with trava:
+        p = carregar(base, pid)
+    fontes = {f["id"]: f for f in p.get("fontes") or []}
+    alvo = [m for m in p.get("midias") or [] if m["tipo"] in ("foto", "video")
+            and (ids is None or m["id"] in ids) and (fonte is None or m.get("fonte") == fonte) and (refazer or not m.get("ia"))]
+    cams = {m["id"]: caminho_midia(base, p, m) for m in alvo}
+    cams = {k: v for k, v in cams.items() if v}
+    fotos = {k: v for k, v in cams.items() if not v.lower().endswith((".mp4", ".mov", ".webm", ".mkv", ".m4v"))}
+    dup = ia_dossies.duplicadas(fotos)
+    itens = []
+    for m in alvo:
+        if m["id"] not in cams or m["id"] in dup:
+            continue
+        f = fontes.get(m.get("fonte") or "") or {}
+        ctx = " | ".join(x for x in (m.get("legenda") and f"legenda: {m['legenda']}", f.get("titulo") and f"matéria: {f['titulo']}",
+                                     f.get("linha_fina"), m.get("descricao") and f"o que eu disse: {m['descricao']}",
+                                     not f and m.get("nome") and f"arquivo: {m['nome']}") if x)
+        itens.append({"id": m["id"], "caminho": cams[m["id"]], "contexto": ctx})
+    fichas = ia_dossies.fichar_imagens(itens, job=pid)
+    with trava:
+        p = carregar(base, pid)
+        n = 0
+        for m in p.get("midias") or []:
+            if m["id"] in dup:
+                m["duplicada_de"] = dup[m["id"]]
+            if m["id"] in fichas:
+                m["ia"] = fichas[m["id"]]
+                m["descartada"] = ia_dossies.descartar(fichas[m["id"]])
+                n += 1
+        salvar(base, p)
+    return {"ok": True, "fichas": n, "duplicadas": len(dup), "descartadas": sum(1 for k in fichas if ia_dossies.descartar(fichas[k]))}
+
+
+def ia_conferir_marcas(p: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    """🤖 Passo E: as marcas [I3] do roteiro que não combinam com a imagem (None sem IA)."""
+    import ia_dossies
+    roteiro = ((p.get("resultado") or {}).get("roteiro") or "")
+    fichas = {m["id"].upper(): o_que_e(m, p) for m in p.get("midias") or [] if m["tipo"] in ("foto", "video") and not m.get("descartada")}
+    return ia_dossies.conferir_marcas(roteiro, fichas, job=p.get("id"))
 
 
 def _texto_pdf(caminho: str, paginas: str) -> Tuple[str, List[Dict[str, Any]], int]:
@@ -681,15 +752,43 @@ def _ler_texto_solto(caminho: str) -> str:
     return bruto.decode("utf-8", "replace")
 
 
-def ler_arquivo(caminho: str, paginas: str = "") -> Dict[str, Any]:
+def _pdf_com_ia(caminho: str, paginas: str, job: Optional[str]) -> Tuple[str, List[Dict[str, Any]], int]:
+    """🤖 PDF escaneado (ou com páginas sem texto): as páginas sem texto vão pra IA (partes de 25)."""
+    import ia_dossies
+    from pypdf import PdfReader
+    total = len(PdfReader(caminho).pages)
+    idx = _intervalo(paginas, total)
+    try:
+        texto, secoes, _t = _texto_pdf(caminho, paginas)
+    except DossieError:
+        texto, secoes = "", []
+    com_texto = {int(s["titulo"].split()[-1]) - 1 for s in secoes}
+    sem = [i for i in idx if i not in com_texto]
+    if sem and len(sem) <= 400:
+        lido = ia_dossies.ler_pdf(caminho, sem, job=job)
+        if lido:
+            for m in re.finditer(r"\[pág\. (\d+)\] (.*?)(?=\n\n\[pág\. \d+\] |\Z)", lido, re.S):
+                secoes.append({"titulo": f"Página {m.group(1)}", "texto": m.group(2).strip(), "ia": True})
+            secoes.sort(key=lambda s: int(s["titulo"].split()[-1]))
+            texto = "\n\n".join(f"[pág. {s['titulo'].split()[-1]}] {s['texto']}" for s in secoes)
+    if not texto.strip():
+        raise DossieError("Não achei texto nesse PDF (pode ser só imagem escaneada — ligue a 🤖 IA pra ler PDF escaneado, ou use OCR).")
+    return texto, secoes, total
+
+
+def ler_arquivo(caminho: str, paginas: str = "", job: Optional[str] = None) -> Dict[str, Any]:
     """Texto (e seções) de um arquivo de fonte: TXT/MD, PDF (com intervalo de páginas),
     EPUB, DOCX, SRT/VTT (sem os tempos), HTML, RTF (texto simples)."""
     nome = os.path.basename(caminho)
     ext = os.path.splitext(nome)[1].lower()
     titulo, secoes, extra = os.path.splitext(nome)[0].split("_", 1)[-1], [], ""
     if ext == ".pdf":
-        texto, secoes, total = _texto_pdf(caminho, paginas)
-        extra = f"PDF de {total} páginas" + (f", usadas: {paginas}" if paginas else "")
+        import ia_servico
+        if ia_servico.ativo("dossie_pdf"):
+            texto, secoes, total = _pdf_com_ia(caminho, paginas, job)
+        else:
+            texto, secoes, total = _texto_pdf(caminho, paginas)
+        extra = f"PDF de {total} páginas" + (f", usadas: {paginas}" if paginas else "") + (" (🤖 páginas escaneadas lidas pela IA)" if any(s.get("ia") for s in secoes) else "")
     elif ext == ".epub":
         texto, secoes, t = _texto_epub(caminho)
         titulo = t or titulo
@@ -811,14 +910,18 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
             L.append(cab + (f"\n({info})" if info else "") + (f"\n{f['url']}" if f.get("url") else f"\n(arquivo: {f.get('arquivo')})"))
             if f.get("linha_fina"):
                 L.append(f"Linha fina: {f['linha_fina']}")
-            L.append(f.get("texto") or "")
+            if f.get("condensado"):  # 🤖 arquivo grande: o dossiê condensado (com as páginas) no lugar do texto inteiro
+                import ia_dossies
+                L.append("(dossiê condensado pela IA — confira os fatos pela página)\n" + ia_dossies.condensado_para_prompt(f["condensado"]))
+            else:
+                L.append(f.get("texto") or "")
     textos = [m for m in p.get("midias") or [] if m["tipo"] == "texto"]
     if textos:
         L.append("")
         L.append("## Textos de apoio")
         for m in textos:
             L.append(f"### {m['id']}" + (f" — {m['descricao']}" if m.get("descricao") else "") + f"\n{m.get('conteudo') or ''}")
-    vis = [m for m in p.get("midias") or [] if m["tipo"] in ("foto", "video")]
+    vis = [m for m in p.get("midias") or [] if m["tipo"] in ("foto", "video") and not m.get("descartada") and not m.get("duplicada_de")]
     if vis:
         L.append("")
         L.append("## Imagens e vídeos que eu tenho (vão aparecer no vídeo — use os IDs)")
@@ -838,10 +941,12 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append("")
         L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
     L.append("")
+    L.append(metodo_roteiro.bloco_titulos(5))
+    L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
         "plano": metodo_roteiro.PLANO_JSON,
-        "titulos": ["5 títulos fortes pro YouTube (até ~70 caracteres, sem mentir)"],
+        "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
         "ideias": ["ideias de thumbnail / ganchos / vídeos derivados"],
         "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
         "capitulos": [{"titulo": "Título curto do capítulo", "comeca_em": "as primeiras 6-10 palavras EXATAS do roteiro onde ele começa"}],

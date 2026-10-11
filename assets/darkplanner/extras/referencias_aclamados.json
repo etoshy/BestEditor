@@ -1,0 +1,1738 @@
+{
+ "_leia": "100 extras inspirados em filmes e séries aclamados (clássicos, Oscar, Cannes, brasileiros, séries de prestígio). As miniaturas já estão em assets/darkplanner/galeria. Confira com  python dp_guia.py verificar  e reinicie o site (transição nova só vale depois de reiniciar). O campo \"direcoes\" de cada item diz em quais Direções do sistema ele entra (o site usa isso desde a v84_51); \"_direcoes\" no fim é só um resumo.",
+ "transicoes": [
+  {
+   "id": "kurosawa_wipe",
+   "rotulo": "Wipe de Kurosawa (Os Sete Samurais)",
+   "familia": "varredura",
+   "int": 2,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "wipeleft",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "lawrence_corte_fosforo",
+   "rotulo": "Corte do fósforo (Lawrence da Arábia)",
+   "familia": "corte",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "rapido",
+   "xfade": "fadefast",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "kane_iris",
+   "rotulo": "Íris clássica (Cidadão Kane)",
+   "familia": "forma",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "xfade": "circleopen",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "psicose_espiral",
+   "rotulo": "Espiral (Psicose / Um Corpo que Cai)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "radial",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "poderoso_chefao_sombra",
+   "rotulo": "Mergulho na sombra (O Poderoso Chefão)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "igual_a": "gl_fade_escuro",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apocalypse_now_fumaca",
+   "rotulo": "Sobreposição de fumaça (Apocalypse Now)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "xfade": "dissolve",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "cidade_de_deus_freeze",
+   "rotulo": "Congela e gira (Cidade de Deus)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "igual_a": "gl_zoom_cross",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "tropa_elite_flash",
+   "rotulo": "Clarão de operação (Tropa de Elite)",
+   "familia": "impacto",
+   "int": 5,
+   "energia": 0.9,
+   "ritmo": "rapido",
+   "igual_a": "camera_flash",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "parasita_degrau",
+   "rotulo": "Descida da escada (Parasita)",
+   "familia": "varredura",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "medio",
+   "xfade": "slidedown",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "requiem_split",
+   "rotulo": "Montagem dividida (Réquiem para um Sonho)",
+   "familia": "corte",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "expr": "if(lt(X,W/2),if(gt(P,0.5),B,A),if(gt(P,0.5),A,B)*lt(P,0.95)+B*gte(P,0.95))",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "lola_corrida",
+   "rotulo": "Corrida de Lola (Corra, Lola, Corra)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.9,
+   "ritmo": "rapido",
+   "xfade": "hlwind",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "fight_club_frame",
+   "rotulo": "Quadro subliminar (Clube da Luta)",
+   "familia": "glitch",
+   "int": 4,
+   "energia": 0.8,
+   "ritmo": "rapido",
+   "expr": "if(between(P,0.45,0.55),255-A,if(lt(P,0.5),A,B))",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "2001_corte_osso",
+   "rotulo": "Corte do osso à nave (2001)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "expr": "clip((A*(1-P)+B*P)*(1-max(0,1-abs(2*P-1)*1.4))+if(eq(PLANE,0),235,128)*max(0,1-abs(2*P-1)*1.4),0,255)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "interestelar_tesseract",
+   "rotulo": "Tesserato (Interestelar)",
+   "familia": "forma",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "xfade": "rectcrop",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "matrix_reload_codigo",
+   "rotulo": "Chuva de código (Matrix)",
+   "familia": "glitch",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "vdwind",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "in_the_mood_lento",
+   "rotulo": "Passagem lenta e vermelha (Amor à Flor da Pele)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "expr": "clip((A*(1-P)+B*P)*(1-max(0,1-abs(2*P-1)*1.4))+if(eq(PLANE,0),60,if(eq(PLANE,1),100,200))*max(0,1-abs(2*P-1)*1.4),0,255)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "la_la_land_iris",
+   "rotulo": "Íris de musical (La La Land)",
+   "familia": "forma",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "xfade": "circleclose",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "sopranos_corte_preto",
+   "rotulo": "Corte para o preto (Família Soprano)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "rapido",
+   "xfade": "fadeblack",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "twin_peaks_cortina",
+   "rotulo": "Cortina vermelha (Twin Peaks)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "cinema",
+   "expr": "if(lt(abs(X/W-0.5)*2,1-P),A,B)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "arcane_pincelada",
+   "rotulo": "Pincelada (Arcane)",
+   "familia": "splash",
+   "int": 4,
+   "energia": 0.7,
+   "ritmo": "rapido",
+   "igual_a": "ft_splash_3",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  }
+ ],
+ "efeitos": [
+  {
+   "id": "poderoso_zoom_lento",
+   "rotulo": "Aproximação lenta (O Poderoso Chefão)",
+   "camera": "in",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "iluminado_corredor",
+   "rotulo": "Avanço no corredor (O Iluminado)",
+   "camera": "zoom_pan_right",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "lawrence_deserto",
+   "rotulo": "Pan no deserto (Lawrence da Arábia)",
+   "camera": "pan_left",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "cidade_de_deus_giro",
+   "rotulo": "Giro na favela (Cidade de Deus)",
+   "camera": "giro",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "oppenheimer_recua",
+   "rotulo": "Recuo da explosão (Oppenheimer)",
+   "camera": "out",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "tropa_elite_mao",
+   "rotulo": "Câmera na mão (Tropa de Elite)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.7,
+   "filtro": "[base]scale=iw+28:ih+28,crop=iw-28:ih-28:'14+10*sin(t*9)':'14+10*cos(t*7)'[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "filhos_da_esperanca_plano",
+   "rotulo": "Plano-sequência tenso (Filhos da Esperança)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]scale=iw+14:ih+14,crop=iw-14:ih-14:'7+5*sin(t*1.9)':'7+5*cos(t*2.7)'[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "o_regresso_respira",
+   "rotulo": "Respiração na lente (O Regresso)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.3,
+   "filtro": "[base]gblur=sigma=0.6,eq=brightness='0.03*sin(2*PI*t*0.4)':eval=frame,vignette=angle=PI/4[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "oppenheimer_tremor",
+   "rotulo": "Onda de choque (Oppenheimer)",
+   "familia": "atmosfera",
+   "int": 5,
+   "energia": 1.0,
+   "filtro": "[base]scale=iw+44:ih+44,crop=iw-44:ih-44:'22+18*sin(t*23)':'22+18*cos(t*19)'[base]",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "in_the_mood_smear",
+   "rotulo": "Câmera lenta borrada (Amor à Flor da Pele)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]tmix=frames=6,eq=saturation=1.25[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "lola_aberracao",
+   "rotulo": "Correria saturada (Corra, Lola, Corra)",
+   "familia": "atmosfera",
+   "int": 4,
+   "energia": 0.8,
+   "filtro": "[base]rgbashift=rh=6:bh=-6,eq=saturation=1.4[base]",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "taxi_driver_neon",
+   "rotulo": "Neon noturno (Taxi Driver)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.5,
+   "filtro": "[base]colorbalance=rs=0.08:rh=0.1:bs=0.06,eq=brightness='0.03*sin(2*PI*t*1.3)':saturation=1.2:eval=frame[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "twin_peaks_estrobo",
+   "rotulo": "Luz piscando (Twin Peaks)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "filtro": "[base]eq=brightness='0.18*lt(mod(t,1.1),0.08)':eval=frame[base]",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "se7en_sujo",
+   "rotulo": "Película suja (Seven)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.6,
+   "filtro": "[base]noise=alls=22:allf=t+u,eq=contrast=1.25:saturation=0.7,vignette=angle=PI/3.5[base]",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "blade_runner_chuva",
+   "rotulo": "Neblina neon (Blade Runner)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "ov_neblina",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apocalypse_now_fumaca_ov",
+   "rotulo": "Fumaça laranja (Apocalypse Now)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "igual_a": "ov_fumaca_rasteira",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "duna_poeira",
+   "rotulo": "Areia no ar (Duna)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_poeira",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "interestelar_estrelas",
+   "rotulo": "Estrelas (Interestelar)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.3,
+   "igual_a": "fv_galaxy",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "entradas": [
+  {
+   "id": "kubrick_assenta_simetrico",
+   "rotulo": "Plano simétrico assentando (O Iluminado)",
+   "igual_a": "assenta",
+   "durAlvoS": 0.9,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "trainspotting_freeze",
+   "rotulo": "Congela no personagem (Trainspotting)",
+   "igual_a": "pop",
+   "durAlvoS": 0.2,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "cidade_de_deus_punch",
+   "rotulo": "Punch na galinha (Cidade de Deus)",
+   "igual_a": "punch_in",
+   "durAlvoS": 0.2,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "tropa_elite_tremor",
+   "rotulo": "Tremor de tiroteio (Tropa de Elite)",
+   "igual_a": "shake",
+   "durAlvoS": 0.3,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "whiplash_estalo",
+   "rotulo": "Estalo de baqueta (Whiplash)",
+   "igual_a": "punch_in",
+   "durAlvoS": 0.15,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "matrix_bullet_time",
+   "rotulo": "Bullet time (Matrix)",
+   "igual_a": "ghost_trail",
+   "durAlvoS": 1.0,
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "la_la_land_giro",
+   "rotulo": "Giro de dança (La La Land)",
+   "igual_a": "spin",
+   "durAlvoS": 0.6,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "parasita_surge",
+   "rotulo": "Surge do porão (Parasita)",
+   "igual_a": "revela_cima",
+   "durAlvoS": 0.9,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "oppenheimer_flash",
+   "rotulo": "Clarão atômico (Oppenheimer)",
+   "igual_a": "flash",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "2001_monolito",
+   "rotulo": "Monólito surgindo (2001)",
+   "igual_a": "ergue_suave",
+   "durAlvoS": 1.2,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "fleabag_olhar",
+   "rotulo": "Olhar para a câmera (Fleabag)",
+   "igual_a": "zoom_in",
+   "durAlvoS": 0.3,
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "arrival_foco",
+   "rotulo": "Foco na nave (A Chegada)",
+   "igual_a": "dissolve_foco",
+   "durAlvoS": 1.1,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  }
+ ],
+ "filtros": [
+  {
+   "id": "poderoso_chefao_ambar",
+   "rotulo": "Âmbar escuro (O Poderoso Chefão)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rs=0.08:rm=0.1:gm=0.04:bm=-0.12,eq=contrast=1.2:brightness=-0.06:saturation=0.9,vignette=angle=PI/4",
+   "css": "sepia(.45) contrast(1.2) brightness(.94)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "schindler_pb",
+   "rotulo": "P&B histórico (A Lista de Schindler)",
+   "grupo": "aclamados",
+   "cadeia": "hue=s=0,eq=contrast=1.3:brightness=-0.02,noise=alls=8:allf=t",
+   "css": "grayscale(1) contrast(1.3)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "blade_runner_82",
+   "rotulo": "Neon e fumaça (Blade Runner)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=bs=0.12:rh=0.1:gh=0.04:bm=0.06,eq=contrast=1.15:saturation=1.1:brightness=-0.04",
+   "css": "contrast(1.15) saturate(1.1) hue-rotate(15deg) brightness(.96)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "o_regresso_natural",
+   "rotulo": "Luz natural fria (O Regresso)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=bs=0.08:bm=0.05,eq=saturation=0.75:contrast=1.12",
+   "css": "saturate(.75) contrast(1.12) hue-rotate(10deg)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "moonlight_ciano_magenta",
+   "rotulo": "Ciano e magenta (Moonlight)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=bs=0.12:gs=0.04:rh=0.08:bh=0.06,eq=saturation=1.3:contrast=1.1",
+   "css": "saturate(1.3) contrast(1.1) hue-rotate(-10deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "her_vermelho_suave",
+   "rotulo": "Vermelho suave (Ela)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rm=0.08:rh=0.06:bm=-0.04,eq=saturation=1.05:contrast=0.92:brightness=0.04",
+   "css": "sepia(.15) saturate(1.1) contrast(.92) brightness(1.04)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "la_la_land_saturado",
+   "rotulo": "Musical saturado (La La Land)",
+   "grupo": "aclamados",
+   "cadeia": "eq=saturation=1.45:contrast=1.05,colorbalance=bs=0.06:rh=0.05",
+   "css": "saturate(1.45) contrast(1.05)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "coringa_doentio",
+   "rotulo": "Verde-amarelo doentio (Coringa)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=gs=0.06:gm=0.06:rm=0.03:bm=-0.1,eq=saturation=0.85:contrast=1.15",
+   "css": "sepia(.3) saturate(.85) contrast(1.15) hue-rotate(20deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "parasita_neutro",
+   "rotulo": "Neutro frio (Parasita)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=bs=0.04:gm=0.02,eq=saturation=0.9:contrast=1.08",
+   "css": "saturate(.9) contrast(1.08)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "cidade_de_deus_70s",
+   "rotulo": "Super 16 saturado (Cidade de Deus)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rm=0.08:gm=0.06:bm=-0.12,eq=saturation=1.35:contrast=1.15,noise=alls=12:allf=t",
+   "css": "sepia(.25) saturate(1.4) contrast(1.15)",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "tropa_elite_dessat",
+   "rotulo": "Dessaturado de operação (Tropa de Elite)",
+   "grupo": "aclamados",
+   "cadeia": "eq=saturation=0.6:contrast=1.25,colorbalance=gs=0.03:bs=0.04,noise=alls=10:allf=t",
+   "css": "saturate(.6) contrast(1.25)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "central_do_brasil_sertao",
+   "rotulo": "Sertão estourado (Central do Brasil)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rm=0.08:gm=0.04:bm=-0.1,eq=brightness=0.05:contrast=0.95:saturation=0.85",
+   "css": "sepia(.35) brightness(1.05) contrast(.95) saturate(.85)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "apocalypse_now_laranja",
+   "rotulo": "Laranja da selva (Apocalypse Now)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rs=0.12:rm=0.12:bm=-0.15:gs=0.04,eq=saturation=1.2:contrast=1.15",
+   "css": "sepia(.4) saturate(1.3) contrast(1.15) hue-rotate(-10deg)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "taxi_driver_noite",
+   "rotulo": "Noite de Nova York (Taxi Driver)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rh=0.08:rs=0.05:bs=0.06,eq=contrast=1.15:saturation=1.05,noise=alls=8:allf=t",
+   "css": "contrast(1.15) saturate(1.05) sepia(.1)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "iluminado_hotel",
+   "rotulo": "Hotel âmbar (O Iluminado)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rm=0.08:gm=0.05:bm=-0.08,eq=saturation=1.1:contrast=1.1",
+   "css": "sepia(.3) saturate(1.1) contrast(1.1)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "duna_areia",
+   "rotulo": "Areia de Arrakis (Duna)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rm=0.08:gm=0.05:bm=-0.1:bs=-0.04,eq=contrast=0.92:saturation=0.8:brightness=0.03",
+   "css": "sepia(.4) contrast(.92) saturate(.8)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "oppenheimer_imax_pb",
+   "rotulo": "IMAX P&B (Oppenheimer)",
+   "grupo": "aclamados",
+   "cadeia": "hue=s=0,eq=contrast=1.35,noise=alls=10:allf=t",
+   "css": "grayscale(1) contrast(1.35)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "in_the_mood_vermelho_verde",
+   "rotulo": "Vermelho e verde (Amor à Flor da Pele)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rh=0.08:rm=0.06:gs=0.06,eq=saturation=1.3:contrast=1.1",
+   "css": "saturate(1.3) contrast(1.1) sepia(.1)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "sopranos_marrom",
+   "rotulo": "Marrom de Nova Jersey (Família Soprano)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=rm=0.06:gm=0.03:bm=-0.06,eq=saturation=0.9:contrast=1.08:brightness=-0.02",
+   "css": "sepia(.25) saturate(.9) contrast(1.08)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "the_wire_baltimore",
+   "rotulo": "Baltimore cru (The Wire)",
+   "grupo": "aclamados",
+   "cadeia": "colorbalance=gm=0.04:gs=0.03,eq=saturation=0.8:contrast=1.02",
+   "css": "saturate(.8) hue-rotate(10deg)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "mad_men_60s",
+   "rotulo": "Escritório anos 60 (Mad Men)",
+   "grupo": "aclamados",
+   "cadeia": "curves=preset=vintage,colorbalance=rh=0.04:gm=0.02,eq=saturation=1.05:contrast=1.05",
+   "css": "sepia(.25) saturate(1.05) contrast(1.05)",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "band_of_brothers_dessat",
+   "rotulo": "Dessaturado de guerra (Band of Brothers)",
+   "grupo": "aclamados",
+   "cadeia": "eq=saturation=0.35:contrast=1.3:brightness=-0.03,colorbalance=gs=0.03:bs=0.03,noise=alls=9:allf=t",
+   "css": "saturate(.35) contrast(1.3) brightness(.97)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "destaques": {
+  "poderoso_chefao_titulo": {
+   "base": "cartaz_classico",
+   "label": "Título clássico (O Poderoso Chefão)",
+   "categoria": "meus",
+   "amostra": "O PODEROSO CHEFÃO",
+   "tipografia": {
+    "fonte": "garamond",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "cor_solida",
+    "cor": "#000000"
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Título de abertura elegante e sombrio"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "psicose_titulo_cortado": {
+   "base": "hl_mask_slide",
+   "label": "Título fatiado (Psicose)",
+   "categoria": "meus",
+   "amostra": "PSICOSE",
+   "tipografia": {
+    "fonte": "archivo",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Título tenso com cortes"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "se7en_creditos": {
+   "base": "doc_scanner",
+   "label": "Créditos rabiscados (Seven)",
+   "categoria": "meus",
+   "amostra": "SETE PECADOS",
+   "tipografia": {
+    "fonte": "specialelite",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "glitch"
+   },
+   "whenToUse": [
+    "Abertura perturbadora"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "trainspotting_nome": {
+   "base": "hera_cracha",
+   "label": "Nome congelado (Trainspotting)",
+   "categoria": "meus",
+   "amostra": "RENTON",
+   "tipografia": {
+    "fonte": "bebas",
+    "caixaAlta": true
+   },
+   "coreografia": {
+    "entrada": "stamp"
+   },
+   "whenToUse": [
+    "Apresentar personagens um a um"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "fleabag_aparte": {
+   "base": "hl_soft_whisper",
+   "label": "Comentário de lado (Fleabag)",
+   "categoria": "meus",
+   "amostra": "(ela não sabe de nada)",
+   "tipografia": {
+    "fonte": "poppins",
+    "italico": true
+   },
+   "whenToUse": [
+    "Comentário irônico do narrador"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_tudo"
+   ]
+  },
+  "mad_men_titulo": {
+   "base": "navy_italico",
+   "label": "Título elegante (Mad Men)",
+   "categoria": "meus",
+   "amostra": "Nova York, 1960",
+   "tipografia": {
+    "fonte": "playfair",
+    "italico": true
+   },
+   "whenToUse": [
+    "Época e lugar com classe"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "twin_peaks_titulo": {
+   "base": "glow_04",
+   "label": "Título misterioso (Twin Peaks)",
+   "categoria": "meus",
+   "amostra": "TWIN PEAKS",
+   "tipografia": {
+    "fonte": "cinzel",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "cor_gradiente",
+    "cor": "#1F4D2E"
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Título misterioso"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "sopranos_serifa": {
+   "base": "din_serif",
+   "label": "Título com serifa (Família Soprano)",
+   "categoria": "meus",
+   "amostra": "a família vem primeiro",
+   "tipografia": {
+    "fonte": "merriweather"
+   },
+   "whenToUse": [
+    "Frase de peso dramático"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "the_wire_epigrafe": {
+   "base": "v2_citacao",
+   "label": "Epígrafe do episódio (The Wire)",
+   "categoria": "meus",
+   "amostra": "…o jogo é o jogo.",
+   "tipografia": {
+    "fonte": "lora",
+    "italico": true
+   },
+   "whenToUse": [
+    "Frase-tema no começo de um bloco"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  "parasita_faixa": {
+   "base": "ed_faixa_editorial",
+   "label": "Faixa de título (Parasita)",
+   "categoria": "meus",
+   "amostra": "PARASITA",
+   "tipografia": {
+    "fonte": "montserrat",
+    "caixaAlta": true
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Título curto atravessando a tela"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "cidade_de_deus_capitulo": {
+   "base": "capitulo",
+   "label": "Capítulo (Cidade de Deus)",
+   "categoria": "meus",
+   "amostra": "A HISTÓRIA DO APARTAMENTO",
+   "tipografia": {
+    "fonte": "archivo",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Dividir a história em capítulos"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "tropa_elite_ordem": {
+   "base": "impacto_red",
+   "label": "Ordem seca (Tropa de Elite)",
+   "categoria": "meus",
+   "amostra": "MISSÃO DADA É MISSÃO CUMPRIDA",
+   "tipografia": {
+    "fonte": "anton",
+    "caixaAlta": true
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Frase de impacto ou ordem"
+   ],
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "kurosawa_titulo": {
+   "base": "ed_selo_capitulo",
+   "label": "Título de épico (Os Sete Samurais)",
+   "categoria": "meus",
+   "amostra": "OS SETE SAMURAIS",
+   "tipografia": {
+    "fonte": "cinzel",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Título de épico histórico"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "oppenheimer_contagem": {
+   "base": "doc_contador",
+   "label": "Contagem do teste (Oppenheimer)",
+   "categoria": "meus",
+   "amostra": "00:00:03",
+   "tipografia": {
+    "fonte": "mono"
+   },
+   "whenToUse": [
+    "Contagem antes de um grande momento"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "interestelar_tempo": {
+   "base": "doc_tempo",
+   "label": "Dilatação do tempo (Interestelar)",
+   "categoria": "meus",
+   "amostra": "1 HORA AQUI = 7 ANOS NA TERRA",
+   "tipografia": {
+    "fonte": "worksans",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Comparação de tempo ou escala"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "blade_runner_data": {
+   "base": "hl_date_stamp",
+   "label": "Data futurista (Blade Runner)",
+   "categoria": "meus",
+   "amostra": "LOS ANGELES · NOV 2019",
+   "tipografia": {
+    "fonte": "rajdhani",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Lugar e data com clima futurista"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "lawrence_intervalo": {
+   "base": "ed_corte_preto",
+   "label": "Intervalo (Lawrence da Arábia)",
+   "categoria": "meus",
+   "amostra": "INTERVALO",
+   "tipografia": {
+    "fonte": "garamond",
+    "caixaAlta": true
+   },
+   "cena": {
+    "fundo": "cor_solida",
+    "cor": "#000000"
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Pausa ou virada no meio do vídeo"
+   ],
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "taxi_driver_diario": {
+   "base": "v2_maquina",
+   "label": "Diário datilografado (Taxi Driver)",
+   "categoria": "meus",
+   "amostra": "10 DE MAIO. ESTA CIDADE…",
+   "tipografia": {
+    "fonte": "specialelite"
+   },
+   "whenToUse": [
+    "Narração em primeira pessoa"
+   ],
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  }
+ },
+ "cenas": {
+  "AC_REQUIEM_SPLIT": {
+   "nome": "Tela dividida (Réquiem para um Sonho)",
+   "arranjo": "lado_a_lado",
+   "motion": [
+    "slide_left",
+    "slide_right"
+   ],
+   "whenToUse": [
+    "Duas pessoas no mesmo momento"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "AC_KUBRICK_MOLDURA": {
+   "nome": "Moldura simétrica (O Iluminado)",
+   "arranjo": "moldura",
+   "whenToUse": [
+    "Plano central e simétrico"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "AC_PARASITA_ESCADA": {
+   "nome": "Escada social (Parasita)",
+   "arranjo": "escada",
+   "motion": [
+    "revela_cima",
+    "revela_cima",
+    "revela_cima"
+   ],
+   "whenToUse": [
+    "Níveis ou hierarquia"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "AC_CIDADE_DE_DEUS_SEQUENCIA": {
+   "nome": "Sequência rápida (Cidade de Deus)",
+   "arranjo": "sequencia4",
+   "motion": [
+    "slide_left",
+    "slide_left",
+    "slide_left",
+    "slide_left"
+   ],
+   "whenToUse": [
+    "Vários momentos em sequência rápida"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  "AC_PODEROSO_RETRATO": {
+   "nome": "Retrato do patriarca (O Poderoso Chefão)",
+   "arranjo": "retrato_dir",
+   "whenToUse": [
+    "Personagem poderoso com texto"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  "AC_TWIN_PEAKS_CONFRONTO": {
+   "nome": "Face a face (Twin Peaks)",
+   "arranjo": "confronto",
+   "whenToUse": [
+    "Duas figuras opostas"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_cinema",
+    "sys_dinamico"
+   ]
+  },
+  "AC_LOLA_TRIADE": {
+   "nome": "Três versões (Corra, Lola, Corra)",
+   "arranjo": "triade",
+   "motion": [
+    "slide_right",
+    "slide_right",
+    "slide_right"
+   ],
+   "whenToUse": [
+    "Três possibilidades do mesmo fato"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  }
+ },
+ "paletas": [
+  {
+   "id": "poderoso_chefao",
+   "nome": "O Poderoso Chefão",
+   "primaria": "#8A5A1F",
+   "secundaria": "#1A1410",
+   "acento": "#B22222",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "in_the_mood",
+   "nome": "Amor à Flor da Pele",
+   "primaria": "#A3121A",
+   "secundaria": "#1B3B2F",
+   "acento": "#E2B04A",
+   "direcoes": [
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "cidade_de_deus",
+   "nome": "Cidade de Deus",
+   "primaria": "#E0A100",
+   "secundaria": "#2B1D0E",
+   "acento": "#C2410C",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_cinema"
+   ]
+  }
+ ],
+ "_direcoes": {
+  "sys_tudo": {
+   "nome": "Padrão do sistema",
+   "transicoes": [],
+   "efeitos": [],
+   "overlays": [],
+   "entradas": [
+    {
+     "id": "fleabag_olhar",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "parasita_neutro",
+     "peso": 1
+    }
+   ],
+   "templates": [],
+   "destaques_estilos": [
+    "fleabag_aparte"
+   ],
+   "paletas_sugeridas": []
+  },
+  "sys_doc_classico": {
+   "nome": "Documentário clássico",
+   "transicoes": [
+    {
+     "id": "kane_iris",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "lawrence_deserto",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "interestelar_estrelas",
+     "peso": 1
+    }
+   ],
+   "entradas": [],
+   "filtros": [
+    {
+     "id": "schindler_pb",
+     "peso": 1
+    },
+    {
+     "id": "o_regresso_natural",
+     "peso": 1
+    },
+    {
+     "id": "central_do_brasil_sertao",
+     "peso": 1
+    },
+    {
+     "id": "the_wire_baltimore",
+     "peso": 1
+    },
+    {
+     "id": "band_of_brothers_dessat",
+     "peso": 1
+    }
+   ],
+   "templates": [],
+   "destaques_estilos": [
+    "the_wire_epigrafe",
+    "taxi_driver_diario"
+   ],
+   "paletas_sugeridas": []
+  },
+  "sys_cinema": {
+   "nome": "Cinema premium",
+   "transicoes": [
+    {
+     "id": "kurosawa_wipe",
+     "peso": 1
+    },
+    {
+     "id": "lawrence_corte_fosforo",
+     "peso": 1
+    },
+    {
+     "id": "kane_iris",
+     "peso": 1
+    },
+    {
+     "id": "psicose_espiral",
+     "peso": 1
+    },
+    {
+     "id": "poderoso_chefao_sombra",
+     "peso": 1
+    },
+    {
+     "id": "apocalypse_now_fumaca",
+     "peso": 1
+    },
+    {
+     "id": "cidade_de_deus_freeze",
+     "peso": 1
+    },
+    {
+     "id": "parasita_degrau",
+     "peso": 1
+    },
+    {
+     "id": "2001_corte_osso",
+     "peso": 1
+    },
+    {
+     "id": "interestelar_tesseract",
+     "peso": 1
+    },
+    {
+     "id": "in_the_mood_lento",
+     "peso": 1
+    },
+    {
+     "id": "la_la_land_iris",
+     "peso": 1
+    },
+    {
+     "id": "sopranos_corte_preto",
+     "peso": 1
+    },
+    {
+     "id": "twin_peaks_cortina",
+     "peso": 1
+    },
+    {
+     "id": "arcane_pincelada",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "poderoso_zoom_lento",
+     "peso": 1
+    },
+    {
+     "id": "iluminado_corredor",
+     "peso": 1
+    },
+    {
+     "id": "lawrence_deserto",
+     "peso": 1
+    },
+    {
+     "id": "oppenheimer_recua",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "filhos_da_esperanca_plano",
+     "peso": 1
+    },
+    {
+     "id": "o_regresso_respira",
+     "peso": 1
+    },
+    {
+     "id": "oppenheimer_tremor",
+     "peso": 1
+    },
+    {
+     "id": "in_the_mood_smear",
+     "peso": 1
+    },
+    {
+     "id": "taxi_driver_neon",
+     "peso": 1
+    },
+    {
+     "id": "twin_peaks_estrobo",
+     "peso": 1
+    },
+    {
+     "id": "se7en_sujo",
+     "peso": 1
+    },
+    {
+     "id": "blade_runner_chuva",
+     "peso": 1
+    },
+    {
+     "id": "apocalypse_now_fumaca_ov",
+     "peso": 1
+    },
+    {
+     "id": "duna_poeira",
+     "peso": 1
+    },
+    {
+     "id": "interestelar_estrelas",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "kubrick_assenta_simetrico",
+     "peso": 1
+    },
+    {
+     "id": "matrix_bullet_time",
+     "peso": 1
+    },
+    {
+     "id": "la_la_land_giro",
+     "peso": 1
+    },
+    {
+     "id": "parasita_surge",
+     "peso": 1
+    },
+    {
+     "id": "oppenheimer_flash",
+     "peso": 1
+    },
+    {
+     "id": "2001_monolito",
+     "peso": 1
+    },
+    {
+     "id": "arrival_foco",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "poderoso_chefao_ambar",
+     "peso": 1
+    },
+    {
+     "id": "schindler_pb",
+     "peso": 1
+    },
+    {
+     "id": "blade_runner_82",
+     "peso": 1
+    },
+    {
+     "id": "o_regresso_natural",
+     "peso": 1
+    },
+    {
+     "id": "moonlight_ciano_magenta",
+     "peso": 1
+    },
+    {
+     "id": "her_vermelho_suave",
+     "peso": 1
+    },
+    {
+     "id": "la_la_land_saturado",
+     "peso": 1
+    },
+    {
+     "id": "coringa_doentio",
+     "peso": 1
+    },
+    {
+     "id": "parasita_neutro",
+     "peso": 1
+    },
+    {
+     "id": "cidade_de_deus_70s",
+     "peso": 1
+    },
+    {
+     "id": "central_do_brasil_sertao",
+     "peso": 1
+    },
+    {
+     "id": "apocalypse_now_laranja",
+     "peso": 1
+    },
+    {
+     "id": "taxi_driver_noite",
+     "peso": 1
+    },
+    {
+     "id": "iluminado_hotel",
+     "peso": 1
+    },
+    {
+     "id": "duna_areia",
+     "peso": 1
+    },
+    {
+     "id": "oppenheimer_imax_pb",
+     "peso": 1
+    },
+    {
+     "id": "in_the_mood_vermelho_verde",
+     "peso": 1
+    },
+    {
+     "id": "sopranos_marrom",
+     "peso": 1
+    },
+    {
+     "id": "the_wire_baltimore",
+     "peso": 1
+    },
+    {
+     "id": "mad_men_60s",
+     "peso": 1
+    },
+    {
+     "id": "band_of_brothers_dessat",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "AC_KUBRICK_MOLDURA",
+     "peso": 1
+    },
+    {
+     "id": "AC_PARASITA_ESCADA",
+     "peso": 1
+    },
+    {
+     "id": "AC_PODEROSO_RETRATO",
+     "peso": 1
+    },
+    {
+     "id": "AC_TWIN_PEAKS_CONFRONTO",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "poderoso_chefao_titulo",
+    "psicose_titulo_cortado",
+    "se7en_creditos",
+    "mad_men_titulo",
+    "twin_peaks_titulo",
+    "sopranos_serifa",
+    "the_wire_epigrafe",
+    "parasita_faixa",
+    "cidade_de_deus_capitulo",
+    "kurosawa_titulo",
+    "oppenheimer_contagem",
+    "interestelar_tempo",
+    "blade_runner_data",
+    "lawrence_intervalo",
+    "taxi_driver_diario"
+   ],
+   "paletas_sugeridas": [
+    "poderoso_chefao",
+    "in_the_mood",
+    "cidade_de_deus"
+   ]
+  },
+  "sys_dinamico": {
+   "nome": "Cortes dinâmicos",
+   "transicoes": [
+    {
+     "id": "cidade_de_deus_freeze",
+     "peso": 1
+    },
+    {
+     "id": "tropa_elite_flash",
+     "peso": 1
+    },
+    {
+     "id": "requiem_split",
+     "peso": 1
+    },
+    {
+     "id": "lola_corrida",
+     "peso": 1
+    },
+    {
+     "id": "fight_club_frame",
+     "peso": 1
+    },
+    {
+     "id": "matrix_reload_codigo",
+     "peso": 1
+    },
+    {
+     "id": "sopranos_corte_preto",
+     "peso": 1
+    },
+    {
+     "id": "arcane_pincelada",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "cidade_de_deus_giro",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "tropa_elite_mao",
+     "peso": 1
+    },
+    {
+     "id": "oppenheimer_tremor",
+     "peso": 1
+    },
+    {
+     "id": "lola_aberracao",
+     "peso": 1
+    },
+    {
+     "id": "twin_peaks_estrobo",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "trainspotting_freeze",
+     "peso": 1
+    },
+    {
+     "id": "cidade_de_deus_punch",
+     "peso": 1
+    },
+    {
+     "id": "tropa_elite_tremor",
+     "peso": 1
+    },
+    {
+     "id": "whiplash_estalo",
+     "peso": 1
+    },
+    {
+     "id": "matrix_bullet_time",
+     "peso": 1
+    },
+    {
+     "id": "la_la_land_giro",
+     "peso": 1
+    },
+    {
+     "id": "oppenheimer_flash",
+     "peso": 1
+    },
+    {
+     "id": "fleabag_olhar",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "la_la_land_saturado",
+     "peso": 1
+    },
+    {
+     "id": "cidade_de_deus_70s",
+     "peso": 1
+    },
+    {
+     "id": "tropa_elite_dessat",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "AC_REQUIEM_SPLIT",
+     "peso": 1
+    },
+    {
+     "id": "AC_CIDADE_DE_DEUS_SEQUENCIA",
+     "peso": 1
+    },
+    {
+     "id": "AC_TWIN_PEAKS_CONFRONTO",
+     "peso": 1
+    },
+    {
+     "id": "AC_LOLA_TRIADE",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "psicose_titulo_cortado",
+    "se7en_creditos",
+    "trainspotting_nome",
+    "fleabag_aparte",
+    "cidade_de_deus_capitulo",
+    "tropa_elite_ordem",
+    "oppenheimer_contagem"
+   ],
+   "paletas_sugeridas": [
+    "cidade_de_deus"
+   ]
+  }
+ }
+}

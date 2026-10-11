@@ -98,7 +98,55 @@ ROTULOS_SHUTTER = [(v, r) for v, r, _d in SHUTTERS.values()]
 @lru_cache(maxsize=1)
 def _catalogo_bruto() -> Dict[str, Any]:
     with open(CATALOGO_PATH, encoding="utf-8") as f:
-        return json.load(f)
+        d = json.load(f)
+    _mesclar_extras(d)
+    return d
+
+
+_CENA_PADRAO = {"slots": 1, "fundos": ["escuro"], "motion": ["assenta"], "textFields": [], "coversCaption": False,
+                "whenToUse": [], "whenNotToUse": [], "autoEligible": False, "manualOnly": True, "papel": "composicao",
+                "familia": "meus", "energia": 0.5, "ritmo": "medio", "durMinS": 2.5, "durIdealS": 5, "durMaxS": 20}
+
+
+def _mesclar_extras(d: Dict[str, Any]) -> None:
+    """Cenas criadas em assets/darkplanner/extras (seção "cenas"): a partir de uma "base"
+    (outro template) e/ou com "arranjo" (um dos _ARRANJOS) ou "janelas" próprias."""
+    try:
+        import dp_extras
+        extras = dp_extras.carregar().get("cenas") or {}
+    except Exception:  # noqa: BLE001
+        return
+    tpls = d.setdefault("templates", {})
+    for tid, spec in extras.items():
+        orig = spec.get("_arquivo")
+        if tid in tpls:
+            dp_extras.avisar(f"{orig}: cena {tid} já existe — escolha outro id.")
+            continue
+        if spec.get("base") and spec["base"] not in tpls:
+            dp_extras.avisar(f"{orig}: cena {tid}: \"base\" {spec['base']!r} não existe.")
+            continue
+        if spec.get("arranjo") and spec["arranjo"] not in _ARRANJOS:
+            dp_extras.avisar(f"{orig}: cena {tid}: \"arranjo\" {spec['arranjo']!r} não existe ({', '.join(sorted(_ARRANJOS))}).")
+            continue
+        jan = spec.get("janelas")
+        if jan is not None and not (isinstance(jan, list) and jan and all(
+                isinstance(j, list) and len(j) == 4 and all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in j) for j in jan)):
+            dp_extras.avisar(f"{orig}: cena {tid}: \"janelas\" = lista de [x, y, largura, altura] em fração da tela (0 a 1).")
+            continue
+        base = tpls[spec["base"]] if spec.get("base") else _CENA_PADRAO
+        novo = dp_extras.mesclar_profundo(base, dp_extras.limpar(spec))
+        novo.setdefault("nome", tid)
+        if jan and "slots" not in spec:
+            novo["slots"] = len(jan)
+        if spec.get("base") and not spec.get("arranjo") and not jan:
+            arr, opc = _MAPA.get(spec["base"], (None, {}))
+            if arr:
+                novo["arranjo"] = arr
+                for k, v in opc.items():
+                    novo.setdefault(k, v)
+        novo["_extra"] = True
+        tpls[tid] = novo
+
 
 
 def catalogo() -> Dict[str, Dict[str, Any]]:
@@ -404,12 +452,22 @@ _MAPA: Dict[str, Tuple[str, Dict[str, Any]]] = {
     "C50_GRID_CATAVENTO": ("mosaico", {}), "C50_GRID_JUNTAS": ("mosaico", {}), "C50_GRID_CANAIS": ("sequencia4", {}),
     "C50_GRID_ROSACEA": ("mosaico", {}), "C50_GRID_DIAGONAIS": ("mosaico", {}),
 }
+_OPCOES_ARRANJO = ("movimento", "fundo_fixo", "foco", "flash", "escurecer", "texto_estilo")
 _PADRAO_POR_SLOTS = {1: "moldura", 2: "lado_a_lado", 3: "triade", 4: "mosaico", 6: "sequencia_tela_cheia"}
 
 
 def layout(tid: str) -> Dict[str, Any]:
     t = template(tid) or {}
     nome_arr, opc = _MAPA.get(tid, (None, {}))
+    if not nome_arr and t.get("janelas"):  # cena dos extras com janelas próprias
+        n = int(t.get("slots") or len(t["janelas"]))
+        return {"janelas": [tuple(float(v) for v in j) for j in t["janelas"]][:max(1, n)],
+                "texto": tuple(t.get("texto") or (0.06, 0.80, 0.88, 0.15)), "arranjo": "personalizado",
+                **({"movimento": t["movimento"]} if t.get("movimento") in _MOVIMENTOS else {}),
+                **({"fundo_fixo": t["fundo_fixo"]} if t.get("fundo_fixo") else {})}
+    if not nome_arr and t.get("arranjo") in _ARRANJOS:
+        nome_arr = t["arranjo"]
+        opc = {k: t[k] for k in _OPCOES_ARRANJO if k in t}
     if not nome_arr:
         familia = t.get("familia") or ""
         nome_arr = "moldura_larga" if familia == "moldura" and "PREMIUM" in tid else _PADRAO_POR_SLOTS.get(int(t.get("slots") or 1), "mosaico")

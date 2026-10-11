@@ -274,6 +274,8 @@ _POS = {  # zona -> (alinhamento ASS, x, y) em fração
 
 def _anim(entrada: str) -> str:
     e = entrada or "fade"
+    if e in ANIMS_ENTRADA:  # já é o nome de uma família (o que o guia ensina a usar nos extras)
+        return e
     regras = [
         # específicos do DarkPlanner que antes caíam no fade
         ("mira", r"doc_mira|doc_radar|doc_scanner|bracket_focus"), ("linha_tempo", r"doc_tempo|cartela_epoca"),
@@ -367,11 +369,27 @@ ALTURA_LINHA_PREVIA = 1.1   # line-height:1.1 do .hlt
 _FORMAS_CAIXA = ("selo_canto", "cartao_dado", "slab", "marca")
 
 
-def _mapa_arquivos_fontes() -> Dict[str, Dict[str, str]]:
+def fontes_json() -> Dict[str, Dict[str, Any]]:
+    """assets/fonts/dp/fontes.json + as fontes dos extras (seção "fontes")."""
     try:
         with open(os.path.join(FONTES_DIR, "fontes.json"), encoding="utf-8") as f:
-            return {v["familia"]: v["arquivos"] for v in json.load(f).values()}
-    except (OSError, ValueError, KeyError):
+            mapa = json.load(f)
+    except (OSError, ValueError):
+        mapa = {}
+    try:
+        import dp_extras
+        for k, v in (dp_extras.carregar().get("fontes") or {}).items():
+            if k not in mapa and isinstance(v.get("arquivos"), dict) and str(v.get("familia") or "").startswith("DP "):
+                mapa[k] = {"familia": v["familia"], "arquivos": dict(v["arquivos"])}
+    except Exception:  # noqa: BLE001
+        pass
+    return mapa
+
+
+def _mapa_arquivos_fontes() -> Dict[str, Dict[str, str]]:
+    try:
+        return {v["familia"]: v["arquivos"] for v in fontes_json().values()}
+    except (KeyError, TypeError):
         return {}
 
 
@@ -1186,3 +1204,29 @@ def renderizar_avulso(estilo_id: str, texto: str, dur: float, W: int, H: int, fu
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg falhou ao gerar o texto: {r.stderr.strip()[-600:]}")
     return saida
+
+
+_FONTES_DE_FABRICA = dict(_FONTE)
+
+
+def _aplicar_extras() -> None:
+    """Fontes dos extras viram opção nos destaques (tipografia.fonte = a chave)."""
+    _FONTE.clear()
+    _FONTE.update(_FONTES_DE_FABRICA)
+    try:
+        import dp_extras
+        for k, v in (dp_extras.carregar().get("fontes") or {}).items():
+            fam = str(v.get("familia") or "")
+            if k in _FONTES_DE_FABRICA:
+                dp_extras.avisar(f"{v.get('_arquivo')}: fonte {k} já existe — escolha outra chave.")
+            elif not fam.startswith("DP "):
+                dp_extras.avisar(f"{v.get('_arquivo')}: fonte {k}: a \"familia\" precisa começar com \"DP \" (use  python dp_guia.py fonte).")
+            else:
+                _FONTE[k] = fam
+    except Exception:  # noqa: BLE001
+        pass
+    _CSS_FONTE.clear()
+    _CSS_FONTE.update(_FONTE)
+
+
+_aplicar_extras()

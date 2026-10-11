@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 import uuid
 from typing import Any, Dict
 
@@ -16,6 +17,14 @@ import vendas as vd
 
 
 def registrar(app, base_dir: str) -> None:
+
+    def _ia_depois(pid: str, ids=None) -> bool:
+        """🤖 ficha das fotos do produto em segundo plano (com a IA ligada)."""
+        import ia_servico
+        if not ia_servico.ativo("venda_imagens"):
+            return False
+        threading.Thread(target=lambda: vd.ia_analisar_imagens(base_dir, pid, ids), daemon=True).start()
+        return True
 
     def _proj(pid: str):
         try:
@@ -54,6 +63,8 @@ def registrar(app, base_dir: str) -> None:
         if link:
             _ler_link(p)
         vd.salvar(base_dir, p)
+        if link:
+            _ia_depois(p["id"])
         return redirect(url_for("venda_detalhe", pid=p["id"]))
 
     def _guardar_produto(p: Dict[str, Any], dados: Dict[str, Any]) -> None:
@@ -124,6 +135,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Cole o link do produto."}), 400
         _ler_link(p, com_fotos=corpo.get("fotos", True) is not False)
         vd.salvar(base_dir, p)
+        _ia_depois(pid)
         if p.get("produto_erro"):
             return jsonify({"erro": p["produto_erro"], "projeto": _json_proj(p)}), 502
         return jsonify({"ok": True, "projeto": _json_proj(p)})
@@ -152,6 +164,7 @@ def registrar(app, base_dir: str) -> None:
                 p["link"] = m.group(1)[:2000]
         _ler_link(p, com_fotos=request.form.get("fotos", "1") != "0", html=html)
         vd.salvar(base_dir, p)
+        _ia_depois(pid)
         if p.get("produto_erro"):
             return jsonify({"erro": p["produto_erro"], "projeto": _json_proj(p)}), 422
         return jsonify({"ok": True, "projeto": _json_proj(p)})
@@ -189,7 +202,8 @@ def registrar(app, base_dir: str) -> None:
         desc = (request.form.get("descricao") or "").strip()
         if not arq or not arq.filename:
             return jsonify({"erro": "Escolha o arquivo."}), 400
-        if not desc:
+        import ia_servico
+        if not desc and not ia_servico.ativo("venda_imagens"):  # 🤖 com a IA, ela descreve
             return jsonify({"erro": "Diga o que é esse arquivo (ex.: \"produto aberto mostrando os compartimentos\")."}), 400
         tipo = vd.tipo_do_arquivo(arq.filename)
         if not tipo:
@@ -199,9 +213,9 @@ def registrar(app, base_dir: str) -> None:
         dest = os.path.join(vd.pasta_midias(base_dir, pid), f"pc_{uuid.uuid4().hex[:6]}_{nome}")
         arq.save(dest)
         m = vd.adicionar_midia(p, tipo=tipo, origem="pc", arquivo=os.path.basename(dest), nome=arq.filename, descricao=desc,
-                               usar="descricao")
+                               usar="descricao" if desc else "ambos")
         vd.salvar(base_dir, p)
-        return jsonify({"ok": True, "midia": m})
+        return jsonify({"ok": True, "midia": m, "ia": _ia_depois(pid, [m["id"]])})
 
     @app.route("/vendas/<pid>/midia-url", methods=["POST"])
     def venda_midia_url(pid: str):

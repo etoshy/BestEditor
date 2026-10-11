@@ -13,6 +13,10 @@ youtube_cookies.json
 cookies*.txt
 # configurações do site (pode ter chaves de API, caminhos do seu PC)
 site_config.json
+# 🤖 IA (chave da API, gasto e respostas guardadas)
+ia_config.json
+ia_uso.json
+ia_cache/
 # chaves de API em arquivo .env
 .env
 .env.*

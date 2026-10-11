@@ -115,3 +115,26 @@ def deltas_yuv(c: str, k: float = 1.0) -> Tuple[float, float, float]:
 
 def rgb(c: str) -> Tuple[int, int, int]:
     return _hex(c)
+
+
+_PALETAS_DE_FABRICA = len(PALETAS)
+
+
+def _aplicar_extras() -> None:
+    """Paletas criadas em assets/darkplanner/extras (seção "paletas")."""
+    del PALETAS[_PALETAS_DE_FABRICA:]
+    try:
+        import dp_extras
+        ids = {p["id"] for p in PALETAS}
+        for p in dp_extras.carregar().get("paletas") or []:
+            if p["id"] in ids:
+                dp_extras.avisar(f"{p['_arquivo']}: paleta {p['id']} já existe — escolha outro id.")
+                continue
+            PALETAS.append({"id": p["id"], "nome": str(p.get("nome") or p["id"])[:60], "primaria": p["primaria"].upper(),
+                            "secundaria": p["secundaria"].upper(), "acento": p["acento"].upper()})
+            ids.add(p["id"])
+    except Exception:  # noqa: BLE001
+        pass
+
+
+_aplicar_extras()

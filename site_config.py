@@ -243,7 +243,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "evitar_repeticao_clipes": True,
     "buscadores_imagem_paralelo": True,
     "templates_cena_ia": True,
-    "sons_auto": {"transicoes": True, "cenas": True, "destaques": True},
+    "sons_auto": {"transicoes": True, "cenas": True, "destaques": True, "editoriais": True},
     "sons_volume": 0.55,
     "transition_type": "none",
     "transition_duration": 0.6,

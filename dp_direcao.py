@@ -34,10 +34,82 @@ RITMOS = ("calmo", "equilibrado", "dinamico", "muito_dinamico")
 DENSIDADES = ("minimal", "equilibrado", "dinamico", "maximo")
 MODOS_COR = ("auto", "predef", "projeto")
 
+# 🗞 quadros editoriais em cada direção: liga/desliga, densidade (1 quadro a cada N s) e os tipos (vazio = todos)
+EDITORIAL_SEGUNDOS = {"minimal": 60, "equilibrado": 40, "dinamico": 25, "maximo": 15}
+_EDITORIAIS_SISTEMA = {
+    "sys_tudo": {"ativo": True, "densidade": "equilibrado", "tipos": []},
+    "sys_doc_classico": {"ativo": True, "densidade": "equilibrado", "tipos": []},
+    "sys_cinema": {"ativo": True, "densidade": "minimal",
+                   "tipos": ["nome", "titulo_video", "numero", "explosao", "pagina", "mural", "linha_tempo", "reescrita"]},
+    "sys_dinamico": {"ativo": True, "densidade": "dinamico",
+                     "tipos": ["post", "pagina", "numero", "terminal", "recortes", "grade_pontos", "ficha", "nome", "titulo_video"]},
+}
+# extras com "direcoes": [...] entram nas direções do sistema. O que já existia fica com
+# pelo menos metade do peso (os extras não engolem a cara da direção).
+_EIXO_DA_SECAO = {"transicoes": "transicoes", "filtros": "filtros", "efeitos": "efeitos", "entradas": "entradas", "cenas": "templates"}
+PCT_MINIMO_EXTRAS = {"entradas": 15}
+
+
+def editoriais_da(p: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """{"ativo", "densidade", "tipos", "segundos"} de uma direção (as antigas, sem o campo, usam todos)."""
+    import dp_editorial
+    e = (p or {}).get("editoriais")
+    if not isinstance(e, dict):
+        e = _EDITORIAIS_SISTEMA.get((p or {}).get("id") or "", {"ativo": True, "densidade": "equilibrado", "tipos": []})
+    dens = e.get("densidade") if e.get("densidade") in DENSIDADES else "equilibrado"
+    return {"ativo": e.get("ativo", True) is not False, "densidade": dens,
+            "tipos": [t for t in dict.fromkeys(e.get("tipos") or []) if t in dp_editorial.TIPOS], "segundos": EDITORIAL_SEGUNDOS[dens]}
+
+
+def _com_extras(p: Dict[str, Any]) -> Dict[str, Any]:
+    """Cópia de uma direção do sistema com os extras que pedem ela ("direcoes": ["sys_cinema"…])."""
+    out = json.loads(json.dumps(p))
+    out["editoriais"] = editoriais_da(p)
+    try:
+        import dp_extras
+        ex = dp_extras.carregar()
+    except Exception:  # noqa: BLE001
+        return out
+    novos: Dict[str, List[str]] = {}
+    for sec, eixo in _EIXO_DA_SECAO.items():
+        itens = ex.get(sec) or []
+        pares = itens.items() if isinstance(itens, dict) else [(i.get("id"), i) for i in itens]
+        for iid, it in pares:
+            if p["id"] in (it.get("direcoes") or []) and iid:
+                novos.setdefault(eixo, []).append(iid)
+    for eixo, ids in novos.items():
+        cat = out.get(eixo) if isinstance(out.get(eixo), dict) else {"pct": 0, "itens": []}
+        cat.setdefault("itens", [])
+        if not cat["itens"] and (p.get("universo") == "sistema"):
+            continue  # lista vazia = catálogo inteiro, que já tem os extras
+        validos = _ids_validos(eixo) if eixo != "efeitos" else (set(dp_visual.EFEITO_PARA_ZOOM) | {e["id"] for e in dp_visual.efeitos()})
+        if eixo == "templates":
+            import cenas_dp
+            validos = set(cenas_dp.catalogo())
+        ja = {i["id"] for i in cat["itens"]}
+        add = [i for i in dict.fromkeys(ids) if i in validos and i not in ja]
+        if not add:
+            continue
+        w0 = sum(max(1, int(i.get("peso") or 1)) for i in cat["itens"])
+        fator = max(1, -(-len(add) // max(1, w0))) if w0 else 1
+        for i in cat["itens"]:
+            i["peso"] = max(1, int(i.get("peso") or 1)) * fator
+            i["original"] = True
+        cat["itens"] += [{"id": i, "peso": 1, "extra": True} for i in add]
+        if not cat.get("pct") and eixo in PCT_MINIMO_EXTRAS:
+            cat["pct"] = PCT_MINIMO_EXTRAS[eixo]
+        out[eixo] = cat
+    return out
+
+
+def sistema() -> List[Dict[str, Any]]:
+    """As direções do sistema já com os extras e os quadros editoriais."""
+    return [_com_extras(p) for p in dp_visual.dp()["presets"]["system"]]
+
 
 def direcoes(com_usuario: bool = True) -> List[Dict[str, Any]]:
     out = []
-    lista = list(dp_visual.dp()["presets"]["system"]) + (predefinicoes_usuario() if com_usuario else [])
+    lista = sistema() + (predefinicoes_usuario() if com_usuario else [])
     for p in lista:
         out.append({
             "id": p["id"], "nome": p["nome"], "ritmo": p.get("ritmo") or "equilibrado",
@@ -46,6 +118,8 @@ def direcoes(com_usuario: bool = True) -> List[Dict[str, Any]]:
             "categorias": {c: {"pct": (p.get(c) or {}).get("pct", 0), "itens": [(i["id"], i.get("peso", 1)) for i in (p.get(c) or {}).get("itens", [])]}
                            for c in EIXOS},
             "destaques": p.get("destaques"), "cores": p.get("cores"), "legenda": p.get("legenda"),
+            "editoriais": editoriais_da(p),
+            "extras": sum(1 for c in EIXOS for i in (p.get(c) or {}).get("itens", []) if i.get("extra")),
         })
     return out
 
@@ -148,6 +222,8 @@ def normalizar_predefinicao(d: Dict[str, Any]) -> Dict[str, Any]:
         out["legenda"] = dict(dp_legendas.normalizar(d["legenda"]), ativa=True)
     else:
         out["legenda"] = None
+    ed = d.get("editoriais") if isinstance(d.get("editoriais"), dict) else {}
+    out["editoriais"] = {k: v for k, v in editoriais_da({"editoriais": ed}).items() if k != "segundos"}
     out["som_transicoes"] = d.get("som_transicoes") if d.get("som_transicoes") in ("auto", "nenhum") else "auto"
     out["descricao"] = str(d.get("descricao") or "")[:200]
     return out
@@ -261,13 +337,14 @@ def preset_do_kit(kit: Optional[Dict[str, List[str]]]) -> Dict[str, Any]:
         "transicoes": cat(list(kit.get("transicoes") or []), 55), "entradas": cat(list(kit.get("entradas") or []), 30),
         "saidas": cat([], 0), "templates": cat(list(kit.get("templates") or []), 20),
         "destaques": {"densidade": "equilibrado", "estilos": list(kit.get("destaques") or [])},
+        "editoriais": {"ativo": True, "densidade": "equilibrado", "tipos": list(kit.get("editoriais") or [])},
     }
 
 
 def direcao(did: str, kit: Optional[Dict[str, List[str]]] = None) -> Optional[Dict[str, Any]]:
     if did == "kit":
         return preset_do_kit(kit)
-    p = next((p for p in dp_visual.dp()["presets"]["system"] if p["id"] == did), None)
+    p = next((p for p in sistema() if p["id"] == did), None)
     if p is None and did.startswith("u_"):
         p = next((x for x in predefinicoes_usuario() if x.get("id") == did), None)
     return p
@@ -444,7 +521,7 @@ def planejar(segmentos: List[Dict[str, Any]], did: str, semente: Any = 1, ritmo:
     if f_itens and ((p.get("filtros") or {}).get("itens") or rng.random() < pct("filtros")):
         filtro = _sorteia(rng, f_itens)
     return {"direcao": did, "ritmo": ritmo, "semente": semente, "filtro_cor": filtro, "trechos": plano,
-            "cores": cores_do_plano(p), "legenda": p.get("legenda"), "destaques": p.get("destaques"),
+            "cores": cores_do_plano(p), "legenda": p.get("legenda"), "destaques": p.get("destaques"), "editoriais": editoriais_da(p),
             "som_transicoes": p.get("som_transicoes") or (p.get("transicoes") or {}).get("som") or "auto"}
 
 

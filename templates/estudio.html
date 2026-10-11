@@ -154,6 +154,11 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 .ytm-player>div,.ytm-player iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:6px;background:#000}
 .ia-lista{margin:4px 0;padding-left:16px;font-size:12px;line-height:1.6}
 .clip.k-gr{background:linear-gradient(180deg,#3a5fd6,#253f96);border-color:#6d8cf0}
+.clip.k-ed{background:linear-gradient(180deg,#b7791f,#7c4f12);border-color:#e0a24a}
+.ed-lista{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ed-t{cursor:pointer;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#111;font-size:11px}
+.ed-t:hover{border-color:#e0a24a}.ed-t img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover}
+.ed-t .nm{padding:4px 6px;font-weight:600}.ed-t .q{padding:0 6px 6px;color:#9aa0aa;font-size:10px;line-height:1.3}
 .clip.k-cz{background:repeating-linear-gradient(135deg,#3b3f47 0 6px,#2b2e35 6px 12px);border-color:#8b93a3}
 .clip.k-cz.aud{background:repeating-linear-gradient(135deg,#5a2633 0 6px,#3f1a24 6px 12px);border-color:#d0657f}
 #layerCz{position:absolute;inset:0;pointer-events:none}
@@ -345,6 +350,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <button data-tab="cenas">🎬 Cenas</button>
       <button data-tab="direcao">🎨 Direção</button>
       <button data-tab="destaques">💬 Destaques</button>
+      <button data-tab="editorial">🗞 Editorial</button>
       <button data-tab="ia">🤖 IA</button>
       <button data-tab="textos">🔤 Textos</button>
       <button data-tab="audios">🔊 Áudios</button>
@@ -390,17 +396,26 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <div id="listaHl"></div>
     </div>
 
+    <div class="tab" id="tab-editorial">
+      <h3>🗞 Quadros editoriais</h3>
+      <p class="hint">O estilo "documentário editorial": ficha de pessoa, post, terminal digitando, print de página em 3D, linha do tempo, recortes caindo na mesa, mural de fotos, número grande… Clique pra pôr no cursor (faixa <b>Editorial</b>) e troque os textos no painel da direita. Os "sobre o vídeo" deixam o vídeo aparecer; os de "tela cheia" cobrem a cena.</p>
+      <div class="cenas-filtro"><input type="text" id="edBusca" placeholder="procurar… (post, número, mural…)"></div>
+      <div id="listaEd" class="ed-lista"></div>
+    </div>
+
     <div class="tab" id="tab-ia">
       <h3>🤖 Prompt de edição (2ª etapa com a IA)</h3>
       <p class="hint">Gera um prompt com a <b>direção escolhida</b> (<span id="iaDirecao"></span> — troque na aba 🎨 Direção) e o que ela permite, a <b>timeline como está agora</b> (mídias, cenas, transições, efeitos, destaques) e a <b>fala com os tempos</b> (transcrição/SRT). Cole na sua IA; ela devolve um JSON mais caprichado — transições, efeitos, cenas com textos, destaques ancorados na fala e <b>gráficos com os dados</b> citados. Cole a resposta aqui embaixo, confira e aplique (dá pra desfazer).</p>
       <label class="f"><span>O que você quer nesta edição <span class="dim">(opcional)</span></span><textarea id="iaObjetivo" rows="3" placeholder="ex.: mais gráficos com os números citados; cortes mais rápidos no começo; destaques só nos anos"></textarea></label>
       <label class="chk"><input type="checkbox" id="iaComDestaques" checked> Mandar os destaques que já estão na timeline</label>
+      <label class="chk" title="Vídeo longo: uma IA editando 1 hora de uma vez perde qualidade. Em partes, cada prompt cobre só um pedaço (os números dos trechos continuam os do vídeo inteiro) e no fim você confere tudo junto."><input type="checkbox" id="iaPartes"> ✂️ Dividir em partes de <input type="number" id="iaPartesMin" value="12" min="3" max="60" step="1" style="width:52px;display:inline-block;padding:1px 4px"> min <span class="dim">(opcional — pra vídeo longo)</span></label>
       <div class="row" style="margin-top:6px;gap:6px"><button class="primary" id="iaGerar">📝 Gerar prompt</button><button class="mini" id="iaNovoGrafico" title="gráfico à mão, no cursor">📊 Gráfico à mão</button></div>
       <div id="iaPromptBox" style="display:none;margin-top:8px">
-        <div class="row" style="align-items:center;gap:6px"><button class="mini" id="iaCopiar">📋 Copiar prompt</button><span class="hint" id="iaTam"></span></div>
+        <div class="row" style="align-items:center;gap:6px"><button class="mini" id="iaCopiar">📋 Copiar prompt</button><button class="mini" id="iaFazer" style="display:none" title="manda o prompt pra IA configurada em 🤖 IA e cola a resposta aqui embaixo">🤖 Fazer com a IA</button><span class="hint" id="iaTam"></span></div>
         <textarea id="iaPrompt" rows="7" readonly spellcheck="false" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;margin-top:4px"></textarea>
       </div>
-      <h3 style="margin-top:14px">Resposta da IA</h3>
+      <div id="iaPartesBox" style="display:none;margin-top:8px"></div>
+      <h3 style="margin-top:14px" id="iaRespTit">Resposta da IA</h3>
       <textarea id="iaResposta" rows="7" spellcheck="false" placeholder='Cole aqui o JSON que a IA devolveu ({ "trechos": [...], "destaques": [...], "graficos": [...] ... })' style="width:100%;font-family:ui-monospace,monospace;font-size:11px"></textarea>
       <div class="row" style="margin-top:6px;gap:6px"><button class="mini" id="iaConferir">👁 Conferir</button><button class="primary" id="iaAplicar" disabled>✅ Aplicar</button><button class="mini" id="iaDesfazer" disabled>↩ Desfazer</button></div>
       <div id="iaResumo" style="margin-top:8px"></div>
@@ -461,6 +476,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <label class="chk"><input type="checkbox" id="sTrans"> Som em cada transição (escolhido pelo tipo)</label>
       <label class="chk"><input type="checkbox" id="sCenas"> Sons das cenas/takes (câmera, whoosh)</label>
       <label class="chk"><input type="checkbox" id="sDest"> Sons dos destaques de texto</label>
+      <label class="chk"><input type="checkbox" id="sEd"> Sons dos quadros editoriais</label>
       <label class="f"><span>Volume dos efeitos <b id="sVolTxt"></b></span><input type="range" id="sVol" min="0" max="1.5" step="0.05"></label>
       <p class="hint">Cada pasta do zip virou uma categoria. ▶ ouve · <b>+</b> põe no cursor · ou arraste até a faixa <b>Sons</b> da timeline. Num losango (transição) dá pra trocar o som daquela emenda.</p>
       <div id="listaSons"></div>
@@ -656,6 +672,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <div class="layer" id="layerB"></div>
       <div id="layerCena"></div>
       <div id="layerCz"></div>
+      <img id="layerEd" alt="" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none">
       <div id="layerHl" style="position:absolute;inset:0;pointer-events:none;display:none"></div>
       <img id="layerGr" alt="" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none">
       <div id="layerLeg" style="display:none"></div>
@@ -941,6 +958,18 @@ function desenharTimeline() {
     c.addEventListener('mousedown', (ev) => arrastarGr(ev, g));
     c.dataset.k = 'gr:' + g.id; lgr.appendChild(c);
   });
+  // ---- 🗞 quadros editoriais
+  const led = linha('Editorial', editoriais.length + ' quadros', 'baixa');
+  led.addEventListener('dblclick', (e) => { if (e.target === led) { abrirTab('editorial'); toast('Escolha um quadro na aba 🗞 Editorial — ele entra no cursor'); } });
+  editoriais.forEach((q) => {
+    const c = document.createElement('div'); c.className = 'clip k-ed' + (sel && sel.tipo === 'ed' && sel.id === q.id ? ' sel' : '');
+    c.style.left = xDe(q.start) + 'px'; c.style.width = Math.max(6, xDe(q.end - q.start)) + 'px';
+    const tt = ED_T[q.tipo] || {};
+    c.innerHTML = `<span class="lbl" style="background:none;">${esc(tt.nome || q.tipo)}</span><div class="rh l"></div><div class="rh r"></div>`;
+    c.title = `${tt.nome || q.tipo} · ${fmt(q.start, 1)}–${fmt(q.end, 1)}\n${esc(edResumo(q))}`;
+    c.addEventListener('mousedown', (ev) => arrastarEd(ev, q));
+    c.dataset.k = 'ed:' + q.id; led.appendChild(c);
+  });
   // ---- censura (blur/pixelado/tarja/bip)
   const lcz = linha('Censura', censura.length + ' áreas/bips', 'baixa');
   lcz.addEventListener('dblclick', (e) => { if (e.target === lcz) novaCensura({ start: +((e.clientX - lcz.getBoundingClientRect().left) / px).toFixed(2) }); });
@@ -1001,7 +1030,7 @@ function marcarMulti() { document.querySelectorAll('#tracks [data-k]').forEach(e
 function chaveDoSel(s) {
   if (!s) return null;
   if (s.tipo === 'seg' || s.tipo === 'emenda') return s.tipo + ':' + s.i;
-  if (['hl', 'sfx', 'ov', 'corte', 'gr', 'cz'].includes(s.tipo)) return s.tipo + ':' + s.id;
+  if (['hl', 'sfx', 'ov', 'corte', 'gr', 'cz', 'ed'].includes(s.tipo)) return s.tipo + ':' + s.id;
   return null;
 }
 function itemDaChave(k) {
@@ -1009,7 +1038,7 @@ function itemDaChave(k) {
   const ach = (arr) => arr.find(x => String(x.id) === v);
   if (t === 'seg' || t === 'txt' || t === 'cena') return segs[Number(v)] ? { t: 'seg', i: Number(v) } : null;
   if (t === 'emenda') return { t, i: Number(v) };
-  const o = t === 'hl' ? ach(destaques) : t === 'sfx' ? ach(sfx) : t === 'ov' ? ach(overlays) : t === 'corte' ? ach(cortes) : t === 'gr' ? ach(graficos) : t === 'cz' ? ach(censura) : null;
+  const o = t === 'hl' ? ach(destaques) : t === 'sfx' ? ach(sfx) : t === 'ov' ? ach(overlays) : t === 'corte' ? ach(cortes) : t === 'gr' ? ach(graficos) : t === 'cz' ? ach(censura) : t === 'ed' ? ach(editoriais) : null;
   return o ? { t, o } : null;
 }
 function fecharSelecao() {
@@ -1022,7 +1051,7 @@ function fecharSelecao() {
   desenharTimeline(); renderProps();
 }
 function resumoSelecao() {
-  const c = { seg: new Set(), emenda: new Set(), hl: [], sfx: [], ov: [], corte: [], gr: [], cz: [] };
+  const c = { seg: new Set(), emenda: new Set(), hl: [], sfx: [], ov: [], corte: [], gr: [], cz: [], ed: [] };
   multi.forEach(k => { const it = itemDaChave(k); if (!it) return; if (it.t === 'seg') c.seg.add(it.i); else if (it.t === 'emenda') c.emenda.add(it.i); else c[it.t].push(it.o); });
   return c;
 }
@@ -1045,7 +1074,7 @@ function aplicarNaSelecao(alvo, fn, nome) {
 function selecionarTudo() {
   multi.clear();
   segs.forEach((s, i) => { multi.add('seg:' + i); if (i < segs.length - 1) multi.add('emenda:' + i); });
-  destaques.forEach(d => multi.add('hl:' + d.id)); graficos.forEach(g => multi.add('gr:' + g.id)); censura.forEach(c => multi.add('cz:' + c.id)); sfx.forEach(x => multi.add('sfx:' + x.id)); overlays.forEach(o => multi.add('ov:' + o.id));
+  destaques.forEach(d => multi.add('hl:' + d.id)); graficos.forEach(g => multi.add('gr:' + g.id)); editoriais.forEach(q => multi.add('ed:' + q.id)); censura.forEach(c => multi.add('cz:' + c.id)); sfx.forEach(x => multi.add('sfx:' + x.id)); overlays.forEach(o => multi.add('ov:' + o.id));
   sel = { tipo: 'multi' }; desenharTimeline(); renderProps();
 }
 $('tracks').addEventListener('mousedown', (e) => {
@@ -1097,7 +1126,7 @@ function arrastarGrupoSe(e, k) {   // arrastar um item selecionado move o grupo 
   if (!(sel && sel.tipo === 'multi' && multi.has(k)) || e.ctrlKey || e.metaKey || e.shiftKey) return false;
   if (e.target.classList.contains('l') || e.target.classList.contains('r')) return false;
   e.preventDefault(); e.stopPropagation();
-  const ini = [...multi].map(itemDaChave).filter(it => it && ['hl', 'sfx', 'ov', 'gr', 'cz'].includes(it.t)).map(it => ({ it, s: it.o.start, f: it.t === 'sfx' ? it.o.start : it.o.end }));
+  const ini = [...multi].map(itemDaChave).filter(it => it && ['hl', 'sfx', 'ov', 'gr', 'cz', 'ed'].includes(it.t)).map(it => ({ it, s: it.o.start, f: it.t === 'sfx' ? it.o.start : it.o.end }));
   if (!ini.length) return true;
   const dmin = -Math.min(...ini.map(x => x.s)), dmax = total - Math.max(...ini.map(x => x.f));
   const x0 = e.clientX; let mexeu = false;
@@ -1109,7 +1138,7 @@ function arrastarGrupoSe(e, k) {   // arrastar um item selecionado move o grupo 
   function up() {
     document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
     if (mexeu) {
-      destaques.sort((a, b) => a.start - b.start); sfx.sort((a, b) => a.start - b.start); graficos.sort((a, b) => a.start - b.start); censura.sort((a, b) => a.start - b.start); marcarSujo();
+      destaques.sort((a, b) => a.start - b.start); sfx.sort((a, b) => a.start - b.start); graficos.sort((a, b) => a.start - b.start); editoriais.sort((a, b) => a.start - b.start); censura.sort((a, b) => a.start - b.start); marcarSujo();
       ini.filter(x => x.it.t === 'ov').forEach(x => salvarOverlay(x.it.o, { start: x.it.o.start, end: x.it.o.end }));
       toast(`${ini.length} itens movidos juntos`); atualizarMonitor(true);
     }
@@ -1119,12 +1148,13 @@ function arrastarGrupoSe(e, k) {   // arrastar um item selecionado move o grupo 
   return true;
 }
 async function apagarSelecao() {
-  const c = resumoSelecao(); const n = c.hl.length + c.sfx.length + c.ov.length + c.gr.length + c.cz.length;
+  const c = resumoSelecao(); const n = c.hl.length + c.sfx.length + c.ov.length + c.gr.length + c.cz.length + c.ed.length;
   if (!n) { toast('Só dá pra apagar destaques, sons e overlays (trechos e emendas ficam — use as ações do painel)', 4000); return; }
   if (c.ov.length && !confirm(`Apagar ${n} itens (inclui ${c.ov.length} overlays)?`)) return;
   c.hl.forEach(d => destaques.splice(destaques.indexOf(d), 1));
   c.sfx.forEach(x => sfx.splice(sfx.indexOf(x), 1));
   c.gr.forEach(g => graficos.splice(graficos.indexOf(g), 1));
+  c.ed.forEach(q => editoriais.splice(editoriais.indexOf(q), 1));
   c.cz.forEach(x => censura.splice(censura.indexOf(x), 1));
   for (const o of c.ov) { try { await fetch(`/job/${JOB}/remove-overlay/${o.id}`, { method: 'POST' }); overlays.splice(overlays.indexOf(o), 1); } catch (_) {} }
   [...multi].forEach(k => { if (!itemDaChave(k)) multi.delete(k); });
@@ -1133,7 +1163,7 @@ async function apagarSelecao() {
 function propsMulti(P) {
   const c = resumoSelecao();
   const nTr = indicesSel('emenda').length, nSeg = c.seg.size, nMov = c.hl.length + c.sfx.length + c.ov.length + c.gr.length;
-  const linhas = [[nSeg, 'trechos'], [c.emenda.size, 'emendas (transições)'], [c.hl.length, 'destaques/textos'], [c.sfx.length, 'sons'], [c.ov.length, 'overlays'], [c.gr.length, 'gráficos'], [c.cz.length, 'censuras'], [c.corte.length, 'cortes']].filter(x => x[0]);
+  const linhas = [[nSeg, 'trechos'], [c.emenda.size, 'emendas (transições)'], [c.hl.length, 'destaques/textos'], [c.sfx.length, 'sons'], [c.ov.length, 'overlays'], [c.gr.length, 'gráficos'], [c.ed.length, 'quadros editoriais'], [c.cz.length, 'censuras'], [c.corte.length, 'cortes']].filter(x => x[0]);
   P.innerHTML = `<div class="prop-title">☑ ${multi.size} itens selecionados</div>
     <div class="multi-lista">${linhas.map(([n, r]) => `<b>${n}</b> ${r}`).join('<br>')}</div>
     <p class="hint">Clique numa transição, efeito, animação ou overlay das abas pra aplicar em todos de uma vez. Arraste um destaque/som/overlay selecionado pra mover o grupo.<br><b>Delete</b> apaga · <b>Esc</b> limpa · <b>Ctrl/Shift+clique</b> soma ou tira · <b>Ctrl+A</b> seleciona tudo.</p>
@@ -1477,6 +1507,8 @@ function resumoDirecao() {
   const c = d.categorias, pc = (k) => c[k] && c[k].pct ? c[k].pct + '%' + (c[k].itens.length ? ` · ${c[k].itens.length}` : '') : '—';
   const linhas = [['Templates', pc('templates')], ['Transições', pc('transicoes')], [d.usuario ? 'Movimento' : 'Efeitos', pc('efeitos')], ['Overlays', pc('overlays')], ['Filtros', pc('filtros')], ['Animações', pc('entradas')],
     ['Destaques', d.destaques ? (DENS_PT[d.destaques.densidade] || d.destaques.densidade) + (d.destaques.estilos && d.destaques.estilos.length ? ` · ${d.destaques.estilos.length}` : '') : '—'],
+    ['Editoriais', d.editoriais && d.editoriais.ativo !== false ? `1 a cada ${d.editoriais.segundos}s · ${d.editoriais.tipos.length ? d.editoriais.tipos.length + ' tipos' : 'todos'}` : '—'],
+    ['Extras', d.extras ? `${d.extras} dos extras` : '—'],
     ['Legenda', d.legenda ? ((DPC.legenda_estilos.find(e => e.id === d.legenda.estilo) || {}).nome || d.legenda.estilo) : '—'], ['Cor', textoCor(d.cores)]];
   $('dResumo').innerHTML = `<b>${esc(d.nome)}</b> · ritmo ${esc(RITMO_PT[d.ritmo] || d.ritmo)}${d.usuario ? ' · <i>sua</i>' : ''}<div class="eixos">${linhas.map(([a, b]) => `<span>${a}</span><b>${a === 'Cor' ? b : esc(b)}</b>`).join('')}</div>`;
 }
@@ -1492,6 +1524,7 @@ async function apagarPredef() {
 const PD_EIXOS = [
   { k: 'templates', nome: 'Templates', dica: '% das regiões livres que viram cena/take (respeitando o intervalo mínimo do ritmo).' },
   { k: 'destaques', nome: 'Destaques', dica: 'Densidade e quais estilos de destaque de texto entram (nenhum marcado = kit do projeto).' },
+  { k: 'editoriais', nome: 'Editoriais', dica: 'Quadros editoriais 🗞 (ficha, post, terminal, número…) que a IA pode usar. Densidade = 1 quadro a cada ~60 s (mínimo), 40 s (equilibrado), 25 s (dinâmico) ou 15 s (máximo). Nenhum marcado = todos os tipos.' },
   { k: 'transicoes', nome: 'Transições', dica: '% das emendas que ganham transição (o resto é corte seco).' },
   { k: 'efeitos', nome: 'Movimento', dica: '% dos trechos de FOTO com movimento de câmera.' },
   { k: 'filtros', nome: 'Filtros', dica: 'Chance de o vídeo ganhar UM filtro (identidade do vídeo). Com filtros marcados, sempre aplica um deles.' },
@@ -1506,7 +1539,7 @@ let pdAtual = null, pdEixo = 'templates';
 function pdVazio() {
   const c = (pct) => ({ pct, itens: [] });
   return { nome: '', ritmo: 'equilibrado', universo: 'sistema', templates: c(20), transicoes: c(50), efeitos: c(50), filtros: c(30), entradas: c(20), saidas: c(0), overlays: c(20),
-    destaques: { densidade: 'equilibrado', estilos: [], ativo: true }, legenda: null, cores: { modo: 'auto', primaria: paleta.primaria } };
+    destaques: { densidade: 'equilibrado', estilos: [], ativo: true }, editoriais: { densidade: 'equilibrado', tipos: [], ativo: true }, legenda: null, cores: { modo: 'auto', primaria: paleta.primaria } };
 }
 function idTransicaoEd(id) { return TRANSICOES.some(([v]) => v === 'dp:' + id) ? 'dp:' + id : id; }
 async function abrirEditorPredef(id) {
@@ -1519,6 +1552,7 @@ async function abrirEditorPredef(id) {
   const base = pdVazio();
   ['templates', 'transicoes', 'efeitos', 'filtros', 'entradas', 'saidas', 'overlays'].forEach(k => { p[k] = Object.assign({ pct: 0, itens: [] }, p[k] || {}); p[k].itens = (p[k].itens || []).map(i => ({ id: k === 'transicoes' ? idTransicaoEd(i.id) : i.id, peso: i.peso || 1 })); });
   p.destaques = Object.assign({}, base.destaques, p.destaques || {}); p.destaques.estilos = p.destaques.estilos || [];
+  p.editoriais = Object.assign({}, base.editoriais, p.editoriais || {}); p.editoriais.tipos = (p.editoriais.tipos || []).slice(); delete p.editoriais.segundos;
   p.cores = Object.assign({ modo: 'projeto', primaria: paleta.primaria }, p.cores || {});
   p.ritmo = p.ritmo || 'equilibrado'; p.universo = p.universo === 'sistema' ? 'sistema' : 'predef';
   pdAtual = p; pdEixo = 'templates';
@@ -1531,6 +1565,7 @@ function valorEixo(k) {
   if (k === 'cores') return { auto: 'cada um', predef: 'personalizada', projeto: 'do projeto' }[p.cores.modo];
   if (k === 'legenda') return p.legenda ? ((DPC.legenda_estilos.find(e => e.id === p.legenda.estilo) || {}).nome || p.legenda.estilo) : '—';
   if (k === 'destaques') return p.destaques.ativo === false ? '—' : (DENS_PT[p.destaques.densidade] || '') + (p.destaques.estilos.length ? ' · ' + p.destaques.estilos.length : '');
+  if (k === 'editoriais') return p.editoriais.ativo === false ? '—' : (DENS_PT[p.editoriais.densidade] || '') + (p.editoriais.tipos.length ? ' · ' + p.editoriais.tipos.length : ' · todos');
   const c = p[k]; return c.pct ? c.pct + '%' + (c.itens.length ? ' · ' + c.itens.length : '') : '—';
 }
 function desenharEixosPd() {
@@ -1544,11 +1579,12 @@ function itensDoEixo(k) {
   if (k === 'overlays') return DPC.efeitos.filter(e => !e.so_foto && e.id !== 'none').map(e => ({ id: e.id, nome: e.rotulo, cat: 'Overlays', img: `/dp-galeria/overlays/${e.id}.jpg`, video: `/dp-galeria/overlays/${e.id}.mp4` }));
   if (k === 'entradas' || k === 'saidas') return DPC.entradas.filter(e => e.id !== 'none').map(e => ({ id: e.id, nome: e.rotulo, cat: e.familia || 'Animações', img: `/dp-galeria/animacoes/entrada_${e.id}.jpg`, video: `/dp-galeria/animacoes/entrada_${e.id}.mp4` }));
   if (k === 'transicoes') return TRANSICOES.filter(([v]) => v !== 'none').map(([v, r]) => ({ id: v, nome: r, cat: v.startsWith('dp:') ? 'DarkPlanner' : 'Do site' }));
+  if (k === 'editoriais') return Object.entries(ED_T).map(([id, t]) => ({ id, nome: t.nome, cat: t.camada === 'tela' ? 'Tela cheia' : 'Por cima do vídeo', img: `/dp-galeria/editorial/${id}.jpg` }));
   if (k === 'destaques') return HLC.estilos.map(e => ({ id: e.id, nome: e.nome, cat: e.categoria, img: `/dp-galeria/destaques/${e.id}.jpg`, video: `/dp-galeria/previa/${e.id}.mp4` }));
   return [];
 }
 function kitDoEixo(k) {
-  return { filtros: kit.filtros, efeitos: kit.animacoes_camera, overlays: kit.overlays, entradas: kit.entradas, saidas: kit.entradas, transicoes: kit.transicoes, destaques: kit.destaques, templates: kit.templates || [] }[k] || [];
+  return { filtros: kit.filtros, efeitos: kit.animacoes_camera, overlays: kit.overlays, entradas: kit.entradas, saidas: kit.entradas, transicoes: kit.transicoes, destaques: kit.destaques, templates: kit.templates || [], editoriais: [] }[k] || [];
 }
 function desenharPainelPd() {
   const k = pdEixo, p = pdAtual, info = PD_EIXOS.find(e => e.k === k), box = $('pdPainel');
@@ -1577,24 +1613,26 @@ function desenharPainelPd() {
     box.querySelectorAll('.txt-t').forEach(el => el.addEventListener('click', () => { p.legenda = el.dataset.id ? Object.assign({}, leg, { estilo: el.dataset.id, ativa: true }) : null; desenharEixosPd(); desenharPainelPd(); }));
     return;
   }
-  const cat = k === 'destaques' ? null : p[k];
-  if (k === 'destaques') {
-    h += `<div class="row" style="align-items:center;gap:12px"><label class="chk"><input type="checkbox" id="pdHlAtivo" ${p.destaques.ativo !== false ? 'checked' : ''}> Usar destaques</label>
-      <label class="f" style="flex:0 0 auto"><span>Densidade</span><select id="pdHlDens">${Object.entries(DENS_PT).map(([v, r]) => `<option value="${v}" ${p.destaques.densidade === v ? 'selected' : ''}>${r}</option>`).join('')}</select></label></div>`;
+  const LISTA = k === 'destaques' ? p.destaques.estilos : (k === 'editoriais' ? p.editoriais.tipos : null);  // eixos que são só uma lista de ids
+  const cfg = k === 'destaques' ? p.destaques : (k === 'editoriais' ? p.editoriais : null);
+  const cat = LISTA ? null : p[k];
+  if (LISTA) {
+    h += `<div class="row" style="align-items:center;gap:12px"><label class="chk"><input type="checkbox" id="pdHlAtivo" ${cfg.ativo !== false ? 'checked' : ''}> ${k === 'editoriais' ? 'Usar quadros editoriais' : 'Usar destaques'}</label>
+      <label class="f" style="flex:0 0 auto"><span>Densidade</span><select id="pdHlDens">${Object.entries(DENS_PT).map(([v, r]) => `<option value="${v}" ${cfg.densidade === v ? 'selected' : ''}>${r}</option>`).join('')}</select></label></div>`;
   } else {
     h += `<label class="f"><span>Quanto usar: <b id="pdPctTxt">${cat.pct}%</b></span><input type="range" id="pdPct" min="0" max="100" step="5" value="${cat.pct}"></label>`;
   }
-  const sel = k === 'destaques' ? p.destaques.estilos : cat.itens.map(i => i.id);
-  const vazio = p.universo === 'sistema' || k === 'destaques' ? (k === 'destaques' ? 'nenhum marcado = kit do projeto' : 'nenhum marcado = catálogo inteiro') : 'nenhum marcado = esse eixo não entra (predefinição estrita)';
+  const sel = LISTA || cat.itens.map(i => i.id);
+  const vazio = k === 'editoriais' ? 'nenhum marcado = todos os tipos' : (p.universo === 'sistema' || k === 'destaques' ? (k === 'destaques' ? 'nenhum marcado = kit do projeto' : 'nenhum marcado = catálogo inteiro') : 'nenhum marcado = esse eixo não entra (predefinição estrita)');
   h += `<div class="row" style="margin-top:8px;align-items:center;gap:6px;flex-wrap:wrap"><input type="text" id="pdBusca" placeholder="buscar…" style="flex:1;min-width:120px">
     <button class="mini" id="pdKit" title="marca o que está no seu kit (✓ nas galerias)">✓ Do meu kit</button><button class="mini" id="pdLimpar">Limpar</button>
     <span class="hint" style="flex-basis:100%">${sel.length} marcados · ${vazio}</span></div>`;
-  if (k !== 'destaques' && cat.itens.length) h += `<div class="pd-pesos" title="peso relativo: quanto maior, mais vezes aparece">${cat.itens.map(i => { const it = itensDoEixo(k).find(x => x.id === i.id); return `<span>${esc(it ? it.nome : i.id)} <input type="number" min="1" max="100" value="${i.peso}" data-id="${esc(i.id)}" title="peso"><button data-x="${esc(i.id)}">×</button></span>`; }).join('')}</div>`;
+  if (!LISTA && cat.itens.length) h += `<div class="pd-pesos" title="peso relativo: quanto maior, mais vezes aparece">${cat.itens.map(i => { const it = itensDoEixo(k).find(x => x.id === i.id); return `<span>${esc(it ? it.nome : i.id)} <input type="number" min="1" max="100" value="${i.peso}" data-id="${esc(i.id)}" title="peso"><button data-x="${esc(i.id)}">×</button></span>`; }).join('')}</div>`;
   h += '<div id="pdGrade"></div>';
   box.innerHTML = h;
-  const marcados = () => k === 'destaques' ? p.destaques.estilos : p[k].itens.map(i => i.id);
+  const marcados = () => LISTA ? LISTA : p[k].itens.map(i => i.id);
   const alterna = (id) => {
-    if (k === 'destaques') { const l = p.destaques.estilos, j = l.indexOf(id); if (j >= 0) l.splice(j, 1); else l.push(id); }
+    if (LISTA) { const l = LISTA, j = l.indexOf(id); if (j >= 0) l.splice(j, 1); else l.push(id); }
     else { const l = p[k].itens, j = l.findIndex(i => i.id === id); if (j >= 0) l.splice(j, 1); else { l.push({ id, peso: 1 }); if (!p[k].pct) p[k].pct = k === 'filtros' ? 100 : 30; } }
     desenharEixosPd(); const y = box.scrollTop; desenharPainelPd(); box.scrollTop = y;
   };
@@ -1620,13 +1658,13 @@ function desenharPainelPd() {
   };
   grade(); $('pdBusca').addEventListener('input', grade);
   if ($('pdPct')) $('pdPct').addEventListener('input', (e) => { cat.pct = parseInt(e.target.value); $('pdPctTxt').textContent = cat.pct + '%'; desenharEixosPd(); });
-  if ($('pdHlAtivo')) { $('pdHlAtivo').addEventListener('change', (e) => { p.destaques.ativo = e.target.checked; desenharEixosPd(); }); $('pdHlDens').addEventListener('change', (e) => { p.destaques.densidade = e.target.value; desenharEixosPd(); }); }
+  if ($('pdHlAtivo')) { $('pdHlAtivo').addEventListener('change', (e) => { cfg.ativo = e.target.checked; desenharEixosPd(); }); $('pdHlDens').addEventListener('change', (e) => { cfg.densidade = e.target.value; desenharEixosPd(); }); }
   box.querySelectorAll('.pd-pesos input').forEach(inp => inp.addEventListener('change', () => { const it = cat.itens.find(i => i.id === inp.dataset.id); if (it) it.peso = clamp(parseInt(inp.value) || 1, 1, 100); }));
   box.querySelectorAll('.pd-pesos button').forEach(b => b.addEventListener('click', () => alterna(b.dataset.x)));
-  $('pdLimpar').addEventListener('click', () => { if (k === 'destaques') p.destaques.estilos = []; else p[k].itens = []; desenharEixosPd(); desenharPainelPd(); });
+  $('pdLimpar').addEventListener('click', () => { if (LISTA) LISTA.splice(0); else p[k].itens = []; desenharEixosPd(); desenharPainelPd(); });
   $('pdKit').addEventListener('click', () => {
     const ks = kitDoEixo(k).filter(id => itensDoEixo(k).some(it => it.id === id)); if (!ks.length) { toast('Seu kit não tem nada desse eixo — marque com ✓ nas galerias'); return; }
-    ks.forEach(id => { if (!marcados().includes(id)) { if (k === 'destaques') p.destaques.estilos.push(id); else p[k].itens.push({ id, peso: 1 }); } });
+    ks.forEach(id => { if (!marcados().includes(id)) { if (LISTA) LISTA.push(id); else p[k].itens.push({ id, peso: 1 }); } });
     desenharEixosPd(); desenharPainelPd();
   });
 }
@@ -1655,6 +1693,7 @@ function aplicarDp(i, campo, valor) {
 }
 // filtro aproximado no monitor (CSS)
 function cssDoFiltro(id) {
+  const ex = (DPC.filtros || []).find(f => f.id === id); if (ex && ex.css) return ex.css;   // filtro criado nos extras
   const m = { bw: 'grayscale(1)', noir: 'grayscale(1) contrast(1.35)', inkwell: 'grayscale(1) contrast(1.1)', moon: 'grayscale(1) brightness(1.08)', noir_soft: 'grayscale(1) contrast(1.15)', preto_frio: 'grayscale(1) sepia(.15) hue-rotate(180deg)',
     sepia: 'sepia(1)', vintage: 'sepia(.45) contrast(.95) saturate(.85)', old_film: 'sepia(.6) contrast(1.05) saturate(.4)', earlybird: 'sepia(.35) contrast(.9)', fade: 'contrast(.85) brightness(1.05) saturate(.8)',
     matte: 'contrast(.85) saturate(.9)', vhs: 'saturate(1.3) contrast(1.1)', tape: 'saturate(.9)', soft: 'contrast(.92) saturate(.9) blur(.4px)', dreamy: 'brightness(1.05) saturate(1.1) blur(.8px)',
@@ -1665,7 +1704,7 @@ function cssDoFiltro(id) {
   return m[id] || 'contrast(1.05) saturate(1.05)';
 }
 function gestoCss(s, tl, dur) {   // prévia aproximada de entrada/saída
-  const g = (id, p) => { if (!id) return null; const e = 1 - Math.pow(1 - p, 3); let tr = '', op = Math.min(1, p / 0.6);
+  const g = (id, p) => { if (!id) return null; const al = (DPC.entradas || []).find(e => e.id === id); if (al && al.previa) id = al.previa; const e = 1 - Math.pow(1 - p, 3); let tr = '', op = Math.min(1, p / 0.6);
     if (/zoom_in|escala|pop|spring/.test(id)) tr = `scale(${0.6 + 0.4 * e})`; else if (/zoom_out|punch/.test(id)) tr = `scale(${1.4 - 0.4 * e})`;
     else if (/slide_left|desliza|slingshot|ghost/.test(id)) tr = `translateX(${(1 - e) * 30}%)`; else if (/slide_right|revela_esq/.test(id)) tr = `translateX(${-(1 - e) * 30}%)`;
     else if (/slide_up|ergue|assenta/.test(id)) tr = `translateY(${(1 - e) * 20}%)`; else if (/slide_down|drop|soft_land|revela_cima/.test(id)) tr = `translateY(${-(1 - e) * 20}%)`;
@@ -1991,6 +2030,112 @@ function propsGr(P, g) {
   $('grDel').addEventListener('click', () => { graficos.splice(graficos.indexOf(g), 1); sel = null; marcarSujo(); desenharTimeline(); renderProps(); atualizarMonitor(true); });
 }
 
+// ------------------------------------------------------------------ 🗞 quadros editoriais (faixa "Editorial")
+const editoriais = (D.editoriais || []).map(q => Object.assign({}, q));
+const ED_T = D.editorial_tipos || {};
+const _edPrevias = {};
+function edResumo(q) { return ['nome', 'titulo', 'texto', 'linhas', 'itens', 'manchetes', 'citacoes', 'notas', 'tentativas', 'cabecalho'].map(k => q[k]).filter(Boolean).join(' · ').replace(/\n/g, ' / ').slice(0, 160); }
+async function previaEd(q, t) {
+  const tq = Math.max(0, Math.round(t / 0.2) * 0.2);
+  const chave = JSON.stringify([q, tq, $('gFormato').value]);
+  if (_edPrevias[chave]) return _edPrevias[chave];
+  _edPrevias[chave] = (async () => {
+    const r = await fetch(`/job/${JOB}/editorial/previa`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item: q, t: tq, orientacao: $('gFormato').value }) });
+    if (!r.ok) { delete _edPrevias[chave]; return null; }
+    return URL.createObjectURL(await r.blob());
+  })();
+  return _edPrevias[chave];
+}
+let _edPedido = 0;
+async function desenharEdMonitor(t) {
+  const L = $('layerEd'); const q = editoriais.find(x => t >= x.start && t < x.end);
+  if (!q) { L.style.display = 'none'; return; }
+  const n = ++_edPedido;
+  const url = await previaEd(q, t - q.start);
+  if (n !== _edPedido) return;
+  if (!url) { L.style.display = 'none'; return; }
+  if (L.src !== url) L.src = url;
+  L.style.display = 'block';
+}
+function desenharListaEd() {
+  const box = $('listaEd'); if (!box) return;
+  const busca = ($('edBusca').value || '').trim().toLowerCase();
+  box.innerHTML = Object.entries(ED_T).filter(([k, v]) => !busca || (k + ' ' + v.nome + ' ' + v.quando).toLowerCase().includes(busca)).map(([k, v]) =>
+    `<div class="ed-t" data-tipo="${k}" title="${esc(v.quando)}"><img src="/dp-galeria/editorial/${k}.jpg" alt="" loading="lazy"><div class="nm">${esc(v.nome)}</div><div class="q">${v.camada === 'sobre' ? 'sobre o vídeo' : v.camada === 'mascara' ? 'vídeo nas letras' : 'tela cheia'} · ${esc(v.quando)}</div></div>`).join('');
+  box.querySelectorAll('.ed-t').forEach(el => el.addEventListener('click', () => novoEditorial(el.dataset.tipo)));
+}
+async function novoEditorial(tipo) {
+  const tt = ED_T[tipo]; if (!tt) return;
+  let q = null;
+  try { const r = await fetch(`/editorial/exemplo/${tipo}`); if (r.ok) q = await r.json(); } catch (_) {}
+  q = Object.assign(q || { tipo }, { id: Math.random().toString(16).slice(2, 10), start: +playhead.toFixed(2) });
+  q.end = +Math.min(total, q.start + (tt.dur || 5)).toFixed(2);
+  if (q.end - q.start < 1.2) { toast('Pouco tempo depois do cursor — leve o cursor mais pra trás'); return; }
+  editoriais.push(q); editoriais.sort((a, b) => a.start - b.start); marcarSujo(); selecionar({ tipo: 'ed', id: q.id }); atualizarMonitor(true);
+  toast(`${tt.nome} no cursor — troque os textos no painel da direita`);
+}
+function arrastarEd(e, q) {
+  if (arrastarGrupoSe(e, 'ed:' + q.id)) return;
+  e.preventDefault(); e.stopPropagation(); selecionar({ tipo: 'ed', id: q.id });
+  const modo = e.target.classList.contains('l') ? 'l' : e.target.classList.contains('r') ? 'r' : 'mover';
+  const x0 = e.clientX, s0 = q.start, e0 = q.end; let mexeu = false;
+  function mv(ev) {
+    const dt = (ev.clientX - x0) / px; mexeu = mexeu || Math.abs(ev.clientX - x0) > 2;
+    if (modo === 'mover') { const du = e0 - s0; q.start = Math.round(clamp(s0 + dt, 0, total - du) * 100) / 100; q.end = Math.round((q.start + du) * 100) / 100; }
+    else if (modo === 'l') q.start = Math.round(clamp(s0 + dt, 0, e0 - 1.2) * 100) / 100;
+    else q.end = Math.round(clamp(e0 + dt, s0 + 1.2, total) * 100) / 100;
+    desenharTimeline(); seek(q.start + Math.min(1.5, (q.end - q.start) / 2));
+  }
+  function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); if (mexeu) { editoriais.sort((a, b) => a.start - b.start); marcarSujo(); } renderProps(); }
+  document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+}
+function campoEd(q, c) {
+  const id = 'ed_' + c.k, v = q[c.k] != null ? q[c.k] : '';
+  const imgs = (biblioteca || []).filter(b => b.media_type === 'image' || b.media_type === 'video');
+  if (c.tipo === 'linhas') return campo(esc(c.rotulo), `<textarea id="${id}" rows="${Math.min(7, Math.max(3, String(v).split('\n').length + 1))}" spellcheck="false" placeholder="${esc(c.dica || '')}">${esc(v)}</textarea>`);
+  if (c.tipo === 'num') return campo(esc(c.rotulo), `<input type="number" id="${id}" step="any" value="${esc(v)}">`);
+  if (c.tipo === 'cor') return `<label class="f" style="flex:0 0 auto"><span>${esc(c.rotulo)}</span><span style="display:flex;gap:6px;align-items:center"><input type="color" id="${id}" value="${v || '#D0443E'}"><label class="chk" style="font-size:11px"><input type="checkbox" id="${id}_pad" ${v ? '' : 'checked'}> padrão</label></span></label>`;
+  if (c.tipo.startsWith('escolha:')) { const ops = c.tipo.split(':')[1].split('|'); return campo(esc(c.rotulo), `<select id="${id}">${c.k === 'fundo' ? `<option value="">padrão do quadro</option>` : ''}${ops.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`); }
+  if (c.tipo === 'img') return campo(esc(c.rotulo), `<select id="${id}"><option value="">${esc(c.dica || '(nenhuma)')}</option>${imgs.map(b => `<option value="bib:${b.id}" ${v === 'bib:' + b.id ? 'selected' : ''}>${esc(b.filename)}</option>`).join('')}</select>${imgs.length ? '' : '<span class="dim">Envie imagens na aba 📁 Mídia → Biblioteca.</span>'}`);
+  if (c.tipo === 'imgs') return campo(esc(c.rotulo), imgs.length ? `<div id="${id}" class="ed-imgs" style="display:flex;flex-direction:column;gap:2px;max-height:130px;overflow:auto">${imgs.map(b => `<label class="chk" style="font-size:11px"><input type="checkbox" value="bib:${b.id}" ${(v || []).includes('bib:' + b.id) ? 'checked' : ''}> ${esc(b.filename)}</label>`).join('')}</div><span class="dim">A ordem segue a ordem marcada aqui.</span>` : '<span class="dim">Envie imagens na aba 📁 Mídia → Biblioteca.</span>');
+  return campo(esc(c.rotulo), `<input type="text" id="${id}" maxlength="300" placeholder="${esc(c.dica || '')}" value="${esc(v)}">`);
+}
+function propsEd(P, q) {
+  if (!q) { sel = null; return renderProps(); }
+  const tt = ED_T[q.tipo] || { campos: [] };
+  P.innerHTML = `<div class="prop-title">${esc(tt.nome || q.tipo)}</div><div class="prop-sub">${fmt(q.start, 1)} → ${fmt(q.end, 1)} · ${tt.camada === 'sobre' ? 'sobre o vídeo' : tt.camada === 'mascara' ? 'o vídeo aparece dentro das letras' : 'tela cheia'}</div>
+    <img id="edPrev" style="width:100%;border-radius:6px;background:#000 url('/dp-galeria/foto_exemplo.jpg') center/cover;margin:4px 0 4px">
+    <input type="range" id="edT" min="0" max="${(q.end - q.start).toFixed(2)}" step="0.1" value="${Math.min(q.end - q.start, 2.5).toFixed(1)}" title="momento da prévia" style="width:100%">
+    <p class="hint" style="margin:2px 0 8px">${esc(tt.quando || '')}${q.tipo === 'ficha' ? '<br>📍 <b>Clique no monitor</b> em cima do rosto pra marcar de onde a linha sai.' : ''}</p>
+    ${tt.campos.map(c => campoEd(q, c)).join('')}
+    <div class="row">${campo('Início (s)', `<input type="number" id="edIni" step="0.1" value="${q.start}">`)}${campo('Fim (s)', `<input type="number" id="edFim" step="0.1" value="${q.end}">`)}</div>
+    <div class="row" style="margin-top:8px"><button class="mini" id="edCursor">⇥ Pro cursor</button><button class="mini" id="edDup">⧉ Duplicar</button><button class="mini danger" id="edDel">🗑 Remover</button></div>`;
+  const prev = () => previaEd(q, parseFloat($('edT').value) || 0).then(u => { if (u && $('edPrev')) $('edPrev').src = u; });
+  prev();
+  $('edT').addEventListener('input', prev);
+  const muda = (fn, redesenha) => (ev) => { fn(ev); marcarSujo(); desenharTimeline(); atualizarMonitor(true); prev(); if (redesenha) renderProps(); };
+  tt.campos.forEach(c => {
+    const el = $('ed_' + c.k); if (!el) return;
+    if (c.tipo === 'imgs') { el.querySelectorAll('input').forEach(inp => inp.addEventListener('change', muda(() => { const v = q[c.k] = (q[c.k] || []).filter(x => x !== inp.value); if (inp.checked) v.push(inp.value); }))); return; }
+    if (c.tipo === 'cor') { const pad = $('ed_' + c.k + '_pad'); el.addEventListener('change', muda(() => { q[c.k] = el.value.toUpperCase(); pad.checked = false; })); pad.addEventListener('change', muda(() => { q[c.k] = pad.checked ? '' : el.value.toUpperCase(); })); return; }
+    el.addEventListener('change', muda(() => { q[c.k] = c.tipo === 'num' ? (parseFloat(el.value) || 0) : el.value; }));
+  });
+  $('edIni').addEventListener('change', muda((e) => { q.start = clamp(parseFloat(e.target.value) || 0, 0, q.end - 1.2); }, true));
+  $('edFim').addEventListener('change', muda((e) => { q.end = clamp(parseFloat(e.target.value) || 0, q.start + 1.2, total); }, true));
+  $('edCursor').addEventListener('click', muda(() => { const du = q.end - q.start; q.start = +playhead.toFixed(2); q.end = +Math.min(total, q.start + du).toFixed(2); }, true));
+  $('edDup').addEventListener('click', () => { const n = JSON.parse(JSON.stringify(q)); n.id = Math.random().toString(16).slice(2, 10); const du = q.end - q.start; n.start = +Math.min(total - du, q.end + 0.1).toFixed(2); n.end = +(n.start + du).toFixed(2); delete n.origem; editoriais.push(n); editoriais.sort((a, b) => a.start - b.start); marcarSujo(); selecionar({ tipo: 'ed', id: n.id }); });
+  $('edDel').addEventListener('click', () => { editoriais.splice(editoriais.indexOf(q), 1); sel = null; marcarSujo(); desenharTimeline(); renderProps(); atualizarMonitor(true); });
+}
+if ($('edBusca')) { $('edBusca').addEventListener('input', desenharListaEd); desenharListaEd(); }
+// ficha selecionada: clicar no monitor marca o ponto do rosto (de onde a linha sai)
+$('stage').addEventListener('click', (e) => {
+  if (!(sel && sel.tipo === 'ed')) return;
+  const q = editoriais.find(x => x.id === sel.id); if (!q || q.tipo !== 'ficha') return;
+  const r = $('stage').getBoundingClientRect();
+  q.ponto_x = +clamp((e.clientX - r.left) / r.width, 0, 1).toFixed(3); q.ponto_y = +clamp((e.clientY - r.top) / r.height, 0, 1).toFixed(3);
+  marcarSujo(); renderProps(); atualizarMonitor(true); toast('📍 Ponto do rosto marcado');
+});
+
 // ------------------------------------------------------------------ 🙈 censura (faixa "Censura"): blur/pixelado/tarja numa área, bip/mudo no áudio
 const censura = (D.censura || []).map(c => Object.assign({}, c));
 const CZ_TIPOS = DPC.censura_tipos || { blur: 'Desfoque (blur)', pixel: 'Pixelado (mosaico)', tarja: 'Tarja sólida', bip: 'Bip (som de censura)', mudo: 'Silenciar' };
@@ -2142,19 +2287,78 @@ function estadoParaIA() {
     segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s) } : null,
       youtube_link: s.youtube_link || null, transition: s.transition || null, efeito: s.efeito || null, entrada: s.entrada || null, saida: s.saida || null, template: s.template || null })),
     destaques: destaques.map(d => ({ estilo: d.estilo, start: d.start, end: d.end, texto: d.texto })), graficos,
+    editoriais: editoriais.map(q => ({ tipo: q.tipo, start: q.start, end: q.end })),
   };
 }
 function nomeDirecaoAtual() { const o = $('dDirecao').selectedOptions[0]; return o ? o.textContent : '—'; }
 function atualizarInfoIA() { $('iaDirecao').textContent = nomeDirecaoAtual(); }
+let iaPartes = null;  // ✂️ [{k, n, ini, fim, prompt}] quando o prompt foi dividido em partes
+let iaArte = '';      // 🎨 direção de arte que a parte 1 decidiu (vai nos prompts das partes 2..N)
+let iaArteTimer = null;
+async function iaAtualizarArte() {  // a parte 1 respondeu: refaz os prompts 2..N com a direção de arte dela
+  if (!iaPartes) return;
+  const r1 = (iaPartes[0].resposta || '').trim(); if (!r1) { iaArte = ''; desenharPartesIA(); return; }
+  try {
+    const corpo = Object.assign(estadoParaIA(), { partes_min: Math.max(3, parseFloat($('iaPartesMin').value) || 12), resposta_parte1: r1 });
+    const r = await fetch(`/job/${JOB}/edicao/prompt`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+    if (d.erro_arte) { toast('⚠ ' + d.erro_arte, 5000); iaArte = ''; }
+    else iaArte = d.arte || '(a parte 1 não mudou o visual)';
+    (d.partes || []).forEach((p, i) => { if (iaPartes[i]) Object.assign(iaPartes[i], { prompt: p.prompt, caracteres: p.caracteres }); });
+    desenharPartesIA();
+    if (iaArte && !d.erro_arte) toast('🎨 Direção de arte da parte 1 aplicada nos prompts das outras partes', 4000);
+  } catch (e) { toast('⚠ ' + e.message, 5000); }
+}
+let iaPode = false;  // 🤖 a IA de /ia pode fazer a edição
+fetch('/ia/status').then(r => r.json()).then(j => { iaPode = !!(j.pode && j.pode.edicao); $('iaFazer').style.display = iaPode ? '' : 'none'; }).catch(() => {});
+async function iaFazer(prompt) {
+  const r = await fetch(`/job/${JOB}/edicao/ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+  const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status); return d.texto;
+}
+function copiarTexto(t) { try { navigator.clipboard.writeText(t).then(() => toast('📋 Copiado'), () => toast('⚠ Não consegui copiar — selecione e copie')); } catch (_) { toast('⚠ Não consegui copiar'); } }
+function desenharPartesIA() {
+  const box = $('iaPartesBox');
+  const ae = document.activeElement, foco = ae && ae.classList && ae.classList.contains('iaPResp') ? +ae.dataset.i : null;
+  setTimeout(() => { if (foco != null) { const t = box.querySelector(`.iaPResp[data-i="${foco}"]`); if (t) { t.focus(); t.selectionStart = t.selectionEnd = t.value.length; } } }, 0);
+  if (!iaPartes) { box.style.display = 'none'; box.innerHTML = ''; $('iaResposta').style.display = ''; $('iaRespTit').textContent = 'Resposta da IA'; return; }
+  $('iaResposta').style.display = 'none'; $('iaRespTit').textContent = `Respostas da IA (${iaPartes.length} partes — cole cada uma no seu lugar)`;
+  box.style.display = 'block';
+  const trava = (i) => i > 0 && !iaArte;  // as partes 2..N esperam a direção de arte da parte 1
+  box.innerHTML = (iaArte ? `<details class="sec" style="margin-bottom:6px"><summary>🎨 Direção de arte da parte 1 (as outras seguem igual)</summary><pre style="white-space:pre-wrap;font-size:11px;margin:4px 0">${esc(iaArte)}</pre></details>`
+    : `<p class="hint">🎨 Faça a <b>parte 1</b> primeiro: ela decide o visual (cores, fontes, estilos, transições) e as outras partes recebem isso no prompt.</p>`)
+    + iaPartes.map((p, i) => `<div class="sec" style="border:1px solid var(--line,#333);border-radius:8px;padding:6px 8px;margin-bottom:6px;${trava(i) ? 'opacity:.55' : ''}">
+    <div class="row" style="align-items:center;gap:6px"><b>Parte ${p.k}/${p.n}</b><span class="dim">${fmt(p.ini, 0)} → ${fmt(p.fim, 0)} · ${Math.round(p.caracteres / 1000)} mil caracteres</span>
+      <button class="mini iaPCop" data-i="${i}" ${trava(i) ? 'disabled title="cole a resposta da parte 1 antes"' : ''}>📋 Copiar prompt ${p.k}</button>${iaPode ? `<button class="mini iaPFaz" data-i="${i}" ${trava(i) ? 'disabled' : ''}>🤖 Fazer com a IA</button>` : ''}<span class="hint iaPSt" data-i="${i}">${trava(i) ? '🔒 espera a parte 1' : ''}</span></div>
+    <textarea class="iaPResp" data-i="${i}" rows="3" spellcheck="false" placeholder="Cole aqui a resposta da parte ${p.k}" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;margin-top:4px">${esc(p.resposta || '')}</textarea></div>`).join('');
+  box.querySelectorAll('.iaPCop').forEach(b => b.addEventListener('click', () => copiarTexto(iaPartes[+b.dataset.i].prompt)));
+  box.querySelectorAll('.iaPResp').forEach(t => t.addEventListener('input', () => {
+    iaPartes[+t.dataset.i].resposta = t.value;
+    if (+t.dataset.i === 0) { clearTimeout(iaArteTimer); iaArteTimer = setTimeout(iaAtualizarArte, 900); }
+  }));
+  box.querySelectorAll('.iaPFaz').forEach(b => b.addEventListener('click', async () => {
+    const i = +b.dataset.i, st = box.querySelector(`.iaPSt[data-i="${i}"]`); b.disabled = true; st.textContent = '🤖 editando…';
+    try { iaPartes[i].resposta = await iaFazer(iaPartes[i].prompt); box.querySelector(`.iaPResp[data-i="${i}"]`).value = iaPartes[i].resposta; st.textContent = '✅'; if (i === 0) await iaAtualizarArte(); }
+    catch (e) { st.textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
+  }));
+}
 $('iaGerar').addEventListener('click', async () => {
   try {
     $('iaGerar').disabled = true;
-    const r = await fetch(`/job/${JOB}/edicao/prompt`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(estadoParaIA()) });
+    const corpo = estadoParaIA();
+    if ($('iaPartes').checked) corpo.partes_min = Math.max(3, parseFloat($('iaPartesMin').value) || 12);
+    const r = await fetch(`/job/${JOB}/edicao/prompt`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
     const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
-    $('iaPrompt').value = d.prompt; $('iaPromptBox').style.display = 'block';
+    iaPartes = d.partes && d.partes.length > 1 ? d.partes : null; iaArte = '';
+    $('iaPrompt').value = d.prompt; $('iaPromptBox').style.display = iaPartes ? 'none' : 'block';
     $('iaTam').textContent = `${d.caracteres.toLocaleString('pt-BR')} caracteres`;
-    toast('📝 Prompt pronto — copie e cole na IA (ChatGPT, Claude, Gemini…)');
+    desenharPartesIA();
+    toast(iaPartes ? `✂️ ${iaPartes.length} prompts — copie um por vez, cole a resposta de cada parte no seu lugar e clique em 👁 Conferir` : (d.partes ? '📝 O vídeo é curto: um prompt só já dá conta' : '📝 Prompt pronto — copie e cole na IA (ChatGPT, Claude, Gemini…)'), 6000);
   } catch (e) { toast('⚠ ' + e.message, 5000); } finally { $('iaGerar').disabled = false; }
+});
+$('iaFazer').addEventListener('click', async () => {
+  $('iaFazer').disabled = true; $('iaTam').textContent = '🤖 a IA está editando… (pode levar 1-2 min)';
+  try { $('iaResposta').value = await iaFazer($('iaPrompt').value); $('iaTam').textContent = '✅ resposta da IA colada embaixo — clique em 👁 Conferir'; }
+  catch (e) { $('iaTam').textContent = '⚠ ' + e.message; } finally { $('iaFazer').disabled = false; }
 });
 $('iaCopiar').addEventListener('click', () => {
   const t = $('iaPrompt'); t.select();
@@ -2176,6 +2380,7 @@ function resumoPlano(p) {
   if (nTr) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="trechos" checked> <b>${nTr} trechos</b>: ${det('transition')} transições, ${det('efeito')} efeitos, ${det('entrada') + det('saida')} animações, ${det('template')} cenas${det('bordas') + det('camera') + det('foco') ? `, ${det('bordas') + det('camera') + det('foco')} ajustes de composição` : ''}${det('transition_som') ? `, ${det('transition_som')} sons de transição` : ''}</label></li>`);
   if (p.destaques) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="destaques" checked> <b>${p.destaques.length} destaques</b>${p.destaques.filter(x => x.avulso).length ? ` (${p.destaques.filter(x => x.avulso).length} textos livres)` : ''}${p.destaques.filter(x => x.enfase).length ? `, ${p.destaques.filter(x => x.enfase).length} com ênfase` : ''}${p.destaques.filter(x => x.fonte || x.anim_entrada || x.zona || x.escala).length ? `, ${p.destaques.filter(x => x.fonte || x.anim_entrada || x.zona || x.escala).length} com estilo/posição ajustados` : ''} ${p.substituir_destaques ? '(substituem os automáticos/da IA; os que você fez à mão ficam)' : '(somados aos atuais)'}</label></li>`);
   if (p.graficos) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="graficos" checked> <b>${p.graficos.length} gráficos</b>: ${p.graficos.map(g => esc((GR_TIPOS[g.tipo] || g.tipo) + (g.titulo ? ' "' + g.titulo + '"' : ''))).join(', ')}</label></li>`);
+  if (p.editoriais) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="editoriais" checked> <b>${p.editoriais.length} quadros editoriais</b>: ${p.editoriais.map(q => esc((ED_T[q.tipo] || {}).nome || q.tipo)).join(', ')}</label></li>`);
   if (p.filtro_cor) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="filtro_cor" checked> Filtro: <b>${esc(p.filtro_cor)}</b></label></li>`);
   if (p.paleta) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="paleta" checked> Paleta: <span class="sw" style="display:inline-flex;gap:2px;vertical-align:middle"><i style="width:12px;height:12px;border-radius:3px;background:${p.paleta.primaria}"></i><i style="width:12px;height:12px;border-radius:3px;background:${p.paleta.secundaria}"></i><i style="width:12px;height:12px;border-radius:3px;background:${p.paleta.acento}"></i></span></label></li>`);
   if (p.legenda) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="legenda" checked> Legenda: <b>${esc(p.legenda.estilo)}</b></label></li>`);
@@ -2185,7 +2390,14 @@ function resumoPlano(p) {
 }
 $('iaConferir').addEventListener('click', async () => {
   try {
-    const r = await fetch(`/job/${JOB}/edicao/resposta`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: $('iaResposta').value, n_trechos: segs.length, foto: segs.map(s => tipoMidia(s) === 'image') }) });
+    const corpoResp = { texto: $('iaResposta').value, n_trechos: segs.length, foto: segs.map(s => tipoMidia(s) === 'image') };
+    if (iaPartes) {
+      const faltam = iaPartes.filter(p => !(p.resposta || '').trim()).map(p => p.k);
+      corpoResp.textos = iaPartes.map(p => p.resposta || '').filter(t => t.trim());
+      if (!corpoResp.textos.length) throw new Error('Cole a resposta de pelo menos uma parte.');
+      if (faltam.length) toast(`⚠ Sem resposta nas partes ${faltam.join(', ')} — confiro só as que têm`, 5000);
+    }
+    const r = await fetch(`/job/${JOB}/edicao/resposta`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpoResp) });
     const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
     planoIA = d; $('iaResumo').innerHTML = resumoPlano(d); $('iaAplicar').disabled = false;
   } catch (e) { planoIA = null; $('iaResumo').innerHTML = `<div class="aviso">⚠ ${esc(e.message)}</div>`; $('iaAplicar').disabled = true; }
@@ -2194,7 +2406,7 @@ $('iaAplicar').addEventListener('click', () => {
   const p = planoIA; if (!p) return;
   const pega = (k) => { const c = document.querySelector(`.iaPega[data-k="${k}"]`); return c && c.checked; };
   const CAMPOS_IA = CAMPOS_DIRECAO.concat(['_aspect', 'zoom_direction', 'focus_x', 'focus_y', 'transition_som', 'override_source', 'on_screen_text']);
-  desfazerIA = { segs: JSON.stringify(segs.map(s => Object.fromEntries(CAMPOS_IA.map(k => [k, s[k] === undefined ? null : s[k]])))), destaques: JSON.stringify(destaques), graficos: JSON.stringify(graficos),
+  desfazerIA = { segs: JSON.stringify(segs.map(s => Object.fromEntries(CAMPOS_IA.map(k => [k, s[k] === undefined ? null : s[k]])))), destaques: JSON.stringify(destaques), graficos: JSON.stringify(graficos), editoriais: JSON.stringify(editoriais),
     sfx: JSON.stringify(sfx), filtro: $('gFiltro').value, paleta: JSON.stringify(paleta), leg: JSON.stringify(leg) };
   const feito = [];
   if (pega('limpar_1a')) {
@@ -2227,6 +2439,7 @@ $('iaAplicar').addEventListener('click', () => {
     destaques.sort((a, b) => a.start - b.start); feito.push(`${p.destaques.length} destaques`);
   }
   if (pega('graficos') && p.graficos) { graficos.splice(0, graficos.length, ...graficos.filter(g => g.origem !== 'ia').concat(p.graficos.map(g => Object.assign(g, { origem: 'ia' })))); graficos.sort((a, b) => a.start - b.start); feito.push(`${p.graficos.length} gráficos`); }
+  if (pega('editoriais') && p.editoriais) { editoriais.splice(0, editoriais.length, ...editoriais.filter(q => q.origem !== 'ia').concat(p.editoriais.map(q => Object.assign(q, { origem: 'ia' })))); editoriais.sort((a, b) => a.start - b.start); feito.push(`${p.editoriais.length} quadros editoriais`); }
   if (pega('filtro_cor') && p.filtro_cor) { $('gFiltro').value = p.filtro_cor; feito.push('filtro'); }
   if (pega('paleta') && p.paleta) { Object.assign(paleta, p.paleta, { modo: 'projeto', ativa: true, id: 'ia' }); paletaMudou(); feito.push('paleta'); }
   if (pega('legenda') && p.legenda) { Object.assign(leg, p.legenda, { ativa: true }); preencherLegendaUI(); feito.push('legenda'); }
@@ -2237,7 +2450,7 @@ $('iaAplicar').addEventListener('click', () => {
 $('iaDesfazer').addEventListener('click', () => {
   const u = desfazerIA; if (!u) return;
   JSON.parse(u.segs).forEach((v, i) => { if (segs[i]) Object.assign(segs[i], v); });
-  destaques.splice(0, destaques.length, ...JSON.parse(u.destaques)); graficos.splice(0, graficos.length, ...JSON.parse(u.graficos)); sfx.splice(0, sfx.length, ...JSON.parse(u.sfx));
+  destaques.splice(0, destaques.length, ...JSON.parse(u.destaques)); graficos.splice(0, graficos.length, ...JSON.parse(u.graficos)); if (u.editoriais) editoriais.splice(0, editoriais.length, ...JSON.parse(u.editoriais)); sfx.splice(0, sfx.length, ...JSON.parse(u.sfx));
   $('gFiltro').value = u.filtro; Object.assign(paleta, JSON.parse(u.paleta)); paletaMudou(); Object.assign(leg, JSON.parse(u.leg)); preencherLegendaUI();
   if (u.overlays1a) {
     fetch(`/job/${JOB}/overlays/textos-1a-ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'restaurar' }) })
@@ -2542,9 +2755,9 @@ function desenharSons() {
     box.appendChild(det);
   });
   const sa = DEF.sons_auto || { transicoes: true, cenas: true, destaques: true };
-  $('sTrans').checked = sa.transicoes !== false; $('sCenas').checked = sa.cenas !== false; $('sDest').checked = sa.destaques !== false;
+  $('sTrans').checked = sa.transicoes !== false; $('sCenas').checked = sa.cenas !== false; $('sDest').checked = sa.destaques !== false; $('sEd').checked = sa.editoriais !== false;
   $('sVol').value = DEF.sons_volume != null ? DEF.sons_volume : 0.55; $('sVolTxt').textContent = Math.round($('sVol').value * 100) + '%';
-  ['sTrans', 'sCenas', 'sDest'].forEach(id => $(id).addEventListener('change', marcarSujo));
+  ['sTrans', 'sCenas', 'sDest', 'sEd'].forEach(id => $(id).addEventListener('change', marcarSujo));
   $('sVol').addEventListener('input', () => { $('sVolTxt').textContent = Math.round($('sVol').value * 100) + '%'; marcarSujo(); });
 }
 function adicionarSfx(id, t) {
@@ -2574,11 +2787,18 @@ function propsSfx(P, x) {
   $('xDel').addEventListener('click', () => { sfx.splice(sfx.indexOf(x), 1); sel = null; marcarSujo(); desenharTimeline(); renderProps(); });
 }
 // sons tocando junto na reprodução (prévia)
-let _ultT = 0;
+let _ultT = 0, _sonsEd = [], _sonsEdChave = '';
+function atualizarSonsEd() {  // os sons dos quadros editoriais vêm do servidor (mesma conta da montagem)
+  const chave = JSON.stringify(editoriais); if (chave === _sonsEdChave) return; _sonsEdChave = chave;
+  if (!editoriais.length) { _sonsEd = []; return; }
+  fetch('/editorial/sons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itens: editoriais }) })
+    .then(r => r.json()).then(j => { _sonsEd = j.eventos || []; }).catch(() => {});
+}
 function sonsNaReproducao(t) {
   if (!tocando) { _ultT = t; return; }
   if (t < _ultT || t - _ultT > 0.5) { _ultT = t; return; }
   sfx.forEach(x => { if (x.start > _ultT && x.start <= t) tocarSom(x.som, x.volume); });
+  if ($('sEd').checked) _sonsEd.forEach(e => { if (e.inicio > _ultT && e.inicio <= t) tocarSom(e.som, e.volume); });
   if ($('sTrans').checked) segs.forEach((s, i) => {
     if (i >= segs.length - 1) return; const tr = transicaoDaEmenda(i); const tipo = tr.tipo === 'site' ? TRANS_SITE : tr.tipo;
     if (!tipo || tipo === 'none' || s.transition_som === 'nenhum') return;
@@ -2667,14 +2887,16 @@ $('btnBuscar').addEventListener('click', async () => {
       const o = $('bObra').value.trim() || null, pe = $('bPessoa').value.trim() || null;
       if (o !== (s.obra || null) || pe !== (s.personagem || null)) { s.obra = o; s.personagem = pe; marcarSujo(); }
     }
-    const r = await fetch(`/job/${JOB}/search-candidates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: $('bTermo').value, provider: $('bBanco').value, media_type: s.media_type || 'video', obra: $('bObra').value.trim(), personagem: $('bPessoa').value.trim() }) });
+    const r = await fetch(`/job/${JOB}/search-candidates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: $('bTermo').value, provider: $('bBanco').value, media_type: s.media_type || 'video', obra: $('bObra').value.trim(), personagem: $('bPessoa').value.trim(), indice: i }) });
     const d = await r.json();
     if (d.error) { $('bStatus').textContent = '⚠ ' + d.error; return; }
     if (!d.candidates || !d.candidates.length) { $('bStatus').textContent = 'Nenhum resultado.'; return; }
-    $('bStatus').textContent = 'Clique numa opção (aparece no monitor) e depois em “Usar”.';
+    $('bStatus').textContent = 'Clique numa opção (aparece no monitor) e depois em “Usar”.' + (d.ia ? ' 🤖 Na ordem da nota da IA.' : '');
     d.candidates.forEach((c) => {
       const el = document.createElement('div'); el.className = 'cand';
-      el.innerHTML = `<img src="${esc(c.thumbnail || '')}" alt=""><div class="lb">${esc(c.label || '')}</div>`;
+      const nota = c.ia_nota != null ? `<b style="position:absolute;top:3px;left:3px;background:${c.ia_nota >= 7 ? '#15803d' : c.ia_nota >= 5 ? '#b45309' : '#b91c1c'};color:#fff;border-radius:4px;padding:0 5px;font-size:11px">${c.ia_nota}</b>` : '';
+      el.style.position = 'relative'; if (c.ia_motivo) el.title = '🤖 ' + c.ia_motivo;
+      el.innerHTML = `<img src="${esc(c.thumbnail || '')}" alt="">${nota}<div class="lb">${esc(c.label || '')}</div>`;
       el.addEventListener('click', () => {
         document.querySelectorAll('#bResultados .cand').forEach(x => x.classList.toggle('sel', x === el));
         candSel = { c, provider: $('bBanco').value, media: s.media_type || 'video', i };
@@ -2923,6 +3145,7 @@ function renderProps() {
   if (sel.tipo === 'hl') return propsHl(P, destaques.find(d => d.id === sel.id));
   if (sel.tipo === 'sfx') return propsSfx(P, sfx.find(x => x.id === sel.id));
   if (sel.tipo === 'gr') return propsGr(P, graficos.find(x => x.id === sel.id));
+  if (sel.tipo === 'ed') return propsEd(P, editoriais.find(x => x.id === sel.id));
   if (sel.tipo === 'cz') return propsCz(P, censura.find(x => x.id === sel.id));
 }
 
@@ -3289,9 +3512,9 @@ function montarForm(acao) {
   add('global_aspect_fill', $('gBordas').value); add('global_trim_start_frames', $('gTrim').value);
   add('global_transition_type', $('gTransicao').value); add('global_transition_duration', $('gTransDur').value);
   add('global_filtro_cor', $('gFiltro').value); add('orientacao', $('gFormato').value); if (DEF.direcao) add('global_direcao', DEF.direcao);
-  add('destaques_json', JSON.stringify(destaques)); add('hl_fundo_json', JSON.stringify(hlFundo)); add('graficos_json', JSON.stringify(graficos)); add('censura_json', JSON.stringify(censura)); add('paleta_json', JSON.stringify(paleta)); add('legendas_json', JSON.stringify(leg)); add('kit_json', JSON.stringify(kit));
+  add('destaques_json', JSON.stringify(destaques)); add('hl_fundo_json', JSON.stringify(hlFundo)); add('graficos_json', JSON.stringify(graficos)); add('editoriais_json', JSON.stringify(editoriais)); add('censura_json', JSON.stringify(censura)); add('paleta_json', JSON.stringify(paleta)); add('legendas_json', JSON.stringify(leg)); add('kit_json', JSON.stringify(kit));
   add('sfx_json', JSON.stringify(sfx)); add('global_sons_enviados', '1'); add('global_sons_volume', $('sVol').value);
-  if ($('sTrans').checked) add('global_sons_transicoes', 'on'); if ($('sCenas').checked) add('global_sons_cenas', 'on'); if ($('sDest').checked) add('global_sons_destaques', 'on');
+  if ($('sTrans').checked) add('global_sons_transicoes', 'on'); if ($('sCenas').checked) add('global_sons_cenas', 'on'); if ($('sDest').checked) add('global_sons_destaques', 'on'); if ($('sEd').checked) add('global_sons_editoriais', 'on');
   if (acao) add('acao', acao);
   add('busca_reserva', buscaReserva || '');
   segs.forEach((s, i) => {
@@ -3632,6 +3855,7 @@ function kenBurns(el, s, prog) {
 }
 function efeitoTransicao(L, tipo, q) {
   L.style.opacity = 1; L.style.clipPath = 'none'; L.style.transform = 'none';
+  if (/^dp:/.test(tipo || '')) { const t = (DPC.transicoes || []).find(x => x.id === tipo); if (t && t.previa) tipo = t.previa; }
   if (q >= 1 || tipo === 'none') return;
   const P = (q * 100).toFixed(1), R = (100 - q * 100).toFixed(1);
   if (/^wipeleft|^smoothleft|^coverleft|^revealleft|^hlslice|^hlwind/.test(tipo)) L.style.clipPath = `inset(0 0 0 ${R}%)`;
@@ -3768,7 +3992,7 @@ function atualizarMonitor(forcar) {
   }
   A.className = 'layer' + (fill ? ' fill-zoom' : ''); B.className = 'layer' + (fill ? ' fill-zoom' : '');
   if (s.blur_sigma) { (midiaAtual || {}).style && (midiaAtual.style.filter = `blur(${Math.min(12, s.blur_sigma / 3)}px)`); } else if (midiaAtual && midiaAtual.style) midiaAtual.style.filter = '';
-  desenharHlMonitor(t); desenharLegenda(t); desenharGrMonitor(t); desenharCzMonitor(t);
+  desenharEdMonitor(t); desenharHlMonitor(t); desenharLegenda(t); desenharGrMonitor(t); desenharCzMonitor(t);
   const fcss = cssDoFiltro($('gFiltro') ? $('gFiltro').value : '');
   [A, B, $('layerCena')].forEach(L => { L.style.filter = fcss; });
   if (q >= 1 && !gCena) { const gs = gestoCss(s, t - s.start, s.end - s.start); A.style.transform = gs ? gs.tr : 'none'; A.style.opacity = gs ? gs.op : 1; }
@@ -3803,7 +4027,7 @@ function seek(t) { playhead = clamp(t, 0, total); if (!tocando || Math.abs(narr.
 function alternarPlay() {
   if (tocando) { tocando = false; narr.pause(); $('btnPlay').textContent = '▶ Reproduzir'; atualizarMonitor(); return; }
   if (playhead >= total - 0.05) seek(0);
-  tocando = true; $('btnPlay').textContent = '⏸ Pausar';
+  tocando = true; $('btnPlay').textContent = '⏸ Pausar'; atualizarSonsEd();
   try { narr.currentTime = playhead; } catch (_) {}
   narr.play().catch(() => {});
   const passo = () => { if (!tocando) return; playhead = narr.paused && narr.ended ? total : narr.currentTime; moverPlayhead(); atualizarMonitor(); sonsNaReproducao(playhead); if (playhead >= total - 0.02 || narr.ended) { tocando = false; $('btnPlay').textContent = '▶ Reproduzir'; return; } requestAnimationFrame(passo); };
@@ -3953,7 +4177,7 @@ montarTilesTransicao(); montarTilesEfeitos(); montarTilesDp(); desenharBibliotec
 ajustarStage(); desenharTimeline(); renderProps();
 if (D.erro_indice != null && segs[D.erro_indice]) { selecionar({ tipo: 'seg', i: D.erro_indice }); seek(segs[D.erro_indice].start); }
 else seek(0);
-window.estudio = { segs, overlays, destaques, graficos, censura, novaCensura, paleta, leg, kit, montarForm, selecionar, seek, aplicarTransicao, aplicarEfeito, salvar, aplicarCena, gruposCena, adicionarDestaque, aplicarDirecao, aplicarDp };
+window.estudio = { segs, overlays, destaques, graficos, editoriais, novoEditorial, censura, novaCensura, paleta, leg, kit, montarForm, selecionar, seek, aplicarTransicao, aplicarEfeito, salvar, aplicarCena, gruposCena, adicionarDestaque, aplicarDirecao, aplicarDp };
 })();
 </script>
 <style>

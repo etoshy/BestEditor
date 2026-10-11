@@ -149,6 +149,8 @@
 </div>
 
 <script>
+let IA_VENDA = false;  // 🤖 a IA descreve as fotos (ligada em /ia)
+fetch('/ia/status').then(r => r.json()).then(j => { IA_VENDA = !!(j.pode && j.pode.venda_imagens); if (IA_VENDA && document.getElementById('descPc')) document.getElementById('descPc').placeholder = 'O que é? (opcional — a 🤖 IA descreve)'; }).catch(() => {});
 const PID = {{ p.id|tojson }};
 let P = {{ p|tojson }};
 const TIPOS = {{ tipos|tojson }};
@@ -218,12 +220,13 @@ document.querySelectorAll('#abasAdd button').forEach(b => b.addEventListener('cl
 $('btnPc').addEventListener('click', async () => {
   const f = $('arqPc').files[0], desc = $('descPc').value.trim();
   if (!f) { $('addSt').textContent = 'Escolha o arquivo.'; return; }
-  if (!desc) { $('addSt').innerHTML = '<span class="vd-erro">Diga o que é esse arquivo antes de enviar.</span>'; $('descPc').focus(); return; }
+  if (!desc && !IA_VENDA) { $('addSt').innerHTML = '<span class="vd-erro">Diga o que é esse arquivo antes de enviar.</span>'; $('descPc').focus(); return; }
   const fd = new FormData(); fd.append('arquivo', f); fd.append('descricao', desc);
   $('addSt').textContent = '⏳ enviando…';
   const r = await fetch(`/vendas/${PID}/midia`, { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
   if (!r.ok) { $('addSt').innerHTML = `<span class="vd-erro">⚠ ${esc(d.erro || r.status)}</span>`; return; }
-  $('addSt').innerHTML = `<span class="vd-ok">✔ ${esc(d.midia.id)} adicionado</span>`; $('arqPc').value = ''; $('descPc').value = ''; recarregar();
+  $('addSt').innerHTML = `<span class="vd-ok">✔ ${esc(d.midia.id)} adicionado${d.ia ? ' — 🤖 a IA está descrevendo' : ''}</span>`; $('arqPc').value = ''; $('descPc').value = ''; recarregar();
+  if (d.ia) setTimeout(recarregar, 8000);
 });
 $('btnUrl').addEventListener('click', async () => {
   $('addSt').textContent = '⏳ abrindo o link…';
@@ -249,11 +252,13 @@ function desenharMidias() {
     const vis = m.tipo === 'texto' ? `<div class="txt">${esc(m.conteudo)}</div>`
       : m.url_arquivo ? (m.tipo === 'video' ? `<video class="th" src="${esc(m.url_arquivo)}" muted controls preload="metadata"></video>` : `<img class="th" src="${esc(m.url_arquivo)}" loading="lazy" alt="">`)
       : `<div class="th" style="display:flex;align-items:center;justify-content:center;color:#666;">🔗 página (sem imagem)</div>`;
-    const falta = !(m.descricao || m.og);
+    const falta = !(m.descricao || m.og || m.ia);
+    const fi = m.ia;
     return `<div class="vd-m ${falta ? 'falta' : ''}" data-id="${esc(m.id)}">
       ${vis}
       <div style="margin-top:5px;"><span class="vd-id">${esc(m.id)}</span> ${esc(TIPOS[m.tipo] || m.tipo)} · ${m.origem === 'pc' ? '💻 do PC' : '🔗 de link'}${m.do_produto ? ' · da loja' : ''}</div>
       ${m.transcricao ? trBloco(m.transcricao) : ''}
+      ${fi ? `<div class="vd-og" style="white-space:normal;color:#3730a3" title="ficha da IA">🤖 ${esc(fi.descricao)}${fi.quem_ou_o_que ? ' — ' + esc(fi.quem_ou_o_que) : ''}${fi.texto_na_imagem ? ' · “' + esc(fi.texto_na_imagem) + '”' : ''}</div>` : ''}
       ${m.tipo !== 'texto' && m.conteudo ? `<details style="font-size:0.75rem;margin:3px 0;"><summary style="cursor:pointer;">📄 conteúdo da página (${m.conteudo.length} caracteres — vai pro prompt)</summary><div style="white-space:pre-wrap;max-height:140px;overflow:auto;background:#fff;border:1px solid #eee;border-radius:4px;padding:4px;">${esc(m.conteudo)}</div></details>` : ''}
       ${m.og ? `<div class="vd-og" title="${esc((og.titulo || '') + ' — ' + (og.descricao || ''))}">🏷 OG: <b>${esc(og.titulo || '')}</b> ${esc(og.descricao || '')}</div>` : ''}
       <textarea rows="2" class="mDesc" placeholder="${falta ? '⚠ Diga o que é (obrigatório pra IA entender)' : 'O que é'}">${esc(m.descricao || '')}</textarea>

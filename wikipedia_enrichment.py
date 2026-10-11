@@ -214,9 +214,74 @@ def identificar_entidades_wikipedia(
     sem esse enriquecimento.
     """
     try:
+        com_ia = _entidades_com_ia(segments)  # 🤖 com a IA ligada: nomes da ficha + desambiguação
+        if com_ia is not None:
+            return com_ia
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         candidatos = extrair_entidades_candidatas(segments, max_candidatos=max_candidatos)
         if not candidatos:
             return []
         return buscar_entidades_confirmadas_na_wikipedia(candidatos, max_verificacoes=max_verificacoes)
     except Exception:  # noqa: BLE001
         return []
+
+
+def _entidades_com_ia(segments: List[Dict[str, Any]], max_entidades: int = 40) -> Optional[List[Dict[str, str]]]:
+    """🤖 (LEIA-ME §8, passos B e C) Os nomes vêm da FICHA do vídeo (pessoas e lugares, com o artigo
+    da Wikipedia sugerido) em vez da heurística de maiúsculas; o 1º resultado da busca só é aceito
+    quando bate com a ficha — as dúvidas vão TODAS numa chamada só pra IA escolher o artigo certo.
+    Confirma com imagem que passou no filtro (sem bandeira/brasão/mapa). None = sem IA (usa o de sempre)."""
+    import ia_servico
+    if not ia_servico.ativo("wikipedia"):
+        return None
+    import ia_midia
+    roteiro = " ".join(str(s.get("text") or "").strip() for s in segments or [])
+    ficha = ia_midia.ficha_visual(roteiro)
+    if not ficha:
+        return None
+    if _TOOLKIT_DIR not in sys.path:
+        sys.path.insert(0, _TOOLKIT_DIR)
+    from wikipedia_api_client import WikipediaAPIClient, WikipediaAPIClientError
+    itens = [dict(x, _tipo="pessoa") for x in ficha.get("personagens") or []] + [dict(x, _tipo="lugar") for x in ficha.get("lugares") or []]
+    client = WikipediaAPIClient()
+    escolhidos: Dict[str, str] = {}
+    duvidas = []
+    try:
+        for it in itens[:max_entidades]:
+            nome = (it.get("nome") or "").strip()
+            if not nome:
+                continue
+            sugerido = (it.get("wikipedia_en") or "").strip()
+            try:
+                cands = client.buscar_titulos(sugerido or it.get("busca") or nome, 5)
+            except WikipediaAPIClientError:
+                continue
+            if not cands:
+                continue
+            if sugerido and cands[0]["titulo"].lower() == sugerido.lower():
+                escolhidos[nome] = cands[0]["titulo"]
+            else:
+                duvidas.append({"nome": nome, "contexto": f"{it['_tipo']}; {it.get('como_aparece') or it.get('busca') or ''}; {it.get('epoca') or ficha.get('epoca') or ''}",
+                                "candidatos": cands})
+        if duvidas:
+            res = ia_midia.desambiguar(duvidas, ficha, roteiro)
+            for d in duvidas:
+                t = res.get(d["nome"]) if d["nome"] in res else d["candidatos"][0]["titulo"]
+                if t:
+                    escolhidos[d["nome"]] = t
+        confirmadas = []
+        for nome, titulo in escolhidos.items():
+            try:
+                imgs = client.get_images_filtradas(titulo, max_images=1)
+            except WikipediaAPIClientError:
+                continue
+            if imgs:
+                confirmadas.append({"termo": nome, "titulo_pagina": titulo, "descricao": (imgs[0].descricao or imgs[0].legenda or "")[:150]})
+        return confirmadas
+    finally:
+        try:
+            client.session.close()
+        except Exception:  # noqa: BLE001
+            pass

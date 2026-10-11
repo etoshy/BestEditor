@@ -21,6 +21,17 @@ import pytest
 os.environ["VOICE_GENERATOR_DESATIVAR_ISOLAMENTO"] = "1"
 # a suíte não deve carregar projetos de verdade de jobs/ ao importar o app
 os.environ["NARRATION_SITE_NAO_CARREGAR_PROJETOS"] = "1"
+# os testes usam o catálogo DE FÁBRICA: os seus extras (assets/darkplanner/extras) ficam de fora
+# (os testes que precisam de extras apontam DP_EXTRAS_DIR pra uma pasta própria)
+_EXTRAS_VAZIO = "/tmp/_narration_site_tests_extras_vazio"
+os.makedirs(_EXTRAS_VAZIO, exist_ok=True)
+os.environ.setdefault("DP_EXTRAS_DIR", _EXTRAS_VAZIO)
+# 🤖 a IA dos testes começa DESLIGADA e sem a sua chave (os testes da IA usam um transporte falso)
+_IA_DADOS = "/tmp/_narration_site_tests_ia"
+shutil.rmtree(_IA_DADOS, ignore_errors=True)
+os.makedirs(_IA_DADOS, exist_ok=True)
+os.environ["IA_DADOS_DIR"] = _IA_DADOS
+os.environ.pop("ANTHROPIC_API_KEY", None)
 
 TEST_TMP_ROOT = "/tmp/_narration_site_tests"
 

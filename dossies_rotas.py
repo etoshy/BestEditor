@@ -15,7 +15,8 @@ from werkzeug.utils import secure_filename
 import dossies as ds
 import vendas as vd
 
-_TRAVA = threading.RLock()  # o projeto é mexido por rotas e pelas fontes baixando em segundo plano
+_TRAVA = threading.RLock()
+_IA_ESTADO: Dict[str, Dict[str, Any]] = {}  # 🤖 ficha das imagens rodando por projeto  # o projeto é mexido por rotas e pelas fontes baixando em segundo plano
 
 
 def registrar(app, base_dir: str) -> None:
@@ -218,7 +219,9 @@ def registrar(app, base_dir: str) -> None:
         desc = (request.form.get("descricao") or "").strip()
         if not arq or not arq.filename:
             return jsonify({"erro": "Escolha o arquivo."}), 400
-        if not desc:
+        import ia_servico
+        com_ia = ia_servico.ativo("dossie_imagens")
+        if not desc and not com_ia:  # 🤖 com a IA ligada, ela descreve sozinha (passo D)
             return jsonify({"erro": "Diga o que é esse arquivo (ex.: \"foto da casa onde o crime aconteceu\")."}), 400
         tipo = vd.tipo_do_arquivo(arq.filename)
         if not tipo:
@@ -230,9 +233,53 @@ def registrar(app, base_dir: str) -> None:
             if not p:
                 return jsonify({"erro": "Projeto não encontrado."}), 404
             arq.save(dest)
-            m = ds.adicionar_midia(p, tipo=tipo, origem="pc", arquivo=os.path.basename(dest), nome=arq.filename, descricao=desc, usar="descricao")
+            m = ds.adicionar_midia(p, tipo=tipo, origem="pc", arquivo=os.path.basename(dest), nome=arq.filename, descricao=desc,
+                                   usar="descricao" if desc else "ambos")
             ds.salvar(base_dir, p)
-        return jsonify({"ok": True, "midia": m})
+        if com_ia:
+            threading.Thread(target=lambda: ds.ia_analisar_imagens(base_dir, pid, trava=_TRAVA, ids=[m["id"]]), daemon=True).start()
+        return jsonify({"ok": True, "midia": m, "ia": com_ia})
+
+    @app.route("/modelos-video/<pid>/ia/imagens", methods=["POST"])
+    def dossie_ia_imagens(pid: str):
+        """🤖 Ficha de todas as imagens que ainda não têm (ou de todas, com refazer) — em segundo plano."""
+        import ia_servico
+        motivo = ia_servico.motivo_desligado("dossie_imagens")
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo}), 400
+        if not _proj(pid):
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        refazer = bool((request.get_json(silent=True) or {}).get("refazer"))
+
+        def rodar():
+            r = ds.ia_analisar_imagens(base_dir, pid, trava=_TRAVA, refazer=refazer)
+            _IA_ESTADO[pid] = {"rodando": False, **r}
+        _IA_ESTADO[pid] = {"rodando": True}
+        threading.Thread(target=rodar, daemon=True).start()
+        return jsonify({"ok": True})
+
+    @app.route("/modelos-video/<pid>/ia/estado")
+    def dossie_ia_estado(pid: str):
+        return jsonify(_IA_ESTADO.get(pid) or {"rodando": False})
+
+    @app.route("/modelos-video/<pid>/ia/marcas", methods=["POST"])
+    def dossie_ia_marcas(pid: str):
+        """🤖 Passo E: as marcas [I3] do roteiro que não combinam com a imagem."""
+        import ia_servico
+        motivo = ia_servico.motivo_desligado("dossie_marcas")
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo}), 400
+        p = _proj(pid)
+        if not p or not p.get("resultado"):
+            return jsonify({"erro": "Leia a resposta da IA (o roteiro) primeiro."}), 400
+        r = ds.ia_conferir_marcas(p)
+        if r is None:
+            return jsonify({"erro": "A IA não respondeu agora — tente de novo."}), 200
+        with _TRAVA:
+            p = _proj(pid)
+            p["ia_marcas"] = r
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "problemas": r})
 
     @app.route("/modelos-video/<pid>/midia-url", methods=["POST"])
     def dossie_midia_url(pid: str):
@@ -315,6 +362,10 @@ def registrar(app, base_dir: str) -> None:
                     m["conteudo"] = str(c.get("conteudo") or "").strip()[:12000]
                 if c.get("usar") in ("og", "descricao", "ambos"):
                     m["usar"] = c["usar"]
+                if "descartada" in c:  # 🤖 recuperar (ou descartar) uma imagem que a IA marcou como lixo/anúncio
+                    m["descartada"] = bool(c["descartada"])
+                    if not m["descartada"]:
+                        m.pop("duplicada_de", None)
             ds.salvar(base_dir, p)
         return jsonify({"ok": True})
 

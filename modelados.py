@@ -445,12 +445,14 @@ CENAS ("cenas", em ordem) — cerca de {n} cenas de ~{dc:g}s cada (uma cena nova
 
 {__import__("metodo_roteiro").bloco("curto" if alvo <= 60 else "longo")}
 
+{__import__("metodo_roteiro").bloco_titulos(1)}
+
 Molde que o site usa na imagem: "{estilo['prompt_imagem']}"
 Molde que o site usa na animação: "{estilo['prompt_animacao']}"
 
 FORMATO EXATO DA RESPOSTA:
 {{
-  "titulo": "título curto do vídeo",
+  "titulo": "título do vídeo numa das fórmulas de título (até ~60 caracteres)",
   "sinopse": "1 frase",
   "personagens": [
     {{"nome": "Narrador", "voz": "{vp[0]['slug']}", "genero": "{vp[0]['genero'] or 'masculino'}", "idade": "{vp[0]['idade'] or 'adulto'}", "aparencia": ""}},

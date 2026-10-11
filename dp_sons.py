@@ -28,7 +28,21 @@ SONS_DIR = os.path.join(_AQUI, "assets", "sons")
 @lru_cache(maxsize=1)
 def _manifesto() -> Dict[str, Any]:
     with open(os.path.join(SONS_DIR, "sons.json"), encoding="utf-8") as f:
-        return json.load(f)
+        m = json.load(f)
+    try:  # sons dos extras (python dp_guia.py som arquivo.mp3)
+        import dp_extras
+        ids = {s["id"] for s in m["sons"]}
+        for s in dp_extras.carregar().get("sons") or []:
+            if s["id"] in ids:
+                dp_extras.avisar(f"{s['_arquivo']}: som {s['id']} já existe — escolha outro nome.")
+            elif not os.path.isfile(os.path.join(SONS_DIR, s["arquivo"])):
+                dp_extras.avisar(f"{s['_arquivo']}: som {s['id']}: arquivo assets/sons/{s['arquivo']} não existe.")
+            else:
+                m["sons"].append({k: v for k, v in s.items() if k != "_arquivo"})
+                ids.add(s["id"])
+    except Exception:  # noqa: BLE001
+        pass
+    return m
 
 
 def sons() -> List[Dict[str, Any]]:
@@ -69,7 +83,10 @@ MAPA_DP = {
 
 
 def do_darkplanner(nome: str) -> Optional[str]:
-    """'tpl:wh_cinema_4.mp3' / 'camera_1.mp3' -> id do som no site."""
+    """'tpl:wh_cinema_4.mp3' / 'camera_1.mp3' -> id do som no site. Um id do site
+    ("impacto/impacto_5", "meus/boom") vale direto — é o que os extras usam."""
+    if nome and som(nome):
+        return nome
     base = re.sub(r"^tpl:", "", nome or "")
     base = os.path.splitext(base)[0]
     sid = MAPA_DP.get(base)
@@ -184,13 +201,16 @@ def mixar(narracao: str, eventos: List[Dict[str, Any]], saida: str, volume_sfx: 
     return saida
 
 
-def eventos_automaticos(segments, plano_transicoes, grupos, destaques, opcoes: Dict[str, Any]) -> List[Dict[str, Any]]:
+def eventos_automaticos(segments, plano_transicoes, grupos, destaques, opcoes: Dict[str, Any], editoriais=None) -> List[Dict[str, Any]]:
     """Sons automáticos: transições (no começo da transição), entrada de cada
-    take das cenas (os sons que o template pede) e destaques de texto (o som
-    do estilo, alinhado com o impacto)."""
+    take das cenas (os sons que o template pede), destaques de texto (o som
+    do estilo, alinhado com o impacto) e os quadros editoriais."""
     import cenas_dp
     import dp_destaques
     ev: List[Dict[str, Any]] = []
+    if editoriais and opcoes.get("editoriais", True):
+        import dp_editorial
+        ev += dp_editorial.eventos_sonoros(editoriais)
     if opcoes.get("transicoes", True):
         for i, (tipo, d) in enumerate(plano_transicoes):
             if tipo == "none" or d <= 0:

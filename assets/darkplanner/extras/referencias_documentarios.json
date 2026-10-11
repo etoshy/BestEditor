@@ -1,0 +1,1817 @@
+{
+ "_leia": "100 extras inspirados em documentários conhecidos (BBC, Netflix, Ken Burns, Errol Morris, Herzog, brasileiros). As miniaturas já estão em assets/darkplanner/galeria. Confira com  python dp_guia.py verificar  e reinicie o site (transição nova só vale depois de reiniciar). O campo \"direcoes\" de cada item diz em quais Direções do sistema ele entra (o site usa isso desde a v84_51); \"_direcoes\" no fim é só um resumo.",
+ "transicoes": [
+  {
+   "id": "pe2_dissolve_natureza",
+   "rotulo": "Dissolve de natureza (Planeta Terra II)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.2,
+   "ritmo": "cinema",
+   "xfade": "fade",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "blue_planet_mergulho",
+   "rotulo": "Mergulho no azul (Planeta Azul)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "expr": "clip((A*(1-P)+B*P)*(1-max(0,1-abs(2*P-1)*1.4))+if(eq(PLANE,0),40,if(eq(PLANE,1),170,110))*max(0,1-abs(2*P-1)*1.4),0,255)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "frozen_planet_branco",
+   "rotulo": "Branco de gelo (Planeta Congelado)",
+   "familia": "luz",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "expr": "clip((A*(1-P)+B*P)*(1-max(0,1-abs(2*P-1)*1.4))+if(eq(PLANE,0),235,128)*max(0,1-abs(2*P-1)*1.4),0,255)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "koyaanisqatsi_timelapse",
+   "rotulo": "Varredura de timelapse (Koyaanisqatsi)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "medio",
+   "xfade": "hrslice",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "baraka_respiro",
+   "rotulo": "Respiro contemplativo (Baraka)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.2,
+   "ritmo": "cinema",
+   "xfade": "fadeslow",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apollo11_contagem",
+   "rotulo": "Corte de contagem regressiva (Apollo 11)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.5,
+   "ritmo": "rapido",
+   "xfade": "fadefast",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "apollo11_filme_16mm",
+   "rotulo": "Película de 16 mm (Apollo 11)",
+   "familia": "luz",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "igual_a": "ft_pk_film",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "they_shall_cor_entra",
+   "rotulo": "A cor entra (Eles Não Envelhecerão)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "xfade": "fadegrays",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "senna_transmissao",
+   "rotulo": "Corte de transmissão de TV (Senna)",
+   "familia": "glitch",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "rapido",
+   "igual_a": "ft_pk2_glitch",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "amy_camcorder",
+   "rotulo": "Rebobinar de camcorder (Amy)",
+   "familia": "glitch",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "vdslice",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "errol_morris_corte",
+   "rotulo": "Corte de entrevista (Errol Morris)",
+   "familia": "fade",
+   "int": 1,
+   "energia": 0.2,
+   "ritmo": "medio",
+   "xfade": "dissolve",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "herzog_horizonte",
+   "rotulo": "Horizonte que abre (Werner Herzog)",
+   "familia": "forma",
+   "int": 2,
+   "energia": 0.3,
+   "ritmo": "cinema",
+   "xfade": "vertopen",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "free_solo_paredao",
+   "rotulo": "Subida pelo paredão (Free Solo)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.5,
+   "ritmo": "medio",
+   "xfade": "wipeup",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "man_on_wire_corda",
+   "rotulo": "Travessia na corda (O Equilibrista)",
+   "familia": "varredura",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "medio",
+   "expr": "if(lt(X/W,P),B,A)*(1-lt(abs(Y/H-0.5),0.004))+235*lt(abs(Y/H-0.5),0.004)*eq(PLANE,0)+128*lt(abs(Y/H-0.5),0.004)*gt(PLANE,0)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "social_dilemma_notificacao",
+   "rotulo": "Notificação deslizando (O Dilema das Redes)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.6,
+   "ritmo": "rapido",
+   "xfade": "slidedown",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "fyre_stories",
+   "rotulo": "Troca de stories (Fyre Festival)",
+   "familia": "varredura",
+   "int": 3,
+   "energia": 0.7,
+   "ritmo": "rapido",
+   "xfade": "coverleft",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "blackfish_onda",
+   "rotulo": "Onda do tanque (Blackfish)",
+   "familia": "varredura",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "medio",
+   "xfade": "wave_wipe",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "coutinho_corte_seco",
+   "rotulo": "Corte seco de entrevista (Eduardo Coutinho)",
+   "familia": "corte",
+   "int": 1,
+   "energia": 0.2,
+   "ritmo": "medio",
+   "xfade": "fadefast",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "onibus174_plantao",
+   "rotulo": "Plantão de TV (Ônibus 174)",
+   "familia": "impacto",
+   "int": 4,
+   "energia": 0.7,
+   "ritmo": "rapido",
+   "igual_a": "gl_flash",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "ww2_cores_arquivo",
+   "rotulo": "Arquivo da guerra (Apocalipse: 2ª Guerra)",
+   "familia": "fade",
+   "int": 2,
+   "energia": 0.4,
+   "ritmo": "cinema",
+   "igual_a": "gl_fade_grao",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "efeitos": [
+  {
+   "id": "ken_burns_vietna",
+   "rotulo": "Ken Burns lento (A Guerra do Vietnã)",
+   "camera": "in",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "ken_burns_carta",
+   "rotulo": "Descendo pela carta (Ken Burns)",
+   "camera": "pan_down",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "pe2_panoramica",
+   "rotulo": "Panorâmica de savana (Planeta Terra II)",
+   "camera": "pan_right",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apollo11_sobe_foguete",
+   "rotulo": "Subindo pelo foguete (Apollo 11)",
+   "camera": "zoom_pan_up",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "they_shall_rosto",
+   "rotulo": "Aproxima no rosto (Eles Não Envelhecerão)",
+   "camera": "zoom_pan_left",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "koyaanisqatsi_respiro",
+   "rotulo": "Cidade respirando (Koyaanisqatsi)",
+   "camera": "respiro",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apollo11_vibracao",
+   "rotulo": "Vibração de lançamento (Apollo 11)",
+   "familia": "atmosfera",
+   "int": 4,
+   "energia": 0.8,
+   "filtro": "[base]scale=iw+30:ih+30,crop=iw-30:ih-30:'15+10*sin(t*41)':'15+10*cos(t*37)'[base]",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "free_solo_vento",
+   "rotulo": "Câmera no vento (Free Solo)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]scale=iw+16:ih+16,crop=iw-16:ih-16:'8+6*sin(t*2.3)':'8+6*cos(t*3.1)'[base]",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "amy_camcorder_ruido",
+   "rotulo": "Ruído de camcorder (Amy)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]noise=alls=14:allf=t,eq=saturation=1.15:contrast=0.95,gblur=sigma=0.7[base]",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "senna_tv_90",
+   "rotulo": "TV dos anos 90 (Senna)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]rgbashift=rh=2:bh=-2,eq=saturation=1.1:contrast=0.92,noise=alls=9:allf=t[base]",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "apollo11_grao_nasa",
+   "rotulo": "Grão de 16 mm da NASA (Apollo 11)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "filtro": "[base]noise=alls=16:allf=t+u,eq=contrast=1.08:saturation=1.05[base]",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "they_shall_manivela",
+   "rotulo": "Manivela de cinema mudo (Eles Não Envelhecerão)",
+   "familia": "atmosfera",
+   "int": 3,
+   "energia": 0.5,
+   "filtro": "[base]eq=brightness='0.03*sin(2*PI*t*9)':eval=frame,noise=alls=20:allf=t+u,vignette=angle=PI/4[base]",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "ww2_sepia_tremido",
+   "rotulo": "Sépia tremido (arquivo de guerra)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.4,
+   "filtro": "[base]colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,eq=brightness='0.025*sin(2*PI*t*6)':eval=frame,noise=alls=15:allf=t[base]",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "koyaanisqatsi_pulso",
+   "rotulo": "Pulso urbano (Koyaanisqatsi)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.5,
+   "filtro": "[base]eq=brightness='0.05*sin(2*PI*t*1.2)':contrast=1.15:eval=frame[base]",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "blue_planet_caustica",
+   "rotulo": "Luz de água (Planeta Azul)",
+   "familia": "atmosfera",
+   "int": 2,
+   "energia": 0.3,
+   "filtro": "[base]colorbalance=bs=0.1:bm=0.08:gm=0.03,eq=brightness='0.03*sin(2*PI*t*0.7)+0.015*sin(2*PI*t*2.3)':eval=frame[base]",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "frozen_planet_brilho",
+   "rotulo": "Brilho de neve (Planeta Congelado)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_particulas_lentas",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "herzog_neblina",
+   "rotulo": "Neblina selvagem (Werner Herzog)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.3,
+   "igual_a": "ov_neblina",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "jiro_vapor",
+   "rotulo": "Vapor de cozinha (Jiro Dreams of Sushi)",
+   "familia": "atmosfera",
+   "int": 1,
+   "energia": 0.2,
+   "igual_a": "ov_fumaca_rasteira",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  }
+ ],
+ "entradas": [
+  {
+   "id": "errol_morris_entra",
+   "rotulo": "Entrevistado olhando para a câmera (Errol Morris)",
+   "igual_a": "zoom_soft",
+   "durAlvoS": 0.7,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "ken_burns_foto",
+   "rotulo": "Foto surgindo (Ken Burns)",
+   "igual_a": "dissolve_foco",
+   "durAlvoS": 1.2,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "documento_desliza",
+   "rotulo": "Documento deslizando na mesa",
+   "igual_a": "desliza_suave",
+   "durAlvoS": 0.8,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "recorte_cai",
+   "rotulo": "Recorte de jornal caindo",
+   "igual_a": "drop",
+   "durAlvoS": 0.5,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "pe2_ergue",
+   "rotulo": "Animal surgindo (Planeta Terra II)",
+   "igual_a": "ergue_suave",
+   "durAlvoS": 1.1,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apollo11_tela",
+   "rotulo": "Monitor da NASA ligando (Apollo 11)",
+   "igual_a": "tv_on",
+   "durAlvoS": 0.45,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "social_dilemma_pop",
+   "rotulo": "Notificação pulando (O Dilema das Redes)",
+   "igual_a": "pop",
+   "durAlvoS": 0.25,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "fyre_estilingue",
+   "rotulo": "Post de influencer (Fyre Festival)",
+   "igual_a": "slingshot",
+   "durAlvoS": 0.35,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "senna_foco",
+   "rotulo": "Foco no capacete (Senna)",
+   "igual_a": "focus",
+   "durAlvoS": 0.5,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "super_size_mola",
+   "rotulo": "Mola de lanchonete (Super Size Me)",
+   "igual_a": "spring_in",
+   "durAlvoS": 0.4,
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "searching_sugar_revela",
+   "rotulo": "Revelação do mistério (Searching for Sugar Man)",
+   "igual_a": "revela_cima",
+   "durAlvoS": 1.0,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "coutinho_assenta",
+   "rotulo": "Entrevista que assenta (Edifício Master)",
+   "igual_a": "assenta",
+   "durAlvoS": 0.7,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ ],
+ "filtros": [
+  {
+   "id": "pe2_hiper_real",
+   "rotulo": "Hiper-real (Planeta Terra II)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.35:contrast=1.1,unsharp=5:5:0.7",
+   "css": "saturate(1.35) contrast(1.1)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "blue_planet_azul",
+   "rotulo": "Azul profundo (Planeta Azul)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=bs=0.18:bm=0.12:gs=0.04:rm=-0.08,eq=saturation=1.15:contrast=1.08",
+   "css": "saturate(1.15) contrast(1.08) hue-rotate(25deg)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "frozen_planet_gelo",
+   "rotulo": "Gelo (Planeta Congelado)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=bs=0.1:bm=0.08:bh=0.06,eq=brightness=0.05:saturation=0.8:contrast=1.05",
+   "css": "brightness(1.05) saturate(.8) hue-rotate(15deg)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "our_planet_verde",
+   "rotulo": "Verde vivo (Nosso Planeta)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=gs=0.05:gm=0.06:rm=-0.03,eq=saturation=1.25:contrast=1.05",
+   "css": "saturate(1.25) contrast(1.05) hue-rotate(8deg)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "octopus_kelp",
+   "rotulo": "Floresta de algas (Professor Polvo)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=gs=0.08:gm=0.08:bm=0.04:rm=-0.06,eq=saturation=0.9:contrast=1.05",
+   "css": "saturate(.9) hue-rotate(30deg) sepia(.15)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "free_solo_granito",
+   "rotulo": "Granito ao sol (Free Solo)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=rm=0.06:gm=0.03:bm=-0.06,eq=contrast=1.12:saturation=1.05",
+   "css": "contrast(1.12) sepia(.15)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "apollo11_60s",
+   "rotulo": "NASA 1969 (Apollo 11)",
+   "grupo": "documentarios",
+   "cadeia": "curves=preset=vintage,eq=saturation=1.1:contrast=1.08,noise=alls=8:allf=t",
+   "css": "sepia(.3) saturate(1.1) contrast(1.08)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "they_shall_colorizado",
+   "rotulo": "Colorizado da 1ª Guerra (Eles Não Envelhecerão)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=0.6:contrast=1.1,colorbalance=rm=0.06:gm=0.04:bm=-0.06,noise=alls=10:allf=t",
+   "css": "saturate(.6) contrast(1.1) sepia(.3)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "ww2_colorizado",
+   "rotulo": "Colorizado da 2ª Guerra",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=0.7:contrast=1.15,colorbalance=gm=0.03:bm=-0.04",
+   "css": "saturate(.7) contrast(1.15) sepia(.2)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "koyaanisqatsi_contraste",
+   "rotulo": "Contraste urbano (Koyaanisqatsi)",
+   "grupo": "documentarios",
+   "cadeia": "eq=contrast=1.3:saturation=1.1,colorbalance=bs=0.05:rh=0.06",
+   "css": "contrast(1.3) saturate(1.1)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "senna_broadcast_90",
+   "rotulo": "Transmissão anos 90 (Senna)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.15:contrast=0.92:gamma=1.05,gblur=sigma=0.6,noise=alls=7:allf=t",
+   "css": "saturate(1.15) contrast(.92) blur(.3px)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "amy_mini_dv",
+   "rotulo": "Mini DV caseiro (Amy)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.2:contrast=0.9:brightness=0.03,colorbalance=rh=0.04:bs=0.04,noise=alls=9:allf=t",
+   "css": "saturate(1.2) contrast(.9) brightness(1.03)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "get_back_1969",
+   "rotulo": "Película de 1969 (The Beatles: Get Back)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=rm=0.06:gm=0.04:bm=-0.05,eq=saturation=0.95:contrast=1.05,noise=alls=7:allf=t",
+   "css": "sepia(.2) contrast(1.05)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  {
+   "id": "jiro_macro",
+   "rotulo": "Macro quente (Jiro Dreams of Sushi)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=rm=0.05:gm=0.02:bm=-0.04,eq=saturation=1.15:contrast=1.15,vignette=angle=PI/5",
+   "css": "saturate(1.15) contrast(1.15) sepia(.1)",
+   "direcoes": [
+    "sys_cinema",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "errol_morris_limpo",
+   "rotulo": "Entrevista limpa (Errol Morris)",
+   "grupo": "documentarios",
+   "cadeia": "eq=contrast=1.08:saturation=0.9:brightness=0.02",
+   "css": "contrast(1.08) saturate(.9)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_tudo"
+   ]
+  },
+  {
+   "id": "herzog_cru",
+   "rotulo": "Natureza crua (O Homem Urso)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=0.85:contrast=1.05,colorbalance=gm=0.03:rm=0.03",
+   "css": "saturate(.85) contrast(1.05)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "social_dilemma_tech",
+   "rotulo": "Azul de tela (O Dilema das Redes)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=bs=0.1:bm=0.06:rh=-0.03,eq=saturation=0.85:contrast=1.12:brightness=-0.02",
+   "css": "saturate(.85) contrast(1.12) hue-rotate(12deg)",
+   "direcoes": [
+    "sys_dinamico",
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "fyre_instagram",
+   "rotulo": "Filtro de influencer (Fyre Festival)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.3:brightness=0.05:contrast=1.05,colorbalance=rh=0.05:bh=0.03",
+   "css": "saturate(1.3) brightness(1.05) contrast(1.05)",
+   "direcoes": [
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "blackfish_oceano",
+   "rotulo": "Teal de aquário (Blackfish)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=bs=0.12:gs=0.06:rm=-0.06,eq=saturation=1.05:contrast=1.1",
+   "css": "contrast(1.1) hue-rotate(20deg)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "coutinho_video",
+   "rotulo": "Vídeo de entrevista (Edifício Master)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=0.85:contrast=0.95:gamma=1.04,noise=alls=5:allf=t",
+   "css": "saturate(.85) contrast(.95)",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "onibus174_tv_2000",
+   "rotulo": "Telejornal 2000 (Ônibus 174)",
+   "grupo": "documentarios",
+   "cadeia": "eq=saturation=1.1:contrast=1.05,rgbashift=rh=2:bh=-2,gblur=sigma=0.5,noise=alls=8:allf=t",
+   "css": "saturate(1.1) contrast(1.05) blur(.3px)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  {
+   "id": "honeyland_dourado",
+   "rotulo": "Luz dourada do campo (Honeyland)",
+   "grupo": "documentarios",
+   "cadeia": "colorbalance=rm=0.08:gm=0.05:bm=-0.1,eq=saturation=1.1:gamma=1.04",
+   "css": "sepia(.3) saturate(1.1)",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  }
+ ],
+ "destaques": {
+  "errol_morris_entrevistado": {
+   "base": "doc_lower",
+   "label": "Entrevistado (Errol Morris)",
+   "categoria": "meus",
+   "amostra": "ROBERT McNAMARA · Ex-secretário",
+   "tipografia": {
+    "fonte": "worksans"
+   },
+   "whenToUse": [
+    "Nome e cargo de quem fala"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "apollo11_t_menos": {
+   "base": "doc_contador",
+   "label": "Contagem regressiva (Apollo 11)",
+   "categoria": "meus",
+   "amostra": "T-MENOS 00:00:10",
+   "tipografia": {
+    "fonte": "mono",
+    "caixaAlta": true
+   },
+   "audio": {
+    "assets": [
+     "foley/catraca_rolagem"
+    ],
+    "evento": "rolagem"
+   },
+   "whenToUse": [
+    "Contagem regressiva ou cronômetro"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "they_shall_anos": {
+   "base": "selo_ano",
+   "label": "Anos da guerra (Eles Não Envelhecerão)",
+   "categoria": "meus",
+   "amostra": "1914 – 1918",
+   "tipografia": {
+    "fonte": "garamond"
+   },
+   "whenToUse": [
+    "Período histórico"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "senna_volta": {
+   "base": "doc_numero",
+   "label": "Volta da corrida (Senna)",
+   "categoria": "meus",
+   "amostra": "VOLTA 71",
+   "tipografia": {
+    "fonte": "rajdhani",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Momento exato de uma competição"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "amy_diario": {
+   "base": "v2_caneta",
+   "label": "Diário escrito à mão (Amy)",
+   "categoria": "meus",
+   "amostra": "eu só quero cantar",
+   "tipografia": {
+    "fonte": "lora",
+    "italico": true
+   },
+   "whenToUse": [
+    "Trechos de cartas, diários ou letras"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "jiro_estrelas": {
+   "base": "selo_dado",
+   "label": "Selo de estrelas (Jiro Dreams of Sushi)",
+   "categoria": "meus",
+   "amostra": "3 ESTRELAS MICHELIN",
+   "tipografia": {
+    "fonte": "playfair",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Prêmio, título ou conquista"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "free_solo_altura": {
+   "base": "numerao",
+   "label": "Altura do paredão (Free Solo)",
+   "categoria": "meus",
+   "amostra": "914 m",
+   "tipografia": {
+    "fonte": "anton"
+   },
+   "coreografia": {
+    "entrada": "contador"
+   },
+   "whenToUse": [
+    "Medida impressionante"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "koyaanisqatsi_palavra": {
+   "base": "hl_tracking_reveal",
+   "label": "Palavra espaçada (Koyaanisqatsi)",
+   "categoria": "meus",
+   "amostra": "KOYAANISQATSI",
+   "tipografia": {
+    "fonte": "montserrat",
+    "caixaAlta": true
+   },
+   "maxPorVideo": 1,
+   "whenToUse": [
+    "Título de uma palavra só, solene"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "blackfish_pct": {
+   "base": "doc_pct",
+   "label": "Porcentagem de impacto (Blackfish)",
+   "categoria": "meus",
+   "amostra": "70%",
+   "tipografia": {
+    "fonte": "oswald"
+   },
+   "whenToUse": [
+    "Estatística que choca"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "inconvenient_truth_dado": {
+   "base": "ed_pct_callout",
+   "label": "Dado do gráfico (Uma Verdade Inconveniente)",
+   "categoria": "meus",
+   "amostra": "+1,1 °C",
+   "tipografia": {
+    "fonte": "archivo"
+   },
+   "whenToUse": [
+    "Dado científico em destaque"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "coutinho_fala": {
+   "base": "clean_citacao_serif",
+   "label": "Fala do entrevistado (Eduardo Coutinho)",
+   "categoria": "meus",
+   "amostra": "Eu sou feliz, sabe?",
+   "tipografia": {
+    "fonte": "merriweather",
+    "italico": true
+   },
+   "whenToUse": [
+    "Frase marcante de um entrevistado"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "onibus174_ao_vivo": {
+   "base": "selo_faixa",
+   "label": "Tarja de AO VIVO (Ônibus 174)",
+   "categoria": "meus",
+   "amostra": "AO VIVO · RIO DE JANEIRO",
+   "tipografia": {
+    "fonte": "robotocond",
+    "caixaAlta": true
+   },
+   "cena": {
+    "cor": "#C40000"
+   },
+   "whenToUse": [
+    "Momento transmitido ao vivo"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "super_size_dia": {
+   "base": "ed_contagem",
+   "label": "Dia do experimento (Super Size Me)",
+   "categoria": "meus",
+   "amostra": "DIA 18",
+   "tipografia": {
+    "fonte": "anton",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Diário de um experimento ou desafio"
+   ],
+   "direcoes": [
+    "sys_dinamico",
+    "sys_doc_classico"
+   ]
+  },
+  "man_on_wire_data": {
+   "base": "hl_date_stamp",
+   "label": "Data histórica (O Equilibrista)",
+   "categoria": "meus",
+   "amostra": "7 DE AGOSTO DE 1974",
+   "tipografia": {
+    "fonte": "specialelite",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Data de um acontecimento único"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "sugar_man_nome": {
+   "base": "hera_nome",
+   "label": "Nome do mistério (Searching for Sugar Man)",
+   "categoria": "meus",
+   "amostra": "RODRIGUEZ",
+   "tipografia": {
+    "fonte": "bebas",
+    "caixaAlta": true
+   },
+   "whenToUse": [
+    "Nome de alguém misterioso"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "ken_burns_carta_citacao": {
+   "base": "citacao",
+   "label": "Carta lida (Ken Burns)",
+   "categoria": "meus",
+   "amostra": "Minha querida Sarah…",
+   "tipografia": {
+    "fonte": "garamond",
+    "italico": true
+   },
+   "cena": {
+    "fundo": "papel"
+   },
+   "whenToUse": [
+    "Trecho de carta antiga"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "herzog_narracao": {
+   "base": "ed_pull_quote",
+   "label": "Frase do narrador (Werner Herzog)",
+   "categoria": "meus",
+   "amostra": "a indiferença esmagadora da natureza",
+   "tipografia": {
+    "fonte": "lora",
+    "italico": true
+   },
+   "whenToUse": [
+    "Reflexão filosófica do narrador"
+   ],
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  },
+  "apocalipse_mapa": {
+   "base": "v2_pino_mapa",
+   "label": "Frente de batalha no mapa (Apocalipse)",
+   "categoria": "meus",
+   "amostra": "NORMANDIA, 1944",
+   "cena": {
+    "fundo": "mapa"
+   },
+   "whenToUse": [
+    "Lugar de um evento histórico"
+   ],
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  }
+ },
+ "cenas": {
+  "DOC_INTERROTRON": {
+   "nome": "Entrevista frontal (Errol Morris)",
+   "arranjo": "retrato_esq",
+   "whenToUse": [
+    "Entrevistado com a fala ao lado"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "DOC_APOLLO_PAINEL": {
+   "nome": "Painel de controle (Apollo 11)",
+   "arranjo": "painel_esq",
+   "whenToUse": [
+    "Imagem com dados técnicos ao lado"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "DOC_GUERRA_LINHA_TEMPO": {
+   "nome": "Linha do tempo da guerra (Ken Burns)",
+   "arranjo": "linha_tempo",
+   "whenToUse": [
+    "Eventos históricos em ordem"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "DOC_CLIMA_ANTES_DEPOIS": {
+   "nome": "Geleira antes e depois (Uma Verdade Inconveniente)",
+   "arranjo": "antes_depois",
+   "whenToUse": [
+    "Mudança ao longo dos anos"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "DOC_ARQUIVO_MOSAICO": {
+   "nome": "Mosaico de arquivo (Senna / Amy)",
+   "arranjo": "mosaico",
+   "motion": [
+    "dissolve_foco",
+    "dissolve_foco",
+    "dissolve_foco",
+    "dissolve_foco"
+   ],
+   "whenToUse": [
+    "Várias fotos de arquivo de uma vez"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  "DOC_DOIS_PONTOS_VISTA": {
+   "nome": "Dois pontos de vista (Blackfish)",
+   "arranjo": "lado_a_lado",
+   "whenToUse": [
+    "Comparar duas versões de uma história"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  },
+  "DOC_NATUREZA_FRENTE_FUNDO": {
+   "nome": "Animal e habitat (Planeta Terra II)",
+   "arranjo": "ff_dir",
+   "whenToUse": [
+    "Destaque com o ambiente atrás"
+   ],
+   "autoEligible": false,
+   "manualOnly": false,
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_cinema"
+   ]
+  }
+ },
+ "paletas": [
+  {
+   "id": "planeta_natureza",
+   "nome": "Natureza BBC",
+   "primaria": "#2F6B3A",
+   "secundaria": "#E8E4D8",
+   "acento": "#D9A441",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "arquivo_guerra",
+   "nome": "Arquivo de guerra",
+   "primaria": "#6B6150",
+   "secundaria": "#E3DCC8",
+   "acento": "#8C1C13",
+   "direcoes": [
+    "sys_doc_classico"
+   ]
+  },
+  {
+   "id": "nasa_1969",
+   "nome": "NASA 1969",
+   "primaria": "#0B3D91",
+   "secundaria": "#F2F2F2",
+   "acento": "#FC3D21",
+   "direcoes": [
+    "sys_doc_classico",
+    "sys_dinamico"
+   ]
+  }
+ ],
+ "_direcoes": {
+  "sys_tudo": {
+   "nome": "Padrão do sistema",
+   "transicoes": [
+    {
+     "id": "errol_morris_corte",
+     "peso": 1
+    }
+   ],
+   "efeitos": [],
+   "overlays": [],
+   "entradas": [],
+   "filtros": [
+    {
+     "id": "errol_morris_limpo",
+     "peso": 1
+    }
+   ],
+   "templates": [],
+   "destaques_estilos": [],
+   "paletas_sugeridas": []
+  },
+  "sys_doc_classico": {
+   "nome": "Documentário clássico",
+   "transicoes": [
+    {
+     "id": "pe2_dissolve_natureza",
+     "peso": 1
+    },
+    {
+     "id": "blue_planet_mergulho",
+     "peso": 1
+    },
+    {
+     "id": "frozen_planet_branco",
+     "peso": 1
+    },
+    {
+     "id": "koyaanisqatsi_timelapse",
+     "peso": 1
+    },
+    {
+     "id": "baraka_respiro",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_contagem",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_filme_16mm",
+     "peso": 1
+    },
+    {
+     "id": "they_shall_cor_entra",
+     "peso": 1
+    },
+    {
+     "id": "senna_transmissao",
+     "peso": 1
+    },
+    {
+     "id": "amy_camcorder",
+     "peso": 1
+    },
+    {
+     "id": "errol_morris_corte",
+     "peso": 1
+    },
+    {
+     "id": "herzog_horizonte",
+     "peso": 1
+    },
+    {
+     "id": "free_solo_paredao",
+     "peso": 1
+    },
+    {
+     "id": "man_on_wire_corda",
+     "peso": 1
+    },
+    {
+     "id": "blackfish_onda",
+     "peso": 1
+    },
+    {
+     "id": "coutinho_corte_seco",
+     "peso": 1
+    },
+    {
+     "id": "onibus174_plantao",
+     "peso": 1
+    },
+    {
+     "id": "ww2_cores_arquivo",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "ken_burns_vietna",
+     "peso": 1
+    },
+    {
+     "id": "ken_burns_carta",
+     "peso": 1
+    },
+    {
+     "id": "pe2_panoramica",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_sobe_foguete",
+     "peso": 1
+    },
+    {
+     "id": "they_shall_rosto",
+     "peso": 1
+    },
+    {
+     "id": "koyaanisqatsi_respiro",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "apollo11_vibracao",
+     "peso": 1
+    },
+    {
+     "id": "free_solo_vento",
+     "peso": 1
+    },
+    {
+     "id": "amy_camcorder_ruido",
+     "peso": 1
+    },
+    {
+     "id": "senna_tv_90",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_grao_nasa",
+     "peso": 1
+    },
+    {
+     "id": "they_shall_manivela",
+     "peso": 1
+    },
+    {
+     "id": "ww2_sepia_tremido",
+     "peso": 1
+    },
+    {
+     "id": "koyaanisqatsi_pulso",
+     "peso": 1
+    },
+    {
+     "id": "blue_planet_caustica",
+     "peso": 1
+    },
+    {
+     "id": "frozen_planet_brilho",
+     "peso": 1
+    },
+    {
+     "id": "herzog_neblina",
+     "peso": 1
+    },
+    {
+     "id": "jiro_vapor",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "errol_morris_entra",
+     "peso": 1
+    },
+    {
+     "id": "ken_burns_foto",
+     "peso": 1
+    },
+    {
+     "id": "documento_desliza",
+     "peso": 1
+    },
+    {
+     "id": "recorte_cai",
+     "peso": 1
+    },
+    {
+     "id": "pe2_ergue",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_tela",
+     "peso": 1
+    },
+    {
+     "id": "senna_foco",
+     "peso": 1
+    },
+    {
+     "id": "searching_sugar_revela",
+     "peso": 1
+    },
+    {
+     "id": "coutinho_assenta",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "pe2_hiper_real",
+     "peso": 1
+    },
+    {
+     "id": "blue_planet_azul",
+     "peso": 1
+    },
+    {
+     "id": "frozen_planet_gelo",
+     "peso": 1
+    },
+    {
+     "id": "our_planet_verde",
+     "peso": 1
+    },
+    {
+     "id": "octopus_kelp",
+     "peso": 1
+    },
+    {
+     "id": "free_solo_granito",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_60s",
+     "peso": 1
+    },
+    {
+     "id": "they_shall_colorizado",
+     "peso": 1
+    },
+    {
+     "id": "ww2_colorizado",
+     "peso": 1
+    },
+    {
+     "id": "koyaanisqatsi_contraste",
+     "peso": 1
+    },
+    {
+     "id": "senna_broadcast_90",
+     "peso": 1
+    },
+    {
+     "id": "amy_mini_dv",
+     "peso": 1
+    },
+    {
+     "id": "get_back_1969",
+     "peso": 1
+    },
+    {
+     "id": "jiro_macro",
+     "peso": 1
+    },
+    {
+     "id": "errol_morris_limpo",
+     "peso": 1
+    },
+    {
+     "id": "herzog_cru",
+     "peso": 1
+    },
+    {
+     "id": "social_dilemma_tech",
+     "peso": 1
+    },
+    {
+     "id": "blackfish_oceano",
+     "peso": 1
+    },
+    {
+     "id": "coutinho_video",
+     "peso": 1
+    },
+    {
+     "id": "onibus174_tv_2000",
+     "peso": 1
+    },
+    {
+     "id": "honeyland_dourado",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "DOC_INTERROTRON",
+     "peso": 1
+    },
+    {
+     "id": "DOC_APOLLO_PAINEL",
+     "peso": 1
+    },
+    {
+     "id": "DOC_GUERRA_LINHA_TEMPO",
+     "peso": 1
+    },
+    {
+     "id": "DOC_CLIMA_ANTES_DEPOIS",
+     "peso": 1
+    },
+    {
+     "id": "DOC_ARQUIVO_MOSAICO",
+     "peso": 1
+    },
+    {
+     "id": "DOC_DOIS_PONTOS_VISTA",
+     "peso": 1
+    },
+    {
+     "id": "DOC_NATUREZA_FRENTE_FUNDO",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "errol_morris_entrevistado",
+    "apollo11_t_menos",
+    "they_shall_anos",
+    "senna_volta",
+    "amy_diario",
+    "jiro_estrelas",
+    "free_solo_altura",
+    "koyaanisqatsi_palavra",
+    "blackfish_pct",
+    "inconvenient_truth_dado",
+    "coutinho_fala",
+    "onibus174_ao_vivo",
+    "super_size_dia",
+    "man_on_wire_data",
+    "sugar_man_nome",
+    "ken_burns_carta_citacao",
+    "herzog_narracao",
+    "apocalipse_mapa"
+   ],
+   "paletas_sugeridas": [
+    "planeta_natureza",
+    "arquivo_guerra",
+    "nasa_1969"
+   ]
+  },
+  "sys_cinema": {
+   "nome": "Cinema premium",
+   "transicoes": [
+    {
+     "id": "pe2_dissolve_natureza",
+     "peso": 1
+    },
+    {
+     "id": "blue_planet_mergulho",
+     "peso": 1
+    },
+    {
+     "id": "baraka_respiro",
+     "peso": 1
+    },
+    {
+     "id": "they_shall_cor_entra",
+     "peso": 1
+    },
+    {
+     "id": "herzog_horizonte",
+     "peso": 1
+    },
+    {
+     "id": "free_solo_paredao",
+     "peso": 1
+    }
+   ],
+   "efeitos": [
+    {
+     "id": "pe2_panoramica",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_sobe_foguete",
+     "peso": 1
+    },
+    {
+     "id": "koyaanisqatsi_respiro",
+     "peso": 1
+    }
+   ],
+   "overlays": [
+    {
+     "id": "free_solo_vento",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_grao_nasa",
+     "peso": 1
+    },
+    {
+     "id": "blue_planet_caustica",
+     "peso": 1
+    },
+    {
+     "id": "frozen_planet_brilho",
+     "peso": 1
+    },
+    {
+     "id": "herzog_neblina",
+     "peso": 1
+    },
+    {
+     "id": "jiro_vapor",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "pe2_ergue",
+     "peso": 1
+    },
+    {
+     "id": "senna_foco",
+     "peso": 1
+    },
+    {
+     "id": "searching_sugar_revela",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "pe2_hiper_real",
+     "peso": 1
+    },
+    {
+     "id": "frozen_planet_gelo",
+     "peso": 1
+    },
+    {
+     "id": "free_solo_granito",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_60s",
+     "peso": 1
+    },
+    {
+     "id": "get_back_1969",
+     "peso": 1
+    },
+    {
+     "id": "jiro_macro",
+     "peso": 1
+    },
+    {
+     "id": "honeyland_dourado",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "DOC_NATUREZA_FRENTE_FUNDO",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "jiro_estrelas",
+    "koyaanisqatsi_palavra",
+    "man_on_wire_data",
+    "sugar_man_nome",
+    "herzog_narracao"
+   ],
+   "paletas_sugeridas": []
+  },
+  "sys_dinamico": {
+   "nome": "Cortes dinâmicos",
+   "transicoes": [
+    {
+     "id": "koyaanisqatsi_timelapse",
+     "peso": 1
+    },
+    {
+     "id": "apollo11_contagem",
+     "peso": 1
+    },
+    {
+     "id": "senna_transmissao",
+     "peso": 1
+    },
+    {
+     "id": "amy_camcorder",
+     "peso": 1
+    },
+    {
+     "id": "social_dilemma_notificacao",
+     "peso": 1
+    },
+    {
+     "id": "fyre_stories",
+     "peso": 1
+    },
+    {
+     "id": "onibus174_plantao",
+     "peso": 1
+    }
+   ],
+   "efeitos": [],
+   "overlays": [
+    {
+     "id": "apollo11_vibracao",
+     "peso": 1
+    },
+    {
+     "id": "koyaanisqatsi_pulso",
+     "peso": 1
+    }
+   ],
+   "entradas": [
+    {
+     "id": "recorte_cai",
+     "peso": 1
+    },
+    {
+     "id": "social_dilemma_pop",
+     "peso": 1
+    },
+    {
+     "id": "fyre_estilingue",
+     "peso": 1
+    },
+    {
+     "id": "super_size_mola",
+     "peso": 1
+    }
+   ],
+   "filtros": [
+    {
+     "id": "koyaanisqatsi_contraste",
+     "peso": 1
+    },
+    {
+     "id": "social_dilemma_tech",
+     "peso": 1
+    },
+    {
+     "id": "fyre_instagram",
+     "peso": 1
+    },
+    {
+     "id": "onibus174_tv_2000",
+     "peso": 1
+    }
+   ],
+   "templates": [
+    {
+     "id": "DOC_APOLLO_PAINEL",
+     "peso": 1
+    },
+    {
+     "id": "DOC_DOIS_PONTOS_VISTA",
+     "peso": 1
+    }
+   ],
+   "destaques_estilos": [
+    "apollo11_t_menos",
+    "senna_volta",
+    "free_solo_altura",
+    "onibus174_ao_vivo",
+    "super_size_dia"
+   ],
+   "paletas_sugeridas": [
+    "nasa_1969"
+   ]
+  }
+ }
+}

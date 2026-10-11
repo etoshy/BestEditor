@@ -1,0 +1,24 @@
+{
+  "destaques": {
+    "titulo_neon_grade": {
+      "base": "epico",
+      "label": "Título neon com grade",
+      "categoria": "meus",
+      "amostra": "A NOITE QUE MUDOU TUDO",
+      "tipografia": {"fonte": "bebas", "caixaAlta": true, "italico": false},
+      "coreografia": {"entrada": "glitch", "saida": "blur"},
+      "cena": {"tratamento": "front_grid", "fundo": "grade_3d", "cor": "#2F7BFF"},
+      "whenToUse": ["Abertura de capítulo com clima tecnológico/noturno"],
+      "maxPorVideo": 2
+    },
+    "selo_valor_verde": {
+      "base": "selo_dado",
+      "label": "Selo de valor verde",
+      "categoria": "meus",
+      "amostra": "R$ 2,4 BILHÕES",
+      "tipografia": {"fonte": "anton"},
+      "coreografia": {"entrada": "contador"},
+      "audio": {"assets": ["impacto/impacto_5"], "evento": "assentamento"}
+    }
+  }
+}

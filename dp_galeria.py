@@ -90,12 +90,14 @@ def gerar_destaques(ids: Optional[List[str]] = None) -> int:
     return feitas
 
 
-def gerar_filtros() -> int:
+def gerar_filtros(so: Optional[List[str]] = None) -> int:
     pasta = os.path.join(GALERIA_DIR, "filtros")
     os.makedirs(pasta, exist_ok=True)
     foto = foto_exemplo()
     feitas = 0
     for f in dp_visual.filtros():
+        if so is not None and f["id"] not in so:
+            continue
         vf = f"scale={W}:{H}" + ("," + f["cadeia"] if f["cadeia"] else "")
         _ff(["-i", foto, "-vf", vf, "-frames:v", "1", "-q:v", "4", os.path.join(pasta, f"{f['id']}.jpg")])
         feitas += 1
@@ -110,7 +112,7 @@ def _clip_exemplo(pasta: str, dur: float = 2.2) -> str:
     return destino
 
 
-def gerar_animacoes() -> int:
+def gerar_animacoes(so: Optional[List[str]] = None) -> int:
     """Entradas (o gesto no começo) e movimentos de câmera — clipes curtos em loop."""
     import video_assembler as va
     pasta = os.path.join(GALERIA_DIR, "animacoes")
@@ -118,7 +120,7 @@ def gerar_animacoes() -> int:
     base = _clip_exemplo(pasta, 1.8)
     feitas = 0
     for g in dp_visual.entradas():
-        if g["id"] == "none":
+        if g["id"] == "none" or (so is not None and f"entrada_{g['id']}" not in so):
             continue
         out = os.path.join(pasta, f"entrada_{g['id']}.mp4")
         # clipe começa com 0,3s de preto pra dar pra ver o gesto entrando em loop
@@ -129,6 +131,8 @@ def gerar_animacoes() -> int:
         _ff(["-ss", "0.55", "-i", out, "-frames:v", "1", "-q:v", "4", out[:-4] + ".jpg"])
         feitas += 1
     for eid, modo in dp_visual.EFEITO_PARA_ZOOM.items():
+        if so is not None and f"camera_{eid}" not in so:
+            continue
         out = os.path.join(pasta, f"camera_{eid}.mp4")
         va._render_image_with_ken_burns(foto_exemplo(), 2.0, out, W, H, zoom_direction=modo)
         _ff(["-ss", "1.0", "-i", out, "-frames:v", "1", "-q:v", "4", out[:-4] + ".jpg"])
@@ -140,13 +144,13 @@ def gerar_animacoes() -> int:
     return feitas
 
 
-def gerar_overlays() -> int:
+def gerar_overlays(so: Optional[List[str]] = None) -> int:
     pasta = os.path.join(GALERIA_DIR, "overlays")
     os.makedirs(pasta, exist_ok=True)
     base = _clip_exemplo(pasta, 2.2)
     feitas = 0
     for e in dp_visual.efeitos():
-        if e["id"] == "none" or dp_visual.efeito_e_movimento(e["id"]):
+        if e["id"] == "none" or dp_visual.efeito_e_movimento(e["id"]) or (so is not None and e["id"] not in so):
             continue
         out = os.path.join(pasta, f"{e['id']}.mp4")
         dp_visual.pos_processar_clipe(base, out, 2.2, W, H, os.path.join(pasta, "_w"), efeito=e["id"])
@@ -189,6 +193,8 @@ def existe(tipo: str, nome: str) -> bool:
 
 
 if __name__ == "__main__":
-    o_que = sys.argv[1:] or ["filtros", "overlays", "animacoes", "destaques"]
+    o_que = sys.argv[1:] or ["filtros", "overlays", "animacoes", "destaques", "editorial"]
+    import dp_editorial
     for k in o_que:
-        print(k, {"filtros": gerar_filtros, "overlays": gerar_overlays, "animacoes": gerar_animacoes, "destaques": gerar_destaques}[k](), flush=True)
+        print(k, {"filtros": gerar_filtros, "overlays": gerar_overlays, "animacoes": gerar_animacoes, "destaques": gerar_destaques,
+                  "editorial": lambda: dp_editorial.gerar_miniaturas(os.path.join(GALERIA_DIR, "editorial"), foto_exemplo())}[k](), flush=True)

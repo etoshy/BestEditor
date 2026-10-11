@@ -73,3 +73,21 @@ def test_short_e_ate_60_segundos():
     base = {"id": "x", "produto": {"titulo": "Garrafa"}, "midias": [], "link": ""}
     assert "GANCHO COM O ESPECTADOR DENTRO" in vendas.prompt_roteiro({**base, "config": {"duracao_s": 60}})
     assert "GANCHO COM O ESPECTADOR DENTRO" not in vendas.prompt_roteiro({**base, "config": {"duracao_s": 90}})
+
+
+def test_titulos_sempre_nas_formulas_do_kit():
+    """v84_52: todo título que o site pede segue as 20 fórmulas (Kit Iniciante YouTube, cap. 05)."""
+    assert len(mr.FORMULAS_TITULO) == 20 and mr.TITULO_MAX == 60
+    b = mr.bloco_titulos(5)
+    for chave in ("[Tema] Explicado em [N] Minutos", "O Lado Sombrio de [algo]", "Eu Testei [X] por [tempo]", "até ~60 caracteres",
+                  "PALAVRA PRINCIPAL no começo", "PROMESSA", "NUNCA minta no título", "fórmulas DIFERENTES"):
+        assert chave in b, chave
+    p = {"id": "x", "produto": {"titulo": "Garrafa"}, "config": {}, "midias": [], "link": ""}
+    pr = vd.prompt_roteiro(p)
+    assert "🏷 Títulos" in pr and pr.index("🏷 Títulos") < pr.index("## Resposta")
+    d = {"tema": "Caso", "config": {"modelo": "true_crime", "formato": "caso_completo"}, "fontes": [], "midias": [], "roteiro_base": "notas"}
+    assert "O Mistério de [caso]" in ds.prompt_roteiro(d)
+    p2 = {"transcricao": {"blocos": [{"inicio": 0, "texto": "oi"}]}, "titulo": "T", "analise": {"roteiro": "Texto.", "cenas": []}}
+    assert "O Fim de [algo famoso]" in ry.prompt_acoes(p2, ["titulos"]) and "O Fim de [algo famoso]" in ry.prompt_acoes(p2, ["descricao"])
+    assert "O Fim de [algo famoso]" not in ry.prompt_acoes(p2, ["tags"])
+    assert mr.titulo_ok("O Fim da Blockbuster") and not mr.titulo_ok("x" * 90)

@@ -26,7 +26,97 @@ DP_JSON = os.path.join(_AQUI, "assets", "darkplanner", "darkplanner.json")
 @lru_cache(maxsize=1)
 def dp() -> Dict[str, Any]:
     with open(DP_JSON, encoding="utf-8") as f:
-        return json.load(f)
+        d = json.load(f)
+    _mesclar_extras(d)
+    return d
+
+
+# ---------------------------------------------------------------- ➕ extras (assets/darkplanner/extras/*.json — ver dp_extras.py)
+_XFADE_NATIVAS = {
+    "fade", "fadeblack", "fadewhite", "fadegrays", "fadefast", "fadeslow", "dissolve", "pixelize", "distance", "radial", "hblur",
+    "wipeleft", "wiperight", "wipeup", "wipedown", "wipetl", "wipetr", "wipebl", "wipebr", "slideleft", "slideright", "slideup",
+    "slidedown", "smoothleft", "smoothright", "smoothup", "smoothdown", "circleopen", "circleclose", "circlecrop", "rectcrop",
+    "vertopen", "vertclose", "horzopen", "horzclose", "diagtl", "diagtr", "diagbl", "diagbr", "hlslice", "hrslice", "vuslice",
+    "vdslice", "hlwind", "hrwind", "vuwind", "vdwind", "squeezeh", "squeezev", "zoomin", "coverleft", "coverright", "coverup",
+    "coverdown", "revealleft", "revealright", "revealup", "revealdown",
+    # as nossas (video_assembler.TRANSICOES_CUSTOMIZADAS + shutters do cenas_dp)
+    "blinds_h", "blinds_v", "checkerboard", "noise_dissolve", "iris_blur", "diamond_iris", "pinwheel", "wave_wipe", "fade_grayscale",
+    "dp_shutter", "dp_shutter_laminas", "dp_shutter_filme", "dp_shutter_dossie", "dp_shutter_foco", "dp_shutter_finale",
+    "dp_shutter_deslize", "dp_shutter_refoco", "dp_shutter_pulso",
+}
+_CATEGORIA_MEUS = {"id": "meus", "label": "My styles", "labelPt": "⭐ Meus estilos"}
+
+
+def _mesclar_extras(d: Dict[str, Any]) -> None:
+    """Põe no catálogo o que está em assets/darkplanner/extras (transições, efeitos, entradas,
+    filtros e destaques). O que não bate (id repetido, base que não existe) fica de fora e
+    aparece em `python dp_guia.py verificar` e na página 📘 Guia."""
+    try:
+        import dp_extras
+        ex = dp_extras.carregar()
+    except Exception:  # noqa: BLE001
+        return
+    cats = d.setdefault("catalogs", {})
+    for secao, cat in (("transicoes", "transitions"), ("efeitos", "effects"), ("entradas", "entrances"), ("filtros", "filters")):
+        lista = cats.setdefault(cat, [])
+        ids = {x["id"] for x in lista}
+        for it in ex.get(secao) or []:
+            iid = it["id"]
+            if iid in ids:
+                dp_extras.avisar(f"{it['_arquivo']}: {secao} {iid} já existe no catálogo — escolha outro id.")
+                continue
+            alvo = it.get("igual_a")
+            if secao == "transicoes":
+                if it.get("xfade") and it["xfade"] not in _XFADE_NATIVAS:
+                    dp_extras.avisar(f"{it['_arquivo']}: transição {iid}: \"xfade\" {it['xfade']!r} não é uma transição nativa do ffmpeg.")
+                    continue
+                if alvo and str(alvo).replace("dp:", "", 1) not in ids and alvo not in _XFADE_NATIVAS:
+                    dp_extras.avisar(f"{it['_arquivo']}: transição {iid}: \"igual_a\" {alvo!r} não existe.")
+                    continue
+                item = {"id": iid, "familia": it.get("familia") or "forma", "int": it.get("int", 2), "energia": it.get("energia", 0.5),
+                        "ritmo": it.get("ritmo") or "medio"}
+            elif secao == "efeitos":
+                base = next((x for x in lista if x["id"] == alvo), None) if alvo else None
+                if alvo and not base:
+                    dp_extras.avisar(f"{it['_arquivo']}: efeito {iid}: \"igual_a\" {alvo!r} não existe.")
+                    continue
+                camera = bool(it.get("camera")) or bool(base and base.get("precisaImagem"))
+                item = {"id": iid, "familia": it.get("familia") or ("movimento" if camera else "atmosfera"), "int": it.get("int", 2),
+                        "energia": it.get("energia", 0.4), "precisaImagem": camera}
+            elif secao == "entradas":
+                base = next((x for x in lista if x["id"] == alvo), None)
+                if not base:
+                    dp_extras.avisar(f"{it['_arquivo']}: entrada {iid}: \"igual_a\" {alvo!r} não existe (veja a lista no guia).")
+                    continue
+                item = {"id": iid, "familia": it.get("familia") or base.get("familia"), "int": it.get("int", base.get("int")),
+                        "energia": it.get("energia", base.get("energia")), "durAlvoS": it.get("durAlvoS") or base.get("durAlvoS") or 0.5}
+            else:
+                if alvo and alvo not in ids:
+                    dp_extras.avisar(f"{it['_arquivo']}: filtro {iid}: \"igual_a\" {alvo!r} não existe.")
+                    continue
+                item = {"id": iid, "group": it.get("grupo") or "meus"}
+            item["_x"] = {k: v for k, v in it.items() if k != "_arquivo"}
+            lista.append(item)
+            ids.add(iid)
+    hls = d.setdefault("highlights", {})
+    cats_guia = d.setdefault("guidance", {}).setdefault("categories", [])
+    for hid, spec in (ex.get("destaques") or {}).items():
+        if hid in hls:
+            dp_extras.avisar(f"{spec['_arquivo']}: destaque {hid} já existe — escolha outro id (ou use \"base\": \"{hid}\" num id novo).")
+            continue
+        base_id = spec.get("base") or "minimal"
+        if base_id not in hls:
+            dp_extras.avisar(f"{spec['_arquivo']}: destaque {hid}: \"base\" {base_id!r} não existe.")
+            continue
+        novo = dp_extras.mesclar_profundo(hls[base_id], dp_extras.limpar(spec))
+        if not spec.get("base") and "categoria" not in spec:
+            novo["categoria"] = "meus"
+        novo.setdefault("label", hid)
+        novo["_extra"] = True
+        hls[hid] = novo
+        cat = novo.get("categoria") or "meus"
+        if not any(c.get("id") == cat for c in cats_guia):
+            cats_guia.append(dict(_CATEGORIA_MEUS) if cat == "meus" else {"id": cat, "label": cat, "labelPt": cat})
 
 
 def _catalogo(nome: str) -> List[Dict[str, Any]]:
@@ -121,12 +211,15 @@ _F = {
 }
 
 
+_CSS_FILTRO: Dict[str, str] = {}  # prévia no Estúdio dos filtros criados nos extras
+
+
 def filtros() -> List[Dict[str, Any]]:
     out = []
     for item in _catalogo("filters"):
         fid = item["id"]
         rot, cadeia = _F.get(fid, (_humano(fid), ""))
-        out.append({"id": fid, "rotulo": rot, "grupo": item.get("group"), "cadeia": cadeia})
+        out.append({"id": fid, "rotulo": rot, "grupo": item.get("group"), "cadeia": cadeia, "css": _CSS_FILTRO.get(fid)})
     return out
 
 
@@ -252,9 +345,16 @@ def _png_textura(tipo: str, W: int, H: int, pasta: str) -> str:
     return caminho
 
 
+_ALIAS_EFEITO: Dict[str, str] = {}   # extras: "igual_a" de outro efeito de atmosfera
+_FILTRO_EFEITO: Dict[str, str] = {}  # extras: "filtro" próprio ([base]…[base])
+
+
 def atmosfera(eid: str, W: int, H: int, dur: float, pasta: str) -> Tuple[List[str], List[str]]:
     """(entradas extras do ffmpeg, filtros) pra um efeito de atmosfera. Os
     filtros recebem [base] e devem terminar em [base] de novo (cadeia)."""
+    eid = _ALIAS_EFEITO.get(eid, eid)
+    if eid in _FILTRO_EFEITO:
+        return [], [_FILTRO_EFEITO[eid]]
     if eid == "chroma":
         return [], [f"[base]rgbashift=rh={max(2, W // 320)}:bh=-{max(2, W // 320)}:gv={max(1, W // 640)}[base]"]
     if eid == "flicker":
@@ -304,9 +404,13 @@ _ROT_ENTRADA = {
 }
 
 
+_ALIAS_GESTO: Dict[str, str] = {}  # extras: entrada nova = gesto existente com outro nome/duração
+
+
 def entradas() -> List[Dict[str, Any]]:
     return [{"id": e["id"], "rotulo": _ROT_ENTRADA.get(e["id"], _humano(e["id"])), "familia": e.get("familia"),
-             "dur": e.get("durAlvoS"), "int": e.get("int"), "energia": e.get("energia")} for e in _catalogo("entrances")]
+             "dur": e.get("durAlvoS"), "int": e.get("int"), "energia": e.get("energia"), "previa": _ALIAS_GESTO.get(e["id"])}
+            for e in _catalogo("entrances")]
 
 
 def _dur_gesto(gid: str, dur_cena: float) -> float:
@@ -318,6 +422,7 @@ def _gesto(gid: str, p: str, W: int, H: int) -> Dict[str, str]:
     """Parâmetros do gesto em função de p (0 = começo do gesto, 1 = assentado).
     Saída = o mesmo gesto com p invertido. Devolve expressões pra escala (s),
     deslocamento (dx, dy, em px), rotação (r, rad), e flags."""
+    gid = _ALIAS_GESTO.get(gid, gid)
     e = f"(1-pow(1-{p},3))"  # ease-out
     inv = f"(1-{e})"
     g: Dict[str, str] = {"s": "1", "sx": "", "sy": "", "dx": "0", "dy": "0", "r": "0", "fade": "1", "flash": "", "blur": "", "lag": ""}
@@ -650,8 +755,10 @@ def transicoes() -> List[Dict[str, Any]]:
         tid = t["id"]
         if tid == "none":
             continue
+        alvo = MAPA_TRANSICOES.get(tid, "")
         out.append({"id": "dp:" + tid, "dp_id": tid, "rotulo": _rotulo_tr(tid, t.get("familia")), "familia": t.get("familia"),
-                    "int": t.get("int"), "energia": t.get("energia"), "ritmo": t.get("ritmo")})
+                    "int": t.get("int"), "energia": t.get("energia"), "ritmo": t.get("ritmo"),
+                    "previa": alvo if alvo and not alvo.startswith("@") else None})
     return out
 
 
@@ -811,3 +918,53 @@ def pos_processar_clipe(entrada_path: str, saida_path: str, dur: float, W: int, 
         except OSError:
             pass
     return True
+
+
+def _aplicar_extras() -> None:
+    """Liga os itens dos extras (já no catálogo, ver _mesclar_extras) ao visual: mapa das
+    transições, câmera/atmosfera dos efeitos, gesto das entradas, cadeia dos filtros."""
+    cats = dp()["catalogs"]
+    for t in cats.get("transitions") or []:
+        x = t.get("_x")
+        if not x:
+            continue
+        tid = t["id"]
+        if x.get("xfade"):
+            MAPA_TRANSICOES[tid] = x["xfade"]
+        elif x.get("expr"):
+            _ESPECIAIS["x_" + tid] = str(x["expr"])
+            MAPA_TRANSICOES[tid] = "@x_" + tid
+        else:
+            alvo = str(x["igual_a"]).replace("dp:", "", 1)
+            MAPA_TRANSICOES[tid] = MAPA_TRANSICOES.get(alvo, alvo)
+        if x.get("rotulo"):
+            _ROT_TR[tid] = str(x["rotulo"])[:60]
+    for e in cats.get("effects") or []:
+        x = e.get("_x")
+        if not x:
+            continue
+        eid = e["id"]
+        if x.get("camera"):
+            EFEITO_PARA_ZOOM[eid] = x["camera"]
+        elif x.get("filtro"):
+            _FILTRO_EFEITO[eid] = str(x["filtro"])
+        elif x["igual_a"] in EFEITO_PARA_ZOOM:
+            EFEITO_PARA_ZOOM[eid] = EFEITO_PARA_ZOOM[x["igual_a"]]
+        else:
+            _ALIAS_EFEITO[eid] = x["igual_a"]
+        _ROT_EFEITO[eid] = str(x.get("rotulo") or _humano(eid))[:60]
+    for g in cats.get("entrances") or []:
+        x = g.get("_x")
+        if x:
+            _ALIAS_GESTO[g["id"]] = _ALIAS_GESTO.get(x["igual_a"], x["igual_a"])
+            _ROT_ENTRADA[g["id"]] = str(x.get("rotulo") or _humano(g["id"]))[:60]
+    for f in cats.get("filters") or []:
+        x = f.get("_x")
+        if x:
+            cadeia = str(x.get("cadeia") or _F.get(x.get("igual_a"), ("", ""))[1])
+            _F[f["id"]] = (str(x.get("rotulo") or _humano(f["id"]))[:60], cadeia)
+            if x.get("css"):
+                _CSS_FILTRO[f["id"]] = str(x["css"])[:200]
+
+
+_aplicar_extras()

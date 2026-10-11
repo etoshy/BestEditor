@@ -30,6 +30,8 @@
             <button type="button" onclick="ytPegarTempo('{{ it.id }}','fim')">⏱ fim = agora</button>
             <button type="button" onclick="ytTocarTrecho('{{ it.id }}')">▶ ver o trecho</button>
           </div>
+          <button type="button" class="yt-sec yt-ia-momento" style="display:none;margin-top:6px" onclick="ytAcharMomento('{{ it.id }}')">🎯 Achar o momento pela legenda (IA)</button>
+          <p class="yt-sub" id="yt-ia-{{ it.id }}"></p>
           <p class="yt-sub" id="yt-resumo-{{ it.id }}"></p>
           <button type="button" class="yt-usar" onclick="ytUsar('{{ it.id }}')">✅ Usar esse trecho</button>
           <p class="yt-sub" id="yt-status-{{ it.id }}"></p>
@@ -74,6 +76,10 @@
 .yt-tempos input { width:95px; }
 .yt-tempos button { margin-top:0; }
 .yt-usar { margin-top:8px; background:#16a34a; }
+.yt-card { position:relative; }
+.yt-nota { position:absolute; top:4px; left:4px; color:#fff; border-radius:4px; padding:0 6px; font-size:.72rem; font-weight:700; }
+.yt-card.reprovado { opacity:.55; }
+.yt-mais { grid-column:1/-1; margin-top:2px; background:#fff; color:#374151; border:1px solid #d1d5db; }
 @media (max-width: 600px) { .yt-busca { flex-direction:column; } }
 </style>
 <script>
@@ -88,6 +94,10 @@
   const paradas = {};        // itemId -> intervalo do "ver o trecho"
   let apiPronta = false;
   let pollTimer = null;
+  const mostrando = {};      // itemId -> quantos resultados aparecem (8, 16, 20 — "Outros vídeos")
+  fetch('/ia/status').then(r => r.json()).then(j => {  // 🤖 IA ligada pra achar o momento pela legenda
+    if (j.pode && j.pode.youtube_momento) document.querySelectorAll('.yt-ia-momento').forEach(b => { b.style.display = ''; });
+  }).catch(() => {});
 
   const anterior = window.onYouTubeIframeAPIReady;
   window.onYouTubeIframeAPIReady = function () { apiPronta = true; if (typeof anterior === 'function') anterior(); };
@@ -155,7 +165,7 @@
     const termoInput = el('yt-termo-' + it.id);
     if (termoInput && document.activeElement !== termoInput && it.status !== 'pronto') termoInput.value = it.termo;
 
-    const sig = [it.status, it.termo, (it.resultados || []).length, it.erro || ''].join('|');
+    const sig = [it.status, it.termo, (it.resultados || []).length, it.erro || '', mostrando[it.id] || 8].join('|');
     if (assinatura[it.id] === sig) return;
     assinatura[it.id] = sig;
 
@@ -171,10 +181,21 @@
       p.textContent = it.erro || 'Nenhum vídeo encontrado — tente outro termo.';
       cont.appendChild(p); return;
     }
-    it.resultados.forEach(function (v) {
+    if (it.ia_ordenado) {
+      const p = document.createElement('p'); p.className = 'yt-sub'; p.style.gridColumn = '1/-1';
+      p.textContent = '🤖 Na ordem da nota da IA' + (it.ia_busca_melhor ? ` — sugestão de busca: “${it.ia_busca_melhor}”` : '');
+      cont.appendChild(p);
+    }
+    const limite = mostrando[it.id] || 8;
+    it.resultados.slice(0, limite).forEach(function (v) {
       const card = document.createElement('div');
-      card.className = 'yt-card';
-      card.title = v.titulo || '';
+      card.className = 'yt-card' + (v.ia_nota != null && v.ia_nota < 5 ? ' reprovado' : '');
+      card.title = (v.titulo || '') + (v.ia_motivo ? '\n🤖 ' + v.ia_motivo : '');
+      if (v.ia_nota != null) {
+        const b = document.createElement('b'); b.className = 'yt-nota'; b.textContent = v.ia_nota + (v.ia_nota < 5 ? ' ⚠' : '');
+        b.style.background = v.ia_nota >= 7 ? '#15803d' : v.ia_nota >= 5 ? '#b45309' : '#b91c1c';
+        card.appendChild(b);
+      }
       if (v.miniatura_url) {
         const img = document.createElement('img');
         img.src = v.miniatura_url; img.loading = 'lazy'; img.alt = '';
@@ -192,7 +213,35 @@
       });
       cont.appendChild(card);
     });
+    if (it.resultados.length > limite) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'yt-mais';
+      b.textContent = `➕ Outros vídeos (${it.resultados.length - limite})`;
+      b.addEventListener('click', function () { mostrando[it.id] = limite + 8; delete assinatura[it.id]; desenharItem(it); });
+      cont.appendChild(b);
+    }
   }
+
+  async function acharMomento(itemId) {
+    const v = escolhido[itemId];
+    const out = el('yt-ia-' + itemId);
+    if (!v) { out.textContent = 'Escolha um vídeo primeiro.'; return; }
+    out.textContent = '🤖 lendo a legenda do vídeo… (pode levar uns segundos)';
+    try {
+      const resp = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/item/${encodeURIComponent(itemId)}/momento`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: v.url, titulo: v.titulo, canal: v.canal }),
+      });
+      const d = await resp.json();
+      if (!resp.ok || !d.ok) { out.textContent = '⚠️ ' + (d.erro || 'falhou'); return; }
+      if (!d.achou) { out.textContent = '🤖 Esse vídeo não fala disso — escolha outro.'; return; }
+      el('yt-inicio-' + itemId).value = d.inicio.toFixed(1);
+      el('yt-fim-' + itemId).value = d.fim.toFixed(1);
+      atualizarResumo(itemId);
+      out.textContent = `🤖 ${fmt(d.inicio)} → ${fmt(d.fim)}: “${d.frase}”` + (d.traducao ? ` (${d.traducao})` : '') + ` · confiança ${Math.round((d.confianca || 0) * 100)}% — confira com ▶ ver o trecho e clique em Usar.`;
+      const p = players[itemId]; if (p && p.seekTo) p.seekTo(d.inicio, true);
+    } catch (e) { out.textContent = '⚠️ ' + e; }
+  }
+  window.ytAcharMomento = acharMomento;
 
   async function carregar() {
     clearTimeout(pollTimer);

@@ -627,8 +627,40 @@ def caminho_midia(base: str, p: Dict[str, Any], m: Dict[str, Any]) -> Optional[s
     return c if os.path.isfile(c) else None
 
 
+def ia_analisar_imagens(base: str, pid: str, ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    """🤖 Ficha das fotos/vídeos do produto (ângulo, em uso, embalagem, texto/preço na imagem). Sem IA: nada."""
+    import ia_dossies
+    import ia_servico
+    if not ia_servico.ativo("venda_imagens"):
+        return {"ok": False, "erro": ia_servico.motivo_desligado("venda_imagens")}
+    p = carregar(base, pid)
+    titulo = ((p.get("produto") or {}).get("titulo") or "")[:200]
+    itens = []
+    for m in p.get("midias") or []:
+        if m["tipo"] not in ("foto", "video") or m.get("ia") or (ids is not None and m["id"] not in ids):
+            continue
+        cam = caminho_midia(base, p, m)
+        if cam:
+            ctx = " | ".join(x for x in (titulo and f"produto: {titulo}", m.get("descricao") and f"o que eu disse: {m['descricao']}",
+                                         ((m.get("og") or {}).get("titulo"))) if x)
+            itens.append({"id": m["id"], "caminho": cam, "contexto": ctx})
+    fichas = ia_dossies.fichar_imagens(itens, venda=True, job=pid)
+    if fichas:
+        p = carregar(base, pid)
+        for m in p.get("midias") or []:
+            if m["id"] in fichas:
+                m["ia"] = fichas[m["id"]]
+        salvar(base, p)
+    return {"ok": True, "fichas": len(fichas)}
+
+
 def o_que_e(m: Dict[str, Any]) -> str:
     """Texto que vai pra IA dizendo o que é a mídia (OG, descrição ou as duas)."""
+    if m.get("ia"):  # 🤖 ficha da IA (+ o que você escreveu)
+        import ia_dossies
+        txt = ia_dossies.texto_da_ficha(m["ia"])
+        if txt:
+            return txt + (f" | {m['descricao']}" if m.get("descricao") else "")
     og = m.get("og") or {}
     og_txt = " — ".join(x for x in (og.get("titulo"), og.get("descricao")) if x)
     desc = m.get("descricao") or ""
@@ -763,6 +795,9 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
         L.append("")
         L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
     L.append("")
+    import metodo_roteiro
+    L.append(metodo_roteiro.bloco_titulos(5))
+    L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
         "plano": metodo_roteiro.PLANO_JSON,
@@ -773,7 +808,7 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
                       "texto_na_tela": "texto curto opcional (ex.: o preço, um benefício)"}],
         "cta": "a chamada final",
         "descricao": "descrição do vídeo pras redes, com {LINK} onde o link do produto deve entrar",
-        "titulos": ["5 opções de título"],
+        "titulos": ["5 opções de título (até ~60 caracteres, cada uma numa fórmula diferente da lista de títulos)"],
         "hashtags": ["#exemplo"],
         "observacoes": "algo pra quem vai editar (opcional)",
     }, ensure_ascii=False, indent=2))

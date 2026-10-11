@@ -46,7 +46,7 @@ def _linha_eixo(p: Dict[str, Any], eixo: str, nome: str, rotulos: Dict[str, str]
     cat = p.get(eixo) or {}
     pct = cat.get("pct", 0)
     itens = _itens_eixo(p, eixo)
-    if not pct and not itens:
+    if not pct:
         return f"- {nome}: NÃO usar (0%)."
     if itens:
         lst = ", ".join(f"{rotulos.get(i, i) if i in rotulos else i} [{i}] peso {w}" for i, w in itens)
@@ -93,6 +93,11 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     dsq = p.get("destaques") or {}
     kit_hl = [e for e in (dsq.get("estilos") or []) if dp_destaques.estilo(e)]
     L.append(f"- Destaques de texto: densidade {dsq.get('densidade', 'equilibrado')}" + (f" — use SÓ estes estilos: {', '.join(kit_hl)}" if kit_hl else " — estilos do catálogo abaixo"))
+    ped = dp_direcao.editoriais_da(p)
+    if ped["ativo"]:
+        L.append(f"- Quadros editoriais: ~1 a cada {ped['segundos']} s" + (f" — use SÓ estes tipos: {', '.join(ped['tipos'])}" if ped["tipos"] else " — qualquer tipo do catálogo abaixo"))
+    else:
+        L.append("- Quadros editoriais: NÃO usar nesta direção.")
     cs = p.get("cores") or {}
     if cs.get("modo") == "predef":
         L.append(f"- Cores: use a paleta da direção (primária {cs.get('primaria')}).")
@@ -145,14 +150,46 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
              + " | ".join(dp_graficos.ESQUEMAS) + ", \"cartao\" = " + " | ".join(dp_graficos.CARTOES)
              + ", \"fundo_cor\", \"fundo_opacidade\" 0–1, \"texto_cor\" e \"cor\" em cada item de \"dados\".")
     import dp_sons
-    L.append("Sons (opcional, campo \"sons\"; transições e destaques já ganham som automático): "
+    L.append("Sons (opcional, campo \"sons\"; transições, destaques e quadros editoriais já ganham som automático): "
              + "; ".join(f"{c['nome']}: " + ", ".join(x["id"] for x in c["sons"]) for c in dp_sons.categorias()))
     L.append("Gráficos (campo \"tipo\"): " + "; ".join(f"{k} = {v}" for k, v in dp_graficos.TIPOS.items())
              + ". Posições: " + ", ".join(dp_graficos.POSICOES))
+    import dp_editorial
+    if ped["ativo"]:
+        L.append("Quadros editoriais (campo \"editoriais\", opcional — o estilo documentário: papel bege, serifada, acento vermelho; "
+                 "\"start\"/\"end\" em segundos, 3–8 s, cobrindo a fala daquilo; os de tela cheia cobrem a cena; "
+                 "cada um já vem com o som dele — \"som\": \"nenhum\" tira):\n" + dp_editorial.bloco_para_prompt(ped["tipos"] or None))
+    bib = [b for b in (job.get("media_library") or []) if b.get("media_type") == "image"]
+    if bib:
+        L.append("Imagens na biblioteca (use em \"imagem\"/\"imagens\" dos quadros: pagina, recortes, mural, bilhetes): "
+                 + ", ".join(f"bib:{b['id']} ({b.get('filename', '')})" for b in bib[:40]))
 
     # ---------------- estado atual
-    L.append(f"\n## Timeline atual ({len(segs)} trechos, {_t(total)})")
+    parte = estado.get("parte") if isinstance(estado.get("parte"), dict) else None
+    p_ini, p_fim = (float(parte["ini"]), float(parte["fim"])) if parte else (0.0, float("inf"))
+
+    def na_parte(a, b=None) -> bool:
+        a = float(a or 0)
+        b = float(b if b is not None else a)
+        return b > p_ini and a < p_fim
+    if parte:
+        L.append(f"\n## ⚠ PARTE {parte['k']} de {parte['n']} — só de {_t(p_ini)} até {_t(min(p_fim, total))}")
+        L.append("O vídeo é longo e está dividido em partes (cada uma num prompt). Edite SÓ esta parte: trechos, destaques, "
+                 "gráficos, quadros e sons com tempo DENTRO dela. Os números dos trechos (T…) são os do vídeo inteiro — use-os "
+                 "como estão." + (" Filtro, paleta e legenda valem pro vídeo todo: mande só nesta parte 1." if parte["k"] == 1
+                                  else " NÃO mande filtro_cor, paleta nem legenda (já foram decididos na parte 1)."))
+        if parte["k"] == 1:
+            L.append("Como esta é a PARTE 1, você DECIDE a direção de arte do vídeo inteiro (as outras partes vão seguir igual): "
+                     "mande também \"direcao_arte\" com o resumo do visual — estilos de destaque e fontes, cores, animações, "
+                     "zonas, transições e efeitos preferidos, estilo dos gráficos e dos quadros, e as regras que você seguiu.")
+        elif estado.get("arte"):
+            L.append(str(estado["arte"]))
+        else:
+            L.append("⚠ A direção de arte da parte 1 ainda não veio: mantenha o visual coerente e discreto.")
+    L.append(f"\n## Timeline atual ({len(segs)} trechos, {_t(total)})" + (" — trechos desta parte:" if parte else ""))
     for i, s in enumerate(segs):
+        if parte and not na_parte(s["start"], s["end"]):
+            continue
         ov = s.get("override_source") or {}
         midia = ("foto" if (ov.get("kind") or s.get("media_type")) == "image" else "vídeo") + f" '{s.get('query', '')}'"
         if (s.get("youtube_link") or {}).get("url"):
@@ -160,12 +197,21 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
         extra = [f"{k}={s.get(k)}" for k in ("transition", "efeito", "entrada", "saida", "template") if s.get(k)]
         fala = (s.get("_fala") or "").strip()
         L.append(f"T{i + 1} [{_t(s['start'])}→{_t(s['end'])}] {midia}" + (" · " + ", ".join(extra) if extra else "") + (f" · fala: \"{fala[:160]}\"" if fala else ""))
+    if parte:
+        destaques = [d for d in destaques if na_parte(d.get("start"), d.get("end"))]
+        graficos = [g for g in graficos if na_parte(g.get("start"), g.get("end"))]
     if destaques and op.get("destaques_atuais", True):
         L.append("\nDestaques atuais: " + "; ".join(f"{d.get('estilo')} {_t(d['start'])} \"{(d.get('texto') or '')[:40]}\"" for d in destaques[:60]))
+    eds = estado.get("editoriais") if estado.get("editoriais") is not None else (job.get("editoriais") or [])
+    if parte:
+        eds = [q for q in eds if na_parte(q.get("start"), q.get("end"))]
+    if eds:
+        L.append("Quadros editoriais atuais: " + "; ".join(f"{q.get('tipo')} {_t(float(q.get('start') or 0))}" for q in eds[:40]))
     if graficos:
         L.append("Gráficos atuais: " + "; ".join(f"{g.get('tipo')} {_t(g['start'])} \"{g.get('titulo', '')}\"" for g in graficos))
 
-    blocos = [b for b in (estado.get("blocos") or job.get("segments") or []) if (b.get("text") or "").strip()]
+    blocos = [b for b in (estado.get("blocos") or job.get("segments") or []) if (b.get("text") or "").strip()
+              and (not parte or na_parte(b.get("start"), b.get("end")))]
     if blocos:
         L.append("\n## Fala com os tempos (transcrição/SRT)")
         for b in blocos:
@@ -182,7 +228,8 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
 6. Mande SÓ o que muda: trechos sem alteração podem ficar de fora. Use "null" pra tirar um efeito/cena existente.
 7. REFINO FINO — você decide a composição e a tipografia: em cada destaque escolha "zona" (onde fica na tela, sem cobrir o rosto/assunto da imagem), "enfase" (1–3 palavras do texto que ganham a cor de acento — o número, o nome, a palavra-chave), e se quiser "fonte", "maiusculas", "escala" (0.6–1.6), "anim_entrada"/"anim_saida"/"interna", "cor" (acento só dele), "fundo"/"fundo_cor"/"fundo_int" e "som" (id, ou "nenhum"). Textos livres que não seguem a fala: "avulso": true com "start"/"end".
 8. Sons: as transições e destaques já ganham som automático; use "sons" pra acentos extras (impacto numa revelação, whoosh numa virada, riser antes de um clímax), com "volume" 0.2–1.2, sem poluir.
-9. Composição dos trechos: "bordas" (smart pra vídeo com barra preta/baixa qualidade), "camera"/"foco" em fotos, "transition_som" (id ou "nenhum") pra trocar o som de uma transição.
+9. Quadros editoriais: use com moderação (a frequência da direção acima), SÓ com fatos que a narração cita (nomes, datas, números, posts, manchetes reais); "ficha"/"nome" quando a pessoa aparece; "post" pra citação de rede social (com "traducao" se for em outro idioma); "numero" pra um número-chave; "recortes"/"linha_tempo" pra sequência de fatos. Não ponha quadro e destaque ao mesmo tempo.
+10. Composição dos trechos: "bordas" (smart pra vídeo com barra preta/baixa qualidade), "camera"/"foco" em fotos, "transition_som" (id ou "nenhum") pra trocar o som de uma transição.
 
 ## Responda SÓ com este JSON (sem texto antes/depois)
 {
@@ -207,8 +254,15 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
      "cor": "#RRGGBB", "esquema": "unica", "cartao": "escuro", "fundo_opacidade": 0.85}
   ],
   "sons": [{"som": "id", "start": 10.5, "volume": 0.8}],
+  "editoriais": [
+    {"tipo": "ficha", "start": 4.2, "end": 9.0, "rotulo": "AUSTRÁLIA", "nome": "Nome Sobrenome", "linhas": "Cargo: …\nNo cargo desde: …", "ponto_x": 0.5, "ponto_y": 0.25, "credito": "fonte"},
+    {"tipo": "numero", "start": 20.0, "end": 25.0, "de": 0, "ate": 98, "sufixo": "%", "rotulo": "o que é", "subtexto": "segundo quem"}
+  ],
   "observacoes": "2-3 frases dizendo o que você mudou e por quê"
-}""")
+}""" + ("""
+(Só na PARTE 1, acrescente: "direcao_arte": {"resumo": "1-2 frases", "destaques": "estilos/fontes/animações/zonas que você usou e quando",
+ "cores": "como usou a paleta", "transicoes": "quais e quando", "efeitos": "quais", "graficos": "esquema/cartão/cores",
+ "quadros": "quadros editoriais: cor/fundo/quando", "regras": ["regra que as outras partes devem seguir"]})""" if (parte and parte["k"] == 1) else ""))
     try:  # o vídeo fala um idioma só: textos de destaques/gráficos/cenas no idioma da narração
         import idiomas
         L.append("")
@@ -216,6 +270,121 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     except Exception:  # noqa: BLE001
         pass
     return "\n".join(L)
+
+
+# ------------------------------------------------------------------ prompt em partes (vídeo longo)
+def dividir_partes(segs: List[Dict[str, Any]], total: float, minutos: float = 12.0) -> List[Dict[str, Any]]:
+    """Partes de ~`minutos` cortadas no começo de um trecho (nunca no meio de uma cena/template).
+    Uma IA editando 1 hora de uma vez perde qualidade; 5 prompts de 12 min ficam bem melhores."""
+    alvo = max(2.0, float(minutos or 12)) * 60
+    if not segs or total <= alvo * 1.25:
+        return [{"k": 1, "n": 1, "ini": 0.0, "fim": float(total or (segs[-1]["end"] if segs else 0))}]
+    cortes = [0.0]
+    for i, s in enumerate(segs):
+        if i and float(s["start"]) - cortes[-1] >= alvo and not segs[i - 1].get("template") and (total - float(s["start"])) >= alvo * 0.35:
+            cortes.append(float(s["start"]))
+    cortes.append(float(total))
+    partes = [{"ini": a, "fim": b} for a, b in zip(cortes, cortes[1:]) if b > a]
+    n = len(partes)
+    return [dict(x, k=k, n=n) for k, x in enumerate(partes, start=1)]
+
+
+def _contagem(itens, chave) -> List[str]:
+    from collections import Counter
+    c = Counter(str(x.get(chave)) for x in itens or [] if x.get(chave) not in (None, "", "none", "null"))
+    return [f"{k} ({n}x)" if n > 1 else k for k, n in c.most_common(8)]
+
+
+def arte_da_parte1(plano: Dict[str, Any]) -> str:
+    """✂️ O que a parte 1 decidiu (filtro, paleta, legenda, estilos de destaque, fontes, animações, transições,
+    efeitos, gráficos, quadros + o "direcao_arte" que ela mandou) → bloco que vai nos prompts das partes 2..N,
+    pra o vídeo inteiro ter UMA cara só."""
+    L = ["## 🎨 DIREÇÃO DE ARTE JÁ DECIDIDA NA PARTE 1 — siga IGUAL (o vídeo é um só)",
+         "Use os MESMOS estilos, fontes, cores, animações, zonas, transições e efeitos abaixo, com a mesma frequência. "
+         "Só use algo diferente se a fala pedir muito, e mesmo assim da mesma família."]
+    if plano.get("filtro_cor"):
+        L.append(f"- Filtro do vídeo: {plano['filtro_cor']} (já aplicado — não mande filtro_cor).")
+    pal = plano.get("paleta") or {}
+    if pal.get("primaria"):
+        L.append(f"- Paleta: primária {pal.get('primaria')}, secundária {pal.get('secundaria')}, acento {pal.get('acento')} — "
+                 "use SÓ essas cores em \"cor\"/\"fundo_cor\" de destaques, gráficos e quadros.")
+    leg = plano.get("legenda") or {}
+    if leg.get("estilo"):
+        L.append(f"- Legenda: {leg.get('estilo')} (já decidida — não mande legenda).")
+    ds = plano.get("destaques") or []
+    if ds:
+        L.append("- Destaques: estilos " + ", ".join(_contagem(ds, "estilo"))
+                 + (" · fontes " + ", ".join(_contagem(ds, "fonte")) if _contagem(ds, "fonte") else "")
+                 + (" · entrada " + ", ".join(_contagem(ds, "anim_entrada")) if _contagem(ds, "anim_entrada") else "")
+                 + (" · saída " + ", ".join(_contagem(ds, "anim_saida")) if _contagem(ds, "anim_saida") else "")
+                 + (" · zonas " + ", ".join(_contagem(ds, "zona")) if _contagem(ds, "zona") else "")
+                 + (" · fundos " + ", ".join(_contagem(ds, "fundo")) if _contagem(ds, "fundo") else "")
+                 + (" · cores " + ", ".join(_contagem(ds, "cor")) if _contagem(ds, "cor") else "")
+                 + f" — {len(ds)} destaques na parte 1 (mantenha a densidade).")
+        mai = [x.get("maiusculas") for x in ds if isinstance(x.get("maiusculas"), bool)]
+        if mai:
+            L.append(f"  Maiúsculas: {'sim' if sum(mai) >= len(mai) / 2 else 'não'}.")
+    tr = plano.get("trechos") or []
+    if _contagem(tr, "transition"):
+        L.append("- Transições: " + ", ".join(_contagem(tr, "transition")))
+    if _contagem(tr, "efeito"):
+        L.append("- Efeitos/movimento: " + ", ".join(_contagem(tr, "efeito")))
+    if _contagem(tr, "entrada") or _contagem(tr, "saida"):
+        L.append("- Animações dos trechos: " + ", ".join(_contagem(tr, "entrada") + _contagem(tr, "saida")))
+    if _contagem(tr, "template"):
+        L.append("- Cenas/takes: " + ", ".join(_contagem(tr, "template")))
+    gs = plano.get("graficos") or []
+    if gs:
+        L.append("- Gráficos: " + ", ".join(_contagem(gs, "tipo")) + (" · esquema " + ", ".join(_contagem(gs, "esquema")) if _contagem(gs, "esquema") else "")
+                 + (" · cartão " + ", ".join(_contagem(gs, "cartao")) if _contagem(gs, "cartao") else "")
+                 + (" · cores " + ", ".join(_contagem(gs, "cor")) if _contagem(gs, "cor") else ""))
+    eds = plano.get("editoriais") or []
+    if eds:
+        L.append("- Quadros editoriais: " + ", ".join(_contagem(eds, "tipo")) + (" · cor " + ", ".join(_contagem(eds, "cor")) if _contagem(eds, "cor") else "")
+                 + (" · fundo " + ", ".join(_contagem(eds, "fundo")) if _contagem(eds, "fundo") else ""))
+    sons = plano.get("sons") or []
+    if sons:
+        L.append("- Sons extras: " + ", ".join(_contagem(sons, "som")))
+    da = plano.get("direcao_arte") or {}
+    if da:
+        L.append("- O que a parte 1 disse da direção de arte:")
+        for k, v in da.items():
+            if isinstance(v, list):
+                L += [f"  • {x}" for x in v]
+            elif v:
+                L.append(f"  • {k}: {v}")
+    if len(L) == 2:
+        return ""
+    return "\n".join(L)
+
+
+def juntar_planos(planos: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """As respostas de cada parte → um plano só (os trechos não se repetem; o resto soma)."""
+    out: Dict[str, Any] = {"trechos": [], "destaques": None, "graficos": None, "editoriais": None, "avisos": [], "observacoes": ""}
+    trechos: Dict[int, Dict[str, Any]] = {}
+    obs = []
+    for k, p in enumerate(planos, start=1):
+        for t in p.get("trechos") or []:
+            trechos[t["indice"]] = dict(trechos.get(t["indice"], {}), **t)
+        for chave in ("destaques", "graficos", "editoriais", "sons"):
+            if p.get(chave):
+                out[chave] = (out.get(chave) or []) + list(p[chave])
+        for chave in ("filtro_cor", "paleta", "legenda"):
+            if p.get(chave) and not out.get(chave):
+                out[chave] = p[chave]
+        if p.get("substituir_destaques"):
+            out["substituir_destaques"] = True
+        if k == 1 and p.get("direcao_arte"):
+            out["direcao_arte"] = p["direcao_arte"]
+        out["avisos"] += [f"Parte {k}: {a}" for a in p.get("avisos") or []]
+        if p.get("observacoes"):
+            obs.append(f"Parte {k}: {p['observacoes']}")
+    out["trechos"] = [trechos[i] for i in sorted(trechos)]
+    for chave in ("destaques", "graficos", "editoriais", "sons"):
+        if out.get(chave):
+            out[chave].sort(key=lambda x: float(x.get("start") or 0))
+    out["observacoes"] = " ".join(obs)[:2400]
+    return out
 
 
 # ------------------------------------------------------------------ leitura da resposta
@@ -293,8 +462,14 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
     ef_ok = {e["id"] for e in dp_visual.efeitos()}
     en_ok = {e["id"] for e in dp_visual.entradas()}
     fi_ok = {f["id"] for f in dp_visual.filtros()}
-    out: Dict[str, Any] = {"trechos": [], "destaques": None, "graficos": None, "avisos": avisos,
+    out: Dict[str, Any] = {"trechos": [], "destaques": None, "graficos": None, "editoriais": None, "avisos": avisos,
                            "observacoes": str(d.get("observacoes") or "")[:1200]}
+    da = d.get("direcao_arte")
+    if isinstance(da, dict):  # ✂️ parte 1: a direção de arte que as outras partes seguem
+        out["direcao_arte"] = {str(k)[:30]: ([str(x)[:300] for x in v][:12] if isinstance(v, list) else str(v)[:600])
+                               for k, v in list(da.items())[:12]}
+    elif isinstance(da, str) and da.strip():
+        out["direcao_arte"] = {"resumo": da.strip()[:1200]}
 
     def tr_valida(v):
         if _nulo(v):
@@ -426,6 +601,17 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
             hl.append(item)
         out["destaques"] = dp_destaques.ancorar(hl, palavras, duracao) if palavras else hl  # avulsos mantêm o tempo
         out["substituir_destaques"] = d.get("substituir_destaques", True) is not False
+
+    if isinstance(d.get("editoriais"), list):
+        import dp_editorial
+        eds = []
+        for x in d["editoriais"][:30]:
+            q = dp_editorial.normalizar(x, duracao)
+            if q:
+                eds.append(q)
+            else:
+                avisos.append(f"Quadro editorial \"{(x or {}).get('tipo', '?')}\" inválido — ignorado.")
+        out["editoriais"] = eds
 
     if isinstance(d.get("graficos"), list):
         gs = []
