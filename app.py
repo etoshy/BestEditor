@@ -2251,6 +2251,7 @@ def reuse_json():
             valid_providers=selected_providers,
             total_duration=total_duration,
         )
+        __import__("chamadas").limpar_buscas(parsed.segments)  # 🚫 inscreva-se/venda não viram busca de imagem
     except PromptBuilderError as exc:
         return render_template("index.html", providers=DEFAULT_PROVIDERS,
                                error=f"JSON não compatível com o áudio: {exc}")
@@ -2461,7 +2462,8 @@ def _ligar_venda(job: dict, venda_id: str) -> bool:
 
 
 def _com_produto(job: dict, prompt_text: str) -> str:
-    """Prompt do editor + o bloco das mídias do projeto ligado (venda ou modelo)."""
+    """Prompt do editor + o bloco das mídias do projeto ligado (venda ou modelo) + a regra das chamadas."""
+    prompt_text = prompt_text + "\n" + __import__("chamadas").bloco_prompt_buscas(job.get("chamadas"))  # 🚫 chamada não vira busca
     pj = _projeto_do_job(job)
     if not pj:
         return prompt_text
@@ -3461,6 +3463,7 @@ def submit_json(job_id: str):
         return render_template("prompt.html", job=job, json_error=str(exc), previous_json=raw_json, opcoes=_opcoes_do_job(job), all_providers=DEFAULT_PROVIDERS)
 
     _aplicar_produto(job, parsed.segments)  # 🛒 "produto" -> arquivo do projeto de venda
+    __import__("chamadas").limpar_buscas(parsed.segments, job.get("chamadas"))  # 🚫 inscreva-se/venda não viram busca de imagem
     job["pending_segments"] = [s.to_dict() for s in parsed.segments]
     _aplicar_mix_midia(job, parsed)
     _aplicar_padroes_biblioteca(job, parsed)
@@ -3527,8 +3530,11 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
             job["preview_ia"] = "🤖 lendo o roteiro (ficha do vídeo)…"
             info["ficha"] = ia_midia.ficha_visual(roteiro, job.get("titulo") or job.get("nome") or "", job.get("language") or "", job=job_id)
         if not info.get("buscas_feitas") and ia_servico.ativo("buscas"):
+            import chamadas as _ch
+            _jan = _ch.janelas(job.get("chamadas"))
             elegiveis = [k for k, sg in enumerate(segments)
                          if not sg.override_source and sg.provider not in _IA_PULA_BUSCA
+                         and not any(min(sg.end, b) - max(sg.start, a) >= (sg.end - sg.start) * 0.5 for a, b in _jan)
                          and not (sg.provider in _BIBLIOTECAS_LOCAIS and (getattr(sg, "obra", None) or getattr(sg, "personagem", None)))]
             if elegiveis:
                 job["preview_ia"] = "🤖 escrevendo buscas melhores…"
@@ -3550,6 +3556,10 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
                         pend[k].update(query=sg.query, alternativas=sg.alternativas, ia_busca_original=original,
                                        ia_midia=nb.get("midia") or None, **({"visual": sg.visual} if nb.get("visual") else {}))
                     mudou += 1
+                _ch.limpar_buscas(segments, job.get("chamadas"))  # a IA também não busca inscreva-se/venda
+                for k, sg in enumerate(segments):
+                    if k < len(pend) and pend[k].get("query") != sg.query:
+                        pend[k].update(query=sg.query, alternativas=list(sg.alternativas or []))
                 info["buscas_feitas"] = True
                 info["buscas_trocadas"] = mudou
     except Exception as exc:  # noqa: BLE001 — a IA nunca trava a prévia
@@ -3787,6 +3797,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
         job["status"] = "pronto_para_editar"
         _save_state(job_id)
+        _prebaixar_iniciar(job_id, job)  # ⬇ já vai baixando os clipes enquanto a pessoa edita
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -4252,6 +4263,7 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
     job["progress"] = {"stage": "iniciando", "current": 0, "total": len(segments)}
     job.pop("assembly_error", None)  # limpa erro de uma tentativa anterior, se houver
     job.pop("assembly_error_segment_index", None)
+    job.pop("assembly_error_segments", None)
     job["cancel_requested"] = False
     _save_state(job_id)
 
@@ -4445,6 +4457,7 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 final_status = "pronto_para_editar"
                 job["assembly_error"] = str(exc)
             job["assembly_error_segment_index"] = getattr(exc, "segment_index", None)
+            job["assembly_error_segments"] = getattr(exc, "segment_indices", None)
         except Exception:  # noqa: BLE001
             final_status = "pronto_para_editar"
             job["assembly_error"] = f"Erro inesperado:\n{traceback.format_exc()}"
@@ -4589,6 +4602,7 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         "clipes_chamada": {t: [{"id": x["id"], "nome": x["nome"], "padrao": bool(x.get("padrao"))} for x in l] for t, l in clipes_ch.items()},
         "duracao": job.get("total_duration") or (job["pending_segments"][-1]["end"] if job["pending_segments"] else 0),
         "erro_indice": job.get("assembly_error_segment_index"),
+        "erro_indices": job.get("assembly_error_segments") or [],
         "timelines": _timelines_estudio(job_id, job),
     }
 
@@ -7005,6 +7019,7 @@ def usar_candidato(job_id: str, indice: int):
         except Exception as exc:  # noqa: BLE001
             return jsonify({"erro": f"Falha ao baixar: {exc}"}), 500
         seg["override_source"] = {"source": "local_file", "value": caminho, "kind": "image", **animacao}
+        seg["media_type"] = "image"  # trecho de vídeo que ganhou uma foto (todas as fontes aparecem no Buscar)
         thumb = f"/job/{job_id}/thumbnail/{indice}"
         preview_extra = {"thumbnail_path": caminho}
         modo = "upload"
@@ -7017,6 +7032,7 @@ def usar_candidato(job_id: str, indice: int):
             modo = "url"
         else:
             return jsonify({"erro": f"O banco {provider!r} não deixa escolher um resultado específico — use 'colar link' ou envie o arquivo."}), 400
+        seg["media_type"] = "video"
         thumb = corpo.get("thumbnail") or None
         preview_extra = {}
 
@@ -7030,6 +7046,7 @@ def usar_candidato(job_id: str, indice: int):
         }
         job["segment_previews"] = previews
     _save_state(job_id)
+    _prebaixar_iniciar(job_id, job)  # ⬇ o clipe escolhido já começa a baixar
     return jsonify({"ok": True, "modo": modo, "thumbnail_url": thumb, "override_source": seg["override_source"]})
 
 
@@ -7717,6 +7734,7 @@ def confirm_segments(job_id: str):
     # "💾 Salvar" do editor (sem montar): guarda tudo e volta pro editor
     if request.form.get("acao") == "salvar":
         _save_state(job_id)
+        _prebaixar_iniciar(job_id, job)  # ⬇ trocou clipe/busca: baixa o que mudou
         if request.headers.get("X-Requested-With") == "fetch":
             return jsonify({"ok": True, "pending_segments": job["pending_segments"]})
         return redirect(url_for("edit_segments_page", job_id=job_id))
@@ -7812,6 +7830,218 @@ def _fixar_midias_da_previa(job: dict, segments: List[VideoSegment]) -> List[Vid
 
 
 # --------------------------------------------------------------------- #
+# ⬇ Pré-download no Estúdio: enquanto a pessoa edita, os clipes que a
+# montagem vai usar (clipe da prévia, link, resultado escolhido, clipes
+# curtos extras) já vão sendo baixados em segundo plano pra
+# jobs/<id>/prebaixados. A montagem acha o arquivo lá e não baixa de novo.
+# --------------------------------------------------------------------- #
+_PREBAIXAR: Dict[str, dict] = {}
+_PREBAIXAR_LOCK = threading.Lock()
+
+
+def _prebaixar_lista(job: dict) -> list:
+    """As mídias (override_source) que a montagem baixaria AGORA, na mesma
+    regra de `_fixar_midias_da_previa`."""
+    import video_assembler as _va
+    segs_d = job.get("pending_segments") or []
+    if not segs_d:
+        return []
+    diag = job.get("fixacao_previa")
+    try:
+        segs = _fixar_midias_da_previa(job, [_segmento_obj(d) for d in segs_d])
+    finally:
+        if diag is None:
+            job.pop("fixacao_previa", None)
+        else:
+            job["fixacao_previa"] = diag
+    lista = []
+    for s in segs:
+        if _va.chave_prebaixado(s.override_source):
+            lista.append(dict(s.override_source))
+        for c in (getattr(s, "clipes_extra", None) or []):
+            if isinstance(c, dict) and _va.chave_prebaixado(c):
+                lista.append(dict(c, kind="video"))
+    return lista
+
+
+def _prebaixar_iniciar(job_id: str, job: dict) -> bool:
+    """Liga (ou re-agenda) o download em segundo plano. Devolve True se vai rodar."""
+    if os.environ.get("NARRATION_SEM_PREBAIXAR"):  # testes: nada de baixar em segundo plano
+        return False
+    cfg = _job_site_cfg(job)
+    if not cfg.get("prebaixar_no_editor", True) or not job.get("pending_segments"):
+        return False
+    with _PREBAIXAR_LOCK:
+        est = _PREBAIXAR.setdefault(job_id, {"rodando": False, "de_novo": False})
+        if est["rodando"]:
+            est["de_novo"] = True  # mudou algo no meio: roda mais uma volta no fim
+            return True
+        est["rodando"], est["de_novo"] = True, False
+
+    def _run():
+        import video_assembler as _va
+        try:
+            while True:
+                lista = _prebaixar_lista(job)
+                pb = {"estado": "baixando", "feitos": 0, "total": 0, "falhas": 0, "baixados": 0, "inicio": time.time()}
+                job["prebaixar"] = pb
+
+                def _item(feitos, total, _ok):
+                    pb["feitos"], pb["total"] = feitos, total
+
+                res = _va.prebaixar_midias(
+                    lista, os.path.join(_job_dir(job_id), "prebaixados"), cfg, on_item=_item,
+                    cancel_check=lambda: job.get("status") == "montando" or _PREBAIXAR.get(job_id, {}).get("de_novo"),
+                )
+                pb.update(estado="pronto", feitos=res["baixados"] + res["ja_tinha"], total=res["total"], falhas=res["falhas"], baixados=res["baixados"], ja_tinha=res["ja_tinha"],
+                          erros=res["erros"][:5], fim=time.time())
+                with _PREBAIXAR_LOCK:
+                    est = _PREBAIXAR[job_id]
+                    if not est["de_novo"] or job.get("status") == "montando":
+                        est["rodando"] = est["de_novo"] = False
+                        return
+                    est["de_novo"] = False
+        except Exception as exc:  # noqa: BLE001 — nunca derruba nada: a montagem baixa como antes
+            job["prebaixar"] = {"estado": "erro", "erro": str(exc)[:300]}
+            with _PREBAIXAR_LOCK:
+                _PREBAIXAR[job_id] = {"rodando": False, "de_novo": False}
+
+    threading.Thread(target=_run, daemon=True).start()
+    return True
+
+
+def _verificar_montagem(job_id: str, job: dict, baixar: bool = True) -> dict:
+    """🔎 Confere TUDO que pode derrubar a montagem, de uma vez, antes de começar:
+    arquivos que sumiram, links que não baixam, banco de foto sem chave, busca
+    vazia, cena (template) que não existe, YouTube sem vídeo, espaço em disco…
+    Os links escolhidos à mão já são baixados aqui (vão pro pré-download), então
+    o que passar nessa checagem não falha mais por download na montagem.
+
+    Devolve {"ok", "erros", "avisos", "problemas": [{"trecho", "indice", "tipo", "msg"}]}."""
+    import shutil as _sh
+    import video_assembler as _va
+    import cenas_dp
+    segs_d = job.get("pending_segments") or []
+    probs: list = []
+
+    def _p(i, tipo, msg):
+        probs.append({"indice": i, "trecho": (i + 1) if i is not None else None, "tipo": tipo, "msg": msg})
+
+    fotos_ok: dict = {}
+    links: list = []  # (indice, override, é_extra)
+    for i, d in enumerate(segs_d):
+        try:
+            seg = _segmento_obj(d)
+        except Exception as exc:  # noqa: BLE001
+            _p(i, "erro", f"trecho com dados inválidos ({exc})")
+            continue
+        ov = seg.override_source or {}
+        if float(seg.end) - float(seg.start) < 0.05:
+            _p(i, "erro", "o trecho tem duração zero — junte com o vizinho ou ajuste o tempo")
+        tid = getattr(seg, "template", None)
+        if tid and not cenas_dp.template(tid):
+            _p(i, "erro", f"a cena (template) “{tid}” não existe mais — troque ou tire do trecho")
+        if ov.get("source") == "local_file":
+            caminho = ov.get("value")
+            if not caminho or not os.path.exists(caminho):
+                _p(i, "erro", "o arquivo escolhido pra esse trecho não existe mais no disco — envie de novo ou troque a mídia")
+            else:
+                try:
+                    _va._validate_downloaded_file(caminho)
+                except Exception as exc:  # noqa: BLE001
+                    _p(i, "erro", f"o arquivo escolhido está corrompido/ilegível ({str(exc)[:160]}) — troque a mídia")
+        elif ov.get("source") == "provider_url" and ov.get("provider") not in _va._PROVIDERS_WITH_URL_RESOLUTION:
+            _p(i, "erro", f"o banco {ov.get('provider')} não deixa baixar um resultado pelo link — escolha de outro banco ou envie o arquivo")
+        elif ov.get("source") in ("url", "provider_url"):
+            links.append((i, dict(ov), False))
+        elif ov.get("source"):
+            _p(i, "erro", f"mídia com origem desconhecida ({ov.get('source')}) — escolha de novo")
+        for c in (getattr(seg, "clipes_extra", None) or []):
+            if isinstance(c, dict) and _va.chave_prebaixado(c):
+                links.append((i, dict(c, kind="video"), True))
+        if not ov:
+            if not (seg.query or "").strip() and seg.provider not in ("youtube",):
+                _p(i, "erro", "o trecho está sem busca e sem mídia — escreva o que buscar ou escolha uma mídia")
+            if seg.provider == "youtube":
+                _p(i, "aviso", "YouTube sem vídeo escolhido — vai usar o 1º resultado ou os bancos normais")
+            if (seg.media_type or "video") == "image" and seg.provider not in fotos_ok:
+                fotos_ok[seg.provider] = photo_api_configuration_error(provider=seg.provider)
+            if (seg.media_type or "video") == "image" and fotos_ok.get(seg.provider):
+                _p(i, "erro", f"não dá pra buscar foto em “{seg.provider}”: {fotos_ok[seg.provider]}")
+
+    # links escolhidos à mão: baixa AGORA (o que não baixar aparece aqui, não no meio da montagem)
+    if links and baixar:
+        cache_dir = os.path.join(_job_dir(job_id), "prebaixados")
+        faltam = [ov for (_i, ov, _e) in links if not _va.prebaixado(ov, cache_dir)]
+        if faltam:
+            _va.prebaixar_midias(faltam, cache_dir, _job_site_cfg(job))
+        for (i, ov, extra) in links:
+            if not _va.prebaixado(ov, cache_dir):
+                if extra:
+                    _p(i, "aviso", f"um clipe curto extra não baixou ({ov.get('value')}) — o trecho fica sem ele")
+                else:
+                    _p(i, "erro", f"o link escolhido não baixa ({ov.get('value')}) — cole outro link, escolha outro resultado ou envie o arquivo")
+
+    # clipes da prévia que não baixaram no pré-download: a montagem busca outro (só avisa)
+    try:
+        cache_dir = os.path.join(_job_dir(job_id), "prebaixados")
+        for i, s in enumerate(_fixar_midias_da_previa(dict(job), [_segmento_obj(d) for d in segs_d])):
+            ov = s.override_source or {}
+            if ov.get("da_previa") and not _va.prebaixado(ov, cache_dir) and (job.get("prebaixar") or {}).get("estado") == "pronto" \
+                    and not _PREBAIXAR.get(job_id, {}).get("rodando"):
+                _p(i, "aviso", "o clipe que a telinha mostra não baixou — a montagem vai buscar outra cena pra esse trecho")
+    except Exception:  # noqa: BLE001
+        pass
+
+    for k, ov in enumerate(job.get("overlays") or []):
+        src = (ov.get("source") or {}) if isinstance(ov, dict) else {}
+        if src.get("source") == "local_file" and not os.path.exists(str(src.get("value") or "")):
+            _p(None, "aviso", f"o overlay {ov.get('id', k + 1)} usa um arquivo que não existe mais — ele vai ficar de fora")
+    if job.get("music_path") and not os.path.exists(job["music_path"]):
+        _p(None, "aviso", "a música de fundo não está mais no disco — o vídeo sai sem ela")
+    if not job.get("audio_path") or not os.path.exists(job.get("audio_path") or ""):
+        _p(None, "erro", "a narração (áudio) não está mais no disco — gere ou envie o áudio de novo")
+    try:
+        livre = _sh.disk_usage(_job_dir(job_id)).free
+        precisa = max(2.0, len(segs_d) * 0.03)  # ~30 MB por trecho, no mínimo 2 GB
+        if livre < precisa * 1024 ** 3:
+            _p(None, "erro" if livre < 0.5 * 1024 ** 3 else "aviso",
+               f"pouco espaço em disco ({livre / 1024 ** 3:.1f} GB livres; a montagem precisa de uns {precisa:.0f} GB)")
+    except OSError:
+        pass
+    if not _sh.which("ffmpeg"):
+        _p(None, "erro", "o ffmpeg não foi encontrado — sem ele não dá pra montar")
+
+    probs.sort(key=lambda p: (p["tipo"] != "erro", p["indice"] if p["indice"] is not None else -1))
+    erros = sum(1 for p in probs if p["tipo"] == "erro")
+    return {"ok": erros == 0, "erros": erros, "avisos": len(probs) - erros, "problemas": probs}
+
+
+@app.route("/job/<job_id>/verificar-montagem", methods=["POST"])
+def verificar_montagem_api(job_id: str):
+    job = _JOBS.get(job_id)
+    if not job or "pending_segments" not in job:
+        return jsonify({"error": "job não encontrado"}), 404
+    try:
+        return jsonify(_verificar_montagem(job_id, job))
+    except Exception as exc:  # noqa: BLE001 — a checagem nunca impede de montar
+        return jsonify({"ok": True, "erros": 0, "avisos": 0, "problemas": [], "falhou": str(exc)[:300]})
+
+
+@app.route("/job/<job_id>/prebaixar", methods=["GET", "POST"])
+def prebaixar_api(job_id: str):
+    """GET: andamento do pré-download. POST: (re)começa."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "job não encontrado"}), 404
+    if request.method == "POST" and job.get("status") != "montando":
+        _prebaixar_iniciar(job_id, job)
+    pb = dict(job.get("prebaixar") or {"estado": "parado"})
+    pb["rodando"] = bool(_PREBAIXAR.get(job_id, {}).get("rodando"))
+    return jsonify(pb)
+
+
+# --------------------------------------------------------------------- #
 # Página 3: acompanhar o progresso da montagem, e baixar o resultado
 # --------------------------------------------------------------------- #
 
@@ -7835,6 +8065,7 @@ def job_status_api(job_id: str):
         "error": job.get("error"),
         "assembly_error": job.get("assembly_error"),
         "assembly_error_segment_index": job.get("assembly_error_segment_index"),
+        "prebaixar": job.get("prebaixar"),
     })
 
 

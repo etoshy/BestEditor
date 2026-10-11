@@ -9,6 +9,7 @@
 
 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
 <p id="progress-text"></p>
+<p id="prebaixar-text" class="hint" style="font-size:.85rem;color:#166534;display:none"></p>
 
 <div id="error-box" class="error" style="display:none"></div>
 
@@ -57,6 +58,12 @@ async function poll() {
     const pct = data.progress.total ? Math.round(100 * data.progress.current / data.progress.total) : 0;
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('progress-text').textContent = data.progress.stage + ' (' + data.progress.current + '/' + data.progress.total + ')';
+  }
+  if (data.prebaixar && data.prebaixar.total) {
+    const pb = data.prebaixar, el = document.getElementById('prebaixar-text');
+    el.style.display = 'block';
+    el.textContent = '⬇ ' + pb.feitos + ' de ' + pb.total + ' clipes já tinham sido baixados no editor — esses não baixam de novo'
+      + (pb.falhas ? ' (' + pb.falhas + ' falharam e serão baixados agora)' : '') + '.';
   }
 
   if (data.status === 'concluido') {

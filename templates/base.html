@@ -60,7 +60,7 @@
       try {
         const antes = pr ? pr.value : '';
         if (ger) { diz('📝 gerando o prompt…'); ger.click(); }
-        let t = 0; while (pr && (pr.value === antes || !pr.value.trim()) && t < 60) { await new Promise(r => setTimeout(r, 500)); t++; }
+        let t = 0; while (ger && pr && (pr.value === antes || !pr.value.trim()) && t < 60) { await new Promise(r => setTimeout(r, 500)); t++; }
         if (!pr || !pr.value.trim()) throw new Error('não consegui gerar o prompt (veja o aviso ao lado do botão de gerar)');
         diz('🤖 a IA está escrevendo… (roteiro longo pode levar alguns minutos)');
         const r = await fetch('/ia/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: pr.value }) });

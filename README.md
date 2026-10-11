@@ -28,6 +28,34 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ⬇ Clipes baixando enquanto você edita (v84_59)
+
+**🔎 Conferência antes de montar.** Quando você clica em 🎬 Montar vídeo, o site salva e confere **todos os trechos de uma vez**,
+antes de começar. Ele procura arquivos que sumiram ou estão corrompidos, links escolhidos que não baixam (eles já são
+baixados nessa hora), bancos que não baixam pelo link, foto sem chave do banco, trecho sem busca e sem mídia, cena
+(template) que não existe, trecho com duração zero, narração ausente, ffmpeg ausente e pouco espaço em disco. A lista
+aparece na janela de montar: ❌ é o que faria a montagem falhar, ⚠ é só aviso. Clique num item para ir ao trecho; os
+trechos com ❌ ficam marcados em vermelho na timeline. Dá para montar mesmo assim.
+
+**♻ Montar de novo não recomeça do zero.** Cada trecho pronto (baixado, cortado e com efeito) fica guardado em
+`jobs/<id>/clips_prontos/`. Se a montagem falhar num trecho e você montar de novo, os trechos que não mudaram saem dali
+na hora: só o que falhou, ou o que você mudou, é refeito. Quando falha, a mensagem lista **todos** os trechos que
+falharam, não só o primeiro. Para desligar: `"reaproveitar_clipes_prontos": false`.
+
+Antes, a montagem ("4. Montando o vídeo") baixava clipe por clipe e só então juntava — em vídeos longos ficava
+muito tempo em "processando 62/151". Agora, assim que as prévias ficam prontas, o site já vai **baixando em
+segundo plano** os clipes que a montagem vai usar (o clipe que a telinha do Estúdio mostra, links colados,
+resultados escolhidos no 🔍 Buscar e os clipes curtos extras) para `jobs/<id>/prebaixados/`.
+
+- No Estúdio, ao lado de "tudo salvo", aparece **⬇ baixando mídias X/N** e depois **⬇ mídias prontas**.
+- Trocou um clipe ou uma busca e salvou: só o que mudou baixa; o que já estava baixado é reaproveitado.
+- Na montagem, o clipe já baixado sai direto do disco — sobra só cortar/normalizar e juntar. A tela da montagem
+  mostra quantos clipes já vieram prontos do editor.
+- Um link que falhar no pré-download não trava nada: a montagem tenta de novo (e, se for da prévia, busca outro).
+- Para desligar: `"prebaixar_no_editor": false` no `site_config.json`. Quantos ao mesmo tempo: `assembly_fetch_concurrency`.
+- Fotos dos buscadores por navegador (Bing/Brave/Yandex/Startpage) já vinham da prévia; as demais buscas novas
+  (trecho sem prévia, foto de banco) continuam sendo feitas na montagem.
+
 ## 🤖 IA nas buscas, no editor e nos Modelos de vídeo — Claude Haiku 5.5 (v84_53)
 
 - Página nova **🤖 IA nas buscas e modelos** (`/ia`, nos links do topo e em ⚙️ Configurações): liga a IA, chave, o que

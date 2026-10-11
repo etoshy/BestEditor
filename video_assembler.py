@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from contextlib import nullcontext
 from dataclasses import replace
@@ -3065,6 +3066,150 @@ def _resolve_override_source(override: Dict[str, Any], downloads_dir: str, get_c
     raise VideoAssemblyError(f"override_source com 'source' desconhecido: {source!r}")
 
 
+# ------------------------------------------------------------------ #
+# ⬇ Pré-download: as mídias já escolhidas (clipe da prévia, link,
+# resultado fixado) são baixadas EM SEGUNDO PLANO enquanto a pessoa está
+# no Estúdio. Na montagem, o mesmo link sai da pasta `prebaixados/` do job
+# em vez de ser baixado de novo — a montagem só normaliza e junta.
+# ------------------------------------------------------------------ #
+_PREBAIXADOS_LOCK = threading.Lock()
+PREBAIXADOS_INDICE = "indice.json"
+CLIPES_PRONTOS_VERSAO = 1  # suba quando o jeito de cortar/normalizar mudar (invalida os clipes guardados)
+_TRAVAS_CHAVE: Dict[str, Any] = {}
+
+
+def chave_prebaixado(override: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Identidade de uma mídia baixável: (fonte, banco, link). Arquivo do PC
+    (`local_file`) não precisa — já está no disco."""
+    if not isinstance(override, dict):
+        return None
+    source = override.get("source")
+    value = str(override.get("value") or "").strip()
+    if source not in ("url", "provider_url") or not value:
+        return None
+    import hashlib
+    bruto = f"{source}|{override.get('provider') or ''}|{value}"
+    return hashlib.sha1(bruto.encode("utf-8")).hexdigest()[:20]
+
+
+def _indice_prebaixados(cache_dir: str) -> Dict[str, Any]:
+    try:
+        with open(os.path.join(cache_dir, PREBAIXADOS_INDICE), encoding="utf-8") as f:
+            dados = json.load(f)
+        return dados if isinstance(dados, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def prebaixado(override: Optional[Dict[str, Any]], cache_dir: Optional[str]) -> Optional[tuple]:
+    """(caminho, tipo) se essa mídia já foi baixada e o arquivo ainda existe."""
+    chave = chave_prebaixado(override)
+    if not chave or not cache_dir:
+        return None
+    with _PREBAIXADOS_LOCK:
+        hit = _indice_prebaixados(cache_dir).get(chave)
+    if isinstance(hit, dict) and hit.get("path") and os.path.exists(hit["path"]) and os.path.getsize(hit["path"]) > 0:
+        return hit["path"], hit.get("kind") or _infer_media_kind(hit["path"]) or "video"
+    return None
+
+
+def resolver_override_cacheado(override: Dict[str, Any], downloads_dir: str, get_client_for_provider,
+                               cache_dir: Optional[str] = None) -> tuple:
+    """Igual a `_resolve_override_source`, mas reaproveita/guarda o arquivo em
+    `cache_dir` (cada link na sua própria subpasta: dois downloads ao mesmo
+    tempo nunca escrevem no mesmo arquivo)."""
+    hit = prebaixado(override, cache_dir)
+    if hit:
+        return hit
+    chave = chave_prebaixado(override)
+    if not chave or not cache_dir:
+        return _resolve_override_source(override, downloads_dir, get_client_for_provider)
+    with _PREBAIXADOS_LOCK:
+        trava = _TRAVAS_CHAVE.setdefault(os.path.abspath(cache_dir) + "|" + chave, threading.Lock())
+    with trava:  # o Estúdio e a montagem pedindo o mesmo link ao mesmo tempo: o 2º espera e reaproveita
+        hit = prebaixado(override, cache_dir)
+        if hit:
+            return hit
+        return _baixar_para_cache(override, chave, cache_dir, get_client_for_provider)
+
+
+def _baixar_para_cache(override, chave, cache_dir, get_client_for_provider) -> tuple:
+    destino = os.path.join(cache_dir, chave)
+    os.makedirs(destino, exist_ok=True)
+    path, kind = _resolve_override_source(override, destino, get_client_for_provider)
+    with _PREBAIXADOS_LOCK:
+        idx = _indice_prebaixados(cache_dir)
+        idx[chave] = {"path": os.path.abspath(path), "kind": kind, "link": override.get("value"),
+                      "provider": override.get("provider"), "quando": time.time()}
+        tmp = os.path.join(cache_dir, PREBAIXADOS_INDICE + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(idx, f, ensure_ascii=False)
+        os.replace(tmp, os.path.join(cache_dir, PREBAIXADOS_INDICE))
+    return path, kind
+
+
+def prebaixar_midias(overrides: List[Dict[str, Any]], cache_dir: str, cfg: Optional[Dict[str, Any]] = None,
+                     on_item=None, cancel_check=None, factory_fn=None) -> Dict[str, Any]:
+    """Baixa em paralelo (`assembly_fetch_concurrency`) todas as mídias da
+    lista que ainda não estão em `cache_dir`. Nunca levanta erro: um link que
+    falha fica pra montagem tentar de novo (e, se for da prévia, buscar outro).
+
+    `on_item(feitos, total, ok)` a cada item. Devolve {total, baixados, ja_tinha, falhas, erros}."""
+    cfg = cfg if cfg is not None else load_site_config()
+    vistos, fila = set(), []
+    for ov in overrides:
+        k = chave_prebaixado(ov)
+        if k and k not in vistos:
+            vistos.add(k)
+            fila.append(ov)
+    res = {"total": len(fila), "baixados": 0, "ja_tinha": 0, "falhas": 0, "erros": []}
+    pendentes = []
+    for ov in fila:
+        if prebaixado(ov, cache_dir):
+            res["ja_tinha"] += 1
+        else:
+            pendentes.append(ov)
+    feitos = res["ja_tinha"]
+    if on_item:
+        on_item(feitos, res["total"], True)
+    if not pendentes:
+        return res
+    os.makedirs(cache_dir, exist_ok=True)
+    trava = threading.Lock()
+    fabrica = factory_fn or (lambda: ClientFactory(cfg))
+
+    def _um(ov):
+        if cancel_check and cancel_check():
+            return False, "cancelado"
+        f = fabrica()
+        try:
+            resolver_override_cacheado(ov, cache_dir, f.get_client, cache_dir=cache_dir)
+            return True, None
+        except Exception as exc:  # noqa: BLE001
+            return False, f"{ov.get('value')}: {str(exc)[:200]}"
+        finally:
+            try:
+                f.close_all()
+            except Exception:  # noqa: BLE001
+                pass
+
+    n = max(1, min(int(cfg.get("assembly_fetch_concurrency", 3) or 3), len(pendentes)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
+        for fut in concurrent.futures.as_completed([ex.submit(_um, ov) for ov in pendentes]):
+            ok, erro = fut.result()
+            with trava:
+                feitos += 1
+                if ok:
+                    res["baixados"] += 1
+                else:
+                    res["falhas"] += 1
+                    if erro and len(res["erros"]) < 20:
+                        res["erros"].append(erro)
+            if on_item:
+                on_item(feitos, res["total"], ok)
+    return res
+
+
 def resolve_overlay_source(overlay_source: Dict[str, Any], downloads_dir: str, get_client_for_provider) -> "tuple[str, str]":
     """Resolve a fonte de mídia de um OVERLAY (imagem/vídeo sobreposto
     ao vídeo final, com posição/tamanho/janela de tempo próprios) —
@@ -3762,6 +3907,78 @@ def assemble_video(
             )
 
     origens: Dict[int, Dict[str, Any]] = {}
+    # ⬇ mídias que o Estúdio já baixou em segundo plano (app._prebaixar_iniciar)
+    prebaixados_dir = cfg.get("prebaixados_dir") or os.path.join(work_dir, "prebaixados")
+    # ♻ clipes já prontos (baixados + cortados + com efeito) de uma montagem anterior:
+    # se a montagem falhar num trecho e você montar de novo, os trechos que não
+    # mudaram saem daqui na hora — só o trecho que mudou é refeito.
+    prontos_dir = os.path.join(work_dir, "clips_prontos")
+    reaproveitar_prontos = bool(cfg.get("reaproveitar_clipes_prontos", True))
+    import dataclasses as _dc
+    import hashlib as _hl
+    try:
+        import qualidade_export as _qe
+        _estado_qe = dict(_qe._estado)
+    except Exception:  # noqa: BLE001
+        _estado_qe = {}
+    _base_assinatura = {
+        "v": CLIPES_PRONTOS_VERSAO, "w": target_width, "h": target_height, "trim": trim_position,
+        "ori": search_orientation, "prio": list(provider_priority or []), "mof": magnific_only_free,
+        "completar": cfg.get("completar_trecho_curto", "repetir"), "paleta": paleta, "qe": _estado_qe,
+        "rep": cfg.get("evitar_repeticao_clipes", True),
+    }
+
+    def _arquivo_id(valor: Any) -> Any:
+        # arquivo do PC/gerado: o mesmo caminho com outro conteúdo não pode reaproveitar
+        try:
+            if isinstance(valor, str) and valor and os.path.isfile(valor):
+                st = os.stat(valor)
+                return [valor, st.st_size, int(st.st_mtime)]
+        except OSError:
+            pass
+        return valor
+
+    def _assinatura_clipe(i: int, segment: VideoSegment, alvo: float) -> str:
+        campos = {f.name: getattr(segment, f.name, None) for f in _dc.fields(segment)}
+        ov = dict(campos.get("override_source") or {})
+        if ov.get("source") == "local_file":
+            ov["value"] = _arquivo_id(ov.get("value"))
+        campos["override_source"] = ov
+        bruto = json.dumps({"seg": campos, "alvo": round(float(alvo), 3), "base": _base_assinatura},
+                           sort_keys=True, default=str, ensure_ascii=False)
+        return _hl.sha1(bruto.encode("utf-8")).hexdigest()[:24]
+
+    assinaturas: Dict[int, str] = {}
+
+    def _pegar_pronto(i: int, assin: str) -> Optional[str]:
+        if not reaproveitar_prontos:
+            return None
+        arq = os.path.join(prontos_dir, assin + ".mp4")
+        try:
+            if os.path.getsize(arq) <= 0:
+                return None
+            with open(os.path.join(prontos_dir, assin + ".json"), encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, ValueError):
+            return None
+        destino = os.path.join(clips_dir, f"segment_{i:04d}_pronto.mp4")
+        shutil.copyfile(arq, destino)
+        duracoes_alvo[i] = float(meta.get("alvo") or 0.0)
+        origens[i] = dict(meta.get("origem") or {}, reaproveitado_da_montagem_anterior=True)
+        return destino
+
+    def _guardar_pronto(i: int, assin: str, caminho: str, alvo: float) -> None:
+        if not reaproveitar_prontos:
+            return
+        try:
+            os.makedirs(prontos_dir, exist_ok=True)
+            tmp = os.path.join(prontos_dir, assin + ".tmp.mp4")
+            shutil.copyfile(caminho, tmp)
+            os.replace(tmp, os.path.join(prontos_dir, assin + ".mp4"))
+            with open(os.path.join(prontos_dir, assin + ".json"), "w", encoding="utf-8") as f:
+                json.dump({"alvo": alvo, "origem": origens.get(i) or {}, "trecho": i + 1}, f, ensure_ascii=False, default=str)
+        except OSError:
+            pass  # sem espaço etc.: só não reaproveita da próxima vez
 
     def _process_one(i: int, segment: VideoSegment) -> str:
         """Busca/baixa e normaliza UM segmento por completo, com sua
@@ -3773,15 +3990,22 @@ def assemble_video(
         worker_factory = ClientFactory(cfg)
         pl = perf_log.timed if perf_log else (lambda *a, **k: nullcontext())
         try:
+            _fim = ultimo_do_grupo.get(i, i)
+            _alvo = segments[_fim].end - segment.start + extras[_fim]
+            assin = assinaturas[i] = _assinatura_clipe(i, segment, _alvo)
+            pronto = _pegar_pronto(i, assin)
+            if pronto:
+                return pronto
             with pl(f"montagem:segmento_{i}:busca_download", provider=segment.provider, query=segment.query):
                 ja_resolvido = None
                 erro_previa = None
                 ov_original = dict(segment.override_source or {})
+                veio_prebaixado = bool(prebaixado(ov_original, prebaixados_dir))
                 if (segment.override_source or {}).get("da_previa"):
                     # clipe da prévia (não foi a pessoa que escolheu): se o link
                     # não resolver/baixar, o trecho volta pra busca normal em vez de falhar
                     try:
-                        ja_resolvido = _resolve_override_source(segment.override_source, downloads_dir, worker_factory.get_client)
+                        ja_resolvido = resolver_override_cacheado(segment.override_source, downloads_dir, worker_factory.get_client, cache_dir=prebaixados_dir)
                     except Exception as exc:  # noqa: BLE001
                         erro_previa = str(exc)[:300]
                         print(f"[montagem] trecho {i + 1}: o clipe da prévia não baixou ({exc}); buscando de novo", flush=True)
@@ -3797,15 +4021,15 @@ def assemble_video(
                     # (mesmo espírito de _search_and_download_filling_
                     # duration) — só volta a ser "um clipe só" se essa
                     # busca de complemento falhar ou não achar nada.
-                    raw_path, kind = ja_resolvido or _resolve_override_source(
-                        segment.override_source, downloads_dir, worker_factory.get_client,
+                    raw_path, kind = ja_resolvido or resolver_override_cacheado(
+                        segment.override_source, downloads_dir, worker_factory.get_client, cache_dir=prebaixados_dir,
                     )
                     raw_paths = [raw_path]
                     extras_escolhidos = list(getattr(segment, "clipes_extra", None) or []) if kind == "video" else []
                     for c_extra in extras_escolhidos:
                         # aba ⏱ Clipes curtos: o 2º/3º resultado escolhido completa o trecho, na ordem
                         try:
-                            p_extra, k_extra = _resolve_override_source(dict(c_extra, kind="video"), downloads_dir, worker_factory.get_client)
+                            p_extra, k_extra = resolver_override_cacheado(dict(c_extra, kind="video"), downloads_dir, worker_factory.get_client, cache_dir=prebaixados_dir)
                         except Exception as exc:  # noqa: BLE001
                             print(f"[montagem] trecho {i + 1}: clipe extra {c_extra.get('value')} não baixou ({exc})", flush=True)
                             continue
@@ -3892,7 +4116,7 @@ def assemble_video(
             origens[i] = {"modo": _modo, "kind": kind, "arquivos": [os.path.abspath(r) for r in raw_paths],
                           "link": _ov_now.get("value") or ov_original.get("value"), "erro_previa": erro_previa,
                           "completado_com_outra_cena": kind == "video" and len(raw_paths) > 1,
-                          "banco": segment.provider, "busca": segment.query}
+                          "banco": segment.provider, "busca": segment.query, "prebaixado": veio_prebaixado}
             normalized_path = os.path.join(clips_dir, f"segment_{i:04d}.mp4")
             # + rabo da transição pro próximo trecho; dentro de uma cena com
             # vários takes, o take fica na tela até o fim da cena
@@ -3941,6 +4165,7 @@ def assemble_video(
                             normalized_path = pos_path
                     except Exception as exc:  # noqa: BLE001
                         raise VideoAssemblyError(f"efeito/entrada/saída do DarkPlanner falhou ({str(exc)[-300:]}) — tire o efeito desse trecho") from exc
+            _guardar_pronto(i, assin, normalized_path, alvo_duracao)
             return normalized_path
         except VideoAssemblyError as exc:
             # anota QUAL trecho falhou antes de propagar — sem isso, o
@@ -3967,6 +4192,7 @@ def assemble_video(
     completed = 0
     first_error: Optional[BaseException] = None
     cancelled = False
+    falhas: List[tuple] = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
         future_to_index = {executor.submit(_process_one, i, seg): i for i, seg in enumerate(segments)}
@@ -3985,6 +4211,7 @@ def assemble_video(
             except concurrent.futures.CancelledError:
                 continue
             except Exception as exc:  # noqa: BLE001
+                falhas.append((i, exc))
                 if first_error is None:
                     first_error = exc
                 continue
@@ -3992,13 +4219,34 @@ def assemble_video(
             if on_progress:
                 on_progress("processando", completed, total)
 
+    # limpa clipes prontos de versões antigas dos trechos (só fica o que vale agora)
+    if reaproveitar_prontos and assinaturas and not cancelled:
+        try:
+            vale = set(assinaturas.values())
+            for nome in os.listdir(prontos_dir) if os.path.isdir(prontos_dir) else []:
+                if nome.split(".")[0] not in vale:
+                    os.remove(os.path.join(prontos_dir, nome))
+        except OSError:
+            pass
+
     if cancelled:
         raise VideoAssemblyError("Montagem cancelada pelo usuário.")
 
     if first_error is not None:
-        if isinstance(first_error, VideoAssemblyError):
-            raise first_error
-        raise VideoAssemblyError(f"Falha ao processar um segmento: {first_error}") from first_error
+        falhas.sort(key=lambda t: t[0])
+        i0, exc0 = falhas[0]
+        err = exc0 if isinstance(exc0, VideoAssemblyError) else VideoAssemblyError(f"Falha ao processar um segmento: {exc0}")
+        msg = str(err)
+        if len(falhas) > 1:
+            msg += "\n\nTambém falharam: " + "; ".join(f"{e}" for _k, e in falhas[1:6]) + (" …" if len(falhas) > 6 else "")
+        prontos = total - len(falhas)
+        if reaproveitar_prontos and prontos > 0:
+            msg += (f"\n\n♻ Os outros {prontos} trechos já ficaram prontos e foram guardados: ao montar de novo, "
+                    "só o que falhou (ou o que você mudar) é refeito.")
+        final = VideoAssemblyError(msg)
+        final.segment_index = getattr(err, "segment_index", i0)
+        final.segment_indices = [k for k, _e in falhas]
+        raise final from (exc0 if exc0 is not err else None)
 
     normalized_paths = results_by_index
     with (perf_log.timed("montagem:entradas_saidas") if perf_log else nullcontext()):

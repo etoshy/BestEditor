@@ -418,7 +418,7 @@ def test_gerar_roteiro_com_a_ia(api):
     c = A.app.test_client()
     api.respostas = [(200, ok('{"roteiro": "Era uma vez."}'))]
     r = c.post("/ia/gerar", json={"prompt": "escreva o roteiro"}).get_json()
-    assert r["ok"] and r["texto"] == '{"roteiro": "Era uma vez."}' and api.pedidos[-1]["max_tokens"] == 32000
+    assert r["ok"] and r["texto"] == '{"roteiro": "Era uma vez."}' and api.pedidos[-1]["max_tokens"] == 64000
     ia.salvar_config({"recursos": {"roteiros": False}})
     assert c.post("/ia/gerar", json={"prompt": "x"}).status_code == 400
     raiz = os.path.dirname(os.path.abspath(__file__))

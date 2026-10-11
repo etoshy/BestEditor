@@ -241,3 +241,86 @@ def tirar_marcas_de_cena(texto: str) -> Tuple[str, int]:
         novo = re.sub(r"\n{3,}", "\n\n", novo)
         novo = re.sub(r"[ \t]{2,}", " ", novo).strip()
     return novo, n
+
+
+# ------------------------------------------------------------------ buscas de imagem: chamada não é assunto
+# Frases de chamada (inscreva-se, like, sininho, link, compre, cupom…) não são o assunto do vídeo: a IA não
+# deve buscar imagem disso. Vale com a 🤖 IA ligada ou não (prompt da 1ª IA + limpeza depois da resposta).
+_CTA = re.compile(
+    r"\[\[[^\]]*\]\]|\b(subscrib\w*|subscription|like button|thumbs?[ -]up|notification bell|bell (icon|button)|"
+    r"hit the bell|smash (the )?like|inscrev\w*|inscri[cç][aã]o|curtid\w*|curtir|deix[ae]m? (o |seu |um )?like|"
+    r"sininho|ativ[ea] (o |as )?notifica\w*|link (na|in the|da) descri\w*|link in bio|buy now|shop now|add to cart|"
+    r"discount code|promo code|coupon code|cupom de desconto|compre (j[aá]|agora)|call to action|youtube (logo|button)|"
+    r"comment below)\b", re.I)
+
+
+def eh_busca_de_chamada(texto: str) -> bool:
+    return bool(_CTA.search(str(texto or "")))
+
+
+def janelas(chamadas_job: List[Dict[str, Any]]) -> List[Tuple[float, float]]:
+    """(início, fim) das chamadas FALADAS (as só-marca não têm fala)."""
+    out = []
+    for c in chamadas_job or []:
+        try:
+            ini, fim = float(c.get("inicio") or 0), float(c.get("fim") or c.get("inicio") or 0)
+        except (TypeError, ValueError):
+            continue
+        if fim - ini > 0.2:
+            out.append((ini, fim))
+    return out
+
+
+def bloco_prompt_buscas(chamadas_job: List[Dict[str, Any]]) -> str:
+    """Regra pro prompt da 1ª IA (buscas)."""
+    def _t(x):
+        return f"{int(x) // 60:02d}:{x % 60:04.1f}"
+    L = ["", "## 🚫 Chamadas (inscreva-se / venda) NÃO são assunto do vídeo",
+         "Frases como \"inscreva-se\", \"deixe o like\", \"ative o sininho\", \"link na descrição\", \"compre\", \"cupom\" e "
+         "marcas como [[INSCREVA]] / [[VENDA]] NÃO viram busca de imagem: nunca busque subscribe, like button, bell, "
+         "link, buy now. Nesses momentos, continue o visual do trecho anterior (a mesma busca dele)."]
+    js = janelas(chamadas_job)
+    if js:
+        L.append("Neste vídeo as chamadas faladas estão em: " + "; ".join(f"{_t(a)}–{_t(b)}" for a, b in js)
+                 + " — aí entra o clipe da chamada; use a busca do trecho anterior.")
+    return "\n".join(L)
+
+
+def limpar_buscas(segmentos: List[Any], chamadas_job: Optional[List[Dict[str, Any]]] = None) -> int:
+    """Trechos cuja busca é uma chamada (ou que caem numa chamada falada) herdam a busca do
+    trecho anterior que não é chamada. Funciona com dicts ou objetos (VideoSegment). → quantos mudou."""
+    js = janelas(chamadas_job or [])
+
+    def get(s, k):
+        return s.get(k) if isinstance(s, dict) else getattr(s, k, None)
+
+    def put(s, k, v):
+        if isinstance(s, dict):
+            s[k] = v
+        else:
+            setattr(s, k, v)
+    trocados = 0
+    ultima = None
+    for s in segmentos or []:
+        if get(s, "override_source") or get(s, "provider") in ("produto", "material", "youtube", "flow"):
+            continue
+        ini, fim = float(get(s, "start") or 0), float(get(s, "end") or 0)
+        dur = max(0.01, fim - ini)
+        na_chamada = any(min(fim, b) - max(ini, a) >= dur * 0.5 for a, b in js)
+        query = str(get(s, "query") or "")
+        if na_chamada or eh_busca_de_chamada(query):
+            alts = [a for a in (get(s, "alternativas") or []) if a and not eh_busca_de_chamada(a)]
+            if ultima:
+                put(s, "query", ultima[0])
+                put(s, "alternativas", list(ultima[1]))
+            elif alts:
+                put(s, "query", alts[0])
+                put(s, "alternativas", alts[1:])
+            else:
+                put(s, "query", _CTA.sub(" ", query).strip() or "abstract background")
+            put(s, "busca_chamada", query)
+            trocados += 1
+            continue
+        ultima = (query, [a for a in (get(s, "alternativas") or []) if a])
+    return trocados
+

@@ -326,6 +326,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   </div>
   <div class="hgrp" title="Frames cortados do começo de cada clipe de vídeo">✂️<input type="number" id="gTrim" min="0" max="120" step="1"></div>
   <div class="spacer"></div>
+  <span class="salvo" id="preBaixar" title="Os clipes que a montagem vai usar já vão sendo baixados enquanto você edita — na hora de montar, eles não baixam de novo" style="display:none"></span>
   <span class="salvo" id="estadoSalvo">tudo salvo</span>
   <button id="btnSalvar" title="Salvar sem montar (Ctrl+S)">💾 Salvar</button>
   <button id="btnMontar" class="primary">🎬 Montar vídeo</button>
@@ -734,6 +735,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   <label class="f"><span>Qualidade da imagem</span><select id="expQual"></select></label>
   <p class="hint" id="expDica"></p>
   <p class="hint" id="expTl" style="color:var(--accent)"></p>
+  <div id="expCheck" style="margin-top:8px;max-height:260px;overflow:auto;font-size:12px"></div>
   <div class="row" style="gap:8px;justify-content:flex-end;margin-top:10px"><button id="expCancelar">Cancelar</button><button class="primary" id="expMontar">🎬 Montar</button></div>
 </div></div>
 <form id="formMontar" method="POST" action="{{ url_for('confirm_segments', job_id=job.job_id) }}" enctype="multipart/form-data" style="display:none;"></form>
@@ -871,7 +873,7 @@ function desenharTimeline() {
     const c = document.createElement('div');
     const tipo = tipoMidia(s);
     const yt = s.provider === 'youtube' && !(s.override_source && s.override_source.source);
-    c.className = 'clip ' + (yt ? 'k-yt' : tipo === 'image' ? 'k-image' : '') + (sel && sel.tipo === 'seg' && sel.i === i ? ' sel' : '') + (D.erro_indice === i ? ' err' : '');
+    c.className = 'clip ' + (yt ? 'k-yt' : tipo === 'image' ? 'k-image' : '') + (sel && sel.tipo === 'seg' && sel.i === i ? ' sel' : '') + (D.erro_indice === i || (D.erro_indices || []).includes(i) ? ' err' : '');
     c.style.left = xDe(s.start) + 'px'; c.style.width = Math.max(4, xDe(s.end - s.start)) + 'px';
     const th = s._preview && (s._preview.thumbnail_url || (tipo === 'image' && s._preview.midia_local));
     if (th) c.style.backgroundImage = `url('${th}')`;
@@ -2862,6 +2864,10 @@ $('arqTrecho').addEventListener('change', async (e) => {
 
 // ------------------------------------------------------------------ buscar
 let candSel = null;
+function bancoSel() {  // "video|pexels" / "image|bing"
+  const [media, prov] = String($('bBanco').value || 'video|pexels').split('|');
+  return { media: media === 'image' ? 'image' : 'video', prov: prov || media };
+}
 function prepararBusca() {
   const ok = sel && sel.tipo === 'seg';
   $('buscarSemSel').style.display = ok ? 'none' : ''; $('buscarComSel').style.display = ok ? '' : 'none';
@@ -2873,8 +2879,12 @@ function prepararBusca() {
   $('bAlts').style.display = alts.length ? '' : 'none';
   $('bAlts').innerHTML = alts.length ? '<span class="hint">Reservas:</span>' + alts.map(a => `<button class="mini alt" data-q="${esc(a)}">${esc(a)}</button>`).join('') : '';
   $('bAlts').querySelectorAll('.alt').forEach(b => b.addEventListener('click', () => { $('bTermo').value = b.dataset.q; $('btnBuscar').click(); }));
-  const opcoes = (img ? FOTO_PROV : VIDEO_PROV).filter(p => p !== 'youtube');
-  $('bBanco').innerHTML = opcoes.map(p => `<option ${p === s.provider ? 'selected' : ''}>${p}</option>`).join('');
+  // todas as fontes de busca como alternativa (vídeo E imagem), não só as do tipo atual do trecho
+  const atual = (img ? 'image|' : 'video|') + s.provider;
+  const grupo = (rot, media, lista) => `<optgroup label="${rot}">` + lista.map(p => `<option value="${media}|${p}" ${media + '|' + p === atual ? 'selected' : ''}>${p}</option>`).join('') + '</optgroup>';
+  $('bBanco').innerHTML = grupo('🎥 Vídeos', 'video', VIDEO_PROV.filter(p => p !== 'youtube'))
+    + grupo('🖼 Fotos e imagens', 'image', FOTO_PROV.filter(p => p !== 'flow'));
+  if (!$('bBanco').value) $('bBanco').selectedIndex = 0;
   $('bObra').value = s.obra || ''; $('bPessoa').value = s.personagem || '';
   mostrarBib();
 }
@@ -2883,11 +2893,11 @@ $('btnBuscar').addEventListener('click', async () => {
   const i = sel.i, s = segs[i];
   $('bStatus').textContent = 'Buscando…'; $('bResultados').innerHTML = ''; $('btnUsarCand').style.display = 'none'; candSel = null;
   try {
-    if (BIB_LOCAIS.includes($('bBanco').value)) {  // obra/personagem ficam no trecho
+    if (BIB_LOCAIS.includes(bancoSel().prov)) {  // obra/personagem ficam no trecho
       const o = $('bObra').value.trim() || null, pe = $('bPessoa').value.trim() || null;
       if (o !== (s.obra || null) || pe !== (s.personagem || null)) { s.obra = o; s.personagem = pe; marcarSujo(); }
     }
-    const r = await fetch(`/job/${JOB}/search-candidates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: $('bTermo').value, provider: $('bBanco').value, media_type: s.media_type || 'video', obra: $('bObra').value.trim(), personagem: $('bPessoa').value.trim(), indice: i }) });
+    const r = await fetch(`/job/${JOB}/search-candidates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: $('bTermo').value, provider: bancoSel().prov, media_type: bancoSel().media, obra: $('bObra').value.trim(), personagem: $('bPessoa').value.trim(), indice: i }) });
     const d = await r.json();
     if (d.error) { $('bStatus').textContent = '⚠ ' + d.error; return; }
     if (!d.candidates || !d.candidates.length) { $('bStatus').textContent = 'Nenhum resultado.'; return; }
@@ -2899,7 +2909,7 @@ $('btnBuscar').addEventListener('click', async () => {
       el.innerHTML = `<img src="${esc(c.thumbnail || '')}" alt="">${nota}<div class="lb">${esc(c.label || '')}</div>`;
       el.addEventListener('click', () => {
         document.querySelectorAll('#bResultados .cand').forEach(x => x.classList.toggle('sel', x === el));
-        candSel = { c, provider: $('bBanco').value, media: s.media_type || 'video', i };
+        candSel = { c, provider: bancoSel().prov, media: bancoSel().media, i };
         $('btnUsarCand').style.display = '';
         mostrarCandidatoNoMonitor(c);
       });
@@ -2913,7 +2923,7 @@ $('btnUsarCand').addEventListener('click', async () => {
   try {
     const r = await fetch(`/job/${JOB}/segmento/${i}/usar-candidato`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, media_type: media, image_url: c.image_url || '', thumbnail: c.thumbnail || '', url: c.url || '', video_url: c.video_preview_url || '', label: c.label || '' }) });
     const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || 'falhou');
-    segs[i].override_source = d.override_source; segs[i].clipes_extra = null; segs[i].curto = null;
+    segs[i].override_source = d.override_source; segs[i].clipes_extra = null; segs[i].curto = null; segs[i].media_type = media;
     segs[i]._preview = Object.assign({}, segs[i]._preview, { thumbnail_url: d.thumbnail_url ? d.thumbnail_url + (d.thumbnail_url.startsWith('/') ? '?t=' + Date.now() : '') : segs[i]._preview.thumbnail_url, video_preview_url: c.video_preview_url || null, midia_local: d.override_source.source === 'local_file' ? `/job/${JOB}/segment-media/${i}?t=${Date.now()}` : null, erro: null });
     $('bStatus').textContent = '✅ Trecho ' + (i + 1) + ' vai usar esse resultado.'; limparErroLocal(i);
     selecionar({ tipo: 'seg', i });
@@ -2939,7 +2949,7 @@ async function listaBib(prov, tipo, obra) {
   } catch (e) { $('bBibInfo').textContent = '⚠ ' + e.message; return []; }
 }
 async function mostrarBib() {
-  const prov = $('bBanco').value, local = BIB_LOCAIS.includes(prov);
+  const prov = bancoSel().prov, local = BIB_LOCAIS.includes(prov);
   $('bBib').style.display = local ? '' : 'none';
   if (!local) return;
   const filmes = prov === 'moviepexels' || prov === 'moviepexels_online';
@@ -3119,6 +3129,7 @@ function selecionar(s) {
   if (atual) { const t = [...document.querySelectorAll('#listaCenas .cena-tile')].find(x => x.dataset.id === atual); if (t) t.classList.add('sel'); }
 }
 function limparErroLocal(i) {
+  if (D.erro_indices && D.erro_indices.includes(i)) D.erro_indices = D.erro_indices.filter(k => k !== i);
   if (D.erro_indice === i) { D.erro_indice = null; const a = $('avisoErro'); if (a) a.style.display = 'none'; }
 }
 async function corrigirAuto(i, botao) {
@@ -3565,10 +3576,30 @@ async function salvar(silencioso) {
     const d = await r.json(); if (!r.ok || !d.ok) throw new Error('falhou');
     d.pending_segments.forEach((ns, i) => { const prev = segs[i]._preview, a = segs[i]._aspect, t = segs[i]._trim, fala = segs[i]._fala; Object.keys(segs[i]).forEach(k => delete segs[i][k]); Object.assign(segs[i], ns, { _preview: prev, _aspect: a, _trim: t, _fala: fala }); segs[i].on_screen_text_style = segs[i].on_screen_text_style || {}; });
     marcarLimpo(); if (!silencioso) toast('💾 Salvo');
+    window.dispatchEvent(new Event('estudio:salvo'));
     return true;
   } catch (e) { toast('⚠ Não consegui salvar: ' + e.message, 5000); return false; }
 }
 $('btnSalvar').addEventListener('click', () => salvar(false));
+// ⬇ pré-download: os clipes já vão baixando em segundo plano enquanto você edita
+let preTimer = null;
+async function preBaixarVer(iniciar) {
+  clearTimeout(preTimer);
+  const el = $('preBaixar');
+  try {
+    const r = await fetch(`/job/${JOB}/prebaixar`, { method: iniciar ? 'POST' : 'GET' });
+    const d = await r.json(); if (!r.ok) return;
+    if (d.total) {
+      el.style.display = '';
+      el.textContent = d.rodando ? `⬇ baixando mídias ${d.feitos}/${d.total}` : `⬇ mídias prontas ${d.feitos}/${d.total}` + (d.falhas ? ` (${d.falhas} na montagem)` : '');
+      el.title = (d.erros && d.erros.length ? 'Não baixaram agora (a montagem tenta de novo):\n' + d.erros.join('\n') + '\n\n' : '')
+        + 'Os clipes que a montagem vai usar já vão sendo baixados enquanto você edita — na hora de montar, eles não baixam de novo.';
+    } else if (!d.rodando) { el.style.display = 'none'; }
+    preTimer = setTimeout(() => preBaixarVer(false), (d.rodando || iniciar) ? 3000 : 20000);
+  } catch (_) {}
+}
+preBaixarVer(true);
+window.addEventListener('estudio:salvo', () => setTimeout(() => preBaixarVer(false), 800));
 $('btnMontar').addEventListener('click', () => {
   const semEscolha = segs.filter(s => s.provider === 'youtube' && !(s.override_source && s.override_source.source)).length;
   if (semEscolha && !confirm(`${semEscolha} trecho(s) do YouTube ainda sem vídeo escolhido — ${document.getElementById('yt-auto-escolha') && document.getElementById('yt-auto-escolha').checked ? 'vão usar o 1º resultado automaticamente' : 'vão usar os bancos normais'}. Montar mesmo assim?`)) return;
@@ -3576,7 +3607,34 @@ $('btnMontar').addEventListener('click', () => {
   $('expRes').innerHTML = (((ex.resolucoes_por_formato || {})[$('gFormato').value]) || ex.resolucoes || []).map(([q, wh]) => `<option value="${q}" ${q === ex.resolucao ? 'selected' : ''}>${q} (${wh})</option>`).join('');
   $('expQual').innerHTML = (ex.qualidades || []).map(([q, n]) => `<option value="${q}" ${q === ex.qualidade ? 'selected' : ''}>${esc(n)}</option>`).join('');
   dicaExp(); $('expTl').textContent = TLS.tem_2 ? `Vai exportar: ${TLS.ativa === '3' ? '🔀 Juntar (cada trecho da timeline escolhida)' : 'Timeline ' + TLS.ativa}` : ''; $('expModal').classList.add('on');
+  verificarAntes();
 });
+// 🔎 antes de montar: confere TODOS os trechos de uma vez (arquivos, links, chaves, buscas vazias, disco…)
+async function verificarAntes() {
+  const box = $('expCheck'), bt = $('expMontar');
+  box.innerHTML = '<p class="hint">🔎 Conferindo todos os trechos antes de montar (e baixando os links escolhidos)…</p>';
+  bt.disabled = true; bt.textContent = '🎬 Montar';
+  try {
+    if (!(await salvar(true))) throw new Error('não salvou');
+    const r = await fetch(`/job/${JOB}/verificar-montagem`, { method: 'POST' });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error || r.status);
+    const probs = d.problemas || [];
+    D.erro_indices = probs.filter(p => p.tipo === 'erro' && p.indice != null).map(p => p.indice);
+    desenharTimeline();
+    if (!probs.length) { box.innerHTML = '<p style="color:#22c55e">✅ Tudo conferido: nenhum trecho com problema.</p>'; }
+    else {
+      box.innerHTML = (d.erros ? `<p style="color:#ef4444"><b>❌ ${d.erros} problema(s) que vão fazer a montagem falhar</b> — corrija antes (clique pra ir ao trecho):</p>` : '')
+        + (d.avisos ? `<p class="hint">⚠ ${d.avisos} aviso(s) — a montagem segue, mas confira:</p>` : '')
+        + '<ul style="margin:4px 0;padding-left:18px">' + probs.map(p => `<li class="expProb" data-i="${p.indice == null ? '' : p.indice}" style="cursor:${p.indice == null ? 'default' : 'pointer'};color:${p.tipo === 'erro' ? '#ef4444' : 'inherit'};margin:2px 0">${p.tipo === 'erro' ? '❌' : '⚠'} ${p.trecho ? '<b>Trecho ' + p.trecho + ':</b> ' : ''}${esc(p.msg)}</li>`).join('') + '</ul>';
+      box.querySelectorAll('.expProb').forEach(li => li.addEventListener('click', () => {
+        const i = li.dataset.i; if (i === '') return;
+        $('expModal').classList.remove('on'); selecionar({ tipo: 'seg', i: +i }); seek(segs[+i].start);
+      }));
+    }
+    bt.textContent = d.erros ? '🎬 Montar mesmo assim' : '🎬 Montar';
+  } catch (e) { box.innerHTML = '<p class="hint">⚠ Não consegui conferir antes (' + esc(e.message) + ') — dá pra montar mesmo assim.</p>'; }
+  finally { bt.disabled = false; }
+}
 function dicaExp() {
   const q = $('expQual').value, r = $('expRes').value;
   $('expDica').textContent = (q === 'rapida' ? '⚡ Rápida: todas as etapas no modo mais rápido do codificador — bom pra conferir a edição; o arquivo sai maior e um pouco menos nítido.' : q === 'normal' ? 'Normal: o equilíbrio de sempre.' : q === 'alta' ? 'Alta: menos compressão em todas as etapas + um passe final caprichado (demora um pouco mais).' : 'Máxima: quase sem perda — arquivo bem maior e montagem mais demorada.')

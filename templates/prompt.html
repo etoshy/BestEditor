@@ -71,6 +71,8 @@
 
 <textarea id="prompt-box" rows="20" readonly>{{ job.prompt }}</textarea>
 <button type="button" class="copy-btn" onclick="copyPrompt()">Copiar prompt</button>
+<button type="button" data-ia-gerar="" data-ia-prompt="prompt-box" data-ia-resp="ai-response-box" data-ia-ler="btn-gerar-video" data-ia-status="ia-st-busca" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA (buscas) e já montar</button>
+<span id="ia-st-busca" style="font-size:.85rem;color:#555"></span>
 <span id="copy-feedback"></span>
 
 <details style="margin-top:14px;">
@@ -91,7 +93,7 @@
 {% if json_error %}<div class="error">{{ json_error }}</div>{% endif %}
 
 <form method="post" action="{{ url_for('submit_json', job_id=job.job_id) }}">
-  <textarea name="ai_response" rows="12" placeholder='[{"start": 0.0, "end": 6.8, "provider": "pexels", "query": "sunrise over mountains"}, ...]' required>{{ previous_json or "" }}</textarea>
+  <textarea name="ai_response" id="ai-response-box" rows="12" placeholder='[{"start": 0.0, "end": 6.8, "provider": "pexels", "query": "sunrise over mountains"}, ...]' required>{{ previous_json or "" }}</textarea>
 
   <fieldset style="border:1px solid #d1d5db;border-radius:6px;padding:10px 14px;margin:12px 0;">
     <legend style="font-size:0.9rem;color:#374151;">Opções só deste vídeo</legend>
@@ -101,7 +103,7 @@
     <p style="font-size:.8rem;color:#666;margin:6px 0 0;">Os valores iniciais vêm de Configurações; aqui você muda só para este vídeo.</p>
   </fieldset>
 
-  <button type="submit">Gerar vídeo</button>
+  <button type="submit" id="btn-gerar-video">Gerar vídeo</button>
 </form>
 
 <script>

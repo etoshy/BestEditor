@@ -68,7 +68,7 @@ def registrar(app, base_dir: str) -> None:
             system += (f"\n\nOUTPUT LANGUAGE: {nome}. Every text value in the JSON (script/roteiro, titles, chapters, description, "
                        f"tags, CTA, notes) MUST be written in {nome}, even though the instructions and the sources are in Portuguese. "
                        f"Translate the facts faithfully. Keep the JSON keys exactly as in the example.")
-        texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=32000, effort="medium", timeout=600)
+        texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=64000, effort="medium", timeout=900)
         if not texto:
             return jsonify({"erro": "A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja as últimas chamadas em 🤖 IA") + ")."}), 200
         return jsonify({"ok": True, "texto": texto})

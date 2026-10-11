@@ -32,6 +32,8 @@ shutil.rmtree(_IA_DADOS, ignore_errors=True)
 os.makedirs(_IA_DADOS, exist_ok=True)
 os.environ["IA_DADOS_DIR"] = _IA_DADOS
 os.environ.pop("ANTHROPIC_API_KEY", None)
+# ⬇ sem pré-download em segundo plano nos testes (não baixa nada da internet)
+os.environ["NARRATION_SEM_PREBAIXAR"] = "1"
 
 TEST_TMP_ROOT = "/tmp/_narration_site_tests"
 
