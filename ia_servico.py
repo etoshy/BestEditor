@@ -83,6 +83,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                       "Aponta as marcas [I3] em frases que não combinam com a imagem e sugere outra.", True),
     "venda_imagens": ("🛒 Vídeo de venda: ficha das fotos do produto",
                       "Diz o ângulo, se mostra o produto em uso, a embalagem, os detalhes e se tem texto/preço na imagem.", True),
+    "roteiros": ("📝 Roteiros direto na IA",
+                 "Botão 🤖 Gerar com a IA nos Modelos de vídeo, Vídeo de venda, Roteiro do YouTube e Vídeos modelados: gera o "
+                 "prompt, manda pra IA e já lê a resposta (sem copiar e colar).", True),
     "edicao": ("✂️ Prompt de edição direto na IA",
                "No Estúdio (aba 🤖 IA), um botão manda o prompt de edição (ou cada parte dele) pra IA e cola a resposta.", True),
 }

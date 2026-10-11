@@ -796,7 +796,8 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
         L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
     L.append("")
     import metodo_roteiro
-    L.append(metodo_roteiro.bloco_titulos(5))
+    _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
+    L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
     L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
@@ -812,6 +813,8 @@ def prompt_roteiro(p: Dict[str, Any], extra: str = "", base: Optional[str] = Non
         "hashtags": ["#exemplo"],
         "observacoes": "algo pra quem vai editar (opcional)",
     }, ensure_ascii=False, indent=2))
+    L.append("")
+    L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))  # 🌐 o idioma de novo, no FIM
     return "\n".join(L)
 
 

@@ -77,6 +77,21 @@ def nome(codigo: Optional[str]) -> str:
     return IDIOMAS.get(codigo or "", (codigo or "?",))[0]
 
 
+def lembrete_final(codigo: Optional[str]) -> str:
+    """Última linha dos prompts de roteiro: repete o idioma de saída (as instruções e as fontes costumam estar em
+    português — sem isso a IA tende a escrever em português mesmo pedindo outro idioma). Leva o código numa
+    marca que o /ia/gerar lê."""
+    if not codigo:
+        return ""
+    pt, proprio = IDIOMAS.get(codigo, (codigo, codigo))
+    if codigo == "pt":
+        return "LEMBRETE FINAL: escreva TODOS os textos do JSON em português do Brasil. (output language code: pt)"
+    return (f"LEMBRETE FINAL / FINAL REMINDER: escreva TODOS os textos do JSON em {pt.lower()} ({proprio}) — roteiro, títulos, "
+            f"capítulos, descrição, ideias, tags, CTA, observações —, mesmo com estas instruções e as fontes em português. "
+            f"Write EVERY text value of the JSON in {proprio} (not Portuguese); keep the JSON keys exactly as given. "
+            f"(output language code: {codigo})")
+
+
 def nome_para_prompt(codigo: Optional[str]) -> str:
     """"pt" -> "português do Brasil (pt-BR)" — como o idioma aparece nos prompts."""
     if not codigo:

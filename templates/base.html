@@ -42,5 +42,35 @@
     <a href="{{ url_for('jobs_history_page') }}" style="color:#666;">🗂️ Galeria de projetos</a> · <a href="{{ url_for('textos_avulsos_page') }}" style="color:#666;">🔤 Textos animados</a> · <a href="{{ url_for('guia_page') }}" style="color:#666;">📘 Guia (criar efeitos, transições, destaques…)</a> · <a href="{{ url_for('settings_page') }}" style="color:#666;">⚙️ Configurações</a> · <a href="{{ url_for('ia_page') }}" style="color:#666;">🤖 IA nas buscas e modelos</a>
   </p>
   {% block content %}{% endblock %}
+  <script>
+  // 🤖 botões "Gerar com a IA" (data-ia-gerar): gera o prompt, manda pra IA de /ia e lê a resposta
+  (function () {
+    const bots = document.querySelectorAll('[data-ia-gerar]');
+    if (!bots.length) return;
+    let pode = false, motivo = '';
+    fetch('/ia/status').then(r => r.json()).then(j => { pode = !!(j.pode && j.pode.roteiros); motivo = j.motivo || 'o recurso “Roteiros direto na IA” está desligado';
+      bots.forEach(b => { b.style.display = ''; if (!pode) { b.style.opacity = '.6'; b.title = 'IA desligada: ' + motivo + ' — ligue em 🤖 IA nas buscas e modelos'; } }); }).catch(() => {});
+    const el = (id) => id ? document.getElementById(id) : null;
+    bots.forEach(b => b.addEventListener('click', async () => {
+      const st = el(b.dataset.iaStatus) || b.nextElementSibling;
+      const diz = (t) => { if (st) st.textContent = t; };
+      if (!pode) { diz('⚠ A IA está desligada (' + motivo + ') — ligue em 🤖 IA nas buscas e modelos (link no topo).'); return; }
+      const pr = el(b.dataset.iaPrompt), resp = el(b.dataset.iaResp), ger = el(b.dataset.iaGerar), ler = el(b.dataset.iaLer);
+      b.disabled = true;
+      try {
+        const antes = pr ? pr.value : '';
+        if (ger) { diz('📝 gerando o prompt…'); ger.click(); }
+        let t = 0; while (pr && (pr.value === antes || !pr.value.trim()) && t < 60) { await new Promise(r => setTimeout(r, 500)); t++; }
+        if (!pr || !pr.value.trim()) throw new Error('não consegui gerar o prompt (veja o aviso ao lado do botão de gerar)');
+        diz('🤖 a IA está escrevendo… (roteiro longo pode levar alguns minutos)');
+        const r = await fetch('/ia/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: pr.value }) });
+        const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+        resp.value = d.texto; resp.dispatchEvent(new Event('input'));
+        diz('✅ resposta da IA colada — lendo…');
+        if (ler) ler.click();
+      } catch (e) { diz('⚠ ' + e.message); } finally { b.disabled = false; }
+    }));
+  })();
+  </script>
 </body>
 </html>

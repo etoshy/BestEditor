@@ -121,7 +121,7 @@
 <!-- 4 · prompt e resultado -->
 <div class="ds-card">
   <h2><span class="ds-num">4</span>Prompt pra IA → roteiro</h2>
-  <div class="ds-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="ds-mini" id="btnPrompt">📝 Gerar prompt</button><button class="ds-mini ds-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="ds-hint" id="promptSt"></span></div>
+  <div class="ds-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="ds-mini" id="btnPrompt">📝 Gerar prompt</button><button type="button" class="ds-mini" data-ia-gerar="btnPrompt" data-ia-prompt="prompt" data-ia-resp="resp" data-ia-ler="btnLerResp" data-ia-status="promptSt" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><button class="ds-mini ds-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="ds-hint" id="promptSt"></span></div>
   <textarea id="prompt" rows="6" readonly class="ds-mono" style="display:none;margin-top:6px;"></textarea>
   <label style="margin-top:10px;">Resposta da IA (JSON)</label>
   <textarea id="resp" rows="6" class="ds-mono" placeholder='{ "titulos": [...], "capitulos": [...], "roteiro": "..." }'></textarea>

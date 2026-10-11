@@ -49,6 +49,30 @@ def registrar(app, base_dir: str) -> None:
         ia.salvar_config(novos)
         return _pagina(salvo=not aviso, aviso=aviso)
 
+    @app.route("/ia/gerar", methods=["POST"])
+    def ia_gerar():
+        """📝 Manda um prompt de roteiro (Modelos de vídeo, Venda, Roteiro do YouTube, Modelados) pra IA e devolve o texto."""
+        motivo = ia.motivo_desligado("roteiros")
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo + " — ligue em 🤖 IA nas buscas e modelos."}), 400
+        prompt = str((request.get_json(silent=True) or {}).get("prompt") or "")
+        if not prompt.strip():
+            return jsonify({"erro": "O prompt veio vazio."}), 400
+        system = "Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois, sem ``` em volta."
+        import re
+        import idiomas
+        m = re.search(r"output language code: ([a-z]{2,3}(?:-[A-Za-z]{2})?)", prompt) or re.search(r"\(([a-z]{2})\) — roteiro", prompt)
+        cod = idiomas.normalizar(m.group(1)) if m else None
+        if cod and cod != "pt":  # 🌐 o idioma de saída vai também no system (a IA tende a seguir o idioma das instruções)
+            nome = idiomas.IDIOMAS.get(cod, (cod, cod))[1]
+            system += (f"\n\nOUTPUT LANGUAGE: {nome}. Every text value in the JSON (script/roteiro, titles, chapters, description, "
+                       f"tags, CTA, notes) MUST be written in {nome}, even though the instructions and the sources are in Portuguese. "
+                       f"Translate the facts faithfully. Keep the JSON keys exactly as in the example.")
+        texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=32000, effort="medium", timeout=600)
+        if not texto:
+            return jsonify({"erro": "A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja as últimas chamadas em 🤖 IA") + ")."}), 200
+        return jsonify({"ok": True, "texto": texto})
+
     @app.route("/ia/testar", methods=["POST"])
     def ia_testar():
         return jsonify(ia.testar())

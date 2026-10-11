@@ -410,3 +410,37 @@ def test_chave_errada_do_navegador_nao_substitui_a_boa(api):
     assert "não parece uma chave do Claude" in c.get("/ia").get_data(as_text=True)
     c.post("/ia", data={"ativo": "on", "provedor": "claude", "modelo": "claude-haiku-5-5", "chave": "sk-ant-nova-chave"})
     assert ia.config()["chave"] == "sk-ant-nova-chave" and 'type="password"' not in c.get("/ia").get_data(as_text=True)
+
+
+def test_gerar_roteiro_com_a_ia(api):
+    import app as A
+    A.app.config["TESTING"] = True
+    c = A.app.test_client()
+    api.respostas = [(200, ok('{"roteiro": "Era uma vez."}'))]
+    r = c.post("/ia/gerar", json={"prompt": "escreva o roteiro"}).get_json()
+    assert r["ok"] and r["texto"] == '{"roteiro": "Era uma vez."}' and api.pedidos[-1]["max_tokens"] == 32000
+    ia.salvar_config({"recursos": {"roteiros": False}})
+    assert c.post("/ia/gerar", json={"prompt": "x"}).status_code == 400
+    raiz = os.path.dirname(os.path.abspath(__file__))
+    for t in ("dossie_detalhe.html", "venda_detalhe.html", "roteiro_yt_detalhe.html", "modelado_detalhe.html"):
+        assert "data-ia-gerar" in open(os.path.join(raiz, "templates", t), encoding="utf-8").read(), t
+    assert "/ia/gerar" in open(os.path.join(raiz, "templates", "base.html"), encoding="utf-8").read()
+
+
+def test_idioma_de_saida_no_fim_e_no_system(api):
+    import app as A
+    import dossies as ds
+    import vendas as vd
+    d = {"tema": "Caso", "config": {"modelo": "true_crime", "formato": "caso_completo", "idioma": "en"}, "fontes": [], "midias": [], "roteiro_base": "notas"}
+    pr = ds.prompt_roteiro(d)
+    assert pr.rstrip().endswith("(output language code: en)") and "Write EVERY text value of the JSON in English" in pr
+    pv = vd.prompt_roteiro({"id": "x", "produto": {"titulo": "Garrafa"}, "config": {"idioma": "es"}, "midias": [], "link": ""})
+    assert pv.rstrip().endswith("(output language code: es)")
+    assert "(output language code: pt)" in ds.prompt_roteiro(dict(d, config=dict(d["config"], idioma="pt")))
+    A.app.config["TESTING"] = True
+    api.respostas = [(200, ok('{"roteiro": "Once upon a time."}'))]
+    A.app.test_client().post("/ia/gerar", json={"prompt": pr})
+    assert "OUTPUT LANGUAGE: English" in api.pedidos[-1]["system"][0]["text"]
+    api.respostas = [(200, ok('{"roteiro": "Era uma vez."}'))]
+    A.app.test_client().post("/ia/gerar", json={"prompt": "sem idioma"})
+    assert "OUTPUT LANGUAGE" not in api.pedidos[-1]["system"][0]["text"]

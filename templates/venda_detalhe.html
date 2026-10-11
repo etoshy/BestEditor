@@ -140,7 +140,7 @@
   <h2><span class="vd-num">4</span>Prompt pra IA → roteiro do vídeo</h2>
   <label>Pedido extra <span style="font-weight:400;color:#888;">(opcional)</span></label>
   <textarea id="extra" rows="2" placeholder="ex.: começar mostrando o problema; terminar com uma pergunta"></textarea>
-  <div class="vd-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="vd-mini" id="btnPrompt">📝 Gerar prompt</button><button class="vd-mini vd-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="vd-hint" id="promptSt"></span></div>
+  <div class="vd-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="vd-mini" id="btnPrompt">📝 Gerar prompt</button><button type="button" class="vd-mini" data-ia-gerar="btnPrompt" data-ia-prompt="prompt" data-ia-resp="resp" data-ia-ler="btnLerResp" data-ia-status="promptSt" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><button class="vd-mini vd-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="vd-hint" id="promptSt"></span></div>
   <textarea id="prompt" rows="6" readonly class="vd-mono" style="display:none;margin-top:6px;"></textarea>
   <label style="margin-top:10px;">Resposta da IA (JSON)</label>
   <textarea id="resp" rows="6" class="vd-mono" placeholder='{ "roteiro": "[M1] ...", "momentos": [ ... ] }'></textarea>

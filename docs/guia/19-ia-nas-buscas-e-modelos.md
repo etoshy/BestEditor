@@ -34,6 +34,7 @@ O gasto fica em `ia_uso.json` e aparece na página, por recurso, com as últimas
 | 📄 PDF e dossiê condensado | fontes por arquivo | PDF escaneado (ou só as páginas sem texto) lido pela IA em partes de 25 páginas; arquivo com mais de 40 mil caracteres vira um **dossiê condensado** (fatos com a página de cada um) |
 | ✅ Conferir as marcas | resultado do roteiro do dossiê | aponta as marcas [I3] em frases que não combinam com a imagem |
 | 🛒 Fotos do produto | 🛒 Vídeo de venda | ângulo, em uso, embalagem, texto/preço na imagem |
+| 📝 Roteiros direto na IA | 🕵️ Modelos de vídeo, 🛒 Vídeo de venda, 📜 Roteiro do YouTube (passos 1 e 2), 🎞️ Vídeos modelados (roteiro e ajuste) | botão **🤖 Gerar com a IA** ao lado do Gerar prompt: gera o prompt, manda pra IA, cola a resposta e já lê |
 | ✂️ Edição direto na IA | Estúdio → 🤖 IA | botão **🤖 Fazer com a IA** (no prompt inteiro ou em cada parte) |
 
 O que **pula** a IA: escolhas manuais, acervos locais com obra/personagem (o metadado já é confiável), Flow, mídia do

@@ -73,7 +73,7 @@
       <option value="">roteiro no idioma do vídeo</option>
       {% set p1 = usadas.passo1 or {} %}{% set idr = p.idioma_roteiro if p.idioma_roteiro is defined else (p1.idioma or '') %}{% for cod, nome in idiomas %}<option value="{{ cod }}" {% if cod == idr %}selected{% endif %}>roteiro em {{ nome }}</option>{% endfor %}
     </select>
-    <button class="ry-mini" id="p1Gerar">📝 Gerar prompt</button>
+    <button class="ry-mini" id="p1Gerar">📝 Gerar prompt</button><button type="button" class="ry-mini" data-ia-gerar="p1Gerar" data-ia-prompt="p1Prompt" data-ia-resp="p1Resp" data-ia-ler="p1Ler" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><span class="ry-hint"></span>
   </div>
   <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;display:block;"><input type="checkbox" id="semExperiencias" style="width:auto;" {% if (p.sem_experiencias if p.sem_experiencias is defined else p1.sem_experiencias) != false %}checked{% endif %}> 🙅 Tirar do roteiro experiências pessoais de quem gravou e citações a outros vídeos/ao canal ("como falei no vídeo passado", "quando eu era criança"…)</label>
   <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;display:block;"><input type="checkbox" id="marcarChamadas" style="width:auto;" {% if (p.marcar_chamadas if p.marcar_chamadas is defined else p1.marcar_chamadas) != false %}checked{% endif %}> 📣 A IA marca no roteiro <code>[[INSCREVA]]</code> (chamada pra like/inscreva-se) e <code>[[VENDA]]</code> (momento do anúncio) nos pontos mais oportunos — ali entram os seus vídeos prontos</label>
@@ -128,7 +128,7 @@
   <p class="ry-hint" style="margin-top:6px;">Tags do Chatterbox Turbo — sons: {% for t in tags_som %}<span class="ry-tag">[{{ t }}]</span> {% endfor %}<br>estilo (melhor no início da frase): {% for t in tags_estilo %}<span class="ry-tag">[{{ t }}]</span> {% endfor %}</p>
   <label>Pedido extra <span style="font-weight:400;color:#888;">(opcional)</span></label>
   <textarea id="extra" rows="2" placeholder="ex.: tom mais misterioso; no máximo 8 minutos; trocar o final">{{ (op.extra if op else '') or '' }}</textarea>
-  <button class="ry-mini" id="p2Gerar">📝 Gerar prompt</button>
+  <button class="ry-mini" id="p2Gerar">📝 Gerar prompt</button><button type="button" class="ry-mini" data-ia-gerar="p2Gerar" data-ia-prompt="p2Prompt" data-ia-resp="p2Resp" data-ia-ler="p2Ler" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><span class="ry-hint"></span>
   <div id="p2Box" style="display:none;margin-top:8px;">
     <div class="ry-row"><button class="ry-mini" id="p2Copiar">📋 Copiar prompt</button><span class="ry-hint" id="p2Tam"></span></div>
     <textarea id="p2Prompt" rows="6" readonly class="ry-mono"></textarea>

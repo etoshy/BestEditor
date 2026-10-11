@@ -941,7 +941,8 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append("")
         L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
     L.append("")
-    L.append(metodo_roteiro.bloco_titulos(5))
+    _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
+    L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
     L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
@@ -960,6 +961,8 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
            if cfg.get("sugerir_produto") else {}),
     }, ensure_ascii=False, indent=2))
     L.append("O 1º capítulo começa no início do roteiro. 5 a 15 capítulos (Shorts: nenhum).")
+    L.append("")
+    L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))  # 🌐 o idioma de novo, no FIM (a IA respeita mais)
     return "\n".join(L)
 
 

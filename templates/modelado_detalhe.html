@@ -78,12 +78,12 @@
     <button type="button" class="mini cinza" onclick="salvarCfg()">💾 Salvar configuração</button>
   </details>
   <div class="linha">
-    <button type="button" class="mini roxo" onclick="copiarPrompt('prompt-roteiro', 'p1')">📋 Gerar e copiar o prompt master</button>
+    <button type="button" class="mini roxo" id="gerarP1" onclick="copiarPrompt('prompt-roteiro', 'p1')">📋 Gerar e copiar o prompt master</button><button type="button" class="mini" data-ia-gerar="gerarP1" data-ia-prompt="p1" data-ia-resp="json1" data-ia-ler="lerJson1" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button>
     <span style="font-size:0.82rem;color:#666;">cole na IA (ChatGPT, Claude, Gemini…) e cole a resposta JSON abaixo</span>
   </div>
   <textarea id="p1" rows="5" readonly style="display:none;margin-top:6px;font-size:0.76rem;"></textarea>
   <textarea id="json1" rows="6" placeholder='Cole aqui o JSON do roteiro: {"titulo": ..., "falas": [...], "cenas": [...]}'></textarea>
-  <div class="linha"><button type="button" class="mini" onclick="enviarJson('roteiro', 'json1')">✅ Aplicar roteiro</button></div>
+  <div class="linha"><button type="button" class="mini" id="lerJson1" onclick="enviarJson('roteiro', 'json1')">✅ Aplicar roteiro</button></div>
   <div id="avisos"></div>
   <div id="falas"></div>
 </div>
@@ -104,12 +104,12 @@
   <h2>3 · Ajuste das cenas aos tempos reais</h2>
   <p style="font-size:0.85rem;color:#555;margin:0;">Manda pra IA os tempos de cada fala no áudio pronto: ela devolve as cenas com início/fim (cada uma no máximo do tamanho do vídeo gerado), pode dividir/juntar cenas e corrige a animação. Ou distribua sem IA.</p>
   <div class="linha">
-    <button type="button" class="mini roxo" onclick="copiarPrompt('prompt-ajuste', 'p3')">📋 Gerar e copiar o prompt de ajuste</button>
+    <button type="button" class="mini roxo" id="gerarP3" onclick="copiarPrompt('prompt-ajuste', 'p3')">📋 Gerar e copiar o prompt de ajuste</button><button type="button" class="mini" data-ia-gerar="gerarP3" data-ia-prompt="p3" data-ia-resp="json3" data-ia-ler="lerJson3" data-ia-status="iaSt3" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><span id="iaSt3" style="font-size:0.82rem;color:#666;"></span>
     <button type="button" class="mini cinza" onclick="post('ajuste-auto', {}, true)">⚡ Distribuir automático (sem IA)</button>
   </div>
   <textarea id="p3" rows="5" readonly style="display:none;margin-top:6px;font-size:0.76rem;"></textarea>
   <textarea id="json3" rows="5" placeholder='Cole aqui o JSON das cenas finais: {"cenas": [{"id":1, "inicio":0, "fim":3.8, ...}]}'></textarea>
-  <div class="linha"><button type="button" class="mini" onclick="enviarJson('ajuste', 'json3')">✅ Aplicar cenas</button></div>
+  <div class="linha"><button type="button" class="mini" id="lerJson3" onclick="enviarJson('ajuste', 'json3')">✅ Aplicar cenas</button></div>
   <div id="tl-cenas"></div>
 </div>
 
