@@ -207,7 +207,7 @@ def test_rota_momento(api, monkeypatch):
     A._JOBS[jid] = {"job_id": jid, "segments": [{"start": 0, "end": 5, "text": "ele falou da guerra"}],
                     "pending_segments": [{"start": 0, "end": 5, "provider": "youtube", "query": "discurso", "media_type": "video"}]}
     A._youtube_itens_sincronizar(A._JOBS[jid])
-    monkeypatch.setattr(A, "_legenda_com_tempos", lambda url, pasta: {"linhas": [{"inicio": 10.0, "fim": 14.0, "texto": "a guerra acabou"}], "fonte": "teste"})
+    monkeypatch.setattr(A, "_legenda_com_tempos", lambda url, pasta, **k: {"linhas": [{"inicio": 10.0, "fim": 14.0, "texto": "a guerra acabou"}], "fonte": "teste"})
     api.respostas = [(200, ok({"achou": True, "inicio": 10, "fim": 14, "frase": "a guerra acabou", "traducao": "", "confianca": 0.9, "outros_momentos": []}))]
     r = A.app.test_client().post(f"/job/{jid}/youtube/item/seg-0/momento", json={"url": "https://youtu.be/abcdefghijk"}).get_json()
     assert r["ok"] and r["achou"] and r["inicio"] == 9.6 and r["fonte_legenda"] == "teste"

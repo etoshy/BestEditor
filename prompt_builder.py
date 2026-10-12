@@ -629,6 +629,8 @@ def build_prompt(
     rules = [
         regra_ritmo(interval_seconds, ritmo),
         f"Os segmentos precisam ser contínuos e cobrir o áudio inteiro: o \"end\" de um segmento é sempre igual ao \"start\" do próximo, o primeiro \"start\" é 0.0, e o último \"end\" é {total_duration:.2f}.",
+        f"Nenhum segmento pode passar de {max(15.0, 2.5 * float(interval_seconds or 7)):.0f}s — vale ATÉ O FIM do áudio: não junte o final "
+        "num trecho só (um clipe esticado por minutos). Continue dividindo com o mesmo ritmo até o último segundo.",
         (
             "Para cada segmento, escreva primeiro \"visual\" (o que vai aparecer na tela), depois a busca em \"query\" "
             "**em inglês** e 1 ou 2 \"alternativas\" de reserva — seguindo a seção \"Como escrever a busca\" logo depois "

@@ -27,7 +27,7 @@ import os
 import re
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional
+from typing import Tuple, Any, Callable, Dict, List, Optional
 
 PASTA = "roteiros_yt"
 
@@ -1047,34 +1047,29 @@ def _toks(t: str) -> List[str]:
     return re.findall(r"[a-z0-9']+", t)
 
 
-def capitulos_pelo_audio(p: Dict[str, Any], palavras: List[Dict[str, Any]], duracao: Optional[float]) -> List[Dict[str, Any]]:
-    """Tempo REAL de cada capítulo no áudio gerado (TTS): acha as primeiras palavras do
-    capítulo nas palavras que o Whisper ouviu no áudio (com o tempo de cada uma).
-    Sem as palavras, usa a posição no texto × a duração do áudio."""
-    res = p.get("resultado") or {}
-    caps = res.get("capitulos") or []
-    if not caps:
-        return []
+def tempos_de_frases(texto_falado: str, frases: List[Tuple[str, Optional[float]]], palavras: List[Dict[str, Any]],
+                     duracao: Optional[float]) -> List[Optional[float]]:
+    """Segundo em que cada frase começa no áudio. `frases` = [(as primeiras palavras, posição 0-1 no texto ou None)].
+    Acha a frase no texto falado e depois nas palavras que o Whisper ouviu (com o tempo de cada uma); sem as
+    palavras, usa a posição no texto × a duração."""
     import chamadas as _ch
-    falado = re.sub(r"\[[^\]]*\]", " ", _ch.MARCADOR.sub(" ", roteiro_para_voz(p)))
+    falado = re.sub(r"\[[^\]]*\]", " ", _ch.MARCADOR.sub(" ", texto_falado or ""))
     tf = _toks(falado)
     ouvidas = [(_toks(str(w.get("word") or w.get("text") or "")), float(w.get("start") or 0)) for w in palavras or []]
     seq = [(tok, ini) for toks, ini in ouvidas for tok in toks[:1] if toks]  # 1 token por palavra ouvida
-    out = []
-    for k, c in enumerate(caps):
-        alvo = _toks(c.get("comeca_em") or "")[:5]
+    out: List[Optional[float]] = []
+    for frase, posicao in frases:
+        alvo = _toks(frase or "")[:5]
         idx = None
-        if alvo:  # posição do capítulo no texto falado
+        if alvo:  # posição da frase no texto falado
             for i in range(len(tf) - len(alvo) + 1):
                 if tf[i:i + len(alvo)] == alvo:
                     idx = i
                     break
         if idx is None:
-            idx = int(round((c.get("posicao") or 0) * len(tf)))
+            idx = int(round((posicao or 0) * len(tf)))
         seg = None
-        if k == 0:
-            seg = 0.0
-        elif seq and tf:
+        if seq and tf:
             est = int(round(idx / max(1, len(tf)) * len(seq)))
             melhor, nota = None, -1
             for j in range(max(0, est - 60), min(len(seq), est + 60)):
@@ -1087,6 +1082,22 @@ def capitulos_pelo_audio(p: Dict[str, Any], palavras: List[Dict[str, Any]], dura
                 seg = seq[min(len(seq) - 1, est)][1]
         elif duracao:
             seg = (idx / max(1, len(tf))) * duracao
+        out.append(seg)
+    return out
+
+
+def capitulos_pelo_audio(p: Dict[str, Any], palavras: List[Dict[str, Any]], duracao: Optional[float]) -> List[Dict[str, Any]]:
+    """Tempo REAL de cada capítulo no áudio gerado (TTS): acha as primeiras palavras do
+    capítulo nas palavras que o Whisper ouviu no áudio (com o tempo de cada uma).
+    Sem as palavras, usa a posição no texto × a duração do áudio."""
+    res = p.get("resultado") or {}
+    caps = res.get("capitulos") or []
+    if not caps:
+        return []
+    tempos = tempos_de_frases(roteiro_para_voz(p), [(c.get("comeca_em") or "", c.get("posicao")) for c in caps], palavras, duracao)
+    out = []
+    for k, c in enumerate(caps):
+        seg = 0.0 if k == 0 else tempos[k]
         out.append(dict(c, segundos_audio=None if seg is None else round(seg, 1)))
     # o YouTube exige ordem crescente e 10 s entre capítulos
     for k in range(1, len(out)):

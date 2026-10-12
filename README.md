@@ -28,6 +28,68 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 📜 Histórico de áudios baixa o .zip (v84_75)
+
+- Cada áudio do **📜 Histórico** (Gerador de voz) tem **⬇ ZIP** ao lado de WAV e SRT: narração + legenda + `info.json`
+  (idioma, motor, projeto do Roteiro do YouTube / modelo / venda) + chamadas — o mesmo .zip que vai no **Novo vídeo**.
+- Funciona também com áudios antigos e depois de reiniciar o site (antes o .zip só saía logo após gerar).
+
+---
+
+## 🎬 Google Flow refeito no HTML real + 🧪 área de teste (v84_74)
+
+- A automação do Flow agora segue exatamente o caminho de quem usa: **Novo projeto → ⚙ Configurações do agente**
+  ("Confirmar antes de gerar" = Nunca, modelos padrão de imagem e vídeo, Salvar) **→ desliga o Agente → popup da caixa**
+  (Imagem/Vídeo, Frames/Elementos, proporção, modelo, x1) **→ clica fora → Início/Fim pelo menu de mídia**
+  ("Incluir no comando") **→ prompt → Iniciar geração → espera o %** → baixa o resultado.
+- Os seletores vêm do HTML que você capturou do Flow (sem dados pessoais). Quando um passo falha, o erro diz **qual passo**
+  (ex.: `Flow, passo "configurar": modelo "X" não existe — tem: …`), e "limite de uso" / "precisa entrar na conta" viram avisos próprios.
+- **Configurações → Automação do Flow**: `direto` (novo, padrão) ou `antigo` (a automação anterior, se precisar voltar).
+- **🧪 Testar o Google Flow** (`/flow/teste`, link nas Configurações e em Contas Google):
+  - navegador **visível ou oculto**;
+  - **Teste completo**: imagem → vídeo só com texto (Elementos) → vídeo com Início e Fim (Frames);
+  - **Gerar um**: tipo, modelo, proporção, quantidade, prompt, frames de Início/Fim e imagem de referência;
+  - **💸 Sem gerar**: faz tudo até antes do "Iniciar geração" (não gasta crédito);
+  - cada passo mostra ✅/❌, tempo e a foto da tela; se falhar, salva o diagnóstico em `flow_dados/diagnostico`.
+- Testes: `toolkit/googleflow/test_flow_direto.py` roda contra um **Flow simulado** (`toolkit/googleflow/flow_simulado/`)
+  montado com o HTML real.
+
+---
+
+## ✂️ Trecho longo demais vira pedaços (v84_73)
+
+Com transcrição longa a IA às vezes "cansa" no fim e manda um trecho de 1–2 minutos com uma busca só (um clipe curto
+repetido/esticado). Agora (`trechos_longos.py`):
+
+- o prompt da 1ª IA diz que nenhum trecho passa de 2,5× o intervalo (mínimo 15 s), **até o fim do áudio**;
+- se mesmo assim vier, a resposta já chega **dividida** em pedaços do tamanho do intervalo, cortados no começo das frases
+  quando dá; o 1º pedaço fica com a busca/texto, os outros usam as buscas de reserva — e, com a 🤖 IA, cada um ganha a
+  busca pela própria fala;
+- em projetos já abertos: aviso ⚠ no painel do trecho longo com **✂️ Dividir em pedaços**, e o botão
+  **✂️ Dividir trechos longos (N)** na barra da timeline (a mídia escolhida fica no 1º pedaço; os outros ganham prévia nova).
+  YouTube, mídia do projeto e cenas (template) não são divididos.
+
+## 🚫 Só os bancos e buscadores que você marcou (v84_72)
+
+- A **reserva** (quando um banco não acha nada) vinha da prioridade das Configurações — por padrão TODOS os bancos —, então
+  um vídeo só com Pexels caía em Magnific, VistaCreate… (que abrem navegador). Agora a reserva é só entre os bancos
+  **marcados no vídeo**, na ordem de prioridade das Configurações.
+- Os **buscadores de imagem** (Bing, Brave, Yandex, Startpage) rodavam sempre os 4 juntos, um navegador cada. Agora só os marcados.
+- O 🤖 que acha os vídeos do YouTube lê as legendas **sem abrir janela** (só o botão 🎯 de um vídeo ainda tenta com o
+  navegador visível quando o oculto falha).
+
+## 📝 Projeto do Roteiro do YouTube no editor (v84_71)
+
+No **Novo vídeo**, o seletor "📦 Projeto" agora também lista os projetos do **Roteiro do YouTube** (com roteiro pronto) —
+ou use o botão **🎬 Criar o vídeo com este projeto** na página do roteiro. Com o projeto ligado:
+
+- cada **[CENA n]** do roteiro é achada na narração deste vídeo (as palavras logo depois do marcador) e o prompt da 1ª IA
+  recebe "neste ponto, YouTube, buscando X"; depois da resposta, o trecho de cada cena vira YouTube com a busca da cena;
+- a cena que já tem **link + início/fim** escolhidos na página do roteiro é **baixada e cortada sozinha**; as outras ficam
+  no painel 🎬 Vídeos do YouTube pro 🤖 achar o momento;
+- o YouTube entra nos bancos do projeto sozinho, e os capítulos da descrição saem no tempo do vídeo final
+  (`roteiro_no_editor.py`; o achador de frases no áudio virou `roteiros_yt.tempos_de_frases`).
+
 ## 🧭 Cada trecho na fonte certa + 🃏 cartão quando nada presta (v84_70)
 
 Com a IA ligada, a etapa "buscas melhores" já dizia o tipo de cada trecho, mas isso era ignorado. Agora decide a fonte

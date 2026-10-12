@@ -1125,6 +1125,8 @@ def gerar_voz_historico():
     for it in r["itens"]:
         if it.get("arquivo") and not it.get("sumiu"):
             it["audio_url"] = url_for("gerar_voz_audio", filename=it["arquivo"])
+            if not it.get("erro"):
+                it["zip_url"] = url_for("gerar_voz_baixar_zip", job_id=it["id"])
         if it.get("srt") and os.path.exists(os.path.join(VOZES_DIR, it["srt"])):
             it["srt_url"] = url_for("gerar_voz_legenda", filename=it["srt"])
     return jsonify(r)
@@ -1148,9 +1150,10 @@ def gerar_voz_status(job_id: str):
         h = _hist_voz.obter(VOZES_DIR, job_id)  # o site reiniciou: o histórico ainda sabe do áudio
         if h and h.get("arquivo") and os.path.exists(os.path.join(VOZES_DIR, h["arquivo"])):
             res = {"audio_url": url_for("gerar_voz_audio", filename=h["arquivo"]), "engine": h.get("motor"), "idioma": h.get("idioma")}
+            if not h.get("erro"):
+                res["zip_url"] = url_for("gerar_voz_baixar_zip", job_id=job_id)
             if h.get("srt") and os.path.exists(os.path.join(VOZES_DIR, h["srt"])):
                 res["srt_url"] = url_for("gerar_voz_legenda", filename=h["srt"])
-                res["zip_url"] = url_for("gerar_voz_baixar_zip", job_id=job_id) if job_id in _GERAR_VOZ_STATUS else None
             return jsonify({"running": False, "log": "(do histórico)", "erro": None, "pronto": True, "resultado": res})
         return jsonify({"running": False, "log": "", "erro": "Essa geração não foi encontrada.", "pronto": True, "resultado": None})
     resultado = None
@@ -1597,9 +1600,27 @@ def gerar_voz_legenda(filename: str):
     return send_file(path, mimetype="text/plain", as_attachment=True, download_name=safe_name)
 
 
+def _status_do_historico_voz(job_id: str) -> Optional[Dict[str, Any]]:
+    """Monta, a partir da entrada do 📜 histórico, o mesmo que o zip precisa do status da geração."""
+    h = _hist_voz.obter(VOZES_DIR, job_id)
+    if not h or not h.get("arquivo") or h.get("erro"):
+        return None
+    st: Dict[str, Any] = {"resultado_filename": h["arquivo"], "resultado_srt_filename": h.get("srt"),
+                          "resultado_chamadas_filename": h.get("chamadas"),
+                          "idioma": h.get("idioma") or None, "engine": h.get("motor") or None}
+    chave, _, valor = str(h.get("projeto") or "").partition(":")
+    if chave in ("roteiro_id", "dossie_id", "venda_id") and valor:
+        st[chave] = valor
+    return st
+
+
 @app.route("/gerar-voz/baixar-zip/<job_id>", methods=["GET"])
 def gerar_voz_baixar_zip(job_id: str):
+    if not re.fullmatch(r"[\w\-]+", job_id or ""):
+        return "Essa geração não foi encontrada.", 404
     status = _GERAR_VOZ_STATUS.get(job_id)
+    if not status or not status.get("resultado_filename"):
+        status = _status_do_historico_voz(job_id)  # 📜 do histórico (o site reiniciou ou é um áudio antigo)
     if not status or not status.get("resultado_filename"):
         return "Essa geração não foi encontrada (ou ainda não terminou).", 404
     audio_path = os.path.join(VOZES_DIR, secure_filename(status["resultado_filename"]))
@@ -2036,7 +2057,8 @@ def save_settings():
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
     for chave_flow in ("flow_navegador", "flow_exe", "flow_timeout_seconds", "flow_seletor_configuracoes",
-                       "flow_horas_ate_liberar", "flow_palavras_limite", "flow_modelo_video", "flow_seletor_video"):
+                       "flow_horas_ate_liberar", "flow_palavras_limite", "flow_modelo_video", "flow_seletor_video",
+                       "flow_modo_automacao"):
         if chave_flow in request.form:  # formulários antigos não têm: mantém o que já estava salvo
             new_values[chave_flow] = request.form[chave_flow]
     if "buscadores_proporcao" in request.form:
@@ -2603,12 +2625,80 @@ def _ligar_venda(job: dict, venda_id: str) -> bool:
 def _com_produto(job: dict, prompt_text: str) -> str:
     """Prompt do editor + o bloco das mídias do projeto ligado (venda ou modelo) + a regra das chamadas."""
     prompt_text = prompt_text + "\n" + __import__("chamadas").bloco_prompt_buscas(job.get("chamadas"))  # 🚫 chamada não vira busca
+    prompt_text += _bloco_cenas_do_roteiro(job)
     pj = _projeto_do_job(job)
     if not pj:
         return prompt_text
     _t, mod, p, _prov = pj
     bloco = mod.bloco_prompt_editor(BASE_DIR, p)
     return prompt_text + ("\n" + bloco if bloco else "")
+
+
+def _cenas_do_roteiro(job: dict) -> List[Dict[str, Any]]:
+    """📝 Cenas do projeto do Roteiro do YouTube ligado, com o tempo na narração DESTE vídeo (guardadas no job)."""
+    if not job.get("roteiro_id"):
+        return []
+    if job.get("roteiro_cenas") is not None:
+        return job["roteiro_cenas"]
+    try:
+        import roteiro_no_editor
+        import roteiros_yt
+        p = roteiros_yt.carregar_projeto(BASE_DIR, job["roteiro_id"])
+        job["roteiro_cenas"] = roteiro_no_editor.cenas_com_tempo(p, _palavras_da_narracao(job), job.get("total_duration"))
+    except Exception:  # noqa: BLE001 — projeto apagado/sem roteiro: segue sem as cenas
+        job["roteiro_cenas"] = []
+    return job["roteiro_cenas"]
+
+
+def _bloco_cenas_do_roteiro(job: dict) -> str:
+    cenas = _cenas_do_roteiro(job)
+    if not cenas:
+        return ""
+    try:
+        import roteiro_no_editor
+        import roteiros_yt
+        return "\n" + roteiro_no_editor.bloco_prompt(roteiros_yt.carregar_projeto(BASE_DIR, job["roteiro_id"]), cenas)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _aplicar_cenas_do_roteiro(job: dict, segments: List[VideoSegment]) -> List[int]:
+    """Depois da resposta da 1ª IA: o trecho de cada cena vira YouTube com a busca da cena."""
+    cenas = _cenas_do_roteiro(job)
+    if not cenas:
+        return []
+    import roteiro_no_editor
+    return roteiro_no_editor.aplicar(segments, cenas)
+
+
+def _usar_links_do_roteiro(job_id: str, job: dict) -> int:
+    """As cenas que já têm link (com início/fim) escolhido na página do roteiro: baixa e corta sozinho, em segundo plano."""
+    import roteiro_no_editor
+    pend = job.get("pending_segments") or []
+    por_id = {c["id"]: c for c in _cenas_do_roteiro(job)}
+    n = 0
+    for i, sg in enumerate(pend):
+        c = por_id.get(sg.get("roteiro_cena"))
+        if not c or sg.get("override_source") or sg.get("provider") != "youtube":
+            continue
+        esc = roteiro_no_editor.escolha_do_link(c, float(sg["end"]) - float(sg["start"]))
+        it = _youtube_item(job, f"seg-{i}")
+        if not esc or it is None or it.get("escolha"):
+            continue
+        it["ia"] = {"estado": "baixando", "msg": "📝 link escolhido no roteiro — baixando e cortando…", "log": []}
+
+        def _run(item_id=f"seg-{i}", escolha=esc):
+            it2 = _youtube_item(_JOBS.get(job_id) or {}, item_id)
+            try:
+                _youtube_baixar_e_aplicar(job_id, item_id, escolha)
+                if it2 is not None:
+                    it2["ia"] = {"estado": "pronto", "msg": f"📝 do roteiro: {escolha['titulo'][:80]}", "log": []}
+            except Exception as exc:  # noqa: BLE001
+                if it2 is not None:
+                    it2["ia"] = {"estado": "erro", "msg": f"o link do roteiro não baixou ({str(exc)[:120]}) — escolha à mão", "log": []}
+        threading.Thread(target=_run, daemon=True).start()
+        n += 1
+    return n
 
 
 def _provider_do_projeto(job: dict) -> List[str]:
@@ -2857,9 +2947,14 @@ def transcribe():
         _tipo, _pid = "venda", request.form["venda_id"].strip()
     if not _pid and segments_do_zip is not None:
         _tipo, _pid = _projeto_do_zip(os.path.join(job_dir, "upload.zip"))
-    if _pid:
+    if _pid and _tipo == "roteiro":  # 📝 projeto do Roteiro do YouTube escolhido aqui
+        if re.fullmatch(r"[0-9a-f]{6,40}", _pid):
+            _JOBS[job_id]["roteiro_id"] = _pid
+            if "youtube" not in _JOBS[job_id]["providers"]:  # as cenas vêm do YouTube
+                _JOBS[job_id]["providers"] = list(_JOBS[job_id]["providers"]) + ["youtube"]
+    elif _pid:
         _ligar_projeto(_JOBS[job_id], _tipo, _pid)
-    if segments_do_zip is not None:  # 📝 Roteiro do YouTube: os capítulos da descrição vão pro tempo do vídeo final
+    if segments_do_zip is not None and not _JOBS[job_id].get("roteiro_id"):  # 📝 Roteiro do YouTube: capítulos no tempo do vídeo final
         _rid = _roteiro_do_zip(os.path.join(job_dir, "upload.zip"))
         if _rid:
             _JOBS[job_id]["roteiro_id"] = _rid
@@ -3269,6 +3364,14 @@ def _job_site_cfg(job: dict) -> dict:
             cfg["transition_duration"] = max(0.1, min(3.0, float(editor.get("transition_duration", cfg.get("transition_duration", 0.6)))))
         except (TypeError, ValueError):
             pass
+    # 🚫 v84_72: só os bancos/buscadores MARCADOS neste vídeo. Antes a reserva (quando um banco falha) vinha da
+    # prioridade das Configurações — por padrão TODOS os bancos — e os 4 buscadores de imagem rodavam sempre,
+    # cada um abrindo um navegador.
+    provs = [p for p in (job.get("providers") or []) if isinstance(p, str) and p]
+    if provs:
+        base = cfg.get("provider_priority") or ALL_PROVIDERS
+        cfg["provider_priority"] = [p for p in base if p in provs] + [p for p in provs if p not in base]
+        cfg["provedores_do_job"] = provs
     return cfg
 
 
@@ -3606,8 +3709,17 @@ def submit_json(job_id: str):
         return render_template("prompt.html", job=job, json_error=str(exc), previous_json=raw_json, opcoes=_opcoes_do_job(job), all_providers=DEFAULT_PROVIDERS)
 
     _aplicar_produto(job, parsed.segments)  # 🛒 "produto" -> arquivo do projeto de venda
+    # ✂️ trecho de 1-2 min que a IA mandou (cansou no fim da transcrição): vira pedaços do tamanho do intervalo
+    import trechos_longos
+    _antes = len(parsed.segments)
+    parsed.segments = trechos_longos.dividir_segmentos(parsed.segments, job.get("interval_seconds"),
+                                                       trechos_longos.pausas_da_fala(job.get("segments")))
+    job["trechos_longos_divididos"] = len(parsed.segments) - _antes
     __import__("chamadas").limpar_buscas(parsed.segments, job.get("chamadas"))  # 🚫 inscreva-se/venda não viram busca de imagem
+    _cenas_idx = _aplicar_cenas_do_roteiro(job, parsed.segments)  # 📝 cenas do Roteiro do YouTube → YouTube
     job["pending_segments"] = [s.to_dict() for s in parsed.segments]
+    for _i in _cenas_idx:
+        job["pending_segments"][_i]["roteiro_cena"] = getattr(parsed.segments[_i], "roteiro_cena", None)
     _aplicar_mix_midia(job, parsed)
     _aplicar_padroes_biblioteca(job, parsed)
     _avisar_buscas(job)
@@ -3636,6 +3748,7 @@ def submit_json(job_id: str):
     # paralelo com as prévias — quando o editor abrir, os resultados já estão lá.
     job["youtube_itens"] = []
     _youtube_itens_sincronizar(job)
+    _usar_links_do_roteiro(job_id, job)  # 📝 cena com link já escolhido no roteiro: baixa sozinho
 
     _save_state(job_id)
 
@@ -4904,6 +5017,7 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         "blocos_fala": [{"start": float(b["start"]), "end": float(b["end"]), "text": b.get("text", "")} for b in job.get("segments") or [] if b.get("text")],
         "job_id": job_id, "segmentos": segs, "overlays": overlays, "cortes": cortes, "biblioteca": biblioteca,
         "links_tela": job.get("links_tela") or [],
+        "intervalo": job.get("interval_seconds") or 7,
         "clipes_chamada": {t: [{"id": x["id"], "nome": x["nome"], "padrao": bool(x.get("padrao"))} for x in l] for t, l in clipes_ch.items()},
         "duracao": job.get("total_duration") or (job["pending_segments"][-1]["end"] if job["pending_segments"] else 0),
         "erro_indice": job.get("assembly_error_segment_index"),
@@ -5245,6 +5359,79 @@ def editor_dividir(job_id: str):
     _reindexar_previas_e_youtube(job)
     _save_state(job_id)
     return jsonify({"ok": True})
+
+
+@app.route("/job/<job_id>/editor/dividir-longo", methods=["POST"])
+def editor_dividir_longo(job_id: str):
+    """✂️ Divide um trecho longo (ou TODOS os longos, sem "indice") em pedaços do tamanho do intervalo, nas pausas
+    da fala. Os pedaços novos ganham busca própria (as reservas da IA — e, com a 🤖 IA, a busca pela fala de cada um)
+    e prévia nova em segundo plano."""
+    import trechos_longos
+    job = _JOBS.get(job_id)
+    if not job or "pending_segments" not in job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    corpo = request.get_json(silent=True) or {}
+    segs = job["pending_segments"]
+    intervalo = job.get("interval_seconds") or 7
+    if corpo.get("indice") is not None:
+        try:
+            alvos = [int(corpo["indice"])]
+        except (TypeError, ValueError):
+            return jsonify({"erro": "Índice inválido."}), 400
+        if not (0 <= alvos[0] < len(segs)):
+            return jsonify({"erro": "Trecho inexistente."}), 404
+        s0 = segs[alvos[0]]
+        if float(s0["end"]) - float(s0["start"]) < 2 * max(3.0, float(intervalo)) or s0.get("template"):
+            return jsonify({"erro": "Esse trecho não é longo (ou é uma cena) — use ✂️ Dividir no cursor."}), 400
+    else:
+        alvos = [i for i, sg in enumerate(segs) if trechos_longos.pode_dividir(sg, intervalo)]
+    if not alvos:
+        return jsonify({"ok": True, "divididos": 0, "novos": 0})
+    pausas = trechos_longos.pausas_da_fala(job.get("segments"))
+    previews = list(job.get("segment_previews") or [None] * len(segs))
+    novos_idx: List[int] = []
+    for i in sorted(alvos, reverse=True):
+        partes = trechos_longos.pedacos(segs[i], intervalo, pausas)  # o 1º pedaço fica com a mídia escolhida
+        segs[i:i + 1] = partes
+        prev_i = previews[i] if i < len(previews) else None
+        previews[i:i + 1] = [prev_i] + [None] * (len(partes) - 1)
+        novos_idx = [n + len(partes) - 1 for n in novos_idx] + list(range(i + 1, i + len(partes)))
+    job["segment_previews"] = [dict(p, index=k) if p else None for k, p in enumerate(previews)]
+    _reindexar_previas_e_youtube(job)
+    _save_state(job_id)
+    threading.Thread(target=_previas_dos_pedacos, args=(job_id, sorted(novos_idx)), daemon=True).start()
+    return jsonify({"ok": True, "divididos": len(alvos), "novos": len(novos_idx)})
+
+
+def _previas_dos_pedacos(job_id: str, idx: List[int]) -> None:
+    """Pedaços novos: com a 🤖 IA, a busca de cada um pela fala dele; depois a prévia de cada um."""
+    job = _JOBS.get(job_id)
+    if not job or not idx:
+        return
+    segs = job["pending_segments"]
+    try:
+        import ia_midia
+        import ia_servico
+        if ia_servico.ativo("buscas"):
+            falas, _p = _falas_por_trecho(job, [segs[i] for i in idx])
+            novas = ia_midia.buscas_melhores([{"n": k + 1, "fala": f, "query": segs[i].get("query")} for k, (i, f) in enumerate(zip(idx, falas))],
+                                             (job.get("ia") or {}).get("ficha"), job=job_id)
+            for k, i in enumerate(idx):
+                nb = novas.get(k + 1)
+                if nb and i < len(segs) and not segs[i].get("override_source"):
+                    segs[i].update(query=nb["buscas"][0], alternativas=nb["buscas"][1:] or None,
+                                   **({"visual": nb["visual"]} if nb.get("visual") else {}))
+    except Exception:  # noqa: BLE001 — sem IA: ficam as reservas
+        pass
+    for i in idx:
+        if i >= len(segs) or segs[i].get("override_source"):
+            continue
+        try:
+            with app.test_request_context(json={"alternativas": segs[i].get("alternativas") or []}):
+                buscas_previa(job_id, i)
+        except Exception:  # noqa: BLE001
+            continue
+    _save_state(job_id)
 
 
 @app.route("/job/<job_id>/editor/juntar", methods=["POST"])
@@ -5992,7 +6179,7 @@ def _youtube_fala_do_item(job: dict, item: dict) -> str:
     return str(item.get("descricao") or item.get("termo") or "")
 
 
-def _legenda_com_tempos(url: str, pasta: str) -> Dict[str, Any]:
+def _legenda_com_tempos(url: str, pasta: str, pode_visivel: bool = True) -> Dict[str, Any]:
     """Legenda de um vídeo do YouTube em linhas curtas com os tempos (pra achar o momento).
     youtube-transcript-api → painel "Mostrar transcrição" → a transcrição do Roteiro do YouTube."""
     import yt_alternativas as alt
@@ -6003,7 +6190,8 @@ def _legenda_com_tempos(url: str, pasta: str) -> Dict[str, Any]:
             return {"linhas": r["linhas"], "fonte": "youtube-transcript-api"}
     except Exception as exc:  # noqa: BLE001
         erros.append(str(exc)[:120])
-    for headless in (True, False):
+    # navegador VISÍVEL só no botão 🎯 (um vídeo); o 🤖 que lê vários vídeos nunca abre janela
+    for headless in ((True, False) if pode_visivel else (True,)):
         try:
             r = alt.legenda_painel(url, headless=headless)
             if r and r.get("linhas"):
@@ -6314,12 +6502,12 @@ def _youtube_baixar_e_aplicar(job_id: str, item_id: str, escolha: Dict[str, Any]
     return output_path
 
 
-def _youtube_legenda(job_id: str, job: dict, url: str) -> Dict[str, Any]:
+def _youtube_legenda(job_id: str, job: dict, url: str, pode_visivel: bool = True) -> Dict[str, Any]:
     """Legenda com tempos de um vídeo (guardada no job: as últimas 12)."""
     cache = job.setdefault("ia_legendas", {})
     leg = cache.get(url)
     if not leg or not leg.get("linhas"):
-        leg = _legenda_com_tempos(url, os.path.join(_job_dir(job_id), "youtube_legendas"))
+        leg = _legenda_com_tempos(url, os.path.join(_job_dir(job_id), "youtube_legendas"), pode_visivel=pode_visivel)
         if leg.get("linhas"):
             cache[url] = leg
             while len(cache) > 12:
@@ -6357,7 +6545,7 @@ def _youtube_ia_item(job_id: str, item_id: str) -> None:
     r = yt_agente.procurar(
         fala, item.get("termo") or item.get("termo_original") or "", item.get("duracao_alvo"),
         buscar=lambda t: buscar_videos_youtube(t, quantidade=YOUTUBE_RESULTADOS_COM_IA),
-        ordenar=ordenar, legenda=lambda u: _youtube_legenda(job_id, job, u), achar=achar,
+        ordenar=ordenar, legenda=lambda u: _youtube_legenda(job_id, job, u, pode_visivel=False), achar=achar,
         nova_busca=lambda feitas, motivos: ia_midia.nova_busca_youtube(fala, feitas, motivos, ficha, job=job_id),
         log=log, parar=lambda: job_id in _YOUTUBE_IA_PARAR)
     st["buscas"], st["conferidos"] = r.get("buscas") or [], r.get("conferidos") or []
@@ -9331,6 +9519,8 @@ import ia_rotas as _ia_rotas  # noqa: E402  🤖 IA nas buscas e modelos (v84_53
 _ia_rotas.registrar(app, BASE_DIR)
 import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de canal + ⛏ Niche Miner)
 _analisador_rotas.registrar(app, BASE_DIR)
+import flow_teste as _flow_teste  # noqa: E402  🧪 área de teste do Google Flow (v84_74)
+_flow_teste.registrar(app, BASE_DIR)
 import espaco as _espaco  # noqa: E402  (🧹 Espaço em disco)
 
 

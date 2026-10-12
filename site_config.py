@@ -271,6 +271,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "flow_horas_ate_liberar": 24,
     "flow_palavras_limite": "",
     "flow_modelo_video": "Veo 3.1 - Lite",
+    # 🎬 v84_74: "direto" = automação nova (seletores do HTML real, passo a passo conferido); "antigo" = a de antes
+    "flow_modo_automacao": "direto",
 }
 
 
@@ -395,6 +397,8 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
     _props = ("auto", "horizontal_quadrada", "horizontal", "quadrada", "vertical_quadrada", "vertical", "qualquer")
     if current.get("buscadores_proporcao", "auto") not in _props:
         raise SiteConfigError(f"buscadores_proporcao precisa ser um de {_props}, recebi {current.get('buscadores_proporcao')!r}.")
+    if current.get("flow_modo_automacao") not in ("direto", "antigo"):
+        current["flow_modo_automacao"] = "direto"
     if not isinstance(current.get("flow_seletor_video", ""), str):
         raise SiteConfigError("flow_seletor_video precisa ser um texto (seletor CSS, ou vazio).")
     current["flow_seletor_video"] = str(current.get("flow_seletor_video", "")).strip()

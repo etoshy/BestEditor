@@ -691,6 +691,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   <div class="tl-bar">
     <button class="mini" id="btnDividir" title="S">✂️ Dividir no cursor</button>
     <button class="mini" id="btnJuntar">🔗 Juntar com o próximo</button>
+    <button class="mini" id="btnLongos" style="display:none;background:#78350f;color:#fde68a;" title="trechos de 1-2 min com um clipe só (a IA às vezes faz isso no fim)">✂️ Dividir trechos longos</button>
     <button class="mini" id="btnCensura" title="Blur/pixelado/tarja numa área, ou bip no áudio — entra no cursor">🙈 Censura</button>
     <span class="hint">Zoom</span><input type="range" id="zoom" min="8" max="220" value="40">
     <div class="tl-sel" id="tlSel"></div>
@@ -3219,6 +3220,7 @@ function propsTrecho(P, i) {
       <div class="row">${campo('Início (s)', `<input type="number" id="pIni" step="0.1" value="${s.start.toFixed(2)}" ${i === 0 ? 'disabled' : ''}>`)}${campo('Fim (s)', `<input type="number" id="pFim" step="0.1" value="${s.end.toFixed(2)}" ${i === segs.length - 1 ? 'disabled' : ''}>`)}</div>
       <p class="hint">Mudar o início/fim mexe junto no trecho vizinho (a narração não tem buracos).</p>
       <div class="row" style="margin-top:6px;"><button class="mini" id="pDividir">✂️ Dividir no cursor</button><button class="mini" id="pJuntar" ${i === segs.length - 1 ? 'disabled' : ''}>🔗 Juntar com o próximo</button></div>
+      ${trechoLongo(s) ? `<div class="aviso" style="margin-top:6px;">⚠ Trecho longo (${(s.end - s.start).toFixed(0)}s): um clipe só fica repetido/esticado. <button class="mini primary" id="pDividirLongo" style="margin-top:4px;">✂️ Dividir em pedaços de ~${intervaloDoVideo()}s (busca própria em cada um)</button></div>` : ''}
     </div></details>
     <details class="sec" open><summary>🎞 Mídia</summary><div class="in">
       ${TLS.ativa === '3' ? `<p class="hint" style="margin:0 0 4px">🔀 De qual timeline vem a mídia deste trecho:</p><div class="tl-escolha">${['1', '2'].map(t => `<button class="${(TLS.escolhas || [])[i] === t ? 'on' : ''}" data-de="${t}"><img src="/job/${JOB}/timeline/${t}/thumb/${i}?s=${s.start}" alt="" onerror="this.style.visibility='hidden'">Timeline ${t}</button>`).join('')}</div>${(TLS.escolhas || [])[i] === 'proprio' ? '<p class="hint">✎ Mídia trocada aqui no Juntar — clique numa das duas pra voltar a usar a dela.</p>' : ''}` : ''}
@@ -3281,6 +3283,7 @@ function propsTrecho(P, i) {
   on('pFim', 'change', (e) => { const v = clamp(parseFloat(e.target.value) || 0, s.start + 0.3, segs[i + 1].end - 0.3); s.end = v; segs[i + 1].start = v; marcarSujo(); selecionar({ tipo: 'seg', i }); });
   P.querySelectorAll('.tl-escolha button[data-de]').forEach(b => b.addEventListener('click', () => escolherMix([i], b.dataset.de)));
   on('pDividir', 'click', () => dividir());
+  on('pDividirLongo', 'click', () => dividirLongos(i));
   on('pJuntar', 'click', () => juntar(i));
   on('pVoltarAuto', 'click', () => { limparErroLocal(i); s.override_source = null; s.clipes_extra = null; s.curto = null; s._preview = Object.assign({}, s._preview, { midia_local: null }); marcarSujo(); selecionar({ tipo: 'seg', i }); });
   on('pTermo', 'change', muda((e) => { const q = e.target.value.trim() || s.query; if (q !== s.query) s.alternativas = null; s.query = q; }, true));
@@ -3485,6 +3488,26 @@ async function juntar(i) {
   const d = await r.json(); if (!r.ok) { toast('⚠ ' + (d.erro || 'falhou'), 4000); return; }
   window._enviando = true; location.reload();
 }
+// ✂️ trecho longo demais (a IA às vezes manda 1-2 min com uma busca só): pedaços do tamanho do intervalo
+function intervaloDoVideo() { return Math.round(D.intervalo || 7); }  // funções (não const): o painel chama antes daqui
+function trechoLongo(s) {
+  return !s.template && s.provider !== 'youtube' && s.provider !== 'material' && s.provider !== 'produto'
+    && (s.end - s.start) > Math.max(15, 2.5 * intervaloDoVideo());
+}
+async function dividirLongos(indice) {
+  const alvo = indice == null ? segs.filter(trechoLongo).length : 1;
+  if (!alvo) return;
+  if (!confirm(indice == null ? `Dividir ${alvo} trecho(s) longo(s) em pedaços de ~${intervaloDoVideo()}s? Cada pedaço ganha busca e prévia próprias.`
+    : `Dividir o trecho ${indice + 1} em pedaços de ~${intervaloDoVideo()}s?`)) return;
+  await salvar(true);
+  const r = await fetch(`/job/${JOB}/editor/dividir-longo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(indice == null ? {} : { indice }) });
+  const d = await r.json(); if (!r.ok) { toast('⚠ ' + (d.erro || 'falhou'), 4000); return; }
+  toast(`✂️ ${d.novos} pedaço(s) novo(s) — as prévias chegam em segundo plano`, 4000);
+  window._enviando = true; setTimeout(() => location.reload(), 600);
+}
+function mostrarBotaoLongos() { const b = $('btnLongos'); if (b) { const n = segs.filter(trechoLongo).length; b.style.display = n ? '' : 'none'; b.textContent = `✂️ Dividir trechos longos (${n})`; } }
+$('btnLongos').addEventListener('click', () => dividirLongos(null));
+mostrarBotaoLongos();
 $('btnDividir').addEventListener('click', dividir);
 $('btnJuntar').addEventListener('click', () => juntar());
 

@@ -281,6 +281,7 @@ function desenharResultado() {
       <textarea id="rFinal" style="position:absolute;left:-9999px;">${esc(roteiro)}</textarea>
       <div class="ry-row"><button class="ry-mini" id="rCopiar">📋 Copiar roteiro</button>
       <a class="ry-mini" href="/gerar-voz?roteiro=${PID}" style="background:#5b21b6;color:#fff;border-radius:6px;text-decoration:none;padding:6px 10px;">🎙️ Gerar voz com este roteiro</a>
+      <a class="ry-mini" href="/?roteiro=${PID}" style="background:#334155;color:#fff;border-radius:6px;text-decoration:none;padding:6px 10px;">🎬 Criar o vídeo com este projeto</a>
       <a class="ry-mini" href="/roteiros-yt/${PID}/baixar/txt">⬇ .txt</a><a class="ry-mini" href="/roteiros-yt/${PID}/baixar/json">⬇ JSON completo</a></div>
       <div class="ry-row"><button class="ry-mini ry-sec" id="rLimpar" title="Tira emojis, caracteres invisíveis, [Música]/(risos), links, @/#, markdown, aspas/travessões tipográficos, !!!, muuuito e tags que o TTS não conhece — sem IA, na hora">🧹 Limpar pro TTS (caracteres estranhos)</button>
       ${((R && R.antes_da_limpeza) || (!R && A && A.antes_da_limpeza)) ? '<button class="ry-mini ry-sec" id="rDesfazerLimpeza">↩ Desfazer limpeza</button>' : ''}</div>

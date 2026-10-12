@@ -803,6 +803,7 @@ async function carregarHistorico() {
       <div class="acoes">
         ${h.audio_url ? `<audio controls preload="none" src="${h.audio_url}"></audio><a href="${h.audio_url}" download>⬇ WAV</a>` : ''}
         ${h.srt_url ? `<a href="${h.srt_url}" download>⬇ SRT</a>` : ''}
+        ${h.zip_url ? `<a href="${h.zip_url}" download title="narração + legenda + idioma (e chamadas/projeto) — é o .zip que vai no Novo vídeo">⬇ ZIP</a>` : ''}
         <button type="button" class="hist-apagar" data-id="${h.id}" style="background:#dc2626;">Apagar</button>
       </div>
     </div>`).join('') || '<p style="color:#888;font-size:0.85rem;">Nenhum áudio ainda.</p>';

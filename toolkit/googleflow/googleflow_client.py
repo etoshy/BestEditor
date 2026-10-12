@@ -1857,6 +1857,45 @@ def checar_trabalho(page, estado: Dict[str, Any], ignorar=frozenset(), palavras_
     return None
 
 
+def submeter_direto(page, trab: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Lote no modo direto: configura a caixa (+ frame) e escreve o prompt (erro aqui = _AntesDeGerar, dá pra tentar
+    de novo sem gastar crédito); depois UM clique em gerar. Devolve o estado pra `checar_direto`."""
+    from googleflow import flow_direto as fd
+    d = trabalho_direto(trab["tipo"], trab["prompt"], cfg, trab, trab.get("imagem") or "", trab.get("media_id") or "")
+    if trab.get("modelo"):
+        d["modelo"] = trab["modelo"]
+    video = d["tipo"] == "video"
+    reaproveitou = False
+    try:
+        fd.configurar_caixa(page, d["tipo"], d.get("proporcao") or "16:9", d.get("modelo") or "", "x1",
+                            d.get("tipo_video") or ("Frames" if video else ""))
+        ini = d.get("inicio") or {}
+        if video and (ini.get("arquivo") or ini.get("media_id")):
+            reaproveitou = fd.definir_frame(page, "Início", d["inicio"].get("arquivo"), d["inicio"].get("media_id") or "") == "do projeto"
+        fd.escrever_prompt(page, d["prompt"])
+    except fd.FlowLimite as exc:
+        raise erro_do_passo(exc) from exc
+    except fd.FlowPassoErro as exc:
+        raise _AntesDeGerar(str(erro_do_passo(exc))) from exc
+    try:
+        estado = fd.clicar_gerar(page)
+    except fd.FlowLimite as exc:
+        raise erro_do_passo(exc) from exc
+    except fd.FlowPassoErro as exc:  # o clique não aconteceu: nada foi cobrado
+        raise _AntesDeGerar(str(erro_do_passo(exc))) from exc
+    estado.update(direto=True, tipo_midia="video" if video else "imagem", reaproveitou=reaproveitou)
+    return estado
+
+
+def checar_direto(page, estado: Dict[str, Any]) -> Optional[List[str]]:
+    from googleflow import flow_direto as fd
+    try:
+        r = fd.checar(page, estado, estado.get("tipo_midia") or "imagem")
+    except fd.FlowPassoErro as exc:
+        raise erro_do_passo(exc) from exc
+    return [m["url"] for m in r] if r else None
+
+
 def _url_original(url: str) -> str:
     """Miniatura do Google (\"...=s512-rw\") -> tamanho original (\"=s0\")."""
     return re.sub(r"=s\d+(-[a-z]+)*$", "=s0", url) if "=s" in url else url
@@ -2561,6 +2600,50 @@ def _config_do_projeto(cfg: Dict[str, Any]) -> tuple:
                                                   "flow_proporcao_video", "flow_modelo_video"))
 
 
+# ------------------------------------------------------------------ 🎬 modo DIRETO (v84_74, flow_direto.py)
+def modo_direto(cfg: Dict[str, Any]) -> bool:
+    """O jeito novo (seletores do HTML real, passo a passo conferido). A config do site já vem com "direto" por padrão
+    (site_config.py); um cliente criado sem essa chave (scripts/testes antigos) continua no jeito de antes."""
+    return str((cfg or {}).get("flow_modo_automacao") or "") == "direto"
+
+
+def erro_do_passo(exc: BaseException) -> BaseException:
+    """FlowPassoErro (flow_direto) → os erros que o resto do site já trata (troca de conta, login…)."""
+    from googleflow import flow_direto as fd
+    if isinstance(exc, fd.FlowLimite):
+        return GoogleFlowLimitReached(f"Limite do Google Flow atingido: {exc.mensagem}")
+    if isinstance(exc, fd.FlowLogin):
+        return GoogleFlowLoginRequired(exc.mensagem)
+    if isinstance(exc, fd.FlowPassoErro):
+        return GoogleFlowError(f"Flow, passo \"{exc.passo}\": {exc.mensagem}")
+    return exc
+
+
+def agente_da_cfg(cfg: Dict[str, Any]) -> Dict[str, str]:
+    """O que vai no painel "Configurações do agente" (uma vez por projeto)."""
+    prop = proporcao_flow(proporcao_para_orientacao(cfg.get("orientation")))
+    return {"img_proporcao": proporcao_flow(cfg.get("flow_proporcao_imagem") or "") or prop, "img_quantidade": "x1",
+            "img_modelo": str(cfg.get("flow_modelo_imagem") or ""),
+            "vid_proporcao": proporcao_flow(cfg.get("flow_proporcao_video") or "") or (prop if prop in ("16:9", "9:16") else "16:9"),
+            "vid_quantidade": "x1", "vid_modelo": str(cfg.get("flow_modelo_video") or "")}
+
+
+def trabalho_direto(tipo: str, prompt: str, cfg: Dict[str, Any], opcoes: Optional[Dict[str, Any]] = None,
+                    imagem: str = "", media_id: str = "") -> Dict[str, Any]:
+    """Pedido do site → o formato do flow_direto.gerar_um."""
+    o = dict(opcoes or {})
+    prop_cfg = proporcao_flow(proporcao_para_orientacao(cfg.get("orientation")))
+    if tipo == "animar":
+        return {"tipo": "video", "tipo_video": "Frames", "prompt": prompt, "modelo": o.get("modelo") or "",
+                "proporcao": proporcao_flow(o.get("proporcao") or "") or prop_cfg,
+                "inicio": {"arquivo": imagem, "media_id": media_id}}
+    if tipo == "video":
+        return {"tipo": "video", "tipo_video": "Elementos", "prompt": prompt, "modelo": str(cfg.get("flow_modelo_video") or ""),
+                "proporcao": proporcao_flow(cfg.get("flow_proporcao_video") or "") or prop_cfg}
+    return {"tipo": "imagem", "prompt": prompt, "modelo": str(cfg.get("flow_modelo_imagem") or ""),
+            "proporcao": proporcao_flow(o.get("proporcao") or cfg.get("flow_proporcao_imagem") or "") or prop_cfg}
+
+
 _PARAR = object()
 _REG_LOCK = threading.Lock()
 _TRABALHADOR: Optional["_Trabalhador"] = None
@@ -2670,6 +2753,9 @@ class _Trabalhador(threading.Thread):
         if item.tipo == "lote":
             self._executar_lote(item)
             return
+        if modo_direto(item.cfg):
+            self._gerar_direto(item)
+            return
         config_projeto = _config_do_projeto(item.cfg)
         if self.pagina is not None and getattr(self, "config_projeto", None) not in (None, config_projeto):
             self._fechar_pagina()  # proporção/modelo do projeto mudou: começa um projeto novo
@@ -2709,8 +2795,45 @@ class _Trabalhador(threading.Thread):
         self.vistas.update(urls)
         baixar_imagens(self.contexto, urls, item.prompt, item.chave)
 
+    def _gerar_direto(self, item: _Pedido) -> None:
+        """🎬 Um pedido pelo modo direto (flow_direto): projeto preparado UMA vez (agente configurado e desligado),
+        depois cada pedido configura a caixa, escreve, gera e espera o bloco novo."""
+        from googleflow import flow_direto as fd
+        config_projeto = _config_do_projeto(item.cfg)
+        if self.pagina is not None and getattr(self, "config_projeto", None) not in (None, config_projeto):
+            self._fechar_pagina()
+        try:
+            if self.pagina is None:
+                agente = agente_da_cfg(item.cfg) if item.cfg.get("flow_configurar_projeto", True) else None
+                self.pagina = fd.preparar_projeto(self.contexto, FLOW_URL, self.headless, agente)
+                self.config_projeto = config_projeto
+                salvar_sessao(self.contexto, self.conta)
+            trab = trabalho_direto(item.tipo, item.prompt, item.cfg, item.opcoes, item.imagem)
+            midias = fd.gerar_um(self.pagina, trab, timeout_s=item.timeout_s)
+        except fd.FlowPassoErro as exc:
+            raise erro_do_passo(exc) from exc
+        urls = [m["url"] for m in midias]
+        if not urls:
+            raise GoogleFlowError("O Flow terminou mas não apareceu nenhuma mídia nova no projeto.")
+        if item.tipo in ("video", "animar"):
+            baixar_videos(self.contexto, self.pagina, urls[:1], item.prompt, item.chave)
+        else:
+            try:
+                baixar_imagens(self.contexto, [_url_original(urls[0])], item.prompt, item.chave)
+            except GoogleFlowError:
+                baixar_imagens(self.contexto, urls[:1], item.prompt, item.chave)
+
     # ------------------------------------------------------------ lote em várias abas
     def _nova_aba_projeto(self, cfg: Dict[str, Any]):
+        if modo_direto(cfg):
+            from googleflow import flow_direto as fd
+            try:
+                pagina = fd.preparar_projeto(self.contexto, FLOW_URL, self.headless,
+                                             agente_da_cfg(cfg) if cfg.get("flow_configurar_projeto", True) else None)
+            except fd.FlowPassoErro as exc:
+                raise erro_do_passo(exc) from exc
+            salvar_sessao(self.contexto, self.conta)
+            return pagina
         pagina = abrir_novo_projeto(self.contexto, headless=self.headless)
         if cfg.get("flow_janela_compacta", True):
             try:  # o layout compacto (estreito) do Flow — o que funcionou nos testes do usuário
@@ -2801,7 +2924,8 @@ class _Trabalhador(threading.Thread):
                                 livre["pagina"] = self._nova_aba_projeto(item.cfg)
                                 livre["vistas"], livre["midias"] = set(), set()
                             _ev(tipo="inicio", id=trab.get("id"), trab=trab, aba=livre["n"])
-                            livre["estado"] = submeter_trabalho(livre["pagina"], trab, limite_txt)
+                            livre["estado"] = (submeter_direto(livre["pagina"], trab, item.cfg) if modo_direto(item.cfg)
+                                               else submeter_trabalho(livre["pagina"], trab, limite_txt))
                             livre["trab"], livre["t0"] = trab, time.monotonic()
                             _ev(tipo="aba", aba=livre["n"], estado=("animando" if trab["tipo"] == "animar" else "gerando imagem")
                                 + f" · {trab.get('rotulo') or trab.get('id')}")
@@ -2834,7 +2958,8 @@ class _Trabalhador(threading.Thread):
                         _foto(aba)
                         continue
                     try:
-                        urls = checar_trabalho(aba["pagina"], aba["estado"], aba["vistas"], limite_txt)
+                        urls = (checar_direto(aba["pagina"], aba["estado"]) if aba["estado"].get("direto")
+                                else checar_trabalho(aba["pagina"], aba["estado"], aba["vistas"], limite_txt))
                         limite_s = max(int(item.timeout_s or 0), TIMEOUT_VIDEO_MIN_S) if trab["tipo"] == "animar" else TIMEOUT_IMAGEM_LOTE_S
                         if urls:
                             aba["vistas"].update(urls)

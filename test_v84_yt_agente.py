@@ -123,7 +123,7 @@ def test_rota_ia_acha_baixa_e_aplica(A, monkeypatch, tmp_path):
     monkeypatch.setattr(ia_midia, "ordenar_youtube", lambda rs, fala, termo, ficha, job=None, com_capas=0, ja_vistos=None:
                         capas.append(com_capas) or {"resultados": rs, "busca_melhor": ""})
     monkeypatch.setattr(ia_midia, "nova_busca_youtube", lambda fala, feitas, motivos, ficha, job=None: "" if len(feitas) > 1 else "coisa rara 2")
-    monkeypatch.setattr(A, "_legenda_com_tempos", lambda url, pasta: {"linhas": LEG})
+    monkeypatch.setattr(A, "_legenda_com_tempos", lambda url, pasta, **k: {"linhas": LEG})
     monkeypatch.setattr(ia_midia, "achar_momento", lambda linhas, fala, titulo, canal, dur, ficha, job=None:
                         {"achou": "sonho" in fala and titulo == "Vídeo 1", "inicio": 30.0, "fim": 33.0, "frase": "I have a dream", "confianca": 0.9})
     baixados = []

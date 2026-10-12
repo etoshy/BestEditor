@@ -3382,7 +3382,10 @@ def prefetch_browser_images(
 
     headless = not cfg.get("browser_visible", False)
     paralelo = bool(cfg.get("buscadores_imagem_paralelo", True))
-    engines = [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS]
+    # só os buscadores marcados no vídeo (cada um abre um navegador); sem a lista, os dos próprios trechos
+    permitidos = cfg.get("provedores_do_job")
+    engines = [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS if permitidos is None or p in permitidos] \
+        or [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS if any(getattr(s, "provider", None) == p for _i, s in items)]
 
     def _entregar(termo: str, res: Dict[str, Any], inicio: int = 0) -> None:
         cache[termo] = res

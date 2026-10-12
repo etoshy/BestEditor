@@ -19,6 +19,21 @@ _TAREFAS: Dict[str, Dict[str, Any]] = {}
 
 def registrar(app, base_dir: str) -> None:
 
+    @app.context_processor
+    def _roteiros_no_template():
+        def _lista():  # 📝 projetos com roteiro pronto (o "Novo vídeo" liga um ao vídeo)
+            out = []
+            for it in ry.listar_projetos(base_dir):
+                if it.get("etapa") != "pronto":
+                    continue
+                try:
+                    n = len(ry.cenas_atuais(ry.carregar_projeto(base_dir, it["id"])))
+                except Exception:  # noqa: BLE001
+                    n = 0
+                out.append(dict(it, cenas=n))
+            return out
+        return {"roteiros_yt_lista": _lista}
+
     def _proj(pid: str):
         try:
             return ry.carregar_projeto(base_dir, pid)

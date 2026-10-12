@@ -120,7 +120,7 @@ def test_lote_duas_abas_frame_e_animacao(tmp_path, monkeypatch, variante):
         monkeypatch.setattr(g, nome, lambda *a, **k: None)
     monkeypatch.setattr(g, "_abrir", lambda p, cfg, headless, conta="x": (p.chromium.launch(headless=True).new_context(), True))
     try:
-        cli = g.GoogleFlowClient({"browser_visible": True})
+        cli = g.GoogleFlowClient({"browser_visible": True, "flow_modo_automacao": "antigo"})  # o jeito antigo continua de reserva
         frame = tmp_path / "cena_003_123.png"
         shutil.copy(site / "asb" / "img.png", frame)
         fila = collections.deque([

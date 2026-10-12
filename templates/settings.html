@@ -193,6 +193,12 @@
   </select>
   <label style="margin-top:8px;">Caminho de outro navegador baseado em Chromium (Brave, Opera, Vivaldi…) — opcional, tem prioridade sobre a escolha acima</label>
   <input type="text" name="flow_exe" value="{{ config.flow_exe }}" placeholder="C:\caminho\brave.exe">
+  <p style="margin:8px 0;"><a href="/flow/teste" style="font-weight:700;">🧪 Testar o Google Flow</a> — roda a automação passo a passo (com ou sem o navegador aparecendo, e sem gastar crédito se quiser) e mostra em que passo dá erro.</p>
+  <label style="margin-top:8px;">Automação do Flow
+    <select name="flow_modo_automacao">
+      <option value="direto" {% if config.flow_modo_automacao != 'antigo' %}selected{% endif %}>🎬 Direta (nova) — agente configurado e desligado; imagem, vídeo e vídeo com Início/Fim pela caixa</option>
+      <option value="antigo" {% if config.flow_modo_automacao == 'antigo' %}selected{% endif %}>Antiga (reserva) — a de antes da v84_74</option>
+    </select></label>
   <label style="margin-top:8px;"><input type="checkbox" name="flow_configurar_projeto" {% if config.flow_configurar_projeto %}checked{% endif %} style="width:auto;"> Configurar o projeto antes de gerar — ao criar o projeto, abre as configurações do agente e escolhe <em>Confirmar antes de gerar: Nunca</em> e <em>1 imagem</em>, depois salva. Todas as imagens do vídeo são geradas em sequência na MESMA conversa.</label>
   <label style="margin-top:8px;">Seletor CSS do botão que abre as configurações do agente — opcional</label>
   <input type="text" name="flow_seletor_configuracoes" value="{{ config.flow_seletor_configuracoes }}" placeholder="deixe vazio: o site tenta achar sozinho">
