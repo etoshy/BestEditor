@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Niche Miner{% endblock %}
+{% block content %}
+<style>
+  body { max-width: none; margin: 20px 16px; }
+  #nmFrame { width: 100%; height: calc(100vh - 170px); min-height: 600px; border: 1px solid #ddd; border-radius: 10px; background: #fff; }
+  .hint { font-size: .85rem; color: #666; }
+</style>
+<h1 style="margin:0 0 6px;">⛏ Niche Miner</h1>
+<p class="hint" style="margin:0 0 8px;">Mineração de nichos e canais pequenos, recomendações, ideias virais, análise de canal e API do YouTube.
+  Roda como um app à parte (porta {{ porta }}) dentro desta aba — dados em <code>niche_miner/data/</code>.
+  <span id="nmEstado">⏳ ligando…</span> · <a id="nmAbrir" href="#" target="_blank" rel="noopener">abrir em outra aba ↗</a></p>
+<iframe id="nmFrame" title="Niche Miner"></iframe>
+<script>
+(function () {
+  const url = location.protocol + '//' + location.hostname + ':{{ porta }}/';
+  const est = document.getElementById('nmEstado'); document.getElementById('nmAbrir').href = url;
+  let tentativas = 0;
+  async function checar() {
+    try {
+      const d = await (await fetch('{{ url_for("niche_miner_status") }}')).json();
+      if (d.no_ar) { est.textContent = '✅ no ar'; const f = document.getElementById('nmFrame'); if (!f.src) f.src = url; return; }
+      if (d.morreu) { est.textContent = '❌ o Niche Miner fechou sozinho — ' + (d.log ? 'veja o log: ' + d.log.slice(-400) : 'confira se o Flask e o Playwright estão instalados'); return; }
+    } catch (_) { /* tenta de novo */ }
+    tentativas++; est.textContent = '⏳ ligando… (' + tentativas + ')';
+    if (tentativas < 60) setTimeout(checar, 1000); else est.textContent = '⚠ não subiu em 1 minuto — veja niche_miner/data/niche_miner.log';
+  }
+  fetch('{{ url_for("niche_miner_iniciar") }}', { method: 'POST' }).then(r => r.json()).then(d => {
+    if (!d.ok) { est.textContent = '❌ ' + (d.erro || 'não deu pra ligar'); return; } checar();
+  }).catch(e => { est.textContent = '❌ ' + e.message; });
+})();
+</script>
+{% endblock %}

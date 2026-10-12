@@ -1,0 +1,5 @@
+flask
+playwright
+# opcionais:
+# anthropic   -> geração automática de subnichos via API (não obrigatório, o app já monta o prompt manual)
+# pytrends    -> Google Trends (checagem na aba Minerar e validação na aba Ideias virais; sem ele o app segue e mostra um link para conferir manualmente)

@@ -2845,7 +2845,7 @@ async function usarBiblioteca(i, itemId) {
     const r = await fetch(`/job/${JOB}/assign-library-to-segment/${i}?json=1`, { method: 'POST', body: fd });
     const d = await r.json(); if (!r.ok || !d.ok) throw new Error('falhou');
     segs[i].override_source = d.segmento.override_source; segs[i].media_type = d.segmento.media_type; segs[i].clipes_extra = null; segs[i].curto = null;
-    segs[i]._preview = Object.assign({}, segs[i]._preview, { midia_local: `/job/${JOB}/segment-media/${i}?t=${Date.now()}`, thumbnail_url: `/job/${JOB}/segment-thumb/${i}?t=${Date.now()}`, erro: null });
+    segs[i]._preview = Object.assign({}, segs[i]._preview, { thumb_remoto: null, video_remoto: null, midia_local: `/job/${JOB}/segment-media/${i}?t=${Date.now()}`, thumbnail_url: `/job/${JOB}/segment-thumb/${i}?t=${Date.now()}`, erro: null });
     limparErroLocal(i); selecionar({ tipo: 'seg', i }); toast('Trecho ' + (i + 1) + ' agora usa esse arquivo');
   } catch (e) { toast('⚠ Não consegui usar esse arquivo no trecho', 4000); }
 }
@@ -2924,7 +2924,7 @@ $('btnUsarCand').addEventListener('click', async () => {
     const r = await fetch(`/job/${JOB}/segmento/${i}/usar-candidato`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, media_type: media, image_url: c.image_url || '', thumbnail: c.thumbnail || '', url: c.url || '', video_url: c.video_preview_url || '', label: c.label || '' }) });
     const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || 'falhou');
     segs[i].override_source = d.override_source; segs[i].clipes_extra = null; segs[i].curto = null; segs[i].media_type = media;
-    segs[i]._preview = Object.assign({}, segs[i]._preview, { thumbnail_url: d.thumbnail_url ? d.thumbnail_url + (d.thumbnail_url.startsWith('/') ? '?t=' + Date.now() : '') : segs[i]._preview.thumbnail_url, video_preview_url: c.video_preview_url || null, midia_local: d.override_source.source === 'local_file' ? `/job/${JOB}/segment-media/${i}?t=${Date.now()}` : null, erro: null });
+    segs[i]._preview = Object.assign({}, segs[i]._preview, { thumb_remoto: null, video_remoto: null, thumbnail_url: d.thumbnail_url ? d.thumbnail_url + (d.thumbnail_url.startsWith('/') ? '?t=' + Date.now() : '') : segs[i]._preview.thumbnail_url, video_preview_url: c.video_preview_url || null, midia_local: d.override_source.source === 'local_file' ? `/job/${JOB}/segment-media/${i}?t=${Date.now()}` : null, erro: null });
     $('bStatus').textContent = '✅ Trecho ' + (i + 1) + ' vai usar esse resultado.'; limparErroLocal(i);
     selecionar({ tipo: 'seg', i });
   } catch (e) { $('bStatus').textContent = '⚠ ' + e.message; }
@@ -3003,7 +3003,8 @@ $('rbConferir').addEventListener('click', async () => {
 });
 function previaParaServidor(p) {
   p = p || {};
-  return { ok: !!(p.thumbnail_url && !p.erro), thumbnail_url: p.thumbnail_url || null, video_preview_url: p.video_preview_url || null, label: p.label || '', error: p.erro || null, provider: p.provider || null, result_url: p.result_url || null, query: p.query != null ? p.query : null, media_type: p.media_type || null };
+  // 💾 prévia guardada no PC: pro servidor vai o link original
+  return { ok: !!(p.thumbnail_url && !p.erro), thumbnail_url: p.thumb_remoto || p.thumbnail_url || null, video_preview_url: p.video_remoto || p.video_preview_url || null, label: p.label || '', error: p.erro || null, provider: p.provider || null, result_url: p.result_url || null, query: p.query != null ? p.query : null, media_type: p.media_type || null };
 }
 async function atualizarPrevias(indices) {
   if (previasRodando) { toast('Já estou atualizando prévias'); return; }
@@ -3019,7 +3020,7 @@ async function atualizarPrevias(indices) {
       const d = await r.json();
       if (r.ok && d.preview) {
         const p = d.preview;
-        s._preview = Object.assign({}, s._preview, { thumbnail_url: p.ok ? p.thumbnail_url : null, video_preview_url: p.video_preview_url || null, label: p.label || '', erro: p.ok ? null : p.error, provider: p.provider || s.provider, result_url: p.result_url || null, query: p.query != null ? p.query : null, media_type: p.media_type || null });
+        s._preview = Object.assign({}, s._preview, { thumb_remoto: null, video_remoto: null, thumbnail_url: p.ok ? p.thumbnail_url : null, video_preview_url: p.video_preview_url || null, label: p.label || '', erro: p.ok ? null : p.error, provider: p.provider || s.provider, result_url: p.result_url || null, query: p.query != null ? p.query : null, media_type: p.media_type || null });
         if (p.ok) achou++;
       }
     } catch (_) { /* segue pros outros */ }
@@ -3589,11 +3590,12 @@ async function preBaixarVer(iniciar) {
   try {
     const r = await fetch(`/job/${JOB}/prebaixar`, { method: iniciar ? 'POST' : 'GET' });
     const d = await r.json(); if (!r.ok) return;
-    if (d.total) {
+    const tot = (d.total || 0) + (d.previas_total || 0), fe = (d.feitos || 0) + (d.previas || 0);
+    if (tot) {
       el.style.display = '';
-      el.textContent = d.rodando ? `⬇ baixando mídias ${d.feitos}/${d.total}` : `⬇ mídias prontas ${d.feitos}/${d.total}` + (d.falhas ? ` (${d.falhas} na montagem)` : '');
+      el.textContent = d.rodando ? `⬇ baixando mídias ${fe}/${tot}` : `💾 mídias guardadas ${fe}/${tot}` + (d.falhas ? ` (${d.falhas} na montagem)` : '');
       el.title = (d.erros && d.erros.length ? 'Não baixaram agora (a montagem tenta de novo):\n' + d.erros.join('\n') + '\n\n' : '')
-        + 'Os clipes que a montagem vai usar já vão sendo baixados enquanto você edita — na hora de montar, eles não baixam de novo.';
+        + 'As prévias da telinha e os clipes que a montagem vai usar ficam guardados no PC: ao reabrir o projeto nada é baixado de novo, e na hora de montar os clipes já estão prontos.';
     } else if (!d.rodando) { el.style.display = 'none'; }
     preTimer = setTimeout(() => preBaixarVer(false), (d.rodando || iniciar) ? 3000 : 20000);
   } catch (_) {}
@@ -3751,7 +3753,7 @@ async function acaoCurto(i, acao, msg, emLote) {
     if (d.recarregar) { toast(`Trecho ${i + 1}: ${d.msg}`, 4000); if (!emLote) { marcarLimpo(); setTimeout(() => location.reload(), 700); } return 'recarregar'; }
     s.override_source = d.segmento.override_source; s.provider = d.segmento.provider || s.provider;
     s.clipes_extra = d.segmento.clipes_extra || null; s.curto = d.segmento.curto || null;
-    if (d.preview) s._preview = Object.assign({}, s._preview, d.preview, { midia_local: null, erro: null });
+    if (d.preview) s._preview = Object.assign({}, s._preview, d.preview, { thumb_remoto: null, video_remoto: null, midia_local: null, erro: null });
     marcarSujo(); desenharTimeline(); desenharCurtos(); atualizarMonitor(true);
     toast(`Trecho ${i + 1}: ${d.msg}`, 4000);
     return true;
@@ -4110,7 +4112,7 @@ document.addEventListener('yt-escolhido', (e) => {
 function usarClipeNoTrecho(i) {
   if (!segs[i]) return; limparErroLocal(i);
   segs[i].override_source = { source: 'local_file', kind: 'video' }; segs[i].media_type = 'video'; segs[i].clipes_extra = null; segs[i].curto = null;
-  segs[i]._preview = Object.assign({}, segs[i]._preview, { midia_local: `/job/${JOB}/segment-media/${i}?t=${Date.now()}`, erro: null, thumbnail_url: `/job/${JOB}/segment-thumb/${i}?t=${Date.now()}` });
+  segs[i]._preview = Object.assign({}, segs[i]._preview, { thumb_remoto: null, video_remoto: null, midia_local: `/job/${JOB}/segment-media/${i}?t=${Date.now()}`, erro: null, thumbnail_url: `/job/${JOB}/segment-thumb/${i}?t=${Date.now()}` });
   desenharTimeline(); atualizarMonitor(true);
 }
 // ---- links do YouTube colados como texto

@@ -173,3 +173,41 @@ def test_montagem_usa_o_arquivo_prebaixado(tmp_path, monkeypatch):
     cfg = {"orientation": "16:9", "export_quality": "480p", "provider_priority": ["pexels"]}
     out = va.assemble_video([seg], audio, str(tmp_path / "o.mp4"), str(work), site_cfg=cfg)
     assert os.path.exists(out)
+
+
+def test_previas_ficam_guardadas_e_o_estudio_usa_do_disco(A, monkeypatch):
+    """'se o projeto já baixou os arquivos uma vez, mantém salvos pra não baixar tudo de novo ao abrir'."""
+    job = _job(A, "pre-previas")
+    job["segment_previews"][0].update(thumbnail_url="https://images.pexels.com/t/1.jpeg?w=320",
+                                      video_preview_url="https://videos.pexels.com/v/1.mp4")
+    baixados = []
+
+    def _fake(url, destino):
+        baixados.append(url)
+        with open(destino, "wb") as f:
+            f.write(b"0123456789" * 100)
+        return True
+    monkeypatch.setattr(A, "_baixar_previa", _fake)
+    pb = {}
+    A._guardar_previas("pre-previas", job, pb)
+    assert pb == {"previas_total": 2, "previas": 2} and len(baixados) == 2
+    p = A._seg_estudio("pre-previas", job, 0)["_preview"]
+    assert p["video_preview_url"].startswith("/job/pre-previas/cache-previa/") and p["video_preview_url"].endswith(".mp4")
+    assert p["thumbnail_url"].startswith("/job/pre-previas/cache-previa/")
+    assert p["video_remoto"] == "https://videos.pexels.com/v/1.mp4" and p["thumb_remoto"].startswith("https://images.pexels.com/")
+    c = A.app.test_client()
+    r = c.get(p["video_preview_url"], headers={"Range": "bytes=0-9"})
+    assert r.status_code == 206 and r.data == b"0123456789"
+    assert c.get("/job/pre-previas/cache-previa/..%2Fstate.json").status_code == 404
+    # 2ª vez (reabrir o projeto): nada baixa de novo
+    A._guardar_previas("pre-previas", job, pb)
+    assert len(baixados) == 2 and pb["previas"] == 2
+
+
+def test_previa_que_nao_baixa_continua_pelo_link(A, monkeypatch):
+    job = _job(A, "pre-previas2")
+    job["segment_previews"][0].update(video_preview_url="https://videos.pexels.com/v/2.mp4")
+    monkeypatch.setattr(A, "_baixar_previa", lambda u, d: False)
+    A._guardar_previas("pre-previas2", job, {})
+    p = A._seg_estudio("pre-previas2", job, 0)["_preview"]
+    assert p["video_preview_url"] == "https://videos.pexels.com/v/2.mp4" and p["video_remoto"] is None

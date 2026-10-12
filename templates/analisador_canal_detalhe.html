@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}📊 {{ (a.canal or {}).nome or 'Canal' }}{% endblock %}
+{% block content %}
+{% set c = a.canal or {} %}{% set m = a.metricas or {} %}{% set vs = a.videos or {} %}{% set ia = a.ia %}
+<style>
+  body { max-width: 1180px; }
+  .ac-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; background: #fff; }
+  .hint { font-size: .85rem; color: #666; }
+  .ac-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+  .ac-kpi { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; }
+  .ac-kpi b { display: block; font-size: 1.25rem; } .ac-kpi span { font-size: .78rem; color: #666; }
+  .ac-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 10px; }
+  .ac-v { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; font-size: .82rem; background: #fff; }
+  .ac-v img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #eee; }
+  .ac-v .t { font-weight: 600; padding: 6px 8px 2px; line-height: 1.25; }
+  .ac-v .n { padding: 0 8px 8px; color: #555; }
+  .ac-v.bom { outline: 3px solid #16a34a; } .ac-v.ruim { outline: 3px solid #dc2626; }
+  .ac-badge { display: inline-block; border-radius: 999px; padding: 1px 7px; font-size: .72rem; font-weight: 700; margin-right: 4px; }
+  .b-out { background: #dcfce7; color: #166534; } .b-baixo { background: #fee2e2; color: #991b1b; } .b-tr { background: #ede9fe; color: #5b21b6; }
+  table.ac-t { border-collapse: collapse; width: 100%; font-size: .84rem; } .ac-t td, .ac-t th { border-bottom: 1px solid #eee; padding: 5px 6px; text-align: left; vertical-align: top; }
+  .ac-ia h3 { margin: 16px 0 6px; } .ac-ia ul { margin: 4px 0; padding-left: 20px; }
+  .ac-sug { border: 1px solid #ddd6fe; background: #faf5ff; border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+  .ac-sug b { font-size: 1rem; }
+  .ac-log { font-family: ui-monospace, monospace; font-size: .78rem; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 8px 10px; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+  .ac-mini { display: flex; gap: 8px; align-items: center; margin: 4px 0; } .ac-mini img { width: 96px; border-radius: 4px; }
+  details summary { cursor: pointer; }
+</style>
+<p><a href="{{ url_for('analisador_canal_page') }}">← Análises</a></p>
+<h1>📊 {{ c.nome or a.url }}</h1>
+<p class="hint"><a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.url }}</a>{% if a.fonte %} · lido por: {{ a.fonte }}{% endif %}</p>
+
+{% if a.estado not in ('pronto', 'erro') or a.rodando %}
+<div class="ac-card" id="acAndamento">
+  <h2 style="margin:0;">⏳ <span id="acEtapa">{{ a.etapa or 'Na fila…' }}</span></h2>
+  <div class="progress-bar"><div class="progress-fill" style="width:100%;animation:none;opacity:.35"></div></div>
+  <div class="ac-log" id="acLog">{{ (a.log or [])|join('\n') }}</div>
+  <p class="hint">Pode fechar esta página: a coleta continua e a análise fica salva.</p>
+</div>
+<script>
+(function poll() {
+  fetch('{{ url_for("analisador_canal_estado", aid=a.id) }}').then(r => r.json()).then(d => {
+    document.getElementById('acEtapa').textContent = d.etapa || d.estado;
+    document.getElementById('acLog').textContent = (d.log || []).join('\n');
+    if ((d.estado === 'pronto' || d.estado === 'erro') && !d.rodando) { location.reload(); return; }
+    setTimeout(poll, 2500);
+  }).catch(() => setTimeout(poll, 4000));
+})();
+</script>
+{% endif %}
+
+{% if a.estado == 'erro' %}
+<div class="error">❌ {{ a.erro }}</div>
+<form method="post" action="{{ url_for('analisador_canal_refazer', aid=a.id) }}"><button type="submit">🔁 Tentar de novo</button></form>
+{% endif %}
+
+{% if a.estado == 'pronto' and vs %}
+<div class="ac-card">
+  <div class="ac-kpis">
+    <div class="ac-kpi"><b>{{ (c.inscritos_text or fmt_num(c.inscritos))|replace(' inscritos', '') }}</b><span>inscritos</span></div>
+    <div class="ac-kpi"><b>{{ c.n_videos or '?' }}</b><span>vídeos no canal</span></div>
+    <div class="ac-kpi"><b>{{ fmt_num(m.mediana_recentes) }}</b><span>mediana de views (recentes)</span></div>
+    <div class="ac-kpi"><b>{{ fmt_num(m.mediana_populares) }}</b><span>mediana de views (populares)</span></div>
+    <div class="ac-kpi"><b>{{ m.tracao if m.tracao is not none else '?' }}</b><span>tração (mediana ÷ inscritos)</span></div>
+    <div class="ac-kpi"><b>{{ m.por_semana or '?' }}</b><span>vídeos por semana</span></div>
+    <div class="ac-kpi"><b>{{ fmt_dur(m.duracao_mediana_s) }}</b><span>duração mediana (populares {{ fmt_dur(m.duracao_mediana_populares_s) }})</span></div>
+    <div class="ac-kpi"><b>{{ m.ppm_mediano or '?' }}</b><span>palavras/min na narração</span></div>
+    <div class="ac-kpi"><b>{{ m.com_transcricao }}/{{ vs|length }}</b><span>vídeos com transcrição</span></div>
+  </div>
+</div>
+
+<div class="ac-card ac-ia" id="acIA">
+  <h2 style="margin:0;">🤖 Análise</h2>
+  {% if a.ia_erro %}<div class="error">{{ a.ia_erro }}</div>{% endif %}
+  {% if ia %}
+    <p style="font-size:1.02rem;">{{ ia.resumo }}</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+      <div><h3>✅ O que faz bem</h3><ul>{% for x in ia.faz_bem %}<li>{{ x }}</li>{% endfor %}</ul></div>
+      <div><h3>🔧 Pode melhorar</h3><ul>{% for x in ia.pode_melhorar %}<li>{{ x }}</li>{% endfor %}</ul></div>
+    </div>
+    <h3>🏷 Títulos</h3>
+    <table class="ac-t"><tr><th>Fórmula</th><th>Exemplos</th><th>Desempenho</th></tr>
+      {% for f in ia.titulos.formulas %}<tr><td><b>{{ f.formula }}</b></td><td>{{ f.exemplos|join(' · ') }}</td><td>{{ f.desempenho }}</td></tr>{% endfor %}</table>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+      <div><b>Funciona</b><ul>{% for x in ia.titulos.funcionam %}<li>{{ x }}</li>{% endfor %}</ul></div>
+      <div><b>Não funciona</b><ul>{% for x in ia.titulos.nao_funcionam %}<li>{{ x }}</li>{% endfor %}</ul></div>
+    </div>
+    <h3>🖼 Miniaturas (capas)</h3>
+    <p>{{ ia.thumbs.estilo }}</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+      <div><b>Nas que vão melhor</b><ul>{% for x in ia.thumbs.funcionam %}<li>{{ x }}</li>{% endfor %}</ul></div>
+      <div><b>Nas que vão pior</b><ul>{% for x in ia.thumbs.nao_funcionam %}<li>{{ x }}</li>{% endfor %}</ul></div>
+    </div>
+    {% if ia.thumbs.receita %}<p><b>Receita de capa:</b> {{ ia.thumbs.receita }}</p>{% endif %}
+    <h3>🎞 Tipos de vídeo</h3>
+    <table class="ac-t"><tr><th>Tipo</th><th>Vídeos</th><th>Desempenho</th></tr>
+      {% for t in ia.tipos_de_video %}<tr><td><b>{{ t.tipo }}</b><div class="hint">{{ t.descricao }}</div></td>
+        <td>{% for vid in t.videos %}{% if vs[vid] %}<div class="hint">• {{ vs[vid].titulo }} ({{ fmt_num(vs[vid].views) }})</div>{% endif %}{% endfor %}</td>
+        <td>{{ t.desempenho }}</td></tr>{% endfor %}</table>
+    {% if ia.ganchos_e_roteiro %}<h3>🎣 Ganchos e roteiro</h3><ul>{% for x in ia.ganchos_e_roteiro %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+      <div><h3>🏆 Melhores</h3>{% for x in ia.melhores %}{% if vs[x.id] %}<div class="ac-mini"><img src="{{ vs[x.id].thumb }}" alt=""><div><b>{{ vs[x.id].titulo }}</b> <span class="hint">{{ fmt_num(vs[x.id].views) }}</span><div class="hint">{{ x.por_que }}</div></div></div>{% endif %}{% endfor %}</div>
+      <div><h3>📉 Piores</h3>{% for x in ia.piores %}{% if vs[x.id] %}<div class="ac-mini"><img src="{{ vs[x.id].thumb }}" alt=""><div><b>{{ vs[x.id].titulo }}</b> <span class="hint">{{ fmt_num(vs[x.id].views) }}</span><div class="hint">{{ x.por_que }}</div></div></div>{% endif %}{% endfor %}</div>
+    </div>
+    <h3>💡 Vídeos que o canal pode entregar bem</h3>
+    {% for s in ia.sugestoes %}
+    <div class="ac-sug">
+      <b>{{ s.titulo }}</b> {% if s.tipo %}<span class="ac-badge b-tr">{{ s.tipo }}</span>{% endif %}
+      <div class="hint">{{ s.por_que }}</div>
+      {% if s.gancho %}<div><b>Gancho:</b> {{ s.gancho }}</div>{% endif %}
+      {% if s.thumb %}<div><b>Capa:</b> {{ s.thumb }}</div>{% endif %}
+      <form method="post" action="{{ url_for('analisador_canal_projeto', aid=a.id, k=loop.index0) }}" style="display:flex;gap:8px;align-items:center;margin:6px 0 0;">
+        <select name="modelo" style="width:auto;margin:0;">{% for k, mo in modelos.items() %}<option value="{{ k }}" {% if k == 'misterios' %}selected{% endif %}>{{ mo.nome }}</option>{% endfor %}</select>
+        <button type="submit" style="margin:0;padding:6px 12px;font-size:.85rem;background:#7c3aed;">🕵️ Criar projeto com essa ideia</button>
+      </form>
+    </div>
+    {% endfor %}
+    <p class="hint" style="margin-top:12px;">As conclusões são hipóteses tiradas de {{ vs|length }} vídeos: confira no YouTube antes de decidir.</p>
+  {% else %}
+    <p class="hint">Ainda sem análise.</p>
+  {% endif %}
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    {% if ia_on %}<button type="button" id="acIAbtn" style="background:#7c3aed;">🤖 {{ 'Analisar de novo' if ia else 'Analisar com a IA' }}</button>{% endif %}
+    <span id="acIAmsg" class="hint">{% if not ia_on %}IA não está em uso ({{ ia_motivo }}) — use o prompt abaixo.{% endif %}</span>
+  </div>
+  <details style="margin-top:10px;" {% if not ia_on and not ia %}open{% endif %}><summary>📋 Prompt pra colar numa IA de chat (e colar a resposta aqui)</summary>
+    <button type="button" id="acPrompt" class="copy-btn">📋 Copiar o prompt</button> <span id="acPromptMsg" class="hint"></span>
+    <label>Resposta da IA (JSON)</label><textarea id="acResp" rows="6" placeholder='{"resumo": "...", ...}'></textarea>
+    <button type="button" id="acColar">✅ Ler a resposta</button> <span id="acColarMsg" class="hint"></span>
+  </details>
+</div>
+
+<div class="ac-card">
+  <h2 style="margin:0;">🕒 {{ a.recentes|length }} mais recentes</h2>
+  <div class="ac-grade">{% for vid in a.recentes %}{% set v = vs[vid] %}{% include "_analisador_video.html" %}{% endfor %}</div>
+</div>
+<div class="ac-card">
+  <h2 style="margin:0;">🔥 {{ a.populares|length }} mais populares</h2>
+  <div class="ac-grade">{% for vid in a.populares %}{% set v = vs[vid] %}{% include "_analisador_video.html" %}{% endfor %}</div>
+</div>
+
+<div class="ac-card">
+  <h2 style="margin:0;">🏷 Padrões de título (números, sem IA)</h2>
+  <p class="hint">Mediana de views dos vídeos COM × SEM cada característica (sem os de menos de 14 dias). É correlação em amostra pequena, não causa.</p>
+  <table class="ac-t"><tr><th>Característica</th><th>Com</th><th>Sem</th><th>×</th></tr>
+    {% for p in m.padroes_titulo %}<tr><td>{{ p.rotulo }}{% if p.poucos %} <span class="hint">(poucos vídeos)</span>{% endif %}</td>
+      <td>{{ p.com }} · {{ fmt_num(p.mediana_com) }}</td><td>{{ p.sem }} · {{ fmt_num(p.mediana_sem) }}</td>
+      <td><b style="color:{{ '#166534' if (p.fator or 0) >= 1.2 else ('#991b1b' if (p.fator or 0) <= 0.8 else '#333') }}">{{ p.fator }}</b></td></tr>{% endfor %}</table>
+  {% if m.faixas_duracao %}<h3>⏱ Views por duração</h3>
+  <table class="ac-t"><tr><th>Faixa</th><th>Vídeos</th><th>Mediana de views</th></tr>
+    {% for f in m.faixas_duracao %}<tr><td>{{ f.faixa }}</td><td>{{ f.n }}</td><td>{{ fmt_num(f.mediana_views) }}</td></tr>{% endfor %}</table>{% endif %}
+</div>
+<form method="post" action="{{ url_for('analisador_canal_refazer', aid=a.id) }}" onsubmit="return confirm('Coletar tudo de novo (números novos)?')"><button type="submit" style="background:#6b7280;">🔁 Coletar de novo</button></form>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const b = $('acIAbtn');
+  if (b) b.addEventListener('click', async () => {
+    b.disabled = true; $('acIAmsg').textContent = '🤖 mandando pra IA… (pode levar 1–2 min)';
+    try {
+      const r = await fetch('{{ url_for("analisador_canal_ia", aid=a.id) }}', { method: 'POST' }); const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || r.status);
+      const poll = async () => { const e = await (await fetch('{{ url_for("analisador_canal_estado", aid=a.id) }}')).json();
+        $('acIAmsg').textContent = e.etapa || '…'; if (e.rodando) setTimeout(poll, 2500); else location.reload(); };
+      setTimeout(poll, 2000);
+    } catch (e) { $('acIAmsg').textContent = '⚠ ' + e.message; b.disabled = false; }
+  });
+  $('acPrompt').addEventListener('click', async () => {
+    try { const d = await (await fetch('{{ url_for("analisador_canal_prompt", aid=a.id) }}')).json();
+      await navigator.clipboard.writeText(d.prompt); $('acPromptMsg').textContent = '✅ copiado (' + d.prompt.length + ' caracteres)';
+    } catch (e) { $('acPromptMsg').textContent = '⚠ ' + e.message; }
+  });
+  $('acColar').addEventListener('click', async () => {
+    $('acColarMsg').textContent = 'lendo…';
+    try { const r = await fetch('{{ url_for("analisador_canal_colar", aid=a.id) }}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: $('acResp').value }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); location.reload();
+    } catch (e) { $('acColarMsg').textContent = '⚠ ' + e.message; }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

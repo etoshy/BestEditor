@@ -2447,6 +2447,14 @@ def _ligar_projeto(job: dict, tipo: str, pid: str) -> bool:
     for _t, (_m, _p, ch, _r2) in _PROJETOS_MIDIA.items():
         job.pop(ch, None)
     job[chave] = pid
+    job.pop("direcao_do_projeto", None)
+    if tipo == "dossie":  # o modelo de vídeo pode sugerir uma direção de edição
+        try:
+            _sug = (mod.MODELOS.get((p.get("config") or {}).get("modelo")) or {}).get("direcao_sugerida")
+            if _sug:
+                job["direcao_do_projeto"] = _sug
+        except Exception:  # noqa: BLE001
+            pass
     lib = job.setdefault("media_library", [])
     ja = {it.get("path") for it in lib}
     for m in mod.midias_para_editor(BASE_DIR, p):
@@ -3978,17 +3986,19 @@ def _aplicar_extras_dp(job: dict, parsed) -> None:
     import dp_destaques
     import dp_direcao
     defaults = job.setdefault("editor_defaults", {})
-    if getattr(parsed, "direcao", None):
+    # 🎬 a IA não escolheu direção, mas o modelo de vídeo ligado sugere uma (ex.: 🕳 Rabbit holes → estilo Mistere)
+    _dir = getattr(parsed, "direcao", None) or (job.get("direcao_do_projeto") if dp_direcao.direcao(job.get("direcao_do_projeto") or "") else None)
+    if _dir:
         segs = job["pending_segments"]
         plano = dp_direcao.planejar(
             [{"start": s["start"], "end": s["end"], "foto": s.get("media_type") == "image", "template": s.get("template"),
               "transition": s.get("transition"), "efeito": s.get("efeito"), "entrada": s.get("entrada"), "saida": s.get("saida")} for s in segs],
-            parsed.direcao, semente=1, so_vazios=True)
+            _dir, semente=1, so_vazios=True)
         for s, p in zip(segs, plano["trechos"]):
             for k in ("transition", "efeito", "entrada", "saida", "template"):
                 if p.get(k) and p[k] != "none" and not s.get(k):
                     s[k] = p[k]
-        defaults["direcao"] = parsed.direcao
+        defaults["direcao"] = _dir
         if plano.get("filtro_cor") and not getattr(parsed, "filtro_cor", None):
             defaults["filtro_cor"] = plano["filtro_cor"]
         if plano.get("cores") and not getattr(parsed, "paleta", None):
@@ -4538,9 +4548,14 @@ def _seg_estudio(job_id: str, job: dict, i: int) -> Dict[str, Any]:
     thumb = p.get("thumbnail_url") if p.get("ok") else None
     if thumb and thumb.startswith(f"/job/{job_id}/") and "?" not in thumb:
         thumb += v
+    # 💾 o que já foi guardado no PC sai do disco (reabrir o projeto não baixa tudo de novo)
+    thumb_remoto = thumb
+    thumb = _previa_local(job_id, thumb, "imagem") or thumb
     return dict(seg, _preview={
+        "thumb_remoto": thumb_remoto if thumb != thumb_remoto else None,
+        "video_remoto": p.get("video_preview_url") if _previa_local(job_id, p.get("video_preview_url"), "video") else None,
         "thumbnail_url": (f"/job/{job_id}/segment-thumb/{i}{v}" if midia_local else None) or thumb,
-        "video_preview_url": p.get("video_preview_url"),
+        "video_preview_url": _previa_local(job_id, p.get("video_preview_url"), "video") or p.get("video_preview_url"),
         "label": p.get("label"), "erro": None if p.get("ok") else p.get("error"),
         "provider": p.get("provider"), "midia_local": midia_local,
         "nao_fixa": bool(p.get("nao_fixa")) and not ov,
@@ -7864,6 +7879,115 @@ def _prebaixar_lista(job: dict) -> list:
     return lista
 
 
+PREVIAS_CACHE = "previas_cache"
+PREVIA_MAX_BYTES = 80 * 1024 * 1024
+
+
+def _nome_previa(url: str, tipo: str) -> str:
+    """Nome do arquivo guardado de uma prévia (vídeo/miniatura) remota."""
+    import hashlib
+    from urllib.parse import urlparse
+    ext = os.path.splitext(urlparse(url).path)[1].lower()
+    if ext not in (".mp4", ".webm", ".mov", ".m4v", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"):
+        ext = ".mp4" if tipo == "video" else ".jpg"
+    return hashlib.sha1(url.encode("utf-8")).hexdigest()[:24] + ext
+
+
+def _previa_local(job_id: str, url: Optional[str], tipo: str) -> Optional[str]:
+    """URL local (/job/<id>/cache-previa/<nome>) se essa prévia já foi guardada."""
+    if not url or not isinstance(url, str) or not url.startswith(("http://", "https://")):
+        return None
+    nome = _nome_previa(url, tipo)
+    arq = os.path.join(_job_dir(job_id), PREVIAS_CACHE, nome)
+    try:
+        if os.path.getsize(arq) > 0:
+            return f"/job/{job_id}/cache-previa/{nome}"
+    except OSError:
+        pass
+    return None
+
+
+def _urls_de_previa(job: dict) -> list:
+    """(url, tipo) de tudo que a telinha do Estúdio carrega da internet: vídeo e miniatura de cada trecho
+    (e os clipes curtos extras)."""
+    vistos, lista = set(), []
+
+    def _add(u, tipo):
+        if isinstance(u, str) and u.startswith(("http://", "https://")) and u not in vistos:
+            vistos.add(u)
+            lista.append((u, tipo))
+    for p in job.get("segment_previews") or []:
+        if isinstance(p, dict) and p.get("ok"):
+            _add(p.get("video_preview_url"), "video")
+            _add(p.get("thumbnail_url"), "imagem")
+    for d in job.get("pending_segments") or []:
+        for c in (d.get("clipes_extra") or []) if isinstance(d, dict) else []:
+            if isinstance(c, dict):
+                _add(c.get("video_preview_url"), "video")
+                _add(c.get("thumbnail"), "imagem")
+    return lista
+
+
+def _baixar_previa(url: str, destino: str) -> bool:
+    import requests
+    tmp = destino + ".part"
+    try:
+        with requests.get(url, stream=True, timeout=(10, 60), headers={"User-Agent": "Mozilla/5.0"}) as r:
+            r.raise_for_status()
+            total = 0
+            with open(tmp, "wb") as f:
+                for bloco in r.iter_content(chunk_size=512 * 1024):
+                    if bloco:
+                        total += len(bloco)
+                        if total > PREVIA_MAX_BYTES:
+                            raise ValueError("prévia grande demais")
+                        f.write(bloco)
+        if total <= 0:
+            raise ValueError("vazio")
+        os.replace(tmp, destino)
+        return True
+    except Exception:  # noqa: BLE001 — sem a cópia local, a telinha usa o link da internet como antes
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return False
+
+
+def _guardar_previas(job_id: str, job: dict, pb: dict, cancel=None) -> None:
+    """Guarda no disco (jobs/<id>/previas_cache) os vídeos/miniaturas que a telinha mostra:
+    ao reabrir o projeto, o Estúdio carrega tudo do PC em vez de baixar de novo da internet."""
+    import concurrent.futures as _cf
+    pasta = os.path.join(_job_dir(job_id), PREVIAS_CACHE)
+    lista = [(u, t) for (u, t) in _urls_de_previa(job) if not _previa_local(job_id, u, t)]
+    pb["previas_total"] = len(_urls_de_previa(job))
+    pb["previas"] = pb["previas_total"] - len(lista)
+    if not lista:
+        return
+    os.makedirs(pasta, exist_ok=True)
+
+    def _um(item):
+        if cancel and cancel():
+            return False
+        u, t = item
+        return _baixar_previa(u, os.path.join(pasta, _nome_previa(u, t)))
+
+    n = max(1, min(int(_job_site_cfg(job).get("assembly_fetch_concurrency", 3) or 3) + 1, len(lista)))
+    with _cf.ThreadPoolExecutor(max_workers=n) as ex:
+        for ok in ex.map(_um, lista):
+            if ok:
+                pb["previas"] = pb.get("previas", 0) + 1
+
+
+@app.route("/job/<job_id>/cache-previa/<nome>")
+def cache_previa(job_id: str, nome: str):
+    """Serve uma prévia guardada (com suporte a Range pro <video> poder pular)."""
+    if job_id not in _JOBS or not re.fullmatch(r"[0-9a-f]{24}\.[a-z0-9]{2,5}", nome):
+        return "não encontrado", 404
+    resp = send_from_directory(os.path.join(_job_dir(job_id), PREVIAS_CACHE), nome, conditional=True, max_age=60 * 60 * 24 * 30)
+    return resp
+
+
 def _prebaixar_iniciar(job_id: str, job: dict) -> bool:
     """Liga (ou re-agenda) o download em segundo plano. Devolve True se vai rodar."""
     if os.environ.get("NARRATION_SEM_PREBAIXAR"):  # testes: nada de baixar em segundo plano
@@ -7889,11 +8013,14 @@ def _prebaixar_iniciar(job_id: str, job: dict) -> bool:
                 def _item(feitos, total, _ok):
                     pb["feitos"], pb["total"] = feitos, total
 
+                # 1º as prévias da telinha (leves): ao reabrir o projeto elas saem do disco
+                _guardar_previas(job_id, job, pb, cancel=lambda: job.get("status") == "montando"
+                                 or _PREBAIXAR.get(job_id, {}).get("de_novo"))
                 res = _va.prebaixar_midias(
                     lista, os.path.join(_job_dir(job_id), "prebaixados"), cfg, on_item=_item,
                     cancel_check=lambda: job.get("status") == "montando" or _PREBAIXAR.get(job_id, {}).get("de_novo"),
                 )
-                pb.update(estado="pronto", feitos=res["baixados"] + res["ja_tinha"], total=res["total"], falhas=res["falhas"], baixados=res["baixados"], ja_tinha=res["ja_tinha"],
+                pb.update(estado="pronto", previas=pb.get("previas", 0), previas_total=pb.get("previas_total", 0), feitos=res["baixados"] + res["ja_tinha"], total=res["total"], falhas=res["falhas"], baixados=res["baixados"], ja_tinha=res["ja_tinha"],
                           erros=res["erros"][:5], fim=time.time())
                 with _PREBAIXAR_LOCK:
                     est = _PREBAIXAR[job_id]
@@ -8694,6 +8821,8 @@ import guia as _guia  # noqa: E402
 _guia.registrar(app, BASE_DIR)
 import ia_rotas as _ia_rotas  # noqa: E402  🤖 IA nas buscas e modelos (v84_53)
 _ia_rotas.registrar(app, BASE_DIR)
+import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de canal + ⛏ Niche Miner)
+_analisador_rotas.registrar(app, BASE_DIR)
 
 
 def _texto_do_dossie(pid: Optional[str]) -> str:

@@ -222,6 +222,113 @@ MODELOS: Dict[str, Dict[str, Any]] = {
             "Nada de inventar testemunhas, documentos ou datas. Nada que incentive alguém a se arriscar (invadir lugares, etc.).",
         ],
     },
+    # 🕳 tirado da análise de um vídeo do canal Mistere (compilado de 5 casos em 30 min: teaser de 10 s,
+    # cada caso um bloco seco de 4-10 min, narração rápida ~175 palavras/min, números e datas o tempo todo)
+    "rabbit_holes": {
+        "nome": "🕳 Rabbit holes bizarros",
+        "descricao": "Casos bizarros, arquivos secretos e histórias sombrias pouco conhecidas, contados sem enrolação "
+                     "(estilo Mistere: compilado, caso de arquivo oficial ou “tutorial” irônico). No editor, combina com a "
+                     "direção “Rabbit hole sombrio (estilo Mistere)”.",
+        "palavras_por_minuto": 170,
+        "direcao_sugerida": "sys_mistere",
+        "formatos": {
+            "compilado": {
+                "nome": "🕳 Compilado de rabbit holes (vários casos)", "minutos": 25,
+                "estrutura": [
+                    "TEASER (0-10 s): uma pergunta direta tipo “Tu sabia que…” com o fato mais chocante de um dos casos "
+                    "(de preferência um que vem mais pra frente), com número e data; termine numa frase cortada que deixa "
+                    "curiosidade. Nada de “olá”, nada de apresentar o canal",
+                    "CADA CASO É UM BLOCO INDEPENDENTE (4-10 min), na ordem: título do caso numa linha própria (vira capítulo e "
+                    "cartela na tela) → 1ª frase já diz O QUE é a coisa ou QUEM é a pessoa → contexto rápido (época, lugar, "
+                    "por que isso importa) → os fatos em ordem cronológica, com datas, números e nomes de lugar exatos → o "
+                    "momento mais pesado ou mais bizarro → um trecho de reportagem/documento/declaração lido em voz alta "
+                    "(“abre aspas … fecha aspas”) quando as fontes tiverem → o que aconteceu depois e como está hoje → UMA "
+                    "frase seca ou irônica fechando o caso",
+                    "Entre um caso e outro NÃO existe ponte (“agora vamos para o próximo”): o próximo caso começa direto no "
+                    "título dele",
+                    "Ordem dos casos: abre com um caso forte e curto, alterna pesado e bizarro-curioso, e deixa o caso mais "
+                    "longo e mais tenso por último",
+                    "FIM: sem resumo — logo depois da frase final do último caso, uma chamada curtíssima (curtir/inscrever)",
+                ],
+            },
+            "caso_unico": {
+                "nome": "🔎 Um rabbit hole (caso único)", "minutos": 10,
+                "estrutura": [
+                    "TEASER (0-10 s): “Tu sabia que…” + o fato mais estranho do caso, com número/data, sem entregar o fim",
+                    "Título do caso numa linha própria",
+                    "O que é / quem é, em uma frase; depois o contexto (época, lugar)",
+                    "Os fatos em ordem cronológica, com datas, números e lugares exatos",
+                    "Reviravolta ou o momento mais bizarro",
+                    "Trecho de reportagem/documento lido em voz alta (“abre aspas … fecha aspas”), se as fontes tiverem",
+                    "O que se confirmou e o que é só relato; como está hoje",
+                    "Frase seca/irônica final + chamada curtíssima",
+                ],
+            },
+            # v84_62: "A CIA encontrou um fantasma no Brasil" (33 min) — caso único a partir de arquivo oficial
+            "arquivo_oficial": {
+                "nome": "📂 Caso de arquivo oficial (documento desclassificado)", "minutos": 30,
+                "estrutura": [
+                    "ABERTURA FRIA (0-50 s): de onde vem o documento (lei de acesso, arquivo, projeto secreto) e por que ele "
+                    "existe; termine apontando pro caso (“e uma dessas pastas é sobre…”). Depois, o título do caso numa linha própria",
+                    "Chamada curtíssima (curtir/inscrever) logo depois do título — 1 frase",
+                    "O que é o fenômeno/assunto, explicado do zero e com uma piada leve no máximo",
+                    "“Agora vamos conhecer as pessoas dessa história”: cada personagem em 1-2 frases (nome, idade, profissão, "
+                    "relação com os outros) — os nomes viram texto grande na tela",
+                    "O caso em PARTES numeradas (Parte 1, Parte 2…), cada uma com data de início e fim, os fatos em ordem e "
+                    "o depoimento das testemunhas lido “nas palavras dele” (entre aspas, como está na fonte)",
+                    "Um recado “guarda isso, vai ser importante” antes do detalhe que volta nas explicações",
+                    "Resumo de 2 frases (“esse foi o resumo bem resumido…”) e onde ler o documento completo",
+                    "AS EXPLICAÇÕES: 3 (a dos envolvidos, uma alternativa, a do investigador/ciência), cada uma com o que a "
+                    "sustenta e o que a enfraquece; depois a sua opinião em 1-2 frases, com humor seco",
+                    "FIM: chamada (curtir, inscrever, virar membro) e despedida curta",
+                ],
+            },
+            # v84_62: "Tutorial de como deixar alguém esquizofrênico" (34 min) — história contada como manual irônico
+            "tutorial_ironico": {
+                "nome": "🎓 “Tutorial” irônico (história real contada como manual)", "minutos": 30,
+                "estrutura": [
+                    "ABERTURA: “Parabéns, tu foi um dos selecionados do algoritmo pra esse tutorial…” — apresenta o “tutorial” "
+                    "com cara de aula séria e agradece “aos financiadores dessa pesquisa”",
+                    "“Antes do tutorial, conheça os criadores desse método”: o contexto histórico (país, época, instituição) com "
+                    "datas e números",
+                    "O nome técnico do método, de onde vem a palavra e como era definido nos documentos oficiais",
+                    "LIÇÕES numeradas (algarismos romanos: I, II, III…), cada uma um aspecto do método REAL como os "
+                    "documentos descrevem (objetivo, quem fazia, fases), com citação do documento",
+                    "Depois de cada lição, um exemplo de vítima real (nome, o que fizeram com ela, a fonte) e um exemplo "
+                    "hipotético do cotidiano narrado em 2ª pessoa (“imagina tu chegar em casa e…”) pra ficar concreto",
+                    "O que aconteceu com o programa/instituição depois e quantas vítimas se conhecem",
+                    "FIM irônico: “espero que tenham gostado do tutorial e usem com sabedoria… vejo vocês no próximo tutorial”",
+                ],
+            },
+            "curto": {
+                "nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1,
+                "estrutura": [
+                    "“Tu sabia que…” + o fato mais bizarro, com número",
+                    "3-4 fatos em frases curtíssimas, em ordem",
+                    "O detalhe que ninguém espera",
+                    "Frase seca final",
+                ],
+            },
+        },
+        "regras": [
+            "Só FATOS que estão nas fontes. Não invente nomes, datas, números, falas nem documentos. O que é relato, boato ou "
+            "nunca foi confirmado tem que ser dito assim (“segundo relatos”, “isso nunca foi confirmado”).",
+            "Tom de quem está contando um caso pra um amigo: 2ª pessoa informal (“tu sabia”, “imagina”), frases curtas e "
+            "diretas, ritmo rápido. Ironia só em uma frase de vez em quando — NUNCA às custas das vítimas.",
+            "Escreva números, anos, medidas e quantidades em algarismos (2006, 27 pessoas, 2,7 metros, 340 quilos): eles viram "
+            "texto gigante na tela. Diga o nome dos lugares (cidade, região, país) — também vira texto na tela.",
+            "Palavras-chave de impacto (ex.: CONSERVADOR, PENA, PROIBIDO) podem aparecer isoladas numa frase curta, pra virar "
+            "cartela em máquina de escrever.",
+            "Temas pesados (mortes, violência, crimes): conte o que aconteceu sem detalhe gráfico, com linguagem amigável à "
+            "monetização (“tirou a vida”, “foi morto”, “os corpos foram encontrados”).",
+            "Sem nome de canal, bordões ou vinhetas de outros criadores; sem “como eu disse no outro vídeo”.",
+            "Vídeo longo: divida em partes/lições com título curto numa linha própria (viram cartela de capítulo entre "
+            "barras de cor) e diga as datas de cada parte.",
+            "Formato “tutorial”: a ironia é só a moldura. Conte o que os documentos dizem que FOI feito, no passado, com as "
+            "vítimas e as consequências; nunca escreva um passo a passo aplicável hoje pra prejudicar, vigiar ou enganar "
+            "alguém, e deixe claro que era crime/abuso.",
+        ],
+    },
     "ciencia": {
         "nome": "🔬 Ciência e curiosidades",
         "descricao": "Explicações de 'por que…', 'como funciona', 'e se…?' — ciência, corpo humano, espaço, tecnologia.",
@@ -863,7 +970,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         minutos = max(0.5, min(120, float(cfg.get("minutos") or fmt["minutos"])))
     except (TypeError, ValueError):
         minutos = fmt["minutos"]
-    palavras = int(minutos * 150)
+    palavras = int(minutos * int(mod.get("palavras_por_minuto") or 150))
     L: List[str] = []
     L.append(f"Você é roteirista de um canal de {mod['nome'].split(' ', 1)[1]} no YouTube. Escreva o roteiro NARRADO completo "
              f"(alguém vai ler em voz alta) de um vídeo sobre o tema abaixo, usando SÓ as fontes e materiais que eu juntei.")

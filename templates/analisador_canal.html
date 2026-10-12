@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Analisador de canal{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1000px; }
+  .ac-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .ac-linha { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .ac-tag { font-size: .75rem; background: #f1f5f9; color: #1e293b; border-radius: 999px; padding: 2px 8px; margin-left: 6px; }
+  .ac-ok { background: #dcfce7; color: #166534; } .ac-erro { background: #fee2e2; color: #991b1b; }
+  .hint { font-size: .85rem; color: #666; }
+  .ac-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .ac-passos span { background: #f5f3ff; border: 1px solid #ddd6fe; color: #4c1d95; border-radius: 999px; padding: 3px 10px; font-size: .8rem; }
+</style>
+<h1>📊 Analisador de canal</h1>
+<p style="color:#555;">Cole o link de um canal do YouTube. O site lê os <b>20 vídeos mais recentes</b> e os <b>20 mais populares</b>:
+  miniatura, título, duração, views, data, likes/comentários e a <b>transcrição</b> de cada um (direto do YouTube). Depois a
+  🤖 IA olha as miniaturas, os títulos e os roteiros e diz <b>o que o canal faz bem</b>, que títulos e capas funcionam melhor e
+  pior, os tipos de vídeo e quais performam melhor, e <b>sugere vídeos novos</b> — que viram um 🕵️ Modelo de vídeo com um clique.</p>
+<div class="ac-passos"><span>1 · link do canal</span><span>2 · coleta (página do canal + transcrições)</span><span>3 · métricas</span><span>4 · 🤖 análise</span><span>5 · sugestão → projeto</span></div>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+{% if not ia_on %}<p class="hint">⚠ A IA não está em uso ({{ ia_motivo }}). A coleta e as métricas funcionam igual; a análise sai como um prompt
+  pra colar numa IA de chat — ou ligue em <a href="{{ url_for('ia_page') }}">🤖 IA nas buscas e modelos</a> (recurso "📊 Analisador de canal").</p>{% endif %}
+
+<div class="ac-card">
+  <h2 style="margin:0;">+ Analisar um canal</h2>
+  <form method="post" action="{{ url_for('analisador_canal_novo') }}" id="formCanal">
+    <label>Link do canal</label>
+    <input type="text" name="url" required placeholder="https://www.youtube.com/@Misterecore  ou  @nomedocanal">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;">
+      <label style="flex:1;min-width:200px;">Vídeos por lista (recentes e populares)
+        <input type="number" name="n" min="5" max="50" value="{{ n_padrao }}"></label>
+      <label style="flex:2;min-width:240px;font-weight:normal;"><input type="checkbox" name="transcricoes" checked style="width:auto;">
+        Pegar as transcrições do YouTube <span class="hint">(mais lento: ~5–10 s por vídeo, mas a IA entende os ganchos e roteiros)</span></label>
+    </div>
+    <button type="submit" id="btnAnalisar">📊 Analisar</button>
+  </form>
+  <p class="hint">A página do canal é lida num Chromium invisível (o mesmo leitor do ⛏ Niche Miner); se ele falhar, o yt-dlp lê a lista.</p>
+</div>
+
+<div class="ac-card">
+  <h2 style="margin:0;">Análises</h2>
+  {% for x in analises %}
+  <div class="ac-linha">
+    <div style="min-width:0;">
+      <a href="{{ url_for('analisador_canal_detalhe', aid=x.id) }}" style="font-weight:600;">{{ x.nome }}</a>
+      {% if x.inscritos %}<span class="ac-tag">{{ x.inscritos }}</span>{% endif %}
+      <span class="ac-tag">{{ x.n_videos }} vídeos</span>
+      {% if x.estado == 'erro' %}<span class="ac-tag ac-erro">erro</span>{% elif x.estado != 'pronto' %}<span class="ac-tag">{{ x.estado }}…</span>{% elif x.tem_ia %}<span class="ac-tag ac-ok">🤖 analisado</span>{% endif %}
+      <div class="hint">{{ x.url }}</div>
+    </div>
+    <form method="post" action="{{ url_for('analisador_canal_apagar', aid=x.id) }}" onsubmit="return confirm('Apagar esta análise?')" style="margin:0;">
+      <button type="submit" style="margin:0;background:#6b7280;padding:6px 10px;font-size:.85rem;">Apagar</button></form>
+  </div>
+  {% else %}<p class="hint">Nenhuma análise ainda.</p>{% endfor %}
+</div>
+{% endblock %}

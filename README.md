@@ -28,6 +28,89 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🔒 Subir pro GitHub sem dados pessoais (v84_63)
+
+O `.gitignore` deixa de fora tudo que é seu ou que o site gerou: chaves (`site_config.json`, `ia_config.json`, `.env`),
+cookies e sessões de navegador (inclusive a conta Google do Flow), bancos de dados, projetos, vídeos, áudios, vozes,
+transcrições e análises (`jobs/`, `outputs/`, `dossies/`, `analises_canal/`, `niche_miner/data/`…).
+
+Antes de cada envio, rode o **`verificar_antes_de_subir.py`**:
+
+```
+git add -A
+python verificar_antes_de_subir.py            # confere o que vai no commit
+python verificar_antes_de_subir.py --corrigir # tira do commit o que é pessoal (o arquivo fica no PC)
+python verificar_antes_de_subir.py --instalar # passa a conferir sozinho em todo git commit
+```
+
+Ele acusa arquivos pessoais, chaves de API (Anthropic, Google, GitHub, OpenAI, AWS…), cookies de sessão do
+YouTube/Google, o seu e-mail (o do `git config user.email`) dentro dos arquivos, e arquivos grandes demais pro
+GitHub. Nunca mostra a chave inteira. **Se uma chave já subiu alguma vez, troque a chave no site do serviço**: apagar
+do git não basta.
+
+## 📊 Analisador de canal + ⛏ Niche Miner (v84_62)
+
+**📊 Analisador de canal** (link no topo). Você cola o link de um canal (`youtube.com/@nome` ou só `@nome`) e o site:
+
+1. lê o cabeçalho (inscritos, nº de vídeos, views totais, país) e os **20 vídeos mais recentes** e os **20 mais
+   populares**, com miniatura, título, duração, views e data. Usa o mesmo leitor de página do Niche Miner
+   (`niche_miner/yt_scraper.py`, Chromium invisível); se ele falhar, o yt-dlp lê a lista;
+2. pega pelo yt-dlp, quando dá, a data exata, os likes, os comentários, as tags e os capítulos de cada vídeo;
+3. pega a **transcrição** de cada vídeo direto do YouTube (youtube-transcript-api → painel "Mostrar transcrição"),
+   com o gancho (1º minuto) e as palavras por minuto. Dá para desligar, porque é a parte mais lenta;
+4. calcula as métricas: mediana de views, tração, fator outlier, views/dia, vídeos por semana, duração, padrões de
+   título (mediana com × sem) e views por faixa de duração;
+5. manda tudo para a 🤖 IA (recurso "📊 Analisador de canal"), **com as miniaturas como imagem**. A IA devolve o
+   resumo, o que o canal faz bem e o que pode melhorar, as fórmulas de título que funcionam e as que não, o estilo das
+   capas e uma "receita" de capa, os tipos de vídeo e quais performam melhor, os padrões de gancho e roteiro, os
+   melhores e piores vídeos (marcados em verde e vermelho na grade) e **10 sugestões de vídeos** que o canal entregaria
+   bem;
+6. cada sugestão vira um **🕵️ Modelo de vídeo** com um clique (o tema, o gancho e a ideia de capa já vão juntos).
+
+Sem a IA ligada, a coleta e as métricas funcionam igual, e a análise sai como um prompt para colar numa IA de chat
+(com os links das miniaturas). Você cola o JSON de volta. As análises ficam em `analises_canal/`, fora do GitHub.
+
+**⛏ Niche Miner** (link no topo). É o app do zip `niche_miner_v9`, inteiro em `niche_miner/`. Tem mineração de nicho
+por termos, mineração por recomendações, Método Dark, Analisar canal, Ideias virais, API do YouTube e Biblioteca. A aba
+liga o app sozinha na porta 8843 (`"niche_miner_porta"` no `site_config.json` muda a porta) e mostra o app dentro do
+site. Os dados dele ficam em `niche_miner/data/`, também fora do GitHub. Os testes próprios dele continuam em
+`niche_miner/tests/` (rode com `niche_miner\run_tests.bat`).
+
+**🕳 Estilo Mistere com mais 2 vídeos.** "A CIA encontrou um fantasma no Brasil" e "Tutorial de como deixar alguém
+esquizofrênico" confirmaram o ritmo (mediana de 2,75 s e 1,96 s por plano) e trouxeram mais coisas:
+
+- **Dois formatos novos no modelo "🕳 Rabbit holes bizarros":**
+  - 📂 *Caso de arquivo oficial*: documento → personagens → partes com datas → 3 explicações → opinião;
+  - 🎓 *"Tutorial" irônico*: lições numeradas com o método real dos documentos. A regra proíbe passo a passo aplicável
+    hoje.
+- **A direção agora também usa:**
+  - transições de luz de película no arquivo;
+  - destaques de nome gigante, carimbo CONFIDENCIAL, linha do tempo e capítulo;
+  - mais quadros de página de documento.
+
+## 🕳 Modelo + direção no estilo Mistere (v84_61)
+
+Feito analisando um vídeo do canal [Mistere](https://www.youtube.com/@Misterecore) ("Mistérios e Rabbit Holes Bizarros da
+Internet", 30 min). Medido no vídeo: 480 cortes (plano médio 3,8 s, mediana 2,6 s) e narração rápida (~175 palavras/min).
+A estrutura é de compilado: um teaser de 10 s ("Tu sabia que…"), depois 5 casos independentes de 4 a 10 min, cada um
+aberto por uma cartela de título, sem ponte entre eles, e no fim uma chamada curta. Na imagem: vinheta forte, cor fria e
+dessaturada, estática/glitch de TV nas viradas, números e anos gigantes, palavras em máquina de escrever, fotos de
+arquivo com tarja e sem legenda queimada.
+
+- **🕵️ Modelos de vídeo → "🕳 Rabbit holes bizarros"**, com 3 formatos: compilado de casos, caso único e Shorts. Calcula o
+  roteiro a 170 palavras/min, usa as regras de tom do canal ("tu sabia", frases curtas, ironia seca nunca às custas das
+  vítimas), põe números em algarismos (viram texto na tela) e lê citações com "abre aspas… fecha aspas".
+- **🎬 Direção "Rabbit hole sombrio (estilo Mistere)"** no Estúdio: ritmo dinâmico, filtro frio com vinheta, overlays
+  de vinheta/grão/VHS, maioria corte seco com estática e glitch nas viradas, destaques de números grandes + máquina de
+  escrever + título serifado, e quadros editoriais de número, nome, ficha e recortes. Sem legenda queimada. Sem o pacote
+  de extras, ela usa só os itens da fábrica.
+- Vídeo feito a partir de um projeto desse modelo já sai com essa direção aplicada (se a IA não escolher outra).
+- Copia só o **estilo**: nada de logo, vinheta, nome ou bordões do canal.
+
+**💾 Projeto reaberto não baixa tudo de novo.** As prévias que a telinha do Estúdio mostra (vídeos e miniaturas) ficam
+guardadas em `jobs/<id>/previas_cache/` junto com os clipes da montagem (`prebaixados/`) e os trechos prontos
+(`clips_prontos/`). Ao reabrir o projeto, mesmo depois de reiniciar o site, tudo carrega do PC.
+
 ## ⬇ Clipes baixando enquanto você edita (v84_59)
 
 **🔎 Conferência antes de montar.** Quando você clica em 🎬 Montar vídeo, o site salva e confere **todos os trechos de uma vez**,

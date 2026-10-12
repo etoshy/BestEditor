@@ -17,6 +17,17 @@ site_config.json
 ia_config.json
 ia_uso.json
 ia_cache/
+# sessões/cookies de navegador e contas (qualquer lugar do projeto)
+sessao*.json
+**/sessao*.json
+*storage_state*.json
+**/cookies*.json
+**/cookies*.txt
+*.cookies
+# bancos de dados locais (Niche Miner, caches)
+*.db
+*.sqlite
+*.sqlite3
 # chaves de API em arquivo .env
 .env
 .env.*
@@ -44,6 +55,10 @@ predefinicoes_usuario.json
 toolkit/toolkit_config.local.json
 downloads_manifest.json
 *_batch_results.json
+/flow_falso_teste/
+.chrome_*/
+analises_canal/
+niche_miner/data/
 
 # modelos de voz baixados (Piper/Kokoro/XTTS) e perfis de voz (áudio da sua voz)
 toolkit/tts/models/
@@ -83,3 +98,7 @@ htmlcov/
 Thumbs.db
 desktop.ini
 *.log
+
+# 📊 Analisador de canal e ⛏ Niche Miner: dados locais
+analises_canal/
+niche_miner/data/

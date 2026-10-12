@@ -29,7 +29,7 @@ class TestCatalogos:
     def test_tudo_do_json_esta_no_site(self):
         assert len(dv.filtros()) == 74 and len(dv.efeitos()) == 28 and len(dv.entradas()) == 37
         assert len(dv.transicoes()) == 200  # 201 do JSON menos o "none"
-        assert len(dd.catalogo()) == 207 and len(dr.direcoes()) == 4
+        assert len(dd.catalogo()) == 207 and len(dr.direcoes()) == 4 + len(__import__("direcoes_canais").DIRECOES)  # + as tiradas de canais
 
     def test_todo_filtro_e_valido_no_ffmpeg(self):
         for f in dv.filtros():

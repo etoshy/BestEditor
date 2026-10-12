@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Niche Miner</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<aside class="rail">
+  <div class="brand"><span class="brand-mark">niche<span>miner</span></span></div>
+  <div class="brand-sub">garimpo de nichos e formatos no YouTube — roda local, no seu navegador</div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">1</div><div class="step-title">Gerar o prompt</div></div>
+    <p class="step-desc">Digite um nicho amplo. Isso monta um prompt pra você colar em qualquer IA de chat (ChatGPT, Gemini, Claude web...).</p>
+    <div class="step-body">
+      <div>
+        <label for="nicho">Nicho amplo</label>
+        <input type="text" id="nicho" placeholder="ex: crime, viagem, curiosidades...">
+      </div>
+      <div class="row">
+        <div>
+          <label for="n_subnichos">Subnichos</label>
+          <input type="number" id="n_subnichos" value="5" min="1" max="10">
+        </div>
+        <div>
+          <label for="n_termos">Termos por subnicho</label>
+          <input type="number" id="n_termos" value="5" min="1" max="10">
+        </div>
+      </div>
+      <button id="btn-gerar-prompt">Gerar prompt</button>
+      <div id="prompt-wrap" style="display:none">
+        <label style="margin-top:10px">Prompt (copie e cole numa IA)</label>
+        <div class="prompt-box" id="prompt-text"></div>
+        <button id="btn-copiar-prompt">Copiar prompt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">2</div><div class="step-title">Colar o retorno</div></div>
+    <p class="step-desc">Cole aqui o JSON que a IA devolveu, exatamente como veio.</p>
+    <div class="step-body">
+      <textarea id="json-input" class="mono" rows="6" placeholder='{"subnichos": [...]}'></textarea>
+      <button id="btn-validar">Validar JSON</button>
+      <div id="json-feedback"></div>
+      <div class="tags" id="termos-tags"></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">3</div><div class="step-title">Configurar e rodar</div></div>
+    <p class="step-desc">Ajuste os parâmetros da coleta e inicie a automação.</p>
+    <div class="step-body">
+      <div class="row">
+        <div>
+          <label for="max_videos">Máx. vídeos por termo</label>
+          <input type="number" id="max_videos" value="100" min="10" max="300">
+        </div>
+        <div>
+          <label for="min_subs">Inscritos mínimos (0 = sem corte)</label>
+          <input type="number" id="min_subs" value="0" min="0" step="1000">
+        </div>
+      </div>
+      <div class="filter-box">
+        <div class="filter-title">Filtros do YouTube</div>
+        <div class="row">
+          <div>
+            <label for="duracao_min">Duração mínima (min)</label>
+            <input type="number" id="duracao_min" value="3" min="0" max="240">
+          </div>
+          <div>
+            <label for="duracao_max">Duração máxima (min; 0 = sem limite)</label>
+            <input type="number" id="duracao_max" value="20" min="0" max="240">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="data_periodo">Data de upload</label>
+            <select id="data_periodo">
+              <option value="hoje">Hoje</option>
+              <option value="semana">Esta semana</option>
+              <option value="mes" selected>Este mês</option>
+              <option value="ano">Este ano</option>
+              <option value="todos">Todas as datas</option>
+            </select>
+          </div>
+          <div>
+            <label for="ordenacao">Ordenar resultados</label>
+            <select id="ordenacao">
+              <option value="popularidade" selected>Popularidade</option>
+              <option value="relevancia">Relevância (padrão)</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint">Intervalos de duração personalizados são validados nos vídeos depois da coleta, mesmo quando o YouTube não oferece aquela faixa diretamente.</div>
+      </div>
+      <div class="filter-box">
+        <div class="filter-title">Melhor canal = canal novo</div>
+        <div>
+          <label for="janela_meses">Primeiro vídeo do canal há no máximo</label>
+          <select id="janela_meses">
+            <option value="1">1 mês</option>
+            <option value="2">2 meses</option>
+            <option value="3" selected>3 meses</option>
+            <option value="6">6 meses</option>
+            <option value="12">12 meses</option>
+            <option value="0">Sem limite de idade</option>
+          </select>
+        </div>
+        <div class="checkline"><input type="checkbox" id="descartar_fora_janela" checked><label for="descartar_fora_janela" style="margin:0">Pular a análise detalhada de canais fora da janela (mais rápido)</label></div>
+        <div class="hint">Para cada canal o app lê os 5 vídeos mais antigos, os 3 mais populares, os 3 mais recentes e os últimos 50 vídeos (para medir a frequência de postagem). Canais fora da janela ficam salvos, mas ocultos por padrão.</div>
+      </div>
+      <div class="checkline"><input type="checkbox" id="headless"><label for="headless" style="margin:0">Rodar sem abrir janela (headless)</label></div>
+      <div class="checkline"><input type="checkbox" id="mutar_audio" checked><label for="mutar_audio" style="margin:0">Mutar o áudio do navegador aberto</label></div>
+      <div class="checkline"><input type="checkbox" id="trends"><label for="trends" style="margin:0">Checar Google Trends antes</label></div>
+      <div class="hint">Com headless desligado você vê o Chromium abrindo de verdade. O áudio é mutado na inicialização quando essa opção está marcada.</div>
+      <div class="filter-box">
+        <div class="filter-title">Navegadores simultâneos</div>
+        <div>
+          <label for="n_navegadores">Quantos Chromium abrir em paralelo</label>
+          <select id="n_navegadores">
+            <option value="1" selected>1 (padrão)</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div class="hint">Cada navegador cuida de uma fatia dos termos (ou dos vídeos de origem, na mineração por recomendações). Vale para os dois botões desta página. Mais navegadores = mais rápido, mas mais RAM e mais janelas abrindo se "headless" estiver desligado. Sem ganho se houver menos termos do que navegadores pedidos.</div>
+      </div>
+      <div class="filter-box">
+        <div class="filter-title">Recomendados da lateral (durante esta mineração)</div>
+        <div class="checkline"><input type="checkbox" id="ra-ativo"><label for="ra-ativo" style="margin:0">Também aproveitar a lateral de recomendados de cada vídeo encontrado</label></div>
+        <p class="hint">Sem colar links: para cada vídeo que a busca encontra, o app já está na página dele (a mesma checagem de data/patrocínio abre o vídeo) e aproveita para ler a lateral também. Os recomendados passam pela mesma triagem da aba "recomendações de um vídeo" (canal não verificado, vídeo recente, views na média ou acima) e os aprovados entram como candidatos a mais no ranking.</p>
+        <div id="ra-opcoes" style="display:none">
+          <div class="row">
+            <div>
+              <label for="ra-itens">Recomendados lidos por vídeo</label>
+              <input type="number" id="ra-itens" value="5" min="1" max="15">
+            </div>
+            <div>
+              <label for="ra-meses">Recomendado postado há no máximo</label>
+              <select id="ra-meses">
+                <option value="1">1 mês</option>
+                <option value="2">2 meses</option>
+                <option value="3" selected>3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="ra-ref">Referência de views</label>
+              <select id="ra-ref">
+                <option value="media" selected>Média</option>
+                <option value="mediana">Mediana (menos afetada por 1 vídeo viral)</option>
+              </select>
+            </div>
+            <div>
+              <label for="ra-fator">Guardar quem tiver</label>
+              <select id="ra-fator">
+                <option value="1" selected>na referência ou acima</option>
+                <option value="0.8">até 20% abaixo</option>
+                <option value="0.5">até metade dela</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint">A referência é calculada separadamente para a lateral de cada vídeo. Usa também a duração e o canal novo do passo 3 acima.</div>
+        </div>
+      </div>
+      <button class="primary" id="btn-iniciar" disabled>Iniciar automação</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-recomendados">
+    <div class="step-head"><div class="step-num">+</div><div class="step-title">Ou: recomendações de um vídeo</div></div>
+    <p class="step-desc">Achou um vídeo que está indo bem? Cole o link. O app lê os recomendados ao lado dele, separa canais <b>não verificados</b> com vídeo <b>recente</b> e views na <b>média ou acima</b>, e analisa esses canais como na busca por nicho.</p>
+    <div class="step-body">
+      <label for="rec-urls">Links de vídeos (um por linha)</label>
+      <textarea id="rec-urls" rows="4" placeholder="https://www.youtube.com/watch?v=..."></textarea>
+      <button type="button" id="btn-rec-exemplos">Usar vídeos de exemplo do último resultado</button>
+      <div class="filter-box">
+        <div class="filter-title">Triagem dos recomendados</div>
+        <div class="row">
+          <div>
+            <label for="rec-itens">Recomendados lidos por vídeo</label>
+            <input type="number" id="rec-itens" value="15" min="5" max="40">
+          </div>
+          <div>
+            <label for="rec-meses">Vídeo postado há no máximo</label>
+            <select id="rec-meses">
+              <option value="1">1 mês</option>
+              <option value="2">2 meses</option>
+              <option value="3" selected>3 meses</option>
+              <option value="6">6 meses</option>
+              <option value="12">12 meses</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="rec-ref">Referência de views</label>
+            <select id="rec-ref">
+              <option value="media" selected>Média</option>
+              <option value="mediana">Mediana (menos afetada por 1 vídeo viral)</option>
+            </select>
+          </div>
+          <div>
+            <label for="rec-fator">Guardar quem tiver</label>
+            <select id="rec-fator">
+              <option value="1" selected>na referência ou acima</option>
+              <option value="0.8">até 20% abaixo</option>
+              <option value="0.5">até metade dela</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="rec-escopo">A referência é calculada sobre</label>
+          <select id="rec-escopo">
+            <option value="por_video" selected>cada vídeo de origem separado</option>
+            <option value="global">todos os vídeos de origem juntos</option>
+          </select>
+        </div>
+        <div class="hint">A referência usa só os recomendados elegíveis (não verificados, recentes, duração ok). Usa também a duração, o canal novo e os inscritos mínimos do passo 3.</div>
+      </div>
+      <button class="primary" id="btn-rec-iniciar" disabled>Minerar recomendações</button>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <nav class="topnav">
+    <button type="button" class="topnav-btn active" data-view="minerar">Minerar</button>
+    <button type="button" class="topnav-btn" data-view="biblioteca">Biblioteca</button>
+    <button type="button" class="topnav-btn" data-view="ideias">Ideias virais</button>
+    <button type="button" class="topnav-btn" data-view="metodo">Método Dark</button>
+    <button type="button" class="topnav-btn" data-view="canal">Analisar canal</button>
+    <button type="button" class="topnav-btn" data-view="yt">API do YouTube</button>
+  </nav>
+
+  <div id="view-minerar" class="view">
+  <div class="main-head">
+    <div class="main-title">Execução</div>
+    <div class="status-pill" id="status-pill">parado</div>
+  </div>
+
+  <div class="console" id="console"></div>
+
+  <div>
+    <div class="main-title" style="margin-bottom:10px">Resultado</div>
+    <div id="results-area">
+      <div class="empty-state">os canais candidatos aparecem aqui quando a coleta terminar</div>
+    </div>
+  </div>
+  </div>
+
+  <div id="view-biblioteca" class="view" style="display:none">
+    <div class="main-head">
+      <div class="main-title">Biblioteca</div>
+      <div class="muted-small" id="lib-resumo"></div>
+    </div>
+    <div class="lib-search">
+      <input type="text" id="lib-q" placeholder="Pesquisar por palavra-chave: tema, termo de busca, canal ou título de vídeo...">
+      <button type="button" id="lib-btn-pesquisar">Pesquisar</button>
+      <button type="button" id="lib-btn-limpar">Limpar</button>
+    </div>
+    <div class="lib-layout">
+      <aside class="lib-list" id="lib-list"><div class="empty-state">carregando...</div></aside>
+      <section class="lib-detail" id="lib-detail"><div class="empty-state">escolha uma busca ao lado ou pesquise por palavra-chave</div></section>
+    </div>
+  </div>
+
+  <div id="view-ideias" class="view" style="display:none">
+    <div class="main-head">
+      <div class="main-title">Ideias virais</div>
+      <div class="id-sessao">
+        <select id="id-sessoes" aria-label="Pesquisas salvas"></select>
+        <button type="button" id="id-nova">Nova pesquisa</button>
+        <button type="button" id="id-excluir" class="danger" disabled>Excluir</button>
+      </div>
+    </div>
+    <p class="hint id-intro">Radar de vídeos em alta &rarr; IA decompõe o padrão &rarr; IA gera ideias com ângulo novo &rarr; validação (Google, Trends, YouTube) &rarr; ranking. Nada aqui usa API paga: as etapas de IA montam o prompt para você colar numa IA de chat e validam o JSON que você cola de volta.</p>
+
+    <section class="id-card" id="id-setup">
+      <div class="filter-title">Nova pesquisa</div>
+      <div class="row">
+        <div style="flex:2"><label for="id-tema">Tema / nicho amplo</label><input type="text" id="id-tema" placeholder="ex: pragas em casa, histórias de superação, física do dia a dia..."></div>
+        <div><label for="id-mercado">Mercado de pesquisa</label><select id="id-mercado"></select></div>
+      </div>
+      <div><label for="id-termos-ini">Termos de busca iniciais (um por linha; opcional, dá para preencher depois)</label>
+        <textarea id="id-termos-ini" rows="3" placeholder="ex: como eliminar mosquitos&#10;truque para afastar baratas"></textarea></div>
+      <div><button type="button" class="primary" id="id-criar">Criar pesquisa</button></div>
+    </section>
+
+    <div id="id-fluxo" style="display:none">
+      <div class="filter-summary" id="id-resumo"></div>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">1</span> Radar de vídeos em alta <span class="badge badge-muted">automático</span></summary>
+        <div class="id-etapa-corpo">
+          <p class="hint">Busca cada termo no YouTube (período e popularidade), calcula views por dia e, para os canais pequenos com mais views, lê os inscritos. Vídeo com mais views do que o canal tem de inscritos é o sinal de que a <em>ideia</em> venceu, não a audiência.</p>
+          <div>
+            <label for="id-termos">Termos de busca (um por linha)</label>
+            <textarea id="id-termos" rows="4"></textarea>
+            <div class="id-linha"><button type="button" id="id-usar-minerar">Usar os termos da aba Minerar</button><span class="muted-small" id="id-termos-info"></span></div>
+          </div>
+          <div class="id-grid">
+            <div><label for="id-periodo">Período dos vídeos</label>
+              <select id="id-periodo"><option value="semana">Esta semana</option><option value="mes" selected>Este mês</option><option value="ano">Este ano</option><option value="todos">Todas as datas</option></select></div>
+            <div><label for="id-max-videos">Máx. vídeos por termo</label><input type="number" id="id-max-videos" value="60" min="10" max="200"></div>
+            <div><label for="id-dur-min">Duração mín. (min)</label><input type="number" id="id-dur-min" value="3" min="0" max="240"></div>
+            <div><label for="id-dur-max">Duração máx. (0 = sem limite)</label><input type="number" id="id-dur-max" value="0" min="0" max="240"></div>
+            <div><label for="id-top-canais">Ler inscritos de até N canais (0 = não ler)</label><input type="number" id="id-top-canais" value="10" min="0" max="30"></div>
+          </div>
+          <div class="checkline"><input type="checkbox" id="id-headless"><label for="id-headless" style="margin:0">Rodar sem abrir janela (headless)</label></div>
+          <div><button type="button" class="primary" id="id-rodar-radar">Rodar radar</button></div>
+          <div class="console" id="id-console-radar"></div>
+          <div id="id-radar-res"></div>
+
+          <details class="id-sub">
+            <summary>Opcional: expandir um tema em alta com IA (públicos adjacentes, buscas e termos para validar)</summary>
+            <div class="id-etapa-corpo">
+              <div class="row"><div style="flex:2"><label for="id-foco">Tema em alta (vazio = o tema da pesquisa)</label><input type="text" id="id-foco"></div>
+              <div><label for="id-exp-n">Nº de buscas</label><input type="number" id="id-exp-n" value="10" min="3" max="30"></div></div>
+              <div id="id-exp-ia"></div>
+              <div id="id-exp-res"></div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">2</span> IA: decompor os vídeos em alta <span class="badge badge-muted">prompt manual</span></summary>
+        <div class="id-etapa-corpo">
+          <p class="hint">Usa os vídeos marcados no radar (até 30). A IA separa o que é <strong>fixo</strong> (emoção e estrutura do título) do que é <strong>variável</strong> (personagem, cenário, mercado) e dá uma nota de amplitude ao título.</p>
+          <div class="muted-small" id="id-sel-info"></div>
+          <div><label for="id-refs">Títulos de referência extras (um por linha; opcional — vídeos que você viu e não estão no radar)</label>
+            <textarea id="id-refs" rows="3"></textarea></div>
+          <div id="id-dec-ia"></div>
+          <div id="id-dec-res"></div>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">3</span> IA: gerar ideias (ângulo novo, título em 3 níveis) <span class="badge badge-muted">prompt manual</span></summary>
+        <div class="id-etapa-corpo">
+          <p class="hint">Mantém a emoção e a estrutura, muda personagem, cenário e/ou mercado. Ideias novas são somadas às que já existem (sem duplicar).</p>
+          <div class="row">
+            <div><label for="id-n-ideias">Nº de ideias</label><input type="number" id="id-n-ideias" value="10" min="3" max="30"></div>
+            <div style="flex:2"><label for="id-modo">Modo</label><select id="id-modo"></select></div>
+          </div>
+          <div><label>Mercados-alvo (para levar o formato a outro país/idioma)</label><div class="id-chips" id="id-mercados-alvo"></div></div>
+          <div id="id-ide-ia"></div>
+          <div id="id-ide-res"></div>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">4</span> Validar demanda e concorrência <span class="badge badge-muted">automático</span></summary>
+        <div class="id-etapa-corpo">
+          <p class="hint">Para cada ideia marcada, usa até 3 termos de validação. Autocomplete, YouTube e Trends confirmam se há volume; perguntas e relacionadas do Google viram ganchos.</p>
+          <div id="id-val-lista"></div>
+          <div class="id-grid">
+            <div class="checkline"><input type="checkbox" id="id-v-sug" checked><label for="id-v-sug" style="margin:0">Autocomplete Google + YouTube</label></div>
+            <div class="checkline"><input type="checkbox" id="id-v-alfa"><label for="id-v-alfa" style="margin:0">Expandir com letras (a–z; ~52 consultas por termo)</label></div>
+            <div class="checkline"><input type="checkbox" id="id-v-serp" checked><label for="id-v-serp" style="margin:0">Google: perguntas e relacionadas (pode pedir CAPTCHA)</label></div>
+            <div class="checkline"><input type="checkbox" id="id-v-trends" checked><label for="id-v-trends" style="margin:0">Google Trends (precisa de pytrends)</label></div>
+            <div class="checkline"><input type="checkbox" id="id-v-yt" checked><label for="id-v-yt" style="margin:0">Concorrência no YouTube</label></div>
+            <div class="checkline"><input type="checkbox" id="id-v-headless"><label for="id-v-headless" style="margin:0">Sem abrir janela (headless)</label></div>
+          </div>
+          <div class="id-grid">
+            <div><label for="id-v-trends-fonte">Trends: fonte</label><select id="id-v-trends-fonte"><option value="web">Pesquisa do Google</option><option value="youtube">Pesquisa do YouTube</option></select></div>
+            <div><label for="id-v-trends-periodo">Trends: período</label><select id="id-v-trends-periodo"><option value="today 3-m">3 meses</option><option value="today 12-m" selected>12 meses (vê sazonalidade)</option><option value="today 5-y">5 anos</option></select></div>
+            <div><label for="id-v-periodo">YouTube: período</label><select id="id-v-periodo"><option value="semana">Esta semana</option><option value="mes" selected>Este mês</option><option value="ano">Este ano</option></select></div>
+          </div>
+          <div><button type="button" class="primary" id="id-validar" disabled>Validar ideias marcadas</button></div>
+          <div class="console" id="id-console-val"></div>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">5</span> Ranking e decisão <span class="badge badge-muted">cálculo local</span></summary>
+        <div class="id-etapa-corpo">
+          <p class="hint">Pontuação 0–100 sobre os critérios disponíveis (critério sem dado não vira zero; a confiança mostra quanto do peso tem dado). Amplitude, repetibilidade e produção começam com a estimativa da IA e você pode corrigir. Demanda e concorrência são calculadas a partir da validação e são <em>relativas às demais ideias do mesmo mercado</em>.</p>
+          <div class="id-pesos" id="id-pesos"></div>
+          <div class="id-linha"><a id="id-csv" class="id-link" href="#" style="display:none">Exportar CSV</a></div>
+          <div id="id-ranking"></div>
+
+          <details class="id-sub">
+            <summary>Decisão de canal: continuar, revisar, escalar ou descartar</summary>
+            <div class="id-etapa-corpo">
+              <p class="hint">Regra dos vídeos de referência: alerta com 15–20 vídeos sem tração e corte aos 30. Os limiares de impressão, CTR e retenção são padrões ajustáveis, não regra do autor.</p>
+              <div class="id-grid">
+                <div><label for="id-d-n">Vídeos publicados</label><input type="number" id="id-d-n" min="0" value="10"></div>
+                <div><label for="id-d-imp">Impressões médias por vídeo</label><input type="number" id="id-d-imp" min="0" placeholder="opcional"></div>
+                <div><label for="id-d-ctr">CTR médio (%)</label><input type="number" id="id-d-ctr" min="0" step="0.1" placeholder="opcional"></div>
+                <div><label for="id-d-ret">Retenção média (%)</label><input type="number" id="id-d-ret" min="0" step="0.1" placeholder="opcional"></div>
+              </div>
+              <details class="id-sub"><summary>Ajustar limiares</summary>
+                <div class="id-grid" id="id-d-limiares"></div></details>
+              <div><button type="button" id="id-decidir">Avaliar canal</button></div>
+              <div id="id-decisao"></div>
+            </div>
+          </details>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div id="view-metodo" class="view" style="display:none">
+    <div class="main-head">
+      <div class="main-title">Método Dark</div>
+      <div class="muted-small">o que o vídeo ensina + ferramentas para aplicar</div>
+    </div>
+    <p class="hint id-intro">Base: o roteiro de um vídeo de cerca de 1h10 em que o criador (o público o chama de "Dark"; o nome do canal não aparece na transcrição) explica por que pedir nicho e título a uma IA não funciona e como validar o mercado no próprio YouTube. As minutagens (<span class="mt-min">10:23</span>) servem para voltar ao trecho. Os números são regras práticas dele, e ele mesmo diz para não levar tão a sério (<span class="mt-min">30:56</span>).</p>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">1</span> O que ele explica <span class="badge badge-muted">a tese</span></summary>
+      <div class="id-etapa-corpo">
+        <ul class="mt-lista">
+          <li><b>Não deixe a IA tomar a decisão de nicho e título.</b> <span class="mt-min">0:46</span> <span class="mt-min">23:05</span> Pedir nichos, ângulos e "nich bending" ao ChatGPT, Claude ou Gemini devolve respostas genéricas, as mesmas que já foram entregues a muita gente.</li>
+          <li><b>A prova que ele mostra.</b> <span class="mt-min">10:23</span> Pediu ideias à IA, pesquisou o título sugerido e já existiam vídeos com exatamente aquele título. Repetiu com o Claude <span class="mt-min">17:00</span> e com o Gemini <span class="mt-min">21:26</span>. Para ele <b>não é problema de prompt</b>: é uma limitação de como a IA funciona <span class="mt-min">11:20</span>.</li>
+          <li><b>Modelar canal de guru é competir com uma cascata.</b> <span class="mt-min">11:56</span> Criadores em vários idiomas mostram o mesmo canal e os mesmos prompts. Se já há 50 a 100 vídeos validados sobre o tema, ele pergunta por que o YouTube entregaria o seu <span class="mt-min">16:09</span>.</li>
+          <li><b>O idioma deixou de ser barreira.</b> <span class="mt-min">13:39</span> Legenda e dublagem automática fazem o YouTube mostrar vídeo em inglês a brasileiro. Um vídeo "novo" em português pode ter a versão em inglês de um ano antes <span class="mt-min">15:07</span>.</li>
+          <li><b>Canal grande e outlier antigo enganam.</b> <span class="mt-min">37:22</span> Um canal de 2 milhões bate 100 mil até com tela preta: é autoridade acumulada, não qualidade do vídeo. Procure canais pequenos ou médios com boas métricas.</li>
+          <li><b>Hype é ciclo.</b> <span class="mt-min">21:42</span> <span class="mt-min">58:36</span> O formato "sequencial" tem 6 a 10 anos e voltou. Ele aposta que a modelagem só por tradução vale por uns 2 anos <span class="mt-min">57:52</span>.</li>
+          <li><b>A régua do nicho importa.</b> <span class="mt-min">29:30</span> Há nichos com edição em nível alto; só mudar o "formatinho" não se sustenta a longo prazo.</li>
+          <li><b>A conclusão.</b> <span class="mt-min">27:01</span> Valide a ideia no próprio YouTube, com métricas e público real, não com um modelo de linguagem. Use a IA para calcular e automatizar <span class="mt-min">30:22</span>, não para escolher.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">2</span> Como seguir <span class="badge badge-muted" id="mt-progresso">0 de 0</span></summary>
+      <div class="id-etapa-corpo">
+        <p class="hint">Duas partes: mudar o processo e percorrer seis etapas. As marcações ficam salvas neste navegador.</p>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Antes de tudo: mudar o processo <span class="mt-min">27:01</span> <span class="mt-min">1:03:52</span></div>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="0-decisao"><span>Parei de pedir nicho, ângulo e título à IA como decisão final.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="0-calcular"><span>Uso a IA e o código só para calcular, organizar e automatizar dados (ele recomenda a API do YouTube com Python).</span></label>
+        </div>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Etapa 1: ler o mercado antes de procurar a pauta <span class="mt-min">27:25</span></div>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="1-planilha"><span>Montei uma planilha com 10 a 30 canais de referência <span class="mt-min">27:40</span>. A "Planilha automática" abaixo faz isso com os canais que o app já coletou.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="1-campos"><span>Para cada canal: inscritos, vídeos por mês, duração média, formato, mediana das views dos últimos 10 e características dos 3 vídeos mais vistos <span class="mt-min">28:36</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="1-tracao"><span>Calculei a <b>tração</b>: mediana das views dos últimos 10 ÷ inscritos <span class="mt-min">31:13</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="1-idade"><span>Conferi a data de criação do canal e se o nicho tem muitos canais antigos ainda ativos, sinal de barreira de entrada <span class="mt-min">32:13</span>. Ele diz que não precisa comprar conta antiga <span class="mt-min">33:20</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="1-preco"><span>Estimei o RPM do nicho e o custo real de produzir (ferramentas de IA, energia, equipamento) <span class="mt-min">34:22</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="1-qualidade"><span>Consigo produzir na qualidade média da referência <span class="mt-min">29:54</span>.</span></label>
+        </div>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Etapa 2: achar outliers de verdade <span class="mt-min">37:15</span></div>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="2-tamanho"><span>Olhei canais pequenos ou médios: de mil a 10 mil inscritos "já é ótimo" para ele; o texto que ele leu falava em até 50 mil <span class="mt-min">39:11</span>. Inscritos dizem mais sobre CTA do que sobre qualidade <span class="mt-min">39:32</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="2-fator"><span>Calculei o <b>fator outlier</b> do vídeo: views ÷ mediana dos últimos 10 do canal <span class="mt-min">40:14</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="2-vph"><span>Conferi o VPH (views por hora) em relação ao tempo de postagem e priorizei vídeos com muitas views nos últimos 15 a 30 dias <span class="mt-min">41:15</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="2-formato"><span>Verifiquei se o canal repetiu o mesmo formato do vídeo que viralizou <span class="mt-min">42:58</span>.</span></label>
+        </div>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Etapa 3: entender a emoção e a promessa <span class="mt-min">43:53</span></div>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="3-pergunta"><span>Descobri que pergunta ou ânsia o vídeo respondeu e o que deixou em aberto <span class="mt-min">44:39</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="3-comentarios"><span>Li os comentários dos concorrentes: perguntas repetidas e as discussões com 30 a 40 respostas, onde há "energia acumulada" <span class="mt-min">45:25</span> <span class="mt-min">47:14</span>. O público deles pode ser diferente do seu <span class="mt-min">46:29</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="3-emocao"><span>Variei a emoção entre títulos e capas (nostalgia, raiva, alegria, curiosidade) sem cair no sensacionalismo <span class="mt-min">43:53</span> <span class="mt-min">1:06:03</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="3-promessa"><span>Mostro o que falo e cumpro a promessa do título e da capa; separo decepção por clickbait de estilo que não agrada <span class="mt-min">47:41</span> <span class="mt-min">49:29</span>.</span></label>
+        </div>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Etapa 4: medir a saturação <span class="mt-min">52:17</span></div>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="4-contagem"><span>Pesquisei o título ou ângulo no idioma-alvo, filtrei por mês e contei os vídeos (use o semáforo abaixo). Os filtros da interface do YouTube são limitados; para 3 ou 5 meses ele usa a API <span class="mt-min">53:37</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="4-mediana"><span>Calculei a mediana das views dos 10 a 20 primeiros resultados <span class="mt-min">56:05</span>.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="4-publico"><span>Pensei no tipo de público: quem pesquisa produto para comprar (botas, chapéus) não é o público de "curiosidade" <span class="mt-min">54:47</span>.</span></label>
+        </div>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Etapa 5: variar o ângulo <span class="mt-min">57:08</span></div>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="5-diferencial"><span>Escolhi meu diferencial: geografia e idioma (até o sotaque, como Portugal ou Angola <span class="mt-min">8:12</span>), nicho atemporal combinado, ângulo novo ou formato.</span></label>
+          <label class="id-val-item"><input type="checkbox" class="mt-check" data-chave="5-ciclo"><span>Considerei o ciclo do formato: às vezes o canal de hoje é para dar certo daqui a dois anos <span class="mt-min">1:00:45</span>.</span></label>
+        </div>
+
+        <div class="id-sub"><div class="mt-sub-titulo">Etapa 6: validar título e thumbnail <span class="mt-min">1:01:22</span></div>
+          <p class="hint">Ele não aprofundou: disse que o assunto rende outro vídeo. Não há método dele para marcar aqui além do que ele já cobriu em emoção e promessa (etapa 3).</p>
+        </div>
+
+        <div class="id-linha"><button type="button" id="mt-limpar">Limpar marcações</button></div>
+      </div>
+    </details>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">3</span> Ferramentas <span class="badge badge-muted">calculam as fórmulas dele</span></summary>
+      <div class="id-etapa-corpo">
+
+        <div class="id-card mt-card">
+          <div class="mt-titulo">Planilha automática dos canais de referência</div>
+          <p class="hint">Para cada canal que o app já coletou, calcula a mediana das views dos últimos vídeos, a tração e os vídeos outliers. Usa a lista de vídeos recentes que o app já lê (até 50) e a data de criação do canal. Serve para achar quem tem tração forte antes de estudar o formato.</p>
+          <div class="id-grid">
+            <div style="grid-column: span 2"><label for="mp-fonte">Canais de</label><select id="mp-fonte"></select></div>
+            <div><label for="mp-n">Últimos N vídeos (mediana)</label><input type="number" id="mp-n" value="10" min="3" max="50"></div>
+            <div><label for="mp-cuidado">Tração: cuidado abaixo de</label><input type="number" id="mp-cuidado" value="0.05" step="0.01" min="0"></div>
+            <div><label for="mp-forte">Tração forte a partir de</label><input type="number" id="mp-forte" value="3" step="0.5" min="0"></div>
+            <div><label for="mp-fator">Outlier: fator mínimo</label><input type="number" id="mp-fator" value="2" step="0.5" min="1"></div>
+            <div><label for="mp-ordem">Ordenar por</label>
+              <select id="mp-ordem"><option value="tracao">Tração (maior primeiro)</option><option value="mediana">Mediana</option><option value="inscritos">Inscritos</option><option value="original">Ordem do app</option></select></div>
+          </div>
+          <div class="checkline"><input type="checkbox" id="mp-30d" checked><label for="mp-30d" style="margin:0">Outliers só dos últimos 30 dias</label></div>
+          <div class="id-linha"><button type="button" id="mp-atualizar">Atualizar fontes</button><button type="button" id="mp-csv" disabled>Baixar CSV</button><span class="muted-small" id="mp-info"></span></div>
+          <div id="mp-tabela"></div>
+          <p class="hint">Os limites de tração (0,05 e 3) vêm do roteiro, onde a fala é "5 centés" e "acima de 3": leio como 0,05, mas a transcrição é ambígua, por isso são ajustáveis. O fator mínimo de outlier é meu: ele não dá número.</p>
+        </div>
+
+        <div class="id-card mt-card">
+          <div class="mt-titulo">Calculadora rápida <span class="muted-small">para o canal ou vídeo que você viu fora do app (VidIQ, por exemplo)</span></div>
+          <div class="id-grid">
+            <div style="grid-column: span 2"><label for="mc-views">Views dos últimos 10 vídeos (uma por linha; aceita "12 mil" e "1,5 mi")</label><textarea id="mc-views" rows="5"></textarea></div>
+            <div><label for="mc-inscritos">Inscritos</label><input type="text" id="mc-inscritos" placeholder="ex.: 8,5 mil"></div>
+            <div><label for="mc-video">Views de um vídeo para testar</label><input type="text" id="mc-video" placeholder="ex.: 147 mil"></div>
+            <div><label for="mc-criado">Canal criado em</label><input type="date" id="mc-criado"></div>
+          </div>
+          <div id="mc-saida" class="mt-saida"></div>
+        </div>
+
+        <div class="id-card mt-card">
+          <div class="mt-titulo">Semáforo de saturação <span class="mt-min">56:22</span></div>
+          <p class="hint">Pesquise o título ou ângulo no YouTube, filtre pelo mês e conte quantos vídeos sobre o mesmo tema saíram.</p>
+          <div class="id-grid"><div><label for="ms-n">Vídeos no mês sobre o mesmo tema</label><input type="number" id="ms-n" min="0" placeholder="ex.: 7"></div></div>
+          <div id="ms-saida" class="mt-saida"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">4</span> O que o Niche Miner já cobre e onde diverge dele</summary>
+      <div class="id-etapa-corpo">
+        <div class="table-wrap"><table class="candidate-table mt-cobre">
+          <thead><tr><th>Ele pede</th><th>No Niche Miner</th></tr></thead>
+          <tbody>
+            <tr><td>Data de criação do canal e cuidado com canal antigo</td><td><span class="badge badge-green">já</span> Janela de "canal novo" (passo 3) e "Canal criado em" nos detalhes do canal.</td></tr>
+            <tr><td>Inscritos, vídeos e frequência de postagem</td><td><span class="badge badge-green">já</span> Colunas do ranking, vídeos nos últimos 30 dias e frequência estimada.</td></tr>
+            <tr><td>Canais pequenos ou médios, não os maiores</td><td><span class="badge badge-green">já</span> Só canais não verificados, com inscritos mínimos e janela de idade; a mineração por recomendações parte de vídeos reais que você escolhe.</td></tr>
+            <tr><td>Mediana dos últimos 10, tração e fator outlier</td><td><span class="badge badge-muted">na aba</span> Calculados na Planilha automática acima. Não entram no score nem na ordem do ranking.</td></tr>
+            <tr><td>VPH (ritmo atual do vídeo)</td><td><span class="badge badge-red">não</span> O VidIQ mede o ritmo das últimas horas; o app só guarda a data. O mais próximo é o filtro de outliers dos últimos 30 dias.</td></tr>
+            <tr><td>Contar vídeos por título ou ângulo (saturação)</td><td><span class="badge badge-red">não</span> É manual, com o semáforo acima.</td></tr>
+            <tr><td>RPM do nicho, custo de produção, comentários</td><td><span class="badge badge-red">não</span> O app não coleta.</td></tr>
+            <tr><td>Usar mediana, não média</td><td><span class="badge badge-muted">parcial</span> A triagem de recomendações usa média por padrão. <button type="button" id="mm-usar-mediana">Usar mediana nas recomendações</button> <span class="muted-small" id="mm-info"></span></td></tr>
+            <tr><td>Não deixar a IA decidir o nicho</td><td><span class="badge badge-red">diverge</span> Os passos 1 e 2 (prompt de subnichos) pedem termos de busca a uma IA, e ele diria que isso tende ao genérico e saturado. O ranking sai de dados reais do YouTube, mas os termos vêm da IA. Para seguir o método, escreva os termos você mesmo ou parta de vídeos reais pela mineração de recomendações.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </details>
+
+    <details class="id-etapa">
+      <summary><span class="step-num">5</span> Limites e cuidados</summary>
+      <div class="id-etapa-corpo">
+        <ul class="mt-lista">
+          <li>As faixas de tração e de saturação são heurísticas do criador, ele diz para não levá-las tão a sério <span class="mt-min">30:56</span>. Use como ordem de grandeza, não como veredito.</li>
+          <li>A mediana usa os vídeos recentes que o app leu (até 50). Se a lista não carregou até o fim ou o canal tem menos de N vídeos, a linha mostra o n usado e a amostra é frágil.</li>
+          <li>As views vêm dos cards do YouTube ("12 mil") e são arredondadas.</li>
+          <li>O que ele diz sobre o funcionamento do YouTube (o local do usuário define cerca de 90% do feed, bonificação de vídeos longos, punição a conteúdo repetitivo) são observações dele, não verificadas aqui.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <div id="view-canal" class="view" style="display:none">
+    <div class="main-head">
+      <div class="main-title">Analisar canal</div>
+      <div class="muted-small">as ferramentas do NextLEV, de graça e no seu computador</div>
+    </div>
+    <p class="hint id-intro">Base: o vídeo em que o Luiz mostra o NextLEV (extensão paga, R$ 25 e R$ 82 por mês no vídeo). Aqui você cola o link de um canal, o app lê os últimos vídeos e monta o mesmo tipo de painel. Tudo que é número vem dos dados do YouTube. A IA só entra onde o NextLEV também usa IA e segue o padrão do app: o app monta o prompt, você roda em qualquer IA de chat e cola o JSON de volta. Nada aqui usa API paga. As minutagens (<span class="mt-min">9:58</span>) apontam o trecho do vídeo.</p>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">1</span> O que o NextLEV faz e onde está aqui</summary>
+      <div class="id-etapa-corpo">
+        <div class="table-wrap"><table class="candidate-table mt-cobre" id="cn-mapa">
+          <thead><tr><th>No NextLEV</th><th>Aqui</th></tr></thead>
+          <tbody>
+            <tr><td>Filtros de vídeos e exportar CSV/JSON <span class="mt-min">8:43</span></td><td><span class="badge badge-green">feito</span> Seção 4: filtros por período, views, fator outlier (a "pontuação") e categoria, com exportação. Vale para os últimos vídeos lidos do canal, não para o YouTube inteiro.</td></tr>
+            <tr><td>Analisar canal: views por vídeo, dias de vida, uploads por mês, duração, views mensais <span class="mt-min">10:02</span></td><td><span class="badge badge-green">feito</span> Seção 3, com mediana e tração além da média. <b>Shorts</b> e <b>monetizado</b> aparecem como "não coletado": o YouTube não mostra isso de forma confiável na página, o NextLEV usa base própria.</td></tr>
+            <tr><td>Melhores categorias (subnichos do canal) <span class="mt-min">11:34</span></td><td><span class="badge badge-muted">IA externa</span> Seção 5: a IA só agrupa os vídeos; contagem e views de cada categoria são calculadas pelo app.</td></tr>
+            <tr><td>Formatos de título com melhor desempenho <span class="mt-min">12:55</span></td><td><span class="badge badge-green">feito, sem IA</span> Seção 3: detecta 9 estruturas (Como..., número no início, pergunta, comando, tamanho...) e compara a mediana de views com e sem cada uma. É correlação em amostra pequena e o painel avisa.</td></tr>
+            <tr><td>Análise de saturação (o "83% saturado") <span class="mt-min">15:00</span></td><td><span class="badge badge-red">de propósito, não</span> É um score que não mostra como foi calculado, e uma IA não mede mercado. Use o semáforo da aba Método com a contagem real de vídeos no mês. <button type="button" id="cn-ir-metodo">Abrir o semáforo</button></td></tr>
+            <tr><td>Padrões de desempenho, fórmula de conteúdo, público, oportunidades <span class="mt-min">15:29</span></td><td><span class="badge badge-muted">IA externa</span> Seção 5 (Estratégia). O prompt leva só os seus dados e proíbe a IA de inventar porcentagem ou saturação.</td></tr>
+            <tr><td>Resumo do feedback dos comentários <span class="mt-min">16:18</span></td><td><span class="badge badge-muted">IA externa</span> Seção 5 (Comentários). O app não lê comentários sozinho: você cola os que quiser analisar.</td></tr>
+            <tr><td>Métricas gerais, melhores e piores vídeos <span class="mt-min">17:41</span></td><td><span class="badge badge-green">feito</span> Seção 3. Nos piores só entram vídeos com 14 dias ou mais, porque os recentes ainda não juntaram views.</td></tr>
+            <tr><td>Tópicos sugeridos e diretrizes de roteiro (gancho) <span class="mt-min">18:24</span></td><td><span class="badge badge-muted">IA externa</span> Seção 5 (Estratégia).</td></tr>
+            <tr><td>Palavras por minuto (WPM) <span class="mt-min">19:24</span></td><td><span class="badge badge-red">não</span> Precisa da transcrição de cada vídeo. O próprio autor do vídeo disse que não entendeu essa parte.</td></tr>
+            <tr><td>Canais similares, com % de similaridade <span class="mt-min">20:05</span></td><td><span class="badge badge-muted">ponte</span> Seção 6 manda os vídeos mais vistos do canal para a mineração por recomendações. Sem "% de similaridade": esse número é do NextLEV.</td></tr>
+            <tr><td>Visão geral do nicho: vídeos virais com views por hora <span class="mt-min">22:24</span></td><td><span class="badge badge-muted">ponte</span> Seção 6 cria uma pesquisa na aba Ideias (radar por views por dia). O ritmo atual por hora não existe aqui.</td></tr>
+            <tr><td>Descobrir canais a partir de um vídeo, com um clique <span class="mt-min">26:22</span></td><td><span class="badge badge-muted">ponte</span> Botão em cada vídeo da seção 4, ligado à mineração por recomendações.</td></tr>
+            <tr><td>Canais dark em alta, Faceless Outliers, busca de outliers e Channels <span class="mt-min">28:16</span></td><td><span class="badge badge-red">não</span> Dependem do banco de canais que o NextLEV já coletou. O equivalente é a aba Minerar (busca por termo com filtros) e o radar da aba Ideias.</td></tr>
+          </tbody>
+        </table></div>
+        <p class="hint">O vídeo também vende quadros de Trello e um grupo de WhatsApp do autor. Isso é produto dele, não ferramenta do NextLEV, então não entra aqui.</p>
+      </div>
+    </details>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">2</span> Analisar um canal</summary>
+      <div class="id-etapa-corpo">
+        <div class="id-grid">
+          <div style="grid-column: span 2"><label for="cn-url">Link do canal (youtube.com/@nome)</label><input type="text" id="cn-url" placeholder="https://www.youtube.com/@nomedocanal"></div>
+          <div><label for="cn-n">Vídeos recentes a ler (10 a 200)</label><input type="number" id="cn-n" value="100" min="10" max="200"></div>
+        </div>
+        <div class="checkline"><input type="checkbox" id="cn-headless"><label for="cn-headless" style="margin:0">Rodar sem abrir janela (headless)</label></div>
+        <div class="id-linha">
+          <button type="button" class="primary" id="cn-analisar">Analisar canal</button>
+          <span class="status-pill" id="cn-status">parado</span>
+          <span class="muted-small">Abre o Chromium local; leva de 1 a 3 minutos. Só uma coleta por vez, em qualquer aba.</span>
+        </div>
+        <div class="console" id="cn-log" style="max-height:170px"></div>
+        <div class="id-linha">
+          <label for="cn-analises" style="margin:0">Análises salvas</label>
+          <select id="cn-analises" style="min-width:320px"></select>
+          <button type="button" class="danger" id="cn-excluir" disabled>Excluir esta análise</button>
+        </div>
+      </div>
+    </details>
+
+    <div id="cn-painel" style="display:none">
+      <details class="id-etapa" open>
+        <summary><span class="step-num">3</span> Painel do canal <span class="badge badge-muted">dados reais</span></summary>
+        <div class="id-etapa-corpo">
+          <div id="cn-cab" class="cn-cab"></div>
+          <div id="cn-cards" class="cn-cards"></div>
+          <div class="cn-duas">
+            <div><div class="mt-sub-titulo">Melhores desempenhos <span class="mt-min">17:41</span></div><ol id="cn-melhores" class="cn-lista"></ol></div>
+            <div><div class="mt-sub-titulo">Piores desempenhos</div><ol id="cn-piores" class="cn-lista"></ol><div class="hint">Só vídeos com 14 dias ou mais.</div></div>
+          </div>
+          <div class="mt-sub-titulo">Estruturas de título e desempenho <span class="mt-min">12:55</span></div>
+          <div id="cn-padroes"></div>
+          <div class="mt-sub-titulo">Palavras mais repetidas nos títulos</div>
+          <div id="cn-palavras"></div>
+          <div class="id-linha"><button type="button" id="cn-exp-analise">Exportar a análise (JSON)</button><span class="muted-small">Inclui o painel, os vídeos e o que a IA devolveu, para levar a outra ferramenta.</span></div>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">4</span> Vídeos do canal, com filtros <span class="mt-min">8:43</span></summary>
+        <div class="id-etapa-corpo">
+          <div class="id-grid">
+            <div><label for="cn-f-texto">Título contém</label><input type="text" id="cn-f-texto"></div>
+            <div><label for="cn-f-dias">Publicado nos últimos</label>
+              <select id="cn-f-dias"><option value="">qualquer data</option><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option><option value="180">180 dias</option><option value="365">1 ano</option></select></div>
+            <div><label for="cn-f-vmin">Views a partir de</label><input type="text" id="cn-f-vmin" placeholder="ex.: 5 mil"></div>
+            <div><label for="cn-f-vmax">Views até</label><input type="text" id="cn-f-vmax" placeholder="ex.: 100 mil"></div>
+            <div><label for="cn-f-fator">Fator outlier mínimo</label><input type="number" id="cn-f-fator" min="0" step="0.5" placeholder="ex.: 2"></div>
+            <div><label for="cn-f-cat">Categoria</label><select id="cn-f-cat"><option value="">todas</option></select></div>
+            <div><label for="cn-f-ordem">Ordenar por</label>
+              <select id="cn-f-ordem"><option value="views">Views</option><option value="fator">Fator outlier</option><option value="views_dia">Views por dia</option><option value="data">Mais recentes</option><option value="duracao">Duração</option><option value="original">Ordem do canal</option></select></div>
+          </div>
+          <div class="id-linha">
+            <button type="button" id="cn-f-limpar">Limpar filtros</button>
+            <button type="button" id="cn-csv" disabled>Baixar CSV</button>
+            <button type="button" id="cn-json" disabled>Baixar JSON</button>
+            <span class="muted-small" id="cn-videos-info"></span>
+          </div>
+          <div id="cn-videos"></div>
+          <p class="hint">Fator outlier = views do vídeo ÷ mediana dos últimos vídeos do canal (é a "pontuação" do NextLEV). Views por dia é a média desde a publicação, não o ritmo atual.</p>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">5</span> Análise por IA (você roda a IA, o app monta o prompt e lê a resposta) <span class="badge badge-muted">externa</span></summary>
+        <div class="id-etapa-corpo">
+          <p class="hint">Vale o que a aba Método ensina: a IA dá hipóteses, não veredito. Confirme no YouTube antes de decidir por um nicho.</p>
+
+          <div class="id-card mt-card cn-ia" data-tipo="categorias">
+            <div class="mt-titulo">Categorias e subnichos do canal <span class="mt-min">11:34</span></div>
+            <p class="hint">A IA decide quais vídeos formam cada categoria; o app calcula quantos são e quanto rendem, então os números não são palpite.</p>
+            <div class="id-linha"><button type="button" class="cn-gerar">1. Gerar prompt</button><button type="button" class="cn-copiar" disabled>Copiar prompt</button><span class="muted-small cn-msg-prompt"></span></div>
+            <textarea class="cn-prompt-out" rows="5" readonly style="display:none"></textarea>
+            <label>2. Cole a resposta da IA (JSON)</label>
+            <textarea class="cn-colar" rows="4" placeholder='{"categorias": [{"nome": "...", "indices": [1, 2]}]}'></textarea>
+            <div class="id-linha"><button type="button" class="primary cn-aplicar">Aplicar resposta</button><button type="button" class="danger cn-apagar" style="display:none">Apagar resultado</button><span class="muted-small cn-msg"></span></div>
+            <div class="cn-out"></div>
+          </div>
+
+          <div class="id-card mt-card cn-ia" data-tipo="estrategia">
+            <div class="mt-titulo">Estratégia: fórmula, público, oportunidades, tópicos e roteiro <span class="mt-min">15:29</span> <span class="mt-min">18:24</span></div>
+            <p class="hint">Usa o painel, as estruturas de título, as categorias e o resumo dos comentários, se você já tiver aplicado. O prompt proíbe a IA de inventar porcentagem ou "nível de saturação".</p>
+            <div class="id-grid">
+              <div><label for="cn-mercado">Mercado do seu canal</label><select id="cn-mercado"></select></div>
+              <div style="grid-column: span 2"><label for="cn-objetivo">Seu objetivo (opcional)</label><textarea id="cn-objetivo" rows="2" placeholder="ex.: canal dark em espanhol, sem aparecer, 2 vídeos por semana"></textarea></div>
+            </div>
+            <div class="id-linha"><button type="button" class="cn-gerar">1. Gerar prompt</button><button type="button" class="cn-copiar" disabled>Copiar prompt</button><span class="muted-small cn-msg-prompt"></span></div>
+            <textarea class="cn-prompt-out" rows="5" readonly style="display:none"></textarea>
+            <label>2. Cole a resposta da IA (JSON)</label>
+            <textarea class="cn-colar" rows="4"></textarea>
+            <div class="id-linha"><button type="button" class="primary cn-aplicar">Aplicar resposta</button><button type="button" class="danger cn-apagar" style="display:none">Apagar resultado</button><span class="muted-small cn-msg"></span></div>
+            <div class="cn-out"></div>
+          </div>
+
+          <div class="id-card mt-card cn-ia" data-tipo="comentarios">
+            <div class="mt-titulo">Feedback dos comentários <span class="mt-min">16:18</span></div>
+            <p class="hint">O app não lê comentários sozinho. Copie do YouTube os comentários dos vídeos que mais renderam (inclusive as discussões longas, onde há "energia acumulada" segundo o método da aba Método) e cole abaixo, um por linha. Mínimo de 5, máximo de 200.</p>
+            <label for="cn-comentarios">Comentários (um por linha)</label>
+            <textarea id="cn-comentarios" rows="6"></textarea>
+            <div class="id-linha"><button type="button" class="cn-gerar">1. Gerar prompt</button><button type="button" class="cn-copiar" disabled>Copiar prompt</button><span class="muted-small cn-msg-prompt"></span></div>
+            <textarea class="cn-prompt-out" rows="5" readonly style="display:none"></textarea>
+            <label>2. Cole a resposta da IA (JSON)</label>
+            <textarea class="cn-colar" rows="4"></textarea>
+            <div class="id-linha"><button type="button" class="primary cn-aplicar">Aplicar resposta</button><button type="button" class="danger cn-apagar" style="display:none">Apagar resultado</button><span class="muted-small cn-msg"></span></div>
+            <div class="cn-out"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="id-etapa" open>
+        <summary><span class="step-num">6</span> Descobrir mais a partir deste canal <span class="badge badge-muted">pontes</span></summary>
+        <div class="id-etapa-corpo">
+          <div class="id-card mt-card">
+            <div class="mt-titulo">Canais parecidos <span class="mt-min">20:05</span></div>
+            <p class="hint">Manda os 3 vídeos mais vistos do canal para a mineração por recomendações (aba Minerar): ela lê a lateral de recomendados do YouTube e traz canais pequenos e novos. Confira as opções na barra lateral e clique em "Minerar recomendações".</p>
+            <div class="id-linha"><button type="button" id="cn-ponte-similares">Enviar os 3 vídeos mais vistos para a mineração</button><span class="muted-small" id="cn-ponte-info"></span></div>
+          </div>
+          <div class="id-card mt-card">
+            <div class="mt-titulo">O que está viral no nicho <span class="mt-min">22:24</span></div>
+            <p class="hint">Cria uma pesquisa na aba Ideias com as palavras mais repetidas nos títulos do canal e abre o radar de vídeos em alta. Edite os termos antes de enviar.</p>
+            <div class="id-grid">
+              <div><label for="cn-ponte-tema">Tema da pesquisa</label><input type="text" id="cn-ponte-tema"></div>
+              <div style="grid-column: span 2"><label for="cn-ponte-termos">Termos de busca (separados por vírgula)</label><input type="text" id="cn-ponte-termos"></div>
+            </div>
+            <div class="id-linha"><button type="button" id="cn-ponte-nicho">Criar pesquisa na aba Ideias</button><span class="muted-small" id="cn-ponte-nicho-info"></span></div>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div id="view-yt" class="view" style="display:none">
+    <div class="main-head">
+      <div class="main-title">API do YouTube</div>
+      <div class="muted-small">seis ferramentas que leem o YouTube pela API oficial</div>
+    </div>
+    <p class="hint id-intro">Diferente das outras abas, esta lê o YouTube pela <b>API oficial</b> e por isso precisa de uma chave sua, gratuita. A API limita o uso por <b>cota</b>: são 10.000 unidades por dia, uma busca por palavra-chave gasta 100 e as demais consultas gastam 1 ou 2. Cada botão mostra o custo antes de você clicar. A IA segue o padrão do app: o app monta o prompt, você roda em qualquer IA de chat e cola o JSON de volta.</p>
+
+    <details class="id-etapa" open>
+      <summary><span class="step-num">0</span> Chave da API e cota</summary>
+      <div class="id-etapa-corpo">
+        <div class="id-grid">
+          <div style="grid-column: span 2">
+            <label for="yt-chave">Chave da YouTube Data API v3</label>
+            <div class="id-linha"><input type="password" id="yt-chave" autocomplete="off" spellcheck="false" placeholder="AIza..."><button type="button" id="yt-chave-ver">Mostrar</button><button type="button" id="yt-chave-esquecer">Esquecer</button></div>
+            <span class="muted-small" id="yt-chave-msg"></span>
+          </div>
+          <div>
+            <label for="yt-short">Considerar Short até</label>
+            <select id="yt-short"><option value="60">60 segundos</option><option value="180">3 minutos</option></select>
+            <span class="muted-small">A API não diz o que é Short: é uma classificação por duração.</span>
+          </div>
+        </div>
+        <div class="cn-cards">
+          <div class="cn-card"><div class="cn-card-rot">Cota usada hoje (estimativa)</div><div class="cn-card-val" id="yt-cota-usada">0</div><div class="cn-card-sub">de 10.000 · zera à meia-noite do Pacífico</div></div>
+          <div class="cn-card"><div class="cn-card-rot">Chave do ambiente</div><div class="cn-card-val" id="yt-ambiente">—</div><div class="cn-card-sub">variável YOUTUBE_API_KEY</div></div>
+        </div>
+        <div class="id-linha"><button type="button" id="yt-cota-zerar">Zerar contador</button><span class="muted-small">O contador só soma o que este navegador gastou; outras ferramentas com a mesma chave não entram.</span></div>
+        <details class="mt-aviso">
+          <summary>Como criar a chave (5 minutos, sem cartão)</summary>
+          <ol class="mt-lista">
+            <li>Entre em <b>console.cloud.google.com</b> e crie um projeto.</li>
+            <li>Em <b>APIs e serviços</b>, abra a biblioteca, procure <b>YouTube Data API v3</b> e clique em <b>Ativar</b>.</li>
+            <li>Em <b>Credenciais</b>, clique em <b>Criar credenciais</b> e escolha <b>Chave de API</b>.</li>
+            <li>Cole a chave acima. Ela fica só neste navegador e o app a envia apenas para o YouTube, pelo seu próprio computador.</li>
+          </ol>
+        </details>
+      </div>
+    </details>
+
+    <div class="yt-subnav" role="tablist">
+      <button type="button" class="yt-sub-btn active" data-sub="pesquisa" role="tab">1. Pesquisa avançada</button>
+      <button type="button" class="yt-sub-btn" data-sub="alta" role="tab">2. Em alta</button>
+      <button type="button" class="yt-sub-btn" data-sub="comparar" role="tab">3. Comparar concorrentes</button>
+      <button type="button" class="yt-sub-btn" data-sub="canal" role="tab">4. Analisar canal</button>
+      <button type="button" class="yt-sub-btn" data-sub="video" role="tab">5. Analisar vídeo</button>
+      <button type="button" class="yt-sub-btn" data-sub="historico" role="tab">6. Histórico do canal</button>
+    </div>
+
+    <!-- 1. Pesquisa avançada -->
+    <div class="yt-painel" id="yt-painel-pesquisa">
+      <div class="id-card mt-card">
+        <div class="mt-titulo">Pesquisa avançada</div>
+        <p class="hint">Com palavra-chave, usa a busca do YouTube com país, idioma e datas. Sem palavra-chave, mostra os vídeos em alta do país (EUA se você não escolher) e aplica seus filtros. Sem datas, assume os últimos 7 dias. Os filtros de views, inscritos, views do canal e duração exata rodam aqui no navegador, sem gastar cota.</p>
+        <div class="id-grid">
+          <div style="grid-column: span 2"><label for="yp-q">Palavra-chave (opcional)</label><input type="text" id="yp-q" placeholder="ex.: estoicismo"></div>
+          <div><label for="yp-formato">Formato</label><select id="yp-formato"><option value="todos">Todos</option><option value="longos">Longos</option><option value="shorts">Shorts</option></select></div>
+          <div><label for="yp-idioma">Idioma</label><select id="yp-idioma"><option value="">Qualquer</option></select></div>
+          <div><label for="yp-pais">País</label><select id="yp-pais"><option value="">Qualquer</option></select></div>
+          <div><label for="yp-duracao">Duração (filtro da API)</label><select id="yp-duracao"><option value="any">Qualquer</option><option value="short">Curta (menos de 4 min)</option><option value="medium">Média (4 a 20 min)</option><option value="long">Longa (mais de 20 min)</option></select></div>
+          <div><label for="yp-api-ordem">Ordem da busca</label><select id="yp-api-ordem"><option value="viewCount">Mais vistos</option><option value="relevance">Relevância</option><option value="date">Mais recentes</option><option value="rating">Melhor avaliados</option></select></div>
+          <div><label for="yp-qtd">Quantidade (1 a 50)</label><input type="number" id="yp-qtd" min="1" max="50" value="25"></div>
+          <div><label for="yp-de">Publicado de</label><input type="date" id="yp-de"></div>
+          <div><label for="yp-ate">até</label><input type="date" id="yp-ate"></div>
+        </div>
+        <div class="id-linha" id="yp-atalhos"><span class="muted-small">Período:</span></div>
+        <div class="id-linha"><button type="button" class="primary" id="yp-buscar">Buscar</button><span class="muted-small" id="yp-custo"></span></div>
+        <div class="muted-small" id="yp-msg"></div>
+      </div>
+      <div id="yp-resultado" style="display:none">
+        <div class="id-card mt-card">
+          <div class="mt-titulo">Filtros extras <span class="muted-small">aplicados aqui, sem nova chamada à API</span></div>
+          <div class="id-grid">
+            <div><label for="yp-f-views">Views mínimas</label><input type="number" id="yp-f-views" min="0"></div>
+            <div><label for="yp-f-smin">Inscritos do canal (mín.)</label><input type="number" id="yp-f-smin" min="0"></div>
+            <div><label for="yp-f-smax">Inscritos do canal (máx.)</label><input type="number" id="yp-f-smax" min="0"></div>
+            <div><label for="yp-f-cvmin">Views do canal (mín.)</label><input type="number" id="yp-f-cvmin" min="0"></div>
+            <div><label for="yp-f-cvmax">Views do canal (máx.)</label><input type="number" id="yp-f-cvmax" min="0"></div>
+            <div><label for="yp-f-dmin">Duração exata, de (min)</label><input type="number" id="yp-f-dmin" min="0" step="0.5"></div>
+            <div><label for="yp-f-dmax">Duração exata, até (min)</label><input type="number" id="yp-f-dmax" min="0" step="0.5"></div>
+            <div><label for="yp-f-formato">Formato</label><select id="yp-f-formato"><option value="todos">Todos</option><option value="longos">Longos</option><option value="shorts">Shorts</option></select></div>
+          </div>
+          <div class="id-linha">
+            <label for="yp-ordem" class="inline">Ordenar por</label>
+            <select id="yp-ordem"></select>
+            <select id="yp-dir"><option value="desc">maior primeiro</option><option value="asc">menor primeiro</option></select>
+            <button type="button" id="yp-csv">Exportar CSV</button>
+            <button type="button" id="yp-pdf">Exportar PDF</button>
+            <span class="muted-small" id="yp-contagem"></span>
+          </div>
+          <span class="muted-small">O PDF abre a janela de impressão do navegador: escolha “Salvar como PDF”.</span>
+        </div>
+        <div class="table-wrap"><table class="candidate-table mt-tabela yt-tabela" id="yp-tabela"></table></div>
+      </div>
+    </div>
+
+    <!-- 2. Em alta -->
+    <div class="yt-painel" id="yt-painel-alta" hidden>
+      <div class="id-card mt-card">
+        <div class="mt-titulo">Em alta</div>
+        <p class="hint">Traz os 50 vídeos em alta do país e mantém só os que têm 100 mil views ou mais. A duração e a ordem são aplicadas aqui. Custa 2 unidades.</p>
+        <div class="id-grid">
+          <div><label for="ya-pais">País</label><select id="ya-pais"></select></div>
+          <div><label for="ya-cat">Categoria</label><select id="ya-cat"></select></div>
+          <div><label for="ya-dur">Duração</label><select id="ya-dur"></select></div>
+        </div>
+        <div class="id-linha" id="ya-atalhos"><span class="muted-small">Atalhos:</span></div>
+        <div class="id-linha"><button type="button" class="primary" id="ya-carregar">Carregar</button><span class="muted-small">2 unidades de cota</span></div>
+        <div class="muted-small" id="ya-msg"></div>
+      </div>
+      <div id="ya-resultado" style="display:none">
+        <div class="id-linha">
+          <label for="ya-ordem" class="inline">Ordenar por</label>
+          <select id="ya-ordem"><option value="views">Views</option><option value="engajamento">Engajamento</option><option value="data">Data</option></select>
+          <select id="ya-dir"><option value="desc">maior primeiro</option><option value="asc">menor primeiro</option></select>
+          <span class="muted-small" id="ya-contagem"></span>
+        </div>
+        <div class="table-wrap"><table class="candidate-table mt-tabela yt-tabela" id="ya-tabela"></table></div>
+        <div id="yt-ia-alta"></div>
+      </div>
+    </div>
+
+    <!-- 3. Comparar concorrentes -->
+    <div class="yt-painel" id="yt-painel-comparar" hidden>
+      <div class="id-card mt-card">
+        <div class="mt-titulo">Comparar concorrentes</div>
+        <p class="hint">Informe dois canais (ID, @handle ou link). O app lê os dois ao mesmo tempo, os 10 últimos vídeos de cada um, e mostra os números lado a lado. A tabela só diz quem tem o número maior, sem julgar o que é melhor. Custa cerca de 7 unidades.</p>
+        <div class="id-grid">
+          <div style="grid-column: span 2"><label for="yc-a">Canal A</label><input type="text" id="yc-a" placeholder="@canal ou link"></div>
+          <div style="grid-column: span 2"><label for="yc-b">Canal B</label><input type="text" id="yc-b" placeholder="@canal ou link"></div>
+        </div>
+        <div class="id-linha"><button type="button" class="primary" id="yc-comparar">Comparar</button><span class="muted-small" id="yc-custo"></span></div>
+        <div class="muted-small" id="yc-msg"></div>
+      </div>
+      <div id="yc-resultado" style="display:none">
+        <div class="cn-duas" id="yc-cabecas"></div>
+        <div class="table-wrap"><table class="candidate-table mt-tabela yt-tabela" id="yc-tabela"></table></div>
+        <div class="cn-duas" id="yc-videos"></div>
+        <div id="yt-ia-comparar"></div>
+      </div>
+    </div>
+
+    <!-- 4. Analisar canal -->
+    <div class="yt-painel" id="yt-painel-canal" hidden>
+      <div class="id-card mt-card">
+        <div class="mt-titulo">Analisar canal</div>
+        <p class="hint">Lê os dados públicos do canal e calcula views por vídeo, vídeos por semana (pela data de criação) e a taxa de inscritos sobre views. Custa 2 unidades com @handle e 1 com o ID.</p>
+        <div class="id-linha"><input type="text" id="yk-canal" placeholder="@canal, ID (UC...) ou link" style="flex:1; min-width:260px"><button type="button" class="primary" id="yk-analisar">Analisar</button></div>
+        <span class="muted-small" id="yk-custo"></span>
+        <div class="muted-small" id="yk-msg"></div>
+      </div>
+      <div id="yk-resultado" style="display:none">
+        <div class="id-card mt-card"><div id="yk-cab" class="cn-cab"></div><div class="cn-cards" id="yk-cards"></div><div class="cn-chips" id="yk-palavras"></div><details class="mt-aviso"><summary>Descrição do canal</summary><p id="yk-descricao" style="white-space:pre-wrap"></p></details></div>
+        <div id="yt-ia-canal"></div>
+      </div>
+    </div>
+
+    <!-- 5. Analisar vídeo -->
+    <div class="yt-painel" id="yt-painel-video" hidden>
+      <div class="id-card mt-card">
+        <div class="mt-titulo">Analisar vídeo</div>
+        <p class="hint">Cole o link (normal, youtu.be ou /shorts/) ou o ID. Mostra as estatísticas, as tags, a descrição e a miniatura, com botão para baixar a melhor resolução que existir. Custa 2 unidades.</p>
+        <div class="id-linha"><input type="text" id="yv-video" placeholder="https://www.youtube.com/watch?v=..." style="flex:1; min-width:260px"><button type="button" class="primary" id="yv-analisar">Analisar</button></div>
+        <div class="muted-small" id="yv-msg"></div>
+      </div>
+      <div id="yv-resultado" style="display:none">
+        <div class="id-card mt-card">
+          <div class="yt-video-topo"><img id="yv-thumb" alt="Miniatura do vídeo" width="320"><div class="yt-video-info"><div id="yv-cab" class="cn-cab"></div><div class="id-linha"><a id="yv-baixar" class="botao-link" href="#" download>Baixar miniatura</a><span class="muted-small" id="yv-baixar-info"></span></div></div></div>
+          <div class="cn-cards" id="yv-cards"></div>
+          <div class="cn-chips" id="yv-tags"></div>
+          <details class="mt-aviso"><summary>Descrição do vídeo</summary><p id="yv-descricao" style="white-space:pre-wrap"></p></details>
+        </div>
+        <div class="id-card mt-card">
+          <div class="mt-titulo">Transcrição (opcional, melhora muito a engenharia reversa)</div>
+          <p class="hint">O app não busca a transcrição em serviço externo. No YouTube, abra o vídeo, clique em “...mais” abaixo do título, escolha “Mostrar transcrição”, copie o texto e cole aqui. Sem ela, a IA só vê título, descrição, tags e números e é obrigada a marcar o resto como hipótese.</p>
+          <textarea id="yv-transcricao" rows="6" placeholder="Cole a transcrição aqui"></textarea>
+        </div>
+        <div id="yt-ia-video"></div>
+      </div>
+    </div>
+
+    <!-- 6. Histórico do canal -->
+    <div class="yt-painel" id="yt-painel-historico" hidden>
+      <div class="id-card mt-card">
+        <div class="mt-titulo">Histórico do canal</div>
+        <p class="hint">Lê até 30 vídeos do canal, do mais novo para o mais antigo, com views, likes e comentários de cada um. O formato e a ordem são aplicados aqui, sem nova chamada. Custa 4 unidades com @handle e 3 com o ID.</p>
+        <div class="id-linha"><input type="text" id="yh-canal" placeholder="@canal, ID (UC...) ou link" style="flex:1; min-width:260px"><select id="yh-formato"><option value="todos">Todos</option><option value="longos">Longos</option><option value="shorts">Shorts</option></select><button type="button" class="primary" id="yh-carregar">Carregar</button></div>
+        <span class="muted-small" id="yh-custo"></span>
+        <div class="muted-small" id="yh-msg"></div>
+      </div>
+      <div id="yh-resultado" style="display:none">
+        <div class="id-card mt-card"><div id="yh-cab" class="cn-cab"></div><div class="cn-cards" id="yh-cards"></div></div>
+        <div class="id-linha">
+          <label for="yh-ordem" class="inline">Ordenar por</label>
+          <select id="yh-ordem"><option value="data">Recentes</option><option value="views">Views</option><option value="likes">Likes</option><option value="engajamento">Engajamento</option></select>
+          <span class="muted-small" id="yh-contagem"></span>
+        </div>
+        <div class="table-wrap"><table class="candidate-table mt-tabela yt-tabela" id="yh-tabela"></table></div>
+        <div id="yt-ia-historico"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="{{ url_for('static', filename='ordenacao.js') }}"></script>
+<script src="{{ url_for('static', filename='metodo.js') }}"></script>
+<script src="{{ url_for('static', filename='canal.js') }}"></script>
+<script src="{{ url_for('static', filename='ytapi.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='biblioteca.js') }}"></script>
+<script src="{{ url_for('static', filename='ideias.js') }}"></script>
+<script src="{{ url_for('static', filename='metodo_ui.js') }}"></script>
+<script src="{{ url_for('static', filename='canal_ui.js') }}"></script>
+<script src="{{ url_for('static', filename='ytapi_ui.js') }}"></script>
+</body>
+</html>

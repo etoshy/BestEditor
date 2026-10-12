@@ -51,3 +51,13 @@ direção automaticamente.
   trechos livres e respeita o intervalo mínimo).
 - `EIXOS`, `RITMOS`, `DENSIDADES`: os valores aceitos.
 - `normalizar_predefinicao()`: o formato salvo.
+
+## Direções tiradas de canais de referência
+
+`direcoes_canais.py` guarda direções montadas a partir da análise de um vídeo de um criador (cortes, quadros, textos e
+áudio), traduzidas para os itens que o site já tem. Elas aparecem na lista junto com as do sistema. Um id que não existir
+na instalação (por exemplo, sem o pacote de extras) é ignorado, e a direção segue com o resto.
+
+- **Rabbit hole sombrio (estilo Mistere)** (`sys_mistere`): cortes de ~3 s, filtro frio com vinheta, estática e glitch de
+  TV nas viradas, números gigantes e máquina de escrever, sem legenda queimada. O modelo de vídeo "🕳 Rabbit holes
+  bizarros" aplica essa direção sozinho.

@@ -104,7 +104,8 @@ def _com_extras(p: Dict[str, Any]) -> Dict[str, Any]:
 
 def sistema() -> List[Dict[str, Any]]:
     """As direções do sistema já com os extras e os quadros editoriais."""
-    return [_com_extras(p) for p in dp_visual.dp()["presets"]["system"]]
+    import direcoes_canais
+    return [_com_extras(p) for p in list(dp_visual.dp()["presets"]["system"]) + direcoes_canais.todas()]
 
 
 def direcoes(com_usuario: bool = True) -> List[Dict[str, Any]]:

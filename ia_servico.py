@@ -88,6 +88,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                  "prompt, manda pra IA e já lê a resposta (sem copiar e colar).", True),
     "edicao": ("✂️ Prompt de edição direto na IA",
                "No Estúdio (aba 🤖 IA), um botão manda o prompt de edição (ou cada parte dele) pra IA e cola a resposta.", True),
+    "canal": ("📊 Analisador de canal",
+              "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
+              "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),
 }
 
 PADRAO: Dict[str, Any] = {

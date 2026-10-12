@@ -1,0 +1,14 @@
+{% set melhores = ((a.ia or {}).melhores or [])|map(attribute='id')|list %}{% set piores = ((a.ia or {}).piores or [])|map(attribute='id')|list %}
+<div class="ac-v {{ 'bom' if v.id in melhores else ('ruim' if v.id in piores else '') }}">
+  <a href="{{ v.url }}" target="_blank" rel="noopener"><img loading="lazy" src="{{ v.thumb }}" alt=""></a>
+  <div class="t">{{ v.titulo }}</div>
+  <div class="n">
+    👁 {{ fmt_num(v.views) }} · ⏱ {{ fmt_dur(v.duracao_s) }}{% if v.get('idade_dias') is not none %} · há {{ v.idade_dias }} d{% endif %}<br>
+    {% if v.get('outlier') is not none %}<span class="ac-badge {{ 'b-out' if v.outlier >= 2 else ('b-baixo' if v.outlier < 0.5 else '') }}">×{{ v.outlier }}</span>{% endif %}
+    {% if v.get('views_dia') is not none %}<span class="hint">{{ fmt_num(v.views_dia) }}/dia</span>{% endif %}
+    {% if v.get('likes') is not none %}<span class="hint"> · 👍 {{ fmt_num(v.likes) }}</span>{% endif %}
+    {% if v.get('comentarios') is not none %}<span class="hint"> · 💬 {{ fmt_num(v.comentarios) }}</span>{% endif %}
+    {% if v.transcricao %}<details><summary><span class="ac-badge b-tr">📝 {{ v.transcricao.ppm or '?' }} p/min</span> gancho</summary><div class="hint">{{ v.transcricao.gancho }}</div></details>
+    {% elif v.transcricao_erro %}<div class="hint" title="{{ v.transcricao_erro }}">sem transcrição</div>{% endif %}
+  </div>
+</div>
