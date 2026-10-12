@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ cat.nome }} — espaço{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1000px; }
+  .hint { font-size: .85rem; color: #666; }
+  table.es-t { border-collapse: collapse; width: 100%; font-size: .88rem; margin-top: 10px; }
+  .es-t td, .es-t th { border-bottom: 1px solid #eee; padding: 7px 6px; text-align: left; vertical-align: top; }
+  .es-t td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .es-t input[type=checkbox] { width: auto; margin: 0; }
+  button.es-b { margin: 0; padding: 5px 10px; font-size: .82rem; background: #dc2626; }
+  button.es-b:disabled { background: #9ca3af; cursor: not-allowed; }
+  .es-tag { font-size: .72rem; border-radius: 999px; padding: 1px 7px; margin-left: 4px; background: #e0e7ff; color: #3730a3; }
+  .ok { background: #dcfce7; color: #166534; padding: 10px; border-radius: 6px; margin-top: 12px; }
+  .es-barra { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+</style>
+<p><a href="{{ url_for('espaco_page') }}">← Espaço em disco</a></p>
+<h1>{{ cat.nome }} <span class="hint" style="font-size:1rem;">{{ fmt(total) }} · {{ itens|length }} itens</span></h1>
+<p class="hint">{{ cat.desc }}{% if not cat.virtual %} — pasta <code>{{ cat.pasta }}/</code>{% endif %}</p>
+{% if cat.protegido %}<div class="error">⚠ Categoria protegida: o que você apagar aqui não volta (perfil de voz gravado) ou obriga a refazer (baixar o modelo, entrar na conta de novo).</div>{% endif %}
+<div id="esMsg"></div>
+
+{% if itens %}
+<div class="es-barra">
+  <label style="margin:0;font-weight:normal;"><input type="checkbox" id="esTodos" style="width:auto;"> marcar todos</label>
+  <button class="es-b" id="esSel" disabled>🗑 Apagar marcados</button>
+  <span id="esSelInfo" class="hint"></span>
+  {% if not cat.protegido %}<button class="es-b" id="esCat" style="margin-left:auto;">Apagar tudo desta categoria</button>{% endif %}
+</div>
+<table class="es-t">
+  <tr><th></th><th>Item</th><th class="num">Tamanho</th><th class="num">Modificado</th><th></th></tr>
+  {% for it in itens %}
+  <tr>
+    <td><input type="checkbox" class="esChk" value="{{ it.id }}" data-b="{{ it.bytes }}" {% if it.em_uso %}disabled{% endif %}></td>
+    <td><b>{{ it.nome }}</b>{% if it.nome != it.id %} <span class="hint">{{ it.id }}</span>{% endif %}
+      {% if it.em_uso %}<span class="es-tag">em andamento</span>{% endif %}{% if it.pasta %}<span class="hint"> 📁</span>{% endif %}
+      {% if it.detalhe %}<div class="hint">{{ it.detalhe }}</div>{% endif %}</td>
+    <td class="num"><b>{{ fmt(it.bytes) }}</b></td>
+    <td class="num hint">{{ time.strftime('%d/%m/%Y %H:%M', time.localtime(it.quando)) if it.quando else '' }}</td>
+    <td class="num"><button class="es-b es-um" data-id="{{ it.id }}" data-nome="{{ it.nome }}" {% if it.em_uso %}disabled title="em andamento"{% endif %}>Apagar</button></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="hint">Nada aqui. 🎉</p>{% endif %}
+
+<script>
+(function () {
+  const CAT = {{ cat.id|tojson }};
+  const $ = (id) => document.getElementById(id);
+  const msg = (t, ok) => { $('esMsg').innerHTML = `<div class="${ok ? 'ok' : 'error'}">${t}</div>`; window.scrollTo(0, 0); };
+  const fmt = (b) => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (b >= 1024 && i < 4) { b /= 1024; i++; } return (i < 2 ? b.toFixed(0) : b.toFixed(1)).replace('.', ',') + ' ' + u[i]; };
+  async function apagar(corpo) {
+    const r = await fetch(`/espaco/${CAT}/apagar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+    sessionStorage.setItem('esMsg', `✅ ${d.apagados} item(ns) apagado(s) — ${d.liberado_fmt} liberados.` + (d.pulados.length ? `<br>Ficaram: ${d.pulados.slice(0, 8).join('; ')}` : ''));
+    location.reload();
+  }
+  const chks = () => [...document.querySelectorAll('.esChk')];
+  function atualizar() {
+    const sel = chks().filter(c => c.checked);
+    if ($('esSel')) { $('esSel').disabled = !sel.length; $('esSelInfo').textContent = sel.length ? `${sel.length} marcado(s) · ${fmt(sel.reduce((s, c) => s + Number(c.dataset.b), 0))}` : ''; }
+  }
+  chks().forEach(c => c.addEventListener('change', atualizar));
+  if ($('esTodos')) $('esTodos').addEventListener('change', (e) => { chks().forEach(c => { if (!c.disabled) c.checked = e.target.checked; }); atualizar(); });
+  document.querySelectorAll('.es-um').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm(`Apagar "${b.dataset.nome}"? Não tem como desfazer.`)) return;
+    b.disabled = true; try { await apagar({ id: b.dataset.id }); } catch (e) { msg('⚠ ' + e.message); b.disabled = false; }
+  }));
+  if ($('esSel')) $('esSel').addEventListener('click', async () => {
+    const ids = chks().filter(c => c.checked).map(c => c.value);
+    if (!ids.length || !confirm(`Apagar ${ids.length} item(ns)? Não tem como desfazer.`)) return;
+    try { await apagar({ ids }); } catch (e) { msg('⚠ ' + e.message); }
+  });
+  if ($('esCat')) $('esCat').addEventListener('click', async () => {
+    if (!confirm('Apagar TUDO desta categoria? Não tem como desfazer.')) return;
+    try { await apagar({ tudo: true }); } catch (e) { msg('⚠ ' + e.message); }
+  });
+  try { const m = sessionStorage.getItem('esMsg'); if (m) { msg(m, true); sessionStorage.removeItem('esMsg'); } } catch (_) {}
+})();
+</script>
+{% endblock %}

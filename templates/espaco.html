@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Espaço em disco{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1000px; }
+  .es-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; background: #fff; }
+  .hint { font-size: .85rem; color: #666; }
+  .es-total { display: flex; gap: 18px; flex-wrap: wrap; align-items: baseline; }
+  .es-total b { font-size: 1.6rem; }
+  .es-barra { height: 14px; background: #e5e7eb; border-radius: 7px; overflow: hidden; display: flex; margin-top: 8px; }
+  .es-barra span { display: block; height: 100%; }
+  table.es-t { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  .es-t td, .es-t th { border-bottom: 1px solid #eee; padding: 8px 6px; text-align: left; vertical-align: middle; }
+  .es-t td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .es-mini { height: 8px; background: #ede9fe; border-radius: 4px; min-width: 2px; }
+  .es-tag { font-size: .72rem; border-radius: 999px; padding: 1px 7px; margin-left: 4px; white-space: nowrap; }
+  .t-prot { background: #fef3c7; color: #92400e; } .t-reg { background: #dcfce7; color: #166534; }
+  button.es-b { margin: 0; padding: 5px 10px; font-size: .82rem; background: #dc2626; }
+  button.es-b:disabled { background: #9ca3af; cursor: not-allowed; }
+  .ok { background: #dcfce7; color: #166534; padding: 10px; border-radius: 6px; margin-top: 12px; }
+</style>
+<h1>🧹 Espaço em disco</h1>
+<p class="hint">Quanto cada parte do site ocupa no seu PC. Clique numa categoria pra ver os itens e apagar um, vários ou todos.
+  <span class="es-tag t-reg">refaz sozinho</span> = o site baixa/gera de novo quando precisar ·
+  <span class="es-tag t-prot">protegido</span> = fica fora do "apagar tudo" (só item por item).</p>
+<div id="esMsg"></div>
+
+<div class="es-card">
+  <div class="es-total">
+    <div><b>{{ fmt(r.total) }}</b> <span class="hint">ocupados pelo site</span></div>
+    {% if r.disco %}<div><b style="font-size:1.1rem">{{ fmt(r.disco.livre) }}</b> <span class="hint">livres no disco (de {{ fmt(r.disco.total) }})</span></div>{% endif %}
+  </div>
+  {% if r.disco %}{% set site = r.total / r.disco.total * 100 %}{% set outros = (r.disco.usado - r.total) / r.disco.total * 100 %}
+  <div class="es-barra" title="roxo = site · cinza = resto do disco usado · branco = livre">
+    <span style="width:{{ '%.2f'|format(site) }}%;background:#7c3aed"></span><span style="width:{{ '%.2f'|format(outros if outros > 0 else 0) }}%;background:#9ca3af"></span>
+  </div>{% endif %}
+</div>
+
+<div class="es-card">
+  {% set maior = (r.categorias|map(attribute='bytes')|max) or 1 %}
+  <table class="es-t">
+    <tr><th>Categoria</th><th style="width:28%"></th><th class="num">Itens</th><th class="num">Tamanho</th><th></th></tr>
+    {% for c in r.categorias|sort(attribute='bytes', reverse=True) %}
+    <tr>
+      <td><a href="{{ url_for('espaco_categoria', cid=c.id) }}" style="font-weight:600;">{{ c.nome }}</a>
+        {% if c.protegido %}<span class="es-tag t-prot">protegido</span>{% endif %}{% if c.regeneravel %}<span class="es-tag t-reg">refaz sozinho</span>{% endif %}
+        <div class="hint">{{ c.desc }}{% if not c.virtual %} <code>{{ c.pasta }}/</code>{% endif %}</div></td>
+      <td><div class="es-mini" style="width:{{ '%.1f'|format(c.bytes / maior * 100) }}%"></div></td>
+      <td class="num">{{ c.n }}</td>
+      <td class="num"><b>{{ fmt(c.bytes) }}</b></td>
+      <td class="num"><button class="es-b" data-cat="{{ c.id }}" data-nome="{{ c.nome }}" {% if c.protegido or not c.n %}disabled title="{{ 'Protegida: apague item por item' if c.protegido else 'vazio' }}"{% endif %}>Apagar tudo</button></td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="hint">🧽 Caches dos projetos está dentro de 🎬 Projetos (o total não conta duas vezes). Projeto em andamento nunca é apagado.</p>
+</div>
+
+<div class="es-card" style="border-color:#fecaca;">
+  <h2 style="margin:0;color:#991b1b;">⚠ Apagar tudo de todas as categorias</h2>
+  <p class="hint">Apaga projetos, saídas, uploads, Modelos de vídeo, vendas, análises, caches… — <b>menos</b> as protegidas
+    (perfis/modelos de voz e a sessão do Flow) e os projetos em andamento. Não tem como desfazer.</p>
+  <input type="text" id="esConf" placeholder="digite APAGAR" style="max-width:220px;">
+  <button class="es-b" id="esTudo" style="padding:8px 14px;">🗑 Apagar tudo</button>
+</div>
+
+<script>
+(function () {
+  const msg = (t, ok) => { document.getElementById('esMsg').innerHTML = `<div class="${ok ? 'ok' : 'error'}">${t}</div>`; window.scrollTo(0, 0); };
+  async function post(url, corpo) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); return d;
+  }
+  const fim = (d) => `✅ ${d.apagados} item(ns) apagado(s) — ${d.liberado_fmt} liberados.` + (d.pulados && d.pulados.length ? `<br>Ficaram: ${d.pulados.slice(0, 8).join('; ')}` : '');
+  document.querySelectorAll('button[data-cat]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm(`Apagar TUDO de "${b.dataset.nome}"? Não tem como desfazer.`)) return;
+    b.disabled = true; b.textContent = 'apagando…';
+    try { const d = await post(`/espaco/${b.dataset.cat}/apagar`, { tudo: true }); sessionStorage.setItem('esMsg', fim(d)); location.reload(); }
+    catch (e) { msg('⚠ ' + e.message); b.disabled = false; b.textContent = 'Apagar tudo'; }
+  }));
+  document.getElementById('esTudo').addEventListener('click', async () => {
+    const conf = document.getElementById('esConf').value;
+    if (conf.trim().toUpperCase() !== 'APAGAR') { msg('Digite APAGAR na caixa pra confirmar.'); return; }
+    if (!confirm('Última confirmação: apagar tudo de todas as categorias (menos as protegidas)?')) return;
+    try { const d = await post('/espaco/apagar-tudo', { confirmar: conf }); sessionStorage.setItem('esMsg', fim(d)); location.reload(); }
+    catch (e) { msg('⚠ ' + e.message); }
+  });
+  try { const m = sessionStorage.getItem('esMsg'); if (m) { msg(m, true); sessionStorage.removeItem('esMsg'); } } catch (_) {}
+})();
+</script>
+{% endblock %}

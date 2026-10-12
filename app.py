@@ -8823,6 +8823,17 @@ import ia_rotas as _ia_rotas  # noqa: E402  🤖 IA nas buscas e modelos (v84_53
 _ia_rotas.registrar(app, BASE_DIR)
 import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de canal + ⛏ Niche Miner)
 _analisador_rotas.registrar(app, BASE_DIR)
+import espaco as _espaco  # noqa: E402  (🧹 Espaço em disco)
+
+
+def _apagar_projeto_inteiro(job_id: str) -> None:
+    _JOBS.pop(job_id, None)
+    _PERF_LOGS.pop(job_id, None)
+    _apagar_arquivos_do_projeto(job_id)
+
+
+_espaco.registrar(app, BASE_DIR, lambda: _espaco.Contexto(
+    BASE_DIR, _JOBS, lambda j: j.get("status") in _STATUS_EM_ANDAMENTO, apagar_projeto=_apagar_projeto_inteiro))
 
 
 def _texto_do_dossie(pid: Optional[str]) -> str:

@@ -28,6 +28,22 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🧹 Espaço em disco (v84_64)
+
+Link "🧹 Espaço em disco" no topo. Mostra quanto o site ocupa no total (e quanto sobra no disco) e cada categoria com o
+tamanho e o número de itens: 🎬 Projetos de vídeo (com o vídeo final), 🧽 Caches dos projetos, 📤 Outras saídas
+(vozes, capturas, cortes, downloads), uploads, Roteiro para Áudio, Conversas, Roteiro do YouTube, Vídeo de venda,
+Modelos de vídeo, Vídeos modelados, Análises de canal, Niche Miner, cache da IA, downloads temporários, lixo do Python,
+modelos/perfis de voz e a sessão do Flow.
+
+- Clique numa categoria: lista cada item (maior primeiro) com tamanho e data. Apague um, marque vários, ou apague a
+  categoria inteira.
+- **🧽 Caches dos projetos** apaga só o que o site refaz sozinho (clipes pré-baixados, prévias guardadas, clipes prontos,
+  arquivos intermediários da montagem): o projeto continua na Galeria e abrindo normal.
+- **Apagar tudo de todas as categorias**: precisa digitar APAGAR. Não mexe nas **protegidas** (modelos e perfis de voz,
+  sessão da conta Google do Flow) — essas só item por item.
+- Projeto em andamento (transcrevendo, montando…) nunca é apagado. Apagar um projeto também tira ele da Galeria.
+
 ## 🔒 Subir pro GitHub sem dados pessoais (v84_63)
 
 O `.gitignore` deixa de fora tudo que é seu ou que o site gerou: chaves (`site_config.json`, `ia_config.json`, `.env`),
