@@ -68,6 +68,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                     "Quando você busca à mão no editor, os resultados vêm ordenados pela nota, com o motivo.", True),
     "nova_busca": ("🔁 Reescrever a busca quando nada presta",
                    "Se todos os candidatos ficam abaixo de 5, busca de novo com a sugestão da IA (no máximo 2 vezes).", True),
+    "cartao": ("🃏 Sem imagem boa → cartão de texto",
+               "Quando o juiz reprova tudo (nota abaixo de 5 — ou abaixo da nota mínima num trecho abstrato), o trecho NÃO "
+               "usa a menos pior: vira um cartão (fundo escuro + a frase do trecho na tipografia da direção).", True),
     "youtube_ordem": ("🎬 Ordenar os vídeos do YouTube",
                       "Busca 20 vídeos, dá nota (canal oficial/original sobe; react, compilação, reupload descem) e mostra "
                       "os 8 melhores + \"Outros vídeos\".", True),

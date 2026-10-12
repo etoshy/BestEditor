@@ -267,6 +267,7 @@ function desenharResultado() {
     if (R.titulos.length) h += `<p style="margin:8px 0 0;"><b>Títulos alternativos:</b></p><ul class="ry-lista">${R.titulos.map(t => `<li>${esc(t)} <button class="ry-mini ry-copia" data-t="${esc(t)}">📋</button></li>`).join('')}</ul>`;
     if (R.descricao || (R.capitulos && R.capitulos.length)) {
       h += `<h3 style="margin:14px 0 4px;">📝 Descrição pro YouTube${R.capitulos && R.capitulos.length ? ` com ${R.capitulos.length} capítulos` : ''}</h3>
+        ${(R.capitulos_video || {}).capitulos ? `<p class="ry-ok" style="margin:4px 0;">📑 <label style="display:inline;font-weight:400;"><input type="checkbox" id="rUsarVideo" checked style="width:auto;"> usar os tempos do VÍDEO FINAL montado (já contam as chamadas e os cortes)</label></p>` : ''}
         ${R.audio ? `<p class="ry-ok" style="margin:4px 0;">🎙️ <label style="display:inline;font-weight:400;"><input type="checkbox" id="rUsarAudio" checked style="width:auto;"> usar os tempos REAIS do áudio gerado no Gerar voz</label> (${R.audio.duracao ? fmtMin(R.audio.duracao / 60) : '?'} de áudio${R.audio.com_palavras ? ', cada capítulo achado nas palavras faladas' : ', estimado pela duração'}${R.audio.gerado_em ? ' · ' + new Date(R.audio.gerado_em * 1000).toLocaleString().slice(0, 16) : ''})</p>` : ''}
         <p class="ry-hint">Tempos estimados pelo ritmo da narração: <input type="number" id="rWpm" value="${Number(localStorage.getItem('ryWpm') || 150)}" min="80" max="260" style="width:70px;"> palavras/min
         ou duração do áudio: <input type="text" id="rDurAudio" placeholder="ex.: 12:34" style="width:80px;"> (gerando a voz pelo botão 🎙️ daqui, os tempos reais do áudio entram sozinhos).</p>
@@ -345,6 +346,12 @@ function desenharResultado() {
 }
 function textoDescricao() {
   const R = P.resultado || {}; const caps = R.capitulos || [];
+  const CV = (R.capitulos_video || {}).capitulos;
+  if (CV && CV.length && $('rUsarVideo') && $('rUsarVideo').checked) {  // 📑 tempos do VÍDEO FINAL (com chamadas e cortes)
+    const longo = CV.some(c => c.segundos >= 3600);
+    const f = (s) => { s = Math.round(s); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60), se = s % 60; return (longo ? h + ':' + String(mi).padStart(2, '0') : mi) + ':' + String(se).padStart(2, '0'); };
+    return [R.descricao || '', CV.map(c => `${f(c.segundos)} ${c.titulo}`).join('\n')].filter(Boolean).join('\n\n');
+  }
   const wpm = Number(($('rWpm') || {}).value) || 150;
   const d = String(($('rDurAudio') || {}).value || '').trim();
   let total = (R.palavras || 0) / wpm * 60;
@@ -361,6 +368,7 @@ function ligarDescricao() {
   const atual = () => { $('rDesc').value = textoDescricao(); try { localStorage.setItem('ryWpm', $('rWpm').value); } catch (_) {} };
   atual(); $('rWpm').addEventListener('input', atual); $('rDurAudio').addEventListener('input', atual);
   if ($('rUsarAudio')) $('rUsarAudio').addEventListener('change', atual);
+  if ($('rUsarVideo')) $('rUsarVideo').addEventListener('change', atual);
   $('rCopiarDesc').addEventListener('click', () => { navigator.clipboard.writeText($('rDesc').value); $('rCopiarDesc').textContent = '✔ Copiado'; });
   document.querySelectorAll('.ry-copia').forEach(b => b.addEventListener('click', () => { navigator.clipboard.writeText(b.dataset.t); b.textContent = '✔'; }));
 }

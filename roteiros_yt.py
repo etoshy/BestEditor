@@ -1103,6 +1103,7 @@ def aplicar_tempos_do_audio(base: str, pid: str, palavras: List[Dict[str, Any]],
     if not res.get("capitulos"):
         return None
     res["capitulos"] = capitulos_pelo_audio(p, palavras, duracao)
+    res.pop("capitulos_video", None)  # áudio novo: o vídeo antigo não vale mais
     res["audio"] = {"duracao": round(duracao, 1) if duracao else None, "gerado_em": _time.time(), "origem": origem,
                     "com_palavras": bool(palavras)}
     p["resultado"] = res
@@ -1112,6 +1113,10 @@ def aplicar_tempos_do_audio(base: str, pid: str, palavras: List[Dict[str, Any]],
 
 def descricao_com_capitulos(res: Dict[str, Any], segundos_total: Optional[float] = None) -> str:
     """Texto pronto pra colar na descrição do YouTube: a descrição + "0:00 Capítulo"."""
+    cv = res.get("capitulos_video") or {}
+    if cv.get("capitulos") and not segundos_total:  # 📑 já tem vídeo montado: os tempos do VÍDEO FINAL
+        import capitulos_video
+        return "\n\n".join(x for x in (res.get("descricao") or "", capitulos_video.linhas(cv["capitulos"], cv.get("duracao"))) if x).strip()
     caps = res.get("capitulos") or []
     total = segundos_total or ((res.get("audio") or {}).get("duracao")) or (res.get("palavras", 0) / 150 * 60)
     linhas = []

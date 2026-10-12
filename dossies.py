@@ -1202,11 +1202,66 @@ def roteiro_para_voz(p: Dict[str, Any]) -> str:
     return ((p.get("resultado") or {}).get("roteiro_final") or "").strip()
 
 
+def parecido(texto: str, candidatos: List[Tuple[str, str]]) -> Optional[str]:
+    """O texto é (quase) igual a qual roteiro? candidatos = [(id, roteiro)] → id, ou None.
+    Compara os pares de palavras do começo e o tamanho (edições pequenas não atrapalham)."""
+    import roteiros_yt
+    alvo = roteiros_yt._toks(texto or "")
+    if len(alvo) < 40:
+        return None
+    ini, n = set(zip(alvo[:200], alvo[1:201])), len(alvo)
+    melhor, nota_m = None, 0.0
+    for pid, rot in candidatos:
+        tk = roteiros_yt._toks(rot or "")
+        if not tk or not 0.7 <= n / len(tk) <= 1.4:
+            continue
+        pares = set(zip(tk[:200], tk[1:201]))
+        nota = len(ini & pares) / max(1, min(len(ini), len(pares)))
+        if nota > nota_m:
+            melhor, nota_m = pid, nota
+    return melhor if nota_m >= 0.6 else None
+
+
+def achar_pelo_texto(base: str, texto: str) -> Optional[str]:
+    """📑 O texto mandado pro Gerador de voz é o roteiro de algum modelo de vídeo? (colado à mão, sem
+    vir do botão "Gerar voz com este roteiro") → id do projeto, pra os capítulos ganharem o tempo do áudio."""
+    cands = []
+    for it in listar(base):
+        if not it.get("tem_roteiro"):
+            continue
+        try:
+            p = carregar(base, it["id"])
+        except Exception:  # noqa: BLE001
+            continue
+        if (p.get("resultado") or {}).get("capitulos"):
+            cands.append((p["id"], roteiro_para_voz(p)))
+    return parecido(texto, cands)
+
+
+def achar_roteiro_yt_pelo_texto(base: str, texto: str) -> Optional[str]:
+    """Igual, pros projetos do 📝 Roteiro do YouTube."""
+    import roteiros_yt
+    cands = []
+    for it in roteiros_yt.listar_projetos(base):
+        try:
+            p = roteiros_yt.carregar_projeto(base, it["id"])
+        except Exception:  # noqa: BLE001
+            continue
+        if (p.get("resultado") or {}).get("capitulos"):
+            cands.append((it["id"], roteiros_yt.roteiro_para_voz(p)))
+    return parecido(texto, cands)
+
+
 def descricao_completa(p: Dict[str, Any]) -> str:
     """Descrição + capítulos (0:00 …) + fontes, pronta pro YouTube."""
     import roteiros_yt
     res = p.get("resultado") or {}
-    txt = roteiros_yt.descricao_com_capitulos(res)
+    cv = res.get("capitulos_video") or {}
+    if cv.get("capitulos"):  # 📑 já tem vídeo montado: os tempos do VÍDEO FINAL (com as chamadas/cortes)
+        import capitulos_video
+        txt = "\n\n".join(x for x in (res.get("descricao") or "", capitulos_video.linhas(cv["capitulos"], cv.get("duracao"))) if x).strip()
+    else:
+        txt = roteiros_yt.descricao_com_capitulos(res)
     usadas = set(res.get("fontes_usadas") or [])
     fontes = [f for f in p.get("fontes") or [] if f.get("titulo") and (not usadas or f["id"] in usadas)]
     if fontes:
@@ -1223,6 +1278,7 @@ def aplicar_tempos_do_audio(base: str, pid: str, palavras: List[Dict[str, Any]],
     if not res.get("capitulos"):
         return None
     res["capitulos"] = roteiros_yt.capitulos_pelo_audio({"resultado": res}, palavras, duracao)
+    res.pop("capitulos_video", None)  # áudio novo: o vídeo antigo não vale mais
     res["audio"] = {"duracao": round(duracao, 1) if duracao else None, "gerado_em": time.time(), "origem": origem,
                     "com_palavras": bool(palavras)}
     p["resultado"] = res

@@ -925,6 +925,20 @@ def gerar_voz_gerar():
             pass
     st = _GERAR_VOZ_STATUS[job_id]
     st.update(na_fila=True, voz=_voz_do_kwargs(engine, kwargs), multivoz=multivoz_on, log="⏳ Na fila…\n")
+    if not (st.get("dossie_id") or st.get("roteiro_id") or st.get("venda_id")):
+        try:  # 📑 roteiro de um modelo de vídeo colado à mão: liga sozinho (capítulos + .zip com o projeto)
+            import dossies
+            _achado = dossies.achar_pelo_texto(BASE_DIR, texto)
+            if _achado:
+                st["dossie_id"] = _achado
+                st["log"] += f"🕵️ Esse texto é o roteiro do modelo de vídeo “{dossies.nome_do_projeto(dossies.carregar(BASE_DIR, _achado))}” — os capítulos vão pro tempo do áudio.\n"
+            else:
+                _rid = dossies.achar_roteiro_yt_pelo_texto(BASE_DIR, texto)
+                if _rid:
+                    st["roteiro_id"] = _rid
+                    st["log"] += "📝 Esse texto é o roteiro de um projeto do Roteiro do YouTube — os capítulos vão pro tempo do áudio.\n"
+        except Exception:  # noqa: BLE001
+            pass
     pos = _FILA_VOZ.iniciar(
         job_id, engine,
         lambda: _gerar_voz_em_background(job_id, engine, texto, output_path, kwargs, legenda_kwargs, multivoz_on),
@@ -1602,7 +1616,8 @@ def gerar_voz_baixar_zip(job_id: str):
             zf.writestr("info.json", idiomas.info_json(status.get("idioma"), motor=status.get("engine"),
                                                         origem_idioma=status.get("idioma_origem"),
                                                         **({"venda_id": status["venda_id"]} if status.get("venda_id") else {}),
-                                                        **({"dossie_id": status["dossie_id"]} if status.get("dossie_id") else {})))
+                                                        **({"dossie_id": status["dossie_id"]} if status.get("dossie_id") else {}),
+                                                        **({"roteiro_id": status["roteiro_id"]} if status.get("roteiro_id") else {})))
             if status.get("resultado_chamadas_filename"):
                 ch_path = os.path.join(VOZES_DIR, secure_filename(status["resultado_chamadas_filename"]))
                 if os.path.exists(ch_path):
@@ -2516,6 +2531,20 @@ def _projeto_do_zip(zip_path: str) -> Tuple[str, str]:
     return "", ""
 
 
+def _roteiro_do_zip(zip_path: str) -> str:
+    """id do 📝 Roteiro do YouTube gravado no info.json do .zip do Gerar voz ("" se não tem)."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            info = next((n for n in zf.namelist() if os.path.basename(n).lower() == "info.json"), None)
+            if info:
+                rid = str((json.loads(zf.read(info).decode("utf-8", "replace")) or {}).get("roteiro_id") or "")
+                if re.fullmatch(r"[0-9a-f]{6,40}", rid):
+                    return rid
+    except (zipfile.BadZipFile, OSError, KeyError, ValueError, AttributeError):
+        pass
+    return ""
+
+
 def _venda_do_zip(zip_path: str) -> str:
     tipo, vid = _projeto_do_zip(zip_path)
     return vid if tipo == "venda" else ""
@@ -2830,6 +2859,10 @@ def transcribe():
         _tipo, _pid = _projeto_do_zip(os.path.join(job_dir, "upload.zip"))
     if _pid:
         _ligar_projeto(_JOBS[job_id], _tipo, _pid)
+    if segments_do_zip is not None:  # 📝 Roteiro do YouTube: os capítulos da descrição vão pro tempo do vídeo final
+        _rid = _roteiro_do_zip(os.path.join(job_dir, "upload.zip"))
+        if _rid:
+            _JOBS[job_id]["roteiro_id"] = _rid
     if _formato_do_form(request.form):
         _JOBS[job_id]["orientation"] = _formato_do_form(request.form)
     perf = PerfLog(_job_dir(job_id), job_id=job_id)
@@ -3617,6 +3650,108 @@ def submit_json(job_id: str):
 _IA_PULA_BUSCA = {"youtube", "flow", "produto", "material"}
 
 
+# 🧭 v84_70: cada trecho vai pra FONTE CERTA (só entre os bancos que você ligou no projeto)
+_FOTOS_REAIS = ("bing", "brave", "startpage", "yandex", "wikipedia")  # foto de verdade de uma pessoa/caso/lugar
+_BANCOS_STOCK = ("pexels", "pixabay", "magnific", "mixkit", "vistacreate")
+
+
+def _rotear_trecho(job: dict, sg: VideoSegment, nb: Dict[str, Any]) -> Dict[str, Any]:
+    """Decide a fonte do trecho pelo que a IA disse dele ("midia" + "real"):
+      - pessoa FALANDO (entrevista, discurso) e real → YouTube (o 🤖 do painel acha o momento);
+      - pessoa/caso/lugar/objeto REAL e específico → foto real (buscadores de imagem / Wikipedia),
+        porque banco de stock não tem — ele devolvia algo "parecido";
+      - pede imagem gerada → Flow (se ligado);
+      - "cartao" (ideia abstrata) → busca normal, mas o juiz fica RIGOROSO e, sem nada bom, vira cartão de texto;
+      - clima/ambiente → banco de stock, como sempre.
+    Muda o trecho (provider/media_type) e devolve o que gravar no pending_segments."""
+    ligados = set(job.get("providers") or [])
+    midia = nb.get("midia") or ""
+    real = bool(nb.get("real"))
+    out: Dict[str, Any] = {}
+    if midia == "youtube" and real and "youtube" in ligados:
+        sg.provider, sg.media_type = "youtube", "video"
+        out = {"provider": "youtube", "media_type": "video", "ia_rota": "youtube"}
+    elif real and midia in ("foto", "video", ""):
+        foto = next((p for p in _FOTOS_REAIS if p in ligados), None)
+        if foto and sg.provider not in _FOTOS_REAIS:
+            sg.provider, sg.media_type = foto, "image"
+            out = {"provider": foto, "media_type": "image", "ia_rota": "foto_real"}
+    elif midia == "ia" and "flow" in ligados:
+        sg.provider = "flow"
+        out = {"provider": "flow", "ia_rota": "flow"}
+    elif midia == "cartao":
+        out = {"ia_rigoroso": True, "ia_rota": "abstrato"}
+    elif midia in ("foto", "video") and not real and sg.provider in _FOTOS_REAIS:
+        stock = next((p for p in _BANCOS_STOCK if p in ligados), None)  # clima num buscador de imagem: stock é melhor
+        if stock:
+            sg.provider = stock
+            out = {"provider": stock, "ia_rota": "stock"}
+    return out
+
+
+_CARTAO_PADRAO = ("clean_arquivo_escuro", "minimal", "capitulo")
+
+
+def _estilo_do_cartao(job: dict) -> str:
+    """Tipografia do cartão: um destaque de TELA CHEIA da direção do projeto (ex.: a cartela do Dallas);
+    sem nenhum, um cartão escuro discreto."""
+    import dp_destaques
+    try:
+        import dp_direcao
+        did = (job.get("editor_defaults") or {}).get("direcao") or job.get("direcao_do_projeto")
+        p = dp_direcao.direcao(did) if did else None
+        for forma in ("centro_frase", "centro_titulo"):
+            for e in ((p or {}).get("destaques") or {}).get("estilos") or []:
+                est = dp_destaques.estilo(e) or {}
+                if (est.get("cena") or {}).get("assumeTela") and est.get("forma") == forma:
+                    return e
+    except Exception:  # noqa: BLE001
+        pass
+    return next((e for e in _CARTAO_PADRAO if dp_destaques.estilo(e)), "capitulo")
+
+
+def _frase_do_cartao(fala: str, frase_ia: str, estilo: str) -> str:
+    import dp_destaques
+    faixa = (dp_destaques.estilo(estilo) or {}).get("palavras") or [1, 8]
+    maximo = max(2, min(int(faixa[1]), 8))
+    texto = (frase_ia or "").strip() or " ".join(re.sub(r"\s+", " ", fala or "").split()[:maximo])
+    return " ".join(texto.split()[:maximo]).strip(" ,;")
+
+
+def _cartao_no_trecho(job_id: str, job: dict, i: int, sg: VideoSegment, fala: str, motivo: str) -> Dict[str, Any]:
+    """🃏 O trecho vira um CARTÃO: fundo escuro gerado aqui (sem banco nenhum) + a frase do trecho num destaque de
+    tela cheia. Devolve a prévia do trecho. A pessoa troca no editor como qualquer trecho."""
+    import cenas_dp
+    W, H = {"9:16": (1080, 1920), "1:1": (1080, 1080)}.get(_orientacao_do_job(job), (1920, 1080))
+    pal = (job.get("paleta") or {}) if isinstance(job.get("paleta"), dict) else {}
+    fundo = cenas_dp.gerar_fundo("escuro", W, H, os.path.join(_job_dir(job_id), "cartoes"), tom=pal.get("primaria"))
+    estilo = _estilo_do_cartao(job)
+    frase = _frase_do_cartao(fala, getattr(sg, "_frase_tela", "") or "", estilo)
+    override = {"source": "local_file", "value": fundo, "kind": "image", "cartao": True, "zoom_direction": "in"}
+    sg.override_source, sg.media_type = dict(override), "image"
+    pend = job.get("pending_segments") or []
+    if i < len(pend):
+        pend[i].update(override_source=dict(override), media_type="image",
+                       cartao={"estilo": estilo, "texto": frase, "motivo": motivo})
+    if frase:
+        ds = [d for d in job.get("destaques") or [] if not (d.get("origem") == "cartao" and d.get("trecho") == i)]
+        ds.append({"id": uuid.uuid4().hex[:8], "estilo": estilo, "start": round(float(sg.start), 2),
+                   "end": round(float(sg.end), 2), "texto": frase, "campos": {}, "avulso": True,
+                   "origem": "cartao", "trecho": i})
+        job["destaques"] = sorted(ds, key=lambda d: float(d.get("start") or 0))
+    return {"index": i, "ok": True, "thumbnail_url": f"/job/{job_id}/thumbnail/{i}", "thumbnail_path": fundo,
+            "result_url": None, "label": f"🃏 cartão: “{frase}” — {motivo}", "error": None, "video_preview_url": None,
+            "provider": "cartao", "original_provider": sg.provider, "cartao": True}
+
+
+def _contar_rotas(pend: List[Dict[str, Any]]) -> Dict[str, int]:
+    c: Dict[str, int] = {}
+    for p in pend:
+        if p.get("ia_rota"):
+            c[p["ia_rota"]] = c.get(p["ia_rota"], 0) + 1
+    return c
+
+
 def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) -> Optional[List[Dict[str, Any]]]:
     """🤖 Fases 0 e 1 (com a IA ligada): a FICHA do vídeo (lida do roteiro uma vez) e as buscas
     melhores de cada trecho (query = a 1ª, alternativas = as outras + a busca original). Devolve o
@@ -3652,6 +3787,7 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
                                                    "query": segments[k].query} for k in elegiveis], info.get("ficha"), roteiro, job=job_id)
                 pend = job.get("pending_segments") or []
                 mudou = 0
+                foi_pro_youtube = False
                 for k in elegiveis:
                     nb = novas.get(k + 1)
                     if not nb:
@@ -3662,9 +3798,14 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
                     sg.alternativas = [b for b in nb["buscas"][1:] + [original] if b and b != sg.query][:5]
                     if nb.get("visual"):
                         sg.visual = nb["visual"]
+                    rota = _rotear_trecho(job, sg, nb)
                     if k < len(pend):
                         pend[k].update(query=sg.query, alternativas=sg.alternativas, ia_busca_original=original,
-                                       ia_midia=nb.get("midia") or None, **({"visual": sg.visual} if nb.get("visual") else {}))
+                                       ia_midia=nb.get("midia") or None, ia_real=bool(nb.get("real")),
+                                       **({"frase_tela": nb["frase_tela"]} if nb.get("frase_tela") else {}),
+                                       **({"visual": sg.visual} if nb.get("visual") else {}), **rota)
+                    if rota.get("provider") == "youtube":
+                        foi_pro_youtube = True
                     mudou += 1
                 _ch.limpar_buscas(segments, job.get("chamadas"))  # a IA também não busca inscreva-se/venda
                 for k, sg in enumerate(segments):
@@ -3672,10 +3813,19 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
                         pend[k].update(query=sg.query, alternativas=list(sg.alternativas or []))
                 info["buscas_feitas"] = True
                 info["buscas_trocadas"] = mudou
+                info["rotas"] = _contar_rotas(pend)
+                if foi_pro_youtube:  # pessoa falando (entrevista/discurso): o painel do YouTube já começa a pesquisar
+                    _youtube_itens_sincronizar(job)
+                    _youtube_buscar_pendentes(job_id)
     except Exception as exc:  # noqa: BLE001 — a IA nunca trava a prévia
         info["erro"] = str(exc)[:300]
     job.pop("preview_ia", None)
     ficha = info.get("ficha")
+    pend = job.get("pending_segments") or []
+    for k, sg in enumerate(segments):  # o que a IA marcou: rigor do juiz e a frase do cartão
+        if k < len(pend):
+            sg._rigoroso = bool(pend[k].get("ia_rigoroso"))
+            sg._frase_tela = pend[k].get("frase_tela") or ""
     return [{"ficha": ficha, "fala": falas[k], "anterior": falas[k - 1] if k else "",
              "seguinte": falas[k + 1] if k + 1 < len(falas) else "", "visual": getattr(segments[k], "visual", None) or "",
              "job": job_id} for k in range(len(segments))]
@@ -3746,6 +3896,12 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
         finally:
             factory.close_all()
 
+        if result.get("cartao"):
+            try:
+                return _cartao_no_trecho(job_id, job, i, segment, (ia_ctxs[i] or {}).get("fala") or "",
+                                         result.get("error") or "nenhuma imagem boa")
+            except Exception:  # noqa: BLE001 — sem cartão: o trecho fica sem prévia (como antes)
+                pass
         out = {
             "index": i, "ok": result["ok"], "thumbnail_url": result["thumbnail_url"],
             "result_url": result["result_url"], "label": result["label"], "error": result["error"],
@@ -3827,6 +3983,15 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                         res = _ia_escolher_imagem(res, ia_ctxs[i], job.setdefault("imagens_buscadores", {}), _t, _termos.count(_t) == 1)
                     except Exception:  # noqa: BLE001
                         pass
+                    import ia_servico as _ias
+                    _corte = int((_ias.config() or {}).get("nota_minima") or 7) if getattr(segments[i], "_rigoroso", False) else 5
+                    if res.get("ok") and res.get("ia_nota") is not None and res["ia_nota"] < _corte and _ias.ativo("cartao"):
+                        try:
+                            _publicar(i, _cartao_no_trecho(job_id, job, i, segments[i], ia_ctxs[i].get("fala") or "",
+                                                           f"nenhuma imagem boa (melhor nota {res['ia_nota']})"))
+                            return
+                        except Exception:  # noqa: BLE001
+                            pass
                 _publicar(i, {
                     "index": i, "ok": bool(res.get("ok")),
                     "thumbnail_url": f"/job/{job_id}/thumbnail/{i}" if res.get("ok") else None,
@@ -4155,8 +4320,10 @@ def _destaques_do_form(job: dict, form) -> None:
             item["zona"] = d["zona"]
         if d.get("som") == "nenhum" or _dp_sons_valido(str(d.get("som") or "")):
             item["som"] = d["som"]
-        if d.get("origem") in ("auto", "ia", "ia_busca"):
+        if d.get("origem") in ("auto", "ia", "ia_busca", "cartao"):
             item["origem"] = d["origem"]
+        if d.get("origem") == "cartao" and isinstance(d.get("trecho"), int):
+            item["trecho"] = d["trecho"]
         if d.get("legenda") in ("manter", "ocultar"):
             item["legenda"] = d["legenda"]
         _fundo_do_destaque(item, d)
@@ -4548,6 +4715,7 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                     # nao falha o job inteiro so porque a legenda deu problema.
                     job["captions_error"] = traceback.format_exc()
 
+            _capitulos_do_video_final(job_id, job, output_path, cutaways_to_apply)
             if qualidade_export.valida(job.get("qualidade_exportacao")) != "normal":
                 on_progress("qualidade_final", len(segments), len(segments))
                 with (perf.timed("montagem:qualidade_final", qualidade=job.get("qualidade_exportacao")) if perf else nullcontext()):
@@ -4596,6 +4764,24 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 _diagnostico_em_segundo_plano(job_id, job)
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def _capitulos_do_video_final(job_id: str, job: dict, output_path: str, cortes_aplicados: List[Dict[str, Any]]) -> None:
+    """📑 Vídeo de um 🕵️ modelo de vídeo ou 📝 Roteiro do YouTube: capítulos da descrição no tempo do VÍDEO FINAL (a narração
+    deste vídeo + o empurrão das chamadas/cortes). Nunca derruba a montagem."""
+    job.pop("capitulos_video", None)
+    job.pop("descricao_youtube", None)
+    if not (job.get("dossie_id") or job.get("roteiro_id")):
+        return
+    try:
+        import capitulos_video
+        cortes = [{"insertion_point": c["insertion_point"], "remove_ate": c.get("remove_ate"),
+                   "duration": _probe_media_duration(c["resolved_path"])} for c in cortes_aplicados or []]
+        r = capitulos_video.para_job(job, BASE_DIR, _palavras_da_narracao(job), cortes, _probe_media_duration(output_path))
+        if r:
+            job["capitulos_video"], job["descricao_youtube"] = r
+    except Exception:  # noqa: BLE001
+        job["capitulos_video_erro"] = traceback.format_exc()[-1500:]
 
 
 def _diagnostico_em_segundo_plano(job_id: str, job: dict) -> None:
@@ -5974,9 +6160,13 @@ def youtube_itens(job_id: str):
                 it["status"] = "pendente"
     if any(it.get("status") == "pendente" for it in itens):
         _youtube_buscar_pendentes(job_id)
+    ia_geral = job.get("youtube_ia") or {}
+    if ia_geral.get("rodando") and not any(t.name == "yt-ia-" + job_id for t in threading.enumerate()) \
+            and time.time() - float(ia_geral.get("inicio") or time.time()) > 30:
+        ia_geral["rodando"] = False  # sobrou de antes do servidor reiniciar
     return jsonify({
-        "ok": True, "itens": itens,
-        "buscando": any(it.get("status") in ("pendente", "buscando") for it in itens),
+        "ok": True, "itens": itens, "ia": ia_geral,
+        "buscando": any(it.get("status") in ("pendente", "buscando") for it in itens) or bool(ia_geral.get("rodando")),
     })
 
 
@@ -6017,14 +6207,7 @@ def youtube_item_momento(job_id: str, item_id: str):
     url = (corpo.get("url") or "").strip()
     if not url:
         return jsonify({"erro": "Escolha um vídeo primeiro."}), 400
-    cache = job.setdefault("ia_legendas", {})
-    leg = cache.get(url)
-    if not leg or not leg.get("linhas"):
-        leg = _legenda_com_tempos(url, os.path.join(_job_dir(job_id), "youtube_legendas"))
-        if leg.get("linhas"):
-            cache[url] = leg
-            if len(cache) > 8:
-                cache.pop(next(iter(cache)))
+    leg = _youtube_legenda(job_id, job, url)
     if not leg.get("linhas"):
         return jsonify({"erro": "Não consegui a legenda desse vídeo (" + str(leg.get("erro") or "sem legenda") + ") — marque o trecho à mão."}), 200
     import ia_midia
@@ -6075,38 +6258,8 @@ def youtube_item_usar(job_id: str, item_id: str):
 
     def _run():
         status = _CUTAWAY_YT_JOBS[yt_job_id]
-        destino_dir = os.path.join(_job_dir(job_id), "youtube_clipes")
-        os.makedirs(destino_dir, exist_ok=True)
-        tmp_dir = os.path.join(destino_dir, f"_tmp_{yt_job_id}")
         try:
-            baixado = yt_baixar_video(url, tmp_dir)
-            output_path = os.path.join(destino_dir, f"{item_id}_{yt_job_id}.mp4")
-            yt_cortar_trecho(baixado["caminho"], inicio, fim, output_path)
-            job_atual = _JOBS.get(job_id) or {}
-            item_atual = _youtube_item(job_atual, item_id)
-            if item_atual is not None and item_atual["tipo"] == "segmento":
-                idx = item_atual["indice"]
-                segs = job_atual.get("pending_segments") or []
-                if 0 <= idx < len(segs):
-                    segs[idx]["override_source"] = {"source": "local_file", "value": output_path, "kind": "video"}
-                    segs[idx]["media_type"] = "video"
-                    _limpar_erro_do_trecho(job_atual, idx)
-                    previews = list(job_atual.get("segment_previews") or [])
-                    if idx < len(previews):
-                        previews[idx] = {
-                            "index": idx, "ok": True, "thumbnail_url": escolha["miniatura_url"] or None,
-                            "result_url": url, "label": f"YouTube: {escolha['titulo']}", "error": None,
-                            "video_preview_url": None, "provider": "youtube", "original_provider": "youtube",
-                        }
-                        job_atual["segment_previews"] = previews
-            elif item_atual is not None and item_atual["tipo"] == "corte":
-                cut = next((c for c in job_atual.get("cutaway_suggestions", []) if c["id"] == item_atual["cutaway_id"]), None)
-                if cut is not None:
-                    cut["resolved_path"] = output_path
-            if item_atual is not None:
-                item_atual["escolha"] = dict(escolha, arquivo=output_path)
-            if job_atual:
-                _save_state(job_id)
+            _youtube_baixar_e_aplicar(job_id, item_id, escolha, yt_job_id)
             status["status"] = "pronto"
         except YoutubeClipperError as exc:
             status["status"] = "erro"
@@ -6114,11 +6267,188 @@ def youtube_item_usar(job_id: str, item_id: str):
         except Exception:  # noqa: BLE001
             status["status"] = "erro"
             status["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
-        finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     threading.Thread(target=_run, daemon=True).start()
     return jsonify({"ok": True, "yt_job_id": yt_job_id})
+
+
+def _youtube_baixar_e_aplicar(job_id: str, item_id: str, escolha: Dict[str, Any], tag: str = "") -> str:
+    """Baixa o vídeo da escolha, corta [inicio, fim] e põe no trecho (arquivo do trecho) ou no corte real
+    (clipe do corte). Levanta YoutubeClipperError se não der. → caminho do clipe."""
+    url, inicio, fim = escolha["url"], float(escolha["inicio"]), float(escolha["fim"])
+    tag = tag or uuid.uuid4().hex[:12]
+    destino_dir = os.path.join(_job_dir(job_id), "youtube_clipes")
+    os.makedirs(destino_dir, exist_ok=True)
+    tmp_dir = os.path.join(destino_dir, f"_tmp_{tag}")
+    try:
+        baixado = yt_baixar_video(url, tmp_dir)
+        output_path = os.path.join(destino_dir, f"{item_id}_{tag}.mp4")
+        yt_cortar_trecho(baixado["caminho"], inicio, fim, output_path)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    job_atual = _JOBS.get(job_id) or {}
+    item_atual = _youtube_item(job_atual, item_id)
+    if item_atual is not None and item_atual["tipo"] == "segmento":
+        idx = item_atual["indice"]
+        segs = job_atual.get("pending_segments") or []
+        if 0 <= idx < len(segs):
+            segs[idx]["override_source"] = {"source": "local_file", "value": output_path, "kind": "video"}
+            segs[idx]["media_type"] = "video"
+            _limpar_erro_do_trecho(job_atual, idx)
+            previews = list(job_atual.get("segment_previews") or [])
+            if idx < len(previews):
+                previews[idx] = {
+                    "index": idx, "ok": True, "thumbnail_url": escolha.get("miniatura_url") or None,
+                    "result_url": url, "label": f"YouTube: {escolha.get('titulo') or ''}", "error": None,
+                    "video_preview_url": None, "provider": "youtube", "original_provider": "youtube",
+                }
+                job_atual["segment_previews"] = previews
+    elif item_atual is not None and item_atual["tipo"] == "corte":
+        cut = next((c for c in job_atual.get("cutaway_suggestions", []) if c["id"] == item_atual["cutaway_id"]), None)
+        if cut is not None:
+            cut["resolved_path"] = output_path
+    if item_atual is not None:
+        item_atual["escolha"] = dict(escolha, arquivo=output_path)
+    if job_atual:
+        _save_state(job_id)
+    return output_path
+
+
+def _youtube_legenda(job_id: str, job: dict, url: str) -> Dict[str, Any]:
+    """Legenda com tempos de um vídeo (guardada no job: as últimas 12)."""
+    cache = job.setdefault("ia_legendas", {})
+    leg = cache.get(url)
+    if not leg or not leg.get("linhas"):
+        leg = _legenda_com_tempos(url, os.path.join(_job_dir(job_id), "youtube_legendas"))
+        if leg.get("linhas"):
+            cache[url] = leg
+            while len(cache) > 12:
+                cache.pop(next(iter(cache)))
+    return leg
+
+
+# ------------------------------------------------------------------ 🤖 a IA acha os vídeos do YouTube (v84_69)
+_YOUTUBE_IA_PARAR: set = set()
+
+
+def _youtube_ia_item(job_id: str, item_id: str) -> None:
+    """Roda o agente (yt_agente.procurar) num item e, se achou, baixa e corta o momento."""
+    import ia_midia
+    import yt_agente
+    job = _JOBS.get(job_id) or {}
+    item = _youtube_item(job, item_id)
+    if item is None:
+        return
+    st = {"estado": "procurando", "log": [], "inicio": time.time()}
+    item["ia"] = st
+    ficha = (job.get("ia") or {}).get("ficha")
+    fala = _youtube_fala_do_item(job, item)
+
+    def log(m: str) -> None:
+        st["log"] = (st["log"] + [m])[-40:]
+
+    def ordenar(resultados, termo, vistos):
+        return ia_midia.ordenar_youtube(resultados, fala, termo, ficha, job=job_id, com_capas=12, ja_vistos=vistos)
+
+    def achar(linhas, v):
+        return ia_midia.achar_momento(linhas, fala, str(v.get("titulo") or ""), str(v.get("canal") or ""),
+                                      item.get("duracao_alvo"), ficha, job=job_id)
+
+    r = yt_agente.procurar(
+        fala, item.get("termo") or item.get("termo_original") or "", item.get("duracao_alvo"),
+        buscar=lambda t: buscar_videos_youtube(t, quantidade=YOUTUBE_RESULTADOS_COM_IA),
+        ordenar=ordenar, legenda=lambda u: _youtube_legenda(job_id, job, u), achar=achar,
+        nova_busca=lambda feitas, motivos: ia_midia.nova_busca_youtube(fala, feitas, motivos, ficha, job=job_id),
+        log=log, parar=lambda: job_id in _YOUTUBE_IA_PARAR)
+    st["buscas"], st["conferidos"] = r.get("buscas") or [], r.get("conferidos") or []
+    if not r["achou"]:
+        st.update(estado="nao_achou", msg=r["motivo"])
+        if r.get("resultados"):  # deixa os da última busca pra escolher à mão
+            item.update(termo=r.get("termo_resultados") or r["buscas"][-1], resultados=r["resultados"], status="pronto", erro=None, ia_ordenado=True)
+        _save_state(job_id)
+        return
+    v = r["video"]
+    alvo = item.get("duracao_alvo")
+    ini, fim = float(r["inicio"]), float(r["fim"])
+    if alvo and fim - ini < alvo:  # o trecho do vídeo é maior que a fala achada: completa depois dela
+        fim = ini + float(alvo)
+        if v.get("duracao_segundos"):
+            fim = min(fim, float(v["duracao_segundos"]))
+    escolha = {"url": v["url"], "inicio": round(ini, 2), "fim": round(fim, 2), "titulo": str(v.get("titulo") or "")[:200],
+               "miniatura_url": str(v.get("miniatura_url") or ""), "ia": True, "frase": r.get("frase") or "",
+               "confianca": r.get("confianca")}
+    st.update(estado="baixando", msg=f"achei em “{escolha['titulo'][:60]}” ({ini:.1f}s) — baixando e cortando…")
+    try:
+        _youtube_baixar_e_aplicar(job_id, item_id, escolha)
+        st.update(estado="pronto", msg=f"✅ “{escolha['titulo'][:60]}” {ini:.1f}s → {fim:.1f}s: “{escolha['frase'][:90]}”")
+    except Exception as exc:  # noqa: BLE001
+        st.update(estado="erro", msg=f"achei o momento mas o download falhou ({str(exc)[:120]}) — tente Usar à mão",
+                  achado=escolha)
+    _save_state(job_id)
+
+
+def _youtube_ia_rodar(job_id: str, ids: List[str]) -> None:
+    job = _JOBS.get(job_id) or {}
+    geral = {"rodando": True, "total": len(ids), "feitos": 0, "achados": 0, "atual": None, "inicio": time.time()}
+    job["youtube_ia"] = geral
+    for item_id in ids:
+        if job_id in _YOUTUBE_IA_PARAR:
+            break
+        geral["atual"] = item_id
+        try:
+            _youtube_ia_item(job_id, item_id)
+        except Exception as exc:  # noqa: BLE001
+            it = _youtube_item(job, item_id)
+            if it is not None:
+                it["ia"] = {"estado": "erro", "msg": f"falha inesperada: {str(exc)[:160]}", "log": []}
+        it = _youtube_item(job, item_id)
+        geral["feitos"] += 1
+        geral["achados"] += 1 if it is not None and (it.get("ia") or {}).get("estado") == "pronto" else 0
+    for it in job.get("youtube_itens") or []:  # parou no meio: o que ficou na fila volta ao normal
+        if (it.get("ia") or {}).get("estado") == "na_fila":
+            it.pop("ia", None)
+    geral.update(rodando=False, atual=None, parado=job_id in _YOUTUBE_IA_PARAR)
+    _YOUTUBE_IA_PARAR.discard(job_id)
+    _save_state(job_id)
+
+
+@app.route("/job/<job_id>/youtube/ia", methods=["POST"])
+def youtube_ia(job_id: str):
+    """🤖 A IA acha os vídeos: os itens pedidos (ou todos os que estão sem vídeo), um depois do outro."""
+    import ia_servico
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    for rec in ("youtube_ordem", "youtube_momento"):
+        motivo = ia_servico.motivo_desligado(rec)
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo + " — ligue em 🤖 IA (“Ordenar os vídeos do YouTube” e “Achar o momento”)."}), 400
+    if (job.get("youtube_ia") or {}).get("rodando"):
+        return jsonify({"erro": "A IA já está procurando — espere ou clique em Parar."}), 409
+    itens = _youtube_itens_sincronizar(job)
+    pedidos = (request.get_json(silent=True) or {}).get("itens")
+    if pedidos:
+        ids = [it["id"] for it in itens if it["id"] in set(pedidos)]
+    else:
+        ids = [it["id"] for it in itens if not it.get("escolha") or (it["escolha"] or {}).get("automatico")]
+    if not ids:
+        return jsonify({"erro": "Nenhum vídeo do YouTube sem escolha."}), 400
+    for it in itens:
+        if it["id"] in ids:
+            it["ia"] = {"estado": "na_fila", "log": []}
+    job["youtube_ia"] = {"rodando": True, "total": len(ids), "feitos": 0, "achados": 0, "atual": None}
+    _YOUTUBE_IA_PARAR.discard(job_id)  # um "Parar" antigo não vale pra esta rodada
+    _save_state(job_id)
+    threading.Thread(target=_youtube_ia_rodar, args=(job_id, ids), name="yt-ia-" + job_id, daemon=True).start()
+    return jsonify({"ok": True, "total": len(ids)})
+
+
+@app.route("/job/<job_id>/youtube/ia/parar", methods=["POST"])
+def youtube_ia_parar(job_id: str):
+    if not _JOBS.get(job_id):
+        return jsonify({"erro": "Job não encontrado."}), 404
+    _YOUTUBE_IA_PARAR.add(job_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/job/<job_id>/edicao/prompt", methods=["POST"])
@@ -8369,6 +8699,8 @@ def job_status_api(job_id: str):
         "assembly_error": job.get("assembly_error"),
         "assembly_error_segment_index": job.get("assembly_error_segment_index"),
         "prebaixar": job.get("prebaixar"),
+        "descricao_youtube": job.get("descricao_youtube") if job.get("status") == "concluido" else None,
+        "capitulos_video": job.get("capitulos_video") if job.get("status") == "concluido" else None,
     })
 
 

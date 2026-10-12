@@ -154,6 +154,10 @@ def test_previa_com_juiz(api, monkeypatch):
                                                                                        key=lambda x: -x["ia_nota"]), "nova_busca": ""})
     monkeypatch.setattr(va, "_fallback_queries_for", lambda s: [])
     r = va.fetch_segment_preview_lightweight(_seg(), site_cfg={"provider_priority": ["pexels"]}, ia_ctx={"fala": "x"})
+    assert r.get("cartao") and r["ia_nota"] == 4  # v84_70: 🃏 nada prestou → cartão de texto
+    _pode = va._ia_pode
+    monkeypatch.setattr(va, "_ia_pode", lambda rec: rec != "cartao" and _pode(rec))  # cartão desligado: como antes
+    r = va.fetch_segment_preview_lightweight(_seg(), site_cfg={"provider_priority": ["pexels"]}, ia_ctx={"fala": "x"})
     assert r["ok"] and r["ia_aviso"] and r["label"].startswith("⚠") and r["ia_nota"] == 4
     # sem IA (sem contexto): o 1º, como sempre, 1 resultado só
     buscas.clear()

@@ -48,6 +48,13 @@
   · <a href="{{ url_for('download_diagnostico', job_id=job.job_id, ver=1, refazer=1) }}" target="_blank" style="font-size:0.85rem;color:#666;">gerar de novo</a>
 </p>
 
+<div id="capitulos-box" style="display:none;margin-top:16px;padding:10px 12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;">
+  <label style="font-weight:600;">📑 Descrição do YouTube com os capítulos no tempo DESTE vídeo</label>
+  <p class="hint" style="font-size:.82rem;color:#065f46;margin:4px 0;">Os tempos já contam as chamadas e os cortes que entraram no vídeo — é só colar. A descrição do modelo de vídeo também foi atualizada.</p>
+  <textarea id="capitulos-desc" rows="9" style="width:100%;font-size:.85rem;"></textarea>
+  <button type="button" id="capitulos-copiar">📋 Copiar descrição</button>
+</div>
+
 <script>
 async function poll() {
   const res = await fetch("{{ url_for('job_status_api', job_id=job.job_id) }}");
@@ -68,6 +75,13 @@ async function poll() {
 
   if (data.status === 'concluido') {
     document.getElementById('download-link').style.display = 'block';
+    if (data.descricao_youtube) {
+      document.getElementById('capitulos-desc').value = data.descricao_youtube;
+      document.getElementById('capitulos-box').style.display = 'block';
+      document.getElementById('capitulos-copiar').onclick = () => navigator.clipboard.writeText(data.descricao_youtube).then(() => {
+        document.getElementById('capitulos-copiar').textContent = '✔ Copiado';
+      });
+    }
     const monitor = document.getElementById('program-monitor');
     const video = document.getElementById('program-monitor-video');
     monitor.style.display = 'block';

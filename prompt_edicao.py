@@ -271,7 +271,9 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
             continue
         ov = s.get("override_source") or {}
         midia = ("foto" if (ov.get("kind") or s.get("media_type")) == "image" else "vídeo") + f" '{s.get('query', '')}'"
-        if ov.get("source") == "local_file":
+        if ov.get("cartao"):
+            midia = f"🃏 cartão de texto (nenhuma imagem boa pra '{s.get('query', '')}') — não ponha destaque nem quadro em cima; troque por uma mídia enviada se alguma combinar"
+        elif ov.get("source") == "local_file":
             bid = _id_da_biblioteca(job, ov)
             midia += f" (= bib:{bid}, já colocada)" if bid else " (arquivo escolhido pela pessoa — não troque)"
         if (s.get("youtube_link") or {}).get("url"):

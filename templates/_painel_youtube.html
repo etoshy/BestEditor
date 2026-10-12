@@ -3,6 +3,11 @@
   <div id="painel-youtube" class="yt-painel">
     <h2 style="margin-top:0;">🎬 Vídeos do YouTube pedidos pela IA</h2>
     <label class="yt-auto"><input type="checkbox" id="yt-auto-escolha" {% if job.get('youtube_auto', True) %}checked{% endif %} onchange="ytAutoMudou(this.checked)"> ⚡ Se eu não escolher, usar automaticamente o <strong>1º resultado</strong>, do começo do vídeo, com a duração do trecho (na hora de montar)</label>
+    <div class="yt-ia-barra" id="yt-ia-barra" style="display:none;">
+      <button type="button" id="yt-ia-todos" onclick="ytIaTodos()">🤖 A IA acha os vídeos</button>
+      <button type="button" class="yt-sec" id="yt-ia-parar" style="display:none;" onclick="ytIaParar()">⏹ Parar</button>
+      <span class="yt-sub" id="yt-ia-geral">Para cada item sem vídeo: busca, a IA olha capas/títulos/durações, lê a transcrição dos mais prováveis e acha o momento; se não achar, busca de outro jeito (até 3 buscas) — senão avisa pra você escolher à mão e vai pro próximo.</span>
+    </div>
     <p class="yt-ajuda">O site já pesquisou cada termo abaixo. Escolha o vídeo mais promissor, assista, marque o início/fim do trecho e clique em <strong>Usar esse trecho</strong> — ele é baixado e cortado sozinho. Se os resultados não servirem, troque o termo e clique em <strong>Buscar de novo</strong>.</p>
     <div id="yt-lista">
       {% for it in youtube_itens %}
@@ -18,7 +23,9 @@
           <button type="button" onclick="ytBuscarDeNovo('{{ it.id }}')">🔍 Buscar de novo</button>
           <button type="button" class="yt-sec" id="yt-original-{{ it.id }}" style="display:none;" onclick="ytVoltarOriginal('{{ it.id }}')" title="{{ it.termo_original }}">↩ Termo original</button>
           {% if it.tipo == 'segmento' %}<button type="button" class="yt-sec" onclick="ytUsarPrimeiro('{{ it.id }}')" title="1º resultado, do começo do vídeo, com a duração do trecho">⚡ Usar o 1º</button>{% endif %}
+          <button type="button" class="yt-sec yt-ia-um" style="display:none;" onclick="ytIaUm('{{ it.id }}')" title="a IA busca, lê as transcrições e acha o momento só deste">🤖 IA acha este</button>
         </div>
+        <div class="yt-agente" id="yt-agente-{{ it.id }}" style="display:none;"></div>
         <div class="yt-resultados" id="yt-resultados-{{ it.id }}"><p class="yt-sub">Carregando resultados…</p></div>
         <div class="yt-trecho" id="yt-trecho-{{ it.id }}" style="display:none;">
           <div class="yt-player-wrap"><div id="yt-player-{{ it.id }}"></div></div>
@@ -57,8 +64,8 @@
 .yt-sec { background:#fff; color:#374151; border:1px solid #d1d5db; }
 .yt-auto { display:block; font-size:.86rem; margin:0 0 10px; padding:8px 10px; background:#fff; border:1px dashed #fca5a5; border-radius:6px; }
 .yt-auto input { width:auto; margin-right:6px; }
-.yt-busca { display:flex; gap:8px; margin-top:8px; }
-.yt-busca input { flex:1; margin-top:0; min-width:0; }
+.yt-busca { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+.yt-busca input { flex:1; margin-top:0; min-width:220px; }
 .yt-busca button { margin-top:0; white-space:nowrap; }
 .yt-resultados { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-top:10px; }
 .yt-card { border:2px solid #e5e7eb; border-radius:6px; overflow:hidden; cursor:pointer; background:#fff; }
@@ -79,6 +86,13 @@
 .yt-card { position:relative; }
 .yt-nota { position:absolute; top:4px; left:4px; color:#fff; border-radius:4px; padding:0 6px; font-size:.72rem; font-weight:700; }
 .yt-card.reprovado { opacity:.55; }
+.yt-ia-barra { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 10px; padding:8px 10px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; }
+.yt-ia-barra button { margin-top:0; }
+.yt-agente { margin-top:8px; padding:6px 8px; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0; font-size:.8rem; }
+.yt-agente.ok { background:#f0fdf4; border-color:#86efac; }
+.yt-agente.falhou { background:#fffbeb; border-color:#fcd34d; }
+.yt-agente details { margin-top:4px; color:#555; }
+.yt-agente pre { white-space:pre-wrap; margin:4px 0 0; font-size:.74rem; }
 .yt-mais { grid-column:1/-1; margin-top:2px; background:#fff; color:#374151; border:1px solid #d1d5db; }
 @media (max-width: 600px) { .yt-busca { flex-direction:column; } }
 </style>
@@ -97,6 +111,9 @@
   const mostrando = {};      // itemId -> quantos resultados aparecem (8, 16, 20 — "Outros vídeos")
   fetch('/ia/status').then(r => r.json()).then(j => {  // 🤖 IA ligada pra achar o momento pela legenda
     if (j.pode && j.pode.youtube_momento) document.querySelectorAll('.yt-ia-momento').forEach(b => { b.style.display = ''; });
+    if (j.pode && j.pode.youtube_momento && j.pode.youtube_ordem) {  // 🤖 a IA acha os vídeos sozinha
+      el('yt-ia-barra').style.display = ''; document.querySelectorAll('.yt-ia-um').forEach(b => { b.style.display = ''; });
+    }
   }).catch(() => {});
 
   const anterior = window.onYouTubeIframeAPIReady;
@@ -255,8 +272,61 @@
       return;
     }
     (data.itens || []).forEach(desenharItem);
+    (data.itens || []).forEach(desenharAgente);
+    desenharIaGeral(data.ia || {});
     if (data.buscando) pollTimer = setTimeout(carregar, 2000);
   }
+
+  // ---------------- 🤖 a IA acha os vídeos
+  const ROT_IA = { na_fila: '⏳ na fila da IA', procurando: '🤖 procurando…', baixando: '⬇ baixando o trecho…', pronto: '🤖✅ achado', nao_achou: '🤖❌ não achei', erro: '⚠️ IA: erro' };
+  function desenharAgente(it) {
+    const box = el('yt-agente-' + it.id); if (!box) return;
+    const a = it.ia;
+    if (!a) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    box.className = 'yt-agente' + (a.estado === 'pronto' ? ' ok' : (a.estado === 'nao_achou' || a.estado === 'erro') ? ' falhou' : '');
+    const linhas = (a.log || []).join('\n');
+    const aberto = box.querySelector('details') && box.querySelector('details').open;
+    box.innerHTML = '';
+    const t = document.createElement('div');
+    t.innerHTML = '<b></b> <span></span>';
+    t.querySelector('b').textContent = ROT_IA[a.estado] || a.estado;
+    t.querySelector('span').textContent = a.msg || ((a.log || []).slice(-1)[0] || '');
+    box.appendChild(t);
+    if (a.estado === 'nao_achou') {
+      const d = document.createElement('div'); d.className = 'yt-sub';
+      d.textContent = '👉 Escolha à mão: os resultados da última busca estão abaixo (na ordem da nota), ou troque o termo.';
+      box.appendChild(d);
+    }
+    if (linhas) {
+      const det = document.createElement('details'); if (aberto || a.estado === 'procurando') det.open = true;
+      det.innerHTML = '<summary>o que a IA fez</summary><pre></pre>'; det.querySelector('pre').textContent = linhas;
+      box.appendChild(det);
+    }
+    if (a.estado === 'procurando' || a.estado === 'baixando') { const e = el('yt-estado-' + it.id); if (e) e.textContent = ROT_IA[a.estado]; }
+  }
+  function desenharIaGeral(g) {
+    const rod = !!g.rodando;
+    el('yt-ia-todos').disabled = rod; el('yt-ia-parar').style.display = rod ? '' : 'none';
+    document.querySelectorAll('.yt-ia-um').forEach(b => { b.disabled = rod; });
+    if (rod) el('yt-ia-geral').textContent = `🤖 procurando ${Math.min(g.feitos + 1, g.total)} de ${g.total}… (${g.achados} achado${g.achados === 1 ? '' : 's'})`;
+    else if (g.total) el('yt-ia-geral').textContent = (g.parado ? '⏹ Parado: ' : '🤖 Pronto: ') + `${g.achados} de ${g.total} achados pela IA` + (g.feitos - g.achados > 0 ? ` — ${g.feitos - g.achados} pra escolher à mão (marcados com ❌).` : '.');
+  }
+  async function iaIniciar(itens) {
+    try {
+      const r = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(itens ? { itens } : {}) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { el('yt-ia-geral').textContent = '⚠️ ' + (d.erro || 'falhou'); return; }
+      el('yt-ia-geral').textContent = `🤖 começando (${d.total} item${d.total === 1 ? '' : 's'})…`;
+      carregar();
+    } catch (e) { el('yt-ia-geral').textContent = '⚠️ ' + e; }
+  }
+  window.ytIaTodos = () => iaIniciar(null);
+  window.ytIaUm = (id) => iaIniciar([id]);
+  window.ytIaParar = async () => {
+    await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/ia/parar`, { method: 'POST' }).catch(() => {});
+    el('yt-ia-geral').textContent = '⏹ parando depois do vídeo atual…';
+  };
 
   function escolher(itemId, v) {
     escolhido[itemId] = v;

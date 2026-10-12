@@ -2885,6 +2885,7 @@ def fetch_segment_preview_lightweight(
     ia_c = _ia_cfg() if usar_ia else {}
     reprovada: Optional[Dict[str, Any]] = None
     novas_buscas = 0
+    rigoroso = bool(getattr(segment, "_rigoroso", False))
 
     def _resultado(c: Dict[str, Any], provider: str, query: str, aviso: bool = False) -> Dict[str, Any]:
         out = {
@@ -2934,7 +2935,9 @@ def fetch_segment_preview_lightweight(
                 j = julgar_candidatos_ia([c for c in candidates if c.get("thumbnail")], ia_ctx, query)
                 if j:
                     minima = int(ia_c.get("nota_minima") or 7)
-                    aprovados = [c for c in j["lista"] if c.get("ia_nota", 0) >= 5]
+                    # trecho abstrato (a IA disse "cartao"): só passa o que é BOM de verdade — senão vira cartão de texto
+                    corte = minima if (rigoroso and _ia_pode("cartao")) else 5
+                    aprovados = [c for c in j["lista"] if c.get("ia_nota", 0) >= corte]
                     if aprovados:
                         # "não repetir" vem DEPOIS da nota: entre as aprovadas, a melhor ainda não usada
                         c = _escolher_candidato_previa(aprovados, tracker, provider, evitar)
@@ -2954,8 +2957,13 @@ def fetch_segment_preview_lightweight(
                 return _resultado(c, provider, query)
             last_error = f"nenhum resultado com thumbnail pra '{query}' em {provider}"
 
-    if reprovada is not None:  # nada passou: a melhor das reprovadas, com ⚠ pra você trocar
-        return reprovada["res"]
+    if reprovada is not None:
+        if _ia_pode("cartao"):  # 🃏 nada prestou: em vez da "menos pior", um cartão de texto (o app monta)
+            return {"ok": False, "cartao": True, "thumbnail_url": None, "result_url": None, "label": None,
+                    "error": f"nenhuma imagem boa (melhor nota {reprovada['nota']})", "video_preview_url": None,
+                    "provider": None, "ia_nota": reprovada["nota"],
+                    "ia_motivo": (reprovada["res"].get("ia_motivo") or "")}
+        return reprovada["res"]  # nada passou: a melhor das reprovadas, com ⚠ pra você trocar
 
     return {
         "ok": False, "thumbnail_url": None, "result_url": None, "label": None,

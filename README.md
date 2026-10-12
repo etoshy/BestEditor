@@ -28,6 +28,45 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🧭 Cada trecho na fonte certa + 🃏 cartão quando nada presta (v84_70)
+
+Com a IA ligada, a etapa "buscas melhores" já dizia o tipo de cada trecho, mas isso era ignorado. Agora decide a fonte
+(só entre os bancos ligados no projeto):
+
+- **pessoa falando** (entrevista, discurso) e real → **YouTube** (o 🤖 do painel acha o momento);
+- **pessoa, caso, lugar, objeto ou documento real e específico** → **foto real** (Bing/Brave/Startpage/Yandex, ou Wikipedia)
+  — o banco de stock não tem isso e devolvia algo "parecido";
+- pede imagem gerada → **Flow** (se ligado); **clima/ambiente** → banco de stock (sai do buscador de imagem);
+- **ideia abstrata** → busca normal, mas o juiz fica **rigoroso** (só passa nota ≥ mínima).
+
+**🃏 Sem imagem boa → cartão de texto**: quando o juiz reprova tudo (nota < 5, ou < mínima num trecho abstrato), o trecho
+não usa mais "a menos pior" — vira um cartão: fundo escuro gerado no site + a frase do trecho (até 8 palavras, escrita pela
+IA) num destaque de tela cheia da direção (ex.: a cartela do Dallas). Troque a mídia no editor e a frase sai junto.
+Liga/desliga em 🤖 IA → "Sem imagem boa → cartão de texto".
+
+## 🤖 A IA acha os vídeos do YouTube + 📑 capítulos do Roteiro do YouTube (v84_69)
+
+- No painel **🎬 Vídeos do YouTube** (Estúdio, editor clássico e tela de prévias), o botão **🤖 A IA acha os vídeos**
+  (ou **🤖 IA acha este** em cada item) faz, um item por vez, para os trechos e cortes sem vídeo:
+  1. busca no YouTube (20 resultados) e a IA dá nota olhando as **capas**, títulos, canais e durações;
+  2. lê a **transcrição** dos 3 mais prováveis e a IA acha o **momento** que a narração pede;
+  3. não achou → a IA sugere **outra busca** (no máximo 3 buscas);
+  4. achou → baixa e corta sozinho (completando a duração do trecho); não achou → marca ❌ "escolha à mão",
+     deixa os resultados na ordem da nota e vai pro próximo. O log "o que a IA fez" mostra cada passo; ⏹ Parar interrompe.
+  Usa os recursos “Ordenar os vídeos do YouTube” e “Achar o momento” da página 🤖 IA (`yt_agente.py`).
+- **Roteiro do YouTube**: o .zip do Gerar voz leva o projeto, e ao montar o vídeo os capítulos vão pro tempo do vídeo
+  final (com chamadas e cortes) — a página do roteiro ganhou “usar os tempos do VÍDEO FINAL”. O roteiro colado à mão no
+  Gerador de voz também é reconhecido.
+
+## 📑 Capítulos do YouTube no tempo do vídeo final (v84_68)
+
+- Ao **montar** um vídeo de um 🕵️ modelo de vídeo, os capítulos são achados na narração do próprio vídeo e
+  **deslocados pelas chamadas (inscreva-se/venda) e cortes** que entraram — a página do vídeo pronto mostra a
+  descrição com os tempos certos (📋 copiar), e a descrição do modelo de vídeo também é atualizada.
+- Ao **gerar a voz**, o roteiro de um modelo de vídeo **colado à mão** no Gerador de voz é reconhecido sozinho (antes só
+  pelo botão "Gerar voz com este roteiro"): os capítulos vão pro tempo do áudio e o .zip leva o projeto.
+- Gerar a voz de novo descarta os tempos do vídeo antigo.
+
 ## 📁 Suas mídias e 🖥 sites citados entram na edição da IA (v84_67)
 
 Antes, o 🤖 Prompt de edição só mostrava as FOTOS da biblioteca e só pra usar dentro de quadros — a IA não tinha como pôr

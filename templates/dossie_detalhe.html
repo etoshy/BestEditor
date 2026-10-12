@@ -384,7 +384,7 @@ function desenharResultado() {
       <a class="ds-mini" href="/gerar-voz?dossie=${PID}" style="background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">🎙️ Gerar voz com este roteiro</a>
       <a class="ds-mini" href="/?dossie=${PID}" style="background:#334155;color:#fff;border-radius:6px;text-decoration:none;">🎬 Criar o vídeo com este projeto</a>
     </div>
-    <label style="margin-top:10px;">Descrição do YouTube (caso + capítulos${R.audio ? ' com o tempo REAL do áudio' : ' estimados — depois de gerar a voz ficam exatos'} + fontes)</label>
+    <label style="margin-top:10px;">Descrição do YouTube (caso + capítulos${(R.capitulos_video || {}).capitulos ? ' no tempo do VÍDEO FINAL, já com as chamadas e cortes' : R.audio ? ' com o tempo REAL do áudio — ao montar o vídeo ficam no tempo do vídeo final' : ' estimados — ficam exatos sozinhos ao gerar a voz e ao montar o vídeo'} + fontes)</label>
     <textarea id="rDesc" rows="9">${esc(P.descricao_pronta || '')}</textarea>
     <div class="ds-row"><button class="ds-mini ds-sec" id="cpDesc">📋 Copiar descrição</button>${(R.tags || []).length ? `<button class="ds-mini ds-sec" id="cpTags">📋 Copiar tags</button>` : ''}</div>
     ${R.produto_sugerido ? `<div style="margin-top:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:10px 12px;">

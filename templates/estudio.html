@@ -2287,7 +2287,7 @@ function estadoParaIA() {
   return {
     direcao: $('dDirecao').value, kit, ritmo: $('dRitmo').value, objetivo: $('iaObjetivo').value.trim(), paleta, legenda: leg,
     opcoes: { destaques_atuais: $('iaComDestaques').checked },
-    segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s), source: s.override_source.source || null, value: s.override_source.value || null, biblioteca: s.override_source.biblioteca || null } : null,
+    segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s), source: s.override_source.source || null, value: s.override_source.value || null, biblioteca: s.override_source.biblioteca || null, cartao: !!s.override_source.cartao } : null,
       youtube_link: s.youtube_link || null, transition: s.transition || null, efeito: s.efeito || null, entrada: s.entrada || null, saida: s.saida || null, template: s.template || null })),
     destaques: destaques.map(d => ({ estilo: d.estilo, start: d.start, end: d.end, texto: d.texto })), graficos,
     editoriais: editoriais.map(q => ({ tipo: q.tipo, start: q.start, end: q.end })),
@@ -3207,7 +3207,7 @@ function propsTrecho(P, i) {
   const fy = ov.focus_y != null ? ov.focus_y : (s.focus_y != null ? s.focus_y : 0.5);
   if (s._aspect == null) s._aspect = (s.aspect_fill && s.aspect_fill !== (DEF.aspect_fill || 'black')) ? s.aspect_fill : 'global';
   if (s._trim == null) s._trim = (s.trim_start_frames != null && Number(s.trim_start_frames) !== Number($('gTrim').value)) ? String(s.trim_start_frames) : 'global';
-  const fonte = ov.source === 'local_file' ? (s.provider === 'youtube' ? 'Clipe do YouTube escolhido' : 'Arquivo escolhido (upload/biblioteca/resultado)') : ov.source === 'url' ? 'Link direto' : ov.source === 'provider_url' ? 'Post fixado (' + ov.provider + ')' : null;
+  const fonte = ov.cartao ? '🃏 Cartão de texto — ' + ((s.cartao && s.cartao.motivo) || 'nenhuma imagem boa') + '. Envie/arraste uma mídia ou volte à busca automática pra trocar (a frase sai junto).' : ov.source === 'local_file' ? (s.provider === 'youtube' ? 'Clipe do YouTube escolhido' : 'Arquivo escolhido (upload/biblioteca/resultado)') : ov.source === 'url' ? 'Link direto' : ov.source === 'provider_url' ? 'Post fixado (' + ov.provider + ')' : null;
   const bancos = (s.media_type === 'image' ? FOTO_PROV : VIDEO_PROV);
   const tr = transicaoDaEmenda(i);
   P.innerHTML = `
@@ -3557,6 +3557,7 @@ if (gerandoTl2()) acompanharTl2();
 
 // ------------------------------------------------------------------ formulário (mesmos campos do editor clássico)
 function montarForm(acao) {
+  tirarCartoesOrfaos();
   const f = $('formMontar'); f.innerHTML = '';
   const add = (n, v) => { if (v === undefined || v === null) return; const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
   add('global_aspect_fill', $('gBordas').value); add('global_trim_start_frames', $('gTrim').value);
@@ -3607,6 +3608,12 @@ function montarForm(acao) {
     add(p + 'text_start_offset', st.start_offset != null ? st.start_offset : ''); add(p + 'text_end_offset', st.end_offset != null ? st.end_offset : '');
   });
   return f;
+}
+function tirarCartoesOrfaos() {  // 🃏 trocou a mídia de um trecho-cartão: a frase do cartão sai junto
+  for (let k = destaques.length - 1; k >= 0; k--) {
+    const d = destaques[k]; if (d.origem !== 'cartao') continue;
+    const s = segs[d.trecho]; if (!s || !(s.override_source && s.override_source.cartao)) destaques.splice(k, 1);
+  }
 }
 async function salvar(silencioso) {
   const f = montarForm('salvar');

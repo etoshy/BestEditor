@@ -76,7 +76,7 @@ def ficha_texto(ficha: Optional[Dict[str, Any]]) -> str:
 
 # ------------------------------------------------------------------ Fase 1: buscas melhores
 SCHEMA_BUSCAS = _obj({"trechos": _lista(_obj({"n": _I, "buscas": _lista(_S), "midia": {"type": "string", "enum": [
-    "foto", "video", "youtube", "ia", "cartao"]}, "visual": _S}))})
+    "foto", "video", "youtube", "ia", "cartao"]}, "real": _B, "visual": _S, "frase_tela": _S}))})
 
 _SYS_BUSCAS = """Você escreve as BUSCAS de mídia de cada trecho de um vídeo narrado. Use a FICHA e o ROTEIRO para saber
 quem/onde/quando ("ele", "a cidade", "naquela noite" viram nomes concretos) e o glossário para não cair em duplo sentido.
@@ -85,7 +85,12 @@ Para cada trecho devolva:
   banco de stock. Nomes próprios na grafia mais comum. Nada da lista evitar_sempre.
 - "midia": foto | video | youtube (alguém falando: entrevista, discurso, declaração) | ia | cartao (trecho abstrato,
   sem imagem real que sirva);
-- "visual": uma linha, em português, do que deveria aparecer.
+- "real": true quando o trecho fala de uma pessoa, lugar, evento, objeto ou documento REAL e ESPECÍFICO (com nome,
+  data ou caso) — banco de stock não tem isso, então vai para foto real/notícia/YouTube; false para clima, ambiente,
+  ação genérica ou ideia abstrata;
+- "visual": uma linha, em português, do que deveria aparecer;
+- "frase_tela": a ideia do trecho em até 8 palavras, em português, forte o bastante para aparecer sozinha na tela
+  (usada num cartão de texto quando nenhuma imagem serve).
 Mantenha o "n" de cada trecho."""
 
 
@@ -111,7 +116,8 @@ def buscas_melhores(trechos: List[Dict[str, Any]], ficha: Optional[Dict[str, Any
                 continue
             buscas = [str(b).strip()[:120] for b in x.get("buscas") or [] if str(b).strip()][:4]
             if buscas:
-                out[n] = {"buscas": buscas, "midia": x.get("midia") or "", "visual": str(x.get("visual") or "")[:300]}
+                out[n] = {"buscas": buscas, "midia": x.get("midia") or "", "visual": str(x.get("visual") or "")[:300],
+                          "real": bool(x.get("real")), "frase_tela": " ".join(str(x.get("frase_tela") or "").split()[:10])}
     return out
 
 
@@ -201,14 +207,26 @@ Em "busca_melhor" sugira uma busca do YouTube melhor (ou vazio)."""
 
 
 def ordenar_youtube(resultados: List[Dict[str, Any]], fala: str, termo: str = "", ficha: Optional[Dict[str, Any]] = None,
-                    job: Optional[str] = None) -> Optional[Dict[str, Any]]:
+                    job: Optional[str] = None, com_capas: int = 0, ja_vistos: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    """Nota de cada resultado. `com_capas`: manda também a CAPA (miniatura) dos N primeiros — a IA vê o que o vídeo mostra."""
     if not resultados or not ia.ativo("youtube_ordem"):
         return None
     linhas = [f"[{i}] {r.get('titulo', '')} | canal: {r.get('canal', '')} | duração: {r.get('duracao_formatada') or r.get('duracao_segundos') or '?'}"
               + (f" | {str(r.get('descricao') or '')[:160]}" if r.get("descricao") else "") for i, r in enumerate(resultados[:20], start=1)]
-    txt = f"O que a narração diz neste trecho: {fala[:600]}\nBusca usada: {termo}\n\n## RESULTADOS\n" + "\n".join(linhas)
+    txt = (f"O que a narração diz neste trecho: {fala[:600]}\nBusca usada: {termo}\n"
+           + (f"Vídeos já conferidos que NÃO tinham o momento: {'; '.join(ja_vistos[:10])}\n" if ja_vistos else "")
+           + "\n## RESULTADOS\n" + "\n".join(linhas))
+    conteudo: Any = txt
+    if com_capas:
+        lista = resultados[:min(com_capas, 12)]
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            imgs = list(ex.map(lambda r: ia.imagem_bloco(r["miniatura_url"]) if r.get("miniatura_url") else None, lista))
+        conteudo = [{"type": "text", "text": txt + "\n\n## CAPAS (na mesma numeração)"}]
+        for i, im in enumerate(imgs, start=1):
+            if im:
+                conteudo += [{"type": "text", "text": f"capa [{i}]"}, im]
     system = _SYS_YT + ("\n\n## FICHA DO VÍDEO\n" + ficha_texto(ficha) if ficha else "")
-    r = ia.chamar("youtube_ordem", system, txt, SCHEMA_YT, max_tokens=1500, effort="low", job=job)
+    r = ia.chamar("youtube_ordem", system, conteudo, SCHEMA_YT, max_tokens=1500, effort="low", job=job)
     if not isinstance(r, dict):
         return None
     notas = {}
@@ -229,6 +247,26 @@ def ordenar_youtube(resultados: List[Dict[str, Any]], fala: str, termo: str = ""
             v.update(ia_nota=notas[i]["nota"], ia_motivo=notas[i]["motivo"])
         lista.append(v)
     return {"resultados": lista, "busca_melhor": str(r.get("busca_melhor") or "")[:120]}
+
+
+SCHEMA_NOVA_BUSCA = _obj({"busca": _S, "por_que": _S})
+_SYS_NOVA_BUSCA = """Você procura no YouTube o vídeo de onde cortar UM trecho de um documentário. As buscas abaixo não
+acharam o momento (os vídeos não falavam disso ou não tinham legenda). Sugira UMA busca nova e DIFERENTE das já feitas:
+mais específica (nome completo, evento, data, lugar, "entrevista", "discurso", "coletiva", "reportagem"), no idioma em que
+o vídeo original provavelmente está. Responda vazio se não houver outra busca razoável."""
+
+
+def nova_busca_youtube(fala: str, feitas: List[str], motivos: List[str], ficha: Optional[Dict[str, Any]] = None,
+                       job: Optional[str] = None) -> str:
+    """Uma busca nova do YouTube depois das que falharam ("" se a IA não tiver outra ideia)."""
+    if not ia.ativo("youtube_ordem"):
+        return ""
+    txt = (f"O que a narração diz: {fala[:700]}\nBuscas já feitas: " + " | ".join(feitas)
+           + "\nO que aconteceu: " + "; ".join(motivos[-8:]))
+    system = _SYS_NOVA_BUSCA + ("\n\n## FICHA DO VÍDEO\n" + ficha_texto(ficha) if ficha else "")
+    r = ia.chamar("youtube_ordem", system, txt, SCHEMA_NOVA_BUSCA, max_tokens=400, effort="low", job=job)
+    busca = str((r or {}).get("busca") or "").strip()[:120] if isinstance(r, dict) else ""
+    return "" if busca.lower() in {f.lower() for f in feitas} else busca
 
 
 SCHEMA_MOMENTO = _obj({"achou": _B, "inicio": _N, "fim": _N, "frase": _S, "traducao": _S, "confianca": _N,
