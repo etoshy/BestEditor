@@ -331,7 +331,17 @@ E no final...</pre>
     </div>
   </div>
 
-  <button type="submit" id="btn-gerar">Gerar áudio</button>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:20px;">
+    <button type="submit" id="btn-gerar" style="margin-top:0;">Gerar áudio</button>
+    <label style="margin:0;font-weight:normal;display:flex;gap:6px;align-items:center;" title="Cada geração carrega o próprio modelo na placa de vídeo: com VRAM sobrando, duas rodam juntas">
+      🎛 Ao mesmo tempo:
+      <select id="fila-modo" style="width:auto;margin:0;">
+        <option value="auto">automático (pela VRAM)</option><option value="1">1 por vez (fila)</option><option value="2">2</option><option value="3">3</option>
+      </select></label>
+    <span id="fila-info" style="font-size:0.82rem;color:#555;"></span>
+  </div>
+  <p style="font-size:0.82rem;color:#666;margin:6px 0 0;">Pode pedir vários áudios seguidos: eles entram na <b>fila</b> e vão sendo gerados
+    (2 juntos quando a placa de vídeo tem memória pra isso). Tudo fica no <a href="#historico">📜 Histórico</a>.</p>
 </form>
 
 <h2 style="margin-top:32px;">🎭 Vozes com slug (multi voice)</h2>
@@ -380,6 +390,22 @@ E no final...</pre>
 <style>
 #progress-fill-indeterminate { animation: indeterminate-gerar-voz 1.4s infinite ease-in-out; }
 @keyframes indeterminate-gerar-voz { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+</style>
+
+<h2 id="historico" style="margin-top:32px;">📜 Histórico de áudios gerados</h2>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <input type="text" id="hist-q" placeholder="procurar pelo texto, motor ou voz…" style="flex:1;min-width:220px;margin:0;">
+  <span id="hist-total" style="font-size:0.85rem;color:#555;"></span>
+</div>
+<div id="hist-lista" style="margin-top:8px;"></div>
+<div style="display:flex;gap:8px;margin-top:6px;"><button type="button" id="hist-ant" style="display:none;margin:0;padding:4px 12px;font-size:0.82rem;">← mais novos</button>
+  <button type="button" id="hist-prox" style="display:none;margin:0;padding:4px 12px;font-size:0.82rem;">mais antigos →</button></div>
+<style>
+.hist-item{display:grid;grid-template-columns:1fr auto;gap:4px 12px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:0.86rem;background:#fff}
+.hist-item .meta{color:#555;font-size:0.8rem}
+.hist-item audio{height:32px;width:260px;max-width:100%}
+.hist-item .acoes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.hist-item .acoes a,.hist-item .acoes button{font-size:0.78rem;margin:0;padding:3px 9px}
 </style>
 
 {% if perfis_de_voz %}
@@ -502,6 +528,7 @@ document.getElementById('form-gerar-voz').addEventListener('submit', async funct
   document.getElementById('log-box').textContent = '';
 
   const formData = new FormData(ev.target);
+  setTimeout(() => { document.getElementById('btn-gerar').disabled = false; }, 800);  // já dá pra pedir o próximo
   let resp, data;
   try {
     resp = await fetch("{{ url_for('gerar_voz_gerar') }}", { method: 'POST', body: formData });
@@ -515,7 +542,10 @@ document.getElementById('form-gerar-voz').addEventListener('submit', async funct
     return;
   }
   try { localStorage.setItem('gerarVozUltimo', data.job_id); } catch (_) {}
+  document.getElementById('btn-gerar').disabled = false;
+  acompanhando = data.job_id;
   pollStatus(data.job_id);
+  verGeracoes();
 });
 
 // ---------------- voltar a acompanhar uma geração em andamento (recarregou / fechou a aba)
@@ -525,7 +555,6 @@ function acompanhar(jobId) {
   document.getElementById('error-box').style.display = 'none';
   document.getElementById('resultado-box').style.display = 'none';
   document.getElementById('progresso-box').style.display = '';
-  document.getElementById('btn-gerar').disabled = true;
   try { localStorage.setItem('gerarVozUltimo', jobId); } catch (_) {}
   pollStatus(jobId);
   const pb = document.getElementById('progresso-box'); if (pb && pb.scrollIntoView) pb.scrollIntoView({ block: 'nearest' });
@@ -537,12 +566,22 @@ async function verGeracoes() {
   const lista = (d.geracoes || []);
   let ultimo = null; try { ultimo = localStorage.getItem('gerarVozUltimo'); } catch (_) {}
   if (!lista.length) { box.style.display = 'none'; return; }
-  const hora = (t) => new Date(t * 1000).toLocaleTimeString().slice(0, 5);
-  box.innerHTML = '<b>🎙 Gerações recentes</b> (continuam rodando no servidor mesmo se você fechar a página):' + lista.map(g =>
-    `<div style="margin-top:6px;">${g.running ? '⏳ <b>gerando</b>' : g.erro ? '⚠ deu erro' : '✅ pronta'} · ${hora(g.criado_em)} · ${g.engine || ''} · ${g.palavras || '?'} palavras · <i>“${(g.texto_inicio || '').replace(/</g, '&lt;')}…”</i>
-      <button type="button" class="ver-geracao" data-id="${g.job_id}" style="width:auto;padding:2px 10px;font-size:0.8rem;margin-left:6px;">${g.running ? 'Acompanhar' : 'Ver resultado'}</button></div>`).join('');
+  const hora = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const f = d.fila || {};
+  const estado = (g) => g.na_fila ? `⏳ <b>na fila</b> (posição ${g.posicao || '?'})` : g.running ? '▶ <b>gerando</b>' : g.cancelado ? '✖ cancelada' : g.erro ? '⚠ deu erro' : '✅ pronta';
+  box.innerHTML = `<b>🎙 Fila de geração</b> — ${(f.rodando || []).length} gerando, ${(f.fila || []).length} esperando · até ${f.limite || 1} ao mesmo tempo (continua rodando mesmo se você fechar a página):` + lista.map(g =>
+    `<div style="margin-top:6px;">${estado(g)} · ${hora(g.criado_em)} · ${g.engine || ''} · ${g.palavras || '?'} palavras · <i>“${(g.texto_inicio || '').replace(/</g, '&lt;')}…”</i>
+      <button type="button" class="ver-geracao" data-id="${g.job_id}" style="width:auto;padding:2px 10px;font-size:0.8rem;margin-left:6px;">${g.running ? 'Acompanhar' : 'Ver resultado'}</button>
+      ${g.na_fila ? `<button type="button" class="cancelar-geracao" data-id="${g.job_id}" style="width:auto;padding:2px 10px;font-size:0.8rem;background:#6b7280;">Tirar da fila</button>` : ''}</div>`).join('');
   box.style.display = '';
   box.querySelectorAll('.ver-geracao').forEach(b => b.addEventListener('click', () => acompanhar(b.dataset.id)));
+  box.querySelectorAll('.cancelar-geracao').forEach(b => b.addEventListener('click', async () => {
+    await fetch('/gerar-voz/cancelar/' + b.dataset.id, { method: 'POST' }); verGeracoes();
+  }));
+  filaInfo(f);
+  clearTimeout(window._verGerT);
+  if (lista.some(g => g.running)) window._verGerT = setTimeout(() => { if (!document.hidden) verGeracoes(); }, 3000);
+  else carregarHistorico();
   // abriu a página com a SUA última geração ainda rodando: já volta a acompanhar sozinho
   const rodando = lista.find(g => g.running && g.job_id === ultimo) || (lista.filter(g => g.running).length === 1 ? lista.find(g => g.running) : null);
   if (rodando && !acompanhando) acompanhar(rodando.job_id);
@@ -566,13 +605,15 @@ async function pollStatus(jobId) {
     setTimeout(function () { pollStatus(jobId); }, 2000);
     return;
   }
-  document.getElementById('log-box').textContent = data.log || '';
+  document.getElementById('log-box').textContent = (data.na_fila ? `⏳ Na fila — posição ${data.posicao || '?'}. Pode pedir outro áudio enquanto isso.\n` : '') + (data.log || '');
   document.getElementById('log-box').scrollTop = document.getElementById('log-box').scrollHeight;
 
   if (data.running) {
+    if (acompanhando && acompanhando !== jobId) return;  // passou a acompanhar outra
     setTimeout(function () { pollStatus(jobId); }, 1200);
     return;
   }
+  if (acompanhando && acompanhando !== jobId) return;
   document.getElementById('btn-gerar').disabled = false;
   if (data.erro) {
     mostrarErro(data.erro);
@@ -731,5 +772,51 @@ fetch('/gerar-voz/vozes').then(r => r.json()).then(mvDesenhar);
 document.getElementById('legenda-avancado-toggle').addEventListener('change', function () {
   document.getElementById('legenda-avancado-opcoes').style.display = this.checked ? '' : 'none';
 });
+
+// ---------------- 🎛 fila: quantos ao mesmo tempo
+function filaInfo(f) {
+  if (!f) return;
+  const sel = document.getElementById('fila-modo'); if (sel && document.activeElement !== sel) sel.value = f.modo || 'auto';
+  const v = f.vram;
+  document.getElementById('fila-info').textContent = (v ? `placa: ${v.nome} · ${v.total.toFixed(1)} GB de VRAM (${v.livre.toFixed(1)} GB livres)` : 'sem placa NVIDIA detectada: 1 por vez')
+    + ` · agora: até ${f.limite} ao mesmo tempo`;
+}
+fetch('/gerar-voz/fila').then(r => r.json()).then(filaInfo).catch(() => {});
+document.getElementById('fila-modo').addEventListener('change', async (e) => {
+  const r = await fetch('/gerar-voz/fila/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modo: e.target.value }) });
+  filaInfo(await r.json());
+});
+
+// ---------------- 📜 histórico
+let histPagina = 0, histT = null;
+const hEsc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const hDur = (s) => s == null ? '?' : Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+async function carregarHistorico() {
+  let d;
+  try { d = await (await fetch('/gerar-voz/historico?pagina=' + histPagina + '&q=' + encodeURIComponent(document.getElementById('hist-q').value))).json(); } catch (_) { return; }
+  document.getElementById('hist-total').textContent = d.total + ' áudio(s)';
+  const quando = (t) => new Date(t * 1000).toLocaleString().slice(0, 16);
+  document.getElementById('hist-lista').innerHTML = (d.itens || []).map(h => `
+    <div class="hist-item">
+      <div><b>${h.erro ? '⚠ ' : ''}“${hEsc(h.texto_inicio)}…”</b>
+        <div class="meta">${quando(h.criado)} · ${hEsc(h.motor)}${h.voz ? ' · ' + hEsc(h.voz) : ''}${h.idioma ? ' · ' + hEsc(h.idioma) : ''} · ${h.palavras || '?'} palavras · ⏱ ${hDur(h.duracao)}${h.levou ? ' · levou ' + Math.round(h.levou) + ' s' : ''}${h.multivoz ? ' · 🎭 multi voice' : ''}${h.erro ? ' · <span style="color:#991b1b">' + hEsc(h.erro).slice(0, 140) + '</span>' : ''}${h.sumiu ? ' · <i>arquivo apagado</i>' : ''}</div></div>
+      <div class="acoes">
+        ${h.audio_url ? `<audio controls preload="none" src="${h.audio_url}"></audio><a href="${h.audio_url}" download>⬇ WAV</a>` : ''}
+        ${h.srt_url ? `<a href="${h.srt_url}" download>⬇ SRT</a>` : ''}
+        <button type="button" class="hist-apagar" data-id="${h.id}" style="background:#dc2626;">Apagar</button>
+      </div>
+    </div>`).join('') || '<p style="color:#888;font-size:0.85rem;">Nenhum áudio ainda.</p>';
+  document.querySelectorAll('.hist-apagar').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Apagar este áudio (e a legenda) do histórico e do disco?')) return;
+    const r = await fetch('/gerar-voz/historico/' + b.dataset.id + '/apagar', { method: 'POST' });
+    if (!r.ok) { alert((await r.json()).erro || 'não deu'); return; } carregarHistorico();
+  }));
+  document.getElementById('hist-ant').style.display = histPagina > 0 ? '' : 'none';
+  document.getElementById('hist-prox').style.display = (histPagina + 1) * 50 < d.total ? '' : 'none';
+}
+document.getElementById('hist-q').addEventListener('input', () => { clearTimeout(histT); histT = setTimeout(() => { histPagina = 0; carregarHistorico(); }, 300); });
+document.getElementById('hist-ant').addEventListener('click', () => { histPagina = Math.max(0, histPagina - 1); carregarHistorico(); });
+document.getElementById('hist-prox').addEventListener('click', () => { histPagina++; carregarHistorico(); });
+carregarHistorico();
 </script>
 {% endblock %}

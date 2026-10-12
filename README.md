@@ -28,6 +28,76 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 📁 Suas mídias e 🖥 sites citados entram na edição da IA (v84_67)
+
+Antes, o 🤖 Prompt de edição só mostrava as FOTOS da biblioteca e só pra usar dentro de quadros — a IA não tinha como pôr
+um vídeo/foto que você enviou num trecho, e o quadro de página dependia da direção.
+
+- O prompt lista **todas as mídias da biblioteca** (fotos e vídeos, inclusive as do 🕵️ modelo de vídeo e as capturas de
+  página importadas), com **o que é** cada uma e onde já está; a IA responde `"midia": "bib:<id>"` no trecho e precisa usar
+  todas pelo menos uma vez. Trecho com arquivo que você escolheu não é trocado.
+- Na biblioteca do Estúdio cada arquivo ganhou um campo **“o que é?”** (“print do site X”, “foto do fulano”).
+- **Site na tela**: quando a fala cita um site/página/notícia/post, a IA põe o vídeo da página (se você enviou) ou o quadro
+  🖥 Página/print com o link (o print é tirado sozinho). Os quadros de prova (`pagina`, `post`) valem em **qualquer
+  direção**. Links: as fontes do modelo de vídeo + o campo novo “🖥 Sites pra mostrar na tela” na aba 🤖 IA.
+- Aplicar a resposta já salva o arquivo no trecho; **Desfazer** volta o arquivo de antes (só aceita caminho de dentro do projeto).
+
+## 🕸 Direção e modelo "Exposição da internet" (estilo Dallas) (v84_66)
+
+Tirado de 3 vídeos do canal Dallas (cortes, quadros, ritmo da narração e estrutura do roteiro):
+
+- **Direção `sys_dallas`**: filtro com faixas de cinema 2,39, tarja de terminal (branco no preto) com a frase-chave,
+  cartelas de terminal no preto nas viradas, cartela vermelha "NÍVEL 1/2/3", fotos flutuando com partículas, documentos,
+  ficha de perfil e citações, cortes secos. Sem legenda queimada.
+- **Extras** em `assets/darkplanner/extras/referencias_canais.json`: filtros `cinemascope_dallas`/`cinemascope_frio` e
+  destaques `dallas_tarja`, `dallas_cartela`, `dallas_nivel` (com miniaturas na galeria).
+- **`corFixa`** nos destaques dos extras: a caixa usa a cor do estilo (a tarja é sempre preta), sem herdar o acento da paleta.
+- **Modelo 🕸 Exposição da internet** (Dossiês): formatos "Comunidade em NÍVEIS", "Expondo uma pessoa" e Shorts, a
+  ~170 palavras/min, com regras de proteção (só fatos com fonte, sem identificar vítimas/menores, sem ensinar o crime,
+  palavras sensíveis com símbolos só na tela, [CENSURAR] vira 🙈 no editor).
+
+O estilo é copiado, a identidade do canal não (sem nome, logo, vinheta ou bordões).
+
+## 🎙 Fila e histórico no Gerador de voz + 📁 estilos "Dossiê em colagem" (v84_65)
+
+**Fila de áudios.** No 🎙️ Gerador de voz dá pra pedir vários áudios seguidos: cada pedido entra na **fila** e o botão
+já fica livre pro próximo. Cada geração roda num processo próprio, que carrega o modelo na placa de vídeo, então:
+
+- **🎛 Ao mesmo tempo → automático** (padrão): lê a VRAM pelo `nvidia-smi` e gera **2 juntos** quando cabe (Piper ~0,3 GB,
+  Kokoro ~1 GB, XTTS e Chatterbox Turbo ~3,5 GB, Chatterbox ~5 GB por geração, usando no máximo 90% da placa). Se não
+  couber, ou se não houver placa NVIDIA, gera **um depois do outro**.
+- Também dá pra fixar **1, 2 ou 3** (vai pro `site_config.json`, `voz_simultaneos`).
+- A caixa **🎙 Fila de geração** mostra o que está gerando e o que está esperando (com a posição). O que ainda não começou
+  pode ser tirado da fila. A ordem é a de chegada.
+
+**📜 Histórico de áudios gerados** (fim da página, fica em `outputs/vozes/historico.json` e sobrevive a reiniciar o site).
+Mostra a data, o motor, a voz, o idioma, o começo do texto, as palavras, a duração e quanto tempo levou, com player,
+⬇ WAV, ⬇ SRT e Apagar (apaga também os arquivos). Dá pra procurar pelo texto, pelo motor ou pela voz.
+
+**📁 Vídeos de IA "Dossiê em colagem" virando estilo.** Vieram de 5 vídeos de true crime feitos por IA ("O Caso de Idaho",
+shorts 9:16 de 2 a 3 min, em capítulos). Em 🎞️ Vídeos modelados entram dois estilos novos:
+
+- **Dossiê em colagem de papel — true crime em capítulos**:
+  - a cena tem fotos P&B recortadas com borda branca, jornal e relatório policial ao fundo, linha vermelha entre
+    alfinetes, fita crepe e uma etiqueta de papel rasgado com 2 a 4 palavras;
+  - a animação é stop-motion de recortes;
+  - o roteiro tem "No capítulo anterior…", horários e endereços exatos, sem sensacionalismo, e termina com um gancho
+    pro próximo capítulo;
+  - regra: nunca pedir à IA o rosto realista de uma pessoa real; as fotos reais entram no editor.
+- **Arquivo na mesa escura — abertura/teaser realista**: pastas, lupa, mapas e uma cidade de papel em miniatura numa
+  mesa de madeira com luz de abajur. Serve para apresentar o canal ou abrir um caso.
+
+Os dois abrem no Estúdio com a direção nova **"Dossiê de papel (colagem true crime)"**:
+
+- cor sépia/creme com vermelho e câmera chegando devagar;
+- peças que deslizam e assentam, e viradas de página;
+- destaques de recorte, carimbo e máquina de escrever;
+- quadros editoriais de recortes, mural, bilhetes e linha do tempo.
+
+O que não dá para copiar: a IA de vídeo que fez os originais monta cada colagem com texto já "impresso" nela. O Flow
+consegue escrever etiquetas curtas, mas pode errar letras. Quando errar, apague a etiqueta da cena e use um destaque
+de recorte/carimbo no editor.
+
 ## 🧹 Espaço em disco (v84_64)
 
 Link "🧹 Espaço em disco" no topo. Mostra quanto o site ocupa no total (e quanto sobra no disco) e cada categoria com o

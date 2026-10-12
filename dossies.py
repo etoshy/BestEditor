@@ -329,6 +329,71 @@ MODELOS: Dict[str, Dict[str, Any]] = {
             "alguém, e deixe claro que era crime/abuso.",
         ],
     },
+    # 🕸 v84_66: tirado de 3 vídeos do canal Dallas ("BONES", "CAPPERS", "EXPONDO a líder de um culto"): 12–16 min,
+    # narração ~170 palavras/min, abre com um caso real e chocante, explica a comunidade/o golpe e escala em NÍVEIS.
+    "exposicao_internet": {
+        "nome": "🕸 Exposição da internet (comunidades, golpes e cultos)",
+        "descricao": "Expõe um lado sombrio da internet — uma comunidade, um mercado, um golpe ou uma pessoa que manipulava "
+                     "outras — com casos reais, em tom de alerta (estilo Dallas). No editor, combina com a direção "
+                     "“Exposição da internet (estilo Dallas)”.",
+        "palavras_por_minuto": 170,
+        "direcao_sugerida": "sys_dallas",
+        "formatos": {
+            "niveis": {
+                "nome": "🧊 Comunidade/mercado em NÍVEIS (do menos ao mais grave)", "minutos": 13,
+                "estrutura": [
+                    "ABERTURA (0-30 s): uma frase que diz o que existe AGORA na internet e a promessa (“e eu vou te mostrar "
+                    "não só como funciona, mas como isso pode escalar…”); diga que o assunto está dividido em níveis",
+                    "Caso de entrada: um caso real e recente, com data, lugar e o que a polícia/jornal descobriu — termine com "
+                    "“Mas quer saber de algo ainda mais chocante?”",
+                    "O que é essa comunidade/mercado: como se chamam, onde se reúnem (sites, redes, apps), o vocabulário "
+                    "próprio deles explicado termo a termo, e como o dinheiro (ou a “vitória”) circula",
+                    "NÍVEL 1, NÍVEL 2, NÍVEL 3 — cada nível numa linha própria com um nome curto (vira cartela vermelha): "
+                    "casos reais com nome público, data e fonte, cada nível mais grave que o anterior",
+                    "Viradas entre os blocos com perguntas curtas (“Mas sabe qual é a pior parte?”, “Só que agora vem a pior "
+                    "parte.”, “Ou…”) numa linha própria — viram cartela de terminal no preto",
+                    "Consequências: prisões, julgamentos, leis que mudaram — e o que continua acontecendo hoje",
+                    "FECHAMENTO: o alerta pro público (como reconhecer e se proteger, onde denunciar) e uma frase final seca",
+                ],
+            },
+            "expondo_pessoa": {
+                "nome": "🎭 Expondo uma pessoa (líder de culto, golpista, manipulador)", "minutos": 15,
+                "estrutura": [
+                    "ABERTURA: um momento real e documentado (vídeo, evento, post) que parecia normal e esconde algo — "
+                    "“o que eles não sabiam é que…” — e quem essa pessoa realmente era",
+                    "O contexto: a comunidade/fandom/plataforma onde tudo aconteceu, explicado pra quem nunca ouviu falar",
+                    "Como ela se aproximou das vítimas (sem nome de vítima que não é pública: “um usuário que vou chamar de X”)",
+                    "A escalada: as regras, as histórias inventadas, o controle, o dinheiro — em ordem, com datas e com trechos "
+                    "de mensagens/posts/e-mails lidos em voz alta (entre aspas)",
+                    "O ponto de virada: quem saiu, quem denunciou, o que veio a público",
+                    "Onde essa pessoa está hoje e o que aconteceu com as vítimas",
+                    "FECHAMENTO: o padrão de manipulação pra o público reconhecer e uma frase final",
+                ],
+            },
+            "curto": {
+                "nome": "⚡ Shorts / Reels (até 60 s)", "minutos": 1,
+                "estrutura": [
+                    "O fato mais chocante na 1ª frase, com data",
+                    "O que é a comunidade/o golpe em 2 frases",
+                    "O detalhe que ninguém imagina",
+                    "Alerta curto + “o vídeo completo está no canal”",
+                ],
+            },
+        },
+        "regras": [
+            "Só FATOS que estão nas fontes, com data e fonte (polícia, tribunal, jornal). Acusado não é culpado: diga "
+            "“foi acusado”, “responde pelo crime”, “foi condenado” conforme a fonte.",
+            "Fale direto com quem assiste (“você”, “eu vou te mostrar”), frases curtas, ritmo rápido, perguntas de virada numa "
+            "linha própria. A frase-chave de cada trecho deve caber em até 8 palavras — ela vira a tarja na tela.",
+            "PROTEÇÃO: nunca dê nome, foto ou detalhe que identifique vítima menor de idade ou vítima não pública; nunca "
+            "explique COMO cometer o crime ou o golpe (sem passo a passo, sem onde comprar/achar, sem nome de site ativo "
+            "que facilite) — explique o que aconteceu e como se proteger.",
+            "Monetização: sem detalhe gráfico; temas como abuso, suicídio e violência sexual com palavras neutras "
+            "(“tirou a própria vida”, “material de abuso”, “crime sexual”). As palavras sensíveis podem aparecer na TELA com "
+            "símbolos (ex.: S#XUAL), mas a narração continua natural e respeitosa.",
+            "Rostos de vítimas, menores e conteúdo impróprio: marque [CENSURAR] na frase — no editor vira 🙈 censura (pixel).",
+        ],
+    },
     "ciencia": {
         "nome": "🔬 Ciência e curiosidades",
         "descricao": "Explicações de 'por que…', 'como funciona', 'e se…?' — ciência, corpo humano, espaço, tecnologia.",

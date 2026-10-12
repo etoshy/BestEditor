@@ -439,6 +439,27 @@ def registrar(app, base_dir: str, jobs: Dict[str, Dict[str, Any]], save_state: C
                                   "provider": "flow", "original_provider": "flow"} for i, s in enumerate(pac["pending_segments"])],
             "preview_progress": {"current": n, "total": n}, "modelado_id": pid,
         }
+        if pac.get("direcao"):  # o estilo traz uma direção de edição (ex.: Dossiê de papel)
+            try:
+                import dp_direcao
+                if dp_direcao.direcao(pac["direcao"]):
+                    segs = job["pending_segments"]
+                    plano = dp_direcao.planejar(
+                        [{"start": x["start"], "end": x["end"], "foto": x.get("media_type") == "image", "template": x.get("template"),
+                          "transition": x.get("transition"), "efeito": x.get("efeito"), "entrada": x.get("entrada"),
+                          "saida": x.get("saida")} for x in segs], pac["direcao"], semente=1, so_vazios=True)
+                    for x, pl in zip(segs, plano["trechos"]):
+                        for k in ("transition", "efeito", "entrada", "saida"):
+                            if pl.get(k) and pl[k] != "none" and not x.get(k):
+                                x[k] = pl[k]
+                    job["editor_defaults"]["direcao"] = pac["direcao"]
+                    if plano.get("filtro_cor"):
+                        job["editor_defaults"]["filtro_cor"] = plano["filtro_cor"]
+                    if plano.get("cores"):
+                        import dp_cores
+                        job["editor_defaults"]["paleta"] = dp_cores.normalizar(plano["cores"])
+            except Exception:  # noqa: BLE001 — sem a direção o projeto abre igual
+                pass
         if waveform:
             try:
                 wf = os.path.join(pasta, "waveform.png")

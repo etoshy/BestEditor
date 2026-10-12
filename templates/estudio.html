@@ -370,7 +370,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <h3>Biblioteca de mídia</h3>
       <input type="file" id="arqBiblioteca" multiple accept="video/*,image/*" hidden>
       <button id="btnEnviarBiblioteca" style="width:100%;margin-bottom:8px;">+ Enviar vídeo ou foto</button>
-      <p class="hint">Arraste um item até um trecho da timeline pra usar nele (ou selecione o trecho e clique em “usar”).</p>
+      <p class="hint">Arraste um item até um trecho da timeline pra usar nele (ou selecione o trecho e clique em “usar”). Escreva <b>o que é</b> cada um (“print do site X”, “foto do fulano”): o 🤖 Prompt de edição usa isso pra pôr cada arquivo no trecho em que a fala combina.</p>
       <div id="listaBiblioteca"></div>
     </div>
 
@@ -408,6 +408,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <h3>🤖 Prompt de edição (2ª etapa com a IA)</h3>
       <p class="hint">Gera um prompt com a <b>direção escolhida</b> (<span id="iaDirecao"></span> — troque na aba 🎨 Direção) e o que ela permite, a <b>timeline como está agora</b> (mídias, cenas, transições, efeitos, destaques) e a <b>fala com os tempos</b> (transcrição/SRT). Cole na sua IA; ela devolve um JSON mais caprichado — transições, efeitos, cenas com textos, destaques ancorados na fala e <b>gráficos com os dados</b> citados. Cole a resposta aqui embaixo, confira e aplique (dá pra desfazer).</p>
       <label class="f"><span>O que você quer nesta edição <span class="dim">(opcional)</span></span><textarea id="iaObjetivo" rows="3" placeholder="ex.: mais gráficos com os números citados; cortes mais rápidos no começo; destaques só nos anos"></textarea></label>
+      <label class="f"><span>🖥 Sites pra mostrar na tela <span class="dim">(opcional — um link por linha; quando a fala citar, entra o print da página)</span></span><textarea id="iaLinks" rows="2" placeholder="https://site.com/noticia-citada"></textarea></label>
       <label class="chk"><input type="checkbox" id="iaComDestaques" checked> Mandar os destaques que já estão na timeline</label>
       <label class="chk" title="Vídeo longo: uma IA editando 1 hora de uma vez perde qualidade. Em partes, cada prompt cobre só um pedaço (os números dos trechos continuam os do vídeo inteiro) e no fim você confere tudo junto."><input type="checkbox" id="iaPartes"> ✂️ Dividir em partes de <input type="number" id="iaPartesMin" value="12" min="3" max="60" step="1" style="width:52px;display:inline-block;padding:1px 4px"> min <span class="dim">(opcional — pra vídeo longo)</span></label>
       <div class="row" style="margin-top:6px;gap:6px"><button class="primary" id="iaGerar">📝 Gerar prompt</button><button class="mini" id="iaNovoGrafico" title="gráfico à mão, no cursor">📊 Gráfico à mão</button></div>
@@ -2286,7 +2287,7 @@ function estadoParaIA() {
   return {
     direcao: $('dDirecao').value, kit, ritmo: $('dRitmo').value, objetivo: $('iaObjetivo').value.trim(), paleta, legenda: leg,
     opcoes: { destaques_atuais: $('iaComDestaques').checked },
-    segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s) } : null,
+    segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s), source: s.override_source.source || null, value: s.override_source.value || null, biblioteca: s.override_source.biblioteca || null } : null,
       youtube_link: s.youtube_link || null, transition: s.transition || null, efeito: s.efeito || null, entrada: s.entrada || null, saida: s.saida || null, template: s.template || null })),
     destaques: destaques.map(d => ({ estilo: d.estilo, start: d.start, end: d.end, texto: d.texto })), graficos,
     editoriais: editoriais.map(q => ({ tipo: q.tipo, start: q.start, end: q.end })),
@@ -2407,10 +2408,10 @@ $('iaConferir').addEventListener('click', async () => {
 $('iaAplicar').addEventListener('click', () => {
   const p = planoIA; if (!p) return;
   const pega = (k) => { const c = document.querySelector(`.iaPega[data-k="${k}"]`); return c && c.checked; };
-  const CAMPOS_IA = CAMPOS_DIRECAO.concat(['_aspect', 'zoom_direction', 'focus_x', 'focus_y', 'transition_som', 'override_source', 'on_screen_text']);
+  const CAMPOS_IA = CAMPOS_DIRECAO.concat(['_aspect', 'zoom_direction', 'focus_x', 'focus_y', 'transition_som', 'override_source', 'on_screen_text', 'media_type', 'clipes_extra', 'curto', '_preview']);
   desfazerIA = { segs: JSON.stringify(segs.map(s => Object.fromEntries(CAMPOS_IA.map(k => [k, s[k] === undefined ? null : s[k]])))), destaques: JSON.stringify(destaques), graficos: JSON.stringify(graficos), editoriais: JSON.stringify(editoriais),
     sfx: JSON.stringify(sfx), filtro: $('gFiltro').value, paleta: JSON.stringify(paleta), leg: JSON.stringify(leg) };
-  const feito = [];
+  const feito = [], midiasIA = [];
   if (pega('limpar_1a')) {
     // antes de pôr os destaques novos: sem isso eles "batiam" nos antigos e não entravam
     let n = 0;
@@ -2431,8 +2432,13 @@ $('iaAplicar').addEventListener('click', () => {
       if (t.bordas) s._aspect = t.bordas;
       if (t.camera) { s.zoom_direction = t.camera; if (s.override_source) s.override_source.zoom_direction = t.camera; }
       if (t.foco) { s.focus_x = t.foco.x; s.focus_y = t.foco.y; if (s.override_source) { s.override_source.focus_x = t.foco.x; s.override_source.focus_y = t.foco.y; } }
-      if (t.transition_som) s.transition_som = t.transition_som; });
-    feito.push(`${p.trechos.length} trechos`);
+      if (t.transition_som) s.transition_som = t.transition_som;
+      if (t.midia) {  // 📁 mídia que a pessoa enviou
+        const b = biblioteca.find(x => x.id === t.midia); if (!b) return;
+        s.override_source = Object.assign({ source: 'local_file', biblioteca: b.id, kind: b.media_type }, t.camera ? { zoom_direction: t.camera } : {});
+        s.media_type = b.media_type; s.clipes_extra = null; s.curto = null; midiasIA.push(t.indice);
+      } });
+    feito.push(`${p.trechos.length} trechos` + (midiasIA.length ? ` (${midiasIA.length} com as suas mídias)` : ''));
   }
   if (pega('destaques') && p.destaques) {
     const manter = p.substituir_destaques ? destaques.filter(x => x.origem !== 'auto' && x.origem !== 'ia') : destaques.slice();
@@ -2448,6 +2454,7 @@ $('iaAplicar').addEventListener('click', () => {
   if (pega('sons') && p.sons) { for (let k = sfx.length - 1; k >= 0; k--) if (sfx[k].origem === 'ia') sfx.splice(k, 1); /* reaplicar não duplica */ p.sons.forEach(x => sfx.push(Object.assign({ id: Math.random().toString(16).slice(2, 10), origem: 'ia' }, x))); sfx.sort((a, b) => a.start - b.start); feito.push(`${p.sons.length} sons`); }
   marcarSujo(); desenharTimeline(); renderProps(); desenharCenas(); atualizarMonitor(true); $('iaDesfazer').disabled = false;
   toast('🤖 Aplicado: ' + (feito.join(', ') || 'nada'), 5000);
+  if (midiasIA.length) { desfazerIA.midias = midiasIA.slice(); salvarEPrevias(midiasIA); }
 });
 $('iaDesfazer').addEventListener('click', () => {
   const u = desfazerIA; if (!u) return;
@@ -2458,7 +2465,27 @@ $('iaDesfazer').addEventListener('click', () => {
     fetch(`/job/${JOB}/overlays/textos-1a-ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'restaurar' }) })
       .then(r => r.json()).then(d => { (d.overlays || []).forEach(o => { if (!overlays.some(x => x.id === o.id)) overlays.push(o); }); desenharTimeline(); }).catch(() => {});
   }
+  const voltarMidias = u.midias || [];
   desfazerIA = null; $('iaDesfazer').disabled = true; marcarSujo(); desenharTimeline(); renderProps(); desenharCenas(); atualizarMonitor(true); toast('↩ Edição da IA desfeita');
+  if (voltarMidias.length) salvar(true);  // o arquivo que o trecho tinha antes volta no projeto
+});
+// 📁 a IA pôs mídias da biblioteca: salva (o servidor liga o arquivo ao trecho) e atualiza as miniaturas
+async function salvarEPrevias(idx) {
+  if (!(await salvar(true))) return;
+  idx.forEach(i => { const s = segs[i]; if (!s) return;
+    s._preview = Object.assign({}, s._preview, { thumb_remoto: null, video_remoto: null, erro: null,
+      midia_local: `/job/${JOB}/segment-media/${i}?t=${Date.now()}`, thumbnail_url: `/job/${JOB}/segment-thumb/${i}?t=${Date.now()}` });
+    limparErroLocal(i); });
+  desenharTimeline(); atualizarMonitor(true);
+}
+// 🖥 links pra mostrar na tela
+$('iaLinks').value = (D.links_tela || []).join('\n');
+$('iaLinks').addEventListener('change', async () => {
+  try {
+    const r = await fetch(`/job/${JOB}/links-tela`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links: $('iaLinks').value }) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+    $('iaLinks').value = d.links.join('\n'); toast(`🖥 ${d.links.length} link(s) — gere o prompt de novo pra entrarem`);
+  } catch (e) { toast('⚠ Não salvei os links: ' + e.message, 4000); }
 });
 $('iaNovoGrafico').addEventListener('click', () => novoGrafico());
 $('hlNovoGrafico').addEventListener('click', () => novoGrafico());
@@ -2818,6 +2845,17 @@ function desenharBiblioteca() {
   biblioteca.forEach((it) => {
     const c = document.createElement('div'); c.className = 'card';
     c.innerHTML = `<div class="ico" style="${it.media_type === 'image' ? `background-image:url('${it.url}')` : ''}">${it.media_type === 'image' ? '' : '🎥'}</div><div class="nm" title="${esc(it.filename)}">${esc(it.filename)}</div>`;
+    const oq = document.createElement('input'); oq.type = 'text'; oq.className = 'bibDesc'; oq.placeholder = it.rotulo || 'o que é? (pra IA pôr no lugar certo)';
+    oq.value = it.descricao || ''; oq.title = 'O que é esse arquivo — o 🤖 Prompt de edição usa pra escolher o trecho';
+    oq.style.cssText = 'width:100%;font-size:11px;padding:2px 4px;margin-top:3px';
+    ['mousedown', 'dragstart', 'pointerdown'].forEach(ev => oq.addEventListener(ev, e => e.stopPropagation()));
+    oq.addEventListener('change', async () => {
+      try {
+        const r = await fetch(`/job/${JOB}/library-item/${it.id}/descricao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ descricao: oq.value }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); it.descricao = d.descricao; toast('📝 Guardado');
+      } catch (e) { toast('⚠ ' + e.message, 4000); }
+    });
+    c.appendChild(oq);
     const usar = document.createElement('button'); usar.className = 'mini'; usar.textContent = 'usar';
     usar.addEventListener('click', () => { if (sel && sel.tipo === 'seg') usarBiblioteca(sel.i, it.id); else toast('Selecione um trecho na timeline'); });
     c.appendChild(usar);
@@ -3536,10 +3574,10 @@ function montarForm(acao) {
     add(p + 'obra', s.obra || ''); add(p + 'personagem', s.personagem || '');
     add(p + 'on_screen_text', s.on_screen_text || '');
     let modo = 'auto';
-    if (ov.source === 'local_file') modo = 'upload';
+    if (ov.source === 'local_file') { modo = 'upload'; if (ov.biblioteca) add(p + 'biblioteca', ov.biblioteca); if (ov.value) add(p + 'local_value', ov.value); }
     else if (ov.source === 'url') { modo = 'url'; add(p + 'url', ov.value); }
     else if (ov.source === 'provider_url') { modo = 'post_url'; add(p + 'post_url', ov.value); add(p + 'post_provider', ov.provider); }
-    add(p + 'source_mode', modo);
+    add(p + 'source_mode', modo); if (modo === 'auto' && (s.media_type === 'video' || s.media_type === 'image')) add(p + 'media_type', s.media_type);
     add(p + 'zoom_direction', ov.zoom_direction || s.zoom_direction || 'in');
     add(p + 'focus_x', ov.focus_x != null ? ov.focus_x : (s.focus_x != null ? s.focus_x : 0.5));
     add(p + 'focus_y', ov.focus_y != null ? ov.focus_y : (s.focus_y != null ? s.focus_y : 0.5));

@@ -1011,7 +1011,8 @@ def gerar_ass(destaques: List[Dict[str, Any]], W: int, H: int, caminho: str, pal
     for d in destaques:
         if estilo(d.get("estilo")):
             pal_d = paleta
-            cor = str(d.get("cor") or "")
+            # cor própria deste destaque > a cor fixa do estilo ("corFixa" nos extras, ex.: tarja preta do Dallas)
+            cor = str(d.get("cor") or (estilo(d.get("estilo")) or {}).get("corFixa") or "")
             if re.fullmatch(r"#[0-9a-fA-F]{6}", cor):  # cor própria deste destaque
                 pal_d = dict(paleta, **dp_cores.derivar(cor.upper()))
             import dp_fundos

@@ -61,3 +61,8 @@ na instalação (por exemplo, sem o pacote de extras) é ignorado, e a direção
 - **Rabbit hole sombrio (estilo Mistere)** (`sys_mistere`): cortes de ~3 s, filtro frio com vinheta, estática e glitch de
   TV nas viradas, números gigantes e máquina de escrever, sem legenda queimada. O modelo de vídeo "🕳 Rabbit holes
   bizarros" aplica essa direção sozinho.
+- **Exposição da internet (estilo Dallas)** (`sys_dallas`): quadro de cinema 2,39 (faixas pretas em cima e embaixo), a
+  frase-chave do trecho em letra de terminal, maiúscula, branca numa tarja preta sobre a imagem, cartelas brancas no preto
+  nas viradas ("OU...", "MAS SABE QUAL É A PIOR PARTE?"), cartela vermelha para os NÍVEIS, fotos flutuando com
+  partículas, documentos que deslizam e cortes secos (às vezes pro preto). O modelo "🕸 Exposição da internet" aplica
+  essa direção sozinho. A tarja, as cartelas e o filtro de cinema estão em `assets/darkplanner/extras/referencias_canais.json`.

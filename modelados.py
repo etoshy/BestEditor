@@ -87,7 +87,101 @@ ESTILO_KAMISHIBAI: Dict[str, Any] = {
              "resolucao": "720p", "duracao_video": "4s"},
     "legenda": "classico",
 }
-_EMBUTIDOS = {"kamishibai": ESTILO_KAMISHIBAI}
+# v84_65: tirados de vídeos de IA de um canal de true crime em capítulos ("O Caso de Idaho", shorts 9:16 de
+# 2–3 min + um 16:9): colagem de papel animada (fotos P&B recortadas, jornal, relatório policial, linha
+# vermelha entre alfinetes, etiquetas de papel rasgado com 2–4 palavras) e uma abertura realista de
+# arquivo numa mesa escura. Narração em ordem cronológica, horários e endereços exatos, sem
+# sensacionalismo, "No capítulo anterior…" e gancho pro próximo capítulo.
+ESTILO_DOSSIE_COLAGEM: Dict[str, Any] = {
+    "id": "dossie_colagem",
+    "nome": "Dossiê em colagem de papel — true crime em capítulos",
+    "embutido": True,
+    "descricao": "Investigação montada em papel: fotos P&B recortadas com borda branca, jornais e relatórios ao fundo, "
+                 "linha vermelha entre alfinetes, fita crepe e etiquetas de papel rasgado; animação stop-motion de recortes.",
+    "instrucoes_roteiro": (
+        "Série de true crime em CAPÍTULOS de 2–3 minutos, sem sensacionalismo. "
+        "Capítulo 1: abre com data, lugar e o fato (\"Na madrugada de 13 de novembro de 2022, quatro universitários…\"). "
+        "Capítulo 2 em diante: abre com \"No capítulo anterior…\" (15–25 s resumindo o que já se sabe) e \"E siga com o "
+        "capítulo de hoje\". Depois, os fatos em ordem cronológica, com horários, endereços, nomes e números exatos, "
+        "frases curtas e tom de documentário; o que é suposição, diga que é. Sem detalhe gráfico de violência "
+        "(\"foram mortos\", não como). Termine com uma pergunta ou um fato que puxa o próximo capítulo e "
+        "\"Siga para não perder os próximos capítulos\". "
+        "CENAS: cada cena mostra UM elemento do caso como peça de colagem — a casa, o carro, o celular, o relógio na hora "
+        "exata, o mapa com o alfinete, o calendário com a data circulada, a página do relatório policial, a porta do quarto, "
+        "a silhueta do suspeito — com uma etiqueta de papel rasgado de 2 a 4 palavras EM PORTUGUÊS entre aspas simples "
+        "(ex.: label 'LOCAL DO CRIME', '4H48 DA MANHÃ', 'CARRO BRANCO'). PESSOAS REAIS (vítimas, suspeitos, testemunhas): "
+        "nunca peça o rosto realista de alguém de verdade — use silhueta, foto rasgada sem rosto, ou o objeto/lugar ligado a "
+        "ela; as fotos reais você põe depois no editor."
+    ),
+    "prompt_imagem": (
+        "{cena}, handcrafted true crime investigation collage, black-and-white halftone photo cutouts with torn white edges, "
+        "aged vintage newspaper clippings and police report pages layered in the background, red string connecting red push "
+        "pins, strips of masking tape, short bold stencil label printed on a torn beige paper tag, sepia and cream palette "
+        "with deep red accents, layered paper with soft drop shadows, documentary scrapbook aesthetic, sharp print texture, "
+        "full frame, edge-to-edge, no borders, no extra text --ar {ar}"
+    ),
+    "prompt_animacao": (
+        "{movimento}, paper collage stop-motion animation, cutouts slide in and settle with a small bounce, the red string "
+        "draws itself between the pins, paper edges flutter slightly, subtle slow camera push-in, 12fps, keep all printed "
+        "text and faces unchanged, no morphing."
+    ),
+    "exemplos_movimento": [
+        "Slow push-in on the pinned house photo while the red string draws itself toward the map",
+        "A torn newspaper clipping slides in from the left and settles with a small bounce",
+        "The clock hands spin quickly and stop at 4:00, the label tag flutters",
+        "Paper layers shift with parallax as the camera tilts down the evidence board",
+        "A police report page flips over revealing the car photo underneath",
+        "The red circle is drawn around the date on the calendar",
+    ],
+    "formato": "9:16",
+    "duracao_cena": 4,
+    "duracao_alvo": 150,
+    "idioma": "English",
+    "flow": {"modelo_imagem": "Nano Banana 2.1", "modelo_video": "Omni 1.1 Flash",
+             "resolucao": "720p", "duracao_video": "4s"},
+    "legenda": "caixa",
+    "direcao": "sys_dossie_papel",
+}
+
+ESTILO_ARQUIVO_MESA: Dict[str, Any] = {
+    "id": "arquivo_mesa",
+    "nome": "Arquivo na mesa escura — abertura/teaser realista",
+    "embutido": True,
+    "descricao": "Pastas, fotos, lupa e mapas sobre uma mesa de madeira escura, luz baixa de abajur, cidade em miniatura de "
+                 "papel; câmera lenta e cinematográfica. Bom pra apresentação do canal, abertura de caso e teaser.",
+    "instrucoes_roteiro": (
+        "Texto curto e envolvente (30–70 s) que apresenta o canal ou o caso: uma pergunta de abertura (\"E se uma "
+        "investigação inteira pudesse ganhar vida através do papel?\"), o que o público vai encontrar, a promessa (casos "
+        "reais, passo a passo, separando fatos de especulação, sem sensacionalismo) e uma frase final de mistério. "
+        "CENAS: objetos de arquivo numa mesa — pasta 'ARQUIVOS REAIS', lupa sobre documentos, mural com linha vermelha, "
+        "cidade de papel em miniatura, cronômetro, pasta 'PARTE 1', livro 'ARQUIVO #001' — com etiquetas curtas EM "
+        "PORTUGUÊS entre aspas simples."
+    ),
+    "prompt_imagem": (
+        "{cena}, cinematic still life on a dark wooden desk, case folders, vintage photographs, magnifying glass, maps and "
+        "red string, dramatic low-key lighting from a single desk lamp, warm amber highlights and deep shadows, shallow depth "
+        "of field, dust in the light, photorealistic, moody documentary atmosphere, full frame, no borders --ar {ar}"
+    ),
+    "prompt_animacao": (
+        "{movimento}, slow cinematic dolly, gentle parallax, dust particles drifting in the lamp light, pages lifting "
+        "slightly, smooth natural motion, 24fps, keep printed labels unchanged."
+    ),
+    "exemplos_movimento": [
+        "Slow dolly forward over the desk toward the open case folder",
+        "Top-down camera slowly rotates over the evidence spread on the table",
+        "The folder opens by itself revealing photos connected by red string",
+        "Camera glides low through the paper miniature city street",
+    ],
+    "formato": "9:16",
+    "duracao_cena": 4,
+    "duracao_alvo": 60,
+    "idioma": "English",
+    "flow": {"modelo_imagem": "Nano Banana 2.1", "modelo_video": "Omni 1.1 Flash",
+             "resolucao": "720p", "duracao_video": "4s"},
+    "legenda": "caixa",
+    "direcao": "sys_dossie_papel",
+}
+_EMBUTIDOS = {"kamishibai": ESTILO_KAMISHIBAI, "dossie_colagem": ESTILO_DOSSIE_COLAGEM, "arquivo_mesa": ESTILO_ARQUIVO_MESA}
 
 
 class ModeladoError(Exception):
@@ -1406,4 +1500,5 @@ def pacote_para_editor(base_dir: str, pid: str, pasta_job: str) -> Dict[str, Any
               or idiomas.normalizar(proj.get("idioma")) or "pt")
     return {"idioma": idioma, "audio_path": audio_path, "segments": segments, "total_duration": float(audio["duracao"]),
             "pending_segments": pendentes, "legendas": legenda, "orientation": proj["formato"],
-            "nome": proj.get("nome") or proj.get("tema", "")[:60], "sem_video": faltando}
+            "nome": proj.get("nome") or proj.get("tema", "")[:60], "sem_video": faltando,
+            "direcao": estilo.get("direcao")}

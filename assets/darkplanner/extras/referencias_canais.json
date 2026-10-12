@@ -1,0 +1,81 @@
+{
+ "_leia": "Extras tirados de canais de referência (v84_66). Dallas: tarjas de texto em fonte de terminal sobre o vídeo, cartelas brancas de terminal no preto, cartela vermelha de NÍVEL e o quadro em proporção de cinema (2,39:1).",
+ "filtros": [
+  {
+   "id": "cinemascope_dallas",
+   "rotulo": "Cinema 2,39 (faixas pretas) — Dallas",
+   "grupo": "cinema",
+   "cadeia": "eq=contrast=1.06:saturation=0.95,drawbox=x=0:y=0:w=iw:h=ih*0.128:color=black:t=fill,drawbox=x=0:y=ih-ih*0.128:w=iw:h=ih*0.128:color=black:t=fill",
+   "css": "contrast(1.06) saturate(.95)",
+   "direcoes": []
+  },
+  {
+   "id": "cinemascope_frio",
+   "rotulo": "Cinema 2,39 frio (faixas pretas)",
+   "grupo": "cinema",
+   "cadeia": "colorbalance=bs=0.08:bm=0.04,eq=contrast=1.1:saturation=0.85,drawbox=x=0:y=0:w=iw:h=ih*0.128:color=black:t=fill,drawbox=x=0:y=ih-ih*0.128:w=iw:h=ih*0.128:color=black:t=fill",
+   "css": "contrast(1.1) saturate(.85) hue-rotate(6deg)",
+   "direcoes": []
+  }
+ ],
+ "destaques": {
+  "dallas_tarja": {
+   "base": "marca_preto",
+   "label": "Tarja terminal (Dallas)",
+   "cena": {
+    "tratamento": "none",
+    "fundo": "nenhum",
+    "assumeTela": false
+   },
+   "tipografia": {
+    "direcao": "mono_doc",
+    "fonte": "mono",
+    "italico": false,
+    "caixaAlta": true
+   },
+   "palavras": [
+    2,
+    8
+   ],
+   "amostra": "SÓ QUE UMA COISA EM ESPECÍFICO",
+   "cooldownS": 12,
+   "corFixa": "#0B0B0B"
+  },
+  "dallas_cartela": {
+   "base": "capitulo",
+   "label": "Cartela de terminal no preto (Dallas)",
+   "cena": {
+    "tratamento": "fullscreen_grid",
+    "fundo": "cor_solida",
+    "cor": "#050505",
+    "assumeTela": true
+   },
+   "palavras": [
+    1,
+    8
+   ],
+   "amostra": "PARTE MAIS BIZARRA DISSO TUDO?"
+  },
+  "dallas_nivel": {
+   "base": "capitulo",
+   "label": "Nível (cartela vermelha, Dallas)",
+   "cena": {
+    "tratamento": "fullscreen_grid",
+    "fundo": "cor_solida",
+    "cor": "#A3121B",
+    "assumeTela": true
+   },
+   "tipografia": {
+    "direcao": "mono_doc",
+    "fonte": "mono",
+    "italico": false,
+    "caixaAlta": true
+   },
+   "palavras": [
+    1,
+    6
+   ],
+   "amostra": "NÍVEL 1"
+  }
+ }
+}

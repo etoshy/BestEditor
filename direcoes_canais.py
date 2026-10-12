@@ -94,7 +94,94 @@ MISTERE: Dict[str, Any] = {
                    "videos_analisados": 3, "plano_mediana_s": [2.6, 2.75, 1.96]},
 }
 
-DIRECOES: List[Dict[str, Any]] = [MISTERE]
+# ------------------------------------------------------------------ Dossiê de papel (v84_65)
+# Vídeos de IA de true crime em capítulos ("O Caso de Idaho"): tudo é colagem de papel — fotos P&B recortadas,
+# jornal e relatório policial ao fundo, linha vermelha, alfinetes, etiquetas de papel rasgado; cor sépia/creme com
+# vermelho; nada de glitch. Cada cena fica ~4 s com a câmera chegando devagar; as peças entram deslizando e
+# assentando; viradas como página/recorte. Sem legenda queimada nos shorts originais (aqui fica a "caixa", que
+# combina com o papel). Usada pelos estilos de 🎞️ Vídeos modelados "Dossiê em colagem" e "Arquivo na mesa".
+DOSSIE_PAPEL: Dict[str, Any] = {
+    "id": "sys_dossie_papel",
+    "nome": "Dossiê de papel (colagem true crime)",
+    "descricao": "Colagem de papel envelhecido: cor sépia/creme com vermelho, câmera chegando devagar, peças que deslizam "
+                 "e assentam, viradas de página, etiquetas de papel rasgado e máquina de escrever.",
+    "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "equilibrado", "marca": None, "universo": "predef",
+    "cores": {"ativa": True, "modo": "predef", "primaria": "#F3E9D2", "secundaria": "#2B2B2B", "acento": "#B3261E"},
+    "filtros": {"pct": 70, "itens": [{"id": "vintage", "peso": 3}, {"id": "sepia", "peso": 1}, {"id": "documentary", "peso": 2},
+                                     {"id": "matte", "peso": 1}]},
+    "efeitos": {"pct": 75, "itens": [
+        {"id": "zoom_respiro", "peso": 4}, {"id": "zoom_in", "peso": 3}, {"id": "ken_burns_carta", "peso": 2},
+        {"id": "pan_baixo", "peso": 1}, {"id": "zoom_pan_dir", "peso": 1},
+        {"id": "ov_poeira", "peso": 2}, {"id": "ov_sujeira", "peso": 1}, {"id": "pelicula_suja_arquivo", "peso": 1}]},
+    "transicoes": {"pct": 35, "itens": [
+        {"id": "book_flip", "peso": 3}, {"id": "coverleft", "peso": 2}, {"id": "coverup", "peso": 2},
+        {"id": "dp_shutter_dossie", "peso": 2}, {"id": "slideleft", "peso": 1}, {"id": "wipeleft", "peso": 1}]},
+    "entradas": {"pct": 25, "itens": [
+        {"id": "recorte_cai", "peso": 3}, {"id": "documento_desliza", "peso": 3}, {"id": "foto_cai_mesa", "peso": 2},
+        {"id": "revela_documento", "peso": 2}, {"id": "assenta", "peso": 1}, {"id": "slide_left", "peso": 1}]},
+    "saidas": {"pct": 0, "itens": []},
+    "templates": {"pct": 8, "itens": [{"id": "ED_FICHA_ARQUIVO", "peso": 2}, {"id": "ED_ARTIGO", "peso": 2},
+                                      {"id": "ED_MOSAICO", "peso": 1}, {"id": "C30_PAPEL_DESDOBRA", "peso": 1}]},
+    "templatesAvatar": {"pct": 0, "itens": []},
+    "overlays": {"pct": 0, "itens": [], "maxPorCena": 1},
+    "pares": {"modo": "livre", "itens": []},
+    "legenda": None,
+    "destaques": {"ativo": True, "densidade": "equilibrado", "estilos": [
+        "recorte", "v2_recorte_jornal", "carimbo", "carimbo_confidencial", "v2_maquina", "dossie_maquina_escrever",
+        "true_crime_linha_tempo", "capitulo", "ed_selo_capitulo", "recorte_jornal_vox"]},
+    "editoriais": {"ativo": True, "densidade": "dinamico",
+                   "tipos": ["recortes", "pagina", "ficha", "mural", "bilhetes", "linha_tempo", "numero", "nome"]},
+    "som_transicoes": "auto",
+    "referencia": {"canal": "true crime em colagem (vídeos de IA)", "videos_analisados": 5},
+}
+
+# ------------------------------------------------------------------ Dallas (v84_66)
+# 3 vídeos ("BONES", "CAPPERS", "EXPONDO a líder de um culto"), 12–16 min, 1920×804 (proporção de CINEMA 2,39:1),
+# 160–194 planos por vídeo (mediana 3–5 s), narração ~170 palavras/min. Visual: notícia, entrevista, foto de arquivo,
+# print de site/rede social e reconstituições em 3D/IA, quase sem filtro de cor; a cara do canal é o TEXTO:
+#   • frase-chave da narração em letra de TERMINAL (mono, caixa alta) numa TARJA PRETA por cima do vídeo;
+#   • cartela de terminal branca no PRETO pras viradas ("OU...", "PARTE MAIS BIZARRA DISSO TUDO?");
+#   • cartela vermelha de NÍVEL ("NÍVEL 1 — SUBMUNDO DO CRIME");
+#   • palavra/número enorme em letra condensada por cima da imagem ("SÉCULO 19", "CALCUTA", "5 MILHÕES");
+#   • foto solta flutuando sobre fundo desfocado com partículas; documento com a frase grifada;
+#   • palavras sensíveis escritas com símbolos na tela (4$$4$1N4D0, S#XUA!S) e rosto/nudez pixelado (🙈 censura).
+# Transição: corte seco quase sempre; corte rápido pro preto antes da cartela; um glitch de vez em quando.
+DALLAS: Dict[str, Any] = {
+    "id": "sys_dallas",
+    "nome": "Exposição da internet (estilo Dallas)",
+    "descricao": "Quadro de cinema 2,39 com faixas pretas, frase da narração em tarja preta com letra de terminal, cartelas "
+                 "brancas no preto, cartela vermelha de NÍVEL, foto flutuando com partículas, corte seco.",
+    "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "equilibrado", "marca": None, "universo": "predef",
+    "cores": {"ativa": True, "modo": "predef", "primaria": "#FFFFFF", "secundaria": "#0B0B0B", "acento": "#A3121B"},
+    # o "filtro" aqui é o quadro de cinema (faixas pretas); sem o pacote de extras, fica o cinematic sem faixas
+    "filtros": {"pct": 100, "itens": [{"id": "cinemascope_dallas", "peso": 6}, {"id": "cinematic", "peso": 1}]},
+    "efeitos": {"pct": 55, "itens": [
+        {"id": "zoom_respiro", "peso": 4}, {"id": "zoom_in", "peso": 2}, {"id": "ken_burns_doc", "peso": 2},
+        {"id": "ov_particulas_lentas", "peso": 3}, {"id": "ov_bokeh_suave", "peso": 1}, {"id": "grao_16mm", "peso": 1},
+        {"id": "vhs_desalinhado", "peso": 1}]},
+    "transicoes": {"pct": 15, "itens": [
+        {"id": "caes_corte_preto_rapido", "peso": 4}, {"id": "corte_pro_preto_doc", "peso": 2}, {"id": "gl_glitch", "peso": 1},
+        {"id": "ft_pk_glitch", "peso": 1}, {"id": "gl_fade_escuro", "peso": 1}]},
+    "entradas": {"pct": 18, "itens": [
+        {"id": "foto_arquivo_lenta", "peso": 3}, {"id": "ken_burns_foto", "peso": 2}, {"id": "documento_desliza", "peso": 2},
+        {"id": "revela_documento", "peso": 1}, {"id": "punch_in", "peso": 1}]},
+    "saidas": {"pct": 0, "itens": []},
+    "templates": {"pct": 8, "itens": [{"id": "ED_PERFIL", "peso": 3}, {"id": "ED_ARTIGO", "peso": 2},
+                                      {"id": "ED_CITACAO", "peso": 2}, {"id": "ED_LOWER_NOME", "peso": 1}]},
+    "templatesAvatar": {"pct": 0, "itens": []},
+    "overlays": {"pct": 0, "itens": [], "maxPorCena": 1},
+    "pares": {"modo": "livre", "itens": []},
+    "legenda": None,  # a frase-chave vai em tarja (destaque), não em legenda corrida
+    "destaques": {"ativo": True, "densidade": "maximo", "estilos": [
+        "dallas_tarja", "dallas_cartela", "dallas_nivel", "branco", "estat", "capitulo", "digitacao", "glitch_hacker"]},
+    "editoriais": {"ativo": True, "densidade": "equilibrado",
+                   "tipos": ["post", "pagina", "reescrita", "ficha", "nome", "numero", "terminal"]},
+    "som_transicoes": "auto",
+    "referencia": {"canal": "Dallas", "videos_analisados": 3, "proporcao": "2.39:1", "plano_mediana_s": [3.4, 3.0, 5.0],
+                   "palavras_por_minuto": 170},
+}
+
+DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS]
 
 
 def _so_o_que_existe(d: Dict[str, Any]) -> Dict[str, Any]:

@@ -54,6 +54,81 @@ def _linha_eixo(p: Dict[str, Any], eixo: str, nome: str, rotulos: Dict[str, str]
     return f"- {nome}: ~{pct}% — {'qualquer um do catálogo abaixo' if sistema else 'nenhum marcado (não usar)'}"
 
 
+# 🖥 quadros que mostram a PROVA que a fala cita (liberados em qualquer direção)
+TIPOS_PROVA = ("pagina", "post")
+_RE_LINK = re.compile(r"\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9\-]{1,62}(?:\.[a-z0-9\-]{2,63})*\.(?:com|net|org|br|gov|edu|io|co|tv|me|info|news|app|ai)(?:\.[a-z]{2})?(?:/[^\s\"'<>)]*)?)", re.I)
+
+
+def _id_da_biblioteca(job: Dict[str, Any], ov: Dict[str, Any]) -> Optional[str]:
+    """Id da biblioteca que o trecho usa (pelo id gravado ou pelo caminho do arquivo)."""
+    lib = job.get("media_library") or []
+    if ov.get("biblioteca") and any(b.get("id") == ov["biblioteca"] for b in lib):
+        return str(ov["biblioteca"])
+    v = ov.get("value")
+    return next((b["id"] for b in lib if v and b.get("path") == v), None)
+
+
+def descricao_midia(b: Dict[str, Any]) -> str:
+    """O que a mídia da biblioteca é: a nota da pessoa > o rótulo de onde veio > o nome do arquivo."""
+    d = str(b.get("descricao") or b.get("rotulo") or "").strip()
+    nome = str(b.get("filename") or "").strip()
+    return (d + (f" [{nome}]" if nome and nome not in d else "")) if d else nome
+
+
+def links_do_projeto(job: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Links que o vídeo pode mostrar na tela: as fontes do modelo de vídeo (🕵️) ligado + o que a pessoa colou."""
+    out: List[Dict[str, str]] = []
+    if job.get("dossie_id"):
+        try:
+            import dossies
+            import os as _os
+            base = _os.path.dirname(_os.path.abspath(__file__))
+            for f in (dossies.carregar(base, job["dossie_id"]).get("fontes") or []):
+                if f.get("url"):
+                    out.append({"url": f["url"], "titulo": str(f.get("titulo") or f.get("site") or "")[:120]})
+        except Exception:  # noqa: BLE001
+            pass
+    for u in job.get("links_tela") or []:
+        if isinstance(u, str) and u.strip():
+            out.append({"url": u.strip(), "titulo": ""})
+    vistos, uniq = set(), []
+    for x in out:
+        if x["url"] not in vistos:
+            vistos.add(x["url"])
+            uniq.append(x)
+    return uniq[:40]
+
+
+def _bloco_midias_e_links(job: Dict[str, Any], estado: Dict[str, Any], segs: List[Dict[str, Any]]) -> List[str]:
+    L: List[str] = []
+    lib = [b for b in (job.get("media_library") or []) if b.get("media_type") in ("image", "video")]
+    if lib:
+        usos: Dict[str, List[int]] = {}
+        for i, s in enumerate(segs):
+            bid = _id_da_biblioteca(job, s.get("override_source") or {})
+            if bid:
+                usos.setdefault(bid, []).append(i + 1)
+        L.append("\n## 📁 Mídias que a pessoa ENVIOU (use no trecho com \"midia\": \"bib:<id>\"; as fotos também servem em "
+                 "\"imagem\"/\"imagens\" dos quadros pagina, recortes, mural, bilhetes)")
+        for b in lib[:60]:
+            ja = usos.get(b["id"])
+            L.append(f"- bib:{b['id']} — {'foto' if b['media_type'] == 'image' else 'vídeo'}: {descricao_midia(b)[:160]}"
+                     + (f" · já está em T{', T'.join(map(str, ja))}" if ja else " · AINDA NÃO USADA"))
+    links = links_do_projeto(job)
+    falados = []
+    for b in estado.get("blocos") or job.get("segments") or []:
+        for m in _RE_LINK.findall(str(b.get("text") or "")):
+            if m.lower() not in {x.lower() for x in falados}:
+                falados.append(m)
+    if links or falados:
+        L.append("\n## 🖥 Sites que o vídeo pode mostrar na tela (quadro \"pagina\" com \"url\")")
+        for x in links:
+            L.append(f"- {x['url']}" + (f" — {x['titulo']}" if x["titulo"] else ""))
+        if falados:
+            L.append("- citados na fala: " + ", ".join(falados[:20]))
+    return L
+
+
 def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     """estado (vem do Estúdio, pode estar sem salvar): segmentos, destaques,
     graficos, direcao, kit, ritmo, paleta, legenda, objetivo, opcoes."""
@@ -97,7 +172,12 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     if ped["ativo"]:
         L.append(f"- Quadros editoriais: ~1 a cada {ped['segundos']} s" + (f" — use SÓ estes tipos: {', '.join(ped['tipos'])}" if ped["tipos"] else " — qualquer tipo do catálogo abaixo"))
     else:
-        L.append("- Quadros editoriais: NÃO usar nesta direção.")
+        L.append("- Quadros editoriais: NÃO usar nesta direção (exceto os de PROVA abaixo).")
+    # 🖥 v84_67: mostrar o site/post que a fala cita é CONTEÚDO, não estilo — vale em qualquer direção
+    tipos_prova = [t for t in TIPOS_PROVA if not (ped["ativo"] and (not ped["tipos"] or t in ped["tipos"]))]
+    if tipos_prova:
+        L.append(f"- Quadros de PROVA ({', '.join(tipos_prova)}): liberados em qualquer direção, sempre que a fala citar um site, "
+                 "uma página, uma notícia ou um post — não contam na frequência acima.")
     cs = p.get("cores") or {}
     if cs.get("modo") == "predef":
         L.append(f"- Cores: use a paleta da direção (primária {cs.get('primaria')}).")
@@ -155,14 +235,13 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
     L.append("Gráficos (campo \"tipo\"): " + "; ".join(f"{k} = {v}" for k, v in dp_graficos.TIPOS.items())
              + ". Posições: " + ", ".join(dp_graficos.POSICOES))
     import dp_editorial
-    if ped["ativo"]:
+    if ped["ativo"] or tipos_prova:
+        tipos_cat = (None if ped["ativo"] and not ped["tipos"] else
+                     list(dict.fromkeys((ped["tipos"] if ped["ativo"] else []) + tipos_prova)))
         L.append("Quadros editoriais (campo \"editoriais\", opcional — o estilo documentário: papel bege, serifada, acento vermelho; "
                  "\"start\"/\"end\" em segundos, 3–8 s, cobrindo a fala daquilo; os de tela cheia cobrem a cena; "
-                 "cada um já vem com o som dele — \"som\": \"nenhum\" tira):\n" + dp_editorial.bloco_para_prompt(ped["tipos"] or None))
-    bib = [b for b in (job.get("media_library") or []) if b.get("media_type") == "image"]
-    if bib:
-        L.append("Imagens na biblioteca (use em \"imagem\"/\"imagens\" dos quadros: pagina, recortes, mural, bilhetes): "
-                 + ", ".join(f"bib:{b['id']} ({b.get('filename', '')})" for b in bib[:40]))
+                 "cada um já vem com o som dele — \"som\": \"nenhum\" tira):\n" + dp_editorial.bloco_para_prompt(tipos_cat))
+    L.extend(_bloco_midias_e_links(job, estado, segs))
 
     # ---------------- estado atual
     parte = estado.get("parte") if isinstance(estado.get("parte"), dict) else None
@@ -192,6 +271,9 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
             continue
         ov = s.get("override_source") or {}
         midia = ("foto" if (ov.get("kind") or s.get("media_type")) == "image" else "vídeo") + f" '{s.get('query', '')}'"
+        if ov.get("source") == "local_file":
+            bid = _id_da_biblioteca(job, ov)
+            midia += f" (= bib:{bid}, já colocada)" if bid else " (arquivo escolhido pela pessoa — não troque)"
         if (s.get("youtube_link") or {}).get("url"):
             midia += " (YouTube escolhido)"
         extra = [f"{k}={s.get(k)}" for k in ("transition", "efeito", "entrada", "saida", "template") if s.get(k)]
@@ -230,6 +312,8 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
 8. Sons: as transições e destaques já ganham som automático; use "sons" pra acentos extras (impacto numa revelação, whoosh numa virada, riser antes de um clímax), com "volume" 0.2–1.2, sem poluir.
 9. Quadros editoriais: use com moderação (a frequência da direção acima), SÓ com fatos que a narração cita (nomes, datas, números, posts, manchetes reais); "ficha"/"nome" quando a pessoa aparece; "post" pra citação de rede social (com "traducao" se for em outro idioma); "numero" pra um número-chave; "recortes"/"linha_tempo" pra sequência de fatos. Não ponha quadro e destaque ao mesmo tempo.
 10. Composição dos trechos: "bordas" (smart pra vídeo com barra preta/baixa qualidade), "camera"/"foco" em fotos, "transition_som" (id ou "nenhum") pra trocar o som de uma transição.
+11. MÍDIAS ENVIADAS (lista "📁" acima): a pessoa mandou esses arquivos pra entrarem no vídeo — elas valem MAIS que o banco de imagens. Ponha cada uma no trecho em que a fala combina com ela usando "midia": "bib:<id>" no trecho (vídeo de site/página no trecho que fala do site; foto de pessoa quando falam dela). Use TODAS pelo menos uma vez (só deixe de fora a que não combina com nada e diga em "observacoes"); a mesma mídia pode voltar mais tarde. Não troque um trecho marcado "arquivo escolhido pela pessoa".
+12. SITE NA TELA: sempre que a fala citar um site, uma página, uma notícia ou um post, MOSTRE: se tem um vídeo/print dele nas mídias enviadas, use (rule 11); senão um quadro "pagina" com "url" (o endereço completo — dos links abaixo ou o que a fala diz; o print é tirado sozinho) e "site" (o domínio na barra), ou "post" pra post de rede social. Não invente endereço: sem o link, use "site" + "titulo" (a manchete).
 
 ## Responda SÓ com este JSON (sem texto antes/depois)
 {
@@ -237,6 +321,7 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
   "paleta": {"primaria": "#RRGGBB", "secundaria": "#RRGGBB", "acento": "#RRGGBB"},
   "legenda": {"estilo": "id", "posicao": "base", "tamanho": 0.06, "maiusculas": false, "cor_ativa": "#RRGGBB"},
   "trechos": [
+    {"trecho": 2, "midia": "bib:<id> (mídia enviada pela pessoa — opcional)"},
     {"trecho": 3, "transition": "id ou none", "transition_duration": 0.6, "transition_som": "id opcional", "efeito": "id ou null", "entrada": "id ou null", "saida": "id ou null",
      "template": "id ou null", "template_campos": {"campo": "texto", "_fundo": "id opcional", "_fundo_cor": "#RRGGBB"},
      "bordas": "smart", "camera": "in", "foco": {"x": 0.5, "y": 0.35}}
@@ -256,7 +341,8 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
   "sons": [{"som": "id", "start": 10.5, "volume": 0.8}],
   "editoriais": [
     {"tipo": "ficha", "start": 4.2, "end": 9.0, "rotulo": "AUSTRÁLIA", "nome": "Nome Sobrenome", "linhas": "Cargo: …\nNo cargo desde: …", "ponto_x": 0.5, "ponto_y": 0.25, "credito": "fonte"},
-    {"tipo": "numero", "start": 20.0, "end": 25.0, "de": 0, "ate": 98, "sufixo": "%", "rotulo": "o que é", "subtexto": "segundo quem"}
+    {"tipo": "numero", "start": 20.0, "end": 25.0, "de": 0, "ate": 98, "sufixo": "%", "rotulo": "o que é", "subtexto": "segundo quem"},
+    {"tipo": "pagina", "start": 31.0, "end": 36.0, "url": "https://site.com/a-pagina-citada", "site": "site.com", "titulo": "manchete", "credito": "site.com"}
   ],
   "observacoes": "2-3 frases dizendo o que você mudou e por quê"
 }""" + ("""
@@ -450,7 +536,7 @@ def _nulo(v: Any) -> bool:
 
 
 def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict[str, Any]],
-                 foto: Optional[List[bool]] = None) -> Dict[str, Any]:
+                 foto: Optional[List[bool]] = None, biblioteca: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """Valida a resposta da IA → {trechos, destaques, substituir_destaques, graficos,
     filtro_cor, paleta, legenda, sons, observacoes, avisos}."""
     import dp_cores
@@ -494,6 +580,15 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
             avisos.append(f"Trecho {n} não existe (o projeto tem {n_trechos}).")
             continue
         r: Dict[str, Any] = {"indice": i}
+        if it.get("midia") not in (None, "", "null"):  # 📁 mídia que a pessoa enviou → o trecho passa a usar ela
+            bid = re.sub(r"^bib:", "", str(it["midia"]).strip(), flags=re.I)
+            if biblioteca is not None and bid in biblioteca:
+                r["midia"] = bid
+                if foto is not None and i < len(foto):
+                    foto = list(foto)
+                    foto[i] = biblioteca[bid] == "image"
+            else:
+                avisos.append(f"T{n}: mídia '{it['midia']}' não está na biblioteca — ignorada.")
         if "transition" in it:
             v = tr_valida(it["transition"])
             if v is None:

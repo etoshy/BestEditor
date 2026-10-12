@@ -96,3 +96,49 @@ def test_formatos_dos_videos_2_e_3():
     assert "AS EXPLICAÇÕES" in pr and "conhecer as pessoas" in pr and "Parte 1" in pr
     pr = ds.prompt_roteiro(dict(base, config={"modelo": "rabbit_holes", "formato": "tutorial_ironico"}))
     assert "LIÇÕES numeradas" in pr and "nunca escreva um passo a passo" in pr
+
+
+def test_estilo_dallas():
+    """v84_66: canal Dallas — direção (quadro 2,39, tarja de terminal, cartelas) + modelo 🕸 Exposição da internet."""
+    import dp_direcao
+    d = dp_direcao.direcao("sys_dallas")
+    assert d and d["ritmo"] == "equilibrado" and d["legenda"] is None
+    assert [i["id"] for i in d["filtros"]["itens"]]  # sem o pacote de extras sobra o "cinematic"
+    m = ds.MODELOS["exposicao_internet"]
+    assert m["direcao_sugerida"] == "sys_dallas" and set(m["formatos"]) == {"niveis", "expondo_pessoa", "curto"}
+    base = {"tema": "T", "fontes": [], "midias": [], "roteiro_base": "x"}
+    pr = ds.prompt_roteiro(dict(base, config={"modelo": "exposicao_internet", "formato": "niveis", "minutos": 10}))
+    assert "~1700 palavras" in pr and "NÍVEL 1" in pr and "nunca explique COMO cometer" in pr
+
+
+def test_extras_dallas_validos():
+    """O arquivo de extras dos canais passa na conferência e o filtro de cinema desenha as faixas."""
+    import json
+    import os
+    import subprocess
+    import tempfile
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "darkplanner", "extras", "referencias_canais.json")
+    d = json.load(open(caminho, encoding="utf-8"))
+    assert {"dallas_tarja", "dallas_cartela", "dallas_nivel"} <= set(d["destaques"]) and d["destaques"]["dallas_tarja"]["corFixa"]
+    cadeia = next(f["cadeia"] for f in d["filtros"] if f["id"] == "cinemascope_dallas")
+    with tempfile.TemporaryDirectory() as t:
+        saida = os.path.join(t, "f.png")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=white:s=320x180:d=1", "-vf", cadeia, "-frames:v", "1",
+                        "-y", saida], check=True)
+        from PIL import Image
+        im = Image.open(saida).convert("L")
+        assert im.getpixel((160, 5)) < 20 and im.getpixel((160, 175)) < 20 and im.getpixel((160, 90)) > 200
+
+
+def test_cor_fixa_do_estilo_vale_sem_cor_propria(tmp_path, monkeypatch):
+    """"corFixa" (extras) pinta a caixa do marca-texto com a cor do estilo, não com o acento da paleta."""
+    import dp_destaques as dd
+    cat = dict(dd.catalogo())
+    cat["tarja_teste"] = dict(cat["marca_preto"], id="tarja_teste", corFixa="#0B0B0B")
+    monkeypatch.setattr(dd, "catalogo", lambda: cat)
+    pal = dict(dd.paleta_padrao(), acento="#FFD400")
+    ass_fixa = open(dd.gerar_ass([{"estilo": "tarja_teste", "start": 0, "end": 2, "texto": "SÓ QUE"}], 640, 360,
+                                 str(tmp_path / "a.ass"), pal), encoding="utf-8").read()
+    ass_cor = open(dd.gerar_ass([{"estilo": "tarja_teste", "start": 0, "end": 2, "texto": "SÓ QUE", "cor": "#2255FF"}], 640, 360,
+                                str(tmp_path / "b.ass"), pal), encoding="utf-8").read()
+    assert ass_fixa != ass_cor  # a cor própria do destaque continua valendo por cima da fixa

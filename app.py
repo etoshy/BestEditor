@@ -466,6 +466,34 @@ os.makedirs(VOZES_DIR, exist_ok=True)
 
 _GERAR_VOZ_STATUS: Dict[str, Dict[str, Any]] = {}  # job_id -> {"running", "log", "erro", "pronto", "engine", "resultado_filename"}
 
+
+# 🎙 fila do Gerador de voz (v84_65): vários pedidos de uma vez; 2 ao mesmo tempo se a VRAM deixar
+import fila_voz as _fila_voz  # noqa: E402
+import historico_voz as _hist_voz  # noqa: E402
+
+
+def _fila_voz_mudou(jid: str, info: Dict[str, Any]) -> None:
+    st = _GERAR_VOZ_STATUS.get(jid)
+    if not st:
+        return
+    if info.get("iniciou"):
+        st["na_fila"], st["posicao"], st["iniciou_em"] = False, None, info["iniciou"]
+        st["log"] = (st.get("log") or "") + "▶ Começou a gerar.\n"
+    elif info.get("posicao"):
+        st["posicao"] = info["posicao"]
+
+
+_FILA_VOZ = _fila_voz.Fila(modo_fn=lambda: str(load_site_config().get("voz_simultaneos", "auto")), ao_mudar=_fila_voz_mudou)
+
+
+def _voz_do_kwargs(engine: str, kwargs: Dict[str, Any]) -> str:
+    for k in ("nome_voz", "voz", "voice_profile", "speaker"):
+        if kwargs.get(k):
+            return str(kwargs[k])
+    if kwargs.get("speaker_wav"):
+        return "áudio de referência"
+    return ""
+
 # "Simular Conversa" -- geração de UMA fala é assíncrona (motor de voz
 # pode demorar, principalmente XTTS), chave "<conversa_id>:<fala_id>".
 _CONVERSA_FALA_STATUS: Dict[str, Dict[str, Any]] = {}
@@ -661,6 +689,10 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
     finally:
         status["running"] = False
         status["pronto"] = True
+        try:
+            _hist_voz.registrar(VOZES_DIR, job_id, status)
+        except Exception:  # noqa: BLE001 — o histórico nunca derruba a geração
+            pass
 
 
 def _capitulos_do_roteiro(status: Dict[str, Any], audio: str, palavras: List[Dict[str, Any]], log) -> None:
@@ -891,10 +923,15 @@ def gerar_voz_gerar():
             legenda_kwargs["pausa_troca"] = max(0.0, min(3.0, float(request.form.get("multivoz_pausa", "0.35") or 0.35)))
         except ValueError:
             pass
-    threading.Thread(
-        target=_gerar_voz_em_background, args=(job_id, engine, texto, output_path, kwargs, legenda_kwargs, multivoz_on), daemon=True,
-    ).start()
-    return jsonify({"ok": True, "job_id": job_id})
+    st = _GERAR_VOZ_STATUS[job_id]
+    st.update(na_fila=True, voz=_voz_do_kwargs(engine, kwargs), multivoz=multivoz_on, log="⏳ Na fila…\n")
+    pos = _FILA_VOZ.iniciar(
+        job_id, engine,
+        lambda: _gerar_voz_em_background(job_id, engine, texto, output_path, kwargs, legenda_kwargs, multivoz_on),
+        cpu=forcar_cpu)
+    if st.get("na_fila"):
+        st["posicao"] = _FILA_VOZ.posicao(job_id)
+    return jsonify({"ok": True, "job_id": job_id, "posicao": st.get("posicao") or (pos if st.get("na_fila") else None)})
 
 
 def _config_voz_do_form(form) -> Tuple[str, Dict[str, Any]]:
@@ -1028,15 +1065,79 @@ def gerar_voz_em_andamento():
         if st.get("running") or agora - criado < 3600:
             itens.append({"job_id": jid, "running": bool(st.get("running")), "erro": bool(st.get("erro")),
                           "pronto": bool(st.get("pronto")) and not st.get("erro"), "engine": st.get("engine"),
-                          "criado_em": criado, "texto_inicio": st.get("texto_inicio") or "", "palavras": st.get("palavras")})
-    itens.sort(key=lambda x: (not x["running"], -x["criado_em"]))
-    return jsonify({"geracoes": itens[:10]})
+                          "criado_em": criado, "texto_inicio": st.get("texto_inicio") or "", "palavras": st.get("palavras"),
+                          "na_fila": bool(st.get("na_fila")), "posicao": st.get("posicao"), "cancelado": bool(st.get("cancelado")),
+                          "iniciou_em": st.get("iniciou_em")})
+    itens.sort(key=lambda x: (not (x["running"] and not x["na_fila"]), not x["na_fila"], x["posicao"] or 0, -x["criado_em"]))
+    return jsonify({"geracoes": itens[:30], "fila": _FILA_VOZ.estado()})
+
+
+@app.route("/gerar-voz/fila", methods=["GET"])
+def gerar_voz_fila():
+    e = _FILA_VOZ.estado()
+    e["vram_gb"] = _fila_voz.VRAM_GB
+    return jsonify(e)
+
+
+@app.route("/gerar-voz/fila/config", methods=["POST"])
+def gerar_voz_fila_config():
+    modo = str((request.get_json(silent=True) or request.form).get("modo") or "auto")
+    if modo not in _fila_voz.MODOS:
+        return jsonify({"erro": "Use auto, 1, 2 ou 3."}), 400
+    cfg = load_site_config()
+    cfg["voz_simultaneos"] = modo
+    save_site_config(cfg)
+    return jsonify(dict(_FILA_VOZ.estado(), ok=True))
+
+
+@app.route("/gerar-voz/cancelar/<job_id>", methods=["POST"])
+def gerar_voz_cancelar(job_id: str):
+    """Tira da fila (o que já está gerando termina)."""
+    st = _GERAR_VOZ_STATUS.get(job_id)
+    if not st or not _FILA_VOZ.cancelar(job_id):
+        return jsonify({"erro": "Essa geração não está mais na fila (já começou ou terminou)."}), 400
+    st.update(running=False, pronto=True, na_fila=False, posicao=None, cancelado=True, erro="Cancelada antes de começar.")
+    st["log"] = (st.get("log") or "") + "✖ Cancelada.\n"
+    return jsonify({"ok": True})
+
+
+@app.route("/gerar-voz/historico", methods=["GET"])
+def gerar_voz_historico():
+    try:
+        pagina = max(0, int(request.args.get("pagina") or 0))
+    except ValueError:
+        pagina = 0
+    r = _hist_voz.listar(VOZES_DIR, q=request.args.get("q") or "", limite=50, pagina=pagina)
+    for it in r["itens"]:
+        if it.get("arquivo") and not it.get("sumiu"):
+            it["audio_url"] = url_for("gerar_voz_audio", filename=it["arquivo"])
+        if it.get("srt") and os.path.exists(os.path.join(VOZES_DIR, it["srt"])):
+            it["srt_url"] = url_for("gerar_voz_legenda", filename=it["srt"])
+    return jsonify(r)
+
+
+@app.route("/gerar-voz/historico/<job_id>/apagar", methods=["POST"])
+def gerar_voz_historico_apagar(job_id: str):
+    st = _GERAR_VOZ_STATUS.get(job_id)
+    if st and st.get("running"):
+        return jsonify({"erro": "Ainda está gerando."}), 409
+    if not _hist_voz.apagar(VOZES_DIR, job_id):
+        return jsonify({"erro": "Não achei esse áudio no histórico."}), 404
+    _GERAR_VOZ_STATUS.pop(job_id, None)
+    return jsonify({"ok": True})
 
 
 @app.route("/gerar-voz/status/<job_id>", methods=["GET"])
 def gerar_voz_status(job_id: str):
     status = _GERAR_VOZ_STATUS.get(job_id)
     if not status:
+        h = _hist_voz.obter(VOZES_DIR, job_id)  # o site reiniciou: o histórico ainda sabe do áudio
+        if h and h.get("arquivo") and os.path.exists(os.path.join(VOZES_DIR, h["arquivo"])):
+            res = {"audio_url": url_for("gerar_voz_audio", filename=h["arquivo"]), "engine": h.get("motor"), "idioma": h.get("idioma")}
+            if h.get("srt") and os.path.exists(os.path.join(VOZES_DIR, h["srt"])):
+                res["srt_url"] = url_for("gerar_voz_legenda", filename=h["srt"])
+                res["zip_url"] = url_for("gerar_voz_baixar_zip", job_id=job_id) if job_id in _GERAR_VOZ_STATUS else None
+            return jsonify({"running": False, "log": "(do histórico)", "erro": None, "pronto": True, "resultado": res})
         return jsonify({"running": False, "log": "", "erro": "Essa geração não foi encontrada.", "pronto": True, "resultado": None})
     resultado = None
     if status.get("resultado_filename"):
@@ -1060,6 +1161,7 @@ def gerar_voz_status(job_id: str):
     return jsonify({
         "running": status["running"], "log": status["log"], "erro": status["erro"],
         "pronto": status["pronto"], "resultado": resultado,
+        "na_fila": bool(status.get("na_fila")), "posicao": status.get("posicao"),
     })
 
 
@@ -4588,6 +4690,7 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
                  "clipe_id": next((x["id"] for x in clipes_ch.get(c.get("tipo"), []) if x["caminho"] == c.get("resolved_path")), None)}
               for c in job.get("cutaway_suggestions") or []]
     biblioteca = [{"id": it["id"], "filename": it["filename"], "media_type": it["media_type"],
+                   "descricao": it.get("descricao") or "", "rotulo": it.get("rotulo") or "",
                    "url": f"/job/{job_id}/library-file/{it['id']}"} for it in job.get("media_library") or []]
     try:
         falas, _pal = _falas_por_trecho(job, job["pending_segments"])
@@ -4614,6 +4717,7 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         "origem_legenda": "srt" if (job.get("segments") and not job.get("word_timestamps")) else "whisper",
         "blocos_fala": [{"start": float(b["start"]), "end": float(b["end"]), "text": b.get("text", "")} for b in job.get("segments") or [] if b.get("text")],
         "job_id": job_id, "segmentos": segs, "overlays": overlays, "cortes": cortes, "biblioteca": biblioteca,
+        "links_tela": job.get("links_tela") or [],
         "clipes_chamada": {t: [{"id": x["id"], "nome": x["nome"], "padrao": bool(x.get("padrao"))} for x in l] for t, l in clipes_ch.items()},
         "duracao": job.get("total_duration") or (job["pending_segments"][-1]["end"] if job["pending_segments"] else 0),
         "erro_indice": job.get("assembly_error_segment_index"),
@@ -6084,18 +6188,21 @@ def edicao_resposta(job_id: str):
     corpo = request.get_json(silent=True) or {}
     n = int(corpo.get("n_trechos") or len(job.get("pending_segments") or []))
     textos = [str(t) for t in corpo.get("textos") or [] if str(t or "").strip()]  # ✂️ uma resposta por parte
+    _bib = {it["id"]: it["media_type"] for it in job.get("media_library") or []
+            if it.get("media_type") in ("image", "video") and os.path.exists(it.get("path") or "")}
     try:
         if textos:
             planos = []
             for k, t in enumerate(textos, start=1):
                 try:
-                    planos.append(prompt_edicao.ler_resposta(t, n, float(job.get("total_duration") or 0), _palavras_da_narracao(job), corpo.get("foto")))
+                    planos.append(prompt_edicao.ler_resposta(t, n, float(job.get("total_duration") or 0), _palavras_da_narracao(job), corpo.get("foto"),
+                                                             biblioteca=_bib))
                 except ValueError as exc:
                     raise ValueError(f"Parte {k}: {exc}") from exc
             plano = prompt_edicao.juntar_planos(planos)
         else:
             plano = prompt_edicao.ler_resposta(str(corpo.get("texto") or ""), n, float(job.get("total_duration") or 0),
-                                               _palavras_da_narracao(job), corpo.get("foto"))
+                                               _palavras_da_narracao(job), corpo.get("foto"), biblioteca=_bib)
     except ValueError as exc:
         return jsonify({"erro": str(exc)}), 400
     for d in (plano.get("destaques") or []) + (plano.get("editoriais") or []):
@@ -6538,6 +6645,33 @@ def remove_from_library(job_id: str, item_id: str):
     return redirect(url_for("edit_segments_page", job_id=job_id))
 
 
+@app.route("/job/<job_id>/library-item/<item_id>/descricao", methods=["POST"])
+def library_item_descricao(job_id: str, item_id: str):
+    """📝 O que é essa mídia ("print do site X", "foto do fulano") — a IA da edição usa pra pôr no trecho certo."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    item = next((i for i in job.get("media_library") or [] if i["id"] == item_id), None)
+    if item is None:
+        return jsonify({"erro": "Arquivo não encontrado na biblioteca."}), 404
+    item["descricao"] = " ".join(str((request.get_json(silent=True) or {}).get("descricao") or "").split())[:200]
+    _save_state(job_id)
+    return jsonify({"ok": True, "descricao": item["descricao"]})
+
+
+@app.route("/job/<job_id>/links-tela", methods=["POST"])
+def links_tela(job_id: str):
+    """🖥 Links que o vídeo pode mostrar na tela (a IA da edição põe o print da página quando a fala cita)."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    bruto = (request.get_json(silent=True) or {}).get("links") or ""
+    linhas = bruto.splitlines() if isinstance(bruto, str) else [str(x) for x in bruto]
+    job["links_tela"] = [u.strip() for u in linhas if re.match(r"^https?://\S+$", u.strip())][:40]
+    _save_state(job_id)
+    return jsonify({"ok": True, "links": job["links_tela"]})
+
+
 @app.route("/job/<job_id>/library-file/<item_id>", methods=["GET"])
 def serve_library_file(job_id: str, item_id: str):
     """Serve o arquivo da biblioteca de mídia — usado pra gerar a
@@ -6629,11 +6763,40 @@ def importar_biblioteca_submit(job_id: str):
 
     item = {
         "id": item_id, "filename": safe_name, "path": dest, "media_type": "video",
-        "origem": escolhido["origem"],
+        "origem": escolhido["origem"], "rotulo": re.sub(r"^\W+", "", escolhido.get("label") or "")[:200],
     }
     job.setdefault("media_library", []).append(item)
     _save_state(job_id)
     return redirect(url_for("edit_segments_page", job_id=job_id))
+
+
+def _arquivo_da_biblioteca_ou_local(job_id: str, job: dict, bib_id: str, valor: str) -> Optional[dict]:
+    """override_source de um arquivo da biblioteca (pelo id) ou de um arquivo que já está DENTRO da pasta
+    do projeto (o desfazer da IA manda o caminho de volta) — nunca aceita caminho de fora do projeto."""
+    if bib_id:
+        item = next((i for i in job.get("media_library") or [] if i["id"] == bib_id), None)
+        if item and os.path.exists(item.get("path") or ""):
+            return {"source": "local_file", "value": item["path"], "kind": item["media_type"], "biblioteca": item["id"]}
+    if valor:
+        real = os.path.realpath(valor)
+        permitidos = [os.path.realpath(_job_dir(job_id))] + [os.path.realpath(os.path.dirname(i["path"]))
+                                                            for i in job.get("media_library") or [] if i.get("path")]
+        if os.path.isfile(real) and any(real == d or real.startswith(d + os.sep) for d in permitidos):
+            item = next((i for i in job.get("media_library") or [] if os.path.realpath(i.get("path") or "") == real), None)
+            ext = os.path.splitext(real)[1].lower()
+            kind = item["media_type"] if item else ("image" if ext in _MEDIA_LIBRARY_IMAGE_EXTENSIONS else "video")
+            return {"source": "local_file", "value": valor, "kind": kind, **({"biblioteca": item["id"]} if item else {})}
+    return None
+
+
+def _trocou_arquivo(job_id: str, job: dict, base: dict, bib_id: str, valor: str) -> bool:
+    """O formulário pede um arquivo DIFERENTE do que o trecho já tinha salvo? (igual: segue o caminho antigo,
+    que guarda todos os detalhes do arquivo de antes)."""
+    novo = _arquivo_da_biblioteca_ou_local(job_id, job, bib_id, valor)
+    if not novo:
+        return False
+    atual = base.get("override_source") or {}
+    return atual.get("source") != "local_file" or os.path.realpath(atual.get("value") or "") != os.path.realpath(novo["value"])
 
 
 def _get_library_item(job: dict, item_id: str):
@@ -6660,7 +6823,7 @@ def assign_library_to_segment(job_id: str, segment_index: int):
         return f"Índice de segmento inválido: {segment_index}.", 400
 
     job["pending_segments"][segment_index]["override_source"] = {
-        "source": "local_file", "value": item["path"], "kind": item["media_type"],
+        "source": "local_file", "value": item["path"], "kind": item["media_type"], "biblioteca": item["id"],
     }
     job["pending_segments"][segment_index]["media_type"] = item["media_type"]
     _limpar_erro_do_trecho(job, segment_index)
@@ -7499,6 +7662,8 @@ def confirm_segments(job_id: str):
 
         media_type = base.get("media_type", "video")
         source_mode = request.form.get(f"seg_{i}_source_mode", "auto")
+        if source_mode == "auto" and request.form.get(f"seg_{i}_media_type") in ("video", "image"):
+            media_type = request.form[f"seg_{i}_media_type"]  # ↩ desfazer a mídia da IA: o trecho volta a ser vídeo/foto
 
         # segmentos de foto (media_type="image") só têm busca de verdade
         # via provedores em PHOTO_SEARCH_PROVIDERS (Pexels e Wikipedia,
@@ -7525,6 +7690,17 @@ def confirm_segments(job_id: str):
                     "focus_x": float(request.form.get(f"seg_{i}_focus_x", 0.5) or 0.5),
                     "focus_y": float(request.form.get(f"seg_{i}_focus_y", 0.5) or 0.5),
                 }
+            elif _trocou_arquivo(job_id, job, base, request.form.get(f"seg_{i}_biblioteca", ""),
+                                 request.form.get(f"seg_{i}_local_value", "")):
+                # 📁 v84_67: a edição da IA (ou o desfazer dela) pôs/voltou um arquivo da biblioteca ou um já enviado
+                override_source = _arquivo_da_biblioteca_ou_local(job_id, job, request.form.get(f"seg_{i}_biblioteca", ""),
+                                                                  request.form.get(f"seg_{i}_local_value", ""))
+                media_type = override_source["kind"] or media_type
+                override_source.update({
+                    "zoom_direction": request.form.get(f"seg_{i}_zoom_direction", "in"),
+                    "focus_x": float(request.form.get(f"seg_{i}_focus_x", 0.5) or 0.5),
+                    "focus_y": float(request.form.get(f"seg_{i}_focus_y", 0.5) or 0.5),
+                })
             elif (base.get("override_source") or {}).get("source") == "local_file":
                 # modo "upload" reenviado sem escolher um arquivo novo —
                 # não dá pra pré-preencher um <input type="file"> por
