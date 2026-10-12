@@ -435,6 +435,8 @@ def _args_chromium(headless: bool) -> Dict[str, Any]:
         args["viewport"] = {"width": 1366, "height": 900}
     else:
         args["no_viewport"] = True
+        # janela grande: estreita (< ~1200px) o Flow esconde o chip "Agente" e outros botões da caixa
+        args["args"] = args["args"] + ["--window-size=1400,950"]
     return args
 
 

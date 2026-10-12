@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .fl-box { border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin:12px 0; background:#fff; }
+  .fl-row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  .fl-row label { margin:0; font-size:.85rem; }
+  .fl-hint { color:#666; font-size:.82rem; margin:4px 0; }
+  .fl-sessao { display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:.86rem; padding:8px 12px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0; }
+  .fl-sessao .bola { width:10px; height:10px; border-radius:50%; background:#cbd5e1; display:inline-block; }
+  .fl-sessao.aberto .bola { background:#22c55e; }
+  .fl-teste { background:linear-gradient(135deg,#eef2ff,#f0fdf4); border-color:#c7d2fe; }
+  .fl-teste button.grande { font-size:1.05rem; padding:12px 22px; }
+  .fl-tipo button { border:1px solid #cbd5e1; background:#fff; color:#334155; padding:6px 14px; border-radius:999px; cursor:pointer; }
+  .fl-tipo button.on { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
+  .fl-entrada { border:1px dashed #cbd5e1; border-radius:8px; padding:8px; min-width:210px; flex:1; }
+  .fl-entrada .esc { display:flex; gap:8px; align-items:center; margin-top:4px; font-size:.82rem; }
+  .fl-entrada .esc img { width:64px; height:40px; object-fit:cover; border-radius:4px; }
+  .fl-passos { list-style:none; padding:0; margin:8px 0; }
+  .fl-passos li { display:flex; gap:10px; align-items:flex-start; padding:6px 8px; border-bottom:1px solid #f1f5f9; font-size:.88rem; }
+  .fl-passos li .ic { width:22px; text-align:center; }
+  .fl-passos li .nm { width:150px; font-weight:600; }
+  .fl-passos li .dt { flex:1; color:#374151; word-break:break-word; }
+  .fl-passos li .sg { color:#888; width:56px; text-align:right; }
+  .fl-passos li img { width:120px; border-radius:4px; border:1px solid #ddd; }
+  .fl-erro { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:10px; border-radius:8px; white-space:pre-wrap; font-size:.86rem; }
+  .fl-ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:10px; border-radius:8px; font-size:.9rem; }
+  .fl-grade { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+  .fl-card { border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fafafa; display:flex; flex-direction:column; }
+  .fl-card img, .fl-card video { width:100%; aspect-ratio:16/9; object-fit:contain; background:#000; display:block; }
+  .fl-card .tx { padding:6px 8px; font-size:.8rem; color:#374151; flex:1; }
+  .fl-card .tx .meta { color:#888; font-size:.74rem; margin-top:2px; }
+  .fl-card .ac { display:flex; gap:4px; flex-wrap:wrap; padding:6px 8px; border-top:1px solid #eee; }
+  .fl-card .ac a, .fl-card .ac button { font-size:.74rem; padding:3px 7px; border-radius:5px; border:1px solid #cbd5e1; background:#fff; color:#1f2937; cursor:pointer; text-decoration:none; }
+  .fl-card .ac a, .fl-card .ac button { width:auto !important; margin:0 !important; line-height:1.3; display:inline-block; font-weight:400; }
+  #galTipo, #galQ, .fl-row select { width:auto; margin:0; }
+  .fl-tipo button { width:auto; margin:0; }
+  .fl-card .ac .apagar { color:#b91c1c; border-color:#fecaca; }
+  .fl-res { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
+  .fl-res figure { margin:0; width:260px; }
+  .fl-res img, .fl-res video { width:100%; border-radius:6px; background:#000; }
+</style>
+
+<h1>🎬 Google Flow</h1>
+<p class="fl-hint">Gere imagens e vídeos no Google Flow por aqui. O robô faz os cliques no Flow, e tudo o que sai fica na 🖼 Galeria aqui embaixo.
+{% if not modo_direto %}<br><b>⚠ Nas Configurações está a automação "antigo"</b>: esta aba usa sempre o modo novo (direto) — o resto do site segue a configuração.{% endif %}</p>
+
+<div class="fl-sessao" id="sessao">
+  <span class="bola"></span><span id="sessaoTxt">Navegador do Flow fechado.</span>
+  <label style="margin-left:auto">Conta <select id="conta">{% for c in contas %}<option>{{ c }}</option>{% endfor %}</select></label>
+  <button type="button" id="btnFechar" class="yt-sec" style="display:none">✖ Fechar navegador</button>
+</div>
+<p class="fl-hint">O navegador fica aberto entre um pedido e outro (no mesmo projeto do Flow) e fecha sozinho depois de {{ ocioso_min }} min parado. Enquanto ele está aberto aqui, o resto do site espera pra usar o Flow.</p>
+
+<div class="fl-box fl-teste" id="teste">
+  <h3 style="margin-top:0">🧪 Testar o Flow</h3>
+  <p class="fl-hint">Abre o navegador pra você ver e faz o caminho inteiro: <b>Novo projeto → Configurações do agente</b> ("Confirmar antes de gerar" = Nunca, modelos padrão, Salvar) <b>→ desliga o Agente → gera uma FOTO → um VÍDEO só com texto → um VÍDEO com Início e Fim</b> (Início = a foto gerada). Cada passo aparece com ✅/❌ e a foto da tela. Gasta os créditos de 1 imagem + 2 vídeos.</p>
+  <div class="fl-row">
+    <button type="button" id="btnTeste" class="primary grande">🧪 Testar o Flow</button>
+    <label><input type="checkbox" id="testeVisivel" checked style="width:auto"> 👁 mostrar o navegador</label>
+    <label><input type="checkbox" id="testeSimular" style="width:auto"> 💸 sem gerar (faz tudo até antes do "Iniciar geração", não gasta crédito)</label>
+  </div>
+</div>
+
+<div class="fl-box" id="gerar">
+  <h3 style="margin-top:0">✨ Gerar</h3>
+  <div class="fl-row">
+    <div class="fl-tipo"><button type="button" data-tipo="imagem" class="on">🖼 Imagem</button> <button type="button" data-tipo="video">🎬 Vídeo</button></div>
+    <label>Modelo <select id="modelo"></select></label>
+    <label>Proporção <select id="proporcao">{% for p in proporcoes %}<option {% if p == '16:9' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+    <label>Quantidade <select id="quantidade"><option>x1</option><option>x2</option><option>x3</option><option>x4</option></select></label>
+  </div>
+  <label style="margin-top:8px">Prompt <textarea id="prompt" rows="3" placeholder="ex.: A kitten sleeping on a windowsill, golden hour, photorealistic"></textarea></label>
+  <div class="fl-row" style="margin-top:6px">
+    <div class="fl-entrada so-video" data-campo="inicio"><b>🎬 Frame de Início</b> <span class="fl-hint">(opcional — vídeo → Frames)</span>
+      <input type="file" accept="image/*"><div class="esc"></div></div>
+    <div class="fl-entrada so-video" data-campo="fim"><b>🏁 Frame de Fim</b> <span class="fl-hint">(opcional)</span>
+      <input type="file" accept="image/*"><div class="esc"></div></div>
+    <div class="fl-entrada so-imagem" data-campo="referencia"><b>🖼 Imagem de referência</b> <span class="fl-hint">(opcional — "modificar esta imagem")</span>
+      <input type="file" accept="image/*"><div class="esc"></div></div>
+  </div>
+  <div class="fl-row" style="margin-top:8px">
+    <button type="button" id="btnGerar" class="primary">✨ Gerar</button>
+    <label><input type="checkbox" id="gerarVisivel" style="width:auto"> 👁 mostrar o navegador</label>
+    <label><input type="checkbox" id="novoProjeto" style="width:auto"> começar um projeto novo no Flow</label>
+  </div>
+</div>
+
+<div class="fl-box" id="painel" style="display:none">
+  <div class="fl-row" style="justify-content:space-between"><h3 style="margin:0" id="titulo">Andamento</h3>
+    <button type="button" id="btnParar" class="yt-sec" style="display:none">⏹ Parar</button></div>
+  <div id="resumo"></div>
+  <ul class="fl-passos" id="passos"></ul>
+  <div id="erro"></div>
+  <div class="fl-res" id="resultados"></div>
+</div>
+
+<div class="fl-box" id="galeria">
+  <div class="fl-row" style="justify-content:space-between">
+    <h3 style="margin:0">🖼 Galeria <span class="fl-hint" id="galTotal"></span></h3>
+    <div class="fl-row">
+      <select id="galTipo"><option value="">tudo</option><option value="imagem">só imagens</option><option value="video">só vídeos</option></select>
+      <input id="galQ" placeholder="buscar no prompt…" style="width:200px">
+    </div>
+  </div>
+  <div class="fl-grade" id="galGrade" style="margin-top:10px"></div>
+  <div class="fl-row" style="margin-top:8px"><button type="button" id="galAnt" class="yt-sec" style="display:none">← anteriores</button><button type="button" id="galProx" class="yt-sec" style="display:none">mais →</button></div>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const MODELOS = { imagem: {{ modelos_imagem|tojson }}, video: {{ modelos_video|tojson }} };
+  const PADRAO = { imagem: {{ (cfg.flow_modelo_imagem or '')|tojson }}, video: {{ (cfg.flow_modelo_video or '')|tojson }} };
+  const ROT = { abrir: 'Abrir o Flow', novo_projeto: 'Novo projeto', projeto: 'Projeto', config_agente: 'Config. do agente', desligar_agente: 'Desligar o Agente',
+    configurar: 'Config. da caixa', frame_inicio: 'Frame de Início', frame_fim: 'Frame de Fim', referencia: 'Imagem de referência',
+    prompt: 'Escrever o prompt', gerar: 'Iniciar geração', esperar: 'Esperar o resultado' };
+  const IC = { ok: '✅', erro: '❌', andando: '⏳', pulado: '⏭' };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let tipo = 'imagem', timer = null, galPagina = 0, galT = null;
+  const escolhidos = {};  // campo -> item da galeria
+  let visivelTocado = false;
+  document.getElementById('gerarVisivel').addEventListener('change', () => { visivelTocado = true; });
+
+  function rotulo(n) { return ROT[n] || (n.startsWith('baixar_') ? '⬇ baixar ' + n.slice(7).replace(/_/g, ' ') : n.replace(/_/g, ' ')); }
+
+  // ---------- tipo / modelos
+  function mudarTipo(t) {
+    tipo = t;
+    document.querySelectorAll('.fl-tipo button').forEach(b => b.classList.toggle('on', b.dataset.tipo === t));
+    $('modelo').innerHTML = '<option value="">(o padrão das Configurações' + (PADRAO[t] ? ': ' + esc(PADRAO[t]) : '') + ')</option>'
+      + MODELOS[t].map(m => `<option>${esc(m)}</option>`).join('');
+    document.querySelectorAll('.so-video').forEach(e => e.style.display = t === 'video' ? '' : 'none');
+    document.querySelectorAll('.so-imagem').forEach(e => e.style.display = t === 'imagem' ? '' : 'none');
+  }
+  document.querySelectorAll('.fl-tipo button').forEach(b => b.addEventListener('click', () => mudarTipo(b.dataset.tipo)));
+  mudarTipo('imagem');
+
+  // ---------- entradas (arquivo OU item da galeria)
+  function desenharEntrada(campo) {
+    const box = document.querySelector(`.fl-entrada[data-campo="${campo}"]`), e = escolhidos[campo];
+    box.querySelector('.esc').innerHTML = e ? `<img src="/flow/arquivo/${e.arquivo}" alt=""> da galeria <button type="button" class="yt-sec" data-limpar="${campo}">✕</button>` : '';
+    box.querySelector('input[type=file]').style.display = e ? 'none' : '';
+    const b = box.querySelector('[data-limpar]'); if (b) b.addEventListener('click', () => { delete escolhidos[campo]; desenharEntrada(campo); });
+  }
+  function usarDaGaleria(campo, item) {
+    escolhidos[campo] = item;
+    const box = document.querySelector(`.fl-entrada[data-campo="${campo}"]`); box.querySelector('input[type=file]').value = '';
+    mudarTipo(campo === 'referencia' ? 'imagem' : 'video'); desenharEntrada(campo);
+    $('gerar').scrollIntoView({ behavior: 'smooth' }); $('prompt').focus();
+  }
+
+  // ---------- andamento
+  function desenharSessao(s) {
+    $('sessao').classList.toggle('aberto', !!s.aberto);
+    $('sessaoTxt').textContent = s.aberto ? `Navegador aberto (${s.visivel ? 'visível' : 'oculto'}) · conta ${s.conta}${s.projeto ? ' · projeto aberto' : ''}` : 'Navegador do Flow fechado.';
+    $('btnFechar').style.display = s.aberto ? '' : 'none';
+    if (s.aberto && !visivelTocado) $('gerarVisivel').checked = !!s.visivel;  // segue o navegador aberto (não reabre à toa)
+  }
+  function desenhar(d) {
+    $('painel').style.display = '';
+    $('btnParar').style.display = d.rodando ? '' : 'none';
+    $('btnTeste').disabled = $('btnGerar').disabled = !!d.rodando;
+    const ok = d.passos.filter(p => p.estado === 'ok').length, teste = d.modo === 'teste';
+    const sim = d.opcoes && d.opcoes.simular;
+    $('titulo').textContent = (teste ? '🧪 Teste do Flow — ' : '✨ Gerar — ') + (d.rodando ? '⏳ rodando…' : d.erro ? '❌ parou com erro' : '✅ terminou') + ` · ${ok} passo(s) ok`;
+    let resumo = '';
+    if (!d.rodando && !d.erro && teste) {
+      const r = new Set((d.resultados || []).map(x => x.rotulo));
+      resumo = sim ? '<div class="fl-ok">✅ A automação passou por todas as telas até antes do "Iniciar geração" (nenhum crédito gasto). Desmarque "sem gerar" pra testar gerando de verdade.</div>'
+        : `<div class="fl-ok">✅ Flow funcionando: ${r.has('foto') ? '🖼 foto ✔' : '🖼 foto ✖'} · ${r.has('video_texto') ? '🎬 vídeo ✔' : '🎬 vídeo ✖'} · ${r.has('video_frames') ? '🎞 vídeo com Início/Fim ✔' : '🎞 vídeo com Início/Fim ✖'}</div>`;
+    }
+    $('resumo').innerHTML = resumo;
+    $('passos').innerHTML = d.passos.map(p => `<li><span class="ic">${IC[p.estado] || '•'}</span><span class="nm">${esc(rotulo(p.nome))}</span>`
+      + `<span class="dt">${esc(p.detalhe)}</span><span class="sg">${p.segundos ? p.segundos + 's' : ''}</span>`
+      + (p.foto ? `<a href="/flow/passo/${p.foto}" target="_blank"><img src="/flow/passo/${p.foto}?t=${d.inicio || ''}" alt=""></a>` : '') + '</li>').join('');
+    $('erro').innerHTML = d.erro ? `<div class="fl-erro">${esc(d.erro)}${d.detalhe_erro ? '\n\n' + esc(d.detalhe_erro) : ''}</div>` : '';
+    $('resultados').innerHTML = (d.resultados || []).map(r => `<figure>${r.tipo === 'video'
+      ? `<video src="/flow/arquivo/${r.arquivo}" controls muted></video>` : `<img src="/flow/arquivo/${r.arquivo}" alt="">`}`
+      + `<figcaption class="fl-hint">${esc(r.rotulo.replace(/_/g, ' '))} · <a href="/flow/arquivo/${r.arquivo}?baixar=1">baixar</a></figcaption></figure>`).join('');
+  }
+  let rodava = false;
+  async function status() {
+    clearTimeout(timer);
+    try {
+      const d = await (await fetch('/flow/status')).json();
+      desenharSessao(d.sessao || {});
+      if (d.passos.length || d.rodando || d.erro) desenhar(d);
+      if (rodava && !d.rodando) carregarGaleria();
+      rodava = d.rodando;
+      timer = setTimeout(status, d.rodando ? 1200 : 5000);
+    } catch (e) { timer = setTimeout(status, 4000); }
+  }
+  async function iniciar(fd) {
+    fd.append('conta', $('conta').value);
+    const r = await fetch('/flow/iniciar', { method: 'POST', body: fd }); const d = await r.json();
+    if (!r.ok) { alert(d.erro || 'falhou'); return; }
+    rodava = true; $('painel').style.display = ''; $('painel').scrollIntoView({ behavior: 'smooth' }); status();
+  }
+  $('btnTeste').addEventListener('click', () => {
+    if (!$('testeSimular').checked && !confirm('O teste gera 1 imagem e 2 vídeos de verdade no Flow (gasta créditos). Continuar?')) return;
+    const fd = new FormData(); fd.append('modo', 'teste');
+    fd.append('visivel', $('testeVisivel').checked ? 'on' : 'off'); if ($('testeSimular').checked) fd.append('simular', 'on');
+    iniciar(fd);
+  });
+  $('btnGerar').addEventListener('click', () => {
+    if (!$('prompt').value.trim()) { alert('Escreva o prompt.'); $('prompt').focus(); return; }
+    const fd = new FormData(); fd.append('modo', 'gerar'); fd.append('tipo', tipo);
+    ['modelo', 'proporcao', 'quantidade', 'prompt'].forEach(k => fd.append(k, $(k).value));
+    fd.append('visivel', $('gerarVisivel').checked ? 'on' : 'off'); if ($('novoProjeto').checked) fd.append('novo_projeto', 'on');
+    const campos = tipo === 'video' ? ['inicio', 'fim'] : ['referencia'];
+    campos.forEach(c => {
+      if (escolhidos[c]) fd.append(c + '_galeria', escolhidos[c].id);
+      else { const f = document.querySelector(`.fl-entrada[data-campo="${c}"] input[type=file]`).files[0]; if (f) fd.append(c, f); }
+    });
+    iniciar(fd);
+  });
+  $('btnParar').addEventListener('click', () => fetch('/flow/parar', { method: 'POST' }));
+  $('btnFechar').addEventListener('click', async () => {
+    const r = await fetch('/flow/fechar', { method: 'POST' }); if (!r.ok) { alert((await r.json()).erro || 'não deu'); return; }
+    setTimeout(status, 1500);
+  });
+
+  // ---------- galeria
+  let galItens = [];
+  async function carregarGaleria() {
+    let d; try { d = await (await fetch(`/flow/galeria?pagina=${galPagina}&tipo=${$('galTipo').value}&q=${encodeURIComponent($('galQ').value)}`)).json(); } catch (_) { return; }
+    galItens = d.itens || [];
+    $('galTotal').textContent = d.total ? `· ${d.total} item(ns)` : '';
+    const quando = t => new Date(t * 1000).toLocaleString().slice(0, 16);
+    $('galGrade').innerHTML = galItens.map((e, i) => `<div class="fl-card">
+      ${e.tipo === 'video' ? `<video src="/flow/arquivo/${e.arquivo}" controls muted preload="metadata"></video>` : `<img src="/flow/arquivo/${e.arquivo}" alt="" loading="lazy">`}
+      <div class="tx">${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : ''} · ${quando(e.criado)}</div></div>
+      <div class="ac"><a href="/flow/arquivo/${e.arquivo}?baixar=1">⬇ baixar</a>
+        ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button>` : ''}
+        <button type="button" data-prompt="${i}" title="usar este prompt de novo">↺ prompt</button>
+        <button type="button" class="apagar" data-apagar="${e.id}">🗑</button></div></div>`).join('') || '<p class="fl-hint">Nada gerado ainda.</p>';
+    document.querySelectorAll('[data-usar]').forEach(b => b.addEventListener('click', () => usarDaGaleria(b.dataset.usar, galItens[+b.dataset.i])));
+    document.querySelectorAll('[data-prompt]').forEach(b => b.addEventListener('click', () => {
+      const e = galItens[+b.dataset.prompt]; mudarTipo(e.tipo); $('prompt').value = e.prompt || '';
+      if (e.proporcao) $('proporcao').value = e.proporcao; $('gerar').scrollIntoView({ behavior: 'smooth' });
+    }));
+    document.querySelectorAll('[data-apagar]').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Apagar da galeria (e do disco)?')) return;
+      await fetch(`/flow/galeria/${b.dataset.apagar}/apagar`, { method: 'POST' }); carregarGaleria();
+    }));
+    $('galAnt').style.display = galPagina > 0 ? '' : 'none';
+    $('galProx').style.display = (galPagina + 1) * 60 < d.total ? '' : 'none';
+  }
+  $('galTipo').addEventListener('change', () => { galPagina = 0; carregarGaleria(); });
+  $('galQ').addEventListener('input', () => { clearTimeout(galT); galT = setTimeout(() => { galPagina = 0; carregarGaleria(); }, 300); });
+  $('galAnt').addEventListener('click', () => { galPagina = Math.max(0, galPagina - 1); carregarGaleria(); });
+  $('galProx').addEventListener('click', () => { galPagina++; carregarGaleria(); });
+  carregarGaleria(); status();
+})();
+</script>
+{% endblock %}

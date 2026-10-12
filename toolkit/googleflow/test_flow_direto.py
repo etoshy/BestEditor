@@ -143,3 +143,17 @@ def test_cliente_lote_duas_abas_no_modo_direto(sim, tmp_path, monkeypatch):
         assert {e["aba"] for e in eventos if e["tipo"] == "inicio"} == {1, 2}
     finally:
         g.encerrar_sessao()
+
+
+def test_janela_estreita_e_alargada_pra_achar_o_agente(sim, navegador):
+    """Janela estreita: o Flow esconde o chip "Agente" (erro real do usuário). A automação alarga a página."""
+    ctx = navegador.new_context(viewport={"width": 800, "height": 700})
+    page = fd.preparar_projeto(ctx, sim, True, {"img_modelo": "Nano Banana Pro"})
+    assert page.evaluate("window.innerWidth") >= fd.LARGURA_MIN
+    assert page.evaluate("window.__flowSim")["agente"] is False
+    ctx.close()
+
+
+def test_janela_grande_no_navegador_visivel():
+    assert "--window-size=1400,950" in g._args_chromium(False)["args"]
+    assert g._args_chromium(True)["viewport"]["width"] >= fd.LARGURA_MIN

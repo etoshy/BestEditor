@@ -259,3 +259,36 @@ def test_leitor_do_niche_miner_le_os_cards_do_canal():
     assert len(vs) == 10 and vs[0]["id"] == "cbloz65iVVM"
     assert all(v["thumb"].startswith("https://i.ytimg.com/vi/") for v in vs)
     assert all(v["views"] for v in vs) and all(v["duracao_s"] for v in vs)
+
+
+def test_niche_miner_nao_herda_o_soquete_do_recarregador_do_site(monkeypatch, tmp_path):
+    """O site roda com debug=True (recarregador): WERKZEUG_SERVER_FD herdada fazia o Niche Miner
+    fechar na hora com "OSError: [WinError 10038] ... não é um soquete"."""
+    import socket
+    import subprocess
+    import sys
+    import time
+    import analisador_rotas as ar
+    import analisador_canal as ac
+    monkeypatch.setenv("WERKZEUG_SERVER_FD", "3")
+    monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
+    env = ar.env_do_niche_miner()
+    assert not any(k.startswith("WERKZEUG_") for k in env) and env["PYTHONIOENCODING"] == "utf-8"
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    porta = s.getsockname()[1]
+    s.close()
+    # o próprio app.py também limpa (se for aberto de outro jeito com as variáveis herdadas)
+    log = open(tmp_path / "nm.log", "w")
+    proc = subprocess.Popen([sys.executable, "app.py", "--port", str(porta)], cwd=ac.NICHE_MINER_DIR,
+                            stdout=log, stderr=subprocess.STDOUT, env=dict(os.environ))
+    try:
+        for _ in range(150):
+            if ar._porta_aberta(porta) or proc.poll() is not None:
+                break
+            time.sleep(0.2)
+        assert proc.poll() is None and ar._porta_aberta(porta), (tmp_path / "nm.log").read_text()[-1500:]
+    finally:
+        proc.terminate()
+        proc.wait(10)
+        log.close()

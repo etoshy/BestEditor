@@ -34,6 +34,15 @@ def nm_porta() -> int:
         return NM_PORTA_PADRAO
 
 
+def env_do_niche_miner() -> Dict[str, str]:
+    """Ambiente do processo do Niche Miner SEM as variáveis do recarregador do Flask do site (debug=True):
+    com WERKZEUG_SERVER_FD herdada, o Niche Miner tentava usar o soquete do site e fechava na hora
+    ("OSError: [WinError 10038] ... não é um soquete")."""
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith("WERKZEUG_")}
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
+
 def nm_iniciar(popen=subprocess.Popen) -> Dict[str, Any]:
     """Sobe o Niche Miner (niche_miner/app.py) na porta dele, se ainda não estiver no ar."""
     porta = nm_porta()
@@ -48,7 +57,7 @@ def nm_iniciar(popen=subprocess.Popen) -> Dict[str, Any]:
             return {"ok": False, "erro": "A pasta niche_miner/ não está no site."}
         os.makedirs(os.path.join(pasta, "data"), exist_ok=True)
         log_path = os.path.join(pasta, "data", "niche_miner.log")
-        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        env = env_do_niche_miner()
         try:
             logf = open(log_path, "a", encoding="utf-8")  # noqa: SIM115
             _NM["proc"] = popen([sys.executable, "app.py", "--port", str(porta), "--host", "127.0.0.1"], cwd=pasta,

@@ -22,6 +22,7 @@ Uso:
 import argparse
 import io
 import json
+import os
 import threading
 import time
 import uuid
@@ -657,6 +658,9 @@ def main():
                      help="Porta pra rodar o servidor (padrão: 8843)")
     ap.add_argument("--host", default="127.0.0.1")
     args = ap.parse_args()
+    # aberto pelo site (que roda com o recarregador do Flask): não herda o soquete dele (WinError 10038)
+    for k in ("WERKZEUG_SERVER_FD", "WERKZEUG_RUN_MAIN"):
+        os.environ.pop(k, None)
     print(f"Niche Miner rodando em http://{args.host}:{args.port}")
     app.run(host=args.host, port=args.port, debug=False, threaded=True)
 

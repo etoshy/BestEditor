@@ -9519,8 +9519,8 @@ import ia_rotas as _ia_rotas  # noqa: E402  🤖 IA nas buscas e modelos (v84_53
 _ia_rotas.registrar(app, BASE_DIR)
 import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de canal + ⛏ Niche Miner)
 _analisador_rotas.registrar(app, BASE_DIR)
-import flow_teste as _flow_teste  # noqa: E402  🧪 área de teste do Google Flow (v84_74)
-_flow_teste.registrar(app, BASE_DIR)
+import flow_estudio as _flow_estudio  # noqa: E402  🎬 aba Google Flow: gerar, galeria e 🧪 testar (v84_76)
+_flow_estudio.registrar(app, BASE_DIR)
 import espaco as _espaco  # noqa: E402  (🧹 Espaço em disco)
 
 

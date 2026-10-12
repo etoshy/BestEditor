@@ -177,10 +177,42 @@ def _texto_opcao(texto: str) -> str:
 
 
 # ------------------------------------------------------------------ 1. abrir e criar projeto
+LARGURA_MIN = 1200     # abaixo disso o Flow vira o layout estreito e o chip "Agente" some da caixa
+JANELA = {"width": 1400, "height": 950}
+
+
+def garantir_largura(page, minimo: int = LARGURA_MIN) -> int:
+    """Janela estreita = o Flow esconde o chip "Agente" (e outros botões). Se a página está mais estreita que
+    `minimo`, aumenta a JANELA do navegador (Chromium: CDP) — ou, se não der, o viewport. Devolve a largura final."""
+    try:
+        largura = int(page.evaluate("window.innerWidth"))
+    except Exception:  # noqa: BLE001
+        return 0
+    if largura >= minimo:
+        return largura
+    try:
+        cdp = page.context.new_cdp_session(page)
+        wid = cdp.send("Browser.getWindowForTarget")["windowId"]
+        cdp.send("Browser.setWindowBounds", {"windowId": wid, "bounds": {"windowState": "normal"}})
+        cdp.send("Browser.setWindowBounds", {"windowId": wid, "bounds": dict(JANELA)})
+        _esperar(lambda: int(page.evaluate("window.innerWidth")) >= minimo, 3)
+        largura = int(page.evaluate("window.innerWidth"))
+    except Exception:  # noqa: BLE001
+        pass
+    if largura < minimo:
+        try:
+            page.set_viewport_size({"width": JANELA["width"], "height": JANELA["height"] - 100})
+            largura = int(page.evaluate("window.innerWidth"))
+        except Exception:  # noqa: BLE001
+            pass
+    return largura
+
+
 def abrir_flow(context, url: str = FLOW_URL, headless: bool = True, on_passo: Passo = _nada, timeout_login_s: float = 300):
     """Abre a lista de projetos. Sem o botão "Novo projeto" = precisa de login (oculto: erro na hora)."""
     on_passo("abrir", "andando", url)
     page = context.new_page()
+    garantir_largura(page)
     page.goto(url, wait_until="domcontentloaded")
     try:  # apresentação do Flow (algumas contas): "Crie com o Google Flow"
         b = page.locator(S["criar_com_flow"]).first
@@ -227,6 +259,7 @@ def novo_projeto(page, context=None, on_passo: Passo = _nada):
         except Exception:  # noqa: BLE001
             pass
     p.wait_for_load_state("domcontentloaded")
+    garantir_largura(p)
     _primeiro(p, S["editor"], 30, "novo_projeto", "o projeto abriu mas a caixa \"O que você quer criar?\" não apareceu.")
     on_passo("novo_projeto", "ok", p.url)
     return p
@@ -307,9 +340,13 @@ def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "
 
 def ligar_agente(page, ligado: bool) -> None:
     chip = _primeiro(page, S["agente_chip"], 8)
+    if chip is None:  # janela estreita esconde o chip: alarga e procura de novo
+        largura = garantir_largura(page)
+        chip = _primeiro(page, S["agente_chip"], 6)
     if chip is None:
         if ligado:
-            raise FlowPassoErro("agente", 'não achei o chip "Agente" da caixa.')
+            raise FlowPassoErro("agente", f'não achei o chip "Agente" da caixa (a página tem {largura}px de largura — '
+                                          'abaixo de ~1200px o Flow esconde esse botão; deixe a janela maior).')
         return  # sem o chip: a caixa já está no modo direto
     for _ in range(3):
         if _marcado(chip) == ligado:

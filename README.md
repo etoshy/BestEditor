@@ -28,6 +28,40 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎬 Flow: janela larga pra achar o chip "Agente" (v84_78)
+
+- Com a janela estreita (menos de ~1200px) o Flow esconde o chip "Agente" e a automação parava em
+  `[agente] não achei o chip "Agente" da caixa`. Agora o navegador visível abre com 1400×950 e, se a página estiver
+  estreita, a automação alarga a janela sozinha antes de procurar o chip (e de novo se ele não aparecer).
+
+---
+
+## ⛏ Niche Miner não fecha mais sozinho (v84_77)
+
+- O site roda com o recarregador do Flask e o Niche Miner herdava a variável `WERKZEUG_SERVER_FD` dele: tentava usar o
+  soquete do site e fechava na hora (`OSError: [WinError 10038] ... não é um soquete`). Agora ele sobe com essas
+  variáveis limpas (no site e no próprio `niche_miner/app.py`).
+
+---
+
+## 🎬 Aba Google Flow: gerar pelo site + 🧪 Testar o Flow (v84_76)
+
+- Nova aba **🎬 Google Flow** no menu de cima (`/flow`):
+  - **🧪 Testar o Flow**: abre o navegador (visível) e faz o caminho inteiro — Novo projeto → Configurações do agente
+    (Nunca, modelos padrão, Salvar) → desliga o Agente → gera uma **foto** → um **vídeo só com texto** → um **vídeo com
+    Início (a foto gerada) e Fim**. No fim diz "✅ Flow funcionando: foto ✔ · vídeo ✔ · vídeo com Início/Fim ✔", com cada
+    passo (✅/❌, tempo, foto da tela). "Sem gerar" testa sem gastar crédito.
+  - **✨ Gerar**: imagem ou vídeo, modelo, proporção, quantidade (x1–x4), frames de Início/Fim, imagem de referência,
+    mostrar ou esconder o navegador, conta. O navegador fica aberto no **mesmo projeto** entre um pedido e outro e fecha
+    sozinho após 5 min parado (ou em **✖ Fechar navegador**). Enquanto está aberto, o resto do site espera pra usar o Flow.
+  - **🖼 Galeria** (`outputs/flow_estudio/`): tudo o que saiu daqui, inclusive do teste — baixar, **🎬 animar** (vira o
+    Início de um vídeo; se a imagem é do projeto aberto, usa a própria imagem do Flow sem reenviar), **🏁 como Fim**,
+    **🖼 modificar** (referência), **↺ prompt**, apagar.
+- Limite de uso: a conta fica marcada como esgotada e a tela pede pra escolher outra.
+- O link antigo `/flow/teste` cai nessa aba.
+
+---
+
 ## 📜 Histórico de áudios baixa o .zip (v84_75)
 
 - Cada áudio do **📜 Histórico** (Gerador de voz) tem **⬇ ZIP** ao lado de WAV e SRT: narração + legenda + `info.json`
