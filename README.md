@@ -28,11 +28,13 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
-## 🎬 Flow: janela larga pra achar o chip "Agente" (v84_78)
+## 🎬 Flow: janela larga pra achar o chip "Agente" (v84_78 / v84_79)
 
-- Com a janela estreita (menos de ~1200px) o Flow esconde o chip "Agente" e a automação parava em
+- Com a janela pequena (menos de ~900px) o Flow esconde o chip "Agente" e a automação parava em
   `[agente] não achei o chip "Agente" da caixa`. Agora o navegador visível abre com 1400×950 e, se a página estiver
   estreita, a automação alarga a janela sozinha antes de procurar o chip (e de novo se ele não aparecer).
+- v84_79: com ~900px o chip já aparece (conferido no seu Flow); o chip agora também é achado pelo texto "Agente"
+  (outros jeitos de o Flow montar o botão).
 
 ---
 

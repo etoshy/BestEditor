@@ -46,7 +46,9 @@ S = {
     "caixa": "flow-prompt-box",                                   # a caixa principal (a do painel do agente é outra)
     "editor": 'flow-prompt-box .ProseMirror[contenteditable="true"]',
     "gerar": 'flow-prompt-box button[aria-label="Iniciar geração"]',
-    "agente_chip": "flow-prompt-box flow-agent-mode-toggle-chip button.agent-mode-chip",
+    "agente_chip": ("flow-prompt-box flow-agent-mode-toggle-chip button.agent-mode-chip, "
+                    "flow-prompt-box button.agent-mode-chip, flow-prompt-box button:has(.agent-mode-chip-label), "
+                    'flow-prompt-box button:has-text("Agente"):not([aria-label])'),
     "agente_config": 'flow-prompt-box .agent-footer-actions button[aria-label="Configurações"]',
     "agente_painel": "flow-settings-view",
     "agente_nunca": '.confirm-policy-group mat-radio-button:has(input[value="2"])',
@@ -177,7 +179,7 @@ def _texto_opcao(texto: str) -> str:
 
 
 # ------------------------------------------------------------------ 1. abrir e criar projeto
-LARGURA_MIN = 1200     # abaixo disso o Flow vira o layout estreito e o chip "Agente" some da caixa
+LARGURA_MIN = 900      # janela pequena: o Flow vira o layout estreito e o chip "Agente" some (com ~900px ele aparece)
 JANELA = {"width": 1400, "height": 950}
 
 
@@ -346,7 +348,7 @@ def ligar_agente(page, ligado: bool) -> None:
     if chip is None:
         if ligado:
             raise FlowPassoErro("agente", f'não achei o chip "Agente" da caixa (a página tem {largura}px de largura — '
-                                          'abaixo de ~1200px o Flow esconde esse botão; deixe a janela maior).')
+                                          'com a janela pequena o Flow esconde esse botão; deixe a janela maior).')
         return  # sem o chip: a caixa já está no modo direto
     for _ in range(3):
         if _marcado(chip) == ligado:

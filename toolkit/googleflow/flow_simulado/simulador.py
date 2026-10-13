@@ -36,7 +36,7 @@ flow-prompt-box{display:block;position:fixed;bottom:16px;left:16px;right:16px;ba
 [hidden]{display:none!important}.mat-button-toggle-checked{outline:2px solid #6cf}
 .ProseMirror{min-height:28px;border:1px solid #555;padding:4px}.error-text{color:#f66;position:fixed;top:8px;left:8px}
 mat-icon{font-size:12px}.frame-trigger img{width:40px}
-@media (max-width:1199px){flow-agent-mode-toggle-chip{display:none!important}}"""
+@media (max-width:879px){flow-agent-mode-toggle-chip{display:none!important}}"""
 
 
 def _ler(nome: str) -> str:
