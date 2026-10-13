@@ -95,7 +95,7 @@
       {% if v.herdado %}<small style="color:#7c3aed" title="gênero/idade vêm do perfil de voz {{ v.config.vozPerfil }} — mude aqui pra esta voz ter os próprios">↳ do perfil</small>{% endif %}
       <input type="text" class="md-desc" {{ alvo|safe }} value="{{ v.descricao or '' }}" maxlength="120" placeholder="descrição (ex.: narrador grave, idoso)">
       {% endif %}
-      <small style="color:#666;">{{ v.resumo }}{% if v.motor == 'chatterbox_turbo' %} · <b style="color:#7c3aed">aceita tags</b>{% endif %}</small>
+      <small style="color:#666;">{{ v.resumo }}{% if v.motor in ('chatterbox_turbo', 'fish_s2') %} · <b style="color:#7c3aed">aceita tags</b>{% endif %}</small>
     </div>
   {% endfor %}
   </div>

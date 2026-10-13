@@ -88,6 +88,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tempfile
 import uuid
 import wave
 from pathlib import Path
@@ -2289,6 +2290,233 @@ def aplicar_realce_de_voz(audio_in: str, audio_out: str) -> str:
     return audio_out
 
 
+# ==================================================================== #
+# 🐟 Fish Audio S2 (fish-speech) — clonagem de voz + tags de emoção ([whisper], [excited]…) em 80+ idiomas (PT incluso)
+# ==================================================================== #
+# O modelo (S2 Pro, 4B parâmetros) NÃO roda dentro do site: ou você sobe o servidor do fish-speech
+# (github.com/fishaudio/fish-speech, `python tools/api_server.py ... --listen 127.0.0.1:8080`; pede ~24 GB de
+# VRAM e Linux/WSL) ou usa a API paga da Fish Audio (fish.audio, com chave). O site só manda o texto + a voz de
+# referência por HTTP (mesmo formato nos dois: POST /v1/tts).
+#
+# ⚠️ LICENÇA: os pesos do S2 são "Fish Audio Research License" — uso COMERCIAL (ex.: vídeo monetizado) precisa de
+# licença à parte da Fish Audio. A API paga (modo "nuvem") segue os termos/planos da Fish Audio.
+
+FISH_URL_PADRAO = "http://127.0.0.1:8080"
+FISH_URL_NUVEM = "https://api.fish.audio"
+FISH_MODELOS_NUVEM = ("s2-pro", "s2.1-pro", "s1")
+FISH_LIMITE_CARACTERES_POR_CHAMADA = 400   # pedaços menores = voz mais estável (o servidor tem limite de tokens)
+FISH_MAX_REFERENCIAS = 3
+# Exemplos de tags (o S2 aceita QUALQUER descrição curta entre colchetes, ex.: [sussurrando bem baixinho]).
+FISH_TAGS_EXEMPLO = ("[whisper]", "[excited]", "[angry]", "[sad]", "[laughing]", "[sigh]", "[shouting]",
+                     "[pause]", "[emphasis]", "[pitch up]", "[pitch down]", "[clearing throat]")
+
+
+FISH_TAGS_CONHECIDAS = {
+    "whisper", "whispering", "excited", "angry", "sad", "laughing", "laugh", "chuckle", "sigh", "shouting", "pause",
+    "emphasis", "pitch up", "pitch down", "clearing throat", "happy", "surprised", "scared", "crying", "sarcastic",
+    "calm", "serious", "nervous", "disgusted", "tired", "gasp", "breath", "inhale", "exhale", "low voice", "loud",
+    "sussurrando", "sussurro", "animado", "empolgado", "bravo", "irritado", "triste", "rindo", "risada", "suspiro",
+    "gritando", "pausa", "ênfase", "feliz", "surpreso", "assustado", "chorando", "sarcástico", "calmo", "sério",
+    "nervoso", "cansado", "respiração",
+}
+
+
+def fish_config(**sobrepor: Any) -> Dict[str, Any]:
+    """Modo/URL/chave do Fish: o que vier em `sobrepor` > a config do site (site_config.json) > variáveis de ambiente."""
+    cfg: Dict[str, Any] = {}
+    try:
+        from site_config import load_site_config  # roda dentro do site (também no processo filho: sys.path vem junto)
+        cfg = load_site_config() or {}
+    except Exception:  # noqa: BLE001
+        cfg = {}
+    modo = str(sobrepor.get("modo") or cfg.get("fish_modo") or os.environ.get("FISH_MODO") or "local").lower()
+    modo = modo if modo in ("local", "nuvem") else "local"
+    url = str(sobrepor.get("url") or (cfg.get("fish_url") if modo == "local" else "") or os.environ.get("FISH_URL") or "")
+    url = (url or (FISH_URL_NUVEM if modo == "nuvem" else FISH_URL_PADRAO)).rstrip("/")
+    chave = str(sobrepor.get("api_key") or (cfg.get("fish_api_key") if modo == "nuvem" else cfg.get("fish_api_key_local"))
+                or os.environ.get("FISH_API_KEY") or "")
+    modelo = str(sobrepor.get("modelo") or cfg.get("fish_modelo") or "s2-pro")
+    return {"modo": modo, "url": url, "api_key": chave, "modelo": modelo}
+
+
+def _fish_cabecalhos(c: Dict[str, Any], msgpack_: bool = True) -> Dict[str, str]:
+    h = {"Content-Type": "application/msgpack" if msgpack_ else "application/json"}
+    if c.get("api_key"):
+        h["Authorization"] = f"Bearer {c['api_key']}"
+    if c.get("modo") == "nuvem" and c.get("modelo"):
+        h["model"] = c["modelo"]
+    return h
+
+
+def fish_status(timeout: float = 5.0, **sobrepor: Any) -> Dict[str, Any]:
+    """Confere se o Fish responde (servidor local: GET /v1/health · nuvem: só confere que tem chave)."""
+    c = fish_config(**sobrepor)
+    if c["modo"] == "nuvem":
+        return {"ok": bool(c["api_key"]), "modo": "nuvem", "url": c["url"],
+                "msg": "chave configurada" if c["api_key"] else "falta a chave da API da Fish Audio (Configurações)"}
+    try:
+        import requests
+        r = requests.get(c["url"] + "/v1/health", headers=_fish_cabecalhos(c), timeout=timeout)
+        return {"ok": r.ok, "modo": "local", "url": c["url"], "msg": "servidor no ar" if r.ok else f"HTTP {r.status_code}"}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "modo": "local", "url": c["url"],
+                "msg": f"o servidor do fish-speech não respondeu em {c['url']} ({type(exc).__name__})"}
+
+
+def _fish_texto_da_referencia(audio: str, idioma: Optional[str] = None) -> str:
+    """O Fish clona melhor sabendo O QUE é dito no áudio de referência: usa `<audio>.txt` se existir; se não,
+    transcreve com o Whisper do site (uma vez só — guarda no `.txt` do lado)."""
+    lado = audio + ".txt"
+    if os.path.exists(lado):
+        try:
+            with open(lado, encoding="utf-8") as f:
+                return f.read().strip()
+        except OSError:
+            return ""
+    texto = ""
+    try:
+        from whisper_transcribe import transcribe_audio
+        texto = " ".join(str(s.get("text") or "").strip() for s in transcribe_audio(audio, language=idioma or None)).strip()
+    except Exception:  # noqa: BLE001 — sem Whisper: manda sem o texto (clona um pouco pior, mas funciona)
+        texto = ""
+    if texto:
+        try:
+            with open(lado, "w", encoding="utf-8") as f:
+                f.write(texto)
+        except OSError:
+            pass
+    return texto
+
+
+def _fish_referencias(speaker_wav: Any, voice_profile: Optional[str], texto_referencia: str,
+                      idioma: Optional[str]) -> List[Dict[str, Any]]:
+    if speaker_wav:
+        arquivos = list(speaker_wav) if isinstance(speaker_wav, (list, tuple)) else [speaker_wav]
+    elif voice_profile:
+        arquivos = caminho_perfil_de_voz(voice_profile)
+    else:
+        return []
+    refs = []
+    for k, a in enumerate(arquivos[:FISH_MAX_REFERENCIAS]):
+        pronto = _preparar_audio_referencia(a, duracao_max_segundos=30.0)
+        with open(pronto, "rb") as f:
+            dados = f.read()
+        if pronto != a:
+            try:
+                os.remove(pronto)
+            except OSError:
+                pass
+        txt = texto_referencia.strip() if (texto_referencia and k == 0 and len(arquivos) == 1) else _fish_texto_da_referencia(a, idioma)
+        refs.append({"audio": dados, "text": txt})
+    return refs
+
+
+def _fish_pedir(c: Dict[str, Any], corpo: Dict[str, Any], timeout: float) -> bytes:
+    import requests
+    try:
+        import msgpack
+        dados, usa_msgpack = msgpack.packb(corpo, use_bin_type=True), True
+    except ImportError:
+        if c["modo"] == "nuvem" and corpo.get("references"):
+            raise VoiceGeneratorError("Pra clonar voz pela API da Fish Audio instale o msgpack: pip install msgpack")
+        import base64
+        corpo = dict(corpo, references=[{"audio": base64.b64encode(r["audio"]).decode(), "text": r["text"]}
+                                        for r in corpo.get("references") or []])
+        dados, usa_msgpack = json.dumps(corpo).encode(), False
+    try:
+        r = requests.post(c["url"] + "/v1/tts", data=dados, headers=_fish_cabecalhos(c, usa_msgpack), timeout=timeout)
+    except requests.exceptions.ConnectionError:
+        if c["modo"] == "nuvem":
+            raise VoiceGeneratorError("Não consegui falar com a API da Fish Audio (sem internet?).")
+        raise VoiceGeneratorError(
+            f"O servidor do Fish Audio S2 não está rodando em {c['url']}. Suba o fish-speech "
+            "(python tools/api_server.py --llama-checkpoint-path checkpoints/s2-pro --decoder-checkpoint-path "
+            "checkpoints/s2-pro/codec.pth --listen 127.0.0.1:8080) ou troque pra API da Fish Audio nas Configurações.")
+    except requests.exceptions.Timeout:
+        raise VoiceGeneratorError(f"O Fish Audio S2 demorou mais de {int(timeout)}s pra responder um pedaço do texto.")
+    if r.status_code == 401:
+        raise VoiceGeneratorError("O Fish recusou a chave (401) — confira a chave da API nas Configurações.")
+    if r.status_code == 402:
+        raise VoiceGeneratorError("A conta da Fish Audio está sem créditos (402).")
+    if not r.ok:
+        raise VoiceGeneratorError(f"O Fish Audio S2 deu erro HTTP {r.status_code}: {r.text[:300]}")
+    if len(r.content) < 100:
+        raise VoiceGeneratorError("O Fish Audio S2 devolveu um áudio vazio.")
+    return r.content
+
+
+def fish_s2_synthesize(
+    texto: str,
+    output_path: str,
+    speaker_wav: Any = None,
+    voice_profile: Optional[str] = None,
+    texto_referencia: str = "",
+    reference_id: str = "",
+    idioma: Optional[str] = "pt",
+    velocidade: float = 1.0,
+    temperatura: float = 0.8,
+    top_p: float = 0.8,
+    seed: Optional[int] = 1234,
+    timeout_por_pedaco: float = 600.0,
+    use_gpu: Optional[bool] = None,  # ignorado (quem usa a GPU é o servidor do Fish)
+    **config: Any,
+) -> str:
+    """Gera um `.wav` com o Fish Audio S2 — clonagem zero-shot (10–30s de referência) e TAGS de emoção/efeito
+    entre colchetes no próprio texto, em qualquer ponto: "[excited] Você não vai acreditar! [whisper] É segredo."
+
+    Voz: `speaker_wav` (áudio enviado), `voice_profile` (o mesmo perfil de voz do XTTS/Chatterbox) ou
+    `reference_id` (uma voz salva na conta da Fish Audio, modo nuvem). Sem nada: voz padrão do modelo.
+    `texto_referencia`: o que é dito no áudio de referência (sem ele, o Whisper do site transcreve sozinho).
+    `config` (opcional): modo="local"/"nuvem", url, api_key, modelo — senão vem das Configurações do site.
+    Texto longo é dividido em pedaços (frases inteiras) e juntado num áudio só; a mesma `seed` em todos os
+    pedaços deixa a voz igual do começo ao fim."""
+    texto = (texto or "").strip()
+    if not texto:
+        raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
+    c = fish_config(**config)
+    refs = _fish_referencias(speaker_wav, voice_profile, texto_referencia, idioma)
+    pedacos = _dividir_texto_para_xtts(texto, FISH_LIMITE_CARACTERES_POR_CHAMADA)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    pasta_tmp = tempfile.mkdtemp(prefix="fish_")
+    try:
+        partes = []
+        for i, pedaco in enumerate(pedacos):
+            corpo: Dict[str, Any] = {"text": pedaco, "format": "wav", "references": refs, "normalize": True,
+                                     "chunk_length": 200, "temperature": float(temperatura), "top_p": float(top_p),
+                                     "max_new_tokens": 2048}
+            if seed is not None:
+                corpo["seed"] = int(seed)
+            if reference_id and not refs:
+                corpo["reference_id"] = reference_id
+            if c["modo"] == "nuvem":
+                corpo["prosody"] = {"speed": max(0.5, min(2.0, float(velocidade or 1.0)))}
+            destino = os.path.join(pasta_tmp, f"p{i:04d}.wav")
+            with open(destino, "wb") as f:
+                f.write(_fish_pedir(c, corpo, timeout_por_pedaco))
+            partes.append(destino)
+        if len(partes) > 1:  # pedaços podem vir com cabeçalhos diferentes: normaliza antes de juntar
+            normalizados = []
+            for pth in partes:
+                n = pth[:-4] + "_n.wav"
+                subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", pth, "-ar", "44100", "-ac", "1", "-c:a", "pcm_s16le", n],
+                               capture_output=True, timeout=120)
+                normalizados.append(n if os.path.exists(n) else pth)
+            partes = normalizados
+        bruto = os.path.join(pasta_tmp, "junto.wav")
+        _concatenar_wavs(partes, bruto)
+        vel = float(velocidade or 1.0)
+        if c["modo"] == "local" and abs(vel - 1.0) > 0.01:  # o servidor local não tem "velocidade": ajusta no ffmpeg
+            r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", bruto, "-filter:a", f"atempo={max(0.5, min(2.0, vel))}",
+                                output_path], capture_output=True, timeout=300)
+            if r.returncode != 0:
+                shutil.copy(bruto, output_path)
+        else:
+            shutil.copy(bruto, output_path)
+    finally:
+        shutil.rmtree(pasta_tmp, ignore_errors=True)
+    return output_path
+
+
 ENGINES: Dict[str, Dict[str, Any]] = {
     "piper": {
         "label": "Piper TTS",
@@ -2312,6 +2540,14 @@ ENGINES: Dict[str, Dict[str, Any]] = {
                       "paralinguísticas (ex: [laugh], [sigh], [whispering]) direto no texto. "
                       "GPU recomendada.",
         "instalar": "pip install chatterbox-tts",
+    },
+    "fish_s2": {
+        "label": "Fish Audio S2 (clonagem + tags de emoção)",
+        "descricao": "Clona a voz (10–30s de referência) e entende TAGS de emoção em qualquer ponto do texto — "
+                      "[whisper], [excited], [angry], [laughing], [sigh]… — em 80+ idiomas, português incluso. "
+                      "Roda num servidor à parte (fish-speech, ~24 GB de VRAM, Linux/WSL) ou pela API paga da Fish Audio. "
+                      "⚠️ Os pesos abertos são só pra uso NÃO comercial.",
+        "instalar": "pip install requests msgpack  (+ o servidor: github.com/fishaudio/fish-speech, ou a API da Fish Audio)",
     },
     "kokoro": {
         "label": "Kokoro",
@@ -2347,6 +2583,8 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
         return chatterbox_synthesize(texto, output_path, **kwargs)
     if engine == "chatterbox_turbo":
         return chatterbox_turbo_synthesize(texto, output_path, **kwargs)
+    if engine == "fish_s2":
+        return fish_s2_synthesize(texto, output_path, **kwargs)
     if engine == "kokoro":
         return kokoro_synthesize(texto, output_path, **kwargs)
     raise VoiceGeneratorError(

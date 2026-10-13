@@ -487,7 +487,7 @@ _FILA_VOZ = _fila_voz.Fila(modo_fn=lambda: str(load_site_config().get("voz_simul
 
 
 def _voz_do_kwargs(engine: str, kwargs: Dict[str, Any]) -> str:
-    for k in ("nome_voz", "voz", "voice_profile", "speaker"):
+    for k in ("nome_voz", "voz", "voice_profile", "speaker", "reference_id"):
         if kwargs.get(k):
             return str(kwargs[k])
     if kwargs.get("speaker_wav"):
@@ -532,6 +532,13 @@ def gerar_voz_gpu():
     return jsonify({"pronto": c["pronto"], "gpu": c["gpu"], "diag": c["diag"]})
 
 
+@app.route("/gerar-voz/fish/status", methods=["GET"])
+def gerar_voz_fish_status():
+    """🐟 O servidor do Fish Audio S2 está no ar? (ou: tem chave da API?) — nunca devolve a chave."""
+    from tts import voice_generator as _vg
+    return jsonify(_vg.fish_status(timeout=4.0))
+
+
 @app.route("/gerar-voz", methods=["GET"])
 def gerar_voz_page():
     return render_template(
@@ -545,6 +552,7 @@ def gerar_voz_page():
         kokoro_variantes=tts_KOKORO_MODEL_VARIANTS,
         kokoro_precisoes=tts_KOKORO_PRECISIONS,
         perfis_de_voz=tts_listar_perfis_de_voz(),
+        fish_tags=__import__("tts.voice_generator", fromlist=["x"]).FISH_TAGS_EXEMPLO,
         gpu=_gpu_cache()["gpu"],
         gpu_diagnostico=_gpu_cache()["diag"],
         gpu_verificando=not _gpu_cache()["pronto"],
@@ -576,7 +584,7 @@ def _gerar_voz_com_chamadas(engine: str, partes: List[Dict[str, Any]], output_pa
     try:
         itens, arquivo_da_parte = [], {}
         for k, p in enumerate(partes):
-            limpo = na.limpar_texto_para_tts(p["texto"], preservar_tags_chatterbox_turbo=(engine == "chatterbox_turbo")).strip()
+            limpo = na.limpar_texto_para_tts(p["texto"], motor=engine).strip()
             if re.search(r"\w", limpo):
                 arq = os.path.join(pasta, f"parte_{k:03d}.wav")
                 arquivo_da_parte[k] = arq
@@ -637,7 +645,7 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
             log("🎭 Modo multi voice: as tags [slug] trocam a voz e não são lidas.")
             try:
                 r = mv.gerar(ch.remover_marcadores(texto), output_path, engine, kwargs, tts_gerar_audio_isolado,
-                             lambda t, turbo: na.limpar_texto_para_tts(t, preservar_tags_chatterbox_turbo=turbo),
+                             lambda t, m: na.limpar_texto_para_tts(t, motor=m if isinstance(m, str) else ("chatterbox_turbo" if m else "")),
                              pausa_troca=float((legenda_kwargs or {}).get("pausa_troca", 0.35)), on_log=log, normalizar_fn=_normalizar_multivoz)
             except mv.MultiVozError as exc:
                 raise VoiceGeneratorError(str(exc)) from exc
@@ -645,7 +653,7 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
         elif tem_chamadas:
             _salvar_chamadas_voz(status, output_path, _gerar_voz_com_chamadas(engine, partes_ch, output_path, kwargs, log), log)
         else:
-            texto_limpo = na.limpar_texto_para_tts(texto, preservar_tags_chatterbox_turbo=(engine == "chatterbox_turbo"))
+            texto_limpo = na.limpar_texto_para_tts(texto, motor=engine)
             tts_gerar_audio_isolado(engine, texto_limpo, output_path, **kwargs)
         status["resultado_filename"] = os.path.basename(output_path)
         log("Pronto!")
@@ -861,6 +869,39 @@ def gerar_voz_gerar():
         elif perfil_selecionado:
             kwargs["voice_profile"] = perfil_selecionado
         # sem nenhum dos dois: chatterbox_turbo_synthesize gera com a voz "neutra" padrão do modelo
+    elif engine == "fish_s2":
+        perfil_selecionado = request.form.get("fish_perfil", "").strip()
+        salvar_como_perfil = request.form.get("fish_salvar_perfil") == "on"
+        nome_novo_perfil = request.form.get("fish_nome_novo_perfil", "").strip()
+        texto_ref = " ".join((request.form.get("fish_texto_referencia") or "").split())[:1000]
+        reference_id = re.sub(r"[^0-9a-zA-Z_-]", "", request.form.get("fish_reference_id", ""))[:64]
+        try:
+            temperatura = max(0.1, min(1.0, float(request.form.get("fish_temperatura", "0.8") or 0.8)))
+        except ValueError:
+            temperatura = 0.8
+        kwargs = {"idioma": request.form.get("fish_idioma", "pt").strip() or "pt", "velocidade": velocidade,
+                  "temperatura": temperatura}
+        speaker_wav_file = request.files.get("fish_speaker_wav")
+        if speaker_wav_file and speaker_wav_file.filename:
+            safe_name = secure_filename(speaker_wav_file.filename)
+            ref_path = os.path.join(VOZES_DIR, f"ref_{uuid.uuid4().hex}_{safe_name}")
+            speaker_wav_file.save(ref_path)
+            if salvar_como_perfil:
+                if not nome_novo_perfil:
+                    return jsonify({"erro": "Dê um nome pro novo perfil de voz antes de salvar."}), 400
+                try:
+                    tts_salvar_perfil_de_voz(nome_novo_perfil, ref_path)
+                except VoiceGeneratorError as exc:
+                    return jsonify({"erro": str(exc)}), 400
+                kwargs["voice_profile"] = nome_novo_perfil
+            else:
+                kwargs["speaker_wav"] = ref_path
+                if texto_ref:
+                    kwargs["texto_referencia"] = texto_ref
+        elif perfil_selecionado:
+            kwargs["voice_profile"] = perfil_selecionado
+        elif reference_id:
+            kwargs["reference_id"] = reference_id
     elif engine == "kokoro":
         voz = request.form.get("kokoro_voz", "").strip() or "pf_dora"
         idioma = request.form.get("kokoro_idioma", "").strip() or None
@@ -969,7 +1010,11 @@ def _config_voz_do_form(form) -> Tuple[str, Dict[str, Any]]:
                  chatterboxExaggeration=form.get("chatterbox_exaggeration") or 0.5, chatterboxCfgWeight=form.get("chatterbox_cfg_weight") or 0.5)
     elif engine == "chatterbox_turbo":
         c.update(vozPerfil=form.get("chatterbox_turbo_perfil") or "")
-    for k in ("velocidade", "chatterboxExaggeration", "chatterboxCfgWeight"):
+    elif engine == "fish_s2":
+        c.update(vozPerfil=form.get("fish_perfil") or "", velocidade=vel, idioma=form.get("fish_idioma") or "pt",
+                 fishReferenceId=re.sub(r"[^0-9a-zA-Z_-]", "", form.get("fish_reference_id") or "")[:64],
+                 fishTemperatura=form.get("fish_temperatura") or 0.8)
+    for k in ("velocidade", "chatterboxExaggeration", "chatterboxCfgWeight", "fishTemperatura"):
         if k in c:
             try:
                 c[k] = float(c[k])
@@ -1058,7 +1103,7 @@ def multivoz_testar(slug: str):
         st = _GERAR_VOZ_STATUS[job_id]
         try:
             out = os.path.join(VOZES_DIR, f"teste_{slug}_{job_id[:8]}.wav")
-            tts_gerar_audio_isolado(motor, na.limpar_texto_para_tts(texto, preservar_tags_chatterbox_turbo=(motor == "chatterbox_turbo")), out, **kwargs)
+            tts_gerar_audio_isolado(motor, na.limpar_texto_para_tts(texto, motor=motor), out, **kwargs)
             st["resultado_filename"] = os.path.basename(out)
         except Exception as exc:  # noqa: BLE001
             st["erro"] = str(exc)
@@ -1905,6 +1950,8 @@ def narracao_salvar_config(projeto_id: str):
             kokoro_precisao=request.form.get("kokoro_precisao"),
             cortar_silencio_gravacoes=(request.form.get("cortar_silencio_gravacoes") == "on"),
             multi_voz=(request.form.get("multi_voz") == "on"),
+            fish_reference_id=request.form.get("fish_reference_id"),
+            fish_temperatura=request.form.get("fish_temperatura"),
         )
     except na.NarracaoError:
         pass
@@ -2056,6 +2103,14 @@ def save_settings():
         new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
+    for chave_fish in ("fish_modo", "fish_url", "fish_modelo"):  # 🐟 Fish Audio S2
+        if chave_fish in request.form:
+            new_values[chave_fish] = request.form[chave_fish]
+    for chave_fish in ("fish_api_key", "fish_api_key_local"):
+        if (request.form.get(chave_fish) or "").strip():  # em branco = mantém a chave salva
+            new_values[chave_fish] = request.form[chave_fish]
+        if request.form.get(chave_fish + "_apagar") == "on":
+            new_values[chave_fish] = ""
     for chave_flow in ("flow_navegador", "flow_exe", "flow_timeout_seconds", "flow_seletor_configuracoes",
                        "flow_horas_ate_liberar", "flow_palavras_limite", "flow_modelo_video", "flow_seletor_video",
                        "flow_modo_automacao"):
@@ -6694,6 +6749,47 @@ def edicao_ia(job_id: str):
     if not texto:
         return jsonify({"erro": "A IA não respondeu (" + (ia_servico.motivo_desligado("edicao") or "veja os detalhes em 🤖 IA") + ") — copie o prompt e use outra IA."}), 200
     return jsonify({"ok": True, "texto": texto})
+
+
+@app.route("/job/<job_id>/edicao/conversa", methods=["POST"])
+def edicao_conversa(job_id: str):
+    """💬 Conversa com a IA no Estúdio: pedido + o que está selecionado → plano pequeno (só o que muda) + resposta."""
+    import conversa_edicao
+    import ia_servico
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    motivo = ia_servico.motivo_desligado("edicao")
+    if motivo:
+        return jsonify({"erro": "IA desligada: " + motivo, "ia_desligada": True}), 400
+    corpo = request.get_json(silent=True) or {}
+    pedido = " ".join(str(corpo.get("pedido") or "").split())[:2000]
+    if not pedido:
+        return jsonify({"erro": "Escreva o que você quer mudar."}), 400
+    estado = corpo.get("estado") if isinstance(corpo.get("estado"), dict) else {}
+    if not estado.get("blocos"):
+        estado["blocos"] = [{"start": float(b["start"]), "end": float(b["end"]), "text": b.get("text", "")} for b in job.get("segments") or [] if b.get("text")]
+    if estado.get("segmentos"):
+        falas, _p = _falas_por_trecho(job, estado["segmentos"])
+        for sg, f in zip(estado["segmentos"], falas):
+            sg["_fala"] = f
+    foco = corpo.get("foco") if isinstance(corpo.get("foco"), dict) else {}
+    historico = corpo.get("historico") if isinstance(corpo.get("historico"), list) else []
+    try:
+        prompt = conversa_edicao.montar_prompt(job, estado, pedido, foco, historico)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": f"Não consegui montar o pedido: {exc}"}), 400
+    texto = ia_servico.chamar("edicao", conversa_edicao.sistema(), prompt, max_tokens=4000, effort="low", job=job_id,
+                              cache_local=False, timeout=120)
+    if not texto:
+        return jsonify({"erro": "A IA não respondeu (" + (ia_servico.motivo_desligado("edicao") or "veja os detalhes em 🤖 IA") + ")."}), 502
+    try:
+        plano = conversa_edicao.ler(texto, job, estado, _palavras_da_narracao(job))
+    except ValueError as exc:
+        return jsonify({"erro": f"A IA respondeu fora do formato: {exc}"}), 502
+    for d in (plano.get("destaques") or []) + (plano.get("editoriais") or []):
+        d["id"] = uuid.uuid4().hex[:8]
+    return jsonify({"ok": True, **plano})
 
 
 @app.route("/job/<job_id>/edicao/resposta", methods=["POST"])

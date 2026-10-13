@@ -263,6 +263,43 @@ E no final...</pre>
     <p style="color:#666;font-size:0.8rem;">Sem áudio nenhum, gera com a voz "neutra" padrão do modelo. Não aceita ajuste de intensidade emocional/aderência (o Turbo ignora esses dois parâmetros) — as tags acima é que controlam a expressividade.</p>
   </div>
 
+  <!-- 🐟 Fish Audio S2 -->
+  <div id="opcoes-fish_s2" class="engine-opcoes">
+    <div id="fish-status" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:0.82rem;">⏳ conferindo o servidor do Fish…</div>
+    <p style="color:#666;font-size:0.85rem;"><strong>Tags de emoção em qualquer ponto do texto</strong> (entre colchetes, também em português): <code>[excited] Você não vai acreditar!</code> <code>[whisper] É segredo…</code></p>
+    <p style="color:#666;font-size:0.8rem;margin-top:6px;">Exemplos: {% for t in fish_tags %}<code>{{ t }}</code> {% endfor %}— vale também uma descrição livre curta, ex. <code>[sussurrando bem baixinho]</code>.</p>
+    {% if perfis_de_voz %}
+    <label style="margin-top:12px;">Usar um perfil de voz salvo</label>
+    <select name="fish_perfil" onchange="document.getElementById('bloco-upload-referencia-fish').style.display = this.value ? 'none' : '';">
+      <option value="">— nenhum (escolher abaixo) —</option>
+      {% for perfil in perfis_de_voz %}
+      <option value="{{ perfil }}">{{ perfil }}</option>
+      {% endfor %}
+    </select>
+    <p style="color:#666;font-size:0.8rem;">O mesmo perfil do XTTS/Chatterbox. O Fish clona melhor sabendo o que é falado no áudio: o site transcreve sozinho (Whisper) na 1ª vez e guarda.</p>
+    {% endif %}
+    <div id="bloco-upload-referencia-fish">
+      <label>Áudio de referência pra clonar uma voz (opcional, 10–30s, limpo)</label>
+      <input type="file" name="fish_speaker_wav" accept="audio/*" onchange="document.getElementById('bloco-salvar-perfil-fish').style.display = this.files.length ? '' : 'none';">
+      <div id="bloco-salvar-perfil-fish" style="display:none;margin-top:8px;padding:10px;background:#f7f7f7;border-radius:6px;">
+        <label style="margin-top:0;font-size:0.85rem;">O que é falado nesse áudio (opcional — vazio = o site transcreve)</label>
+        <textarea name="fish_texto_referencia" rows="2" placeholder="ex: Olá, eu sou o João e esse é o meu canal…"></textarea>
+        <label style="font-weight:normal;"><input type="checkbox" name="fish_salvar_perfil" style="width:auto;" onchange="document.getElementById('campo-nome-perfil-fish').style.display = this.checked ? '' : 'none';"> Salvar esse áudio como um perfil de voz reutilizável</label>
+        <div id="campo-nome-perfil-fish" style="display:none;margin-top:6px;">
+          <label style="font-size:0.85rem;">Nome do perfil</label>
+          <input type="text" name="fish_nome_novo_perfil" placeholder="ex: minha_voz, locutor_joao">
+        </div>
+      </div>
+      <label>…ou o ID de uma voz da sua conta da Fish Audio (só no modo API)</label>
+      <input type="text" name="fish_reference_id" placeholder="ex: 7f92f8afb8ec43bf81429cc1c9199cb1" maxlength="64">
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <label>Idioma do texto <select name="fish_idioma">{% for cod, nome in [('pt','Português'),('en','Inglês'),('es','Espanhol'),('fr','Francês'),('it','Italiano'),('de','Alemão'),('ja','Japonês')] %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}</select></label>
+      <label>Expressividade (temperatura) <input type="number" name="fish_temperatura" value="0.8" min="0.1" max="1.0" step="0.05" style="width:90px;"></label>
+    </div>
+    <p style="color:#666;font-size:0.8rem;">Sem áudio nem ID, gera com a voz padrão do modelo. ⚠️ Os pesos abertos do S2 são só pra uso <b>não comercial</b> (vídeo monetizado precisa da licença da Fish Audio ou da API paga). Servidor e chave: <a href="{{ url_for('settings_page') }}#fish">⚙️ Configurações → Fish Audio S2</a>.</p>
+  </div>
+
   <!-- Opções específicas do Kokoro -->
   <div id="opcoes-kokoro" class="engine-opcoes">
     <label>Modelo (Kokoro)</label>
@@ -431,6 +468,18 @@ function mostrarOpcoesDoMotor() {
   if (bloco) bloco.style.display = '';
   var desc = document.querySelector('.engine-desc[data-engine="' + motor + '"]');
   if (desc) desc.style.display = '';
+  if (motor === 'fish_s2') conferirFish();
+}
+let fishConferido = false;
+async function conferirFish(forcar) {
+  const el = document.getElementById('fish-status'); if (!el || (fishConferido && !forcar)) return;
+  fishConferido = true;
+  try {
+    const d = await (await fetch('/gerar-voz/fish/status')).json();
+    el.style.background = d.ok ? '#f0fdf4' : '#fef2f2'; el.style.borderColor = d.ok ? '#bbf7d0' : '#fecaca';
+    el.innerHTML = (d.ok ? '✅ ' : '⚠️ ') + (d.modo === 'nuvem' ? 'API da Fish Audio: ' : 'Servidor local (' + d.url.replace(/[<>"]/g, '') + '): ')
+      + d.msg.replace(/[<>]/g, '') + ' <a href="#" onclick="conferirFish(true);return false;">conferir de novo</a>';
+  } catch (e) { el.textContent = 'não deu pra conferir o Fish agora'; }
 }
 mostrarOpcoesDoMotor();
 

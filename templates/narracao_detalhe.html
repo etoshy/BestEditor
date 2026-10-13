@@ -177,6 +177,30 @@
     {% endif %}
   </div>
 
+  <div id="opcoes-fish_s2" class="engine-opcoes">
+    <p style="color:#666;font-size:0.85rem;"><strong>Tags de emoção direto no texto da fala</strong> (também em português), ex: <code>[excited] Você não vai acreditar!</code> <code>[whisper] É segredo…</code> — vale qualquer descrição curta entre colchetes.</p>
+    <label>Idioma do texto</label>
+    <select name="idioma_fish_visivel" onchange="document.getElementById('idioma-final').value=this.value;">
+      {% for cod, nome in [('pt','Português'),('en','Inglês'),('es','Espanhol'),('fr','Francês'),('it','Italiano'),('de','Alemão'),('ja','Japonês')] %}
+      <option value="{{ cod }}" {% if (projeto.idioma or 'pt') == cod %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
+    {% if perfis_de_voz %}
+    <label style="margin-top:12px;">Clonar a voz de um perfil salvo</label>
+    <select name="fish_perfil_visivel" onchange="document.getElementById('perfil-final').value=this.value;">
+      <option value="">— nenhum —</option>
+      {% for perfil in perfis_de_voz %}
+      <option value="{{ perfil }}" {% if projeto.vozPerfil == perfil %}selected{% endif %}>{{ perfil }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    <label>…ou o ID de uma voz da sua conta da Fish Audio (modo API)</label>
+    <input type="text" name="fish_reference_id" value="{{ projeto.fishReferenceId or '' }}" maxlength="64" placeholder="ex: 7f92f8afb8ec43bf81429cc1c9199cb1">
+    <label>Expressividade (temperatura, 0.1–1.0)</label>
+    <input type="number" name="fish_temperatura" value="{{ projeto.fishTemperatura or 0.8 }}" min="0.1" max="1.0" step="0.05">
+    <p style="color:#666;font-size:0.8rem;">Servidor/chave em <a href="{{ url_for('settings_page') }}#fish">⚙️ Configurações → Fish Audio S2</a>. ⚠️ Pesos abertos: só uso não comercial.</p>
+  </div>
+
   <div id="opcoes-kokoro" class="engine-opcoes">
     <label>Voz (Kokoro)</label>
     <select name="voz_kokoro_visivel" onchange="document.getElementById('voz-final').value=this.value;">

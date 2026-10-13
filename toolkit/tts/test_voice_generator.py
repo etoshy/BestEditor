@@ -100,7 +100,7 @@ def test_gerar_audio_texto_vazio():
 
 
 def test_engines_tem_os_cinco_motores_com_label_e_instrucao_de_instalacao():
-    assert set(vg.ENGINES) == {"piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro"}
+    assert set(vg.ENGINES) == {"piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro", "fish_s2"}
     for info in vg.ENGINES.values():
         assert info["label"]
         assert info["instalar"].startswith("pip install")

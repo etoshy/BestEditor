@@ -181,6 +181,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Dict, Optional
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "site_config.json")
@@ -273,6 +274,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "flow_modelo_video": "Veo 3.1 - Lite",
     # 🎬 v84_74: "direto" = automação nova (seletores do HTML real, passo a passo conferido); "antigo" = a de antes
     "flow_modo_automacao": "direto",
+    # 🐟 Fish Audio S2 (motor de voz): "local" = servidor do fish-speech rodando à parte; "nuvem" = API paga da Fish Audio
+    "fish_modo": "local",
+    "fish_url": "http://127.0.0.1:8080",
+    "fish_modelo": "s2-pro",
+    "fish_api_key": "",        # chave da API da Fish Audio (modo nuvem) — pessoal, fica só no site_config.json
+    "fish_api_key_local": "",  # --api-key do servidor local, se você subiu ele com uma
 }
 
 
@@ -399,6 +406,13 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
         raise SiteConfigError(f"buscadores_proporcao precisa ser um de {_props}, recebi {current.get('buscadores_proporcao')!r}.")
     if current.get("flow_modo_automacao") not in ("direto", "antigo"):
         current["flow_modo_automacao"] = "direto"
+    if current.get("fish_modo") not in ("local", "nuvem"):
+        current["fish_modo"] = "local"
+    _fu = str(current.get("fish_url") or "").strip().rstrip("/")
+    current["fish_url"] = _fu if re.fullmatch(r"https?://[^\s\"'<>]+", _fu) else "http://127.0.0.1:8080"
+    current["fish_modelo"] = re.sub(r"[^a-z0-9.\-]", "", str(current.get("fish_modelo") or "s2-pro").lower())[:30] or "s2-pro"
+    for _k in ("fish_api_key", "fish_api_key_local"):
+        current[_k] = str(current.get(_k) or "").strip()[:200]
     if not isinstance(current.get("flow_seletor_video", ""), str):
         raise SiteConfigError("flow_seletor_video precisa ser um texto (seletor CSS, ou vazio).")
     current["flow_seletor_video"] = str(current.get("flow_seletor_video", "")).strip()

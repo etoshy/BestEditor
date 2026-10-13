@@ -40,7 +40,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from narracoes import limpar_texto_para_tts, _duracao_audio as _duracao_audio_ou_none
 
-MOTORES_QUE_CLONAM_VOZ = ("xtts", "chatterbox")
+MOTORES_QUE_CLONAM_VOZ = ("xtts", "chatterbox", "fish_s2")
 VELOCIDADE_MIN_PADRAO = 0.75
 VELOCIDADE_MAX_PADRAO = 1.6
 IDIOMAS_SUGERIDOS = {
@@ -263,7 +263,7 @@ def gerar_narracao_sincronizada(
     tts_kwargs = dict(tts_kwargs or {})
     if voz_referencia and engine in MOTORES_QUE_CLONAM_VOZ:
         tts_kwargs.setdefault("speaker_wav", voz_referencia)
-    if engine in ("xtts",):
+    if engine in ("xtts", "fish_s2"):
         tts_kwargs.setdefault("idioma", idioma_destino)
 
     duracao_total_ms = int(duracao_total_segundos * 1000) + 2000

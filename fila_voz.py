@@ -29,7 +29,8 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
 
-VRAM_GB = {"piper": 0.3, "kokoro": 1.0, "xtts": 3.5, "chatterbox_turbo": 3.5, "chatterbox": 5.0}
+VRAM_GB = {"piper": 0.3, "kokoro": 1.0, "xtts": 3.5, "chatterbox_turbo": 3.5, "chatterbox": 5.0,
+           "fish_s2": 0.2}  # Fish: a GPU é do servidor dele (outro programa); aqui é só um pedido HTTP
 MAX_SIMULTANEOS = 3
 MAX_AUTO = 2
 MODOS = ("auto", "1", "2", "3")

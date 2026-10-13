@@ -457,7 +457,7 @@ def vozes_para_prompt(vozes: List[Dict[str, Any]], tags_turbo: Optional[set] = N
                     "genero": v.get("genero") or "", "idade": v.get("idade") or "",
                     "genero_rotulo": multivoz.rotulo_genero(v),
                     "descricao": v.get("descricao") or "", "motor": v.get("motor"),
-                    "aceita_tags": v.get("motor") == "chatterbox_turbo",
+                    "aceita_tags": v.get("motor") in ("chatterbox_turbo", "fish_s2"),
                     "idioma": "inglês" if v.get("motor") == "chatterbox_turbo" else ((v.get("config") or {}).get("idioma") or "")})
     return out
 
@@ -745,10 +745,10 @@ def texto_para_tts(fala: Dict[str, Any], motor: str) -> str:
     campo "tags" entram no começo); nos outros motores as tags saem."""
     import narracoes
     texto = fala.get("texto") or ""
-    if motor == "chatterbox_turbo":
+    if motor in ("chatterbox_turbo", "fish_s2"):
         prefixo = " ".join(f"[{t}]" for t in fala.get("tags") or [] if f"[{t}]" not in texto)
         texto = (prefixo + " " + texto).strip()
-        return narracoes.limpar_texto_para_tts(texto, preservar_tags_chatterbox_turbo=True)
+        return narracoes.limpar_texto_para_tts(texto, motor=motor)
     texto = _RE_TAG_INLINE.sub(" ", texto)
     return narracoes.limpar_texto_para_tts(re.sub(r"\s{2,}", " ", texto).strip())
 

@@ -148,7 +148,7 @@ def idioma_do_motor(engine: str, config: Optional[Dict[str, Any]] = None) -> Opt
             return normalizar(c["idioma"])
         voz = str(c.get("voz") or "")
         return _KOKORO_LETRA.get(voz[:1].lower()) if voz else None
-    if engine in ("xtts", "chatterbox"):
+    if engine in ("xtts", "chatterbox", "fish_s2"):
         return normalizar(c.get("idioma"))
     return None
 

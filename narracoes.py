@@ -53,7 +53,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-MOTORES_VALIDOS = ("piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro")
+MOTORES_VALIDOS = ("piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro", "fish_s2")
 
 CONFIG_PADRAO: Dict[str, Any] = {
     "motor": "piper",
@@ -68,6 +68,8 @@ CONFIG_PADRAO: Dict[str, Any] = {
     "chatterboxCfgWeight": 0.5,  # chatterbox: aderência ao estilo/sotaque da voz de referência (0.0 a 1.0)
     "kokoroVariante": "v1.0",  # kokoro: "v1.0" ou "v1.1-zh" (ver KOKORO_MODEL_VARIANTS)
     "kokoroPrecisao": "fp32",  # kokoro: "fp32"/"fp16"/"int8" (ver KOKORO_PRECISIONS)
+    "fishReferenceId": "",  # fish_s2 (API da Fish Audio): id de uma voz salva na conta — sem perfil de voz
+    "fishTemperatura": 0.8,  # fish_s2: 0.1–1.0 (mais alto = mais variado/expressivo)
     "multiVoz": False,  # 🎭 multi voice: [slug] no texto troca pra voz salva com esse slug (multivoz.py) e não é lido
     "cortarSilencioGravacoes": True,  # corta automaticamente o silêncio do início/fim das SUAS gravações (não mexe em pausa no meio da fala) na hora de gerar -- não modifica o take salvo, só o áudio final
 }
@@ -149,6 +151,8 @@ def salvar_config(
     kokoro_precisao: Optional[str] = None,
     cortar_silencio_gravacoes: Optional[bool] = None,
     multi_voz: Optional[bool] = None,
+    fish_reference_id: Optional[str] = None,
+    fish_temperatura: Optional[float] = None,
 ) -> Dict[str, Any]:
     projeto = carregar_projeto(base_dir, projeto_id)
     if nome is not None and nome.strip():
@@ -195,6 +199,13 @@ def salvar_config(
         projeto["cortarSilencioGravacoes"] = bool(cortar_silencio_gravacoes)
     if multi_voz is not None:
         projeto["multiVoz"] = bool(multi_voz)
+    if fish_reference_id is not None:
+        projeto["fishReferenceId"] = re.sub(r"[^0-9a-zA-Z_-]", "", str(fish_reference_id))[:64]
+    if fish_temperatura not in (None, ""):
+        try:
+            projeto["fishTemperatura"] = max(0.1, min(float(fish_temperatura), 1.0))
+        except (TypeError, ValueError):
+            pass
 
     projeto_salvo = {k: v for k, v in projeto.items() if k != "projetoId"}
     _projeto_path(base_dir, projeto_id).write_text(
@@ -323,7 +334,14 @@ def remover_fala(base_dir: str, projeto_id: str, indice: int) -> Dict[str, Any]:
 # Limpeza de texto antes do TTS
 # ============================================================ #
 
-def limpar_texto_para_tts(texto: str, preservar_tags_chatterbox_turbo: bool = False) -> str:
+MOTORES_COM_TAGS_LIVRES = ("fish_s2",)   # entendem QUALQUER [descrição] curta: [whisper], [excited], [rindo baixinho]
+
+
+def motor_aceita_tags(motor: str) -> bool:
+    return motor == "chatterbox_turbo" or motor in MOTORES_COM_TAGS_LIVRES
+
+
+def limpar_texto_para_tts(texto: str, preservar_tags_chatterbox_turbo: bool = False, motor: str = "") -> str:
     """Limpa o texto ANTES de mandar pro motor de voz, pra evitar que o
     modelo vocalize sinais de pontuação literalmente (falar "aspas",
     "reticências" etc — comum em Piper/Kokoro com pontuação incomum).
@@ -343,6 +361,16 @@ def limpar_texto_para_tts(texto: str, preservar_tags_chatterbox_turbo: bool = Fa
     t = _ch.remover_marcadores(texto)  # [[INSCREVA: texto]] -> só o texto (ver chamadas.py)
 
     tags_preservadas: List[str] = []
+    if motor == "chatterbox_turbo":
+        preservar_tags_chatterbox_turbo = True
+    if motor in MOTORES_COM_TAGS_LIVRES:  # 🐟 Fish S2: toda [tag] curta fica como está (é emoção/efeito)
+        def _preservar_livre(m: "re.Match") -> str:
+            conteudo = " ".join(m.group(1).split())
+            if not conteudo or re.fullmatch(r"[\d\s.,:-]+", conteudo):
+                return m.group(0)  # [3], [00:12] etc.: não é tag
+            tags_preservadas.append(f"[{conteudo}]")
+            return f"\x00TAG{len(tags_preservadas) - 1}\x00"
+        t = re.sub(r"\[([^\[\]]{1,40})\]", _preservar_livre, t)
     if preservar_tags_chatterbox_turbo:
         from tts.voice_generator import CHATTERBOX_TURBO_TAGS
 
@@ -514,6 +542,18 @@ def _kwargs_motor(projeto: Dict[str, Any]) -> Dict[str, Any]:
         # dos três (só inglês, sem esses controles).
         if projeto.get("vozPerfil"):
             kwargs["voice_profile"] = projeto["vozPerfil"]
+        return kwargs
+    if motor == "fish_s2":
+        kwargs = {"idioma": projeto.get("idioma") or "pt", "velocidade": projeto.get("velocidade", 1.0)}
+        try:
+            kwargs["temperatura"] = max(0.1, min(1.0, float(projeto.get("fishTemperatura") or 0.8)))
+        except (TypeError, ValueError):
+            pass
+        # mesmo perfil de voz do XTTS/Chatterbox (clonagem) — ou uma voz salva na conta da Fish Audio
+        if projeto.get("vozPerfil"):
+            kwargs["voice_profile"] = projeto["vozPerfil"]
+        elif projeto.get("fishReferenceId"):
+            kwargs["reference_id"] = projeto["fishReferenceId"]
         return kwargs
     # kokoro
     return {
@@ -992,7 +1032,7 @@ def gerar_audio_projeto(
                     log(f"[{pos}/{len(indices_com_texto)}] {quem} ({m_}): \"{parte['texto'][:60]}\"")
                     bruto = tmp_dir / f"fala_{i:04d}_{k:02d}_bruto.wav"
                     try:
-                        gerar_audio_isolado(m_, limpar_texto_para_tts(parte["texto"], preservar_tags_chatterbox_turbo=(m_ == "chatterbox_turbo")), str(bruto), **kw_)
+                        gerar_audio_isolado(m_, limpar_texto_para_tts(parte["texto"], motor=m_), str(bruto), **kw_)
                     except VoiceGeneratorError as exc:
                         raise NarracaoError(f"Falha na fala {i + 1} ({quem}): {exc}") from exc
                     norm = tmp_dir / f"fala_{i:04d}_{k:02d}.wav"
@@ -1005,7 +1045,7 @@ def gerar_audio_projeto(
                 else:
                     multivoz.concatenar(sub, str(saida), [0.0] + [0.3] * (len(sub) - 1), str(tmp_dir))
             else:
-                texto_limpo = limpar_texto_para_tts(texto_original, preservar_tags_chatterbox_turbo=(motor == "chatterbox_turbo"))
+                texto_limpo = limpar_texto_para_tts(texto_original, motor=motor)
                 log(f"[{pos}/{len(indices_com_texto)}] Gerando com {motor}: \"{texto_original[:60]}\"")
                 try:
                     gerar_audio_isolado(motor, texto_limpo, str(saida), **kwargs_motor)

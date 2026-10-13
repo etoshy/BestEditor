@@ -51,6 +51,7 @@
             <option value="chatterbox" {% if f.motor == 'chatterbox' %}selected{% endif %}>Chatterbox</option>
             <option value="chatterbox_turbo" {% if f.motor == 'chatterbox_turbo' %}selected{% endif %}>Chatterbox Turbo (EN)</option>
             <option value="kokoro" {% if f.motor == 'kokoro' %}selected{% endif %}>Kokoro</option>
+            <option value="fish_s2" {% if f.motor == 'fish_s2' %}selected{% endif %}>Fish Audio S2 (tags de emoção)</option>
           </select>
           <input type="text" name="voz" value="{{ f.voz }}" placeholder="nome da voz/speaker/perfil" style="flex:1;">
         </div>
@@ -76,6 +77,7 @@
         <option value="chatterbox">Chatterbox (clonagem de voz)</option>
         <option value="chatterbox_turbo">Chatterbox Turbo (só inglês, tags de emoção)</option>
         <option value="kokoro">Kokoro</option>
+        <option value="fish_s2">Fish Audio S2 (clonagem + tags de emoção, PT)</option>
       </select>
     </div>
     <div style="flex:1;">

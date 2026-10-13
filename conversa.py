@@ -25,7 +25,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from narracoes import limpar_texto_para_tts, normalizar_volume_wav
 
-MOTORES_VALIDOS = {"piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro"}
+MOTORES_VALIDOS = {"piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro", "fish_s2"}
 
 
 class ConversaError(Exception):
@@ -292,6 +292,16 @@ def _kwargs_motor_fala(fala: Dict[str, Any]) -> Dict[str, Any]:
                 kwargs["voice_profile"] = voz
         return kwargs
 
+    if motor == "fish_s2":
+        kwargs = {"idioma": idioma or "pt", "velocidade": velocidade}
+        if voz:  # perfil de voz salvo (clonagem); senão, um id de voz da conta da Fish Audio
+            from tts.voice_generator import listar_perfis_de_voz
+            if voz in listar_perfis_de_voz():
+                kwargs["voice_profile"] = voz
+            else:
+                kwargs["reference_id"] = voz
+        return kwargs
+
     # kokoro
     return {"voz": voz or "pf_dora", "velocidade": velocidade, "idioma": idioma}
 
@@ -309,7 +319,7 @@ def gerar_audio_fala(base_dir: str, conversa_id: str, fala_id: str) -> Dict[str,
     pasta_falas.mkdir(parents=True, exist_ok=True)
     destino = pasta_falas / f"{fala_id}.wav"
 
-    texto_limpo = limpar_texto_para_tts(fala["texto"], preservar_tags_chatterbox_turbo=(fala["motor"] == "chatterbox_turbo"))
+    texto_limpo = limpar_texto_para_tts(fala["texto"], motor=fala["motor"])
     kwargs = _kwargs_motor_fala(fala)
     try:
         gerar_audio_isolado(fala["motor"], texto_limpo, str(destino), **kwargs)

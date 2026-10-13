@@ -300,6 +300,19 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 .pd-rodape .hint{margin-right:auto}
 .pal .x{float:right;color:var(--dim);cursor:pointer;padding:0 3px}.pal .x:hover{color:#f66}
 @media (max-width:700px){.pd-corpo{flex-direction:column}.pd-eixos{width:auto;max-height:180px;border-right:0;border-bottom:1px solid var(--line)}.pd-cores{grid-template-columns:1fr}}
+.barra-rapida{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;padding:6px;border:1px dashed var(--line,#333);border-radius:8px}
+.barra-rapida .mini{flex:0 0 auto}
+.chat-ia{position:fixed;right:14px;bottom:14px;width:360px;max-width:calc(100vw - 28px);max-height:62vh;display:flex;flex-direction:column;background:var(--panel,#16181d);border:1px solid var(--line,#333);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:60}
+.chat-cab{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line,#333)}
+.chat-cab .dim{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-log{flex:1;overflow:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;min-height:90px}
+.chat-log .m{padding:6px 8px;border-radius:8px;max-width:92%;white-space:pre-wrap;word-break:break-word}
+.chat-log .eu{align-self:flex-end;background:#1d4ed8;color:#fff}
+.chat-log .ia{align-self:flex-start;background:rgba(255,255,255,.06)}
+.chat-log .ia .feito{font-size:11px;opacity:.8;margin-top:3px}
+.chat-log .sis{align-self:center;font-size:11px;opacity:.75;text-align:center}
+.chat-pe{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line,#333)}
+.chat-pe textarea{flex:1;resize:vertical;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -326,6 +339,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   </div>
   <div class="hgrp" title="Frames cortados do começo de cada clipe de vídeo">✂️<input type="number" id="gTrim" min="0" max="120" step="1"></div>
   <div class="spacer"></div>
+  <button id="btnChatIA" title="Conversar com a IA sobre a parte selecionada (ela muda efeitos, transições, destaques…)">💬 Falar com a IA</button>
   <span class="salvo" id="preBaixar" title="Os clipes que a montagem vai usar já vão sendo baixados enquanto você edita — na hora de montar, eles não baixam de novo" style="display:none"></span>
   <span class="salvo" id="estadoSalvo">tudo salvo</span>
   <button id="btnSalvar" title="Salvar sem montar (Ctrl+S)">💾 Salvar</button>
@@ -744,6 +758,14 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 <input type="file" id="arqTrecho" accept="video/*,image/*" hidden>
 <audio id="narracao" preload="auto" src="{{ url_for('narration_audio', job_id=job.job_id) }}"></audio>
 <div class="toast" id="toast"></div>
+<div id="chatIA" class="chat-ia" style="display:none">
+  <div class="chat-cab"><b>💬 Falar com a IA</b><span class="dim" id="chatFoco"></span><button class="mini" id="chatFechar" title="fechar">✕</button></div>
+  <div class="chat-log" id="chatLog"></div>
+  <div class="chat-pe">
+    <textarea id="chatTexto" rows="2" placeholder="Ex.: deixa esse trecho mais dramático · tira o zoom · troca a transição por algo mais suave · muda o texto desse destaque pra …"></textarea>
+    <button class="primary" id="chatEnviar">Enviar</button>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -3186,6 +3208,10 @@ function campo(rotulo, html) { return `<label class="f"><span>${rotulo}</span>${
 function opcoes(lista, atual) { return lista.map(([v, r]) => `<option value="${esc(v)}" ${String(v) === String(atual) ? 'selected' : ''}>${esc(r)}</option>`).join(''); }
 
 function renderProps() {
+  renderProps0();
+  try { barraRapida($('props')); if ($('chatIA').style.display !== 'none') $('chatFoco').textContent = focoChat().rotulo; } catch (e) { /* antes de tudo carregar */ }
+}
+function renderProps0() {
   const P = $('props');
   if (!sel) { P.innerHTML = '<h3>Propriedades</h3><p class="hint">Clique num trecho, num losango (transição), num overlay ou num corte da timeline.</p><p class="hint">Clique e arraste no fundo da timeline pra selecionar vários itens (Ctrl/Shift+clique soma).</p><p class="hint">Atalhos: <b>Espaço</b> toca/pausa · <b>S</b> divide no cursor · <b>Ctrl+S</b> salva · <b>←/→</b> 1s.</p>'; return; }
   if (sel.tipo === 'multi') return propsMulti(P);
@@ -4299,6 +4325,190 @@ $('ytCopiarTodos').addEventListener('click', () => {
 });
 $('ytConferir').addEventListener('click', () => enviarYtTexto($('ytTexto').value, false, alvosYt()).catch(e => toast('⚠ ' + e.message)));
 $('ytAplicar').addEventListener('click', () => { if (!$('ytTexto').value.trim()) { toast('Cole pelo menos um link'); return; } aplicarYtTexto($('ytTexto').value, alvosYt()); });
+
+
+// ------------------------------------------------------------------ 🔄 trocar / 🗑 tirar (sem IA) e 💬 falar com a IA
+const CAMPOS_RAPIDO = ['transition', 'transition_duration', 'efeito', 'entrada', 'saida', 'template', 'template_campos', 'zoom_direction'];
+const pilhaEdicao = [];  // ↩ desfazer das trocas rápidas e da conversa com a IA
+function fotoEdicao() {
+  return { n: segs.length, segs: JSON.stringify(segs.map(s => Object.fromEntries(CAMPOS_RAPIDO.map(k => [k, s[k] === undefined ? null : s[k]])))),
+    destaques: JSON.stringify(destaques), graficos: JSON.stringify(graficos), editoriais: JSON.stringify(editoriais), sfx: JSON.stringify(sfx),
+    filtro: $('gFiltro').value, paleta: JSON.stringify(paleta), leg: JSON.stringify(leg) };
+}
+function guardarEdicao(rotulo) { pilhaEdicao.push(Object.assign(fotoEdicao(), { rotulo })); if (pilhaEdicao.length > 40) pilhaEdicao.shift(); return pilhaEdicao.length - 1; }
+function voltarEdicao(k) {
+  const u = pilhaEdicao[k]; if (!u) return false;
+  if (u.n !== segs.length) { toast('⚠ Os trechos mudaram (dividiu/juntou) depois disso — não dá pra desfazer'); return false; }
+  JSON.parse(u.segs).forEach((v, i) => Object.assign(segs[i], v));
+  destaques.splice(0, destaques.length, ...JSON.parse(u.destaques)); graficos.splice(0, graficos.length, ...JSON.parse(u.graficos));
+  editoriais.splice(0, editoriais.length, ...JSON.parse(u.editoriais)); sfx.splice(0, sfx.length, ...JSON.parse(u.sfx));
+  $('gFiltro').value = u.filtro; Object.assign(paleta, JSON.parse(u.paleta)); paletaMudou(); Object.assign(leg, JSON.parse(u.leg)); preencherLegendaUI();
+  pilhaEdicao.splice(k);
+  if (sel && sel.tipo === 'hl' && !destaques.some(d => d.id === sel.id)) sel = null;
+  marcarSujo(); desenharTimeline(); renderProps(); desenharCenas(); desenharListaHl(); atualizarMonitor(true); return true;
+}
+let giroTroca = 0;
+function parecido(lista, atual, ok) {  // outro item da MESMA família, com energia parecida (gira entre os mais próximos)
+  const a = lista.find(x => x.id === atual);
+  const cands = lista.filter(x => x.id !== atual && x.id !== 'none' && (!ok || ok(x)));
+  if (!cands.length) return null;
+  const mesma = a && a.familia ? cands.filter(x => x.familia === a.familia) : [];
+  const pool = (mesma.length ? mesma : cands).slice();
+  const ea = a && a.energia != null ? a.energia : 0.4;
+  pool.sort((x, y) => Math.abs((x.energia != null ? x.energia : 0.5) - ea) - Math.abs((y.energia != null ? y.energia : 0.5) - ea));
+  const top = pool.slice(0, Math.min(4, pool.length));
+  return top[(giroTroca++) % top.length].id;
+}
+function transicaoParecida(atual) {
+  const lista = DPC.transicoes || [];
+  const igual = lista.find(t => t.id === atual) || lista.find(t => t.previa === atual);
+  return parecido(lista, igual ? igual.id : '__nada__', null) || null;
+}
+function trocarTrecho(i) {  // devolve o que trocou (texto) ou ''
+  const s = segs[i]; const img = tipoMidia(s) === 'image'; const fe = [];
+  if (s.efeito) { const n = parecido(DPC.efeitos, s.efeito, e => !e.so_foto || img); if (n) { s.efeito = n; fe.push('efeito → ' + (ROT_EFEITO_DP[n] || n)); } }
+  if (s.entrada) { const n = parecido(DPC.entradas, s.entrada); if (n) { s.entrada = n; fe.push('entrada → ' + (ROT_GESTO_DP[n] || n)); } }
+  if (s.saida) { const n = parecido(DPC.entradas, s.saida); if (n) { s.saida = n; fe.push('saída → ' + (ROT_GESTO_DP[n] || n)); } }
+  if (!fe.length) {  // não tinha nada: põe um efeito discreto que combina com a mídia
+    const n = parecido(DPC.efeitos, '__nada__', e => (!e.so_foto || img) && (e.energia == null || e.energia <= 0.5));
+    if (n) { s.efeito = n; fe.push('efeito novo: ' + (ROT_EFEITO_DP[n] || n)); }
+  }
+  return fe.join(', ');
+}
+function tirarTrecho(i) { const s = segs[i]; const tinha = !!(s.efeito || s.entrada || s.saida); s.efeito = null; s.entrada = null; s.saida = null; return tinha; }
+function trocarEmenda(i) {
+  const n = transicaoParecida(transicaoDaEmenda(i).tipo); if (!n) return '';
+  segs[i].transition = n; return 'transição → ' + (ROTULO_TRANS[n] || n);
+}
+function tirarEmenda(i) { segs[i].transition = 'none'; segs[i].transition_duration = null; return true; }
+function trocarHl(d) {
+  const e = HLE[d.estilo] || {};
+  const lista = HLC.estilos.filter(x => !x.manual).map(x => ({ id: x.id, familia: x.papel || x.categoria, energia: null }));
+  const n = parecido(lista, d.estilo, x => !e.papel || (HLE[x.id] || {}).papel === e.papel); if (!n) return '';
+  d.estilo = n; return 'estilo → ' + ((HLE[n] || {}).nome || n);
+}
+function alvosSel() {  // {trechos:[i], emendas:[i], hl:[obj]}
+  const a = { trechos: [], emendas: [], hl: [] };
+  const add = (t, v) => { if (t === 'seg') a.trechos.push(v); else if (t === 'emenda') a.emendas.push(v); else if (t === 'hl') a.hl.push(v); };
+  if (!sel) return a;
+  if (sel.tipo === 'multi') [...multi].forEach(k => { const it = itemDaChave(k); if (it) add(it.t, it.t === 'hl' ? it.o : it.i); });
+  else if (sel.tipo === 'seg' || sel.tipo === 'emenda') add(sel.tipo, sel.i);
+  else if (sel.tipo === 'hl') { const d = destaques.find(x => x.id === sel.id); if (d) add('hl', d); }
+  return a;
+}
+function acaoRapida(tipo) {
+  const a = alvosSel(); if (!a.trechos.length && !a.emendas.length && !a.hl.length) { toast('Selecione um trecho, uma transição ou um destaque'); return; }
+  const k = guardarEdicao(tipo === 'trocar' ? '🔄 troca' : '🗑 remoção'); const fe = [];
+  if (tipo === 'trocar') {
+    a.trechos.forEach(i => { const r = trocarTrecho(i); if (r) fe.push(`T${i + 1}: ${r}`); });
+    a.emendas.forEach(i => { const r = trocarEmenda(i); if (r) fe.push(`T${i + 1}→T${i + 2}: ${r}`); });
+    a.hl.forEach(d => { const r = trocarHl(d); if (r) fe.push(`destaque: ${r}`); });
+  } else {
+    a.trechos.forEach(i => { if (tirarTrecho(i)) fe.push(`T${i + 1}: sem efeito`); });
+    a.emendas.forEach(i => { tirarEmenda(i); fe.push(`T${i + 1}→T${i + 2}: corte seco`); });
+    a.hl.forEach(d => { const j = destaques.indexOf(d); if (j >= 0) { destaques.splice(j, 1); fe.push('destaque removido'); } });
+    if (a.hl.length && sel && (sel.tipo === 'hl' || sel.tipo === 'multi')) { sel = null; multi.clear(); }
+  }
+  if (!fe.length) { pilhaEdicao.splice(k); toast(tipo === 'trocar' ? 'Nada pra trocar aqui' : 'Não tinha efeito pra tirar'); return; }
+  marcarSujo(); desenharTimeline(); renderProps(); desenharListaHl(); atualizarMonitor(true);
+  toast((tipo === 'trocar' ? '🔄 ' : '🗑 ') + fe.slice(0, 4).join(' · ') + (fe.length > 4 ? ` (+${fe.length - 4})` : '') + ' — ↩ desfaz', 4500);
+}
+function barraRapida(P) {
+  const a = alvosSel(); if (!a.trechos.length && !a.emendas.length && !a.hl.length) return;
+  const b = document.createElement('div'); b.className = 'barra-rapida';
+  const oQue = a.hl.length && !a.trechos.length && !a.emendas.length ? 'estilo' : a.emendas.length && !a.trechos.length ? 'transição' : 'efeito';
+  b.innerHTML = `<button class="mini" data-r="trocar" title="Troca por um parecido (mesma família, mesma energia) — clique de novo pra outro">🔄 Trocar ${oQue}</button>`
+    + `<button class="mini" data-r="tirar" title="${a.hl.length ? 'Remove o destaque' : a.emendas.length && !a.trechos.length ? 'Vira corte seco' : 'Tira efeito, entrada e saída'}">🗑 Tirar</button>`
+    + `<button class="mini" data-r="ia" title="Pedir à IA uma mudança nisso">💬 Pedir à IA</button>`
+    + (pilhaEdicao.length ? `<button class="mini" data-r="desfazer" title="Desfaz: ${esc(pilhaEdicao[pilhaEdicao.length - 1].rotulo || '')}">↩ Desfazer</button>` : '');
+  b.addEventListener('click', (e) => {
+    const r = e.target.closest('[data-r]'); if (!r) return;
+    if (r.dataset.r === 'desfazer') { if (voltarEdicao(pilhaEdicao.length - 1)) toast('↩ Desfeito'); return; }
+    if (r.dataset.r === 'ia') { abrirChat(); return; }
+    acaoRapida(r.dataset.r);
+  });
+  const tit = P.querySelector('.prop-title'); if (tit) tit.insertAdjacentElement('afterend', b); else P.prepend(b);
+}
+
+// ---- 💬 conversa
+const chatHist = [];
+function focoChat() {
+  const f = {}; const rot = [];
+  const a = alvosSel();
+  if (a.trechos.length) { f.trechos = a.trechos.slice(0, 40); rot.push(a.trechos.length === 1 ? `Trecho ${a.trechos[0] + 1}` : `${a.trechos.length} trechos`); }
+  if (a.emendas.length) { f.emendas = a.emendas.slice(0, 40); rot.push(a.emendas.length === 1 ? `transição T${a.emendas[0] + 1}→T${a.emendas[0] + 2}` : `${a.emendas.length} transições`); }
+  if (a.hl.length) { f.destaques = a.hl.map(d => destaques.indexOf(d)).filter(k => k >= 0); rot.push(a.hl.length === 1 ? 'um destaque' : `${a.hl.length} destaques`); }
+  if (!rot.length && sel && sel.id) {
+    const o = (sel.tipo === 'gr' ? graficos : sel.tipo === 'ed' ? editoriais : sel.tipo === 'sfx' ? sfx : sel.tipo === 'ov' ? overlays : []).find(x => x.id === sel.id);
+    if (o && o.start != null) { f.start = o.start; f.end = o.end != null ? o.end : o.start + 2; rot.push(`${fmt(f.start, 1)}–${fmt(f.end, 1)}`); }
+  }
+  return { foco: f, rotulo: rot.length ? 'sobre: ' + rot.join(' + ') : 'sobre: o vídeo todo (selecione algo pra focar)' };
+}
+function msgChat(cls, html) { const d = document.createElement('div'); d.className = 'm ' + cls; d.innerHTML = html; $('chatLog').appendChild(d); $('chatLog').scrollTop = 1e9; return d; }
+function abrirChat() {
+  $('chatIA').style.display = 'flex'; $('chatFoco').textContent = focoChat().rotulo;
+  if (!$('chatLog').children.length) {
+    msgChat('sis', iaPode ? 'Selecione um trecho, uma transição ou um destaque na timeline (ou nada = o vídeo todo) e diga o que quer mudar.'
+      : '🔌 A IA está desligada (ative em <a href="/ia" target="_blank">🤖 IA</a>, recurso "✂️ Prompt de edição"). Sem ela: selecione um clipe e use <b>🔄 Trocar</b> ou <b>🗑 Tirar</b> no painel da direita.');
+  }
+  setTimeout(() => $('chatTexto').focus(), 0);
+}
+function aplicarPlanoChat(p) {
+  const fe = [];
+  (p.trechos || []).forEach(t => {
+    const s = segs[t.indice]; if (!s) return;
+    ['transition', 'transition_duration', 'efeito', 'entrada', 'saida'].forEach(k => { if (k in t) s[k] = t[k] === 'none' && k !== 'transition' ? null : t[k]; });
+    if ('template' in t) { s.template = t.template; s.template_campos = t.template ? (t.template_campos || {}) : null; }
+    if (t.bordas) s._aspect = t.bordas;
+    if (t.camera) { s.zoom_direction = t.camera; if (s.override_source) s.override_source.zoom_direction = t.camera; }
+    if (t.foco) { s.focus_x = t.foco.x; s.focus_y = t.foco.y; if (s.override_source) { s.override_source.focus_x = t.foco.x; s.override_source.focus_y = t.foco.y; } }
+    if (t.transition_som) s.transition_som = t.transition_som;
+    fe.push('T' + (t.indice + 1));
+  });
+  (p.remover_destaques || []).forEach(id => { const j = destaques.findIndex(d => d.id === id); if (j >= 0) { destaques.splice(j, 1); fe.push('−1 destaque'); } });
+  (p.mudar_destaques || []).forEach(m => { const d = destaques.find(x => x.id === m.id); if (d) { const c = Object.assign({}, m); delete c.id; Object.assign(d, c); fe.push('destaque mudado'); } });
+  let pulados = 0;
+  (p.destaques || []).forEach(n => { if (destaques.some(m => !m.avulso && !n.avulso && n.start < m.end + 0.1 && n.end > m.start - 0.1)) { pulados++; return; } destaques.push(n); fe.push('+1 destaque'); });
+  destaques.sort((a, b) => a.start - b.start);
+  if (p.graficos && p.graficos.length) { p.graficos.forEach(g => graficos.push(Object.assign(g, { origem: 'ia' }))); graficos.sort((a, b) => a.start - b.start); fe.push(`+${p.graficos.length} gráfico(s)`); }
+  if (p.editoriais && p.editoriais.length) { p.editoriais.forEach(q => editoriais.push(Object.assign(q, { origem: 'ia' }))); editoriais.sort((a, b) => a.start - b.start); fe.push(`+${p.editoriais.length} quadro(s)`); }
+  if (p.sons && p.sons.length) { p.sons.forEach(x => sfx.push(Object.assign({ id: Math.random().toString(16).slice(2, 10), origem: 'ia' }, x))); sfx.sort((a, b) => a.start - b.start); fe.push(`+${p.sons.length} som(ns)`); }
+  if (p.filtro_cor) { $('gFiltro').value = p.filtro_cor; fe.push('filtro'); }
+  if (p.paleta) { Object.assign(paleta, p.paleta, { modo: 'projeto', ativa: true, id: 'ia' }); paletaMudou(); fe.push('paleta'); }
+  if (p.legenda) { Object.assign(leg, p.legenda, { ativa: true }); preencherLegendaUI(); fe.push('legenda'); }
+  if (pulados) fe.push(`${pulados} destaque(s) não entrou(aram): já tem outro no mesmo momento`);
+  return fe;
+}
+async function enviarChat() {
+  const pedido = $('chatTexto').value.trim(); if (!pedido) return;
+  if (!iaPode) { msgChat('sis', '🔌 A IA está desligada — ative em <a href="/ia" target="_blank">🤖 IA</a>. Enquanto isso, use 🔄 Trocar / 🗑 Tirar no painel do item.'); return; }
+  const { foco, rotulo } = focoChat();
+  msgChat('eu', esc(pedido)); $('chatTexto').value = ''; $('chatEnviar').disabled = true;
+  const pensando = msgChat('ia', '🤖 pensando…');
+  try {
+    const estado = Object.assign(estadoParaIA(), { destaques: destaques.map(d => ({ id: d.id, estilo: d.estilo, start: d.start, end: d.end, texto: d.texto })) });
+    const r = await fetch(`/job/${JOB}/edicao/conversa`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedido, foco, estado, historico: chatHist.slice(-6) }) });
+    const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+    const k = guardarEdicao('💬 ' + pedido.slice(0, 40));
+    const fe = aplicarPlanoChat(d);
+    if (!fe.length) pilhaEdicao.splice(k);
+    chatHist.push({ pedido, resposta: d.resposta || '' });
+    pensando.innerHTML = esc(d.resposta || (fe.length ? 'Feito.' : 'Não mudei nada.'))
+      + (fe.length ? `<div class="feito">✔ ${esc(fe.join(' · '))} · <a href="#" data-desfaz="${k}">↩ desfazer</a></div>` : '')
+      + ((d.avisos || []).length ? `<div class="feito">⚠ ${esc(d.avisos.slice(0, 3).join(' · '))}</div>` : '');
+    if (fe.length) { marcarSujo(); desenharTimeline(); renderProps(); desenharCenas(); desenharListaHl(); atualizarMonitor(true); }
+  } catch (e) { pensando.textContent = '⚠ ' + e.message; }
+  finally { $('chatEnviar').disabled = false; $('chatFoco').textContent = focoChat().rotulo; }
+}
+$('btnChatIA').addEventListener('click', () => { if ($('chatIA').style.display === 'none') abrirChat(); else $('chatIA').style.display = 'none'; });
+$('chatFechar').addEventListener('click', () => { $('chatIA').style.display = 'none'; });
+$('chatEnviar').addEventListener('click', enviarChat);
+$('chatTexto').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); } e.stopPropagation(); });
+$('chatLog').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-desfaz]'); if (!a) return; e.preventDefault();
+  if (voltarEdicao(+a.dataset.desfaz)) { a.replaceWith(document.createTextNode('↩ desfeito')); toast('↩ Voltou a como estava antes desse pedido'); }
+});
 
 // ------------------------------------------------------------------ início
 montarTilesTransicao(); montarTilesEfeitos(); montarTilesDp(); desenharBiblioteca(); desenharCortes(); desenharCenas(); desenharListaHl(); desenharListaTx(); desenharSons(); desenharPaleta(); montarLegendas(); desenharBibliotecaDp(); desenharFundoPadraoHl();

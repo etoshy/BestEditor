@@ -28,6 +28,41 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 💬 Falar com a IA no editor + 🔄 Trocar / 🗑 Tirar (v84_83)
+
+- **Sem IA**: selecione um trecho, uma transição (losango) ou um destaque — ou vários — e use os botões que aparecem no
+  topo do painel da direita:
+  - **🔄 Trocar** = troca por um **parecido** (mesma família e energia do catálogo do DarkPlanner; clique de novo pra
+    outro). Trecho sem efeito ganha um efeito discreto que combina com a mídia (câmera só em foto).
+  - **🗑 Tirar** = tira efeito/entrada/saída do trecho, vira **corte seco** na transição, remove o destaque.
+  - **↩ Desfazer** volta a última troca (até 40 passos).
+- **Com a IA ligada** (🤖 IA → "✂️ Prompt de edição"): botão **💬 Falar com a IA** no topo. Selecione a parte (ou nada =
+  o vídeo todo) e escreva: "deixa esse mais dramático", "tira o zoom", "transição mais suave aqui", "muda o texto
+  desse destaque pra …", "põe um destaque com o ano". A IA vê os trechos selecionados + 2 vizinhos de cada lado, os
+  destaques e a fala daquela parte, e responde só o que muda — aplicado na hora, com **↩ desfazer** em cada resposta.
+  A conversa lembra os últimos pedidos ("agora mais rápido").
+
+---
+
+## 🐟 Novo motor de voz: Fish Audio S2 — clonagem + tags de emoção em português (v84_82)
+
+- Em **🎙️ Gerador de voz**, **📝 Roteiro para Áudio**, **💬 Simular Conversa**, **🎭 multi voice** e dublagem: motor
+  **Fish Audio S2**. Clona a voz com 10–30s de áudio (o mesmo **perfil de voz** do XTTS/Chatterbox) e entende **tags de
+  emoção em qualquer ponto do texto**, inclusive em PT: `[excited] Você não vai acreditar! [whisper] É segredo…` —
+  vale também descrição livre curta (`[sussurrando bem baixinho]`, `[pitch up]`).
+- O Fish clona melhor sabendo o que é dito no áudio de referência: o site **transcreve com o Whisper** na 1ª vez e guarda
+  (`<clipe>.wav.txt` no perfil); no envio avulso dá pra escrever o texto.
+- **Onde roda** (⚙️ Configurações → 🐟 Fish Audio S2):
+  - **Servidor local**: o modelo (S2 Pro, 4B) roda no programa do [fish-speech](https://github.com/fishaudio/fish-speech),
+    à parte — precisa de **~24 GB de VRAM** e **Linux/WSL**. Depois de instalar e baixar os pesos (`fishaudio/s2-pro`):
+    `python tools/api_server.py --llama-checkpoint-path checkpoints/s2-pro --decoder-checkpoint-path checkpoints/s2-pro/codec.pth --listen 127.0.0.1:8080`
+  - **API da Fish Audio** (paga, com chave): sem GPU; dá pra usar também o ID de uma voz salva na sua conta.
+- ⚠️ **Licença**: os pesos abertos do S2 são "Fish Audio Research License" — **uso comercial (vídeo monetizado) precisa
+  de licença da Fish Audio** (ou usar a API paga, nos termos dela).
+- No site só precisa de `pip install requests msgpack`. A tela mostra se o servidor está no ar.
+
+---
+
 ## 🎬 Flow com janela larga: o Agente em painel (v84_81)
 
 - Com a janela larga o Flow não mostra o chip "Agente": o agente vira um **painel à direita** ("Sessão sem título",

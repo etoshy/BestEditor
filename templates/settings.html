@@ -253,6 +253,24 @@
   <input type="password" name="animepexels_online_api_key" value="" placeholder="apx_…" autocomplete="off">
   {% if config.animepexels_online_api_key %}<label style="font-weight:normal;"><input type="checkbox" name="animepexels_online_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
 
+  <h2 style="margin-top:32px;" id="fish">🐟 Fish Audio S2 (motor de voz: clonagem + tags de emoção)</h2>
+  <p style="color:#666;font-size:0.85rem;">O modelo não roda dentro do site. <b>Local</b>: você sobe o servidor do <a href="https://github.com/fishaudio/fish-speech" target="_blank" rel="noopener">fish-speech</a> (precisa de ~24 GB de VRAM e Linux/WSL) e o site manda o texto pra ele. <b>API</b>: usa a API paga da <a href="https://fish.audio" target="_blank" rel="noopener">Fish Audio</a> com a sua chave. ⚠️ Os pesos abertos do S2 são só pra uso <b>não comercial</b>.</p>
+  <label>Onde roda</label>
+  <select name="fish_modo">
+    <option value="local" {% if config.fish_modo != 'nuvem' %}selected{% endif %}>Servidor local (fish-speech)</option>
+    <option value="nuvem" {% if config.fish_modo == 'nuvem' %}selected{% endif %}>API da Fish Audio (paga)</option>
+  </select>
+  <label>Endereço do servidor local</label>
+  <input type="text" name="fish_url" value="{{ config.fish_url }}" placeholder="http://127.0.0.1:8080">
+  <label>Chave do servidor local (só se subiu com <code>--api-key</code>) {% if config.fish_api_key_local %}<span style="font-weight:normal;color:#15803d;">(✔ salva: …{{ config.fish_api_key_local[-4:] }} — em branco mantém)</span>{% endif %}</label>
+  <input type="password" name="fish_api_key_local" value="" autocomplete="off">
+  {% if config.fish_api_key_local %}<label style="font-weight:normal;"><input type="checkbox" name="fish_api_key_local_apagar" style="width:auto;"> apagar essa chave</label>{% endif %}
+  <label>Modelo na API da Fish Audio</label>
+  <select name="fish_modelo">{% for m in ['s2-pro', 's2.1-pro', 's1'] %}<option {% if config.fish_modelo == m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select>
+  <label>Chave da API da Fish Audio {% if config.fish_api_key %}<span style="font-weight:normal;color:#15803d;">(✔ salva: …{{ config.fish_api_key[-4:] }} — em branco mantém)</span>{% endif %}</label>
+  <input type="password" name="fish_api_key" value="" autocomplete="off">
+  {% if config.fish_api_key %}<label style="font-weight:normal;"><input type="checkbox" name="fish_api_key_apagar" style="width:auto;"> apagar a chave salva</label>{% endif %}
+
   <button type="submit">Salvar configurações</button>
 </form>
 

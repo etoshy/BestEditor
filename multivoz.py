@@ -29,9 +29,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO = os.path.join(_AQUI, "vozes_multi.json")
 _TRAVA = threading.Lock()
-MOTORES = ("piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro")
+MOTORES = ("piper", "xtts", "chatterbox", "chatterbox_turbo", "kokoro", "fish_s2")
 CHAVES_CONFIG = ("voz", "idioma", "velocidade", "vozPerfil", "xttsCheckpoint", "chatterboxExaggeration",
-                 "chatterboxCfgWeight", "kokoroVariante", "kokoroPrecisao", "usarGpu")
+                 "chatterboxCfgWeight", "kokoroVariante", "kokoroPrecisao", "usarGpu", "fishReferenceId", "fishTemperatura")
 _RE_TAG = re.compile(r"\[\s*([^\[\]\n]{1,40}?)\s*\]\s*:?\s*")
 GENEROS = {"masculino": "masculina", "feminino": "feminina", "neutro": "neutra/indefinida"}
 GENERO_EN = {"masculino": "male", "feminino": "female", "neutro": "neutral"}
@@ -198,8 +198,8 @@ def _tags_extras() -> set:
     if pasta not in sys.path:
         sys.path.insert(0, pasta)
     try:
-        from tts.voice_generator import CHATTERBOX_TURBO_TAGS
-        return set(CHATTERBOX_TURBO_TAGS)
+        from tts.voice_generator import CHATTERBOX_TURBO_TAGS, FISH_TAGS_CONHECIDAS
+        return set(CHATTERBOX_TURBO_TAGS) | set(FISH_TAGS_CONHECIDAS)
     except Exception:  # noqa: BLE001
         return set()
 
@@ -238,8 +238,8 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
             fecha()
             atual = s
             pos = m.end()
-        elif bruto.lower() in extras:
-            continue  # tag do Chatterbox Turbo: fica no texto
+        elif bruto.lower() in extras or " " in bruto.strip():
+            continue  # tag de emoção (Chatterbox Turbo / Fish S2, ex.: [excited], [whisper in small voice]): fica no texto
         else:
             desconhecidas.append(bruto)
     buf += (texto or "")[pos:]
@@ -312,7 +312,7 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
                 motor, kw, quem = motor_padrao, kwargs_padrao, "voz padrão"
             log(f"[{k}/{len(d['falas'])}] {quem} ({motor}): \"{f['texto'][:60]}\"")
             bruto = os.path.join(pasta, f"f{k:04d}_bruto.wav")
-            gerar_fn(motor, limpar_fn(f["texto"], motor == "chatterbox_turbo"), bruto, **kw)
+            gerar_fn(motor, limpar_fn(f["texto"], motor), bruto, **kw)
             wav = os.path.join(pasta, f"f{k:04d}.wav")
             _wav_padrao(bruto, wav)
             arquivos.append(wav)
