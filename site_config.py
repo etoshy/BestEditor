@@ -280,6 +280,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "fish_modelo": "s2-pro",
     "fish_api_key": "",        # chave da API da Fish Audio (modo nuvem) — pessoal, fica só no site_config.json
     "fish_api_key_local": "",  # --api-key do servidor local, se você subiu ele com uma
+    # 🔎 IA do Google (app ia_google/, à parte): porta e quando o agente do YouTube usa ela pra achar o momento
+    "ia_google_porta": 8852,
+    "ia_google_youtube": "complemento",  # complemento (sem legenda / a legenda não achou) | sempre | desligado
 }
 
 
@@ -337,7 +340,7 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
     if current["clip_trim_position"] not in VALID_TRIM_POSITIONS:
         raise SiteConfigError(f"clip_trim_position precisa ser um de {VALID_TRIM_POSITIONS}, recebi {current['clip_trim_position']!r}.")
 
-    if current.get("aspect_fill", "black") not in ("black", "mosaic", "zoom", "smart"):
+    if current.get("aspect_fill", "black") not in ("black", "mosaic", "zoom", "smart", "cartao"):
         raise SiteConfigError("aspect_fill precisa ser black, mosaic ou zoom.")
     try:
         trim_frames = int(current.get("trim_start_frames", 10))
@@ -406,6 +409,14 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
         raise SiteConfigError(f"buscadores_proporcao precisa ser um de {_props}, recebi {current.get('buscadores_proporcao')!r}.")
     if current.get("flow_modo_automacao") not in ("direto", "antigo"):
         current["flow_modo_automacao"] = "direto"
+    if current.get("ia_google_youtube") not in ("complemento", "sempre", "desligado"):
+        current["ia_google_youtube"] = "complemento"
+    try:
+        current["ia_google_porta"] = int(current.get("ia_google_porta") or 8852)
+        if not 1024 <= current["ia_google_porta"] <= 65535:
+            raise ValueError
+    except (TypeError, ValueError):
+        current["ia_google_porta"] = 8852
     if current.get("fish_modo") not in ("local", "nuvem"):
         current["fish_modo"] = "local"
     _fu = str(current.get("fish_url") or "").strip().rstrip("/")

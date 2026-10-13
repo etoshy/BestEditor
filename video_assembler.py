@@ -27,6 +27,7 @@ import concurrent.futures
 import importlib
 import json
 import os
+import tempfile
 import re
 import shutil
 import subprocess
@@ -36,7 +37,7 @@ import time
 import uuid
 from contextlib import nullcontext
 from dataclasses import replace
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "toolkit"))
 
@@ -974,6 +975,8 @@ def _normalize_clip(
     borda, fundo, fonte). Sem isso, usa o visual padrão de sempre.
     """
     input_duration = _probe_duration(input_path)
+    if aspect_fill == "cartao":  # 🪧 cartão sobre fundo é pra IMAGEM; vídeo de outra proporção fica no mosaico
+        aspect_fill = "mosaic"
     if aspect_fill not in ("black", "zoom", "mosaic", "smart"):
         aspect_fill = "black"
     if aspect_fill == "smart":
@@ -1945,6 +1948,169 @@ _ZOOM_DIRECTIONS_VALIDAS = {"in", "out", "pan_left", "pan_right", "pan_up", "pan
                             "rapido", "zoom_pan_left", "zoom_pan_right", "zoom_pan_up", "giro", "respiro"}
 
 
+# ------------------------------------------------------------------ 🪧 cartão sobre fundo (v84_85)
+FUNDOS_CARTAO = ("cor_gradiente", "luz", "nevoa", "grade", "ondas", "grade_ondulada", "grade_3d", "pontos", "linhas", "papel")
+
+
+def proporcao_diferente(image_path: str, W: int, H: int) -> bool:
+    """A imagem tem proporção BEM diferente do vídeo (a mesma regra das bordas pretas/mosaico)?"""
+    try:
+        from PIL import Image
+        with Image.open(image_path) as im:
+            iw, ih = im.size
+    except Exception:  # noqa: BLE001
+        return False
+    if iw < 2 or ih < 2:
+        return False
+    r = (iw / ih) / (W / H)
+    return not (0.88 <= r <= 1.14)
+
+
+def preparar_fundo_cartao(conf: Optional[Dict[str, Any]], W: int, H: int, pasta: str,
+                          baixar_video: Optional[Callable[[str], Optional[str]]] = None) -> Dict[str, Any]:
+    """O fundo que roda atrás dos cartões. conf = {"modo": "gerado"|"video", "estilo", "cor", "video_path", "busca",
+    "desfocar", "escurecer"}. Vídeo que não deu (sem arquivo / a busca falhou) → fundo gerado."""
+    conf = conf if isinstance(conf, dict) else {}
+    os.makedirs(pasta, exist_ok=True)
+    if conf.get("modo") == "video":
+        p = conf.get("video_path")
+        if (not p or not os.path.isfile(p)) and conf.get("busca") and baixar_video:
+            try:
+                p = baixar_video(str(conf["busca"]))
+            except Exception as exc:  # noqa: BLE001
+                print(f"[montagem] fundo dos cartões: a busca '{conf.get('busca')}' falhou ({exc}) — uso o fundo gerado", flush=True)
+                p = None
+        if p and os.path.isfile(p):
+            try:
+                dur = _probe_duration(p)
+            except Exception:  # noqa: BLE001
+                dur = 0.0
+            if dur and dur > 0.5:
+                def _num(k, padrao, a, b):
+                    try:
+                        return max(a, min(b, float(conf.get(k, padrao))))
+                    except (TypeError, ValueError):
+                        return padrao
+                return {"tipo": "video", "path": p, "dur": float(dur), "desfocar": _num("desfocar", 4.0, 0.0, 30.0),
+                        "escurecer": _num("escurecer", 0.15, 0.0, 0.6)}
+    estilo = conf.get("estilo") if conf.get("estilo") in FUNDOS_CARTAO else "cor_gradiente"
+    cor = conf.get("cor") if re.fullmatch(r"#[0-9a-fA-F]{6}", str(conf.get("cor") or "")) else "#3C5082"
+    import cenas_dp
+    return {"tipo": "gerado", "png": cenas_dp._fundo_desenhado(estilo, W * 2, H * 2, pasta, cor)}
+
+
+def _cartao_png(image_path: str, W: int, H: int) -> str:
+    """A imagem como um CARTÃO: cantos arredondados + sombra, no tamanho que cabe no vídeo (78% × 84%)."""
+    from PIL import Image, ImageDraw, ImageFilter
+    with Image.open(image_path) as im0:
+        im = im0.convert("RGB")
+    iw, ih = im.size
+    esc = min(W * 0.78 / iw, H * 0.84 / ih)
+    cw, ch = max(4, int(iw * esc)), max(4, int(ih * esc))
+    card = im.resize((cw, ch), Image.LANCZOS)
+    raio = max(6, int(min(cw, ch) * 0.035))
+    pad = max(8, int(H * 0.045))
+    tela = Image.new("RGBA", (cw + 2 * pad, ch + 2 * pad), (0, 0, 0, 0))
+    sombra = Image.new("L", tela.size, 0)
+    ImageDraw.Draw(sombra).rounded_rectangle((pad, pad + pad // 3, pad + cw, pad + ch + pad // 3), raio, fill=150)
+    sombra = sombra.filter(ImageFilter.GaussianBlur(pad / 2.2))
+    tela.paste((0, 0, 0, 255), (0, 0), sombra)
+    mascara = Image.new("L", (cw, ch), 0)
+    ImageDraw.Draw(mascara).rounded_rectangle((0, 0, cw - 1, ch - 1), raio, fill=255)
+    tela.paste(card, (pad, pad), mascara)
+    destino = os.path.join(tempfile.gettempdir(), f"_cartao_{uuid.uuid4().hex[:10]}.png")
+    tela.save(destino)
+    return destino
+
+
+def _render_imagem_cartao(image_path: str, duration: float, output_path: str, W: int, H: int, fundo: Dict[str, Any],
+                          t0: float = 0.0, on_screen_text: Optional[str] = None,
+                          on_screen_text_style: Optional[Dict[str, Any]] = None) -> str:
+    """🪧 A imagem como cartão (cantos arredondados + sombra) por cima de um fundo em movimento — fundo gerado
+    (que deriva devagar) ou um clipe de vídeo em loop. O movimento do fundo segue o tempo do VÍDEO (`t0` = início
+    do trecho): cartões seguidos parecem passar sobre o MESMO fundo, sem pulo. O cartão sobe de leve e aparece
+    (0,45 s) e fica flutuando."""
+    image_path = garantir_imagem_compativel(image_path)
+    fps = TARGET_FPS
+    frames = max(1, round(duration * fps))
+    card = _cartao_png(image_path, W, H)
+    try:
+        if fundo.get("tipo") == "video":
+            ss = float(t0) % max(0.5, float(fundo["dur"]))
+            entradas = ["-stream_loop", "-1", "-ss", f"{ss:.3f}", "-i", fundo["path"]]
+            bg = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,fps={fps}"
+                  + (f",gblur=sigma={fundo['desfocar']:.1f}" if fundo.get("desfocar") else "")
+                  + (f",eq=brightness=-{fundo['escurecer']:.2f}" if fundo.get("escurecer") else "") + ",format=yuv420p[bg]")
+        else:
+            Tz = f"({float(t0):.3f}+on/{fps})"
+            entradas = ["-loop", "1", "-i", fundo["png"]]
+            bg = (f"[0:v]zoompan=z='1.10+0.04*sin({Tz}/5)':x='(iw-iw/zoom)*(0.5+0.45*sin({Tz}/9))':"
+                  f"y='(ih-ih/zoom)*(0.5+0.45*cos({Tz}/11))':d={frames}:s={W}x{H}:fps={fps},setsar=1,format=yuv420p[bg]")
+        entradas += ["-loop", "1", "-i", card]
+        T = f"(t+{float(t0):.3f})"
+        e = "min(1,t/0.45)"
+        x = f"(W-w)/2+{W * 0.006:.1f}*sin(2*PI*{T}/8)"
+        y = f"(H-h)/2+{H * 0.06:.1f}*pow(1-{e},3)+{H * 0.012:.1f}*sin(2*PI*{T}/6)"
+        grafo = [bg, "[1:v]format=rgba,fade=t=in:st=0:d=0.35:alpha=1[cd]", f"[bg][cd]overlay=x='{x}':y='{y}':eval=frame,setsar=1[v]"]
+        saida = "[v]"
+        if on_screen_text:
+            grafo.append("[v]" + _build_drawtext_filter(on_screen_text, H, on_screen_text_style, duration=duration) + "[vt]")
+            saida = "[vt]"
+        _run_ffmpeg(entradas + ["-filter_complex", ";".join(grafo), "-map", saida, "-t", f"{duration:.3f}", "-r", str(fps),
+                                "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-an", output_path])
+    finally:
+        try:
+            os.remove(card)
+        except OSError:
+            pass
+    return output_path
+
+
+def _compor_imagem_nas_bordas(image_path: str, W: int, H: int, aspect_fill: Optional[str]):
+    """Imagem com proporção BEM diferente do vídeo + bordas "black"/"mosaic"/"smart": monta (2× o tamanho final,
+    pro zoom não pixelar) a imagem INTEIRA encaixada no centro, com fundo preto (black) ou um mosaico desfocado
+    dela mesma (mosaic/smart — igual ao dos vídeos). Devolve (caminho_png, mapa_do_foco) ou None (= preencher
+    cortando, como sempre: bordas "zoom" ou proporção parecida)."""
+    if aspect_fill not in ("black", "mosaic", "smart"):
+        return None
+    try:
+        from PIL import Image, ImageEnhance, ImageFilter
+        with Image.open(image_path) as im0:
+            im = im0.convert("RGB")
+    except Exception:  # noqa: BLE001
+        return None
+    iw, ih = im.size
+    if iw < 2 or ih < 2:
+        return None
+    razao = (iw / ih) / (W / H)
+    if 0.88 <= razao <= 1.14:  # quase a mesma proporção: preencher cortando perde pouco
+        return None
+    CW, CH = W * 2, H * 2
+    esc = min(CW / iw, CH / ih)
+    fw, fh = max(2, int(iw * esc)), max(2, int(ih * esc))
+    frente = im.resize((fw, fh), Image.LANCZOS)
+    if aspect_fill == "black":
+        fundo = Image.new("RGB", (CW, CH), (0, 0, 0))
+    else:
+        tw, th = CW // 2, CH // 2
+        e2 = max(tw / iw, th / ih)
+        lad = im.resize((max(tw, int(iw * e2) + 1), max(th, int(ih * e2) + 1)), Image.LANCZOS)
+        lx, ly = (lad.width - tw) // 2, (lad.height - th) // 2
+        lad = lad.crop((lx, ly, lx + tw, ly + th))
+        fundo = Image.new("RGB", (CW, CH))
+        for x, y in ((0, 0), (tw, 0), (0, th), (tw, th)):
+            fundo.paste(lad, (x, y))
+        fundo = ImageEnhance.Brightness(fundo.filter(ImageFilter.GaussianBlur(radius=max(12, CH // 40)))).enhance(0.7)
+    ox, oy = (CW - fw) // 2, (CH - fh) // 2
+    fundo.paste(frente, (ox, oy))
+    destino = os.path.join(tempfile.gettempdir(), f"_img_bordas_{uuid.uuid4().hex[:10]}.png")
+    fundo.save(destino)
+
+    def foco(fx: float, fy: float):
+        return (max(0.0, min(1.0, (ox + fx * fw) / CW)), max(0.0, min(1.0, (oy + fy * fh) / CH)))
+    return destino, foco
+
+
 def _render_image_with_ken_burns(
     image_path: str,
     duration: float,
@@ -1960,6 +2126,7 @@ def _render_image_with_ken_burns(
     fade_out: bool = False,
     fade_duration: float = 0.5,
     blur_sigma: float = 0.0,
+    aspect_fill: Optional[str] = None,
 ) -> str:
     """Transforma uma imagem parada num clipe de `duration` segundos com
     uma animação de câmera (ou nenhuma), no mesmo formato dos clipes de
@@ -2004,9 +2171,17 @@ def _render_image_with_ken_burns(
 
     fps = TARGET_FPS
     total_frames = max(1, round(duration * fps))
-    max_zoom = 1.4
+    # 🖼 v84_84: imagem de proporção bem diferente do vídeo (capa de livro em pé num vídeo 16:9…) respeita as
+    # BORDAS escolhidas (pretas / mosaico): a imagem inteira aparece encaixada, e a câmera mexe pouco. Antes ela
+    # sempre era cortada pra preencher a tela (+ zoom de até 40%) — sobrava só um pedaço gigante da imagem.
+    k_mov = 1.0
+    composta = _compor_imagem_nas_bordas(image_path, target_width, target_height, aspect_fill)
+    if composta:
+        image_path, (focus_x, focus_y) = composta[0], composta[1](focus_x, focus_y)
+        k_mov = 0.35
+    max_zoom = 1.0 + 0.4 * k_mov
     zoom_step = (max_zoom - 1.0) / total_frames
-    pan_zoom = 1.15  # zoom fixo pros modos "pan_*" -- só o suficiente pra sobrar imagem nas bordas pra deslizar
+    pan_zoom = 1.0 + 0.15 * k_mov  # zoom fixo pros modos "pan_*" -- só o suficiente pra sobrar imagem nas bordas pra deslizar
 
     if zoom_direction == "in":
         zoom_expr = f"min(zoom+{zoom_step:.6f},{max_zoom})"
@@ -2022,14 +2197,15 @@ def _render_image_with_ken_burns(
         y_expr = f"(ih-ih/zoom)*{focus_y:.3f}"
     elif zoom_direction in ("rapido", "giro", "respiro", "zoom_pan_left", "zoom_pan_right", "zoom_pan_up"):
         prog = f"((on-1)/{max(1, total_frames - 1)})"
+        k = k_mov
         if zoom_direction == "rapido":  # zoom forte no começo e segura
-            zoom_expr = f"1+0.5*(1-pow(1-min(1,{prog}*2.5),3))"
+            zoom_expr = f"1+{0.5 * k:.3f}*(1-pow(1-min(1,{prog}*2.5),3))"
         elif zoom_direction == "respiro":  # aproxima e volta, suave
-            zoom_expr = f"1.06+0.1*sin(PI*{prog})"
+            zoom_expr = f"{1 + 0.06 * k:.3f}+{0.1 * k:.3f}*sin(PI*{prog})"
         elif zoom_direction == "giro":
-            zoom_expr = f"1.2+0.15*{prog}"
+            zoom_expr = f"{1 + 0.2 * k:.3f}+{0.15 * k:.3f}*{prog}"
         else:
-            zoom_expr = f"1.12+0.2*{prog}"
+            zoom_expr = f"{1 + 0.12 * k:.3f}+{0.2 * k:.3f}*{prog}"
         x_expr = f"(iw-iw/zoom)*{focus_x:.3f}"
         y_expr = f"(ih-ih/zoom)*{focus_y:.3f}"
         if zoom_direction == "zoom_pan_left":
@@ -2088,13 +2264,20 @@ def _render_image_with_ken_burns(
     if on_screen_text:
         filters.append(_build_drawtext_filter(on_screen_text, target_height, on_screen_text_style, duration=duration))
 
-    _run_ffmpeg([
-        "-loop", "1", "-i", image_path,
-        "-vf", ",".join(filters),
-        "-t", f"{duration:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-        output_path,
-    ])
+    try:
+        _run_ffmpeg([
+            "-loop", "1", "-i", image_path,
+            "-vf", ",".join(filters),
+            "-t", f"{duration:.3f}",
+            "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+            output_path,
+        ])
+    finally:
+        if composta:
+            try:
+                os.remove(composta[0])
+            except OSError:
+                pass
     return output_path
 
 
@@ -3082,7 +3265,7 @@ def _resolve_override_source(override: Dict[str, Any], downloads_dir: str, get_c
 # ------------------------------------------------------------------ #
 _PREBAIXADOS_LOCK = threading.Lock()
 PREBAIXADOS_INDICE = "indice.json"
-CLIPES_PRONTOS_VERSAO = 1  # suba quando o jeito de cortar/normalizar mudar (invalida os clipes guardados)
+CLIPES_PRONTOS_VERSAO = 2  # v84_84/85: imagem nas bordas, entradas corrigidas, cartão sobre fundo — suba quando o jeito de cortar/normalizar mudar (invalida os clipes guardados)
 _TRAVAS_CHAVE: Dict[str, Any] = {}
 
 
@@ -3809,6 +3992,7 @@ def assemble_video(
                         fade_out=getattr(segment, "image_fade_out", False),
                         fade_duration=getattr(segment, "image_fade_duration", 0.5),
                         blur_sigma=override.get("blur_sigma", segment.blur_sigma),
+                        aspect_fill=getattr(segment, "aspect_fill", None),
                     )
                 else:
                     _normalize_clip(raw_path, segment.duration, normalized_path, target_width, target_height, on_screen_text=segment.on_screen_text, aspect_fill=segment.aspect_fill, trim_start_frames=getattr(segment, "trim_start_frames", 0), blur_sigma=segment.blur_sigma)
@@ -3936,8 +4120,29 @@ def assemble_video(
         "v": CLIPES_PRONTOS_VERSAO, "w": target_width, "h": target_height, "trim": trim_position,
         "ori": search_orientation, "prio": list(provider_priority or []), "mof": magnific_only_free,
         "completar": cfg.get("completar_trecho_curto", "repetir"), "paleta": paleta, "qe": _estado_qe,
-        "rep": cfg.get("evitar_repeticao_clipes", True),
+        "rep": cfg.get("evitar_repeticao_clipes", True), "cartao": cfg.get("cartao_fundo"),
     }
+    # 🪧 fundo dos cartões: preparado UMA vez (o clipe de fundo é baixado uma vez só) e dividido entre os trechos
+    _fundo_cartao_estado: Dict[str, Any] = {}
+    _fundo_cartao_trava = threading.Lock()
+
+    def _fundo_cartao(fabrica) -> Dict[str, Any]:
+        with _fundo_cartao_trava:
+            if "f" not in _fundo_cartao_estado:
+                pasta_fc = os.path.join(work_dir, "fundo_cartao")
+
+                def _baixar(q: str) -> Optional[str]:
+                    for prov in [p for p in provider_priority if p not in BIBLIOTECAS_LOCAIS][:3]:
+                        try:
+                            seg_fc = VideoSegment(start=0.0, end=12.0, provider=prov, query=q, media_type="video")
+                            return _run_with_timeout(lambda: _search_and_download_one(seg_fc, pasta_fc, fabrica.get_client(prov),
+                                                                                       orientation=orientation),
+                                                     max(30, cfg.get("provider_attempt_timeout_seconds", 25) * 2))
+                        except Exception as exc:  # noqa: BLE001
+                            print(f"[montagem] fundo dos cartões: {prov} não trouxe '{q}' ({exc})", flush=True)
+                    return None
+                _fundo_cartao_estado["f"] = preparar_fundo_cartao(cfg.get("cartao_fundo"), target_width, target_height, pasta_fc, _baixar)
+            return _fundo_cartao_estado["f"]
 
     def _arquivo_id(valor: Any) -> Any:
         # arquivo do PC/gerado: o mesmo caminho com outro conteúdo não pode reaproveitar
@@ -4139,16 +4344,22 @@ def assemble_video(
                     _zoom = override.get("zoom_direction", segment.zoom_direction)
                     if _dp_visual.efeito_e_movimento(getattr(segment, "efeito", None)):
                         _zoom = _dp_visual.EFEITO_PARA_ZOOM[segment.efeito]  # efeito de câmera do DarkPlanner manda
-                    _render_image_with_ken_burns(
-                        raw_paths[0], alvo_duracao, normalized_path, target_width, target_height,
-                        zoom_direction=_zoom,
-                        focus_x=override.get("focus_x", segment.focus_x), focus_y=override.get("focus_y", segment.focus_y),
-                        on_screen_text=segment.on_screen_text, on_screen_text_style=segment.on_screen_text_style,
-                        fade_in=getattr(segment, "image_fade_in", False),
-                        fade_out=getattr(segment, "image_fade_out", False),
-                        fade_duration=getattr(segment, "image_fade_duration", 0.5),
-                        blur_sigma=override.get("blur_sigma", segment.blur_sigma),
-                    )
+                    if getattr(segment, "aspect_fill", None) == "cartao" and proporcao_diferente(raw_paths[0], target_width, target_height):
+                        _render_imagem_cartao(raw_paths[0], alvo_duracao, normalized_path, target_width, target_height,
+                                              _fundo_cartao(worker_factory), t0=segment.start, on_screen_text=segment.on_screen_text,
+                                              on_screen_text_style=segment.on_screen_text_style)
+                    else:
+                        _render_image_with_ken_burns(
+                            raw_paths[0], alvo_duracao, normalized_path, target_width, target_height,
+                            zoom_direction=_zoom,
+                            focus_x=override.get("focus_x", segment.focus_x), focus_y=override.get("focus_y", segment.focus_y),
+                            on_screen_text=segment.on_screen_text, on_screen_text_style=segment.on_screen_text_style,
+                            fade_in=getattr(segment, "image_fade_in", False),
+                            fade_out=getattr(segment, "image_fade_out", False),
+                            fade_duration=getattr(segment, "image_fade_duration", 0.5),
+                            blur_sigma=override.get("blur_sigma", segment.blur_sigma),
+                            aspect_fill=getattr(segment, "aspect_fill", None),
+                        )
                 elif len(raw_paths) > 1:
                     # busca automática trouxe mais de uma cena diferente
                     # pra completar a duração do segmento (em vez de
@@ -4264,7 +4475,10 @@ def assemble_video(
         normalized_paths = _aplicar_gestos(
             segments, normalized_paths, duracoes_alvo, plano_transicoes, ultimo_do_grupo,
             target_width, target_height, clips_dir, work_dir, concurrency,
-            em_cena={k for (g_a, g_b, g_t) in grupos if g_t for k in range(g_a, g_b + 1)},
+            em_cena={k for (g_a, g_b, g_t) in grupos if g_t for k in range(g_a, g_b + 1)}
+            # 🪧 foto em cartão: o próprio cartão já entra (sobe + aparece); o gesto mexeria o FUNDO junto
+            | {k for k, sg in enumerate(segments) if getattr(sg, "aspect_fill", None) == "cartao"
+               and ((sg.override_source or {}).get("kind") or sg.media_type) == "image"},
         )
 
     # junta os takes de cada cena com template num clipe só

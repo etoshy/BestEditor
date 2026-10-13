@@ -49,15 +49,7 @@ def registrar(app, base_dir: str) -> None:
         ia.salvar_config(novos)
         return _pagina(salvo=not aviso, aviso=aviso)
 
-    @app.route("/ia/gerar", methods=["POST"])
-    def ia_gerar():
-        """📝 Manda um prompt de roteiro (Modelos de vídeo, Venda, Roteiro do YouTube, Modelados) pra IA e devolve o texto."""
-        motivo = ia.motivo_desligado("roteiros")
-        if motivo:
-            return jsonify({"erro": "IA: " + motivo + " — ligue em 🤖 IA nas buscas e modelos."}), 400
-        prompt = str((request.get_json(silent=True) or {}).get("prompt") or "")
-        if not prompt.strip():
-            return jsonify({"erro": "O prompt veio vazio."}), 400
+    def _gerar_roteiro(prompt: str) -> str:
         system = "Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois, sem ``` em volta."
         import re
         import idiomas
@@ -70,7 +62,33 @@ def registrar(app, base_dir: str) -> None:
                        f"Translate the facts faithfully. Keep the JSON keys exactly as in the example.")
         texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=64000, effort="medium", timeout=900)
         if not texto:
-            return jsonify({"erro": "A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja as últimas chamadas em 🤖 IA") + ")."}), 200
+            raise RuntimeError("A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja as últimas chamadas em 🤖 IA") + ").")
+        return texto
+
+    @app.route("/ia/gerar", methods=["POST"])
+    def ia_gerar():
+        """📝 Manda um prompt de roteiro (Modelos de vídeo, Venda, Roteiro do YouTube, Modelados) pra IA e devolve o texto.
+        Com "bg": true roda em SEGUNDO PLANO (v84_87): devolve o id da tarefa — pode fechar a aba; ao voltar na página
+        a resposta é colada sozinha (e chega um aviso no 🔔)."""
+        motivo = ia.motivo_desligado("roteiros")
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo + " — ligue em 🤖 IA nas buscas e modelos."}), 400
+        corpo = request.get_json(silent=True) or {}
+        prompt = str(corpo.get("prompt") or "")
+        if not prompt.strip():
+            return jsonify({"erro": "O prompt veio vazio."}), 400
+        if corpo.get("bg"):
+            import tarefas_bg
+            alvo = {k: str(v)[:80] for k, v in (corpo.get("alvo") or {}).items() if k in ("resp", "ler", "prompt", "botao")} \
+                if isinstance(corpo.get("alvo"), dict) else {}
+            titulo = "🤖 " + (str(corpo.get("titulo") or "").strip()[:120] or "Roteiro pela IA")
+            tid = tarefas_bg.iniciar("ia_gerar", titulo, lambda t: {"texto": _gerar_roteiro(prompt)},
+                                     pagina=str(corpo.get("pagina") or ""), alvo=alvo)
+            return jsonify({"ok": True, "tarefa": tid})
+        try:
+            texto = _gerar_roteiro(prompt)
+        except RuntimeError as exc:
+            return jsonify({"erro": str(exc)}), 200
         return jsonify({"ok": True, "texto": texto})
 
     @app.route("/ia/testar", methods=["POST"])

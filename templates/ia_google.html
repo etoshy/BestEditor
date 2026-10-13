@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}IA do Google{% endblock %}
+{% block content %}
+<style>
+  body { max-width: none; margin: 20px 16px; }
+  #igFrame { width: 100%; height: calc(100vh - 190px); min-height: 600px; border: 1px solid #ddd; border-radius: 10px; background: #fff; }
+  .hint { font-size: .85rem; color: #666; }
+</style>
+<h1 style="margin:0 0 6px;">🔎 IA do Google</h1>
+<p class="hint" style="margin:0 0 4px;">Pesquisa no <b>Modo IA do Google</b> por um navegador automatizado: chat com fontes e análise de vídeos do
+  YouTube (resumo, achar momentos, capítulos, checar fatos…). Roda como um app à parte (porta {{ porta }}) dentro desta aba.
+  <span id="igEstado">⏳ ligando…</span> · <a id="igAbrir" href="#" target="_blank" rel="noopener">abrir em outra aba ↗</a></p>
+<p class="hint" style="margin:0 0 8px;">No site ela entra em: 🎬 <b>agente do YouTube</b> (acha o momento "assistindo" o vídeo —
+  {% if modo == 'sempre' %}<b>sempre</b>{% elif modo == 'desligado' %}<b>desligado</b>{% else %}quando o vídeo não tem legenda ou a legenda não achou{% endif %};
+  mude em <a href="{{ url_for('settings_page') }}#ia-google">⚙️ Configurações</a>) e ✅ <b>Checar fatos</b> no Roteiro do YouTube.
+  Se aparecer captcha, resolva na janela do navegador dela.</p>
+{% if not instalado %}<div class="aviso">A pasta <code>ia_google/</code> não está no site.</div>{% endif %}
+<div id="igCaptcha" style="display:none;background:#fef3c7;border:1px solid #f59e0b;color:#78350f;padding:10px 14px;border-radius:8px;margin:0 0 8px;font-weight:600;">
+  🔒 O Google pediu um <b>captcha</b> — a janela do navegador da IA abriu <b>visível</b> (mesmo se estava oculta). Resolva o “não sou um robô” nela; a pesquisa continua sozinha.</div>
+<iframe id="igFrame" title="IA do Google"></iframe>
+<script>
+(function () {
+  const url = location.protocol + '//' + location.hostname + ':{{ porta }}/';
+  const est = document.getElementById('igEstado'); document.getElementById('igAbrir').href = url;
+  let tentativas = 0;
+  async function checar() {
+    try {
+      const d = await (await fetch('{{ url_for("ia_google_status") }}')).json();
+      if (d.no_ar) { est.textContent = '✅ no ar'; const f = document.getElementById('igFrame'); if (!f.src) f.src = url;
+        document.getElementById('igCaptcha').style.display = d.captcha ? 'block' : 'none'; setTimeout(checar, 5000); return; }
+      if (d.morreu) { est.textContent = '❌ fechou sozinho — ' + (d.log ? 'veja o log: ' + d.log.slice(-400) : 'confira: pip install -r ia_google/requirements.txt'); return; }
+    } catch (_) { /* tenta de novo */ }
+    tentativas++; est.textContent = '⏳ ligando… (' + tentativas + ')';
+    if (tentativas < 60) setTimeout(checar, 1000); else est.textContent = '⚠ não subiu em 1 minuto — veja ia_google/ia_google.log';
+  }
+  fetch('{{ url_for("ia_google_iniciar") }}', { method: 'POST' }).then(r => r.json()).then(d => {
+    if (!d.ok) { est.textContent = '❌ ' + (d.erro || 'não deu pra ligar'); return; } checar();
+  }).catch(e => { est.textContent = '❌ ' + e.message; });
+})();
+</script>
+{% endblock %}

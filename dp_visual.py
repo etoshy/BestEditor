@@ -545,12 +545,15 @@ def cadeia_gesto(entrada: Optional[str], saida: Optional[str], dur: float, W: in
             filtros_g.append(f"split=2[nb{k}][bb{k}];[bb{k}]gblur=sigma={max(8, H // 40)},format=yuva420p,fade=t={tipo}:st={st:.3f}:d={d:.3f}:alpha=1[bb{k}2];[nb{k}][bb{k}2]overlay=format=auto")
         if g["lag"]:
             filtros_g.append(f"lagfun=decay=0.93:enable='{jan}'")
+    gira = any(_gesto(gid, p, W, H)["r"] not in ("", "0") for (_k, gid, _d, p, _jan) in gestos)
+    if gira:
+        # ⚠ a rotação vem ANTES da escala: o "rotate" fixa o tamanho de saída no 1º quadro — depois de uma escala
+        # que muda a cada quadro, ele cortava a imagem no tamanho do começo do gesto (ficava pequena o clipe todo)
+        filtros_g.append(f"format=yuva420p,rotate=a='{r}':c=black@0:ow='iw':oh='ih'")
     if geo:
         filtros_g.append(
             f"scale=w='max(2,trunc({W}*({sxe})/2)*2)':h='max(2,trunc({H}*({sye})/2)*2)':eval=frame"
         )
-        if r != "0":
-            filtros_g.append(f"rotate=a='{r}':c=black@0:ow='iw':oh='ih'")
     filtros_g.append("format=yuva420p")
     for (k, gid, d, p, jan) in gestos:
         if _gesto(gid, p, W, H)["fade"]:

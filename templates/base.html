@@ -25,7 +25,7 @@
   </style>
 </head>
 <body>
-  <p style="text-align:right;font-size:0.8rem;margin:0 0 10px;">
+  <p style="text-align:right;font-size:0.8rem;margin:0 0 10px;padding-right:48px;">
     <a href="{{ url_for('modelados_page') }}" style="color:#7c3aed;margin-right:14px;font-weight:600;">🎞️ Vídeos modelados</a>
     <a href="{{ url_for('roteiros_yt_page') }}" style="color:#b91c1c;margin-right:14px;font-weight:600;">📜 Roteiro do YouTube</a>
     <a href="{{ url_for('vendas_page') }}" style="color:#047857;margin-right:14px;font-weight:600;">🛒 Vídeo de venda</a>
@@ -33,6 +33,7 @@
     <a href="{{ url_for('analisador_canal_page') }}" style="color:#7c3aed;margin-right:14px;font-weight:600;">📊 Analisador de canal</a>
     <a href="{{ url_for('niche_miner_page') }}" style="color:#a16207;margin-right:14px;font-weight:600;">⛏ Niche Miner</a>
     <a href="{{ url_for('flow_page') }}" style="color:#1d4ed8;margin-right:14px;font-weight:600;">🎬 Google Flow</a>
+    <a href="{{ url_for('ia_google_page') }}" style="color:#0f766e;margin-right:14px;font-weight:600;">🔎 IA do Google</a>
     <a href="{{ url_for('narracoes_page') }}" style="color:#666;margin-right:14px;">📝 Roteiro para Áudio</a>
     <a href="{{ url_for('gerar_voz_page') }}" style="color:#666;margin-right:14px;">🎙️ Gerador de voz</a>
     <a href="{{ url_for('perfis_de_voz_page') }}" style="color:#666;margin-right:14px;">🗣️ Perfis de voz</a>
@@ -42,37 +43,72 @@
     <a href="{{ url_for('extrair_links_canal_page') }}" style="color:#666;margin-right:14px;">🔗 Extrair links de canal</a>
     <a href="{{ url_for('transcrever_page') }}" style="color:#666;margin-right:14px;">📝 Transcrever</a>
     <a href="{{ url_for('contas_google_page') }}" style="color:#666;margin-right:14px;">🔑 Contas Google</a>
-    <a href="{{ url_for('jobs_history_page') }}" style="color:#666;">🗂️ Galeria de projetos</a> · <a href="{{ url_for('textos_avulsos_page') }}" style="color:#666;">🔤 Textos animados</a> · <a href="{{ url_for('guia_page') }}" style="color:#666;">📘 Guia (criar efeitos, transições, destaques…)</a> · <a href="{{ url_for('settings_page') }}" style="color:#666;">⚙️ Configurações</a> · <a href="{{ url_for('espaco_page') }}" style="color:#666;">🧹 Espaço em disco</a> · <a href="{{ url_for('ia_page') }}" style="color:#666;">🤖 IA nas buscas e modelos</a>
+    <a href="{{ url_for('historico_page') }}" style="color:#666;">🕘 Histórico</a> · <a href="{{ url_for('jobs_history_page') }}" style="color:#666;">🗂️ Galeria de projetos</a> · <a href="{{ url_for('textos_avulsos_page') }}" style="color:#666;">🔤 Textos animados</a> · <a href="{{ url_for('guia_page') }}" style="color:#666;">📘 Guia (criar efeitos, transições, destaques…)</a> · <a href="{{ url_for('settings_page') }}" style="color:#666;">⚙️ Configurações</a> · <a href="{{ url_for('espaco_page') }}" style="color:#666;">🧹 Espaço em disco</a> · <a href="{{ url_for('ia_page') }}" style="color:#666;">🤖 IA nas buscas e modelos</a>
   </p>
   {% block content %}{% endblock %}
+  {% include "_sino.html" %}
   <script>
-  // 🤖 botões "Gerar com a IA" (data-ia-gerar): gera o prompt, manda pra IA de /ia e lê a resposta
+  // 🤖 botões "Gerar com a IA" (data-ia-gerar): gera o prompt, manda pra IA de /ia e lê a resposta.
+  // ⏳ v84_87: a IA roda em SEGUNDO PLANO no servidor — pode fechar a aba. Quando terminar chega um aviso no 🔔
+  // e, voltando nesta página, a resposta é colada e lida sozinha.
   (function () {
     const bots = document.querySelectorAll('[data-ia-gerar]');
     if (!bots.length) return;
     let pode = false, motivo = '';
+    const pagina = location.pathname + location.search;
     fetch('/ia/status').then(r => r.json()).then(j => { pode = !!(j.pode && j.pode.roteiros); motivo = j.motivo || 'o recurso “Roteiros direto na IA” está desligado';
       bots.forEach(b => { b.style.display = ''; if (!pode) { b.style.opacity = '.6'; b.title = 'IA desligada: ' + motivo + ' — ligue em 🤖 IA nas buscas e modelos'; } }); }).catch(() => {});
     const el = (id) => id ? document.getElementById(id) : null;
+    const statusDe = (b) => el(b.dataset.iaStatus) || b.nextElementSibling;
+    const dizEm = (b, t) => { const st = statusDe(b); if (st) st.textContent = t; };
+    function aplicar(b, t) {
+      fetch('/tarefas/' + t.id + '/aplicada', { method: 'POST' }).catch(() => {});
+      b.disabled = false;
+      if (t.status !== 'pronto') { dizEm(b, '⚠ ' + (t.erro || 'a IA não respondeu')); return; }
+      const resp = el(b.dataset.iaResp), ler = el(b.dataset.iaLer);
+      if (!resp) { dizEm(b, '⚠ não achei o campo da resposta'); return; }
+      resp.value = (t.resultado || {}).texto || ''; resp.dispatchEvent(new Event('input'));
+      dizEm(b, '✅ resposta da IA colada — lendo…');
+      if (ler) ler.click();
+    }
+    async function acompanhar(b, id) {
+      b.disabled = true;
+      dizEm(b, '🤖 a IA está escrevendo no servidor… pode fechar a aba: quando terminar chega um aviso no 🔔 e, voltando aqui, a resposta é colada sozinha.');
+      while (true) {
+        let t = null;
+        try { const r = await fetch('/tarefas/' + id, { cache: 'no-store' }); if (r.status === 404) { b.disabled = false; dizEm(b, '⚠ a tarefa sumiu'); return; } t = await r.json(); } catch (_) {}
+        if (t && t.status !== 'rodando') { aplicar(b, t); return; }
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
     bots.forEach(b => b.addEventListener('click', async () => {
-      const st = el(b.dataset.iaStatus) || b.nextElementSibling;
-      const diz = (t) => { if (st) st.textContent = t; };
-      if (!pode) { diz('⚠ A IA está desligada (' + motivo + ') — ligue em 🤖 IA nas buscas e modelos (link no topo).'); return; }
-      const pr = el(b.dataset.iaPrompt), resp = el(b.dataset.iaResp), ger = el(b.dataset.iaGerar), ler = el(b.dataset.iaLer);
+      if (!pode) { dizEm(b, '⚠ A IA está desligada (' + motivo + ') — ligue em 🤖 IA nas buscas e modelos (link no topo).'); return; }
+      const pr = el(b.dataset.iaPrompt), ger = el(b.dataset.iaGerar);
       b.disabled = true;
       try {
         const antes = pr ? pr.value : '';
-        if (ger) { diz('📝 gerando o prompt…'); ger.click(); }
+        if (ger) { dizEm(b, '📝 gerando o prompt…'); ger.click(); }
         let t = 0; while (ger && pr && (pr.value === antes || !pr.value.trim()) && t < 60) { await new Promise(r => setTimeout(r, 500)); t++; }
         if (!pr || !pr.value.trim()) throw new Error('não consegui gerar o prompt (veja o aviso ao lado do botão de gerar)');
-        diz('🤖 a IA está escrevendo… (roteiro longo pode levar alguns minutos)');
-        const r = await fetch('/ia/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: pr.value }) });
+        const titulo = (document.querySelector('h1') || {}).textContent || document.title;
+        const r = await fetch('/ia/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: pr.value, bg: true, pagina: pagina, titulo: titulo.trim().slice(0, 100),
+                                 alvo: { resp: b.dataset.iaResp || '', ler: b.dataset.iaLer || '', prompt: b.dataset.iaPrompt || '' } }) });
         const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
-        resp.value = d.texto; resp.dispatchEvent(new Event('input'));
-        diz('✅ resposta da IA colada — lendo…');
-        if (ler) ler.click();
-      } catch (e) { diz('⚠ ' + e.message); } finally { b.disabled = false; }
+        acompanhar(b, d.tarefa);
+      } catch (e) { dizEm(b, '⚠ ' + e.message); b.disabled = false; }
     }));
+    // voltou na página: retoma o que está rodando e cola o que terminou com a aba fechada
+    fetch('/tarefas?tipo=ia_gerar&pendentes=1&limite=20&pagina=' + encodeURIComponent(pagina)).then(r => r.json()).then(d => {
+      const feitos = new Set();
+      (d.tarefas || []).forEach(t => {
+        const b = [...bots].find(x => (x.dataset.iaResp || '') === ((t.alvo || {}).resp || ''));
+        if (!b) return;
+        if (feitos.has(b)) { if (t.status !== 'rodando') fetch('/tarefas/' + t.id + '/aplicada', { method: 'POST' }).catch(() => {}); return; }  // só a mais nova de cada botão
+        feitos.add(b);
+        if (t.status === 'rodando') acompanhar(b, t.id); else aplicar(b, t);
+      });
+    }).catch(() => {});
   })();
   </script>
 </body>

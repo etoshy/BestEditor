@@ -45,32 +45,73 @@
 </style>
 
 <script>
+const esc = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function buscar() {
   const erroBox = document.getElementById('error-box');
   erroBox.style.display = 'none';
   document.getElementById('resultado-box').style.display = 'none';
   const url = document.getElementById('campo-canal').value.trim();
   if (!url) { erroBox.style.display = 'block'; erroBox.textContent = 'Cole o link do canal primeiro.'; return; }
-
-  document.getElementById('carregando').style.display = 'block';
   try {
     const r = await fetch('{{ url_for("extrair_links_canal_buscar") }}', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        url: url,
+        url: url, bg: true,
         tipo: document.getElementById('select-tipo').value,
         ordem: document.getElementById('select-ordem').value,
       }),
     });
     const j = await r.json();
     if (!r.ok) { erroBox.style.display = 'block'; erroBox.textContent = j.erro || 'Falhou.'; return; }
-    mostrarResultado(j);
+    acompanharTarefa(j.tarefa);
   } catch (e) {
     erroBox.style.display = 'block'; erroBox.textContent = e.message;
-  } finally {
-    document.getElementById('carregando').style.display = 'none';
   }
 }
+
+// ⏳ roda no servidor: pode fechar a aba — chega um aviso no 🔔 e o resultado fica no histórico abaixo
+async function acompanharTarefa(id) {
+  const car = document.getElementById('carregando');
+  car.style.display = 'block';
+  car.textContent = '⏳ Buscando no servidor… pode fechar a aba: quando terminar chega um aviso no 🔔 e fica no histórico abaixo.';
+  while (true) {
+    let t = null;
+    try { t = await (await fetch('/tarefas/' + id)).json(); } catch (_) {}
+    if (t && t.status !== 'rodando') {
+      car.style.display = 'none';
+      fetch('/tarefas/' + id + '/aplicada', { method: 'POST' }).catch(() => {});
+      if (t.status === 'pronto') mostrarResultado(t.resultado);
+      else { const e = document.getElementById('error-box'); e.style.display = 'block'; e.textContent = t.erro || 'Falhou.'; }
+      carregarHistorico();
+      return;
+    }
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+
+async function carregarHistorico() {
+  const box = document.getElementById('historico-lista');
+  let d = { tarefas: [] };
+  try { d = await (await fetch('/tarefas?tipo=links_canal&limite=40')).json(); } catch (_) {}
+  box.innerHTML = d.tarefas.length ? d.tarefas.map(t =>
+    '<div class="hist-item" id="t-' + esc(t.id) + '" style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;">' +
+    new Date(t.criado * 1000).toLocaleString('pt-BR') + ' · ' + esc(t.titulo) + ' — <b>' + esc(t.status) + '</b>' +
+    (t.status === 'pronto' ? ' (' + esc((t.resultado || {}).total) + ' links) <button type="button" data-abrir="' + esc(t.id) + '" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">abrir</button>' : '') +
+    (t.erro ? '<div style="color:#b91c1c;">' + esc(String(t.erro).slice(0, 200)) + '</div>' : '') + '</div>').join('')
+    : '<p style="color:#666;font-size:.85rem;">Nada ainda.</p>';
+  box.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => {
+    const t = d.tarefas.find(x => x.id === b.dataset.abrir); if (t) { mostrarResultado(t.resultado); document.getElementById('resultado-box').scrollIntoView({ behavior: 'smooth' }); }
+  });
+  return d.tarefas;
+}
+
+document.addEventListener('DOMContentLoaded', async function () {
+  const ts = await carregarHistorico();
+  const rodando = ts.find(t => t.status === 'rodando');
+  if (rodando) { acompanharTarefa(rodando.id); return; }
+  const novo = ts.find(t => !t.aplicada && t.status !== 'rodando');  // terminou com a aba fechada: mostra
+  if (novo) { if (novo.status === 'pronto') mostrarResultado(novo.resultado); fetch('/tarefas/' + novo.id + '/aplicada', { method: 'POST' }).catch(() => {}); }
+});
 
 function mostrarResultado(j) {
   document.getElementById('resumo').textContent = `${j.total} link(s) encontrado(s) em ${j.canal}`;
@@ -79,7 +120,7 @@ function mostrarResultado(j) {
   j.itens.forEach(function (item) {
     const div = document.createElement('div');
     div.className = 'item-canal';
-    div.innerHTML = `<span class="indice">${item.indice}.</span><span class="titulo">${item.titulo}</span><a href="${item.link}" target="_blank" rel="noopener">${item.link}</a>`;
+    div.innerHTML = `<span class="indice">${esc(item.indice)}.</span><span class="titulo">${esc(item.titulo)}</span><a href="${/^https?:\/\//.test(item.link) ? esc(item.link) : '#'}" target="_blank" rel="noopener">${esc(item.link)}</a>`;
     lista.appendChild(div);
   });
   document.getElementById('resultado-box').style.display = 'block';
@@ -96,4 +137,6 @@ async function copiarTudo() {
   }
 }
 </script>
+<h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
+<div id="historico-lista"></div>
 {% endblock %}

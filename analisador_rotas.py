@@ -119,12 +119,24 @@ def registrar(app, base_dir: str) -> None:
         a["etapa"] = "✅ Pronto."
         ac.salvar(base_dir, a)
 
+    def _avisar_analise(aid: str) -> None:
+        try:
+            import notificacoes
+            a = ac.carregar(base_dir, aid)
+            nome = str(a.get("canal_nome") or a.get("nome") or a.get("url") or aid)[:60]
+            erro = a.get("erro") if a.get("estado") != "pronto" else None
+            notificacoes.avisar(("❌ " if erro else "✅ ") + f"Análise do canal {nome}" + (" — deu erro" if erro else " — pronta"),
+                                str(erro or a.get("ia_erro") or "")[:400], f"/analisador-canal/{aid}", "erro" if erro else "ok", tipo="analisador")
+        except Exception:  # noqa: BLE001
+            pass
+
     def _rodar(aid: str) -> None:
         def _t():
             try:
                 ac.executar(base_dir, aid, depois=_ia_e_salva)
             finally:
                 _RODANDO.pop(aid, None)
+                _avisar_analise(aid)
         t = threading.Thread(target=_t, daemon=True)
         _RODANDO[aid] = t
         t.start()
@@ -182,6 +194,7 @@ def registrar(app, base_dir: str) -> None:
                 _ia_e_salva(ac.carregar(base_dir, aid))
             finally:
                 _RODANDO.pop(aid, None)
+                _avisar_analise(aid)
         t = threading.Thread(target=_t, daemon=True)
         _RODANDO[aid] = t
         t.start()

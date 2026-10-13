@@ -82,16 +82,18 @@ https://youtu.be/qqq            ← sem tempo: o vídeo inteiro</pre></details>
 </div>
 
 {% if jobs %}
-<h2 style="margin-top:32px;">Processamentos recentes</h2>
+<h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
 <div>
   {% for j in jobs %}
-  <div style="border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.85rem;">
-    {{ j.quantidade_videos }} vídeo(s), qualidade {{ j.qualidade }} — status: {{ j.status }}
+  <div class="hist-item" id="j-{{ j.id }}" style="border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.85rem;">
+    <span class="hist-data" data-t="{{ (j.criado_em or 0) | int }}"></span> · {{ j.quantidade_videos }} vídeo(s), qualidade {{ j.qualidade }} — status: {{ j.status }}
     {% if j.status == 'pronto' %}<a href="{{ url_for('cortar_youtube_download', job_id=j.id) }}" style="margin-left:10px;">⬇ baixar</a>{% endif %}
     {% if j.erro %} — {{ j.erro[:150] }}{% endif %}
   </div>
   {% endfor %}
 </div>
+<style>.hist-item:target{background:#eff6ff;border-color:#2563eb!important}</style>
+<script>document.querySelectorAll('.hist-data').forEach(e => { e.textContent = new Date(parseInt(e.dataset.t) * 1000).toLocaleString('pt-BR'); });</script>
 {% endif %}
 
 <template id="template-video">

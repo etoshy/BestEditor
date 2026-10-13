@@ -125,6 +125,48 @@ for d in (UPLOADS_DIR, JOBS_DIR, OUTPUTS_DIR):
 app = Flask(__name__)
 
 
+def _avisar(titulo: str, msg: str = "", link: str = "", nivel: str = "ok", tipo: str = "", chave: str = "") -> None:
+    """🔔 Notificação no sininho (v84_87) — nunca derruba quem chamou."""
+    try:
+        import notificacoes
+        notificacoes.avisar(titulo, msg, link, nivel, tipo=tipo, chave=chave)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _thread_com_aviso(fn, estado_fn, nome: str, link: str, tipo: str = "", chave_ok: str = "", ao_fim=None) -> None:
+    """Roda `fn` numa thread e, no fim, avisa no 🔔 conforme o dict de estado (status "erro" / campo "erro")."""
+    def _w():
+        try:
+            fn()
+        finally:
+            if ao_fim is not None:
+                try:
+                    ao_fim()
+                except Exception:  # noqa: BLE001
+                    pass
+            st = (estado_fn() if estado_fn else None) or {}
+            erro = st.get("erro") or (("falhou" if st.get("status") == "erro" else None))
+            if erro:
+                _avisar(f"❌ {nome} — deu erro", str(erro)[:500], link, "erro", tipo)
+            else:
+                _avisar(f"✅ {nome} — pronto", "", link, "ok", tipo, chave=chave_ok)
+    threading.Thread(target=_w, daemon=True).start()
+
+
+def _nome_job(job_id: str) -> str:
+    job = _JOBS.get(job_id) or {}
+    return str(job.get("nome_projeto") or job.get("original_filename") or job_id)[:60]
+
+
+def _avisar_fim(nome: str, erro: Any, link: str, tipo: str = "", msg_ok: str = "") -> None:
+    """Aviso padrão de fim: ✅ pronto ou ❌ deu erro."""
+    if erro:
+        _avisar(f"❌ {nome} — deu erro", str(erro)[:500], link, "erro", tipo)
+    else:
+        _avisar(f"✅ {nome} — pronto", msg_ok, link, "ok", tipo)
+
+
 @app.route("/favicon.ico")
 def favicon():
     # Evita 404 no console quando o navegador procura automaticamente pelo favicon.
@@ -303,6 +345,44 @@ os.makedirs(REDES_SOCIAIS_DIR, exist_ok=True)
 _TRANSCRICOES_AVULSAS_JOBS: Dict[str, Dict[str, Any]] = {}
 TRANSCRICOES_AVULSAS_DIR = os.path.join(OUTPUTS_DIR, "transcricoes_avulsas")
 os.makedirs(TRANSCRICOES_AVULSAS_DIR, exist_ok=True)
+
+
+# 🕘 histórico das ferramentas avulsas (v84_87): cada job salva um _job.json na pasta dele e volta ao abrir o site
+def _historico_salvar(pasta_raiz: str, job: Optional[Dict[str, Any]]) -> None:
+    if not job or not job.get("id"):
+        return
+    try:
+        d = os.path.join(pasta_raiz, job["id"])
+        os.makedirs(d, exist_ok=True)
+        dados = dict(job, log=str(job.get("log") or "")[-4000:])
+        with open(os.path.join(d, "_job.json"), "w", encoding="utf-8") as f:
+            json.dump(dados, f, ensure_ascii=False, default=str)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _historico_carregar(pasta_raiz: str, destino: Dict[str, Dict[str, Any]], limite: int = 200) -> None:
+    try:
+        nomes = [n for n in os.listdir(pasta_raiz) if os.path.isfile(os.path.join(pasta_raiz, n, "_job.json"))]
+    except OSError:
+        return
+    nomes.sort(key=lambda n: os.path.getmtime(os.path.join(pasta_raiz, n, "_job.json")))
+    for n in nomes[-limite:]:
+        try:
+            with open(os.path.join(pasta_raiz, n, "_job.json"), encoding="utf-8") as f:
+                j = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(j, dict) or j.get("id") != n or n in destino:
+            continue
+        if j.get("status") in ("processando", "capturando"):
+            j.update(status="erro", erro="O site foi fechado enquanto isso rodava.")
+        destino[n] = j
+
+
+for _pasta_h, _dict_h in ((CAPTURAS_DIR, _CAPTURAS_PAGINA), (YT_CLIPPER_DIR, _YT_CLIPPER_JOBS), (REDES_SOCIAIS_DIR, _REDES_SOCIAIS_JOBS),
+                          (TRANSCRICOES_AVULSAS_DIR, _TRANSCRICOES_AVULSAS_JOBS)):
+    _historico_carregar(_pasta_h, _dict_h)
 
 
 def _job_dir(job_id: str) -> str:
@@ -982,11 +1062,20 @@ def gerar_voz_gerar():
             pass
     pos = _FILA_VOZ.iniciar(
         job_id, engine,
-        lambda: _gerar_voz_em_background(job_id, engine, texto, output_path, kwargs, legenda_kwargs, multivoz_on),
+        lambda: _gerar_voz_e_avisar(job_id, engine, texto, output_path, kwargs, legenda_kwargs, multivoz_on),
         cpu=forcar_cpu)
     if st.get("na_fila"):
         st["posicao"] = _FILA_VOZ.posicao(job_id)
     return jsonify({"ok": True, "job_id": job_id, "posicao": st.get("posicao") or (pos if st.get("na_fila") else None)})
+
+
+def _gerar_voz_e_avisar(job_id: str, *a: Any) -> None:
+    try:
+        _gerar_voz_em_background(job_id, *a)
+    finally:
+        st = _GERAR_VOZ_STATUS.get(job_id) or {}
+        _avisar_fim("🎙️ Áudio “" + (st.get("texto_inicio") or "")[:50] + "…”", st.get("erro"), "/gerar-voz#historico", "voz",
+                    "Ouça ou baixe no histórico do Gerador de voz.")
 
 
 def _config_voz_do_form(form) -> Tuple[str, Dict[str, Any]]:
@@ -1349,6 +1438,10 @@ def conversa_gerar_fala(conversa_id: str, fala_id: str):
         finally:
             status["running"] = False
             status["pronto"] = True
+            if status["erro"]:
+                _avisar("❌ Conversa — uma fala deu erro", status["erro"], f"/gerar-voz/conversa/{conversa_id}", "erro", "conversa")
+            else:
+                _avisar("✅ Conversa — fala gerada", "", f"/gerar-voz/conversa/{conversa_id}", "ok", "conversa", chave=f"conversa:{conversa_id}")
 
     threading.Thread(target=_run, daemon=True).start()
     return jsonify({"ok": True})
@@ -1577,7 +1670,7 @@ def perfis_de_voz_youtube_extrair():
             job["status"] = "erro"
             job["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _PERFIL_YOUTUBE_JOBS.get(job_id), f"🗣️ Perfil de voz “{nome}” do YouTube", "/perfis-de-voz", "perfil_voz")
     return jsonify({"ok": True, "job_id": job_id})
 
 
@@ -1976,6 +2069,8 @@ def _narracao_gerar_em_background(projeto_id: str) -> None:
     finally:
         status["running"] = False
         status["pronto"] = True
+        _avisar_fim("📝 Narração do roteiro", status.get("erro"), f"/narracoes/{projeto_id}", "narracao",
+                    "O áudio do roteiro ficou pronto.")
 
 
 @app.route("/narracoes/<projeto_id>/gerar", methods=["POST"])
@@ -2103,6 +2198,9 @@ def save_settings():
         new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
+    for chave_ig in ("ia_google_youtube", "ia_google_porta"):  # 🔎 IA do Google
+        if chave_ig in request.form:
+            new_values[chave_ig] = request.form[chave_ig]
     for chave_fish in ("fish_modo", "fish_url", "fish_modelo"):  # 🐟 Fish Audio S2
         if chave_fish in request.form:
             new_values[chave_fish] = request.form[chave_fish]
@@ -2189,7 +2287,7 @@ def flow_login():
         except Exception as exc:  # noqa: BLE001
             _FLOW_LOGIN.update({"status": "erro", "erro": str(exc)})
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _FLOW_LOGIN, f"🔑 Login no Flow ({conta})", "/contas-google", "flow")
     return jsonify({"ok": True})
 
 
@@ -3116,6 +3214,10 @@ def transcribe():
         finally:
             perf.save()
             _save_state(job_id)
+            _j = _JOBS.get(job_id) or {}
+            _avisar_fim(f"📝 Transcrição de “{_nome_job(job_id)}”",
+                        _j.get("error") if str(_j.get("status", "")).startswith("erro") else None,
+                        f"/job/{job_id}/transcribing", "transcricao", str(_j.get("fase") or ""))
 
     threading.Thread(target=_run_transcription, daemon=True).start()
 
@@ -3209,6 +3311,8 @@ def submit_termos_wikipedia(job_id: str):
             if perf:
                 perf.save()
             _save_state(job_id)
+            _avisar_fim(f"📝 Prompt de “{_nome_job(job_id)}”", job.get("error") if str(job.get("status", "")).startswith("erro") else None,
+                        f"/job/{job_id}/transcribing", "transcricao", "O prompt das cenas está pronto.")
 
     threading.Thread(target=_run_busca_e_prompt_final, daemon=True).start()
     return redirect(url_for("transcribing_status_page", job_id=job_id))
@@ -3286,6 +3390,8 @@ def submit_termos_buscadores(job_id: str):
             if perf:
                 perf.save()
             _save_state(job_id)
+            _avisar_fim(f"📝 Prompt de “{_nome_job(job_id)}”", job.get("error") if str(job.get("status", "")).startswith("erro") else None,
+                        f"/job/{job_id}/transcribing", "transcricao", "O prompt das cenas está pronto.")
 
     threading.Thread(target=_run_busca_e_prompt_final_buscadores, daemon=True).start()
     return redirect(url_for("transcribing_status_page", job_id=job_id))
@@ -3388,6 +3494,30 @@ def _formato_do_form(form, nome: str = "formato") -> Optional[str]:
     return v if v in VALID_ORIENTATIONS else None
 
 
+def _cartao_fundo_do_form(bruto: Any) -> Optional[Dict[str, Any]]:
+    """🪧 config do fundo dos cartões que o Estúdio manda (JSON) → validada. None = não veio."""
+    if not bruto:
+        return None
+    try:
+        d = json.loads(bruto) if isinstance(bruto, str) else dict(bruto)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(d, dict):
+        return None
+    import video_assembler as _va
+    out: Dict[str, Any] = {"modo": "video" if d.get("modo") == "video" else "gerado",
+                           "estilo": d.get("estilo") if d.get("estilo") in _va.FUNDOS_CARTAO else "cor_gradiente",
+                           "cor": d["cor"].upper() if re.fullmatch(r"#[0-9a-fA-F]{6}", str(d.get("cor") or "")) else "",
+                           "biblioteca": re.sub(r"[^\w-]", "", str(d.get("biblioteca") or ""))[:40],
+                           "busca": " ".join(str(d.get("busca") or "").split())[:120]}
+    for k, padrao, a, b in (("desfocar", 4.0, 0.0, 30.0), ("escurecer", 0.15, 0.0, 0.6)):
+        try:
+            out[k] = max(a, min(b, float(d.get(k, padrao))))
+        except (TypeError, ValueError):
+            out[k] = padrao
+    return out
+
+
 def _job_site_cfg(job: dict) -> dict:
     """Config do site + o que a pessoa escolheu só pra este vídeo na página
     do prompt (`job["cfg_overrides"]`). Usada nas prévias e na montagem."""
@@ -3408,6 +3538,15 @@ def _job_site_cfg(job: dict) -> dict:
         cfg["filtro_cor"] = editor["filtro_cor"]
     if isinstance(editor.get("paleta"), dict):
         cfg["paleta"] = editor["paleta"]
+    cf = dict(editor.get("cartao_fundo") or {})  # 🪧 fundo dos cartões: o clipe da biblioteca vira o caminho do arquivo
+    if cf.get("biblioteca"):
+        it = next((x for x in job.get("media_library") or [] if x.get("id") == cf["biblioteca"]), None)
+        if it and os.path.isfile(it.get("path") or ""):
+            cf["video_path"] = it["path"]
+    if not cf.get("cor") and (editor.get("paleta") or {}).get("primaria"):
+        cf["cor"] = editor["paleta"]["primaria"]
+    if cf:
+        cfg["cartao_fundo"] = cf
     if isinstance(editor.get("sons_auto"), dict):
         cfg["sons_auto"] = editor["sons_auto"]
     if editor.get("sons_volume") is not None:
@@ -4240,6 +4379,8 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
         job["status"] = "pronto_para_editar"
         _save_state(job_id)
+        _avisar_fim(f"🖼️ Prévias de “{_nome_job(job_id)}”", None, f"/job/{job_id}/edit-segments", "previas",
+                    "Pronto pra editar a timeline.")
         _prebaixar_iniciar(job_id, job)  # ⬇ já vai baixando os clipes enquanto a pessoa edita
 
     threading.Thread(target=_run, daemon=True).start()
@@ -4927,6 +5068,12 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             if final_status:
                 job["status"] = final_status
             _save_state(job_id)
+            if final_status == "concluido":
+                _avisar_fim(f"🎬 Vídeo “{_nome_job(job_id)}”", None, f"/job/{job_id}/status-page", "montagem",
+                            "A montagem terminou — assista ou baixe.")
+            elif final_status == "pronto_para_editar" and job.get("assembly_error"):
+                _avisar_fim(f"🎬 Montagem de “{_nome_job(job_id)}”", str(job.get("assembly_error"))[-400:],
+                            f"/job/{job_id}/edit-segments", "montagem")
             if final_status == "concluido":
                 # diagnóstico (vídeo × telinha) DEPOIS de liberar o vídeo: não atrasa a entrega
                 _diagnostico_em_segundo_plano(job_id, job)
@@ -6193,7 +6340,7 @@ def cutaway_youtube_baixar(job_id: str, cutaway_id: str):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _CUTAWAY_YT_JOBS.get(yt_job_id), f"✂️ Corte do YouTube em “{_nome_job(job_id)}”", f"/job/{job_id}/edit-segments", "youtube", chave_ok=f"yt:{job_id}")
     return jsonify({"ok": True, "yt_job_id": yt_job_id})
 
 
@@ -6511,7 +6658,7 @@ def youtube_item_usar(job_id: str, item_id: str):
             status["status"] = "erro"
             status["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _CUTAWAY_YT_JOBS.get(yt_job_id), f"✂️ Clipe do YouTube em “{_nome_job(job_id)}”", f"/job/{job_id}/edit-segments", "youtube", chave_ok=f"yt:{job_id}")
     return jsonify({"ok": True, "yt_job_id": yt_job_id})
 
 
@@ -6597,8 +6744,17 @@ def _youtube_ia_item(job_id: str, item_id: str) -> None:
         return ia_midia.achar_momento(linhas, fala, str(v.get("titulo") or ""), str(v.get("canal") or ""),
                                       item.get("duracao_alvo"), ficha, job=job_id)
 
+    assistir, assistir_sempre = None, False
+    try:  # 🔎 IA do Google: "assiste" o vídeo (sem legenda / a legenda não achou — ou sempre)
+        import ia_google_rotas as _igr
+        if _igr.instalado() and _igr.modo_youtube() != "desligado":
+            assistir = lambda v: _igr.momento(v["url"], fala, item.get("duracao_alvo"))  # noqa: E731
+            assistir_sempre = _igr.modo_youtube() == "sempre"
+    except Exception:  # noqa: BLE001
+        assistir = None
     r = yt_agente.procurar(
         fala, item.get("termo") or item.get("termo_original") or "", item.get("duracao_alvo"),
+        assistir=assistir, assistir_sempre=assistir_sempre,
         buscar=lambda t: buscar_videos_youtube(t, quantidade=YOUTUBE_RESULTADOS_COM_IA),
         ordenar=ordenar, legenda=lambda u: _youtube_legenda(job_id, job, u, pode_visivel=False), achar=achar,
         nova_busca=lambda feitas, motivos: ia_midia.nova_busca_youtube(fala, feitas, motivos, ficha, job=job_id),
@@ -6653,6 +6809,9 @@ def _youtube_ia_rodar(job_id: str, ids: List[str]) -> None:
     geral.update(rodando=False, atual=None, parado=job_id in _YOUTUBE_IA_PARAR)
     _YOUTUBE_IA_PARAR.discard(job_id)
     _save_state(job_id)
+    _avisar(f"✅ 🤖 Agente do YouTube em “{_nome_job(job_id)}” — achou {geral['achados']} de {geral['feitos']}",
+            "Parado por você." if geral.get("parado") else "", f"/job/{job_id}/edit-segments",
+            "ok" if geral["achados"] else "aviso", "youtube_ia")
 
 
 @app.route("/job/<job_id>/youtube/ia", methods=["POST"])
@@ -6741,11 +6900,27 @@ def edicao_ia(job_id: str):
     motivo = ia_servico.motivo_desligado("edicao")
     if motivo:
         return jsonify({"erro": "IA: " + motivo}), 400
-    prompt = str((request.get_json(silent=True) or {}).get("prompt") or "")
+    corpo = request.get_json(silent=True) or {}
+    prompt = str(corpo.get("prompt") or "")
     if not prompt.strip():
         return jsonify({"erro": "Gere o prompt primeiro."}), 400
-    texto = ia_servico.chamar("edicao", "Você é editor de vídeo. Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois.",
-                              prompt, schema=None, max_tokens=20000, effort="medium", job=job_id, timeout=300)
+
+    def _chamar() -> Optional[str]:
+        return ia_servico.chamar("edicao", "Você é editor de vídeo. Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois.",
+                                 prompt, schema=None, max_tokens=20000, effort="medium", job=job_id, timeout=300)
+    if corpo.get("bg"):  # ⏳ v84_87: em segundo plano — a resposta fica guardada (🕘 Histórico) mesmo fechando o Estúdio
+        import tarefas_bg
+
+        def _tarefa(t):
+            texto_bg = _chamar()
+            if not texto_bg:
+                raise RuntimeError("A IA não respondeu (" + (ia_servico.motivo_desligado("edicao") or "veja os detalhes em 🤖 IA") + ").")
+            return {"texto": texto_bg}
+        parte = str(corpo.get("parte") or "")[:20]
+        tid = tarefas_bg.iniciar("ia_edicao", f"🪄 Edição pela IA de “{_nome_job(job_id)}”" + (f" (parte {parte})" if parte else ""),
+                                 _tarefa, pagina=f"/job/{job_id}/edit-segments", alvo={"parte": parte})
+        return jsonify({"ok": True, "tarefa": tid})
+    texto = _chamar()
     if not texto:
         return jsonify({"erro": "A IA não respondeu (" + (ia_servico.motivo_desligado("edicao") or "veja os detalhes em 🤖 IA") + ") — copie o prompt e use outra IA."}), 200
     return jsonify({"ok": True, "texto": texto})
@@ -7107,7 +7282,7 @@ def youtube_texto(job_id: str):
             if erros:
                 estado["erro"] = f"{len(erros)} de {len(estado['itens'])} falharam: " + "; ".join(f"trecho {e['indice'] + 1}: {e['erro']}" for e in erros)[:600]
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: estado, f"✂️ Links do YouTube em “{_nome_job(job_id)}”", f"/job/{job_id}/edit-segments", "youtube")
     return jsonify({"ok": True, "yt_job_id": yt_job_id, "linhas": linhas})
 
 
@@ -7999,6 +8174,7 @@ def _gerar_timeline2(job_id: str) -> None:
         traceback.print_exc()
         prog["erro"] = str(exc)
     _save_state(job_id)
+    _avisar_fim(f"🎞️ Timeline 2 de “{_nome_job(job_id)}”", prog.get("erro"), f"/job/{job_id}/edit-segments", "timeline")
 
 
 @app.route("/job/<job_id>/timeline/gerar", methods=["POST"])
@@ -8146,7 +8322,7 @@ def confirm_segments(job_id: str):
     segments: List[VideoSegment] = []
 
     global_aspect_fill = request.form.get("global_aspect_fill", load_site_config().get("aspect_fill", "black")).strip().lower()
-    if global_aspect_fill not in ("black", "mosaic", "zoom", "smart"):
+    if global_aspect_fill not in ("black", "mosaic", "zoom", "smart", "cartao"):
         global_aspect_fill = "black"
     try:
         global_trim_frames = max(0, min(120, int(request.form.get("global_trim_start_frames", load_site_config().get("trim_start_frames", 10)))))
@@ -8154,6 +8330,11 @@ def confirm_segments(job_id: str):
         global_trim_frames = 10
     _defaults_antes = job.get("editor_defaults") or {}
     job["editor_defaults"] = {"aspect_fill": global_aspect_fill, "trim_start_frames": global_trim_frames}
+    _cf = _cartao_fundo_do_form(request.form.get("global_cartao_fundo"))  # 🪧 fundo dos cartões (v84_85)
+    if _cf is not None:
+        job["editor_defaults"]["cartao_fundo"] = _cf
+    elif _defaults_antes.get("cartao_fundo"):
+        job["editor_defaults"]["cartao_fundo"] = _defaults_antes["cartao_fundo"]
     # filtro de cor global e Direção (DarkPlanner): o editor clássico não manda -> mantém
     import dp_visual
     if "global_filtro_cor" in request.form:
@@ -8392,7 +8573,7 @@ def confirm_segments(job_id: str):
 
         aspect_choice = request.form.get(f"seg_{i}_aspect_fill", "global").strip().lower()
         aspect_fill = global_aspect_fill if aspect_choice == "global" else aspect_choice
-        if aspect_fill not in ("black", "zoom", "mosaic", "smart"):
+        if aspect_fill not in ("black", "zoom", "mosaic", "smart", "cartao"):
             aspect_fill = global_aspect_fill
         trim_choice = request.form.get(f"seg_{i}_trim_frames", "global").strip().lower()
         try:
@@ -9139,7 +9320,8 @@ def capturar_pagina_submit():
             estado["status"] = "erro"
             estado["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
-    threading.Thread(target=_run_captura, daemon=True).start()
+    _thread_com_aviso(_run_captura, lambda: _CAPTURAS_PAGINA.get(captura_id), "🖼️ Captura de " + url[:60],
+                      f"/capturar-pagina/{captura_id}", "captura", ao_fim=lambda: _historico_salvar(CAPTURAS_DIR, _CAPTURAS_PAGINA.get(captura_id)))
     return jsonify({"ok": True, "captura_id": captura_id})
 
 
@@ -9332,7 +9514,7 @@ def cortar_youtube_submit():
             job["status"] = "erro"
             job["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _YT_CLIPPER_JOBS.get(job_id), f"✂️ Cortes do YouTube ({len(itens)} vídeo(s))", f"/cortar-youtube#j-{job_id}", "cortar_youtube", ao_fim=lambda: _historico_salvar(YT_CLIPPER_DIR, _YT_CLIPPER_JOBS.get(job_id)))
     return jsonify({"ok": True, "job_id": job_id})
 
 
@@ -9443,7 +9625,7 @@ def redes_sociais_submit():
             job["status"] = "erro"
             job["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _REDES_SOCIAIS_JOBS.get(job_id), f"📲 Download de {len(urls)} vídeo(s) de redes", f"/redes-sociais#j-{job_id}", "redes", ao_fim=lambda: _historico_salvar(REDES_SOCIAIS_DIR, _REDES_SOCIAIS_JOBS.get(job_id)))
     return jsonify({"ok": True, "job_id": job_id})
 
 
@@ -9482,6 +9664,16 @@ def extrair_links_canal_buscar():
     url = (corpo.get("url") or "").strip()
     tipo = (corpo.get("tipo") or "shorts").strip().lower()
     ordem = (corpo.get("ordem") or "mais_novos").strip().lower()
+    if corpo.get("bg"):  # ⏳ em segundo plano: pode fechar a aba (v84_87)
+        if not url:
+            return jsonify({"erro": "Cole o link do canal primeiro."}), 400
+        import tarefas_bg
+
+        def _tarefa(t):
+            t.progresso("listando os vídeos do canal…")
+            return extrair_links_canal(url, tipo=tipo, ordem=ordem)
+        tid = tarefas_bg.iniciar("links_canal", "🔗 Links de " + url[:70], _tarefa, pagina="/extrair-links-canal")
+        return jsonify({"ok": True, "tarefa": tid})
     try:
         resultado = extrair_links_canal(url, tipo=tipo, ordem=ordem)
     except YoutubeClipperError as exc:
@@ -9560,7 +9752,7 @@ def transcrever_submit():
             job["status"] = "erro"
             job["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
-    threading.Thread(target=_run, daemon=True).start()
+    _thread_com_aviso(_run, lambda: _TRANSCRICOES_AVULSAS_JOBS.get(job_id), "📝 " + ("Transcrição" if modo == "transcrever" else "Download") + " avulsa", f"/transcrever#j-{job_id}", "transcrever", ao_fim=lambda: _historico_salvar(TRANSCRICOES_AVULSAS_DIR, _TRANSCRICOES_AVULSAS_JOBS.get(job_id)))
     return jsonify({"ok": True, "job_id": job_id})
 
 
@@ -9617,6 +9809,12 @@ import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de 
 _analisador_rotas.registrar(app, BASE_DIR)
 import flow_estudio as _flow_estudio  # noqa: E402  🎬 aba Google Flow: gerar, galeria e 🧪 testar (v84_76)
 _flow_estudio.registrar(app, BASE_DIR)
+import ia_google_rotas as _ia_google_rotas  # noqa: E402  🔎 IA do Google (app à parte, porta 8852) (v84_86)
+_ia_google_rotas.registrar(app, BASE_DIR)
+import notificacoes as _notif  # noqa: E402  🔔 sininho + 🕘 histórico (v84_87)
+_notif.registrar(app, BASE_DIR)
+import tarefas_bg as _tarefas_bg  # noqa: E402  ⏳ tarefas de segundo plano genéricas (v84_87)
+_tarefas_bg.registrar(app, BASE_DIR)
 import espaco as _espaco  # noqa: E402  (🧹 Espaço em disco)
 
 

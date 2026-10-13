@@ -31,6 +31,8 @@ PASTAS_PESSOAIS = (
     "jobs/", "uploads/", "outputs/", "narracoes/", "conversas/", "roteiros_yt/", "vendas/", "dossies/",
     "modelados/", "chamadas_padrao/", "downloads/", "flow_dados/", "ia_cache/", "analises_canal/",
     "niche_miner/data/", "toolkit/tts/models/", ".chrome_downloads/",
+    "ia_google/perfil_navegador/", "ia_google/conversas/", "ia_google/debug/", "ia_google/erros/", "ia_google/resultados/",
+    "ia_google/videos/", "ia_google/config.json",
 )
 ARQUIVOS_PESSOAIS = re.compile(
     r"(^|/)(site_config\.json|ia_config\.json|ia_uso\.json|youtube_cookies\.json|cookies[^/]*\.(txt|json)|"

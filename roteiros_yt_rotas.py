@@ -74,6 +74,9 @@ def registrar(app, base_dir: str) -> None:
                 log("✖ " + str(exc).splitlines()[0][:300])
             finally:
                 t["rodando"] = False
+                import notificacoes
+                notificacoes.avisar(("❌ Roteiro do YouTube — transcrição deu erro" if t.get("erro") else "✅ Roteiro do YouTube — transcrição pronta"),
+                                    str(t.get("erro") or "")[:400], f"/roteiros-yt/{pid}", "erro" if t.get("erro") else "ok", tipo="roteiro_yt")
         threading.Thread(target=_th, daemon=True).start()
 
     @app.route("/roteiros-yt/<pid>")

@@ -45,6 +45,7 @@
     <option value="mosaic" {% if config.aspect_fill == "mosaic" %}selected{% endif %}>🧩 Mosaico do próprio clipe</option>
     <option value="zoom" {% if config.aspect_fill == "zoom" %}selected{% endif %}>🔎 Zoom central</option>
     <option value="smart" {% if config.aspect_fill == "smart" %}selected{% endif %}>✨ Preencher inteligente — tira barras pretas que já vêm no vídeo e aumenta sem distorcer</option>
+    <option value="cartao" {% if config.aspect_fill == "cartao" %}selected{% endif %}>🪧 Cartão sobre fundo — imagem de outro formato vira cartão flutuando sobre um fundo animado ou clipe (propaganda)</option>
   </select>
 
   <label style="margin-top:16px;">Cortar quantos frames do início de cada clipe por padrão?</label>
@@ -252,6 +253,17 @@
   <label>Chave de API {% if config.animepexels_online_api_key %}<span style="font-weight:normal;color:#15803d;">(✔ salva: {{ config.animepexels_online_api_key[:8] }}… — em branco mantém)</span>{% endif %}</label>
   <input type="password" name="animepexels_online_api_key" value="" placeholder="apx_…" autocomplete="off">
   {% if config.animepexels_online_api_key %}<label style="font-weight:normal;"><input type="checkbox" name="animepexels_online_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
+
+  <h2 style="margin-top:32px;" id="ia-google">🔎 IA do Google (Modo IA, por navegador)</h2>
+  <p style="color:#666;font-size:0.85rem;">O app da pasta <code>ia_google/</code> roda à parte (aba <a href="{{ url_for('ia_google_page') }}">🔎 IA do Google</a>). Ele "assiste" vídeos do YouTube e pesquisa com fontes. Precisa de: <code>pip install -r ia_google/requirements.txt</code>.</p>
+  <label>No agente do YouTube (🤖 achar o momento do vídeo)</label>
+  <select name="ia_google_youtube">
+    <option value="complemento" {% if config.ia_google_youtube not in ('sempre', 'desligado') %}selected{% endif %}>Quando o vídeo não tem legenda ou a legenda não achou (recomendado)</option>
+    <option value="sempre" {% if config.ia_google_youtube == 'sempre' %}selected{% endif %}>Sempre primeiro (mais lento — o Google assiste cada vídeo)</option>
+    <option value="desligado" {% if config.ia_google_youtube == 'desligado' %}selected{% endif %}>Não usar</option>
+  </select>
+  <label>Porta do app</label>
+  <input type="number" name="ia_google_porta" value="{{ config.ia_google_porta }}" min="1024" max="65535">
 
   <h2 style="margin-top:32px;" id="fish">🐟 Fish Audio S2 (motor de voz: clonagem + tags de emoção)</h2>
   <p style="color:#666;font-size:0.85rem;">O modelo não roda dentro do site. <b>Local</b>: você sobe o servidor do <a href="https://github.com/fishaudio/fish-speech" target="_blank" rel="noopener">fish-speech</a> (precisa de ~24 GB de VRAM e Linux/WSL) e o site manda o texto pra ele. <b>API</b>: usa a API paga da <a href="https://fish.audio" target="_blank" rel="noopener">Fish Audio</a> com a sua chave. ⚠️ Os pesos abertos do S2 são só pra uso <b>não comercial</b>.</p>

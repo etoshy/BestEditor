@@ -76,7 +76,17 @@ def registrar(app, base_dir: str) -> None:
             with _fila:
                 try:
                     ds.processar_fonte(base_dir, pid, fid, _TRAVA)
+                    import notificacoes
+                    f_ok = next((x for x in (_proj(pid) or {}).get("fontes") or [] if x["id"] == fid), {})
+                    if f_ok.get("estado") == "erro":
+                        notificacoes.avisar("❌ Modelo de vídeo — uma fonte deu erro", str(f_ok.get("erro") or "")[:400],
+                                            f"/modelos-video/{pid}", "erro", tipo="dossie")
+                    else:
+                        notificacoes.avisar("✅ Modelo de vídeo — fontes processadas", "", f"/modelos-video/{pid}", "ok",
+                                            tipo="dossie", chave=f"dossie:{pid}")
                 except Exception as exc:  # noqa: BLE001
+                    import notificacoes
+                    notificacoes.avisar("❌ Modelo de vídeo — uma fonte deu erro", str(exc)[:400], f"/modelos-video/{pid}", "erro", tipo="dossie")
                     with _TRAVA:
                         p = _proj(pid)
                         f = next((x for x in (p or {}).get("fontes") or [] if x["id"] == fid), None)
@@ -252,8 +262,14 @@ def registrar(app, base_dir: str) -> None:
         refazer = bool((request.get_json(silent=True) or {}).get("refazer"))
 
         def rodar():
-            r = ds.ia_analisar_imagens(base_dir, pid, trava=_TRAVA, refazer=refazer)
+            try:
+                r = ds.ia_analisar_imagens(base_dir, pid, trava=_TRAVA, refazer=refazer)
+            except Exception as exc:  # noqa: BLE001
+                r = {"erro": str(exc)[:300]}
             _IA_ESTADO[pid] = {"rodando": False, **r}
+            import notificacoes
+            notificacoes.avisar(("❌ " if r.get("erro") else "✅ ") + "Modelo de vídeo — fichas das imagens pela IA",
+                                str(r.get("erro") or ""), f"/modelos-video/{pid}", "erro" if r.get("erro") else "ok", tipo="dossie")
         _IA_ESTADO[pid] = {"rodando": True}
         threading.Thread(target=rodar, daemon=True).start()
         return jsonify({"ok": True})

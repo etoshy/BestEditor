@@ -523,7 +523,10 @@ def planejar(segmentos: List[Dict[str, Any]], did: str, semente: Any = 1, ritmo:
         filtro = _sorteia(rng, f_itens)
     return {"direcao": did, "ritmo": ritmo, "semente": semente, "filtro_cor": filtro, "trechos": plano,
             "cores": cores_do_plano(p), "legenda": p.get("legenda"), "destaques": p.get("destaques"), "editoriais": editoriais_da(p),
-            "som_transicoes": p.get("som_transicoes") or (p.get("transicoes") or {}).get("som") or "auto"}
+            "som_transicoes": p.get("som_transicoes") or (p.get("transicoes") or {}).get("som") or "auto",
+            # 🪧 a direção pode escolher as bordas (ex.: Propaganda = cartão sobre fundo) e o fundo dos cartões
+            "bordas": p.get("bordas") if p.get("bordas") in ("black", "mosaic", "zoom", "smart", "cartao") else None,
+            "cartao_fundo": p.get("cartao_fundo") if isinstance(p.get("cartao_fundo"), dict) else None}
 
 
 def cores_do_plano(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:

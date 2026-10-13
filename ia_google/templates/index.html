@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pesquisa IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <div>
+        <strong>Pesquisa IA</strong>
+        <small>via Modo IA do Google</small>
+      </div>
+    </div>
+    <button class="btn-nova" id="btnNova">＋ Nova conversa</button>
+    <div class="hist-titulo">Histórico</div>
+    <nav class="historico" id="historico"></nav>
+    <div class="sidebar-rodape">
+      <button class="item-rodape" id="btnConfig">⚙️ Configurações</button>
+      <button class="item-rodape" id="btnLogs">📋 Registro <span class="badge-erro" id="badgeErro" hidden>erro</span></button>
+      <button class="item-rodape" id="btnApi">🔌 Como usar a API</button>
+      <span class="status" id="status" title="Clique para abrir as configurações"><i></i><span> navegador fechado</span></span>
+    </div>
+  </aside>
+
+  <main class="principal">
+    <header class="topo">
+      <button class="icone" id="btnMenu" aria-label="Menu">☰</button>
+      <div class="abas" role="tablist">
+        <button class="aba on" data-aba="chat" role="tab">💬 Chat</button>
+        <button class="aba" data-aba="video" role="tab">🎬 Vídeo</button>
+      </div>
+      <span id="tituloConversa">Nova conversa</span>
+      <label class="toggle so-chat" title="Desligado: cada pergunta abre uma conversa nova no Google">
+        <input type="checkbox" id="continuar" checked>
+        <span></span> Continuar conversa
+      </label>
+    </header>
+
+    <section class="tela-video" id="telaVideo" hidden>
+      <form class="video-url" id="formVideo">
+        <input id="urlVideo" type="url" placeholder="Cole o link do vídeo do YouTube…" autocomplete="off">
+        <button type="submit" class="btn primario">Carregar</button>
+      </form>
+      <div class="video-vazio" id="videoVazio">
+        <h1>Analise vídeos do YouTube</h1>
+        <p>Cole um link e peça resumo, capítulos, momentos exatos, cortes para Shorts, checagem de fatos e mais.
+           Clique em qualquer tempo <b>▶ 1:05</b> para pular o vídeo até ele.</p>
+      </div>
+      <div class="video-grid" id="videoGrid" hidden>
+        <div class="video-player">
+          <div class="player"><iframe id="player" title="Vídeo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+          <div class="video-info" id="videoInfo"></div>
+        </div>
+        <div class="video-acoes">
+          <div class="rotulo">O que fazer com o vídeo</div>
+          <div class="tarefas" id="tarefas"></div>
+          <form class="consulta" id="formConsulta" hidden>
+            <label id="rotuloConsulta" for="consultaVideo"></label>
+            <div><input id="consultaVideo" autocomplete="off"><button type="submit" class="btn primario">Enviar</button></div>
+          </form>
+          <label class="check"><input type="checkbox" id="videoNova"> Começar conversa nova com a IA</label>
+        </div>
+      </div>
+      <div class="video-resultados" id="videoResultados"></div>
+    </section>
+
+    <section class="mensagens" id="mensagens">
+      <div class="vazio" id="vazio">
+        <h1>O que você quer pesquisar?</h1>
+        <p>Toda resposta vem com a <b>resposta objetiva</b>, a <b>resposta completa</b> e as <b>fontes</b>.</p>
+        <div class="sugestoes">
+          <button>Últimas notícias sobre inteligência artificial no Brasil</button>
+          <button>Qual a cotação do dólar hoje?</button>
+          <button>Quais lançamentos de anime estreiam esta temporada?</button>
+          <button>Resumo das principais notícias de tecnologia da semana</button>
+        </div>
+      </div>
+    </section>
+
+    <form class="entrada so-chat" id="form">
+      <textarea id="pergunta" rows="1" placeholder="Pergunte o que quiser…" autofocus></textarea>
+      <button type="submit" id="btnEnviar" aria-label="Enviar">➤</button>
+    </form>
+    <p class="dica so-chat">Dica: cole um link do YouTube no chat para resumir o vídeo ou perguntar sobre ele · Enter envia · Shift+Enter quebra linha · a janela do navegador abre na 1ª pergunta</p>
+  </main>
+
+  <dialog id="dlg">
+    <div class="dlg-topo"><strong id="dlgTitulo"></strong><button class="icone" id="dlgFechar">✕</button></div>
+    <div id="dlgCorpo"></div>
+  </dialog>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

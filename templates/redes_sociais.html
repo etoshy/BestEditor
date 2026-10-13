@@ -115,4 +115,17 @@ document.addEventListener('DOMContentLoaded', function () { novoBlocoLink(); });
     <div class="qualidade-resultado" style="display:none;"></div>
   </div>
 </template>
+
+<h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
+{% if not jobs %}<p style="color:#666;font-size:.85rem;">Nada ainda — pode começar um download e fechar a aba: quando terminar chega um aviso no 🔔 e o .zip fica aqui.</p>{% endif %}
+{% for j in jobs %}
+<div class="hist-item" id="j-{{ j.id }}" style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;">
+  <span class="hist-data" data-t="{{ (j.criado_em or 0) | int }}"></span> · {{ j.quantidade }} link(s) — <b>{{ j.status }}</b>
+  {% if j.status == 'pronto' %}<a href="{{ url_for('redes_sociais_download', job_id=j.id) }}" style="margin-left:8px;">⬇ baixar o .zip ({{ j.quantidade_baixados }} vídeo(s))</a>{% endif %}
+  {% if j.status == 'processando' %}<button type="button" onclick="acompanhar('{{ j.id }}');document.getElementById('progresso-box').style.display='block'" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">acompanhar</button>{% endif %}
+  {% if j.erro %}<div style="color:#b91c1c;">{{ j.erro[:200] }}</div>{% endif %}
+</div>
+{% endfor %}
+<style>.hist-item:target{background:#eff6ff;border-color:#2563eb!important}</style>
+<script>document.querySelectorAll('.hist-data').forEach(e => { e.textContent = new Date(parseInt(e.dataset.t) * 1000).toLocaleString('pt-BR'); });</script>
 {% endblock %}

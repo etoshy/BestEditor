@@ -53,6 +53,8 @@ aside.right{width:320px;border-left:1px solid var(--line);padding:12px}
 #stage .layer{position:absolute;inset:0;overflow:hidden}
 #stage .layer img,#stage .layer video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform-origin:50% 50%}
 #stage .layer.fill-zoom img,#stage .layer.fill-zoom video{object-fit:cover}
+#stage .layer.fill-cartao{background:radial-gradient(circle at 30% 20%,var(--cf1,#5b46c9),var(--cf2,#15102e))}
+#stage .layer.fill-cartao img{inset:0;margin:auto;width:auto;height:auto;max-width:78%;max-height:84%;border-radius:10px;box-shadow:0 14px 36px rgba(0,0,0,.55)}
 #stage .txt{position:absolute;transform:translate(-50%,-50%);text-align:center;white-space:pre-wrap;line-height:1.15;font-weight:700;pointer-events:none;max-width:92%}
 #stage .ov{position:absolute;transform:translate(-50%,-50%);pointer-events:none}
 #stage .ov img{width:100%;display:block}
@@ -335,7 +337,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
     <select id="gFormato"><option value="16:9">▭ 16:9</option><option value="9:16">▯ 9:16</option><option value="1:1">◻ 1:1</option></select>
   </div>
   <div class="hgrp" title="Bordas de todos os clipes">
-    <select id="gBordas"><option value="black">⬛ Bordas pretas</option><option value="mosaic">🧩 Mosaico</option><option value="zoom">🔎 Zoom (preencher)</option><option value="smart">✨ Inteligente (tira barras embutidas)</option></select>
+    <select id="gBordas"><option value="black">⬛ Bordas pretas</option><option value="mosaic">🧩 Mosaico</option><option value="zoom">🔎 Zoom (preencher)</option><option value="smart">✨ Inteligente (tira barras embutidas)</option><option value="cartao">🪧 Cartão sobre fundo (imagem em pé)</option></select>
   </div>
   <div class="hgrp" title="Frames cortados do começo de cada clipe de vídeo">✂️<input type="number" id="gTrim" min="0" max="120" step="1"></div>
   <div class="spacer"></div>
@@ -515,6 +517,23 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       </div>
       <label class="chk"><input type="checkbox" id="dSoVazios"> Manter o que eu já escolhi (só preenche o que está vazio)</label>
       <div class="row" style="margin-top:8px;"><button class="primary" id="dAplicar">🎨 Aplicar direção</button><label class="chk" style="margin:0 4px" title="repetir exatamente a mesma edição (mesma semente)"><input type="checkbox" id="dFixar"> 🔒 repetir</label><button id="dDesfazer" disabled>↩ Desfazer</button></div>
+      <h3 style="margin-top:16px;">🪧 Cartão sobre fundo</h3>
+      <p class="hint">Com <b>Bordas = 🪧 Cartão sobre fundo</b> (no topo ou num trecho), a imagem de formato diferente do vídeo (capa, foto em pé, print) vira um cartão com sombra flutuando por cima de um fundo em movimento — imagens seguidas passam sobre o MESMO fundo. Ótimo pra propaganda.</p>
+      <div class="seg3" id="cfModo"><button data-v="gerado">✨ Fundo animado</button><button data-v="video">🎞 Clipe de vídeo</button></div>
+      <div id="cfGerado" class="row" style="margin-top:6px;">
+        <label class="f"><span>Estilo</span><select id="cfEstilo"></select></label>
+        <label class="f"><span>Cor</span><input type="color" id="cfCor"></label>
+      </div>
+      <div id="cfVideo" style="margin-top:6px;">
+        <label class="f"><span>Clipe</span><select id="cfClipe"></select></label>
+        <label class="f" id="cfBuscaBox"><span>Buscar nos bancos</span><input type="text" id="cfBusca" placeholder="abstract background bokeh"></label>
+        <div class="row">
+          <label class="f"><span>Desfocar <b id="cfDesfTxt"></b></span><input type="range" id="cfDesf" min="0" max="20" step="1"></label>
+          <label class="f"><span>Escurecer <b id="cfEscTxt"></b></span><input type="range" id="cfEsc" min="0" max="0.5" step="0.05"></label>
+        </div>
+        <p class="hint">Mande um vídeo pela 📁 Mídia (Biblioteca) pra usar de fundo, ou deixe o site buscar um nos bancos na hora de montar. Se não achar, usa o fundo animado.</p>
+      </div>
+      <div class="row" style="margin-top:6px;"><button class="mini" id="cfUsar">🪧 Usar em todo o vídeo (Bordas)</button></div>
       <h3 style="margin-top:16px;">🎨 Cores do projeto</h3>
       <div class="seg3" id="pcModo"><button data-v="projeto">Paleta do projeto</button><button data-v="auto">Automático</button></div>
       <p class="hint">Paleta do projeto: cenas, destaques, textos, legendas e transições de luz em tom sobre tom (cor neutra nunca é trocada). Automático: cada estilo com as cores dele.</p>
@@ -1490,6 +1509,8 @@ async function aplicarDirecao(somente) {
       paletaMudou();
     }
     if (d.som_transicoes === 'nenhum') $('sTrans').checked = false;
+    if (d.bordas && !so) { $('gBordas').value = d.bordas; if (d.bordas === 'cartao') extras.push('🪧 cartões sobre fundo'); }
+    if (d.cartao_fundo && !so) { Object.assign(cartaoFundo, d.cartao_fundo); desenharCartaoFundo(); }
     if ($('dComDestaques').checked && (!d.destaques || d.destaques.ativo !== false)) {
       const faixas = so ? [...so].map(i => [segs[i].start, segs[i].end]) : null;
       const nHl = await sugerirDestaques((d.destaques && d.destaques.densidade) || 'equilibrado', corpo.semente, true, faixas);
@@ -2337,10 +2358,26 @@ async function iaAtualizarArte() {  // a parte 1 respondeu: refaz os prompts 2..
 }
 let iaPode = false;  // 🤖 a IA de /ia pode fazer a edição
 fetch('/ia/status').then(r => r.json()).then(j => { iaPode = !!(j.pode && j.pode.edicao); $('iaFazer').style.display = iaPode ? '' : 'none'; }).catch(() => {});
-async function iaFazer(prompt) {
-  const r = await fetch(`/job/${JOB}/edicao/ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
-  const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status); return d.texto;
+async function iaFazer(prompt, parte) {
+  // ⏳ roda no servidor (v84_87): se fechar o Estúdio, a resposta fica guardada e chega um aviso no 🔔
+  const r = await fetch(`/job/${JOB}/edicao/ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, bg: true, parte: parte || '' }) });
+  const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+  while (true) {
+    await new Promise(res => setTimeout(res, 2500));
+    let t = null; try { t = await (await fetch('/tarefas/' + d.tarefa, { cache: 'no-store' })).json(); } catch (_) {}
+    if (t && t.status !== 'rodando') {
+      fetch('/tarefas/' + d.tarefa + '/aplicada', { method: 'POST' }).catch(() => {});
+      if (t.status !== 'pronto') throw new Error(t.erro || 'a IA não respondeu');
+      return (t.resultado || {}).texto || '';
+    }
+  }
 }
+// voltou no Estúdio: resposta da edição pela IA que terminou com ele fechado → cola no painel
+fetch('/tarefas?tipo=ia_edicao&pendentes=1&limite=5&pagina=' + encodeURIComponent(`/job/${JOB}/edit-segments`)).then(r => r.json()).then(d => {
+  const t = (d.tarefas || []).find(x => x.status === 'pronto' && !(x.alvo || {}).parte);
+  (d.tarefas || []).forEach(x => { if (x.status !== 'rodando') fetch('/tarefas/' + x.id + '/aplicada', { method: 'POST' }).catch(() => {}); });
+  if (t && $('iaResposta')) { $('iaResposta').value = (t.resultado || {}).texto || ''; toast('🤖 A edição pela IA ficou pronta enquanto você estava fora — a resposta foi colada no painel da IA (é só aplicar). Respostas de partes ficam no 🕘 Histórico.', 9000); }
+}).catch(() => {});
 function copiarTexto(t) { try { navigator.clipboard.writeText(t).then(() => toast('📋 Copiado'), () => toast('⚠ Não consegui copiar — selecione e copie')); } catch (_) { toast('⚠ Não consegui copiar'); } }
 function desenharPartesIA() {
   const box = $('iaPartesBox');
@@ -2363,7 +2400,7 @@ function desenharPartesIA() {
   }));
   box.querySelectorAll('.iaPFaz').forEach(b => b.addEventListener('click', async () => {
     const i = +b.dataset.i, st = box.querySelector(`.iaPSt[data-i="${i}"]`); b.disabled = true; st.textContent = '🤖 editando…';
-    try { iaPartes[i].resposta = await iaFazer(iaPartes[i].prompt); box.querySelector(`.iaPResp[data-i="${i}"]`).value = iaPartes[i].resposta; st.textContent = '✅'; if (i === 0) await iaAtualizarArte(); }
+    try { iaPartes[i].resposta = await iaFazer(iaPartes[i].prompt, iaPartes[i].k + '/' + iaPartes[i].n); box.querySelector(`.iaPResp[data-i="${i}"]`).value = iaPartes[i].resposta; st.textContent = '✅'; if (i === 0) await iaAtualizarArte(); }
     catch (e) { st.textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   }));
 }
@@ -3278,7 +3315,7 @@ function propsTrecho(P, i) {
     </div></details>
     <details class="sec"><summary>🎨 Visual</summary><div class="in">
       ${campo('Desfoque (0 = nenhum)', `<input type="number" id="pBlur" min="0" max="50" step="1" value="${s.blur_sigma || 0}">`)}
-      ${campo('Bordas', `<select id="pBordas">${opcoes([['global', '⚙️ Usar a global'], ['black', '⬛ Pretas'], ['mosaic', '🧩 Mosaico'], ['zoom', '🔎 Preencher (zoom)'], ['smart', '✨ Inteligente: tira barras pretas do próprio vídeo e aumenta sem distorcer']], s._aspect)}</select>`)}
+      ${campo('Bordas', `<select id="pBordas">${opcoes([['global', '⚙️ Usar a global'], ['black', '⬛ Pretas'], ['mosaic', '🧩 Mosaico'], ['zoom', '🔎 Preencher (zoom)'], ['smart', '✨ Inteligente: tira barras pretas do próprio vídeo e aumenta sem distorcer'], ['cartao', '🪧 Cartão sobre fundo (imagem em pé)']], s._aspect)}</select>`)}
       ${campo('Frames iniciais cortados', `<select id="pTrim">${opcoes([['global', '⚙️ Usar o global']].concat([0, 5, 10, 15, 20, 30, 60].map(n => [String(n), n + ' frames'])), s._trim)}</select>`)}
     </div></details>
     ${i < segs.length - 1 ? `<details class="sec" open><summary>🎞️ Transição pro trecho ${i + 2}</summary><div class="in">
@@ -3610,6 +3647,7 @@ function montarForm(acao) {
   const f = $('formMontar'); f.innerHTML = '';
   const add = (n, v) => { if (v === undefined || v === null) return; const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
   add('global_aspect_fill', $('gBordas').value); add('global_trim_start_frames', $('gTrim').value);
+  add('global_cartao_fundo', JSON.stringify(cartaoFundo));
   add('global_transition_type', $('gTransicao').value); add('global_transition_duration', $('gTransDur').value);
   add('global_filtro_cor', $('gFiltro').value); add('orientacao', $('gFormato').value); if (DEF.direcao) add('global_direcao', DEF.direcao);
   add('destaques_json', JSON.stringify(destaques)); add('hl_fundo_json', JSON.stringify(hlFundo)); add('graficos_json', JSON.stringify(graficos)); add('editoriais_json', JSON.stringify(editoriais)); add('censura_json', JSON.stringify(censura)); add('paleta_json', JSON.stringify(paleta)); add('legendas_json', JSON.stringify(leg)); add('kit_json', JSON.stringify(kit));
@@ -4126,7 +4164,9 @@ function atualizarMonitor(forcar) {
   if (gCena) { $('layerCena').style.display = 'block'; if (forcar) $('layerCena').dataset.chave = ''; desenharCenaMonitor(gCena, t); }
   else if ($('layerCena').style.display !== 'none') { $('layerCena').style.display = 'none'; $('layerCena').innerHTML = ''; $('layerCena').dataset.chave = ''; }
   const s = segs[i]; const A = $('layerA'), B = $('layerB');
-  const fill = (s._aspect && s._aspect !== 'global' ? s._aspect : $('gBordas').value) === 'zoom';
+  const bordaTr = (s._aspect && s._aspect !== 'global' ? s._aspect : $('gBordas').value);
+  const fill = bordaTr === 'zoom';
+  const cartaoPrev = bordaTr === 'cartao' && tipoMidia(s) === 'image';
   // transição: o trecho i entra por cima do i-1 durante a duração da transição
   let q = 1, tipo = 'none';
   if (i > 0) { const tr = transicaoDaEmenda(i - 1); tipo = tr.tipo === 'site' ? TRANS_SITE : tr.tipo; const d = Math.min(tr.tipo === 'site' ? TRANS_SITE_DUR : tr.dur, (s.end - s.start) / 2); if (tipo !== 'none' && t - s.start < d) q = (t - s.start) / d; }
@@ -4144,7 +4184,8 @@ function atualizarMonitor(forcar) {
     kenBurns(el, s, (t - s.start) / (s.end - s.start)); midiaAtual = el; sincronizarVideo(el, fnA.tl);
     if (el && tipoMidia(s) === 'image') { const fd = s.image_fade_duration || 0.5; let op = 1; if (s.image_fade_in && t - s.start < fd) op = (t - s.start) / fd; if (s.image_fade_out && s.end - t < fd) op = (s.end - t) / fd; el.style.opacity = clamp(op, 0, 1); }
   }
-  A.className = 'layer' + (fill ? ' fill-zoom' : ''); B.className = 'layer' + (fill ? ' fill-zoom' : '');
+  const clsL = 'layer' + (fill ? ' fill-zoom' : '') + (cartaoPrev ? ' fill-cartao' : '');
+  A.className = clsL; B.className = clsL;
   if (s.blur_sigma) { (midiaAtual || {}).style && (midiaAtual.style.filter = `blur(${Math.min(12, s.blur_sigma / 3)}px)`); } else if (midiaAtual && midiaAtual.style) midiaAtual.style.filter = '';
   desenharEdMonitor(t); desenharHlMonitor(t); desenharLegenda(t); desenharGrMonitor(t); desenharCzMonitor(t);
   const fcss = cssDoFiltro($('gFiltro') ? $('gFiltro').value : '');
@@ -4326,6 +4367,35 @@ $('ytCopiarTodos').addEventListener('click', () => {
 $('ytConferir').addEventListener('click', () => enviarYtTexto($('ytTexto').value, false, alvosYt()).catch(e => toast('⚠ ' + e.message)));
 $('ytAplicar').addEventListener('click', () => { if (!$('ytTexto').value.trim()) { toast('Cole pelo menos um link'); return; } aplicarYtTexto($('ytTexto').value, alvosYt()); });
 
+
+
+// ------------------------------------------------------------------ 🪧 cartão sobre fundo (config do projeto)
+const FUNDOS_CARTAO = [['cor_gradiente', 'Gradiente de cor'], ['luz', 'Luz diagonal'], ['nevoa', 'Névoa'], ['grade', 'Grade'], ['ondas', 'Linhas onduladas'],
+  ['grade_ondulada', 'Grade ondulada'], ['grade_3d', 'Grade 3D'], ['pontos', 'Grade de pontos'], ['linhas', 'Linhas retas'], ['papel', 'Papel']];
+const cartaoFundo = Object.assign({ modo: 'gerado', estilo: 'cor_gradiente', cor: '', biblioteca: '', busca: 'abstract background bokeh', desfocar: 4, escurecer: 0.15 }, DEF.cartao_fundo || {});
+function corCartao() { return cartaoFundo.cor || paleta.primaria || '#3C5082'; }
+function desenharCartaoFundo() {
+  document.querySelectorAll('#cfModo button').forEach(b => b.classList.toggle('on', b.dataset.v === cartaoFundo.modo));
+  $('cfGerado').style.display = cartaoFundo.modo === 'gerado' ? '' : 'none'; $('cfVideo').style.display = cartaoFundo.modo === 'video' ? '' : 'none';
+  $('cfEstilo').innerHTML = opcoes(FUNDOS_CARTAO, cartaoFundo.estilo);
+  $('cfCor').value = corCartao();
+  const vids = biblioteca.filter(b => b.media_type === 'video');
+  $('cfClipe').innerHTML = opcoes([['', '🔎 Buscar nos bancos automaticamente']].concat(vids.map(b => [b.id, '📁 ' + (b.rotulo || b.descricao || b.filename)])), cartaoFundo.biblioteca || '');
+  $('cfBuscaBox').style.display = cartaoFundo.biblioteca ? 'none' : '';
+  $('cfBusca').value = cartaoFundo.busca || ''; $('cfDesf').value = cartaoFundo.desfocar; $('cfEsc').value = cartaoFundo.escurecer;
+  $('cfDesfTxt').textContent = cartaoFundo.desfocar; $('cfEscTxt').textContent = Math.round(cartaoFundo.escurecer * 100) + '%';
+  const c = corCartao(); $('stage').style.setProperty('--cf1', c); $('stage').style.setProperty('--cf2', '#0d0b1a');
+}
+function mudouCartao() { marcarSujo(); desenharCartaoFundo(); atualizarMonitor(true); }
+document.querySelectorAll('#cfModo button').forEach(b => b.addEventListener('click', () => { cartaoFundo.modo = b.dataset.v; mudouCartao(); }));
+$('cfEstilo').addEventListener('change', e => { cartaoFundo.estilo = e.target.value; mudouCartao(); });
+$('cfCor').addEventListener('input', e => { cartaoFundo.cor = e.target.value; mudouCartao(); });
+$('cfClipe').addEventListener('change', e => { cartaoFundo.biblioteca = e.target.value; mudouCartao(); });
+$('cfBusca').addEventListener('change', e => { cartaoFundo.busca = e.target.value.trim(); marcarSujo(); });
+$('cfDesf').addEventListener('input', e => { cartaoFundo.desfocar = +e.target.value; mudouCartao(); });
+$('cfEsc').addEventListener('input', e => { cartaoFundo.escurecer = +e.target.value; mudouCartao(); });
+$('cfUsar').addEventListener('click', () => { $('gBordas').value = 'cartao'; segs.forEach(s => { if (s._aspect === 'cartao') s._aspect = 'global'; }); marcarSujo(); desenharTimeline(); renderProps(); atualizarMonitor(true); toast('🪧 Imagens de formato diferente viram cartão sobre o fundo'); });
+desenharCartaoFundo();
 
 // ------------------------------------------------------------------ 🔄 trocar / 🗑 tirar (sem IA) e 💬 falar com a IA
 const CAMPOS_RAPIDO = ['transition', 'transition_duration', 'efeito', 'entrada', 'saida', 'template', 'template_campos', 'zoom_direction'];
@@ -4526,5 +4596,7 @@ window.estudio = { segs, overlays, destaques, graficos, editoriais, novoEditoria
 @keyframes dWipe{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0 0 0 0)}}
 @keyframes dCirc{from{clip-path:circle(0% at 50% 50%)}to{clip-path:circle(75% at 50% 50%)}}
 </style>
+{% include "_sino.html" %}
+<style>header{padding-right:58px!important}#sinoBox{top:5px}#sinoBtn{width:34px;height:34px;line-height:32px;font-size:17px}</style>
 </body>
 </html>

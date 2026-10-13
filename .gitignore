@@ -102,3 +102,14 @@ desktop.ini
 # 📊 Analisador de canal e ⛏ Niche Miner: dados locais
 analises_canal/
 niche_miner/data/
+
+# 🔎 IA do Google (ia_google/): perfil do navegador (login/cookies), conversas, prints e HTML das páginas — tudo pessoal
+ia_google/perfil_navegador/
+ia_google/conversas/
+ia_google/config.json
+ia_google/debug/
+ia_google/erros/
+ia_google/resultados/
+ia_google/videos/
+ia_google/falhas_*
+ia_google/ia_google.log

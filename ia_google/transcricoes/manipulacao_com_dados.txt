@@ -1,0 +1,747 @@
+0:00 uma pílula anticoncepcional dobra o risco de trombose
+0:03 verdade
+0:04 uma universidade
+0:05 aprova quarenta e quatro por cento
+0:07 dos homens que se candidatam
+0:09 e só trinta e cinco por cento
+0:10 das mulheres que se candidatam
+0:12 verdade
+0:13 nos Estados Unidos
+0:14 pessoas negras são 13% da população
+0:17 e 51% dos presos por homicídio
+0:20 verdade
+0:21 os 3 Números que EU te apresentei são reais
+0:23 eles saíram de estudo científico
+0:24 de relatório oficial e de tabela do governo
+0:27 e os 3 já foram usados pra fazer muita gente acreditar
+0:30 em algo que não é verdade
+0:32 o primeiro
+0:33 fez milhares de mulheres
+0:34 largarem a pílula de uma hora pra outra
+0:36 e no ano seguinte
+0:37 a Inglaterra e o país do
+0:39 gaules tiveram cerca de treze mil
+0:41 abortos a mais
+0:43 o segundo
+0:43 parecia a prova de que a universidade
+0:45 discriminava mulheres
+0:47 quando alguém olhou direito
+0:48 o dado mostrava na verdade o contrário
+0:50 e o terceiro roda a internet há anos
+0:53 como prova de uma coisa que ele não prova
+0:55 ninguém precisou de mentir
+0:57 bastou cortar um pedaço pequeno da informação
+1:00 que fez com que uma informação
+1:02 verídica se tornasse uma falsa verdade
+1:04 e você acreditou
+1:06 eu sou o copas
+1:07 e hoje eu vou te provar que manipular você
+1:11 é fácil
+1:13 na segurança da informação
+1:15 existe um nome
+1:16 pra quando o atacante não quebra o sistema
+1:18 e sim convence uma pessoa a abrir a porta pra ele
+1:21 o nome que a gente dá pra isso é engenharia social
+1:24 o que eu vou te mostrar hoje é engenharia social
+1:27 feita com números
+1:28 o exploit não tá no dado exploite
+1:30 tá num defeito de fábrica do seu cérebro
+1:33 e esse defeito se chama vs
+1:36 pra entender a manipulação
+1:37 primeiro você precisa entender o alvo
+1:39 o seu cérebro não foi feito pra ser correto
+1:42 ele foi feito pra ser rápido
+1:44 nos anos setenta
+1:45 os psicólogos amos
+1:47 tiversky e Daniel karneman mostraram como isso funciona
+1:51 e inclusive
+1:52 karneman ganhou um Nobel por esse trabalho
+1:55 quando a gente precisa decidir
+1:56 sem ter certeza
+1:57 o cérebro utiliza de atalhos
+2:00 esses atalhos quase sempre acertam
+2:03 mas quando eles erram
+2:04 eles erram de 1 jeito previsível
+2:06 e é sempre pro mesmo lado
+2:08 e esse erro com direção tem nome VS
+2:11 em um dos experimentos deles
+2:13 eles mostram o quanto isso é fácil de ser explorado
+2:16 eles giravam uma roleta na frente das pessoas
+2:18 preparada pra parar no dez ou no sessenta e cinco
+2:21 e depois fazia uma pergunta
+2:23 qual a porcentagem
+2:24 de países africanos que estão presentes na ono
+2:28 quem tinha visto dez
+2:29 chutou em média vinte e cinco por cento
+2:32 quem tinha visto sessenta e cinco
+2:33 chutou em média
+2:34 quarenta e cinco por cento
+2:36 um número aleatório
+2:37 que não tinha nada a ver com a pergunta
+2:39 mas que puxou a resposta das pessoas
+2:42 e isso se chama ancoragem
+2:44 e é por isso
+2:45 que a primeira informação que você recebe
+2:47 sobre um assunto
+2:48 tem tanto poder
+2:49 porque ela vira âncora
+2:51 tudo que vem depois é ajustado em volta dela
+2:54 o segundo atalho é o mais importante
+2:56 o vies de confirmação
+2:58 o cérebro dá mais peso pro que confirma
+3:01 o que você já acredita
+3:02 e desconfia do que contradiz
+3:04 em mil novecentos e setenta e nove
+3:06 pesquisadores de Stanford
+3:07 reuniram quarenta e oito estudantes
+3:09 uma parte a favor da pena de morte e a outra contra
+3:12 todos leram os mesmos dois estudos
+3:14 um dizia que a pena de morte reduzia crimes
+3:17 e o outro dizia que não
+3:18 a mesma informação pros dois lados
+3:20 o resultado lógico
+3:21 seria todo mundo sair um pouco mais moderado
+3:24 só que aconteceu exatamente o contrário
+3:27 cada grupo achou mais convincente o estudo
+3:30 que concordava com o que ele já pensava
+3:32 e saiu mais radical ainda do que entrou
+3:34 pensa no que que isso significa
+3:36 mostrar a mesma evidência pra dois grupos
+3:39 não aproxima eles
+3:41 na verdade
+3:41 afasta mais ainda pra quem é de ti
+3:44 pensa no cérebro como um sistema com cash
+3:46 ele não vai no banco de dados e confere tudo
+3:49 a cada pergunta que você faz
+3:51 ele devolve a resposta que já tá guardada
+3:54 quem quer te manipular não precisa mentir pra você
+3:56 basta falar a verdade de uma forma criativa
+3:59 agora você já conhece o alvo
+4:01 então eu vou te mostrar as ferramentas
+4:03 toda manipulação com dado verdadeiro
+4:05 usa um conjunto pequeno de ferramentas
+4:08 elas são sempre as mesmas
+4:09 e depois que você aprende a reconhecer
+4:11 você começa a ver elas em todo lugar
+4:14 a primeira ferramenta é o corte
+4:15 você não inventa nada
+4:17 você só escolhe qual pedaço
+4:18 da informação mostrar
+4:20 pensa num investimento que subiu trezentos por cento
+4:23 pode ser verdade
+4:24 se você começar a contar
+4:25 do dia em que ele tava no fundo do poço
+4:28 contando de um ano antes
+4:29 esse mesmo investimento pode ter dado muito prejuízo
+4:32 os dois fatos são verdadeiros
+4:34 quem escolhe a data de início
+4:36 escolhe a conclusão
+4:37 o corte também pode ser em quem aparece
+4:39 todo curso de como ficar rico
+4:42 mostra os alunos que ficaram ricos
+4:44 ninguém mostra
+4:44 os milhares de alunos que pagaram o mesmo curso
+4:47 e perderam
+4:48 dinheiro
+4:48 e esse mesmo erro quase custou muito caro
+4:51 numa guerra
+4:52 segunda guerra mundial
+4:53 os bombardeiros americanos voltavam das missões
+4:56 cheios de buracos de bala
+4:57 os militares queriam saber aonde colocar mais blindagem
+5:01 só que blindagem pesa
+5:03 avião mais pesado
+5:04 gasta mais combustível
+5:05 voa mais devagar e vira um alvo mais fácil
+5:08 então não dava pra blindar o avião inteiro
+5:10 eles olharam os aviões que voltaram
+5:12 e marcaram aonde estavam os buracos
+5:14 tinha buraco nas asas
+5:15 na cauda
+5:16 no corpo do avião e quase nenhum no motor
+5:19 a conclusão
+5:20 parece óbvia vamo brindar aonde tem mais buraco
+5:23 até que esse problema
+5:24 chegou num grupo de matemáticos
+5:26 da universidade de colúmbia
+5:27 que trabalhava pros militares americanos
+5:30 e um deles
+5:30 Abraham wald
+5:32 olhou pros mesmos dados e chegou na conclusão oposta
+5:35 os buracos não mostravam
+5:36 aonde o avião era mais atingido
+5:38 mostravam aonde ele podia ser atingido
+5:41 e mesmo assim continuar operando
+5:43 se quase nenhum avião voltava com o buraco no motor não
+5:47 era porque o motor não era atingido
+5:49 era porque quem tomava tiro no motor
+5:51 ia de arrasta pra cima na hora
+5:53 e as contas que ele fez mostravam o seguinte
+5:55 um avião atingido uma vez no motor
+5:58 voltava cerca de sessenta por cento das vezes
+6:01 atingido no corpo
+6:03 voltava perto de noventa e cinco por cento das vezes
+6:06 a blindagem tinha que ir
+6:08 justamente aonde não tinha buraco de bala
+6:10 e um detalhe honesto
+6:12 aquela imagem famosa
+6:13 do avião cheio de ponte
+6:14 vermelho que circula na internet
+6:16 é uma ilustração moderna
+6:17 não é da época da guerra tá
+6:19 o raciocínio do áudio é real
+6:21 o do desenho nem tanto
+6:23 ou seja
+6:23 como o áudio mostrou
+6:25 analisar só os aviões que voltavam das missões
+6:28 escondia justamente
+6:29 os que tinham sido derrubados
+6:31 e isso a gente chama de vs de sobrevivência
+6:35 você só vê quem sobrou pra poder contar a história
+6:38 e existe um corte que nem precisa de palavra nenhuma
+6:41 o corte gráfico
+6:42 imagina duas barras
+6:43 uma vale trinta e cinco e a outra vale trinta e nove
+6:46 se o eixo do gráfico começa no zero
+6:49 essas barras parecem quase exatamente do mesmo tamanho
+6:52 com pouca diferença
+6:54 mas se alguém faz o eixo começar no trinta e quatro
+6:57 a barra do trinta e nove
+6:59 fica cinco vezes maior
+7:01 os números continuam sendo os mesmos
+7:03 só mudou a régua de onde começa
+7:05 e o seu olho decide o tamanho da diferença
+7:08 antes de você ler qualquer número
+7:11 agora que você já conhece
+7:12 os cortes vão pra segunda ferramenta
+7:14 a segunda ferramenta é a troca de palavras
+7:17 você pega um dado que mede uma coisa e descreve
+7:20 como se ele me disse outra
+7:21 esse aqui você tá muito
+7:23 acostumado a ver
+7:25 exemplo
+7:25 ladrão assalta empresário na porta de sua casa
+7:29 se torna
+7:30 vítima da sociedade
+7:31 comete
+7:32 delito contra homem branco privilegiado em bairro nobre
+7:35 variante do vírus da gripe ainda não nomeada
+7:39 surge em São Paulo
+7:40 se torna doença desconhecida
+7:43 surge na maior capital do Brasil
+7:45 e preocupa
+7:46 doutores
+7:47 parece detalhe
+7:48 mas isso aqui faz uma diferença
+7:50 absurda
+7:51 no impacto da leitura
+7:53 a conclusão é
+7:53 é completamente diferente
+7:56 outubro de mil novecentos e noventa e cinco
+7:58 reino unido
+7:59 o órgão que fiscaliza medicamentos no país
+8:02 manda um alerta para todos os médicos
+8:05 algumas pílulas anticoncepcionais mais novas
+8:08 chamadas de terceira geração
+8:10 dobravam o risco de trombose
+8:12 trombose
+8:13 pra quem não sabe
+8:14 é um coágulo no sangue que pode te matar
+8:16 a notícia se espalhou e era verdade
+8:18 os estudos mostravam exatamente isso
+8:20 só que faltava um número
+8:22 qual era o risco
+8:23 pra começo de conversa
+8:25 com as pílulas antigas
+8:27 mais ou menos uma
+8:28 a cada sete mil mulheres tinha trombose
+8:31 com as novas
+8:32 mais ou menos duas a cada sete mil
+8:35 dobrou sim
+8:36 de um pra dois
+8:37 a cada sete mil mulheres
+8:39 só que quase ninguém
+8:41 ouviu esse um em sete mil
+8:43 o que as pessoas ouviram foi cem por cento de aumento
+8:46 muitas mulheres pararam de tomar a pílula de uma hora
+8:49 pra outra
+8:50 no ano seguinte
+8:50 a Inglaterra e o país do gaules
+8:53 tiveram cerca de treze mil
+8:55 abortos a mais
+8:56 e a própria gravidez
+8:57 ironicamente
+8:59 aumenta o risco de trombose
+9:00 nesse caso
+9:01 ninguém tava tentando manipular ninguém
+9:03 era um alerta de saúde sério sobre um dado real
+9:06 e mesmo assim
+9:07 o jeito de contar o número
+9:09 causou mais estrago do que o risco que ele alertava
+9:12 agora imagina quando alguém faz isso de propósito
+9:15 isso tem nome
+9:16 risco relativo
+9:18 sem risco absoluto
+9:19 dobra o risco
+9:20 aumenta duzentos por cento
+9:22 triplica a chance
+9:24 toda vez que você ouvir uma porcentagem de aumento
+9:27 a pergunta que você deve fazer é uma só
+9:30 qual é o aumento sobre o número absoluto
+9:33 porque cem por cento de quase nada é quase nada
+9:36 e funciona pro outro lado também
+9:38 mil casos
+9:39 parece muito
+9:40 mas mil casos num país de duzentos milhões de pessoas
+9:44 é outra história
+9:46 um número sem o total por trás não informa
+9:48 ele só assusta
+9:49 e a média também
+9:51 pode esconder esse total
+9:53 imagina dez pessoas numa sala
+9:55 cada uma ganha dois mil reais por mês
+9:58 entra uma pessoa naquela sala que ganha um milhão
+10:01 a renda média da sala pula pra quase
+10:04 noventa e três mil reais
+10:06 a frase a renda média dessa sala
+10:09 é de noventa e três mil reais
+10:12 é matematicamente verdadeira
+10:13 e ainda assim não descreve nenhuma
+10:16 das onze pessoas que estão lá dentro
+10:18 nem o rico e nem os pobres
+10:21 outono de mil novecentos e setenta e
+10:23 três universidades da Califórnia
+10:25 em Berkeley
+10:26 a universidade
+10:27 olha os números de quem se candidatou pra
+10:29 pós graduação
+10:30 mais de oito mil homens e mais de quatro mil mulheres
+10:34 dos homens
+10:35 quarenta e quatro por cento foram aprovados
+10:37 das mulheres
+10:38 só trinta e cinco por cento
+10:40 a diferença é grande demais pra ser acaso
+10:43 parecia o retrato exato
+10:45 de uma universidade que discriminava
+10:47 as mulheres
+10:48 a própria direção
+10:49 ficou preocupada e pediu uma análise
+10:52 um estatístico chamado Peter bikel foi olhar os dados
+10:55 departamento por departamento
+10:57 e aí o retrato virou meu amigo
+11:00 dentro de cada departamento
+11:01 as mulheres tinham chances parecidas
+11:03 em vários casos
+11:05 até um pouco maiores do que as dos homens
+11:07 como isso é possível
+11:09 é que as mulheres estavam se candidatando mais
+11:12 pros cursos mais disputados
+11:14 que reprovavam quase todo Mundo
+11:16 os homens estavam se candidatando mais
+11:18 pros cursos com mais vagas
+11:20 e o que puxava a taxa geral deles pra baixo
+11:23 não era o gênero
+11:24 era o curso escolhido
+11:25 isso se chama paradoxo de Simpson
+11:28 um padrão que aparece no total e some
+11:31 ou até inverte quando você separa os grupos
+11:34 e aqui é importante ser honesto
+11:36 isso
+11:37 não prova que discriminação não existe em lugar nenhum
+11:40 prova que aquele número sozinho
+11:43 não provava o que parecia provar
+11:45 a medicina
+11:47 já caiu nessa armadilha também
+11:48 estudos com dezenas de milhares de enfermeiras
+11:52 mostravam que quem fazia reposição hormonal
+11:55 tinha bem menos doença no coração
+11:57 quando um estudo maior sorteou quem tomaria o hormônio
+12:01 o risco
+12:01 cardíaco no grupo do hormônio
+12:03 foi vinte por cento maior
+12:05 as mulheres que tomavam hormônio já se cuidavam mais
+12:08 iam ao médico e fumavam menos
+12:11 o hormônio não era a causa da saúde
+12:14 ele só era usado por quem já era saudável
+12:17 esse é o perigo da variável escondida
+12:20 você vê duas coisas andando juntas
+12:22 e conclui que uma causa a outra
+12:24 quando na verdade tem uma terceira empurrando as duas
+12:28 e quem quer te manipular
+12:29 só precisa não mencionar essa terceira
+12:31 tá vendo como é fácil
+12:33 até aqui
+12:33 o manipulador escolhia qual pedaço do dado te mostrar
+12:37 agora ele vai mostrar o dado inteiro
+12:39 sem cortar nada
+12:41 e mesmo assim
+12:42 ele ainda vai te levar pra onde ele quiser
+12:45 em 1982
+12:47 pesquisadores apresentaram pra médicos 1 caso
+12:49 de câncer de pulmão
+12:51 com 2 opções
+12:52 cirurgia ou radioterapia
+12:54 pra metade dos médicos
+12:55 a cirurgia foi descrita assim
+12:57 a sobrevivência no primeiro mês
+12:59 é de noventa por cento
+13:00 pra outra metade foi descrita dessa forma
+13:03 a mortalidade no primeiro mês
+13:05 é de dez por cento
+13:06 é exatamente a mesma informação
+13:08 noventa por cento vive
+13:10 dez por cento morre
+13:11 com a palavra sobrevivência
+13:13 oitenta e quatro por cento escolheram a cirurgia
+13:16 com a palavra mortalidade
+13:18 só cinquenta por cento escolheram
+13:20 e repara
+13:21 não era gente leiga
+13:23 eram médicos
+13:24 isso se chama
+13:26 efeito de enquadramento
+13:28 é aquela famosa frase do
+13:29 pra um pessimista
+13:30 o copo tá meio vazio e pra um otimista
+13:33 o copo tá meio cheio
+13:34 a moldura decide o que você
+13:36 sente sobre ela
+13:37 nove em cada dez
+13:38 aprovam e um em cada dez reprova
+13:42 dizem exatamente
+13:44 a mesma coisa
+13:45 mas uma frase vende
+13:47 e a outra te assusta
+13:49 engraçada né
+13:50 e agora a última ferramenta
+13:52 e é a mais simples de todas
+13:55 repetição
+13:56 desde os anos setenta
+13:57 a psicologia sabe que uma frase repetida
+14:01 parece mais verdadeira
+14:03 só porque ela ficou familiar no seu cérebro
+14:06 é aquele velho ditado
+14:07 uma mentira repetida mil vezes
+14:10 se torna uma verdade
+14:11 e isso se chama
+14:12 mentira
+14:12 efeito da verdade
+14:14 e ilusória
+14:15 pesquisadores testaram
+14:17 e se saber a resposta certa
+14:19 protege as pessoas disso
+14:21 mesmo frases que contradiziam que as pessoas já sabiam
+14:25 ficaram mais críveis
+14:27 depois de repetir algumas vezes
+14:29 o cérebro confundiu
+14:31 eu já ouvi isso
+14:32 com isso
+14:33 é verdade
+14:34 agora junta isso com 1 rede social
+14:36 1 corte bem feito
+14:38 compartilhado por 1000 pessoas diferentes
+14:40 em 1000 grupos diferentes
+14:42 cada vez que você vê
+14:43 ele fica 1 pouco mais verdadeiro na sua cabeça
+14:47 mesmo que nenhum número
+14:48 nenhum dado e nenhuma realidade tenham sido alterados
+14:53 agora eu vou juntar
+14:54 todas essas ferramentas que eu te mostrei
+14:57 em um caso só
+14:58 e ele é desconfortável de propósito tá
+15:01 negros
+15:02 são treze por cento da população dos Estados Unidos
+15:05 e cometem
+15:06 cinquenta por cento dos crimes
+15:08 essa frase roda a internet há anos
+15:12 e ela funciona justamente
+15:14 porque os números dela
+15:15 saem de uma tabela oficial do FBI
+15:18 então vamo desmontar essa frase peça por peça
+15:22 como quem faz engenharia reversa num mauer
+15:25 vamo lá
+15:26 ferramenta um
+15:26 o corte em dois mil e dezenove
+15:29 cinquenta e um por cento das prisões por homicídio
+15:31 nos Estados Unidos
+15:32 foram de pessoas negras
+15:34 esse é o número verdadeiro
+15:36 só que essa frase pegou um número de um tipo de crime
+15:39 específico e chamou de os crimes
+15:42 globando todos os crimes cometidos
+15:45 contando todas as prisões daquele ano
+15:47 o número verdadeiro de crimes cometidos por eles
+15:50 é vinte e seis
+15:51 vírgula
+15:52 seis por cento
+15:53 ferramenta dois
+15:54 a troca de palavras
+15:55 a tabela não mede quem cometeu o crime
+15:58 ela mede quem foi preso
+16:00 e nos Estados Unidos
+16:01 mais ou menos
+16:02 metade dos homicídios nem termina com alguém preso
+16:06 e quem é preso
+16:07 depende de onde a polícia olha
+16:09 brancos e negros americanos
+16:11 usam maconha numa proporção parecida
+16:13 mas entre dois mil e dez e dois mil e dezoito
+16:16 negros tiveram três
+16:17 vírgula
+16:17 seis vezes
+16:19 mais chances de serem presos por posse de maconha
+16:22 o mesmo comportamento
+16:23 mas quase quatro vezes mais punição
+16:27 agora como vocês sabem
+16:28 eu sempre sou
+16:29 técnico e a partidário em todos os meus vídeos
+16:33 então eu vou te mostrar o dado
+16:35 que também não ajuda no meu argumento
+16:37 existem pesquisas
+16:38 em que as próprias vítimas descrevem quem as atacou
+16:42 sem passar pela polícia
+16:43 e essas pesquisas também mostram uma diferença grotesca
+16:46 em dois mil e dezoito
+16:47 nos crimes violentos não letais
+16:49 negros eram vinte e nove por cento dos agressores
+16:52 e trinta e três por cento dos presos
+16:55 ou seja
+16:55 a diferença existe
+16:57 e a prisão ainda aumenta ela mais um pouco
+17:00 mas a pergunta honesta não é se a diferença existe
+17:03 é o que causa ela
+17:04 ferramenta três
+17:05 a variável escondida
+17:07 um estudo de Harvard
+17:09 acompanhou quase três mil jovens de Chicago
+17:11 durante anos
+17:12 quando os pesquisadores compararam
+17:14 jovens que viviam em condições parecidas
+17:17 a diferença de violência
+17:19 entre negros e brancos
+17:20 encolheu muito
+17:22 mas da metade dela
+17:23 foi explicada pelo bairro onde a pessoa cresceu
+17:27 e pela estrutura familiar e fatores sociais
+17:30 bora lá que é Berkeley de novo
+17:32 o que parecia ser sobre cor
+17:34 era em grande parte
+17:36 sobre onde e como
+17:37 essas pessoas viviam
+17:38 ferramenta quatro
+17:39 o denominador
+17:40 em dois mil e dezenove
+17:41 os Estados Unidos tiveram dezesseis mil e quatrocentas
+17:44 vítimas de homicídio
+17:46 a população negra do país
+17:47 é de uns quarenta e quatro milhões
+17:49 mesmo se metade desses homicídios
+17:52 tivessem sido cometidos por pessoas negras
+17:54 cada 1 matando 1 Pessoa só
+17:56 daria mais OU menos umas 8000 pessoas
+17:59 menos de zero vírgula zero
+18:01 dois por cento do grupo
+18:02 mais de noventa e nove vírgula
+18:04 nove por cento dos negros
+18:05 não matou ninguém naquele ano
+18:07 percebe
+18:08 a frase
+18:08 pega o comportamento de uma fração minúscula e carimba
+18:12 como se fosse culpa
+18:13 do grupo inteiro
+18:14 e agora
+18:15 ferramenta número cinco
+18:17 a repetição
+18:18 essa frase é é compartilhada há anos
+18:21 sempre igual
+18:22 o que faz com que ela soe como um fato
+18:24 agora o teste que desmonta qualquer frase desse tipo
+18:28 troca o grupo
+18:29 homens são mais ou menos metade
+18:31 da população do mundo
+18:33 e mais de noventa por cento dos suspeitos de homicídio
+18:36 são homens
+18:37 isso no mundo inteiro
+18:38 mesma estrutura de frase e uma diferença
+18:41 grotescamente maior
+18:43 e ninguém usa isso pra concluir que o próprio pai
+18:45 ou o próprio irmão é perigoso
+18:47 porque com o grupo que você conhece
+18:49 você enxerga pessoas
+18:51 com o grupo que você não conhece
+18:53 você só enxerga a estatística
+18:54 e lembra do estudo da pena de morte
+18:56 mostrar
+18:56 esses mesmos números
+18:57 pra dois grupos que já pensam diferente
+19:00 não aproxima ninguém
+19:01 cada lado pega o pedaço que confirma o que já pensava
+19:04 e no Brasil
+19:05 no Brasil
+19:06 segundo senso de dois mil e vinte e dois
+19:08 pretos e pardos são 55,5% da população
+19:13 nas prisões
+19:14 eles são 68,2%
+19:17 o maior patamar já registrado
+19:20 as mesmas perguntas
+19:21 valem aqui
+19:22 quem foi preso e quem só não foi pego
+19:24 quem estava sendo vigiado
+19:25 e o que mais essas pessoas tem em comum
+19:27 além da cor
+19:28 dado de prisão não é retrato de dado de crime
+19:32 é retrato de quem foi preso
+19:34 às vezes
+19:35 a manipulação nem é de propósito
+19:37 e o resultado é ainda pior
+19:39 Inglaterra
+19:39 mil novecentos e noventa e seis
+19:41 Sally Clark
+19:42 uma advogada
+19:43 perde o primeiro filho
+19:44 Christopher
+19:45 com poucas semanas de vida
+19:46 em mil novecentos e noventa e oito
+19:48 o segundo filho
+19:49 Harry também morre ainda bebê
+19:51 ela é acusada de ter matado os dois
+19:54 no julgamento
+19:55 um pediatra famoso chamado Roy middle
+19:58 depõe como especialista
+19:59 e ele apresenta um
+20:00 número a chance de uma família
+20:02 como a dela ter uma morte súbita infantil seria de uma
+20:06 em oito mil quinhentos e quarenta e três
+20:08 a chance de ter duas
+20:09 segundo ele
+20:10 era só multiplicar uma pela outra
+20:12 ou seja
+20:13 uma em setenta e três milhões
+20:15 em mil novecentos e noventa e nove
+20:16 Sally Clark é condenada por assassinato
+20:19 esse número tinha dois problemas graves
+20:21 o primeiro
+20:22 ele tratou as duas mortes como se fossem variáveis
+20:25 independentes
+20:26 como dois lançamentos de uma moeda qualquer
+20:28 só que bebês de uma mesma família
+20:31 compartilham genética e ambiente
+20:33 se acontece uma vez
+20:35 a chance de acontecer de novo é muito maior
+20:37 o segundo problema é mais sutil e é o que mais engana
+20:41 mesmo que duas mortes naturais sejam muito raras
+20:44 uma mãe matar os dois filhos bebês é raríssimo
+20:48 a pergunta certa nunca foi
+20:50 qual é a chance
+20:51 disso acontecer por acaso
+20:53 a pergunta correta era
+20:54 entre as explicações possíveis
+20:56 qual delas é a mais provável
+20:59 e esse erro tem nome
+21:00 a falácia do promotor
+21:02 em dois mil e um
+21:03 a real sociedade de estatística do reino unido
+21:05 declarou publicamente
+21:06 que aquele número
+21:08 não tinha base estatística
+21:10 e em dois mil e três
+21:11 a condenação de cele foi anulada
+21:14 apareceu um exame que tinha ficado de fora do processo
+21:17 indicando que uma infecção havia ocorrido
+21:20 no segundo bebê
+21:21 cele Clark passou mais de três anos presa e morreu
+21:24 em dois mil e sete
+21:25 o número tinha cara de ciência
+21:27 veio de 1
+21:28 especialista e 1 juri inteiro acreditou nele
+21:31 e não era verdade
+21:33 nesse ponto do vídeo
+21:34 você tá pensando que agora
+21:36 você tá protegido do Tal do VS
+21:39 conhecendo as ferramentas
+21:40 você não cai mais nisso certo
+21:42 infelizmente
+21:44 não é assim que funciona
+21:45 em dois mil e dois
+21:46 a psicóloga Emily pronin e os pesquisadores de Stanford
+21:50 descreveram o que chamaram de ponto cego do vs
+21:53 a gente reconhece muito bem o vs nos outros
+21:56 muito bem
+21:57 mas a gente sempre se avalia como menos
+22:00 ou até não inviesado
+22:02 mesmo depois de ouvir a explicação de como o vies
+22:05 funciona
+22:06 a maioria das pessoas acredita que elas mesmas
+22:09 não são afetadas pelo vies
+22:11 outro estudo mostrou que ser mais inteligente
+22:15 não diminui esse ponto cego
+22:16 e lembra do estudo lá de 2015
+22:18 saber a resposta certa
+22:20 não te protege da repetição
+22:22 então assistir esse vídeo não te vacina
+22:25 ele te dá ferramentas pra reconhecer a manipulação
+22:29 mas o que mais acontece
+22:30 é você usar essa ferramenta
+22:32 só pra apontar o vs dos outros
+22:35 o vs ele não pode ser desligado
+22:37 porque ele não é um bug
+22:38 ele é o preço de um cérebro que precisa decidir rápido
+22:41 e já que eu prometi ser honesto
+22:43 esse vídeo
+22:44 também tem vs
+22:46 eu escolhi os casos
+22:47 eu escolhi os casos mais fortes
+22:49 os que prendem a sua atenção
+22:51 e quase todos
+22:52 são casos em que o erro foi descoberto
+22:55 os casos em que ninguém nunca descobriu não estão aqui
+22:58 porque ninguém sabe quais são
+23:00 EU usei nesse vídeo
+23:01 alguma das ferramentas que EU acabei de te mostrar
+23:04 começando pelo título
+23:05 manipular você é fácil
+23:07 é 1 moldura é escolhida
+23:09 pra te fazer clicar
+23:11 se EU tivesse chamado esse vídeo de
+23:13 introdução aos vieses estatísticos
+23:16 muito provavelmente você nem teria clicado
+23:18 repara como
+23:19 até o jeito de te convencer a assistir
+23:21 usa as mesmas ferramentas
+23:24 e é exatamente por isso
+23:25 que todas as fontes
+23:27 estão sempre nas descrições dos meus vídeos
+23:30 a partir de agora
+23:31 toda vez que você for analisar um fato
+23:34 uma estatística
+23:35 um dado
+23:36 faça a seguinte pergunta pra você mesmo
+23:39 eu quero que isso seja verdade
+23:41 se a resposta for sim
+23:42 é exatamente aí que você tem que conferir duas vezes
+23:46 procura de propósito o dado que provaria
+23:49 que você tá errado
+23:51 se você nem procurou
+23:52 você não tá pensando
+23:53 você tá torcendo
+23:54 e quem tá torcendo
+23:56 não tem lugar em discussão científica
+23:59 seu lugar é na arquibancada
+24:01 e é por isso que e tudo nesse canal tem fonte
+24:04 não é pra você confiar em mim
+24:06 é pra você não precisar confiar em mim
+24:09 você mesmo pode IR lá
+24:10 e sempre tirar suas próprias conclusões e debater
+24:14 aqui nos comentários
+24:15 se você viu algo que você não concorda
+24:17 não fique calado
+24:18 vem aqui e digita pra mim se esse vídeo mudou
+24:21 o jeito que você vai olhar pro próximo
+24:23 dado que aparecer na sua timeline
+24:25 deixa aquele like e se inscreve no canal
+24:27 e mais uma vez
+24:28 todas as fontes do
+24:29 vídeo estão aqui na descrição
+24:32 vai lá e lê
+24:33 muito obrigado a todo mundo que assistiu até aqui
+24:35 um grande abraço e como sempre falou

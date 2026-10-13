@@ -397,6 +397,30 @@ class _Sessao(threading.Thread):
         finally:
             est["rodando"], est["fim"] = False, time.time()
             _SESSAO_INFO["ultimo_uso"] = time.time()
+            _avisar_fim_flow(tipo, est.get("erro"), bool(opcoes.get("visivel")), len(est.get("resultados") or []))
+
+
+_RE_PRECISA_DE_VOCE = re.compile(r"login|entrar na conta|fa[cç]a o login|captcha|verifica[cç][aã]o|n[aã]o sou um rob[oô]|sign in", re.I)
+
+
+def _avisar_fim_flow(tipo: str, erro: Optional[str], visivel: bool, n: int) -> None:
+    """🔔 Fim de uma geração no Flow (v84_87). Login/captcha com o navegador OCULTO: avisa pra rodar visível e resolver."""
+    try:
+        import notificacoes
+        nome = "🧪 Teste do Flow" if tipo == "teste" else "🎬 Geração no Flow"
+        if not erro:
+            notificacoes.avisar(f"✅ {nome} — pronto", f"{n} arquivo(s) na galeria.", "/flow#galeria", "ok", tipo="flow")
+        elif erro == "Parado por você.":
+            return
+        elif _RE_PRECISA_DE_VOCE.search(erro):
+            notificacoes.avisar("🔒 O Flow precisa de você (login/captcha)",
+                                ("O navegador estava OCULTO — marque “navegador visível” e rode de novo pra resolver na janela. "
+                                 if not visivel else "Resolva na janela do navegador e rode de novo. ") + erro[:300],
+                                "/flow", "aviso", tipo="flow", chave="flow:captcha")
+        else:
+            notificacoes.avisar(f"❌ {nome} — deu erro", erro[:400], "/flow", "erro", tipo="flow")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _enviar(tipo: str, cfg: Dict[str, Any], opcoes: Dict[str, Any]) -> None:

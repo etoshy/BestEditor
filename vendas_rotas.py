@@ -23,7 +23,14 @@ def registrar(app, base_dir: str) -> None:
         import ia_servico
         if not ia_servico.ativo("venda_imagens"):
             return False
-        threading.Thread(target=lambda: vd.ia_analisar_imagens(base_dir, pid, ids), daemon=True).start()
+        def _rodar():
+            import notificacoes
+            try:
+                vd.ia_analisar_imagens(base_dir, pid, ids)
+                notificacoes.avisar("✅ Vídeo de venda — fichas das fotos pela IA", "", f"/vendas/{pid}", "ok", tipo="venda", chave=f"venda:{pid}")
+            except Exception as exc:  # noqa: BLE001
+                notificacoes.avisar("❌ Vídeo de venda — fichas das fotos deram erro", str(exc)[:300], f"/vendas/{pid}", "erro", tipo="venda")
+        threading.Thread(target=_rodar, daemon=True).start()
         return True
 
     def _proj(pid: str):

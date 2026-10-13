@@ -614,7 +614,7 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
                     r[campo] = str(v)
                 else:
                     avisos.append(f"T{n}: {campo} '{v}' desconhecido.")
-        if it.get("bordas") in ("black", "zoom", "mosaic", "smart"):
+        if it.get("bordas") in ("black", "zoom", "mosaic", "smart", "cartao"):
             r["bordas"] = it["bordas"]
         cam = it.get("camera") or it.get("zoom_direction")
         if cam:

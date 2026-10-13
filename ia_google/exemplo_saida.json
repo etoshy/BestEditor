@@ -1,0 +1,31 @@
+{
+  "pergunta": "Qual o valor do dólar hoje?",
+  "resposta_objetiva": "O valor atual do dólar comercial é de R$ 4,99.",
+  "resposta_completa": "Em 13 de outubro de 2026, o dólar comercial apresenta uma cotação estável na faixa de R$ 4,989 a R$ 4,990. O mercado de câmbio tem mantido o par USD/BRL operando com flutuações cotidianas normais, equilibrando-se ligeiramente abaixo da marca de R$ 5,00 devido às recentes movimentações econômicas globais e taxas de juros.",
+  "fontes": [
+    {
+      "titulo": "Investing.com",
+      "site": "Investing.com",
+      "url": "https://br.investing.com/currencies/usd-brl",
+      "trecho": "",
+      "origem": "citada_pela_ia"
+    },
+    {
+      "titulo": "Dólar Hoje",
+      "site": "Dólar Hoje",
+      "url": "https://dolarhoje.com/",
+      "trecho": "",
+      "origem": "citada_pela_ia"
+    },
+    {
+      "titulo": "Bloomberg Línea",
+      "site": "Bloomberg Línea",
+      "url": "https://www.bloomberglinea.com.br/quote/USDBRL:CUR/",
+      "trecho": "",
+      "origem": "citada_pela_ia"
+    }
+  ],
+  "formato_respeitado": true,
+  "completa": true,
+  "data": "2026-10-13T12:02:53"
+}

@@ -28,6 +28,79 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🔔 Notificações, tudo em segundo plano e 🕘 Histórico (v84_87)
+
+- **🔔 Sininho** no canto de cima de TODAS as páginas (inclusive o Estúdio): bolinha vermelha com o número de não lidas
+  (também aparece no título da aba). Clicando abre a lista; clicando num aviso você vai direto pro lugar (o vídeo pronto,
+  o áudio no histórico, o zip, o projeto…). Chega um balãozinho quando aparece aviso novo. Guardado em
+  `outputs/notificacoes.json` (não vai pro git).
+- Avisa quando termina ou dá erro: áudio do Gerador de voz, narração do Roteiro para Áudio, falas da Conversa,
+  transcrição/prompt do vídeo, prévias, 🎞️ timeline 2, 🎬 montagem, cortes/clipes do YouTube no editor, 🤖 agente do
+  YouTube, ✂️ Cortar do YouTube, 📲 Baixar de outras redes, 📝 Transcrever, 🖼️ Capturar página, 🔗 Extrair links,
+  🎬 Google Flow (e login do Flow), 🎞️ Vídeos modelados, 🕵️ Modelos de vídeo, 🛒 Venda, 📜 Roteiro do YouTube,
+  📊 Analisador de canal, perfil de voz do YouTube e todas as tarefas de IA abaixo.
+- **🔒 Captcha**: se a 🔎 IA do Google pedir captcha com o navegador **oculto**, ela reabre o navegador **visível** na
+  mesma página e espera você resolver (antes dava erro). O sininho avisa ("resolva na janela") e o aviso some sozinho
+  quando você resolve; a aba 🔎 IA do Google mostra uma faixa amarela. No 🎬 Flow, login/captcha com o navegador oculto
+  vira um aviso pedindo pra rodar com "navegador visível".
+- **Tudo em segundo plano** (pode clicar, fechar a aba e voltar depois): o que antes precisava ficar com a aba aberta
+  agora roda no servidor (`tarefas_bg.py`, salvo em `outputs/tarefas/`):
+  - 🤖 **Gerar com a IA** (Modelos de vídeo, Venda, Roteiro do YouTube, Modelados, prompt das buscas) — voltando na
+    página a resposta é colada e lida sozinha;
+  - 🪄 **Fazer com a IA** da edição no Estúdio — a resposta fica guardada e é colada no painel ao voltar;
+  - ✅ **Checar fatos** — o resultado volta sozinho no roteiro;
+  - 🔗 **Extrair links de canal**.
+  Continuam na aba só as coisas de edição ao vivo do Estúdio (prévias, 💬 conversa com a IA, ver/ouvir), porque mexem no
+  que ainda não foi salvo.
+- **🕘 Histórico** (link no menu e no sininho): todas as tarefas (com o resultado pra copiar) e todos os avisos, mais
+  atalhos pros históricos de cada ferramenta. Ganharam histórico que sobrevive a fechar o site: ✂️ Cortar do YouTube,
+  📲 Baixar de outras redes, 📝 Transcrever, 🖼️ Capturar página (um `_job.json` na pasta de cada um) e 🔗 Extrair links.
+
+## 🔎 IA do Google dentro do site (v84_86)
+
+- O app **ia_google/** (pesquisa no Modo IA do Google por um navegador automatizado: chat com fontes + análise de vídeos
+  do YouTube) agora vem junto e roda **à parte**, na porta **8852** (a 5000 dele brigava com o Anime Pexels local) —
+  aba **🔎 IA do Google** no menu de cima (liga sozinho ao abrir). Precisa de `pip install -r ia_google/requirements.txt`.
+- **🤖 Agente do YouTube**: quando o vídeo **não tem legenda** ou a leitura da legenda **não achou** o momento, a IA do
+  Google **assiste o vídeo** e dá o início/fim (⚙️ Configurações → 🔎 IA do Google: "complemento" (padrão), "sempre
+  primeiro" ou "não usar"). Funciona até sem a IA do Claude ligada.
+- **✅ Checar fatos** no 📜 Roteiro do YouTube (embaixo do roteiro): a IA do Google confere nomes, datas e números na web
+  e diz o que está certo/errado, com as fontes.
+- O perfil do navegador dela, as conversas, prints e HTMLs (`ia_google/perfil_navegador/`, `conversas/`, `debug/`,
+  `erros/`, `config.json`…) são pessoais: ficam fora do git e do zip.
+
+---
+
+## 🪧 Cartão sobre fundo + direção "Propaganda" (v84_85)
+
+- Nova opção de **Bordas: 🪧 Cartão sobre fundo** (no topo do Estúdio, por trecho ou nas Configurações). Imagem de
+  formato diferente do vídeo (capa de livro, produto em pé, print) vira um **cartão** com cantos arredondados e sombra
+  que sobe de leve, aparece e fica flutuando por cima de um **fundo em movimento**. Fotos seguidas passam sobre o
+  **mesmo fundo** (ele continua de onde parou, sem pulo). Foto com o formato do vídeo continua ocupando a tela; vídeo
+  de outro formato fica no mosaico.
+- **O fundo** (🎨 Direção → 🪧 Cartão sobre fundo), por projeto:
+  - **✨ Fundo animado**: gradiente, luz diagonal, névoa, grades, ondas, pontos, linhas ou papel, na cor que você
+    escolher (padrão: a primária da paleta do projeto) — deriva devagar.
+  - **🎞 Clipe de vídeo**: um vídeo que você mandou pra 📁 Mídia, ou o site busca um nos bancos na montagem (ex.:
+    "abstract background bokeh") — com desfoque e escurecer ajustáveis. Se não achar, usa o fundo animado.
+- **Direção "Propaganda (cartões sobre fundo)"**: liga o cartão, transições rápidas (deslizes, zoom, woosh), entradas
+  com pop, cor viva e destaques grandes de oferta.
+- Os clipes já montados antes são refeitos uma vez (mudou o jeito de montar fotos).
+
+---
+
+## 🖼 Capa/imagem em pé sem zoom gigante + 🎬 entradas que travavam (v84_84)
+
+- Imagem com proporção bem diferente do vídeo (capa de livro em pé num vídeo 16:9, print vertical…) agora respeita as
+  **Bordas** escolhidas: **Bordas pretas** ou **Mosaico** mostram a imagem **inteira** (mosaico = cópias desfocadas dela
+  no fundo, igual aos vídeos) e a câmera mexe pouco (zoom de no máximo ~14%). **Zoom (preencher)** continua cortando.
+  Antes toda foto era cortada pra preencher a tela + zoom de até 40%.
+- **Bug corrigido**: as entradas que mudam o tamanho da imagem (Liga TV, Zoom, Estica, Pop, Gira…) ficavam TRAVADAS no
+  começo do gesto o trecho inteiro — a imagem virava uma linha fina no meio da tela preta (Liga TV) ou ficava pequena.
+  Agora o gesto acontece e a imagem fica inteira.
+
+---
+
 ## 💬 Falar com a IA no editor + 🔄 Trocar / 🗑 Tirar (v84_83)
 
 - **Sem IA**: selecione um trecho, uma transição (losango) ou um destaque — ou vários — e use os botões que aparecem no

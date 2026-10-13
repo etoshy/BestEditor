@@ -175,4 +175,28 @@ function mostrarResultado(jobId, resultado) {
   document.getElementById('resultado-box').style.display = 'block';
 }
 </script>
+
+<h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
+{% if not jobs %}<p style="color:#666;font-size:.85rem;">Nada ainda — pode começar um e fechar a aba: quando terminar chega um aviso no 🔔 e fica tudo aqui.</p>{% endif %}
+{% for j in jobs %}
+<div class="hist-item" id="j-{{ j.id }}" style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;">
+  <span class="hist-data" data-t="{{ (j.criado_em or 0) | int }}"></span> ·
+  {{ 'Transcrever' if j.modo == 'transcrever' else 'Só baixar' }} — {{ (j.url or 'arquivo enviado')[:80] }} — <b>{{ j.status }}</b>
+  {% if j.status == 'pronto' %}<button type="button" onclick="abrirDoHistorico('{{ j.id }}')" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">abrir</button>{% endif %}
+  {% if j.status == 'processando' %}<button type="button" onclick="acompanhar('{{ j.id }}');document.getElementById('progresso-box').style.display='block'" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">acompanhar</button>{% endif %}
+  {% if j.erro %}<div style="color:#b91c1c;">{{ j.erro[:200] }}</div>{% endif %}
+</div>
+{% endfor %}
+<style>.hist-item:target{background:#eff6ff;border-color:#2563eb!important}</style>
+<script>
+document.querySelectorAll('.hist-data').forEach(e => { e.textContent = new Date(parseInt(e.dataset.t) * 1000).toLocaleString('pt-BR'); });
+async function abrirDoHistorico(id) {
+  const j = await (await fetch(`/transcrever/${id}/status`)).json();
+  if (j.status === 'pronto') { mostrarResultado(id, j.resultado); document.getElementById('resultado-box').scrollIntoView({behavior: 'smooth'}); }
+}
+(function () {  // voltou pela notificação: já abre o resultado
+  const m = location.hash.match(/^#j-([0-9a-f]{12})$/); if (!m) return;
+  const el = document.getElementById('j-' + m[1]); if (el && el.querySelector('button')) el.querySelector('button').click();
+})();
+</script>
 {% endblock %}

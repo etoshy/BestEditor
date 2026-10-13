@@ -51,6 +51,12 @@ def _rodar(pid: str, fase: str, alvo: Callable[[Callable[[str], None], Callable[
             log("✖ " + str(exc).splitlines()[0][:300])
         finally:
             t["rodando"] = False
+            import notificacoes
+            _cancelou = bool(t.get("cancelar"))
+            if t.get("erro"):
+                notificacoes.avisar(f"❌ Vídeo modelado — {fase} deu erro", str(t["erro"])[:400], f"/modelados/{pid}", "erro", tipo="modelado")
+            elif not _cancelou:
+                notificacoes.avisar(f"✅ Vídeo modelado — {fase} pronto", "", f"/modelados/{pid}", "ok", tipo="modelado")
     threading.Thread(target=_thread, daemon=True).start()
     return True
 

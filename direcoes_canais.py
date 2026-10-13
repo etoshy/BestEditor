@@ -181,7 +181,41 @@ DALLAS: Dict[str, Any] = {
                    "palavras_por_minuto": 170},
 }
 
-DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS]
+# ------------------------------------------------------------------ Propaganda (v84_85)
+# Vídeo de venda / anúncio: produto em CARTÃO sobre um fundo que se mexe (as fotos de formato diferente —
+# capa, produto em pé, print — viram cartões com sombra; fotos seguidas passam sobre o mesmo fundo), cortes
+# rápidos com deslizes, entradas com "pop", cor viva e destaques grandes de preço/oferta.
+PROPAGANDA: Dict[str, Any] = {
+    "id": "sys_propaganda",
+    "nome": "Propaganda (cartões sobre fundo)",
+    "descricao": "Pra vídeo de venda e anúncio: foto/capa de outro formato vira CARTÃO com sombra flutuando sobre um fundo "
+                 "animado ou um clipe, transições rápidas (deslizes), entradas com pop, cor viva e destaques grandes de oferta.",
+    "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "dinamico", "marca": None, "universo": "predef",
+    "cores": {"ativa": True, "modo": "projeto"},
+    "bordas": "cartao",
+    "cartao_fundo": {"modo": "gerado", "estilo": "cor_gradiente"},
+    "filtros": {"pct": 60, "itens": [{"id": "vivid", "peso": 3}, {"id": "punch", "peso": 2}, {"id": "clarendon", "peso": 1}]},
+    "efeitos": {"pct": 35, "itens": [
+        {"id": "zoom_respiro", "peso": 3}, {"id": "zoom_in", "peso": 2}, {"id": "ov_bokeh_suave", "peso": 2},
+        {"id": "ov_particulas_lentas", "peso": 1}, {"id": "ov_leak", "peso": 1}]},
+    "transicoes": {"pct": 70, "itens": [
+        {"id": "slide_left", "peso": 3}, {"id": "slide_up", "peso": 2}, {"id": "cb_zoom", "peso": 2}, {"id": "gl_woosh", "peso": 2},
+        {"id": "zoom_in_out", "peso": 1}, {"id": "camera_flash", "peso": 1}]},
+    "entradas": {"pct": 30, "itens": [
+        {"id": "pop", "peso": 3}, {"id": "spring_in", "peso": 2}, {"id": "punch_in", "peso": 1}, {"id": "slide_up", "peso": 1}]},
+    "saidas": {"pct": 0, "itens": []},
+    "templates": {"pct": 0, "itens": []},
+    "templatesAvatar": {"pct": 0, "itens": []},
+    "overlays": {"pct": 0, "itens": [], "maxPorCena": 1},
+    "pares": {"modo": "livre", "itens": []},
+    "legenda": None,
+    "destaques": {"ativo": True, "densidade": "equilibrado", "estilos": [
+        "impacto_red", "cartaz_vivo", "cartaz_3d", "selo_dado", "selo_alerta", "numerao", "sfx_pop", "palavras", "marca_3d_ouro"]},
+    "editoriais": {"ativo": False},
+    "som_transicoes": "auto",
+}
+
+DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS, PROPAGANDA]
 
 
 def _so_o_que_existe(d: Dict[str, Any]) -> Dict[str, Any]:

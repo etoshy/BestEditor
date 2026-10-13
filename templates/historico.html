@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Histórico{% endblock %}
+{% block content %}
+<style>
+  .hint { font-size: .85rem; color: #666; }
+  .cartao { border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; margin: 6px 0; font-size: .88rem; }
+  .cartao.erro { border-color: #fecaca; background: #fff7f7; } .cartao.nova { background: #eff6ff; }
+  .cartao .q { color: #888; font-size: .78rem; }
+  .cartao pre { white-space: pre-wrap; max-height: 260px; overflow: auto; background: #f8fafc; padding: 8px; border-radius: 6px; font-size: .78rem; }
+  .atalhos a { display: inline-block; margin: 3px 10px 3px 0; }
+  details summary { cursor: pointer; }
+  .peq { margin: 0 0 0 8px; padding: 3px 9px; font-size: .78rem; }
+</style>
+<h1>🕘 Histórico</h1>
+<p class="hint">Tudo que rodou em segundo plano fica aqui — você pode iniciar uma geração, fechar a aba e voltar depois.
+  Quando algo termina (ou precisa de você, tipo um captcha) chega um aviso no 🔔 do canto.</p>
+
+<p class="atalhos hint"><b>Onde ficam os resultados de cada ferramenta:</b><br>
+  <a href="{{ url_for('jobs_history_page') }}">🗂️ Projetos de vídeo</a>
+  <a href="{{ url_for('gerar_voz_page') }}#historico">🎙️ Áudios gerados</a>
+  <a href="{{ url_for('narracoes_page') }}">📝 Roteiros para áudio</a>
+  <a href="{{ url_for('modelados_page') }}">🎞️ Vídeos modelados</a>
+  <a href="{{ url_for('roteiros_yt_page') }}">📜 Roteiros do YouTube</a>
+  <a href="{{ url_for('vendas_page') }}">🛒 Vídeos de venda</a>
+  <a href="{{ url_for('dossies_page') }}">🕵️ Modelos de vídeo</a>
+  <a href="{{ url_for('flow_page') }}#galeria">🎬 Galeria do Flow</a>
+  <a href="{{ url_for('cortar_youtube_page') }}#historico">✂️ Cortes do YouTube</a>
+  <a href="{{ url_for('redes_sociais_page') }}#historico">📲 Downloads de redes</a>
+  <a href="{{ url_for('transcrever_page') }}#historico">📝 Transcrições</a>
+  <a href="{{ url_for('capturar_pagina_page') }}">🖼️ Capturas de página</a>
+  <a href="{{ url_for('extrair_links_canal_page') }}#historico">🔗 Links de canal</a>
+  <a href="{{ url_for('analisador_canal_page') }}">📊 Análises de canal</a>
+</p>
+
+<h2>⏳ Tarefas de segundo plano</h2>
+{% if not tarefas %}<p class="hint">Nenhuma ainda.</p>{% endif %}
+{% for t in tarefas %}
+<div class="cartao {{ 'erro' if t.status == 'erro' }}" id="t-{{ t.id }}">
+  <b>{% if t.status == 'rodando' %}⏳{% elif t.status == 'pronto' %}✅{% else %}❌{% endif %} {{ t.titulo }}</b>
+  <span class="q" data-t="{{ t.criado }}"></span>
+  {% if t.link %}<a href="{{ t.link }}" style="margin-left:8px;">abrir ↗</a>{% endif %}
+  {% if t.status == 'rodando' and t.progresso %}<div class="hint">{{ t.progresso }}</div>{% endif %}
+  {% if t.erro %}<div style="color:#b91c1c;white-space:pre-wrap;">{{ t.erro }}</div>{% endif %}
+  {% if t.status == 'pronto' and t.resultado %}
+  <details><summary class="hint">ver o resultado</summary>
+    {% set r = t.resultado %}
+    <pre class="resTxt">{% if r is mapping %}{{ r.texto or r.completa or r.resumo or (r | tojson(indent=1)) }}{% else %}{{ r }}{% endif %}</pre>
+    <button type="button" class="peq" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent);this.textContent='✅ copiado'">📋 copiar</button>
+  </details>{% endif %}
+</div>
+{% endfor %}
+
+<h2 style="margin-top:28px;">🔔 Notificações <button type="button" class="peq" style="background:#6b7280;" onclick="if(confirm('Apagar todas as notificações?'))fetch('/notificacoes/limpar',{method:'POST'}).then(()=>location.reload())">🗑 limpar</button></h2>
+{% if not notificacoes %}<p class="hint">Nenhuma ainda.</p>{% endif %}
+{% for n in notificacoes %}
+<div class="cartao {{ n.nivel }} {{ '' if n.lida else 'nova' }}">
+  <b>{{ n.titulo }}</b> <span class="q" data-t="{{ n.quando }}"></span>
+  {% if n.link %}<a href="{{ url_for('notificacoes_ir', nid=n.id) }}" style="margin-left:8px;">ir ↗</a>{% endif %}
+  {% if n.msg %}<div class="hint" style="white-space:pre-wrap;">{{ n.msg }}</div>{% endif %}
+</div>
+{% endfor %}
+<script>
+  document.querySelectorAll('[data-t]').forEach(e => { e.textContent = '· ' + new Date(parseFloat(e.dataset.t) * 1000).toLocaleString('pt-BR'); });
+</script>
+{% endblock %}
