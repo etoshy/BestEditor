@@ -1624,7 +1624,9 @@ def perfis_de_voz_youtube_buscar():
     if not termo:
         return jsonify({"erro": "Digite um termo de busca."}), 400
     try:
-        resultados = buscar_videos_youtube(termo, quantidade=15)
+        pular = int(request.args.get("pular") or 0) if str(request.args.get("pular") or "0").isdigit() else 0
+        resultados = (buscar_videos_youtube(termo, quantidade=12, pular=pular) if pular  # ➕ "Buscar outros vídeos"
+                      else buscar_videos_youtube(termo, quantidade=15))
     except YoutubeClipperError as exc:
         return jsonify({"erro": str(exc)}), 400
     except Exception:  # noqa: BLE001
@@ -6277,7 +6279,9 @@ def cutaway_youtube_buscar(job_id: str, cutaway_id: str):
     if not termo:
         return jsonify({"erro": "Digite um termo de busca."}), 400
     try:
-        resultados = buscar_videos_youtube(termo, quantidade=15)
+        pular = int(request.args.get("pular") or 0) if str(request.args.get("pular") or "0").isdigit() else 0
+        resultados = (buscar_videos_youtube(termo, quantidade=12, pular=pular) if pular  # ➕ "Buscar outros vídeos"
+                      else buscar_videos_youtube(termo, quantidade=15))
     except YoutubeClipperError as exc:
         return jsonify({"erro": str(exc)}), 400
     except Exception:  # noqa: BLE001
@@ -6740,9 +6744,27 @@ def _youtube_ia_item(job_id: str, item_id: str, modo: str = "") -> None:
     def ordenar(resultados, termo, vistos):
         return ia_midia.ordenar_youtube(resultados, fala, termo, ficha, job=job_id, com_capas=12, ja_vistos=vistos)
 
+    import yt_google
+
+    def _guardar(v, m, tipo, erro=""):  # 🧾 cada resposta da IA fica no histórico do clipe (v84_90)
+        item["ia_respostas"] = yt_google.guardar_resposta(item.get("ia_respostas"), yt_google.resposta(v, m, tipo=tipo, erro=erro))
+
     def achar(linhas, v):
-        return ia_midia.achar_momento(linhas, fala, str(v.get("titulo") or ""), str(v.get("canal") or ""),
-                                      item.get("duracao_alvo"), ficha, job=job_id)
+        m = ia_midia.achar_momento(linhas, fala, str(v.get("titulo") or ""), str(v.get("canal") or ""),
+                                   item.get("duracao_alvo"), ficha, job=job_id)
+        _guardar(v, m, "legenda")
+        return m
+
+    def _com_historico(fn):
+        def assistir_v(v):
+            try:
+                m = fn(v)
+            except Exception as exc:  # noqa: BLE001
+                _guardar(v, None, "google", str(exc)[:160])
+                raise
+            _guardar(v, m, "google")
+            return m
+        return assistir_v
 
     assistir, assistir_sempre = None, False
     try:  # 🔎 IA do Google: "assiste" o vídeo (sem legenda / a legenda não achou — ou sempre)
@@ -6752,9 +6774,26 @@ def _youtube_ia_item(job_id: str, item_id: str, modo: str = "") -> None:
             assistir_sempre = _igr.modo_youtube() == "sempre"
     except Exception:  # noqa: BLE001
         assistir = None
+    if assistir is not None:
+        assistir = _com_historico(assistir)
     if modo == "google":
         st["log"] = ["🤖🔎 Claude busca e escolhe os vídeos · a IA do Google assiste e acha o momento"]
-    r = yt_agente.procurar(
+    if modo == "perguntar":  # 🔎 pergunta pra IA do Google ONDE achar (ela indica link + tempo e depois assiste pra confirmar)
+        st["log"] = ["🔎 perguntando pra IA do Google onde achar essa cena no YouTube…"]
+
+        def _resp(resp):
+            item["ia_respostas"] = yt_google.guardar_resposta(item.get("ia_respostas"), resp)
+        try:
+            p = yt_google.perguntar_onde(fala, item.get("duracao_alvo"), log=log, ao_responder=_resp,
+                                         parar=lambda: job_id in _YOUTUBE_IA_PARAR)
+        except Exception as exc:  # noqa: BLE001
+            p = {"achou": False, "motivo": str(exc)[:200]}
+        r = {"achou": bool(p.get("achou")), "motivo": p.get("motivo") or "não achei", "buscas": [], "conferidos": [],
+             "inicio": p.get("inicio"), "fim": p.get("fim"), "frase": p.get("frase") or "", "confianca": 0.7,
+             "video": {"url": p.get("url"), "titulo": p.get("titulo") or "", "miniatura_url": p.get("miniatura_url") or ""}}
+    else:
+        r = None
+    r = r or yt_agente.procurar(
         fala, item.get("termo") or item.get("termo_original") or "", item.get("duracao_alvo"),
         assistir=assistir, assistir_sempre=assistir_sempre, so_google=modo == "google",
         buscar=lambda t: buscar_videos_youtube(t, quantidade=YOUTUBE_RESULTADOS_COM_IA),
@@ -6824,8 +6863,8 @@ def youtube_ia(job_id: str):
     if not job:
         return jsonify({"erro": "Job não encontrado."}), 404
     corpo = request.get_json(silent=True) or {}
-    modo = "google" if corpo.get("modo") == "google" else ""
-    if modo == "google":  # 🤖🔎 alternativa (v84_88): Claude busca/escolhe, a IA do Google assiste e acha o momento
+    modo = corpo.get("modo") if corpo.get("modo") in ("google", "perguntar") else ""
+    if modo:  # 🤖🔎 alternativa (v84_88): Claude busca/escolhe, a IA do Google assiste e acha o momento
         import yt_google
         motivo = yt_google.disponivel()
         if motivo:
@@ -6875,6 +6914,7 @@ def _youtube_olhar_de_novo(job_id: str, item_id: str, errados: List[Dict[str, An
             m = None
             st["log"].append(str(exc)[:200])
         item["google_errados"] = errados
+        item["ia_respostas"] = yt_google.guardar_resposta(item.get("ia_respostas"), yt_google.resposta(esc0, m, tipo="olhar de novo"))
         if not (m and m.get("achou")):
             st.update(estado="nao_achou", msg="olhou de novo e não achou outro momento nesse vídeo — tente 🤖🔎 Claude + Google (outros vídeos) ou escolha à mão")
             return
@@ -6895,6 +6935,61 @@ def _youtube_olhar_de_novo(job_id: str, item_id: str, errados: List[Dict[str, An
     finally:
         geral.update(rodando=False, atual=None, feitos=1)
         _save_state(job_id)
+
+
+@app.route("/job/<job_id>/youtube/item/<item_id>/mais", methods=["POST"])
+def youtube_item_mais(job_id: str, item_id: str):
+    """➕ Buscar outros vídeos: os próximos 12 resultados da mesma busca (sem repetir os que já estão)."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    item = _youtube_item(job, item_id)
+    if item is None:
+        return jsonify({"erro": "Esse item não existe mais."}), 404
+    termo = str(item.get("termo") or "").strip()
+    if not termo:
+        return jsonify({"erro": "Sem termo de busca."}), 400
+    atuais = list(item.get("resultados") or [])
+    try:
+        novos = buscar_videos_youtube(termo, quantidade=12, pular=len(atuais))
+    except YoutubeClipperError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    vistos = {v.get("url") for v in atuais}
+    novos = [v for v in novos if v.get("url") not in vistos]
+    item["resultados"] = atuais + novos
+    _save_state(job_id)
+    return jsonify({"ok": True, "novos": len(novos), "total": len(item["resultados"])})
+
+
+@app.route("/job/<job_id>/youtube/item/<item_id>/momento-google", methods=["POST"])
+def youtube_item_momento_google(job_id: str, item_id: str):
+    """🔎 A IA do Google assiste o vídeo ESCOLHIDO (um que já está na lista) e acha o momento — em segundo plano."""
+    import tarefas_bg
+    import yt_google
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    item = _youtube_item(job, item_id)
+    if item is None:
+        return jsonify({"erro": "Esse item não existe mais."}), 404
+    corpo = request.get_json(silent=True) or {}
+    url = str(corpo.get("url") or "").strip()
+    if not yt_google._RE_LINK_YT.search(url):
+        return jsonify({"erro": "Escolha um vídeo primeiro."}), 400
+    motivo = yt_google.disponivel()
+    if motivo:
+        return jsonify({"erro": "🔎 IA do Google: " + motivo}), 400
+    video = {"url": url, "titulo": str(corpo.get("titulo") or "")[:160], "miniatura_url": str(corpo.get("miniatura_url") or "")}
+    fala = _youtube_fala_do_item(job, item)
+
+    def _tarefa(t):
+        t.progresso("🔎 a IA do Google está assistindo o vídeo…")
+        m = yt_google.momento_no_link(url, fala, item.get("duracao_alvo"))
+        item["ia_respostas"] = yt_google.guardar_resposta(item.get("ia_respostas"), yt_google.resposta(video, m, tipo="google"))
+        _save_state(job_id)
+        return {"achou": bool(m and m.get("achou")), **({"inicio": m["inicio"], "fim": m["fim"], "frase": m.get("frase") or ""} if m and m.get("achou") else {})}
+    tid = tarefas_bg.iniciar("achar_google", f"🔎 Momento no vídeo (“{_nome_job(job_id)}”)", _tarefa, pagina=f"/job/{job_id}/edit-segments")
+    return jsonify({"ok": True, "tarefa": tid})
 
 
 @app.route("/job/<job_id>/youtube/item/<item_id>/olhar-de-novo", methods=["POST"])
@@ -9553,7 +9648,9 @@ def cortar_youtube_buscar():
     if not termo:
         return jsonify({"erro": "Digite um termo de busca."}), 400
     try:
-        resultados = buscar_videos_youtube(termo, quantidade=15)
+        pular = int(request.args.get("pular") or 0) if str(request.args.get("pular") or "0").isdigit() else 0
+        resultados = (buscar_videos_youtube(termo, quantidade=12, pular=pular) if pular  # ➕ "Buscar outros vídeos"
+                      else buscar_videos_youtube(termo, quantidade=15))
     except YoutubeClipperError as exc:
         return jsonify({"erro": str(exc)}), 400
     except Exception:  # noqa: BLE001
@@ -9623,9 +9720,12 @@ def cortar_youtube_achar_google():
             errados.append({"inicio": ini, "fim": fim if fim and fim > ini else ini + 5})
     if errados and not url:
         return jsonify({"erro": "Pra olhar de novo precisa do link do vídeo."}), 400
+    perguntar = corpo.get("modo") == "perguntar"  # 🔎 pergunta pra IA do Google ONDE achar (ela indica link + tempo)
 
     def _tarefa(t):
-        if url:
+        if perguntar:
+            r = yt_google.perguntar_onde(descricao, log=t.progresso)
+        elif url:
             t.progresso("🔁 a IA do Google está olhando o vídeo de novo…" if errados else "🔎 a IA do Google está assistindo o vídeo…")
             m = yt_google.momento_no_link(url, descricao, evitar=errados) if errados else yt_google.momento_no_link(url, descricao)
             r = dict(m or {"achou": False, "motivo": "a IA do Google não achou esse momento no vídeo"}, url=url)
@@ -9633,10 +9733,16 @@ def cortar_youtube_achar_google():
             r = yt_google.achar(descricao, "", log=t.progresso)
         if r.get("achou"):
             r["inicio_txt"], r["fim_txt"] = yt_google.mmss(r["inicio"]), yt_google.mmss(r["fim"])
+        for x in r.get("respostas") or []:  # 🧾 cada resposta da IA do Google (um por vídeo olhado)
+            if x.get("achou"):
+                x["inicio_txt"], x["fim_txt"] = yt_google.mmss(x["inicio"]), yt_google.mmss(x["fim"])
+            else:
+                x.setdefault("motivo", x.get("erro") or "não achou nesse vídeo")
         r.pop("video", None)
         r.pop("resultados", None)
         return r
-    tid = tarefas_bg.iniciar("achar_google", ("🔁 Olhar de novo: " if errados else "🤖🔎 Achar trecho: ") + descricao[:70], _tarefa,
+    tid = tarefas_bg.iniciar("achar_google", ("🔎 Perguntar ao Google: " if perguntar else "🔁 Olhar de novo: " if errados
+                                              else "🤖🔎 Achar trecho: ") + descricao[:70], _tarefa,
                              pagina="/cortar-youtube")
     return jsonify({"ok": True, "tarefa": tid})
 

@@ -301,7 +301,7 @@ def _slug(texto: str, tamanho_max: int = 60) -> str:
     return (texto or "video")[:tamanho_max]
 
 
-def buscar_videos_youtube(termo: str, quantidade: int = 12, ytdlp_module: Any = None) -> List[Dict[str, Any]]:
+def buscar_videos_youtube(termo: str, quantidade: int = 12, ytdlp_module: Any = None, pular: int = 0) -> List[Dict[str, Any]]:
     """Busca vídeos no YouTube por um termo de texto (igual digitar na
     busca do próprio site) e devolve os resultados — sem precisar de
     chave de API nenhuma: usa o pseudo-URL `ytsearchN:termo` do yt-dlp,
@@ -313,11 +313,14 @@ def buscar_videos_youtube(termo: str, quantidade: int = 12, ytdlp_module: Any = 
     busca traz os metadados "resumidos" de cada vídeo, não a página
     inteira — pedir a descrição completa de cada um deixaria a busca
     bem mais lenta, com uma requisição extra por vídeo).
+
+    `pular` (➕ "Buscar outros vídeos"): pula os N primeiros da busca e devolve os `quantidade` seguintes.
     """
     termo = (termo or "").strip()
     if not termo:
         raise YoutubeClipperError("Termo de busca vazio.")
     quantidade = max(1, min(int(quantidade or 12), 50))
+    pular = max(0, min(int(pular or 0), 150))
 
     if ytdlp_module is not None:
         yt_dlp = ytdlp_module
@@ -332,12 +335,12 @@ def buscar_videos_youtube(termo: str, quantidade: int = 12, ytdlp_module: Any = 
     ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": "in_playlist", "skip_download": True, **__import__("yt_cookies").opcoes()}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch{quantidade}:{termo}", download=False)
+            info = ydl.extract_info(f"ytsearch{quantidade + pular}:{termo}", download=False)
     except Exception as exc:  # noqa: BLE001
         raise YoutubeClipperError(f"Não consegui buscar por {termo!r}: {exc}") from exc
 
     resultados = []
-    for entrada in (info or {}).get("entries") or []:
+    for entrada in list((info or {}).get("entries") or [])[pular:pular + quantidade]:
         if not entrada:
             continue
         video_id = entrada.get("id")

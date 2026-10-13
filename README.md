@@ -45,6 +45,21 @@ pela API dela, que "assiste" o vídeo e devolve o **início/fim** do momento —
   Os recusados vão se acumulando (e nunca voltam como resposta). Tem nas 🎬 cenas do Roteiro do YouTube (aparece quando a
   cena tem link), no painel do YouTube do editor (depois que acha) e no ✂️ Cortar do YouTube (depois do ✅), além do
   próprio app 🔎 IA do Google (embaixo do resultado de "Achar momentos"/"Perguntar").
+- **▶ Prévia + 🧾 respostas da IA por clipe** (v84_90): colocou um link, aparece a miniatura e o "▶ Ver o trecho" (toca só
+  do início ao fim, ali mesmo). E CADA resposta da IA fica guardada no clipe — cada vídeo que a IA do Google olhou (achou
+  ou não), cada leitura de legenda e cada "olhar de novo" — com miniatura, tempo, a frase, "▶ ver" e "✔ usar esta"
+  (marca a que está em uso). Nas cenas do Roteiro do YouTube aparece até enquanto ainda está procurando; no editor fica
+  em "🧾 Respostas da IA pra este clipe"; no ✂️ Cortar do YouTube em cada trecho (+ "▶ ver trecho" e a miniatura/título
+  do link).
+- **➕ Buscar outros vídeos** (v84_91): em toda busca do YouTube (cenas do Roteiro, editor, Cortar do YouTube) dá pra
+  trazer os **12 seguintes** da mesma busca, sem repetir os que já apareceram (no editor aparece quando acabam os "Outros
+  vídeos").
+- **🔎 Perguntar ao Google onde achar** (v84_91): pergunta pra IA do Google (pesquisando, com foco no YouTube) ONDE está a
+  cena — ela indica os links e os tempos; os 3 primeiros ela **assiste** pra confirmar o momento (se nenhum confirmar, fica o
+  tempo que a pesquisa indicou). Cada indicação e cada conferência entram no 🧾 histórico do clipe. Botões por cena/item/
+  trecho e "pra todas sem link".
+- **🔎 Achar o momento num vídeo que você já tem**: em cada resultado da busca da cena ("🔎 achar o momento") e no editor,
+  com o vídeo escolhido ("🔎 Achar o momento com a IA do Google") — ela assiste ESSE vídeo e preenche início/fim.
 - Tudo roda no servidor (pode fechar a aba) com aviso no 🔔 e registro no 🕘 Histórico. Precisa da pasta `ia_google/`
   (funciona mesmo com o modo da IA do Google no agente em "desligado"); sem o Claude ligado ele usa a busca direta.
 

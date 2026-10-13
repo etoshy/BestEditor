@@ -24,6 +24,14 @@
   .ry-cena .tipo { font-size: 0.72rem; background: #fef2f2; color: #991b1b; border-radius: 999px; padding: 1px 8px; margin-left: 4px; }
   .ry-cena .meta { color: #666; font-size: 0.8rem; margin-top: 3px; }
   .ry-cena input { margin: 0; padding: 4px 8px; font-size: 0.82rem; }
+  .ry-prev { display: flex; gap: 10px; align-items: flex-start; margin-top: 6px; flex-wrap: wrap; }
+  .ry-prev img { width: 160px; border-radius: 6px; cursor: pointer; display: block; }
+  .ry-prev iframe { width: 400px; max-width: 100%; aspect-ratio: 16/9; height: auto; border: 0; border-radius: 6px; }
+  .ry-resp { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px dashed #e5e7eb; font-size: 0.8rem; }
+  .ry-resp img { width: 96px; border-radius: 4px; flex: none; }
+  .ry-resp.uso { background: #f0fdf4; } .ry-resp.nao { opacity: .7; }
+  .ry-resp .rtag { font-size: 0.7rem; border-radius: 999px; padding: 0 6px; background: #eef2ff; color: #3730a3; margin-right: 4px; }
+  .ry-resp .rbtns button { margin: 3px 4px 0 0; padding: 2px 8px; font-size: 0.72rem; }
   .ry-yt { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
   .ry-yt div { border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; font-size: 0.75rem; cursor: pointer; }
   .ry-yt div:hover { border-color: #b91c1c; }
@@ -158,6 +166,43 @@ async function api(url, corpo, metodo) {
   return d;
 }
 function copiar(id) { const t = $(id); t.select(); (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).catch(() => document.execCommand('copy')); }
+// ▶ prévia do link (miniatura → clica e toca só o trecho) + 🧾 respostas da IA de cada clipe (v84_90)
+function ytId(u) { const m = String(u || '').match(/(?:youtube\.com\/(?:watch\?[^\s]*v=|shorts\/|live\/|embed\/)|youtu\.be\/)([\w-]{11})/); return m ? m[1] : null; }
+function mmss(s) { s = Math.max(0, Math.round(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; }
+function embedTrecho(id, ini, fim) {
+  const a = Math.max(0, Math.floor(ini || 0)), b = fim && fim > a ? Math.ceil(fim) : '';
+  return `<iframe src="https://www.youtube-nocookie.com/embed/${id}?start=${a}${b ? '&end=' + b : ''}&autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+}
+function desenharPrevia(el) {
+  const box = el.querySelector('.cPrev'); if (!box) return;
+  const id = ytId(el.querySelector('.cLink').value);
+  if (!id) { box.innerHTML = ''; return; }
+  const ini = tempoSeg(el.querySelector('.cIni').value), fim = tempoSeg(el.querySelector('.cFim').value);
+  const chave = id + '|' + ini + '|' + fim; if (box.dataset.chave === chave) return; box.dataset.chave = chave;
+  box.innerHTML = `<img src="https://i.ytimg.com/vi/${id}/mqdefault.jpg" alt="" title="▶ ver o trecho"><div><button class="ry-mini ry-sec pVer">▶ Ver o trecho${ini != null ? ` (${mmss(ini)}${fim ? ' → ' + mmss(fim) : ''})` : ''}</button>
+    <a class="ry-hint" href="https://youtu.be/${id}${ini ? '?t=' + Math.floor(ini) : ''}" target="_blank" rel="noopener" style="margin-left:6px;">abrir no YouTube ↗</a></div>`;
+  const tocar = () => { box.innerHTML = embedTrecho(id, ini, fim) + `<button class="ry-mini ry-sec pFechar" style="align-self:flex-start">✕ fechar prévia</button>`;
+    box.querySelector('.pFechar').onclick = () => { box.dataset.chave = ''; desenharPrevia(el); }; };
+  box.querySelector('img').onclick = tocar; box.querySelector('.pVer').onclick = tocar;
+}
+function htmlResposta(r, c) {
+  const id = ytId(r.url), thumb = r.miniatura_url || (id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : '');
+  const emUso = c && r.achou && c.link === r.url && c.link_inicio === mmss(r.inicio);
+  return `<div class="ry-resp ${emUso ? 'uso' : ''} ${r.achou ? '' : 'nao'}" data-rid="${esc(r.id)}">${thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy">` : ''}
+    <div style="flex:1;min-width:0"><span class="rtag">${({ 'olhar de novo': '🔁 olhou de novo', 'google indicou': '🔎 Google indicou (pesquisa)', legenda: '📄 legenda' })[r.tipo] || '🔎 Google assistiu'}</span><b>${esc(r.titulo || r.url)}</b>
+      <div>${r.achou ? `🎯 <b>${mmss(r.inicio)} → ${mmss(r.fim)}</b>${r.frase ? ` — “${esc(r.frase)}”` : ''}` : (r.erro ? '⚠ ' + esc(r.erro) : '❌ não achou nesse vídeo')}
+        <span style="color:#999"> · ${new Date(r.quando * 1000).toLocaleTimeString('pt-BR')}</span></div>
+      <div class="rbtns">${id ? `<button class="ry-mini ry-sec rVer">▶ ver</button>` : ''}${r.achou ? (emUso ? '<b style="color:#065f46">✔ em uso</b>' : `<button class="ry-mini rUsar">✔ usar esta</button>`) : ''}</div>
+      <div class="rPlayer"></div></div></div>`;
+}
+function ligarRespostas(box, lista, el, cid) {
+  box.querySelectorAll('.ry-resp').forEach(div => {
+    const r = lista.find(x => x.id === div.dataset.rid); if (!r) return;
+    const ver = div.querySelector('.rVer'), usar = div.querySelector('.rUsar');
+    if (ver) ver.onclick = () => { const pl = div.querySelector('.rPlayer'); pl.innerHTML = pl.innerHTML ? '' : embedTrecho(ytId(r.url), r.achou ? r.inicio : 0, r.achou ? r.fim : null); };
+    if (usar && el) usar.onclick = () => { el.querySelector('.cLink').value = r.url; el.querySelector('.cIni').value = mmss(r.inicio); el.querySelector('.cFim').value = mmss(r.fim); salvarCena(el, cid); };
+  });
+}
 function tempoSeg(t) { if (!t) return null; const p = String(t).split(':').map(Number); return p.reduce((a, b) => a * 60 + b, 0); }
 
 // ---------------------------------------------------------------- 1 · transcrição
@@ -329,6 +374,7 @@ function desenharResultado() {
   else {
     h += `<p class="ry-hint">Pra cada cena: <b>🔎 Buscar no YouTube</b> e clicar no vídeo certo, ajustar início/fim, e no fim mandar tudo pro <b>✂️ Cortar do YouTube</b>. Se o vídeo original mostrava a cena, dá pra cortar direto dele pelos tempos.</p>
     <div class="ry-row" style="margin:4px 0 8px;"><button class="ry-mini" id="cGoogleTodas" style="background:#0f766e;color:#fff">🤖🔎 Achar todas as cenas sem link (Claude + Google)</button>
+      <button class="ry-mini" id="cPergTodas" style="background:#155e75;color:#fff">🔎 Perguntar ao Google onde achar todas sem link</button>
       <span class="ry-hint" id="cGoogleGeral">o Claude faz as buscas e escolhe os vídeos; o link vai pra 🔎 IA do Google, que assiste e acha o início/fim. Roda no servidor — pode fechar a aba.</span></div>`;
     h += cs.map(c => `<div class="ry-cena" data-id="${c.id}">
       <div><b>${c.id}. ${esc(c.obra)}</b><span class="tipo">${esc(c.tipo)}${c.ano ? ' · ' + esc(c.ano) : ''}</span>${c.certeza ? ` <span style="font-size:0.72rem;color:${c.certeza === 'alta' ? '#065f46' : c.certeza === 'baixa' ? '#b91c1c' : '#92400e'};">certeza ${esc(c.certeza)}</span>` : ''}${c.marcador ? ` <span class="ry-cenatag">${esc(c.marcador)}</span>` : ''}${c.como_ficou ? ` <span style="font-size:0.75rem;color:#555;">(${esc(c.como_ficou)})</span>` : ''}</div>
@@ -339,6 +385,7 @@ function desenharResultado() {
         <input type="text" class="cBusca" value="${esc(c.busca_youtube)}" style="flex:1;min-width:200px;">
         <button class="ry-mini ry-sec cBuscar">🔎 Buscar no YouTube</button>
         <button class="ry-mini cGoogle" style="background:#0f766e;color:#fff" title="Alternativa: o Claude faz as buscas e escolhe os vídeos, e a 🔎 IA do Google assiste cada um e diz o momento certo (início/fim)">🤖🔎 Achar com Claude + Google</button>
+        <button class="ry-mini cPerg" style="background:#155e75;color:#fff" title="Pergunta pra 🔎 IA do Google (pesquisando, com foco no YouTube) ONDE achar essa cena: ela indica o link e o tempo, e depois assiste pra confirmar">🔎 Perguntar ao Google onde achar</button>
       </div>
       <div class="ry-hint cGoogleSt"></div>
       <div class="ry-yt"></div>
@@ -349,7 +396,9 @@ function desenharResultado() {
         <button class="ry-mini cSalvar">💾</button>
         ${c.link ? `<button class="ry-mini cDeNovo" title="O momento está errado? Pede pra 🔎 IA do Google, na mesma conversa, olhar o vídeo de novo — dizendo que esse momento não tem o que procuramos e reafirmando o que é">🔁 Não é esse — olhar de novo</button>` : ''}
       </div>
+      <div class="ry-prev cPrev"></div>
       ${(c.google_errados || []).length ? `<div class="ry-hint">já recusados nesse vídeo: ${c.google_errados.map(e => fmtMin(e.inicio / 60)).join(', ')}</div>` : ''}
+      ${(c.ia_respostas || []).length ? `<details class="cResp" style="margin-top:6px;"><summary class="ry-hint" style="cursor:pointer;">🧾 Respostas da IA pra esta cena (${c.ia_respostas.length}) — ver cada uma e escolher</summary><div class="cRespLista">${c.ia_respostas.slice().reverse().map(r => htmlResposta(r, c)).join('')}</div></details>` : ''}
     </div>`).join('');
     const comLink = cs.filter(c => c.link).length, comTempo = cs.filter(c => c.inicio).length;
     h += `<div class="ry-row" style="margin-top:10px;">
@@ -380,15 +429,13 @@ function desenharResultado() {
   });
   document.querySelectorAll('.ry-cena').forEach(el => {
     const id = Number(el.dataset.id);
-    el.querySelector('.cBuscar').addEventListener('click', async () => {
-      const box = el.querySelector('.ry-yt'); box.innerHTML = '<span class="ry-hint">Buscando…</span>';
-      try {
-        const d = await api(`/roteiros-yt/${PID}/buscar-cena?termo=${encodeURIComponent(el.querySelector('.cBusca').value)}`, null, 'GET');
-        box.innerHTML = d.resultados.map(r => `<div data-url="${esc(r.url)}"><img src="${esc(r.miniatura_url)}" loading="lazy" alt=""><b>${esc(r.titulo)}</b><br>${esc(r.canal)}${r.duracao_formatada ? ' · ' + esc(r.duracao_formatada) : ''}</div>`).join('') || '<span class="ry-hint">Nada achado.</span>';
-        box.querySelectorAll('[data-url]').forEach(v => v.addEventListener('click', () => { el.querySelector('.cLink').value = v.dataset.url; salvarCena(el, id); box.innerHTML = ''; }));
-      } catch (e) { box.innerHTML = `<span class="ry-erro">⚠ ${esc(e.message)}</span>`; }
-    });
+    el.querySelector('.cBuscar').addEventListener('click', () => buscarCena(el, id, false));
+    el.querySelector('.cPerg').addEventListener('click', () => acharComGoogle([id], 'perguntar'));
     el.querySelector('.cSalvar').addEventListener('click', () => salvarCena(el, id));
+    desenharPrevia(el);
+    ['.cLink', '.cIni', '.cFim'].forEach(q => el.querySelector(q).addEventListener('change', () => desenharPrevia(el)));
+    const c0 = cs.find(x => x.id === id), rl = el.querySelector('.cRespLista');
+    if (rl && c0) ligarRespostas(rl, c0.ia_respostas || [], el, id);
     el.querySelector('.cGoogle').addEventListener('click', () => acharComGoogle([id]));
     const dn = el.querySelector('.cDeNovo');
     if (dn) dn.addEventListener('click', async () => {
@@ -400,6 +447,7 @@ function desenharResultado() {
     });
   });
   if ($('cGoogleTodas')) $('cGoogleTodas').addEventListener('click', () => acharComGoogle(null));
+  if ($('cPergTodas')) $('cPergTodas').addEventListener('click', () => acharComGoogle(null, 'perguntar'));
   mostrarAchar();
 }
 // 🤖🔎 achar com Claude + Google (v84_88) — tarefa no servidor; a página mostra o andamento e preenche os links
@@ -409,20 +457,56 @@ function mostrarAchar() {
   const est = (achar.status === 'rodando' ? achar.parcial : (achar.resultado || {}).cenas || achar.parcial) || {};
   document.querySelectorAll('.ry-cena').forEach(el => {
     const s = est[el.dataset.id], box = el.querySelector('.cGoogleSt'); if (!box) return;
-    el.querySelector('.cGoogle').disabled = achar.status === 'rodando';
+    el.querySelector('.cGoogle').disabled = achar.status === 'rodando'; el.querySelector('.cPerg').disabled = achar.status === 'rodando';
     if (!s) { box.textContent = ''; return; }
     const ult = (s.log || []).slice(-1)[0] || '';
-    box.innerHTML = s.estado === 'na_fila' ? '⏳ na fila…' : s.estado === 'procurando' ? '⏳ ' + esc((ult || 'procurando…').trim())
-      : `<span style="color:${s.estado === 'pronto' ? '#065f46' : '#b91c1c'}">${esc(s.msg || '')}</span>` + (s.log && s.log.length ? ` <details style="display:inline"><summary style="display:inline;cursor:pointer">como foi</summary><pre style="white-space:pre-wrap;font-size:.75rem;margin:2px 0">${esc(s.log.join('\n'))}</pre></details>` : '');
+    const vivas = (s.respostas || []).slice().reverse();
+    const sig = [achar.status, s.estado, ult, s.msg, vivas.length].join('|');
+    if (box.dataset.sig === sig) return;  // não redesenha à toa (não corta a prévia que está tocando)
+    box.dataset.sig = sig;
+    box.innerHTML = (s.estado === 'na_fila' ? '⏳ na fila…' : s.estado === 'procurando' ? '⏳ ' + esc((ult || 'procurando…').trim())
+      : `<span style="color:${s.estado === 'pronto' ? '#065f46' : '#b91c1c'}">${esc(s.msg || '')}</span>` + (s.log && s.log.length ? ` <details style="display:inline"><summary style="display:inline;cursor:pointer">como foi</summary><pre style="white-space:pre-wrap;font-size:.75rem;margin:2px 0">${esc(s.log.join('\n'))}</pre></details>` : ''))
+      + (achar.status === 'rodando' && vivas.length ? `<div class="cRespVivas" style="margin-top:4px;"><div class="ry-hint">🧾 respostas da IA até agora (${vivas.length}):</div>${vivas.map(r => htmlResposta(r, null)).join('')}</div>` : '');
+    if (achar.status === 'rodando' && vivas.length) ligarRespostas(box.querySelector('.cRespVivas'), vivas, el, Number(el.dataset.id));
   });
   if ($('cGoogleTodas')) $('cGoogleTodas').disabled = achar.status === 'rodando';
+  if ($('cPergTodas')) $('cPergTodas').disabled = achar.status === 'rodando';
   if ($('cGoogleGeral') && achar.status === 'rodando') $('cGoogleGeral').textContent = '⏳ ' + (achar.progresso || 'procurando…') + ' — pode fechar a aba: chega um aviso no 🔔.';
   else if ($('cGoogleGeral') && achar.status === 'pronto') $('cGoogleGeral').textContent = `✅ achou ${(achar.resultado || {}).achadas || 0} de ${(achar.resultado || {}).total || 0} cena(s).`;
   else if ($('cGoogleGeral') && achar.status === 'erro') $('cGoogleGeral').textContent = '⚠ ' + (achar.erro || 'falhou');
 }
-async function acharComGoogle(ids) {
+// 🔍 busca da cena: 8 primeiros; "➕ Buscar outros vídeos" traz os 12 seguintes; cada vídeo tem "🔎 achar o momento" (IA do Google)
+async function buscarCena(el, id, mais) {
+  const box = el.querySelector('.ry-yt'), termo = el.querySelector('.cBusca').value;
+  const atuais = mais ? (box._res || []) : [];
+  const bt = box.querySelector('.rMais'); if (bt) { bt.disabled = true; bt.textContent = 'Buscando mais…'; }
+  if (!mais) box.innerHTML = '<span class="ry-hint">Buscando…</span>';
   try {
-    const d = await api(`/roteiros-yt/${PID}/achar-google`, ids ? { cenas: ids } : {});
+    const d = await api(`/roteiros-yt/${PID}/buscar-cena?termo=${encodeURIComponent(termo)}${mais ? '&pular=' + atuais.length : ''}`, null, 'GET');
+    const vistos = new Set(atuais.map(r => r.url));
+    box._res = atuais.concat(d.resultados.filter(r => !vistos.has(r.url)));
+    desenharBusca(el, id, box, mais && !d.resultados.length);
+  } catch (e) { if (mais && bt) { bt.disabled = false; bt.textContent = '⚠ ' + e.message; } else box.innerHTML = `<span class="ry-erro">⚠ ${esc(e.message)}</span>`; }
+}
+function desenharBusca(el, id, box, acabou) {
+  const lista = box._res || [];
+  box.innerHTML = lista.map((r, k) => `<div data-k="${k}"><img src="${esc(r.miniatura_url)}" loading="lazy" alt=""><b>${esc(r.titulo)}</b><br>${esc(r.canal)}${r.duracao_formatada ? ' · ' + esc(r.duracao_formatada) : ''}
+      <button class="ry-mini rMom" style="margin-top:4px;font-size:.7rem;padding:2px 6px;background:#155e75;color:#fff" title="A 🔎 IA do Google assiste ESTE vídeo e acha o momento da cena">🔎 achar o momento</button></div>`).join('')
+    + (lista.length ? `<button class="ry-mini ry-sec rMais" style="grid-column:1/-1" ${acabou ? 'disabled' : ''}>${acabou ? 'não tem mais resultados' : `➕ Buscar outros vídeos (+12) — já tem ${lista.length}`}</button>` : '<span class="ry-hint">Nada achado.</span>');
+  box.querySelectorAll('[data-k]').forEach(v => {
+    const r = lista[+v.dataset.k];
+    v.addEventListener('click', () => { el.querySelector('.cLink').value = r.url; salvarCena(el, id); box.innerHTML = ''; });
+    v.querySelector('.rMom').addEventListener('click', async (ev) => {
+      ev.stopPropagation(); ev.target.disabled = true; ev.target.textContent = '🔎 assistindo…';
+      try { const d = await api(`/roteiros-yt/${PID}/cena/${id}/momento-no-video`, { url: r.url, titulo: r.titulo, miniatura_url: r.miniatura_url }); acompanharAchar(d.tarefa); }
+      catch (e) { alert(e.message); ev.target.disabled = false; ev.target.textContent = '🔎 achar o momento'; }
+    });
+  });
+  const m = box.querySelector('.rMais'); if (m && !acabou) m.addEventListener('click', () => buscarCena(el, id, true));
+}
+async function acharComGoogle(ids, modo) {
+  try {
+    const d = await api(`/roteiros-yt/${PID}/achar-google`, Object.assign(ids ? { cenas: ids } : {}, modo ? { modo } : {}));
     acompanharAchar(d.tarefa);
   } catch (e) { alert(e.message); }
 }

@@ -36,6 +36,18 @@ def _atualizar_cena(base_dir: str, pid: str, cid: int, dados: Dict[str, Any]) ->
         ry.salvar_projeto(base_dir, pp)
 
 
+def _guardar_resposta(base_dir: str, pid: str, cid: int, resp: Dict[str, Any]) -> None:
+    """🧾 Cada resposta da IA (achou ou não) fica no histórico da cena — pra acompanhar e escolher outra."""
+    import yt_google
+    with _TRAVA_CENAS:
+        pp = ry.carregar_projeto(base_dir, pid)
+        for lista in ((pp.get("analise") or {}).get("cenas") or [], (pp.get("resultado") or {}).get("cenas") or []):
+            for x in lista:
+                if x.get("id") == cid:
+                    x["ia_respostas"] = yt_google.guardar_resposta(x.get("ia_respostas"), resp)
+        ry.salvar_projeto(base_dir, pp)
+
+
 def _cenas_do(p: Dict[str, Any]) -> List[Dict[str, Any]]:
     """As cenas que a página mostra (as do resultado; senão as da análise)."""
     return list((p.get("resultado") or {}).get("cenas") or (p.get("analise") or {}).get("cenas") or [])
@@ -294,6 +306,7 @@ def registrar(app, base_dir: str) -> None:
         if rodando:
             return jsonify({"ok": True, "tarefa": rodando[0]["id"], "ja_rodando": True})
         ids = [c["id"] for c in alvo]
+        modo = "perguntar" if corpo.get("modo") == "perguntar" else ""
 
         def _tarefa(t):
             estado: Dict[str, Any] = {str(i): {"estado": "na_fila"} for i in ids}
@@ -311,7 +324,14 @@ def registrar(app, base_dir: str) -> None:
                     t.parcial(estado)
                 descr = _descr_cena(c)
                 try:
-                    r = yt_google.achar(descr, c.get("busca_youtube") or "", log=log, job=pid)
+                    def ao_responder(resp, st=st, cid=cid):
+                        st["respostas"] = (st.get("respostas") or []) + [resp]
+                        _guardar_resposta(base_dir, pid, cid, resp)
+                        t.parcial(estado)
+                    if modo == "perguntar":  # 🔎 pergunta pra IA do Google ONDE achar (ela indica link + tempo)
+                        r = yt_google.perguntar_onde(descr, log=log, ao_responder=ao_responder)
+                    else:
+                        r = yt_google.achar(descr, c.get("busca_youtube") or "", log=log, job=pid, ao_responder=ao_responder)
                 except Exception as exc:  # noqa: BLE001
                     r = {"achou": False, "motivo": str(exc)[:200]}
                 if r.get("achou"):
@@ -323,7 +343,8 @@ def registrar(app, base_dir: str) -> None:
                     st.update(estado="nao_achou", msg="❌ " + str(r.get("motivo") or "não achei"))
                 t.parcial(estado)
             return {"cenas": estado, "achadas": achadas, "total": len(ids)}
-        tid = tarefas_bg.iniciar("achar_google", f"🔎🤖 Achar {len(ids)} cena(s) com Claude + Google", _tarefa,
+        tid = tarefas_bg.iniciar("achar_google", (f"🔎 Perguntar à IA do Google onde achar {len(ids)} cena(s)" if modo == "perguntar"
+                                                  else f"🔎🤖 Achar {len(ids)} cena(s) com Claude + Google"), _tarefa,
                                  pagina=f"/roteiros-yt/{pid}")
         return jsonify({"ok": True, "tarefa": tid, "total": len(ids)})
 
@@ -362,6 +383,9 @@ def registrar(app, base_dir: str) -> None:
                 m = yt_google.momento_no_link(link, _descr_cena(c), evitar=errados)
             except Exception as exc:  # noqa: BLE001
                 m, st["log"] = None, st["log"] + [str(exc)[:200]]
+            resp = yt_google.resposta({"url": link, "titulo": c.get("obra") or ""}, m, tipo="olhar de novo")
+            st["respostas"] = [resp]
+            _guardar_resposta(base_dir, pid, cid, resp)
             if m and m.get("achou"):
                 dados = {"link": link, "link_inicio": yt_google.mmss(m["inicio"]), "link_fim": yt_google.mmss(m["fim"])}
                 _atualizar_cena(base_dir, pid, cid, dict(dados, google_errados=errados))
@@ -374,6 +398,47 @@ def registrar(app, base_dir: str) -> None:
         tid = tarefas_bg.iniciar("achar_google", f"🔁 Olhar de novo: {c.get('obra') or 'cena'}", _tarefa, pagina=f"/roteiros-yt/{pid}")
         return jsonify({"ok": True, "tarefa": tid})
 
+    @app.route("/roteiros-yt/<pid>/cena/<int:cid>/momento-no-video", methods=["POST"])
+    def roteiro_yt_momento_no_video(pid: str, cid: int):
+        """🔎 A IA do Google analisa UM vídeo que você já tem (da busca ou colado) e acha o momento da cena."""
+        import tarefas_bg
+        import yt_google
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = next((x for x in _cenas_do(p) if x.get("id") == cid), None)
+        if c is None:
+            return jsonify({"erro": "Cena não encontrada."}), 404
+        corpo = request.get_json(silent=True) or {}
+        url = str(corpo.get("url") or "").strip()
+        if not yt_google._RE_LINK_YT.search(url):
+            return jsonify({"erro": "Mande um link do YouTube."}), 400
+        motivo = yt_google.disponivel()
+        if motivo:
+            return jsonify({"erro": "🔎 IA do Google: " + motivo}), 400
+        video = {"url": url, "titulo": str(corpo.get("titulo") or "")[:160], "miniatura_url": str(corpo.get("miniatura_url") or "")}
+
+        def _tarefa(t):
+            st: Dict[str, Any] = {"estado": "procurando", "log": [f"🔎 a IA do Google está assistindo “{(video['titulo'] or url)[:60]}”…"]}
+            estado = {str(cid): st}
+            t.parcial(estado)
+            try:
+                m = yt_google.momento_no_link(url, _descr_cena(c))
+            except Exception as exc:  # noqa: BLE001
+                m, st["log"] = None, st["log"] + [str(exc)[:200]]
+            resp = yt_google.resposta(video, m, tipo="google")
+            st["respostas"] = [resp]
+            _guardar_resposta(base_dir, pid, cid, resp)
+            if m and m.get("achou"):
+                dados = {"link": url, "link_inicio": yt_google.mmss(m["inicio"]), "link_fim": yt_google.mmss(m["fim"])}
+                _atualizar_cena(base_dir, pid, cid, dict(dados, google_errados=[]))
+                st.update(estado="pronto", msg=f"✅ “{(video['titulo'] or url)[:60]}” {dados['link_inicio']} → {dados['link_fim']}", **dados)
+                return {"cenas": estado, "achadas": 1, "total": 1}
+            st.update(estado="nao_achou", msg="❌ a IA do Google não achou essa cena nesse vídeo — tente outro")
+            return {"cenas": estado, "achadas": 0, "total": 1}
+        tid = tarefas_bg.iniciar("achar_google", f"🔎 Momento no vídeo: {c.get('obra') or 'cena'}", _tarefa, pagina=f"/roteiros-yt/{pid}")
+        return jsonify({"ok": True, "tarefa": tid})
+
     @app.route("/roteiros-yt/<pid>/buscar-cena")
     def roteiro_yt_buscar_cena(pid: str):
         from youtube_clipper import YoutubeClipperError, buscar_videos_youtube
@@ -381,7 +446,8 @@ def registrar(app, base_dir: str) -> None:
         if not termo:
             return jsonify({"erro": "Termo vazio."}), 400
         try:
-            return jsonify({"ok": True, "resultados": buscar_videos_youtube(termo, quantidade=8)})
+            pular = int(request.args.get("pular") or 0) if str(request.args.get("pular") or "0").isdigit() else 0
+            return jsonify({"ok": True, "resultados": (buscar_videos_youtube(termo, quantidade=12, pular=pular) if pular else buscar_videos_youtube(termo, quantidade=8))})
         except YoutubeClipperError as exc:
             return jsonify({"erro": str(exc)}), 400
 
