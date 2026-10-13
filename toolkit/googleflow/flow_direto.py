@@ -50,7 +50,16 @@ S = {
     "agente_chip": ("flow-prompt-box flow-agent-mode-toggle-chip button.agent-mode-chip, "
                     "flow-prompt-box button.agent-mode-chip, flow-prompt-box button:has(.agent-mode-chip-label), "
                     'flow-prompt-box button:has-text("Agente"):not([aria-label])'),
-    "agente_config": 'flow-prompt-box .agent-footer-actions button[aria-label="Configurações"]',
+    "agente_config": ('flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
+                      'flow-agent-panel .agent-footer-actions button[aria-label="Configurações"], '
+                      'flow-creative-agent-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
+                      '.base-prompt-box .agent-footer-actions button[aria-label="Configurações"]'),
+    # janela larga: o Agente vira um PAINEL à direita ("Sessão sem título" / "Olá, … O que você quer criar?") com a
+    # própria caixa e SEM o chip "Agente"; fechar o painel (X) = agente desligado → volta a caixa principal.
+    "painel_sessao": ('flow-agent-panel:has(button.header-action[aria-label="Iniciar nova sessão"]), '
+                      'flow-agent-panel:has(flow-creative-agent-prompt-box)'),
+    "painel_fechar": ('flow-agent-panel button.header-action[aria-label="Fechar"], '
+                      'button.header-action[aria-label="Fechar"]'),
     "agente_painel": "flow-settings-view",
     "agente_nunca": '.confirm-policy-group mat-radio-button:has(input[value="2"])',
     "agente_nunca_input": '.confirm-policy-group input[value="2"]',
@@ -351,14 +360,27 @@ def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "
 
 
 def ligar_agente(page, ligado: bool) -> None:
-    chip = _primeiro(page, S["agente_chip"], 8)
-    if chip is None:  # janela estreita esconde o chip: alarga e procura de novo
+    """Liga/desliga o Agente. Dois jeitos do Flow: o chip "Agente" na caixa, ou (janela larga) o PAINEL do agente
+    à direita — aberto = ligado; fechar no X = desligado."""
+    chip = _primeiro(page, S["agente_chip"], 6)
+    largura = 0
+    if chip is None and _visivel(page, S["painel_sessao"]):
+        if ligado:
+            return  # o painel do agente está aberto: o agente já está ligado (o "tune" fica na caixa do painel)
+        _primeiro(page, S["painel_fechar"], 5, "agente", 'não achei o X ("Fechar") do painel do agente.').click()
+        if not _esperar(lambda: not _visivel(page, S["painel_sessao"]), 8):
+            raise FlowPassoErro("agente", "cliquei no X do painel do agente mas ele não fechou.")
+        chip = _primeiro(page, S["agente_chip"], 6)  # a caixa principal volta (às vezes com o chip)
+        if chip is None:
+            return
+    if chip is None:  # janela pequena esconde o chip: alarga e procura de novo
         largura = garantir_largura(page)
         chip = _primeiro(page, S["agente_chip"], 6)
+        if chip is None and _visivel(page, S["painel_sessao"]):
+            return ligar_agente(page, ligado)
     if chip is None:
         if ligado:
-            raise FlowPassoErro("agente", f'não achei o chip "Agente" da caixa (a página tem {largura}px de largura — '
-                                          'com a janela pequena o Flow esconde esse botão; deixe a janela maior).')
+            raise FlowPassoErro("agente", f'não achei o chip "Agente" nem o painel do agente (a página tem {largura}px de largura).')
         return  # sem o chip: a caixa já está no modo direto
     for _ in range(3):
         if _marcado(chip) == ligado:

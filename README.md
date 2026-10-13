@@ -28,6 +28,15 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎬 Flow com janela larga: o Agente em painel (v84_81)
+
+- Com a janela larga o Flow não mostra o chip "Agente": o agente vira um **painel à direita** ("Sessão sem título",
+  "Olá, … O que você quer criar?") com a própria caixa. A automação agora entende os dois jeitos: configura o agente
+  pelo ícone ⚙ (tune) da caixa do painel e **desliga o agente fechando o painel (X)** — aí volta a caixa principal,
+  onde a imagem/vídeo é gerada.
+
+---
+
 ## 🩺 Erro do Flow: baixar ou copiar a tela pra mandar (v84_80)
 
 - Quando um passo do Flow dá erro, aparecem os botões **⬇ Baixar diagnóstico (.zip)**, **📋 Copiar HTML** (é só colar

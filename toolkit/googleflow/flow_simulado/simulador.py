@@ -8,6 +8,7 @@ comportamento. `iniciar()` sobe um servidor local e devolve a URL base — passe
     url + "?limite=1"               # o Flow avisa "Você chegou ao limite de uso."
     url + "?falha=1"                # o cartão "gerando" vira "Não foi possível gerar"
     url + "?login=1"                # sem o botão "Novo projeto" (pediu login)
+    url + "?painel=1"               # janela larga: o agente é um painel à direita, sem o chip "Agente"
     url + "?semcaixa=1"             # o projeto abre sem a caixa "O que você quer criar?" (1x = só na 1ª vez)
 """
 from __future__ import annotations
@@ -60,6 +61,14 @@ def pagina_projeto() -> str:
     barra = re.search(r"<flow-ingredient-bar.*?</flow-ingredient-bar>", frames, re.S).group(0)
     tpls = "".join(f'<template id="t-{n}">{_ler(n)}</template>' for n in TEMPLATES)
     tpls += f'<template id="t-barra_frames">{barra}</template>'
+    tpls += ('<template id="t-painel_sessao"><div class="agent-panel-wrapper sessao-agente"><flow-agent-panel>'
+             '<div class="agent-panel-header"><div class="header-left"><button class="header-action" aria-label="Abrir histórico de sessões">menu</button>'
+             '<h2 class="header-title">Sessão sem título</h2></div><div class="header-right">'
+             '<button class="header-action" aria-label="Iniciar nova sessão">edit_square</button>'
+             '<button class="header-action" aria-label="Fechar">close</button></div></div>'
+             '<div class="agent-panel-content"><p>Olá! O que você quer criar?</p></div>'
+             f'<flow-creative-agent-prompt-box>{_ler("caixa_painel_sessao")}</flow-creative-agent-prompt-box>'
+             '</flow-agent-panel></div></template>')
     return (f'<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Projeto (simulado)</title>'
             f'<style>{CSS}</style></head><body><header><button aria-label="Conta do Google: Pessoa Teste (pessoa.teste@example.com)">P</button>'
             '<a hidden href="https://lh3.googleusercontent.com/a/FOTO-TESTE=s96">foto</a></header><flow-project-page><div class="tiles"></div>'

@@ -180,3 +180,17 @@ def test_projeto_sem_caixa_erro_traz_a_aba_e_diagnostico_sem_dados_pessoais(sim,
     assert "pessoa.teste@example.com" not in tudo and "Pessoa Teste" not in tudo and "FOTO-TESTE" not in tudo
     assert "flow-prompt-box" in tudo
     ctx.close()
+
+
+def test_janela_larga_agente_em_painel_sem_chip(sim, navegador, tmp_path):
+    """Erro real (1384px): o Agente vira um PAINEL à direita, sem o chip. Configura pelo "tune" do painel e
+    desliga fechando o painel (X) — depois gera normalmente na caixa principal."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    passos = []
+    page = fd.preparar_projeto(ctx, sim + "?painel=1", True, {"img_modelo": "Nano Banana Pro", "vid_modelo": "Veo 3.1 - Fast"},
+                               lambda n, e, d: passos.append((n, e)))
+    assert ("config_agente", "ok") in passos and ("desligar_agente", "ok") in passos
+    assert page.locator(".sessao-agente").count() == 0 and page.evaluate("window.__flowSim")["agente"] is False
+    r = fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple", "modelo": "Nano Banana 2.1"}, timeout_s=30)
+    assert len(r) == 1 and r[0]["tipo"] == "imagem"
+    ctx.close()

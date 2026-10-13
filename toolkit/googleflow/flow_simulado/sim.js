@@ -150,7 +150,7 @@
     const btn = t.closest('button');
     if (!btn) return;
     if (btn.matches('flow-prompt-box button.agent-mode-chip')) return agente(!st.agente);
-    if (btn.matches('flow-prompt-box .agent-footer-actions button[aria-label="Configurações"]')) {
+    if (btn.matches('flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], flow-creative-agent-prompt-box .agent-footer-actions button[aria-label="Configurações"]')) {
       if (!$('flow-settings-view')) document.body.appendChild(T('painel_agente')); return; }
     if (btn.matches('flow-prompt-box button.settings-trigger-button')) return $('.popup-config') ? fecharPopup() : abrirPopup();
     if (btn.matches('flow-prompt-box button[aria-label="Iniciar geração"]')) return gerar();
@@ -159,14 +159,16 @@
       const chips = $$('flow-ingredient-bar .frame-trigger', caixa()); return abrirMidia(chips.indexOf(btn.closest('.frame-trigger')) === 0 ? 'inicio' : 'fim'); }
     // painel do agente
     if (btn.closest('flow-settings-view')) {
-      if (btn.matches('button.settings-save-button')) return $('.agent-panel-wrapper').remove();
+      if (btn.matches('button.settings-save-button')) return $('.agent-panel-wrapper:not(.sessao-agente)').remove();
       if (btn.matches('button.mat-button-toggle-button')) return marcar(btn);
       if (btn.matches('button.image-model-picker-button, button.video-model-picker-button')) {
         const video = btn.matches('.video-model-picker-button');
         return abrirMenuModelos(video, nome => { $('.model-select-trigger-label', btn).textContent = ' ' + nome + ' '; });
       }
     }
-    if (btn.closest('.agent-panel-header') && btn.matches('[aria-label="Voltar"]')) return $('.agent-panel-wrapper').remove();
+    if (btn.closest('.agent-panel-header') && btn.matches('[aria-label="Voltar"]')) return $('.agent-panel-wrapper:not(.sessao-agente)').remove();
+    if (btn.closest('.sessao-agente') && btn.matches('button.header-action[aria-label="Fechar"]')) {  // X do painel = agente desligado
+      $('.sessao-agente').remove(); caixa().style.display = ''; return agente(false); }
     // pop-up de configurações da caixa
     const pop = btn.closest('.popup-config');
     if (pop) {
@@ -192,5 +194,8 @@
   });
   // começo: igual ao projeto novo (agente ligado, sem nada gerado)
   agente(true);
+  if (Q.get('painel') === '1') {  // janela larga: o agente é um PAINEL à direita (sem o chip) e a caixa principal some
+    caixa().style.display = 'none'; document.body.appendChild(T('painel_sessao'));
+  }
   ($$('flow-prompt-box flow-ingredient-bar') || []).forEach(e => e.remove());
 })();
