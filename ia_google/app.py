@@ -250,7 +250,7 @@ def tarefa_perguntar(n, pergunta, nova, usar_instrucao):
         raise ErroComInfo(info)
 
 
-def tarefa_video(n, url, tarefa, consulta, nova):
+def tarefa_video(n, url, tarefa, consulta, nova, errados=None):
     try:
         ia = n.garantir_aberto()
         if getattr(n, "yt", None) is None or n.yt.ia is not ia:
@@ -258,7 +258,7 @@ def tarefa_video(n, url, tarefa, consulta, nova):
         if getattr(n, "modo", "chat") != "video":
             n.yt.video_atual = None  # vinha do chat: começa conversa nova para o vídeo
         n.modo = "video"
-        r = n.yt.executar(url, tarefa, consulta, nova_conversa=True if nova else None)
+        r = n.yt.executar(url, tarefa, consulta, nova_conversa=True if nova else None, errados=errados)
         if config.get("salvar_html_respostas"):
             nome = time.strftime("%Y%m%d-%H%M%S") + f"_video_{tarefa}"
             arqs = ia.salvar_print(DEBUG_DIR / nome)
@@ -419,7 +419,8 @@ def api_video_tarefas():
 
 @app.route("/api/video", methods=["GET", "POST"])
 def api_video():
-    """POST {"url": "...", "tarefa": "resumo|pergunta|momentos|...", "consulta": "...", "nova_conversa": false}"""
+    """POST {"url": "...", "tarefa": "resumo|pergunta|momentos|...", "consulta": "...", "nova_conversa": false,
+             "errados": [{"inicio": "1:05", "fim": "1:20"}]}   ← 🔁 olhar de novo (na mesma conversa)"""
     d = request.get_json(silent=True) or {}
     url = (d.get("url") or request.args.get("url") or "").strip()
     tarefa = (d.get("tarefa") or request.args.get("tarefa") or "resumo").strip()
@@ -430,7 +431,8 @@ def api_video():
         return jsonify({"erro": f"Tarefa inválida. Opções: {', '.join(TAREFAS_VIDEO)}"}), 400
     inicio = time.time()
     try:
-        r = nav.executar(tarefa_video, url, tarefa, consulta, bool(d.get("nova_conversa")))
+        errados = d.get("errados") if isinstance(d.get("errados"), list) else None
+        r = nav.executar(tarefa_video, url, tarefa, consulta, bool(d.get("nova_conversa")) and not errados, errados)
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
     except ErroComInfo as e:

@@ -4,7 +4,8 @@
     <h2 style="margin-top:0;">🎬 Vídeos do YouTube pedidos pela IA</h2>
     <label class="yt-auto"><input type="checkbox" id="yt-auto-escolha" {% if job.get('youtube_auto', True) %}checked{% endif %} onchange="ytAutoMudou(this.checked)"> ⚡ Se eu não escolher, usar automaticamente o <strong>1º resultado</strong>, do começo do vídeo, com a duração do trecho (na hora de montar)</label>
     <div class="yt-ia-barra" id="yt-ia-barra" style="display:none;">
-      <button type="button" id="yt-ia-todos" onclick="ytIaTodos()">🤖 A IA acha os vídeos</button>
+      <button type="button" id="yt-ia-todos" class="yt-ia-claude" style="display:none;" onclick="ytIaTodos()">🤖 A IA acha os vídeos</button>
+      <button type="button" id="yt-google-todos" class="yt-ia-google" style="display:none;background:#0f766e;" onclick="ytGoogleTodos()" title="Alternativa: o Claude faz as buscas e escolhe os vídeos; o link vai pra 🔎 IA do Google, que assiste o vídeo e acha o momento (não precisa de legenda)">🤖🔎 Claude + Google acham</button>
       <button type="button" class="yt-sec" id="yt-ia-parar" style="display:none;" onclick="ytIaParar()">⏹ Parar</button>
       <span class="yt-sub" id="yt-ia-geral">Para cada item sem vídeo: busca, a IA olha capas/títulos/durações, lê a transcrição dos mais prováveis e acha o momento; se não achar, busca de outro jeito (até 3 buscas) — senão avisa pra você escolher à mão e vai pro próximo.</span>
     </div>
@@ -23,7 +24,8 @@
           <button type="button" onclick="ytBuscarDeNovo('{{ it.id }}')">🔍 Buscar de novo</button>
           <button type="button" class="yt-sec" id="yt-original-{{ it.id }}" style="display:none;" onclick="ytVoltarOriginal('{{ it.id }}')" title="{{ it.termo_original }}">↩ Termo original</button>
           {% if it.tipo == 'segmento' %}<button type="button" class="yt-sec" onclick="ytUsarPrimeiro('{{ it.id }}')" title="1º resultado, do começo do vídeo, com a duração do trecho">⚡ Usar o 1º</button>{% endif %}
-          <button type="button" class="yt-sec yt-ia-um" style="display:none;" onclick="ytIaUm('{{ it.id }}')" title="a IA busca, lê as transcrições e acha o momento só deste">🤖 IA acha este</button>
+          <button type="button" class="yt-sec yt-ia-um yt-ia-claude" style="display:none;" onclick="ytIaUm('{{ it.id }}')" title="a IA busca, lê as transcrições e acha o momento só deste">🤖 IA acha este</button>
+          <button type="button" class="yt-sec yt-ia-um yt-ia-google" style="display:none;" onclick="ytGoogleUm('{{ it.id }}')" title="Alternativa: o Claude busca e escolhe; a 🔎 IA do Google assiste o vídeo e acha o momento só deste">🤖🔎 Claude + Google</button>
         </div>
         <div class="yt-agente" id="yt-agente-{{ it.id }}" style="display:none;"></div>
         <div class="yt-resultados" id="yt-resultados-{{ it.id }}"><p class="yt-sub">Carregando resultados…</p></div>
@@ -108,12 +110,16 @@
   const paradas = {};        // itemId -> intervalo do "ver o trecho"
   let apiPronta = false;
   let pollTimer = null;
+  let googleOk = false;       // 🔎 IA do Google instalada (botões 🤖🔎 e 🔁)
   const mostrando = {};      // itemId -> quantos resultados aparecem (8, 16, 20 — "Outros vídeos")
   fetch('/ia/status').then(r => r.json()).then(j => {  // 🤖 IA ligada pra achar o momento pela legenda
     if (j.pode && j.pode.youtube_momento) document.querySelectorAll('.yt-ia-momento').forEach(b => { b.style.display = ''; });
     if (j.pode && j.pode.youtube_momento && j.pode.youtube_ordem) {  // 🤖 a IA acha os vídeos sozinha
-      el('yt-ia-barra').style.display = ''; document.querySelectorAll('.yt-ia-um').forEach(b => { b.style.display = ''; });
+      el('yt-ia-barra').style.display = ''; document.querySelectorAll('.yt-ia-claude').forEach(b => { b.style.display = ''; });
     }
+  }).catch(() => {});
+  fetch('/ia-google/status').then(r => r.json()).then(j => {  // 🤖🔎 alternativa: Claude busca + IA do Google assiste
+    if (j.instalado) { googleOk = true; el('yt-ia-barra').style.display = ''; document.querySelectorAll('.yt-ia-google').forEach(b => { b.style.display = ''; }); }
   }).catch(() => {});
 
   const anterior = window.onYouTubeIframeAPIReady;
@@ -293,6 +299,14 @@
     t.querySelector('b').textContent = ROT_IA[a.estado] || a.estado;
     t.querySelector('span').textContent = a.msg || ((a.log || []).slice(-1)[0] || '');
     box.appendChild(t);
+    if (a.estado === 'pronto' && it.escolha && it.escolha.url && googleOk) {  // 🔁 a IA do Google errou o momento
+      const dn = document.createElement('button');
+      dn.type = 'button'; dn.className = 'yt-sec'; dn.style.marginTop = '4px';
+      dn.textContent = '🔁 Não é esse momento — Google, olhe de novo';
+      dn.title = 'Pede pra 🔎 IA do Google, na mesma conversa, olhar esse vídeo de novo: diz que o momento anterior não tem o que procuramos e reafirma o que é';
+      dn.onclick = () => ytOlharDeNovo(it.id);
+      box.appendChild(dn);
+    }
     if (a.estado === 'nao_achou') {
       const d = document.createElement('div'); d.className = 'yt-sub';
       d.textContent = '👉 Escolha à mão: os resultados da última busca estão abaixo (na ordem da nota), ou troque o termo.';
@@ -307,14 +321,15 @@
   }
   function desenharIaGeral(g) {
     const rod = !!g.rodando;
-    el('yt-ia-todos').disabled = rod; el('yt-ia-parar').style.display = rod ? '' : 'none';
+    el('yt-ia-todos').disabled = rod; el('yt-google-todos').disabled = rod; el('yt-ia-parar').style.display = rod ? '' : 'none';
     document.querySelectorAll('.yt-ia-um').forEach(b => { b.disabled = rod; });
     if (rod) el('yt-ia-geral').textContent = `🤖 procurando ${Math.min(g.feitos + 1, g.total)} de ${g.total}… (${g.achados} achado${g.achados === 1 ? '' : 's'})`;
     else if (g.total) el('yt-ia-geral').textContent = (g.parado ? '⏹ Parado: ' : '🤖 Pronto: ') + `${g.achados} de ${g.total} achados pela IA` + (g.feitos - g.achados > 0 ? ` — ${g.feitos - g.achados} pra escolher à mão (marcados com ❌).` : '.');
   }
-  async function iaIniciar(itens) {
+  async function iaIniciar(itens, modo) {
     try {
-      const r = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(itens ? { itens } : {}) });
+      const corpo = Object.assign(itens ? { itens } : {}, modo ? { modo } : {});
+      const r = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
       const d = await r.json();
       if (!r.ok || !d.ok) { el('yt-ia-geral').textContent = '⚠️ ' + (d.erro || 'falhou'); return; }
       el('yt-ia-geral').textContent = `🤖 começando (${d.total} item${d.total === 1 ? '' : 's'})…`;
@@ -323,6 +338,17 @@
   }
   window.ytIaTodos = () => iaIniciar(null);
   window.ytIaUm = (id) => iaIniciar([id]);
+  window.ytGoogleTodos = () => iaIniciar(null, 'google');
+  window.ytOlharDeNovo = async (id) => {
+    try {
+      const r = await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/item/${encodeURIComponent(id)}/olhar-de-novo`, { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { el('yt-ia-geral').textContent = '⚠️ ' + (d.erro || 'falhou'); return; }
+      el('yt-ia-geral').textContent = `🔁 a IA do Google está olhando o vídeo de novo (sem ${d.errados.length} momento(s) errado(s))…`;
+      carregar();
+    } catch (e) { el('yt-ia-geral').textContent = '⚠️ ' + e; }
+  };
+  window.ytGoogleUm = (id) => iaIniciar([id], 'google');
   window.ytIaParar = async () => {
     await fetch(`/job/${encodeURIComponent(JOB_ID)}/youtube/ia/parar`, { method: 'POST' }).catch(() => {});
     el('yt-ia-geral').textContent = '⏹ parando depois do vídeo atual…';

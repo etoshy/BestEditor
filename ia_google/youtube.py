@@ -273,6 +273,50 @@ def normalizar_tempos(obj, vid):
     return novo
 
 
+# ---------- 🔁 "olhar de novo": a IA errou o momento ----------
+def normalizar_errados(errados):
+    """[{"inicio": "1:05"|65, "fim": ...}, ...] -> [(65, 80), ...] (só os válidos, sem repetir)."""
+    out = []
+    for e in errados or []:
+        if not isinstance(e, dict):
+            continue
+        ini = para_segundos(e.get("inicio_seg", e.get("inicio")))
+        fim = para_segundos(e.get("fim_seg", e.get("fim")))
+        if ini is None:
+            continue
+        fim = fim if fim is not None and fim > ini else ini + 5
+        if (ini, fim) not in out:
+            out.append((ini, fim))
+    return out[:20]
+
+
+def consulta_olhar_de_novo(consulta, errados):
+    """O pedido de "olhar de novo" na MESMA conversa: diz que os momentos anteriores não tinham o que buscamos e
+    reafirma o que estamos procurando."""
+    faixas = ", ".join(f"{formatar_tempo(a)}–{formatar_tempo(b)}" for a, b in normalizar_errados(errados))
+    return (f"{consulta}\n\nATENÇÃO — OLHE DE NOVO: o(s) momento(s) que você indicou antes ({faixas}) NÃO têm o que "
+            f"estamos procurando. Assista o vídeo outra vez, com atenção, do começo ao fim, e encontre o momento em que "
+            f"realmente acontece ou é falado isto: {consulta}. Não repita esses momentos. Se isso de fato não existir no "
+            f"vídeo, responda com \"encontrado\": false.")
+
+
+def tirar_errados(dados, errados, folga=3):
+    """Tira da resposta os momentos que caem num dos já recusados (a IA às vezes repete)."""
+    faixas = normalizar_errados(errados)
+    if not faixas or not isinstance(dados, dict):
+        return dados
+
+    def repetido(it):
+        ini = it.get("inicio_seg", it.get("tempo_seg"))
+        return ini is not None and any(a - folga <= ini <= max(b, a + folga) for a, b in faixas)
+    for k in ("momentos", "trechos"):
+        if isinstance(dados.get(k), list):
+            dados[k] = [it for it in dados[k] if not (isinstance(it, dict) and repetido(it))]
+            if k == "momentos" and not dados[k]:
+                dados["encontrado"] = False
+    return dados
+
+
 def _itens_com_tempo(obj, caminho=""):
     """Gera (caminho, item) de todo dict que tenha inicio/tempo."""
     if isinstance(obj, list):
@@ -434,7 +478,9 @@ class AnalisadorYouTube:
         pedido = t["pedido"].format(consulta=(consulta or "").strip()).strip()
         return MODELO_PROMPT.format(url=url, pedido=pedido, formato=t["formato"])
 
-    def executar(self, url, tarefa="resumo", consulta="", nova_conversa=None):
+    def executar(self, url, tarefa="resumo", consulta="", nova_conversa=None, errados=None):
+        """`errados` (🔁 olhar de novo): momentos que a IA indicou e NÃO eram o procurado — a pergunta vai na mesma
+        conversa dizendo isso e reafirmando o que buscamos; esses momentos são tirados da resposta."""
         if tarefa not in TAREFAS:
             raise ValueError(f"Tarefa desconhecida: {tarefa}. Opções: {', '.join(TAREFAS)}")
         vid = id_do_video(url)
@@ -446,12 +492,17 @@ class AnalisadorYouTube:
             self.ia.nova_conversa()
         self.video_atual = vid
 
-        prompt = self.montar_prompt(url_limpa, tarefa, consulta)
-        self.ia.log(f"Vídeo {vid}: {TAREFAS[tarefa]['nome']}" + (f" — {consulta}" if consulta else ""))
-        r = self.ia.perguntar(f"[{tarefa}] {consulta or url_limpa}", texto_personalizado=prompt)
+        errados = normalizar_errados(errados) if errados and consulta else []
+        envio = consulta_olhar_de_novo(consulta, [{"inicio": a, "fim": b} for a, b in errados]) if errados else consulta
+        prompt = self.montar_prompt(url_limpa, tarefa, envio)
+        self.ia.log(f"Vídeo {vid}: {TAREFAS[tarefa]['nome']}" + (f" — {consulta}" if consulta else "")
+                    + (f" (🔁 olhando de novo: {len(errados)} momento(s) recusado(s))" if errados else ""))
+        r = self.ia.perguntar(f"[{tarefa}]{' 🔁' if errados else ''} {consulta or url_limpa}", texto_personalizado=prompt)
 
         bruto = r.get("json") or {}
         dados = normalizar_tempos(bruto, vid)
+        if errados:
+            dados = tirar_errados(dados, [{"inicio": a, "fim": b} for a, b in errados])
         duracao = para_segundos(dados.get("duracao")) if isinstance(dados.get("duracao"), str) else None
         problemas = validar_tempos(dados, duracao)
         texto_todo = (r.get("resposta_bruta_md") or "")
@@ -463,6 +514,7 @@ class AnalisadorYouTube:
                       "miniatura": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"},
             "tarefa": tarefa,
             "consulta": consulta,
+            "errados": [{"inicio": a, "fim": b} for a, b in errados],
             "resposta_objetiva": resposta_objetiva_de(tarefa, dados) or r.get("resposta_objetiva", ""),
             "markdown": montar_markdown(tarefa, dados) if dados else (r.get("resposta_completa") or texto_todo),
             "dados": dados,

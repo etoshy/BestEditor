@@ -191,18 +191,38 @@ def pesquisar(pergunta: str, nova_conversa: bool = True, timeout: float = 360) -
     return _post("/api/pesquisar", {"pergunta": pergunta, "nova_conversa": nova_conversa}, timeout)
 
 
-def video(url: str, tarefa: str, consulta: str = "", timeout: float = 480) -> Dict[str, Any]:
-    """Tarefas: resumo, pergunta, momentos, capitulos, cortes, frases, checar, … (ver ia_google/youtube.py)."""
-    return _post("/api/video", {"url": url, "tarefa": tarefa, "consulta": consulta}, timeout)
+def video(url: str, tarefa: str, consulta: str = "", timeout: float = 480,
+          errados: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """Tarefas: resumo, pergunta, momentos, capitulos, cortes, frases, checar, … (ver ia_google/youtube.py).
+    `errados` (🔁 olhar de novo): momentos que ela indicou e não eram — vai na MESMA conversa dizendo isso."""
+    corpo: Dict[str, Any] = {"url": url, "tarefa": tarefa, "consulta": consulta}
+    if errados:
+        corpo["errados"] = [{"inicio": float(e["inicio"]), "fim": float(e.get("fim") or float(e["inicio"]) + 5)}
+                            for e in errados if e.get("inicio") is not None][:20]
+    return _post("/api/video", corpo, timeout)
 
 
-def momento(url: str, fala: str, duracao_alvo: Optional[float] = None, timeout: float = 480) -> Optional[Dict[str, Any]]:
+def _recusado(ini: float, evitar: Optional[List[Dict[str, Any]]], folga: float = 3.0) -> bool:
+    for e in evitar or []:
+        try:
+            a = float(e["inicio"])
+            b = float(e.get("fim") or a + 5)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if a - folga <= ini <= max(b, a + folga):
+            return True
+    return False
+
+
+def momento(url: str, fala: str, duracao_alvo: Optional[float] = None, timeout: float = 480,
+            evitar: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
     """🎬 O Google "assiste" o vídeo e diz onde está o que a narração pede → formato do yt_agente
-    ({"achou", "inicio", "fim", "frase", "confianca"}) ou None (não achou)."""
+    ({"achou", "inicio", "fim", "frase", "confianca"}) ou None (não achou).
+    `evitar` = [{"inicio", "fim"}] (🔁 olhar de novo): os momentos que estavam errados."""
     fala = " ".join(str(fala or "").split())[:600]
     consulta = (f"o momento que mostra ou em que é dito o que esta narração descreve: \"{fala}\""
                 + (f" (trecho de uns {int(duracao_alvo)} segundos)" if duracao_alvo else ""))
-    d = video(url, "momentos", consulta, timeout)
+    d = video(url, "momentos", consulta, timeout, errados=evitar)
     dados = d.get("dados") or {}
     if dados.get("encontrado") is False:
         return None
@@ -212,7 +232,7 @@ def momento(url: str, fala: str, duracao_alvo: Optional[float] = None, timeout: 
             fim = float(m.get("fim_seg") if m.get("fim_seg") is not None else ini + (duracao_alvo or 5))
         except (TypeError, ValueError):
             continue
-        if fim > ini >= 0:
+        if fim > ini >= 0 and not _recusado(ini, evitar):
             return {"achou": True, "inicio": ini, "fim": fim, "frase": str(m.get("citacao") or m.get("descricao") or "")[:300],
                     "confianca": 0.7, "fonte": "google"}
     return None

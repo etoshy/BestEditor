@@ -81,6 +81,14 @@ class _Andamento:
     def __init__(self, t: Dict[str, Any]):
         self._t = t
 
+    def parcial(self, dados: Any) -> None:
+        """Resultado parcial (a página vai mostrando enquanto roda)."""
+        self._t["parcial"] = dados
+        try:
+            _gravar(self._t)
+        except OSError:
+            pass
+
     def progresso(self, texto: str) -> None:
         self._t["progresso"] = str(texto or "")[:300]
         try:

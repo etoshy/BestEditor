@@ -587,9 +587,15 @@ function htmlResultadoVideo(r) {
       <button data-a="json">Copiar JSON</button>
       <button data-a="ver">Ver JSON</button>
       ${r.debug && r.debug.html ? `<button data-a="html">📄 HTML da página</button>` : ""}
+      ${podeOlharDeNovo(r) ? `<button data-a="denovo" title="Diz pra IA, na mesma conversa, que esses momentos não têm o que você procura e pede pra olhar o vídeo de novo">🔁 Não é isso — olhar de novo</button>` : ""}
       <span class="meta">${r.tempo_segundos ? r.tempo_segundos + "s · " : ""}${r.tentativas > 1 ? r.tentativas + " tentativas · " : ""}${esc((r.data || "").replace("T", " "))}</span>
     </div>`;
 }
+
+// 🔁 olhar de novo: os momentos achados (e os já recusados antes) vão como "errados" na mesma conversa
+const momentosDe = (r) => ((r.dados || {}).momentos || (r.dados || {}).trechos || [])
+  .filter((m) => m && m.inicio_seg != null).map((m) => ({ inicio: m.inicio_seg, fim: m.fim_seg != null ? m.fim_seg : m.inicio_seg + 5 }));
+const podeOlharDeNovo = (r) => ["momentos", "pergunta"].includes(r.tarefa) && r.consulta && (momentosDe(r).length || (r.errados || []).length);
 
 function ligarAcoesVideo(el, r) {
   const json = JSON.stringify(r, null, 2);
@@ -598,13 +604,19 @@ function ligarAcoesVideo(el, r) {
   on("json", (e) => copiar(json, e.target));
   on("ver", () => abrirDialogo("JSON da análise", `<pre>${esc(json)}</pre>`));
   on("html", () => window.open(r.debug.html, "_blank"));
+  on("denovo", (e) => {
+    const errados = [...(r.errados || []), ...momentosDe(r)];
+    e.target.disabled = true;
+    if (videoAtual && r.video && videoAtual.id === r.video.id) executarVideo(r.tarefa, r.consulta, errados);
+    else { mostrarAba("video"); carregarVideo(r.video.url); executarVideo(r.tarefa, r.consulta, errados); }
+  });
 }
 
-async function chamarVideo(url, tarefa, consulta, nova) {
+async function chamarVideo(url, tarefa, consulta, nova, errados) {
   let resp, r;
   try {
     resp = await fetch("/api/video", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, tarefa, consulta, nova_conversa: !!nova }) });
+      body: JSON.stringify(Object.assign({ url, tarefa, consulta, nova_conversa: !!nova }, errados && errados.length ? { errados } : {})) });
     r = await resp.json();
   } catch {
     throw { codigo: "SERVIDOR_OFFLINE", mensagem: "Não consegui falar com o servidor local.",
@@ -701,27 +713,27 @@ $("#formConsulta").addEventListener("submit", (e) => {
   executarVideo(tarefaSel, q);
 });
 
-async function executarVideo(tarefa, consulta) {
+async function executarVideo(tarefa, consulta, errados) {
   if (!videoAtual) return;
   if (ocupadoVideo) return abrirDialogo("Aguarde", "<p>Já tem uma análise em andamento. Espere ela terminar.</p>");
   ocupadoVideo = true;
   const t = tarefasVideo[tarefa];
   const load = addCarregando(elResVideo);
-  load.querySelector(".etapa").textContent = `${t.icone} ${t.nome}${consulta ? ": " + consulta : ""} — analisando o vídeo…`;
+  load.querySelector(".etapa").textContent = `${t.icone} ${t.nome}${consulta ? ": " + consulta : ""} — ${errados && errados.length ? "🔁 olhando de novo (os momentos anteriores não eram)…" : "analisando o vídeo…"}`;
   try {
-    const r = await chamarVideo(videoAtual.url, tarefa, consulta, $("#videoNova").checked);
+    const r = await chamarVideo(videoAtual.url, tarefa, consulta, errados && errados.length ? false : $("#videoNova").checked, errados);
     $("#videoNova").checked = false;
     load.parar();
     if (r.video.titulo) $("#videoInfo").innerHTML = `<b>${esc(r.video.titulo)}</b><span>${esc([r.video.canal, r.video.duracao].filter(Boolean).join(" · "))}</span>`;
     const card = document.createElement("div");
     card.className = "msg-ia cartao-video";
-    card.innerHTML = `<div class="cab-tarefa">${t.icone} <b>${esc(t.nome)}</b>${consulta ? ` <span>— ${esc(consulta)}</span>` : ""}</div>` + htmlResultadoVideo(r);
+    card.innerHTML = `<div class="cab-tarefa">${t.icone} <b>${esc(t.nome)}</b>${consulta ? ` <span>— ${esc(consulta)}</span>` : ""}${(r.errados || []).length ? ` <span>· 🔁 olhando de novo (${r.errados.length} recusado${r.errados.length > 1 ? "s" : ""}: ${r.errados.map((x) => fmtSeg(x.inicio)).join(", ")})</span>` : ""}</div>` + htmlResultadoVideo(r);
     ligarAcoesVideo(card, r);
     elResVideo.prepend(card);
   } catch (e) {
     load.parar();
     addErro(e && e.codigo ? e : { codigo: "ERRO_NA_TELA", mensagem: String(e) }, consulta || tarefa,
-            { container: elResVideo, aoTentar: () => executarVideo(tarefa, consulta) });
+            { container: elResVideo, aoTentar: () => executarVideo(tarefa, consulta, errados) });
   } finally { ocupadoVideo = false; }
 }
 

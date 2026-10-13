@@ -28,6 +28,26 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🤖🔎 Achar com Claude + Google em todas as partes de YouTube (v84_88)
+
+Botão **alternativo** ao lado das buscas normais: o **Claude** faz as buscas (e refaz de outro jeito se não achar, até
+3) e escolhe os vídeos mais prováveis pela capa/título/canal/duração; o **link** de cada um vai pra **🔎 IA do Google**
+pela API dela, que "assiste" o vídeo e devolve o **início/fim** do momento — sem depender de legenda (`yt_google.py`).
+
+- **📜 Roteiro do YouTube → 🎬 Cenas**: "🤖🔎 Achar com Claude + Google" em cada cena e "Achar todas as cenas sem link";
+  preenche link + início/fim e salva. Mostra o andamento de cada cena ("como foi").
+- **Editor / Estúdio → 🎬 Vídeos do YouTube**: "🤖🔎 Claude + Google acham" (todos) e "🤖🔎 Claude + Google" em cada item;
+  achou → baixa e corta sozinho, igual ao agente normal.
+- **✂️ Cortar do YouTube**: em cada trecho, escreva na descrição o que a cena mostra e clique "🤖🔎 Achar com Claude +
+  Google" — com link, a IA do Google acha o trecho nesse vídeo; sem link, o Claude busca o vídeo também.
+- **🔁 Não é esse — olhar de novo** (v84_89): se a IA do Google errou o momento, o botão pede pra ela olhar o MESMO vídeo
+  de novo, na mesma conversa, dizendo que o(s) momento(s) anterior(es) não tinham o que buscamos e reafirmando o que é.
+  Os recusados vão se acumulando (e nunca voltam como resposta). Tem nas 🎬 cenas do Roteiro do YouTube (aparece quando a
+  cena tem link), no painel do YouTube do editor (depois que acha) e no ✂️ Cortar do YouTube (depois do ✅), além do
+  próprio app 🔎 IA do Google (embaixo do resultado de "Achar momentos"/"Perguntar").
+- Tudo roda no servidor (pode fechar a aba) com aviso no 🔔 e registro no 🕘 Histórico. Precisa da pasta `ia_google/`
+  (funciona mesmo com o modo da IA do Google no agente em "desligado"); sem o Claude ligado ele usa a busca direta.
+
 ## 🔔 Notificações, tudo em segundo plano e 🕘 Histórico (v84_87)
 
 - **🔔 Sininho** no canto de cima de TODAS as páginas (inclusive o Estúdio): bolinha vermelha com o número de não lidas

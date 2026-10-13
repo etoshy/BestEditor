@@ -117,10 +117,59 @@ https://youtu.be/qqq            ← sem tempo: o vídeo inteiro</pre></details>
     <input type="text" class="campo-fim" placeholder="fim (vazio = fim do vídeo)" style="width:190px;margin-top:0;">
     <button type="button" class="btn-pegar-fim" title="Usar o tempo atual do player como fim" style="margin-top:0;font-size:0.75rem;padding:4px 6px;background:#666;">⏱→fim</button>
     <input type="text" class="campo-descricao" placeholder="descrição (opcional)" style="flex:1;min-width:120px;margin-top:0;">
+    <button type="button" class="btn-google-trecho" title="Escreva na descrição o que a cena mostra: a 🔎 IA do Google assiste o vídeo e preenche início/fim. Sem link, o Claude busca no YouTube e escolhe o vídeo também." style="margin-top:0;font-size:0.75rem;padding:4px 8px;background:#0f766e;">🤖🔎 Achar com Claude + Google</button>
     <button type="button" onclick="this.closest('.bloco-trecho').remove()" style="margin-top:0;background:#dc2626;padding:4px 10px;">✕</button>
+    <div class="google-st" style="width:100%;font-size:0.78rem;color:#555;"></div>
   </div>
 </template>
 
+<script>
+// 🤖🔎 achar o trecho com Claude + Google (v84_88): roda no servidor (pode fechar a aba — fica no 🕘 Histórico e chega aviso no 🔔)
+document.addEventListener('click', function (e) {
+  const b = e.target.closest('.btn-google-trecho'); if (b) { acharTrecho(b, null); return; }
+  const dn = e.target.closest('.btn-google-denovo'); if (!dn) return;
+  // 🔁 o momento estava errado: a IA do Google olha o vídeo de novo, na mesma conversa, sem os momentos recusados
+  const trecho = dn.closest('.bloco-trecho');
+  const errados = JSON.parse(trecho.dataset.errados || '[]');
+  errados.push({ inicio: trecho.querySelector('.campo-inicio').value.trim(), fim: trecho.querySelector('.campo-fim').value.trim() });
+  trecho.dataset.errados = JSON.stringify(errados);
+  acharTrecho(trecho.querySelector('.btn-google-trecho'), errados);
+});
+async function acharTrecho(b, errados) {
+  const trecho = b.closest('.bloco-trecho'), video = b.closest('.bloco-video');
+  const st = trecho.querySelector('.google-st'), desc = trecho.querySelector('.campo-descricao').value.trim();
+  const url = video.querySelector('.campo-url').value.trim();
+  if (desc.length < 4) { st.textContent = '⚠ escreva na descrição o que a cena mostra (ex.: "o T-Rex ataca o homem no banheiro")'; return; }
+  if (!errados) trecho.dataset.errados = '[]';
+  b.disabled = true;
+  st.textContent = errados ? `🔁 a IA do Google está olhando o vídeo de novo (sem ${errados.length} momento(s) errado(s))…`
+    : url ? '🔎 a IA do Google está assistindo o vídeo…' : '🤖 o Claude está buscando no YouTube; a IA do Google assiste os candidatos…';
+  try {
+    const r = await fetch('/cortar-youtube/achar-google', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ url, descricao: desc }, errados ? { errados } : {})) });
+    const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+    while (true) {
+      await new Promise(res => setTimeout(res, 2500));
+      let t = null; try { t = await (await fetch('/tarefas/' + d.tarefa, { cache: 'no-store' })).json(); } catch (_) {}
+      if (!t) continue;
+      if (t.status === 'rodando') { if (t.progresso) st.textContent = '⏳ ' + t.progresso; continue; }
+      fetch('/tarefas/' + d.tarefa + '/aplicada', { method: 'POST' }).catch(() => {});
+      if (t.status !== 'pronto') throw new Error(t.erro || 'falhou');
+      const m = t.resultado || {};
+      if (!m.achou) { st.textContent = '❌ ' + (m.motivo || (errados ? 'olhou de novo e não achou outro momento nesse vídeo' : 'não achei esse momento')); break; }
+      if (m.url && !url) { video.querySelector('.campo-url').value = m.url; video.querySelector('.campo-url').dispatchEvent(new Event('change')); }
+      trecho.querySelector('.campo-inicio').value = m.inicio_txt; trecho.querySelector('.campo-fim').value = m.fim_txt;
+      st.textContent = (errados ? '🔁✅ ' : '✅ ') + (m.titulo ? '“' + m.titulo.slice(0, 60) + '” ' : '') + m.inicio_txt + ' → ' + m.fim_txt + (m.frase ? ' — “' + m.frase.slice(0, 90) + '”' : '') + ' ';
+      const dn = document.createElement('button');
+      dn.type = 'button'; dn.className = 'btn-google-denovo'; dn.textContent = '🔁 Não é esse — olhar de novo';
+      dn.title = 'Diz pra IA do Google, na mesma conversa, que esse momento não tem o que procuramos e pede pra olhar de novo';
+      dn.style.cssText = 'margin:2px 0 0;font-size:0.72rem;padding:3px 8px;background:#92400e;';
+      st.appendChild(dn);
+      break;
+    }
+  } catch (err) { st.textContent = '⚠ ' + err.message; } finally { b.disabled = false; }
+}
+</script>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 let ytApiPronta = false;

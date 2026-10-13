@@ -327,7 +327,9 @@ function desenharResultado() {
   h += `<h3 style="margin:16px 0 4px;">🎬 Cenas (${cs.length})</h3>`;
   if (!cs.length) h += '<p class="ry-hint">Nenhuma cena de filme/série/anime listada.</p>';
   else {
-    h += `<p class="ry-hint">Pra cada cena: <b>🔎 Buscar no YouTube</b> e clicar no vídeo certo, ajustar início/fim, e no fim mandar tudo pro <b>✂️ Cortar do YouTube</b>. Se o vídeo original mostrava a cena, dá pra cortar direto dele pelos tempos.</p>`;
+    h += `<p class="ry-hint">Pra cada cena: <b>🔎 Buscar no YouTube</b> e clicar no vídeo certo, ajustar início/fim, e no fim mandar tudo pro <b>✂️ Cortar do YouTube</b>. Se o vídeo original mostrava a cena, dá pra cortar direto dele pelos tempos.</p>
+    <div class="ry-row" style="margin:4px 0 8px;"><button class="ry-mini" id="cGoogleTodas" style="background:#0f766e;color:#fff">🤖🔎 Achar todas as cenas sem link (Claude + Google)</button>
+      <span class="ry-hint" id="cGoogleGeral">o Claude faz as buscas e escolhe os vídeos; o link vai pra 🔎 IA do Google, que assiste e acha o início/fim. Roda no servidor — pode fechar a aba.</span></div>`;
     h += cs.map(c => `<div class="ry-cena" data-id="${c.id}">
       <div><b>${c.id}. ${esc(c.obra)}</b><span class="tipo">${esc(c.tipo)}${c.ano ? ' · ' + esc(c.ano) : ''}</span>${c.certeza ? ` <span style="font-size:0.72rem;color:${c.certeza === 'alta' ? '#065f46' : c.certeza === 'baixa' ? '#b91c1c' : '#92400e'};">certeza ${esc(c.certeza)}</span>` : ''}${c.marcador ? ` <span class="ry-cenatag">${esc(c.marcador)}</span>` : ''}${c.como_ficou ? ` <span style="font-size:0.75rem;color:#555;">(${esc(c.como_ficou)})</span>` : ''}</div>
       <div>${esc(c.momento)}${c.episodio_ou_tempo ? ` <span style="color:#777;">· ${esc(c.episodio_ou_tempo)}</span>` : ''}</div>
@@ -336,14 +338,18 @@ function desenharResultado() {
       <div class="ry-row">
         <input type="text" class="cBusca" value="${esc(c.busca_youtube)}" style="flex:1;min-width:200px;">
         <button class="ry-mini ry-sec cBuscar">🔎 Buscar no YouTube</button>
+        <button class="ry-mini cGoogle" style="background:#0f766e;color:#fff" title="Alternativa: o Claude faz as buscas e escolhe os vídeos, e a 🔎 IA do Google assiste cada um e diz o momento certo (início/fim)">🤖🔎 Achar com Claude + Google</button>
       </div>
+      <div class="ry-hint cGoogleSt"></div>
       <div class="ry-yt"></div>
       <div class="ry-row">
         <input type="url" class="cLink" placeholder="link do vídeo da cena" value="${esc(c.link || '')}" style="flex:1;min-width:220px;">
         <input type="text" class="cIni" placeholder="início 0:00" value="${esc(c.link_inicio || '')}" style="width:90px;">
         <input type="text" class="cFim" placeholder="fim 0:10" value="${esc(c.link_fim || '')}" style="width:90px;">
         <button class="ry-mini cSalvar">💾</button>
+        ${c.link ? `<button class="ry-mini cDeNovo" title="O momento está errado? Pede pra 🔎 IA do Google, na mesma conversa, olhar o vídeo de novo — dizendo que esse momento não tem o que procuramos e reafirmando o que é">🔁 Não é esse — olhar de novo</button>` : ''}
       </div>
+      ${(c.google_errados || []).length ? `<div class="ry-hint">já recusados nesse vídeo: ${c.google_errados.map(e => fmtMin(e.inicio / 60)).join(', ')}</div>` : ''}
     </div>`).join('');
     const comLink = cs.filter(c => c.link).length, comTempo = cs.filter(c => c.inicio).length;
     h += `<div class="ry-row" style="margin-top:10px;">
@@ -383,8 +389,68 @@ function desenharResultado() {
       } catch (e) { box.innerHTML = `<span class="ry-erro">⚠ ${esc(e.message)}</span>`; }
     });
     el.querySelector('.cSalvar').addEventListener('click', () => salvarCena(el, id));
+    el.querySelector('.cGoogle').addEventListener('click', () => acharComGoogle([id]));
+    const dn = el.querySelector('.cDeNovo');
+    if (dn) dn.addEventListener('click', async () => {
+      dn.disabled = true;
+      try {
+        const d = await api(`/roteiros-yt/${PID}/cena/${id}/olhar-de-novo`, { inicio: el.querySelector('.cIni').value, fim: el.querySelector('.cFim').value });
+        acompanharAchar(d.tarefa);
+      } catch (e) { alert(e.message); dn.disabled = false; }
+    });
   });
+  if ($('cGoogleTodas')) $('cGoogleTodas').addEventListener('click', () => acharComGoogle(null));
+  mostrarAchar();
 }
+// 🤖🔎 achar com Claude + Google (v84_88) — tarefa no servidor; a página mostra o andamento e preenche os links
+let achar = null;
+function mostrarAchar() {
+  if (!achar) return;
+  const est = (achar.status === 'rodando' ? achar.parcial : (achar.resultado || {}).cenas || achar.parcial) || {};
+  document.querySelectorAll('.ry-cena').forEach(el => {
+    const s = est[el.dataset.id], box = el.querySelector('.cGoogleSt'); if (!box) return;
+    el.querySelector('.cGoogle').disabled = achar.status === 'rodando';
+    if (!s) { box.textContent = ''; return; }
+    const ult = (s.log || []).slice(-1)[0] || '';
+    box.innerHTML = s.estado === 'na_fila' ? '⏳ na fila…' : s.estado === 'procurando' ? '⏳ ' + esc((ult || 'procurando…').trim())
+      : `<span style="color:${s.estado === 'pronto' ? '#065f46' : '#b91c1c'}">${esc(s.msg || '')}</span>` + (s.log && s.log.length ? ` <details style="display:inline"><summary style="display:inline;cursor:pointer">como foi</summary><pre style="white-space:pre-wrap;font-size:.75rem;margin:2px 0">${esc(s.log.join('\n'))}</pre></details>` : '');
+  });
+  if ($('cGoogleTodas')) $('cGoogleTodas').disabled = achar.status === 'rodando';
+  if ($('cGoogleGeral') && achar.status === 'rodando') $('cGoogleGeral').textContent = '⏳ ' + (achar.progresso || 'procurando…') + ' — pode fechar a aba: chega um aviso no 🔔.';
+  else if ($('cGoogleGeral') && achar.status === 'pronto') $('cGoogleGeral').textContent = `✅ achou ${(achar.resultado || {}).achadas || 0} de ${(achar.resultado || {}).total || 0} cena(s).`;
+  else if ($('cGoogleGeral') && achar.status === 'erro') $('cGoogleGeral').textContent = '⚠ ' + (achar.erro || 'falhou');
+}
+async function acharComGoogle(ids) {
+  try {
+    const d = await api(`/roteiros-yt/${PID}/achar-google`, ids ? { cenas: ids } : {});
+    acompanharAchar(d.tarefa);
+  } catch (e) { alert(e.message); }
+}
+async function acompanharAchar(id) {
+  while (true) {
+    let t = null; try { t = await (await fetch('/tarefas/' + id, { cache: 'no-store' })).json(); } catch (_) {}
+    if (t) { achar = t; mostrarAchar(); }
+    if (t && t.status !== 'rodando') {
+      fetch('/tarefas/' + id + '/aplicada', { method: 'POST' }).catch(() => {});
+      Object.entries((t.resultado || {}).cenas || {}).forEach(([cid, s]) => {
+        if (s.estado !== 'pronto') return;
+        [P.analise && P.analise.cenas, P.resultado && P.resultado.cenas].forEach(l => (l || []).forEach(c => {
+          if (String(c.id) === cid) Object.assign(c, { link: s.link, link_inicio: s.link_inicio, link_fim: s.link_fim }); }));
+      });
+      try {  // traz também os momentos já recusados (🔁)
+        const pj = await (await fetch(`/roteiros-yt/${PID}/baixar/json`)).json();
+        ['analise', 'resultado'].forEach(k => { if (pj[k] && P[k]) P[k].cenas = pj[k].cenas; });
+      } catch (_) {}
+      const scroll = window.scrollY; desenharResultado(); window.scrollTo(0, scroll);
+      return;
+    }
+    await new Promise(r => setTimeout(r, 2500));
+  }
+}
+fetch('/tarefas?tipo=achar_google&limite=1&pagina=' + encodeURIComponent(location.pathname)).then(r => r.json()).then(d => {
+  const t = (d.tarefas || [])[0]; if (!t) return;
+  if (t.status === 'rodando' || !t.aplicada) acompanharAchar(t.id); else { achar = t; mostrarAchar(); }
+}).catch(() => {});
 function textoDescricao() {
   const R = P.resultado || {}; const caps = R.capitulos || [];
   const CV = (R.capitulos_video || {}).capitulos;

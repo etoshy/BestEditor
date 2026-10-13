@@ -63,6 +63,11 @@ No **chat**, colar só o link faz o resumo; link + texto faz uma pergunta sobre 
 Cada tempo vem também em segundos e com link direto: `inicio`, `inicio_seg`, `inicio_link` (`youtu.be/ID?t=65`).
 `GET /api/video/tarefas` lista as tarefas.
 
+**🔁 Olhar de novo:** se os momentos estiverem errados, clique em **"🔁 Não é isso — olhar de novo"** embaixo do resultado
+(ou mande `"errados": [{"inicio": "1:05", "fim": "1:20"}]` no `POST /api/video`). A pergunta vai na **mesma conversa**,
+dizendo que esses momentos não tinham o que você procura e reafirmando o que é; se ela repetir um momento recusado,
+ele é tirado da resposta. Clicando de novo, os recusados vão se acumulando.
+
 **Em Python:**
 ```python
 from ia_google import GoogleIA

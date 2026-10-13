@@ -8,13 +8,37 @@ import json
 import threading
 import time
 import traceback
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from flask import Response, jsonify, redirect, render_template, request, url_for
 
 import roteiros_yt as ry
 
 _TAREFAS: Dict[str, Dict[str, Any]] = {}
+
+
+_TRAVA_CENAS = threading.Lock()
+
+
+def _descr_cena(c: Dict[str, Any]) -> str:
+    """O que procurar no vídeo (vai pra IA do Google)."""
+    return (f"{c.get('obra') or ''} ({c.get('tipo') or ''}{' ' + str(c.get('ano')) if c.get('ano') else ''}): "
+            f"{c.get('momento') or ''}" + (f" — {c['episodio_ou_tempo']}" if c.get("episodio_ou_tempo") else ""))
+
+
+def _atualizar_cena(base_dir: str, pid: str, cid: int, dados: Dict[str, Any]) -> None:
+    with _TRAVA_CENAS:
+        pp = ry.carregar_projeto(base_dir, pid)
+        for lista in ((pp.get("analise") or {}).get("cenas") or [], (pp.get("resultado") or {}).get("cenas") or []):
+            for x in lista:
+                if x.get("id") == cid:
+                    x.update(dados)
+        ry.salvar_projeto(base_dir, pp)
+
+
+def _cenas_do(p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """As cenas que a página mostra (as do resultado; senão as da análise)."""
+    return list((p.get("resultado") or {}).get("cenas") or (p.get("analise") or {}).get("cenas") or [])
 
 
 def registrar(app, base_dir: str) -> None:
@@ -234,6 +258,8 @@ def registrar(app, base_dir: str) -> None:
         for lista in ((p.get("analise") or {}).get("cenas") or [], (p.get("resultado") or {}).get("cenas") or []):
             for c in lista:
                 if c.get("id") == cid:
+                    if "link" in corpo and str(corpo["link"] or "").strip() != (c.get("link") or ""):
+                        c["google_errados"] = []  # outro vídeo: os momentos recusados não valem mais
                     for k in ("link", "link_inicio", "link_fim"):
                         if k in corpo:
                             c[k] = str(corpo[k] or "").strip()[:300]
@@ -242,6 +268,111 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Cena não encontrada."}), 404
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True})
+
+    @app.route("/roteiros-yt/<pid>/achar-google", methods=["POST"])
+    def roteiro_yt_achar_google(pid: str):
+        """🔎🤖 Alternativa (v84_88): Claude busca no YouTube e escolhe os vídeos, a IA do Google assiste e acha o
+        momento de cada cena → preenche link + início/fim. Em segundo plano (pode fechar a aba)."""
+        import tarefas_bg
+        import yt_google
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        motivo = yt_google.disponivel()
+        if motivo:
+            return jsonify({"erro": "🔎 IA do Google: " + motivo}), 400
+        corpo = request.get_json(silent=True) or {}
+        todas = _cenas_do(p)
+        pedidas = corpo.get("cenas")
+        if isinstance(pedidas, list) and pedidas:
+            alvo = [c for c in todas if c.get("id") in {int(x) for x in pedidas if str(x).isdigit()}]
+        else:
+            alvo = [c for c in todas if not c.get("link")]
+        if not alvo:
+            return jsonify({"erro": "Nenhuma cena sem link (escolha uma cena)."}), 400
+        rodando = [t for t in tarefas_bg.listar(5, tipo="achar_google", pagina=f"/roteiros-yt/{pid}") if t["status"] == "rodando"]
+        if rodando:
+            return jsonify({"ok": True, "tarefa": rodando[0]["id"], "ja_rodando": True})
+        ids = [c["id"] for c in alvo]
+
+        def _tarefa(t):
+            estado: Dict[str, Any] = {str(i): {"estado": "na_fila"} for i in ids}
+            achadas = 0
+            for k, cid in enumerate(ids, 1):
+                c = next((x for x in _cenas_do(ry.carregar_projeto(base_dir, pid)) if x.get("id") == cid), None)
+                if c is None:
+                    continue
+                st = estado[str(cid)] = {"estado": "procurando", "log": []}
+                t.progresso(f"cena {k}/{len(ids)}: {c.get('obra') or ''}")
+                t.parcial(estado)
+
+                def log(m, st=st):
+                    st["log"] = (st["log"] + [m])[-12:]
+                    t.parcial(estado)
+                descr = _descr_cena(c)
+                try:
+                    r = yt_google.achar(descr, c.get("busca_youtube") or "", log=log, job=pid)
+                except Exception as exc:  # noqa: BLE001
+                    r = {"achou": False, "motivo": str(exc)[:200]}
+                if r.get("achou"):
+                    achadas += 1
+                    dados = {"link": r["url"], "link_inicio": yt_google.mmss(r["inicio"]), "link_fim": yt_google.mmss(r["fim"])}
+                    _atualizar_cena(base_dir, pid, cid, dict(dados, google_errados=[]))
+                    st.update(estado="pronto", msg=f"✅ “{r['titulo'][:60]}” {dados['link_inicio']} → {dados['link_fim']}", **dados)
+                else:
+                    st.update(estado="nao_achou", msg="❌ " + str(r.get("motivo") or "não achei"))
+                t.parcial(estado)
+            return {"cenas": estado, "achadas": achadas, "total": len(ids)}
+        tid = tarefas_bg.iniciar("achar_google", f"🔎🤖 Achar {len(ids)} cena(s) com Claude + Google", _tarefa,
+                                 pagina=f"/roteiros-yt/{pid}")
+        return jsonify({"ok": True, "tarefa": tid, "total": len(ids)})
+
+    @app.route("/roteiros-yt/<pid>/cena/<int:cid>/olhar-de-novo", methods=["POST"])
+    def roteiro_yt_olhar_de_novo(pid: str, cid: int):
+        """🔁 A IA do Google errou o momento: pede, na mesma conversa, pra olhar o vídeo de novo — dizendo que o(s)
+        momento(s) anterior(es) não tinham o que buscamos e reafirmando o que é. Em segundo plano."""
+        import tarefas_bg
+        import yt_google
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = next((x for x in _cenas_do(p) if x.get("id") == cid), None)
+        if c is None:
+            return jsonify({"erro": "Cena não encontrada."}), 404
+        if not c.get("link"):
+            return jsonify({"erro": "Essa cena ainda não tem link."}), 400
+        motivo = yt_google.disponivel()
+        if motivo:
+            return jsonify({"erro": "🔎 IA do Google: " + motivo}), 400
+        corpo = request.get_json(silent=True) or {}
+        ini = yt_google.tempo_seg(corpo.get("inicio", c.get("link_inicio")))
+        fim = yt_google.tempo_seg(corpo.get("fim", c.get("link_fim")))
+        errados = [e for e in (c.get("google_errados") or []) if isinstance(e, dict)]
+        if ini is not None:
+            errados.append({"inicio": ini, "fim": fim if fim and fim > ini else ini + 5})
+        if not errados:
+            return jsonify({"erro": "Diga qual momento estava errado (início/fim)."}), 400
+        link = c["link"]
+
+        def _tarefa(t):
+            st: Dict[str, Any] = {"estado": "procurando", "log": [f"🔁 pedindo pra IA do Google olhar de novo (sem {len(errados)} momento(s) errado(s))…"]}
+            estado = {str(cid): st}
+            t.parcial(estado)
+            try:
+                m = yt_google.momento_no_link(link, _descr_cena(c), evitar=errados)
+            except Exception as exc:  # noqa: BLE001
+                m, st["log"] = None, st["log"] + [str(exc)[:200]]
+            if m and m.get("achou"):
+                dados = {"link": link, "link_inicio": yt_google.mmss(m["inicio"]), "link_fim": yt_google.mmss(m["fim"])}
+                _atualizar_cena(base_dir, pid, cid, dict(dados, google_errados=errados))
+                st.update(estado="pronto", msg=f"✅ olhou de novo: {dados['link_inicio']} → {dados['link_fim']}"
+                          + (f" — “{str(m.get('frase') or '')[:80]}”" if m.get("frase") else ""), **dados)
+                return {"cenas": estado, "achadas": 1, "total": 1}
+            _atualizar_cena(base_dir, pid, cid, {"google_errados": errados})
+            st.update(estado="nao_achou", msg="❌ olhou de novo e não achou outro momento nesse vídeo — tente outro vídeo (🤖🔎 Achar) ou escolha à mão")
+            return {"cenas": estado, "achadas": 0, "total": 1}
+        tid = tarefas_bg.iniciar("achar_google", f"🔁 Olhar de novo: {c.get('obra') or 'cena'}", _tarefa, pagina=f"/roteiros-yt/{pid}")
+        return jsonify({"ok": True, "tarefa": tid})
 
     @app.route("/roteiros-yt/<pid>/buscar-cena")
     def roteiro_yt_buscar_cena(pid: str):

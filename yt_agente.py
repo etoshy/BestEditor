@@ -34,11 +34,14 @@ def procurar(fala: str, termo: str, duracao_alvo: Optional[float], *,
              nova_busca: Callable[[List[str], List[str]], str],
              assistir: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
              assistir_sempre: bool = False,
+             so_google: bool = False,
              log: Callable[[str], None] = lambda _m: None,
              parar: Callable[[], bool] = lambda: False,
              max_buscas: int = MAX_BUSCAS, videos_por_busca: int = VIDEOS_POR_BUSCA) -> Dict[str, Any]:
     """`assistir(video)` (opcional, 🔎 IA do Google): "assiste" o vídeo e devolve o momento (mesmo formato do `achar`).
     Usada quando o vídeo não tem legenda ou a leitura da legenda não achou — ou ANTES da legenda, com `assistir_sempre`.
+    `so_google` (v84_88, o botão alternativo "🔎 Achar com Claude + Google"): nem lê legenda — a IA (Claude) faz as buscas
+    e escolhe os vídeos, e a IA do Google assiste cada um e diz o momento.
     → {"achou": True, "video", "inicio", "fim", "frase", "confianca", "busca", "buscas", "conferidos"}
        ou {"achou": False, "motivo", "buscas", "conferidos", "resultados" (os da última busca)}."""
     feitas: List[str] = []
@@ -47,6 +50,14 @@ def procurar(fala: str, termo: str, duracao_alvo: Optional[float], *,
     ultimos: List[Dict[str, Any]] = []
     termo_ultimos = ""
     termo = (termo or "").strip()
+    if so_google and assistir is None:
+        return {"achou": False, "motivo": "a IA do Google não está disponível", "buscas": [], "conferidos": [],
+                "motivos": [], "resultados": [], "termo_resultados": ""}
+    if not termo:  # sem termo: a IA (Claude) faz a primeira busca a partir da descrição
+        try:
+            termo = (nova_busca([], ["ainda não buscou nada — sugira a melhor primeira busca"]) or "").strip()
+        except Exception:  # noqa: BLE001
+            termo = ""
     while termo and len(feitas) < max_buscas and not parar():
         feitas.append(termo)
         log(f"🔍 Busca {len(feitas)}/{max_buscas}: “{termo}”")
@@ -83,8 +94,10 @@ def procurar(fala: str, termo: str, duracao_alvo: Optional[float], *,
                     except Exception as exc:  # noqa: BLE001
                         log(f"      IA do Google: {str(exc)[:120]}")
                         return None
-                m = _google() if assistir_sempre else None
-                if not (m and m.get("achou")):
+                m = _google() if (assistir_sempre or so_google) else None
+                if so_google:
+                    pass  # só o Google: não lê legenda
+                elif not (m and m.get("achou")):
                     log(f"   📄 lendo a transcrição de “{str(v.get('titulo') or '')[:70]}”{nota}")
                     try:
                         leg = legenda(v["url"]) or {}
