@@ -9,9 +9,13 @@ ia_google_rotas.py
   • usa a API dele pra:
       - 🎬 achar o MOMENTO num vídeo do YouTube "assistindo" o vídeo (o agente do YouTube usa quando o vídeo não
         tem legenda ou a leitura da legenda não achou — ou sempre, se você escolher);
-      - ✅ checar fatos de um roteiro (com fontes).
+      - ✅ checar fatos de um roteiro (com fontes);
+      - 🖼️ buscar IMAGENS em tamanho real (Google Imagens pelo Modo IA — `POST /api/imagens` do app): é o
+        buscador de imagem "google" do site, ao lado de Bing/Brave/Yandex/Startpage
+        (ver toolkit/buscador_imagens_unificado.py e toolkit/google_api_client.py).
 
-  cliente: no_ar() · garantir() · pesquisar(pergunta) · video(url, tarefa, consulta) · momento(url, fala)
+  cliente: no_ar() · garantir() · pesquisar(pergunta) · video(url, tarefa, consulta) · momento(url, fala) ·
+           imagens(termo, quantidade, min_lado)
 """
 from __future__ import annotations
 
@@ -236,6 +240,32 @@ def momento(url: str, fala: str, duracao_alvo: Optional[float] = None, timeout: 
             return {"achou": True, "inicio": ini, "fim": fim, "frase": str(m.get("citacao") or m.get("descricao") or "")[:300],
                     "confianca": 0.7, "fonte": "google"}
     return None
+
+
+MIN_LADO_OPCOES = (0, 800, 1280, 1920, 3840)
+
+
+def min_lado_imagens() -> int:
+    """🖼️ Tamanho mínimo (maior lado, em px) preferido pras imagens do Google no vídeo. 0 = qualquer."""
+    try:
+        v = int(_cfg().get("ia_google_imagens_min_lado", 800) or 0)
+    except (TypeError, ValueError):
+        return 800
+    return v if v in MIN_LADO_OPCOES else 800
+
+
+def imagens(termo: str, quantidade: int = 10, min_lado: int = 0, verificar: bool = False,
+            relacionadas: bool = False, timeout: float = 300) -> Dict[str, Any]:
+    """🖼️ Google Imagens pelo Modo IA (`POST /api/imagens` do app — ver ia_google/README.md):
+    → {"termo", "total", "imagens": [{titulo, site, pagina, imagem (link ORIGINAL), miniatura, largura, altura}],
+       "rodadas", "aviso"}.
+    `min_lado` > 0: o app descarta as menores e continua buscando (até 4 rodadas — mais lento)."""
+    termo = " ".join(str(termo or "").split())
+    if not termo:
+        raise IAGoogleErro("termo de busca vazio")
+    corpo = {"termo": termo, "quantidade": max(1, min(int(quantidade or 10), 80)),
+             "min_lado": max(0, int(min_lado or 0)), "verificar": bool(verificar), "relacionadas": bool(relacionadas)}
+    return _post("/api/imagens", corpo, timeout)
 
 
 def checar_fatos(texto: str, timeout: float = 420) -> Dict[str, Any]:

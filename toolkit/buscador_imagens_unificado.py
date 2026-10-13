@@ -9,6 +9,14 @@ Bing + Brave + Yandex + Startpage Images, os 4 motores com navegador
 de proporção, downloader que confere pelos bytes se o arquivo é mesmo
 uma imagem e tenta a thumbnail/proxy quando a original falha.
 
++ "google": Google Imagens pelo Modo IA do Google — não é um motor do
+`unified_images/`: quem pesquisa é o app da pasta `ia_google/` (o mesmo da
+aba 🔎 IA do Google, que sobe sozinho na porta 8852), pela API dele
+`POST /api/imagens` (ver ia_google/README.md, "Imagens em tamanho real").
+Ele devolve o link da imagem ORIGINAL (não a miniatura), com largura,
+altura e página de origem. É um navegador só, com fila: os termos vão um
+atrás do outro (cada um ~10-30 s). Ver `_buscar_lote_google`.
+
 Duas formas de usar:
 
 1. `BuscadorImagensClient` (e as subclasses por buscador em
@@ -43,13 +51,17 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Union, Tuple
 
-ENGINES = ("bing", "brave", "yandex", "startpage")
+ENGINES = ("bing", "brave", "yandex", "startpage", "google")
+# ordem padrão da troca entre buscadores quando ninguém diz quais usar: os 4 por navegador. O "google" (Modo IA,
+# app ia_google/) entra quando é pedido — no `engines` ou como buscador preferido do termo.
+ENGINES_PADRAO = ("bing", "brave", "yandex", "startpage")
 
 ENGINE_HOME = {
     "bing": "https://www.bing.com/",
     "brave": "https://search.brave.com/",
     "yandex": "https://yandex.com/",
     "startpage": "https://www.startpage.com/",
+    "google": "https://www.google.com/",
 }
 
 
@@ -281,6 +293,8 @@ def buscar_lote(
     out: Dict[str, Any] = {"por_termo": {t: [] for t in termos}, "erros": {}, "erro_geral": None}
     if not termos:
         return out
+    if engine == "google":
+        return _buscar_lote_google(termos, limit=limit, orientation=orientation, engine_options=engine_options)
 
     try:
         from unified_images._compat import garantir_imports_dos_motores
@@ -333,6 +347,112 @@ def buscar_lote(
         if not out["por_termo"].get(termo) and termo not in out["erros"]:
             out["erros"][termo] = out["erro_geral"] or "nenhuma imagem encontrada"
     return out
+
+
+# --------------------------------------------------------------------------- #
+# "google": Google Imagens pelo Modo IA (app ia_google/, API POST /api/imagens)
+# --------------------------------------------------------------------------- #
+
+
+def _cliente_ia_google():
+    """O cliente do app ia_google/ (`ia_google_rotas.py`, na raiz do site)."""
+    try:
+        import ia_google_rotas  # noqa: WPS433
+    except ImportError:
+        import sys
+        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if raiz not in sys.path:
+            sys.path.insert(0, raiz)
+        import ia_google_rotas  # noqa: WPS433
+    return ia_google_rotas
+
+
+def _imagem_de_google(im: Dict[str, Any], termo: str) -> ImagemBuscador:
+    def _int(v: Any) -> Optional[int]:
+        try:
+            return int(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+    titulo = str(im.get("titulo") or "")
+    return ImagemBuscador(
+        title=titulo, description=titulo or str(im.get("site") or ""), source_page=str(im.get("pagina") or ""),
+        original_url=str(im.get("imagem") or ""), thumbnail_url=str(im.get("miniatura") or ""),
+        width=_int(im.get("largura")), height=_int(im.get("altura")), query=termo, engine="google", raw=dict(im),
+    )
+
+
+def _ordenar_google(imagens: List[ImagemBuscador], orientation: str, min_lado: int) -> List[ImagemBuscador]:
+    """Grandes (≥ min_lado) primeiro e, dentro delas, a orientação pedida — sem jogar nada fora:
+    melhor uma imagem menor do que trecho sem imagem."""
+    def peso(img: ImagemBuscador):
+        lado = max(int(img.width or 0), int(img.height or 0))
+        pequena = 1 if (min_lado and lado and lado < min_lado) else 0
+        t = tipo_da_imagem(img)
+        fora = 0 if orientation in ("", "any", None) or t == orientation else (1 if t is None else 2)
+        return (pequena, fora)
+    return sorted(imagens, key=peso)
+
+
+def _buscar_lote_google(
+    termos: List[str],
+    limit: int = 1,
+    orientation: str = "any",
+    engine_options: Optional[Dict[str, Any]] = None,
+    cliente: Any = None,
+) -> Dict[str, Any]:
+    """Pesquisa cada termo no Google Imagens pelo app ia_google/ (um termo de cada vez — o app tem UM
+    navegador e atende em fila). Mesmo formato de saída de `buscar_lote`. Se o app não sobe (pasta ausente,
+    Playwright/Flask faltando) ou cai, vira `erro_geral` e os termos que faltam vão pro próximo buscador.
+
+    engine_options: {"min_lado": px preferido (padrão: config ia_google_imagens_min_lado),
+                     "quantidade": quantas pedir por termo, "timeout": s por termo}."""
+    opts = dict(engine_options or {})
+    out: Dict[str, Any] = {"por_termo": {t: [] for t in termos}, "erros": {}, "erro_geral": None}
+    try:
+        g = cliente or _cliente_ia_google()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"IA do Google indisponível: {type(exc).__name__}: {exc}"
+        out["erro_geral"] = msg
+        out["erros"] = {t: msg for t in termos}
+        return out
+    try:
+        min_lado = int(opts["min_lado"]) if "min_lado" in opts else int(g.min_lado_imagens())
+    except Exception:  # noqa: BLE001
+        min_lado = 0
+    quantidade = max(int(opts.get("quantidade") or 0), int(limit) + 4, 8)
+    timeout = float(opts.get("timeout") or 300)
+    falhas_seguidas = 0
+    for n, termo in enumerate(termos):
+        try:
+            r = g.imagens(termo, quantidade=quantidade, timeout=timeout)
+        except Exception as exc:  # noqa: BLE001
+            msg = f"IA do Google: {str(exc) or type(exc).__name__}"
+            out["erros"][termo] = msg
+            falhas_seguidas += 1
+            # o app não sobe / não responde: não adianta insistir nos próximos termos
+            if not (hasattr(g, "no_ar") and _seguro(g.no_ar)) or falhas_seguidas >= 2:
+                out["erro_geral"] = msg
+                for resto in termos[n + 1:]:
+                    out["erros"][resto] = msg
+                break
+            continue
+        falhas_seguidas = 0
+        imgs = [_imagem_de_google(im, termo) for im in (r.get("imagens") or []) if im.get("imagem")]
+        todas = len(imgs)
+        imgs = sem_marca_dagua(imgs)
+        imgs = _ordenar_google(imgs, orientation or "any", min_lado)
+        out["por_termo"][termo] = imgs[:max(1, int(limit))]
+        if not imgs:
+            out["erros"][termo] = ("só achou imagens de banco pago (com marca d'água)" if todas
+                                   else (r.get("aviso") or "nenhuma imagem encontrada"))
+    return out
+
+
+def _seguro(fn: Callable[[], Any]) -> bool:
+    try:
+        return bool(fn())
+    except Exception:  # noqa: BLE001
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -419,6 +539,11 @@ def buscar_lote_proporcao(
     if not termos:
         return out
     passadas = list(PROPORCOES[proporcao])
+    if engine == "google":
+        # o Modo IA não tem filtro de proporção e cada busca custa ~10-30 s: UMA busca só, com folga de
+        # candidatos, e a lista volta ordenada (proporção certa primeiro) logo abaixo
+        passadas = ["any"]
+        limit_google = max(int(limit), 6)
     if passadas != ["any"]:
         passadas.append("any")  # reserva
     vistos: Dict[str, set] = {t: set() for t in termos}
@@ -433,8 +558,10 @@ def buscar_lote_proporcao(
         opts = dict(engine_options or {})
         if engine == "bing" and ori in _ASPECTO_BING and "aspect" not in opts:
             opts["aspect"] = _ASPECTO_BING[ori]  # filtro do próprio Bing (qft aspect-wide/square/tall)
-        res = buscar(engine, faltam, limit=limit if not reserva else max(limit, 3), headless=headless,
-                     orientation=ori, engine_options=opts or None)
+        lim = limit if not reserva else max(limit, 3)
+        if engine == "google":
+            lim = limit_google
+        res = buscar(engine, faltam, limit=lim, headless=headless, orientation=ori, engine_options=opts or None)
         if res.get("erro_geral") and not out["erro_geral"]:
             out["erro_geral"] = res["erro_geral"]
         for t in faltam:
@@ -630,7 +757,7 @@ BaixarFn = Callable[[ImagemBuscador, str, str], str]            # (imagem, pasta
 def buscar_e_baixar_primeira(
     pedidos: Iterable[Union[str, Dict[str, Any]]],
     output_dir: str,
-    engines: Iterable[str] = ENGINES,
+    engines: Iterable[str] = ENGINES_PADRAO,
     headless: bool = True,
     paralelo: bool = True,
     on_result: Optional[Callable[[str, Dict[str, Any]], None]] = None,
@@ -671,7 +798,7 @@ def buscar_e_baixar_primeira(
     último recurso ("repetida": True) — melhor que trecho sem imagem.
     Imagem de banco pago (marca d'água) nunca entra.
     """
-    ordem_global = [e for e in engines if e in ENGINES] or list(ENGINES)
+    ordem_global = [e for e in engines if e in ENGINES] or list(ENGINES_PADRAO)
     # proporção ("horizontal_quadrada" etc.): cada passada usa o filtro nativo
     # do buscador e a lista volta ordenada por ela — a 1ª já é a da proporção certa
     if buscar_fn is None:

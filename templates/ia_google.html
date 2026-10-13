@@ -7,12 +7,13 @@
   .hint { font-size: .85rem; color: #666; }
 </style>
 <h1 style="margin:0 0 6px;">🔎 IA do Google</h1>
-<p class="hint" style="margin:0 0 4px;">Pesquisa no <b>Modo IA do Google</b> por um navegador automatizado: chat com fontes e análise de vídeos do
-  YouTube (resumo, achar momentos, capítulos, checar fatos…). Roda como um app à parte (porta {{ porta }}) dentro desta aba.
+<p class="hint" style="margin:0 0 4px;">Pesquisa no <b>Modo IA do Google</b> por um navegador automatizado: chat com fontes, análise de vídeos do
+  YouTube (resumo, achar momentos, capítulos, checar fatos…) e 🖼️ <b>imagens em tamanho real</b> (link da original, resolução e página). Roda como um app à parte (porta {{ porta }}) dentro desta aba.
   <span id="igEstado">⏳ ligando…</span> · <a id="igAbrir" href="#" target="_blank" rel="noopener">abrir em outra aba ↗</a></p>
 <p class="hint" style="margin:0 0 8px;">No site ela entra em: 🎬 <b>agente do YouTube</b> (acha o momento "assistindo" o vídeo —
   {% if modo == 'sempre' %}<b>sempre</b>{% elif modo == 'desligado' %}<b>desligado</b>{% else %}quando o vídeo não tem legenda ou a legenda não achou{% endif %};
-  mude em <a href="{{ url_for('settings_page') }}#ia-google">⚙️ Configurações</a>) e ✅ <b>Checar fatos</b> no Roteiro do YouTube.
+  mude em <a href="{{ url_for('settings_page') }}#ia-google">⚙️ Configurações</a>), ✅ <b>Checar fatos</b> no Roteiro do YouTube
+  e 🖼️ no buscador de imagem <b>google</b> (marque “google” nos provedores do vídeo).
   Se aparecer captcha, resolva na janela do navegador dela.</p>
 {% if not instalado %}<div class="aviso">A pasta <code>ia_google/</code> não está no site.</div>{% endif %}
 <div id="igCaptcha" style="display:none;background:#fef3c7;border:1px solid #f59e0b;color:#78350f;padding:10px 14px;border-radius:8px;margin:0 0 8px;font-weight:600;">

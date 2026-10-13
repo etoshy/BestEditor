@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # bancos que trazem foto E vídeo (o resto é só um dos dois)
 PROVEDORES_MISTOS = ("pexels", "flow")
-SO_FOTO = ("wikipedia", "bing", "brave", "yandex", "startpage")
+SO_FOTO = ("wikipedia", "bing", "brave", "yandex", "startpage", "google")
 SO_VIDEO = ("pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "youtube")
 # bancos de estoque só-vídeo cujos termos (inglês, genéricos) servem igual pra
 # buscar FOTO no pexels — os outros (youtube, animepexels) têm termos próprios.

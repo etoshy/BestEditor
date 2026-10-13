@@ -62,10 +62,22 @@ def _mmss(s: float) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
-def bloco_prompt(p: Dict[str, Any], cenas: List[Dict[str, Any]]) -> str:
+def bloco_prompt(p: Dict[str, Any], cenas: List[Dict[str, Any]], com_youtube: bool = True) -> str:
+    """`com_youtube=False` (a fonte youtube NÃO foi marcada no vídeo): as cenas entram só como contexto, pra
+    ilustrar com os bancos marcados — nada de "provider": "youtube"."""
     if not cenas:
         return ""
-    L = ["", f"## 📝 Cenas do roteiro (projeto “{p.get('titulo') or p.get('url') or 'Roteiro do YouTube'}”) — use o YouTube nelas",
+    titulo = p.get('titulo') or p.get('url') or 'Roteiro do YouTube'
+    if not com_youtube:
+        L = ["", f"## 📝 Cenas do roteiro (projeto “{titulo}”) — contexto",
+             "O roteiro foi escrito em cima destas cenas (de filmes, séries, animes, jogos…). A fonte YouTube NÃO está "
+             "marcada neste vídeo: NÃO use \"youtube\". Nos trechos dessas cenas, ilustre com os bancos marcados acima, "
+             "com uma busca que combine com o que acontece na cena."]
+        for c in cenas:
+            onde = f"em ~{_mmss(c['tempo'])} da narração" if c.get("tempo") is not None else "(sem marcador: ache pelo assunto)"
+            L.append(f"- CENA {c['id']} {onde}: {c['obra']} — {c['momento'][:160]}")
+        return "\n".join(L)
+    L = ["", f"## 📝 Cenas do roteiro (projeto “{titulo}”) — use o YouTube nelas",
          "O roteiro foi escrito em cima destas cenas (de filmes, séries, animes, jogos…). No trecho em que cada uma entra, use "
          "`\"provider\": \"youtube\"` com a busca indicada (a cena de verdade, não uma imagem de banco). Sem o tempo, ache o "
          "momento pelo assunto na transcrição."]

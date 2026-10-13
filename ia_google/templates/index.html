@@ -34,6 +34,7 @@
       <div class="abas" role="tablist">
         <button class="aba on" data-aba="chat" role="tab">💬 Chat</button>
         <button class="aba" data-aba="video" role="tab">🎬 Vídeo</button>
+        <button class="aba" data-aba="imagens" role="tab">🖼️ Imagens</button>
       </div>
       <span id="tituloConversa">Nova conversa</span>
       <label class="toggle so-chat" title="Desligado: cada pergunta abre uma conversa nova no Google">
@@ -68,6 +69,31 @@
         </div>
       </div>
       <div class="video-resultados" id="videoResultados"></div>
+    </section>
+
+    <section class="tela-video tela-imagens" id="telaImagens" hidden>
+      <form class="busca-img" id="formImagens">
+        <input id="termoImagens" placeholder="Do que você quer imagens? ex.: Satoru Gojo expansão de domínio" autocomplete="off">
+        <select id="qtdImagens" title="Quantidade">
+          <option value="10">10 imagens</option><option value="20" selected>20 imagens</option>
+          <option value="40">40 imagens</option><option value="60">60 imagens</option>
+        </select>
+        <select id="minImagens" title="Tamanho mínimo">
+          <option value="0">qualquer tamanho</option><option value="800">≥ 800 px</option>
+          <option value="1280">≥ 1280 px (HD)</option><option value="1920">≥ 1920 px (Full HD)</option>
+          <option value="3000">≥ 3000 px (4K)</option>
+        </select>
+        <label class="check" title="Abre o painel lateral e vai clicando nas imagens relacionadas para pegar mais originais"><input type="checkbox" id="relacionadasImagens" checked> incluir relacionadas</label>
+        <label class="check" title="Confere se cada link abre mesmo como imagem (mais lento)"><input type="checkbox" id="verificarImagens"> verificar links</label>
+        <button type="submit" class="btn primario">Buscar</button>
+      </form>
+      <div class="video-vazio" id="imagensVazio">
+        <h1>Imagens em tamanho real</h1>
+        <p>Busca pelo Modo IA do Google e traz o <b>link da imagem original</b> (não a miniatura), com resolução e página de origem.
+           Clique numa imagem para ver grande, copiar o link ou baixar. Dá para baixar todas num .zip.</p>
+      </div>
+      <div class="barra-img" id="barraImagens" hidden></div>
+      <div class="grade-img" id="gradeImagens"></div>
     </section>
 
     <section class="mensagens" id="mensagens">

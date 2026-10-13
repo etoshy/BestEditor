@@ -20,6 +20,7 @@ API:
     GET  /api/logs           últimos eventos (para achar erros)
 """
 import json
+import re
 import os
 import queue
 import threading
@@ -30,10 +31,11 @@ from collections import deque
 from concurrent.futures import Future
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, render_template, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, render_template, request, send_from_directory
 
 from ia_google import ErroIA, GoogleIA, classificar_erro
 from youtube import AnalisadorYouTube, TAREFAS as TAREFAS_VIDEO, id_do_video
+from imagens import BuscadorImagens, baixar_bytes, nome_arquivo, zip_imagens
 
 BASE = Path(__file__).resolve().parent
 CONVERSAS_DIR = BASE / "conversas"
@@ -231,7 +233,7 @@ def registrar_erro(e, nav_obj=None, contexto=""):
 def tarefa_perguntar(n, pergunta, nova, usar_instrucao):
     try:
         ia = n.garantir_aberto()
-        if nova or getattr(n, "modo", "chat") == "video":
+        if nova or getattr(n, "modo", "chat") != "chat":
             ia.nova_conversa()   # depois de analisar vídeo, o chat volta para uma conversa própria
         n.modo = "chat"
         log(f"Pergunta: {pergunta[:120]}")
@@ -277,6 +279,46 @@ def tarefa_video(n, url, tarefa, consulta, nova, errados=None):
         if getattr(n, "yt", None):
             n.yt.video_atual = None
         raise ErroComInfo(info)
+
+
+def tarefa_imagens(n, termo, quantidade, verificar, min_lado, relacionadas=False):
+    try:
+        ia = n.garantir_aberto()
+        n.modo = "imagens"
+        r = BuscadorImagens(ia).buscar(termo, quantidade=quantidade, verificar=verificar, min_lado=min_lado,
+                                       relacionadas=relacionadas)
+        if config.get("salvar_html_respostas"):
+            arqs = ia.salvar_print(DEBUG_DIR / (time.strftime("%Y%m%d-%H%M%S") + "_imagens"))
+            r["debug"] = {k: f"/debug/{Path(v).name}" for k, v in arqs.items()}
+        log(f"Imagens: {r['total']} encontradas para '{termo}'.", "ok")
+        estado["ultimo_erro"] = None
+        return r
+    except ValueError:
+        raise
+    except Exception as e:
+        info = registrar_erro(e, n, contexto=f"imagens: {termo}")
+        if n.ia:
+            n.ia.nova_conversa()
+        raise ErroComInfo(info)
+
+
+def tarefa_imagens_mais(n, quantidade, ja_vistas, min_lado, verificar):
+    """Continua explorando as relacionadas do painel lateral na página da última busca."""
+    from imagens import verificar_imagem
+    import concurrent.futures as cf
+    try:
+        if getattr(n, "modo", "") != "imagens" or not n.ia or not n.ia.esta_aberto():
+            raise ErroIA("SEM_BUSCA", "Não há uma busca de imagens aberta no navegador.",
+                         "Faça uma busca de imagens primeiro e depois clique em “Mais imagens”.")
+        novas = BuscadorImagens(n.ia).explorar_relacionadas(quantidade, ja_vistas=set(ja_vistas), min_lado=min_lado)
+        if verificar and novas:
+            with cf.ThreadPoolExecutor(8) as ex:
+                novas = list(ex.map(verificar_imagem, novas))
+        log(f"Mais imagens: {len(novas)} novas das relacionadas.", "ok")
+        return {"imagens": novas, "total": len(novas),
+                "aviso": None if novas else "Não encontrei mais imagens novas nas relacionadas."}
+    except Exception as e:
+        raise ErroComInfo(registrar_erro(e, n, contexto="mais imagens"))
 
 
 def tarefa_testar(n):
@@ -443,6 +485,75 @@ def api_video():
     if not d.get("incluir_bruto"):
         r.pop("resposta_bruta_md", None)
     return jsonify(r)
+
+
+@app.post("/api/imagens")
+def api_imagens():
+    """POST {"termo": "...", "quantidade": 20, "verificar": false, "min_lado": 0}"""
+    d = request.get_json(silent=True) or {}
+    termo = (d.get("termo") or request.args.get("q") or "").strip()
+    if not termo:
+        return jsonify({"erro": "Diga do que você quer imagens em 'termo'."}), 400
+    try:
+        qtd = max(1, min(int(d.get("quantidade", 20)), 80))
+        min_lado = max(0, int(d.get("min_lado", 0)))
+    except (TypeError, ValueError):
+        return jsonify({"erro": "quantidade e min_lado devem ser números."}), 400
+    inicio = time.time()
+    try:
+        r = nav.executar(tarefa_imagens, termo, qtd, bool(d.get("verificar")), min_lado, bool(d.get("relacionadas")))
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
+    except ErroComInfo as e:
+        return resposta_erro(e.info)
+    except Exception as e:
+        return resposta_erro(registrar_erro(e, None, contexto="imagens"))
+    r["tempo_segundos"] = round(time.time() - inicio, 1)
+    return jsonify(r)
+
+
+@app.post("/api/imagens/mais")
+def api_imagens_mais():
+    """POST {"quantidade": 10, "ja_vistas": ["url", ...], "min_lado": 0, "verificar": false}
+    Continua explorando as imagens relacionadas (painel lateral) da última busca."""
+    d = request.get_json(silent=True) or {}
+    try:
+        qtd = max(1, min(int(d.get("quantidade", 10)), 60))
+        r = nav.executar(tarefa_imagens_mais, qtd, d.get("ja_vistas", []), int(d.get("min_lado", 0)), bool(d.get("verificar")))
+    except ErroComInfo as e:
+        return resposta_erro(e.info)
+    except Exception as e:
+        return resposta_erro(registrar_erro(e, None, contexto="mais imagens"))
+    return jsonify(r)
+
+
+@app.get("/api/imagens/baixar")
+def api_imagem_baixar():
+    """Baixa UMA imagem original pelo servidor (evita bloqueio de hotlink). ?url=...&pagina=...&titulo=..."""
+    url = request.args.get("url", "")
+    if not url.startswith(("http://", "https://")):
+        return jsonify({"erro": "url inválida"}), 400
+    im = {"imagem": url, "pagina": request.args.get("pagina", ""), "titulo": request.args.get("titulo", "")}
+    try:
+        dados, tipo = baixar_bytes(im)
+    except Exception as e:
+        return jsonify({"erro": f"Não consegui baixar: {e}"}), 502
+    return Response(dados, mimetype=tipo or "application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="{nome_arquivo(im, 1, tipo)}"'})
+
+
+@app.post("/api/imagens/zip")
+def api_imagens_zip():
+    """POST {"imagens": [{"imagem": "...", "pagina": "...", "titulo": "..."}], "nome": "gojo"} -> arquivo .zip"""
+    d = request.get_json(silent=True) or {}
+    imagens = [im for im in d.get("imagens", []) if str(im.get("imagem", "")).startswith("http")][:100]
+    if not imagens:
+        return jsonify({"erro": "nenhuma imagem enviada"}), 400
+    dados, falhas = zip_imagens(imagens)
+    nome = re.sub(r"[^\w\-]+", "_", d.get("nome") or "imagens")[:40] or "imagens"
+    log(f"Zip de imagens: {len(imagens) - len(falhas)} baixadas, {len(falhas)} falharam.", "ok" if not falhas else "aviso")
+    return Response(dados, mimetype="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}.zip"', "X-Falhas": str(len(falhas))})
 
 
 @app.post("/api/nova")

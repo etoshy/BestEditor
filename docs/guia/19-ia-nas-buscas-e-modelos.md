@@ -24,7 +24,7 @@ O gasto fica em `ia_uso.json` e aparece na página, por recurso, com as últimas
 | Recurso | Onde | O que muda |
 |---|---|---|
 | 🧭 Ficha + buscas melhores | ao buscar as prévias | lê o roteiro uma vez (quem é quem, lugares, época, duplo sentido, o que evitar) e reescreve as buscas de cada trecho (2–4, em inglês, da específica pra genérica). A busca original vira a última alternativa |
-| ⚖️ Juiz visual | prévias da timeline (bancos e buscadores Bing/Brave/Yandex/Startpage) | olha 10 miniaturas e escolhe a melhor. Nota ≥ mínima = usa; 5–6 = usa com ⚠ no nome; abaixo de 5 = busca de novo |
+| ⚖️ Juiz visual | prévias da timeline (bancos e buscadores Bing/Brave/Yandex/Startpage/Google) | olha 10 miniaturas e escolhe a melhor. Nota ≥ mínima = usa; 5–6 = usa com ⚠ no nome; abaixo de 5 = busca de novo |
 | 🔁 Reescrever a busca | junto do juiz | com tudo abaixo de 5, tenta a busca sugerida pelo juiz (no máximo 2 vezes); no fim, a melhor das reprovadas com ⚠ |
 | 🔎 Nota no Buscar | Estúdio → painel do trecho → Buscar | resultados na ordem da nota, com a nota no canto e o motivo ao passar o mouse |
 | 🎬 YouTube | painel "Vídeos do YouTube" | busca 20, mostra os 8 melhores (nota no canto) + ➕ Outros vídeos |

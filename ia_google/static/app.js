@@ -654,12 +654,13 @@ async function enviarVideoNoChat(texto, link, repetindo) {
 // ---- aba Vídeo
 function mostrarAba(aba) {
   document.querySelectorAll(".aba").forEach((b) => b.classList.toggle("on", b.dataset.aba === aba));
-  const video = aba === "video";
-  $("#telaVideo").hidden = !video;
-  elMsgs.hidden = video;
-  document.querySelectorAll(".so-chat").forEach((e) => (e.hidden = video));
-  elTitulo.hidden = video;
-  if (video) setTimeout(() => (videoAtual ? null : $("#urlVideo").focus()), 50);
+  $("#telaVideo").hidden = aba !== "video";
+  $("#telaImagens").hidden = aba !== "imagens";
+  elMsgs.hidden = aba !== "chat";
+  document.querySelectorAll(".so-chat").forEach((e) => (e.hidden = aba !== "chat"));
+  elTitulo.hidden = aba !== "chat";
+  if (aba === "video") setTimeout(() => (videoAtual ? null : $("#urlVideo").focus()), 50);
+  if (aba === "imagens") setTimeout(() => $("#termoImagens").focus(), 50);
 }
 document.querySelectorAll(".aba").forEach((b) => (b.onclick = () => mostrarAba(b.dataset.aba)));
 
@@ -744,6 +745,125 @@ document.addEventListener("click", (e) => {
   const m = a.href.match(/youtu\.be\/([\w-]{11})\?t=(\d+)/);
   if (m && videoAtual && m[1] === videoAtual.id && !$("#telaVideo").hidden) { e.preventDefault(); pular(+m[2]); }
 });
+
+// =====================================================================
+// IMAGENS EM TAMANHO REAL
+// =====================================================================
+let resultadoImagens = null, buscandoImagens = false;
+const fmtBytes = (b) => !b ? "" : b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
+const urlBaixar = (im) => `/api/imagens/baixar?url=${encodeURIComponent(im.imagem)}&pagina=${encodeURIComponent(im.pagina || "")}&titulo=${encodeURIComponent(im.titulo || "")}`;
+
+$("#formImagens").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const termo = $("#termoImagens").value.trim();
+  if (!termo || buscandoImagens) return;
+  buscandoImagens = true;
+  $("#imagensVazio").hidden = true;
+  $("#barraImagens").hidden = true;
+  $("#gradeImagens").innerHTML = "";
+  const load = addCarregando($("#gradeImagens"));
+  load.classList.add("carregando-img");
+  try {
+    let resp, r;
+    try {
+      resp = await fetch("/api/imagens", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ termo, quantidade: +$("#qtdImagens").value, min_lado: +$("#minImagens").value,
+                               verificar: $("#verificarImagens").checked, relacionadas: $("#relacionadasImagens").checked }) });
+      r = await resp.json();
+    } catch { throw { codigo: "SERVIDOR_OFFLINE", mensagem: "Não consegui falar com o servidor local.", dica: "Verifique se o app.py está rodando." }; }
+    load.parar();
+    if (!resp.ok || r.erro) throw (r.detalhes_erro || { codigo: "HTTP_" + resp.status, mensagem: r.erro });
+    resultadoImagens = r;
+    desenharImagens(r);
+  } catch (err) {
+    load.parar();
+    addErro(err && err.codigo ? err : { codigo: "ERRO_NA_TELA", mensagem: String(err) }, termo,
+            { container: $("#gradeImagens"), aoTentar: () => $("#formImagens").requestSubmit() });
+  } finally { buscandoImagens = false; }
+});
+
+function desenharImagens(r) {
+  const barra = $("#barraImagens");
+  barra.hidden = false;
+  barra.innerHTML = `
+    <span><b>${r.total}</b> imagens de “${esc(r.termo)}” · ${r.tempo_segundos || ""}s</span>
+    ${r.aviso ? `<span class="alerta">⚠️ ${esc(r.aviso)}</span>` : ""}
+    <span class="acoes">
+      <button data-a="mais" title="Continua clicando nas imagens relacionadas do painel lateral">➕ Mais imagens</button>
+      <button data-a="zip">⬇️ Baixar todas (.zip)</button>
+      <button data-a="links">Copiar todos os links</button>
+      <button data-a="json">Copiar JSON</button>
+    </span>`;
+  barra.querySelector('[data-a="links"]').onclick = (e) => copiar(r.imagens.map((i) => i.imagem).join("\n"), e.target);
+  barra.querySelector('[data-a="json"]').onclick = (e) => copiar(JSON.stringify(r, null, 2), e.target);
+  barra.querySelector('[data-a="zip"]').onclick = (e) => baixarZip(r, e.target);
+  barra.querySelector('[data-a="mais"]').onclick = (e) => maisImagens(r, e.target);
+
+  $("#gradeImagens").innerHTML = r.imagens.map((im, i) => `
+    <figure class="cartao-img ${im.verificada === false ? "quebrada" : ""}" data-i="${i}">
+      <img src="${esc(im.miniatura || im.imagem)}" data-alt-src="${esc(im.imagem)}" alt="${esc(im.titulo)}" loading="lazy" onerror="falhaImagem(this)">
+      <figcaption>
+        <span class="tam">${im.largura && im.altura ? `${im.largura}×${im.altura}` : "?"}${im.bytes ? " · " + fmtBytes(im.bytes) : ""}</span>
+        <span class="site">${esc(im.site || dominio(im.pagina))}</span>
+      </figcaption>
+      ${im.origem === "relacionada" ? `<span class="selo rel" title="Veio das relacionadas do painel lateral">relacionada</span>` : ""}
+      ${im.verificada === false ? `<span class="selo" title="${esc(im.erro_verificacao || "")}">link não abriu</span>` : im.verificada ? `<span class="selo ok">✓</span>` : ""}
+    </figure>`).join("");
+  $("#gradeImagens").querySelectorAll(".cartao-img").forEach((f) => (f.onclick = () => verImagem(r.imagens[+f.dataset.i])));
+}
+
+function verImagem(im) {
+  abrirDialogo(im.titulo || "Imagem", `
+    <div class="visor-img"><img src="${esc(im.imagem)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('p'),{className:'alerta',textContent:'⚠️ O site não deixa exibir esta imagem aqui. Use “Baixar” (o servidor baixa por você) ou abra a página de origem.'}))"></div>
+    <div class="dados-img">
+      <div><span class="rotulo">Tamanho</span> ${im.largura && im.altura ? `${im.largura} × ${im.altura} px` : "desconhecido"}${im.bytes ? " · " + fmtBytes(im.bytes) : ""}${im.tipo ? " · " + esc(im.tipo) : ""}</div>
+      <div><span class="rotulo">Imagem original</span> <a href="${esc(im.imagem)}" target="_blank" rel="noopener">${esc(im.imagem)}</a></div>
+      ${im.pagina ? `<div><span class="rotulo">Página de origem</span> <a href="${esc(im.pagina)}" target="_blank" rel="noopener">${esc(im.pagina)}</a></div>` : ""}
+    </div>
+    <div class="botoes">
+      <a class="btn primario" href="${urlBaixar(im)}">⬇️ Baixar</a>
+      <a class="btn" href="${esc(im.imagem)}" target="_blank" rel="noopener">Abrir original</a>
+      <button class="btn" id="btCopiarImg">Copiar link</button>
+      ${im.pagina ? `<a class="btn" href="${esc(im.pagina)}" target="_blank" rel="noopener">Página de origem</a>` : ""}
+    </div>`);
+  $("#btCopiarImg").onclick = (e) => copiar(im.imagem, e.target);
+}
+
+async function maisImagens(r, botao) {
+  if (buscandoImagens) return;
+  buscandoImagens = true;
+  const antes = botao.textContent;
+  botao.textContent = "Explorando relacionadas…"; botao.disabled = true;
+  try {
+    const resp = await fetch("/api/imagens/mais", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantidade: +$("#qtdImagens").value || 10, ja_vistas: r.imagens.map((i) => i.imagem),
+                             min_lado: +$("#minImagens").value, verificar: $("#verificarImagens").checked }) });
+    const d = await resp.json();
+    if (!resp.ok || d.erro) throw (d.detalhes_erro || { codigo: "HTTP_" + resp.status, mensagem: d.erro });
+    r.imagens.push(...d.imagens);
+    r.total = r.imagens.length;
+    r.aviso = d.aviso;
+    desenharImagens(r);
+  } catch (e) {
+    addErro(e && e.codigo ? e : { codigo: "ERRO_NA_TELA", mensagem: String(e) }, "", { container: $("#gradeImagens") });
+  } finally { buscandoImagens = false; botao.textContent = antes; botao.disabled = false; }
+}
+
+async function baixarZip(r, botao) {
+  const antes = botao.textContent;
+  botao.textContent = "Baixando…"; botao.disabled = true;
+  try {
+    const resp = await fetch("/api/imagens/zip", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagens: r.imagens, nome: r.termo }) });
+    if (!resp.ok) throw new Error((await resp.json()).erro || resp.statusText);
+    const blob = await resp.blob();
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: (r.termo || "imagens") + ".zip" });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    const falhas = +resp.headers.get("X-Falhas") || 0;
+    botao.textContent = falhas ? `Pronto (${falhas} falharam)` : "Pronto ✓";
+  } catch (e) { botao.textContent = "Erro ao baixar"; abrirDialogo("Erro", `<p class="alerta">${esc(e.message)}</p>`); }
+  setTimeout(() => { botao.textContent = antes; botao.disabled = false; }, 3000);
+}
 
 fetch("/api/video/tarefas").then((r) => r.json()).then((t) => { tarefasVideo = t; desenharTarefas(); }).catch(() => {});
 

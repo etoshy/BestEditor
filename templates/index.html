@@ -37,7 +37,7 @@
     {% if _dossies %}<optgroup label="🕵️ Modelos de vídeo">{% for v in _dossies %}<option value="dossie:{{ v.id }}" {% if request.args.get('dossie') == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
     {% if _vendas %}<optgroup label="🛒 Vídeos de venda">{% for v in _vendas %}<option value="venda:{{ v.id }}" {% if request.args.get('venda') == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
   </select>
-  <p style="color:#666;font-size:0.8rem;margin:2px 0 8px;">O prompt da IA recebe as fotos e vídeos do projeto com as descrições: ela põe cada um no momento certo da narração e completa o resto com os bancos marcados abaixo. As mídias também ficam na biblioteca do Estúdio. <b>📝 Roteiro do YouTube:</b> cada [CENA n] do roteiro vira um trecho do YouTube no ponto certo da narração (a cena com link já escolhido entra sozinha; as outras, o 🤖 do painel acha) e os capítulos da descrição saem no tempo do vídeo final.</p>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 8px;">O prompt da IA recebe as fotos e vídeos do projeto com as descrições: ela põe cada um no momento certo da narração e completa o resto com os bancos marcados abaixo. As mídias também ficam na biblioteca do Estúdio. <b>📝 Roteiro do YouTube:</b> com a fonte <b>youtube</b> marcada abaixo, cada [CENA n] do roteiro vira um trecho do YouTube no ponto certo da narração (a cena com link já escolhido entra sozinha; as outras, o 🤖 do painel acha) e os capítulos da descrição saem no tempo do vídeo final. Sem o youtube marcado, nada vira clipe do YouTube: as cenas só orientam a IA a ilustrar com os bancos marcados.</p>
   {% endif %}
 
   <label>Idioma da narração</label>
@@ -50,7 +50,7 @@
   <label>Bancos de vídeo disponíveis pra IA escolher</label>
   <div class="checkboxes">
     {% for p in providers %}
-    <label><input type="checkbox" name="providers" value="{{ p }}" {% if p not in ('animepexels', 'moviepexels', 'animepexels_online', 'moviepexels_online', 'wikipedia', 'bing', 'brave', 'yandex', 'startpage', 'flow', 'youtube') %}checked{% endif %}> {{ p }}{% if p == 'animepexels' %} (acervo local de anime){% elif p == 'moviepexels' %} (acervo local de filmes e séries — mesmo servidor do anime, em /movie){% elif p == 'animepexels_online' %} (🌐 acervo ONLINE de anime — servidor com chave de API){% elif p == 'moviepexels_online' %} (🌐 acervo ONLINE de filmes e séries — mesma chave){% elif p == 'wikipedia' %} (Wikipedia — só fotos reais de pessoas, lugares, obras e objetos que existem/existiram){% elif p in ('bing', 'brave', 'yandex', 'startpage') %} (busca por navegador, mais lento que os bancos com API){% elif p == 'flow' %} (Google Flow — imagens e vídeos gerados por IA; lento, usa sua conta Google){% elif p == 'youtube' %} (YouTube — filmagem real específica; o site já pesquisa os termos e você escolhe o vídeo e o trecho no editor){% endif %}</label>
+    <label><input type="checkbox" name="providers" value="{{ p }}" {% if p not in ('animepexels', 'moviepexels', 'animepexels_online', 'moviepexels_online', 'wikipedia', 'bing', 'brave', 'yandex', 'startpage', 'google', 'flow', 'youtube') %}checked{% endif %}> {{ p }}{% if p == 'animepexels' %} (acervo local de anime){% elif p == 'moviepexels' %} (acervo local de filmes e séries — mesmo servidor do anime, em /movie){% elif p == 'animepexels_online' %} (🌐 acervo ONLINE de anime — servidor com chave de API){% elif p == 'moviepexels_online' %} (🌐 acervo ONLINE de filmes e séries — mesma chave){% elif p == 'wikipedia' %} (Wikipedia — só fotos reais de pessoas, lugares, obras e objetos que existem/existiram){% elif p in ('bing', 'brave', 'yandex', 'startpage') %} (busca por navegador, mais lento que os bancos com API){% elif p == 'google' %} (🖼️ Google Imagens pelo Modo IA do Google — imagem original em tamanho real; usa o app da aba 🔎 IA do Google, um termo de cada vez){% elif p == 'flow' %} (Google Flow — imagens e vídeos gerados por IA; lento, usa sua conta Google){% elif p == 'youtube' %} (YouTube — filmagem real específica; o site já pesquisa os termos e você escolhe o vídeo e o trecho no editor){% endif %}</label>
     {% endfor %}
   </div>
   {{ bibliotecas("", "providers") }}
@@ -62,7 +62,7 @@
   </div>
 
   <div style="margin:10px 0;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">
-    <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="usar_buscadores_inteligente" style="width:auto;"> 🔎 Este vídeo usa buscadores de imagem (Bing/Brave/Yandex/Startpage — coisas específicas que um banco de estoque não teria)</label>
+    <label style="margin-top:0;font-weight:normal;"><input type="checkbox" name="usar_buscadores_inteligente" style="width:auto;"> 🔎 Este vídeo usa buscadores de imagem (Bing/Brave/Yandex/Startpage/Google — coisas específicas que um banco de estoque não teria)</label>
     <p style="color:#666;font-size:0.8rem;margin:6px 0 0;">Mesma ideia do modo Wikipedia acima, mas pros 4 buscadores de imagem por navegador — pensados pra coisas específicas demais pra um banco de estoque (uma pessoa real, uma marca, um produto, uma captura de tela), não só entidades históricas/enciclopédicas. Ativa o provedor "bing" automaticamente se nenhum dos 4 estiver marcado acima. Se os dois checkboxes forem marcados juntos, o modo Wikipedia tem prioridade (só uma etapa de confirmação roda por vez). Adiciona uma etapa extra de copiar/colar ao processo.</p>
   </div>
 
@@ -161,7 +161,7 @@
   <label>Bancos de vídeo usados nesse JSON</label>
   <div class="checkboxes">
     {% for p in providers %}
-    <label><input type="checkbox" name="providers_reuse" value="{{ p }}" {% if p not in ('animepexels', 'moviepexels', 'animepexels_online', 'moviepexels_online', 'wikipedia', 'bing', 'brave', 'yandex', 'startpage', 'flow', 'youtube') %}checked{% endif %}> {{ p }}</label>
+    <label><input type="checkbox" name="providers_reuse" value="{{ p }}" {% if p not in ('animepexels', 'moviepexels', 'animepexels_online', 'moviepexels_online', 'wikipedia', 'bing', 'brave', 'yandex', 'startpage', 'google', 'flow', 'youtube') %}checked{% endif %}> {{ p }}</label>
     {% endfor %}
   </div>
   {{ bibliotecas("_reuse", "providers_reuse") }}

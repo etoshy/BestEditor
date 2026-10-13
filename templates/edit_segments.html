@@ -260,7 +260,7 @@
     </div>
     <p class="trim-help">💡 Você também pode arrastar as extremidades do bloco na timeline para encurtar/aumentar este trecho.</p>
     {% if seg.media_type == 'image' %}
-    <p style="color:#b45309;font-size:0.85rem;margin:4px 0;">📷 A IA sugeriu uma FOTO parada (com zoom) pra esse trecho, buscada em <strong>{{ seg.provider }}</strong>.{% if seg.provider in browser_image_providers %} Os buscadores de imagem pegam a 1ª imagem do resultado; se esse buscador não achar, o site tenta o termo nos outros (Bing/Brave/Yandex/Startpage) automaticamente.{% endif %} Pra usar vídeo aqui, escolha "usar um arquivo"/"colar link" abaixo.</p>
+    <p style="color:#b45309;font-size:0.85rem;margin:4px 0;">📷 A IA sugeriu uma FOTO parada (com zoom) pra esse trecho, buscada em <strong>{{ seg.provider }}</strong>.{% if seg.provider in browser_image_providers %} Os buscadores de imagem pegam a 1ª imagem do resultado; se esse buscador não achar, o site tenta o termo nos outros (Bing/Brave/Yandex/Startpage/Google) automaticamente.{% endif %} Pra usar vídeo aqui, escolha "usar um arquivo"/"colar link" abaixo.</p>
     {% set img_fade_in = seg.image_fade_in or False %}
     {% set img_fade_out = seg.image_fade_out or False %}
     <div style="margin:8px 0;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">

@@ -10,6 +10,8 @@ Toda resposta volta no mesmo formato:
 > **Dentro do BestEditor:** este app sobe sozinho pela aba **🔎 IA do Google** do site, na porta **8852**
 > (mude em ⚙️ Configurações). O site usa a API dele no agente do YouTube e no "Checar fatos" do Roteiro do YouTube.
 > Rodando sozinho (`iniciar.bat`), ele continua na porta 5000 — use `PORTA=8852` se o site também estiver aberto.
+> No site, a busca de imagens (🖼️ abaixo) é também o **buscador de imagem `google`** dos vídeos
+> (`toolkit/google_api_client.py`, pela rota `POST /api/imagens`).
 
 ## Iniciar
 
@@ -85,6 +87,48 @@ encontrados estão no lugar certo, se as respostas estão corretas e se cada fra
 No fim mostra um **placar de precisão** e, se algo falhar, gera o `falhas_video_*.zip` para enviar.
 Para testar outros vídeos, coloque a transcrição deles em `transcricoes/` (linhas no formato `m:ss texto`) e rode
 `python testar_video.py --url LINK`.
+
+## 🖼️ Imagens em tamanho real
+
+Na aba **🖼️ Imagens** você escreve do que quer imagens e recebe o **link da imagem original** (não a miniatura do
+Google), com a resolução (ex.: 3579×2684) e a página de origem.
+
+- **Como funciona:** o Modo IA mostra uma galeria; junto de cada miniatura o Google já manda, escondido no atributo
+  `data-im`, o link da imagem original, a largura, a altura e a página. O sistema lê isso direto, sem precisar
+  clicar em cada imagem. Se algum dia o link não vier, o **plano B** é clicar na miniatura e pegar a imagem grande
+  do painel lateral (a `img[jsname="kn3ccd"]`), como você faria à mão.
+- **Imagens relacionadas (painel lateral):** com "incluir relacionadas" ligado, depois da galeria o sistema abre o
+  painel lateral de uma imagem e vai **clicando nas imagens relacionadas que aparecem embaixo**, pegando o link
+  original de cada uma (a imagem grande do painel). Cada clique mostra novas relacionadas, então dá para juntar
+  bem mais imagens do que a galeria tem. Para não fugir do assunto, a cada 5 cliques ele volta para outra imagem
+  da galeria. Essas imagens aparecem com a marca **relacionada**.
+- **➕ Mais imagens:** depois de uma busca, continua explorando as relacionadas e acrescenta imagens novas
+  (sem repetir as que você já tem).
+- **Quantidade:** se a primeira galeria vier com poucas imagens, ele pede "mais imagens diferentes" na mesma conversa
+  (até 4 rodadas), sem repetir.
+- **Tamanho mínimo:** filtra por ≥ 800 px, HD, Full HD ou 4K, e continua buscando para completar a quantidade.
+- **Verificar links:** confere se cada link abre mesmo como imagem (alguns sites bloqueiam acesso direto).
+- **Baixar:** cada imagem tem o botão Baixar (o servidor baixa por você, evitando bloqueio de "hotlink"), e
+  **Baixar todas (.zip)** traz todas as imagens + um `_links.txt` com os links e as páginas de origem.
+
+**API:**
+| Método | Rota | O que faz |
+|---|---|---|
+| POST | `/api/imagens` | `{"termo": "...", "quantidade": 20, "min_lado": 1920, "verificar": true, "relacionadas": true}` |
+| POST | `/api/imagens/mais` | `{"quantidade": 10, "ja_vistas": ["url", ...]}` — mais imagens das relacionadas da última busca |
+| GET | `/api/imagens/baixar?url=...&pagina=...` | baixa uma imagem original |
+| POST | `/api/imagens/zip` | `{"imagens": [...], "nome": "gojo"}` → arquivo .zip |
+
+**Em Python:**
+```python
+from ia_google import GoogleIA
+from imagens import BuscadorImagens, baixar_imagens
+with GoogleIA() as ia:
+    r = BuscadorImagens(ia).buscar("Satoru Gojo expansão de domínio", quantidade=40, min_lado=1280, relacionadas=True)
+    for im in r["imagens"]:
+        print(im["largura"], im["altura"], im["imagem"], im["pagina"])
+    baixar_imagens(r["imagens"], "imagens_baixadas/gojo")
+```
 
 ## Configurações (⚙️ na barra lateral)
 

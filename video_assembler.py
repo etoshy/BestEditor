@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "too
 
 from prompt_builder import PHOTO_SEARCH_PROVIDERS as _PHOTO_SEARCH_PROVIDERS
 from prompt_builder import BROWSER_IMAGE_SEARCH_PROVIDERS as _BROWSER_IMAGE_SEARCH_PROVIDERS
+_SO_SE_MARCADO = ("google",)  # buscador de imagem que só entra na troca entre buscadores se estiver marcado no vídeo
 from prompt_builder import VideoSegment
 from site_config import load_site_config, resolution_for_orientation
 from perf_log import PerfLog
@@ -2477,6 +2478,8 @@ _PHOTO_PROVIDER_MODULES = {
     "brave": ("brave_api_client", "BraveAPIClient"),
     "yandex": ("yandex_api_client", "YandexAPIClient"),
     "startpage": ("startpage_api_client", "StartpageAPIClient"),
+    # 🖼️ Google Imagens pelo Modo IA do Google (app ia_google/, API POST /api/imagens)
+    "google": ("google_api_client", "GoogleAPIClient"),
     # imagens GERADAS por IA no Google Flow (automação de navegador; ver
     # toolkit/googleflow/googleflow_client.py) — recebe a config do site.
     "flow": ("googleflow.googleflow_client", "GoogleFlowClient"),
@@ -3567,8 +3570,12 @@ def prefetch_browser_images(
     paralelo = bool(cfg.get("buscadores_imagem_paralelo", True))
     # só os buscadores marcados no vídeo (cada um abre um navegador); sem a lista, os dos próprios trechos
     permitidos = cfg.get("provedores_do_job")
-    engines = [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS if permitidos is None or p in permitidos] \
-        or [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS if any(getattr(s, "provider", None) == p for _i, s in items)]
+    no_trecho = {getattr(s, "provider", None) for _i, s in items}
+    # sem a lista do job (vídeos antigos): os 4 de antes — o "google" (Modo IA, liga o app ia_google/ e é bem
+    # mais lento) só entra quando foi marcado no vídeo ou quando o próprio trecho pede
+    engines = [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS
+               if (p in permitidos if permitidos is not None else (p not in _SO_SE_MARCADO or p in no_trecho))] \
+        or [p for p in _BROWSER_IMAGE_SEARCH_PROVIDERS if p in no_trecho]
 
     def _entregar(termo: str, res: Dict[str, Any], inicio: int = 0) -> None:
         cache[termo] = res
@@ -4285,7 +4292,7 @@ def assemble_video(
                     res = prefetched_images[i]
                     if not res.get("ok") or not res.get("path"):
                         raise VideoAssemblyError(
-                            f"Nenhum buscador de imagem (bing/brave/yandex/startpage) conseguiu achar e baixar "
+                            f"Nenhum buscador de imagem (bing/brave/yandex/startpage/google) conseguiu achar e baixar "
                             f"uma imagem pra '{segment.query}' — {res.get('erro') or 'sem detalhes'}. Troque o "
                             "termo no editor, ou envie um arquivo/link pra esse trecho."
                         )

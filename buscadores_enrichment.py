@@ -41,6 +41,7 @@ _CLIENTES_BUSCADORES = {
     "brave": ("brave_api_client", "BraveAPIClient"),
     "yandex": ("yandex_api_client", "YandexAPIClient"),
     "startpage": ("startpage_api_client", "StartpageAPIClient"),
+    "google": ("google_api_client", "GoogleAPIClient"),  # 🖼️ Google Imagens pelo Modo IA (app ia_google/)
 }
 
 

@@ -87,8 +87,8 @@
   <label style="margin-top:8px;"><input type="checkbox" name="evitar_repeticao_clipes" {% if config.evitar_repeticao_clipes %}checked{% endif %} style="width:auto;"> Evitar repetição de cenas/fotos — nunca deixar a mesma cena aparecer em dois trechos do vídeo (prefere sempre uma nova, só repete se a busca esgotar de verdade)</label>
 
   <input type="hidden" name="buscadores_imagem_paralelo_enviado" value="1">
-  <label style="margin-top:8px;"><input type="checkbox" name="buscadores_imagem_paralelo" {% if config.buscadores_imagem_paralelo %}checked{% endif %} style="width:auto;"> Buscadores de imagem (Bing/Brave/Yandex/Startpage): rodar os buscadores ao mesmo tempo — cada um usa só 1 navegador e pesquisa todos os termos nele. Desmarcado = um buscador de cada vez (1 navegador aberto no total: mais lento, menos RAM)</label>
-  <label style="margin-top:8px;">Proporção das imagens dos buscadores (Bing/Brave/Yandex/Startpage)</label>
+  <label style="margin-top:8px;"><input type="checkbox" name="buscadores_imagem_paralelo" {% if config.buscadores_imagem_paralelo %}checked{% endif %} style="width:auto;"> Buscadores de imagem (Bing/Brave/Yandex/Startpage/Google): rodar os buscadores ao mesmo tempo — cada um usa só 1 navegador e pesquisa todos os termos nele. Desmarcado = um buscador de cada vez (1 navegador aberto no total: mais lento, menos RAM)</label>
+  <label style="margin-top:8px;">Proporção das imagens dos buscadores (Bing/Brave/Yandex/Startpage/Google)</label>
   <select name="buscadores_proporcao">
     {% for v, rot in [("auto", "Automática — segue o vídeo (16:9 → horizontal ou quadrada; 9:16 → vertical ou quadrada)"), ("horizontal_quadrada", "Horizontal, e quadrada se faltar"), ("horizontal", "Só horizontal"), ("quadrada", "Só quadrada"), ("vertical_quadrada", "Vertical, e quadrada se faltar"), ("vertical", "Só vertical"), ("qualquer", "Qualquer (sem filtro, como antes)")] %}
     <option value="{{ v }}" {% if (config.buscadores_proporcao or 'auto') == v %}selected{% endif %}>{{ rot }}</option>
@@ -255,13 +255,20 @@
   {% if config.animepexels_online_api_key %}<label style="font-weight:normal;"><input type="checkbox" name="animepexels_online_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
 
   <h2 style="margin-top:32px;" id="ia-google">🔎 IA do Google (Modo IA, por navegador)</h2>
-  <p style="color:#666;font-size:0.85rem;">O app da pasta <code>ia_google/</code> roda à parte (aba <a href="{{ url_for('ia_google_page') }}">🔎 IA do Google</a>). Ele "assiste" vídeos do YouTube e pesquisa com fontes. Precisa de: <code>pip install -r ia_google/requirements.txt</code>.</p>
+  <p style="color:#666;font-size:0.85rem;">O app da pasta <code>ia_google/</code> roda à parte (aba <a href="{{ url_for('ia_google_page') }}">🔎 IA do Google</a>). Ele "assiste" vídeos do YouTube, pesquisa com fontes e busca imagens no Google Imagens em tamanho real. Precisa de: <code>pip install -r ia_google/requirements.txt</code>.</p>
   <label>No agente do YouTube (🤖 achar o momento do vídeo)</label>
   <select name="ia_google_youtube">
     <option value="complemento" {% if config.ia_google_youtube not in ('sempre', 'desligado') %}selected{% endif %}>Quando o vídeo não tem legenda ou a legenda não achou (recomendado)</option>
     <option value="sempre" {% if config.ia_google_youtube == 'sempre' %}selected{% endif %}>Sempre primeiro (mais lento — o Google assiste cada vídeo)</option>
     <option value="desligado" {% if config.ia_google_youtube == 'desligado' %}selected{% endif %}>Não usar</option>
   </select>
+  <label>🖼️ Buscador de imagem "google" (Google Imagens pelo Modo IA) — preferir imagens com o maior lado de pelo menos</label>
+  <select name="ia_google_imagens_min_lado">
+    {% for v, rot in [(0, "Qualquer tamanho"), (800, "800 px (recomendado)"), (1280, "1280 px (HD)"), (1920, "1920 px (Full HD)"), (3840, "3840 px (4K)")] %}
+    <option value="{{ v }}" {% if (config.ia_google_imagens_min_lado if config.ia_google_imagens_min_lado is not none else 800) == v %}selected{% endif %}>{{ rot }}</option>
+    {% endfor %}
+  </select>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Marque o provedor <b>google</b> no vídeo pra usar. O Google devolve o link da imagem <b>original</b> (não a miniatura) com a resolução; as grandes vêm primeiro e as menores só entram se não houver outra. É um navegador só: os termos vão um de cada vez (~10-30 s cada) — se o Google não achar, o termo vai pros outros buscadores marcados.</p>
   <label>Porta do app</label>
   <input type="number" name="ia_google_porta" value="{{ config.ia_google_porta }}" min="1024" max="65535">
 

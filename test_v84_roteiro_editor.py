@@ -115,4 +115,5 @@ def test_novo_video_com_roteiro_liga_o_projeto(A, monkeypatch, tmp_path):
                                                       "providers": ["pexels"], "projeto_midias": "roteiro:abc123def"},
                                  content_type="multipart/form-data")
     job = A._JOBS[list(A._JOBS.keys())[-1]]
-    assert job["roteiro_id"] == "abc123def" and "youtube" in job["providers"] and not job.get("dossie_id")
+    # (v84_92) o projeto liga, mas NÃO marca a fonte youtube sozinho — só o que você marcou
+    assert job["roteiro_id"] == "abc123def" and job["providers"] == ["pexels"] and not job.get("dossie_id")

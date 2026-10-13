@@ -28,6 +28,34 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎬 Sem a fonte youtube marcada, nada vira clipe do YouTube (v84_92)
+
+- Escolher um projeto do **📝 Roteiro do YouTube** (ou ele vir no .zip do Gerar voz) **não marca mais o youtube
+  sozinho**. Com o youtube marcado, cada [CENA n] vira trecho do YouTube, como antes. Sem ele, as cenas vão pro prompt
+  só como contexto: a IA ilustra com os bancos marcados e nenhum clipe é pesquisado no YouTube.
+- Os **cortes reais** sugeridos pela IA continuam (pra você enviar o seu clipe), mas sem o youtube marcado o site não
+  pesquisa nada no YouTube pra eles.
+- Se algum trecho ainda chegar como "youtube" num vídeo sem essa fonte, ele vira o 1º banco de vídeo marcado (mesma busca).
+
+## 🖼️ Google Imagens como buscador de imagem + IA do Google atualizada (v84_92)
+
+- A pasta **ia_google/** foi atualizada pra versão nova do app (aba **🖼️ Imagens**: link da imagem **original** em
+  tamanho real, resolução, página de origem, “➕ Mais imagens” pelas relacionadas do painel lateral, baixar uma ou
+  todas em .zip). Continua com o que só existe no site: 🔁 “olhar de novo” nos momentos do vídeo, captcha reabrindo o
+  navegador visível e a porta 8852.
+- **Novo buscador de imagem `google`** (ao lado de Bing/Brave/Yandex/Startpage): marque **google** nos provedores do
+  vídeo. Ele pesquisa no Google Imagens pelo **Modo IA do Google**, usando a API do app (`POST /api/imagens`, ver
+  `ia_google/README.md`) — o site liga o app sozinho. A IA de edição pode escolher `"provider": "google"` com
+  `"media_type": "image"`, e a troca entre buscadores funciona igual: se o Google não achar ou o app não subir, o
+  termo vai pros outros buscadores marcados.
+- As imagens **grandes** e na **proporção** do vídeo vêm primeiro (⚙️ Configurações → 🔎 IA do Google → tamanho mínimo
+  preferido: 800 px por padrão; as menores só entram se não houver outra). Imagem de banco pago com marca d'água fica
+  de fora, como nos outros buscadores.
+- É **um navegador só**: os termos vão um de cada vez (~10-30 s cada), em paralelo com os outros buscadores. Em vídeos
+  antigos (sem a lista de provedores marcados) o Google não entra na troca entre buscadores, só se o trecho pedir.
+
+---
+
 ## 🤖🔎 Achar com Claude + Google em todas as partes de YouTube (v84_88)
 
 Botão **alternativo** ao lado das buscas normais: o **Claude** faz as buscas (e refaz de outro jeito se não achar, até

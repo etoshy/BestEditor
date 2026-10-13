@@ -283,6 +283,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # 🔎 IA do Google (app ia_google/, à parte): porta e quando o agente do YouTube usa ela pra achar o momento
     "ia_google_porta": 8852,
     "ia_google_youtube": "complemento",  # complemento (sem legenda / a legenda não achou) | sempre | desligado
+    # 🖼️ buscador de imagem "google" (Google Imagens pelo Modo IA): imagens com o maior lado ≥ isto vêm primeiro (0 = qualquer)
+    "ia_google_imagens_min_lado": 800,
 }
 
 
@@ -417,6 +419,12 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
             raise ValueError
     except (TypeError, ValueError):
         current["ia_google_porta"] = 8852
+    try:
+        current["ia_google_imagens_min_lado"] = int(current.get("ia_google_imagens_min_lado", 800) or 0)
+    except (TypeError, ValueError):
+        current["ia_google_imagens_min_lado"] = 800
+    if current["ia_google_imagens_min_lado"] not in (0, 800, 1280, 1920, 3840):
+        current["ia_google_imagens_min_lado"] = 800
     if current.get("fish_modo") not in ("local", "nuvem"):
         current["fish_modo"] = "local"
     _fu = str(current.get("fish_url") or "").strip().rstrip("/")

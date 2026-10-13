@@ -2200,7 +2200,7 @@ def save_settings():
         new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
-    for chave_ig in ("ia_google_youtube", "ia_google_porta"):  # 🔎 IA do Google
+    for chave_ig in ("ia_google_youtube", "ia_google_porta", "ia_google_imagens_min_lado"):  # 🔎 IA do Google
         if chave_ig in request.form:
             new_values[chave_ig] = request.form[chave_ig]
     for chave_fish in ("fish_modo", "fish_url", "fish_modelo"):  # 🐟 Fish Audio S2
@@ -2805,6 +2805,38 @@ def _cenas_do_roteiro(job: dict) -> List[Dict[str, Any]]:
     return job["roteiro_cenas"]
 
 
+def _youtube_marcado(job: dict) -> bool:
+    """A fonte 🎬 youtube foi marcada no vídeo? Sem ela, NADA vira clipe do YouTube (nem as cenas de um projeto
+    do Roteiro do YouTube / modelo de vídeo, nem os cortes reais)."""
+    return "youtube" in (job.get("providers") or [])
+
+
+def _reserva_sem_youtube(job: dict) -> Tuple[str, str]:
+    """(provider, media_type) pra um trecho que pedia YouTube com a fonte desmarcada: o 1º banco de VÍDEO marcado;
+    sem nenhum, a 1ª fonte de foto marcada; sem nada, pexels."""
+    import mix_midia
+    marcados = [p for p in job.get("providers") or [] if p not in ("youtube", "produto", "material", "flow")]
+    video = next((p for p in marcados if p not in mix_midia.SO_FOTO), None)
+    if video:
+        return video, "video"
+    foto = next((p for p in marcados if p in PHOTO_SEARCH_PROVIDERS), None)
+    return (foto, "image") if foto else ("pexels", "video")
+
+
+def _tirar_youtube_desmarcado(job: dict, segments: List[VideoSegment]) -> int:
+    """Trecho "youtube" (sem arquivo escolhido) num vídeo SEM a fonte youtube marcada vira o banco marcado
+    (mesma busca). Devolve quantos mudaram."""
+    if _youtube_marcado(job):
+        return 0
+    prov, tipo = _reserva_sem_youtube(job)
+    n = 0
+    for s in segments:
+        if getattr(s, "provider", None) == "youtube" and not getattr(s, "override_source", None):
+            s.provider, s.media_type = prov, tipo
+            n += 1
+    return n
+
+
 def _bloco_cenas_do_roteiro(job: dict) -> str:
     cenas = _cenas_do_roteiro(job)
     if not cenas:
@@ -2812,13 +2844,17 @@ def _bloco_cenas_do_roteiro(job: dict) -> str:
     try:
         import roteiro_no_editor
         import roteiros_yt
-        return "\n" + roteiro_no_editor.bloco_prompt(roteiros_yt.carregar_projeto(BASE_DIR, job["roteiro_id"]), cenas)
+        return "\n" + roteiro_no_editor.bloco_prompt(roteiros_yt.carregar_projeto(BASE_DIR, job["roteiro_id"]), cenas,
+                                                     com_youtube=_youtube_marcado(job))
     except Exception:  # noqa: BLE001
         return ""
 
 
 def _aplicar_cenas_do_roteiro(job: dict, segments: List[VideoSegment]) -> List[int]:
-    """Depois da resposta da 1ª IA: o trecho de cada cena vira YouTube com a busca da cena."""
+    """Depois da resposta da 1ª IA: o trecho de cada cena vira YouTube com a busca da cena — só com a fonte
+    youtube marcada (sem ela, a IA já ilustrou as cenas com os bancos marcados)."""
+    if not _youtube_marcado(job):
+        return []
     cenas = _cenas_do_roteiro(job)
     if not cenas:
         return []
@@ -2829,6 +2865,8 @@ def _aplicar_cenas_do_roteiro(job: dict, segments: List[VideoSegment]) -> List[i
 def _usar_links_do_roteiro(job_id: str, job: dict) -> int:
     """As cenas que já têm link (com início/fim) escolhido na página do roteiro: baixa e corta sozinho, em segundo plano."""
     import roteiro_no_editor
+    if not _youtube_marcado(job):
+        return 0
     pend = job.get("pending_segments") or []
     por_id = {c["id"]: c for c in _cenas_do_roteiro(job)}
     n = 0
@@ -3105,8 +3143,7 @@ def transcribe():
     if _pid and _tipo == "roteiro":  # 📝 projeto do Roteiro do YouTube escolhido aqui
         if re.fullmatch(r"[0-9a-f]{6,40}", _pid):
             _JOBS[job_id]["roteiro_id"] = _pid
-            if "youtube" not in _JOBS[job_id]["providers"]:  # as cenas vêm do YouTube
-                _JOBS[job_id]["providers"] = list(_JOBS[job_id]["providers"]) + ["youtube"]
+            # (v84_92) não marca mais o "youtube" sozinho: as cenas só viram YouTube se VOCÊ marcou a fonte
     elif _pid:
         _ligar_projeto(_JOBS[job_id], _tipo, _pid)
     if segments_do_zip is not None and not _JOBS[job_id].get("roteiro_id"):  # 📝 Roteiro do YouTube: capítulos no tempo do vídeo final
@@ -3913,6 +3950,7 @@ def submit_json(job_id: str):
     job["trechos_longos_divididos"] = len(parsed.segments) - _antes
     __import__("chamadas").limpar_buscas(parsed.segments, job.get("chamadas"))  # 🚫 inscreva-se/venda não viram busca de imagem
     _cenas_idx = _aplicar_cenas_do_roteiro(job, parsed.segments)  # 📝 cenas do Roteiro do YouTube → YouTube
+    job["youtube_desmarcado"] = _tirar_youtube_desmarcado(job, parsed.segments)  # 🎬 sem a fonte youtube: nada vira YouTube
     job["pending_segments"] = [s.to_dict() for s in parsed.segments]
     for _i in _cenas_idx:
         job["pending_segments"][_i]["roteiro_cena"] = getattr(parsed.segments[_i], "roteiro_cena", None)
@@ -3960,7 +3998,7 @@ _IA_PULA_BUSCA = {"youtube", "flow", "produto", "material"}
 
 
 # 🧭 v84_70: cada trecho vai pra FONTE CERTA (só entre os bancos que você ligou no projeto)
-_FOTOS_REAIS = ("bing", "brave", "startpage", "yandex", "wikipedia")  # foto de verdade de uma pessoa/caso/lugar
+_FOTOS_REAIS = ("bing", "brave", "startpage", "yandex", "google", "wikipedia")  # foto de verdade de uma pessoa/caso/lugar
 _BANCOS_STOCK = ("pexels", "pixabay", "magnific", "mixkit", "vistacreate")
 
 
@@ -6447,6 +6485,8 @@ def _youtube_itens_sincronizar(job: dict) -> List[Dict[str, Any]]:
 
     for cut in job.get("cutaway_suggestions") or []:
         if cut.get("chamada") or cut.get("do_projeto"):  # clipe seu (chamada / vídeo do projeto), não vem do YouTube
+            continue
+        if not _youtube_marcado(job):  # 🎬 sem a fonte youtube: o corte real fica só pra você enviar o clipe
             continue
         item_id = f"cut-{cut['id']}"
         termo = (cut.get("query") or cut.get("description") or "").strip()

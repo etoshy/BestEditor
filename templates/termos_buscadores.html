@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>🔎 Etapa Buscadores de Imagem — 1 de 2: busque os termos com a IA</h1>
-<p>Antes de montar o prompt principal de edição, precisamos saber quais coisas específicas (pessoas, marcas, produtos, lugares exatos) do seu roteiro valem a pena pesquisar nos buscadores de imagem por navegador (Bing/Brave/Yandex/Startpage). Copie o prompt abaixo, cole em outra IA (ChatGPT, Claude, etc.), e cole a resposta dela mais abaixo.</p>
+<p>Antes de montar o prompt principal de edição, precisamos saber quais coisas específicas (pessoas, marcas, produtos, lugares exatos) do seu roteiro valem a pena pesquisar nos buscadores de imagem por navegador (Bing/Brave/Yandex/Startpage/Google). Copie o prompt abaixo, cole em outra IA (ChatGPT, Claude, etc.), e cole a resposta dela mais abaixo.</p>
 
 <textarea id="prompt-termos-box" rows="16" readonly>{{ job.prompt_termos_buscadores }}</textarea>
 <button type="button" class="copy-btn" onclick="copyPromptTermos()">Copiar prompt</button>

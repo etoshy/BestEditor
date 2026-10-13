@@ -30,13 +30,14 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "bing", "brave", "yandex", "startpage", "flow", "youtube"]
-PHOTO_SEARCH_PROVIDERS = {"pexels", "wikipedia", "bing", "brave", "yandex", "startpage", "flow"}  # provedores que suportam media_type="image" (busca de fotos de verdade)
-# os 4 buscadores de imagem por navegador (bing/brave/yandex/startpage) --
+DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow", "youtube"]
+PHOTO_SEARCH_PROVIDERS = {"pexels", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow"}  # provedores que suportam media_type="image" (busca de fotos de verdade)
+# os buscadores de imagem por navegador (bing/brave/yandex/startpage + google,
+# que é o Google Imagens pelo Modo IA do app ia_google/) --
 # usado tanto aqui (build_prompt) quanto em app.py (checkbox "usar
 # buscadores inteligente") e buscadores_enrichment.py, pra não espalhar
 # essa mesma tupla em vários lugares.
-BROWSER_IMAGE_SEARCH_PROVIDERS = ("bing", "brave", "yandex", "startpage")
+BROWSER_IMAGE_SEARCH_PROVIDERS = ("bing", "brave", "yandex", "startpage", "google")
 # Provedores de VÍDEO que não são buscados/baixados automaticamente: o site
 # já pesquisa os termos sozinho, mas quem escolhe o vídeo certo e a faixa de
 # tempo é a pessoa, no painel "Vídeos do YouTube" do editor (escolher QUAL
@@ -483,7 +484,7 @@ def build_buscadores_search_terms_prompt(
         )
     transcript_block = "\n".join(transcript_lines)
 
-    return f"""Analise o roteiro de narração abaixo (idioma: {language_hint}) e liste TERMOS DE BUSCA pra buscadores de imagem (Bing/Brave/Yandex/Startpage Images) — coisas ESPECÍFICAS E CONCRETAS mencionadas no roteiro ou claramente relacionadas ao que está sendo narrado, que provavelmente têm uma foto real disponível numa busca de imagem comum (não precisa ser uma entidade histórica/enciclopédica — pode ser uma pessoa, marca, produto, empresa, lugar exato, captura de tela, logotipo, objeto específico).
+    return f"""Analise o roteiro de narração abaixo (idioma: {language_hint}) e liste TERMOS DE BUSCA pra buscadores de imagem (Bing/Brave/Yandex/Startpage/Google Images) — coisas ESPECÍFICAS E CONCRETAS mencionadas no roteiro ou claramente relacionadas ao que está sendo narrado, que provavelmente têm uma foto real disponível numa busca de imagem comum (não precisa ser uma entidade histórica/enciclopédica — pode ser uma pessoa, marca, produto, empresa, lugar exato, captura de tela, logotipo, objeto específico).
 
 Regras:
 1. Só inclua coisas ESPECÍFICAS (não conceitos abstratos, não termos genéricos que qualquer banco de imagem de estoque já resolveria bem, como "pessoa feliz" ou "paisagem bonita") — o tipo de busca que só faz sentido nesses buscadores porque é concreta e particular demais pra um banco de estoque ter.
@@ -673,7 +674,7 @@ def build_prompt(
         "segundos ABSOLUTOS no vídeo final (não relativos a um segmento). Use com moderação — só nos pontos "
         "que realmente pedem esse destaque extra, a maioria do vídeo não precisa de overlay nenhum."
     )
-    rules.append(
+    rules.append(  # corte real: a parte "o site pesquisa no YouTube" só entra com a fonte youtube marcada
         "(Opcional) Se a narração descreve um EVENTO REAL específico (uma notícia, um acontecimento, uma "
         "declaração pública) onde uma filmagem de verdade daquele momento faria muito mais sentido do que "
         "qualquer stock footage genérico, sugira um CORTE em \"cutaway_suggestions\" (lista, no nível raiz da "
@@ -683,10 +684,14 @@ def build_prompt(
         "momento, que substitui o trecho ali (o vídeo final fica mais longo). \"insertion_point\" é o segundo "
         "exato (absoluto) onde o corte deveria entrar; \"description\" explica em poucas palavras o que "
         "filmar/buscar pra colocar ali (seja específico: \"entrevista do CEO anunciando a fusão\", não só "
-        "\"vídeo relacionado\"); \"query\" (opcional, mas recomendado) é o termo pra achar esse vídeo no YouTube "
-        "(no idioma em que ele provavelmente foi publicado, com os nomes próprios — ex: \"coletiva prefeito "
-        "anuncia tarifa zero 2024\"), o site pesquisa esse termo sozinho e mostra os resultados pra pessoa "
-        "escolher; \"audio_mode\" é \"pause\" (a narração para durante o corte, toca só o áudio "
+        "\"vídeo relacionado\"); "
+        + ("\"query\" (opcional, mas recomendado) é o termo pra achar esse vídeo no YouTube "
+           "(no idioma em que ele provavelmente foi publicado, com os nomes próprios — ex: \"coletiva prefeito "
+           "anuncia tarifa zero 2024\"), o site pesquisa esse termo sozinho e mostra os resultados pra pessoa "
+           "escolher; " if "youtube" in providers else
+           "a fonte YouTube não está marcada neste vídeo, então o site NÃO pesquisa o clipe: a pessoa envia o "
+           "arquivo dela (não precisa de \"query\"); ")
+        + "\"audio_mode\" é \"pause\" (a narração para durante o corte, toca só o áudio "
         "do clipe inserido) ou \"continue\" (padrão \"pause\" se omitido). Use isso raramente — a maioria dos "
         "vídeos não tem nenhum momento que peça isso; não force um corte só por ter a opção disponível."
     )
@@ -748,7 +753,7 @@ def build_prompt(
         _nomes = " / ".join(f'"{p}"' for p in _buscadores_navegador)
         rules.append(
             f"Os provedores {_nomes} são DIFERENTES dos bancos de estoque: são buscadores de imagem de "
-            "verdade (Bing/Brave/Yandex/Startpage Images), que pesquisam a web aberta inteira em vez de um "
+            "verdade (Bing/Brave/Yandex/Startpage/Google Images), que pesquisam a web aberta inteira em vez de um "
             "acervo curado — então encontram praticamente qualquer coisa específica que um banco de estoque "
             "não teria (uma pessoa real, uma marca, um produto específico, um lugar exato, uma captura de "
             "tela de algo), mas o resultado não é curado/profissional como um banco de estoque. Use um "
