@@ -49,6 +49,9 @@ _TRAVA_GALERIA = threading.Lock()
 _BASE: Dict[str, str] = {"dir": os.path.dirname(os.path.abspath(__file__))}
 
 
+_RE_DIAG = re.compile(r"\d{8}_\d{6}_\d{6}")
+
+
 class _Parado(Exception):
     pass
 
@@ -374,7 +377,8 @@ class _Sessao(threading.Thread):
             est["erro"] = "Parado por você."
             self._fechar_pagina()  # o projeto pode ter ficado no meio de algo: o próximo pedido abre outro
         except fd.FlowPassoErro as exc:
-            diag = gf.salvar_diagnostico(atual["page"], str(exc)) if atual.get("page") is not None else None
+            pagina_erro = getattr(exc, "page", None) or atual.get("page")  # a aba onde o passo falhou
+            diag = gf.salvar_diagnostico(pagina_erro, str(exc)) if pagina_erro is not None else None
             _marcar_erro(exc.passo, exc.mensagem)
             msg = str(exc)
             if isinstance(exc, fd.FlowLimite) and self.conta:
@@ -383,7 +387,7 @@ class _Sessao(threading.Thread):
                 except Exception:  # noqa: BLE001
                     pass
                 msg += f" — a conta \"{self.conta}\" ficou marcada como esgotada; escolha outra conta e rode de novo."
-            est["erro"] = msg + (f" — a tela e o HTML ficaram em {diag}.png / _html.txt (mande pra ajustar)" if diag else "")
+            est["erro"] = msg + (" — a foto e o HTML da tela foram guardados: use os botões abaixo pra baixar ou copiar e mandar." if diag else "")
             est["diagnostico"] = os.path.basename(diag) if diag else None
             self._fechar_pagina()
         except Exception as exc:  # noqa: BLE001
@@ -546,6 +550,56 @@ def registrar(app, base_dir: str) -> None:
         if not re.fullmatch(r"[\w.\-]+", nome) or nome.endswith(".json"):
             return "nome inválido", 400
         return send_from_directory(pasta_galeria(), nome, as_attachment=request.args.get("baixar") == "1")
+
+    @app.route("/flow/diagnosticos")
+    def flow_diagnosticos():
+        from googleflow import googleflow_client as gf
+        pasta = gf.pasta_dados() / "diagnostico"
+        itens = []
+        if pasta.is_dir():
+            for t in sorted(pasta.glob("*.txt"), reverse=True):
+                if t.name.endswith("_html.txt") or not _RE_DIAG.fullmatch(t.stem):
+                    continue
+                try:
+                    motivo = t.read_text(encoding="utf-8").split("\n", 1)[0][:300]
+                except OSError:
+                    motivo = ""
+                itens.append({"id": t.stem, "motivo": motivo, "quando": t.stat().st_mtime,
+                              "foto": (pasta / (t.stem + ".png")).exists()})
+                if len(itens) >= 20:
+                    break
+        return jsonify({"itens": itens})
+
+    @app.route("/flow/diagnostico/<diag>/<oque>")
+    def flow_diagnostico(diag: str, oque: str):
+        """🩺 Diagnóstico de um erro: `zip` (foto + textos + HTML), `html` (texto pra copiar) ou `foto`."""
+        import io
+        import zipfile
+        from flask import send_file
+        from googleflow import googleflow_client as gf
+        if not _RE_DIAG.fullmatch(diag):
+            return "diagnóstico inválido", 400
+        arqs = gf.arquivos_do_diagnostico(diag)
+        if not arqs:
+            return "Esse diagnóstico não existe mais (só os 20 últimos ficam guardados).", 404
+        por_fim = {a.name[len(diag):]: a for a in arqs}
+        if oque == "foto" and ".png" in por_fim:
+            return send_file(str(por_fim[".png"]), mimetype="image/png")
+        if oque == "html":
+            alvo = por_fim.get("_html.txt") or por_fim.get(".txt")
+            txt = alvo.read_text(encoding="utf-8") if alvo else ""
+            if len(txt) < 4000 and "_pagina.html" in por_fim:  # a parte importante veio quase vazia: vai a página inteira
+                pagina = por_fim["_pagina.html"].read_text(encoding="utf-8")
+                txt += "\n\n<!-- ===== PÁGINA INTEIRA (sem scripts/estilos) ===== -->\n" + pagina[:400_000]
+            return txt, 200, {"Content-Type": "text/plain; charset=utf-8"}
+        if oque == "zip":
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                for fim, a in por_fim.items():
+                    z.write(str(a), arcname="diagnostico_flow_" + diag + fim)
+            buf.seek(0)
+            return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"diagnostico_flow_{diag}.zip")
+        return "não achei", 404
 
     @app.route("/flow/passo/<nome>")
     def flow_passo_foto(nome: str):

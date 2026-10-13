@@ -332,16 +332,19 @@ JS_HTML_IMPORTANTE = r"""() => {
     .replace(/<span class="mat-(focus-indicator|mdc-button-touch-target|mdc-button-persistent-ripple|ripple)[^"]*"[^>]*><\/span>/g, '')
     .replace(/\n\s*\n/g, '\n');
   const partes = [], vistos = new Set();
-  const add = (titulo, els) => els.forEach((e, i) => {
-    if (!vis(e) || vistos.has(e)) return;
+  const add = (titulo, els, mesmoEscondido) => els.forEach((e, i) => {
+    if ((!vis(e) && !mesmoEscondido) || vistos.has(e)) return;
     for (const v of vistos) if (v.contains(e)) return;
     vistos.add(e);
-    partes.push('<!-- ===== ' + titulo + ' ' + (i + 1) + ' ===== -->\n' + limpa(e.outerHTML).slice(0, 40000));
+    partes.push('<!-- ===== ' + titulo + ' ' + (i + 1) + (vis(e) ? '' : ' (ESCONDIDA na tela)') + ' ===== -->\n'
+      + limpa(e.outerHTML).slice(0, 40000));
   });
-  add('CAIXA DE COMANDO', [...document.querySelectorAll('flow-prompt-box, .base-prompt-box')]);
+  const caixas = [...document.querySelectorAll('flow-prompt-box, .base-prompt-box')];
+  add('CAIXA DE COMANDO', caixas);
   add('PAINEL CONFIGURAÇÕES DO AGENTE', [...document.querySelectorAll('.settings-content')].map(e =>
       e.closest('[role=dialog], aside, mat-sidenav, mat-drawer, .side-panel, [class*=panel]') || e.parentElement));
   add('POP-UP / MENU ABERTO', [...document.querySelectorAll('.cdk-overlay-pane, [role=dialog], [role=alertdialog]')]);
+  if (!partes.length) add('CAIXA DE COMANDO', caixas, true);  // nada visível (o erro pode ser esse): manda a caixa escondida
   const botoes = [...document.querySelectorAll('button')].filter(vis).slice(0, 80).map(b =>
       '- "' + (b.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 50) + '" aria-label="' + (b.getAttribute('aria-label') || '') +
       '" class="' + (b.getAttribute('class') || '').split(' ').filter(c => !/^(mdc-|mat-mdc|mat-unthemed|flow-button-no)/.test(c)).join(' ') + '"');
@@ -1940,6 +1943,31 @@ def _aviso_diag(base: Optional[str]) -> str:
     return f" [diagnóstico salvo em {base}.png/.txt{extra}]"
 
 
+JS_HTML_PAGINA = r"""() => {
+  const c = document.documentElement.cloneNode(true);
+  c.querySelectorAll('script, style, link[rel=stylesheet], noscript, iframe').forEach(e => e.remove());
+  return '<!-- URL: ' + location.href + ' -->\n' + c.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '<svg/>')
+    .replace(/\s_ng[a-z]+-[a-z0-9-]+="[^"]*"/g, '').replace(/<!---->/g, '');
+}"""
+
+_RE_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
+_RE_CONTA = re.compile(r"(Conta do Google|Google Account)\s*:[^\"<]*", re.I)
+_RE_FOTO = re.compile(r"https://lh\d\.googleusercontent\.com/[^\"'\s)]*")
+
+
+def limpar_dados_pessoais(texto: str) -> str:
+    """Tira e-mail, nome da conta Google e foto do perfil do que vai pro diagnóstico (você vai mandar pra alguém)."""
+    texto = _RE_EMAIL.sub("email@removido", texto or "")
+    texto = _RE_CONTA.sub(r"\1: (removido)", texto)
+    return _RE_FOTO.sub("https://foto-do-perfil-removida", texto)
+
+
+def arquivos_do_diagnostico(base: str) -> List[Path]:
+    """Os arquivos de um diagnóstico (`base` = nome sem extensão, ex.: 20261013_042705_039541)."""
+    pasta = pasta_dados() / "diagnostico"
+    return [pasta / (base + fim) for fim in (".png", ".txt", "_html.txt", "_pagina.html") if (pasta / (base + fim)).exists()]
+
+
 def salvar_diagnostico(page, motivo: str) -> Optional[str]:
     """Guarda uma captura de tela + o texto da página em `flow_dados/diagnostico/`
     (mantém só os 20 mais recentes) pra você poder ver o que o Flow mostrou quando
@@ -1956,15 +1984,21 @@ def salvar_diagnostico(page, motivo: str) -> Optional[str]:
             texto = str(page.evaluate(JS_TEXTO_PAGINA) or "")
         except Exception:  # noqa: BLE001
             texto = ""
-        Path(str(base) + ".txt").write_text(f"{motivo}\n\n--- texto da página ---\n{texto}", encoding="utf-8")
+        Path(str(base) + ".txt").write_text(limpar_dados_pessoais(f"{motivo}\n\n--- texto da página ---\n{texto}"), encoding="utf-8")
         try:  # HTML só da parte importante, pronto pra copiar e mandar
             html = str(page.evaluate(JS_HTML_IMPORTANTE) or "")
             if html:
-                Path(str(base) + "_html.txt").write_text(f"{motivo}\n\n{html}", encoding="utf-8")
+                Path(str(base) + "_html.txt").write_text(limpar_dados_pessoais(f"{motivo}\n\n{html}"), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+        try:  # a página INTEIRA (sem scripts/estilos) — pra quando a parte importante não basta
+            pagina = str(page.evaluate(JS_HTML_PAGINA) or "")
+            if pagina:
+                Path(str(base) + "_pagina.html").write_text(limpar_dados_pessoais(pagina)[:4_000_000], encoding="utf-8")
         except Exception:  # noqa: BLE001
             pass
         for antigo in sorted(a for a in pasta.glob("*.txt") if not a.name.endswith("_html.txt"))[:-20]:
-            for fim in (".txt", ".png", "_html.txt"):
+            for fim in (".txt", ".png", "_html.txt", "_pagina.html"):
                 Path(str(antigo.with_suffix("")) + fim).unlink(missing_ok=True)
         return str(base)
     except Exception:  # noqa: BLE001
@@ -3012,8 +3046,9 @@ class _Trabalhador(threading.Thread):
         """A conversa pode ter ficado num estado estranho: descarta e recomeça num
         projeto novo no próximo pedido. Só fecha o navegador se o erro for de
         login ou inesperado (ex: o usuário fechou a janela)."""
-        if self.pagina is not None and not isinstance(exc, GoogleFlowLoginRequired):
-            caminho = salvar_diagnostico(self.pagina, f"{type(exc).__name__}: {exc}")
+        pagina = self.pagina or getattr(exc.__cause__, "page", None)  # modo direto: a aba onde o passo falhou
+        if pagina is not None and not isinstance(exc, GoogleFlowLoginRequired):
+            caminho = salvar_diagnostico(pagina, f"{type(exc).__name__}: {exc}")
             if caminho and isinstance(exc, GoogleFlowError):
                 exc.args = (f"{exc}{_aviso_diag(caminho)}",)
         self._fechar_pagina()

@@ -28,6 +28,18 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🩺 Erro do Flow: baixar ou copiar a tela pra mandar (v84_80)
+
+- Quando um passo do Flow dá erro, aparecem os botões **⬇ Baixar diagnóstico (.zip)**, **📋 Copiar HTML** (é só colar
+  na conversa) e **🖼 ver a tela**. Em **🎬 Google Flow → 🩺 Erros recentes do Flow** ficam os 20 últimos (inclusive dos
+  erros gerando vídeo), com os mesmos botões.
+- O diagnóstico agora guarda também a **página inteira** (`_pagina.html`, sem scripts/estilos) e a caixa de comando
+  mesmo quando está escondida. **E-mail, nome da conta Google e foto do perfil são tirados** antes de salvar.
+- A foto e o HTML são da aba **onde o passo falhou** (antes, num erro do "Novo projeto", podiam ser da aba errada).
+- "Novo projeto" sem a caixa "O que você quer criar?": recarrega a página uma vez antes de dar erro.
+
+---
+
 ## 🎬 Flow: janela larga pra achar o chip "Agente" (v84_78 / v84_79)
 
 - Com a janela pequena (menos de ~900px) o Flow esconde o chip "Agente" e a automação parava em

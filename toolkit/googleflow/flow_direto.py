@@ -44,7 +44,8 @@ S = {
     "novo_projeto": "button.new-project-button",
     "criar_com_flow": 'button[aria-label="Crie com o Google Flow"]',
     "caixa": "flow-prompt-box",                                   # a caixa principal (a do painel do agente é outra)
-    "editor": 'flow-prompt-box .ProseMirror[contenteditable="true"]',
+    "editor": ('flow-prompt-box .ProseMirror[contenteditable="true"], .base-prompt-box .ProseMirror[contenteditable="true"], '
+               'flow-rich-text-editor [contenteditable="true"]'),
     "gerar": 'flow-prompt-box button[aria-label="Iniciar geração"]',
     "agente_chip": ("flow-prompt-box flow-agent-mode-toggle-chip button.agent-mode-chip, "
                     "flow-prompt-box button.agent-mode-chip, flow-prompt-box button:has(.agent-mode-chip-label), "
@@ -104,9 +105,10 @@ RE_FALHA = re.compile(r"n[ãa]o foi poss[ií]vel|falh|erro ao gerar|viola|pol[i�
 class FlowPassoErro(Exception):
     """Um passo do Flow não deu certo. `passo` diz qual (pra mostrar na área de teste e no log)."""
 
-    def __init__(self, passo: str, mensagem: str):
+    def __init__(self, passo: str, mensagem: str, page=None):
         super().__init__(f"[{passo}] {mensagem}")
         self.passo, self.mensagem = passo, mensagem
+        self.page = page  # a aba onde deu errado (pro diagnóstico tirar a foto e o HTML da tela CERTA)
 
 
 class FlowLimite(FlowPassoErro):
@@ -163,7 +165,7 @@ def _primeiro(page, sel: str, timeout_s: float = 10.0, passo: str = "", erro: st
     if _esperar(_tem, timeout_s):
         return achado[0]
     if passo:
-        raise FlowPassoErro(passo, erro or f"não apareceu: {sel}")
+        raise FlowPassoErro(passo, erro or f"não apareceu: {sel}", page=page if hasattr(page, "goto") else None)
     return None
 
 
@@ -262,7 +264,15 @@ def novo_projeto(page, context=None, on_passo: Passo = _nada):
             pass
     p.wait_for_load_state("domcontentloaded")
     garantir_largura(p)
-    _primeiro(p, S["editor"], 30, "novo_projeto", "o projeto abriu mas a caixa \"O que você quer criar?\" não apareceu.")
+    if _primeiro(p, S["editor"], 30) is None:
+        try:  # às vezes o projeto novo abre "em branco": recarregar resolve
+            p.reload(wait_until="domcontentloaded")
+            garantir_largura(p)
+        except Exception:  # noqa: BLE001
+            pass
+        if _primeiro(p, S["editor"], 30) is None:
+            raise FlowPassoErro("novo_projeto", f'o projeto abriu ({p.url}) mas a caixa "O que você quer criar?" não '
+                                                'apareceu (nem depois de recarregar a página).', page=p)
     on_passo("novo_projeto", "ok", p.url)
     return p
 

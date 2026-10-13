@@ -22,6 +22,9 @@
   .fl-passos li .dt { flex:1; color:#374151; word-break:break-word; }
   .fl-passos li .sg { color:#888; width:56px; text-align:right; }
   .fl-passos li img { width:120px; border-radius:4px; border:1px solid #ddd; }
+  .fl-diag { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .fl-diag a, .fl-diag button { width:auto !important; margin:0 !important; font-size:.82rem; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:#1f2937; cursor:pointer; text-decoration:none; }
+  .fl-diag-lista li { font-size:.84rem; padding:6px 0; border-bottom:1px solid #f1f5f9; list-style:none; }
   .fl-erro { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:10px; border-radius:8px; white-space:pre-wrap; font-size:.86rem; }
   .fl-ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:10px; border-radius:8px; font-size:.9rem; }
   .fl-grade { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
@@ -93,6 +96,12 @@
   <div id="erro"></div>
   <div class="fl-res" id="resultados"></div>
 </div>
+
+<details class="fl-box" id="diagnosticos">
+  <summary style="cursor:pointer;font-weight:600">🩺 Erros recentes do Flow (foto + HTML pra mandar)</summary>
+  <p class="fl-hint">Toda vez que um passo do Flow dá erro (aqui ou gerando um vídeo), a foto e o HTML da tela ficam guardados (os 20 últimos). E-mail, nome da conta e foto do perfil são tirados antes.</p>
+  <ul class="fl-diag-lista" id="diagLista" style="padding:0;margin:0"></ul>
+</details>
 
 <div class="fl-box" id="galeria">
   <div class="fl-row" style="justify-content:space-between">
@@ -173,7 +182,8 @@
     $('passos').innerHTML = d.passos.map(p => `<li><span class="ic">${IC[p.estado] || '•'}</span><span class="nm">${esc(rotulo(p.nome))}</span>`
       + `<span class="dt">${esc(p.detalhe)}</span><span class="sg">${p.segundos ? p.segundos + 's' : ''}</span>`
       + (p.foto ? `<a href="/flow/passo/${p.foto}" target="_blank"><img src="/flow/passo/${p.foto}?t=${d.inicio || ''}" alt=""></a>` : '') + '</li>').join('');
-    $('erro').innerHTML = d.erro ? `<div class="fl-erro">${esc(d.erro)}${d.detalhe_erro ? '\n\n' + esc(d.detalhe_erro) : ''}</div>` : '';
+    $('erro').innerHTML = d.erro ? `<div class="fl-erro">${esc(d.erro)}${d.detalhe_erro ? '\n\n' + esc(d.detalhe_erro) : ''}</div>`
+      + (d.diagnostico ? botoesDiag(d.diagnostico) : '') : '';
     $('resultados').innerHTML = (d.resultados || []).map(r => `<figure>${r.tipo === 'video'
       ? `<video src="/flow/arquivo/${r.arquivo}" controls muted></video>` : `<img src="/flow/arquivo/${r.arquivo}" alt="">`}`
       + `<figcaption class="fl-hint">${esc(r.rotulo.replace(/_/g, ' '))} · <a href="/flow/arquivo/${r.arquivo}?baixar=1">baixar</a></figcaption></figure>`).join('');
@@ -185,7 +195,7 @@
       const d = await (await fetch('/flow/status')).json();
       desenharSessao(d.sessao || {});
       if (d.passos.length || d.rodando || d.erro) desenhar(d);
-      if (rodava && !d.rodando) carregarGaleria();
+      if (rodava && !d.rodando) { carregarGaleria(); if ($('diagnosticos').open) carregarDiagnosticos(); }
       rodava = d.rodando;
       timer = setTimeout(status, d.rodando ? 1200 : 5000);
     } catch (e) { timer = setTimeout(status, 4000); }
@@ -250,6 +260,31 @@
   $('galQ').addEventListener('input', () => { clearTimeout(galT); galT = setTimeout(() => { galPagina = 0; carregarGaleria(); }, 300); });
   $('galAnt').addEventListener('click', () => { galPagina = Math.max(0, galPagina - 1); carregarGaleria(); });
   $('galProx').addEventListener('click', () => { galPagina++; carregarGaleria(); });
+  // ---------- 🩺 diagnóstico (baixar / copiar o HTML pra mandar)
+  function botoesDiag(id) {
+    return `<div class="fl-diag"><a href="/flow/diagnostico/${id}/zip">⬇ Baixar diagnóstico (.zip)</a>`
+      + `<button type="button" data-copiar="${id}">📋 Copiar HTML</button>`
+      + `<a href="/flow/diagnostico/${id}/foto" target="_blank">🖼 ver a tela</a><span class="fl-hint" data-copiado="${id}"></span></div>`;
+  }
+  async function copiarDiag(id) {
+    const aviso = document.querySelector(`[data-copiado="${id}"]`);
+    let txt = '';
+    try { txt = await (await fetch(`/flow/diagnostico/${id}/html`)).text(); } catch (_) {}
+    if (!txt) { if (aviso) aviso.textContent = 'não achei o HTML'; return; }
+    let ok = false;
+    try { await navigator.clipboard.writeText(txt); ok = true; } catch (_) {
+      const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select();
+      try { ok = document.execCommand('copy'); } catch (_) {} t.remove();
+    }
+    if (aviso) aviso.textContent = ok ? `✅ copiado (${Math.round(txt.length / 1024)} KB) — é só colar na conversa` : '❌ não deu pra copiar — use o Baixar';
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-copiar]'); if (b) copiarDiag(b.dataset.copiar); });
+  async function carregarDiagnosticos() {
+    let d; try { d = await (await fetch('/flow/diagnosticos')).json(); } catch (_) { return; }
+    $('diagLista').innerHTML = (d.itens || []).map(x => `<li><b>${new Date(x.quando * 1000).toLocaleString().slice(0, 17)}</b> — ${esc(x.motivo)}${botoesDiag(x.id)}</li>`).join('')
+      || '<li class="fl-hint">Nenhum erro guardado.</li>';
+  }
+  $('diagnosticos').addEventListener('toggle', () => { if ($('diagnosticos').open) carregarDiagnosticos(); });
   carregarGaleria(); status();
 })();
 </script>

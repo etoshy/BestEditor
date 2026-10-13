@@ -157,3 +157,26 @@ def test_janela_estreita_e_alargada_pra_achar_o_agente(sim, navegador):
 def test_janela_grande_no_navegador_visivel():
     assert "--window-size=1400,950" in g._args_chromium(False)["args"]
     assert g._args_chromium(True)["viewport"]["width"] >= fd.LARGURA_MIN
+
+
+def test_projeto_sem_caixa_recarrega_uma_vez(sim, navegador):
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    page = fd.preparar_projeto(ctx, sim + "?semcaixa=1x", True, None)
+    assert fd._primeiro(page, fd.S["editor"], 2) is not None
+    ctx.close()
+
+
+def test_projeto_sem_caixa_erro_traz_a_aba_e_diagnostico_sem_dados_pessoais(sim, navegador, tmp_path, monkeypatch):
+    from pathlib import Path
+    monkeypatch.setattr(g, "pasta_dados", lambda: Path(tmp_path))
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    with pytest.raises(fd.FlowPassoErro) as e:
+        fd.preparar_projeto(ctx, sim + "?semcaixa=1", True, None)
+    assert e.value.passo == "novo_projeto" and "/project/" in e.value.page.url
+    base = g.salvar_diagnostico(e.value.page, str(e.value))
+    nomes = sorted(a.name[len(Path(base).name):] for a in g.arquivos_do_diagnostico(Path(base).name))
+    assert nomes == [".png", ".txt", "_html.txt", "_pagina.html"]
+    tudo = "".join(a.read_text(encoding="utf-8") for a in g.arquivos_do_diagnostico(Path(base).name) if a.suffix != ".png")
+    assert "pessoa.teste@example.com" not in tudo and "Pessoa Teste" not in tudo and "FOTO-TESTE" not in tudo
+    assert "flow-prompt-box" in tudo
+    ctx.close()

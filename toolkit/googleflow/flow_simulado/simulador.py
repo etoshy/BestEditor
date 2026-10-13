@@ -8,6 +8,7 @@ comportamento. `iniciar()` sobe um servidor local e devolve a URL base — passe
     url + "?limite=1"               # o Flow avisa "Você chegou ao limite de uso."
     url + "?falha=1"                # o cartão "gerando" vira "Não foi possível gerar"
     url + "?login=1"                # sem o botão "Novo projeto" (pediu login)
+    url + "?semcaixa=1"             # o projeto abre sem a caixa "O que você quer criar?" (1x = só na 1ª vez)
 """
 from __future__ import annotations
 
@@ -60,9 +61,14 @@ def pagina_projeto() -> str:
     tpls = "".join(f'<template id="t-{n}">{_ler(n)}</template>' for n in TEMPLATES)
     tpls += f'<template id="t-barra_frames">{barra}</template>'
     return (f'<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Projeto (simulado)</title>'
-            f'<style>{CSS}</style></head><body><flow-project-page><div class="tiles"></div>'
+            f'<style>{CSS}</style></head><body><header><button aria-label="Conta do Google: Pessoa Teste (pessoa.teste@example.com)">P</button>'
+            '<a hidden href="https://lh3.googleusercontent.com/a/FOTO-TESTE=s96">foto</a></header><flow-project-page><div class="tiles"></div>'
             f'<flow-prompt-box class="prompt-box-container"><flow-base-prompt-box>{caixa}</flow-base-prompt-box></flow-prompt-box>'
-            f'</flow-project-page><div class="cdk-overlay-container"></div>{tpls}<script src="/sim.js"></script></body></html>')
+            f'</flow-project-page><div class="cdk-overlay-container"></div>{tpls}<script src="/sim.js"></script>'
+            # ?semcaixa=1: a caixa nunca aparece · ?semcaixa=1x: só na 1ª vez (recarregar resolve)
+            "<script>(function(){const q=location.search;const esconder=q.includes('semcaixa=1x')"
+            "?!sessionStorage.getItem('jaRecarregou'):q.includes('semcaixa=1');sessionStorage.setItem('jaRecarregou','1');"
+            "if(esconder)document.querySelector('flow-prompt-box').style.display='none';})();</script></body></html>")
 
 
 _MIDIA_CACHE = os.path.join(tempfile.gettempdir(), "flow_simulado_midia")

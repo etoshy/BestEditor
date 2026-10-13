@@ -131,3 +131,31 @@ def test_limite_marca_conta_e_fecha_projeto(ctx, monkeypatch):
         assert d["sessao"]["projeto"] is None
     finally:
         parar()
+
+
+@pytest.mark.skipif(not _chromium_ok(), reason="Playwright/Chromium não instalado")
+def test_erro_guarda_diagnostico_pra_baixar_e_copiar(ctx, monkeypatch):
+    import zipfile
+    c, FE, gf, tmp = ctx
+    from googleflow.flow_simulado import simulador
+    url, parar = simulador.iniciar()
+    try:
+        monkeypatch.setattr(gf, "FLOW_URL", url + "?semcaixa=1")
+        monkeypatch.setattr(gf, "_abrir", lambda p, cfg, headless, conta="x": (
+            p.chromium.launch(headless=True).new_context(viewport={"width": 1400, "height": 900}), True))
+        for nome in ("salvar_sessao", "restaurar_sessao"):
+            monkeypatch.setattr(gf, nome, lambda *a, **k: None)
+        c.post("/flow/iniciar", data={"modo": "teste"})
+        d = _esperar(c, 180)
+        assert "novo_projeto" in d["erro"] and d["diagnostico"]
+        dg = d["diagnostico"]
+        z = zipfile.ZipFile(io.BytesIO(c.get(f"/flow/diagnostico/{dg}/zip").data))
+        assert sorted(n.split(dg)[1] for n in z.namelist()) == [".png", ".txt", "_html.txt", "_pagina.html"]
+        html = c.get(f"/flow/diagnostico/{dg}/html").get_data(as_text=True)
+        assert "flow-prompt-box" in html and "example.com" not in html
+        assert c.get(f"/flow/diagnostico/{dg}/foto").mimetype == "image/png"
+        assert c.get("/flow/diagnosticos").get_json()["itens"][0]["id"] == dg
+        assert c.get("/flow/diagnostico/..%2F..%2Fx/zip").status_code in (400, 404)
+        assert c.get("/flow/diagnostico/20990101_000000_000000/zip").status_code == 404
+    finally:
+        parar()
