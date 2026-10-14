@@ -508,7 +508,9 @@ MODELOS_FABRICA: List[Dict[str, Any]] = [
             "Faça três coisas:\n"
             "1. Veja se o vídeo usa CENAS de filmes, séries, animes, desenhos ou jogos — mostradas na tela ou descritas — e "
             "anote cada uma.\n"
-            "2. Reescreva o roteiro inteiro com as suas palavras, mantendo o assunto, a ordem das ideias e o tom. Troque "
+            "2. Escreva um roteiro NOVO sobre o mesmo assunto, com a SUA própria linha de storytelling: use o vídeo como guia dos "
+            "fatos e do tom, mas escolha você o gancho, o ângulo e a ordem das revelações — sem seguir o original ponto a ponto "
+            "nem reaproveitar frases. Troque "
             "exemplos específicos demais (do canal original, do apresentador, de pessoas comuns, datas e números que só fazem "
             "sentido lá) por outros EQUIVALENTES que funcionem pra qualquer público; tire o que não faz sentido fora do vídeo "
             "original (\"como eu disse no vídeo passado\", patrocinador, recados do canal, \"deixa o like\", piadas internas, "
@@ -680,7 +682,8 @@ REGRA_SEM_EXPERIENCIAS = (
     "(\"como eu falei no vídeo passado\", \"no meu vídeo sobre X\", \"link aqui em cima\", \"comenta no vídeo anterior\", "
     "\"essa série do canal\", \"parte 2\"), experiências e histórias pessoais do apresentador (\"quando eu era criança\", "
     "\"eu assisti isso no cinema com meu pai\", \"aconteceu comigo\", \"minha esposa\", \"no meu trabalho\"), menções à equipe, "
-    "aos inscritos, a comentários, lives, patrocinadores ou ao próprio canal pelo nome. Se a ideia for importante pra "
+    "aos inscritos, a comentários, lives, patrocinadores ou ao canal ORIGINAL pelo nome (o nome do MEU canal, se eu "
+    "informar, segue a seção 📺). Se a ideia for importante pra "
     "história, reescreva de forma neutra e geral (\"muita gente lembra de ver isso no cinema\"); se não, apenas tire — e "
     "costure o texto em volta pra continuar fluindo. Liste o que tirou em \"removidos\"."
 )
@@ -737,14 +740,20 @@ def prompt_analise(p: Dict[str, Any], modelo: Dict[str, Any], idioma: str = "o m
     for k, v in campos.items():
         texto = texto.replace("{" + k + "}", str(v))
     import metodo_roteiro  # 🧭 método de roteiro em todo prompt que escreve roteiro
+    curto = modelo.get("id") == "reescrever_curto" or "short" in str(modelo.get("nome") or "").lower()
     if modelo.get("id") != "so_cenas":  # "só listar as cenas" não reescreve nada
-        curto = modelo.get("id") == "reescrever_curto" or "short" in str(modelo.get("nome") or "").lower()
         texto = texto.strip() + "\n\n" + metodo_roteiro.bloco("curto" if curto else "reescrita")
+    mins = minutos_alvo(p.get("minutos_alvo"))
+    if modelo.get("id") != "so_cenas":  # ✍️ o vídeo original é GUIA: a IA cria a própria linha de storytelling
+        texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_guia("o vídeo original (a transcrição)", tem_tamanho=bool(mins))
+        import canal  # 📺 o nome do MEU canal, falado no momento certo
+        _canal = canal.nome_do_projeto(p.get("nome_canal"))
+        if _canal:
+            texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_canal(_canal, curto=curto)
     if sem_experiencias:
         texto = texto.strip() + "\n\n" + REGRA_SEM_EXPERIENCIAS
     if marcar_chamadas:
         texto = texto.strip() + "\n\n" + REGRA_MARCAS
-    mins = minutos_alvo(p.get("minutos_alvo"))
     if mins and modelo.get("id") != "so_cenas":  # 📏 duração escolhida: seção de tamanho perto do fim
         texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_tamanho(mins, int(mins * PALAVRAS_POR_MINUTO), reescrita=True)
     return texto.strip() + "\n\n" + _FORMATO_ANALISE
@@ -924,6 +933,7 @@ def prompt_acoes(p: Dict[str, Any], acoes: List[str], idioma: str = "en", extra:
     if {"titulos", "descricao"} & set(acoes):
         import metodo_roteiro
         tarefas.append("Títulos:\n" + metodo_roteiro.bloco_titulos(5).split("\n", 1)[1])
+        tarefas.append(__import__("thumbs_flow").BLOCO_PROMPT)
     if (extra or "").strip():
         tarefas.append("Pedido extra de quem está editando (siga com prioridade): " + extra.strip()[:1500])
     if {"sem_cenas", "sem_experiencias", "traduzir"} & set(acoes) or (extra or "").strip():
@@ -969,6 +979,7 @@ Responda **apenas** com um JSON válido (sem texto antes ou depois), assim (omit
   "titulo_original": "...",
   "descricao": "...",
   "capitulos": [{{"titulo": "...", "comeca_em": "as primeiras palavras exatas do capítulo no roteiro_final"}}],
+  "thumbnails": [{{"ideia": "...", "texto": "2-4 PALAVRAS", "prompt": "in English: the image scene (no text)"}}],
   "observacoes": "..."
 }}"""
 
@@ -1046,6 +1057,7 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "ctas": _lista("ctas", ["tipo", "texto", "depois_de"]),
         "cenas": cenas,
         "titulos": [str(t).strip()[:150] for t in (d.get("titulos") or []) if str(t).strip()][:10],
+        "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
         "titulo_original": str(d.get("titulo_original") or "").strip()[:200],
         "descricao": str(d.get("descricao") or "").strip()[:4500],
         "capitulos": _capitulos(d.get("capitulos"), ref, palavras, avisos),

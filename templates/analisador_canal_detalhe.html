@@ -114,6 +114,7 @@
       </form>
     </div>
     {% endfor %}
+    {% if ia.sugestoes|selectattr('thumb')|list %}{% set thumbs_base = '/thumbs/canal/' ~ a.id %}{% include "_thumbs.html" %}{% endif %}
     <p class="hint" style="margin-top:12px;">As conclusões são hipóteses tiradas de {{ vs|length }} vídeos: confira no YouTube antes de decidir.</p>
   {% else %}
     <p class="hint">Ainda sem análise.</p>

@@ -37,6 +37,7 @@ MODELOS: Dict[str, Dict[str, Any]] = {
     "true_crime": {
         "nome": "🕵️ True Crime",
         "descricao": "Casos criminais reais contados como documentário: fatos, linha do tempo, investigação, julgamento.",
+        "afirmacoes": True,  # v84_95: lista de afirmações importantes com tipo (fato/alegação/interpretação) e fonte
         "formatos": {
             "caso_completo": {
                 "nome": "📁 Caso completo (cronológico)", "minutos": 18,
@@ -91,6 +92,24 @@ MODELOS: Dict[str, Dict[str, Any]] = {
             "'violência', em vez de detalhes crus.",
             "Narração de documentário: frases claras, ritmo de suspense, ganchos no fim de cada capítulo pra segurar até o próximo.",
             "Nomes de menores de idade envolvidos: não cite (diga 'uma criança de 9 anos', por exemplo).",
+            # v84_95: fato × alegação × interpretação, com a fonte de cada afirmação importante
+            "FATO, ALEGAÇÃO E INTERPRETAÇÃO — deixe SEMPRE claro, na própria narração, de qual dos três se trata: "
+            "(1) FATO DOCUMENTADO = está em documento/registro (autos do processo, laudo, boletim, sentença, registro oficial, "
+            "reportagem que apurou) — diga de onde vem (\"segundo os autos do processo\", \"o laudo do Instituto Médico Legal "
+            "registrou\", \"de acordo com a reportagem do G1\"); (2) ALEGAÇÃO = o que alguém afirmou e não foi comprovado "
+            "(acusação, defesa, testemunha, familiar, o próprio suspeito) — atribua sempre (\"a promotoria sustentou que\", "
+            "\"ele alegou que\", \"uma vizinha contou à polícia que\") e nunca narre como fato; (3) INTERPRETAÇÃO DO NARRADOR "
+            "= leitura, hipótese ou opinião — marque como tal (\"uma leitura possível é\", \"tudo indica que\", \"é difícil "
+            "não pensar que\"). Datas, causa da morte, diagnósticos/laudos, provas, acusações, confissões e sentenças são "
+            "afirmações IMPORTANTES: cada uma precisa de fonte (dita no texto quando couber e listada em \"afirmacoes\").",
+            "UNIDADES DE SENTIDO: frases que acumulam informação histórica (datas, idades, lugares, nomes, instituições, "
+            "diagnósticos, resultados) viram VÁRIAS frases curtas, uma informação principal em cada, na ordem em que o "
+            "espectador precisa entender. Isso vale principalmente nos trechos sobre a INFÂNCIA e o histórico familiar, as "
+            "AVALIAÇÕES MÉDICAS/PSIQUIÁTRICAS e laudos, e a INVESTIGAÇÃO POLICIAL (prazos, depoimentos, perícias, prisões). "
+            "Ex.: em vez de \"Em 1998, aos 12 anos, depois de ser avaliado por dois psiquiatras do hospital estadual, que o "
+            "diagnosticaram com transtorno de conduta, ele foi transferido para um abrigo em Ohio\", escreva: \"Era 1998. Ele "
+            "tinha 12 anos. Dois psiquiatras do hospital estadual o avaliaram. O diagnóstico, segundo o prontuário citado pelo "
+            "jornal: transtorno de conduta. Pouco depois, ele foi transferido para um abrigo em Ohio.\"",
         ],
     },
     "historia": {
@@ -429,7 +448,9 @@ CONFIG_PADRAO: Dict[str, Any] = {"modelo": "true_crime", "formato": "caso_comple
                                  # 🛒 a IA sugere um produto adequado ao tema (aparece separado)
                                  "sugerir_produto": False,
                                  # 📐 transcrição de um vídeo que viralizou: a IA copia a estrutura
-                                 "referencia": ""}
+                                 "referencia": "",
+                                 # 📺 nome do canal deste projeto ("" = o das Configurações; "-" = não falar)
+                                 "nome_canal": ""}
 
 REGRA_SEM_PESSOAL = (
     "CONTEÚDO DAS FONTES: muitas fontes são textos ou transcrições de OUTROS criadores. NÃO traga pro roteiro as experiências "
@@ -1045,6 +1066,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if not fontes and not (p.get("roteiro_base") or "").strip() and not any(m["tipo"] == "texto" for m in p.get("midias") or []):
         raise DossieError("Adicione pelo menos uma fonte (link de matéria), um texto ou o roteiro base — sem isso a IA inventaria.")
     minutos, palavras, _ppm = alvo_tamanho(p)
+    import metodo_roteiro
     L: List[str] = []
     L.append(f"Você é roteirista de um canal de {mod['nome'].split(' ', 1)[1]} no YouTube. Escreva o roteiro NARRADO completo "
              f"(alguém vai ler em voz alta) de um vídeo sobre o tema abaixo, usando SÓ as fontes e materiais que eu juntei.")
@@ -1080,8 +1102,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append("- " + REGRA_PRODUTO)
     if (p.get("roteiro_base") or "").strip():
         L.append("")
-        L.append("## Meu roteiro / anotações (use como base, corrigindo e completando com as fontes)")
+        L.append("## Meu roteiro / anotações — GUIA (os fatos e o que eu quero destacar; confira e complete com as fontes)")
         L.append(p["roteiro_base"].strip()[:30000])
+        L.append("")
+        L.append(metodo_roteiro.bloco_guia("o meu roteiro/as minhas anotações"))
     if fontes:
         L.append("")
         L.append("## Fontes (matérias que eu salvei — cite o site quando usar um fato importante)")
@@ -1116,11 +1140,15 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         if any(m["tipo"] == "video" for m in vis):
             L.append(mt.instrucao_roteiro("I7"))
     L.append("")
-    import metodo_roteiro
     L.append(metodo_roteiro.bloco("curto" if (minutos <= 1 or cfg.get("formato") == "curto") else "longo"))
     if (cfg.get("referencia") or "").strip():
         L.append("")
         L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
+    import canal  # 📺 o nome do canal, falado no momento certo
+    _canal = canal.nome_do_projeto(cfg.get("nome_canal"))
+    if _canal:
+        L.append("")
+        L.append(metodo_roteiro.bloco_canal(_canal, curto=minutos <= 1 or cfg.get("formato") == "curto"))
     L.append("")
     _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
     L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
@@ -1133,19 +1161,24 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.append(json.dumps({
         "plano": metodo_roteiro.PLANO_JSON,
         "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
-        "ideias": ["ideias de thumbnail / ganchos / vídeos derivados"],
+        "ideias": ["ideias de ganchos / vídeos derivados"],
+        "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
         "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
         "capitulos": [{"titulo": "Título curto do capítulo", "comeca_em": "as primeiras 6-10 palavras EXATAS do roteiro onde ele começa"}],
         "roteiro": "Texto narrado completo... [I3] frase em que a imagem I3 aparece...",
         "momentos": [{"midia": "I3", "trecho": "frase exata do roteiro em que a imagem entra"}],
         "tags": ["tags do YouTube"],
         "fontes_usadas": ["F1", "F2"],
+        **({"afirmacoes": [{"trecho": "a frase do roteiro (cópia curta)", "tipo": "fato | alegacao | interpretacao",
+                            "fonte": "F2 — de onde vem (site/documento) · ou quem alega"}]}
+           if mod.get("afirmacoes") else {}),
         "observacoes": "pontos que eu devo conferir (fatos duvidosos, fontes que discordam)",
         **({"produto_sugerido": {"nome": "nome do produto", "por_que": "por que combina com este vídeo e com o público",
                                  "busca": "o que digitar na Amazon pra achar", "chamada": "2-3 frases de venda pro vídeo da [[VENDA]]"}}
            if cfg.get("sugerir_produto") else {}),
     }, ensure_ascii=False, indent=2))
     L.append("O 1º capítulo começa no início do roteiro. 5 a 15 capítulos (Shorts: nenhum).")
+    L.append(__import__("thumbs_flow").BLOCO_PROMPT)
     L.append("")
     L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))  # 🌐 o idioma de novo, no FIM (a IA respeita mais)
     return "\n".join(L)
@@ -1188,10 +1221,24 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             "roteiro": rot, "roteiro_final": voz, "momentos": momentos,
             "tags": [str(x)[:60] for x in d.get("tags") or [] if str(x).strip()][:30],
             "fontes_usadas": [str(x)[:10] for x in d.get("fontes_usadas") or []][:30],
+            "afirmacoes": _afirmacoes(d.get("afirmacoes")),
+            "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
             "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time(),
             "produto_sugerido": _produto(d.get("produto_sugerido")),
             "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
             "chamadas": {"inscreva": len(re.findall(r"\[\[\s*INSCREVA", rot, re.I)), "venda": len(re.findall(r"\[\[\s*VENDA", rot, re.I))}}
+
+
+def _afirmacoes(x: Any) -> List[Dict[str, str]]:
+    """🔎 Afirmações importantes do roteiro: fato documentado / alegação / interpretação + a fonte."""
+    out = []
+    for a in x if isinstance(x, list) else []:
+        if not isinstance(a, dict) or not str(a.get("trecho") or "").strip():
+            continue
+        t = str(a.get("tipo") or "").strip().lower()
+        t = "alegacao" if t.startswith(("aleg", "alleg", "claim")) else "interpretacao" if t.startswith("interp") else "fato"
+        out.append({"trecho": str(a["trecho"]).strip()[:300], "tipo": t, "fonte": str(a.get("fonte") or "").strip()[:200]})
+    return out[:80]
 
 
 def _produto(x: Any) -> Optional[Dict[str, str]]:
@@ -1243,7 +1290,8 @@ def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
     res = p.get("resultado") or {}
     if not str(novo or "").strip():
         raise DossieError("O roteiro ficou vazio.")
-    d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano")}
+    d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano",
+                                 "afirmacoes", "thumbnails")}
     d["capitulos"] = [{"titulo": c["titulo"], "comeca_em": c.get("comeca_em")} for c in res.get("capitulos") or []]
     d["momentos"] = [m for m in res.get("momentos") or [] if not m.get("inicio")]
     d["roteiro"] = novo

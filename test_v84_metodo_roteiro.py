@@ -57,7 +57,7 @@ def test_estrategia_de_shorts_e_estrutura_de_referencia():
     p["config"] = {"duracao_s": 300, "referencia": "You're a coffee company and you have a problem..."}
     pr = vd.prompt_roteiro(p)
     assert "GANCHO COM O ESPECTADOR DENTRO" not in pr
-    assert "📐 Estrutura de referência" in pr and "You're a coffee company" in pr and "Não copie frases" in pr
+    assert "📐 Referência" in pr and "You're a coffee company" in pr and "não copie frases" in pr  # v84_95: inspiração, não molde
     d = {"tema": "Caso", "config": {"modelo": "negocios", "formato": "curto", "referencia": "Você é a Nescafé…"}, "fontes": [], "midias": [], "roteiro_base": "n"}
     pr = ds.prompt_roteiro(d)
     assert "GANCHO COM O ESPECTADOR DENTRO" in pr and "Você é a Nescafé…" in pr

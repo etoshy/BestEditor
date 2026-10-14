@@ -2218,7 +2218,8 @@ def narracao_remover_geracao(projeto_id: str, geracao_id: str):
 
 @app.route("/settings", methods=["GET"])
 def settings_page():
-    return render_template("settings.html", config=load_site_config(), all_providers=ALL_PROVIDERS)
+    return render_template("settings.html", config=load_site_config(), all_providers=ALL_PROVIDERS,
+                           vinhetas={t: os.path.basename(__import__("canal").clipe_padrao(t) or "") for t in __import__("canal").VINHETAS})
 
 
 @app.route("/youtube-cookies", methods=["GET"])
@@ -2296,6 +2297,8 @@ def save_settings():
         new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
+    if "nome_canal" in request.form:  # 📺 v84_95
+        new_values["nome_canal"] = request.form["nome_canal"]
     if "estilo_imagens" in request.form:  # 🎞️ imagens reais × ilustração
         new_values["estilo_imagens"] = request.form["estilo_imagens"]
     for chave_ig in ("ia_google_youtube", "ia_google_porta", "ia_google_imagens_min_lado"):  # 🔎 IA do Google
@@ -5114,6 +5117,9 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 }
                 for c in job.get("cutaway_suggestions", []) if c.get("resolved_path") and os.path.isfile(c["resolved_path"])
             ]
+            # 🎬 abertura e 🏁 encerramento do canal (canal.py): cortes reais no começo e no fim
+            cutaways_to_apply += [dict(v, insertion_point=min(float(v["insertion_point"]), _probe_media_duration(output_path)))
+                                  for v in __import__("canal").cortes_para_montagem(job)]
             if cutaways_to_apply:
                 target_width, target_height = resolution_for_orientation(
                     _orientacao_do_job(job), job.get("export_quality", "1080p"),
@@ -5365,6 +5371,8 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         "links_tela": job.get("links_tela") or [],
         "intervalo": job.get("interval_seconds") or 7,
         "clipes_chamada": {t: [{"id": x["id"], "nome": x["nome"], "padrao": bool(x.get("padrao"))} for x in l] for t, l in clipes_ch.items()},
+        "vinhetas": {t: {k: v[k] for k in ("usar", "nome", "proprio", "rotulo")} | {"tem": bool(v["caminho"]), "padrao": bool(__import__("canal").clipe_padrao(t))}
+                     for t, v in __import__("canal").do_job(job).items()},
         "duracao": job.get("total_duration") or (job["pending_segments"][-1]["end"] if job["pending_segments"] else 0),
         "erro_indice": job.get("assembly_error_segment_index"),
         "erro_indices": job.get("assembly_error_segments") or [],
@@ -6322,6 +6330,73 @@ def chamadas_enviar(job_id: str, tipo: str):
     _registrar_clipe_chamada(job, tipo, dest, up.filename)
     _save_state(job_id)
     return redirect(url_for("edit_segments_page", job_id=job_id) + "#cortes")
+
+
+@app.route("/job/<job_id>/vinhetas/<tipo>", methods=["POST"])
+def job_vinheta(job_id: str, tipo: str):
+    """🎬 abertura / 🏁 encerramento deste vídeo: liga/desliga ("usar") ou envia um vídeo só pra ele (e, se pedir, padrão)."""
+    import canal
+    job = _JOBS.get(job_id)
+    if not job or tipo not in canal.VINHETAS:
+        return jsonify({"erro": "Job ou tipo não encontrado."}), 404
+    up = request.files.get("arquivo")
+    if up and up.filename:
+        tmp = os.path.join(_job_dir(job_id), "cutaway_uploads")
+        os.makedirs(tmp, exist_ok=True)
+        orig = os.path.join(tmp, f"_up_{uuid.uuid4().hex[:6]}_{secure_filename(up.filename)}")
+        up.save(orig)
+        canal.guardar_no_job(job, tipo, _job_dir(job_id), orig, up.filename)
+        if request.form.get("padrao") == "on":
+            canal.definir_padrao(tipo, orig)
+        try:
+            os.remove(orig)
+        except OSError:
+            pass
+        _save_state(job_id)
+        return redirect(url_for("edit_segments_page", job_id=job_id) + "#cortes")
+    corpo = request.get_json(silent=True) or {}
+    v = job.setdefault("vinhetas", {}).setdefault(tipo, {})
+    if "usar" in corpo:
+        v["usar"] = bool(corpo["usar"])
+    if corpo.get("voltar_ao_padrao"):
+        v.pop("caminho", None)
+    _save_state(job_id)
+    return jsonify({"ok": True, "vinhetas": {t: {k: x[k] for k in ("usar", "nome", "proprio")} for t, x in canal.do_job(job).items()}})
+
+
+@app.route("/vinhetas/<tipo>", methods=["POST"])
+def vinheta_padrao(tipo: str):
+    """⚙️ Configurações → 📺 Seu canal: abertura/encerramento padrão (entra em todo vídeo)."""
+    import canal
+    if tipo not in canal.VINHETAS:
+        return "Tipo desconhecido.", 404
+    if request.form.get("remover") == "on":
+        canal.definir_padrao(tipo, None)
+    else:
+        up = request.files.get("arquivo")
+        if not up or not up.filename:
+            return "Nenhum arquivo enviado.", 400
+        tmp = os.path.join(BASE_DIR, "chamadas_padrao")
+        os.makedirs(tmp, exist_ok=True)
+        orig = os.path.join(tmp, f"_up_{uuid.uuid4().hex[:6]}{os.path.splitext(secure_filename(up.filename))[1] or '.mp4'}")
+        up.save(orig)
+        try:
+            canal.definir_padrao(tipo, orig)
+        finally:
+            try:
+                os.remove(orig)
+            except OSError:
+                pass
+    return redirect(url_for("settings_page") + "#canal")
+
+
+@app.route("/vinhetas/<tipo>/arquivo")
+def vinheta_arquivo(tipo: str):
+    import canal
+    cam = canal.clipe_padrao(tipo)
+    if not cam:
+        return "Sem vídeo.", 404
+    return send_file(cam, conditional=True)
 
 
 @app.route("/job/<job_id>/chamadas/escolher", methods=["POST"])
@@ -10296,6 +10371,11 @@ vendas_rotas.registrar(app, BASE_DIR)
 import dossies_rotas  # noqa: E402
 
 dossies_rotas.registrar(app, BASE_DIR)
+
+# 🖼 thumbnails no Google Flow + 🎙 adaptar o roteiro pro TTS por idioma (v84_96)
+import thumbs_tts_rotas  # noqa: E402
+
+thumbs_tts_rotas.registrar(app, BASE_DIR)
 
 import guia as _guia  # noqa: E402
 _guia.registrar(app, BASE_DIR)

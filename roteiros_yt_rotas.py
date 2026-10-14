@@ -126,6 +126,7 @@ def registrar(app, base_dir: str) -> None:
             transcricao_txt=ry.texto_da_transcricao(p.get("transcricao") or {}),
             tarefa=_TAREFAS.get(pid) or {}, tags_som=ry.TAGS_SOM, tags_estilo=ry.TAGS_ESTILO,
             idiomas=[(k, v[0]) for k, v in idiomas.IDIOMAS.items()], usadas=ry.opcoes_usadas(base_dir),
+            nome_canal_global=__import__("canal").nome_global(),
         )
 
     @app.route("/roteiros-yt/<pid>/status")
@@ -167,6 +168,8 @@ def registrar(app, base_dir: str) -> None:
         idioma = idiomas.nome_para_prompt(cod) if cod else "o mesmo idioma da transcrição"
         if "minutos" in corpo:  # ⏱ duração do roteiro reescrito (vazio = a do vídeo original)
             p["minutos_alvo"] = ry.minutos_alvo(corpo.get("minutos"))
+        if "nome_canal" in corpo:  # 📺 v84_95 ("" = o das Configurações; "-" = não falar)
+            p["nome_canal"] = " ".join(str(corpo.get("nome_canal") or "").split())[:80]
         try:
             sem_exp = corpo.get("sem_experiencias", True) is not False
             texto = ry.prompt_analise(p, modelo, idioma, marcar_chamadas=corpo.get("marcar_chamadas", True) is not False,

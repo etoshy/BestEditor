@@ -44,6 +44,11 @@ _BASE = [
     "\"MAS / PORTANTO\": ligue os acontecimentos com causa e conflito (\"isso aconteceu, MAS…, PORTANTO…\") em vez de "
     "\"e aí… e então…\". Fica menos previsível.",
     "RITMO: varie o tamanho das frases (curtas, médias, uma longa de vez em quando). Nunca o mesmo comprimento seguido.",
+    "UMA IDEIA POR FRASE (unidades de sentido): não amontoe informação numa frase só. Quando uma frase junta data + lugar + "
+    "nome + cargo + resultado (\"Em 1987, aos 9 anos, em Ohio, depois de ser avaliado por dois psiquiatras que…\"), divida em "
+    "frases curtas, cada uma com UM fato principal, na ordem em que o espectador precisa saber. Vale ainda mais nos trechos "
+    "cheios de dados (infância, histórico, laudos/avaliações médicas, investigação, processos, números). Quem ouve não pode "
+    "voltar a frase.",
     "AUTOCRÍTICA: antes de escrever a versão final, critique o seu próprio esboço — o que falta, o que está chato, o que sobra, "
     "se a virada surpreende — e corrija. Entregue só a versão final.",
     "SEM MANIPULAÇÃO: nada de isca de raiva, promessa falsa, gancho que o vídeo não cumpre, nem cortar a parte útil só pra "
@@ -114,8 +119,8 @@ def bloco(tipo: str = "longo") -> str:
     else:
         extra = _JORNADA
     if tipo == "reescrita":
-        extra += (" Ao REESCREVER, mantenha os fatos e a ordem das ideias que funcionam, mas reorganize pra seguir esse método "
-                  "quando ajudar (sem inventar fatos).")
+        extra += (" Ao REESCREVER, mantenha os FATOS, mas crie a SUA linha de storytelling (ângulo, gancho, ordem das revelações) "
+                  "seguindo esse método — o original é só um guia, não um molde (sem inventar fatos).")
     return ("## 🧭 Método de roteiro (siga ao escrever)\n" + "\n".join(f"- {x}" for x in itens) + f"\n- {extra}\n"
             "- Notas de edição (imagem, música, efeito) NÃO vão no texto narrado — se tiver, ponha em \"plano\".\"notas_edicao\".")
 
@@ -166,13 +171,51 @@ def titulo_ok(t: str) -> bool:
 
 
 def bloco_referencia(texto: str) -> str:
-    """Transcrição de um vídeo/short que viralizou: a IA copia a ESTRUTURA (não o conteúdo)."""
+    """Transcrição de um vídeo/short que viralizou: INSPIRAÇÃO de estrutura (não um molde ponto a ponto)."""
     t = str(texto or "").strip()
     if not t:
         return ""
-    return ("## 📐 Estrutura de referência (um vídeo que viralizou)\n"
-            "Use a ESTRUTURA deste roteiro como molde — tipo de gancho, ordem das revelações, ritmo das frases, tamanho, como "
-            "termina — mas com o MEU tema e os MEUS fatos. Não copie frases, nomes nem o assunto dele.\n\n" + t[:12000])
+    return ("## 📐 Referência (um vídeo que viralizou) — inspiração, não molde\n"
+            "Observe o que faz este roteiro funcionar — o tipo de gancho, como ele segura a atenção, o ritmo das frases, como "
+            "termina — e use essas LIÇÕES no MEU tema, com os MEUS fatos e a SUA linha de storytelling. Não siga a sequência "
+            "dele ponto a ponto e não copie frases, nomes nem o assunto. O tamanho pedido (seção 📏) vale mais que o dele.\n\n"
+            + t[:12000])
+
+
+def bloco_guia(origem: str = "o roteiro/as anotações", tem_tamanho: bool = True) -> str:
+    """✍️ O roteiro/as referências que a pessoa colou são GUIA: a IA cria a própria linha de storytelling (v84_95)."""
+    return ("## ✍️ Sua própria linha de storytelling (" + origem + " é só um GUIA)\n"
+            f"- {origem[0].upper() + origem[1:]} serve pra você saber o assunto, os fatos e o que eu quero destacar — NÃO é um "
+            "molde pra clonar.\n"
+            "- Crie a SUA forma de contar, como um roteirista profissional faria: escolha o ângulo, o gancho, por onde começar "
+            "(pode abrir pelo momento mais forte e voltar no tempo), a ordem das revelações, onde ficam os laços abertos, as "
+            "viradas e o final — o que contar MELHOR esta história pra este público.\n"
+            "- NÃO siga ponto a ponto, NÃO repita a mesma sequência de parágrafos, NÃO reaproveite frases, aberturas, "
+            "transições, metáforas nem a divisão de capítulos do guia. Lado a lado, o seu roteiro não pode parecer uma "
+            "paráfrase do guia.\n"
+            "- Mantenha os FATOS corretos (nada inventado) e o texto claro e fácil de entender: contexto antes do detalhe, uma "
+            "ideia por frase.\n"
+            + ("- O TAMANHO pedido (seção 📏) vale mais que o tamanho do guia.\n" if tem_tamanho else
+               "- Mantenha mais ou menos o tamanho/duração do original.\n"))
+
+
+def bloco_canal(nome: str, curto: bool = False) -> str:
+    """📺 O nome do canal, dito no momento certo (v84_95)."""
+    nome = " ".join(str(nome or "").split())[:80]
+    if not nome:
+        return ""
+    if curto:
+        return ("## 📺 Nome do canal: " + nome + "\n"
+                f"- Diga o nome do canal UMA vez, no fim, numa frase curta e natural (ex.: “Mais casos assim aqui no {nome}.”). "
+                "Nunca na 1ª frase — o gancho vem primeiro.\n"
+                f"- Escreva exatamente “{nome}”.")
+    return ("## 📺 Nome do canal: " + nome + "\n"
+            f"- Fale o nome do canal de forma natural, como um apresentador faria: UMA vez no começo, logo DEPOIS do gancho, "
+            f"quando apresenta o tema (ex.: “Hoje, aqui no {nome}, a gente vai entender…”) — nunca na 1ª frase; e UMA vez no "
+            f"fechamento (ex.: “Esse foi o caso de hoje no {nome}.”). Em vídeo longo, no máximo mais uma vez numa transição do "
+            "meio. No máximo 3 vezes no total.\n"
+            "- Não junte o nome a pedido de like/inscrição nem cole numa marca [[INSCREVA]] (o vídeo de inscreva-se já faz isso).\n"
+            f"- Escreva exatamente “{nome}”. O nome de OUTROS canais (dos vídeos/fontes de referência) não aparece no roteiro.")
 
 
 def ler_plano(d: Any) -> Dict[str, Any]:

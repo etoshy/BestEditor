@@ -197,7 +197,7 @@ def clipe_padrao(tipo: str) -> Optional[str]:
 
 def definir_padrao(tipo: str, caminho: Optional[str]) -> Optional[str]:
     """Guarda uma CÓPIA do clipe como padrão do tipo (None tira o padrão)."""
-    if tipo not in TIPOS:
+    if tipo not in TIPOS and tipo not in ("abertura", "encerramento"):  # 🎬🏁 vídeos de início/fim (canal.py)
         raise ValueError("Tipo de chamada desconhecido.")
     os.makedirs(PASTA_PADRAO, exist_ok=True)
     mapa = _mapa_padrao()

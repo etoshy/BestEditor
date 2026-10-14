@@ -75,6 +75,7 @@
       <label style="margin:0;flex:1">Idioma <input type="text" id="cfg-idioma"></label>
     </div>
     <label>Instruções extras</label><input type="text" id="cfg-extra">
+    <label>📺 Nome do canal <span style="font-weight:400;color:#888;">(a IA fala uma vez, no fim — vazio = o das ⚙️ Configurações; “-” = não falar)</span></label><input type="text" id="cfg-canal" maxlength="80">
     <button type="button" class="mini cinza" onclick="salvarCfg()">💾 Salvar configuração</button>
   </details>
   <div class="linha">
@@ -188,7 +189,7 @@ async function enviarJson(rota, campo) {
   if (d) document.getElementById(campo).value = '';
 }
 function salvarCfg() {
-  post('config', { tema: v('cfg-tema'), duracao_alvo: v('cfg-duracao'), formato: v('cfg-formato'), idioma: v('cfg-idioma'), instrucoes_extra: v('cfg-extra') });
+  post('config', { tema: v('cfg-tema'), duracao_alvo: v('cfg-duracao'), formato: v('cfg-formato'), idioma: v('cfg-idioma'), instrucoes_extra: v('cfg-extra'), nome_canal: v('cfg-canal') });
 }
 const v = (id) => document.getElementById(id).value;
 async function paraEditor() {
@@ -344,7 +345,7 @@ function desenhar() {
   if (!document.getElementById('cfg-box').open) {
     document.getElementById('cfg-tema').value = p.tema || ''; document.getElementById('cfg-duracao').value = p.duracao_alvo;
     document.getElementById('cfg-formato').value = p.formato; document.getElementById('cfg-idioma').value = p.idioma || '';
-    document.getElementById('cfg-extra').value = p.instrucoes_extra || '';
+    document.getElementById('cfg-extra').value = p.instrucoes_extra || ''; document.getElementById('cfg-canal').value = p.nome_canal || '';
   }
   if (!p.roteiro) document.getElementById('cfg-box').open = true;
   const foco = document.activeElement, editando = (id) => foco && foco.closest && foco.closest('#' + id) && /^(TEXTAREA|INPUT|SELECT)$/.test(foco.tagName);

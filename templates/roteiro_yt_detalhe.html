@@ -82,6 +82,7 @@
       {% set p1 = usadas.passo1 or {} %}{% set idr = p.idioma_roteiro if p.idioma_roteiro is defined else (p1.idioma or '') %}{% for cod, nome in idiomas %}<option value="{{ cod }}" {% if cod == idr %}selected{% endif %}>roteiro em {{ nome }}</option>{% endfor %}
     </select>
     <label style="margin:0;font-weight:400;font-size:0.85rem;white-space:nowrap;" title="Quanto tempo de narração o roteiro reescrito deve ter. Vazio = o tamanho do vídeo original.">⏱ <input type="number" id="minutosAlvo" min="1" max="120" step="0.5" placeholder="min" value="{{ (p.minutos_alvo if p.minutos_alvo is defined else p1.minutos) or '' }}" style="width:70px;margin:0;"> min</label>
+    <label style="margin:0;font-weight:400;font-size:0.85rem;white-space:nowrap;" title="O nome do SEU canal: a IA fala no começo (depois do gancho) e no fechamento. Vazio = o das ⚙️ Configurações; “-” = não falar.">📺 <input type="text" id="nomeCanal" maxlength="80" placeholder="{{ nome_canal_global or 'nome do canal' }}" value="{{ p.nome_canal or '' }}" style="width:150px;margin:0;"></label>
     <button class="ry-mini" id="p1Gerar">📝 Gerar prompt</button><button type="button" class="ry-mini" data-ia-gerar="p1Gerar" data-ia-prompt="p1Prompt" data-ia-resp="p1Resp" data-ia-ler="p1Ler" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><span class="ry-hint"></span>
   </div>
   <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;display:block;"><input type="checkbox" id="semExperiencias" style="width:auto;" {% if (p.sem_experiencias if p.sem_experiencias is defined else p1.sem_experiencias) != false %}checked{% endif %}> 🙅 Tirar do roteiro experiências pessoais de quem gravou e citações a outros vídeos/ao canal ("como falei no vídeo passado", "quando eu era criança"…)</label>
@@ -153,6 +154,9 @@
   <h2><span class="ry-num">4</span>Resultado</h2>
   <div id="resultado"><p class="ry-hint">Aparece aqui depois do passo 2 (cenas) e do passo 3 (roteiro final).</p></div>
 </div>
+
+{% set tts_base = '/tts-adaptar/roteiro_yt/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).antes_do_tts or (p.analise or {}).antes_do_tts %}{% include "_adaptar_tts.html" %}
+{% set thumbs_base = '/thumbs/roteiro_yt/' ~ p.id %}{% include "_thumbs.html" %}
 
 <script>
 const PID = {{ p.id|tojson }};
@@ -245,7 +249,7 @@ $('mExcluir').addEventListener('click', async () => {
 });
 $('p1Gerar').addEventListener('click', async () => {
   try {
-    const d = await api(`/roteiros-yt/${PID}/prompt-analise`, { modelo_id: $('modelo').value, idioma: $('idiomaRoteiro').value, marcar_chamadas: $('marcarChamadas').checked, sem_experiencias: $('semExperiencias').checked, minutos: $('minutosAlvo').value });
+    const d = await api(`/roteiros-yt/${PID}/prompt-analise`, { modelo_id: $('modelo').value, idioma: $('idiomaRoteiro').value, marcar_chamadas: $('marcarChamadas').checked, sem_experiencias: $('semExperiencias').checked, minutos: $('minutosAlvo').value, nome_canal: $('nomeCanal').value });
     $('p1Prompt').value = d.prompt; $('p1Box').style.display = ''; $('p1Tam').textContent = d.caracteres.toLocaleString('pt-BR') + ' caracteres';
   } catch (e) { alert(e.message); }
 });
@@ -341,6 +345,7 @@ fetch('/tarefas?tipo=checar_fatos&limite=1&pagina=' + encodeURIComponent(locatio
   if (t.status === 'rodando') acompanharChecagem(t.id); else { checagem = t; mostrarChecagem(); if (!t.aplicada) fetch('/tarefas/' + t.id + '/aplicada', { method: 'POST' }).catch(() => {}); }
 }).catch(() => {});
 function desenharResultado() {
+  if (window.thumbsRecarregar) setTimeout(window.thumbsRecarregar, 0);  // 🖼 as thumbnails que a IA recomendou
   const R = P.resultado, A = P.analise;
   if (!R && !A) return;
   let h = '';

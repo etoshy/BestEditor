@@ -28,6 +28,38 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🖼 Thumbnails no Google Flow e 🎙 adaptar o roteiro pro TTS por idioma (v84_96)
+
+- **🖼 Thumbnails**: onde a IA recomenda thumbnail (🕵️ Modelos de vídeo — 3 por roteiro; 📜 Roteiro do YouTube — junto com
+  🔥 Títulos / 📝 Descrição; 📊 Analisador de canal — a “capa” de cada vídeo sugerido) aparece o bloco **🖼 Thumbnails**:
+  cada ideia com o texto grande e o prompt da imagem (editáveis). **🎨 Gerar no Flow** (uma ou todas, em segundo plano —
+  o 🔔 avisa): o Flow gera a imagem 16:9 sem letras e o site põe o texto por cima (contorno, degradê, 1280×720), pronta
+  pra baixar. “🔁 Outra imagem” gera uma variação. Arquivos em `thumbs/` (`thumbs_flow.py`).
+- **🎙 Adaptar o roteiro pro TTS** (`adaptar_tts.py`), nos 🕵️ Modelos de vídeo e no 📜 Roteiro do YouTube: um prompt
+  prepara o texto pra voz NO IDIOMA DELE — frases naturais, pontuação que dá as pausas, números/datas/siglas do jeito
+  que se fala, nada de [pausa]/[dramático] que o TTS leria — sem mudar fatos nem encurtar, mantendo as marcas do site
+  ([[INSCREVA]], [[VENDA]], [I3], [CENA n]) e as frases de começo de capítulo. **Alemão** tem regras próprias
+  (Hochdeutsch, compostos, ä/ö/ü/ß); os outros idiomas usam o modelo geral até ganharem o deles. A **direção narrativa**
+  muda com o tipo de vídeo (true crime, história, biografia, mistério, documentário) e o motor (Chatterbox, Turbo com
+  tags…). A resposta é só o texto: o site confere marcas e tamanho, troca o roteiro e guarda o anterior (↩ voltar).
+
+## 📺 Canal: nome nos roteiros, abertura/encerramento e roteiro como guia (v84_95)
+
+- **⚙️ Configurações → 📺 Seu canal**: o **nome do canal** (a IA fala no começo, logo depois do gancho, e no fechamento —
+  nos Shorts, uma vez no fim) e os vídeos de **🎬 abertura** e **🏁 encerramento**: como os de 👍 inscreva-se e 🛒 venda,
+  envia uma vez e eles entram sozinhos no começo e no fim de todo vídeo montado (legenda e capítulos andam junto). No
+  editor → aba ✂️ Cortes dá pra desligar ou trocar em cada vídeo. Cada projeto de 🕵️ Modelos de vídeo, 📜 Roteiro do
+  YouTube e 🎞️ Vídeos modelados pode usar outro nome (ou “-” pra não falar).
+- **✍️ O roteiro/as referências são GUIA**: em todos os prompts de roteiro (🕵️ Modelos de vídeo, 📜 Roteiro do YouTube,
+  🎞️ Vídeos modelados) a IA usa o seu roteiro, as anotações, a transcrição do vídeo original e a referência viral só pra
+  saber os fatos — e cria a própria linha de storytelling (gancho, ângulo, ordem das revelações), sem clonar nem seguir
+  ponto a ponto, mantendo a duração pedida.
+- **🕵️ True crime**: a narração diferencia **fato documentado** (com a fonte: autos, laudo, reportagem), **alegação**
+  (sempre atribuída: “a defesa sustentou”, “ele alegou”) e **interpretação do narrador**; a IA devolve a lista
+  “🔎 Fatos, alegações e interpretações” com a fonte de cada afirmação importante (sem fonte aparece em vermelho).
+  Frases que amontoam dados viram **unidades de sentido** (uma informação por frase) — principalmente na infância,
+  nas avaliações médicas e na investigação policial. A regra “uma ideia por frase” vale em todo roteiro.
+
 ## ✍️ Escrita no papel, fontes de máquina/à mão e legenda com o texto do roteiro (v84_94)
 
 - **Quadro ✍️ Escrita** (🗞 Editorial): o texto aparecendo letra por letra, de 3 jeitos:

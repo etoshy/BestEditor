@@ -16,6 +16,11 @@
 
 <form method="post" action="{{ url_for('save_settings') }}">
 
+  <h2 style="margin-top:32px;" id="canal">📺 Seu canal</h2>
+  <label>Nome do canal <span style="font-weight:normal;color:#666;">(a IA fala ele no momento certo dos roteiros — 🕵️ Modelos de vídeo, 📜 Roteiro do YouTube, 🎞️ Vídeos modelados; cada projeto pode trocar)</span></label>
+  <input type="text" name="nome_canal" value="{{ config.nome_canal or '' }}" maxlength="80" placeholder="ex.: Casos Arquivados">
+  <p style="font-size:.84rem;color:#555;margin:4px 0 0;">Vídeos de 🎬 abertura e 🏁 encerramento: logo abaixo do botão Salvar.</p>
+
   <h2 style="margin-top:32px;">Vídeo</h2>
   <label>Proporção do vídeo gerado</label>
   <label style="font-weight:normal;"><input type="radio" name="orientation" value="16:9" {% if config.orientation == '16:9' %}checked{% endif %} style="width:auto;"> 16:9 (paisagem — YouTube normal)</label><br>
@@ -300,6 +305,21 @@
 
   <button type="submit">Salvar configurações</button>
 </form>
+
+<h3 style="margin-top:24px;" id="vinhetas">🎬 Abertura e 🏁 encerramento do canal</h3>
+<p style="color:#555;font-size:0.85rem;">Como os vídeos de 👍 inscreva-se e 🛒 venda: envie uma vez e eles entram sozinhos no <b>começo</b> e no <b>fim</b> de todo vídeo montado (com o áudio deles; a legenda e os capítulos andam junto). Em cada vídeo dá pra desligar ou trocar por outro, no editor → aba ✂️ Cortes.</p>
+{% set _vh = vinhetas or {} %}
+{% for tipo, rot in [('abertura', '🎬 Abertura (vídeo de início)'), ('encerramento', '🏁 Encerramento (vídeo final)')] %}
+<form method="post" action="/vinhetas/{{ tipo }}" enctype="multipart/form-data" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+  <b>{{ rot }}</b> —
+  {% if _vh.get(tipo) %}<span style="color:#15803d;">✔ {{ _vh.get(tipo) }}</span> · <a href="/vinhetas/{{ tipo }}/arquivo" target="_blank">ver</a>{% else %}<span style="color:#888;">nenhum</span>{% endif %}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+    <input type="file" name="arquivo" accept="video/*" style="width:auto;">
+    <button type="submit" style="width:auto;">⬆ {% if _vh.get(tipo) %}Trocar{% else %}Enviar{% endif %}</button>
+    {% if _vh.get(tipo) %}<label style="font-weight:normal;margin:0;"><input type="checkbox" name="remover" style="width:auto;"> tirar (nenhum vídeo)</label>{% endif %}
+  </div>
+</form>
+{% endfor %}
 
 <h2 style="margin-top:32px;" id="youtube-cookies">YouTube — “Sign in to confirm you’re not a bot”</h2>
 <p style="color:#555;font-size:0.85rem;">Quando o YouTube pede login (Roteiro do YouTube, Cortar do YouTube, painel do YouTube no editor), o site usa os cookies de um navegador em que você está logado no YouTube. Se você não escolher nada, ele tenta sozinho Firefox, Edge, Chrome, Brave, Opera e Vivaldi e guarda o que funcionou. O mais garantido: <strong>Firefox logado no YouTube</strong>, ou um <strong>cookies.txt</strong> (extensão “Get cookies.txt LOCALLY” no Chrome/Edge, com youtube.com aberto e logado → Export). Feche o Chrome antes — aberto, ele bloqueia a leitura dos cookies.</p>

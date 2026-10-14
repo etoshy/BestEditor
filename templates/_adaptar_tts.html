@@ -1,0 +1,56 @@
+{# 🎙 Adaptar o roteiro pro TTS (adaptar_tts.py) — incluir com: {% set tts_base = '/tts-adaptar/<origem>/<id>' %}{% include "_adaptar_tts.html" %} #}
+<div class="tts-card" id="ttsCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🎙 Adaptar o roteiro pro TTS <span style="font-weight:400;font-size:.82rem;color:#666;">(pontuação, ritmo, números e siglas do jeito que se fala — no idioma do roteiro, sem mudar fatos nem encurtar)</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
+    <label style="margin:0;font-weight:400;">🌐 Idioma <select id="ttsIdioma" style="width:auto;margin:0;"><option value="">o do roteiro</option>{% for cod, nome in (idiomas or []) %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}</select></label>
+    <label style="margin:0;font-weight:400;">🎬 Direção narrativa <select id="ttsDirecao" style="width:auto;margin:0;"><option value="">a do tipo de vídeo</option></select></label>
+    <label style="margin:0;font-weight:400;">🔊 Motor <select id="ttsMotor" style="width:auto;margin:0;"></select></label>
+    <button type="button" id="ttsGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
+    <button type="button" data-ia-gerar="ttsGerar" data-ia-prompt="ttsPrompt" data-ia-resp="ttsResp" data-ia-ler="ttsLer" data-ia-status="ttsSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Gerar com a IA</button>
+    <button type="button" id="ttsDesfazer" style="display:none;width:auto;margin:0;padding:5px 12px;background:#64748b;">↩ Voltar ao roteiro de antes</button>
+    <span id="ttsSt" style="color:#555;"></span>
+  </div>
+  <div id="ttsInfo" style="font-size:.8rem;color:#555;margin-top:4px;"></div>
+  <textarea id="ttsPrompt" rows="5" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+  <div id="ttsCopiarBox" style="display:none;margin-top:4px;"><button type="button" id="ttsCopiar" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;">📋 Copiar prompt</button></div>
+  <label style="margin-top:8px;display:block;font-size:.86rem;">Resposta da IA (só o texto adaptado)</label>
+  <textarea id="ttsResp" rows="5" style="width:100%;font-size:.85rem;"></textarea>
+  <button type="button" id="ttsLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Usar o texto adaptado</button>
+  <div id="ttsRes" style="font-size:.85rem;margin-top:6px;"></div>
+</div>
+<script>
+(function () {
+  const BASE = {{ tts_base|tojson }};
+  const $t = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  fetch('/tts-adaptar/opcoes').then(r => r.json()).then(o => {
+    Object.entries(o.direcoes || {}).forEach(([k, v]) => $t('ttsDirecao').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
+    Object.entries(o.motores || {}).forEach(([k, v]) => $t('ttsMotor').insertAdjacentHTML('beforeend', `<option value="${k}" ${k === 'chatterbox' ? 'selected' : ''}>${esc(v)}</option>`));
+    window._ttsEspecificos = o.especificos || [];
+  }).catch(() => {});
+  $t('ttsGerar').addEventListener('click', async () => {
+    $t('ttsSt').textContent = '📝 gerando…';
+    try {
+      const d = await post(BASE + '/prompt', { idioma: $t('ttsIdioma').value, direcao: $t('ttsDirecao').value, motor: $t('ttsMotor').value });
+      $t('ttsPrompt').value = d.prompt; $t('ttsPrompt').style.display = ''; $t('ttsCopiarBox').style.display = '';
+      $t('ttsSt').textContent = `✔ prompt pronto (${Math.round(d.caracteres / 1000)} mil caracteres)`;
+      $t('ttsInfo').innerHTML = d.especifico ? `✅ Regras próprias de <b>${esc(d.nome_idioma)}</b>.` : `ℹ️ <b>${esc(d.nome_idioma)}</b> ainda usa o modelo geral (as regras próprias deste idioma vêm depois).`;
+    } catch (e) { $t('ttsSt').textContent = '⚠ ' + e.message; }
+  });
+  $t('ttsCopiar').addEventListener('click', () => { navigator.clipboard.writeText($t('ttsPrompt').value).then(() => { $t('ttsSt').textContent = '📋 copiado'; }); });
+  $t('ttsLer').addEventListener('click', async () => {
+    try {
+      const d = await post(BASE + '/ler', { texto: $t('ttsResp').value });
+      $t('ttsRes').innerHTML = `<span style="color:#15803d">✔ Texto adaptado em uso: ${d.palavras_antes} → ${d.palavras_depois} palavras.</span>` +
+        (d.avisos || []).map(a => `<div style="color:#b45309">⚠ ${esc(a)}</div>`).join('') + '<div style="color:#555">Recarregando…</div>';
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) { $t('ttsRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
+  });
+  $t('ttsDesfazer').addEventListener('click', async () => {
+    if (!confirm('Voltar ao roteiro de antes da adaptação?')) return;
+    try { await post(BASE + '/desfazer', {}); location.reload(); } catch (e) { $t('ttsSt').textContent = '⚠ ' + e.message; }
+  });
+  if ({{ (tts_tem_antes or false)|tojson }}) $t('ttsDesfazer').style.display = '';
+})();
+</script>

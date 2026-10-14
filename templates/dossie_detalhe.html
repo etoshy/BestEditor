@@ -53,10 +53,12 @@
   <input type="text" id="cTom" value="{{ p.config.tom }}" placeholder="ex.: sóbrio e investigativo, como documentário">
   <label>Pedido extra <span style="font-weight:400;color:#888;">(opcional)</span></label>
   <input type="text" id="cExtra" value="{{ p.config.extra }}" placeholder="ex.: dar mais tempo pra investigação; terminar com a situação atual">
-  <label>Roteiro / anotações seus <span style="font-weight:400;color:#888;">(opcional — a IA usa como base)</span></label>
+  <label>📺 Nome do canal <span style="font-weight:400;color:#888;">(a IA fala no começo, depois do gancho, e no fechamento — vazio = o das ⚙️ Configurações{% if nome_canal_global %}: “{{ nome_canal_global }}”{% endif %}; “-” = não falar)</span></label>
+  <input type="text" id="cCanal" value="{{ p.config.nome_canal or '' }}" maxlength="80" placeholder="{{ nome_canal_global or 'ex.: Casos Arquivados' }}">
+  <label>Roteiro / anotações seus <span style="font-weight:400;color:#888;">(opcional — é um GUIA: a IA usa os fatos e cria a própria linha de storytelling, sem clonar)</span></label>
   <textarea id="rotBase" rows="4">{{ p.roteiro_base }}</textarea>
   <details style="margin-top:8px;"{% if p.config.referencia %} open{% endif %}>
-    <summary style="cursor:pointer;font-size:0.88rem;">📐 Estrutura de referência <span style="font-weight:400;color:#888;">(opcional — cole a transcrição de um vídeo/short que viralizou: a IA copia a ESTRUTURA — gancho, ordem das revelações, ritmo, final — com o seu tema)</span></summary>
+    <summary style="cursor:pointer;font-size:0.88rem;">📐 Estrutura de referência <span style="font-weight:400;color:#888;">(opcional — cole a transcrição de um vídeo/short que viralizou: a IA aprende com ele — tipo de gancho, ritmo, final — e conta o seu tema do jeito dela, sem seguir ponto a ponto)</span></summary>
     <textarea id="cRef" rows="4" placeholder="Transcrição de um vídeo que viralizou no seu nicho…">{{ p.config.referencia or '' }}</textarea>
   </details>
   <div style="margin-top:8px;display:grid;gap:4px;font-size:0.88rem;">
@@ -129,6 +131,9 @@
   <div id="resBox"></div>
 </div>
 
+{% set tts_base = '/tts-adaptar/dossie/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).roteiro_antes_tts %}{% include "_adaptar_tts.html" %}
+{% set thumbs_base = '/thumbs/dossie/' ~ p.id %}{% include "_thumbs.html" %}
+
 <script>
 const PID = {{ p.id|tojson }};
 let P = {{ p|tojson }};
@@ -174,7 +179,7 @@ function salvarCfg(extra) {
       const d = await api(`/modelos-video/${PID}/config`, Object.assign({ tema: $('tema').value, modelo: $('cModelo').value, formato: $('cFormato').value,
         minutos: $('cMin').value, idioma: $('cIdioma').value, formato_video: $('cVid').value, tom: $('cTom').value, extra: $('cExtra').value,
         roteiro_base: $('rotBase').value, referencia: $('cRef').value, sem_experiencias: $('cSemExp').checked, marcar_chamadas: $('cChamadas').checked,
-        sugerir_produto: $('cProduto').checked }, extra || {}));
+        sugerir_produto: $('cProduto').checked, nome_canal: $('cCanal').value }, extra || {}));
       P.config = d.config; $('cfgSt').innerHTML = '<span class="ds-ok">✔ salvo</span>'; $('titulo').textContent = '🕵️ ' + ($('tema').value || 'Projeto');
     } catch (e) { $('cfgSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
   }, 450);
@@ -185,7 +190,7 @@ $('cFormato').addEventListener('change', () => {
   const f = ((MODELOS[$('cModelo').value] || {}).formatos || {})[$('cFormato').value]; if (f) $('cMin').value = f.minutos;
   salvarCfg();
 });
-['tema', 'cMin', 'cTom', 'cExtra', 'rotBase', 'cRef'].forEach(id => $(id).addEventListener('input', () => salvarCfg()));
+['tema', 'cMin', 'cTom', 'cExtra', 'rotBase', 'cRef', 'cCanal'].forEach(id => $(id).addEventListener('input', () => salvarCfg()));
 ['cIdioma', 'cVid', 'cSemExp', 'cChamadas', 'cProduto'].forEach(id => $(id).addEventListener('change', () => salvarCfg()));
 opcoesFormato();
 
@@ -369,6 +374,7 @@ document.addEventListener('click', async (ev) => {
   catch (e) { $('iaMarcasSt').textContent = '⚠ ' + e.message; }
 });
 function desenharResultado() {
+  if (window.thumbsRecarregar) setTimeout(window.thumbsRecarregar, 0);  // 🖼 as thumbnails que a IA recomendou
   const R = P.resultado; if (!R) { $('resBox').innerHTML = ''; return; }
   const rot = esc(R.roteiro).replace(/\[\s*([MIT]\d+[^\]]{0,30})\]/gi, '<span class="mk">$1</span>');
   const mid = (id) => (P.midias || []).find(m => m.id === id) || {};
@@ -377,6 +383,8 @@ function desenharResultado() {
     ${R.alvo && R.alvo.curto ? `<div class="ds-row" style="margin:4px 0 8px;"><button class="ds-mini" id="btnCompletar" style="background:#b45309;color:#fff">📏 Prompt pra completar o tamanho</button><span class="ds-hint" id="completarSt">Cole na MESMA conversa da IA (ela já tem as fontes) e traga o JSON aqui no “Ler resposta” — só o roteiro é trocado.</span></div>` : ''}
     ${R.observacoes ? `<p style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;">🔎 <b>Conferir:</b> ${esc(R.observacoes)}</p>` : ''}
     ${planoHtml(R.plano)}
+    ${(R.afirmacoes || []).length ? `<details style="margin:8px 0;border:1px solid #e5e7eb;border-radius:6px;padding:6px 10px;"><summary style="cursor:pointer"><b>🔎 Fatos, alegações e interpretações</b> <span class="ds-hint">(${R.afirmacoes.filter(a => a.tipo === 'fato').length} fato(s) · ${R.afirmacoes.filter(a => a.tipo === 'alegacao').length} alegação(ões) · ${R.afirmacoes.filter(a => a.tipo === 'interpretacao').length} interpretação(ões) — confira as fontes)</span></summary>
+      <table style="width:100%;font-size:.84rem;border-collapse:collapse;margin-top:6px">${R.afirmacoes.map(a => `<tr style="border-top:1px solid #f1f5f9"><td style="padding:3px 6px;white-space:nowrap">${a.tipo === 'fato' ? '📄 fato' : a.tipo === 'alegacao' ? '🗣 alegação' : '💭 interpretação'}</td><td style="padding:3px 6px">“${esc(a.trecho)}”</td><td style="padding:3px 6px;color:${a.fonte ? '#334155' : '#b91c1c'}">${a.fonte ? esc(a.fonte) : '⚠ sem fonte'}</td></tr>`).join('')}</table></details>` : ''}
     ${IA.dossie_marcas ? `<div class="ds-row" style="margin-top:8px"><button class="ds-mini" id="btnIaMarcas" style="background:#4338ca">🤖 Conferir onde cada imagem entrou</button><span class="ds-hint" id="iaMarcasSt"></span></div>
       <div id="iaMarcas">${marcasHtml(P.ia_marcas)}</div>` : ''}
     <h3 style="margin:12px 0 4px;">Títulos</h3><ol>${(R.titulos || []).map(t => `<li>${esc(t)}</li>`).join('')}</ol>

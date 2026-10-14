@@ -103,7 +103,8 @@ def registrar(app, base_dir: str) -> None:
         import idiomas
         return render_template("dossie_detalhe.html", p=_json_proj(p), modelos=ds.MODELOS, tipos=ds.TIPOS_MIDIA,
                                ordem={k: list(m["formatos"]) for k, m in ds.MODELOS.items()},
-                               idiomas=[(k, v[0]) for k, v in idiomas.IDIOMAS.items()])
+                               idiomas=[(k, v[0]) for k, v in idiomas.IDIOMAS.items()],
+                               nome_canal_global=__import__("canal").nome_global())
 
     @app.route("/modelos-video/<pid>/dados")
     def dossie_dados(pid: str):
@@ -127,7 +128,7 @@ def registrar(app, base_dir: str) -> None:
                 cfg["formato"] = next(iter(fmts))
             if c.get("formato_video") in ("16:9", "9:16", "1:1"):
                 cfg["formato_video"] = c["formato_video"]
-            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20), ("referencia", 12000)):
+            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20), ("referencia", 12000), ("nome_canal", 80)):
                 if k in c:
                     cfg[k] = str(c.get(k) or "").strip()[:lim]
             if "minutos" in c:

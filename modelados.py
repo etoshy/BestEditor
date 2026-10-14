@@ -507,7 +507,7 @@ def prompt_roteiro(proj: Dict[str, Any], estilo: Dict[str, Any], vozes: List[Dic
 
 TAREFA: escreva o roteiro COMPLETO de um vídeo no estilo "{estilo['nome']}" sobre o tema abaixo, já com a narração, os diálogos, a voz de cada fala, as tags de áudio e o plano de CENAS (uma imagem inicial + uma animação por cena). Responda SÓ com um JSON válido, sem texto antes ou depois, sem ```.
 
-TEMA / LENDA:
+TEMA / LENDA (se vier um roteiro pronto aqui, ele é só um GUIA — veja ✍️ abaixo):
 {proj['tema']}
 {('INSTRUÇÕES EXTRAS: ' + proj['instrucoes_extra']) if proj.get('instrucoes_extra') else ''}
 
@@ -540,6 +540,9 @@ CENAS ("cenas", em ordem) — cerca de {n} cenas de ~{dc:g}s cada (uma cena nova
 {__import__("metodo_roteiro").bloco("curto" if alvo <= 60 else "longo")}
 
 {__import__("metodo_roteiro").bloco_titulos(1)}
+
+{__import__("metodo_roteiro").bloco_guia("o tema/roteiro que eu colei", tem_tamanho=False).replace("- Mantenha mais ou menos o tamanho/duração do original.", f"- A DURAÇÃO é a pedida acima (~{int(alvo)} s), não a do guia.")}
+{__import__("metodo_roteiro").bloco_canal(__import__("canal").nome_do_projeto(proj.get("nome_canal")), curto=True)}
 
 Molde que o site usa na imagem: "{estilo['prompt_imagem']}"
 Molde que o site usa na animação: "{estilo['prompt_animacao']}"

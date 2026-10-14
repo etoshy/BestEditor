@@ -1,0 +1,64 @@
+{# 🖼 Thumbnails no Google Flow (thumbs_flow.py) — incluir com: {% set thumbs_base = '/thumbs/<origem>/<id>' %}{% include "_thumbs.html" %} #}
+<div class="th-card" id="thCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🖼 Thumbnails <span style="font-weight:400;font-size:.82rem;color:#666;">(as que a IA recomendou — a imagem é gerada no Google Flow e o texto entra por cima, 1280×720)</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <button type="button" id="thTodas" style="width:auto;margin:0;padding:5px 12px;background:#7c3aed;">🎨 Gerar as que faltam no Flow</button>
+    <button type="button" id="thNova" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Nova ideia</button>
+    <button type="button" id="thAtualizar" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">🔄</button>
+    <span id="thSt" style="font-size:.85rem;color:#555;"></span>
+  </div>
+  <div id="thLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:10px;"></div>
+</div>
+<script>
+(function () {
+  const BASE = {{ thumbs_base|tojson }};
+  const $h = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  let itens = [], timer = null;
+  const ST = { '': '', fila: '⏳ na fila', gerando: '🎨 gerando no Flow…', pronto: '✅ pronta', erro: '⚠ erro' };
+  function desenhar() {
+    const L = $h('thLista');
+    if (!itens.length) { L.innerHTML = '<p style="color:#666;font-size:.85rem;margin:0">Nenhuma ideia ainda — a IA sugere 3 junto com o roteiro (ou no 🔥 Títulos / 📝 Descrição). Ou crie uma em ➕.</p>'; return; }
+    L.innerHTML = itens.map(it => `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px;" data-n="${it.n}">
+      ${it.url_final ? `<a href="${it.url_final}" target="_blank"><img src="${it.url_final}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;"></a>` :
+        `<div style="box-sizing:border-box;width:100%;aspect-ratio:16/9;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:.85rem;text-align:center;padding:8px">${esc(ST[it.status] || 'sem imagem')}</div>`}
+      <div style="font-size:.8rem;color:#475569;margin:6px 0">${esc(it.ideia)}</div>
+      <label style="font-size:.78rem;margin:0">Texto na thumb</label><input type="text" class="thTexto" maxlength="40" value="${esc(it.texto)}" style="margin:2px 0 4px;">
+      <details style="font-size:.78rem"><summary>prompt da imagem (Flow)</summary><textarea class="thPrompt" rows="3" style="width:100%;font-size:.78rem">${esc(it.prompt)}</textarea></details>
+      ${it.erro ? `<div style="color:#b91c1c;font-size:.78rem">⚠ ${esc(it.erro)}</div>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        <button type="button" class="thGerar" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#7c3aed" ${['fila', 'gerando'].includes(it.status) ? 'disabled' : ''}>${it.url_imagem ? '🔁 Outra imagem' : '🎨 Gerar no Flow'}</button>
+        ${it.url_final ? `<a href="${it.url_final.split('?')[0]}?baixar=1" style="font-size:.8rem;align-self:center">⬇ baixar</a><a href="${it.url_imagem}" target="_blank" style="font-size:.8rem;align-self:center">imagem sem texto</a>` : ''}
+        <button type="button" class="thApagar" style="width:auto;margin:0 0 0 auto;padding:4px 8px;font-size:.8rem;background:#94a3b8" title="tirar esta ideia">✕</button>
+      </div></div>`).join('');
+    L.querySelectorAll('[data-n]').forEach(card => {
+      const n = Number(card.dataset.n);
+      const salvar = (campo, v) => post(BASE + '/editar', { n, [campo]: v }).then(d => { itens = d.itens; desenhar(); }).catch(e => { $h('thSt').textContent = '⚠ ' + e.message; });
+      card.querySelector('.thTexto').addEventListener('change', e => salvar('texto', e.target.value));
+      card.querySelector('.thPrompt').addEventListener('change', e => salvar('prompt', e.target.value));
+      card.querySelector('.thGerar').addEventListener('click', () => gerar([n], true));
+      card.querySelector('.thApagar').addEventListener('click', () => { if (confirm('Tirar esta ideia?')) salvar('apagar', true); });
+    });
+  }
+  async function carregar() {
+    try { const r = await fetch(BASE, { cache: 'no-store' }); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); itens = d.itens || []; desenhar();
+      const andando = itens.some(i => ['fila', 'gerando'].includes(i.status));
+      clearTimeout(timer); if (andando) timer = setTimeout(carregar, 4000);
+    } catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
+  }
+  async function gerar(ns, forcar) {
+    try { await post(BASE + '/gerar', { ns, forcar: !!forcar, pagina: location.pathname }); $h('thSt').textContent = '🎨 gerando no Flow em segundo plano — o 🔔 avisa quando terminar'; carregar(); }
+    catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
+  }
+  $h('thTodas').addEventListener('click', () => gerar(null, false));
+  $h('thAtualizar').addEventListener('click', carregar);
+  $h('thNova').addEventListener('click', async () => {
+    const ideia = prompt('O que a thumbnail mostra? (ex.: close no rosto de um detetive olhando um mapa com alfinetes, luz fria)'); if (!ideia) return;
+    const texto = prompt('Texto grande na thumb (2 a 4 palavras):', '') || '';
+    try { const d = await post(BASE + '/editar', { novo: true, ideia, texto }); itens = d.itens; desenhar(); } catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
+  });
+  window.thumbsRecarregar = carregar;
+  carregar();
+})();
+</script>

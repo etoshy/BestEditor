@@ -288,6 +288,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "ia_google_youtube": "complemento",  # complemento (sem legenda / a legenda não achou) | sempre | desligado
     # 🖼️ buscador de imagem "google" (Google Imagens pelo Modo IA): imagens com o maior lado ≥ isto vêm primeiro (0 = qualquer)
     "ia_google_imagens_min_lado": 800,
+    # 📺 v84_95: o nome do seu canal — os prompts de roteiro (🕵️ Modelos de vídeo, 📜 Roteiro do YouTube, 🎞️ Vídeos
+    # modelados) pedem pra IA falar ele no momento certo (cada projeto pode trocar)
+    "nome_canal": "",
 }
 
 
@@ -414,6 +417,7 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
         raise SiteConfigError(f"buscadores_proporcao precisa ser um de {_props}, recebi {current.get('buscadores_proporcao')!r}.")
     if current.get("flow_modo_automacao") not in ("direto", "antigo"):
         current["flow_modo_automacao"] = "direto"
+    current["nome_canal"] = " ".join(str(current.get("nome_canal") or "").split())[:80]
     if current.get("estilo_imagens") not in ("auto", "real", "qualquer"):
         current["estilo_imagens"] = "auto"
     if current.get("ia_google_youtube") not in ("complemento", "sempre", "desligado"):

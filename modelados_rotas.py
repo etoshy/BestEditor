@@ -173,6 +173,8 @@ def registrar(app, base_dir: str, jobs: Dict[str, Dict[str, Any]], save_state: C
             for k in ("tema", "idioma", "instrucoes_extra", "nome"):
                 if isinstance(corpo.get(k), str):
                     proj[k] = corpo[k].strip()[:4000]
+            if isinstance(corpo.get("nome_canal"), str):  # 📺 v84_95
+                proj["nome_canal"] = " ".join(corpo["nome_canal"].split())[:80]
             if corpo.get("formato") in md.FORMATOS:
                 proj["formato"] = corpo["formato"]
             if corpo.get("duracao_alvo") not in (None, ""):
