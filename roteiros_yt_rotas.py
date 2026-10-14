@@ -305,7 +305,7 @@ def registrar(app, base_dir: str) -> None:
                 ry.salvar_parte(q, k, texto)
                 parte = next(x for x in q["analise"]["partes"] if x["k"] == k)
                 parte["tentativas"] = antes + 1
-                if parte["status"] == "curta" and parte["tentativas"] >= 2:
+                if parte["status"] in ("curta", "longa") and parte["tentativas"] >= 2:
                     parte["aceita_curta"] = True
                 ry.salvar_projeto(base_dir, q)
                 feitas += 1

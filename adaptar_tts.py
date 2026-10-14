@@ -274,7 +274,8 @@ def prompt(texto: str, idioma: str, direcao: str = "true_crime", canal: str = ""
           "solução factual para eliminar uma ambiguidade.", "",
           "## ENTRADA", "", f"A seguir, o roteiro original em {lingua}. Adapte-o integralmente segundo todas as regras anteriores.", "",
           "<<<ROTEIRO", texto, "ROTEIRO>>>", "",
-          "## SAÍDA", "", f"Somente o roteiro final em {lingua}, otimizado para o {nome_motor}."]
+          "## SAÍDA", "", f"Somente o roteiro final em {lingua}, otimizado para o {nome_motor} — TEXTO PURO (sem JSON, sem ``` "
+          "em volta, sem título e sem comentário antes ou depois), do começo ao fim, sem cortar nada."]
     return "\n".join(L)
 
 
@@ -304,7 +305,9 @@ def ler_resposta(resposta: str, original: str) -> Dict[str, Any]:
     if t.startswith("{"):
         try:
             d = json.loads(t)
-            t = str(d.get("roteiro") or d.get("roteiro_final") or d.get("texto") or "").strip() if isinstance(d, dict) else t
+            if isinstance(d, dict):  # v84_99: qualquer chave — fica o maior texto do JSON
+                strs = [v for v in d.values() if isinstance(v, str)]
+                t = str(d.get("roteiro") or d.get("roteiro_final") or d.get("texto") or (max(strs, key=len) if strs else "")).strip()
         except ValueError:
             pass
     t = t.replace("<<<ROTEIRO", "").replace("ROTEIRO>>>", "").strip()

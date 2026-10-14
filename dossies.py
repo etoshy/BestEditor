@@ -1242,7 +1242,10 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     _av = metodo_roteiro.aviso_tamanho(metodo_roteiro.palavras_do_texto(voz), _alvo, _min, _ppm)
     if _av:
         avisos.insert(0, "📏 " + _av)
-    return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": bool(_av)},"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
+    _lg = metodo_roteiro.aviso_longo(metodo_roteiro.palavras_do_texto(voz), _alvo, _min, _ppm)
+    if _lg:
+        avisos.insert(0, "📏 " + _lg)
+    return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": bool(_av), "longo": bool(_lg)},"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
             "ideias": [str(x)[:300] for x in d.get("ideias") or [] if str(x).strip()][:15],
             "descricao": str(d.get("descricao") or "").strip()[:5000], "capitulos": caps, "palavras": n_pal,
             "roteiro": rot, "roteiro_final": voz, "momentos": momentos,
@@ -1358,8 +1361,7 @@ def salvar_parte(p: Dict[str, Any], k: int, texto: str) -> Dict[str, Any]:
         parte["texto"] = rp.ler_parte(texto, parte)
     except ValueError as exc:
         raise DossieError(str(exc)) from exc
-    n = rp.palavras(parte["texto"])
-    parte["status"] = "pronta" if n >= parte["palavras"] * 0.85 else "curta"
+    parte["status"] = rp.status_de(parte)
     if any(not x.get("texto") for x in partes):
         res["avisos"] = [f"✍️ Partes escritas: {sum(1 for x in partes if x.get('texto'))} de {len(partes)}."]
         return res
@@ -1381,6 +1383,10 @@ def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
     curtas = [x["k"] for x in partes if x.get("status") == "curta"]
     if curtas:
         novo["avisos"].append("✍️ Partes abaixo do tamanho: " + ", ".join(map(str, curtas)) + " — dá pra pedir de novo só elas.")
+    longas = [x["k"] for x in partes if x.get("status") == "longa"]
+    if longas:
+        novo["avisos"].append("✍️ Partes bem acima do tamanho: " + ", ".join(map(str, longas)) + " — peça de novo só elas (o prompt "
+                              "pede a versão enxuta) ou use a 🪄 revisão no modo ✂️ enxugar.")
     return novo
 
 

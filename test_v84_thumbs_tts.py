@@ -23,7 +23,7 @@ def test_prompt_alemao_true_crime():
     assert "documentário criminal" in p and "Revelações importantes" in p
     assert "[[INSCREVA]]" in p and "[I3]" in p and "8.1 MARCAS DO SITE" in p and "“Era 1998.”" in p
     assert "Não traduza o roteiro para outro idioma" in p and "em alemão" in p
-    assert p.rstrip().endswith("otimizado para o Chatterbox TTS.") and ROT in p
+    assert "otimizado para o Chatterbox TTS — TEXTO PURO" in p and ROT in p
     assert at.regras_do_idioma("de")["especifico"] and "de" in at.idiomas_especificos()
 
 

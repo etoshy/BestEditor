@@ -17,13 +17,13 @@
   function desenhar(L, temRoteiro) {
     $p('ptCard').style.display = L.length ? '' : 'none'; if (!L.length) return;
     const feitas = L.filter(x => x.texto).length;
-    $p('ptIA').style.display = ia ? '' : 'none'; $p('ptIA').textContent = feitas === L.length ? '🤖 Reescrever as curtas com a IA' : '🤖 Escrever as que faltam com a IA';
+    $p('ptIA').style.display = ia ? '' : 'none'; $p('ptIA').textContent = feitas === L.length ? '🤖 Reescrever as curtas/longas com a IA' : '🤖 Escrever as que faltam com a IA';
     $p('ptMontar').style.display = feitas === L.length ? '' : 'none';
     $p('ptSt').textContent = `${feitas}/${L.length} escritas · ${L.reduce((a, x) => a + pal(x.texto), 0)} de ~${L.reduce((a, x) => a + (x.palavras || 0), 0)} palavras` + (temRoteiro ? ' · roteiro montado ✔' : '');
-    $p('ptLista').innerHTML = L.map(x => { const n = pal(x.texto), ok = x.texto && (n >= x.palavras * 0.85 || x.aceita_curta);
+    $p('ptLista').innerHTML = L.map(x => { const n = pal(x.texto), longa = x.texto && n > x.palavras * 1.25 && !x.aceita_curta, ok = x.texto && !longa && (n >= x.palavras * 0.85 || x.aceita_curta);
       return `<div style="border-top:1px solid #e9d5ff;margin-top:8px;padding-top:6px" data-k="${x.k}">
         <b>${x.k}. ${esc(x.titulo)}</b> <span style="font-size:.8rem;color:#666">${x.texto ? `${n} / ~${x.palavras} palavras` : `~${x.palavras} palavras`}</span>
-        ${ok ? '<span style="color:#15803d"> ✔</span>' : x.texto ? '<span style="color:#b45309"> ⚠ curta</span>' : '<span style="color:#666"> · a escrever</span>'}
+        ${ok ? '<span style="color:#15803d"> ✔</span>' : longa ? '<span style="color:#b45309"> ⚠ longa</span>' : x.texto ? '<span style="color:#b45309"> ⚠ curta</span>' : '<span style="color:#666"> · a escrever</span>'}
         ${x.objetivo ? `<div style="font-size:.8rem;color:#555">${esc(x.objetivo)}</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="pP" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#64748b">📋 Prompt desta parte</button>${x.texto ? '<button type="button" class="pV" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#94a3b8">👁 ver texto</button>' : ''}</div>
         <textarea class="pPT" rows="3" readonly style="display:none;width:100%;margin-top:4px;font-family:monospace;font-size:.75rem"></textarea>

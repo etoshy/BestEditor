@@ -24,6 +24,21 @@ from typing import Any, Dict, List, Optional, Tuple
 
 PARTES_A_PARTIR_DE = 8.0  # minutos
 MIN_PALAVRAS_PARTE = 120
+CURTA = 0.85   # abaixo de 85% do alvo da parte = curta (reescreve expandindo)
+LONGA = 1.25   # v84_99: acima de 125% = longa (reescreve enxugando) — 25 min pedidos viravam 38
+
+
+def status_de(parte: Dict[str, Any]) -> str:
+    """"pendente" | "curta" | "longa" | "pronta"."""
+    t = parte.get("texto")
+    if not t:
+        return "pendente"
+    n, alvo = palavras(t), int(parte.get("palavras") or 0)
+    if alvo and n < alvo * CURTA:
+        return "curta"
+    if alvo and n > alvo * LONGA:
+        return "longa"
+    return "pronta"
 
 
 def usa_partes(cfg: Dict[str, Any], minutos: float) -> bool:
@@ -180,14 +195,22 @@ def de_roteiro(roteiro: str, capitulos: List[Dict[str, Any]], total_palavras: in
         pedacos = _subdividir(pedacos, n_desejado)
     alvos = _repartir([max(60, palavras(b)) for _t, b in pedacos], total_palavras)
     return [{"k": k + 1, "titulo": t or f"Parte {k + 1}", "objetivo": "", "fatos": [], "midias": sorted(set(re.findall(r"\[([MIT]\d+)\]", b))),
-             "palavras": alvo, "texto": b, "status": "curta" if palavras(b) < alvo * 0.85 else "pronta"}
+             "palavras": alvo, "texto": b, "status": status_de({"texto": b, "palavras": alvo})}
             for k, ((t, b), alvo) in enumerate(zip(pedacos, alvos))]
 
 
 def falta(partes: List[Dict[str, Any]]) -> List[int]:
-    """Quais partes ainda precisam de texto (sem texto ou curta)."""
+    """Quais partes ainda precisam de texto (sem texto, curta ou longa — a não ser que já tenha sido aceita como está)."""
     return [p["k"] for p in partes
-            if not p.get("texto") or (not p.get("aceita_curta") and palavras(p["texto"]) < p["palavras"] * 0.85)]
+            if not p.get("texto") or (not p.get("aceita_curta") and status_de(p) in ("curta", "longa"))]
+
+
+def _resumo_parte(x: Dict[str, Any]) -> str:
+    """O que uma parte já escrita contou (pra próxima não recontar): os fatos do plano ou, sem eles, o começo de cada parágrafo."""
+    if x.get("fatos"):
+        return "; ".join(f["fato"][:160] for f in x["fatos"][:10])
+    pars = [re.sub(r"\[[^\]]*\]", " ", par) for par in str(x.get("texto") or "").split("\n\n") if par.strip()]
+    return " / ".join(" ".join(par.split()[:14]) + "…" for par in pars[:8])
 
 
 # ------------------------------------------------------------------ o prompt de cada parte
@@ -196,7 +219,8 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
     p = next(x for x in partes if x["k"] == k)
     n = len(partes)
     alvo = int(p["palavras"])
-    minimo = int(alvo * 0.95)
+    minimo, maximo = int(alvo * 0.9), int(alvo * 1.1)
+    st = status_de(p)
     L = [f"Você está escrevendo, em PARTES, o roteiro NARRADO (alguém vai ler em voz alta) de um vídeo de {contexto.get('nome_modelo', 'documentário')} "
          f"sobre: {contexto.get('tema', '')} (~{contexto.get('minutos', 0):g} min no total).",
          f"AGORA escreva SÓ a PARTE {k} de {n}: “{p['titulo']}”.",
@@ -207,6 +231,14 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
     plano = contexto.get("plano") or {}
     if plano.get("problema_profundo"):
         L.append(f"Problema profundo do vídeo (plantar cedo, revelar no fim): {plano['problema_profundo']}")
+    antes = [x for x in partes if x["k"] < k and (x.get("texto") or x.get("fatos"))]
+    if antes:
+        L += ["", "## JÁ CONTADO nas partes anteriores — NÃO reconte (no máximo meia frase de referência, e só se trouxer algo NOVO)"]
+        L += [f"- {x['k']}. {x['titulo']}: {_resumo_parte(x)}" for x in antes]
+    depois = [x for x in partes if x["k"] > k and x.get("fatos")]
+    if depois:
+        L += ["", "## Vem DEPOIS (não antecipe nem resuma isto aqui)"]
+        L += [f"- {x['k']}. {x['titulo']}" for x in depois]
     ant = next((x for x in partes if x["k"] == k - 1), None)
     if ant and ant.get("texto"):
         fim = " ".join(ant["texto"].split()[-90:])
@@ -224,18 +256,28 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
         L.append("Imagens/vídeos desta parte — ponha a marca (ex.: [I3]) sozinha logo ANTES da frase em que ela aparece, só se a "
                  "frase fala MESMO daquilo:")
         L += [f"- {m}: {mids[m]}" for m in meus]
-    if p.get("texto"):
+    if p.get("texto") and st == "longa":
+        L += ["", f"## O texto ATUAL desta parte ({palavras(p['texto'])} palavras — LONGO demais: o vídeo passa do tempo pedido)",
+              f"Reescreva esta parte ENXUTA, com ~{alvo} palavras: corte o que repete outras partes ou repete a si mesma, frases de "
+              "suspense vazias, fórmulas de análise e explicações em dobro. Mantenha os fatos essenciais, a ordem e as marcas de "
+              "imagem.", "", p["texto"]]
+    elif p.get("texto"):
         L += ["", f"## O texto ATUAL desta parte ({palavras(p['texto'])} palavras — curto demais)",
               "Reescreva esta parte expandida: mantenha os fatos, a ordem e as marcas de imagem; aprofunde cada fato com contexto, "
               "detalhes das fontes, causas e consequências, o que as pessoas disseram — sem repetir frases pra encher.", "",
               p["texto"]]
     L += ["", "## TAMANHO (o mais importante)",
-          f"- Esta parte tem NO MÍNIMO {minimo} palavras (alvo ~{alvo}). Não resuma, não pule fatos, não termine antes.",
-          "- Antes de responder, conte as palavras; se estiver abaixo do mínimo, continue desenvolvendo."]
+          f"- Esta parte tem ENTRE {minimo} e {maximo} palavras (alvo ~{alvo}). O vídeo tem DURAÇÃO FIXA "
+          f"(~{contexto.get('minutos', 0):g} min): menos que isso fica raso, mais que isso estoura o tempo do vídeo.",
+          "- Não resuma nem pule fatos — mas também não encha: nada de recontar o que já foi dito, de frases de suspense "
+          "vazias ou de explicar a mesma ideia duas vezes. Se sobrar espaço, aprofunde um fato com um detalhe concreto das fontes.",
+          "- Antes de responder, conte as palavras e ajuste ao intervalo."]
     L += ["", "## Regras"]
     L += [f"- {r}" for r in contexto.get("regras") or []]
     L.append("- Uma ideia por frase: frases que juntam data + lugar + nome + resultado viram várias frases curtas. Varie o "
              "tamanho das frases.")
+    import metodo_roteiro
+    L += [f"- {r}" for r in metodo_roteiro.REGRAS_NARRACAO]
     if k == 1:
         L.append("- Esta é a ABERTURA: comece com o gancho (o momento mais intrigante, sem entregar o desfecho) e termine com uma "
                  "pergunta que faça a pessoa querer continuar.")
@@ -243,7 +285,8 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
         L.append("- Esta é a ÚLTIMA parte: feche os laços abertos, resolva o problema profundo e termine com uma reflexão "
                  "respeitosa + uma pergunta pro público comentar.")
     else:
-        L.append("- Termine esta parte com um pequeno gancho pro próximo capítulo (sem anunciar \"no próximo capítulo\").")
+        L.append("- Termine esta parte com uma revelação, uma consequência concreta ou uma pergunta realmente necessária pro "
+                 "próximo capítulo — nunca com frase de suspense vazia (sem anunciar \"no próximo capítulo\").")
     if contexto.get("canal") and k in (1, n):
         L.append(f"- Diga o nome do canal “{contexto['canal']}” uma vez, de forma natural"
                  + (" — logo depois do gancho, nunca na 1ª frase." if k == 1 else " — no fechamento."))
@@ -307,7 +350,7 @@ def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_pal
             blocos.append("[[INSCREVA]]")
         elif i == n - 2 and n >= 4:
             blocos.append("[[INSCREVA]]")
-        elif acum / total >= 0.15 and acum - ultima_venda >= 450:
+        elif acum / total >= 0.15 and acum - ultima_venda >= max(600, total // 4):  # v84_99: ~3 no vídeo, não 6
             blocos.append("[[VENDA]]")
             ultima_venda = acum
     return "\n\n".join(blocos), caps

@@ -269,7 +269,8 @@ $('p1Ler').addEventListener('click', async () => {
     }
     const al = d.analise.alvo;
     $('p1Res').innerHTML = `<div class="ry-ok">✔ Roteiro com ${d.analise.roteiro.split(/\s+/).filter(Boolean).length} palavras${al ? ` (alvo ~${al.minutos} min = ~${al.palavras})` : ''} e ${d.analise.cenas.length} cenas${d.analise.marcas ? ` · 📣 ${d.analise.marcas.inscreva}× [[INSCREVA]] e ${d.analise.marcas.venda}× [[VENDA]]` : ''}. Agora escolha o que fazer (passo 3) — ou use as cenas aqui embaixo.</div>`
-      + (al && al.curto ? `<div class="ry-erro">⚠ 📏 ${esc(al.aviso)}</div><div class="ry-row"><button class="ry-mini" id="p1Completar" style="background:#b45309;color:#fff">📏 Completar o tamanho por partes</button><span class="ry-hint">O roteiro é cortado em capítulos e a IA reescreve SÓ os curtos, um por vez, em texto puro.</span></div>` : '');
+      + (al && al.curto ? `<div class="ry-erro">⚠ 📏 ${esc(al.aviso)}</div><div class="ry-row"><button class="ry-mini" id="p1Completar" style="background:#b45309;color:#fff">📏 Completar o tamanho por partes</button><span class="ry-hint">O roteiro é cortado em capítulos e a IA reescreve SÓ os curtos, um por vez, em texto puro.</span></div>` : '')
+      + (al && al.longo ? `<div class="ry-erro">⚠ 📏 ${esc(al.aviso)}</div>` : '');
     desenharResultado();
     if (al && al.curto) {
       $('p1Completar').addEventListener('click', async () => {

@@ -87,7 +87,8 @@ def registrar(app, base_dir: str) -> None:
             p = ds.carregar(base_dir, pid)
             res = p.get("resultado") or {}
             cfg = dict(ds.CONFIG_PADRAO, **(p.get("config") or {}))
-            return p, res.get("roteiro") or "", {
+            _mins, _alvo, _ppm = ds.alvo_tamanho(p)
+            return p, res.get("roteiro") or "", {"minutos": _mins, "alvo": _alvo,
                 "idioma": cfg.get("idioma") or "pt", "direcao": at.DIRECAO_DO_MODELO.get(cfg.get("modelo"), "documentario"),
                 "canal": canal.nome_do_projeto(cfg.get("nome_canal")),
                 "inicios": [c.get("comeca_em") for c in res.get("capitulos") or [] if c.get("comeca_em")],
@@ -99,7 +100,11 @@ def registrar(app, base_dir: str) -> None:
             res, an = p.get("resultado") or {}, p.get("analise") or {}
             alvo = res if res.get("roteiro_final") else an
             texto = alvo.get("roteiro_final") if alvo is res else alvo.get("roteiro")
-            return p, texto or "", {
+            try:
+                _mins, _alvo = ry.alvo_palavras(p)
+            except Exception:  # noqa: BLE001
+                _mins, _alvo = 0, 0
+            return p, texto or "", {"minutos": _mins, "alvo": _alvo,
                 "idioma": idiomas.normalizar(res.get("idioma") or an.get("idioma") or p.get("idioma_roteiro")) or "pt",
                 "direcao": p.get("tts_direcao") or "documentario", "canal": canal.nome_do_projeto(p.get("nome_canal")),
                 "inicios": [c.get("comeca_em") for c in res.get("capitulos") or [] if c.get("comeca_em")],
@@ -207,11 +212,26 @@ def registrar(app, base_dir: str) -> None:
         except Exception:  # noqa: BLE001
             return jsonify({"erro": "Projeto não encontrado."}), 404
         try:
+            c = request.get_json(silent=True) or {}
+            modo = rv.modo_efetivo(str(c.get("modo") or "auto"), rv.palavras(texto), int(pad.get("alvo") or 0))
             t = rv.prompt(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
-                          str(p.get("tema") or p.get("titulo") or ""), str((request.get_json(silent=True) or {}).get("foco") or ""))
+                          str(p.get("tema") or p.get("titulo") or ""), str(c.get("foco") or ""),
+                          alvo_palavras=int(pad.get("alvo") or 0), minutos=float(pad.get("minutos") or 0), modo=modo)
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
-        return jsonify({"ok": True, "prompt": t, "caracteres": len(t)})
+        return jsonify({"ok": True, "prompt": t, "caracteres": len(t), "modo": modo, "palavras": rv.palavras(texto),
+                        "alvo": int(pad.get("alvo") or 0), "minutos": pad.get("minutos") or 0})
+
+    @app.route("/revisao/<origem>/<pid>/info")
+    def revisao_info(origem: str, pid: str):
+        import revisao_roteiro as rv
+        try:
+            _p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        n, alvo = rv.palavras(texto), int(pad.get("alvo") or 0)
+        return jsonify({"ok": True, "palavras": n, "alvo": alvo, "minutos": pad.get("minutos") or 0,
+                        "modo_auto": rv.modo_efetivo("auto", n, alvo), "modos": rv.MODOS})
 
     @app.route("/revisao/<origem>/<pid>/ler", methods=["POST"])
     def revisao_ler(origem: str, pid: str):

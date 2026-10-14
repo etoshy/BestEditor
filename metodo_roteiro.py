@@ -55,6 +55,26 @@ _BASE = [
     "segurar retenção. Valor de verdade primeiro.",
 ]
 
+# v84_99 — o que deixava o roteiro longo, repetitivo e com "cara de IA" (crítica de um roteiro real em alemão)
+REGRAS_NARRACAO = [
+    "SEM ENCHIMENTO: cada fato importante é contado UMA vez, no lugar certo. Não reconte o que já foi dito — a prisão, o "
+    "julgamento, as incertezas e o legado NÃO refazem o resumo do caso. Uma ideia já dita (\"a polícia ignorou os sinais\", "
+    "\"as vítimas eram jovens vulneráveis\") só volta com um fato NOVO, nunca como eco.",
+    "FIM DE SEÇÃO COM SUBSTÂNCIA: cada trecho termina com uma revelação, uma consequência concreta ou uma pergunta realmente "
+    "necessária — nunca com suspense vazio pra preencher tempo (\"A pergunta de quem bateu à porta naquela noite continua nos "
+    "acompanhando\", \"Mas isso era só o começo\").",
+    "AFIRMAÇÃO DO TAMANHO DA PROVA: conclusões sobre motivos, acordos, omissões ou causas (\"Em troca, a polícia fazia vista "
+    "grossa aos pequenos delitos dele\") só com a fonte ESPECÍFICA dita no texto (\"segundo os autos do processo de 1924…\", "
+    "\"como o comissário X admitiu no julgamento…\"). Sem uma fonte assim, suavize (\"há indícios de que…\", \"historiadores "
+    "suspeitam que…\") ou corte.",
+    "SEM FÓRMULAS DE ANÁLISE: \"Aqui está a verdadeira questão\", \"É preciso ter cuidado neste ponto\", \"Uma leitura possível "
+    "é\" e equivalentes no idioma do roteiro (em alemão: „Hier liegt die eigentliche Frage“, „Man muss an dieser Stelle "
+    "vorsichtig sein“, „Eine mögliche Lesart ist“) — no máximo UMA vez no vídeo inteiro. Mostre a dúvida pelos fatos, sem "
+    "anunciar que vai analisar. Varie as construções: nada de começar frases seguidas do mesmo jeito.",
+    "FALA, NÃO ENSAIO: escreva como um narrador conta, não como um artigo; nos momentos de tensão, frases curtas (5–12 "
+    "palavras), sem orações encaixadas; frase longa só em trecho calmo de contexto. Uma voz sintética se perde em período longo.",
+]
+
 _JORNADA = (
     "ESTRUTURA DE HISTÓRIA (jornada do herói adaptada — o \"herói\" pode ser a pessoa/empresa do tema, quem investiga, ou o próprio "
     "espectador aprendendo): status quo (como tudo era) → chamado (o fato que muda tudo: problema, ameaça, oportunidade ou "
@@ -118,6 +138,7 @@ def bloco(tipo: str = "longo") -> str:
             itens = [x for x in itens if not x.startswith(("LACUNA", "COMPLEXIDADE", "PÚBLICO"))] + _SHORTS
     else:
         extra = _JORNADA
+        itens += REGRAS_NARRACAO
     if tipo == "reescrita":
         extra += (" Ao REESCREVER, mantenha os FATOS, mas crie a SUA linha de storytelling (ângulo, gancho, ordem das revelações) "
                   "seguindo esse método — o original é só um guia, não um molde (sem inventar fatos).")
@@ -293,6 +314,18 @@ def aviso_tamanho(palavras: int, alvo_palavras: int, minutos: float, ppm: int = 
         return ""
     return (f"O roteiro ficou CURTO: {palavras} palavras (~{palavras / max(1, ppm):.1f} min), o alvo era ~{minutos:g} min "
             f"(~{alvo_palavras} palavras). Use “📏 Prompt pra completar o tamanho”.")
+
+
+TOLERANCIA_LONGO = 1.15  # v84_99: acima de 115% do alvo = longo demais (avisa e oferece a 🪄 revisão "enxugar")
+
+
+def aviso_longo(palavras: int, alvo_palavras: int, minutos: float, ppm: int = 150) -> str:
+    """"" se está ok; senão o aviso de que ficou LONGO (o vídeo passa do tempo pedido)."""
+    if not alvo_palavras or not minutos or minutos <= 1 or palavras <= alvo_palavras * TOLERANCIA_LONGO:
+        return ""
+    return (f"O roteiro ficou LONGO: {palavras} palavras (~{palavras / max(1, ppm):.0f} min), o pedido era ~{minutos:g} min "
+            f"(~{alvo_palavras} palavras). Use a “🪄 Revisão do roteiro inteiro” no modo ✂️ enxugar — ela corta repetições e "
+            "enchimento até o tamanho certo.")
 
 
 def prompt_completar(roteiro: str, palavras: int, alvo_palavras: int, minutos: float, inicios_capitulos: List[str] = None,

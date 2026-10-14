@@ -86,9 +86,9 @@
       const pr = el(b.dataset.iaPrompt), ger = el(b.dataset.iaGerar);
       b.disabled = true;
       try {
-        const antes = pr ? pr.value : '';
+        if (ger && pr) pr.value = '';  // v84_99: limpa antes — senão, com um prompt já gerado, esperava 30 s à toa
         if (ger) { dizEm(b, '📝 gerando o prompt…'); ger.click(); }
-        let t = 0; while (ger && pr && (pr.value === antes || !pr.value.trim()) && t < 60) { await new Promise(r => setTimeout(r, 500)); t++; }
+        let t = 0; while (ger && pr && !pr.value.trim() && t < 120) { await new Promise(r => setTimeout(r, 500)); t++; }
         if (!pr || !pr.value.trim()) throw new Error('não consegui gerar o prompt (veja o aviso ao lado do botão de gerar)');
         const titulo = (document.querySelector('h1') || {}).textContent || document.title;
         const r = await fetch('/ia/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -536,7 +536,7 @@ def registrar(app, base_dir: str) -> None:
                     parte = next((x for x in (q["resultado"].get("partes") or []) if x["k"] == k), None)
                     if parte is not None:
                         parte["tentativas"] = ja_tentou + 1
-                        if parte["status"] == "curta" and parte["tentativas"] >= 2:
+                        if parte["status"] in ("curta", "longa") and parte["tentativas"] >= 2:
                             parte["status"] = "pronta"  # tentou 2x: aceita e segue (avisa na lista)
                             parte["aceita_curta"] = True
                     ds.salvar(base_dir, q)

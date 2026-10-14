@@ -1,13 +1,15 @@
 {# 🪄 Revisão do roteiro inteiro (revisao_roteiro.py) — incluir com: {% set rev_base = '/revisao/<origem>/<id>' %}{% include "_revisao.html" %} #}
 <div id="revCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
-  <h2 style="margin:0 0 6px;font-size:1.1rem;">🪄 Revisão do roteiro inteiro <span style="font-weight:400;font-size:.82rem;color:#666;">(costuras entre capítulos, frases genéricas de IA, repetições, ritmo — a IA devolve só as TROCAS, então o roteiro não encolhe)</span></h2>
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🪄 Revisão do roteiro inteiro <span style="font-weight:400;font-size:.82rem;color:#666;">(costuras entre capítulos, repetições, frases genéricas de IA, conclusões sem fonte, ritmo — a IA devolve só as TROCAS; no modo ✂️ enxugar ela corta até o tempo pedido)</span></h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
+    <label style="margin:0;font-weight:400;">Modo <select id="revModo" style="width:auto;margin:0;"><option value="auto">🤖 automático</option><option value="melhorar">🪄 melhorar sem encurtar</option><option value="enxugar">✂️ enxugar até o tempo pedido</option></select></label>
     <input type="text" id="revFoco" placeholder="foco extra (opcional) — ex.: o fim está fraco; menos “mas” no começo das frases" style="flex:1;min-width:240px;margin:0;">
     <button type="button" id="revGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
     <button type="button" data-ia-gerar="revGerar" data-ia-prompt="revPrompt" data-ia-resp="revResp" data-ia-ler="revLer" data-ia-status="revSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Revisar com a IA</button>
     <button type="button" id="revDesfazer" style="display:none;width:auto;margin:0;padding:5px 12px;background:#64748b;">↩ Voltar ao roteiro de antes da revisão</button>
     <span id="revSt" style="color:#555;"></span>
   </div>
+  <div id="revInfo" style="font-size:.8rem;color:#555;margin-top:4px;"></div>
   <textarea id="revPrompt" rows="4" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
   <label style="margin-top:8px;display:block;font-size:.86rem;">Resposta da IA (JSON com as trocas)</label>
   <textarea id="revResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "trocas": [ { "de": "...", "para": "..." } ] }'></textarea>
@@ -22,7 +24,8 @@
   const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
   $r('revGerar').addEventListener('click', async () => {
     $r('revSt').textContent = '📝 gerando…';
-    try { const d = await post(BASE + '/prompt', { foco: $r('revFoco').value }); $r('revPrompt').value = d.prompt; $r('revPrompt').style.display = '';
+    try { const d = await post(BASE + '/prompt', { foco: $r('revFoco').value, modo: $r('revModo').value }); $r('revPrompt').value = d.prompt; $r('revPrompt').style.display = '';
+      $r('revInfo').innerHTML = (d.modo === 'enxugar' ? '✂️ <b>Modo enxugar</b>' : '🪄 <b>Modo melhorar</b> (não encurta)') + (d.alvo ? ` · roteiro com ${d.palavras} palavras, alvo ~${d.alvo} (${d.minutos} min)` : '');
       try { await navigator.clipboard.writeText(d.prompt); $r('revSt').textContent = '✔ prompt copiado — cole na conversa da IA'; } catch (_) { $r('revSt').textContent = '✔ prompt pronto'; } }
     catch (e) { $r('revSt').textContent = '⚠ ' + e.message; }
   });
@@ -41,5 +44,11 @@
     try { await post(BASE + '/desfazer', {}); location.reload(); } catch (e) { $r('revSt').textContent = '⚠ ' + e.message; }
   });
   if ({{ (rev_tem_antes or false)|tojson }}) $r('revDesfazer').style.display = '';
+  fetch(BASE + '/info').then(r => r.json()).then(d => {
+    if (!d.ok || !d.alvo) return;
+    const longo = d.modo_auto === 'enxugar';
+    $r('revInfo').innerHTML = `📏 Roteiro com <b>${d.palavras}</b> palavras · alvo ~${d.alvo} (${d.minutos} min)` +
+      (longo ? ` — <b style="color:#b45309">${Math.round(100 * d.palavras / d.alvo)}% do tempo pedido: o modo automático vai ✂️ enxugar</b>` : ' — o modo automático só melhora (não encurta)');
+  }).catch(() => {});
 })();
 </script>

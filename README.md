@@ -28,6 +28,27 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 📏 Roteiro no tempo certo, ✂️ revisão que enxuga e 🎙/🪄 botões da IA consertados (v84_99)
+
+- **Tamanho das partes com teto**: cada capítulo agora pede **entre 90% e 110%** do tamanho dele (antes era só “no mínimo”
+  — a IA esticava e 25 min viravam 38). Capítulo acima de 125% fica **⚠ longa** e o “🤖 Escrever com a IA” reescreve ele
+  enxuto (até 2 tentativas, depois aceita e avisa).
+- **Sem recontar**: o prompt de cada parte traz a lista do que **JÁ FOI CONTADO** nas partes anteriores (e o que vem
+  depois) — prisão, julgamento e legado não refazem o resumo do caso.
+- **Aviso de roteiro LONGO** (acima de 115% do tempo) no Modelos de vídeo e no Roteiro do YouTube, apontando pra revisão.
+- **🪄 Revisão — modo ✂️ enxugar** (automático quando passou de 110% do tempo, ou escolha no menu): as trocas podem
+  encurtar ou **apagar** trechos (`"para": ""`) até o tamanho pedido — repetição entre capítulos, recapitulações, suspense
+  vazio, fórmulas de análise. O modo 🪄 melhorar continua sem encurtar. O trecho é achado mesmo quando a IA troca as
+  aspas („…“ × "…"), travessões ou reticências — antes isso fazia as trocas “não baterem”.
+- **Regras de narração novas** (método, partes e revisão): fim de seção com revelação/consequência/pergunta necessária
+  (nada de suspense pra encher); conclusão do tamanho da prova (motivo/acordo/omissão só com a fonte específica, senão
+  suavizado); fórmulas como „Hier liegt die eigentliche Frage“ / „Man muss an dieser Stelle vorsichtig sein“ / „Eine
+  mögliche Lesart ist“ no máximo 1× no vídeo; frases curtas nos momentos de tensão (voz sintética).
+- **🎙 Adaptar pro TTS / 🪄 Revisão com a IA**: o 🤖 mandava o pedido de texto puro com a instrução de sistema “responda só
+  JSON” — a IA embrulhava o texto num JSON com outra chave e o site dizia “resposta vazia”. Agora o site manda em texto
+  puro e ainda aceita JSON com qualquer chave. E apertar 🤖 com um prompt já gerado não espera mais 30 s à toa.
+- Menos `[[VENDA]]`: ~3 num vídeo longo (antes 1 a cada ~450 palavras).
+
 ## ✍️ Partes também no Roteiro do YouTube, 🪄 revisão do roteiro inteiro e 📊 analisador sem erro (v84_98)
 
 - **📜 Roteiro do YouTube** longo (⏱ ≥ 8 min, ou o vídeo original com ≥ 8 min; escolha “✍️ em partes” no passo 2): a

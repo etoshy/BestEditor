@@ -775,7 +775,9 @@ def conferir_tamanho(p: Dict[str, Any], an: Dict[str, Any]) -> Dict[str, Any]:
         return an
     alvo = int(mins * PALAVRAS_POR_MINUTO)
     aviso = metodo_roteiro.aviso_tamanho(metodo_roteiro.palavras_do_texto(an.get("roteiro")), alvo, mins, PALAVRAS_POR_MINUTO)
-    an["alvo"] = {"minutos": mins, "palavras": alvo, "ppm": PALAVRAS_POR_MINUTO, "curto": bool(aviso), "aviso": aviso}
+    longo = metodo_roteiro.aviso_longo(metodo_roteiro.palavras_do_texto(an.get("roteiro")), alvo, mins, PALAVRAS_POR_MINUTO)
+    an["alvo"] = {"minutos": mins, "palavras": alvo, "ppm": PALAVRAS_POR_MINUTO, "curto": bool(aviso), "aviso": aviso or longo,
+                  "longo": bool(longo)}
     return an
 
 
@@ -929,7 +931,7 @@ def salvar_parte(p: Dict[str, Any], k: int, texto: str) -> Dict[str, Any]:
         parte["texto"] = rp.ler_parte(texto, parte)
     except ValueError as exc:
         raise RoteiroError(str(exc)) from exc
-    parte["status"] = "pronta" if rp.palavras(parte["texto"]) >= parte["palavras"] * 0.85 else "curta"
+    parte["status"] = rp.status_de(parte)
     if all(x.get("texto") for x in an["partes"]):
         montar_partes(p)
     return an
