@@ -33,7 +33,7 @@ def _dur(v):
 
 
 def test_catalogo_exemplos_e_prompt():
-    assert len(E.TIPOS) == 14 and set(E.EXEMPLOS) == set(E.TIPOS)
+    assert len(E.TIPOS) == 20 and set(E.EXEMPLOS) == set(E.TIPOS)
     ed = E.para_editor()
     for tipo in E.TIPOS:
         q = E.exemplo(tipo, 3.0)

@@ -40,9 +40,11 @@ _EDITORIAIS_SISTEMA = {
     "sys_tudo": {"ativo": True, "densidade": "equilibrado", "tipos": []},
     "sys_doc_classico": {"ativo": True, "densidade": "equilibrado", "tipos": []},
     "sys_cinema": {"ativo": True, "densidade": "minimal",
-                   "tipos": ["nome", "titulo_video", "numero", "explosao", "pagina", "mural", "linha_tempo", "reescrita"]},
+                   "tipos": ["nome", "titulo_video", "numero", "explosao", "pagina", "mural", "linha_tempo", "reescrita",
+                            "folhinha", "calendario_mes", "lista_riscar"]},
     "sys_dinamico": {"ativo": True, "densidade": "dinamico",
-                     "tipos": ["post", "pagina", "numero", "terminal", "recortes", "grade_pontos", "ficha", "nome", "titulo_video"]},
+                     "tipos": ["post", "pagina", "numero", "terminal", "recortes", "grade_pontos", "ficha", "nome", "titulo_video",
+                              "placar_datas", "calendario_ano", "calendario_mes", "lista_riscar"]},
 }
 # extras com "direcoes": [...] entram nas direções do sistema. O que já existia fica com
 # pelo menos metade do peso (os extras não engolem a cara da direção).

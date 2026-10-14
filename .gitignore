@@ -36,6 +36,9 @@ sessao*.json
 *.key
 
 # ---------- seus dados / o que o site gera ao usar ----------
+# fontes só de uso pessoal (licença não deixa redistribuir) — ficam só no seu PC
+assets/fonts/pessoais/
+
 jobs/
 uploads/
 outputs/

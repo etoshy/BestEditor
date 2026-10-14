@@ -28,6 +28,91 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ✍️ Escrita no papel, fontes de máquina/à mão e legenda com o texto do roteiro (v84_94)
+
+- **Quadro ✍️ Escrita** (🗞 Editorial): o texto aparecendo letra por letra, de 3 jeitos:
+  - **mão** — a caneta (ou o giz) escreve com a ponta andando junto; papel **branco, antigo** (amarelado, manchas,
+    dobras, borda queimada), **caderno, quadriculado, carta, kraft, post-it, guardanapo** ou **quadro-negro**;
+  - **máquina de escrever** — cada tecla bate a letra (tinta irregular, letra um pouco torta, batida dupla de vez em
+    quando), o carro anda, no fim da linha toca o **sininho** e o carro volta, o papel sobe pelo rolo; no fim a câmera
+    recua e mostra a folha;
+  - **computador** — documento, bloco de notas, editor de código (cores e números de linha) ou **mensagem** (cada linha
+    é digitada e ENVIADA como balão ✓✓); ritmo humano e, se quiser, um erro de digitação apagado.
+  - Extras: título, data no canto, assinatura à mão e **palavras de destaque** circuladas/sublinhadas (no computador,
+    marca-texto). Sons novos da máquina de escrever (datilografando, tecla, sininho, retorno do carro).
+- **Fontes** (`fontes_escrita.py`): solte .ttf/.otf em `assets/fonts/maquina|manuscrita/` (livres, vão pro GitHub) ou
+  `assets/fonts/pessoais/maquina|manuscrita/` (**uso pessoal — no .gitignore**, ficam só no seu PC; aparecem com ⚠).
+  Fonte sem acento/número: a letra base da própria fonte + o acento desenhado por cima; o que faltar vem da reserva.
+  A **letra à mão** também é escolhível no calendário do mês/ano, na folhinha e na lista riscada.
+- **Calendários: idioma "auto"** = o idioma do vídeo (ou fixe pt, en, es, fr, it, de).
+- **Legenda do 🗣️ Gerador de voz com o texto do roteiro**: o TTS não diz em que instante cada palavra é falada, então o
+  Whisper ainda ouve o áudio — mas só pra medir o tempo; as palavras são as do texto (nomes, acentos, números e
+  pontuação como você escreveu) — `legenda_texto.py`. Sem Whisper, a legenda sai com tempos estimados.
+
+## 📅 Calendários, folhinha, placar de datas e lista riscada à mão (v84_93)
+
+Cinco quadros novos no **🗞 Editorial** do Estúdio (e no prompt de edição da IA), tudo desenhado com traço "à mão"
+(círculo com 1,1 volta e tremido, risco ondulado, X em dois traços, ✓, seta curva — a caneta andando) e letra
+manuscrita (Kalam / Permanent Marker, licenças livres em `assets/fonts/manuscrita/`):
+
+| Quadro | O que faz | Campos principais |
+|---|---|---|
+| 📅 `calendario_mes` | a folha do mês cai na mesa e a caneta **circula** o dia, faz um **X**, passa **marca-texto** na semana ou **risca os dias um a um** até o dia marcado; anotação à mão com seta | mês, ano, dias (`18` · `4, 18` · `10-16`), marca, anotação, idioma pt/en/es |
+| 🗓 `calendario_ano` | os 12 meses; circula os meses, passa marca-texto ou risca mês a mês até o mês final | ano, meses (`3-7` · `mar, jun`), marca |
+| 📆 `folhinha` | folhinha de mesa **arrancando páginas** (acelera e freia) até a data final, que fica circulada | de/até: `dd/mm/aaaa` = dias · `mm/aaaa` = meses · `aaaa` = anos |
+| 🛫 `placar_datas` | placar de aeroporto (split-flap) virando MÊS e ANO até a data final (no vertical: mês em cima, ano embaixo) | de/até, rótulo |
+| ✅ `lista_riscar` | lista **escrita à mão** item por item (caderno, post-it ou quadro-negro), depois riscada / ✓ / circulada | itens: `x ` = riscar · `v ` = ✓ · `! ` = circular |
+
+Com sons próprios (papel, caneta, catraca) e funcionando em 16:9 e 9:16. O marca-texto multiplica a cor (os números
+continuam legíveis) e o texto comprido diminui pra caber no papel.
+
+## 🎧 Perfis de voz: áudio limpo × com música de fundo (v84_92)
+
+- Cada perfil de voz (🗣️ Perfis de voz) é marcado **🎙️ limpo** ou **🎵 tem música/efeitos de fundo** — ao criar (upload
+  ou YouTube) ou depois, no próprio perfil.
+- Com música, o site processa os clipes **uma vez** com o **Demucs** (o mesmo da 🌐 dublagem), em segundo plano (aviso
+  no 🔔): no lugar de cada clipe fica **só a voz** — é o que a clonagem (XTTS / Chatterbox / Turbo) usa. O áudio como
+  veio fica em `_original/` dentro da pasta do perfil: dá pra **ouvir os originais** e **↩ voltar aos originais**.
+- Clipe novo num perfil marcado 🎵 é limpo sozinho; os já limpos não são processados de novo. Precisa de
+  `pip install demucs` (com placa de vídeo NVIDIA ele usa a GPU).
+
+## 🎬 Revisão do diretor + 🖼️ nada de mídia em pé num vídeo deitado (v84_92)
+
+- **🖼️ Formato:** a prévia agora pede o formato do vídeo aos bancos que têm esse filtro (antes só a montagem pedia — a
+  prévia escolhia e FIXAVA um vídeo em pé num vídeo 16:9). Nos outros, a miniatura é conferida: em pé num vídeo deitado
+  (ou o contrário) vai pro fim da fila; se a busca só tiver isso, tenta a próxima.
+- **🎬 Revisão do diretor** (Estúdio → aba 🤖 IA): passa pela timeline e aponta o que não combina — sem prévia, formato
+  errado, desenho/3D, nota baixa, repetida. Com a 🤖 IA ligada (recurso "🎬 Revisão do diretor" em 🤖 IA), ela **olha a
+  miniatura de cada trecho com a fala de antes e de depois** e decide: **busca nova** no buscador com mais chance
+  (bancos de vídeo pra cena genérica, buscadores de imagem/Wikipedia pra coisa real e específica, YouTube pra alguém
+  falando — só os marcados), **📊 gráfico nativo** quando a fala cita números (dados só da fala, sobre um fundo),
+  **🃏 cartão** de texto pra ideia abstrata, ou **✋ procurar na mão** (diz o quê). Você marca o que aplicar; as buscas
+  novas são conferidas (pulando desenho e formato errado) e o que ainda assim não achar fica marcado **🔎 laranja na
+  timeline**, com o que procurar no painel do trecho (“✓ Resolvido” tira a marca). Dá pra desfazer. Roda em segundo
+  plano (pode fechar o Estúdio — chega um aviso no 🔔).
+
+## 🎞️ Vídeo de imagens reais sem desenho no meio + buscas com contexto (v84_92)
+
+- **Filtro de estilo (sem IA, de graça):** o site olha a miniatura de cada resultado e manda pro fim da fila o que parece
+  **boneco 3D / recorte em fundo branco**, **objeto recortado em fundo preto** ou **ilustração vetorial**. Se a busca só
+  tem isso, tenta a próxima busca e os outros bancos; só usa um desenho (com ⚠) se não achar nada real.
+  ⚙️ Configurações → **🎞️ Estilo das imagens**: Automático (padrão) / Sempre só reais / Qualquer estilo.
+  Os acervos de anime/filmes e o Flow ficam fora do filtro.
+- **🤖 Com a IA ligada:** a ficha do vídeo agora diz o **estilo** (real / ilustração / misto); o juiz dá **no máximo 2**
+  pra desenho/3D/vetor/recorte num vídeo de imagens reais; e quem escreve as buscas recebe a **fala de antes e a de
+  depois** de cada trecho — a busca descreve a cena daquele momento da história, não palavras soltas da frase.
+- O prompt principal de edição também pede isso (contexto de antes/depois e nada de "cartoon", "3d", "vector"…).
+
+## 📏 O tempo escolhido vale de verdade (v84_92)
+
+- Pôs 18 min e veio roteiro de 8? As IAs de chat encurtam roteiro longo. Agora o prompt tem uma seção **📏 TAMANHO**
+  perto do fim, com o **mínimo de palavras** e quantas palavras cada parte da estrutura deve ter.
+- Ao **ler a resposta**, o site confere: abaixo de 85% do alvo aparece o aviso e o botão **📏 Prompt pra completar o
+  tamanho**. Cole esse prompt na **mesma conversa** da IA (ela já tem as fontes) e traga o JSON no “Ler resposta”: só o
+  roteiro é trocado — títulos, descrição, capítulos (e as cenas, no Roteiro do YouTube) ficam.
+- Vale no 🕵️ **Modelo de vídeo** (campo Minutos) e no 📝 **Roteiro do YouTube**, que ganhou o campo **⏱ min** no passo 2
+  (vazio = o tamanho do vídeo original, como antes).
+
 ## 🎬 Sem a fonte youtube marcada, nada vira clipe do YouTube (v84_92)
 
 - Escolher um projeto do **📝 Roteiro do YouTube** (ou ele vir no .zip do Gerar voz) **não marca mais o youtube

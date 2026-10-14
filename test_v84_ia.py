@@ -161,7 +161,8 @@ def test_previa_com_juiz(api, monkeypatch):
     assert r["ok"] and r["ia_aviso"] and r["label"].startswith("⚠") and r["ia_nota"] == 4
     # sem IA (sem contexto): o 1º, como sempre, 1 resultado só
     buscas.clear()
-    r = va.fetch_segment_preview_lightweight(_seg(), site_cfg={"provider_priority": ["pexels"]})
+    # (v84_92: com o filtro 🎞️ "imagens reais" ligado ele pede 6 pra poder pular desenho; "qualquer" = como antes)
+    r = va.fetch_segment_preview_lightweight(_seg(), site_cfg={"provider_priority": ["pexels"], "estilo_imagens": "qualquer"})
     assert r["result_url"] == "http://p/prison0" and "ia_nota" not in r and buscas == [("prison", 1)]
 
 

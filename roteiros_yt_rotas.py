@@ -165,6 +165,8 @@ def registrar(app, base_dir: str) -> None:
         import idiomas
         cod = idiomas.normalizar(corpo.get("idioma") or "")
         idioma = idiomas.nome_para_prompt(cod) if cod else "o mesmo idioma da transcrição"
+        if "minutos" in corpo:  # ⏱ duração do roteiro reescrito (vazio = a do vídeo original)
+            p["minutos_alvo"] = ry.minutos_alvo(corpo.get("minutos"))
         try:
             sem_exp = corpo.get("sem_experiencias", True) is not False
             texto = ry.prompt_analise(p, modelo, idioma, marcar_chamadas=corpo.get("marcar_chamadas", True) is not False,
@@ -172,7 +174,7 @@ def registrar(app, base_dir: str) -> None:
             p["marcar_chamadas"] = corpo.get("marcar_chamadas", True) is not False
             p["sem_experiencias"] = sem_exp
             p["idioma_roteiro"] = cod or ""
-            ry.lembrar_passo1(base_dir, {"modelo_id": modelo["id"], "idioma": cod or "",
+            ry.lembrar_passo1(base_dir, {"modelo_id": modelo["id"], "idioma": cod or "", "minutos": p.get("minutos_alvo"),
                                          "marcar_chamadas": p["marcar_chamadas"], "sem_experiencias": sem_exp})
         except ry.RoteiroError as exc:
             return jsonify({"erro": str(exc)}), 400
@@ -185,15 +187,37 @@ def registrar(app, base_dir: str) -> None:
         p = _proj(pid)
         if not p:
             return jsonify({"erro": "Projeto não encontrado."}), 404
+        texto = (request.get_json(silent=True) or {}).get("texto") or ""
         try:
-            an = ry.ler_analise((request.get_json(silent=True) or {}).get("texto") or "")
+            an = ry.ler_analise(texto)
         except ry.RoteiroError as exc:
             return jsonify({"erro": str(exc)}), 400
+        # 📏 resposta do "completar o tamanho" (só o roteiro): mantém as cenas, o plano etc. da análise anterior
+        if an.get("roteiro") and not an.get("cenas") and (p.get("analise") or {}).get("cenas"):
+            try:
+                so_roteiro = not any((ry.extrair_json(texto) or {}).get(k) for k in ("cenas", "titulo", "removidos", "plano"))
+            except Exception:  # noqa: BLE001
+                so_roteiro = False
+            if so_roteiro:
+                an = dict(p["analise"], roteiro=an["roteiro"], marcas=an["marcas"])
+        an = ry.conferir_tamanho(p, an)
         p["analise"] = an
         p["resultado"] = None
         p["titulo"] = p.get("titulo") or an.get("titulo") or ""
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, "analise": an})
+
+    @app.route("/roteiros-yt/<pid>/prompt-completar", methods=["POST"])
+    def roteiro_yt_prompt_completar(pid: str):
+        """📏 O roteiro reescrito ficou curto: prompt pra IA esticar até a ⏱ duração escolhida."""
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            texto = ry.prompt_completar_analise(p)
+        except ry.RoteiroError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": texto, "caracteres": len(texto)})
 
     @app.route("/roteiros-yt/opcoes-usadas", methods=["GET", "DELETE"])
     def roteiro_yt_opcoes_usadas():

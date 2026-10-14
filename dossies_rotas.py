@@ -438,11 +438,23 @@ def registrar(app, base_dir: str) -> None:
             if not p:
                 return jsonify({"erro": "Projeto não encontrado."}), 404
             try:
-                p["resultado"] = ds.ler_resultado(str((request.get_json(silent=True) or {}).get("texto") or ""), p)
+                p["resultado"] = ds.ler_resposta(str((request.get_json(silent=True) or {}).get("texto") or ""), p)
             except ds.DossieError as exc:
                 return jsonify({"erro": str(exc)}), 400
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/prompt-completar", methods=["POST"])
+    def dossie_prompt_completar(pid: str):
+        """📏 O roteiro ficou curto: prompt pra IA esticar até o tamanho escolhido."""
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            texto = ds.prompt_completar(p)
+        except ds.DossieError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": texto, "caracteres": len(texto)})
 
     @app.route("/modelos-video/<pid>/roteiro-editado", methods=["POST"])
     def dossie_roteiro_editado(pid: str):

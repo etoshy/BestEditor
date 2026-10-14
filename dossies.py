@@ -1022,6 +1022,19 @@ def adicionar_fonte(p: Dict[str, Any], url: str) -> Dict[str, Any]:
 
 
 # ------------------------------------------------------------------ prompt do roteiro
+def alvo_tamanho(p: Dict[str, Any]) -> Tuple[float, int, int]:
+    """(minutos, palavras, palavras por minuto) que o roteiro deste projeto tem que ter."""
+    cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    mod = MODELOS.get(cfg["modelo"]) or MODELOS["true_crime"]
+    fmt = mod["formatos"].get(cfg["formato"]) or next(iter(mod["formatos"].values()))
+    try:
+        minutos = max(0.5, min(120, float(cfg.get("minutos") or fmt["minutos"])))
+    except (TypeError, ValueError):
+        minutos = fmt["minutos"]
+    ppm = int(mod.get("palavras_por_minuto") or 150)
+    return minutos, int(minutos * ppm), ppm
+
+
 def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
     mod = MODELOS.get(cfg["modelo"]) or MODELOS["true_crime"]
@@ -1031,11 +1044,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         raise DossieError("Escreva o tema do vídeo (ex.: o nome do caso).")
     if not fontes and not (p.get("roteiro_base") or "").strip() and not any(m["tipo"] == "texto" for m in p.get("midias") or []):
         raise DossieError("Adicione pelo menos uma fonte (link de matéria), um texto ou o roteiro base — sem isso a IA inventaria.")
-    try:
-        minutos = max(0.5, min(120, float(cfg.get("minutos") or fmt["minutos"])))
-    except (TypeError, ValueError):
-        minutos = fmt["minutos"]
-    palavras = int(minutos * int(mod.get("palavras_por_minuto") or 150))
+    minutos, palavras, _ppm = alvo_tamanho(p)
     L: List[str] = []
     L.append(f"Você é roteirista de um canal de {mod['nome'].split(' ', 1)[1]} no YouTube. Escreva o roteiro NARRADO completo "
              f"(alguém vai ler em voz alta) de um vídeo sobre o tema abaixo, usando SÓ as fontes e materiais que eu juntei.")
@@ -1116,6 +1125,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
     L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
     L.append("")
+    _tam = metodo_roteiro.bloco_tamanho(minutos, palavras, fmt.get("estrutura"))  # 📏 perto do fim: a IA respeita mais
+    if _tam:
+        L.append(_tam)
+        L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
     L.append(json.dumps({
         "plano": metodo_roteiro.PLANO_JSON,
@@ -1164,7 +1177,12 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     voz = _texto_voz(rot)
     n_pal = len(voz.split())
     caps = roteiros_yt._capitulos(d.get("capitulos") or [], voz, n_pal, avisos)
-    return {"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
+    import metodo_roteiro
+    _min, _alvo, _ppm = alvo_tamanho(p)
+    _av = metodo_roteiro.aviso_tamanho(metodo_roteiro.palavras_do_texto(voz), _alvo, _min, _ppm)
+    if _av:
+        avisos.insert(0, "📏 " + _av)
+    return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": bool(_av)},"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
             "ideias": [str(x)[:300] for x in d.get("ideias") or [] if str(x).strip()][:15],
             "descricao": str(d.get("descricao") or "").strip()[:5000], "capitulos": caps, "palavras": n_pal,
             "roteiro": rot, "roteiro_final": voz, "momentos": momentos,
@@ -1182,6 +1200,40 @@ def _produto(x: Any) -> Optional[Dict[str, str]]:
     if not isinstance(x, dict) or not str(x.get("nome") or "").strip():
         return None
     return {k: str(x.get(k) or "").strip()[:lim] for k, lim in (("nome", 200), ("por_que", 800), ("busca", 200), ("chamada", 800))}
+
+
+def prompt_completar(p: Dict[str, Any]) -> str:
+    """📏 O roteiro ficou curto: prompt pra IA esticar até o tamanho (resposta só {"roteiro"})."""
+    import idiomas
+    import metodo_roteiro
+    res = p.get("resultado") or {}
+    if not res.get("roteiro"):
+        raise DossieError("Ainda não tem roteiro.")
+    minutos, alvo, _ppm = alvo_tamanho(p)
+    if minutos <= 1:
+        raise DossieError("Shorts não tem tamanho mínimo pra completar.")
+    cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    return metodo_roteiro.prompt_completar(
+        res["roteiro"], metodo_roteiro.palavras_do_texto(res.get("roteiro_final") or res["roteiro"]), alvo, minutos,
+        [c.get("comeca_em") for c in res.get("capitulos") or [] if c.get("comeca_em")],
+        idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"))
+
+
+def ler_resposta(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
+    """Resposta colada: o JSON completo do prompt do roteiro, OU só {"roteiro"} (resposta do 📏 completar) — nesse
+    caso troca só o roteiro e mantém títulos, descrição, capítulos etc."""
+    import json_ia
+    try:
+        d = json_ia.carregar(texto)
+    except ValueError as exc:
+        raise DossieError(str(exc)) from exc
+    if isinstance(d, list) and len(d) == 1 and isinstance(d[0], dict):
+        d = d[0]
+    so_roteiro = isinstance(d, dict) and str(d.get("roteiro") or "").strip() and \
+        not any(d.get(k) for k in ("titulos", "descricao", "capitulos", "tags", "ideias"))
+    if so_roteiro and (p.get("resultado") or {}).get("roteiro"):
+        return roteiro_editado(p, str(d["roteiro"]))
+    return ler_resultado(texto, p)
 
 
 def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:

@@ -31,6 +31,13 @@
 
   <label style="margin-top:12px;"><input type="checkbox" name="dividir_automaticamente" checked style="width:auto;"> Se eu enviar só um áudio e ele for longo, dividir automaticamente em vários trechos espalhados (recomendado)</label>
 
+  <label style="margin-top:12px;">🎧 Como é o áudio?</label>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;">
+    <label style="font-weight:normal;margin:0;"><input type="radio" name="audio" value="limpo" checked style="width:auto;"> 🎙️ Limpo — só a voz</label>
+    <label style="font-weight:normal;margin:0;"><input type="radio" name="audio" value="musica" style="width:auto;"> 🎵 Tem música / efeitos de fundo</label>
+  </div>
+  <p style="color:#666;font-size:0.8rem;margin:4px 0 0;">Com música/efeitos, o site processa os clipes <b>uma vez</b> (Demucs — o mesmo da dublagem) e deixa só a voz pra clonagem; o áudio original fica guardado (dá pra ouvir e voltar). Precisa de <code>pip install demucs</code>.</p>
+
   <button type="submit">Salvar perfil</button>
 </form>
 
@@ -54,6 +61,7 @@
 <div id="yt-lista-videos" style="margin-top:12px;"></div>
 <button type="button" onclick="ytAdicionarVideo()" style="background:#666;">+ Adicionar outro vídeo (colar link na mão)</button>
 
+<label style="margin-top:16px;font-weight:normal;"><input type="checkbox" id="yt-musica" style="width:auto;"> 🎵 O vídeo tem <b>música ou efeitos de fundo</b> — limpar e deixar só a voz (Demucs, uma vez; o original fica guardado)</label>
 <button type="button" id="yt-btn-extrair" onclick="ytExtrair()" style="margin-top:18px;display:block;">Baixar e criar perfil</button>
 
 <div id="yt-progresso-box" style="display:none;margin-top:16px;">
@@ -302,7 +310,7 @@ async function ytExtrair() {
   try {
     resp = await fetch("{{ url_for('perfis_de_voz_youtube_extrair') }}", {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome: nome, itens: itens, qualidade: '480p' }),
+      body: JSON.stringify({ nome: nome, itens: itens, qualidade: '480p', audio: document.getElementById('yt-musica').checked ? 'musica' : 'limpo' }),
     });
     data = await resp.json();
   } catch (e) {
@@ -382,10 +390,24 @@ function ytMostrarErro(msg) {
       <input type="text" class="pf-desc" value="{{ p.descricao }}" maxlength="120" placeholder="descrição (ex.: grave, rouca)" style="flex:1;min-width:180px;margin:0;">
       <span class="pf-salvo" style="color:#059669;font-size:0.8rem;display:none;">✓ salvo</span>
     </div>
-    <p style="color:#666;font-size:0.85rem;margin:6px 0 8px;">{{ p.quantidade_clipes }} clipe(s) de referência{% if p.vozes_slug %} · usado pelas vozes {% for s in p.vozes_slug %}<code>[{{ s }}]</code> {% endfor %}{% endif %}</p>
+    {% set lp = p.limpeza or {} %}
+    <div class="pf-audio" data-perfil="{{ p.nome }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+      <select class="pf-audio-tipo" style="width:auto;margin:0;{% if not p.audio %}border-color:#f59e0b;background:#fffbeb{% endif %}">
+        <option value="" {% if not p.audio %}selected{% endif %}>⚠ áudio limpo ou com música?</option>
+        <option value="limpo" {% if p.audio == 'limpo' %}selected{% endif %}>🎙️ limpo (só a voz)</option>
+        <option value="musica" {% if p.audio == 'musica' %}selected{% endif %}>🎵 tem música/efeitos de fundo</option>
+      </select>
+      <span class="pf-audio-st" style="font-size:0.82rem;">{% if lp.estado == 'rodando' %}⏳ limpando a voz…{% elif lp.estado == 'erro' %}<span style="color:#dc2626">⚠ {{ lp.erro }}</span>{% elif (lp.clipes or [])|length %}<span style="color:#059669">✅ voz limpa ({{ (lp.clipes or [])|length }} clipe(s))</span>{% endif %}</span>
+      <button type="button" class="pf-limpar" style="margin:0;padding:4px 10px;font-size:0.8rem;{% if p.audio != 'musica' %}display:none{% endif %}">🧹 Limpar agora</button>
+      <button type="button" class="pf-restaurar" style="margin:0;padding:4px 10px;font-size:0.8rem;background:#666;{% if not p.n_originais %}display:none{% endif %}">↩ Voltar aos originais</button>
+    </div>
+    <p style="color:#666;font-size:0.85rem;margin:6px 0 8px;">{{ p.quantidade_clipes }} clipe(s) de referência{% if p.vozes_slug %} · usado pelas vozes {% for s in p.vozes_slug %}<code>[{{ s }}]</code> {% endfor %}{% endif %}{% if p.n_originais %} · 🎧 tocando a <b>voz limpa</b>{% endif %}</p>
     {% for i in range(p.quantidade_clipes) %}
     <audio controls style="width:100%;margin-bottom:4px;" src="{{ url_for('perfis_de_voz_clipe', nome=p.nome, indice=i) }}"></audio>
     {% endfor %}
+    {% if p.n_originais %}<details style="margin:2px 0 6px;"><summary style="cursor:pointer;font-size:0.82rem;color:#666;">🎵 ouvir os originais (com a música de fundo)</summary>
+      {% for i in range(p.quantidade_clipes) %}<audio controls preload="none" style="width:100%;margin:4px 0 0;" src="{{ url_for('perfis_de_voz_original', nome=p.nome, indice=i) }}"></audio>{% endfor %}
+    </details>{% endif %}
     <p style="color:#666;font-size:0.8rem;margin-top:8px;">Pra usar: vá no <a href="{{ url_for('gerar_voz_page') }}">Gerador de voz</a>, escolha o motor XTTS v2, Chatterbox ou Chatterbox Turbo, e selecione "{{ p.nome }}" no campo "Usar um perfil de voz salvo" — ou, nos <a href="{{ url_for('modelados_page') }}">🎞️ Vídeos modelados</a>, use "➕ Cadastrar vozes Chatterbox Turbo" pra virar uma voz com slug (herda o gênero e a idade daqui).</p>
   </div>
   {% endfor %}
@@ -404,6 +426,37 @@ document.querySelectorAll('.pf-info').forEach(box => {
   };
   box.querySelectorAll('select').forEach(s => s.addEventListener('change', salvar));
   box.querySelector('.pf-desc').addEventListener('change', salvar);
+});
+// 🎧 áudio limpo × com música: com música, o site limpa a voz (uma vez, em segundo plano)
+document.querySelectorAll('.pf-audio').forEach(box => {
+  const url = '/perfis-de-voz/' + encodeURIComponent(box.dataset.perfil);
+  const st = box.querySelector('.pf-audio-st'), sel = box.querySelector('.pf-audio-tipo');
+  const mostrar = (d) => {
+    const lp = d.limpeza || {}, n = (lp.clipes || []).length;
+    st.innerHTML = lp.estado === 'rodando' ? '⏳ limpando a voz… (pode sair da página — chega um aviso no 🔔)' : lp.estado === 'erro' ? `<span style="color:#dc2626">⚠ ${String(lp.erro || '').replace(/</g, '&lt;')}</span>` : n ? `<span style="color:#059669">✅ voz limpa (${n} clipe(s))</span>` : '';
+    box.querySelector('.pf-limpar').style.display = sel.value === 'musica' ? '' : 'none';
+    box.querySelector('.pf-restaurar').style.display = (d.n_originais || n) ? '' : 'none';
+    sel.style.borderColor = sel.value ? '' : '#f59e0b'; sel.style.background = sel.value ? '' : '#fffbeb';
+    if (lp.estado === 'rodando') setTimeout(acompanhar, 3000);
+    else if (box.dataset.rodava === '1') { box.dataset.rodava = ''; location.reload(); }  // terminou: recarrega pra tocar a voz limpa
+  };
+  const acompanhar = async () => {
+    try { const d = await (await fetch(url + '/estado', { cache: 'no-store' })).json(); if (d.ok) mostrar(d); } catch (_) { setTimeout(acompanhar, 5000); }
+  };
+  const post = async (rota, corpo) => {
+    const r = await fetch(url + rota, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json(); if (!r.ok || d.erro) { alert(d.erro || r.status); return; }
+    if ((d.limpeza || {}).estado === 'rodando') box.dataset.rodava = '1';
+    mostrar(d);
+    return d;
+  };
+  sel.addEventListener('change', () => post('/audio', { audio: sel.value }));
+  box.querySelector('.pf-limpar').addEventListener('click', () => post('/limpar', {}));
+  box.querySelector('.pf-restaurar').addEventListener('click', async () => {
+    if (!confirm('Voltar os clipes pros áudios originais (com a música de fundo)?')) return;
+    const d = await post('/restaurar', {}); if (d) location.reload();
+  });
+  if (st.textContent.includes('limpando')) { box.dataset.rodava = '1'; setTimeout(acompanhar, 3000); }
 });
 </script>
 {% endblock %}

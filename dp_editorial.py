@@ -157,7 +157,8 @@ def campos(tipo: str) -> List[Tuple[str, str, str, Any, str]]:
 
 def para_editor() -> Dict[str, Any]:
     return {k: {"nome": v["nome"], "camada": v["camada"], "dur": v["dur"], "quando": v["quando"], "fundo": v.get("fundo"),
-                "campos": [{"k": c[0], "rotulo": c[1], "tipo": c[2], "padrao": c[3], "dica": c[4]} for c in campos(k)]}
+                "campos": [dict({"k": c[0], "rotulo": c[1], "tipo": c[2], "padrao": c[3], "dica": c[4]},
+                                **({"rotulos": v["rotulos"][c[0]]} if c[0] in (v.get("rotulos") or {}) else {})) for c in campos(k)]}
             for k, v in TIPOS.items()}
 
 
@@ -213,7 +214,18 @@ def normalizar(x: Any, duracao: Optional[float] = None) -> Optional[Dict[str, An
             out[k] = str(v if v is not None else "").strip()[:300]
     if x.get("origem"):
         out["origem"] = str(x["origem"])[:10]
+    if x.get("_idioma_video"):  # 📅 idioma "auto" dos calendários = o idioma do vídeo (o site preenche)
+        out["_idioma_video"] = str(x["_idioma_video"])[:8]
     return out
+
+
+def com_idioma_do_video(itens: Optional[List[Dict[str, Any]]], idioma: Optional[str]) -> Optional[List[Dict[str, Any]]]:
+    """Cópia dos quadros com o idioma do vídeo anotado (usado pelos quadros com idioma "auto")."""
+    if not itens:
+        return itens
+    if not idioma:
+        return list(itens)
+    return [dict(i, _idioma_video=idioma) if isinstance(i, dict) else i for i in itens]
 
 
 # ------------------------------------------------------------------ sons de cada quadro
@@ -316,6 +328,13 @@ def batidas(it: Dict[str, Any]) -> List[Tuple[float, str, float, str]]:
     elif tipo == "explosao":
         t_exp = max(1.0, 0.35 * dur)
         b += [(t_exp + 0.05, S["explosao"], 0.75, "pico"), (t_exp + 0.4, S["explosao_ar"], 0.45, "pico")]
+    else:
+        import dp_calendario  # 📅 calendários / folhinha / placar / lista riscada (v84_93)
+        import dp_escrita  # ✍️ escrita no papel: mão / máquina / computador (v84_94)
+        if tipo in dp_calendario.TIPOS:
+            b += dp_calendario.batidas(it, dur, S)
+        elif tipo in dp_escrita.TIPOS:
+            b += dp_escrita.batidas(it, dur, S)
     return [(round(max(0.0, min(t, dur)), 3), sid, v, al) for t, sid, v, al in b]
 
 
@@ -1725,3 +1744,12 @@ def gerar_miniaturas(pasta: str, fundo_foto: Optional[str] = None, so: Optional[
         bg.convert("RGB").resize((W, H), Image.LANCZOS).save(os.path.join(pasta, f"{tipo}.jpg"), quality=86)
         feitas += 1
     return feitas
+
+
+# 📅 v84_93 — calendário marcado, ano inteiro, folhinha de parede, placar de datas e lista riscada (dp_calendario.py)
+import dp_calendario as _calendario  # noqa: E402
+if hasattr(_calendario, "registrar"):  # importado por dp_calendario primeiro: ele mesmo registra no fim
+    _calendario.registrar()
+import dp_escrita as _escrita  # noqa: E402  ✍️ v84_94
+if hasattr(_escrita, "registrar"):
+    _escrita.registrar()

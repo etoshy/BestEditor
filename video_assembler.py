@@ -412,6 +412,7 @@ def _search_and_download_photo(
         if not photos:
             last_error = VideoAssemblyError(f"nenhuma foto encontrada pra '{query}'")
             continue
+        photos = _ordenar_resultados_estilo(photos, segment.provider)  # 🎞️ imagens reais: desenho/3D/recorte por último
 
         already_used_candidates: List[Any] = []
         tentativas = 0
@@ -602,6 +603,7 @@ def _search_and_download_filling_duration(
         if not videos:
             last_error = VideoAssemblyError(f"nenhum resultado pra '{query}'")
             continue
+        videos = _ordenar_resultados_estilo(videos, segment.provider, orientation)  # 🎞️🖼️ imagens reais: desenho/3D/recorte por último
 
         collected: List[str] = []
         accumulated = initial_duration
@@ -2337,12 +2339,23 @@ def search_candidates(
         if personagem:
             weight_kwargs["personagem"] = personagem
 
+    # 🖼️ (v84_92) a prévia também pede o FORMATO do vídeo aos bancos que têm esse filtro — antes só a montagem pedia,
+    # e a prévia escolhia (e fixava) um vídeo em pé num vídeo deitado
+    orient_kwargs = _orientation_filter_kwargs(provider, cfg.get("orientation")) if media_type != "image" else {}
+    foto_orient = {"16:9": "landscape", "9:16": "portrait", "1:1": "square"}.get(str(cfg.get("orientation") or ""))
+
     try:
         if media_type == "image":
             if provider not in _PHOTO_SEARCH_PROVIDERS:
                 raise VideoAssemblyError(f"'{provider}' não suporta busca de fotos.")
             client = factory.get_photo_client(provider)
-            results = client.search_photos_all(query=query, max_pages=1)[:max_results]
+            if provider == "pexels" and foto_orient:
+                try:
+                    results = client.search_photos_all(query=query, max_pages=1, orientation=foto_orient)[:max_results]
+                except TypeError:  # cliente sem o filtro
+                    results = client.search_photos_all(query=query, max_pages=1)[:max_results]
+            else:
+                results = client.search_photos_all(query=query, max_pages=1)[:max_results]
             return [
                 {
                     "id": r.id, "thumbnail": r.sizes.get("tiny") or r.sizes.get("small") or "",
@@ -2354,10 +2367,15 @@ def search_candidates(
             ]
 
         client = factory.get_client(provider)
-        if provider == "mixkit":
-            results = client.search_all(category=query, max_pages=1, **weight_kwargs)[:max_results]
-        else:
-            results = client.search_all(query=query, max_pages=1, **weight_kwargs)[:max_results]
+
+        def _buscar(extra):
+            if provider == "mixkit":
+                return client.search_all(category=query, max_pages=1, **weight_kwargs, **extra)[:max_results]
+            return client.search_all(query=query, max_pages=1, **weight_kwargs, **extra)[:max_results]
+        try:
+            results = _buscar(orient_kwargs)
+        except TypeError:  # cliente sem o filtro de orientação
+            results = _buscar({})
         candidates = []
         for r in results:
             data = r.to_dict() if hasattr(r, "to_dict") else {}
@@ -2972,6 +2990,50 @@ def _escolher_candidato_previa(candidates: List[Dict[str, Any]], tracker: Option
     return com_thumb[0] if com_thumb else None
 
 
+def _estilo_conta(provider: Optional[str]) -> bool:
+    """Acervos de anime/filmes (desenho de propósito) e o Flow (imagem gerada por IA) ficam fora do filtro de estilo."""
+    return provider not in BIBLIOTECAS_LOCAIS and provider not in ("flow", "produto", "material")
+
+
+def _ordenar_resultados_estilo(resultados: List[Any], provider: Optional[str] = None,
+                               orientacao: Optional[str] = None) -> List[Any]:
+    """Na montagem (busca de novo): os resultados do toolkit com desenho/3D/recorte vão pro fim
+    (config do site; a escolha da prévia — que já usa a ficha do vídeo — fica fixada quando dá)."""
+    if not _estilo_conta(provider):
+        return list(resultados or [])
+    try:
+        import estilo_imagem
+        return estilo_imagem.ordenar_resultados(resultados, load_site_config(), orientacao=orientacao)
+    except Exception:  # noqa: BLE001
+        return list(resultados or [])
+
+
+def _filtro_estilo(cfg: Optional[Dict[str, Any]]) -> bool:
+    """Tem o que conferir na miniatura? (🎞️ imagens reais e/ou 🖼️ o formato do vídeo)."""
+    try:
+        import estilo_imagem
+        return estilo_imagem.filtro_ativo(cfg)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _so_real(cfg: Optional[Dict[str, Any]]) -> bool:
+    """🎞️ O vídeo é de imagens reais? (estilo_imagem.py; desligável em Configurações → Estilo das imagens)."""
+    try:
+        import estilo_imagem
+        return estilo_imagem.modo_real(cfg)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _ordenar_por_estilo(candidates: List[Dict[str, Any]], cfg: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    try:
+        import estilo_imagem
+        return estilo_imagem.ordenar_candidatos(candidates, cfg)
+    except Exception:  # noqa: BLE001
+        return candidates
+
+
 def _ia_pode(recurso: str) -> bool:
     try:
         import ia_servico
@@ -3093,6 +3155,8 @@ def fetch_segment_preview_lightweight(
         max_results = 8 if (tracker is not None or evitar) else 1
         if usar_ia:
             max_results = max(max_results, int(ia_c.get("candidatos") or 10))
+        if _filtro_estilo(cfg) and _estilo_conta(provider):  # 🎞️🖼️ pede alguns a mais pra poder pular desenho/3D/recorte/formato errado
+            max_results = max(max_results, 6)
         queries_to_try = [segment.query] + _fallback_queries_for(segment)
         qi = 0
         while qi < len(queries_to_try):
@@ -3117,6 +3181,9 @@ def fetch_segment_preview_lightweight(
                 last_error = str(exc)
                 continue
 
+            if candidates and _filtro_estilo(cfg) and _estilo_conta(provider):  # 🎞️ desenho/3D/recorte e 🖼️ formato errado pro fim
+                candidates = _ordenar_por_estilo(candidates, cfg)
+
             if usar_ia and candidates:
                 j = julgar_candidatos_ia([c for c in candidates if c.get("thumbnail")], ia_ctx, query)
                 if j:
@@ -3140,11 +3207,22 @@ def fetch_segment_preview_lightweight(
                     continue
             c = _escolher_candidato_previa(candidates, tracker, provider, evitar)
             if c is not None:
-                return _resultado(c, provider, query)
+                if (c.get("estilo_problema") or c.get("formato_errado")) and qi < len(queries_to_try):
+                    # 🎞️🖼️ só sobrou desenho/recorte (ou mídia no formato errado) nessa busca: reserva e tenta a próxima
+                    if tracker is not None and c.get("id"):
+                        try:
+                            tracker.release(c["id"], provider)  # não usou: libera pra outro trecho
+                        except Exception:  # noqa: BLE001
+                            pass
+                    if reprovada is None:
+                        reprovada = {"nota": -1, "res": _resultado(c, provider, query, aviso=True), "estilo": True}
+                    last_error = f"só ilustração/recorte ou formato errado em '{query}' ({provider})"
+                    continue
+                return _resultado(c, provider, query, aviso=bool(c.get("estilo_problema") or c.get("formato_errado")))
             last_error = f"nenhum resultado com thumbnail pra '{query}' em {provider}"
 
     if reprovada is not None:
-        if _ia_pode("cartao"):  # 🃏 nada prestou: em vez da "menos pior", um cartão de texto (o app monta)
+        if _ia_pode("cartao") and not reprovada.get("estilo"):  # 🃏 nada prestou: em vez da "menos pior", um cartão de texto (o app monta)
             return {"ok": False, "cartao": True, "thumbnail_url": None, "result_url": None, "label": None,
                     "error": f"nenhuma imagem boa (melhor nota {reprovada['nota']})", "video_preview_url": None,
                     "provider": None, "ia_nota": reprovada["nota"],

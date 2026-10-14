@@ -1364,6 +1364,50 @@
    "pico": 0.546,
    "fim_som": 1.015,
    "nivel_db": -9.2
+  },
+  {
+   "id": "foley/maquina_tecla",
+   "categoria": "foley",
+   "nome": "máquina de escrever · tecla",
+   "arquivo": "foley/maquina_tecla.m4a",
+   "dur": 0.256,
+   "inicio_som": 0.01,
+   "pico": 0.01,
+   "fim_som": 0.031,
+   "nivel_db": -28.2
+  },
+  {
+   "id": "foley/maquina_datilografando",
+   "categoria": "foley",
+   "nome": "máquina de escrever · datilografando",
+   "arquivo": "foley/maquina_datilografando.m4a",
+   "dur": 2.411,
+   "inicio_som": 0.03,
+   "pico": 1.096,
+   "fim_som": 2.23,
+   "nivel_db": -26.6
+  },
+  {
+   "id": "foley/maquina_ding",
+   "categoria": "foley",
+   "nome": "máquina de escrever · sininho",
+   "arquivo": "foley/maquina_ding.m4a",
+   "dur": 1.429,
+   "inicio_som": 0.02,
+   "pico": 0.034,
+   "fim_som": 1.178,
+   "nivel_db": -13.8
+  },
+  {
+   "id": "foley/maquina_retorno",
+   "categoria": "foley",
+   "nome": "máquina de escrever · retorno do carro",
+   "arquivo": "foley/maquina_retorno.m4a",
+   "dur": 0.768,
+   "inicio_som": 0.02,
+   "pico": 0.522,
+   "fim_som": 0.61,
+   "nivel_db": -25.7
   }
  ]
 }

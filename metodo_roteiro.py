@@ -195,3 +195,85 @@ ROTULOS_PLANO = {
     "problema_profundo": "💔 Problema profundo", "publico": "👤 Público", "comeco_e_fim": "🔁 Começo → fim",
     "jornada": "🗺 Jornada", "lacos_abertos": "❓ Laços abertos", "notas_edicao": "🎬 Notas de edição",
 }
+
+
+# ------------------------------------------------------------------ 📏 tamanho do roteiro (v84_92)
+# As IAs de chat encurtam roteiro longo: com "~18 min (~2700 palavras)" só no título do formato, voltava um de ~8 min.
+# Agora o tamanho vira uma seção própria perto do FIM do prompt (a IA respeita mais), com o MÍNIMO de palavras e quanto
+# cada parte da estrutura deve ter; ao ler a resposta o site confere e, se faltou, gera um prompt pra completar.
+TOLERANCIA_TAMANHO = 0.85  # abaixo de 85% do alvo = curto demais (avisa e oferece o "completar")
+
+
+def palavras_do_texto(texto: str) -> int:
+    """Palavras faladas (sem marcas [I3], [CENA 2], [[INSCREVA]], tags de voz)."""
+    import re
+    t = re.sub(r"\[\[[^\]]*\]\]|\[[^\]]*\]", " ", str(texto or ""))
+    return len(t.split())
+
+
+def _orcamento(partes: List[str], total: int) -> List[int]:
+    """Palavras por parte: o gancho (1ª) leva ~1/3 de cota, as outras dividem o resto por igual."""
+    if not partes:
+        return []
+    pesos = [0.35] + [1.0] * (len(partes) - 1)
+    soma = sum(pesos)
+    return [max(30, int(round(total * w / soma / 10.0)) * 10) for w in pesos]
+
+
+def bloco_tamanho(minutos: float, palavras: int, partes: List[str] = None, reescrita: bool = False) -> str:
+    """Seção "📏 TAMANHO" do prompt. `partes` = a estrutura do formato (vira o orçamento de palavras por parte)."""
+    if not minutos or not palavras or minutos <= 1:
+        return ""
+    minimo = int(palavras * 0.95)
+    L = [f"## 📏 TAMANHO DO ROTEIRO — obrigatório (é o que mais erra)",
+         f"- O texto NARRADO tem que durar ~{minutos:g} minutos: NO MÍNIMO {minimo} palavras (alvo: ~{palavras}). "
+         f"Isso é BEM longo (~{palavras * 6 // 1000} mil caracteres) — um roteiro de {minutos / 2:g} min é a METADE e está errado.",
+         "- NÃO resuma e NÃO pule partes: desenvolva cada fato com contexto, detalhes das fontes, causas, consequências, "
+         "o que as pessoas envolvidas disseram, e transições entre as partes. Nada de encher linguiça repetindo frases — "
+         "aprofunde o conteúdo."]
+    orc = _orcamento(list(partes or []), palavras)
+    if orc:
+        L.append("- Palavras por parte (aproximado):")
+        L += [f"  {k}. {str(p)[:90]} → ~{n} palavras" for k, (p, n) in enumerate(zip(partes, orc), start=1)]
+    if reescrita:
+        L.append("- Se o vídeo original for mais curto que isso, expanda com mais explicação e contexto sobre o mesmo assunto "
+                 "(sem inventar fatos). Se for mais longo, condense mantendo o essencial.")
+    L.append("- Este tamanho vale mais do que o tamanho de qualquer referência ou exemplo acima.")
+    L.append("- Antes de responder, estime as palavras do roteiro; se ficou abaixo do mínimo, continue escrevendo até chegar. "
+             "Se precisar economizar espaço na resposta, encurte os OUTROS campos do JSON — nunca o roteiro.")
+    return "\n".join(L)
+
+
+def aviso_tamanho(palavras: int, alvo_palavras: int, minutos: float, ppm: int = 150) -> str:
+    """"" se está ok; senão o aviso de que ficou curto."""
+    if not alvo_palavras or not minutos or minutos <= 1 or palavras >= alvo_palavras * TOLERANCIA_TAMANHO:
+        return ""
+    return (f"O roteiro ficou CURTO: {palavras} palavras (~{palavras / max(1, ppm):.1f} min), o alvo era ~{minutos:g} min "
+            f"(~{alvo_palavras} palavras). Use “📏 Prompt pra completar o tamanho”.")
+
+
+def prompt_completar(roteiro: str, palavras: int, alvo_palavras: int, minutos: float, inicios_capitulos: List[str] = None,
+                     idioma: str = "", regras_extra: List[str] = None) -> str:
+    """Prompt pra IA ESTICAR o roteiro que ficou curto (na mesma conversa, que já tem as fontes).
+    A resposta é só {"roteiro": "..."} — o resto (títulos, descrição, cenas…) o site mantém."""
+    minimo = int(alvo_palavras * 0.95)
+    L = [f"O roteiro que você escreveu ficou CURTO: tem {palavras} palavras, e o vídeo precisa de ~{minutos:g} minutos de "
+         f"narração = NO MÍNIMO {minimo} palavras (alvo ~{alvo_palavras}). Faltam ~{max(0, alvo_palavras - palavras)} palavras.",
+         "",
+         "Reescreva o roteiro COMPLETO, do começo ao fim, chegando nesse tamanho:",
+         "- mantenha a história, a ordem, o tom, o gancho e o final; NÃO resuma nada do que já existe;",
+         "- aprofunde cada parte com mais contexto, detalhes e fatos das MESMAS fontes que eu te passei nesta conversa "
+         "(se esta for uma conversa nova, use só o que está no roteiro e não invente fatos), causas e consequências, "
+         "o que as pessoas disseram, e transições melhores — sem repetir frases pra encher;",
+         "- mantenha TODAS as marcas que estão no texto, no mesmo ponto da história: imagens ([I3], [M2]…), cenas ([CENA 2]), "
+         "[[INSCREVA]], [[VENDA]] e tags de voz;"]
+    if inicios_capitulos:
+        L.append("- mantenha EXATAMENTE estas frases de começo de capítulo (o site usa pra achar os capítulos): "
+                 + "; ".join(f"“{c}”" for c in inicios_capitulos if c) + ";")
+    L += [f"- {r}" for r in (regras_extra or [])]
+    if idioma:
+        L.append(f"- escreva em {idioma}.")
+    L += ["", "Antes de responder, conte as palavras; se ainda estiver abaixo do mínimo, continue.", "",
+          "Responda SOMENTE com um JSON válido, assim (só este campo — o resto eu já tenho):",
+          '{"roteiro": "o roteiro completo, já no tamanho certo"}', "", "## Roteiro atual", str(roteiro or "").strip()]
+    return "\n".join(L)

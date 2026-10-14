@@ -119,8 +119,8 @@ def normalizar(g: Dict[str, Any], duracao: Optional[float] = None) -> Optional[D
             out["fundo_opacidade"] = round(max(0.0, min(1.0, float(g["fundo_opacidade"]))), 2)
     except (TypeError, ValueError):
         pass
-    if g.get("origem") == "ia":  # reaplicar a resposta da IA troca estes em vez de duplicar
-        out["origem"] = "ia"
+    if g.get("origem") in ("ia", "revisao"):  # reaplicar a resposta da IA / 🎬 revisão troca estes em vez de duplicar
+        out["origem"] = g["origem"]
     return out
 
 

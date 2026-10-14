@@ -112,6 +112,24 @@ def definir(nome: str, genero: Any = None, idade: Any = None, descricao: Optiona
     return info
 
 
+def atualizar(nome: str, **campos: Any) -> Dict[str, Any]:
+    """Grava outros campos do perfil (ex.: 🎧 "audio" e "limpeza" — ver perfis_limpeza.py). None = apaga o campo."""
+    nome = str(nome or "").strip()
+    if not nome:
+        raise ValueError("Perfil sem nome.")
+    with _TRAVA:
+        d = _ler()
+        info = d.get(nome) or {}
+        for k, v in campos.items():
+            if v is None:
+                info.pop(k, None)
+            else:
+                info[k] = v
+        d[nome] = info
+        _gravar(d)
+    return dict(info)
+
+
 def remover(nome: str) -> None:
     with _TRAVA:
         d = _ler()

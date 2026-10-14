@@ -118,14 +118,17 @@ def iniciar(tipo: str, titulo: str, fn: Callable[[_Andamento], Any], *, pagina: 
             t["trace"] = traceback.format_exc()[-3000:]
         t["fim"] = time.time()
         t["progresso"] = ""
+        if avisar:  # o aviso ANTES de gravar o status final: quem vê "pronto" já acha o aviso no 🔔 (v84_92)
+            ok = t["status"] == "pronto"
+            try:
+                notificacoes.avisar(("✅ " if ok else "❌ ") + t["titulo"] + (" — pronto" if ok else " — deu erro"),
+                                    "" if ok else t["erro"], t["link"] or "/historico", "ok" if ok else "erro", tipo=t["tipo"])
+            except Exception:  # noqa: BLE001 — o aviso nunca impede de guardar o resultado
+                pass
         try:
             _gravar(t)
         except OSError:
             pass
-        if avisar:
-            ok = t["status"] == "pronto"
-            notificacoes.avisar(("✅ " if ok else "❌ ") + t["titulo"] + (" — pronto" if ok else " — deu erro"),
-                                "" if ok else t["erro"], t["link"] or "/historico", "ok" if ok else "erro", tipo=t["tipo"])
 
     if rodar_ja:
         _rodar()

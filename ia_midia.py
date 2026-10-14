@@ -46,6 +46,9 @@ SCHEMA_FICHA = _obj({
     "lugares": _lista(_obj({"id": _S, "nome": _S, "busca": _S, "evitar": _S, "wikipedia_pt": _S, "wikipedia_en": _S})),
     "glossario": _lista(_obj({"no_roteiro": _S, "significa": _S, "nunca_buscar": _lista(_S)})),
     "evitar_sempre": _lista(_S), "visual_geral": _S,
+    # 🎞️ (v84_92) o estilo das imagens do vídeo: "real" = foto/filmagem de verdade (desenho, 3D, vetor e recorte em
+    # fundo branco ficam de fora — ver estilo_imagem.py e o juiz); "ilustracao"/"misto" só quando o roteiro pede
+    "estilo_imagem": {"type": "string", "enum": ["real", "ilustracao", "misto"]},
 })
 
 _SYS_FICHA = """Você prepara a FICHA VISUAL de um vídeo narrado (documentário/YouTube) para quem vai buscar as imagens.
@@ -57,7 +60,11 @@ Leia o roteiro inteiro e devolva o que importa para a IMAGEM:
 - lugares: nome, "busca" (em inglês, com a época quando importa, ex.: "Medellin Colombia 1980s"), o que evitar;
 - glossário: palavras do roteiro com duplo sentido e o que NÃO buscar (ex.: "a queda" = derrota, nunca "waterfall");
 - evitar_sempre: o que nunca deve aparecer (memes, atores de série no lugar da pessoa real, logos…);
-- visual_geral: uma linha com o visual do vídeo.
+- visual_geral: uma linha com o visual do vídeo;
+- estilo_imagem: "real" (padrão: documentário, notícia, true crime, história, biografia, negócios, ciência — só FOTO e
+  FILMAGEM de verdade, nunca desenho, cartoon, boneco 3D, ilustração vetorial, clipart ou objeto recortado em fundo
+  branco/preto); "ilustracao" só se o vídeo é SOBRE animação/desenho/jogo ou o roteiro pede esse visual; "misto" quando
+  o roteiro alterna os dois de propósito. Na dúvida, "real".
 Não invente: se o roteiro não diz, deixe vazio."""
 
 
@@ -89,6 +96,13 @@ Para cada trecho devolva:
   data ou caso) — banco de stock não tem isso, então vai para foto real/notícia/YouTube; false para clima, ambiente,
   ação genérica ou ideia abstrata;
 - "visual": uma linha, em português, do que deveria aparecer;
+CONTEXTO: cada trecho vem com a fala de ANTES e a de DEPOIS — use as três pra entender do que a frase fala de verdade
+(quem é "ele", que dinheiro, que lugar, que época). A busca descreve a CENA daquele momento da história, não palavras
+soltas da frase (ex.: "ganhou 6 mil numa noite" num caso de golpe = "man counting cash at night table", não
+"rising arrow chart").
+ESTILO: se a ficha diz estilo_imagem "real" (ou não diz), as buscas pedem FOTO/FILMAGEM REAL: nada de "cartoon",
+"illustration", "vector", "icon", "3d", "animation", "clipart", "isolated on white"; prefira cenas com pessoas e
+lugares reais (ex.: "real hospital room patient", "police officers at crime scene night").
 - "frase_tela": a ideia do trecho em até 8 palavras, em português, forte o bastante para aparecer sozinha na tela
   (usada num cartão de texto quando nenhuma imagem serve).
 Mantenha o "n" de cada trecho."""
@@ -105,7 +119,10 @@ def buscas_melhores(trechos: List[Dict[str, Any]], ficha: Optional[Dict[str, Any
         bloco = trechos[k:k + BLOCO_BUSCAS]
         linhas = []
         for t in bloco:
-            linhas.append(f"[{t['n']}] fala: {str(t.get('fala') or '')[:400]}"
+            linhas.append(f"[{t['n']}]"
+                          + (f" antes: {str(t['antes'])[:220]} |" if t.get("antes") else "")
+                          + f" FALA: {str(t.get('fala') or '')[:400]}"
+                          + (f" | depois: {str(t['depois'])[:220]}" if t.get("depois") else "")
                           + (f" | visual pedido: {t['visual']}" if t.get("visual") else "")
                           + (f" | busca atual: {t['query']}" if t.get("query") else ""))
         r = ia.chamar("buscas", system, "## TRECHOS\n" + "\n".join(linhas), SCHEMA_BUSCAS, max_tokens=12000, effort="low", job=job)
@@ -123,7 +140,7 @@ def buscas_melhores(trechos: List[Dict[str, Any]], ficha: Optional[Dict[str, Any
 
 # ------------------------------------------------------------------ Fase 2: juiz visual
 PROBLEMAS = ["epoca_errada", "lugar_errado", "assunto_errado", "texto_na_imagem", "marca_dagua", "logo_de_canal",
-             "meme_ou_montagem", "print_de_site", "baixa_qualidade", "repetida", "evitar_sempre"]
+             "meme_ou_montagem", "print_de_site", "baixa_qualidade", "repetida", "evitar_sempre", "ilustracao_ou_3d"]
 SCHEMA_JUIZ = _obj({
     "notas": _lista(_obj({"n": _I, "nota": _I, "motivo": _S, "problemas": _lista({"type": "string", "enum": PROBLEMAS})})),
     "melhor": _I, "nova_busca": _S})
@@ -135,6 +152,10 @@ quem/onde/quando. Dê nota 0-10 a cada candidato:
 Tire pontos de: época/lugar errados, texto grande ou legenda na imagem, marca d'água, logo de
 canal, meme, montagem, print de site, tela dividida, baixa qualidade, algo da lista "evitar_sempre".
 Se a imagem parece muito com a do trecho anterior, tire 2 pontos.
+ESTILO: se a ficha diz estilo_imagem "real" (ou não diz), o vídeo é de imagens REAIS — desenho, cartoon, boneco/
+personagem 3D, ilustração vetorial (flat), clipart, ícone, gráfico desenhado ou objeto recortado em fundo branco/preto
+liso levam no MÁXIMO 2, com o problema "ilustracao_ou_3d", mesmo que o assunto bata.
+Julgue pelo CONTEXTO da história (trecho anterior + atual + seguinte), não só pelas palavras da frase.
 Não identifique pessoas pelo rosto: julgue pelo contexto (título, legenda, cenário, época).
 Quando a imagem é um vídeo, ela pode vir como 3 momentos lado a lado do mesmo vídeo.
 Se todas ficarem abaixo de 5, sugira em "nova_busca" uma busca nova em inglês que tenha mais chance de achar

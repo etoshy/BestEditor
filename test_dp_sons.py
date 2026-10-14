@@ -21,7 +21,7 @@ def _pcm(path):
 
 class TestBiblioteca:
     def test_124_sons_em_11_categorias_e_arquivos_existem(self):
-        assert len(ds.sons()) == 124 and len(ds.categorias()) == 11
+        assert len(ds.sons()) == 128 and len(ds.categorias()) == 11  # v84_94: +4 da máquina de escrever
         assert ds.categorias()[0]["nome"] == "transições"
         for s in ds.sons():
             assert os.path.exists(os.path.join(ds.SONS_DIR, s["arquivo"])) and s["arquivo"].endswith(".m4a")

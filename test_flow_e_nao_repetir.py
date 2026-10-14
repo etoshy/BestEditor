@@ -388,8 +388,11 @@ class TestPreviasNaoRepetem:
         monkeypatch.setattr(va, "search_candidates", espiao)
         fabrica = _FabricaFalsa([_Res("a")])
         _previa("pexels", fabrica, UsedClipsTracker())
-        _previa("pexels", fabrica, None)
-        assert pedidos[0] > 1 and pedidos[1] == 1
+        seg = VideoSegment(start=0.0, end=3.0, provider="pexels", query="tema", media_type="image")
+        # (v84_92) sem tracker e com o filtro 🎞️ "imagens reais" desligado: só 1, como antes
+        fetch_segment_preview_lightweight(seg, site_cfg=dict(_CFG_PREVIA, estilo_imagens="qualquer"), client_factory=fabrica)
+        _previa("pexels", fabrica, None)  # filtro ligado (padrão): pede alguns a mais pra poder pular desenho/3D
+        assert pedidos[0] > 1 and pedidos[1] == 1 and pedidos[2] >= 6
 
 
 # ======================================================================

@@ -269,6 +269,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "flow_seletor_video": "",
     # proporção das imagens do Bing/Brave/Yandex/Startpage (ver video_assembler.proporcao_dos_buscadores)
     "buscadores_proporcao": "auto",
+    # 🎞️ estilo das imagens: "auto" (imagens reais, a não ser que a ficha do vídeo diga ilustração/misto),
+    # "real" (sempre pula desenho/3D/vetor/recorte em fundo chapado) ou "qualquer" (não filtra) — ver estilo_imagem.py
+    "estilo_imagens": "auto",
     "flow_horas_ate_liberar": 24,
     "flow_palavras_limite": "",
     "flow_modelo_video": "Veo 3.1 - Lite",
@@ -411,6 +414,8 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
         raise SiteConfigError(f"buscadores_proporcao precisa ser um de {_props}, recebi {current.get('buscadores_proporcao')!r}.")
     if current.get("flow_modo_automacao") not in ("direto", "antigo"):
         current["flow_modo_automacao"] = "direto"
+    if current.get("estilo_imagens") not in ("auto", "real", "qualquer"):
+        current["estilo_imagens"] = "auto"
     if current.get("ia_google_youtube") not in ("complemento", "sempre", "desligado"):
         current["ia_google_youtube"] = "complemento"
     try:

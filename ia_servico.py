@@ -89,6 +89,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "roteiros": ("📝 Roteiros direto na IA",
                  "Botão 🤖 Gerar com a IA nos Modelos de vídeo, Vídeo de venda, Roteiro do YouTube e Vídeos modelados: gera o "
                  "prompt, manda pra IA e já lê a resposta (sem copiar e colar).", True),
+    "revisao": ("🎬 Revisão do diretor",
+                "No Estúdio (aba 🤖 IA), a IA olha a miniatura de cada trecho com a fala de antes e de depois e diz o que não "
+                "combina — e o que fazer: busca nova no buscador com mais chance, gráfico nativo, cartão ou \"procure na mão\".", True),
     "edicao": ("✂️ Prompt de edição direto na IA",
                "No Estúdio (aba 🤖 IA), um botão manda o prompt de edição (ou cada parte dele) pra IA e cola a resposta.", True),
     "canal": ("📊 Analisador de canal",

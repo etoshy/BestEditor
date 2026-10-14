@@ -709,6 +709,14 @@ def build_prompt(
             "sempre os bancos de estoque. Segmentos \"youtube\" são sempre vídeo (nunca use "
             "`\"media_type\": \"image\"` com ele)."
         )
+    rules.append(
+        "Cada \"query\" descreve a CENA daquele momento da história — leia a fala de ANTES e a de DEPOIS pra saber de quem/"
+        "de quê o trecho fala (\"ele\", \"o dinheiro\", \"naquela noite\" viram coisas concretas) e não busque palavras soltas da "
+        "frase (\"ganhou 6 mil numa noite\" num golpe = \"man counting cash at night\", não \"rising arrow chart\"). A não ser "
+        "que o roteiro peça outro visual, o vídeo é de imagens REAIS: busque foto/filmagem de verdade (pessoas e lugares reais) e "
+        "nunca use termos que puxam desenho — \"cartoon\", \"illustration\", \"vector\", \"icon\", \"3d\", \"animation\", "
+        "\"clipart\", \"isolated on white\" (os acervos de anime/filmes, quando marcados, são a exceção: lá é a obra mesmo)."
+    )
     if "pexels" in providers:
         _extras_foto = [f'\"{_p}\"' for _p in ("wikipedia",) + BROWSER_IMAGE_SEARCH_PROVIDERS + ("flow",) if _p in providers]
         _photo_providers_note = (" ou " + " ou ".join(_extras_foto)) if _extras_foto else ""

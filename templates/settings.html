@@ -96,6 +96,14 @@
   </select>
   <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Usa o filtro de proporção do próprio buscador (no Bing, o filtro "largura/quadrada" da busca). Se um termo não tiver NENHUMA imagem na proporção pedida, entra uma busca sem filtro como reserva — a foto em pé ainda aparece, com fundo desfocado/bordas.</p>
 
+  <label style="margin-top:16px;" id="estilo-imagens">🎞️ Estilo das imagens (bancos e buscadores)</label>
+  <select name="estilo_imagens">
+    {% for v, rot in [("auto", "Automático — imagens REAIS, a não ser que a ficha do vídeo (🤖 IA) diga que é de ilustração"), ("real", "Sempre só imagens reais (pula desenho, boneco 3D, vetor e recorte em fundo branco/preto)"), ("qualquer", "Qualquer estilo (não filtra, como antes)")] %}
+    <option value="{{ v }}" {% if (config.estilo_imagens or 'auto') == v %}selected{% endif %}>{{ rot }}</option>
+    {% endfor %}
+  </select>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">O site olha a miniatura de cada resultado (sem IA, de graça) e manda pro fim da fila o que parece desenho, boneco 3D, ilustração chapada ou objeto recortado em fundo liso. Se a busca só tiver isso, ele tenta a próxima busca e os outros bancos; só usa um desenho (com ⚠ no nome) se não achar nada real. Com a 🤖 IA ligada, o juiz também tira ponto deles.</p>
+
   <label style="margin-top:16px;">Transição entre os trechos do vídeo</label>
   <select name="transition_type">
     <option value="none" {% if config.transition_type == 'none' %}selected{% endif %}>✂️ Corte seco (padrão — sem transição)</option>

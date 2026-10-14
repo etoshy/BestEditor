@@ -594,6 +594,7 @@ def lembrar_acoes(base: str, op: Dict[str, Any], limite: int = 12) -> None:
 def lembrar_passo1(base: str, op: Dict[str, Any]) -> None:
     d = opcoes_usadas(base)
     d["passo1"] = {"modelo_id": str(op.get("modelo_id") or "")[:60], "idioma": str(op.get("idioma") or "")[:20],
+                   "minutos": minutos_alvo(op.get("minutos")),
                    "marcar_chamadas": op.get("marcar_chamadas", True) is not False,
                    "sem_experiencias": op.get("sem_experiencias", True) is not False}
     _salvar_opcoes(base, d)
@@ -709,6 +710,18 @@ def marcas_no_texto(texto: str) -> Dict[str, int]:
     return out
 
 
+PALAVRAS_POR_MINUTO = 150
+
+
+def minutos_alvo(v: Any) -> float:
+    """⏱ Duração pedida pro roteiro reescrito (0 = mantém o tamanho do vídeo original)."""
+    try:
+        m = float(str(v).replace(",", ".")) if v not in (None, "") else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+    return round(m, 1) if 1 < m <= 120 else 0.0
+
+
 def prompt_analise(p: Dict[str, Any], modelo: Dict[str, Any], idioma: str = "o mesmo idioma da transcrição",
                    marcar_chamadas: bool = True, sem_experiencias: bool = True) -> str:
     tr = p.get("transcricao")
@@ -731,7 +744,40 @@ def prompt_analise(p: Dict[str, Any], modelo: Dict[str, Any], idioma: str = "o m
         texto = texto.strip() + "\n\n" + REGRA_SEM_EXPERIENCIAS
     if marcar_chamadas:
         texto = texto.strip() + "\n\n" + REGRA_MARCAS
+    mins = minutos_alvo(p.get("minutos_alvo"))
+    if mins and modelo.get("id") != "so_cenas":  # 📏 duração escolhida: seção de tamanho perto do fim
+        texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_tamanho(mins, int(mins * PALAVRAS_POR_MINUTO), reescrita=True)
     return texto.strip() + "\n\n" + _FORMATO_ANALISE
+
+
+def conferir_tamanho(p: Dict[str, Any], an: Dict[str, Any]) -> Dict[str, Any]:
+    """📏 Marca na análise o alvo e se o roteiro ficou curto (só com ⏱ duração escolhida)."""
+    import metodo_roteiro
+    mins = minutos_alvo(p.get("minutos_alvo"))
+    if not mins:
+        an.pop("alvo", None)
+        return an
+    alvo = int(mins * PALAVRAS_POR_MINUTO)
+    aviso = metodo_roteiro.aviso_tamanho(metodo_roteiro.palavras_do_texto(an.get("roteiro")), alvo, mins, PALAVRAS_POR_MINUTO)
+    an["alvo"] = {"minutos": mins, "palavras": alvo, "ppm": PALAVRAS_POR_MINUTO, "curto": bool(aviso), "aviso": aviso}
+    return an
+
+
+def prompt_completar_analise(p: Dict[str, Any]) -> str:
+    """📏 Roteiro reescrito ficou curto: prompt pra esticar (resposta só {"roteiro"}; as cenas ficam)."""
+    import idiomas
+    import metodo_roteiro
+    an = p.get("analise") or {}
+    mins = minutos_alvo(p.get("minutos_alvo"))
+    if not an.get("roteiro"):
+        raise RoteiroError("Ainda não tem roteiro reescrito (passo 2).")
+    if not mins:
+        raise RoteiroError("Escolha a ⏱ duração do roteiro no passo 2.")
+    cod = idiomas.normalizar(p.get("idioma_roteiro") or "")
+    return metodo_roteiro.prompt_completar(
+        an["roteiro"], metodo_roteiro.palavras_do_texto(an["roteiro"]), int(mins * PALAVRAS_POR_MINUTO), mins,
+        idioma=idiomas.nome_para_prompt(cod) if cod else "",
+        regras_extra=["as cenas de filmes/séries/animes/jogos continuam as mesmas (o trecho de cada uma continua no roteiro)"])
 
 
 # ------------------------------------------------------------------ leitura da análise

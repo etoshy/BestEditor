@@ -254,6 +254,13 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 .clip.curto{outline:2px dashed #f5b84a;outline-offset:-2px}
 .clip .curto-bdg{position:absolute;right:3px;top:2px;font-size:10px;background:#f5b84a;color:#111;border-radius:3px;padding:0 3px;font-style:normal;z-index:2}
 .clip .curto-bdg.ok{background:#00d4b4}
+.clip .rev-bdg{position:absolute;left:3px;bottom:2px;font-size:10px;background:#f97316;color:#111;border-radius:3px;padding:0 3px;font-style:normal;z-index:2}
+.rd-lista{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.rd-lista li{display:flex;gap:8px;align-items:flex-start;background:var(--panel2,#1b1e24);border:1px solid var(--line,#2a2e36);border-radius:8px;padding:6px}
+.rd-lista img{width:64px;height:36px;object-fit:cover;border-radius:4px;background:#000;flex:0 0 auto;cursor:pointer}
+.rd-lista .rd-txt{flex:1;font-size:11.5px;line-height:1.35}
+.rd-lista .rd-acao{display:block;margin-top:2px;color:var(--text)}
+.rd-chip{display:inline-block;font-size:10px;border-radius:3px;padding:0 4px;margin-right:3px;background:#3b2a12;color:#fdba74}
 .clip .curto-mk{position:absolute;top:0;bottom:0;width:2px;background:#f5b84a;opacity:.9;pointer-events:none}
 #listaCurtos .cc{border:1px solid var(--line);border-radius:6px;padding:8px;margin:6px 0;background:var(--panel2)}
 #listaCurtos .cc.ok{opacity:.7}
@@ -421,6 +428,13 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
     </div>
 
     <div class="tab" id="tab-ia">
+      <details class="sec" id="revDiretor" open><summary>🎬 Revisão do diretor — o que não combina e como resolver</summary><div class="in">
+        <p class="hint">Passa pela timeline e aponta os trechos com problema: <b>sem prévia</b>, <b>em pé num vídeo deitado</b> (ou o contrário), <b>desenho/3D</b> num vídeo de imagens reais, <b>nota baixa</b>, <b>repetida</b>. Com a <b>🤖 IA</b> ligada, ela também <b>olha cada miniatura</b> com a fala de antes e de depois e diz o que fazer: <b>busca nova</b> no buscador com mais chance, <b>📊 gráfico</b> nativo (quando a fala cita números), <b>🃏 cartão</b> de texto, ou <b>🔎 procurar na mão</b>. Você marca o que aplicar; as buscas novas são conferidas e o que ainda assim não achar fica marcado 🔎 na timeline.</p>
+        <div class="row" style="align-items:center;gap:6px"><button class="primary" id="rdRodar">🎬 Revisar as cenas</button><span class="hint" id="rdSt"></span></div>
+        <div id="rdLista"></div>
+        <div class="row" style="margin-top:6px;gap:6px"><button class="primary" id="rdAplicar" disabled>✅ Aplicar marcados</button><button class="mini" id="rdDesfazer" disabled>↩ Desfazer</button></div>
+        <p class="hint" id="rdPrevias"></p>
+      </div></details>
       <h3>🤖 Prompt de edição (2ª etapa com a IA)</h3>
       <p class="hint">Gera um prompt com a <b>direção escolhida</b> (<span id="iaDirecao"></span> — troque na aba 🎨 Direção) e o que ela permite, a <b>timeline como está agora</b> (mídias, cenas, transições, efeitos, destaques) e a <b>fala com os tempos</b> (transcrição/SRT). Cole na sua IA; ela devolve um JSON mais caprichado — transições, efeitos, cenas com textos, destaques ancorados na fala e <b>gráficos com os dados</b> citados. Cole a resposta aqui embaixo, confira e aplique (dá pra desfazer).</p>
       <label class="f"><span>O que você quer nesta edição <span class="dim">(opcional)</span></span><textarea id="iaObjetivo" rows="3" placeholder="ex.: mais gráficos com os números citados; cortes mais rápidos no começo; destaques só nos anos"></textarea></label>
@@ -925,6 +939,7 @@ function desenharTimeline() {
     c.innerHTML = `<span class="tag">${deTl ? `<b class="tl-de d${deTl}" title="${deTl === 'proprio' ? 'Mídia trocada aqui no Juntar' : 'Mídia da timeline ' + deTl + ' — clique pra trocar'}">${deTl === 'proprio' ? '✎' : deTl}</b>` : ''}${tipo === 'image' ? '📷' : yt ? '▶YT' : '🎥'}${manual ? ' ✓' : ''}${s.efeito ? ' ✨' : ''}${s.entrada ? ' ⇥' : ''}${s.saida ? ' ⇤' : ''}</span><span class="lbl">${esc((i + 1) + '. ' + (manual ? 'escolhido' : s.provider) + ': ' + s.query)}</span>`;
     c.title = `Trecho ${i + 1} · ${fmt(s.start, 1)}–${fmt(s.end, 1)}\n${s.provider}: ${s.query}` + (s._preview && s._preview.erro ? '\n⚠ ' + s._preview.erro : '');
     const ic = infoCurto(s);
+    if (s.revisao && s.revisao.manual) { c.title += `\n🔎 Procurar na mão: ${s.revisao.procurar || ''}`; c.insertAdjacentHTML('beforeend', '<b class="rev-bdg" title="🎬 Revisão do diretor: procurar na mão">🔎</b>'); }
     if (ic.estado === 'curto') { c.classList.add('curto'); c.title += `\n⏱ Clipe curto: ${segS(ic.tem)} de ${segS(ic.precisa)} (vai repetir) — aba ⏱ Clipes curtos`; c.insertAdjacentHTML('beforeend', '<b class="curto-bdg">⏱</b>'); }
     else if (ic.estado === 'completado' || ic.estado === 'loop') c.insertAdjacentHTML('beforeend', `<b class="curto-bdg ok" title="${ic.estado === 'loop' ? 'Clipe curto: repete (escolhido)' : 'Completado com ' + (s.clipes_extra || []).length + ' clipe(s) da mesma busca'}">${ic.estado === 'loop' ? '🔁' : '➕' + (s.clipes_extra || []).length}</b>`);
     if (ic.cortes) ic.cortes.forEach(x => { if (x > 0 && x < ic.precisa) c.insertAdjacentHTML('beforeend', `<i class="curto-mk" style="left:${xDe(x)}px"></i>`); });
@@ -2142,7 +2157,7 @@ function campoEd(q, c) {
   if (c.tipo === 'linhas') return campo(esc(c.rotulo), `<textarea id="${id}" rows="${Math.min(7, Math.max(3, String(v).split('\n').length + 1))}" spellcheck="false" placeholder="${esc(c.dica || '')}">${esc(v)}</textarea>`);
   if (c.tipo === 'num') return campo(esc(c.rotulo), `<input type="number" id="${id}" step="any" value="${esc(v)}">`);
   if (c.tipo === 'cor') return `<label class="f" style="flex:0 0 auto"><span>${esc(c.rotulo)}</span><span style="display:flex;gap:6px;align-items:center"><input type="color" id="${id}" value="${v || '#D0443E'}"><label class="chk" style="font-size:11px"><input type="checkbox" id="${id}_pad" ${v ? '' : 'checked'}> padrão</label></span></label>`;
-  if (c.tipo.startsWith('escolha:')) { const ops = c.tipo.split(':')[1].split('|'); return campo(esc(c.rotulo), `<select id="${id}">${c.k === 'fundo' ? `<option value="">padrão do quadro</option>` : ''}${ops.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`); }
+  if (c.tipo.startsWith('escolha:')) { const ops = c.tipo.split(':')[1].split('|'); return campo(esc(c.rotulo), `<select id="${id}">${c.k === 'fundo' ? `<option value="">padrão do quadro</option>` : ''}${ops.map(o => `<option value="${esc(o)}" ${o === v ? 'selected' : ''}>${esc((c.rotulos && c.rotulos[o]) || o)}</option>`).join('')}</select>`); }
   if (c.tipo === 'img') return campo(esc(c.rotulo), `<select id="${id}"><option value="">${esc(c.dica || '(nenhuma)')}</option>${imgs.map(b => `<option value="bib:${b.id}" ${v === 'bib:' + b.id ? 'selected' : ''}>${esc(b.filename)}</option>`).join('')}</select>${imgs.length ? '' : '<span class="dim">Envie imagens na aba 📁 Mídia → Biblioteca.</span>'}`);
   if (c.tipo === 'imgs') return campo(esc(c.rotulo), imgs.length ? `<div id="${id}" class="ed-imgs" style="display:flex;flex-direction:column;gap:2px;max-height:130px;overflow:auto">${imgs.map(b => `<label class="chk" style="font-size:11px"><input type="checkbox" value="bib:${b.id}" ${(v || []).includes('bib:' + b.id) ? 'checked' : ''}> ${esc(b.filename)}</label>`).join('')}</div><span class="dim">A ordem segue a ordem marcada aqui.</span>` : '<span class="dim">Envie imagens na aba 📁 Mídia → Biblioteca.</span>');
   return campo(esc(c.rotulo), `<input type="text" id="${id}" maxlength="300" placeholder="${esc(c.dica || '')}" value="${esc(v)}">`);
@@ -2530,6 +2545,125 @@ $('iaDesfazer').addEventListener('click', () => {
   if (voltarMidias.length) salvar(true);  // o arquivo que o trecho tinha antes volta no projeto
 });
 // 📁 a IA pôs mídias da biblioteca: salva (o servidor liga o arquivo ao trecho) e atualiza as miniaturas
+// ------------------------------------------------------------------ 🎬 revisão do diretor (v84_92)
+let planoRev = null, desfazerRev = null;
+const ROT_FLAG = { sem_previa: 'sem prévia', formato: 'formato errado', desenho: 'desenho/3D', nota_baixa: 'nota baixa', repetida: 'repetida' };
+const ICONE_ACAO = { busca: '🔎 busca nova', grafico: '📊 gráfico', cartao: '🃏 cartão', manual: '✋ procurar na mão', manter: '✔ manter' };
+function thumbDoTrecho(i) { const p = (segs[i] || {})._preview || {}; return p.thumbnail_url || p.thumb_remoto || ''; }
+function descreverAcao(it) {
+  if (it.acao === 'busca') return `em <b>${esc(it.buscador)}</b> (${it.midia === 'foto' ? 'foto' : 'vídeo'}): ${it.buscas.map(b => '“' + esc(b) + '”').join(' · ')}`;
+  if (it.acao === 'grafico') { const g = it.grafico || {}; return `<b>${esc(GR_TIPOS[g.tipo] || g.tipo)}</b>${g.titulo ? ' “' + esc(g.titulo) + '”' : ''}: ${(g.dados || []).map(d => esc(d.rotulo) + ' ' + esc(String(d.valor)) + (g.unidade ? ' ' + esc(g.unidade) : '')).join(', ')} — sobre um fundo`; }
+  if (it.acao === 'cartao') return `“${esc(it.frase)}”`;
+  if (it.acao === 'manual') return esc(it.procurar || '');
+  return 'a mídia atual serve';
+}
+function desenharRevisao(d) {
+  planoRev = d;
+  const c = d.contagem || {};
+  const resumo = Object.entries(ICONE_ACAO).filter(([k]) => c[k]).map(([k, n]) => `${n}: <b>${c[k]}</b>`).join(' · ');
+  $('rdLista').innerHTML = `<p class="hint" style="color:var(--text)">${d.revisados} trechos olhados${d.pulados ? ` (${d.pulados} pulados: escolhidos por você, cartões, YouTube)` : ''} — ${d.itens.length ? resumo : '<b>nada pra mudar 🎉</b>'}${d.com_ia ? '' : ' <span class="dim">(sem a 🤖 IA: só os problemas automáticos — ligue o recurso “🎬 Revisão do diretor” em 🤖 IA pra ela olhar as imagens e sugerir gráfico/cartão)</span>'}</p>`
+    + (d.itens.length ? `<label class="chk"><input type="checkbox" id="rdTodas" checked> todas</label><ul class="rd-lista">${d.itens.map((it, k) => `<li><input type="checkbox" class="rdPega" data-k="${k}" ${it.acao === 'manter' ? '' : 'checked'}>${thumbDoTrecho(it.i) ? `<img src="${esc(thumbDoTrecho(it.i))}" data-i="${it.i}" class="rdVer" alt="">` : `<img data-i="${it.i}" class="rdVer" alt="">`}<span class="rd-txt"><b class="rdVer" data-i="${it.i}" style="cursor:pointer">Trecho ${it.i + 1}</b> <span class="dim">${fmt(it.start, 1)}</span> ${(it.flags || []).map(f => `<span class="rd-chip">${ROT_FLAG[f] || f}</span>`).join('')}${it.problema ? `<br>${esc(it.problema)}` : ''}<span class="rd-acao">${ICONE_ACAO[it.acao] || it.acao}: ${descreverAcao(it)}</span></span></li>`).join('')}</ul>` : '')
+    + ((d.avisos || []).length ? `<details class="sec"><summary>⚠ ${d.avisos.length} avisos</summary><div class="in"><ul class="ia-lista">${d.avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div></details>` : '');
+  const todas = $('rdTodas'); if (todas) todas.addEventListener('change', () => document.querySelectorAll('.rdPega').forEach(x => { x.checked = todas.checked; }));
+  document.querySelectorAll('.rdVer').forEach(el => el.addEventListener('click', () => { const i = +el.dataset.i; selecionar({ tipo: 'seg', i }); seek(segs[i].start + 0.01); }));
+  $('rdAplicar').disabled = !d.itens.length;
+}
+async function esperarTarefa(tid, aoAndar) {
+  while (true) {
+    await new Promise(res => setTimeout(res, 2500));
+    let t = null; try { t = await (await fetch('/tarefas/' + tid, { cache: 'no-store' })).json(); } catch (_) {}
+    if (t && t.status !== 'rodando') { fetch('/tarefas/' + tid + '/aplicada', { method: 'POST' }).catch(() => {}); return t; }
+    if (t && aoAndar) aoAndar(t.progresso || '');
+  }
+}
+$('rdRodar').addEventListener('click', async () => {
+  $('rdRodar').disabled = true; $('rdSt').textContent = '🎬 começando…'; $('rdLista').innerHTML = '';
+  try {
+    if (sujo && !(await salvar(true))) throw new Error('não consegui salvar antes de revisar');
+    const previas = segs.map(x => { const p = x._preview || {}; return { thumb: p.thumb_remoto || p.thumbnail_url || '', label: p.label || '', erro: p.erro || null, ia_nota: p.ia_nota != null ? p.ia_nota : null, result_url: p.result_url || '' }; });
+    const r = await fetch(`/job/${JOB}/revisao-diretor`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ segmentos: segsParaRevisao(), previas }) });
+    const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+    $('rdSt').textContent = '⏳ rodando no servidor — pode fechar o Estúdio, chega um aviso no 🔔';
+    const t = await esperarTarefa(d.tarefa, (p) => { if (p) $('rdSt').textContent = p; });
+    if (t.status !== 'pronto') throw new Error(t.erro || 'a revisão deu erro');
+    $('rdSt').textContent = ''; desenharRevisao(t.resultado);
+  } catch (e) { $('rdSt').textContent = '⚠ ' + e.message; } finally { $('rdRodar').disabled = false; }
+});
+// voltou no Estúdio com a revisão pronta: mostra
+fetch('/tarefas?tipo=revisao_diretor&pendentes=1&limite=3&pagina=' + encodeURIComponent(`/job/${JOB}/edit-segments`)).then(r => r.json()).then(d => {
+  const t = (d.tarefas || []).find(x => x.status === 'pronto');
+  (d.tarefas || []).forEach(x => { if (x.status !== 'rodando') fetch('/tarefas/' + x.id + '/aplicada', { method: 'POST' }).catch(() => {}); });
+  if (t && t.resultado) { desenharRevisao(t.resultado); toast('🎬 A revisão do diretor ficou pronta — veja na aba 🤖 IA', 7000); }
+}).catch(() => {});
+const CAMPOS_REV = ['query', 'provider', 'media_type', 'alternativas', 'override_source', '_preview', 'revisao', 'cartao'];
+$('rdAplicar').addEventListener('click', async () => {
+  const p = planoRev; if (!p) return;
+  const marcados = [...document.querySelectorAll('.rdPega')].filter(c => c.checked).map(c => p.itens[+c.dataset.k]).filter(Boolean);
+  if (!marcados.length) { toast('Marque pelo menos um'); return; }
+  $('rdAplicar').disabled = true;
+  if (sujo && !(await salvar(true))) { toast('⚠ Não consegui salvar antes de aplicar', 5000); $('rdAplicar').disabled = false; return; }
+  desfazerRev = { segs: {}, destaques: JSON.stringify(destaques), graficos: JSON.stringify(graficos) };
+  marcados.forEach(it => { const x = segs[it.i]; if (x) desfazerRev.segs[it.i] = JSON.stringify(Object.fromEntries(CAMPOS_REV.map(k => [k, x[k] === undefined ? null : x[k]]))); });
+  const buscas = [], feito = { busca: 0, grafico: 0, cartao: 0, manual: 0 };
+  for (const it of marcados) {
+    const x = segs[it.i]; if (!x) continue;
+    if (it.acao === 'busca') {
+      const antiga = x.query;
+      x.query = it.buscas[0]; x.alternativas = it.buscas.slice(1).concat(antiga && !it.buscas.includes(antiga) ? [antiga] : []).slice(0, 4);
+      x.provider = it.buscador; x.media_type = it.midia === 'foto' ? 'image' : 'video'; x.override_source = null; delete x.revisao;
+      buscas.push(it); feito.busca++;
+    } else if (it.acao === 'grafico' || it.acao === 'cartao') {
+      try {
+        const r = await fetch(`/job/${JOB}/revisao/fundo/${it.i}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: it.acao, frase: it.frase || '' }) });
+        const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+        x.override_source = d.override_source; x.media_type = 'image'; delete x.revisao;
+        x._preview = { thumbnail_url: d.preview.thumbnail_url + '?t=' + Date.now(), label: d.preview.label, provider: 'cartao', erro: null };
+        for (let k = destaques.length - 1; k >= 0; k--) if (destaques[k].origem === 'cartao' && destaques[k].trecho === it.i) destaques.splice(k, 1);
+        if (d.destaque) destaques.push(d.destaque);
+        if (it.acao === 'grafico' && it.grafico) {
+          for (let k = graficos.length - 1; k >= 0; k--) if (graficos[k].origem === 'revisao' && graficos[k].start < x.end && graficos[k].end > x.start) graficos.splice(k, 1);
+          graficos.push(Object.assign({}, it.grafico, { start: x.start, end: x.end }));
+        }
+        feito[it.acao]++;
+      } catch (e) { x.revisao = { manual: true, procurar: it.acao === 'grafico' ? 'o gráfico não deu certo — use 📊 Gráfico à mão' : 'o cartão não deu certo — escolha uma mídia', motivo: e.message }; feito.manual++; }
+    } else if (it.acao === 'manual') {
+      x.revisao = { manual: true, procurar: it.procurar || '', motivo: it.problema || '' }; feito.manual++;
+    }
+  }
+  destaques.sort((a, b) => a.start - b.start); graficos.sort((a, b) => a.start - b.start);
+  marcarSujo(); desenharTimeline(); renderProps(); atualizarMonitor(true); $('rdDesfazer').disabled = false;
+  toast(`🎬 Aplicado: ${feito.busca} buscas novas, ${feito.grafico} gráficos, ${feito.cartao} cartões, ${feito.manual} pra procurar na mão` + (buscas.length ? ' — conferindo as buscas…' : ''), 6000);
+  if (!(await salvar(true))) { $('rdPrevias').textContent = '⚠ Não consegui salvar.'; return; }
+  if (buscas.length) {
+    $('rdPrevias').textContent = `🔄 conferindo ${buscas.length} buscas novas (pulando desenho e formato errado)…`;
+    await atualizarPrevias(buscas.map(it => it.i));
+    let semNada = 0;
+    buscas.forEach(it => {  // não achou nada que preste: vira "procurar na mão"
+      const x = segs[it.i], pv = (x && x._preview) || {};
+      if (!x || x.override_source) return;
+      if (!pv.thumbnail_url || pv.erro || String(pv.label || '').startsWith('⚠')) {
+        x.revisao = { manual: true, procurar: `nenhum buscador achou uma boa pra: ${it.buscas.map(b => '“' + b + '”').join(' / ')}`, motivo: it.problema || '' };
+        semNada++;
+      }
+    });
+    if (semNada) { marcarSujo(); desenharTimeline(); await salvar(true); }
+    $('rdPrevias').textContent = `✅ Buscas conferidas: ${buscas.length - semNada} com mídia nova${semNada ? ` · ${semNada} sem nada bom → 🔎 marcadas pra procurar na mão (laranja na timeline)` : ''}.`;
+  }
+});
+$('rdDesfazer').addEventListener('click', async () => {
+  const u = desfazerRev; if (!u) return;
+  pararPrevias = true;
+  Object.entries(u.segs).forEach(([i, v]) => { const x = segs[i]; if (!x) return; const o = JSON.parse(v); CAMPOS_REV.forEach(k => { if (o[k] === null) delete x[k]; else x[k] = o[k]; }); });
+  destaques.splice(0, destaques.length, ...JSON.parse(u.destaques)); graficos.splice(0, graficos.length, ...JSON.parse(u.graficos));
+  desfazerRev = null; $('rdDesfazer').disabled = true; marcarSujo(); desenharTimeline(); renderProps(); atualizarMonitor(true);
+  const previas = Object.keys(u.segs).map(Number);
+  if (await salvar(true)) {
+    for (const i of previas) {  // a prévia antiga volta pro servidor também
+      try { await fetch(`/job/${JOB}/buscas/previa/${i}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ definir: previaParaServidor(segs[i]._preview) }) }); } catch (_) {}
+    }
+  }
+  toast('↩ Revisão do diretor desfeita');
+});
 async function salvarEPrevias(idx) {
   if (!(await salvar(true))) return;
   idx.forEach(i => { const s = segs[i]; if (!s) return;
@@ -3279,6 +3413,7 @@ function propsTrecho(P, i) {
     <div class="prop-sub">${fmt(s.start, 1)} → ${fmt(s.end, 1)} · ${(s.end - s.start).toFixed(1)}s</div>
     ${D.erro_indice === i ? '<div class="erro">Esse trecho falhou na última montagem. <button class="primary mini corrigir-auto" data-indice="' + i + '" style="margin-top:6px;">🔧 Corrigir automaticamente</button><br><span style="font-size:11px;">ou troque a mídia dele abaixo.</span></div>' : ''}
     ${s._preview && s._preview.erro && !fonte ? `<div class="aviso">Sem prévia: ${esc(s._preview.erro)}</div>` : ''}
+    ${s.revisao && s.revisao.manual ? `<div class="aviso">🔎 <b>Procurar na mão</b> (🎬 revisão do diretor): ${esc(s.revisao.procurar || '')}${s.revisao.motivo ? `<br><span class="dim">${esc(s.revisao.motivo)}</span>` : ''}<br><button class="mini" id="pRevOk" style="margin-top:4px">✓ Resolvido</button></div>` : ''}
     <details class="sec" open><summary>⏱ Tempo</summary><div class="in">
       <div class="row">${campo('Início (s)', `<input type="number" id="pIni" step="0.1" value="${s.start.toFixed(2)}" ${i === 0 ? 'disabled' : ''}>`)}${campo('Fim (s)', `<input type="number" id="pFim" step="0.1" value="${s.end.toFixed(2)}" ${i === segs.length - 1 ? 'disabled' : ''}>`)}</div>
       <p class="hint">Mudar o início/fim mexe junto no trecho vizinho (a narração não tem buracos).</p>
@@ -3345,6 +3480,7 @@ function propsTrecho(P, i) {
   on('pIni', 'change', (e) => { const v = clamp(parseFloat(e.target.value) || 0, segs[i - 1].start + 0.3, s.end - 0.3); s.start = v; segs[i - 1].end = v; marcarSujo(); selecionar({ tipo: 'seg', i }); });
   on('pFim', 'change', (e) => { const v = clamp(parseFloat(e.target.value) || 0, s.start + 0.3, segs[i + 1].end - 0.3); s.end = v; segs[i + 1].start = v; marcarSujo(); selecionar({ tipo: 'seg', i }); });
   P.querySelectorAll('.tl-escolha button[data-de]').forEach(b => b.addEventListener('click', () => escolherMix([i], b.dataset.de)));
+  on('pRevOk', 'click', () => { delete s.revisao; marcarSujo(); desenharTimeline(); renderProps(); toast('🔎 Marca tirada — salve pra guardar'); });
   on('pDividir', 'click', () => dividir());
   on('pDividirLongo', 'click', () => dividirLongos(i));
   on('pJuntar', 'click', () => juntar(i));
@@ -3660,6 +3796,7 @@ function montarForm(acao) {
     add(p + 'start', s.start); add(p + 'end', s.end); add(p + 'query', s.query); add(p + 'provider', s.provider);
     add(p + 'alternativas', JSON.stringify(s.alternativas || [])); add(p + 'visual', s.visual || '');
     add(p + 'obra', s.obra || ''); add(p + 'personagem', s.personagem || '');
+    add(p + 'revisao', s.revisao && s.revisao.manual ? JSON.stringify(s.revisao) : '');
     add(p + 'on_screen_text', s.on_screen_text || '');
     let modo = 'auto';
     if (ov.source === 'local_file') { modo = 'upload'; if (ov.biblioteca) add(p + 'biblioteca', ov.biblioteca); if (ov.value) add(p + 'local_value', ov.value); }

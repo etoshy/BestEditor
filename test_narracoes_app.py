@@ -521,8 +521,9 @@ class TestGerarVozComLegenda:
             status = _espera_gerar_voz_terminar(client, job_id)
             assert status["erro"] is None  # o áudio continua sendo sucesso
             assert status["resultado"]["audio_url"]
-            assert "srt_url" not in status["resultado"]  # mas sem legenda
-            assert "falha simulada" in status["log"]
+            # v84_94: sem o Whisper a legenda sai com o texto do roteiro e tempos estimados
+            assert status["resultado"].get("srt_url")
+            assert "falha simulada" in status["log"] and "ESTIMADOS" in status["log"]
         finally:
             app_module.transcribe_audio = original
 
