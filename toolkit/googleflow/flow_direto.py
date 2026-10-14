@@ -82,6 +82,15 @@ S = {
     "progresso": ".loading-percentage",
     "erro_uso": ".error-text",
     "creditos_banner": "flow-credit-banner",
+    # aviso de NOVIDADES do Flow (HTML real, v84_107): flow-change-log-modal num mat-dialog → botão "Começar"
+    "novidades": "flow-change-log-modal",
+    "novidades_ok": ('flow-change-log-modal button.flow-button-primary, '
+                     'flow-change-log-modal button:has-text("Começar"), flow-change-log-modal button:has-text("Get started")'),
+    # "Direitos de uso desta imagem" ao ENVIAR mídia (HTML real, v84_107): só sobe depois do "Concordo"
+    "consentimento": "flow-upload-consent-dialog",
+    "consentimento_ok": ('flow-upload-consent-dialog .agree-actions-group button, '
+                         'flow-upload-consent-dialog button:has-text("Concordo"), flow-upload-consent-dialog button:has-text("I agree"), '
+                         'flow-upload-consent-dialog button:has-text("Agree")'),
     # conta sem créditos (HTML real, v84_104): no lugar do "Iniciar geração" aparece o alerta de créditos
     "sem_creditos": ('flow-prompt-box flow-credit-warning-button, '
                      'flow-prompt-box button[aria-label="Alerta de créditos insuficientes"], '
@@ -256,6 +265,43 @@ def garantir_largura(page, minimo: int = LARGURA_MIN) -> int:
     return largura
 
 
+def aceitar_direitos(page, on_passo: Passo = _nada) -> bool:
+    """"Direitos de uso desta imagem" (flow-upload-consent-dialog, ao enviar mídia): clica em "Concordo". Nunca erra."""
+    try:
+        d = page.locator(S["consentimento"]).first
+        if not d.count() or not d.is_visible():
+            return False
+        page.locator(S["consentimento_ok"]).first.click(timeout=5_000)
+        _esperar(lambda: not page.locator(S["consentimento"]).first.is_visible(), 5)
+        on_passo("direitos", "ok", '"Direitos de uso desta imagem" → Concordo')
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def fechar_novidades(page, on_passo: Passo = _nada, esperar_s: float = 0.0) -> bool:
+    """Se o Flow mostrou o aviso de NOVIDADES ("registros de alterações" — flow-change-log-modal), clica em "Começar"
+    (e, se tiver o "Direitos de uso desta imagem", em "Concordo"). Rápido quando não tem nada. Nunca levanta erro."""
+    aceitar_direitos(page, on_passo)
+    try:
+        if esperar_s:
+            _esperar(lambda: page.locator(S["novidades"]).first.is_visible(), esperar_s)
+        modal = page.locator(S["novidades"]).first
+        if not modal.count() or not modal.is_visible():
+            return False
+        botao = page.locator(S["novidades_ok"]).first
+        botao.click(timeout=5_000)
+        _esperar(lambda: not page.locator(S["novidades"]).first.is_visible(), 5)
+        on_passo("novidades", "ok", 'aviso de novidades do Flow fechado ("Começar")')
+        return True
+    except Exception:  # noqa: BLE001
+        try:
+            page.keyboard.press("Escape")
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+
+
 def abrir_flow(context, url: str = FLOW_URL, headless: bool = True, on_passo: Passo = _nada, timeout_login_s: float = 300):
     """Abre a lista de projetos. Sem o botão "Novo projeto" = precisa de login (oculto: erro na hora)."""
     on_passo("abrir", "andando", url)
@@ -269,6 +315,7 @@ def abrir_flow(context, url: str = FLOW_URL, headless: bool = True, on_passo: Pa
         page.wait_for_load_state("domcontentloaded")
     except Exception:  # noqa: BLE001
         pass
+    fechar_novidades(page, on_passo, esperar_s=2)
     if _primeiro(page, S["novo_projeto"], 15) is None:
         if headless or timeout_login_s <= 0:
             page.close()
@@ -308,6 +355,7 @@ def novo_projeto(page, context=None, on_passo: Passo = _nada):
             pass
     p.wait_for_load_state("domcontentloaded")
     garantir_largura(p)
+    fechar_novidades(p, on_passo, esperar_s=4)  # o aviso de novidades costuma aparecer logo depois do "Novo projeto"
     if _primeiro(p, S["editor"], 30) is None:
         try:  # às vezes o projeto novo abre "em branco": recarregar resolve
             p.reload(wait_until="domcontentloaded")
@@ -363,6 +411,7 @@ def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "
                       vid_proporcao: str = "16:9", vid_quantidade: str = "x1", vid_modelo: str = "",
                       on_passo: Passo = _nada) -> None:
     """Agente ligado → "tune" → Confirmar antes de gerar = NUNCA + padrões de imagem/vídeo → Salvar."""
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     passo = "config_agente"
     on_passo(passo, "andando", "")
     ligar_agente(page, True)
@@ -427,6 +476,7 @@ def ligar_agente(page, ligado: bool) -> None:
 
 
 def desligar_agente(page, on_passo: Passo = _nada) -> None:
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     on_passo("desligar_agente", "andando", "")
     ligar_agente(page, False)
     _primeiro(page, S["gatilho"], 8, "desligar_agente",
@@ -468,6 +518,7 @@ def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo
                      tipo_video: str = "Frames", on_passo: Passo = _nada) -> Dict[str, str]:
     """tipo "imagem" ou "video". Vídeo: `tipo_video` "Frames" (início/fim) ou "Elementos" (só o texto).
     Devolve {"resumo", "creditos"}."""
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     passo = "configurar"
     on_passo(passo, "andando", f"{tipo} {proporcao} {modelo} {quantidade}")
     pop = abrir_popup(page)
@@ -502,7 +553,7 @@ def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo
 
 
 # ------------------------------------------------------------------ 4. mídia: frames (início/fim) e referência
-def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, passo: str) -> str:
+def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, passo: str, on_passo: Passo = _nada) -> str:
     """Menu de mídia aberto → escolhe a imagem do projeto (`media_id`) ou envia `arquivo` → Incluir no comando."""
     _primeiro(page, S["menu_midia"], 8, passo, "o menu de mídia (imagens do projeto / Enviar mídia) não abriu.")
     item = None
@@ -521,7 +572,11 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
         except PWTimeout:
             raise FlowPassoErro(passo, 'cliquei em "Enviar mídia" mas a janela de escolher arquivo não abriu.')
         origem = "enviada"
-        if not _esperar(lambda: page.locator(S["midia_incluir"]).count() > 0 and page.locator(S["midia_item"]).count() > antes, 120):
+
+        def _subiu() -> bool:
+            aceitar_direitos(page, on_passo)  # o Flow só sobe a imagem depois do "Concordo"
+            return page.locator(S["midia_incluir"]).count() > 0 and page.locator(S["midia_item"]).count() > antes
+        if not _esperar(_subiu, 120):
             raise FlowPassoErro(passo, "enviei a imagem mas ela não apareceu na lista de mídias do Flow.")
         item = page.locator(S["midia_item"]).first  # a mais recente vem primeiro ("Recentes")
     item.click()
@@ -535,6 +590,7 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
 def definir_frame(page, qual: str = "Início", arquivo: Optional[str] = None, media_id: str = "",
                   on_passo: Passo = _nada) -> str:
     """Vídeo → Frames: chip "Início" ou "Fim" → imagem → "Incluir no comando". Confere que o chip ficou preenchido."""
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     passo = "frame_" + ("inicio" if qual.lower().startswith("in") else "fim")
     on_passo(passo, "andando", media_id or (arquivo or ""))
     chips = page.locator(S["chip_frame"])
@@ -542,7 +598,7 @@ def definir_frame(page, qual: str = "Início", arquivo: Optional[str] = None, me
         raise FlowPassoErro(passo, 'os campos "Início"/"Fim" não apareceram (o modo Vídeo → Frames está ligado?).')
     chip = chips.nth(0 if passo.endswith("inicio") else 1)
     (chip.locator("button").first if chip.locator("button").count() else chip).click()  # o botão do chip, não a moldura
-    origem = _escolher_midia(page, arquivo, media_id, qual, passo)
+    origem = _escolher_midia(page, arquivo, media_id, qual, passo, on_passo)
     if not _esperar(lambda: chip.locator("button.empty-chip").count() == 0, 10):
         raise FlowPassoErro(passo, f'incluí a imagem mas o campo "{qual}" continua vazio.')
     on_passo(passo, "ok", f"imagem {origem}")
@@ -551,16 +607,18 @@ def definir_frame(page, qual: str = "Início", arquivo: Optional[str] = None, me
 
 def incluir_referencia(page, arquivo: Optional[str] = None, media_id: str = "", on_passo: Passo = _nada) -> str:
     """"+" da caixa → imagem de referência (pra modificar uma foto com um prompt novo)."""
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     passo = "referencia"
     on_passo(passo, "andando", media_id or (arquivo or ""))
     _primeiro(page, S["adicionar"], 8, passo, 'não achei o "+" (Adicionar elementos à caixa de comando).').click()
-    origem = _escolher_midia(page, arquivo, media_id, "referência", passo)
+    origem = _escolher_midia(page, arquivo, media_id, "referência", passo, on_passo)
     on_passo(passo, "ok", f"imagem {origem}")
     return origem
 
 
 # ------------------------------------------------------------------ 5. prompt, gerar, esperar
 def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     passo = "prompt"
     texto = " ".join((texto or "").split())
     if not texto:
@@ -601,6 +659,7 @@ def avisos(page) -> str:
 
 def clicar_gerar(page, on_passo: Passo = _nada) -> Dict[str, Any]:
     """Clica UMA vez em "Iniciar geração" (clicar de novo cobraria duas vezes). Devolve o estado pra `checar`."""
+    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
     passo = "gerar"
     on_passo(passo, "andando", "")
     antes = {m["id"] for m in midias_na_pagina(page)}
@@ -632,6 +691,42 @@ def clicar_gerar(page, on_passo: Passo = _nada) -> Dict[str, Any]:
             "viu_cartao": False, "pct": ""}
 
 
+# v84_107: o Flow só põe o <video> no cartão quando o mouse passa por cima — antes disso é uma capa com o ícone de play.
+# Os centros dos cartões de VÍDEO sem <video> ainda (fora da caixa/menus), pra passar o mouse por cima.
+JS_TILES_VIDEO_SEM_VIDEO = r"""() => {
+  const fora = e => !e.closest('.cdk-overlay-container, flow-add-menu-popover-content, flow-prompt-box, flow-settings-view, nav, header');
+  const out = [];
+  document.querySelectorAll('mat-icon, i, span').forEach(ic => {
+    const t = (ic.innerText || '').trim();
+    if (!/^(play_circle|play_arrow|play_circle_filled|play_circle_outline)$/.test(t) || !fora(ic)) return;
+    let tile = ic; for (let k = 0; k < 8 && tile.parentElement; k++) { tile = tile.parentElement; if (tile.querySelector('img, video') && tile.getBoundingClientRect().width > 120) break; }
+    if (tile.querySelector('video')) return;
+    const r = tile.getBoundingClientRect(); if (r.width < 60 || r.height < 40) return;
+    out.push({x: r.left + r.width / 2, y: r.top + r.height / 2});
+  });
+  return out.slice(0, 6); }"""
+
+
+def acordar_videos(page) -> int:
+    """Passa o mouse por cima dos cartões de vídeo que ainda não têm o <video> (o Flow só carrega assim)."""
+    try:
+        alvos = page.evaluate(JS_TILES_VIDEO_SEM_VIDEO) or []
+    except Exception:  # noqa: BLE001
+        return 0
+    for a in alvos:
+        try:
+            page.mouse.move(float(a["x"]), float(a["y"]))
+            page.wait_for_timeout(400)
+        except Exception:  # noqa: BLE001
+            pass
+    if alvos:
+        try:
+            page.mouse.move(5, 5)
+        except Exception:  # noqa: BLE001
+            pass
+    return len(alvos)
+
+
 def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[Dict[str, str]]]:
     """Não bloqueia: None = ainda gerando; lista = as mídias NOVAS (imagem/vídeo). Erro nomeado se o Flow recusou."""
     novas = [m for m in midias_na_pagina(page) if m["id"] not in estado["antes"]
@@ -645,6 +740,13 @@ def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[
             raise FlowRecusou("esperar", "o Flow não gerou: " + (falhou[-1].get("pct") or ""))
     if novas and not cartoes:
         return novas
+    if tipo == "video" and not novas and (not cartoes or all((c.get("pct") or "").startswith("100") for c in cartoes)) \
+            and estado.get("viu_cartao") and time.monotonic() - estado.get("acordou_em", 0) > 3:
+        estado["acordou_em"] = time.monotonic()  # o vídeo ficou pronto mas o <video> só aparece com o mouse em cima
+        if acordar_videos(page):
+            novas = [m for m in midias_na_pagina(page) if m["id"] not in estado["antes"] and m["tipo"] == "video"]
+            if novas and not (page.evaluate(JS_CARTOES) or []):
+                return novas
     av = avisos(page)
     if av and av != estado.get("avisos_antes"):
         if RE_LIMITE.search(av):

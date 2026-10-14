@@ -76,7 +76,16 @@
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
       inp.addEventListener('change', () => { const f = inp.files[0]; if (!f) return;
         const m = { id: 'up' + (++st.n), url: URL.createObjectURL(f), titulo: f.name, tipo: 'imagem' };
-        setTimeout(() => { st.midias.unshift(m); desenharLista(pane); escolher(pane, m.id); }, 300); });
+        const subir = () => setTimeout(() => { st.midias.unshift(m); desenharLista(pane); escolher(pane, m.id); }, 300);
+        if (!Q.get('direitos')) return subir();
+        // ?direitos=1 (HTML REAL, v84_107): "Direitos de uso desta imagem" — só sobe depois do "Concordo"
+        document.body.insertAdjacentHTML('beforeend', '<div class="sim-direitos" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4)">'
+          + '<mat-dialog-container role="dialog" style="display:block;background:#fff;margin:80px auto;width:420px;padding:20px"><flow-upload-consent-dialog>'
+          + '<h2>Direitos de uso desta imagem</h2><mat-dialog-actions><button class="mdc-button">Cancelar</button>'
+          + '<div class="agree-actions-group"><button class="mdc-button"><span class="mdc-button__label">Concordo</span></button></div>'
+          + '</mat-dialog-actions></flow-upload-consent-dialog></mat-dialog-container></div>');
+        document.querySelector('.sim-direitos .agree-actions-group button').addEventListener('click', () => { document.querySelector('.sim-direitos').remove(); subir(); });
+      });
       inp.click();
     });
   }
@@ -116,7 +125,13 @@
         if (Q.get('falha') && pct > 40) { clearInterval(tick); $('.loading-percentage', tile).textContent = 'Não foi possível gerar. Tente outro comando.'; return; }
         if (pct < 99) { $('.loading-percentage', tile).textContent = pct + '%'; return; }
         clearInterval(tick);
-        if (video) {
+        if (video && Q.get('hover')) {
+          // ?hover=1 (como o Flow de verdade, v84_107): só a capa com o play — o <video> entra quando o mouse passa por cima
+          tile.innerHTML = `<flow-video-tile style="display:block;width:400px;height:225px"><img src="/media/image/${mid}?Expires=1" width="400" height="225"><mat-icon class="google-symbols">play_circle</mat-icon><span class="footer-title">${prompt}</span></flow-video-tile>`;
+          tile.addEventListener('mouseenter', () => { const t = $('flow-video-tile', tile); if (t.querySelector('video')) return;
+            t.insertAdjacentHTML('afterbegin', `<video src="/media/video/${mid}?Expires=1" data-media-id="${mid}" muted></video>`); });
+          st.midias.unshift({ id: mid, url: `/media/video/${mid}?Expires=1`, titulo: prompt, tipo: 'video' });
+        } else if (video) {
           tile.innerHTML = `<flow-video-tile><video src="/media/video/${mid}?Expires=1" data-media-id="${mid}" muted></video><span class="footer-title">${prompt}</span></flow-video-tile>`;
           st.midias.unshift({ id: mid, url: `/media/video/${mid}?Expires=1`, titulo: prompt, tipo: 'video' });
         } else {
@@ -208,4 +223,14 @@
     caixa().style.display = 'none'; document.body.appendChild(T('painel_sessao'));
   }
   ($$('flow-prompt-box flow-ingredient-bar') || []).forEach(e => e.remove());
+  // ?novidades=1 (HTML REAL, v84_107): o aviso de novidades do Flow cobre a tela até clicar em "Começar"
+  if (Q.get('novidades')) setTimeout(() => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="sim-novidades" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999">'
+      + '<mat-dialog-container role="dialog" class="mat-mdc-dialog-container" style="display:block;background:#fff;margin:80px auto;width:420px;padding:20px">'
+      + '<flow-change-log-modal><h2>Novidades</h2><p>registros de alterações</p><mat-dialog-actions>'
+      + '<button class="mdc-button flow-button-transparent">Ver todos os registros de alterações</button>'
+      + '<button class="mdc-button flow-button-primary"><span class="mdc-button__label">Começar</span></button>'
+      + '</mat-dialog-actions></flow-change-log-modal></mat-dialog-container></div>');
+    document.querySelector('.sim-novidades .flow-button-primary').addEventListener('click', () => document.querySelector('.sim-novidades').remove());
+  }, 300);
 })();

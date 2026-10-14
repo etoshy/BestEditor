@@ -208,3 +208,28 @@ def test_sem_creditos_pra_video_vira_flowlimite(sim, navegador):
     assert isinstance(g.erro_do_passo(e.value), g.GoogleFlowLimitReached)
     assert fd.RE_SEM_CREDITO.search("Alerta de créditos insuficientes") and not fd.RE_SEM_CREDITO.search("Vídeo · 10 créditos")
     ctx.close()
+
+
+def test_aviso_de_novidades_clica_em_comecar(sim, navegador):
+    """v84_107 (HTML real): o Flow cobre a tela com o aviso de novidades (flow-change-log-modal) — o site clica em
+    "Começar" e segue (antes, os cliques seguintes batiam no aviso)."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    passos = []
+    page = fd.preparar_projeto(ctx, sim + "?novidades=1", True, None, lambda n, e, d: passos.append((n, e, d)))
+    assert page.locator(".sim-novidades").count() == 0
+    assert any(n == "novidades" and e == "ok" for n, e, _ in passos)
+    assert fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple"}, timeout_s=30)
+    ctx.close()
+
+
+def test_direitos_de_uso_concordo_e_video_que_so_aparece_com_o_mouse(sim, navegador, tmp_path):
+    """v84_107 (HTML real): ao ENVIAR a imagem do frame o Flow pede "Direitos de uso desta imagem" → Concordo; e o
+    vídeo pronto só ganha o <video> quando o mouse passa por cima do cartão → o site passa o mouse e baixa."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    page = fd.preparar_projeto(ctx, sim + "?direitos=1&hover=1", True, None)
+    passos = []
+    v = fd.gerar_um(page, {"tipo": "video", "prompt": "a calm lake", "inicio": {"arquivo": _png(tmp_path)}},
+                    lambda n, e, d: passos.append((n, e, d)), 30)
+    assert len(v) == 1 and v[0]["tipo"] == "video"
+    assert any(n == "direitos" and e == "ok" for n, e, _ in passos)
+    ctx.close()

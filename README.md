@@ -28,6 +28,15 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎬 Flow: “Começar”, “Concordo” e o vídeo que só aparece com o mouse em cima (v84_107)
+
+- **Aviso de novidades** (“Ver todos os registros de alterações” / **Começar**): o site clica em **Começar** e segue —
+  ao abrir o Flow, depois do “Novo projeto” e antes de cada passo, já que o aviso pode aparecer a qualquer hora.
+- **“Direitos de uso desta imagem”** (ao enviar a imagem de Início/Fim ou de referência): o site clica em **Concordo**
+  — antes a imagem nunca subia e dava “enviei a imagem mas ela não apareceu na lista de mídias”.
+- **Vídeo pronto que não baixava**: o Flow só põe o vídeo no cartão quando o mouse passa por cima (antes é só a capa
+  com o ▶). Quando a geração chega em 100% e o vídeo não aparece, o site passa o mouse por cima do cartão e baixa.
+
 ## ⛔ Lista negra de sites (marca d'água) e 🖼 galeria do Flow com o que vai pros vídeos (v84_106)
 
 - ⚙️ Configurações → Fontes de vídeo → **⛔ Lista negra de sites** (editável, um por linha; dá pra voltar pra padrão):

@@ -173,8 +173,8 @@ def gerar_senha_aleatoria(tamanho: int = 10) -> str:
 # projeto" (confirmado pelo usuário via HTML real). Diferente das caixas de
 # boas-vindas: aparece uma vez só, sem rolagem, e some sozinho ao clicar
 # "Começar" -- não reaparece nas próximas vezes que essa conta abre um projeto.
-SEL_CHANGELOG_MODAL = ".change-log-modal"
-SEL_CHANGELOG_BOTAO_PRIMARIO = SEL_CHANGELOG_MODAL + " button.flow-button-primary"
+SEL_CHANGELOG_MODAL = "flow-change-log-modal, .change-log-modal"  # v84_107: a tag do HTML real
+SEL_CHANGELOG_BOTAO_PRIMARIO = "flow-change-log-modal button.flow-button-primary, .change-log-modal button.flow-button-primary"
 
 # Painel de configurações do agente (HTML fornecido pelo usuário). O BOTÃO que
 # abre esse painel não é conhecido com certeza: tentamos os candidatos abaixo
