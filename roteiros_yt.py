@@ -744,6 +744,7 @@ def prompt_analise(p: Dict[str, Any], modelo: Dict[str, Any], idioma: str = "o m
     if modelo.get("id") != "so_cenas":  # "só listar as cenas" não reescreve nada
         texto = texto.strip() + "\n\n" + metodo_roteiro.bloco("curto" if curto else "reescrita")
     mins = minutos_alvo(p.get("minutos_alvo"))
+    em_partes = usa_partes(p, modelo)
     if modelo.get("id") != "so_cenas":  # ✍️ o vídeo original é GUIA: a IA cria a própria linha de storytelling
         texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_guia("o vídeo original (a transcrição)", tem_tamanho=bool(mins))
         import canal  # 📺 o nome do MEU canal, falado no momento certo
@@ -752,8 +753,14 @@ def prompt_analise(p: Dict[str, Any], modelo: Dict[str, Any], idioma: str = "o m
             texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_canal(_canal, curto=curto)
     if sem_experiencias:
         texto = texto.strip() + "\n\n" + REGRA_SEM_EXPERIENCIAS
-    if marcar_chamadas:
+    if marcar_chamadas and not em_partes:
         texto = texto.strip() + "\n\n" + REGRA_MARCAS
+    if em_partes:  # ✍️ vídeo longo: agora só o PLANO; depois um capítulo por vez, em texto puro
+        import roteiro_partes
+        m2, alvo2 = alvo_palavras(p)
+        bloco = roteiro_partes.bloco_plano(m2, alvo2).replace("cada um com a fonte (F1, F2…)", "cada um com o tempo na transcrição ([3:12])")
+        texto = texto.strip() + "\n\n" + bloco + ("\n- As marcas [[INSCREVA]]/[[VENDA]] o site põe entre os capítulos." if marcar_chamadas else "")
+        return texto.strip() + "\n\n" + _FORMATO_PLANO
     if mins and modelo.get("id") != "so_cenas":  # 📏 duração escolhida: seção de tamanho perto do fim
         texto = texto.strip() + "\n\n" + metodo_roteiro.bloco_tamanho(mins, int(mins * PALAVRAS_POR_MINUTO), reescrita=True)
     return texto.strip() + "\n\n" + _FORMATO_ANALISE
@@ -818,6 +825,7 @@ def _cena(c: Dict[str, Any], k: int) -> Optional[Dict[str, Any]]:
         "busca_youtube": str(c.get("busca_youtube") or f"{obra} {momento}")[:160].strip(),
         "certeza": str(c.get("certeza") or "").lower()[:10],
         "marcador": str(c.get("marcador") or "")[:20],
+        "capitulo": int(c["capitulo"]) if str(c.get("capitulo") or "").isdigit() else 0,
         "link": "", "link_inicio": "", "link_fim": "",
     }
 
@@ -828,7 +836,9 @@ def ler_analise(texto: str) -> Dict[str, Any]:
         raise RoteiroError("Esperava um objeto JSON com \"roteiro\" e \"cenas\".")
     roteiro = str(d.get("roteiro") or d.get("roteiro_reescrito") or "").strip()
     cenas_raw = d.get("cenas") or []
-    if not roteiro and not cenas_raw:
+    import roteiro_partes as _rp
+    plano_caps = d.get("capitulos") if not roteiro and _rp.eh_plano(d.get("capitulos")) else None
+    if not roteiro and not cenas_raw and not plano_caps:
         raise RoteiroError("O JSON não tem \"roteiro\" nem \"cenas\".")
     cenas = [c for c in (_cena(x, k) for k, x in enumerate(cenas_raw if isinstance(cenas_raw, list) else []) if isinstance(x, dict)) if c]
     for k, c in enumerate(cenas, start=1):
@@ -837,7 +847,114 @@ def ler_analise(texto: str) -> Dict[str, Any]:
             "roteiro": roteiro, "cenas": cenas, "marcas": marcas_no_texto(roteiro),
             "removidos": [str(x)[:300] for x in (d.get("removidos") or []) if str(x).strip()][:60],
             "observacoes": str(d.get("observacoes") or "").strip()[:1500],
-            "plano": __import__("metodo_roteiro").ler_plano(d.get("plano"))}
+            "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
+            **({"capitulos_plano": plano_caps} if plano_caps else {})}
+
+
+# ------------------------------------------------------------------ ✍️ roteiro em partes (v84_98)
+def minutos_do_original(p: Dict[str, Any]) -> float:
+    blocos = (p.get("transcricao") or {}).get("blocos") or []
+    if blocos and blocos[-1].get("inicio"):
+        return round(float(blocos[-1].get("fim") or blocos[-1]["inicio"]) / 60.0, 1)
+    return round(sum(len(str(b.get("texto") or "").split()) for b in blocos) / PALAVRAS_POR_MINUTO, 1)
+
+
+def alvo_palavras(p: Dict[str, Any]) -> Tuple[float, int]:
+    mins = minutos_alvo(p.get("minutos_alvo")) or minutos_do_original(p)
+    return mins, int(mins * PALAVRAS_POR_MINUTO)
+
+
+def usa_partes(p: Dict[str, Any], modelo: Dict[str, Any]) -> bool:
+    import roteiro_partes as rp
+    if modelo.get("id") in ("so_cenas", "reescrever_curto") or "short" in str(modelo.get("nome") or "").lower():
+        return False
+    mins, _alvo = alvo_palavras(p)
+    return rp.usa_partes({"modo_partes": p.get("modo_partes") or "auto"}, mins)
+
+
+_FORMATO_PLANO = """## Formato de resposta — IMPORTANTE
+
+Responda **apenas** com um JSON válido (sem texto antes ou depois). NÃO inclua "roteiro" — só o plano:
+
+{
+  "titulo": "título curto do assunto do vídeo",
+  "idioma": "idioma em que o roteiro vai ser escrito (ex.: pt-BR)",
+  "capitulos": [{"titulo": "...", "objetivo": "o que conta e como termina", "fatos": [{"fato": "fato concreto do vídeo original", "fonte": "[3:12] (o tempo na transcrição)", "tipo": "fato | alegacao | interpretacao"}], "palavras": 350}],
+  "cenas": [{"obra": "...", "tipo": "filme | serie | anime | desenho | jogo | documentario | novela | outro", "ano": "", "momento": "...", "no_video_original": {"inicio": "3:12", "fim": "3:25"}, "capitulo": 2, "busca_youtube": "...", "certeza": "alta | media | baixa"}],
+  "removidos": ["o que você tirou ou trocou e por quê (curto)"],
+  "plano": {"objetivo_comum": "...", "problema_superficie": "...", "problema_profundo": "...", "publico": "...", "comeco_e_fim": "...", "jornada": ["..."], "lacos_abertos": ["..."]},
+  "observacoes": "algo importante pra quem vai editar (opcional)"
+}
+
+"capitulo" de cada cena = o número do capítulo do SEU plano em que ela entra. Liste TODA cena de filme, série, anime, desenho, jogo etc. que o vídeo mostra ou descreve."""
+
+
+def contexto_partes(p: Dict[str, Any]) -> Dict[str, Any]:
+    import canal
+    import idiomas
+    an = p.get("analise") or {}
+    cod = idiomas.normalizar(p.get("idioma_roteiro") or an.get("idioma") or "")
+    mins, _alvo = alvo_palavras(p)
+    regras = ["Use o vídeo original (a transcrição) como GUIA dos fatos — conte com a SUA linha de storytelling, sem seguir "
+              "ponto a ponto nem reaproveitar frases.",
+              REGRA_SEM_EXPERIENCIAS.split("\n\n", 1)[1].split(". Liste")[0] + "."]
+    return {"tema": p.get("titulo") or an.get("titulo") or "o vídeo", "nome_modelo": "canal do YouTube", "minutos": mins,
+            "idioma": idiomas.nome_para_prompt(cod) if cod else "o mesmo idioma da transcrição",
+            "regras": regras, "canal": canal.nome_do_projeto(p.get("nome_canal")), "midias": {}, "plano": an.get("plano") or {}}
+
+
+def prompt_parte(p: Dict[str, Any], k: int, com_fontes: bool = False) -> str:
+    import roteiro_partes as rp
+    an = p.get("analise") or {}
+    partes = an.get("partes") or []
+    if not any(x["k"] == k for x in partes):
+        raise RoteiroError("Parte não encontrada.")
+    ctx = contexto_partes(p)
+    cenas = [c for c in an.get("cenas") or [] if int(c.get("capitulo") or 0) == k]
+    if cenas:
+        ctx["regras"] = ctx["regras"] + ["Cenas de filmes/séries/animes que o editor vai mostrar nesta parte (comente/narre o que "
+                                         "elas mostram no ponto certo): " + "; ".join(f"{c['obra']} — {c['momento']}" for c in cenas)]
+    fontes = texto_da_transcricao(p.get("transcricao") or {})[:80000] if com_fontes else ""
+    return rp.prompt_parte(ctx, partes, k, fontes)
+
+
+def salvar_parte(p: Dict[str, Any], k: int, texto: str) -> Dict[str, Any]:
+    import roteiro_partes as rp
+    an = p.get("analise") or {}
+    parte = next((x for x in an.get("partes") or [] if x["k"] == k), None)
+    if not parte:
+        raise RoteiroError("Parte não encontrada.")
+    parte.pop("aceita_curta", None)
+    try:
+        parte["texto"] = rp.ler_parte(texto, parte)
+    except ValueError as exc:
+        raise RoteiroError(str(exc)) from exc
+    parte["status"] = "pronta" if rp.palavras(parte["texto"]) >= parte["palavras"] * 0.85 else "curta"
+    if all(x.get("texto") for x in an["partes"]):
+        montar_partes(p)
+    return an
+
+
+def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
+    import roteiro_partes as rp
+    an = p.get("analise") or {}
+    roteiro, caps = rp.montar(an.get("partes") or [], p.get("marcar_chamadas", True) is not False)
+    an["roteiro"] = roteiro
+    an["capitulos_partes"] = caps
+    an["marcas"] = marcas_no_texto(roteiro)
+    conferir_tamanho(p, an)
+    p["resultado"] = None
+    return an
+
+
+def iniciar_completar(p: Dict[str, Any]) -> Dict[str, Any]:
+    import roteiro_partes as rp
+    an = p.get("analise") or {}
+    if not an.get("roteiro"):
+        raise RoteiroError("Ainda não tem roteiro reescrito.")
+    mins, alvo = alvo_palavras(p)
+    an["partes"] = rp.de_roteiro(an["roteiro"], an.get("capitulos_partes") or [], alvo, rp.n_capitulos(mins))
+    return an
 
 
 # ------------------------------------------------------------------ passo 2: o que fazer com o roteiro

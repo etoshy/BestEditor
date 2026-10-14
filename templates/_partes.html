@@ -1,0 +1,56 @@
+{# ✍️ Roteiro em partes (roteiro_partes.py) — incluir com: {% set partes_base = '/roteiros-yt/<id>/partes' %}{% include "_partes.html" %} #}
+<div id="ptCard" style="display:none;background:#faf5ff;border:2px solid #c4b5fd;border-radius:10px;padding:12px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 4px;font-size:1.1rem;">✍️ Roteiro em partes</h2>
+  <p style="font-size:.84rem;color:#555;margin:0 0 6px;">Cada capítulo é pedido separado e a resposta é <b>só o texto</b> (sem JSON) — assim a IA escreve cada um inteiro. Cole cada prompt na MESMA conversa do 1º prompt (ela já tem a transcrição). Com todas prontas, o site junta tudo num roteiro só, com <code>[[INSCREVA]]</code>/<code>[[VENDA]]</code> entre os capítulos. Depois, a 🪄 revisão do roteiro inteiro dá o acabamento.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button type="button" id="ptIA" style="width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff;display:none">🤖 Escrever as que faltam com a IA</button><button type="button" id="ptMontar" style="width:auto;margin:0;padding:5px 12px;background:#64748b;display:none">🧩 Juntar agora</button><span id="ptSt" style="font-size:.85rem;color:#555"></span></div>
+  <div id="ptLista"></div>
+</div>
+<script>
+(function () {
+  const BASE = {{ partes_base|tojson }};
+  const $p = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  const pal = (t) => String(t || '').replace(/\[\[[^\]]*\]\]|\[[^\]]*\]/g, ' ').split(/\s+/).filter(Boolean).length;
+  let ia = false;
+  fetch('/ia/status').then(r => r.json()).then(j => { ia = !!(j.pode && j.pode.roteiros); carregar(); }).catch(() => carregar());
+  function desenhar(L, temRoteiro) {
+    $p('ptCard').style.display = L.length ? '' : 'none'; if (!L.length) return;
+    const feitas = L.filter(x => x.texto).length;
+    $p('ptIA').style.display = ia ? '' : 'none'; $p('ptIA').textContent = feitas === L.length ? '🤖 Reescrever as curtas com a IA' : '🤖 Escrever as que faltam com a IA';
+    $p('ptMontar').style.display = feitas === L.length ? '' : 'none';
+    $p('ptSt').textContent = `${feitas}/${L.length} escritas · ${L.reduce((a, x) => a + pal(x.texto), 0)} de ~${L.reduce((a, x) => a + (x.palavras || 0), 0)} palavras` + (temRoteiro ? ' · roteiro montado ✔' : '');
+    $p('ptLista').innerHTML = L.map(x => { const n = pal(x.texto), ok = x.texto && (n >= x.palavras * 0.85 || x.aceita_curta);
+      return `<div style="border-top:1px solid #e9d5ff;margin-top:8px;padding-top:6px" data-k="${x.k}">
+        <b>${x.k}. ${esc(x.titulo)}</b> <span style="font-size:.8rem;color:#666">${x.texto ? `${n} / ~${x.palavras} palavras` : `~${x.palavras} palavras`}</span>
+        ${ok ? '<span style="color:#15803d"> ✔</span>' : x.texto ? '<span style="color:#b45309"> ⚠ curta</span>' : '<span style="color:#666"> · a escrever</span>'}
+        ${x.objetivo ? `<div style="font-size:.8rem;color:#555">${esc(x.objetivo)}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="pP" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#64748b">📋 Prompt desta parte</button>${x.texto ? '<button type="button" class="pV" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#94a3b8">👁 ver texto</button>' : ''}</div>
+        <textarea class="pPT" rows="3" readonly style="display:none;width:100%;margin-top:4px;font-family:monospace;font-size:.75rem"></textarea>
+        <textarea class="pR" rows="3" placeholder="cole aqui o texto que a IA escreveu pra esta parte" style="width:100%;margin-top:4px"></textarea>
+        <div style="display:flex;gap:6px;align-items:center"><button type="button" class="pU" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem">✅ Usar o texto desta parte</button><span class="pS" style="font-size:.8rem"></span></div>
+        <div class="pT" style="display:none;white-space:pre-wrap;font-size:.82rem;background:#fff;border-radius:6px;padding:6px 8px;margin-top:4px">${esc(x.texto || '')}</div></div>`; }).join('');
+    $p('ptLista').querySelectorAll('[data-k]').forEach(el => {
+      const k = Number(el.dataset.k), st = el.querySelector('.pS');
+      el.querySelector('.pP').addEventListener('click', async (e) => { try { const d = await post(`${BASE}/${k}/prompt`, {}); const ta = el.querySelector('.pPT'); ta.value = d.prompt; ta.style.display = '';
+        try { await navigator.clipboard.writeText(d.prompt); e.target.textContent = '✅ Copiado'; } catch (_) { ta.select(); } } catch (err) { st.textContent = '⚠ ' + err.message; } });
+      const v = el.querySelector('.pV'); if (v) v.addEventListener('click', () => { const t = el.querySelector('.pT'); t.style.display = t.style.display === 'none' ? '' : 'none'; });
+      el.querySelector('.pU').addEventListener('click', async () => { try { const d = await post(`${BASE}/${k}/texto`, { texto: el.querySelector('.pR').value });
+        if (d.tem_roteiro && d.partes.every(x => x.texto)) { st.textContent = '✔ roteiro montado — recarregando…'; setTimeout(() => location.reload(), 900); return; }
+        desenhar(d.partes, d.tem_roteiro); } catch (err) { st.textContent = '⚠ ' + err.message; } });
+    });
+  }
+  async function carregar() { try { const d = await (await fetch(BASE, { cache: 'no-store' })).json(); desenhar(d.partes || [], d.tem_roteiro); } catch (_) {} }
+  $p('ptMontar').addEventListener('click', async () => { try { await post(BASE + '/montar', {}); location.reload(); } catch (e) { $p('ptSt').textContent = '⚠ ' + e.message; } });
+  $p('ptIA').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try { const d = await post(BASE + '/ia', {});
+      while (true) { const t = await (await fetch('/tarefas/' + d.tarefa, { cache: 'no-store' })).json(); await carregar();
+        $p('ptSt').textContent = t.status === 'rodando' ? '🤖 ' + (t.progresso || 'escrevendo…') + ' (pode fechar a aba — o 🔔 avisa)' : t.status === 'erro' ? '⚠ ' + (t.erro || 'falhou') : '✔ pronto';
+        if (t.status !== 'rodando') { if (t.status === 'pronto') setTimeout(() => location.reload(), 900); break; }
+        await new Promise(r => setTimeout(r, 5000)); }
+    } catch (err) { $p('ptSt').textContent = '⚠ ' + err.message; } e.target.disabled = false;
+  });
+  window.partesRecarregar = carregar;
+})();
+</script>

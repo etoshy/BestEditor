@@ -450,7 +450,9 @@ CONFIG_PADRAO: Dict[str, Any] = {"modelo": "true_crime", "formato": "caso_comple
                                  # 📐 transcrição de um vídeo que viralizou: a IA copia a estrutura
                                  "referencia": "",
                                  # 📺 nome do canal deste projeto ("" = o das Configurações; "-" = não falar)
-                                 "nome_canal": ""}
+                                 "nome_canal": "",
+                                 # ✍️ roteiro escrito capítulo por capítulo: "auto" (a partir de ~8 min), "sim", "nao"
+                                 "modo_partes": "auto"}
 
 REGRA_SEM_PESSOAL = (
     "CONTEÚDO DAS FONTES: muitas fontes são textos ou transcrições de OUTROS criadores. NÃO traga pro roteiro as experiências "
@@ -1153,19 +1155,41 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
     L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
     L.append("")
-    _tam = metodo_roteiro.bloco_tamanho(minutos, palavras, fmt.get("estrutura"))  # 📏 perto do fim: a IA respeita mais
+    import roteiro_partes
+    em_partes = roteiro_partes.usa_partes(cfg, minutos)
+    _tam = (roteiro_partes.bloco_plano(minutos, palavras, fmt.get("estrutura")) if em_partes
+            else metodo_roteiro.bloco_tamanho(minutos, palavras, fmt.get("estrutura")))  # 📏 perto do fim: a IA respeita mais
     if _tam:
         L.append(_tam)
         L.append("")
     L.append("## Resposta — SOMENTE um JSON válido, assim:")
+    if em_partes:  # ✍️ só o PLANO agora (os capítulos vêm um por um, em texto puro)
+        L.append(json.dumps({
+            "plano": metodo_roteiro.PLANO_JSON,
+            "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
+            "capitulos": roteiro_partes.exemplo_capitulos(),
+            "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
+            "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
+            "ideias": ["ideias de ganchos / vídeos derivados"],
+            "tags": ["tags do YouTube"],
+            "fontes_usadas": ["F1", "F2"],
+            "observacoes": "pontos que eu devo conferir (fatos duvidosos, fontes que discordam)",
+            **({"produto_sugerido": {"nome": "nome do produto", "por_que": "por que combina com este vídeo e com o público",
+                                     "busca": "o que digitar na Amazon pra achar", "chamada": "2-3 frases de venda pro vídeo da [[VENDA]]"}}
+               if cfg.get("sugerir_produto") else {}),
+        }, ensure_ascii=False, indent=2))
+        L.append("NÃO inclua \"roteiro\" nesta resposta — só o plano. " + __import__("thumbs_flow").BLOCO_PROMPT)
+        L.append("")
+        L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))
+        return "\n".join(L)
     L.append(json.dumps({
+        "roteiro": "Texto narrado COMPLETO, no tamanho pedido... [I3] frase em que a imagem I3 aparece...",
         "plano": metodo_roteiro.PLANO_JSON,
         "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
         "ideias": ["ideias de ganchos / vídeos derivados"],
         "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
         "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
         "capitulos": [{"titulo": "Título curto do capítulo", "comeca_em": "as primeiras 6-10 palavras EXATAS do roteiro onde ele começa"}],
-        "roteiro": "Texto narrado completo... [I3] frase em que a imagem I3 aparece...",
         "momentos": [{"midia": "I3", "trecho": "frase exata do roteiro em que a imagem entra"}],
         "tags": ["tags do YouTube"],
         "fontes_usadas": ["F1", "F2"],
@@ -1198,6 +1222,9 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         raise DossieError(str(exc)) from exc
     if isinstance(d, list) and len(d) == 1 and isinstance(d[0], dict):
         d = d[0]
+    import roteiro_partes as _rp
+    if isinstance(d, dict) and not str(d.get("roteiro") or "").strip() and _rp.eh_plano(d.get("capitulos")):
+        return _resultado_plano(d, p)  # ✍️ veio o PLANO: os capítulos são escritos um por um
     if not isinstance(d, dict) or not str(d.get("roteiro") or "").strip():
         raise DossieError("O JSON não tem o \"roteiro\".")
     rot = str(d["roteiro"]).strip()
@@ -1223,10 +1250,138 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             "fontes_usadas": [str(x)[:10] for x in d.get("fontes_usadas") or []][:30],
             "afirmacoes": _afirmacoes(d.get("afirmacoes")),
             "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
+            **({"partes": d["partes"]} if isinstance(d.get("partes"), list) and d["partes"] else {}),
             "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time(),
             "produto_sugerido": _produto(d.get("produto_sugerido")),
             "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
             "chamadas": {"inscreva": len(re.findall(r"\[\[\s*INSCREVA", rot, re.I)), "venda": len(re.findall(r"\[\[\s*VENDA", rot, re.I))}}
+
+
+def _resultado_plano(d: Dict[str, Any], p: Dict[str, Any]) -> Dict[str, Any]:
+    """✍️ O 1º prompt devolveu o PLANO (vídeo longo): guarda títulos, descrição etc. e as partes a escrever."""
+    import roteiro_partes as rp
+    _min, _alvo, _ppm = alvo_tamanho(p)
+    partes = rp.de_plano(d.get("capitulos") or [], _alvo)
+    if not partes:
+        raise DossieError("O plano veio sem capítulos.")
+    afirm = _afirmacoes(d.get("afirmacoes")) or [
+        {"trecho": f["fato"][:300], "tipo": f["tipo"], "fonte": f.get("fonte") or ""} for pt in partes for f in pt["fatos"]][:80]
+    return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": False},
+            "titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
+            "ideias": [str(x)[:300] for x in d.get("ideias") or [] if str(x).strip()][:15],
+            "descricao": str(d.get("descricao") or "").strip()[:5000],
+            "capitulos": [{"titulo": pt["titulo"], "comeca_em": ""} for pt in partes], "palavras": 0,
+            "roteiro": "", "roteiro_final": "", "momentos": [],
+            "tags": [str(x)[:60] for x in d.get("tags") or [] if str(x).strip()][:30],
+            "fontes_usadas": [str(x)[:10] for x in d.get("fontes_usadas") or []][:30],
+            "observacoes": str(d.get("observacoes") or "").strip()[:2000],
+            "avisos": [f"✍️ Plano pronto: {len(partes)} capítulos (~{_alvo} palavras no total). Agora escreva as partes — "
+                       "uma por vez, em texto puro (ou 🤖 todas com a IA)."],
+            "gerado_em": time.time(), "produto_sugerido": _produto(d.get("produto_sugerido")),
+            "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
+            "afirmacoes": afirm,
+            "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
+            "partes": partes, "chamadas": {"inscreva": 0, "venda": 0}}
+
+
+# ------------------------------------------------------------------ ✍️ roteiro em partes
+def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str, Any]:
+    import canal
+    import idiomas
+    cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    mod = MODELOS.get(cfg["modelo"]) or MODELOS["true_crime"]
+    minutos, _alvo, _ppm = alvo_tamanho(p)
+    vis = [m for m in p.get("midias") or [] if m["tipo"] in ("foto", "video") and not m.get("descartada") and not m.get("duplicada_de")]
+    regras = list(mod["regras"])
+    if (cfg.get("tom") or "").strip():
+        regras.append(f"Tom: {cfg['tom'].strip()[:400]}")
+    if (cfg.get("extra") or "").strip():
+        regras.append(f"Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
+    return {"tema": (p.get("tema") or "").strip(), "nome_modelo": mod["nome"].split(" ", 1)[1], "minutos": minutos,
+            "idioma": idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
+            "regras": regras, "canal": canal.nome_do_projeto(cfg.get("nome_canal")),
+            "midias": {m["id"].upper(): o_que_e(m)[:300] for m in vis}, "plano": (p.get("resultado") or {}).get("plano") or {}}
+
+
+def _fontes_texto(p: Dict[str, Any], limite: int = 60000) -> str:
+    """As fontes, em texto (pra quando a IA do site escreve as partes numa conversa nova)."""
+    L: List[str] = []
+    for f in p.get("fontes") or []:
+        if not f.get("texto"):
+            continue
+        L.append(f"### {f['id']} — {f.get('titulo') or f.get('url') or f.get('arquivo')}")
+        if f.get("condensado"):
+            import ia_dossies
+            L.append(ia_dossies.condensado_para_prompt(f["condensado"]))
+        else:
+            L.append(f.get("texto") or "")
+    for m in p.get("midias") or []:
+        if m["tipo"] == "texto":
+            L.append(f"### {m['id']}" + (f" — {m['descricao']}" if m.get("descricao") else "") + f"\n{m.get('conteudo') or ''}")
+    if (p.get("roteiro_base") or "").strip():
+        L.append("### Roteiro/anotações do autor (guia)\n" + p["roteiro_base"].strip()[:20000])
+    t = "\n\n".join(L)
+    return t[:limite]
+
+
+def iniciar_completar(p: Dict[str, Any]) -> Dict[str, Any]:
+    """📏 O roteiro ficou curto: corta em partes (nos capítulos) pra reescrever só as curtas."""
+    import roteiro_partes as rp
+    res = p.get("resultado") or {}
+    if not res.get("roteiro"):
+        raise DossieError("Ainda não tem roteiro.")
+    minutos, alvo, _ppm = alvo_tamanho(p)
+    if minutos <= 1:
+        raise DossieError("Shorts não tem tamanho mínimo pra completar.")
+    res["partes"] = rp.de_roteiro(res["roteiro"], res.get("capitulos") or [], alvo, rp.n_capitulos(minutos))
+    return res
+
+
+def prompt_parte(p: Dict[str, Any], k: int, com_fontes: bool = False) -> str:
+    import roteiro_partes as rp
+    partes = (p.get("resultado") or {}).get("partes") or []
+    if not any(x["k"] == k for x in partes):
+        raise DossieError("Parte não encontrada.")
+    return rp.prompt_parte(_contexto_partes(p), partes, k, _fontes_texto(p) if com_fontes else "")
+
+
+def salvar_parte(p: Dict[str, Any], k: int, texto: str) -> Dict[str, Any]:
+    """Guarda o texto de uma parte; com todas prontas, monta o roteiro (marcas e capítulos) e refaz o resultado."""
+    import roteiro_partes as rp
+    res = p.get("resultado") or {}
+    partes = res.get("partes") or []
+    parte = next((x for x in partes if x["k"] == k), None)
+    if not parte:
+        raise DossieError("Parte não encontrada.")
+    parte.pop("aceita_curta", None)
+    try:
+        parte["texto"] = rp.ler_parte(texto, parte)
+    except ValueError as exc:
+        raise DossieError(str(exc)) from exc
+    n = rp.palavras(parte["texto"])
+    parte["status"] = "pronta" if n >= parte["palavras"] * 0.85 else "curta"
+    if any(not x.get("texto") for x in partes):
+        res["avisos"] = [f"✍️ Partes escritas: {sum(1 for x in partes if x.get('texto'))} de {len(partes)}."]
+        return res
+    return montar_partes(p)
+
+
+def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
+    import json as _json
+    import roteiro_partes as rp
+    res = p.get("resultado") or {}
+    partes = res.get("partes") or []
+    cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
+    _min, alvo, _ppm = alvo_tamanho(p)
+    roteiro, caps = rp.montar(partes, cfg.get("marcar_chamadas", True) is not False, alvo)
+    d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano",
+                                 "afirmacoes", "thumbnails")}
+    d.update(roteiro=roteiro, capitulos=caps, momentos=[], partes=partes)
+    novo = ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+    curtas = [x["k"] for x in partes if x.get("status") == "curta"]
+    if curtas:
+        novo["avisos"].append("✍️ Partes abaixo do tamanho: " + ", ".join(map(str, curtas)) + " — dá pra pedir de novo só elas.")
+    return novo
 
 
 def _afirmacoes(x: Any) -> List[Dict[str, str]]:
@@ -1273,6 +1428,9 @@ def ler_resposta(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     try:
         d = json_ia.carregar(texto)
     except ValueError as exc:
+        # texto puro (sem JSON) colado depois de já ter roteiro = o roteiro novo (ex.: resposta do 📏 completar)
+        if (p.get("resultado") or {}).get("roteiro") and len(str(texto or "").split()) > 80 and "{" not in str(texto)[:5]:
+            return roteiro_editado(p, str(texto).strip())
         raise DossieError(str(exc)) from exc
     if isinstance(d, list) and len(d) == 1 and isinstance(d[0], dict):
         d = d[0]

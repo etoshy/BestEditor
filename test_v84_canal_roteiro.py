@@ -80,7 +80,7 @@ def test_prompt_roteiro_yt_guia_e_canal(monkeypatch):
     t = ry.prompt_analise(_p_yt(), ry.MODELOS_FABRICA[0])
     assert "Sua própria linha de storytelling" in t and "📺 Nome do canal: Meu Canal" in t
     assert "Mantenha mais ou menos o tamanho" in t  # sem ⏱: o tamanho do original
-    t2 = ry.prompt_analise(_p_yt(minutos_alvo=18), ry.MODELOS_FABRICA[0])
+    t2 = ry.prompt_analise(_p_yt(minutos_alvo=18, modo_partes="nao"), ry.MODELOS_FABRICA[0])
     assert "O TAMANHO pedido" in t2 and "TAMANHO DO ROTEIRO" in t2
     assert "SUA própria linha de storytelling" in ry.MODELOS_FABRICA[0]["texto"]
     so = next(m for m in ry.MODELOS_FABRICA if m["id"] == "so_cenas")

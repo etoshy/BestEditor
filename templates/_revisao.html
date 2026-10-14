@@ -1,0 +1,45 @@
+{# 🪄 Revisão do roteiro inteiro (revisao_roteiro.py) — incluir com: {% set rev_base = '/revisao/<origem>/<id>' %}{% include "_revisao.html" %} #}
+<div id="revCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🪄 Revisão do roteiro inteiro <span style="font-weight:400;font-size:.82rem;color:#666;">(costuras entre capítulos, frases genéricas de IA, repetições, ritmo — a IA devolve só as TROCAS, então o roteiro não encolhe)</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
+    <input type="text" id="revFoco" placeholder="foco extra (opcional) — ex.: o fim está fraco; menos “mas” no começo das frases" style="flex:1;min-width:240px;margin:0;">
+    <button type="button" id="revGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
+    <button type="button" data-ia-gerar="revGerar" data-ia-prompt="revPrompt" data-ia-resp="revResp" data-ia-ler="revLer" data-ia-status="revSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Revisar com a IA</button>
+    <button type="button" id="revDesfazer" style="display:none;width:auto;margin:0;padding:5px 12px;background:#64748b;">↩ Voltar ao roteiro de antes da revisão</button>
+    <span id="revSt" style="color:#555;"></span>
+  </div>
+  <textarea id="revPrompt" rows="4" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+  <label style="margin-top:8px;display:block;font-size:.86rem;">Resposta da IA (JSON com as trocas)</label>
+  <textarea id="revResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "trocas": [ { "de": "...", "para": "..." } ] }'></textarea>
+  <button type="button" id="revLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Aplicar as trocas</button>
+  <div id="revRes" style="font-size:.85rem;margin-top:6px;"></div>
+</div>
+<script>
+(function () {
+  const BASE = {{ rev_base|tojson }};
+  const $r = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  $r('revGerar').addEventListener('click', async () => {
+    $r('revSt').textContent = '📝 gerando…';
+    try { const d = await post(BASE + '/prompt', { foco: $r('revFoco').value }); $r('revPrompt').value = d.prompt; $r('revPrompt').style.display = '';
+      try { await navigator.clipboard.writeText(d.prompt); $r('revSt').textContent = '✔ prompt copiado — cole na conversa da IA'; } catch (_) { $r('revSt').textContent = '✔ prompt pronto'; } }
+    catch (e) { $r('revSt').textContent = '⚠ ' + e.message; }
+  });
+  $r('revLer').addEventListener('click', async () => {
+    try {
+      const d = await post(BASE + '/ler', { texto: $r('revResp').value });
+      $r('revRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} troca(s) aplicada(s) · ${d.palavras_antes} → ${d.palavras_depois} palavras</span>` +
+        (d.nao_achadas.length ? `<div style="color:#b45309">⚠ ${d.nao_achadas.length} não bateram com o texto (ignoradas)</div>` : '') +
+        `<details><summary>ver as trocas</summary>${d.aplicadas.map(t => `<div style="margin:4px 0"><s style="color:#b91c1c">${esc(t.de)}</s><br><span style="color:#15803d">${esc(t.para)}</span> <i style="color:#666">${esc(t.motivo)}</i></div>`).join('')}</details>` +
+        '<div style="color:#555">Recarregando…</div>';
+      setTimeout(() => location.reload(), 2500);
+    } catch (e) { $r('revRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
+  });
+  $r('revDesfazer').addEventListener('click', async () => {
+    if (!confirm('Voltar ao roteiro de antes da revisão?')) return;
+    try { await post(BASE + '/desfazer', {}); location.reload(); } catch (e) { $r('revSt').textContent = '⚠ ' + e.message; }
+  });
+  if ({{ (rev_tem_antes or false)|tojson }}) $r('revDesfazer').style.display = '';
+})();
+</script>

@@ -168,6 +168,8 @@ def registrar(app, base_dir: str) -> None:
         idioma = idiomas.nome_para_prompt(cod) if cod else "o mesmo idioma da transcrição"
         if "minutos" in corpo:  # ⏱ duração do roteiro reescrito (vazio = a do vídeo original)
             p["minutos_alvo"] = ry.minutos_alvo(corpo.get("minutos"))
+        if corpo.get("modo_partes") in ("auto", "sim", "nao"):  # ✍️ v84_98
+            p["modo_partes"] = corpo["modo_partes"]
         if "nome_canal" in corpo:  # 📺 v84_95 ("" = o das Configurações; "-" = não falar)
             p["nome_canal"] = " ".join(str(corpo.get("nome_canal") or "").split())[:80]
         try:
@@ -203,12 +205,117 @@ def registrar(app, base_dir: str) -> None:
                 so_roteiro = False
             if so_roteiro:
                 an = dict(p["analise"], roteiro=an["roteiro"], marcas=an["marcas"])
+        if an.get("capitulos_plano"):  # ✍️ veio o PLANO: as partes são escritas uma por vez
+            import roteiro_partes as rp
+            _m, _alvo = ry.alvo_palavras(p)
+            an["partes"] = rp.de_plano(an.pop("capitulos_plano"), _alvo)
         an = ry.conferir_tamanho(p, an)
+        if an.get("partes") and not an.get("roteiro"):
+            an.pop("alvo", None)
         p["analise"] = an
         p["resultado"] = None
         p["titulo"] = p.get("titulo") or an.get("titulo") or ""
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, "analise": an})
+
+    # ------------------------------------------------------------------ ✍️ roteiro em partes + 🪄 revisão (v84_98)
+    @app.route("/roteiros-yt/<pid>/partes")
+    def roteiro_yt_partes(pid: str):
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        an = p.get("analise") or {}
+        return jsonify({"ok": True, "partes": an.get("partes") or [], "tem_roteiro": bool(an.get("roteiro")),
+                        "alvo": an.get("alvo") or {}})
+
+    @app.route("/roteiros-yt/<pid>/partes/completar", methods=["POST"])
+    def roteiro_yt_partes_completar(pid: str):
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            ry.iniciar_completar(p)
+        except ry.RoteiroError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        ry.salvar_projeto(base_dir, p)
+        return jsonify({"ok": True, "partes": p["analise"]["partes"]})
+
+    @app.route("/roteiros-yt/<pid>/partes/<int:k>/prompt", methods=["POST"])
+    def roteiro_yt_parte_prompt(pid: str, k: int):
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            t = ry.prompt_parte(p, k, bool((request.get_json(silent=True) or {}).get("com_fontes")))
+        except ry.RoteiroError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": t, "caracteres": len(t)})
+
+    @app.route("/roteiros-yt/<pid>/partes/<int:k>/texto", methods=["POST"])
+    def roteiro_yt_parte_texto(pid: str, k: int):
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            an = ry.salvar_parte(p, k, str((request.get_json(silent=True) or {}).get("texto") or ""))
+        except ry.RoteiroError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        ry.salvar_projeto(base_dir, p)
+        return jsonify({"ok": True, "partes": an.get("partes"), "tem_roteiro": bool(an.get("roteiro"))})
+
+    @app.route("/roteiros-yt/<pid>/partes/montar", methods=["POST"])
+    def roteiro_yt_partes_montar(pid: str):
+        p = _proj(pid)
+        an = (p or {}).get("analise") or {}
+        if not an.get("partes"):
+            return jsonify({"erro": "Não tem partes."}), 404
+        if any(not x.get("texto") for x in an["partes"]):
+            return jsonify({"erro": "Ainda tem parte sem texto."}), 400
+        ry.montar_partes(p)
+        ry.salvar_projeto(base_dir, p)
+        return jsonify({"ok": True, "partes": an["partes"], "tem_roteiro": True})
+
+    @app.route("/roteiros-yt/<pid>/partes/ia", methods=["POST"])
+    def roteiro_yt_partes_ia(pid: str):
+        import ia_servico as ia
+        import roteiro_partes as rp
+        import tarefas_bg
+        p = _proj(pid)
+        if not p or not (p.get("analise") or {}).get("partes"):
+            return jsonify({"erro": "Não tem partes."}), 404
+        if not ia.ativo("roteiros"):
+            return jsonify({"erro": "A IA está desligada (" + (ia.motivo_desligado("roteiros") or "ligue em 🤖 IA") + ")."}), 400
+
+        def rodar(t):
+            feitas = 0
+            while feitas <= 40:
+                q = _proj(pid)
+                pend = rp.falta((q.get("analise") or {}).get("partes") or [])
+                if not pend:
+                    break
+                k = pend[0]
+                t.progresso(f"✍️ escrevendo a parte {k} de {len(q['analise']['partes'])}…")
+                texto = ia.chamar("roteiros", "Você é roteirista de YouTube. Responda SÓ com o texto narrado pedido, sem JSON, sem "
+                                  "markdown, sem título e sem comentários.", ry.prompt_parte(q, k, True), schema=None,
+                                  max_tokens=16000, effort="medium", timeout=900)
+                if not texto:
+                    raise RuntimeError("A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja 🤖 IA") + ").")
+                q = _proj(pid)
+                antes = next((x for x in q["analise"]["partes"] if x["k"] == k), {}).get("tentativas", 0)
+                ry.salvar_parte(q, k, texto)
+                parte = next(x for x in q["analise"]["partes"] if x["k"] == k)
+                parte["tentativas"] = antes + 1
+                if parte["status"] == "curta" and parte["tentativas"] >= 2:
+                    parte["aceita_curta"] = True
+                ry.salvar_projeto(base_dir, q)
+                feitas += 1
+            q = _proj(pid)
+            if all(x.get("texto") for x in (q.get("analise") or {}).get("partes") or []):
+                ry.montar_partes(q)
+                ry.salvar_projeto(base_dir, q)
+            return {"partes": feitas}
+        tid = tarefas_bg.iniciar("roteiro_partes", "✍️ Roteiro em partes (🤖 IA)", rodar, pagina=f"/roteiros-yt/{pid}")
+        return jsonify({"ok": True, "tarefa": tid})
 
     @app.route("/roteiros-yt/<pid>/prompt-completar", methods=["POST"])
     def roteiro_yt_prompt_completar(pid: str):

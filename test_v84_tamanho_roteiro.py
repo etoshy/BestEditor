@@ -31,6 +31,7 @@ def test_bloco_de_tamanho():
 
 def test_prompt_do_modelo_de_video_pede_o_tamanho_perto_do_fim():
     p = _dossie(18)
+    p["config"]["modo_partes"] = "nao"  # v84_97: a partir de 8 min o padrão é escrever em partes (test_v84_roteiro_partes)
     texto = ds.prompt_roteiro(p)
     minutos, palavras, ppm = ds.alvo_tamanho(p)
     assert (minutos, palavras) == (18.0, 18 * ppm)
@@ -88,6 +89,7 @@ def _roteiro_yt(base, minutos):
 def test_roteiro_do_youtube_com_duracao(tmp_path):
     base = str(tmp_path)
     p = _roteiro_yt(base, "18")
+    p["modo_partes"] = "nao"  # v84_98: ≥ 8 min o padrão é em partes (test_v84_partes_yt_revisao)
     texto = ry.prompt_analise(p, ry.obter_modelo(base, "reescrever_cenas"))
     assert "NO MÍNIMO 2565 palavras" in texto and "expanda" in texto and texto.index("📏") < texto.index(ry._FORMATO_ANALISE[:30])
     assert "📏" not in ry.prompt_analise(p, ry.obter_modelo(base, "so_cenas"))
@@ -116,7 +118,7 @@ def test_fluxo_do_roteiro_do_youtube_pelo_site(tmp_path, monkeypatch):
     base = A.BASE_DIR
     p = ry.criar_projeto(base, texto="[0:00] " + _texto(300))
     try:
-        d = c.post(f"/roteiros-yt/{p['id']}/prompt-analise", json={"modelo_id": "reescrever_cenas", "minutos": "18"}).get_json()
+        d = c.post(f"/roteiros-yt/{p['id']}/prompt-analise", json={"modelo_id": "reescrever_cenas", "minutos": "18", "modo_partes": "nao"}).get_json()
         assert "NO MÍNIMO 2565" in d["prompt"]
         d = c.post(f"/roteiros-yt/{p['id']}/analise", json={"texto": json.dumps(
             {"roteiro": _texto(900), "cenas": [{"obra": "Filme A", "momento": "a dança"}]})}).get_json()

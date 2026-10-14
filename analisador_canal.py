@@ -146,7 +146,7 @@ def duracao_s(txt: Any) -> Optional[int]:
 def fmt_dur(s: Optional[float]) -> str:
     try:
         s = int(round(float(s)))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except Exception:  # noqa: BLE001 — idem fmt_num
         return "?"
     return f"{s // 3600}:{s % 3600 // 60:02d}:{s % 60:02d}" if s >= 3600 else f"{s // 60}:{s % 60:02d}"
 
@@ -154,7 +154,7 @@ def fmt_dur(s: Optional[float]) -> str:
 def fmt_num(n: Optional[float]) -> str:
     try:
         n = float(n)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except Exception:  # noqa: BLE001 — None, texto, ou o "Undefined" do Jinja (vídeo salvo sem esse campo)
         return "?"
     for lim, suf in ((1e9, " bi"), (1e6, " mi"), (1e3, " mil")):
         if abs(n) >= lim:

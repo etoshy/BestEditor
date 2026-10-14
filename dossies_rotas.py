@@ -139,6 +139,8 @@ def registrar(app, base_dir: str) -> None:
             for k in ("sem_experiencias", "marcar_chamadas", "sugerir_produto"):
                 if k in c:
                     cfg[k] = bool(c[k])
+            if c.get("modo_partes") in ("auto", "sim", "nao"):
+                cfg["modo_partes"] = c["modo_partes"]
             if "tema" in c:
                 p["tema"] = str(c.get("tema") or "").strip()[:300]
             if "roteiro_base" in c:
@@ -444,6 +446,112 @@ def registrar(app, base_dir: str) -> None:
                 return jsonify({"erro": str(exc)}), 400
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    # ------------------------------------------------------------------ ✍️ roteiro em partes (v84_97)
+    @app.route("/modelos-video/<pid>/partes/completar", methods=["POST"])
+    def dossie_partes_completar(pid: str):
+        """📏 Roteiro curto: corta nos capítulos pra reescrever só as partes curtas, uma por vez."""
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            try:
+                p["resultado"] = ds.iniciar_completar(p)
+            except ds.DossieError as exc:
+                return jsonify({"erro": str(exc)}), 400
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/partes/<int:k>/prompt", methods=["POST"])
+    def dossie_parte_prompt(pid: str, k: int):
+        p = _proj(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            texto = ds.prompt_parte(p, k, com_fontes=bool((request.get_json(silent=True) or {}).get("com_fontes")))
+        except ds.DossieError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": texto, "caracteres": len(texto)})
+
+    @app.route("/modelos-video/<pid>/partes/<int:k>/texto", methods=["POST"])
+    def dossie_parte_texto(pid: str, k: int):
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            try:
+                p["resultado"] = ds.salvar_parte(p, k, str((request.get_json(silent=True) or {}).get("texto") or ""))
+            except ds.DossieError as exc:
+                return jsonify({"erro": str(exc)}), 400
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/partes/montar", methods=["POST"])
+    def dossie_partes_montar(pid: str):
+        """Junta as partes que já têm texto (mesmo com alguma curta)."""
+        with _TRAVA:
+            p = _proj(pid)
+            if not p or not (p.get("resultado") or {}).get("partes"):
+                return jsonify({"erro": "Não tem partes."}), 404
+            if any(not x.get("texto") for x in p["resultado"]["partes"]):
+                return jsonify({"erro": "Ainda tem parte sem texto."}), 400
+            p["resultado"] = ds.montar_partes(p)
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
+    @app.route("/modelos-video/<pid>/partes/ia", methods=["POST"])
+    def dossie_partes_ia(pid: str):
+        """🤖 A IA do site escreve as partes que faltam (ou as curtas), uma de cada vez, em segundo plano."""
+        import ia_servico as ia
+        import roteiro_partes as rp
+        import tarefas_bg
+        p = _proj(pid)
+        if not p or not (p.get("resultado") or {}).get("partes"):
+            return jsonify({"erro": "Não tem partes."}), 404
+        if not ia.ativo("roteiros"):
+            return jsonify({"erro": "A IA está desligada (" + (ia.motivo_desligado("roteiros") or "ligue em 🤖 IA") + ")."}), 400
+
+        def rodar(t):
+            feitas = 0
+            while True:
+                with _TRAVA:
+                    q = _proj(pid)
+                    pend = rp.falta((q.get("resultado") or {}).get("partes") or [])
+                if not pend:
+                    break
+                k = pend[0]
+                total = len(q["resultado"]["partes"])
+                t.progresso(f"✍️ escrevendo a parte {k} de {total}…")
+                prompt = ds.prompt_parte(q, k, com_fontes=True)
+                system = ("Você é roteirista de documentários. Responda SÓ com o texto narrado pedido, sem JSON, sem markdown, "
+                          "sem título e sem comentários.")
+                texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=16000, effort="medium", timeout=900)
+                if not texto:
+                    raise RuntimeError("A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja 🤖 IA") + ").")
+                with _TRAVA:
+                    q = _proj(pid)
+                    antes = next((x for x in q["resultado"]["partes"] if x["k"] == k), {})
+                    ja_tentou = antes.get("tentativas", 0)
+                    q["resultado"] = ds.salvar_parte(q, k, texto)
+                    parte = next((x for x in (q["resultado"].get("partes") or []) if x["k"] == k), None)
+                    if parte is not None:
+                        parte["tentativas"] = ja_tentou + 1
+                        if parte["status"] == "curta" and parte["tentativas"] >= 2:
+                            parte["status"] = "pronta"  # tentou 2x: aceita e segue (avisa na lista)
+                            parte["aceita_curta"] = True
+                    ds.salvar(base_dir, q)
+                feitas += 1
+                if feitas > 40:
+                    break
+            with _TRAVA:
+                q = _proj(pid)
+                if q and (q.get("resultado") or {}).get("partes") and all(x.get("texto") for x in q["resultado"]["partes"]):
+                    q["resultado"] = ds.montar_partes(q)
+                    ds.salvar(base_dir, q)
+            return {"partes": feitas}
+
+        tid = tarefas_bg.iniciar("roteiro_partes", "✍️ Roteiro em partes (🤖 IA)", rodar, pagina=f"/modelos-video/{pid}")
+        return jsonify({"ok": True, "tarefa": tid})
 
     @app.route("/modelos-video/<pid>/prompt-completar", methods=["POST"])
     def dossie_prompt_completar(pid: str):

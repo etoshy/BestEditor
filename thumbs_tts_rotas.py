@@ -106,14 +106,21 @@ def registrar(app, base_dir: str) -> None:
                 "antes": alvo.get("antes_do_tts") or ""}
         raise ValueError("Origem inválida.")
 
-    def _gravar(origem: str, pid: str, p: Dict[str, Any], novo: str, antes: Optional[str], avisos: List[str]) -> Dict[str, Any]:
+    def _gravar(origem: str, pid: str, p: Dict[str, Any], novo: str, antes: Optional[str], avisos: List[str],
+                chave_antes: str = "") -> Dict[str, Any]:
         if origem == "dossie":
             import dossies as ds
             import dossies_rotas
             with dossies_rotas._TRAVA:
                 p = ds.carregar(base_dir, pid)
+                velho = p.get("resultado") or {}
                 res = ds.roteiro_editado(p, novo)
-                res["roteiro_antes_tts"] = antes or ""
+                for k in ("roteiro_antes_tts", "roteiro_antes_revisao"):  # o "voltar" de cada um sobrevive ao outro
+                    if velho.get(k):
+                        res[k] = velho[k]
+                if velho.get("partes"):
+                    res["partes"] = velho["partes"]
+                res[chave_antes or "roteiro_antes_tts"] = antes or ""
                 res["avisos"] = list(avisos) + list(res.get("avisos") or [])
                 p["resultado"] = res
                 ds.salvar(base_dir, p)
@@ -122,10 +129,11 @@ def registrar(app, base_dir: str) -> None:
         p = ry.carregar_projeto(base_dir, pid)
         res, an = p.get("resultado") or {}, p.get("analise") or {}
         alvo, chave = (res, "roteiro_final") if res.get("roteiro_final") else (an, "roteiro")
+        ch = {"roteiro_antes_revisao": "antes_da_revisao"}.get(chave_antes, "antes_do_tts")
         if antes is None:
-            alvo.pop("antes_do_tts", None)
+            alvo.pop(ch, None)
         else:
-            alvo["antes_do_tts"] = antes
+            alvo[ch] = antes
         alvo[chave] = novo
         ry.salvar_projeto(base_dir, p)
         return {"palavras": len(novo.split()), "avisos": avisos}
@@ -188,6 +196,64 @@ def registrar(app, base_dir: str) -> None:
                 (p.get("resultado") or {}).pop("roteiro_antes_tts", None)
                 ds.salvar(base_dir, p)
         return jsonify({"ok": True, **g})
+
+    # ------------------------------------------------------------------ 🪄 revisão do roteiro inteiro (v84_98)
+    @app.route("/revisao/<origem>/<pid>/prompt", methods=["POST"])
+    def revisao_prompt(origem: str, pid: str):
+        import idiomas
+        import revisao_roteiro as rv
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            t = rv.prompt(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
+                          str(p.get("tema") or p.get("titulo") or ""), str((request.get_json(silent=True) or {}).get("foco") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": t, "caracteres": len(t)})
+
+    @app.route("/revisao/<origem>/<pid>/ler", methods=["POST"])
+    def revisao_ler(origem: str, pid: str):
+        import revisao_roteiro as rv
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            r = rv.aplicar(texto, str((request.get_json(silent=True) or {}).get("texto") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if not r["aplicadas"]:
+            return jsonify({"erro": "Nenhuma troca bateu com o roteiro (" + str(len(r["nao_achadas"])) + " não achadas).", **r}), 400
+        antes = (p.get("resultado") or {}).get("roteiro_antes_revisao") if origem == "dossie" else \
+            (((p.get("resultado") or {}) if (p.get("resultado") or {}).get("roteiro_final") else (p.get("analise") or {})).get("antes_da_revisao"))
+        avisos = [f"🪄 {len(r['nao_achadas'])} troca(s) da revisão não bateram com o texto."] if r["nao_achadas"] else []
+        g = _gravar(origem, pid, p, r["texto"], antes or texto, avisos, chave_antes="roteiro_antes_revisao")
+        return jsonify({"ok": True, **{k: r[k] for k in ("aplicadas", "nao_achadas", "palavras_antes", "palavras_depois", "observacoes")}, **g})
+
+    @app.route("/revisao/<origem>/<pid>/desfazer", methods=["POST"])
+    def revisao_desfazer(origem: str, pid: str):
+        try:
+            p, _texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        if origem == "dossie":
+            antes = (p.get("resultado") or {}).get("roteiro_antes_revisao")
+        else:
+            res, an = p.get("resultado") or {}, p.get("analise") or {}
+            antes = (res if res.get("roteiro_final") else an).get("antes_da_revisao")
+        if not antes:
+            return jsonify({"erro": "Não tem revisão pra desfazer."}), 400
+        _gravar(origem, pid, p, antes, None, [], chave_antes="roteiro_antes_revisao")
+        if origem == "dossie":
+            import dossies as ds
+            import dossies_rotas
+            with dossies_rotas._TRAVA:
+                q = ds.carregar(base_dir, pid)
+                (q.get("resultado") or {}).pop("roteiro_antes_revisao", None)
+                ds.salvar(base_dir, q)
+        return jsonify({"ok": True})
 
     @app.route("/tts-adaptar/opcoes")
     def tts_adaptar_opcoes():

@@ -28,6 +28,34 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ✍️ Partes também no Roteiro do YouTube, 🪄 revisão do roteiro inteiro e 📊 analisador sem erro (v84_98)
+
+- **📜 Roteiro do YouTube** longo (⏱ ≥ 8 min, ou o vídeo original com ≥ 8 min; escolha “✍️ em partes” no passo 2): a
+  IA devolve o PLANO (capítulos com objetivo, fatos com o tempo na transcrição e as cenas de cada capítulo) e depois
+  escreve um capítulo por vez, em texto puro — à mão (colando na mesma conversa) ou 🤖 todos com a IA. No fim vira UM
+  roteiro inteiro, com `[[INSCREVA]]`/`[[VENDA]]` entre os capítulos. “📏 Completar o tamanho” também é por partes.
+- **🪄 Revisão do roteiro inteiro** (🕵️ Modelos de vídeo e 📜 Roteiro do YouTube): uma passada no texto TODO pra ele
+  soar como um roteiro só — costuras entre capítulos, frases genéricas/clichês de IA trocadas por detalhes concretos,
+  repetições, ritmo, laços abertos. A IA devolve só as TROCAS (`{"de", "para"}`) e o site aplica — o roteiro não
+  encolhe; o que não bater é avisado; ↩ volta ao de antes.
+- **📊 Analisador de canal**: análise com vídeo sem o número de views (ou vídeo que saiu da lista) não derruba mais a
+  página (era `UndefinedError: 'dict object' has no attribute 'views'`).
+
+## ✍️ Roteiro longo escrito em partes (v84_97)
+
+- Por que o roteiro saía pequeno: pedir ~18 min (~2.700 palavras) DENTRO de um JSON junto com títulos, descrição,
+  capítulos, thumbnails e afirmações faz a IA de chat entregar ~40–50% (no exemplo: 1.228 palavras); e o 📏 completar
+  pedia o roteiro inteiro de novo num JSON — o mesmo problema.
+- Agora, nos 🕵️ Modelos de vídeo a partir de ~8 min (ou sempre, em “✍️ Escrever o roteiro em partes”): o 1º prompt
+  devolve só o **PLANO** (títulos, descrição, thumbnails e os capítulos com objetivo, fatos com fonte, mídias e quantas
+  palavras cada um tem); depois **um prompt por capítulo**, resposta em **texto puro** (cada um inteiro, ~300–450
+  palavras), na mesma conversa (ela já tem as fontes) — ou **🤖 Escrever com a IA**, que faz todos em sequência.
+  Com todos prontos, o site junta, põe `[[INSCREVA]]`/`[[VENDA]]` entre os capítulos e os capítulos da descrição saem
+  com o começo exato.
+- **📏 Completar o tamanho por partes**: o roteiro curto é cortado nos capítulos (mesmo quando a IA errou o começo
+  deles) e só os trechos curtos são reescritos, um por vez, em texto puro. Texto puro colado no “Ler resposta” também
+  vira o roteiro novo. No modo de um prompt só, o `"roteiro"` agora vem PRIMEIRO no JSON.
+
 ## 🖼 Thumbnails no Google Flow e 🎙 adaptar o roteiro pro TTS por idioma (v84_96)
 
 - **🖼 Thumbnails**: onde a IA recomenda thumbnail (🕵️ Modelos de vídeo — 3 por roteiro; 📜 Roteiro do YouTube — junto com

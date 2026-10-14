@@ -94,12 +94,12 @@
     <h3>🎞 Tipos de vídeo</h3>
     <table class="ac-t"><tr><th>Tipo</th><th>Vídeos</th><th>Desempenho</th></tr>
       {% for t in ia.tipos_de_video %}<tr><td><b>{{ t.tipo }}</b><div class="hint">{{ t.descricao }}</div></td>
-        <td>{% for vid in t.videos %}{% if vs[vid] %}<div class="hint">• {{ vs[vid].titulo }} ({{ fmt_num(vs[vid].views) }})</div>{% endif %}{% endfor %}</td>
+        <td>{% for vid in t.videos %}{% if vs[vid] %}<div class="hint">• {{ vs[vid].titulo }} ({{ fmt_num(vs[vid].get('views')) }})</div>{% endif %}{% endfor %}</td>
         <td>{{ t.desempenho }}</td></tr>{% endfor %}</table>
     {% if ia.ganchos_e_roteiro %}<h3>🎣 Ganchos e roteiro</h3><ul>{% for x in ia.ganchos_e_roteiro %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
-      <div><h3>🏆 Melhores</h3>{% for x in ia.melhores %}{% if vs[x.id] %}<div class="ac-mini"><img src="{{ vs[x.id].thumb }}" alt=""><div><b>{{ vs[x.id].titulo }}</b> <span class="hint">{{ fmt_num(vs[x.id].views) }}</span><div class="hint">{{ x.por_que }}</div></div></div>{% endif %}{% endfor %}</div>
-      <div><h3>📉 Piores</h3>{% for x in ia.piores %}{% if vs[x.id] %}<div class="ac-mini"><img src="{{ vs[x.id].thumb }}" alt=""><div><b>{{ vs[x.id].titulo }}</b> <span class="hint">{{ fmt_num(vs[x.id].views) }}</span><div class="hint">{{ x.por_que }}</div></div></div>{% endif %}{% endfor %}</div>
+      <div><h3>🏆 Melhores</h3>{% for x in ia.melhores %}{% if vs[x.id] %}<div class="ac-mini"><img src="{{ vs[x.id].thumb }}" alt=""><div><b>{{ vs[x.id].titulo }}</b> <span class="hint">{{ fmt_num(vs[x.id].get('views')) }}</span><div class="hint">{{ x.por_que }}</div></div></div>{% endif %}{% endfor %}</div>
+      <div><h3>📉 Piores</h3>{% for x in ia.piores %}{% if vs[x.id] %}<div class="ac-mini"><img src="{{ vs[x.id].thumb }}" alt=""><div><b>{{ vs[x.id].titulo }}</b> <span class="hint">{{ fmt_num(vs[x.id].get('views')) }}</span><div class="hint">{{ x.por_que }}</div></div></div>{% endif %}{% endfor %}</div>
     </div>
     <h3>💡 Vídeos que o canal pode entregar bem</h3>
     {% for s in ia.sugestoes %}
@@ -132,11 +132,11 @@
 
 <div class="ac-card">
   <h2 style="margin:0;">🕒 {{ a.recentes|length }} mais recentes</h2>
-  <div class="ac-grade">{% for vid in a.recentes %}{% set v = vs[vid] %}{% include "_analisador_video.html" %}{% endfor %}</div>
+  <div class="ac-grade">{% for vid in a.recentes %}{% if vs[vid] %}{% set v = vs[vid] %}{% include "_analisador_video.html" %}{% endif %}{% endfor %}</div>
 </div>
 <div class="ac-card">
   <h2 style="margin:0;">🔥 {{ a.populares|length }} mais populares</h2>
-  <div class="ac-grade">{% for vid in a.populares %}{% set v = vs[vid] %}{% include "_analisador_video.html" %}{% endfor %}</div>
+  <div class="ac-grade">{% for vid in a.populares %}{% if vs[vid] %}{% set v = vs[vid] %}{% include "_analisador_video.html" %}{% endif %}{% endfor %}</div>
 </div>
 
 <div class="ac-card">

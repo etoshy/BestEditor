@@ -83,6 +83,7 @@
     </select>
     <label style="margin:0;font-weight:400;font-size:0.85rem;white-space:nowrap;" title="Quanto tempo de narração o roteiro reescrito deve ter. Vazio = o tamanho do vídeo original.">⏱ <input type="number" id="minutosAlvo" min="1" max="120" step="0.5" placeholder="min" value="{{ (p.minutos_alvo if p.minutos_alvo is defined else p1.minutos) or '' }}" style="width:70px;margin:0;"> min</label>
     <label style="margin:0;font-weight:400;font-size:0.85rem;white-space:nowrap;" title="O nome do SEU canal: a IA fala no começo (depois do gancho) e no fechamento. Vazio = o das ⚙️ Configurações; “-” = não falar.">📺 <input type="text" id="nomeCanal" maxlength="80" placeholder="{{ nome_canal_global or 'nome do canal' }}" value="{{ p.nome_canal or '' }}" style="width:150px;margin:0;"></label>
+    <label style="margin:0;font-weight:400;font-size:0.85rem;white-space:nowrap;" title="Roteiro longo: a IA faz o plano e depois escreve um capítulo por vez (a IA de chat encurta roteiro longo pedido de uma vez).">✍️ <select id="modoPartes" style="width:auto;margin:0;">{% for v, r in [('auto', 'em partes: auto (≥ 8 min)'), ('sim', 'em partes: sempre'), ('nao', 'tudo de uma vez')] %}<option value="{{ v }}" {% if (p.modo_partes or 'auto') == v %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
     <button class="ry-mini" id="p1Gerar">📝 Gerar prompt</button><button type="button" class="ry-mini" data-ia-gerar="p1Gerar" data-ia-prompt="p1Prompt" data-ia-resp="p1Resp" data-ia-ler="p1Ler" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><span class="ry-hint"></span>
   </div>
   <label style="margin:6px 0 0;font-weight:400;font-size:0.85rem;display:block;"><input type="checkbox" id="semExperiencias" style="width:auto;" {% if (p.sem_experiencias if p.sem_experiencias is defined else p1.sem_experiencias) != false %}checked{% endif %}> 🙅 Tirar do roteiro experiências pessoais de quem gravou e citações a outros vídeos/ao canal ("como falei no vídeo passado", "quando eu era criança"…)</label>
@@ -155,6 +156,8 @@
   <div id="resultado"><p class="ry-hint">Aparece aqui depois do passo 2 (cenas) e do passo 3 (roteiro final).</p></div>
 </div>
 
+{% set partes_base = '/roteiros-yt/' ~ p.id ~ '/partes' %}{% include "_partes.html" %}
+{% set rev_base = '/revisao/roteiro_yt/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).antes_da_revisao or (p.analise or {}).antes_da_revisao %}{% include "_revisao.html" %}
 {% set tts_base = '/tts-adaptar/roteiro_yt/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).antes_do_tts or (p.analise or {}).antes_do_tts %}{% include "_adaptar_tts.html" %}
 {% set thumbs_base = '/thumbs/roteiro_yt/' ~ p.id %}{% include "_thumbs.html" %}
 
@@ -249,7 +252,7 @@ $('mExcluir').addEventListener('click', async () => {
 });
 $('p1Gerar').addEventListener('click', async () => {
   try {
-    const d = await api(`/roteiros-yt/${PID}/prompt-analise`, { modelo_id: $('modelo').value, idioma: $('idiomaRoteiro').value, marcar_chamadas: $('marcarChamadas').checked, sem_experiencias: $('semExperiencias').checked, minutos: $('minutosAlvo').value, nome_canal: $('nomeCanal').value });
+    const d = await api(`/roteiros-yt/${PID}/prompt-analise`, { modelo_id: $('modelo').value, idioma: $('idiomaRoteiro').value, marcar_chamadas: $('marcarChamadas').checked, sem_experiencias: $('semExperiencias').checked, minutos: $('minutosAlvo').value, nome_canal: $('nomeCanal').value, modo_partes: $('modoPartes').value });
     $('p1Prompt').value = d.prompt; $('p1Box').style.display = ''; $('p1Tam').textContent = d.caracteres.toLocaleString('pt-BR') + ' caracteres';
   } catch (e) { alert(e.message); }
 });
@@ -258,16 +261,22 @@ $('p1Ler').addEventListener('click', async () => {
   try {
     const d = await api(`/roteiros-yt/${PID}/analise`, { texto: $('p1Resp').value });
     P.analise = d.analise; P.resultado = null;
+    if ((d.analise.partes || []).length && !d.analise.roteiro) {  // ✍️ veio o PLANO: agora as partes, uma por vez
+      $('p1Res').innerHTML = `<div class="ry-ok">✔ Plano pronto: ${d.analise.partes.length} capítulos e ${d.analise.cenas.length} cenas. Agora escreva as partes no bloco ✍️ Roteiro em partes (logo abaixo) — cada uma inteira, em texto puro.</div>`;
+      if (window.partesRecarregar) await window.partesRecarregar();
+      const c = $('ptCard'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     const al = d.analise.alvo;
     $('p1Res').innerHTML = `<div class="ry-ok">✔ Roteiro com ${d.analise.roteiro.split(/\s+/).filter(Boolean).length} palavras${al ? ` (alvo ~${al.minutos} min = ~${al.palavras})` : ''} e ${d.analise.cenas.length} cenas${d.analise.marcas ? ` · 📣 ${d.analise.marcas.inscreva}× [[INSCREVA]] e ${d.analise.marcas.venda}× [[VENDA]]` : ''}. Agora escolha o que fazer (passo 3) — ou use as cenas aqui embaixo.</div>`
-      + (al && al.curto ? `<div class="ry-erro">⚠ 📏 ${esc(al.aviso)}</div><div class="ry-row"><button class="ry-mini" id="p1Completar" style="background:#b45309;color:#fff">📏 Prompt pra completar o tamanho</button><span class="ry-hint">Cole na MESMA conversa da IA e traga o JSON aqui no “Ler resposta” — só o roteiro é trocado, as cenas ficam.</span></div>` : '');
+      + (al && al.curto ? `<div class="ry-erro">⚠ 📏 ${esc(al.aviso)}</div><div class="ry-row"><button class="ry-mini" id="p1Completar" style="background:#b45309;color:#fff">📏 Completar o tamanho por partes</button><span class="ry-hint">O roteiro é cortado em capítulos e a IA reescreve SÓ os curtos, um por vez, em texto puro.</span></div>` : '');
     desenharResultado();
     if (al && al.curto) {
       $('p1Completar').addEventListener('click', async () => {
         try {
-          const c = await api(`/roteiros-yt/${PID}/prompt-completar`, {});
-          $('p1Prompt').value = c.prompt; $('p1Box').style.display = ''; $('p1Tam').textContent = '📏 completar o tamanho · ' + c.caracteres.toLocaleString('pt-BR') + ' caracteres';
-          $('p1Resp').value = ''; $('p1Prompt').scrollIntoView({ behavior: 'smooth', block: 'center' });
+          await api(`/roteiros-yt/${PID}/partes/completar`, {});
+          if (window.partesRecarregar) await window.partesRecarregar();
+          const c = $('ptCard'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (e) { alert(e.message); }
       });
     } else $('etapa3').scrollIntoView({ behavior: 'smooth' });
