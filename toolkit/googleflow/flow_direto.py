@@ -82,6 +82,10 @@ S = {
     "progresso": ".loading-percentage",
     "erro_uso": ".error-text",
     "creditos_banner": "flow-credit-banner",
+    # conta sem créditos (HTML real, v84_104): no lugar do "Iniciar geração" aparece o alerta de créditos
+    "sem_creditos": ('flow-prompt-box flow-credit-warning-button, '
+                     'flow-prompt-box button[aria-label="Alerta de créditos insuficientes"], '
+                     'flow-prompt-box button.prompt-warning-button[aria-label*="crédito"]'),
 }
 # grupos de opções do pop-up / do painel (aria-label do flow-toggles)
 GRUPO = {"modo": "Modo", "tipo_video": "Tipo de vídeo", "proporcao": "Proporção", "quantidade": "Quantidade de resultados",
@@ -108,6 +112,37 @@ JS_CARTOES = r"""() => Array.from(document.querySelectorAll('.loading-percentage
 JS_AVISOS = r"""() => Array.from(document.querySelectorAll('.error-text, mat-snack-bar-container, simple-snack-bar, [role="alert"]'))
   .filter(e => e.getClientRects().length > 0).map(e => (e.innerText || '').trim()).filter(Boolean).join(' | ').slice(0, 400)"""
 RE_LIMITE = re.compile(r"limite de uso|cr[eé]ditos? insuficiente|sem cr[eé]ditos|limit|quota|cota", re.I)
+# v84_104: conta SEM CRÉDITOS — o Flow não mostra o "Iniciar geração" (ou deixa ele desabilitado) e põe no lugar um
+# aviso/banner de créditos ou um botão de upgrade. O que estiver visível disso vira FlowLimite → troca de conta.
+JS_SEM_CREDITO = r"""() => {
+  const vis = e => e && e.getClientRects().length > 0;
+  const out = [];
+  document.querySelectorAll('flow-credit-banner, [class*="credit"], [class*="Credit"], [class*="upgrade"], [class*="Upgrade"], [class*="quota"], [class*="paywall"]')
+    .forEach(e => { if (vis(e) && !e.closest('flow-prompt-box-settings, .cdk-overlay-container flow-prompt-box-settings')) out.push((e.innerText || e.getAttribute('aria-label') || '').trim()); });
+  const caixa = document.querySelector('flow-prompt-box');
+  if (caixa) caixa.querySelectorAll('button, a, [role="button"]').forEach(b => { if (vis(b)) out.push(((b.getAttribute('aria-label') || '') + ' ' + (b.innerText || '')).trim()); });
+  document.querySelectorAll('mat-dialog-container, [role="dialog"], [role="alert"], mat-snack-bar-container, .error-text')
+    .forEach(e => { if (vis(e)) out.push((e.innerText || '').trim()); });
+  return out.filter(Boolean).join(' | ').replace(/\s+/g, ' ').slice(0, 800); }"""
+RE_SEM_CREDITO = re.compile(
+    r"cr[eé]ditos?\s+(insuficientes?|esgotad\w*|acabaram|acabou)|sem cr[eé]ditos|n[ãa]o (tem|possui|h[áa]) cr[eé]ditos|(?<![\d.,])0\s*cr[eé]ditos?|n[ãa]o h[áa] cr[eé]ditos|"
+    r"not enough credits|out of credits|insufficient credits|no credits( left)?|0 credits|"
+    r"fa[çc]a (o )?upgrade|fazer upgrade|upgrade|obter (mais )?cr[eé]ditos|get (more )?credits|comprar cr[eé]ditos|"
+    r"buy (more )?credits|adicionar cr[eé]ditos|limite de uso|usage limit|limit reached|quota|cota (di[aá]ria)?",
+    re.I)
+
+
+def sem_credito(page) -> str:
+    """O trecho que mostra que a conta está SEM CRÉDITOS (ou "" se não achar nada disso na tela)."""
+    try:
+        txt = str(page.evaluate(JS_SEM_CREDITO) or "")
+    except Exception:  # noqa: BLE001
+        return ""
+    m = RE_SEM_CREDITO.search(txt)
+    if not m:
+        return ""
+    ini = max(0, m.start() - 80)
+    return txt[ini:m.end() + 120].strip(" |")
 RE_FALHA = re.compile(r"n[ãa]o foi poss[ií]vel|falh|erro ao gerar|viola|pol[ií]tica|policy|unable to generate|couldn.t generate", re.I)
 
 
@@ -570,11 +605,25 @@ def clicar_gerar(page, on_passo: Passo = _nada) -> Dict[str, Any]:
     on_passo(passo, "andando", "")
     antes = {m["id"] for m in midias_na_pagina(page)}
     avisos_antes = avisos(page)
-    botao = _primeiro(page, S["gerar"], 8, passo, 'não achei o botão "Iniciar geração".')
+    if _primeiro(page, S["sem_creditos"], 0.3) is not None and _primeiro(page, S["gerar"], 0.3) is None:
+        raise FlowLimite(passo, 'a conta está SEM CRÉDITOS pra isso: no lugar do "Iniciar geração" o Flow mostra o '
+                         '"Alerta de créditos insuficientes".', page=page if hasattr(page, "goto") else None)
+    try:
+        botao = _primeiro(page, S["gerar"], 8, passo, 'não achei o botão "Iniciar geração".')
+    except FlowPassoErro:
+        sc = sem_credito(page)
+        if sc:  # sem o botão e com aviso de créditos/upgrade na tela: a conta acabou os créditos
+            raise FlowLimite(passo, f'a conta está SEM CRÉDITOS pra isso (o "Iniciar geração" sumiu; o Flow mostra: “{sc}”).',
+                             page=page if hasattr(page, "goto") else None)
+        raise
     if not _esperar(lambda: botao.is_enabled() and botao.get_attribute("disabled") is None, 15):
         av = avisos(page)
         if av and RE_LIMITE.search(av):
             raise FlowLimite(passo, "o Flow avisou: " + av)
+        sc = sem_credito(page)
+        if sc:
+            raise FlowLimite(passo, f'a conta está SEM CRÉDITOS pra isso ("Iniciar geração" desabilitado; o Flow mostra: “{sc}”).',
+                             page=page if hasattr(page, "goto") else None)
         raise FlowPassoErro(passo, '"Iniciar geração" continua desabilitado (o prompt entrou?).' + (f" Aviso: {av}" if av else ""))
     n_cartoes = len(page.evaluate(JS_CARTOES) or [])
     botao.click()

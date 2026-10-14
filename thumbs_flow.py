@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import shutil
 import threading
@@ -62,7 +63,7 @@ def salvar(base: str, origem: str, pid: str, d: Dict[str, Any]) -> None:
     tmp = _arq(base, origem, pid) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, _arq(base, origem, pid))
+    arquivo_seguro.trocar(tmp, _arq(base, origem, pid))
 
 
 def normalizar(x: Any) -> Optional[Dict[str, str]]:

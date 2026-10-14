@@ -194,3 +194,17 @@ def test_janela_larga_agente_em_painel_sem_chip(sim, navegador, tmp_path):
     r = fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple", "modelo": "Nano Banana 2.1"}, timeout_s=30)
     assert len(r) == 1 and r[0]["tipo"] == "imagem"
     ctx.close()
+
+
+def test_sem_creditos_pra_video_vira_flowlimite(sim, navegador):
+    """v84_104 (HTML real): sem créditos, o Flow troca o "Iniciar geração" pelo "Alerta de créditos insuficientes" —
+    isso é FlowLimite (o site troca de conta), não "não achei o botão"."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    page = fd.preparar_projeto(ctx, sim + "?sem_credito=1", True, None)
+    assert fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple"}, timeout_s=30)  # foto ainda gera
+    with pytest.raises(fd.FlowLimite) as e:
+        fd.gerar_um(page, {"tipo": "video", "tipo_video": "Elementos", "prompt": "a calm lake"}, timeout_s=30)
+    assert e.value.passo == "gerar" and "SEM CRÉDITOS" in e.value.mensagem
+    assert isinstance(g.erro_do_passo(e.value), g.GoogleFlowLimitReached)
+    assert fd.RE_SEM_CREDITO.search("Alerta de créditos insuficientes") and not fd.RE_SEM_CREDITO.search("Vídeo · 10 créditos")
+    ctx.close()

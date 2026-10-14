@@ -158,6 +158,8 @@
 
 {% set partes_base = '/roteiros-yt/' ~ p.id ~ '/partes' %}{% include "_partes.html" %}
 {% set rev_base = '/revisao/roteiro_yt/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).antes_da_revisao or (p.analise or {}).antes_da_revisao %}{% include "_revisao.html" %}
+{% set rt_origem = 'roteiro_yt' %}{% set rt_id = p.id %}{% include "_checagem.html" %}
+{% include "_historico.html" %}
 {% set tts_base = '/tts-adaptar/roteiro_yt/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).antes_do_tts or (p.analise or {}).antes_do_tts %}{% include "_adaptar_tts.html" %}
 {% set thumbs_base = '/thumbs/roteiro_yt/' ~ p.id %}{% include "_thumbs.html" %}
 

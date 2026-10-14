@@ -30,6 +30,7 @@
     <a href="{{ url_for('roteiros_yt_page') }}" style="color:#b91c1c;margin-right:14px;font-weight:600;">📜 Roteiro do YouTube</a>
     <a href="{{ url_for('vendas_page') }}" style="color:#047857;margin-right:14px;font-weight:600;">🛒 Vídeo de venda</a>
     <a href="{{ url_for('dossies_page') }}" style="color:#334155;margin-right:14px;font-weight:600;">🕵️ Modelos de vídeo</a>
+    <a href="/perfis-canal" style="color:#be123c;margin-right:14px;font-weight:600;">📺 Perfis do canal</a>
     <a href="{{ url_for('analisador_canal_page') }}" style="color:#7c3aed;margin-right:14px;font-weight:600;">📊 Analisador de canal</a>
     <a href="{{ url_for('niche_miner_page') }}" style="color:#a16207;margin-right:14px;font-weight:600;">⛏ Niche Miner</a>
     <a href="{{ url_for('flow_page') }}" style="color:#1d4ed8;margin-right:14px;font-weight:600;">🎬 Google Flow</a>
@@ -47,6 +48,25 @@
   </p>
   {% block content %}{% endblock %}
   {% include "_sino.html" %}
+  <script>
+  // 🔄 v84_102: servidor rodando código velho (atualizou o site com ele aberto) → avisa em vez de deixar botão dar 404
+  (function () {
+    const ESPERADO = {{ (versao_codigo | default(''))|tojson }};
+    const faixa = (txt) => {
+      if (document.getElementById('avisoCodigoVelho')) return;
+      const d = document.createElement('div'); d.id = 'avisoCodigoVelho';
+      d.style.cssText = 'position:sticky;top:0;z-index:9999;background:#b91c1c;color:#fff;padding:10px 14px;font-size:.9rem;line-height:1.4';
+      d.innerHTML = txt + ' <button type="button" style="margin-left:8px;width:auto;padding:2px 10px;background:#fff;color:#b91c1c" onclick="this.parentNode.remove()">ok</button>';
+      document.body.prepend(d);
+    };
+    fetch('/versao-codigo', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+      if (!d || !ESPERADO || d.id !== ESPERADO)
+        faixa('⚠ <b>O servidor do site está rodando um código ANTIGO</b> (você atualizou os arquivos, mas a janela do <code>python app.py</code> de antes continua aberta — ou tem duas abertas). Por isso alguns botões novos dão <b>404</b>. Feche <b>todas</b> as janelas do site e abra de novo.');
+      else if (d.desatualizado)
+        faixa('⚠ <b>Os arquivos do site mudaram depois que o servidor abriu</b> (' + (d.arquivos || []).slice(0, 5).join(', ') + '). Se o servidor não reiniciou sozinho, feche a janela do <code>python app.py</code> e abra de novo — senão os botões novos dão 404.');
+    }).catch(() => {});
+  })();
+  </script>
   <script>
   // 🤖 botões "Gerar com a IA" (data-ia-gerar): gera o prompt, manda pra IA de /ia e lê a resposta.
   // ⏳ v84_87: a IA roda em SEGUNDO PLANO no servidor — pode fechar a aba. Quando terminar chega um aviso no 🔔

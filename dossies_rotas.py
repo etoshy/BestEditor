@@ -444,6 +444,7 @@ def registrar(app, base_dir: str) -> None:
                 p["resultado"] = ds.ler_resposta(str((request.get_json(silent=True) or {}).get("texto") or ""), p)
             except ds.DossieError as exc:
                 return jsonify({"erro": str(exc)}), 400
+            ds.marcar_mudanca(p, "🤖 resposta da IA", "roteiro lido da resposta da IA")
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
@@ -483,6 +484,7 @@ def registrar(app, base_dir: str) -> None:
                 p["resultado"] = ds.salvar_parte(p, k, str((request.get_json(silent=True) or {}).get("texto") or ""))
             except ds.DossieError as exc:
                 return jsonify({"erro": str(exc)}), 400
+            ds.marcar_mudanca(p, "✍️ partes montadas", f"parte {k} colada")
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
@@ -496,6 +498,7 @@ def registrar(app, base_dir: str) -> None:
             if any(not x.get("texto") for x in p["resultado"]["partes"]):
                 return jsonify({"erro": "Ainda tem parte sem texto."}), 400
             p["resultado"] = ds.montar_partes(p)
+            ds.marcar_mudanca(p, "✍️ partes montadas", "as partes juntadas num roteiro só")
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
@@ -547,6 +550,7 @@ def registrar(app, base_dir: str) -> None:
                 q = _proj(pid)
                 if q and (q.get("resultado") or {}).get("partes") and all(x.get("texto") for x in q["resultado"]["partes"]):
                     q["resultado"] = ds.montar_partes(q)
+                    ds.marcar_mudanca(q, "✍️ partes montadas", "🤖 a IA escreveu as partes")
                     ds.salvar(base_dir, q)
             return {"partes": feitas}
 
@@ -576,6 +580,7 @@ def registrar(app, base_dir: str) -> None:
                 p["resultado"] = ds.roteiro_editado(p, str((request.get_json(silent=True) or {}).get("roteiro") or ""))
             except ds.DossieError as exc:
                 return jsonify({"erro": str(exc)}), 400
+            ds.marcar_mudanca(p, "✏️ edição manual")
             ds.salvar(base_dir, p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 

@@ -124,7 +124,7 @@ def test_limite_marca_conta_e_fecha_projeto(ctx, monkeypatch):
             p.chromium.launch(headless=True).new_context(viewport={"width": 1400, "height": 900}), True))
         for nome in ("salvar_sessao", "restaurar_sessao"):
             monkeypatch.setattr(gf, nome, lambda *a, **k: None)
-        monkeypatch.setattr(gf, "marcar_esgotada", lambda conta, horas=24: marcadas.append(conta))
+        monkeypatch.setattr(gf, "marcar_esgotada", lambda conta, horas=24, tipo=None: marcadas.append(conta))
         c.post("/flow/iniciar", data={"modo": "gerar", "prompt": "x y", "conta": "principal"})
         d = _esperar(c)
         assert "limite" in d["erro"].lower() and "esgotada" in d["erro"] and marcadas == ["principal"]
@@ -159,3 +159,66 @@ def test_erro_guarda_diagnostico_pra_baixar_e_copiar(ctx, monkeypatch):
         assert c.get("/flow/diagnostico/20990101_000000_000000/zip").status_code == 404
     finally:
         parar()
+
+
+def test_sem_creditos_troca_de_conta_e_refaz(ctx, monkeypatch):
+    """v84_104: a conta ficou sem créditos no meio (ex.: vídeo) → marca esgotada, abre a próxima conta e refaz o MESMO
+    pedido; a mídia do projeto antigo (media_id) vira o arquivo reenviado."""
+    _c, FE, gf, tmp = ctx
+    from googleflow import flow_direto as fd
+    s = FE._Sessao()
+    s.conta, s.page = "principal", object()
+    chamadas, marcadas, abertas = [], [], []
+
+    def gerar_um(page, trab, on_passo, timeout):
+        chamadas.append((s.conta, dict(trab)))
+        if s.conta == "principal":
+            raise fd.FlowLimite("gerar", 'a conta está SEM CRÉDITOS pra isso (“Alerta de créditos insuficientes”).')
+        return [{"id": "m1", "url": "https://x/video/m1", "tipo": "video"}]
+    monkeypatch.setattr(fd, "gerar_um", gerar_um)
+    monkeypatch.setattr(gf, "marcar_esgotada", lambda nome, horas=24, tipo=None: marcadas.append((nome, tipo)))
+    monkeypatch.setattr(gf, "escolher_conta_disponivel", lambda **k: "reserva")
+    monkeypatch.setattr(gf, "salvar_diagnostico", lambda *a, **k: None)
+
+    def garantir_nav(cfg, visivel, conta):
+        abertas.append(conta)
+        s.conta = conta
+    monkeypatch.setattr(s, "_garantir_navegador", garantir_nav)
+    monkeypatch.setattr(s, "_garantir_projeto", lambda cfg, novo, on_passo, atual: setattr(s, "page", object()))
+    passos = []
+    trab = {"tipo": "video", "prompt": "lago", "inicio": {"media_id": "velho", "arquivo": "/tmp/a.png"}}
+    r = s._gerar(trab, {}, {"visivel": False}, lambda n, e, d: passos.append((n, e, d)), {}, 30)
+    assert r[0]["id"] == "m1" and marcadas == [("principal", "video")] and abertas == ["reserva"]  # só o vídeo
+    assert chamadas[1][0] == "reserva" and chamadas[1][1]["inicio"] == {"arquivo": "/tmp/a.png"}
+    assert any("trocando pra “reserva”" in d for n, e, d in passos if n == "conta")
+    # sem outra conta: o erro diz isso
+    s.conta = "principal"
+    monkeypatch.setattr(gf, "escolher_conta_disponivel", lambda **k: (_ for _ in ()).throw(gf.GoogleFlowSemContas("todas esgotadas")))
+    with pytest.raises(fd.FlowLimite) as e:
+        s._gerar({"tipo": "video", "prompt": "x"}, {}, {}, lambda *a: None, {}, 30)
+    assert "não sobrou outra conta" in e.value.mensagem
+    # opção desligada: não troca
+    s.conta = "principal"
+    monkeypatch.setattr(gf, "escolher_conta_disponivel", lambda **k: "reserva")
+    with pytest.raises(fd.FlowLimite):
+        s._gerar({"tipo": "video", "prompt": "x"}, {}, {"trocar_conta": False}, lambda *a: None, {}, 30)
+
+
+def test_o_que_o_site_gera_no_flow_vai_pra_galeria(ctx, monkeypatch):
+    """v84_106: imagem/vídeo gerado no Flow PRO VÍDEO (não pela aba) também entra na 🖼 galeria (uma cópia, sem repetir)."""
+    c, FE, gf, tmp = ctx
+    pasta = tmp / "flow_imgs"
+    pasta.mkdir()
+    monkeypatch.setattr(gf, "pasta_imagens", lambda: pasta)
+    (pasta / "flow_abc_1.png").write_bytes(b"png")
+    (pasta / "flow_def_1.mp4").write_bytes(b"mp4" * 400)
+    assert FE.guardar_da_geracao in gf.AO_SALVAR
+    regs = [{"arquivo": "flow_abc_1.png", "prompt": "uma maçã", "chave": "abc", "indice": 1},
+            {"arquivo": "flow_def_1.mp4", "prompt": "um lago", "chave": "def", "indice": 1, "tipo": "video"}]
+    gf._avisar_salvo(regs)
+    gf._avisar_salvo(regs)  # de novo: não duplica
+    g = FE.galeria()
+    assert len(g) == 2 and {e["tipo"] for e in g} == {"imagem", "video"} and all(e["origem"] == "video" for e in g)
+    assert all((tmp / "outputs" / "flow_estudio" / e["arquivo"]).exists() for e in g)
+    assert (pasta / "flow_abc_1.png").exists()  # o cache do site continua com o arquivo
+    assert "gerado pra um vídeo" in c.get("/flow").get_data(as_text=True)

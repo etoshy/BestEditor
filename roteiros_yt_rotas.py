@@ -215,6 +215,7 @@ def registrar(app, base_dir: str) -> None:
         p["analise"] = an
         p["resultado"] = None
         p["titulo"] = p.get("titulo") or an.get("titulo") or ""
+        ry.marcar_mudanca(p, '🤖 resposta da IA')
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, "analise": an})
 
@@ -260,6 +261,7 @@ def registrar(app, base_dir: str) -> None:
             an = ry.salvar_parte(p, k, str((request.get_json(silent=True) or {}).get("texto") or ""))
         except ry.RoteiroError as exc:
             return jsonify({"erro": str(exc)}), 400
+        ry.marcar_mudanca(p, '✍️ partes montadas')
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, "partes": an.get("partes"), "tem_roteiro": bool(an.get("roteiro"))})
 
@@ -272,6 +274,7 @@ def registrar(app, base_dir: str) -> None:
         if any(not x.get("texto") for x in an["partes"]):
             return jsonify({"erro": "Ainda tem parte sem texto."}), 400
         ry.montar_partes(p)
+        ry.marcar_mudanca(p, '✍️ partes montadas')
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, "partes": an["partes"], "tem_roteiro": True})
 
@@ -373,6 +376,7 @@ def registrar(app, base_dir: str) -> None:
         limpeza = None
         if "limpar_tts" in ((p.get("acoes") or {}).get("acoes") or []) and res.get("roteiro_final"):
             limpeza = ry.aplicar_limpeza(p)  # o que a IA deixou passar, o site tira
+        ry.marcar_mudanca(p, '🤖 resposta da IA')
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, "resultado": p["resultado"], "limpeza": limpeza})
 
@@ -390,6 +394,7 @@ def registrar(app, base_dir: str) -> None:
             feito = ry.aplicar_limpeza(p)
         except ry.RoteiroError as exc:
             return jsonify({"erro": str(exc)}), 400
+        ry.marcar_mudanca(p, '🧹 limpeza pro TTS')
         ry.salvar_projeto(base_dir, p)
         return jsonify({"ok": True, **feito, "analise": p.get("analise"), "resultado": p.get("resultado")})
 

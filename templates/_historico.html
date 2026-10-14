@@ -1,0 +1,69 @@
+{# 🕘 Histórico de versões do roteiro (historico_roteiro.py, v84_99) — tipo o git: o que mudou em cada versão e voltar.
+   incluir com: {% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_historico.html" %} #}
+<div id="histCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🕘 Histórico do roteiro <span style="font-weight:400;font-size:.82rem;color:#666;">(cada mudança vira uma versão — IA, partes, 🪄 revisão, 🔎 checagem, 🎙 TTS, edição sua. Veja o que mudou e volte pra qualquer uma: voltar também vira versão, nada se perde)</span></h2>
+  <div id="histLista" style="font-size:.85rem;">carregando…</div>
+  <div id="histVer" style="display:none;margin-top:8px;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.85rem;">
+      <b id="histTit"></b>
+      <label style="margin:0;font-weight:400;">comparar com <select id="histContra" style="width:auto;margin:0;"></select></label>
+      <label style="margin:0;font-weight:400;"><input type="checkbox" id="histTexto" style="width:auto;margin:0 4px 0 0">ver o texto inteiro</label>
+      <button type="button" id="histCopiar" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#64748b">📋 Copiar esta versão</button>
+      <button type="button" id="histFechar" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#94a3b8">✕</button>
+    </div>
+    <div id="histStat" style="font-size:.8rem;color:#555;margin:4px 0;"></div>
+    <div id="histDiff" style="white-space:pre-wrap;font-size:.86rem;line-height:1.5;max-height:520px;overflow:auto;background:#fafafa;border-radius:6px;padding:8px;"></div>
+  </div>
+</div>
+<script>
+(function () {
+  const BASE = '/historico/' + {{ rt_origem|tojson }} + '/' + {{ rt_id|tojson }};
+  const $h = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const quando = (t) => { const d = new Date(t * 1000), z = (n) => String(n).padStart(2, '0'); return `${z(d.getDate())}/${z(d.getMonth() + 1)} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+  let VERS = [], atual = null, txtAtual = '';
+  function lista() {
+    fetch(BASE, { cache: 'no-store' }).then(r => r.json()).then(d => {
+      VERS = d.versoes || [];
+      if (!VERS.length) { $h('histLista').innerHTML = '<span style="color:#666">Ainda não tem versões (aparecem quando o roteiro existir).</span>'; return; }
+      $h('histLista').innerHTML = VERS.map((v, i) => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:${i ? '1px solid #f1f5f9' : '0'};padding:5px 0">
+        <code style="background:#eef2ff;border-radius:4px;padding:1px 6px">v${v.n}</code>${i === 0 ? '<span style="color:#15803d;font-size:.78rem">● atual</span>' : ''}
+        <span style="color:#555">${quando(v.quando)}</span> <b>${esc(v.origem)}</b> <span style="color:#555">${esc(v.mensagem)}</span>
+        <span style="color:#555">· ${v.palavras} palavras</span> <span style="color:#15803d">+${v.entraram}</span> <span style="color:#b91c1c">−${v.sairam}</span>
+        <span style="margin-left:auto;display:flex;gap:6px"><button type="button" class="hVer" data-n="${v.n}" style="width:auto;margin:0;padding:2px 9px;font-size:.78rem;background:#64748b">👁 o que mudou</button>${i === 0 ? '' : `<button type="button" class="hVolta" data-n="${v.n}" style="width:auto;margin:0;padding:2px 9px;font-size:.78rem;background:#b45309">↩ voltar pra esta</button>`}</span></div>`).join('');
+      document.querySelectorAll('#histLista .hVer').forEach(b => b.addEventListener('click', () => ver(+b.dataset.n)));
+      document.querySelectorAll('#histLista .hVolta').forEach(b => b.addEventListener('click', async () => {
+        if (!confirm(`Voltar o roteiro pra versão v${b.dataset.n}? (a versão atual continua no histórico)`)) return;
+        const r = await fetch(BASE + '/' + b.dataset.n + '/restaurar', { method: 'POST' }); const d = await r.json().catch(() => ({}));
+        if (!r.ok || d.erro) { alert('⚠ ' + (d.erro || r.status)); return; }
+        location.reload();
+      }));
+    }).catch(() => { $h('histLista').textContent = ''; });
+  }
+  async function ver(n, contra) {
+    const d = await (await fetch(BASE + '/' + n + (contra ? '?contra=' + contra : ''), { cache: 'no-store' })).json();
+    if (!d.ok) return;
+    atual = n; txtAtual = d.texto;
+    $h('histVer').style.display = '';
+    $h('histTit').textContent = `v${n}`;
+    $h('histContra').innerHTML = VERS.filter(v => v.n !== n).map(v => `<option value="${v.n}" ${v.n === d.contra ? 'selected' : ''}>v${v.n} — ${esc(v.origem)}</option>`).join('') + (d.contra ? '' : '<option value="" selected>(nada — é a 1ª)</option>');
+    $h('histStat').innerHTML = d.contra ? `comparando v${d.contra} → v${n}: <span style="color:#15803d">+${d.diff.entraram}</span> / <span style="color:#b91c1c">−${d.diff.sairam}</span> palavras` : '';
+    desenharDiff(d);
+    $h('histVer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  let ULT = null;
+  function desenharDiff(d) {
+    ULT = d || ULT;
+    if ($h('histTexto').checked || !ULT.contra) { $h('histDiff').textContent = ULT.texto; return; }
+    $h('histDiff').innerHTML = ULT.diff.partes.map(x => x.op === '-' ? `<del style="background:#fee2e2;color:#991b1b">${esc(x.t)}</del>`
+      : x.op === '+' ? `<ins style="background:#dcfce7;color:#166534;text-decoration:none">${esc(x.t)}</ins>`
+      : x.op === '…' ? `<span style="display:block;color:#94a3b8;font-size:.78rem;margin:2px 0">⋯ ${esc(x.t)} ⋯</span>` : esc(x.t)).join('');
+  }
+  $h('histContra').addEventListener('change', () => { if ($h('histContra').value) ver(atual, $h('histContra').value); });
+  $h('histTexto').addEventListener('change', () => desenharDiff());
+  $h('histFechar').addEventListener('click', () => { $h('histVer').style.display = 'none'; });
+  $h('histCopiar').addEventListener('click', () => navigator.clipboard.writeText(txtAtual).then(() => { $h('histStat').textContent = '📋 copiado'; }));
+  window.histRecarregar = lista;
+  lista();
+})();
+</script>

@@ -70,6 +70,9 @@ def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = 
             f"  • \"palavras\": quantas palavras o capítulo vai ter (a SOMA de todos = ~{palavras}; o gancho pode ser menor, "
             f"~{max(80, por // 2)}; os outros ~{por}).\n"
             "- Distribua os fatos: cada fato importante em UM capítulo (sem repetir), na ordem da história que você escolheu.\n"
+            "- Cada ASSUNTO que atravessa o caso (ex.: a relação do criminoso com a polícia, a contagem das vítimas, o papel do "
+            "cúmplice, o julgamento) tem UM capítulo DONO, que explica tudo; os outros capítulos só citam em meia frase.\n"
+            "- Confira a CRONOLOGIA do plano: as datas de cada capítulo batem entre si e com as fontes.\n"
             "- As marcas [[INSCREVA]] e [[VENDA]] o site põe sozinho entre os capítulos — não precisa planejar.")
 
 

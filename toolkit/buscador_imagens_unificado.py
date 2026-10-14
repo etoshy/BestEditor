@@ -195,6 +195,11 @@ def _url_com_marca_dagua(url: str) -> bool:
     u = (url or "").lower()
     if not u:
         return False
+    try:  # ⛔ a lista negra EDITÁVEL do site (Configurações → Fontes de vídeo), quando roda dentro dele
+        import lista_negra
+        return lista_negra.bloqueado(u) is not None
+    except ImportError:
+        pass
     try:
         from urllib.parse import urlparse
         host = urlparse(u).netloc
@@ -208,7 +213,14 @@ def tem_marca_dagua(img: "ImagemBuscador") -> bool:
     endereço da imagem, a página de origem e o título ("... Stock Photo - Alamy")."""
     if _url_com_marca_dagua(img.original_url) or _url_com_marca_dagua(img.source_page):
         return True
-    return bool(_TITULO_MARCA_DAGUA.search(f"{img.title or ''} {img.description or ''}"))
+    texto = f"{img.title or ''} {img.description or ''}"
+    try:
+        import lista_negra
+        if lista_negra.titulo_de_banco(texto):
+            return True
+    except ImportError:
+        pass
+    return bool(_TITULO_MARCA_DAGUA.search(texto))
 
 
 def sem_marca_dagua(imagens: List["ImagemBuscador"]) -> List["ImagemBuscador"]:

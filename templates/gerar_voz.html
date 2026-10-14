@@ -331,6 +331,19 @@ E no final...</pre>
 
   <label style="margin-top:16px;"><input type="checkbox" name="forcar_cpu" style="width:auto;"> Forçar CPU mesmo se houver GPU disponível (Piper e XTTS)</label>
 
+  <div style="margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;">
+    <input type="hidden" name="instancias" id="inst-valor" value="1">
+    <label style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;cursor:pointer;">
+      <input type="checkbox" id="inst-on" style="width:auto;margin:0;"> ⚡ <b>Geração rápida</b> <span style="font-weight:400;font-size:.84rem;">(várias cópias do motor gerando partes diferentes do áudio ao mesmo tempo)</span></label>
+    <div id="inst-opcoes" style="display:none;margin-top:6px;">
+      <label style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:400;">Quantas cópias
+        <select id="inst-modo" style="width:auto;margin:0;"><option value="auto">automático (o site mede a VRAM, a RAM e a CPU)</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+      <div id="inst-info" style="font-size:.82rem;color:#9a3412;margin-top:4px;"></div>
+      <div id="inst-pc" style="font-size:.78rem;color:#555;margin-top:2px;"></div>
+      <div style="margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:6px;font-size:.8rem;color:#78350f;">⚠ Pode deixar o PC <b>um pouco lento</b> enquanto gera: cada cópia carrega o modelo de novo (Chatterbox ~5 GB, Turbo/XTTS ~3,5 GB de placa + memória do PC) e usa mais CPU. O site nunca passa do que está livre agora; se mesmo assim faltar memória numa cópia, o bloco dela é gerado de novo numa cópia só. Vale também pro 📝 Roteiro para Áudio.</div>
+    </div>
+  </div>
+
   <div style="margin-top:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="checkbox" id="legenda-avancado-toggle" style="width:auto;">
@@ -821,6 +834,39 @@ fetch('/gerar-voz/vozes').then(r => r.json()).then(mvDesenhar);
 document.getElementById('legenda-avancado-toggle').addEventListener('change', function () {
   document.getElementById('legenda-avancado-opcoes').style.display = this.checked ? '' : 'none';
 });
+
+// ---------------- ⚡ geração rápida: várias instâncias do motor neste áudio (v84_103)
+function instModo() { return document.getElementById('inst-on').checked ? document.getElementById('inst-modo').value : '1'; }
+function instPrevia() {
+  const modo = instModo();
+  document.getElementById('inst-valor').value = modo;
+  document.getElementById('inst-opcoes').style.display = modo === '1' ? 'none' : '';
+  if (modo === '1') return;
+  const eng = document.getElementById('engine-select');
+  const cpu = (document.querySelector('[name=forcar_cpu]') || {}).checked ? '1' : '0';
+  const n = ((document.getElementById('texto-narrar') || {}).value || '').length;
+  fetch(`/gerar-voz/instancias/previa?engine=${encodeURIComponent(eng.value)}&modo=${modo}&cpu=${cpu}&caracteres=${Math.max(n, 20000)}`)
+    .then(r => r.json()).then(d => {
+      document.getElementById('inst-info').textContent = '→ ' + d.motivo + (n && n < 1500 ? ' · (este texto é curto: vai com 1)' : '');
+      const g = (x) => x ? x.toFixed(1) : '?';
+      document.getElementById('inst-pc').textContent = 'Seu PC agora: ' + (d.ram ? `RAM ${g(d.ram.livre)} GB livres de ${g(d.ram.total)} GB` : 'RAM ?')
+        + ' · ' + (d.vram ? `placa ${d.vram.nome}: ${g(d.vram.livre)} GB livres de ${g(d.vram.total)} GB` : 'sem placa NVIDIA') + ` · ${d.nucleos} núcleos de CPU`;
+    }).catch(() => {});
+}
+async function instSalvar() {
+  await fetch('/gerar-voz/instancias/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modo: instModo() }) }).catch(() => {});
+  instPrevia();
+}
+fetch('/gerar-voz/instancias/previa').then(r => r.json()).then(d => {
+  const m = d.modo || '1';
+  document.getElementById('inst-on').checked = m !== '1';
+  if (m !== '1') document.getElementById('inst-modo').value = m;
+  instPrevia();
+}).catch(() => {});
+document.getElementById('inst-on').addEventListener('change', instSalvar);
+document.getElementById('inst-modo').addEventListener('change', instSalvar);
+document.getElementById('engine-select').addEventListener('change', instPrevia);
+(document.querySelector('[name=forcar_cpu]') || document.body).addEventListener('change', instPrevia);
 
 // ---------------- 🎛 fila: quantos ao mesmo tempo
 function filaInfo(f) {

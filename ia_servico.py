@@ -26,6 +26,7 @@ import hashlib
 import io
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import threading
 import time
@@ -127,7 +128,7 @@ def _gravar(caminho: str, dados: Any) -> None:
     tmp = caminho + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, caminho)
+    arquivo_seguro.trocar(tmp, caminho)
 
 
 def config() -> Dict[str, Any]:

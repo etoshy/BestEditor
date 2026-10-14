@@ -291,6 +291,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # 📺 v84_95: o nome do seu canal — os prompts de roteiro (🕵️ Modelos de vídeo, 📜 Roteiro do YouTube, 🎞️ Vídeos
     # modelados) pedem pra IA falar ele no momento certo (cada projeto pode trocar)
     "nome_canal": "",
+    "voz_simultaneos": "auto",  # 🎛 quantos áudios o Gerador de voz gera ao mesmo tempo (fila_voz.py)
+    "voz_instancias": "1",      # ⚡ geração rápida: cópias do motor num MESMO áudio ("1" = desligada; tts_paralelo.py)
+    # ⛔ lista negra de sites (lista_negra.py): imagem/vídeo de lá nunca entra (marca d'água); editável em Configurações
+    "sites_bloqueados": None,
 }
 
 

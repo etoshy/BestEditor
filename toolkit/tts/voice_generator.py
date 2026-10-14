@@ -2575,6 +2575,9 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
         raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
 
     engine = (engine or "").strip().lower()
+    if engine == "teste" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") == "1":  # só nos testes automatizados
+        _gerar_teste_falso(texto, output_path)
+        return output_path
     if engine == "piper":
         return piper_synthesize(texto, output_path, **kwargs)
     if engine == "xtts":
@@ -2771,6 +2774,162 @@ def gerar_audio_isolado_lote(itens, timeout_por_item: float = 7200.0, on_progres
         if processo.is_alive():
             processo.terminate()
             processo.join(5)
+    return erros
+
+
+# ---------------------------------------------------------------------------
+# ⚡ VÁRIAS INSTÂNCIAS DO MOTOR AO MESMO TEMPO (v84_103)
+# ---------------------------------------------------------------------------
+def _gerar_teste_falso(texto: str, output_path: str) -> None:
+    """Motor "teste" — SÓ com VOICE_GENERATOR_TESTE_MOTOR_FALSO=1 (testes automatizados): um seno com duração
+    proporcional ao texto, pra testar o paralelismo em processos de verdade sem modelo nenhum."""
+    dur = max(0.2, min(20.0, len(texto) / 60.0))
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"sine=f=330:d={dur:.2f}", "-ar", "24000",
+                    "-ac", "1", output_path], check=True, capture_output=True, timeout=60)
+    if os.environ.get("VOICE_GENERATOR_TESTE_LENTO"):
+        time.sleep(float(os.environ["VOICE_GENERATOR_TESTE_LENTO"]))
+
+
+def _gerar_ou_teste(engine: str, texto: str, output_path: str, kwargs: Dict[str, Any]) -> None:
+    if engine == "teste" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") == "1":
+        _gerar_teste_falso(texto, output_path)
+        return
+    gerar_audio(engine, texto, output_path, **kwargs)
+
+
+def _processo_trabalhador(itens, tarefas, fila, wid: int) -> None:
+    """Uma INSTÂNCIA do motor: carrega o modelo uma vez (na 1ª fala) e vai pegando o próximo pedaço da fila de
+    tarefas até ela acabar — as instâncias rápidas pegam mais pedaços (balanceamento sozinho)."""
+    import queue as _queue
+    while True:
+        try:
+            i = tarefas.get(timeout=2)
+        except _queue.Empty:
+            break
+        if i is None:
+            break
+        engine, texto, output_path, kwargs = itens[i]
+        fila.put(("inicio", i, wid, ""))
+        try:
+            _gerar_ou_teste(engine, texto, output_path, kwargs)
+            fila.put(("ok", i, wid, ""))
+        except BaseException as exc:  # noqa: BLE001 -- um pedaço ruim não derruba a instância
+            fila.put(("erro", i, wid, f"{type(exc).__name__}: {exc}"))
+    fila.put(("fim", -1, wid, ""))
+
+
+def gerar_audio_isolado_paralelo(itens, instancias: int = 2, timeout_por_item: float = 7200.0, on_progresso=None,
+                                 intervalo_inicio: float = 3.0) -> Dict[int, str]:
+    """Como `gerar_audio_isolado_lote`, mas com VÁRIAS instâncias do motor (processos separados, cada um com o seu
+    modelo carregado) gerando pedaços diferentes AO MESMO TEMPO. As instâncias começam com `intervalo_inicio`
+    segundos de diferença (não carregam o modelo todas juntas — pico de memória/disco).
+
+    `on_progresso(i, erro_ou_None, instancia)` a cada pedaço terminado. Devolve {indice: erro} ({} = tudo certo).
+    Se uma instância cai (ex.: faltou VRAM), o pedaço que ela estava gerando volta pra fila das outras."""
+    itens = list(itens)
+    erros: Dict[int, str] = {}
+    if not itens:
+        return erros
+    instancias = max(1, min(int(instancias or 1), len(itens), 8))
+    if instancias == 1:
+        return gerar_audio_isolado_lote(itens, timeout_por_item, on_progresso=(lambda i, e: on_progresso(i, e, 1)) if on_progresso else None)
+    if os.environ.get("VOICE_GENERATOR_DESATIVAR_ISOLAMENTO") == "1" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") != "1":
+        for i, (engine, texto, output_path, kwargs) in enumerate(itens):  # só nos testes com mock (ver gerar_audio_isolado)
+            try:
+                gerar_audio(engine, texto, output_path, **kwargs)
+            except Exception as exc:  # noqa: BLE001
+                erros[i] = str(exc)
+            if on_progresso:
+                on_progresso(i, erros.get(i), 1 + i % instancias)
+        return erros
+
+    import multiprocessing
+    import queue as _queue
+
+    ctx = multiprocessing.get_context("spawn")
+    tarefas: Any = ctx.Queue()
+    fila: Any = ctx.Queue()
+    for i in range(len(itens)):
+        tarefas.put(i)
+    procs: Dict[int, Any] = {}
+    fazendo: Dict[int, int] = {}       # instância -> pedaço que ela está gerando
+    desde: Dict[int, float] = {}       # instância -> quando começou o pedaço atual
+    pendentes = set(range(len(itens)))
+    terminaram: set = set()
+    proximo_inicio = 0.0
+
+    reinicios = 0
+
+    def iniciar() -> None:
+        wid = len(procs) + 1
+        pr = ctx.Process(target=_processo_trabalhador, args=(itens, tarefas, fila, wid))
+        pr.start()
+        procs[wid] = pr
+
+    iniciar()
+    proximo_inicio = time.monotonic() + intervalo_inicio
+    try:
+        while pendentes:
+            vivos = [w for w, pr in procs.items() if w not in terminaram]
+            if len(procs) < instancias and time.monotonic() >= proximo_inicio:
+                iniciar()
+                proximo_inicio = time.monotonic() + intervalo_inicio
+            elif not vivos and len(procs) >= instancias:
+                if reinicios >= instancias:  # já reabriu instâncias demais: desiste do que sobrou
+                    for k in sorted(pendentes):
+                        erros[k] = "Todas as instâncias do motor de voz fecharam (crash nativo ou falta de memória da placa?)."
+                    break
+                reinicios += 1
+                iniciar()
+            try:
+                status, i, wid, detalhe = fila.get(timeout=1.0)
+            except _queue.Empty:
+                agora = time.monotonic()
+                for w, pr in list(procs.items()):
+                    if w in terminaram:
+                        continue
+                    travou = w in fazendo and agora - desde.get(w, agora) > timeout_por_item
+                    if not pr.is_alive() or travou:
+                        if travou:
+                            pr.terminate()
+                        terminaram.add(w)
+                        k = fazendo.pop(w, None)
+                        if k is not None and k in pendentes:
+                            if travou:
+                                erros[k] = f"A instância {w} travou (passou de {_duracao_legivel(timeout_por_item)} neste pedaço)."
+                                pendentes.discard(k)
+                                if on_progresso:
+                                    on_progresso(k, erros[k], w)
+                            else:
+                                tarefas.put(k)  # caiu no meio: outra instância gera de novo
+                continue
+            if status == "inicio":
+                fazendo[wid] = i
+                desde[wid] = time.monotonic()
+                continue
+            if status == "fim":
+                terminaram.add(wid)
+                k = fazendo.pop(wid, None)
+                if k is not None and k in pendentes:
+                    tarefas.put(k)
+                continue
+            fazendo.pop(wid, None)
+            pendentes.discard(i)
+            if status == "erro":
+                erros[i] = detalhe
+            if on_progresso:
+                on_progresso(i, erros.get(i), wid)
+    finally:
+        for _ in procs:
+            try:
+                tarefas.put(None)
+            except Exception:  # noqa: BLE001
+                pass
+        for pr in procs.values():
+            pr.join(5)
+            if pr.is_alive():
+                pr.terminate()
+                pr.join(5)
     return erros
 
 

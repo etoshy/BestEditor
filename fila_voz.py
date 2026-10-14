@@ -105,8 +105,10 @@ class Fila:
                     "fila": [{"id": f["id"], "motor": f["motor"], "posicao": k} for k, f in enumerate(self._fila, 1)]}
 
     # ---------------------------------------------------------------- ações
-    def iniciar(self, jid: str, motor: str, fn: Callable[[], None], cpu: bool = False) -> int:
-        item = {"id": jid, "motor": motor, "fn": fn, "vram": 0.0 if cpu else VRAM_GB.get(motor, 3.5), "criado": time.time()}
+    def iniciar(self, jid: str, motor: str, fn: Callable[[], None], cpu: bool = False, instancias: int = 1) -> int:
+        """instancias: quantas cópias do motor ESTA geração usa ao mesmo tempo (⚡ tts_paralelo) — conta na VRAM."""
+        item = {"id": jid, "motor": motor, "fn": fn, "vram": 0.0 if cpu else VRAM_GB.get(motor, 3.5) * max(1, int(instancias or 1)),
+                "criado": time.time()}
         with self._cv:
             self._fila.append(item)
             pos = len(self._fila)

@@ -50,6 +50,7 @@
 <div class="fl-sessao" id="sessao">
   <span class="bola"></span><span id="sessaoTxt">Navegador do Flow fechado.</span>
   <label style="margin-left:auto">Conta <select id="conta">{% for c in contas %}<option>{{ c }}</option>{% endfor %}</select></label>
+  <label title="Se a conta ficar sem créditos (o Flow some com o “Iniciar geração” ou avisa limite), ela fica marcada como esgotada e o site abre a próxima conta e refaz o mesmo pedido"><input type="checkbox" id="trocarConta" checked style="width:auto"> 🔁 sem créditos → próxima conta</label>
   <button type="button" id="btnFechar" class="yt-sec" style="display:none">✖ Fechar navegador</button>
 </div>
 <p class="fl-hint">O navegador fica aberto entre um pedido e outro (no mesmo projeto do Flow) e fecha sozinho depois de {{ ocioso_min }} min parado. Enquanto ele está aberto aqui, o resto do site espera pra usar o Flow.</p>
@@ -202,6 +203,7 @@
   }
   async function iniciar(fd) {
     fd.append('conta', $('conta').value);
+    fd.append('trocar_conta', $('trocarConta').checked ? 'on' : 'off');
     const r = await fetch('/flow/iniciar', { method: 'POST', body: fd }); const d = await r.json();
     if (!r.ok) { alert(d.erro || 'falhou'); return; }
     rodava = true; $('painel').style.display = ''; $('painel').scrollIntoView({ behavior: 'smooth' }); status();
@@ -239,7 +241,7 @@
     const quando = t => new Date(t * 1000).toLocaleString().slice(0, 16);
     $('galGrade').innerHTML = galItens.map((e, i) => `<div class="fl-card">
       ${e.tipo === 'video' ? `<video src="/flow/arquivo/${e.arquivo}" controls muted preload="metadata"></video>` : `<img src="/flow/arquivo/${e.arquivo}" alt="" loading="lazy">`}
-      <div class="tx">${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : ''} · ${quando(e.criado)}</div></div>
+      <div class="tx">${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
       <div class="ac"><a href="/flow/arquivo/${e.arquivo}?baixar=1">⬇ baixar</a>
         ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button>` : ''}
         <button type="button" data-prompt="${i}" title="usar este prompt de novo">↺ prompt</button>

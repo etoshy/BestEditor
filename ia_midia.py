@@ -152,6 +152,10 @@ quem/onde/quando. Dê nota 0-10 a cada candidato:
 Tire pontos de: época/lugar errados, texto grande ou legenda na imagem, marca d'água, logo de
 canal, meme, montagem, print de site, tela dividida, baixa qualidade, algo da lista "evitar_sempre".
 Se a imagem parece muito com a do trecho anterior, tire 2 pontos.
+MARCA D'ÁGUA: olhe a imagem inteira (cantos e o meio) — texto/logo semitransparente por cima, grade repetida com o
+nome de um banco (Shutterstock, Alamy, Getty, iStock, Adobe Stock, Dreamstime, Depositphotos, 123RF, Magnific/Freepik,
+Vecteezy, Pond5, Storyblocks…) ou carimbo de site: nota 0 com o problema "marca_dagua" — essa imagem NUNCA entra no
+vídeo, por melhor que seja o assunto. Na dúvida (parece ter algo escrito por cima), também marque "marca_dagua".
 ESTILO: se a ficha diz estilo_imagem "real" (ou não diz), o vídeo é de imagens REAIS — desenho, cartoon, boneco/
 personagem 3D, ilustração vetorial (flat), clipart, ícone, gráfico desenhado ou objeto recortado em fundo branco/preto
 liso levam no MÁXIMO 2, com o problema "ilustracao_ou_3d", mesmo que o assunto bata.
@@ -191,8 +195,11 @@ def julgar(candidatos: List[Dict[str, Any]], fala: str, ficha: Optional[Dict[str
         except (TypeError, ValueError):
             continue
         if 0 <= i < len(lista):
-            notas[i] = {"nota": max(0, min(10, int(x.get("nota") or 0))), "motivo": str(x.get("motivo") or "")[:200],
-                        "problemas": [p for p in x.get("problemas") or [] if p in PROBLEMAS]}
+            probs = [p for p in x.get("problemas") or [] if p in PROBLEMAS]
+            nota = max(0, min(10, int(x.get("nota") or 0)))
+            if "marca_dagua" in probs:  # ⛔ v84_106: com marca d'água nunca entra
+                nota = 0
+            notas[i] = {"nota": nota, "motivo": str(x.get("motivo") or "")[:200], "problemas": probs}
     if not notas:
         return None
     ordem = sorted(notas, key=lambda i: (-notas[i]["nota"], i)) + [i for i in range(len(lista)) if i not in notas]
@@ -203,17 +210,22 @@ def reordenar(candidatos: List[Dict[str, Any]], j: Optional[Dict[str, Any]]) -> 
     """Os candidatos na ordem da nota, cada um com ia_nota/ia_motivo (o que não foi julgado vai no fim)."""
     if not j:
         return candidatos
-    out = []
+    out, marcadas = [], []
     for i in j["ordem"]:
         if i < len(candidatos):
             c = dict(candidatos[i])
             n = j["notas"].get(i)
             if n:
                 c.update(ia_nota=n["nota"], ia_motivo=n["motivo"], ia_problemas=n["problemas"])
+                if "marca_dagua" in n["problemas"]:  # ⛔ vai pro fim, marcada (no editor aparece "⛔ marca d'água")
+                    c["marca_dagua"] = True
+                    c["label"] = "⛔ marca d'água — " + str(c.get("label") or "")
+                    marcadas.append(c)
+                    continue
             out.append(c)
     vistos = set(j["ordem"])
     out += [c for k, c in enumerate(candidatos) if k not in vistos]
-    return out
+    return out + marcadas
 
 
 # ------------------------------------------------------------------ YouTube

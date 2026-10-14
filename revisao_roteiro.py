@@ -65,6 +65,13 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
               "o que é NOVO em cada um.",
               "3. ENCHIMENTO: frases de suspense vazias, transições que só anunciam, fórmulas de análise, explicação em dobro.",
               "4. Parágrafos inteiros que não trazem fato novo nem consequência.", ""]
+    try:  # o que o site já achou: repetições entre parágrafos, assuntos que voltam, fórmulas, fragmentos
+        import checagem_roteiro
+        achados = checagem_roteiro.resumo_texto(checagem_roteiro.analisar(roteiro, tema), roteiro)
+    except Exception:  # noqa: BLE001
+        achados = []
+    if achados:
+        L += ["## O que o site já achou no texto (as linhas são do roteiro abaixo, 1ª linha = 1) — resolva primeiro"] + achados + [""]
     L += ["## O que melhorar (em ordem de importância)",
           "1. COSTURAS: a passagem entre um capítulo e o próximo — retomadas repetidas (\"Como vimos\", \"Agora\", \"Voltando\"), "
           "ganchos que não se cumprem, a mesma informação dita duas vezes em partes diferentes.",

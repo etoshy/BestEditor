@@ -134,6 +134,8 @@
 </div>
 
 {% set rev_base = '/revisao/dossie/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).roteiro_antes_revisao %}{% include "_revisao.html" %}
+{% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %}
+{% include "_historico.html" %}
 {% set tts_base = '/tts-adaptar/dossie/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).roteiro_antes_tts %}{% include "_adaptar_tts.html" %}
 {% set thumbs_base = '/thumbs/dossie/' ~ p.id %}{% include "_thumbs.html" %}
 

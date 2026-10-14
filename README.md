@@ -28,6 +28,91 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ⛔ Lista negra de sites (marca d'água) e 🖼 galeria do Flow com o que vai pros vídeos (v84_106)
+
+- ⚙️ Configurações → Fontes de vídeo → **⛔ Lista negra de sites** (editável, um por linha; dá pra voltar pra padrão):
+  Magnific/Freepik, Vecteezy, Pngtree… e os bancos pagos (Shutterstock, Alamy, Getty, iStock, Adobe Stock,
+  Dreamstime…). Imagem/vídeo de um site da lista **nunca entra**: nos buscadores (Bing, Brave, Yandex, Startpage,
+  Google — a imagem, a página de origem e os endereços reserva) e como banco (o **Magnific** sai da ordem de busca, nem
+  como reserva, e nem é oferecido pra IA escolher).
+- 🤖 **Juiz olhando a capa**: com a IA ligada, toda miniatura (foto ou capa/quadros do vídeo) é conferida — **marca
+  d'água = nota 0**, nunca entra (nem como “a menos pior”): busca outra e, se só sobrar imagem marcada, vira **cartão
+  de texto** no lugar. No 🔎 Buscar do editor ela aparece no fim como “⛔ marca d'água”.
+- 🎬 Tudo que o site gera no **Google Flow pros vídeos** (fotos e vídeos) também aparece na **🖼 galeria** da aba Google
+  Flow (marcado “🎞 gerado pra um vídeo”).
+
+## 🎬 Google Flow: limite de vídeo e de imagem separados por conta (v84_105)
+
+- Sem crédito de **vídeo** não quer dizer sem crédito de **imagem**: a conta fica marcada **só pro tipo que acabou** e
+  continua gerando o outro (vídeo vai pra próxima conta; foto continua nela). Quando os **dois** acabam, ela fica
+  esgotada de vez e volta depois das horas de Configurações → Google Flow (24 h por padrão).
+- 🔑 Contas Google mostra “🎬 sem crédito de vídeo até … (imagem ok)” / “🖼 sem crédito de imagem até … (vídeo ok)”;
+  “Liberar” limpa os dois.
+
+## 🎬 Google Flow: conta sem créditos → próxima conta sozinho (v84_104)
+
+- Com o HTML que você mandou: quando a conta não tem crédito (pra vídeo, por exemplo), o Flow **some com o “Iniciar
+  geração”** e põe no lugar o **“Alerta de créditos insuficientes”**. Antes o site dizia “não achei o botão Iniciar
+  geração” e parava; agora ele reconhece isso como **sem créditos**.
+- Na geração de vídeos do site: a conta fica marcada como esgotada e o pedido é refeito na **próxima conta** (como já
+  acontecia com o aviso de limite).
+- Na aba **🎬 Google Flow** (✨ Gerar e 🧪 Testar o Flow): mesma coisa — opção **“🔁 sem créditos → próxima conta”**
+  (ligada): marca a conta, abre a próxima, cria um projeto novo e refaz o **mesmo** pedido (no teste, a foto já gerada
+  é reenviada como Início). Sem outra conta com crédito, o erro diz isso.
+
+## ⚡ Geração rápida de voz: várias cópias do motor no mesmo áudio (v84_103)
+
+- 🎙️ Gerador de voz → **⚡ Geração rápida** (desligada por padrão). Ligada, o texto é cortado em blocos (entre frases) e
+  2, 3 ou 4 cópias do motor (XTTS, Chatterbox, Turbo, Kokoro, Piper, Fish) geram **blocos diferentes ao mesmo tempo**;
+  no fim o site junta na ordem (com `[[INSCREVA]]`/`[[VENDA]]` cada parte continua com o tempo exato).
+- **Automático**: o site mede o PC na hora — **VRAM livre** da placa NVIDIA, **RAM livre** e **núcleos de CPU** — e usa
+  quantas cópias cabem (até 3); texto curto vai com 1. Ou fixe 2, 3 ou 4 (o site nunca passa do que cabe na RAM/VRAM).
+  A tela mostra o que o seu PC tem livre e quantas cópias vão rodar.
+- ⚠ **Aviso**: pode deixar o PC um pouco lento enquanto gera (mais placa, memória e CPU). Se faltar memória numa cópia,
+  o bloco dela volta pras outras; o que falhar é gerado de novo numa cópia só.
+- **📝 Roteiro para Áudio**: as falas agora são geradas todas de uma vez — num processo só (o modelo carrega **uma**
+  vez, não uma por fala) ou, com a geração rápida ligada, em várias cópias ao mesmo tempo.
+- A fila do Gerador de voz conta a VRAM de todas as cópias; e a escolha “🎛 Ao mesmo tempo” agora fica salva de verdade.
+- ⚙️ Configurações → **Fontes de vídeo**: a ordem arrastada agora é **salva na hora** (aparece “✔ Ordem salva”) — antes só
+  valia depois de clicar em “Salvar configurações”, lá no fim da página.
+
+## 📺 Perfis do canal: biblioteca de intro, inscreva-se, venda e final (v84_101)
+
+- Página nova **📺 Perfis do canal** (menu do topo): cada perfil é um canal seu, com o **nome do canal** falado nos
+  roteiros e uma biblioteca de vídeos de **🎬 intro**, **👍 inscreva-se**, **🛒 venda** e **🏁 final** — quantos quiser de
+  cada (envie vários de uma vez ou arraste), com prévia, nome editável e um **⭐ padrão** por tipo.
+- O perfil **✅ ativo** é o que os vídeos novos usam: intro no começo, final no fim, inscreva-se/venda nas marcas
+  `[[INSCREVA]]`/`[[VENDA]]`.
+- No editor, aba **✂️ Cortes**: **📺 Perfil do canal deste vídeo** (trocar de perfil passa as chamadas e a intro/final pro
+  padrão do perfil novo); quando um tipo tem mais de um vídeo, **escolha qual entra** — na intro/final e em cada marca de
+  venda/inscreva-se (dá pra alternar vídeos diferentes entre as marcas). Vídeo enviado no editor pode ir direto pra
+  biblioteca do perfil.
+- Os vídeos padrão que você já tinha viram o perfil **“Meu canal”** sozinhos. ⚙️ Configurações → 📺 Seu canal continua
+  funcionando (vai pro perfil ativo).
+
+## 🔎 Checagem (cronologia · alegações · repetições), 🕘 histórico de versões e 💾 fim do "WinError 5" (v84_100)
+
+- **🔎 Checagem do roteiro** (🕵️ Modelos de vídeo e 📜 Roteiro do YouTube), com 3 focos:
+  - **⏳ Cronologia** — o site monta a linha do tempo do roteiro e acha conflitos do tipo “informante *ab 1924*” × trecho
+    de 1918 que já fala disso; a IA confere datas, idades e o começo/fim de cada relação contra as fontes.
+  - **📚 Alegações históricas** — cada afirmação contra as fontes do projeto (no YouTube, a transcrição); fato ×
+    alegação com quem afirmou; condenado × acusação × ligado pela polícia × alegado × estimado; e a lista do que precisa
+    ser **conferido fora** (com caixinha “conferido”) — citar uma fonte no texto não confirma a afirmação.
+  - **✂️ Repetições** — o site acha parágrafos distantes que contam a mesma coisa e assuntos que voltam demais
+    (com o nº da linha, como num editor); a IA corta (`"para": ""`) ou reduz à meia frase nova.
+  A IA devolve as correções como trocas e o site aplica (aspas „“ × "" toleradas).
+- **🤖 Revisar + checar + corrigir (tudo automático)**: 🪄 revisão (✂️ enxuga se passou do tempo) → 🔎 checagem com
+  correção → ✂️ enxuga de novo se ainda estiver longo. Roda no servidor (pode fechar a aba).
+- **🕘 Histórico do roteiro** (tipo o git): toda mudança — IA, partes, revisão, checagem, TTS, edição sua, desfazer —
+  vira uma versão com data, origem e +/− palavras; **👁 o que mudou** mostra o diff (riscado vermelho / novo verde,
+  comparando com qualquer versão) e **↩ voltar pra esta** restaura (voltar também vira versão). Fica em
+  `historico/` dentro da pasta do projeto (últimas 80).
+- **💾 “[WinError 5] Acesso negado … projeto.json”**: no Windows, o antivírus/indexador/OneDrive às vezes segura o
+  arquivo no instante em que o site troca o .json salvo. Agora a troca tenta de novo por alguns segundos e, se ainda
+  assim não der, grava direto por cima — vale pra todos os arquivos de projeto do site.
+- O plano dos capítulos dá um **capítulo “dono”** pra cada assunto que atravessa o caso, e as regras de escrita ganharam
+  **cronologia coerente** e **números com nome**.
+
 ## 📏 Roteiro no tempo certo, ✂️ revisão que enxuga e 🎙/🪄 botões da IA consertados (v84_99)
 
 - **Tamanho das partes com teto**: cada capítulo agora pede **entre 90% e 110%** do tamanho dele (antes era só “no mínimo”

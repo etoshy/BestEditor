@@ -1,0 +1,123 @@
+{# 🔎 Checagem do roteiro: ⏳ cronologia · 📚 alegações históricas · ✂️ repetições (checagem_roteiro.py, v84_99)
+   incluir com: {% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %} #}
+<div id="chkCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🔎 Checagem do roteiro <span style="font-weight:400;font-size:.82rem;color:#666;">⏳ cronologia · 📚 alegações históricas · ✂️ repetições — a IA confere contra as fontes do projeto e devolve as correções; o site aplica (e guarda uma versão no 🕘 histórico)</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;padding:8px 10px;background:#eef2ff;border-radius:8px;">
+    <button type="button" id="chkAuto" style="display:none;width:auto;margin:0;padding:6px 14px;background:#4338ca;color:#fff;font-weight:600">🤖 Revisar + checar + corrigir (tudo automático)</button>
+    <span id="chkAutoSt" style="font-size:.84rem;color:#3730a3;">1º 🪄 revisão (✂️ enxuga se passou do tempo) → 2º 🔎 checagem dos 3 focos com correção → 3º ✂️ enxuga de novo se ainda estiver longo. Cada passo vira uma versão no 🕘 histórico.</span>
+  </div>
+  <div id="chkLocal" style="font-size:.85rem;">carregando a análise…</div>
+  <details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.9rem;">📝 Fazer a checagem pelo prompt (colar na conversa da IA)</summary>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;margin-top:6px;">
+      <input type="text" id="chkFoco" placeholder="foco extra (opcional) — ex.: confira a carta de Friedel Rothe e o número de vítimas" style="flex:1;min-width:240px;margin:0;">
+      <button type="button" id="chkGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
+      <button type="button" data-ia-gerar="chkGerar" data-ia-prompt="chkPrompt" data-ia-resp="chkResp" data-ia-ler="chkLer" data-ia-status="chkSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Checar com a IA</button>
+      <span id="chkSt" style="color:#555;"></span>
+    </div>
+    <textarea id="chkPrompt" rows="4" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+    <label style="margin-top:8px;display:block;font-size:.86rem;">Resposta da IA (JSON com as correções)</label>
+    <textarea id="chkResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "correcoes": [ { "de": "...", "para": "...", "eixo": "cronologia" } ], "verificar": [...] }'></textarea>
+    <button type="button" id="chkLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Aplicar as correções</button>
+  </details>
+  <div id="chkRes" style="font-size:.85rem;margin-top:8px;"></div>
+</div>
+<script>
+(function () {
+  const ORIG = {{ rt_origem|tojson }}, PID_ = {{ rt_id|tojson }};
+  const BASE = '/checagem/' + ORIG + '/' + PID_;
+  const $c = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || (r.status === 404 ? '404 — essa função não existe no servidor que está rodando: feche a janela do site (python app.py) e abra de novo' : r.status)); return d; };
+  const EIXO = { cronologia: '⏳', alegacao: '📚', repeticao: '✂️' };
+  const sec = (titulo, corpo, aberto) => `<details ${aberto ? 'open' : ''} style="margin:6px 0;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;"><summary style="cursor:pointer;font-weight:600">${titulo}</summary><div style="margin-top:6px">${corpo}</div></details>`;
+
+  function desenhar(d) {
+    const a = d.local || {}, cr = d.cronologia || {}, u = d.ultima;
+    let h = '';
+    if (u) {
+      const pe = u.por_eixo || {};
+      h += `<div style="padding:6px 10px;background:#f0fdf4;border-radius:8px;margin-bottom:6px;">✔ Última checagem: ⏳ ${pe.cronologia || 0} · 📚 ${pe.alegacao || 0} · ✂️ ${pe.repeticao || 0} correções aplicadas · ${u.palavras_antes} → ${u.palavras_depois} palavras${u.resumo ? `<div style="color:#444;margin-top:2px">${esc(u.resumo)}</div>` : ''}</div>`;
+    }
+    // ⏳ cronologia
+    let c1 = '';
+    const grupos = {};
+    (cr.conflitos || []).forEach(x => { (grupos[x.linha + '|' + x.frase] = grupos[x.linha + '|' + x.frase] || []).push(x); });
+    Object.values(grupos).forEach(g => { c1 += `<div style="color:#b45309;margin:3px 0">⚠ linha ${g[0].linha}: „${esc(g[0].frase.slice(0, 160))}“ (desde ${g[0].ano}) — mas trechos de ANTES desse ano já falam disso: ${g.map(x => `linha ${x.linha_conflito} (em ${x.ano_conflito}: <i>${esc((x.palavras || []).join(', '))}</i>)`).join('; ')} <span style="color:#666">— pode ser falso alarme; a checagem da IA confere</span></div>`; });
+    if (!c1) c1 = '<div style="color:#15803d">Nenhum conflito "desde ANO" achado pelo site (a IA confere o resto).</div>';
+    ((u && u.inconsistencias) || []).forEach(x => { c1 += `<div style="margin:3px 0">🔁 ${esc(x.descricao)}${(x.linhas || []).length ? ` <i style="color:#666">(linhas ${x.linhas.join(', ')})</i>` : ''}</div>`; });
+    const ldt = (u && (u.linha_do_tempo || []).length) ? u.linha_do_tempo.map(x => `<div>• <b>${esc(x.data)}</b> — ${esc(x.evento)} <i style="color:#666">${esc(x.fonte)}</i></div>`).join('')
+      : (cr.linha_do_tempo || []).map(x => `<div>• <b>${x.ano}</b> · linha ${x.linha}: ${esc(x.frase.slice(0, 160))}</div>`).join('');
+    if (ldt) c1 += `<details style="margin-top:4px"><summary style="cursor:pointer">${u && (u.linha_do_tempo || []).length ? 'Linha do tempo (da IA, pelas fontes)' : 'Datas na ordem em que o roteiro conta'}</summary>${ldt}</details>`;
+    h += sec(`⏳ Cronologia${Object.keys(grupos).length ? ` <span style="color:#b45309">· ${Object.keys(grupos).length} possível(is) conflito(s)</span>` : ''}`, c1, (cr.conflitos || []).length > 0);
+    // 📚 alegações
+    let c2 = '';
+    const ver = (u && u.verificar) || [];
+    if (ver.length) {
+      c2 += '<div style="margin-bottom:4px">Conferir fora (citar uma fonte no texto não confirma a afirmação):</div>' + ver.map((v, i) =>
+        `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:4px 0"><input type="checkbox" class="chkVer" data-i="${i}" ${v.conferido ? 'checked' : ''} style="width:auto;margin-top:3px"><span><b>${esc(v.afirmacao)}</b>${v.por_que ? ` — ${esc(v.por_que)}` : ''}${v.como ? `<br><i style="color:#555">🔍 ${esc(v.como)}</i>` : ''}</span></label>`).join('');
+    } else c2 += '<div style="color:#666">Rode a checagem pra ter a lista do que precisa ser conferido.</div>';
+    const nums = (a.numeros || []).filter(x => x.vezes >= 1).slice(0, 10);
+    if (nums.length) c2 += `<details style="margin-top:4px"><summary style="cursor:pointer">Números citados (condenado × acusado × alegado × estimado não são a mesma coisa)</summary>${nums.map(x => `<div>• <b>${esc(x.valor)}</b>: ${x.onde.map(o => `linha ${o.linha}: ${esc(o.frase.slice(0, 110))}`).join(' | ')}</div>`).join('')}</details>`;
+    h += sec(`📚 Alegações históricas${ver.length ? ` · ${ver.filter(v => v.conferido).length}/${ver.length} conferidas` : ''}`, c2, ver.length > 0);
+    // ✂️ repetições
+    let c3 = '';
+    (a.repeticoes || []).forEach(r => { c3 += `<div style="margin:4px 0">🔁 linha <b>${r.a}</b> „${esc(r.trecho_a)}“ ≈ linha <b>${r.b}</b> „${esc(r.trecho_b)}“ <i style="color:#666">(${esc(r.palavras.slice(0, 6).join(', '))})</i></div>`; });
+    (a.temas || []).forEach(t => { c3 += `<div style="margin:4px 0;color:#b45309">↻ “${esc(t.palavra)}” volta em ${t.paragrafos} parágrafos (linhas ${t.linhas.slice(0, 14).join(', ')})</div>`; });
+    if (!c3) c3 = '<div style="color:#15803d">Nenhuma repetição forte entre parágrafos.</div>';
+    h += sec(`✂️ Repetições${(a.repeticoes || []).length ? ` <span style="color:#b45309">· ${a.repeticoes.length} par(es) parecido(s)</span>` : ''}`, c3, (a.repeticoes || []).length > 0);
+    $c('chkLocal').innerHTML = h;
+    document.querySelectorAll('#chkLocal .chkVer').forEach(cb => cb.addEventListener('change', () =>
+      post(BASE + '/verificar/' + cb.dataset.i, { conferido: cb.checked }).catch(() => {})));
+  }
+  const carregar = () => fetch(BASE, { cache: 'no-store' }).then(async r => {
+    if (r.status === 404 && !(r.headers.get('content-type') || '').includes('json')) { $c('chkLocal').innerHTML = '<span style="color:#b91c1c">⚠ 404 — o servidor que está rodando ainda é o código antigo: feche a janela do site (python app.py) e abra de novo.</span>'; return; }
+    const d = await r.json(); if (d.ok) desenhar(d); else $c('chkLocal').textContent = '⚠ ' + (d.erro || r.status);
+  }).catch(() => { $c('chkLocal').textContent = ''; });
+  window.chkRecarregar = carregar;
+  carregar();
+
+  $c('chkGerar').addEventListener('click', async () => {
+    $c('chkSt').textContent = '📝 gerando…';
+    try { const d = await post(BASE + '/prompt', { foco: $c('chkFoco').value }); $c('chkPrompt').value = d.prompt; $c('chkPrompt').style.display = '';
+      try { await navigator.clipboard.writeText(d.prompt); $c('chkSt').textContent = `✔ prompt copiado (${Math.round(d.caracteres / 1000)} mil caracteres)`; } catch (_) { $c('chkSt').textContent = '✔ prompt pronto'; } }
+    catch (e) { $c('chkSt').textContent = '⚠ ' + e.message; }
+  });
+  $c('chkLer').addEventListener('click', async () => {
+    try {
+      const d = await post(BASE + '/ler', { texto: $c('chkResp').value });
+      $c('chkRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} correção(ões) aplicada(s) · ${d.palavras_antes} → ${d.palavras_depois} palavras</span>` +
+        (d.nao_achadas.length ? `<div style="color:#b45309">⚠ ${d.nao_achadas.length} não bateram com o texto (ignoradas)</div>` : '') +
+        `<details><summary>ver as correções</summary>${d.aplicadas.map(t => `<div style="margin:4px 0">${EIXO[t.eixo] || ''} <s style="color:#b91c1c">${esc(t.de)}</s><br><span style="color:#15803d">${esc(t.para) || '<i>(apagado)</i>'}</span> <i style="color:#666">${esc(t.motivo)} ${esc(t.fonte || '')}</i></div>`).join('')}</details>` +
+        '<div style="color:#555">Recarregando…</div>';
+      setTimeout(() => location.reload(), 2500);
+    } catch (e) { $c('chkRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
+  });
+
+  // 🤖 tudo automático
+  async function acompanhar(tid) {
+    $c('chkAuto').disabled = true;
+    while (true) {
+      let t = null; try { t = await (await fetch('/tarefas/' + tid, { cache: 'no-store' })).json(); } catch (_) {}
+      if (t && t.status === 'rodando') { $c('chkAutoSt').textContent = '🤖 ' + (t.progresso || 'trabalhando…') + ' (pode fechar a aba — o 🔔 avisa)'; }
+      else {
+        $c('chkAuto').disabled = false;
+        if (t && t.status === 'pronto') {
+          const ps = ((t.resultado || {}).passos || []);
+          $c('chkAutoSt').innerHTML = '✔ pronto: ' + ps.map(p => p.modo === 'checagem' ? `🔎 ${p.aplicadas} correções (${p.verificar} pra conferir)` : `${p.modo === 'enxugar' ? '✂️' : '🪄'} ${p.aplicadas} trocas`).join(' → ') +
+            ` · ${ps.length ? ps[ps.length - 1].palavras : '?'} palavras. Recarregando…`;
+          setTimeout(() => location.reload(), 2500);
+        } else $c('chkAutoSt').textContent = '⚠ ' + ((t && t.erro) || 'a tarefa falhou');
+        return;
+      }
+      await new Promise(r => setTimeout(r, 4000));
+    }
+  }
+  fetch('/ia/status').then(r => r.json()).then(j => { if (j.pode && j.pode.roteiros) $c('chkAuto').style.display = ''; }).catch(() => {});
+  $c('chkAuto').addEventListener('click', async () => {
+    try { const d = await post('/roteiro-auto/' + ORIG + '/' + PID_, { foco: $c('chkFoco').value, pagina: location.pathname }); acompanhar(d.tarefa); }
+    catch (e) { $c('chkAutoSt').textContent = '⚠ ' + e.message; }
+  });
+  fetch('/tarefas?tipo=roteiro_auto&pendentes=1&limite=5&pagina=' + encodeURIComponent(location.pathname)).then(r => r.json())
+    .then(d => { const t = (d.tarefas || []).find(x => x.status === 'rodando'); if (t) acompanhar(t.id); }).catch(() => {});
+})();
+</script>

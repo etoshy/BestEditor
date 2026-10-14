@@ -23,6 +23,14 @@ FIM = 10 ** 7  # ponto de inserção do encerramento (a montagem prende no fim d
 
 
 def nome_global() -> str:
+    """O nome do canal do 📺 perfil ativo (perfis_canal.py) ou, sem ele, o das Configurações."""
+    try:
+        import perfis_canal
+        n = perfis_canal.nome_canal_ativo()
+        if n:
+            return n
+    except Exception:  # noqa: BLE001
+        pass
     try:
         from site_config import load_site_config
         return str(load_site_config().get("nome_canal") or "").strip()
@@ -39,9 +47,9 @@ def nome_do_projeto(valor: Any) -> str:
 
 
 # ------------------------------------------------------------------ abertura / encerramento
-def clipe_padrao(tipo: str) -> Optional[str]:
+def clipe_padrao(tipo: str, perfil: Optional[str] = None) -> Optional[str]:
     import chamadas
-    return chamadas.clipe_padrao(tipo) if tipo in VINHETAS else None
+    return chamadas.clipe_padrao(tipo, perfil) if tipo in VINHETAS else None
 
 
 def definir_padrao(tipo: str, caminho: Optional[str]) -> Optional[str]:
@@ -53,15 +61,24 @@ def definir_padrao(tipo: str, caminho: Optional[str]) -> Optional[str]:
 
 
 def do_job(job: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """{tipo: {"usar": bool, "caminho": arquivo efetivo ou None, "proprio": é um vídeo só deste job, "nome"}}."""
+    """{tipo: {"usar", "caminho" (o arquivo que entra), "proprio" (vídeo só deste job), "nome", "video_id" (o vídeo do
+    📺 perfil escolhido), "opcoes" (os vídeos do perfil daquele tipo)}}."""
+    import perfis_canal
     cfg = job.get("vinhetas") or {}
+    pid = perfis_canal.do_job(job)
     out = {}
     for tipo in VINHETAS:
         c = cfg.get(tipo) or {}
+        opcoes = perfis_canal.videos(tipo, pid)
         proprio = c.get("caminho") if c.get("caminho") and os.path.isfile(c["caminho"]) else None
-        cam = proprio or clipe_padrao(tipo)
+        escolhido = perfis_canal.caminho(pid, c["video_id"]) if c.get("video_id") else None
+        cam = proprio or escolhido or clipe_padrao(tipo, pid)
+        vid = next((v["id"] for v in opcoes if v["arquivo"] == cam), None)
+        nome = next((v["nome"] for v in opcoes if v["id"] == vid), None) or (os.path.basename(cam) if cam else "")
         out[tipo] = {"usar": bool(c.get("usar", True)) and bool(cam), "caminho": cam, "proprio": bool(proprio),
-                     "nome": os.path.basename(cam) if cam else "", "rotulo": VINHETAS[tipo]}
+                     "nome": nome, "rotulo": VINHETAS[tipo], "video_id": vid,
+                     "opcoes": [{"id": v["id"], "nome": v["nome"], "padrao": v["padrao"], "duracao": v.get("duracao") or 0}
+                                for v in opcoes]}
     return out
 
 

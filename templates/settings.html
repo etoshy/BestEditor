@@ -19,7 +19,7 @@
   <h2 style="margin-top:32px;" id="canal">📺 Seu canal</h2>
   <label>Nome do canal <span style="font-weight:normal;color:#666;">(a IA fala ele no momento certo dos roteiros — 🕵️ Modelos de vídeo, 📜 Roteiro do YouTube, 🎞️ Vídeos modelados; cada projeto pode trocar)</span></label>
   <input type="text" name="nome_canal" value="{{ config.nome_canal or '' }}" maxlength="80" placeholder="ex.: Casos Arquivados">
-  <p style="font-size:.84rem;color:#555;margin:4px 0 0;">Vídeos de 🎬 abertura e 🏁 encerramento: logo abaixo do botão Salvar.</p>
+  <p style="font-size:.84rem;color:#555;margin:4px 0 0;">É o nome do <a href="/perfis-canal">📺 perfil do canal</a> ⭐ ativo. Os vídeos de 🎬 intro, 👍 inscreva-se, 🛒 venda e 🏁 final (vários de cada, com o ⭐ padrão) ficam em <a href="/perfis-canal"><b>📺 Perfis do canal</b></a>.</p>
 
   <h2 style="margin-top:32px;">Vídeo</h2>
   <label>Proporção do vídeo gerado</label>
@@ -82,6 +82,16 @@
     </li>
     {% endfor %}
   </ul>
+
+  <div id="lista-negra" style="margin-top:18px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;">
+    <label style="margin:0;">⛔ Lista negra de sites — imagem ou vídeo de lá <b>nunca entra</b> no vídeo (marca d'água)</label>
+    <p style="color:#555;font-size:0.8rem;margin:4px 0 6px;">Um por linha. Vale pros buscadores de imagem (Bing, Brave, Yandex, Startpage, Google — a imagem, a página de origem e os endereços reserva) e pros bancos: um banco cujo site está aqui sai da ordem de busca (nem como reserva){% if provedores_bloqueados %} — agora: <b>{{ provedores_bloqueados|join(', ') }}</b> fora{% endif %}. Sem ponto (ex.: <code>magnific</code>) = esse nome no endereço (magnific.com, cdn.magnific.ai…); com ponto (ex.: <code>stock.adobe.</code>) = esse pedaço em qualquer lugar do endereço. Linhas com <code>#</code> são comentário. Além do endereço, com a 🤖 IA ligada o juiz olha a miniatura: com marca d'água leva nota 0 — busca outra e, sem nada bom, vira cartão de texto no lugar.</p>
+    <textarea name="sites_bloqueados" rows="8" style="width:100%;font-family:monospace;font-size:.82rem;">{{ sites_bloqueados|join('\n') }}</textarea>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:.82rem;margin-top:4px;">
+      <span>{{ sites_bloqueados|length }} site(s) na lista</span>
+      <label style="margin:0;font-weight:normal;"><input type="checkbox" name="sites_bloqueados_padrao" style="width:auto;"> voltar pra lista padrão ({{ sites_padrao|length }} sites: Magnific/Freepik + bancos pagos) ao salvar</label>
+    </div>
+  </div>
 
   <label style="margin-top:20px;"><input type="checkbox" name="pexels_api_fallback_to_browser" {% if config.pexels_api_fallback_to_browser %}checked{% endif %} style="width:auto;"> Se a chave da API do Pexels falhar (inválida ou todas em rate limit), usar o navegador como alternativa automaticamente</label>
 
@@ -307,7 +317,7 @@
 </form>
 
 <h3 style="margin-top:24px;" id="vinhetas">🎬 Abertura e 🏁 encerramento do canal</h3>
-<p style="color:#555;font-size:0.85rem;">Como os vídeos de 👍 inscreva-se e 🛒 venda: envie uma vez e eles entram sozinhos no <b>começo</b> e no <b>fim</b> de todo vídeo montado (com o áudio deles; a legenda e os capítulos andam junto). Em cada vídeo dá pra desligar ou trocar por outro, no editor → aba ✂️ Cortes.</p>
+<p style="color:#555;font-size:0.85rem;">Como os vídeos de 👍 inscreva-se e 🛒 venda: envie uma vez e eles entram sozinhos no <b>começo</b> e no <b>fim</b> de todo vídeo montado (com o áudio deles; a legenda e os capítulos andam junto). Em cada vídeo dá pra desligar ou trocar por outro, no editor → aba ✂️ Cortes. O que você envia aqui vira o ⭐ padrão do 📺 perfil ativo — pra guardar <b>vários</b> vídeos de cada tipo (e vários canais), use <a href="/perfis-canal">📺 Perfis do canal</a>.</p>
 {% set _vh = vinhetas or {} %}
 {% for tipo, rot in [('abertura', '🎬 Abertura (vídeo de início)'), ('encerramento', '🏁 Encerramento (vídeo final)')] %}
 <form method="post" action="/vinhetas/{{ tipo }}" enctype="multipart/form-data" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
@@ -361,6 +371,7 @@ fetch("{{ url_for('youtube_cookies_status') }}").then(r => r.json()).then(d => {
     item.addEventListener('dragend', () => {
       item.style.opacity = '1';
       draggedItem = null;
+      salvarOrdem();
     });
   });
 
@@ -374,6 +385,21 @@ fetch("{{ url_for('youtube_cookies_status') }}").then(r => r.json()).then(d => {
       list.insertBefore(draggedItem, afterElement);
     }
   });
+
+  // v84_103: salva a ordem NA HORA (antes só salvava no botão "Salvar configurações", lá embaixo)
+  const aviso = document.createElement('div');
+  aviso.style.cssText = 'font-size:.84rem;margin:-2px 0 8px;min-height:1.1em;';
+  list.after(aviso);
+  async function salvarOrdem() {
+    const ordem = [...list.querySelectorAll('input[name="provider_priority"]')].map(i => i.value);
+    aviso.style.color = '#555'; aviso.textContent = '💾 salvando a ordem…';
+    try {
+      const r = await fetch('/settings/ordem-fontes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordem }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.erro) throw new Error(d.erro || r.status);
+      aviso.style.color = '#15803d'; aviso.textContent = '✔ Ordem salva: ' + d.ordem.slice(0, 4).join(' → ') + (d.ordem.length > 4 ? ' → …' : '');
+    } catch (e) { aviso.style.color = '#b91c1c'; aviso.textContent = '⚠ Não salvou: ' + e.message; }
+  }
 
   function getDragAfterElement(container, y) {
     const items = [...container.querySelectorAll('.priority-item:not([style*="opacity: 0.4"])')];

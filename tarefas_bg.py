@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import threading
 import time
@@ -44,7 +45,7 @@ def _gravar(t: Dict[str, Any]) -> None:
         tmp = _caminho(t["id"]) + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(t, f, ensure_ascii=False)
-        os.replace(tmp, _caminho(t["id"]))
+        arquivo_seguro.trocar(tmp, _caminho(t["id"]))
 
 
 def pegar(tid: str) -> Optional[Dict[str, Any]]:

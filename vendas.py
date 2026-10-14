@@ -25,6 +25,7 @@ import html as _html
 import json
 import mimetypes
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import time
 import uuid
@@ -161,7 +162,7 @@ def salvar(base: str, p: Dict[str, Any]) -> None:
     tmp = _arquivo(base, p["id"]) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(p, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _arquivo(base, p["id"]))
+    arquivo_seguro.trocar(tmp, _arquivo(base, p["id"]))
 
 
 def listar(base: str) -> List[Dict[str, Any]]:

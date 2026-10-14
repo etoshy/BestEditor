@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Perfis do canal{% endblock %}
+{% block content %}
+<style>
+  .pc-wrap { display:grid; grid-template-columns: 230px 1fr; gap:16px; align-items:start; }
+  @media (max-width: 760px) { .pc-wrap { grid-template-columns: 1fr; } }
+  .pc-lista { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:8px; }
+  .pc-item { display:block; width:100%; text-align:left; background:none; color:#111; border:1px solid transparent; border-radius:8px; padding:8px 10px; margin:0 0 4px; cursor:pointer; }
+  .pc-item:hover { background:#f8fafc; }
+  .pc-item.sel { background:#fff1f2; border-color:#fda4af; }
+  .pc-item small { display:block; color:#666; font-weight:400; font-size:.75rem; margin-top:2px; }
+  .pc-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .pc-tipo h3 { margin:0 0 4px; font-size:1rem; }
+  .pc-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap:10px; margin-top:8px; }
+  .pc-vid { border:1px solid #e5e7eb; border-radius:8px; padding:6px; background:#fafafa; }
+  .pc-vid.pad { border-color:#f59e0b; background:#fffbeb; }
+  .pc-vid video { width:100%; aspect-ratio:16/9; background:#000; border-radius:6px; display:block; }
+  .pc-vid input { margin:4px 0 0; font-size:.82rem; padding:4px 6px; }
+  .pc-acoes { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+  .pc-acoes button, .pc-mini { width:auto; margin:0; padding:3px 9px; font-size:.78rem; }
+  .pc-vazio { color:#888; font-size:.85rem; padding:8px 0; }
+  .pc-drop { border:2px dashed #cbd5e1; border-radius:8px; padding:10px; text-align:center; color:#64748b; font-size:.84rem; cursor:pointer; margin-top:8px; }
+  .pc-drop.on { border-color:#e11d48; background:#fff1f2; color:#9f1239; }
+</style>
+<h1>📺 Perfis do canal</h1>
+<p style="color:#444;max-width:900px;">Cada perfil é um canal seu, com a sua biblioteca de vídeos: <b>🎬 intro</b>, <b>👍 inscreva-se</b>, <b>🛒 venda</b> e <b>🏁 final</b> — quantos quiser de cada, com um <b>⭐ padrão</b> por tipo. O perfil <b>✅ ativo</b> é o que os vídeos novos usam: a intro entra no começo, o final no fim e o inscreva-se/venda nas marcas <code>[[INSCREVA]]</code>/<code>[[VENDA]]</code> do roteiro. No editor, na aba <b>✂️ Cortes</b>, você troca o perfil daquele vídeo e escolhe <b>qual vídeo</b> entra em cada item quando tiver mais de um.</p>
+
+<div class="pc-wrap">
+  <div>
+    <div class="pc-lista" id="pcLista">carregando…</div>
+    <button type="button" id="pcNovo" style="width:100%;margin-top:8px;">➕ Novo perfil</button>
+  </div>
+  <div id="pcDetalhe"></div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const dur = (s) => s ? (s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : `${Math.round(s)}s`) : '';
+  let D = null, SEL = null;
+  try { SEL = localStorage.getItem('pcSel'); } catch (_) {}
+  const post = async (url, corpo) => {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) { alert('⚠ ' + (d.erro || r.status)); return null; } return d;
+  };
+  const usar = (d) => { if (d) { D = d; desenhar(); } };
+  function carregar() { fetch('/perfis-canal/dados', { cache: 'no-store' }).then(r => r.json()).then(usar); }
+
+  function desenhar() {
+    if (!D.perfis.find(p => p.id === SEL)) SEL = D.ativo;
+    try { localStorage.setItem('pcSel', SEL); } catch (_) {}
+    $('pcLista').innerHTML = D.perfis.map(p => {
+      const n = Object.values(p.videos).reduce((a, l) => a + l.length, 0);
+      return `<button type="button" class="pc-item ${p.id === SEL ? 'sel' : ''}" data-id="${p.id}"><b>${esc(p.nome)}</b>${p.ativo ? ' <span style="color:#15803d;font-size:.75rem">✅ ativo</span>' : ''}<small>${n} vídeo(s)${p.nome_canal ? ' · fala “' + esc(p.nome_canal) + '”' : ''}</small></button>`;
+    }).join('');
+    document.querySelectorAll('.pc-item').forEach(b => b.addEventListener('click', () => { SEL = b.dataset.id; desenhar(); }));
+    const P = D.perfis.find(p => p.id === SEL);
+    let h = `<div class="pc-card">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <label style="flex:1;min-width:200px;margin:0">Nome do perfil<input id="pcNome" value="${esc(P.nome)}" maxlength="60"></label>
+        <label style="flex:1;min-width:200px;margin:0">Nome do canal <span style="font-weight:400;color:#666;font-size:.8rem">(a IA fala nos roteiros)</span><input id="pcCanal" value="${esc(P.nome_canal)}" maxlength="80" placeholder="ex.: Johans Akte"></label>
+        <button type="button" id="pcSalvar" class="pc-mini" style="padding:7px 14px">💾 Salvar</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+        ${P.ativo ? '<span style="color:#15803d;font-weight:600">✅ Este é o perfil ativo — os vídeos novos usam ele</span>' : '<button type="button" id="pcAtivar" class="pc-mini" style="background:#15803d;padding:6px 12px">✅ Usar este perfil nos vídeos novos</button>'}
+        <button type="button" id="pcApagar" class="pc-mini" style="background:#b91c1c;margin-left:auto">🗑 Apagar perfil</button>
+      </div></div>`;
+    (D.ordem || Object.keys(D.tipos)).map(t => [t, D.tipos[t]]).forEach(([t, rot]) => {
+      const L = P.videos[t] || [];
+      h += `<div class="pc-card pc-tipo" data-tipo="${t}"><h3>${esc(rot)} <span style="font-weight:400;color:#666;font-size:.82rem">· ${L.length} vídeo(s)${L.length ? '' : ' — nenhum: ' + (t === 'abertura' || t === 'encerramento' ? 'o vídeo sai sem' : 'a narração segue normal na marca')}</span></h3>
+        ${L.length > 1 ? '<p style="margin:0;color:#555;font-size:.8rem">O ⭐ padrão entra sozinho; no editor (✂️ Cortes) dá pra escolher outro deste tipo em cada item.</p>' : ''}
+        <div class="pc-grid">${L.map(v => `<div class="pc-vid ${v.padrao ? 'pad' : ''}" data-vid="${v.id}">
+            <video src="${v.url}" preload="metadata" controls muted></video>
+            <input class="pcVNome" value="${esc(v.nome)}" maxlength="80" title="nome do vídeo">
+            <div class="pc-acoes">${v.padrao ? '<span style="color:#b45309;font-size:.78rem;font-weight:600">⭐ padrão</span>' : '<button type="button" class="pcPad" style="background:#b45309">⭐ tornar padrão</button>'}
+              <span style="color:#666;font-size:.75rem;align-self:center">${dur(v.duracao)}</span>
+              <button type="button" class="pcDel" style="background:#94a3b8;margin-left:auto" title="apagar este vídeo">🗑</button></div></div>`).join('')}</div>
+        <label class="pc-drop"><input type="file" class="pcUp" accept="video/*" multiple style="display:none">➕ Adicionar vídeo(s) de ${esc(D.curto[t])} — clique ou arraste aqui (pode vários)</label>
+        <div class="pcSt" style="font-size:.8rem;color:#555;margin-top:4px"></div></div>`;
+    });
+    $('pcDetalhe').innerHTML = h;
+    $('pcSalvar').addEventListener('click', async () => usar(await post('/perfis-canal/' + SEL, { nome: $('pcNome').value, nome_canal: $('pcCanal').value })));
+    if ($('pcAtivar')) $('pcAtivar').addEventListener('click', async () => usar(await post('/perfis-canal/' + SEL, { ativar: true })));
+    $('pcApagar').addEventListener('click', async () => { if (confirm(`Apagar o perfil “${P.nome}” e os vídeos dele?`)) usar(await post('/perfis-canal/' + SEL + '/apagar')); });
+    document.querySelectorAll('.pc-vid').forEach(c => {
+      const vid = c.dataset.vid;
+      c.querySelector('.pcVNome').addEventListener('change', async (e) => usar(await post(`/perfis-canal/${SEL}/video/${vid}`, { nome: e.target.value })));
+      const pb = c.querySelector('.pcPad'); if (pb) pb.addEventListener('click', async () => usar(await post(`/perfis-canal/${SEL}/video/${vid}`, { padrao: true })));
+      c.querySelector('.pcDel').addEventListener('click', async () => { if (confirm('Apagar este vídeo do perfil?')) usar(await post(`/perfis-canal/${SEL}/video/${vid}/apagar`)); });
+    });
+    document.querySelectorAll('.pc-tipo').forEach(card => {
+      const t = card.dataset.tipo, inp = card.querySelector('.pcUp'), drop = card.querySelector('.pc-drop'), st = card.querySelector('.pcSt');
+      const enviar = async (files) => {
+        if (!files.length) return;
+        const fd = new FormData(); [...files].forEach(f => fd.append('arquivos', f));
+        st.textContent = `⬆ enviando ${files.length} vídeo(s)…`;
+        const r = await fetch(`/perfis-canal/${SEL}/${t}/enviar`, { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
+        if (!r.ok || d.erro) { st.textContent = '⚠ ' + (d.erro || r.status); return; }
+        usar(d);
+      };
+      inp.addEventListener('change', () => enviar(inp.files));
+      ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('on'); }));
+      ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('on'); }));
+      drop.addEventListener('drop', (e) => enviar(e.dataTransfer.files));
+    });
+  }
+  $('pcNovo').addEventListener('click', async () => {
+    const nome = prompt('Nome do novo perfil (ex.: o nome do canal):'); if (!nome) return;
+    const d = await post('/perfis-canal/novo', { nome, nome_canal: nome }); if (d) { SEL = d.novo; usar(d); }
+  });
+  carregar();
+})();
+</script>
+{% endblock %}

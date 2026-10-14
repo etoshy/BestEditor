@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import queue
 import re
 import secrets
@@ -86,7 +87,7 @@ def _gravar_galeria(itens: List[Dict[str, Any]]) -> None:
     tmp = _arq_galeria() + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(itens[:MAX_GALERIA], f, ensure_ascii=False, indent=0)
-    os.replace(tmp, _arq_galeria())
+    arquivo_seguro.trocar(tmp, _arq_galeria())
 
 
 def adicionar_na_galeria(entrada: Dict[str, Any]) -> None:
@@ -329,6 +330,54 @@ class _Sessao(threading.Thread):
             except Exception as exc:  # noqa: BLE001
                 on_passo(passo, "erro", f"não baixou: {exc}")
 
+    # -- 🔁 sem créditos numa conta: troca pra próxima e refaz o MESMO pedido (v84_104)
+    def _gerar(self, trab: Dict[str, Any], cfg: Dict[str, Any], opcoes: Dict[str, Any], on_passo, atual: Dict[str, Any],
+               timeout: int) -> List[Dict[str, str]]:
+        from googleflow import flow_direto as fd
+        from googleflow import googleflow_client as gf
+        tentadas: List[str] = []
+        while True:
+            try:
+                return fd.gerar_um(self.page, trab, on_passo, timeout)
+            except fd.FlowLimite as exc:
+                conta = self.conta or gf.CONTA_PADRAO
+                tentadas.append(conta)
+                pode_trocar = opcoes.get("trocar_conta", True) and str(cfg.get("flow_navegador") or "auto").lower() != "cdp"
+                tipo_lim = gf.tipo_do_limite(trab.get("tipo"))  # v84_105: sem crédito de vídeo ≠ sem crédito de imagem
+                try:
+                    gf.marcar_esgotada(conta, gf._horas_para_liberar(cfg), tipo=tipo_lim)
+                except Exception:  # noqa: BLE001
+                    pass
+                exc.conta_marcada, exc.tipo_lim = conta, tipo_lim
+                if not pode_trocar:
+                    raise
+                try:
+                    proxima = gf.escolher_conta_disponivel(tipo=tipo_lim)
+                except Exception as exc_sem:  # noqa: BLE001 — GoogleFlowSemContas
+                    novo = fd.FlowLimite(exc.passo, f"{exc.mensagem} — e não sobrou outra conta com crédito: {exc_sem}",
+                                         page=getattr(exc, "page", None))
+                    novo.conta_marcada, novo.tipo_lim = conta, tipo_lim
+                    raise novo from exc
+                if proxima in tentadas:
+                    raise
+                try:
+                    gf.salvar_diagnostico(getattr(exc, "page", None) or self.page, str(exc))
+                except Exception:  # noqa: BLE001
+                    pass
+                on_passo("conta", "andando", f"🔁 a conta “{conta}” está sem créditos de {'vídeo' if tipo_lim == 'video' else 'imagem'} "
+                                             f"({exc.mensagem[:140]}) — ela continua valendo pra "
+                                             f"{'imagem' if tipo_lim == 'video' else 'vídeo'}; trocando pra “{proxima}” e fazendo de novo…")
+                self._fechar_pagina()
+                self._garantir_navegador(cfg, bool(opcoes.get("visivel")), proxima)
+                self._garantir_projeto(cfg, True, on_passo, atual)
+                on_passo("conta", "ok", f"agora na conta “{proxima}”")
+                for k in ("inicio", "fim", "referencia"):  # a mídia do projeto antigo não existe no novo: reenvia o arquivo
+                    f = trab.get(k)
+                    if isinstance(f, dict) and f.get("media_id") and f.get("arquivo"):
+                        trab[k] = {"arquivo": f["arquivo"]}
+                    elif isinstance(f, dict) and f.get("media_id") and not f.get("arquivo"):
+                        trab.pop(k, None)
+
     # -- um comando
     def _executar(self, tipo: str, cfg: Dict[str, Any], opcoes: Dict[str, Any]) -> None:
         from googleflow import flow_direto as fd
@@ -345,17 +394,20 @@ class _Sessao(threading.Thread):
             if tipo == "teste":
                 t_img = {"tipo": "imagem", "prompt": PROMPT_IMAGEM, "proporcao": "16:9",
                          "modelo": cfg.get("flow_modelo_imagem") or "", "simular": simular}
-                img = fd.gerar_um(page, t_img, on_passo, timeout)
+                img = self._gerar(t_img, cfg, opcoes, on_passo, atual, timeout)
                 self._baixar(img[:1], t_img, "teste", "foto", on_passo)
+                _SESSAO_INFO["conta_da_foto"] = self.conta  # a foto é do projeto DESTA conta (pra usar como Início)
                 t_vid = {"tipo": "video", "tipo_video": "Elementos", "prompt": PROMPT_VIDEO, "proporcao": "16:9",
                          "modelo": cfg.get("flow_modelo_video") or "", "simular": simular}
-                vid = fd.gerar_um(page, t_vid, on_passo, timeout)
+                vid = self._gerar(t_vid, cfg, opcoes, on_passo, atual, timeout)
                 self._baixar(vid[:1], t_vid, "teste", "video_texto", on_passo)
-                inicio = {"media_id": img[0]["id"], "arquivo": opcoes["imagem_teste"]} if img else {"arquivo": opcoes["imagem_teste"]}
+                foto = next((os.path.join(pasta_galeria(), r["arquivo"]) for r in est["resultados"] if r.get("rotulo") == "foto"), None)
+                inicio = ({"media_id": img[0]["id"], "arquivo": foto or opcoes["imagem_teste"]} if img and _SESSAO_INFO.get("conta_da_foto") == self.conta
+                          else {"arquivo": foto or opcoes["imagem_teste"]})
                 t_fr = {"tipo": "video", "tipo_video": "Frames", "prompt": PROMPT_ANIMAR, "proporcao": "16:9",
                         "modelo": cfg.get("flow_modelo_video") or "", "inicio": inicio,
                         "fim": {"arquivo": opcoes["imagem_teste"]}, "simular": simular}
-                fr = fd.gerar_um(page, t_fr, on_passo, timeout)
+                fr = self._gerar(t_fr, cfg, opcoes, on_passo, atual, timeout)
                 self._baixar(fr[:1], t_fr, "teste", "video_frames", on_passo)
                 if not simular:
                     ok = {r["rotulo"] for r in est["resultados"]}
@@ -371,7 +423,7 @@ class _Sessao(threading.Thread):
                         trab[k] = opcoes[k]
                 if trab["tipo"] == "video":
                     trab["tipo_video"] = "Frames" if (trab.get("inicio") or trab.get("fim")) else "Elementos"
-                r = fd.gerar_um(page, trab, on_passo, timeout)
+                r = self._gerar(trab, cfg, opcoes, on_passo, atual, timeout)
                 self._baixar(r, trab, "gerar", "resultado", on_passo)
         except _Parado:
             est["erro"] = "Parado por você."
@@ -382,11 +434,16 @@ class _Sessao(threading.Thread):
             _marcar_erro(exc.passo, exc.mensagem)
             msg = str(exc)
             if isinstance(exc, fd.FlowLimite) and self.conta:
-                try:
-                    gf.marcar_esgotada(self.conta, gf._horas_para_liberar(cfg))
-                except Exception:  # noqa: BLE001
-                    pass
-                msg += f" — a conta \"{self.conta}\" ficou marcada como esgotada; escolha outra conta e rode de novo."
+                if not getattr(exc, "conta_marcada", None):  # o _gerar já marcou (e tentou as outras contas)
+                    try:
+                        gf.marcar_esgotada(self.conta, gf._horas_para_liberar(cfg))
+                    except Exception:  # noqa: BLE001
+                        pass
+                _tl = getattr(exc, "tipo_lim", None)
+                msg += (f" — a conta \"{self.conta}\" ficou marcada como esgotada" +
+                        (f" só pra {'vídeo' if _tl == 'video' else 'imagem'} (continua valendo pra {'imagem' if _tl == 'video' else 'vídeo'})" if _tl else "") +
+                        ("; não sobrou outra conta com crédito (adicione/libere uma em 🔑 Contas Google)." if "não sobrou" in msg
+                         else "; escolha outra conta e rode de novo."))
             est["erro"] = msg + (" — a foto e o HTML da tela foram guardados: use os botões abaixo pra baixar ou copiar e mandar." if diag else "")
             est["diagnostico"] = os.path.basename(diag) if diag else None
             self._fechar_pagina()
@@ -465,8 +522,34 @@ def _salvar_entrada(gf, campo: str) -> Optional[Dict[str, str]]:
     return {"arquivo": caminho}
 
 
+def guardar_da_geracao(caminho: str, registro: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """🖼 v84_106: imagem/vídeo que o Flow gerou PRO VÍDEO (fora desta aba) também entra na galeria — uma cópia."""
+    import shutil
+    if not caminho or not os.path.isfile(caminho):
+        return None
+    chave = f"{registro.get('chave') or ''}_{registro.get('indice') or ''}"
+    with _TRAVA_GALERIA:
+        if any(e.get("chave_site") == chave for e in galeria()):
+            return None
+    tipo = "video" if registro.get("tipo") == "video" else "imagem"
+    gid = time.strftime("%Y%m%d_%H%M%S") + "_" + secrets.token_hex(3)
+    nome = f"{gid}{os.path.splitext(caminho)[1].lower() or ('.mp4' if tipo == 'video' else '.png')}"
+    shutil.copy(caminho, os.path.join(pasta_galeria(), nome))
+    e = {"id": gid, "tipo": tipo, "arquivo": nome, "media_id": "", "prompt": registro.get("prompt") or "", "modelo": "",
+         "proporcao": "", "origem": "video", "frames": False, "referencia": False, "conta": None, "projeto": None,
+         "criado": time.time(), "rotulo": "do vídeo", "chave_site": chave}
+    adicionar_na_galeria(e)
+    return e
+
+
 def registrar(app, base_dir: str) -> None:
     _BASE["dir"] = base_dir
+    try:  # o que o site gera no Flow pros vídeos também aparece na 🖼 galeria
+        from googleflow import googleflow_client as _gf
+        if guardar_da_geracao not in _gf.AO_SALVAR:
+            _gf.AO_SALVAR.append(guardar_da_geracao)
+    except Exception:  # noqa: BLE001
+        pass
 
     @app.route("/flow")
     def flow_page():
@@ -494,6 +577,7 @@ def registrar(app, base_dir: str) -> None:
             modo = "teste" if f.get("modo") == "teste" else "gerar"
             opcoes: Dict[str, Any] = {
                 "modo": modo, "visivel": f.get("visivel") == "on", "simular": f.get("simular") == "on",
+                "trocar_conta": f.get("trocar_conta", "on") == "on",  # 🔁 sem créditos: próxima conta (v84_104)
                 "conta": (f.get("conta") or "").strip(), "novo_projeto": f.get("novo_projeto") == "on",
                 "tipo": f.get("tipo") if f.get("tipo") in ("imagem", "video") else "imagem",
                 "prompt": " ".join((f.get("prompt") or "").split())[:4000],

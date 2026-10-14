@@ -230,7 +230,7 @@ def test_varias_marcas_do_mesmo_tipo_so_a_primeira_ganha_o_padrao(monkeypatch, t
     as outras ficam desligadas até a pessoa escolher — mesmo sem mexer em nada."""
     padrao = tmp_path / "p.mp4"
     padrao.write_bytes(b"x")
-    monkeypatch.setattr(ch, "clipe_padrao", lambda tipo: str(padrao))
+    monkeypatch.setattr(ch, "clipe_padrao", lambda tipo, perfil=None: str(padrao))
     cortes = ch.para_cortes([{"tipo": "venda", "inicio": 50}, {"tipo": "inscreva", "inicio": 10}, {"tipo": "inscreva", "inicio": 80},
                              {"tipo": "venda", "inicio": 120}, {"tipo": "inscreva", "inicio": 200}])
     com = [(c["tipo"], c["insertion_point"]) for c in cortes if c["resolved_path"]]

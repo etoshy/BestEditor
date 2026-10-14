@@ -606,6 +606,10 @@ def _ler_contas() -> Dict[str, Any]:
     return {
         "contas": contas,
         "esgotadas": dict(d.get("esgotadas", {})) if isinstance(d.get("esgotadas"), dict) else {},
+        # v84_105: limite SÓ de vídeo ou SÓ de imagem ({nome: {"video": iso, "imagem": iso}}) — a conta sem crédito pra
+        # vídeo continua gerando imagem; quando as duas acabam, ela fica esgotada de vez até liberar
+        "esgotadas_tipo": {k: dict(v) for k, v in (d.get("esgotadas_tipo") or {}).items() if isinstance(v, dict)}
+                          if isinstance(d.get("esgotadas_tipo"), dict) else {},
     }
 
 
@@ -665,58 +669,104 @@ def remover_conta(nome: str) -> None:
             raise GoogleFlowError(f"Conta '{nome}' não encontrada.")
         d["contas"] = [c for c in d["contas"] if c["nome"] != nome]
         d["esgotadas"].pop(nome, None)
+        d["esgotadas_tipo"].pop(nome, None)
         _gravar_contas(d)
     remover_senha(nome)
 
 
-def marcar_esgotada(nome: str, horas: float = 24, agora: Optional[datetime] = None) -> None:
+TIPOS_LIMITE = ("video", "imagem")
+
+
+def tipo_do_limite(tipo: Any) -> Optional[str]:
+    """"video"/"animar" → "video"; "imagem"/"foto" → "imagem"; o resto (lote misto, desconhecido) → None (= a conta toda)."""
+    t = str(tipo or "").lower()
+    if t in ("video", "vídeo", "animar"):
+        return "video"
+    if t in ("imagem", "foto", "image"):
+        return "imagem"
+    return None
+
+
+def marcar_esgotada(nome: str, horas: float = 24, agora: Optional[datetime] = None, tipo: Optional[str] = None) -> None:
+    """Conta sem crédito/limite por `horas`. `tipo` "video" ou "imagem": só aquele tipo (a conta continua servindo pro
+    outro); None: a conta toda."""
     if nome not in nomes_das_contas():
         raise GoogleFlowError(f"Conta '{nome}' não encontrada.")
+    ate = ((agora or datetime.now()) + timedelta(hours=horas)).isoformat(timespec="seconds")
+    tipo = tipo_do_limite(tipo)
     with _CONTAS_LOCK:
         d = _ler_contas()
-        d["esgotadas"][nome] = ((agora or datetime.now()) + timedelta(hours=horas)).isoformat(timespec="seconds")
+        if tipo:
+            d["esgotadas_tipo"].setdefault(nome, {})[tipo] = ate
+        else:
+            d["esgotadas"][nome] = ate
         _gravar_contas(d)
 
 
-def liberar_conta(nome: str) -> None:
+def liberar_conta(nome: str, tipo: Optional[str] = None) -> None:
+    tipo = tipo_do_limite(tipo)
     with _CONTAS_LOCK:
         d = _ler_contas()
-        d["esgotadas"].pop(nome, None)
+        if tipo:
+            (d["esgotadas_tipo"].get(nome) or {}).pop(tipo, None)
+        else:
+            d["esgotadas"].pop(nome, None)
+            d["esgotadas_tipo"].pop(nome, None)
         _gravar_contas(d)
+
+
+def _ativo(ate: Optional[str], agora: datetime) -> bool:
+    try:
+        return bool(ate) and datetime.fromisoformat(ate) > agora
+    except ValueError:
+        return False
 
 
 def listar_contas(agora: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    """[{nome, esgotada, esgotada_ate, logada, email, tem_senha_salva}] — a
-    principal sempre primeiro. "logada" = já existe backup de sessão dessa
-    conta (foi usada/logada antes)."""
+    """[{nome, esgotada, esgotada_ate, esgotada_video, video_ate, esgotada_imagem, imagem_ate, logada, email,
+    tem_senha_salva}] — a principal sempre primeiro. "esgotada" = a conta TODA (marcada assim, ou vídeo E imagem
+    esgotados). "logada" = já existe backup de sessão dessa conta (foi usada/logada antes)."""
     agora = agora or datetime.now()
     d = _ler_contas()
     saida = []
     for c in d["contas"]:
         nome = c["nome"]
         ate = d["esgotadas"].get(nome)
-        try:
-            esgotada = bool(ate) and datetime.fromisoformat(ate) > agora
-        except ValueError:
-            esgotada = False
+        toda = _ativo(ate, agora)
+        por = d["esgotadas_tipo"].get(nome) or {}
+        vid, img = _ativo(por.get("video"), agora), _ativo(por.get("imagem"), agora)
+        esgotada = toda or (vid and img)
+        if not toda and esgotada:
+            ate = min(por["video"], por["imagem"])
         saida.append({
             "nome": nome, "esgotada": esgotada, "esgotada_ate": ate if esgotada else None,
+            "esgotada_video": toda or vid, "video_ate": (ate if toda else por.get("video")) if (toda or vid) else None,
+            "esgotada_imagem": toda or img, "imagem_ate": (ate if toda else por.get("imagem")) if (toda or img) else None,
             "logada": arquivo_sessao(nome).exists(), "email": c["email"],
             "tem_senha_salva": obter_senha(nome) is not None,
         })
     return saida
 
 
-def escolher_conta_disponivel(agora: Optional[datetime] = None) -> str:
-    """A 1ª conta (na ordem da lista) que não está esgotada, preferindo as que já
-    têm login. Se todas estão esgotadas, levanta `GoogleFlowSemContas`."""
+def conta_serve(nome: str, tipo: Optional[str] = None, agora: Optional[datetime] = None) -> bool:
+    c = next((x for x in listar_contas(agora) if x["nome"] == nome), None)
+    tipo = tipo_do_limite(tipo)
+    return bool(c) and not c["esgotada"] and not (tipo and c["esgotada_" + tipo])
+
+
+def escolher_conta_disponivel(agora: Optional[datetime] = None, tipo: Optional[str] = None) -> str:
+    """A 1ª conta (na ordem da lista) que serve pra `tipo` ("video"/"imagem"; None = qualquer), preferindo as que já
+    têm login. Se nenhuma serve, levanta `GoogleFlowSemContas`."""
     contas = listar_contas(agora)
-    livres = [c for c in contas if not c["esgotada"]]
+    tipo = tipo_do_limite(tipo)
+    livres = [c for c in contas if not c["esgotada"] and not (tipo and c["esgotada_" + tipo])]
     if not livres:
-        detalhe = "; ".join(f"'{c['nome']}' volta em {c['esgotada_ate']}" for c in contas)
+        def _quando(c):
+            return c["esgotada_ate"] or (c.get(f"{tipo}_ate") if tipo else None) or "?"
+        detalhe = "; ".join(f"'{c['nome']}' volta em {_quando(c)}" for c in contas)
         raise GoogleFlowSemContas(
-            f"Todas as contas do Google Flow atingiram o limite ({detalhe}). Adicione outra conta em "
-            "Configurações → Google Flow, ou libere uma manualmente se o limite já renovou."
+            f"Todas as contas do Google Flow atingiram o limite{' de ' + ('vídeo' if tipo == 'video' else 'imagem') if tipo else ''} "
+            f"({detalhe}). Adicione outra conta em 🔑 Contas Google, ou libere uma manualmente se o limite já renovou."
         )
     return ([c for c in livres if c["logada"]] or livres)[0]["nome"]
 
@@ -1879,13 +1929,17 @@ def submeter_direto(page, trab: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str
             reaproveitou = fd.definir_frame(page, "Início", d["inicio"].get("arquivo"), d["inicio"].get("media_id") or "") == "do projeto"
         fd.escrever_prompt(page, d["prompt"])
     except fd.FlowLimite as exc:
-        raise erro_do_passo(exc) from exc
+        e2 = erro_do_passo(exc)
+        e2.tipo_midia = "video" if video else "imagem"
+        raise e2 from exc
     except fd.FlowPassoErro as exc:
         raise _AntesDeGerar(str(erro_do_passo(exc))) from exc
     try:
         estado = fd.clicar_gerar(page)
     except fd.FlowLimite as exc:
-        raise erro_do_passo(exc) from exc
+        e2 = erro_do_passo(exc)
+        e2.tipo_midia = "video" if video else "imagem"
+        raise e2 from exc
     except fd.FlowPassoErro as exc:  # o clique não aconteceu: nada foi cobrado
         raise _AntesDeGerar(str(erro_do_passo(exc))) from exc
     estado.update(direto=True, tipo_midia="video" if video else "imagem", reaproveitou=reaproveitou)
@@ -1897,7 +1951,10 @@ def checar_direto(page, estado: Dict[str, Any]) -> Optional[List[str]]:
     try:
         r = fd.checar(page, estado, estado.get("tipo_midia") or "imagem")
     except fd.FlowPassoErro as exc:
-        raise erro_do_passo(exc) from exc
+        e2 = erro_do_passo(exc)
+        if isinstance(exc, fd.FlowLimite):
+            e2.tipo_midia = estado.get("tipo_midia") or "imagem"
+        raise e2 from exc
     return [m["url"] for m in r] if r else None
 
 
@@ -2050,6 +2107,20 @@ def esperar_geracao(page, antes: int, timeout_s: float, ignorar=frozenset(), pal
         time.sleep(PAUSA_POLLING_S)
 
 
+# v84_106: quem quer saber de cada imagem/vídeo gerado (o site põe na 🖼 galeria da aba Google Flow).
+# Cada função recebe (caminho_do_arquivo, registro) — erro aqui nunca atrapalha a geração.
+AO_SALVAR: List[Any] = []
+
+
+def _avisar_salvo(registros: List[Dict[str, str]]) -> None:
+    for r in registros:
+        for fn in list(AO_SALVAR):
+            try:
+                fn(str(pasta_imagens() / r["arquivo"]), dict(r))
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def baixar_imagens(context, urls: List[str], prompt: str, chave: str) -> List[Dict[str, str]]:
     """Baixa as imagens (usa os cookies do navegador) pra pasta de imagens
     e registra cada uma em `imagens.json`. Nomes determinísticos
@@ -2076,6 +2147,7 @@ def baixar_imagens(context, urls: List[str], prompt: str, chave: str) -> List[Di
     if not salvas:
         raise GoogleFlowError("Não consegui baixar nenhuma das imagens geradas pelo Google Flow.")
     _salvar_json(dados)
+    _avisar_salvo(salvas)
     return salvas
 
 
@@ -2123,6 +2195,7 @@ def baixar_videos(context, page, urls: List[str], prompt: str, chave: str) -> Li
     if not salvos:
         raise GoogleFlowError("Não consegui baixar nenhum dos vídeos gerados pelo Google Flow.")
     _salvar_json(dados)
+    _avisar_salvo(salvos)
     return salvos
 
 
@@ -2765,7 +2838,8 @@ class _Trabalhador(threading.Thread):
                 if self.chave[0] == "cdp" or self.conta is None:
                     raise  # Chrome do próprio usuário: não dá pra trocar de conta
                 ultimo_limite = str(exc_limite)
-                marcar_esgotada(self.conta, horas)
+                # v84_105: sem crédito de VÍDEO não quer dizer sem crédito de IMAGEM — marca só o tipo que acabou
+                marcar_esgotada(self.conta, horas, tipo=getattr(exc_limite, "tipo_midia", None) or tipo_do_limite(item.tipo))
                 self._fechar_pagina()
                 self._fechar_contexto()
                 # volta pro início do laço: escolhe a próxima conta e refaz ESTE pedido
@@ -2781,8 +2855,13 @@ class _Trabalhador(threading.Thread):
         raise GoogleFlowSemContas("Não consegui gerar a imagem em nenhuma das contas do Google Flow.")
 
     def _gerar(self, p, item: _Pedido) -> None:
+        tipo_lim = tipo_do_limite(item.tipo)
+        if self.contexto is not None and self.chave[0] != "cdp" and self.conta and tipo_lim \
+                and not conta_serve(self.conta, tipo_lim):  # a conta aberta não tem mais crédito pra este tipo
+            self._fechar_pagina()
+            self._fechar_contexto()
         if self.contexto is None:
-            self.conta = CONTA_PADRAO if self.chave[0] == "cdp" else escolher_conta_disponivel()
+            self.conta = CONTA_PADRAO if self.chave[0] == "cdp" else escolher_conta_disponivel(tipo=tipo_lim)
             self.contexto, self.fechar_contexto = _abrir(p, item.cfg, headless=self.headless, conta=self.conta)
             if self.fechar_contexto:
                 restaurar_sessao(self.contexto, self.conta)

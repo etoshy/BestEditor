@@ -267,8 +267,8 @@ def test_example_json_uses_actually_selected_providers():
     fixos — se nenhum dos dois estivesse selecionado, o próprio exemplo
     sugeriria bancos indisponíveis."""
     segments = [{"start": 0.0, "end": 5.0, "text": "teste"}]
-    prompt = build_prompt(segments, providers=["magnific", "vistacreate"])
-    assert '"provider": "magnific"' in prompt
+    prompt = build_prompt(segments, providers=["mixkit", "vistacreate"])  # (magnific está na ⛔ lista negra por padrão)
+    assert '"provider": "mixkit"' in prompt
     assert '"provider": "vistacreate"' in prompt
     print("OK: exemplo de JSON usa provedores de verdade da lista selecionada, não nomes fixos.")
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import time
 import uuid
@@ -510,13 +511,26 @@ def carregar(base: str, pid: str) -> Dict[str, Any]:
     return p
 
 
+def marcar_mudanca(p: Dict[str, Any], origem: str, mensagem: str = "") -> None:
+    """🕘 Diz de onde veio a próxima mudança do roteiro (vai pro histórico de versões no próximo salvar)."""
+    p["_mudanca"] = {"origem": origem, "mensagem": mensagem}
+
+
 def salvar(base: str, p: Dict[str, Any]) -> None:
     os.makedirs(_pasta(base, p["id"]), exist_ok=True)
+    mud = p.pop("_mudanca", None) or {}
     p["atualizado"] = time.time()
     tmp = _arquivo(base, p["id"]) + f".{uuid.uuid4().hex[:6]}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(p, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _arquivo(base, p["id"]))
+    arquivo_seguro.trocar(tmp, _arquivo(base, p["id"]))
+    rot = (p.get("resultado") or {}).get("roteiro") or ""
+    if rot.strip():
+        try:  # 🕘 histórico de versões (só grava se o roteiro mudou)
+            import historico_roteiro
+            historico_roteiro.registrar(_pasta(base, p["id"]), rot, mud.get("origem") or "alteração", mud.get("mensagem") or "")
+        except Exception:  # noqa: BLE001 — o histórico nunca impede de salvar
+            pass
 
 
 def listar(base: str) -> List[Dict[str, Any]]:

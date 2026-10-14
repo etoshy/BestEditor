@@ -112,7 +112,8 @@ def registrar(app, base_dir: str) -> None:
         raise ValueError("Origem inválida.")
 
     def _gravar(origem: str, pid: str, p: Dict[str, Any], novo: str, antes: Optional[str], avisos: List[str],
-                chave_antes: str = "") -> Dict[str, Any]:
+                chave_antes: str = "", hist: Tuple[str, str] = ("", "")) -> Dict[str, Any]:
+        """Grava o roteiro novo. chave_antes "-" = não mexe nos "voltar"; hist = (origem, mensagem) pro 🕘 histórico."""
         if origem == "dossie":
             import dossies as ds
             import dossies_rotas
@@ -123,11 +124,14 @@ def registrar(app, base_dir: str) -> None:
                 for k in ("roteiro_antes_tts", "roteiro_antes_revisao"):  # o "voltar" de cada um sobrevive ao outro
                     if velho.get(k):
                         res[k] = velho[k]
-                if velho.get("partes"):
-                    res["partes"] = velho["partes"]
-                res[chave_antes or "roteiro_antes_tts"] = antes or ""
+                for k in ("partes", "checagem"):
+                    if velho.get(k):
+                        res[k] = velho[k]
+                if chave_antes != "-":
+                    res[chave_antes or "roteiro_antes_tts"] = antes or ""
                 res["avisos"] = list(avisos) + list(res.get("avisos") or [])
                 p["resultado"] = res
+                ds.marcar_mudanca(p, hist[0] or "alteração", hist[1])
                 ds.salvar(base_dir, p)
             return {"palavras": res.get("palavras"), "avisos": res["avisos"]}
         import roteiros_yt as ry
@@ -135,11 +139,14 @@ def registrar(app, base_dir: str) -> None:
         res, an = p.get("resultado") or {}, p.get("analise") or {}
         alvo, chave = (res, "roteiro_final") if res.get("roteiro_final") else (an, "roteiro")
         ch = {"roteiro_antes_revisao": "antes_da_revisao"}.get(chave_antes, "antes_do_tts")
-        if antes is None:
+        if chave_antes == "-":
+            pass
+        elif antes is None:
             alvo.pop(ch, None)
         else:
             alvo[ch] = antes
         alvo[chave] = novo
+        ry.marcar_mudanca(p, hist[0] or "alteração", hist[1])
         ry.salvar_projeto(base_dir, p)
         return {"palavras": len(novo.split()), "avisos": avisos}
 
@@ -179,7 +186,8 @@ def registrar(app, base_dir: str) -> None:
         if r["colchetes"]:
             avisos.append("🎙 Colchetes no texto (podem ser lidos em voz alta): " + ", ".join(f"[{x}]" for x in r["colchetes"][:8]))
         try:
-            g = _gravar(origem, pid, p, r["texto"], pad["antes"] or texto, avisos)
+            g = _gravar(origem, pid, p, r["texto"], pad["antes"] or texto, avisos,
+                        hist=("🎙 adaptado pro TTS", f"{r['palavras_antes']} → {r['palavras_depois']} palavras"))
         except Exception as exc:  # noqa: BLE001
             return jsonify({"erro": str(exc)[:300]}), 400
         return jsonify({"ok": True, "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"], **g})
@@ -192,7 +200,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         if not pad["antes"]:
             return jsonify({"erro": "Não tem adaptação pra desfazer."}), 400
-        g = _gravar(origem, pid, p, pad["antes"], None, [])
+        g = _gravar(origem, pid, p, pad["antes"], None, [], hist=("↩ desfazer", "voltou ao roteiro de antes do TTS"))
         if origem == "dossie":  # tira a marca de "antes"
             import dossies as ds
             import dossies_rotas
@@ -249,7 +257,8 @@ def registrar(app, base_dir: str) -> None:
         antes = (p.get("resultado") or {}).get("roteiro_antes_revisao") if origem == "dossie" else \
             (((p.get("resultado") or {}) if (p.get("resultado") or {}).get("roteiro_final") else (p.get("analise") or {})).get("antes_da_revisao"))
         avisos = [f"🪄 {len(r['nao_achadas'])} troca(s) da revisão não bateram com o texto."] if r["nao_achadas"] else []
-        g = _gravar(origem, pid, p, r["texto"], antes or texto, avisos, chave_antes="roteiro_antes_revisao")
+        g = _gravar(origem, pid, p, r["texto"], antes or texto, avisos, chave_antes="roteiro_antes_revisao",
+                    hist=("🪄 revisão", f"{len(r['aplicadas'])} troca(s) · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
         return jsonify({"ok": True, **{k: r[k] for k in ("aplicadas", "nao_achadas", "palavras_antes", "palavras_depois", "observacoes")}, **g})
 
     @app.route("/revisao/<origem>/<pid>/desfazer", methods=["POST"])
@@ -265,7 +274,8 @@ def registrar(app, base_dir: str) -> None:
             antes = (res if res.get("roteiro_final") else an).get("antes_da_revisao")
         if not antes:
             return jsonify({"erro": "Não tem revisão pra desfazer."}), 400
-        _gravar(origem, pid, p, antes, None, [], chave_antes="roteiro_antes_revisao")
+        _gravar(origem, pid, p, antes, None, [], chave_antes="roteiro_antes_revisao",
+                hist=("↩ desfazer", "voltou ao roteiro de antes da revisão"))
         if origem == "dossie":
             import dossies as ds
             import dossies_rotas
@@ -279,3 +289,225 @@ def registrar(app, base_dir: str) -> None:
     def tts_adaptar_opcoes():
         return jsonify({"direcoes": {k: v["nome"] for k, v in at.DIRECOES.items()}, "especificos": at.idiomas_especificos(),
                         "motores": {k: v for k, v in at.MOTORES.items() if k}})
+
+    # ------------------------------------------------------------------ 🔎 checagem: cronologia · alegações · repetições (v84_99)
+    def _pasta_proj(origem: str, pid: str) -> str:
+        if origem == "dossie":
+            import dossies as ds
+            return ds._pasta(base_dir, pid)
+        import roteiros_yt as ry
+        return ry._pasta(base_dir, pid)
+
+    def _fontes(origem: str, p: Dict[str, Any]) -> str:
+        try:
+            if origem == "dossie":
+                import dossies as ds
+                return ds._fontes_texto(p, 60000)
+            blocos = (p.get("transcricao") or {}).get("blocos") or []
+            t = " ".join(str(b.get("texto") or "") for b in blocos)
+            return ("F1 — transcrição do vídeo original:\n" + t[:60000]) if t.strip() else ""
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _guardar(origem: str, pid: str, chave: str, valor: Any) -> None:
+        """Guarda um campo de 1º nível do projeto (ex.: a última checagem)."""
+        if origem == "dossie":
+            import dossies as ds
+            import dossies_rotas
+            with dossies_rotas._TRAVA:
+                q = ds.carregar(base_dir, pid)
+                q[chave] = valor
+                ds.salvar(base_dir, q)
+            return
+        import roteiros_yt as ry
+        q = ry.carregar_projeto(base_dir, pid)
+        q[chave] = valor
+        ry.salvar_projeto(base_dir, q)
+
+    @app.route("/checagem/<origem>/<pid>")
+    def checagem_ver(origem: str, pid: str):
+        import checagem_roteiro as ch
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        tema = str(p.get("tema") or p.get("titulo") or "")
+        a = ch.analisar(texto, tema) if texto.strip() else {}
+        cr = ch.cronologia(texto, tema) if texto.strip() else {}
+        cr.pop("ano_de", None)
+        return jsonify({"ok": True, "local": a, "cronologia": cr, "ultima": p.get("checagem") or None})
+
+    @app.route("/checagem/<origem>/<pid>/prompt", methods=["POST"])
+    def checagem_prompt(origem: str, pid: str):
+        import checagem_roteiro as ch
+        import idiomas
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = request.get_json(silent=True) or {}
+        try:
+            t = ch.prompt(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
+                          str(p.get("tema") or p.get("titulo") or ""), _fontes(origem, p), str(c.get("foco") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": t, "caracteres": len(t)})
+
+    def _aplicar_checagem(origem: str, pid: str, resposta: str) -> Dict[str, Any]:
+        import json as _json
+        import time as _time
+
+        import checagem_roteiro as ch
+        import revisao_roteiro as rv
+        p, texto, _pad = _roteiro(origem, pid)
+        d = ch.ler(resposta)
+        r = rv.aplicar(texto, _json.dumps({"trocas": d["trocas"]}, ensure_ascii=False))
+        por_eixo = {e: sum(1 for t in d["trocas"] if t.get("eixo") == e and any(a["de"] == t["de"][:200] for a in r["aplicadas"]))
+                    for e in ("cronologia", "alegacao", "repeticao")}
+        g = {}
+        if r["aplicadas"]:
+            avisos = [f"🔎 {len(r['nao_achadas'])} correção(ões) da checagem não bateram com o texto."] if r["nao_achadas"] else []
+            g = _gravar(origem, pid, p, r["texto"], None, avisos, chave_antes="-",
+                        hist=("🔎 checagem", f"⏳ {por_eixo['cronologia']} · 📚 {por_eixo['alegacao']} · ✂️ {por_eixo['repeticao']} "
+                                             f"correções · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
+        reg = {"quando": _time.time(), "resumo": d["resumo"], "verificar": d["verificar"], "inconsistencias": d["inconsistencias"],
+               "linha_do_tempo": d["linha_do_tempo"], "aplicadas": r["aplicadas"], "nao_achadas": r["nao_achadas"],
+               "por_eixo": por_eixo, "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"]}
+        for t in reg["aplicadas"]:
+            orig = next((x for x in d["trocas"] if x["de"][:200] == t["de"]), {})
+            t["eixo"], t["fonte"] = orig.get("eixo", ""), orig.get("fonte", "")
+        _guardar(origem, pid, "checagem", reg)
+        return {**reg, **g}
+
+    @app.route("/checagem/<origem>/<pid>/ler", methods=["POST"])
+    def checagem_ler(origem: str, pid: str):
+        try:
+            _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            r = _aplicar_checagem(origem, pid, str((request.get_json(silent=True) or {}).get("texto") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, **r})
+
+    @app.route("/checagem/<origem>/<pid>/verificar/<int:i>", methods=["POST"])
+    def checagem_conferido(origem: str, pid: str, i: int):
+        try:
+            p, _t, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        reg = p.get("checagem") or {}
+        lista = reg.get("verificar") or []
+        if not 0 <= i < len(lista):
+            return jsonify({"erro": "Item não encontrado."}), 404
+        lista[i]["conferido"] = bool((request.get_json(silent=True) or {}).get("conferido"))
+        _guardar(origem, pid, "checagem", reg)
+        return jsonify({"ok": True})
+
+    # ------------------------------------------------------------------ 🤖 tudo automático: revisão → checagem → enxugar
+    @app.route("/roteiro-auto/<origem>/<pid>", methods=["POST"])
+    def roteiro_auto(origem: str, pid: str):
+        """🤖 Melhora (🪄 revisão, enxugando se passou do tempo) → 🔎 checa cronologia/alegações/repetições e corrige →
+        se ainda ficou longo, ✂️ enxuga de novo. Cada passo vira uma versão no 🕘 histórico."""
+        import ia_servico as ia
+        import tarefas_bg
+        try:
+            _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        if not ia.ativo("roteiros"):
+            return jsonify({"erro": "A IA está desligada (" + (ia.motivo_desligado("roteiros") or "ligue em 🤖 IA") + ")."}), 400
+        foco = str((request.get_json(silent=True) or {}).get("foco") or "")
+        pagina = str((request.get_json(silent=True) or {}).get("pagina") or "")
+        system = "Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois, sem ``` em volta."
+
+        def chamar(prompt: str) -> str:
+            texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=32000, effort="medium", timeout=900)
+            if not texto:
+                raise RuntimeError("A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja 🤖 IA") + ").")
+            return texto
+
+        def revisar(t, modo: str) -> Dict[str, Any]:
+            import idiomas
+            import revisao_roteiro as rv
+            p, texto, pad = _roteiro(origem, pid)
+            m = rv.modo_efetivo(modo, rv.palavras(texto), int(pad.get("alvo") or 0))
+            t.progresso(("✂️ enxugando" if m == "enxugar" else "🪄 revisando") + " o roteiro com a IA…")
+            pr = rv.prompt(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
+                           str(p.get("tema") or p.get("titulo") or ""), foco, alvo_palavras=int(pad.get("alvo") or 0),
+                           minutos=float(pad.get("minutos") or 0), modo=m)
+            r = rv.aplicar(texto, chamar(pr))
+            if r["aplicadas"]:
+                antes = (p.get("resultado") or {}).get("roteiro_antes_revisao") if origem == "dossie" else None
+                _gravar(origem, pid, p, r["texto"], antes or texto, [], chave_antes="roteiro_antes_revisao",
+                        hist=("🪄 revisão" if m == "melhorar" else "✂️ enxugar",
+                              f"🤖 automático · {len(r['aplicadas'])} troca(s) · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
+            return {"modo": m, "aplicadas": len(r["aplicadas"]), "palavras": r["palavras_depois"]}
+
+        def rodar(t):
+            import checagem_roteiro as ch
+            import idiomas
+            passos = [revisar(t, "auto")]
+            t.progresso("🔎 checando cronologia, alegações históricas e repetições…")
+            p, texto, pad = _roteiro(origem, pid)
+            pr = ch.prompt(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
+                           str(p.get("tema") or p.get("titulo") or ""), _fontes(origem, p), foco)
+            c = _aplicar_checagem(origem, pid, chamar(pr))
+            passos.append({"modo": "checagem", "aplicadas": len(c["aplicadas"]), "palavras": c["palavras_depois"],
+                           "verificar": len(c["verificar"])})
+            import revisao_roteiro as rv
+            _p, texto, pad = _roteiro(origem, pid)
+            if pad.get("alvo") and rv.palavras(texto) > int(pad["alvo"]) * 1.1:
+                passos.append(revisar(t, "enxugar"))
+            return {"passos": passos}
+
+        tid = tarefas_bg.iniciar("roteiro_auto", "🤖 Revisar + checar + corrigir o roteiro", rodar, pagina=pagina)
+        return jsonify({"ok": True, "tarefa": tid})
+
+    # ------------------------------------------------------------------ 🕘 histórico de versões (v84_99)
+    @app.route("/historico/<origem>/<pid>")
+    def historico_lista(origem: str, pid: str):
+        import historico_roteiro as hr
+        try:
+            _p, texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        pasta = _pasta_proj(origem, pid)
+        if texto.strip() and not hr.listar(pasta):  # projeto de antes do histórico: o roteiro atual vira a v1
+            hr.registrar(pasta, texto, "📌 início do histórico", "o roteiro como estava quando o histórico começou")
+        return jsonify({"ok": True, "versoes": hr.listar(pasta)})
+
+    @app.route("/historico/<origem>/<pid>/<int:n>")
+    def historico_versao(origem: str, pid: str, n: int):
+        import historico_roteiro as hr
+        try:
+            _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        pasta = _pasta_proj(origem, pid)
+        t = hr.texto(pasta, n)
+        if t is None:
+            return jsonify({"erro": "Versão não encontrada."}), 404
+        versoes = [v["n"] for v in hr.listar(pasta)]
+        try:
+            contra = int(request.args.get("contra") or 0)
+        except ValueError:
+            contra = 0
+        if not contra:
+            contra = max([m for m in versoes if m < n] or [0])
+        base_txt = hr.texto(pasta, contra) if contra else ""
+        return jsonify({"ok": True, "n": n, "texto": t, "contra": contra, "diff": hr.diff(base_txt or "", t)})
+
+    @app.route("/historico/<origem>/<pid>/<int:n>/restaurar", methods=["POST"])
+    def historico_restaurar(origem: str, pid: str, n: int):
+        import historico_roteiro as hr
+        try:
+            p, _texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        t = hr.texto(_pasta_proj(origem, pid), n)
+        if t is None:
+            return jsonify({"erro": "Versão não encontrada."}), 404
+        g = _gravar(origem, pid, p, t, None, [], chave_antes="-", hist=("🕘 restaurado", f"voltou pra versão v{n}"))
+        return jsonify({"ok": True, **g})

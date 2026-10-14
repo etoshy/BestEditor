@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import threading
 import time
 import uuid
@@ -46,7 +47,7 @@ def _gravar(itens: List[Dict[str, Any]]) -> None:
     tmp = ARQUIVO + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(itens[:MAXIMO], f, ensure_ascii=False)
-    os.replace(tmp, ARQUIVO)
+    arquivo_seguro.trocar(tmp, ARQUIVO)
 
 
 def link_seguro(link: Any) -> str:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import subprocess
 import threading
@@ -41,7 +42,7 @@ def _gravar(pasta: str, itens: List[Dict[str, Any]]) -> None:
     tmp = _caminho(pasta) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(itens[:MAX_ENTRADAS], f, ensure_ascii=False, indent=0)
-    os.replace(tmp, _caminho(pasta))
+    arquivo_seguro.trocar(tmp, _caminho(pasta))
 
 
 def duracao_audio(caminho: str) -> Optional[float]:

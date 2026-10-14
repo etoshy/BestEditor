@@ -173,7 +173,7 @@ def test_rotas_configuracoes_e_editor(A, padrao, monkeypatch):
                content_type="multipart/form-data")
     assert r.status_code == 302
     v = canal.do_job(A._JOBS["vh-job"])
-    assert v["encerramento"]["proprio"] and v["encerramento"]["usar"] and canal.clipe_padrao("encerramento")
+    assert not v["encerramento"]["proprio"] and v["encerramento"]["usar"] and canal.clipe_padrao("encerramento") == v["encerramento"]["caminho"]  # v84_101: vai pro 📺 perfil
     assert c.post("/job/vh-job/vinhetas/xyz", json={}).status_code == 404
     r = c.post("/vinhetas/abertura", data={"remover": "on"})
     assert r.status_code == 302 and canal.clipe_padrao("abertura") is None

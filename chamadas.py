@@ -22,7 +22,6 @@ import difflib
 import json
 import os
 import re
-import shutil
 import unicodedata
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -157,7 +156,7 @@ def do_srt(segmentos: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[
 
 
 # ------------------------------------------------------------------ editor / montagem
-def para_cortes(chamadas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def para_cortes(chamadas: List[Dict[str, Any]], perfil: Optional[str] = None) -> List[Dict[str, Any]]:
     """Chamadas -> itens da aba ✂️ Cortes (sem clipe = narração normal).
     Com várias marcas do mesmo tipo, o clipe padrão entra SÓ NA PRIMEIRA de
     cada tipo; as outras ficam desligadas (a narração segue normal ali) até a
@@ -167,7 +166,7 @@ def para_cortes(chamadas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for c in sorted(chamadas or [], key=lambda x: float(x.get("inicio") or 0)):
         tipo = c.get("tipo") if c.get("tipo") in TIPOS else "inscreva"
         ini, fim = float(c.get("inicio") or 0), float(c.get("fim") or c.get("inicio") or 0)
-        padrao = clipe_padrao(tipo) if tipo not in ja_tem else None
+        padrao = clipe_padrao(tipo, perfil) if tipo not in ja_tem else None
         item = {
             "id": uuid.uuid4().hex[:8], "chamada": True, "tipo": tipo, "texto": c.get("texto") or "",
             "insertion_point": round(ini, 3), "remove_ate": round(max(ini, fim), 3), "audio_mode": "pause",
@@ -190,33 +189,23 @@ def _mapa_padrao() -> Dict[str, str]:
         return {}
 
 
-def clipe_padrao(tipo: str) -> Optional[str]:
-    p = _mapa_padrao().get(tipo)
-    return p if p and os.path.isfile(p) else None
+def clipe_padrao(tipo: str, perfil: Optional[str] = None) -> Optional[str]:
+    """O vídeo ⭐ padrão do tipo no 📺 perfil do canal (o ativo, ou o perfil pedido) — v84_101: perfis_canal.py."""
+    import perfis_canal
+    return perfis_canal.caminho_padrao(tipo, perfil)
 
 
-def definir_padrao(tipo: str, caminho: Optional[str]) -> Optional[str]:
-    """Guarda uma CÓPIA do clipe como padrão do tipo (None tira o padrão)."""
+def definir_padrao(tipo: str, caminho: Optional[str], perfil: Optional[str] = None) -> Optional[str]:
+    """Guarda uma CÓPIA do clipe no 📺 perfil (o ativo) como ⭐ padrão do tipo (None: o tipo fica sem padrão; os vídeos
+    continuam na biblioteca do perfil)."""
+    import perfis_canal
     if tipo not in TIPOS and tipo not in ("abertura", "encerramento"):  # 🎬🏁 vídeos de início/fim (canal.py)
         raise ValueError("Tipo de chamada desconhecido.")
-    os.makedirs(PASTA_PADRAO, exist_ok=True)
-    mapa = _mapa_padrao()
-    destino = None
+    pid = perfil or perfis_canal.ativo_id()
     if caminho:
-        destino = os.path.join(PASTA_PADRAO, f"{tipo}_{uuid.uuid4().hex[:6]}{os.path.splitext(caminho)[1].lower() or '.mp4'}")
-        shutil.copy(caminho, destino)
-        antigo = mapa.get(tipo)
-        if antigo and antigo != destino and os.path.dirname(os.path.abspath(antigo)) == os.path.abspath(PASTA_PADRAO):
-            try:
-                os.remove(antigo)
-            except OSError:
-                pass
-        mapa[tipo] = destino
-    else:
-        mapa.pop(tipo, None)
-    with open(os.path.join(PASTA_PADRAO, "padrao.json"), "w", encoding="utf-8") as f:
-        json.dump(mapa, f, ensure_ascii=False, indent=2)
-    return destino
+        return perfis_canal.adicionar_video(pid, tipo, caminho, padrao=True)["arquivo"]
+    perfis_canal.definir_padrao(pid, tipo, None)
+    return None
 
 
 GUIA_TEXTO = (

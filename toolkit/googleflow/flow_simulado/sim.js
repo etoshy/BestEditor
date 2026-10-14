@@ -1,6 +1,6 @@
 // Google Flow SIMULADO — o HTML é o REAL (capturado da página do Flow); este script só imita o comportamento:
 // agente liga/desliga, painel do agente, pop-up de configurações, menus de modelo, Início/Fim, menu de mídia,
-// "Iniciar geração" → cartão com % → imagem/vídeo. Parâmetros da URL: ?limite=1 (limite de uso), ?falha=1 (recusa).
+// "Iniciar geração" → cartão com % → imagem/vídeo. Parâmetros da URL: ?limite=1 (limite de uso), ?falha=1 (recusa), ?sem_credito=1 (sem créditos pra vídeo).
 (function () {
   const Q = new URLSearchParams(location.search);
   const $ = (s, r) => (r || document).querySelector(s);
@@ -129,6 +129,16 @@
     }
     ed.innerHTML = '<p><br class="ProseMirror-trailingBreak"></p>'; editorMudou();
   }
+  // ?sem_credito=1 (HTML REAL, v84_104): conta sem créditos pra vídeo — o "Iniciar geração" some e no lugar aparece o
+  // "Alerta de créditos insuficientes"
+  function semCredito() {
+    const b = $('flow-prompt-box button[aria-label="Iniciar geração"]'); if (!b) return;
+    const sem = Q.get('sem_credito') && st.modo === 'Vídeo';
+    b.style.display = sem ? 'none' : '';
+    const w = $('flow-prompt-box flow-credit-warning-button');
+    if (sem && !w) b.insertAdjacentHTML('afterend', '<flow-credit-warning-button><flow-prompt-warning-button arialabel="Alerta de créditos insuficientes"><button type="button" class="prompt-warning-button" aria-label="Alerta de créditos insuficientes"><mat-icon class="mat-icon google-symbols">info</mat-icon></button></flow-prompt-warning-button></flow-credit-warning-button>');
+    if (!sem && w) w.remove();
+  }
   function editorMudou() {
     const ed = $('flow-prompt-box .ProseMirror'); const tem = ed.innerText.trim().length > 0;
     const b = $('flow-prompt-box button[aria-label="Iniciar geração"]');
@@ -175,7 +185,7 @@
       if (btn.matches('button.mat-button-toggle-button')) {
         marcar(btn);
         const grupo = btn.closest('flow-toggles').getAttribute('aria-label'); const v = $('.toggle-text', btn).textContent.trim();
-        if (grupo === 'Modo') { st.modo = v; framesBar(); abrirPopup(); }
+        if (grupo === 'Modo') { st.modo = v; framesBar(); semCredito(); abrirPopup(); }
         else if (grupo === 'Tipo de vídeo') { st.tipoVideo = v; framesBar(); }
         else if (grupo === 'Proporção') st.prop = v; else if (grupo === 'Quantidade de resultados') st.qtd = v;
         return;

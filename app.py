@@ -34,6 +34,7 @@ from contextlib import nullcontext
 import json
 import re
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import shutil
 import subprocess
 import sys
@@ -652,7 +653,8 @@ def _normalizar_multivoz(entrada: str, saida: str) -> None:
         shutil.copy(entrada, saida)
 
 
-def _gerar_voz_com_chamadas(engine: str, partes: List[Dict[str, Any]], output_path: str, kwargs: Dict[str, Any], log) -> List[Dict[str, Any]]:
+def _gerar_voz_com_chamadas(engine: str, partes: List[Dict[str, Any]], output_path: str, kwargs: Dict[str, Any], log,
+                            instancias: int = 1) -> List[Dict[str, Any]]:
     """Texto com [[INSCREVA: ...]] etc (ver chamadas.py): gera cada pedaço
     separado (no mesmo processo, sem recarregar o modelo), junta e devolve
     onde cada chamada começa e termina no áudio final — exato, sem depender
@@ -670,9 +672,17 @@ def _gerar_voz_com_chamadas(engine: str, partes: List[Dict[str, Any]], output_pa
                 arquivo_da_parte[k] = arq
                 itens.append((engine, limpo, arq, kwargs))
         log(f"📣 {sum(1 for p in partes if p['tipo'])} chamada(s) no texto — gerando em {len(itens)} pedaço(s) pra saber onde cada uma fica.")
-        erros = tts_gerar_audio_isolado_lote(itens, on_progresso=lambda i, e: log(f"  pedaço {i + 1}/{len(itens)} " + ("⚠ " + e if e else "pronto")))
-        if erros:
-            raise VoiceGeneratorError("Falhou ao gerar: " + "; ".join(f"pedaço {i + 1}: {e}" for i, e in sorted(erros.items()))[:800])
+        if instancias > 1:  # ⚡ v84_103: várias instâncias do motor dividindo os blocos de todos os pedaços
+            import tts_paralelo
+            ks = sorted(arquivo_da_parte)
+            prontos = tts_paralelo.gerar_partes(engine, [t for (_e, t, _a, _k) in itens], os.path.join(pasta, "_blocos"),
+                                                kwargs, instancias, log)
+            for k, arq in zip(ks, prontos):
+                shutil.move(arq, arquivo_da_parte[k])
+        else:
+            erros = tts_gerar_audio_isolado_lote(itens, on_progresso=lambda i, e: log(f"  pedaço {i + 1}/{len(itens)} " + ("⚠ " + e if e else "pronto")))
+            if erros:
+                raise VoiceGeneratorError("Falhou ao gerar: " + "; ".join(f"pedaço {i + 1}: {e}" for i, e in sorted(erros.items()))[:800])
         arquivos = [arquivo_da_parte[k] for k in sorted(arquivo_da_parte)]
         duracoes = [(_probe_media_duration(arquivo_da_parte[k]) if k in arquivo_da_parte else 0.0) for k in range(len(partes))]
         taxa = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=sample_rate", "-of", "csv=p=0", arquivos[0]],
@@ -731,10 +741,15 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
                 raise VoiceGeneratorError(str(exc)) from exc
             log(f"{r['falas']} fala(s), vozes: " + (", ".join(r["vozes"]) or "só a padrão") + ".")
         elif tem_chamadas:
-            _salvar_chamadas_voz(status, output_path, _gerar_voz_com_chamadas(engine, partes_ch, output_path, kwargs, log), log)
+            _salvar_chamadas_voz(status, output_path, _gerar_voz_com_chamadas(engine, partes_ch, output_path, kwargs, log,
+                                                                              int(status.get("instancias") or 1)), log)
         else:
             texto_limpo = na.limpar_texto_para_tts(texto, motor=engine)
-            tts_gerar_audio_isolado(engine, texto_limpo, output_path, **kwargs)
+            if int(status.get("instancias") or 1) > 1:  # ⚡ v84_103: vários blocos ao mesmo tempo
+                import tts_paralelo
+                tts_paralelo.gerar_texto(engine, texto_limpo, output_path, kwargs, int(status["instancias"]), log)
+            else:
+                tts_gerar_audio_isolado(engine, texto_limpo, output_path, **kwargs)
         status["resultado_filename"] = os.path.basename(output_path)
         log("Pronto!")
 
@@ -1074,10 +1089,17 @@ def gerar_voz_gerar():
                     st["log"] += "📝 Esse texto é o roteiro de um projeto do Roteiro do YouTube — os capítulos vão pro tempo do áudio.\n"
         except Exception:  # noqa: BLE001
             pass
+    # ⚡ v84_103: quantas instâncias do motor geram ESTE áudio (blocos ao mesmo tempo)
+    import tts_paralelo
+    _modo_inst = str(request.form.get("instancias") or tts_paralelo.modo_salvo())
+    _n_inst, _por_que = (1, "multi voice: 1 instância") if multivoz_on else tts_paralelo.escolher(
+        engine, _modo_inst, forcar_cpu or kwargs.get("use_gpu") is False, len(texto))
+    st["instancias"] = _n_inst
+    st["log"] += f"⚡ {_por_que}.\n" + (tts_paralelo.AVISO + "\n" if _n_inst > 1 else "")
     pos = _FILA_VOZ.iniciar(
         job_id, engine,
         lambda: _gerar_voz_e_avisar(job_id, engine, texto, output_path, kwargs, legenda_kwargs, multivoz_on),
-        cpu=forcar_cpu)
+        cpu=forcar_cpu, instancias=_n_inst)
     if st.get("na_fila"):
         st["posicao"] = _FILA_VOZ.posicao(job_id)
     return jsonify({"ok": True, "job_id": job_id, "posicao": st.get("posicao") or (pos if st.get("na_fila") else None)})
@@ -1250,6 +1272,29 @@ def gerar_voz_fila_config():
     cfg["voz_simultaneos"] = modo
     save_site_config(cfg)
     return jsonify(dict(_FILA_VOZ.estado(), ok=True))
+
+
+@app.route("/gerar-voz/instancias/config", methods=["POST"])
+def gerar_voz_instancias_config():
+    """⚡ Quantas instâncias do motor geram cada áudio (auto, 1–4) — vale no Gerador de voz e no Roteiro para Áudio."""
+    import tts_paralelo
+    modo = str((request.get_json(silent=True) or request.form).get("modo") or "auto")
+    if modo not in tts_paralelo.MODOS:
+        return jsonify({"erro": "Use auto, 1, 2, 3 ou 4."}), 400
+    cfg = load_site_config()
+    cfg["voz_instancias"] = modo
+    save_site_config(cfg)
+    return jsonify({"ok": True, "modo": modo})
+
+
+@app.route("/gerar-voz/instancias/previa", methods=["GET"])
+def gerar_voz_instancias_previa():
+    """Quantas instâncias o automático usaria agora (pra mostrar do lado da opção)."""
+    import tts_paralelo
+    engine = str(request.args.get("engine") or "chatterbox_turbo")
+    n, por_que = tts_paralelo.escolher(engine, str(request.args.get("modo") or tts_paralelo.modo_salvo()),
+                                       request.args.get("cpu") == "1", int(request.args.get("caracteres") or 20000))
+    return jsonify({"instancias": n, "motivo": por_que, "modo": tts_paralelo.modo_salvo(), **tts_paralelo.recursos()})
 
 
 @app.route("/gerar-voz/cancelar/<job_id>", methods=["POST"])
@@ -2218,7 +2263,10 @@ def narracao_remover_geracao(projeto_id: str, geracao_id: str):
 
 @app.route("/settings", methods=["GET"])
 def settings_page():
+    import lista_negra
     return render_template("settings.html", config=load_site_config(), all_providers=ALL_PROVIDERS,
+                           sites_bloqueados=lista_negra.sites(), sites_padrao=lista_negra.PADRAO,
+                           provedores_bloqueados=[p for p in ALL_PROVIDERS if lista_negra.provedor_bloqueado(p)],
                            vinhetas={t: os.path.basename(__import__("canal").clipe_padrao(t) or "") for t in __import__("canal").VINHETAS})
 
 
@@ -2256,6 +2304,17 @@ def youtube_cookies_salvar():
 def contas_google_page():
     from googleflow import googleflow_client as gf
     return render_template("contas_google.html", keyring_disponivel=gf.keyring_disponivel())
+
+
+@app.route("/settings/ordem-fontes", methods=["POST"])
+def salvar_ordem_fontes():
+    """Ordem de preferência das fontes de vídeo — salva NA HORA, ao soltar o item arrastado (v84_103)."""
+    ordem = [str(x) for x in ((request.get_json(silent=True) or {}).get("ordem") or [])]
+    try:
+        cfg = save_site_config({"provider_priority": ordem})
+    except SiteConfigError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    return jsonify({"ok": True, "ordem": cfg["provider_priority"]})
 
 
 @app.route("/settings", methods=["POST"])
@@ -2297,8 +2356,17 @@ def save_settings():
         new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
-    if "nome_canal" in request.form:  # 📺 v84_95
+    if "sites_bloqueados" in request.form:  # ⛔ lista negra de sites (v84_106)
+        import lista_negra
+        new_values["sites_bloqueados"] = (list(lista_negra.PADRAO) if request.form.get("sites_bloqueados_padrao") == "on"
+                                          else lista_negra.normalizar(request.form["sites_bloqueados"]))
+    if "nome_canal" in request.form:  # 📺 v84_95 (v84_101: vale pro 📺 perfil ativo também)
         new_values["nome_canal"] = request.form["nome_canal"]
+        try:
+            import perfis_canal
+            perfis_canal.editar(perfis_canal.ativo_id(), nome_canal=request.form["nome_canal"])
+        except Exception:  # noqa: BLE001
+            pass
     if "estilo_imagens" in request.form:  # 🎞️ imagens reais × ilustração
         new_values["estilo_imagens"] = request.form["estilo_imagens"]
     for chave_ig in ("ia_google_youtube", "ia_google_porta", "ia_google_imagens_min_lado"):  # 🔎 IA do Google
@@ -2782,7 +2850,7 @@ def _cortes_com_chamadas(job: dict, cortes: List[Dict[str, Any]]) -> List[Dict[s
     """Cortes da IA + as chamadas do roteiro. Colar o JSON da IA de novo não
     apaga as chamadas que já existem (nem o clipe que você enviou pra elas)."""
     ja = [c for c in job.get("cutaway_suggestions") or [] if c.get("chamada")]
-    return list(cortes) + (ja or __import__("chamadas").para_cortes(job.get("chamadas")))
+    return list(cortes) + (ja or __import__("chamadas").para_cortes(job.get("chamadas"), __import__("perfis_canal").do_job(job)))
 
 
 # 🛒 projeto de venda e 🕵️ modelo de vídeo: mídias do próprio projeto que entram no vídeo
@@ -3614,6 +3682,40 @@ def _formato_padrao_ctx():
         return {"formato_padrao": "16:9"}
 
 
+# 🔄 v84_102: o servidor que está rodando é o código que está no disco? (atualizou o site com ele aberto → as páginas
+# novas chamam rotas que o processo velho não tem e os botões dão 404). base.html avisa com uma faixa no topo.
+_CODIGO_ID = uuid.uuid4().hex[:12]
+
+
+def _mtimes_codigo() -> Dict[str, float]:
+    out = {}
+    try:
+        for nome in os.listdir(BASE_DIR):
+            if nome.endswith(".py") and not nome.startswith("test_"):
+                try:
+                    out[nome] = os.path.getmtime(os.path.join(BASE_DIR, nome))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return out
+
+
+_CODIGO_NO_INICIO = _mtimes_codigo()
+
+
+@app.route("/versao-codigo")
+def versao_codigo():
+    agora = _mtimes_codigo()
+    mudou = sorted(n for n, t in agora.items() if _CODIGO_NO_INICIO.get(n) != t)
+    return jsonify({"id": _CODIGO_ID, "desatualizado": bool(mudou), "arquivos": mudou[:12]})
+
+
+@app.context_processor
+def _versao_codigo_ctx():
+    return {"versao_codigo": _CODIGO_ID}
+
+
 @app.context_processor
 def _idiomas_ctx():
     import idiomas
@@ -4299,6 +4401,8 @@ def _ia_escolher_imagem(res: dict, ctx: Optional[dict], cache: dict, termo: str,
     if not j or not j["lista"]:
         return res
     melhor = j["lista"][0]
+    if melhor.get("marca_dagua"):  # ⛔ v84_106: todas as baixadas têm marca d'água — nenhuma entra
+        return dict(res, ok=False, erro="o 🤖 juiz viu marca d'água em todas as imagens achadas", marca_dagua=True)
     escolhida = dict(variantes[melhor["_v"]], extras=res.get("extras"))
     escolhida.update(ia_nota=melhor.get("ia_nota"), ia_motivo=melhor.get("ia_motivo"),
                      ia_aviso=melhor.get("ia_nota", 0) < int((__import__("ia_servico").config() or {}).get("nota_minima") or 7))
@@ -4439,10 +4543,12 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                         pass
                     import ia_servico as _ias
                     _corte = int((_ias.config() or {}).get("nota_minima") or 7) if getattr(segments[i], "_rigoroso", False) else 5
-                    if res.get("ok") and res.get("ia_nota") is not None and res["ia_nota"] < _corte and _ias.ativo("cartao"):
+                    if ((res.get("ok") and res.get("ia_nota") is not None and res["ia_nota"] < _corte) or res.get("marca_dagua")) \
+                            and _ias.ativo("cartao"):  # nada bom (ou ⛔ só com marca d'água): gera um cartão no lugar
                         try:
                             _publicar(i, _cartao_no_trecho(job_id, job, i, segments[i], ia_ctxs[i].get("fala") or "",
-                                                           f"nenhuma imagem boa (melhor nota {res['ia_nota']})"))
+                                                           "⛔ só achei imagens com marca d'água" if res.get("marca_dagua")
+                                                           else f"nenhuma imagem boa (melhor nota {res['ia_nota']})"))
                             return
                         except Exception:  # noqa: BLE001
                             pass
@@ -5371,8 +5477,8 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         "links_tela": job.get("links_tela") or [],
         "intervalo": job.get("interval_seconds") or 7,
         "clipes_chamada": {t: [{"id": x["id"], "nome": x["nome"], "padrao": bool(x.get("padrao"))} for x in l] for t, l in clipes_ch.items()},
-        "vinhetas": {t: {k: v[k] for k in ("usar", "nome", "proprio", "rotulo")} | {"tem": bool(v["caminho"]), "padrao": bool(__import__("canal").clipe_padrao(t))}
-                     for t, v in __import__("canal").do_job(job).items()},
+        "vinhetas": _vinhetas_editor(job),
+        "perfis_canal": dict(__import__("perfis_canal").resumo(), do_video=__import__("perfis_canal").do_job(job)),
         "duracao": job.get("total_duration") or (job["pending_segments"][-1]["end"] if job["pending_segments"] else 0),
         "erro_indice": job.get("assembly_error_segment_index"),
         "erro_indices": job.get("assembly_error_segments") or [],
@@ -6277,36 +6383,49 @@ def chamada_tirar_clipe(job_id: str, cutaway_id: str):
     cut["resolved_path"] = None
     cut["clipe_padrao"] = False
     if (request.get_json(silent=True) or {}).get("padrao") and cut.get("tipo") in _chm.TIPOS:
-        _chm.definir_padrao(cut["tipo"], None)
+        _chm.definir_padrao(cut["tipo"], None, __import__("perfis_canal").do_job(job))
     _save_state(job_id)
     return jsonify({"ok": True})
 
 
 def _clipes_do_tipo(job: dict, tipo: str) -> List[Dict[str, Any]]:
-    """Vídeos de chamada (venda / like-inscreva-se) deste projeto: os enviados + o
-    padrão do tipo + os que já estão em alguma marca. Cada um com um id estável."""
-    import chamadas as _chm
+    """Vídeos de chamada (venda / like-inscreva-se) deste projeto: os do 📺 perfil do canal do vídeo (v84_101) + os
+    enviados só pra ele + os que já estão em alguma marca. Cada um com um id estável."""
     import hashlib
-    lista = list((job.setdefault("clipes_chamada", {})).get(tipo) or [])
-    caminhos = [c["caminho"] for c in lista]
-    extras = [c.get("resolved_path") for c in job.get("cutaway_suggestions", []) if c.get("chamada") and c.get("tipo") == tipo]
-    for cam in extras + [_chm.clipe_padrao(tipo)]:
+
+    import perfis_canal
+    pid = perfis_canal.do_job(job)
+    do_perfil = perfis_canal.videos(tipo, pid)
+    padrao = perfis_canal.caminho_padrao(tipo, pid)
+    dos_perfis = {v["arquivo"] for v in do_perfil}
+    proprios = [dict(c, so_deste=True) for c in (job.setdefault("clipes_chamada", {})).get(tipo) or []
+                if c.get("caminho") and c["caminho"] not in dos_perfis]
+    lista: List[Dict[str, Any]] = []
+    caminhos: List[str] = []
+
+    def por(cam, nome, **extra):
         if cam and cam not in caminhos and os.path.isfile(cam):
-            lista.append({"id": hashlib.md5(cam.encode("utf-8")).hexdigest()[:10], "caminho": cam,
-                          "nome": os.path.basename(cam),
-                          "padrao": cam == _chm.clipe_padrao(tipo)})
+            lista.append({"id": hashlib.md5(cam.encode("utf-8")).hexdigest()[:10], "caminho": cam, "nome": nome,
+                          "padrao": cam == padrao, **extra})
             caminhos.append(cam)
-    lista = [c for c in lista if os.path.isfile(c["caminho"])]
-    job["clipes_chamada"][tipo] = lista
+    for v in do_perfil:
+        por(v["arquivo"], "📺 " + v["nome"], perfil=True)
+    for c in proprios:
+        por(c["caminho"], c.get("nome") or os.path.basename(c["caminho"]), so_deste=True)
+    for c in job.get("cutaway_suggestions", []):
+        if c.get("chamada") and c.get("tipo") == tipo:
+            por(c.get("resolved_path"), os.path.basename(c.get("resolved_path") or ""))
+    job["clipes_chamada"][tipo] = [c for c in lista if c.get("so_deste")]
     return lista
 
 
 def _registrar_clipe_chamada(job: dict, tipo: str, caminho: str, nome: str) -> Dict[str, Any]:
     import hashlib
-    lista = _clipes_do_tipo(job, tipo)
+    _clipes_do_tipo(job, tipo)
+    lista = job["clipes_chamada"].setdefault(tipo, [])
     item = next((c for c in lista if c["caminho"] == caminho), None)
     if not item:
-        item = {"id": hashlib.md5(caminho.encode("utf-8")).hexdigest()[:10], "caminho": caminho, "nome": nome}
+        item = {"id": hashlib.md5(caminho.encode("utf-8")).hexdigest()[:10], "caminho": caminho, "nome": nome, "so_deste": True}
         lista.append(item)
     item["nome"] = nome or item["nome"]
     return item
@@ -6327,7 +6446,15 @@ def chamadas_enviar(job_id: str, tipo: str):
     nome = secure_filename(up.filename)
     dest = os.path.join(pasta, f"{tipo}_{uuid.uuid4().hex[:6]}_{nome}")
     up.save(dest)
-    _registrar_clipe_chamada(job, tipo, dest, up.filename)
+    if request.form.get("perfil") == "on":  # 📺 guarda na biblioteca do perfil deste vídeo (serve pros próximos vídeos)
+        import perfis_canal
+        perfis_canal.adicionar_video(perfis_canal.do_job(job), tipo, dest, up.filename)
+        try:
+            os.remove(dest)
+        except OSError:
+            pass
+    else:
+        _registrar_clipe_chamada(job, tipo, dest, up.filename)
     _save_state(job_id)
     return redirect(url_for("edit_segments_page", job_id=job_id) + "#cortes")
 
@@ -6345,9 +6472,16 @@ def job_vinheta(job_id: str, tipo: str):
         os.makedirs(tmp, exist_ok=True)
         orig = os.path.join(tmp, f"_up_{uuid.uuid4().hex[:6]}_{secure_filename(up.filename)}")
         up.save(orig)
-        canal.guardar_no_job(job, tipo, _job_dir(job_id), orig, up.filename)
-        if request.form.get("padrao") == "on":
-            canal.definir_padrao(tipo, orig)
+        if request.form.get("padrao") == "on":  # vai pra biblioteca do 📺 perfil deste vídeo, como ⭐ padrão
+            import perfis_canal
+            pid = perfis_canal.do_job(job)
+            perfis_canal.adicionar_video(pid, tipo, orig, up.filename, padrao=True)
+            v = job.setdefault("vinhetas", {}).setdefault(tipo, {})
+            v.pop("caminho", None)
+            v.pop("video_id", None)
+            v["usar"] = True
+        else:
+            canal.guardar_no_job(job, tipo, _job_dir(job_id), orig, up.filename)
         try:
             os.remove(orig)
         except OSError:
@@ -6360,8 +6494,55 @@ def job_vinheta(job_id: str, tipo: str):
         v["usar"] = bool(corpo["usar"])
     if corpo.get("voltar_ao_padrao"):
         v.pop("caminho", None)
+        v.pop("video_id", None)
+    if "video_id" in corpo:  # 📺 qual vídeo do perfil entra ("" = o ⭐ padrão do perfil)
+        v.pop("caminho", None)
+        if corpo["video_id"]:
+            v["video_id"] = str(corpo["video_id"])[:20]
+            v["usar"] = True
+        else:
+            v.pop("video_id", None)
     _save_state(job_id)
-    return jsonify({"ok": True, "vinhetas": {t: {k: x[k] for k in ("usar", "nome", "proprio")} for t, x in canal.do_job(job).items()}})
+    return jsonify({"ok": True, "vinhetas": _vinhetas_editor(job)})
+
+
+def _vinhetas_editor(job: dict) -> Dict[str, Any]:
+    import canal
+    return {t: {k: v[k] for k in ("usar", "nome", "proprio", "rotulo", "video_id", "opcoes")}
+            | {"tem": bool(v["caminho"]), "padrao": any(o["padrao"] for o in v["opcoes"])}
+            for t, v in canal.do_job(job).items()}
+
+
+@app.route("/job/<job_id>/perfil-canal", methods=["POST"])
+def job_perfil_canal(job_id: str):
+    """📺 Troca o perfil do canal deste vídeo: as chamadas que estavam com o vídeo ⭐ padrão passam pro padrão do
+    perfil novo; intro/final voltam pro padrão do perfil novo (o vídeo enviado só pra este vídeo continua)."""
+    import chamadas as _chm
+    import perfis_canal
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    pid = str((request.get_json(silent=True) or {}).get("perfil") or "")
+    if not perfis_canal.existe(pid):
+        return jsonify({"erro": "Perfil não encontrado."}), 404
+    velho = perfis_canal.do_job(job)
+    job["perfil_canal"] = pid
+    trocadas = 0
+    for c in job.get("cutaway_suggestions", []):
+        if not c.get("chamada") or c.get("tipo") not in _chm.TIPOS or c.get("desligada"):
+            continue
+        do_velho = c.get("clipe_padrao") or (c.get("resolved_path") and any(
+            v["arquivo"] == c.get("resolved_path") for v in perfis_canal.videos(c["tipo"], velho)))
+        if do_velho or not c.get("resolved_path"):
+            novo = _chm.clipe_padrao(c["tipo"], pid)
+            if novo != c.get("resolved_path"):
+                trocadas += 1
+            c["resolved_path"] = novo
+            c["clipe_padrao"] = bool(novo)
+    for v in (job.get("vinhetas") or {}).values():
+        v.pop("video_id", None)
+    _save_state(job_id)
+    return jsonify({"ok": True, "perfil": pid, "trocadas": trocadas})
 
 
 @app.route("/vinhetas/<tipo>", methods=["POST"])
@@ -6431,14 +6612,14 @@ def chamadas_escolher(job_id: str):
         return jsonify({"ok": True, "com_clipe": sum(1 for c in do_tipo if c.get("resolved_path")), "total": len(do_tipo)})
     clipe = next((c["resolved_path"] for c in do_tipo if c.get("resolved_path") and os.path.isfile(c["resolved_path"]) and not c.get("clipe_padrao")), None) \
         or next((c["resolved_path"] for c in do_tipo if c.get("resolved_path") and os.path.isfile(c["resolved_path"])), None) \
-        or _chm.clipe_padrao(tipo)
+        or _chm.clipe_padrao(tipo, __import__("perfis_canal").do_job(job))
     if ligadas and not clipe:
         return jsonify({"erro": "Ainda não tem clipe desse tipo: envie o vídeo numa das chamadas primeiro."}), 400
     for c in do_tipo:
         if c["id"] in ligadas:
             if not c.get("resolved_path"):
                 c["resolved_path"] = clipe
-                c["clipe_padrao"] = clipe == _chm.clipe_padrao(tipo)
+                c["clipe_padrao"] = clipe == _chm.clipe_padrao(tipo, __import__("perfis_canal").do_job(job))
             c.pop("desligada", None)
         else:
             c["resolved_path"] = None
@@ -9433,7 +9614,7 @@ def _baixar_previa(url: str, destino: str) -> bool:
                         f.write(bloco)
         if total <= 0:
             raise ValueError("vazio")
-        os.replace(tmp, destino)
+        arquivo_seguro.trocar(tmp, destino)
         return True
     except Exception:  # noqa: BLE001 — sem a cópia local, a telinha usa o link da internet como antes
         try:
@@ -10376,6 +10557,11 @@ dossies_rotas.registrar(app, BASE_DIR)
 import thumbs_tts_rotas  # noqa: E402
 
 thumbs_tts_rotas.registrar(app, BASE_DIR)
+
+# 📺 perfis do canal: biblioteca de vídeos de intro / inscreva-se / venda / final (v84_101)
+import perfis_canal_rotas  # noqa: E402
+
+perfis_canal_rotas.registrar(app, BASE_DIR)
 
 import guia as _guia  # noqa: E402
 _guia.registrar(app, BASE_DIR)

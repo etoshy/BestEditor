@@ -45,6 +45,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import shutil
 import subprocess
@@ -789,7 +790,7 @@ def recortar_take(
         raise NarracaoError(
             f"ffmpeg não conseguiu cortar a gravação: {resultado.stderr.decode(errors='replace')[-300:]}"
         )
-    os.replace(str(destino_tmp), str(caminho_atual))
+    arquivo_seguro.trocar(str(destino_tmp), str(caminho_atual))
 
     nova_duracao = _duracao_audio(caminho_atual)
     _invalidar_realce_apos_edicao(base_dir, projeto_id, indice_fala, take_id_seguro, nova_duracao, recortado=True)
@@ -984,6 +985,36 @@ def gerar_audio_projeto(
         log("🎭 Modo multi voice ligado: [slug] troca a voz (e continua até a próxima tag).")
     voz_atual: Optional[str] = None
 
+    # ⚡ v84_103: as falas de TTS são geradas ANTES, todas de uma vez — num processo só (o modelo carrega 1 vez, não 1
+    # por fala) ou em várias instâncias do motor ao mesmo tempo (tts_paralelo: ⚡ no Gerador de voz). O que falhar aqui
+    # é gerado de novo no laço abaixo, fala por fala, como antes.
+    pre: Dict[int, str] = {}
+    if not multi:
+        tts_idx = [i for i in indices_com_texto
+                   if not ((gravacoes.get(str(i)) or {}).get("usar") and (gravacoes.get(str(i)) or {}).get("takeAtivo"))]
+        if len(tts_idx) > 1:
+            try:
+                import tts_paralelo
+                from tts.voice_generator import gerar_audio_isolado_paralelo
+                n_inst, por_que = tts_paralelo.escolher(motor, tts_paralelo.modo_salvo(), kwargs_motor.get("use_gpu") is False,
+                                                        sum(len(falas[i]["texto"]) for i in tts_idx))
+                n_inst = min(n_inst, len(tts_idx))
+                log(f"⚡ {por_que} — gerando as {len(tts_idx)} falas" + (" ao mesmo tempo." if n_inst > 1 else " num processo só (o modelo carrega uma vez)."))
+                if n_inst > 1:
+                    log(tts_paralelo.AVISO)
+                itens_pre = [(motor, limpar_texto_para_tts(falas[i]["texto"].strip(), motor=motor), str(tmp_dir / f"fala_{i:04d}.wav"), kwargs_motor)
+                             for i in tts_idx]
+                cont = {"n": 0}
+
+                def _prog(k, erro, inst):
+                    cont["n"] += 1
+                    log(f"[{cont['n']}/{len(itens_pre)}] fala {tts_idx[k] + 1} " + (f"⚠ {str(erro)[:120]}" if erro else "pronta")
+                        + (f" (instância {inst})" if n_inst > 1 else ""))
+                erros_pre = gerar_audio_isolado_paralelo(itens_pre, n_inst, on_progresso=_prog)
+                pre = {tts_idx[k]: itens_pre[k][2] for k in range(len(itens_pre)) if k not in erros_pre and os.path.exists(itens_pre[k][2])}
+            except Exception as exc:  # noqa: BLE001 — o caminho de sempre (uma por uma) continua valendo
+                log(f"(⚡ não deu pra gerar tudo de uma vez — seguindo fala por fala: {exc})")
+
     try:
         caminhos_segmentos = []
         for pos, i in enumerate(indices_com_texto, start=1):
@@ -1044,6 +1075,8 @@ def gerar_audio_projeto(
                     shutil.copy(sub[0], saida)
                 else:
                     multivoz.concatenar(sub, str(saida), [0.0] + [0.3] * (len(sub) - 1), str(tmp_dir))
+            elif i in pre:
+                pass  # ⚡ já gerada lá em cima
             else:
                 texto_limpo = limpar_texto_para_tts(texto_original, motor=motor)
                 log(f"[{pos}/{len(indices_com_texto)}] Gerando com {motor}: \"{texto_original[:60]}\"")

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import time
 import uuid
@@ -72,13 +73,31 @@ def carregar_projeto(base: str, pid: str) -> Dict[str, Any]:
         return json.load(f)
 
 
+def marcar_mudanca(p: Dict[str, Any], origem: str, mensagem: str = "") -> None:
+    """🕘 Diz de onde veio a próxima mudança do roteiro (vai pro histórico de versões no próximo salvar)."""
+    p["_mudanca"] = {"origem": origem, "mensagem": mensagem}
+
+
+def roteiro_atual(p: Dict[str, Any]) -> str:
+    res, an = p.get("resultado") or {}, p.get("analise") or {}
+    return (res.get("roteiro_final") if res.get("roteiro_final") else an.get("roteiro")) or ""
+
+
 def salvar_projeto(base: str, p: Dict[str, Any]) -> None:
     os.makedirs(_pasta(base, p["id"]), exist_ok=True)
+    mud = p.pop("_mudanca", None) or {}
     p["atualizado"] = time.time()
-    tmp = _arquivo(base, p["id"]) + ".tmp"
+    tmp = _arquivo(base, p["id"]) + f".{uuid.uuid4().hex[:6]}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(p, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _arquivo(base, p["id"]))
+    arquivo_seguro.trocar(tmp, _arquivo(base, p["id"]))
+    rot = roteiro_atual(p)
+    if rot.strip():
+        try:  # 🕘 histórico de versões (só grava se o roteiro mudou)
+            import historico_roteiro
+            historico_roteiro.registrar(_pasta(base, p["id"]), rot, mud.get("origem") or "alteração", mud.get("mensagem") or "")
+        except Exception:  # noqa: BLE001 — o histórico nunca impede de salvar
+            pass
 
 
 def listar_projetos(base: str) -> List[Dict[str, Any]]:
@@ -568,7 +587,7 @@ def _salvar_opcoes(base: str, d: Dict[str, Any]) -> None:
     tmp = _arquivo_opcoes(base) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _arquivo_opcoes(base))
+    arquivo_seguro.trocar(tmp, _arquivo_opcoes(base))
 
 
 def lembrar_acoes(base: str, op: Dict[str, Any], limite: int = 12) -> None:

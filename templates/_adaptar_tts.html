@@ -23,7 +23,7 @@
   const BASE = {{ tts_base|tojson }};
   const $t = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || (r.status === 404 ? '404 — essa função não existe no servidor que está rodando: feche a janela do site (python app.py) e abra de novo' : r.status)); return d; };
   fetch('/tts-adaptar/opcoes').then(r => r.json()).then(o => {
     Object.entries(o.direcoes || {}).forEach(([k, v]) => $t('ttsDirecao').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
     Object.entries(o.motores || {}).forEach(([k, v]) => $t('ttsMotor').insertAdjacentHTML('beforeend', `<option value="${k}" ${k === 'chatterbox' ? 'selected' : ''}>${esc(v)}</option>`));

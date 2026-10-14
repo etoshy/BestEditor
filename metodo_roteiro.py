@@ -68,9 +68,15 @@ REGRAS_NARRACAO = [
     "\"como o comissário X admitiu no julgamento…\"). Sem uma fonte assim, suavize (\"há indícios de que…\", \"historiadores "
     "suspeitam que…\") ou corte.",
     "SEM FÓRMULAS DE ANÁLISE: \"Aqui está a verdadeira questão\", \"É preciso ter cuidado neste ponto\", \"Uma leitura possível "
-    "é\" e equivalentes no idioma do roteiro (em alemão: „Hier liegt die eigentliche Frage“, „Man muss an dieser Stelle "
-    "vorsichtig sein“, „Eine mögliche Lesart ist“) — no máximo UMA vez no vídeo inteiro. Mostre a dúvida pelos fatos, sem "
+    "é\", \"É preciso se perguntar\" e equivalentes no idioma do roteiro (em alemão: „Hier liegt die eigentliche Frage“, „Man "
+    "muss an dieser Stelle vorsichtig sein“, „Eine mögliche Lesart ist“, „Man muss sich fragen“) — no máximo UMA vez no "
+    "vídeo inteiro. Frase-fragmento de efeito („Mit der Guillotine.“) só nas revelações de verdade, não como tique. Mostre a dúvida pelos fatos, sem "
     "anunciar que vai analisar. Varie as construções: nada de começar frases seguidas do mesmo jeito.",
+    "CRONOLOGIA COERENTE: datas, idades e o início/fim de cada relação ou situação têm que bater do começo ao fim (não "
+    "diga que algo começou \"a partir de 1924\" se outro trecho mostra isso em 1918). Sem data exata nas fontes, não "
+    "invente uma — diga \"pelo menos desde…\" ou atribua.",
+    "NÚMEROS COM NOME: o número pelo qual alguém foi condenado, o da acusação, os casos que a polícia ligou, o que o "
+    "acusado alegou e as estimativas NÃO são intercambiáveis — diga sempre qual é qual, igual no vídeo inteiro.",
     "FALA, NÃO ENSAIO: escreva como um narrador conta, não como um artigo; nos momentos de tensão, frases curtas (5–12 "
     "palavras), sem orações encaixadas; frase longa só em trecho calmo de contexto. Uma voz sintética se perde em período longo.",
 ]

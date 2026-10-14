@@ -238,6 +238,15 @@ def proporcao_dos_buscadores(cfg: Dict[str, Any]) -> str:
     return {"9:16": "vertical_quadrada", "1:1": "quadrada"}.get(ori, "horizontal_quadrada")
 
 
+def _sem_bloqueados(provedores: List[str], cfg: Optional[Dict[str, Any]] = None) -> List[str]:
+    """⛔ tira os bancos cujo site está na lista negra (ex.: "magnific") — v84_106."""
+    try:
+        import lista_negra
+        return lista_negra.sem_bloqueados(provedores, lista_negra.sites(cfg) if cfg is not None and "sites_bloqueados" in cfg else None)
+    except Exception:  # noqa: BLE001
+        return list(provedores)
+
+
 def _sem_flow_no_fallback(provider_priority: List[str], provider_do_trecho: str) -> List[str]:
     """Bancos reserva de um trecho de vídeo: a prioridade sem o próprio banco do
     trecho e SEM o "flow" (gerar vídeo com IA leva minutos e gasta créditos —
@@ -3125,7 +3134,7 @@ def fetch_segment_preview_lightweight(
     else:
         cfg = site_cfg or load_site_config()
         provider_priority = cfg.get("provider_priority") or ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels"]
-        providers_to_try = [segment.provider] + _sem_flow_no_fallback(provider_priority, segment.provider)
+        providers_to_try = _sem_bloqueados([segment.provider] + _sem_flow_no_fallback(provider_priority, segment.provider), cfg)
 
     # acervo local com obra/personagem: o metadado já é confiável, pula o juiz
     acervo_confiavel = segment.provider in BIBLIOTECAS_LOCAIS and bool(getattr(segment, "obra", None) or getattr(segment, "personagem", None))
@@ -3196,7 +3205,7 @@ def fetch_segment_preview_lightweight(
                         c = _escolher_candidato_previa(aprovados, tracker, provider, evitar)
                         if c is not None:
                             return _resultado(c, provider, query, aviso=c.get("ia_nota", 0) < minima)
-                    melhor = j["lista"][0] if j["lista"] else None
+                    melhor = next((c for c in j["lista"] if not c.get("marca_dagua")), None)  # ⛔ marca d'água nunca é a "menos pior"
                     if melhor is not None and (reprovada is None or melhor.get("ia_nota", 0) > reprovada["nota"]):
                         reprovada = {"nota": melhor.get("ia_nota", 0), "res": _resultado(melhor, provider, query, aviso=True)}
                     nova = (j.get("nova_busca") or "").strip()
@@ -3748,7 +3757,7 @@ def _download_segment_with_fallbacks(
     `_search_and_download_filling_duration`), em vez de depender de
     repetir uma única cena em loop.
     """
-    providers_to_try = [segment.provider] + _sem_flow_no_fallback(provider_priority, segment.provider)
+    providers_to_try = _sem_bloqueados([segment.provider] + _sem_flow_no_fallback(provider_priority, segment.provider))
     last_error: Optional[Exception] = None
     close_after = client_factory.cfg.get("browser_mode", "reuse_session") == "close_each_download"
 

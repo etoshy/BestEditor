@@ -21,7 +21,7 @@
   const BASE = {{ rev_base|tojson }};
   const $r = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || (r.status === 404 ? '404 — essa função não existe no servidor que está rodando: feche a janela do site (python app.py) e abra de novo' : r.status)); return d; };
   $r('revGerar').addEventListener('click', async () => {
     $r('revSt').textContent = '📝 gerando…';
     try { const d = await post(BASE + '/prompt', { foco: $r('revFoco').value, modo: $r('revModo').value }); $r('revPrompt').value = d.prompt; $r('revPrompt').style.display = '';

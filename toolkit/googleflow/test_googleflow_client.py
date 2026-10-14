@@ -1035,7 +1035,7 @@ def test_limite_atingido_troca_de_conta_e_refaz_o_mesmo_pedido():
     ctxs = _pw(c).contextos
     assert len(ctxs) == 2 and ctxs[0].fechado and not ctxs[1].fechado
     assert ctxs[0].conta_fake == "principal" and ctxs[1].conta_fake == "b"
-    assert _estado("principal")["esgotada"] and not _estado("b")["esgotada"]
+    assert _estado("principal")["esgotada_imagem"] and not _estado("b")["esgotada_imagem"]
     assert ctxs[1].paginas_criadas[0].settings == {"confirmar": 2, "qtd": 1, "qtd_video": 1}   # projeto novo, já configurado
 
 
@@ -1059,7 +1059,7 @@ def test_percorre_varias_contas_ate_achar_uma_com_limite():
     c = _cliente(flow_cfg={"sem_credito": {"principal", "b"}})
     assert len(c.search_photos_all("um gato")) == 1
     assert [x.conta_fake for x in _pw(c).contextos] == ["principal", "b", "c"]
-    assert _estado("principal")["esgotada"] and _estado("b")["esgotada"] and not _estado("c")["esgotada"]
+    assert _estado("principal")["esgotada_imagem"] and _estado("b")["esgotada_imagem"] and not _estado("c")["esgotada_imagem"]
 
 
 def test_todas_as_contas_esgotadas_da_erro_claro_e_nao_abre_navegador_a_toa():
@@ -1080,7 +1080,7 @@ def test_so_com_a_conta_principal_o_limite_da_erro_de_sem_contas_e_marca_a_conta
     c = _cliente(flow_cfg={"sem_credito": {"principal"}})
     with pytest.raises(gf.GoogleFlowSemContas, match="'principal' volta em"):
         c.search_photos_all("um gato")
-    assert _estado("principal")["esgotada"]
+    assert _estado("principal")["esgotada_imagem"]
 
 
 def test_conta_marcada_como_esgotada_a_mao_e_pulada_ja_na_abertura():
@@ -1100,7 +1100,7 @@ def test_horas_ate_liberar_vem_da_config():
     c = _cliente(cfg={"flow_horas_ate_liberar": 2}, flow_cfg={"sem_credito": {"principal"}})
     antes = datetime.now()
     c.search_photos_all("um gato")
-    ate = datetime.fromisoformat(_estado("principal")["esgotada_ate"])
+    ate = datetime.fromisoformat(_estado("principal")["imagem_ate"])
     assert timedelta(hours=1, minutes=59) < ate - antes < timedelta(hours=2, minutes=1)
 
 
@@ -1117,7 +1117,7 @@ def test_mensagem_de_limite_diferente_so_troca_de_conta_com_a_palavra_extra():
     gf.encerrar_sessao()
     c2 = _cliente(cfg={"flow_palavras_limite": "zerou"}, flow_cfg=flow_cfg)
     assert len(c2.search_photos_all("um gato")) == 1                     # agora reconhece e troca
-    assert _estado("principal")["esgotada"]
+    assert _estado("principal")["esgotada_imagem"]
 
 
 def test_conta_sem_login_no_modo_oculto_avisa_qual_conta_precisa_de_login():
@@ -1180,7 +1180,7 @@ def test_aviso_de_limite_ao_recusar_o_pedido_vira_limite_e_troca_de_conta():
     finally:
         FakePage.enviar = original
     assert [x.conta_fake for x in _pw(c).contextos] == ["principal", "b"]
-    assert _estado("principal")["esgotada"]
+    assert _estado("principal")["esgotada_imagem"]
 
 
 def test_botao_de_enviar_desabilitado_da_erro_com_o_aviso():

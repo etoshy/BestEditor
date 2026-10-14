@@ -26,6 +26,7 @@ import concurrent.futures
 import importlib.util
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import shutil
 import statistics
@@ -90,7 +91,7 @@ def salvar(base: str, a: Dict[str, Any]) -> None:
     with _TRAVA:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(a, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, caminho)
+        arquivo_seguro.trocar(tmp, caminho)
 
 
 def carregar(base: str, aid: str) -> Dict[str, Any]:

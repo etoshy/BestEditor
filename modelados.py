@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import re
 import shutil
 import subprocess
@@ -203,7 +204,7 @@ def _gravar_estilos(estilos: Dict[str, Dict[str, Any]]) -> None:
     tmp = ARQUIVO_ESTILOS + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"estilos": list(estilos.values())}, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, ARQUIVO_ESTILOS)
+    arquivo_seguro.trocar(tmp, ARQUIVO_ESTILOS)
 
 
 def _slug(t: str) -> str:
@@ -360,7 +361,7 @@ def salvar_projeto(base_dir: str, proj: Dict[str, Any]) -> None:
     pasta.mkdir(parents=True, exist_ok=True)
     tmp = pasta / "projeto.json.tmp"
     tmp.write_text(json.dumps(proj, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, pasta / "projeto.json")
+    arquivo_seguro.trocar(tmp, pasta / "projeto.json")
 
 
 def listar_projetos(base_dir: str) -> List[Dict[str, Any]]:

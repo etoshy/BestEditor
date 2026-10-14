@@ -14,7 +14,7 @@
 {% endif %}
 
 
-  <p style="color:#666;font-size:0.82rem;">Cada conta tem o seu <strong>próprio perfil de navegador</strong>. Quando o Flow avisar que o limite/créditos da conta acabou, o site marca a conta como <em>esgotada</em>, abre a <strong>próxima da lista</strong> e refaz a mesma imagem. A ordem é a da lista; a <em>principal</em> é a conta de sempre. ⚠️ Usar várias contas para contornar limites pode contrariar os termos do Google — por sua conta e risco.</p>
+  <p style="color:#666;font-size:0.82rem;">Cada conta tem o seu <strong>próprio perfil de navegador</strong>. Quando o Flow avisar que o limite/créditos da conta acabou, o site marca a conta como <em>esgotada</em>, abre a <strong>próxima da lista</strong> e refaz o mesmo pedido. <strong>Vídeo e imagem contam separado</strong>: sem crédito de vídeo, a conta continua gerando imagem (e vice-versa); quando os dois acabam, ela fica esgotada até liberar (as horas de Configurações → Google Flow). A ordem é a da lista; a <em>principal</em> é a conta de sempre. ⚠️ Usar várias contas para contornar limites pode contrariar os termos do Google — por sua conta e risco.</p>
   <p style="color:#666;font-size:0.82rem;"><strong>Login manual</strong> (padrão): abre uma janela e você mesmo digita e-mail/senha. <strong>Login automático</strong> (👤🔑, opcional): você informa e-mail e senha uma vez e o site preenche sozinho; "salvar a senha" já vem marcado (fica no cofre de credenciais do sistema operacional — nunca num arquivo do projeto), desmarque se não quiser guardar. O Google costuma desconfiar de login automatizado (pode pedir verificação em duas etapas ou bloquear); nesse caso a mesma janela fica aberta pra você terminar à mão.</p>
   <table id="flow-contas" style="width:100%;border-collapse:collapse;font-size:0.9rem;"><tbody></tbody></table>
   <h3 style="margin-top:20px;">Adicionar conta</h3>
@@ -66,7 +66,11 @@
         }
 
         const estado = document.createElement('td');
-        let txt = c.esgotada ? ('⛔ esgotada até ' + c.esgotada_ate.replace('T', ' ')) : (c.logada ? '✅ pronta' : '⚠️ sem login ainda');
+        const _q = (x) => String(x || '').replace('T', ' ');
+        let txt = c.esgotada ? ('⛔ esgotada até ' + _q(c.esgotada_ate))
+          : (c.logada ? '✅ pronta' : '⚠️ sem login ainda')
+            + (c.esgotada_video ? ' · 🎬 sem crédito de vídeo até ' + _q(c.video_ate) + ' (imagem ok)' : '')
+            + (c.esgotada_imagem ? ' · 🖼 sem crédito de imagem até ' + _q(c.imagem_ate) + ' (vídeo ok)' : '');
         if (c.logada && !c.tem_senha_salva) txt += ' — sem senha salva (login manual, ou "salvar a senha" não foi marcado)';
         if (c.tem_senha_salva) txt += ' 🔑';
         estado.textContent = txt;
@@ -87,8 +91,9 @@
         if (c.tem_senha_salva) acoes.appendChild(botao('Esquecer senha', async function () {
           const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/senha/remover'); if (j) { msg.textContent = '✅ Senha esquecida.'; desenhar(j); }
         }, '#92400e'));
-        acoes.appendChild(botao(c.esgotada ? 'Liberar' : 'Marcar esgotada', async function () {
-          const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/esgotada', {esgotada: !c.esgotada}); if (j) desenhar(j);
+        const _parcial = !c.esgotada && (c.esgotada_video || c.esgotada_imagem);
+        acoes.appendChild(botao(c.esgotada || _parcial ? 'Liberar' : 'Marcar esgotada', async function () {
+          const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/esgotada', {esgotada: !(c.esgotada || _parcial)}); if (j) desenhar(j);
         }));
         if (c.nome !== 'principal') acoes.appendChild(botao('Remover', async function () {
           const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/remover'); if (j) desenhar(j);

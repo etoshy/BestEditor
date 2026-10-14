@@ -610,6 +610,11 @@ def build_prompt(
         raise PromptBuilderError("Lista de segmentos vazia — nada pra transcrever/prompt-ar.")
 
     providers = providers or DEFAULT_PROVIDERS
+    try:  # ⛔ banco na lista negra (ex.: magnific) nem é oferecido pra IA (v84_106)
+        import lista_negra
+        providers = lista_negra.sem_bloqueados(providers) or providers
+    except Exception:  # noqa: BLE001
+        pass
     total_duration = segments[-1]["end"]
 
     transcript_lines = []
