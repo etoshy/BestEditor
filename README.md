@@ -28,6 +28,38 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ⚡ Exportação em pedaços paralelos (v84_115)
+
+- Os passes longos do fim da montagem (**destaques de texto, legendas, filtro de cor, passe de qualidade**) rodavam num
+  ffmpeg só, com o filtro praticamente num núcleo. Agora o vídeo é cortado em **pedaços de tempo que rodam ao mesmo
+  tempo**, como a ⚡ geração rápida da voz faz com o TTS. Cada um codifica na **placa de vídeo** (NVENC/QSV/AMF) quando
+  tem. Os pedaços são emendados sem recodificar (`-c copy`), e a duração é conferida no fim.
+- No modal **🎬 Montar** do Estúdio, opção **⚡ Exportação em paralelo**: Automático (recomendado), Desligado, ou 2, 3,
+  4, 6 ou 8 pedaços. Fica salva como padrão.
+  - O Automático usa até 4 pedaços, limitado pelos núcleos da CPU (~2 por pedaço), pela RAM livre (~0,9 GB por pedaço)
+    e pelas sessões da placa (3 ao mesmo tempo).
+  - Vídeo com menos de 80 s usa um ffmpeg só.
+  - O PC fica pesado enquanto monta.
+- Nos destaques, cada pedaço leva só os fundos que aparecem nele, o que também gasta menos memória.
+- **Segurança**:
+  - se a placa falha num pedaço, todos refazem na CPU (pra emendar certinho);
+  - qualquer outro erro e o passe roda do jeito de sempre.
+- Ainda num ffmpeg só: quadros editoriais e gráficos.
+- Testes: `test_v84_export_paralelo.py` (compara quadro a quadro com o jeito de sempre).
+
+## ⏱ Montagem com etapas, progresso de verdade e previsão (v84_114)
+
+- A tela “4. Montando o vídeo” mostra:
+  - **a lista de etapas**, com as feitas ✅ e o tempo de cada, a que está rodando ⏳, as puladas ⏭ e as que faltam ○;
+  - **quando começou** e **há quanto tempo está rodando**;
+  - **duas barras**: o total e a etapa atual.
+- Nas etapas finais (juntar, filtro, censura, narração, overlays, quadros, destaques, gráficos, chamadas, legendas,
+  qualidade), a % vem do **próprio ffmpeg** (`-progress`: até onde ele já chegou no vídeo). Nos destaques em lotes,
+  aparece qual lote está rodando.
+- **Falta ~X** em cada etapa. A **previsão do horário de término** usa os tempos da montagem anterior do mesmo vídeo; na
+  1ª montagem, mostra só a previsão da etapa.
+- Código: `progresso_ffmpeg.py`. Testes: `test_v84_progresso_montagem.py`.
+
 ## 🧠 Destaques sem estourar a memória (v84_113)
 
 - Vídeo longo com muitos destaques de texto podia falhar na montagem com “Cannot allocate memory”: cada fundo com

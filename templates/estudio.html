@@ -783,6 +783,8 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   <div class="prop-title">🎬 Montar vídeo</div>
   <label class="f"><span>Resolução</span><select id="expRes"></select></label>
   <label class="f"><span>Qualidade da imagem</span><select id="expQual"></select></label>
+  <label class="f"><span>⚡ Exportação em paralelo</span><select id="expPar"></select></label>
+  <p class="hint" id="expParDica"></p>
   <p class="hint" id="expDica"></p>
   <p class="hint" id="expTl" style="color:var(--accent)"></p>
   <div id="expCheck" style="margin-top:8px;max-height:260px;overflow:auto;font-size:12px"></div>
@@ -3928,6 +3930,12 @@ $('btnMontar').addEventListener('click', () => {
   const ex = D.exportacao || {};
   $('expRes').innerHTML = (((ex.resolucoes_por_formato || {})[$('gFormato').value]) || ex.resolucoes || []).map(([q, wh]) => `<option value="${q}" ${q === ex.resolucao ? 'selected' : ''}>${q} (${wh})</option>`).join('');
   $('expQual').innerHTML = (ex.qualidades || []).map(([q, n]) => `<option value="${q}" ${q === ex.qualidade ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  const par = ex.paralelo || {};
+  $('expPar').innerHTML = (par.modos || [['auto', 'Automático'], ['1', 'Desligado']]).map(([m, n]) => `<option value="${m}" ${m === (par.modo || 'auto') ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  const dicaPar = () => { $('expParDica').textContent = $('expPar').value === '1' ? 'Um ffmpeg só (mais leve pro PC, bem mais lento em vídeo longo).'
+    : `${par.aviso || ''} Este PC: ${par.nucleos || '?'} núcleos` + (par.ram_livre != null ? `, ${par.ram_livre} GB de RAM livres` : '')
+      + (par.placa ? `, placa de vídeo: ${par.placa}` : ', sem placa de vídeo detectada pra codificar (só CPU)') + '.'; };
+  $('expPar').onchange = dicaPar; dicaPar();
   dicaExp(); $('expTl').textContent = TLS.tem_2 ? `Vai exportar: ${TLS.ativa === '3' ? '🔀 Juntar (cada trecho da timeline escolhida)' : 'Timeline ' + TLS.ativa}` : ''; $('expModal').classList.add('on');
   verificarAntes();
 });
@@ -3966,7 +3974,7 @@ $('expQual').addEventListener('change', dicaExp); $('expRes').addEventListener('
 $('expCancelar').addEventListener('click', () => $('expModal').classList.remove('on'));
 $('expMontar').addEventListener('click', () => {
   const f = montarForm(null);
-  [['export_quality', $('expRes').value], ['qualidade_exportacao', $('expQual').value]].forEach(([n, v]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); });
+  [['export_quality', $('expRes').value], ['qualidade_exportacao', $('expQual').value], ['export_paralelo', $('expPar').value]].forEach(([n, v]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); });
   try { const i = document.createElement('input'); i.type = 'hidden'; i.name = 'previa_snapshot_json'; i.value = JSON.stringify(fotografarPrevia()); f.appendChild(i); } catch (e) { console.warn('foto da telinha falhou', e); }
   window._enviando = true; f.submit();
 });

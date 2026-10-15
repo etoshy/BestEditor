@@ -292,6 +292,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # modelados) pedem pra IA falar ele no momento certo (cada projeto pode trocar)
     "nome_canal": "",
     "voz_simultaneos": "auto",  # 🎛 quantos áudios o Gerador de voz gera ao mesmo tempo (fila_voz.py)
+    "export_paralelo": "auto",  # ⚡ exportação em pedaços paralelos ("1" = desligada; export_paralelo.py)
     "voz_instancias": "1",      # ⚡ geração rápida: cópias do motor num MESMO áudio ("1" = desligada; tts_paralelo.py)
     # ⛔ lista negra de sites (lista_negra.py): imagem/vídeo de lá nunca entra (marca d'água); editável em Configurações
     "sites_bloqueados": None,

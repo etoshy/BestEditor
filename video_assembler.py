@@ -2970,6 +2970,15 @@ def burn_captions(video_path: str, ass_path: str, output_path: str) -> str:
     """
     escaped_ass_path = _escape_path_for_ffmpeg_filter(os.path.abspath(ass_path))
     escaped_fonts_dir = _escape_path_for_ffmpeg_filter(_FONT_DIR)
+    import export_paralelo  # ⚡ v84_115: em pedaços paralelos (o tempo da legenda continua o do vídeo inteiro)
+    try:
+        _dur = _probe_duration(video_path)
+    except VideoAssemblyError:
+        _dur = 0.0
+    if export_paralelo.tentar("legenda", lambda: export_paralelo.vf_em_pedacos(
+            video_path, output_path, f"ass={escaped_ass_path}:fontsdir={escaped_fonts_dir}", _dur,
+            os.path.join(os.path.dirname(os.path.abspath(output_path)), "_pedacos_legenda"), "legenda")):
+        return output_path
     _run_ffmpeg([
         "-i", video_path,
         "-vf", f"ass={escaped_ass_path}:fontsdir={escaped_fonts_dir}",
@@ -4803,10 +4812,24 @@ def assemble_video(
                         extra={"origens": origens, "W": target_width, "H": target_height, "trim_position": trim_position,
                                "filtro_cor": cfg.get("filtro_cor"), "paleta": paleta, "plano_transicoes": [list(p) for p in plano_transicoes]})
 
+    import progresso_ffmpeg
+    dur_video = float(sum(final_duracoes) or 0)
+
+    def _acomp(etapa: str):
+        """v84_114: o andamento do ffmpeg desta etapa (fração do vídeo já processada) vai pra tela."""
+        def _cb(frac: float, detalhe: str) -> None:
+            if not on_progress:
+                return
+            try:
+                on_progress(etapa, int(round(frac * 1000)), 1000, detalhe=detalhe)
+            except TypeError:  # on_progress antigo (3 argumentos)
+                on_progress(etapa, int(round(frac * 1000)), 1000)
+        return progresso_ffmpeg.acompanhar(_cb, dur_video)
+
     if on_progress:
         on_progress("concatenando", total, total)
     concat_path = os.path.join(work_dir, "_concat_video_only.mp4")
-    with (perf_log.timed("montagem:concatenar") if perf_log else nullcontext()):
+    with (perf_log.timed("montagem:concatenar") if perf_log else nullcontext()), _acomp("concatenando"):
         _concat_clips_com_plano(final_paths, final_duracoes, final_plano, concat_path, work_dir)
 
     # filtro de cor: identidade GLOBAL do vídeo (regra do DarkPlanner — um só)
@@ -4815,8 +4838,11 @@ def assemble_video(
         if on_progress:
             on_progress("filtro_cor", total, total)
         filtrado = os.path.join(work_dir, "_concat_filtrado.mp4")
-        with (perf_log.timed("montagem:filtro_cor", filtro=cfg.get("filtro_cor")) if perf_log else nullcontext()):
-            _run_ffmpeg(["-i", concat_path, "-vf", cadeia_cor + ",format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+        with (perf_log.timed("montagem:filtro_cor", filtro=cfg.get("filtro_cor")) if perf_log else nullcontext()), _acomp("filtro_cor"):
+            import export_paralelo  # ⚡ v84_115: em pedaços paralelos
+            if not export_paralelo.tentar("filtro de cor", lambda: export_paralelo.vf_em_pedacos(
+                    concat_path, filtrado, cadeia_cor, dur_video or _probe_duration(concat_path), os.path.join(work_dir, "pedacos"), "filtro")):
+                _run_ffmpeg(["-i", concat_path, "-vf", cadeia_cor + ",format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
                          "-pix_fmt", "yuv420p", "-r", str(TARGET_FPS), "-an", filtrado], timeout=3600)
         concat_path = filtrado
 
@@ -4828,7 +4854,7 @@ def assemble_video(
         if on_progress:
             on_progress("censura", total, total)
         censurado = os.path.join(work_dir, "_concat_censurado.mp4")
-        with (perf_log.timed("montagem:censura", quantidade=len(dp_censura.de_video(censura))) if perf_log else nullcontext()):
+        with (perf_log.timed("montagem:censura", quantidade=len(dp_censura.de_video(censura))) if perf_log else nullcontext()), _acomp("censura"):
             try:
                 dp_censura.aplicar_video(concat_path, censurado, censura, target_width, target_height,
                                          os.path.join(work_dir, "censura"), _probe_duration(concat_path),
@@ -4867,7 +4893,7 @@ def assemble_video(
     if on_progress:
         on_progress("sincronizando_audio", total, total)
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    with (perf_log.timed("montagem:mux_audio", com_trilha=bool(music_path)) if perf_log else nullcontext()):
+    with (perf_log.timed("montagem:mux_audio", com_trilha=bool(music_path)) if perf_log else nullcontext()), _acomp("sincronizando_audio"):
         if music_path and os.path.exists(music_path):
             _mux_audio_with_music(concat_path, audio_path, music_path, output_path, music_volume)
         else:
@@ -4877,7 +4903,7 @@ def assemble_video(
         if on_progress:
             on_progress("aplicando_overlays", total, total)
         overlaid_path = os.path.join(work_dir, "_with_overlays.mp4")
-        with (perf_log.timed("montagem:overlays", quantidade=len(overlays)) if perf_log else nullcontext()):
+        with (perf_log.timed("montagem:overlays", quantidade=len(overlays)) if perf_log else nullcontext()), _acomp("aplicando_overlays"):
             apply_overlays(output_path, overlays, overlaid_path, target_width, target_height)
         shutil.move(overlaid_path, output_path)
 
@@ -4888,7 +4914,7 @@ def assemble_video(
         if on_progress:
             on_progress("editoriais", total, total)
         com_ed = os.path.join(work_dir, "_com_editoriais.mp4")
-        with (perf_log.timed("montagem:editoriais", quantidade=len(editoriais)) if perf_log else nullcontext()):
+        with (perf_log.timed("montagem:editoriais", quantidade=len(editoriais)) if perf_log else nullcontext()), _acomp("editoriais"):
             try:
                 r_ed = dp_editorial.aplicar_editoriais(output_path, com_ed, editoriais, target_width, target_height,
                                                        os.path.join(work_dir, "editoriais"), imagens=imagens_editorial, paleta=paleta_textos)
@@ -4902,7 +4928,7 @@ def assemble_video(
         if on_progress:
             on_progress("destaques", total, total)
         com_destaques = os.path.join(work_dir, "_com_destaques.mp4")
-        with (perf_log.timed("montagem:destaques", quantidade=len(destaques)) if perf_log else nullcontext()):
+        with (perf_log.timed("montagem:destaques", quantidade=len(destaques)) if perf_log else nullcontext()), _acomp("destaques"):
             try:
                 dp_destaques.aplicar_destaques(output_path, com_destaques, destaques, target_width, target_height,
                                                os.path.join(work_dir, "destaques"), paleta=paleta_textos, palavras=palavras_narracao)
@@ -4916,7 +4942,7 @@ def assemble_video(
         if on_progress:
             on_progress("graficos", total, total)
         com_graficos = os.path.join(work_dir, "_com_graficos.mp4")
-        with (perf_log.timed("montagem:graficos", quantidade=len(graficos)) if perf_log else nullcontext()):
+        with (perf_log.timed("montagem:graficos", quantidade=len(graficos)) if perf_log else nullcontext()), _acomp("graficos"):
             try:
                 r = dp_graficos.aplicar_graficos(output_path, com_graficos, graficos, target_width, target_height,
                                                  os.path.join(work_dir, "graficos"), paleta=paleta_textos)

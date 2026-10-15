@@ -212,7 +212,7 @@ def aplicar_video(entrada: str, saida: str, itens: List[Dict[str, Any]], W: int,
     if run:
         run(cmd)
     else:
-        r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + cmd, capture_output=True, text=True)
+        r = __import__("progresso_ffmpeg").rodar(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + cmd)
         if r.returncode != 0:
             raise RuntimeError(r.stderr[-800:])
     return True

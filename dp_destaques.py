@@ -1153,8 +1153,51 @@ def _passe_destaques(video_in: str, video_out: str, ent: List[str], etapas: List
     r = qualidade_export.executar(cmd, timeout=3600, _original=cmd_cpu)
     if r.returncode != 0 and ("nrecognized" in r.stderr or "not found" in r.stderr) and "filter_complex_script" in r.stderr:
         k = cmd.index("-filter_complex_script")
-        r = subprocess.run(cmd[:k] + ["-/filter_complex"] + cmd[k + 1:], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600)
+        import progresso_ffmpeg
+        r = progresso_ffmpeg.rodar(cmd[:k] + ["-/filter_complex"] + cmd[k + 1:], timeout=3600)
     return r
+
+
+def _destaques_em_pedacos(video_in: str, video_out: str, validos: List[Dict[str, Any]], ass: str, W: int, H: int,
+                          pasta_png: str, paleta: Optional[Dict[str, str]], work_dir: str, dur: float, n: int) -> str:
+    """⚡ v84_115: o vídeo em pedaços de tempo que rodam ao mesmo tempo (export_paralelo). Cada pedaço leva só os fundos
+    que aparecem nele (menos memória) e a legenda ASS inteira; o tempo continua o do vídeo todo."""
+    import export_paralelo
+    from video_assembler import _escape_path_for_ffmpeg_filter
+
+    def _no(d, a, b):
+        return float(d["start"]) < b and float(d["end"]) > a
+    m = n
+    while m < 400:  # pedaço com fundos demais estoura a memória: mais pedaços (rodando só `n` de cada vez)
+        js = export_paralelo.janelas(dur, m)
+        maior = max(filtros_de_tratamento([d for d in validos if _no(d, ini, ini + q / export_paralelo.FPS)], W, H, pasta_png, paleta)[0].count("-i")
+                    for ini, q in js)
+        if maior <= MAX_IMAGENS_PASSE_UNICO:
+            break
+        m *= 2
+    fim = (f"[base]ass='{_escape_path_for_ffmpeg_filter(ass)}':fontsdir='{_escape_path_for_ffmpeg_filter(FONTES_DIR)}',"
+           "format=yuv420p[vout]")
+
+    def montar(ini: float, quadros: int, saida: str) -> List[str]:
+        sub = [d for d in validos if _no(d, ini, ini + quadros / export_paralelo.FPS)]
+        ent, etapas = filtros_de_tratamento(sub, W, H, pasta_png, paleta)
+        linhas = export_paralelo.deslocar(["[0:v]setpts=PTS-STARTPTS,format=yuv420p[base]"] + etapas + [fim], ini)
+        script = saida + ".grafo.txt"
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(";\n".join(dp_visual._encadear(linhas)))
+        return (["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{ini:.6f}", "-i", video_in] + ent +
+                ["-filter_complex_script", script, "-map", "[vout]", "-an", "-frames:v", str(quadros),
+                 "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", saida])
+    try:
+        return export_paralelo.rodar_pedacos(video_in, video_out, dur, m, montar, os.path.join(work_dir, "pedacos"),
+                                             "destaques", simultaneos=n)
+    finally:
+        for g in os.listdir(os.path.join(work_dir, "pedacos")) if os.path.isdir(os.path.join(work_dir, "pedacos")) else []:
+            if g.endswith(".grafo.txt"):
+                try:
+                    os.remove(os.path.join(work_dir, "pedacos", g))
+                except OSError:
+                    pass
 
 
 def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, Any]], W: int, H: int, work_dir: str,
@@ -1175,6 +1218,14 @@ def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, A
     pasta_png = os.path.join(work_dir, "destaques_png")
     dur = _probe_duration(video_in)
     if lote is None:
+        import export_paralelo
+        n_ped, _motivo = export_paralelo.escolher(dur)
+        if n_ped > 1:  # ⚡ v84_115: pedaços em paralelo; se der qualquer erro, segue do jeito de sempre
+            feito = export_paralelo.tentar("destaques", lambda: _destaques_em_pedacos(
+                video_in, video_out, validos, ass, W, H, pasta_png, paleta, work_dir, dur, n_ped))
+            if feito:
+                return feito
+    if lote is None:
         ent, etapas = filtros_de_tratamento(validos, W, H, pasta_png, paleta)
         if ent.count("-i") > MAX_IMAGENS_PASSE_UNICO:  # muitas imagens de fundo: nem tenta o passe único (estouraria)
             lote = LOTE_FUNDOS
@@ -1188,13 +1239,15 @@ def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, A
         lote = LOTE_FUNDOS
     com_fundo = [d for d in validos if filtros_de_tratamento([d], W, H, pasta_png, paleta)[1]]
     ultimo_erro = ""
+    import progresso_ffmpeg
     while True:
         lotes = [com_fundo[k:k + lote] for k in range(0, len(com_fundo), lote)]
         atual, temporarios, ok = video_in, [], True
         for n, grupo in enumerate(lotes, start=1):
             ent, etapas = filtros_de_tratamento(grupo, W, H, pasta_png, paleta)
             saida = os.path.join(work_dir, f"_destaques_lote{n}.mp4")
-            r = _passe_destaques(atual, saida, ent, etapas, None, work_dir, f"_lote{n}", dur, poupar=True)
+            with progresso_ffmpeg.parte(n, len(lotes) + 1, f"fundos: lote {n} de {len(lotes)} (até {lote} por vez)"):
+                r = _passe_destaques(atual, saida, ent, etapas, None, work_dir, f"_lote{n}", dur, poupar=True)
             if r.returncode != 0:
                 ok, ultimo_erro = False, r.stderr
                 if not _sem_memoria(r.stderr, r.returncode):
@@ -1203,7 +1256,8 @@ def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, A
             temporarios.append(saida)
             atual = saida
         if ok:
-            r = _passe_destaques(atual, video_out, [], [], ass, work_dir, "_textos", dur, poupar=True)
+            with progresso_ffmpeg.parte(len(lotes) + 1, len(lotes) + 1, "textos (último passe)"):
+                r = _passe_destaques(atual, video_out, [], [], ass, work_dir, "_textos", dur, poupar=True)
             if r.returncode == 0:
                 for t in temporarios:
                     try:

@@ -7,8 +7,29 @@
 <p style="color:#666;">🎵 Sugestão de trilha sonora da IA: <em>{{ job.soundtrack_suggestion }}</em> (ainda não é aplicada automaticamente — adicione manualmente se quiser usar essa direção)</p>
 {% endif %}
 
+<style>
+  .mt-resumo { display:flex; gap:14px; flex-wrap:wrap; font-size:.9rem; color:#374151; margin:6px 0 4px; }
+  .mt-resumo b { color:#111827; }
+  .mt-rot { font-size:.8rem; color:#6b7280; margin:10px 0 3px; display:flex; justify-content:space-between; gap:8px; }
+  .mt-etapas { list-style:none; padding:0; margin:12px 0 0; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }
+  .mt-etapas li { display:flex; gap:10px; align-items:center; padding:7px 10px; border-bottom:1px solid #f1f5f9; font-size:.88rem; }
+  .mt-etapas li:last-child { border-bottom:0; }
+  .mt-etapas li .ic { width:20px; text-align:center; }
+  .mt-etapas li .nm { flex:1; }
+  .mt-etapas li .tp { color:#6b7280; font-variant-numeric:tabular-nums; font-size:.8rem; white-space:nowrap; }
+  .mt-etapas li.rodando { background:#eff6ff; font-weight:600; }
+  .mt-etapas li.feita .nm { color:#166534; }
+  .mt-etapas li.pulada .nm, .mt-etapas li.pendente .nm { color:#9ca3af; }
+  .mt-etapas li .mini { height:4px; background:#dbeafe; border-radius:2px; margin-top:4px; overflow:hidden; }
+  .mt-etapas li .mini > div { height:100%; background:#2563eb; }
+</style>
+<div class="mt-resumo" id="mt-resumo"></div>
+<div class="mt-rot"><span>Total</span><span id="mt-total-txt"></span></div>
+<div class="progress-bar"><div class="progress-fill" id="progress-total" style="width: 0%"></div></div>
+<div class="mt-rot"><span id="mt-etapa-nome">Etapa atual</span><span id="mt-etapa-txt"></span></div>
 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
-<p id="progress-text"></p>
+<p id="progress-text" style="font-size:.85rem;color:#374151"></p>
+<ul class="mt-etapas" id="mt-etapas"></ul>
 <p id="prebaixar-text" class="hint" style="font-size:.85rem;color:#166534;display:none"></p>
 
 <div id="error-box" class="error" style="display:none"></div>
@@ -61,11 +82,7 @@ async function poll() {
   const data = await res.json();
   document.getElementById('status-text').textContent = 'Status: ' + data.status;
 
-  if (data.progress) {
-    const pct = data.progress.total ? Math.round(100 * data.progress.current / data.progress.total) : 0;
-    document.getElementById('progress-fill').style.width = pct + '%';
-    document.getElementById('progress-text').textContent = data.progress.stage + ' (' + data.progress.current + '/' + data.progress.total + ')';
-  }
+  if (data.progress) desenharProgresso(data.progress, data.status);
   if (data.prebaixar && data.prebaixar.total) {
     const pb = data.prebaixar, el = document.getElementById('prebaixar-text');
     el.style.display = 'block';
@@ -111,6 +128,57 @@ async function poll() {
   setTimeout(poll, 2000);
 }
 poll();
+
+// ⏱ v84_114: etapas da montagem, começo, tempo de cada uma e quanto falta
+function tempo(s) {
+  s = Math.max(0, Math.round(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  return h ? `${h}h${String(m).padStart(2, '0')}` : m ? `${m} min ${String(ss).padStart(2, '0')} s` : `${ss} s`;
+}
+function hora(t) { return t ? new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''; }
+let relogio = null, ultimoProg = null;
+function desenharProgresso(p, status) {
+  ultimoProg = { p, status, recebido: Date.now() / 1000 };
+  const etapas = p.etapas || [];
+  if (!etapas.length) {  // montagem de uma versão antiga (sem a lista de etapas)
+    const pct = p.total ? Math.round(100 * p.current / p.total) : 0;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = p.stage + ' (' + p.current + '/' + p.total + ')';
+    return;
+  }
+  const agoraSrv = p.agora || (Date.now() / 1000);
+  const frac = p.total ? Math.max(0, Math.min(1, p.current / p.total)) : 0;
+  const k = etapas.findIndex(e => e.estado === 'rodando');
+  const conta = etapas.filter(e => e.estado !== 'pulada');
+  const feitas = conta.filter(e => e.estado === 'feita').length;
+  const fracTotal = conta.length ? Math.min(1, (feitas + (k >= 0 ? frac : 0)) / conta.length) : frac;
+  document.getElementById('progress-total').style.width = Math.round(fracTotal * 100) + '%';
+  document.getElementById('progress-fill').style.width = Math.round(frac * 100) + '%';
+  const nEtapa = k >= 0 ? conta.indexOf(etapas[k]) + 1 : feitas;
+  document.getElementById('mt-etapa-nome').textContent = `Etapa ${nEtapa} de ${conta.length}: ${p.nome || p.stage}`;
+  const contagem = p.total === 1000 ? `${(frac * 100).toFixed(1)}%` : `${p.current}/${p.total}`;
+  document.getElementById('mt-etapa-txt').textContent = contagem + (p.estimated_seconds_remaining != null ? ` · falta ~${tempo(p.estimated_seconds_remaining)}` : '');
+  document.getElementById('progress-text').textContent = p.detalhe ? '↳ ' + p.detalhe : '';
+  const decorrido = agoraSrv - (p.inicio || agoraSrv);
+  let fim = '';
+  if (status === 'montando') {
+    if (p.eta_total != null) fim = `<span>🏁 previsão: termina ~<b>${hora(agoraSrv + p.eta_total)}</b> (falta ~${tempo(p.eta_total)})</span>`;
+    else if (p.estimated_seconds_remaining != null) fim = '<span class="hint">🏁 previsão do total depois da 1ª montagem deste vídeo (por enquanto: só da etapa)</span>';
+  }
+  document.getElementById('mt-resumo').innerHTML = `<span>🕐 começou às <b>${hora(p.inicio)}</b></span><span>⏱ rodando há <b id="mt-decorrido">${tempo(decorrido)}</b></span>${fim}`;
+  document.getElementById('mt-total-txt').textContent = `${Math.round(fracTotal * 100)}% · ${feitas} de ${conta.length} etapas`;
+  const IC = { feita: '✅', rodando: '⏳', pulada: '⏭', pendente: '○' };
+  document.getElementById('mt-etapas').innerHTML = etapas.map(e => {
+    const dur = e.inicio ? ((e.fim || agoraSrv) - e.inicio) : null;
+    const tp = e.estado === 'feita' ? tempo(dur) : e.estado === 'rodando' ? tempo(dur) + (p.estimated_seconds_remaining != null ? ` · falta ~${tempo(p.estimated_seconds_remaining)}` : '') : e.estado === 'pulada' ? 'nada a fazer' : '';
+    const mini = e.estado === 'rodando' ? `<div class="mini"><div style="width:${Math.round(frac * 100)}%"></div></div>` : '';
+    return `<li class="${e.estado}"><span class="ic">${IC[e.estado] || '•'}</span><span class="nm">${e.nome}${mini}</span><span class="tp">${tp}</span></li>`;
+  }).join('');
+  if (!relogio) relogio = setInterval(() => {  // o "rodando há" anda sozinho entre uma consulta e outra
+    const el = document.getElementById('mt-decorrido'); if (!el || !ultimoProg || ultimoProg.status !== 'montando') return;
+    const pp = ultimoProg.p; el.textContent = tempo((pp.agora || 0) - (pp.inicio || 0) + (Date.now() / 1000 - ultimoProg.recebido));
+  }, 1000);
+}
 
 function switchProgramMonitorVersion(version) {
   const video = document.getElementById('program-monitor-video');

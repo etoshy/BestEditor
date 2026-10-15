@@ -106,14 +106,15 @@ def usa_hw(cmd: List[str]) -> bool:
 def executar(cmd: List[str], timeout: int = 3600, **kw) -> "subprocess.CompletedProcess":
     """Roda um comando do ffmpeg já ajustado; se a placa falhar, roda de novo na CPU."""
     original = kw.pop("_original", None)
+    import progresso_ffmpeg  # v84_114: dentro da montagem, o andamento de cada passe vai pra tela
     if usa_hw(cmd):
         with _sessoes_hw:
-            r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, **kw)
+            r = progresso_ffmpeg.rodar(cmd, timeout=timeout, **kw)
         if r.returncode == 0 or original is None:
             return r
         print(f"[montagem] a placa falhou nesse passo ({r.stderr.strip()[-160:]}) — refazendo na CPU", flush=True)
         cmd = original
-    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, **kw)
+    return progresso_ffmpeg.rodar(cmd, timeout=timeout, **kw)
 
 
 def rodar(cmd: List[str], timeout: int = 3600, **kw) -> "subprocess.CompletedProcess":
@@ -170,6 +171,21 @@ def passe_final(caminho: str, q: Optional[str]) -> bool:
     if not cfg["crf"] or not os.path.exists(caminho):
         return False
     tmp = caminho + ".q.mp4"
+    import export_paralelo  # ⚡ v84_115: o vídeo em pedaços paralelos (o áudio é copiado do original)
+    try:
+        from video_assembler import _probe_duration
+        _dur = _probe_duration(caminho)
+    except Exception:  # noqa: BLE001
+        _dur = 0.0
+    if export_paralelo.tentar("qualidade final", lambda: export_paralelo.vf_em_pedacos(
+            caminho, tmp, "", _dur, caminho + "_pedacos", "qualidade",
+            extra=["-c:v", "libx264", "-crf", str(cfg["crf"]), "-preset", cfg["preset"]])):
+        shutil.move(tmp, caminho)
+        try:
+            shutil.rmtree(caminho + "_pedacos", ignore_errors=True)
+        except Exception:  # noqa: BLE001
+            pass
+        return True
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", caminho, "-map", "0:v:0", "-map", "0:a?",
            "-c:v", "libx264", "-crf", str(cfg["crf"]), "-preset", cfg["preset"], "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-b:a", cfg["audio"], "-movflags", "+faststart", tmp]

@@ -5160,6 +5160,93 @@ def _usa_templates_cena() -> bool:
         return True
 
 
+# v84_114: as etapas da montagem, na ordem, com o nome que aparece na tela
+NOMES_ETAPAS_MONTAGEM = {
+    "iniciando": "Preparando", "youtube_automatico": "Escolhendo os vídeos do YouTube", "buscando_imagens": "Buscando imagens nos buscadores",
+    "buscando": "Buscando os clipes", "processando": "Baixando e preparando os clipes", "normalizando": "Ajustando os clipes",
+    "compondo_cenas": "Compondo as cenas (templates)", "concatenando": "Juntando os clipes e as transições", "filtro_cor": "Filtro de cor",
+    "censura": "Censura (blur/tarja)", "sons": "Efeitos sonoros", "sincronizando_audio": "Juntando a narração e a trilha",
+    "aplicando_overlays": "Overlays", "editoriais": "Quadros editoriais", "destaques": "Destaques de texto", "graficos": "Gráficos",
+    "cortes": "Chamadas, abertura e encerramento", "gerando_legendas": "Legendas", "qualidade_final": "Passe final de qualidade",
+}
+
+
+def _etapas_planejadas(job: dict, segments: List[VideoSegment]) -> List[str]:
+    """As etapas que ESTA montagem deve ter (as que não têm nada a fazer ficam de fora)."""
+    e = ["iniciando"]
+    if any(s.provider == "youtube" and not s.override_source for s in segments):
+        e.append("youtube_automatico")
+    e.append("processando")
+    if any(getattr(s, "template", None) for s in segments):
+        e.append("compondo_cenas")
+    e.append("concatenando")
+    try:
+        if __import__("dp_visual").cadeia_filtro(_job_site_cfg(job).get("filtro_cor")):
+            e.append("filtro_cor")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        if __import__("dp_censura").de_video(__import__("dp_censura").normalizar(job.get("censura") or [])):
+            e.append("censura")
+    except Exception:  # noqa: BLE001
+        pass
+    e += ["sons", "sincronizando_audio"]
+    for chave, etapa in (("overlays", "aplicando_overlays"), ("editoriais", "editoriais")):
+        if job.get(chave):
+            e.append(etapa)
+    if _destaques_para_montar(job):
+        e.append("destaques")
+    if job.get("graficos"):
+        e.append("graficos")
+    if any(c.get("resolved_path") for c in job.get("cutaway_suggestions") or []) or __import__("canal").cortes_para_montagem(job):
+        e.append("cortes")
+    if (job.get("legendas") or {}).get("ativa") or (job.get("add_word_captions") and job.get("word_timestamps")):
+        e.append("gerando_legendas")
+    if __import__("qualidade_export").valida(job.get("qualidade_exportacao")) != "normal":
+        e.append("qualidade_final")
+    return e
+
+
+def _progresso_etapa(job: dict, stage: str, current: int, total: int, detalhe: Optional[str] = None,
+                     agora: Optional[float] = None) -> dict:
+    """Atualiza job["progress"]: a etapa atual (com a fração e o detalhe), a lista de etapas (feita / rodando /
+    pulada / pendente, com o tempo de cada), quando começou e as estimativas (desta etapa e do total)."""
+    agora = agora or time.time()
+    prog = job.get("progress") if isinstance(job.get("progress"), dict) else {}
+    etapas = list(prog.get("etapas") or [])
+    k = next((i for i, x in enumerate(etapas) if x["id"] == stage), None)
+    if k is None:  # etapa que não estava no plano (ex.: buscar imagens): entra logo depois da que está rodando
+        pos = max([i + 1 for i, x in enumerate(etapas) if x["estado"] != "pendente"] or [0])
+        etapas.insert(pos, {"id": stage, "nome": NOMES_ETAPAS_MONTAGEM.get(stage, stage), "estado": "pendente"})
+        k = pos
+    for i, x in enumerate(etapas):
+        if i < k and x["estado"] == "pendente":
+            x["estado"] = "pulada"
+        elif i != k and x["estado"] == "rodando":
+            x.update(estado="feita", fim=agora)
+    atual = etapas[k]
+    if atual["estado"] != "rodando":
+        atual.update(estado="rodando", inicio=agora, fim=None)
+    frac = (current / total) if total else 0.0
+    frac = max(0.0, min(1.0, frac))
+    decorrido = agora - float(atual.get("inicio") or agora)
+    eta = None
+    if 0.01 <= frac < 1 and decorrido >= 3:
+        eta = round(decorrido * (1 - frac) / frac)
+    hist = job.get("montagem_tempos") or {}  # quanto cada etapa levou na montagem anterior deste vídeo
+    pendentes = [x["id"] for x in etapas if x["estado"] == "pendente"]
+    eta_total = None
+    if eta is not None or frac >= 1 or not pendentes:
+        conhecidas = [hist[i] for i in pendentes if i in hist]
+        if len(conhecidas) == len(pendentes):
+            eta_total = round((eta or 0) + sum(conhecidas))
+    prog.update(stage=stage, nome=atual["nome"], current=current, total=total, detalhe=detalhe or "",
+                estimated_seconds_remaining=eta, eta_total=eta_total, etapas=etapas,
+                inicio=prog.get("inicio") or agora, agora=agora, etapa_inicio=atual.get("inicio"))
+    job["progress"] = prog
+    return prog
+
+
 def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> None:
     """Salva os segmentos finais no job e dispara a montagem em segundo
     plano — chamado depois que os segmentos (já revisados/editados no
@@ -5167,7 +5254,10 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
     """
     job["video_segments"] = [s.to_dict() for s in segments]
     job["status"] = "montando"
-    job["progress"] = {"stage": "iniciando", "current": 0, "total": len(segments)}
+    job["progress"] = {"stage": "iniciando", "current": 0, "total": len(segments), "inicio": time.time(),
+                       "etapas": [{"id": e, "nome": NOMES_ETAPAS_MONTAGEM.get(e, e), "estado": "pendente"}
+                                  for e in _etapas_planejadas(job, segments)]}
+    _progresso_etapa(job, "iniciando", 0, 1)
     job.pop("assembly_error", None)  # limpa erro de uma tentativa anterior, se houver
     job.pop("assembly_error_segment_index", None)
     job.pop("assembly_error_segments", None)
@@ -5177,19 +5267,18 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
     def _run():
         assembly_start_time = time.time()
 
-        def on_progress(stage, current, total):
-            elapsed = time.time() - assembly_start_time
-            # estimativa simples: tempo médio por segmento já concluído
-            # vezes quantos faltam — só faz sentido depois de pelo menos
-            # 1 segmento pronto (antes disso não tem base pra estimar).
-            estimated_seconds_remaining = None
-            if stage == "processando" and current > 0 and total > current:
-                avg_per_segment = elapsed / current
-                estimated_seconds_remaining = round(avg_per_segment * (total - current))
-            job["progress"] = {
-                "stage": stage, "current": current, "total": total,
-                "estimated_seconds_remaining": estimated_seconds_remaining,
-            }
+        def on_progress(stage, current, total, detalhe=None):
+            # v84_114: a lista de etapas (feitas / rodando / que faltam), a fração da etapa atual — nas etapas
+            # finais vem do próprio ffmpeg (até onde ele já chegou no vídeo) — e as estimativas de tempo
+            _progresso_etapa(job, stage, current, total, detalhe)
+
+        def acompanhar(stage):
+            import progresso_ffmpeg
+            try:
+                dur = _probe_media_duration(output_path)
+            except Exception:  # noqa: BLE001
+                dur = 0
+            return progresso_ffmpeg.acompanhar(lambda f, det: on_progress(stage, int(round(f * 1000)), 1000, det), dur)
 
         perf = _PERF_LOGS.get(job_id)
         final_status: Optional[str] = None
@@ -5243,6 +5332,7 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
             import qualidade_export
             qualidade_export.definir(job.get("qualidade_exportacao"))
+            __import__("export_paralelo").definir(job.get("export_paralelo"))  # ⚡ v84_115
             _falas = _falas_por_trecho(job, segments) if any(getattr(sg, "template", None) for sg in segments) else (None, None)
             assemble_video(
                 segments=segments,
@@ -5297,7 +5387,8 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                     _orientacao_do_job(job), job.get("export_quality", "1080p"),
                 )
                 cutaway_output = os.path.join(_job_dir(job_id), "_with_cutaways.mp4")
-                with (perf.timed("montagem:cortes", quantidade=len(cutaways_to_apply)) if perf else nullcontext()):
+                on_progress("cortes", 0, 1000)
+                with (perf.timed("montagem:cortes", quantidade=len(cutaways_to_apply)) if perf else nullcontext()), acompanhar("cortes"):
                     insert_cutaways(output_path, cutaways_to_apply, cutaway_output, _job_dir(job_id), target_width, target_height)
                 shutil.move(cutaway_output, output_path)
 
@@ -5305,14 +5396,14 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             if _leg_cfg.get("ativa"):
                 on_progress("gerando_legendas", len(segments), len(segments))
                 try:
-                    with (perf.timed("montagem:legendas_dp") if perf else nullcontext()):
+                    with (perf.timed("montagem:legendas_dp") if perf else nullcontext()), acompanhar("gerando_legendas"):
                         _gerar_legendas_dp(job_id, job, segments, output_path, cutaways_to_apply)
                 except Exception:  # noqa: BLE001
                     job["captions_error"] = traceback.format_exc()
             elif job.get("add_word_captions") and job.get("word_timestamps"):
                 on_progress("gerando_legendas", len(segments), len(segments))
                 try:
-                    with (perf.timed("montagem:gerar_legendas") if perf else nullcontext()):
+                    with (perf.timed("montagem:gerar_legendas") if perf else nullcontext()), acompanhar("gerando_legendas"):
                         width, height = _probe_video_resolution(output_path)
                         # Bug real: um corte real desloca tudo que vem
                         # depois dele pra frente no vídeo final, mas a
@@ -5349,10 +5440,19 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             _capitulos_do_video_final(job_id, job, output_path, cutaways_to_apply)
             if qualidade_export.valida(job.get("qualidade_exportacao")) != "normal":
                 on_progress("qualidade_final", len(segments), len(segments))
-                with (perf.timed("montagem:qualidade_final", qualidade=job.get("qualidade_exportacao")) if perf else nullcontext()):
+                with (perf.timed("montagem:qualidade_final", qualidade=job.get("qualidade_exportacao")) if perf else nullcontext()), acompanhar("qualidade_final"):
                     for _arq in {output_path, job.get("captioned_output_path")} - {None}:
                         qualidade_export.passe_final(_arq, job.get("qualidade_exportacao"))
             final_status = "concluido"
+            # ⏱ quanto cada etapa levou: a próxima montagem deste vídeo usa pra estimar o tempo total
+            _agora = time.time()
+            job["montagem_tempos"] = {x["id"]: round((x.get("fim") or _agora) - x["inicio"], 1)
+                                      for x in (job.get("progress") or {}).get("etapas") or [] if x.get("inicio")}
+            for x in (job.get("progress") or {}).get("etapas") or []:
+                if x["estado"] == "rodando":
+                    x.update(estado="feita", fim=_agora)
+                elif x["estado"] == "pendente":
+                    x["estado"] = "pulada"
         except VideoAssemblyError as exc:
             if job.get("cancel_requested"):
                 # cancelamento pedido pela pessoa, não é uma falha de
@@ -5377,6 +5477,7 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             try:
                 import qualidade_export
                 qualidade_export.limpar()
+                __import__("export_paralelo").limpar()
             except Exception:  # noqa: BLE001
                 pass
             if perf:
@@ -5536,7 +5637,8 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
                        "orientacao": _orientacao_do_job(job),
                        "resolucoes": [[q, "x".join(str(v) for v in resolution_for_orientation(_orientacao_do_job(job), q))] for q in __import__("qualidade_export").RESOLUCOES],
                        "resolucoes_por_formato": {o: [[q, "x".join(str(v) for v in resolution_for_orientation(o, q))] for q in __import__("qualidade_export").RESOLUCOES] for o in ("16:9", "9:16", "1:1")},
-                       "qualidades": [[k, v["nome"]] for k, v in __import__("qualidade_export").QUALIDADES.items()]},
+                       "qualidades": [[k, v["nome"]] for k, v in __import__("qualidade_export").QUALIDADES.items()],
+                       "paralelo": dict(__import__("export_paralelo").recursos(), modo=job.get("export_paralelo") or __import__("export_paralelo").modo_atual())},
         "origem_legenda": "srt" if (job.get("segments") and not job.get("word_timestamps")) else "whisper",
         "blocos_fala": [{"start": float(b["start"]), "end": float(b["end"]), "text": b.get("text", "")} for b in job.get("segments") or [] if b.get("text")],
         "job_id": job_id, "segmentos": segs, "overlays": overlays, "cortes": cortes, "biblioteca": biblioteca,
@@ -9500,6 +9602,12 @@ def confirm_segments(job_id: str):
         job["export_quality"] = request.form["export_quality"]
     if request.form.get("qualidade_exportacao"):
         job["qualidade_exportacao"] = __import__("qualidade_export").valida(request.form["qualidade_exportacao"])
+    if request.form.get("export_paralelo") in __import__("export_paralelo").MODOS:  # ⚡ v84_115
+        job["export_paralelo"] = request.form["export_paralelo"]
+        try:  # vira o padrão dos próximos vídeos também
+            save_site_config({"export_paralelo": request.form["export_paralelo"]})
+        except Exception:  # noqa: BLE001
+            pass
     if request.form.get("legendas_json"):
         import dp_legendas
         try:
