@@ -404,7 +404,7 @@
         <div class="ag">${esc(c.agora)}</div>${c.problema ? `<div class="pb">⚠ ${esc(c.problema)}</div>` : ''}
         <div class="ac">${c.manual ? `<button type="button" data-concluir="${esc(c.nome)}">✔ Concluir (fechar e salvar)</button>`
           : `<button type="button" data-abrir="${esc(c.nome)}" ${c.gerando || d.cdp ? 'disabled' : ''}>🌐 Abrir navegador</button><button type="button" data-abrir-url="${esc(c.nome)}" ${c.gerando || d.cdp ? 'disabled' : ''} title="abrir a conta em outro endereço (ex.: a página de planos/premium)">🔗</button>`}
-          ${(c.esgotada_video || c.esgotada_imagem) ? `<button type="button" data-liberar="${esc(c.nome)}" title="o crédito já voltou (ou ativou o premium)">♻ liberar créditos</button>` : ''}</div></div>`;
+          ${(c.esgotada_video || c.esgotada_imagem || c.pulada) ? `<button type="button" data-liberar="${esc(c.nome)}" title="o crédito já voltou (ou ativou o premium)">♻ liberar créditos</button>` : ''}</div></div>`;
     }).join('') + (d.cdp ? '<p class="fl-hint">Modo CDP (o seu Chrome): uma conta só, sem paralelo.</p>' : '');
   }
   function desenharFila(d) {

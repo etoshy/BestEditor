@@ -71,6 +71,7 @@
           : (c.logada ? '✅ pronta' : '⚠️ sem login ainda')
             + (c.esgotada_video ? ' · 🎬 sem crédito de vídeo até ' + _q(c.video_ate) + ' (imagem ok)' : '')
             + (c.esgotada_imagem ? ' · 🖼 sem crédito de imagem até ' + _q(c.imagem_ate) + ' (vídeo ok)' : '');
+        if (c.pulada) txt += ' · ⏭ PULADA até ' + _q(c.pulada_ate).slice(11, 16) + ' (' + c.pulada + ') — faça o login (ou Liberar) pra ela voltar';
         if (c.logada && !c.tem_senha_salva) txt += ' — sem senha salva (login manual, ou "salvar a senha" não foi marcado)';
         if (c.tem_senha_salva) txt += ' 🔑';
         estado.textContent = txt;
@@ -91,7 +92,7 @@
         if (c.tem_senha_salva) acoes.appendChild(botao('Esquecer senha', async function () {
           const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/senha/remover'); if (j) { msg.textContent = '✅ Senha esquecida.'; desenhar(j); }
         }, '#92400e'));
-        const _parcial = !c.esgotada && (c.esgotada_video || c.esgotada_imagem);
+        const _parcial = !c.esgotada && (c.esgotada_video || c.esgotada_imagem || c.pulada);
         acoes.appendChild(botao(c.esgotada || _parcial ? 'Liberar' : 'Marcar esgotada', async function () {
           const j = await api('/flow/contas/' + encodeURIComponent(c.nome) + '/esgotada', {esgotada: !(c.esgotada || _parcial)}); if (j) desenhar(j);
         }));

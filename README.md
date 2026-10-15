@@ -28,6 +28,37 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ⬛ Trecho sem cena coberto pela edição da IA (v84_111)
+
+- Na edição com a IA (Estúdio → 🤖 IA), os trechos **sem cena** (nenhum banco achou mídia, sem prévia) aparecem como
+  “⬛ SEM CENA” no prompt. A IA **cobre** cada um como se fosse uma escolha de edição: escolhe um **fundo gerado**
+  (`"cobrir": {"fundo": "papel", "cor": "#…"}` — escuro, concreto, papel, película, clarão, luz, grade de pontos,
+  marcas de registro, cantoneiras, borda queimada, grade ondulada, grade 3D, ondas, linhas, gradiente) e põe **por cima**
+  o que a fala pede: cena/template com texto, quadro editorial de tela cheia, gráfico (se tem dados) ou um destaque com a
+  frase-chave. O fundo é uma foto, então câmera e efeitos de atmosfera também valem.
+- O fundo é gerado na pasta `coberturas/` do projeto e entra no trecho pelo **Aplicar** (com **↩ Desfazer**).
+- **Pôs uma mídia nesse trecho?** Gere a edição de novo: ele vai como um clipe normal, e a cobertura antiga sai. Trecho
+  ainda coberto aparece como “coberto na edição anterior” e a IA pode refazer a cobertura.
+- Testes: `test_v84_cobrir_sem_cena.py`.
+
+## ⏭ Conta com problema é pulada; Flow sem crédito → foto → pesquisa (v84_110)
+
+- **Conta que pede login** (sessão caiu, verificação, “faça login”…) é **pulada**: o pedido vai pra próxima conta, no
+  🚀 Em massa, no ✨ Gerar da aba e nas imagens/vídeos do Flow pros vídeos do site. No Em massa, a conta também é
+  pulada quando não abre o navegador, quando não abre o projeto 2× ou quando dá 3 erros seguidos. Nesses casos o pedido
+  volta pra fila sem contar como erro dele.
+- A conta pulada aparece com “⏭ PULADA” em 🔑 Contas Google e no Em massa. Ela volta quando você faz o login (🔑 Contas
+  Google ou 🌐 Abrir navegador → ✔ Concluir), clica em **Liberar / ♻ liberar créditos**, ou depois de 60 min.
+- **Vídeos do site com trechos do Flow**:
+  1. tenta gerar o **vídeo**;
+  2. sem conta com crédito de vídeo (nem tenta) ou o vídeo não sai, o prompt é **reescrito como prompt de foto** (🤖 IA
+     do site, ou a regra simples) e a **foto** é gerada nas contas que ainda têm crédito de imagem (passando de conta
+     em conta);
+  3. sem crédito de imagem em nenhuma conta (ou a foto não sai), **pesquisa** a cena só nos mecanismos **marcados**
+     pra aquele vídeo: trecho de vídeo → bancos de vídeo → buscadores de imagem → bancos de foto; trecho de foto →
+     buscadores → bancos de foto → bancos de vídeo.
+- Testes: `test_v84_pular_conta.py` e `toolkit/googleflow/test_googleflow_client.py`.
+
 ## 🚀 Flow em massa: várias contas em paralelo, cooldown e vídeo → foto (v84_109)
 
 Na aba **🎬 Google Flow**, nova seção **🚀 Em massa** (`/flow#lote`, código em `flow_lote.py`):

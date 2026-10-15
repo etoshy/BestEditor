@@ -2347,7 +2347,8 @@ function estadoParaIA() {
   return {
     direcao: $('dDirecao').value, kit, ritmo: $('dRitmo').value, objetivo: $('iaObjetivo').value.trim(), paleta, legenda: leg,
     opcoes: { destaques_atuais: $('iaComDestaques').checked },
-    segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s), source: s.override_source.source || null, value: s.override_source.value || null, biblioteca: s.override_source.biblioteca || null, cartao: !!s.override_source.cartao } : null,
+    segmentos: segs.map(s => ({ start: s.start, end: s.end, query: s.query, provider: s.provider, media_type: tipoMidia(s), override_source: s.override_source ? { kind: tipoMidia(s), source: s.override_source.source || null, value: s.override_source.value || null, biblioteca: s.override_source.biblioteca || null, cartao: !!s.override_source.cartao, cobertura: !!s.override_source.cobertura, fundo: s.override_source.fundo || null } : null,
+      sem_midia: !s.override_source && !fonteDe(s) && !(s.youtube_link && s.youtube_link.url),
       youtube_link: s.youtube_link || null, transition: s.transition || null, efeito: s.efeito || null, entrada: s.entrada || null, saida: s.saida || null, template: s.template || null })),
     destaques: destaques.map(d => ({ estilo: d.estilo, start: d.start, end: d.end, texto: d.texto })), graficos,
     editoriais: editoriais.map(q => ({ tipo: q.tipo, start: q.start, end: q.end })),
@@ -2456,7 +2457,7 @@ function resumoPlano(p) {
   if (n1) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="limpar_1a" checked> 🧹 <b>Tirar os ${n1} textos da 1ª IA</b> (a das buscas): ${[t1.segs && t1.segs + ' textos na tela', t1.destaques && t1.destaques + ' destaques', t1.overlays && t1.overlays + ' overlays de texto'].filter(Boolean).join(', ')} — os desta edição ficam no lugar. Os que você editou à mão ficam.</label></li>`);
   const nTr = p.trechos.length;
   const det = (k) => p.trechos.filter(t => k in t).length;
-  if (nTr) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="trechos" checked> <b>${nTr} trechos</b>: ${det('transition')} transições, ${det('efeito')} efeitos, ${det('entrada') + det('saida')} animações, ${det('template')} cenas${det('bordas') + det('camera') + det('foco') ? `, ${det('bordas') + det('camera') + det('foco')} ajustes de composição` : ''}${det('transition_som') ? `, ${det('transition_som')} sons de transição` : ''}</label></li>`);
+  if (nTr) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="trechos" checked> <b>${nTr} trechos</b>: ${det('transition')} transições, ${det('efeito')} efeitos, ${det('entrada') + det('saida')} animações, ${det('template')} cenas${det('cobrir') ? `, ⬛ ${det('cobrir')} trechos sem cena cobertos` : ''}${det('bordas') + det('camera') + det('foco') ? `, ${det('bordas') + det('camera') + det('foco')} ajustes de composição` : ''}${det('transition_som') ? `, ${det('transition_som')} sons de transição` : ''}</label></li>`);
   if (p.destaques) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="destaques" checked> <b>${p.destaques.length} destaques</b>${p.destaques.filter(x => x.avulso).length ? ` (${p.destaques.filter(x => x.avulso).length} textos livres)` : ''}${p.destaques.filter(x => x.enfase).length ? `, ${p.destaques.filter(x => x.enfase).length} com ênfase` : ''}${p.destaques.filter(x => x.fonte || x.anim_entrada || x.zona || x.escala).length ? `, ${p.destaques.filter(x => x.fonte || x.anim_entrada || x.zona || x.escala).length} com estilo/posição ajustados` : ''} ${p.substituir_destaques ? '(substituem os automáticos/da IA; os que você fez à mão ficam)' : '(somados aos atuais)'}</label></li>`);
   if (p.graficos) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="graficos" checked> <b>${p.graficos.length} gráficos</b>: ${p.graficos.map(g => esc((GR_TIPOS[g.tipo] || g.tipo) + (g.titulo ? ' "' + g.titulo + '"' : ''))).join(', ')}</label></li>`);
   if (p.editoriais) li.push(`<li><label class="chk"><input type="checkbox" class="iaPega" data-k="editoriais" checked> <b>${p.editoriais.length} quadros editoriais</b>: ${p.editoriais.map(q => esc((ED_T[q.tipo] || {}).nome || q.tipo)).join(', ')}</label></li>`);
@@ -2487,7 +2488,7 @@ $('iaAplicar').addEventListener('click', () => {
   const CAMPOS_IA = CAMPOS_DIRECAO.concat(['_aspect', 'zoom_direction', 'focus_x', 'focus_y', 'transition_som', 'override_source', 'on_screen_text', 'media_type', 'clipes_extra', 'curto', '_preview']);
   desfazerIA = { segs: JSON.stringify(segs.map(s => Object.fromEntries(CAMPOS_IA.map(k => [k, s[k] === undefined ? null : s[k]])))), destaques: JSON.stringify(destaques), graficos: JSON.stringify(graficos), editoriais: JSON.stringify(editoriais),
     sfx: JSON.stringify(sfx), filtro: $('gFiltro').value, paleta: JSON.stringify(paleta), leg: JSON.stringify(leg) };
-  const feito = [], midiasIA = [];
+  const feito = [], midiasIA = []; let cobertos = 0;
   if (pega('limpar_1a')) {
     // antes de pôr os destaques novos: sem isso eles "batiam" nos antigos e não entravam
     let n = 0;
@@ -2509,12 +2510,16 @@ $('iaAplicar').addEventListener('click', () => {
       if (t.camera) { s.zoom_direction = t.camera; if (s.override_source) s.override_source.zoom_direction = t.camera; }
       if (t.foco) { s.focus_x = t.foco.x; s.focus_y = t.foco.y; if (s.override_source) { s.override_source.focus_x = t.foco.x; s.override_source.focus_y = t.foco.y; } }
       if (t.transition_som) s.transition_som = t.transition_som;
+      if (t.cobertura && !t.midia) {  // ⬛ trecho sem cena: o fundo que a IA escolheu vira a "foto" do trecho
+        s.override_source = { source: 'local_file', value: t.cobertura.value, kind: 'image', cobertura: true, fundo: t.cobertura.fundo, zoom_direction: t.camera || 'in' };
+        s.media_type = 'image'; s.clipes_extra = null; s.curto = null; midiasIA.push(t.indice); cobertos++;
+      }
       if (t.midia) {  // 📁 mídia que a pessoa enviou
         const b = biblioteca.find(x => x.id === t.midia); if (!b) return;
         s.override_source = Object.assign({ source: 'local_file', biblioteca: b.id, kind: b.media_type }, t.camera ? { zoom_direction: t.camera } : {});
         s.media_type = b.media_type; s.clipes_extra = null; s.curto = null; midiasIA.push(t.indice);
       } });
-    feito.push(`${p.trechos.length} trechos` + (midiasIA.length ? ` (${midiasIA.length} com as suas mídias)` : ''));
+    feito.push(`${p.trechos.length} trechos` + (midiasIA.length - cobertos ? ` (${midiasIA.length - cobertos} com as suas mídias)` : '') + (cobertos ? ` · ⬛ ${cobertos} sem cena cobertos` : ''));
   }
   if (pega('destaques') && p.destaques) {
     const manter = p.substituir_destaques ? destaques.filter(x => x.origem !== 'auto' && x.origem !== 'ia') : destaques.slice();

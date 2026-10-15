@@ -170,7 +170,8 @@ def prompt_foto_simples(prompt: str) -> str:
     return f"Still photograph: {t}. A single frozen moment, static image, sharp and detailed.".replace("..", ".")
 
 
-def reescrever_para_foto(prompt: str, log: Callable[[str, str], None] = lambda m, n="info": None) -> Dict[str, str]:
+def reescrever_para_foto(prompt: str, log: Callable[[str, str], None] = lambda m, n="info": None,
+                         ia_google: bool = True) -> Dict[str, str]:
     """→ {"prompt": novo, "por": "ia_site" | "ia_google" | "regra"}"""
     # 1) 🤖 a IA do site (Claude)
     try:
@@ -185,7 +186,7 @@ def reescrever_para_foto(prompt: str, log: Callable[[str, str], None] = lambda m
     # 2) 🔎 IA do Google (Modo IA), se o app dela estiver no ar
     try:
         import ia_google_rotas as IG
-        if IG.no_ar():
+        if ia_google and IG.no_ar():
             r = IG.pesquisar(INSTRUCAO_FOTO.replace("Responda SÓ com o novo comando, texto puro, sem aspas e sem explicação.",
                                                     "Coloque o novo comando INTEIRO na resposta objetiva.")
                              + "\n\nComando de vídeo: " + prompt, nova_conversa=True, timeout=240)
@@ -575,6 +576,17 @@ class Lote:
             st[conta] = f"{nome}: {estado}" + (f" — {detalhe[:120]}" if detalhe else "")
 
         job = None
+        falhas_seguidas = 0  # ⏭ v84_110: a conta que falha seguido (ou pede login) é pulada — o pedido vai pra outra
+
+        def _pular(motivo: str) -> None:
+            self.problema_conta[conta] = motivo
+            try:
+                gf.pular_conta(conta, motivo)
+            except Exception:  # noqa: BLE001
+                pass
+            self.log(f"⏭ Pulando a conta “{conta}”: {motivo}. Os pedidos dela vão pra outra conta. "
+                     f"(🌐 Abrir navegador → faça o login → ✔ Concluir pra ela voltar.)", "erro")
+
         try:
             from playwright.sync_api import sync_playwright
             p = sync_playwright().start()
@@ -589,8 +601,21 @@ class Lote:
                 try:
                     if page is None or page.is_closed():
                         st[conta] = "abrindo um projeto no Flow…"
-                        page = fd.preparar_projeto(ctx, gf.FLOW_URL, headless=not visivel, agente=gf.agente_da_cfg(cfg),
-                                                   on_passo=on_passo)
+                        try:
+                            page = fd.preparar_projeto(ctx, gf.FLOW_URL, headless=not visivel, agente=gf.agente_da_cfg(cfg),
+                                                       on_passo=on_passo)
+                        except (fd.FlowLogin, fd.FlowLimite, _Parado):
+                            raise
+                        except Exception as exc_proj:  # noqa: BLE001 — a CONTA não abriu o projeto: não é culpa do pedido
+                            falhas_seguidas += 1
+                            self._devolver(job, f"a conta “{conta}” não abriu o projeto: {str(exc_proj)[:200]}")
+                            job = None
+                            if falhas_seguidas >= 2 or gf.RE_PROBLEMA_DE_LOGIN.search(str(exc_proj)):
+                                _pular(f"não abriu o projeto no Flow ({str(exc_proj).splitlines()[0][:140] if str(exc_proj) else type(exc_proj).__name__})")
+                                break
+                            self.log(f"⚠ “{conta}” não abriu o projeto ({str(exc_proj)[:160]}) — tentando de novo.", "aviso")
+                            page = None
+                            continue
                         gf.salvar_sessao(ctx, conta)
                     self._aguardar_vez(conta)
                     trab = {"tipo": job["tipo"], "prompt": job["prompt"], "proporcao": job["proporcao"],
@@ -610,6 +635,7 @@ class Lote:
                         self._salvar()
                     self.log(f"✅ “{conta}”: {len(salvos)} arquivo(s) na galeria — {job['prompt'][:70]}", "ok")
                     job = None
+                    falhas_seguidas = 0
                 except fd.FlowLimite as exc:
                     tipo_lim = gf.tipo_do_limite(job["tipo"])
                     try:
@@ -630,9 +656,7 @@ class Lote:
                         pass
                     page = None
                 except fd.FlowLogin as exc:
-                    self.problema_conta[conta] = "precisa de login"
-                    self.log(f"🔒 “{conta}” precisa de LOGIN ({exc.mensagem[:160]}). Clique em 🌐 Abrir navegador nessa "
-                             f"conta, faça o login e depois ✔ Concluir.", "erro")
+                    _pular(f"precisa de login ({exc.mensagem[:120]})")
                     self._devolver(job)
                     job = None
                     break
@@ -645,6 +669,12 @@ class Lote:
                 except _Parado:
                     raise
                 except Exception as exc:  # noqa: BLE001 — passo falhou, rede, download…
+                    if gf.RE_PROBLEMA_DE_LOGIN.search(str(exc)):  # "faça login", sessão caiu, verificação da conta…
+                        _pular(f"problema de login ({str(exc).splitlines()[0][:120]})")
+                        self._devolver(job)
+                        job = None
+                        break
+                    falhas_seguidas += 1
                     diag = None
                     try:
                         diag = gf.salvar_diagnostico(getattr(exc, "page", None) or page, str(exc)) if page is not None else None
@@ -664,13 +694,15 @@ class Lote:
                     except Exception:  # noqa: BLE001
                         pass
                     page = None
+                    if falhas_seguidas >= 3:  # 3 erros seguidos na mesma conta: o problema é ela
+                        _pular(f"{falhas_seguidas} erros seguidos (o último: {str(exc).splitlines()[0][:120] if str(exc) else type(exc).__name__})")
+                        break
         except _Parado:
             if job is not None:
                 self._devolver(job)
         except Exception as exc:  # noqa: BLE001 — não abriu o navegador
             msg = str(exc).splitlines()[0][:200] if str(exc) else type(exc).__name__
-            self.problema_conta[conta] = f"não abriu: {msg}"
-            self.log(f"❌ Conta “{conta}”: não consegui abrir o navegador ({msg}).", "erro")
+            _pular(f"não abriu o navegador: {msg}")
             if job is not None:
                 self._devolver(job)
         finally:
@@ -716,6 +748,10 @@ class Lote:
             self.manuais.pop(conta, None)
             self.status_conta.pop(conta, None)
             self.problema_conta.pop(conta, None)  # logou/ativou: o lote volta a tentar essa conta
+        try:
+            _gf().despular_conta(conta)
+        except Exception:  # noqa: BLE001
+            pass
         _liberar("manual:" + conta)
         self.log(f"🌐 Conta “{conta}”: " + (f"a janela fechou com erro ({erro})." if erro else "janela fechada, sessão salva."),
                  "erro" if erro else "ok")
@@ -735,10 +771,10 @@ class Lote:
             for c in lista:
                 n = c["nome"]
                 contas.append({**{k: c.get(k) for k in ("nome", "esgotada", "esgotada_ate", "esgotada_video", "video_ate",
-                                                         "esgotada_imagem", "imagem_ate", "logada", "email")},
+                                                         "esgotada_imagem", "imagem_ate", "logada", "email", "pulada")},
                                "no_lote": n in usar, "gerando": n in self.trabalhadores and self.trabalhadores[n].is_alive(),
                                "manual": n in self.manuais, "agora": self.status_conta.get(n) or "",
-                               "problema": self.problema_conta.get(n) or ""})
+                               "problema": self.problema_conta.get(n) or (f"⏭ pulada: {c['pulada']}" if c.get("pulada") else "")})
             espera = max(0.0, self.proximo_envio - time.monotonic())
             return {"rodando": self.rodando, "pausando": self.pausando, "config": dict(self.cfg), "contagem": cont,
                     "fila": fila[-400:], "total": len(fila), "contas": contas, "log": self.logs[-120:],
@@ -885,6 +921,7 @@ def registrar(app) -> None:
             for n in gf.nomes_das_contas():
                 gf.liberar_conta(n)
             lote().problema_conta.clear()
+            gf.despular_conta(None)
             lote().log("↺ Créditos liberados em todas as contas.", "ok")
             return {"ok": True}
         return _resp(_lib)

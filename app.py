@@ -2459,6 +2459,7 @@ def flow_login():
             else:
                 cliente.login_interativo(conta=conta) if conta_pedida else cliente.login_interativo()
             _FLOW_LOGIN.update({"status": "ok", "erro": None})
+            gf.despular_conta(conta or None)  # ⏭ logou: a conta pulada volta pra troca de contas
         except Exception as exc:  # noqa: BLE001
             _FLOW_LOGIN.update({"status": "erro", "erro": str(exc)})
 
@@ -3768,6 +3769,8 @@ def _job_site_cfg(job: dict) -> dict:
     """Config do site + o que a pessoa escolheu só pra este vídeo na página
     do prompt (`job["cfg_overrides"]`). Usada nas prévias e na montagem."""
     cfg = load_site_config()
+    if job.get("providers"):  # v84_110: Flow sem crédito nenhum → pesquisa só nos mecanismos marcados pra este vídeo
+        cfg["_providers_marcados"] = list(job["providers"])
     for chave, valor in (job.get("cfg_overrides") or {}).items():
         if chave in _JOB_CFG_OVERRIDE_KEYS and isinstance(valor, bool):
             cfg[chave] = valor
@@ -7639,7 +7642,31 @@ def edicao_resposta(job_id: str):
         return jsonify({"erro": str(exc)}), 400
     for d in (plano.get("destaques") or []) + (plano.get("editoriais") or []):
         d["id"] = uuid.uuid4().hex[:8]
+    _gerar_coberturas(job_id, job, plano)
     return jsonify({"ok": True, **plano})
+
+
+def _gerar_coberturas(job_id: str, job: dict, plano: dict) -> None:
+    """⬛ v84_111: trecho SEM CENA que a IA cobriu ("cobrir": {"fundo", "cor"}) → gera o fundo (uma FOTO na pasta
+    coberturas/ do projeto) e devolve no plano o caminho; o Estúdio põe ela no trecho (com desfazer)."""
+    import cenas_dp
+    trechos = [t for t in plano.get("trechos") or [] if t.get("cobrir")]
+    if not trechos:
+        return
+    W, H = {"9:16": (1080, 1920), "1:1": (1080, 1080)}.get(_orientacao_do_job(job), (1920, 1080))
+    pasta = os.path.join(_job_dir(job_id), "coberturas")
+    os.makedirs(pasta, exist_ok=True)
+    pal = (job.get("paleta") or {}) if isinstance(job.get("paleta"), dict) else {}
+    for t in trechos:
+        fundo, cor = t["cobrir"]["fundo"], t["cobrir"].get("cor") or pal.get("primaria")
+        try:
+            if fundo in cenas_dp._FUNDOS_DESENHO:
+                caminho = cenas_dp._fundo_desenhado(fundo, W, H, pasta, cor or "#7C8AA5")
+            else:
+                caminho = cenas_dp.gerar_fundo(fundo, W, H, pasta, tom=cor)
+            t["cobertura"] = {"value": caminho, "fundo": fundo}
+        except Exception as exc:  # noqa: BLE001
+            plano.setdefault("avisos", []).append(f"T{t['indice'] + 1}: não gerei o fundo '{fundo}' ({exc}).")
 
 
 def _trechos_para_revisao(job: dict, segmentos: list) -> list:
@@ -8325,8 +8352,20 @@ def _arquivo_da_biblioteca_ou_local(job_id: str, job: dict, bib_id: str, valor: 
             item = next((i for i in job.get("media_library") or [] if os.path.realpath(i.get("path") or "") == real), None)
             ext = os.path.splitext(real)[1].lower()
             kind = item["media_type"] if item else ("image" if ext in _MEDIA_LIBRARY_IMAGE_EXTENSIONS else "video")
-            return {"source": "local_file", "value": valor, "kind": kind, **({"biblioteca": item["id"]} if item else {})}
+            cob = os.path.realpath(os.path.join(_job_dir(job_id), "coberturas"))
+            extra = {"cobertura": True, "fundo": _fundo_da_cobertura(real)} if real.startswith(cob + os.sep) else {}
+            return {"source": "local_file", "value": valor, "kind": kind, **({"biblioteca": item["id"]} if item else {}), **extra}
     return None
+
+
+def _fundo_da_cobertura(caminho: str) -> str:
+    """fundo_papel_ab12cd34ef.png → papel; <tipo>_..._rgb.png (desenhado) → o 1º pedaço conhecido."""
+    import prompt_edicao
+    nome = os.path.basename(caminho)
+    for f in sorted(prompt_edicao.IDS_COBERTURA, key=len, reverse=True):
+        if nome.startswith("fundo_" + f + "_") or nome.startswith("fd_" + f + "_"):
+            return f
+    return "?"
 
 
 def _trocou_arquivo(job_id: str, job: dict, base: dict, bib_id: str, valor: str) -> bool:

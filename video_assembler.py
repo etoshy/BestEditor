@@ -37,7 +37,7 @@ import time
 import uuid
 from contextlib import nullcontext
 from dataclasses import replace
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "toolkit"))
 
@@ -3536,6 +3536,99 @@ def resolve_overlay_source(overlay_source: Dict[str, Any], downloads_dir: str, g
     return local_path, "video"
 
 
+# ------------------------------------------------------------------ v84_110: Flow esgotado → foto → pesquisa
+def flow_tem_conta(tipo: str, cfg: Optional[Dict[str, Any]] = None) -> Optional[bool]:
+    """Alguma conta do Google Flow ainda serve pra `tipo` ("video"/"imagem")? None = não dá pra saber (segue tentando)."""
+    if str((cfg or {}).get("flow_navegador") or "auto").lower() == "cdp":
+        return None  # o Chrome do próprio usuário: não tem troca de contas pra conferir
+    try:
+        from googleflow import googleflow_client as gf
+        gf.escolher_conta_disponivel(tipo=tipo)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        return False if type(exc).__name__ == "GoogleFlowSemContas" else None
+
+
+def _termo_de_pesquisa(segment: VideoSegment) -> str:
+    """O prompt do Flow é uma descrição longa: pra PESQUISAR usa a alternativa curta da IA, a busca reserva ou o núcleo."""
+    for t in list(getattr(segment, "alternativas", None) or []) + [getattr(segment, "busca_reserva", None) or ""]:
+        if t and t.strip():
+            return t.strip()
+    return _nucleo_da_busca(segment.query) or " ".join((segment.query or "").split()[:6])
+
+
+def prompt_de_foto(prompt: str) -> str:
+    """O prompt de VÍDEO reescrito como prompt de FOTO (tira movimento de câmera, duração…) — pra gerar a imagem da
+    cena numa conta que não tem mais crédito de vídeo. 🤖 IA do site se ligada; senão a regra simples (sem esperar a
+    🔎 IA do Google, que demora minutos por trecho)."""
+    try:
+        import flow_lote
+        return flow_lote.reescrever_para_foto(prompt, ia_google=False)["prompt"]
+    except Exception:  # noqa: BLE001
+        return prompt
+
+
+def _pesquisa_no_lugar_do_flow(segment: VideoSegment, downloads_dir: str, client_factory: "ClientFactory",
+                               cfg: Dict[str, Any], provider_priority: Optional[List[str]] = None,
+                               orientation: Optional[str] = None, video: bool = False, used_tracker=None,
+                               motivo: str = "") -> Tuple[List[str], str]:
+    """Nenhuma conta do Flow consegue gerar mais nada (nem vídeo nem foto): PESQUISA a cena nos mecanismos de busca
+    MARCADOS pro vídeo (`cfg["_providers_marcados"]`, os que você marcou ao criar; sem isso, a prioridade das
+    Configurações). Trecho de vídeo: bancos de vídeo → buscadores de imagem → bancos de foto. Trecho de foto:
+    buscadores de imagem → bancos de foto → bancos de vídeo. → (arquivos, "video"|"image")."""
+    termo = _termo_de_pesquisa(segment)
+    marcados = [p for p in (cfg.get("_providers_marcados") or provider_priority or []) if p != "flow"]
+    ordem = [p for p in (provider_priority or []) if p in marcados] + [p for p in marcados if p not in (provider_priority or [])]
+    ordem = _sem_bloqueados(ordem, cfg)
+    bancos_video = [b for b in ordem if b not in ("youtube", "produto", "material", "wikipedia")
+                    and b not in _BROWSER_IMAGE_SEARCH_PROVIDERS]
+    buscadores = [b for b in ordem if b in _BROWSER_IMAGE_SEARCH_PROVIDERS]
+    bancos_foto = [b for b in ordem if b in _PHOTO_PROVIDER_MODULES and b != "flow" and b not in _BROWSER_IMAGE_SEARCH_PROVIDERS]
+    erros: List[str] = []
+
+    def _videos():
+        if not bancos_video:
+            return None
+        try:
+            return _download_segment_with_fallbacks(
+                replace(segment, provider=bancos_video[0], query=termo, alternativas=[], media_type="video"), downloads_dir,
+                client_factory, bancos_video, orientation, used_tracker=used_tracker), "video"
+        except Exception as exc:  # noqa: BLE001
+            erros.append(f"{', '.join(bancos_video)}: {exc}")
+            return None
+
+    def _buscadores():
+        if not buscadores:
+            return None
+        try:
+            res = prefetch_browser_images([(0, replace(segment, provider=buscadores[0], query=termo, media_type="image"))],
+                                          downloads_dir, cfg).get(0) or {}
+            if res.get("ok") and res.get("path"):
+                return [res["path"]], "image"
+            erros.append(f"{', '.join(buscadores)}: {res.get('erro') or 'nada'}")
+        except Exception as exc:  # noqa: BLE001
+            erros.append(f"{', '.join(buscadores)}: {exc}")
+        return None
+
+    def _fotos():
+        for b in bancos_foto:
+            try:
+                return [_download_image_segment_with_fallbacks(replace(segment, provider=b, query=termo, media_type="image"),
+                                                               downloads_dir, client_factory, used_tracker=used_tracker)], "image"
+            except Exception as exc:  # noqa: BLE001
+                erros.append(f"{b} (fotos): {exc}")
+        return None
+
+    for etapa in ((_videos, _buscadores, _fotos) if video else (_buscadores, _fotos, _videos)):
+        r = etapa()
+        if r:
+            return r
+    if not (bancos_video or buscadores or bancos_foto):
+        erros.append("nenhum mecanismo de busca marcado pra este vídeo além do Flow")
+    raise VideoAssemblyError(f"Flow: {motivo or 'não gerou'} — e a pesquisa por '{termo}' nos mecanismos marcados também "
+                             f"não achou ({'; '.join(erros)}).")
+
+
 def _download_image_segment_with_fallbacks(
     segment: VideoSegment,
     downloads_dir: str,
@@ -4196,6 +4289,7 @@ def assemble_video(
             )
 
     origens: Dict[int, Dict[str, Any]] = {}
+    flow_trocas: Dict[int, str] = {}  # v84_110: trecho do Flow que virou foto / pesquisa (vai no "origens")
     # ⬇ mídias que o Estúdio já baixou em segundo plano (app._prebaixar_iniciar)
     prebaixados_dir = cfg.get("prebaixados_dir") or os.path.join(work_dir, "prebaixados")
     # ♻ clipes já prontos (baixados + cortados + com efeito) de uma montagem anterior:
@@ -4385,6 +4479,22 @@ def assemble_video(
                         )
                     raw_paths = [res["path"]]
                     kind = "image"
+                elif getattr(segment, "media_type", "video") == "image" and segment.provider == "flow":
+                    # 🖼 foto do Flow. v84_110: sem conta com crédito de imagem (ou o Flow falhou) → PESQUISA a cena
+                    if flow_tem_conta("imagem", cfg) is False:
+                        raw_paths, kind = _pesquisa_no_lugar_do_flow(
+                            segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
+                            used_tracker=used_clips_tracker, motivo="todas as contas sem crédito de imagem")
+                        flow_trocas[i] = "pesquisa (contas do Flow esgotadas)"
+                    else:
+                        try:
+                            raw_paths = [_download_image_segment_with_fallbacks(segment, downloads_dir, worker_factory, used_tracker=used_clips_tracker)]
+                            kind = "image"
+                        except Exception as exc_flow:  # noqa: BLE001
+                            raw_paths, kind = _pesquisa_no_lugar_do_flow(
+                                segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
+                                used_tracker=used_clips_tracker, motivo=f"a foto não saiu ({str(exc_flow)[:200]})")
+                            flow_trocas[i] = "pesquisa (a foto do Flow não saiu)"
                 elif getattr(segment, "media_type", "video") == "image":
                     raw_paths = [_download_image_segment_with_fallbacks(segment, downloads_dir, worker_factory, used_tracker=used_clips_tracker)]
                     kind = "image"
@@ -4392,19 +4502,37 @@ def assemble_video(
                     # vídeo gerado no Flow (Veo). Se não sair (limite, recusa,
                     # tela mudou), gera a IMAGEM da mesma cena no Flow em vez de
                     # cair num banco de estoque com uma descrição em português.
-                    try:
-                        raw_paths = _download_segment_with_fallbacks(
-                            segment, downloads_dir, worker_factory, [], search_orientation,
-                            magnific_only_free=magnific_only_free, used_tracker=used_clips_tracker,
-                        )
-                        kind = "video"
-                    except VideoAssemblyError as exc_flow:
+                    # v84_110: sem conta com crédito de VÍDEO nem tenta (vai direto pra foto); sem crédito de
+                    # IMAGEM também (ou a foto não sai) → PESQUISA a cena nos bancos/buscadores.
+                    tem_video, tem_foto = flow_tem_conta("video", cfg), flow_tem_conta("imagem", cfg)
+                    exc_flow: Any = "todas as contas sem crédito de vídeo"
+                    raw_paths, kind = [], ""
+                    if tem_video is not False:
                         try:
-                            raw_paths = [_download_image_segment_with_fallbacks(replace(segment, media_type="image"), downloads_dir,
-                                                                                worker_factory, used_tracker=used_clips_tracker)]
+                            raw_paths = _download_segment_with_fallbacks(
+                                segment, downloads_dir, worker_factory, [], search_orientation,
+                                magnific_only_free=magnific_only_free, used_tracker=used_clips_tracker,
+                            )
+                            kind = "video"
+                        except VideoAssemblyError as exc_v:
+                            exc_flow = exc_v
+                            tem_foto = flow_tem_conta("imagem", cfg)
+                    if not kind and tem_foto is not False:
+                        try:
+                            # 🔁 o prompt de VÍDEO vira prompt de FOTO e gera nas contas que ainda têm crédito de imagem
+                            raw_paths = [_download_image_segment_with_fallbacks(
+                                replace(segment, media_type="image", query=prompt_de_foto(segment.query)), downloads_dir,
+                                worker_factory, used_tracker=used_clips_tracker)]
+                            kind = "image"
+                            flow_trocas[i] = f"foto no lugar do vídeo ({str(exc_flow)[:120]})"
                         except Exception as exc_img:  # noqa: BLE001
-                            raise VideoAssemblyError(f"Flow: o vídeo não saiu ({exc_flow}) e a imagem reserva também não ({exc_img}).") from exc_img
-                        kind = "image"
+                            exc_flow = f"o vídeo não saiu ({exc_flow}) e a imagem reserva também não ({exc_img})"
+                    if not kind:
+                        raw_paths, kind = _pesquisa_no_lugar_do_flow(
+                            segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation, video=True,
+                            used_tracker=used_clips_tracker,
+                            motivo=("todas as contas sem crédito (vídeo e imagem)" if tem_foto is False else str(exc_flow))[:300])
+                        flow_trocas[i] = "pesquisa (contas do Flow esgotadas)" if tem_foto is False else "pesquisa (o Flow não gerou)"
                 else:
                     raw_paths = _download_segment_with_fallbacks(
                         segment, downloads_dir, worker_factory, provider_priority, search_orientation,
@@ -4426,7 +4554,8 @@ def assemble_video(
             origens[i] = {"modo": _modo, "kind": kind, "arquivos": [os.path.abspath(r) for r in raw_paths],
                           "link": _ov_now.get("value") or ov_original.get("value"), "erro_previa": erro_previa,
                           "completado_com_outra_cena": kind == "video" and len(raw_paths) > 1,
-                          "banco": segment.provider, "busca": segment.query, "prebaixado": veio_prebaixado}
+                          "banco": segment.provider, "busca": segment.query, "prebaixado": veio_prebaixado,
+                          **({"flow_troca": flow_trocas[i]} if i in flow_trocas else {})}
             normalized_path = os.path.join(clips_dir, f"segment_{i:04d}.mp4")
             # + rabo da transição pro próximo trecho; dentro de uma cena com
             # vários takes, o take fica na tela até o fim da cena

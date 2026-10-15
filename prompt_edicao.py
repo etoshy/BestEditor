@@ -54,6 +54,26 @@ def _linha_eixo(p: Dict[str, Any], eixo: str, nome: str, rotulos: Dict[str, str]
     return f"- {nome}: ~{pct}% — {'qualquer um do catálogo abaixo' if sistema else 'nenhum marcado (não usar)'}"
 
 
+# ⬛ v84_111: trecho SEM CENA (nenhum banco achou mídia) → a IA cobre com um fundo gerado + o que a fala pede, como
+# se fosse escolha de edição. Quando a pessoa põe uma mídia ali e gera a edição de novo, ele volta a ser um trecho normal.
+FUNDOS_COBERTURA: List[Tuple[str, str]] = [
+    ("escuro", "escuro com grão (neutro, sério)"), ("concreto", "concreto (cru, investigação)"),
+    ("papel", "papel de arquivo (documento, história)"), ("filme", "película (memória, arquivo antigo)"),
+    ("clarao", "clarão de luz no centro (revelação)"), ("luz", "luz diagonal (dramático)"),
+    ("grade_pontos", "grade de pontos (dados, técnico)"), ("registro", "marcas de registro (gráfico, impresso)"),
+    ("cantoneiras", "cantoneiras (moldura de dossiê)"), ("borda_queimada", "borda queimada (passado, tensão)"),
+    ("grade_ondulada", "grade ondulada (tecnologia, sinal)"), ("grade_3d", "grade 3D (futuro, digital)"),
+    ("ondas", "ondas (som, fluxo)"), ("linhas", "linhas (moderno, limpo)"), ("cor_gradiente", "gradiente da cor (marca, leve)"),
+]
+IDS_COBERTURA = {f for f, _ in FUNDOS_COBERTURA}
+
+
+def sem_cena(s: Dict[str, Any]) -> bool:
+    """O trecho está sem cena de verdade: nenhuma mídia (`sem_midia`, mandado pelo Estúdio) ou coberto pela IA antes."""
+    ov = s.get("override_source") or {}
+    return bool(ov.get("cobertura")) or (bool(s.get("sem_midia")) and not ov.get("source"))
+
+
 # 🖥 quadros que mostram a PROVA que a fala cita (liberados em qualquer direção)
 TIPOS_PROVA = ("pagina", "post")
 _RE_LINK = re.compile(r"\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9\-]{1,62}(?:\.[a-z0-9\-]{2,63})*\.(?:com|net|org|br|gov|edu|io|co|tv|me|info|news|app|ai)(?:\.[a-z]{2})?(?:/[^\s\"'<>)]*)?)", re.I)
@@ -271,7 +291,12 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
             continue
         ov = s.get("override_source") or {}
         midia = ("foto" if (ov.get("kind") or s.get("media_type")) == "image" else "vídeo") + f" '{s.get('query', '')}'"
-        if ov.get("cartao"):
+        if ov.get("cobertura"):
+            midia = (f"⬛ SEM CENA — coberto na edição anterior (fundo {ov.get('fundo') or '?'}); nenhuma mídia achada pra "
+                     f"'{s.get('query', '')}' — refaça a cobertura (regra 13)")
+        elif sem_cena(s):
+            midia = f"⬛ SEM CENA — nenhuma mídia achada pra '{s.get('query', '')}' — COBRIR (regra 13)"
+        elif ov.get("cartao"):
             midia = f"🃏 cartão de texto (nenhuma imagem boa pra '{s.get('query', '')}') — não ponha destaque nem quadro em cima; troque por uma mídia enviada se alguma combinar"
         elif ov.get("source") == "local_file":
             bid = _id_da_biblioteca(job, ov)
@@ -316,14 +341,14 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
 10. Composição dos trechos: "bordas" (smart pra vídeo com barra preta/baixa qualidade), "camera"/"foco" em fotos, "transition_som" (id ou "nenhum") pra trocar o som de uma transição.
 11. MÍDIAS ENVIADAS (lista "📁" acima): a pessoa mandou esses arquivos pra entrarem no vídeo — elas valem MAIS que o banco de imagens. Ponha cada uma no trecho em que a fala combina com ela usando "midia": "bib:<id>" no trecho (vídeo de site/página no trecho que fala do site; foto de pessoa quando falam dela). Use TODAS pelo menos uma vez (só deixe de fora a que não combina com nada e diga em "observacoes"); a mesma mídia pode voltar mais tarde. Não troque um trecho marcado "arquivo escolhido pela pessoa".
 12. SITE NA TELA: sempre que a fala citar um site, uma página, uma notícia ou um post, MOSTRE: se tem um vídeo/print dele nas mídias enviadas, use (rule 11); senão um quadro "pagina" com "url" (o endereço completo — dos links abaixo ou o que a fala diz; o print é tirado sozinho) e "site" (o domínio na barra), ou "post" pra post de rede social. Não invente endereço: sem o link, use "site" + "titulo" (a manchete).
-
+{regra_cobrir}
 ## Responda SÓ com este JSON (sem texto antes/depois)
 {
   "filtro_cor": "id ou null",
   "paleta": {"primaria": "#RRGGBB", "secundaria": "#RRGGBB", "acento": "#RRGGBB"},
   "legenda": {"estilo": "id", "posicao": "base", "tamanho": 0.06, "maiusculas": false, "cor_ativa": "#RRGGBB"},
   "trechos": [
-    {"trecho": 2, "midia": "bib:<id> (mídia enviada pela pessoa — opcional)"},
+    {"trecho": 2, "midia": "bib:<id> (mídia enviada pela pessoa — opcional)"},{exemplo_cobrir}
     {"trecho": 3, "transition": "id ou none", "transition_duration": 0.6, "transition_som": "id opcional", "efeito": "id ou null", "entrada": "id ou null", "saida": "id ou null",
      "template": "id ou null", "template_campos": {"campo": "texto", "_fundo": "id opcional", "_fundo_cor": "#RRGGBB"},
      "bordas": "smart", "camera": "in", "foco": {"x": 0.5, "y": 0.35}}
@@ -351,6 +376,21 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
 (Só na PARTE 1, acrescente: "direcao_arte": {"resumo": "1-2 frases", "destaques": "estilos/fontes/animações/zonas que você usou e quando",
  "cores": "como usou a paleta", "transicoes": "quais e quando", "efeitos": "quais", "graficos": "esquema/cartão/cores",
  "quadros": "quadros editoriais: cor/fundo/quando", "regras": ["regra que as outras partes devem seguir"]})""" if (parte and parte["k"] == 1) else ""))
+    vazios = [i + 1 for i, s in enumerate(segs) if sem_cena(s) and (not parte or na_parte(s["start"], s["end"]))]
+    regra = ""
+    if vazios:
+        regra = ("13. TRECHOS SEM CENA (⬛: " + ", ".join(f"T{n}" for n in vazios[:80]) + "): nenhum banco achou mídia pra eles. "
+                 "COBRE cada um como se fosse uma ESCOLHA de edição (nunca pode parecer buraco ou erro): no trecho mande "
+                 "\"cobrir\": {\"fundo\": \"id\", \"cor\": \"#RRGGBB\"} (um fundo gerado que combina com o assunto — lista abaixo) "
+                 "e, POR CIMA, o que a fala daquele momento pede: uma cena/template com os textos (se a direção permite), um "
+                 "quadro editorial de tela cheia (numero, recortes, linha_tempo, ficha…), um gráfico se a fala cita dados, ou "
+                 "um destaque avulso de tela cheia com a frase-chave (\"avulso\": true, start/end do trecho). Pode pôr "
+                 "\"efeito\" de atmosfera e \"camera\" (o fundo é uma FOTO). Trechos sem cena seguidos: varie o fundo e o "
+                 "que vai por cima. Se a pessoa já pôs uma mídia num trecho que antes era ⬛, ele aparece normal na lista — "
+                 "edite como qualquer clipe.\n    Fundos (\"cobrir.fundo\"): "
+                 + "; ".join(f"{f} = {d}" for f, d in FUNDOS_COBERTURA))
+    L[-1] = L[-1].replace("{regra_cobrir}", regra).replace(
+        "{exemplo_cobrir}", f'\n    {{"trecho": {vazios[0]}, "cobrir": {{"fundo": "papel", "cor": "#RRGGBB"}}, "camera": "in", "efeito": "id ou null"}},' if vazios else "")
     try:  # o vídeo fala um idioma só: textos de destaques/gráficos/cenas no idioma da narração
         import idiomas
         L.append("")
@@ -582,6 +622,20 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
             avisos.append(f"Trecho {n} não existe (o projeto tem {n_trechos}).")
             continue
         r: Dict[str, Any] = {"indice": i}
+        cob = it.get("cobrir")
+        if isinstance(cob, str):
+            cob = {"fundo": cob}
+        if isinstance(cob, dict) and cob.get("fundo") not in (None, "", "null"):
+            fundo = str(cob.get("fundo")).strip()
+            if fundo not in IDS_COBERTURA:
+                avisos.append(f"T{n}: fundo de cobertura '{fundo}' desconhecido — usei 'escuro'.")
+                fundo = "escuro"
+            r["cobrir"] = {"fundo": fundo}
+            if re.fullmatch(r"#[0-9a-fA-F]{6}", str(cob.get("cor") or "")):
+                r["cobrir"]["cor"] = str(cob["cor"]).upper()
+            if foto is not None and i < len(foto):  # coberto = vira FOTO (o fundo): câmera e efeitos de foto valem
+                foto = list(foto)
+                foto[i] = True
         if it.get("midia") not in (None, "", "null"):  # 📁 mídia que a pessoa enviou → o trecho passa a usar ela
             bid = re.sub(r"^bib:", "", str(it["midia"]).strip(), flags=re.I)
             if biblioteca is not None and bid in biblioteca:

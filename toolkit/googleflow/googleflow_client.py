@@ -705,6 +705,7 @@ def marcar_esgotada(nome: str, horas: float = 24, agora: Optional[datetime] = No
 
 def liberar_conta(nome: str, tipo: Optional[str] = None) -> None:
     tipo = tipo_do_limite(tipo)
+    despular_conta(nome)  # ♻ liberar = volta a tentar a conta também se ela tinha sido pulada
     with _CONTAS_LOCK:
         d = _ler_contas()
         if tipo:
@@ -713,6 +714,48 @@ def liberar_conta(nome: str, tipo: Optional[str] = None) -> None:
             d["esgotadas"].pop(nome, None)
             d["esgotadas_tipo"].pop(nome, None)
         _gravar_contas(d)
+
+
+# ⏭ v84_110: conta PULADA (pediu login de novo, sessão caiu, não abriu o navegador…) — fica fora da troca de contas até
+# fazer o login (🔑 Contas Google / 🌐 Abrir navegador), clicar em ♻ liberar, ou passar PULAR_MINUTOS. Só na memória:
+# reiniciar o site tenta a conta de novo.
+PULAR_MINUTOS = 60
+_PULADAS: Dict[str, Dict[str, Any]] = {}
+_PULADAS_LOCK = threading.Lock()
+RE_PROBLEMA_DE_LOGIN = re.compile(r"login|log in|sign[ -]?in|fa[çc]a o login|fazer login|entrar na conta|sess[ãa]o (?:caiu|expirou)|"
+                                  r"verifi(?:que|car) (?:sua|a) (?:identidade|conta)|captcha|unusual|incomum|"
+                                  r"conta (?:desativada|suspensa|bloqueada)|account (?:disabled|suspended)|accounts\.google\.com", re.I)
+
+
+def _chave_pulada(nome: str) -> str:
+    return f"{pasta_dados()}::{nome}"  # por pasta de dados (cada instalação/teste tem as suas)
+
+
+def pular_conta(nome: str, motivo: str, minutos: Optional[float] = None, agora: Optional[datetime] = None) -> None:
+    agora = agora or datetime.now()
+    ate = agora + timedelta(minutes=PULAR_MINUTOS if minutos is None else minutos)
+    with _PULADAS_LOCK:
+        _PULADAS[_chave_pulada(nome)] = {"motivo": str(motivo or "problema na conta")[:240], "ate": ate.isoformat(timespec="seconds")}
+
+
+def despular_conta(nome: Optional[str] = None) -> None:
+    """Volta a usar a conta (None = todas)."""
+    with _PULADAS_LOCK:
+        if nome is None:
+            for k in [k for k in _PULADAS if k.startswith(f"{pasta_dados()}::")]:
+                _PULADAS.pop(k, None)
+        else:
+            _PULADAS.pop(_chave_pulada(nome), None)
+
+
+def conta_pulada(nome: str, agora: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+    agora = agora or datetime.now()
+    with _PULADAS_LOCK:
+        info = _PULADAS.get(_chave_pulada(nome))
+        if info and not _ativo(info["ate"], agora):
+            _PULADAS.pop(_chave_pulada(nome), None)
+            return None
+        return dict(info) if info else None
 
 
 def _ativo(ate: Optional[str], agora: datetime) -> bool:
@@ -744,6 +787,7 @@ def listar_contas(agora: Optional[datetime] = None) -> List[Dict[str, Any]]:
             "esgotada_imagem": toda or img, "imagem_ate": (ate if toda else por.get("imagem")) if (toda or img) else None,
             "logada": arquivo_sessao(nome).exists(), "email": c["email"],
             "tem_senha_salva": obter_senha(nome) is not None,
+            "pulada": (conta_pulada(nome, agora) or {}).get("motivo"), "pulada_ate": (conta_pulada(nome, agora) or {}).get("ate"),
         })
     return saida
 
@@ -751,7 +795,7 @@ def listar_contas(agora: Optional[datetime] = None) -> List[Dict[str, Any]]:
 def conta_serve(nome: str, tipo: Optional[str] = None, agora: Optional[datetime] = None) -> bool:
     c = next((x for x in listar_contas(agora) if x["nome"] == nome), None)
     tipo = tipo_do_limite(tipo)
-    return bool(c) and not c["esgotada"] and not (tipo and c["esgotada_" + tipo])
+    return bool(c) and not c["esgotada"] and not (tipo and c["esgotada_" + tipo]) and not c.get("pulada")
 
 
 def escolher_conta_disponivel(agora: Optional[datetime] = None, tipo: Optional[str] = None) -> str:
@@ -759,7 +803,12 @@ def escolher_conta_disponivel(agora: Optional[datetime] = None, tipo: Optional[s
     têm login. Se nenhuma serve, levanta `GoogleFlowSemContas`."""
     contas = listar_contas(agora)
     tipo = tipo_do_limite(tipo)
-    livres = [c for c in contas if not c["esgotada"] and not (tipo and c["esgotada_" + tipo])]
+    livres = [c for c in contas if not c["esgotada"] and not (tipo and c["esgotada_" + tipo]) and not c.get("pulada")]
+    puladas = [c for c in contas if c.get("pulada") and not c["esgotada"] and not (tipo and c["esgotada_" + tipo])]
+    if not livres and puladas:
+        raise GoogleFlowSemContas(
+            "Nenhuma conta do Google Flow disponível: " + "; ".join(f"'{c['nome']}' foi pulada ({c['pulada']})" for c in puladas)
+            + ". Faça o login dela em 🔑 Contas Google (ou 🌐 Abrir navegador no 🚀 Em massa) e tente de novo.")
     if not livres:
         def _quando(c):
             return c["esgotada_ate"] or (c.get(f"{tipo}_ate") if tipo else None) or "?"
@@ -2828,6 +2877,7 @@ class _Trabalhador(threading.Thread):
     def _atender(self, p, item: _Pedido) -> None:
         horas = _horas_para_liberar(item.cfg)
         ultimo_limite = ""
+        ultimo_login: Optional[GoogleFlowLoginRequired] = None
         for _ in range(len(nomes_das_contas()) + 1):  # no máximo uma tentativa por conta: nunca gira pra sempre
             if item.tipo != "lote" and (_videos_do_cache(item.chave) if item.tipo in ("video", "animar") else _fotos_do_cache(item.chave)):  # outro pedido igual já gerou enquanto esperava na fila
                 return
@@ -2845,10 +2895,19 @@ class _Trabalhador(threading.Thread):
                 # volta pro início do laço: escolhe a próxima conta e refaz ESTE pedido
                 # (se não sobrou nenhuma, `escolher_conta_disponivel` levanta SemContas)
             except GoogleFlowSemContas as exc_sem:
+                if ultimo_login is not None:  # pulou conta(s) por login e não sobrou nenhuma: o erro útil é o do login
+                    raise ultimo_login from exc_sem
                 if ultimo_limite:  # não perde o texto que o Flow mostrou
                     raise GoogleFlowSemContas(f"{exc_sem} | Última mensagem do Flow: {ultimo_limite}") from exc_sem
                 raise
             except GoogleFlowLoginRequired as exc:
+                if self.chave[0] != "cdp" and self.conta and len(nomes_das_contas()) > 1:
+                    # ⏭ v84_110: a conta pediu login → pula ela e refaz ESTE pedido na próxima
+                    pular_conta(self.conta, f"pediu login: {str(exc)[:160]}")
+                    ultimo_login = exc if str(exc).startswith("Conta '") else GoogleFlowLoginRequired(f"Conta '{self.conta}': {exc}")
+                    self._fechar_pagina()
+                    self._fechar_contexto()
+                    continue
                 if self.conta and not str(exc).startswith("Conta '"):
                     raise GoogleFlowLoginRequired(f"Conta '{self.conta}': {exc}") from exc
                 raise

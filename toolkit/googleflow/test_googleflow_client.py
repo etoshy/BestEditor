@@ -1700,3 +1700,18 @@ def test_pagina_de_apresentacao_e_passada_no_login_manual():
     c = _cliente(cfg={"browser_visible": True}, flow_cfg={"precisa_login": True, "login_ok_depois": True, "pagina_apresentacao": True})
     assert len(c.search_photos_all("um gato")) == 1
     assert "crie_com_o_flow" in _pw(c).log
+
+
+def test_conta_que_pede_login_e_pulada_e_o_pedido_vai_pra_outra():
+    """v84_110: a principal pede login (modo oculto) → é PULADA e a mesma imagem sai na 'b'."""
+    gf.adicionar_conta("b")
+    _logada("principal")  # tinha login, mas a sessão caiu
+    _logada("b")
+    c = _cliente(cfg={"browser_visible": False}, flow_cfg={"precisa_login_contas": {"principal"}})
+    try:
+        assert len(c.search_photos_all("um gato")) == 1
+        assert [x.conta_fake for x in _pw(c).contextos] == ["principal", "b"]
+        assert "login" in gf.conta_pulada("principal")["motivo"] and gf.conta_pulada("b") is None
+        assert not gf.conta_serve("principal", "imagem")
+    finally:
+        gf.despular_conta(None)

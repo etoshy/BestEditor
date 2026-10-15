@@ -339,37 +339,53 @@ class _Sessao(threading.Thread):
         while True:
             try:
                 return fd.gerar_um(self.page, trab, on_passo, timeout)
-            except fd.FlowLimite as exc:
+            except (fd.FlowLimite, fd.FlowLogin) as exc:
                 conta = self.conta or gf.CONTA_PADRAO
                 tentadas.append(conta)
+                login = isinstance(exc, fd.FlowLogin)  # ⏭ v84_110: pediu login → pula a conta e segue na próxima
                 pode_trocar = opcoes.get("trocar_conta", True) and str(cfg.get("flow_navegador") or "auto").lower() != "cdp"
                 tipo_lim = gf.tipo_do_limite(trab.get("tipo"))  # v84_105: sem crédito de vídeo ≠ sem crédito de imagem
                 try:
-                    gf.marcar_esgotada(conta, gf._horas_para_liberar(cfg), tipo=tipo_lim)
+                    if login:
+                        if pode_trocar:
+                            gf.pular_conta(conta, f"pediu login: {exc.mensagem[:160]}")
+                    else:
+                        gf.marcar_esgotada(conta, gf._horas_para_liberar(cfg), tipo=tipo_lim)
                 except Exception:  # noqa: BLE001
                     pass
-                exc.conta_marcada, exc.tipo_lim = conta, tipo_lim
+                if not login:
+                    exc.conta_marcada, exc.tipo_lim = conta, tipo_lim
                 if not pode_trocar:
-                    raise
-                try:
-                    proxima = gf.escolher_conta_disponivel(tipo=tipo_lim)
-                except Exception as exc_sem:  # noqa: BLE001 — GoogleFlowSemContas
-                    novo = fd.FlowLimite(exc.passo, f"{exc.mensagem} — e não sobrou outra conta com crédito: {exc_sem}",
-                                         page=getattr(exc, "page", None))
-                    novo.conta_marcada, novo.tipo_lim = conta, tipo_lim
-                    raise novo from exc
-                if proxima in tentadas:
                     raise
                 try:
                     gf.salvar_diagnostico(getattr(exc, "page", None) or self.page, str(exc))
                 except Exception:  # noqa: BLE001
                     pass
-                on_passo("conta", "andando", f"🔁 a conta “{conta}” está sem créditos de {'vídeo' if tipo_lim == 'video' else 'imagem'} "
-                                             f"({exc.mensagem[:140]}) — ela continua valendo pra "
-                                             f"{'imagem' if tipo_lim == 'video' else 'vídeo'}; trocando pra “{proxima}” e fazendo de novo…")
-                self._fechar_pagina()
-                self._garantir_navegador(cfg, bool(opcoes.get("visivel")), proxima)
-                self._garantir_projeto(cfg, True, on_passo, atual)
+                motivo = (f"🔒 a conta “{conta}” pediu login ({exc.mensagem[:140]}) — pulando ela" if login else
+                          f"🔁 a conta “{conta}” está sem créditos de {'vídeo' if tipo_lim == 'video' else 'imagem'} "
+                          f"({exc.mensagem[:140]}) — ela continua valendo pra {'imagem' if tipo_lim == 'video' else 'vídeo'}")
+                while True:  # a próxima conta também pode pedir login ao abrir: pula e tenta a seguinte
+                    try:
+                        proxima = gf.escolher_conta_disponivel(tipo=tipo_lim)
+                    except Exception as exc_sem:  # noqa: BLE001 — GoogleFlowSemContas
+                        cls = fd.FlowLogin if login else fd.FlowLimite
+                        novo = cls(exc.passo, f"{exc.mensagem} — e não sobrou outra conta: {exc_sem}",
+                                   page=getattr(exc, "page", None))
+                        if not login:
+                            novo.conta_marcada, novo.tipo_lim = conta, tipo_lim
+                        raise novo from exc
+                    if proxima in tentadas:
+                        raise exc
+                    on_passo("conta", "andando", f"{motivo}; trocando pra “{proxima}” e fazendo de novo…")
+                    self._fechar_pagina()
+                    try:
+                        self._garantir_navegador(cfg, bool(opcoes.get("visivel")), proxima)
+                        self._garantir_projeto(cfg, True, on_passo, atual)
+                        break
+                    except fd.FlowLogin as exc_login:
+                        tentadas.append(proxima)
+                        gf.pular_conta(proxima, f"pediu login: {exc_login.mensagem[:160]}")
+                        motivo = f"🔒 a conta “{proxima}” também pediu login — pulando ela"
                 on_passo("conta", "ok", f"agora na conta “{proxima}”")
                 for k in ("inicio", "fim", "referencia"):  # a mídia do projeto antigo não existe no novo: reenvia o arquivo
                     f = trab.get(k)
