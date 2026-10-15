@@ -37,7 +37,7 @@ class TestMiniaturas:
     def test_tratamento_usa_uma_entrada_por_imagem(self, tmp_path):
         ds = [{"estilo": "marca_azul", "start": k * 2, "end": k * 2 + 1.5, "texto": "x"} for k in range(6)]
         ent, etapas = dd.filtros_de_tratamento(ds, 320, 180, str(tmp_path))
-        assert ent.count("-i") == 1 and "split=6" in etapas[0]
+        assert ent.count("-i") == 1 and "concat" in ent and etapas[0].startswith("[1:v]fps=30")  # v84_117: uma faixa só
 
 
 class TestKit:

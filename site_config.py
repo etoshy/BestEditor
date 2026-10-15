@@ -218,13 +218,13 @@ VALID_TRANSITION_TYPES = {
 VALID_SEARCH_ORIENTATIONS = ("match_export", "16:9", "9:16", "1:1", "mixed")
 # (valor, rótulo) de cada transição, na ordem em que aparecem nos seletores
 TRANSITION_LABELS = [('none', '✂️ Corte seco'), ('fade', '🌗 Fade (mistura suave)'), ('dissolve', '💫 Dissolve'), ('fadeblack', '⬛ Fade pra preto'), ('fadewhite', '⬜ Fade pra branco'), ('wipeleft', '◀️ Wipe (esquerda)'), ('wiperight', '▶️ Wipe (direita)'), ('wipeup', '🔼 Wipe (cima)'), ('wipedown', '🔽 Wipe (baixo)'), ('slideleft', '⬅️ Slide (esquerda)'), ('slideright', '➡️ Slide (direita)'), ('slideup', '⬆️ Slide (cima)'), ('slidedown', '⬇️ Slide (baixo)'), ('circleopen', '⭕ Círculo abrindo'), ('circleclose', '⚫ Círculo fechando'), ('circlecrop', '⭕ Círculo (corte)'), ('rectcrop', '▭ Retângulo (corte)'), ('smoothleft', '〰️ Suave (esquerda)'), ('smoothright', '〰️ Suave (direita)'), ('smoothup', '〰️ Suave (cima)'), ('smoothdown', '〰️ Suave (baixo)'), ('vertopen', '↕️ Vertical abrindo'), ('vertclose', '↕️ Vertical fechando'), ('horzopen', '↔️ Horizontal abrindo'), ('horzclose', '↔️ Horizontal fechando'), ('wipetl', '↖️ Wipe (diagonal sup. esq.)'), ('wipetr', '↗️ Wipe (diagonal sup. dir.)'), ('wipebl', '↙️ Wipe (diagonal inf. esq.)'), ('wipebr', '↘️ Wipe (diagonal inf. dir.)'), ('diagtl', '◤ Diagonal (sup. esq.)'), ('diagtr', '◥ Diagonal (sup. dir.)'), ('diagbl', '◣ Diagonal (inf. esq.)'), ('diagbr', '◢ Diagonal (inf. dir.)'), ('hlslice', '▤ Fatias horizontais (esq.)'), ('hrslice', '▤ Fatias horizontais (dir.)'), ('vuslice', '▥ Fatias verticais (cima)'), ('vdslice', '▥ Fatias verticais (baixo)'), ('pixelize', '▦ Pixelizar'), ('hblur', '💨 Desfoque horizontal'), ('fadegrays', '◐ Fade (preto e branco)'), ('fadefast', '⚡ Fade rápido'), ('fadeslow', '🐢 Fade lento'), ('distance', '🌫️ Distância'), ('radial', '🕐 Radial (ponteiro)'), ('squeezeh', '↔️ Espremer horizontal'), ('squeezev', '↕️ Espremer vertical'), ('zoomin', '🔍 Zoom in'), ('hlwind', '🍃 Vento (esquerda)'), ('hrwind', '🍃 Vento (direita)'), ('vuwind', '🍃 Vento (cima)'), ('vdwind', '🍃 Vento (baixo)'), ('coverleft', '🔲 Cobrir (esquerda)'), ('coverright', '🔲 Cobrir (direita)'), ('coverup', '🔲 Cobrir (cima)'), ('coverdown', '🔲 Cobrir (baixo)'), ('revealleft', '🔳 Revelar (esquerda)'), ('revealright', '🔳 Revelar (direita)'), ('revealup', '🔳 Revelar (cima)'), ('revealdown', '🔳 Revelar (baixo)'), ('blinds_h', '🎞️ Persianas (horizontal)'), ('blinds_v', '🎞️ Persianas (vertical)'), ('checkerboard', '▦ Xadrez'), ('noise_dissolve', '✨ Dissolve com ruído'), ('iris_blur', '🔮 Íris (borda suave)'), ('diamond_iris', '💎 Íris em losango'), ('pinwheel', '🌀 Cata-vento'), ('wave_wipe', '🌊 Varredura ondulada'), ('fade_grayscale', '⚫ Dissolve com passagem por cinza')]
-ALL_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "flow"]
+ALL_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "flow", "runpod"]
 # Provedores que foram ADICIONADOS depois da primeira versão da config: um
 # `site_config.json` antigo (ou um formulário antigo) não os tem em
 # `provider_priority` — em vez de dar erro de "faltando provedor", completa
 # no fim da lista automaticamente. Provedores fora desta lista continuam
 # obrigatórios (uma lista realmente incompleta ainda é rejeitada).
-PROVEDORES_ADICIONADOS_DEPOIS = ("flow", "moviepexels", "animepexels_online", "moviepexels_online")
+PROVEDORES_ADICIONADOS_DEPOIS = ("flow", "moviepexels", "animepexels_online", "moviepexels_online", "runpod")
 VALID_FLOW_BROWSERS = ("auto", "chrome", "edge", "chromium", "firefox", "webkit", "cdp")
 
 # altura de exportação, em pixels, pra cada opção de qualidade
@@ -292,7 +292,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # modelados) pedem pra IA falar ele no momento certo (cada projeto pode trocar)
     "nome_canal": "",
     "voz_simultaneos": "auto",  # 🎛 quantos áudios o Gerador de voz gera ao mesmo tempo (fila_voz.py)
-    "export_paralelo": "auto",  # ⚡ exportação em pedaços paralelos ("1" = desligada; export_paralelo.py)
+    "export_paralelo": "auto",
+    # 🟣 Runpod (runpod_gerador.py): imagens/vídeos gerados por IA pagos do saldo da conta
+    "runpod_api_key": "", "runpod_modelo_imagem": "z-image-turbo", "runpod_modelo_video": "p-video",
+    "runpod_video_duracao": 5, "runpod_video_rascunho": False, "runpod_video_1080p": False,
+    "runpod_reserva_flow": False,  # Flow sem crédito (vídeo/foto) → gera no Runpod antes de ir pra pesquisa  # ⚡ exportação em pedaços paralelos ("1" = desligada; export_paralelo.py)
     "voz_instancias": "1",      # ⚡ geração rápida: cópias do motor num MESMO áudio ("1" = desligada; tts_paralelo.py)
     # ⛔ lista negra de sites (lista_negra.py): imagem/vídeo de lá nunca entra (marca d'água); editável em Configurações
     "sites_bloqueados": None,

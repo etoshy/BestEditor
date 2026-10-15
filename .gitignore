@@ -7,6 +7,8 @@
 # ---------- PESSOAL / SENHAS — nunca versionar ----------
 # sessão da conta Google usada pelo Google Flow
 flow_dados/
+# 🟣 Runpod: mídias geradas, cache e gasto (a chave fica em site_config.json)
+runpod_dados/
 # cookies do YouTube
 cookies_youtube.txt
 youtube_cookies.json

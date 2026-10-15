@@ -99,6 +99,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                      "Quando o Google Flow falha com \"pode violar nossas políticas contra a geração de imagens de pessoas famosas\", "
                      "a IA troca o nome da pessoa real por uma descrição genérica (roupa, época, cenário) e o Flow tenta de novo "
                      "(a geração recusada é reembolsada pelo Google).", True),
+    "runpod_prompt": ("🟣 Runpod: prompt do jeito de cada modelo",
+                      "Antes de gerar no Runpod, a IA escreve o prompt próprio do modelo (Z-Image, Flux, Pruna Video): em "
+                      "inglês, com o estilo do vídeo, prompt negativo no Flux e movimento de câmera no vídeo.", True),
     "flow_foto": ("🔁 Flow em massa: vídeo → foto",
                   "No 🚀 Em massa da aba Google Flow, quando TODAS as contas ficam sem crédito de vídeo, a IA reescreve o "
                   "prompt de cada vídeo que falta como prompt de FOTO (o instante mais marcante, sem movimento de câmera).", True),

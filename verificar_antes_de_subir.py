@@ -29,7 +29,7 @@ from typing import List, Tuple
 # ---------------------------------------------------------------- o que nunca sobe
 PASTAS_PESSOAIS = (
     "jobs/", "uploads/", "outputs/", "narracoes/", "conversas/", "roteiros_yt/", "vendas/", "dossies/",
-    "modelados/", "chamadas_padrao/", "downloads/", "flow_dados/", "ia_cache/", "analises_canal/",
+    "modelados/", "chamadas_padrao/", "downloads/", "flow_dados/", "runpod_dados/", "ia_cache/", "analises_canal/",
     "niche_miner/data/", "toolkit/tts/models/", ".chrome_downloads/",
     "ia_google/perfil_navegador/", "ia_google/conversas/", "ia_google/debug/", "ia_google/erros/", "ia_google/resultados/",
     "ia_google/videos/", "ia_google/config.json",
@@ -53,6 +53,7 @@ SEGREDOS: List[Tuple[str, re.Pattern]] = [
     ("chave privada", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |)PRIVATE KEY-----")),
     ("cookie de sessão do Google/YouTube", re.compile(r"\b(__Secure-[13]PSID|SAPISID|__Secure-3PAPISID|LOGIN_INFO)\b[\"'\s:=\t]+[A-Za-z0-9_\-./:%]{20,}")),
     ("chave do ElevenLabs", re.compile(r"\bsk_[a-f0-9]{40,}\b")),
+    ("chave do Runpod", re.compile(r"\brpa_[A-Za-z0-9]{30,}\b")),
 ]
 # testes usam chaves falsas de propósito ("AIzaFake…", "sk-ant-teste")
 FALSO = re.compile(r"fake|falsa|teste|test|exemplo|example|xxxx|errada|qualquer", re.I)

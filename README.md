@@ -28,6 +28,40 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🚀 Destaques de texto horas mais rápidos (v84_117)
+
+- A etapa “Destaques de texto” podia levar **horas** (a tela chegou a prever 8 h). Cada fundo com imagem (faixas,
+  grade, vinheta…) entrava como uma sobreposição de tela cheia rodando o vídeo **inteiro**. Com 200 destaques eram 200
+  sobreposições em cada quadro.
+- Agora todos os fundos viram **uma faixa só**: uma lista do concat do ffmpeg com cada imagem no tempo do seu destaque
+  e transparente no resto, ou seja, **uma** sobreposição, não importa quantos destaques. Destaques ao mesmo tempo vão
+  em faixas separadas.
+- Num teste com 12 destaques, a etapa caiu de 20 s pra 4 s. O ganho cresce com o número de destaques.
+- Testes: `test_v84_destaques_faixa.py`.
+
+## 🟣 Runpod: outro gerador de imagens e vídeos por IA (v84_116)
+
+- Nova fonte **`runpod`**, além do Google Flow. Gera pela API do Runpod (Public Endpoints) em segundos, sem navegador,
+  e é **paga do saldo da sua conta**:
+  - 🖼 **Z-Image Turbo** — US$ 0,005 por imagem (o padrão);
+  - 🖼 **Flux Schnell** — ~US$ 0,0025 por megapixel, aceita prompt negativo;
+  - 🎬 **Pruna Video** — 1–10 s, US$ 0,02/s em 720p; o modo rascunho sai 75% mais barato.
+- **⚙️ Configurações → 🟣 Runpod**: chave da API (fica em `site_config.json`, que não vai pro GitHub), modelo de imagem
+  e de vídeo, duração, rascunho, 1080p, **💰 saldo** (conferido ao abrir e com ↻), gasto do site e 🧪 imagem de teste.
+- **Prompt do jeito de cada modelo** (`runpod_gerador.adaptar`): em inglês, com o estilo do vídeo e a proporção
+  certa (tamanhos válidos de cada um). No Flux vai **prompt negativo** (texto, marca d'água, deformações; desenho/3D
+  quando o vídeo é de imagens reais). No Pruna vai **movimento de câmera e da cena**, sem texto nem áudio. Com a 🤖 IA
+  ligada (recurso “🟣 Runpod: prompt do jeito de cada modelo”), ela escreve o prompt de cada modelo; sem ela, uma regra.
+- **💰 Saldo conferido antes de cada pedido**: se não paga, nem envia, e o trecho segue sem o Runpod.
+- **O mesmo pedido nunca é cobrado duas vezes**: tudo fica em `runpod_dados/` com cache, e a exportação usa o que a
+  prévia gerou.
+- **Na montagem**:
+  - trecho `runpod` de vídeo: vídeo; sem saldo pra vídeo (ou se falhar), vira **foto** com o prompt reescrito; sem
+    nada, **pesquisa** a cena nos mecanismos marcados;
+  - opção “quando o Flow não gerar, gerar no Runpod antes da pesquisa”.
+- Na página inicial a fonte `runpod` aparece desmarcada (marque pra IA do roteiro poder usar).
+- Testes: `test_v84_runpod.py`.
+
 ## ⚡ Exportação em pedaços paralelos (v84_115)
 
 - Os passes longos do fim da montagem (**destaques de texto, legendas, filtro de cor, passe de qualidade**) rodavam num

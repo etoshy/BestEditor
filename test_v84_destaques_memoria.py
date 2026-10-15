@@ -30,17 +30,17 @@ def test_sem_memoria_refaz_em_lotes_cada_vez_menores(tmp_path, monkeypatch):
     real = dd._passe_destaques
 
     def falso(video_in, video_out, ent, etapas, ass, work_dir, nome, dur, poupar=False):
-        n_png = ent.count("-i")
+        n_png = len(etapas)  # v84_117: os fundos com imagem viram UMA faixa — conta as etapas do grafo
         chamadas.append((nome, n_png, bool(ass)))
-        if (nome == "" or n_png > 2) and etapas:  # o passe único e lotes com mais de 2 imagens "estouram"
+        if (nome == "" or n_png > 3) and etapas:  # o passe único e lotes "grandes" estouram
             return subprocess.CompletedProcess([], 1, "", "[fc#0] Error while filtering: Cannot allocate memory")
         return real(video_in, video_out, ent, etapas, ass, work_dir, nome, dur, poupar)
     monkeypatch.setattr(dd, "_passe_destaques", falso)
     out = dd.aplicar_destaques(base, str(tmp_path / "o.mp4"), _ds(12), 320, 180, str(tmp_path / "w"))
     assert abs(_dur(out) - 6.0) < 0.15
-    assert chamadas[0][0] == "" and chamadas[-1] == ("_textos", 0, True)
+    assert chamadas[0][0] == "" and chamadas[-1][0] == "_textos" and chamadas[-1][2]
     lotes = [n for nome, n, _a in chamadas if nome.startswith("_lote")]
-    assert any(n > 2 for n in lotes) and lotes[-1] <= 2  # tentou lote grande, estourou, caiu pela metade até caber
+    assert lotes[0] > 3 and all(n <= 3 for n in lotes[-2:])  # tentou lote grande, estourou, caiu pela metade até caber
     assert not list((tmp_path / "w").glob("_destaques_lote*.mp4"))  # temporários apagados
 
 
@@ -66,6 +66,6 @@ def test_muitas_imagens_ja_vai_direto_em_lotes(tmp_path, monkeypatch):
     nomes = []
     real = dd._passe_destaques
     monkeypatch.setattr(dd, "_passe_destaques", lambda *a, **k: nomes.append(a[6]) or real(*a, **k))
-    monkeypatch.setattr(dd, "MAX_IMAGENS_PASSE_UNICO", 3)
+    monkeypatch.setattr(dd, "MAX_IMAGENS_PASSE_UNICO", 0)
     dd.aplicar_destaques(base, str(tmp_path / "o.mp4"), _ds(10), 320, 180, str(tmp_path / "w"))
     assert "" not in nomes and nomes[0] == "_lote1" and nomes[-1] == "_textos"

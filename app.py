@@ -2269,6 +2269,7 @@ def narracao_remover_geracao(projeto_id: str, geracao_id: str):
 def settings_page():
     import lista_negra
     return render_template("settings.html", config=load_site_config(), all_providers=ALL_PROVIDERS,
+                           runpod=__import__("runpod_gerador").resumo(rede=False),
                            sites_bloqueados=lista_negra.sites(), sites_padrao=lista_negra.PADRAO,
                            provedores_bloqueados=[p for p in ALL_PROVIDERS if lista_negra.provedor_bloqueado(p)],
                            vinhetas={t: os.path.basename(__import__("canal").clipe_padrao(t) or "") for t in __import__("canal").VINHETAS})
@@ -2360,6 +2361,22 @@ def save_settings():
         new_values["animepexels_online_api_key"] = request.form["animepexels_online_api_key"]
     if request.form.get("animepexels_online_apagar_chave") == "on":
         new_values["animepexels_online_api_key"] = ""
+    if "runpod_modelo_imagem" in request.form:  # 🟣 Runpod (v84_116)
+        import runpod_gerador as _rp
+        if (request.form.get("runpod_api_key") or "").strip():  # em branco = mantém a chave salva
+            new_values["runpod_api_key"] = request.form["runpod_api_key"].strip()
+        if request.form.get("runpod_apagar_chave") == "on":
+            new_values["runpod_api_key"] = ""
+        if request.form.get("runpod_modelo_imagem") in _rp.MODELOS:
+            new_values["runpod_modelo_imagem"] = request.form["runpod_modelo_imagem"]
+        if request.form.get("runpod_modelo_video") in _rp.MODELOS:
+            new_values["runpod_modelo_video"] = request.form["runpod_modelo_video"]
+        try:
+            new_values["runpod_video_duracao"] = max(1, min(10, int(request.form.get("runpod_video_duracao") or 5)))
+        except ValueError:
+            pass
+        for _b in ("runpod_video_rascunho", "runpod_video_1080p", "runpod_reserva_flow"):
+            new_values[_b] = request.form.get(_b) == "on"
     if "sites_bloqueados" in request.form:  # ⛔ lista negra de sites (v84_106)
         import lista_negra
         new_values["sites_bloqueados"] = (list(lista_negra.PADRAO) if request.form.get("sites_bloqueados_padrao") == "on"
@@ -2397,11 +2414,13 @@ def save_settings():
         new_values["flow_configurar_projeto"] = request.form.get("flow_configurar_projeto") == "on"
     try:
         saved = save_site_config(new_values)
-        return render_template("settings.html", config=saved, all_providers=ALL_PROVIDERS, success=True)
+        return render_template("settings.html", config=saved, all_providers=ALL_PROVIDERS, success=True,
+                               runpod=__import__("runpod_gerador").resumo(rede=False))
     except SiteConfigError as exc:
         # devolve o que a pessoa tentou salvar (não o que já estava no
         # disco), pra ela ver exatamente o que causou o erro e corrigir.
-        return render_template("settings.html", config={**load_site_config(), **new_values}, all_providers=ALL_PROVIDERS, error=str(exc))
+        return render_template("settings.html", config={**load_site_config(), **new_values}, all_providers=ALL_PROVIDERS, error=str(exc),
+                               runpod=__import__("runpod_gerador").resumo(rede=False))
 
 
 # --------------------------------------------------------------------- #
@@ -2989,7 +3008,7 @@ def _reserva_sem_youtube(job: dict) -> Tuple[str, str]:
     """(provider, media_type) pra um trecho que pedia YouTube com a fonte desmarcada: o 1º banco de VÍDEO marcado;
     sem nenhum, a 1ª fonte de foto marcada; sem nada, pexels."""
     import mix_midia
-    marcados = [p for p in job.get("providers") or [] if p not in ("youtube", "produto", "material", "flow")]
+    marcados = [p for p in job.get("providers") or [] if p not in ("youtube", "produto", "material", "flow", "runpod")]
     video = next((p for p in marcados if p not in mix_midia.SO_FOTO), None)
     if video:
         return video, "video"
@@ -3134,7 +3153,7 @@ def _aplicar_produto(job: dict, segmentos: list) -> int:
         return 0
     _t, mod, p, prov_proj = pj
     por_id = {m["id"].upper(): m for m in mod.midias_para_editor(BASE_DIR, p)}
-    reserva = next((x for x in job.get("providers") or [] if x not in ("produto", "material", "youtube", "flow", "wikipedia")), "pexels")
+    reserva = next((x for x in job.get("providers") or [] if x not in ("produto", "material", "youtube", "flow", "runpod", "wikipedia")), "pexels")
     n = 0
     for s in segmentos:
         d = s if isinstance(s, dict) else None
@@ -4207,7 +4226,7 @@ def submit_json(job_id: str):
     return redirect(url_for("fetching_previews_page", job_id=job_id))
 
 
-_IA_PULA_BUSCA = {"youtube", "flow", "produto", "material"}
+_IA_PULA_BUSCA = {"youtube", "flow", "runpod", "produto", "material"}
 
 
 # 🧭 v84_70: cada trecho vai pra FONTE CERTA (só entre os bancos que você ligou no projeto)
@@ -4236,9 +4255,9 @@ def _rotear_trecho(job: dict, sg: VideoSegment, nb: Dict[str, Any]) -> Dict[str,
         if foto and sg.provider not in _FOTOS_REAIS:
             sg.provider, sg.media_type = foto, "image"
             out = {"provider": foto, "media_type": "image", "ia_rota": "foto_real"}
-    elif midia == "ia" and "flow" in ligados:
-        sg.provider = "flow"
-        out = {"provider": "flow", "ia_rota": "flow"}
+    elif midia == "ia" and ("flow" in ligados or "runpod" in ligados):
+        sg.provider = "flow" if "flow" in ligados else "runpod"
+        out = {"provider": sg.provider, "ia_rota": sg.provider}
     elif midia == "cartao":
         out = {"ia_rigoroso": True, "ia_rota": "abstrato"}
     elif midia in ("foto", "video") and not real and sg.provider in _FOTOS_REAIS:
@@ -7963,7 +7982,7 @@ def buscas_previa(job_id: str, indice: int):
         _cfg_p = _job_site_cfg(job)
         import estilo_imagem as _ei
         # 🎞️🖼️ (v84_92) pede alguns e pula desenho/3D/recorte e mídia no formato errado (acervos de anime e Flow: não)
-        _filtra = _ei.filtro_ativo(_cfg_p) and provider not in _BIBLIOTECAS_LOCAIS and provider not in ("flow", "produto", "material")
+        _filtra = _ei.filtro_ativo(_cfg_p) and provider not in _BIBLIOTECAS_LOCAIS and provider not in ("flow", "runpod", "produto", "material")
         for q in tentativas:
             try:
                 cands = search_candidates(provider, q, media_type=media_type, max_results=6 if _filtra else 1, site_cfg=_cfg_p,
@@ -8984,7 +9003,7 @@ def _gerar_timeline2(job_id: str) -> None:
             prov, tipo = sd.get("provider"), sd.get("media_type") or "video"
             if prov == "youtube":
                 _pronto(i, _midia_igual_a_1(_f1(i), sd, "YouTube é escolhido à mão"))
-            elif prov == "flow":
+            elif prov in ("flow", "runpod"):
                 _pronto(i, _midia_igual_a_1(_f1(i), sd, "imagem gerada por IA"))
             elif tipo == "image" and prov in BROWSER_IMAGE_SEARCH_PROVIDERS:
                 imagens.append((i, _segmento_obj(dict(sd, override_source=None))))
@@ -9690,7 +9709,7 @@ def _fixar_midias_da_previa(job: dict, segments: List[VideoSegment]) -> List[Vid
         p = previews[i] if i < len(previews) and isinstance(previews[i], dict) else {}
         motivo, fixou = None, False
         flow_local = None
-        if not seg.override_source and p.get("ok") and (p.get("provider") or seg.provider) == "flow" \
+        if not seg.override_source and p.get("ok") and (p.get("provider") or seg.provider) in ("flow", "runpod") \
                 and (p.get("query") is None or " ".join(str(p["query"]).split()) == " ".join(seg.query.split())):
             from video_assembler import flow_arquivo_local as _fal
             flow_local = next((x for x in (_fal(p.get(k)) for k in ("video_preview_url", "result_url", "thumbnail_url")) if x), None)
@@ -10790,6 +10809,8 @@ import ia_rotas as _ia_rotas  # noqa: E402  🤖 IA nas buscas e modelos (v84_53
 _ia_rotas.registrar(app, BASE_DIR)
 import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de canal + ⛏ Niche Miner)
 _analisador_rotas.registrar(app, BASE_DIR)
+import runpod_gerador as _runpod  # noqa: E402  🟣 Runpod: mídias geradas, saldo e teste (v84_116)
+_runpod.registrar(app)
 import flow_estudio as _flow_estudio  # noqa: E402  🎬 aba Google Flow: gerar, galeria e 🧪 testar (v84_76)
 _flow_estudio.registrar(app, BASE_DIR)
 import ia_google_rotas as _ia_google_rotas  # noqa: E402  🔎 IA do Google (app à parte, porta 8852) (v84_86)

@@ -30,8 +30,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow", "youtube"]
-PHOTO_SEARCH_PROVIDERS = {"pexels", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow"}  # provedores que suportam media_type="image" (busca de fotos de verdade)
+DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow", "runpod", "youtube"]
+PHOTO_SEARCH_PROVIDERS = {"pexels", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow", "runpod"}  # provedores que suportam media_type="image" (busca de fotos de verdade)
 # os buscadores de imagem por navegador (bing/brave/yandex/startpage + google,
 # que é o Google Imagens pelo Modo IA do app ia_google/) --
 # usado tanto aqui (build_prompt) quanto em app.py (checkbox "usar
@@ -723,7 +723,7 @@ def build_prompt(
         "\"clipart\", \"isolated on white\" (os acervos de anime/filmes, quando marcados, são a exceção: lá é a obra mesmo)."
     )
     if "pexels" in providers:
-        _extras_foto = [f'\"{_p}\"' for _p in ("wikipedia",) + BROWSER_IMAGE_SEARCH_PROVIDERS + ("flow",) if _p in providers]
+        _extras_foto = [f'\"{_p}\"' for _p in ("wikipedia",) + BROWSER_IMAGE_SEARCH_PROVIDERS + ("flow", "runpod") if _p in providers]
         _photo_providers_note = (" ou " + " ou ".join(_extras_foto)) if _extras_foto else ""
         rules.append(f"(Opcional) Se um trecho combinar mais com uma FOTO parada (com efeito de zoom lento) do que com um vídeo — ex: um conceito, um produto específico, um retrato — pode usar `\"media_type\": \"image\"` nesse segmento, com `\"provider\": \"pexels\"` e o termo de busca da foto em \"query\". Sem essa chave, o padrão é sempre vídeo. Busca de foto só funciona com \"pexels\"{_photo_providers_note} — não use `\"media_type\": \"image\"` com nenhum outro provedor.")
     if "wikipedia" in providers:
@@ -818,6 +818,15 @@ def build_prompt(
             "trechos em que nenhum banco de estoque teria a cena (algo fantástico, hipotético, muito "
             "específico, ilustrativo, ou um conceito abstrato que precisa de uma imagem sob medida). Para "
             "cenas comuns (natureza, cidade, pessoas trabalhando, objetos), prefira SEMPRE os outros bancos."
+        )
+    if "runpod" in providers:
+        rules.append(
+            "O provedor \"runpod\" também GERA (não busca) uma mídia inédita com IA, pela API do Runpod (paga do saldo da "
+            "conta, rápida: segundos). IMAGEM (`\"media_type\": \"image\"`, o normal, ~US$ 0,005) ou VÍDEO curto de ~5 s "
+            "(`\"media_type\": \"video\"`, ~US$ 0,10 — só quando o MOVIMENTO importa). Todo segmento \"runpod\" traz o "
+            "\"media_type\" explícito, e a \"query\" é a DESCRIÇÃO DA CENA (assunto, ação, cenário, época, luz, enquadramento; "
+            "o site reescreve no formato de cada modelo). Sem pessoas reais/famosas, marcas, logotipos nem texto na imagem. "
+            "Use com moderação, só onde nenhum banco teria a cena — custa dinheiro a cada trecho."
         )
     if "animepexels" in providers:
         rules.append(
@@ -940,7 +949,7 @@ def build_prompt(
     # typing on laptop") não são entidades reais/nomeadas, então usá-lo
     # como exemplo contradiria a própria regra que acabamos de dar sobre
     # ele (nome preciso de algo real + media_type "image" obrigatório).
-    _non_wiki_providers = [p for p in providers if p not in (("wikipedia", "flow", "moviepexels", "moviepexels_online") + BROWSER_IMAGE_SEARCH_PROVIDERS + MANUAL_VIDEO_PROVIDERS)] or providers
+    _non_wiki_providers = [p for p in providers if p not in (("wikipedia", "flow", "runpod", "moviepexels", "moviepexels_online") + BROWSER_IMAGE_SEARCH_PROVIDERS + MANUAL_VIDEO_PROVIDERS)] or providers
     example_provider_a = _non_wiki_providers[0]
     example_provider_b = _non_wiki_providers[1] if len(_non_wiki_providers) > 1 else _non_wiki_providers[0]
     example_photo_line = (
@@ -948,7 +957,7 @@ def build_prompt(
         if "pexels" in providers else ""
     )
     optional_fields = ["\"visual\" e \"alternativas\" (por segmento — fortemente recomendados)", "\"on_screen_text\" (por segmento)"]
-    if "pexels" in providers or "wikipedia" in providers or "flow" in providers or _buscadores_navegador:
+    if "pexels" in providers or "wikipedia" in providers or "flow" in providers or "runpod" in providers or _buscadores_navegador:
         optional_fields.append("\"media_type\" (por segmento, padrão \"video\")")
     optional_fields.append("\"busca_reserva\" (no nível raiz)")
     optional_fields.append("\"soundtrack_suggestion\" (no nível raiz)")
@@ -1330,7 +1339,7 @@ def _graficos_da_ia(data: Any) -> List[Dict[str, Any]]:
 # tipo "4k footage" sem mudar o sentido) e onde não existe busca de reserva
 # (flow gera, youtube a pessoa escolhe, wikipedia é o nome exato).
 _PROVEDORES_COM_LIMPEZA = STOCK_PROVIDERS + ("animepexels", "moviepexels", "animepexels_online", "moviepexels_online")
-_PROVEDORES_SEM_ALTERNATIVA = ("flow", "youtube", "wikipedia")
+_PROVEDORES_SEM_ALTERNATIVA = ("flow", "runpod", "youtube", "wikipedia")
 
 _RUIDO_BUSCA = re.compile(
     r"\b(?:4k|8k|uhd|full\s*hd|hd|1080p|720p|stock\s+(?:footage|videos?|clips?|photos?|images?)|footage|b-?roll|royalty[\s-]*free)\b",
@@ -1775,7 +1784,7 @@ def _motivo_fixo(seg: Dict[str, Any]) -> str:
     if seg.get("override_source"):
         return "mídia escolhida à mão"
     prov = seg.get("provider")
-    if prov == "flow":
+    if prov in ("flow", "runpod"):
         return "imagem gerada por IA"
     if prov == "youtube":
         return "vídeo do YouTube"

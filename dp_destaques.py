@@ -1089,15 +1089,51 @@ def _tratamento(fundo: str, tratamento: str) -> str:
     return ""
 
 
+def _png_transparente(W: int, H: int, pasta: str) -> str:
+    from PIL import Image
+    os.makedirs(pasta, exist_ok=True)
+    p = os.path.join(pasta, f"vazio_{W}x{H}.png")
+    if not os.path.exists(p):
+        Image.new("RGBA", (W, H), (0, 0, 0, 0)).save(p)
+    return p
+
+
+def _faixa_de_fundos(usos: List[Tuple[str, float, float]], W: int, H: int, pasta: str, inicio: float, nome: str) -> str:
+    """Uma lista do concat do ffmpeg que vira UMA faixa de vídeo com os fundos (PNG) de vários destaques, cada um no
+    tempo dele e transparente no resto — em vez de uma entrada por destaque rodando o vídeo inteiro."""
+    vazio = _png_transparente(W, H, pasta)
+    linhas, t = ["ffconcat version 1.0"], inicio
+
+    def _add(arq: str, dur: float) -> None:
+        if dur > 0.0005:
+            linhas.append(f"file '{os.path.abspath(arq).replace(chr(92), '/')}'")
+            linhas.append(f"duration {dur:.4f}")
+    for png, a, b in usos:
+        _add(vazio, a - t)
+        _add(png, b - max(a, t))
+        t = max(t, b)
+    _add(vazio, 0.05)
+    linhas.append(f"file '{os.path.abspath(vazio).replace(chr(92), '/')}'")  # o concat ignora a duração do último
+    caminho = os.path.join(pasta, f"{nome}.ffconcat")
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write("\n".join(linhas) + "\n")
+    return caminho
+
+
 def filtros_de_tratamento(destaques: List[Dict[str, Any]], W: int, H: int, pasta: str,
-                          paleta: Optional[Dict[str, str]] = None) -> Tuple[List[str], List[str]]:
+                          paleta: Optional[Dict[str, str]] = None, inicio: float = 0.0) -> Tuple[List[str], List[str]]:
     """(entradas extras, etapas do filtergraph usando [base]) pro fundo de cada
     destaque — o do estilo ou o escolhido (dp_fundos: faixas, grades retas ou
-    onduladas, cena desfocada, banho de cor…), com cor e intensidade."""
+    onduladas, cena desfocada, banho de cor…), com cor e intensidade.
+
+    v84_117: os fundos com imagem (PNG) entram numa FAIXA só (concat de imagens, cada uma no tempo do seu destaque e
+    transparente no resto) — antes era uma entrada por imagem rodando a 30 fps o vídeo INTEIRO: com 200 destaques,
+    200 sobreposições de tela cheia em cada quadro (horas). Destaques que se sobrepõem no tempo vão em faixas
+    separadas. `inicio`: o tempo do vídeo onde a faixa começa (pedaço da exportação em paralelo)."""
     import dp_fundos
     ent: List[str] = []
     etapas: List[str] = []
-    usos_png: Dict[str, List[str]] = {}  # um PNG = uma entrada só (dividida), não uma por destaque
+    usos: List[Tuple[str, float, float]] = []
     for d in destaques:
         h = estilo(d.get("estilo")) or {}
         fid, cor, inten = dp_fundos.resolver(d, h.get("cena") or {}, paleta)
@@ -1106,16 +1142,22 @@ def filtros_de_tratamento(destaques: List[Dict[str, Any]], W: int, H: int, pasta
         a, b = float(d["start"]), float(d["end"])
         novas, png = dp_fundos.etapas_destaque(fid, cor, inten, a, b, W, H, pasta)
         etapas += novas
-        if png:
-            rot = f"g{len(etapas)}x{len(usos_png)}"
-            usos_png.setdefault(png, []).append(rot)
-            etapas.append(f"[base][{rot}]overlay=shortest=0:eof_action=repeat:enable='between(t,{a:.3f},{b:.3f})'[base]")
-    for n_in, (png, rotulos) in enumerate(usos_png.items(), start=1):
-        ent += ["-loop", "1", "-framerate", "2", "-i", png]
-        saidas = "".join(f"[{r}]" for r in rotulos)
-        # a imagem entra a 2 fps (decodifica pouco) e o fps=30 só repete o quadro: sem isso
-        # o overlay com enable= não pega o quadro na hora certa e o fundo não aparece
-        etapas.insert(0, f"[{n_in}:v]format=rgba,fps=30" + (f",split={len(rotulos)}" if len(rotulos) > 1 else "") + saidas)
+        if png and b > max(a, inicio):
+            usos.append((png, max(a, inicio), b))
+    camadas: List[List[Tuple[str, float, float]]] = []
+    for u in sorted(usos, key=lambda x: (x[1], x[2])):  # sobrepostos no tempo: outra faixa
+        alvo = next((c for c in camadas if c[-1][2] <= u[1] + 1e-6), None)
+        if alvo is None:
+            camadas.append([u])
+        else:
+            alvo.append(u)
+    for n_in, camada in enumerate(camadas, start=1):
+        lista = _faixa_de_fundos(camada, W, H, pasta, inicio,
+                                 f"faixa_{abs(hash((tuple(camada), inicio, W, H))) % 10 ** 10}_{n_in}")
+        ent += ["-f", "concat", "-safe", "0", "-i", lista]
+        rot = f"gf{n_in}"
+        etapas.insert(0, f"[{n_in}:v]fps=30,format=rgba[{rot}]")
+        etapas.append(f"[base][{rot}]overlay=shortest=0:eof_action=pass:format=auto[base]")
     return ent, etapas
 
 
@@ -1180,7 +1222,7 @@ def _destaques_em_pedacos(video_in: str, video_out: str, validos: List[Dict[str,
 
     def montar(ini: float, quadros: int, saida: str) -> List[str]:
         sub = [d for d in validos if _no(d, ini, ini + quadros / export_paralelo.FPS)]
-        ent, etapas = filtros_de_tratamento(sub, W, H, pasta_png, paleta)
+        ent, etapas = filtros_de_tratamento(sub, W, H, pasta_png, paleta, inicio=ini)
         linhas = export_paralelo.deslocar(["[0:v]setpts=PTS-STARTPTS,format=yuv420p[base]"] + etapas + [fim], ini)
         script = saida + ".grafo.txt"
         with open(script, "w", encoding="utf-8") as f:

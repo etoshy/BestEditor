@@ -247,6 +247,10 @@ def _sem_bloqueados(provedores: List[str], cfg: Optional[Dict[str, Any]] = None)
         return list(provedores)
 
 
+# 🤖 provedores que GERAM a mídia com IA (não buscam): nunca entram de reserva, não têm busca alternativa
+GERADORES_IA = ("flow", "runpod")
+
+
 def _sem_flow_no_fallback(provider_priority: List[str], provider_do_trecho: str) -> List[str]:
     """Bancos reserva de um trecho de vídeo: a prioridade sem o próprio banco do
     trecho e SEM o "flow" (gerar vídeo com IA leva minutos e gasta créditos —
@@ -255,7 +259,7 @@ def _sem_flow_no_fallback(provider_priority: List[str], provider_do_trecho: str)
     # estoque — senão uma cena de anime aparecia num vídeo que não é de anime só porque o
     # Pexels falhou. Entre acervos (local <-> online) continua valendo.
     acervo = provider_do_trecho in BIBLIOTECAS_LOCAIS
-    return [p for p in (provider_priority or []) if p != provider_do_trecho and p != "flow"
+    return [p for p in (provider_priority or []) if p != provider_do_trecho and p not in GERADORES_IA
             and (acervo or not p.endswith("_online"))]
 
 
@@ -264,6 +268,8 @@ def _provider_timeout_seconds(cfg: Dict[str, Any], provider: str) -> float:
     imagem com IA (leva de dezenas de segundos a minutos), então o limite
     padrão de uma busca em banco (25s) o derrubaria toda vez."""
     base = cfg.get("provider_attempt_timeout_seconds", 25)
+    if provider == "runpod":  # 🟣 gera em segundos; vídeo pode passar de 1 min na fila
+        return max(base, 600)
     if provider == "flow":
         try:
             flow_s = int(cfg.get("flow_timeout_seconds") or 300)
@@ -2421,7 +2427,7 @@ def _fallback_queries_for(segment: VideoSegment) -> List[str]:
     (o motivo mais comum é o termo ser específico ou pouco comum demais
     no banco de imagens escolhido).
     """
-    if segment.provider == "flow":
+    if segment.provider in GERADORES_IA:
         # gerar imagem com IA custa minutos e créditos: "tentar de novo com
         # menos palavras" seria gerar OUTRA imagem, não achar a mesma.
         return []
@@ -2510,6 +2516,8 @@ _PHOTO_PROVIDER_MODULES = {
     # imagens GERADAS por IA no Google Flow (automação de navegador; ver
     # toolkit/googleflow/googleflow_client.py) — recebe a config do site.
     "flow": ("googleflow.googleflow_client", "GoogleFlowClient"),
+    # 🟣 imagens geradas por IA no Runpod (API paga; runpod_gerador.py)
+    "runpod": ("runpod_gerador", "RunpodClient"),
 }
 
 _API_FALLBACK_CONFIG_KEY = {
@@ -2634,7 +2642,7 @@ class ClientFactory:
             # mais (era um gap real: eles ignoravam essa config e
             # ficavam sempre ocultos, mesmo com a pessoa desmarcando a
             # opção pra depurar).
-            if provider == "flow":
+            if provider in GERADORES_IA:
                 self._clients[cache_key] = client_cls(site_cfg=self.cfg)
             elif provider in _BROWSER_IMAGE_SEARCH_PROVIDERS:
                 _headless = not self.cfg.get("browser_visible", False)
@@ -2647,6 +2655,8 @@ class ClientFactory:
         return self._clients[cache_key]
 
     def _create_client(self, provider: str):
+        if provider == "runpod":  # 🟣 vídeo gerado no Runpod (Pruna Video)
+            return importlib.import_module("runpod_gerador").RunpodClient(site_cfg=self.cfg)
         if provider == "flow":
             # vídeo GERADO com IA (Veo) no Google Flow — mesmo cliente das
             # imagens, no modo vídeo (`search_all`/`download_video`). Ele só
@@ -3010,7 +3020,7 @@ def _escolher_candidato_previa(candidates: List[Dict[str, Any]], tracker: Option
 
 def _estilo_conta(provider: Optional[str]) -> bool:
     """Acervos de anime/filmes (desenho de propósito) e o Flow (imagem gerada por IA) ficam fora do filtro de estilo."""
-    return provider not in BIBLIOTECAS_LOCAIS and provider not in ("flow", "produto", "material")
+    return provider not in BIBLIOTECAS_LOCAIS and provider not in GERADORES_IA + ("produto", "material")
 
 
 def _ordenar_resultados_estilo(resultados: List[Any], provider: Optional[str] = None,
@@ -3567,6 +3577,11 @@ def flow_arquivo_local(url: Any) -> Optional[str]:
     """v84_112: link de mídia do Flow que JÁ está no disco ("/flow/imagens/<arq>" = gerada pros vídeos;
     "/flow/arquivo/<arq>" = galeria da aba 🎬 Google Flow) → o caminho do arquivo (ou None)."""
     u = str(url or "").split("?", 1)[0].split("#", 1)[0]
+    if "/runpod/midias/" in u:  # 🟣 gerada no Runpod
+        try:
+            return importlib.import_module("runpod_gerador").arquivo_local(u)
+        except Exception:  # noqa: BLE001
+            return None
     m = re.search(r"/flow/(imagens|arquivo)/([^/]+)$", u)
     if not m:
         return None
@@ -3613,6 +3628,33 @@ def prompt_de_foto(prompt: str) -> str:
         return prompt
 
 
+def gerar_no_runpod(segment: VideoSegment, downloads_dir: str, client_factory: "ClientFactory", cfg: Dict[str, Any],
+                    orientation: Optional[str] = None, video: bool = False, used_tracker=None) -> Tuple[List[str], str, str]:
+    """🟣 Gera a cena no Runpod: VÍDEO (Pruna) se pedido e o saldo paga; senão (ou se o vídeo falhar) a FOTO
+    (Z-Image/Flux) com o prompt de vídeo reescrito como foto. → (arquivos, "video"|"image", o que aconteceu).
+    Levanta erro se não deu nem foto (sem chave, sem saldo, recusa…)."""
+    rp = importlib.import_module("runpod_gerador")
+    if not rp.configurado(cfg):
+        raise VideoAssemblyError("Runpod sem chave (⚙️ Configurações → 🟣 Runpod).")
+    seg_rp = replace(segment, provider="runpod")
+    motivo = ""
+    if video:
+        if rp.ja_gerado(segment.query, "video", cfg) or rp.tem_saldo("video", cfg) is not False:
+            try:
+                return _download_segment_with_fallbacks(seg_rp, downloads_dir, client_factory, [], orientation,
+                                                        used_tracker=used_tracker), "video", "vídeo do Runpod"
+            except Exception as exc:  # noqa: BLE001
+                motivo = f"o vídeo do Runpod não saiu ({str(exc)[:160]})"
+        else:
+            motivo = "sem saldo no Runpod pra vídeo"
+    q = segment.query
+    if video and not rp.ja_gerado(q, "imagem", cfg):
+        q = prompt_de_foto(segment.query)
+    caminho = _download_image_segment_with_fallbacks(replace(seg_rp, media_type="image", query=q), downloads_dir,
+                                                     client_factory, used_tracker=used_tracker)
+    return [caminho], "image", ("foto do Runpod no lugar do vídeo (" + motivo + ")" if video else "foto do Runpod")
+
+
 def _pesquisa_no_lugar_do_flow(segment: VideoSegment, downloads_dir: str, client_factory: "ClientFactory",
                                cfg: Dict[str, Any], provider_priority: Optional[List[str]] = None,
                                orientation: Optional[str] = None, video: bool = False, used_tracker=None,
@@ -3622,13 +3664,13 @@ def _pesquisa_no_lugar_do_flow(segment: VideoSegment, downloads_dir: str, client
     Configurações). Trecho de vídeo: bancos de vídeo → buscadores de imagem → bancos de foto. Trecho de foto:
     buscadores de imagem → bancos de foto → bancos de vídeo. → (arquivos, "video"|"image")."""
     termo = _termo_de_pesquisa(segment)
-    marcados = [p for p in (cfg.get("_providers_marcados") or provider_priority or []) if p != "flow"]
+    marcados = [p for p in (cfg.get("_providers_marcados") or provider_priority or []) if p not in GERADORES_IA]
     ordem = [p for p in (provider_priority or []) if p in marcados] + [p for p in marcados if p not in (provider_priority or [])]
     ordem = _sem_bloqueados(ordem, cfg)
     bancos_video = [b for b in ordem if b not in ("youtube", "produto", "material", "wikipedia")
                     and b not in _BROWSER_IMAGE_SEARCH_PROVIDERS]
     buscadores = [b for b in ordem if b in _BROWSER_IMAGE_SEARCH_PROVIDERS]
-    bancos_foto = [b for b in ordem if b in _PHOTO_PROVIDER_MODULES and b != "flow" and b not in _BROWSER_IMAGE_SEARCH_PROVIDERS]
+    bancos_foto = [b for b in ordem if b in _PHOTO_PROVIDER_MODULES and b not in GERADORES_IA and b not in _BROWSER_IMAGE_SEARCH_PROVIDERS]
     erros: List[str] = []
 
     def _videos():
@@ -4527,10 +4569,19 @@ def assemble_video(
                 elif getattr(segment, "media_type", "video") == "image" and segment.provider == "flow":
                     # 🖼 foto do Flow. v84_110: sem conta com crédito de imagem (ou o Flow falhou) → PESQUISA a cena
                     if flow_tem_conta("imagem", cfg) is False and not flow_ja_gerado(segment.query, cfg, "imagem"):
-                        raw_paths, kind = _pesquisa_no_lugar_do_flow(
-                            segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
-                            used_tracker=used_clips_tracker, motivo="todas as contas sem crédito de imagem")
-                        flow_trocas[i] = "pesquisa (contas do Flow esgotadas)"
+                        kind = ""
+                        if cfg.get("runpod_reserva_flow"):  # 🟣 v84_116: o Runpod gera antes de ir pra pesquisa
+                            try:
+                                raw_paths, kind, oque = gerar_no_runpod(segment, downloads_dir, worker_factory, cfg,
+                                                                        search_orientation, used_tracker=used_clips_tracker)
+                                flow_trocas[i] = f"{oque} (contas do Flow esgotadas)"
+                            except Exception:  # noqa: BLE001
+                                kind = ""
+                        if not kind:
+                            raw_paths, kind = _pesquisa_no_lugar_do_flow(
+                                segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
+                                used_tracker=used_clips_tracker, motivo="todas as contas sem crédito de imagem")
+                            flow_trocas[i] = "pesquisa (contas do Flow esgotadas)"
                     else:
                         try:
                             raw_paths = [_download_image_segment_with_fallbacks(segment, downloads_dir, worker_factory, used_tracker=used_clips_tracker)]
@@ -4540,7 +4591,7 @@ def assemble_video(
                                 segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
                                 used_tracker=used_clips_tracker, motivo=f"a foto não saiu ({str(exc_flow)[:200]})")
                             flow_trocas[i] = "pesquisa (a foto do Flow não saiu)"
-                elif getattr(segment, "media_type", "video") == "image":
+                elif getattr(segment, "media_type", "video") == "image" and segment.provider != "runpod":
                     raw_paths = [_download_image_segment_with_fallbacks(segment, downloads_dir, worker_factory, used_tracker=used_clips_tracker)]
                     kind = "image"
                 elif segment.provider == "flow":
@@ -4582,12 +4633,33 @@ def assemble_video(
                             flow_trocas[i] = f"foto no lugar do vídeo ({str(exc_flow)[:120]})"
                         except Exception as exc_img:  # noqa: BLE001
                             exc_flow = f"o vídeo não saiu ({exc_flow}) e a imagem reserva também não ({exc_img})"
+                    if not kind and cfg.get("runpod_reserva_flow"):  # 🟣 v84_116: o Runpod gera antes de ir pra pesquisa
+                        try:
+                            raw_paths, kind, oque = gerar_no_runpod(segment, downloads_dir, worker_factory, cfg, search_orientation,
+                                                                    video=True, used_tracker=used_clips_tracker)
+                            flow_trocas[i] = f"{oque} (o Flow não gerou)"
+                        except Exception:  # noqa: BLE001
+                            kind = ""
                     if not kind:
                         raw_paths, kind = _pesquisa_no_lugar_do_flow(
                             segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation, video=True,
                             used_tracker=used_clips_tracker,
                             motivo=("todas as contas sem crédito (vídeo e imagem)" if tem_foto is False else str(exc_flow))[:300])
                         flow_trocas[i] = "pesquisa (contas do Flow esgotadas)" if tem_foto is False else "pesquisa (o Flow não gerou)"
+                elif segment.provider == "runpod":
+                    # 🟣 v84_116: gerado no Runpod (vídeo → foto); sem chave/saldo ou recusa → PESQUISA a cena
+                    try:
+                        raw_paths, kind, oque = gerar_no_runpod(
+                            segment, downloads_dir, worker_factory, cfg, search_orientation,
+                            video=getattr(segment, "media_type", "video") != "image", used_tracker=used_clips_tracker)
+                        if oque.startswith("foto do Runpod no lugar"):
+                            flow_trocas[i] = oque
+                    except Exception as exc_rp:  # noqa: BLE001
+                        raw_paths, kind = _pesquisa_no_lugar_do_flow(
+                            segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
+                            video=getattr(segment, "media_type", "video") != "image", used_tracker=used_clips_tracker,
+                            motivo=f"Runpod: {str(exc_rp)[:200]}")
+                        flow_trocas[i] = "pesquisa (o Runpod não gerou)"
                 else:
                     raw_paths = _download_segment_with_fallbacks(
                         segment, downloads_dir, worker_factory, provider_priority, search_orientation,

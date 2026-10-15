@@ -133,7 +133,7 @@ def deslocar(grafo_linhas: List[str], inicio: float) -> List[str]:
     out = []
     for ln in grafo_linhas:
         ln = ln.replace("[0:v]setpts=PTS-STARTPTS,", f"[0:v]setpts=PTS-STARTPTS+{off}/TB,", 1)
-        ln = re.sub(r"^(\[\d+:v\]format=rgba,fps=30)", r"\1" + f",setpts=PTS-STARTPTS+{off}/TB", ln)
+        ln = re.sub(r"^(\[\d+:v\](?:format=rgba,fps=30|fps=30,format=rgba))", r"\1" + f",setpts=PTS-STARTPTS+{off}/TB", ln)
         if ln.rstrip().endswith("[vout]"):
             ln = ln.rstrip()[:-len("[vout]")] + ",setpts=PTS-STARTPTS[vout]"
         out.append(ln)

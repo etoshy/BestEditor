@@ -249,6 +249,60 @@
   <h3 style="margin-top:20px;">Contas do Google Flow</h3>
   <p style="color:#666;font-size:0.82rem;">O cadastro de contas, login e troca de senha foram pra própria página <a href="{{ url_for('contas_google_page') }}">🔑 Contas Google</a>.</p>
 
+  <h2 style="margin-top:32px;" id="runpod">🟣 Runpod (imagens e vídeos gerados por IA — pago do saldo da conta)</h2>
+  <p style="color:#666;font-size:0.82rem;">Fonte <code>runpod</code>: gera pela API do <a href="https://console.runpod.io/hub?tabSelected=public_endpoints" target="_blank" rel="noopener">Runpod</a> em segundos (sem navegador). Cada geração é cobrada do saldo da sua conta — o site confere o saldo antes de cada pedido e não envia se não pagar. O mesmo pedido nunca é gerado duas vezes (fica guardado em <code>runpod_dados/</code>). Pegue a chave em console.runpod.io → Settings → API Keys.</p>
+  <div id="runpod-saldo" style="padding:8px 12px;border-radius:8px;background:#f5f3ff;border:1px solid #ddd6fe;font-size:.9rem;margin:6px 0;">
+    {% if runpod.configurado %}
+      💰 Saldo: <b id="runpod-saldo-valor">{% if runpod.saldo is not none %}US$ {{ '%.2f'|format(runpod.saldo) }}{% else %}—{% endif %}</b>
+      {% if runpod.erro %}<span style="color:#b91c1c;"> ({{ runpod.erro }})</span>{% endif %}
+      · gasto pelo site até agora: US$ {{ '%.3f'|format(runpod.gasto_site) }}
+      · chave {{ runpod.chave }}
+      <button type="button" id="runpod-atualizar" style="width:auto;margin-left:6px;padding:2px 10px;">↻ conferir saldo</button>
+    {% else %}⚠ Sem chave ainda — cole abaixo e salve.{% endif %}
+  </div>
+  <label>Chave da API do Runpod {% if runpod.configurado %}(deixe em branco pra manter a atual){% endif %}</label>
+  <input type="password" name="runpod_api_key" value="" autocomplete="off" placeholder="{% if runpod.configurado %}{{ runpod.chave }}{% else %}rpa_…{% endif %}">
+  {% if runpod.configurado %}<label style="font-weight:normal;"><input type="checkbox" name="runpod_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
+  <label style="margin-top:8px;">Modelo de IMAGEM</label>
+  <select name="runpod_modelo_imagem">
+    {% for m in runpod.modelos if m.tipo == 'imagem' %}<option value="{{ m.id }}" {% if runpod.modelo_imagem == m.id %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}
+  </select>
+  <label style="margin-top:8px;">Modelo de VÍDEO</label>
+  <select name="runpod_modelo_video">
+    {% for m in runpod.modelos if m.tipo == 'video' %}<option value="{{ m.id }}" {% if runpod.modelo_video == m.id %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}
+  </select>
+  <label style="margin-top:8px;">Duração do vídeo gerado (1–10 s)</label>
+  <input type="number" name="runpod_video_duracao" value="{{ config.runpod_video_duracao }}" min="1" max="10" step="1" style="width:100px;">
+  <label style="font-weight:normal;"><input type="checkbox" name="runpod_video_rascunho" {% if config.runpod_video_rascunho %}checked{% endif %} style="width:auto;"> Vídeo em modo rascunho (75% mais barato, qualidade menor)</label>
+  <label style="font-weight:normal;"><input type="checkbox" name="runpod_video_1080p" {% if config.runpod_video_1080p %}checked{% endif %} style="width:auto;"> Vídeo em 1080p (o dobro do preço do 720p)</label>
+  <label style="font-weight:normal;"><input type="checkbox" name="runpod_reserva_flow" {% if config.runpod_reserva_flow %}checked{% endif %} style="width:auto;"> Quando o Google Flow não gerar (contas sem crédito, recusa…), gerar no Runpod antes de ir pra pesquisa</label>
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">O prompt é adaptado pra cada modelo: em inglês, com o estilo do vídeo, prompt negativo no Flux e movimento de câmera no vídeo — com a 🤖 IA do site ligada (recurso “🟣 Runpod: prompt do jeito de cada modelo” em <a href="/ia">/ia</a>) ela escreve; sem ela, uma regra simples.</p>
+  {% if runpod.configurado %}
+  <p style="margin:8px 0;"><button type="button" id="runpod-testar" style="width:auto;">🧪 Gerar uma imagem de teste (~US$ 0,005)</button> <span id="runpod-teste-res" style="font-size:.85rem;"></span></p>
+  {% endif %}
+  <script>
+  (function () {
+    const b = document.getElementById('runpod-atualizar');
+    async function conferir(forcar) {
+      if (!b) return; b.disabled = true;
+      try { const d = await (await fetch('/runpod/saldo' + (forcar ? '?forcar=1' : ''))).json();
+        document.getElementById('runpod-saldo-valor').textContent = d.saldo != null ? 'US$ ' + d.saldo.toFixed(2) : '— ' + (d.erro || ''); }
+      catch (e) { document.getElementById('runpod-saldo-valor').textContent = '— ' + e.message; }
+      finally { b.disabled = false; }
+    }
+    if (b) { b.addEventListener('click', () => conferir(true)); conferir(false); }  // 💰 confere o saldo ao abrir
+    const t = document.getElementById('runpod-testar');
+    if (t) t.addEventListener('click', async () => {
+      const res = document.getElementById('runpod-teste-res'); t.disabled = true; res.textContent = '⏳ gerando…';
+      try {
+        const r = await fetch('/runpod/testar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ forcar: true }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+        res.innerHTML = `✅ <a href="${d.url}" target="_blank">ver a imagem</a> · custou US$ ${(d.custo || 0).toFixed(4)} · saldo: ${d.saldo != null ? 'US$ ' + d.saldo.toFixed(2) : '?'}<br><small>prompt (${d.prompt_por === 'ia' ? '🤖 IA' : 'regra'}): ${(d.prompt || '').replace(/</g, '&lt;')}</small>`;
+      } catch (e) { res.textContent = '❌ ' + e.message; } finally { t.disabled = false; }
+    });
+  })();
+  </script>
+
   <h2 style="margin-top:32px;">Transcrição (Whisper)</h2>
   <label>Processador usado pra transcrever o áudio</label>
   <select name="whisper_device">
