@@ -295,7 +295,11 @@ def _carregar_projetos_salvos() -> int:
             continue
         status = job.get("status")
         if status in _STATUS_EM_ANDAMENTO:
-            if job.get("pending_segments"):
+            if status == "buscando_previas" and job.get("pending_segments") and any(
+                    pv is None for pv in (job.get("segment_previews") or [None])):
+                job["status"] = "previas_pausadas"  # ⏸ v84_108: o servidor caiu no meio — dá pra ▶ retomar de onde parou
+                job["pausar_previas"] = False
+            elif job.get("pending_segments"):
                 job["status"] = "pronto_para_editar"
                 if status == "montando":
                     job["assembly_error"] = "A montagem foi interrompida (o servidor reiniciou). Confira e confirme de novo."
@@ -4414,7 +4418,7 @@ def _ia_escolher_imagem(res: dict, ctx: Optional[dict], cache: dict, termo: str,
     return escolhida
 
 
-def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> None:
+def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment], retomar: bool = False) -> None:
     """Dispara em segundo plano: busca (SEM baixar nada) uma prévia de
     cada segmento, usando o thumbnail que o próprio provedor já entrega
     na busca (hospedado no CDN dele) — o navegador carrega essa imagem
@@ -4435,13 +4439,20 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
     sessão por worker, não uma compartilhada.
     """
     job["status"] = "buscando_previas"
-    job["preview_progress"] = {"current": 0, "total": len(segments)}
-    job["segment_previews"] = [None] * len(segments)
+    job["pausar_previas"] = False
+    # ⏸ v84_108: retomar = mantém as prévias que já ficaram prontas e busca só as que faltam
+    anteriores = list(job.get("segment_previews") or []) if retomar else []
+    anteriores = (anteriores + [None] * len(segments))[:len(segments)]
+    faltam = {k for k, pv in enumerate(anteriores) if pv is None}
+    job["preview_progress"] = {"current": len(segments) - len(faltam), "total": len(segments)}
+    job["segment_previews"] = anteriores
     _save_state(job_id)
 
     ia_ctxs: List[Optional[dict]] = [None] * len(segments)
 
     def _fetch_one(i: int, segment: VideoSegment, cfg: dict, tracker=None) -> dict:
+        if job.get("pausar_previas"):  # ⏸ pausado: nem começa (o que já estava buscando termina)
+            return {"index": i, "_pausado": True}
         factory = ClientFactory(cfg)
         perf = _PERF_LOGS.get(job_id)
         pl = perf.timed if perf else (lambda *a, **k: nullcontext())
@@ -4487,8 +4498,9 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             ia_ctxs[:] = ctxs
             _save_state(job_id)
 
-        completed = 0
+        completed = len(segments) - len(faltam)
         cancelled = False
+        pausado = False
         progress_lock = threading.Lock()
 
         def _publicar(i: int, preview: dict) -> None:
@@ -4501,7 +4513,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 job["preview_progress"] = {"current": completed, "total": len(segments)}
 
         # 0) 🛒 mídias do produto (projeto de venda): o arquivo já está aqui — prévia na hora
-        produto_idx = [i for i, s in enumerate(segments) if s.provider in ("produto", "material") and s.override_source]
+        produto_idx = [i for i, s in enumerate(segments) if s.provider in ("produto", "material") and s.override_source and i in faltam]
         for i in produto_idx:
             _publicar(i, {
                 "index": i, "ok": True, "thumbnail_url": f"/job/{job_id}/segment-thumb/{i}", "result_url": None,
@@ -4512,7 +4524,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
         # 1) trechos do YouTube: sem prévia automática — o vídeo e a faixa de
         #    tempo são escolhidos no painel do editor (a busca já está rodando).
-        youtube_idx = [i for i, s in enumerate(segments) if s.provider == "youtube" and not s.override_source]
+        youtube_idx = [i for i, s in enumerate(segments) if s.provider == "youtube" and not s.override_source and i in faltam]
         for i in youtube_idx:
             _publicar(i, {
                 "index": i, "ok": False, "thumbnail_url": None, "result_url": None, "label": None,
@@ -4526,7 +4538,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
         imagem_items = [
             (i, s) for i, s in enumerate(segments)
             if not s.override_source and getattr(s, "media_type", "video") == "image"
-            and s.provider in BROWSER_IMAGE_SEARCH_PROVIDERS
+            and s.provider in BROWSER_IMAGE_SEARCH_PROVIDERS and i in faltam
         ]
         imagem_thread = None
         if imagem_items:
@@ -4581,7 +4593,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
         # 3) o resto: como sempre, em paralelo
         especiais = set(youtube_idx) | set(produto_idx) | {i for i, _s in imagem_items}
-        restantes = [(i, s) for i, s in enumerate(segments) if i not in especiais]
+        restantes = [(i, s) for i, s in enumerate(segments) if i not in especiais and i in faltam]
         concurrency = max(1, min(cfg.get("preview_fetch_concurrency", 3), max(1, len(restantes))))
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
             future_to_index = {
@@ -4602,6 +4614,9 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 except Exception as exc:  # noqa: BLE001
                     preview = {"index": i, "ok": False, "thumbnail_url": None,
                                "result_url": None, "label": None, "error": f"Erro inesperado: {exc}"}
+                if preview.get("_pausado"):
+                    pausado = True
+                    continue
                 # atualiza incrementalmente — permite a pagina de progresso
                 # mostrar cada thumbnail assim que fica pronta, em vez de
                 # so uma porcentagem sem conteudo visual ate tudo terminar
@@ -4612,6 +4627,13 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
         if imagem_thread is not None:
             imagem_thread.join()
+
+        if (pausado or job.get("pausar_previas")) and not cancelled and any(pv is None for pv in job["segment_previews"]):
+            if perf:
+                perf.save()
+            job["status"] = "previas_pausadas"  # ⏸ retoma depois em /job/<id>/previas/retomar
+            _save_state(job_id)
+            return
 
         if cancelled:
             if perf:
@@ -4637,6 +4659,46 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
         _prebaixar_iniciar(job_id, job)  # ⬇ já vai baixando os clipes enquanto a pessoa edita
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def previas_faltando(job: dict) -> int:
+    """Quantos trechos ainda estão sem prévia (nem buscada) — pra ▶ continuar a busca de onde parou."""
+    segs = job.get("pending_segments") or []
+    pv = list(job.get("segment_previews") or [])
+    return sum(1 for k in range(len(segs)) if k >= len(pv) or pv[k] is None)
+
+
+app.jinja_env.globals["previas_faltando"] = previas_faltando
+
+
+@app.route("/job/<job_id>/previas/pausar", methods=["POST"])
+def previas_pausar(job_id: str):
+    """⏸ Pausa a busca de prévias: o que já está buscando termina, o resto espera (e fica salvo pra retomar)."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    if job.get("status") != "buscando_previas":
+        return jsonify({"erro": "Não está buscando prévias agora.", "status": job.get("status")}), 400
+    job["pausar_previas"] = True
+    _save_state(job_id)
+    return jsonify({"ok": True, "status": job.get("status")})
+
+
+@app.route("/job/<job_id>/previas/retomar", methods=["POST"])
+def previas_retomar(job_id: str):
+    """▶ Retoma: busca só as prévias que faltam (as prontas ficam)."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Job não encontrado."}), 404
+    if job.get("status") == "buscando_previas" and job.get("pausar_previas"):
+        job["pausar_previas"] = False  # ainda nem parou: só desfaz o pedido de pausa
+        return jsonify({"ok": True, "status": job["status"]})
+    # também um projeto interrompido ANTES (servidor fechou no meio da busca e ele abriu no editor com trechos sem prévia)
+    if job.get("status") not in ("previas_pausadas", "pronto_para_editar") or not previas_faltando(job):
+        return jsonify({"erro": "Não tem prévia faltando pra buscar.", "status": job.get("status")}), 400
+    segs = [_segmento_obj(d) for d in job.get("pending_segments") or []]
+    _fetch_previews(job_id, job, segs, retomar=True)
+    return jsonify({"ok": True, "status": job.get("status")})
 
 
 @app.route("/job/<job_id>/fetching-previews", methods=["GET"])
@@ -4673,6 +4735,7 @@ def fetching_previews_status_api(job_id: str):
         "progress": job.get("preview_progress"),
         "previews": previews_summary,
         "ia": job.get("preview_ia"),
+        "pausando": bool(job.get("pausar_previas")) and job.get("status") == "buscando_previas",
     })
 
 

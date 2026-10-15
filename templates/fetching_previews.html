@@ -7,6 +7,13 @@
 <p id="progress-text"></p>
 <p id="resumo-text" style="font-size:0.8rem;color:#555;"></p>
 
+<div id="pausa-box" style="margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <button type="button" id="btn-pausar-previas" class="btn-secondary">⏸ Pausar</button>
+  <button type="button" id="btn-retomar-previas" style="display:none;">▶ Retomar</button>
+  <span id="pausa-texto" style="font-size:0.82rem;color:#92400e;"></span>
+  <a id="pausa-editor" href="{{ url_for('edit_segments_page', job_id=job.job_id) }}" style="display:none;font-size:0.82rem;">ou abrir o editor com o que já tem →</a>
+</div>
+
 <div id="pronto-box" style="display:none;margin:12px 0;padding:12px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;">
   ✅ Prévias prontas. <a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}"><strong>Ir para o editor →</strong></a>
   <span style="font-size:0.8rem;color:#555;">(as escolhas do YouTube feitas aqui já ficam salvas)</span>
@@ -23,6 +30,30 @@
 
 <script>
 const shownIndexes = new Set();
+let pollAtivo = false;
+function mostrarPausa(estado) {
+  // estado: 'rodando' | 'pausando' | 'pausado' | 'fim'
+  const bp = document.getElementById('btn-pausar-previas'), br = document.getElementById('btn-retomar-previas');
+  const tx = document.getElementById('pausa-texto'), ed = document.getElementById('pausa-editor');
+  bp.style.display = estado === 'rodando' ? '' : 'none';
+  br.style.display = (estado === 'pausado' || estado === 'pausando') ? '' : 'none';
+  ed.style.display = estado === 'pausado' ? '' : 'none';
+  tx.textContent = estado === 'pausando' ? '⏳ Pausando… os trechos que já estavam buscando terminam primeiro.'
+    : estado === 'pausado' ? '⏸ Pausado — as prévias prontas ficam salvas; ▶ Retomar busca só as que faltam (dá pra fechar o site e voltar depois).' : '';
+  if (estado === 'fim') document.getElementById('pausa-box').style.display = 'none';
+}
+async function acaoPausa(qual) {
+  const url = qual === 'pausar' ? "{{ url_for('previas_pausar', job_id=job.job_id) }}" : "{{ url_for('previas_retomar', job_id=job.job_id) }}";
+  try {
+    const r = await fetch(url, {method: 'POST'});
+    const j = await r.json();
+    if (!r.ok) { document.getElementById('pausa-texto').textContent = '⚠ ' + (j.erro || 'não deu'); return; }
+  } catch (e) { document.getElementById('pausa-texto').textContent = '⚠ ' + e; return; }
+  mostrarPausa(qual === 'pausar' ? 'pausando' : 'rodando');
+  if (!pollAtivo) poll();
+}
+document.getElementById('btn-pausar-previas').addEventListener('click', () => acaoPausa('pausar'));
+document.getElementById('btn-retomar-previas').addEventListener('click', () => acaoPausa('retomar'));
 const temPainelYoutube = {{ 'true' if youtube_itens else 'false' }};
 
 function addThumb(p) {
@@ -61,6 +92,7 @@ function addThumb(p) {
 }
 
 async function poll() {
+  pollAtivo = true;
   let data;
   try {
     const res = await fetch("{{ url_for('fetching_previews_status_api', job_id=job.job_id) }}");
@@ -84,6 +116,18 @@ async function poll() {
   document.getElementById('resumo-text').textContent =
     `${comImagem} com prévia · ${youtube} do YouTube (escolha manual) · ${falhas} sem prévia`;
 
+  if (data.status === 'previas_pausadas') {
+    mostrarPausa('pausado');
+    document.getElementById('titulo-previas').textContent = '⏸ Busca de prévias pausada';
+    pollAtivo = false;
+    return;  // para de perguntar; ▶ Retomar volta a acompanhar
+  }
+  if (data.status === 'buscando_previas') {
+    mostrarPausa(data.pausando ? 'pausando' : 'rodando');
+    document.getElementById('titulo-previas').textContent = 'Buscando uma prévia de cada trecho...';
+  } else {
+    mostrarPausa('fim');
+  }
   if (data.status === 'pronto_para_editar') {
     if (temPainelYoutube) {
       document.getElementById('pronto-box').style.display = '';
@@ -97,6 +141,7 @@ async function poll() {
     const box = document.getElementById('error-box');
     box.style.display = 'block';
     box.textContent = 'Busca de prévias cancelada.';
+    pollAtivo = false;
     return;
   }
   setTimeout(poll, 800);

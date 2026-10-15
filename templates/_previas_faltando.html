@@ -1,0 +1,24 @@
+{# ⏸ v84_108: projeto com trechos sem prévia (busca pausada ou interrompida antes) → ▶ continuar de onde parou #}
+{% set _faltam = previas_faltando(job) if job and job.get('pending_segments') else 0 %}
+{% if _faltam and job.status in ('previas_pausadas', 'pronto_para_editar') %}
+<div id="previas-faltando-box" style="{% if previas_flutuante %}position:fixed;left:14px;bottom:14px;z-index:9999;max-width:560px;box-shadow:0 6px 24px rgba(0,0,0,.4);{% endif %}margin:8px 12px;padding:10px 14px;background:#fef3c7;color:#78350f;border:1px solid #f59e0b;border-radius:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
+  <span style="flex:1;min-width:220px;">⏸ <b>{{ _faltam }}</b> trecho(s) ainda sem prévia — a busca foi pausada ou interrompida. As que já estavam prontas ficam.</span>
+  <button type="button" id="btn-continuar-previas" style="background:#f59e0b;color:#1f1300;font-weight:700;border:0;padding:7px 14px;border-radius:8px;cursor:pointer;">▶ Continuar a busca de prévias</button>
+  {% if previas_flutuante %}<button type="button" onclick="this.parentElement.remove()" title="esconder" style="background:none;border:0;color:#78350f;cursor:pointer;font-size:1rem;">✕</button>{% endif %}
+</div>
+<script>
+(function () {
+  const b = document.getElementById('btn-continuar-previas');
+  if (!b) return;
+  b.addEventListener('click', async function () {
+    b.disabled = true; b.textContent = '⏳ retomando…';
+    try {
+      const r = await fetch("{{ url_for('previas_retomar', job_id=job.job_id) }}", {method: 'POST'});
+      const j = await r.json();
+      if (!r.ok) { b.textContent = '⚠ ' + (j.erro || 'não deu'); return; }
+      window.location.href = "{{ url_for('fetching_previews_page', job_id=job.job_id) }}";
+    } catch (e) { b.disabled = false; b.textContent = '⚠ ' + e; }
+  });
+})();
+</script>
+{% endif %}

@@ -95,6 +95,13 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                 "combina — e o que fazer: busca nova no buscador com mais chance, gráfico nativo, cartão ou \"procure na mão\".", True),
     "edicao": ("✂️ Prompt de edição direto na IA",
                "No Estúdio (aba 🤖 IA), um botão manda o prompt de edição (ou cada parte dele) pra IA e cola a resposta.", True),
+    "flow_famosos": ("🚫 Flow recusou \"pessoa famosa\" → reescrever o comando",
+                     "Quando o Google Flow falha com \"pode violar nossas políticas contra a geração de imagens de pessoas famosas\", "
+                     "a IA troca o nome da pessoa real por uma descrição genérica (roupa, época, cenário) e o Flow tenta de novo "
+                     "(a geração recusada é reembolsada pelo Google).", True),
+    "flow_foto": ("🔁 Flow em massa: vídeo → foto",
+                  "No 🚀 Em massa da aba Google Flow, quando TODAS as contas ficam sem crédito de vídeo, a IA reescreve o "
+                  "prompt de cada vídeo que falta como prompt de FOTO (o instante mais marcante, sem movimento de câmera).", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

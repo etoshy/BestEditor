@@ -28,6 +28,48 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🚀 Flow em massa: várias contas em paralelo, cooldown e vídeo → foto (v84_109)
+
+Na aba **🎬 Google Flow**, nova seção **🚀 Em massa** (`/flow#lote`, código em `flow_lote.py`):
+
+- **📋 Fila de prompts**: cole vários (um por linha, ou separados por linha em branco). `foto:` / `video:` no começo
+  da linha escolhe o tipo só daquele prompt. Modelo, proporção e quantidade valem pra leva toda.
+- **👥 Contas em paralelo** (padrão **2**, até 4): cada conta abre o próprio navegador (o perfil dela, já logado) e o
+  próprio projeto no Flow. Marque quais contas o lote usa.
+- **⏱ Cooldown escalonado** (padrão **5–10 s**): uma conta envia → o site sorteia uma espera entre 5 e 10 s → a outra
+  envia → espera de novo… Nunca duas contas clicam em “Iniciar geração” juntas.
+- **💳 Sem crédito**: a conta fica marcada só pro tipo que acabou (vídeo ou imagem, como no v84_105) e o pedido volta
+  pra fila pra outra conta pegar.
+- **🔁 Vídeo → foto**: quando **todas** as contas do lote ficam sem crédito de vídeo, cada vídeo que falta vira foto. O
+  prompt é reescrito pela 🤖 IA do site (recurso novo “🔁 Flow em massa: vídeo → foto” em /ia); sem ela, pela 🔎 IA do
+  Google (se o app dela estiver no ar); sem as duas, por uma regra simples que tira movimento de câmera e duração. Na
+  fila aparece “🔁 era vídeo” com o prompt original.
+- **🌐 Abrir navegador** em cada conta: abre a janela daquela conta pra você logar, ativar o premium/teste, ver os
+  créditos… Enquanto ela está aberta, o lote não usa essa conta; **✔ Concluir** (ou fechar a janela) salva a sessão e
+  devolve. **♻ liberar créditos** desmarca a conta quando o crédito voltou.
+- ⏸ **Pausar** termina o que está gerando e para; ⏹ **Parar agora** devolve pra fila o que estava gerando. A fila e as
+  configurações ficam salvas em `flow_dados/lote/` (fechar o site não perde nada).
+- **Repetir** cada prompt N× (variações), **🔗** abre a conta em outro endereço (ex.: a página de planos) e **↺ créditos de
+  volta em todas** libera todas as contas de uma vez depois de recarregar.
+- Tudo vai pra 🖼 **Galeria** da aba (origem “🚀 lote”). Enquanto o lote roda, o ✨ Gerar da aba e as imagens do Flow
+  pros vídeos do site esperam (cada perfil só pode estar aberto uma vez). No modo CDP (o seu Chrome) roda 1 conta só.
+- Testes: `test_v84_flow_lote.py` (inclui 2 contas em paralelo no Flow simulado).
+
+## ⏸ Pausar as prévias, conta nova do Flow e recusa de “pessoa famosa” (v84_108)
+
+- **⏸ Pausar / ▶ Retomar a busca de prévias**: na tela “Buscando uma prévia de cada trecho…”. Pausar deixa terminar o
+  que já estava buscando e para o resto (status “previas_pausadas”). As prévias prontas ficam salvas, e dá pra
+  fechar o site. **▶ Retomar** busca só as que faltam. Também dá pra abrir o editor com o que já tem.
+- **Projeto interrompido** (servidor fechado no meio da busca, inclusive antes desta versão): ao abrir o projeto, o
+  editor (Estúdio e clássico) mostra “⏸ N trecho(s) ainda sem prévia — **▶ Continuar a busca de prévias**”. Um
+  projeto que estava buscando quando o servidor caiu volta como pausado.
+- **Conta nova no Flow**: as boas-vindas (**Avançar** → privacidade, cujo **Continuar** só libera depois de rolar o
+  texto até o fim → **Aceitar**) são passadas sozinhas.
+- **“Falha — pode violar nossas políticas contra a geração de imagens de pessoas famosas”**: antes, o site esperava
+  até o tempo esgotar. Agora reconhece o cartão na hora e tira a pessoa real do comando (com a IA ligada, recurso
+  “🚫 Flow recusou pessoa famosa”, ela troca o nome por uma descrição genérica; sem a IA, os nomes próprios saem).
+  Depois tenta **uma** vez de novo. O Google reembolsa a geração recusada.
+
 ## 🎬 Flow: “Começar”, “Concordo” e o vídeo que só aparece com o mouse em cima (v84_107)
 
 - **Aviso de novidades** (“Ver todos os registros de alterações” / **Começar**): o site clica em **Começar** e segue —

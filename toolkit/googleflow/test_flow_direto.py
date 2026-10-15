@@ -2,6 +2,7 @@
 import collections
 import os
 import sys
+import time
 
 import pytest
 
@@ -233,3 +234,41 @@ def test_direitos_de_uso_concordo_e_video_que_so_aparece_com_o_mouse(sim, navega
     assert len(v) == 1 and v[0]["tipo"] == "video"
     assert any(n == "direitos" and e == "ok" for n, e, _ in passos)
     ctx.close()
+
+
+def test_conta_nova_passa_pelas_boas_vindas(sim, navegador):
+    """v84_108 (HTML real): conta nova no Flow — Avançar → "Seus dados e o Google Flow" (Continuar só depois de rolar
+    até o fim) → Aceitar. O site passa sozinho por todas e segue."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    passos = []
+    page = fd.preparar_projeto(ctx, sim + "?boas_vindas=1", True, None, lambda n, e, d: passos.append((n, e, d)))
+    assert page.locator(".sim-bv").count() == 0
+    rots = [d for n, e, d in passos if n == "boas_vindas" and e == "andando"]
+    assert any("Avançar" in d for d in rots) and any("Continuar" in d for d in rots) and any("Aceitar" in d for d in rots)
+    assert fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple"}, timeout_s=30)
+    ctx.close()
+
+
+def test_recusa_pessoa_famosa_reescreve_e_tenta_de_novo(sim, navegador, monkeypatch):
+    """v84_108 (HTML real): o cartão "⚠ Falha — … pessoas famosas" (sem %) vira FlowRecusou(motivo="famosos") na hora
+    (antes esperava o tempo esgotar) e o comando é refeito UMA vez sem o nome da pessoa real."""
+    monkeypatch.setattr(fd, "REESCREVER_FAMOSOS", None)
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    page = fd.preparar_projeto(ctx, sim + "?famosos=1", True, None)
+    passos = []
+    t0 = time.monotonic()
+    r = fd.gerar_um(page, {"tipo": "imagem", "prompt": "Portrait of Fritz Haarmann in 1920s Hanover"},
+                    lambda p, s, d: passos.append((p, s, d)), timeout_s=40)
+    assert r and time.monotonic() - t0 < 35
+    assert any("pessoa famosa" in d for _p, _s, d in passos)
+    with pytest.raises(fd.FlowRecusou) as e:  # sem reescrever: o erro sobe com o motivo
+        fd.gerar_um(page, {"tipo": "imagem", "prompt": "Portrait of Fritz Haarmann", "reescrever_famosos": False}, timeout_s=40)
+    assert e.value.motivo == "famosos" and "pessoas famosas" in e.value.mensagem
+    ctx.close()
+    # a IA (quando ligada) escreve a versão nova
+    monkeypatch.setattr(fd, "REESCREVER_FAMOSOS", lambda p, erro: "a man in a 1920s suit")
+    assert fd.sem_famosos("Fritz Haarmann") == "a man in a 1920s suit"
+    monkeypatch.setattr(fd, "REESCREVER_FAMOSOS", None)
+    novo = fd.sem_famosos("Portrait of Fritz Haarmann and Hans Grans in Hanover")
+    assert "Haarmann" not in novo and "Grans" not in novo and "Hanover" in novo and "no real or recognizable person" in novo
+    assert fd.recusa("esperar", "Esse comando pode violar nossas políticas").motivo == "politica"

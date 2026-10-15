@@ -86,6 +86,11 @@ S = {
     "novidades": "flow-change-log-modal",
     "novidades_ok": ('flow-change-log-modal button.flow-button-primary, '
                      'flow-change-log-modal button:has-text("Começar"), flow-change-log-modal button:has-text("Get started")'),
+    # conta NOVA no Flow (HTML real, v84_108): janelas de boas-vindas em sequência no mesmo app-onboarding-dialog —
+    # "Conheça e molde…" (Avançar) → "Seus dados e o Google Flow" (Continuar, só depois de rolar até o fim) → termos (Aceitar)
+    "boas_vindas": "app-onboarding-dialog",
+    "boas_vindas_ok": "app-onboarding-dialog mat-dialog-actions button.flow-button-primary",
+    "boas_vindas_fim": "app-onboarding-dialog .scroll-end-target",
     # "Direitos de uso desta imagem" ao ENVIAR mídia (HTML real, v84_107): só sobe depois do "Concordo"
     "consentimento": "flow-upload-consent-dialog",
     "consentimento_ok": ('flow-upload-consent-dialog .agree-actions-group button, '
@@ -173,7 +178,76 @@ class FlowLogin(FlowPassoErro):
 
 
 class FlowRecusou(FlowPassoErro):
-    """O Flow recusou o pedido (política de conteúdo / falha na geração)."""
+    """O Flow recusou o pedido (política de conteúdo / falha na geração). `motivo`: "famosos" | "politica" | "falha"."""
+    motivo = "falha"
+
+
+# v84_108: o cartão "⚠ Falha — Esse comando pode violar nossas políticas contra a geração de imagens de pessoas famosas…"
+# (no lugar da mídia, com ↻ / ↶ / 🗑). Não tem .loading-percentage: era ignorado e o site esperava até o tempo esgotar.
+JS_FALHAS = r"""() => Array.from(document.querySelectorAll('.error-title'))
+  .filter(t => t.getClientRects().length > 0)
+  .map(t => { const c = t.parentElement || t; const m = c.querySelector('.error-message-text');
+              return ((m && m.innerText) || c.innerText || t.innerText || '').trim(); })"""
+RE_FAMOSOS = re.compile(r"pessoas? famosas?|famous (?:people|person)|public figures?|celebrit|personalidades?|"
+                        r"figuras? p[uú]blicas?|pessoas? reais|real (?:people|person)", re.I)
+RE_POLITICA_FALHA = re.compile(r"viola|pol[ií]tica|policy|policies|diretrizes|guidelines", re.I)
+
+
+def falhas(page) -> List[str]:
+    try:
+        return [str(x) for x in (page.evaluate(JS_FALHAS) or []) if x]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def recusa(passo: str, texto: str, page=None) -> "FlowRecusou":
+    exc = FlowRecusou(passo, texto, page=page)
+    exc.motivo = "famosos" if RE_FAMOSOS.search(texto or "") else ("politica" if RE_POLITICA_FALHA.search(texto or "") else "falha")
+    return exc
+
+
+# Quem reescreve o comando quando o Flow recusa "pessoa famosa". O site liga a IA aqui (app.py); sem IA, a
+# heurística tira os nomes próprios (duas+ palavras com maiúscula) e pede uma pessoa genérica.
+REESCREVER_FAMOSOS: Optional[Callable[[str, str], Optional[str]]] = None
+_NOME_PROPRIO = re.compile(r"\b(?:[A-ZÁÉÍÓÚÂÊÔÃÕÇÄÖÜ][a-záéíóúâêôãõçäöüß'’-]+\s+(?:(?:von|van|de|da|do|dos|das|der|del|di|du|la|le|bin|al)\s+)?)"
+                           r"+[A-ZÁÉÍÓÚÂÊÔÃÕÇÄÖÜ][a-záéíóúâêôãõçäöüß'’-]+\b")
+
+
+_SYS_FAMOSOS = ("O Google Flow recusou este comando de imagem/vídeo por mostrar uma PESSOA REAL/FAMOSA. Reescreva o comando "
+                "no MESMO idioma, mantendo cena, época, roupas, cenário, luz e enquadramento, mas trocando cada pessoa real "
+                "(nome, apelido, cargo que identifica alguém) por uma descrição genérica e anônima (ex.: \"um homem magro de "
+                "bigode, terno escuro dos anos 1920\"). Sem nomes de pessoas reais, sem \"parecido com\". Lugares e objetos "
+                "podem ficar. Responda SÓ com o comando novo, TEXTO PURO, sem JSON.")
+
+
+def _ia_sem_famosos(prompt: str, erro: str) -> Optional[str]:
+    try:
+        import ia_servico  # a IA do site (raiz do projeto); fora do site não existe
+    except Exception:  # noqa: BLE001
+        return None
+    if not ia_servico.ativo("flow_famosos"):
+        return None
+    r = ia_servico.chamar("flow_famosos", _SYS_FAMOSOS, f"Erro do Flow: {erro}\n\nComando:\n{prompt}", max_tokens=600)
+    return str(r).strip().strip('"').strip() if r else None
+
+
+def sem_famosos(prompt: str, erro: str = "") -> str:
+    """O comando sem a pessoa real (pra tentar de novo depois da recusa "pessoas famosas")."""
+    for f in (REESCREVER_FAMOSOS, _ia_sem_famosos):
+        if f is None:
+            continue
+        try:
+            novo = f(prompt, erro)
+            if novo and novo.strip() and novo.strip() != prompt.strip():
+                return novo.strip()
+        except Exception:  # noqa: BLE001
+            pass
+        if f is REESCREVER_FAMOSOS:
+            break  # quem chamou escolheu o jeito (testes): sem IA do site
+    novo = _NOME_PROPRIO.sub("an anonymous person", prompt or "")
+    novo = re.sub(r"(?:an anonymous person)(?:\s*(?:,|and|e)\s*an anonymous person)+", "anonymous people", novo)
+    aviso = "Generic anonymous people only, no real or recognizable person, no celebrity likeness."
+    return (novo.strip() + (" " if novo.strip().endswith(".") else ". ") + aviso).strip()
 
 
 Passo = Callable[[str, str, str], None]
@@ -279,10 +353,53 @@ def aceitar_direitos(page, on_passo: Passo = _nada) -> bool:
         return False
 
 
+JS_ROLAR_ATE_O_FIM = r"""() => {
+  const d = document.querySelector('app-onboarding-dialog'); if (!d) return false;
+  d.querySelectorAll('mat-dialog-content, .mat-mdc-dialog-content, [class*="content"]').forEach(e => { e.scrollTop = e.scrollHeight; });
+  const fim = d.querySelector('.scroll-end-target'); if (fim) fim.scrollIntoView({block: 'end'});
+  return true; }"""
+
+
+def passar_boas_vindas(page, on_passo: Passo = _nada, esperar_s: float = 0.0) -> int:
+    """Conta nova no Flow: passa pelas janelas de boas-vindas (Avançar → rola o aviso de privacidade até o fim →
+    Continuar → Aceitar…). Os checkboxes de e-mail de marketing/pesquisa ficam como estão. Devolve quantas passou."""
+    feitas = 0
+    try:
+        if esperar_s:
+            _esperar(lambda: page.locator(S["boas_vindas"]).first.is_visible(), esperar_s)
+        for _ in range(8):
+            d = page.locator(S["boas_vindas"]).first
+            if not d.count() or not d.is_visible():
+                break
+            botao = page.locator(S["boas_vindas_ok"]).last
+            texto_antes = " ".join((d.inner_text() or "").split())[:200]
+
+            def _pronto() -> bool:
+                try:
+                    page.evaluate(JS_ROLAR_ATE_O_FIM)  # "Continuar" só habilita depois de ler (rolar) até o fim
+                except Exception:  # noqa: BLE001
+                    pass
+                return botao.is_enabled() and botao.get_attribute("disabled") is None
+            _esperar(_pronto, 10)
+            rotulo = " ".join((botao.inner_text() or "").split())
+            botao.click(timeout=8_000)
+            feitas += 1
+            on_passo("boas_vindas", "andando", f'conta nova no Flow: "{rotulo}"')
+            _esperar(lambda: not page.locator(S["boas_vindas"]).first.is_visible()
+                     or " ".join((page.locator(S["boas_vindas"]).first.inner_text() or "").split())[:200] != texto_antes, 8)
+        if feitas:
+            on_passo("boas_vindas", "ok", f"passei pelas {feitas} janela(s) de boas-vindas do Flow")
+    except Exception:  # noqa: BLE001
+        pass
+    return feitas
+
+
 def fechar_novidades(page, on_passo: Passo = _nada, esperar_s: float = 0.0) -> bool:
     """Se o Flow mostrou o aviso de NOVIDADES ("registros de alterações" — flow-change-log-modal), clica em "Começar"
-    (e, se tiver o "Direitos de uso desta imagem", em "Concordo"). Rápido quando não tem nada. Nunca levanta erro."""
+    (e, se tiver o "Direitos de uso desta imagem", em "Concordo"; e as boas-vindas de conta nova). Rápido quando não tem
+    nada. Nunca levanta erro."""
     aceitar_direitos(page, on_passo)
+    passar_boas_vindas(page, on_passo)
     try:
         if esperar_s:
             _esperar(lambda: page.locator(S["novidades"]).first.is_visible(), esperar_s)
@@ -315,6 +432,7 @@ def abrir_flow(context, url: str = FLOW_URL, headless: bool = True, on_passo: Pa
         page.wait_for_load_state("domcontentloaded")
     except Exception:  # noqa: BLE001
         pass
+    passar_boas_vindas(page, on_passo, esperar_s=3)  # conta nova: Avançar → Continuar → Aceitar
     fechar_novidades(page, on_passo, esperar_s=2)
     if _primeiro(page, S["novo_projeto"], 15) is None:
         if headless or timeout_login_s <= 0:
@@ -411,7 +529,7 @@ def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "
                       vid_proporcao: str = "16:9", vid_quantidade: str = "x1", vid_modelo: str = "",
                       on_passo: Passo = _nada) -> None:
     """Agente ligado → "tune" → Confirmar antes de gerar = NUNCA + padrões de imagem/vídeo → Salvar."""
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "config_agente"
     on_passo(passo, "andando", "")
     ligar_agente(page, True)
@@ -476,7 +594,7 @@ def ligar_agente(page, ligado: bool) -> None:
 
 
 def desligar_agente(page, on_passo: Passo = _nada) -> None:
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     on_passo("desligar_agente", "andando", "")
     ligar_agente(page, False)
     _primeiro(page, S["gatilho"], 8, "desligar_agente",
@@ -518,7 +636,7 @@ def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo
                      tipo_video: str = "Frames", on_passo: Passo = _nada) -> Dict[str, str]:
     """tipo "imagem" ou "video". Vídeo: `tipo_video` "Frames" (início/fim) ou "Elementos" (só o texto).
     Devolve {"resumo", "creditos"}."""
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "configurar"
     on_passo(passo, "andando", f"{tipo} {proporcao} {modelo} {quantidade}")
     pop = abrir_popup(page)
@@ -590,7 +708,7 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
 def definir_frame(page, qual: str = "Início", arquivo: Optional[str] = None, media_id: str = "",
                   on_passo: Passo = _nada) -> str:
     """Vídeo → Frames: chip "Início" ou "Fim" → imagem → "Incluir no comando". Confere que o chip ficou preenchido."""
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "frame_" + ("inicio" if qual.lower().startswith("in") else "fim")
     on_passo(passo, "andando", media_id or (arquivo or ""))
     chips = page.locator(S["chip_frame"])
@@ -607,7 +725,7 @@ def definir_frame(page, qual: str = "Início", arquivo: Optional[str] = None, me
 
 def incluir_referencia(page, arquivo: Optional[str] = None, media_id: str = "", on_passo: Passo = _nada) -> str:
     """"+" da caixa → imagem de referência (pra modificar uma foto com um prompt novo)."""
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "referencia"
     on_passo(passo, "andando", media_id or (arquivo or ""))
     _primeiro(page, S["adicionar"], 8, passo, 'não achei o "+" (Adicionar elementos à caixa de comando).').click()
@@ -618,7 +736,7 @@ def incluir_referencia(page, arquivo: Optional[str] = None, media_id: str = "", 
 
 # ------------------------------------------------------------------ 5. prompt, gerar, esperar
 def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "prompt"
     texto = " ".join((texto or "").split())
     if not texto:
@@ -659,7 +777,7 @@ def avisos(page) -> str:
 
 def clicar_gerar(page, on_passo: Passo = _nada) -> Dict[str, Any]:
     """Clica UMA vez em "Iniciar geração" (clicar de novo cobraria duas vezes). Devolve o estado pra `checar`."""
-    fechar_novidades(page)  # v84_107: o aviso de novidades pode aparecer a qualquer hora
+    fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "gerar"
     on_passo(passo, "andando", "")
     antes = {m["id"] for m in midias_na_pagina(page)}
@@ -685,10 +803,11 @@ def clicar_gerar(page, on_passo: Passo = _nada) -> Dict[str, Any]:
                              page=page if hasattr(page, "goto") else None)
         raise FlowPassoErro(passo, '"Iniciar geração" continua desabilitado (o prompt entrou?).' + (f" Aviso: {av}" if av else ""))
     n_cartoes = len(page.evaluate(JS_CARTOES) or [])
+    falhas_antes = len(falhas(page))
     botao.click()
     on_passo(passo, "ok", "pedido enviado")
     return {"antes": antes, "avisos_antes": avisos_antes, "cartoes_antes": n_cartoes, "t0": time.monotonic(),
-            "viu_cartao": False, "pct": ""}
+            "viu_cartao": False, "pct": "", "falhas_antes": falhas_antes}
 
 
 # v84_107: o Flow só põe o <video> no cartão quando o mouse passa por cima — antes disso é uma capa com o ícone de play.
@@ -737,7 +856,10 @@ def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[
         estado["pct"] = cartoes[-1].get("pct") or estado.get("pct") or ""
         falhou = [c for c in cartoes if RE_FALHA.search(c.get("pct") or "")]
         if falhou:
-            raise FlowRecusou("esperar", "o Flow não gerou: " + (falhou[-1].get("pct") or ""))
+            raise recusa("esperar", "o Flow não gerou: " + (falhou[-1].get("pct") or ""))
+    fl = falhas(page)
+    if len(fl) > int(estado.get("falhas_antes") or 0):  # v84_108: cartão "⚠ Falha" novo (ex.: pessoas famosas)
+        raise recusa("esperar", "o Flow não gerou: " + fl[0][:300])
     if novas and not cartoes:
         return novas
     if tipo == "video" and not novas and (not cartoes or all((c.get("pct") or "").startswith("100") for c in cartoes)) \
@@ -752,7 +874,7 @@ def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[
         if RE_LIMITE.search(av):
             raise FlowLimite("esperar", "o Flow avisou: " + av)
         if RE_FALHA.search(av):
-            raise FlowRecusou("esperar", "o Flow recusou: " + av)
+            raise recusa("esperar", "o Flow recusou: " + av)
     return None
 
 
@@ -796,7 +918,19 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         on_passo("gerar", "pulado", "modo teste sem gerar (nenhum crédito gasto)")
         return []
     estado = clicar_gerar(page, on_passo)
-    return esperar_resultado(page, estado, tipo, timeout_s, on_passo)
+    try:
+        return esperar_resultado(page, estado, tipo, timeout_s, on_passo)
+    except FlowRecusou as exc:
+        # v84_108: "pode violar nossas políticas contra a geração de imagens de pessoas famosas" → o Google reembolsa;
+        # tira a pessoa real do comando e tenta UMA vez de novo (no mesmo projeto, mesma conta).
+        if exc.motivo != "famosos" or trab.get("_sem_famosos") or not trab.get("reescrever_famosos", True):
+            raise
+        novo = sem_famosos(trab["prompt"], exc.mensagem)
+        if not novo or novo.strip() == str(trab["prompt"]).strip():
+            raise
+        on_passo("prompt", "andando", "🚫 o Flow recusou (pessoa famosa — a geração é reembolsada). Tentando de novo sem o nome: "
+                 + novo[:160])
+        return gerar_um(page, dict(trab, prompt=novo, _sem_famosos=True, prompt_original=trab["prompt"]), on_passo, timeout_s)
 
 
 def preparar_projeto(context, url: str = FLOW_URL, headless: bool = True, agente: Optional[Dict[str, str]] = None,

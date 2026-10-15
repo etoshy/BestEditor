@@ -41,10 +41,35 @@
   .fl-res { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
   .fl-res figure { margin:0; width:260px; }
   .fl-res img, .fl-res video { width:100%; border-radius:6px; background:#000; }
+  /* 🚀 em massa */
+  .fl-lote { border-color:#fcd34d; background:linear-gradient(135deg,#fffbeb,#fff); }
+  .fl-lote textarea { font-family:inherit; }
+  .fl-contas { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:8px; margin:8px 0; }
+  .fl-conta { border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; background:#fff; font-size:.84rem; }
+  .fl-conta.gerando { border-color:#22c55e; box-shadow:0 0 0 2px #dcfce7; }
+  .fl-conta.manual { border-color:#6366f1; box-shadow:0 0 0 2px #e0e7ff; }
+  .fl-conta .nm { font-weight:600; display:flex; gap:6px; align-items:center; }
+  .fl-conta .nm input { width:auto; margin:0; }
+  .fl-conta .cr { margin:3px 0; }
+  .fl-conta .ag { color:#475569; font-size:.78rem; min-height:1em; word-break:break-word; }
+  .fl-conta .pb { color:#b91c1c; font-size:.78rem; }
+  .fl-conta .ac { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+  .fl-conta .ac button, .fl-lote .mini { width:auto !important; margin:0 !important; font-size:.76rem; padding:3px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:#1f2937; cursor:pointer; }
+  .fl-tag { display:inline-block; font-size:.72rem; padding:1px 6px; border-radius:999px; background:#f1f5f9; color:#334155; margin-right:3px; }
+  .fl-tag.ok { background:#dcfce7; color:#166534; } .fl-tag.no { background:#fee2e2; color:#991b1b; } .fl-tag.av { background:#fef3c7; color:#92400e; }
+  .fl-fila { list-style:none; padding:0; margin:6px 0; max-height:460px; overflow:auto; border:1px solid #f1f5f9; border-radius:8px; }
+  .fl-fila li { display:flex; gap:8px; align-items:center; padding:6px 8px; border-bottom:1px solid #f1f5f9; font-size:.84rem; }
+  .fl-fila li .ic { width:22px; text-align:center; }
+  .fl-fila li .pr { flex:1; word-break:break-word; }
+  .fl-fila li .pr small { display:block; color:#6b7280; }
+  .fl-fila li img, .fl-fila li video { width:72px; height:42px; object-fit:cover; border-radius:4px; background:#000; }
+  .fl-fila li button { width:auto !important; margin:0 !important; font-size:.74rem; padding:2px 7px; border-radius:5px; border:1px solid #cbd5e1; background:#fff; color:#1f2937; line-height:1.3; cursor:pointer; }
+  .fl-log { font-family:ui-monospace,Consolas,monospace; font-size:.76rem; max-height:220px; overflow:auto; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:8px; white-space:pre-wrap; }
+  .fl-log .erro { color:#fca5a5; } .fl-log .aviso { color:#fcd34d; } .fl-log .ok { color:#86efac; }
 </style>
 
 <h1>🎬 Google Flow</h1>
-<p class="fl-hint">Gere imagens e vídeos no Google Flow por aqui. O robô faz os cliques no Flow, e tudo o que sai fica na 🖼 Galeria aqui embaixo.
+<p class="fl-hint">Gere imagens e vídeos no Google Flow por aqui (um de cada vez no ✨ Gerar, ou muitos com várias contas no <a href="#lote">🚀 Em massa</a>). O robô faz os cliques no Flow, e tudo o que sai fica na 🖼 Galeria aqui embaixo.
 {% if not modo_direto %}<br><b>⚠ Nas Configurações está a automação "antigo"</b>: esta aba usa sempre o modo novo (direto) — o resto do site segue a configuração.{% endif %}</p>
 
 <div class="fl-sessao" id="sessao">
@@ -87,6 +112,62 @@
     <label><input type="checkbox" id="gerarVisivel" style="width:auto"> 👁 mostrar o navegador</label>
     <label><input type="checkbox" id="novoProjeto" style="width:auto"> começar um projeto novo no Flow</label>
   </div>
+</div>
+
+<div class="fl-box fl-lote" id="lote">
+  <div class="fl-row" style="justify-content:space-between">
+    <h3 style="margin:0">🚀 Em massa (várias contas em paralelo)</h3>
+    <span class="fl-hint" id="loteResumo"></span>
+  </div>
+  <p class="fl-hint">Cole muitos prompts: o robô divide entre as contas, <b>várias ao mesmo tempo</b> (padrão 2 — muda em ⚙), com um <b>cooldown escalonado</b> entre os envios (uma conta envia → espera 5–10 s → a outra envia…). Conta sem crédito fica marcada só pro tipo que acabou e o pedido vai pra outra conta. Quando <b>todas</b> ficam sem crédito de <b>vídeo</b>, os vídeos que faltam viram <b>foto</b> com o prompt reescrito pela IA. Tudo vai pra 🖼 Galeria.</p>
+
+  <details open><summary style="cursor:pointer;font-weight:600">👥 Contas <span class="fl-hint">(marque quais o lote usa · 🌐 abre o navegador da conta pra você logar, ativar o premium, ver os créditos…)</span></summary>
+    <div class="fl-contas" id="loteContas"></div>
+    <p class="fl-hint">Cadastrar/remover contas e fazer o 1º login: <a href="/contas-google">🔑 Contas Google</a>.
+      <button type="button" class="mini" id="loteLiberarTodas" title="use depois de recarregar os créditos / ativar o premium">↺ créditos de volta em todas</button></p>
+  </details>
+
+  <details><summary style="cursor:pointer;font-weight:600">⚙ Configurações do lote</summary>
+    <div class="fl-row" style="margin-top:6px">
+      <label>Contas em paralelo <select id="loteParalelo">{% for n in range(1, 5) %}<option>{{ n }}</option>{% endfor %}</select></label>
+      <label>Cooldown entre envios (s) <span style="display:flex;gap:4px;align-items:center"><input id="loteCdMin" type="number" min="0" max="600" step="1" style="width:70px"> a <input id="loteCdMax" type="number" min="0" max="600" step="1" style="width:70px"></span></label>
+      <label>Tentativas por pedido <select id="loteTent"><option>1</option><option>2</option><option>3</option></select></label>
+    </div>
+    <div class="fl-row" style="margin-top:6px">
+      <label title="Quando nenhuma conta do lote tem crédito de vídeo, cada vídeo que falta vira foto: a IA reescreve o prompt (🤖 IA do site → 🔎 IA do Google → regra simples)"><input type="checkbox" id="loteConverter" style="width:auto"> 🔁 sem crédito de vídeo em todas → vira foto (a IA reescreve o prompt)</label>
+      <label><input type="checkbox" id="loteVisivel" style="width:auto"> 👁 mostrar os navegadores</label>
+      <button type="button" class="mini" id="loteSalvarCfg">💾 salvar</button><span class="fl-hint" id="loteCfgOk"></span>
+    </div>
+  </details>
+
+  <div class="fl-row" style="margin-top:10px">
+    <div class="fl-tipo" id="loteTipo"><button type="button" data-tipo="imagem" class="on">🖼 Imagens</button> <button type="button" data-tipo="video">🎬 Vídeos</button></div>
+    <label>Modelo de imagem <select id="loteModeloImg"><option value="">(padrão)</option>{% for m in modelos_imagem %}<option>{{ m }}</option>{% endfor %}</select></label>
+    <label>Modelo de vídeo <select id="loteModeloVid"><option value="">(padrão)</option>{% for m in modelos_video %}<option>{{ m }}</option>{% endfor %}</select></label>
+    <label>Proporção <select id="loteProporcao">{% for p in proporcoes %}<option {% if p == '16:9' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+    <label>Quantidade <select id="loteQtd"><option>x1</option><option>x2</option><option>x3</option><option>x4</option></select></label>
+    <label title="cada prompt entra N vezes na fila (sai uma variação diferente a cada vez)">Repetir <select id="loteRepetir">{% for n in [1,2,3,4,5,10] %}<option value="{{ n }}">{{ n }}×</option>{% endfor %}</select></label>
+    <label>Separar <select id="loteSeparar"><option value="linha">um prompt por linha</option><option value="bloco">por linha em branco</option></select></label>
+  </div>
+  <label style="margin-top:8px">Prompts <textarea id="lotePrompts" rows="6" placeholder="A lighthouse in a storm, cinematic&#10;video: Slow push-in on a calm lake at sunrise&#10;foto: An old map on a wooden desk"></textarea></label>
+  <p class="fl-hint" style="margin-top:2px">Começar a linha com <code>foto:</code> ou <code>video:</code> escolhe o tipo só daquele prompt.</p>
+  <div class="fl-row" style="margin-top:6px">
+    <button type="button" id="loteAdd" class="yt-sec">➕ Pôr na fila</button>
+    <button type="button" id="loteAddIniciar" class="primary">🚀 Pôr na fila e iniciar</button>
+    <span style="flex:1"></span>
+    <button type="button" id="loteIniciar" class="primary">▶ Iniciar</button>
+    <button type="button" id="lotePausar" class="yt-sec" title="termina o que já está gerando e para">⏸ Pausar</button>
+    <button type="button" id="loteParar" class="yt-sec" title="para agora — o que está gerando volta pra fila">⏹ Parar agora</button>
+  </div>
+  <div id="loteFim" style="margin-top:8px"></div>
+
+  <div class="fl-row" style="justify-content:space-between;margin-top:10px">
+    <b>📋 Fila <span class="fl-hint" id="loteCont"></span></b>
+    <span><select id="loteFiltro" style="width:auto;margin:0"><option value="">tudo</option><option value="pendente">pendentes</option><option value="rodando">gerando</option><option value="ok">prontos</option><option value="erro">com erro</option><option value="convertido">🔁 viraram foto</option></select>
+    <button type="button" class="mini" data-limpar="concluidos">🧹 tirar concluídos</button> <button type="button" class="mini" data-limpar="erros">tirar erros</button> <button type="button" class="mini" data-limpar="tudo">esvaziar</button></span>
+  </div>
+  <ul class="fl-fila" id="loteFila"></ul>
+  <details style="margin-top:6px"><summary style="cursor:pointer" class="fl-hint">📜 Registro do lote</summary><div class="fl-log" id="loteLog"></div></details>
 </div>
 
 <div class="fl-box" id="painel" style="display:none">
@@ -288,6 +369,133 @@
   }
   $('diagnosticos').addEventListener('toggle', () => { if ($('diagnosticos').open) carregarDiagnosticos(); });
   carregarGaleria(); status();
+})();
+</script>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const IC = { pendente: '⏳', rodando: '⚙️', convertendo: '🔁', ok: '✅', erro: '❌' };
+  let tipo = 'imagem', timer = null, cfgCarregada = false, ultimo = null;
+  const hora = t => t ? new Date(t * 1000).toLocaleTimeString().slice(0, 8) : '';
+  const quando = iso => iso ? new Date(iso).toLocaleString().slice(0, 16) : '';
+
+  document.querySelectorAll('#loteTipo button').forEach(b => b.addEventListener('click', () => {
+    tipo = b.dataset.tipo; document.querySelectorAll('#loteTipo button').forEach(x => x.classList.toggle('on', x === b));
+  }));
+  async function post(url, corpo) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    let d = {}; try { d = await r.json(); } catch (_) {}
+    if (!r.ok) { alert(d.erro || 'não deu'); return null; }
+    return d;
+  }
+
+  function desenharContas(d) {
+    const usar = new Set(d.config.contas || []);
+    $('loteContas').innerHTML = d.contas.map(c => {
+      const marcado = usar.size ? usar.has(c.nome) : true;
+      const vid = c.esgotada_video ? `<span class="fl-tag no" title="volta em ${esc(quando(c.video_ate))}">🎬 sem crédito</span>` : '<span class="fl-tag ok">🎬 ok</span>';
+      const img = c.esgotada_imagem ? `<span class="fl-tag no" title="volta em ${esc(quando(c.imagem_ate))}">🖼 sem crédito</span>` : '<span class="fl-tag ok">🖼 ok</span>';
+      const login = c.logada ? '' : '<span class="fl-tag av" title="ainda não tem login salvo">🔒 sem login</span>';
+      return `<div class="fl-conta ${c.gerando ? 'gerando' : ''} ${c.manual ? 'manual' : ''}">
+        <div class="nm"><input type="checkbox" data-usar="${esc(c.nome)}" ${marcado ? 'checked' : ''} ${d.cdp ? 'disabled' : ''}> ${esc(c.nome)} ${c.gerando ? '⚙️' : ''}${c.manual ? '🌐' : ''}</div>
+        <div class="cr">${vid}${img}${login}</div>
+        <div class="ag">${esc(c.agora)}</div>${c.problema ? `<div class="pb">⚠ ${esc(c.problema)}</div>` : ''}
+        <div class="ac">${c.manual ? `<button type="button" data-concluir="${esc(c.nome)}">✔ Concluir (fechar e salvar)</button>`
+          : `<button type="button" data-abrir="${esc(c.nome)}" ${c.gerando || d.cdp ? 'disabled' : ''}>🌐 Abrir navegador</button><button type="button" data-abrir-url="${esc(c.nome)}" ${c.gerando || d.cdp ? 'disabled' : ''} title="abrir a conta em outro endereço (ex.: a página de planos/premium)">🔗</button>`}
+          ${(c.esgotada_video || c.esgotada_imagem) ? `<button type="button" data-liberar="${esc(c.nome)}" title="o crédito já voltou (ou ativou o premium)">♻ liberar créditos</button>` : ''}</div></div>`;
+    }).join('') + (d.cdp ? '<p class="fl-hint">Modo CDP (o seu Chrome): uma conta só, sem paralelo.</p>' : '');
+  }
+  function desenharFila(d) {
+    const f = $('loteFiltro').value;
+    const itens = d.fila.filter(j => !f || (f === 'convertido' ? j.convertido : j.estado === f)).slice().reverse();
+    $('loteFila').innerHTML = itens.map(j => {
+      const r = (j.resultados || [])[0];
+      const midia = r ? (r.tipo === 'video' ? `<video src="/flow/arquivo/${r.arquivo}" muted preload="metadata"></video>` : `<a href="/flow/arquivo/${r.arquivo}" target="_blank"><img src="/flow/arquivo/${r.arquivo}" loading="lazy" alt=""></a>`) : '';
+      const tags = (j.tipo === 'video' ? '🎬' : '🖼') + (j.convertido ? ` <span class="fl-tag av" title="era vídeo: ${esc(j.prompt_original)}">🔁 era vídeo · ${j.reescrito_por === 'ia_site' ? '🤖 IA' : j.reescrito_por === 'ia_google' ? '🔎 IA do Google' : 'regra'}</span>` : '')
+        + (j.conta ? ` <span class="fl-tag">${esc(j.conta)}</span>` : '') + ((j.resultados || []).length > 1 ? ` <span class="fl-tag">${j.resultados.length} arquivos</span>` : '');
+      const acoes = (j.estado === 'ok' || j.estado === 'erro' ? `<button type="button" data-refazer="${j.id}" title="gerar de novo">↻</button>` : '')
+        + (j.estado !== 'rodando' && j.estado !== 'convertendo' ? `<button type="button" data-remover="${j.id}" title="tirar da fila">✖</button>` : '');
+      return `<li><span class="ic">${IC[j.estado] || '•'}</span><span class="pr">${esc(j.prompt.slice(0, 220))}<small>${tags}${j.erro ? ' · <span style="color:#b91c1c">' + esc(j.erro.slice(0, 220)) + '</span>' : ''}</small></span>${midia}${acoes}</li>`;
+    }).join('') || '<li class="fl-hint">Fila vazia.</li>';
+  }
+  function desenhar(d) {
+    ultimo = d;
+    const c = d.contagem;
+    $('loteCont').textContent = `· ${c.pendente} pendente(s) · ${c.rodando + c.convertendo} gerando · ${c.ok} pronto(s) · ${c.erro} com erro`;
+    $('loteResumo').textContent = d.rodando ? (d.pausando ? '⏸ pausando…' : '⚙️ rodando' + (d.proximo_envio_s > 0 ? ` · próximo envio em ${Math.ceil(d.proximo_envio_s)} s` : '')) : 'parado';
+    $('loteIniciar').disabled = d.rodando && !d.pausando;
+    $('lotePausar').disabled = $('loteParar').disabled = !d.rodando;
+    $('loteFim').innerHTML = !d.rodando && d.fim_msg ? `<div class="${d.fim_msg.startsWith('✅') ? 'fl-ok' : 'fl-erro'}">${esc(d.fim_msg)}</div>` : '';
+    if (!cfgCarregada) {
+      cfgCarregada = true;
+      $('loteParalelo').value = d.config.paralelo; $('loteCdMin').value = d.config.cooldown_min; $('loteCdMax').value = d.config.cooldown_max;
+      $('loteTent').value = d.config.tentativas; $('loteConverter').checked = !!d.config.converter_para_foto; $('loteVisivel').checked = !!d.config.visivel;
+      if (d.cdp) $('loteParalelo').disabled = true;
+    }
+    if (!document.activeElement || !document.activeElement.closest('#loteContas')) desenharContas(d);
+    desenharFila(d);
+    $('loteLog').innerHTML = d.log.slice().reverse().map(l => `<div class="${l.nivel}">${hora(l.t)}  ${esc(l.msg)}</div>`).join('');
+  }
+  let rodava = false;
+  async function estado() {
+    clearTimeout(timer);
+    try {
+      const d = await (await fetch('/flow/lote/estado')).json(); desenhar(d);
+      const ativo = d.rodando || d.contas.some(c => c.manual);
+      if (rodava && !d.rodando) { const b = document.getElementById('galTipo'); if (b) b.dispatchEvent(new Event('change')); }
+      rodava = d.rodando;
+      timer = setTimeout(estado, ativo ? 1500 : 6000);
+    } catch (e) { timer = setTimeout(estado, 5000); }
+  }
+  function cfgDaTela() {
+    const contas = [...document.querySelectorAll('[data-usar]')].filter(x => x.checked).map(x => x.dataset.usar);
+    const todas = document.querySelectorAll('[data-usar]').length;
+    return { paralelo: +$('loteParalelo').value, cooldown_min: +$('loteCdMin').value, cooldown_max: +$('loteCdMax').value,
+             tentativas: +$('loteTent').value, converter_para_foto: $('loteConverter').checked, visivel: $('loteVisivel').checked,
+             contas: contas.length === todas ? [] : contas };
+  }
+  async function salvarCfg() {
+    const d = await post('/flow/lote/config', cfgDaTela());
+    if (d) { $('loteCfgOk').textContent = '✅ salvo'; setTimeout(() => $('loteCfgOk').textContent = '', 2000); estado(); }
+  }
+  $('loteSalvarCfg').addEventListener('click', salvarCfg);
+  ['loteParalelo', 'loteTent', 'loteConverter', 'loteVisivel'].forEach(id => $(id).addEventListener('change', salvarCfg));
+  ['loteCdMin', 'loteCdMax'].forEach(id => $(id).addEventListener('change', salvarCfg));
+  document.addEventListener('change', e => { if (e.target.matches && e.target.matches('[data-usar]')) {
+    if (![...document.querySelectorAll('[data-usar]')].some(x => x.checked)) { e.target.checked = true; alert('Deixe pelo menos uma conta marcada.'); return; }
+    salvarCfg(); } });
+  async function adicionar(iniciar) {
+    const texto = $('lotePrompts').value;
+    if (!texto.trim()) { alert('Cole os prompts.'); $('lotePrompts').focus(); return; }
+    const d = await post('/flow/lote/fila', { texto, tipo, separar: $('loteSeparar').value, modelo: $('loteModeloImg').value,
+      modelo_video: $('loteModeloVid').value, repetir: +$('loteRepetir').value, proporcao: $('loteProporcao').value, quantidade: $('loteQtd').value, iniciar });
+    if (d) { $('lotePrompts').value = ''; estado(); }
+  }
+  $('loteAdd').addEventListener('click', () => adicionar(false));
+  $('loteLiberarTodas').addEventListener('click', async () => {
+    if (confirm('Marcar TODAS as contas com crédito de novo (vídeo e imagem)?') && await post('/flow/lote/liberar-todas')) estado();
+  });
+  $('loteAddIniciar').addEventListener('click', () => adicionar(true));
+  $('loteIniciar').addEventListener('click', async () => { if (await post('/flow/lote/iniciar')) estado(); });
+  $('lotePausar').addEventListener('click', async () => { await post('/flow/lote/pausar', { agora: false }); estado(); });
+  $('loteParar').addEventListener('click', async () => { if (confirm('Parar agora? O que está gerando volta pra fila.')) { await post('/flow/lote/pausar', { agora: true }); estado(); } });
+  $('loteFiltro').addEventListener('change', () => ultimo && desenharFila(ultimo));
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b || !b.closest('#lote')) return;
+    if (b.dataset.abrir) { if (await post(`/flow/lote/contas/${encodeURIComponent(b.dataset.abrir)}/abrir`)) estado(); }
+    else if (b.dataset.abrirUrl) {
+      const url = prompt('Abrir a conta “' + b.dataset.abrirUrl + '” em qual endereço? (começa com https://)', 'https://one.google.com/');
+      if (url && await post(`/flow/lote/contas/${encodeURIComponent(b.dataset.abrirUrl)}/abrir`, { url })) estado();
+    }
+    else if (b.dataset.concluir) { await post(`/flow/lote/contas/${encodeURIComponent(b.dataset.concluir)}/concluir`); setTimeout(estado, 1200); }
+    else if (b.dataset.liberar) { await post(`/flow/contas/${encodeURIComponent(b.dataset.liberar)}/esgotada`, { esgotada: false }); estado(); }
+    else if (b.dataset.remover) { await post(`/flow/lote/fila/${b.dataset.remover}/remover`); estado(); }
+    else if (b.dataset.refazer) { await post(`/flow/lote/fila/${b.dataset.refazer}/refazer`); estado(); }
+    else if (b.dataset.limpar) { if (b.dataset.limpar !== 'tudo' || confirm('Esvaziar a fila inteira?')) { await post('/flow/lote/limpar', { quais: b.dataset.limpar }); estado(); } }
+  });
+  estado();
 })();
 </script>
 {% endblock %}

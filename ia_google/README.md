@@ -7,6 +7,9 @@ Toda resposta volta no mesmo formato:
 - **Resposta completa**: em Markdown
 - **Fontes**: título, site, trecho e link
 
+> **🎞️ Google Flow em massa** (várias contas, cooldown, vídeo → foto) fica no site, na aba **🎬 Google Flow → 🚀 Em massa**
+> (`flow_lote.py`): ela usa o Flow com os botões reais e as contas de 🔑 Contas Google.
+>
 > **Dentro do BestEditor:** este app sobe sozinho pela aba **🔎 IA do Google** do site, na porta **8852**
 > (mude em ⚙️ Configurações). O site usa a API dele no agente do YouTube e no "Checar fatos" do Roteiro do YouTube.
 > Rodando sozinho (`iniciar.bat`), ele continua na porta 5000 — use `PORTA=8852` se o site também estiver aberto.

@@ -25,7 +25,7 @@
   .status-concluido { background: #dcfce7; color: #166534; }
   .status-erro, .status-erro_transcricao { background: #fee2e2; color: #991b1b; }
   .status-transcrevendo, .status-buscando_previas, .status-montando, .status-buscando_termos_wikipedia, .status-buscando_termos_buscadores { background: #dbeafe; color: #1e40af; }
-  .status-aguardando_json, .status-pronto_para_editar, .status-aguardando_termos_wikipedia, .status-aguardando_termos_buscadores { background: #fef3c7; color: #92400e; }
+  .status-aguardando_json, .status-pronto_para_editar, .status-previas_pausadas, .status-aguardando_termos_wikipedia, .status-aguardando_termos_buscadores { background: #fef3c7; color: #92400e; }
 </style>
 
 <div class="galeria">
@@ -53,7 +53,7 @@
         <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">Ver progresso</a>
         {% elif job.status == 'aguardando_json' %}
         <a href="{{ url_for('show_prompt', job_id=job.job_id) }}">Ver prompt</a>
-        {% elif job.status == 'buscando_previas' %}
+        {% elif job.status in ('buscando_previas', 'previas_pausadas') %}
         <a href="{{ url_for('fetching_previews_page', job_id=job.job_id) }}">Ver progresso</a>
         {% elif job.status == 'pronto_para_editar' %}
         <a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}">Editar timeline</a>

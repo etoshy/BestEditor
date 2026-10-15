@@ -551,6 +551,12 @@ def registrar(app, base_dir: str) -> None:
     except Exception:  # noqa: BLE001
         pass
 
+    try:  # 🚀 Flow em massa (várias contas em paralelo, cooldown, vídeo → foto, abrir o navegador da conta)
+        import flow_lote
+        flow_lote.registrar(app)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+
     @app.route("/flow")
     def flow_page():
         from googleflow import flow_direto as fd
@@ -574,6 +580,13 @@ def registrar(app, base_dir: str) -> None:
         with _TRAVA:
             if _ESTADO["rodando"]:
                 return jsonify({"erro": "Já tem algo rodando no Flow — espere ou clique em Parar."}), 409
+            try:  # 🚀 o lote (ou uma janela de conta aberta na mão) está com o Flow
+                import flow_lote
+                motivo_lote = flow_lote.ocupado()
+            except Exception:  # noqa: BLE001
+                motivo_lote = None
+            if motivo_lote:
+                return jsonify({"erro": motivo_lote}), 409
             modo = "teste" if f.get("modo") == "teste" else "gerar"
             opcoes: Dict[str, Any] = {
                 "modo": modo, "visivel": f.get("visivel") == "on", "simular": f.get("simular") == "on",

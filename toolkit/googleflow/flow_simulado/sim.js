@@ -1,6 +1,6 @@
 // Google Flow SIMULADO — o HTML é o REAL (capturado da página do Flow); este script só imita o comportamento:
 // agente liga/desliga, painel do agente, pop-up de configurações, menus de modelo, Início/Fim, menu de mídia,
-// "Iniciar geração" → cartão com % → imagem/vídeo. Parâmetros da URL: ?limite=1 (limite de uso), ?falha=1 (recusa), ?sem_credito=1 (sem créditos pra vídeo).
+// "Iniciar geração" → cartão com % → imagem/vídeo. Parâmetros da URL: ?limite=1 (limite de uso), ?falha=1 (recusa), ?famosos=1 (recusa "pessoas famosas" se o comando tiver Nome Sobrenome), ?sem_credito=1 (sem créditos pra vídeo).
 (function () {
   const Q = new URLSearchParams(location.search);
   const $ = (s, r) => (r || document).querySelector(s);
@@ -122,6 +122,14 @@
       let pct = 0;
       const tick = setInterval(() => {
         pct += 33;
+        if (Q.get('famosos') && pct > 40 && /[A-Z][a-z]+ [A-Z][a-z]+/.test(prompt)) {
+          // ?famosos=1 (HTML REAL, v84_108): comando com nome de pessoa real → cartão "⚠ Falha … pessoas famosas" (sem %)
+          clearInterval(tick);
+          tile.innerHTML = '<div class="error-message"><mat-icon class="mat-icon error-icon google-symbols">warning</mat-icon><div class="error-title">Falha</div>'
+            + '<div class="error-subtitle"><span class="error-message-text"> Esse comando pode violar nossas políticas contra a geração de imagens de pessoas famosas. Tente usar outro comando ou envie feedback. </span>'
+            + '<span class="disclaimer-message"> Você vai receber um reembolso por esta geração. <a class="error-link" href="#">Acompanhar o status</a></span></div></div>';
+          return;
+        }
         if (Q.get('falha') && pct > 40) { clearInterval(tick); $('.loading-percentage', tile).textContent = 'Não foi possível gerar. Tente outro comando.'; return; }
         if (pct < 99) { $('.loading-percentage', tile).textContent = pct + '%'; return; }
         clearInterval(tick);
@@ -223,6 +231,23 @@
     caixa().style.display = 'none'; document.body.appendChild(T('painel_sessao'));
   }
   ($$('flow-prompt-box flow-ingredient-bar') || []).forEach(e => e.remove());
+  // ?boas_vindas=1 (HTML REAL, v84_108): conta nova — Avançar → privacidade (Continuar só depois de rolar até o fim) → Aceitar
+  if (Q.get('boas_vindas')) setTimeout(() => {
+    const passos = [['Conheça e molde ferramentas de IA para a criatividade', 'Avançar', false],
+                    ['Seus dados e o Google Flow', 'Continuar', true], ['Termos de Serviço', 'Aceitar', false]];
+    let k = 0;
+    document.body.insertAdjacentHTML('beforeend', '<div class="sim-bv" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5)"><mat-dialog-container role="dialog" style="display:block;background:#fff;margin:60px auto;width:460px;padding:16px"><app-onboarding-dialog></app-onboarding-dialog></mat-dialog-container></div>');
+    const dlg = document.querySelector('.sim-bv app-onboarding-dialog');
+    const desenhar = () => {
+      const [tit, rot, rolar] = passos[k];
+      dlg.innerHTML = `<h2>${tit}</h2><mat-dialog-content style="display:block;height:120px;overflow:auto">${rolar ? '<p style="height:900px">texto longo da política…</p><div class="scroll-end-target"></div>' : '<p>bem-vindo</p>'}</mat-dialog-content>`
+        + `<mat-dialog-actions><button class="mdc-button flow-button-transparent">Sair</button><button class="mdc-button flow-button-primary" ${rolar ? 'disabled="true"' : ''}><span class="mdc-button__label">${rot}</span></button></mat-dialog-actions>`;
+      const b = dlg.querySelector('.flow-button-primary'), c = dlg.querySelector('mat-dialog-content');
+      if (rolar) c.addEventListener('scroll', () => { if (c.scrollTop + c.clientHeight >= c.scrollHeight - 4) b.removeAttribute('disabled'); });
+      b.addEventListener('click', () => { if (b.hasAttribute('disabled')) return; k++; if (k >= passos.length) document.querySelector('.sim-bv').remove(); else desenhar(); });
+    };
+    desenhar();
+  }, 200);
   // ?novidades=1 (HTML REAL, v84_107): o aviso de novidades do Flow cobre a tela até clicar em "Começar"
   if (Q.get('novidades')) setTimeout(() => {
     document.body.insertAdjacentHTML('beforeend', '<div class="sim-novidades" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999">'
