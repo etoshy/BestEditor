@@ -1119,28 +1119,34 @@ def filtros_de_tratamento(destaques: List[Dict[str, Any]], W: int, H: int, pasta
     return ent, etapas
 
 
-def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, Any]], W: int, H: int, work_dir: str,
-                      paleta: Optional[Dict[str, str]] = None, palavras: Optional[List[Dict[str, Any]]] = None) -> str:
-    """Um passe do ffmpeg: tratamento da cena + legenda ASS animada. O áudio é copiado."""
-    from video_assembler import _escape_path_for_ffmpeg_filter, _probe_duration
-    validos = [d for d in destaques if estilo(d.get("estilo"))]
-    if not validos:
-        return video_in
-    os.makedirs(work_dir, exist_ok=True)
-    ass = gerar_ass(validos, W, H, os.path.join(work_dir, "destaques.ass"), paleta, palavras)
-    ent, etapas = filtros_de_tratamento(validos, W, H, os.path.join(work_dir, "destaques_png"), paleta)
-    dur = _probe_duration(video_in)
-    grafo = ["[0:v]setpts=PTS-STARTPTS,format=yuv420p[base]"] + etapas + [
-        f"[base]ass='{_escape_path_for_ffmpeg_filter(ass)}':fontsdir='{_escape_path_for_ffmpeg_filter(FONTES_DIR)}',format=yuv420p[vout]"
-    ]
-    final = dp_visual._encadear(grafo)
-    script = os.path.join(work_dir, "_destaques_grafo.txt")
+MAX_IMAGENS_PASSE_UNICO = 16  # v84_113: mais imagens de fundo que isso num passe só = muita memória
+LOTE_FUNDOS = 8  # v84_113: fundos de destaque por passe quando o passe único estoura a memória
+
+
+def _sem_memoria(stderr: str, returncode: int) -> bool:
+    t = (stderr or "").lower()
+    return returncode in (-12, 244) or "cannot allocate memory" in t or "out of memory" in t or "error code: -12" in t \
+        or "bad_alloc" in t or "not enough memory" in t
+
+
+def _passe_destaques(video_in: str, video_out: str, ent: List[str], etapas: List[str], ass: Optional[str], work_dir: str,
+                     nome: str, dur: float, poupar: bool = False) -> "subprocess.CompletedProcess":
+    """Um passe do ffmpeg: as `etapas` (fundos) e, se `ass`, a legenda ASS dos textos. O áudio é copiado."""
+    from video_assembler import _escape_path_for_ffmpeg_filter
+    fim = (f"[base]ass='{_escape_path_for_ffmpeg_filter(ass)}':fontsdir='{_escape_path_for_ffmpeg_filter(FONTES_DIR)}',format=yuv420p[vout]"
+           if ass else "[base]format=yuv420p[vout]")
+    final = dp_visual._encadear(["[0:v]setpts=PTS-STARTPTS,format=yuv420p[base]"] + etapas + [fim])
+    script = os.path.join(work_dir, f"_destaques_grafo{nome}.txt")
     with open(script, "w", encoding="utf-8") as f:
         f.write(";\n".join(final))
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", video_in] + ent + [
+    extra = ["-filter_complex_threads", "1", "-threads", "2"] if poupar else []  # menos cópias de quadro na memória
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + extra + ["-i", video_in] + ent + [
         "-filter_complex_script", script, "-map", "[vout]", "-map", "0:a?", "-t", f"{dur:.3f}",
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "copy", video_out,
     ]
+    if ass is None:  # passe intermediário: quase sem perda (o último passe é que define a qualidade)
+        k = cmd.index("libx264")
+        cmd = cmd[:k + 1] + ["-crf", "12"] + cmd[k + 1:]
     import qualidade_export
     cmd_cpu = qualidade_export._ajustar_cpu(cmd)
     cmd = qualidade_export.ajustar(cmd)
@@ -1148,9 +1154,76 @@ def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, A
     if r.returncode != 0 and ("nrecognized" in r.stderr or "not found" in r.stderr) and "filter_complex_script" in r.stderr:
         k = cmd.index("-filter_complex_script")
         r = subprocess.run(cmd[:k] + ["-/filter_complex"] + cmd[k + 1:], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600)
-    if r.returncode != 0:
-        raise RuntimeError(f"ffmpeg falhou nos destaques: {r.stderr.strip()[-900:]}")
-    return video_out
+    return r
+
+
+def aplicar_destaques(video_in: str, video_out: str, destaques: List[Dict[str, Any]], W: int, H: int, work_dir: str,
+                      paleta: Optional[Dict[str, str]] = None, palavras: Optional[List[Dict[str, Any]]] = None,
+                      lote: Optional[int] = None) -> str:
+    """Tratamento da cena + legenda ASS animada, num passe só do ffmpeg. O áudio é copiado.
+
+    v84_113: vídeo longo com MUITOS destaques podia estourar a memória ("Cannot allocate memory") — cada fundo com
+    imagem (grade, faixas, vinheta…) é uma entrada a mais decodificando o vídeo todo. Aí refaz em LOTES: os fundos
+    em passes de até `LOTE_FUNDOS` (passes intermediários quase sem perda) e os textos no último; se ainda faltar
+    memória, o lote cai pela metade (até 1)."""
+    from video_assembler import _probe_duration
+    validos = [d for d in destaques if estilo(d.get("estilo"))]
+    if not validos:
+        return video_in
+    os.makedirs(work_dir, exist_ok=True)
+    ass = gerar_ass(validos, W, H, os.path.join(work_dir, "destaques.ass"), paleta, palavras)
+    pasta_png = os.path.join(work_dir, "destaques_png")
+    dur = _probe_duration(video_in)
+    if lote is None:
+        ent, etapas = filtros_de_tratamento(validos, W, H, pasta_png, paleta)
+        if ent.count("-i") > MAX_IMAGENS_PASSE_UNICO:  # muitas imagens de fundo: nem tenta o passe único (estouraria)
+            lote = LOTE_FUNDOS
+    if lote is None:
+        r = _passe_destaques(video_in, video_out, ent, etapas, ass, work_dir, "", dur)
+        if r.returncode == 0:
+            return video_out
+        if not _sem_memoria(r.stderr, r.returncode):
+            raise RuntimeError(f"ffmpeg falhou nos destaques: {r.stderr.strip()[-900:]}")
+        print(f"[montagem] destaques: faltou memória com {len(validos)} destaques num passe só — refazendo em lotes", flush=True)
+        lote = LOTE_FUNDOS
+    com_fundo = [d for d in validos if filtros_de_tratamento([d], W, H, pasta_png, paleta)[1]]
+    ultimo_erro = ""
+    while True:
+        lotes = [com_fundo[k:k + lote] for k in range(0, len(com_fundo), lote)]
+        atual, temporarios, ok = video_in, [], True
+        for n, grupo in enumerate(lotes, start=1):
+            ent, etapas = filtros_de_tratamento(grupo, W, H, pasta_png, paleta)
+            saida = os.path.join(work_dir, f"_destaques_lote{n}.mp4")
+            r = _passe_destaques(atual, saida, ent, etapas, None, work_dir, f"_lote{n}", dur, poupar=True)
+            if r.returncode != 0:
+                ok, ultimo_erro = False, r.stderr
+                if not _sem_memoria(r.stderr, r.returncode):
+                    raise RuntimeError(f"ffmpeg falhou nos destaques (lote {n}): {r.stderr.strip()[-900:]}")
+                break
+            temporarios.append(saida)
+            atual = saida
+        if ok:
+            r = _passe_destaques(atual, video_out, [], [], ass, work_dir, "_textos", dur, poupar=True)
+            if r.returncode == 0:
+                for t in temporarios:
+                    try:
+                        os.remove(t)
+                    except OSError:
+                        pass
+                return video_out
+            ok, ultimo_erro = False, r.stderr
+            if not _sem_memoria(r.stderr, r.returncode):
+                raise RuntimeError(f"ffmpeg falhou nos textos dos destaques: {r.stderr.strip()[-900:]}")
+        for t in temporarios:
+            try:
+                os.remove(t)
+            except OSError:
+                pass
+        if lote <= 1:
+            raise RuntimeError("ffmpeg falhou nos destaques: faltou memória mesmo um fundo por vez — feche outros programas "
+                               f"(navegadores, gerador de voz) e monte de novo. {ultimo_erro.strip()[-400:]}")
+        lote = max(1, lote // 2)
+        print(f"[montagem] destaques: ainda faltou memória — lotes de {lote}", flush=True)
 
 
 # ------------------------------------------------------------------ texto avulso -> vídeo (página "Textos animados")

@@ -3317,6 +3317,11 @@ def _resolve_override_source(override: Dict[str, Any], downloads_dir: str, get_c
         url = override.get("value")
         if not url:
             raise VideoAssemblyError("override_source do tipo 'url' precisa de 'value' com o link.")
+        local_flow = flow_arquivo_local(url)  # v84_112: mídia do Flow que já está no disco — nada de baixar/gerar
+        if local_flow:
+            if _infer_media_kind(local_flow) == "image":
+                return garantir_imagem_compativel(local_flow), "image"
+            return local_flow, "video"
         local_path = _download_generic_url(url, downloads_dir)
         _validate_downloaded_file(local_path)
         kind = kind or _infer_media_kind(local_path) or _infer_media_kind(url)
@@ -3547,6 +3552,37 @@ def flow_tem_conta(tipo: str, cfg: Optional[Dict[str, Any]] = None) -> Optional[
         return True
     except Exception as exc:  # noqa: BLE001
         return False if type(exc).__name__ == "GoogleFlowSemContas" else None
+
+
+def flow_arquivo_local(url: Any) -> Optional[str]:
+    """v84_112: link de mídia do Flow que JÁ está no disco ("/flow/imagens/<arq>" = gerada pros vídeos;
+    "/flow/arquivo/<arq>" = galeria da aba 🎬 Google Flow) → o caminho do arquivo (ou None)."""
+    u = str(url or "").split("?", 1)[0].split("#", 1)[0]
+    m = re.search(r"/flow/(imagens|arquivo)/([^/]+)$", u)
+    if not m:
+        return None
+    try:
+        if m.group(1) == "imagens":
+            from googleflow import googleflow_client as gf
+            caminho = os.path.join(str(gf.pasta_imagens()), os.path.basename(m.group(2)))
+        else:
+            import flow_estudio
+            caminho = os.path.join(flow_estudio.pasta_galeria(), os.path.basename(m.group(2)))
+    except Exception:  # noqa: BLE001
+        return None
+    return caminho if os.path.isfile(caminho) else None
+
+
+def flow_ja_gerado(query: str, cfg: Optional[Dict[str, Any]], tipo: str) -> bool:
+    """Esse pedido JÁ foi gerado no Flow (está no cache do site)? Aí a montagem usa ele mesmo sem crédito nenhum."""
+    try:
+        from googleflow import googleflow_client as gf
+        prop = gf.proporcao_para_orientacao((cfg or {}).get("orientation"))
+        if tipo == "video":
+            return bool(gf._videos_do_cache(gf.chave_do_prompt(gf.montar_prompt_video(query, prop))))
+        return bool(gf._fotos_do_cache(gf.chave_do_prompt(gf.montar_prompt(query, prop))))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _termo_de_pesquisa(segment: VideoSegment) -> str:
@@ -4481,7 +4517,7 @@ def assemble_video(
                     kind = "image"
                 elif getattr(segment, "media_type", "video") == "image" and segment.provider == "flow":
                     # 🖼 foto do Flow. v84_110: sem conta com crédito de imagem (ou o Flow falhou) → PESQUISA a cena
-                    if flow_tem_conta("imagem", cfg) is False:
+                    if flow_tem_conta("imagem", cfg) is False and not flow_ja_gerado(segment.query, cfg, "imagem"):
                         raw_paths, kind = _pesquisa_no_lugar_do_flow(
                             segment, downloads_dir, worker_factory, cfg, provider_priority, search_orientation,
                             used_tracker=used_clips_tracker, motivo="todas as contas sem crédito de imagem")
@@ -4505,6 +4541,10 @@ def assemble_video(
                     # v84_110: sem conta com crédito de VÍDEO nem tenta (vai direto pra foto); sem crédito de
                     # IMAGEM também (ou a foto não sai) → PESQUISA a cena nos bancos/buscadores.
                     tem_video, tem_foto = flow_tem_conta("video", cfg), flow_tem_conta("imagem", cfg)
+                    # v84_112: o que JÁ foi gerado (prévia, edição) entra sem gerar de novo, com ou sem crédito
+                    if flow_ja_gerado(segment.query, cfg, "video"):
+                        tem_video = True
+                    q_foto = segment.query if flow_ja_gerado(segment.query, cfg, "imagem") else None
                     exc_flow: Any = "todas as contas sem crédito de vídeo"
                     raw_paths, kind = [], ""
                     if tem_video is not False:
@@ -4517,11 +4557,17 @@ def assemble_video(
                         except VideoAssemblyError as exc_v:
                             exc_flow = exc_v
                             tem_foto = flow_tem_conta("imagem", cfg)
+                    if not kind and q_foto is None:
+                        q_foto = prompt_de_foto(segment.query)
+                        if flow_ja_gerado(q_foto, cfg, "imagem"):
+                            tem_foto = True
+                    elif not kind:
+                        tem_foto = True
                     if not kind and tem_foto is not False:
                         try:
                             # 🔁 o prompt de VÍDEO vira prompt de FOTO e gera nas contas que ainda têm crédito de imagem
                             raw_paths = [_download_image_segment_with_fallbacks(
-                                replace(segment, media_type="image", query=prompt_de_foto(segment.query)), downloads_dir,
+                                replace(segment, media_type="image", query=q_foto), downloads_dir,
                                 worker_factory, used_tracker=used_clips_tracker)]
                             kind = "image"
                             flow_trocas[i] = f"foto no lugar do vídeo ({str(exc_flow)[:120]})"

@@ -28,6 +28,23 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🧠 Destaques sem estourar a memória (v84_113)
+
+- Vídeo longo com muitos destaques de texto podia falhar na montagem com “Cannot allocate memory”: cada fundo com
+  imagem (faixas, grade, vinheta, gradiente…) era uma entrada a mais do ffmpeg, todas no mesmo passe.
+- Agora, com mais de 16 imagens de fundo (ou se o passe único faltar memória), os fundos vão em **lotes de 8** (passes
+  intermediários quase sem perda) e os **textos no último passe**. Se ainda faltar memória, o lote cai pela metade, até 1.
+- Testes: `test_v84_destaques_memoria.py`.
+
+## ♻ Exportar usa o que o Flow já gerou (v84_112)
+
+- Na exportação, o trecho do Flow que já tem a mídia gerada na **prévia** entra com **esse mesmo arquivo**, foto ou
+  vídeo, sem gerar de novo. Se a busca do trecho mudou depois da prévia, ele gera a nova.
+- O que já está no cache do Flow (mesmo pedido) também entra, **inclusive com as contas sem crédito**. Antes, sem
+  crédito de vídeo, a montagem pulava o vídeo já gerado e criava uma foto nova.
+- Mídia do Flow escolhida no editor por link (`/flow/imagens/…` ou da galeria `/flow/arquivo/…`) sai direto do disco.
+- Testes: `test_v84_flow_reusa.py`.
+
 ## ⬛ Trecho sem cena coberto pela edição da IA (v84_111)
 
 - Na edição com a IA (Estúdio → 🤖 IA), os trechos **sem cena** (nenhum banco achou mídia, sem prévia) aparecem como

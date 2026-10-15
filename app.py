@@ -9581,8 +9581,19 @@ def _fixar_midias_da_previa(job: dict, segments: List[VideoSegment]) -> List[Vid
     for i, seg in enumerate(segments):
         p = previews[i] if i < len(previews) and isinstance(previews[i], dict) else {}
         motivo, fixou = None, False
+        flow_local = None
+        if not seg.override_source and p.get("ok") and (p.get("provider") or seg.provider) == "flow" \
+                and (p.get("query") is None or " ".join(str(p["query"]).split()) == " ".join(seg.query.split())):
+            from video_assembler import flow_arquivo_local as _fal
+            flow_local = next((x for x in (_fal(p.get(k)) for k in ("video_preview_url", "result_url", "thumbnail_url")) if x), None)
         if seg.override_source:
             motivo = "mídia escolhida à mão (" + str(seg.override_source.get("source")) + ") — entra a que você escolheu"
+        elif flow_local:  # v84_112: o Flow já gerou na prévia — a montagem usa ESSE arquivo (não gera de novo)
+            fixou = True
+            motivo = "mídia do Flow gerada na prévia — entra o mesmo arquivo"
+            kind = "image" if __import__("video_assembler")._infer_media_kind(flow_local) == "image" else "video"
+            seg = _replace(seg, override_source={"source": "local_file", "value": flow_local, "kind": kind, "da_previa": True},
+                           media_type=kind)
         elif not ligado:
             motivo = "fixar_midias_da_previa desligado nas configurações — a montagem busca de novo"
         elif (seg.media_type or "video") != "video":
