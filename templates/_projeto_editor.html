@@ -1,0 +1,55 @@
+{# 🕵️ v84_141: o projeto do vídeo no editor — ligar/trocar e encaixar as fotos/vídeos reais nos momentos do roteiro #}
+{% if job and job.status in ('pronto_para_editar', 'previas_pausadas') %}
+{% set _pe = info_projeto_editor(job) %}
+{% set _vendas = vendas_lista() %}{% set _dossies = dossies_lista() %}{% set _roteiros = roteiros_yt_lista() %}
+<details id="projeto-box" {% if _pe.tipo in ('dossie', 'venda') and _pe.momentos and not _pe.encaixadas %}open{% endif %} style="margin:8px 12px;padding:8px 14px;background:#fdf4ff;color:#581c87;border:1px solid #e9d5ff;border-radius:8px;font-size:.9rem;">
+  <summary style="cursor:pointer;font-weight:600;">📦 Projeto do vídeo: {% if _pe.nome %}<b>{{ {'dossie': '🕵️', 'venda': '🛒', 'roteiro': '📝'}.get(_pe.tipo, '') }} {{ _pe.nome }}</b>{% else %}<i>nenhum</i>{% endif %}
+    {% if _pe.momentos %}<span style="font-weight:400;color:#7e22ce;"> · {{ _pe.momentos }} momento(s) com foto/vídeo real no roteiro</span>{% endif %}
+    {% if _pe.encaixadas %}<span style="font-weight:400;color:#15803d;"> · ✔ {{ _pe.encaixadas }} trecho(s) com a mídia real</span>{% endif %}</summary>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+    <select id="pe-projeto" style="width:auto;max-width:420px;margin:0;">
+      <option value="">— nenhum —</option>
+      {% if _dossies %}<optgroup label="🕵️ Modelos de vídeo">{% for v in _dossies %}<option value="dossie:{{ v.id }}" {% if _pe.tipo == 'dossie' and _pe.id == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
+      {% if _roteiros %}<optgroup label="📝 Roteiros do YouTube">{% for v in _roteiros %}<option value="roteiro:{{ v.id }}" {% if _pe.tipo == 'roteiro' and _pe.id == v.id %}selected{% endif %}>{{ v.titulo }} ({{ v.cenas }} cenas)</option>{% endfor %}</optgroup>{% endif %}
+      {% if _vendas %}<optgroup label="🛒 Vídeos de venda">{% for v in _vendas %}<option value="venda:{{ v.id }}" {% if _pe.tipo == 'venda' and _pe.id == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
+    </select>
+    <button type="button" id="pe-ligar" style="width:auto;margin:0;padding:5px 12px;background:#7e22ce;color:#fff;border:0;border-radius:6px;cursor:pointer;">🔗 Ligar este projeto</button>
+    <span id="pe-st" style="font-size:.84rem;"></span>
+  </div>
+  {% if _pe.tipo in ('dossie', 'venda') %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #e9d5ff;">
+    <button type="button" id="pe-encaixar" style="width:auto;margin:0;padding:6px 14px;background:#15803d;color:#fff;font-weight:700;border:0;border-radius:6px;cursor:pointer;">🕵️ Encaixar as fotos e vídeos reais</button>
+    <label style="margin:0;font-weight:400;font-size:.84rem;"><input type="checkbox" id="pe-tudo" style="width:auto;margin:0 4px 0 0;">trocar também os trechos que você já escolheu</label>
+    {% if _pe.encaixadas %}<button type="button" id="pe-desfazer" style="width:auto;margin:0;padding:5px 12px;background:#64748b;color:#fff;border:0;border-radius:6px;cursor:pointer;">↩ Voltar as cenas de antes</button>{% endif %}
+  </div>
+  <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">Em cada momento que o roteiro marcou ([I3] antes da frase), o trecho em que essa frase é falada troca a mídia pela foto/vídeo REAL do projeto (vídeo com o pedaço planejado). Por padrão só troca cena de IA (pod/Flow/Runpod), ⏳ pendente ou sem mídia — o que você escolheu à mão fica. As cenas de IA continuam guardadas: ↩ volta. Sem marcas? No Modelo de vídeo, 📸 → 📍 Posicionar.</div>
+  {% elif _pe.tipo == 'roteiro' %}
+  <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">📝 Roteiro do YouTube ligado: as [CENA n] e os capítulos usam ele (gerar o prompt de novo pra valer nas buscas).</div>
+  {% endif %}
+</details>
+<script>
+(function () {
+  const $p = (id) => document.getElementById(id);
+  const URL_LIGAR = "{{ url_for('ligar_projeto_rota', job_id=job.job_id) }}", URL_ENC = "{{ url_for('encaixar_projeto_rota', job_id=job.job_id) }}";
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  $p('pe-ligar').addEventListener('click', async () => {
+    try { await post(URL_LIGAR, { projeto: $p('pe-projeto').value }); $p('pe-st').textContent = '✔ ligado — recarregando…'; setTimeout(() => location.reload(), 800); }
+    catch (e) { $p('pe-st').textContent = '⚠ ' + e.message; }
+  });
+  const enc = $p('pe-encaixar');
+  if (enc) enc.addEventListener('click', async () => {
+    enc.disabled = true; $p('pe-st').textContent = '🕵️ achando os momentos na narração…';
+    try { const d = await post(URL_ENC, { modo: $p('pe-tudo').checked ? 'tudo' : 'ia' });
+      $p('pe-st').textContent = `✔ ${d.trocadas} trecho(s) com a mídia real (${d.achados} de ${d.momentos} momentos achados na fala) — buscando as prévias…`;
+      setTimeout(() => location.reload(), 1500); }
+    catch (e) { $p('pe-st').textContent = '⚠ ' + e.message; enc.disabled = false; }
+  });
+  const des = $p('pe-desfazer');
+  if (des) des.addEventListener('click', async () => {
+    if (!confirm('Voltar as cenas que estavam antes nesses trechos?')) return;
+    try { const d = await post(URL_ENC, { desfazer: true }); $p('pe-st').textContent = `✔ ${d.voltaram} trecho(s) voltaram`; setTimeout(() => location.reload(), 1200); }
+    catch (e) { $p('pe-st').textContent = '⚠ ' + e.message; }
+  });
+})();
+</script>
+{% endif %}

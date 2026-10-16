@@ -157,31 +157,41 @@ def descrever(cenas: List[Dict[str, Any]], roteiro: str = "", idioma: str = "", 
 
 
 # ------------------------------------------------------------------ 3. escolher (espaçadas)
-def escolher(notas: List[int], pct: float = 0.30, nota_minima: int = 3) -> Set[int]:
-    """Índices (0-based) das cenas que o pod gera: as de nota mais alta, ~pct do total, nunca vizinhas, no máximo
-    ⌈pct·10⌉+1 em qualquer janela de 10 cenas. Cena fácil (nota < nota_minima) nunca entra."""
+def escolher(notas: List[int], pct: float = 0.30, nota_minima: Optional[int] = None) -> Set[int]:
+    """Índices (0-based) das cenas que o pod gera: as de nota mais alta, ~pct do total, espalhadas (no máximo
+    ⌈pct·10⌉+1 em qualquer janela de 10 cenas). Nota < 0 = nunca (ex.: cena com foto real do modelo).
+    Até 45%: nunca duas vizinhas e só cena com nota ≥ 3. Acima (v84_140, até 90%): primeiro espalhadas, depois
+    completa permitindo vizinhas, e entra cena mais fácil (nota ≥ 1 até 60%; qualquer uma acima disso)."""
     n = len(notas)
-    alvo = int(round(n * max(0.0, min(0.5, pct))))
+    pct = max(0.0, min(1.0, pct))
+    alvo = int(round(n * pct))
     if not alvo:
         return set()
+    if nota_minima is None:
+        nota_minima = 3 if pct <= 0.45 else (1 if pct <= 0.6 else 0)
     teto_janela = math.ceil(pct * 10) + 1
     ordem = sorted(range(n), key=lambda i: (-notas[i], i))
     escolhidas: Set[int] = set()
-    for i in ordem:
-        if len(escolhidas) >= alvo or notas[i] < nota_minima:
+    for passe in (1, 2):
+        for i in ordem:
+            if len(escolhidas) >= alvo:
+                break
+            if i in escolhidas or notas[i] < 0 or notas[i] < nota_minima:
+                continue
+            if passe == 1 and ((i - 1) in escolhidas or (i + 1) in escolhidas):
+                continue
+            if teto_janela < 10 and any(sum(1 for j in range(a, a + 10) if j in escolhidas or j == i) > teto_janela
+                                        for a in range(max(0, i - 9), min(i, n - 1) + 1)):
+                continue
+            escolhidas.add(i)
+        if pct <= 0.45:
             break
-        if (i - 1) in escolhidas or (i + 1) in escolhidas:
-            continue
-        if any(sum(1 for j in range(a, a + 10) if j in escolhidas or j == i) > teto_janela
-               for a in range(max(0, i - 9), min(i, n - 1) + 1)):
-            continue
-        escolhidas.add(i)
     return escolhidas
 
 
 def escolher_sem_ia(n: int, pct: float = 0.30) -> Set[int]:
     """Sem IA (não dá pra saber quais são difíceis): espalha por igual."""
-    alvo = int(round(n * max(0.0, min(0.5, pct))))
+    alvo = int(round(n * max(0.0, min(1.0, pct))))
     if not alvo:
         return set()
     passo = n / alvo

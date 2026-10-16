@@ -178,7 +178,7 @@ def criar(itens: List[Dict[str, Any]], config: Dict[str, Any], pod_url: str = ""
         raise ProducaoErro("Escolha pelo menos um roteiro.")
     cfg = dict(PADRAO_LOTE)
     cfg["intervalo"] = _num(config.get("intervalo"), 5.0, 2.0, 30.0)
-    cfg["pct"] = int(_num(config.get("pct"), 30, 0, 50))
+    cfg["pct"] = int(_num(config.get("pct"), 30, 0, 100))
     cfg["orientacao"] = config.get("orientacao") if config.get("orientacao") in ("16:9", "9:16", "1:1") else "16:9"
     cfg["estilo_extra"] = " ".join(str(config.get("estilo_extra") or "").split())[:300]
     cfg["rostos"] = config.get("rostos", True) is not False  # 🎭 rosto das pessoas do elenco (FLUX.2 klein no pod)
@@ -566,7 +566,7 @@ def _planejar_cenas(lid: str, iid: str) -> None:
         _mudar(lid, iid, _log=f"🕵️ {len(materiais)} cenas com as fotos do modelo de vídeo (marcas [I…] do roteiro)")
     if info:
         # 🎭 cena com pessoa do elenco ganha +2 (o rosto real só o pod faz)
-        notas = [0 if i in materiais else min(10, (info.get(i + 1) or {}).get("dificil", 0)
+        notas = [-1 if i in materiais else min(10, (info.get(i + 1) or {}).get("dificil", 0)
                                               + (2 if (info.get(i + 1) or {}).get("pessoas") else 0)
                                               + (1 if (info.get(i + 1) or {}).get("lugar") else 0))
                  for i in range(len(cenas))]

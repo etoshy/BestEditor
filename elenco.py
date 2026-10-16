@@ -363,7 +363,7 @@ def registrar(app, base_dir: str) -> None:
 
     def _estado(p: Dict[str, Any]) -> Dict[str, Any]:
         import ia_servico
-        fotos = [{"id": f["id"], "url": f"/modelos-video/{p['id']}/arquivo/{f['id']}", "contexto": f["contexto"][:160]}
+        fotos = [{"id": f["id"], "url": ds.url_midia(p, ds.midia(p, f["id"])), "contexto": f["contexto"][:160]}
                  for f in _fotos(base_dir, p, None)]
         return {"ok": True, "elenco": p.get("elenco") or {"pessoas": [], "locais": []}, "fotos": fotos,
                 "ia": ia_servico.ativo("elenco"), "ia_motivo": ia_servico.motivo_desligado("elenco") or "",

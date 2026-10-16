@@ -38,6 +38,7 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 ## 🔎 Buscar as fotos das perguntas no Bing e no Google (v84_132)
 
 - No cartão 📸 Fotos pro roteiro, cada pergunta ganha um **termo de busca** escrito pela IA, com o nome e o termo do caso que desambigua ("Linda Patrik Unabomber"). Dá pra editar.
+- **🐞 Foto errada na miniatura** (v84_139): quando uma foto era apagada, o ID dela (ex.: I31) era reaproveitado pela próxima, e o navegador mostrava a foto ANTIGA guardada no cache. Agora o ID nunca volta, o link da miniatura leva o nome do arquivo e o navegador sempre confere. Cada miniatura mostra de onde veio (🔗 link · 📄 foto principal da página · B/G busca) e abre a foto inteira num clique.
 - **🖼 Google Imagens ↗** (v84_138): cada pergunta tem um botão que abre a busca NORMAL do Google Imagens (sem Modo IA) numa nova guia, com o termo da caixa (vazio: o nome). Achou a foto? Copie o link e cole em 🔗 Colar links.
 - **🔗 Colar links** (v84_137): cada pergunta (e "➕ Outras imagens") tem um campo pra colar links, 1 por linha. Pode ser o link da própria imagem ou o de uma página (aí vem a foto principal da matéria). O site baixa um por um, mostrando o andamento, e põe como resposta da pergunta. Conta como envio manual: já entra conferida.
 - **🗑 Apagar as fotos das buscas** (v84_136): "Apagar todas as fotos das buscas" ou só "as não conferidas". Apaga só o que veio das buscas automáticas (as enviadas à mão e as das matérias ficam) e tira as marcas dessas fotos do roteiro e do 🎭 elenco.
@@ -68,6 +69,18 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 - **🏭 Produção no pod** (opção "🎭 Rosto das pessoas reais", ligada por padrão): a IA que descreve as cenas diz quem do elenco aparece em cada uma e com que IDADE naquele momento da história (flashback, "anos depois", a criança que cresceu). Nas cenas do pod com essas pessoas, o site escolhe a foto de idade mais próxima e manda pro pod como referência. Lá, o **FLUX.2 [klein] 4B** (Apache 2.0, ~13 GB) gera a cena com aquele rosto, envelhecido ou rejuvenescido. As outras cenas continuam no Z-Image. Cenas com pessoa do elenco ganham prioridade dentro da % do pod.
 - Regra fixa: com rosto real, nada de violência, sangue, morte ou o crime acontecendo. Nesses momentos, a cena fica sem as pessoas do elenco.
 - Pod com código antigo (sem o klein): as cenas vão sem o rosto pro Z-Image e aparece um aviso pra atualizar o pod.
+
+## 📦 Projeto no editor + 🕵️ encaixar as fotos reais (v84_141)
+
+- No editor (e no Estúdio) tem a caixa **📦 Projeto do vídeo**: dá pra **ligar ou trocar** o projeto depois de criado (🕵️ Modelo de vídeo, 📝 Roteiro do YouTube ou 🛒 venda). Antes só dava na hora de criar.
+- **🕵️ Encaixar as fotos e vídeos reais:** em cada momento que o roteiro do projeto marcou ([I3] antes da frase), o trecho em que a frase é falada troca a mídia pela foto/vídeo REAL (vídeo com o pedaço planejado). Por padrão só troca cena de IA (pod/Flow/Runpod), ⏳ pendente ou sem mídia; marcando "trocar também os que você já escolheu", troca todas. **↩ Voltar** devolve as cenas de antes (as de IA ficam guardadas).
+- **🏭 Produção no pod até 100%:** com 100% o pod gera todas as cenas, e as cenas com pessoa do 🎭 elenco continuam indo pro modelo de rostos, na idade certa. Roteiros de Modelo de vídeo já saem com as fotos reais nos momentos marcados. Se você posicionar fotos novas depois, o 🕵️ Encaixar no editor põe elas no lugar.
+
+## 🎚 Até 90% das cenas no pod (v84_140)
+
+- A "% de cenas geradas no pod" vai até **90%** (antes 50%). A ordem de prioridade é: 1) cenas com FOTO REAL do modelo (marcas [I…]) nunca vão pro pod, ficam com a foto real; 2) simulações/reconstruções (nota 9-10); 3) cenas com pessoa do 🎭 elenco (rosto real, +2) e local do elenco (+1); 4) o resto, da mais difícil pra mais fácil.
+- Até 45%: só cenas difíceis (nota ≥ 3) e nunca duas seguidas. Acima disso entram cenas mais fáceis e pode haver seguidas, sempre espalhando primeiro.
+- O que sobra (nem foto real nem pod) fica ⏳ pendente pro editor completar com os bancos.
 
 ## 📸 Fotos pro roteiro + marcas que não somem (v84_127)
 

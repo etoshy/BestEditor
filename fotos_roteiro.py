@@ -479,7 +479,8 @@ def registrar(app, base_dir: str) -> None:
         for m in p.get("midias") or []:
             if m.get("pergunta"):
                 enviadas.setdefault(m["pergunta"], []).append(m["id"])
-        info = {m["id"]: {"url": f"/modelos-video/{p['id']}/arquivo/{m['id']}", "a_conferir": bool(m.get("a_conferir")),
+        info = {m["id"]: {"url": ds.url_midia(p, m), "a_conferir": bool(m.get("a_conferir")),
+                          "link": (m.get("url") or "")[:300], "da_pagina": bool(m.get("da_pagina")),
                           "buscador": m.get("buscador") or "", "fora": bool(m.get("descartada") or m.get("duplicada_de"))}
                 for m in p.get("midias") or [] if m.get("pergunta")}
         return {"ok": True, "perguntas": fr.get("perguntas") or [], "enviadas": enviadas, "uso": uso_das_imagens(p),
@@ -586,6 +587,8 @@ def registrar(app, base_dir: str) -> None:
                                    descricao=desc or ((q or {}).get("alvo") or ""), usar="ambos")
             if q:
                 m.update(pergunta=qid, pergunta_alvo=(q.get("alvo") or "")[:120])
+            if og:
+                m["da_pagina"] = True  # 📄 veio da foto principal da página (pode não ser a que você queria)
             ds.salvar(base_dir, p)
         import ia_servico
         if ia_servico.ativo("dossie_imagens"):

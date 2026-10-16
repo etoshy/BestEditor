@@ -327,7 +327,7 @@ def test_paginas_da_producao(site, tmp_path, monkeypatch):
                                             "config": {"pct": 99}, "pod_url": "https://p-8000.proxy.runpod.net",
                                             "nome": "Meu lote"})
     lid = r.get_json()["id"]
-    assert pp.carregar(lid)["config"]["pct"] == 50  # teto de 50%
+    assert pp.carregar(lid)["config"]["pct"] == 99  # teto de 100% (v84_141)
     assert "Meu lote" in c.get(f"/producao-pod/{lid}").get_data(as_text=True)
     est = c.get(f"/producao-pod/{lid}/estado").get_json()
     assert est["itens"][0]["estado"] == "aguardando"

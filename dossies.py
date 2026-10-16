@@ -677,11 +677,24 @@ def ler_materia(html: str, url: str) -> Dict[str, Any]:
 
 # ------------------------------------------------------------------ mídias
 def _novo_id(p: Dict[str, Any], prefixo: str) -> str:
+    """Próximo ID (I42…). NUNCA reaproveita o de uma mídia apagada (v84_139): o mesmo ID com outra foto confundia o
+    navegador (mostrava a foto antiga do cache), o roteiro e o elenco."""
     usados = {m["id"] for m in p.get("midias") or []}
-    k = 1
+    nums = [int(i[len(prefixo):]) for i in usados if i.startswith(prefixo) and i[len(prefixo):].isdigit()]
+    seq = p.setdefault("seq_ids", {})
+    k = max(nums + [int(seq.get(prefixo) or 0)]) + 1
     while f"{prefixo}{k}" in usados:
         k += 1
+    seq[prefixo] = k
     return f"{prefixo}{k}"
+
+
+def url_midia(p: Dict[str, Any], m: Optional[Dict[str, Any]]) -> str:
+    """Link da mídia pra tela — com o nome do arquivo no fim, pra o navegador nunca mostrar a foto antiga do cache."""
+    if not m:
+        return ""
+    from urllib.parse import quote
+    return f"/modelos-video/{p['id']}/arquivo/{m['id']}?v={quote(os.path.basename(m.get('arquivo') or '')[:80])}"
 
 
 def adicionar_midia(p: Dict[str, Any], **c: Any) -> Dict[str, Any]:

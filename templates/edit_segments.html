@@ -2,7 +2,7 @@
 {% block content %}
 <h1>3.5. Timeline — revise antes de montar</h1>
 {% include "_previas_faltando.html" %}
-{% include "_pendentes.html" %}
+{% include "_pendentes.html" %}{% include "_projeto_editor.html" %}
 <div style="margin:6px 0 14px;padding:12px 14px;background:#0d0e12;color:#e8e9ee;border-radius:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
   <span style="flex:1;min-width:220px;">✨ Este é o <b>editor clássico</b>. O editor novo (<b>Estúdio</b>), com timeline arrastável, transições e efeitos por arrastar, está a um clique.</span>
   <a href="{{ url_for('edit_segments_page', job_id=job.job_id, modo='estudio') }}" style="background:#00d4b4;color:#04231d;font-weight:700;padding:8px 14px;border-radius:8px;text-decoration:none;">Abrir no Estúdio →</a>

@@ -33,7 +33,7 @@ def registrar(app, base_dir: str) -> None:
         out["midias"] = []
         for m in p.get("midias") or []:
             cam = ds.caminho_midia(base_dir, p, m)
-            item = dict(m, url_arquivo=(f"/modelos-video/{p['id']}/arquivo/{m['id']}" if cam else ""))
+            item = dict(m, url_arquivo=(ds.url_midia(p, m) if cam else ""))
             if cam and mt.eh_video(cam):
                 mt.agendar(cam)  # sem transcrição ainda (ou interrompida): faz em segundo plano
                 item["transcricao"] = mt.resumo(cam)
@@ -416,7 +416,9 @@ def registrar(app, base_dir: str) -> None:
         cam = ds.caminho_midia(base_dir, p, ds.midia(p, mid)) if p else None
         if not cam:
             abort(404)
-        return send_file(cam, conditional=True)
+        r = send_file(cam, conditional=True)
+        r.headers["Cache-Control"] = "no-cache"  # mesmo ID pode virar outra foto: o navegador sempre confere
+        return r
 
     @app.route("/modelos-video/<pid>/prompt", methods=["POST"])
     def dossie_prompt(pid: str):

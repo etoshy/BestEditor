@@ -223,3 +223,13 @@ def test_link_colado_vira_foto_conferida(cliente, monkeypatch):
     novas = [m for m in p["midias"] if m["id"] in (d["midia"]["id"], d2["midia"]["id"])]
     assert all(m["pergunta"] == "P1" and not m.get("a_conferir") and m["descricao"] == "Linda Patrik" for m in novas)
     assert c.post(f"/modelos-video/{pid}/fotos-roteiro/link", json={"url": "ftp://x"}).status_code == 400
+
+
+def test_id_de_midia_apagada_nunca_volta():
+    p = {"id": "abc", "midias": []}
+    a = ds.adicionar_midia(p, tipo="foto", descricao="a")
+    b = ds.adicionar_midia(p, tipo="foto", descricao="b", arquivo="x y.jpg")
+    p["midias"] = [a]  # apagou a I2
+    c = ds.adicionar_midia(p, tipo="foto", descricao="c")
+    assert (a["id"], b["id"], c["id"]) == ("I1", "I2", "I3")
+    assert ds.url_midia(p, b) == "/modelos-video/abc/arquivo/I2?v=x%20y.jpg"

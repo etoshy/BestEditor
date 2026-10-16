@@ -125,10 +125,10 @@
           <span data-qst="${q.id}" style="font-size:.78rem;"></span>
         </div>`}
         ${env.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${env.map(id => { const i = MI[id] || {};
-          return `<div style="position:relative;width:96px;font-size:.68rem;${i.fora ? 'opacity:.45;' : ''}" title="${id}${i.buscador ? ' · ' + i.buscador : ''}${i.fora ? ' · a IA tirou (lixo/anúncio/repetida)' : ''}">
-            <img src="${i.url || ''}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:5px;background:#eee;${i.a_conferir ? 'outline:2px solid #f59e0b;' : ''}">
+          return `<div style="position:relative;width:96px;font-size:.68rem;${i.fora ? 'opacity:.45;' : ''}" title="${id}${i.buscador ? ' · busca ' + i.buscador : ''}${i.link ? ' · ' + esc(i.link) : ''}${i.da_pagina ? ' · 📄 foto principal da PÁGINA do link (confira)' : ''}${i.fora ? ' · a IA tirou (lixo/anúncio/repetida)' : ''}">
+            <a href="${i.url || ''}" target="_blank" rel="noopener"><img src="${i.url || ''}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:5px;background:#eee;${i.a_conferir ? 'outline:2px solid #f59e0b;' : ''}"></a>
             <button type="button" data-apagar="${id}" title="não serve — apagar" style="position:absolute;top:2px;right:2px;width:auto;margin:0;padding:0 5px;font-size:.7rem;background:#ef4444;">✕</button>
-            <div>${id}${i.a_conferir ? ' 🔎' : ''}</div></div>`; }).join('')}
+            <div>${id}${i.a_conferir ? ' 🔎' : ''}${i.buscador ? ' <span style="color:#0f766e">' + (i.buscador === 'google' ? 'G' : 'B') + '</span>' : ''}${i.link && !i.buscador ? ' 🔗' : ''}${i.da_pagina ? ' 📄' : ''}</div></div>`; }).join('')}
           ${env.some(id => (MI[id] || {}).a_conferir) ? `<button type="button" data-conferi="${env.join(',')}" style="width:auto;align-self:center;margin:0;padding:3px 10px;font-size:.78rem;background:#15803d;">✓ conferi</button>` : ''}
         </div>` : ''}
       </div>`;

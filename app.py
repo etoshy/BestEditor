@@ -11182,6 +11182,149 @@ def refazer_cenas_pod_rota(job_id: str):
         return jsonify({"erro": str(exc)}), 400
 
 
+# ------------------------------------------------------------------ 🕵️ projeto no editor (v84_141)
+def _momentos_do_projeto(mod, p: dict) -> List[Dict[str, Any]]:
+    """Os momentos planejados no roteiro do projeto (marcas [I3] / [M2 0:12-0:25]) → [{midia, trecho, inicio?, fim?, tipo}]."""
+    out = []
+    for m in mod.midias_para_editor(BASE_DIR, p):
+        for u in m.get("usos") or []:
+            if (u.get("trecho") or "").strip():
+                out.append({"midia": m["id"], "trecho": u["trecho"], "inicio": u.get("inicio"), "fim": u.get("fim"),
+                            "audio": bool(u.get("audio")), "tipo": m["tipo"]})
+    return out
+
+
+def info_projeto_editor(job: dict) -> Dict[str, Any]:
+    """Pra caixa 🕵️ do editor: projeto ligado, quantos momentos/fotos, se dá pra desfazer."""
+    out: Dict[str, Any] = {"tipo": "", "id": "", "nome": "", "momentos": 0, "midias": 0,
+                           "encaixadas": sum(1 for d in job.get("pending_segments") or [] if d.get("_antes_material"))}
+    if job.get("roteiro_id"):
+        out.update(tipo="roteiro", id=job["roteiro_id"])
+        try:
+            import roteiros_yt
+            out["nome"] = (roteiros_yt.carregar_projeto(BASE_DIR, job["roteiro_id"]).get("titulo") or "")[:80]
+        except Exception:  # noqa: BLE001
+            pass
+    pj = _projeto_do_job(job)
+    if pj:
+        tipo, mod, p, _prov = pj
+        out.update(tipo=tipo, id=p.get("id"), nome=(mod.nome_do_projeto(p) if hasattr(mod, "nome_do_projeto") else p.get("nome") or "")[:80])
+        try:
+            out["momentos"] = len(_momentos_do_projeto(mod, p))
+            out["midias"] = len(mod.midias_para_editor(BASE_DIR, p))
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
+app.jinja_env.globals["info_projeto_editor"] = info_projeto_editor
+
+
+@app.route("/job/<job_id>/ligar-projeto", methods=["POST"])
+def ligar_projeto_rota(job_id: str):
+    """📦 Liga (ou troca) o projeto do vídeo DEPOIS de criado: 🕵️ modelo de vídeo, 🛒 venda ou 📝 roteiro do YouTube."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Projeto não encontrado."}), 404
+    valor = str((request.get_json(silent=True) or {}).get("projeto") or "").strip()
+    tipo, _, pid = valor.partition(":")
+    if not valor:
+        for _t, (_m, _p, ch, _r) in _PROJETOS_MIDIA.items():
+            job.pop(ch, None)
+        job.pop("roteiro_id", None)
+        job.pop("roteiro_cenas", None)
+    elif tipo == "roteiro":
+        if not re.fullmatch(r"[0-9a-f]{6,40}", pid):
+            return jsonify({"erro": "Roteiro inválido."}), 400
+        job["roteiro_id"] = pid
+        job.pop("roteiro_cenas", None)
+    elif not _ligar_projeto(job, tipo, pid):
+        return jsonify({"erro": "Não achei esse projeto."}), 404
+    _save_state(job_id)
+    return jsonify({"ok": True, **info_projeto_editor(job)})
+
+
+def _encaixar_projeto(job_id: str, modo: str = "ia") -> Dict[str, Any]:
+    """🕵️ Põe as fotos/vídeos REAIS do projeto ligado nos momentos que o roteiro planejou (marcas [I3]): acha a frase
+    de cada marca na fala dos trechos e troca a mídia daquele trecho pela real. modo "ia" = só troca cena de IA
+    (pod/Flow/Runpod), ⏳ pendente ou sem mídia; "tudo" = troca qualquer uma (menos as que já são do projeto).
+    Guarda o que tinha antes em cada trecho (dá pra desfazer)."""
+    import cenas_lote
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    if job.get("status") == "buscando_previas":
+        raise ValueError("O projeto ainda está buscando prévias — espere terminar.")
+    pj = _projeto_do_job(job)
+    if not pj:
+        raise ValueError("Ligue um 🕵️ Modelo de vídeo (ou 🛒 venda) neste vídeo primeiro.")
+    _t, mod, p, prov = pj
+    momentos = _momentos_do_projeto(mod, p)
+    if not momentos:
+        raise ValueError("O roteiro do projeto não tem marcas de imagem [I…] — no Modelo de vídeo, use 📍 Posicionar.")
+    pend = job.get("pending_segments") or []
+    segs = [_segmento_obj(d) for d in pend]
+    falas, _pal = _falas_por_trecho(job, segs)
+    mapa = cenas_lote.cenas_dos_momentos([{"fala": f} for f in falas], momentos)
+    por_id = {}
+    for mo in momentos:
+        por_id.setdefault(mo["midia"], []).append(mo)
+    trocadas = []
+    for k, mid in sorted(mapa.items()):
+        d = pend[k]
+        if d.get("provider") in ("produto", "material"):
+            continue
+        ia_ou_vazio = d.get("provider") in ("runpod", "flow", "adiado") or not d.get("override_source")
+        if modo != "tudo" and not ia_ou_vazio:
+            continue
+        mo = next((x for x in por_id.get(mid, []) if x.get("inicio") is not None), por_id.get(mid, [{}])[0])
+        d.setdefault("_antes_material", {kk: d.get(kk) for kk in ("provider", "query", "override_source", "media_type", "venda_midia")})
+        d["provider"] = prov
+        d["query"] = mid + (f"@{mo['inicio']}-{mo['fim']}" if mo.get("tipo") == "video" and mo.get("inicio") is not None
+                            and mo.get("fim") is not None else "")
+        d["override_source"] = None
+        trocadas.append(k)
+    if not trocadas:
+        raise ValueError("Nenhum trecho pra trocar (os momentos caem em trechos que você já escolheu — use “trocar todas”).")
+    _aplicar_produto(job, [pend[k] for k in trocadas])
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    for k in trocadas:
+        previas[k] = None
+    job["segment_previews"] = previas
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
+    return {"ok": True, "trocadas": len(trocadas), "momentos": len(momentos), "achados": len(mapa)}
+
+
+def _desfazer_encaixe(job_id: str) -> Dict[str, Any]:
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    pend = job.get("pending_segments") or []
+    idx = [k for k, d in enumerate(pend) if d.get("_antes_material")]
+    if not idx:
+        raise ValueError("Nada pra desfazer.")
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    for k in idx:
+        pend[k].update(pend[k].pop("_antes_material"))
+        previas[k] = None
+    job["segment_previews"] = previas
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
+    return {"ok": True, "voltaram": len(idx)}
+
+
+@app.route("/job/<job_id>/encaixar-projeto", methods=["POST"])
+def encaixar_projeto_rota(job_id: str):
+    corpo = request.get_json(silent=True) or {}
+    try:
+        if corpo.get("desfazer"):
+            return jsonify(_desfazer_encaixe(job_id))
+        return jsonify(_encaixar_projeto(job_id, "tudo" if corpo.get("modo") == "tudo" else "ia"))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+
+
 @app.route("/job/<job_id>/completar-pendentes", methods=["POST"])
 def completar_pendentes_rota(job_id: str):
     corpo = request.get_json(silent=True) or {}
