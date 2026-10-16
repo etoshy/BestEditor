@@ -9,6 +9,8 @@
 flow_dados/
 # 🟣 Runpod: mídias geradas, cache e gasto (a chave fica em site_config.json)
 runpod_dados/
+# 🏭 Produção no pod: lotes, narrações e imagens geradas
+producao_pod/
 # cookies do YouTube
 cookies_youtube.txt
 youtube_cookies.json
