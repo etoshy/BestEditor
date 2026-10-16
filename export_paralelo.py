@@ -194,6 +194,13 @@ def rodar_pedacos(video_in: str, video_out: str, duracao: float, n: int, montar:
     if any(erros):
         _apagar(saidas)
         raise PedacosFalharam(f"pedaço falhou: {next(e for e in erros if e)}")
+    # v84_119: cada pedaço tem que ter TODOS os quadros — um pedaço curto deixava o fim do vídeo congelado (a imagem
+    # parava e o áudio seguia). Faltou quadro: o passe roda do jeito de sempre.
+    for k, ((ini, q), saida) in enumerate(zip(js, saidas)):
+        n = contar_quadros(saida)
+        if n is not None and n < q - 2:
+            _apagar(saidas)
+            raise PedacosFalharam(f"o pedaço {k + 1} saiu com {n} quadros (devia ter {q}) — a partir de {ini / 60:.0f}:{ini % 60:04.1f}")
     lista = os.path.join(work_dir, f"_{nome}_lista.txt")
     with open(lista, "w", encoding="utf-8") as f:
         f.write("".join(f"file '{os.path.abspath(s).replace(chr(92), '/')}'\n" for s in saidas))
@@ -211,8 +218,36 @@ def rodar_pedacos(video_in: str, video_out: str, duracao: float, n: int, montar:
         raise PedacosFalharam(f"o vídeo emendado não abriu: {exc}") from exc
     if abs(d - duracao) > max(0.5, duracao * 0.002):
         raise PedacosFalharam(f"o vídeo emendado ficou com {d:.2f}s (devia ter {duracao:.2f}s)")
+    dv = duracao_do_video(video_out)
+    if dv is not None and dv < duracao - 1.0:  # o arquivo "dura" o certo (pelo áudio), mas a IMAGEM acaba antes
+        raise PedacosFalharam(f"a imagem do vídeo emendado acaba em {dv:.1f}s (o áudio vai até {duracao:.1f}s)")
     pai(1.0, f"{len(js)} pedaços emendados")
     return video_out
+
+
+def contar_quadros(caminho: str) -> Optional[int]:
+    """Quantos quadros de vídeo o arquivo tem (lendo os pacotes — rápido). None = não deu pra saber."""
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
+                            "stream=nb_read_packets", "-of", "csv=p=0", caminho], capture_output=True, text=True, timeout=600)
+        return int(r.stdout.strip().split(",")[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def duracao_do_video(caminho: str) -> Optional[float]:
+    """Até onde vai a IMAGEM (a faixa de vídeo), não o arquivo — um arquivo com áudio mais longo que a imagem
+    "dura" o áudio, mas a imagem congela no último quadro."""
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration:stream=r_frame_rate",
+                            "-of", "default=nw=1", caminho], capture_output=True, text=True, timeout=120)
+        d = dict(x.split("=", 1) for x in r.stdout.split() if "=" in x)
+        if d.get("duration") not in (None, "", "N/A"):
+            return float(d["duration"])
+    except Exception:  # noqa: BLE001
+        pass
+    n = contar_quadros(caminho)
+    return n / FPS if n else None
 
 
 def _apagar(caminhos: List[str]) -> None:

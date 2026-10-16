@@ -53,15 +53,15 @@ def acompanhar(cb: Callable[[float, str], None], duracao: Optional[float]):
 
 
 @contextmanager
-def parte(k: int, n: int, rotulo: str = "", duracao: Optional[float] = None):
-    """O pedaço k (1..n) da etapa atual (ex.: o lote 2 de 5)."""
+def parte(k: int, n: int, rotulo: str = "", duracao: Optional[float] = None, ate: Optional[int] = None):
+    """O pedaço k (1..n) da etapa atual (ex.: o lote 2 de 5). `ate`: ocupa as fatias k..ate (um passo mais demorado)."""
     p = _pilha()
     if not p:
         yield
         return
     topo = p[-1]
     larg = (topo["fim"] - topo["ini"]) / max(1, n)
-    p.append(dict(topo, ini=topo["ini"] + larg * (k - 1), fim=topo["ini"] + larg * k,
+    p.append(dict(topo, ini=topo["ini"] + larg * (k - 1), fim=topo["ini"] + larg * max(k, ate or k),
                   rot=" · ".join(x for x in (topo["rot"], rotulo) if x), dur=float(duracao or topo["dur"]), ult=0.0))
     try:
         avisar(0.0, forcar=True)

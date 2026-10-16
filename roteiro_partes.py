@@ -28,6 +28,9 @@ CURTA = 0.85   # abaixo de 85% do alvo da parte = curta (reescreve expandindo)
 LONGA = 1.25   # v84_99: acima de 125% = longa (reescreve enxugando) — 25 min pedidos viravam 38
 
 
+
+REGRA = 'USE AS IMAGENS COM FREQUÊNCIA: use TODAS as imagens que têm relação com o roteiro (nenhuma útil fica de fora) e ponha a marca DE NOVO toda vez que a narração voltar a falar daquela pessoa, lugar, objeto ou documento — a mesma imagem pode (e deve) voltar várias vezes ao longo do vídeo, com pelo menos 2-3 frases entre um uso e outro; quando houver várias fotos da mesma pessoa/lugar, alterne entre elas. Mire em uma marca a cada ~3-5 frases nos trechos em que o assunto tem imagem. Não use imagem que não mostra o que a frase fala.'
+
 def status_de(parte: Dict[str, Any]) -> str:
     """"pendente" | "curta" | "longa" | "pronta"."""
     t = parte.get("texto")
@@ -66,7 +69,8 @@ def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = 
             "  • \"fatos\": 8 a 15 fatos CONCRETOS das fontes que entram nele (datas, nomes, lugares, números, citações, o que "
             "cada pessoa disse), cada um com a fonte (F1, F2…) e o tipo (fato documentado / alegação / interpretação) — é "
             "deles que o capítulo vai ser escrito, então capriche: quanto mais detalhe aqui, mais rico o capítulo;\n"
-            "  • \"midias\": os IDs das imagens/vídeos que entram nele (ex.: [\"I3\", \"I7\"]);\n"
+            "  • \"midias\": TODOS os IDs das imagens/vídeos que combinam com ele (ex.: [\"I3\", \"I7\", \"I9\"]) — a mesma "
+            "imagem pode (e deve) estar em vários capítulos quando a pessoa/lugar volta na história;\n"
             f"  • \"palavras\": quantas palavras o capítulo vai ter (a SOMA de todos = ~{palavras}; o gancho pode ser menor, "
             f"~{max(80, por // 2)}; os outros ~{por}).\n"
             "- Distribua os fatos: cada fato importante em UM capítulo (sem repetir), na ordem da história que você escolheu.\n"
@@ -255,10 +259,16 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
         L += [f"- {f['fato']}" + (f" ({f['fonte']}" + (f", {f['tipo']})" if f.get("tipo") != "fato" else ")") if f.get("fonte") else "") for f in p["fatos"]]
     mids = contexto.get("midias") or {}
     meus = [m for m in p.get("midias") or [] if m in mids]
-    if meus:
-        L.append("Imagens/vídeos desta parte — ponha a marca (ex.: [I3]) sozinha logo ANTES da frase em que ela aparece, só se a "
-                 "frase fala MESMO daquilo:")
-        L += [f"- {m}: {mids[m]}" for m in meus]
+    outras = [m for m in mids if m not in meus][:80]
+    if meus or outras:
+        L.append("Imagens/vídeos que eu tenho — ponha a marca (ex.: [I3]) sozinha logo ANTES da frase em que ela aparece, "
+                 "quando a frase fala MESMO daquilo (pessoa, lugar, objeto, documento). " + REGRA)
+        if meus:
+            L.append("Planejadas pra esta parte (prioridade):")
+            L += [f"- {m}: {mids[m]}" for m in meus]
+        if outras:
+            L.append("Todas as outras do caso (use também sempre que a frase falar delas):")
+            L += [f"- {m}: {mids[m]}" for m in outras]
     if p.get("texto") and st == "longa":
         L += ["", f"## O texto ATUAL desta parte ({palavras(p['texto'])} palavras — LONGO demais: o vídeo passa do tempo pedido)",
               f"Reescreva esta parte ENXUTA, com ~{alvo} palavras: corte o que repete outras partes ou repete a si mesma, frases de "

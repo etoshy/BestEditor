@@ -29,10 +29,12 @@
 <div class="mt-rot"><span id="mt-etapa-nome">Etapa atual</span><span id="mt-etapa-txt"></span></div>
 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
 <p id="progress-text" style="font-size:.85rem;color:#374151"></p>
+<p id="mt-sem-resposta" style="font-size:.82rem;color:#b45309;margin:4px 0;"></p>
 <ul class="mt-etapas" id="mt-etapas"></ul>
 <p id="prebaixar-text" class="hint" style="font-size:.85rem;color:#166534;display:none"></p>
 
 <div id="error-box" class="error" style="display:none"></div>
+<div id="avisos-montagem" style="display:none;margin:10px 0;padding:10px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;color:#92400e;font-size:.88rem;"></div>
 
 <div id="program-monitor" style="display:none;margin-top:16px;">
   <label style="font-weight:600;">🎬 Monitor de Programa — resultado montado</label>
@@ -77,9 +79,21 @@
 </div>
 
 <script>
+let ultimaResposta = Date.now(), falhasSeguidas = 0;
 async function poll() {
-  const res = await fetch("{{ url_for('job_status_api', job_id=job.job_id) }}");
-  const data = await res.json();
+  // v84_118: uma consulta que falha (servidor ocupado com a montagem) NÃO para mais o acompanhamento — tenta de novo
+  let data;
+  try {
+    const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 15000);
+    const res = await fetch("{{ url_for('job_status_api', job_id=job.job_id) }}", { cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(tm);
+    data = await res.json();
+    ultimaResposta = Date.now(); falhasSeguidas = 0;
+  } catch (e) {
+    falhasSeguidas++;
+    setTimeout(poll, Math.min(10000, 2000 * falhasSeguidas));
+    return;
+  }
   document.getElementById('status-text').textContent = 'Status: ' + data.status;
 
   if (data.progress) desenharProgresso(data.progress, data.status);
@@ -92,6 +106,11 @@ async function poll() {
 
   if (data.status === 'concluido') {
     document.getElementById('download-link').style.display = 'block';
+    if ((data.avisos_montagem || []).length) {  // v84_119: etapa pulada por cortar a imagem do vídeo
+      const av = document.getElementById('avisos-montagem');
+      av.style.display = 'block';
+      av.innerHTML = '⚠️ ' + data.avisos_montagem.map(a => a.replace(/</g, '&lt;')).join('<br>⚠️ ');
+    }
     if (data.descricao_youtube) {
       document.getElementById('capitulos-desc').value = data.descricao_youtube;
       document.getElementById('capitulos-box').style.display = 'block';
@@ -174,10 +193,20 @@ function desenharProgresso(p, status) {
     const mini = e.estado === 'rodando' ? `<div class="mini"><div style="width:${Math.round(frac * 100)}%"></div></div>` : '';
     return `<li class="${e.estado}"><span class="ic">${IC[e.estado] || '•'}</span><span class="nm">${e.nome}${mini}</span><span class="tp">${tp}</span></li>`;
   }).join('');
-  if (!relogio) relogio = setInterval(() => {  // o "rodando há" anda sozinho entre uma consulta e outra
-    const el = document.getElementById('mt-decorrido'); if (!el || !ultimoProg || ultimoProg.status !== 'montando') return;
-    const pp = ultimoProg.p; el.textContent = tempo((pp.agora || 0) - (pp.inicio || 0) + (Date.now() / 1000 - ultimoProg.recebido));
-  }, 1000);
+  if (!relogio) relogio = setInterval(tique, 1000);
+}
+// ⏱ o relógio anda sozinho (pelo relógio deste PC), mesmo se o servidor demorar pra responder
+function tique() {
+  if (!ultimoProg || ultimoProg.status !== 'montando') return;
+  const pp = ultimoProg.p, desvio = (pp.agora || ultimoProg.recebido) - ultimoProg.recebido;  // relógio do servidor × deste PC
+  const agora = Date.now() / 1000 + desvio;
+  const el = document.getElementById('mt-decorrido'); if (el) el.textContent = tempo(agora - (pp.inicio || agora));
+  const linha = document.querySelector('#mt-etapas li.rodando .tp');
+  const atual = (pp.etapas || []).find(e => e.estado === 'rodando');
+  if (linha && atual && atual.inicio) linha.textContent = tempo(agora - atual.inicio) + (pp.estimated_seconds_remaining != null ? ` · falta ~${tempo(pp.estimated_seconds_remaining)}` : ' · trabalhando…');
+  const sem = (Date.now() - ultimaResposta) / 1000;
+  const av = document.getElementById('mt-sem-resposta');
+  if (av) av.textContent = sem > 12 ? `⚠ o servidor não responde há ${tempo(sem)} (o PC deve estar no limite) — a montagem continua; a tela atualiza quando ele responder.` : '';
 }
 
 function switchProgramMonitorVersion(version) {

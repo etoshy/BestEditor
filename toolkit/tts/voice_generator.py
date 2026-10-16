@@ -1437,6 +1437,52 @@ def _checar_perth_watermarker() -> None:
         pass  # se nem o perth importar, o erro do ChatterboxMultilingualTTS/ChatterboxTurboTTS abaixo já é claro o bastante
 
 
+def _pod_studio():
+    """🖥️ Meu pod (v84_121): o cliente do servidor studio-ia fica na raiz do site (pod_studio.py)."""
+    raiz = os.path.dirname(os.path.dirname(_DIR))
+    if raiz not in sys.path:
+        sys.path.insert(0, raiz)
+    import pod_studio  # type: ignore
+    return pod_studio
+
+
+def _no_pod(engine: str) -> bool:
+    """Esse motor está configurado pra gerar no pod (⚙️ Configurações → 🟣 Runpod → Meu pod)?"""
+    try:
+        return bool(_pod_studio().motor_no_pod(engine))
+    except Exception:  # noqa: BLE001 — sem o módulo/config: roda local como sempre
+        return False
+
+
+def _narrar_no_pod(engine: str, texto: str, output_path: str, speaker_wav: Optional[str] = None,
+                   voice_profile: Optional[str] = None, idioma: str = "pt", exaggeration: float = 0.5,
+                   cfg_weight: float = 0.5) -> str:
+    """Mesma voz (áudio enviado ou 1º clipe do perfil, igual ao local), só que gerada na GPU do pod."""
+    if not (texto or "").strip():
+        raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
+    referencia, temporaria = None, False
+    if speaker_wav:
+        if not os.path.exists(speaker_wav):
+            raise VoiceGeneratorError(f"Áudio de referência não encontrado: {speaker_wav!r}")
+        referencia = _preparar_audio_referencia(speaker_wav)
+        temporaria = referencia != speaker_wav
+    elif voice_profile:
+        referencia = caminho_perfil_de_voz(voice_profile)[0]
+    pod = _pod_studio()
+    try:
+        pod.narrar(texto, output_path, motor=engine, idioma=idioma, referencia=referencia,
+                   exaggeration=exaggeration, cfg_weight=cfg_weight)
+    except pod.PodErro as exc:
+        raise VoiceGeneratorError(f"🖥️ Pod: {exc}") from exc
+    finally:
+        if temporaria and referencia:
+            try:
+                os.remove(referencia)
+            except OSError:
+                pass
+    return output_path
+
+
 def chatterbox_load(use_gpu: Optional[bool] = None):
     """Carrega (ou reaproveita, se já carregado com os mesmos
     parâmetros) o modelo multilíngue do Chatterbox TTS — baixa sozinho
@@ -1573,6 +1619,10 @@ def chatterbox_synthesize(
         raise VoiceGeneratorError(
             f"Idioma {idioma!r} não é suportado pelo Chatterbox TTS — use um de {sorted(CHATTERBOX_IDIOMAS)}."
         )
+
+    if _no_pod("chatterbox"):  # 🖥️ Meu pod: gera na GPU do pod (pt usa o modelo dedicado pt-BR, se marcado)
+        return _narrar_no_pod("chatterbox", texto, output_path, speaker_wav=speaker_wav, voice_profile=voice_profile,
+                              idioma=idioma, exaggeration=exaggeration, cfg_weight=cfg_weight)
 
     modelo = chatterbox_load(use_gpu=use_gpu)
 
@@ -1786,6 +1836,10 @@ def chatterbox_turbo_synthesize(
     Texto mais longo que `CHATTERBOX_TURBO_LIMITE_CARACTERES_POR_CHAMADA`
     é dividido automaticamente, igual o modelo multilíngue.
     """
+    if _no_pod("chatterbox_turbo"):  # 🖥️ Meu pod
+        return _narrar_no_pod("chatterbox_turbo", texto, output_path, speaker_wav=speaker_wav,
+                              voice_profile=voice_profile, idioma="en")
+
     modelo = chatterbox_turbo_load(use_gpu=use_gpu)
 
     audio_prompt_path = None

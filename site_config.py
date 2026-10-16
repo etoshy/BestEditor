@@ -296,6 +296,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # 🟣 Runpod (runpod_gerador.py): imagens/vídeos gerados por IA pagos do saldo da conta
     "runpod_api_key": "", "runpod_modelo_imagem": "z-image-turbo", "runpod_modelo_video": "p-video",
     "runpod_video_duracao": 5, "runpod_video_rascunho": False, "runpod_video_1080p": False,
+    # 🖥️ Meu pod (pod_studio.py, v84_121): "endpoints" = API paga por geração | "pod" = imagens Z-Image no SEU pod
+    "runpod_modo": "endpoints", "runpod_pod_url": "", "runpod_pod_chave": "",
+    "chatterbox_onde": "local",    # Chatterbox e Chatterbox Turbo: "local" (este PC) | "pod" (a GPU do seu pod)
+    "chatterbox_pod_ptbr": True,   # no pod, português sai pelo modelo dedicado pt-BR (senão o multilíngue)
     "runpod_reserva_flow": False,  # Flow sem crédito (vídeo/foto) → gera no Runpod antes de ir pra pesquisa  # ⚡ exportação em pedaços paralelos ("1" = desligada; export_paralelo.py)
     "voz_instancias": "1",      # ⚡ geração rápida: cópias do motor num MESMO áudio ("1" = desligada; tts_paralelo.py)
     # ⛔ lista negra de sites (lista_negra.py): imagem/vídeo de lá nunca entra (marca d'água); editável em Configurações
@@ -443,6 +447,14 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
         current["ia_google_imagens_min_lado"] = 800
     if current["ia_google_imagens_min_lado"] not in (0, 800, 1280, 1920, 3840):
         current["ia_google_imagens_min_lado"] = 800
+    if current.get("runpod_modo") not in ("endpoints", "pod"):
+        current["runpod_modo"] = "endpoints"
+    _pu = str(current.get("runpod_pod_url") or "").strip().rstrip("/")
+    current["runpod_pod_url"] = _pu if re.fullmatch(r"https?://[^\s\"'<>]+", _pu) else ""
+    current["runpod_pod_chave"] = str(current.get("runpod_pod_chave") or "").strip()[:200]
+    if current.get("chatterbox_onde") not in ("local", "pod"):
+        current["chatterbox_onde"] = "local"
+    current["chatterbox_pod_ptbr"] = bool(current.get("chatterbox_pod_ptbr", True))
     if current.get("fish_modo") not in ("local", "nuvem"):
         current["fish_modo"] = "local"
     _fu = str(current.get("fish_url") or "").strip().rstrip("/")

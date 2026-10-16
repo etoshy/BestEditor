@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Produção no pod{% endblock %}
+{% block content %}
+<style>
+  body { max-width: 1200px; }
+  .pp-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+  .pp-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .pp-passos span { background: #ecfeff; border: 1px solid #a5f3fc; color: #155e75; border-radius: 999px; padding: 3px 10px; font-size: .8rem; }
+  .pp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 14px; }
+  .pp-grid label { margin-top: 0; font-size: .85rem; }
+  .pp-lista { max-height: 300px; overflow: auto; border: 1px solid #eee; border-radius: 8px; }
+  .pp-lista label { display: flex; gap: 8px; align-items: center; font-weight: normal; margin: 0; padding: 6px 10px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+  .pp-lista label:hover { background: #f9fafb; }
+  .pp-tag { font-size: .72rem; border-radius: 999px; padding: 1px 8px; background: #f1f5f9; color: #475569; white-space: nowrap; }
+  table.pp-itens { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 8px; }
+  table.pp-itens th, table.pp-itens td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; vertical-align: middle; }
+  table.pp-itens input, table.pp-itens select { margin: 0; padding: 4px 6px; font-size: .85rem; }
+  table.pp-itens input[type=number] { width: 70px; }
+  .pp-estim { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin-top: 10px; }
+  .pp-lote { display: flex; justify-content: space-between; gap: 10px; align-items: center; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+</style>
+
+<h1>🏭 Produção no pod</h1>
+<p style="color:#555;">Escolha vários roteiros e mande tudo pro seu pod de uma vez. Para cada roteiro o site: <b>narra e transcreve no pod</b> (a narração entra no 📜 Histórico do Gerador de voz com a <b>legenda pronta</b>, no mesmo <b>.zip</b> de sempre), corta em cenas, a 🤖 IA escolhe as cenas <b>difíceis de achar em banco</b> (bem espaçadas) e o pod <b>gera as imagens</b> delas. No fim, cada roteiro vira um <b>projeto do editor</b> com essas cenas prontas e as outras <b>⏳ pendentes</b> — lá você clica em <b>Completar cenas pendentes</b>, escolhe as fontes e a IA escreve as buscas.</p>
+<div class="pp-passos"><span>1 · roteiros e vozes</span><span>2 · 🗣️ narração + transcrição no pod</span><span>3 · 🎬 cenas e 🖼 imagens difíceis no pod</span><span>4 · 📂 projeto com ⏳ pendentes</span></div>
+
+<div class="pp-card">
+  <h2 style="margin:0;">1 · Pod</h2>
+  <label>Endereço do pod <span style="font-weight:normal;color:#888;">(o que o start.sh mostra; o padrão vem de ⚙️ Configurações → 🟣 Runpod → Meu pod)</span></label>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <input type="text" id="pod-url" value="{{ pod_url }}" placeholder="https://xxxxxxxx-8000.proxy.runpod.net" style="flex:1;">
+    <button type="button" id="pod-testar" style="width:auto;white-space:nowrap;">🔌 Testar</button>
+  </div>
+  <div id="pod-status" style="font-size:.85rem;margin-top:4px;color:#555;"></div>
+  <p style="font-size:.8rem;color:#666;margin:6px 0 0;">Precisa do servidor <code>studio-ia</code> atualizado (com o Whisper). As vozes vão daqui: o 1º clipe do 🗣️ perfil escolhido segue junto com cada roteiro.</p>
+</div>
+
+<div class="pp-card">
+  <h2 style="margin:0;">2 · Roteiros</h2>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+    <input type="search" id="filtro" placeholder="filtrar por título…" style="flex:1;margin:0;">
+    <button type="button" id="marcar-todos" style="width:auto;">☑ marcar os filtrados</button>
+  </div>
+  <div class="pp-lista" id="lista-roteiros" style="margin-top:8px;">
+    {% for r in roteiros %}
+    <label data-titulo="{{ r.titulo|lower }}">
+      <input type="checkbox" class="rot" style="width:auto;margin:0;" data-origem="{{ r.origem }}" data-id="{{ r.id }}" data-titulo="{{ r.titulo }}" data-palavras="{{ r.palavras }}" data-idioma="{{ r.idioma }}">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.titulo }}</span>
+      <span class="pp-tag">{{ '📜 Roteiro do YouTube' if r.origem == 'roteiro' else '🕵️ Modelo de vídeo' }}</span>
+      <span class="pp-tag">{{ r.palavras }} palavras · ~{{ (r.palavras / 150)|round(0)|int }} min</span>
+    </label>
+    {% else %}
+    <div style="padding:10px;color:#888;">Nenhum roteiro pronto em 📜 Roteiro do YouTube nem em 🕵️ Modelos de vídeo. Cole um abaixo.</div>
+    {% endfor %}
+  </div>
+  <details style="margin-top:10px;">
+    <summary style="cursor:pointer;">✍️ Colar um roteiro</summary>
+    <label>Título</label><input type="text" id="colar-titulo" placeholder="ex.: O navio fantasma de 1872">
+    <label>Texto</label><textarea id="colar-texto" rows="6" placeholder="O roteiro, do jeito que vai ser narrado ([[INSCREVA]] e [[VENDA]] funcionam)."></textarea>
+    <button type="button" id="colar-add" style="width:auto;">+ Adicionar à lista</button>
+  </details>
+</div>
+
+<div class="pp-card">
+  <h2 style="margin:0;">3 · Configurações</h2>
+  <div class="pp-grid" style="margin-top:10px;">
+    <div><label>Trocar de cena a cada (s)</label><input type="number" id="intervalo" value="{{ padrao.intervalo }}" min="2" max="30" step="0.5"></div>
+    <div><label>% de cenas geradas no pod</label><input type="number" id="pct" value="{{ padrao.pct }}" min="0" max="50" step="5"></div>
+    <div><label>Formato</label><select id="orientacao"><option>16:9</option><option>9:16</option><option>1:1</option></select></div>
+    <div><label>Legenda</label><select id="leg-modo"><option value="legenda">frases (como o Gerador de voz)</option><option value="palavra">palavra a palavra</option><option value="tempo">por tempo</option></select></div>
+    <div><label>Palavras por legenda</label><input type="number" id="leg-n" value="5" min="1" max="15"></div>
+    <div style="grid-column: span 2;"><label><input type="checkbox" id="rostos" checked style="width:auto;margin-right:4px;">🎭 Rosto das pessoas reais nas imagens do pod <span style="font-weight:normal;color:#888;">(roteiros de 🕵️ Modelo de vídeo: usa as fotos do elenco, na idade de cada cena — FLUX.2 klein; o resto continua no Z-Image)</span></label></div>
+    <div style="grid-column: span 2;"><label><input type="checkbox" id="epoca" checked style="width:auto;margin-right:4px;">🎞 Visual da época em cada cena <span style="font-weight:normal;color:#888;">(a IA diz o ano em que cada cena se passa; a imagem sai com o jeito de foto daquele ano — filme dos anos 70, flash dos 80… — e carros/roupas da época)</span></label></div>
+    <div style="grid-column: span 2;"><label>Estilo extra nas imagens <span style="font-weight:normal;color:#888;">(inglês, opcional)</span></label><input type="text" id="estilo" placeholder="ex.: dark moody lighting, film grain"></div>
+  </div>
+  <h3 style="margin:14px 0 4px;font-size:1rem;">Voz — padrão pra todos</h3>
+  <div class="pp-grid">
+    <div><label>Idioma</label><select id="p-idioma">{% for k, n in idiomas %}<option value="{{ k }}" {% if k == padrao.idioma %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+    <div><label>Motor</label><select id="p-motor"><option value="chatterbox">Chatterbox (23 idiomas; pt-BR dedicado)</option><option value="chatterbox_turbo">Chatterbox Turbo (inglês, tags)</option></select></div>
+    <div><label>Perfil de voz</label><select id="p-perfil"><option value="">(voz padrão do modelo)</option>{% for p in perfis %}<option>{{ p }}</option>{% endfor %}</select></div>
+    <div><label>Intensidade emocional (exaggeration)</label><input type="number" id="p-exag" value="{{ padrao.exaggeration }}" min="0.25" max="2" step="0.05"></div>
+    <div><label>Aderência à referência (cfg_weight)</label><input type="number" id="p-cfg" value="{{ padrao.cfg_weight }}" min="0" max="1" step="0.05"></div>
+  </div>
+  <button type="button" id="aplicar-todos" style="width:auto;margin-top:10px;">⤵ Aplicar a todos os roteiros escolhidos</button>
+
+  <table class="pp-itens" id="tab-itens">
+    <thead><tr><th>Roteiro</th><th>Idioma</th><th>Motor</th><th>Perfil</th><th>Emoção</th><th>Aderência</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div id="vazio" style="color:#888;font-size:.9rem;padding:8px 0;">Marque roteiros na lista acima.</div>
+  <div class="pp-estim" id="estimativa" style="display:none;"></div>
+  <label>Nome do lote <span style="font-weight:normal;color:#888;">(opcional)</span></label>
+  <input type="text" id="nome-lote" placeholder="ex.: Semana 42">
+  <button type="button" id="iniciar" style="background:#0e7490;color:#fff;font-weight:700;">▶ Iniciar produção</button>
+  <div id="erro" class="error" style="display:none;"></div>
+  {% if chatterbox_onde != 'pod' %}<p style="font-size:.8rem;color:#666;">Dica: a narração aqui sempre roda no pod, mesmo com o Chatterbox do Gerador de voz rodando neste PC.</p>{% endif %}
+</div>
+
+<div class="pp-card">
+  <h2 style="margin:0;">Lotes</h2>
+  {% for l in lotes %}
+  <div class="pp-lote">
+    <div style="min-width:0;">
+      <a href="/producao-pod/{{ l.id }}" style="font-weight:600;">{{ l.nome }}</a>
+      <div style="font-size:.8rem;color:#666;">{{ l.resumo.prontos }}/{{ l.resumo.total }} prontos · {{ l.status }} · {{ l.resumo.minutos }} min</div>
+    </div>
+    <a href="/producao-pod/{{ l.id }}" style="white-space:nowrap;">abrir →</a>
+  </div>
+  {% else %}<div style="color:#888;padding:6px 0;">Nenhum lote ainda.</div>{% endfor %}
+</div>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const PERFIS = {{ perfis|tojson }}, IDIOMAS = {{ idiomas|tojson }};
+  const itens = [];  // {chave, origem, id, titulo, texto?, palavras, idioma, motor, perfil, exaggeration, cfg_weight}
+
+  function opcoes(lista, atual) { return lista.map(([v, n]) => `<option value="${v}" ${v === atual ? 'selected' : ''}>${n}</option>`).join(''); }
+  function padrao() {
+    return {idioma: $('#p-idioma').value, motor: $('#p-motor').value, perfil: $('#p-perfil').value,
+            exaggeration: parseFloat($('#p-exag').value), cfg_weight: parseFloat($('#p-cfg').value)};
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
+
+  function desenhar() {
+    const tb = $('#tab-itens tbody');
+    tb.innerHTML = itens.map((it, k) => `<tr data-k="${k}">
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(it.titulo)}">${esc(it.titulo)}<br><small style="color:#888">${it.palavras} palavras · ~${Math.round(it.palavras / 150)} min</small></td>
+      <td><select data-c="idioma">${opcoes(IDIOMAS, it.idioma)}</select></td>
+      <td><select data-c="motor">${opcoes([['chatterbox', 'Chatterbox'], ['chatterbox_turbo', 'Turbo (inglês)']], it.motor)}</select></td>
+      <td><select data-c="perfil">${opcoes([['', '(padrão)']].concat(PERFIS.map(p => [p, p])), it.perfil)}</select></td>
+      <td><input type="number" data-c="exaggeration" value="${it.exaggeration}" min="0.25" max="2" step="0.05"></td>
+      <td><input type="number" data-c="cfg_weight" value="${it.cfg_weight}" min="0" max="1" step="0.05"></td>
+      <td><button type="button" data-rm="${k}" style="width:auto;padding:2px 8px;">✕</button></td></tr>`).join('');
+    $('#vazio').style.display = itens.length ? 'none' : '';
+    estimar();
+  }
+
+  function estimar() {
+    const box = $('#estimativa');
+    if (!itens.length) { box.style.display = 'none'; return; }
+    const min = itens.reduce((a, it) => a + it.palavras / 150, 0);
+    const intervalo = parseFloat($('#intervalo').value) || 5, pct = (parseFloat($('#pct').value) || 0) / 100;
+    const imagens = Math.round(min * 60 / intervalo * pct);
+    const vozMin = min * 0.35, vozMax = min * 0.7;  // Chatterbox na L40S/4090: ~0,35–0,7 min por minuto de fala
+    const imgMin = imagens * 3 / 60;
+    const h = (m) => m >= 60 ? `${Math.floor(m / 60)} h ${Math.round(m % 60)} min` : `${Math.round(m)} min`;
+    box.style.display = '';
+    box.innerHTML = `📊 <b>${itens.length}</b> roteiro(s) · ~<b>${Math.round(min)} min</b> de narração · ~<b>${imagens}</b> imagens no pod`
+      + `<br>⏱ estimativa no pod: <b>${h(vozMin + 5)} a ${h(vozMax + imgMin + 10)}</b> (voz e imagens rodam ao mesmo tempo; a 1ª vez soma o download dos modelos). Meça com 2–3 roteiros e ajuste.`;
+  }
+
+  $('#tab-itens').addEventListener('input', (e) => {
+    const tr = e.target.closest('tr'); if (!tr || !e.target.dataset.c) return;
+    const it = itens[+tr.dataset.k], c = e.target.dataset.c;
+    it[c] = (c === 'exaggeration' || c === 'cfg_weight') ? parseFloat(e.target.value) : e.target.value;
+    if (c === 'motor' && it.motor === 'chatterbox_turbo') { it.idioma = 'en'; desenhar(); }
+  });
+  $('#tab-itens').addEventListener('click', (e) => {
+    const k = e.target.dataset.rm; if (k === undefined) return;
+    const it = itens.splice(+k, 1)[0];
+    const cb = document.querySelector(`.rot[data-id="${it.id}"][data-origem="${it.origem}"]`); if (cb) cb.checked = false;
+    desenhar();
+  });
+  document.querySelectorAll('.rot').forEach(cb => cb.addEventListener('change', () => {
+    const chave = cb.dataset.origem + ':' + cb.dataset.id;
+    const k = itens.findIndex(i => i.chave === chave);
+    if (cb.checked && k < 0) {
+      itens.push(Object.assign(padrao(), {chave, origem: cb.dataset.origem, id: cb.dataset.id, titulo: cb.dataset.titulo,
+                                          palavras: +cb.dataset.palavras}, cb.dataset.idioma ? {idioma: cb.dataset.idioma} : {}));
+    } else if (!cb.checked && k >= 0) itens.splice(k, 1);
+    desenhar();
+  }));
+  $('#filtro').addEventListener('input', () => {
+    const f = $('#filtro').value.toLowerCase();
+    document.querySelectorAll('#lista-roteiros label').forEach(l => { l.style.display = l.dataset.titulo.includes(f) ? '' : 'none'; });
+  });
+  $('#marcar-todos').addEventListener('click', () => {
+    document.querySelectorAll('#lista-roteiros label').forEach(l => {
+      const cb = l.querySelector('.rot'); if (cb && l.style.display !== 'none' && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+    });
+  });
+  $('#colar-add').addEventListener('click', () => {
+    const t = $('#colar-texto').value.trim(); if (t.split(/\s+/).length < 5) { alert('Cole o roteiro (pelo menos algumas frases).'); return; }
+    itens.push(Object.assign(padrao(), {chave: 'texto:' + Date.now(), origem: 'texto', titulo: $('#colar-titulo').value.trim() || 'Roteiro colado',
+                                        texto: t, palavras: t.split(/\s+/).length}));
+    $('#colar-texto').value = ''; $('#colar-titulo').value = ''; desenhar();
+  });
+  $('#aplicar-todos').addEventListener('click', () => { const p = padrao(); itens.forEach(it => Object.assign(it, p)); desenhar(); });
+  ['#intervalo', '#pct'].forEach(s => $(s).addEventListener('input', estimar));
+
+  $('#pod-testar').addEventListener('click', async () => {
+    const out = $('#pod-status'); out.textContent = '⏳ testando…';
+    try { const d = await (await fetch('/runpod/pod-status?url=' + encodeURIComponent($('#pod-url').value.trim()))).json();
+      out.textContent = (d.ok ? '✅ ' : '❌ ') + (d.msg || ''); }
+    catch (e) { out.textContent = '❌ ' + e.message; }
+  });
+
+  $('#iniciar').addEventListener('click', async () => {
+    const err = $('#erro'); err.style.display = 'none';
+    if (!itens.length) { err.textContent = 'Escolha pelo menos um roteiro.'; err.style.display = ''; return; }
+    if (!$('#pod-url').value.trim()) { err.textContent = 'Cole o endereço do pod.'; err.style.display = ''; return; }
+    const b = $('#iniciar'); b.disabled = true; b.textContent = '⏳ enviando…';
+    try {
+      const r = await fetch('/producao-pod/criar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+        pod_url: $('#pod-url').value.trim(), nome: $('#nome-lote').value.trim(),
+        config: {intervalo: $('#intervalo').value, pct: $('#pct').value, orientacao: $('#orientacao').value, estilo_extra: $('#estilo').value, rostos: $('#rostos').checked, epoca: $('#epoca').checked,
+                 legenda: {modo: $('#leg-modo').value, max_palavras: $('#leg-n').value}},
+        itens: itens.map(({chave, palavras, ...resto}) => resto)})});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || r.status);
+      location.href = d.link;
+    } catch (e) { err.textContent = '❌ ' + e.message; err.style.display = ''; b.disabled = false; b.textContent = '▶ Iniciar produção'; }
+  });
+  desenhar();
+})();
+</script>
+{% endblock %}

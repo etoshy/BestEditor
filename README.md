@@ -28,6 +28,156 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🕰 Tudo gerado na época certa: locais pela descrição, documentos da época e cronologia (v84_130)
+
+- **📍 Locais pela descrição do caso:** a catalogação lê também as FONTES. Um lugar bem descrito (a mansão de 19 cômodos com salão de baile, a fazenda isolada…) entra no elenco mesmo SEM foto, com uma descrição rica em inglês, fiel às fontes. Toda cena nesse lugar usa essa mesma descrição, então a casa sai igual no vídeo todo. Com foto, a foto vai como referência. Dá pra adicionar à mão (➕ Local).
+- **🕰 Cronologia:** a IA monta os marcos do caso (nascimentos, crime, fuga, captura, julgamento). Cada cena sabe em que ano se passa, e a idade de cada pessoa sai da cronologia: ano da cena − nascimento, quando a IA não disse.
+- **📰 Documentos da época:** cartaz de PROCURADO/DESAPARECIDO, primeira página de jornal, ficha policial, carta… podem virar cena gerada. O rosto da pessoa sai na idade da data do documento, com papel, tipografia e desgaste da época, e só textos curtos e REAIS do roteiro (nome, data, cidade). Nunca fato inventado.
+- **🎞 Visual da época** (opção do lote, ligada): cada imagem do pod sai com o "jeito de foto" do ano da cena (sépia/preto e branco antigos, Kodachrome dos 60, filme quente dos 70, flash dos 80…), com carros, roupas, cabelos e objetos daquele ano.
+- A IA das cenas mantém a coerência entre cenas vizinhas: mesma casa, mesma roupa no mesmo dia, mesma estação.
+
+## 🗂 A IA cataloga as fotos das matérias: pessoas, idades e locais (v84_129)
+
+- **🤖 Catalogar as fotos com a IA** (cartão 🎭 Elenco): passa por TODAS as fotos do modelo (até 120, de 20 em 20, em segundo plano — pode sair da página), inclusive as extraídas das matérias. Diz quem é cada pessoa pela legenda, pelo OG da página, pelo texto impresso (cartaz de DESAPARECIDO/PROCURADO/RECOMPENSA, ficha policial, recorte de jornal) e pela sua descrição. Não reconhece pelo rosto: foto sem contexto fica de fora. Tira daí a idade em cada foto e o ano de nascimento ("15 anos em 1971" → 1956). Cada foto mostra 🔎 "como sei".
+- **📍 Locais:** a casa, a rua, a cidade, a cena do crime… com as fotos de cada um. Nas cenas do pod que se passam num local catalogado, a foto vai como referência (o lugar fica igual, na época e na luz da cena).
+- Na grade de imagens do modelo, cada foto catalogada mostra 👤 quem é (idade) e 📍 qual lugar.
+- A ficha das imagens (🤖 Descrever as imagens com IA) não descarta mais cartaz de desaparecido/procurado como "anúncio": vira documento útil, com o nome, a idade e as datas copiados do cartaz.
+
+## 🎭 Rosto das pessoas reais nas imagens do pod (v84_128)
+
+- **Cartão 🎭 Elenco** no Modelo de vídeo: a IA olha as fotos e o roteiro e diz quem é quem, o papel, o ano de nascimento, a idade da pessoa em CADA foto e, em foto de grupo, qual pessoa é ela. Você confere e corrige as idades (são elas que dizem quanto envelhecer ou rejuvenescer o rosto) e clica em 💾 Salvar. Se você não montar o elenco, a 🏭 Produção no pod monta sozinha com a IA (recurso "🎭 Elenco" em 🤖 IA).
+- **🏭 Produção no pod** (opção "🎭 Rosto das pessoas reais", ligada por padrão): a IA que descreve as cenas diz quem do elenco aparece em cada uma e com que IDADE naquele momento da história (flashback, "anos depois", a criança que cresceu). Nas cenas do pod com essas pessoas, o site escolhe a foto de idade mais próxima e manda pro pod como referência. Lá, o **FLUX.2 [klein] 4B** (Apache 2.0, ~13 GB) gera a cena com aquele rosto, envelhecido ou rejuvenescido. As outras cenas continuam no Z-Image. Cenas com pessoa do elenco ganham prioridade dentro da % do pod.
+- Regra fixa: com rosto real, nada de violência, sangue, morte ou o crime acontecendo. Nesses momentos, a cena fica sem as pessoas do elenco.
+- Pod com código antigo (sem o klein): as cenas vão sem o rosto pro Z-Image e aparece um aviso pra atualizar o pod.
+
+## 📸 Fotos pro roteiro + marcas que não somem (v84_127)
+
+- **🔒 As marcas não somem mais:** quando a IA adapta o roteiro pro TTS (ou revisa), as marcas [I3]/[M2], [[INSCREVA]]/[[VENDA]] e [CENA n] que ela tirar voltam pro mesmo ponto, achado pelas palavras em volta. Aparece um aviso 🔒 dizendo quais voltaram. As marcas continuam sem ser lidas pela voz.
+- **🖼 Mais imagens no vídeo:** o prompt do roteiro (e cada capítulo, no modo em partes) agora recebe TODAS as imagens do modelo, e não só as planejadas pro capítulo. A IA é instruída a usar todas as que têm relação e a repetir a marca sempre que a narração volta àquela pessoa, lugar ou objeto, alternando entre fotos da mesma pessoa. O prompt do editor pede o mesmo.
+- **📸 Fotos pro roteiro** (novo cartão no Modelo de vídeo, depois que o roteiro está pronto; opcional):
+  1. **❓ A IA pergunta:** lê o roteiro e pergunta que fotos você tem das pessoas, lugares, objetos, documentos e cenas citados (qualquer nicho), com o trecho, quantas vezes aparece e onde costuma ter a foto. Em cada pergunta você envia as fotos com uma descrição, ou clica em "não tenho / pular".
+  2. **➕ Outras imagens:** envie qualquer imagem com uma descrição de quando usar.
+  3. **📍 A IA posiciona:** o roteiro vai em frases numeradas e ela diz em quais frases cada imagem entra (várias vezes, espaçadas, no máximo 1 por frase). O site põe as marcas e **↩ desfaz** se precisar. Também dá pra usar com outra IA: gerar o prompt e colar a resposta.
+- **🏭 Produção no pod:** roteiros de Modelo de vídeo agora usam as próprias fotos do modelo nas cenas em que caem as marcas [I…]. Essas cenas não vão pro pod nem ficam pendentes.
+
+## 🧩 "O JSON das cenas não passou na validação" (v84_126)
+
+- Antes de colar o JSON, as cenas são ajustadas ao áudio: começam em 0, ficam sem buracos e terminam no fim exato do áudio. Cenas com menos de 0,35 s são juntadas na vizinha, e buscas vazias são preenchidas. A legenda costuma começar depois de 0 e acabar antes do fim do áudio, e era isso que travava.
+- Se ainda assim falhar, o erro mostra o motivo exato.
+- **Tentar de novo** reaproveita o projeto que ficou esperando o JSON. Se a narração e as imagens já estão no PC, ele só monta o projeto de novo, sem precisar do pod, e registra as imagens no cache antes.
+
+## 🔒 Cache de imagens do pod sem "Acesso negado" (v84_125)
+
+- Corrigido o `PermissionError: [WinError 5] Acesso negado: runpod_dados\\cache.json.tmp -> cache.json`: o cache e o `uso.json` agora gravam com nome temporário único e novas tentativas (o Windows bloqueia a troca quando outro processo está lendo o arquivo).
+- Quando a etapa anda, o erro antigo some do roteiro.
+- Novo botão **🖼 Baixar imagens de novo** no lote (roteiros que já têm imagens no pod; o pod precisa estar ligado). As imagens que já estão no PC não são baixadas de novo — só registradas. Se o projeto já existe, não cria outro: depois é só abrir no editor e clicar em **🔁 Pôr as imagens do pod de volta**.
+- **Tentar de novo** num roteiro que já tinha imagens no pod agora volta direto para o download (não narra nem gera de novo).
+
+## 🖥️ Imagens do pod não viram mais cartão (v84_124)
+
+- O ⚖️ juiz da IA julgava também as imagens que o pod gerou SOB MEDIDA pra cena: nota baixa → trocava por um 🃏 cartão
+  (ou pedia "nova busca", que falhava). Agora imagem da fonte `runpod` não passa pelo juiz.
+- Projetos já criados: no editor aparece **🔁 Pôr as imagens do pod de volta** — as imagens estão guardadas no cache,
+  é só buscar de novo (sem gerar nada no pod). Cena do pod que você trocou à mão não é mexida.
+
+---
+
+## 🏭 Produção no pod: a narração sai no mesmo .zip do Gerador de voz (v84_123)
+
+- A narração de cada roteiro da 🏭 Produção no pod agora é feita **do mesmo jeito do 🎙️ Gerador de voz**: legenda com o
+  texto do roteiro nos tempos do Whisper (mesmo modo e nº de palavras por legenda, escolhidos na aba), chamadas
+  ([[INSCREVA]]/[[VENDA]]), capítulos do Roteiro do YouTube / Modelo de vídeo, entrada no **📜 Histórico** do Gerador
+  de voz e o **.zip** de sempre (`narracao.wav` + `legenda.srt` + `info.json` + `chamadas.json`) — botão **⬇ ZIP** em
+  cada roteiro do lote.
+- O projeto do editor é criado **a partir desse .zip**, pelo mesmo caminho de quem envia o .zip na página inicial: a
+  legenda pronta entra no editor (aba 📝 Legendas), o idioma e o projeto vêm do `info.json`, sem transcrever de novo.
+
+---
+
+## 🏭 Produção no pod: vários roteiros de uma vez → projetos com cenas pendentes (v84_122)
+
+- Aba nova **🏭 Produção no pod** (no topo). Marque os roteiros prontos do **📜 Roteiro do YouTube** e dos
+  **🕵️ Modelos de vídeo** (ou cole um), cole o endereço do pod e clique **▶ Iniciar produção**.
+- **Voz por roteiro**: idioma, motor (Chatterbox ou Turbo), 🗣️ perfil de voz, intensidade emocional (exaggeration) e
+  aderência à referência (cfg_weight) em cada linha — ou preencha o padrão e **⤵ Aplicar a todos**.
+- **O que o site faz sozinho**, roteiro por roteiro:
+  1. manda **todas as narrações** pro pod de uma vez (ele narra em fila e **transcreve com o Whisper** na GPU);
+  2. corta a narração em **cenas de ~5 s** (configurável) pelo tempo de cada palavra;
+  3. a 🤖 IA (recurso novo **“🏭 Produção no pod: cenas e prompts”** em 🤖 IA) descreve cada cena, dá uma **nota de
+     dificuldade** (quão difícil é achar em banco) e escreve o **prompt de imagem**;
+  4. as **~30% mais difíceis** (configurável, até 50%) vão pro pod — **nunca duas seguidas**, bem espalhadas;
+  5. o pod gera essas imagens num lote só, e o site cria o **projeto do editor**: essas cenas já com imagem, as outras
+     **⏳ pendentes**.
+- **No editor**: o quadro **⏳ Completar cenas pendentes** — marque as fontes (Pexels, YouTube, buscadores…) e a 🤖 IA
+  escreve as buscas de cada cena pendente (e manda pro YouTube/foto real só se a fonte estiver marcada). Pode rodar de
+  novo com outras fontes. Sem IA, usa a busca em inglês que veio da produção, em rodízio nas fontes marcadas.
+- [[INSCREVA]] / [[VENDA]] do roteiro não são narrados e viram chamadas no ponto certo (pelas palavras do Whisper).
+  Projeto do Roteiro do YouTube leva os capítulos junto.
+- O pod trabalha sem parar (enquanto narra o 3º roteiro, já gera as imagens do 1º e do 2º). A tela mostra uma
+  estimativa de tempo; pode fechar a aba — o lote continua, e retoma se o site reiniciar. Chega aviso no 🔔.
+- Precisa do **studio-ia atualizado** no pod (Whisper). Código: `producao_pod.py`, `cenas_lote.py`,
+  `producao_pod_rotas.py`; testes: `test_v84_producao_pod.py`.
+
+---
+
+## 🖥️ Meu pod: imagens e Chatterbox na GPU de um pod da RunPod (v84_121)
+
+- Servidor à parte **`studio-ia`** (outra pasta): sobe num pod da RunPod com `setup.sh` + `start.sh` e roda o
+  **Z-Image Turbo** (imagens) e o **Chatterbox** (Multilingual V3 com 23 idiomas, modelo dedicado **pt-BR** e o
+  **Turbo** em inglês com tags). O pod é cobrado por hora: liga, gera tudo, desliga.
+- **⚙️ Configurações → 🟣 Runpod → 🖥️ Meu pod**: cole o endereço que o `start.sh` mostra
+  (`https://<id>-8000.proxy.runpod.net`) e escolha:
+  - **De onde vêm as imagens**: “Meu pod” → a fonte `runpod` gera no Z-Image do pod, **sem custo por imagem e sem
+    conferir saldo** (mesmo cache de sempre: o mesmo pedido não é gerado duas vezes). Vídeo continua pelos Public
+    Endpoints com a chave; sem chave, o trecho de vídeo vira foto.
+  - **🗣️ Chatterbox e Chatterbox Turbo no pod**: Gerador de voz, Roteiro para Áudio, multi voice, dublagem e geração
+    rápida continuam iguais; a voz (áudio enviado ou 1º clipe do perfil) vai junto com cada pedido e o áudio volta
+    pronto. A geração rápida não conta a VRAM deste PC (usa 2 cópias, como o Fish).
+  - **🇧🇷 pt-BR dedicado**: com isso marcado, português sai pelo modelo `Chatterbox-Multilingual-pt-br`.
+- **🔌 Ver se o pod está no ar** mostra os dois workers (carregando/pronto) e a GPU.
+- Os **perfis de voz** usam o mesmo .zip do 📦 Exportar/Importar: o zip do site entra no pod (`POST /vozes/importar`)
+  e o zip do pod (`GET /vozes/exportar`) volta pro site em 📦 Importar perfis.
+- Código: `pod_studio.py` (cliente), `runpod_gerador.py` (modo pod), `voice_generator.py` (`_narrar_no_pod`).
+  Testes: `test_v84_pod.py`.
+
+---
+
+## 📦 Perfis de voz: exportar e importar em .zip (v84_120)
+
+- Em **🗣️ Perfis de voz**: **📦 Exportar** em cada perfil, **📦 Exportar todos** e **📦 Exportar marcados**. O .zip leva
+  os clipes de referência, os originais (`_original/`, se a voz foi limpa da música), gênero/idade/descrição, a marca
+  🎧 limpo×música e as 🎭 vozes com slug que usam o perfil (`manifesto.json`).
+- **📦 Importar perfis (.zip)**: o zip exportado volta tudo como estava no outro PC. Também aceita um .zip comum só com
+  áudios: áudios na raiz viram **um** perfil (nome digitado ou o nome do arquivo), e cada pasta (`joao/`, `maria/`)
+  vira um perfil. Nome repetido vira `nome_2`, a menos que marque **substituir**. Código: `perfis_pacote.py`.
+
+---
+
+## 🧊 O fim do vídeo não congela mais (v84_119)
+
+- Vídeo de 25 min com a imagem parada desde 19:42 e o áudio seguindo: uma etapa devolveu a IMAGEM mais curta que o
+  áudio. O arquivo “durava” 25:10 pelo áudio, e o player repetia o último quadro.
+- **Pedaços paralelos** (destaques, legendas, filtro, qualidade): cada pedaço é conferido **quadro a quadro** e o
+  vídeo emendado pela duração da **imagem** (não só a do arquivo). Faltou quadro, o passe roda do jeito de sempre.
+- **Cada etapa do fim** (overlays, quadros editoriais, destaques, gráficos, chamadas/abertura) é conferida. Se ela
+  devolver a imagem mais curta, é **pulada** (o vídeo sai sem ela, mas inteiro) e aparece um ⚠️ aviso na tela do
+  resultado. A legenda que cortar a imagem é refeita num passe só.
+- Os passes longos (legenda num passe só, quadros, gráficos, destaques, filtro, censura) agora podem durar até 4 h.
+  Antes alguns paravam em 5 min ou 1 h.
+- As legendas do estilo DarkPlanner também rodam em pedaços paralelos.
+- Testes: `test_v84_sem_congelar.py`.
+
+## ⏱ Tela da montagem que não trava (v84_118)
+
+- O relógio (“rodando há”) e o tempo da etapa agora andam pelo relógio do próprio PC, de segundo em segundo. Antes
+  eles congelavam quando o servidor demorava pra responder.
+- Se uma consulta falha (servidor ocupado com a montagem), a tela tenta de novo sozinha. Antes uma falha parava a
+  atualização pra sempre. Sem resposta por mais de 12 s, aparece um aviso.
+- Etapas que trabalham antes do ffmpeg também andam a barra:
+  - **quadros editoriais**: print dos sites, cada quadro, cada trecho e a junção;
+  - **gráficos**: cada gráfico desenhado e depois o passe no vídeo.
+- As etapas começam em 0%. Antes mostravam “208/208” cheia antes de começar.
+
 ## 🚀 Destaques de texto horas mais rápidos (v84_117)
 
 - A etapa “Destaques de texto” podia levar **horas** (a tela chegou a prever 8 h). Cada fundo com imagem (faixas,

@@ -69,3 +69,21 @@ def test_pagina_de_status_tem_as_etapas():
         assert c.get("/job/prog1/status").get_json()["progress"]["stage"] == "destaques"
     finally:
         A._JOBS.pop("prog1", None)
+
+
+def test_graficos_e_quadros_contam_cada_passo(tmp_path):
+    """v84_118: as etapas que desenham em Python antes do ffmpeg (gráficos, quadros) também andam a barra."""
+    import dp_graficos
+    base = _base(tmp_path, 6)
+    visto = []
+    with pf.acompanhar(lambda f, d: visto.append((round(f, 3), d)), 6.0):
+        dp_graficos.aplicar_graficos(base, str(tmp_path / "g.mp4"), [{"tipo": "barras", "titulo": "X", "dados": [["a", 5], ["b", 8]],
+                                                                      "start": 1.0, "end": 4.0}], 320, 180, str(tmp_path / "wg"))
+    detalhes = [d for _f, d in visto]
+    assert "desenhando o gráfico 1 de 1" in detalhes and "colocando os gráficos no vídeo" in detalhes
+    assert visto[0][0] == 0.0 and visto[-1][0] == 1.0 and [f for f, _d in visto] == sorted(f for f, _d in visto)
+
+
+def test_pagina_continua_quando_o_servidor_falha():
+    html = open("templates/result.html", encoding="utf-8").read()
+    assert "falhasSeguidas++" in html and "setInterval(tique, 1000)" in html and "mt-sem-resposta" in html

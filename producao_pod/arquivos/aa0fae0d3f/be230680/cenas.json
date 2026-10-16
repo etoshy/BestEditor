@@ -1,0 +1,2289 @@
+{
+ "segments": [
+  {
+   "start": 0.0,
+   "end": 6.74,
+   "provider": "adiado",
+   "query": "cardboard box doorstep morning Japan",
+   "visual": "Pequena caixa de papelão deixada na soleira de uma casa residencial japonesa, em manhã cinzenta de inverno",
+   "media_type": "video"
+  },
+  {
+   "start": 6.74,
+   "end": 12.44,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged Japanese man in dark suit and tie stepping out of a modest house doorway, looking down at a cardboard box on the doorstep, early morning, 1989 Tokyo residential street, overcast light, shot from behind-side at distance, 35mm lens, muted realistic colors, no text",
+   "visual": "Homem japonês de meia-idade saindo de casa para o trabalho, olhando para a caixa na porta"
+  },
+  {
+   "start": 12.44,
+   "end": 18.54,
+   "provider": "adiado",
+   "query": "Japanese couple 1980s home telephone worried",
+   "visual": "Casal japonês da época em casa, a mulher ao telefone, preocupados",
+   "media_type": "video"
+  },
+  {
+   "start": 18.54,
+   "end": 23.23,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, paper missing child poster pinned to a utility pole on a Tokyo residential street, 1980s, poster shows a school portrait of a small girl, faces blurred, overcast daylight, shallow depth of field, 35mm lens, realistic colors, no legible text",
+   "visual": "Cartaz de criança desaparecida pregado num poste de rua em Tóquio"
+  },
+  {
+   "start": 23.23,
+   "end": 28.25,
+   "provider": "adiado",
+   "query": "hands holding photograph table grief Japan",
+   "visual": "Mãos de adulto segurando retrato escolar de criança e uma pequena urna de cinzas sobre mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 28.25,
+   "end": 34.63,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, small folded children's clothing and a few personal objects laid out on a plain wooden table in a police evidence room, 1989 Japan, cool fluorescent light, sober documentary mood, no bodies, no blood, 50mm lens, muted realistic colors, no text",
+   "visual": "Fotos de roupas infantis e objetos sobre mesa, em clima sóbrio"
+  },
+  {
+   "start": 34.63,
+   "end": 38.27,
+   "provider": "adiado",
+   "query": "Japanese police officers 1980s investigation",
+   "visual": "Policiais japoneses da época examinando uma caixa e documentos",
+   "media_type": "video"
+  },
+  {
+   "start": 38.27,
+   "end": 44.82,
+   "provider": "adiado",
+   "query": "single paper sheet typed words desk evidence",
+   "visual": "Detalhe de um papel isolado com palavras impressas, sobre mesa de investigação",
+   "media_type": "video"
+  },
+  {
+   "start": 44.82,
+   "end": 51.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, gloved hands of forensic investigators sorting small items inside an open cardboard box on a steel table, 1989 Japan, sober clinical lighting, no visible remains, shallow depth of field, 50mm lens, muted colors, no text",
+   "visual": "Polícia examinando objetos dentro de caixa, mãos enluvadas"
+  },
+  {
+   "start": 51.18,
+   "end": 56.22,
+   "provider": "adiado",
+   "query": "parents looking out window night sadness Japan",
+   "visual": "Pais olhando pela janela de casa, em silêncio, em noite fria",
+   "media_type": "video"
+  },
+  {
+   "start": 56.22,
+   "end": 61.58,
+   "provider": "adiado",
+   "query": "Tokyo residential street 1960s old photo",
+   "visual": "Vista de uma rua residencial de Tóquio dos anos 1960, casas baixas e fios elétricos",
+   "media_type": "video"
+  },
+  {
+   "start": 61.58,
+   "end": 66.29,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, exterior of a small 1960s Japanese maternity hospital with concrete facade and narrow windows, Tokyo, daylight, quiet street, period vehicles, muted realistic colors, wide 28mm lens, no people in focus, no text",
+   "visual": "Hospital japonês antigo de maternidade, fachada e corredor"
+  },
+  {
+   "start": 66.29,
+   "end": 71.72,
+   "provider": "adiado",
+   "query": "newborn incubator hospital 1960s",
+   "visual": "Incubadora de bebê recém-nascido em hospital antigo, luz suave",
+   "media_type": "video"
+  },
+  {
+   "start": 71.72,
+   "end": 78.67,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a newborn baby's small hand with short underdeveloped fingers resting on white hospital blanket, soft natural light, tender clinical mood, shallow depth of field, 100mm macro lens, realistic colors, no text",
+   "visual": "Close de mãos pequenas de bebê com dedos curtos e deformados, em tom suave"
+  },
+  {
+   "start": 78.67,
+   "end": 84.22,
+   "provider": "adiado",
+   "query": "child struggling grab small object hands",
+   "visual": "Criança pequena tentando pegar um objeto pequeno com as mãos, cuidadosamente",
+   "media_type": "video"
+  },
+  {
+   "start": 84.22,
+   "end": 91.5,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese elementary school playground in the 1960s, group of children playing in the distance while one boy stands apart near the fence, wearing long sleeves, muted realistic colors, daylight, 35mm lens, no text",
+   "visual": "Escola japonesa dos anos 1960 com crianças no pátio, uma criança isolada"
+  },
+  {
+   "start": 91.5,
+   "end": 99.07,
+   "provider": "adiado",
+   "query": "children mocking classmate playground isolation",
+   "visual": "Crianças rindo e apontando para um menino isolado no pátio da escola",
+   "media_type": "video"
+  },
+  {
+   "start": 99.07,
+   "end": 105.4,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese boy around eleven years old sitting alone at a wooden desk in the corner of a 1970s classroom, head lowered, empty chairs around him, soft window light, muted realistic colors, 35mm lens, no text",
+   "visual": "Menino sentado sozinho num canto de sala de aula, cabisbaixo"
+  },
+  {
+   "start": 105.4,
+   "end": 111.02,
+   "provider": "adiado",
+   "query": "boy long sleeves gloves hiding hands",
+   "visual": "Menino de mangas longas e luvas, escondendo as mãos, sentado num banco",
+   "media_type": "video"
+  },
+  {
+   "start": 111.02,
+   "end": 116.68,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a young boy's hands covered by long sweater sleeves and gloves, fabric pulled down over fingers, neutral background, soft natural light, shallow depth of field, 85mm lens, muted realistic colors, no text",
+   "visual": "Close de mãos com luvas escondidas dentro das mangas da roupa"
+  },
+  {
+   "start": 116.68,
+   "end": 123.43,
+   "provider": "adiado",
+   "query": "Japanese newspaper office 1970s editors",
+   "visual": "Escritório de jornal japonês dos anos 1970 com editores e prensas",
+   "media_type": "video"
+  },
+  {
+   "start": 123.43,
+   "end": 129.36,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged Japanese man in dark suit carrying a briefcase leaving a newspaper building entrance late at night, Tokyo 1980s, street lights, muted realistic colors, 35mm lens, no text",
+   "visual": "Homem de terno saindo de um prédio de jornal com pasta na mão, à noite"
+  },
+  {
+   "start": 129.36,
+   "end": 134.28,
+   "provider": "adiado",
+   "query": "Japanese student desk papers stress exam",
+   "visual": "Estudante japonês com pilha de provas e papéis em mesa de estudo",
+   "media_type": "video"
+  },
+  {
+   "start": 134.28,
+   "end": 139.49,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, school report card with handwritten grades lying on a wooden desk beside a pencil and eraser, soft window light, shallow depth of field, muted realistic colors, 50mm lens, no legible text",
+   "visual": "Boletim escolar sobre mesa com lápis e borracha, clima de decepção"
+  },
+  {
+   "start": 139.49,
+   "end": 147.0,
+   "provider": "adiado",
+   "query": "Japanese teenager reading manga bedroom",
+   "visual": "Adolescente japonês deitado no quarto lendo revista de mangá",
+   "media_type": "video"
+  },
+  {
+   "start": 147.0,
+   "end": 152.49,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, bedroom bookshelf crammed with stacked comic magazines and paperbacks, dim light from a single lamp, quiet solitary atmosphere, 1980s Japan, muted realistic colors, 35mm lens, covers blank or unreadable, no text",
+   "visual": "Estante lotada de revistas e livros de quadrinhos em quarto escuro"
+  },
+  {
+   "start": 152.49,
+   "end": 158.26,
+   "provider": "adiado",
+   "query": "lonely boy sitting floor bedroom staring wall",
+   "visual": "Garoto sentado no chão do quarto, sozinho, olhando para a parede",
+   "media_type": "video"
+  },
+  {
+   "start": 158.26,
+   "end": 163.79,
+   "provider": "adiado",
+   "query": "shadow boy wall dim bedroom",
+   "visual": "Sombra de um menino na parede de um quarto, sugerindo presença imaginária",
+   "media_type": "video"
+  },
+  {
+   "start": 163.79,
+   "end": 169.66,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a pencil sketch on lined school paper of an ambiguous half-human half-rodent figure drawn by a child, lying on a wooden desk, soft light, shallow depth of field, muted colors, 50mm lens, no text",
+   "visual": "Desenho de figura ambígua em papel, metade humana, metade animal, feito à mão"
+  },
+  {
+   "start": 169.66,
+   "end": 175.21,
+   "provider": "adiado",
+   "query": "half open bedroom door dim light",
+   "visual": "Porta de quarto entreaberta com luz fraca vindo do interior",
+   "media_type": "video"
+  },
+  {
+   "start": 175.21,
+   "end": 180.48,
+   "provider": "adiado",
+   "query": "empty street evening Japan suburb",
+   "visual": "Rua de bairro vazia ao anoitecer, sem ninguém, sensação de isolamento",
+   "media_type": "video"
+  },
+  {
+   "start": 180.48,
+   "end": 187.25,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, old folded paper map of Tokyo spread on a wooden archive table with a magnifying glass and pencil, unlabeled blurred lines, soft lamp light, muted realistic colors, 50mm lens, no legible text",
+   "visual": "Mapa antigo de Tóquio sobre mesa de arquivo com caneta e lupa"
+  },
+  {
+   "start": 187.25,
+   "end": 193.0,
+   "provider": "adiado",
+   "query": "Tokyo street 1980s traffic pedestrians",
+   "visual": "Ruas de Tóquio nos anos 1980 com carros e pedestres, vida cotidiana",
+   "media_type": "video"
+  },
+  {
+   "start": 193.0,
+   "end": 198.09,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two-story Japanese family house in 1980s residential area, a woman in an apron standing alone in a small front garden, quiet tense mood, daylight, muted realistic colors, 35mm lens, no text",
+   "visual": "Casa familiar japonesa de dois andares, com a mãe sozinha no jardim"
+  },
+  {
+   "start": 198.09,
+   "end": 203.75,
+   "provider": "adiado",
+   "query": "man arriving home late night gate Japan",
+   "visual": "Homem de terno chegando em casa tarde da noite, portão fechado",
+   "media_type": "video"
+  },
+  {
+   "start": 203.75,
+   "end": 210.44,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese woman in her forties placing shopping bags with toys and clothes on a kitchen table, 1980s kitchen, warm interior light, muted realistic colors, 35mm lens, no text",
+   "visual": "Mulher pondo sacolas de compras sobre a mesa da cozinha, sozinha"
+  },
+  {
+   "start": 210.44,
+   "end": 215.24,
+   "provider": "adiado",
+   "query": "wrapped gift box plain table",
+   "visual": "Caixa de presente embrulhada com papel simples sobre mesa, sem alegria",
+   "media_type": "video"
+  },
+  {
+   "start": 215.24,
+   "end": 220.76,
+   "provider": "adiado",
+   "query": "toy on empty child bed sad parents",
+   "visual": "Pais olhando um brinquedo infantil sobre a cama vazia, em tom de saudade",
+   "media_type": "video"
+  },
+  {
+   "start": 220.76,
+   "end": 228.05,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, adult hand gently touching a small child's shoe lying on a wooden floor, soft natural light, shallow depth of field, grief mood, muted realistic colors, 85mm lens, no text",
+   "visual": "Mão de adulto acariciando um objeto de criança, em clima de luto"
+  },
+  {
+   "start": 228.05,
+   "end": 234.12,
+   "provider": "adiado",
+   "query": "Japanese man sitting sofa looking down home",
+   "visual": "Homem japonês de idade mediana sentado num sofá, olhar baixo, em casa",
+   "media_type": "video"
+  },
+  {
+   "start": 234.12,
+   "end": 239.41,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, stack of yellowed old newspaper pages on an archive table, unreadable blurred print, soft lamp light, sober archival mood, muted realistic colors, 50mm lens, no legible text or logos",
+   "visual": "Arquivo de jornal japonês antigo com páginas amareladas sobre mesa"
+  },
+  {
+   "start": 239.41,
+   "end": 244.68,
+   "provider": "adiado",
+   "query": "old photographs investigation table magnifier",
+   "visual": "Fotos antigas sobre mesa de investigação com lupa e caneta",
+   "media_type": "video"
+  },
+  {
+   "start": 244.68,
+   "end": 252.12,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese police officer in 1980s uniform standing by the edge of a calm lake under overcast sky, wooded shore behind, serious mood, muted realistic colors, 35mm lens, no text",
+   "visual": "Policial japonês de uniforme em frente a um lago calmo, sob céu nublado"
+  },
+  {
+   "start": 252.12,
+   "end": 259.49,
+   "provider": "adiado",
+   "query": "Japan forest lake overcast no people",
+   "visual": "Lago e floresta de Saitama em dia nublado, sem pessoas",
+   "media_type": "video"
+  },
+  {
+   "start": 259.49,
+   "end": 265.07,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1980s Japanese sedan parked on the edge of a dirt road at night with headlights on, dark forest behind, lonely tense mood, no people visible, muted realistic colors, 35mm lens, no text",
+   "visual": "Carro antigo parado na beira de uma estrada de terra, luz de farol"
+  },
+  {
+   "start": 265.07,
+   "end": 270.51,
+   "provider": "adiado",
+   "query": "empty parking lot night 1980s Japan",
+   "visual": "Estacionamento vazio à noite com luz de postes e um carro ao fundo",
+   "media_type": "video"
+  },
+  {
+   "start": 270.51,
+   "end": 276.95,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, bright headlights of an approaching car sweeping across a dark nighttime parking lot, long light beams, tense mood, empty spaces, muted realistic colors, 35mm lens, no people, no text",
+   "visual": "Faróis de outro carro iluminando um estacionamento escuro, sensação de susto"
+  },
+  {
+   "start": 276.95,
+   "end": 283.29,
+   "provider": "adiado",
+   "query": "dense forest night flashlight police search",
+   "visual": "Floresta densa à noite, luz de lanterna de polícia entre as árvores",
+   "media_type": "video"
+  },
+  {
+   "start": 283.29,
+   "end": 287.99,
+   "provider": "adiado",
+   "query": "car stuck mud forest road tires",
+   "visual": "Carro atolado na lama de um caminho de floresta, rodas girando",
+   "media_type": "video"
+  },
+  {
+   "start": 287.99,
+   "end": 294.57,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two Japanese men in work clothes pushing a small sedan out of mud on a forest track, 1980s, overcast light, muted realistic colors, 35mm lens, faces partly in shadow, no text",
+   "visual": "Dois homens ajudando a empurrar um carro na lama, em floresta"
+  },
+  {
+   "start": 294.57,
+   "end": 301.07,
+   "provider": "adiado",
+   "query": "dass mit dem Großvater die letzte Verbindung zu",
+   "visual": "dass mit dem Großvater die letzte Verbindung zu einem Menschenriss. Ein Schutz, der plötzlich fehlte.",
+   "media_type": "video"
+  },
+  {
+   "start": 301.07,
+   "end": 307.17,
+   "provider": "adiado",
+   "query": "Doch Familienmitglieder hatten zuvor schon Bahnzeichen gesehen. Und",
+   "visual": "Doch Familienmitglieder hatten zuvor schon Bahnzeichen gesehen. Und niemand reagierte mit Hilfe.",
+   "media_type": "video"
+  },
+  {
+   "start": 307.17,
+   "end": 315.41,
+   "provider": "adiado",
+   "query": "Wer damals hätte eingreifen können, bleibt offen.",
+   "visual": "Wer damals hätte eingreifen können, bleibt offen.",
+   "media_type": "video"
+  },
+  {
+   "start": 315.41,
+   "end": 324.86,
+   "provider": "adiado",
+   "query": "Die beiden Mädchen",
+   "visual": "Die beiden Mädchen",
+   "media_type": "video"
+  },
+  {
+   "start": 324.86,
+   "end": 340.16,
+   "provider": "adiado",
+   "query": "wohnten nur wenige Straßen voneinander entfernt.",
+   "visual": "wohnten nur wenige Straßen voneinander entfernt.",
+   "media_type": "video"
+  },
+  {
+   "start": 340.16,
+   "end": 353.78,
+   "provider": "adiado",
+   "query": "Es",
+   "visual": "Es",
+   "media_type": "video"
+  },
+  {
+   "start": 353.78,
+   "end": 359.58,
+   "provider": "adiado",
+   "query": "war ein gewöhnlicher Nachmittag im Sommer. Die waren",
+   "visual": "war ein gewöhnlicher Nachmittag im Sommer. Die waren in den Anwohnern beliebt. Dort,",
+   "media_type": "video"
+  },
+  {
+   "start": 359.58,
+   "end": 365.0,
+   "provider": "adiado",
+   "query": "so stellte es später ein Gericht fest, wurde",
+   "visual": "so stellte es später ein Gericht fest, wurde Mari getötet. Wie genau es geschah,",
+   "media_type": "video"
+  },
+  {
+   "start": 365.0,
+   "end": 371.15,
+   "provider": "adiado",
+   "query": "ist in den öffentlichen Berichten nur knapp festgehalten.",
+   "visual": "ist in den öffentlichen Berichten nur knapp festgehalten. Ihr Tod war der erste einer Reihe von Verbrechen,",
+   "media_type": "video"
+  },
+  {
+   "start": 371.15,
+   "end": 377.5,
+   "provider": "adiado",
+   "query": "die Japan erschüttern sollten. Die Familie begann sofort",
+   "visual": "die Japan erschüttern sollten. Die Familie begann sofort zu suchen. Schon in den folgenden Tagen geschah etwas seltsames.",
+   "media_type": "video"
+  },
+  {
+   "start": 377.5,
+   "end": 382.79,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an old beige rotary telephone on a wooden table in a modest Japanese home interior, late 1980s, soft afternoon light through paper shoji screens, dust particles in the air, quiet empty room, shallow depth of field, 35mm lens, muted colors, no text, no people visible",
+   "visual": "Telefone antigo de disco numa sala de casa japonesa dos anos 1980, ninguém atende, luz da tarde"
+  },
+  {
+   "start": 382.79,
+   "end": 389.27,
+   "provider": "adiado",
+   "query": "Japanese house front door entrance 1980s",
+   "visual": "Postal impressa colocada sob a porta de uma casa japonesa, close nas letras datilografadas",
+   "media_type": "video"
+  },
+  {
+   "start": 389.27,
+   "end": 395.95,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a Japanese police detective in a dark 1980s uniform examining a small printed postcard under a desk lamp in an old police station office, cluttered desk with paper files, fluorescent and lamp light, 1989 period details, shallow depth of field, 50mm lens, no legible text, no faces shown clearly",
+   "visual": "Policial japonês de uniforme analisando um cartão postal com a lupa, escritório antigo"
+  },
+  {
+   "start": 395.95,
+   "end": 402.57,
+   "provider": "adiado",
+   "query": "missing child posters wall Japan street",
+   "visual": "Pilha de cartazes de procura de criança desaparecida numa parede de rua em Tóquio",
+   "media_type": "video"
+  },
+  {
+   "start": 402.57,
+   "end": 409.72,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, police officers in dark uniforms walking with search dogs through a dense Japanese forest in the suburbs, 1988, misty morning light, trees and undergrowth, muddy path, wide shot, 28mm lens, natural muted colors, no faces in focus",
+   "visual": "Cães farejadores com policiais atravessando uma floresta densa nos arredores de Saitama"
+  },
+  {
+   "start": 409.72,
+   "end": 414.89,
+   "provider": "adiado",
+   "query": "Japan dense forest overcast empty",
+   "visual": "Floresta japonesa vazia em dia nublado, sem ninguém, clima de busca sem resultado",
+   "media_type": "video"
+  },
+  {
+   "start": 414.89,
+   "end": 420.56,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a white and black Japanese police patrol car parked on a quiet suburban street at night in 1988, dim streetlights, residential houses, rain-slicked asphalt, 35mm lens, grainy film look, no people, no text",
+   "visual": "Carro de polícia parado em estrada de bairro japonês à noite, luz de viatura"
+  },
+  {
+   "start": 420.56,
+   "end": 425.77,
+   "provider": "adiado",
+   "query": "Japanese public telephone booth night street",
+   "visual": "Cabine telefônica pública japonesa iluminada à noite numa rua tranquila",
+   "media_type": "video"
+  },
+  {
+   "start": 425.77,
+   "end": 431.5,
+   "provider": "adiado",
+   "query": "hand holding telephone receiver dark room",
+   "visual": "Mão segurando um telefone de disco em close, o fone mudo, a sala escura ao fundo",
+   "media_type": "video"
+  },
+  {
+   "start": 431.5,
+   "end": 437.88,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a printed missing child poster on a pale wall showing a school portrait of a young Japanese girl with short hair, 1988 style print, slightly faded colors, blurred background, no legible text, 50mm lens, documentary style, the face partially out of focus",
+   "visual": "Retrato escolar antigo de uma menina de cabelo curto num cartaz de desaparecida"
+  },
+  {
+   "start": 437.88,
+   "end": 443.18,
+   "provider": "adiado",
+   "query": "old calendar wall Japan 1988",
+   "visual": "Calendário antigo de 1988 na parede de uma casa japonesa, a data destacada",
+   "media_type": "video"
+  },
+  {
+   "start": 443.18,
+   "end": 450.56,
+   "provider": "adiado",
+   "query": "Japanese residential street evening bicycle",
+   "visual": "Rua residencial japonesa no fim da tarde com uma bicicleta de criança encostada no poste",
+   "media_type": "video"
+  },
+  {
+   "start": 450.56,
+   "end": 454.88,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two 1980s Japanese sedan cars parked on a suburban street in Saitama, early evening, streetlights coming on, residential houses, 35mm lens, grainy film look, no people visible, no text",
+   "visual": "Dois carros antigos parados lado a lado numa rua japonesa, um deles no ponto de partida"
+  },
+  {
+   "start": 454.88,
+   "end": 462.1,
+   "provider": "adiado",
+   "query": "city map table investigation Japan",
+   "visual": "Dois mapas de bairros japoneses sobre uma mesa, com cores e riscos de comparação",
+   "media_type": "video"
+  },
+  {
+   "start": 462.1,
+   "end": 468.13,
+   "provider": "adiado",
+   "query": "police case file folder desk 1980s",
+   "visual": "Pasta de arquivo policial aberta sobre a mesa com fotografias e anotações",
+   "media_type": "video"
+  },
+  {
+   "start": 468.13,
+   "end": 475.04,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese detectives in dark 1980s suits gathered around a conference table with maps and documents in a police meeting room, serious atmosphere, fluorescent overhead light, 35mm lens, documentary style, faces partly turned away, no text",
+   "visual": "Investigadores japoneses em uma sala de reunião, com mapas e documentos sobre a mesa"
+  },
+  {
+   "start": 475.04,
+   "end": 481.88,
+   "provider": "adiado",
+   "query": "1980s light colored Japanese sedan street",
+   "visual": "Carro antigo de cor clara parado numa rua japonesa ao entardecer, vista de frente",
+   "media_type": "video"
+  },
+  {
+   "start": 481.88,
+   "end": 488.98,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a dark 1980s Japanese sedan parked with headlights off on a quiet street at night, side view, soft streetlight reflection on the car body, 50mm lens, grainy film look, no people, no text",
+   "visual": "Close de um carro antigo de cor escura estacionado com as luzes apagadas à noite"
+  },
+  {
+   "start": 488.98,
+   "end": 495.39,
+   "provider": "adiado",
+   "query": "stack of paper files desk police office",
+   "visual": "Pilha de fichas de registro de veículos sobre uma mesa de escritório policial",
+   "media_type": "video"
+  },
+  {
+   "start": 495.39,
+   "end": 502.93,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese police officers in dark 1980s uniforms walking down a corridor carrying stacks of paper files and boxes, fluorescent ceiling light, 35mm lens, documentary style, faces partly out of focus, no text",
+   "visual": "Policiais japoneses de uniforme percorrendo um corredor com arquivos e caixas"
+  },
+  {
+   "start": 502.93,
+   "end": 509.25,
+   "provider": "adiado",
+   "query": "office workers reading documents 1980s Japan",
+   "visual": "Funcionários de escritório japoneses sentados lendo papéis em mesas lotadas",
+   "media_type": "video"
+  },
+  {
+   "start": 509.25,
+   "end": 515.49,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a desk covered with piles of paperwork, notebooks and a pen, 1980s Japanese office, soft window light, shallow depth of field, 50mm lens, no legible text, no people",
+   "visual": "Mesa de escritório com um monte de papéis e cadernos de anotação de investigação"
+  },
+  {
+   "start": 515.49,
+   "end": 520.57,
+   "provider": "adiado",
+   "query": "Tokyo street parked cars evening 1980s",
+   "visual": "Estacionamento de rua em Tóquio com vários carros, ao fim do dia",
+   "media_type": "video"
+  },
+  {
+   "start": 520.57,
+   "end": 526.67,
+   "provider": "adiado",
+   "query": "people walking Japanese sidewalk dusk blur",
+   "visual": "Pessoas caminhando numa calçada de bairro japonês ao entardecer, em desfoque de movimento",
+   "media_type": "video"
+  },
+  {
+   "start": 526.67,
+   "end": 531.73,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a plain 1980s Japanese interview room with a metal table and two chairs, a man in a dark suit seen from behind in the doorway, a detective in the background, harsh overhead light, 35mm lens, sober documentary mood, no text, faces not clearly shown",
+   "visual": "Homem de terno numa sala de interrogatório com a porta entreaberta, ambiente sóbrio"
+  },
+  {
+   "start": 531.73,
+   "end": 538.8,
+   "provider": "adiado",
+   "query": "light colored car driving slowly narrow street Japan",
+   "visual": "Carro de cor clara dirigindo lentamente por uma rua estreita de bairro japonês",
+   "media_type": "video"
+  },
+  {
+   "start": 538.8,
+   "end": 544.21,
+   "provider": "adiado",
+   "query": "hand pointing map on table close up",
+   "visual": "Mão de homem apontando para um papel com mapa numa mesa, sem rosto",
+   "media_type": "video"
+  },
+  {
+   "start": 544.21,
+   "end": 549.65,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an empty small parking lot at night in a Tokyo suburb in 1988, a few streetlights casting pools of light on the asphalt, no cars, quiet and still, 35mm lens, grainy film look, no people, no text",
+   "visual": "Estacionamento vazio à noite em um bairro de Tóquio, com postes de luz"
+  },
+  {
+   "start": 549.65,
+   "end": 555.9,
+   "provider": "adiado",
+   "query": "parking lot night single car streetlight Japan",
+   "visual": "Estacionamento noturno com um carro parado sob uma lâmpada de rua, sem ninguém",
+   "media_type": "video"
+  },
+  {
+   "start": 555.9,
+   "end": 563.27,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, the interior of a 1980s Japanese sedan at night seen through the side window from outside, dim dashboard glow, vague silhouette of seats, streetlight reflections, shallow depth of field, 50mm lens, no faces, no text, sober mood",
+   "visual": "Interior de um carro à noite, visto de fora pela janela, sem pessoas claramente visíveis"
+  },
+  {
+   "start": 563.27,
+   "end": 569.51,
+   "provider": "adiado",
+   "query": "notes paper close up wooden table evidence",
+   "visual": "Plano fechado de um pedaço de papel com recortes e nota escrita, sobre mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 569.51,
+   "end": 575.56,
+   "provider": "adiado",
+   "query": "Tokyo cityscape overcast day 1980s",
+   "visual": "Ruas e prédios de Tóquio em dia nublado, vista ampla da cidade",
+   "media_type": "video"
+  },
+  {
+   "start": 575.56,
+   "end": 582.58,
+   "provider": "adiado",
+   "query": "car headlights illuminating dark parking night",
+   "visual": "Faróis de carro acesos iluminando uma área escura de estacionamento à noite",
+   "media_type": "video"
+  },
+  {
+   "start": 582.58,
+   "end": 588.01,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a dark 1980s Japanese sedan in an empty parking lot at night, caught in the bright beam of an approaching car's headlights, high contrast, grainy film look, 35mm lens, no people, no text",
+   "visual": "Carro escuro parado no estacionamento escuro com os faróis focados sobre ele"
+  },
+  {
+   "start": 588.01,
+   "end": 594.72,
+   "provider": "adiado",
+   "query": "two cars night road headlights rear view",
+   "visual": "Carro de noite na estrada com faróis acesos e outro veículo ao lado, vista de trás",
+   "media_type": "video"
+  },
+  {
+   "start": 594.72,
+   "end": 600.7,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, the open trunk of a dark 1980s Japanese sedan at night in an empty parking area, a folded pale cloth inside, dim interior light, shadowy and restrained, no bodies, no blood, 35mm lens, sober tone, no text",
+   "visual": "Porta-malas de carro aberto à noite, com um volume coberto por um pano claro, sem detalhes explícitos"
+  },
+  {
+   "start": 600.7,
+   "end": 606.77,
+   "provider": "adiado",
+   "query": "car driving dirt road forest night Japan",
+   "visual": "Carro dirigindo numa estrada de terra no meio de uma mata, à noite, lanternas acesas",
+   "media_type": "video"
+  },
+  {
+   "start": 606.77,
+   "end": 612.19,
+   "provider": "adiado",
+   "query": "car wheel stuck mud forest road close",
+   "visual": "Roda de carro presa na lama de uma trilha de floresta, vista de baixo",
+   "media_type": "video"
+  },
+  {
+   "start": 612.19,
+   "end": 615.83,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, the open trunk of a dark 1980s Japanese sedan on a muddy forest track at dusk, dim fading light, trees around, empty and restrained composition, no bodies, no blood, 35mm lens, sober tone, no text, no people",
+   "visual": "Porta-malas aberto de um carro numa trilha de floresta, sob luz fraca de anoitecer"
+  },
+  {
+   "start": 615.83,
+   "end": 621.81,
+   "provider": "adiado",
+   "query": "two men helping stuck car forest night Japan",
+   "visual": "Dois homens em uma trilha de floresta à noite, parados perto de um carro atolado",
+   "media_type": "video"
+  },
+  {
+   "start": 621.81,
+   "end": 627.52,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two men pushing a car stuck in mud on a dark forest track at night, mud splashing, flashlight beam on the scene, 35mm lens, grainy film look, faces partly out of focus, no text",
+   "visual": "Dois homens empurrando um carro atolado na lama, com a floresta escura ao fundo"
+  },
+  {
+   "start": 627.52,
+   "end": 632.57,
+   "provider": "adiado",
+   "query": "car leaving muddy forest road headlights night",
+   "visual": "Carro saindo da lama na estrada de terra, faróis acesos, floresta ao redor",
+   "media_type": "video"
+  },
+  {
+   "start": 632.57,
+   "end": 638.58,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a plain wooden box and a sealed envelope lying on a table in a quiet Japanese home, soft window light, 1980s domestic setting, shallow depth of field, 50mm lens, no legible text, no people, sober mood",
+   "visual": "Caixa de madeira de presente e envelope sobre a mesa da casa, sob luz suave"
+  },
+  {
+   "start": 638.58,
+   "end": 645.22,
+   "provider": "adiado",
+   "query": "police search team forest line Japan",
+   "visual": "Floresta com policiais e equipe de busca percorrendo o terreno em fila",
+   "media_type": "video"
+  },
+  {
+   "start": 645.22,
+   "end": 651.44,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two Japanese men in 1980s clothing speaking with uniformed police officers beside a parked car on a country road, overcast daylight, 35mm lens, documentary style, faces partly turned away, no text",
+   "visual": "Dois homens conversando com policiais numa estrada, em frente a um carro"
+  },
+  {
+   "start": 651.44,
+   "end": 658.79,
+   "provider": "adiado",
+   "query": "parked car rural road Japan 1980s distance",
+   "visual": "Carro parado no acostamento de estrada rural japonesa visto de longe",
+   "media_type": "video"
+  },
+  {
+   "start": 658.79,
+   "end": 665.95,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, police investigators in dark 1980s suits reviewing a large paper map on a meeting table, serious mood, fluorescent overhead light, 35mm lens, documentary style, faces partly turned away, no text",
+   "visual": "Policiais e investigadores analisando um mapa sobre uma mesa de reunião"
+  },
+  {
+   "start": 665.95,
+   "end": 672.64,
+   "provider": "adiado",
+   "query": "Japanese family house facade 1980s suburb",
+   "visual": "Fachada de uma casa de família japonesa dos anos 1980 em um bairro tranquilo",
+   "media_type": "video"
+  },
+  {
+   "start": 672.64,
+   "end": 678.8,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a plain cardboard parcel box placed on the doorstep of a Japanese house at dawn, genkan entrance, soft early light, 1980s setting, shallow depth of field, 50mm lens, no legible text, no people",
+   "visual": "Caixa de papelão sobre o chão de uma entrada de casa japonesa, sem etiqueta visível"
+  },
+  {
+   "start": 678.8,
+   "end": 685.64,
+   "provider": "adiado",
+   "query": "brown paper parcel doorstep morning",
+   "visual": "Pequeno pacote de papel pardo sobre a soleira de uma porta, luz da manhã",
+   "media_type": "video"
+  },
+  {
+   "start": 685.64,
+   "end": 691.57,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, printed missing child posters pinned on a concrete wall in a Japanese neighborhood, blurred portrait photos, 1980s, overcast day, 35mm lens, no legible text, documentary style, faces out of focus",
+   "visual": "Cartazes de criança desaparecida colados numa parede de bairro japonês"
+  },
+  {
+   "start": 691.57,
+   "end": 696.69,
+   "provider": "adiado",
+   "query": "missing child flyers table home Japan",
+   "visual": "Cartazes de desaparecida e folhetos espalhados sobre uma mesa de casa",
+   "media_type": "video"
+  },
+  {
+   "start": 696.69,
+   "end": 703.48,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a plain wooden evidence box with its lid open on a metal table in a 1980s Japanese police laboratory, sterile fluorescent light, restrained and sober, no remains visible, 50mm lens, no text, no people",
+   "visual": "Caixa de madeira aberta em mesa de escritório policial, sem detalhes explícitos"
+  },
+  {
+   "start": 703.48,
+   "end": 709.19,
+   "provider": "adiado",
+   "query": "envelope folded paper table quiet mourning",
+   "visual": "Envelope e papel dobrado sobre uma mesa, luz de janela, clima de luto e silêncio",
+   "media_type": "video"
+  },
+  {
+   "start": 709.19,
+   "end": 715.64,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese forensic scientists in white coats examining documents and evidence bags in a 1980s laboratory, fluorescent light, sober and restrained, 35mm lens, faces partly turned away, no text, no visible remains",
+   "visual": "Peritos japoneses de jaleco analisando documentos num laboratório forense antigo"
+  },
+  {
+   "start": 715.64,
+   "end": 720.26,
+   "provider": "adiado",
+   "query": "forensic evidence bags laboratory table close",
+   "visual": "Mesa de laboratório com lupas, pinças e amostras guardadas em sacos plásticos",
+   "media_type": "video"
+  },
+  {
+   "start": 720.26,
+   "end": 726.55,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a forensic report lying on a desk next to a magnifying glass and reading glasses, 1980s Japanese office, somber sober mood, soft lamp light, shallow depth of field, 50mm lens, no legible text, no people",
+   "visual": "Relatório de perícia sobre a mesa ao lado de uma lupa e óculos, clima sóbrio"
+  },
+  {
+   "start": 726.55,
+   "end": 732.82,
+   "provider": "adiado",
+   "query": "hands holding closed folder close up somber",
+   "visual": "Mãos de um investigador segurando uma pasta fechada, em close, sóbrio e pesado",
+   "media_type": "video"
+  },
+  {
+   "start": 732.82,
+   "end": 738.28,
+   "provider": "adiado",
+   "query": "open case file folder official stamp desk",
+   "visual": "Pasta de arquivo aberta com fotos de documentos e carimbo oficial sobre a mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 738.28,
+   "end": 744.36,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a Japanese couple in 1980s clothing seated side by side on the floor of a quiet living room, seen from behind, soft window light, somber silent mood, 35mm lens, no faces visible, no text",
+   "visual": "Pai e mãe de costas sentados numa sala de casa japonesa, em silêncio, luz da janela"
+  },
+  {
+   "start": 744.36,
+   "end": 749.64,
+   "provider": "adiado",
+   "query": "Japanese parents sitting silent at home",
+   "visual": "Pais sentados à mesa de casa, sem falar, com a incerteza sobre a filha pesando no ambiente.",
+   "media_type": "video"
+  },
+  {
+   "start": 749.64,
+   "end": 755.2,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a weathered Japanese missing child poster pinned to a utility pole on a quiet 1980s street in Tokyo, the photo of a smiling young girl with short hair, faded paper, soft overcast light, shallow depth of field, 50mm lens, no legible text or captions, somber documentary mood",
+   "visual": "Cartaz de desaparecida com a foto de uma menina sorridente, símbolo da busca sem resposta."
+  },
+  {
+   "start": 755.2,
+   "end": 760.24,
+   "provider": "adiado",
+   "query": "empty Japanese residential street evening",
+   "visual": "Rua de bairro japonês vazia ao entardecer, transmitindo a espera e o silêncio.",
+   "media_type": "video"
+  },
+  {
+   "start": 760.24,
+   "end": 765.55,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a small Japanese child's bedroom in the 1980s, neatly arranged toys and a folded futon, a small desk with school supplies, soft window light falling across tatami floor, empty and still, muted colors, 35mm lens, no people, no text, somber documentary style",
+   "visual": "Quarto infantil vazio, com brinquedos arrumados, símbolo da ausência da criança."
+  },
+  {
+   "start": 765.55,
+   "end": 770.95,
+   "provider": "adiado",
+   "query": "hands holding empty box indoors",
+   "visual": "Mãos de um adulto segurando um pequeno vaso ou caixa vazia, sugerindo a falta de um lugar para despedida.",
+   "media_type": "video"
+  },
+  {
+   "start": 770.95,
+   "end": 776.28,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, exterior of a Tokyo police headquarters building in the 1980s, concrete facade with rows of windows, overcast sky, a few pedestrians blurred in the distance, neutral daylight, wide angle lens, documentary style, no text or signage legible, sober tone",
+   "visual": "Fachada de um prédio de tribunal ou delegacia em Tóquio, lugar da investigação que não trouxe respostas."
+  },
+  {
+   "start": 776.28,
+   "end": 781.44,
+   "provider": "adiado",
+   "query": "Japanese family walking street silent",
+   "visual": "Família caminhando em silêncio por uma rua estreita, mostrando o peso da busca contínua.",
+   "media_type": "video"
+  },
+  {
+   "start": 781.44,
+   "end": 786.77,
+   "provider": "adiado",
+   "query": "Japanese man standing by window thoughtful",
+   "visual": "Homem japonês de meia-idade de costas, em frente à janela, pensativo.",
+   "media_type": "video"
+  },
+  {
+   "start": 786.77,
+   "end": 791.89,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a quiet neighborhood park in a Japanese residential area in summer, late afternoon golden light, a swing set and sandbox empty of children, tall trees casting long shadows, 1980s style, wide lens, no people, no text, calm but ominous documentary atmosphere",
+   "visual": "Parque de bairro japonês ao fim da tarde, lugar onde a menina desapareceu."
+  },
+  {
+   "start": 791.89,
+   "end": 797.36,
+   "provider": "adiado",
+   "query": "Japanese children playing park summer",
+   "visual": "Crianças brincando num parque ensolarado de verão, contraste com o desaparecimento que vem a seguir.",
+   "media_type": "video"
+  },
+  {
+   "start": 797.36,
+   "end": 804.09,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a blurred silhouette of an adult man standing beside a parked 1980s sedan at a park edge in the dusk, a small child figure at a distance, faces obscured and out of focus, warm fading light, long shadows, shallow depth of field, 85mm lens, no text, ominous but non-graphic mood",
+   "visual": "Homem de silhueta indistinta conversando com uma menina junto a um carro estacionado ao entardecer."
+  },
+  {
+   "start": 804.09,
+   "end": 809.3,
+   "provider": "adiado",
+   "query": "old sedan parked park edge dusk Japan",
+   "visual": "Carro antigo parado na beira de um parque, sugerindo a aproximação do sequestro.",
+   "media_type": "video"
+  },
+  {
+   "start": 809.3,
+   "end": 814.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1980s sedan driving slowly away down a dim residential street at night, rear view, taillights glowing red, wet pavement reflecting streetlights, no people visible, 35mm lens, somber and ominous documentary mood, no text",
+   "visual": "Carro entrando em uma rua escura, com a menina fora do quadro, sugerindo o momento do desaparecimento."
+  },
+  {
+   "start": 814.18,
+   "end": 821.26,
+   "provider": "adiado",
+   "query": "empty street night streetlights Japan",
+   "visual": "Rua vazia à noite com postes acesos, sugerindo a busca sem testemunhas.",
+   "media_type": "video"
+  },
+  {
+   "start": 821.26,
+   "end": 827.87,
+   "provider": "adiado",
+   "query": "parents waiting clock living room night",
+   "visual": "Pais olhando o relógio na sala, com a porta fechada, esperando a filha voltar.",
+   "media_type": "video"
+  },
+  {
+   "start": 827.87,
+   "end": 834.73,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a Japanese couple standing at the open doorway of a house at night, calling out into a dark street, warm light spilling from inside, silhouettes against the night, 1980s setting, 35mm lens, no text, anxious and somber mood",
+   "visual": "Pais na porta de casa chamando pela filha no escuro da noite."
+  },
+  {
+   "start": 834.73,
+   "end": 840.7,
+   "provider": "adiado",
+   "query": "Japanese police officers talking residents street night",
+   "visual": "Policiais conversando com moradores em uma rua de bairro japonês à noite.",
+   "media_type": "video"
+  },
+  {
+   "start": 840.7,
+   "end": 847.28,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a stack of printed missing child flyers on a worn wooden desk in a Japanese police station in the 1980s, a photo of a smiling young girl on top, paper texture, fluorescent overhead light, shallow depth of field, 50mm lens, no legible text, somber mood",
+   "visual": "Pilha de panfletos com foto de uma menina sobre uma mesa de polícia."
+  },
+  {
+   "start": 847.28,
+   "end": 854.06,
+   "provider": "adiado",
+   "query": "volunteers handing flyers train station Japan",
+   "visual": "Voluntários entregando cartazes de desaparecida em uma estação de trem japonesa.",
+   "media_type": "video"
+  },
+  {
+   "start": 854.06,
+   "end": 860.5,
+   "provider": "adiado",
+   "query": "night highway car passing Japan 1980s",
+   "visual": "Estrada à noite com um carro passando, sugerindo o agressor que segue livre.",
+   "media_type": "video"
+  },
+  {
+   "start": 860.5,
+   "end": 867.23,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, dense Japanese woodland at dawn at the edge of a quiet cemetery, mist between cedar trees, soft grey light, stone path, no people, no bodies, no remains, wide lens, somber and still atmosphere, no text",
+   "visual": "Floresta densa ao amanhecer, lugar onde os restos foram encontrados, sem qualquer corpo visível."
+  },
+  {
+   "start": 867.23,
+   "end": 874.36,
+   "provider": "adiado",
+   "query": "Japanese cemetery stone graves morning mist",
+   "visual": "Cemitério japonês silencioso com lápides ao amanhecer, lugar do achado.",
+   "media_type": "video"
+  },
+  {
+   "start": 874.36,
+   "end": 881.14,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese police investigators in dark civilian clothing standing near a forest edge with yellow police tape stretched between trees, 1980s setting, overcast light, distant figures, wide lens, documentary style, no bodies, no text, grave and procedural mood",
+   "visual": "Policiais em roupas civis inspecionando a borda de um bosque, com fita de isolamento."
+  },
+  {
+   "start": 881.14,
+   "end": 886.8,
+   "provider": "adiado",
+   "query": "paper map investigation table Japan 1980s",
+   "visual": "Mapa de papel sobre uma mesa de investigação, marcando a área de busca sem marcas vermelhas.",
+   "media_type": "video"
+  },
+  {
+   "start": 886.8,
+   "end": 893.32,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of an older Japanese man's hands holding a small framed school photo of a child, face of the child visible but small, soft window light, muted tones, shallow depth of field, 85mm lens, no text, grief and restraint mood",
+   "visual": "Mãos de um homem mais velho segurando um porta-retratos com uma criança, dor contida."
+  },
+  {
+   "start": 893.32,
+   "end": 900.37,
+   "provider": "adiado",
+   "query": "closed curtains house window Japan dim",
+   "visual": "Janela de casa fechada com cortinas, transmitindo o fim da esperança.",
+   "media_type": "video"
+  },
+  {
+   "start": 900.37,
+   "end": 905.19,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1980s Japanese sedan parked in front of a concrete police building in Tokyo, overcast daylight, no people, wide angle lens, documentary style, sober tone, no text or legible signage",
+   "visual": "Tribunal japonês ou delegacia ao fundo, com um carro antigo em primeiro plano."
+  },
+  {
+   "start": 905.19,
+   "end": 910.09,
+   "provider": "adiado",
+   "query": "wall calendar July Japan 1980s room",
+   "visual": "Calendário de parede marcando dias de julho, sugerindo a passagem do tempo.",
+   "media_type": "video"
+  },
+  {
+   "start": 910.09,
+   "end": 914.66,
+   "provider": "adiado",
+   "query": "Japanese neighborhood street summer sunny quiet",
+   "visual": "Rua de bairro japonês no verão, com sol forte e poucas pessoas.",
+   "media_type": "video"
+  },
+  {
+   "start": 914.66,
+   "end": 921.27,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two young Japanese schoolgirls seen from behind walking together on a sunny sidewalk, a slow-moving 1980s sedan passing beside them on the street, faces not visible, summer light, shallow depth of field, 50mm lens, no text, tense and ominous mood",
+   "visual": "Duas meninas caminhando juntas pela calçada de uma rua japonesa, de costas, com um carro passando devagar ao lado."
+  },
+  {
+   "start": 921.27,
+   "end": 927.9,
+   "provider": "adiado",
+   "query": "car window open driver hand steering wheel",
+   "visual": "Janela de carro aberta, mão de um motorista sobre o volante, carro parado ao lado de crianças fora do quadro.",
+   "media_type": "video"
+  },
+  {
+   "start": 927.9,
+   "end": 933.81,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a young Japanese girl running along a sidewalk toward a house, seen from behind, motion blur, residential street in summer, 1980s setting, shallow depth of field, 35mm lens, no face visible, no text, urgent and frightened mood",
+   "visual": "Menina correndo na calçada, em direção à casa, com a rua desfocada ao fundo."
+  },
+  {
+   "start": 933.81,
+   "end": 938.83,
+   "provider": "adiado",
+   "query": "father and daughter walking back empty street",
+   "visual": "Pai e filha de costas voltando ao local onde o carro estava parado, rua vazia.",
+   "media_type": "video"
+  },
+  {
+   "start": 938.83,
+   "end": 944.7,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a calm lake in Saitama Japan at late afternoon, a 1980s sedan parked on the grassy shore, reeds and still water, golden soft light, no people, wide lens, quiet and sombre mood, no text",
+   "visual": "Lago calmo ao fim da tarde, com um carro estacionado na margem."
+  },
+  {
+   "start": 944.7,
+   "end": 951.96,
+   "provider": "adiado",
+   "query": "man standing lakeside back view evening",
+   "visual": "Homem de camisa e calça comum de pé na margem de um lago, de costas, sob luz do fim da tarde.",
+   "media_type": "video"
+  },
+  {
+   "start": 951.96,
+   "end": 958.57,
+   "provider": "adiado",
+   "query": "man running into dense forest woods",
+   "visual": "Homem correndo para dentro de um bosque denso, sumindo entre as árvores.",
+   "media_type": "video"
+  },
+  {
+   "start": 958.57,
+   "end": 964.14,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a figure walking through undergrowth on a forest path, another figure following at a distance, seen from behind, dense bushes and trees, muted green light, shallow depth of field, 35mm lens, no faces, no text, tense pursuit mood",
+   "visual": "Homem seguindo por um caminho de mato, atrás dele uma figura que o persegue ao longe."
+  },
+  {
+   "start": 964.14,
+   "end": 970.22,
+   "provider": "adiado",
+   "query": "dense quiet forest undergrowth no people",
+   "visual": "Floresta densa e silenciosa, sem ninguém visível, mato alto e sombras.",
+   "media_type": "video"
+  },
+  {
+   "start": 970.22,
+   "end": 975.42,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a man in plain clothes approaching a parked 1980s sedan with its door open, a police officer in uniform standing beside the car, afternoon light, wide lens, documentary style, faces partly obscured, no text, tense confrontation mood",
+   "visual": "Homem de volta ao carro estacionado, porta aberta, polícia já aguardando ao lado."
+  },
+  {
+   "start": 975.42,
+   "end": 980.58,
+   "provider": "adiado",
+   "query": "Japanese police car roadside 1980s",
+   "visual": "Viatura de polícia japonesa estacionada na beira da estrada, luzes desligadas.",
+   "media_type": "video"
+  },
+  {
+   "start": 980.58,
+   "end": 986.46,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a Japanese police officer in uniform placing handcuffs on a man beside a parked sedan, faces partly turned away, daylight, 50mm lens, documentary style, no text, grave and restrained mood",
+   "visual": "Policial algemando um homem junto a um carro, sem mostrar o rosto em close."
+  },
+  {
+   "start": 986.46,
+   "end": 991.39,
+   "provider": "adiado",
+   "query": "legal documents desk pen glasses Japan",
+   "visual": "Documento de processo judicial sobre uma mesa, com caneta e óculos ao lado.",
+   "media_type": "video"
+  },
+  {
+   "start": 991.39,
+   "end": 998.31,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a Japanese detective in a dark suit reviewing papers at a desk in a 1980s police office, serious focused expression, fluorescent light, shallow depth of field, 50mm lens, no text, sober documentary mood",
+   "visual": "Delegado examinando papéis em uma sala de polícia, com ar sério."
+  },
+  {
+   "start": 998.31,
+   "end": 1003.8,
+   "provider": "adiado",
+   "query": "folded newspaper on table Japan 1980s",
+   "visual": "Notícia de jornal dobrada sobre a mesa, sem logo legível, sugerindo a cobertura da imprensa.",
+   "media_type": "video"
+  },
+  {
+   "start": 1003.8,
+   "end": 1008.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a middle-aged Japanese man sitting on a park bench with his head lowered, late afternoon light, empty park, 1980s setting, shallow depth of field, 50mm lens, no text, restrained grief mood",
+   "visual": "Pai sentado em um banco de parque, cabeça baixa, pensativo."
+  },
+  {
+   "start": 1008.18,
+   "end": 1014.78,
+   "provider": "adiado",
+   "query": "stacked case files shelves office Japan",
+   "visual": "Arquivo de papéis em uma prateleira de escritório, pastas empilhadas.",
+   "media_type": "video"
+  },
+  {
+   "start": 1014.78,
+   "end": 1021.1,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a young Japanese man with dark hair and thin glasses seated in a courtroom, seen from the side, uniformed guard standing nearby, fluorescent light, 1980s setting, 50mm lens, no text, sober and tense documentary mood",
+   "visual": "Homem de meia-idade em uma sala de tribunal japonesa, sentado de lado, expressão séria."
+  },
+  {
+   "start": 1021.1,
+   "end": 1027.54,
+   "provider": "adiado",
+   "query": "Japanese courthouse door guard exterior",
+   "visual": "Porta de um tribunal japonês fechada, com um guarda do lado de fora.",
+   "media_type": "video"
+  },
+  {
+   "start": 1027.54,
+   "end": 1033.01,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a small cluttered bedroom shelf stacked with Japanese manga magazines and comic volumes, cardboard boxes nearby, dim window light, shallow depth of field, 50mm lens, covers blurred with no legible text or characters, sober documentary tone",
+   "visual": "Prateleira com livros e revistas de mangá empilhados em um quarto pequeno."
+  },
+  {
+   "start": 1033.01,
+   "end": 1038.72,
+   "provider": "adiado",
+   "query": "collectible figures shelf bedroom Japan",
+   "visual": "Prateleiras de quarto com figuras de colecionador e pôsteres, vistas em close-up, sem pessoas.",
+   "media_type": "video"
+  },
+  {
+   "start": 1038.72,
+   "end": 1045.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a young Japanese man with dark hair and thin wire-rimmed glasses in profile, looking to the side, neutral expression, archival black and white feel, 85mm lens, no text, sober documentary mood",
+   "visual": "Homem de cabelo escuro e óculos finos de perfil, olhar para o lado, em foto de arquivo."
+  },
+  {
+   "start": 1045.53,
+   "end": 1051.82,
+   "provider": "adiado",
+   "query": "uniformed officer beside man profile custody",
+   "visual": "Policial de uniforme escuro ao lado de um homem de perfil, cena de custódia.",
+   "media_type": "video"
+  },
+  {
+   "start": 1051.82,
+   "end": 1058.43,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, exterior of a Japanese television broadcast building in Tokyo on an overcast day, concrete and glass facade with no visible logos or legible signage, wide lens, documentary style, sober tone",
+   "visual": "Fachada de uma emissora de notícias japonesa, sem logos visíveis, em dia cinzento."
+  },
+  {
+   "start": 1058.43,
+   "end": 1063.07,
+   "provider": "adiado",
+   "query": "manga magazines stacked newsstand Japan",
+   "visual": "Pilha de revistas de anime e mangá em uma banca, de perto, sem títulos legíveis.",
+   "media_type": "video"
+  },
+  {
+   "start": 1063.07,
+   "end": 1068.57,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a lonely young Japanese man seated alone in a small room, seen from behind, surrounded by bookshelves filled with comics, dim lamp light, no legible text, 35mm lens, melancholic sombre mood, not glamorized",
+   "visual": "Jovem japonês sentado sozinho num quarto, de costas, cercado por estantes de quadrinhos."
+  },
+  {
+   "start": 1068.57,
+   "end": 1075.0,
+   "provider": "adiado",
+   "query": "crowd pedestrians Tokyo sidewalk blurred",
+   "visual": "Multidão de pessoas comuns caminhando numa calçada de Tóquio, sem foco em ninguém.",
+   "media_type": "video"
+  },
+  {
+   "start": 1075.0,
+   "end": 1078.98,
+   "provider": "adiado",
+   "query": "Japanese people quiet cafe conversation",
+   "visual": "Pessoas sentadas em um pequeno café japonês, conversando baixo, luz suave.",
+   "media_type": "video"
+  },
+  {
+   "start": 1078.98,
+   "end": 1085.8,
+   "provider": "adiado",
+   "query": "library bookshelf closed books soft light",
+   "visual": "Estante de biblioteca com livros fechados, símbolo da dúvida sobre o que se pode concluir.",
+   "media_type": "video"
+  },
+  {
+   "start": 1085.8,
+   "end": 1093.06,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, stacked cardboard boxes of VHS videocassettes sealed in plastic evidence bags in a 1980s Japanese police storage room, fluorescent light, no legible labels, no visible content, 50mm lens, sober documentary tone",
+   "visual": "Caixas de fitas de vídeo empilhadas em uma sala de polícia, lacradas em plástico."
+  },
+  {
+   "start": 1093.06,
+   "end": 1099.36,
+   "provider": "adiado",
+   "query": "video cassette tapes shelf archive evidence",
+   "visual": "Pilha de fitas de vídeo em uma prateleira de arquivo, sem qualquer imagem explícita.",
+   "media_type": "video"
+  },
+  {
+   "start": 1099.36,
+   "end": 1104.87,
+   "provider": "adiado",
+   "query": "stack of vhs tapes evidence room",
+   "visual": "Pilhas de fitas de vídeo guardadas em uma sala de polícia, sem imagens explícitas",
+   "media_type": "video"
+  },
+  {
+   "start": 1104.87,
+   "end": 1111.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two Japanese police investigators in dark suits seated at a desk watching an old CRT television monitor showing blurred static, faces turned away from camera, 1989 office with paper files, dim light, 35mm lens, somber mood, no visible explicit content, no text",
+   "visual": "Investigadores japoneses assistindo a fitas em um monitor antigo de tubo"
+  },
+  {
+   "start": 1111.18,
+   "end": 1117.88,
+   "provider": "adiado",
+   "query": "Japanese police case files desk",
+   "visual": "Arquivos e papéis de investigação espalhados sobre uma mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 1117.88,
+   "end": 1124.32,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged Japanese detective in a grey suit sitting at a wooden desk in a 1980s Tokyo police office, hand on chin, looking at a wall map, muted lighting, 50mm lens, documentary style, no text",
+   "visual": "Homem japonês de meia-idade pensativo em escritório de arquivos"
+  },
+  {
+   "start": 1124.32,
+   "end": 1129.35,
+   "provider": "adiado",
+   "query": "Tokyo residential street night 1980s",
+   "visual": "Rua residencial de Tóquio nos anos 1980 à noite",
+   "media_type": "video"
+  },
+  {
+   "start": 1129.35,
+   "end": 1134.79,
+   "provider": "adiado",
+   "query": "Japanese police station exterior night",
+   "visual": "Porta de delegacia japonesa de noite",
+   "media_type": "video"
+  },
+  {
+   "start": 1134.79,
+   "end": 1140.16,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, calm lake surrounded by dense Japanese woodland in Saitama prefecture, late afternoon, muted green and grey tones, mist on water, no people, no vehicles, 35mm lens, documentary realism, no text",
+   "visual": "Lago calmo e florestal nos arredores de Saitama"
+  },
+  {
+   "start": 1140.16,
+   "end": 1145.29,
+   "provider": "adiado",
+   "query": "Japanese police officer uniform car 1980s",
+   "visual": "Policial japonês em uniforme escuro ao lado de uma viatura",
+   "media_type": "video"
+  },
+  {
+   "start": 1145.29,
+   "end": 1150.68,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a plain brown cardboard parcel box with no visible writing sitting on a wooden table in a dim room, single soft light, shallow depth of field, 50mm lens, somber mood, no text, no people",
+   "visual": "Pacote postal pardo em uma mesa de madeira"
+  },
+  {
+   "start": 1150.68,
+   "end": 1154.82,
+   "provider": "adiado",
+   "query": "police interrogation notes pen notebook",
+   "visual": "Caderno de protocolo e caneta sobre mesa de investigação",
+   "media_type": "video"
+  },
+  {
+   "start": 1154.82,
+   "end": 1160.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, young Japanese man in his late twenties with dark hair and thin wire-rimmed glasses sitting calmly at a metal table in a bare interrogation room, 1989 Japan, neutral expression, side profile, soft overhead light, 50mm lens, no text",
+   "visual": "Homem de óculos finos sentado calmamente em sala de interrogatório"
+  },
+  {
+   "start": 1160.18,
+   "end": 1165.68,
+   "provider": "adiado",
+   "query": "empty interrogation room table chair",
+   "visual": "Sala de interrogatório vazia com cadeira e mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 1165.68,
+   "end": 1171.09,
+   "provider": "adiado",
+   "query": "hand writing statement paper pen",
+   "visual": "Mão segurando caneta sobre papel de depoimento",
+   "media_type": "video"
+  },
+  {
+   "start": 1171.09,
+   "end": 1176.02,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a bedroom bookshelf filled with Japanese manga volumes and comic books, no figurines, no posters, dim evening light, 1980s Japan, 35mm lens, realistic, no people, no text readable",
+   "visual": "Estante com mangás e revistas em quarto de jovem"
+  },
+  {
+   "start": 1176.02,
+   "end": 1182.18,
+   "provider": "adiado",
+   "query": "stacked japanese comic books room",
+   "visual": "Pilhas de revistas em quadrinhos japonesas em um quarto",
+   "media_type": "video"
+  },
+  {
+   "start": 1182.18,
+   "end": 1187.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, dark silhouette of a young Japanese man seated in a dim bedroom, lit only by a faint window light from behind, face in shadow, 1980s Japan, moody and somber, 50mm lens, no text",
+   "visual": "Silhueta sombria de homem em quarto escuro"
+  },
+  {
+   "start": 1187.18,
+   "end": 1192.18,
+   "provider": "adiado",
+   "query": "empty child bedroom window night",
+   "visual": "Quarto de criança vazio com janela à noite",
+   "media_type": "video"
+  },
+  {
+   "start": 1192.18,
+   "end": 1197.85,
+   "provider": "adiado",
+   "query": "closed manga book on wooden table",
+   "visual": "Página de mangá fechada sobre uma mesa, imagem genérica",
+   "media_type": "video"
+  },
+  {
+   "start": 1197.85,
+   "end": 1202.86,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, long shadow of a seated person cast on a plain wall by a single lamp, dim room, 1980s Japan, no face visible, moody atmosphere, 35mm lens, no text, documentary realism",
+   "visual": "Sombra de figura humana em uma parede iluminada"
+  },
+  {
+   "start": 1202.86,
+   "end": 1208.52,
+   "provider": "adiado",
+   "query": "police archive corridor shelves files",
+   "visual": "Corredor de arquivo de polícia com prateleiras de documentos",
+   "media_type": "video"
+  },
+  {
+   "start": 1208.52,
+   "end": 1214.88,
+   "provider": "adiado",
+   "query": "empty desk desk lamp dark office",
+   "visual": "Mesa vazia de sala de investigação com lâmpada acesa",
+   "media_type": "video"
+  },
+  {
+   "start": 1214.88,
+   "end": 1218.66,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, dark silhouette of a man standing still against a window at dusk, warm sunset light outside, 1980s Japanese room, contemplative mood, 50mm lens, no text, no visible face",
+   "visual": "Silhueta contra janela com luz de fim de tarde"
+  },
+  {
+   "start": 1218.66,
+   "end": 1225.1,
+   "provider": "adiado",
+   "query": "Japanese court building dusk exterior",
+   "visual": "Edifício de tribunal japonês ao anoitecer",
+   "media_type": "video"
+  },
+  {
+   "start": 1225.1,
+   "end": 1231.16,
+   "provider": "adiado",
+   "query": "stack legal documents wooden desk",
+   "visual": "Pilha de papéis de processo sobre mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 1231.16,
+   "end": 1236.7,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged Japanese psychiatrist in a white coat reading a bound report at a desk in a clinic office, 1977 era, serious and focused, soft window light, 50mm lens, no text readable, documentary style",
+   "visual": "Psiquiatra japonês de meia-idade lendo um relatório"
+  },
+  {
+   "start": 1236.7,
+   "end": 1240.56,
+   "provider": "adiado",
+   "query": "University of Tokyo campus 1970s building",
+   "visual": "Fachada da Universidade de Tóquio nos anos 1970",
+   "media_type": "video"
+  },
+  {
+   "start": 1240.56,
+   "end": 1246.52,
+   "provider": "adiado",
+   "query": "doctor reading medical report serious",
+   "visual": "Pessoa lendo um relatório médico com expressão séria",
+   "media_type": "video"
+  },
+  {
+   "start": 1246.52,
+   "end": 1251.68,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a printed medical brain scan image lying on a clinic desk next to a pen and glasses, realistic, no gore, no text readable, 1970s Japan, soft light, 50mm lens, documentary style",
+   "visual": "Cérebro humano em ilustração médica sobre mesa de consultório"
+  },
+  {
+   "start": 1251.68,
+   "end": 1258.64,
+   "provider": "adiado",
+   "query": "Japanese lawyers courtroom conversation",
+   "visual": "Advogados japoneses em tribunal conversando",
+   "media_type": "video"
+  },
+  {
+   "start": 1258.64,
+   "end": 1266.23,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese defense lawyer in a dark suit seated at a courtroom table, looking thoughtfully to the side, wooden courtroom interior, soft light, 50mm lens, documentary style, no text",
+   "visual": "Advogado em tribunal olhando pensativo para o lado"
+  },
+  {
+   "start": 1266.23,
+   "end": 1273.47,
+   "provider": "adiado",
+   "query": "man alone courtroom bench japan",
+   "visual": "Homem de terno sentado sozinho em banco de tribunal",
+   "media_type": "video"
+  },
+  {
+   "start": 1273.47,
+   "end": 1278.91,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, empty Japanese courtroom with wooden benches and a raised judge's bench, soft natural light, formal and quiet, 35mm lens, no people, no text, documentary realism",
+   "visual": "Tribunal japonês vazio com bancos de madeira"
+  },
+  {
+   "start": 1278.91,
+   "end": 1282.6,
+   "provider": "adiado",
+   "query": "scales of justice close up desk",
+   "visual": "Balança da justiça em close sobre mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 1282.6,
+   "end": 1289.55,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a prosecutor's desk with neatly stacked case documents, a pen and a folder, dim office light, 1990s Japan, shallow depth of field, 50mm lens, no legible text, no people",
+   "visual": "Mesa de promotoria com documentos e caneta"
+  },
+  {
+   "start": 1289.55,
+   "end": 1294.73,
+   "provider": "adiado",
+   "query": "Japan map case files investigation desk",
+   "visual": "Mapa do Japão com arquivos de caso sobre mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 1294.73,
+   "end": 1302.38,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, dim parking lot at night in 1988 Japan, a light-coloured Nissan sedan with headlights on parked under a sodium streetlight, empty surroundings, 35mm lens, no people, no text, muted tones",
+   "visual": "Estacionamento noturno com faróis de carro antigo"
+  },
+  {
+   "start": 1302.38,
+   "end": 1308.84,
+   "provider": "adiado",
+   "query": "old japanese sedan driving dark street 1980s",
+   "visual": "Carro antigo japonês dirigindo por rua escura",
+   "media_type": "video"
+  },
+  {
+   "start": 1308.84,
+   "end": 1313.83,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, misty early morning lake in Saitama prefecture, still water and bare trees on the shore, muted grey-green palette, no people, no structures, 35mm lens, documentary realism, no text",
+   "visual": "Lago em Saitama com névoa de manhã cedo"
+  },
+  {
+   "start": 1313.83,
+   "end": 1319.9,
+   "provider": "adiado",
+   "query": "stopped clock wooden table",
+   "visual": "Figura de relógio parado sobre mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 1319.9,
+   "end": 1326.37,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, front door of a modest Japanese house at night with a warm porch light on, quiet residential street, 1980s, 35mm lens, no people, no text, documentary style",
+   "visual": "Porta de casa japonesa à noite com luz acesa"
+  },
+  {
+   "start": 1326.37,
+   "end": 1332.51,
+   "provider": "adiado",
+   "query": "empty Japanese elementary school dusk",
+   "visual": "Escola primária japonesa vazia ao entardecer",
+   "media_type": "video"
+  },
+  {
+   "start": 1332.51,
+   "end": 1338.26,
+   "provider": "adiado",
+   "query": "Japanese judge robe courtroom bench",
+   "visual": "Juiz japonês de toga em sala de audiência",
+   "media_type": "video"
+  },
+  {
+   "start": 1338.26,
+   "end": 1345.48,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, elderly Japanese judge with grey hair in a dark robe reading a document at a raised bench, courtroom in 2006 Japan, dignified and serious, soft natural light, 50mm lens, no text readable",
+   "visual": "Juiz idoso japonês lendo sentença em tribunal"
+  },
+  {
+   "start": 1345.48,
+   "end": 1352.88,
+   "provider": "adiado",
+   "query": "court verdict document judge desk",
+   "visual": "Papel de sentença sobre mesa de juiz",
+   "media_type": "video"
+  },
+  {
+   "start": 1352.88,
+   "end": 1357.11,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, facade of the Supreme Court of Japan building in Tokyo on an ordinary overcast day, modern stone architecture, empty plaza, 35mm lens, no people, no text, documentary realism",
+   "visual": "Edifício do Tribunal Supremo do Japão em dia comum"
+  },
+  {
+   "start": 1357.11,
+   "end": 1362.96,
+   "provider": "adiado",
+   "query": "japanese courtroom interior empty bench",
+   "visual": "Interior de tribunal japonês com bancada vazia",
+   "media_type": "video"
+  },
+  {
+   "start": 1362.96,
+   "end": 1368.5,
+   "provider": "adiado",
+   "query": "japanese lawyer worried expression suit",
+   "visual": "Advogado japonês de terno com expressão preocupada",
+   "media_type": "video"
+  },
+  {
+   "start": 1368.5,
+   "end": 1372.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese psychiatrist seated at a desk in a clinic office writing notes in a notebook, calm focused expression, 1970s styling, soft light, 50mm lens, no legible text, documentary style",
+   "visual": "Médico psiquiatra em consultório com caderno de anotações"
+  },
+  {
+   "start": 1372.53,
+   "end": 1379.81,
+   "provider": "adiado",
+   "query": "Japanese children playing park blurred back",
+   "visual": "Crianças japonesas de costas em parque escolar, desfocadas",
+   "media_type": "video"
+  },
+  {
+   "start": 1379.81,
+   "end": 1386.02,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Japanese mother and father seen from behind standing at a window of a house at dusk, waiting and looking outside, muted tones, 1980s era, no faces visible, 35mm lens, no text, somber mood",
+   "visual": "Pais japoneses de costas olhando para uma janela"
+  },
+  {
+   "start": 1386.02,
+   "end": 1392.76,
+   "provider": "adiado",
+   "query": "closed door Japanese house dusk",
+   "visual": "Porta de casa japonesa fechada ao entardecer",
+   "media_type": "video"
+  },
+  {
+   "start": 1392.76,
+   "end": 1398.39,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Tokyo police station building at night with several windows lit, quiet street, 1980s style architecture, 35mm lens, no people, no text, documentary realism",
+   "visual": "Estação de polícia de Tóquio à noite, janelas iluminadas"
+  },
+  {
+   "start": 1398.39,
+   "end": 1403.7,
+   "provider": "adiado",
+   "query": "closed notebook office desk",
+   "visual": "Caderno de anotações fechado sobre mesa de escritório",
+   "media_type": "video"
+  },
+  {
+   "start": 1403.7,
+   "end": 1408.83,
+   "provider": "adiado",
+   "query": "wall clock empty room japan",
+   "visual": "Relógio de parede marcando o tempo em sala vazia",
+   "media_type": "video"
+  },
+  {
+   "start": 1408.83,
+   "end": 1414.87,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, exterior facade of a Tokyo detention center on an overcast grey day, high walls and small windows, no people, no barbed wire, 35mm lens, documentary realism, no text",
+   "visual": "Prisão de Tóquio, fachada externa em dia cinzento"
+  },
+  {
+   "start": 1414.87,
+   "end": 1420.38,
+   "provider": "adiado",
+   "query": "Japanese prison gate closed exterior",
+   "visual": "Portão de prisão japonesa fechado",
+   "media_type": "video"
+  },
+  {
+   "start": 1420.38,
+   "end": 1425.42,
+   "provider": "adiado",
+   "query": "Japanese newspaper morning folded table",
+   "visual": "Jornal japonês de manhã com notícia dobrada",
+   "media_type": "video"
+  },
+  {
+   "start": 1425.42,
+   "end": 1430.98,
+   "provider": "adiado",
+   "query": "Japanese newsroom 2008 desks reporters",
+   "visual": "Agência de notícias japonesa, redação de jornal",
+   "media_type": "video"
+  },
+  {
+   "start": 1430.98,
+   "end": 1435.65,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged Japanese man with short grey hair in a dark suit, neutral expression, plain background, 2000s era, soft studio light, 85mm lens, documentary portrait, no text",
+   "visual": "Retrato de homem japonês de meia-idade, expressão neutra"
+  },
+  {
+   "start": 1435.65,
+   "end": 1443.08,
+   "provider": "adiado",
+   "query": "Japanese father back office window thoughtful",
+   "visual": "Pai japonês de costas em escritório, olhando pela janela",
+   "media_type": "video"
+  },
+  {
+   "start": 1443.08,
+   "end": 1447.66,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of the exterior facade of a Tokyo detention center, concrete and gray walls, overcast daylight, neutral wide-angle framing, no people in focus, no text or signs, realistic colors, shot on 35mm lens",
+   "visual": "Fachada de prédio de tribunal ou prisão em Tóquio, dia comum, sem pessoas em destaque"
+  },
+  {
+   "start": 1447.66,
+   "end": 1455.2,
+   "provider": "adiado",
+   "query": "Japanese justice minister press conference Tokyo",
+   "visual": "Ministro da Justiça japonês em sala formal, ambiente oficial sóbrio",
+   "media_type": "video"
+  },
+  {
+   "start": 1455.2,
+   "end": 1462.61,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of a formal Japanese government meeting room, several men in dark suits seated around a long wooden table, fluorescent office lighting, wide shot, serious atmosphere, no text or captions, realistic colors, shot on 35mm lens",
+   "visual": "Plenário ou gabinete do governo japonês, reunião sóbria"
+  },
+  {
+   "start": 1462.61,
+   "end": 1468.3,
+   "provider": "adiado",
+   "query": "European Union flag building Brussels",
+   "visual": "Bandeira da União Europeia e símbolo de direitos humanos em contexto diplomático",
+   "media_type": "video"
+  },
+  {
+   "start": 1468.3,
+   "end": 1475.66,
+   "provider": "adiado",
+   "query": "Tokyo skyline business district daytime",
+   "visual": "Vista de cidade japonesa moderna, prédios de escritório e trânsito",
+   "media_type": "video"
+  },
+  {
+   "start": 1475.66,
+   "end": 1481.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of a stack of printed official reports and a pen on a wooden desk, shallow depth of field, soft window light, close-up framing, no readable text, realistic, shot on 50mm lens",
+   "visual": "Gráfico ou pilha de documentos de estatísticas oficiais sobre execuções"
+  },
+  {
+   "start": 1481.53,
+   "end": 1487.15,
+   "provider": "adiado",
+   "query": "news agency newsroom journalists Japan",
+   "visual": "Escritório de agência de notícias com equipe trabalhando",
+   "media_type": "video"
+  },
+  {
+   "start": 1487.15,
+   "end": 1494.61,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of a group of Japanese journalists seated in rows at a press briefing, notebooks and cameras, focused expressions, soft indoor lighting, medium shot, no text or captions, realistic, shot on 35mm lens",
+   "visual": "Pessoas observando em silêncio, analistas e jornalistas em coletiva"
+  },
+  {
+   "start": 1494.61,
+   "end": 1500.66,
+   "provider": "adiado",
+   "query": "family grief hands together quiet room",
+   "visual": "Familiares em luto ou silêncio, mãos juntas, ambiente discreto",
+   "media_type": "video"
+  },
+  {
+   "start": 1500.66,
+   "end": 1506.73,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of an empty corridor in a Japanese courthouse, polished floors and tall doors, soft diffused light, one-point perspective framing, quiet and somber mood, no people, no text, realistic colors, shot on 24mm lens",
+   "visual": "Porta fechada de tribunal ou corredor vazio de justiça"
+  },
+  {
+   "start": 1506.73,
+   "end": 1512.7,
+   "provider": "adiado",
+   "query": "old building window soft light reflection",
+   "visual": "Janela ou corredor de prédio antigo com luz suave, atmosfera de reflexão",
+   "media_type": "video"
+  },
+  {
+   "start": 1512.7,
+   "end": 1519.16,
+   "provider": "adiado",
+   "query": "lonely young man sitting alone dim room",
+   "visual": "Homem jovem sentado sozinho em quarto apagado, expressão fechada",
+   "media_type": "video"
+  },
+  {
+   "start": 1519.16,
+   "end": 1525.47,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of a Japanese couple in their fifties sitting stiffly in a 1980s living room, the woman's hands folded, the man looking away, tense silence, warm but muted lighting, medium wide shot, no text, realistic, shot on 35mm lens",
+   "visual": "Casal japonês de meia-idade em sala de estar tensa, conversa séria"
+  },
+  {
+   "start": 1525.47,
+   "end": 1531.0,
+   "provider": "adiado",
+   "query": "elderly Japanese grandfather sitting smiling vintage",
+   "visual": "Avô idoso sentado sorrindo, cena antiga e calorosa, em tom de lembrança",
+   "media_type": "video"
+  },
+  {
+   "start": 1531.0,
+   "end": 1536.48,
+   "provider": "adiado",
+   "query": "Japanese urn ashes altar incense",
+   "visual": "Urna ou caixa de cinzas em altar discreto, sem ênfase macabra",
+   "media_type": "video"
+  },
+  {
+   "start": 1536.48,
+   "end": 1543.86,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of two hands holding a small ceramic urn in a quiet room, soft window light, shallow depth of field, somber and respectful mood, no face visible, no gore, realistic colors, shot on 85mm lens",
+   "visual": "Mãos segurando recipiente com cinzas, close respeitoso e sóbrio"
+  },
+  {
+   "start": 1543.86,
+   "end": 1549.06,
+   "provider": "adiado",
+   "query": "case files reports archive desk Japan",
+   "visual": "Cadernos de arquivo e relatórios sobre o caso em mesa de escritório",
+   "media_type": "video"
+  },
+  {
+   "start": 1549.06,
+   "end": 1556.1,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph of a closed apartment door at the end of a dim hallway at night, a faint light under the door, quiet and ominous mood, wide framing, no people, no text, realistic colors, shot on 35mm lens",
+   "visual": "Porta de casa fechada ou janela de prédio com luz fraca, sensação de alerta ignorado"
+  },
+  {
+   "start": 1556.1,
+   "end": 1561.61,
+   "provider": "adiado",
+   "query": "Japanese residential street night streetlight",
+   "visual": "Rua de bairro japonês à noite, luz de poste, atmosfera de ausência",
+   "media_type": "video"
+  },
+  {
+   "start": 1561.61,
+   "end": 1566.69,
+   "provider": "adiado",
+   "query": "community meeting discussion table Japan",
+   "visual": "Mesa de reunião com pessoas debatendo, ambiente comunitário",
+   "media_type": "video"
+  },
+  {
+   "start": 1566.69,
+   "end": 1571.88,
+   "provider": "adiado",
+   "query": "Japanese people walking street daytime neighborhood",
+   "visual": "Pessoas caminhando em rua de bairro japonês, dia comum",
+   "media_type": "video"
+  },
+  {
+   "start": 1571.88,
+   "end": 1580.87,
+   "provider": "adiado",
+   "query": "silhouette person standing window reflection",
+   "visual": "Silhueta de pessoa diante de janela, reflexão final",
+   "media_type": "video"
+  },
+  {
+   "start": 1580.87,
+   "end": 1571.46,
+   "provider": "adiado",
+   "query": "dark background fade out black",
+   "visual": "Tela escura com a logo implícita de encerramento, sem texto",
+   "media_type": "video"
+  }
+ ],
+ "_ficha": {
+  "tema": "Tsutomu Miyazaki e os assassinatos de meninas em Tóquio e Saitama (1988-1989), com a execução em 2008",
+  "epoca": "Japão, 1960 a 2008 (crimes 1988-1989, julgamento até 2006, execução em 17 de junho de 2008)",
+  "tom": "investigativo, sóbrio, documental e sombrio, sem sensacionalismo",
+  "personagens": [
+   {
+    "id": "miyazaki",
+    "nome": "Tsutomu Miyazaki",
+    "busca": "Tsutomu Miyazaki 1989 police Japan",
+    "como_aparece": "Homem jovem de cabelo escuro e óculos finos, fotografado de lado sob escolta policial em 1989; mais tarde, foto de arquivo de 2000s em tribunal. Nunca mostrar nu, ensanguentado ou em cena de crime.",
+    "tipo": "pessoa",
+    "epoca": "1960-2008",
+    "wikipedia_pt": "Tsutomu Miyazaki",
+    "wikipedia_en": "Tsutomu Miyazaki"
+   },
+   {
+    "id": "mari_kono",
+    "nome": "Mari Kono",
+    "busca": "Japan missing girl 1988 poster",
+    "como_aparece": "Menina de quatro anos, retrato escolar ou cartaz de desaparecida; o cartaz em si é melhor que foto de vítima morta. Usar só como cartaz ou fundo borrado.",
+    "tipo": "pessoa",
+    "epoca": "1984-1988",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "masami_yoshizawa",
+    "nome": "Masami Yoshizawa",
+    "busca": "Japan missing girl October 1988 Saitama",
+    "como_aparece": "Menina de sete anos, desaparecida em 3 de outubro de 1988, indicada por cartaz ou imagem de arquivo de desaparecidas; sem foto de corpo.",
+    "tipo": "pessoa",
+    "epoca": "1981-1988",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "erika_namba",
+    "nome": "Erika Namba",
+    "busca": "Japan 1988 missing girl news archive",
+    "como_aparece": "Menina de quatro anos, vítima de dezembro de 1988; usar apenas imagem de arquivo jornalístico ou cartaz, nunca cena da morte.",
+    "tipo": "pessoa",
+    "epoca": "1984-1988",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "ayako",
+    "nome": "Ayako",
+    "busca": "Japan girl missing June 1989 park",
+    "como_aparece": "Menina de cinco anos, desaparecida em 6 de junho de 1989 após sair para brincar em um parque; usar parque de bairro ou cartaz, sem sobrenome.",
+    "tipo": "pessoa",
+    "epoca": "1984-1989",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "pai_kono",
+    "nome": "Shigokono (pai de Mari Kono)",
+    "busca": "Japanese father 1989 family news archive",
+    "como_aparece": "Homem japonês de meia-idade, fotografado de costas ou de longe, em ambiente doméstico ou de polícia; nunca em close com cara de sofrimento staged.",
+    "tipo": "pessoa",
+    "epoca": "1989",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "tribunal_japao",
+    "nome": "Tribunal Supremo do Japão",
+    "busca": "Supreme Court of Japan Tokyo building",
+    "como_aparece": "Fachada e interior do tribunal em Tóquio, em dia comum.",
+    "tipo": "empresa",
+    "epoca": "2006",
+    "wikipedia_pt": "Suprema Corte do Japão",
+    "wikipedia_en": "Supreme Court of Japan"
+   }
+  ],
+  "lugares": [
+   {
+    "id": "toquio",
+    "nome": "Tóquio",
+    "busca": "Tokyo Japan 1980s street residential",
+    "evitar": "Nada de Tóquio atual com neon e turistas quando a cena é de 1988-1989; evitar Shibuya cheio de anúncios.",
+    "wikipedia_pt": "Tóquio",
+    "wikipedia_en": "Tokyo"
+   },
+   {
+    "id": "saitama",
+    "nome": "Saitama (prefeitura)",
+    "busca": "Saitama Japan 1989 suburban",
+    "evitar": "Evitar mapas com marcações e alvos vermelhos; evitar imagens de vítimas ou cenas de morte.",
+    "wikipedia_pt": "",
+    "wikipedia_en": "Saitama Prefecture"
+   },
+   {
+    "id": "floresta_saitama",
+    "nome": "Floresta e lago em Saitama",
+    "busca": "Japan forest lake 1989 wooded area",
+    "evitar": "Nada de cena de corpo ou de cova; evitar floresta tropical ou selva, que não condiz com o Japão.",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "estacionamento",
+    "nome": "Estacionamento à noite",
+    "busca": "Japan parking lot night 1988 car headlights",
+    "evitar": "Nada de cena reconstruída com criança; evitar carros de luxo ou modelos errados, o carro era Nissan Langley.",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "prisao_japao",
+    "nome": "Prisão de Tóquio",
+    "busca": "Tokyo Detention Center prison exterior",
+    "evitar": "Evitar muros de prisão americanos ou cenas de execução com cadeira ou corda; usar fachada externa.",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   }
+  ],
+  "glossario": [
+   {
+    "no_roteiro": "Otaku-Mörder",
+    "significa": "Termo da mídia japonesa, 'assassino otaku', ligado a pessoas com hobbies intensos como mangá e anime; o roteiro critica essa associação.",
+    "nunca_buscar": [
+     "anime girl",
+     "manga character",
+     "cartoon killer",
+     "nerd stereotype"
+    ]
+   },
+   {
+    "no_roteiro": "Der Rattenmann",
+    "significa": "Figura imaginária, metade homem e metade rato, que Miyazaki disse ter criado na infância; não é fato comprovado.",
+    "nunca_buscar": [
+     "rat man illustration",
+     "rat monster",
+     "cartoon rat",
+     "rat costume",
+     "Ratte"
+    ]
+   },
+   {
+    "no_roteiro": "Die Asche",
+    "significa": "Cinzas do avô de Miyazaki, citadas em relatos; no roteiro, a cena é de cinzas dentro de uma caixa.",
+    "nunca_buscar": [
+     "fire ashes burning",
+     "gore",
+     "food eating"
+    ]
+   },
+   {
+    "no_roteiro": "Die Schachtel",
+    "significa": "Caixa com restos da menina enviada à família; o roteiro usa para mostrar o envio, não a cena em si.",
+    "nunca_buscar": [
+     "gift box",
+     "present",
+     "wrapped gift"
+    ]
+   },
+   {
+    "no_roteiro": "Der Fehler (Toyota Corolla)",
+    "significa": "Erro das testemunhas que confundiram o modelo do carro; o carro certo era um Nissan Langley.",
+    "nunca_buscar": [
+     "Toyota Corolla advertisement",
+     "Corolla commercial",
+     "error sign"
+    ]
+   }
+  ],
+  "evitar_sempre": [
+   "desenhos, anime, manga, cartoon ou ilustração do Rattenmann ou de Miyazaki",
+   "corpos, cadáveres, cenas de morte ou restos humanos",
+   "fotos ou vídeos das vítimas em momentos de violência",
+   "imagens dos vídeos de arquivo de Miyazaki",
+   "atores de série de TV ou filme no lugar do acusado ou das famílias",
+   "memes ou montagens de humor sobre o caso",
+   "logos de jornal ou emissora que identifiquem fontes",
+   "rostos de crianças reais em situações de abuso"
+  ],
+  "visual_geral": "Fotos e filmagens reais de arquivo do Japão dos anos 1980 e 1990, ruas e bairros de Tóquio e Saitama, florestas, estacionamentos noturnos, carros da época, polícia e tribunal, sempre sem sangue, sem corpos e com rostos de crianças desfocados ou fora de quadro.",
+  "estilo_imagem": "real"
+ }
+}

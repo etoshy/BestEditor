@@ -1,0 +1,50 @@
+{# 🏭 v84_122: cenas ⏳ pendentes (Produção no pod) → escolher as fontes e completar #}
+{% set _pi = pendentes_info(job) if job else {'n': 0, 'pod_refazer': 0} %}
+{% if (_pi.n or _pi.pod_refazer) and job.status in ('pronto_para_editar', 'previas_pausadas') %}
+<div id="pendentes-box" style="{% if previas_flutuante %}position:fixed;right:14px;bottom:14px;z-index:9999;max-width:640px;box-shadow:0 6px 24px rgba(0,0,0,.4);{% endif %}margin:8px 12px;padding:10px 14px;background:#ecfeff;color:#164e63;border:1px solid #06b6d4;border-radius:8px;font-size:.9rem;">
+  {% if _pi.pod_refazer %}
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #a5f3fc;">
+    <span style="flex:1;min-width:220px;">🖥️ <b>{{ _pi.pod_refazer }}</b> cena(s) do pod viraram 🃏 cartão ou ficaram sem prévia — as imagens estão guardadas, é só pôr de volta.</span>
+    <button type="button" id="btn-refazer-pod" style="background:#7c3aed;color:#fff;font-weight:700;border:0;padding:7px 14px;border-radius:8px;cursor:pointer;">🔁 Pôr as imagens do pod de volta</button>
+  </div>
+  {% endif %}
+  {% if _pi.n %}
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <span style="flex:1;min-width:220px;">⏳ <b>{{ _pi.n }}</b> cena(s) pendente(s) — escolha de onde buscar e a 🤖 IA escreve a busca de cada uma (as cenas do pod e as que você já escolheu ficam).</span>
+    <button type="button" id="btn-pendentes" style="background:#0e7490;color:#fff;font-weight:700;border:0;padding:7px 14px;border-radius:8px;cursor:pointer;">▶ Completar cenas pendentes</button>
+    {% if previas_flutuante %}<button type="button" onclick="this.closest('#pendentes-box').remove()" title="esconder" style="background:none;border:0;color:#164e63;cursor:pointer;font-size:1rem;">✕</button>{% endif %}
+  </div>
+  <div id="pendentes-fontes" style="display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:.82rem;">
+    {% for f in _pi.fontes %}<label style="font-weight:normal;margin:0;display:inline-flex;gap:4px;align-items:center;"><input type="checkbox" value="{{ f }}" style="width:auto;margin:0;" {% if f in _pi.marcadas or (not _pi.marcadas and f in ('pexels', 'pixabay')) %}checked{% endif %}> {{ f }}</label>{% endfor %}
+  </div>
+  <div style="font-size:.78rem;color:#0e7490;margin-top:4px;">Sem a IA ligada (🤖 → “Ficha do vídeo + buscas melhores”), usa a busca em inglês que já veio da produção, nas fontes marcadas em rodízio. Cena que sobrar ⏳ na montagem vai pros bancos da sua prioridade.</div>
+  {% endif %}
+</div>
+<script>
+(function () {
+  const r = document.getElementById('btn-refazer-pod');
+  if (r) r.addEventListener('click', async function () {
+    r.disabled = true; r.textContent = '⏳ pondo de volta…';
+    try {
+      const x = await fetch("{{ url_for('refazer_cenas_pod_rota', job_id=job.job_id) }}", {method: 'POST'});
+      const j = await x.json();
+      if (!x.ok) { r.disabled = false; r.textContent = '⚠ ' + (j.erro || 'não deu'); return; }
+      window.location.href = "{{ url_for('fetching_previews_page', job_id=job.job_id) }}";
+    } catch (e) { r.disabled = false; r.textContent = '⚠ ' + e; }
+  });
+  const b = document.getElementById('btn-pendentes');
+  if (!b) return;
+  b.addEventListener('click', async function () {
+    const fontes = [...document.querySelectorAll('#pendentes-fontes input:checked')].map(i => i.value);
+    if (!fontes.length) { alert('Marque pelo menos uma fonte.'); return; }
+    b.disabled = true; b.textContent = '⏳ a IA está escrevendo as buscas…';
+    try {
+      const r = await fetch("{{ url_for('completar_pendentes_rota', job_id=job.job_id) }}", {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fontes})});
+      const j = await r.json();
+      if (!r.ok) { b.disabled = false; b.textContent = '⚠ ' + (j.erro || 'não deu'); return; }
+      window.location.href = "{{ url_for('fetching_previews_page', job_id=job.job_id) }}";
+    } catch (e) { b.disabled = false; b.textContent = '⚠ ' + e; }
+  });
+})();
+</script>
+{% endif %}

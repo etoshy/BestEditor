@@ -93,7 +93,11 @@ def escolher(engine: str, modo: str = "1", cpu: bool = False, caracteres: int = 
         por = RAM_GB.get(engine, 3.0)
         cabe = int(max(0.0, ram["livre"] - RAM_FOLGA) // por)
         limites.append((max(1, cabe), f"RAM: {ram['livre']:.1f} GB livres de {ram['total']:.0f} GB, ~{por:g} GB por cópia"))
-    usa_gpu = engine in MOTORES_GPU and not cpu
+    no_pod = fila_voz._no_pod(engine)  # 🖥️ gerando no pod: nem RAM nem VRAM deste PC
+    if no_pod:
+        limites = [x for x in limites if not x[1].startswith("RAM:")]
+        limites.append((2, "no pod: o servidor gera um pedido por vez, 2 cópias só adiantam o envio"))
+    usa_gpu = engine in MOTORES_GPU and not cpu and not no_pod
     if usa_gpu:
         v = (vram_fn or fila_voz.ler_vram)()
         if not v:
@@ -105,7 +109,7 @@ def escolher(engine: str, modo: str = "1", cpu: bool = False, caracteres: int = 
             limites.append((max(1, cabe), f"VRAM: {v['livre']:.1f} GB livres na {v.get('nome') or 'placa'}, ~{por:g} GB por cópia"))
     if engine == "fish_s2":
         limites.append((2, "o servidor do Fish atende 2 pedidos bem; mais que isso ele enfileira"))
-    elif not usa_gpu:
+    elif not usa_gpu and not no_pod:
         nucleos = os.cpu_count() or 2
         limites.append((max(1, nucleos // 4), f"CPU: {nucleos} núcleos (na CPU cada cópia precisa de ~4)"))
     n, motivo = min(limites, key=lambda x: x[0])

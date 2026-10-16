@@ -19,6 +19,10 @@ Tudo que é gerado fica em `runpod_dados/midias/` com um registro (`cache.json`)
 proporção) nunca é gerado (nem cobrado) duas vezes — a exportação reaproveita o que a prévia já gerou.
 
 Chave: ⚙️ Configurações → 🟣 Runpod (fica em site_config.json, que não vai pro GitHub) ou a variável RUNPOD_API_KEY.
+
+🖥️ MODO "MEU POD" (v84_121, `runpod_modo = "pod"`): as IMAGENS saem do Z-Image Turbo rodando no SEU pod (servidor
+`studio-ia`, ver pod_studio.py) — o pod é cobrado por hora, então não há custo por imagem nem conferência de saldo.
+Vídeo continua pelos Public Endpoints (precisa da chave); sem chave, o trecho de vídeo vira foto como sempre.
 """
 from __future__ import annotations
 
@@ -94,8 +98,15 @@ def chave_mascarada(cfg: Optional[Dict[str, Any]] = None) -> str:
     return (k[:6] + "…" + k[-4:]) if len(k) > 12 else ("…" if k else "")
 
 
+def modo(cfg: Optional[Dict[str, Any]] = None) -> str:
+    """"pod" (imagens no seu pod, ver pod_studio.py) ou "endpoints" (API paga por geração)."""
+    c = _cfg(cfg)
+    return "pod" if str(c.get("runpod_modo") or "") == "pod" and str(c.get("runpod_pod_url") or "").strip() else "endpoints"
+
+
 def configurado(cfg: Optional[Dict[str, Any]] = None) -> bool:
-    return bool(chave(cfg))
+    """Tem chave, ou tem o endereço do seu pod (as imagens feitas na 🏭 Produção no pod ficam no cache)."""
+    return bool(chave(cfg)) or modo(cfg) == "pod" or bool(str(_cfg(cfg).get("runpod_pod_url") or "").strip())
 
 
 def modelo_imagem(cfg: Optional[Dict[str, Any]] = None) -> str:
@@ -133,11 +144,13 @@ def _baixar(url: str, destino: str, timeout: float = 300) -> str:
     import requests
     with requests.get(url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
-        tmp = destino + ".parte"
+        import uuid
+        import arquivo_seguro
+        tmp = f"{destino}.{uuid.uuid4().hex[:8]}.parte"
         with open(tmp, "wb") as f:
             for bloco in r.iter_content(1 << 16):
                 f.write(bloco)
-    os.replace(tmp, destino)
+    arquivo_seguro.trocar(tmp, destino)
     return destino
 
 
@@ -198,6 +211,10 @@ def tem_saldo(tipo: str = "imagem", cfg: Optional[Dict[str, Any]] = None) -> Opt
     """Dá pra gerar `tipo` agora? None = não sei (sem internet) / False = sem chave ou sem saldo."""
     if not configurado(cfg):
         return False
+    if modo(cfg) == "pod" and tipo != "video":
+        return True  # no seu pod não tem custo por imagem
+    if not chave(cfg):
+        return False
     m = modelo_video(cfg) if tipo == "video" else modelo_imagem(cfg)
     custo = MODELOS[m]["custo"](parametros_base(m, cfg))
     s = saldo(cfg)
@@ -207,6 +224,11 @@ def tem_saldo(tipo: str = "imagem", cfg: Optional[Dict[str, Any]] = None) -> Opt
 
 
 def _registrar_uso(modelo: str, custo: float, descricao: str) -> None:
+    with _CACHE_TRAVA:
+        _registrar_uso_(modelo, custo, descricao)
+
+
+def _registrar_uso_(modelo: str, custo: float, descricao: str) -> None:
     caminho = os.path.join(pasta(), "uso.json")
     try:
         with open(caminho, encoding="utf-8") as f:
@@ -217,9 +239,8 @@ def _registrar_uso(modelo: str, custo: float, descricao: str) -> None:
     uso.setdefault("por_modelo", {})[modelo] = round(float(uso["por_modelo"].get(modelo) or 0) + float(custo or 0), 5)
     uso.setdefault("ultimos", []).append({"quando": time.time(), "modelo": modelo, "custo": custo, "descricao": descricao[:160]})
     uso["ultimos"] = uso["ultimos"][-50:]
-    with open(caminho + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(uso, f, ensure_ascii=False, indent=1)
-    os.replace(caminho + ".tmp", caminho)
+    import arquivo_seguro  # nome temporário único + novas tentativas (WinError 5 no Windows)
+    arquivo_seguro.gravar_json(caminho, uso, indent=1)
 
 
 def uso() -> Dict[str, Any]:
@@ -331,7 +352,7 @@ def adaptar(modelo: str, descricao: str, cfg: Optional[Dict[str, Any]] = None) -
 
 
 # ------------------------------------------------------------------ cache (o mesmo pedido nunca é cobrado 2×)
-_CACHE_TRAVA = threading.Lock()
+_CACHE_TRAVA = threading.RLock()
 
 
 def chave_pedido(modelo: str, descricao: str, cfg: Optional[Dict[str, Any]] = None) -> str:
@@ -362,10 +383,8 @@ def _guardar(chave_p: str, registro: Dict[str, Any]) -> None:
     with _CACHE_TRAVA:
         d = _cache()
         d[chave_p] = registro
-        caminho = os.path.join(pasta(), "cache.json")
-        with open(caminho + ".tmp", "w", encoding="utf-8") as f:
-            json.dump(d, f, ensure_ascii=False, indent=1)
-        os.replace(caminho + ".tmp", caminho)
+        import arquivo_seguro  # nome temporário único + novas tentativas (WinError 5 no Windows)
+        arquivo_seguro.gravar_json(os.path.join(pasta(), "cache.json"), d, indent=1)
 
 
 def ja_gerado(descricao: str, tipo: str, cfg: Optional[Dict[str, Any]] = None) -> bool:
@@ -408,8 +427,17 @@ def gerar(descricao: str, tipo: str = "imagem", cfg: Optional[Dict[str, Any]] = 
           on_passo: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
     """Gera (ou reaproveita) a mídia dessa cena. → registro {"arquivo", "caminho", "url", "modelo", "prompt", "custo", …}."""
     cfg = _cfg(cfg)
+    if tipo != "video" and not forcar:  # 🏭 já gerada em lote no pod (Produção no pod): usa, em qualquer modo
+        r = do_cache(chave_pedido("z-image-turbo", descricao, cfg))
+        if r:
+            return dict(r, caminho=os.path.join(pasta(), "midias", r["arquivo"]), url=URL_MIDIAS + r["arquivo"], reaproveitado=True)
+    if tipo != "video" and modo(cfg) == "pod":
+        return _gerar_no_pod(descricao, cfg, forcar=forcar, on_passo=on_passo)
     k = chave(cfg)
     if not k:
+        if tipo == "video" and modo(cfg) == "pod":
+            raise RunpodSemChave("Vídeo não roda no seu pod (só imagem): pra vídeo pelo Runpod precisa da chave dos "
+                                 "Public Endpoints — sem ela o trecho vira foto.")
         raise RunpodSemChave("Sem chave do Runpod — coloque em ⚙️ Configurações → 🟣 Runpod.")
     modelo = modelo_video(cfg) if tipo == "video" else modelo_imagem(cfg)
     ch = chave_pedido(modelo, descricao, cfg)
@@ -448,6 +476,57 @@ def gerar(descricao: str, tipo: str = "imagem", cfg: Optional[Dict[str, Any]] = 
     except OSError:
         pass
     return dict(reg, caminho=caminho, url=URL_MIDIAS + nome, reaproveitado=False)
+
+
+def _tamanho_pod(cfg: Optional[Dict[str, Any]]) -> tuple:
+    return {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (1024, 1024)}[_orientacao(cfg)]
+
+
+def _gerar_no_pod(descricao: str, cfg: Dict[str, Any], forcar: bool = False,
+                  on_passo: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
+    """🖥️ Imagem no SEU pod (Z-Image Turbo): mesmo cache e mesmo registro do modo pago, custo 0."""
+    import pod_studio
+    modelo = "z-image-turbo"
+    ch = chave_pedido(modelo, descricao, cfg)
+    if not forcar:
+        r = do_cache(ch)
+        if r:
+            return dict(r, caminho=os.path.join(pasta(), "midias", r["arquivo"]), url=URL_MIDIAS + r["arquivo"], reaproveitado=True)
+    entrada = adaptar(modelo, descricao, cfg)  # o prompt do jeito do Z-Image (🤖 IA ou regra)
+    por = entrada.pop("_por", "regra")
+    w, h = _tamanho_pod(cfg)
+    if on_passo:
+        on_passo("Runpod (meu pod): gerando com Z-Image Turbo…")
+    nome = f"rp_{ch[:16]}.png"
+    caminho = os.path.join(pasta(), "midias", nome)
+    try:
+        pod_studio.gerar_imagem(entrada.get("prompt") or descricao, caminho, largura=w, altura=h, cfg=cfg, on_passo=on_passo)
+    except pod_studio.PodErro as exc:
+        raise RunpodErro(str(exc)) from exc
+    reg = {"arquivo": nome, "tipo": "imagem", "modelo": "pod:" + modelo, "descricao": descricao[:600],
+           "prompt": entrada.get("prompt"), "negative_prompt": None, "prompt_por": por, "custo": 0.0,
+           "quando": time.time(), "miniatura": ""}
+    _guardar(ch, reg)
+    try:
+        _registrar_uso("pod:" + modelo, 0.0, descricao)
+    except OSError:
+        pass
+    return dict(reg, caminho=caminho, url=URL_MIDIAS + nome, reaproveitado=False)
+
+
+def guardar_do_pod(descricao: str, arquivo: str, prompt: str, cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """🏭 Produção no pod: uma imagem gerada em LOTE no pod entra no cache como se a fonte `runpod` tivesse gerado
+    essa `descricao` — quando o editor buscar a prévia do trecho, acha pronta (sem gerar de novo)."""
+    cfg = _cfg(cfg)
+    modelo = "z-image-turbo"
+    ch = chave_pedido(modelo, descricao, cfg)
+    nome = f"rp_{ch[:16]}.png"
+    destino = os.path.join(pasta(), "midias", nome)
+    shutil.copyfile(arquivo, destino)
+    reg = {"arquivo": nome, "tipo": "imagem", "modelo": "pod:" + modelo, "descricao": descricao[:600], "prompt": prompt,
+           "negative_prompt": None, "prompt_por": "lote", "custo": 0.0, "quando": time.time(), "miniatura": ""}
+    _guardar(ch, reg)
+    return dict(reg, caminho=destino, url=URL_MIDIAS + nome)
 
 
 def _miniatura(video: str) -> str:
@@ -530,7 +609,7 @@ class RunpodClient:
 def resumo(cfg: Optional[Dict[str, Any]] = None, forcar: bool = False, rede: bool = True) -> Dict[str, Any]:
     """Pra tela de Configurações: chave (mascarada), modelos, saldo e quanto já foi gasto pelo site.
     `rede=False`: só o saldo já conhecido (a página abre na hora e pergunta o saldo depois)."""
-    if not configurado(cfg):
+    if not chave(cfg):
         s = {"saldo": None, "erro": "sem chave"}
     elif rede:
         s = saldo(cfg, forcar=forcar)
@@ -540,6 +619,7 @@ def resumo(cfg: Optional[Dict[str, Any]] = None, forcar: bool = False, rede: boo
     return {"configurado": configurado(cfg), "chave": chave_mascarada(cfg), "saldo": s.get("saldo"), "erro": s.get("erro"),
             "gasto_hora": s.get("gasto_hora"), "gasto_site": u.get("total") or 0.0, "por_modelo": u.get("por_modelo") or {},
             "modelo_imagem": modelo_imagem(cfg), "modelo_video": modelo_video(cfg),
+            "tem_chave": bool(chave(cfg)), "modo": modo(cfg), "pod_url": str(_cfg(cfg).get("runpod_pod_url") or ""),
             "modelos": [{"id": m, "nome": v["nome"], "tipo": v["tipo"]} for m, v in MODELOS.items()]}
 
 
@@ -554,6 +634,12 @@ def registrar(app) -> None:
     @app.route("/runpod/saldo")
     def runpod_saldo():
         return jsonify(resumo(forcar=request.args.get("forcar") == "1"))
+
+    @app.route("/runpod/pod-status")
+    def runpod_pod_status():
+        import pod_studio
+        url = (request.args.get("url") or "").strip()
+        return jsonify(pod_studio.status(dict(pod_studio._cfg(None), runpod_pod_url=url) if url else None))
 
     @app.route("/runpod/testar", methods=["POST"])
     def runpod_testar():

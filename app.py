@@ -1729,6 +1729,67 @@ def perfis_de_voz_criar():
     return redirect(url_for("perfis_de_voz_page"))
 
 
+# ------------------------------------------------------------------ 📦 exportar / importar perfis em .zip
+@app.route("/perfis-de-voz/exportar", methods=["GET"])
+def perfis_de_voz_exportar():
+    """📦 Baixa um .zip com os perfis (?nomes=a&nomes=b; sem nomes = todos) — clipes, originais e informações."""
+    import perfis_pacote
+    nomes = [n for n in request.args.getlist("nomes") if n.strip()]
+    try:
+        dados = perfis_pacote.exportar(nomes or None)
+    except (perfis_pacote.PacoteErro, VoiceGeneratorError) as exc:
+        return str(exc), 404
+    import io
+    if len(nomes) == 1:
+        rotulo = secure_filename(nomes[0]) or "perfil"
+    else:
+        rotulo = f"{len(nomes)}_perfis" if nomes else "todos"
+    nome_arq = f"perfis_de_voz_{rotulo}_{time.strftime('%Y%m%d_%H%M')}.zip"
+    return send_file(io.BytesIO(dados),mimetype="application/zip", as_attachment=True, download_name=nome_arq)
+
+
+@app.route("/perfis-de-voz/<nome>/exportar", methods=["GET"])
+def perfis_de_voz_exportar_um(nome: str):
+    return redirect(url_for("perfis_de_voz_exportar", nomes=nome))
+
+
+@app.route("/perfis-de-voz/importar", methods=["POST"])
+def perfis_de_voz_importar():
+    """📦 Importa um .zip: exportado daqui (com manifesto.json) ou só com áudios (raiz = 1 perfil; pastas = 1 por pasta)."""
+    import perfis_pacote
+    arquivo = request.files.get("zip")
+    quer_json = request.headers.get("Accept", "").startswith("application/json") or request.args.get("json") == "1"
+
+    def _erro(msg: str):
+        if quer_json:
+            return jsonify({"erro": msg}), 400
+        perfis = [{"nome": n, "quantidade_clipes": len(tts_caminho_perfil_de_voz(n))} for n in tts_listar_perfis_de_voz()]
+        return render_template("perfis_de_voz.html", perfis=_perfis_com_info(perfis), max_clipes=tts_MAX_CLIPES_POR_PERFIL, error=msg)
+
+    if not arquivo or not arquivo.filename:
+        return _erro("Escolha um arquivo .zip pra importar.")
+    if not arquivo.filename.lower().endswith(".zip"):
+        return _erro("O arquivo precisa ser um .zip.")
+    tmp = os.path.join(VOZES_DIR, f"perfilimport_{uuid.uuid4().hex}.zip")
+    os.makedirs(VOZES_DIR, exist_ok=True)
+    try:
+        arquivo.save(tmp)
+        res = perfis_pacote.importar(
+            tmp, nome=request.form.get("nome", ""), substituir=request.form.get("substituir") == "on",
+            dividir=request.form.get("dividir_automaticamente", "on") == "on", nome_zip=arquivo.filename,
+        )
+    except (perfis_pacote.PacoteErro, VoiceGeneratorError) as exc:
+        return _erro(str(exc))
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    if quer_json:
+        return jsonify({"ok": True, "importados": res})
+    return redirect(url_for("perfis_de_voz_page", importados=",".join(r["nome"] for r in res)))
+
+
 @app.route("/perfis-de-voz/<nome>/excluir", methods=["POST"])
 def perfis_de_voz_excluir(nome: str):
     tts_excluir_perfil_de_voz(nome)
@@ -1911,6 +1972,14 @@ def gerar_voz_baixar_zip(job_id: str):
     audio_path = os.path.join(VOZES_DIR, secure_filename(status["resultado_filename"]))
     if not os.path.exists(audio_path):
         return "Áudio não encontrado.", 404
+    zip_path = _zip_da_voz(job_id, status)
+    return send_file(zip_path, mimetype="application/zip", as_attachment=True, download_name="narracao_e_legenda.zip")
+
+
+def _zip_da_voz(job_id: str, status: Dict[str, Any]) -> str:
+    """O .zip de narração do Gerador de voz (narracao.wav + legenda.srt + info.json + chamadas.json) — o mesmo que
+    o Novo vídeo aceita. Também usado pela 🏭 Produção no pod."""
+    audio_path = os.path.join(VOZES_DIR, secure_filename(status["resultado_filename"]))
     zip_path = os.path.join(VOZES_DIR, f"{job_id}.zip")
     # monta o zip sob demanda (só na primeira vez que baixarem -- depois
     # reaproveita, já que áudio e legenda não mudam mais uma vez prontos)
@@ -1933,7 +2002,7 @@ def gerar_voz_baixar_zip(job_id: str):
                 srt_path = os.path.join(VOZES_DIR, secure_filename(srt_filename))
                 if os.path.exists(srt_path):
                     zf.write(srt_path, arcname="legenda.srt")
-    return send_file(zip_path, mimetype="application/zip", as_attachment=True, download_name="narracao_e_legenda.zip")
+    return zip_path
 
 
 # --------------------------------------------------------------------- #
@@ -2377,6 +2446,15 @@ def save_settings():
             pass
         for _b in ("runpod_video_rascunho", "runpod_video_1080p", "runpod_reserva_flow"):
             new_values[_b] = request.form.get(_b) == "on"
+        if "runpod_modo" in request.form:  # 🖥️ Meu pod (pod_studio.py, v84_121)
+            new_values["runpod_modo"] = request.form.get("runpod_modo")
+            new_values["runpod_pod_url"] = (request.form.get("runpod_pod_url") or "").strip()
+            if (request.form.get("runpod_pod_chave") or "").strip():  # em branco = mantém a chave salva
+                new_values["runpod_pod_chave"] = request.form["runpod_pod_chave"].strip()
+            if request.form.get("runpod_pod_chave_apagar") == "on":
+                new_values["runpod_pod_chave"] = ""
+            new_values["chatterbox_onde"] = "pod" if request.form.get("chatterbox_no_pod") == "on" else "local"
+            new_values["chatterbox_pod_ptbr"] = request.form.get("chatterbox_pod_ptbr") == "on"
     if "sites_bloqueados" in request.form:  # ⛔ lista negra de sites (v84_106)
         import lista_negra
         new_values["sites_bloqueados"] = (list(lista_negra.PADRAO) if request.form.get("sites_bloqueados_padrao") == "on"
@@ -3088,6 +3166,8 @@ def _usar_links_do_roteiro(job_id: str, job: dict) -> int:
 
 
 def _provider_do_projeto(job: dict) -> List[str]:
+    if job.get("producao_pod"):  # 🏭 cenas ⏳ pendentes (completar depois, no editor) + 🕵️ fotos do modelo
+        return ["adiado"] + [prov for _t, (_m, prov, chave, _r) in _PROJETOS_MIDIA.items() if job.get(chave)]
     for _t, (_m, prov, chave, _r) in _PROJETOS_MIDIA.items():
         if job.get(chave):
             return [prov]
@@ -4226,7 +4306,7 @@ def submit_json(job_id: str):
     return redirect(url_for("fetching_previews_page", job_id=job_id))
 
 
-_IA_PULA_BUSCA = {"youtube", "flow", "runpod", "produto", "material"}
+_IA_PULA_BUSCA = {"youtube", "flow", "runpod", "produto", "material", "adiado"}
 
 
 # 🧭 v84_70: cada trecho vai pra FONTE CERTA (só entre os bancos que você ligou no projeto)
@@ -4554,6 +4634,15 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment], retoma
                 "video_preview_url": None, "provider": "youtube", "original_provider": "youtube",
             })
 
+        # 1b) 🏭 cenas ⏳ PENDENTES (Produção no pod): sem prévia agora — "Completar cenas pendentes" no editor
+        adiado_idx = [i for i, s in enumerate(segments) if s.provider == "adiado" and not s.override_source and i in faltam]
+        for i in adiado_idx:
+            _publicar(i, {
+                "index": i, "ok": False, "thumbnail_url": None, "result_url": None, "label": None, "adiado": True,
+                "error": "⏳ cena pendente — use “Completar cenas pendentes” (escolha as fontes e a IA escreve a busca).",
+                "video_preview_url": None, "provider": "adiado", "original_provider": "adiado",
+            })
+
         # 2) trechos com buscador de imagem por navegador: TODOS de uma vez,
         #    1 navegador por buscador (não 1 por trecho), já baixando a 1ª
         #    imagem — a montagem reaproveita o arquivo sem buscar de novo.
@@ -4614,7 +4703,7 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment], retoma
             imagem_thread.start()
 
         # 3) o resto: como sempre, em paralelo
-        especiais = set(youtube_idx) | set(produto_idx) | {i for i, _s in imagem_items}
+        especiais = set(youtube_idx) | set(produto_idx) | set(adiado_idx) | {i for i, _s in imagem_items}
         restantes = [(i, s) for i, s in enumerate(segments) if i not in especiais and i in faltam]
         concurrency = max(1, min(cfg.get("preview_fetch_concurrency", 3), max(1, len(restantes))))
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -5304,6 +5393,10 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
 
         try:
             output_path = os.path.join(OUTPUTS_DIR, f"{job_id}.mp4")
+            try:  # avisos de uma montagem anterior não valem pra esta
+                os.remove(os.path.join(_job_dir(job_id), "avisos_montagem.json"))
+            except OSError:
+                pass
 
             # Sempre limpa erros de overlay de uma tentativa anterior —
             # sem isso, se a pessoa REMOVER todos os overlays depois de
@@ -5377,6 +5470,13 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 censura=job.get("censura") or None,
             )
             job["output_path"] = output_path
+            try:  # v84_119: etapas puladas por cortar a imagem do vídeo (aparecem na tela do resultado)
+                _av = os.path.join(_job_dir(job_id), "avisos_montagem.json")
+                job["avisos_montagem"] = json.load(open(_av, encoding="utf-8")) if os.path.exists(_av) else []
+                if os.path.exists(_av):
+                    os.remove(_av)
+            except Exception:  # noqa: BLE001
+                job["avisos_montagem"] = []
 
             # Cortes reais (vídeo+áudio, não camada) — aplicados DEPOIS
             # dos overlays, no vídeo já pronto. Só os que já têm upload
@@ -5409,7 +5509,13 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 on_progress("cortes", 0, 1000)
                 with (perf.timed("montagem:cortes", quantidade=len(cutaways_to_apply)) if perf else nullcontext()), acompanhar("cortes"):
                     insert_cutaways(output_path, cutaways_to_apply, cutaway_output, _job_dir(job_id), target_width, target_height)
-                shutil.move(cutaway_output, output_path)
+                _ev = __import__("export_paralelo")
+                _dv_a, _dv_d = _ev.duracao_do_video(output_path), _ev.duracao_do_video(cutaway_output)
+                if _dv_a and _dv_d and _dv_d < _dv_a - 1.0:  # v84_119: com cortes o vídeo só pode CRESCER
+                    job.setdefault("avisos_montagem", []).append(
+                        f"As chamadas/abertura/encerramento cortaram a imagem do vídeo em {int(_dv_d // 60)}:{_dv_d % 60:04.1f} — foram puladas.")
+                else:
+                    shutil.move(cutaway_output, output_path)
 
             _leg_cfg = (job.get("legendas") or {})
             if _leg_cfg.get("ativa"):
@@ -5450,6 +5556,14 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                         generate_word_captions_ass(word_timestamps, ass_path, width, height, style=job.get("caption_style"))
                         captioned_path = os.path.join(OUTPUTS_DIR, f"{job_id}_legendado.mp4")
                         burn_captions(output_path, ass_path, captioned_path)
+                        _ev = __import__("export_paralelo")
+                        _dv_a, _dv_d = _ev.duracao_do_video(output_path), _ev.duracao_do_video(captioned_path)
+                        if _dv_a and _dv_d and _dv_d < _dv_a - 1.0:  # v84_119: legenda que corta a imagem → refaz num passe só
+                            _ev.definir("1")
+                            try:
+                                burn_captions(output_path, ass_path, captioned_path)
+                            finally:
+                                _ev.definir(job.get("export_paralelo"))
                         job["captioned_output_path"] = captioned_path
                 except Exception:  # noqa: BLE001
                     # a versao sem legenda ja esta pronta e continua valendo —
@@ -10103,6 +10217,7 @@ def job_status_api(job_id: str):
         "assembly_error": job.get("assembly_error"),
         "assembly_error_segment_index": job.get("assembly_error_segment_index"),
         "prebaixar": job.get("prebaixar"),
+        "avisos_montagem": job.get("avisos_montagem") or [] if job.get("status") == "concluido" else [],
         "descricao_youtube": job.get("descricao_youtube") if job.get("status") == "concluido" else None,
         "capitulos_video": job.get("capitulos_video") if job.get("status") == "concluido" else None,
     })
@@ -10792,6 +10907,10 @@ vendas_rotas.registrar(app, BASE_DIR)
 import dossies_rotas  # noqa: E402
 
 dossies_rotas.registrar(app, BASE_DIR)
+import fotos_roteiro  # noqa: E402  (📸 v84_127: a IA pergunta que fotos você tem e posiciona no roteiro)
+fotos_roteiro.registrar(app, BASE_DIR)
+import elenco as _elenco  # noqa: E402  (🎭 v84_128: rostos e idades das fotos pro pod)
+_elenco.registrar(app, BASE_DIR)
 
 # 🖼 thumbnails no Google Flow + 🎙 adaptar o roteiro pro TTS por idioma (v84_96)
 import thumbs_tts_rotas  # noqa: E402
@@ -10811,6 +10930,277 @@ import analisador_rotas as _analisador_rotas  # noqa: E402  (📊 Analisador de 
 _analisador_rotas.registrar(app, BASE_DIR)
 import runpod_gerador as _runpod  # noqa: E402  🟣 Runpod: mídias geradas, saldo e teste (v84_116)
 _runpod.registrar(app)
+
+
+# --------------------------------------------------------------------- #
+# 🏭 Produção no pod (v84_122): roteiros → narração/transcrição/imagens no pod → projeto com cenas ⏳ pendentes
+# --------------------------------------------------------------------- #
+def _registrar_narracao_do_pod(item: dict, lote: dict, wav: str, segments: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """A narração que veio do pod vira uma geração do 🎙️ Gerador de voz, feita do MESMO jeito: legenda com o texto do
+    roteiro nos tempos do Whisper, chamadas ([[INSCREVA]]/[[VENDA]]), capítulos do roteiro, 📜 Histórico e o .zip
+    (narracao.wav + legenda.srt + info.json + chamadas.json)."""
+    import chamadas as _ch
+    import legenda_texto as _lt
+    os.makedirs(VOZES_DIR, exist_ok=True)
+    gv_id = uuid.uuid4().hex
+    output_path = os.path.join(VOZES_DIR, f"{gv_id}.wav")
+    shutil.copyfile(wav, output_path)
+    texto = item.get("texto") or ""
+    perfil = item.get("perfil") or ""
+    status: Dict[str, Any] = {
+        "running": False, "log": "🏭 Produção no pod: narrado e transcrito no pod.\n", "erro": None, "pronto": True,
+        "engine": item.get("motor") or "chatterbox", "resultado_filename": os.path.basename(output_path),
+        "resultado_srt_filename": None, "idioma": item.get("idioma") or "pt", "idioma_origem": "escolhido",
+        "criado_em": item.get("inicio") or time.time(), "iniciou_em": item.get("inicio"),
+        "texto_inicio": " ".join(texto.split())[:90], "palavras": len(texto.split()),
+        "voz": f"🖥️ pod · {perfil or 'voz padrão do modelo'}",
+        "roteiro_id": item.get("origem_id") if item.get("origem") == "roteiro" else None,
+        "dossie_id": item.get("origem_id") if item.get("origem") == "dossie" else None,
+    }
+
+    def log(linha: str) -> None:
+        status["log"] += linha + "\n"
+
+    try:
+        segmentos, inf = _lt.com_texto(segments, texto)
+        log(f"✍️ Legenda com o texto do roteiro ({inf['casadas']}% das palavras achadas no áudio).")
+    except Exception:  # noqa: BLE001
+        segmentos = segments
+    if not any(sg.get("words") for sg in segmentos or []):
+        segmentos = _lt.estimar(texto, get_audio_duration(output_path))
+        log("⚠ Sem o tempo das palavras: legenda com tempos estimados.")
+    palavras = [w for sg in segmentos for w in sg.get("words", [])]
+    partes = _ch.dividir(texto)
+    if any(p["tipo"] for p in partes):
+        _salvar_chamadas_voz(status, output_path, _ch.alinhar(partes, palavras), log)
+    leg = (lote.get("config") or {}).get("legenda") or {}
+    n = int(leg.get("max_palavras") or 5)
+    srt_texto = lg.gerar_srt(segmentos, modo=leg.get("modo") or "legenda", duracao_alvo_s=5.0, max_palavras=n,
+                             palavras_por_linha=n)
+    srt_path = os.path.splitext(output_path)[0] + ".srt"
+    with open(srt_path, "w", encoding="utf-8") as f:
+        f.write(srt_texto)
+    status["resultado_srt_filename"] = os.path.basename(srt_path)
+    log("Legenda gerada.")
+    _capitulos_do_roteiro(status, output_path, palavras, log)
+    _GERAR_VOZ_STATUS[gv_id] = status
+    try:
+        _hist_voz.registrar(VOZES_DIR, gv_id, status, voz=status["voz"])
+    except Exception:  # noqa: BLE001
+        pass
+    zip_path = _zip_da_voz(gv_id, status)
+    blocos = lg.parse_srt(srt_texto)
+    return {"gv_id": gv_id, "zip": zip_path, "total": float(blocos[-1]["end"]) if blocos else float(segments[-1]["end"])}
+
+
+def _criar_job_producao(item: dict, lote: dict, zip_path: str, resposta: dict, ficha: Optional[dict] = None) -> str:
+    """Cria o projeto do editor pelo MESMO caminho de quem envia o .zip do Gerador de voz na página inicial
+    (legenda pronta, idioma e projeto do info.json, chamadas) e depois "cola" o JSON das cenas."""
+    cfg_lote = lote.get("config") or {}
+    marca = {"lote": lote.get("id"), "item": item.get("id")}
+    for jid, j in list(_JOBS.items()):  # 🔁 tentar de novo: reaproveita o projeto que ficou esperando o JSON
+        if j.get("producao_pod") == marca and j.get("status") == "aguardando_json":
+            return _colar_json_producao(jid, resposta)
+    with open(zip_path, "rb") as f:
+        dados = {"audio": (f, "narracao_e_legenda.zip"), "interval_seconds": str(cfg_lote.get("intervalo") or 5),
+                 "ritmo_cenas": "livre", "providers": "runpod", "language": item.get("idioma") or "auto",
+                 "formato": cfg_lote.get("orientacao") or "16:9"}
+        with app.test_request_context("/transcribe", method="POST", data=dados, content_type="multipart/form-data"):
+            resp = transcribe()
+    m = re.search(r"/job/([0-9a-f]+)/", getattr(resp, "location", "") or "")
+    if not m:
+        raise RuntimeError("o site não aceitou o .zip da narração (veja a página inicial com esse .zip)")
+    job_id = m.group(1)
+    job = _JOBS[job_id]
+    fim = time.time() + 180
+    while job.get("status") == "transcrevendo" and time.time() < fim:
+        time.sleep(0.2)
+    if job.get("status") != "aguardando_json":
+        raise RuntimeError(f"o projeto não ficou pronto ({job.get('status')}): {str(job.get('error') or '')[:300]}")
+    job["nome_projeto"] = item.get("titulo") or ""
+    job["producao_pod"] = {"lote": lote.get("id"), "item": item.get("id")}
+    if ficha:
+        job.setdefault("ia", {})["ficha"] = ficha
+    _save_state(job_id)
+    return _colar_json_producao(job_id, resposta)
+
+
+def _colar_json_producao(job_id: str, resposta: dict) -> str:
+    """Ajusta os tempos ao áudio do projeto (início 0, sem buracos, fim exato) e cola o JSON das cenas."""
+    import cenas_lote
+    job = _JOBS[job_id]
+    resposta = cenas_lote.ajustar_tempos(resposta, float(job.get("total_duration") or 0))
+    texto = json.dumps(resposta, ensure_ascii=False)
+    try:
+        parse_ai_response(texto, valid_providers=job["providers"] + _provider_do_projeto(job),
+                          total_duration=job["total_duration"])
+    except PromptBuilderError as exc:
+        raise RuntimeError(f"o JSON das cenas não passou na validação do site: {exc}"[:500]) from None
+    with app.test_request_context(f"/job/{job_id}/submit-json", method="POST", data={"ai_response": texto}):
+        submit_json(job_id)
+    if job.get("status") == "aguardando_json":
+        raise RuntimeError("o JSON das cenas não passou na validação do site — veja o projeto " + job_id)
+    return job_id
+
+
+def pendentes_info(job: dict) -> Dict[str, Any]:
+    """Quantas cenas ⏳ pendentes o projeto tem (e as fontes que dá pra escolher pra completar)."""
+    pend = job.get("pending_segments") or []
+    n = sum(1 for s in pend if s.get("provider") == "adiado")
+    fontes = [p for p in DEFAULT_PROVIDERS if p not in ("adiado",)]
+    return {"n": n, "fontes": fontes, "marcadas": [p for p in (job.get("providers_completar") or []) if p in fontes],
+            "pod_refazer": len(_cenas_pod_para_refazer(job))}
+
+
+app.jinja_env.globals["pendentes_info"] = pendentes_info
+
+
+def _completar_pendentes(job_id: str, fontes: List[str]) -> Dict[str, Any]:
+    """⏳ → fonte de verdade: a 🤖 IA escreve as buscas de cada cena pendente (e decide YouTube/foto real/IA, só entre
+    as fontes escolhidas); sem IA, a busca em inglês que a 1ª etapa já escreveu vai pras fontes em rodízio. Depois
+    busca só as prévias dessas cenas (as do pod e as que você já escolheu ficam)."""
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    fontes = [p for p in fontes if p in DEFAULT_PROVIDERS and p != "adiado"]
+    if not fontes:
+        raise ValueError("Escolha pelo menos uma fonte.")
+    if job.get("status") == "buscando_previas":
+        raise ValueError("O projeto ainda está buscando prévias — espere terminar.")
+    pend = job.get("pending_segments") or []
+    idx = [k for k, d in enumerate(pend) if d.get("provider") == "adiado" and not d.get("override_source")]
+    if not idx:
+        raise ValueError("Não tem cena pendente neste projeto.")
+    job["providers"] = list(dict.fromkeys(fontes + [p for p in (job.get("providers") or []) if p != "adiado"]))
+    job["providers_completar"] = fontes
+    segs = [_segmento_obj(d) for d in pend]
+    # rodízio entre as fontes marcadas (bancos de vídeo primeiro); YouTube só quando a IA pede (busca precisa ser outra)
+    _videos = [p for p in fontes if p not in PHOTO_ONLY_PROVIDERS_COMPLETAR and p not in ("youtube", "flow", "runpod")]
+    _fotos = [p for p in fontes if p in PHOTO_ONLY_PROVIDERS_COMPLETAR]
+    padrao_rodizio = (_videos + _fotos) or [p for p in fontes if p != "youtube"] or fontes
+    novas: Dict[int, Dict[str, Any]] = {}
+    import ia_servico
+    if ia_servico.ativo("buscas"):
+        try:
+            import ia_midia
+            info = job.setdefault("ia", {})
+            blocos = [b for b in job.get("segments") or [] if (b.get("text") or "").strip()]
+            roteiro = " ".join(str(b["text"]).strip() for b in blocos)
+            if info.get("ficha") is None:
+                info["ficha"] = ia_midia.ficha_visual(roteiro, job.get("nome_projeto") or "", job.get("language") or "", job=job_id)
+            falas, _p = _falas_por_trecho(job, segs)
+            novas = ia_midia.buscas_melhores([{"n": k + 1, "fala": falas[k], "visual": segs[k].visual,
+                                               "antes": falas[k - 1] if k else "",
+                                               "depois": falas[k + 1] if k + 1 < len(falas) else "",
+                                               "query": segs[k].query} for k in idx], info.get("ficha"), roteiro, job=job_id)
+        except Exception:  # noqa: BLE001 — sem IA: segue com a regra
+            novas = {}
+    usou_ia = 0
+    for j, k in enumerate(idx):
+        sg = segs[k]
+        nb = novas.get(k + 1)
+        sg.provider = padrao_rodizio[j % len(padrao_rodizio)]
+        sg.media_type = "image" if sg.provider in PHOTO_ONLY_PROVIDERS_COMPLETAR else "video"
+        mud: Dict[str, Any] = {}
+        if nb:
+            usou_ia += 1
+            original = sg.query
+            sg.query = nb["buscas"][0]
+            sg.alternativas = [b for b in nb["buscas"][1:] + [original] if b and b != sg.query][:5]
+            if nb.get("visual"):
+                sg.visual = nb["visual"]
+            if nb.get("midia") == "foto" and "pexels" in fontes and sg.provider not in PHOTO_ONLY_PROVIDERS_COMPLETAR:
+                sg.provider, sg.media_type = "pexels", "image"
+            mud = _rotear_trecho(job, sg, nb)
+            if sg.provider in ("flow", "runpod"):
+                sg.media_type = "image"
+                sg.query = sg.visual or sg.query
+        pend[k].update(provider=sg.provider, query=sg.query, media_type=sg.media_type,
+                       alternativas=sg.alternativas, visual=sg.visual, **{x: v for x, v in mud.items() if x != "provider"})
+    previas = list(job.get("segment_previews") or []) + [None] * len(pend)
+    previas = previas[:len(pend)]
+    for k in idx:
+        previas[k] = None
+    job["segment_previews"] = previas
+    if any(pend[k].get("provider") == "youtube" for k in idx):  # 🎬 cenas que a IA mandou pro YouTube: já pesquisa
+        _youtube_itens_sincronizar(job)
+        _youtube_buscar_pendentes(job_id)
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
+    return {"ok": True, "cenas": len(idx), "com_ia": usou_ia, "fontes": fontes}
+
+
+PHOTO_ONLY_PROVIDERS_COMPLETAR = ("wikipedia", "bing", "brave", "yandex", "startpage", "google")
+
+
+def _cenas_pod_para_refazer(job: dict) -> List[int]:
+    """Cenas do pod (runpod) que viraram 🃏 cartão ou ficaram sem prévia (o juiz da IA trocava a imagem gerada por um
+    cartão até a v84_123) — a imagem continua no cache, é só buscar de novo."""
+    pend = job.get("pending_segments") or []
+    pv = list(job.get("segment_previews") or [])
+    out = []
+    for k, d in enumerate(pend):
+        if d.get("provider") != "runpod":
+            continue
+        o = d.get("override_source") or {}
+        p = pv[k] if k < len(pv) else None
+        if o.get("cartao") or d.get("cartao") or (p is not None and not (p or {}).get("ok")) or (p or {}).get("cartao"):
+            if not o or o.get("cartao"):  # não mexe no que VOCÊ escolheu no editor
+                out.append(k)
+    return out
+
+
+def _refazer_cenas_pod(job_id: str) -> Dict[str, Any]:
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    if job.get("status") == "buscando_previas":
+        raise ValueError("O projeto ainda está buscando prévias — espere terminar.")
+    idx = _cenas_pod_para_refazer(job)
+    if not idx:
+        raise ValueError("Nenhuma cena do pod pra refazer.")
+    pend = job["pending_segments"]
+    for k in idx:
+        pend[k]["override_source"] = None
+        pend[k].pop("cartao", None)
+        pend[k]["media_type"] = "image"
+    job["destaques"] = [d for d in job.get("destaques") or [] if not (d.get("origem") == "cartao" and d.get("trecho") in idx)]
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    for k in idx:
+        previas[k] = None
+    job["segment_previews"] = previas
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
+    return {"ok": True, "cenas": len(idx)}
+
+
+@app.route("/job/<job_id>/refazer-cenas-pod", methods=["POST"])
+def refazer_cenas_pod_rota(job_id: str):
+    try:
+        return jsonify(_refazer_cenas_pod(job_id))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+
+
+@app.route("/job/<job_id>/completar-pendentes", methods=["POST"])
+def completar_pendentes_rota(job_id: str):
+    corpo = request.get_json(silent=True) or {}
+    fontes = corpo.get("fontes") or request.form.getlist("fontes")
+    try:
+        return jsonify(_completar_pendentes(job_id, [str(f) for f in fontes]))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+
+
+import producao_pod as _producao  # noqa: E402
+import producao_pod_rotas as _producao_rotas  # noqa: E402
+
+_producao.configurar(_criar_job_producao, _registrar_narracao_do_pod)
+_producao_rotas.registrar(app, BASE_DIR)
+try:
+    _producao.garantir_runner()  # ▶ lote que estava rodando quando o site fechou: continua
+except Exception:  # noqa: BLE001
+    pass
 import flow_estudio as _flow_estudio  # noqa: E402  🎬 aba Google Flow: gerar, galeria e 🧪 testar (v84_76)
 _flow_estudio.registrar(app, BASE_DIR)
 import ia_google_rotas as _ia_google_rotas  # noqa: E402  🔎 IA do Google (app à parte, porta 8852) (v84_86)

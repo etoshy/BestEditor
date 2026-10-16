@@ -1,0 +1,147 @@
+{# 🎭 Elenco (elenco.py, v84_128) — incluir com {% set el_pid = p.id %}{% include "_elenco.html" %} #}
+<div id="elCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">🎭 Elenco — pessoas, idades e locais <span style="font-weight:400;font-size:.82rem;color:#666;">(a IA cataloga TODAS as fotos — inclusive as que vieram das matérias — pela legenda, pelo OG da página e pelo texto impresso, como cartaz de desaparecido/procurado: quem é quem, com que idade, e quais são os lugares. Na 🏭 Produção no pod, as cenas com essas pessoas saem com o ROSTO delas na idade daquele momento da história — ex.: o filho que só tem foto criança aparece adulto anos depois. Sem elenco, o pod monta um sozinho com a IA.)</span></h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
+    <button type="button" id="elIa" style="width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff;">🤖 Catalogar as fotos com a IA</button>
+    <button type="button" id="elNova" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Pessoa</button>
+    <button type="button" id="elNovoLocal" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Local</button>
+    <button type="button" id="elSalvar" style="width:auto;margin:0;padding:5px 12px;">💾 Salvar</button>
+    <span id="elSt" style="color:#555;"></span>
+  </div>
+  <div id="elLista" style="margin-top:8px;"></div>
+  <div id="elLocais" style="margin-top:8px;"></div>
+  <div id="elCrono" style="margin-top:8px;font-size:.8rem;color:#444;"></div>
+</div>
+<script>
+(function () {
+  const BASE = '/modelos-video/' + {{ el_pid|tojson }} + '/elenco';
+  const $e = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let EL = { pessoas: [], locais: [] }, FOTOS = [];
+  const urlDe = (id) => (FOTOS.find(f => f.id === id) || {}).url || '';
+
+  function lerTela() {  // a tela → EL (antes de salvar / redesenhar)
+    lerLocais();
+    document.querySelectorAll('#elLista [data-p]').forEach(box => {
+      const x = EL.pessoas[+box.dataset.p]; if (!x) return;
+      ['nome', 'papel', 'aparencia'].forEach(k => { x[k] = box.querySelector(`[data-k="${k}"]`).value; });
+      x.nascimento = +box.querySelector('[data-k="nascimento"]').value || 0;
+      x.usar = box.querySelector('[data-k="usar"]').checked;
+      box.querySelectorAll('[data-f]').forEach(fb => {  // (pessoas)
+        const f = x.fotos[+fb.dataset.f]; if (!f) return;
+        f.idade = +fb.querySelector('[data-k="idade"]').value || 0;
+        f.quem_na_foto = fb.querySelector('[data-k="quem"]').value;
+        f.so_ele = !f.quem_na_foto;
+      });
+    });
+  }
+
+  function lerLocais() {
+    document.querySelectorAll('#elLocais [data-l]').forEach(box => {
+      const x = (EL.locais || [])[+box.dataset.l]; if (!x) return;
+      ['nome', 'tipo', 'descricao'].forEach(k => { x[k] = box.querySelector(`[data-k="${k}"]`).value; });
+      x.usar = box.querySelector('[data-k="usar"]').checked;
+    });
+  }
+  function desenharLocais() {
+    const ls = EL.locais || [];
+    $e('elLocais').innerHTML = !ls.length ? '' : '<div style="font-weight:600;font-size:.9rem;margin-top:6px;">📍 Locais</div>' + ls.map((x, i) => `
+      <div data-l="${i}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;margin:4px 0;${x.usar === false ? 'opacity:.55;' : ''}">
+        <label style="margin:0;font-weight:400;font-size:.8rem;"><input type="checkbox" data-k="usar" ${x.usar === false ? '' : 'checked'} style="width:auto;margin:0 3px 0 0;">usar</label>
+        <input data-k="nome" value="${esc(x.nome)}" style="width:170px;margin:0;font-weight:600;">
+        <input data-k="tipo" value="${esc(x.tipo)}" placeholder="tipo" style="width:110px;margin:0;">
+        <input data-k="descricao" value="${esc(x.descricao)}" placeholder="descrição em inglês" style="flex:1;min-width:180px;margin:0;font-size:.8rem;">
+        ${(x.fotos || []).length ? x.fotos.map(id => `<img src="${urlDe(id)}" title="${id}" style="width:70px;height:50px;object-fit:cover;border-radius:4px;">`).join('') : '<span style="font-size:.72rem;color:#92400e;" title="gerado pela descrição (fiel às fontes), igual em todas as cenas">📝 sem foto — pela descrição</span>'}
+        <button type="button" data-tirarl="${i}" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem;background:#94a3b8;">✕</button>
+      </div>`).join('');
+  }
+  $e('elLocais').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tirarl]'); if (!b) return;
+    lerLocais(); EL.locais.splice(+b.dataset.tirarl, 1); desenharLocais();
+  });
+
+  function desenharCrono() {
+    const cr = EL.cronologia || [];
+    $e('elCrono').innerHTML = cr.length ? '<b>🕰 Cronologia</b> <span style="color:#666">(é por ela que cada cena sabe o ano e a idade de cada um)</span><br>' + cr.map(c => `<b>${c.ano}</b> ${esc(c.evento)}`).join(' · ') : '';
+  }
+  function desenhar() {
+    desenharLocais(); desenharCrono();
+    const ps = EL.pessoas || [];
+    if (!ps.length) { $e('elLista').innerHTML = '<div style="font-size:.84rem;color:#666;">Ninguém no elenco ainda. Clique em 🤖 Montar com a IA (ela olha as fotos) ou ➕ Pessoa.</div>'; return; }
+    const opcoes = FOTOS.map(f => `<option value="${f.id}">${f.id} — ${esc(f.contexto.slice(0, 60))}</option>`).join('');
+    $e('elLista').innerHTML = ps.map((x, i) => `
+      <div data-p="${i}" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;margin:6px 0;${x.usar === false ? 'opacity:.55;' : ''}">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <label style="margin:0;font-weight:400;font-size:.8rem;"><input type="checkbox" data-k="usar" ${x.usar === false ? '' : 'checked'} style="width:auto;margin:0 3px 0 0;">usar</label>
+          <input data-k="nome" value="${esc(x.nome)}" placeholder="nome" style="width:170px;margin:0;font-weight:600;">
+          <input data-k="papel" value="${esc(x.papel)}" placeholder="papel (o pai, vítima…)" style="width:200px;margin:0;">
+          <label style="margin:0;font-weight:400;font-size:.8rem;">nasceu em <input data-k="nascimento" type="number" value="${x.nascimento || ''}" placeholder="ano" style="width:80px;margin:0;"></label>
+          <input data-k="aparencia" value="${esc(x.aparencia)}" placeholder="aparência em inglês (white man, thin face, glasses…)" style="flex:1;min-width:200px;margin:0;font-size:.82rem;">
+          <button type="button" data-tirar="${i}" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem;background:#94a3b8;">✕</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+          ${(x.fotos || []).map((f, j) => `<div data-f="${j}" style="width:150px;font-size:.75rem;">
+            <img src="${urlDe(f.midia)}" alt="" style="width:150px;height:110px;object-fit:cover;border-radius:6px;background:#eee;">
+            <div style="display:flex;gap:4px;align-items:center;margin-top:2px;"><b>${f.midia}</b> idade <input data-k="idade" type="number" value="${f.idade || ''}" style="width:52px;margin:0;font-size:.75rem;padding:2px;">
+              <button type="button" data-tirarf="${i}:${j}" style="width:auto;margin:0;padding:0 5px;font-size:.7rem;background:#cbd5e1;color:#333;">✕</button></div>
+            <input data-k="quem" value="${esc(f.quem_na_foto)}" placeholder="se há mais gente: qual é ela (em inglês)" style="width:100%;margin:2px 0 0;font-size:.72rem;padding:2px;">
+            ${f.como_sei ? `<div style="color:#666;font-size:.7rem;">🔎 ${esc(f.como_sei)}</div>` : ''}
+          </div>`).join('')}
+          <div style="font-size:.75rem;"><select data-addf="${i}" style="width:150px;margin:0;font-size:.75rem;"><option value="">➕ foto…</option>${opcoes}</select></div>
+        </div>
+      </div>`).join('') + '<div style="font-size:.78rem;color:#666;">Confira as idades: é por elas que o pod sabe quanto envelhecer (ou rejuvenescer) o rosto em cada cena. Depois de mexer, 💾 Salvar.</div>';
+  }
+
+  async function chamar(url, corpo) {
+    const r = await fetch(url, corpo === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+  }
+  let acompanhando = false;
+  function aplicar(d) {
+    EL = d.elenco || { pessoas: [], locais: [] }; EL.locais = EL.locais || []; FOTOS = d.fotos || []; desenhar();
+    if (!d.ia) { $e('elIa').style.opacity = '.6'; $e('elIa').title = 'IA: ' + d.ia_motivo; }
+    const r = d.rodando;
+    if (r && r.ativo) { $e('elIa').disabled = true; $e('elSt').textContent = r.msg + ' (pode sair da página)'; if (!acompanhando) acompanhar(); }
+    else { $e('elIa').disabled = false; if (r) $e('elSt').textContent = r.erro ? '⚠ ' + r.erro : r.msg + ' — confira as idades'; }
+  }
+  async function acompanhar() {
+    acompanhando = true;
+    while (true) {
+      await new Promise(ok => setTimeout(ok, 3000));
+      let d = null; try { d = await chamar(BASE); } catch (_) { continue; }
+      if (!(d.rodando && d.rodando.ativo)) { aplicar(d); break; }
+      $e('elSt').textContent = d.rodando.msg + ' (pode sair da página)';
+    }
+    acompanhando = false;
+  }
+
+  $e('elLista').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    lerTela();
+    if (b.dataset.tirar) EL.pessoas.splice(+b.dataset.tirar, 1);
+    if (b.dataset.tirarf) { const [i, j] = b.dataset.tirarf.split(':').map(Number); EL.pessoas[i].fotos.splice(j, 1); }
+    desenhar();
+  });
+  $e('elLista').addEventListener('change', (e) => {
+    const s = e.target.closest('[data-addf]'); if (!s || !s.value) return;
+    lerTela();
+    const x = EL.pessoas[+s.dataset.addf];
+    if (!x.fotos.some(f => f.midia === s.value)) x.fotos.push({ midia: s.value, idade: 0, ano: 0, quem_na_foto: '', so_ele: true, rosto_visivel: true });
+    desenhar();
+  });
+  $e('elNovoLocal').addEventListener('click', () => { lerTela(); EL.locais.push({ nome: '', tipo: '', descricao: '', ano: 0, usar: true, fotos: [] }); desenhar(); });
+  $e('elNova').addEventListener('click', () => { lerTela(); EL.pessoas.push({ nome: '', papel: '', nascimento: 0, aparencia: '', usar: true, fotos: [] }); desenhar(); });
+  $e('elSalvar').addEventListener('click', async () => {
+    lerTela(); lerLocais();
+    const sem = EL.pessoas.filter(x => !x.fotos.length).length;
+    try { aplicar(await chamar(BASE, EL)); $e('elSt').textContent = '✔ salvo' + (sem ? ` (${sem} pessoa(s) sem foto saíram)` : ''); } catch (err) { $e('elSt').textContent = '⚠ ' + err.message; }
+  });
+  $e('elIa').addEventListener('click', async () => {
+    if ((EL.pessoas.length || EL.locais.length) && !confirm('Catalogar de novo com a IA? O elenco atual (e o que você corrigiu) é substituído.')) return;
+    $e('elIa').disabled = true; $e('elSt').textContent = '🤖 começando…';
+    try { aplicar(await chamar(BASE + '/ia', {})); }
+    catch (err) { $e('elSt').textContent = '⚠ ' + err.message; $e('elIa').disabled = false; }
+  });
+  chamar(BASE).then(aplicar).catch(() => {});
+})();
+</script>

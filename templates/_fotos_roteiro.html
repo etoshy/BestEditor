@@ -1,0 +1,147 @@
+{# 📸 Fotos pro roteiro (fotos_roteiro.py, v84_127) — incluir com {% set fr_pid = p.id %}{% include "_fotos_roteiro.html" %} #}
+<div id="frCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
+  <h2 style="margin:0 0 6px;font-size:1.1rem;">📸 Fotos pro roteiro <span style="font-weight:400;font-size:.82rem;color:#666;">(opcional — a IA lê o roteiro e pergunta que fotos você tem das pessoas, lugares, objetos e cenas dele; você envia e ela põe cada imagem nos melhores pontos, quantas vezes fizer sentido. As marcas não são lidas pela voz.)</span></h2>
+  <div id="frUso" style="font-size:.82rem;color:#555;margin-bottom:6px;"></div>
+
+  <details id="frPassoA" open style="margin:6px 0;">
+    <summary style="font-weight:600;cursor:pointer;">❓ 1 · A IA pergunta que fotos você tem</summary>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;margin-top:6px;">
+      <button type="button" id="frPergGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
+      <button type="button" data-ia-gerar="frPergGerar" data-ia-prompt="frPergPrompt" data-ia-resp="frPergResp" data-ia-ler="frPergLer" data-ia-status="frPergSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Perguntar com a IA</button>
+      <span id="frPergSt" style="color:#555;"></span>
+    </div>
+    <textarea id="frPergPrompt" rows="3" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+    <details style="margin-top:4px;font-size:.84rem;"><summary>colar a resposta de outra IA</summary>
+      <textarea id="frPergResp" rows="3" style="width:100%;font-size:.85rem;" placeholder='{ "perguntas": [ { "alvo": "...", "pergunta": "..." } ] }'></textarea>
+      <button type="button" id="frPergLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Ler as perguntas</button>
+    </details>
+    <div id="frPerguntas" style="margin-top:8px;"></div>
+  </details>
+
+  <details style="margin:6px 0;">
+    <summary style="font-weight:600;cursor:pointer;">➕ Outras imagens (com uma descrição de quando usar)</summary>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;margin-top:6px;">
+      <input type="file" id="frOutrasArq" multiple accept="image/*,video/*" style="margin:0;max-width:260px;">
+      <input type="text" id="frOutrasDesc" placeholder="o que é e quando usar — ex.: carta que ele deixou na mesa da cozinha; usar quando falar da carta" style="flex:1;min-width:260px;margin:0;">
+      <button type="button" id="frOutrasEnviar" style="width:auto;margin:0;padding:5px 12px;">⬆ Enviar</button>
+      <span id="frOutrasSt" style="color:#555;"></span>
+    </div>
+  </details>
+
+  <details id="frPassoB" style="margin:6px 0;">
+    <summary style="font-weight:600;cursor:pointer;">📍 2 · A IA posiciona as imagens no roteiro</summary>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;margin-top:6px;">
+      <label style="margin:0;font-weight:400;">Posicionar <select id="frModo" style="width:auto;margin:0;"><option value="todas">todas as imagens (mais usos, inclusive as que já estão)</option><option value="novas">só as que ainda não estão no roteiro</option></select></label>
+      <button type="button" id="frPosGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
+      <button type="button" data-ia-gerar="frPosGerar" data-ia-prompt="frPosPrompt" data-ia-resp="frPosResp" data-ia-ler="frPosLer" data-ia-status="frPosSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Posicionar com a IA</button>
+      <button type="button" id="frDesfazer" style="display:none;width:auto;margin:0;padding:5px 12px;background:#64748b;">↩ Tirar as marcas que a IA pôs</button>
+      <span id="frPosSt" style="color:#555;"></span>
+    </div>
+    <textarea id="frPosPrompt" rows="3" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+    <details style="margin-top:4px;font-size:.84rem;"><summary>colar a resposta de outra IA</summary>
+      <textarea id="frPosResp" rows="3" style="width:100%;font-size:.85rem;" placeholder='{ "usos": [ { "midia": "I9", "frases": [12, 40] } ] }'></textarea>
+      <button type="button" id="frPosLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Pôr as marcas</button>
+    </details>
+    <div id="frPosRes" style="font-size:.85rem;margin-top:6px;"></div>
+  </details>
+</div>
+<script>
+(function () {
+  const BASE = '/modelos-video/' + {{ fr_pid|tojson }};
+  const $f = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ICONE = { pessoa: '👤', lugar: '📍', objeto: '🔧', documento: '📄', cena: '🎬', veiculo: '🚗', outro: '🖼' };
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || (r.status === 404 ? '404 — reinicie o site (python app.py)' : r.status)); return d; };
+  let E = null;
+
+  function desenhar(d) {
+    E = d;
+    const uso = d.uso || {}, ids = Object.keys(uso);
+    const total = ids.reduce((a, k) => a + uso[k], 0);
+    $f('frUso').innerHTML = d.imagens ? `🖼 ${d.imagens} imagem(ns) no modelo · <b>${ids.length}</b> usada(s) no roteiro, <b>${total}</b> marca(s) no total` +
+      (d.imagens > ids.length ? ` · <span style="color:#b45309">${d.imagens - ids.length} sem uso — o passo 📍 2 encaixa</span>` : '') : '';
+    $f('frDesfazer').style.display = d.pode_desfazer ? '' : 'none';
+    const qs = d.perguntas || [];
+    if (!qs.length) { $f('frPerguntas').innerHTML = ''; return; }
+    $f('frPerguntas').innerHTML = qs.map(q => {
+      const env = (d.enviadas || {})[q.id] || [];
+      const feita = env.length > 0;
+      return `<div data-q="${q.id}" style="border:1px solid ${feita ? '#86efac' : '#e5e7eb'};background:${q.pulada ? '#f8fafc' : feita ? '#f0fdf4' : '#fff'};border-radius:8px;padding:8px 10px;margin:6px 0;${q.pulada ? 'opacity:.55;' : ''}">
+        <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+          <b>${ICONE[q.tipo] || '🖼'} ${esc(q.pergunta)}</b>
+          ${q.vezes ? `<span style="font-size:.78rem;color:#666;">citado ~${q.vezes}×</span>` : ''}
+          ${q.ja_tem && q.ja_tem.length ? `<span style="font-size:.78rem;color:#2563eb;">já tem: ${q.ja_tem.join(', ')}</span>` : ''}
+          ${feita ? `<span style="font-size:.78rem;color:#15803d;">✔ enviada(s): ${env.join(', ')}</span>` : ''}
+          <button type="button" data-pular="${q.id}" data-v="${q.pulada ? '0' : '1'}" style="margin-left:auto;width:auto;padding:1px 8px;font-size:.75rem;background:#94a3b8;">${q.pulada ? '↩ voltar' : 'não tenho / pular'}</button>
+        </div>
+        ${q.trecho ? `<div style="font-size:.8rem;color:#555;margin-top:2px;">“${esc(q.trecho)}”</div>` : ''}
+        ${q.por_que || q.dica ? `<div style="font-size:.78rem;color:#777;">${esc(q.por_que)}${q.dica ? ' · 🔎 ' + esc(q.dica) : ''}</div>` : ''}
+        ${q.pulada ? '' : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;">
+          <input type="file" multiple accept="image/*,video/*" data-arq="${q.id}" style="margin:0;max-width:240px;font-size:.8rem;">
+          <input type="text" data-desc="${q.id}" value="${esc(q.alvo)}" placeholder="descrição (quem/o quê, época…)" style="flex:1;min-width:200px;margin:0;font-size:.82rem;">
+          <button type="button" data-enviar="${q.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.82rem;">⬆ Enviar</button>
+          <span data-st="${q.id}" style="font-size:.8rem;color:#555;"></span></div>`}
+      </div>`;
+    }).join('') + `<div style="font-size:.8rem;color:#555;">Enviou as fotos? Agora o passo <b>📍 2</b> põe cada uma nos melhores pontos do roteiro.</div>`;
+  }
+
+  async function atualizar() { try { desenhar(await (await fetch(BASE + '/fotos-roteiro', { cache: 'no-store' })).json()); } catch (_) {} }
+
+  async function enviar(arquivos, desc, pergunta, st) {
+    if (!arquivos.length) { st.textContent = '⚠ escolha o(s) arquivo(s)'; return; }
+    let ok = 0, erro = '';
+    for (const a of arquivos) {
+      st.textContent = `⬆ enviando ${ok + 1}/${arquivos.length}…`;
+      const fd = new FormData(); fd.append('arquivo', a); fd.append('descricao', desc || ''); if (pergunta) fd.append('pergunta', pergunta);
+      const r = await fetch(BASE + '/midia', { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
+      if (r.ok && !d.erro) ok++; else erro = d.erro || r.status;
+    }
+    st.textContent = `✔ ${ok} enviada(s)` + (erro ? ` · ⚠ ${erro}` : '');
+    atualizar();
+  }
+
+  $f('frPerguntas').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.pular) { try { desenhar(await post(`${BASE}/fotos-roteiro/perguntas/${b.dataset.pular}`, { pulada: b.dataset.v === '1' })); } catch (_) {} return; }
+    if (b.dataset.enviar) {
+      const q = b.dataset.enviar, box = b.closest('[data-q]');
+      b.disabled = true;
+      await enviar([...box.querySelector('[data-arq]').files], box.querySelector('[data-desc]').value, q, box.querySelector('[data-st]'));
+      b.disabled = false;
+    }
+  });
+  $f('frOutrasEnviar').addEventListener('click', async () => {
+    if (!$f('frOutrasDesc').value.trim()) { $f('frOutrasSt').textContent = '⚠ escreva o que é e quando usar'; return; }
+    await enviar([...$f('frOutrasArq').files], $f('frOutrasDesc').value, '', $f('frOutrasSt'));
+    $f('frOutrasArq').value = '';
+  });
+
+  async function gerar(url, corpo, campo, st) {
+    $f(st).textContent = '📝 gerando…';
+    try { const d = await post(url, corpo); $f(campo).value = d.prompt; $f(campo).style.display = '';
+      try { await navigator.clipboard.writeText(d.prompt); $f(st).textContent = '✔ prompt copiado — cole na IA (ou use o botão 🤖)'; } catch (_) { $f(st).textContent = '✔ prompt pronto'; } }
+    catch (e) { $f(st).textContent = '⚠ ' + e.message; }
+  }
+  $f('frPergGerar').addEventListener('click', () => gerar(BASE + '/fotos-roteiro/perguntas/prompt', {}, 'frPergPrompt', 'frPergSt'));
+  $f('frPosGerar').addEventListener('click', () => gerar(BASE + '/fotos-roteiro/posicionar/prompt', { modo: $f('frModo').value }, 'frPosPrompt', 'frPosSt'));
+  $f('frPergLer').addEventListener('click', async () => {
+    try { const d = await post(BASE + '/fotos-roteiro/perguntas/ler', { texto: $f('frPergResp').value }); desenhar(d); $f('frPergSt').textContent = `✔ ${d.perguntas.length} perguntas`; }
+    catch (e) { $f('frPergSt').textContent = '⚠ ' + e.message; }
+  });
+  $f('frPosLer').addEventListener('click', async () => {
+    try {
+      const d = await post(BASE + '/fotos-roteiro/posicionar/ler', { texto: $f('frPosResp').value });
+      const lista = Object.entries(d.por_imagem || {}).map(([k, v]) => `${k}×${v}`).join(', ');
+      $f('frPosRes').innerHTML = `<span style="color:#15803d">✔ ${d.postas} marca(s) de imagem postas no roteiro</span> <span style="color:#555">(${esc(lista)})</span>` +
+        (d.ignoradas ? ` <span style="color:#b45309">· ${d.ignoradas} ignorada(s): frase já tinha imagem ou ficava perto demais da mesma foto</span>` : '') +
+        '<div style="color:#555">Recarregando…</div>';
+      setTimeout(() => location.reload(), 2500);
+    } catch (e) { $f('frPosRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
+  });
+  $f('frDesfazer').addEventListener('click', async () => {
+    if (!confirm('Voltar o roteiro para antes das marcas que a IA pôs? (o que você mudou no roteiro depois disso também volta)')) return;
+    try { await post(BASE + '/fotos-roteiro/desfazer', {}); location.reload(); } catch (e) { $f('frPosSt').textContent = '⚠ ' + e.message; }
+  });
+  atualizar();
+})();
+</script>

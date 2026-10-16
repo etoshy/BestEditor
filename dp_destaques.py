@@ -1192,11 +1192,11 @@ def _passe_destaques(video_in: str, video_out: str, ent: List[str], etapas: List
     import qualidade_export
     cmd_cpu = qualidade_export._ajustar_cpu(cmd)
     cmd = qualidade_export.ajustar(cmd)
-    r = qualidade_export.executar(cmd, timeout=3600, _original=cmd_cpu)
+    r = qualidade_export.executar(cmd, timeout=4 * 3600, _original=cmd_cpu)
     if r.returncode != 0 and ("nrecognized" in r.stderr or "not found" in r.stderr) and "filter_complex_script" in r.stderr:
         k = cmd.index("-filter_complex_script")
         import progresso_ffmpeg
-        r = progresso_ffmpeg.rodar(cmd[:k] + ["-/filter_complex"] + cmd[k + 1:], timeout=3600)
+        r = progresso_ffmpeg.rodar(cmd[:k] + ["-/filter_complex"] + cmd[k + 1:], timeout=4 * 3600)
     return r
 
 

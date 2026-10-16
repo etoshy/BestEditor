@@ -1634,12 +1634,12 @@ def _janela_com_quadros(video_in: str, saida: str, f0: int, f1: int, itens: List
         cur = f"c{k}"
     grafo.append(f"[{cur}]format=yuv420p[vout]")
     _ff(entradas + ["-filter_complex", ";".join(grafo), "-map", "[vout]", "-frames:v", str(f1 - f0), "-an",
-                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p", "-r", str(FPS), saida], timeout=3600)
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p", "-r", str(FPS), saida], timeout=4 * 3600)
 
 
 def _pedaco(video_in: str, saida: str, f0: int, f1: int, W: int, H: int) -> None:
     _ff(["-ss", f"{f0 / FPS:.4f}", "-i", video_in, "-vf", f"fps={FPS},scale={W}:{H},setsar=1,format=yuv420p", "-frames:v", str(f1 - f0), "-an",
-         "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p", "-r", str(FPS), saida], timeout=3600)
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p", "-r", str(FPS), saida], timeout=4 * 3600)
 
 
 def aplicar_editoriais(video_in: str, video_out: str, itens: List[Dict[str, Any]], W: int, H: int, work_dir: str,
@@ -1657,41 +1657,53 @@ def aplicar_editoriais(video_in: str, video_out: str, itens: List[Dict[str, Any]
     os.makedirs(work_dir, exist_ok=True)
     dur = _probe_duration(video_in)
     total = int(round(dur * FPS))
-    prints: Dict[str, str] = {}
-    for it in validos:
-        if it["tipo"] == "pagina" and it.get("url") and not it.get("imagem"):
-            p = capturar_print(it["url"], os.path.join(work_dir, "prints"))
-            if p:
-                prints[it["url"]] = p
+    import progresso_ffmpeg  # v84_118: cada pedaço (e cada print de site) anda a barra da etapa
     pecas = os.path.join(work_dir, "pecas_" + hashlib.md5(video_in.encode()).hexdigest()[:6])
     shutil.rmtree(pecas, ignore_errors=True)
     os.makedirs(pecas)
-    lista, pos, n = [], 0, 0
+    plano, pos = [], 0  # ("pedaco", f0, f1) | ("quadros", f0, f1, grupo)
     for (f0, f1, grupo) in _grupos(validos, FPS):
         f0, f1 = max(0, min(f0, total)), max(0, min(f1, total))
         if f1 <= f0:
             continue
         if f0 > pos:
-            n += 1
-            arq = os.path.join(pecas, f"p{n:03d}.mp4")
-            _pedaco(video_in, arq, pos, f0, W, H)
-            lista.append(arq)
-        n += 1
-        arq = os.path.join(pecas, f"p{n:03d}.mp4")
-        _janela_com_quadros(video_in, arq, f0, f1, grupo, W, H, work_dir, imagens, prints)
-        lista.append(arq)
+            plano.append(("pedaco", pos, f0, None))
+        plano.append(("quadros", f0, f1, grupo))
         pos = f1
     if pos < total:
-        n += 1
-        arq = os.path.join(pecas, f"p{n:03d}.mp4")
-        _pedaco(video_in, arq, pos, total, W, H)
+        plano.append(("pedaco", pos, total, None))
+    sites = [it for it in validos if it["tipo"] == "pagina" and it.get("url") and not it.get("imagem")]
+    partes = len(plano) + 1 + (1 if sites else 0)
+    prints: Dict[str, str] = {}
+    if sites:
+        with progresso_ffmpeg.parte(1, partes, f"tirando print de {len(sites)} site(s)"):
+            for it in sites:
+                p = capturar_print(it["url"], os.path.join(work_dir, "prints"))
+                if p:
+                    prints[it["url"]] = p
+    lista = []
+    base_k = 2 if sites else 1
+    n_quadros = sum(1 for x in plano if x[0] == "quadros")
+    q = 0
+    for k, (tipo, f0, f1, grupo) in enumerate(plano):
+        arq = os.path.join(pecas, f"p{k + 1:03d}.mp4")
+        if tipo == "quadros":
+            q += 1
+        rot = (f"quadro {q} de {n_quadros} ({len(grupo)} item(ns))" if tipo == "quadros"
+               else f"trecho sem quadro {f0 // FPS // 60:.0f}:{f0 // FPS % 60:02.0f}–{f1 // FPS // 60:.0f}:{f1 // FPS % 60:02.0f}")
+        with progresso_ffmpeg.parte(base_k + k, partes, rot, duracao=(f1 - f0) / FPS):
+            if tipo == "quadros":
+                _janela_com_quadros(video_in, arq, f0, f1, grupo, W, H, work_dir, imagens, prints)
+            else:
+                _pedaco(video_in, arq, f0, f1, W, H)
         lista.append(arq)
     txt = os.path.join(pecas, "lista.txt")
     with open(txt, "w", encoding="utf-8") as f:
         f.write("".join(f"file '{os.path.abspath(a)}'\n" for a in lista))
     import qualidade_export
-    r = qualidade_export.rodar(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", txt, "-i", video_in,
-                                "-map", "0:v", "-map", "1:a?", "-t", f"{dur:.3f}", "-c:v", "copy", "-c:a", "copy", video_out], timeout=3600)
+    with progresso_ffmpeg.parte(partes, partes, "juntando os pedaços"):
+        r = qualidade_export.rodar(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", txt, "-i", video_in,
+                                    "-map", "0:v", "-map", "1:a?", "-t", f"{dur:.3f}", "-c:v", "copy", "-c:a", "copy", video_out], timeout=4 * 3600)
     shutil.rmtree(pecas, ignore_errors=True)
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg falhou nos quadros editoriais: {r.stderr.strip()[-600:]}")

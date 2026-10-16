@@ -38,7 +38,10 @@ o roteiro. Para cada imagem [ID] devolva:
 - texto_na_imagem: o texto legível (manchete, placa, documento, mensagem), resumido;
 - util: serve para contar ESTE caso/tema?;
 - sensivel: nao | violencia | corpo | menor | dados_pessoais (CPF, endereço, telefone…);
-- qualidade: boa | media | ruim."""
+- qualidade: boa | media | ruim.
+CARTAZ de pessoa DESAPARECIDA / PROCURADA / RECOMPENSA, ficha policial, foto de documento, recorte de jornal com foto:
+NUNCA é "anuncio" nem "lixo" — é tipo "documento", util=true; em texto_na_imagem copie o NOME, a IDADE, as DATAS e o
+lugar impressos (é daí que o vídeo sabe quem é e com que idade estava)."""
 
 _SYS_VENDA = """Você descreve as fotos e materiais de um PRODUTO para quem vai escrever o roteiro de um vídeo de venda.
 Para cada imagem [ID] devolva: descricao (o ângulo: frente, lado, detalhe, em uso, embalagem, antes/depois),

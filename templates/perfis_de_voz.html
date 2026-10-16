@@ -360,15 +360,36 @@ function ytMostrarErro(msg) {
 }
 </script>
 
+<h2 style="margin-top:32px;">📦 Importar perfis (.zip)</h2>
+<p style="color:#666;font-size:0.85rem;">Pra trazer perfis de outro PC (o .zip que o botão <b>📦 Exportar</b> gera — volta tudo: clipes, voz limpa e original, gênero/idade/descrição e as vozes com slug) <b>ou</b> um .zip qualquer só com áudios: áudios soltos na raiz viram <b>um</b> perfil; uma pasta por pessoa (<code>joao/…</code>, <code>maria/…</code>) vira um perfil por pasta. Não precisa descompactar.</p>
+{% if request.args.get('importados') %}<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:10px 12px;margin:8px 0;color:#065f46;">✅ Importado: {% for n in request.args.get('importados').split(',') %}<code>{{ n }}</code> {% endfor %}</div>{% endif %}
+<form method="post" action="{{ url_for('perfis_de_voz_importar') }}" enctype="multipart/form-data" style="border:1px dashed #94a3b8;border-radius:8px;padding:12px 14px;">
+  <label>Arquivo .zip</label>
+  <input type="file" name="zip" accept=".zip,application/zip" required>
+  <label>Nome do perfil (opcional)</label>
+  <input type="text" name="nome" placeholder="em branco = o nome que veio no zip (ou o nome do arquivo)">
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">Só vale quando o zip tem um perfil só. Se já existir um perfil com o mesmo nome, o importado vira <code>nome_2</code> — a não ser que marque abaixo.</p>
+  <label style="margin-top:10px;font-weight:normal;"><input type="checkbox" name="substituir" style="width:auto;"> Substituir perfis que já existem com o mesmo nome</label>
+  <label style="font-weight:normal;"><input type="checkbox" name="dividir_automaticamente" checked style="width:auto;"> (zip só com áudios) se for um áudio único e longo, dividir em trechos</label>
+  <button type="submit">📦 Importar</button>
+</form>
+
 <h2 style="margin-top:32px;">Perfis salvos</h2>
 {% if not perfis %}
 <p style="color:#666;">Nenhum perfil ainda — crie um acima.</p>
 {% else %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+  <a href="{{ url_for('perfis_de_voz_exportar') }}"><button type="button" style="margin:0;">📦 Exportar todos ({{ perfis|length }})</button></a>
+  <button type="button" id="pf-exportar-sel" style="margin:0;background:#475569;" disabled>📦 Exportar marcados</button>
+  <span style="color:#666;font-size:0.8rem;">Leve o .zip pro outro PC e use “📦 Importar” lá.</span>
+</div>
 <div>
   {% for p in perfis %}
   <div style="border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <strong>{{ p.nome }}</strong>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <label style="margin:0;display:flex;align-items:center;gap:8px;"><input type="checkbox" class="pf-sel" value="{{ p.nome }}" style="width:auto;margin:0;"> <strong>{{ p.nome }}</strong></label>
+      <span style="flex:1"></span>
+      <a href="{{ url_for('perfis_de_voz_exportar', nomes=p.nome) }}" title="Baixar este perfil num .zip (pra outro PC)"><button type="button" style="padding:5px 10px;font-size:0.8rem;margin:0;background:#475569;">📦 Exportar</button></a>
       <form method="post" action="{{ url_for('perfis_de_voz_excluir', nome=p.nome) }}" onsubmit="return confirm('Excluir o perfil {{ p.nome }} e todos os clipes dele?');" style="margin:0;">
         <button type="submit" style="background:#dc2626;padding:5px 10px;font-size:0.8rem;margin-top:0;">Excluir</button>
       </form>
@@ -414,6 +435,18 @@ function ytMostrarErro(msg) {
 </div>
 {% endif %}
 <script>
+// 📦 exportar só os perfis marcados
+(() => {
+  const btn = document.getElementById('pf-exportar-sel');
+  if (!btn) return;
+  const marcados = () => [...document.querySelectorAll('.pf-sel:checked')].map(c => c.value);
+  const atualizar = () => { const n = marcados().length; btn.disabled = !n; btn.textContent = '📦 Exportar marcados' + (n ? ` (${n})` : ''); };
+  document.querySelectorAll('.pf-sel').forEach(c => c.addEventListener('change', atualizar));
+  btn.addEventListener('click', () => {
+    const q = marcados().map(n => 'nomes=' + encodeURIComponent(n)).join('&');
+    if (q) location.href = '{{ url_for('perfis_de_voz_exportar') }}?' + q;
+  });
+})();
 document.querySelectorAll('.pf-info').forEach(box => {
   const salvar = async () => {
     const g = box.querySelector('.pf-genero'), i = box.querySelector('.pf-idade');

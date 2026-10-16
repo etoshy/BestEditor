@@ -302,9 +302,18 @@ def queimar(video: str, ass: str, saida: str) -> str:
     import subprocess
     from video_assembler import _escape_path_for_ffmpeg_filter
     vf = f"ass='{_escape_path_for_ffmpeg_filter(ass)}':fontsdir='{_escape_path_for_ffmpeg_filter(dp_destaques.FONTES_DIR)}'"
+    import export_paralelo  # ⚡ pedaços em paralelo (conferidos quadro a quadro); falhou → do jeito de sempre
+    try:
+        from video_assembler import _probe_duration
+        _dur = _probe_duration(video)
+    except Exception:  # noqa: BLE001
+        _dur = 0.0
+    if export_paralelo.tentar("legendas", lambda: export_paralelo.vf_em_pedacos(
+            video, saida, vf, _dur, os.path.join(os.path.dirname(os.path.abspath(saida)), "_pedacos_legendas"), "legendas")):
+        return saida
     import qualidade_export
     r = qualidade_export.rodar(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", video, "-vf", vf, "-c:v", "libx264", "-preset", "veryfast",
-                        "-pix_fmt", "yuv420p", "-c:a", "copy", saida], timeout=3600)
+                        "-pix_fmt", "yuv420p", "-c:a", "copy", saida], timeout=4 * 3600)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip()[-600:])
     return saida

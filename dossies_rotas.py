@@ -248,6 +248,10 @@ def registrar(app, base_dir: str) -> None:
             arq.save(dest)
             m = ds.adicionar_midia(p, tipo=tipo, origem="pc", arquivo=os.path.basename(dest), nome=arq.filename, descricao=desc,
                                    usar="descricao" if desc else "ambos")
+            _q = (request.form.get("pergunta") or "").strip()[:10]  # 📸 resposta a uma pergunta das fotos pro roteiro
+            if _q:
+                _alvo = next((x.get("alvo") for x in (p.get("fotos_roteiro") or {}).get("perguntas") or [] if x["id"] == _q), "")
+                m["pergunta"], m["pergunta_alvo"] = _q, (_alvo or "")[:120]
             ds.salvar(base_dir, p)
         if com_ia:
             threading.Thread(target=lambda: ds.ia_analisar_imagens(base_dir, pid, trava=_TRAVA, ids=[m["id"]]), daemon=True).start()

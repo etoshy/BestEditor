@@ -1,0 +1,1456 @@
+{
+ "segments": [
+  {
+   "start": 0.0,
+   "end": 7.34,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, narrow wooded ravine near Moffat Scotland, autumn 1935, grey overcast light, distant figures of workmen in flat caps and long coats silhouetted at the edge of the gorge, dead leaves and mist, black and white archival look, wide shot, 35mm lens, no text, no bodies, no gore",
+   "visual": "Vale estreito e bosque escocês em Moffat, outono de 1935, trabalhadores em silhueta à distância"
+  },
+  {
+   "start": 7.34,
+   "end": 12.78,
+   "provider": "adiado",
+   "query": "1930s police search wooded hillside Scotland",
+   "visual": "Paisagem da Schlucht com marcas de escavação e policiais de época vasculhando o terreno",
+   "media_type": "video"
+  },
+  {
+   "start": 12.78,
+   "end": 19.46,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, group of 1930s detectives in tweed suits and trench coats standing at the edge of a wooded ravine, canvas sheets and wooden crates on muddy ground, grey autumn light, serious expressions, archival black and white, medium shot, 35mm lens, no bodies visible, no text",
+   "visual": "Policiais e técnicos reunidos à beira da ravina, expressão sóbria, caixas e lonas no chão"
+  },
+  {
+   "start": 19.46,
+   "end": 25.85,
+   "provider": "adiado",
+   "query": "1930s forensic laboratory microscope desk",
+   "visual": "Mesa de laboratório de época com ferramentas de exame e anotações, sem restos humanos visíveis",
+   "media_type": "video"
+  },
+  {
+   "start": 25.85,
+   "end": 32.27,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two 1930s scientists in white lab coats examining printed photographs under a desk lamp in a university laboratory, wooden cabinets behind, sepia archival tone, serious focused mood, medium shot, 50mm lens, no bodies, no text",
+   "visual": "Cientistas de época examinando documentos e fotografias sob lâmpada, clima de laboratório"
+  },
+  {
+   "start": 32.27,
+   "end": 38.85,
+   "provider": "adiado",
+   "query": "1930s newspaper front page magnifying glass",
+   "visual": "Jornal de época com manchete sobre o caso e lupa sobre a página",
+   "media_type": "video"
+  },
+  {
+   "start": 38.85,
+   "end": 44.78,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, portrait of a 1930s Glasgow police detective in a dark three-piece suit and tie, short slicked hair, holding a fingerprint card, studio backdrop, archival black and white, head and shoulders, 85mm lens, no text on image",
+   "visual": "Detetive de Glasgow em retrato de arquivo dos anos 1930 com ficha de impressões digitais"
+  },
+  {
+   "start": 44.78,
+   "end": 52.09,
+   "provider": "adiado",
+   "query": "1930s university researchers microscope photographs",
+   "visual": "Pesquisadores universitários de época com microscópio e fotografias ampliadas sobre mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 52.09,
+   "end": 58.48,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s anatomy laboratory, wooden table with two enlarged black and white portrait photographs, a steel measuring ruler, calipers and a magnifying lens, sepia archival tone, dim window light, close-up, 50mm lens, no bodies, no gore, no text",
+   "visual": "Mesa de análise com fotos de rosto e cranio em escalas, lupa e régua de medição"
+  },
+  {
+   "start": 58.48,
+   "end": 63.88,
+   "provider": "adiado",
+   "query": "1930s anatomist thinking laboratory portrait",
+   "visual": "Anatomista de época em jaleco examinando papéis e fotos com ar pensativo",
+   "media_type": "video"
+  },
+  {
+   "start": 63.88,
+   "end": 70.14,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s police office desk with an old paper map of northern England and southern Scotland, pencil marks, a fountain pen and a notebook, sepia archival tone, soft lamp light, top-down angle, 35mm lens, no legible text, no bodies",
+   "visual": "Mapa de época da região de Moffat e Lancaster com marcadores e caderno de anotações"
+  },
+  {
+   "start": 70.14,
+   "end": 75.46,
+   "provider": "adiado",
+   "query": "1930s detective hands notebook close up",
+   "visual": "Mãos de luvas escuras segurando documento com anotações, close de época",
+   "media_type": "video"
+  },
+  {
+   "start": 75.46,
+   "end": 82.55,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, portrait of a 34-year-old woman in a 1930s evening dress with a small tiara, dark wavy bobbed hair, gentle smile, studio backdrop, soft lighting, sepia archival tone, head and shoulders, 85mm lens, no text on image",
+   "visual": "Retrato de família dos anos 1930 de uma mulher jovem com vestido e diadema"
+  },
+  {
+   "start": 82.55,
+   "end": 87.43,
+   "provider": "adiado",
+   "query": "1930s young woman portrait pearl necklace",
+   "visual": "Retrato de época de uma mulher jovem sorridente com colar e cabelo ondulado",
+   "media_type": "video"
+  },
+  {
+   "start": 87.43,
+   "end": 94.97,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, portrait of a young English woman aged nineteen in a 1930s nursemaid uniform with white collar and apron, cheerful smile, short wavy hair, plain studio backdrop, sepia archival tone, head and shoulders, 85mm lens, no text",
+   "visual": "Retrato de uma jovem com uniforme de babá dos anos 1930 e sorriso franco"
+  },
+  {
+   "start": 94.97,
+   "end": 100.32,
+   "provider": "adiado",
+   "query": "1930s handwritten letter vintage paper desk",
+   "visual": "Carta manuscrita de época em papel envelhecido sobre mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 100.32,
+   "end": 104.22,
+   "provider": "adiado",
+   "query": "Lancaster England 1930s street",
+   "visual": "Rua de Lancaster dos anos 1930 com passantes e carros antigos",
+   "media_type": "video"
+  },
+  {
+   "start": 104.22,
+   "end": 110.9,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, elegant Georgian townhouse facade in an English city square, tall sash windows, dark wooden front door with brass knocker, 1930s street, overcast light, black and white archival look, medium wide shot, 35mm lens, no text",
+   "visual": "Fachada elegante de sobrado georgiano em Lancaster com janelas altas e porta de madeira"
+  },
+  {
+   "start": 110.9,
+   "end": 115.88,
+   "provider": "adiado",
+   "query": "1930s doctor consulting room interior",
+   "visual": "Consultório médico de época com estante de livros, mesa e instrumentos de madeira e vidro",
+   "media_type": "video"
+  },
+  {
+   "start": 115.88,
+   "end": 122.07,
+   "provider": "adiado",
+   "query": "1930s wealthy living room interior mahogany furniture",
+   "visual": "Sala de estar de família abastada dos anos 1930 com móveis escuros e tapete",
+   "media_type": "video"
+  },
+  {
+   "start": 122.07,
+   "end": 127.0,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s woman in a dark evening dress seated at a grand piano in an elegant drawing room, candlelight and lamp glow, relaxed smile, sepia archival tone, medium shot, 50mm lens, no text",
+   "visual": "Mulher de época em vestido de noite sentada ao piano em sala elegante"
+  },
+  {
+   "start": 127.0,
+   "end": 131.93,
+   "provider": "adiado",
+   "query": "1930s women laughing party vintage",
+   "visual": "Grupo de mulheres dos anos 1930 sorrindo numa festa à luz de lampião",
+   "media_type": "video"
+  },
+  {
+   "start": 131.93,
+   "end": 136.95,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s young nursemaid in a white apron and cap pushing a black perambulator along a tree-lined garden path of an English townhouse, soft afternoon light, sepia archival tone, medium wide shot, 50mm lens, faces not in focus, no text",
+   "visual": "Casa de família de época com jardim e babá com criança ao fundo"
+  },
+  {
+   "start": 136.95,
+   "end": 143.01,
+   "provider": "adiado",
+   "query": "1930s vintage seaside postcard young woman",
+   "visual": "Postal de época com uma jovem sorridente de uniforme diante de um mar",
+   "media_type": "video"
+  },
+  {
+   "start": 143.01,
+   "end": 150.5,
+   "provider": "adiado",
+   "query": "brass house number plate door bell vintage",
+   "visual": "Porta de sobrado com número 2 em placa de metal e campainha",
+   "media_type": "video"
+  },
+  {
+   "start": 150.5,
+   "end": 155.86,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, Dalton Square in Lancaster England, 1930s, central monument and bare trees, Georgian terraced houses around the square, overcast sky, black and white archival look, wide shot, 35mm lens, no people, no text",
+   "visual": "Vista ampla da praça Dalton Square em Lancaster com estátua e casas georgianas"
+  },
+  {
+   "start": 155.86,
+   "end": 161.68,
+   "provider": "adiado",
+   "query": "1930s doctor's surgery entrance brass plate",
+   "visual": "Fachada de sobrado e entrada de consultório com placa discreta de médico",
+   "media_type": "video"
+  },
+  {
+   "start": 161.68,
+   "end": 168.01,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s doctor's waiting room, leather armchairs, potted fern, framed prints on the wall, wooden floor with rug, warm lamp light, sepia archival tone, wide interior shot, 35mm lens, no people, no text",
+   "visual": "Interior de sala de espera de consultório com cadeiras de couro e vaso de plantas"
+  },
+  {
+   "start": 168.01,
+   "end": 173.98,
+   "provider": "adiado",
+   "query": "1930s doctor study desk books letters",
+   "visual": "Escrivaninha de madeira com livros de medicina e carta fechada de época",
+   "media_type": "video"
+  },
+  {
+   "start": 173.98,
+   "end": 180.29,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, portrait of a 1930s British doctor in his thirties in a dark formal suit and tie, pleasant smile, standing before a bookshelf, soft studio light, sepia archival tone, medium shot, 85mm lens, no text",
+   "visual": "Médico de época sorrindo em retrato formal diante de estante com livros"
+  },
+  {
+   "start": 180.29,
+   "end": 183.82,
+   "provider": "adiado",
+   "query": "1930s man tense standing by window dim room",
+   "visual": "Homem de época de costas com olhar tenso diante de janela, ambiente doméstico sombrio",
+   "media_type": "video"
+  },
+  {
+   "start": 183.82,
+   "end": 188.61,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a man's hand clenched into a fist resting on a dark wooden table, 1930s cuffed shirt sleeve, dim lamp light, sepia archival tone, shallow depth of field, 85mm lens, no face, no text",
+   "visual": "Mão de homem apertando punho sobre mesa de madeira, tensão doméstica sugerida"
+  },
+  {
+   "start": 188.61,
+   "end": 194.23,
+   "provider": "adiado",
+   "query": "dim hallway closed door 1930s house",
+   "visual": "Corredor de casa de época com porta fechada e luz fraca",
+   "media_type": "video"
+  },
+  {
+   "start": 194.23,
+   "end": 199.66,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s wall calendar and a wooden clock in an empty room, faded paper calendar page, soft window light, sepia archival tone, medium shot, 50mm lens, calendar numbers not legible, no people, no text",
+   "visual": "Calendário de parede antigo e relógio em sala vazia, sensação de tempo passando"
+  },
+  {
+   "start": 199.66,
+   "end": 206.96,
+   "provider": "adiado",
+   "query": "1930s car rural road Scotland mist autumn",
+   "visual": "Estrada rural escocesa em direção ao sul, carro antigo na neblina do outono",
+   "media_type": "video"
+  },
+  {
+   "start": 206.96,
+   "end": 213.16,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s black saloon car parked on a quiet English street outside a townhouse, driver door slightly open, no people, overcast light, black and white archival look, medium wide shot, 35mm lens, no text",
+   "visual": "Carro antigo estacionado diante de casa, sem ninguém dentro, porta entreaberta"
+  },
+  {
+   "start": 213.16,
+   "end": 219.44,
+   "provider": "adiado",
+   "query": "bandaged hand resting on table close up",
+   "visual": "Mão enfaixada apoiada sobre mesa, detalhe de ferimento discreto sem sangue",
+   "media_type": "video"
+  },
+  {
+   "start": 219.44,
+   "end": 226.35,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s British police officer in a dark uniform writing in a notebook at a wooden table, a seated man's back in the foreground, dim office light, sepia archival tone, medium shot, 50mm lens, faces not visible, no text readable",
+   "visual": "Policial de época tomando nota em caderno diante de um homem de costas numa sala"
+  },
+  {
+   "start": 226.35,
+   "end": 232.78,
+   "provider": "adiado",
+   "query": "1930s railway station platform train vintage",
+   "visual": "Estação ferroviária dos anos 1930 com trem e bagagens, sensação de viagem",
+   "media_type": "video"
+  },
+  {
+   "start": 232.78,
+   "end": 239.42,
+   "provider": "adiado",
+   "query": "Scottish woodland leaves forest floor dusk",
+   "visual": "Bosque e chão de folhas secas na ravina, sem corpos, luz de entardecer",
+   "media_type": "video"
+  },
+  {
+   "start": 239.42,
+   "end": 244.67,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s paper road map of northern England and southern Scotland on a wooden table, a pencil line traced between two towns, a brass compass, sepia archival tone, top-down angle, 35mm lens, no legible text, no bodies",
+   "visual": "Mapa de época com a linha entre Moffat e Lancaster marcada a lápis"
+  },
+  {
+   "start": 244.67,
+   "end": 251.8,
+   "provider": "adiado",
+   "query": "aerial view Scottish valley road river autumn",
+   "visual": "Vale escocês visto de cima com estrada sinuosa e rio, outono",
+   "media_type": "video"
+  },
+  {
+   "start": 251.8,
+   "end": 259.14,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s British roadside finger-post sign in a Scottish countryside field, wooden signpost with blurred lettering, grey overcast sky, black and white archival look, medium shot, 50mm lens, no legible text",
+   "visual": "Placa de estrada de época apontando para Dumfries em paisagem rural"
+  },
+  {
+   "start": 259.14,
+   "end": 265.86,
+   "provider": "adiado",
+   "query": "1930s rural police station stone building Scotland",
+   "visual": "Posto policial rural de pedra com policiais de época na porta",
+   "media_type": "video"
+  },
+  {
+   "start": 265.86,
+   "end": 272.72,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s black police car parked on a dirt road beside a stone wall in rural Scotland, grey sky, black and white archival look, wide shot, 35mm lens, no people, no text",
+   "visual": "Viatura policial antiga estacionada em estrada de terra"
+  },
+  {
+   "start": 272.72,
+   "end": 278.37,
+   "provider": "adiado",
+   "query": "two 1930s detectives walking rural road coats hats",
+   "visual": "Dois detetives de época de sobretudo e chapéu caminhando por estrada rural",
+   "media_type": "video"
+  },
+  {
+   "start": 278.37,
+   "end": 283.64,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, portrait of a 1930s Scottish police detective in a dark suit and trilby hat, serious expression, studio backdrop, archival black and white, head and shoulders, 85mm lens, no text on image",
+   "visual": "Retrato de arquivo de detetive de Glasgow dos anos 1930 com chapéu"
+  },
+  {
+   "start": 283.64,
+   "end": 289.56,
+   "provider": "adiado",
+   "query": "1930s fingerprint card magnifying glass desk",
+   "visual": "Mesa de laboratório com lupa, pinça e ficha de impressões digitais de época",
+   "media_type": "video"
+  },
+  {
+   "start": 289.56,
+   "end": 297.14,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, group of 1930s detectives in coats gathered around a trestle table outdoors under a canvas tent, papers and a map on the table, woodland behind, grey autumn light, black and white archival look, medium shot, 35mm lens, no bodies visible, no text",
+   "visual": "Detetives de época reunidos em volta de mesa numa tenda ao ar livre, planejando a busca"
+  },
+  {
+   "start": 297.14,
+   "end": 303.84,
+   "provider": "adiado",
+   "query": "stack of 1930s newspapers office desk",
+   "visual": "Pilha de jornais de época sobre mesa de escritório com manchete borrada",
+   "media_type": "video"
+  },
+  {
+   "start": 303.84,
+   "end": 308.49,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, open 1930s newspaper on a desk showing two small blurred black and white portrait photographs of women side by side, sepia tone, soft light, close-up, 50mm lens, no legible text",
+   "visual": "Página de jornal com fotos de duas mulheres lado a lado, recorte de época"
+  },
+  {
+   "start": 308.49,
+   "end": 314.49,
+   "provider": "adiado",
+   "query": "two vintage portrait photographs side by side desk",
+   "visual": "Duas fotografias de retratos femininos lado a lado sobre mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 314.49,
+   "end": 318.52,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, magnifying glass held over a vintage black and white portrait photograph of a woman, wooden desk, soft lamp light, sepia archival tone, close-up, 85mm lens, no text",
+   "visual": "Lupa sobre fotografia antiga de retrato, ênfase na comparação de traços"
+  },
+  {
+   "start": 318.52,
+   "end": 323.64,
+   "provider": "adiado",
+   "query": "old newspaper wrapping paper wooden crate desk",
+   "visual": "Papel de jornal antigo com fitas e caixa de madeira na mesa de exame",
+   "media_type": "video"
+  },
+  {
+   "start": 323.64,
+   "end": 330.03,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, wooden evidence crate with paper tags and string on a concrete floor of a 1930s police storage room, shelves behind, dim light, sepia archival tone, medium shot, 35mm lens, no bodies, no legible text",
+   "visual": "Caixa de evidências de madeira com etiquetas e papel de jornal, sala de polícia"
+  },
+  {
+   "start": 330.03,
+   "end": 334.58,
+   "provider": "adiado",
+   "query": "brown paper parcel string wrapped old newspaper",
+   "visual": "Pacote de papel de jornal amarrado com barbante, sobre mesa de metal",
+   "media_type": "video"
+  },
+  {
+   "start": 334.58,
+   "end": 340.38,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s street map of a small English city pinned to a wooden wall in a police incident room, brass pins marking points, a desk lamp, sepia archival tone, medium shot, 35mm lens, no legible text, no people",
+   "visual": "Mapa da cidade de Lancaster com alfinetes marcando pontos, mesa de investigação"
+  },
+  {
+   "start": 340.38,
+   "end": 347.11,
+   "provider": "adiado",
+   "query": "1930s forensic examination bench precision tools",
+   "visual": "Bancada de laboratório de época com ferramentas de precisão, régua e lupa",
+   "media_type": "video"
+  },
+  {
+   "start": 347.11,
+   "end": 352.22,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s anatomist in a white coat leaning over a laboratory bench with a magnifying lens, concentrated expression, cool sepia light, medium shot, 50mm lens, no bodies visible, no gore, no text",
+   "visual": "Anatomista de época inclinado sobre bancada com lupa, expressão concentrada"
+  },
+  {
+   "start": 352.22,
+   "end": 358.19,
+   "provider": "adiado",
+   "query": "empty steel examination table vintage laboratory",
+   "visual": "Mesa de exame vazia com tabuleiro de aço, lupa e caderno de anotações",
+   "media_type": "video"
+  },
+  {
+   "start": 358.19,
+   "end": 362.94,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "black and white archival photograph, 1930s forensic laboratory, wooden table with scattered small bone fragments and wrapped evidence packets, sepia tones, soft lamplight, documentary style, 35mm lens, shallow depth of field, no blood, no visible wounds, no text or labels, photorealistic documentary photograph",
+   "visual": "Fotografia de arquivo dos anos 1930 de fragmentos ósseos e pedaços de tecido sobre uma mesa de laboratório, sem detalhes gráficos, luz de lâmpada de época"
+  },
+  {
+   "start": 362.94,
+   "end": 369.21,
+   "provider": "adiado",
+   "query": "1930s detective magnifying glass examining evidence",
+   "visual": "Detetive em casaco escuro examinando com lupa um pequeno pedaço de papel de época em uma mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 369.21,
+   "end": 376.78,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, young woman around nineteen years old in a 1930s English nursemaid uniform with white collar and dark dress, gentle smile, standing in front of a plain wall, vintage postcard look, sepia tones, soft natural light, medium close-up, 85mm lens, no text, no captions",
+   "visual": "Jovem mulher de uniforme de babá dos anos 1930 sorrindo em uma postal antiga, mãos juntas diante do peito"
+  },
+  {
+   "start": 376.78,
+   "end": 381.96,
+   "provider": "adiado",
+   "query": "1930s police detective walking hallway house",
+   "visual": "Detetive Bertie Hammond percorrendo um corredor de casa vitoriana dos anos 1930, observando as paredes e portas com atenção",
+   "media_type": "video"
+  },
+  {
+   "start": 381.96,
+   "end": 387.33,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close view of an antique brass doorknob on a dark wooden door, a gloved hand holding a small brush dusting powder near the handle, 1930s police investigation setting, warm lamplight, sepia and black and white, shallow depth of field, 85mm lens, no text, no gore",
+   "visual": "Detetive examinando com lâmpada e pó de impressão digital a superfície de uma maçaneta antiga de porta"
+  },
+  {
+   "start": 387.33,
+   "end": 394.9,
+   "provider": "adiado",
+   "query": "old bathroom door wood 1930s interior",
+   "visual": "Porta de banheiro de madeira dos anos 1930 com foco na superfície onde se busca uma marca, iluminação rasante de lanterna",
+   "media_type": "video"
+  },
+  {
+   "start": 394.9,
+   "end": 402.09,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s university laboratory, wooden desk covered with black and white photographic prints, magnifying glass, index cards and a desk lamp, two men in white coats analyzing the prints, sepia tones, overhead angle, 35mm lens, no text readable, no gore",
+   "visual": "Mesa de laboratório dos anos 1930 com lâmpadas, fichas e fotografias espalhadas, cientistas analisando documentos"
+  },
+  {
+   "start": 402.09,
+   "end": 408.37,
+   "provider": "adiado",
+   "query": "vintage map Scotland England desk ruler",
+   "visual": "Mapa antigo da Escócia e Inglaterra sobre uma mesa, com régua e lápis marcando as cidades de Moffat e Lancaster",
+   "media_type": "video"
+  },
+  {
+   "start": 408.37,
+   "end": 415.28,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a collection of old 1930s family portrait photographs arranged on a dark wooden table, a woman in her thirties in a dark dress and pearl necklace in one photo, soft window light, sepia tones, top-down angle, 50mm lens, no text, no faces of real people identifiable",
+   "visual": "Fotografias antigas de família e retratos de uma mulher de meia-idade dos anos 1930 espalhados sobre uma mesa"
+  },
+  {
+   "start": 415.28,
+   "end": 422.78,
+   "provider": "adiado",
+   "query": "old police archive files 1930s office",
+   "visual": "Escritório de arquivo histórico com fichas de papel amareladas e caixas de documentos da polícia dos anos 1930",
+   "media_type": "video"
+  },
+  {
+   "start": 422.78,
+   "end": 429.81,
+   "provider": "adiado",
+   "query": "vintage index card file cabinet drawer",
+   "visual": "Cartão de registro antigo em uma gaveta de arquivo de madeira, luz suave de janela",
+   "media_type": "video"
+  },
+  {
+   "start": 429.81,
+   "end": 437.08,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s university anatomy laboratory in Scotland, two researchers in tweed jackets and wool waistcoats examining papers and a microscope at a long wooden bench, shelves of old books in background, sepia tones, medium wide shot, 35mm lens, no text, no gore",
+   "visual": "Pesquisadores da década de 1930 trabalhando em uma sala de universidade com microscópios e livros de anatomia"
+  },
+  {
+   "start": 437.08,
+   "end": 441.75,
+   "provider": "adiado",
+   "query": "1930s British anatomist portrait suit",
+   "visual": "Retrato de um anatomista britânico de meia-idade dos anos 1930 de terno e gravata em frente a uma estante de livros",
+   "media_type": "video"
+  },
+  {
+   "start": 441.75,
+   "end": 448.97,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s anatomist in a white lab coat examining an old portrait photograph of a woman under a desk lamp, a metal ruler laid beside the photo for scale, sepia tones, close-up over-the-shoulder view, 50mm lens, no text readable, no skulls visible, no gore",
+   "visual": "Anatomista examinando à luz de uma lâmpada uma fotografia de retrato de uma mulher ao lado de uma régua de medição"
+  },
+  {
+   "start": 448.97,
+   "end": 454.34,
+   "provider": "adiado",
+   "query": "1930s woman portrait tiara dress vintage",
+   "visual": "Fotografia de retrato de uma mulher dos anos 1930 com vestido e diadema, sobre a mesa de análise",
+   "media_type": "video"
+  },
+  {
+   "start": 454.34,
+   "end": 459.93,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, faded 1930s family snapshot of a woman in a light summer dress standing with three children in a garden, sepia tones, slightly soft focus, photo lying on a dark wooden table, top-down angle, 50mm lens, no text, no gore",
+   "visual": "Foto de família antiga da década de 1930 sobre uma mesa, mostrando uma mulher ao lado de crianças em um jardim"
+  },
+  {
+   "start": 459.93,
+   "end": 467.14,
+   "provider": "adiado",
+   "query": "vintage bellows camera tripod 1930s",
+   "visual": "Câmera antiga de fole dos anos 1930 sobre um tripé diante de um objeto em uma mesa de laboratório",
+   "media_type": "video"
+  },
+  {
+   "start": 467.14,
+   "end": 473.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two old black and white photographic prints overlaid on a backlit glass light table, faint outlines of a face visible through the overlap, 1930s laboratory setting, sepia tones, close-up, 85mm lens, shallow depth of field, no gore, no text",
+   "visual": "Duas fotografias sobrepostas sobre uma mesa de luz, mostrando contornos de um rosto em transparência"
+  },
+  {
+   "start": 473.53,
+   "end": 480.42,
+   "provider": "adiado",
+   "query": "vintage ruler measuring old photograph",
+   "visual": "Régua de metal e fita métrica dos anos 1930 sobre uma fotografia antiga de uma mulher",
+   "media_type": "video"
+  },
+  {
+   "start": 480.42,
+   "end": 488.15,
+   "provider": "adiado",
+   "query": "magnifying glass enlarged photographs laboratory desk",
+   "visual": "Lupa e fotografias ampliadas sobre a mesa de um laboratório, com medições anotadas à mão",
+   "media_type": "video"
+  },
+  {
+   "start": 488.15,
+   "end": 492.55,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s anatomist in a white lab coat carefully adjusting an enlarged black and white portrait photograph on a wooden easel, a reference scale beside it, sepia tones, medium shot, 50mm lens, no text, no skulls visible, no gore",
+   "visual": "Pesquisador ajustando um retrato ampliado sobre um suporte de madeira, com um molde de referência ao lado"
+  },
+  {
+   "start": 492.55,
+   "end": 498.4,
+   "provider": "adiado",
+   "query": "researcher writing notes notebook photographs 1930s",
+   "visual": "Caderno de anotações aberto ao lado de fotografias e régua, mãos de pesquisador escrevendo",
+   "media_type": "video"
+  },
+  {
+   "start": 498.4,
+   "end": 505.08,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two vintage 1930s black and white portrait photographs placed side by side on a dark wooden desk, a magnifying glass and brass ruler between them, sepia tones, overhead angle, 50mm lens, no text, no gore",
+   "visual": "Dois retratos antigos lado a lado sobre uma mesa de análise, com lupa e régua entre eles"
+  },
+  {
+   "start": 505.08,
+   "end": 511.62,
+   "provider": "adiado",
+   "query": "side profile photographs comparison vintage",
+   "visual": "Comparação de dois perfis em fotografias antigas sob luz de mesa, um deles claramente diferente do outro",
+   "media_type": "video"
+  },
+  {
+   "start": 511.62,
+   "end": 517.08,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two black and white profile photographs overlaid on a backlit glass light box, forming a combined outline, 1930s forensic laboratory, sepia tones, close-up, 85mm lens, shallow depth of field, no gore, no text",
+   "visual": "Sobreposição de duas fotografias de perfil criando um contorno de rosto sobre uma mesa de luz"
+  },
+  {
+   "start": 517.08,
+   "end": 522.36,
+   "provider": "adiado",
+   "query": "vintage portrait photograph tracing pencil measurements",
+   "visual": "Fotografia antiga de rosto de mulher com contorno traçado a lápis e marcações de medidas ao redor",
+   "media_type": "video"
+  },
+  {
+   "start": 522.36,
+   "end": 526.89,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, stack of old leather-bound science and anatomy books on a wooden library desk, warm lamplight, sepia tones, close-up, 50mm lens, no legible text, no gore, no people",
+   "visual": "Pilha de livros de anatomia e revistas científicas antigas sobre uma mesa de biblioteca"
+  },
+  {
+   "start": 526.89,
+   "end": 534.64,
+   "provider": "adiado",
+   "query": "open vintage science book black white illustrations",
+   "visual": "Página de um livro científico antigo aberta sobre uma mesa, com ilustrações em preto e branco",
+   "media_type": "video"
+  },
+  {
+   "start": 534.64,
+   "end": 540.03,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged 1930s British researcher in a tweed jacket seated at a wooden laboratory desk, studying papers and photographs under a green-shaded lamp, sepia tones, medium shot, 35mm lens, no text readable, no gore",
+   "visual": "Pesquisador de meia-idade sentado examinando documentos em uma mesa de laboratório de madeira"
+  },
+  {
+   "start": 540.03,
+   "end": 546.07,
+   "provider": "adiado",
+   "query": "vintage glass jar laboratory specimen 1930s",
+   "visual": "Pequeno frasco de vidro com amostras antigas e um pedaço de tecido, sobre uma mesa de laboratório",
+   "media_type": "video"
+  },
+  {
+   "start": 546.07,
+   "end": 550.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, magnifying glass over a small fly specimen on white paper on a 1930s laboratory table, desk lamp light, sepia and black and white tones, macro close-up, 100mm macro lens, shallow depth of field, no gore, no text",
+   "visual": "Lupa sobre um pequeno inseto em um papel branco, em uma mesa de laboratório dos anos 1930"
+  },
+  {
+   "start": 550.53,
+   "end": 557.48,
+   "provider": "adiado",
+   "query": "1930s scientist microscope vintage laboratory",
+   "visual": "Cientista observando através de microscópio antigo em um laboratório da década de 1930",
+   "media_type": "video"
+  },
+  {
+   "start": 557.48,
+   "end": 563.24,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, antique wall clock beside a 1930s wall calendar in a dim laboratory office, soft window light, sepia tones, wide shot, 35mm lens, no readable text, no people",
+   "visual": "Relógio de parede antigo ao lado de um calendário de 1935 em uma sala de laboratório"
+  },
+  {
+   "start": 563.24,
+   "end": 568.74,
+   "provider": "adiado",
+   "query": "scattered old documents photographs wooden table",
+   "visual": "Vários documentos antigos, fotos e fichas espalhados sobre uma mesa de madeira, vistos de cima",
+   "media_type": "video"
+  },
+  {
+   "start": 568.74,
+   "end": 574.29,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s analyst in a dark suit reviewing an old black and white photograph with a magnifying glass at a cluttered wooden desk, sepia tones, medium shot, 50mm lens, no text readable, no gore",
+   "visual": "Pesquisador analisando uma foto de época com lupa em uma mesa coberta de papéis, tom sóbrio"
+  },
+  {
+   "start": 574.29,
+   "end": 579.72,
+   "provider": "adiado",
+   "query": "1930s British courtroom interior wooden benches",
+   "visual": "Sala de tribunal britânica dos anos 1930 com bancos de madeira e público nas galerias",
+   "media_type": "video"
+  },
+  {
+   "start": 579.72,
+   "end": 586.86,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1936 British criminal courtroom, a judge in a black robe and white wig at the bench, barristers in gowns at wooden tables, the courtroom quiet and formal, sepia tones, wide shot, 35mm lens, no identifiable faces, no text, no gore",
+   "visual": "Tribunal de Manchester em 1936, advogados e juiz de peruca em suas bancadas, visão distante"
+  },
+  {
+   "start": 586.86,
+   "end": 591.12,
+   "provider": "adiado",
+   "query": "1930s accused man courtroom dock back view",
+   "visual": "Homem de meia-idade de terno escuro sentado no banco dos réus em um tribunal dos anos 1930, de costas e pouco visível",
+   "media_type": "video"
+  },
+  {
+   "start": 591.12,
+   "end": 596.75,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, open 1936 British newspaper on a wooden table, large headline blurred and unreadable, sepia tones, soft window light, top-down angle, 50mm lens, no legible text, no logos",
+   "visual": "Jornal antigo de 1936 aberto sobre uma mesa, com manchete em letras grandes e borradas"
+  },
+  {
+   "start": 596.75,
+   "end": 602.28,
+   "provider": "adiado",
+   "query": "old legal case folder fountain pen desk",
+   "visual": "Pasta de processo judicial antiga fechada sobre uma mesa de tribunal, com caneta-tinteiro ao lado",
+   "media_type": "video"
+  },
+  {
+   "start": 602.28,
+   "end": 607.89,
+   "provider": "adiado",
+   "query": "1930s British doctor surgery facade street",
+   "visual": "Fachada de um consultório médico britânico dos anos 1930, com placa discreta e janelas de vidro",
+   "media_type": "video"
+  },
+  {
+   "start": 607.89,
+   "end": 613.4,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a middle-aged 1930s British doctor in a formal three-piece suit seated in a leather armchair in a wood-paneled office, a bookshelf behind him, soft window light, sepia tones, medium shot, 50mm lens, no identifiable face, no gore, no text",
+   "visual": "Médico de meia-idade dos anos 1930 em traje formal sentado em uma cadeira de couro em um escritório"
+  },
+  {
+   "start": 613.4,
+   "end": 618.42,
+   "provider": "adiado",
+   "query": "1930s English city street crowd newsstand",
+   "visual": "Rua movimentada de uma cidade inglesa dos anos 1930 com pessoas em roupas de época e bancas de jornal",
+   "media_type": "video"
+  },
+  {
+   "start": 618.42,
+   "end": 621.915,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, open wooden drawer containing yellowed newspaper clippings and an old photograph of a woman, soft light, sepia tones, close-up, 85mm lens, no legible text, no gore",
+   "visual": "Gaveta de madeira com recortes de jornais antigos e uma fotografia de mulher, vista de perto"
+  },
+  {
+   "start": 621.915,
+   "end": 628.86,
+   "provider": "adiado",
+   "query": "old wooden door building night window light",
+   "visual": "Porta de madeira de um prédio antigo fechada, com uma lâmpada acesa em uma janela acima",
+   "media_type": "video"
+  },
+  {
+   "start": 628.86,
+   "end": 636.08,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1930s English newspaper stand with stacked broadsheets in the window, afternoon light reflecting on the glass, sepia tones, medium shot, 50mm lens, headlines blurred and unreadable, no people, no logos",
+   "visual": "Vitrine de jornal antigo com manchetes em uma banca de rua, reflexo de luz da tarde"
+  },
+  {
+   "start": 636.08,
+   "end": 642.12,
+   "provider": "adiado",
+   "query": "hand holding old newspaper window light",
+   "visual": "Mão segurando uma página de jornal antigo sob a luz de uma janela, em close",
+   "media_type": "video"
+  },
+  {
+   "start": 642.12,
+   "end": 648.98,
+   "provider": "adiado",
+   "query": "stack old newspapers desk lamp documents",
+   "visual": "Pilhas de jornais antigos e um documento aberto sobre uma mesa de escritório, luz de abajur",
+   "media_type": "video"
+  },
+  {
+   "start": 648.98,
+   "end": 653.83,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, twelve men in dark suits seated in the jury box of a 1930s British courtroom, photographed from behind, wooden rail and paneling, sepia tones, wide shot, 35mm lens, no identifiable faces, no text",
+   "visual": "Juri de doze homens em bancos de madeira de um tribunal dos anos 1930, de costas para a câmera"
+  },
+  {
+   "start": 653.83,
+   "end": 658.62,
+   "provider": "adiado",
+   "query": "1930s juror reading document courtroom side view",
+   "visual": "Jurado de terno escuro lendo um documento em um tribunal da década de 1930, visto de lado",
+   "media_type": "video"
+  },
+  {
+   "start": 658.62,
+   "end": 663.64,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an old 1930s desk calendar open to a March page on a wooden office desk, a pen resting beside it, soft window light, sepia tones, close-up, 85mm lens, no legible text, no people",
+   "visual": "Calendário antigo com a página de março aberta sobre uma mesa de escritório, mãos ao lado"
+  },
+  {
+   "start": 663.64,
+   "end": 666.82,
+   "provider": "adiado",
+   "query": "judge gavel wooden court desk close up",
+   "visual": "Martelo de juiz antigo sobre uma mesa de madeira de tribunal, em close",
+   "media_type": "video"
+  },
+  {
+   "start": 666.82,
+   "end": 671.41,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1930s British judge in a black robe and white wig reading a document at the bench of a dim courtroom, soft side lighting, sepia tones, medium shot, 50mm lens, no identifiable face, no text readable",
+   "visual": "Juiz de peruca branca lendo um papel em sua bancada de tribunal, visto de frente em penumbra"
+  },
+  {
+   "start": 671.41,
+   "end": 677.06,
+   "provider": "adiado",
+   "query": "researcher examining old photograph identification card desk",
+   "visual": "Pesquisador olhando uma coleção de fotos antigas e ficha de identificação em uma mesa, luz de abajur",
+   "media_type": "video"
+  },
+  {
+   "start": 677.06,
+   "end": 684.51,
+   "provider": "adiado",
+   "query": "empty courtroom wooden benches window light",
+   "visual": "Tribunal vazio após a sessão, cadeiras de madeira e luz pela janela alta",
+   "media_type": "video"
+  },
+  {
+   "start": 684.51,
+   "end": 691.62,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, tall iron gate in a 1930s English red brick prison wall, a watchtower visible behind, overcast sky, sepia and black and white tones, wide shot, 35mm lens, no people, no text, no execution imagery",
+   "visual": "Portão alto de ferro de uma prisão de tijolos dos anos 1930, com muro e torres ao fundo"
+  },
+  {
+   "start": 691.62,
+   "end": 696.37,
+   "provider": "adiado",
+   "query": "old prison corridor brick England 1930s",
+   "visual": "Muro e corredor de tijolos de uma prisão britânica antiga, luz fraca, sem pessoas",
+   "media_type": "video"
+  },
+  {
+   "start": 696.37,
+   "end": 701.55,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a plain wooden table in an empty 1930s prison cell with a small notebook and a pencil on it, narrow window light, sepia tones, medium shot, 35mm lens, no people, no text, no gallows",
+   "visual": "Caderno velho e uma caneta sobre uma mesa de madeira em uma cela vazia, luz de janela estreita"
+  },
+  {
+   "start": 701.55,
+   "end": 707.08,
+   "provider": "adiado",
+   "query": "1930s English terraced house street quiet",
+   "visual": "Fotografia antiga de uma casa de tijolos vitoriana em uma rua calma, com a porta fechada",
+   "media_type": "video"
+  },
+  {
+   "start": 707.08,
+   "end": 712.68,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, stack of old cardboard archive boxes and a faded photograph of a young woman on a wooden table, soft window light, sepia tones, medium shot, 50mm lens, no legible text, no gore, no people",
+   "visual": "Caixas de papelão antigas e uma fotografia de mulher sobre uma mesa de arquivo, cena de memória"
+  },
+  {
+   "start": 712.68,
+   "end": 718.43,
+   "provider": "adiado",
+   "query": "1930s English townhouse exterior black and white",
+   "visual": "Fachada histórica de um sobrado de tijolos em Lancaster, anos 1930, com janelas altas e porta de madeira, em tom sépia.",
+   "media_type": "video"
+  },
+  {
+   "start": 718.43,
+   "end": 723.44,
+   "provider": "adiado",
+   "query": "1930s parlour interior mahogany furniture",
+   "visual": "Interior de uma casa burguesa dos anos 1930 com móveis de mogno, tapetes e quadros, quase vazia, como numa venda de bens.",
+   "media_type": "video"
+  },
+  {
+   "start": 723.44,
+   "end": 728.49,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, crowd of 1930s British men and women in overcoats and hats walking through the rooms of a large townhouse during a public auction viewing, staircase and hallway, dim daylight from windows, grainy black and white archival film, wide shot 24mm lens, documentary atmosphere, no visible text or signs.",
+   "visual": "Multidão de visitantes curiosos com roupas de época circulando por uma casa vitoriana, em dia de leilão."
+  },
+  {
+   "start": 728.49,
+   "end": 733.81,
+   "provider": "adiado",
+   "query": "1930s auction room furniture sale England",
+   "visual": "Mesa de leilão com móveis e objetos numerados, um leiloeiro de época ao fundo, numa sala com paredes escuras.",
+   "media_type": "video"
+  },
+  {
+   "start": 733.81,
+   "end": 738.99,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, close view of an ornate antique Persian rug on a polished wooden floor beside a gilt-framed oil painting on a wallpapered wall, luxurious 1930s bourgeois interior, soft window light, shallow depth of field, 50mm lens, archival sepia-toned look, no people, no text.",
+   "visual": "Tapete persa de pele animal e quadros a óleo pendurados numa parede, detalhes do luxo da casa."
+  },
+  {
+   "start": 738.99,
+   "end": 745.33,
+   "provider": "adiado",
+   "query": "old wooden staircase banister removed workers",
+   "visual": "Escadaria de madeira de uma casa antiga, com o corrimão sendo removido por trabalhadores, em tom sombrio.",
+   "media_type": "video"
+  },
+  {
+   "start": 745.33,
+   "end": 750.9,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s British delivery van parked on a cobbled street in Glasgow, workmen carrying a long wrapped wooden banister into the back of the van, overcast light, period clothing, archival black and white photograph, wide 35mm lens, no text or signs readable, documentary style.",
+   "visual": "Corrimão de madeira envolto em papel, sendo carregado para dentro de um furgão de época em Glasgow."
+  },
+  {
+   "start": 750.9,
+   "end": 756.26,
+   "provider": "adiado",
+   "query": "1930s forensic laboratory microscope vintage",
+   "visual": "Laboratório de criminalística dos anos 1930 com bancadas, microscópios e fotografias espalhadas.",
+   "media_type": "video"
+  },
+  {
+   "start": 756.26,
+   "end": 760.72,
+   "provider": "adiado",
+   "query": "Lancaster City Museum exterior building",
+   "visual": "Fachada de um museu de cidade inglesa com pedra clara e uma placa de exposição, em dia nublado.",
+   "media_type": "video"
+  },
+  {
+   "start": 760.72,
+   "end": 766.64,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, museum glass display case containing vintage personal items from the 1930s: handwritten letters, old family photographs in frames, a folded pale dress, soft spotlight from above, reflections on glass, shallow depth of field, 50mm lens, no legible text, respectful somber mood.",
+   "visual": "Vitrine de museu com objetos pessoais de duas mulheres dos anos 1930: cartas, fotos e um pequeno vestido."
+  },
+  {
+   "start": 766.64,
+   "end": 771.67,
+   "provider": "adiado",
+   "query": "old handwritten diary open wooden table",
+   "visual": "Diário antigo aberto com letra à mão e fotos de época ao lado, sobre uma mesa de madeira.",
+   "media_type": "video"
+  },
+  {
+   "start": 771.67,
+   "end": 779.16,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, close-up of 1940s handwritten diary pages with cursive ink writing, slightly yellowed paper, a fountain pen resting beside it on a dark wooden desk, soft side light, shallow depth of field, macro 85mm lens, archival feel, no legible words, no people.",
+   "visual": "Página de diário de 1944 e um caderno dobrado sobre a mesa, com a caligrafia visível em destaque."
+  },
+  {
+   "start": 779.16,
+   "end": 782.74,
+   "provider": "adiado",
+   "query": "1930s woman back view looking through window",
+   "visual": "Mulher de época de costas olhando pela janela de uma sala, simbolizando a voz negada às vítimas.",
+   "media_type": "video"
+  },
+  {
+   "start": 782.74,
+   "end": 789.17,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, rows of old cardboard archive folders and ledgers on wooden library shelves, a researcher's hand flipping through a folder, warm reading lamp light, dust in air, archival atmosphere, 35mm lens, documentary style, no legible text.",
+   "visual": "Arquivo de pastas antigas numa estante de biblioteca, com pessoas buscando registros de familiares."
+  },
+  {
+   "start": 789.17,
+   "end": 792.26,
+   "provider": "adiado",
+   "query": "University of Edinburgh old building stone exterior",
+   "visual": "Prédio antigo de pedra da Universidade de Edimburgo, com o pátio e a arquitetura gótica ao fundo.",
+   "media_type": "video"
+  },
+  {
+   "start": 792.26,
+   "end": 799.66,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, university archive table holding several plain wooden boxes and a small simple ceramic urn, soft cool daylight from a high window, neutral respectful mood, shallow depth of field, 50mm lens, no human remains visible, no legible text.",
+   "visual": "Caixas de madeira com pertences antigos e uma urna pequena numa mesa de arquivo universitário."
+  },
+  {
+   "start": 799.66,
+   "end": 805.465,
+   "provider": "adiado",
+   "query": "1930s public notice poster wall England",
+   "visual": "Cartaz antigo de aviso público colado num poste de rua em Lancaster, anos 1930.",
+   "media_type": "video"
+  },
+  {
+   "start": 805.465,
+   "end": 812.24,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, stack of yellowed 1930s newspapers and typed reports on a wooden research desk, a pair of reading glasses beside them, soft window light, shallow depth of field, 50mm lens, archival sepia tone, no legible text, no people.",
+   "visual": "Pilha de jornais antigos e relatórios amarelados sobre uma mesa de pesquisa."
+  },
+  {
+   "start": 812.24,
+   "end": 816.7,
+   "provider": "adiado",
+   "query": "1930s detective portrait with photograph files",
+   "visual": "Retrato em preto e branco de um investigador dos anos 1930 com um fichário de fotos.",
+   "media_type": "video"
+  },
+  {
+   "start": 816.7,
+   "end": 822.75,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s police laboratory desk with a magnifying glass over a black and white enlarged fingerprint photograph, a pair of tweezers beside it, warm desk lamp light, archival grainy look, close-up 60mm lens, no icons, no vector graphics, no gore.",
+   "visual": "Dedos sobre uma impressão digital ampliada numa lupa, numa mesa de laboratório dos anos 1930."
+  },
+  {
+   "start": 822.75,
+   "end": 827.9,
+   "provider": "adiado",
+   "query": "magnifying glass tweezers vintage desk photographs",
+   "visual": "Lupa e pinça sobre um tabuleiro com fotos ampliadas, símbolo do método baseado em experiência.",
+   "media_type": "video"
+  },
+  {
+   "start": 827.9,
+   "end": 832.78,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, group of four 1930s men in suits and waistcoats gathered around a wooden table with photographs, a microscope and magnifying glass, discussing, warm lamp light, black and white archival film, medium shot 35mm lens, no text or signs.",
+   "visual": "Equipe de especialistas dos anos 1930 reunida numa mesa, com fotos, microscópio e lupas, trabalhando juntos."
+  },
+  {
+   "start": 832.78,
+   "end": 839.02,
+   "provider": "adiado",
+   "query": "1930s photographer large format camera tripod",
+   "visual": "Fotógrafo de época ajustando câmera de grande formato sobre tripé diante de um objeto de laboratório.",
+   "media_type": "video"
+  },
+  {
+   "start": 839.02,
+   "end": 844.52,
+   "provider": "adiado",
+   "query": "1930s anatomist examining skull laboratory notes",
+   "visual": "Mesa de laboratório forense com um anatomista de jaleco examinando um crânio e anotações.",
+   "media_type": "video"
+  },
+  {
+   "start": 844.52,
+   "end": 849.64,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s forensic comparison setup on a laboratory table: an enlarged black and white portrait of a young woman's face propped beside a plain skull, precise measuring calipers and a glass lens above them, soft lamp light, archival grain, 50mm lens, no gore, no icons, no text.",
+   "visual": "Ampliação de fotografia de rosto de mulher de época sobreposta a contorno de crânio, como comparação forense."
+  },
+  {
+   "start": 849.64,
+   "end": 856.76,
+   "provider": "adiado",
+   "query": "1930s police station drawers files Glasgow",
+   "visual": "Sala de polícia de Glasgow dos anos 1930, com arquivos de impressões digitais em gavetas de madeira.",
+   "media_type": "video"
+  },
+  {
+   "start": 856.76,
+   "end": 863.86,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s British chief constable in a formal dark uniform seated at a large mahogany desk in an office, framed certificates on the wall, warm lamp light, serious posture, black and white archival portrait, 50mm lens, no text readable.",
+   "visual": "Chefe de polícia de Glasgow dos anos 1930 em gabinete formal, com uniforme e mesa de madeira."
+  },
+  {
+   "start": 863.86,
+   "end": 870.94,
+   "provider": "adiado",
+   "query": "vintage darkroom enlarger police photography 1930s",
+   "visual": "Pequena oficina de fotografia policial com ampliadora, bandejas e negativos pendurados.",
+   "media_type": "video"
+  },
+  {
+   "start": 870.94,
+   "end": 878.11,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s British detective in a dark suit and tie leaning over a desk comparing two black and white photographs of fingerprints under a bright desk lamp, serious focused expression, archival film grain, medium shot 50mm lens, no text.",
+   "visual": "Detetive de época em ação numa sala escura, comparando fotografias de impressões digitais sob uma lâmpada."
+  },
+  {
+   "start": 878.11,
+   "end": 884.9,
+   "provider": "adiado",
+   "query": "detective hands examining fingerprint magnifying glass",
+   "visual": "Mãos de detetive examinando um abdômen de impressão digital com lupa, em mesa de madeira.",
+   "media_type": "video"
+  },
+  {
+   "start": 884.9,
+   "end": 890.11,
+   "provider": "adiado",
+   "query": "old card catalog cabinet office 1930s",
+   "visual": "Escritório antigo com uma longa fileira de gavetas de fichas, cenário de trabalho manual sem computadores.",
+   "media_type": "video"
+  },
+  {
+   "start": 890.11,
+   "end": 896.41,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s radio broadcaster in a tweed suit speaking into a vintage ribbon microphone in a BBC-style studio, mid-century wooden panelling, warm lamp light, archival black and white film grain, 50mm lens, no legible logos or text.",
+   "visual": "Repórter de rádio dos anos 1930 com microfone antigo em frente a um prédio, falando sobre o caso."
+  },
+  {
+   "start": 896.41,
+   "end": 902.67,
+   "provider": "adiado",
+   "query": "yellowed archive document stamp vintage desk",
+   "visual": "Papel de arquivo amarelado com carimbo de época sobre uma mesa, símbolo da investigação analógica.",
+   "media_type": "video"
+  },
+  {
+   "start": 902.67,
+   "end": 907.85,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, 1930s police investigation room with several wooden desks covered in papers and black and white photographs, a hanging ceiling lamp, empty chairs, archival grainy look, wide 24mm lens, no people, no text.",
+   "visual": "Fotografia de época de uma sala de investigação com papéis e fotos espalhados sobre mesas."
+  },
+  {
+   "start": 907.85,
+   "end": 912.3,
+   "provider": "adiado",
+   "query": "vintage portrait photographs faces 1930s table",
+   "visual": "Fotos antigas de rostos de pessoas de época espalhadas sobre uma mesa, com contraste entre passado e presente.",
+   "media_type": "video"
+  },
+  {
+   "start": 912.3,
+   "end": 919.94,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, heavy wooden door of a 1930s English courthouse closed at the end of a dim stone corridor, faint light from a high window, somber mood, black and white archival film, 35mm lens, no people, no text.",
+   "visual": "Porta de tribunal de época fechada, com luz fraca no corredor, simbolizando o fim do processo."
+  },
+  {
+   "start": 919.94,
+   "end": 926.85,
+   "provider": "adiado",
+   "query": "old iron chain dark background close up",
+   "visual": "Corrente de ferro sobre um fundo escuro, metáfora de uma prova que pode se romper.",
+   "media_type": "video"
+  },
+  {
+   "start": 926.85,
+   "end": 932.54,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "Photorealistic documentary photograph, faded 1930s portrait of a young woman with hair pinned back in a simple dress, slightly soft focus, sepia-toned archival print on a wooden table, soft window light, 85mm lens, respectful and melancholic mood, no text.",
+   "visual": "Retrato de época de jovem mulher em foto desbotada, lembrando uma vida perdida."
+  },
+  {
+   "start": 932.54,
+   "end": 937.84,
+   "provider": "adiado",
+   "query": "stacked archive boxes dim storage room",
+   "visual": "Pilha de caixas de arquivo com etiquetas em branco numa sala de arquivo sombria.",
+   "media_type": "video"
+  },
+  {
+   "start": 937.84,
+   "end": 943.89,
+   "provider": "adiado",
+   "query": "open notebook pen wooden desk",
+   "visual": "Caderno aberto e caneta numa mesa de madeira, convidando o público a escrever um comentário.",
+   "media_type": "video"
+  },
+  {
+   "start": 943.89,
+   "end": 949.76,
+   "provider": "adiado",
+   "query": "empty reading desk teacup closed book",
+   "visual": "Mesa de leitura vazia com uma xícara de chá e um livro fechado, encerrando a reflexão.",
+   "media_type": "video"
+  }
+ ],
+ "_ficha": {
+  "tema": "Buck Ruxton: o caso das mulheres desmembradas em Moffat e o início da criminalística científica",
+  "epoca": "1935-1936, Escócia e Inglaterra (Moffat, Glasgow, Edimburgo, Lancaster, Manchester)",
+  "tom": "documentário true crime, sóbrio, investigativo, respeitoso com as vítimas",
+  "personagens": [
+   {
+    "id": "buck_ruxton",
+    "nome": "Buck Ruxton",
+    "busca": "Buck Ruxton 1930s doctor portrait",
+    "como_aparece": "médico de Lancaster, anos 1930, traje formal; retrato de arquivo e imagens do julgamento em Manchester em 1936",
+    "tipo": "pessoa",
+    "epoca": "1930s",
+    "wikipedia_pt": "",
+    "wikipedia_en": "Buck Ruxton"
+   },
+   {
+    "id": "isabella_ruxton",
+    "nome": "Isabella Ruxton (Isabella Rockstone no roteiro)",
+    "busca": "Isabella Ruxton 1930s portrait woman",
+    "como_aparece": "mulher de 34 anos, fotos de família e retratos de época; em uma foto usa vestido e diadema",
+    "tipo": "pessoa",
+    "epoca": "1930s",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "mary_rogerson",
+    "nome": "Mary Rogerson (Mary Ann Rogerson no roteiro)",
+    "busca": "1930s young woman nursemaid uniform England",
+    "como_aparece": "jovem quase aos 20 anos, em uniforme de babá; postal de época em que sorri",
+    "tipo": "pessoa",
+    "epoca": "1930s",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "bertie_hammond",
+    "nome": "Bertie Hammond",
+    "busca": "Bertie Hammond Glasgow police detective 1930s",
+    "como_aparece": "detetive de Glasgow, especialista em impressões digitais e fotografia; arquivo policial dos anos 1930",
+    "tipo": "pessoa",
+    "epoca": "1930s",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "james_cooper_brash",
+    "nome": "James Cooper Brash",
+    "busca": "James Cooper Brash anatomist Edinburgh University 1930s",
+    "como_aparece": "anatomista da Universidade de Edimburgo, anos 1930; trabalho com fotografias e crânios em laboratório",
+    "tipo": "pessoa",
+    "epoca": "1930s",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   }
+  ],
+  "lugares": [
+   {
+    "id": "moffat",
+    "nome": "Moffat, Dumfriesshire",
+    "busca": "Moffat Dumfriesshire Scotland ravine woodland",
+    "evitar": "cenas de crime gráficas, restos humanos, cadáveres, polícia isolando área em close",
+    "wikipedia_pt": "Moffat",
+    "wikipedia_en": "Moffat"
+   },
+   {
+    "id": "dalton_square",
+    "nome": "Dalton Square, Lancaster",
+    "busca": "Dalton Square Lancaster England 1930s",
+    "evitar": "prédios modernos, ruas de outras cidades, casas que não sejam da época",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "strangeways",
+    "nome": "Strangeways Prison, Manchester",
+    "busca": "Strangeways Prison Manchester 1930s",
+    "evitar": "forca de cinema, cenas de execução dramatizadas, presídios modernos",
+    "wikipedia_pt": "",
+    "wikipedia_en": "HM Prison Manchester"
+   },
+   {
+    "id": "lancaster_museum",
+    "nome": "Lancaster City Museum",
+    "busca": "Lancaster City Museum exhibition",
+    "evitar": "fachada de outro museu, objetos sem relação com o caso",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   }
+  ],
+  "glossario": [
+   {
+    "no_roteiro": "Puzzlemorde (Jigsaw-Mörder)",
+    "significa": "apelido da imprensa para os assassinatos com corpos cortados em partes espalhadas",
+    "nunca_buscar": [
+     "jigsaw puzzle pieces",
+     "puzzle game",
+     "quebra-cabeça colorido"
+    ]
+   },
+   {
+    "no_roteiro": "Common Law-Beziehung",
+    "significa": "convivência sem casamento oficial",
+    "nunca_buscar": [
+     "wedding ceremony",
+     "law books",
+     "court gavel"
+    ]
+   },
+   {
+    "no_roteiro": "Die Schlucht",
+    "significa": "barranco ou vale estreito onde os restos foram achados",
+    "nunca_buscar": [
+     "waterfall",
+     "Grand Canyon"
+    ]
+   },
+   {
+    "no_roteiro": "Fingerkuppen fehlten",
+    "significa": "as pontas dos dedos foram removidas para dificultar a identificação",
+    "nunca_buscar": [
+     "fingerprint scanner",
+     "fingerprint icon"
+    ]
+   },
+   {
+    "no_roteiro": "Schädelfotoüberlagerung",
+    "significa": "sobreposição de foto e crânio para comparar rostos",
+    "nunca_buscar": [
+     "skull emoji",
+     "skull cartoon",
+     "x-ray medical"
+    ]
+   },
+   {
+    "no_roteiro": "Insektenlarven",
+    "significa": "larvas de moscas usadas para estimar a hora da morte",
+    "nunca_buscar": [
+     "maggots close-up",
+     "gore"
+    ]
+   },
+   {
+    "no_roteiro": "Der Galgen (gehängt)",
+    "significa": "execução na forca",
+    "nunca_buscar": [
+     "gallows cartoon",
+     "noose close-up"
+    ]
+   }
+  ],
+  "evitar_sempre": [
+   "restos humanos ou cadáveres em close",
+   "sangue ou ferimentos explícitos",
+   "atores de séries ou filmes de crime no lugar dos personagens reais",
+   "silhuetas de assassino com capuz",
+   "logos de canais, plataformas ou jornais modernos",
+   "memes",
+   "ícones ou vetores de impressão digital",
+   "pessoas modernas no lugar de cenas de época"
+  ],
+  "visual_geral": "arquivo histórico dos anos 1930 em preto e branco ou sépia: fachadas de Lancaster, vales e bosques escoceses, jornais de época, retratos de família e objetos pessoais das vítimas",
+  "estilo_imagem": "real"
+ }
+}

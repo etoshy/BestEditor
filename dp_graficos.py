@@ -503,9 +503,11 @@ def aplicar_graficos(video_in: str, video_out: str, graficos: List[Dict[str, Any
         return video_in
     os.makedirs(work_dir, exist_ok=True)
     primaria = (paleta or {}).get("primaria") or "#FFD60A"
+    import progresso_ffmpeg  # v84_118: cada gráfico desenhado anda a barra da etapa
     entradas, grafo, atual = [], ["[0:v]setpts=PTS-STARTPTS,format=yuv420p[b0]"], "b0"
     for k, g in enumerate(validos, start=1):
-        mov, (x, y) = renderizar_mov(g, W, H, work_dir, primaria)
+        with progresso_ffmpeg.parte(k, len(validos) + 2, f"desenhando o gráfico {k} de {len(validos)}"):
+            mov, (x, y) = renderizar_mov(g, W, H, work_dir, primaria)
         entradas += ["-i", mov]
         a = float(g["start"])
         grafo.append(f"[{k}:v]setpts=PTS-STARTPTS+{a:.3f}/TB[g{k}]")
@@ -514,9 +516,11 @@ def aplicar_graficos(video_in: str, video_out: str, graficos: List[Dict[str, Any
     grafo.append(f"[{atual}]format=yuv420p[vout]")
     dur = _probe_duration(video_in)
     import qualidade_export
-    r = qualidade_export.rodar(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", video_in] + entradas + [
-        "-filter_complex", ";".join(grafo), "-map", "[vout]", "-map", "0:a?", "-t", f"{dur:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "copy", video_out], timeout=3600)
+    with progresso_ffmpeg.parte(len(validos) + 1, len(validos) + 2, "colocando os gráficos no vídeo", ate=len(validos) + 2):
+        # (vale 2 fatias: o passe do vídeo inteiro é o que mais demora)
+        r = qualidade_export.rodar(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", video_in] + entradas + [
+            "-filter_complex", ";".join(grafo), "-map", "[vout]", "-map", "0:a?", "-t", f"{dur:.3f}",
+            "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "copy", video_out], timeout=4 * 3600)
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg falhou nos gráficos: {r.stderr.strip()[-600:]}")
     return video_out

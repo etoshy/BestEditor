@@ -316,6 +316,11 @@ def ler_resposta(resposta: str, original: str) -> Dict[str, Any]:
     if not t:
         raise ValueError("A resposta está vazia — cole o texto que a IA devolveu.")
     avisos: List[str] = []
+    import marcas_seguras  # 🔒 a IA tirou marca do site? volta pro mesmo ponto
+    t, volta = marcas_seguras.restaurar(original, t)
+    if volta:
+        avisos.append(f"🔒 A IA tinha tirado {len(volta)} marca(s) — recoloquei no mesmo ponto: "
+                      + ", ".join(dict.fromkeys(volta))[:300])
     a, b = marcas(original), marcas(t)
     for k, nome in (("inscreva", "[[INSCREVA]]"), ("venda", "[[VENDA]]")):
         if b[k] < a[k]:

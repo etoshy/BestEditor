@@ -1,0 +1,1439 @@
+{
+ "segments": [
+  {
+   "start": 0.0,
+   "end": 6.38,
+   "provider": "adiado",
+   "query": "Victorian mansion New Jersey dark exterior",
+   "visual": "Fachada de uma grande casa vitoriana de luxo em Westfield, Nova Jersey, com janelas escuras e clima de mistério, vista de fora em tom frio",
+   "media_type": "video"
+  },
+  {
+   "start": 6.38,
+   "end": 12.11,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, empty high school theater stage in the 1970s, wooden floorboards, old red velvet curtains, single worn chair, soft dim light from overhead lamps, shallow depth of field, muted colors, no text, no people",
+   "visual": "Sala de aula de teatro de uma escola americana dos anos 1970, com palco e cortinas vazias"
+  },
+  {
+   "start": 12.11,
+   "end": 18.5,
+   "provider": "adiado",
+   "query": "1970s teenage girl school hallway books",
+   "visual": "Jovem estudante americana dos anos 1970 com livros nos braços, olhar pensativo num corredor de escola",
+   "media_type": "video"
+  },
+  {
+   "start": 18.5,
+   "end": 23.92,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two American teachers in 1970s clothing talking in a school corridor, man in a brown suit with glasses, woman in a knit cardigan, concerned expressions, lockers, soft fluorescent light, medium shot, no text",
+   "visual": "Professor de terno dos anos 1970 conversando com uma colega junto a um armário de escola"
+  },
+  {
+   "start": 23.92,
+   "end": 29.88,
+   "provider": "adiado",
+   "query": "1970s people knocking front door mansion",
+   "visual": "Dois professores de pé diante da porta de uma casa grande, batendo à porta, clima tenso",
+   "media_type": "video"
+  },
+  {
+   "start": 29.88,
+   "end": 36.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged American couple in 1970s clothing peering from behind a half-open curtain of their house window next door, serious worried expressions, soft interior light, medium close shot, no text",
+   "visual": "Vizinhos de meia-idade observando de uma janela de casa ao lado, com cortina entreaberta"
+  },
+  {
+   "start": 36.53,
+   "end": 43.57,
+   "provider": "adiado",
+   "query": "house lights on daytime windows closed",
+   "visual": "Casa grande com luzes acesas durante o dia inteiro, janelas fechadas e sem movimento",
+   "media_type": "video"
+  },
+  {
+   "start": 43.57,
+   "end": 49.69,
+   "provider": "adiado",
+   "query": "1970s rotary telephone hand picking up",
+   "visual": "Telefone antigo de disco sobre uma mesa, com mão pegando o fone",
+   "media_type": "video"
+  },
+  {
+   "start": 49.69,
+   "end": 55.09,
+   "provider": "adiado",
+   "query": "1970s police officers approaching house uniform",
+   "visual": "Dois policiais americanos dos anos 1970 de uniforme se aproximando de uma casa grande",
+   "media_type": "video"
+  },
+  {
+   "start": 55.09,
+   "end": 60.65,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, two police officers in 1970s uniforms carefully pushing open a slightly ajar window of a house, climbing inside, cautious expressions, dim interior, cold daylight, medium shot, no text",
+   "visual": "Policiais abrindo uma janela entreaberta de casa, entrando com cuidado"
+  },
+  {
+   "start": 60.65,
+   "end": 67.36,
+   "provider": "adiado",
+   "query": "dark hallway luxury house wooden floor vintage",
+   "visual": "Corredor escuro de uma casa de luxo, com piso de madeira, tapetes e móveis antigos, ar pesado",
+   "media_type": "video"
+  },
+  {
+   "start": 67.36,
+   "end": 74.51,
+   "provider": "adiado",
+   "query": "police walking mansion hallway velvet curtain",
+   "visual": "Policiais cruzando um grande corredor até uma cortina pesada que separa um salão, clima de suspense",
+   "media_type": "video"
+  },
+  {
+   "start": 74.51,
+   "end": 81.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, empty dim ballroom of a 1970s mansion with a parted heavy curtain, a few bundled shapes covered under dark fabric on the floor in the far distance, cold blue light, no visible bodies or blood, respectful restrained composition, no text",
+   "visual": "Salão de baile vazio e escuro, com cortina aberta; a cena sugere o que foi encontrado sem mostrar corpos"
+  },
+  {
+   "start": 81.18,
+   "end": 86.84,
+   "provider": "adiado",
+   "query": "1971 calendar vintage wall",
+   "visual": "Calendário de dezembro de 1971 numa parede de casa antiga, em tom frio",
+   "media_type": "video"
+  },
+  {
+   "start": 86.84,
+   "end": 93.59,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, old wooden writing desk in a 1970s home study, two revolvers lying on the desk and a folded handwritten letter beside them, warm lamp light, dust, shallow depth of field, somber mood, no blood, no text legible",
+   "visual": "Escrivaninha de madeira num escritório com duas armas sobre a mesa e uma carta dobrada ao lado"
+  },
+  {
+   "start": 93.59,
+   "end": 99.13,
+   "provider": "adiado",
+   "query": "handwritten letter pages old desk close up",
+   "visual": "Close de uma carta manuscrita de cinco páginas sobre uma escrivaninha antiga",
+   "media_type": "video"
+  },
+  {
+   "start": 99.13,
+   "end": 105.57,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, wide wooden staircase of a large 1970s American mansion leading up to a dim third floor landing, soft light from above, dust particles in the air, empty, no people, low angle, no text",
+   "visual": "Escada de madeira de uma casa grande subindo para o terceiro andar, em penumbra"
+  },
+  {
+   "start": 105.57,
+   "end": 111.38,
+   "provider": "adiado",
+   "query": "1970s man reading letter desk back view",
+   "visual": "Homem de terno dos anos 1970 de costas, lendo um papel em um escritório, luz fria",
+   "media_type": "video"
+  },
+  {
+   "start": 111.38,
+   "end": 117.6,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, portrait of an elderly American woman in her eighties in the 1960s, hair pulled back in a bun, wire-rimmed glasses, dark high-collar dress, serious gaze, soft vintage film look, sepia-toned, head and shoulders, no text",
+   "visual": "Retrato antigo em sépia de uma mulher idosa de cabelos presos e óculos, dos anos 1960"
+  },
+  {
+   "start": 117.6,
+   "end": 123.62,
+   "provider": "adiado",
+   "query": "vintage map United States Michigan table",
+   "visual": "Mapa antigo dos Estados Unidos com marcação em Michigan, sobre uma mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 123.62,
+   "end": 129.4,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, small American Midwestern town street in Bay City Michigan in the 1920s, wooden houses, early model cars, unpaved edge, sepia-tinted archival look, wide shot, no people in focus, no text",
+   "visual": "Rua de cidade pequena de Bay City, Michigan, nos anos 1920, com casas de madeira e carros antigos"
+  },
+  {
+   "start": 129.4,
+   "end": 135.24,
+   "provider": "adiado",
+   "query": "1920s boy with mother outside house portrait",
+   "visual": "Jovem menino de cabelo penteado dos anos 1920 com a mãe, em frente a uma casa simples",
+   "media_type": "video"
+  },
+  {
+   "start": 135.24,
+   "end": 141.89,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, strict elderly woman in a dark 1930s dress holding a young boy by the hand at a front porch while other children play on the street behind them, sepia archival tone, medium shot, no text",
+   "visual": "Mulher idosa de vestido escuro impedindo o menino de brincar com outras crianças na rua"
+  },
+  {
+   "start": 141.89,
+   "end": 148.13,
+   "provider": "adiado",
+   "query": "mother son reading Bible together vintage living room",
+   "visual": "Mãe e filho sentados juntos lendo uma Bíblia grande numa sala de estar antiga",
+   "media_type": "video"
+  },
+  {
+   "start": 148.13,
+   "end": 155.02,
+   "provider": "adiado",
+   "query": "children playing street 1930s sunny",
+   "visual": "Crianças brincando na rua fora de uma casa, em dia de sol, em contraste com a casa isolada",
+   "media_type": "video"
+  },
+  {
+   "start": 155.02,
+   "end": 161.39,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, stern older American man in a dark three-piece suit in the 1930s, seated in a formal wooden living room, distant cold expression, sepia archival look, medium shot, no text",
+   "visual": "Homem mais velho de terno escuro, sério, sentado numa sala com ar distante"
+  },
+  {
+   "start": 161.39,
+   "end": 166.55,
+   "provider": "adiado",
+   "query": "emotionless man glasses 1940s home portrait",
+   "visual": "Homem de meia-idade de óculos e expressão fechada numa cena de sala com ar de distanciamento",
+   "media_type": "video"
+  },
+  {
+   "start": 166.55,
+   "end": 172.02,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, shy young American boy in the 1940s wearing thick glasses and simple clothes, looking down on a quiet town street, slightly withdrawn posture, sepia archival look, medium shot, no text",
+   "visual": "Jovem tímido de óculos grossos e roupa simples, olhando para baixo em uma rua de cidade"
+  },
+  {
+   "start": 172.02,
+   "end": 176.86,
+   "provider": "adiado",
+   "query": "University of Michigan Ann Arbor 1940s campus",
+   "visual": "Campus universitário de Ann Arbor com prédios de tijolos e árvores, anos 1940",
+   "media_type": "video"
+  },
+  {
+   "start": 176.86,
+   "end": 180.52,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1940s university accounting classroom with students seen from behind at wooden desks, blackboard covered with numbers and ledger columns, archival sepia look, medium wide shot, no text legible",
+   "visual": "Sala de aula universitária dos anos 1940 com estudantes de costas e quadro-negro com números"
+  },
+  {
+   "start": 180.52,
+   "end": 186.06,
+   "provider": "adiado",
+   "query": "WW2 American officer uniform flag portrait",
+   "visual": "Soldado americano de uniforme da Segunda Guerra com boina, em pé diante de uma bandeira",
+   "media_type": "video"
+  },
+  {
+   "start": 186.06,
+   "end": 193.14,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, American accountant in a dark suit in a 1950s office working over large ledger books at a wooden desk, adding machine nearby, warm lamp light, archival look, medium shot, no text",
+   "visual": "Homem de terno escuro em escritório dos anos 1950 trabalhando com livros de contabilidade"
+  },
+  {
+   "start": 193.14,
+   "end": 200.04,
+   "provider": "adiado",
+   "query": "1950s wedding couple portrait vintage",
+   "visual": "Casal de noivos dos anos 1950 posando, ele de terno e ela de vestido branco",
+   "media_type": "video"
+  },
+  {
+   "start": 200.04,
+   "end": 205.53,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1950s American woman with light hair and a young girl and boy in a living room, cheerful family moment, warm lamp light, archival film look, medium shot, no text",
+   "visual": "Mulher loira dos anos 1950 com um menino e uma menina pequena, em uma sala de estar"
+  },
+  {
+   "start": 205.53,
+   "end": 226.11,
+   "provider": "adiado",
+   "query": "1960s family five posing house photo album",
+   "visual": "Família de cinco pessoas posando na frente de uma casa, anos 1960, com clima de álbum de fotos",
+   "media_type": "video"
+  },
+  {
+   "start": 226.11,
+   "end": 241.8,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, luxurious interior of a 1960s American mansion with a wide wooden staircase, crystal chandelier, patterned carpet, elegant but dated furniture, warm light, no people, wide angle, no text",
+   "visual": "Interior de uma mansão de luxo antiga com escada de madeira e lustre, anos 1960"
+  },
+  {
+   "start": 241.8,
+   "end": 247.64,
+   "provider": "adiado",
+   "query": "1960s upscale living room wood furniture curtains",
+   "visual": "Sala de estar elegante de uma casa de classe média alta, com móveis de madeira e cortinas",
+   "media_type": "video"
+  },
+  {
+   "start": 247.64,
+   "end": 252.83,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, American bank employee in a dark suit standing outside a brick bank building in the early 1970s, head slightly bowed, thoughtful mood, muted overcast light, medium shot, no text",
+   "visual": "Bancário de terno escuro observando a fachada de um banco de tijolos, sentindo o peso da demissão"
+  },
+  {
+   "start": 252.83,
+   "end": 258.16,
+   "provider": "adiado",
+   "query": "bills calculator kitchen table money worry",
+   "visual": "Dinheiro e contas sobre uma mesa de cozinha, com calculadora e papéis espalhados",
+   "media_type": "video"
+  },
+  {
+   "start": 258.16,
+   "end": 264.88,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged American man in a dark suit and glasses sitting alone on a wooden bench at a 1970s train station, head bowed, hands clasped, cold morning light, medium wide shot, no text",
+   "visual": "Homem de terno escuro sentado sozinho em um banco de estação, cabisbaixo, olhando o vazio"
+  },
+  {
+   "start": 264.88,
+   "end": 270.58,
+   "provider": "adiado",
+   "query": "businessman suit briefcase train platform 1970s",
+   "visual": "Homem de terno com maleta na plataforma de estação lotada, em tom distante",
+   "media_type": "video"
+  },
+  {
+   "start": 270.58,
+   "end": 275.93,
+   "provider": "adiado",
+   "query": "stack bills receipts office desk lamp",
+   "visual": "Contas e recibos empilhados sobre uma mesa de escritório, com lâmpada acesa, ar de crise",
+   "media_type": "video"
+  },
+  {
+   "start": 275.93,
+   "end": 283.24,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, formal dining table of a wealthy 1970s American family with fine china and silverware, candles, tidy and perfect appearance, warm light, no people, wide angle, no text",
+   "visual": "Mesa de jantar de família luxuosa com louça fina, cena de aparência perfeita"
+  },
+  {
+   "start": 283.24,
+   "end": 287.82,
+   "provider": "adiado",
+   "query": "1970s woman dress living room expectant",
+   "visual": "Mulher loira dos anos 1970 de vestido, sentada numa sala de estar com ar de expectativa",
+   "media_type": "video"
+  },
+  {
+   "start": 287.82,
+   "end": 292.97,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, American man in a dark suit adjusting his tie in front of an antique mirror in a 1970s bedroom, early morning window light, somber expression, medium shot, no text",
+   "visual": "Homem de terno vestindo o paletó diante de um espelho antigo, de manhã cedo"
+  },
+  {
+   "start": 292.97,
+   "end": 300.41,
+   "provider": "adiado",
+   "query": "man sitting alone station bench empty tracks",
+   "visual": "Homem de terno sentado sozinho num banco de estação de trem por horas, olhando trilhos vazios",
+   "media_type": "video"
+  },
+  {
+   "start": 300.41,
+   "end": 305.91,
+   "provider": "adiado",
+   "query": "ashamed man suit glasses urban 1970s",
+   "visual": "Homem de terno de óculos com olhar desviado, mostrando vergonha e pressão, em ambiente urbano",
+   "media_type": "video"
+  },
+  {
+   "start": 305.91,
+   "end": 311.22,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, 1970s American woman seen from behind with hands pressed to her face in a living room, emotional tension, a man standing apart in the background, warm but heavy light, medium shot, no text",
+   "visual": "Mulher de costas com as mãos no rosto numa sala de estar, cena de conflito familiar"
+  },
+  {
+   "start": 311.22,
+   "end": 319.1,
+   "provider": "adiado",
+   "query": "open Bible wooden table glasses religious",
+   "visual": "Bíblia aberta sobre uma mesa de madeira com óculos dobrados ao lado, ar religioso e sombrio",
+   "media_type": "video"
+  },
+  {
+   "start": 319.1,
+   "end": 324.83,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, American man in a dark suit standing before a dark window at night, reflection of his face faintly visible in the glass, expression of guilt and despair, cold blue light, medium shot, no text",
+   "visual": "Homem de terno de pé diante de uma janela escura, com expressão de culpa e desespero"
+  },
+  {
+   "start": 324.83,
+   "end": 330.68,
+   "provider": "adiado",
+   "query": "man sitting empty church pew stained glass",
+   "visual": "Homem de terno sentado em uma cadeira de igreja vazia, com cabeça baixa, em luz de vitral",
+   "media_type": "video"
+  },
+  {
+   "start": 330.68,
+   "end": 337.84,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a man's hand in a dark sleeve gripping a revolver on a wooden table, dim lamp light, tense and heavy mood, shallow depth of field, no blood, no face visible, no text",
+   "visual": "Mão apertando um revólver sobre uma mesa de madeira, em close e luz baixa"
+  },
+  {
+   "start": 337.84,
+   "end": 343.9,
+   "provider": "adiado",
+   "query": "vintage calendar November 1971 kitchen wall",
+   "visual": "Calendário de novembro de 1971 numa parede de cozinha, com dia 9 marcado, clima sombrio",
+   "media_type": "video"
+  },
+  {
+   "start": 343.9,
+   "end": 349.57,
+   "provider": "adiado",
+   "query": "children walking to school morning suburban winter",
+   "visual": "Manhã de inverno em rua residencial calma de Westfield, crianças indo para a escola com mochilas",
+   "media_type": "video"
+  },
+  {
+   "start": 349.57,
+   "end": 355.71,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, three children in 1970s school clothes leaving the front door of a large suburban house in the early morning, backpacks on shoulders, cold light, medium wide shot, no text",
+   "visual": "Três crianças saindo de uma casa de classe média alta pela porta da frente, de manhã"
+  },
+  {
+   "start": 355.71,
+   "end": 361.76,
+   "provider": "adiado",
+   "query": "elderly woman gray hair sitting window home 1970s",
+   "visual": "Mulher idosa de cabelos grisos sentada perto de janela em casa grande, ar tranquilo",
+   "media_type": "video"
+  },
+  {
+   "start": 361.76,
+   "end": 367.67,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged American woman in a 1970s dress descending a wooden staircase in a large house, soft natural light from a window, calm domestic atmosphere, medium shot, no text",
+   "visual": "Corredor de uma casa com escada que sobe a um andar superior, mulher de meia-idade descendo"
+  },
+  {
+   "start": 367.67,
+   "end": 374.84,
+   "provider": "adiado",
+   "query": "dark kitchen luxury 1970s wood cabinets sink",
+   "visual": "Cozinha escura de casa de luxo dos anos 1970, pia e armários de madeira, ambiente sombrio",
+   "media_type": "video"
+  },
+  {
+   "start": 374.84,
+   "end": 381.41,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, low angle view of a wooden staircase in a dim 1970s house with light falling from above, empty and tense atmosphere, no people, no text",
+   "visual": "Escada da casa vista de baixo, com luz vindo de cima, ambiente de espera e tensão"
+  },
+  {
+   "start": 381.41,
+   "end": 387.27,
+   "provider": "adiado",
+   "query": "ajar wooden front door house light crack",
+   "visual": "Porta de madeira de uma casa grande entreaberta, com luz saindo pela fresta, clima de espera",
+   "media_type": "video"
+  },
+  {
+   "start": 387.27,
+   "end": 394.33,
+   "provider": "adiado",
+   "query": "children walking home school 1970s suburban street",
+   "visual": "Três crianças de uniforme escolar voltando para casa numa rua residencial de Westfield, a casa grande ao fundo",
+   "media_type": "video"
+  },
+  {
+   "start": 394.33,
+   "end": 399.98,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, front entrance of a large Victorian mansion in Westfield New Jersey 1971, dark wooden door slightly ajar, ivy on red brick, dry autumn leaves on the steps, cold overcast light, quiet and ominous mood, eye-level medium shot, 35mm lens, no people, no text or captions",
+   "visual": "Porta de uma casa grande de luxo fechada, com uma janela entreaberta, clima de silêncio"
+  },
+  {
+   "start": 399.98,
+   "end": 407.62,
+   "provider": "adiado",
+   "query": "police autopsy report folder desk archive",
+   "visual": "Arquivo policial: relatório de autópsia sobre uma mesa, com carimbos e fotos de arquivo fora de foco",
+   "media_type": "video"
+  },
+  {
+   "start": 407.62,
+   "end": 413.64,
+   "provider": "adiado",
+   "query": "large house at dusk lights on 1970s America",
+   "visual": "Mansão vista de fora ao anoitecer, com luzes acesas num único andar, sensação de isolamento",
+   "media_type": "video"
+  },
+  {
+   "start": 413.64,
+   "end": 421.06,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, stack of typed letters and sealed envelopes on an old wooden writing desk, a pile of 1970s newspapers beside them, a fountain pen resting nearby, warm lamp light with dark surroundings, muted tones, close-up 50mm lens, no legible text, no faces",
+   "visual": "Cartas datilografadas e envelopes sobre uma escrivaninha antiga, pilha de jornais"
+  },
+  {
+   "start": 421.06,
+   "end": 426.76,
+   "provider": "adiado",
+   "query": "man in suit sitting alone on bench train station",
+   "visual": "Homem de terno e óculos grossos de costas, sentado sozinho num banco de estação, vazio de expressão",
+   "media_type": "video"
+  },
+  {
+   "start": 426.76,
+   "end": 433.0,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an open vintage leather suitcase on a bed in a dim room, folded clothes and stacks of US dollar bills inside, 1970s styling, harsh single window light, dark muted tones, overhead medium shot, 35mm lens, no people, no text or captions",
+   "visual": "Mala de viagem antiga aberta sobre uma cama, com maços de dinheiro e roupas dobradas"
+  },
+  {
+   "start": 433.0,
+   "end": 438.05,
+   "provider": "adiado",
+   "query": "antique wall clock dark room",
+   "visual": "Relógio de parede marcando as horas numa sala escura de casa antiga, sensação de tempo passando",
+   "media_type": "video"
+  },
+  {
+   "start": 438.05,
+   "end": 443.76,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1960s dark sedan car driving away on an empty two-lane highway at dawn, fog over the fields, cold blue and grey tones, wide shot from behind, 35mm lens, no people visible, no text or captions",
+   "visual": "Estrada ao amanhecer com um carro sedan antigo seguindo para longe"
+  },
+  {
+   "start": 443.76,
+   "end": 449.61,
+   "provider": "adiado",
+   "query": "1970s bank exterior brick facade",
+   "visual": "Banco antigo com fachada de tijolo e porta de vidro, símbolo de dinheiro retirado",
+   "media_type": "video"
+  },
+  {
+   "start": 449.61,
+   "end": 456.62,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1963 Chevrolet Impala sedan parked in an airport long-term parking lot in New York, November 1971, grey overcast sky, parked among other period cars, muted cold colors, medium wide shot, 35mm lens, no people, no legible plates or text",
+   "visual": "Carro sedan de 1963 estacionado num estacionamento de aeroporto, com céu cinzento"
+  },
+  {
+   "start": 456.62,
+   "end": 462.56,
+   "provider": "adiado",
+   "query": "JFK airport 1970s terminal aerial",
+   "visual": "Aeroporto John F. Kennedy visto de longe, com aviões e terminal dos anos 1970",
+   "media_type": "video"
+  },
+  {
+   "start": 462.56,
+   "end": 468.99,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a vintage paper parking ticket on the dashboard of an old car, 1971 styling, soft grey daylight, shallow depth of field, muted tones, macro lens, no legible text, no faces",
+   "visual": "Parquímetro ou bilhete de estacionamento antigo close, com data impressa"
+  },
+  {
+   "start": 468.99,
+   "end": 474.82,
+   "provider": "adiado",
+   "query": "vintage United States map table pins",
+   "visual": "Mapa dos Estados Unidos sobre uma mesa com marcações de rotas",
+   "media_type": "video"
+  },
+  {
+   "start": 474.82,
+   "end": 480.88,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, row of empty vinyl chairs in a 1970s airport departure lounge, grey overcast light from large windows, muted cold tones, wide shot, 35mm lens, no people, no text or captions",
+   "visual": "Fileira de cadeiras vazias numa sala de embarque antiga de aeroporto"
+  },
+  {
+   "start": 480.88,
+   "end": 486.22,
+   "provider": "adiado",
+   "query": "airplane window view clouds grey",
+   "visual": "Viagem de avião vista pela janela, nuvens cinzentas, sensação de fuga",
+   "media_type": "video"
+  },
+  {
+   "start": 486.22,
+   "end": 491.39,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a rural winter landscape with a two-lane road splitting into two paths through bare trees, grey sky, cold muted tones, wide shot, 35mm lens, no people, no text or captions",
+   "visual": "Dois caminhos divergentes numa estrada rural de inverno, sugerindo escolha"
+  },
+  {
+   "start": 491.39,
+   "end": 497.3,
+   "provider": "adiado",
+   "query": "1970s police station office desks telephones",
+   "visual": "Escritório de polícia dos anos 1970 com mesas, telefones e pilhas de pastas",
+   "media_type": "video"
+  },
+  {
+   "start": 497.3,
+   "end": 503.15,
+   "provider": "adiado",
+   "query": "vintage rotary telephone on desk office",
+   "visual": "Telefone antigo de disco tocando sobre uma mesa de escritório",
+   "media_type": "video"
+  },
+  {
+   "start": 503.15,
+   "end": 509.57,
+   "provider": "adiado",
+   "query": "old index card file drawer open",
+   "visual": "Pilha de fichas e cartões de arquivo sem resposta, numa gaveta aberta",
+   "media_type": "video"
+  },
+  {
+   "start": 509.57,
+   "end": 515.62,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an old 1960s family portrait photograph lying on a table with one face carefully cut out, leaving a jagged empty space, soft window light, muted sepia tones, close-up 50mm lens, no legible text, faces of other family members partly visible but blurred",
+   "visual": "Fotografia de família antiga com um rosto recortado, sobre uma mesa"
+  },
+  {
+   "start": 515.62,
+   "end": 522.24,
+   "provider": "adiado",
+   "query": "two detectives reviewing case files archive room",
+   "visual": "Dois homens de terno folheando pastas de arquivo numa sala de arquivo",
+   "media_type": "video"
+  },
+  {
+   "start": 522.24,
+   "end": 529.51,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an old paper wall calendar showing November with one date circled in red pen, dim room with window light, muted cold tones, close-up 50mm lens, no legible text beyond the circle, no people",
+   "visual": "Calendário de parede com a data 10 de novembro marcada, luz de janela"
+  },
+  {
+   "start": 529.51,
+   "end": 534.64,
+   "provider": "adiado",
+   "query": "small American town street overcast day 1980s",
+   "visual": "Pequena cidade americana num dia cinzento, casas e uma praça tranquila",
+   "media_type": "video"
+  },
+  {
+   "start": 534.64,
+   "end": 540.94,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a mother holding a young boy's hand on a suburban sidewalk in 1980s New Jersey, both seen from behind, a house with a dark window behind them, overcast light, muted tones, medium shot, 35mm lens, faces not visible, no text",
+   "visual": "Pai e filho de costas numa calçada, com a casa ao fundo, clima de advertência"
+  },
+  {
+   "start": 540.94,
+   "end": 544.36,
+   "provider": "adiado",
+   "query": "children playing backyard adult watching window",
+   "visual": "Crianças brincando no quintal sob o olhar de um adulto na janela da casa",
+   "media_type": "video"
+  },
+  {
+   "start": 544.36,
+   "end": 550.92,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a cork bulletin board in a 1980s police station covered with old wanted posters, pins and paper, dim fluorescent light, muted tones, medium close shot, 35mm lens, faces on posters blurred, no legible text, no people",
+   "visual": "Cartaz antigo de procurado pregado em um mural de cortiça numa delegacia"
+  },
+  {
+   "start": 550.92,
+   "end": 555.26,
+   "provider": "adiado",
+   "query": "calendar pages flipping years passing time",
+   "visual": "Relógio de parede e calendário passando de anos, sensação de tempo longo",
+   "media_type": "video"
+  },
+  {
+   "start": 555.26,
+   "end": 562.54,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, interior of a 1980s American television studio with a dark set, a studio camera and stage lights, a wooden desk in the centre, muted tones, wide shot, 35mm lens, no people, no logos or text",
+   "visual": "Estúdio de TV dos anos 1980 com cenário escuro, câmeras e luz de palco"
+  },
+  {
+   "start": 562.54,
+   "end": 569.17,
+   "provider": "adiado",
+   "query": "television host middle-aged sitting desk studio 1989",
+   "visual": "Apresentador de TV de meia-idade sentado atrás de uma mesa no estúdio, falando para a câmera",
+   "media_type": "video"
+  },
+  {
+   "start": 569.17,
+   "end": 575.26,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an old CRT television set glowing in a dark 1980s living room, the screen showing a blurred image of a man's face, a sofa silhouetted in front, muted cool tones, medium shot, 35mm lens, no logos or legible text",
+   "visual": "Tela de televisão antiga de tubo exibindo um rosto desfocado numa sala escura"
+  },
+  {
+   "start": 575.26,
+   "end": 581.5,
+   "provider": "adiado",
+   "query": "stack of case files on office desk",
+   "visual": "Pilha de fichas e documentos sobre uma mesa de escritório, à espera de decisão",
+   "media_type": "video"
+  },
+  {
+   "start": 581.5,
+   "end": 586.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a grey clay portrait bust of a middle-aged man with thick-framed glasses sitting on a sculptor's workbench in a forensic studio, sculpting tools and clay scraps around it, warm studio light, muted tones, close-up 50mm lens, no text, no real person's face identifiable",
+   "visual": "Escultura de busto em argila sobre uma bancada de ateliê, com ferramentas ao redor"
+  },
+  {
+   "start": 586.18,
+   "end": 592.3,
+   "provider": "adiado",
+   "query": "forensic sculptor hands working clay studio",
+   "visual": "Escultor forense trabalhando na argila com as mãos, ao lado de fotos de família",
+   "media_type": "video"
+  },
+  {
+   "start": 592.3,
+   "end": 598.96,
+   "provider": "adiado",
+   "query": "vintage black and white family portraits 1930s 1940s",
+   "visual": "Retratos antigos em preto e branco de um jovem e um casal dos anos 1930 e 1940 numa mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 598.96,
+   "end": 605.61,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, close-up of a grey clay portrait bust of a middle-aged man with thick-framed glasses and a small scar behind the left ear, on a sculptor's bench, warm directional light, muted tones, 85mm lens, no text, no identifiable real face",
+   "visual": "Busto de argila com óculos grossos e uma marca atrás da orelha, close-up"
+  },
+  {
+   "start": 605.61,
+   "end": 611.16,
+   "provider": "adiado",
+   "query": "clay sculpture profile bust studio",
+   "visual": "Busto de argila visto de perfil com detalhes da orelha e da marca, bancada de ateliê",
+   "media_type": "video"
+  },
+  {
+   "start": 611.16,
+   "end": 617.76,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1980s living room at night with a CRT television showing a blurred studio scene with an audience, a family silhouette watching, warm TV glow, muted tones, medium shot, 35mm lens, no logos or legible text",
+   "visual": "Tela de TV de tubo mostrando um programa noturno com plateia numa sala escura"
+  },
+  {
+   "start": 617.76,
+   "end": 621.67,
+   "provider": "adiado",
+   "query": "rotary telephone notepad police desk",
+   "visual": "Telefone de disco com fio enrolado sobre uma mesa de delegacia, ao lado de bloco de anotações",
+   "media_type": "video"
+  },
+  {
+   "start": 621.67,
+   "end": 627.39,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a middle-aged American woman with short hair seated on a 1980s sofa holding a corded telephone to her ear, attentive expression, warm lamp light, muted tones, medium shot, 35mm lens, no text or captions",
+   "visual": "Mulher de meia-idade de cabelo curto sentada num sofá, segurando um telefone, expressão atenta"
+  },
+  {
+   "start": 627.39,
+   "end": 634.4,
+   "provider": "adiado",
+   "query": "mother daughter watching television living room 1980s",
+   "visual": "Mulher de meia-idade com a filha adolescente, ambas diante de uma TV ligada numa sala de estar",
+   "media_type": "video"
+  },
+  {
+   "start": 634.4,
+   "end": 639.84,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a middle-aged American man in a neat grey suit seen in profile close-up in a dim room, expression of quiet recognition, soft window light, muted cool tones, 85mm lens, no text or captions",
+   "visual": "Rosto de homem de meia-idade de perfil, em close, com expressão de reconhecimento"
+  },
+  {
+   "start": 639.84,
+   "end": 646.13,
+   "provider": "adiado",
+   "query": "dark suit hanging wardrobe white shirt tie",
+   "visual": "Terno escuro pendurado num armário de madeira, com gravata e camisa branca ao lado",
+   "media_type": "video"
+  },
+  {
+   "start": 646.13,
+   "end": 653.08,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a small white wooden church in a New Jersey town, members of the congregation leaving on a Sunday morning in the late 1980s, overcast soft light, muted tones, wide shot, 35mm lens, faces small and not identifiable, no text",
+   "visual": "Igreja de madeira de cidade pequena com pessoas saindo do culto no domingo"
+  },
+  {
+   "start": 653.08,
+   "end": 659.47,
+   "provider": "adiado",
+   "query": "map Virginia city marked red pen",
+   "visual": "Mapa da Virgínia com uma cidade marcada em vermelho, papel sobre mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 659.47,
+   "end": 666.72,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a fountain pen and an open leather wallet of documents on a wooden desk, a sheet of paper with a name crossed out in ink, soft window light, muted tones, close-up 50mm lens, no legible text, no people",
+   "visual": "Caneta-tinteiro e carteira de documentos sobre uma mesa, com nome riscado num papel"
+  },
+  {
+   "start": 666.72,
+   "end": 672.17,
+   "provider": "adiado",
+   "query": "old social security card desk close up",
+   "visual": "Cartão de seguridade social antigo sobre uma mesa com caneta, close",
+   "media_type": "video"
+  },
+  {
+   "start": 672.17,
+   "end": 679.78,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a middle-aged man in a dark suit walking away down a corridor of a 1980s accounting office, desks and filing cabinets on both sides, fluorescent light, muted tones, wide shot, 35mm lens, face not visible, no text",
+   "visual": "Homem de terno de costas caminhando num corredor de escritório de contabilidade"
+  },
+  {
+   "start": 679.78,
+   "end": 683.56,
+   "provider": "adiado",
+   "query": "church congregation gathered entrance small town",
+   "visual": "Igreja branca com uma pequena congregação reunida na entrada, dia de sol fraco",
+   "media_type": "video"
+  },
+  {
+   "start": 683.56,
+   "end": 689.45,
+   "provider": "adiado",
+   "query": "neighbors talking sidewalk friendly 1980s suburb",
+   "visual": "Vizinhos conversando na calçada, um homem de terno dando um aceno cordial",
+   "media_type": "video"
+  },
+  {
+   "start": 689.45,
+   "end": 693.37,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an open manila case file folder on a wooden desk with a typed name label partly out of focus, a university yearbook page beside it, soft window light, muted tones, close-up 50mm lens, no legible text, no people",
+   "visual": "Pasta de arquivo aberta com um nome datilografado parcialmente visível, sobre uma mesa"
+  },
+  {
+   "start": 693.37,
+   "end": 698.91,
+   "provider": "adiado",
+   "query": "university campus 1940s brick buildings students walking",
+   "visual": "Campus universitário dos anos 1940 com prédios de tijolo e alunos caminhando",
+   "media_type": "video"
+  },
+  {
+   "start": 698.91,
+   "end": 705.31,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, black rotary telephone on a police desk with a handwritten call list beside it, afternoon window light, muted tones, close-up 50mm lens, no legible text, no people",
+   "visual": "Telefone de disco sobre mesa de delegacia com lista de chamadas, luz da tarde"
+  },
+  {
+   "start": 705.31,
+   "end": 710.59,
+   "provider": "adiado",
+   "query": "two detectives standing interrogation room notebook",
+   "visual": "Dois investigadores de terno de pé numa sala de interrogatório, um deles com caderno",
+   "media_type": "video"
+  },
+  {
+   "start": 710.59,
+   "end": 716.93,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a fingerprint identification card with inked prints lying on a metal interrogation table, an open case folder beside it, dim overhead light, muted tones, close-up 50mm lens, no legible text, no people",
+   "visual": "Mesa de interrogatório com pasta aberta, impressões digitais em cartão sobre a mesa"
+  },
+  {
+   "start": 716.93,
+   "end": 722.69,
+   "provider": "adiado",
+   "query": "magnifying glass fingerprint forensic lab",
+   "visual": "Lupa sobre uma impressão digital em papel, mesa de laboratório forense antigo",
+   "media_type": "video"
+  },
+  {
+   "start": 722.69,
+   "end": 728.99,
+   "provider": "adiado",
+   "query": "empty interrogation room metal table chair",
+   "visual": "Sala de interrogatório vazia com cadeira e mesa de metal, luz fria",
+   "media_type": "video"
+  },
+  {
+   "start": 728.99,
+   "end": 736.12,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a middle-aged American woman sitting in a chair in a 1980s office with a hand over her face, expression of shock and disbelief, soft window light, muted tones, medium shot, 35mm lens, no text",
+   "visual": "Mulher de meia-idade sentada numa cadeira de escritório, mão no rosto, expressão de choque"
+  },
+  {
+   "start": 736.12,
+   "end": 740.02,
+   "provider": "adiado",
+   "query": "couple dining table tense 1980s home",
+   "visual": "Casal sentado numa mesa de jantar antiga, a mulher olhando para o marido com desconfiança",
+   "media_type": "video"
+  },
+  {
+   "start": 740.02,
+   "end": 746.62,
+   "provider": "adiado",
+   "query": "hand resting on closed notebook pen wooden table",
+   "visual": "Mão apoiada sobre um caderno de anotações fechado, com caneta, sobre uma mesa de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 746.62,
+   "end": 753.68,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, middle-aged man in his sixties in a dark suit and thick-framed glasses, seated in a 1989 American police interview room, somber expression, fluorescent overhead light, muted cool tones, shot with 35mm lens at eye level, realistic period details, no text or captions",
+   "visual": "Foto de arquivo de John List em 1989 durante a prisão, rosto sério, de terno, em ambiente policial"
+  },
+  {
+   "start": 753.68,
+   "end": 758.93,
+   "provider": "adiado",
+   "query": "courtroom trial 1990 defendant New Jersey",
+   "visual": "Tribunal de Nova Jersey, réu sentado à mesa da defesa, familiares das vítimas ao fundo",
+   "media_type": "video"
+  },
+  {
+   "start": 758.93,
+   "end": 765.71,
+   "provider": "adiado",
+   "query": "gavel and scales of justice courtroom",
+   "visual": "Plano fechado de martelo de juiz e balança da justiça em tribunal antigo",
+   "media_type": "video"
+  },
+  {
+   "start": 765.71,
+   "end": 772.26,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a calm middle-aged man in his sixties wearing a well-pressed dark suit and thick black-rimmed glasses, seated upright in a 1990 courtroom, composed and quiet expression, soft cool daylight from a window, shot with 50mm lens, realistic period styling, no text",
+   "visual": "Homem de meia-idade de terno e óculos grossos sentado calmamente em sala de tribunal"
+  },
+  {
+   "start": 772.26,
+   "end": 779.15,
+   "provider": "adiado",
+   "query": "lawyers courtroom jury 1990s",
+   "visual": "Advogados em tribunal discutindo com o júri ao fundo",
+   "media_type": "video"
+  },
+  {
+   "start": 779.15,
+   "end": 785.03,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic black and white documentary photograph, a young American soldier in a 1944 US Army uniform with a distant, haunted gaze, slightly out of focus background of a military camp, soft diffused light, shot with 50mm lens, realistic period detail, no text",
+   "visual": "Soldado da Segunda Guerra Mundial em uniforme, olhar distante, imagem em preto e branco"
+  },
+  {
+   "start": 785.03,
+   "end": 790.2,
+   "provider": "adiado",
+   "query": "prosecutor speaking courtroom 1990",
+   "visual": "Promotor público em frente ao tribunal fazendo a acusação",
+   "media_type": "video"
+  },
+  {
+   "start": 790.2,
+   "end": 797.66,
+   "provider": "adiado",
+   "query": "judge in robe courtroom bench serious",
+   "visual": "Juiz de toga em tribunal, expressão firme, bancada de madeira",
+   "media_type": "video"
+  },
+  {
+   "start": 797.66,
+   "end": 804.52,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, an older American judge in a black robe reading from papers at a wooden bench, a man seen from behind in a suit at the defense table, cool muted courtroom light, shot with 35mm lens, realistic 1990 details, no text",
+   "visual": "Juiz lendo sentença em tribunal com réu de costas ao fundo"
+  },
+  {
+   "start": 804.52,
+   "end": 807.71,
+   "provider": "adiado",
+   "query": "judge portrait severe 1990 courtroom",
+   "visual": "Retrato de juiz de meia-idade com toga, olhar severo",
+   "media_type": "video"
+  },
+  {
+   "start": 807.71,
+   "end": 814.39,
+   "provider": "adiado",
+   "query": "lonely man silhouette hallway dim light",
+   "visual": "Silhueta de homem sozinho em corredor de prédio antigo, luz baixa",
+   "media_type": "video"
+  },
+  {
+   "start": 814.39,
+   "end": 820.67,
+   "provider": "adiado",
+   "query": "handcuffed hands on metal table interrogation",
+   "visual": "Mãos algemadas sobre mesa de metal em sala de interrogatório",
+   "media_type": "video"
+  },
+  {
+   "start": 820.67,
+   "end": 827.08,
+   "provider": "adiado",
+   "query": "empty prison cell bars light",
+   "visual": "Cela de prisão vazia com grade e luz filtrada",
+   "media_type": "video"
+  },
+  {
+   "start": 827.08,
+   "end": 834.13,
+   "provider": "adiado",
+   "query": "old wall calendar close up date",
+   "visual": "Calendário de parede com data marcada, objeto simbólico de passagem do tempo",
+   "media_type": "video"
+  },
+  {
+   "start": 834.13,
+   "end": 840.35,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1970s American living room with an empty armchair in the foreground, a sofa with family photos on a side table, cool muted light from a window, shot with 35mm lens, realistic period details, no people, no text",
+   "visual": "Família sentada em sala de estar, pai ausente, cadeira vazia"
+  },
+  {
+   "start": 840.35,
+   "end": 846.82,
+   "provider": "adiado",
+   "query": "grieving family hands clasped courtroom",
+   "visual": "Pessoas em luto em sala de tribunal, mãos entrelaçadas",
+   "media_type": "video"
+  },
+  {
+   "start": 846.82,
+   "end": 852.5,
+   "provider": "adiado",
+   "query": "sunlight through clouds sky rays",
+   "visual": "Céu nublado com raios de luz atravessando nuvens, sugerindo o céu",
+   "media_type": "video"
+  },
+  {
+   "start": 852.5,
+   "end": 859.42,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a calm older man in his seventies with grey hair wearing a sweater, seated in a TV interview setting in the early 2000s, soft even studio lighting, muted tones, shot with 50mm lens, no logos or text",
+   "visual": "Homem idoso em tom sereno numa entrevista de TV dos anos 2000"
+  },
+  {
+   "start": 859.42,
+   "end": 865.23,
+   "provider": "adiado",
+   "query": "vintage TV studio camera dark",
+   "visual": "Câmera antiga de televisão em estúdio escuro, luz de sinal",
+   "media_type": "video"
+  },
+  {
+   "start": 865.23,
+   "end": 871.62,
+   "provider": "adiado",
+   "query": "old house door closing evening dusk",
+   "visual": "Porta de casa antiga se fechando lentamente ao entardecer",
+   "media_type": "video"
+  },
+  {
+   "start": 871.62,
+   "end": 888.92,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1970s American airport departure lounge with travelers carrying suitcases, a lone man in a dark suit walking away, muted warm and cool tones, shot with 35mm lens, realistic period details, no text or signage",
+   "visual": "Aeroporto antigo com saguão e pessoas indo embora, cenário dos anos 1970"
+  },
+  {
+   "start": 888.92,
+   "end": 904.06,
+   "provider": "adiado",
+   "query": "forged documents identity card desk",
+   "visual": "Pilha de documentos falsos, carteira de identidade e envelopes, sobre mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 904.06,
+   "end": 909.57,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic documentary photograph, a 1970s sedan driving away on a long empty American highway at dawn, muted cool tones, wide shot with 35mm lens, realistic period details, no people visible, no text",
+   "visual": "Estrada ao longo da qual um carro se afasta, deixando a cidade para trás"
+  },
+  {
+   "start": 909.57,
+   "end": 913.76,
+   "provider": "adiado",
+   "query": "man alone church pew empty 1970s",
+   "visual": "Homem de terno sentado sozinho num banco de igreja vazia",
+   "media_type": "video"
+  },
+  {
+   "start": 913.76,
+   "end": 920.7,
+   "provider": "adiado",
+   "query": "old family photo frames on sideboard",
+   "visual": "Retratos antigos de família em porta-retratos sobre aparador",
+   "media_type": "video"
+  },
+  {
+   "start": 920.7,
+   "end": 927.18,
+   "provider": "runpod",
+   "media_type": "image",
+   "query": "photorealistic vintage-style documentary photograph, a smiling mother and five children posed together in a 1960s American living room, period clothing, warm muted tones, shot with 50mm lens, respectful and gentle, no text",
+   "visual": "Mulher e crianças sorrindo numa foto de família dos anos 1960"
+  },
+  {
+   "start": 927.18,
+   "end": 932.86,
+   "provider": "adiado",
+   "query": "children playing suburban street 1970s",
+   "visual": "Crianças brincando em rua de bairro tranquilo, tom nostálgico",
+   "media_type": "video"
+  },
+  {
+   "start": 932.86,
+   "end": 940.11,
+   "provider": "adiado",
+   "query": "vintage map New Jersey state",
+   "visual": "Mapa antigo de Nova Jersey com destaque para a região",
+   "media_type": "video"
+  },
+  {
+   "start": 940.11,
+   "end": 947.26,
+   "provider": "adiado",
+   "query": "old case files archive folders",
+   "visual": "Arquivo de pastas antigas em sala de registros",
+   "media_type": "video"
+  },
+  {
+   "start": 947.26,
+   "end": 951.23,
+   "provider": "adiado",
+   "query": "old church cross sunrise quiet",
+   "visual": "Igreja antiga com cruz ao amanhecer, tom reflexivo",
+   "media_type": "video"
+  },
+  {
+   "start": 951.23,
+   "end": 956.27,
+   "provider": "adiado",
+   "query": "man back to camera looking out window dark room",
+   "visual": "Homem de costas olhando pela janela de um quarto escuro",
+   "media_type": "video"
+  },
+  {
+   "start": 956.27,
+   "end": 962.95,
+   "provider": "adiado",
+   "query": "court documents pile pen desk",
+   "visual": "Pilha de páginas de documentos judiciais com caneta sobre a mesa",
+   "media_type": "video"
+  },
+  {
+   "start": 962.95,
+   "end": 968.15,
+   "provider": "adiado",
+   "query": "thoughtful person hand on chin shadow",
+   "visual": "Pessoa sentada pensativa com a cabeça apoiada na mão, sombra no rosto",
+   "media_type": "video"
+  },
+  {
+   "start": 968.15,
+   "end": 974.16,
+   "provider": "adiado",
+   "query": "people talking cafe table discussion",
+   "visual": "Pessoas conversando em mesa de café, tom reflexivo e aberto",
+   "media_type": "video"
+  },
+  {
+   "start": 974.16,
+   "end": 980.25,
+   "provider": "adiado",
+   "query": "person reading phone comments cozy room",
+   "visual": "Pessoa lendo comentários no celular numa sala tranquila",
+   "media_type": "video"
+  },
+  {
+   "start": 980.25,
+   "end": 983.6,
+   "provider": "adiado",
+   "query": "candle held hands dark closing",
+   "visual": "Plano de encerramento com mãos segurando uma vela acesa no escuro",
+   "media_type": "video"
+  }
+ ],
+ "_ficha": {
+  "tema": "Caso John List: o homem que matou a própria família em Westfield (Nova Jersey) em novembro de 1971, fugiu sob o nome Robert Peter Clark e foi preso em 1989",
+  "epoca": "Westfield, Nova Jersey, EUA, 1971 a 1989, com cenas de hoje para contextualizar",
+  "tom": "documentário sombrio e respeitoso com as vítimas, sem sensacionalismo",
+  "personagens": [
+   {
+    "id": "john_list",
+    "nome": "John List",
+    "busca": "John List 1971 murderer portrait",
+    "como_aparece": "Homem de meia-idade de terno e óculos grossos; na fuga, aparece como Robert Peter Clark. Usar a reconstrução em busto (Frank Bender) como referência, não foto inventada",
+    "tipo": "pessoa",
+    "epoca": "1925 a 2008, principal em 1971 e 1989",
+    "wikipedia_pt": "",
+    "wikipedia_en": "John List"
+   },
+   {
+    "id": "helen_list",
+    "nome": "Helen List",
+    "busca": "Helen Taylor List 1970s family",
+    "como_aparece": "Esposa, ex-viúva de guerra, mãe de cinco filhos; sem fotos seguras no roteiro, usar imagem de época genérica de dona de casa americana dos anos 1970",
+    "tipo": "pessoa",
+    "epoca": "anos 1950 a 1971",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "alma_list",
+    "nome": "Alma List",
+    "busca": "1970s elderly American woman Bible 1971",
+    "como_aparece": "Mãe de John, com 84 anos em 1971, religiosa e superprotetora",
+    "tipo": "pessoa",
+    "epoca": "1887 a 1971",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "bernard_tracy",
+    "nome": "Bernard Tracy",
+    "busca": "Bernard Tracy Westfield detective",
+    "como_aparece": "Detetive de Westfield que manteve o caso aberto por anos",
+    "tipo": "pessoa",
+    "epoca": "anos 1970 a 1990",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "frank_bender",
+    "nome": "Frank Bender",
+    "busca": "Frank Bender forensic sculptor bust",
+    "como_aparece": "Escultor forense que criou o busto de John List em 1989",
+    "tipo": "pessoa",
+    "epoca": "anos 1980 e 1990",
+    "wikipedia_pt": "",
+    "wikipedia_en": "Frank Bender"
+   },
+   {
+    "id": "wanda_flannery",
+    "nome": "Wanda Flannery",
+    "busca": "Denver woman 1989 TV tip",
+    "como_aparece": "Moradora de Denver que reconheceu o vizinho no programa; usar apenas imagem genérica, sem foto real identificada",
+    "tipo": "pessoa",
+    "epoca": "1989",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "william_wertheimer",
+    "nome": "William Wertheimer",
+    "busca": "Judge William Wertheimer New Jersey courtroom",
+    "como_aparece": "Juiz que condenou John List em 1990",
+    "tipo": "pessoa",
+    "epoca": "anos 1990",
+    "wikipedia_pt": "",
+    "wikipedia_en": ""
+   },
+   {
+    "id": "america_most_wanted",
+    "nome": "America's Most Wanted",
+    "busca": "America's Most Wanted TV show 1989 studio",
+    "como_aparece": "Programa de TV que exibiu o busto e recebeu a dica. Usar cenário de estúdio ou tela de TV antiga, não logo em destaque",
+    "tipo": "obra",
+    "epoca": "1989",
+    "wikipedia_pt": "",
+    "wikipedia_en": "America's Most Wanted"
+   }
+  ],
+  "lugares": [
+   {
+    "id": "westfield_casa",
+    "nome": "Casa da família List em Westfield",
+    "busca": "Westfield New Jersey Victorian mansion 1971 house",
+    "evitar": "Não mostrar cenas de morte nem interiores com sangue; casas de outros estados que não sejam parecidas",
+    "wikipedia_pt": "",
+    "wikipedia_en": "Westfield, New Jersey"
+   },
+   {
+    "id": "bay_city",
+    "nome": "Bay City, Michigan",
+    "busca": "Bay City Michigan 1930s street",
+    "evitar": "Não confundir com cidades da Califórnia ou da Flórida",
+    "wikipedia_pt": "",
+    "wikipedia_en": "Bay City, Michigan"
+   },
+   {
+    "id": "ann_arbor",
+    "nome": "Universidade de Michigan em Ann Arbor",
+    "busca": "University of Michigan Ann Arbor 1940s campus",
+    "evitar": "Evitar imagens atuais de estudantes com celular",
+    "wikipedia_pt": "",
+    "wikipedia_en": "University of Michigan"
+   },
+   {
+    "id": "jfk_airport",
+    "nome": "Aeroporto John F. Kennedy, Nova York",
+    "busca": "JFK airport 1971 parking lot",
+    "evitar": "Não usar fotos de aviões acidentados; o carro foi encontrado no estacionamento",
+    "wikipedia_pt": "",
+    "wikipedia_en": "John F. Kennedy International Airport"
+   },
+   {
+    "id": "richmond_va",
+    "nome": "Richmond, Virginia",
+    "busca": "Richmond Virginia 1980s downtown",
+    "evitar": "Não confundir com Richmond no Reino Unido",
+    "wikipedia_pt": "",
+    "wikipedia_en": "Richmond, Virginia"
+   }
+  ],
+  "glossario": [
+   {
+    "no_roteiro": "der Schein musste gewahrt bleiben",
+    "significa": "manter as aparências, a fachada social",
+    "nunca_buscar": [
+     "light",
+     "shining lamp",
+     "glow"
+    ]
+   },
+   {
+    "no_roteiro": "die Kündigung",
+    "significa": "demissão do emprego de John List em 1970",
+    "nunca_buscar": [
+     "termination of contract signature",
+     "end sign",
+     "cancelation icon"
+    ]
+   },
+   {
+    "no_roteiro": "der Absturz",
+    "significa": "queda social e financeira de John List",
+    "nunca_buscar": [
+     "plane crash",
+     "airplane falling",
+     "aircraft wreck"
+    ]
+   },
+   {
+    "no_roteiro": "Schreckgespenst",
+    "significa": "figura assustadora usada por pais para ameaçar crianças",
+    "nunca_buscar": [
+     "ghost",
+     "spirit",
+     "haunted house"
+    ]
+   },
+   {
+    "no_roteiro": "Verwesung",
+    "significa": "decomposição dos corpos, cheiro do crime",
+    "nunca_buscar": [
+     "rotting food",
+     "garbage",
+     "compost"
+    ]
+   }
+  ],
+  "evitar_sempre": [
+   "cadáveres, sangue ou corpos das vítimas",
+   "fotos reais das vítimas mortas",
+   "atores de séries ou filmes no lugar de John List ou da família",
+   "memes e imagens de outros assassinos famosos",
+   "logos de programas de TV ou de polícia em destaque",
+   "imagens de armas em close com tom de glamour",
+   "fotos de crianças em contexto de crime"
+  ],
+  "visual_geral": "Tons frios e escuros, casa de luxo americana dos anos 1970 vista de fora, interiores com retratos de família e objetos de época, documentos de arquivo, rostos reais de pessoas da época, sem sangue ou corpos",
+  "estilo_imagem": "real"
+ }
+}

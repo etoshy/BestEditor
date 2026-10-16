@@ -2994,7 +2994,7 @@ def burn_captions(video_path: str, ass_path: str, output_path: str) -> str:
         "-vf", f"ass={escaped_ass_path}:fontsdir={escaped_fonts_dir}",
         "-c:a", "copy",
         output_path,
-    ])
+    ], timeout=4 * 3600)  # vídeo longo queimando legenda num passe só passa fácil dos 5 min do padrão
     return output_path
 
 
@@ -3157,7 +3157,9 @@ def fetch_segment_preview_lightweight(
 
     # acervo local com obra/personagem: o metadado já é confiável, pula o juiz
     acervo_confiavel = segment.provider in BIBLIOTECAS_LOCAIS and bool(getattr(segment, "obra", None) or getattr(segment, "personagem", None))
-    usar_ia = bool(ia_ctx) and not acervo_confiavel and _ia_pode("juiz")
+    # 🖥️ imagem gerada no SEU pod pra essa cena (Produção no pod / Meu pod): foi feita sob medida — o juiz não troca por
+    # cartão nem pede "nova busca" (que geraria outra imagem no pod)
+    usar_ia = bool(ia_ctx) and not acervo_confiavel and segment.provider != "runpod" and _ia_pode("juiz")
     ia_c = _ia_cfg() if usar_ia else {}
     reprovada: Optional[Dict[str, Any]] = None
     novas_buscas = 0
@@ -3561,6 +3563,28 @@ def resolve_overlay_source(overlay_source: Dict[str, Any], downloads_dir: str, g
 
 
 # ------------------------------------------------------------------ v84_110: Flow esgotado → foto → pesquisa
+def _etapa_inteira(antes: str, depois: str, etapa: str, work_dir: str) -> bool:
+    """v84_119: a etapa devolveu a IMAGEM do vídeo inteira? Se ela acabar antes (o áudio segue e a imagem congela
+    no último quadro), a etapa é PULADA — o vídeo fica sem ela, mas não congela — e isso vai pros avisos da montagem."""
+    import export_paralelo
+    da, dd = export_paralelo.duracao_do_video(antes), export_paralelo.duracao_do_video(depois)
+    if da is None or dd is None or dd >= da - 1.0:
+        return True
+    aviso = (f"A etapa “{etapa}” cortou a imagem do vídeo em {int(dd // 60)}:{dd % 60:04.1f} (devia ir até "
+             f"{int(da // 60)}:{da % 60:04.1f}) — ela foi PULADA pra o vídeo não congelar no fim. Monte de novo; se repetir, "
+             "mande o diagnóstico.")
+    print(f"[montagem] ⚠ {aviso}", flush=True)
+    try:
+        caminho = os.path.join(work_dir, "avisos_montagem.json")
+        avisos = json.load(open(caminho, encoding="utf-8")) if os.path.exists(caminho) else []
+        avisos.append(aviso)
+        with open(caminho, "w", encoding="utf-8") as f:
+            json.dump(avisos, f, ensure_ascii=False)
+    except Exception:  # noqa: BLE001
+        pass
+    return False
+
+
 def flow_tem_conta(tipo: str, cfg: Optional[Dict[str, Any]] = None) -> Optional[bool]:
     """Alguma conta do Google Flow ainda serve pra `tipo` ("video"/"imagem")? None = não dá pra saber (segue tentando)."""
     if str((cfg or {}).get("flow_navegador") or "auto").lower() == "cdp":
@@ -4896,6 +4920,7 @@ def assemble_video(
                 on_progress(etapa, int(round(frac * 1000)), 1000, detalhe=detalhe)
             except TypeError:  # on_progress antigo (3 argumentos)
                 on_progress(etapa, int(round(frac * 1000)), 1000)
+        _cb(0.0, "")  # v84_118: a etapa começa em 0% (antes mostrava 208/208 = cheia antes de começar)
         return progresso_ffmpeg.acompanhar(_cb, dur_video)
 
     if on_progress:
@@ -4915,7 +4940,7 @@ def assemble_video(
             if not export_paralelo.tentar("filtro de cor", lambda: export_paralelo.vf_em_pedacos(
                     concat_path, filtrado, cadeia_cor, dur_video or _probe_duration(concat_path), os.path.join(work_dir, "pedacos"), "filtro")):
                 _run_ffmpeg(["-i", concat_path, "-vf", cadeia_cor + ",format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
-                         "-pix_fmt", "yuv420p", "-r", str(TARGET_FPS), "-an", filtrado], timeout=3600)
+                         "-pix_fmt", "yuv420p", "-r", str(TARGET_FPS), "-an", filtrado], timeout=4 * 3600)
         concat_path = filtrado
 
     # censura de IMAGEM (blur/pixelado/tarja): na imagem crua, antes dos textos e
@@ -4930,7 +4955,7 @@ def assemble_video(
             try:
                 dp_censura.aplicar_video(concat_path, censurado, censura, target_width, target_height,
                                          os.path.join(work_dir, "censura"), _probe_duration(concat_path),
-                                         run=lambda cmd: _run_ffmpeg(cmd, timeout=3600))
+                                         run=lambda cmd: _run_ffmpeg(cmd, timeout=4 * 3600))
             except Exception as exc:  # noqa: BLE001
                 raise VideoAssemblyError(f"A censura (blur/tarja) falhou: {str(exc)[-400:]} — confira as áreas na faixa Censura.") from exc
         concat_path = censurado
@@ -4977,7 +5002,8 @@ def assemble_video(
         overlaid_path = os.path.join(work_dir, "_with_overlays.mp4")
         with (perf_log.timed("montagem:overlays", quantidade=len(overlays)) if perf_log else nullcontext()), _acomp("aplicando_overlays"):
             apply_overlays(output_path, overlays, overlaid_path, target_width, target_height)
-        shutil.move(overlaid_path, output_path)
+        if _etapa_inteira(output_path, overlaid_path, "overlays", work_dir):
+            shutil.move(overlaid_path, output_path)
 
     # destaques de texto do DarkPlanner (legenda ASS animada + tratamento da cena)
     # 🗞 quadros editoriais (ficha, post, terminal, recortes…) — antes dos destaques (eles ficam por cima)
@@ -4992,7 +5018,7 @@ def assemble_video(
                                                        os.path.join(work_dir, "editoriais"), imagens=imagens_editorial, paleta=paleta_textos)
             except Exception as exc:  # noqa: BLE001
                 raise VideoAssemblyError(f"Os quadros editoriais falharam: {str(exc)[-400:]} — confira o quadro no editor.") from exc
-        if r_ed == com_ed:
+        if r_ed == com_ed and _etapa_inteira(output_path, com_ed, "quadros editoriais", work_dir):
             shutil.move(com_ed, output_path)
 
     if destaques:
@@ -5006,7 +5032,8 @@ def assemble_video(
                                                os.path.join(work_dir, "destaques"), paleta=paleta_textos, palavras=palavras_narracao)
             except Exception as exc:  # noqa: BLE001
                 raise VideoAssemblyError(f"Os destaques de texto falharam: {str(exc)[-400:]} — tire o destaque problemático no editor.") from exc
-        shutil.move(com_destaques, output_path)
+        if _etapa_inteira(output_path, com_destaques, "destaques de texto", work_dir):
+            shutil.move(com_destaques, output_path)
 
     # gráficos animados com os dados (barras, linha, pizza…)
     if graficos:
@@ -5020,7 +5047,7 @@ def assemble_video(
                                                  os.path.join(work_dir, "graficos"), paleta=paleta_textos)
             except Exception as exc:  # noqa: BLE001
                 raise VideoAssemblyError(f"Os gráficos falharam: {str(exc)[-400:]} — confira os dados do gráfico no editor.") from exc
-        if r == com_graficos:
+        if r == com_graficos and _etapa_inteira(output_path, com_graficos, "gráficos", work_dir):
             shutil.move(com_graficos, output_path)
 
     return output_path

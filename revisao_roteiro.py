@@ -169,6 +169,8 @@ def aplicar(roteiro: str, resposta: str, apagar: bool = True) -> Dict[str, Any]:
     texto = re.sub(r"[ \t]+\n", "\n", texto)
     texto = re.sub(r"\n{3,}", "\n\n", texto).strip()  # parágrafos apagados não deixam buraco
     texto = re.sub(r"(\[\[[^\]]+\]\])(\s*\n\s*\1)+", r"\1", texto)  # duas marcas iguais coladas (o trecho entre elas saiu)
+    import marcas_seguras  # 🔒 marca de imagem/cena que sumiu numa troca volta pro mesmo ponto
+    texto, _volta = marcas_seguras.restaurar(str(roteiro or ""), texto, chamadas=False)
     pal = palavras
     return {"texto": texto, "aplicadas": aplicadas, "nao_achadas": nao, "palavras_antes": pal(roteiro), "palavras_depois": pal(texto),
             "observacoes": str((d.get("observacoes") if isinstance(d, dict) else "") or "")[:1500]}

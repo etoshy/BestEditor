@@ -29,6 +29,15 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
 
+def _no_pod(motor: str) -> bool:
+    """🖥️ Chatterbox/Turbo gerando no pod: a VRAM é a do pod, aqui é só um pedido HTTP (como o Fish)."""
+    try:
+        import pod_studio
+        return pod_studio.motor_no_pod(motor)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 VRAM_GB = {"piper": 0.3, "kokoro": 1.0, "xtts": 3.5, "chatterbox_turbo": 3.5, "chatterbox": 5.0,
            "fish_s2": 0.2}  # Fish: a GPU é do servidor dele (outro programa); aqui é só um pedido HTTP
 MAX_SIMULTANEOS = 3
@@ -107,7 +116,8 @@ class Fila:
     # ---------------------------------------------------------------- ações
     def iniciar(self, jid: str, motor: str, fn: Callable[[], None], cpu: bool = False, instancias: int = 1) -> int:
         """instancias: quantas cópias do motor ESTA geração usa ao mesmo tempo (⚡ tts_paralelo) — conta na VRAM."""
-        item = {"id": jid, "motor": motor, "fn": fn, "vram": 0.0 if cpu else VRAM_GB.get(motor, 3.5) * max(1, int(instancias or 1)),
+        item = {"id": jid, "motor": motor, "fn": fn,
+                "vram": 0.0 if (cpu or _no_pod(motor)) else VRAM_GB.get(motor, 3.5) * max(1, int(instancias or 1)),
                 "criado": time.time()}
         with self._cv:
             self._fila.append(item)

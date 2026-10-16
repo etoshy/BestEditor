@@ -1152,7 +1152,8 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
             L.append(f"- {m['id']} ({'vídeo' if m['tipo'] == 'video' else 'foto'}{', ' + m['fonte'] if m.get('fonte') else ''}): {o_que_e(m)}"
                      + (mt.para_prompt(cam) if cam and m["tipo"] == "video" else ""))
         L.append("No ROTEIRO, ponha a marca do ID (ex.: [I4]) sozinha logo ANTES da frase em que aquela imagem deve aparecer — "
-                 "só imagens que mostram MESMO o que a frase fala (pessoa, lugar, objeto, documento). As marcas não são lidas.")
+                 "só imagens que mostram MESMO o que a frase fala (pessoa, lugar, objeto, documento). As marcas não são lidas. "
+                 + __import__("roteiro_partes").REGRA)
         if any(m["tipo"] == "video" for m in vis):
             L.append(mt.instrucao_roteiro("I7"))
     L.append("")
@@ -1591,8 +1592,10 @@ def bloco_prompt_editor(base: str, p: Dict[str, Any]) -> str:
          "Estas são fotos e vídeos REAIS do tema (das matérias e dos meus arquivos). Nos trechos em que a narração fala de uma "
          "pessoa, lugar, objeto ou documento que uma delas mostra, use-a com `\"provider\": \"material\"` e `\"query\": \"<ID>\"` "
          "(ex.: `{\"start\": 12.0, \"end\": 16.5, \"provider\": \"material\", \"query\": \"I4\"}`) — sem \"alternativas\". "
-         "O \"trecho\" sugerido é onde o roteiro planejou cada uma: ache esse momento na transcrição. Prefira essas imagens "
-         "sempre que combinarem; nos outros trechos, use os bancos normais pra clima (cidade à noite, fita de isolamento, "
+         "Cada \"trecho sugerido\" é um ponto em que o roteiro planejou a imagem: ache CADA um na transcrição e use a imagem "
+         "ali (a mesma imagem aparece em vários pontos — use em todos). Além deles, use de novo toda vez que a narração "
+         "voltar a falar daquela pessoa/lugar/objeto (alterne entre as fotos da mesma pessoa; pelo menos ~10 s entre dois "
+         "usos da mesma foto). Nenhuma imagem útil fica de fora. Prefira essas imagens sempre que combinarem; nos outros trechos, use os bancos normais pra clima (cidade à noite, fita de isolamento, "
          "documentos, viatura) — nunca uma pessoa de banco de imagem no lugar de uma pessoa real do caso."]
     L.extend(_vd.linhas_editor(no_roteiro + outras[:150]))
     return "\n".join(L)

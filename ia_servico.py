@@ -105,6 +105,13 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "flow_foto": ("🔁 Flow em massa: vídeo → foto",
                   "No 🚀 Em massa da aba Google Flow, quando TODAS as contas ficam sem crédito de vídeo, a IA reescreve o "
                   "prompt de cada vídeo que falta como prompt de FOTO (o instante mais marcante, sem movimento de câmera).", True),
+    "producao_pod": ("🏭 Produção no pod: cenas e prompts",
+                     "Na aba 🏭 Produção no pod, lê a narração de cada roteiro, descreve cada cena, diz quais são DIFÍCEIS de "
+                     "achar em banco (essas o seu pod gera com o Z-Image) e escreve o prompt de imagem de cada uma.", True),
+    "elenco": ("🎭 Elenco: rostos e idades nas fotos",
+               "No 🕵️ Modelo de vídeo (e sozinho na 🏭 Produção no pod), olha as fotos e o roteiro e diz quem é quem, a "
+               "idade de cada pessoa em cada foto e o ano de nascimento — pra o pod gerar as cenas com o rosto certo, na "
+               "idade certa daquele momento da história.", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

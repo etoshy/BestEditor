@@ -133,6 +133,8 @@
   <div id="resBox"></div>
 </div>
 
+{% if (p.resultado or {}).roteiro %}{% set fr_pid = p.id %}{% include "_fotos_roteiro.html" %}{% endif %}
+{% if (p.resultado or {}).roteiro %}{% set el_pid = p.id %}{% include "_elenco.html" %}{% endif %}
 {% set rev_base = '/revisao/dossie/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).roteiro_antes_revisao %}{% include "_revisao.html" %}
 {% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %}
 {% include "_historico.html" %}
@@ -148,6 +150,12 @@ const TIPOS = {{ tipos|tojson }};
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const IA = {};  // 🤖 o que a IA pode fazer agora (vem de /ia/status)
+function elencoDe(id) {  // 🎭 v84_128: quem/qual lugar o elenco diz que é esta foto
+  const el = P.elenco || {}; const t = [];
+  (el.pessoas || []).forEach(x => (x.fotos || []).forEach(f => { if (f.midia === id) t.push('👤 ' + esc(x.nome) + (f.idade ? ` (${f.idade})` : '')); }));
+  (el.locais || []).forEach(x => { if ((x.fotos || []).includes(id)) t.push('📍 ' + esc(x.nome)); });
+  return t.length ? `<div class="ds-leg" style="white-space:normal;color:#7c2d12;" title="🎭 elenco">${t.join(' · ')}</div>` : '';
+}
 async function api(url, body, method) {
   const r = await fetch(url, { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
@@ -304,7 +312,7 @@ function desenharMidias() {
       ${vis}
       <div style="margin-top:4px;"><span class="ds-id">${esc(m.id)}</span> ${esc(TIPOS[m.tipo] || m.tipo)}${m.fonte ? ' · ' + esc(m.fonte) : (m.origem === 'pc' ? ' · 💻' : ' · 🔗')}</div>
       ${m.transcricao ? trBloco(m.transcricao) : ''}
-      ${iaHtml}${foraHtml}
+      ${iaHtml}${foraHtml}${elencoDe(m.id)}
       ${m.legenda ? `<div class="ds-leg" title="${esc(m.legenda)}">📝 ${esc(m.legenda)}</div>` : ''}
       ${!m.legenda && og.titulo ? `<div class="ds-leg">🏷 ${esc(og.titulo)}</div>` : ''}
       <textarea rows="2" class="mDesc" placeholder="${falta ? '⚠ Diga o que é' : 'Sua descrição (opcional)'}">${esc(m.descricao || '')}</textarea>

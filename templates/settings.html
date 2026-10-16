@@ -251,8 +251,36 @@
 
   <h2 style="margin-top:32px;" id="runpod">🟣 Runpod (imagens e vídeos gerados por IA — pago do saldo da conta)</h2>
   <p style="color:#666;font-size:0.82rem;">Fonte <code>runpod</code>: gera pela API do <a href="https://console.runpod.io/hub?tabSelected=public_endpoints" target="_blank" rel="noopener">Runpod</a> em segundos (sem navegador). Cada geração é cobrada do saldo da sua conta — o site confere o saldo antes de cada pedido e não envia se não pagar. O mesmo pedido nunca é gerado duas vezes (fica guardado em <code>runpod_dados/</code>). Pegue a chave em console.runpod.io → Settings → API Keys.</p>
+  <h3 style="margin-top:12px;">🖥️ Meu pod (Studio IA) — sem custo por imagem</h3>
+  <p style="color:#666;font-size:0.82rem;">Em vez de pagar cada imagem, ligue um pod seu na RunPod com o servidor <code>studio-ia</code> (Z-Image Turbo + Chatterbox), gere tudo e desligue. O pod é cobrado por hora. Cole aqui o endereço que o <code>start.sh</code> mostra.</p>
+  <label>De onde vêm as imagens da fonte <code>runpod</code></label>
+  <select name="runpod_modo">
+    <option value="endpoints" {% if config.runpod_modo != 'pod' %}selected{% endif %}>Public Endpoints (pago por imagem, usa a chave abaixo)</option>
+    <option value="pod" {% if config.runpod_modo == 'pod' %}selected{% endif %}>🖥️ Meu pod (Z-Image Turbo no seu pod)</option>
+  </select>
+  <label>Endereço do pod</label>
+  <input type="text" name="runpod_pod_url" value="{{ config.runpod_pod_url }}" placeholder="https://xxxxxxxx-8000.proxy.runpod.net">
+  <label>Chave do pod (só se você subiu com <code>API_KEY=</code>) {% if config.runpod_pod_chave %}<span style="font-weight:normal;color:#15803d;">(✔ salva: …{{ config.runpod_pod_chave[-4:] }} — em branco mantém)</span>{% endif %}</label>
+  <input type="password" name="runpod_pod_chave" value="" autocomplete="off">
+  {% if config.runpod_pod_chave %}<label style="font-weight:normal;"><input type="checkbox" name="runpod_pod_chave_apagar" style="width:auto;"> apagar essa chave</label>{% endif %}
+  <label style="font-weight:normal;"><input type="checkbox" name="chatterbox_no_pod" {% if config.chatterbox_onde == 'pod' %}checked{% endif %} style="width:auto;"> 🗣️ Gerar <b>Chatterbox</b> e <b>Chatterbox Turbo</b> no pod (em vez da placa deste PC) — Gerador de voz, Roteiro para Áudio, multi voice e geração rápida continuam iguais</label>
+  <label style="font-weight:normal;"><input type="checkbox" name="chatterbox_pod_ptbr" {% if config.chatterbox_pod_ptbr %}checked{% endif %} style="width:auto;"> 🇧🇷 No pod, português pelo modelo dedicado pt-BR (Chatterbox Multilingual V3 Single Language Pack)</label>
+  <p style="margin:8px 0;"><button type="button" id="pod-testar" style="width:auto;">🔌 Ver se o pod está no ar</button> <span id="pod-status" style="font-size:.85rem;"></span></p>
+  <script>
+  (function () {
+    const b = document.getElementById('pod-testar'), out = document.getElementById('pod-status');
+    if (!b) return;
+    b.addEventListener('click', async () => {
+      b.disabled = true; out.textContent = '⏳ (salve antes se mudou o endereço)…';
+      try { const d = await (await fetch('/runpod/pod-status')).json(); out.textContent = (d.ok ? '✅ ' : '❌ ') + (d.msg || ''); }
+      catch (e) { out.textContent = '❌ ' + e.message; }
+      finally { b.disabled = false; }
+    });
+  })();
+  </script>
+  <h3 style="margin-top:16px;">Public Endpoints (pago por geração)</h3>
   <div id="runpod-saldo" style="padding:8px 12px;border-radius:8px;background:#f5f3ff;border:1px solid #ddd6fe;font-size:.9rem;margin:6px 0;">
-    {% if runpod.configurado %}
+    {% if runpod.tem_chave %}
       💰 Saldo: <b id="runpod-saldo-valor">{% if runpod.saldo is not none %}US$ {{ '%.2f'|format(runpod.saldo) }}{% else %}—{% endif %}</b>
       {% if runpod.erro %}<span style="color:#b91c1c;"> ({{ runpod.erro }})</span>{% endif %}
       · gasto pelo site até agora: US$ {{ '%.3f'|format(runpod.gasto_site) }}
@@ -260,9 +288,9 @@
       <button type="button" id="runpod-atualizar" style="width:auto;margin-left:6px;padding:2px 10px;">↻ conferir saldo</button>
     {% else %}⚠ Sem chave ainda — cole abaixo e salve.{% endif %}
   </div>
-  <label>Chave da API do Runpod {% if runpod.configurado %}(deixe em branco pra manter a atual){% endif %}</label>
-  <input type="password" name="runpod_api_key" value="" autocomplete="off" placeholder="{% if runpod.configurado %}{{ runpod.chave }}{% else %}rpa_…{% endif %}">
-  {% if runpod.configurado %}<label style="font-weight:normal;"><input type="checkbox" name="runpod_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
+  <label>Chave da API do Runpod {% if runpod.tem_chave %}(deixe em branco pra manter a atual){% endif %}</label>
+  <input type="password" name="runpod_api_key" value="" autocomplete="off" placeholder="{% if runpod.tem_chave %}{{ runpod.chave }}{% else %}rpa_…{% endif %}">
+  {% if runpod.tem_chave %}<label style="font-weight:normal;"><input type="checkbox" name="runpod_apagar_chave" style="width:auto;"> apagar a chave salva</label>{% endif %}
   <label style="margin-top:8px;">Modelo de IMAGEM</label>
   <select name="runpod_modelo_imagem">
     {% for m in runpod.modelos if m.tipo == 'imagem' %}<option value="{{ m.id }}" {% if runpod.modelo_imagem == m.id %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}
@@ -278,7 +306,7 @@
   <label style="font-weight:normal;"><input type="checkbox" name="runpod_reserva_flow" {% if config.runpod_reserva_flow %}checked{% endif %} style="width:auto;"> Quando o Google Flow não gerar (contas sem crédito, recusa…), gerar no Runpod antes de ir pra pesquisa</label>
   <p style="color:#666;font-size:0.8rem;margin:2px 0 0;">O prompt é adaptado pra cada modelo: em inglês, com o estilo do vídeo, prompt negativo no Flux e movimento de câmera no vídeo — com a 🤖 IA do site ligada (recurso “🟣 Runpod: prompt do jeito de cada modelo” em <a href="/ia">/ia</a>) ela escreve; sem ela, uma regra simples.</p>
   {% if runpod.configurado %}
-  <p style="margin:8px 0;"><button type="button" id="runpod-testar" style="width:auto;">🧪 Gerar uma imagem de teste (~US$ 0,005)</button> <span id="runpod-teste-res" style="font-size:.85rem;"></span></p>
+  <p style="margin:8px 0;"><button type="button" id="runpod-testar" style="width:auto;">🧪 Gerar uma imagem de teste ({% if runpod.modo == 'pod' %}no seu pod{% else %}~US$ 0,005{% endif %})</button> <span id="runpod-teste-res" style="font-size:.85rem;"></span></p>
   {% endif %}
   <script>
   (function () {
