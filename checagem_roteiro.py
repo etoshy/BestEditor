@@ -334,7 +334,7 @@ def ler(resposta: str) -> Dict[str, Any]:
             trocas.append({"de": str(c["de"]), "para": str(c.get("para") or ""),
                            "motivo": (_eixo(c.get("eixo") or c.get("tipo")) + (": " + str(c.get("problema")) if c.get("problema") else ""))[:200],
                            "eixo": _eixo(c.get("eixo") or c.get("tipo")),
-                           "fonte": str(c.get("fonte") or "")[:120]})
+                           "fonte": str(c.get("fonte") or "")[:300]})
     verificar = [{"afirmacao": str(v.get("afirmacao") or "")[:400], "por_que": str(v.get("por_que") or "")[:300],
                   "como": str(v.get("como") or "")[:300], "conferido": False}
                  for v in d.get("verificar") or [] if isinstance(v, dict) and str(v.get("afirmacao") or "").strip()][:40]
@@ -353,3 +353,123 @@ def _eixo(x: Any) -> str:
     if t.startswith(("repet", "dup")):
         return "repeticao"
     return "alegacao"
+
+
+# ------------------------------------------------------------------ 🌐 2ª IA com internet (v84_133)
+def _linha_de(pars: List[Tuple[int, str]], trecho: str) -> int:
+    """A linha (parágrafo) que mais combina com um trecho/afirmação (0 se nenhuma)."""
+    alvo = set(_tokens(trecho))
+    if not alvo:
+        return 0
+    melhor, nota = 0, 0.0
+    for n, t in pars:
+        tk = set(_tokens(t))
+        s = len(alvo & tk) / max(1, len(alvo))
+        if s > nota:
+            melhor, nota = n, s
+    return melhor if nota >= 0.4 else 0
+
+
+def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", ultima: Dict[str, Any] = None,
+               afirmacoes: List[Dict[str, Any]] = None, foco: str = "") -> str:
+    """Um prompt CURTO pra uma IA com busca na internet (ChatGPT/Claude/Perplexity/Gemini com pesquisa): só os
+    pontos suspeitos — conflitos de data, anos, números, alegações, o que a checagem mandou conferir e as repetições —
+    com os TRECHOS do roteiro em volta (não o roteiro inteiro). Ela pesquisa e devolve só as correções {"de","para"}."""
+    roteiro = str(roteiro or "").strip()
+    if not roteiro:
+        raise ValueError("Ainda não tem roteiro pra checar.")
+    ultima = ultima or {}
+    pars = paragrafos(roteiro)
+    texto_de = dict(pars)
+    a = analisar(roteiro, tema)
+    cr = cronologia(roteiro, tema)
+    itens: List[str] = []
+    linhas: List[int] = []
+
+    def usa(*ns: int) -> str:
+        ok = [n for n in ns if n in texto_de]
+        for n in ok:
+            if n not in linhas:
+                linhas.append(n)
+        return ", ".join(f"L{n}" for n in ok)
+
+    k = 0
+    for c in cr["conflitos"][:12]:
+        k += 1
+        itens.append(f"C{k} ⏳ CRONOLOGIA — {usa(c['linha'], c['linha_conflito'])}: a L{c['linha']} diz que começou em "
+                     f"{c['ano']} („{_trecho(c['frase'], 14)}“), mas a L{c['linha_conflito']} (ano {c['ano_conflito']}) já "
+                     f"fala disso ({', '.join(c['palavras'])}). Qual é a data certa?")
+    for k, inc in enumerate((ultima.get("inconsistencias") or [])[:12], 1):
+        itens.append(f"I{k} 🔁 INCONSISTÊNCIA — {usa(*inc.get('linhas') or []) or 'ache no texto'}: {inc['descricao']}")
+    pend = [(i, v) for i, v in enumerate(ultima.get("verificar") or []) if not v.get("conferido")]
+    for i, v in pend[:25]:
+        n = _linha_de(pars, v["afirmacao"])
+        itens.append(f"V{i + 1} 📚 CONFERIR — {usa(n) if n else 'ache no texto'}: „{v['afirmacao']}“"
+                     + (f" — {v['por_que']}" if v.get("por_que") else "") + (f" (sugestão: {v['como']})" if v.get("como") else ""))
+    for k, af in enumerate([x for x in afirmacoes or [] if x.get("tipo") in ("alegacao", "interpretacao")][:20], 1):
+        n = _linha_de(pars, af.get("trecho") or "")
+        itens.append(f"A{k} 📚 {'ALEGAÇÃO' if af.get('tipo') == 'alegacao' else 'INTERPRETAÇÃO'} — {usa(n) if n else 'ache no texto'}: "
+                     f"„{af.get('trecho')}“ (fonte que o roteiro usou: {af.get('fonte') or '?'}). Está atribuída a quem alega? "
+                     "Os fatos dela batem?")
+    anos_vistos = set()
+    k = 0
+    for d in cr["linha_do_tempo"]:
+        if len(anos_vistos) >= 25 or (d["ano"], d["linha"]) in anos_vistos:
+            continue
+        anos_vistos.add((d["ano"], d["linha"]))
+        k += 1
+        itens.append(f"D{k} 📅 ANO — {usa(d['linha'])}: {d['ano']} em „{_trecho(d['frase'], 16)}“")
+    for k, d in enumerate(a["numeros"][:12], 1):
+        itens.append(f"N{k} 🔢 NÚMERO {d['valor']} — {usa(*[o['linha'] for o in d['onde'][:4]])}: confira o número e o NOME "
+                     "dele (condenado × acusado × ligado pela polícia × alegado × estimado), igual em todo lugar.")
+    for k, r in enumerate(a["repeticoes"][:10], 1):
+        itens.append(f"R{k} ✂️ REPETIÇÃO — {usa(r['a'], r['b'])}: os dois trechos contam a mesma coisa "
+                     f"({', '.join(r['palavras'][:6])}). Fica UMA vez, no lugar mais forte; no outro apague ou reduza.")
+    if not itens:
+        raise ValueError("O site não achou nada pra checar (rode a 🔎 checagem primeiro pra ter a lista do que conferir).")
+    linhas = sorted(linhas)[:70]
+    L = [f"Você é um CHECADOR DE FATOS com acesso à INTERNET. O roteiro é de um vídeo do YouTube{(' sobre ' + tema) if tema else ''}, "
+         f"em {idioma}. NÃO vou mandar o roteiro inteiro — só os PONTOS SUSPEITOS e os TRECHOS em volta deles.",
+         "",
+         "## O que fazer",
+         "1. Para cada item abaixo, PESQUISE NA INTERNET em fontes confiáveis (jornais, arquivos, documentos oficiais, "
+         "processos, livros, Wikipedia só como ponto de partida) e confira: anos, datas, idades, números, nomes, lugares, "
+         "e se cada alegação está atribuída a quem alega.",
+         "2. Errado → corrija. Sem confirmação → atribua (\"segundo…\", \"de acordo com…\"), suavize ou tire o detalhe. "
+         "NUNCA invente um dado pra tapar buraco.",
+         "3. Repetições: deixe uma vez só, no lugar mais forte (no outro: apague com \"para\": \"\" ou reduza à meia frase "
+         "que traga algo novo).",
+         "4. Só esses três focos (ano/cronologia, alegações/fatos, repetições). Não mexa no estilo.",
+         "",
+         "## Regras das correções",
+         "- \"de\": trecho COPIADO EXATAMENTE dos TRECHOS abaixo (uma frase ou poucas), na língua do roteiro.",
+         "- NÃO inclua no \"de\" as marcas entre colchetes ([I3], [[INSCREVA]], [CENA 2]) — escolha um pedaço que não passe por elas.",
+         "- \"para\": o trecho corrigido, na MESMA língua e no mesmo tom (ou \"\" pra apagar uma repetição).",
+         "- \"fonte\": o LINK (URL) que confirma a correção.",
+         "- Item que está CERTO: ponha em \"conferidos\" com o link que confirma (assim eu sei que foi checado).",
+         ]
+    if foco:
+        L.append(f"- Pedido extra (prioridade): {foco.strip()[:800]}")
+    L += ["", "## Itens pra checar (L12 = linha 12 dos trechos)", *[f"- {x}" for x in itens], "",
+          "## Trechos do roteiro (só os parágrafos citados — a linha é a do roteiro)",
+          *[f"L{n}: {texto_de[n]}" for n in linhas], "",
+          "## Resposta — SOMENTE um JSON válido, assim (sem texto antes ou depois):",
+          json.dumps({"correcoes": [{"item": "C1", "de": "trecho exato", "para": "trecho corrigido (ou \"\")",
+                                     "eixo": "cronologia | alegacao | repeticao", "problema": "o que estava errado",
+                                     "fonte": "https://…"}],
+                      "conferidos": [{"item": "V2", "ok": True, "fonte": "https://…", "nota": "o que a fonte diz"}],
+                      "resumo": "1-3 frases: o que estava errado e o que foi confirmado"}, ensure_ascii=False, indent=1)]
+    return "\n".join(L)
+
+
+def ler_web(resposta: str) -> Dict[str, Any]:
+    """{"trocas" (pro revisao_roteiro.aplicar), "conferidos": [{"item","ok","fonte","nota"}], "resumo"}."""
+    d = ler(resposta)
+    import json_ia
+    bruto = json_ia.carregar(resposta)
+    conf = []
+    for c in (bruto.get("conferidos") if isinstance(bruto, dict) else None) or []:
+        if isinstance(c, dict) and str(c.get("item") or "").strip():
+            conf.append({"item": str(c["item"]).strip().upper()[:6], "ok": c.get("ok", True) is not False,
+                         "fonte": str(c.get("fonte") or "")[:300], "nota": str(c.get("nota") or "")[:300]})
+    return {"trocas": d["trocas"], "conferidos": conf[:80], "resumo": d["resumo"]}

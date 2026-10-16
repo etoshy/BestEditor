@@ -10,8 +10,10 @@ Os dois passos funcionam com a 🤖 IA do site (botão) ou copiando o prompt pra
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
+import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 import marcas_seguras
@@ -98,7 +100,12 @@ def prompt_perguntas(p: Dict[str, Any]) -> str:
          json.dumps({"perguntas": [{"tipo": "pessoa | lugar | objeto | documento | cena | veiculo | outro",
                                     "alvo": "quem/o quê (ex.: Helen List)", "pergunta": "Você tem foto de …?",
                                     "por_que": "por que vale a imagem (curto)", "trecho": "frase exata do roteiro",
-                                    "vezes": 4, "dica": "onde achar", "ja_tem": ["I3"]}]}, ensure_ascii=False, indent=2)]
+                                    "vezes": 4, "dica": "onde achar",
+                                    "busca": "termo pra buscar a foto no Bing/Google (ex.: Linda Patrik Unabomber)",
+                                    "ja_tem": ["I3"]}]}, ensure_ascii=False, indent=2),
+         "\"busca\": o que digitar no Bing/Google Imagens pra achar ESSA foto: o nome + o termo do caso que desambigua "
+         "(ex.: \"Linda Patrik Unabomber\", \"Kaczynski cabin Montana\"), SEMPRE EM INGLÊS (é onde se acha mais foto) — "
+         "nome próprio fica como é. 2 a 6 palavras."]
     return "\n".join(L)
 
 
@@ -124,6 +131,7 @@ def ler_perguntas(texto: str, p: Dict[str, Any]) -> List[Dict[str, Any]]:
                     "pergunta": str(q.get("pergunta") or f"Você tem foto de {alvo}?").strip()[:300],
                     "por_que": str(q.get("por_que") or "").strip()[:300], "trecho": str(q.get("trecho") or "").strip()[:300],
                     "dica": str(q.get("dica") or "").strip()[:200],
+                    "busca": " ".join(str(q.get("busca") or "").split())[:120] or antiga.get("busca") or "",
                     "vezes": int(q.get("vezes") or 0) if str(q.get("vezes") or "0").isdigit() else 0,
                     "ja_tem": [str(x).strip("[] ").upper() for x in q.get("ja_tem") or [] if str(x).strip("[] ").upper() in ids][:10],
                     "pulada": bool(antiga.get("pulada"))})
@@ -232,6 +240,224 @@ def uso_das_imagens(p: Dict[str, Any]) -> Dict[str, int]:
     return cont
 
 
+# ------------------------------------------------------------------ 🔎 buscar as fotos (Bing + Google Modo IA)
+MOTORES = ("bing", "google")
+BUSCA: Dict[str, Dict[str, Any]] = {}  # {pid: {ativo, msg, feitas, total, achadas, erro}} — em segundo plano
+
+
+def termo_da_pergunta(p: Dict[str, Any], q: Dict[str, Any]) -> str:
+    """O termo de busca: o que a IA escreveu ("Linda Patrik Unabomber"); senão o NOME da pessoa/lugar (nome próprio
+    funciona em qualquer língua — a descrição em português, ", o irmão", fica de fora)."""
+    if (q.get("busca") or "").strip():
+        return q["busca"].strip()
+    return re.split(r"[,(—–-]| o | a | do | da ", " " + (q.get("alvo") or q.get("pergunta") or "") + " ")[0].strip()[:120]
+
+
+def termos_em_ingles(p: Dict[str, Any], qs: List[Dict[str, Any]], job: Optional[str] = None) -> Dict[str, str]:
+    """🌐 As perguntas sem termo: a IA escreve a busca EM INGLÊS (nome + o termo do caso que desambigua).
+    {} sem IA — aí vai só o nome (ver termo_da_pergunta)."""
+    import ia_servico as ia
+    if not qs or not ia.ativo("buscas"):
+        return {}
+    import dossies as ds
+    from ia_midia import _S, _lista, _obj
+    system = ("Você escreve termos de busca de IMAGEM (Bing/Google Imagens) SEMPRE EM INGLÊS: o nome próprio como é + 1 a 3 "
+              "palavras em inglês do caso que desambiguam (ex.: \"Linda Patrik Unabomber\", \"Kaczynski cabin Montana\", "
+              "\"Westfield New Jersey List mansion 1971\"). 2 a 6 palavras. Mantenha o \"id\".")
+    linhas = [f"{q['id']}: {q.get('alvo') or ''} — {q.get('pergunta') or ''}" + (f" (trecho: {q['trecho'][:120]})" if q.get("trecho") else "")
+              for q in qs]
+    r = ia.chamar("buscas", system, f"Tema do vídeo: {ds.nome_do_projeto(p)}\n\n" + "\n".join(linhas),
+                  _obj({"termos": _lista(_obj({"id": _S, "busca": _S}))}), max_tokens=2000, effort="low", job=job)
+    ids = {q["id"] for q in qs}
+    return {str(x.get("id")): " ".join(str(x.get("busca") or "").split())[:120]
+            for x in (r or {}).get("termos") or [] if str(x.get("id")) in ids and str(x.get("busca") or "").strip()}
+
+
+def buscar_fotos(base: str, pid: str, pedidos: List[Dict[str, Any]], motores: List[str], quantidade: int = 4,
+                 trava=None) -> Dict[str, Any]:
+    """pedidos = [{"id": "P3", "busca": "termo (opcional)"}]. Pesquisa cada termo nos buscadores (um navegador por
+    buscador, todos os termos na mesma aba), baixa até `quantidade` fotos por buscador e põe no modelo como
+    resposta da pergunta (🔎 "a conferir"). Repetidas (iguais a uma foto que já está no modelo) ficam de fora."""
+    import contextlib
+    import dossies as ds
+    import buscador_imagens_unificado as bu
+    trava = trava or contextlib.nullcontext()
+    estado = BUSCA.setdefault(pid, {})
+    with trava:
+        p = ds.carregar(base, pid)
+    qs = {q["id"]: q for q in (p.get("fotos_roteiro") or {}).get("perguntas") or []}
+    termos: Dict[str, str] = {}
+    for ped in pedidos:
+        q = qs.get(str(ped.get("id") or ""))
+        if q and not q.get("pulada"):
+            if (ped.get("busca") or "").strip():
+                q["busca"] = " ".join(str(ped["busca"]).split())[:120]
+            termos[q["id"]] = termo_da_pergunta(p, q)
+    if not termos:
+        raise ValueError("Nenhuma pergunta pra buscar.")
+    sem = [qs[i] for i in termos if not (qs[i].get("busca") or "").strip()]
+    if sem:  # 🌐 sem termo: a IA escreve em inglês (e fica guardado na pergunta)
+        estado.update(ativo=True, msg="🌐 a IA está escrevendo os termos em inglês…")
+        novos_t = termos_em_ingles(p, sem, job=pid)
+        termos.update(novos_t)
+        if novos_t:
+            with trava:
+                q2 = ds.carregar(base, pid)
+                for x in (q2.get("fotos_roteiro") or {}).get("perguntas") or []:
+                    if x["id"] in novos_t:
+                        x["busca"] = novos_t[x["id"]]
+                ds.salvar(base, q2)
+    motores = [m for m in motores if m in MOTORES] or ["bing"]
+    import ia_servico
+    conferir_ia = ia_servico.ativo("dossie_imagens")
+    nome_m = {"bing": "Bing", "google": "Google (Modo IA)"}
+    t0 = time.time()
+    pp = {qid: {"st": "fila", "achou": {}, "fotos": 0, "termo": termos[qid], "alvo": qs[qid].get("alvo") or qid} for qid in termos}
+    estado.update(ativo=True, inicio=t0, etapa="pesquisa", passo=0, passos=len(termos) * len(motores) + len(termos) + (1 if conferir_ia else 0),
+                  atual="começando…", msg="🔎 buscando…", feitas=0, total=len(termos), achadas=0, erro="", por_pergunta=pp, eta_s=None)
+
+    def avancar(n: int = 1, atual: str = "") -> None:
+        estado["passo"] = min(estado["passos"], estado["passo"] + n)
+        if atual:
+            estado["atual"] = atual
+        gasto = time.time() - t0
+        estado["eta_s"] = round(gasto / estado["passo"] * (estado["passos"] - estado["passo"])) if estado["passo"] else None
+        estado["msg"] = estado["atual"]
+
+    # o que já existe no modelo (pra não trazer a mesma foto de novo)
+    assin = []
+    for m in p.get("midias") or []:
+        cam = ds.caminho_midia(base, p, m)
+        if cam and m.get("tipo") == "foto":
+            a = bu.assinatura_visual(cam)
+            if a is not None:
+                assin.append(a)
+    achados: Dict[str, List[Any]] = {qid: [] for qid in termos}
+    erros = []
+    ids = list(termos)
+    for motor in motores:
+        # Bing: de 4 em 4 termos no mesmo navegador (dá pra mostrar o andamento); Google: um por vez (o app tem fila)
+        passo_lote = 1 if motor == "google" else 4
+        for k in range(0, len(ids), passo_lote):
+            grupo = ids[k:k + passo_lote]
+            for qid in grupo:
+                pp[qid]["st"] = "pesquisando"
+            estado["atual"] = (f"🔎 {nome_m[motor]} · termo {k + 1}" + (f"–{k + len(grupo)}" if len(grupo) > 1 else "")
+                               + f" de {len(ids)}: " + " · ".join(f"“{termos[q]}”" for q in grupo))
+            estado["msg"] = estado["atual"]
+            r = bu.buscar_lote(motor, [termos[q] for q in grupo], limit=max(quantidade * 2, 6), orientation="any")
+            if r.get("erro_geral"):
+                erros.append(f"{nome_m[motor]}: {str(r['erro_geral'])[:160]}")
+            for qid in grupo:
+                imgs = bu.sem_marca_dagua(r["por_termo"].get(bu._norm(termos[qid])) or [])
+                achados[qid] += [(motor, im) for im in imgs]
+                pp[qid]["achou"][motor] = len(imgs)
+                pp[qid]["st"] = "fila" if motor != motores[-1] else ("achou" if achados[qid] else "nada")
+            avancar(len(grupo))
+    pasta = ds.pasta_midias(base, pid)
+    os.makedirs(pasta, exist_ok=True)
+    novos: List[str] = []
+    estado["etapa"] = "download"
+    for n, (qid, lista) in enumerate(achados.items(), start=1):
+        q = qs[qid]
+        if not lista:
+            pp[qid]["st"] = "nada"
+            avancar(1)
+            continue
+        pp[qid]["st"] = "baixando"
+        estado.update(atual=f"⬇ baixando as fotos de {q.get('alvo') or qid} ({n}/{len(achados)})", feitas=n - 1)
+        estado["msg"] = estado["atual"]
+        por_motor: Dict[str, int] = {}
+        vistos = set()
+        for motor, im in lista:
+            if por_motor.get(motor, 0) >= quantidade or im.original_url in vistos:
+                continue
+            vistos.add(im.original_url)
+            try:
+                cam = bu.baixar_imagem(im, pasta, stem=f"busca_{qid}_{motor}_{len(vistos)}_{uuid.uuid4().hex[:4]}", timeout_s=30)
+            except Exception:  # noqa: BLE001 — essa não baixou: vai a próxima
+                continue
+            a = bu.assinatura_visual(cam)
+            if a is not None and any(bu.parecidas(a, b) for b in assin):
+                try:
+                    os.remove(cam)
+                except OSError:
+                    pass
+                continue
+            if a is not None:
+                assin.append(a)
+            with trava:
+                p = ds.carregar(base, pid)
+                m = ds.adicionar_midia(p, tipo="foto", origem="busca", arquivo=os.path.basename(cam), url=im.source_page or "",
+                                       nome=(im.title or q.get("alvo") or "")[:200],
+                                       og={"titulo": im.title or "", "descricao": f"busca {motor}: {termos[qid]}"},
+                                       descricao=q.get("alvo") or "", usar="ambos")
+                m.update(pergunta=qid, pergunta_alvo=(q.get("alvo") or "")[:120], a_conferir=True, buscador=motor)
+                for x in (p.get("fotos_roteiro") or {}).get("perguntas") or []:  # guarda o termo usado
+                    if x["id"] == qid:
+                        x["busca"] = termos[qid]
+                ds.salvar(base, p)
+            novos.append(m["id"])
+            por_motor[motor] = por_motor.get(motor, 0) + 1
+            pp[qid]["fotos"] += 1
+            estado["achadas"] = len(novos)
+        pp[qid]["st"] = "pronto" if pp[qid]["fotos"] else "nada"
+        avancar(1)
+    estado.update(feitas=len(achados), etapa="conferir")
+    if novos and conferir_ia:  # 🤖 a ficha de cada uma (e tira lixo/anúncio)
+        estado["atual"] = estado["msg"] = f"🤖 a IA está conferindo as {len(novos)} foto(s) (tira lixo/anúncio)…"
+        try:
+            ds.ia_analisar_imagens(base, pid, trava=trava, ids=novos)
+        except Exception:  # noqa: BLE001
+            pass
+    avancar(estado["passos"])
+    dur = time.time() - t0
+    estado.update(ativo=False, etapa="fim", duracao_s=round(dur), atual="",
+                  msg=f"✔ {len(novos)} foto(s) novas em {int(dur // 60)} min {int(dur % 60)} s — confira e tire as que não servem"
+                  + (f" · ⚠ {'; '.join(erros)}" if erros else ""), erro="" if novos or not erros else "; ".join(erros))
+    return {"novas": novos, "erros": erros}
+
+
+def baixar_link(base: str, pid: str, url: str) -> Tuple[str, str, Optional[Dict[str, Any]]]:
+    """🔗 Um link colado: link direto da imagem/vídeo (baixa) ou de uma página (pega a imagem do OG da página).
+    → (nome do arquivo, tipo "foto"|"video", og ou None). Levanta ValueError se não deu."""
+    import dossies as ds
+    import vendas as vd
+    url = url.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("o link tem que começar com http:// ou https://")
+    pasta = ds.pasta_midias(base, pid)
+    os.makedirs(pasta, exist_ok=True)
+    nome = f"link_{uuid.uuid4().hex[:6]}"
+    try:  # 1) o próprio link é a foto/vídeo (o tipo vem do Content-Type)
+        cam, tipo = vd.baixar_arquivo(url, pasta, nome)
+        return os.path.basename(cam), tipo, None
+    except vd.VendaError as exc:
+        erro1 = str(exc)
+    if vd.tipo_do_arquivo(url.split("?")[0]):  # 2) parece imagem mas o site barrou: baixador dos buscadores (referer, proxy)
+        try:
+            import buscador_imagens_unificado as bu
+            im = bu.ImagemBuscador(title="", description="", source_page="", original_url=url, thumbnail_url="",
+                                   width=None, height=None, query="", engine="")
+            cam = bu.baixar_imagem(im, pasta, stem=nome, timeout_s=40)
+            return os.path.basename(cam), "foto", None
+        except Exception:  # noqa: BLE001
+            pass
+    try:  # 3) é uma página: a imagem do OG (a foto principal da matéria)
+        html, final = vd.baixar_html(url, navegador=False)
+        og = vd.ler_og(html, final)
+    except vd.VendaError:
+        raise ValueError(f"não consegui baixar ({erro1[:120]})")
+    for u in (og.get("imagem"), og.get("video")):
+        if u:
+            try:
+                cam, tipo = vd.baixar_arquivo(u, pasta, nome)
+                return os.path.basename(cam), tipo, og
+            except vd.VendaError:
+                continue
+    raise ValueError("a página não tem imagem principal — copie o link da própria imagem (botão direito → copiar endereço da imagem)")
+
+
 # ------------------------------------------------------------------ rotas
 def registrar(app, base_dir: str) -> None:
     from flask import jsonify, request
@@ -253,10 +479,17 @@ def registrar(app, base_dir: str) -> None:
         for m in p.get("midias") or []:
             if m.get("pergunta"):
                 enviadas.setdefault(m["pergunta"], []).append(m["id"])
+        info = {m["id"]: {"url": f"/modelos-video/{p['id']}/arquivo/{m['id']}", "a_conferir": bool(m.get("a_conferir")),
+                          "buscador": m.get("buscador") or "", "fora": bool(m.get("descartada") or m.get("duplicada_de"))}
+                for m in p.get("midias") or [] if m.get("pergunta")}
         return {"ok": True, "perguntas": fr.get("perguntas") or [], "enviadas": enviadas, "uso": uso_das_imagens(p),
+                "midias": info, "busca": BUSCA.get(p["id"]) or None,
+                "termos": {q["id"]: (q.get("busca") or "") for q in fr.get("perguntas") or []},
                 "tem_roteiro": bool((p.get("resultado") or {}).get("roteiro")),
                 "pode_desfazer": bool((p.get("resultado") or {}).get("roteiro_antes_fotos")),
-                "imagens": len(_imagens(p))}
+                "imagens": len(_imagens(p)),
+                "de_busca": sum(1 for m in p.get("midias") or [] if m.get("origem") == "busca"),
+                "de_busca_conferir": sum(1 for m in p.get("midias") or [] if m.get("origem") == "busca" and m.get("a_conferir"))}
 
     @app.route("/modelos-video/<pid>/fotos-roteiro")
     def fotos_roteiro_estado(pid: str):
@@ -302,6 +535,79 @@ def registrar(app, base_dir: str) -> None:
             ds.salvar(base_dir, p)
             return jsonify(_estado(p))
 
+    @app.route("/modelos-video/<pid>/fotos-roteiro/buscar", methods=["POST"])
+    def fotos_roteiro_buscar(pid: str):
+        """🔎 Busca as fotos de uma pergunta (ou de todas) no Bing / Google Modo IA — em segundo plano."""
+        import threading
+        p = _carregar(pid)
+        if not p:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        if (BUSCA.get(pid) or {}).get("ativo"):
+            return jsonify({"erro": "Já tem uma busca rodando neste modelo — espere terminar."}), 409
+        c = _corpo()
+        pedidos = c.get("perguntas")
+        if pedidos == "todas" or not pedidos:
+            pedidos = [{"id": q["id"]} for q in (p.get("fotos_roteiro") or {}).get("perguntas") or [] if not q.get("pulada")]
+        if not pedidos:
+            return jsonify({"erro": "Não tem pergunta pra buscar — gere as perguntas primeiro."}), 400
+        motores = [m for m in (c.get("motores") or ["bing", "google"]) if m in MOTORES]
+        qtd = max(1, min(10, int(c.get("quantidade") or 4)))
+        BUSCA[pid] = {"ativo": True, "msg": "🔎 começando…", "feitas": 0, "total": len(pedidos), "achadas": 0, "erro": ""}
+
+        def rodar():
+            try:
+                buscar_fotos(base_dir, pid, pedidos, motores, qtd, trava=dossies_rotas._TRAVA)
+            except Exception as exc:  # noqa: BLE001
+                BUSCA[pid] = {"ativo": False, "msg": "", "erro": str(exc)[:300]}
+
+        threading.Thread(target=rodar, daemon=True).start()
+        return jsonify(_estado(p))
+
+    @app.route("/modelos-video/<pid>/fotos-roteiro/link", methods=["POST"])
+    def fotos_roteiro_link(pid: str):
+        """🔗 Baixa UM link (a tela manda um por vez, pra mostrar o andamento) e põe no modelo — como envio manual:
+        já conta como conferida. Com "pergunta", vira resposta dela."""
+        c = _corpo()
+        if not _carregar(pid):
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        url = str(c.get("url") or "").strip()
+        try:
+            arquivo, tipo, og = baixar_link(base_dir, pid, url)
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        qid = str(c.get("pergunta") or "")[:10]
+        desc = str(c.get("descricao") or "").strip()[:2000]
+        with dossies_rotas._TRAVA:
+            p = _carregar(pid)
+            q = next((x for x in (p.get("fotos_roteiro") or {}).get("perguntas") or [] if x["id"] == qid), None)
+            m = ds.adicionar_midia(p, tipo=tipo, origem="url", url=url, arquivo=arquivo,
+                                   nome=((og or {}).get("titulo") or url[-80:])[:200],
+                                   og={"titulo": og.get("titulo"), "descricao": og.get("descricao")} if og and (og.get("titulo") or og.get("descricao")) else None,
+                                   descricao=desc or ((q or {}).get("alvo") or ""), usar="ambos")
+            if q:
+                m.update(pergunta=qid, pergunta_alvo=(q.get("alvo") or "")[:120])
+            ds.salvar(base_dir, p)
+        import ia_servico
+        if ia_servico.ativo("dossie_imagens"):
+            import threading
+            threading.Thread(target=lambda: ds.ia_analisar_imagens(base_dir, pid, trava=dossies_rotas._TRAVA, ids=[m["id"]]),
+                             daemon=True).start()
+        return jsonify({"ok": True, "midia": {"id": m["id"], "tipo": tipo}, "da_pagina": bool(og)})
+
+    @app.route("/modelos-video/<pid>/fotos-roteiro/conferidas", methods=["POST"])
+    def fotos_roteiro_conferidas(pid: str):
+        """✓ as fotos achadas foram conferidas (tira o 🔎 "a conferir")."""
+        ids = {str(x).upper() for x in _corpo().get("ids") or []}
+        with dossies_rotas._TRAVA:
+            p = _carregar(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            for m in p.get("midias") or []:
+                if m["id"].upper() in ids:
+                    m.pop("a_conferir", None)
+            ds.salvar(base_dir, p)
+            return jsonify(_estado(p))
+
     @app.route("/modelos-video/<pid>/fotos-roteiro/posicionar/prompt", methods=["POST"])
     def fotos_roteiro_posicionar_prompt(pid: str):
         p = _carregar(pid)
@@ -326,6 +632,52 @@ def registrar(app, base_dir: str) -> None:
         p["resultado"] = res
         ds.marcar_mudanca(p, "📸 fotos pro roteiro", hist)
         ds.salvar(base_dir, p)
+
+    @app.route("/modelos-video/<pid>/fotos-roteiro/apagar-buscas", methods=["POST"])
+    def fotos_roteiro_apagar_buscas(pid: str):
+        """🗑 Apaga as fotos que vieram das 🔎 buscas automáticas (todas, ou só as ainda "a conferir"; ou de uma pergunta).
+        As enviadas à mão e as das matérias ficam. Tira também as marcas delas do roteiro e do 🎭 elenco."""
+        c = _corpo()
+        so_conferir = bool(c.get("so_a_conferir"))
+        pergunta = str(c.get("pergunta") or "")
+        if (BUSCA.get(pid) or {}).get("ativo"):
+            return jsonify({"erro": "Tem uma busca rodando — espere terminar."}), 409
+        with dossies_rotas._TRAVA:
+            p = _carregar(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            sai = [m for m in p.get("midias") or [] if m.get("origem") == "busca"
+                   and (not so_conferir or m.get("a_conferir")) and (not pergunta or m.get("pergunta") == pergunta)]
+            if not sai:
+                return jsonify({"erro": "Não tem foto de busca automática pra apagar."}), 400
+            ids = {m["id"].upper() for m in sai}
+            for m in sai:
+                cam = ds.caminho_midia(base_dir, p, m)
+                if cam:
+                    try:
+                        os.remove(cam)
+                    except OSError:
+                        pass
+            p["midias"] = [m for m in p["midias"] if m["id"].upper() not in ids]
+            el = p.get("elenco")
+            if el:  # 🎭 as fotos apagadas saem do elenco (pessoa sem foto nenhuma sai; local fica se tem descrição)
+                for x in el.get("pessoas") or []:
+                    x["fotos"] = [f for f in x.get("fotos") or [] if f.get("midia", "").upper() not in ids]
+                el["pessoas"] = [x for x in el.get("pessoas") or [] if x["fotos"]]
+                for x in el.get("locais") or []:
+                    x["fotos"] = [f for f in x.get("fotos") or [] if str(f).upper() not in ids]
+            rot = (p.get("resultado") or {}).get("roteiro") or ""
+            tirou = 0
+            if rot:
+                padrao = re.compile(r"\[\s*(" + "|".join(sorted(ids)) + r")(?:\s[^\]\n]*)?\]\s?", re.I)
+                novo, tirou = padrao.subn("", rot)
+                if tirou:
+                    _gravar_roteiro(p, novo, (p.get("resultado") or {}).get("roteiro_antes_fotos"),
+                                    f"🗑 {len(ids)} foto(s) de busca apagadas ({tirou} marcas)")
+                    p = _carregar(pid)
+            ds.marcar_mudanca(p, "📸 fotos pro roteiro", f"🗑 {len(ids)} foto(s) das buscas automáticas apagadas")
+            ds.salvar(base_dir, p)
+            return jsonify({**_estado(p), "apagadas": len(ids), "marcas_tiradas": tirou})
 
     @app.route("/modelos-video/<pid>/fotos-roteiro/posicionar/ler", methods=["POST"])
     def fotos_roteiro_posicionar_ler(pid: str):

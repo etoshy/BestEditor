@@ -101,3 +101,125 @@ def test_cenas_do_pod_usam_as_fotos_do_modelo():
     j = cenas_lote.montar_json(cenas, {}, {0}, "", {1: {"id": "I3", "tipo": "foto"}})
     assert j["segments"][1]["provider"] == "material" and j["segments"][1]["query"] == "I3"
     assert j["segments"][0]["provider"] == "runpod"
+
+
+def test_buscar_fotos_bing_google(cliente, monkeypatch):
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "toolkit"))
+    import buscador_imagens_unificado as bu
+    from PIL import Image
+    c, pid, base = cliente
+    p = ds.carregar(base, pid)
+    p["fotos_roteiro"] = {"perguntas": [{"id": "P1", "alvo": "Linda Patrik", "pergunta": "Tem foto de Linda Patrik?", "busca": "Linda Patrik Unabomber"},
+                                        {"id": "P2", "alvo": "Gary Wright", "pergunta": "?", "busca": "", "pulada": True}]}
+    ds.salvar(base, p)
+    pedidos = []
+
+    def lote(motor, termos, limit=1, orientation="any", **kw):
+        pedidos.append((motor, list(termos)))
+        return {"por_termo": {bu._norm(t): [bu.ImagemBuscador(title=f"{motor} {i}", description="", source_page="https://x/p",
+                                                               original_url=f"https://x/{motor}{i}.jpg", thumbnail_url="",
+                                                               width=800, height=600, query=t, engine=motor)
+                                            for i in range(3)] for t in termos}, "erros": {}, "erro_geral": None}
+    cores = iter(range(10, 250, 20))
+
+    def baixar(im, pasta, stem=None, timeout_s=0):
+        cam = os.path.join(pasta, stem + ".jpg")
+        img = Image.new("RGB", (64, 64), (next(cores), 0, 0))
+        for x in range(0, 64, 8):  # padrões diferentes (a assinatura visual não acha "parecidas")
+            img.paste((255, 255, 255), (x, (x * 7) % 64, x + 4, (x * 7) % 64 + 4))
+        img.save(cam)
+        return cam
+    monkeypatch.setattr(bu, "buscar_lote", lote)
+    monkeypatch.setattr(bu, "baixar_imagem", baixar)
+    monkeypatch.setattr(bu, "assinatura_visual", lambda cam: None)
+    import ia_servico
+    monkeypatch.setattr(ia_servico, "ativo", lambda r=None: False)
+    r = fr.buscar_fotos(base, pid, [{"id": "P1"}, {"id": "P2"}], ["bing", "google"], quantidade=2)
+    assert pedidos == [("bing", ["Linda Patrik Unabomber"]), ("google", ["Linda Patrik Unabomber"])]
+    assert len(r["novas"]) == 4
+    p = ds.carregar(base, pid)
+    novas = [m for m in p["midias"] if m["id"] in r["novas"]]
+    assert all(m["pergunta"] == "P1" and m["a_conferir"] and m["pergunta_alvo"] == "Linda Patrik" for m in novas)
+    est = c.get(f"/modelos-video/{pid}/fotos-roteiro").get_json()
+    assert sorted(est["enviadas"]["P1"]) == sorted(r["novas"]) and est["midias"][r["novas"][0]]["a_conferir"]
+    est = c.post(f"/modelos-video/{pid}/fotos-roteiro/conferidas", json={"ids": r["novas"]}).get_json()
+    assert not any(est["midias"][i]["a_conferir"] for i in r["novas"])
+    assert fr.termo_da_pergunta(p, {"alvo": "Gary Wright", "busca": ""}).startswith("Gary Wright")
+
+
+def test_termos_sempre_em_ingles(monkeypatch):
+    import ia_servico
+    p = {"id": "x", "tema": "Unabomber", "midias": []}
+    assert fr.termo_da_pergunta(p, {"alvo": "David Kaczynski, o irmão"}) == "David Kaczynski"
+    monkeypatch.setattr(ia_servico, "ativo", lambda r=None: True)
+    visto = {}
+
+    def chamar(rec, system, conteudo, schema=None, **kw):
+        visto["s"] = system
+        return {"termos": [{"id": "P2", "busca": "David Kaczynski Unabomber brother"}, {"id": "P9", "busca": "x"}]}
+    monkeypatch.setattr(ia_servico, "chamar", chamar)
+    import dossies as ds
+    monkeypatch.setattr(ds, "nome_do_projeto", lambda p: "Unabomber")
+    assert fr.termos_em_ingles(p, [{"id": "P2", "alvo": "David Kaczynski, o irmão", "pergunta": "?"}]) == {"P2": "David Kaczynski Unabomber brother"}
+    assert "EM INGLÊS" in visto["s"]
+    assert "SEMPRE EM INGLÊS" in fr.prompt_perguntas({"resultado": {"roteiro_final": "Texto do roteiro."}, "midias": []})
+
+
+def test_apagar_fotos_das_buscas(cliente):
+    c, pid, base = cliente
+    import os
+    p = ds.carregar(base, pid)
+    os.makedirs(ds.pasta_midias(base, pid), exist_ok=True)
+    novos = []
+    for k, conferir in enumerate((True, False, True)):
+        nome = f"busca_{k}.jpg"
+        open(os.path.join(ds.pasta_midias(base, pid), nome), "wb").write(b"x")
+        m = ds.adicionar_midia(p, tipo="foto", origem="busca", arquivo=nome, descricao="x")
+        m.update(pergunta="P1", a_conferir=conferir)
+        novos.append(m["id"])
+    manual = ds.adicionar_midia(p, tipo="foto", origem="pc", descricao="minha")
+    p["elenco"] = {"pessoas": [{"nome": "X", "fotos": [{"midia": novos[0]}]}, {"nome": "Y", "fotos": [{"midia": manual["id"]}]}], "locais": []}
+    p["resultado"] = ds.ler_resultado(json.dumps({"roteiro": f"[{novos[0]}] Em 1971 tudo mudou. [{novos[1]}] John List matou a família.", "titulos": ["t"]}), p)
+    ds.salvar(base, p)
+    d = c.get(f"/modelos-video/{pid}/fotos-roteiro").get_json()
+    assert d["de_busca"] == 3 and d["de_busca_conferir"] == 2
+    d = c.post(f"/modelos-video/{pid}/fotos-roteiro/apagar-buscas", json={"so_a_conferir": True}).get_json()
+    assert d["apagadas"] == 2 and d["marcas_tiradas"] == 1 and d["de_busca"] == 1
+    p = ds.carregar(base, pid)
+    assert p["resultado"]["roteiro"].startswith("Em 1971") and f"[{novos[1]}]" in p["resultado"]["roteiro"]
+    assert [x["nome"] for x in p["elenco"]["pessoas"]] == ["Y"]
+    assert not os.path.exists(os.path.join(ds.pasta_midias(base, pid), "busca_0.jpg"))
+    d = c.post(f"/modelos-video/{pid}/fotos-roteiro/apagar-buscas", json={}).get_json()
+    assert d["apagadas"] == 1 and d["de_busca"] == 0
+    assert any(m["id"] == manual["id"] for m in ds.carregar(base, pid)["midias"])
+    assert c.post(f"/modelos-video/{pid}/fotos-roteiro/apagar-buscas", json={}).status_code == 400
+
+
+def test_link_colado_vira_foto_conferida(cliente, monkeypatch):
+    c, pid, base = cliente
+    import os
+    import vendas as vd
+    p = ds.carregar(base, pid)
+    p["fotos_roteiro"] = {"perguntas": [{"id": "P1", "alvo": "Linda Patrik", "pergunta": "?"}]}
+    ds.salvar(base, p)
+
+    def baixar(url, pasta, nome, timeout=60):
+        if "pagina" in url:
+            raise vd.VendaError("Esse link não é um arquivo de foto ou vídeo.")
+        os.makedirs(pasta, exist_ok=True)
+        open(os.path.join(pasta, nome + ".jpg"), "wb").write(b"x")
+        return os.path.join(pasta, nome + ".jpg"), "foto"
+    monkeypatch.setattr(vd, "baixar_arquivo", baixar)
+    monkeypatch.setattr(vd, "baixar_html", lambda url, navegador=False: ("<html>", url))
+    monkeypatch.setattr(vd, "ler_og", lambda html, final: {"titulo": "Matéria", "imagem": "https://x/foto.jpg"})
+    import ia_servico
+    monkeypatch.setattr(ia_servico, "ativo", lambda r=None: False)
+    d = c.post(f"/modelos-video/{pid}/fotos-roteiro/link", json={"url": "https://x/a.jpg", "pergunta": "P1"}).get_json()
+    assert d["ok"] and not d["da_pagina"]
+    d2 = c.post(f"/modelos-video/{pid}/fotos-roteiro/link", json={"url": "https://site/pagina", "pergunta": "P1"}).get_json()
+    assert d2["ok"] and d2["da_pagina"]
+    p = ds.carregar(base, pid)
+    novas = [m for m in p["midias"] if m["id"] in (d["midia"]["id"], d2["midia"]["id"])]
+    assert all(m["pergunta"] == "P1" and not m.get("a_conferir") and m["descricao"] == "Linda Patrik" for m in novas)
+    assert c.post(f"/modelos-video/{pid}/fotos-roteiro/link", json={"url": "ftp://x"}).status_code == 400

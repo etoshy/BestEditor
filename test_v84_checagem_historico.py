@@ -212,3 +212,37 @@ def test_versao_codigo_avisa_servidor_velho(monkeypatch):
     assert _app._CODIGO_ID in h and "avisoCodigoVelho" in h
     monkeypatch.setitem(_app._CODIGO_NO_INICIO, "app.py", 0.0)
     assert c.get("/versao-codigo").get_json()["arquivos"] == ["app.py"]
+
+
+# ------------------------------------------------------------------ 🌐 2ª IA com internet (v84_133)
+def test_prompt_web_so_trechos():
+    ultima = {"verificar": [{"afirmacao": "Ein Brief Haarmanns beteuerte Grans' Unschuld", "por_que": "nur eine Quelle", "conferido": False},
+                            {"afirmacao": "já ok", "conferido": True}],
+              "inconsistencias": [{"descricao": "1924 × 1918", "linhas": [3, 5]}]}
+    t = ch.prompt_web(ROT, "alemão", "Fritz Haarmann", ultima, [{"trecho": "Er selbst sprach von 50 bis 70 Opfern", "tipo": "alegacao", "fonte": "F1"}])
+    for x in ("INTERNET", "C1 ⏳ CRONOLOGIA", "I1 🔁", "V1 📚 CONFERIR", "A1 📚 ALEGAÇÃO", "D1 📅 ANO", "N1 🔢", "R1 ✂️",
+              "L3: Bemerkenswert", "\"conferidos\"", "\"fonte\": \"https://…\""):
+        assert x in t, x
+    assert "V2 📚" not in t  # o que já foi conferido não vai
+    assert "Die Akte umfasste sechzig Bände" not in t  # parágrafo sem nada suspeito fica de fora
+
+
+def test_rota_web_aplica_e_marca_conferido(proj):
+    A, p = proj
+    c = A.app.test_client()
+    pid = p["id"]
+    c.post(f"/checagem/dossie/{pid}/ler", json={"texto": json.dumps({"correcoes": [], "verificar": [{"afirmacao": "Brief", "por_que": "p"}]})})
+    pr = c.post(f"/checagem/dossie/{pid}/web/prompt", json={}).get_json()
+    assert pr["ok"] and "V1" in pr["prompt"]
+    resp = json.dumps({"correcoes": [{"item": "C1", "de": "Haarmann arbeitete ab 1924 als Informant",
+                                      "para": "Haarmann arbeitete spätestens ab 1918 als Informant", "eixo": "cronologia",
+                                      "fonte": "https://example.org/haarmann"}],
+                       "conferidos": [{"item": "V1", "ok": True, "fonte": "https://example.org/brief", "nota": "confirmado"}],
+                       "resumo": "ok"})
+    r = c.post(f"/checagem/dossie/{pid}/web/ler", json={"texto": resp}).get_json()
+    assert r["ok"] and len(r["aplicadas"]) == 1 and r["verificar_marcados"] == 1
+    q = ds.carregar(A.BASE_DIR, pid)
+    assert "spätestens ab 1918" in q["resultado"]["roteiro"]
+    assert q["checagem"]["verificar"][0]["conferido"] and q["checagem"]["verificar"][0]["fonte_web"].endswith("/brief")
+    assert q["checagem"]["web"]["aplicadas"] == 1
+    assert c.post(f"/checagem/dossie/{pid}/web/ler", json={"texto": "{}"}).status_code == 400

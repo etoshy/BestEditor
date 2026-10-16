@@ -391,6 +391,69 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": str(exc)}), 400
         return jsonify({"ok": True, **r})
 
+    # ------------------------------------------------------------------ 🌐 checagem por uma 2ª IA com internet (v84_133)
+    @app.route("/checagem/<origem>/<pid>/web/prompt", methods=["POST"])
+    def checagem_web_prompt(origem: str, pid: str):
+        import checagem_roteiro as ch
+        import idiomas
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = request.get_json(silent=True) or {}
+        try:
+            t = ch.prompt_web(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
+                              str(p.get("tema") or p.get("titulo") or ""), p.get("checagem") or {},
+                              (p.get("resultado") or {}).get("afirmacoes") or [], str(c.get("foco") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, "prompt": t, "caracteres": len(t), "palavras_roteiro": len(texto.split())})
+
+    @app.route("/checagem/<origem>/<pid>/web/ler", methods=["POST"])
+    def checagem_web_ler(origem: str, pid: str):
+        import json as _json
+        import time as _time
+
+        import checagem_roteiro as ch
+        import revisao_roteiro as rv
+        try:
+            p, texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            d = ch.ler_web(str((request.get_json(silent=True) or {}).get("texto") or ""))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if not d["trocas"] and not d["conferidos"]:
+            return jsonify({"erro": "O JSON não tem \"correcoes\" nem \"conferidos\"."}), 400
+        r = rv.aplicar(texto, _json.dumps({"trocas": d["trocas"]}, ensure_ascii=False))
+        g = {}
+        if r["aplicadas"]:
+            avisos = [f"🌐 {len(r['nao_achadas'])} correção(ões) da checagem na internet não bateram com o texto."] if r["nao_achadas"] else []
+            g = _gravar(origem, pid, p, r["texto"], None, avisos, chave_antes="-",
+                        hist=("🌐 checagem na internet", f"{len(r['aplicadas'])} correção(ões) · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
+            p, _t, _pad = _roteiro(origem, pid)
+        reg = p.get("checagem") or {}
+        for t in r["aplicadas"]:
+            orig = next((x for x in d["trocas"] if x["de"][:200] == t["de"]), {})
+            t["eixo"], t["fonte"], t["web"] = orig.get("eixo", ""), orig.get("fonte", ""), True
+        ver = reg.get("verificar") or []
+        marcados = 0
+        for c in d["conferidos"]:
+            if c["item"].startswith("V") and c["item"][1:].isdigit() and c["ok"]:
+                i = int(c["item"][1:]) - 1
+                if 0 <= i < len(ver):
+                    ver[i].update(conferido=True, fonte_web=c["fonte"], nota_web=c["nota"])
+                    marcados += 1
+        reg["verificar"] = ver
+        reg["aplicadas"] = (reg.get("aplicadas") or []) + r["aplicadas"]
+        reg["web"] = {"quando": _time.time(), "resumo": d["resumo"], "aplicadas": len(r["aplicadas"]),
+                      "nao_achadas": r["nao_achadas"], "conferidos": d["conferidos"]}
+        _guardar(origem, pid, "checagem", reg)
+        return jsonify({"ok": True, "aplicadas": r["aplicadas"], "nao_achadas": r["nao_achadas"], "conferidos": d["conferidos"],
+                        "verificar_marcados": marcados, "palavras_antes": r["palavras_antes"],
+                        "palavras_depois": r["palavras_depois"], "resumo": d["resumo"], **g})
+
     @app.route("/checagem/<origem>/<pid>/verificar/<int:i>", methods=["POST"])
     def checagem_conferido(origem: str, pid: str, i: int):
         try:

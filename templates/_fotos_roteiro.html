@@ -15,6 +15,23 @@
       <textarea id="frPergResp" rows="3" style="width:100%;font-size:.85rem;" placeholder='{ "perguntas": [ { "alvo": "...", "pergunta": "..." } ] }'></textarea>
       <button type="button" id="frPergLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Ler as perguntas</button>
     </details>
+    <div id="frBuscaBar" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;font-size:.85rem;margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;">
+      <button type="button" id="frBuscarTodas" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;color:#fff;">🔎 Buscar as fotos de todas</button>
+      <label style="margin:0;font-weight:400;"><input type="checkbox" id="frMotorBing" checked style="width:auto;margin:0 3px 0 0;">Bing</label>
+      <label style="margin:0;font-weight:400;"><input type="checkbox" id="frMotorGoogle" checked style="width:auto;margin:0 3px 0 0;">Google (Modo IA)</label>
+      <label style="margin:0;font-weight:400;">até <select id="frQtd" style="width:auto;margin:0;"><option>3</option><option selected>4</option><option>6</option><option>8</option></select> por buscador</label>
+      <span id="frBuscaSt" style="color:#555;"></span>
+      <span id="frApagarBox" style="margin-left:auto;display:none;gap:6px;align-items:center;">
+        <button type="button" id="frApagarConferir" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#b45309;">🗑 Apagar as não conferidas</button>
+        <button type="button" id="frApagarBuscas" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#b91c1c;">🗑 Apagar todas as fotos das buscas</button>
+      </span>
+      <div id="frProg" style="display:none;width:100%;margin-top:4px;">
+        <div style="height:10px;background:#e2e8f0;border-radius:6px;overflow:hidden;"><div id="frProgBar" style="height:100%;width:0;background:linear-gradient(90deg,#0f766e,#14b8a6);transition:width .6s;"></div></div>
+        <div id="frProgTxt" style="font-size:.8rem;color:#0f172a;margin-top:3px;"></div>
+        <div id="frProgInfo" style="font-size:.75rem;color:#555;"></div>
+      </div>
+      <div style="width:100%;font-size:.76rem;color:#666;">As fotos achadas já entram no modelo como resposta da pergunta (marcadas 🔎 conferir) — tire as que não servem no ✕. Dá pra mudar o termo de cada uma e buscar só ela; o envio manual continua igual.</div>
+    </div>
     <div id="frPerguntas" style="margin-top:8px;"></div>
   </details>
 
@@ -25,6 +42,10 @@
       <input type="text" id="frOutrasDesc" placeholder="o que é e quando usar — ex.: carta que ele deixou na mesa da cozinha; usar quando falar da carta" style="flex:1;min-width:260px;margin:0;">
       <button type="button" id="frOutrasEnviar" style="width:auto;margin:0;padding:5px 12px;">⬆ Enviar</button>
       <span id="frOutrasSt" style="color:#555;"></span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;margin-top:6px;font-size:.86rem;">
+      <textarea id="frOutrasLinks" rows="3" placeholder="🔗 ou cole links de imagens, 1 por linha (link da imagem ou da página)" style="flex:1;min-width:260px;margin:0;font-size:.8rem;"></textarea>
+      <button type="button" id="frOutrasBaixar" style="width:auto;margin:0;padding:5px 12px;">⬇ Baixar os links</button>
     </div>
   </details>
 
@@ -62,7 +83,18 @@
       (d.imagens > ids.length ? ` · <span style="color:#b45309">${d.imagens - ids.length} sem uso — o passo 📍 2 encaixa</span>` : '') : '';
     $f('frDesfazer').style.display = d.pode_desfazer ? '' : 'none';
     const qs = d.perguntas || [];
+    $f('frBuscaBar').style.display = qs.length ? 'flex' : 'none';
+    const bu = d.busca;
+    $f('frBuscarTodas').disabled = !!(bu && bu.ativo);
+    $f('frBuscaSt').textContent = bu && bu.erro ? '⚠ ' + bu.erro : (bu && !bu.passos ? (bu.msg || '') : '');
+    if (bu && bu.ativo) acompanharBusca();
+    setTimeout(() => progresso(bu), 0);
+    $f('frApagarBox').style.display = d.de_busca && !(bu && bu.ativo) ? 'inline-flex' : 'none';
+    $f('frApagarBuscas').textContent = `🗑 Apagar todas as fotos das buscas (${d.de_busca || 0})`;
+    $f('frApagarConferir').style.display = d.de_busca_conferir ? '' : 'none';
+    $f('frApagarConferir').textContent = `🗑 Apagar as não conferidas (${d.de_busca_conferir || 0})`;
     if (!qs.length) { $f('frPerguntas').innerHTML = ''; return; }
+    const MI = d.midias || {}, TERMOS = d.termos || {};
     $f('frPerguntas').innerHTML = qs.map(q => {
       const env = (d.enviadas || {})[q.id] || [];
       const feita = env.length > 0;
@@ -71,7 +103,7 @@
           <b>${ICONE[q.tipo] || '🖼'} ${esc(q.pergunta)}</b>
           ${q.vezes ? `<span style="font-size:.78rem;color:#666;">citado ~${q.vezes}×</span>` : ''}
           ${q.ja_tem && q.ja_tem.length ? `<span style="font-size:.78rem;color:#2563eb;">já tem: ${q.ja_tem.join(', ')}</span>` : ''}
-          ${feita ? `<span style="font-size:.78rem;color:#15803d;">✔ enviada(s): ${env.join(', ')}</span>` : ''}
+          ${feita ? `<span style="font-size:.78rem;color:#15803d;">✔ ${env.length} foto(s)</span>` : ''}
           <button type="button" data-pular="${q.id}" data-v="${q.pulada ? '0' : '1'}" style="margin-left:auto;width:auto;padding:1px 8px;font-size:.75rem;background:#94a3b8;">${q.pulada ? '↩ voltar' : 'não tenho / pular'}</button>
         </div>
         ${q.trecho ? `<div style="font-size:.8rem;color:#555;margin-top:2px;">“${esc(q.trecho)}”</div>` : ''}
@@ -80,12 +112,88 @@
           <input type="file" multiple accept="image/*,video/*" data-arq="${q.id}" style="margin:0;max-width:240px;font-size:.8rem;">
           <input type="text" data-desc="${q.id}" value="${esc(q.alvo)}" placeholder="descrição (quem/o quê, época…)" style="flex:1;min-width:200px;margin:0;font-size:.82rem;">
           <button type="button" data-enviar="${q.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.82rem;">⬆ Enviar</button>
-          <span data-st="${q.id}" style="font-size:.8rem;color:#555;"></span></div>`}
+          <span data-st="${q.id}" style="font-size:.8rem;color:#555;"></span></div>
+        <details style="margin-top:4px;font-size:.8rem;"><summary style="cursor:pointer;color:#334155;">🔗 Colar links de imagens (1 por linha)</summary>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;margin-top:4px;">
+            <textarea data-links="${q.id}" rows="3" placeholder="https://…/foto.jpg&#10;https://site.com/materia (pega a foto principal da página)" style="flex:1;min-width:260px;margin:0;font-size:.78rem;"></textarea>
+            <button type="button" data-baixarlinks="${q.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;">⬇ Baixar os links</button>
+          </div></details>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+          <input type="text" data-termo="${q.id}" value="${esc(TERMOS[q.id] || '')}" placeholder="termo em inglês — vazio: a IA escreve" title="o que pesquisar no Bing/Google (em inglês acha mais)" style="flex:1;min-width:200px;margin:0;font-size:.8rem;background:#f0fdfa;">
+          <button type="button" data-buscar="${q.id}" ${bu && bu.ativo ? 'disabled' : ''} style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#0f766e;">🔎 Buscar</button>
+          <button type="button" data-gimg="${q.id}" title="abre o Google Imagens numa nova guia com este termo (busca normal, sem Modo IA)" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#1a73e8;">🖼 Google Imagens ↗</button>
+          <span data-qst="${q.id}" style="font-size:.78rem;"></span>
+        </div>`}
+        ${env.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${env.map(id => { const i = MI[id] || {};
+          return `<div style="position:relative;width:96px;font-size:.68rem;${i.fora ? 'opacity:.45;' : ''}" title="${id}${i.buscador ? ' · ' + i.buscador : ''}${i.fora ? ' · a IA tirou (lixo/anúncio/repetida)' : ''}">
+            <img src="${i.url || ''}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:5px;background:#eee;${i.a_conferir ? 'outline:2px solid #f59e0b;' : ''}">
+            <button type="button" data-apagar="${id}" title="não serve — apagar" style="position:absolute;top:2px;right:2px;width:auto;margin:0;padding:0 5px;font-size:.7rem;background:#ef4444;">✕</button>
+            <div>${id}${i.a_conferir ? ' 🔎' : ''}</div></div>`; }).join('')}
+          ${env.some(id => (MI[id] || {}).a_conferir) ? `<button type="button" data-conferi="${env.join(',')}" style="width:auto;align-self:center;margin:0;padding:3px 10px;font-size:.78rem;background:#15803d;">✓ conferi</button>` : ''}
+        </div>` : ''}
       </div>`;
     }).join('') + `<div style="font-size:.8rem;color:#555;">Enviou as fotos? Agora o passo <b>📍 2</b> põe cada uma nos melhores pontos do roteiro.</div>`;
   }
 
   async function atualizar() { try { desenhar(await (await fetch(BASE + '/fotos-roteiro', { cache: 'no-store' })).json()); } catch (_) {} }
+  const tempo = (s) => s == null ? '?' : (s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${Math.round(s)} s`);
+  const NOME_M = { bing: 'Bing', google: 'Google' };
+  function chip(x) {
+    if (!x) return '';
+    const ach = Object.entries(x.achou || {}).map(([m, n]) => `${NOME_M[m] || m} ${n}`).join(' · ');
+    return { fila: '<span style="color:#64748b">⏳ na fila</span>',
+             pesquisando: '<span style="color:#0f766e;font-weight:600">🔎 pesquisando…</span>',
+             achou: `<span style="color:#0f766e">✔ achou (${ach}) — ⏳ vai baixar</span>`,
+             baixando: `<span style="color:#0f766e;font-weight:600">⬇ baixando… ${x.fotos ? x.fotos + ' foto(s)' : ''}</span>`,
+             pronto: `<span style="color:#15803d;font-weight:600">✔ ${x.fotos} foto(s) nova(s)</span> <span style="color:#666">(achou ${ach})</span>`,
+             nada: `<span style="color:#b45309">✖ nada novo${ach ? ' (achou ' + ach + ', mas eram repetidas/não baixaram)' : ' — tente outro termo'}</span>` }[x.st] || '';
+  }
+  function progresso(bu) {  // barra + termo atual + tempo + o estado de cada pergunta
+    const box = $f('frProg');
+    if (!bu || !bu.passos || (!bu.ativo && !bu.duracao_s)) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    const pct = Math.round(100 * (bu.passo || 0) / bu.passos);
+    $f('frProgBar').style.width = (bu.ativo ? Math.max(3, pct) : 100) + '%';
+    const gasto = bu.ativo && bu.inicio ? Date.now() / 1000 - bu.inicio : bu.duracao_s;
+    $f('frProgTxt').textContent = bu.ativo ? (bu.atual || bu.msg || '') : (bu.msg || '');
+    const pp = Object.values(bu.por_pergunta || {});
+    const prontas = pp.filter(x => x.st === 'pronto').length, nada = pp.filter(x => x.st === 'nada').length;
+    $f('frProgInfo').textContent = (bu.ativo ? `${pct}% · ${tempo(gasto)} rodando` + (bu.eta_s != null && bu.passo ? ` · falta ~${tempo(bu.eta_s)}` : ' · calculando quanto falta…') + ' · '
+      : `levou ${tempo(gasto)} · `) + `${bu.achadas || 0} foto(s) nova(s) · ${prontas} pergunta(s) com foto` + (nada ? ` · ${nada} sem nada` : '') + (bu.ativo ? ' — pode sair da página, continua no servidor' : '');
+    Object.entries(bu.por_pergunta || {}).forEach(([qid, x]) => { const el = document.querySelector(`[data-qst="${qid}"]`); if (el) el.innerHTML = chip(x); });
+  }
+  let acompanhando = false;
+  async function acompanharBusca() {  // a busca roda no servidor: só a linha de status muda; a lista redesenha quando chega foto nova
+    if (acompanhando) return; acompanhando = true;
+    let achadas = (E && E.busca && E.busca.achadas) || 0;
+    while (true) {
+      await new Promise(ok => setTimeout(ok, 3000));
+      let d = null; try { d = await (await fetch(BASE + '/fotos-roteiro', { cache: 'no-store' })).json(); } catch (_) { continue; }
+      const bu = d.busca || {};
+      if (!bu.ativo || (bu.achadas || 0) !== achadas) { achadas = bu.achadas || 0; acompanhando = bu.ativo; desenhar(d); if (!bu.ativo) break; }
+      else { $f('frBuscaSt').textContent = ''; progresso(bu); }
+    }
+    acompanhando = false;
+  }
+  function motores() { return [$f('frMotorBing').checked && 'bing', $f('frMotorGoogle').checked && 'google'].filter(Boolean); }
+  async function buscar(perguntas) {
+    if (!motores().length) { $f('frBuscaSt').textContent = '⚠ marque o Bing e/ou o Google'; return; }
+    try { desenhar(await post(BASE + '/fotos-roteiro/buscar', { perguntas, motores: motores(), quantidade: +$f('frQtd').value })); }
+    catch (e) { $f('frBuscaSt').textContent = '⚠ ' + e.message; }
+  }
+  async function apagarBuscas(soConferir) {
+    const n = soConferir ? (E && E.de_busca_conferir) : (E && E.de_busca);
+    if (!confirm(`Apagar ${n} foto(s) que vieram das buscas automáticas${soConferir ? ' e ainda não foram conferidas' : ''}?\n\nAs que você enviou à mão e as das matérias ficam. As marcas delas no roteiro e no elenco também saem.`)) return;
+    try { const d = await post(BASE + '/fotos-roteiro/apagar-buscas', { so_a_conferir: soConferir }); desenhar(d);
+      $f('frBuscaSt').textContent = `✔ ${d.apagadas} foto(s) apagada(s)` + (d.marcas_tiradas ? ` · ${d.marcas_tiradas} marca(s) tirada(s) do roteiro` : ''); }
+    catch (e) { $f('frBuscaSt').textContent = '⚠ ' + e.message; }
+  }
+  $f('frApagarBuscas').addEventListener('click', () => apagarBuscas(false));
+  $f('frApagarConferir').addEventListener('click', () => apagarBuscas(true));
+  $f('frBuscarTodas').addEventListener('click', () => {
+    const perguntas = [...document.querySelectorAll('#frPerguntas [data-termo]')].map(i => ({ id: i.dataset.termo, busca: i.value }));
+    buscar(perguntas.length ? perguntas : 'todas');
+  });
 
   async function enviar(arquivos, desc, pergunta, st) {
     if (!arquivos.length) { st.textContent = '⚠ escolha o(s) arquivo(s)'; return; }
@@ -100,9 +208,45 @@
     atualizar();
   }
 
+  async function baixarLinks(texto, desc, pergunta, st) {  // um link por vez: dá pra ver o andamento
+    const links = [...new Set(String(texto || '').split(/\s+/).map(x => x.trim()).filter(x => /^https?:\/\//i.test(x)))];
+    if (!links.length) { st.textContent = '⚠ cole pelo menos um link (http…)'; return 0; }
+    let ok = 0; const falhas = [];
+    for (let i = 0; i < links.length; i++) {
+      st.textContent = `⬇ baixando ${i + 1}/${links.length}…`;
+      try { await post(BASE + '/fotos-roteiro/link', { url: links[i], pergunta, descricao: desc }); ok++; }
+      catch (e) { falhas.push(`${links[i].slice(0, 60)}… (${e.message})`); }
+    }
+    await atualizar();  // redesenha a lista: o aviso vai no campo novo da pergunta
+    const st2 = (pergunta && document.querySelector(`[data-st="${pergunta}"]`)) || st;
+    st2.innerHTML = `✔ ${ok} de ${links.length} baixada(s)` + (falhas.length ? ` · <span style="color:#b45309" title="${esc(falhas.join('\n'))}">⚠ ${falhas.length} falharam (passe o mouse)</span>` : '');
+    return ok;
+  }
+  $f('frOutrasBaixar').addEventListener('click', async () => {
+    if (!$f('frOutrasDesc').value.trim()) { $f('frOutrasSt').textContent = '⚠ escreva o que é e quando usar (no campo de cima)'; return; }
+    if (await baixarLinks($f('frOutrasLinks').value, $f('frOutrasDesc').value, '', $f('frOutrasSt'))) $f('frOutrasLinks').value = '';
+  });
   $f('frPerguntas').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.baixarlinks) {
+      const box = b.closest('[data-q]'); b.disabled = true;
+      await baixarLinks(box.querySelector('[data-links]').value, box.querySelector('[data-desc]').value, b.dataset.baixarlinks, box.querySelector('[data-st]'));
+      b.disabled = false; return;
+    }
     if (b.dataset.pular) { try { desenhar(await post(`${BASE}/fotos-roteiro/perguntas/${b.dataset.pular}`, { pulada: b.dataset.v === '1' })); } catch (_) {} return; }
+    if (b.dataset.gimg) {  // 🖼 abre a busca normal do Google Imagens numa guia nova (o termo da caixa; vazio = o nome)
+      const box = b.closest('[data-q]');
+      const q = (box.querySelector('[data-termo]').value || (box.querySelector('[data-desc]').value || '').split(/[,(—–]/)[0] || '').trim();
+      if (!q) return;
+      window.open('https://www.google.com/search?udm=2&q=' + encodeURIComponent(q), '_blank', 'noopener');
+      return;
+    }
+    if (b.dataset.buscar) { const box = b.closest('[data-q]'); buscar([{ id: b.dataset.buscar, busca: box.querySelector('[data-termo]').value }]); return; }
+    if (b.dataset.apagar) {
+      if (!confirm(`Apagar a ${b.dataset.apagar} do modelo?`)) return;
+      await fetch(`${BASE}/midia/${b.dataset.apagar}`, { method: 'DELETE' }).catch(() => {}); atualizar(); return;
+    }
+    if (b.dataset.conferi) { try { desenhar(await post(BASE + '/fotos-roteiro/conferidas', { ids: b.dataset.conferi.split(',') })); } catch (_) {} return; }
     if (b.dataset.enviar) {
       const q = b.dataset.enviar, box = b.closest('[data-q]');
       b.disabled = true;

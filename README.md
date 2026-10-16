@@ -28,6 +28,25 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🌐 Checagem na internet com outra IA (v84_133)
+
+- No cartão 🔎 Checagem do roteiro, o novo **🌐 Checar na internet com outra IA** monta um prompt CURTO com só os pontos suspeitos: conflitos de data (C), inconsistências da última checagem (I), o que ela mandou conferir e ainda não foi conferido (V), as alegações/interpretações do roteiro (A), os anos (D), os números (N) e as repetições (R). Vão junto só os parágrafos citados, com o número da linha, e não o roteiro inteiro.
+- Cole numa IA com pesquisa na web (ChatGPT, Claude, Gemini, Perplexity). Ela devolve só as correções `{"de", "para", "fonte": URL}` e os itens confirmados (`"conferidos"`, com o link).
+- Você cola o JSON em **✅ Ajustar o roteiro**: o site troca só os trechos, guarda uma versão no 🕘 histórico, marca os itens "conferir" confirmados (com a fonte) e mostra o que não bateu.
+- As marcas [I3] / [[VENDA]] / [CENA n] não se perdem (🔒).
+
+## 🔎 Buscar as fotos das perguntas no Bing e no Google (v84_132)
+
+- No cartão 📸 Fotos pro roteiro, cada pergunta ganha um **termo de busca** escrito pela IA, com o nome e o termo do caso que desambigua ("Linda Patrik Unabomber"). Dá pra editar.
+- **🖼 Google Imagens ↗** (v84_138): cada pergunta tem um botão que abre a busca NORMAL do Google Imagens (sem Modo IA) numa nova guia, com o termo da caixa (vazio: o nome). Achou a foto? Copie o link e cole em 🔗 Colar links.
+- **🔗 Colar links** (v84_137): cada pergunta (e "➕ Outras imagens") tem um campo pra colar links, 1 por linha. Pode ser o link da própria imagem ou o de uma página (aí vem a foto principal da matéria). O site baixa um por um, mostrando o andamento, e põe como resposta da pergunta. Conta como envio manual: já entra conferida.
+- **🗑 Apagar as fotos das buscas** (v84_136): "Apagar todas as fotos das buscas" ou só "as não conferidas". Apaga só o que veio das buscas automáticas (as enviadas à mão e as das matérias ficam) e tira as marcas dessas fotos do roteiro e do 🎭 elenco.
+- **📊 Andamento da busca** (v84_135): barra de progresso, o termo que está sendo pesquisado agora ("🔎 Bing · termo 5–8 de 28: …"), tempo rodando, quanto falta e quantas fotos já chegaram. Cada pergunta mostra o próprio estado: ⏳ na fila, 🔎 pesquisando, ⬇ baixando, ✔ N fotos (achou Bing 6 · Google 4) ou ✖ nada novo.
+- **🌐 Sempre em inglês** (v84_134): o termo de cada pergunta é escrito em INGLÊS, com o nome próprio como é, porque é onde se acha mais foto. Pergunta sem termo: na hora de buscar, a IA escreve o termo em inglês e ele fica guardado. Sem IA, vai só o nome, sem a descrição em português.
+- **🔎 Buscar** (uma pergunta) ou **🔎 Buscar as fotos de todas**: pesquisa no **Bing** e/ou no **Google Imagens pelo Modo IA**, com um navegador por buscador e todos os termos na mesma aba. Baixa até N fotos por buscador e já põe no modelo como resposta da pergunta. Roda em segundo plano.
+- As fotos achadas aparecem embaixo de cada pergunta com contorno laranja (🔎 conferir): **✕** apaga a que não serve e **✓ conferi** tira a marca. Repetidas (iguais a uma foto que já está no modelo) não entram. Com a IA ligada, cada foto ganha a ficha e lixo/anúncio sai sozinho.
+- O envio manual continua igual, em cada pergunta e em "➕ Outras imagens".
+
 ## 🕰 Tudo gerado na época certa: locais pela descrição, documentos da época e cronologia (v84_130)
 
 - **📍 Locais pela descrição do caso:** a catalogação lê também as FONTES. Um lugar bem descrito (a mansão de 19 cômodos com salão de baile, a fazenda isolada…) entra no elenco mesmo SEM foto, com uma descrição rica em inglês, fiel às fontes. Toda cena nesse lugar usa essa mesma descrição, então a casa sai igual no vídeo todo. Com foto, a foto vai como referência. Dá pra adicionar à mão (➕ Local).

@@ -19,6 +19,18 @@
     <textarea id="chkResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "correcoes": [ { "de": "...", "para": "...", "eixo": "cronologia" } ], "verificar": [...] }'></textarea>
     <button type="button" id="chkLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Aplicar as correções</button>
   </details>
+  <details id="chkWebBox" style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.9rem;">🌐 Checar na internet com outra IA <span style="font-weight:400;color:#666;font-size:.82rem;">(ChatGPT, Claude, Gemini ou Perplexity COM pesquisa na web)</span></summary>
+    <div style="font-size:.8rem;color:#555;margin:4px 0;">O site junta num prompt curto SÓ os pontos suspeitos: conflitos de data, anos, números, alegações, o que a 🔎 checagem mandou conferir e as repetições. Vão junto os trechos do roteiro em volta, não o roteiro inteiro. A outra IA pesquisa e devolve só as correções de cada trecho; você cola o JSON e o site ajusta o roteiro (e guarda uma versão no 🕘 histórico). Rode a 🔎 checagem antes, pra ter a lista do que conferir.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
+      <button type="button" id="chkWebGerar" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;">🌐 Gerar o prompt das inconsistências</button>
+      <span id="chkWebSt" style="color:#555;"></span>
+    </div>
+    <textarea id="chkWebPrompt" rows="4" readonly style="display:none;width:100%;margin-top:6px;font-family:monospace;font-size:.78rem;"></textarea>
+    <label style="margin-top:8px;display:block;font-size:.86rem;">JSON que a outra IA devolveu</label>
+    <textarea id="chkWebResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "correcoes": [ { "item": "C1", "de": "...", "para": "...", "fonte": "https://..." } ], "conferidos": [ { "item": "V2", "ok": true, "fonte": "https://..." } ] }'></textarea>
+    <button type="button" id="chkWebLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Ajustar o roteiro</button>
+    <div id="chkWebRes" style="font-size:.85rem;margin-top:6px;"></div>
+  </details>
   <div id="chkRes" style="font-size:.85rem;margin-top:8px;"></div>
 </div>
 <script>
@@ -54,7 +66,7 @@
     const ver = (u && u.verificar) || [];
     if (ver.length) {
       c2 += '<div style="margin-bottom:4px">Conferir fora (citar uma fonte no texto não confirma a afirmação):</div>' + ver.map((v, i) =>
-        `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:4px 0"><input type="checkbox" class="chkVer" data-i="${i}" ${v.conferido ? 'checked' : ''} style="width:auto;margin-top:3px"><span><b>${esc(v.afirmacao)}</b>${v.por_que ? ` — ${esc(v.por_que)}` : ''}${v.como ? `<br><i style="color:#555">🔍 ${esc(v.como)}</i>` : ''}</span></label>`).join('');
+        `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:4px 0"><input type="checkbox" class="chkVer" data-i="${i}" ${v.conferido ? 'checked' : ''} style="width:auto;margin-top:3px"><span><b>${esc(v.afirmacao)}</b>${v.por_que ? ` — ${esc(v.por_que)}` : ''}${v.como ? `<br><i style="color:#555">🔍 ${esc(v.como)}</i>` : ''}${v.fonte_web ? `<br><span style="color:#0f766e">🌐 ${esc(v.nota_web || 'confirmado')} — <a href="${esc(v.fonte_web)}" target="_blank" rel="noopener">fonte</a></span>` : ''}</span></label>`).join('');
     } else c2 += '<div style="color:#666">Rode a checagem pra ter a lista do que precisa ser conferido.</div>';
     const nums = (a.numeros || []).filter(x => x.vezes >= 1).slice(0, 10);
     if (nums.length) c2 += `<details style="margin-top:4px"><summary style="cursor:pointer">Números citados (condenado × acusado × alegado × estimado não são a mesma coisa)</summary>${nums.map(x => `<div>• <b>${esc(x.valor)}</b>: ${x.onde.map(o => `linha ${o.linha}: ${esc(o.frase.slice(0, 110))}`).join(' | ')}</div>`).join('')}</details>`;
@@ -91,6 +103,26 @@
         '<div style="color:#555">Recarregando…</div>';
       setTimeout(() => location.reload(), 2500);
     } catch (e) { $c('chkRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
+  });
+
+  // 🌐 2ª IA com internet
+  $c('chkWebGerar').addEventListener('click', async () => {
+    $c('chkWebSt').textContent = '📝 juntando as inconsistências…';
+    try { const d = await post(BASE + '/web/prompt', { foco: $c('chkFoco').value }); $c('chkWebPrompt').value = d.prompt; $c('chkWebPrompt').style.display = '';
+      const info = `${Math.round(d.caracteres / 1000)} mil caracteres (o roteiro tem ${d.palavras_roteiro} palavras — vão só os trechos)`;
+      try { await navigator.clipboard.writeText(d.prompt); $c('chkWebSt').textContent = '✔ prompt copiado — ' + info + '. Cole numa IA com pesquisa na web ligada.'; } catch (_) { $c('chkWebSt').textContent = '✔ prompt pronto — ' + info; } }
+    catch (e) { $c('chkWebSt').textContent = '⚠ ' + e.message; }
+  });
+  $c('chkWebLer').addEventListener('click', async () => {
+    try {
+      const d = await post(BASE + '/web/ler', { texto: $c('chkWebResp').value });
+      $c('chkWebRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} trecho(s) corrigido(s) · ${d.palavras_antes} → ${d.palavras_depois} palavras · ${d.conferidos.filter(c => c.ok).length} item(ns) confirmado(s)${d.verificar_marcados ? ` (${d.verificar_marcados} marcados como conferidos)` : ''}</span>` +
+        (d.nao_achadas.length ? `<div style="color:#b45309">⚠ ${d.nao_achadas.length} correção(ões) não bateram com o texto (o "de" não foi copiado igual): ${d.nao_achadas.map(x => '„' + esc(x.de) + '“').join(' · ')}</div>` : '') +
+        (d.resumo ? `<div style="color:#444">${esc(d.resumo)}</div>` : '') +
+        `<details open><summary>ver as correções</summary>${d.aplicadas.map(t => `<div style="margin:4px 0">${EIXO[t.eixo] || ''} <s style="color:#b91c1c">${esc(t.de)}</s><br><span style="color:#15803d">${esc(t.para) || '<i>(apagado)</i>'}</span> ${t.fonte ? (/^https?:/.test(t.fonte) ? `<a href="${esc(t.fonte)}" target="_blank" rel="noopener">fonte</a>` : `<i>${esc(t.fonte)}</i>`) : ''}</div>`).join('')}</details>` +
+        (d.aplicadas.length ? '<div style="color:#555">Recarregando em 6 s…</div>' : '');
+      if (d.aplicadas.length) setTimeout(() => location.reload(), 6000); else carregar();
+    } catch (e) { $c('chkWebRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
   });
 
   // 🤖 tudo automático
