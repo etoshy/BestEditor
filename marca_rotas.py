@@ -38,6 +38,11 @@ def registrar(app, base_dir: str) -> None:
     def _motor(v: Any) -> str:
         return v if v in mv.MOTORES else "pod"
 
+    try:  # 🕵️ cada pacote de canal com modelo_roteiro.json vira um modelo nos Modelos de vídeo
+        mv.registrar_modelos(base_dir)
+    except Exception:  # noqa: BLE001
+        pass
+
     @app.context_processor
     def _marcas_no_template():
         return {"marcas_visuais": lambda: mv.listar(base_dir)}
@@ -50,16 +55,48 @@ def registrar(app, base_dir: str) -> None:
             return redirect(url_for("marca_detalhe", slug=marcas[0]["slug"]))
         return render_template("marca_lista.html", marcas=marcas, erro=request.args.get("erro"))
 
+    def _js(v):
+        import json
+        return json.dumps(v, ensure_ascii=False, indent=1)
+
+    @app.route("/marca/como-montar")
+    def marca_como_montar():
+        return render_template("marca_como.html", estrutura=mv.ESTRUTURA_PACOTE, chaves=mv.CHAVES_GUIA,
+                               prompt_com=mv.prompt_montar_pacote(True), prompt_sem=mv.prompt_montar_pacote(False),
+                               ex_pacote=_js(mv.EXEMPLO_PACOTE), ex_reforcos=_js(mv.EXEMPLO_REFORCOS), ex_poses=_js(mv.EXEMPLO_POSES),
+                               ex_modelo=_js(mv.EXEMPLO_MODELO), formato=mv.FORMATO_PACOTE, marcas=mv.listar(base_dir))
+
+    @app.route("/marca/modelo-vazio.zip")
+    def marca_modelo_vazio():
+        return send_file(io.BytesIO(mv.zip_modelo_vazio()), mimetype="application/zip", as_attachment=True,
+                         download_name="pacote_canal_modelo_vazio.zip")
+
+    @app.route("/marca/<slug>/pacote.zip")
+    def marca_pacote(slug: str):
+        m = _marca(slug)
+        return send_file(io.BytesIO(mv.exportar_pacote(m)), mimetype="application/zip", as_attachment=True,
+                         download_name=f"pacote_{slug}.zip")
+
+    @app.route("/marca/<slug>/excluir", methods=["POST"])
+    def marca_excluir(slug: str):
+        import shutil
+        m = _marca(slug)
+        shutil.rmtree(m["dir"], ignore_errors=True)
+        import dossies as ds
+        for k in [k for k, v in ds.MODELOS.items() if v.get("do_pacote") and v.get("identidade_visual") == slug]:
+            ds.MODELOS.pop(k, None)
+        return redirect(url_for("marca_lista", todas=1))
+
     @app.route("/marca/importar", methods=["POST"])
     def marca_importar():
         arq = request.files.get("zip")
         if not arq or not arq.filename:
-            return redirect(url_for("marca_lista", todas=1, erro="Escolha o .zip do Brand Kit."))
+            return redirect(url_for("marca_lista", todas=1, erro="Escolha o .zip do pacote do canal."))
         try:
             slug = mv.importar_zip(base_dir, arq.read())
         except mv.MarcaErro as exc:
             return redirect(url_for("marca_lista", todas=1, erro=str(exc)))
-        return redirect(url_for("marca_detalhe", slug=slug))
+        return redirect(url_for("marca_detalhe", slug=slug, importado=1))
 
     @app.route("/marca/<slug>")
     def marca_detalhe(slug: str):
@@ -68,7 +105,8 @@ def registrar(app, base_dir: str) -> None:
         return render_template("marca_detalhe.html", m=m, g=m["guia"], paleta=mv.paleta(m), celulas=mv.celulas_folha(m),
                                folha=mv.estado_folha(m), poses=mv.todas_poses(m), projetos=mv.listar_projetos(m),
                                motores=mv.MOTORES, dossies=ds.listar(base_dir)[:40], erro=request.args.get("erro"),
-                               sugeridas=mv.poses_sugeridas(m))
+                               sugeridas=mv.poses_sugeridas(m), conferir=mv.conferir_pacote(m), importado=request.args.get("importado"),
+                               modelo=mv.modelo_roteiro(m))
 
     @app.route("/marca/<slug>/arquivo/<path:rel>")
     def marca_arquivo(slug: str, rel: str):

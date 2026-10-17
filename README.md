@@ -30,30 +30,26 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ## 🎨 Identidade visual — imagens 100% IA na marca do canal (v84_168)
 
-Menu **Roteiros e modelos → Identidade visual**. A marca **Dinge erklären** já vem em `marcas/dinge_erklaeren/`
-(o `brand_guide.json` é a especificação principal e nunca é reescrito; `manifest.json` lista cada arquivo).
+Menu **Roteiros e modelos → Identidade visual**. Nenhum canal vem embutido: cada canal entra como um **pacote (.zip)**
+no formato `besteditor_pacote_canal` — **📥 Importar** na aba. A página **📘 Como montar o pacote** (`/marca/como-montar`)
+explica a estrutura, mostra os JSON e traz o **pedido pronto pra colar no Claude** (com ou sem Brand Kit) + um modelo vazio.
 
-1. **Folha mestra do mascote** — a v0 é montada das referências oficiais (+ quadros do desenho original).
-   Gere cada vista (frente, perfil, três quartos, silhueta) e pose, aprove a melhor de cada e clique **Montar a folha**:
-   ela vira a referência de todas as cenas.
-2. **Poses e emoções novas** — escreva a pose ("comemorando", "com telescópio"…): a IA traduz, o site escolhe a pose
-   oficial mais parecida como referência e gera o **mesmo** personagem. A aprovada entra na biblioteca.
-   🦵 **Trava de proporção** (`reforcos.json`): cabeça pequena, corpo fino e curvo, pernas de mangueira compridíssimas —
-   vai no prompt e na revisão (o fantasminha baixinho/gordinho de outra IA fica em `referencias_rejeitadas/`).
-3. **Imagens de um vídeo** — cole a narração ou puxe o roteiro de um 🕵️ Modelo de vídeo (botão no fim dele; modelo novo
-   **🎨 Curiosidade explicada**). Batidas pela IA, por copiar/colar ou por frases → prompt pelo template do JSON +
-   style lock + prompt lock (o que evitar vai como "Avoid:") → **Pod** (FLUX.2 klein com até 4 referências; Z-Image nas
-   cenas sem referência) ou **Google Flow** (1 referência). Sem mudança no studio-ia do pod.
-4. **📷 Fotos suas** (animal, estátua, pessoa, objeto): viram referência da cena e a IA anota as características pro prompt;
-   sai como foto de arquivo ou ilustração no traço da marca. As fotos `[I3]` do Modelo de vídeo vêm sozinhas.
-   **🎭 Elenco** (igual ao true crime): vindo de um Modelo de vídeo, as batidas dizem quem aparece, com que idade e em que
-   lugar — o rosto sai da foto mais perto da idade da cena (envelhecido/rejuvenescido), no estilo da marca.
-   O modelo 🎨 Curiosidade explicada fala **sempre o nome do canal da marca** (Dinge erklären), a não ser que você mude.
-5. **Paleta** conferida em cada imagem (score + problemas); fora da paleta, o grading `noir_vermelho_v1` corrige numa cópia.
-6. **Textos em alemão** postos depois (manchete slab, etiquetas de papel rasgado, `*palavra*` em vermelho, círculo/seta).
-7. **QA**: ✅ / 🔁 / ✖ com motivo, ou **👁 Revisão da IA** (mascote igual, proporção, sem texto, paleta).
-8. **📦 Exportar**: masters sem texto, corrigidas, com texto, finais na ordem + `registro_cenas.json` (modelo, seed,
-   prompt, referências, versões do style lock/paleta/prompt, QA) + prompts.
+O pacote: `pacote.json`, `brand_guide.json` (a especificação — nunca é reescrita), `assets/` (imagens oficiais),
+`referencias/` (poses recortadas, `mascote_proporcoes.png`, silhuetas, quadros do original, amostras de estilo — sem texto),
+`reforcos.json` (trava de proporção do mascote), `poses_sugeridas.json`, `modelo_roteiro.json` (vira um modelo nos
+🕵️ Modelos de vídeo, falando sempre o nome do canal), `folha_mestra/`, `exemplos_alvo/`, `referencias_rejeitadas/`.
+Importar de novo atualiza as referências e mantém os seus vídeos; **⬇ Baixar o pacote** devolve o .zip.
+
+Na página do canal:
+1. **Folha mestra do mascote** — gere cada vista/pose com as referências, aprove a melhor e **Monte a folha** (vira a referência).
+2. **Poses e emoções novas** — descreva em português; o mesmo personagem é gerado na pose nova (com a trava de proporção).
+3. **Imagens de um vídeo** — narração colada ou o roteiro de um 🕵️ Modelo de vídeo: batidas (IA, copiar/colar ou por frases)
+   → prompt pelo template da marca ("Avoid:" no lugar do negativo) → **Pod** (FLUX.2 klein com até 4 referências; Z-Image sem
+   referência) ou **Google Flow** (1 referência). O studio-ia do pod não muda.
+4. **📷 Fotos e 🎭 Elenco** (igual ao true crime): `[I3]` do roteiro, pessoas com a idade da cena, lugares; animal, estátua,
+   objeto — a IA anota as características; sai como foto de arquivo ou ilustração no traço da marca.
+5. **Paleta** conferida (grading `noir_vermelho_v1` numa cópia), **textos no idioma do canal** postos depois,
+   **QA** (✅/🔁/✖ com motivo ou 👁 revisão da IA) e **📦 Exportar** (masters, corrigidas, com texto, registro de cada cena).
 
 Fica fora do Git: `marcas/*/projetos/`, `marcas/*/folha_mestra/celulas/`, `marcas/*/estado.json`.
 

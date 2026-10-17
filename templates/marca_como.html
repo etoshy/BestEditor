@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Como montar o pacote do canal{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1000px; }
+  .mv-card { border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .mv-hint { color: var(--mudo); font-size: .86rem; }
+  .mv-tab { width: 100%; border-collapse: collapse; font-size: .86rem; margin-top: 8px; }
+  .mv-tab td, .mv-tab th { border-bottom: 1px solid var(--borda); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .mv-tab code { white-space: nowrap; }
+  .nv { font-size: .74rem; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--borda); white-space: nowrap; }
+  .nv.obr { border-color: #c5383f; } .nv.rec { border-color: #c99a2e; }
+  pre.mv-pre { white-space: pre-wrap; font-size: .8rem; background: var(--card-2); border: 1px solid var(--borda); border-radius: 8px; padding: 10px; max-height: 360px; overflow: auto; }
+  .mv-arvore { font-family: ui-monospace, monospace; font-size: .82rem; line-height: 1.5; background: var(--card-2); border: 1px solid var(--borda); border-radius: 8px; padding: 10px 14px; white-space: pre; overflow-x: auto; }
+  ol.mv-passos li { margin: 6px 0; }
+</style>
+<p style="margin:0"><a href="/marca?todas=1">← Identidade visual</a></p>
+<h1>📘 Como montar o pacote do canal</h1>
+<p class="mv-hint">O pacote é um <b>.zip</b> com tudo que o site precisa pra gerar as imagens de um canal sem inventar nada: a especificação da marca, as imagens oficiais, os recortes do mascote, a trava de proporção, as sugestões de pose e o modelo de roteiro. Você monta à mão ou pede pra uma IA com arquivos (o Claude, por exemplo) — o pedido pronto está abaixo.</p>
+
+<div class="mv-card">
+  <h2>O caminho</h2>
+  <ol class="mv-passos">
+    <li><b>Tenha o Brand Kit</b> do canal: o JSON da marca (<code>schema: channel_visual_identity_spec</code>) + as imagens oficiais (mascote, painel de identidade, logo, banner). Não tem o JSON? Use o pedido “sem Brand Kit” — a IA escreve a partir das imagens.</li>
+    <li><b>Abra uma conversa nova no Claude</b>, anexe o Brand Kit (.zip ou os arquivos) + imagens/GIF do mascote original + um roteiro de exemplo do canal (se tiver), e cole o pedido abaixo.</li>
+    <li><b>Baixe o .zip</b> que a IA entregar e confira a lista do que ficou faltando.</li>
+    <li><b>Importe</b> em <a href="/marca?todas=1">🎨 Identidade visual → 📥 Importar</a>. O site confere o pacote, monta a folha mestra v0 se faltar e registra o modelo de roteiro nos 🕵️ Modelos de vídeo.</li>
+    <li>Na página do canal: gere e aprove a <b>folha mestra</b> antes de gerar em quantidade.</li>
+  </ol>
+  <p><a class="button" href="{{ url_for('marca_modelo_vazio') }}" style="width:auto;display:inline-block">📦 Baixar o modelo vazio (.zip)</a>
+  {% for x in marcas %} <a class="button secondary" href="/marca/{{ x.slug }}/pacote.zip" style="width:auto;display:inline-block">⬇ Pacote de exemplo: {{ x.nome }}</a>{% endfor %}</p>
+</div>
+
+<div class="mv-card">
+  <h2>🤖 Pedido pronto pra IA</h2>
+  <p class="mv-hint">Copie e cole junto com os arquivos. A IA tem de devolver um .zip — no Claude, peça “me entregue o .zip pra baixar”.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
+    <button type="button" data-copiar="pCom" style="width:auto;margin:0">📋 Copiar — já tenho o Brand Kit (JSON)</button>
+    <button type="button" data-copiar="pSem" class="secondary" style="width:auto;margin:0">📋 Copiar — só tenho as imagens</button>
+    <span class="mv-hint" id="cpSt"></span>
+  </div>
+  <details open><summary>Ver o pedido (com Brand Kit)</summary><pre class="mv-pre" id="pCom">{{ prompt_com }}</pre></details>
+  <details><summary>Ver o pedido (sem Brand Kit)</summary><pre class="mv-pre" id="pSem">{{ prompt_sem }}</pre></details>
+</div>
+
+<div class="mv-card">
+  <h2>📁 A estrutura do .zip</h2>
+<div class="mv-arvore">meu_canal/
+├── pacote.json              ← etiqueta do pacote
+├── brand_guide.json         ← a especificação da marca (obrigatório)
+├── reforcos.json            ← trava de proporção do mascote
+├── poses_sugeridas.json
+├── modelo_roteiro.json      ← o roteiro do canal (vira um Modelo de vídeo)
+├── LEIA-ME.txt
+├── assets/                  ← imagens oficiais (obrigatório)
+├── referencias/
+│   ├── poses/pose_normal.png, pose_curioso.png, …
+│   ├── silhuetas/
+│   ├── animacao_original/
+│   ├── mascote_proporcoes.png
+│   └── estilo_colagem_*.png
+├── folha_mestra/            ← opcional: o site monta a v0
+├── exemplos_alvo/           ← podem ter texto (só pra humanos)
+└── referencias_rejeitadas/  ← o que NÃO é o personagem</div>
+  <table class="mv-tab">
+    <tr><th>Arquivo / pasta</th><th></th><th>O que é</th></tr>
+    {% for rel, nivel, oque in estrutura %}<tr><td><code>{{ rel }}</code></td><td><span class="nv {{ 'obr' if nivel == 'obrigatório' else ('rec' if nivel == 'recomendado' else '') }}">{{ nivel }}</span></td><td>{{ oque }}</td></tr>{% endfor %}
+  </table>
+  <p class="mv-hint">⚠ Nenhuma imagem de <code>referencias/</code> ou <code>folha_mestra/</code> pode ter texto (vaza pra imagem gerada). O site só aceita PNG/JPG/WEBP/GIF e estes JSON.</p>
+</div>
+
+<div class="mv-card">
+  <h2>🧾 Os JSON</h2>
+  <p><b>brand_guide.json</b> — as chaves que o site usa:</p>
+  <table class="mv-tab">{% for k, v in chaves.items() %}<tr><td><code>{{ k }}</code></td><td>{{ v }}</td></tr>{% endfor %}</table>
+  <p style="margin-top:12px"><b>pacote.json</b> (<code>"formato": "{{ formato }}"</code>)</p><pre class="mv-pre">{{ ex_pacote }}</pre>
+  <p><b>reforcos.json</b> — derivado do JSON e das imagens: o que a IA erra no mascote. Entra no prompt e na revisão.</p><pre class="mv-pre">{{ ex_reforcos }}</pre>
+  <p><b>poses_sugeridas.json</b></p><pre class="mv-pre">{{ ex_poses }}</pre>
+  <p><b>modelo_roteiro.json</b> — vira o modelo <i>nome</i> nos 🕵️ Modelos de vídeo, ligado a esta identidade visual e falando sempre <i>nome_canal</i>.</p><pre class="mv-pre">{{ ex_modelo }}</pre>
+</div>
+<script>
+  document.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {
+    const t = document.getElementById(b.dataset.copiar).textContent;
+    try { await navigator.clipboard.writeText(t); document.getElementById('cpSt').textContent = '✅ copiado'; }
+    catch (_) { document.getElementById('cpSt').textContent = 'selecione o texto abaixo e copie'; }
+  }));
+</script>
+{% endblock %}

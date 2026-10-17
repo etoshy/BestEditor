@@ -12,7 +12,7 @@ O fluxo segue o recommended_pipeline do JSON:
   1-2 batidas da narração + tipo de imagem (IA ou prompt pra colar)  →  3 prompt = template + style_lock + prompt_lock
   (+ negativo como "Avoid:", porque o FLUX.2 klein e o Z-Image não têm prompt negativo)  →  4 referências (até 4 no
   klein do pod; 1 no Flow)  →  5 gerar e registrar (modelo, seed, versões)  →  6 validar a paleta e corrigir (grading
-  noir + vermelho seletivo)  →  7 textos em alemão por cima (nunca gerados pela IA)  →  8 QA (automático + IA + você)
+  noir + vermelho seletivo)  →  7 textos no idioma do canal por cima (nunca gerados pela IA)  →  8 QA (automático + IA + você)
   →  9 exportar (masters sem texto + versões com texto + metadados).
 """
 from __future__ import annotations
@@ -145,46 +145,217 @@ def versoes(guia: Dict[str, Any]) -> Dict[str, str]:
             "postprocess_preset": PRESET_GRADING}
 
 
+FORMATO_PACOTE = "besteditor_pacote_canal"
+VERSAO_PACOTE = 1
+_IMG = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+# o que o pacote pode ter (caminho relativo à raiz do pacote) → nível, o que é
+ESTRUTURA_PACOTE: List[Tuple[str, str, str]] = [
+    ("pacote.json", "recomendado", "a etiqueta do pacote: formato, versão, slug, nome do canal, idioma"),
+    ("brand_guide.json", "obrigatório", "a especificação da marca (schema channel_visual_identity_spec) — nunca é reescrita"),
+    ("assets/", "obrigatório", "as imagens oficiais da marca (mascote, painel, logo, banner…)"),
+    ("referencias/poses/pose_<id>.png", "recomendado", "um recorte do mascote por pose oficial: normal, curioso, surpreso, investigando, explicando, estudando, sem_ideia, ideia"),
+    ("referencias/mascote_proporcoes.png", "recomendado", "o mascote inteiro em vários quadros lado a lado — a proporção de verdade (vai em toda geração)"),
+    ("referencias/silhuetas/silhueta_<id>.png", "opcional", "silhuetas pretas das poses"),
+    ("referencias/animacao_original/*.png", "opcional", "quadros do desenho original do mascote"),
+    ("referencias/mascote_alta_res_tronco.png", "opcional", "o mascote em alta resolução (traço e textura)"),
+    ("referencias/estilo_colagem_*.png", "opcional", "amostras de estilo/paleta SEM texto"),
+    ("folha_mestra/folha_mestra_v0_limpa.png", "opcional", "a folha mestra inicial sem texto (o site monta se faltar)"),
+    ("exemplos_alvo/*.png", "opcional", "exemplos do visual desejado (podem ter texto — só pra humanos, nunca vão pra IA)"),
+    ("referencias_rejeitadas/*.png", "opcional", "o que NÃO é o personagem (nunca vai pra IA)"),
+    ("reforcos.json", "recomendado", "{\"mascote_en\", \"evitar_en\", \"qa_pt\"}: a trava de proporção/o que a IA costuma errar"),
+    ("poses_sugeridas.json", "opcional", "{\"poses\": [\"com lupa\", …]}: sugestões de poses novas"),
+    ("modelo_roteiro.json", "recomendado", "o modelo de roteiro do canal (entra nos 🕵️ Modelos de vídeo, falando o nome do canal)"),
+    ("LEIA-ME.txt", "opcional", "notas pra humanos"),
+]
+_JSON_PERMITIDOS = {"pacote.json", "brand_guide.json", "reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "manifest.json"}
+_PASTAS_PERMITIDAS = ("assets/", "referencias/", "folha_mestra/", "exemplos_alvo/", "referencias_rejeitadas/")
+
+
+def _slugificar(nome: str) -> str:
+    import unicodedata
+    return re.sub(r"[^a-z0-9]+", "_", unicodedata.normalize("NFKD", str(nome or "")).encode("ascii", "ignore").decode().lower()).strip("_")[:40] or "marca"
+
+
 def importar_zip(base: str, dados: bytes) -> str:
-    """Um Brand Kit em .zip (o JSON + a pasta assets/) vira marcas/<slug>/ — o JSON é copiado como está."""
+    """📦 Um pacote de canal (.zip no formato besteditor_pacote_canal) — ou só o Brand Kit (o JSON + assets/) — vira
+    marcas/<slug>/. Os arquivos vêm como estão (o JSON da marca nunca é reescrito). Se a marca já existe, as
+    referências são trocadas e os seus projetos/aprovações ficam. Falta folha mestra → o site monta a v0."""
     try:
         z = zipfile.ZipFile(io.BytesIO(dados))
     except zipfile.BadZipFile as exc:
         raise MarcaErro("Esse arquivo não é um .zip.") from exc
-    nomes = [n for n in z.namelist() if not n.endswith("/") and "__MACOSX" not in n]
-    guia_nome = None
-    for n in nomes:
+    nomes = [n for n in z.namelist() if not n.endswith("/") and "__MACOSX" not in n and not os.path.basename(n).startswith(".")]
+    guia_nome, guia = None, None
+    for n in sorted(nomes, key=lambda x: (os.path.basename(x) != "brand_guide.json", x.count("/"))):
         if n.lower().endswith(".json"):
             try:
-                g = json.loads(z.read(n).decode("utf-8"))
+                g = json.loads(z.read(n).decode("utf-8-sig"))
             except (ValueError, UnicodeDecodeError):
                 continue
             if isinstance(g, dict) and g.get("schema") == SCHEMA:
                 guia_nome, guia = n, g
                 break
     if not guia_nome:
-        raise MarcaErro(f"Não achei no .zip um JSON com \"schema\": \"{SCHEMA}\".")
-    nome = (guia.get("project") or {}).get("name") or "marca"
-    import unicodedata
-    slug = re.sub(r"[^a-z0-9]+", "_", unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode().lower()).strip("_")[:40] or "marca"
-    d = _pasta(base, slug)
-    os.makedirs(os.path.join(d, "assets"), exist_ok=True)
+        raise MarcaErro(f"Não achei no .zip o JSON da marca (com \"schema\": \"{SCHEMA}\"). Veja 📘 Como montar o pacote.")
     raiz = os.path.dirname(guia_nome)
-    with open(os.path.join(d, "brand_guide.json"), "wb") as f:
-        f.write(z.read(guia_nome))
+    pac = {}
+    pn = (raiz + "/" if raiz else "") + "pacote.json"
+    if pn in nomes:
+        try:
+            pac = json.loads(z.read(pn).decode("utf-8-sig"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise MarcaErro(f"pacote.json inválido: {exc}") from exc
+        if pac.get("formato") not in (None, FORMATO_PACOTE):
+            raise MarcaErro(f"pacote.json: \"formato\" deve ser \"{FORMATO_PACOTE}\".")
+    slug = _slugificar(pac.get("slug") or (guia.get("project") or {}).get("name") or "marca")
+    d = _pasta(base, slug)
+    if os.path.isdir(d):  # troca as referências, mantém os seus projetos e aprovações
+        for item in os.listdir(d):
+            if item not in ("projetos", "estado.json") and not (item == "folha_mestra"):
+                cam = os.path.join(d, item)
+                shutil.rmtree(cam) if os.path.isdir(cam) else os.remove(cam)
+        fm = os.path.join(d, "folha_mestra")
+        if os.path.isdir(fm):
+            for item in os.listdir(fm):
+                if item.startswith("folha_mestra_v0"):
+                    os.remove(os.path.join(fm, item))
+    os.makedirs(d, exist_ok=True)
+    copiados = 0
     for n in nomes:
-        rel = os.path.relpath(n, raiz) if raiz else n
-        if rel.startswith("assets/") and os.path.splitext(rel)[1].lower() in (".png", ".jpg", ".jpeg", ".webp"):
-            alvo = os.path.join(d, os.path.normpath(rel))
-            if not os.path.abspath(alvo).startswith(os.path.abspath(d) + os.sep):
-                continue
-            os.makedirs(os.path.dirname(alvo), exist_ok=True)
-            with open(alvo, "wb") as f:
-                f.write(z.read(n))
-        elif os.path.basename(rel).upper().startswith("LEIA") and rel.endswith(".txt"):
-            with open(os.path.join(d, "LEIA-ME.txt"), "wb") as f:
-                f.write(z.read(n))
+        rel = os.path.relpath(n, raiz).replace("\\", "/") if raiz else n
+        if rel.startswith("../"):
+            continue
+        if n == guia_nome:
+            rel = "brand_guide.json"
+        ext = os.path.splitext(rel)[1].lower()
+        ok = (rel in _JSON_PERMITIDOS or (rel.upper().startswith("LEIA") and ext == ".txt")
+              or (rel.startswith(_PASTAS_PERMITIDAS) and ext in _IMG))
+        if not ok:
+            continue
+        if rel in ("reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "pacote.json", "manifest.json"):
+            try:
+                json.loads(z.read(n).decode("utf-8-sig"))
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise MarcaErro(f"{rel} não é um JSON válido: {exc}") from exc
+        alvo = os.path.abspath(os.path.join(d, os.path.normpath(rel)))
+        if not alvo.startswith(os.path.abspath(d) + os.sep):
+            continue
+        os.makedirs(os.path.dirname(alvo), exist_ok=True)
+        with open(alvo, "wb") as f:
+            f.write(z.read(n))
+        copiados += 1
+    if not os.path.isdir(os.path.join(d, "assets")):
+        raise MarcaErro("O pacote precisa da pasta assets/ com as imagens oficiais da marca.")
+    m = carregar(base, slug)
+    if not folha_atual(m):
+        montar_folha_v0(m, base)
+    registrar_modelos(base)
     return slug
+
+
+def montar_folha_v0(m: Dict[str, Any], base: str = ".") -> Optional[str]:
+    """A folha mestra v0 com o que o pacote tem: quadros do original, poses, silhuetas (ou as imagens de assets/)."""
+    R = os.path.join(m["dir"], "referencias")
+    cel: List[Tuple[str, str]] = []
+    ani = os.path.join(R, "animacao_original")
+    if os.path.isdir(ani):
+        cel += [("Original", os.path.join(ani, f)) for f in sorted(os.listdir(ani)) if f.lower().endswith(_IMG)][:4]
+    for k in POSES:
+        cam = os.path.join(R, "poses", f"pose_{k}.png")
+        if os.path.isfile(cam):
+            cel.append((POSES[k]["nome"], cam))
+    sil = os.path.join(R, "silhuetas")
+    if os.path.isdir(sil):
+        cel += [("Silhueta", os.path.join(sil, f)) for f in sorted(os.listdir(sil)) if f.lower().endswith(_IMG)][:2]
+    if not cel:  # pacote só com o Brand Kit: os arquivos canônicos do mascote que o JSON aponta
+        for rel in ((m["guia"].get("mascot") or {}).get("canonical_reference_files") or []):
+            cam = os.path.join(m["dir"], os.path.normpath(rel))
+            if os.path.isfile(cam) and "painel" not in rel:
+                cel.append((os.path.splitext(os.path.basename(rel))[0], cam))
+    if not cel:
+        return None
+    nome = (m["guia"].get("project") or {}).get("name") or m["slug"]
+    fm = os.path.join(m["dir"], "folha_mestra")
+    montar_folha(m, cel, os.path.join(fm, "folha_mestra_v0_limpa.png"), False, base)
+    montar_folha(m, cel, os.path.join(fm, "folha_mestra_v0_rotulada.png"), True, base, titulo=f"{nome} — folha mestra v0")
+    return os.path.join(fm, "folha_mestra_v0_limpa.png")
+
+
+def conferir_pacote(m: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """✅ O que o pacote tem e o que falta (pra página e pro import)."""
+    import glob
+    out = []
+    for rel, nivel, oque in ESTRUTURA_PACOTE:
+        padrao = rel.replace("<id>", "*")
+        if padrao.endswith("/"):
+            achados = [x for x in glob.glob(os.path.join(m["dir"], padrao, "*")) if x.lower().endswith(_IMG)]
+        else:
+            achados = glob.glob(os.path.join(m["dir"], padrao))
+        out.append({"item": rel, "nivel": nivel, "oque": oque, "ok": bool(achados), "n": len(achados)})
+    poses = [k for k in POSES if os.path.isfile(os.path.join(m["dir"], "referencias", "poses", f"pose_{k}.png"))]
+    out.append({"item": "poses oficiais recortadas", "nivel": "recomendado", "oque": f"{len(poses)} de 8: {', '.join(poses) or '—'}",
+                "ok": len(poses) >= 6, "n": len(poses)})
+    return out
+
+
+def modelo_roteiro(m: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    d = _json(os.path.join(m["dir"], "modelo_roteiro.json"))
+    if not isinstance(d, dict) or not isinstance(d.get("formatos"), dict) or not d["formatos"]:
+        return None
+    return d
+
+
+def registrar_modelos(base: str) -> List[str]:
+    """🕵️ Cada pacote com modelo_roteiro.json vira um modelo nos Modelos de vídeo (com a identidade visual ligada e o
+    nome do canal da marca). Nada de canal embutido no código: sem pacote, sem modelo."""
+    try:
+        import dossies as ds
+    except Exception:  # noqa: BLE001
+        return []
+    feitos = []
+    for x in listar(base):
+        m = carregar(base, x["slug"])
+        d = modelo_roteiro(m)
+        if not d:
+            continue
+        chave = "marca_" + _slugificar(d.get("chave") or x["slug"])[:30]
+        formatos = {}
+        for fk, fv in d["formatos"].items():
+            if isinstance(fv, dict) and fv.get("estrutura"):
+                formatos[_slugificar(fk)[:30]] = {"nome": str(fv.get("nome") or fk)[:80],
+                                                   "minutos": float(fv.get("minutos") or 10),
+                                                   "estrutura": [str(e)[:400] for e in fv["estrutura"]][:30]}
+        if not formatos:
+            continue
+        nome_canal = str(d.get("nome_canal") or (m["guia"].get("project") or {}).get("name") or "")[:80]
+        ds.MODELOS[chave] = {"nome": str(d.get("nome") or f"🎨 {x['nome']}")[:100], "descricao": str(d.get("descricao") or "")[:600],
+                             "identidade_visual": x["slug"], "nome_canal": nome_canal, "formatos": formatos,
+                             "regras": [str(r)[:500] for r in d.get("regras") or []][:20],
+                             **({"palavras_por_minuto": int(d["palavras_por_minuto"])} if d.get("palavras_por_minuto") else {}),
+                             "do_pacote": True}
+        feitos.append(chave)
+    return feitos
+
+
+def exportar_pacote(m: Dict[str, Any]) -> bytes:
+    """📦 A marca de volta em .zip no formato do pacote (sem os seus projetos e sem as células geradas)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        tem_pacote = False
+        for raiz, _dirs, fs in os.walk(m["dir"]):
+            for f in sorted(fs):
+                cam = os.path.join(raiz, f)
+                rel = os.path.relpath(cam, m["dir"]).replace("\\", "/")
+                if rel.startswith(("projetos/", "folha_mestra/celulas/")) or rel == "estado.json" or rel.endswith(".tmp"):
+                    continue
+                tem_pacote = tem_pacote or rel == "pacote.json"
+                z.write(cam, f"{m['slug']}/{rel}")
+        if not tem_pacote:
+            p = m["guia"].get("project") or {}
+            z.writestr(f"{m['slug']}/pacote.json", json.dumps({"formato": FORMATO_PACOTE, "versao": VERSAO_PACOTE, "slug": m["slug"],
+                                                               "nome": p.get("name"), "idioma": p.get("channel_language")},
+                                                              ensure_ascii=False, indent=1))
+    return buf.getvalue()
 
 
 def arquivo(m: Dict[str, Any], rel: str) -> str:
@@ -350,6 +521,41 @@ def paleta(m: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [dict(c, rgb=_hex(c["hex"])) for c in (m["guia"].get("design_system") or {}).get("palette") or []]
 
 
+_PAPEIS = ("ink_black", "charcoal", "archive_gray", "aged_paper", "chalk_white", "signal_red", "deep_red")
+
+
+def _pal(m: Optional[Dict[str, Any]]) -> Dict[str, Tuple[int, int, int]]:
+    """As cores da marca por PAPEL (fundo mais escuro, carvão, cinza, papel claro, branco, acento e acento escuro).
+    Com os tokens do guia quando ele usa esses nomes; senão, pela luminância/saturação de cada cor da paleta."""
+    if not m:
+        return {}
+    cores = paleta(m)
+    por_token = {c["token"]: c["rgb"] for c in cores if c.get("token")}
+    if all(k in por_token for k in _PAPEIS[:4]) and "signal_red" in por_token:
+        return {**{k: v for k, v in por_token.items() if k in _PAPEIS}, **por_token}
+
+    def hsv(rgb):
+        return colorsys.rgb_to_hsv(*(x / 255 for x in rgb))
+    neutras = sorted([c["rgb"] for c in cores if hsv(c["rgb"])[1] < 0.3], key=lambda c: sum(c))
+    acentos = sorted([c["rgb"] for c in cores if hsv(c["rgb"])[1] >= 0.3], key=lambda c: -sum(c))
+    out: Dict[str, Tuple[int, int, int]] = {}
+    if neutras:
+        out["ink_black"] = neutras[0]
+        out["charcoal"] = neutras[1] if len(neutras) > 2 else neutras[0]
+        out["archive_gray"] = neutras[len(neutras) // 2]
+        out["aged_paper"] = neutras[-2] if len(neutras) > 2 else neutras[-1]
+        out["chalk_white"] = neutras[-1]
+    if acentos:
+        out["signal_red"] = acentos[0]
+        out["deep_red"] = acentos[-1]
+    return out
+
+
+def _matiz_acento(m: Optional[Dict[str, Any]]) -> float:
+    c = _pal(m).get("signal_red")
+    return colorsys.rgb_to_hsv(*(x / 255 for x in c))[0] * 360 if c else 357.0
+
+
 def validar_paleta(caminho_ou_img: Any, m: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Confere as palette_rules do JSON: só preto/carvão/cinza/creme + vermelho de sinalização.
     Mede (numa miniatura): % de pixels de cor proibida (azul, verde, roxo, amarelo vivo), % de vermelho, % de escuro,
@@ -367,10 +573,11 @@ def validar_paleta(caminho_ou_img: Any, m: Optional[Dict[str, Any]] = None) -> D
     d = np.maximum(mx - mn, 1e-6)
     h = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60.0
     colorido = (s > 0.32) & (v > 0.22)
-    vermelho = colorido & ((h < 30) | (h > 330))
+    ha = _matiz_acento(m)  # a cor de sinalização da marca (no Dinge erklären, o vermelho)
+    vermelho = colorido & (np.minimum(np.abs(h - ha), 360 - np.abs(h - ha)) < 30)
     laranja_creme = (s <= 0.42) & (h >= 18) & (h <= 65)  # creme/sépia/papel (permitido)
     proibido = colorido & ~vermelho & ~(laranja_creme)
-    frio = (h > 65) & (h < 330) & (v > 0.2)  # fora dos tons quentes (papel/sépia/vermelho): deveria ser cinza
+    frio = (h > 65) & (h < 330) & (v > 0.2) & ~vermelho  # fora dos tons quentes (papel/sépia/vermelho): deveria ser cinza
     total = float(a.shape[0] * a.shape[1])
     lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
     met = {"proibida_pct": round(float(proibido.sum()) / total * 100, 1), "vermelho_pct": round(float(vermelho.sum()) / total * 100, 1),
@@ -401,7 +608,7 @@ def gradear(origem: str, destino: str, m: Optional[Dict[str, Any]] = None, grao:
     no lugar dele."""
     import numpy as np
     from PIL import Image
-    pal = {c["token"]: c["rgb"] for c in paleta(m)} if m else {}
+    pal = _pal(m)
     escala = [pal.get("ink_black", (8, 8, 7)), pal.get("charcoal", (33, 30, 27)), pal.get("archive_gray", (119, 113, 106)),
               pal.get("aged_paper", (232, 221, 197)), pal.get("chalk_white", (243, 235, 221))]
     pontos = [0.0, 0.22, 0.52, 0.86, 1.0]
@@ -420,7 +627,9 @@ def gradear(origem: str, destino: str, m: Optional[Dict[str, Any]] = None, grao:
     s = np.where(mx > 1e-6, (mx - mn) / np.maximum(mx, 1e-6), 0)
     d = np.maximum(mx - mn, 1e-6)
     h = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60.0
-    peso = np.clip((s - 0.3) / 0.25, 0, 1) * (((h < 20) | (h > 335)).astype("float32")) * np.clip((mx - 0.18) / 0.2, 0, 1)
+    ha = _matiz_acento(m)
+    perto = (np.minimum(np.abs(h - ha), 360 - np.abs(h - ha)) < 22).astype("float32")
+    peso = np.clip((s - 0.3) / 0.25, 0, 1) * perto * np.clip((mx - 0.18) / 0.2, 0, 1)
     alvo = np.where((mx > 0.55)[..., None], sinal / 255.0, fundo / 255.0)
     out = out * (1 - peso[..., None]) + alvo * peso[..., None]
     hh, ww = lum.shape
@@ -434,7 +643,7 @@ def gradear(origem: str, destino: str, m: Optional[Dict[str, Any]] = None, grao:
     return destino
 
 
-# ------------------------------------------------------------------ textos em alemão (pós-produção)
+# ------------------------------------------------------------------ textos no idioma do canal (pós-produção)
 def _fonte(base: str, tipo: str, tamanho: int):
     from PIL import ImageFont
     for cam in (os.path.join(base, FONTES.get(tipo, FONTES["etiqueta"])), os.path.join(base, "assets/fonts/DejaVuSans.ttf")):
@@ -482,7 +691,7 @@ def aplicar_textos(origem: str, destino: str, elementos: List[Dict[str, Any]], m
     import math as _m
     import random
     from PIL import Image, ImageDraw, ImageFilter
-    pal = {c["token"]: c["rgb"] for c in paleta(m)} if m else {}
+    pal = _pal(m)
     creme = pal.get("aged_paper", (232, 221, 197))
     preto = pal.get("ink_black", (8, 8, 7))
     vermelho = pal.get("signal_red", (197, 31, 39))
@@ -571,7 +780,7 @@ def montar_folha(m: Dict[str, Any], celulas: List[Tuple[str, str]], destino: str
     """Junta as células [(rótulo, caminho)] numa folha 16:9 sobre o preto do guia. A versão SEM rótulos é a que vai
     como referência pra IA (texto na referência vaza pra imagem gerada)."""
     from PIL import Image, ImageDraw
-    pal = {c["token"]: c["rgb"] for c in paleta(m)}
+    pal = _pal(m)
     W, H = 2400, 1350
     folha = Image.new("RGB", (W, H), pal.get("ink_black", (8, 8, 7)))
     d = ImageDraw.Draw(folha)
@@ -704,8 +913,8 @@ inteiro sem pular nada). Para cada batida decida (pipeline do guia, passos 1 e 2
   fotografias de arquivo em preto e branco);
 - "pergunta_visual_en": a pergunta que o quadro faz o espectador se perguntar, em inglês;
 - "composicao_en": primeiro plano, plano médio, fundo, ângulo e o ponto focal, em inglês (varie plano aberto, médio e detalhe);
-- "texto_de": 0 a 4 linhas CURTAS em ALEMÃO pra pôr por cima (manchete ou etiquetas de papel; marque a palavra-chave com
-  *asteriscos* — ela fica vermelha). Só quando ajuda (datas, lugares, nomes, uma pergunta). Alemão correto.
+- "texto_de": 0 a 4 linhas CURTAS no idioma do canal ({p.get('channel_language')}) pra pôr por cima (manchete ou etiquetas de papel; marque a palavra-chave com
+  *asteriscos* — ela fica vermelha). Só quando ajuda (datas, lugares, nomes, uma pergunta). Escrita correta nesse idioma.
 - "anotacao": null ou "circulo" ou "seta" (marcação vermelha à mão no ponto que a narração destaca).
 Nada de gore; estética documental vintage. Pessoas reais: representação neutra e respeitosa.
 {_bloco_elenco(elenco)}
@@ -1359,7 +1568,7 @@ def exportar(m: Dict[str, Any], pid: str) -> bytes:
         registro = []
         for k, b in enumerate(p["batidas"], 1):
             for chave, pasta in (("arquivo_master", "1_masters_sem_texto"), ("arquivo_corrigido", "2_corrigidas_paleta"),
-                                 ("arquivo_texto", "3_com_texto_alemao")):
+                                 ("arquivo_texto", "3_com_texto")):
                 if b.get(chave) and os.path.isfile(arquivo(m, b[chave])):
                     z.write(arquivo(m, b[chave]), f"{pasta}/{k:03d}_{b['id']}.png")
             final = imagem_final_da_batida(m, b)
@@ -1370,4 +1579,92 @@ def exportar(m: Dict[str, Any], pid: str) -> bytes:
                                                        "cenas": registro}, ensure_ascii=False, indent=1))
         z.writestr("prompts.txt", "\n\n".join(f"[{r['scene_id']}] {r['prompt_final'] or ''}" for r in registro))
         z.writestr("narracao_por_cena.txt", "\n\n".join(f"[{k:03d}] {b.get('narracao')}" for k, b in enumerate(p["batidas"], 1)))
+    return buf.getvalue()
+
+
+# ------------------------------------------------------------------ 📘 como montar um pacote (página + prompt pra IA)
+EXEMPLO_PACOTE = {"formato": FORMATO_PACOTE, "versao": VERSAO_PACOTE, "slug": "meu_canal", "nome": "Meu Canal", "idioma": "de",
+                  "descricao": "Uma frase sobre o canal."}
+EXEMPLO_REFORCOS = {
+    "_sobre": "O que a IA de imagem costuma errar no mascote — DERIVADO do brand_guide.json e das imagens oficiais (não invente traços novos).",
+    "mascote_en": "PROPORTION LOCK (match image references exactly): <cabeça, corpo, braços, pernas, pés, olhos, boca — proporções exatas, em inglês>",
+    "evitar_en": "<o que o mascote NUNCA é, em inglês, separado por vírgula: chubby body, short legs, …>",
+    "qa_pt": "<em português: quando reprovar o mascote na revisão>"}
+EXEMPLO_POSES = {"poses": ["com lupa", "apontando", "lendo livro", "surpreso", "com ideia", "comemorando"]}
+EXEMPLO_MODELO = {
+    "chave": "meu_canal", "nome": "🎨 Meu Canal — curiosidade explicada", "descricao": "Que tipo de vídeo o canal faz.",
+    "nome_canal": "Meu Canal", "palavras_por_minuto": 150,
+    "formatos": {"longo": {"nome": "Vídeo longo", "minutos": 12, "estrutura": ["GANCHO: …", "VIRADA: …", "…", "FECHAMENTO: …"]},
+                 "curto": {"nome": "Shorts", "minutos": 1, "estrutura": ["Fato estranho", "Explicação", "Pergunta final"]}},
+    "regras": ["Falar o nome do canal no momento certo, sempre.", "Só fatos das fontes; lenda dita como lenda."]}
+CHAVES_GUIA = {
+    "schema": f'"{SCHEMA}" (obrigatório, exatamente assim)',
+    "project": "name, channel_language, positioning, editorial_rule, brand_slogan_* (o nome do canal sai daqui)",
+    "design_system.palette": '[{"token", "hex", "role", "share_guideline"}] — preto/escuros, claros e a cor de sinalização',
+    "design_system.palette_rules / typography": "regras de cor e as fontes (manchete e etiquetas)",
+    "mascot": "role, design_bible (silhouette, face, body_color, outline, canonical_pose, allowed_variations, invariants, never_change), "
+              "consistency_protocol, prompt_lock_en, negative_prompt_en, canonical_reference_files",
+    "generation_system": "style_lock_en, negative_prompt_global_en, base_prompt_template_en (com SUBJECT: [..] VISUAL QUESTION: [..] "
+                         "COMPOSITION: [..] MASCOT: [..] BRAND STYLE: [..]), scene_prompt_template_en, thumbnail_prompt_template_en "
+                         "([topic]), quality_checklist",
+}
+
+
+def prompt_montar_pacote(tem_brand_kit: bool = True) -> str:
+    """O pedido pra colar no Claude (ou outra IA com arquivos) junto com as imagens/Brand Kit → o .zip do pacote."""
+    estrutura = "\n".join(f"- {rel}  [{nivel}] — {oque}" for rel, nivel, oque in ESTRUTURA_PACOTE)
+    chaves = "\n".join(f"  - {k}: {v}" for k, v in CHAVES_GUIA.items())
+    passo_guia = ("Use o brand_guide.json que vai em anexo COMO ESTÁ (não reescreva nem \"melhore\" — é a especificação principal)."
+                  if tem_brand_kit else
+                  "Ainda não tenho o brand_guide.json: crie um a partir das imagens e da descrição do canal que mando, com estas chaves "
+                  f"(os textos *_en em inglês):\n{chaves}\n  Descreva só o que está nas imagens — não invente uma identidade nova.")
+    return f"""Monte um PACOTE DE CANAL pro meu editor de vídeo (BestEditor), em um arquivo .zip, seguindo à risca o formato abaixo.
+Os arquivos que mando em anexo: o Brand Kit do canal (JSON + imagens) e/ou imagens do mascote e do estilo.
+
+1. {passo_guia}
+2. Leia o JSON inteiro e examine TODAS as imagens. Não invente identidade visual: tudo sai do JSON e das imagens oficiais.
+3. Organize em uma pasta <slug>/ (slug = nome do canal em minúsculas, sem acento, com _ ), com esta estrutura:
+{estrutura}
+
+Regras de cada parte:
+- pacote.json: {json.dumps(EXEMPLO_PACOTE, ensure_ascii=False)}
+- assets/: as imagens oficiais, com os nomes originais, sem mexer nelas.
+- referencias/poses/pose_<id>.png: RECORTE (não redesenhe) o mascote de cada pose do painel oficial, com uma margem pequena,
+  ids: normal, curioso, surpreso, investigando, explicando, estudando, sem_ideia, ideia (o que existir). Sem texto/rótulo no recorte.
+- referencias/mascote_proporcoes.png: vários quadros do mascote INTEIRO (da cabeça aos pés) lado a lado sobre fundo escuro,
+  tirados das imagens oficiais/do desenho original — é a referência de PROPORÇÃO que vai em toda geração. Sem texto.
+- referencias/silhuetas/: a forma do mascote em preto sólido sobre o papel claro da paleta (opcional).
+- referencias/estilo_colagem_*.png: recortes do banner/painel que mostram o estilo e a paleta, SEM nenhum texto.
+- Nenhuma imagem de referencias/ ou folha_mestra/ pode ter texto (texto em referência vaza pra imagem gerada).
+  Imagens com texto só em exemplos_alvo/. Versões erradas do personagem (de outra IA) em referencias_rejeitadas/.
+- reforcos.json: {json.dumps(EXEMPLO_REFORCOS, ensure_ascii=False)}
+  Escreva a trava de proporção olhando as imagens oficiais (tamanho da cabeça, comprimento das pernas, boca/sem boca…)
+  e o design_bible do JSON. É o que impede a IA de desenhar um mascote "parecido" mas errado.
+- poses_sugeridas.json: {json.dumps(EXEMPLO_POSES, ensure_ascii=False)} (20 a 100 poses que combinam com o canal).
+- modelo_roteiro.json (o roteiro do canal): {json.dumps(EXEMPLO_MODELO, ensure_ascii=False)}
+  Se eu mandar um roteiro de exemplo, modele a estrutura dele (gancho, viradas, ritmo, humor, final) nos "formatos".
+  As regras seguem o editorial_rule do JSON; "nome_canal" é o nome falado no vídeo.
+- Só PNG/JPG/WEBP/GIF e os JSON acima; JSON em UTF-8 válido.
+4. No fim, me diga em uma lista o que ficou faltando (o que é [recomendado] e não deu pra fazer) e me entregue o .zip.
+Eu importo o .zip na aba 🎨 Identidade visual → Importar pacote."""
+
+
+def zip_modelo_vazio() -> bytes:
+    """📦 Um pacote de exemplo vazio (as pastas, os JSON de exemplo e o LEIA-ME) pra você ou a IA preencher."""
+    buf = io.BytesIO()
+    r = "meu_canal/"
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(r + "pacote.json", json.dumps(EXEMPLO_PACOTE, ensure_ascii=False, indent=1))
+        z.writestr(r + "reforcos.json", json.dumps(EXEMPLO_REFORCOS, ensure_ascii=False, indent=1))
+        z.writestr(r + "poses_sugeridas.json", json.dumps(EXEMPLO_POSES, ensure_ascii=False, indent=1))
+        z.writestr(r + "modelo_roteiro.json", json.dumps(EXEMPLO_MODELO, ensure_ascii=False, indent=1))
+        z.writestr(r + "brand_guide.json.LEIA.txt", "Coloque aqui o brand_guide.json da marca (schema " + SCHEMA + ").\nChaves usadas:\n"
+                   + "\n".join(f"- {k}: {v}" for k, v in CHAVES_GUIA.items()))
+        for pasta in ("assets", "referencias/poses", "referencias/silhuetas", "referencias/animacao_original", "folha_mestra",
+                      "exemplos_alvo", "referencias_rejeitadas"):
+            oque = next((o for rel, _n, o in ESTRUTURA_PACOTE if rel.startswith(pasta)), "")
+            z.writestr(f"{r}{pasta}/COLOQUE_AQUI.txt", oque or "imagens")
+        z.writestr(r + "LEIA-ME.txt", "Pacote de canal do BestEditor — estrutura:\n\n"
+                   + "\n".join(f"{rel}  [{nivel}]  {oque}" for rel, nivel, oque in ESTRUTURA_PACOTE)
+                   + "\n\nPedido pronto pra IA montar:\n\n" + prompt_montar_pacote())
     return buf.getvalue()

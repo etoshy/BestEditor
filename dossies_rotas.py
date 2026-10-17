@@ -123,7 +123,7 @@ def registrar(app, base_dir: str) -> None:
                 if c["modelo"] != cfg.get("modelo") and ds.canal_do_modelo(c["modelo"]) and "nome_canal" not in c:
                     cfg["nome_canal"] = ds.canal_do_modelo(c["modelo"])  # 🎨 modelo da marca: o nome do canal dela
                 cfg["modelo"] = c["modelo"]
-            fmts = ds.MODELOS[cfg["modelo"]]["formatos"]
+            fmts = (ds.MODELOS.get(cfg["modelo"]) or ds.MODELOS["true_crime"])["formatos"]
             if c.get("formato") in fmts:
                 cfg["formato"] = c["formato"]
             elif cfg.get("formato") not in fmts:

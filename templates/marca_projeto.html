@@ -61,7 +61,7 @@
 
 <div class="mv-card">
   <h2>Batidas da narração</h2>
-  <p class="mv-hint">Cada batida = uma imagem: o trecho, a intenção visual, o tipo de imagem, a pose do mascote (≈ 1 a cada 3) e os textos em alemão que vão por cima.</p>
+  <p class="mv-hint">Cada batida = uma imagem: o trecho, a intenção visual, o tipo de imagem, a pose do mascote (≈ 1 a cada 3) e os textos no idioma do canal que vão por cima.</p>
   <div class="mv-linha">
     <button type="button" id="btnIA">🤖 Dividir com a IA</button>
     <button type="button" id="btnPrompt" class="secondary">📋 Copiar o prompt (pra outra IA)</button>
@@ -175,7 +175,7 @@
           <label>SUBJECT (inglês)<textarea data-c="assunto_en" rows="2">${esc(b.assunto_en)}</textarea></label>
           <label>VISUAL QUESTION<input type="text" data-c="pergunta_visual_en" value="${esc(b.pergunta_visual_en)}"></label>
           <label>COMPOSITION<input type="text" data-c="composicao_en" value="${esc(b.composicao_en)}"></label>
-          <label>Textos em alemão (1 por linha; *palavra* = vermelho)<textarea data-c="texto_de" rows="3">${esc((b.texto_de || []).join('\n'))}</textarea></label>
+          <label>Textos por cima, no idioma do canal (1 por linha; *palavra* = vermelho)<textarea data-c="texto_de" rows="3">${esc((b.texto_de || []).join('\n'))}</textarea></label>
           <label>Marcação vermelha<select data-c="anotacao"><option value="">nenhuma</option><option value="circulo" ${b.anotacao === 'circulo' ? 'selected' : ''}>círculo</option><option value="seta" ${b.anotacao === 'seta' ? 'selected' : ''}>seta</option></select></label>
           ${(P.fotos || []).length ? `<label>📷 Fotos de referência nesta cena (até 3)<span style="display:flex;gap:8px;flex-wrap:wrap">${P.fotos.map(f => `<label style="display:flex;gap:4px;align-items:center;margin:0"><input type="checkbox" data-foto="${f.id}" ${(b.fotos || []).includes(f.id) ? 'checked' : ''}>${f.id}</label>`).join('')}</span></label>` : ''}
           <label>🎭 Pessoas do elenco nesta cena (Nome:idade; Nome2:idade)<input type="text" data-c="pessoas" value="${esc((b.pessoas || []).map(x => x.nome + (x.idade ? ':' + x.idade : '')).join('; '))}"></label>
