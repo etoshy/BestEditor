@@ -28,6 +28,27 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎙 Gerar voz de qualquer lugar (v84_170)
+
+- Botão **🎙 Gerar voz** fixo no topo dos 🕵️ Modelos de vídeo (quando já tem roteiro), do 📜 Roteiro do YouTube e do 🛒 Vídeo
+  de venda — abre o Gerador de voz com o texto e o projeto ligados.
+- No **Gerador de voz**, o seletor **📂 Pegar o roteiro de um projeto** lista os projetos com roteiro (agrupados por tipo,
+  os mais recentes primeiro): escolheu, a página abre com o texto, o idioma e o projeto ligado (o .zip leva o projeto).
+
+## 🧵 Título = promessa, sem frase repetida e roteiro exemplo (v84_169)
+
+Nos 🕵️ Modelos de vídeo:
+- **🧵 Título do vídeo — a promessa** (campo novo; vazio = o tema): o prompt manda a IA abrir com a tese do título, pôr uma
+  **frase-ponte** em cada troca de assunto (nada de “efeito mosaico”), fechar cada bloco ligando ao título e **responder ao
+  título no fim**. Vale no roteiro de uma vez e em cada parte do roteiro em partes.
+- **🔁 Frase repetida sai sozinha**: frase quase igual a uma das 3 anteriores do mesmo parágrafo é tirada ao ler o roteiro e
+  ao aplicar a revisão (as marcas [I3] dela ficam; frases com números diferentes não contam como repetição).
+- **🪄 Revisão**: novo modo **🧵 amarrar ao título** (tese na abertura, pontes, fechamento); o **foco extra** que você escreve
+  agora vai no TOPO do prompt como prioridade máxima; o site avisa quando a abertura/o fechamento não falam do título.
+- **📐 Roteiro exemplo pra seguir** (opcional): cole o roteiro/transcrição de um vídeo — ou o **link** dele (🎬 pega a
+  transcrição) — e escolha **🧭 modelar** (a mesma sequência de blocos com o seu tema) ou **💡 inspirar** (só gancho, ritmo e
+  final). O assunto e os fatos do exemplo nunca entram. Até ~60 mil caracteres.
+
 ## 🎨 Identidade visual — imagens 100% IA na marca do canal (v84_168)
 
 Menu **Roteiros e modelos → Identidade visual**. Nenhum canal vem embutido: cada canal entra como um **pacote (.zip)**
@@ -51,7 +72,7 @@ Na página do canal:
 5. **Paleta** conferida (grading `noir_vermelho_v1` numa cópia), **textos no idioma do canal** postos depois,
    **QA** (✅/🔁/✖ com motivo ou 👁 revisão da IA) e **📦 Exportar** (masters, corrigidas, com texto, registro de cada cena).
 
-Fica fora do Git: `marcas/*/projetos/`, `marcas/*/folha_mestra/celulas/`, `marcas/*/estado.json`.
+Os canais importados ficam em `marcas/` (fora do Git — o pacote .zip é o backup).
 
 ## 📰 Buscador de casos e notícias (v84_165)
 

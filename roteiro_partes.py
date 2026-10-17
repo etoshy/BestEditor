@@ -250,6 +250,21 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
     if ant and ant.get("texto"):
         fim = " ".join(ant["texto"].split()[-90:])
         L += ["", "## Como a parte anterior terminou (continue DAQUI, sem repetir nada dela)", f"“…{fim}”"]
+    if contexto.get("promessa"):  # 🧵 v84_169: cada parte é uma prova da promessa do título
+        prom = contexto["promessa"]
+        papel = ("ABERTURA: depois do gancho, apresente a tese do título com as palavras dele e mostre de relance os assuntos "
+                 "que vêm como provas." if k == 1 else
+                 "FECHAMENTO: volte ao título e RESPONDA a ele somando as provas das partes anteriores (com os fatos; sem "
+                 "inventar pra confirmar) e termine com uma pergunta ao público ligada ao título." if k == n else
+                 "Comece com uma FRASE-PONTE que liga o assunto da parte anterior a este e ao título (nada de pulo seco) e "
+                 "termine dizendo, numa frase, o que esta parte acrescenta à pergunta do título.")
+        L += ["", f"## 🧵 O título é a promessa: “{prom}”", papel,
+              "Cada frase traz informação nova — não repita a mesma frase/ideia com outras palavras."]
+    if contexto.get("referencia"):  # 📐 v84_169: modelando um roteiro exemplo — esta parte é o bloco equivalente dele
+        L += ["", "## 📐 Roteiro exemplo que o vídeo modela (SÓ a estrutura e as técnicas — o assunto e os fatos dele NÃO entram)",
+              f"Esta é a parte {k} de {n}: escreva-a como o bloco equivalente do exemplo (mesma função, mesmo tipo de gancho/"
+              "transição/ritmo), com o MEU tema e os fatos desta parte. Não copie frases, nomes nem fatos do exemplo.",
+              contexto["referencia"]]
     L += ["", f"## Esta parte: {k}. {p['titulo']}"]
     if p.get("objetivo"):
         L.append(f"Objetivo: {p['objetivo']}")

@@ -25,7 +25,32 @@ CLICHES = ["Mas isso não é tudo", "Prepare-se", "uma história que vai te deix
 
 
 MODOS = {"auto": "🤖 automático (enxuga se passou do tempo)", "melhorar": "🪄 melhorar sem encurtar",
-         "enxugar": "✂️ enxugar até o tempo pedido"}
+         "enxugar": "✂️ enxugar até o tempo pedido", "titulo": "🧵 amarrar ao título (tese, pontes, fechamento)"}
+
+
+def _palavras_titulo(titulo: str) -> List[str]:
+    import metodo_roteiro
+    return list(dict.fromkeys(metodo_roteiro._conteudo(titulo)))
+
+
+def achados_titulo(roteiro: str, titulo: str) -> List[str]:
+    """🧵 O título aparece na abertura e no fechamento? (sinal simples, sem IA)"""
+    import metodo_roteiro
+    chaves = _palavras_titulo(titulo)
+    if not chaves or not roteiro.strip():
+        return []
+    pal = roteiro.split()
+    n = len(pal)
+    ini = set(metodo_roteiro._conteudo(" ".join(pal[:max(60, n // 7)])))
+    fim = set(metodo_roteiro._conteudo(" ".join(pal[-max(60, n // 7):])))
+    out = []
+    faltam_ini = [c for c in chaves if c not in ini]
+    faltam_fim = [c for c in chaves if c not in fim]
+    if len(faltam_ini) > len(chaves) / 2:
+        out.append(f"- 🧵 A ABERTURA não apresenta a tese do título “{titulo}” (faltam as ideias dele no começo).")
+    if len(faltam_fim) > len(chaves) / 2:
+        out.append(f"- 🧵 O FECHAMENTO não volta ao título “{titulo}” nem responde a ele.")
+    return out
 
 
 def palavras(texto: str) -> int:
@@ -40,7 +65,7 @@ def modo_efetivo(modo: str, n: int, alvo: int) -> str:
 
 
 def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", foco: str = "", alvo_palavras: int = 0,
-           minutos: float = 0, modo: str = "auto") -> str:
+           minutos: float = 0, modo: str = "auto", titulo: str = "") -> str:
     import metodo_roteiro
     roteiro = str(roteiro or "").strip()
     if not roteiro:
@@ -49,10 +74,32 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
     modo = modo_efetivo(modo, n, alvo_palavras)
     enx = modo == "enxugar"
     cortar = max(0, n - alvo_palavras) if alvo_palavras else int(n * 0.2)
+    fio = modo == "titulo"
+    titulo = " ".join(str(titulo or tema or "").split())[:200]
     max_trocas = max(15, min(60, n // 60)) if not enx else max(25, min(90, n // 50))
+    if fio:
+        max_trocas = max(20, min(70, n // 45))
     L = [f"Você é o roteirista-chefe revisando o roteiro COMPLETO de um vídeo{(' sobre ' + tema) if tema else ''} (~{n} palavras, "
          f"em {idioma}). Ele foi escrito em partes; agora ele precisa soar como UM roteiro só, escrito com cuidado por uma "
          "pessoa — não como capítulos colados nem como texto genérico de IA.", ""]
+    if (foco or "").strip():  # 🙋 v84_169: o pedido do autor vem PRIMEIRO (antes ficava no fim e a IA quase ignorava)
+        L += ["## 🙋 PEDIDO DO AUTOR — PRIORIDADE MÁXIMA",
+              foco.strip()[:1500],
+              "Isto vem antes de tudo abaixo: faça as trocas que forem precisas pra cumprir o pedido (pode usar muitas), "
+              "mesmo que isso mude a estrutura (abertura, transições, fechamento).", ""]
+    if titulo and not enx:
+        L += [f"## 🧵 FIO CONDUTOR — o título é a promessa: “{titulo}”" + (" (FOCO DESTA REVISÃO)" if fio else ""),
+              "O roteiro tem de entregar o que o título promete e amarrar TODOS os assuntos nele. Confira e conserte com trocas:",
+              "A. ABERTURA: logo depois do gancho, a TESE do título com as palavras dele (ou bem perto) + 2-4 frases que mostram de "
+              "relance os assuntos que vêm aí como provas da tese. → troque o 1º ou 2º parágrafo por ele mesmo + essas frases.",
+              "B. PONTES: em CADA troca de assunto, a 1ª frase do assunto novo ganha antes uma frase-ponte que liga o anterior ao "
+              "próximo e ao título (ex.: “Mas o perigo não vem só pelo ar…”). → \"de\": a 1ª frase do assunto novo; \"para\": "
+              "a frase-ponte + a mesma frase. Nenhum pulo seco de assunto pode sobrar.",
+              "C. FIM DE CADA BLOCO: uma frase dizendo o que aquilo acrescenta à pergunta do título.",
+              "D. FECHAMENTO: o último parágrafo volta ao título e RESPONDE a ele somando as provas (sim / não / depende, com os "
+              "fatos), e termina com uma pergunta ao público ligada ao título. → troque o último parágrafo.",
+              "E. Título exagerado (“o pior”, “o mais…”): trate como pergunta a investigar — sem inventar pra confirmar.",
+              "F. Frase repetida (a mesma frase ou ideia dita de novo logo em seguida): apague a repetição (\"para\": \"\").", ""]
     if enx:
         alvo_txt = f"~{alvo_palavras} palavras" + (f" (≈ {minutos:g} min de narração)" if minutos else "")
         L += ["## ✂️ MODO ENXUGAR — o roteiro está LONGO demais",
@@ -70,6 +117,14 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
         achados = checagem_roteiro.resumo_texto(checagem_roteiro.analisar(roteiro, tema), roteiro)
     except Exception:  # noqa: BLE001
         achados = []
+    if titulo and not enx:
+        achados = achados_titulo(roteiro, titulo) + achados
+    try:  # 🔁 frases quase iguais em sequência
+        import metodo_roteiro as _mr
+        _t, rep = _mr.tirar_repeticoes(roteiro)
+        achados += [f"- 🔁 Frase repetida logo em seguida (apague): “{x[:160]}”" for x in rep[:12]]
+    except Exception:  # noqa: BLE001
+        pass
     if achados:
         L += ["## O que o site já achou no texto (as linhas são do roteiro abaixo, 1ª linha = 1) — resolva primeiro"] + achados + [""]
     L += ["## O que melhorar (em ordem de importância)",
@@ -99,7 +154,7 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
           "(não inclua elas no \"de\").",
           "- Mantenha os fatos, a ordem da história e o tom; mantenha a distinção entre fato, alegação e interpretação."]
     if foco:
-        L.append(f"- Pedido extra (prioridade): {foco.strip()[:800]}")
+        L.append(f"- Lembrete — o pedido do autor (lá em cima) é a prioridade: {foco.strip()[:300]}")
     L += ["", "## Resposta — SOMENTE um JSON válido, assim:",
           json.dumps({"trocas": [{"de": "trecho exato do roteiro", "para": "trecho melhorado" + (" (ou \"\" pra apagar)" if enx else ""),
                                   "motivo": "repetição | enchimento | costura | clichê | prova | fórmula | ritmo | laço | clareza"}],
@@ -171,6 +226,10 @@ def aplicar(roteiro: str, resposta: str, apagar: bool = True) -> Dict[str, Any]:
     texto = re.sub(r"(\[\[[^\]]+\]\])(\s*\n\s*\1)+", r"\1", texto)  # duas marcas iguais coladas (o trecho entre elas saiu)
     import marcas_seguras  # 🔒 marca de imagem/cena que sumiu numa troca volta pro mesmo ponto
     texto, _volta = marcas_seguras.restaurar(str(roteiro or ""), texto, chamadas=False)
+    import metodo_roteiro  # 🔁 v84_169: frase quase igual logo em seguida sai (mesmo se a IA não pegou)
+    texto, repetidas = metodo_roteiro.tirar_repeticoes(texto)
+    for x in repetidas:
+        aplicadas.append({"de": x[:200], "para": "", "motivo": "repetição (site)"})
     pal = palavras
     return {"texto": texto, "aplicadas": aplicadas, "nao_achadas": nao, "palavras_antes": pal(roteiro), "palavras_depois": pal(texto),
             "observacoes": str((d.get("observacoes") if isinstance(d, dict) else "") or "")[:1500]}

@@ -26,7 +26,8 @@ mágica nem manipulação):
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Tuple
 
 _BASE = [
     "OBJETIVO COMUM: descubra por que a pessoa clicou (o que ela quer levar do vídeo) e faça o objetivo do vídeo ser o mesmo. "
@@ -197,16 +198,30 @@ def titulo_ok(t: str) -> bool:
     return 0 < len(str(t or "").strip()) <= TITULO_MAX + 10
 
 
-def bloco_referencia(texto: str) -> str:
-    """Transcrição de um vídeo/short que viralizou: INSPIRAÇÃO de estrutura (não um molde ponto a ponto)."""
+def bloco_referencia(texto: str, modo: str = "inspirar") -> str:
+    """Transcrição de um vídeo/short que viralizou: INSPIRAÇÃO de estrutura (não um molde ponto a ponto).
+    v84_169: modo "modelar" = seguir a MESMA sequência de blocos do exemplo, com o meu tema e os meus fatos."""
     t = str(texto or "").strip()
     if not t:
         return ""
+    if modo == "modelar":
+        return ("## 📐 ROTEIRO EXEMPLO — modele a ESTRUTURA dele, com o MEU tema (o assunto do exemplo NÃO entra)\n"
+                "1. Antes de escrever, mapeie (por dentro, sem pôr na resposta) o exemplo em BLOCOS: o que cada bloco FAZ (ex.: "
+                "gancho com 3 perigos seguidos → frase de impacto → “no vídeo de hoje…” → por que este lugar é diferente dos "
+                "outros → perigo 1 com a causa curiosa → perigo 2 … → virada → fechamento), o ritmo das frases, como cada "
+                "bloco puxa o próximo e como ele termina.\n"
+                "2. Escreva o MEU roteiro com a MESMA sequência de funções: cada bloco do exemplo vira um bloco equivalente do meu "
+                "tema (o “perigo da natureza” do exemplo vira um perigo/curiosidade do meu tema, a apresentação vira a minha "
+                "apresentação etc.). As mesmas técnicas de gancho, de transição e de final.\n"
+                "3. NÃO copie frases, nomes, lugares, números nem fatos do exemplo; interjeições, palavrões e “[ __ ]” do exemplo não "
+                "entram. Os fatos vêm SÓ das minhas fontes — se faltar fato pra um bloco, junte ou pule o bloco, nunca invente.\n"
+                "4. O tamanho pedido (seção 📏) vale mais que o do exemplo; o título/a promessa (🧵) também manda.\n\n"
+                + t[:40000])
     return ("## 📐 Referência (um vídeo que viralizou) — inspiração, não molde\n"
             "Observe o que faz este roteiro funcionar — o tipo de gancho, como ele segura a atenção, o ritmo das frases, como "
             "termina — e use essas LIÇÕES no MEU tema, com os MEUS fatos e a SUA linha de storytelling. Não siga a sequência "
             "dele ponto a ponto e não copie frases, nomes nem o assunto. O tamanho pedido (seção 📏) vale mais que o dele.\n\n"
-            + t[:12000])
+            + t[:40000])
 
 
 def bloco_guia(origem: str = "o roteiro/as anotações", tem_tamanho: bool = True) -> str:
@@ -359,3 +374,78 @@ def prompt_completar(roteiro: str, palavras: int, alvo_palavras: int, minutos: f
           "Responda SOMENTE com um JSON válido, assim (só este campo — o resto eu já tenho):",
           '{"roteiro": "o roteiro completo, já no tamanho certo"}', "", "## Roteiro atual", str(roteiro or "").strip()]
     return "\n".join(L)
+
+
+# ------------------------------------------------------------------ 🧵 v84_169: o título é a promessa + sem frase repetida
+def bloco_promessa(titulo: str, curto: bool = False) -> str:
+    """🧵 O título/tema do vídeo é uma PROMESSA: o roteiro inteiro tem de entregar e amarrar tudo nela (fio condutor)."""
+    titulo = " ".join(str(titulo or "").split())[:200]
+    if not titulo:
+        return ""
+    if curto:
+        return (f"## 🧵 O título é a promessa: “{titulo}”\n"
+                "- A 1ª frase já põe a ideia do título; cada frase seguinte prova ou complica essa ideia; a última responde a ela.")
+    return (f"## 🧵 O TÍTULO É A PROMESSA (obrigatório): “{titulo}”\n"
+            "O vídeo existe pra cumprir o que esse título promete. Ele é o FIO CONDUTOR (o “roter Faden”) que liga todos os assuntos:\n"
+            "- ABERTURA: depois do gancho, apresente a TESE do título com as palavras dele (ou bem perto delas) e diga por que "
+            "ela faz sentido — em 2-4 frases, mostre de relance os assuntos que vêm aí como provas dessa tese (ex.: “pragas que "
+            "chegam pelo ar e pela água, javalis dentro da cidade e bombas da guerra debaixo de florestas que pegam fogo”).\n"
+            "- CADA BLOCO/CAPÍTULO: é uma PROVA (ou um contraponto) da tese. Termine o bloco dizendo, numa frase, o que ele "
+            "acrescenta à pergunta do título.\n"
+            "- TRANSIÇÕES: nunca pule de assunto a seco (“efeito mosaico”). Toda troca de assunto começa com uma frase-ponte que "
+            "liga o anterior ao próximo e ao título (ex.: “Mas o perigo não vem só pelo ar…”, “Se a superfície já parece "
+            "perigosa, o pior está debaixo da terra…”).\n"
+            "- FECHAMENTO: volte ao título e RESPONDA a ele com honestidade (sim, não, ou “depende” — com os fatos na mão), "
+            "somando as provas; termine com uma pergunta ao público ligada ao título.\n"
+            "- Título exagerado (“o pior”, “o mais perigoso”): trate como pergunta a investigar — mostre os fatos que sustentam e "
+            "os que relativizam; nunca invente pra confirmar.\n"
+            "- Cada frase traz informação NOVA: nada de repetir a mesma frase ou ideia com outras palavras logo em seguida.")
+
+
+_PALAVRAS_VAZIAS = set("""a o os as um uma uns umas de do da dos das em no na nos nas por para pra com sem que e ou mas se
+como mais muito já não também ele ela eles elas isso esse essa este esta the and or of to in on at for with is are was were be
+it this that der die das den dem des ein eine einen einem einer und oder aber nicht auch ist sind war waren wird werden wurde
+im in am an auf aus bei mit nach von vor zu zum zur sich sie er es so dass wie noch nur schon el la los las y del al un una""".split())
+
+
+def _conteudo(frase: str) -> List[str]:
+    t = re.sub(r"\[[^\]]*\]", " ", frase.lower())
+    return [w[:6] for w in re.findall(r"[^\W\d_]{3,}", t) if w not in _PALAVRAS_VAZIAS]  # raiz curta: Feuerwehr ≈ Feuerwehrleute
+
+
+def tirar_repeticoes(texto: str, janela: int = 3, limite: float = 0.72) -> Tuple[str, List[str]]:
+    """🔁 Tira a frase que repete (quase igual) uma das `janela` frases anteriores do mesmo parágrafo — o erro comum de IA
+    (“X gelten als brandanfällig; deshalb sollen sie umgebaut werden. X sollen deshalb … umgebaut werden.”).
+    Mantém as marcas da frase tirada ([I3], [[INSCREVA]]…) na frase que ficou. → (texto, frases tiradas)."""
+    tiradas: List[str] = []
+    paragrafos = re.split(r"(\n\s*\n)", str(texto or ""))
+    out = []
+    for par in paragrafos:
+        if not par.strip() or re.fullmatch(r"\n\s*\n", par):
+            out.append(par)
+            continue
+        frases = re.split(r"(?<=[.!?…])\s+(?=\S)", par)
+        ficam: List[str] = []
+        for f in frases:
+            c = _conteudo(f)
+            repetida = False
+            if len(c) >= 5:
+                cs = set(c)
+                nums = set(re.findall(r"\d+", re.sub(r"\[[^\]]*\]", " ", f)))
+                for ant in ficam[-janela:]:
+                    ca = set(_conteudo(ant))
+                    nums_a = set(re.findall(r"\d+", re.sub(r"\[[^\]]*\]", " ", ant)))
+                    if nums != nums_a:  # números diferentes (1937 × 1970): é outra informação, não repetição
+                        continue
+                    if len(ca) >= 5 and len(cs & ca) / min(len(cs), len(ca)) >= limite:
+                        repetida = True
+                        break
+            if repetida:
+                marcas = re.findall(r"\[\[?[^\]]+\]\]?", f)
+                if marcas and ficam:
+                    ficam[-1] = ficam[-1].rstrip() + " " + " ".join(m for m in marcas if m not in ficam[-1])
+                tiradas.append(f.strip())
+            else:
+                ficam.append(f)
+        out.append(" ".join(ficam))
+    return "".join(out), tiradas

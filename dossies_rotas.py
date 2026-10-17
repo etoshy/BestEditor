@@ -120,7 +120,7 @@ def registrar(app, base_dir: str) -> None:
                 return jsonify({"erro": "Projeto não encontrado."}), 404
             cfg = p["config"]
             if c.get("modelo") in ds.MODELOS:
-                if c["modelo"] != cfg.get("modelo") and ds.canal_do_modelo(c["modelo"]) and "nome_canal" not in c:
+                if c["modelo"] != cfg.get("modelo") and ds.canal_do_modelo(c["modelo"]) and not str(c.get("nome_canal") or "").strip():
                     cfg["nome_canal"] = ds.canal_do_modelo(c["modelo"])  # 🎨 modelo da marca: o nome do canal dela
                 cfg["modelo"] = c["modelo"]
             fmts = (ds.MODELOS.get(cfg["modelo"]) or ds.MODELOS["true_crime"])["formatos"]
@@ -130,7 +130,7 @@ def registrar(app, base_dir: str) -> None:
                 cfg["formato"] = next(iter(fmts))
             if c.get("formato_video") in ("16:9", "9:16", "1:1"):
                 cfg["formato_video"] = c["formato_video"]
-            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20), ("referencia", 12000), ("nome_canal", 80)):
+            for k, lim in (("tom", 400), ("extra", 1500), ("idioma", 20), ("referencia", 60000), ("nome_canal", 80), ("titulo", 200)):
                 if k in c:
                     cfg[k] = str(c.get(k) or "").strip()[:lim]
             if "minutos" in c:
@@ -141,6 +141,8 @@ def registrar(app, base_dir: str) -> None:
             for k in ("sem_experiencias", "marcar_chamadas", "sugerir_produto"):
                 if k in c:
                     cfg[k] = bool(c[k])
+            if c.get("referencia_modo") in ("inspirar", "modelar"):
+                cfg["referencia_modo"] = c["referencia_modo"]
             if c.get("modo_partes") in ("auto", "sim", "nao"):
                 cfg["modo_partes"] = c["modo_partes"]
             if "tema" in c:
@@ -187,6 +189,32 @@ def registrar(app, base_dir: str) -> None:
 
         return tarefas_bg.iniciar("dossie_transcricao", f"🎬 Transcrição de {len(links)} vídeo(s) pras anotações", _rodar,
                                   pagina=f"/modelos-video/{pid}")
+
+    @app.route("/modelos-video/<pid>/referencia/link", methods=["POST"])
+    def dossie_referencia_link(pid: str):
+        """📐 v84_169: link de um vídeo (YouTube, TikTok…) → a transcrição dele vira o roteiro exemplo."""
+        import tarefas_bg
+        import roteiros_yt as ry
+        url = str((request.get_json(silent=True) or {}).get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            return jsonify({"erro": "Cole o link do vídeo."}), 400
+        if not _proj(pid):
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+
+        def _rodar(t):
+            t.progresso("lendo a transcrição do vídeo exemplo…")
+            pasta = os.path.join(ds._pasta(base_dir, pid), "transcricoes_links")
+            tr = ry.extrair_transcricao(url, pasta, on_log=lambda m: t.progresso(str(m)[:150]))
+            texto = ry.texto_da_transcricao(tr, com_tempo=False).strip()
+            if not texto:
+                raise ValueError("o vídeo não tem fala/legenda")
+            with _TRAVA:
+                p = _proj(pid)
+                p["config"]["referencia"] = texto[:60000]
+                ds.salvar(base_dir, p)
+            return {"caracteres": len(texto), "titulo": tr.get("titulo") or ""}
+        tid = tarefas_bg.iniciar("dossie_referencia", "📐 Roteiro exemplo (transcrição)", _rodar, pagina=f"/modelos-video/{pid}")
+        return jsonify({"ok": True, "tarefa": tid})
 
     @app.route("/modelos-video/<pid>/fontes", methods=["POST"])
     def dossie_fontes(pid: str):

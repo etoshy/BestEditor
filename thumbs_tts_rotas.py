@@ -224,7 +224,8 @@ def registrar(app, base_dir: str) -> None:
             modo = rv.modo_efetivo(str(c.get("modo") or "auto"), rv.palavras(texto), int(pad.get("alvo") or 0))
             t = rv.prompt(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
                           str(p.get("tema") or p.get("titulo") or ""), str(c.get("foco") or ""),
-                          alvo_palavras=int(pad.get("alvo") or 0), minutos=float(pad.get("minutos") or 0), modo=modo)
+                          alvo_palavras=int(pad.get("alvo") or 0), minutos=float(pad.get("minutos") or 0), modo=modo,
+                          titulo=str(((p.get("config") or {}).get("titulo") if isinstance(p.get("config"), dict) else "") or ""))
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify({"ok": True, "prompt": t, "caracteres": len(t), "modo": modo, "palavras": rv.palavras(texto),

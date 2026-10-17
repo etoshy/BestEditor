@@ -209,6 +209,9 @@ h1 .ico, h2 .ico { color: var(--acento); }
   font-size: .88rem; font-weight: 600; gap: 7px; box-shadow: var(--sombra); position: relative;
 }
 .topo-btn:hover { background: var(--card-2); filter: none; }
+a.topo-btn { display: inline-flex; align-items: center; text-decoration: none; }
+a.topo-btn.voz { background: var(--acento); color: #fff; border-color: transparent; }
+a.topo-btn.voz:hover { filter: brightness(1.08); text-decoration: none; }
 .topo-btn.icone { padding: 0; width: 40px; font-size: 16px; }
 .topo-btn .rot-curto { display: none; }
 

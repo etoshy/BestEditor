@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Modelo de vídeo{% endblock %}
+{% block topo_acoes %}{% if (p.resultado or {}).roteiro %}<a class="topo-btn voz" href="/gerar-voz?dossie={{ p.id }}" title="Gerar a voz com este roteiro (abre o Gerador de voz já com o texto)"><i class="fa-solid fa-microphone"></i><span class="rot-longo">Gerar voz</span></a>{% endif %}{% endblock %}
 {% block content %}
 <style>
   .app-content { max-width: 1150px; }
@@ -43,6 +44,8 @@
   <h2><span class="ds-num">1</span>Tema e modelo</h2>
   <label>Tema</label>
   <input type="text" id="tema" value="{{ p.tema }}">
+  <label>🧵 Título do vídeo — a promessa <span style="font-weight:400;color:#888;">(opcional — vazio = o tema é a promessa. O roteiro abre com a tese do título, liga cada assunto a ela com frases-ponte e no fim responde ao título)</span></label>
+  <input type="text" id="cTitulo" value="{{ p.config.titulo or '' }}" maxlength="200" placeholder="ex.: Brandenburg: o pior lugar da Alemanha?">
   <div class="ds-row">
     <label style="flex:2;min-width:200px;">Modelo<select id="cModelo">{% for k, m in modelos.items() %}<option value="{{ k }}" {% if k == p.config.modelo %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}</select></label>
     <label style="flex:2;min-width:220px;">Formato<select id="cFormato"></select></label>
@@ -60,8 +63,16 @@
   <label>Roteiro / anotações seus <span style="font-weight:400;color:#888;">(opcional — é um GUIA: a IA usa os fatos e cria a própria linha de storytelling, sem clonar)</span></label>
   <textarea id="rotBase" rows="4">{{ p.roteiro_base }}</textarea>
   <details style="margin-top:8px;"{% if p.config.referencia %} open{% endif %}>
-    <summary style="cursor:pointer;font-size:0.88rem;">📐 Estrutura de referência <span style="font-weight:400;color:#888;">(opcional — cole a transcrição de um vídeo/short que viralizou: a IA aprende com ele — tipo de gancho, ritmo, final — e conta o seu tema do jeito dela, sem seguir ponto a ponto)</span></summary>
-    <textarea id="cRef" rows="4" placeholder="Transcrição de um vídeo que viralizou no seu nicho…">{{ p.config.referencia or '' }}</textarea>
+    <summary style="cursor:pointer;font-size:0.88rem;">📐 Roteiro exemplo pra seguir <span style="font-weight:400;color:#888;">(opcional — o roteiro/transcrição de um vídeo que você quer modelar: a IA pega SÓ a ideia e a estrutura dele; o assunto e os fatos são os do SEU tema)</span></summary>
+    <div class="ds-row" style="align-items:flex-end;margin-top:6px">
+      <label style="flex:1;min-width:220px;">Como seguir<select id="cRefModo">
+        <option value="modelar" {% if p.config.referencia_modo == 'modelar' %}selected{% endif %}>🧭 modelar: a mesma sequência de blocos (gancho, apresentação, cada parte, final) com o meu tema</option>
+        <option value="inspirar" {% if p.config.referencia_modo != 'modelar' %}selected{% endif %}>💡 inspirar: só o tipo de gancho, o ritmo e o final — a ordem é livre</option></select></label>
+      <label style="flex:2;min-width:240px;">ou o link do vídeo exemplo<input type="text" id="cRefLink" placeholder="https://www.youtube.com/watch?v=… (a transcrição entra aqui embaixo)"></label>
+      <button type="button" id="btnRefLink" style="width:auto;margin:0;">🎬 Pegar a transcrição</button>
+    </div>
+    <span id="refSt" class="ds-hint"></span>
+    <textarea id="cRef" rows="5" placeholder="Cole o roteiro ou a transcrição do vídeo exemplo (ex.: o do rio Madeira) — o seu vídeo segue a ideia dele com o seu tema">{{ p.config.referencia or '' }}</textarea>
   </details>
   <div style="margin-top:8px;display:grid;gap:4px;font-size:0.88rem;">
     <label style="font-weight:400;margin:0;"><input type="checkbox" id="cSemExp" style="width:auto;" {% if p.config.sem_experiencias != false %}checked{% endif %}> 🙅 Tirar das fontes experiências pessoais de quem escreveu/gravou, citações a outros vídeos e detalhes muito pessoais</label>
@@ -208,9 +219,9 @@ function salvarCfg(extra) {
     try {
       const d = await api(`/modelos-video/${PID}/config`, Object.assign({ tema: $('tema').value, modelo: $('cModelo').value, formato: $('cFormato').value,
         minutos: $('cMin').value, idioma: $('cIdioma').value, formato_video: $('cVid').value, tom: $('cTom').value, extra: $('cExtra').value,
-        roteiro_base: $('rotBase').value, referencia: $('cRef').value, sem_experiencias: $('cSemExp').checked, marcar_chamadas: $('cChamadas').checked,
-        sugerir_produto: $('cProduto').checked, nome_canal: $('cCanal').value, modo_partes: $('cPartes').value }, extra || {}));
-      P.config = d.config; $('cfgSt').innerHTML = '<span class="ds-ok">✔ salvo</span>'; $('titulo').textContent = '🕵️ ' + ($('tema').value || 'Projeto');
+        roteiro_base: $('rotBase').value, referencia: $('cRef').value, referencia_modo: $('cRefModo').value, sem_experiencias: $('cSemExp').checked, marcar_chamadas: $('cChamadas').checked,
+        sugerir_produto: $('cProduto').checked, nome_canal: $('cCanal').value, titulo: $('cTitulo').value, modo_partes: $('cPartes').value }, extra || {}));
+      P.config = d.config; if (d.config.nome_canal && !$('cCanal').value) $('cCanal').value = d.config.nome_canal; $('cfgSt').innerHTML = '<span class="ds-ok">✔ salvo</span>'; $('titulo').textContent = '🕵️ ' + ($('tema').value || 'Projeto');
     } catch (e) { $('cfgSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
   }, 450);
 }
@@ -220,7 +231,25 @@ $('cFormato').addEventListener('change', () => {
   const f = ((MODELOS[$('cModelo').value] || {}).formatos || {})[$('cFormato').value]; if (f) $('cMin').value = f.minutos;
   salvarCfg();
 });
-['tema', 'cMin', 'cTom', 'cExtra', 'rotBase', 'cRef', 'cCanal'].forEach(id => $(id).addEventListener('input', () => salvarCfg()));
+['tema', 'cTitulo', 'cMin', 'cTom', 'cExtra', 'rotBase', 'cRef', 'cCanal'].forEach(id => $(id).addEventListener('input', () => salvarCfg()));
+$('cRefModo').addEventListener('change', () => salvarCfg());
+$('btnRefLink').addEventListener('click', async () => {
+  const url = $('cRefLink').value.trim(); if (!url) return;
+  $('refSt').textContent = '⏳ pegando a transcrição…';
+  try {
+    const d = await api(`/modelos-video/${PID}/referencia/link`, { url });
+    while (true) {
+      await new Promise(r => setTimeout(r, 2000));
+      const t = await (await fetch('/tarefas/' + d.tarefa, { cache: 'no-store' })).json();
+      if (t.status === 'rodando') { $('refSt').textContent = '⏳ ' + (t.progresso || 'transcrevendo…'); continue; }
+      fetch('/tarefas/' + d.tarefa + '/aplicada', { method: 'POST' }).catch(() => {});
+      if (t.status !== 'pronto') { $('refSt').textContent = '❌ ' + (t.erro || 'falhou'); return; }
+      const pr = await (await fetch(`/modelos-video/${PID}/dados`, { cache: 'no-store' })).json().catch(() => null);
+      if (pr && pr.config) $('cRef').value = pr.config.referencia || '';
+      $('refSt').textContent = `✅ transcrição de “${(t.resultado || {}).titulo || 'o vídeo'}” no campo abaixo`; return;
+    }
+  } catch (e) { $('refSt').textContent = '❌ ' + e.message; }
+});
 ['cIdioma', 'cVid', 'cSemExp', 'cChamadas', 'cProduto', 'cPartes'].forEach(id => $(id).addEventListener('change', () => salvarCfg()));
 opcoesFormato();
 

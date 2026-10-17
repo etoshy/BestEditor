@@ -11,7 +11,7 @@
     h.setAttribute('data-tema', t === 'claro' ? 'claro' : 'escuro'); if (m === '1') h.classList.add('menu-mini'); })();
   </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" data-ui-base>
-  <link rel="stylesheet" href="{{ url_for('static', filename='ui/tema.css') }}?v=84161" data-ui-base>
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui/tema.css') }}?v=84170" data-ui-base>
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -86,6 +86,7 @@
       <button type="button" class="topo-btn icone mini-menu" data-ui-mini-menu title="Recolher / abrir o menu lateral" aria-label="Recolher o menu"><i class="fa-solid fa-bars-staggered"></i></button>
       <div class="topo-tit">{{ self.title() }}</div>
       <div class="espaco"></div>
+      {% block topo_acoes %}{% endblock %}
       <div id="saldoBox" style="position:relative">
         <button type="button" class="topo-btn" id="saldoBtn" title="Uso do Claude"><i class="fa-solid fa-coins"></i><span class="rot-longo">Claude</span><span class="rot-curto">—</span></button>
         <div class="topo-painel" id="saldoPainel" role="dialog" aria-label="Uso do Claude"></div>

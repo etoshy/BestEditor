@@ -648,7 +648,32 @@ def gerar_voz_page():
         venda_id=request.args.get("venda") if _texto_da_venda(request.args.get("venda")) else "",
         dossie_id=request.args.get("dossie") if _texto_do_dossie(request.args.get("dossie")) else "",
         idioma_inicial=_idioma_do_projeto(request.args.get("venda"), request.args.get("dossie")),
+        projetos_voz=_projetos_para_voz(),
     )
+
+
+def _projetos_para_voz() -> list:
+    """🎙 v84_170: os projetos com roteiro, pro seletor do Gerar voz (abre com o texto e o projeto ligados)."""
+    out = []
+    try:
+        import dossies
+        out += [{"param": "dossie", "id": x["id"], "nome": x["nome"], "grupo": "🕵️ Modelos de vídeo", "atualizado": x["atualizado"]}
+                for x in dossies.listar(BASE_DIR) if x.get("tem_roteiro")]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import roteiros_yt
+        out += [{"param": "roteiro", "id": x["id"], "nome": x["titulo"], "grupo": "📜 Roteiro do YouTube", "atualizado": x["atualizado"]}
+                for x in roteiros_yt.listar_projetos(BASE_DIR)]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import vendas
+        out += [{"param": "venda", "id": x["id"], "nome": x["nome"], "grupo": "🛒 Vídeo de venda", "atualizado": x["atualizado"]}
+                for x in vendas.listar(BASE_DIR) if x.get("tem_roteiro")]
+    except Exception:  # noqa: BLE001
+        pass
+    return out[:300]
 
 
 def _normalizar_multivoz(entrada: str, saida: str) -> None:

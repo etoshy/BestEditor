@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Vídeo de venda{% endblock %}
+{% block topo_acoes %}<a class="topo-btn voz" href="/gerar-voz?venda={{ p.id }}" title="Gerar a voz com este roteiro (abre o Gerador de voz já com o texto)"><i class="fa-solid fa-microphone"></i><span class="rot-longo">Gerar voz</span></a>{% endblock %}
 {% block content %}
 <style>
   .vd-card input[type=url], .vd-card input[type=file] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; width: 100%; box-sizing: border-box; }

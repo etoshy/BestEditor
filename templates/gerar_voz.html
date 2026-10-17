@@ -57,6 +57,24 @@
 
 <form id="form-gerar-voz" enctype="multipart/form-data" style="margin-top:20px;" data-lembrar="gerar_voz">
   <label>Texto a narrar</label>
+  {% if projetos_voz %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.9rem">
+    <label for="projVoz" style="margin:0;font-weight:600">📂 Pegar o roteiro de um projeto:</label>
+    <select id="projVoz" style="width:auto;max-width:100%;flex:1;min-width:220px;margin:0" data-ui-sem-lembrar>
+      <option value="">— escolha (ou escreva o texto abaixo) —</option>
+      {% set _sel = ('dossie:' ~ dossie_id) if dossie_id else (('roteiro:' ~ roteiro_id) if roteiro_id else (('venda:' ~ venda_id) if venda_id else '')) %}
+      {% for grupo in projetos_voz|groupby('grupo') %}<optgroup label="{{ grupo.grouper }}">
+        {% for x in grupo.list|sort(attribute='atualizado', reverse=True) %}<option value="{{ x.param }}:{{ x.id }}" {% if _sel == x.param ~ ':' ~ x.id %}selected{% endif %}>{{ x.nome }}</option>{% endfor %}
+      </optgroup>{% endfor %}
+    </select>
+  </div>
+  <script>
+    document.getElementById('projVoz').addEventListener('change', (e) => {
+      const v = e.target.value; if (!v) { location.href = '/gerar-voz'; return; }
+      const [param, id] = v.split(':'); location.href = '/gerar-voz?' + param + '=' + encodeURIComponent(id);
+    });
+  </script>
+  {% endif %}
   {% if roteiro_id %}<input type="hidden" name="roteiro_id" value="{{ roteiro_id }}">{% endif %}
   {% if dossie_id %}<input type="hidden" name="dossie_id" value="{{ dossie_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#334155;">🕵️ Roteiro do modelo de vídeo — os capítulos ganham o tempo real do áudio, e o .zip leva o projeto: no <b>Novo vídeo</b> as imagens do tema entram sozinhas.</p>{% endif %}
   {% if venda_id %}<input type="hidden" name="venda_id" value="{{ venda_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#047857;">🛒 Roteiro do projeto de venda — o .zip leva o projeto junto: no <b>Novo vídeo</b> as mídias do produto entram sozinhas.</p>{% endif %}
@@ -94,7 +112,7 @@ E no final...</pre>
     </div>
     <p style="margin:6px 0 0;">Depois baixe <b>Tudo (.zip)</b> e crie o vídeo com o .zip na página inicial: as pausas aparecem sozinhas no editor.</p>
   </details>
-  {% if texto_inicial %}<p style="font-size:0.82rem;color:#5b21b6;margin:4px 0 0;">📜 Texto vindo da aba Roteiro do YouTube.{% if '[[' in texto_inicial %} 📣 Ele tem marcas <code>[[INSCREVA]]</code>/<code>[[VENDA]]</code>: não são lidas — viram pausas onde entram os seus vídeos no editor (baixe o .zip).{% endif %}{% if '[' in texto_inicial.replace('[[', '').replace(']]', '') %} Ele tem tags de voz ([laugh], [whispering]…): use o motor <b>Chatterbox Turbo</b> (inglês) pra elas virarem som/estilo.{% endif %}</p>{% endif %}
+  {% if texto_inicial %}<p style="font-size:0.82rem;color:#5b21b6;margin:4px 0 0;">📜 Texto vindo do projeto escolhido.{% if '[[' in texto_inicial %} 📣 Ele tem marcas <code>[[INSCREVA]]</code>/<code>[[VENDA]]</code>: não são lidas — viram pausas onde entram os seus vídeos no editor (baixe o .zip).{% endif %}{% if '[' in texto_inicial.replace('[[', '').replace(']]', '') %} Ele tem tags de voz ([laugh], [whispering]…): use o motor <b>Chatterbox Turbo</b> (inglês) pra elas virarem som/estilo.{% endif %}</p>{% endif %}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.88rem;">
     <span>🌐 Idioma da narração (vai junto no .zip — o vídeo inteiro segue ele):</span>
     <select name="idioma_narracao" style="width:auto;margin:0;padding:4px 8px;"{% if idioma_inicial %} data-nao-restaurar{% endif %}>

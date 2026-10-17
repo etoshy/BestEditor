@@ -450,6 +450,8 @@ CONFIG_PADRAO: Dict[str, Any] = {"modelo": "true_crime", "formato": "caso_comple
                                  "sugerir_produto": False,
                                  # 📐 transcrição de um vídeo que viralizou: a IA copia a estrutura
                                  "referencia": "",
+                                 # 📐 v84_169: "inspirar" (aprende o gancho/ritmo) ou "modelar" (segue a mesma sequência de blocos)
+                                 "referencia_modo": "inspirar",
                                  # 📺 nome do canal deste projeto ("" = o das Configurações; "-" = não falar)
                                  "nome_canal": "",
                                  # ✍️ roteiro escrito capítulo por capítulo: "auto" (a partir de ~8 min), "sim", "nao"
@@ -1119,6 +1121,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.append("")
     L.append(f"## Tema\n{p['tema'].strip()}")
     L.append("")
+    _prom = metodo_roteiro.bloco_promessa(titulo_promessa(p), curto=minutos <= 1 or cfg.get("formato") == "curto")
+    if _prom:  # 🧵 v84_169: o título/tema é a promessa — o roteiro inteiro amarra nele
+        L.append(_prom)
+        L.append("")
     import idiomas
     nome_idioma = idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt")
     if (idiomas.normalizar(cfg.get("idioma")) or "pt") == "en":
@@ -1190,7 +1196,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.append(metodo_roteiro.bloco("curto" if (minutos <= 1 or cfg.get("formato") == "curto") else "longo"))
     if (cfg.get("referencia") or "").strip():
         L.append("")
-        L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
+        L.append(metodo_roteiro.bloco_referencia(cfg["referencia"], cfg.get("referencia_modo") or "inspirar"))
     import canal  # 📺 o nome do canal, falado no momento certo
     _canal = canal.nome_do_projeto(nome_canal_cfg(cfg))
     if _canal:
@@ -1275,6 +1281,10 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     rot = str(d["roteiro"]).strip()
     ids = {m["id"].upper() for m in p.get("midias") or []}
     avisos: List[str] = []
+    import metodo_roteiro as _mr
+    rot, _rep = _mr.tirar_repeticoes(rot)  # 🔁 v84_169: frase quase igual logo em seguida sai
+    if _rep:
+        avisos.append(f"🔁 {len(_rep)} frase(s) repetida(s) logo em seguida tirada(s): " + " · ".join(f"“{x[:70]}…”" for x in _rep[:3]))
     import midia_transcricao as mt
     momentos, sem = mt.momentos_do_roteiro(rot, ids, d.get("momentos"))
     if sem:
@@ -1345,7 +1355,8 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
         regras.append(f"Tom: {cfg['tom'].strip()[:400]}")
     if (cfg.get("extra") or "").strip():
         regras.append(f"Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
-    return {"tema": (p.get("tema") or "").strip(), "nome_modelo": mod["nome"].split(" ", 1)[1], "minutos": minutos,
+    return {"referencia": (cfg.get("referencia") or "")[:9000] if cfg.get("referencia_modo") == "modelar" else "",
+            "tema": (p.get("tema") or "").strip(), "promessa": titulo_promessa(p), "nome_modelo": mod["nome"].split(" ", 1)[1], "minutos": minutos,
             "idioma": idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
             "regras": regras, "canal": canal.nome_do_projeto(nome_canal_cfg(cfg)),
             "midias": {m["id"].upper(): o_que_e(m)[:300] for m in vis}, "plano": (p.get("resultado") or {}).get("plano") or {}}
@@ -1505,6 +1516,12 @@ def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
     d["momentos"] = [m for m in res.get("momentos") or [] if not m.get("inicio")]
     d["roteiro"] = novo
     return ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+
+
+def titulo_promessa(p: Dict[str, Any]) -> str:
+    """🧵 v84_169: o título do vídeo (a promessa) — o campo próprio ou, vazio, o tema."""
+    cfg = p.get("config") or {}
+    return " ".join(str(cfg.get("titulo") or p.get("tema") or "").split())[:200]
 
 
 def canal_do_modelo(modelo: str) -> str:
