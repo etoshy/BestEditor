@@ -340,6 +340,7 @@ def criar_projeto(base_dir: str, nome: str, estilo_id: str, tema: str, duracao_a
         "formato": formato if formato in FORMATOS else estilo.get("formato") or "9:16",
         "idioma": (str(idioma or "").strip() or estilo.get("idioma") or "português do Brasil")[:60],
         "instrucoes_extra": str(instrucoes_extra or "").strip()[:3000],
+        "nome_canal": __import__("ultimas_escolhas").pegar(base_dir, "nome_canal"),  # 🔁 v84_161: o da última vez
         "etapa": "roteiro", "roteiro": None, "audio": None, "cenas": [], "job_id": None, "avisos": [],
     }
     pasta = pasta_projeto(base_dir, pid)

@@ -1,54 +1,102 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="pt-br" data-tema="escuro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Narração para Vídeo{% endblock %}</title>
-  <style>
-    body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.5; }
-    h1 { font-size: 1.5rem; }
-    label { display: block; margin-top: 16px; font-weight: 600; }
-    input[type="file"], input[type="number"], input[type="text"], select, textarea {
-      width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box;
-      border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 1rem;
-    }
-    textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; }
-    button { margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
-    button:hover { background: #1d4ed8; }
-    .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-top: 16px; white-space: pre-wrap; }
-    .checkboxes label { display: inline-block; font-weight: normal; margin-right: 16px; }
-    .checkboxes input { width: auto; margin-right: 4px; }
-    .copy-btn { background: #059669; }
-    .progress-bar { height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin-top: 12px; }
-    .progress-fill { height: 100%; background: #2563eb; transition: width 0.3s; }
-    code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
-  </style>
+  <title>{% block title %}BestEditor{% endblock %}</title>
+  <script>
+  /* tema e menu antes de desenhar (sem piscar) — ver static/ui/ui.js */
+  (function () { var h = document.documentElement, t = null, m = null;
+    try { t = localStorage.getItem('ui-tema'); m = localStorage.getItem('ui-menu-mini'); } catch (e) {}
+    h.setAttribute('data-tema', t === 'claro' ? 'claro' : 'escuro'); if (m === '1') h.classList.add('menu-mini'); })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" data-ui-base>
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui/tema.css') }}?v=84161" data-ui-base>
+  {% block head %}{% endblock %}
 </head>
 <body>
-  <p style="text-align:right;font-size:0.8rem;margin:0 0 10px;padding-right:48px;">
-    <a href="/producao-pod" style="color:#0e7490;margin-right:14px;font-weight:600;">🏭 Produção no pod</a>
-    <a href="{{ url_for('modelados_page') }}" style="color:#7c3aed;margin-right:14px;font-weight:600;">🎞️ Vídeos modelados</a>
-    <a href="{{ url_for('roteiros_yt_page') }}" style="color:#b91c1c;margin-right:14px;font-weight:600;">📜 Roteiro do YouTube</a>
-    <a href="{{ url_for('vendas_page') }}" style="color:#047857;margin-right:14px;font-weight:600;">🛒 Vídeo de venda</a>
-    <a href="{{ url_for('dossies_page') }}" style="color:#334155;margin-right:14px;font-weight:600;">🕵️ Modelos de vídeo</a>
-    <a href="/perfis-canal" style="color:#be123c;margin-right:14px;font-weight:600;">📺 Perfis do canal</a>
-    <a href="{{ url_for('analisador_canal_page') }}" style="color:#7c3aed;margin-right:14px;font-weight:600;">📊 Analisador de canal</a>
-    <a href="{{ url_for('niche_miner_page') }}" style="color:#a16207;margin-right:14px;font-weight:600;">⛏ Niche Miner</a>
-    <a href="{{ url_for('flow_page') }}" style="color:#1d4ed8;margin-right:14px;font-weight:600;">🎬 Google Flow</a>
-    <a href="{{ url_for('ia_google_page') }}" style="color:#0f766e;margin-right:14px;font-weight:600;">🔎 IA do Google</a>
-    <a href="{{ url_for('narracoes_page') }}" style="color:#666;margin-right:14px;">📝 Roteiro para Áudio</a>
-    <a href="{{ url_for('gerar_voz_page') }}" style="color:#666;margin-right:14px;">🎙️ Gerador de voz</a>
-    <a href="{{ url_for('perfis_de_voz_page') }}" style="color:#666;margin-right:14px;">🗣️ Perfis de voz</a>
-    <a href="{{ url_for('capturar_pagina_page') }}" style="color:#666;margin-right:14px;">🖼️ Capturar página</a>
-    <a href="{{ url_for('cortar_youtube_page') }}" style="color:#666;margin-right:14px;">✂️ Cortar do YouTube</a>
-    <a href="{{ url_for('redes_sociais_page') }}" style="color:#666;margin-right:14px;">📲 Baixar de outras redes</a>
-    <a href="{{ url_for('extrair_links_canal_page') }}" style="color:#666;margin-right:14px;">🔗 Extrair links de canal</a>
-    <a href="{{ url_for('transcrever_page') }}" style="color:#666;margin-right:14px;">📝 Transcrever</a>
-    <a href="{{ url_for('contas_google_page') }}" style="color:#666;margin-right:14px;">🔑 Contas Google</a>
-    <a href="{{ url_for('historico_page') }}" style="color:#666;">🕘 Histórico</a> · <a href="{{ url_for('jobs_history_page') }}" style="color:#666;">🗂️ Galeria de projetos</a> · <a href="{{ url_for('textos_avulsos_page') }}" style="color:#666;">🔤 Textos animados</a> · <a href="{{ url_for('guia_page') }}" style="color:#666;">📘 Guia (criar efeitos, transições, destaques…)</a> · <a href="{{ url_for('settings_page') }}" style="color:#666;">⚙️ Configurações</a> · <a href="{{ url_for('espaco_page') }}" style="color:#666;">🧹 Espaço em disco</a> · <a href="{{ url_for('ia_page') }}" style="color:#666;">🤖 IA nas buscas e modelos</a>
-  </p>
+{%- macro item(destino, icone, rotulo, ativo_em=None, classe='') -%}
+  {%- set _url = destino -%}  {#- caminhos fixos: a página funciona mesmo num app de teste sem todas as rotas #}
+  {%- set _p = request.path -%}
+  {%- set ns = namespace(a=((_p == _url) if _url == '/' else (_p == _url or _p.startswith(_url.rstrip('/') + '/')))) -%}
+  {%- for pre in (ativo_em or []) %}{% if _p.startswith(pre) %}{% set ns.a = true %}{% endif %}{% endfor -%}
+  <li><a class="item{% if classe %} {{ classe }}{% endif %}{% if ns.a %} ativo{% endif %}" href="{{ _url }}" title="{{ rotulo }}"><i class="ii fa-solid fa-{{ icone }}"></i><span class="itxt">{{ rotulo }}</span></a></li>
+{%- endmacro -%}
+{%- macro grupo(id, icone, titulo) -%}
+  <div class="grupo" data-grupo="{{ id }}">
+    <button type="button" class="grupo-tit" title="{{ titulo }}"><i class="gi fa-solid fa-{{ icone }}"></i><span class="gtxt">{{ titulo }}</span><i class="seta fa-solid fa-chevron-down"></i></button>
+    <ul class="itens">{{ caller() }}</ul>
+  </div>
+{%- endmacro %}
+  <aside class="app-sidebar" data-ui-base aria-label="Menu">
+    <div class="app-marca">
+      <a href="/"><span class="logo"><i class="fa-solid fa-clapperboard"></i></span><span class="nome">BestEditor</span></a>
+      <button type="button" class="fechar-menu" data-ui-fechar-menu title="Fechar o menu"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <nav class="app-nav">
+      <ul class="itens" style="margin-top:4px">
+        {{ item('/', 'house', 'Início — novo vídeo', classe='destaque-ini') }}
+        {{ item('/jobs', 'photo-film', 'Galeria de projetos', ['/job/', '/estudio'], classe='destaque-ini') }}
+        {{ item('/historico', 'clock-rotate-left', 'Histórico', classe='destaque-ini') }}
+      </ul>
+      {% call grupo('roteiros', 'scroll', 'Roteiros e modelos') %}
+        {{ item('/modelos-video', 'user-secret', 'Modelos de vídeo') }}
+        {{ item('/roteiros-yt', 'scroll', 'Roteiro do YouTube') }}
+        {{ item('/vendas', 'cart-shopping', 'Vídeo de venda') }}
+        {{ item('/modelados', 'film', 'Vídeos modelados') }}
+        {{ item('/narracoes', 'file-pen', 'Roteiro para Áudio') }}
+      {% endcall %}
+      {% call grupo('producao', 'industry', 'Produção') %}
+        {{ item('/producao-pod', 'industry', 'Produção no pod') }}
+        {{ item('/flow', 'clapperboard', 'Google Flow') }}
+        {{ item('/ia-google', 'magnifying-glass', 'IA do Google') }}
+        {{ item('/textos', 'font', 'Textos animados') }}
+      {% endcall %}
+      {% call grupo('canal', 'chart-column', 'Canal e pesquisa') %}
+        {{ item('/perfis-canal', 'tv', 'Perfis do canal') }}
+        {{ item('/analisador-canal', 'chart-column', 'Analisador de canal') }}
+        {{ item('/niche-miner', 'person-digging', 'Niche Miner') }}
+      {% endcall %}
+      {% call grupo('voz', 'microphone', 'Voz') %}
+        {{ item('/gerar-voz', 'microphone', 'Gerador de voz') }}
+        {{ item('/perfis-de-voz', 'comment', 'Perfis de voz') }}
+      {% endcall %}
+      {% call grupo('ferramentas', 'toolbox', 'Ferramentas') %}
+        {{ item('/cortar-youtube', 'scissors', 'Cortar do YouTube') }}
+        {{ item('/redes-sociais', 'mobile-screen-button', 'Baixar de outras redes') }}
+        {{ item('/transcrever', 'closed-captioning', 'Transcrever') }}
+        {{ item('/capturar-pagina', 'image', 'Capturar página') }}
+        {{ item('/extrair-links-canal', 'link', 'Extrair links de canal') }}
+        {{ item('/contas-google', 'key', 'Contas Google') }}
+      {% endcall %}
+      {% call grupo('sistema', 'gear', 'Sistema') %}
+        {{ item('/ia', 'robot', 'IA nas buscas e modelos') }}
+        {{ item('/settings', 'sliders', 'Configurações') }}
+        {{ item('/espaco', 'broom', 'Espaço em disco') }}
+        {{ item('/guia', 'book', 'Guia de efeitos') }}
+      {% endcall %}
+    </nav>
+  </aside>
+  <div class="app-veu" data-ui-fechar-menu></div>
+  <div class="app-main">
+    <header class="app-topo" data-ui-base>
+      <button type="button" class="topo-btn icone abrir-menu" data-ui-abrir-menu title="Abrir o menu" aria-label="Abrir o menu"><i class="fa-solid fa-bars"></i></button>
+      <button type="button" class="topo-btn icone mini-menu" data-ui-mini-menu title="Recolher / abrir o menu lateral" aria-label="Recolher o menu"><i class="fa-solid fa-bars-staggered"></i></button>
+      <div class="topo-tit">{{ self.title() }}</div>
+      <div class="espaco"></div>
+      <div id="saldoBox" style="position:relative">
+        <button type="button" class="topo-btn" id="saldoBtn" title="Uso do Claude"><i class="fa-solid fa-coins"></i><span class="rot-longo">Claude</span><span class="rot-curto">—</span></button>
+        <div class="topo-painel" id="saldoPainel" role="dialog" aria-label="Uso do Claude"></div>
+      </div>
+      <button type="button" class="topo-btn icone" data-ui-tema-btn title="Mudar o tema" aria-label="Mudar entre modo claro e escuro"><i data-ui-tema-ico class="fa-solid fa-sun"></i></button>
+      {% include "_sino.html" %}
+    </header>
+    <main class="app-content" {% block content_attrs %}{% endblock %}>
   {% block content %}{% endblock %}
-  {% include "_sino.html" %}
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='ui/icones.js') }}?v=84161"></script>
+  <script src="{{ url_for('static', filename='ui/ui.js') }}?v=84161"></script>
   <script>
   // 🔄 v84_102: servidor rodando código velho (atualizou o site com ele aberto) → avisa em vez de deixar botão dar 404
   (function () {

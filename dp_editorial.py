@@ -3,7 +3,7 @@
 vinheta, serifada, versalete espaçado, acento vermelho), recriado a partir de
 vídeos de referência que a pessoa mandou:
 
-  ficha         linha sai do rosto até um cartão escuro (nome + dados linha a linha)   [sobre o vídeo]
+  ficha         cartão escuro ao lado (nome + dados linha a linha)                        [sobre o vídeo]
   nome          nome serifado + cargo em versalete, com um traço vermelho               [sobre o vídeo]
   post          post (X/Instagram…) sobre o vídeo desfocado + tradução em itálico       [sobre o vídeo]
   titulo_video  título gigante com o VÍDEO dentro das letras + definição digitada       [máscara]
@@ -48,12 +48,10 @@ _C_CREDITO = ("credito", "Crédito/fonte (canto)", "texto", "", "ex.: BBC NEWS �
 TIPOS: Dict[str, Dict[str, Any]] = {
     "ficha": {
         "nome": "🪪 Ficha de pessoa", "camada": "sobre", "dur": 5.0,
-        "quando": "apresentar alguém que aparece no vídeo (nome + cargo + dados), com uma linha saindo do rosto",
+        "quando": "apresentar alguém que aparece no vídeo (nome + cargo + dados) num cartão ao lado",
         "campos": [("rotulo", "Rótulo em vermelho", "texto", "PERFIL", "ex.: AUSTRÁLIA"),
                    ("nome", "Nome", "texto", "Nome da Pessoa", ""),
                    ("linhas", "Dados (um por linha: Rótulo: valor)", "linhas", "Cargo: Primeiro-ministro\nNo cargo desde: Maio de 2022", ""),
-                   ("ponto_x", "Ponto do rosto X (0–1)", "num", 0.5, "onde a linha começa"),
-                   ("ponto_y", "Ponto do rosto Y (0–1)", "num", 0.25, ""),
                    ("lado", "Lado do cartão", "escolha:direita|esquerda", "direita", ""), _C_CREDITO],
     },
     "nome": {
@@ -653,19 +651,7 @@ def _d_ficha(it, t, W, H, ctx):
     _cola(im, _cache(ctx, "ficha_base", base), x0 + dx, y0, a_card)
     for i in range(len(linhas)):
         _cola(im, _cache(ctx, f"ficha_l{i}", lambda i=i: linha_img(i)), x0 + dx, y0 + topo_linhas + i * lh, _janela(t, 0.55 + 0.13 * i, 0.3) * k_out)
-    # linha do rosto até o cartão
-    if not vert:
-        px, py = float(it.get("ponto_x", 0.5)) * W, float(it.get("ponto_y", 0.25)) * H
-        ex = x0 + dx if it.get("lado") != "esquerda" else x0 + dx + cw
-        ey = y0 + pad + int(24 * u) + int(30 * u)
-        p = _janela(t, 0.0, 0.4)
-        if p > 0 and k_out > 0:
-            d = ImageDraw.Draw(im, "RGBA")
-            qx, qy = px + (ex - px) * p, py + (ey - py) * p
-            al = int(225 * k_out)
-            d.line([px, py, qx, qy], fill=(240, 240, 240, al), width=max(1, int(1.6 * u)))
-            r = 4.5 * u
-            d.ellipse([px - r, py - r, px + r, py + r], fill=(250, 250, 250, al))
+    # v84_148: sem a linha/ponto ligando o rosto ao cartão (apontava pro lugar errado quando a foto não tem o rosto ali)
     _credito(ImageDraw.Draw(im, "RGBA"), it, W, H, u, "escuro", k_out * _cl(t / ENTRA_S))
     return im
 
@@ -975,6 +961,22 @@ def _particulas(d, W, H, u, t, n=26, semente=3, cor=(200, 205, 215)):
         d.ellipse([x - r, y - r, x + r, y + r], fill=cor + (al,))
 
 
+def _itens_linha_tempo(txt: str) -> List[Tuple[str, str]]:
+    """"MÊS | fato" — e também "1969: fato" / "1969 – fato" (a IA às vezes manda assim): a data vira o rótulo grande."""
+    out = []
+    for l in str(txt).split("\n"):
+        l = l.strip()
+        if not l:
+            continue
+        if "|" in l:
+            a, _s, b = l.partition("|")
+        else:
+            m = re.match(r"^\s*([^:|]{1,16}?)\s*(?::|\s[–—-])\s+(.+)$", l)
+            a, b = (m.group(1), m.group(2)) if m else (l, "")
+        out.append((a.strip().upper(), b.strip()))
+    return out
+
+
 def _d_linha_tempo(it, t, W, H, ctx):
     from PIL import ImageDraw
     u, dur = _u(W, H), it["end"] - it["start"]
@@ -982,14 +984,16 @@ def _d_linha_tempo(it, t, W, H, ctx):
     im = _fundo(fundo, W, H).copy()
     d = ImageDraw.Draw(im, "RGBA")
     claro = fundo == "papel"
-    itens = []
-    for l in (it.get("itens") or "").split("\n"):
-        if l.strip():
-            a, _s, b = l.partition("|")
-            itens.append((a.strip().upper(), b.strip()))
+    itens = _itens_linha_tempo(it.get("itens") or "")
     n = max(1, len(itens))
     S = W * (0.27 if not _vert(W, H) else 0.52)
     X0 = W * 0.078
+    # v84_148: o rótulo grande cabe no espaço de um item (antes "1969: VERLÄSST BERKELEY" inteiro em 80px atropelava o vizinho)
+    px_rot = 80 * u
+    maior = max([_largura(r, _f("serif_i", px_rot)) for r, _d in itens] or [1])
+    if maior > S * 0.86:
+        px_rot = max(30 * u, px_rot * S * 0.86 / maior)
+    px_desc = 21 * u
     seg = max(0.4, (dur - 0.8) / n)
     foco = -0.8 + 0.8 * _ease(t / 0.7)
     for kk in range(1, n):
@@ -1008,12 +1012,14 @@ def _d_linha_tempo(it, t, W, H, ctx):
         perto = max(0.0, 1 - abs(i - foco))
         al = 0.32 + 0.68 * perto
         cor = (24, 22, 20) if claro else (238, 238, 240)
-        f = _f("serif_i" if on else "serif", 80 * u)
+        f = _f("serif_i" if on else "serif", px_rot)
         d.text((x, yl - 24 * u), rot, font=f, fill=cor + (int(255 * al),), anchor="ls")
         r = 4.5 * u
         d.ellipse([x + 6 * u - r, yl - r, x + 6 * u + r, yl + r], fill=cor + (int(255 * al),))
         if desc:
-            d.text((x - 10 * u, yl + 50 * u), desc, font=_f("sans_i", 21 * u), fill=((90, 84, 76) if claro else (150, 156, 166)) + (int(255 * al),), anchor="ls")
+            fd = _f("sans_i", px_desc)
+            for k, l in enumerate(_quebrar(desc, fd, S * 0.86)[:3]):
+                d.text((x, yl + 50 * u + k * 28 * u), l, font=fd, fill=((90, 84, 76) if claro else (150, 156, 166)) + (int(255 * al),), anchor="ls")
     _credito(d, it, W, H, u, fundo)
     return _com_alfa(im, _k_tela(t, dur))
 
@@ -1494,8 +1500,24 @@ def previa_png(it: Dict[str, Any], t: float, W: int, H: int, destino: str, ctx: 
         letras.putalpha(mascara(it, t, W, H).point(lambda v: int(v * 0.9)))
         q.alpha_composite(letras)
     os.makedirs(os.path.dirname(destino) or ".", exist_ok=True)
-    q.save(destino)
+    q.save(destino, compress_level=1)  # v84_148: rápido (a prévia pede ~5 quadros/s)
     return destino
+
+
+_CTX_PREVIA: Dict[str, Dict[str, Any]] = {}
+
+
+def ctx_da_previa(it: Dict[str, Any], W: int, H: int, imagens: Optional[Dict[str, str]], prints: Optional[Dict[str, str]], pasta: str) -> Dict[str, Any]:
+    """O mesmo ctx (print redimensionado, navegador, sombras…) pra todos os quadros de um quadro editorial na prévia —
+    antes cada quadro abria e montava tudo de novo (a 🖥 página/Wikipedia travava)."""
+    base = {k: v for k, v in it.items() if k not in ("start", "end", "id")}
+    chave = hashlib.md5(json.dumps([base, W, H, sorted((imagens or {}).items()), sorted((prints or {}).items())], sort_keys=True, default=str).encode()).hexdigest()
+    ctx = _CTX_PREVIA.get(chave)
+    if ctx is None:
+        if len(_CTX_PREVIA) >= 8:
+            _CTX_PREVIA.pop(next(iter(_CTX_PREVIA)))
+        ctx = _CTX_PREVIA[chave] = novo_ctx(imagens, prints, pasta)
+    return ctx
 
 
 
@@ -1712,7 +1734,7 @@ def aplicar_editoriais(video_in: str, video_out: str, itens: List[Dict[str, Any]
 
 # ------------------------------------------------------------------ exemplos (miniaturas da galeria e quadro novo no Estúdio)
 EXEMPLOS: Dict[str, Dict[str, Any]] = {
-    "ficha": {"rotulo": "Entrevistada", "nome": "Helena Duarte", "linhas": "Cargo: Diretora de pesquisa\nNo cargo desde: Março de 2021\nÁrea: Inteligência artificial\nFala: Entrevista · out/2026", "ponto_x": 0.33, "ponto_y": 0.38, "_t": 2.6},
+    "ficha": {"rotulo": "Entrevistada", "nome": "Helena Duarte", "linhas": "Cargo: Diretora de pesquisa\nNo cargo desde: Março de 2021\nÁrea: Inteligência artificial\nFala: Entrevista · out/2026", "_t": 2.6},
     "nome": {"nome": "Helena Duarte", "cargo": "Diretora de pesquisa", "credito": "Entrevista", "_t": 1.8},
     "post": {"nome": "Ana Ribeiro", "usuario": "@anaribeiro", "texto": "\"Nobody expected this to happen so fast. We are not ready.\"", "data": "8 de out. de 2026",
              "traducao": "Ninguém esperava que isso acontecesse tão rápido. Não estamos prontos.", "credito": "Post no X", "_t": 3.0},

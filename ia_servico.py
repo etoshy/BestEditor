@@ -121,10 +121,13 @@ PADRAO: Dict[str, Any] = {
     "ativo": False, "provedor": "claude", "modelo": "claude-haiku-5-5", "chave": "",
     "recursos": {k: v[2] for k, v in RECURSOS.items()},
     "nota_minima": 7, "candidatos": 10, "limite_usd": 5.0,
+    "credito_usd": 0.0,  # 🪙 v84_161: quanto você pôs de crédito na conta (pro saldo ao lado do sininho); 0 = só mostra o gasto
     "sem_credito": None,  # {"quando": ts, "erro": "..."} — desliga sozinho até você tentar de novo
 }
 
 _RECENTES: List[Dict[str, Any]] = []  # últimas chamadas (mostradas na página /ia)
+_CTX = threading.local()  # 🪙 v84_161: rótulo da ação que está chamando a IA (aparece no saldo: "Roteiro: Hinterkaifeck")
+LOG_MAX = 300
 _SEM_PARAM: set = set()  # parâmetros que a API recusou (thinking/effort) — não manda de novo
 
 
@@ -184,6 +187,11 @@ def salvar_config(novos: Dict[str, Any]) -> Dict[str, Any]:
                     c[k] = int(max(lo, min(hi, int(float(novos[k])))))
                 except (TypeError, ValueError):
                     pass
+        if "credito_usd" in novos:
+            try:
+                c["credito_usd"] = round(max(0.0, float(str(novos["credito_usd"] or 0).replace(",", "."))), 2)
+            except (TypeError, ValueError):
+                pass
         if "limite_usd" in novos:
             try:
                 c["limite_usd"] = round(max(0.0, float(str(novos["limite_usd"]).replace(",", "."))), 2)
@@ -257,9 +265,61 @@ def gasto() -> Dict[str, Any]:
     return d
 
 
+class rotulo:
+    """`with ia.rotulo("Roteiro: Hinterkaifeck"):` — as chamadas feitas dentro levam esse nome no 🪙 saldo."""
+
+    def __init__(self, texto: str):
+        self.texto = str(texto or "").strip()[:120]
+        self.antes = None
+
+    def __enter__(self):
+        self.antes = getattr(_CTX, "rotulo", None)
+        _CTX.rotulo = self.texto
+        return self
+
+    def __exit__(self, *_a):
+        _CTX.rotulo = self.antes
+        return False
+
+
+def _entrada_log(recurso: str, u: Dict[str, Any], custo: float, job: Optional[str], ok: bool, erro: str = "",
+                 cache: bool = False) -> Dict[str, Any]:
+    e = {"quando": round(time.time(), 1), "recurso": recurso, "usd": round(custo, 6), "ok": bool(ok),
+         "entrada": int(u.get("input_tokens") or 0) + int(u.get("cache_creation_input_tokens") or 0),
+         "saida": int(u.get("output_tokens") or 0), "cache_lido": int(u.get("cache_read_input_tokens") or 0)}
+    rot = getattr(_CTX, "rotulo", None) or ""
+    if rot:
+        e["rotulo"] = rot
+    if job:
+        e["job"] = str(job)[:60]
+    if erro:
+        e["erro"] = str(erro)[:200]
+    if cache:
+        e["cache"] = True
+    return e
+
+
+def _guardar_log(d: Dict[str, Any], e: Dict[str, Any]) -> None:
+    log = d.setdefault("log", [])
+    log.append(e)
+    del log[:-LOG_MAX]
+
+
+def _registrar_cache(recurso: str, job: Optional[str]) -> None:
+    """Resposta que já estava guardada (não paga de novo) — entra no histórico do saldo como grátis."""
+    with _TRAVA:
+        d = gasto()
+        _guardar_log(d, _entrada_log(recurso, {}, 0.0, job, True, cache=True))
+        try:
+            _gravar(USO_PATH, d)
+        except OSError:
+            pass
+
+
 def _registrar(recurso: str, u: Dict[str, Any], custo: float, job: Optional[str], ok: bool, erro: str = "") -> None:
     with _TRAVA:
         d = gasto()
+        _guardar_log(d, _entrada_log(recurso, u, custo, job, ok, erro))
         d["desde"] = d["desde"] or time.time()
         d["usd"] = round(d["usd"] + custo, 6)
         d["chamadas"] += 1
@@ -289,7 +349,36 @@ def recentes() -> List[Dict[str, Any]]:
 
 def zerar_gasto() -> None:
     with _TRAVA:
-        _gravar(USO_PATH, {"usd": 0.0, "chamadas": 0, "por_recurso": {}, "desde": time.time()})
+        _gravar(USO_PATH, {"usd": 0.0, "chamadas": 0, "por_recurso": {}, "desde": time.time(), "log": []})
+
+
+def nome_recurso(recurso: str) -> str:
+    """Nome do recurso sem o emoji do começo (pro saldo)."""
+    nome = RECURSOS.get(recurso, (recurso or "outro",))[0]
+    return re.sub(r"^[^\w(]+", "", nome).strip() or nome
+
+
+def saldo() -> Dict[str, Any]:
+    """🪙 v84_161: o que aparece ao lado do sininho — gasto, crédito informado, saldo, hoje, custo por ação e as últimas chamadas."""
+    c = config()
+    g = gasto()
+    log = [x for x in (g.get("log") or []) if isinstance(x, dict)]
+    t0 = time.localtime()
+    meia_noite = time.mktime((t0.tm_year, t0.tm_mon, t0.tm_mday, 0, 0, 0, 0, 0, -1))
+    hoje = sum(float(x.get("usd") or 0) for x in log if float(x.get("quando") or 0) >= meia_noite)
+    por = [{"recurso": k, "nome": nome_recurso(k), "usd": round(float(v.get("usd") or 0), 6), "chamadas": int(v.get("chamadas") or 0)}
+           for k, v in (g.get("por_recurso") or {}).items() if isinstance(v, dict)]
+    por.sort(key=lambda x: -x["usd"])
+    cred = float(c.get("credito_usd") or 0)
+    gasto_usd = round(float(g.get("usd") or 0), 6)
+    return {
+        "ativo": bool(c.get("ativo")), "motivo": motivo_desligado(None, c), "modelo": c.get("modelo") or "",
+        "gasto_usd": gasto_usd, "chamadas": int(g.get("chamadas") or 0), "desde": g.get("desde"),
+        "hoje_usd": round(hoje, 6), "credito_usd": round(cred, 2), "saldo_usd": round(cred - gasto_usd, 6) if cred else None,
+        "limite_usd": float(c.get("limite_usd") or 0), "console": PROVEDORES[c["provedor"]].get("console") or "",
+        "por_recurso": por[:20],
+        "log": [dict(x, nome=nome_recurso(str(x.get("recurso") or ""))) for x in reversed(log[-60:])],
+    }
 
 
 def _marcar_sem_credito(erro: str) -> None:
@@ -441,6 +530,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
         if guardado is not None:
             _RECENTES.append({"quando": time.time(), "recurso": recurso, "ok": True, "usd": 0.0, "erro": "", "cache_local": True,
                               "entrada": 0, "saida": 0, "cache_lido": 0})
+            _registrar_cache(recurso, job)
             return guardado.get("v")
 
     tentativas, espera = 0, 2.0

@@ -1400,3 +1400,52 @@ def _aplicar_extras() -> None:
 
 
 _aplicar_extras()
+
+
+# ------------------------------------------------------------------ v84_148: destaque × quadro com texto
+_ORIGENS_AUTO = ("auto", "ia", "ia_busca")
+
+
+def _cena_tem_texto(tid: Optional[str]) -> bool:
+    if not tid:
+        return False
+    try:
+        import cenas_dp
+        return bool(cenas_dp.campos_de_texto(tid)) or cenas_dp.tem_fala(tid)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def janelas_com_texto(editoriais: Optional[List[Dict[str, Any]]], trechos: Optional[List[Dict[str, Any]]]) -> List[Tuple[float, float]]:
+    """Onde já tem texto/número grande na tela: os quadros editoriais e as cenas (templates) com texto."""
+    out = []
+    for e in editoriais or []:
+        try:
+            out.append((float(e["start"]), float(e["end"])))
+        except (KeyError, TypeError, ValueError):
+            pass
+    for s in trechos or []:
+        if _cena_tem_texto(s.get("template")):
+            try:
+                out.append((float(s["start"]), float(s["end"])))
+            except (KeyError, TypeError, ValueError):
+                pass
+    return out
+
+
+def em_conflito(d: Dict[str, Any], janelas: List[Tuple[float, float]], limite: float = 0.3) -> bool:
+    try:
+        ini, fim = float(d["start"]), float(d["end"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    dur = max(0.05, fim - ini)
+    return any(max(0.0, min(fim, b) - max(ini, a)) / dur >= limite for a, b in janelas)
+
+
+def sem_conflito(destaques: List[Dict[str, Any]], editoriais=None, trechos=None, so_automaticos: bool = True) -> List[Dict[str, Any]]:
+    """Tira os destaques (da IA/automáticos; os feitos à mão ficam) que cairiam em cima de um quadro/cena que já
+    mostra texto — antes "40.000 Seiten" aparecia duas vezes, um por cima do outro."""
+    jan = janelas_com_texto(editoriais, trechos)
+    if not jan:
+        return list(destaques or [])
+    return [d for d in destaques or [] if (so_automaticos and d.get("origem") not in _ORIGENS_AUTO) or not em_conflito(d, jan)]

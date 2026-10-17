@@ -33,6 +33,10 @@ h3{margin:14px 0 8px;font-size:11px;letter-spacing:.04em;color:var(--dim);text-t
 #res{margin-top:12px}
 video{max-width:100%;border-radius:6px;background:#000}
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" data-ui-base>
+<style data-ui-base>/* v84_161: emojis → ícones (static/ui/ui.js, modo mínimo) */
+.ico{display:inline-block;min-width:1.05em;text-align:center;font-size:.95em;line-height:1;vertical-align:-.06em}
+.emo-txt{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;font-size:0}</style>
 </head>
 <body>
 <header><b>🔤 Textos animados</b><span class="hint">os mesmos 207 estilos do Estúdio — pra baixar como vídeo e usar em qualquer editor</span><span style="flex:1"></span><a href="{{ url_for('jobs_history_page') }}">🗂️ Galeria</a><a href="/">Início</a></header>
@@ -124,5 +128,7 @@ lista(); campos(); prev();
 })();
 </script>
 {% include "_sino.html" %}
+<script src="{{ url_for('static', filename='ui/icones.js') }}?v=84161"></script>
+<script src="{{ url_for('static', filename='ui/ui.js') }}?v=84161" data-modo="minimo"></script>
 </body>
 </html>

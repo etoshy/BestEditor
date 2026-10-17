@@ -2,7 +2,7 @@
 {% block title %}{{ lote.nome }} — Produção no pod{% endblock %}
 {% block content %}
 <style>
-  body { max-width: 1100px; }
+  .app-content { max-width: 1100px; }
   .pl-item { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
   .pl-topo { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
   .pl-estado { font-size: .8rem; border-radius: 999px; padding: 2px 10px; background: #f1f5f9; white-space: nowrap; }
@@ -32,14 +32,18 @@
     document.getElementById('itens').innerHTML = d.itens.map(it => {
       const c = it.cenas ? `🎬 ${it.cenas.cenas} cenas · 🖼 ${it.cenas.no_pod} no pod (${it.cenas.pct}%) · ⏳ ${it.cenas.pendentes} pendentes` : '';
       const zip = it.gv_id ? `<a href="/gerar-voz/baixar-zip/${it.gv_id}" title="narração + legenda + info.json — o mesmo .zip do Gerador de voz">⬇ ZIP</a>` : '';
+      const refazer = (it.pod_img && (it.faltam_img || it.estado === 'erro') && ['pronto', 'erro'].includes(it.estado)) ? ` <button type="button" data-refazer="${it.id}" title="o pod precisa estar ligado" style="width:auto;padding:2px 8px;font-size:.8rem;background:#7c3aed;">🔁 Gerar de novo as ${it.faltam_img || ''} que falharam</button>` : '';
       const rebaixar = (it.pod_img && ['pronto', 'erro'].includes(it.estado)) ? ` <button type="button" data-rebaixar="${it.id}" title="o pod precisa estar ligado" style="width:auto;padding:2px 8px;font-size:.8rem;">🖼 Baixar imagens de novo</button>` : '';
-      const acoes = zip + rebaixar + (it.job_id ? ` <a href="/job/${it.job_id}/edit-segments" style="font-weight:600;">📂 Abrir no editor →</a>`
+      const acoes = zip + refazer + rebaixar + (it.job_id ? ` <a href="/job/${it.job_id}/edit-segments" style="font-weight:600;">📂 Abrir no editor →</a>`
                   : (it.estado === 'erro' ? ` <button type="button" data-tentar="${it.id}" style="width:auto;">🔁 Tentar de novo</button>` : ''));
       return `<div class="pl-item"><div class="pl-topo">
           <div style="min-width:0;"><b>${esc(it.titulo)}</b> <span style="font-size:.8rem;color:#888;">${esc(it.idioma)} · ${esc(it.motor)}${it.perfil ? ' · 🗣️ ' + esc(it.perfil) : ''}</span></div>
           <div style="display:flex;gap:10px;align-items:center;"><span class="pl-estado ${esc(it.estado)}">${esc(it.rotulo)}</span>${acoes}</div></div>
         <div class="pl-msg">${esc(it.erro || it.mensagem)}</div>
         ${c ? `<div class="pl-msg">${c}</div>` : ''}
+        ${(it.recentes || []).length ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+            ${it.recentes.slice(0, 8).map(n => `<a href="/producao-pod/${LID}/${it.id}/galeria#${n}" target="_blank" rel="noopener"><img src="/producao-pod/${LID}/${it.id}/imagem/${n}" loading="lazy" title="${n}" style="width:96px;height:54px;object-fit:cover;border-radius:5px;background:#eee;"></a>`).join('')}
+            <a href="/producao-pod/${LID}/${it.id}/galeria" target="_blank" rel="noopener" style="font-size:.82rem;font-weight:600;">👀 ver as ${it.baixadas || it.recentes.length} imagens →</a></div>` : ''}
         ${(it.avisos || []).map(a => `<div class="pl-msg" style="color:#92400e;">⚠ ${esc(a)}</div>`).join('')}
         <details><summary style="cursor:pointer;font-size:.8rem;color:#666;">registro</summary><pre class="pl-log">${esc((it.log || []).join('\n'))}</pre></details></div>`;
     }).join('');
@@ -47,6 +51,8 @@
     if (d.status === 'rodando') setTimeout(atualizar, 3000);
   }
   document.getElementById('itens').addEventListener('click', async (e) => {
+    const rf = e.target.dataset.refazer;
+    if (rf) { e.target.disabled = true; const d = await post(`/producao-pod/${LID}/${rf}/refazer-imagens`); if (d && d.erro) alert(d.erro); atualizar(); return; }
     const re = e.target.dataset.rebaixar;
     if (re) { e.target.disabled = true; await post(`/producao-pod/${LID}/${re}/imagens-de-novo`); atualizar(); return; }
     const id = e.target.dataset.tentar; if (!id) return;

@@ -2,7 +2,7 @@
 {% block title %}Modelos de vídeo{% endblock %}
 {% block content %}
 <style>
-  body { max-width: 1000px; }
+  .app-content { max-width: 1000px; }
   .ds-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
   .ds-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
   .ds-passos span { background: #f1f5f9; border: 1px solid #cbd5e1; color: #1e293b; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; }
@@ -19,6 +19,7 @@
 
 {% if erro %}<div class="error">{{ erro }}</div>{% endif %}
 
+<div class="ds-card" style="background:#eef2ff;border-color:#c7d2fe;"><b>🚀 Piloto automático</b> — cole os links e o texto (roteiro ou anotações) e o site faz tudo até a parte que precisa de você. <a href="/piloto"><b>Abrir →</b></a></div>
 <div class="ds-card">
   <h2 style="margin:0;">+ Novo projeto</h2>
   <form method="post" action="{{ url_for('dossies_novo') }}" id="formNovo">

@@ -351,6 +351,8 @@ def registrar(app, base_dir: str) -> None:
             except (TypeError, ValueError):
                 pass
         vd.salvar(base_dir, p)
+        if "idioma" in c:
+            __import__("ultimas_escolhas").lembrar(base_dir, idioma=cfg.get("idioma"))
         return jsonify({"ok": True, "config": cfg})
 
     @app.route("/vendas/<pid>/prompt", methods=["POST"])

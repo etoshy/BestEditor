@@ -332,7 +332,7 @@ def registrar(app, base_dir: str) -> None:
         except Exception:  # noqa: BLE001
             return jsonify({"erro": "Projeto não encontrado."}), 404
         tema = str(p.get("tema") or p.get("titulo") or "")
-        a = ch.analisar(texto, tema) if texto.strip() else {}
+        a = ch.analisar(texto, tema, set((p.get("checagem") or {}).get("rep_ignoradas") or [])) if texto.strip() else {}
         cr = ch.cronologia(texto, tema) if texto.strip() else {}
         cr.pop("ano_de", None)
         return jsonify({"ok": True, "local": a, "cronologia": cr, "ultima": p.get("checagem") or None})
@@ -372,7 +372,8 @@ def registrar(app, base_dir: str) -> None:
                                              f"correções · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
         reg = {"quando": _time.time(), "resumo": d["resumo"], "verificar": d["verificar"], "inconsistencias": d["inconsistencias"],
                "linha_do_tempo": d["linha_do_tempo"], "aplicadas": r["aplicadas"], "nao_achadas": r["nao_achadas"],
-               "por_eixo": por_eixo, "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"]}
+               "por_eixo": por_eixo, "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"],
+               "rep_ignoradas": ((p.get("checagem") or {}).get("rep_ignoradas") or [])}  # o "não é repetição" fica
         for t in reg["aplicadas"]:
             orig = next((x for x in d["trocas"] if x["de"][:200] == t["de"]), {})
             t["eixo"], t["fonte"] = orig.get("eixo", ""), orig.get("fonte", "")
@@ -392,22 +393,79 @@ def registrar(app, base_dir: str) -> None:
         return jsonify({"ok": True, **r})
 
     # ------------------------------------------------------------------ 🌐 checagem por uma 2ª IA com internet (v84_133)
-    @app.route("/checagem/<origem>/<pid>/web/prompt", methods=["POST"])
-    def checagem_web_prompt(origem: str, pid: str):
+    def _montar_prompt_web(origem: str, pid: str, foco: str):
+        """O prompt das inconsistências (o mesmo pra colar numa IA ou mandar pro 🔷 Gemini). LookupError = sem projeto."""
         import checagem_roteiro as ch
         import idiomas
+        import re as _re
         try:
             p, texto, pad = _roteiro(origem, pid)
-        except Exception:  # noqa: BLE001
-            return jsonify({"erro": "Projeto não encontrado."}), 404
+        except Exception as exc:  # noqa: BLE001
+            raise LookupError("Projeto não encontrado.") from exc
+        t = ch.prompt_web(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
+                          str(p.get("tema") or p.get("titulo") or ""), p.get("checagem") or {},
+                          (p.get("resultado") or {}).get("afirmacoes") or [], str(foco or ""))
+        reg = p.get("checagem") or {}
+        reg["web_itens"] = _re.findall(r"^- ([A-Z]\d+) ", t, _re.M)
+        _guardar(origem, pid, "checagem", reg)
+        return p, texto, t
+
+    @app.route("/checagem/<origem>/<pid>/web/prompt", methods=["POST"])
+    def checagem_web_prompt(origem: str, pid: str):
         c = request.get_json(silent=True) or {}
         try:
-            t = ch.prompt_web(texto, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"),
-                              str(p.get("tema") or p.get("titulo") or ""), p.get("checagem") or {},
-                              (p.get("resultado") or {}).get("afirmacoes") or [], str(c.get("foco") or ""))
+            _p, texto, t = _montar_prompt_web(origem, pid, str(c.get("foco") or ""))
+        except LookupError as exc:
+            return jsonify({"erro": str(exc)}), 404
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify({"ok": True, "prompt": t, "caracteres": len(t), "palavras_roteiro": len(texto.split())})
+
+    # ------------------------------------------------------------------ 🔷 Gemini com a busca do Google (v84_162)
+    @app.route("/gemini/status")
+    def gemini_status():
+        import gemini_servico as gm
+        return jsonify(gm.resumo())
+
+    @app.route("/gemini/config", methods=["POST"])
+    def gemini_config():
+        import gemini_servico as gm
+        c = request.get_json(silent=True) or {}
+        try:
+            gm.salvar_config({k: c[k] for k in ("chave", "modelo") if k in c})
+        except gm.GeminiErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True, **gm.resumo()})
+
+    @app.route("/gemini/testar", methods=["POST"])
+    def gemini_testar():
+        import gemini_servico as gm
+        return jsonify(gm.testar())
+
+    @app.route("/checagem/<origem>/<pid>/web/gemini", methods=["POST"])
+    def checagem_web_gemini(origem: str, pid: str):
+        """🔷 Manda o prompt das inconsistências pro Gemini com a busca do Google e devolve o JSON das correções.
+        Roda em SEGUNDO PLANO (pode fechar a aba; ao voltar, a resposta é colada e aplicada; chega aviso no 🔔)."""
+        import gemini_servico as gm
+        import tarefas_bg
+        c = request.get_json(silent=True) or {}
+        if not gm.chave():
+            return jsonify({"erro": "Falta a chave do Gemini — cole na caixa “🔷 Gemini” logo acima."}), 400
+        try:
+            p, _texto, t = _montar_prompt_web(origem, pid, str(c.get("foco") or ""))
+        except LookupError as exc:
+            return jsonify({"erro": str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        nome = str(p.get("tema") or p.get("titulo") or p.get("nome") or "roteiro")[:80]
+        pagina = str(c.get("pagina") or "")
+
+        def _rodar(tr):
+            r = gm.checar(t, rotulo="Checagem: " + nome, on_log=tr.progresso)
+            return {**r, "prompt_caracteres": len(t)}
+        tid = tarefas_bg.iniciar("checagem_gemini", "🔷 Checagem na internet (Gemini): " + nome, _rodar, pagina=pagina,
+                                 alvo={"origem": origem, "pid": pid})
+        return jsonify({"ok": True, "tarefa": tid, "prompt": t})
 
     @app.route("/checagem/<origem>/<pid>/web/ler", methods=["POST"])
     def checagem_web_ler(origem: str, pid: str):
@@ -426,6 +484,9 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": str(exc)}), 400
         if not d["trocas"] and not d["conferidos"]:
             return jsonify({"erro": "O JSON não tem \"correcoes\" nem \"conferidos\"."}), 400
+        reg0 = p.get("checagem") or {}
+        a0 = ch.analisar(texto, str(p.get("tema") or p.get("titulo") or ""), set(reg0.get("rep_ignoradas") or []))
+        reps0 = a0.get("repeticoes") or []  # os R1, R2… do prompt (antes de aplicar)
         r = rv.aplicar(texto, _json.dumps({"trocas": d["trocas"]}, ensure_ascii=False))
         g = {}
         if r["aplicadas"]:
@@ -439,20 +500,144 @@ def registrar(app, base_dir: str) -> None:
             t["eixo"], t["fonte"], t["web"] = orig.get("eixo", ""), orig.get("fonte", ""), True
         ver = reg.get("verificar") or []
         marcados = 0
+        ign = list(reg.get("rep_ignoradas") or [])
         for c in d["conferidos"]:
-            if c["item"].startswith("V") and c["item"][1:].isdigit() and c["ok"]:
-                i = int(c["item"][1:]) - 1
+            num = c["item"][1:]
+            if c["item"].startswith("V") and num.isdigit():
+                i = int(num) - 1
                 if 0 <= i < len(ver):
-                    ver[i].update(conferido=True, fonte_web=c["fonte"], nota_web=c["nota"])
-                    marcados += 1
+                    ver[i].update(conferido=bool(c["ok"]), fonte_web=c["fonte"], nota_web=c["nota"],
+                                  status_web="confirmado" if c["ok"] else "nao_confirmado")
+                    marcados += 1 if c["ok"] else 0
+            elif c["item"].startswith("R") and num.isdigit() and c["ok"] and 0 < int(num) <= len(reps0):
+                ign.append(reps0[int(num) - 1]["chave"])  # a IA disse que NÃO é repetição: sai da lista
+        # v84_156: corrigido também é resolvido (antes só os "conferidos" marcavam ✔ — o corrigido ficava pendente)
+        feitos = {x.get("item") for x in d["trocas"] if x.get("item") and any(x["de"][:200] == t["de"] for t in r["aplicadas"])}
+        _NOTA = {"corrigido": "✏ corrigido", "falso": "✖ falso — tirado do texto", "sem_fonte": "❔ sem confirmação — atribuído/suavizado",
+                 "repeticao": "✂ repetição tirada"}
+        for it in feitos:
+            if it.startswith("V") and it[1:].isdigit() and 0 <= int(it[1:]) - 1 < len(ver):
+                tr = next((x for x in d["trocas"] if x.get("item") == it), {})
+                ver[int(it[1:]) - 1].update(conferido=True, status_web=tr.get("status") or "corrigido",
+                                            nota_web=_NOTA.get(tr.get("status"), "✏ corrigido") + (": " + tr["motivo"].split(": ", 1)[-1] if ": " in (tr.get("motivo") or "") else ""),
+                                            fonte_web=tr.get("fonte") or "")
+                marcados += 1
+        reg["rep_ignoradas"] = list(dict.fromkeys(ign))[-300:]
         reg["verificar"] = ver
+        itens_prompt = reg.get("web_itens") or []
+        respondidos = {x.get("item") for x in d["trocas"]} | {c["item"] for c in d["conferidos"]}
+        sem_resposta = [i for i in itens_prompt if i not in respondidos]
         reg["aplicadas"] = (reg.get("aplicadas") or []) + r["aplicadas"]
+        aplicados_de = {t["de"] for t in r["aplicadas"]}
+        itens_res = [{"item": x.get("item") or "?", "status": x.get("status") or "corrigido", "nota": (x.get("motivo") or "")[:200],
+                      "fonte": x.get("fonte") or "", "aplicada": x["de"][:200] in aplicados_de, "de": x["de"][:160], "para": x["para"][:160]}
+                     for x in d["trocas"]]
+        itens_res += [{"item": c["item"], "status": "confirmado" if c["ok"] else "nao_confirmado", "nota": c["nota"], "fonte": c["fonte"],
+                       "aplicada": True} for c in d["conferidos"]]
         reg["web"] = {"quando": _time.time(), "resumo": d["resumo"], "aplicadas": len(r["aplicadas"]),
-                      "nao_achadas": r["nao_achadas"], "conferidos": d["conferidos"]}
+                      "nao_achadas": r["nao_achadas"], "conferidos": d["conferidos"], "itens": itens_res, "sem_resposta": sem_resposta}
         _guardar(origem, pid, "checagem", reg)
         return jsonify({"ok": True, "aplicadas": r["aplicadas"], "nao_achadas": r["nao_achadas"], "conferidos": d["conferidos"],
-                        "verificar_marcados": marcados, "palavras_antes": r["palavras_antes"],
+                        "verificar_marcados": marcados, "sem_resposta": sem_resposta, "palavras_antes": r["palavras_antes"],
                         "palavras_depois": r["palavras_depois"], "resumo": d["resumo"], **g})
+
+    def _aplicar_repeticoes(origem: str, pid: str, resposta: str, reps: List[Dict[str, Any]]) -> Dict[str, Any]:
+        import json as _json
+        import json_ia
+        import revisao_roteiro as rv
+        d = json_ia.carregar(resposta)
+        if not isinstance(d, dict):
+            raise ValueError("A resposta tem que ser um JSON com \"trocas\".")
+        trocas = [{"de": str(t["de"]), "para": str(t.get("para") or ""), "motivo": "✂️ repetição"}
+                  for t in d.get("trocas") or d.get("correcoes") or [] if isinstance(t, dict) and str(t.get("de") or "").strip()]
+        p, texto, _pad = _roteiro(origem, pid)
+        r = rv.aplicar(texto, _json.dumps({"trocas": trocas}, ensure_ascii=False))
+        g = {}
+        if r["aplicadas"]:
+            g = _gravar(origem, pid, p, r["texto"], None, [], chave_antes="-",
+                        hist=("✂️ repetições", f"{len(r['aplicadas'])} trecho(s) · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
+            p, _t, _pad = _roteiro(origem, pid)
+        reg = p.get("checagem") or {}
+        ign = list(reg.get("rep_ignoradas") or [])
+        nao = [str(x).upper().replace(" ", "") for x in d.get("nao_e_repeticao") or []]
+        for x in nao:
+            if x.startswith("R") and x[1:].isdigit() and 0 < int(x[1:]) <= len(reps):
+                ign.append(reps[int(x[1:]) - 1]["chave"])
+        reg["rep_ignoradas"] = list(dict.fromkeys(ign))[-300:]
+        reg["aplicadas"] = (reg.get("aplicadas") or []) + [dict(t, eixo="repeticao") for t in r["aplicadas"]]
+        _guardar(origem, pid, "checagem", reg)
+        return {"ok": True, "aplicadas": len(r["aplicadas"]), "nao_achadas": r["nao_achadas"], "nao_e_repeticao": len(nao),
+                "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"], **g}
+
+    def _reps_atuais(origem: str, pid: str):
+        import checagem_roteiro as ch
+        import idiomas
+        p, texto, pad = _roteiro(origem, pid)
+        reps = ch.analisar(texto, str(p.get("tema") or p.get("titulo") or ""), set((p.get("checagem") or {}).get("rep_ignoradas") or []))["repeticoes"]
+        return texto, reps, idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt")
+
+    @app.route("/checagem/<origem>/<pid>/repeticoes/prompt", methods=["POST"])
+    def checagem_reps_prompt(origem: str, pid: str):
+        import checagem_roteiro as ch
+        try:
+            texto, reps, lingua = _reps_atuais(origem, pid)
+            return jsonify({"ok": True, "prompt": ch.prompt_repeticoes(texto, reps, lingua), "pares": len(reps)})
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+
+    @app.route("/checagem/<origem>/<pid>/repeticoes/ler", methods=["POST"])
+    def checagem_reps_ler(origem: str, pid: str):
+        try:
+            _t, reps, _l = _reps_atuais(origem, pid)
+            return jsonify(_aplicar_repeticoes(origem, pid, str((request.get_json(silent=True) or {}).get("texto") or ""), reps))
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+
+    @app.route("/checagem/<origem>/<pid>/repeticoes/ia", methods=["POST"])
+    def checagem_reps_ia(origem: str, pid: str):
+        """✂️ Corrige TODAS as repetições da lista de uma vez com a IA do site (em segundo plano)."""
+        import checagem_roteiro as ch
+        import ia_servico as ia
+        import tarefas_bg
+        if not ia.ativo("roteiros"):
+            return jsonify({"erro": "A IA está desligada (" + (ia.motivo_desligado("roteiros") or "ligue em 🤖 IA") + ")."}), 400
+        try:
+            texto, reps, lingua = _reps_atuais(origem, pid)
+            pr = ch.prompt_repeticoes(texto, reps, lingua)
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+
+        def rodar(t):
+            t.progresso(f"✂️ a IA está tirando {len(reps)} repetição(ões)…")
+            resp = ia.chamar("roteiros", "Responda SÓ com o JSON pedido, sem texto antes ou depois.", pr, schema=None,
+                             max_tokens=16000, effort="medium", timeout=900)
+            if not resp:
+                raise RuntimeError("A IA não respondeu.")
+            return _aplicar_repeticoes(origem, pid, resp, reps)
+
+        tid = tarefas_bg.iniciar("repeticoes", "✂️ Corrigir as repetições", rodar,
+                                 pagina=str((request.get_json(silent=True) or {}).get("pagina") or ""))
+        return jsonify({"ok": True, "tarefa": tid})
+
+    @app.route("/checagem/<origem>/<pid>/repeticao-ignorar", methods=["POST"])
+    def checagem_rep_ignorar(origem: str, pid: str):
+        """✓ não é repetição: o par some da lista (e do prompt)."""
+        try:
+            p, _t, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        reg = p.get("checagem") or {}
+        c = request.get_json(silent=True) or {}
+        ign = list(reg.get("rep_ignoradas") or [])
+        if c.get("limpar"):
+            ign = []
+        elif str(c.get("chave") or ""):
+            ign.append(str(c["chave"])[:12])
+        reg["rep_ignoradas"] = list(dict.fromkeys(ign))[-300:]
+        _guardar(origem, pid, "checagem", reg)
+        return jsonify({"ok": True, "ignoradas": len(reg["rep_ignoradas"])})
 
     @app.route("/checagem/<origem>/<pid>/verificar/<int:i>", methods=["POST"])
     def checagem_conferido(origem: str, pid: str, i: int):

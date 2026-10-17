@@ -494,6 +494,12 @@ def criar(base: str, tema: str = "", modelo: str = "true_crime") -> Dict[str, An
     cfg = dict(CONFIG_PADRAO, modelo=modelo if modelo in MODELOS else "true_crime")
     fk, fv = next(iter(MODELOS[cfg["modelo"]]["formatos"].items()))
     cfg.update(formato=fk, minutos=fv["minutos"])
+    import ultimas_escolhas as ue  # 🔁 v84_161: idioma e canal da última vez
+    ult = ue.ler(base)
+    if ult.get("idioma"):
+        cfg["idioma"] = ult["idioma"]
+    if "nome_canal" in ult:
+        cfg["nome_canal"] = ult["nome_canal"]
     p = {"id": pid, "criado": time.time(), "atualizado": time.time(), "tema": (tema or "").strip()[:300],
          "roteiro_base": "", "config": cfg, "fontes": [], "midias": [], "resultado": None}
     salvar(base, p)
@@ -555,7 +561,7 @@ def excluir(base: str, pid: str) -> None:
 
 
 def nome_do_projeto(p: Dict[str, Any]) -> str:
-    return (p.get("tema") or ((p.get("resultado") or {}).get("titulos") or [""])[0] or "Projeto sem tema")[:120]
+    return (p.get("apelido") or p.get("tema") or ((p.get("resultado") or {}).get("titulos") or [""])[0] or "Projeto sem tema")[:120]
 
 
 # ------------------------------------------------------------------ matérias (qualquer site)
@@ -1057,6 +1063,17 @@ def adicionar_fonte_arquivo(base: str, p: Dict[str, Any], nome: str, conteudo: b
     return f
 
 
+_RX_VIDEO = re.compile(
+    r"^https?://(?:[\w-]+\.)*(?:youtube\.com/(?:watch|shorts/|live/|embed/)|youtu\.be/|vimeo\.com/\d|player\.vimeo\.com/|"
+    r"tiktok\.com/.+/video/|vm\.tiktok\.com/|instagram\.com/(?:reel|reels|tv|p)/|facebook\.com/(?:.+/videos/|watch|reel/)|fb\.watch/|"
+    r"dailymotion\.com/video/|dai\.ly/|twitch\.tv/videos/|rumble\.com/v|kwai\.com/|(?:x|twitter)\.com/[^/]+/status/)", re.I)
+
+
+def eh_link_de_video(url: str) -> bool:
+    """🎬 v84_161: link de vídeo (YouTube, TikTok, Instagram, Vimeo, Facebook, X…) — vira transcrição nas anotações."""
+    return bool(_RX_VIDEO.match(str(url or "").strip()))
+
+
 def adicionar_fonte(p: Dict[str, Any], url: str) -> Dict[str, Any]:
     url = _vd._checar_url(url)
     if any(x["url"] == url for x in p.get("fontes") or []):
@@ -1132,7 +1149,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if (p.get("roteiro_base") or "").strip():
         L.append("")
         L.append("## Meu roteiro / anotações — GUIA (os fatos e o que eu quero destacar; confira e complete com as fontes)")
-        L.append(p["roteiro_base"].strip()[:30000])
+        L.append(p["roteiro_base"].strip()[:120000])  # v84_161: cabe a transcrição de vídeos
         L.append("")
         L.append(metodo_roteiro.bloco_guia("o meu roteiro/as minhas anotações"))
     if fontes:

@@ -127,7 +127,8 @@ def registrar(app, base_dir: str, jobs: Dict[str, Dict[str, Any]], save_state: C
     def modelados_page():
         return render_template("modelados.html", projetos=md.listar_projetos(base_dir), estilos=md.listar_estilos(),
                                vozes=_vozes_view(), perfis=_perfis(), formatos=md.FORMATOS, duracoes=md.DURACOES_VIDEO + ("auto",),
-                               resolucoes=md.RESOLUCOES_VIDEO, legendas=__import__("dp_legendas").ESTILOS)
+                               resolucoes=md.RESOLUCOES_VIDEO, legendas=__import__("dp_legendas").ESTILOS,
+                               ultimo_idioma=__import__("ultimas_escolhas").pegar(base_dir, "modelado_idioma"))
 
     @app.route("/modelados/novo", methods=["POST"])
     def modelados_novo():
@@ -135,6 +136,8 @@ def registrar(app, base_dir: str, jobs: Dict[str, Dict[str, Any]], save_state: C
         try:
             proj = md.criar_projeto(base_dir, f.get("nome", ""), f.get("estilo_id", "kamishibai"), f.get("tema", ""),
                                     f.get("duracao_alvo"), f.get("formato"), f.get("idioma"), f.get("instrucoes_extra", ""))
+            if (f.get("idioma") or "").strip():
+                __import__("ultimas_escolhas").lembrar(base_dir, modelado_idioma=f.get("idioma"))
         except md.ModeladoError as exc:
             return render_template("modelados.html", projetos=md.listar_projetos(base_dir), estilos=md.listar_estilos(),
                                    vozes=_vozes_view(), formatos=md.FORMATOS, duracoes=md.DURACOES_VIDEO + ("auto",),
@@ -175,6 +178,9 @@ def registrar(app, base_dir: str, jobs: Dict[str, Dict[str, Any]], save_state: C
                     proj[k] = corpo[k].strip()[:4000]
             if isinstance(corpo.get("nome_canal"), str):  # 📺 v84_95
                 proj["nome_canal"] = " ".join(corpo["nome_canal"].split())[:80]
+            __import__("ultimas_escolhas").lembrar(  # 🔁 v84_161: vira o padrão dos próximos projetos
+                base_dir, nome_canal=proj.get("nome_canal") if isinstance(corpo.get("nome_canal"), str) else None,
+                modelado_idioma=proj.get("idioma") if isinstance(corpo.get("idioma"), str) and proj.get("idioma") else None)
             if corpo.get("formato") in md.FORMATOS:
                 proj["formato"] = corpo["formato"]
             if corpo.get("duracao_alvo") not in (None, ""):

@@ -127,3 +127,23 @@ def test_cataloga_so_texto_sem_fotos(tmp_path, monkeypatch):
     el = elenco.montar_com_ia(base, p)
     assert el["locais"][0]["nome"] == "A fazenda" and el["cronologia"][0]["ano"] == 1950
     assert "Ainda não tenho fotos" in visto[0][-1]["text"]
+
+
+def test_descrever_em_blocos_de_20_e_refaz_as_que_faltaram(monkeypatch):
+    import re
+    import ia_servico
+    monkeypatch.setattr(ia_servico, "ativo", lambda r=None: True)
+    chamadas = []
+
+    def chamar(rec, system, conteudo, schema=None, **kw):
+        ns = [int(x) for x in re.findall(r"^\[(\d+)\]", conteudo, re.M)]
+        chamadas.append(ns)
+        if len(chamadas) == 1:  # o 1º bloco falha inteiro
+            return None
+        return {"cenas": [{"n": n, "visual": "v", "busca": "b", "dificil": 5, "prompt_imagem": f"p{n}", "ano": 0}
+                          for n in ns if n % 7 or len(chamadas) > 3]}
+    monkeypatch.setattr(ia_servico, "chamar", chamar)
+    cenas = [{"start": i * 5, "end": i * 5 + 5, "fala": f"fala {i}"} for i in range(45)]
+    info = cenas_lote.descrever(cenas)
+    assert len(info) == 45 and info[45]["prompt_imagem"] == "p45"
+    assert max(len(c) for c in chamadas) <= 20 and len(chamadas) > 3

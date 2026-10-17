@@ -141,6 +141,9 @@ def criar(base: str, link: str = "", nome: str = "") -> Dict[str, Any]:
          "produto": {"titulo": "", "preco": "", "topicos": [], "descricao": "", "detalhes": "", "imagens": [], "videos": [],
                      "conteudo": "", "legendas": {}},
          "produto_erro": None, "midias": [], "config": dict(CONFIG_PADRAO), "roteiro": None}
+    import ultimas_escolhas as ue  # 🔁 v84_161: idioma da última vez
+    if ue.pegar(base, "idioma"):
+        p["config"]["idioma"] = ue.pegar(base, "idioma")
     salvar(base, p)
     return p
 

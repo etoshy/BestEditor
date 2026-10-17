@@ -829,6 +829,8 @@ def _build_drawtext_filter(
     escaped_font_path = _escape_path_for_ffmpeg_filter(font_path)
 
     fontsize = style.get("font_size") or max(18, round(target_height * 0.055))
+    if style.get("font_size_pct") and not style.get("font_size"):  # 🤖 v84_145: tamanho em % da altura (selo de IA)
+        fontsize = max(12, round(target_height * float(style["font_size_pct"]) / 100))
     font_color = style.get("font_color") or "white"
 
     position = style.get("position", "bottom-center")
@@ -1907,10 +1909,17 @@ def apply_overlays(
         if media_type == "text":
             # texto puro não consome nenhum input novo — desenha direto
             # em cima do vídeo atual, só ativo na sua própria janela.
-            text_filter = _build_drawtext_filter(ov.get("text", ""), target_height, ov.get("style"))
-            filter_parts.append(
-                f"{current_label}{text_filter}:enable='between(t,{start:.3f},{end:.3f})'{next_label}"
-            )
+            st_ov = dict(ov.get("style") or {})
+            if st_ov.get("animation") in ("fade", "slide", "zoom"):
+                # animação na janela do PRÓPRIO overlay (tempo do vídeo inteiro): o drawtext já põe o enable
+                st_ov["start_offset"], st_ov["end_offset"] = start, end
+                text_filter = _build_drawtext_filter(ov.get("text", ""), target_height, st_ov)
+                filter_parts.append(f"{current_label}{text_filter}{next_label}")
+            else:
+                text_filter = _build_drawtext_filter(ov.get("text", ""), target_height, ov.get("style"))
+                filter_parts.append(
+                    f"{current_label}{text_filter}:enable='between(t,{start:.3f},{end:.3f})'{next_label}"
+                )
             current_label = next_label
             continue
 

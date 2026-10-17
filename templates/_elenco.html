@@ -6,6 +6,8 @@
     <button type="button" id="elNova" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Pessoa</button>
     <button type="button" id="elNovoLocal" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Local</button>
     <button type="button" id="elSalvar" style="width:auto;margin:0;padding:5px 12px;">💾 Salvar</button>
+    <button type="button" id="elZerar" title="apaga o elenco (pessoas, locais e cronologia) e cataloga de novo com a IA — as fotos do modelo ficam" style="width:auto;margin:0;padding:5px 12px;background:#b91c1c;color:#fff;">🗑 Começar do zero</button>
+    <button type="button" id="elGuias" title="abre no 🧲 navegador das imagens (o Brave do site, com o script) uma guia do Google Imagens pra cada pessoa/lugar SEM foto — as que você capturar entram direto nela/nele" style="width:auto;margin:0;padding:5px 12px;background:#1a73e8;color:#fff;">🧲 Buscar quem está sem foto</button>
     <span id="elSt" style="color:#555;"></span>
   </div>
   <div id="elLista" style="margin-top:8px;"></div>
@@ -52,10 +54,13 @@
         <input data-k="tipo" value="${esc(x.tipo)}" placeholder="tipo" style="width:110px;margin:0;">
         <input data-k="descricao" value="${esc(x.descricao)}" placeholder="descrição em inglês" style="flex:1;min-width:180px;margin:0;font-size:.8rem;">
         ${(x.fotos || []).length ? x.fotos.map(id => `<img src="${urlDe(id)}" title="${id}" style="width:70px;height:50px;object-fit:cover;border-radius:4px;">`).join('') : '<span style="font-size:.72rem;color:#92400e;" title="gerado pela descrição (fiel às fontes), igual em todas as cenas">📝 sem foto — pela descrição</span>'}
+        <button type="button" data-guial="${i}" title="🧲 abrir no navegador das imagens (as fotos entram neste lugar)" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem;background:#1a73e8;">🧲</button>
         <button type="button" data-tirarl="${i}" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem;background:#94a3b8;">✕</button>
       </div>`).join('');
   }
   $e('elLocais').addEventListener('click', (e) => {
+    const g = e.target.closest('[data-guial]');
+    if (g) { lerLocais(); const x = EL.locais[+g.dataset.guial]; if (x && x.nome) abrirGuiasEl([{ tipo: 'local', nome: x.nome, termo: x.nome }]); return; }
     const b = e.target.closest('[data-tirarl]'); if (!b) return;
     lerLocais(); EL.locais.splice(+b.dataset.tirarl, 1); desenharLocais();
   });
@@ -77,6 +82,7 @@
           <input data-k="papel" value="${esc(x.papel)}" placeholder="papel (o pai, vítima…)" style="width:200px;margin:0;">
           <label style="margin:0;font-weight:400;font-size:.8rem;">nasceu em <input data-k="nascimento" type="number" value="${x.nascimento || ''}" placeholder="ano" style="width:80px;margin:0;"></label>
           <input data-k="aparencia" value="${esc(x.aparencia)}" placeholder="aparência em inglês (white man, thin face, glasses…)" style="flex:1;min-width:200px;margin:0;font-size:.82rem;">
+          <button type="button" data-guiap="${i}" title="🧲 abrir no navegador das imagens (as fotos que você capturar entram nesta pessoa)" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem;background:#1a73e8;">🧲</button>
           <button type="button" data-tirar="${i}" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem;background:#94a3b8;">✕</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
@@ -115,9 +121,45 @@
     acompanhando = false;
   }
 
+  // 🧲 navegador das imagens: as fotos chegam no servidor; aqui só JUNTA as novas (não perde o que você editou sem salvar)
+  async function abrirGuiasEl(itens) {
+    itens = itens.filter(x => (x.nome || '').trim()); if (!itens.length) { $e('elSt').textContent = 'ninguém pra buscar'; return; }
+    $e('elSt').textContent = '🧲 abrindo…';
+    try { const d = await chamar(BASE + '/guias', { itens });
+      $e('elSt').textContent = `✔ ${d.guias} guia(s) no ${d.navegador} — marque as fotos e clique em "Capturar e enviar ao site"; elas aparecem aqui sozinhas`;
+      vigiarFotos(); }
+    catch (err) { $e('elSt').textContent = '⚠ ' + err.message; }
+  }
+  let vigiandoF = 0;
+  async function vigiarFotos() {
+    vigiandoF = Date.now(); const meu = vigiandoF;
+    for (let k = 0; k < 450 && meu === vigiandoF; k++) {  // ~30 min
+      await new Promise(ok => setTimeout(ok, 4000));
+      let d = null; try { d = await chamar(BASE); } catch (_) { continue; }
+      const srv = d.elenco || {}; let novas = 0;
+      if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#elCard')) { lerTela(); lerLocais(); }
+      (srv.pessoas || []).forEach(sp => {
+        let x = EL.pessoas.find(y => (y.nome || '').trim().toLowerCase() === (sp.nome || '').trim().toLowerCase());
+        if (!x) { x = Object.assign({}, sp, { fotos: [] }); EL.pessoas.push(x); }
+        (sp.fotos || []).forEach(f => { if (!x.fotos.some(g => g.midia === f.midia)) { x.fotos.push(f); novas++; } });
+      });
+      (srv.locais || []).forEach(sl => {
+        let x = EL.locais.find(y => (y.nome || '').trim().toLowerCase() === (sl.nome || '').trim().toLowerCase());
+        if (!x) { x = Object.assign({}, sl, { fotos: [] }); EL.locais.push(x); }
+        (sl.fotos || []).forEach(id => { if (!x.fotos.includes(id)) { x.fotos.push(id); novas++; } });
+      });
+      if (novas) { FOTOS = d.fotos || FOTOS; desenhar(); $e('elSt').textContent = `🧲 +${novas} foto(s) chegaram — confira as idades e 💾 Salvar`; }
+    }
+  }
+  $e('elGuias').addEventListener('click', () => {
+    lerTela(); lerLocais();
+    abrirGuiasEl([...EL.pessoas.filter(x => !(x.fotos || []).length).map(x => ({ tipo: 'pessoa', nome: x.nome, termo: x.nome })),
+                  ...(EL.locais || []).filter(x => !(x.fotos || []).length).map(x => ({ tipo: 'local', nome: x.nome, termo: x.nome }))].slice(0, 10));
+  });
   $e('elLista').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     lerTela();
+    if (b.dataset.guiap) { const x = EL.pessoas[+b.dataset.guiap]; if (x && x.nome) abrirGuiasEl([{ tipo: 'pessoa', nome: x.nome, termo: x.nome }]); return; }
     if (b.dataset.tirar) EL.pessoas.splice(+b.dataset.tirar, 1);
     if (b.dataset.tirarf) { const [i, j] = b.dataset.tirarf.split(':').map(Number); EL.pessoas[i].fotos.splice(j, 1); }
     desenhar();
@@ -141,6 +183,16 @@
     $e('elIa').disabled = true; $e('elSt').textContent = '🤖 começando…';
     try { aplicar(await chamar(BASE + '/ia', {})); }
     catch (err) { $e('elSt').textContent = '⚠ ' + err.message; $e('elIa').disabled = false; }
+  });
+  $e('elZerar').addEventListener('click', async () => {
+    if (!confirm('Apagar o elenco inteiro (pessoas, idades, locais e cronologia) e começar do zero?\n\nAs fotos do modelo ficam. Depois a IA cataloga tudo de novo.')) return;
+    $e('elZerar').disabled = true; $e('elSt').textContent = '🗑 zerando…';
+    try {
+      aplicar(await chamar(BASE + '/zerar', {}));
+      $e('elSt').textContent = '🤖 começando do zero…';
+      aplicar(await chamar(BASE + '/ia', {}));
+    } catch (err) { $e('elSt').textContent = '⚠ ' + err.message + ' (o elenco foi zerado — dá pra ➕ montar à mão)'; }
+    $e('elZerar').disabled = false;
   });
   chamar(BASE).then(aplicar).catch(() => {});
 })();

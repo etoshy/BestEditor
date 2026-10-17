@@ -88,11 +88,17 @@ def registrar(app, base_dir: str) -> None:
             alvo = {k: str(v)[:80] for k, v in (corpo.get("alvo") or {}).items() if k in ("resp", "ler", "prompt", "botao")} \
                 if isinstance(corpo.get("alvo"), dict) else {}
             titulo = "🤖 " + (str(corpo.get("titulo") or "").strip()[:120] or "Roteiro pela IA")
-            tid = tarefas_bg.iniciar("ia_gerar", titulo, lambda t: {"texto": _gerar_roteiro(prompt)},
+            rot = str(corpo.get("titulo") or "").strip()[:100]
+
+            def _rodar(_t):
+                with ia.rotulo(rot):
+                    return {"texto": _gerar_roteiro(prompt)}
+            tid = tarefas_bg.iniciar("ia_gerar", titulo, _rodar,
                                      pagina=str(corpo.get("pagina") or ""), alvo=alvo)
             return jsonify({"ok": True, "tarefa": tid})
         try:
-            texto = _gerar_roteiro(prompt)
+            with ia.rotulo(str(corpo.get("titulo") or "").strip()[:100]):
+                texto = _gerar_roteiro(prompt)
         except RuntimeError as exc:
             return jsonify({"erro": str(exc)}), 200
         return jsonify({"ok": True, "texto": texto})
@@ -110,6 +116,25 @@ def registrar(app, base_dir: str) -> None:
     def ia_zerar_gasto():
         ia.zerar_gasto()
         return redirect(url_for("ia_page"))
+
+    @app.route("/ia/saldo")
+    def ia_saldo():
+        """🪙 v84_161: o número ao lado do sininho e a lista do que rodou (custo por ação)."""
+        d = ia.saldo()
+        try:  # 🔷 v84_162: o Gemini da checagem na internet aparece junto (custo estimado + cota grátis da busca)
+            import gemini_servico as gm
+            g = gm.resumo()
+            d["gemini"] = {k: g[k] for k in ("tem_chave", "modelo", "gasto_usd", "chamadas", "buscas_usadas", "buscas_gratis",
+                                             "buscas_periodo", "console")}
+        except Exception:  # noqa: BLE001
+            d["gemini"] = None
+        return jsonify(d)
+
+    @app.route("/ia/credito", methods=["POST"])
+    def ia_credito():
+        corpo = request.get_json(silent=True) or {}
+        c = ia.salvar_config({"credito_usd": corpo.get("credito_usd") or 0})
+        return jsonify({"ok": True, "credito_usd": c.get("credito_usd", 0)})
 
     @app.route("/ia/status")
     def ia_status():

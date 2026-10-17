@@ -2,9 +2,9 @@
 <div class="tts-card" id="ttsCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
   <h2 style="margin:0 0 6px;font-size:1.1rem;">🎙 Adaptar o roteiro pro TTS <span style="font-weight:400;font-size:.82rem;color:#666;">(pontuação, ritmo, números e siglas do jeito que se fala — no idioma do roteiro, sem mudar fatos nem encurtar)</span></h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
-    <label style="margin:0;font-weight:400;">🌐 Idioma <select id="ttsIdioma" style="width:auto;margin:0;"><option value="">o do roteiro</option>{% for cod, nome in (idiomas or []) %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}</select></label>
-    <label style="margin:0;font-weight:400;">🎬 Direção narrativa <select id="ttsDirecao" style="width:auto;margin:0;"><option value="">a do tipo de vídeo</option></select></label>
-    <label style="margin:0;font-weight:400;">🔊 Motor <select id="ttsMotor" style="width:auto;margin:0;"></select></label>
+    <label style="margin:0;font-weight:400;">🌐 Idioma <select id="ttsIdioma" style="width:auto;margin:0;" data-lembrar="tts_idioma" data-lembrar-aplicar><option value="">o do roteiro</option>{% for cod, nome in (idiomas or []) %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}</select></label>
+    <label style="margin:0;font-weight:400;">🎬 Direção narrativa <select id="ttsDirecao" style="width:auto;margin:0;" data-lembrar="tts_direcao" data-lembrar-aplicar><option value="">a do tipo de vídeo</option></select></label>
+    <label style="margin:0;font-weight:400;">🔊 Motor <select id="ttsMotor" style="width:auto;margin:0;" data-lembrar="tts_motor" data-lembrar-aplicar></select></label>
     <button type="button" id="ttsGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
     <button type="button" data-ia-gerar="ttsGerar" data-ia-prompt="ttsPrompt" data-ia-resp="ttsResp" data-ia-ler="ttsLer" data-ia-status="ttsSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Gerar com a IA</button>
     <button type="button" id="ttsDesfazer" style="display:none;width:auto;margin:0;padding:5px 12px;background:#64748b;">↩ Voltar ao roteiro de antes</button>

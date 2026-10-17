@@ -2,7 +2,7 @@
 {% block title %}Vídeos modelados{% endblock %}
 {% block content %}
 <style>
-  body { max-width: 1000px; }
+  .app-content { max-width: 1000px; }
   .md-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
   .md-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
   .md-passos span { background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; }
@@ -54,7 +54,7 @@
       </div>
       <div>
         <label>Idioma da narração</label>
-        <input type="text" name="idioma" id="novo-idioma" value="{{ estilos[0].idioma if estilos else 'português do Brasil' }}">
+        <input type="text" name="idioma" id="novo-idioma" value="{{ ultimo_idioma or (estilos[0].idioma if estilos else 'português do Brasil') }}">
       </div>
       <div>
         <label>Instruções extras pra IA (opcional)</label>

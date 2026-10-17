@@ -384,13 +384,14 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         if not ia_servico.ativo("elenco"):
             return jsonify({"erro": "IA: " + (ia_servico.motivo_desligado("elenco") or "desligada")}), 400
-        if (_RODANDO.get(pid) or {}).get("ativo"):
-            return jsonify(_estado(p))
-        _RODANDO[pid] = {"ativo": True, "msg": "🤖 começando…", "erro": ""}
+        r0 = _RODANDO.get(pid) or {}
+        if r0.get("ativo") and time.time() - float(r0.get("inicio") or 0) < 20 * 60:
+            return jsonify(_estado(p))  # já está rodando (travado há mais de 20 min = roda de novo)
+        _RODANDO[pid] = {"ativo": True, "msg": "🤖 começando…", "erro": "", "inicio": time.time()}
 
         def rodar():
             try:
-                novo = montar_com_ia(base_dir, p, job=pid, on_passo=lambda m: _RODANDO[pid].update(msg=m))
+                novo = montar_com_ia(base_dir, ds.carregar(base_dir, pid), job=pid, on_passo=lambda m: _RODANDO[pid].update(msg=m))
                 if novo is None:
                     _RODANDO[pid] = {"ativo": False, "msg": "", "erro": "a IA não respondeu — tente de novo"}
                     return
@@ -404,6 +405,19 @@ def registrar(app, base_dir: str) -> None:
                 _RODANDO[pid] = {"ativo": False, "msg": "", "erro": str(exc)[:300]}
 
         threading.Thread(target=rodar, daemon=True).start()
+        return jsonify(_estado(p))
+
+    @app.route("/modelos-video/<pid>/elenco/zerar", methods=["POST"])
+    def elenco_zerar(pid: str):
+        """🗑 Começar do zero: apaga o elenco (pessoas, locais, cronologia) — as fotos do modelo ficam."""
+        with dossies_rotas._TRAVA:
+            p = _p(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            p["elenco"] = {"pessoas": [], "locais": [], "cronologia": []}
+            ds.marcar_mudanca(p, "🎭 elenco", "zerado")
+            ds.salvar(base_dir, p)
+        _RODANDO.pop(pid, None)
         return jsonify(_estado(p))
 
     @app.route("/modelos-video/<pid>/elenco", methods=["POST"])

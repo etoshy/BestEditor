@@ -2,7 +2,7 @@
 {% block title %}Modelo de vídeo{% endblock %}
 {% block content %}
 <style>
-  body { max-width: 1150px; }
+  .app-content { max-width: 1150px; }
   .ds-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
   .ds-card h2 { margin: 0 0 6px; font-size: 1.15rem; }
   .ds-card input[type=url], .ds-card input[type=file] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
@@ -34,10 +34,12 @@
 </style>
 
 <p><a href="{{ url_for('dossies_page') }}">← Modelos de vídeo</a></p>
-<h1 id="titulo">🕵️ {{ p.tema or 'Projeto' }}</h1>
+<h1 id="titulo">🕵️ {{ p.apelido or p.tema or 'Projeto' }}</h1>
+<div style="margin:-4px 0 8px;"><button type="button" id="plLigar" style="display:none;width:auto;margin:0 8px 0 0;padding:4px 12px;font-size:.82rem;background:#4338ca;color:#fff;" title="roda sozinho o que falta: fontes → roteiro → revisão/checagem → perguntas de fotos e termos → prompt da checagem na internet; para pra você; depois fotos → elenco → TTS">🚀 Piloto automático</button>{% set cl_tipo = 'dossie' %}{% set cl_id = p.id %}{% include "_clonar.html" %}{% if p.clonado_de %}<span style="font-size:.8rem;color:#666;margin-left:8px;">📑 cópia de <a href="/modelos-video/{{ p.clonado_de }}">outro projeto</a></span>{% endif %}</div>
 
+{% set pl_pid = p.id %}{% include "_piloto.html" %}
 <!-- 1 · tema e modelo -->
-<div class="ds-card">
+<div class="ds-card" data-feito="{{ '1' if p.tema else '0' }}">
   <h2><span class="ds-num">1</span>Tema e modelo</h2>
   <label>Tema</label>
   <input type="text" id="tema" value="{{ p.tema }}">
@@ -72,9 +74,10 @@
 </div>
 
 <!-- 2 · fontes -->
-<div class="ds-card">
+<div class="ds-card" data-feito="{{ '1' if p.fontes else '0' }}">
   <h2><span class="ds-num">2</span>Fontes (matérias de qualquer site)</h2>
   <p class="ds-hint">Cole um ou vários links (um por linha). De cada matéria o sistema salva título, linha fina, autor, data, subtítulos e o texto inteiro — e baixa as imagens com a legenda (elas aparecem nos materiais com o código da fonte). Ícones e logos pequenos ficam de fora.</p>
+  <p class="ds-hint">🎬 <b>Link de vídeo</b> (YouTube, Shorts, TikTok, Instagram, Vimeo, Facebook, X…): o sistema pega a <b>transcrição sem os tempos</b> e coloca no campo <b>Roteiro / anotações seus</b> (etapa 1), um bloco por vídeo. Dá pra misturar matérias e vídeos na mesma lista.</p>
   <textarea id="urls" rows="3" placeholder="https://...&#10;https://..."></textarea>
   <div class="ds-row"><button class="ds-mini" id="btnFontes">➕ Adicionar fontes</button><span class="ds-hint" id="fontesSt"></span></div>
   <div class="ds-row" style="margin-top:10px;padding-top:8px;border-top:1px dashed #ddd;">
@@ -88,7 +91,7 @@
 </div>
 
 <!-- 3 · materiais -->
-<div class="ds-card">
+<div class="ds-card" data-feito="{{ '1' if p.midias else '0' }}">
   <h2><span class="ds-num">3</span>Materiais (imagens, vídeos, textos)</h2>
   <div class="ds-row ds-tabs" id="abasAdd">
     <button class="on" data-a="pc">💻 Do PC</button><button data-a="url">🔗 De um link</button><button data-a="texto">📝 Texto</button>
@@ -123,7 +126,7 @@
 </div>
 
 <!-- 4 · prompt e resultado -->
-<div class="ds-card">
+<div class="ds-card" data-feito="{{ '1' if (p.resultado or {}).roteiro else '0' }}">
   <h2><span class="ds-num">4</span>Prompt pra IA → roteiro</h2>
   <div class="ds-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="ds-mini" id="btnPrompt">📝 Gerar prompt</button><button type="button" class="ds-mini" data-ia-gerar="btnPrompt" data-ia-prompt="prompt" data-ia-resp="resp" data-ia-ler="btnLerResp" data-ia-status="promptSt" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><button class="ds-mini ds-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="ds-hint" id="promptSt"></span></div>
   <textarea id="prompt" rows="6" readonly class="ds-mono" style="display:none;margin-top:6px;"></textarea>
@@ -133,13 +136,15 @@
   <div id="resBox"></div>
 </div>
 
-{% if (p.resultado or {}).roteiro %}{% set fr_pid = p.id %}{% include "_fotos_roteiro.html" %}{% endif %}
-{% if (p.resultado or {}).roteiro %}{% set el_pid = p.id %}{% include "_elenco.html" %}{% endif %}
-{% set rev_base = '/revisao/dossie/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).roteiro_antes_revisao %}{% include "_revisao.html" %}
-{% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %}
-{% include "_historico.html" %}
-{% set tts_base = '/tts-adaptar/dossie/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).roteiro_antes_tts %}{% include "_adaptar_tts.html" %}
-{% set thumbs_base = '/thumbs/dossie/' ~ p.id %}{% include "_thumbs.html" %}
+{# v84_161: as etapas na ordem em que se usam (a mesma do 🚀 piloto automático): roteiro → revisão → checagem → fotos → elenco → TTS → thumbnails. O histórico fica no fim. #}
+{% set _rot = (p.resultado or {}).roteiro or '' %}
+<div data-feito="{{ '1' if (p.resultado or {}).roteiro_antes_revisao else '0' }}">{% set rev_base = '/revisao/dossie/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).roteiro_antes_revisao %}{% include "_revisao.html" %}</div>
+<div data-feito="0">{% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %}</div>
+{% if _rot %}<div data-feito="{{ '1' if '[I' in _rot else '0' }}">{% set fr_pid = p.id %}{% include "_fotos_roteiro.html" %}</div>{% endif %}
+{% if _rot %}<div data-feito="{{ '1' if (p.elenco or {}).pessoas else '0' }}">{% set el_pid = p.id %}{% include "_elenco.html" %}</div>{% endif %}
+<div data-feito="{{ '1' if (p.resultado or {}).roteiro_antes_tts else '0' }}">{% set tts_base = '/tts-adaptar/dossie/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).roteiro_antes_tts %}{% include "_adaptar_tts.html" %}</div>
+<div data-feito="0">{% set thumbs_base = '/thumbs/dossie/' ~ p.id %}{% include "_thumbs.html" %}</div>
+<div data-feito="0">{% include "_historico.html" %}</div>
 
 <script>
 const PID = {{ p.id|tojson }};
@@ -244,11 +249,36 @@ $('btnArqFonte').addEventListener('click', async () => {
     : `<span class="ds-erro">⚠ ${esc(d.erro || (d.erros || []).join(' · ') || r.status)}</span>`;
   $('arqFonte').value = ''; recarregar();
 });
+// 🎬 v84_161: transcrição dos links de vídeo → campo "Roteiro / anotações seus" (roda no servidor; pode fechar a aba)
+async function acompanharVideos(tid) {
+  const st = () => $('vidSt') || $('fontesSt');
+  while (true) {
+    let t = null;
+    try { const r = await fetch('/tarefas/' + tid, { cache: 'no-store' }); if (r.status === 404) return; t = await r.json(); } catch (_) {}
+    if (t && t.status === 'rodando') { if (t.progresso) st().textContent = '🎬 ' + t.progresso; }
+    else if (t) {
+      fetch('/tarefas/' + tid + '/aplicada', { method: 'POST' }).catch(() => {});
+      if (t.status !== 'pronto') { st().innerHTML = `<span class="ds-erro">⚠ ${esc(t.erro || 'não deu pra transcrever')}</span>`; return; }
+      const res = t.resultado || {};
+      try { const dd = await (await fetch(`/modelos-video/${PID}/dados`, { cache: 'no-store' })).json(); if (document.activeElement !== $('rotBase')) $('rotBase').value = dd.roteiro_base || ''; } catch (_) {}
+      st().innerHTML = `<span class="ds-ok">✔ ${(res.feitos || []).length} transcrição(ões) no campo “Roteiro / anotações seus”</span>`
+        + ((res.falhas || []).length ? ` <span class="ds-erro">⚠ ${esc(res.falhas.join(' · '))}</span>` : '');
+      return;
+    }
+    await new Promise(r => setTimeout(r, 2500));
+  }
+}
+// voltou na página com uma transcrição rodando ou pronta: retoma
+fetch('/tarefas?tipo=dossie_transcricao&pendentes=1&limite=5&pagina=' + encodeURIComponent(location.pathname)).then(r => r.json())
+  .then(d => (d.tarefas || []).slice(0, 1).forEach(t => { $('fontesSt').innerHTML = '<span class="ds-ok" id="vidSt">🎬 transcrição dos vídeos…</span>'; acompanharVideos(t.id); })).catch(() => {});
 $('btnFontes').addEventListener('click', async () => {
   try {
     const d = await api(`/modelos-video/${PID}/fontes`, { urls: $('urls').value });
-    $('fontesSt').innerHTML = `<span class="ds-ok">✔ ${d.novas.length} na fila</span>` + (d.erros.length ? ` <span class="ds-erro">⚠ ${esc(d.erros.join(' · '))}</span>` : '');
+    $('fontesSt').innerHTML = (d.novas.length || !d.videos ? `<span class="ds-ok">✔ ${d.novas.length} matéria(s) na fila</span>` : '')
+      + (d.videos ? ` <span class="ds-ok" id="vidSt">🎬 ${d.videos} vídeo(s): pegando a transcrição pras anotações…</span>` : '')
+      + (d.erros.length ? ` <span class="ds-erro">⚠ ${esc(d.erros.join(' · '))}</span>` : '');
     $('urls').value = ''; recarregar();
+    if (d.tarefa_videos) acompanharVideos(d.tarefa_videos);
   } catch (e) { $('fontesSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
 });
 

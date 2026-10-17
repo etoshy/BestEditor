@@ -55,7 +55,7 @@
   </p>
 </div>
 
-<form id="form-gerar-voz" enctype="multipart/form-data" style="margin-top:20px;">
+<form id="form-gerar-voz" enctype="multipart/form-data" style="margin-top:20px;" data-lembrar="gerar_voz">
   <label>Texto a narrar</label>
   {% if roteiro_id %}<input type="hidden" name="roteiro_id" value="{{ roteiro_id }}">{% endif %}
   {% if dossie_id %}<input type="hidden" name="dossie_id" value="{{ dossie_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#334155;">🕵️ Roteiro do modelo de vídeo — os capítulos ganham o tempo real do áudio, e o .zip leva o projeto: no <b>Novo vídeo</b> as imagens do tema entram sozinhas.</p>{% endif %}
@@ -97,7 +97,7 @@ E no final...</pre>
   {% if texto_inicial %}<p style="font-size:0.82rem;color:#5b21b6;margin:4px 0 0;">📜 Texto vindo da aba Roteiro do YouTube.{% if '[[' in texto_inicial %} 📣 Ele tem marcas <code>[[INSCREVA]]</code>/<code>[[VENDA]]</code>: não são lidas — viram pausas onde entram os seus vídeos no editor (baixe o .zip).{% endif %}{% if '[' in texto_inicial.replace('[[', '').replace(']]', '') %} Ele tem tags de voz ([laugh], [whispering]…): use o motor <b>Chatterbox Turbo</b> (inglês) pra elas virarem som/estilo.{% endif %}</p>{% endif %}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.88rem;">
     <span>🌐 Idioma da narração (vai junto no .zip — o vídeo inteiro segue ele):</span>
-    <select name="idioma_narracao" style="width:auto;margin:0;padding:4px 8px;">
+    <select name="idioma_narracao" style="width:auto;margin:0;padding:4px 8px;"{% if idioma_inicial %} data-nao-restaurar{% endif %}>
       <option value="auto" {% if not idioma_inicial %}selected{% endif %}>Automático (pela voz escolhida / pelo texto)</option>
       {% for cod, nome in idiomas_lista %}<option value="{{ cod }}" {% if cod == idioma_inicial %}selected{% endif %}>{{ nome }}</option>{% endfor %}
     </select>

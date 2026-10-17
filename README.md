@@ -28,6 +28,25 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🔷 Checagem na internet com o Gemini + busca do Google (v84_162)
+
+- Na 🔎 **Checagem do roteiro** → 🌐 **Checar na internet**, o botão **🔷 Checar e ajustar com o Gemini** manda o prompt das inconsistências (cronologia, alegações, repetições) pro Gemini com a **busca do Google** ligada, cola o JSON e ajusta o roteiro sozinho. Mostra as buscas feitas e as fontes consultadas. Roda em segundo plano (aviso no 🔔).
+- **Chave:** [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → *Create API key*; cole na própria caixa (fica em `gemini_config.json`, fora do Git). O 🔌 Testar faz uma pergunta curta com busca.
+- **Modelos:** Gemini 2.5 Flash (padrão) ou 2.5 Flash-Lite. O Google só libera os 2.5 pra quem já usou antes: se a chave não tiver acesso, o site cai sozinho no **Gemini 3.5 Flash-Lite** (e lembra disso).
+- **Custo:** a busca do Google é grátis até 1.500 pedidos/dia nos 2.5 (5.000/mês nos Gemini 3); os tokens custam centavos. O gasto **estimado** aparece na caixa e no 🪙 painel do saldo.
+- O **prompt + JSON pra colar em outra IA** continua igual, logo abaixo.
+- 🪙 **Saldo:** com o crédito informado, o painel mostra o **saldo restante** e **quanto já gastou no Claude**, lado a lado.
+
+## 🎨 Visual novo: menu lateral, modo claro/escuro, ícones e etapas numeradas (v84_161)
+
+- **Menu lateral** com as ferramentas em grupos (Roteiros e modelos, Produção, Canal e pesquisa, Voz, Ferramentas, Sistema). O botão ☰ do topo recolhe o menu só pros ícones; no celular ele vira uma gaveta.
+- **Modo claro e escuro** no site inteiro: o botão ao lado do sininho troca (fica salvo no navegador). O escuro é o padrão.
+- **Ícones no lugar dos emojis** (Font Awesome, que vem junto em `static/vendor/fontawesome` — funciona sem internet). As fontes Poppins e Inter também vêm junto (`static/ui/fontes`).
+- **Etapas numeradas** em todas as páginas com mais de uma seção: cada uma tem um ▾ pra recolher e o botão **Concluir** (a etapa concluída recolhe sozinha e a próxima abre). O índice **Etapas** fica sempre à direita (só números em tela média, botão flutuante no celular): clicar rola até a etapa. Nos 🕵️ Modelos de vídeo e no 📜 Roteiro do YouTube as etapas seguem a ordem de uso (roteiro → revisão → checagem → fotos → elenco → TTS → thumbnails; histórico no fim) e as que já foram feitas vêm marcadas.
+- **🪙 Saldo do Claude** ao lado do sininho: quanto já gastou (ou quanto resta, se você informar o crédito que pôs na conta). Clicando, mostra o custo por ação e as últimas chamadas, com tokens e custo de cada uma.
+- **🎬 Link de vídeo nas fontes** (Modelos de vídeo): YouTube, Shorts, TikTok, Instagram, Vimeo, Facebook, X… viram a **transcrição sem os tempos** no campo **Roteiro / anotações seus**, um bloco por vídeo (em segundo plano, com aviso no 🔔).
+- **🔁 Últimas escolhas viram padrão:** o idioma e o nome do canal usados por último entram nos projetos novos (Modelos de vídeo, Vídeo de venda, Roteiro do YouTube, Vídeos modelados); o projeto novo do 📝 Roteiro para Áudio já nasce com a voz do último; o 🎙️ Gerador de voz e o 🎙 Adaptar pro TTS lembram motor, voz, idioma e ajustes. Fica em `ultimas_escolhas.json` (fora do Git).
+
 ## 🌐 Checagem na internet com outra IA (v84_133)
 
 - No cartão 🔎 Checagem do roteiro, o novo **🌐 Checar na internet com outra IA** monta um prompt CURTO com só os pontos suspeitos: conflitos de data (C), inconsistências da última checagem (I), o que ela mandou conferir e ainda não foi conferido (V), as alegações/interpretações do roteiro (A), os anos (D), os números (N) e as repetições (R). Vão junto só os parágrafos citados, com o número da linha, e não o roteiro inteiro.
@@ -69,6 +88,35 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 - **🏭 Produção no pod** (opção "🎭 Rosto das pessoas reais", ligada por padrão): a IA que descreve as cenas diz quem do elenco aparece em cada uma e com que IDADE naquele momento da história (flashback, "anos depois", a criança que cresceu). Nas cenas do pod com essas pessoas, o site escolhe a foto de idade mais próxima e manda pro pod como referência. Lá, o **FLUX.2 [klein] 4B** (Apache 2.0, ~13 GB) gera a cena com aquele rosto, envelhecido ou rejuvenescido. As outras cenas continuam no Z-Image. Cenas com pessoa do elenco ganham prioridade dentro da % do pod.
 - Regra fixa: com rosto real, nada de violência, sangue, morte ou o crime acontecendo. Nesses momentos, a cena fica sem as pessoas do elenco.
 - Pod com código antigo (sem o klein): as cenas vão sem o rosto pro Z-Image e aparece um aviso pra atualizar o pod.
+
+## 📑 Clonar projeto (v84_146)
+
+- Botão **📑 Clonar projeto** no 🕵️ Modelo de vídeo, no 📝 Roteiro do YouTube e no editor (caixa 📦 Projeto do vídeo). Faz uma cópia independente com outro nome, pra trabalhar o mesmo material por outro ângulo ou testar outra montagem. O original nunca muda.
+- Modelo de vídeo: copia fontes, fotos (os arquivos também), elenco, perguntas de fotos, roteiro e histórico. Roteiro do YouTube: transcrição, análise, roteiro e cenas. Editor: narração, legendas, trechos, prévias, overlays e cortes. O vídeo final já montado não é copiado.
+
+## 🤖 Conteúdo IA: selo nas cenas geradas por IA (v84_145)
+
+- Nova aba **🤖 Conteúdo IA** no Estúdio. Toda cena gerada por IA (🟣 pod/Runpod, Google Flow) ganha um texto discreto num canto. Padrão: **"Simulação: conteúdo gerado por IA"**, no canto superior direito, **no idioma do vídeo**.
+- Mensagens prontas (Simulação, Recriação, Imagem ilustrativa, Dramatização, Não é real, Gerado por IA) em pt, en, es, de, fr, it, nl e pl (outros idiomas: inglês). Também dá pra escrever a sua e salvar como ⭐ mensagem própria, que vale pra todos os vídeos.
+- Escolha do canto, tamanho, fundo, contorno, aparecer suave e duração mínima do trecho. Prévia na hora.
+- Os selos entram na faixa Overlays e são **refeitos sozinhos em toda montagem**: trocou uma cena de IA por uma real, o selo daquele trecho some. Vem ligado por padrão (desligue na aba se não quiser).
+
+## 👀 Ver as imagens enquanto o pod gera (v84_144)
+
+- Enquanto o pod gera, as imagens prontas já vêm pro PC (de 20 em 20 segundos). No lote, cada roteiro mostra as últimas imagens e o link **👀 ver as N imagens**.
+- A **galeria** (uma página por roteiro) mostra todas, com o número da cena, o tempo na narração, a descrição e o prompt. As cenas com rosto/local do elenco ficam com borda roxa e o nome da pessoa. Clique amplia.
+- Viu que está ruim? Dá pra cancelar o lote cedo, sem esperar todas. A etapa final só baixa o que ainda falta.
+
+## 🔁 Imagens que o pod não fez (v84_143)
+
+- Quando o job de imagens do pod termina com erros (ex.: falta de memória na placa), o lote manda **só as que faltaram** de novo, uma vez, sozinho, com as mesmas fotos de referência. Se ainda faltar, aparece o botão **🔁 Gerar de novo as N que falharam** no roteiro (o pod precisa estar ligado).
+- Pod (Studio IA): Z-Image e o modelo de rostos não ficam mais os dois na GPU ao mesmo tempo. Um espera na RAM e troca de lugar quando o job precisa (o job faz primeiro todas do Z-Image, depois as com rosto: uma troca só). A imagem é decodificada em pedaços, sobrando memória pra voz. Se faltar memória numa imagem, limpa e tenta de novo.
+
+## 🤖 Prompts das cenas em blocos menores (v84_142)
+
+- A IA que escreve o prompt de cada cena do pod trabalha em blocos de **20 cenas** (antes eram 60). Cada cena ganha mais atenção. O roteiro, a ficha, o elenco e a cronologia vão no começo de cada chamada (em cache, então sai barato).
+- **3 blocos ao mesmo tempo**, pra não demorar mais.
+- Bloco que falhou ou cena que veio sem prompt é refeita numa 2ª volta, só com as que faltaram. Antes, uma cena sem resposta ia pro pod com a própria fala como prompt.
 
 ## 📦 Projeto no editor + 🕵️ encaixar as fotos reais (v84_141)
 

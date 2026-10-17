@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Piloto automático{% endblock %}
+{% block content %}
+<style>.app-content { max-width: 900px; } .pl-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }</style>
+<p><a href="{{ url_for('dossies_page') }}">← Modelos de vídeo</a></p>
+<h1>🚀 Piloto automático</h1>
+<p style="color:#555;">Cole os <b>links</b> e o <b>texto</b> e clique em 🚀. O site lê as matérias, faz (ou usa) o roteiro, revisa e checa,
+  cria as perguntas de fotos com os termos de busca e o prompt da checagem na internet — e <b>para pra você</b>: mandar o prompt 🌐 pra outra IA
+  e pegar as fotos no 🧲. Depois do ▶ Continuar: posiciona as fotos, monta o elenco e adapta pro TTS.</p>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+<div class="pl-card">
+  <form method="post" action="/piloto/iniciar" id="plForm">
+    <label>Tema / nome do caso</label>
+    <input type="text" name="tema" required placeholder="ex.: O caso Sheri Jo Elliott">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:200px;">Modelo<select name="modelo">{% for k, m in modelos.items() %}<option value="{{ k }}">{{ m.nome }}</option>{% endfor %}</select></label>
+      <label style="width:180px;">Idioma do vídeo<select name="idioma">{% for k, n in idiomas %}<option value="{{ k }}" {% if k == 'pt' %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+      <label style="width:120px;">Minutos<input type="number" name="minutos" value="20" min="1" max="120"></label>
+      <label style="width:120px;">Formato<select name="formato_video"><option>16:9</option><option>9:16</option><option>1:1</option></select></label>
+    </div>
+    <label>Links das matérias <span style="font-weight:400;color:#888;">(um por linha)</span></label>
+    <textarea name="links" rows="5" placeholder="https://…&#10;https://…"></textarea>
+    <label>Texto</label>
+    <div style="display:flex;gap:14px;font-size:.9rem;margin:2px 0 4px;">
+      <label style="font-weight:400;"><input type="radio" name="modo_texto" value="anotacoes" checked style="width:auto;"> são anotações / guia — a IA escreve o roteiro</label>
+      <label style="font-weight:400;"><input type="radio" name="modo_texto" value="roteiro" style="width:auto;"> é o roteiro pronto — use ele</label>
+    </div>
+    <textarea name="texto" rows="12" placeholder="O roteiro, ou as suas anotações: o que contar, a ordem, o gancho, datas, nomes…"></textarea>
+    <button type="submit" id="plBtn" style="margin-top:8px;">🚀 Ir no automático</button>
+  </form>
+</div>
+<script>document.getElementById('plForm').addEventListener('submit', () => { document.getElementById('plBtn').disabled = true; });</script>
+{% endblock %}

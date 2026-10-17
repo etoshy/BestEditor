@@ -14,6 +14,7 @@
       {% if _vendas %}<optgroup label="🛒 Vídeos de venda">{% for v in _vendas %}<option value="venda:{{ v.id }}" {% if _pe.tipo == 'venda' and _pe.id == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
     </select>
     <button type="button" id="pe-ligar" style="width:auto;margin:0;padding:5px 12px;background:#7e22ce;color:#fff;border:0;border-radius:6px;cursor:pointer;">🔗 Ligar este projeto</button>
+    {% set cl_tipo = 'job' %}{% set cl_id = job.job_id %}{% include "_clonar.html" %}
     <span id="pe-st" style="font-size:.84rem;"></span>
   </div>
   {% if _pe.tipo in ('dossie', 'venda') %}
@@ -30,7 +31,7 @@
 <script>
 (function () {
   const $p = (id) => document.getElementById(id);
-  const URL_LIGAR = "{{ url_for('ligar_projeto_rota', job_id=job.job_id) }}", URL_ENC = "{{ url_for('encaixar_projeto_rota', job_id=job.job_id) }}";
+  const URL_LIGAR = "/job/{{ job.job_id }}/ligar-projeto", URL_ENC = "/job/{{ job.job_id }}/encaixar-projeto";
   const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
   $p('pe-ligar').addEventListener('click', async () => {
     try { await post(URL_LIGAR, { projeto: $p('pe-projeto').value }); $p('pe-st').textContent = '✔ ligado — recarregando…'; setTimeout(() => location.reload(), 800); }
@@ -40,7 +41,7 @@
   if (enc) enc.addEventListener('click', async () => {
     enc.disabled = true; $p('pe-st').textContent = '🕵️ achando os momentos na narração…';
     try { const d = await post(URL_ENC, { modo: $p('pe-tudo').checked ? 'tudo' : 'ia' });
-      $p('pe-st').textContent = `✔ ${d.trocadas} trecho(s) com a mídia real (${d.achados} de ${d.momentos} momentos achados na fala) — buscando as prévias…`;
+      $p('pe-st').textContent = `✔ ${d.trocadas} trecho(s) com a mídia real (${d.achados} de ${d.momentos} momentos achados na fala)` + (d.paginas ? ` · 🌐 ${d.paginas} site(s) viraram 🖥 Página animada` : '') + ' — buscando as prévias…';
       setTimeout(() => location.reload(), 1500); }
     catch (e) { $p('pe-st').textContent = '⚠ ' + e.message; enc.disabled = false; }
   });

@@ -377,11 +377,16 @@ def _tick(lid: str) -> None:
             elif it["estado"] == "imagens":
                 st = pod_studio.job(it["pod_img"], cfg)
                 if st["status"] in pod_studio.FINAIS:
-                    _em_segundo_plano(lid, it["id"], _receber_imagens)
+                    if (st.get("erros") and int(it.get("reenvios_img") or 0) < 1
+                            and st["status"] != "cancelado"):  # 🔁 falhou alguma (ex.: memória): manda só essas de novo, 1 vez
+                        _em_segundo_plano(lid, it["id"], _reenviar_faltantes)
+                    else:
+                        _em_segundo_plano(lid, it["id"], _receber_imagens)
                 else:
                     p = st.get("progresso") or {}
                     _mudar(lid, it["id"], mensagem=f"🖼 {p.get('feito', 0)}/{p.get('total', 0)} imagens"
                                                    + (f" — {st['posicao_fila']}º na fila" if st.get("posicao_fila") else ""))
+                    _baixar_parciais_bg(lid, it["id"], st)
             elif it["estado"] == "montando":
                 _em_segundo_plano(lid, it["id"], _montar)
         except pod_studio.PodErro as exc:
@@ -393,6 +398,67 @@ def _tick(lid: str) -> None:
         except Exception as exc:  # noqa: BLE001
             traceback.print_exc()
             _mudar(lid, it["id"], estado="erro", erro=f"{type(exc).__name__}: {exc}", _log=f"❌ {exc}")
+
+
+_BAIXANDO: Dict[str, float] = {}
+
+
+def _baixar_parciais_bg(lid: str, iid: str, st: Dict[str, Any]) -> None:
+    """👀 Enquanto o pod gera, as imagens que ficaram prontas já vêm pro PC (de 20 em 20 s), pra você ver como está
+    ficando no lote. Não trava o acompanhamento; erro aqui é ignorado (a etapa final baixa o que faltar)."""
+    if _BAIXANDO.get(iid, 0) > time.time() - 20:
+        return
+    _BAIXANDO[iid] = time.time()
+    prontos = [n for n in st.get("arquivos") or [] if re.fullmatch(r"cena-\d{4}\.png", n)]
+    if not prontos:
+        return
+
+    def _rodar():
+        try:
+            import pod_studio
+            lote = carregar(lid)
+            it = next(x for x in lote["itens"] if x["id"] == iid)
+            pasta_img = os.path.join(pasta_item(lid, iid), "imagens")
+            os.makedirs(pasta_img, exist_ok=True)
+            novas = [n for n in prontos if not os.path.exists(os.path.join(pasta_img, n))][:40]
+            for n in novas:
+                pod_studio.baixar(it["pod_img"], n, os.path.join(pasta_img, n), _cfg_pod(lote))
+            if novas:
+                tem = sorted((x for x in os.listdir(pasta_img) if x.endswith(".png")),
+                             key=lambda x: os.path.getmtime(os.path.join(pasta_img, x)))
+                _mudar(lid, iid, baixadas=len(tem), recentes=tem[-12:][::-1])
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            _BAIXANDO[iid] = time.time()
+
+    threading.Thread(target=_rodar, daemon=True).start()
+
+
+def galeria(lid: str, iid: str) -> List[Dict[str, Any]]:
+    """As imagens do pod que já estão no PC, com o prompt e se a cena tem rosto/local do elenco."""
+    pasta = pasta_item(lid, iid)
+    pasta_img = os.path.join(pasta, "imagens")
+    try:
+        with open(os.path.join(pasta, "cenas.json"), encoding="utf-8") as f:
+            segs = json.load(f).get("segments") or []
+    except (OSError, ValueError):
+        segs = []
+    try:
+        with open(os.path.join(pasta, "rostos.json"), encoding="utf-8") as f:
+            rostos = json.load(f)
+    except (OSError, ValueError):
+        rostos = {}
+    out = []
+    for n in sorted(os.listdir(pasta_img)) if os.path.isdir(pasta_img) else []:
+        m = re.fullmatch(r"cena-(\d{4})\.png", n)
+        if not m:
+            continue
+        k = int(m.group(1)) - 1
+        s = segs[k] if 0 <= k < len(segs) else {}
+        out.append({"nome": n, "cena": k + 1, "inicio": s.get("start"), "prompt": (s.get("query") or "")[:600],
+                    "visual": s.get("visual") or "", "rostos": s.get("rostos") or [], "com_referencia": str(k) in rostos})
+    return out
 
 
 def _em_segundo_plano(lid: str, iid: str, fn: Callable[[str, str], None]) -> None:
@@ -603,6 +669,69 @@ def _planejar_cenas(lid: str, iid: str) -> None:
            _log=f"🖼 {len(pedidos)} imagens na fila do pod ({res['pct']}% das cenas)")
 
 
+def _prontos_no_pod(it: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, str]:
+    """{nome do arquivo: id do job do pod que tem ele} — juntando o job das imagens e os de reenvio."""
+    import pod_studio
+    out: Dict[str, str] = {}
+    for jid in list(it.get("pod_imgs") or []) + [it["pod_img"]]:
+        try:
+            st = pod_studio.job(jid, cfg)
+        except Exception:  # noqa: BLE001 — job antigo apagado: segue com os outros
+            continue
+        for n in st.get("arquivos") or []:
+            out[n] = jid
+    return out
+
+
+def _reenviar_faltantes(lid: str, iid: str, manual: bool = False) -> int:
+    """🔁 As imagens que o pod não fez (erro, falta de memória…) vão de novo num job só com elas (com as mesmas fotos
+    de referência). Devolve quantas foram."""
+    import pod_studio
+    lote = carregar(lid)
+    it = next(x for x in lote["itens"] if x["id"] == iid)
+    cfg = _cfg_pod(lote)
+    pasta = pasta_item(lid, iid)
+    with open(os.path.join(pasta, "cenas.json"), encoding="utf-8") as f:
+        resposta = json.load(f)
+    try:
+        with open(os.path.join(pasta, "rostos.json"), encoding="utf-8") as f:
+            rostos = json.load(f)
+    except (OSError, ValueError):
+        rostos = {}
+    prontos = _prontos_no_pod(it, cfg)
+    pasta_img = os.path.join(pasta, "imagens")
+    no_pc = set(os.listdir(pasta_img)) if os.path.isdir(pasta_img) else set()
+    pedidos = []
+    for k, s in enumerate(resposta["segments"]):
+        nome = f"cena-{k + 1:04d}"
+        if s["provider"] == "runpod" and f"{nome}.png" not in prontos and f"{nome}.png" not in no_pc:
+            pedidos.append({"prompt": s["query"], "nome": nome, **({"referencias": rostos[str(k)]} if str(k) in rostos else {})})
+    if not pedidos:
+        if not manual:
+            _receber_imagens(lid, iid)
+        return 0
+    w, h = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (1024, 1024)}[lote["config"]["orientacao"]]
+    jid, _sem = pod_studio.enviar_imagens_com_refs(pedidos, largura=w, altura=h, nome=(it["titulo"] + " (de novo)")[:40], cfg=cfg)
+    _mudar(lid, iid, estado="imagens", pod_imgs=list(it.get("pod_imgs") or []) + [it["pod_img"]], pod_img=jid,
+           reenvios_img=int(it.get("reenvios_img") or 0) + 1, erro=None,
+           _log=f"🔁 {len(pedidos)} imagem(ns) que o pod não fez foram de novo pra fila")
+    return len(pedidos)
+
+
+def refazer_imagens(lid: str, iid: str) -> Dict[str, Any]:
+    """Botão 🔁 Gerar de novo as que falharam (o pod precisa estar ligado)."""
+    with _TRAVA:
+        lote = carregar(lid)
+        it = next((x for x in lote["itens"] if x["id"] == iid), None)
+        if not it or not it.get("pod_img"):
+            raise ProducaoErro("Esse roteiro ainda não mandou imagens pro pod.")
+    n = _reenviar_faltantes(lid, iid, manual=True)
+    if not n:
+        raise ProducaoErro("Não falta nenhuma imagem — todas foram feitas.")
+    garantir_runner()
+    return {"ok": True, "reenviadas": n}
+
+
 def _receber_imagens(lid: str, iid: str) -> None:
     import pod_studio
     import runpod_gerador
@@ -612,15 +741,20 @@ def _receber_imagens(lid: str, iid: str) -> None:
     pasta = pasta_item(lid, iid)
     pasta_img = os.path.join(pasta, "imagens")
     try:
-        st = pod_studio.job(it["pod_img"], cfg)
+        pod_studio.job(it["pod_img"], cfg)
+        donos = _prontos_no_pod(it, cfg)
     except Exception:
         # pod desligado: usa só as imagens que já estão no PC
         if not (os.path.isdir(pasta_img) and os.listdir(pasta_img)):
             raise
-        st = {"arquivos": [n for n in os.listdir(pasta_img) if n.endswith(".png")]}
+        donos = {}
+    if os.path.isdir(pasta_img):
+        for n in os.listdir(pasta_img):
+            if n.endswith(".png"):
+                donos.setdefault(n, "")
     with open(os.path.join(pasta, "cenas.json"), encoding="utf-8") as f:
         resposta = json.load(f)
-    prontos = set(st.get("arquivos") or [])
+    prontos = set(donos)
     cfg_rp = {"orientation": lote["config"]["orientacao"]}
     feitas = faltaram = 0
     pasta_img = os.path.join(pasta, "imagens")
@@ -634,7 +768,7 @@ def _receber_imagens(lid: str, iid: str) -> None:
             continue
         local = os.path.join(pasta_img, nome)
         if not (os.path.exists(local) and os.path.getsize(local) > 0):
-            local = pod_studio.baixar(it["pod_img"], nome, local, cfg)
+            local = pod_studio.baixar(donos.get(nome) or it["pod_img"], nome, local, cfg)
         for tentativa in range(3):  # o cache.json pode estar preso por um instante no Windows
             try:
                 runpod_gerador.guardar_do_pod(s["query"], local, s["query"], cfg_rp)
@@ -646,7 +780,9 @@ def _receber_imagens(lid: str, iid: str) -> None:
         feitas += 1
         if feitas % 10 == 0:
             _mudar(lid, iid, mensagem=f"⬇ baixando imagens {feitas}…")
-    msg = f"🖼 {feitas} imagens prontas" + (f" ({faltaram} falharam no pod — o editor tenta de novo)" if faltaram else "")
+    msg = f"🖼 {feitas} imagens prontas" + (f" ({faltaram} falharam no pod — 🔁 dá pra gerar de novo no lote, ou o editor tenta)" if faltaram else "")
+    if faltaram:
+        _mudar(lid, iid, faltam_img=faltaram)
     if it.get("job_id"):  # o projeto já existe (baixou de novo): não cria outro
         _mudar(lid, iid, estado="pronto", _log=msg + " — no editor clique em 🔁 Pôr as imagens do pod de volta")
         return

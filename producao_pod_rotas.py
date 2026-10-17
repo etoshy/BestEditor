@@ -5,7 +5,9 @@ from typing import Any
 
 
 def registrar(app, base_dir: str) -> None:
-    from flask import abort, jsonify, render_template, request
+    import os
+
+    from flask import abort, jsonify, render_template, request, send_file
 
     import producao_pod as pp
 
@@ -64,7 +66,7 @@ def registrar(app, base_dir: str) -> None:
         except pp.ProducaoErro:
             return jsonify({"erro": "lote não encontrado"}), 404
         itens = [{k: it.get(k) for k in ("id", "titulo", "estado", "mensagem", "job_id", "erro", "cenas", "idioma",
-                                          "motor", "perfil", "avisos", "inicio", "fim", "gv_id", "pod_img")}
+                                          "motor", "perfil", "avisos", "inicio", "fim", "gv_id", "pod_img", "faltam_img", "baixadas", "recentes")}
                  | {"rotulo": pp.ROTULOS.get(it["estado"], it["estado"]), "log": (it.get("log") or [])[-8:]}
                  for it in lote["itens"]]
         return jsonify({"status": lote["status"], "resumo": pp.resumo_lote(lote), "itens": itens})
@@ -92,6 +94,34 @@ def registrar(app, base_dir: str) -> None:
         except pp.ProducaoErro as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify({"ok": True})
+
+    @app.route("/producao-pod/<lid>/<iid>/imagem/<nome>")
+    def producao_pod_imagem(lid: str, iid: str, nome: str):
+        import re as _re
+        if not _re.fullmatch(r"cena-\d{4}\.png", nome) or not _re.fullmatch(r"[\w-]+", lid + iid):
+            return "", 404
+        cam = os.path.join(pp.pasta_item(lid, iid), "imagens", nome)
+        if not os.path.exists(cam):
+            return "", 404
+        return send_file(cam, max_age=3600)
+
+    @app.route("/producao-pod/<lid>/<iid>/galeria")
+    def producao_pod_galeria(lid: str, iid: str):
+        try:
+            lote = pp.carregar(lid)
+            it = next(x for x in lote["itens"] if x["id"] == iid)
+        except Exception:  # noqa: BLE001
+            return "Roteiro não encontrado.", 404
+        return render_template("producao_pod_galeria.html", lote=lote, it=it, imgs=pp.galeria(lid, iid))
+
+    @app.route("/producao-pod/<lid>/<iid>/refazer-imagens", methods=["POST"])
+    def producao_pod_refazer_imagens(lid: str, iid: str):
+        try:
+            return jsonify(pp.refazer_imagens(lid, iid))
+        except pp.ProducaoErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001 — pod fora do ar etc.
+            return jsonify({"erro": str(exc)[:300]}), 400
 
     @app.route("/producao-pod/<lid>/excluir", methods=["POST"])
     def producao_pod_excluir(lid: str):

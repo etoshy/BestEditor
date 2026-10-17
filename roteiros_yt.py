@@ -60,6 +60,9 @@ def criar_projeto(base: str, url: str = "", texto: str = "", titulo: str = "") -
          "titulo": (titulo or "").strip()[:200], "transcricao": None,
          "modelo_id": (opcoes_usadas(base).get("passo1") or {}).get("modelo_id") or "reescrever_cenas",
          "analise": None, "acoes": None, "resultado": None}
+    import ultimas_escolhas as ue  # 🔁 v84_161: nome do canal da última vez
+    if ue.pegar(base, "nome_canal"):
+        p["nome_canal"] = ue.pegar(base, "nome_canal")
     if texto and texto.strip():
         p["transcricao"] = transcricao_de_texto(texto)
     salvar_projeto(base, p)

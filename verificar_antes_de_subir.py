@@ -35,7 +35,7 @@ PASTAS_PESSOAIS = (
     "ia_google/videos/", "ia_google/config.json",
 )
 ARQUIVOS_PESSOAIS = re.compile(
-    r"(^|/)(site_config\.json|ia_config\.json|ia_uso\.json|youtube_cookies\.json|cookies[^/]*\.(txt|json)|"
+    r"(^|/)(site_config\.json|ia_config\.json|ia_uso\.json|ultimas_escolhas\.json|gemini_config\.json|gemini_uso\.json|youtube_cookies\.json|cookies[^/]*\.(txt|json)|"
     r"sessao[^/]*\.json|[^/]*storage_state[^/]*\.json|\.env(\.[^/]+)?|perfis_info\.json|vozes_multi\.json|"
     r"predefinicoes_usuario\.json|estilos_modelados\.json|toolkit_config\.local\.json|[^/]*\.(db|sqlite3?|pem|key|p12|pfx))$",
     re.I)

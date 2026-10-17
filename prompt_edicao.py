@@ -341,6 +341,7 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
 10. Composição dos trechos: "bordas" (smart pra vídeo com barra preta/baixa qualidade), "camera"/"foco" em fotos, "transition_som" (id ou "nenhum") pra trocar o som de uma transição.
 11. MÍDIAS ENVIADAS (lista "📁" acima): a pessoa mandou esses arquivos pra entrarem no vídeo — elas valem MAIS que o banco de imagens. Ponha cada uma no trecho em que a fala combina com ela usando "midia": "bib:<id>" no trecho (vídeo de site/página no trecho que fala do site; foto de pessoa quando falam dela). Use TODAS pelo menos uma vez (só deixe de fora a que não combina com nada e diga em "observacoes"); a mesma mídia pode voltar mais tarde. Não troque um trecho marcado "arquivo escolhido pela pessoa".
 12. SITE NA TELA: sempre que a fala citar um site, uma página, uma notícia ou um post, MOSTRE: se tem um vídeo/print dele nas mídias enviadas, use (rule 11); senão um quadro "pagina" com "url" (o endereço completo — dos links abaixo ou o que a fala diz; o print é tirado sozinho) e "site" (o domínio na barra), ou "post" pra post de rede social. Não invente endereço: sem o link, use "site" + "titulo" (a manchete).
+13. UM EFEITO POR VEZ: nunca dois efeitos (destaque, gráfico, quadro editorial, cena com texto) no mesmo momento nem colados — deixe pelo menos 2 s de tela "limpa" entre um e outro. E não repita a mesma informação (o mesmo número, a mesma data, o mesmo nome) em dois efeitos próximos: escolha o melhor formato pra ela e use uma vez só.
 {regra_cobrir}
 ## Responda SÓ com este JSON (sem texto antes/depois)
 {
@@ -367,7 +368,7 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
   ],
   "sons": [{"som": "id", "start": 10.5, "volume": 0.8}],
   "editoriais": [
-    {"tipo": "ficha", "start": 4.2, "end": 9.0, "rotulo": "AUSTRÁLIA", "nome": "Nome Sobrenome", "linhas": "Cargo: …\nNo cargo desde: …", "ponto_x": 0.5, "ponto_y": 0.25, "credito": "fonte"},
+    {"tipo": "ficha", "start": 4.2, "end": 9.0, "rotulo": "AUSTRÁLIA", "nome": "Nome Sobrenome", "linhas": "Cargo: …\nNo cargo desde: …", "credito": "fonte"},
     {"tipo": "numero", "start": 20.0, "end": 25.0, "de": 0, "ate": 98, "sufixo": "%", "rotulo": "o que é", "subtexto": "segundo quem"},
     {"tipo": "pagina", "start": 31.0, "end": 36.0, "url": "https://site.com/a-pagina-citada", "site": "site.com", "titulo": "manchete", "credito": "site.com"}
   ],

@@ -373,3 +373,41 @@ def test_por_as_imagens_do_pod_de_volta(site, tmp_path):
     assert job["segment_previews"][k]["ok"] and not job["segment_previews"][k].get("cartao")
     assert not job["pending_segments"][k].get("override_source") and not job.get("destaques")
     assert A.pendentes_info(job)["pod_refazer"] == 0
+
+
+def test_galeria_e_imagens_parciais(monkeypatch, tmp_path):
+    """👀 v84_144: imagens prontas do pod já vêm pro PC enquanto ele gera, e a galeria mostra com o prompt."""
+    import json as _json
+    import os as _os
+    import time as _time
+    import pod_studio
+    import producao_pod as pp
+    from PIL import Image
+    monkeypatch.setattr(pp, "PASTA", str(tmp_path))
+    lid, iid = "lotex", "itemx"
+    lote = {"id": lid, "nome": "L", "config": {"orientacao": "16:9"}, "pod_url": "http://x",
+            "itens": [{"id": iid, "titulo": "T", "estado": "imagens", "pod_img": "img-1", "log": []}]}
+    monkeypatch.setattr(pp, "carregar", lambda l: lote)
+    monkeypatch.setattr(pp, "_mudar", lambda l, i, **kw: lote["itens"][0].update({k: v for k, v in kw.items() if not k.startswith("_")}))
+    monkeypatch.setattr(pp, "_cfg_pod", lambda l: {})
+    pasta = pp.pasta_item(lid, iid)
+    with open(_os.path.join(pasta, "cenas.json"), "w", encoding="utf-8") as f:
+        _json.dump({"segments": [{"start": 0, "end": 5, "provider": "runpod", "query": "a house at night 1971", "visual": "a casa"},
+                                 {"start": 5, "end": 10, "provider": "runpod", "query": "face prompt", "rostos": ["John List"]}]}, f)
+    with open(_os.path.join(pasta, "rostos.json"), "w", encoding="utf-8") as f:
+        _json.dump({"1": [["I1.jpg", "/x"]]}, f)
+
+    def baixar(jid, nome, destino, cfg=None):
+        Image.new("RGB", (16, 9)).save(destino)
+        return destino
+    monkeypatch.setattr(pod_studio, "baixar", baixar)
+    pp._BAIXANDO.pop(iid, None)
+    pp._baixar_parciais_bg(lid, iid, {"arquivos": ["cena-0001.png", "cena-0002.png", "metadados.json"]})
+    for _ in range(50):
+        if lote["itens"][0].get("baixadas") == 2:
+            break
+        _time.sleep(0.05)
+    assert lote["itens"][0]["baixadas"] == 2 and len(lote["itens"][0]["recentes"]) == 2
+    g = pp.galeria(lid, iid)
+    assert [x["cena"] for x in g] == [1, 2] and g[1]["com_referencia"] and g[1]["rostos"] == ["John List"]
+    assert g[0]["prompt"] == "a house at night 1971"

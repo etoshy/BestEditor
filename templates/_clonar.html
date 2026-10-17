@@ -1,0 +1,18 @@
+{# 📑 Botão "Clonar projeto" (clonar.py, v84_146) — {% set cl_tipo = 'dossie'|'roteiro'|'job' %}{% set cl_id = … %}{% include "_clonar.html" %} #}
+<button type="button" class="cl-btn" data-cl-tipo="{{ cl_tipo }}" data-cl-id="{{ cl_id }}" title="Faz uma cópia independente pra trabalhar outro ângulo/versão — o original não muda" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#475569;color:#fff;border:0;border-radius:6px;cursor:pointer;">📑 Clonar projeto</button>
+<script>
+(function () {
+  if (window._clonarPronto) return; window._clonarPronto = true;
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('.cl-btn'); if (!b) return;
+    const nome = prompt('Nome da cópia (ex.: "ângulo psicológico", "versão curta"). Vazio = "… (cópia)".\nO original não muda.', '');
+    if (nome === null) return;
+    b.disabled = true; const txt = b.textContent; b.textContent = '📑 clonando…';
+    try {
+      const r = await fetch(`/clonar/${b.dataset.clTipo}/${b.dataset.clId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) });
+      const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status);
+      if (confirm(`✔ Cópia criada: “${d.nome}”.\nAbrir a cópia agora?`)) location.href = d.url; else { b.textContent = txt; b.disabled = false; }
+    } catch (err) { alert('⚠ ' + err.message); b.textContent = txt; b.disabled = false; }
+  });
+})();
+</script>

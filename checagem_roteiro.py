@@ -25,7 +25,7 @@ import re
 from collections import Counter, defaultdict
 from itertools import combinations
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # palavras muito comuns (pt, de, en, es) — não contam como "assunto" do parágrafo
 _STOP = set("""
@@ -90,9 +90,24 @@ def _trecho(s: str, n: int = 12) -> str:
 
 
 # ------------------------------------------------------------------ análise local (sem IA)
-def analisar(texto: str, tema: str = "") -> Dict[str, Any]:
+def chave_par(ta: str, tb: str) -> str:
+    """Id estável de um par de parágrafos (pra lembrar "não é repetição")."""
+    import hashlib
+    norm = lambda t: re.sub(r"\W+", " ", _sem_marcas(t).lower()).strip()[:160]
+    return hashlib.md5((norm(ta) + "|" + norm(tb)).encode()).hexdigest()[:12]
+
+
+def analisar(texto: str, tema: str = "", ignorar: Optional[set] = None) -> Dict[str, Any]:
     pars = paragrafos(texto)
     raizes = {n: {_raiz(w) for w in _tokens(t)} for n, t in pars}
+    # v84_156: as palavras que estão em MUITOS parágrafos (os nomes do caso, a cidade, o assunto) não contam pra
+    # "repetição" — antes 2 parágrafos que só citavam Sheri, Robert, Schultz e Michigan viravam "par parecido"
+    if len(raizes) >= 8:
+        _df = Counter(r for rs in raizes.values() for r in rs)
+        _muito = {r for r, c in _df.items() if c > max(3, len(raizes) * 0.22)}
+        raizes_rep = {n: rs - _muito for n, rs in raizes.items()}
+    else:
+        raizes_rep = raizes
     formas: Dict[str, Counter] = defaultdict(Counter)
     for _n, t in pars:
         for w in re.findall(r"[^\W\d_]+", _sem_marcas(t)):
@@ -104,7 +119,7 @@ def analisar(texto: str, tema: str = "") -> Dict[str, Any]:
     pos = {n: i for i, n in enumerate(linhas)}
     pares = []
     for a, b in combinations(linhas, 2):
-        ta, tb = raizes[a], raizes[b]
+        ta, tb = raizes_rep[a], raizes_rep[b]
         if len(ta) < 6 or len(tb) < 6 or pos[b] - pos[a] < 3:
             continue
         comum = ta & tb
@@ -117,9 +132,12 @@ def analisar(texto: str, tema: str = "") -> Dict[str, Any]:
     for nota, a, b, comum in pares:
         if nota < 0.26 or len(comum) < 5 or usos[a] >= 2 or usos[b] >= 2:
             continue
+        ch_par = chave_par(texto_de[a], texto_de[b])
+        if ignorar and ch_par in ignorar:
+            continue
         usos[a] += 1
         usos[b] += 1
-        repeticoes.append({"a": a, "b": b, "nota": round(nota, 2), "trecho_a": _trecho(texto_de[a]), "trecho_b": _trecho(texto_de[b]),
+        repeticoes.append({"a": a, "b": b, "chave": ch_par, "nota": round(nota, 2), "trecho_a": _trecho(texto_de[a]), "trecho_b": _trecho(texto_de[b]),
                            "palavras": sorted((formas[r].most_common(1)[0][0] for r in comum), key=str.lower)[:10]})
         if len(repeticoes) >= 15:
             break
@@ -331,7 +349,11 @@ def ler(resposta: str) -> Dict[str, Any]:
     trocas = []
     for c in d.get("correcoes") or d.get("trocas") or []:
         if isinstance(c, dict) and str(c.get("de") or "").strip():
-            trocas.append({"de": str(c["de"]), "para": str(c.get("para") or ""),
+            st = str(c.get("status") or "").strip().lower().replace(" ", "_")
+            if c.get("para") is None and st not in ("falso", "repeticao"):
+                continue  # "para": null = a IA não mandou o texto novo (não apaga o trecho por engano)
+            trocas.append({"de": str(c["de"]), "para": str(c.get("para") or ""), "item": str(c.get("item") or "").replace(" ", "").upper()[:6],
+                           "status": st if st in ("corrigido", "falso", "sem_fonte", "repeticao") else "corrigido",
                            "motivo": (_eixo(c.get("eixo") or c.get("tipo")) + (": " + str(c.get("problema")) if c.get("problema") else ""))[:200],
                            "eixo": _eixo(c.get("eixo") or c.get("tipo")),
                            "fonte": str(c.get("fonte") or "")[:300]})
@@ -381,7 +403,7 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
     ultima = ultima or {}
     pars = paragrafos(roteiro)
     texto_de = dict(pars)
-    a = analisar(roteiro, tema)
+    a = analisar(roteiro, tema, set(ultima.get("rep_ignoradas") or []))
     cr = cronologia(roteiro, tema)
     itens: List[str] = []
     linhas: List[int] = []
@@ -422,9 +444,10 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
     for k, d in enumerate(a["numeros"][:12], 1):
         itens.append(f"N{k} 🔢 NÚMERO {d['valor']} — {usa(*[o['linha'] for o in d['onde'][:4]])}: confira o número e o NOME "
                      "dele (condenado × acusado × ligado pela polícia × alegado × estimado), igual em todo lugar.")
-    for k, r in enumerate(a["repeticoes"][:10], 1):
-        itens.append(f"R{k} ✂️ REPETIÇÃO — {usa(r['a'], r['b'])}: os dois trechos contam a mesma coisa "
-                     f"({', '.join(r['palavras'][:6])}). Fica UMA vez, no lugar mais forte; no outro apague ou reduza.")
+    for k, r in enumerate(a["repeticoes"][:15], 1):
+        itens.append(f"R{k} ✂️ REPETIÇÃO? — {usa(r['a'], r['b'])}: parecem contar a mesma coisa "
+                     f"({', '.join(r['palavras'][:6])}). Se CONTAM: fica UMA vez, no lugar mais forte (no outro apague ou reduza). "
+                     "Se NÃO é repetição (cada um traz algo novo), ponha em \"conferidos\" com \"ok\": true.")
     if not itens:
         raise ValueError("O site não achou nada pra checar (rode a 🔎 checagem primeiro pra ter a lista do que conferir).")
     linhas = sorted(linhas)[:70]
@@ -446,7 +469,11 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
          "- NÃO inclua no \"de\" as marcas entre colchetes ([I3], [[INSCREVA]], [CENA 2]) — escolha um pedaço que não passe por elas.",
          "- \"para\": o trecho corrigido, na MESMA língua e no mesmo tom (ou \"\" pra apagar uma repetição).",
          "- \"fonte\": o LINK (URL) que confirma a correção.",
+         "- \"status\" de cada correção: \"corrigido\" (dado errado, trocado pelo certo), \"falso\" (não aconteceu / não "
+         "se sustenta — tirado do texto), \"sem_fonte\" (não achei confirmação — atribuído/suavizado) ou \"repeticao\".",
          "- Item que está CERTO: ponha em \"conferidos\" com o link que confirma (assim eu sei que foi checado).",
+         "- RESPONDA TODOS os itens: cada um vai em \"correcoes\" (com o \"item\") OU em \"conferidos\". Item sem resposta "
+         "eu mando de novo.",
          ]
     if foco:
         L.append(f"- Pedido extra (prioridade): {foco.strip()[:800]}")
@@ -455,6 +482,7 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
           *[f"L{n}: {texto_de[n]}" for n in linhas], "",
           "## Resposta — SOMENTE um JSON válido, assim (sem texto antes ou depois):",
           json.dumps({"correcoes": [{"item": "C1", "de": "trecho exato", "para": "trecho corrigido (ou \"\")",
+                                     "status": "corrigido | falso | sem_fonte | repeticao",
                                      "eixo": "cronologia | alegacao | repeticao", "problema": "o que estava errado",
                                      "fonte": "https://…"}],
                       "conferidos": [{"item": "V2", "ok": True, "fonte": "https://…", "nota": "o que a fonte diz"}],
@@ -469,7 +497,29 @@ def ler_web(resposta: str) -> Dict[str, Any]:
     bruto = json_ia.carregar(resposta)
     conf = []
     for c in (bruto.get("conferidos") if isinstance(bruto, dict) else None) or []:
+        if isinstance(c, str) and c.strip():  # às vezes vem só ["V2", "R3"]
+            c = {"item": c}
         if isinstance(c, dict) and str(c.get("item") or "").strip():
-            conf.append({"item": str(c["item"]).strip().upper()[:6], "ok": c.get("ok", True) is not False,
+            conf.append({"item": str(c["item"]).replace(" ", "").upper()[:6], "ok": str(c.get("ok", True)).strip().lower() not in ("false", "0", "no", "nao", "não", "none"),
                          "fonte": str(c.get("fonte") or "")[:300], "nota": str(c.get("nota") or "")[:300]})
     return {"trocas": d["trocas"], "conferidos": conf[:80], "resumo": d["resumo"]}
+
+
+def prompt_repeticoes(roteiro: str, reps: List[Dict[str, Any]], idioma: str = "o idioma do roteiro") -> str:
+    """✂️ Todas as repetições de uma vez: a IA decide em cada par o que fica e devolve as trocas."""
+    pars = dict(paragrafos(roteiro))
+    if not reps:
+        raise ValueError("Não tem repetição na lista.")
+    L = [f"Você é editor de roteiro de documentário (em {idioma}). Abaixo vão PARES de parágrafos que parecem contar a mesma coisa.",
+         "Para CADA par:",
+         "- Se for repetição de verdade: a informação fica UMA vez, no lugar mais forte; no outro parágrafo apague o trecho repetido "
+         "(\"para\": \"\") ou reduza à meia frase que traga algo novo. Mantenha o texto fluindo (ajuste a ligação se precisar).",
+         "- Se NÃO for repetição (cada um traz algo novo, ou é um gancho/retomada de propósito): ponha o número do par em \"nao_e_repeticao\".",
+         "- \"de\": trecho COPIADO EXATAMENTE do parágrafo (uma frase ou poucas), sem as marcas entre colchetes ([I3], [[INSCREVA]]).",
+         "- Não mexa em nada além das repetições. Mesma língua e mesmo tom.", "", "## Pares"]
+    for k, r in enumerate(reps, 1):
+        L += [f"R{k}:", f"  L{r['a']}: {pars.get(r['a'], '')}", f"  L{r['b']}: {pars.get(r['b'], '')}"]
+    L += ["", "## Resposta — SOMENTE este JSON:",
+          json.dumps({"trocas": [{"par": "R1", "de": "trecho exato", "para": "trecho novo (ou \"\")"}], "nao_e_repeticao": ["R2"]},
+                     ensure_ascii=False, indent=1)]
+    return "\n".join(L)

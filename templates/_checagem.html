@@ -19,7 +19,26 @@
     <textarea id="chkResp" rows="4" style="width:100%;font-size:.85rem;" placeholder='{ "correcoes": [ { "de": "...", "para": "...", "eixo": "cronologia" } ], "verificar": [...] }'></textarea>
     <button type="button" id="chkLer" style="width:auto;margin-top:4px;padding:5px 12px;">✅ Aplicar as correções</button>
   </details>
-  <details id="chkWebBox" style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.9rem;">🌐 Checar na internet com outra IA <span style="font-weight:400;color:#666;font-size:.82rem;">(ChatGPT, Claude, Gemini ou Perplexity COM pesquisa na web)</span></summary>
+  <details id="chkWebBox" open style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.9rem;">🌐 Checar na internet <span style="font-weight:400;color:#666;font-size:.82rem;">(🔷 Gemini com a busca do Google direto daqui — ou o prompt pra colar em outra IA com pesquisa na web)</span></summary>
+    <div id="gmBox" style="margin:6px 0 10px;padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;font-size:.86rem;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <b>🔷 Gemini + busca do Google</b>
+        <select id="gmModelo" style="width:auto;margin:0;font-size:.82rem;" title="O 2.5 Flash é o melhor custo-benefício; o Flash-Lite é o mais barato"></select>
+        <button type="button" id="gmChecar" style="width:auto;margin:0;padding:5px 14px;background:#1d4ed8;color:#fff;font-weight:600">🔷 Checar e ajustar com o Gemini</button>
+        <span id="gmSt" style="color:#1e3a8a;"></span>
+      </div>
+      <div id="gmChaveBox" style="display:none;margin-top:8px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <input type="password" id="gmChave" placeholder="cole a chave do Gemini" autocomplete="new-password" spellcheck="false" style="flex:1;min-width:220px;margin:0;">
+          <button type="button" id="gmSalvar" style="width:auto;margin:0;padding:5px 12px;">💾 Salvar a chave</button>
+          <button type="button" id="gmTestar" style="width:auto;margin:0;padding:5px 12px;background:#475569;">🔌 Testar</button>
+        </div>
+        <div style="font-size:.78rem;color:#555;margin-top:4px;">Pegue a chave em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → <i>Create API key</i>. Ela fica no arquivo <code>gemini_config.json</code> da pasta do site (fora do GitHub).</div>
+      </div>
+      <div id="gmInfo" style="font-size:.78rem;color:#555;margin-top:6px;"></div>
+      <div id="gmFontes" style="font-size:.8rem;margin-top:6px;"></div>
+    </div>
+    <div style="font-size:.8rem;color:#555;margin:2px 0 4px;"><b>Ou</b> pelo prompt numa outra IA (ChatGPT, Claude, Perplexity…) com a pesquisa na web ligada:</div>
     <div style="font-size:.8rem;color:#555;margin:4px 0;">O site junta num prompt curto SÓ os pontos suspeitos: conflitos de data, anos, números, alegações, o que a 🔎 checagem mandou conferir e as repetições. Vão junto os trechos do roteiro em volta, não o roteiro inteiro. A outra IA pesquisa e devolve só as correções de cada trecho; você cola o JSON e o site ajusta o roteiro (e guarda uma versão no 🕘 histórico). Rode a 🔎 checagem antes, pra ter a lista do que conferir.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
       <button type="button" id="chkWebGerar" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;">🌐 Gerar o prompt das inconsistências</button>
@@ -43,9 +62,19 @@
   const EIXO = { cronologia: '⏳', alegacao: '📚', repeticao: '✂️' };
   const sec = (titulo, corpo, aberto) => `<details ${aberto ? 'open' : ''} style="margin:6px 0;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;"><summary style="cursor:pointer;font-weight:600">${titulo}</summary><div style="margin-top:6px">${corpo}</div></details>`;
 
+  const SELO = { confirmado: ['✔ confirmado', '#15803d'], corrigido: ['✏ corrigido', '#1d4ed8'], falso: ['✖ falso — tirado', '#b91c1c'],
+                 sem_fonte: ['❔ sem fonte — suavizado', '#b45309'], repeticao: ['✂ repetição', '#7c3aed'], nao_confirmado: ['⚠ não confirmado', '#b45309'] };
+  const selo = (st) => { const x = SELO[st] || [st, '#475569']; return `<span style="font-size:.74rem;font-weight:700;color:#fff;background:${x[1]};border-radius:999px;padding:0 7px;">${esc(x[0])}</span>`; };
   function desenhar(d) {
     const a = d.local || {}, cr = d.cronologia || {}, u = d.ultima;
     let h = '';
+    const W = u && u.web;
+    if (W && (W.itens || []).length) {  // 🌐 o que a IA da internet respondeu, item por item
+      const cont = {}; W.itens.forEach(x => { cont[x.status] = (cont[x.status] || 0) + 1; });
+      h += sec(`🌐 Resultado da checagem na internet · ${Object.entries(cont).map(([k, n]) => `${(SELO[k] || [k])[0]} ${n}`).join(' · ')}${(W.sem_resposta || []).length ? ` · <span style="color:#b45309">⚠ ${W.sem_resposta.length} sem resposta</span>` : ''}`,
+        (W.resumo ? `<div style="color:#444;margin-bottom:4px">${esc(W.resumo)}</div>` : '') + W.itens.map(x => `<div style="margin:3px 0"><b>${esc(x.item)}</b> ${selo(x.status)} ${x.aplicada === false ? '<span style="color:#b91c1c;font-size:.78rem">(o trecho não bateu com o texto — não aplicado)</span>' : ''} ${esc(x.nota || '')}${x.de ? `<div style="font-size:.8rem;color:#555;margin-left:14px">„${esc(x.de)}“ → „${esc(x.para || '(apagado)')}“</div>` : ''}${x.fonte ? ` <a href="${esc(x.fonte)}" target="_blank" rel="noopener" style="font-size:.8rem">fonte</a>` : ''}</div>`).join('')
+        + ((W.sem_resposta || []).length ? `<div style="color:#b45309;margin-top:4px">⚠ sem resposta: ${esc(W.sem_resposta.join(', '))} — gere o prompt 🌐 de novo e mande</div>` : ''), false);
+    }
     if (u) {
       const pe = u.por_eixo || {};
       h += `<div style="padding:6px 10px;background:#f0fdf4;border-radius:8px;margin-bottom:6px;">✔ Última checagem: ⏳ ${pe.cronologia || 0} · 📚 ${pe.alegacao || 0} · ✂️ ${pe.repeticao || 0} correções aplicadas · ${u.palavras_antes} → ${u.palavras_depois} palavras${u.resumo ? `<div style="color:#444;margin-top:2px">${esc(u.resumo)}</div>` : ''}</div>`;
@@ -66,20 +95,46 @@
     const ver = (u && u.verificar) || [];
     if (ver.length) {
       c2 += '<div style="margin-bottom:4px">Conferir fora (citar uma fonte no texto não confirma a afirmação):</div>' + ver.map((v, i) =>
-        `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:4px 0"><input type="checkbox" class="chkVer" data-i="${i}" ${v.conferido ? 'checked' : ''} style="width:auto;margin-top:3px"><span><b>${esc(v.afirmacao)}</b>${v.por_que ? ` — ${esc(v.por_que)}` : ''}${v.como ? `<br><i style="color:#555">🔍 ${esc(v.como)}</i>` : ''}${v.fonte_web ? `<br><span style="color:#0f766e">🌐 ${esc(v.nota_web || 'confirmado')} — <a href="${esc(v.fonte_web)}" target="_blank" rel="noopener">fonte</a></span>` : ''}</span></label>`).join('');
+        `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:4px 0"><input type="checkbox" class="chkVer" data-i="${i}" ${v.conferido ? 'checked' : ''} style="width:auto;margin-top:3px"><span><b>${esc(v.afirmacao)}</b>${v.por_que ? ` — ${esc(v.por_que)}` : ''}${v.como ? `<br><i style="color:#555">🔍 ${esc(v.como)}</i>` : ''}${v.status_web ? ' ' + selo(v.status_web) : ''}${v.fonte_web || v.nota_web ? `<br><span style="color:#0f766e">🌐 ${esc(v.nota_web || 'confirmado')}${v.fonte_web ? ` — <a href="${esc(v.fonte_web)}" target="_blank" rel="noopener">fonte</a>` : ''}</span>` : ''}</span></label>`).join('');
     } else c2 += '<div style="color:#666">Rode a checagem pra ter a lista do que precisa ser conferido.</div>';
     const nums = (a.numeros || []).filter(x => x.vezes >= 1).slice(0, 10);
     if (nums.length) c2 += `<details style="margin-top:4px"><summary style="cursor:pointer">Números citados (condenado × acusado × alegado × estimado não são a mesma coisa)</summary>${nums.map(x => `<div>• <b>${esc(x.valor)}</b>: ${x.onde.map(o => `linha ${o.linha}: ${esc(o.frase.slice(0, 110))}`).join(' | ')}</div>`).join('')}</details>`;
     h += sec(`📚 Alegações históricas${ver.length ? ` · ${ver.filter(v => v.conferido).length}/${ver.length} conferidas` : ''}`, c2, ver.length > 0);
     // ✂️ repetições
     let c3 = '';
-    (a.repeticoes || []).forEach(r => { c3 += `<div style="margin:4px 0">🔁 linha <b>${r.a}</b> „${esc(r.trecho_a)}“ ≈ linha <b>${r.b}</b> „${esc(r.trecho_b)}“ <i style="color:#666">(${esc(r.palavras.slice(0, 6).join(', '))})</i></div>`; });
+    (a.repeticoes || []).forEach(r => { c3 += `<div style="margin:4px 0">🔁 linha <b>${r.a}</b> „${esc(r.trecho_a)}“ ≈ linha <b>${r.b}</b> „${esc(r.trecho_b)}“ <i style="color:#666">(${esc(r.palavras.slice(0, 6).join(', '))})</i> <button type="button" class="chkRepIgn" data-ch="${esc(r.chave || '')}" title="cada um traz algo novo: tira da lista (e do prompt)" style="width:auto;margin:0;padding:0 6px;font-size:.72rem;background:#94a3b8;">✓ não é repetição</button></div>`; });
     (a.temas || []).forEach(t => { c3 += `<div style="margin:4px 0;color:#b45309">↻ “${esc(t.palavra)}” volta em ${t.paragrafos} parágrafos (linhas ${t.linhas.slice(0, 14).join(', ')})</div>`; });
     if (!c3) c3 = '<div style="color:#15803d">Nenhuma repetição forte entre parágrafos.</div>';
+    if ((a.repeticoes || []).length) c3 = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;background:#f5f3ff;border-radius:6px;">
+      <button type="button" id="chkRepIa" style="width:auto;margin:0;padding:4px 12px;font-size:.82rem;background:#7c3aed;color:#fff;">✂️ Corrigir todas de uma vez (🤖 IA)</button>
+      <button type="button" id="chkRepPrompt" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#64748b;">📋 prompt pra outra IA</button>
+      <span id="chkRepSt" style="font-size:.82rem"></span>
+      <div id="chkRepCola" style="display:none;width:100%"><textarea id="chkRepResp" rows="3" style="width:100%;font-size:.8rem" placeholder='{ "trocas": [ { "par": "R1", "de": "...", "para": "" } ], "nao_e_repeticao": ["R2"] }'></textarea>
+        <button type="button" id="chkRepLer" style="width:auto;margin:2px 0 0;padding:3px 10px;font-size:.8rem;">✅ Aplicar</button></div></div>` + c3;
     h += sec(`✂️ Repetições${(a.repeticoes || []).length ? ` <span style="color:#b45309">· ${a.repeticoes.length} par(es) parecido(s)</span>` : ''}`, c3, (a.repeticoes || []).length > 0);
     $c('chkLocal').innerHTML = h;
     document.querySelectorAll('#chkLocal .chkVer').forEach(cb => cb.addEventListener('change', () =>
       post(BASE + '/verificar/' + cb.dataset.i, { conferido: cb.checked }).catch(() => {})));
+    const st = (t) => { const e = $c('chkRepSt'); if (e) e.innerHTML = t; };
+    const fim = (r) => { st(`✔ ${r.aplicadas} trecho(s) corrigido(s) · ${r.nao_e_repeticao || 0} par(es) não eram repetição · ${r.palavras_antes} → ${r.palavras_depois} palavras` + ((r.nao_achadas || []).length ? ` · ⚠ ${r.nao_achadas.length} não bateram com o texto` : '')); if (window.atualizarRoteiro) window.atualizarRoteiro(); setTimeout(carregar, 1500); };
+    if ($c('chkRepIa')) $c('chkRepIa').addEventListener('click', async () => {
+      $c('chkRepIa').disabled = true; st('🤖 a IA está corrigindo as repetições… (pode sair da página)');
+      try { const d = await post(BASE + '/repeticoes/ia', { pagina: location.pathname });
+        while (true) { await new Promise(ok => setTimeout(ok, 3000)); const t = await (await fetch('/tarefas/' + d.tarefa, { cache: 'no-store' })).json();
+          if (t.status === 'rodando') continue; fetch('/tarefas/' + d.tarefa + '/aplicada', { method: 'POST' }).catch(() => {});
+          if (t.status !== 'pronto') throw new Error(t.erro || 'falhou'); fim(t.resultado || {}); break; } }
+      catch (e) { st('⚠ ' + e.message); $c('chkRepIa').disabled = false; }
+    });
+    if ($c('chkRepPrompt')) $c('chkRepPrompt').addEventListener('click', async () => {
+      try { const d = await post(BASE + '/repeticoes/prompt', {}); $c('chkRepCola').style.display = '';
+        try { await navigator.clipboard.writeText(d.prompt); st(`✔ prompt copiado (${d.pares} pares) — cole a resposta embaixo`); } catch (_) { $c('chkRepResp').value = d.prompt; st('copie o prompt da caixa, troque pela resposta'); } }
+      catch (e) { st('⚠ ' + e.message); }
+    });
+    if ($c('chkRepLer')) $c('chkRepLer').addEventListener('click', async () => {
+      try { fim(await post(BASE + '/repeticoes/ler', { texto: $c('chkRepResp').value })); } catch (e) { st('⚠ ' + e.message); }
+    });
+    document.querySelectorAll('.chkRepIgn').forEach(b => b.addEventListener('click', async () => {
+      b.disabled = true; try { await post(BASE + '/repeticao-ignorar', { chave: b.dataset.ch }); b.closest('div').style.opacity = '.35'; } catch (_) { b.disabled = false; } }));
   }
   const carregar = () => fetch(BASE, { cache: 'no-store' }).then(async r => {
     if (r.status === 404 && !(r.headers.get('content-type') || '').includes('json')) { $c('chkLocal').innerHTML = '<span style="color:#b91c1c">⚠ 404 — o servidor que está rodando ainda é o código antigo: feche a janela do site (python app.py) e abra de novo.</span>'; return; }
@@ -116,7 +171,7 @@
   $c('chkWebLer').addEventListener('click', async () => {
     try {
       const d = await post(BASE + '/web/ler', { texto: $c('chkWebResp').value });
-      $c('chkWebRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} trecho(s) corrigido(s) · ${d.palavras_antes} → ${d.palavras_depois} palavras · ${d.conferidos.filter(c => c.ok).length} item(ns) confirmado(s)${d.verificar_marcados ? ` (${d.verificar_marcados} marcados como conferidos)` : ''}</span>` +
+      $c('chkWebRes').innerHTML = `<span style="color:#15803d">✔ ${d.aplicadas.length} trecho(s) corrigido(s) · ${d.palavras_antes} → ${d.palavras_depois} palavras · ${d.conferidos.filter(c => c.ok).length} item(ns) confirmado(s)${d.verificar_marcados ? ` (${d.verificar_marcados} marcados como conferidos)` : ''}</span>` + ((d.sem_resposta || []).length ? `<br><span style="color:#b45309">⚠ a IA não respondeu ${d.sem_resposta.length} item(ns): ${esc(d.sem_resposta.join(', '))} — gere o prompt de novo e mande (os conferidos e os “não é repetição” já não vão)</span>` : '') +
         (d.nao_achadas.length ? `<div style="color:#b45309">⚠ ${d.nao_achadas.length} correção(ões) não bateram com o texto (o "de" não foi copiado igual): ${d.nao_achadas.map(x => '„' + esc(x.de) + '“').join(' · ')}</div>` : '') +
         (d.resumo ? `<div style="color:#444">${esc(d.resumo)}</div>` : '') +
         `<details open><summary>ver as correções</summary>${d.aplicadas.map(t => `<div style="margin:4px 0">${EIXO[t.eixo] || ''} <s style="color:#b91c1c">${esc(t.de)}</s><br><span style="color:#15803d">${esc(t.para) || '<i>(apagado)</i>'}</span> ${t.fonte ? (/^https?:/.test(t.fonte) ? `<a href="${esc(t.fonte)}" target="_blank" rel="noopener">fonte</a>` : `<i>${esc(t.fonte)}</i>`) : ''}</div>`).join('')}</details>` +
@@ -124,6 +179,78 @@
       if (d.aplicadas.length) setTimeout(() => location.reload(), 6000); else carregar();
     } catch (e) { $c('chkWebRes').innerHTML = `<span style="color:#b91c1c">⚠ ${esc(e.message)}</span>`; }
   });
+
+  // 🔷 Gemini com a busca do Google (v84_162)
+  const brl = (v) => 'US$ ' + (Number(v) || 0).toFixed(v && v < 0.1 ? 4 : 2).replace('.', ',');
+  let GM = null;
+  function gmDesenhar(d) {
+    GM = d;
+    const sel = $c('gmModelo');
+    if (!sel.options.length) Object.entries(d.modelos || {}).forEach(([k, v]) => sel.insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
+    sel.value = d.modelo;
+    $c('gmChaveBox').style.display = d.tem_chave ? 'none' : '';
+    $c('gmChecar').disabled = !d.tem_chave;
+    $c('gmInfo').innerHTML = d.tem_chave
+      ? `chave ${esc(d.chave)} · busca do Google: <b>${d.buscas_usadas}</b> de ${d.buscas_gratis.toLocaleString('pt-BR')} grátis por ${esc(d.buscas_periodo)} · gasto estimado com o Gemini: ${brl(d.gasto_usd)} (${d.chamadas} checagens)`
+        + ((d.sem_acesso || []).length ? ` · <span style="color:#b45309">sem acesso a ${esc(d.sem_acesso.join(', '))} — usando o 3.5 Flash-Lite</span>` : '')
+        + ` · <a href="#" id="gmTrocar">trocar a chave</a>`
+      : 'Sem chave ainda. Enquanto isso, o prompt pra outra IA (logo abaixo) continua funcionando.';
+    const tr = $c('gmTrocar'); if (tr) tr.onclick = (e) => { e.preventDefault(); $c('gmChaveBox').style.display = ''; $c('gmChave').focus(); };
+  }
+  const gmStatus = () => fetch('/gemini/status', { cache: 'no-store' }).then(r => r.json()).then(gmDesenhar).catch(() => {});
+  gmStatus();
+  $c('gmModelo').addEventListener('change', () => post('/gemini/config', { modelo: $c('gmModelo').value }).then(gmDesenhar).catch(e => { $c('gmSt').textContent = '⚠ ' + e.message; }));
+  $c('gmSalvar').addEventListener('click', async () => {
+    try { gmDesenhar(await post('/gemini/config', { chave: $c('gmChave').value })); $c('gmChave').value = ''; $c('gmSt').textContent = '✔ chave salva — clique em 🔌 Testar ou já pode checar'; $c('gmChaveBox').style.display = ''; }
+    catch (e) { $c('gmSt').textContent = '⚠ ' + e.message; }
+  });
+  $c('gmTestar').addEventListener('click', async () => {
+    $c('gmSt').textContent = '🔌 testando…';
+    try {
+      if ($c('gmChave').value.trim()) { gmDesenhar(await post('/gemini/config', { chave: $c('gmChave').value })); $c('gmChave').value = ''; }
+      const d = await post('/gemini/testar', {}); $c('gmSt').textContent = d.ok ? `✔ funcionou (${d.modelo}: “${d.resposta}”, ${d.fontes} fonte(s))` : '⚠ ' + d.erro; gmStatus(); }
+    catch (e) { $c('gmSt').textContent = '⚠ ' + e.message; }
+  });
+  function gmFontes(r) {
+    const fs = r.fontes || [];
+    $c('gmFontes').innerHTML = (r.buscas || []).length || fs.length
+      ? `<details><summary>🔎 ${(r.buscas || []).length} busca(s) no Google · ${fs.length} fonte(s) consultada(s) · ${esc(r.modelo || '')} · ${brl(r.usd)} (estimado)</summary>`
+        + ((r.buscas || []).length ? `<div style="color:#555;margin:4px 0">buscou: ${r.buscas.map(q => '“' + esc(q) + '”').join(' · ')}</div>` : '')
+        + fs.map(f => `<div><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.titulo)}</a></div>`).join('') + '</details>'
+      : '';
+  }
+  async function gmAcompanhar(tid) {
+    $c('gmChecar').disabled = true;
+    while (true) {
+      let t = null;
+      try { const r = await fetch('/tarefas/' + tid, { cache: 'no-store' }); if (r.status === 404) { $c('gmChecar').disabled = false; return; } t = await r.json(); } catch (_) {}
+      if (t && t.status === 'rodando') { $c('gmSt').textContent = '🔷 ' + (t.progresso || 'o Gemini está pesquisando…') + ' (pode fechar a aba: o aviso chega no 🔔)'; }
+      else if (t) {
+        fetch('/tarefas/' + tid + '/aplicada', { method: 'POST' }).catch(() => {});
+        $c('gmChecar').disabled = false; gmStatus();
+        if (t.status !== 'pronto') { $c('gmSt').textContent = '⚠ ' + (t.erro || 'o Gemini não respondeu'); return; }
+        const r = t.resultado || {};
+        gmFontes(r);
+        $c('chkWebResp').value = r.texto || '';
+        $c('gmSt').textContent = '✔ o Gemini respondeu — ajustando o roteiro…';
+        $c('chkWebLer').click();
+        if (window.saldoAtualizar) window.saldoAtualizar();
+        return;
+      }
+      await new Promise(res => setTimeout(res, 2500));
+    }
+  }
+  $c('gmChecar').addEventListener('click', async () => {
+    $c('gmSt').textContent = '📝 juntando as inconsistências…';
+    try {
+      const d = await post(BASE + '/web/gemini', { foco: $c('chkFoco').value, pagina: location.pathname });
+      $c('chkWebPrompt').value = d.prompt; $c('chkWebPrompt').style.display = '';
+      gmAcompanhar(d.tarefa);
+    } catch (e) { $c('gmSt').textContent = '⚠ ' + e.message; }
+  });
+  // voltou na página: retoma a checagem do Gemini que estava rodando (ou aplica a que terminou com a aba fechada)
+  fetch('/tarefas?tipo=checagem_gemini&pendentes=1&limite=5&pagina=' + encodeURIComponent(location.pathname)).then(r => r.json())
+    .then(d => (d.tarefas || []).filter(t => (t.alvo || {}).pid === PID_).slice(0, 1).forEach(t => gmAcompanhar(t.id))).catch(() => {});
 
   // 🤖 tudo automático
   async function acompanhar(tid) {

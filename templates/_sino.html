@@ -1,32 +1,34 @@
 <!-- 🔔 sininho de notificações (em todas as páginas) — ver notificacoes.py -->
-<style>
-  #sinoBox { position: fixed; top: 8px; right: 12px; z-index: 99999; font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
-  #sinoBtn { position: relative; width: 40px; height: 40px; margin: 0; padding: 0; border-radius: 50%; border: 1px solid #ddd;
-    background: #fff; color: #222; font-size: 20px; line-height: 38px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
-  #sinoBtn:hover { background: #f3f4f6; }
+<style data-ui-base>
+  #sinoBox { position: fixed; top: 10px; right: 12px; z-index: 99999; font-family: var(--fonte, -apple-system, Segoe UI, Roboto, sans-serif); }
+  .app-topo #sinoBox { position: relative; top: auto; right: auto; z-index: auto; }
+  #sinoBtn { position: relative; width: 40px; height: 40px; margin: 0; padding: 0; border-radius: 50%; border: 1px solid var(--borda, #ddd);
+    background: var(--card, #fff); color: var(--texto, #222); font-size: 16px; line-height: 38px; cursor: pointer; box-shadow: var(--sombra, 0 1px 4px rgba(0,0,0,.15));
+    display: inline-flex; align-items: center; justify-content: center; }
+  #sinoBtn:hover { background: var(--card-2, #f3f4f6); filter: none; }
   #sinoNum { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box;
     border-radius: 9px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; display: none; }
-  #sinoLista { display: none; position: absolute; right: 0; top: 46px; width: min(380px, calc(100vw - 24px)); max-height: 70vh; overflow: auto;
-    background: #fff; color: #222; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); text-align: left; }
+  #sinoLista { display: none; position: absolute; right: 0; top: 48px; width: min(380px, calc(100vw - 24px)); max-height: 72vh; overflow: auto;
+    background: var(--card, #fff); color: var(--texto, #222); border: 1px solid var(--borda, #ddd); border-radius: 12px; box-shadow: var(--sombra-alta, 0 8px 24px rgba(0,0,0,.18)); text-align: left; }
   #sinoLista.aberta { display: block; }
-  #sinoLista .sTopo { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #eee;
-    position: sticky; top: 0; background: #fff; font-weight: 700; font-size: 14px; }
-  #sinoLista .sTopo a { font-weight: 400; font-size: 12px; color: #2563eb; cursor: pointer; margin-left: 10px; text-decoration: none; }
-  #sinoLista .sItem { display: block; padding: 9px 12px; border-bottom: 1px solid #f1f1f1; color: inherit; text-decoration: none; font-size: 13px; }
-  #sinoLista .sItem:hover { background: #f5f7ff; }
-  #sinoLista .sItem.nova { background: #eff6ff; }
+  #sinoLista .sTopo { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--borda, #eee);
+    position: sticky; top: 0; background: var(--card, #fff); font-weight: 700; font-size: 14px; font-family: var(--fonte-titulo, inherit); }
+  #sinoLista .sTopo a { font-weight: 500; font-size: 12px; color: var(--link, #2563eb); cursor: pointer; margin-left: 10px; text-decoration: none; }
+  #sinoLista .sItem { display: block; padding: 9px 14px; border-bottom: 1px solid var(--borda, #f1f1f1); color: inherit; text-decoration: none; font-size: 13px; }
+  #sinoLista .sItem:hover { background: var(--bg-2, #f5f7ff); }
+  #sinoLista .sItem.nova { background: var(--acento-suave, #eff6ff); }
   #sinoLista .sItem b { display: block; font-weight: 600; }
-  #sinoLista .sItem .sMsg { color: #555; font-size: 12px; white-space: pre-wrap; max-height: 3.6em; overflow: hidden; }
-  #sinoLista .sItem .sQuando { color: #888; font-size: 11px; }
-  #sinoLista .sItem.erro b { color: #b91c1c; } #sinoLista .sItem.aviso b { color: #a16207; }
-  #sinoLista .sVazio { padding: 18px 12px; color: #777; font-size: 13px; text-align: center; }
-  #sinoToast { position: fixed; right: 12px; top: 56px; z-index: 99999; max-width: 340px; display: none; background: #111827; color: #fff;
+  #sinoLista .sItem .sMsg { color: var(--texto-2, #555); font-size: 12px; white-space: pre-wrap; max-height: 3.6em; overflow: hidden; }
+  #sinoLista .sItem .sQuando { color: var(--mudo, #888); font-size: 11px; }
+  #sinoLista .sItem.erro b { color: var(--erro, #b91c1c); } #sinoLista .sItem.aviso b { color: var(--aviso, #a16207); }
+  #sinoLista .sVazio { padding: 18px 12px; color: var(--mudo, #777); font-size: 13px; text-align: center; }
+  #sinoToast { position: fixed; right: 12px; top: 70px; z-index: 99999; max-width: 340px; display: none; background: #111827; color: #fff;
     padding: 10px 14px; border-radius: 10px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.25); cursor: pointer; }
 </style>
 <div id="sinoBox">
-  <button type="button" id="sinoBtn" title="Notificações" aria-label="Notificações">🔔<span id="sinoNum"></span></button>
+  <button type="button" id="sinoBtn" title="Notificações" aria-label="Notificações"><i class="fa-solid fa-bell"></i><span id="sinoNum"></span></button>
   <div id="sinoLista" role="menu">
-    <div class="sTopo"><span>Notificações</span><span><a id="sinoLer">marcar todas como lidas</a><a href="/historico">🕘 histórico</a></span></div>
+    <div class="sTopo"><span>Notificações</span><span><a id="sinoLer">marcar todas como lidas</a><a href="/historico"><i class="fa-solid fa-clock-rotate-left"></i> histórico</a></span></div>
     <div id="sinoItens"><div class="sVazio">Carregando…</div></div>
   </div>
 </div>

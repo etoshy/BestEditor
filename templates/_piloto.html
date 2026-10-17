@@ -1,0 +1,97 @@
+{# 🚀 piloto automático (piloto.py) — {% set pl_pid = p.id %}{% include "_piloto.html" %} #}
+<div id="piloto" style="display:none;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 16px;margin:12px 0;">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <b style="font-size:1.05rem;">🚀 Piloto automático</b>
+    <span id="plSt" style="font-size:.85rem;color:#3730a3;"></span>
+    <span style="margin-left:auto;display:flex;gap:6px;">
+      <button type="button" id="plRodar" style="width:auto;margin:0;padding:4px 12px;font-size:.82rem;background:#4338ca;color:#fff;">🚀 Rodar o que falta</button>
+      <button type="button" id="plDeNovo" style="width:auto;margin:0;padding:4px 12px;font-size:.82rem;background:#0f766e;color:#fff;">🔁 Rodar de novo…</button>
+    </span>
+  </div>
+  <div id="plPassos" style="margin-top:8px;font-size:.88rem;"></div>
+  <div id="plDeNovoBox" style="display:none;margin-top:8px;padding:8px 10px;background:#fff;border:1px solid #99f6e4;border-radius:8px;font-size:.86rem;">
+    <b>🔁 Rodar de novo — marque o que refazer</b> <span style="color:#666">(o que não marcar fica como está; cada mudança no roteiro vira versão no 🕘 histórico)</span>
+    <div id="plDeNovoLista" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0;"></div>
+    <div style="font-size:.78rem;color:#92400e;margin-bottom:6px;">⚠ ✍️ Roteiro marcado = escreve um roteiro NOVO (com as fontes e as anotações; o atual fica no histórico). 🎙 TTS de novo num texto que já foi adaptado: rode depois de mexer no roteiro.</div>
+    <button type="button" id="plDeNovoIr" style="width:auto;margin:0;padding:5px 14px;background:#0f766e;color:#fff;font-weight:700;">▶ Rodar</button>
+    <button type="button" id="plDeNovoTodos" style="width:auto;margin:0 0 0 6px;padding:4px 10px;font-size:.8rem;background:#94a3b8;">marcar tudo (menos o roteiro)</button>
+  </div>
+  <div id="plVoce" style="display:none;margin-top:10px;padding:10px;background:#fff;border:1px solid #c7d2fe;border-radius:8px;">
+    <b>⏸ Sua vez</b>
+    <ol style="margin:6px 0 6px 18px;padding:0;font-size:.88rem;">
+      <li>🌐 <b>Copie o prompt</b> e mande pra uma IA com pesquisa na internet (ChatGPT, Claude, Gemini, Perplexity) → cole o JSON da resposta aqui embaixo.
+        <div style="display:flex;gap:6px;margin:4px 0;"><button type="button" id="plCopiar" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;">📋 Copiar o prompt</button><span id="plCopSt" style="font-size:.8rem;"></span></div>
+        <textarea id="plWebResp" rows="3" style="width:100%;font-size:.82rem;" placeholder='{ "correcoes": [...], "conferidos": [...] }'></textarea>
+        <button type="button" id="plWebLer" style="width:auto;margin:2px 0 0;padding:4px 12px;font-size:.82rem;">✅ Aplicar as correções</button> <span id="plWebSt" style="font-size:.82rem;"></span></li>
+      <li>🧲 <b>Fotos</b>: em <a href="#frCard" onclick="document.querySelector('[data-q]')?.scrollIntoView({behavior:'smooth'})">📸 Fotos do roteiro</a>, clique em <b>🧲 Abrir as próximas</b> e escolha as imagens em cada guia (os termos de busca já estão prontos).</li>
+    </ol>
+    <button type="button" id="plContinuar" style="width:auto;margin:0;padding:6px 16px;background:#15803d;color:#fff;font-weight:700;">▶ Continuar (posicionar fotos → elenco → TTS)</button>
+  </div>
+</div>
+<script>
+(function () {
+  const PID = {{ pl_pid|tojson }}, BASE = '/modelos-video/' + PID;
+  const $l = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  const ICO = { esperando: '◻', rodando: '⏳', ok: '✅', erro: '⚠', pulado: '⏭', voce: '⏸' };
+  let PL = null, timer = null;
+  function desenhar(d) {
+    PL = d.piloto;
+    if (!PL) { $l('piloto').style.display = 'none'; return; }
+    $l('piloto').style.display = '';
+    $l('plSt').textContent = d.rodando ? `⏳ rodando a fase ${PL.fase}… (pode sair da página)` : PL.erro ? '❌ ' + PL.erro : '';
+    $l('plRodar').disabled = d.rodando; $l('plDeNovo').disabled = d.rodando;
+    $l('plPassos').innerHTML = (PL.passos || []).map(x => `<div style="display:flex;gap:6px;align-items:baseline;margin:2px 0;${x.estado === 'esperando' ? 'color:#64748b' : ''}">
+      <span style="width:1.4em">${ICO[x.estado] || '◻'}</span><b style="min-width:230px">${esc(x.nome)}</b><span style="flex:1;${x.estado === 'erro' ? 'color:#b91c1c' : 'color:#334155'}">${esc(x.msg)}</span>
+      ${x.id !== 'voce' && !d.rodando && ['erro', 'ok', 'pulado'].includes(x.estado) ? `<button type="button" data-refazer="${x.id}" style="width:auto;margin:0;padding:0 6px;font-size:.72rem;background:#94a3b8;">↻</button>` : ''}
+      ${x.id !== 'voce' && !d.rodando && ['esperando', 'erro'].includes(x.estado) ? `<button type="button" data-pular="${x.id}" style="width:auto;margin:0;padding:0 6px;font-size:.72rem;background:#cbd5e1;color:#333;">⏭</button>` : ''}</div>`).join('');
+    const voce = (PL.passos || []).find(x => x.id === 'voce');
+    $l('plVoce').style.display = voce && voce.estado === 'voce' && !d.rodando ? '' : 'none';
+    clearTimeout(timer); if (d.rodando) timer = setTimeout(atualizar, 4000);
+  }
+  let estavaRodando = false;
+  async function atualizar() { try { const d = await (await fetch(BASE + '/piloto', { cache: 'no-store' })).json(); desenhar(d);
+    if (estavaRodando && !d.rodando) location.reload();  // terminou uma fase: recarrega pra mostrar o roteiro/fotos novos
+    estavaRodando = d.rodando; } catch (_) {} }
+  $l('plPassos').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    await post(`${BASE}/piloto/passo/${b.dataset.refazer || b.dataset.pular}`, { acao: b.dataset.pular ? 'pular' : 'refazer' }).catch(() => {});
+    atualizar();
+  });
+  $l('plRodar').addEventListener('click', async () => {
+    const voce = PL && (PL.passos || []).find(x => x.id === 'voce');
+    const fase = voce && voce.estado === 'ok' ? 2 : 1;
+    try { await post(BASE + '/piloto/iniciar', { fase }); estavaRodando = true; atualizar(); } catch (e) { $l('plSt').textContent = '⚠ ' + e.message; }
+  });
+  const PADRAO_DE_NOVO = ['revisao', 'perguntas', 'termos', 'web', 'posicionar', 'elenco', 'tts'];
+  $l('plDeNovo').addEventListener('click', () => {
+    const box = $l('plDeNovoBox'); box.style.display = box.style.display === 'none' ? '' : 'none';
+    $l('plDeNovoLista').innerHTML = ((PL && PL.passos) || []).filter(x => x.id !== 'voce').map(x =>
+      `<label style="font-weight:400;margin:0"><input type="checkbox" class="plDn" value="${x.id}" ${PADRAO_DE_NOVO.includes(x.id) ? 'checked' : ''} style="width:auto;margin:0 3px 0 0">${esc(x.nome)}</label>`).join('');
+  });
+  $l('plDeNovoTodos').addEventListener('click', () => document.querySelectorAll('.plDn').forEach(c => { c.checked = c.value !== 'roteiro'; }));
+  $l('plDeNovoIr').addEventListener('click', async () => {
+    const refazer = [...document.querySelectorAll('.plDn:checked')].map(c => c.value);
+    if (!refazer.length) return;
+    if (refazer.includes('roteiro') && !confirm('Escrever um roteiro NOVO do zero? O atual fica no 🕘 histórico.')) return;
+    try { await post(BASE + '/piloto/iniciar', { refazer }); $l('plDeNovoBox').style.display = 'none'; estavaRodando = true; atualizar(); }
+    catch (e) { $l('plSt').textContent = '⚠ ' + e.message; }
+  });
+  $l('plCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText(PL.web_prompt || ''); $l('plCopSt').textContent = '✔ copiado'; } catch (_) { $l('plCopSt').textContent = '⚠ não consegui copiar'; } });
+  $l('plWebLer').addEventListener('click', async () => {
+    $l('plWebSt').textContent = '⏳ aplicando…';
+    try { const d = await post(`/checagem/dossie/${PID}/web/ler`, { texto: $l('plWebResp').value });
+      $l('plWebSt').textContent = `✔ ${d.aplicadas.length} corrigido(s) · ${(d.conferidos || []).filter(c => c.ok).length} confirmado(s)` + ((d.sem_resposta || []).length ? ` · ⚠ sem resposta: ${d.sem_resposta.join(', ')}` : '') + ((d.nao_achadas || []).length ? ` · ${d.nao_achadas.length} não bateram com o texto` : ''); }
+    catch (e) { $l('plWebSt').textContent = '⚠ ' + e.message; }
+  });
+  $l('plContinuar').addEventListener('click', async () => { try { await post(BASE + '/piloto/continuar'); estavaRodando = true; atualizar(); } catch (e) { $l('plSt').textContent = '⚠ ' + e.message; } });
+  // modelo sem piloto: um botão discreto pra ligar
+  fetch(BASE + '/piloto', { cache: 'no-store' }).then(r => r.json()).then(d => {
+    if (d.piloto) { estavaRodando = d.rodando; return desenhar(d); }
+    const b = document.getElementById('plLigar'); if (b) b.style.display = '';
+  }).catch(() => {});
+  const lig = document.getElementById('plLigar');
+  if (lig) lig.addEventListener('click', async () => { try { await post(BASE + '/piloto/iniciar', { fase: 1 }); lig.style.display = 'none'; estavaRodando = true; atualizar(); } catch (e) { alert(e.message); } });
+})();
+</script>

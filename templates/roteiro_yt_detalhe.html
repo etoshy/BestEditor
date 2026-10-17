@@ -2,7 +2,7 @@
 {% block title %}{{ p.titulo or 'Roteiro do YouTube' }}{% endblock %}
 {% block content %}
 <style>
-  body { max-width: 1050px; }
+  .app-content { max-width: 1050px; }
   .ry-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
   .ry-card h2 { margin: 0 0 4px; font-size: 1.15rem; }
   .ry-num { display: inline-block; background: #b91c1c; color: #fff; border-radius: 999px; width: 24px; height: 24px; text-align: center; line-height: 24px; font-size: 0.85rem; margin-right: 6px; }
@@ -46,10 +46,11 @@
 
 <p><a href="{{ url_for('roteiros_yt_page') }}">← Roteiros do YouTube</a></p>
 <h1 style="margin-bottom:2px;">📜 {{ p.titulo or 'Roteiro do YouTube' }}</h1>
+<div style="margin:2px 0 8px;">{% set cl_tipo = 'roteiro' %}{% set cl_id = p.id %}{% include "_clonar.html" %}{% if p.clonado_de %}<span style="font-size:.8rem;color:#666;margin-left:8px;">📑 cópia de <a href="/roteiros-yt/{{ p.clonado_de }}">outro roteiro</a></span>{% endif %}</div>
 {% if p.url %}<p class="ry-hint"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.url }}</a></p>{% endif %}
 
 <!-- 1 · transcrição -->
-<div class="ry-card" id="etapa1">
+<div class="ry-card" id="etapa1" data-feito="{{ '1' if p.transcricao else '0' }}">
   <h2><span class="ry-num">1</span>Transcrição</h2>
   <div id="trStatus">
     {% if p.transcricao %}
@@ -70,7 +71,7 @@
 </div>
 
 <!-- 2 · prompt: reescrever + cenas -->
-<div class="ry-card" id="etapa2">
+<div class="ry-card" id="etapa2" data-feito="{{ '1' if p.analise else '0' }}">
   <h2><span class="ry-num">2</span>Reescrever o roteiro e listar as cenas</h2>
   <p class="ry-hint">Escolha o modelo do prompt, gere, cole na sua IA (ChatGPT, Claude, Gemini…) e cole aqui o JSON que ela devolver.</p>
   <div class="ry-row">
@@ -109,8 +110,10 @@
   <div id="p1Res"></div>
 </div>
 
+{% set partes_base = '/roteiros-yt/' ~ p.id ~ '/partes' %}{% include "_partes.html" %}
+
 <!-- 3 · o que fazer -->
-<div class="ry-card" id="etapa3">
+<div class="ry-card" id="etapa3" data-feito="{{ '1' if p.resultado else '0' }}">
   <h2><span class="ry-num">3</span>O que fazer com o roteiro</h2>
   <p class="ry-hint">Marque o que quer — dá pra combinar (ex.: traduzir + tags + anúncios + likes). Gere o prompt, mande pra IA e cole a resposta.</p>
   {% set op = p.acoes or usadas.ultima or none %}
@@ -151,17 +154,17 @@
 </div>
 
 <!-- 4 · resultado -->
-<div class="ry-card" id="etapa4">
+<div class="ry-card" id="etapa4" data-feito="{{ '1' if '' else '0' }}">
   <h2><span class="ry-num">4</span>Resultado</h2>
   <div id="resultado"><p class="ry-hint">Aparece aqui depois do passo 2 (cenas) e do passo 3 (roteiro final).</p></div>
 </div>
 
-{% set partes_base = '/roteiros-yt/' ~ p.id ~ '/partes' %}{% include "_partes.html" %}
-{% set rev_base = '/revisao/roteiro_yt/' ~ p.id %}{% set rev_tem_antes = (p.resultado or {}).antes_da_revisao or (p.analise or {}).antes_da_revisao %}{% include "_revisao.html" %}
-{% set rt_origem = 'roteiro_yt' %}{% set rt_id = p.id %}{% include "_checagem.html" %}
-{% include "_historico.html" %}
-{% set tts_base = '/tts-adaptar/roteiro_yt/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).antes_do_tts or (p.analise or {}).antes_do_tts %}{% include "_adaptar_tts.html" %}
-{% set thumbs_base = '/thumbs/roteiro_yt/' ~ p.id %}{% include "_thumbs.html" %}
+{% set _rv = (p.resultado or {}).antes_da_revisao or (p.analise or {}).antes_da_revisao %}{% set _tt = (p.resultado or {}).antes_do_tts or (p.analise or {}).antes_do_tts %}
+<div data-feito="{{ '1' if _rv else '0' }}">{% set rev_base = '/revisao/roteiro_yt/' ~ p.id %}{% set rev_tem_antes = _rv %}{% include "_revisao.html" %}</div>
+<div data-feito="0">{% set rt_origem = 'roteiro_yt' %}{% set rt_id = p.id %}{% include "_checagem.html" %}</div>
+<div data-feito="{{ '1' if _tt else '0' }}">{% set tts_base = '/tts-adaptar/roteiro_yt/' ~ p.id %}{% set tts_tem_antes = _tt %}{% include "_adaptar_tts.html" %}</div>
+<div data-feito="0">{% set thumbs_base = '/thumbs/roteiro_yt/' ~ p.id %}{% include "_thumbs.html" %}</div>
+<div data-feito="0">{% include "_historico.html" %}</div>
 
 <script>
 const PID = {{ p.id|tojson }};

@@ -20,6 +20,9 @@ site_config.json
 # 🤖 IA (chave da API, gasto e respostas guardadas)
 ia_config.json
 ia_uso.json
+ultimas_escolhas.json
+gemini_config.json
+gemini_uso.json
 ia_cache/
 # sessões/cookies de navegador e contas (qualquer lugar do projeto)
 sessao*.json
@@ -121,3 +124,6 @@ ia_google/resultados/
 ia_google/videos/
 ia_google/falhas_*
 ia_google/ia_google.log
+
+# 🧲 navegador das imagens (perfil do Brave do site: logins, extensões)
+navegador_imagens_perfil/

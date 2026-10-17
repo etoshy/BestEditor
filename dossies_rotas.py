@@ -144,17 +144,61 @@ def registrar(app, base_dir: str) -> None:
             if "tema" in c:
                 p["tema"] = str(c.get("tema") or "").strip()[:300]
             if "roteiro_base" in c:
-                p["roteiro_base"] = str(c.get("roteiro_base") or "")[:60000]
+                p["roteiro_base"] = str(c.get("roteiro_base") or "")[:250000]  # v84_161: cabe a transcrição de vídeos longos
             ds.salvar(base_dir, p)
+            __import__("ultimas_escolhas").lembrar(base_dir, idioma=cfg.get("idioma") if "idioma" in c else None,
+                                                   nome_canal=cfg.get("nome_canal") if "nome_canal" in c else None)
         return jsonify({"ok": True, "config": cfg})
+
+    def _transcrever_videos(pid: str, links: list) -> str:
+        """🎬 v84_161: links de VÍDEO colados nas fontes → a transcrição (sem os tempos) de cada um vai pro campo
+        "Roteiro / anotações seus" (passo 1), um bloco por vídeo. Roda em segundo plano (chega aviso no 🔔)."""
+        import tarefas_bg
+        import roteiros_yt as ry
+
+        def _rodar(t):
+            feitos, falhas = [], []
+            for k, url in enumerate(links, 1):
+                t.progresso(f"vídeo {k} de {len(links)}: lendo a transcrição…")
+                try:
+                    pasta = os.path.join(ds._pasta(base_dir, pid), "transcricoes_links")
+                    tr = ry.extrair_transcricao(url, pasta, on_log=lambda m: t.progresso(f"vídeo {k} de {len(links)}: {str(m)[:120]}"))
+                    texto = ry.texto_da_transcricao(tr, com_tempo=False).strip()
+                    if not texto:
+                        raise ValueError("o vídeo não tem fala/legenda")
+                except Exception as exc:  # noqa: BLE001
+                    falhas.append(f"{url[:80]}: {str(exc).splitlines()[0][:200] if str(exc) else exc.__class__.__name__}")
+                    continue
+                titulo = (tr.get("titulo") or "").strip() or url
+                with _TRAVA:
+                    p = _proj(pid)
+                    if not p:
+                        raise ValueError("Projeto não encontrado.")
+                    base = (p.get("roteiro_base") or "").rstrip()
+                    bloco = f"── Transcrição: {titulo} ──\n({url})\n{texto}"
+                    p["roteiro_base"] = ((base + "\n\n") if base else "") + bloco
+                    ds.salvar(base_dir, p)
+                feitos.append({"url": url, "titulo": titulo, "caracteres": len(texto)})
+            if not feitos and falhas:
+                raise ValueError("Nenhuma transcrição: " + " · ".join(falhas))
+            return {"feitos": feitos, "falhas": falhas}
+
+        return tarefas_bg.iniciar("dossie_transcricao", f"🎬 Transcrição de {len(links)} vídeo(s) pras anotações", _rodar,
+                                  pagina=f"/modelos-video/{pid}")
 
     @app.route("/modelos-video/<pid>/fontes", methods=["POST"])
     def dossie_fontes(pid: str):
-        """Um ou vários links (um por linha) de matérias — cada um é lido e tem as imagens baixadas em segundo plano."""
+        """Um ou vários links (um por linha) de matérias — cada um é lido e tem as imagens baixadas em segundo plano.
+        Link de vídeo (YouTube, TikTok, Instagram, Vimeo…) não vira matéria: a transcrição dele vai pras anotações (v84_161)."""
         c = request.get_json(silent=True) or {}
         urls = [u.strip() for u in str(c.get("urls") or "").split("\n") if u.strip()]
         if not urls:
             return jsonify({"erro": "Cole pelo menos um link."}), 400
+        videos = [u for u in urls if ds.eh_link_de_video(u)] if c.get("videos_transcrever", True) is not False else []
+        urls = [u for u in urls if u not in videos]
+        tarefa = _transcrever_videos(pid, videos[:20]) if videos and _proj(pid) else None
+        if not urls:
+            return jsonify({"ok": bool(tarefa), "novas": [], "erros": [], "videos": len(videos[:20]), "tarefa_videos": tarefa})
         novas, erros = [], []
         with _TRAVA:
             p = _proj(pid)
@@ -168,7 +212,7 @@ def registrar(app, base_dir: str) -> None:
             ds.salvar(base_dir, p)
         for fid in novas:
             _processar(pid, fid)
-        return jsonify({"ok": bool(novas), "novas": novas, "erros": erros})
+        return jsonify({"ok": bool(novas) or bool(tarefa), "novas": novas, "erros": erros, "videos": len(videos[:20]), "tarefa_videos": tarefa})
 
     @app.route("/modelos-video/<pid>/fonte-arquivo", methods=["POST"])
     def dossie_fonte_arquivo(pid: str):

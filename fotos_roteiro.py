@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import marcas_seguras
 
-TIPOS = {"pessoa": "👤", "lugar": "📍", "objeto": "🔧", "documento": "📄", "cena": "🎬", "veiculo": "🚗", "outro": "🖼"}
+TIPOS = {"pessoa": "👤", "lugar": "📍", "objeto": "🔧", "documento": "📄", "site": "🌐", "cena": "🎬", "veiculo": "🚗", "outro": "🖼"}
 _MIDIA_ID = re.compile(r"\[\s*([MIT]\d+)", re.I)
 
 
@@ -89,6 +89,9 @@ def prompt_perguntas(p: Dict[str, Any]) -> str:
          "- \"trecho\": uma frase curta COPIADA do roteiro onde aquilo aparece. \"vezes\": quantas vezes (mais ou menos) o "
          "roteiro fala daquilo. \"dica\": onde costuma ter essa foto (ex.: arquivo de jornal da época, Find a Grave, site "
          "da prefeitura, Google Street View) — curta.",
+         "- SITE/PÁGINA (o roteiro fala de um site, página, perfil, post, petição, fórum, página de recompensa…): tipo \"site\" "
+         "e peça o LINK (pode ser do arquivo web: web.archive.org) — no vídeo a página aparece animada; \"dica\": onde achar "
+         "(Wayback Machine, reportagens que mostram a página).",
          "",
          "## Imagens que eu já tenho",
          *([f"- {m['id']}: {_descr(m)}" for m in imgs[:200]] or ["(nenhuma)"]),
@@ -97,7 +100,7 @@ def prompt_perguntas(p: Dict[str, Any]) -> str:
          roteiro[:60000],
          "",
          "## Resposta — SOMENTE um JSON válido, assim:",
-         json.dumps({"perguntas": [{"tipo": "pessoa | lugar | objeto | documento | cena | veiculo | outro",
+         json.dumps({"perguntas": [{"tipo": "pessoa | lugar | objeto | documento | site | cena | veiculo | outro",
                                     "alvo": "quem/o quê (ex.: Helen List)", "pergunta": "Você tem foto de …?",
                                     "por_que": "por que vale a imagem (curto)", "trecho": "frase exata do roteiro",
                                     "vezes": 4, "dica": "onde achar",
@@ -418,6 +421,31 @@ def buscar_fotos(base: str, pid: str, pedidos: List[Dict[str, Any]], motores: Li
     return {"novas": novos, "erros": erros}
 
 
+def salvar_bytes(base: str, pid: str, dados: bytes) -> Tuple[str, str]:
+    """🧲 A imagem que o próprio navegador baixou (o site dela barra o nosso download, ex.: Facebook)."""
+    import io
+    import dossies as ds
+    from PIL import Image
+    if not dados or len(dados) > 40 * 1024 * 1024:
+        raise ValueError("imagem vazia ou grande demais")
+    try:
+        im = Image.open(io.BytesIO(dados))
+        fmt = (im.format or "").lower()
+    except Exception:  # noqa: BLE001
+        raise ValueError("o que veio não é uma imagem")
+    ext = {"jpeg": ".jpg", "png": ".png", "webp": ".webp", "gif": ".gif", "avif": ".avif", "bmp": ".bmp"}.get(fmt)
+    pasta = ds.pasta_midias(base, pid)
+    os.makedirs(pasta, exist_ok=True)
+    nome = f"link_{uuid.uuid4().hex[:6]}"
+    if not ext:  # formato estranho: vira jpg
+        ext = ".jpg"
+        im.convert("RGB").save(os.path.join(pasta, nome + ext), quality=92)
+    else:
+        with open(os.path.join(pasta, nome + ext), "wb") as fh:
+            fh.write(dados)
+    return nome + ext, "foto"
+
+
 def baixar_link(base: str, pid: str, url: str) -> Tuple[str, str, Optional[Dict[str, Any]]]:
     """🔗 Um link colado: link direto da imagem/vídeo (baixa) ou de uma página (pega a imagem do OG da página).
     → (nome do arquivo, tipo "foto"|"video", og ou None). Levanta ValueError se não deu."""
@@ -434,7 +462,7 @@ def baixar_link(base: str, pid: str, url: str) -> Tuple[str, str, Optional[Dict[
         return os.path.basename(cam), tipo, None
     except vd.VendaError as exc:
         erro1 = str(exc)
-    if vd.tipo_do_arquivo(url.split("?")[0]):  # 2) parece imagem mas o site barrou: baixador dos buscadores (referer, proxy)
+    if True:  # 2) o site barrou (ou o link não tem extensão, ex.: lookaside.fbsbx.com/...?media_id=): baixador dos buscadores
         try:
             import buscador_imagens_unificado as bu
             im = bu.ImagemBuscador(title="", description="", source_page="", original_url=url, thumbnail_url="",
@@ -458,6 +486,48 @@ def baixar_link(base: str, pid: str, url: str) -> Tuple[str, str, Optional[Dict[
     raise ValueError("a página não tem imagem principal — copie o link da própria imagem (botão direito → copiar endereço da imagem)")
 
 
+def eh_de_site(q: Dict[str, Any]) -> bool:
+    """A pergunta é sobre um site/página (mostra o campo 🌐 link do site em destaque)."""
+    if q.get("tipo") == "site":
+        return True
+    t = " ".join(str(q.get(k) or "") for k in ("pergunta", "alvo", "trecho", "dica")).lower()
+    return bool(re.search(r"\b(site|página|pagina|website|webseite|internetseite|homepage|web\.archive|wayback|archive\.org|"
+                          r"perfil|post|fórum|forum|blog|petição|url|link|internet)\b", t))
+
+
+def capturar_site(base: str, pid: str, url: str) -> str:
+    """🌐 Print da página (1440×900) — também do web.archive.org. → nome do arquivo na pasta de mídias."""
+    import shutil
+    import dossies as ds
+    import dp_editorial
+    pasta = ds.pasta_midias(base, pid)
+    os.makedirs(pasta, exist_ok=True)
+    cam = dp_editorial.capturar_print(url, os.path.join(pasta, "_prints"), timeout_ms=45000)
+    if not cam:
+        raise ValueError("não consegui abrir a página pra tirar o print (o site pode bloquear) — mande um print à mão")
+    nome = f"site_{uuid.uuid4().hex[:6]}.png"
+    shutil.copyfile(cam, os.path.join(pasta, nome))
+    return nome
+
+
+def _ligar_ao_elenco(p: Dict[str, Any], m: Dict[str, Any], tipo: str, nome: str) -> None:
+    el = p.setdefault("elenco", {"pessoas": [], "locais": []})
+    chave = "locais" if tipo == "local" else "pessoas"
+    lista = el.setdefault(chave, [])
+    x = next((y for y in lista if str(y.get("nome") or "").strip().lower() == nome.lower()), None)
+    if x is None:
+        x = ({"nome": nome, "tipo": "", "descricao": "", "ano": 0, "usar": True, "fotos": []} if chave == "locais"
+             else {"nome": nome, "papel": "", "nascimento": 0, "aparencia": "", "usar": True, "fotos": []})
+        lista.append(x)
+    fotos = x.setdefault("fotos", [])
+    if chave == "locais":
+        if m["id"] not in fotos:
+            fotos.append(m["id"])
+    elif not any(f.get("midia") == m["id"] for f in fotos if isinstance(f, dict)):
+        fotos.append({"midia": m["id"], "idade": 0, "ano": 0, "quem_na_foto": "", "so_ele": True, "rosto_visivel": True})
+    m["descricao"] = m.get("descricao") or nome
+
+
 # ------------------------------------------------------------------ rotas
 def registrar(app, base_dir: str) -> None:
     from flask import jsonify, request
@@ -471,7 +541,7 @@ def registrar(app, base_dir: str) -> None:
             return None
 
     def _corpo() -> Dict[str, Any]:
-        return request.get_json(silent=True) or {}
+        return request.get_json(silent=True, force=True) or {}  # force: o script do Google pode mandar como text/plain
 
     def _estado(p: Dict[str, Any]) -> Dict[str, Any]:
         fr = p.get("fotos_roteiro") or {}
@@ -481,9 +551,10 @@ def registrar(app, base_dir: str) -> None:
                 enviadas.setdefault(m["pergunta"], []).append(m["id"])
         info = {m["id"]: {"url": ds.url_midia(p, m), "a_conferir": bool(m.get("a_conferir")),
                           "link": (m.get("url") or "")[:300], "da_pagina": bool(m.get("da_pagina")),
-                          "buscador": m.get("buscador") or "", "fora": bool(m.get("descartada") or m.get("duplicada_de"))}
+                          "buscador": m.get("buscador") or "", "fora": bool(m.get("descartada") or m.get("duplicada_de")),
+                          "site": m.get("site_url") or ""}
                 for m in p.get("midias") or [] if m.get("pergunta")}
-        return {"ok": True, "perguntas": fr.get("perguntas") or [], "enviadas": enviadas, "uso": uso_das_imagens(p),
+        return {"ok": True, "perguntas": [dict(q, eh_site=eh_de_site(q)) for q in fr.get("perguntas") or []], "enviadas": enviadas, "uso": uso_das_imagens(p),
                 "midias": info, "busca": BUSCA.get(p["id"]) or None,
                 "termos": {q["id"]: (q.get("busca") or "") for q in fr.get("perguntas") or []},
                 "tem_roteiro": bool((p.get("resultado") or {}).get("roteiro")),
@@ -573,9 +644,16 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         url = str(c.get("url") or "").strip()
         try:
-            arquivo, tipo, og = baixar_link(base_dir, pid, url)
+            if c.get("dados_b64"):  # 🧲 o navegador já baixou a imagem (o site dela barrou o servidor)
+                import base64 as _b64
+                arquivo, tipo = salvar_bytes(base_dir, pid, _b64.b64decode(str(c["dados_b64"]).split(",")[-1]))
+                og = None
+            else:
+                arquivo, tipo, og = baixar_link(base_dir, pid, url)
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"erro": f"não consegui baixar ({str(exc)[:120]})"}), 400
         qid = str(c.get("pergunta") or "")[:10]
         desc = str(c.get("descricao") or "").strip()[:2000]
         with dossies_rotas._TRAVA:
@@ -589,6 +667,11 @@ def registrar(app, base_dir: str) -> None:
                 m.update(pergunta=qid, pergunta_alvo=(q.get("alvo") or "")[:120])
             if og:
                 m["da_pagina"] = True  # 📄 veio da foto principal da página (pode não ser a que você queria)
+            if c.get("origem") == "guia":
+                m["buscador"] = "google"  # 🧲 escolhida por você no navegador das imagens: já conferida
+            el_dest = c.get("elenco") if isinstance(c.get("elenco"), dict) else None
+            if el_dest and str(el_dest.get("n") or "").strip():  # 🧲 do 🎭 Elenco: a foto já entra na pessoa/no lugar
+                _ligar_ao_elenco(p, m, str(el_dest.get("t") or "pessoa"), str(el_dest["n"]).strip())
             ds.salvar(base_dir, p)
         import ia_servico
         if ia_servico.ativo("dossie_imagens"):
@@ -596,6 +679,38 @@ def registrar(app, base_dir: str) -> None:
             threading.Thread(target=lambda: ds.ia_analisar_imagens(base_dir, pid, trava=dossies_rotas._TRAVA, ids=[m["id"]]),
                              daemon=True).start()
         return jsonify({"ok": True, "midia": {"id": m["id"], "tipo": tipo}, "da_pagina": bool(og)})
+
+    @app.route("/modelos-video/<pid>/fotos-roteiro/site", methods=["POST"])
+    def fotos_roteiro_site(pid: str):
+        """🌐 O link de um site/página (ou do web.archive.org): tira o print e guarda o LINK junto — no editor esse
+        momento vira o quadro 🖥 Página animada (o print flutuando no navegador)."""
+        c = _corpo()
+        url = str(c.get("url") or "").strip()
+        if not re.match(r"^https?://", url, re.I):
+            return jsonify({"erro": "Cole o link completo (https://…)."}), 400
+        if not _carregar(pid):
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            arquivo = capturar_site(base_dir, pid, url)
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        qid = str(c.get("pergunta") or "")[:10]
+        from urllib.parse import urlparse
+        dominio = urlparse(url).netloc
+        if "archive.org" in dominio:  # web.archive.org/web/2015…/https://site.de/… → o site de verdade na barra
+            m_ = re.search(r"/web/\d+[a-z_]*/(?:https?://)?([^/]+)", url)
+            dominio = m_.group(1) if m_ else dominio
+        with dossies_rotas._TRAVA:
+            p = _carregar(pid)
+            q = next((x for x in (p.get("fotos_roteiro") or {}).get("perguntas") or [] if x["id"] == qid), None)
+            desc = str(c.get("descricao") or "").strip()[:2000] or (q or {}).get("alvo") or dominio
+            m = ds.adicionar_midia(p, tipo="foto", origem="url", url=url, arquivo=arquivo, nome=f"🌐 {dominio}"[:200],
+                                   descricao=f"Print do site {dominio} — {desc}", usar="ambos")
+            m.update(site_url=url, site_dominio=dominio[:120])
+            if q:
+                m.update(pergunta=qid, pergunta_alvo=(q.get("alvo") or "")[:120])
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "midia": {"id": m["id"]}, "dominio": dominio})
 
     @app.route("/modelos-video/<pid>/fotos-roteiro/conferidas", methods=["POST"])
     def fotos_roteiro_conferidas(pid: str):

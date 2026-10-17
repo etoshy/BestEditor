@@ -1,0 +1,80 @@
+{# 🤖 Conteúdo IA (conteudo_ia.py, v84_145) — selo nas cenas geradas por IA. Dentro da aba do Estúdio. #}
+<h3>🤖 Selo nas cenas geradas por IA</h3>
+<p class="hint">Toda cena de IA (🟣 pod/Runpod, Google Flow) ganha um texto discreto num canto, no idioma do vídeo. É refeito sozinho na montagem: trocou uma cena de IA por uma real, o selo daquele trecho some. Os selos aparecem na faixa “Overlays” da timeline.</p>
+<div id="ciInfo" class="hint" style="margin:6px 0;"></div>
+<label class="chk"><input type="checkbox" id="ciAtivo"> Pôr o selo nas cenas de IA</label>
+<label class="f"><span>Mensagem</span><select id="ciPreset"></select></label>
+<label class="f"><span>Ou escreva a sua (vazio = a escolhida acima)</span><input type="text" id="ciTexto" maxlength="120" placeholder="ex.: Reconstituição — imagem gerada por IA"></label>
+<div class="row">
+  <label class="f"><span>Canto</span><select id="ciPos"></select></label>
+  <label class="f"><span>Tamanho (% da altura)</span><input type="number" id="ciTam" min="1.5" max="8" step="0.1"></label>
+</div>
+<div class="row">
+  <label class="chk"><input type="checkbox" id="ciFundo"> Fundo escuro</label>
+  <label class="chk"><input type="checkbox" id="ciContorno"> Contorno</label>
+  <label class="chk"><input type="checkbox" id="ciFade"> Aparecer suave</label>
+</div>
+<label class="f"><span>Só em trechos de IA com pelo menos (s)</span><input type="number" id="ciMin" min="0" max="10" step="0.5"></label>
+<div id="ciPrev" style="position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,#334155,#0f172a);border-radius:6px;margin:8px 0;overflow:hidden;">
+  <span id="ciPrevTxt" style="position:absolute;color:#fff;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;"></span>
+</div>
+<button type="button" id="ciAplicar" class="primary" style="width:100%;">✔ Aplicar nos trechos de IA</button>
+<div id="ciSt" class="hint" style="margin-top:6px;"></div>
+<details style="margin-top:10px;"><summary>⭐ Minhas mensagens</summary>
+  <div id="ciMeus" style="margin:6px 0;"></div>
+  <div class="row"><input type="text" id="ciNovoNome" placeholder="nome (ex.: Reconstituição)" style="flex:1;"><button type="button" class="mini" id="ciSalvarPreset">⭐ Salvar a mensagem escrita</button></div>
+</details>
+<script>
+(function () {
+  const URL_CI = "/job/{{ job.job_id }}/conteudo-ia";
+  const $c = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let E = null;
+  const POSCSS = { 'top-right': 'top:4%;right:2%', 'top-left': 'top:4%;left:2%', 'bottom-right': 'bottom:4%;right:2%', 'bottom-left': 'bottom:4%;left:2%',
+                   'top-center': 'top:4%;left:50%;transform:translateX(-50%)', 'bottom-center': 'bottom:4%;left:50%;transform:translateX(-50%)' };
+  function previa() {
+    const t = $c('ciTexto').value.trim() || (($c('ciPreset').selectedOptions[0] || {}).dataset || {}).texto || '';
+    const el = $c('ciPrevTxt'), box = $c('ciPrev');
+    el.textContent = t;
+    el.style.cssText = 'position:absolute;color:#fff;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;' + (POSCSS[$c('ciPos').value] || POSCSS['top-right']) +
+      `;font-size:${Math.max(8, box.clientHeight * (+$c('ciTam').value || 2.6) / 100)}px;` + ($c('ciFundo').checked ? 'background:rgba(0,0,0,.55);' : '') +
+      ($c('ciContorno').checked ? 'text-shadow:0 0 2px #000,0 0 2px #000,0 0 2px #000;' : '') + ($c('ciAtivo').checked ? '' : 'opacity:.25;');
+  }
+  function desenhar(d) {
+    E = d; const c = d.config;
+    $c('ciInfo').innerHTML = `🌐 idioma do vídeo: <b>${esc(d.idioma)}</b> · <b>${d.cenas_ia}</b> cena(s) de IA em <b>${d.trechos}</b> trecho(s) · ${d.selos} selo(s) na timeline`;
+    $c('ciAtivo').checked = !!c.ativo;
+    $c('ciPreset').innerHTML = d.presets.map(p => `<option value="${p.id}" data-texto="${esc(p.texto)}">${esc(p.nome)} — ${esc(p.texto)}</option>`).join('') +
+      (d.meus.length ? '<optgroup label="⭐ Minhas">' + d.meus.map(p => `<option value="${p.id}" data-texto="${esc(p.texto)}">${esc(p.nome)} — ${esc(p.texto)}</option>`).join('') + '</optgroup>' : '');
+    $c('ciPreset').value = c.preset;
+    $c('ciTexto').value = c.texto || '';
+    $c('ciPos').innerHTML = Object.entries(d.posicoes).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+    $c('ciPos').value = c.posicao;
+    $c('ciTam').value = c.tamanho; $c('ciFundo').checked = !!c.fundo; $c('ciContorno').checked = !!c.contorno; $c('ciFade').checked = !!c.fade; $c('ciMin').value = c.min_dur || 0;
+    $c('ciMeus').innerHTML = d.meus.length ? d.meus.map(p => `<div style="display:flex;gap:6px;align-items:center;margin:2px 0;"><span style="flex:1">⭐ <b>${esc(p.nome)}</b> — ${esc(p.texto)}</span><button type="button" class="mini" data-apagar="${p.id}">✕</button></div>`).join('') : '<span class="hint">nenhuma ainda</span>';
+    previa();
+  }
+  async function chamar(corpo) {
+    const r = await fetch(URL_CI, corpo ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) } : {});
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+  }
+  ['ciPreset', 'ciTexto', 'ciPos', 'ciTam', 'ciFundo', 'ciContorno', 'ciAtivo'].forEach(id => $c(id).addEventListener('input', previa));
+  $c('ciAplicar').addEventListener('click', async () => {
+    try {
+      const d = await chamar({ ativo: $c('ciAtivo').checked, preset: $c('ciPreset').value, texto: $c('ciTexto').value, posicao: $c('ciPos').value,
+                               tamanho: +$c('ciTam').value, fundo: $c('ciFundo').checked, contorno: $c('ciContorno').checked, fade: $c('ciFade').checked, min_dur: +$c('ciMin').value });
+      desenhar(d); $c('ciSt').textContent = d.config.ativo ? `✔ ${d.selos} selo(s) na timeline — recarregando…` : '✔ selo desligado — recarregando…';
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) { $c('ciSt').textContent = '⚠ ' + e.message; }
+  });
+  $c('ciSalvarPreset').addEventListener('click', async () => {
+    try { desenhar(await chamar({ acao: 'salvar_preset', nome: $c('ciNovoNome').value, texto: $c('ciTexto').value })); $c('ciNovoNome').value = ''; $c('ciSt').textContent = '⭐ mensagem salva (vale pra todos os vídeos)'; }
+    catch (e) { $c('ciSt').textContent = '⚠ ' + e.message; }
+  });
+  $c('ciMeus').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-apagar]'); if (!b) return;
+    try { desenhar(await chamar({ acao: 'apagar_preset', id: b.dataset.apagar })); } catch (_) {}
+  });
+  chamar().then(desenhar).catch(e => { $c('ciSt').textContent = '⚠ ' + e.message; });
+})();
+</script>

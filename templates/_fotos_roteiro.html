@@ -25,6 +25,15 @@
         <button type="button" id="frApagarConferir" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#b45309;">🗑 Apagar as não conferidas</button>
         <button type="button" id="frApagarBuscas" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#b91c1c;">🗑 Apagar todas as fotos das buscas</button>
       </span>
+      <div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px dashed #cbd5e1;padding-top:6px;margin-top:2px;">
+        <b title="Um Brave só do site (perfil separado) com o Tampermonkey + o script 'Capturar links'. Cada guia é uma pergunta: você marca as imagens certas e clica em 'Capturar e enviar ao site' — os links vêm pra cá sozinhos, o site baixa e a guia fecha.">🧲 Navegador das imagens</b>
+        <button type="button" id="frGuias" style="width:auto;margin:0;padding:5px 12px;background:#1a73e8;color:#fff;">🧲 Abrir as próximas <span id="frGuiasN">5</span></button>
+        <select id="frGuiasQtd" style="width:auto;margin:0;"><option>3</option><option selected>5</option><option>8</option><option>10</option></select>
+        <button type="button" id="frGuiasReabrir" title="as guias que você fechou sem enviar nada (não achou imagem boa) voltam pra fila" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#64748b;">↻ Voltar pra fila as abertas sem foto</button>
+        <button type="button" id="frGuiasPreparar" title="1ª vez: abre o navegador do site na página da extensão (OrangeMonkey ou Tampermonkey) e na de instalar o script — instale os dois" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#475569;">⚙ Preparar (1ª vez)</button>
+        <select id="frGuiasExt" title="extensão de scripts" style="width:auto;margin:0;font-size:.8rem;"><option value="orangemonkey">OrangeMonkey</option><option value="tampermonkey">Tampermonkey</option></select>
+        <span id="frGuiasSt" style="font-size:.8rem;color:#555;"></span>
+      </div>
       <div id="frProg" style="display:none;width:100%;margin-top:4px;">
         <div style="height:10px;background:#e2e8f0;border-radius:6px;overflow:hidden;"><div id="frProgBar" style="height:100%;width:0;background:linear-gradient(90deg,#0f766e,#14b8a6);transition:width .6s;"></div></div>
         <div id="frProgTxt" style="font-size:.8rem;color:#0f172a;margin-top:3px;"></div>
@@ -71,7 +80,12 @@
   const BASE = '/modelos-video/' + {{ fr_pid|tojson }};
   const $f = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const ICONE = { pessoa: '👤', lugar: '📍', objeto: '🔧', documento: '📄', cena: '🎬', veiculo: '🚗', outro: '🖼' };
+  const ICONE = { pessoa: '👤', lugar: '📍', objeto: '🔧', documento: '📄', site: '🌐', cena: '🎬', veiculo: '🚗', outro: '🖼' };
+  const linhaSite = (q) => `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;${q.eh_site ? 'background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 7px;' : ''}">
+      <span style="font-size:.8rem;font-weight:600;color:#1d4ed8;" title="o site tira o print sozinho e guarda o link: no editor esse momento vira a 🖥 Página animada">🌐 Link do site/página</span>
+      <input type="url" data-site="${q.id}" placeholder="https://… (ou do arquivo: https://web.archive.org/web/2015…/site.de)" style="flex:1;min-width:240px;margin:0;font-size:.8rem;">
+      <button type="button" data-usarsite="${q.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#1d4ed8;">🌐 Usar o link</button>
+      ${q.eh_site ? `<a href="https://web.archive.org/web/*/${encodeURIComponent(q.busca || q.alvo || '')}" target="_blank" rel="noopener" style="font-size:.78rem;">procurar no archive.org ↗</a>` : ''}</div>`;
   const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || (r.status === 404 ? '404 — reinicie o site (python app.py)' : r.status)); return d; };
   let E = null;
 
@@ -104,6 +118,8 @@
           ${q.vezes ? `<span style="font-size:.78rem;color:#666;">citado ~${q.vezes}×</span>` : ''}
           ${q.ja_tem && q.ja_tem.length ? `<span style="font-size:.78rem;color:#2563eb;">já tem: ${q.ja_tem.join(', ')}</span>` : ''}
           ${feita ? `<span style="font-size:.78rem;color:#15803d;">✔ ${env.length} foto(s)</span>` : ''}
+          ${!feita && q.guia === 'aberta' ? '<span style="font-size:.78rem;color:#1a73e8;">🧲 aberta no navegador</span>' : ''}
+          ${!feita && q.guia === 'vazia' ? '<span style="font-size:.78rem;color:#b45309;">🧲 não achou — mude o termo e abra de novo</span>' : ''}
           <button type="button" data-pular="${q.id}" data-v="${q.pulada ? '0' : '1'}" style="margin-left:auto;width:auto;padding:1px 8px;font-size:.75rem;background:#94a3b8;">${q.pulada ? '↩ voltar' : 'não tenho / pular'}</button>
         </div>
         ${q.trecho ? `<div style="font-size:.8rem;color:#555;margin-top:2px;">“${esc(q.trecho)}”</div>` : ''}
@@ -113,14 +129,16 @@
           <input type="text" data-desc="${q.id}" value="${esc(q.alvo)}" placeholder="descrição (quem/o quê, época…)" style="flex:1;min-width:200px;margin:0;font-size:.82rem;">
           <button type="button" data-enviar="${q.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.82rem;">⬆ Enviar</button>
           <span data-st="${q.id}" style="font-size:.8rem;color:#555;"></span></div>
+        ${q.eh_site ? linhaSite(q) : ''}
         <details style="margin-top:4px;font-size:.8rem;"><summary style="cursor:pointer;color:#334155;">🔗 Colar links de imagens (1 por linha)</summary>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;margin-top:4px;">
             <textarea data-links="${q.id}" rows="3" placeholder="https://…/foto.jpg&#10;https://site.com/materia (pega a foto principal da página)" style="flex:1;min-width:260px;margin:0;font-size:.78rem;"></textarea>
             <button type="button" data-baixarlinks="${q.id}" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;">⬇ Baixar os links</button>
-          </div></details>
+          </div>${q.eh_site ? '' : linhaSite(q)}</details>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">
           <input type="text" data-termo="${q.id}" value="${esc(TERMOS[q.id] || '')}" placeholder="termo em inglês — vazio: a IA escreve" title="o que pesquisar no Bing/Google (em inglês acha mais)" style="flex:1;min-width:200px;margin:0;font-size:.8rem;background:#f0fdfa;">
           <button type="button" data-buscar="${q.id}" ${bu && bu.ativo ? 'disabled' : ''} style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#0f766e;">🔎 Buscar</button>
+          <button type="button" data-guia="${q.id}" title="abre esta pergunta no 🧲 navegador das imagens (os links que você capturar vêm pra cá sozinhos)" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#1a73e8;">🧲 Abrir</button>
           <button type="button" data-gimg="${q.id}" title="abre o Google Imagens numa nova guia com este termo (busca normal, sem Modo IA)" style="width:auto;margin:0;padding:3px 10px;font-size:.8rem;background:#1a73e8;">🖼 Google Imagens ↗</button>
           <span data-qst="${q.id}" style="font-size:.78rem;"></span>
         </div>`}
@@ -128,12 +146,46 @@
           return `<div style="position:relative;width:96px;font-size:.68rem;${i.fora ? 'opacity:.45;' : ''}" title="${id}${i.buscador ? ' · busca ' + i.buscador : ''}${i.link ? ' · ' + esc(i.link) : ''}${i.da_pagina ? ' · 📄 foto principal da PÁGINA do link (confira)' : ''}${i.fora ? ' · a IA tirou (lixo/anúncio/repetida)' : ''}">
             <a href="${i.url || ''}" target="_blank" rel="noopener"><img src="${i.url || ''}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:5px;background:#eee;${i.a_conferir ? 'outline:2px solid #f59e0b;' : ''}"></a>
             <button type="button" data-apagar="${id}" title="não serve — apagar" style="position:absolute;top:2px;right:2px;width:auto;margin:0;padding:0 5px;font-size:.7rem;background:#ef4444;">✕</button>
-            <div>${id}${i.a_conferir ? ' 🔎' : ''}${i.buscador ? ' <span style="color:#0f766e">' + (i.buscador === 'google' ? 'G' : 'B') + '</span>' : ''}${i.link && !i.buscador ? ' 🔗' : ''}${i.da_pagina ? ' 📄' : ''}</div></div>`; }).join('')}
+            <div>${id}${i.a_conferir ? ' 🔎' : ''}${i.buscador ? ' <span style="color:#0f766e">' + (i.buscador === 'google' ? 'G' : 'B') + '</span>' : ''}${i.site ? ' 🌐' : i.link && !i.buscador ? ' 🔗' : ''}${i.da_pagina ? ' 📄' : ''}</div></div>`; }).join('')}
           ${env.some(id => (MI[id] || {}).a_conferir) ? `<button type="button" data-conferi="${env.join(',')}" style="width:auto;align-self:center;margin:0;padding:3px 10px;font-size:.78rem;background:#15803d;">✓ conferi</button>` : ''}
         </div>` : ''}
       </div>`;
     }).join('') + `<div style="font-size:.8rem;color:#555;">Enviou as fotos? Agora o passo <b>📍 2</b> põe cada uma nos melhores pontos do roteiro.</div>`;
   }
+
+  // 🧲 navegador das imagens
+  function termosDaTela() { const t = {}; document.querySelectorAll('#frPerguntas [data-termo]').forEach(i => { if (i.value.trim()) t[i.dataset.termo] = i.value.trim(); }); return t; }
+  async function abrirGuias(extra) {
+    $f('frGuiasSt').textContent = '🧲 abrindo…';
+    try {
+      const d = await post(BASE + '/fotos-roteiro/guias', Object.assign({ quantas: +$f('frGuiasQtd').value, termos: termosDaTela() }, extra || {}));
+      const fx = (d.fechadas ? ` · ${d.fechadas} guia(s) prontas fechadas` : '') + ((d.mantidas || []).length ? ` · ${d.mantidas.length} ficaram abertas (imagem marcada e não enviada)` : '') + (d.aviso ? ' · ⚠ ' + d.aviso : '');
+      $f('frGuiasSt').textContent = (d.abertas ? `✔ ${d.abertas} guia(s) no ${d.navegador} — marque as imagens e clique em "Capturar e enviar ao site" em cada uma; na última, ➡ Próximas guias${d.faltam ? ` · faltam ${d.faltam}` : ''}` : (d.msg || '')) + fx;
+      await atualizar(); vigiarGuias();
+    } catch (e) { $f('frGuiasSt').textContent = '⚠ ' + e.message; }
+  }
+  let vigiando = false;
+  async function vigiarGuias() {  // fotos chegando das guias: redesenha só quando muda (não apaga o que você digita)
+    if (vigiando) return; vigiando = true;
+    const conta = (d) => Object.values((d && d.enviadas) || {}).reduce((a, l) => a + l.length, 0) + '|' + ((d && d.perguntas) || []).map(q => q.guia || '').join(',');
+    let antes = conta(E);
+    while ((E && E.perguntas || []).some(q => q.guia === 'aberta')) {
+      await new Promise(ok => setTimeout(ok, 4000));
+      let d = null; try { d = await (await fetch(BASE + '/fotos-roteiro', { cache: 'no-store' })).json(); } catch (_) { continue; }
+      const agora = conta(d);
+      if (agora !== antes) { antes = agora; const foco = document.activeElement && document.activeElement.closest && document.activeElement.closest('#frPerguntas'); if (!foco) desenhar(d); else E = d; }
+    }
+    vigiando = false;
+  }
+  $f('frGuiasQtd').addEventListener('change', () => { $f('frGuiasN').textContent = $f('frGuiasQtd').value; });
+  $f('frGuias').addEventListener('click', () => abrirGuias({ trocar: true }));
+  $f('frGuiasReabrir').addEventListener('click', () => abrirGuias({ reabrir_abertas: true }));
+  $f('frGuiasPreparar').addEventListener('click', async () => {
+    try { const ext = $f('frGuiasExt').value, nome = ext === 'tampermonkey' ? 'Tampermonkey' : 'OrangeMonkey';
+      const d = await post('/navegador-imagens/preparar', { gerenciador: ext });
+      $f('frGuiasSt').textContent = `✔ ${d.navegador} do site aberto: 1) instale o ${nome}; 2) na outra guia, instale o script (ou copie e cole); 3) se pedir, ative "Permitir scripts de usuário" nos detalhes da extensão. Depois é só 🧲 Abrir.`; }
+    catch (e) { $f('frGuiasSt').textContent = '⚠ ' + e.message; }
+  });
 
   async function atualizar() { try { desenhar(await (await fetch(BASE + '/fotos-roteiro', { cache: 'no-store' })).json()); } catch (_) {} }
   const tempo = (s) => s == null ? '?' : (s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${Math.round(s)} s`);
@@ -241,6 +293,16 @@
       window.open('https://www.google.com/search?udm=2&q=' + encodeURIComponent(q), '_blank', 'noopener');
       return;
     }
+    if (b.dataset.usarsite) {
+      const box = b.closest('[data-q]'), url = (box.querySelector('[data-site]').value || '').trim(), st = box.querySelector('[data-st]');
+      if (!/^https?:\/\//i.test(url)) { st.textContent = '⚠ cole o link completo (https://…)'; return; }
+      b.disabled = true; st.textContent = '🌐 abrindo a página e tirando o print… (até ~1 min)';
+      try { const d = await post(BASE + '/fotos-roteiro/site', { url, pergunta: b.dataset.usarsite, descricao: box.querySelector('[data-desc]').value });
+        await atualizar(); const st2 = document.querySelector(`[data-st="${b.dataset.usarsite}"]`); if (st2) st2.textContent = `✔ print de ${d.dominio} guardado (${d.midia.id}) — no editor vira a 🖥 Página animada`; }
+      catch (e) { st.textContent = '⚠ ' + e.message; b.disabled = false; }
+      return;
+    }
+    if (b.dataset.guia) { const box = b.closest('[data-q]'); abrirGuias({ perguntas: [b.dataset.guia], termos: { [b.dataset.guia]: box.querySelector('[data-termo]').value } }); return; }
     if (b.dataset.buscar) { const box = b.closest('[data-q]'); buscar([{ id: b.dataset.buscar, busca: box.querySelector('[data-termo]').value }]); return; }
     if (b.dataset.apagar) {
       if (!confirm(`Apagar a ${b.dataset.apagar} do modelo?`)) return;
@@ -286,6 +348,6 @@
     if (!confirm('Voltar o roteiro para antes das marcas que a IA pôs? (o que você mudou no roteiro depois disso também volta)')) return;
     try { await post(BASE + '/fotos-roteiro/desfazer', {}); location.reload(); } catch (e) { $f('frPosSt').textContent = '⚠ ' + e.message; }
   });
-  atualizar();
+  atualizar().then(vigiarGuias);
 })();
 </script>

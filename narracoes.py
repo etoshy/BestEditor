@@ -112,10 +112,35 @@ def _gerar_id_projeto() -> str:
     return f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
 
+CAMPOS_DE_VOZ = ("motor", "voz", "idioma", "velocidade", "pausaSegundos", "usarGpu", "vozPerfil", "xttsCheckpoint",
+                 "chatterboxExaggeration", "chatterboxCfgWeight", "kokoroVariante", "kokoroPrecisao", "fishReferenceId",
+                 "fishTemperatura", "multiVoz", "cortarSilencioGravacoes")
+
+
+def ultima_config_de_voz(base_dir: str) -> Dict[str, Any]:
+    """As configurações de voz do projeto mexido por último (o arquivo salvo mais recente) — vazio se não tiver nenhum."""
+    if os.environ.get("ULTIMAS_ESCOLHAS_DESLIGADO"):
+        return {}
+    try:
+        raiz = narracoes_dir(base_dir)
+        arqs = [p / "projeto.json" for p in raiz.iterdir() if (p / "projeto.json").exists()]
+    except OSError:
+        return {}
+    if not arqs:
+        return {}
+    try:
+        ult = max(arqs, key=lambda c: c.stat().st_mtime)
+        dados = json.loads(ult.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {k: dados[k] for k in CAMPOS_DE_VOZ if k in dados}
+
+
 def criar_projeto(base_dir: str, nome: str = "") -> Dict[str, Any]:
     nome = (nome or "").strip() or time.strftime("Narração %d/%m/%Y %H:%M")
     projeto_id = _gerar_id_projeto()
-    projeto = {"nome": nome, "criadoEm": time.time(), **CONFIG_PADRAO}
+    # 🔁 v84_161: o projeto novo já nasce com a voz/idioma/motor do último usado (até você mudar)
+    projeto = {"nome": nome, "criadoEm": time.time(), **CONFIG_PADRAO, **ultima_config_de_voz(base_dir)}
     _projeto_path(base_dir, projeto_id).write_text(
         json.dumps(projeto, ensure_ascii=False, indent=2), encoding="utf-8"
     )

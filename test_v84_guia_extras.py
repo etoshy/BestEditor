@@ -211,4 +211,4 @@ def test_pagina_do_guia_e_todos_os_arquivos():
     assert c.get("/guia/nao-existe").status_code == 404 and c.get("/guia/..%2Fapp").status_code == 404
     assert json.loads(c.get("/guia/exemplos/destaques.json").get_data(as_text=True))["destaques"]
     assert c.post("/guia/extras/recarregar").get_json()["ok"]
-    assert "📘 Guia" in c.get("/").get_data(as_text=True)
+    assert 'href="/guia"' in c.get("/").get_data(as_text=True)  # v84_161: link no menu lateral

@@ -5132,7 +5132,8 @@ def _fundo_do_destaque(item: dict, d: dict) -> dict:
 
 def _destaques_para_montar(job: dict):
     """Destaques com o fundo padrão do projeto aplicado onde a pessoa não escolheu um."""
-    lista = job.get("destaques") or []
+    import dp_destaques
+    lista = dp_destaques.sem_conflito(job.get("destaques") or [], job.get("editoriais"), job.get("pending_segments") or job.get("segments"))
     pad = (job.get("editor_defaults") or {}).get("hl_fundo") or {}
     if not pad.get("fundo"):
         return lista or None
@@ -5410,6 +5411,11 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 _youtube_escolher_automatico(job_id, job, segments, log=print)
                 job["video_segments"] = [s.to_dict() for s in segments]
 
+            try:  # 🤖 v84_145: selo "Simulação: conteúdo gerado por IA" nos trechos de IA de AGORA (aba 🤖 Conteúdo IA)
+                import conteudo_ia as _cia
+                _cia.sincronizar(job, BASE_DIR)
+            except Exception:  # noqa: BLE001
+                pass
             resolved_overlays = None
             if job.get("overlays"):
                 resolved_overlays = []
@@ -8185,7 +8191,7 @@ def editorial_previa(job_id: str):
     destino = os.path.join(pasta, chave + ".png")
     if not os.path.exists(destino):
         os.makedirs(pasta, exist_ok=True)
-        dp_editorial.previa_png(it, t, W, H, destino, dp_editorial.novo_ctx(imagens, prints, pasta))
+        dp_editorial.previa_png(it, t, W, H, destino, dp_editorial.ctx_da_previa(it, W, H, imagens, prints, pasta))
     return send_file(destino, mimetype="image/png", max_age=3600)
 
 
@@ -10911,6 +10917,20 @@ import fotos_roteiro  # noqa: E402  (📸 v84_127: a IA pergunta que fotos você
 fotos_roteiro.registrar(app, BASE_DIR)
 import elenco as _elenco  # noqa: E402  (🎭 v84_128: rostos e idades das fotos pro pod)
 _elenco.registrar(app, BASE_DIR)
+import piloto as _piloto  # noqa: E402  (🚀 v84_157: piloto automático do Modelo de vídeo)
+_piloto.registrar(app, BASE_DIR)
+import navegador_imagens as _nav_img  # noqa: E402  (🧲 v84_150: Brave do site + userscript que manda os links)
+_nav_img.registrar(app, BASE_DIR)
+
+
+@app.after_request
+def _cors_das_guias(resp):  # 🧲 o script no Google manda os links (fallback com fetch, sem GM_xmlhttpRequest)
+    if request.path in ("/navegador-imagens/aba", "/navegador-imagens/fechar") or (request.path.startswith("/modelos-video/") and any(
+            k in request.path for k in ("/fotos-roteiro/link", "/fotos-roteiro/guia-feita", "/fotos-roteiro/guias"))):
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    return resp
 
 # 🖼 thumbnails no Google Flow + 🎙 adaptar o roteiro pro TTS por idioma (v84_96)
 import thumbs_tts_rotas  # noqa: E402
@@ -11287,13 +11307,37 @@ def _encaixar_projeto(job_id: str, modo: str = "ia") -> Dict[str, Any]:
     if not trocadas:
         raise ValueError("Nenhum trecho pra trocar (os momentos caem em trechos que você já escolheu — use “trocar todas”).")
     _aplicar_produto(job, [pend[k] for k in trocadas])
+    # 🌐 v84_160: foto que é print de SITE (veio com o link) → o quadro 🖥 Página animada naquele momento
+    sites = {m["id"]: m for m in (p.get("midias") or []) if m.get("site_url")}
+    paginas = 0
+    if sites:
+        import dp_editorial
+        eds = [e for e in job.get("editoriais") or [] if e.get("origem") != "projeto_site"]
+        for k, mid in sorted(mapa.items()):
+            m = sites.get(mid)
+            if not m or k >= len(pend):
+                continue
+            try:
+                ini, fim = float(pend[k]["start"]), float(pend[k]["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if any(float(e["start"]) < fim and float(e["end"]) > ini for e in eds):
+                continue  # já tem um quadro ali
+            q = dp_editorial.normalizar({"tipo": "pagina", "start": ini, "end": max(fim, ini + 3.5), "url": m["site_url"],
+                                         "site": m.get("site_dominio") or "", "titulo": (m.get("descricao") or "")[:120]},
+                                        job.get("total_duration"))
+            if q:
+                q["origem"] = "projeto_site"
+                eds.append(q)
+                paginas += 1
+        job["editoriais"] = sorted(eds, key=lambda e: float(e["start"]))
     previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
     for k in trocadas:
         previas[k] = None
     job["segment_previews"] = previas
     _save_state(job_id)
     _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
-    return {"ok": True, "trocadas": len(trocadas), "momentos": len(momentos), "achados": len(mapa)}
+    return {"ok": True, "trocadas": len(trocadas), "momentos": len(momentos), "achados": len(mapa), "paginas": paginas}
 
 
 def _desfazer_encaixe(job_id: str) -> Dict[str, Any]:
@@ -11304,6 +11348,7 @@ def _desfazer_encaixe(job_id: str) -> Dict[str, Any]:
     idx = [k for k, d in enumerate(pend) if d.get("_antes_material")]
     if not idx:
         raise ValueError("Nada pra desfazer.")
+    job["editoriais"] = [e for e in job.get("editoriais") or [] if e.get("origem") != "projeto_site"]
     previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
     for k in idx:
         pend[k].update(pend[k].pop("_antes_material"))
@@ -11340,6 +11385,10 @@ import producao_pod_rotas as _producao_rotas  # noqa: E402
 
 _producao.configurar(_criar_job_producao, _registrar_narracao_do_pod)
 _producao_rotas.registrar(app, BASE_DIR)
+import conteudo_ia as _conteudo_ia  # noqa: E402  🤖 selo nas cenas geradas por IA (v84_145)
+_conteudo_ia.registrar(app, BASE_DIR, _JOBS, _save_state)
+import clonar as _clonar  # noqa: E402  📑 clonar projeto (modelo de vídeo, roteiro, editor) (v84_146)
+_clonar.registrar(app, BASE_DIR, _JOBS, _job_dir, _save_state)
 try:
     _producao.garantir_runner()  # ▶ lote que estava rodando quando o site fechou: continua
 except Exception:  # noqa: BLE001

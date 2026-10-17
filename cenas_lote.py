@@ -21,7 +21,8 @@ import re
 from typing import Any, Dict, List, Optional, Set
 
 PROVIDER_ADIADO = "adiado"
-BLOCO_IA = 60
+BLOCO_IA = 20  # v84_142: blocos menores = prompt melhor em cada cena (eram 60)
+PARALELO_IA = 3
 _FIM_FRASE = re.compile(r"[.!?…;:,]$")
 
 
@@ -122,37 +123,62 @@ def descrever(cenas: List[Dict[str, Any]], roteiro: str = "", idioma: str = "", 
         + "\n\n## FICHA DO VÍDEO\n" + json.dumps(ficha or {}, ensure_ascii=False) \
         + (f"\n\nIdioma da narração: {idioma}" if idioma else "") + ("\n\n## ROTEIRO\n" + roteiro[:60000] if roteiro else "")
     out: Dict[int, Dict[str, Any]] = {}
-    for k in range(0, len(cenas), BLOCO_IA):
-        if on_passo:
-            on_passo(f"🤖 descrevendo as cenas {k + 1}–{min(len(cenas), k + BLOCO_IA)} de {len(cenas)}")
-        linhas = []
-        for j in range(k, min(len(cenas), k + BLOCO_IA)):
-            c = cenas[j]
-            antes = cenas[j - 1]["fala"][-160:] if j else ""
-            depois = cenas[j + 1]["fala"][:160] if j + 1 < len(cenas) else ""
-            linhas.append(f"[{j + 1}] ({c['end'] - c['start']:.1f}s)" + (f" antes: {antes} |" if antes else "")
-                          + f" FALA: {c['fala'][:400]}" + (f" | depois: {depois}" if depois else ""))
-        r = ia.chamar("producao_pod", system, "## CENAS\n" + "\n".join(linhas), _schema(bool(bloco_el)), max_tokens=20000,
-                      effort="low", job=job, timeout=300)
+
+    def linha(j: int) -> str:
+        c = cenas[j]
+        antes = cenas[j - 1]["fala"][-160:] if j else ""
+        depois = cenas[j + 1]["fala"][:160] if j + 1 < len(cenas) else ""
+        return (f"[{j + 1}] ({c['end'] - c['start']:.1f}s)" + (f" antes: {antes} |" if antes else "")
+                + f" FALA: {c['fala'][:400]}" + (f" | depois: {depois}" if depois else ""))
+
+    def bloco(idx: List[int]) -> Dict[int, Dict[str, Any]]:
+        """Uma chamada pra IA com ~20 cenas (o roteiro, a ficha e o elenco vão no começo, guardados em cache)."""
+        r = ia.chamar("producao_pod", system, "## CENAS\n" + "\n".join(linha(j) for j in idx), _schema(bool(bloco_el)),
+                      max_tokens=12000, effort="low", job=job, timeout=300)
+        res: Dict[int, Dict[str, Any]] = {}
         for x in (r or {}).get("cenas") or []:
             try:
                 n = int(x.get("n"))
             except (TypeError, ValueError):
                 continue
-            if 1 <= n <= len(cenas):
-                out[n] = {"visual": " ".join(str(x.get("visual") or "").split())[:300],
-                          "busca": " ".join(str(x.get("busca") or "").split())[:120],
-                          "dificil": max(0, min(10, int(x.get("dificil") or 0))),
-                          "prompt_imagem": " ".join(str(x.get("prompt_imagem") or "").split())[:1200],
-                          "ano": max(0, min(2100, int(x.get("ano") or 0)))}
-                if bloco_el:
-                    ps = []
-                    for pc in x.get("pessoas") or []:
-                        nome = nomes_el.get(str((pc or {}).get("nome") or "").strip().lower())
-                        if nome and not any(q["nome"] == nome for q in ps):
-                            ps.append({"nome": nome, "idade": max(0, min(110, int(pc.get("idade") or 0)))})
-                    out[n]["pessoas"] = ps[:3]
-                    out[n]["lugar"] = locais_el.get(str(x.get("lugar") or "").strip().lower(), "")
+            if n - 1 not in idx:
+                continue
+            d = {"visual": " ".join(str(x.get("visual") or "").split())[:300],
+                 "busca": " ".join(str(x.get("busca") or "").split())[:120],
+                 "dificil": max(0, min(10, int(x.get("dificil") or 0))),
+                 "prompt_imagem": " ".join(str(x.get("prompt_imagem") or "").split())[:1200],
+                 "ano": max(0, min(2100, int(x.get("ano") or 0)))}
+            if bloco_el:
+                ps = []
+                for pc in x.get("pessoas") or []:
+                    nome = nomes_el.get(str((pc or {}).get("nome") or "").strip().lower())
+                    if nome and not any(q["nome"] == nome for q in ps):
+                        ps.append({"nome": nome, "idade": max(0, min(110, int(pc.get("idade") or 0)))})
+                d["pessoas"] = ps[:3]
+                d["lugar"] = locais_el.get(str(x.get("lugar") or "").strip().lower(), "")
+            if d["prompt_imagem"]:
+                res[n] = d
+        return res
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    todos = list(range(len(cenas)))
+    for tentativa in (1, 2):  # 2ª volta: só as cenas que ficaram sem resposta (bloco que falhou ou veio incompleto)
+        faltam = [j for j in todos if j + 1 not in out]
+        if not faltam:
+            break
+        blocos = [faltam[k:k + BLOCO_IA] for k in range(0, len(faltam), BLOCO_IA)]
+        feitos = 0
+        with ThreadPoolExecutor(max_workers=PARALELO_IA) as ex:
+            futuros = [ex.submit(bloco, b) for b in blocos]
+            for f in as_completed(futuros):
+                try:
+                    out.update(f.result())
+                except Exception:  # noqa: BLE001 — esse bloco vai de novo na 2ª volta
+                    pass
+                feitos += 1
+                if on_passo:
+                    on_passo(f"🤖 {'refazendo as que faltaram: ' if tentativa == 2 else ''}descrevendo as cenas — "
+                             f"bloco {feitos}/{len(blocos)} · {len(out)} de {len(cenas)} cenas prontas")
     return out
 
 

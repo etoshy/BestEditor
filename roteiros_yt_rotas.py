@@ -172,6 +172,7 @@ def registrar(app, base_dir: str) -> None:
             p["modo_partes"] = corpo["modo_partes"]
         if "nome_canal" in corpo:  # 📺 v84_95 ("" = o das Configurações; "-" = não falar)
             p["nome_canal"] = " ".join(str(corpo.get("nome_canal") or "").split())[:80]
+            __import__("ultimas_escolhas").lembrar(base_dir, nome_canal=p["nome_canal"])
         try:
             sem_exp = corpo.get("sem_experiencias", True) is not False
             texto = ry.prompt_analise(p, modelo, idioma, marcar_chamadas=corpo.get("marcar_chamadas", True) is not False,
