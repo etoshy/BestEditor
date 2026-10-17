@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}{{ p.tema }} — Buscador de casos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1100px; }
+  .pq-card { border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .pq-card h2 { margin: 0 0 6px; font-size: 1.12rem; }
+  .pq-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .pq-linha > label { margin: 0; flex: 1; min-width: 150px; }
+  .pq-linha > button, .pq-mini { margin: 0; width: auto; }
+  .pq-mini { padding: 6px 12px; font-size: .86rem; }
+  .pq-sec { background: var(--bg-2) !important; color: var(--texto) !important; border: 1px solid var(--borda) !important; }
+  .pq-hint { color: var(--mudo); font-size: .84rem; margin: 6px 0 0; }
+  .pq-st { font-size: .86rem; color: var(--texto-2); }
+  .pq-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
+  .pq-stats div { background: var(--bg-2); border-radius: 10px; padding: 8px 12px; }
+  .pq-stats small { display: block; color: var(--mudo); font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; }
+  .pq-stats b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .pq-stats .destaque { background: var(--acento-suave); }
+  .pq-vids { display: grid; gap: 6px; margin-top: 10px; max-height: 520px; overflow: auto; }
+  .pq-vid { display: flex; gap: 10px; align-items: center; padding: 6px; border-radius: 8px; border: 1px solid var(--borda); }
+  .pq-vid img { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; flex: none; }
+  .pq-vid .t { flex: 1; min-width: 0; font-size: .88rem; }
+  .pq-vid .t a { font-weight: 600; }
+  .pq-vid .m { color: var(--mudo); font-size: .78rem; }
+  .pq-vid .n { font-variant-numeric: tabular-nums; text-align: right; font-size: .82rem; white-space: nowrap; }
+  .pq-vid.top { border-color: var(--acento); }
+  .pq-vid.short { opacity: .6; }
+  .pq-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .pq-tabs button { margin: 0; padding: 4px 12px; font-size: .82rem; border-radius: 999px; background: var(--bg-2); color: var(--texto); border: 1px solid var(--borda); }
+  .pq-tabs button.on { background: var(--acento); color: var(--acento-txt); border-color: var(--acento); }
+  .pq-res { display: grid; gap: 6px; margin-top: 10px; }
+  .pq-r { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 10px; background: var(--card-2); }
+  .pq-r.off { opacity: .5; }
+  .pq-r input[type=checkbox] { width: 18px; height: 18px; margin: 3px 0 0; flex: none; }
+  .pq-r .c { flex: 1; min-width: 0; font-size: .88rem; }
+  .pq-r .c a { font-weight: 600; word-break: break-word; }
+  .pq-r .c .m { color: var(--mudo); font-size: .78rem; margin-top: 1px; }
+  .pq-r .c .tr { color: var(--texto-2); font-size: .8rem; margin-top: 3px; }
+  .pq-r select { width: auto; margin: 0; padding: 3px 6px; font-size: .78rem; }
+  .pq-r .x { margin: 0; padding: 3px 8px; font-size: .78rem; background: transparent; color: var(--mudo); border: 1px solid var(--borda); }
+  .pq-tipo { font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 0 7px; margin-right: 4px; text-transform: uppercase; letter-spacing: .03em; }
+  .pq-tipo.materia { background: #dbeafe; color: #1e40af; } .pq-tipo.video { background: #fee2e2; color: #991b1b; }
+  .pq-tipo.social { background: #ede9fe; color: #5b21b6; } .pq-tipo.documento { background: #fef3c7; color: #92400e; }
+</style>
+
+<p><a href="{{ url_for('pesquisas_page') }}">← Buscador de casos</a></p>
+<h1>📰 {{ p.tema }}</h1>
+
+<!-- tema e termo -->
+<div class="pq-card" data-feito="{{ '1' if p.termo else '0' }}">
+  <h2>Caso e termo de busca</h2>
+  <div class="pq-linha">
+    <label style="flex:2;min-width:220px;">Caso / tema<input type="text" id="tema" value="{{ p.tema }}" maxlength="200"></label>
+    <label style="flex:2;min-width:220px;">Termo da busca <span style="font-weight:400;color:var(--mudo)">(no idioma da busca)</span><input type="text" id="termo" value="{{ p.termo }}" maxlength="200"></label>
+    <label>🌐 Idioma<select id="idioma">{% for k, v in idiomas.items() %}<option value="{{ k }}" {% if k == p.idioma %}selected{% endif %}>{{ v[3] }}</option>{% endfor %}</select></label>
+    <button type="button" class="pq-mini pq-sec" id="btnTraduzir" title="{{ 'a IA escreve o termo no idioma da busca' if ia_ligada else 'ligue a IA em 🤖 IA nas buscas e modelos' }}">🤖 Traduzir o termo</button>
+  </div>
+  <p class="pq-hint" id="cfgSt">Salva sozinho. O termo é o que vai pro YouTube e pro Google.</p>
+</div>
+
+<!-- youtube -->
+<div class="pq-card" data-feito="0">
+  <h2>▶ Mais vistos no YouTube <span style="font-weight:400;font-size:.82rem;color:var(--mudo)">(e quanto tempo dá pra falar do caso)</span></h2>
+  <div class="pq-linha">
+    <button type="button" id="btnYt" class="pq-mini">▶ Buscar os mais vistos</button>
+    <label style="flex:none;min-width:0;display:flex;gap:6px;align-items:center;font-weight:400;font-size:.86rem;"><input type="checkbox" id="semShorts" checked style="width:auto;margin:0;"> sem Shorts na média</label>
+    <label style="flex:none;min-width:0;display:flex;gap:6px;align-items:center;font-weight:400;font-size:.86rem;">média dos <select id="topN" style="width:auto;margin:0;">{% for n in (3, 5, 10) %}<option {% if n == 5 %}selected{% endif %}>{{ n }}</option>{% endfor %}</select> mais vistos</label>
+    <span class="pq-st" id="ytSt"></span>
+  </div>
+  <div id="ytBox"></div>
+</div>
+
+<!-- google no brave -->
+<div class="pq-card">
+  <h2>🌐 Google no navegador do site <span style="font-weight:400;font-size:.82rem;color:var(--mudo)">(marque os resultados e mande pro site)</span></h2>
+  <div class="pq-linha">
+    <label>Buscar em<select id="categoria">{% for k, v in categorias.items() %}<option value="{{ k }}" {% if k == p.categoria %}selected{% endif %}>{{ v.nome }}</option>{% endfor %}</select></label>
+    <label style="flex:none;min-width:110px;">Página<select id="pagina">{% for n in range(1, 6) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}</select></label>
+    <button type="button" id="btnGoogle" class="pq-mini">🌐 Abrir no navegador do site</button>
+    <button type="button" id="btnPreparar" class="pq-mini pq-sec" title="só na 1ª vez: instala o gerenciador de scripts e o script no navegador do site">⚙ Preparar (1ª vez)</button>
+    <span class="pq-st" id="gSt"></span>
+  </div>
+  <p class="pq-hint">Na página do Google aparece uma caixinha ☐ em cada resultado e o painel <b>BestEditor</b>: marque (ou <b>Marcar todos</b>) e clique em <b>Enviar ao site</b>. Foi pra página 2? Marque e envie de novo — os resultados se juntam aqui, sem repetir. É o mesmo navegador e o mesmo script das 📸 fotos (se o script for antigo, ele se atualiza sozinho; ou clique em ⚙ Preparar).</p>
+</div>
+
+<!-- colar -->
+<div class="pq-card">
+  <h2>📋 Colar links ou o HTML do Google</h2>
+  <textarea id="colar" rows="4" placeholder="Um link por linha (matérias, vídeos, posts)… ou cole o HTML inteiro da página de resultados do Google (Ctrl+U → Ctrl+A → Ctrl+C)"></textarea>
+  <div class="pq-linha" style="margin-top:6px;"><button type="button" id="btnColar" class="pq-mini">➕ Adicionar</button><span class="pq-st" id="colarSt"></span></div>
+</div>
+
+<!-- resultados -->
+<div class="pq-card" data-feito="{{ '1' if p.modelos else '0' }}">
+  <h2>🗂 Resultados <span style="font-weight:400;font-size:.82rem;color:var(--mudo)" id="resResumo"></span></h2>
+  <div class="pq-tabs" id="filtros"></div>
+  <div class="pq-linha" style="margin-top:8px;">
+    <button type="button" class="pq-mini pq-sec" id="btnTodos">☑ Marcar todos</button>
+    <button type="button" class="pq-mini pq-sec" id="btnNenhum">☐ Desmarcar todos</button>
+    <button type="button" class="pq-mini pq-sec" id="btnApagar">🗑 Apagar os desmarcados</button>
+    <button type="button" class="pq-mini pq-sec" id="btnCopiar">📋 Copiar os marcados (1 por linha)</button>
+    <span class="pq-st" id="resSt"></span>
+  </div>
+  <div class="pq-res" id="res"></div>
+</div>
+
+<!-- para o modelo -->
+<div class="pq-card">
+  <h2>🕵️ Usar no Modelo de vídeo</h2>
+  <div class="pq-linha">
+    <label style="flex:2;min-width:240px;">Mandar pra<select id="modelo"><option value="novo">➕ um Modelo de vídeo NOVO com este caso</option>{% for d in dossies %}<option value="{{ d.id }}">{{ d.nome }}</option>{% endfor %}</select></label>
+    <label style="flex:none;min-width:120px;">⏱ Minutos<input type="number" id="minutos" min="1" max="120" step="0.5" value="{{ (p.youtube or {}).sugestao_min or '' }}" placeholder="sugerido"></label>
+    <label style="flex:none;min-width:200px;">+ vídeos do YouTube (transcrição)<select id="ytTop"><option value="0">nenhum</option>{% for n in (1, 2, 3, 5) %}<option value="{{ n }}" {% if n == 3 %}selected{% endif %}>os {{ n }} mais vistos</option>{% endfor %}</select></label>
+    <button type="button" id="btnModelo" style="margin:0;">🕵️ Mandar os marcados</button>
+  </div>
+  <p class="pq-hint">As <b>matérias</b> viram fontes (o site lê o texto e baixa as imagens com a legenda). Os <b>vídeos</b> (do Google e os mais vistos do YouTube) viram a <b>transcrição sem os tempos</b> no campo “Roteiro / anotações seus”. Num modelo novo, os minutos vêm do tempo sugerido.</p>
+  <p class="pq-st" id="modeloSt">{% if p.modelos %}Já mandado pra: {% for m in p.modelos %}<a href="/modelos-video/{{ m.id }}">modelo {{ loop.index }}</a> ({{ m.links }} links){% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</p>
+</div>
+
+<form method="post" action="{{ url_for('pesquisa_excluir', pid=p.id) }}" onsubmit="return confirm('Apagar esta pesquisa?');" style="margin-top:18px;">
+  <button type="submit" class="pq-mini" style="background:#b91c1c;">🗑 Apagar a pesquisa</button>
+</form>
+
+<script>
+(function () {
+  const PID = {{ p.id|tojson }};
+  let P = {{ p|tojson }};
+  let FILTRO = '';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const api = async (url, corpo, metodo) => {
+    const r = await fetch(url, { method: metodo || 'POST', headers: { 'Content-Type': 'application/json' }, body: corpo ? JSON.stringify(corpo) : undefined });
+    const d = await r.json().catch(() => ({ erro: 'resposta inválida do servidor' }));
+    if (!r.ok || d.erro) throw new Error(d.erro || r.status);
+    return d;
+  };
+  const num = (n) => (Number(n) || 0).toLocaleString('pt-BR');
+  const compacto = (n) => { n = Number(n) || 0; return n >= 1e9 ? (n / 1e9).toFixed(1).replace('.', ',') + ' bi' : n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' mi' : n >= 1e3 ? Math.round(n / 1e3) + ' mil' : String(n); };
+  const TIPO = { materia: 'matéria', video: 'vídeo', social: 'rede social', documento: 'documento' };
+
+  // ---- config (salva sozinho)
+  let tCfg = null;
+  const salvar = () => { clearTimeout(tCfg); tCfg = setTimeout(async () => {
+    try { await api(`/pesquisas/${PID}/config`, { tema: $('tema').value, termo: $('termo').value, idioma: $('idioma').value, categoria: $('categoria').value }); $('cfgSt').textContent = '✔ salvo'; }
+    catch (e) { $('cfgSt').textContent = '⚠ ' + e.message; } }, 500); };
+  ['tema', 'termo'].forEach(id => $(id).addEventListener('input', salvar));
+  ['idioma', 'categoria'].forEach(id => $(id).addEventListener('change', salvar));
+  $('btnTraduzir').addEventListener('click', async () => {
+    $('cfgSt').textContent = '🤖 traduzindo…';
+    try { const d = await api(`/pesquisas/${PID}/traduzir`, { idioma: $('idioma').value }); $('termo').value = d.termo; salvar(); }
+    catch (e) { $('cfgSt').textContent = '⚠ ' + e.message; }
+  });
+
+  // ---- youtube
+  function desenharYt() {
+    const Y = P.youtube;
+    if (!Y) { $('ytBox').innerHTML = '<p class="pq-hint">Ainda não buscou. Os vídeos vêm ordenados pelos mais vistos.</p>'; return; }
+    const top = Number($('topN').value) || 5, sem = $('semShorts').checked;
+    const usados = new Set(Y.videos.filter(v => v.duracao_s && (!sem || !v.short)).slice(0, top).map(v => v.id));
+    $('ytBox').innerHTML = `<div class="pq-stats">
+        <div class="destaque"><small>Tempo sugerido pro caso</small><b>${Y.sugestao_min ? '~' + Y.sugestao_min + ' min' : '—'}</b></div>
+        <div><small>Média dos ${Y.usados || top} mais vistos</small><b>${esc(Y.media_fmt || '—')}</b></div>
+        <div><small>Mediana</small><b>${esc(Y.mediana_fmt || '—')}</b></div>
+        <div><small>Mais curto / mais longo</small><b>${esc(Y.min_fmt || '—')} / ${esc(Y.max_fmt || '—')}</b></div>
+        <div><small>Views (média do top)</small><b>${compacto(Y.views_media)}</b></div></div>
+      <p class="pq-hint">Busca: “${esc(Y.termo)}” · ${Y.videos.length} vídeos · <a href="${esc(Y.url)}" target="_blank" rel="noopener">ver no YouTube ↗</a> · os destacados entram na média.</p>
+      <div class="pq-vids">${Y.videos.map((v, i) => `<div class="pq-vid ${usados.has(v.id) ? 'top' : ''} ${v.short ? 'short' : ''}">
+          <a href="${esc(v.url)}" target="_blank" rel="noopener"><img src="${esc(v.miniatura)}" alt="" loading="lazy"></a>
+          <div class="t"><a href="${esc(v.url)}" target="_blank" rel="noopener">${i + 1}. ${esc(v.titulo)}</a><div class="m">${esc(v.canal)}${v.data ? ' · ' + esc(v.data.slice(0, 4)) : ''}${v.short ? ' · Short' : ''}</div></div>
+          <div class="n"><b>${compacto(v.views)}</b> views<br>${esc(v.duracao_fmt || 'ao vivo')}</div></div>`).join('')}</div>`;
+  }
+  async function recalcular() {
+    if (!P.youtube) return;
+    try { const d = await api(`/pesquisas/${PID}/youtube/estatisticas`, { sem_shorts: $('semShorts').checked, top: Number($('topN').value) });
+      P.youtube = d.youtube; desenharYt(); if (P.youtube.sugestao_min && !$('minutos').dataset.mexeu) $('minutos').value = P.youtube.sugestao_min; } catch (_) {}
+  }
+  $('semShorts').addEventListener('change', recalcular); $('topN').addEventListener('change', recalcular);
+  $('minutos').addEventListener('input', () => { $('minutos').dataset.mexeu = '1'; });
+  async function acompanhar(tid, st, aoFim) {
+    while (true) {
+      let t = null;
+      try { const r = await fetch('/tarefas/' + tid, { cache: 'no-store' }); if (r.status === 404) return; t = await r.json(); } catch (_) {}
+      if (t && t.status === 'rodando') st.textContent = '⏳ ' + (t.progresso || 'buscando…');
+      else if (t) { fetch('/tarefas/' + tid + '/aplicada', { method: 'POST' }).catch(() => {}); aoFim(t); return; }
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+  $('btnYt').addEventListener('click', async () => {
+    $('btnYt').disabled = true; $('ytSt').textContent = '⏳ buscando os mais vistos…';
+    try {
+      const d = await api(`/pesquisas/${PID}/youtube`, { termo: $('termo').value, idioma: $('idioma').value });
+      acompanhar(d.tarefa, $('ytSt'), async (t) => {
+        $('btnYt').disabled = false;
+        if (t.status !== 'pronto') { $('ytSt').textContent = '⚠ ' + (t.erro || 'não deu'); return; }
+        await recarregar(); await recalcular();
+        $('ytSt').textContent = `✔ ${P.youtube.videos.length} vídeos`;
+      });
+    } catch (e) { $('ytSt').textContent = '⚠ ' + e.message; $('btnYt').disabled = false; }
+  });
+
+  // ---- google no navegador do site
+  $('btnGoogle').addEventListener('click', async () => {
+    $('gSt').textContent = '🌐 abrindo…';
+    try { const d = await api(`/pesquisas/${PID}/google`, { termo: $('termo').value, categoria: $('categoria').value, pagina: $('pagina').value });
+      $('gSt').innerHTML = `✔ aberto no ${esc(d.navegador)} — marque os resultados e clique em <b>Enviar ao site</b>${d.aviso ? ' · ⚠ ' + esc(d.aviso) : ''}`;
+      const pg = $('pagina'); if (pg.selectedIndex < pg.options.length - 1) pg.selectedIndex += 1;  // a próxima vez abre a página seguinte
+    } catch (e) { $('gSt').textContent = '⚠ ' + e.message; }
+  });
+  $('btnPreparar').addEventListener('click', async () => {
+    $('gSt').textContent = '⚙ abrindo o navegador do site na instalação…';
+    try { await api('/navegador-imagens/preparar', {}); $('gSt').textContent = '✔ siga os passos na janela que abriu (instalar a extensão e o script)'; }
+    catch (e) { $('gSt').textContent = '⚠ ' + e.message; }
+  });
+
+  // ---- colar
+  $('btnColar').addEventListener('click', async () => {
+    try { const d = await api(`/pesquisas/${PID}/colar`, { texto: $('colar').value });
+      $('colarSt').textContent = `✔ ${d.achados} link(s) achados · ${d.novos} novo(s)${d.repetidos ? ` · ${d.repetidos} já estavam` : ''}`; $('colar').value = ''; recarregar(); }
+    catch (e) { $('colarSt').textContent = '⚠ ' + e.message; }
+  });
+
+  // ---- resultados
+  function desenharRes() {
+    const rs = P.resultados || [];
+    const cont = {}; rs.forEach(r => { cont[r.tipo] = (cont[r.tipo] || 0) + 1; });
+    const marc = rs.filter(r => r.marcado !== false).length;
+    $('resResumo').textContent = rs.length ? `· ${marc} de ${rs.length} marcados` : '';
+    $('filtros').innerHTML = [['', 'Todos', rs.length]].concat(Object.keys(TIPO).filter(k => cont[k]).map(k => [k, TIPO[k], cont[k]]))
+      .map(([k, n, c]) => `<button type="button" data-f="${k}" class="${FILTRO === k ? 'on' : ''}">${n} (${c})</button>`).join('');
+    $('filtros').querySelectorAll('button').forEach(b => b.onclick = () => { FILTRO = b.dataset.f; desenharRes(); });
+    const lista = rs.filter(r => !FILTRO || r.tipo === FILTRO);
+    $('res').innerHTML = lista.length ? lista.map(r => `<div class="pq-r ${r.marcado === false ? 'off' : ''}" data-id="${r.id}">
+        <input type="checkbox" class="rChk" ${r.marcado === false ? '' : 'checked'}>
+        <div class="c"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.titulo || r.url)}</a>
+          <div class="m"><span class="pq-tipo ${r.tipo}">${TIPO[r.tipo] || r.tipo}</span>${esc(r.fonte || '')}${r.data ? ' · ' + esc(r.data) : ''}${r.pagina ? ' · pág. ' + esc(r.pagina) : ''}${r.aproximado ? ' · <span style="color:var(--aviso)" title="o Google escondeu o link; este foi montado pelo endereço que ele mostra — confira">⚠ link aproximado</span>' : ''}</div>
+          ${r.trecho ? `<div class="tr">${esc(r.trecho)}</div>` : ''}</div>
+        <select class="rTipo" title="tipo">${Object.entries(TIPO).map(([k, n]) => `<option value="${k}" ${k === r.tipo ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        <button type="button" class="x rDel" title="tirar da lista">✕</button></div>`).join('')
+      : '<p class="pq-hint">Nada ainda. Use o 🌐 Google no navegador do site ou cole os links acima.</p>';
+    $('res').querySelectorAll('.pq-r').forEach(el => {
+      const id = el.dataset.id;
+      el.querySelector('.rChk').onchange = async (e) => { const r = rs.find(x => x.id === id); r.marcado = e.target.checked; el.classList.toggle('off', !r.marcado); api(`/pesquisas/${PID}/item/${id}`, { marcado: r.marcado }).catch(() => {}); $('resResumo').textContent = `· ${rs.filter(x => x.marcado !== false).length} de ${rs.length} marcados`; };
+      el.querySelector('.rTipo').onchange = (e) => { rs.find(x => x.id === id).tipo = e.target.value; api(`/pesquisas/${PID}/item/${id}`, { tipo: e.target.value }).then(desenharRes).catch(() => {}); };
+      el.querySelector('.rDel').onclick = async () => { await api(`/pesquisas/${PID}/item/${id}`, null, 'DELETE').catch(() => {}); P.resultados = rs.filter(x => x.id !== id); desenharRes(); };
+    });
+  }
+  $('btnTodos').onclick = async () => { await api(`/pesquisas/${PID}/marcar`, { marcado: true, tipo: FILTRO }); recarregar(); };
+  $('btnNenhum').onclick = async () => { await api(`/pesquisas/${PID}/marcar`, { marcado: false, tipo: FILTRO }); recarregar(); };
+  $('btnApagar').onclick = async () => { if (!confirm('Tirar da lista todos os desmarcados?')) return; await api(`/pesquisas/${PID}/marcar`, { apagar_desmarcados: true }); recarregar(); };
+  $('btnCopiar').onclick = async () => {
+    const txt = (P.resultados || []).filter(r => r.marcado !== false && (!FILTRO || r.tipo === FILTRO)).map(r => r.url).join('\n');
+    try { await navigator.clipboard.writeText(txt); $('resSt').textContent = `✔ ${txt.split('\n').filter(Boolean).length} link(s) copiados`; }
+    catch (_) { $('colar').value = txt; $('resSt').textContent = 'copie da caixa “Colar” acima (Ctrl+C)'; }
+  };
+
+  // ---- para o modelo de vídeo
+  $('btnModelo').addEventListener('click', async () => {
+    const st = $('modeloSt'); $('btnModelo').disabled = true; st.textContent = '⏳ preparando…';
+    try {
+      const d = await api(`/pesquisas/${PID}/para-modelo`, { modelo: $('modelo').value, minutos: $('minutos').value, youtube_top: $('ytTop').value });
+      st.textContent = `⏳ mandando ${d.urls.length} link(s) pro Modelo de vídeo…`;
+      const f = await api(`/modelos-video/${d.modelo}/fontes`, { urls: d.urls.join('\n') });
+      st.innerHTML = `✔ ${f.novas.length} matéria(s) na fila${f.videos ? ` · 🎬 ${f.videos} vídeo(s) sendo transcritos pras anotações` : ''}${f.erros.length ? ` · ⚠ ${esc(f.erros.join(' · '))}` : ''} — <a href="${d.link}"><b>abrir o Modelo de vídeo →</b></a>`;
+    } catch (e) { st.textContent = '⚠ ' + e.message; }
+    $('btnModelo').disabled = false;
+  });
+
+  async function recarregar() {
+    try { P = await (await fetch(`/pesquisas/${PID}/dados`, { cache: 'no-store' })).json(); } catch (_) { return; }
+    desenharYt(); desenharRes();
+  }
+  // os resultados que o navegador do site manda aparecem sozinhos
+  let ult = (P.resultados || []).length;
+  setInterval(async () => {
+    if (document.hidden) return;
+    try { const d = await (await fetch(`/pesquisas/${PID}/dados`, { cache: 'no-store' })).json();
+      if ((d.resultados || []).length !== ult) { ult = d.resultados.length; P = d; desenharRes(); $('resSt').textContent = '✔ chegaram resultados do navegador'; } } catch (_) {}
+  }, 4000);
+  // voltou com a busca do YouTube rodando
+  fetch('/tarefas?tipo=pesquisa_youtube&pendentes=1&limite=3&pagina=' + encodeURIComponent(location.pathname)).then(r => r.json())
+    .then(d => (d.tarefas || []).slice(0, 1).forEach(t => acompanhar(t.id, $('ytSt'), async () => { await recarregar(); }))).catch(() => {});
+  desenharYt(); desenharRes();
+})();
+</script>
+{% endblock %}

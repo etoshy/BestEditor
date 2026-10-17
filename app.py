@@ -10921,6 +10921,10 @@ import piloto as _piloto  # noqa: E402  (🚀 v84_157: piloto automático do Mod
 _piloto.registrar(app, BASE_DIR)
 import navegador_imagens as _nav_img  # noqa: E402  (🧲 v84_150: Brave do site + userscript que manda os links)
 _nav_img.registrar(app, BASE_DIR)
+import pesquisa_rotas as _pesquisa_rotas  # noqa: E402  (📰 v84_165: buscador de casos e notícias)
+_pesquisa_rotas.registrar(app, BASE_DIR)
+import marca_rotas as _marca_rotas  # noqa: E402  (🎨 v84_168: identidade visual — imagens 100% IA na marca)
+_marca_rotas.registrar(app, BASE_DIR)
 
 
 @app.after_request

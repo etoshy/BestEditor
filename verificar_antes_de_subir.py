@@ -28,7 +28,7 @@ from typing import List, Tuple
 
 # ---------------------------------------------------------------- o que nunca sobe
 PASTAS_PESSOAIS = (
-    "jobs/", "uploads/", "outputs/", "narracoes/", "conversas/", "roteiros_yt/", "vendas/", "dossies/",
+    "jobs/", "uploads/", "outputs/", "narracoes/", "conversas/", "roteiros_yt/", "vendas/", "dossies/", "pesquisas/",
     "modelados/", "chamadas_padrao/", "downloads/", "flow_dados/", "runpod_dados/", "producao_pod/", "ia_cache/", "analises_canal/",
     "niche_miner/data/", "toolkit/tts/models/", ".chrome_downloads/",
     "ia_google/perfil_navegador/", "ia_google/conversas/", "ia_google/debug/", "ia_google/erros/", "ia_google/resultados/",
@@ -41,6 +41,7 @@ ARQUIVOS_PESSOAIS = re.compile(
     re.I)
 EXCECOES = re.compile(r"(^|/)\.env\.example$")
 MIDIA_SOLTA = re.compile(r"^[^/]+\.(mp4|mov|mkv|webm|wav|mp3|m4a|zip)$", re.I)  # na raiz do projeto
+MARCA_GERADA = re.compile(r"^marcas/[^/]+/(projetos/|folha_mestra/celulas/|estado\.json$)")  # 🎨 v84_168: o que você gerou
 
 # ---------------------------------------------------------------- conteúdo sensível
 SEGREDOS: List[Tuple[str, re.Pattern]] = [
@@ -87,7 +88,7 @@ def conferir(arquivos: List[str], email: str = "") -> Tuple[List[str], List[str]
     pessoais, conteudo, grandes = [], [], []
     for a in arquivos:
         n = a.replace("\\", "/")
-        if (any(n.startswith(p) for p in PASTAS_PESSOAIS) or ARQUIVOS_PESSOAIS.search(n) or MIDIA_SOLTA.match(n)) \
+        if (any(n.startswith(p) for p in PASTAS_PESSOAIS) or ARQUIVOS_PESSOAIS.search(n) or MIDIA_SOLTA.match(n) or MARCA_GERADA.match(n)) \
                 and not EXCECOES.search(n):
             pessoais.append(a)
             continue

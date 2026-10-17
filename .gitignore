@@ -54,6 +54,10 @@ conversas/
 roteiros_yt/
 vendas/
 dossies/
+pesquisas/
+marcas/*/projetos/
+marcas/*/folha_mestra/celulas/
+marcas/*/estado.json
 thumbs/
 modelados/
 chamadas_padrao/

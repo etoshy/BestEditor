@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}{{ p.titulo }} — {{ m.guia.project.name }}{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1250px; }
+  .mv-card { border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .mv-hint { color: var(--mudo); font-size: .86rem; margin: 6px 0 0; }
+  .mv-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 8px; }
+  .mv-linha > label { margin: 0; }
+  .mv-st { font-size: .86rem; color: var(--mudo); }
+  .mv-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .mv-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .mv-foto { display: flex; gap: 8px; border: 1px solid var(--borda); border-radius: 10px; padding: 8px; font-size: .8rem; }
+  .mv-foto img { width: 110px; height: 110px; object-fit: cover; border-radius: 6px; border: 1px solid var(--borda); }
+  .mv-foto textarea { width: 100%; font-size: .78rem; margin: 4px 0; }
+  .mv-foto button { font-size: .72rem; padding: 2px 8px; margin: 0; }
+  .mv-cenas { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; margin-top: 10px; }
+  .mv-cena { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; background: var(--card-2); }
+  .mv-cena.approved { border-color: #2e9e5b; } .mv-cena.reject { border-color: #c5383f; } .mv-cena.revise { border-color: #c99a2e; }
+  .mv-cena header { display: flex; gap: 6px; align-items: center; }
+  .mv-cena header h3 { margin: 0; font-size: .95rem; flex: 1; }
+  .mv-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #080807; border-radius: 8px; display: block; margin-top: 6px; cursor: zoom-in; }
+  .mv-narr { font-size: .86rem; margin: 6px 0; max-height: 5.4em; overflow: auto; }
+  .mv-badges { display: flex; gap: 6px; flex-wrap: wrap; font-size: .74rem; margin-top: 4px; }
+  .mv-badges span { border: 1px solid var(--borda); border-radius: 999px; padding: 1px 8px; }
+  .mv-cena details { margin-top: 6px; font-size: .84rem; }
+  .mv-cena details label { display: block; margin: 4px 0; }
+  .mv-cena textarea, .mv-cena input[type=text] { width: 100%; font-size: .82rem; }
+  .mv-acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .mv-acoes button { font-size: .78rem; padding: 3px 9px; margin: 0; }
+  .mv-ger { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .mv-ger img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid var(--borda); }
+  dialog.mv-zoom { max-width: 95vw; padding: 0; border: 0; background: transparent; }
+  dialog.mv-zoom img { max-width: 95vw; max-height: 88vh; display: block; }
+</style>
+
+<p style="margin:0"><a href="/marca/{{ m.slug }}">← {{ m.guia.project.name }}</a></p>
+<h1>🎬 {{ p.titulo }}</h1>
+
+<div class="mv-card">
+  <h2>Narração, motor e fotos</h2>
+  <div class="mv-linha">
+    <label>Gerar em<select id="cMotor">{% for k, v in motores.items() %}<option value="{{ k }}" {% if p.motor == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Formato<select id="cProp">{% for k in ['16:9', '9:16', '1:1'] %}<option {% if p.proporcao == k %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
+    <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="cCorr" {% if p.corrigir_sempre %}checked{% endif %}> 🎞 corrigir a paleta de todas (grading noir)</label>
+    <label style="display:flex;gap:6px;align-items:center" title="manda uma amostra de estilo da marca como referência também nas cenas sem mascote (usa o klein em vez do Z-Image)"><input type="checkbox" id="cEst" {% if p.ref_estilo_sempre %}checked{% endif %}> 🖌 referência de estilo nas cenas sem mascote</label>
+  </div>
+  <p class="mv-hint">Pod: cena com mascote ou com foto sua → <b>FLUX.2 klein</b> (até 4 referências: pose aprovada, folha mestra, mascote em alta, suas fotos); cena sem nada → <b>Z-Image Turbo</b>. Flow: 1 referência (a pose do mascote ou a sua foto). Nenhum dos dois tem prompt negativo — o que evitar vai no fim do prompt como “Avoid: …”.</p>
+  <details style="margin-top:8px"><summary>Ver a narração ({{ p.narracao.split()|length }} palavras)</summary><div style="white-space:pre-wrap;font-size:.86rem;max-height:260px;overflow:auto">{{ p.narracao }}</div></details>
+  <h3 style="margin:12px 0 0;font-size:.95rem">📷 Fotos suas (pessoa, objeto ou lugar real)</h3>
+  <p class="mv-hint">Animal, estátua, pessoa, objeto, lugar: a foto vai como referência do gerador nas cenas em que você marcar (até 3 por cena) e a IA anota as características dela pro prompt — a cena sai na paleta e no estilo da marca, como foto de arquivo ou como ilustração no traço da marca, e o mascote pode aparecer junto. No Flow (1 referência só) vai a foto quando a cena é sobre ela.</p>
+  <div class="mv-linha"><input type="file" id="fArq" accept="image/*" multiple><input type="text" id="fNome" placeholder="quem/o que é (opcional)"><button type="button" id="btnFotos" class="secondary">📤 Enviar</button><span class="mv-st" id="fSt"></span></div>
+  <div class="mv-fotos" id="fotos"></div>
+  <div id="elencoBox" style="display:none">
+    <h3 style="margin:14px 0 0;font-size:.95rem">🎭 Elenco — pessoas, idades e locais (do Modelo de vídeo)</h3>
+    <p class="mv-hint">Igual ao true crime: quem é quem nas fotos e com que idade. Nas batidas, cada pessoa aparece com o <b>rosto da foto mais perto da idade da cena</b> (envelhecida/rejuvenescida quando precisa) e cada lugar fica igual em todas as cenas — só que no estilo e na paleta da marca. Vale pra animal, estátua, objeto: o que estiver no elenco/fotos.</p>
+    <div class="mv-linha"><button type="button" id="btnElenco" class="secondary">🎭 Montar / refazer o elenco com a IA</button><a id="lnkDossie" href="#" class="mv-hint" target="_blank">editar o elenco no Modelo de vídeo ↗</a><span class="mv-st" id="eSt"></span></div>
+    <div class="mv-fotos" id="elenco"></div>
+  </div>
+</div>
+
+<div class="mv-card">
+  <h2>Batidas da narração</h2>
+  <p class="mv-hint">Cada batida = uma imagem: o trecho, a intenção visual, o tipo de imagem, a pose do mascote (≈ 1 a cada 3) e os textos em alemão que vão por cima.</p>
+  <div class="mv-linha">
+    <button type="button" id="btnIA">🤖 Dividir com a IA</button>
+    <button type="button" id="btnPrompt" class="secondary">📋 Copiar o prompt (pra outra IA)</button>
+    <button type="button" id="btnSimples" class="secondary">✂ Dividir sem IA (por frases)</button>
+    <span class="mv-st" id="bSt"></span>
+  </div>
+  <details style="margin-top:8px"><summary>Colar a resposta da outra IA (JSON)</summary>
+    <textarea id="resp" rows="5" placeholder='{"batidas": [...]}'></textarea><button type="button" id="btnColar" class="secondary">✅ Usar essa resposta</button></details>
+</div>
+
+<div class="mv-card">
+  <h2>Cenas</h2>
+  <div class="mv-linha">
+    <button type="button" id="btnGerarFalta">🖼 Gerar as que faltam</button>
+    <button type="button" id="btnGerarSel" class="secondary">🔁 Gerar/refazer as marcadas</button>
+    <button type="button" id="btnQA" class="secondary">👁 Revisão da IA</button>
+    <a class="button secondary" href="/marca/{{ m.slug }}/p/{{ p.id }}/exportar" style="margin:0">📦 Exportar (.zip)</a>
+    <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="selTodas"> marcar todas</label>
+    <span class="mv-st" id="gSt"></span>
+  </div>
+  <p class="mv-hint">Toda imagem fica registrada (modelo, versão, seed, prompt final, referências, versões do style lock e da paleta, preset de grading, QA). A paleta é conferida sozinha — fora da paleta, o grading <code>noir_vermelho_v1</code> corrige numa cópia. Aprove ✅, peça revisão 🔁 ou reprove ✖ com o motivo.</p>
+  <div class="mv-cenas" id="cenas"></div>
+</div>
+
+<dialog class="mv-zoom" id="zoom"><img id="zImg" alt=""></dialog>
+
+<script>
+(() => {
+  const SLUG = {{ m.slug|tojson }}, PID = {{ p.id|tojson }};
+  const POSES = {{ poses|tojson }}, TIPOS = {{ tipos|tojson }};
+  const BASE = `/marca/${SLUG}/p/${PID}`;
+  const $ = (id) => document.getElementById(id);
+  let P = null; const SEL = new Set();
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const arq = (rel, mini) => rel ? `/marca/${SLUG}/arquivo/${rel}${mini ? '?mini=' + mini + '&t=' + Date.now() % 100000 : ''}` : '';
+  async function api(url, corpo) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.erro) throw new Error(d.erro || ('erro ' + r.status));
+    return d;
+  }
+  async function acompanhar(tid, st, aoFim) {
+    while (true) {
+      let t = null;
+      try { const r = await fetch('/tarefas/' + tid, { cache: 'no-store' }); if (r.status === 404) return; t = await r.json(); } catch (_) {}
+      if (t && t.status === 'rodando') { st.textContent = '⏳ ' + (t.progresso || 'trabalhando…'); }
+      else if (t) { fetch('/tarefas/' + tid + '/aplicada', { method: 'POST' }).catch(() => {});
+        const r = t.resultado || {};
+        st.textContent = t.status === 'pronto' ? '✅ ' + (r.geradas != null ? `${r.geradas} geradas` : r.batidas != null ? `${r.batidas} batidas` : r.revisadas != null ? `${r.revisadas} revisadas` : r.descritas != null ? `${r.descritas} fotos lidas` : r.pessoas != null ? `${r.pessoas} pessoas, ${r.locais} locais` : 'pronto') + ((r.erros || []).length ? ' · ⚠ ' + r.erros[0] : '') : '❌ ' + (t.erro || 'falhou');
+        aoFim && aoFim(t); return; }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  async function carregar() { P = await (await fetch(BASE + '/dados', { cache: 'no-store' })).json(); desenhar(); carregarElenco(); }
+  async function carregarElenco() {
+    let e = null; try { e = await (await fetch(BASE + '/elenco', { cache: 'no-store' })).json(); } catch (_) { return; }
+    if (!e || !e.origem) return;
+    $('elencoBox').style.display = ''; $('lnkDossie').href = '/modelos-video/' + e.dossie;
+    $('elenco').innerHTML = (e.pessoas.map(x => `<div class="mv-foto">${x.foto ? `<img src="${x.foto}" alt="">` : ''}<div><b>${esc(x.nome)}</b><br>${esc(x.papel)}${x.nascimento ? '<br>nasceu em ' + x.nascimento : ''}${x.idades.length ? '<br>fotos com ' + x.idades.join(', ') + ' anos' : ''}</div></div>`).join('')
+      + e.locais.map(x => `<div class="mv-foto"><div><b>📍 ${esc(x.nome)}</b><br>${esc(x.tipo)}${x.foto ? ' · com foto' : ' · pela descrição'}</div></div>`).join(''))
+      || '<span class="mv-hint">O Modelo de vídeo ainda não tem elenco — clique em 🎭 Montar.</span>';
+  }
+  $('btnElenco').addEventListener('click', async () => {
+    try { const d = await api(BASE + '/elenco/montar'); acompanhar(d.tarefa, $('eSt'), carregarElenco); } catch (e) { $('eSt').textContent = '❌ ' + e.message; }
+  });
+  function salvarCampo(bid, corpo) { return api(`${BASE}/batida/${bid}`, corpo).catch(e => alert(e.message)); }
+  function desenhar() {
+    $('fotos').innerHTML = (P.fotos || []).map(f => `<div class="mv-foto" data-f="${f.id}"><img src="${BASE}/foto/${f.id}" alt="">
+      <div style="flex:1;min-width:0"><b>${f.id}</b> <input type="text" data-fc="nome" value="${esc(f.nome)}" placeholder="quem/o que é" style="width:auto">
+      <select data-fc="estilo"><option value="foto" ${f.estilo !== 'ilustracao' ? 'selected' : ''}>sai como foto de arquivo</option><option value="ilustracao" ${f.estilo === 'ilustracao' ? 'selected' : ''}>sai como ilustração no traço da marca</option></select>
+      <textarea data-fc="descricao_en" rows="2" placeholder="características que precisam aparecer (a IA preenche sozinha)">${esc(f.descricao_en)}</textarea>
+      <button type="button" class="secondary" data-fa="descrever">🔎 IA: ler as características</button> <button type="button" class="secondary" data-fa="excluir">🗑</button></div></div>`).join('') || '<span class="mv-hint">Nenhuma foto.</span>';
+    $('fotos').querySelectorAll('.mv-foto').forEach(el => {
+      const fid = el.dataset.f;
+      el.querySelectorAll('[data-fc]').forEach(c => c.addEventListener('change', () => api(`${BASE}/foto/${fid}/editar`, { [c.dataset.fc]: c.value }).then(carregar).catch(e => alert(e.message))));
+      el.querySelector('[data-fa=descrever]').addEventListener('click', async () => { try { const d = await api(`${BASE}/foto/${fid}/editar`, { descrever: true });
+        if (d.tarefa) acompanhar(d.tarefa, $('fSt'), carregar); else $('fSt').textContent = 'A IA está desligada (ligue em /ia) — escreva as características à mão.'; } catch (e) { alert(e.message); } });
+      el.querySelector('[data-fa=excluir]').addEventListener('click', async () => { if (!confirm('Tirar essa foto?')) return; await api(`${BASE}/foto/${fid}/editar`, { excluir: true }); carregar(); });
+    });
+    const box = $('cenas'); box.innerHTML = '';
+    if (!P.batidas.length) { box.innerHTML = '<p class="mv-hint">Divida a narração em batidas primeiro.</p>'; return; }
+    P.batidas.forEach((b, k) => {
+      const div = document.createElement('div');
+      div.className = 'mv-cena ' + (b.qa_status || '');
+      const img = b.arquivo_texto || ((b.usar_corrigida !== false && b.arquivo_corrigido) ? b.arquivo_corrigido : b.arquivo_master);
+      const pal = (b.usar_corrigida !== false && b.arquivo_corrigido) ? b.paleta_corrigida : b.paleta;
+      const qa = { approved: '✅ aprovada', revise: '🔁 revisar', reject: '✖ reprovada' }[b.qa_status] || '⏳ revisão pendente';
+      const ult = (b.geracoes || []).slice(-1)[0] || {};
+      const prev = b._previa || {};
+      div.innerHTML = `<header><input type="checkbox" ${SEL.has(b.id) ? 'checked' : ''}><h3>${k + 1}. ${esc(b.intencao_visual || TIPOS[b.tipo_imagem] || '')}</h3><small>${b.id}</small></header>
+        ${img ? `<img class="mv-img" src="${arq(img, 720)}" data-full="${arq(img)}">` : '<div class="mv-img" style="display:grid;place-items:center;color:#777">sem imagem</div>'}
+        <div class="mv-badges"><span>${esc(TIPOS[b.tipo_imagem] || b.tipo_imagem)}</span>${b.mascote ? `<span>🧍 ${esc((POSES[b.mascote] || {}).nome || b.mascote)}</span>` : ''}
+          ${pal ? `<span title="${esc((pal.problemas || []).join('; '))}">🎨 paleta ${pal.score} (${pal.status})</span>` : ''}<span title="${esc(b.qa_notas)}">${qa}${b.qa_por === 'ia' ? ' (IA)' : ''}</span>
+          ${(b.pessoas || []).map(x => `<span>🎭 ${esc(x.nome)}${x.idade ? ' (' + x.idade + ')' : ''}</span>`).join('')}${b.lugar ? `<span>📍 ${esc(b.lugar)}</span>` : ''}${b.ano ? `<span>${b.ano}</span>` : ''}
+          ${ult.model_name ? `<span>${esc(ult.model_name)} · seed ${ult.seed ?? '?'}</span>` : ''}${(b.fotos || []).length ? `<span>📷 ${b.fotos.join(', ')}</span>` : ''}</div>
+        <div class="mv-narr">${esc(b.narracao)}</div>
+        ${(b.texto_de || []).length ? `<div class="mv-hint" style="margin:0">✍️ ${b.texto_de.map(esc).join(' / ')}</div>` : ''}
+        ${b.qa_notas ? `<div class="mv-hint" style="margin:2px 0 0;color:#c99a2e">${esc(b.qa_notas)}</div>` : ''}
+        <div class="mv-acoes">
+          <button type="button" data-a="gerar">${b.arquivo_master ? '🔁 Refazer' : '🖼 Gerar'}</button>
+          <button type="button" class="secondary" data-a="ok">✅</button><button type="button" class="secondary" data-a="rev">🔁 revisar</button><button type="button" class="secondary" data-a="rej">✖</button>
+          ${b.arquivo_master ? `<button type="button" class="secondary" data-a="corr">🎞 corrigir paleta</button>` : ''}
+          ${b.arquivo_corrigido ? `<button type="button" class="secondary" data-a="alt">${b.usar_corrigida !== false ? 'usar a original' : 'usar a corrigida'}</button>` : ''}
+          ${b.arquivo_master ? `<button type="button" class="secondary" data-a="texto">✍️ textos</button>` : ''}
+        </div>
+        <details><summary>Editar cena, textos e prompt</summary>
+          <label>Pose do mascote<select data-c="mascote"><option value="">— sem mascote —</option>${Object.entries(POSES).map(([k2, v]) => `<option value="${k2}" ${b.mascote === k2 ? 'selected' : ''}>${esc(v.nome)}</option>`).join('')}</select></label>
+          <label>Ação do mascote nesta cena (inglês, opcional)<input type="text" data-c="acao_mascote_en" value="${esc(b.acao_mascote_en)}"></label>
+          <label>Tipo de imagem<select data-c="tipo_imagem">${Object.entries(TIPOS).map(([k2, v]) => `<option value="${k2}" ${b.tipo_imagem === k2 ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+          <label>Intenção visual<input type="text" data-c="intencao_visual" value="${esc(b.intencao_visual)}"></label>
+          <label>SUBJECT (inglês)<textarea data-c="assunto_en" rows="2">${esc(b.assunto_en)}</textarea></label>
+          <label>VISUAL QUESTION<input type="text" data-c="pergunta_visual_en" value="${esc(b.pergunta_visual_en)}"></label>
+          <label>COMPOSITION<input type="text" data-c="composicao_en" value="${esc(b.composicao_en)}"></label>
+          <label>Textos em alemão (1 por linha; *palavra* = vermelho)<textarea data-c="texto_de" rows="3">${esc((b.texto_de || []).join('\n'))}</textarea></label>
+          <label>Marcação vermelha<select data-c="anotacao"><option value="">nenhuma</option><option value="circulo" ${b.anotacao === 'circulo' ? 'selected' : ''}>círculo</option><option value="seta" ${b.anotacao === 'seta' ? 'selected' : ''}>seta</option></select></label>
+          ${(P.fotos || []).length ? `<label>📷 Fotos de referência nesta cena (até 3)<span style="display:flex;gap:8px;flex-wrap:wrap">${P.fotos.map(f => `<label style="display:flex;gap:4px;align-items:center;margin:0"><input type="checkbox" data-foto="${f.id}" ${(b.fotos || []).includes(f.id) ? 'checked' : ''}>${f.id}</label>`).join('')}</span></label>` : ''}
+          <label>🎭 Pessoas do elenco nesta cena (Nome:idade; Nome2:idade)<input type="text" data-c="pessoas" value="${esc((b.pessoas || []).map(x => x.nome + (x.idade ? ':' + x.idade : '')).join('; '))}"></label>
+          <label>📍 Lugar do elenco<input type="text" data-c="lugar" value="${esc(b.lugar)}"></label>
+          <label>Ano da cena<input type="text" data-c="ano" value="${b.ano || ''}"></label>
+          <label>Seed fixa (vazio = aleatória)<input type="text" data-c="seed_fixa" value="${b.seed_fixa ?? ''}"></label>
+          <label>Notas do QA<input type="text" data-c="qa_notas" value="${esc(b.qa_notas)}"></label>
+          <label>Prompt final que vai pro gerador <span class="mv-hint">(${esc(prev.modelo || '')} · refs: ${(prev.referencias || []).map(r => r.papel).join(', ') || 'nenhuma'})</span><textarea data-c="prompt_manual" rows="5" placeholder="${esc(prev.prompt)}">${esc(b.prompt_manual)}</textarea></label>
+          <span class="mv-hint">Deixe o prompt vazio pra usar o montado pela marca (o cinza acima). <button type="button" class="secondary" data-a="del" style="font-size:.74rem;padding:2px 8px">🗑 apagar batida</button></span>
+          ${(b.geracoes || []).filter(g => g.arquivo).length > 1 ? `<div class="mv-hint">Gerações anteriores (clique pra voltar):</div><div class="mv-ger">${b.geracoes.map((g, i) => g.arquivo ? `<img src="${arq(g.arquivo, 160)}" data-g="${i}" title="${esc(g.model_name)} seed ${g.seed}">` : '').join('')}</div>` : ''}
+        </details>`;
+      div.querySelector('header input').addEventListener('change', (e) => e.target.checked ? SEL.add(b.id) : SEL.delete(b.id));
+      const im = div.querySelector('img.mv-img'); if (im) im.addEventListener('click', () => { $('zImg').src = im.dataset.full; $('zoom').showModal(); });
+      div.querySelectorAll('[data-c]').forEach(el => el.addEventListener('change', () => salvarCampo(b.id, { [el.dataset.c]: el.value }).then(() => { if (['mascote', 'tipo_imagem', 'prompt_manual', 'pessoas', 'lugar', 'ano'].includes(el.dataset.c)) carregar(); })));
+      div.querySelectorAll('[data-foto]').forEach(el => el.addEventListener('change', () => salvarCampo(b.id, { fotos: [...div.querySelectorAll('[data-foto]:checked')].map(x => x.dataset.foto) })));
+      div.querySelectorAll('[data-g]').forEach(el => el.addEventListener('click', () => salvarCampo(b.id, { voltar_geracao: Number(el.dataset.g) }).then(carregar)));
+      div.querySelectorAll('[data-a]').forEach(el => el.addEventListener('click', async () => {
+        const a = el.dataset.a;
+        try {
+          if (a === 'gerar') return gerar([b.id]);
+          if (a === 'ok' || a === 'rev' || a === 'rej') { const st = { ok: 'approved', rev: 'revise', rej: 'reject' }[a];
+            const corpo = { qa_status: st }; if (st !== 'approved') { const mot = prompt('Motivo (fica no registro):', b.qa_notas || ''); if (mot === null) return; corpo.qa_notas = mot; }
+            await salvarCampo(b.id, corpo); }
+          if (a === 'corr') await api(`${BASE}/batida/${b.id}/corrigir`);
+          if (a === 'alt') await salvarCampo(b.id, { usar_corrigida: !(b.usar_corrigida !== false) }).then(() => api(`${BASE}/batida/${b.id}/texto`));
+          if (a === 'texto') await api(`${BASE}/batida/${b.id}/texto`);
+          if (a === 'del') { if (!confirm('Apagar essa batida?')) return; await api(`${BASE}/batida/${b.id}/excluir`); }
+          carregar();
+        } catch (e) { alert(e.message); }
+      }));
+      box.appendChild(div);
+    });
+  }
+  async function gerar(ids) {
+    try { const d = await api(BASE + '/gerar', ids ? { ids } : {}); $('gSt').textContent = '⏳ enviando…'; acompanhar(d.tarefa, $('gSt'), carregar); }
+    catch (e) { $('gSt').textContent = '❌ ' + e.message; }
+  }
+  const cfg = (c) => api(BASE + '/config', c).catch(e => alert(e.message));
+  $('cMotor').addEventListener('change', () => cfg({ motor: $('cMotor').value }).then(carregar));
+  $('cProp').addEventListener('change', () => cfg({ proporcao: $('cProp').value }));
+  $('cCorr').addEventListener('change', () => cfg({ corrigir_sempre: $('cCorr').checked }));
+  $('cEst').addEventListener('change', () => cfg({ ref_estilo_sempre: $('cEst').checked }).then(carregar));
+  $('btnGerarFalta').addEventListener('click', () => gerar(null));
+  $('btnGerarSel').addEventListener('click', () => SEL.size ? gerar([...SEL]) : ($('gSt').textContent = 'Marque as cenas.'));
+  $('selTodas').addEventListener('change', (e) => { SEL.clear(); if (e.target.checked) P.batidas.forEach(b => SEL.add(b.id)); desenhar(); });
+  $('btnQA').addEventListener('click', async () => {
+    try { const d = await api(BASE + '/revisar-ia', SEL.size ? { ids: [...SEL] } : {}); acompanhar(d.tarefa, $('gSt'), carregar); } catch (e) { $('gSt').textContent = '❌ ' + e.message; }
+  });
+  $('btnIA').addEventListener('click', async () => {
+    if (P.batidas.length && !confirm('Refazer as batidas? As atuais (e as imagens ligadas a elas) saem da lista.')) return;
+    try { const d = await api(BASE + '/batidas', { ia: true }); acompanhar(d.tarefa, $('bSt'), carregar); } catch (e) { $('bSt').textContent = '❌ ' + e.message; }
+  });
+  $('btnSimples').addEventListener('click', async () => {
+    if (P.batidas.length && !confirm('Refazer as batidas?')) return;
+    try { const d = await api(BASE + '/batidas', { simples: true }); $('bSt').textContent = `✅ ${d.batidas} batidas`; carregar(); } catch (e) { $('bSt').textContent = '❌ ' + e.message; }
+  });
+  $('btnPrompt').addEventListener('click', async () => {
+    const d = await (await fetch(BASE + '/prompt-batidas')).json();
+    try { await navigator.clipboard.writeText(d.prompt); $('bSt').textContent = '📋 prompt copiado — cole a resposta abaixo'; }
+    catch (_) { $('resp').value = d.prompt; $('bSt').textContent = 'copie o prompt da caixa abaixo'; }
+  });
+  $('btnColar').addEventListener('click', async () => {
+    try { const d = await api(BASE + '/batidas', { resposta: $('resp').value }); $('bSt').textContent = `✅ ${d.batidas} batidas`; $('resp').value = ''; carregar(); } catch (e) { $('bSt').textContent = '❌ ' + e.message; }
+  });
+  $('btnFotos').addEventListener('click', async () => {
+    const fd = new FormData(); [...$('fArq').files].forEach(f => fd.append('fotos', f)); fd.append('nome', $('fNome').value);
+    if (!$('fArq').files.length) return;
+    const r = await fetch(BASE + '/fotos', { method: 'POST', body: fd }); const d = await r.json();
+    $('fSt').textContent = d.ok ? `✅ ${d.novas.length} fotos` : '❌ ' + (d.erro || 'falhou'); $('fArq').value = ''; carregar();
+    if (d.tarefa) acompanhar(d.tarefa, $('fSt'), carregar);
+  });
+  $('zoom').addEventListener('click', () => $('zoom').close());
+  fetch(`/tarefas?pendentes=1&limite=5&pagina=${encodeURIComponent(location.pathname)}`).then(r => r.json())
+    .then(d => (d.tarefas || []).filter(t => t.status === 'rodando').slice(0, 1).forEach(t => acompanhar(t.id, t.tipo === 'marca_batidas' ? $('bSt') : $('gSt'), carregar))).catch(() => {});
+  carregar();
+})();
+</script>
+{% endblock %}

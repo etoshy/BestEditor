@@ -28,6 +28,48 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎨 Identidade visual — imagens 100% IA na marca do canal (v84_168)
+
+Menu **Roteiros e modelos → Identidade visual**. A marca **Dinge erklären** já vem em `marcas/dinge_erklaeren/`
+(o `brand_guide.json` é a especificação principal e nunca é reescrito; `manifest.json` lista cada arquivo).
+
+1. **Folha mestra do mascote** — a v0 é montada das referências oficiais (+ quadros do desenho original).
+   Gere cada vista (frente, perfil, três quartos, silhueta) e pose, aprove a melhor de cada e clique **Montar a folha**:
+   ela vira a referência de todas as cenas.
+2. **Poses e emoções novas** — escreva a pose ("comemorando", "com telescópio"…): a IA traduz, o site escolhe a pose
+   oficial mais parecida como referência e gera o **mesmo** personagem. A aprovada entra na biblioteca.
+   🦵 **Trava de proporção** (`reforcos.json`): cabeça pequena, corpo fino e curvo, pernas de mangueira compridíssimas —
+   vai no prompt e na revisão (o fantasminha baixinho/gordinho de outra IA fica em `referencias_rejeitadas/`).
+3. **Imagens de um vídeo** — cole a narração ou puxe o roteiro de um 🕵️ Modelo de vídeo (botão no fim dele; modelo novo
+   **🎨 Curiosidade explicada**). Batidas pela IA, por copiar/colar ou por frases → prompt pelo template do JSON +
+   style lock + prompt lock (o que evitar vai como "Avoid:") → **Pod** (FLUX.2 klein com até 4 referências; Z-Image nas
+   cenas sem referência) ou **Google Flow** (1 referência). Sem mudança no studio-ia do pod.
+4. **📷 Fotos suas** (animal, estátua, pessoa, objeto): viram referência da cena e a IA anota as características pro prompt;
+   sai como foto de arquivo ou ilustração no traço da marca. As fotos `[I3]` do Modelo de vídeo vêm sozinhas.
+   **🎭 Elenco** (igual ao true crime): vindo de um Modelo de vídeo, as batidas dizem quem aparece, com que idade e em que
+   lugar — o rosto sai da foto mais perto da idade da cena (envelhecido/rejuvenescido), no estilo da marca.
+   O modelo 🎨 Curiosidade explicada fala **sempre o nome do canal da marca** (Dinge erklären), a não ser que você mude.
+5. **Paleta** conferida em cada imagem (score + problemas); fora da paleta, o grading `noir_vermelho_v1` corrige numa cópia.
+6. **Textos em alemão** postos depois (manchete slab, etiquetas de papel rasgado, `*palavra*` em vermelho, círculo/seta).
+7. **QA**: ✅ / 🔁 / ✖ com motivo, ou **👁 Revisão da IA** (mascote igual, proporção, sem texto, paleta).
+8. **📦 Exportar**: masters sem texto, corrigidas, com texto, finais na ordem + `registro_cenas.json` (modelo, seed,
+   prompt, referências, versões do style lock/paleta/prompt, QA) + prompts.
+
+Fica fora do Git: `marcas/*/projetos/`, `marcas/*/folha_mestra/celulas/`, `marcas/*/estado.json`.
+
+## 📰 Buscador de casos e notícias (v84_165)
+
+Menu **Roteiros e modelos → Buscador de casos**. Escreva o caso (ex.: "o Unabomber"):
+
+1. **Termo da busca** no idioma escolhido (padrão **inglês**) — a 🤖 IA traduz se estiver ligada; dá pra editar.
+2. **▶ Mais vistos no YouTube** (yt-dlp, sem chave): a lista ordenada por visualizações e o **tempo médio dos 5 mais vistos** (sem Shorts) → o **tempo sugerido** pra falar do caso. Dá pra trocar pra top 3 ou 10, com ou sem Shorts.
+3. **🌐 Google no navegador do site** (o mesmo Brave + userscript das 📸 fotos): abre a busca (padrão **Notícias**, em inglês; também Tudo, Enciclopédias, PDFs, Fóruns, Vídeos e jornais antigos). Cada resultado ganha uma caixinha ☐; **Enviar ao site** manda os marcados. Na página 2, marca e manda de novo (ou **Enviar e ir pra próxima página**) — tudo se junta, sem repetir.
+4. **📋 Colar** links (um por linha) ou o **HTML inteiro** da página do Google.
+5. **🗂 Resultados** separados por tipo (matéria, vídeo, rede social, documento), com marcar/desmarcar e copiar os links.
+6. **🕵️ Usar no Modelo de vídeo** (novo ou existente): matérias viram fontes, vídeos (e os N mais vistos do YouTube) viram transcrição nas anotações; num modelo novo, os minutos vêm do tempo sugerido.
+
+O userscript foi pra versão **2.5.0** (modo pesquisa). Se a extensão não atualizar sozinha, clique em ⚙ **Preparar** e instale o script de novo.
+
 ## 🔷 Checagem na internet com o Gemini + busca do Google (v84_162)
 
 - Na 🔎 **Checagem do roteiro** → 🌐 **Checar na internet**, o botão **🔷 Checar e ajustar com o Gemini** manda o prompt das inconsistências (cronologia, alegações, repetições) pro Gemini com a **busca do Google** ligada, cola o JSON e ajusta o roteiro sozinho. Mostra as buscas feitas e as fontes consultadas. Roda em segundo plano (aviso no 🔔).

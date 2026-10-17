@@ -744,3 +744,43 @@ def registrar(app, base_dir: str) -> None:
         if not re.fullmatch(r"passo_\d+\.jpg", nome):
             return "nome inválido", 400
         return send_from_directory(pasta_passos(gf), nome)
+
+
+def gerar_imagem_e_esperar(prompt: str, referencia: Optional[str] = None, proporcao: str = "16:9", modelo: str = "",
+                           visivel: bool = False, timeout_s: float = 900) -> List[str]:
+    """🎨 v84_168: uma imagem no Flow pelo código (Identidade visual) — o mesmo pedido do botão Gerar da aba Flow,
+    esperando terminar. → caminhos das imagens baixadas (na galeria do Flow). Erro se o Flow estiver ocupado."""
+    from googleflow import flow_direto as fd
+    from site_config import load_site_config
+    with _TRAVA:
+        if _ESTADO["rodando"]:
+            raise RuntimeError("Já tem algo rodando no Flow — espere terminar.")
+        try:
+            import flow_lote
+            motivo = flow_lote.ocupado()
+        except Exception:  # noqa: BLE001
+            motivo = None
+        if motivo:
+            raise RuntimeError(motivo)
+        opcoes: Dict[str, Any] = {"modo": "gerar", "visivel": bool(visivel), "simular": False, "trocar_conta": True, "conta": "",
+                                  "novo_projeto": False, "tipo": "imagem", "prompt": " ".join(str(prompt).split())[:4000],
+                                  "modelo": (modelo or "")[:60], "proporcao": proporcao if proporcao in fd.PROPORCOES else "16:9",
+                                  "quantidade": "x1"}
+        if referencia and os.path.isfile(referencia):
+            opcoes["referencia"] = {"arquivo": os.path.abspath(referencia)}
+        _ESTADO.update(rodando=True, passos=[], resultados=[], erro=None, inicio=time.time(), fim=None, modo="gerar",
+                       parar=False, diagnostico=None, detalhe_erro=None,
+                       opcoes={k: (v if not isinstance(v, dict) else True) for k, v in opcoes.items()})
+        _enviar("gerar", load_site_config(), opcoes)
+    fim = time.time() + timeout_s
+    time.sleep(1.0)
+    while _ESTADO["rodando"]:
+        if time.time() > fim:
+            raise RuntimeError(f"O Flow não terminou em {int(timeout_s)} s.")
+        time.sleep(1.5)
+    if _ESTADO.get("erro"):
+        raise RuntimeError(str(_ESTADO["erro"]))
+    saidas = [os.path.join(pasta_galeria(), e["arquivo"]) for e in _ESTADO.get("resultados") or [] if e.get("tipo") == "imagem"]
+    if not saidas:
+        raise RuntimeError("O Flow terminou sem imagem.")
+    return saidas

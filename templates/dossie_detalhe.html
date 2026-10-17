@@ -142,6 +142,18 @@
 <div data-feito="0">{% set rt_origem = 'dossie' %}{% set rt_id = p.id %}{% include "_checagem.html" %}</div>
 {% if _rot %}<div data-feito="{{ '1' if '[I' in _rot else '0' }}">{% set fr_pid = p.id %}{% include "_fotos_roteiro.html" %}</div>{% endif %}
 {% if _rot %}<div data-feito="{{ '1' if (p.elenco or {}).pessoas else '0' }}">{% set el_pid = p.id %}{% include "_elenco.html" %}</div>{% endif %}
+{% if _rot %}{% set _mv_lista = marcas_visuais() %}{% if _mv_lista %}{% set _mv_padrao = (modelos.get(p.config.modelo) or {}).get('identidade_visual') or _mv_lista[0].slug %}
+<div class="ds-card" data-feito="0">
+  <h2>🎨 Imagens 100% IA na identidade visual</h2>
+  <p style="font-size:.86rem;color:var(--mudo);margin:4px 0 8px">Leva o roteiro pra 🎨 Identidade visual: ela divide em batidas, gera cada imagem na paleta e no estilo da marca (com o mascote nas cenas certas) e põe os textos depois. As fotos deste modelo vão junto — onde o roteiro tem <code>[I3]</code>, a foto I3 vira a referência da cena (a pessoa/objeto sai no estilo da marca).</p>
+  <form method="post" id="mvForm" action="/marca/{{ _mv_padrao }}/projeto/novo" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="dossie" value="{{ p.id }}"><input type="hidden" name="titulo" value="{{ p.tema }}">
+    <label style="margin:0">Marca<select onchange="document.getElementById('mvForm').action='/marca/'+this.value+'/projeto/novo'">{% for x in _mv_lista %}<option value="{{ x.slug }}" {% if x.slug == _mv_padrao %}selected{% endif %}>{{ x.nome }}</option>{% endfor %}</select></label>
+    <label style="margin:0">Gerar em<select name="motor"><option value="pod">Pod (FLUX.2 klein / Z-Image)</option><option value="flow">Google Flow</option></select></label>
+    <label style="margin:0">Formato<select name="proporcao"><option>{{ p.config.formato_video if p.config.formato_video in ['16:9','9:16','1:1'] else '16:9' }}</option><option>16:9</option><option>9:16</option><option>1:1</option></select></label>
+    <button type="submit" style="margin:0;width:auto">🎨 Criar as imagens</button>
+  </form>
+</div>{% endif %}{% endif %}
 <div data-feito="{{ '1' if (p.resultado or {}).roteiro_antes_tts else '0' }}">{% set tts_base = '/tts-adaptar/dossie/' ~ p.id %}{% set tts_tem_antes = (p.resultado or {}).roteiro_antes_tts %}{% include "_adaptar_tts.html" %}</div>
 <div data-feito="0">{% set thumbs_base = '/thumbs/dossie/' ~ p.id %}{% include "_thumbs.html" %}</div>
 <div data-feito="0">{% include "_historico.html" %}</div>

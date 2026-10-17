@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}{{ g.project.name }} — Identidade visual{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1150px; }
+  .mv-card { border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .mv-hint { color: var(--mudo); font-size: .86rem; margin: 6px 0 0; }
+  .mv-pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 8px; }
+  .mv-cor { border: 1px solid var(--borda); border-radius: 10px; overflow: hidden; font-size: .8rem; }
+  .mv-cor .am { height: 46px; }
+  .mv-cor div.t { padding: 6px 8px; }
+  .mv-regras { margin: 6px 0 0 18px; padding: 0; font-size: .9rem; }
+  .mv-regras li { margin: 3px 0; }
+  .mv-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 10px; }
+  .mv-cel { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; background: var(--card-2); }
+  .mv-cel.aprovada { border-color: #2e9e5b; }
+  .mv-cel header { display: flex; gap: 6px; align-items: center; font-weight: 600; }
+  .mv-cel header small { margin-left: auto; font-weight: 400; color: var(--mudo); }
+  .mv-cands { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+  .mv-cand { position: relative; border-radius: 6px; overflow: hidden; border: 2px solid transparent; cursor: pointer; background: #080807; }
+  .mv-cand img { width: 100%; display: block; aspect-ratio: 1; object-fit: contain; }
+  .mv-cand.ok { border-color: #2e9e5b; }
+  .mv-cand.ruim { opacity: .35; }
+  .mv-cand .sc { position: absolute; left: 3px; bottom: 3px; font-size: .68rem; background: rgba(0,0,0,.7); color: #fff; padding: 0 4px; border-radius: 4px; }
+  .mv-ref { width: 100%; aspect-ratio: 1; object-fit: contain; background: #080807; border-radius: 6px; margin-top: 6px; }
+  .mv-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 8px; }
+  .mv-linha > label { margin: 0; }
+  .mv-folha img { width: 100%; border-radius: 8px; border: 1px solid var(--borda); }
+  .mv-proj { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 10px; color: inherit; text-decoration: none; margin-top: 8px; }
+  .mv-proj:hover { border-color: var(--acento); text-decoration: none; }
+  .mv-st { font-size: .86rem; color: var(--mudo); }
+  dialog.mv-zoom { max-width: 92vw; padding: 0; border: 0; background: transparent; }
+  dialog.mv-zoom img { max-width: 92vw; max-height: 86vh; display: block; }
+  dialog.mv-zoom .bar { display: flex; gap: 8px; background: var(--card); padding: 8px; flex-wrap: wrap; }
+</style>
+
+<h1>🎨 {{ g.project.name }} <small style="font-weight:400;color:var(--mudo);font-size:1rem">— {{ g.project.brand_slogan_de }} · {{ g.project.brand_slogan_pt_br }}</small></h1>
+<p class="mv-hint" style="margin-top:-4px">O <code>brand_guide.json</code> é a especificação principal (nunca é reescrito). Versões em uso: <code>{{ m.versoes.style_lock_version }}</code> · <code>{{ m.versoes.palette_version }}</code> · <code>{{ m.versoes.prompt_version }}</code> · grading <code>{{ m.versoes.postprocess_preset }}</code>.</p>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="mv-card">
+  <h2>Guia da marca</h2>
+  <p style="margin:4px 0">{{ g.project.positioning }}</p>
+  <p class="mv-hint"><b>Regra editorial:</b> {{ g.project.editorial_rule }}</p>
+  <div class="mv-pal" data-ui-base>
+    {% for c in paleta %}<div class="mv-cor"><div class="am" style="background:{{ c.hex }}"></div><div class="t"><b>{{ c.token }}</b> {{ c.hex }}<br>{{ c.share_guideline }}<br><span class="mv-hint" style="font-size:.74rem">{{ c.role }}</span></div></div>{% endfor %}
+  </div>
+  <ul class="mv-regras">{% for r in g.design_system.palette_rules %}<li>{{ r }}</li>{% endfor %}</ul>
+  <p class="mv-hint"><b>Mascote:</b> {{ g.mascot.role }}</p>
+  <ul class="mv-regras">{% for r in g.mascot.consistency_protocol %}<li>{{ r }}</li>{% endfor %}</ul>
+  <p class="mv-hint">📌 As imagens saem <b>sem texto</b>; títulos e anotações em alemão são postos depois (manchete slab, etiquetas de máquina de escrever em papel rasgado, palavra-chave em vermelho).</p>
+</div>
+
+<div class="mv-card" id="folha">
+  <h2>Folha mestra do mascote</h2>
+  <p class="mv-hint">Antes de gerar em quantidade: gere cada <b>vista</b> (frente, perfil, três quartos, silhueta) e cada <b>pose/expressão</b> com as referências oficiais, aprove a melhor de cada uma e monte a folha. A folha aprovada vira a referência canônica de todas as cenas (o FLUX.2 klein do pod recebe a folha + a pose + o mascote em alta). Enquanto não aprovar, vale a <b>v0</b>, montada direto das referências oficiais.</p>
+  <div class="mv-linha mv-folha" style="align-items:flex-start">
+    {% set fa = m.estado.get('folha_aprovada') %}
+    <div style="flex:1;min-width:280px">
+      {% if fa %}<b>✅ Folha mestra v{{ fa.versao }}</b> (em uso)<a href="/marca/{{ m.slug }}/arquivo/{{ fa.rotulada }}" target="_blank"><img src="/marca/{{ m.slug }}/arquivo/{{ fa.rotulada }}?mini=1100" alt="folha"></a>
+      {% else %}<b>Folha mestra v0</b> (das referências oficiais — em uso até aprovar a v1)<a href="/marca/{{ m.slug }}/arquivo/folha_mestra/folha_mestra_v0_rotulada.png" target="_blank"><img src="/marca/{{ m.slug }}/arquivo/folha_mestra/folha_mestra_v0_rotulada.png?mini=1100" alt="folha v0"></a>{% endif %}
+    </div>
+  </div>
+  <div class="mv-linha">
+    <label>Gerar em<select id="fMotor" data-lembrar="mv_motor">{% for k, v in motores.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>Candidatas por célula<select id="fVar"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+    <button type="button" id="btnSelTodas" class="secondary">☑ Marcar as que faltam</button>
+    <button type="button" id="btnGerarCel">🖼 Gerar as marcadas</button>
+    <button type="button" id="btnCompor" class="secondary">🗂 Montar a folha com as aprovadas</button>
+    <span class="mv-st" id="fSt"></span>
+  </div>
+  <div class="mv-grade" id="celulas"></div>
+</div>
+
+<div class="mv-card" id="poses">
+  <h2>Poses e emoções novas</h2>
+  <p class="mv-hint">Descreva o que quiser (“correndo assustado”, “rindo com a mão na barriga”, “dormindo em cima de um livro”, “com raiva, braços cruzados”): o sistema traduz pra instrução do gerador, escolhe a pose oficial mais parecida como referência e gera o <b>mesmo personagem</b> nessa pose. A que você aprovar entra na biblioteca — dá pra usar nas cenas e ela também passa a ser referência.</p>
+  <div class="mv-linha">
+    <label style="flex:1;min-width:260px">Pose ou emoção<input type="text" id="pDesc" maxlength="300" placeholder="ex.: comemorando, pulando com os braços pra cima"></label>
+    <label>Candidatas<select id="pVar"><option>2</option><option selected>3</option><option>4</option></select></label>
+    <button type="button" id="btnPose">🧍 Criar e gerar</button>
+    <span class="mv-st" id="pSt"></span>
+  </div>
+  {% if sugeridas %}<p class="mv-hint">Sugestões (clique pra preencher) — a lista veio da folha de poses de outra IA, que desenhou o fantasma <b>fora do modelo</b> (baixinho, pernas curtas, com boca). Por isso dela só usamos os <b>nomes</b>: cada pose é gerada com as referências do personagem verdadeiro, com a trava de proporção.</p>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">{% for x in sugeridas %}<button type="button" class="secondary" data-sug="{{ x }}" style="font-size:.74rem;padding:2px 9px;margin:0">{{ x }}</button>{% endfor %}</div>{% endif %}
+  <details style="margin-top:8px"><summary>Referências de proporção (o desenho original)</summary>
+    <img src="/marca/{{ m.slug }}/arquivo/referencias/mascote_proporcoes.png?mini=1400" alt="" style="width:100%;border-radius:8px;margin-top:6px">
+    <p class="mv-hint">Vão junto em toda geração com o mascote: cabeça pequena, corpo fino e curvo, pernas de mangueira compridíssimas, sapatões. A revisão da IA reprova o mascote baixinho/gordinho.</p></details>
+</div>
+
+<div class="mv-card" id="videos">
+  <h2>Imagens de um vídeo</h2>
+  <p class="mv-hint">Cole a narração (ou puxe o roteiro de um 🕵️ Modelo de vídeo — as fotos dele vêm junto e as marcas <code>[I3]</code> viram a foto de referência da cena). O site divide em batidas, escreve o prompt de cada uma pela marca, gera no pod ou no Flow, confere a paleta e põe os textos em alemão.</p>
+  <form method="post" action="/marca/{{ m.slug }}/projeto/novo">
+    <div class="mv-linha">
+      <label style="flex:2;min-width:220px">Título<input type="text" name="titulo" maxlength="160" placeholder="ex.: Die Geschichte von Cannabis"></label>
+      <label style="flex:2;min-width:220px">Ou do Modelo de vídeo<select name="dossie"><option value="">— nenhum (colo a narração) —</option>{% for d in dossies %}{% if d.tem_roteiro %}<option value="{{ d.id }}">{{ d.nome }}</option>{% endif %}{% endfor %}</select></label>
+      <label>Gerar em<select name="motor" data-lembrar="mv_motor_proj">{% for k, v in motores.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>Formato<select name="proporcao"><option>16:9</option><option>9:16</option><option>1:1</option></select></label>
+    </div>
+    <label style="display:block;margin-top:8px">Narração<textarea name="narracao" rows="6" placeholder="Cole aqui o texto narrado (em alemão, como vai no vídeo)."></textarea></label>
+    <button type="submit" style="margin-top:8px">➕ Criar</button>
+  </form>
+  {% for x in projetos %}
+  <a class="mv-proj" href="/marca/{{ m.slug }}/p/{{ x.id }}"><b style="flex:1">{{ x.titulo }}</b><small class="mv-hint">{{ x.batidas }} batidas · {{ x.geradas }} geradas · {{ x.aprovadas }} aprovadas</small></a>
+  {% endfor %}
+</div>
+
+<dialog class="mv-zoom" id="zoom"><img id="zImg" alt=""><div class="bar"><b id="zTit" style="flex:1"></b><span id="zInfo" class="mv-hint"></span>
+  <button type="button" id="zOk">✅ Aprovar</button><input type="text" id="zMotivo" placeholder="motivo (se reprovar)" style="min-width:180px"><button type="button" id="zRuim" class="secondary">✖ Reprovar</button><button type="button" id="zFechar" class="secondary">Fechar</button></div></dialog>
+
+<script>
+(() => {
+  const SLUG = {{ m.slug|tojson }};
+  const $ = (id) => document.getElementById(id);
+  let EST = null, SEL = new Set(), ZOOM = null;
+  async function api(url, corpo) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.erro) throw new Error(d.erro || ('erro ' + r.status));
+    return d;
+  }
+  const arq = (rel, mini) => `/marca/${SLUG}/arquivo/${rel}${mini ? '?mini=' + mini : ''}`;
+  async function acompanhar(tid, st, aoFim) {
+    while (true) {
+      let t = null;
+      try { const r = await fetch('/tarefas/' + tid, { cache: 'no-store' }); if (r.status === 404) return; t = await r.json(); } catch (_) {}
+      if (t && t.status === 'rodando') st.textContent = '⏳ ' + (t.progresso || 'gerando…');
+      else if (t) { fetch('/tarefas/' + tid + '/aplicada', { method: 'POST' }).catch(() => {});
+        st.textContent = t.status === 'pronto' ? `✅ ${(t.resultado || {}).geradas ?? ''} geradas${((t.resultado || {}).erros || []).length ? ' · ⚠ ' + t.resultado.erros[0] : ''}` : '❌ ' + (t.erro || 'falhou');
+        aoFim && aoFim(t); return; }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  async function carregar() {
+    EST = await (await fetch(`/marca/${SLUG}/estado`, { cache: 'no-store' })).json();
+    desenhar();
+  }
+  function desenhar() {
+    const cel = EST.folha.celulas || {};
+    $('celulas').innerHTML = '';
+    EST.celulas.forEach(c => {
+      const e = cel[c.id] || {};
+      const div = document.createElement('div');
+      div.className = 'mv-cel' + (e.status === 'aprovada' ? ' aprovada' : '');
+      const st = e.status === 'aprovada' ? '✅ aprovada' : (e.status === 'candidatas' ? '👀 escolha uma' : (e.erro ? '⚠ erro' : 'falta gerar'));
+      div.innerHTML = `<header><input type="checkbox" ${SEL.has(c.id) ? 'checked' : ''}> ${c.nome}${c.extra ? ' <span title="pose criada por você">🆕</span>' : ''}<small>${st}</small></header>
+        <div class="mv-hint" style="font-size:.75rem">${c.en}</div>
+        ${(e.candidatas || []).length ? '' : `<img class="mv-ref" src="${arq('referencias/poses/pose_' + c.ref + '.png')}" title="referência usada (pose oficial ${c.ref})">`}
+        <div class="mv-cands"></div>${e.erro ? `<div class="mv-hint" style="color:#c55">${e.erro}</div>` : ''}
+        ${c.extra ? '<button type="button" class="secondary" data-x style="margin-top:6px;font-size:.75rem;padding:2px 8px">🗑 apagar pose</button>' : ''}`;
+      div.querySelector('input').addEventListener('change', (ev) => { ev.target.checked ? SEL.add(c.id) : SEL.delete(c.id); });
+      const box = div.querySelector('.mv-cands');
+      (e.candidatas || []).slice(-6).forEach(cd => {
+        const b = document.createElement('div');
+        b.className = 'mv-cand' + (e.arquivo === cd.arquivo ? ' ok' : '') + (cd.qa === 'rejected' ? ' ruim' : '');
+        b.innerHTML = `<img src="${arq(cd.arquivo, 300)}" loading="lazy"><span class="sc" title="paleta">${cd.paleta ? cd.paleta.score : ''}</span>`;
+        b.addEventListener('click', () => abrirZoom(c, cd));
+        box.appendChild(b);
+      });
+      const x = div.querySelector('[data-x]');
+      if (x) x.addEventListener('click', async () => { if (!confirm('Apagar essa pose da biblioteca?')) return; await api(`/marca/${SLUG}/pose/${c.id}/excluir`); carregar(); });
+      $('celulas').appendChild(div);
+    });
+  }
+  function abrirZoom(c, cd) {
+    ZOOM = { c, cd };
+    $('zImg').src = arq(cd.arquivo);
+    $('zTit').textContent = c.nome;
+    const p = cd.paleta || {};
+    $('zInfo').textContent = `${cd.model_name || ''} · seed ${cd.seed ?? '?'} · paleta ${p.score ?? '?'} (${p.status || ''})${(p.problemas || []).length ? ' — ' + p.problemas.join('; ') : ''}`;
+    $('zMotivo').value = cd.motivo || '';
+    $('zoom').showModal();
+  }
+  $('zFechar').addEventListener('click', () => $('zoom').close());
+  $('zOk').addEventListener('click', async () => { await api(`/marca/${SLUG}/folha/aprovar`, { celula: ZOOM.c.id, arquivo: ZOOM.cd.arquivo }); $('zoom').close(); carregar(); });
+  $('zRuim').addEventListener('click', async () => { await api(`/marca/${SLUG}/folha/reprovar`, { celula: ZOOM.c.id, arquivo: ZOOM.cd.arquivo, motivo: $('zMotivo').value }); $('zoom').close(); carregar(); });
+  $('btnSelTodas').addEventListener('click', () => { const cel = EST.folha.celulas || {}; EST.celulas.forEach(c => { if ((cel[c.id] || {}).status !== 'aprovada') SEL.add(c.id); }); desenhar(); });
+  $('btnGerarCel').addEventListener('click', async () => {
+    if (!SEL.size) { $('fSt').textContent = 'Marque as células.'; return; }
+    try { const d = await api(`/marca/${SLUG}/folha/gerar`, { ids: [...SEL], motor: $('fMotor').value, variacoes: Number($('fVar').value) });
+      $('fSt').textContent = '⏳ enviando…'; SEL.clear(); acompanhar(d.tarefa, $('fSt'), carregar); } catch (e) { $('fSt').textContent = '❌ ' + e.message; }
+  });
+  $('btnCompor').addEventListener('click', async () => {
+    try { const d = await api(`/marca/${SLUG}/folha/compor`); $('fSt').textContent = `✅ folha mestra v${d.folha.versao} montada — já é a referência das próximas imagens`; setTimeout(() => location.reload(), 900); }
+    catch (e) { $('fSt').textContent = '❌ ' + e.message; }
+  });
+  $('btnPose').addEventListener('click', async () => {
+    const desc = $('pDesc').value.trim(); if (!desc) return;
+    $('btnPose').disabled = true; $('pSt').textContent = '⏳ entendendo a pose…';
+    try { const d = await api(`/marca/${SLUG}/pose/nova`, { descricao: desc, motor: $('fMotor').value, variacoes: Number($('pVar').value) });
+      $('pSt').textContent = `🧍 “${d.info.nome}” → ${d.info.en} (referência: ${d.info.ref})`; $('pDesc').value = ''; await carregar();
+      document.getElementById('folha').scrollIntoView({ behavior: 'smooth' });
+      if (d.tarefa) acompanhar(d.tarefa, $('fSt'), carregar);
+    } catch (e) { $('pSt').textContent = '❌ ' + e.message; } finally { $('btnPose').disabled = false; }
+  });
+  document.querySelectorAll('[data-sug]').forEach(b => b.addEventListener('click', () => { $('pDesc').value = b.dataset.sug; $('pDesc').focus(); }));
+  fetch(`/tarefas?tipo=marca_folha&pendentes=1&limite=3&pagina=${encodeURIComponent(location.pathname)}`).then(r => r.json())
+    .then(d => (d.tarefas || []).slice(0, 1).forEach(t => acompanhar(t.id, $('fSt'), carregar))).catch(() => {});
+  carregar();
+})();
+</script>
+{% endblock %}

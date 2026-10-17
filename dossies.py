@@ -436,6 +436,40 @@ MODELOS: Dict[str, Dict[str, Any]] = {
             "Analogias simples, sem errar a ciência pra simplificar.",
         ],
     },
+    # 🎨 v84_168: modelado no roteiro de referência do canal (a história da cannabis) — imagens 100% IA na identidade visual
+    "curiosidade_ia": {
+        "nome": "🎨 Curiosidade explicada (imagens 100% IA, mascote cartoon)",
+        "descricao": "Canal de curiosidades estilo “Dinge erklären”: um fato concreto e estranho vira uma viagem no tempo e "
+                     "pelo mundo até a ciência por trás e a briga moderna — com humor seco e o mascote como guia curioso. "
+                     "Todas as imagens são geradas na 🎨 Identidade visual (fotos que você mandar viram referência).",
+        "identidade_visual": "dinge_erklaeren",
+        "formatos": {
+            "jornada": {"nome": "🧭 Jornada (história + ciência + polêmica)", "minutos": 12, "estrutura": [
+                "COLD OPEN concreto: uma cena real e específica (lugar, ano, um objeto achado) narrada como mistério — sem dizer ainda o tema",
+                "VIRADA: 'mas ele não foi o primeiro' — revela o tema e promete a viagem (de onde veio, por que importa hoje)",
+                "ORIGEM: o ponto mais antigo que as fontes provam (datas e lugares exatos), com uma piada seca logo depois do fato",
+                "A VIAGEM: em ordem cronológica e geográfica, 3-5 paradas (povos, rotas, usos) — cada parada = 1 fato forte + 1 detalhe humano",
+                "O CRONISTA DESACREDITADO: alguém antigo descreveu isso, ninguém acreditou, e a arqueologia/ciência provou depois (mini-arco)",
+                "MEIO CIENTÍFICO: como funciona de verdade, com UMA metáfora do dia a dia que o espectador lembra (ex.: a 'chave reserva' do corpo)",
+                "VOLTA AO MUNDO: como cada cultura usou (medicina, religião, trabalho, comércio) — ritmo rápido, um lugar por frase",
+                "O CONFLITO MODERNO: quem decidiu proibir/mudar, por quê, com citação documentada e a consequência — sem opinar, só as fontes",
+                "O QUE SE SABE HOJE: o consenso, o que ainda é debate (dito como debate)",
+                "FECHAMENTO EM LOOP: volta à cena do cold open com o novo significado + a pergunta que fica"]},
+            "curto": {"nome": "⚡ Shorts (até 60 s)", "minutos": 1, "estrutura": [
+                "Fato estranho e concreto na primeira frase", "A explicação em 2-3 frases com uma metáfora",
+                "O detalhe que ninguém sabe", "Pergunta final (loop pro início)"]},
+        },
+        "regras": [
+            "Regra editorial do canal: começar por um mistério visual, uma pergunta ou um contraste forte; explicar com clareza; "
+            "terminar com uma conclusão que dê sentido à curiosidade.",
+            "Humor seco DEPOIS do fato (uma frase curta, irônica), nunca no lugar do fato; nada de piada com vítimas.",
+            "Cada fato com data, lugar e quem — e só o que está nas fontes; lenda é dita como lenda, hipótese como hipótese.",
+            "Frases curtas e visuais: cada 2-3 frases têm de render UMA imagem clara (objeto, lugar, pessoa, gesto do mascote).",
+            "Temas polêmicos (drogas, política, religião): mostrar as posições e os documentos, sem recomendar nem incentivar uso.",
+            "O mascote não fala nem aparece no texto: a narração é em terceira pessoa; ele só reage nas imagens.",
+        ],
+        "palavras_por_minuto": 150,
+    },
 }
 
 TIPOS_MIDIA = {"foto": "🖼 Foto", "video": "🎥 Vídeo", "texto": "📝 Texto", "link": "🔗 Link/página"}
@@ -1192,7 +1226,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append("")
         L.append(metodo_roteiro.bloco_referencia(cfg["referencia"]))
     import canal  # 📺 o nome do canal, falado no momento certo
-    _canal = canal.nome_do_projeto(cfg.get("nome_canal"))
+    _canal = canal.nome_do_projeto(nome_canal_cfg(cfg))
     if _canal:
         L.append("")
         L.append(metodo_roteiro.bloco_canal(_canal, curto=minutos <= 1 or cfg.get("formato") == "curto"))
@@ -1347,7 +1381,7 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
         regras.append(f"Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
     return {"tema": (p.get("tema") or "").strip(), "nome_modelo": mod["nome"].split(" ", 1)[1], "minutos": minutos,
             "idioma": idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
-            "regras": regras, "canal": canal.nome_do_projeto(cfg.get("nome_canal")),
+            "regras": regras, "canal": canal.nome_do_projeto(nome_canal_cfg(cfg)),
             "midias": {m["id"].upper(): o_que_e(m)[:300] for m in vis}, "plano": (p.get("resultado") or {}).get("plano") or {}}
 
 
@@ -1505,6 +1539,27 @@ def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
     d["momentos"] = [m for m in res.get("momentos") or [] if not m.get("inicio")]
     d["roteiro"] = novo
     return ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+
+
+def canal_do_modelo(modelo: str) -> str:
+    """🎨 v84_168: o modelo ligado a uma identidade visual fala SEMPRE o nome do canal da marca (ex.: Dinge erklären)."""
+    mod = MODELOS.get(modelo or "") or {}
+    if mod.get("nome_canal"):
+        return str(mod["nome_canal"])
+    slug = mod.get("identidade_visual")
+    if slug:
+        try:
+            import marca_visual
+            return str((marca_visual.carregar(os.path.dirname(os.path.abspath(__file__)), slug)["guia"].get("project") or {}).get("name") or "")
+        except Exception:  # noqa: BLE001
+            return ""
+    return ""
+
+
+def nome_canal_cfg(cfg: Dict[str, Any]) -> str:
+    """O nome do canal do projeto; vazio = o do modelo (canal da marca) e, sem ele, o das Configurações."""
+    v = str(cfg.get("nome_canal") or "").strip()
+    return v or canal_do_modelo(cfg.get("modelo") or "")
 
 
 def roteiro_para_voz(p: Dict[str, Any]) -> str:

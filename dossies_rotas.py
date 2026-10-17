@@ -120,6 +120,8 @@ def registrar(app, base_dir: str) -> None:
                 return jsonify({"erro": "Projeto não encontrado."}), 404
             cfg = p["config"]
             if c.get("modelo") in ds.MODELOS:
+                if c["modelo"] != cfg.get("modelo") and ds.canal_do_modelo(c["modelo"]) and "nome_canal" not in c:
+                    cfg["nome_canal"] = ds.canal_do_modelo(c["modelo"])  # 🎨 modelo da marca: o nome do canal dela
                 cfg["modelo"] = c["modelo"]
             fmts = ds.MODELOS[cfg["modelo"]]["formatos"]
             if c.get("formato") in fmts:

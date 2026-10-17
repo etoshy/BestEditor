@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Buscador de casos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1050px; }
+  .pq-card { border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .pq-card h2 { margin: 0 0 6px; font-size: 1.12rem; }
+  .pq-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .pq-linha > label { margin: 0; flex: 1; min-width: 160px; }
+  .pq-hint { color: var(--mudo); font-size: .84rem; margin: 6px 0 0; }
+  .pq-lista { display: grid; gap: 8px; margin-top: 8px; }
+  .pq-item { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 10px; color: inherit; text-decoration: none; background: var(--card-2); }
+  .pq-item:hover { border-color: var(--acento); text-decoration: none; }
+  .pq-item b { flex: 1; min-width: 0; }
+  .pq-item small { color: var(--mudo); font-size: .8rem; white-space: nowrap; }
+</style>
+
+<h1>📰 Buscador de casos e notícias</h1>
+<p class="pq-hint" style="margin-top:-6px;">Escreva o caso: o site traz os <b>vídeos mais vistos do YouTube</b> sobre ele (com o tempo médio dos 5 mais vistos → quanto tempo dá pra falar do caso) e abre o <b>Google no navegador do site</b> (o mesmo das imagens) — você marca as notícias e manda pro site. No fim, tudo vira fonte de um 🕵️ Modelo de vídeo.</p>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="pq-card">
+  <h2>➕ Nova pesquisa</h2>
+  <form method="post" action="{{ url_for('pesquisa_nova') }}">
+    <div class="pq-linha">
+      <label style="flex:3;min-width:240px;">Caso ou tema<input type="text" name="tema" required maxlength="200" placeholder="ex.: o Unabomber, o caso Hinterkaifeck, o naufrágio do Titanic"></label>
+      <label>🌐 Idioma da busca<select name="idioma" data-lembrar="pq_idioma" data-lembrar-aplicar>{% for k, v in idiomas.items() %}<option value="{{ k }}" {% if k == 'en' %}selected{% endif %}>{{ v[3] }}</option>{% endfor %}</select></label>
+      <label>No Google, buscar em<select name="categoria" data-lembrar="pq_categoria" data-lembrar-aplicar>{% for k, v in categorias.items() %}<option value="{{ k }}" {% if k == 'noticias' %}selected{% endif %}>{{ v.nome }}</option>{% endfor %}</select></label>
+      <button type="submit" style="margin:0;">🔎 Começar</button>
+    </div>
+    <p class="pq-hint">O padrão é <b>notícias em inglês</b> (é onde tem mais material). Com a 🤖 IA ligada, o site já escreve o termo no idioma da busca (dá pra editar depois).</p>
+  </form>
+</div>
+
+<div class="pq-card">
+  <h2>🗂 Pesquisas</h2>
+  {% if pesquisas %}
+  <div class="pq-lista">
+    {% for x in pesquisas %}
+    <a class="pq-item" href="{{ url_for('pesquisa_detalhe', pid=x.id) }}">
+      <b>{{ x.tema }}{% if x.termo and x.termo != x.tema %} <span style="font-weight:400;color:var(--mudo)">· {{ x.termo }}</span>{% endif %}</b>
+      <small>{{ x.marcados }} de {{ x.resultados }} links{% if x.videos_yt %} · ▶ {{ x.videos_yt }} vídeos{% endif %}{% if x.sugestao_min %} · ⏱ ~{{ x.sugestao_min }} min{% endif %}</small>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}<p class="pq-hint">Nenhuma pesquisa ainda.</p>{% endif %}
+</div>
+{% endblock %}

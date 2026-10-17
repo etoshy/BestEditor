@@ -87,44 +87,105 @@ def _nova_guia(porta: int, url: str) -> Optional[str]:
     return d.get("id") if isinstance(d, dict) else None
 
 
+def _paginas(porta: int) -> List[str]:
+    return [t.get("id") for t in (_cdp(porta, "/json/list") or []) if isinstance(t, dict) and t.get("type") == "page"]
+
+
+def _kw_processo() -> Dict[str, Any]:
+    kw: Dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if sys.platform.startswith("win"):
+        kw["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kw["start_new_session"] = True
+    return kw
+
+
+def _iniciar(exe: str, perfil: str, porta: int, espera_s: float = 20.0) -> bool:
+    """Abre o navegador do site com a porta de controle e espera ela responder."""
+    import time
+    subprocess.Popen([exe, f"--user-data-dir={perfil}", f"--remote-debugging-port={porta}"] + FLAGS, **_kw_processo())  # noqa: S603
+    fim = time.monotonic() + espera_s
+    while time.monotonic() < fim:
+        time.sleep(0.25)
+        if _cdp(porta, "/json/version"):
+            return True
+    return False
+
+
+def matar_navegador_do_site(base: str) -> bool:
+    """🔁 v84_164: fecha à força SÓ o navegador do site (o processo com o perfil navegador_imagens_perfil) — o seu
+    Brave de sempre não é tocado. Usado quando ele trava: a porta responde mas as guias não abrem, ou some a janela."""
+    import time
+    perfil = os.path.join(base, PERFIL)
+    try:
+        if sys.platform.startswith("win"):
+            alvo = perfil.replace("'", "''")
+            cmd = ("Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('"
+                   + alvo + "') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }")
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd], timeout=25,  # noqa: S603,S607
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        else:
+            subprocess.run(["pkill", "-f", "--", perfil], timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # noqa: S603,S607
+    except Exception:  # noqa: BLE001
+        return False
+    time.sleep(1.5)
+    for pid_ in list(ABAS):
+        ABAS[pid_] = []  # as guias antigas morreram junto
+    return True
+
+
 def abrir(base: str, urls: List[str], cfg: Optional[Dict[str, Any]] = None, chaves: Optional[List[str]] = None,
           pid: str = "") -> Dict[str, Any]:
     """Abre as guias no navegador do site (perfil próprio, separado do seu navegador de sempre). Com a porta de
-    controle no ar, guarda o id de cada guia — é assim que o site consegue FECHAR as que já terminaram."""
+    controle no ar, guarda o id de cada guia — é assim que o site consegue FECHAR as que já terminaram.
+
+    v84_164: CONFERE se cada guia abriu de verdade (às vezes o Brave dizia que sim e não abria nada). Se nenhuma
+    abriu, reinicia o navegador do site sozinho e tenta de novo. Devolve "confirmadas" (os índices que abriram) —
+    só essas contam como abertas."""
     import time
     exe = achar(cfg)
     if not exe:
         return {"ok": False, "erro": "Não achei o Brave (nem Chrome/Edge). Instale o Brave ou ponha o caminho do .exe em ⚙."}
     porta = _porta(cfg)
-    if not _cdp(porta, "/json/version"):
-        perfil = os.path.join(base, PERFIL)
-        os.makedirs(perfil, exist_ok=True)
-        kw: Dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-        if sys.platform.startswith("win"):
-            kw["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        else:
-            kw["start_new_session"] = True
-        subprocess.Popen([exe, f"--user-data-dir={perfil}", f"--remote-debugging-port={porta}"] + FLAGS, **kw)  # noqa: S603
-        for _ in range(40):
-            time.sleep(0.25)
-            if _cdp(porta, "/json/version"):
-                break
-        else:  # o Brave do site já estava aberto sem a porta (versão antiga): abre do jeito simples
-            subprocess.Popen([exe, f"--user-data-dir={perfil}"] + FLAGS + list(urls), **kw)  # noqa: S603
-            return {"ok": True, "navegador": nome_do(exe), "guias": len(urls), "controle": False,
-                    "aviso": "feche o Brave do site e abra de novo pelo site pra ele poder fechar as guias sozinho"}
-        branca = [t.get("id") for t in (_cdp(porta, "/json/list") or []) if isinstance(t, dict) and t.get("type") == "page"]
-    else:
-        branca = []
-    ids = []
-    for k, u in enumerate(urls):
-        gid = _nova_guia(porta, u)
-        ids.append(gid)
-        if gid and pid and chaves and k < len(chaves):
-            ABAS.setdefault(pid, []).append({"id": gid, "chave": chaves[k]})
-    for gid in branca:  # a guia em branco de quando o Brave abriu
-        _cdp(porta, f"/json/close/{gid}")
-    return {"ok": True, "navegador": nome_do(exe), "guias": len(urls), "controle": any(ids)}
+    perfil = os.path.join(base, PERFIL)
+    os.makedirs(perfil, exist_ok=True)
+    reiniciou = False
+    for tentativa in (1, 2):
+        branca: List[str] = []
+        if not _cdp(porta, "/json/version"):
+            if not _iniciar(exe, perfil, porta):
+                if tentativa == 1:  # aberto sem a porta (ou travado na abertura): fecha e abre de novo
+                    matar_navegador_do_site(base)
+                    reiniciou = True
+                    continue
+                return {"ok": False, "navegador": nome_do(exe), "confirmadas": [],
+                        "erro": f"O {nome_do(exe)} do site não abriu (esperei 20 s, duas vezes). Feche todas as janelas dele "
+                                "e clique de novo — se continuar, veja em ⚙ o caminho do navegador."}
+            branca = _paginas(porta)
+        ids: List[Optional[str]] = [_nova_guia(porta, u) for u in urls]
+        time.sleep(0.8)
+        vivas = set(_paginas(porta))
+        confirmadas = [k for k, gid in enumerate(ids) if gid and gid in vivas]
+        if confirmadas:
+            for k in confirmadas:
+                if pid and chaves and k < len(chaves):
+                    ABAS.setdefault(pid, []).append({"id": ids[k], "chave": chaves[k]})
+            _cdp(porta, f"/json/activate/{ids[confirmadas[0]]}")  # traz a janela pra frente
+            for gid in branca:  # a guia em branco de quando o navegador abriu
+                if gid not in ids:
+                    _cdp(porta, f"/json/close/{gid}")
+            r = {"ok": True, "navegador": nome_do(exe), "guias": len(confirmadas), "confirmadas": confirmadas,
+                 "controle": True, "reiniciou": reiniciou}
+            if len(confirmadas) < len(urls):
+                r["aviso"] = f"{len(urls) - len(confirmadas)} guia(s) não abriram — elas continuam na fila"
+            return r
+        if tentativa == 1:  # a porta respondeu mas nenhuma guia apareceu: o navegador do site travou
+            matar_navegador_do_site(base)
+            reiniciou = True
+    return {"ok": False, "navegador": nome_do(exe), "confirmadas": [],
+            "erro": f"O {nome_do(exe)} do site não abriu as guias (reiniciei ele e tentei de novo). Feche todas as janelas "
+                    "dele e clique em “Abrir as próximas” outra vez."}
 
 
 def fechar_terminadas(pid: str, cfg: Optional[Dict[str, Any]] = None, espera_s: float = 0) -> Dict[str, Any]:
@@ -177,7 +238,7 @@ def proximas(perguntas: List[Dict[str, Any]], enviadas: Dict[str, List[str]], qu
     return fila[:max(1, min(10, int(quantas or 5)))]
 
 
-def script(site: str = "http://localhost:5050", versao: str = "2.4.0") -> str:
+def script(site: str = "http://localhost:5050", versao: str = "2.5.2") -> str:  # 2.5.x = 📰 modo pesquisa (v84_165/166)
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "navegador_imagens.user.js")
     with open(caminho, encoding="utf-8") as fh:
         return fh.read().replace("__VERSAO__", versao).replace("__SITE__", site.rstrip("/"))
@@ -265,16 +326,20 @@ Se não abrir: no ícone da extensão → <b>Criar/Adicionar novo script</b>, ap
                                 "msg": "Nenhuma pergunta pendente (todas com foto, puladas, sem imagem boa ou já abertas)."})
             urls = [url_google(termo_da(q), destino(_site(), pid, q["id"], rotulo=q.get("pergunta") or "")) for q in escolhidas]
             r = abrir(base_dir, urls, cfg, chaves=[q["id"] for q in escolhidas], pid=pid)
-            if r.get("ok") or c.get("sem_navegador"):
-                for q in escolhidas:
+            # v84_164: só conta como aberta a guia que o navegador confirmou (as outras ficam na fila)
+            conf = set(range(len(escolhidas))) if c.get("sem_navegador") else set(r.get("confirmadas") or [])
+            for k, q in enumerate(escolhidas):
+                if k in conf:
                     q["guia"] = "aberta"
+            escolhidas = [q for k, q in enumerate(escolhidas) if k in conf] or escolhidas[:0]
             ds.salvar(base_dir, p)
-        if not r.get("ok"):
+        if not r.get("ok") and not c.get("sem_navegador"):
             return jsonify({"ok": False, "erro": r.get("erro"), "urls": urls}), 400
         faltam = sum(1 for q in qs if not q.get("pulada") and not enviadas.get(q["id"]) and q.get("guia") != "aberta")
         return jsonify({"ok": True, "abertas": len(escolhidas), "navegador": r.get("navegador"), "faltam": faltam,
                         "ids": [q["id"] for q in escolhidas], "fechadas": len(troca["fechadas"]), "mantidas": troca["mantidas"],
-                        "controle": r.get("controle"), "aviso": r.get("aviso") or ""})
+                        "controle": r.get("controle"), "aviso": ((r.get("aviso") or "") + (" · o navegador do site travou e foi reiniciado"
+                                                                  if r.get("reiniciou") else "")).strip(" ·")})
 
     @app.route("/navegador-imagens/fechar", methods=["POST"])
     def navegador_imagens_fechar():

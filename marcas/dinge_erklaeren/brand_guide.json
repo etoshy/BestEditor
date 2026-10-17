@@ -1,0 +1,442 @@
+{
+  "schema": "channel_visual_identity_spec",
+  "schema_version": "1.0.0",
+  "project": {
+    "name": "Dinge erklären",
+    "name_language": "de-DE",
+    "literal_meaning_pt_br": "Explicar coisas / Explicando coisas",
+    "channel_language": "German (de-DE)",
+    "platform_primary": "YouTube",
+    "content_category": "Curiosidades explicadas, conhecimento, fenômenos incomuns",
+    "brand_slogan_de": "Die Welt ist seltsamer, als du denkst.",
+    "brand_slogan_pt_br": "O mundo é mais estranho do que você pensa.",
+    "brand_promise_de": "Wir erklären überraschende Dinge verständlich und zeigen, was dahintersteckt.",
+    "brand_promise_pt_br": "Explicar coisas surpreendentes de forma compreensível e revelar o que existe por trás delas.",
+    "positioning": "Um canal de curiosidades e explicações com atmosfera de arquivo antigo, humor estranho e estética de documentário vintage. O conteúdo deve ser intrigante e acessível, não um canal de terror puro.",
+    "personality_keywords": [
+      "curioso",
+      "estranho",
+      "inteligente",
+      "investigativo",
+      "irreverente",
+      "cinematográfico",
+      "acessível"
+    ],
+    "audience": "Público germanófono interessado em curiosidades, ciência, história, psicologia, natureza, tecnologia e fenômenos inexplicados.",
+    "editorial_pillars": [
+      {
+        "name": "Wissen & Wissenschaft",
+        "description": "Ciência, espaço, corpo humano, tecnologia e fenômenos naturais."
+      },
+      {
+        "name": "Geschichte & Archäologie",
+        "description": "Mistérios históricos, civilizações, artefatos e contextos do passado."
+      },
+      {
+        "name": "Psychologie & Alltag",
+        "description": "Comportamento, sonhos, memória, percepções e perguntas do cotidiano."
+      },
+      {
+        "name": "Kuriose Phänomene",
+        "description": "Fatos incomuns, perguntas contraintuitivas e fenômenos pouco conhecidos."
+      },
+      {
+        "name": "Natur & unerforschte Orte",
+        "description": "Oceano profundo, animais, lugares extremos e ecossistemas intrigantes."
+      }
+    ],
+    "editorial_rule": "Cada vídeo deve começar com uma pergunta ou fato intrigante e entregar uma explicação clara, sem promessas falsas, sensacionalismo enganoso ou mistério artificial."
+  },
+  "design_system": {
+    "visual_concept": "Vintage noir curiosity archive: colagem editorial em preto, creme e vermelho, cartoon de mascote tipo rubber-hose, papel envelhecido, película arranhada, gravura antiga, mapas, diagramas e objetos associados ao tema.",
+    "palette": [
+      {
+        "token": "ink_black",
+        "hex": "#080807",
+        "role": "Fundo principal, áreas negativas e base das thumbnails",
+        "share_guideline": "40–55%"
+      },
+      {
+        "token": "charcoal",
+        "hex": "#211E1B",
+        "role": "Painéis, sombras, papel escuro e profundidade",
+        "share_guideline": "15–25%"
+      },
+      {
+        "token": "archive_gray",
+        "hex": "#77716A",
+        "role": "Fotografias monocromáticas, objetos e textura",
+        "share_guideline": "10–20%"
+      },
+      {
+        "token": "aged_paper",
+        "hex": "#E8DDC5",
+        "role": "Mascote, manchetes principais e recortes de papel",
+        "share_guideline": "15–25%"
+      },
+      {
+        "token": "chalk_white",
+        "hex": "#F3EBDD",
+        "role": "Pequenos realces e áreas de maior contraste",
+        "share_guideline": "0–5%"
+      },
+      {
+        "token": "signal_red",
+        "hex": "#C51F27",
+        "role": "Palavra-chave, círculo atrás do mascote, setas e pontos de atenção",
+        "share_guideline": "8–12%"
+      },
+      {
+        "token": "deep_red",
+        "hex": "#74171B",
+        "role": "Sombras vermelhas, manchas e vermelho envelhecido",
+        "share_guideline": "0–5%"
+      }
+    ],
+    "palette_rules": [
+      "Usar somente preto, carvão, tons de cinza, creme envelhecido e vermelho escuro como cores dominantes.",
+      "O vermelho é uma cor de sinalização, não deve preencher toda a imagem.",
+      "Imagens internas devem ser monocromáticas ou dessaturadas, com detalhes vermelhos seletivos.",
+      "Não introduzir azul elétrico, verde, roxo, amarelo vivo, gradientes arco-íris ou cores saturadas fora da paleta.",
+      "Para imagens geradas por IA, descrever explicitamente a paleta e adicionar uma instrução negativa para cores fora dela."
+    ],
+    "typography": {
+      "headline_style": "Serif slab pesada, editorial, ligeiramente condensada e desgastada; aparência de cartaz antigo ou título impresso por tipo móvel.",
+      "headline_font_suggestions": [
+        "Roboto Slab ExtraBold",
+        "Arvo Bold",
+        "Rockwell-style slab serif"
+      ],
+      "secondary_style": "Sans-serif condensada ou máquina de escrever para etiquetas, datas, pequenas notas e rótulos.",
+      "secondary_font_suggestions": [
+        "Roboto Condensed",
+        "Special Elite-style typewriter"
+      ],
+      "usage": "Dinge normalmente em creme; erklären em vermelho. Sublinhado de pincel vermelho pode ser usado como assinatura.",
+      "font_note": "As fontes são referências visuais aproximadas; não são afirmação de que a arte existente foi feita com essas fontes.",
+      "text_generation_rule": "Para máxima legibilidade, peça à IA uma imagem sem texto e aplique títulos em alemão posteriormente no editor. Não dependa da IA de imagem para escrever palavras corretamente."
+    },
+    "texture_and_materials": [
+      "grão de película analógica",
+      "riscos e poeira de filme",
+      "papel de arquivo amarelado",
+      "recortes rasgados",
+      "tinta de impressão falhada",
+      "colagem editorial",
+      "fotografias antigas em preto e branco",
+      "rabiscos vermelhos à mão",
+      "diagramas de astronomia e anatomia",
+      "mapas e manuscritos envelhecidos"
+    ],
+    "lighting": "Luz de alto contraste, vinheta escura, realces em creme e um brilho vermelho discreto; evitar aparência 3D polida.",
+    "composition": {
+      "general": "Composição editorial em camadas; assunto principal imediatamente reconhecível; fundo de colagem denso nas bordas e área central mais limpa para o foco.",
+      "thumbnail": "Um assunto visual grande, mascote com reação clara, uma pista visual ligada ao tema e 2–5 palavras em alemão adicionadas na pós-produção.",
+      "video_still": "Formato horizontal 16:9, um foco visual por quadro, variação de plano aberto, médio e detalhe; usar o vermelho para guiar o olhar.",
+      "logo": "Mascote e nome em creme/vermelho sobre preto; preservar leitura em tamanho pequeno.",
+      "youtube_banner_safe_area": "Manter nome e mascote principal na zona central segura. Elementos decorativos podem chegar às bordas.",
+      "negative_space": "Deixar espaço de respiro em torno do ponto focal; não preencher cada centímetro com objetos."
+    }
+  },
+  "mascot": {
+    "role": "Personagem-assinatura do canal, apresentador visual e guia curioso que observa, aponta, investiga ou reage aos fatos.",
+    "canonical_reference_files": [
+      "assets/mascote_referencia_original.png",
+      "assets/painel_identidade_visual.png",
+      "assets/logo_avatar_circular.png",
+      "assets/logo_mascote_wordmark.png"
+    ],
+    "design_bible": {
+      "type": "Criatura-cartoon fantasmagórica e elástica com estética de animação antiga rubber-hose.",
+      "silhouette": "Corpo claro, esguio e sinuoso; cabeça/parte superior arredondada parcialmente integrada ao corpo; braços longos e flexíveis; pernas finas e pés simples ligeiramente grandes.",
+      "face": "Dois olhos ovais pretos grandes e simples; expressão lida principalmente pela inclinação do corpo, direção dos olhos e pose.",
+      "body_color": "Creme de papel envelhecido #E8DDC5, nunca branco puro brilhante.",
+      "outline": "Contorno preto ou carvão, desenho de tinta manual com pequenas imperfeições.",
+      "surface": "Leve desgaste de impressão e speckles no próprio personagem, sem destruir a leitura da silhueta.",
+      "personality": "Curioso, expressivo, ligeiramente desajeitado, misterioso sem ser assustador demais; transmite descoberta e humor seco.",
+      "canonical_pose": "Inclinado para a frente, um braço comprido estendido ou apontando, tronco curvo e olhos atentos.",
+      "allowed_variations": [
+        "apontando para uma pista",
+        "segurando uma lupa",
+        "lendo um livro",
+        "olhando para cima",
+        "surpreso com um objeto",
+        "explicando com um gesto",
+        "investigando uma fotografia",
+        "observando uma esfera, fóssil ou diagrama"
+      ],
+      "invariants": [
+        "mesma criatura e mesma silhueta geral",
+        "olhos ovais pretos",
+        "corpo creme envelhecido",
+        "contorno preto irregular",
+        "membros alongados e flexíveis",
+        "estética 2D de desenho antigo",
+        "sem roupas permanentes ou acessórios que alterem a identidade base"
+      ],
+      "never_change": [
+        "não transformar em humano realista",
+        "não transformar em fantasma infantil fofo de 3D",
+        "não adicionar cabelo, roupas, nariz detalhado, dentes ou dedos realistas",
+        "não mudar a cor da pele/corpo para azul, verde ou roxo",
+        "não aumentar a musculatura ou alterar a proporção para um personagem robusto",
+        "não criar vários mascotes diferentes na mesma imagem"
+      ]
+    },
+    "consistency_protocol": [
+      "Sempre anexar a referência original do mascote e o painel de identidade visual à geração quando o sistema aceitar imagens de referência.",
+      "Criar e aprovar primeiro uma folha mestra do personagem: frente, perfil, três quartos, silhueta e pelo menos seis expressões/poses. Usar essa folha mestra como referência canônica em trabalhos seguintes.",
+      "Manter fixos o mesmo modelo, versão, preset de estilo, aspect ratio e parâmetros de referência sempre que possível; registrar seed quando o sistema oferecer suporte.",
+      "Usar image-to-image, character reference, IP-Adapter, ControlNet ou ferramenta equivalente se disponível. A descrição textual isolada não garante consistência perfeita.",
+      "Quando houver muitas imagens recorrentes e ferramentas compatíveis, considerar treinar um LoRA/personagem com um conjunto selecionado de imagens consistentes e licenciadas/geradas para esse fim.",
+      "Não treinar nem usar imagens inconsistentes na folha mestra. Corrigir a referência antes de gerar dezenas de cenas.",
+      "Variações de pose e ação são permitidas; a anatomia, os olhos, o contorno, a cor e a linguagem de desenho devem permanecer estáveis.",
+      "Usar o mascote como camada separada quando possível: gerar cenário e personagem separadamente pode facilitar correções e composição."
+    ],
+    "prompt_lock_en": "Use the same recurring mascot from the supplied reference images: a peculiar vintage 2D rubber-hose ghost-like creature, slim curved cream-colored body, two large black oval eyes, elongated flexible arms and legs, simple oversized feet, hand-inked dark outline, subtle aged-paper speckles. Preserve the exact silhouette, facial simplicity, body proportions, cream color and imperfect black linework. Only change pose, gaze and interaction with the scene. No clothes, no new facial features, no realistic human anatomy, no 3D redesign.",
+    "negative_prompt_en": "different character, inconsistent anatomy, blue skin, green skin, purple skin, bright white glossy body, realistic human, detailed fingers, teeth, hair, clothing, 3D render, glossy toy, anime style, modern vector mascot, different eye shape, extra arms, extra legs, duplicate mascot, chibi proportions, cute baby ghost"
+  },
+  "generation_system": {
+    "purpose": "Especificação para construir um fluxo reutilizável de geração de imagens para vídeos do canal, com consistência de marca e do mascote.",
+    "generation_principles": [
+      "Separar a geração visual da renderização de texto: gerar imagens limpas e colocar títulos, legendas e rótulos depois.",
+      "Usar a mesma imagem de referência, prompt base, paleta, proporção e modelo para cada série de cenas.",
+      "Cada imagem deve reforçar a pergunta do vídeo e acrescentar informação visual; evitar imagens bonitas mas genéricas sem ligação com a narração.",
+      "Manter contraste suficiente para o sujeito ser entendido em tela pequena.",
+      "A estética é documental, vintage e curiosa; não deve ficar excessivamente sangrenta ou virar horror gratuito.",
+      "A cor dos objetos reais pode ser reinterpretada em monocromia/tons de arquivo; apenas detalhes selecionados recebem vermelho.",
+      "Não colocar logotipo repetido automaticamente em todas as imagens. Adicionar branding como camada de edição quando fizer sentido."
+    ],
+    "style_lock_en": "Vintage noir curiosity-documentary collage, distressed archival print, black and charcoal paper, aged ivory/cream, grayscale historical photography, analog film grain, scratches, dust, torn paper edges, imperfect screen-print ink, old books and diagrams, hand-drawn red annotations, deep crimson accents, dramatic chiaroscuro, editorial composition, tactile paper texture, high contrast, slightly surreal but informative, visually coherent with a retro mystery-knowledge YouTube channel. Restricted palette only: near-black, charcoal, grayscale, aged cream and deep red. No modern glossy finish.",
+    "negative_prompt_global_en": "bright saturated colors, cyan, electric blue, green, purple, rainbow palette, glossy 3D, plastic CGI, clean corporate vector art, pastel cute illustration, futuristic neon UI, cyberpunk, smooth gradient background, excessive lens flare, oversaturated photo, bright orange, excessive gore, random illegible text, misspelled words, watermark, unrelated logo, duplicate objects, cluttered focal point, low contrast subject, different mascot design",
+    "base_prompt_template_en": "Create a 16:9 visual for a German curiosity-explainer documentary. SUBJECT: [specific subject/action from the narration]. VISUAL QUESTION: [the question the frame should make viewers ask]. COMPOSITION: [foreground, midground, background, camera angle and clear focal point]. MASCOT: [include the recurring mascot using the supplied mascot reference and the character lock; if not needed, write 'no mascot in this frame']. BRAND STYLE: [insert style_lock_en]. COLOR LIMIT: near-black #080807, charcoal #211E1B, archive gray #77716A, aged paper cream #E8DDC5, chalk white #F3EBDD and signal red #C51F27 only; mostly monochrome with small red accents. TEXT: no generated lettering, no captions, no labels, no logos. OUTPUT: cinematic 16:9 composition, clear focal point, detailed but not cluttered, suitable for a documentary video frame.",
+    "thumbnail_prompt_template_en": "Create a high-contrast YouTube thumbnail background for the German channel 'Dinge erklären'. Topic: [topic]. Visual hook: [one surprising object, contrast or phenomenon]. Use one dominant subject, the recurring mascot from supplied reference images reacting to or pointing at the subject, a black/charcoal archival collage background, aged cream highlights, deep red annotation or circular accent, rough vintage print grain, torn paper and cinematic lighting. Keep the main subject and empty headline area readable at small size. Restricted palette only: black, charcoal, gray, aged cream and deep red. Do not generate text or logos; leave a clean area for 2–5 words in German to be added in editing. Avoid small busy details, random letters and modern glossy effects.",
+    "scene_prompt_template_en": "Documentary still about [specific narration beat], showing [one concrete visual metaphor or factual object]. Vintage black-and-cream archival collage with distressed analog film texture, realistic source imagery converted to grayscale, selective crimson red markings, dark vignette and tactile paper. If the mascot appears, use the supplied reference and preserve the canonical creature design exactly; give it the action [pose/action]. No text, no watermark, no new color palette. 16:9 wide frame.",
+    "recommended_pipeline": [
+      {
+        "step": 1,
+        "name": "Interpretar a narração",
+        "action": "Dividir a narração em batidas visuais. Para cada batida guardar timestamp, ideia central, emoção, objeto/fenômeno e função no argumento."
+      },
+      {
+        "step": 2,
+        "name": "Escolher tipo de imagem",
+        "action": "Classificar cada batida como arquivo/fotografia monocromática, ilustração explicativa, close-up simbólico, ambiente, gráfico/diagrama ou cena com mascote."
+      },
+      {
+        "step": 3,
+        "name": "Montar prompt",
+        "action": "Combinar base_prompt_template_en + style_lock_en + mascot.prompt_lock_en quando o personagem aparecer + negative prompts."
+      },
+      {
+        "step": 4,
+        "name": "Anexar referências",
+        "action": "Anexar painel de identidade visual e mascote original. Para logo e banner, anexar também o arquivo final relevante. Preferir referências visuais em vez de depender só de texto."
+      },
+      {
+        "step": 5,
+        "name": "Gerar e escolher",
+        "action": "Gerar alternativas, selecionar a melhor composição e verificar sujeito, paleta, anatomia do mascote e relevância para a narração."
+      },
+      {
+        "step": 6,
+        "name": "Aplicar correções",
+        "action": "Se o mascote sair diferente, regenerar usando a imagem aprovada como referência; se a paleta desviar, reduzir saturação e aplicar grading monocromático com vermelho seletivo."
+      },
+      {
+        "step": 7,
+        "name": "Adicionar texto e gráficos",
+        "action": "Compor em pós-produção os títulos alemães, setas, caixas, círculos, sublinhados, datas e diagramas para garantir ortografia e consistência."
+      },
+      {
+        "step": 8,
+        "name": "QA visual",
+        "action": "Verificar legibilidade em tamanho pequeno, ausência de cores fora da paleta, continuidade do mascote, ausência de texto aleatório e relação clara com a narração."
+      },
+      {
+        "step": 9,
+        "name": "Exportar",
+        "action": "Exportar 16:9 para cenas de vídeo, 1280x720 para thumbnails e proporções específicas para Shorts quando solicitado. Manter masters sem texto quando útil para reutilização."
+      }
+    ],
+    "consistency_metadata_to_log": [
+      "model_name",
+      "model_version",
+      "seed_if_supported",
+      "prompt_version",
+      "style_lock_version",
+      "mascot_reference_files",
+      "reference_strength_if_supported",
+      "aspect_ratio",
+      "palette_version",
+      "postprocess_preset",
+      "approved_or_rejected",
+      "reason_for_rejection"
+    ],
+    "quality_checklist": [
+      "O assunto da imagem reflete o trecho da narração?",
+      "O mascote mantém olhos ovais pretos, corpo creme, membros alongados e contorno escuro?",
+      "As únicas cores dominantes são preto, carvão, cinza, creme e vermelho?",
+      "O foco principal é entendível em menos de dois segundos?",
+      "O contraste permanece claro em tela pequena?",
+      "Não há texto inventado ou pseudo-letras dentro da imagem?",
+      "A imagem tem espaço para os elementos de edição necessários?",
+      "A estética combina com o painel e com as peças oficiais incluídas em assets/?"
+    ]
+  },
+  "visual_examples": [
+    {
+      "id": "history_pyramids",
+      "topic_de": "Wie wurden die Pyramiden gebaut?",
+      "topic_pt_br": "Como as pirâmides foram construídas?",
+      "visual_hook": "Pirâmide monumental, trabalhadores em silhueta e um esquema de rampa desenhado em vermelho.",
+      "prompt_en": "A monumental ancient Egyptian pyramid under construction, workers as small grayscale silhouettes for scale, enormous limestone blocks in the foreground, a hand-drawn red ramp diagram and red arrows over an archival map, the recurring cream rubber-hose mascot examining a stone block with a magnifying glass. Vintage archaeological documentary collage, torn parchment, black-and-cream photography, distressed film grain, black charcoal background, selective deep red accents only, clear central focal point, no text or labels, 16:9.",
+      "headline_overlay_de": "WIE BAUTEN SIE DAS?",
+      "notes": "Verificar precisão histórica; usar setas e rótulos como sobreposição após a geração."
+    },
+    {
+      "id": "psychology_dreams",
+      "topic_de": "Warum träumen wir?",
+      "topic_pt_br": "Por que sonhamos?",
+      "visual_hook": "Olho humano em preto e branco, lua, fragmentos de memória e o mascote olhando para uma nuvem de imagens.",
+      "prompt_en": "Surreal editorial collage about human dreaming: a large grayscale close-up eye, a crescent moon, scattered archival photographs and faint anatomical brain engraving, with the recurring cream rubber-hose mascot looking upward at floating memory fragments. Deep black paper background, aged cream cutouts, charcoal gray photographs, tiny crimson question-mark brush marks, vintage print distress and analog film grain, strong focal hierarchy, no readable text, no neon, 16:9.",
+      "headline_overlay_de": "WARUM TRÄUMEN WIR?",
+      "notes": "Evitar representar uma interpretação especulativa como se fosse consenso científico."
+    },
+    {
+      "id": "deep_sea",
+      "topic_de": "Was lebt in der Tiefsee?",
+      "topic_pt_br": "O que vive no fundo do mar?",
+      "visual_hook": "Criatura marinha estranha emergindo da escuridão, escala humana mínima e feixe de luz com marcação vermelha.",
+      "prompt_en": "A mysterious deep-ocean scene rendered as a monochrome archival scientific photograph collage: an unusual deep-sea fish emerging from black water, faint pressure-depth diagram and submarine light beam, the recurring cream rubber-hose mascot peering over the edge of a research submersible window. Near-black and charcoal dominate, aged cream highlights, only small crimson red marks on hand-drawn depth annotations, tactile old-paper texture, cinematic suspense without horror gore, no text, 16:9.",
+      "headline_overlay_de": "WAS LEBT IN DER TIEFSEE?",
+      "notes": "As espécies ilustradas devem corresponder ao conteúdo factual do vídeo."
+    },
+    {
+      "id": "space_question",
+      "topic_de": "Warum ist das Weltall so dunkel?",
+      "topic_pt_br": "Por que o espaço é tão escuro?",
+      "visual_hook": "Fundo quase preto, planeta em escala, gravura científica e um pequeno feixe vermelho destacando o fenômeno.",
+      "prompt_en": "Vintage astronomy archive collage about the darkness of space: a grayscale planet, sparse stars, an old astronomical diagram, black paper void and cream etched orbital lines; the recurring rubber-hose mascot tilts its head toward the horizon, pointing at a tiny deep-red annotation. Monochrome engraved imagery, distressed book-page texture, film grain, high contrast, restrained composition, no colorful nebula, no generated text, 16:9.",
+      "headline_overlay_de": "WARUM IST ES SO DUNKEL?",
+      "notes": "Não encher o quadro com nebulosas coloridas; preservar a sensação de vazio."
+    },
+    {
+      "id": "everyday_science",
+      "topic_de": "Warum bekommen wir Gänsehaut?",
+      "topic_pt_br": "Por que ficamos arrepiados?",
+      "visual_hook": "Close-up de pele arrepiada, desenho anatômico antigo e o mascote reagindo com curiosidade.",
+      "prompt_en": "Close-up grayscale archival macro photograph of goosebumps on human skin beside a vintage hand-inked skin follicle diagram, the cream rubber-hose mascot inspecting the skin with a tiny magnifying glass. Dark charcoal background, aged ivory paper fragments, one deep-red hand-drawn arrow, distressed screen-print grain and subtle film scratches, factual educational editorial mood, no gore, no text, 16:9.",
+      "headline_overlay_de": "WARUM GÄNSEHAUT?",
+      "notes": "Manter o corpo humano representado de maneira neutra e educativa."
+    },
+    {
+      "id": "history_object_mystery",
+      "topic_de": "Ein Gegenstand, den niemand erklären kann",
+      "topic_pt_br": "Um objeto que ninguém consegue explicar",
+      "visual_hook": "Artefato arqueológico sobre mesa escura, fotografia de arquivo, régua de escala e anotações vermelhas.",
+      "prompt_en": "An unusual archaeological artifact placed on a dark evidence table, surrounded by grayscale archival photos, a measuring ruler, torn handwritten notes and a vintage museum catalogue image. The recurring cream rubber-hose mascot leans forward and points at one strange detail. Near-black, charcoal, aged cream and limited deep red only, gritty archival documentary collage, scratches and dust, no fake lettering, no invented logos, 16:9.",
+      "headline_overlay_de": "WAS IST DAS?",
+      "notes": "Quando o caso real não for um mistério resolvido, deixar a incerteza clara na narração e no título."
+    }
+  ],
+  "templates_and_formats": {
+    "youtube_channel_art": {
+      "size_px": "2560x1440",
+      "format": "JPG recomendado; PNG para arquivo master",
+      "rule": "Nome e mascote devem continuar legíveis dentro da região segura central; detalhes periféricos podem ser cortados em televisores ou móveis."
+    },
+    "youtube_thumbnail": {
+      "size_px": "1280x720",
+      "aspect_ratio": "16:9",
+      "rule": "Um foco principal, contraste alto, poucas palavras em alemão adicionadas em pós-produção, vermelho reservado para a pista ou palavra-chave."
+    },
+    "video_scene": {
+      "size_px": "1920x1080 ou maior em 16:9",
+      "rule": "Sem texto gerado; produzir masters limpos para reutilização e adicionar gráficos na edição."
+    },
+    "video_watermark": {
+      "size_px": "150x150 para upload no YouTube; guardar 512x512 como master",
+      "format": "PNG",
+      "rule": "Verificar leitura real em tamanho pequeno; se o lettering ficar ilegível, criar uma variante só com o mascote/símbolo."
+    },
+    "profile_avatar": {
+      "format": "PNG/JPG quadrado",
+      "rule": "Usar versão circular do mascote e wordmark; garantir que rosto e nome sobrevivam ao recorte circular."
+    },
+    "shorts": {
+      "aspect_ratio": "9:16",
+      "rule": "Manter o foco no centro vertical, reduzir elementos periféricos e não mudar a paleta ou o design do mascote."
+    }
+  },
+  "asset_manifest": [
+    {
+      "path": "assets/mascote_referencia_original.png",
+      "purpose": "Referência original fornecida pelo usuário para a forma do personagem; baixa resolução, usar em conjunto com referências maiores."
+    },
+    {
+      "path": "assets/painel_identidade_visual.png",
+      "purpose": "Moodboard principal com avatar, banner conceitual, poses, thumbnails, paleta, tipografia e texturas."
+    },
+    {
+      "path": "assets/logo_avatar_circular.png",
+      "purpose": "Logo/avatar circular gerado na conversa."
+    },
+    {
+      "path": "assets/logo_mascote_wordmark.png",
+      "purpose": "Referência adicional de logotipo horizontal com mascote e lettering."
+    },
+    {
+      "path": "assets/banner_youtube_2560x1440.jpg",
+      "purpose": "Banner final no tamanho recomendado para upload; versão compacta."
+    },
+    {
+      "path": "assets/banner_youtube_2560x1440.png",
+      "purpose": "Banner final PNG em alta qualidade."
+    },
+    {
+      "path": "assets/marca_dagua_150x150.png",
+      "purpose": "Marca-d'água de vídeo pronta para upload."
+    },
+    {
+      "path": "assets/marca_dagua_512x512.png",
+      "purpose": "Marca-d'água master em alta resolução."
+    },
+    {
+      "path": "assets/banner_conceito_horizontal.png",
+      "purpose": "Referência do conceito de banner horizontal e composição editorial."
+    }
+  ],
+  "handoff_instructions_for_another_ai": {
+    "first_message": "Leia todo o arquivo JSON e inspecione todas as imagens em assets/. Trate-as como referências visuais da marca, não como imagens aleatórias. Antes de gerar cenas em lote, crie uma folha mestra do mascote e um preset de estilo aprovável.",
+    "priority_order": [
+      "consistência do mascote",
+      "paleta de cores",
+      "clareza visual",
+      "relação com o conteúdo narrado",
+      "texturas decorativas"
+    ],
+    "do_not": [
+      "inventar uma nova paleta",
+      "redesenhar o mascote para cada cena",
+      "gerar títulos e legendas dentro das imagens",
+      "colocar logotipos aleatórios",
+      "transformar o canal em horror gore",
+      "saturar a imagem com detalhes que escondam o assunto"
+    ],
+    "expected_output_per_scene": {
+      "scene_id": "ID sequencial",
+      "narration_excerpt": "trecho usado para a imagem",
+      "visual_intent": "objetivo visual",
+      "prompt_final": "prompt integral usado",
+      "reference_assets": [
+        "arquivos anexados"
+      ],
+      "model_metadata": "modelo, versão, seed e parâmetros quando disponíveis",
+      "output_file": "caminho do arquivo gerado",
+      "qa_status": "approved/revise/reject",
+      "qa_notes": "motivo da avaliação"
+    },
+    "important_limit": "A especificação melhora a coerência, mas nenhuma combinação de prompt garante identidade perfeita em todo modelo. Use referências de imagem, folha mestra e revisão humana; considere uma ferramenta de referência de personagem ou LoRA quando disponível."
+  }
+}

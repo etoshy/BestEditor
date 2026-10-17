@@ -2,7 +2,7 @@
 // @name         Google Imagens - Capturar Links (tamanho original) + BestEditor
 // @namespace    https://github.com/rivans/google-img-links
 // @version      __VERSAO__
-// @description  Marca imagens no Google Imagens e captura o link da imagem em tamanho original. Aberta pelo site (🧲), manda os links direto pra pergunta/pessoa certa e fecha a guia.
+// @description  Marca imagens no Google Imagens e captura o link da imagem em tamanho original. Aberta pelo site (🧲), manda os links direto pra pergunta/pessoa certa e fecha a guia. No 📰 Buscador de casos: marca os resultados da busca normal/notícias e manda pro site.
 // @author       rivans
 // @match        https://www.google.com/search*
 // @match        https://www.google.com.br/search*
@@ -484,7 +484,7 @@
     const d = r.d || {}, m = d.mantidas || [];
     status(`✔ ${d.fechadas || 0} fechada(s) · ${d.abertas || 0} nova(s)` + (m.length ? ` · ${m.length} ficaram abertas (imagem marcada e não enviada${m.some((x) => x.estado === 'erro') ? ' ou com erro' : ''})` : '') + (d.msg ? ' · ' + d.msg : '') + (d.aviso ? ' · ⚠ ' + d.aviso : ''));
   }
-  setInterval(avisarEstado, 20000);
+  setInterval(() => { if (!(DEST && DEST.m === 'pesquisa')) avisarEstado(); }, 20000);
 
   // ===================== COPIAR / BAIXAR =====================
   // Tenta 3 jeitos de copiar, porque cada navegador/versão do Tampermonkey se comporta diferente
@@ -533,8 +533,158 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
+  // ===================== 📰 MODO PESQUISA (Buscador de casos e notícias, v84_165) =====================
+  // A guia foi aberta pelo 📰 Buscador (#bes com m:"pesquisa"): caixinha em cada resultado da busca normal ou da aba
+  // Notícias; "Enviar ao site" manda os marcados pra /pesquisas/<id>/resultados. Página 2, 3…: marca e envia de novo.
+  const MODO_PESQ = !!(DEST && DEST.m === 'pesquisa');
+  const pesqMarcados = new Set(), pesqEnviados = new Set();
+  let pesqStatus = null, pesqCont = null;
+  const pesqEl = (tag, attrs = {}, ...filhos) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k in e && typeof v !== 'string') e[k] = v; else e.setAttribute(k, v); }
+    filhos.forEach((f) => e.append(f));
+    return e;
+  };
+  function pesqLink(h) {
+    try {
+      const u = new URL(h, location.href);
+      // v84_167: o Google novo esconde o link num código (/goto?url=CAES…) — guarda e descobre o de verdade antes de enviar
+      if (/\.google\./.test(u.hostname) && u.pathname === '/goto' && u.searchParams.get('url')) return u.href;
+      if (/\.google\./.test(u.hostname) && (u.pathname === '/url' || u.pathname === '/imgres')) return u.searchParams.get('q') || u.searchParams.get('url') || '';
+      if (/(^|\.)google\.|gstatic\.com$|googleusercontent\.com$/.test(u.hostname)) return '';
+      return /^https?:$/.test(u.protocol) ? u.href : '';
+    } catch { return ''; }
+  }
+  // v84_166: acha pelo TÍTULO (h3 / heading / .LC20lb) em qualquer lugar da página e sobe/desce até o link —
+  // o Google muda a estrutura (link dentro do título, título fora do link, #rso ausente na página 2…)
+  function pesqLinkDoTitulo(t) {
+    let a = t.closest('a[href]');
+    if (!a) a = t.querySelector('a[href]');
+    for (let n = t.parentElement, k = 0; !a && n && k < 4; n = n.parentElement, k++) a = n.querySelector(':scope > a[href], :scope > * > a[href]');
+    return a;
+  }
+  function pesqItens() {
+    const vistos = new Set(), out = [];
+    document.querySelectorAll('h3, [role="heading"][aria-level="3"], .LC20lb, a[jsname="UWckNb"] [role="heading"], div.n0jPhd').forEach((tit) => {
+      if (tit.closest('#gcl-painel') || tit.querySelector('h3')) return;
+      const a = pesqLinkDoTitulo(tit);
+      if (!a) return;
+      const url = pesqLink(a.getAttribute('href'));
+      if (!url || vistos.has(url)) return;
+      vistos.add(url);
+      const bloco = a.closest('div.MjjYud, div.SoaBEf, div.g, div.Gx5Zad, div[data-hveid], div[data-ved]') || a.parentElement;
+      const txt = (sel) => { const x = bloco && bloco.querySelector(sel); return x ? x.textContent.replace(/\s+/g, ' ').trim() : ''; };
+      let fonte = txt('.VuuXrf, .MgUUmf, .NUnG9d, cite');
+      try { fonte = fonte || (/\/goto\?/.test(url) ? '' : new URL(url).hostname.replace(/^www\./, '')); } catch {}
+      out.push({ a, tit, bloco, url, titulo: tit.textContent.replace(/\s+/g, ' ').trim(), fonte, cite: txt('cite'),
+        trecho: txt('.VwiC3b, .GI74Re, [data-sncf], .ITZIwc, .UqSP2b, [style*="-webkit-line-clamp"]').slice(0, 400),
+        data: txt('.OSrXXb span, .LfVVr, .rbYSKb, .WG9SHc span').slice(0, 40) });
+    });
+    return out;
+  }
+  function pesqAtualizar() {
+    if (pesqCont) pesqCont.textContent = pesqMarcados.size;
+  }
+  // 🆘 se as caixinhas não aparecerem (o Google mudou a página): manda a página inteira e o site tira os links do HTML
+  async function pesqPaginaInteira() {
+    pesqStatus.textContent = '⬆ Mandando a página inteira pro site…';
+    const html = document.documentElement.outerHTML;
+    const r = await postar(`/pesquisas/${encodeURIComponent(DEST.p)}/colar`, { texto: html, pagina: pesqPagina() });
+    if (!r.ok) { pesqStatus.textContent = '⚠ ' + r.erro; return; }
+    const d = r.d || {};
+    pesqStatus.textContent = `✔ ${d.achados || 0} link(s) achados na página · ${d.novos || 0} novo(s) no site${d.repetidos ? ` · ${d.repetidos} já estavam` : ''}. No site dá pra desmarcar os que não servem.`;
+  }
+  function pesqCaixinhas() {
+    pesqItens().forEach((it) => {
+      if (it.tit.querySelector('.gcl-pchk') || (it.bloco && it.bloco.querySelector('.gcl-pchk[data-u="' + CSS.escape(it.url) + '"]'))) return;
+      const c = pesqEl('span', { class: 'gcl-pchk' + (pesqMarcados.has(it.url) ? ' on' : '') + (pesqEnviados.has(it.url) ? ' ok' : ''), title: 'marcar pra mandar ao site', 'data-u': it.url });
+      c.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (pesqMarcados.has(it.url)) pesqMarcados.delete(it.url); else pesqMarcados.add(it.url);
+        c.classList.toggle('on', pesqMarcados.has(it.url)); pesqAtualizar();
+      }, true);
+      it.tit.prepend(c);
+    });
+  }
+  function pesqPagina() { const s = +(new URLSearchParams(location.search).get('start') || 0); return String(Math.floor(s / 10) + 1); }
+  // /goto?url=… → o link de verdade (o navegador segue o redirecionamento como num clique; o site tenta de novo os que faltarem)
+  function pesqResolver(url) {
+    if (!/\/goto\?/.test(url) || !_gmx) return Promise.resolve(url);
+    const fora = (u) => { try { const h = new URL(u).hostname; return !/(^|\.)google\./.test(h) ? u : ''; } catch { return ''; } };
+    return new Promise((fim) => {
+      const tentar = (metodo) => _gmx({ method: metodo, url, timeout: 15000,
+        onload: (x) => {
+          const f = fora(x.finalUrl || '');
+          if (f) return fim(f);
+          const html = String(x.responseText || '');
+          const m = html.match(/http-equiv=["']?refresh["']?[^>]*?url=['"]?([^"'>\s]+)/i) || html.match(/location\.(?:replace|assign)\(\s*["']([^"']+)/) || html.match(/href="(https?:\/\/(?![a-z.]*google\.)[^"]+)"/);
+          if (m) return fim(fora(m[1].replace(/&amp;/g, '&')) || url);
+          if (metodo === 'HEAD') return tentar('GET');
+          fim(url);
+        },
+        onerror: () => (metodo === 'HEAD' ? tentar('GET') : fim(url)), ontimeout: () => fim(url) });
+      tentar('HEAD');
+    });
+  }
+  async function pesqEnviar(depois) {
+    const escolhidos = pesqItens().filter((it) => pesqMarcados.has(it.url) && !pesqEnviados.has(it.url));
+    const gotos = escolhidos.filter((it) => /\/goto\?/.test(it.url)).length;
+    if (gotos) pesqStatus.textContent = `🔗 descobrindo o link de verdade de ${gotos} resultado(s)…`;
+    const reais = await Promise.all(escolhidos.map((it) => pesqResolver(it.url)));
+    const itens = escolhidos.map((it, k) => ({ url: reais[k], titulo: it.titulo, fonte: it.fonte, trecho: it.trecho, data: it.data, cite: it.cite }));
+    if (!itens.length) { pesqStatus.textContent = pesqMarcados.size ? 'Os marcados já foram enviados.' : 'Marque os resultados na caixinha ☐.'; if (depois) depois(); return; }
+    pesqStatus.textContent = `⬆ Mandando ${itens.length}…`;
+    const r = await postar(`/pesquisas/${encodeURIComponent(DEST.p)}/resultados`, { itens, pagina: pesqPagina() });
+    if (!r.ok) { pesqStatus.textContent = '⚠ ' + r.erro; return; }
+    escolhidos.forEach((x) => pesqEnviados.add(x.url));
+    document.querySelectorAll('.gcl-pchk.on').forEach((c) => c.classList.add('ok'));
+    const d = r.d || {};
+    pesqStatus.textContent = `✔ ${d.novos ?? itens.length} novo(s) no site${d.repetidos ? ` · ${d.repetidos} já estavam` : ''} · total: ${d.total ?? '?'}`;
+    if (depois) setTimeout(depois, 500);
+  }
+  function pesqPainel() {
+    if (document.getElementById('gcl-painel')) return;
+    const p = pesqEl('div', { id: 'gcl-painel' },
+      pesqEl('div', { id: 'gcl-topo' }, pesqEl('b', {}, '📰 Enviar ao site'), pesqEl('button', { id: 'gcl-min', title: 'Minimizar' }, '–')),
+      pesqEl('div', { id: 'gcl-corpo' },
+        pesqEl('div', { id: 'gcl-dest' }, 'Para: ', pesqEl('b', {}, DEST.r || 'a pesquisa')),
+        pesqEl('button', { class: 'principal', id: 'gcl-penviar' }, 'Enviar ao site (', (pesqCont = pesqEl('span', {}, '0')), ')'),
+        pesqEl('div', { class: 'linha' }, pesqEl('button', { id: 'gcl-ptodos' }, 'Marcar todos'), pesqEl('button', { id: 'gcl-pnenhum' }, 'Desmarcar')),
+        pesqEl('div', { class: 'linha' }, pesqEl('button', { id: 'gcl-pprox', class: 'principal', style: 'background:#188038' }, 'Enviar e ir pra próxima página →')),
+        pesqEl('div', { class: 'linha' }, pesqEl('button', { id: 'gcl-pinteira', title: 'manda TODOS os resultados desta página (o site lê o HTML) — use se as caixinhas não aparecerem' }, '🆘 Mandar todos desta página')),
+        (pesqStatus = pesqEl('div', { id: 'gcl-status' }, 'Marque os resultados na caixinha ☐ (ou Marcar todos) e envie.'))));
+    document.body.appendChild(p);
+    p.querySelector('#gcl-min').onclick = () => p.classList.toggle('min');
+    p.querySelector('#gcl-penviar').onclick = () => pesqEnviar();
+    p.querySelector('#gcl-pinteira').onclick = () => pesqPaginaInteira();
+    p.querySelector('#gcl-ptodos').onclick = () => { pesqItens().forEach((it) => pesqMarcados.add(it.url)); document.querySelectorAll('.gcl-pchk').forEach((c) => c.classList.add('on')); pesqAtualizar(); };
+    p.querySelector('#gcl-pnenhum').onclick = () => { pesqMarcados.clear(); document.querySelectorAll('.gcl-pchk').forEach((c) => c.classList.remove('on')); pesqAtualizar(); };
+    p.querySelector('#gcl-pprox').onclick = () => pesqEnviar(() => {
+      const prox = document.querySelector('#pnnext, a[aria-label="Next page"], a[aria-label="Próxima página"]');
+      if (prox) location.href = prox.href;
+      else { const u = new URL(location.href); u.searchParams.set('start', String((+u.searchParams.get('start') || 0) + 10)); location.href = u.href; }
+    });
+  }
+  const _cssPesq = `
+    .gcl-pchk { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-right:8px; vertical-align:middle;
+      border:2px solid #1a73e8; border-radius:6px; background:#fff; cursor:pointer; font:bold 14px/1 Arial,sans-serif; color:#fff; flex:none; }
+    .gcl-pchk.on { background:#1a73e8; } .gcl-pchk.on::after { content:'✓'; }
+    .gcl-pchk.ok { background:#188038; border-color:#188038; }
+  `;
+  function pesqIniciar() {
+    if (!document.body) return false;
+    try { GM_addStyle(_cssPesq); } catch { const st = document.createElement('style'); st.textContent = _cssPesq; (document.head || document.documentElement).appendChild(st); }
+    pesqPainel();
+    pesqCaixinhas();
+    setTimeout(() => { const n = pesqItens().length;
+      if (pesqStatus && !pesqMarcados.size) pesqStatus.textContent = n ? `${n} resultado(s) nesta página — marque na caixinha ☐ (ou Marcar todos) e envie.`
+        : 'Não achei os resultados nesta página (o Google mudou o layout?) — use 🆘 Mandar todos desta página.'; }, 1500);
+    return true;
+  }
+
   // ===================== INICIALIZAÇÃO =====================
   function iniciar() {
+    if (MODO_PESQ) { if (!document.getElementById('gcl-painel')) pesqIniciar(); else pesqCaixinhas(); return true; }
     if (!document.body || !document.querySelector(SEL.tile)) return false;
     criarPainel();
     adicionarCaixinhas();

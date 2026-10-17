@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Identidade visual{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 900px; }
+  .mv-card { border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .mv-hint { color: var(--mudo); font-size: .86rem; }
+  .mv-item { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 10px; color: inherit; text-decoration: none; margin-top: 8px; }
+  .mv-item:hover { border-color: var(--acento); text-decoration: none; }
+</style>
+<h1>🎨 Identidade visual</h1>
+<p class="mv-hint">Canais em que <b>todas as imagens são geradas por IA</b> seguindo um Brand Kit (o JSON da marca + as imagens de referência): folha mestra do mascote, prompts travados, paleta conferida e os textos postos depois.</p>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+<div class="mv-card">
+  <h2>Marcas</h2>
+  {% for x in marcas %}
+  <a class="mv-item" href="{{ url_for('marca_detalhe', slug=x.slug) }}"><b style="flex:1">{{ x.nome }}</b><small class="mv-hint">{{ x.slogan }} · {{ x.idioma }}{% if x.folha_aprovada %} · ✅ folha mestra aprovada{% endif %}</small></a>
+  {% else %}<p class="mv-hint">Nenhuma marca ainda.</p>{% endfor %}
+</div>
+<div class="mv-card">
+  <h2>Importar um Brand Kit (.zip)</h2>
+  <form method="post" action="{{ url_for('marca_importar') }}" enctype="multipart/form-data">
+    <input type="file" name="zip" accept=".zip" required> <button type="submit">📥 Importar</button>
+  </form>
+  <p class="mv-hint">O .zip precisa ter o JSON com <code>"schema": "channel_visual_identity_spec"</code> e a pasta <code>assets/</code>. O JSON é guardado como está — ele é a especificação principal.</p>
+</div>
+{% endblock %}

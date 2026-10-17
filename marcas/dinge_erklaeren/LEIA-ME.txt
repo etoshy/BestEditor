@@ -1,0 +1,21 @@
+# Dinge erklären — pacote de identidade visual e geração de imagens
+
+Este pacote reúne o guia JSON e as referências visuais da identidade do canal.
+
+## Como passar para outra IA
+1. Envie o arquivo `Dinge_erklaeren_Brand_Guide.json` junto com a pasta `assets/` (é mais fácil enviar o ZIP inteiro).
+2. Peça à IA para ler o JSON e inspecionar as imagens de referência antes de gerar qualquer cena.
+3. Para manter o mascote, sempre anexe `assets/mascote_referencia_original.png` e `assets/painel_identidade_visual.png`; use também a folha mestra do personagem quando ela for criada.
+4. Gere primeiro uma folha mestra aprovada do mascote. Depois gere imagens por trecho da narração usando `style_lock_en`, `prompt_lock_en` e os templates do JSON.
+5. Gere as imagens sem texto e aplique manchetes em alemão na pós-produção para evitar erros de ortografia.
+6. Registre prompts e parâmetros em cada cena para permitir reprodução e correção.
+
+## Arquivos principais
+- `assets/painel_identidade_visual.png`: moodboard principal.
+- `assets/mascote_referencia_original.png`: imagem original do personagem.
+- `assets/logo_avatar_circular.png`: logotipo circular.
+- `assets/banner_youtube_2560x1440.jpg` e `.png`: banner final.
+- `assets/marca_dagua_150x150.png` e `assets/marca_dagua_512x512.png`: marca-d'água.
+
+## Nota de consistência
+A imagem original do mascote tem resolução pequena; use-a junto do moodboard e da arte de logo. Para resultados repetíveis, a próxima etapa ideal é criar uma folha mestra do personagem com poses e expressões consistentes e usá-la como referência visual persistente.
