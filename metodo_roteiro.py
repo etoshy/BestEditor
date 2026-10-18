@@ -504,14 +504,24 @@ def tirar_repeticoes(texto: str, janela: int = 3, limite: float = 0.72) -> Tuple
             if len(c) >= 5:
                 cs = set(c)
                 nums = set(re.findall(r"\d+", re.sub(r"\[[^\]]*\]", " ", f)))
-                for ant in ficam[-janela:]:
+                for j in range(max(0, len(ficam) - janela), len(ficam)):
+                    ant = ficam[j]
                     ca = set(_conteudo(ant))
                     nums_a = set(re.findall(r"\d+", re.sub(r"\[[^\]]*\]", " ", ant)))
-                    if nums != nums_a:  # números diferentes (1937 × 1970): é outra informação, não repetição
+                    if nums and nums_a and nums != nums_a:  # números diferentes (1937 × 1970): é outra informação
                         continue
                     if len(ca) >= 5 and len(cs & ca) / min(len(cs), len(ca)) >= limite:
                         repetida = True
+                        if len(cs - ca) >= 3:  # v84_179: a 2ª diz MAIS que a 1ª
+                            if not (nums_a - nums) and len(ca - cs) <= 1:  # e cobre tudo dela → fica só a 2ª
+                                tiradas.append(ant.strip())
+                                ficam[j] = f
+                            else:  # cada uma tem algo que a outra não tem (o ano numa, o sentido na outra): ficam as duas
+                                ficam.append(f)
+                            repetida = None
                         break
+            if repetida is None:
+                continue
             if repetida:
                 marcas = re.findall(r"\[\[?[^\]]+\]\]?", f)
                 if marcas and ficam:

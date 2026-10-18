@@ -25,7 +25,8 @@ CLICHES = ["Mas isso não é tudo", "Prepare-se", "uma história que vai te deix
 
 
 MODOS = {"auto": "🤖 automático (enxuga se passou do tempo)", "melhorar": "🪄 melhorar sem encurtar",
-         "enxugar": "✂️ enxugar até o tempo pedido", "titulo": "🧵 amarrar ao título (tese, pontes, fechamento)"}
+         "enxugar": "✂️ enxugar até o tempo pedido", "titulo": "🧵 amarrar ao título (tese, pontes, fechamento)",
+         "escopo": "🎯 tirar o que foge do título (assunto vizinho vira 1 frase + “outro vídeo”)"}
 
 
 def _palavras_titulo(titulo: str) -> List[str]:
@@ -75,10 +76,13 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
     enx = modo == "enxugar"
     cortar = max(0, n - alvo_palavras) if alvo_palavras else int(n * 0.2)
     fio = modo == "titulo"
+    esc = modo == "escopo"  # 🎯 v84_179
     titulo = " ".join(str(titulo or tema or "").split())[:200]
     max_trocas = max(15, min(60, n // 60)) if not enx else max(25, min(90, n // 50))
     if fio:
         max_trocas = max(20, min(70, n // 45))
+    if esc:
+        max_trocas = max(25, min(90, n // 45))
     L = [f"Você é o roteirista-chefe revisando o roteiro COMPLETO de um vídeo{(' sobre ' + tema) if tema else ''} (~{n} palavras, "
          f"em {idioma}). Ele foi escrito em partes; agora ele precisa soar como UM roteiro só, escrito com cuidado por uma "
          "pessoa — não como capítulos colados nem como texto genérico de IA.", ""]
@@ -87,7 +91,7 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
               foco.strip()[:1500],
               "Isto vem antes de tudo abaixo: faça as trocas que forem precisas pra cumprir o pedido (pode usar muitas), "
               "mesmo que isso mude a estrutura (abertura, transições, fechamento).", ""]
-    if titulo and not enx:
+    if titulo and not enx and not esc:
         L += [f"## 🧵 FIO CONDUTOR — o título é a promessa: “{titulo}”" + (" (FOCO DESTA REVISÃO)" if fio else ""),
               "O roteiro tem de entregar o que o título promete e amarrar TODOS os assuntos nele. Confira e conserte com trocas:",
               "A. ABERTURA: logo depois do gancho, a TESE do título com as palavras dele (ou bem perto) + 2-4 frases que mostram de "
@@ -100,6 +104,20 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
               "fatos), e termina com uma pergunta ao público ligada ao título. → troque o último parágrafo.",
               "E. Título exagerado (“o pior”, “o mais…”): trate como pergunta a investigar — sem inventar pra confirmar.",
               "F. Frase repetida (a mesma frase ou ideia dita de novo logo em seguida): apague a repetição (\"para\": \"\").", ""]
+    if esc:
+        L += [f"## 🎯 MODO ESCOPO — o vídeo cobre SÓ o necessário pra entender o título “{titulo}”",
+              "1. Primeiro decida (pra você): quais 3 a 6 passos a pessoa PRECISA entender pra responder o título. Esse é o vídeo.",
+              "2. Todo trecho que não serve a esses passos é ASSUNTO VIZINHO (outra época, outro objeto famoso, outra descoberta, "
+              "história paralela): apague o trecho inteiro (\"para\": \"\") — ou, se a falta dele deixaria um buraco, troque por "
+              "UMA frase simples que diga que isso terá um vídeo próprio (no idioma do roteiro; ex. em alemão: „Das ist eine "
+              "eigene Geschichte — darüber machen wir ein eigenes Video.“). No máximo 2 desses avisos no roteiro inteiro.",
+              "3. A mesma história contada em dois lugares (o mesmo evento, a mesma descoberta): fica UMA vez, no lugar mais forte.",
+              "4. Conceito complexo que É necessário e ficou difícil: troque por uma analogia do dia a dia + uma frase do mecanismo.",
+              "5. Costure: depois de um corte, a frase seguinte precisa continuar fazendo sentido (ajuste a ponte se precisar).",
+              "6. Saudação repetida no meio (“Willkommen zurück”), referência a outro episódio e fonte dita em voz alta (“so X in "
+              "ihrem Vortrag”) saem.",
+              "O roteiro vai ficar MAIS CURTO — tudo bem: é melhor 4 ideias bem entendidas que 9 de passagem"
+              + (f" (o vídeo pedido tem ~{alvo_palavras} palavras; agora tem {n})." if alvo_palavras else "."), ""]
     if enx:
         alvo_txt = f"~{alvo_palavras} palavras" + (f" (≈ {minutos:g} min de narração)" if minutos else "")
         L += ["## ✂️ MODO ENXUGAR — o roteiro está LONGO demais",
@@ -142,7 +160,10 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
           f"- Devolva no máximo {max_trocas} trocas, as que mais fazem diferença.",
           "- \"de\": um trecho COPIADO EXATAMENTE do roteiro (uma frase, poucas frases seguidas ou um parágrafo inteiro — mesma "
           "pontuação, mesmas aspas, mesmas maiúsculas) — o site procura esse texto e troca."]
-    if enx:
+    if esc:
+        L += ["- \"para\": \"\" (vazio) pra APAGAR o assunto vizinho, ou a frase curta que o substitui. Pode cortar parágrafos "
+              "inteiros (copie o parágrafo inteiro no \"de\"). Não corte o que a pergunta do título precisa."]
+    elif enx:
         L += ["- \"para\": a versão mais curta daquele trecho — ou \"\" (vazio) pra APAGAR o trecho inteiro. Some as palavras "
               f"cortadas: o total tem que chegar perto de {cortar}. Não corte fatos essenciais nem a distinção entre fato, "
               "alegação e interpretação; quando cortar uma conclusão sem fonte, troque por uma versão atribuída ou suavizada."]

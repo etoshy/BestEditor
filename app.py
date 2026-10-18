@@ -11084,7 +11084,7 @@ def _registrar_narracao_do_pod(item: dict, lote: dict, wav: str, segments: List[
     gv_id = uuid.uuid4().hex
     output_path = os.path.join(VOZES_DIR, f"{gv_id}.wav")
     shutil.copyfile(wav, output_path)
-    texto = item.get("texto") or ""
+    texto = item.get("texto_legenda") or item.get("texto") or ""  # 🎭 v84_180: várias vozes → a legenda sem as tags
     perfil = item.get("perfil") or ""
     status: Dict[str, Any] = {
         "running": False, "log": "🏭 Produção no pod: narrado e transcrito no pod.\n", "erro": None, "pronto": True,

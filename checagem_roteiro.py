@@ -184,7 +184,38 @@ def analisar(texto: str, tema: str = "", ignorar: Optional[set] = None) -> Dict[
 
     return {"paragrafos": len(pars), "repeticoes": repeticoes, "temas": temas, "formulas": formulas, "comecos": comecos,
             "fragmentos": fragmentos[:30], "n_fragmentos": len(fragmentos), "perguntas_fim": perguntas_fim,
-            "datas": datas_l, "numeros": nums_l}
+            "datas": datas_l, "numeros": nums_l, "frases_repetidas": frases_repetidas(texto)}
+
+
+def frases_repetidas(texto: str, limite: int = 10) -> List[Dict[str, Any]]:
+    """🔁 v84_179: a MESMA informação contada de novo noutra frase (mesmo parágrafo ou lá na frente) — ex.: o roteiro em
+    partes que conta a descoberta de 1987 no cap. 3 e de novo no cap. 5. Pega pela frase (não pelo parágrafo inteiro):
+    muitas palavras de conteúdo em comum + a mesma data/número (ou quase as mesmas palavras)."""
+    import metodo_roteiro as mr
+    todas = []
+    for n, t in paragrafos(texto):
+        for f in frases(t):
+            c = set(mr._conteudo(f))
+            if len(c) >= 5:
+                nums = {x for x in re.findall(r"\d{2,}", _sem_marcas(f))}
+                todas.append((n, f, c, nums))
+    out, usadas = [], set()
+    for i in range(len(todas)):
+        for j in range(i + 1, len(todas)):
+            na, fa, ca, ua = todas[i]
+            nb, fb, cb, ub = todas[j]
+            if i in usadas or j in usadas:
+                continue
+            if ua and ub and not (ua & ub):  # 1054 × 1572: outro acontecimento, não repetição
+                continue
+            nota = len(ca & cb) / min(len(ca), len(cb))
+            mesmo_num = bool(ua & ub)  # a mesma data/número nas duas
+            if (nota >= 0.6 and mesmo_num) or nota >= 0.8:
+                usadas.update((i, j))
+                out.append({"a": na, "b": nb, "frase_a": fa.strip()[:220], "frase_b": fb.strip()[:220], "nota": round(nota, 2)})
+                if len(out) >= limite:
+                    return out
+    return out
 
 
 _ANO = r"(1[5-9]\d\d|20[0-4]\d)"
@@ -237,6 +268,10 @@ def resumo_texto(a: Dict[str, Any], texto: str, estilo: bool = True) -> List[str
     for r in a.get("repeticoes") or []:
         L.append(f"- REPETIÇÃO: linha {r['a']} („{_trecho(pars.get(r['a'], ''), 8)}“) e linha {r['b']} („{_trecho(pars.get(r['b'], ''), 8)}“) "
                  f"contam a mesma coisa ({', '.join(r['palavras'][:6])}).")
+    for r in a.get("frases_repetidas") or []:
+        onde = f"linha {r['a']}" + (f" e de novo na linha {r['b']}" if r["b"] != r["a"] else " (duas vezes no mesmo parágrafo)")
+        L.append(f"- 🔁 MESMA INFORMAÇÃO DUAS VEZES ({onde}): „{r['frase_a'][:110]}“ × „{r['frase_b'][:110]}“ — fique com UMA "
+                 "(a mais completa, no lugar mais forte); a outra sai ou vira só o que for novo.")
     for t in a.get("temas") or []:
         L.append(f"- ASSUNTO QUE VOLTA DEMAIS: “{t['palavra']}” (linhas {', '.join(map(str, t['linhas'][:14]))}) — explique UMA "
                  "vez, no lugar mais forte; nas outras, só o que for novo.")

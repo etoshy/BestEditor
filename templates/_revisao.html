@@ -2,7 +2,7 @@
 <div id="revCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0;">
   <h2 style="margin:0 0 6px;font-size:1.1rem;">🪄 Revisão do roteiro inteiro <span style="font-weight:400;font-size:.82rem;color:#666;">(costuras entre capítulos, repetições, frases genéricas de IA, conclusões sem fonte, ritmo — a IA devolve só as TROCAS; no modo ✂️ enxugar ela corta até o tempo pedido)</span></h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.86rem;">
-    <label style="margin:0;font-weight:400;">Modo <select id="revModo" style="width:auto;margin:0;"><option value="auto">🤖 automático</option><option value="melhorar">🪄 melhorar sem encurtar</option><option value="enxugar">✂️ enxugar até o tempo pedido</option><option value="titulo">🧵 amarrar ao título (tese, pontes, fechamento)</option></select></label>
+    <label style="margin:0;font-weight:400;">Modo <select id="revModo" style="width:auto;margin:0;"><option value="auto">🤖 automático</option><option value="melhorar">🪄 melhorar sem encurtar</option><option value="enxugar">✂️ enxugar até o tempo pedido</option><option value="titulo">🧵 amarrar ao título (tese, pontes, fechamento)</option><option value="escopo">🎯 tirar o que foge do título</option></select></label>
     <input type="text" id="revFoco" placeholder="foco extra (opcional) — ex.: o fim está fraco; menos “mas” no começo das frases" style="flex:1;min-width:240px;margin:0;">
     <button type="button" id="revGerar" style="width:auto;margin:0;padding:5px 12px;">📝 Gerar prompt</button>
     <button type="button" data-ia-gerar="revGerar" data-ia-prompt="revPrompt" data-ia-resp="revResp" data-ia-ler="revLer" data-ia-status="revSt" style="display:none;width:auto;margin:0;padding:5px 12px;background:#4338ca;color:#fff">🤖 Revisar com a IA</button>
@@ -25,7 +25,7 @@
   $r('revGerar').addEventListener('click', async () => {
     $r('revSt').textContent = '📝 gerando…';
     try { const d = await post(BASE + '/prompt', { foco: $r('revFoco').value, modo: $r('revModo').value }); $r('revPrompt').value = d.prompt; $r('revPrompt').style.display = '';
-      $r('revInfo').innerHTML = (d.modo === 'enxugar' ? '✂️ <b>Modo enxugar</b>' : d.modo === 'titulo' ? '🧵 <b>Modo amarrar ao título</b> (tese na abertura, frase-ponte em cada troca de assunto, fechamento que responde ao título)' : '🪄 <b>Modo melhorar</b> (não encurta)') + (d.alvo ? ` · roteiro com ${d.palavras} palavras, alvo ~${d.alvo} (${d.minutos} min)` : '');
+      $r('revInfo').innerHTML = (d.modo === 'enxugar' ? '✂️ <b>Modo enxugar</b>' : d.modo === 'titulo' ? '🧵 <b>Modo amarrar ao título</b> (tese na abertura, frase-ponte em cada troca de assunto, fechamento que responde ao título)' : d.modo === 'escopo' ? '🎯 <b>Modo escopo</b> (sai o assunto vizinho e a história contada duas vezes; o que faria falta vira 1 frase + “outro vídeo” — o roteiro fica mais curto)' : '🪄 <b>Modo melhorar</b> (não encurta)') + (d.alvo ? ` · roteiro com ${d.palavras} palavras, alvo ~${d.alvo} (${d.minutos} min)` : '');
       try { await navigator.clipboard.writeText(d.prompt); $r('revSt').textContent = '✔ prompt copiado — cole na conversa da IA'; } catch (_) { $r('revSt').textContent = '✔ prompt pronto'; } }
     catch (e) { $r('revSt').textContent = '⚠ ' + e.message; }
   });

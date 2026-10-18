@@ -28,6 +28,17 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🏭 Produção no pod com várias vozes (v84_180)
+
+Roteiro com tags de voz (canal com personagens: `[narrador]`, `[mira|curiosa]`… ou as 🎭 vozes com slug) agora vai pro pod como **um texto só** com `{{perfil=…, emocao=…, cfg=…}}` antes de cada fala: o pod troca a voz e a emoção no meio, devolve **um áudio** e transcreve com o Whisper. Os 🗣️ perfis usados vão pro pod sozinhos (uma vez por lote). Cada voz tem de ser **Chatterbox com um perfil de voz** (no pod não roda Piper/Kokoro/XTTS). A legenda sai sem as tags. Precisa do **studio-ia_pod_6** (o pod passa a respeitar o ⭐ clipe principal).
+
+## 🔁 Mesma história duas vezes, 🎯 revisão de escopo (v84_179)
+
+- A checagem acha a **mesma informação em dois lugares** pela frase (ex.: a descoberta de 1987 no cap. 3 e de novo no cap. 5) — vira aviso ao montar as partes e vai pra lista da 🪄 revisão. Frases com anos diferentes (1054 × 1572) não contam.
+- Repetição logo em seguida: não escapa mais quando só uma das frases tem o ano; se a 2ª diz mais e cobre a 1ª, fica a 2ª; se cada uma tem algo que a outra não tem, ficam as duas (a revisão resolve).
+- 🪄 Revisão: modo novo **🎯 tirar o que foge do título** — assunto vizinho sai (ou vira 1 frase + “isso fica pra outro vídeo”), a história repetida fica uma vez, saudação no meio e fonte falada saem.
+- Partes 2 em diante: sem “Willkommen zurück”, sem “no episódio passado / vor einigen Wochen”, sem o nome do canal no meio.
+
 ## 🎯 Só o necessário pro título (v84_178)
 
 - O prompt do roteiro ganhou o bloco **🎯 ESCOPO**: o vídeo cobre só os 3–6 passos que a pessoa precisa pra entender o título. Assunto vizinho (outro tipo do fenômeno, outra descoberta, outro objeto famoso) vira no máximo 1–2 frases simples com “isso fica pra um vídeo próprio” — no máximo 2 vezes por vídeo. Conceito complexo necessário é explicado com analogia + uma frase do mecanismo.

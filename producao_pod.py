@@ -477,6 +477,84 @@ def _em_segundo_plano(lid: str, iid: str, fn: Callable[[str, str], None]) -> Non
     threading.Thread(target=_rodar, daemon=True).start()
 
 
+# ------------------------------------------------------------------ 🎭 várias vozes num roteiro (v84_180)
+def _texto_com_vozes(it: Dict[str, Any]) -> str:
+    """Canal com personagens (🕵️ Modelo de vídeo do pacote): [mira|curiosa] → [<voz escolhida>|exag=..|cfg=..]."""
+    if it.get("origem") != "dossie" or not it.get("origem_id"):
+        return it["texto"]
+    try:
+        import dossies
+        p = dossies.carregar(_BASE, it["origem_id"])
+        perfil = dossies.perfil_do_modelo((p.get("config") or {}).get("modelo"))
+    except Exception:  # noqa: BLE001
+        return it["texto"]
+    if not perfil:
+        return it["texto"]
+    import canal_perfil
+    cfg = p.get("config") or {}
+    texto, faltam = canal_perfil.converter_para_vozes(it["texto"], perfil, cfg.get("vozes_personagens") or {},
+                                                      usar_emocao=cfg.get("ia_emocao", True) is not False)
+    if faltam:
+        raise ProducaoErro("falta escolher a voz de " + ", ".join(faltam) + " (🕵️ Modelo de vídeo → 🎭 Vozes dos personagens)")
+    return texto
+
+
+def multivoz_para_pod(texto: str, it: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Roteiro com tags de voz → UM texto pro pod com {{perfil=…, emocao=…, cfg=…}} antes de cada fala (o pod troca a voz
+    e a emoção no meio e devolve um áudio só, transcrito). → {"texto", "perfis", "legenda"} ou None (uma voz só).
+    No pod só roda Chatterbox: cada voz usada precisa ser Chatterbox com um 🗣️ perfil de voz."""
+    import multivoz as mv
+    vozes = mv.por_slug()
+    d = mv.dividir(texto, vozes)
+    if not d["usadas"]:
+        return None
+    perfis: List[str] = []
+    blocos: List[str] = []
+    for f in d["falas"]:
+        v = vozes.get(f["slug"]) if f["slug"] else None
+        c = (v or {}).get("config") or {}
+        if v is not None:
+            if v.get("motor") not in ("chatterbox", "chatterbox_turbo") or not c.get("vozPerfil"):
+                raise ProducaoErro(f"a voz [{v['slug']}] usa {v.get('motor')}"
+                                   + ("" if c.get("vozPerfil") else " sem perfil de voz")
+                                   + " — no pod só roda Chatterbox com um 🗣️ perfil de voz (troque em 🎙 Gerador de voz → 🎭 Vozes)")
+            perfil = c["vozPerfil"]
+        else:
+            perfil = it.get("perfil") or ""
+        aj = f.get("ajustes") or {}
+        exag = aj.get("exag", c.get("chatterboxExaggeration", it.get("exaggeration", 0.5)))
+        cfgw = aj.get("cfg", c.get("chatterboxCfgWeight", it.get("cfg_weight", 0.5)))
+        fala = texto_para_tts(f["texto"], it["idioma"], it["motor"])
+        if not fala:
+            continue
+        marca = [f"emocao={float(exag):.2f}", f"cfg={float(cfgw):.2f}"]
+        if perfil:
+            marca.insert(0, f"perfil={perfil}")
+            if perfil not in perfis:
+                perfis.append(perfil)
+        blocos.append("{{" + ", ".join(marca) + "}} " + fala)
+    if not blocos:
+        return None
+    # a legenda é o roteiro sem as tags de voz (as chamadas [[INSCREVA]]/[[VENDA]] ficam: o site alinha elas)
+    sem_tags = mv._RE_TAG.sub(lambda m: "" if mv.slugify(m.group(1).partition("|")[0]) in vozes else m.group(0), texto)
+    return {"texto": "\n\n".join(blocos), "perfis": perfis, "legenda": re.sub(r"[ \t]{2,}", " ", sem_tags).strip()}
+
+
+_PERFIS_ENVIADOS: Dict[str, set] = {}  # lote → perfis já mandados (uma vez por lote: não troca a voz no meio de outra narração)
+
+
+def _mandar_perfis(perfis: List[str], cfg: Dict[str, Any], lote_id: str = "") -> None:
+    """Os 🗣️ perfis usados no roteiro vão pro pod (o mesmo .zip do 📦 Exportar; substitui o que já estava lá)."""
+    ja = _PERFIS_ENVIADOS.setdefault(lote_id, set())
+    novos = [x for x in perfis if x not in ja]
+    if not novos:
+        return
+    import perfis_pacote
+    import pod_studio
+    pod_studio.importar_perfis(perfis_pacote.exportar(novos), cfg)
+    ja.update(novos)
+
+
 # ------------------------------------------------------------------ etapas
 def _referencia(perfil: str) -> Optional[str]:
     if not perfil:
@@ -487,6 +565,17 @@ def _referencia(perfil: str) -> Optional[str]:
 
 def _enviar_narracao(lote: Dict[str, Any], it: Dict[str, Any], cfg: Dict[str, Any]) -> None:
     import pod_studio
+    mv = multivoz_para_pod(_texto_com_vozes(it), it)  # 🎭 v84_180: várias vozes, cada uma com a sua emoção
+    if mv:
+        _mandar_perfis(mv["perfis"], cfg, lote["id"])
+        jid = pod_studio.enviar_narracao(mv["texto"], motor="chatterbox", idioma=it["idioma"], referencia=None,
+                                         exaggeration=it["exaggeration"], cfg_weight=it["cfg_weight"],
+                                         transcrever=True, nome="narracao", cfg=cfg, marcacoes=True)
+        _mudar(lote["id"], it["id"], estado="narrando", pod_voz=jid, inicio=time.time(), falhas_pod=0,
+               texto_legenda=mv["legenda"],
+               _log=f"🗣️ narração com {len(mv['perfis'])} voz(es) na fila do pod ({len(mv['legenda'].split())} palavras): "
+                    + ", ".join(mv["perfis"]))
+        return
     texto = texto_para_tts(it["texto"], it["idioma"], it["motor"])
     jid = pod_studio.enviar_narracao(texto, motor=it["motor"], idioma=it["idioma"], referencia=_referencia(it["perfil"]),
                                      exaggeration=it["exaggeration"], cfg_weight=it["cfg_weight"],

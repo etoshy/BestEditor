@@ -1493,6 +1493,15 @@ def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
                                  "afirmacoes", "thumbnails", "lore_registro", "escopo")}
     d.update(roteiro=roteiro, capitulos=caps, momentos=[], partes=partes)
     novo = ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+    try:  # 🔁 v84_179: a mesma informação contada em duas partes (o plano deu o mesmo assunto a dois capítulos)
+        import checagem_roteiro as _ch
+        _fr = [r for r in _ch.frases_repetidas(novo.get("roteiro") or "") if r["b"] != r["a"]]
+        if _fr:
+            novo["avisos"].append("🔁 A mesma informação em partes diferentes: " + " · ".join(
+                f"„{r['frase_a'][:60]}…“ × „{r['frase_b'][:60]}…“" for r in _fr[:3])
+                + " — use a 🪄 revisão (ela recebe a lista) ou peça de novo a parte que repete.")
+    except Exception:  # noqa: BLE001
+        pass
     curtas = [x["k"] for x in partes if x.get("status") == "curta"]
     if curtas:
         novo["avisos"].append("✍️ Partes abaixo do tamanho: " + ", ".join(map(str, curtas)) + " — dá pra pedir de novo só elas.")

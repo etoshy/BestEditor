@@ -331,6 +331,11 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
     if contexto.get("canal") and k in (1, n):
         L.append(f"- Diga o nome do canal “{contexto['canal']}” uma vez, de forma natural"
                  + (" — logo depois do gancho, nunca na 1ª frase." if k == 1 else " — no fechamento."))
+    if 1 < k:
+        L.append("- Esta parte CONTINUA o MESMO vídeo, que a pessoa está assistindo agora: nada de saudar de novo (“Willkommen "
+                 "zurück”, “bem-vindo de volta”), nada de “no episódio passado / vor einigen Wochen habt ihr…”, nada de retomar o "
+                 "que a parte anterior acabou de contar e nada de anunciar o que “ainda não vamos contar”."
+                 + (" O nome do canal NÃO aparece nesta parte." if k < n else ""))
     L += ["- NÃO escreva o título da parte, \"Parte 2\", \"Capítulo\", marcações de câmera nem as marcas [[INSCREVA]]/[[VENDA]] "
           "(o site põe entre as partes).",
           "- Não repita o que as outras partes contam e não antecipe as revelações delas.",

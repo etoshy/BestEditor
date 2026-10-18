@@ -195,7 +195,8 @@ def job(job_id: str, cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
 def enviar_narracao(texto: str, motor: str = "chatterbox", idioma: str = "pt", referencia: Optional[str] = None,
                     exaggeration: float = 0.5, cfg_weight: float = 0.5, temperature: float = 0.8,
-                    transcrever: bool = True, nome: str = "narracao", cfg: Optional[Dict[str, Any]] = None) -> str:
+                    transcrever: bool = True, nome: str = "narracao", cfg: Optional[Dict[str, Any]] = None,
+                    marcacoes: bool = False) -> str:
     """Põe uma narração na fila do pod e devolve o id do job (o pod narra e, com `transcrever`, transcreve)."""
     c = _cfg(cfg)
     dados = {"texto": texto, "motor": motor if motor in MOTORES_NO_POD else "chatterbox",
@@ -203,7 +204,7 @@ def enviar_narracao(texto: str, motor: str = "chatterbox", idioma: str = "pt", r
              "exaggeration": str(float(exaggeration)), "cfg_weight": str(float(cfg_weight)),
              "temperature": str(float(temperature)),
              "pacote_dedicado": "true" if c.get("chatterbox_pod_ptbr", True) else "false",
-             "marcacoes": "false", "normalizar": "true", "legenda_srt": "false",
+             "marcacoes": "true" if marcacoes else "false", "normalizar": "true", "legenda_srt": "false",
              "transcrever": "true" if transcrever else "false", "nome": nome or "narracao",
              "pausa_ms": "180", "pausa_paragrafo_ms": "450"}
     arquivos = None
@@ -214,6 +215,12 @@ def enviar_narracao(texto: str, motor: str = "chatterbox", idioma: str = "pt", r
     finally:
         if arquivos:
             arquivos["referencia"][1].close()
+
+
+def importar_perfis(zip_bytes: bytes, cfg: Optional[Dict[str, Any]] = None) -> Any:
+    """🗣️ Manda perfis de voz pro pod (o .zip do 📦 Exportar) — substitui os de mesmo nome. v84_180."""
+    return _pedir("POST", "/vozes/importar", cfg, timeout=300, data={"substituir": "true", "dividir": "false"},
+                  files={"arquivo": ("perfis.zip", zip_bytes, "application/zip")}).json()
 
 
 def enviar_imagens(itens: List[Dict[str, Any]], largura: int = 1280, altura: int = 720, nome: str = "lote",
