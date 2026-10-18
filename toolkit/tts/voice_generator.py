@@ -1115,8 +1115,9 @@ def listar_perfis_de_voz() -> List[str]:
 def caminho_perfil_de_voz(nome: str) -> List[str]:
     """Caminho(s) do(s) áudio(s) salvo(s) pra esse perfil, em ordem —
     sempre uma LISTA (com um item só, pros perfis antigos de um único
-    áudio). Levanta erro claro (com a lista dos perfis que existem) se
-    o nome não existir."""
+    áudio). O clipe ⭐ principal (`_principal.txt`) vem PRIMEIRO — é o
+    único que o Chatterbox/Turbo/pod usam. Levanta erro claro (com a
+    lista dos perfis que existem) se o nome não existir."""
     seguro = _nome_perfil_seguro(nome)
     pasta = _pasta_perfil(seguro)
     if os.path.isdir(pasta):
@@ -1124,6 +1125,9 @@ def caminho_perfil_de_voz(nome: str) -> List[str]:
             os.path.join(pasta, f) for f in os.listdir(pasta) if f.lower().endswith(".wav")
         )
         if arquivos:
+            principal = _ler_principal(pasta)
+            if principal:
+                arquivos.sort(key=lambda a: os.path.basename(a) != principal)
             return arquivos
     antigo = _arquivo_perfil_antigo(seguro)
     if os.path.exists(antigo):
@@ -1144,6 +1148,147 @@ def excluir_perfil_de_voz(nome: str) -> None:
     antigo = _arquivo_perfil_antigo(seguro)
     if os.path.exists(antigo):
         os.remove(antigo)
+
+
+# ------------------------------------------------------------------ ✂ clipe a clipe (v84_174)
+# Somando os clipes que vão sendo ADICIONADOS (outro vídeo, outro áudio) — o envio de uma vez continua até
+# MAX_CLIPES_POR_PERFIL. Mais que isso não melhora a voz: o Chatterbox usa só o clipe ⭐ principal (~10 s dele) e o
+# XTTS ~30 s somando todos. Ter mais serve pra ESCOLHER o melhor e apagar os ruins.
+MAX_CLIPES_TOTAL = 12
+ARQ_PRINCIPAL = "_principal.txt"
+
+
+def _ler_principal(pasta: str) -> str:
+    try:
+        with open(os.path.join(pasta, ARQ_PRINCIPAL), encoding="utf-8") as f:
+            nome = f.read().strip()
+    except OSError:
+        return ""
+    return nome if nome and os.path.isfile(os.path.join(pasta, nome)) else ""
+
+
+def _pasta_do_perfil_existente(nome: str) -> str:
+    """A pasta do perfil (o perfil antigo de um .wav solto vira pasta). Erro claro se não existir."""
+    seguro = _nome_perfil_seguro(nome)
+    pasta = _pasta_perfil(seguro)
+    antigo = _arquivo_perfil_antigo(seguro)
+    if not os.path.isdir(pasta) and os.path.isfile(antigo):
+        os.makedirs(pasta, exist_ok=True)
+        shutil.move(antigo, os.path.join(pasta, f"{seguro}.wav"))  # igual ao perfis_limpeza
+    if not os.path.isdir(pasta):
+        caminho_perfil_de_voz(nome)  # levanta o erro com a lista dos perfis que existem
+    return pasta
+
+
+def duracao_wav(caminho: str) -> float:
+    """Duração (s) de um .wav do perfil — lida do cabeçalho (rápido), com o ffprobe de reserva."""
+    import wave
+    try:
+        with wave.open(caminho, "rb") as w:
+            return round(w.getnframes() / float(w.getframerate() or 1), 1)
+    except Exception:  # noqa: BLE001
+        return round(_duracao_audio_segundos(caminho) or 0.0, 1)
+
+
+def adicionar_clipes_ao_perfil(
+    nome: str,
+    caminhos_audio_origem,
+    duracao_max_segundos: float = 25.0,
+    dividir_audio_longo: bool = True,
+) -> List[str]:
+    """➕ Junta mais áudio(s)/vídeo(s) num perfil que JÁ EXISTE, sem apagar os clipes que ele tem (o
+    `salvar_perfil_de_voz` regrava do zero). Mesmo processamento: um áudio longo sozinho é dividido em trechos
+    espalhados. Os novos entram com o próximo número livre (ref_06.wav…). Devolve só os caminhos novos."""
+    eh_caminho_unico = isinstance(caminhos_audio_origem, str)
+    caminhos = [caminhos_audio_origem] if eh_caminho_unico else list(caminhos_audio_origem)
+    if not caminhos:
+        raise VoiceGeneratorError("Mande pelo menos um áudio pra adicionar ao perfil.")
+    for caminho in caminhos:
+        if not os.path.exists(caminho):
+            raise VoiceGeneratorError(f"Áudio de referência não encontrado: {caminho!r}")
+    pasta = _pasta_do_perfil_existente(nome)
+    atuais = caminho_perfil_de_voz(nome)
+
+    temporarios: List[str] = []
+    if eh_caminho_unico and dividir_audio_longo:
+        por_clipe = min(10.0, duracao_max_segundos)
+        divididos = dividir_audio_em_clipes(caminhos[0], duracao_por_clipe=por_clipe)
+        if len(divididos) > 1:
+            caminhos, temporarios, duracao_max_segundos = divididos, divididos, por_clipe
+    try:
+        if len(atuais) + len(caminhos) > MAX_CLIPES_TOTAL:
+            raise VoiceGeneratorError(
+                f"O perfil ficaria com {len(atuais) + len(caminhos)} clipes — o máximo é {MAX_CLIPES_TOTAL}. "
+                f"Apague os clipes ruins (🗑) antes de adicionar mais (mais áudio não melhora a voz: o Chatterbox "
+                f"usa só o ⭐ principal e o XTTS uns 30 s somando todos)."
+            )
+        import re
+        import subprocess
+        usados = [int(m.group(1)) for a in atuais for m in [re.match(r"ref_(\d+)\.wav$", os.path.basename(a))] if m]
+        prox = max(usados + [len(atuais)]) + 1
+        novos: List[str] = []
+        for k, origem in enumerate(caminhos):
+            destino = os.path.join(pasta, f"ref_{prox + k:02d}.wav")
+            r = subprocess.run(
+                ["ffmpeg", "-y", "-i", origem, "-t", str(duracao_max_segundos),
+                 "-ac", "1", "-ar", "22050", "-c:a", "pcm_s16le", destino],
+                capture_output=True, timeout=60,
+            )
+            if r.returncode != 0 or not os.path.exists(destino):
+                for n in novos:  # nada de perfil pela metade
+                    try:
+                        os.remove(n)
+                    except OSError:
+                        pass
+                raise VoiceGeneratorError(
+                    f"Não consegui processar o áudio {k + 1} com o ffmpeg (código {r.returncode}). "
+                    f"Confira se o arquivo é um áudio/vídeo válido."
+                )
+            novos.append(destino)
+        return novos
+    finally:
+        for tmp in temporarios:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        if temporarios:
+            try:
+                os.rmdir(os.path.dirname(temporarios[0]))
+            except OSError:
+                pass
+
+
+def excluir_clipe_do_perfil(nome: str, indice: int) -> str:
+    """🗑 Apaga UM clipe (o índice é o da lista de `caminho_perfil_de_voz`, a mesma da página) e a cópia
+    original dele em `_original/`. O último clipe não sai — pra isso, exclua o perfil. Devolve o nome do arquivo."""
+    pasta = _pasta_do_perfil_existente(nome)
+    lista = caminho_perfil_de_voz(nome)
+    if not (0 <= indice < len(lista)):
+        raise VoiceGeneratorError("Clipe não encontrado.")
+    if len(lista) == 1:
+        raise VoiceGeneratorError("É o único clipe do perfil — adicione outro antes, ou exclua o perfil inteiro.")
+    alvo = lista[indice]
+    base = os.path.basename(alvo)
+    os.remove(alvo)
+    original = os.path.join(pasta, "_original", base)
+    if os.path.isfile(original):
+        os.remove(original)
+    if _ler_principal(pasta) == "" and os.path.isfile(os.path.join(pasta, ARQ_PRINCIPAL)):
+        os.remove(os.path.join(pasta, ARQ_PRINCIPAL))  # o ⭐ era esse — volta pro primeiro
+    return base
+
+
+def definir_clipe_principal(nome: str, indice: int) -> str:
+    """⭐ Marca o clipe que vai PRIMEIRO na lista — o único que o Chatterbox/Turbo/pod usam."""
+    pasta = _pasta_do_perfil_existente(nome)
+    lista = caminho_perfil_de_voz(nome)
+    if not (0 <= indice < len(lista)):
+        raise VoiceGeneratorError("Clipe não encontrado.")
+    base = os.path.basename(lista[indice])
+    with open(os.path.join(pasta, ARQ_PRINCIPAL), "w", encoding="utf-8") as f:
+        f.write(base)
+    return base
 
 
 # O XTTS v2 tem um limite de tokens POR CHAMADA (o modelo trunca ou
@@ -1483,6 +1628,43 @@ def _narrar_no_pod(engine: str, texto: str, output_path: str, speaker_wav: Optio
     return output_path
 
 
+# ------------------------------------------------------------------ 🪟 Windows: "arquivo de paginação muito pequeno" (v84_175)
+def _falta_memoria_virtual(exc: BaseException) -> bool:
+    """WinError 1455: o Windows não conseguiu reservar memória virtual pra abrir os pesos do modelo. No arquivo de
+    paginação "gerenciado pelo sistema", ele CRESCE depois dessa falha — por isso a 2ª tentativa costuma funcionar."""
+    m = str(exc).lower()
+    return "1455" in m or "paging file" in m or "arquivo de paginação" in m or "arquivo de paginacao" in m
+
+
+def _carregar_com_nova_tentativa(carregar, nome_motor: str, tentativas: int = 3, espera: float = 3.0):
+    """Roda `carregar()`; no erro 1455 libera memória, espera e tenta de novo (até `tentativas` vezes)."""
+    import gc
+    for k in range(tentativas):
+        try:
+            return carregar()
+        except Exception as exc:  # noqa: BLE001
+            if not _falta_memoria_virtual(exc):
+                raise
+            if k == tentativas - 1:
+                raise VoiceGeneratorError(
+                    f"O Windows ficou sem memória virtual pra abrir o {nome_motor} (erro 1455 — \"arquivo de paginação "
+                    f"muito pequeno\"), mesmo tentando {tentativas} vezes. Resolve de vez aumentando o arquivo de "
+                    "paginação: Iniciar → \"Ajustar a aparência e o desempenho do Windows\" → Avançado → Memória "
+                    "virtual → Alterar → desmarque \"Gerenciar automaticamente\" → no disco mais rápido (SSD), "
+                    "Tamanho personalizado: inicial 16384 e máximo 32768 MB (ou mais) → Definir → OK → reinicie o PC. "
+                    "Fechar o navegador e outros programas pesados antes também ajuda. "
+                    f"Erro original: {exc}"
+                ) from exc
+            gc.collect()
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(espera)
+
+
 def chatterbox_load(use_gpu: Optional[bool] = None):
     """Carrega (ou reaproveita, se já carregado com os mesmos
     parâmetros) o modelo multilíngue do Chatterbox TTS — baixa sozinho
@@ -1515,7 +1697,9 @@ def chatterbox_load(use_gpu: Optional[bool] = None):
         return _chatterbox_cache[cache_key]
 
     try:
-        modelo = ChatterboxMultilingualTTS.from_pretrained(device=device)
+        modelo = _carregar_com_nova_tentativa(lambda: ChatterboxMultilingualTTS.from_pretrained(device=device), "Chatterbox")
+    except VoiceGeneratorError:
+        raise
     except Exception as exc:  # noqa: BLE001
         mensagem = str(exc)
         if "nonetype" in mensagem.lower() and "callable" in mensagem.lower():
@@ -1782,7 +1966,9 @@ def chatterbox_turbo_load(use_gpu: Optional[bool] = None):
         return _chatterbox_turbo_cache[cache_key]
 
     try:
-        modelo = ChatterboxTurboTTS.from_pretrained(device=device)
+        modelo = _carregar_com_nova_tentativa(lambda: ChatterboxTurboTTS.from_pretrained(device=device), "Chatterbox Turbo")
+    except VoiceGeneratorError:
+        raise
     except Exception as exc:  # noqa: BLE001
         mensagem = str(exc)
         if "nonetype" in mensagem.lower() and "callable" in mensagem.lower():

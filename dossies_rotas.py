@@ -58,6 +58,9 @@ def registrar(app, base_dir: str) -> None:
         with _TRAVA:
             p = ds.criar(base_dir, tema=tema, modelo=request.form.get("modelo") or "true_crime")
             urls = [u.strip() for u in (request.form.get("fontes") or "").split("\n") if u.strip()]
+            videos = [u for u in urls if ds.eh_link_de_video(u)][:20]  # 🎬 v84_176: vídeo vira transcrição nas anotações
+            urls = [u for u in urls if u not in videos]
+            videos = list(dict.fromkeys(ds.link_video_padrao(u) for u in videos))  # v84_177: Shorts → watch?v=
             novas = []
             for u in urls[:30]:
                 try:
@@ -67,7 +70,24 @@ def registrar(app, base_dir: str) -> None:
             ds.salvar(base_dir, p)
         for fid in novas:
             _processar(p["id"], fid)
+        if videos:
+            _transcrever_videos(p["id"], videos)
         return redirect(url_for("dossie_detalhe", pid=p["id"]))
+
+    def _fontes_video_para_transcricao(pid: str) -> int:
+        """🎬 v84_176: link de vídeo que entrou como matéria ("Não achei texto nem imagens") sai das fontes e vira
+        transcrição nas anotações. Devolve quantos."""
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return 0
+            vids = [f for f in p.get("fontes") or [] if ds.eh_link_de_video(f.get("url") or "") and f.get("estado") == "erro"]
+            if not vids:
+                return 0
+            p["fontes"] = [f for f in p["fontes"] if f not in vids]
+            ds.salvar(base_dir, p)
+        _transcrever_videos(pid, [f["url"] for f in vids][:20])
+        return len(vids)
 
     _fila = threading.Semaphore(2)  # até 2 matérias baixando ao mesmo tempo
 
@@ -100,11 +120,44 @@ def registrar(app, base_dir: str) -> None:
         p = _proj(pid)
         if not p:
             return redirect(url_for("dossies_page", erro="Projeto não encontrado."))
+        if _fontes_video_para_transcricao(pid):  # os links de vídeo que tinham falhado como matéria
+            p = _proj(pid)
         import idiomas
         return render_template("dossie_detalhe.html", p=_json_proj(p), modelos=ds.MODELOS, tipos=ds.TIPOS_MIDIA,
                                ordem={k: list(m["formatos"]) for k, m in ds.MODELOS.items()},
                                idiomas=[(k, v[0]) for k, v in idiomas.IDIOMAS.items()],
-                               nome_canal_global=__import__("canal").nome_global())
+                               nome_canal_global=__import__("canal").nome_global(), perfis_voz=_perfis_voz(),
+                               vozes_multi=_vozes_multi(), perfis_clonagem=_perfis_clonagem())
+
+    def _vozes_multi():
+        return [{"slug": v["slug"], "nome": v["nome"], "motor": v.get("motor"), "genero": v.get("genero") or "",
+                 "perfil": (v.get("config") or {}).get("vozPerfil") or ""} for v in __import__("multivoz").listar()]
+
+    def _perfis_clonagem():
+        """🗣️ v84_176: os perfis de voz (clonagem) — escolher um no 🎭 cria sozinho a voz Chatterbox dele."""
+        try:
+            from tts.voice_generator import listar_perfis_de_voz
+            import perfis_info
+            info = perfis_info.todos()
+            return [{"nome": n, "genero": (info.get(n) or {}).get("genero") or ""} for n in listar_perfis_de_voz()]
+        except Exception:  # noqa: BLE001
+            return []
+
+    def _perfis_voz():
+        """🎭 v84_173: pros modelos de canal com personagens — quem fala, as emoções e a voz sugerida de cada um."""
+        out = {}
+        for k, m in ds.MODELOS.items():
+            if not m.get("perfil_canal"):
+                continue
+            perfil = ds.perfil_do_modelo(k)
+            if not perfil:
+                continue
+            import canal_perfil
+            out[k] = {"canal": perfil["nome"], "marca": perfil["marca"], "falantes": [
+                {"slug": f["slug"], "nome": f["nome"], "epiteto": f.get("epiteto") or "", "papel": f.get("papel") or "",
+                 "voz_sugerida": f.get("voz_sugerida") or {}, "emocoes": f.get("emocoes") or {}}
+                for f in canal_perfil.falantes(perfil)]}
+        return out
 
     @app.route("/modelos-video/<pid>/dados")
     def dossie_dados(pid: str):
@@ -114,14 +167,17 @@ def registrar(app, base_dir: str) -> None:
     @app.route("/modelos-video/<pid>/config", methods=["POST"])
     def dossie_config(pid: str):
         c = request.get_json(silent=True) or {}
+        criou_voz = False
         with _TRAVA:
             p = _proj(pid)
             if not p:
                 return jsonify({"erro": "Projeto não encontrado."}), 404
             cfg = p["config"]
+            mudou_modelo = False
             if c.get("modelo") in ds.MODELOS:
                 if c["modelo"] != cfg.get("modelo") and ds.canal_do_modelo(c["modelo"]) and not str(c.get("nome_canal") or "").strip():
                     cfg["nome_canal"] = ds.canal_do_modelo(c["modelo"])  # 🎨 modelo da marca: o nome do canal dela
+                mudou_modelo = c["modelo"] != cfg.get("modelo")
                 cfg["modelo"] = c["modelo"]
             fmts = (ds.MODELOS.get(cfg["modelo"]) or ds.MODELOS["true_crime"])["formatos"]
             if c.get("formato") in fmts:
@@ -143,6 +199,32 @@ def registrar(app, base_dir: str) -> None:
                     cfg[k] = bool(c[k])
             if c.get("referencia_modo") in ("inspirar", "modelar"):
                 cfg["referencia_modo"] = c["referencia_modo"]
+            if mudou_modelo:  # 🎭 o roteiro exemplo do canal (se o 📐 estiver vazio)
+                ds.aplicar_padroes_do_modelo(cfg, cfg["modelo"])
+            if "ia_emocao" in c:
+                cfg["ia_emocao"] = bool(c["ia_emocao"])
+            if isinstance(c.get("vozes_personagens"), dict):  # 🎭 a voz e a emoção padrão de cada personagem
+                vp = {}
+                for k, v in list(c["vozes_personagens"].items())[:12]:
+                    if not isinstance(v, dict):
+                        continue
+                    voz = str(v.get("voz") or "")[:80]
+                    if voz.startswith("perfil:"):  # 🗣️ perfil de voz → a voz Chatterbox dele (criada uma vez)
+                        try:
+                            voz = __import__("multivoz").voz_de_perfil(voz[7:], idioma=cfg.get("idioma") or "")["slug"]
+                            criou_voz = True
+                        except Exception:  # noqa: BLE001
+                            voz = ""
+                    item = {"voz": voz[:40]}
+                    for kk in ("exag", "cfg", "vel"):
+                        try:
+                            if v.get(kk) not in (None, ""):
+                                item[kk] = round(float(v[kk]), 2)
+                        except (TypeError, ValueError):
+                            pass
+                    vp[str(k)[:30]] = item
+                cfg["vozes_personagens"] = vp
+                ds.lembrar_vozes(cfg["modelo"], vp)  # 🔁 o próximo vídeo deste canal já vem com essas vozes
             if c.get("modo_partes") in ("auto", "sim", "nao"):
                 cfg["modo_partes"] = c["modo_partes"]
             if "tema" in c:
@@ -152,6 +234,8 @@ def registrar(app, base_dir: str) -> None:
             ds.salvar(base_dir, p)
             __import__("ultimas_escolhas").lembrar(base_dir, idioma=cfg.get("idioma") if "idioma" in c else None,
                                                    nome_canal=cfg.get("nome_canal") if "nome_canal" in c else None)
+        if criou_voz:  # a tela troca "perfil:x" pela voz nova
+            return jsonify({"ok": True, "config": cfg, "vozes_multi": _vozes_multi()})
         return jsonify({"ok": True, "config": cfg})
 
     def _transcrever_videos(pid: str, links: list) -> str:
@@ -159,6 +243,7 @@ def registrar(app, base_dir: str) -> None:
         "Roteiro / anotações seus" (passo 1), um bloco por vídeo. Roda em segundo plano (chega aviso no 🔔)."""
         import tarefas_bg
         import roteiros_yt as ry
+        links = list(dict.fromkeys(ds.link_video_padrao(u) for u in links))  # v84_177: Shorts/youtu.be → watch?v=
 
         def _rodar(t):
             feitos, falhas = [], []
@@ -195,7 +280,7 @@ def registrar(app, base_dir: str) -> None:
         """📐 v84_169: link de um vídeo (YouTube, TikTok…) → a transcrição dele vira o roteiro exemplo."""
         import tarefas_bg
         import roteiros_yt as ry
-        url = str((request.get_json(silent=True) or {}).get("url") or "").strip()
+        url = ds.link_video_padrao((request.get_json(silent=True) or {}).get("url") or "")
         if not url.startswith(("http://", "https://")):
             return jsonify({"erro": "Cole o link do vídeo."}), 400
         if not _proj(pid):
@@ -226,6 +311,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Cole pelo menos um link."}), 400
         videos = [u for u in urls if ds.eh_link_de_video(u)] if c.get("videos_transcrever", True) is not False else []
         urls = [u for u in urls if u not in videos]
+        videos = list(dict.fromkeys(ds.link_video_padrao(u) for u in videos))  # v84_177: Shorts → watch?v=
         tarefa = _transcrever_videos(pid, videos[:20]) if videos and _proj(pid) else None
         if not urls:
             return jsonify({"ok": bool(tarefa), "novas": [], "erros": [], "videos": len(videos[:20]), "tarefa_videos": tarefa})
@@ -293,6 +379,10 @@ def registrar(app, base_dir: str) -> None:
                 ds.salvar(base_dir, p)
                 return jsonify({"ok": True})
             c = request.get_json(silent=True) or {}
+            if ds.eh_link_de_video(f.get("url") or ""):  # ↻ num link de vídeo: vira transcrição
+                p["fontes"] = [x for x in p["fontes"] if x is not f]
+                ds.salvar(base_dir, p)
+                return jsonify({"ok": True, "tarefa_videos": _transcrever_videos(pid, [f["url"]])})
             if "paginas" in c:
                 f["paginas"] = str(c.get("paginas") or "").strip()[:60]
             f.update(estado="na fila", erro=None)

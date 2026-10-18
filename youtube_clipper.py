@@ -733,8 +733,11 @@ def extrair_perfil_de_voz_do_youtube(
     qualidade: str = QUALIDADE_PADRAO,
     on_log: Optional[Any] = None,
     ytdlp_module: Any = None,
+    adicionar: bool = False,
 ) -> List[str]:
-    """Baixa vídeo(s) do YouTube, corta os trechos pedidos, e salva
+    """(`adicionar=True`: junta os clipes num perfil que já existe, sem apagar os que ele tem — v84_174.)
+
+    Baixa vídeo(s) do YouTube, corta os trechos pedidos, e salva
     tudo direto como um PERFIL DE VOZ reutilizável (ver
     `tts.voice_generator.salvar_perfil_de_voz`) — um jeito rápido de
     montar um perfil sem precisar baixar e editar o áudio manualmente
@@ -781,7 +784,7 @@ def extrair_perfil_de_voz_do_youtube(
     toolkit_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toolkit")
     if toolkit_dir not in sys.path:
         sys.path.insert(0, toolkit_dir)
-    from tts.voice_generator import salvar_perfil_de_voz, dividir_audio_em_clipes
+    from tts.voice_generator import salvar_perfil_de_voz, dividir_audio_em_clipes, adicionar_clipes_ao_perfil
 
     import tempfile
     pasta_tmp = tempfile.mkdtemp(prefix="perfil_youtube_")
@@ -829,7 +832,10 @@ def extrair_perfil_de_voz_do_youtube(
         log(f"Salvando o perfil de voz {nome_perfil!r} com {len(caminhos_trechos)} clipe(s)...")
         # já são os trechos exatos que a pessoa escolheu -- não deixa a
         # divisão automática de áudio longo mexer neles de novo.
-        salvos = salvar_perfil_de_voz(nome_perfil, caminhos_trechos, dividir_audio_longo=False)
+        if adicionar:
+            salvos = adicionar_clipes_ao_perfil(nome_perfil, caminhos_trechos, dividir_audio_longo=False)
+        else:
+            salvos = salvar_perfil_de_voz(nome_perfil, caminhos_trechos, dividir_audio_longo=False)
         log("Pronto!")
         return salvos
     finally:

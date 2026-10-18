@@ -56,9 +56,15 @@ def n_capitulos(minutos: float) -> int:
 
 
 # ------------------------------------------------------------------ 1º prompt (o plano)
-def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = None) -> str:
+def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = None, enxuto: bool = False) -> str:
     n = n_capitulos(minutos)
     por = max(MIN_PALAVRAS_PARTE, palavras // n)
+    fatos = ("  • \"fatos\": 3 a 7 pontos — SÓ os que a pessoa precisa pra entender o título (o 🎯 escopo); cada um com a fonte "
+             "(F1, F2…) e o tipo (fato documentado / modelo científico / hipótese). Explicativo: menos coisas, bem explicadas — "
+             "assunto vizinho não entra no plano, vai em \"escopo.fica_para_outro_video\";\n") if enxuto else (
+             "  • \"fatos\": 8 a 15 fatos CONCRETOS das fontes que entram nele (datas, nomes, lugares, números, citações, o que "
+             "cada pessoa disse), cada um com a fonte (F1, F2…) e o tipo (fato documentado / alegação / interpretação) — é "
+             "deles que o capítulo vai ser escrito, então capriche: quanto mais detalhe aqui, mais rico o capítulo;\n")
     return (f"## ✍️ ESTE ROTEIRO É ESCRITO EM PARTES (vídeo de ~{minutos:g} min ≈ {palavras} palavras)\n"
             "AGORA você NÃO escreve o roteiro. Você faz o PLANO DETALHADO — depois eu peço cada capítulo separado, um por vez, "
             "e você escreve aquele capítulo inteiro com o tamanho dele.\n"
@@ -66,9 +72,7 @@ def bloco_plano(minutos: float, palavras: int, estrutura: Optional[List[str]] = 
             "formato e o método de roteiro (gancho no 1º, viradas, final). Cada capítulo:\n"
             "  • \"titulo\": curto e chamativo (vira o capítulo da descrição do YouTube);\n"
             "  • \"objetivo\": o que este capítulo conta, que pergunta abre/fecha e como termina (o gancho pro próximo);\n"
-            "  • \"fatos\": 8 a 15 fatos CONCRETOS das fontes que entram nele (datas, nomes, lugares, números, citações, o que "
-            "cada pessoa disse), cada um com a fonte (F1, F2…) e o tipo (fato documentado / alegação / interpretação) — é "
-            "deles que o capítulo vai ser escrito, então capriche: quanto mais detalhe aqui, mais rico o capítulo;\n"
+            + fatos +
             "  • \"midias\": TODOS os IDs das imagens/vídeos que combinam com ele (ex.: [\"I3\", \"I7\", \"I9\"]) — a mesma "
             "imagem pode (e deve) estar em vários capítulos quando a pessoa/lugar volta na história;\n"
             f"  • \"palavras\": quantas palavras o capítulo vai ter (a SOMA de todos = ~{palavras}; o gancho pode ser menor, "
@@ -260,6 +264,11 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
                  "termine dizendo, numa frase, o que esta parte acrescenta à pergunta do título.")
         L += ["", f"## 🧵 O título é a promessa: “{prom}”", papel,
               "Cada frase traz informação nova — não repita a mesma frase/ideia com outras palavras."]
+    if contexto.get("escopo"):  # 🎯 v84_178: o que ficou de fora no plano continua de fora em cada parte
+        import metodo_roteiro as _mr
+        L += ["", _mr.bloco_escopo_parte(contexto["escopo"], contexto.get("idioma_cod") or "pt")]
+    if contexto.get("personagens_bloco"):  # 🎭 v84_173: as vozes/personagens/lore valem em cada parte
+        L += ["", contexto["personagens_bloco"]]
     if contexto.get("referencia"):  # 📐 v84_169: modelando um roteiro exemplo — esta parte é o bloco equivalente dele
         L += ["", "## 📐 Roteiro exemplo que o vídeo modela (SÓ a estrutura e as técnicas — o assunto e os fatos dele NÃO entram)",
               f"Esta é a parte {k} de {n}: escreva-a como o bloco equivalente do exemplo (mesma função, mesmo tipo de gancho/"
@@ -269,8 +278,12 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
     if p.get("objetivo"):
         L.append(f"Objetivo: {p['objetivo']}")
     if p.get("fatos"):
-        L.append("Fatos desta parte (use TODOS, desenvolvidos — quem/quando/onde/como/por quê; diga a fonte no texto quando for "
-                 "uma afirmação importante; alegação sempre atribuída a quem alega; interpretação marcada como tal):")
+        if contexto.get("enxuto"):  # 🎯 explicativo: só o necessário, explicado simples; a fonte não é falada
+            L.append("Pontos desta parte (explique cada um do jeito mais simples — analogia + uma frase do mecanismo; NÃO diga a "
+                     "fonte em voz alta, ela vai na descrição; hipótese e estimativa ditas como tal, em palavras simples):")
+        else:
+            L.append("Fatos desta parte (use TODOS, desenvolvidos — quem/quando/onde/como/por quê; diga a fonte no texto quando for "
+                     "uma afirmação importante; alegação sempre atribuída a quem alega; interpretação marcada como tal):")
         L += [f"- {f['fato']}" + (f" ({f['fonte']}" + (f", {f['tipo']})" if f.get("tipo") != "fato" else ")") if f.get("fonte") else "") for f in p["fatos"]]
     mids = contexto.get("midias") or {}
     meus = [m for m in p.get("midias") or [] if m in mids]

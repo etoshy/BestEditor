@@ -168,7 +168,8 @@ def ler(texto: str, job: Dict[str, Any], estado: Dict[str, Any], palavras: List[
     d = pe.extrair_json(texto)
     total = float(job.get("total_duration") or (segs[-1]["end"] if segs else 0))
     foto = [((s.get("override_source") or {}).get("kind") or s.get("media_type")) == "image" for s in segs]
-    plano = pe.ler_resposta(texto, len(segs), total, palavras, foto)
+    plano = pe.ler_resposta(texto, len(segs), total, palavras, foto,
+                            direcao=pe.direcao_escolhida(job, estado.get("direcao"), estado.get("kit")))  # 🎬 só o que a direção tem
     plano["substituir_destaques"] = False  # na conversa, destaque novo SOMA (nunca apaga os outros)
     plano["resposta"] = str(d.get("resposta") or d.get("observacoes") or "").strip()[:600]
     avisos = plano["avisos"]

@@ -155,7 +155,7 @@
         ${img ? `<img class="mv-img" src="${arq(img, 720)}" data-full="${arq(img)}">` : '<div class="mv-img" style="display:grid;place-items:center;color:#777">sem imagem</div>'}
         <div class="mv-badges"><span>${esc(TIPOS[b.tipo_imagem] || b.tipo_imagem)}</span>${b.mascote ? `<span>🧍 ${esc((POSES[b.mascote] || {}).nome || b.mascote)}</span>` : ''}
           ${pal ? `<span title="${esc((pal.problemas || []).join('; '))}">🎨 paleta ${pal.score} (${pal.status})</span>` : ''}<span title="${esc(b.qa_notas)}">${qa}${b.qa_por === 'ia' ? ' (IA)' : ''}</span>
-          ${(b.pessoas || []).map(x => `<span>🎭 ${esc(x.nome)}${x.idade ? ' (' + x.idade + ')' : ''}</span>`).join('')}${b.lugar ? `<span>📍 ${esc(b.lugar)}</span>` : ''}${b.ano ? `<span>${b.ano}</span>` : ''}
+          ${(b.personagens || []).map(x => `<span>✨ ${esc(x.slug)}</span>`).join('')}${(b.pessoas || []).map(x => `<span>🎭 ${esc(x.nome)}${x.idade ? ' (' + x.idade + ')' : ''}</span>`).join('')}${b.lugar ? `<span>📍 ${esc(b.lugar)}</span>` : ''}${b.ano ? `<span>${b.ano}</span>` : ''}
           ${ult.model_name ? `<span>${esc(ult.model_name)} · seed ${ult.seed ?? '?'}</span>` : ''}${(b.fotos || []).length ? `<span>📷 ${b.fotos.join(', ')}</span>` : ''}</div>
         <div class="mv-narr">${esc(b.narracao)}</div>
         ${(b.texto_de || []).length ? `<div class="mv-hint" style="margin:0">✍️ ${b.texto_de.map(esc).join(' / ')}</div>` : ''}
@@ -178,6 +178,7 @@
           <label>Textos por cima, no idioma do canal (1 por linha; *palavra* = vermelho)<textarea data-c="texto_de" rows="3">${esc((b.texto_de || []).join('\n'))}</textarea></label>
           <label>Marcação vermelha<select data-c="anotacao"><option value="">nenhuma</option><option value="circulo" ${b.anotacao === 'circulo' ? 'selected' : ''}>círculo</option><option value="seta" ${b.anotacao === 'seta' ? 'selected' : ''}>seta</option></select></label>
           ${(P.fotos || []).length ? `<label>📷 Fotos de referência nesta cena (até 3)<span style="display:flex;gap:8px;flex-wrap:wrap">${P.fotos.map(f => `<label style="display:flex;gap:4px;align-items:center;margin:0"><input type="checkbox" data-foto="${f.id}" ${(b.fotos || []).includes(f.id) ? 'checked' : ''}>${f.id}</label>`).join('')}</span></label>` : ''}
+          <label>🎭 Personagens do canal na imagem (slug: ação em inglês; …)<input type="text" data-c="personagens" value="${esc((b.personagens || []).map(x => x.slug + (x.acao_en ? ': ' + x.acao_en : '')).join('; '))}" placeholder="mira: looking up at the nebula; vanta"></label>
           <label>🎭 Pessoas do elenco nesta cena (Nome:idade; Nome2:idade)<input type="text" data-c="pessoas" value="${esc((b.pessoas || []).map(x => x.nome + (x.idade ? ':' + x.idade : '')).join('; '))}"></label>
           <label>📍 Lugar do elenco<input type="text" data-c="lugar" value="${esc(b.lugar)}"></label>
           <label>Ano da cena<input type="text" data-c="ano" value="${b.ano || ''}"></label>
@@ -189,7 +190,7 @@
         </details>`;
       div.querySelector('header input').addEventListener('change', (e) => e.target.checked ? SEL.add(b.id) : SEL.delete(b.id));
       const im = div.querySelector('img.mv-img'); if (im) im.addEventListener('click', () => { $('zImg').src = im.dataset.full; $('zoom').showModal(); });
-      div.querySelectorAll('[data-c]').forEach(el => el.addEventListener('change', () => salvarCampo(b.id, { [el.dataset.c]: el.value }).then(() => { if (['mascote', 'tipo_imagem', 'prompt_manual', 'pessoas', 'lugar', 'ano'].includes(el.dataset.c)) carregar(); })));
+      div.querySelectorAll('[data-c]').forEach(el => el.addEventListener('change', () => salvarCampo(b.id, { [el.dataset.c]: el.value }).then(() => { if (['mascote', 'tipo_imagem', 'prompt_manual', 'pessoas', 'lugar', 'ano', 'personagens'].includes(el.dataset.c)) carregar(); })));
       div.querySelectorAll('[data-foto]').forEach(el => el.addEventListener('change', () => salvarCampo(b.id, { fotos: [...div.querySelectorAll('[data-foto]:checked')].map(x => x.dataset.foto) })));
       div.querySelectorAll('[data-g]').forEach(el => el.addEventListener('click', () => salvarCampo(b.id, { voltar_geracao: Number(el.dataset.g) }).then(carregar)));
       div.querySelectorAll('[data-a]').forEach(el => el.addEventListener('click', async () => {

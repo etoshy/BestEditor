@@ -76,6 +76,7 @@
   </script>
   {% endif %}
   {% if roteiro_id %}<input type="hidden" name="roteiro_id" value="{{ roteiro_id }}">{% endif %}
+  {% if vozes_canal.multivoz %}<p style="margin:4px 0;font-size:0.85rem;color:#7c3aed;">🎭 Roteiro com personagens: as falas já vêm com a voz de cada um e a emoção de cada fala (Chatterbox), no <b>modo multi voice</b>.{% if vozes_canal.faltam %} <b style="color:#b91c1c">Falta escolher a voz de: {{ vozes_canal.faltam|join(', ') }}</b> — na página do Modelo de vídeo (🎭 Vozes dos personagens).{% endif %}</p>{% endif %}
   {% if dossie_id %}<input type="hidden" name="dossie_id" value="{{ dossie_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#334155;">🕵️ Roteiro do modelo de vídeo — os capítulos ganham o tempo real do áudio, e o .zip leva o projeto: no <b>Novo vídeo</b> as imagens do tema entram sozinhas.</p>{% endif %}
   {% if venda_id %}<input type="hidden" name="venda_id" value="{{ venda_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#047857;">🛒 Roteiro do projeto de venda — o .zip leva o projeto junto: no <b>Novo vídeo</b> as mídias do produto entram sozinhas.</p>{% endif %}
   <textarea name="texto" id="texto-narrar" rows="6" placeholder="Cole ou escreva aqui o texto que vai virar áudio...">{{ texto_inicial or '' }}</textarea>
@@ -121,7 +122,7 @@ E no final...</pre>
     </select>
   </div>
   <div class="mv-modo">
-    <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600;"><input type="checkbox" name="multivoz" id="mv-ativo" style="width:auto;margin:0;"> 🎭 Modo multi voice — <span style="font-weight:400;color:#555">as tags <code>[slug]</code> trocam a voz e não são lidas</span></label>
+    <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600;"><input type="checkbox" name="multivoz" id="mv-ativo" style="width:auto;margin:0;" {% if vozes_canal.multivoz %}checked data-nao-restaurar{% endif %}> 🎭 Modo multi voice — <span style="font-weight:400;color:#555">as tags <code>[slug]</code> trocam a voz e não são lidas</span></label>
     <div id="mv-detalhes" style="display:none;margin-top:8px;">
       <p class="mv-hint">Ex.: <code>[narrador] Era noite em Berlim. [ricardo] Você ouviu isso? [ana] Ouvi.</code> — o que vem antes da primeira tag usa a voz escolhida abaixo. A voz continua até a próxima tag. Clique numa voz em <b>🎭 Vozes com slug</b> pra inserir a tag no cursor.</p>
       <label style="font-size:0.85rem;">Pausa quando troca de voz: <span id="mv-pausa-valor">0.35</span>s</label>

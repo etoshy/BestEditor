@@ -81,7 +81,7 @@ def test_projeto_do_modelo_sugere_a_direcao_no_editor(A):
         A._aplicar_extras_dp(job2, ParsedAIResponse(segments=[], direcao="sys_cinema"))
         assert job2["editor_defaults"]["direcao"] == "sys_cinema"
         # outro modelo: nenhuma sugestão
-        p2 = ds.criar(A.BASE_DIR, "Outro", modelo="true_crime")
+        p2 = ds.criar(A.BASE_DIR, "Outro", modelo="ciencia")  # modelo sem direção sugerida (o true crime sugere a dele desde v84_171)
         assert A._ligar_projeto(job, "dossie", p2["id"]) and "direcao_do_projeto" not in job
     finally:
         import shutil

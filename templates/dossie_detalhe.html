@@ -60,6 +60,13 @@
   <input type="text" id="cExtra" value="{{ p.config.extra }}" placeholder="ex.: dar mais tempo pra investigação; terminar com a situação atual">
   <label>📺 Nome do canal <span style="font-weight:400;color:#888;">(a IA fala no começo, depois do gancho, e no fechamento — vazio = o das ⚙️ Configurações{% if nome_canal_global %}: “{{ nome_canal_global }}”{% endif %}; “-” = não falar)</span></label>
   <input type="text" id="cCanal" value="{{ p.config.nome_canal or '' }}" maxlength="80" placeholder="{{ nome_canal_global or 'ex.: Casos Arquivados' }}">
+  <div id="vozBox" class="ds-hint" style="display:none;margin-top:10px;border:1px solid var(--borda);border-radius:10px;padding:10px 12px">
+    <b style="font-size:.95rem">🎭 Vozes dos personagens — <span id="vozCanal"></span></b>
+    <p style="margin:4px 0 8px">O roteiro sai com as falas marcadas (<code>[narrador]</code>, <code>[mira]</code>…). Escolha a voz de cada um (uma voz cadastrada no <a href="/gerar-voz" target="_blank">🎙 Gerador de voz → 🎭 Vozes</a>) e a emoção padrão (Chatterbox: <b>exag</b> = intensidade emocional, <b>cfg</b> = mais baixo fala mais solto/expressivo, <b>vel</b> = velocidade). No 🎙 Gerar voz, tudo já vem pronto no modo multi voz.</p>
+    <label style="font-weight:400;display:flex;gap:6px;align-items:center;margin:0 0 6px"><input type="checkbox" id="cIaEmocao" style="width:auto" {% if p.config.ia_emocao != false %}checked{% endif %}> 🤖 A IA do roteiro escolhe a emoção de cada fala (presets como <code>[mira|curiosa]</code> ou números <code>[vanta|exag=0.35]</code>)</label>
+    <div id="vozLinhas" style="display:grid;gap:6px"></div>
+    <span id="vozSt"></span>
+  </div>
   <label>Roteiro / anotações seus <span style="font-weight:400;color:#888;">(opcional — é um GUIA: a IA usa os fatos e cria a própria linha de storytelling, sem clonar)</span></label>
   <textarea id="rotBase" rows="4">{{ p.roteiro_base }}</textarea>
   <details style="margin-top:8px;"{% if p.config.referencia %} open{% endif %}>
@@ -90,7 +97,7 @@
   <p class="ds-hint">Cole um ou vários links (um por linha). De cada matéria o sistema salva título, linha fina, autor, data, subtítulos e o texto inteiro — e baixa as imagens com a legenda (elas aparecem nos materiais com o código da fonte). Ícones e logos pequenos ficam de fora.</p>
   <p class="ds-hint">🎬 <b>Link de vídeo</b> (YouTube, Shorts, TikTok, Instagram, Vimeo, Facebook, X…): o sistema pega a <b>transcrição sem os tempos</b> e coloca no campo <b>Roteiro / anotações seus</b> (etapa 1), um bloco por vídeo. Dá pra misturar matérias e vídeos na mesma lista.</p>
   <textarea id="urls" rows="3" placeholder="https://...&#10;https://..."></textarea>
-  <div class="ds-row"><button class="ds-mini" id="btnFontes">➕ Adicionar fontes</button><span class="ds-hint" id="fontesSt"></span></div>
+  <div class="ds-row"><button class="ds-mini" id="btnFontes">➕ Adicionar fontes</button><button class="ds-mini" id="btnCopiarLinks" title="Todos os links do projeto (matérias e vídeos transcritos), um por linha">📋 Copiar links do projeto</button><span class="ds-hint" id="fontesSt"></span></div>
   <div class="ds-row" style="margin-top:10px;padding-top:8px;border-top:1px dashed #ddd;">
     <span style="font-size:0.88rem;">📄 Ou arquivos:</span>
     <input type="file" id="arqFonte" multiple accept=".txt,.md,.pdf,.epub,.docx,.srt,.vtt,.html,.htm,.rtf" style="flex:2;min-width:220px;">
@@ -173,6 +180,9 @@
 const PID = {{ p.id|tojson }};
 let P = {{ p|tojson }};
 const MODELOS = {{ modelos|tojson }};
+const PERFIS_VOZ = {{ perfis_voz|tojson }};
+let VOZES_MULTI = {{ vozes_multi|tojson }};
+const PERFIS_CLONAGEM = {{ (perfis_clonagem or [])|tojson }};
 const ORDEM = {{ ordem|tojson }};  // ordem dos formatos (o tojson ordena as chaves)
 const TIPOS = {{ tipos|tojson }};
 const $ = (id) => document.getElementById(id);
@@ -220,11 +230,58 @@ function salvarCfg(extra) {
       const d = await api(`/modelos-video/${PID}/config`, Object.assign({ tema: $('tema').value, modelo: $('cModelo').value, formato: $('cFormato').value,
         minutos: $('cMin').value, idioma: $('cIdioma').value, formato_video: $('cVid').value, tom: $('cTom').value, extra: $('cExtra').value,
         roteiro_base: $('rotBase').value, referencia: $('cRef').value, referencia_modo: $('cRefModo').value, sem_experiencias: $('cSemExp').checked, marcar_chamadas: $('cChamadas').checked,
-        sugerir_produto: $('cProduto').checked, nome_canal: $('cCanal').value, titulo: $('cTitulo').value, modo_partes: $('cPartes').value }, extra || {}));
-      P.config = d.config; if (d.config.nome_canal && !$('cCanal').value) $('cCanal').value = d.config.nome_canal; $('cfgSt').innerHTML = '<span class="ds-ok">✔ salvo</span>'; $('titulo').textContent = '🕵️ ' + ($('tema').value || 'Projeto');
+        sugerir_produto: $('cProduto').checked, nome_canal: $('cCanal').value, titulo: $('cTitulo').value, modo_partes: $('cPartes').value, ia_emocao: $('cIaEmocao').checked, ...(vozesDaTela() ? { vozes_personagens: vozesDaTela() } : {}) }, extra || {}));
+      if (d.vozes_multi) { VOZES_MULTI = d.vozes_multi; $('vozLinhas').dataset.modelo = ''; }
+      P.config = d.config; if (d.config.nome_canal && !$('cCanal').value) $('cCanal').value = d.config.nome_canal; if (d.config.referencia && !$('cRef').value.trim()) { $('cRef').value = d.config.referencia; $('cRefModo').value = d.config.referencia_modo || 'modelar'; } desenharVozes(); $('cfgSt').innerHTML = '<span class="ds-ok">✔ salvo</span>'; $('titulo').textContent = '🕵️ ' + ($('tema').value || 'Projeto');
     } catch (e) { $('cfgSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
   }, 450);
 }
+function vozesDaTela() {
+  const linhas = document.querySelectorAll('#vozLinhas [data-fal]'); if (!linhas.length) return null;
+  const out = {}; linhas.forEach(l => { out[l.dataset.fal] = { voz: l.querySelector('[data-k=voz]').value, exag: l.querySelector('[data-k=exag]').value, cfg: l.querySelector('[data-k=cfg]').value, vel: l.querySelector('[data-k=vel]').value }; });
+  return out;
+}
+function desenharVozes() {
+  const pf = PERFIS_VOZ[$('cModelo').value];
+  $('vozBox').style.display = pf ? '' : 'none'; if (!pf) { $('vozLinhas').innerHTML = ''; return; }
+  if ($('vozLinhas').dataset.modelo === $('cModelo').value && $('vozLinhas').children.length) return;
+  $('vozLinhas').dataset.modelo = $('cModelo').value; $('vozCanal').textContent = pf.canal;
+  const atual = (P.config && P.config.vozes_personagens) || {};
+  $('vozLinhas').innerHTML = pf.falantes.map(f => {
+    const a = atual[f.slug] || {}, sg = f.voz_sugerida || {};
+    const comVoz = new Set(VOZES_MULTI.filter(v => v.motor === 'chatterbox').map(v => v.perfil).filter(Boolean));
+    const pfs = PERFIS_CLONAGEM.filter(x => !comVoz.has(x.nome));
+    const ops = '<option value="">— escolha a voz —</option>'
+      + (VOZES_MULTI.length ? '<optgroup label="🎭 Vozes cadastradas">' + VOZES_MULTI.map(v => `<option value="${esc(v.slug)}" ${a.voz === v.slug ? 'selected' : ''}>${esc(v.nome)} (${esc(v.motor || '')}${v.genero ? ', ' + esc(v.genero) : ''})</option>`).join('') + '</optgroup>' : '')
+      + (pfs.length ? '<optgroup label="🗣️ Perfis de voz (vira voz Chatterbox)">' + pfs.map(x => `<option value="perfil:${esc(x.nome)}">${esc(x.nome)}${x.genero ? ' (' + esc(x.genero) + ')' : ''}</option>`).join('') + '</optgroup>' : '');
+    const emo = Object.entries(f.emocoes || {}).map(([k, e]) => `<code title="${esc(e.descricao || '')}">${esc(k)}${e.exag != null ? ' ' + e.exag : ''}</code>`).join(' ');
+    const num = (k, ph) => `<input type="number" step="0.05" min="0" max="2" data-k="${k}" value="${a[k] ?? ''}" placeholder="${ph ?? ''}" style="width:72px;margin:0" title="${k}">`;
+    return `<div data-fal="${esc(f.slug)}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--borda);padding-top:6px">
+      <b style="min-width:150px">[${esc(f.slug)}] ${esc(f.nome)}${f.epiteto ? ' <span style="font-weight:400">· ' + esc(f.epiteto) + '</span>' : ''}</b>
+      <select data-k="voz" style="width:auto;min-width:200px;margin:0">${ops}</select>
+      exag ${num('exag', sg.exag)} cfg ${num('cfg', sg.cfg)} vel ${num('vel', sg.vel)}
+      ${sg.descricao || sg.genero ? `<span style="flex-basis:100%;font-size:.78rem">voz sugerida: ${esc([sg.genero, sg.idade, sg.motor, sg.descricao].filter(Boolean).join(' · '))}</span>` : ''}
+      ${emo ? `<span style="flex-basis:100%;font-size:.78rem">emoções: ${emo}</span>` : ''}</div>`;
+  }).join('');
+  $('vozLinhas').querySelectorAll('select, input').forEach(el => el.addEventListener('change', () => salvarCfg()));
+}
+$('cIaEmocao').addEventListener('change', () => salvarCfg());
+// 📋 v84_176: os links usados no projeto, um por linha (matérias + vídeos transcritos nas anotações)
+function linksDoProjeto() {
+  const out = [];
+  (P.fontes || []).forEach(f => { if (/^https?:\/\//.test(f.url || '')) out.push(f.url); });
+  ($('rotBase').value || '').split('\n').forEach(l => { const m = l.trim().match(/^\((https?:\/\/[^\s)]+)\)$/); if (m) out.push(m[1]); });
+  // Shorts/youtu.be/?si=… → https://www.youtube.com/watch?v=ID (v84_177)
+  const yt = u => { const m = u.match(/^https?:\/\/(?:[\w-]+\.)*(?:youtube\.com\/(?:watch\?(?:[^#\s]*?&)?v=|shorts\/|live\/|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i); return m ? 'https://www.youtube.com/watch?v=' + m[1] : u; };
+  return [...new Set(out.map(yt))];
+}
+$('btnCopiarLinks').addEventListener('click', async () => {
+  const ls = linksDoProjeto();
+  if (!ls.length) { $('fontesSt').textContent = 'nenhum link no projeto ainda'; return; }
+  try { await navigator.clipboard.writeText(ls.join('\n')); $('fontesSt').textContent = `✅ ${ls.length} link(s) copiados`; }
+  catch (_) { prompt('Copie os links:', ls.join(' ')); }
+});
+desenharVozes();
 $('cModelo').addEventListener('change', () => { opcoesFormato(); const f = ((MODELOS[$('cModelo').value] || {}).formatos || {})[$('cFormato').value]; if (f) $('cMin').value = f.minutos; salvarCfg(); });
 $('cFormato').addEventListener('change', () => {
   mostrarEstrutura();

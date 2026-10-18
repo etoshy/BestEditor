@@ -649,6 +649,7 @@ def gerar_voz_page():
         dossie_id=request.args.get("dossie") if _texto_do_dossie(request.args.get("dossie")) else "",
         idioma_inicial=_idioma_do_projeto(request.args.get("venda"), request.args.get("dossie")),
         projetos_voz=_projetos_para_voz(),
+        vozes_canal=_info_vozes_dossie(request.args.get("dossie")),
     )
 
 
@@ -1616,7 +1617,8 @@ def _perfis_com_info(perfis: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         lp = perfis_limpeza.info(p["nome"])
         out.append(dict(p, genero=(info.get(p["nome"]) or {}).get("genero", ""), idade=(info.get(p["nome"]) or {}).get("idade", ""),
                         descricao=(info.get(p["nome"]) or {}).get("descricao", ""), vozes_slug=usos.get(p["nome"], []),
-                        audio=lp["audio"], limpeza=lp["limpeza"], n_originais=len(perfis_limpeza.originais(p["nome"]))))
+                        audio=lp["audio"], limpeza=lp["limpeza"], n_originais=len(perfis_limpeza.originais(p["nome"])),
+                        clipes=_clipes_info(p["nome"])))
     return out
 
 
@@ -1678,6 +1680,87 @@ def perfis_de_voz_original(nome: str, indice: int):
     if not os.path.isfile(o):
         return "Esse clipe não foi limpo.", 404
     return send_file(o, mimetype="audio/wav")
+
+
+# ------------------------------------------------------------------ ✂ clipe a clipe (v84_174)
+def _limpeza_sem(nome: str, base: str) -> None:
+    """Tira o clipe apagado da lista de "já limpos" — um clipe novo com o mesmo nome tem de ser limpo de novo."""
+    import perfis_info
+    lp = dict((perfis_info.obter(nome) or {}).get("limpeza") or {})
+    if base in (lp.get("clipes") or []):
+        lp["clipes"] = [c for c in lp["clipes"] if c != base]
+        perfis_info.atualizar(nome, limpeza=lp)
+
+
+@app.route("/perfis-de-voz/<nome>/clipe/<int:indice>/excluir", methods=["POST"])
+def perfis_de_voz_clipe_excluir(nome: str, indice: int):
+    """🗑 Apaga UM clipe ruim do perfil (e o original dele)."""
+    from tts import voice_generator as _vg
+    if nome not in tts_listar_perfis_de_voz():
+        return jsonify({"erro": "Perfil não encontrado."}), 404
+    try:
+        base = _vg.excluir_clipe_do_perfil(nome, indice)
+    except VoiceGeneratorError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    _limpeza_sem(nome, base)
+    return jsonify({"ok": True, "apagado": base, "clipes": _clipes_info(nome)})
+
+
+@app.route("/perfis-de-voz/<nome>/clipe/<int:indice>/principal", methods=["POST"])
+def perfis_de_voz_clipe_principal(nome: str, indice: int):
+    """⭐ Esse clipe vai primeiro — é o único que o Chatterbox usa."""
+    from tts import voice_generator as _vg
+    if nome not in tts_listar_perfis_de_voz():
+        return jsonify({"erro": "Perfil não encontrado."}), 404
+    try:
+        _vg.definir_clipe_principal(nome, indice)
+    except VoiceGeneratorError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    return jsonify({"ok": True, "clipes": _clipes_info(nome)})
+
+
+@app.route("/perfis-de-voz/<nome>/adicionar", methods=["POST"])
+def perfis_de_voz_adicionar(nome: str):
+    """➕ Junta mais áudio(s)/vídeo(s) no perfil sem apagar os clipes que ele já tem."""
+    from tts import voice_generator as _vg
+    if nome not in tts_listar_perfis_de_voz():
+        return jsonify({"erro": "Perfil não encontrado."}), 404
+    arquivos = [f for f in request.files.getlist("audios") if f and f.filename]
+    if not arquivos:
+        return jsonify({"erro": "Escolha pelo menos um áudio ou vídeo."}), 400
+    if len(arquivos) > tts_MAX_CLIPES_POR_PERFIL:
+        return jsonify({"erro": f"No máximo {tts_MAX_CLIPES_POR_PERFIL} arquivos de uma vez."}), 400
+    os.makedirs(VOZES_DIR, exist_ok=True)
+    tmps = []
+    try:
+        for arq in arquivos:
+            t = os.path.join(VOZES_DIR, f"perfiladd_{uuid.uuid4().hex}_{secure_filename(arq.filename) or 'audio'}")
+            arq.save(t)
+            tmps.append(t)
+        origem = tmps[0] if len(tmps) == 1 else tmps
+        novos = _vg.adicionar_clipes_ao_perfil(nome, origem, dividir_audio_longo=request.form.get("dividir", "on") == "on")
+    except VoiceGeneratorError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    finally:
+        for t in tmps:
+            try:
+                os.remove(t)
+            except OSError:
+                pass
+    import perfis_limpeza
+    tid = perfis_limpeza.iniciar(nome) if perfis_limpeza.precisa_limpar(nome) else None  # 🎵 perfil com música: limpa só os novos
+    return jsonify({"ok": True, "adicionados": len(novos), "tarefa": tid, "clipes": _clipes_info(nome)})
+
+
+def _clipes_info(nome: str) -> List[Dict[str, Any]]:
+    """[{indice, arquivo, segundos, principal}] na ordem da página (o ⭐ primeiro)."""
+    from tts import voice_generator as _vg
+    try:
+        lista = tts_caminho_perfil_de_voz(nome)
+    except VoiceGeneratorError:
+        return []
+    return [{"indice": i, "arquivo": os.path.basename(c), "segundos": _vg.duracao_wav(c), "principal": i == 0}
+            for i, c in enumerate(lista)]
 
 
 @app.route("/perfis-de-voz/<nome>/info", methods=["POST"])
@@ -1865,9 +1948,12 @@ def perfis_de_voz_youtube_extrair():
     itens = corpo.get("itens") or []
     qualidade = (corpo.get("qualidade") or YT_QUALIDADE_PADRAO).strip()
     audio_tipo = corpo.get("audio") if corpo.get("audio") in ("limpo", "musica") else ""  # 🎧
+    adicionar = bool(corpo.get("adicionar"))  # ➕ juntar num perfil que já existe (v84_174)
 
     if not nome:
         return jsonify({"erro": "Dê um nome pro perfil antes de extrair."}), 400
+    if adicionar and nome not in tts_listar_perfis_de_voz():
+        return jsonify({"erro": f"O perfil {nome!r} não existe — escolha um da lista."}), 400
     if not itens:
         return jsonify({"erro": "Adicione pelo menos um vídeo com um trecho."}), 400
 
@@ -1884,10 +1970,10 @@ def perfis_de_voz_youtube_extrair():
             job["log"] += linha + "\n"
 
         try:
-            salvos = yt_extrair_perfil_de_voz_do_youtube(itens, nome, qualidade=qualidade, on_log=log)
+            salvos = yt_extrair_perfil_de_voz_do_youtube(itens, nome, qualidade=qualidade, on_log=log, **({"adicionar": True} if adicionar else {}))
             import perfis_limpeza
             from tts.voice_generator import _nome_perfil_seguro as _nps
-            if audio_tipo:
+            if audio_tipo and not (adicionar and audio_tipo == "limpo"):  # ➕ juntando: "limpo" não desmarca o 🎵 do perfil
                 perfis_limpeza.marcar(_nps(nome), audio_tipo)
             if perfis_limpeza.precisa_limpar(_nps(nome)):  # 🎵 com música de fundo: limpa os clipes agora (uma vez)
                 try:
@@ -1895,7 +1981,8 @@ def perfis_de_voz_youtube_extrair():
                 except Exception as exc:  # noqa: BLE001 — o perfil fica criado; dá pra limpar depois na página
                     log(f"⚠ Não consegui limpar a música de fundo: {exc}")
             job["status"] = "pronto"
-            job["quantidade_clipes"] = len(salvos)
+            job["quantidade_clipes"] = len(tts_caminho_perfil_de_voz(nome)) if adicionar else len(salvos)
+            job["adicionados"] = len(salvos)
         except (YoutubeClipperError, VoiceGeneratorError) as exc:
             job["status"] = "erro"
             job["erro"] = str(exc)
@@ -1915,6 +2002,7 @@ def perfis_de_voz_youtube_status(job_id: str):
     return jsonify({
         "status": job["status"], "erro": job.get("erro"), "log": job.get("log", ""),
         "nome_perfil": job.get("nome_perfil"), "quantidade_clipes": job.get("quantidade_clipes"),
+        "adicionados": job.get("adicionados"),
     })
 
 
@@ -7889,6 +7977,8 @@ def edicao_resposta(job_id: str):
     corpo = request.get_json(silent=True) or {}
     n = int(corpo.get("n_trechos") or len(job.get("pending_segments") or []))
     textos = [str(t) for t in corpo.get("textos") or [] if str(t or "").strip()]  # ✂️ uma resposta por parte
+    # 🎬 v84_172: só vale o que a direção escolhida tem (o que a IA trouxer de fora sai, com aviso)
+    _dir = prompt_edicao.direcao_escolhida(job, corpo.get("direcao"), corpo.get("kit")) if corpo.get("so_direcao", True) is not False else None
     _bib = {it["id"]: it["media_type"] for it in job.get("media_library") or []
             if it.get("media_type") in ("image", "video") and os.path.exists(it.get("path") or "")}
     try:
@@ -7897,13 +7987,13 @@ def edicao_resposta(job_id: str):
             for k, t in enumerate(textos, start=1):
                 try:
                     planos.append(prompt_edicao.ler_resposta(t, n, float(job.get("total_duration") or 0), _palavras_da_narracao(job), corpo.get("foto"),
-                                                             biblioteca=_bib))
+                                                             biblioteca=_bib, direcao=_dir))
                 except ValueError as exc:
                     raise ValueError(f"Parte {k}: {exc}") from exc
             plano = prompt_edicao.juntar_planos(planos)
         else:
             plano = prompt_edicao.ler_resposta(str(corpo.get("texto") or ""), n, float(job.get("total_duration") or 0),
-                                               _palavras_da_narracao(job), corpo.get("foto"), biblioteca=_bib)
+                                               _palavras_da_narracao(job), corpo.get("foto"), biblioteca=_bib, direcao=_dir)
     except ValueError as exc:
         return jsonify({"erro": str(exc)}), 400
     for d in (plano.get("destaques") or []) + (plano.get("editoriais") or []):
@@ -11448,9 +11538,37 @@ def _texto_do_dossie(pid: Optional[str]) -> str:
         return ""
     import dossies
     try:
-        return dossies.roteiro_para_voz(dossies.carregar(BASE_DIR, pid))
+        p = dossies.carregar(BASE_DIR, pid)
+        texto = dossies.roteiro_para_voz(p)
+        return _vozes_do_canal(p, texto)[0]
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _vozes_do_canal(p: Dict[str, Any], texto: str):
+    """🎭 v84_173: canal com personagens — [mira|curiosa] vira a voz escolhida pra Mira com a emoção da fala.
+    → (texto, faltam, é_multivoz)."""
+    import dossies
+    perfil = dossies.perfil_do_modelo((p.get("config") or {}).get("modelo"))
+    if not perfil:
+        return texto, [], False
+    import canal_perfil
+    cfg = p.get("config") or {}
+    t, faltam = canal_perfil.converter_para_vozes(texto, perfil, cfg.get("vozes_personagens") or {},
+                                                  usar_emocao=cfg.get("ia_emocao", True) is not False)
+    return t, faltam, True
+
+
+def _info_vozes_dossie(pid: Optional[str]) -> Dict[str, Any]:
+    if not pid:
+        return {}
+    import dossies
+    try:
+        p = dossies.carregar(BASE_DIR, pid)
+    except Exception:  # noqa: BLE001
+        return {}
+    _t, faltam, multi = _vozes_do_canal(p, dossies.roteiro_para_voz(p))
+    return {"multivoz": multi, "faltam": faltam} if multi else {}
 
 
 def _idioma_do_projeto(venda: Optional[str], dossie: Optional[str]) -> str:

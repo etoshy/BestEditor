@@ -402,6 +402,78 @@ def bloco_promessa(titulo: str, curto: bool = False) -> str:
             "- Cada frase traz informação NOVA: nada de repetir a mesma frase ou ideia com outras palavras logo em seguida.")
 
 
+# ------------------------------------------------------------------ 🎯 escopo: só o necessário pro título (v84_178)
+FRASE_OUTRO_VIDEO = {
+    "pt": "Isso merece um vídeo só pra ele — fica pra outro episódio.",
+    "de": "Das ist eine eigene Geschichte — darüber machen wir ein eigenes Video.",
+    "en": "That's a story of its own — we'll save it for another video.",
+    "es": "Eso merece un video aparte — lo dejamos para otro episodio.",
+    "fr": "C'est une histoire à part — on y consacrera une autre vidéo.",
+    "it": "Questa è un'altra storia — le dedicheremo un video a parte.",
+}
+ESCOPO_JSON = {"pergunta_central": "a pergunta que o título promete responder, numa frase",
+               "precisa_para_entender": ["passo 1 que a pessoa precisa entender", "passo 2", "… (3 a 6 passos)"],
+               "fica_para_outro_video": ["assunto vizinho que ficou de fora (vira ideia de próximo vídeo)"]}
+
+
+def bloco_escopo(titulo: str, idioma: str = "pt", curto: bool = False, enxuto: bool = False) -> str:
+    """🎯 O vídeo cobre SÓ o que a pessoa precisa pra entender o título; o assunto vizinho é outro vídeo."""
+    titulo = " ".join(str(titulo or "").split())[:200]
+    frase = FRASE_OUTRO_VIDEO.get((idioma or "pt")[:2], FRASE_OUTRO_VIDEO["pt"])
+    if curto:
+        return (f"## 🎯 Escopo: só o necessário pra entender “{titulo}”\n"
+                "- Uma pergunta, uma resposta. Nada de assunto vizinho — no máximo uma frase simples.")
+    L = [f"## 🎯 ESCOPO — SÓ O NECESSÁRIO PRA ENTENDER O TÍTULO: “{titulo}”" if titulo else
+         "## 🎯 ESCOPO — SÓ O NECESSÁRIO PRA ENTENDER O TEMA",
+         "Antes de escrever, decida: o que a pessoa PRECISA saber pra entender (e responder) o título? Isso — 3 a 6 passos "
+         "encadeados — é o vídeo. O resto fica de fora, mesmo sendo verdadeiro e interessante.",
+         "- Pra cada assunto ou fato candidato, pergunte: “sem isto, a pessoa ainda entende o título?”. Se entende, corte. "
+         "Assunto VIZINHO (outro tipo do mesmo fenômeno, outra descoberta, outro objeto famoso, uma aplicação curiosa) não é "
+         "prova da tese: é OUTRO vídeo.",
+         "- Profundidade vale mais que amplitude: 4 ideias bem entendidas são melhores que 9 citadas de passagem.",
+         f"- Assunto relacionado que faria falta se sumisse de vez: no máximo 1–2 frases SIMPLES e diga que ele terá vídeo "
+         f"próprio (ex.: “{frase}”). No máximo 2 desses adiamentos no vídeo inteiro.",
+         "- Conceito complexo que É necessário: explique do jeito mais simples — uma analogia do dia a dia + uma frase do "
+         "mecanismo, sem cascata de termos técnicos. O detalhe que não muda o entendimento: simplifique (sem ficar errado) e, se "
+         "valer, prometa o aprofundamento noutro vídeo.",
+         "- Não reconte o que já foi dito (nada de “Em 1054, como vimos…” a cada bloco) e não faça resumo de tudo no fim — o fim "
+         "RESPONDE ao título.",
+         "- Em \"escopo\" no JSON: a pergunta central, os passos necessários e o que ficou pra outro vídeo (viram ideias de "
+         "próximos vídeos)."]
+    if enxuto:
+        L.append("- Fonte NÃO é dita em voz alta (“segundo a astrônoma X na palestra dela”, “so X in ihrem Vortrag”) — ela vai "
+                 "na descrição e no \"observacoes\". Diga um nome só quando a pessoa faz parte da história (quem descobriu, quem "
+                 "observou). Incerteza se diz em palavras simples (“estimativas”, “ainda não se sabe”), sem citar quem estimou.")
+    return "\n".join(L)
+
+
+def ler_escopo(x: Any) -> Dict[str, Any]:
+    if not isinstance(x, dict):
+        return {}
+    lista = lambda v: [str(i).strip()[:200] for i in (v if isinstance(v, list) else []) if str(i).strip()][:10]  # noqa: E731
+    out = {"pergunta_central": str(x.get("pergunta_central") or "").strip()[:300],
+           "precisa_para_entender": lista(x.get("precisa_para_entender")),
+           "fica_para_outro_video": lista(x.get("fica_para_outro_video"))}
+    return out if any(out.values()) else {}
+
+
+def bloco_escopo_parte(escopo: Dict[str, Any], idioma: str = "pt") -> str:
+    """O escopo decidido no plano, repetido em cada parte (pra parte não puxar o assunto que ficou de fora)."""
+    if not escopo:
+        return ""
+    frase = FRASE_OUTRO_VIDEO.get((idioma or "pt")[:2], FRASE_OUTRO_VIDEO["pt"])
+    L = ["## 🎯 Escopo do vídeo (decidido no plano — respeite)"]
+    if escopo.get("pergunta_central"):
+        L.append(f"Pergunta central: {escopo['pergunta_central']}")
+    if escopo.get("precisa_para_entender"):
+        L.append("O que a pessoa precisa entender: " + " → ".join(escopo["precisa_para_entender"]))
+    if escopo.get("fica_para_outro_video"):
+        L.append("FICA DE FORA (é outro vídeo): " + "; ".join(escopo["fica_para_outro_video"])
+                 + f". Se precisar tocar num deles, no máximo 1 frase simples + o aviso de vídeo próprio (ex.: “{frase}”).")
+    L.append("Explique o necessário do jeito mais simples (analogia + uma frase do mecanismo), sem cascata de termos técnicos.")
+    return "\n".join(L)
+
+
 _PALAVRAS_VAZIAS = set("""a o os as um uma uns umas de do da dos das em no na nos nas por para pra com sem que e ou mas se
 como mais muito já não também ele ela eles elas isso esse essa este esta the and or of to in on at for with is are was were be
 it this that der die das den dem des ein eine einen einem einer und oder aber nicht auch ist sind war waren wird werden wurde

@@ -37,7 +37,9 @@ EXT_ARQUIVO_FONTE = (".txt", ".md", ".pdf", ".epub", ".docx", ".srt", ".vtt", ".
 MODELOS: Dict[str, Dict[str, Any]] = {
     "true_crime": {
         "nome": "🕵️ True Crime",
-        "descricao": "Casos criminais reais contados como documentário: fatos, linha do tempo, investigação, julgamento.",
+        "descricao": "Casos criminais reais contados como documentário: fatos, linha do tempo, investigação, julgamento. "
+                     "No editor, combina com a direção “True crime investigativo (documentário de caso)”.",
+        "direcao_sugerida": "sys_true_crime",  # 🎬 v84_171
         "afirmacoes": True,  # v84_95: lista de afirmações importantes com tipo (fato/alegação/interpretação) e fonte
         "formatos": {
             "caso_completo": {
@@ -502,6 +504,7 @@ def criar(base: str, tema: str = "", modelo: str = "true_crime") -> Dict[str, An
         cfg["idioma"] = ult["idioma"]
     if "nome_canal" in ult:
         cfg["nome_canal"] = ult["nome_canal"]
+    aplicar_padroes_do_modelo(cfg, cfg["modelo"])
     p = {"id": pid, "criado": time.time(), "atualizado": time.time(), "tema": (tema or "").strip()[:300],
          "roteiro_base": "", "config": cfg, "fontes": [], "midias": [], "resultado": None}
     salvar(base, p)
@@ -1076,6 +1079,18 @@ def eh_link_de_video(url: str) -> bool:
     return bool(_RX_VIDEO.match(str(url or "").strip()))
 
 
+_RX_YT_ID = re.compile(r"^https?://(?:[\w-]+\.)*(?:youtube\.com/(?:watch\?(?:[^#\s]*?&)?v=|shorts/|live/|embed/|v/)|youtu\.be/)"
+                       r"([A-Za-z0-9_-]{11})", re.I)
+
+
+def link_video_padrao(url: str) -> str:
+    """🎬 v84_177: qualquer link do YouTube (Shorts, youtu.be, live, embed, com ?si=/&xstg=/&sttick=…) vira
+    https://www.youtube.com/watch?v=ID — o formato que a transcrição entende. Os outros sites ficam como estão."""
+    u = str(url or "").strip()
+    m = _RX_YT_ID.match(u)
+    return f"https://www.youtube.com/watch?v={m.group(1)}" if m else u
+
+
 def adicionar_fonte(p: Dict[str, Any], url: str) -> Dict[str, Any]:
     url = _vd._checar_url(url)
     if any(x["url"] == url for x in p.get("fontes") or []):
@@ -1116,7 +1131,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     minutos, palavras, _ppm = alvo_tamanho(p)
     import metodo_roteiro
     L: List[str] = []
-    L.append(f"Você é roteirista de um canal de {mod['nome'].split(' ', 1)[1]} no YouTube. Escreva o roteiro NARRADO completo "
+    L.append(f"Você é roteirista de um canal de {sem_emoji(mod['nome'])} no YouTube. Escreva o roteiro NARRADO completo "
              f"(alguém vai ler em voz alta) de um vídeo sobre o tema abaixo, usando SÓ as fontes e materiais que eu juntei.")
     L.append("")
     L.append(f"## Tema\n{p['tema'].strip()}")
@@ -1125,6 +1140,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if _prom:  # 🧵 v84_169: o título/tema é a promessa — o roteiro inteiro amarra nele
         L.append(_prom)
         L.append("")
+    _esc = metodo_roteiro.bloco_escopo(titulo_promessa(p), idioma=__import__("idiomas").normalizar(cfg.get("idioma")) or "pt",
+                                       curto=minutos <= 1 or cfg.get("formato") == "curto", enxuto=escopo_enxuto(mod))
+    L.append(_esc)  # 🎯 v84_178: só o necessário pro título; o assunto vizinho é outro vídeo
+    L.append("")
     import idiomas
     nome_idioma = idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt")
     if (idiomas.normalizar(cfg.get("idioma")) or "pt") == "en":
@@ -1133,7 +1152,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.insert(1, f"IDIOMA DE SAÍDA: escreva TUDO em {nome_idioma} — roteiro, títulos, ideias, descrição, capítulos e tags —, "
                 "mesmo que as fontes estejam em outro idioma (traduza os fatos com fidelidade; nomes próprios, de lugares e de "
                 "obras ficam como são, com a tradução oficial quando existir).")
-    L.append(f"## Formato: {fmt['nome'].split(' ', 1)[1]} — ~{minutos:g} min (~{palavras} palavras), em {nome_idioma}")
+    L.append(f"## Formato: {sem_emoji(fmt['nome'])} — ~{minutos:g} min (~{palavras} palavras), em {nome_idioma}")
     L.append("Estrutura (siga a ordem; cada parte pode virar um ou mais capítulos):")
     L.extend(f"{k}. {e}" for k, e in enumerate(fmt["estrutura"], start=1))
     L.append("")
@@ -1145,6 +1164,12 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append(f"- Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
     if cfg.get("sem_experiencias", True):
         L.append("- " + REGRA_SEM_PESSOAL)
+    _perfil = perfil_do_modelo(cfg.get("modelo"))
+    if _perfil:  # 🎭 v84_173: canal com personagens — falas multi voz, emoção por fala, lore, continuidade, histórico
+        import canal_perfil
+        L.append("")
+        L.append(canal_perfil.bloco_roteiro(_perfil, ia_emocao=cfg.get("ia_emocao", True) is not False,
+                                            curto=minutos <= 1 or cfg.get("formato") == "curto"))
     if cfg.get("marcar_chamadas", True) and fmt.get("minutos", 10) > 1:
         import roteiros_yt
         L.append("")
@@ -1208,7 +1233,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.append("")
     import roteiro_partes
     em_partes = roteiro_partes.usa_partes(cfg, minutos)
-    _tam = (roteiro_partes.bloco_plano(minutos, palavras, fmt.get("estrutura")) if em_partes
+    _tam = (roteiro_partes.bloco_plano(minutos, palavras, fmt.get("estrutura"), enxuto=escopo_enxuto(mod)) if em_partes
             else metodo_roteiro.bloco_tamanho(minutos, palavras, fmt.get("estrutura")))  # 📏 perto do fim: a IA respeita mais
     if _tam:
         L.append(_tam)
@@ -1217,6 +1242,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if em_partes:  # ✍️ só o PLANO agora (os capítulos vêm um por um, em texto puro)
         L.append(json.dumps({
             "plano": metodo_roteiro.PLANO_JSON,
+            "escopo": metodo_roteiro.ESCOPO_JSON,
             "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
             "capitulos": roteiro_partes.exemplo_capitulos(),
             "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
@@ -1228,7 +1254,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
             **({"produto_sugerido": {"nome": "nome do produto", "por_que": "por que combina com este vídeo e com o público",
                                      "busca": "o que digitar na Amazon pra achar", "chamada": "2-3 frases de venda pro vídeo da [[VENDA]]"}}
                if cfg.get("sugerir_produto") else {}),
+            **({"lore_registro": __import__("canal_perfil").EXEMPLO_REGISTRO} if _perfil else {}),
         }, ensure_ascii=False, indent=2))
+        if _perfil:
+            L.append(__import__("canal_perfil").bloco_registro())
         L.append("NÃO inclua \"roteiro\" nesta resposta — só o plano. " + __import__("thumbs_flow").BLOCO_PROMPT)
         L.append("")
         L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))
@@ -1236,6 +1265,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     L.append(json.dumps({
         "roteiro": "Texto narrado COMPLETO, no tamanho pedido... [I3] frase em que a imagem I3 aparece...",
         "plano": metodo_roteiro.PLANO_JSON,
+        "escopo": metodo_roteiro.ESCOPO_JSON,
         "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
         "ideias": ["ideias de ganchos / vídeos derivados"],
         "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
@@ -1251,7 +1281,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         **({"produto_sugerido": {"nome": "nome do produto", "por_que": "por que combina com este vídeo e com o público",
                                  "busca": "o que digitar na Amazon pra achar", "chamada": "2-3 frases de venda pro vídeo da [[VENDA]]"}}
            if cfg.get("sugerir_produto") else {}),
+        **({"lore_registro": __import__("canal_perfil").EXEMPLO_REGISTRO} if _perfil else {}),
     }, ensure_ascii=False, indent=2))
+    if _perfil:
+        L.append(__import__("canal_perfil").bloco_registro())
     L.append("O 1º capítulo começa no início do roteiro. 5 a 15 capítulos (Shorts: nenhum).")
     L.append(__import__("thumbs_flow").BLOCO_PROMPT)
     L.append("")
@@ -1278,10 +1311,19 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         return _resultado_plano(d, p)  # ✍️ veio o PLANO: os capítulos são escritos um por um
     if not isinstance(d, dict) or not str(d.get("roteiro") or "").strip():
         raise DossieError("O JSON não tem o \"roteiro\".")
+    _esc = __import__("metodo_roteiro").ler_escopo(d.get("escopo")) or ((p.get("resultado") or {}).get("escopo") or {})
+    if isinstance(d.get("lore_registro"), dict) or _esc.get("fica_para_outro_video"):
+        registrar_lore(p, d.get("lore_registro") or {}, _esc)  # 🎭 v84_173 (+ 🎯 os vídeos prometidos)
     rot = str(d["roteiro"]).strip()
     ids = {m["id"].upper() for m in p.get("midias") or []}
     avisos: List[str] = []
     import metodo_roteiro as _mr
+    _perf = perfil_do_modelo((p.get("config") or {}).get("modelo"))
+    if _perf:  # 🎭 v84_178: [narrator|contemplativ] → [narrador|contemplativo]; fala vazia sai
+        import canal_perfil as _cp
+        rot, _cons = _cp.normalizar_falas(rot, _perf)
+        if _cons:
+            avisos.append("🎭 Tags corrigidas: " + " · ".join(_cons[:6]) + (f" (+{len(_cons) - 6})" if len(_cons) > 6 else ""))
     rot, _rep = _mr.tirar_repeticoes(rot)  # 🔁 v84_169: frase quase igual logo em seguida sai
     if _rep:
         avisos.append(f"🔁 {len(_rep)} frase(s) repetida(s) logo em seguida tirada(s): " + " · ".join(f"“{x[:70]}…”" for x in _rep[:3]))
@@ -1301,7 +1343,8 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     if _lg:
         avisos.insert(0, "📏 " + _lg)
     return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": bool(_av), "longo": bool(_lg)},"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
-            "ideias": [str(x)[:300] for x in d.get("ideias") or [] if str(x).strip()][:15],
+            "ideias": _ideias_com_escopo(d.get("ideias"), _esc),
+            **({"escopo": _esc} if _esc else {}),
             "descricao": str(d.get("descricao") or "").strip()[:5000], "capitulos": caps, "palavras": n_pal,
             "roteiro": rot, "roteiro_final": voz, "momentos": momentos,
             "tags": [str(x)[:60] for x in d.get("tags") or [] if str(x).strip()][:30],
@@ -1310,6 +1353,7 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
             **({"partes": d["partes"]} if isinstance(d.get("partes"), list) and d["partes"] else {}),
             "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time(),
+            **({"lore_registro": d["lore_registro"]} if isinstance(d.get("lore_registro"), dict) else {}),
             "produto_sugerido": _produto(d.get("produto_sugerido")),
             "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
             "chamadas": {"inscreva": len(re.findall(r"\[\[\s*INSCREVA", rot, re.I)), "venda": len(re.findall(r"\[\[\s*VENDA", rot, re.I))}}
@@ -1318,6 +1362,9 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
 def _resultado_plano(d: Dict[str, Any], p: Dict[str, Any]) -> Dict[str, Any]:
     """✍️ O 1º prompt devolveu o PLANO (vídeo longo): guarda títulos, descrição etc. e as partes a escrever."""
     import roteiro_partes as rp
+    _esc = __import__("metodo_roteiro").ler_escopo(d.get("escopo"))
+    if isinstance(d.get("lore_registro"), dict) or _esc.get("fica_para_outro_video"):
+        registrar_lore(p, d.get("lore_registro") or {}, _esc)  # 🎭 v84_173 (+ 🎯 os vídeos prometidos)
     _min, _alvo, _ppm = alvo_tamanho(p)
     partes = rp.de_plano(d.get("capitulos") or [], _alvo)
     if not partes:
@@ -1326,7 +1373,8 @@ def _resultado_plano(d: Dict[str, Any], p: Dict[str, Any]) -> Dict[str, Any]:
         {"trecho": f["fato"][:300], "tipo": f["tipo"], "fonte": f.get("fonte") or ""} for pt in partes for f in pt["fatos"]][:80]
     return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": False},
             "titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
-            "ideias": [str(x)[:300] for x in d.get("ideias") or [] if str(x).strip()][:15],
+            "ideias": _ideias_com_escopo(d.get("ideias"), _esc),
+            **({"escopo": _esc} if _esc else {}),
             "descricao": str(d.get("descricao") or "").strip()[:5000],
             "capitulos": [{"titulo": pt["titulo"], "comeca_em": ""} for pt in partes], "palavras": 0,
             "roteiro": "", "roteiro_final": "", "momentos": [],
@@ -1339,7 +1387,8 @@ def _resultado_plano(d: Dict[str, Any], p: Dict[str, Any]) -> Dict[str, Any]:
             "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
             "afirmacoes": afirm,
             "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
-            "partes": partes, "chamadas": {"inscreva": 0, "venda": 0}}
+            "partes": partes, "chamadas": {"inscreva": 0, "venda": 0},
+            **({"lore_registro": d["lore_registro"]} if isinstance(d.get("lore_registro"), dict) else {})}
 
 
 # ------------------------------------------------------------------ ✍️ roteiro em partes
@@ -1355,8 +1404,16 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
         regras.append(f"Tom: {cfg['tom'].strip()[:400]}")
     if (cfg.get("extra") or "").strip():
         regras.append(f"Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
-    return {"referencia": (cfg.get("referencia") or "")[:9000] if cfg.get("referencia_modo") == "modelar" else "",
-            "tema": (p.get("tema") or "").strip(), "promessa": titulo_promessa(p), "nome_modelo": mod["nome"].split(" ", 1)[1], "minutos": minutos,
+    _perfil = perfil_do_modelo(cfg.get("modelo"))
+    _pb = ""
+    if _perfil:
+        import canal_perfil
+        _pb = canal_perfil.bloco_roteiro(_perfil, ia_emocao=cfg.get("ia_emocao", True) is not False, curto=True, n_hist=6)
+    return {"personagens_bloco": _pb,
+            "escopo": (p.get("resultado") or {}).get("escopo") or {}, "enxuto": escopo_enxuto(mod),  # 🎯 v84_178
+            "idioma_cod": idiomas.normalizar(cfg.get("idioma")) or "pt",
+            "referencia": (cfg.get("referencia") or "")[:9000] if cfg.get("referencia_modo") == "modelar" else "",
+            "tema": (p.get("tema") or "").strip(), "promessa": titulo_promessa(p), "nome_modelo": sem_emoji(mod["nome"]), "minutos": minutos,
             "idioma": idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
             "regras": regras, "canal": canal.nome_do_projeto(nome_canal_cfg(cfg)),
             "midias": {m["id"].upper(): o_que_e(m)[:300] for m in vis}, "plano": (p.get("resultado") or {}).get("plano") or {}}
@@ -1433,7 +1490,7 @@ def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
     _min, alvo, _ppm = alvo_tamanho(p)
     roteiro, caps = rp.montar(partes, cfg.get("marcar_chamadas", True) is not False, alvo)
     d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano",
-                                 "afirmacoes", "thumbnails")}
+                                 "afirmacoes", "thumbnails", "lore_registro", "escopo")}
     d.update(roteiro=roteiro, capitulos=caps, momentos=[], partes=partes)
     novo = ler_resultado(_json.dumps(d, ensure_ascii=False), p)
     curtas = [x["k"] for x in partes if x.get("status") == "curta"]
@@ -1511,11 +1568,101 @@ def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
     if not str(novo or "").strip():
         raise DossieError("O roteiro ficou vazio.")
     d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano",
-                                 "afirmacoes", "thumbnails")}
+                                 "afirmacoes", "thumbnails", "lore_registro", "escopo")}
     d["capitulos"] = [{"titulo": c["titulo"], "comeca_em": c.get("comeca_em")} for c in res.get("capitulos") or []]
     d["momentos"] = [m for m in res.get("momentos") or [] if not m.get("inicio")]
     d["roteiro"] = novo
     return ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+
+
+def aplicar_padroes_do_modelo(cfg: Dict[str, Any], modelo: str) -> None:
+    """Modelo de canal: o roteiro exemplo do pacote entra no 📐 (se você ainda não pôs outro) e o nome do canal."""
+    mod = MODELOS.get(modelo or "") or {}
+    if mod.get("referencia_padrao") and not str(cfg.get("referencia") or "").strip():
+        cfg["referencia"] = mod["referencia_padrao"]
+        cfg["referencia_modo"] = mod.get("referencia_modo_padrao") or "modelar"
+    if canal_do_modelo(modelo) and not str(cfg.get("nome_canal") or "").strip():
+        cfg["nome_canal"] = canal_do_modelo(modelo)
+    if mod.get("perfil_canal") and not cfg.get("vozes_personagens"):
+        cfg["vozes_personagens"] = vozes_lembradas(modelo)
+
+
+def _arq_vozes(modelo: str) -> Optional[str]:
+    slug = (MODELOS.get(modelo or "") or {}).get("perfil_canal")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "marcas", slug, "vozes_escolhidas.json") if slug else None
+
+
+def lembrar_vozes(modelo: str, vozes: Dict[str, Any]) -> None:
+    cam = _arq_vozes(modelo)
+    if cam and os.path.isdir(os.path.dirname(cam)):
+        try:
+            with open(cam, "w", encoding="utf-8") as f:
+                json.dump(vozes, f, ensure_ascii=False, indent=1)
+        except OSError:
+            pass
+
+
+def vozes_lembradas(modelo: str) -> Dict[str, Any]:
+    cam = _arq_vozes(modelo)
+    try:
+        with open(cam, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def perfil_do_modelo(modelo: Any) -> Optional[Dict[str, Any]]:
+    """🎭 v84_173: o perfil do canal (personagens, lore…) do modelo que veio de um pacote com personagens.json."""
+    slug = (MODELOS.get(str(modelo or "")) or {}).get("perfil_canal")
+    if not slug:
+        return None
+    try:
+        import canal_perfil
+        return canal_perfil.carregar(os.path.dirname(os.path.abspath(__file__)), slug)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def registrar_lore(p: Dict[str, Any], registro: Any, escopo: Optional[Dict[str, Any]] = None) -> None:
+    """O "lore_registro" do roteiro entra no histórico do canal (e as pistas mudam de estado). 🎯 v84_178: os assuntos
+    que o vídeo deixou "pra outro vídeo" ficam anotados no episódio (o canal lembra o que prometeu)."""
+    slug = (MODELOS.get((p.get("config") or {}).get("modelo") or "") or {}).get("perfil_canal")
+    if not slug or not isinstance(registro, dict):
+        return
+    if escopo and escopo.get("fica_para_outro_video"):
+        registro = dict(registro, proximos_videos=list(escopo["fica_para_outro_video"]))
+    try:
+        import canal_perfil
+        canal_perfil.registrar_episodio(os.path.dirname(os.path.abspath(__file__)), slug, p.get("id") or "",
+                                        titulo_promessa(p) or p.get("tema") or "", registro)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def escopo_enxuto(mod: Dict[str, Any]) -> bool:
+    """🎯 v84_178: vídeo EXPLICATIVO (ciência, canal com personagens): plano com menos fatos por capítulo e sem dizer a fonte
+    em voz alta. O true crime e os outros documentários continuam densos. O pacote pode forçar com "escopo_enxuto"."""
+    mod = mod or {}
+    if "escopo_enxuto" in mod:
+        return bool(mod["escopo_enxuto"])
+    return bool(mod.get("perfil_canal")) or mod is MODELOS.get("ciencia")
+
+
+def _ideias_com_escopo(ideias: Any, escopo: Dict[str, Any]) -> List[str]:
+    out = [str(x)[:300] for x in ideias or [] if str(x).strip()][:15]
+    for t in (escopo or {}).get("fica_para_outro_video") or []:
+        item = f"🎬 Próximo vídeo (ficou de fora deste): {t}"
+        if item not in out:
+            out.append(item)
+    return out[:25]
+
+
+def sem_emoji(nome: str) -> str:
+    """"🕵️ True Crime" → "True Crime" (e nomes sem emoji, de pacotes, ficam como estão)."""
+    nome = str(nome or "").strip()
+    primeiro, _, resto = nome.partition(" ")
+    return resto if resto and not any(ch.isalnum() for ch in primeiro) else nome
 
 
 def titulo_promessa(p: Dict[str, Any]) -> str:

@@ -282,6 +282,10 @@ def extrair_transcricao(url: str, pasta: str, preferidos: Optional[List[str]] = 
     outros clientes do YouTube → cookies dos navegadores → youtube-transcript-api →
     um navegador de verdade lendo a legenda do player → pytubefix pro áudio (ver
     yt_alternativas.py). `alternativas` = módulo (pra teste)."""
+    _m = re.match(r"^https?://(?:[\w-]+\.)*(?:youtube\.com/(?:watch\?(?:[^#\s]*?&)?v=|shorts/|live/|embed/|v/)|youtu\.be/)"
+                  r"([A-Za-z0-9_-]{11})", str(url or "").strip(), re.I)
+    if _m:  # v84_177: Shorts / youtu.be / ?si=… → watch?v=ID
+        url = f"https://www.youtube.com/watch?v={_m.group(1)}"
     if painel_primeiro is None:
         painel_primeiro = ytdlp_module is None
     if ytdlp_module is None:

@@ -64,7 +64,9 @@ def registrar(app, base_dir: str) -> None:
         return render_template("marca_como.html", estrutura=mv.ESTRUTURA_PACOTE, chaves=mv.CHAVES_GUIA,
                                prompt_com=mv.prompt_montar_pacote(True), prompt_sem=mv.prompt_montar_pacote(False),
                                ex_pacote=_js(mv.EXEMPLO_PACOTE), ex_reforcos=_js(mv.EXEMPLO_REFORCOS), ex_poses=_js(mv.EXEMPLO_POSES),
-                               ex_modelo=_js(mv.EXEMPLO_MODELO), formato=mv.FORMATO_PACOTE, marcas=mv.listar(base_dir))
+                               ex_modelo=_js(mv.EXEMPLO_MODELO), formato=mv.FORMATO_PACOTE, marcas=mv.listar(base_dir),
+                               ex_direcao=_js(mv.EXEMPLO_DIRECAO), ex_personagens=_js(mv.EXEMPLO_PERSONAGENS),
+                               ex_continuidade=_js(mv.EXEMPLO_CONTINUIDADE), ids_editor=mv._ids_catalogo(), direcoes=mv.direcoes_do_editor())
 
     @app.route("/marca/modelo-vazio.zip")
     def marca_modelo_vazio():
@@ -106,7 +108,35 @@ def registrar(app, base_dir: str) -> None:
                                folha=mv.estado_folha(m), poses=mv.todas_poses(m), projetos=mv.listar_projetos(m),
                                motores=mv.MOTORES, dossies=ds.listar(base_dir)[:40], erro=request.args.get("erro"),
                                sugeridas=mv.poses_sugeridas(m), conferir=mv.conferir_pacote(m), importado=request.args.get("importado"),
-                               modelo=mv.modelo_roteiro(m))
+                               modelo=mv.modelo_roteiro(m), direcao=mv._json(os.path.join(m["dir"], "direcao.json")),
+                               perfil=__import__("canal_perfil").carregar(base_dir, slug),
+                               tem_mascote=bool((m["guia"].get("mascot") or {}).get("prompt_lock_en")),
+                               tem_proporcoes=os.path.isfile(os.path.join(m["dir"], "referencias", "mascote_proporcoes.png")))
+
+    # ---------------------------------------------------------------- 🎭 perfil do canal: lore e histórico
+    @app.route("/marca/<slug>/lore", methods=["POST"])
+    def marca_lore(slug: str):
+        import canal_perfil
+        _marca(slug)
+        c = _corpo()
+        canal_perfil.salvar_lore(base_dir, slug, str(c.get("texto") or "")[:200000], str(c.get("motivo") or ""))
+        return jsonify({"ok": True})
+
+    @app.route("/marca/<slug>/historico/<acao>", methods=["POST"])
+    def marca_historico(slug: str, acao: str):
+        import canal_perfil
+        _marca(slug)
+        c = _corpo()
+        try:
+            if acao == "nota":
+                canal_perfil.adicionar_nota(base_dir, slug, str(c.get("texto") or ""), str(c.get("tipo") or "nota"))
+            elif acao == "apagar":
+                canal_perfil.apagar_entrada(base_dir, slug, float(c.get("quando") or 0))
+            else:
+                abort(404)
+        except ValueError as exc:
+            return _erro(exc)
+        return jsonify({"ok": True})
 
     @app.route("/marca/<slug>/arquivo/<path:rel>")
     def marca_arquivo(slug: str, rel: str):
@@ -328,7 +358,7 @@ def registrar(app, base_dir: str) -> None:
             p = _proj(m, pid)
             try:
                 if c.get("simples"):
-                    p["batidas"] = mv.batidas_sem_ia(p["narracao"], int(c.get("a_cada") or 3))
+                    p["batidas"] = mv.batidas_sem_ia(p["narracao"], int(c.get("a_cada") or 3), m)
                 else:
                     p["batidas"] = mv.ler_batidas(str(c.get("resposta") or ""), m)
             except (mv.MarcaErro, ValueError) as exc:
@@ -359,6 +389,12 @@ def registrar(app, base_dir: str) -> None:
             if "texto_de" in c:
                 v = c["texto_de"]
                 b["texto_de"] = [str(x)[:80] for x in (v if isinstance(v, list) else str(v).split("\n")) if str(x).strip()][:6]
+            if "personagens" in c:  # 🎭 "mira: looking up; vanta" ou lista
+                v = c["personagens"]
+                if isinstance(v, str):
+                    v = [{"slug": x.split(":", 1)[0].strip(), "acao_en": (x.split(":", 1)[1].strip() if ":" in x else "")}
+                         for x in re.split(r"[;\n]", v) if x.strip()]
+                b["personagens"] = mv._slugs_personagens(v)
             if "pessoas" in c:
                 b["pessoas"] = mv._pessoas(c["pessoas"])
             if "lugar" in c:

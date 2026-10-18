@@ -28,6 +28,74 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎯 Só o necessário pro título (v84_178)
+
+- O prompt do roteiro ganhou o bloco **🎯 ESCOPO**: o vídeo cobre só os 3–6 passos que a pessoa precisa pra entender o título. Assunto vizinho (outro tipo do fenômeno, outra descoberta, outro objeto famoso) vira no máximo 1–2 frases simples com “isso fica pra um vídeo próprio” — no máximo 2 vezes por vídeo. Conceito complexo necessário é explicado com analogia + uma frase do mecanismo.
+- A IA devolve `"escopo"` (pergunta central, o que precisa, o que ficou pra outro vídeo). O que ficou de fora aparece nas ideias (“🎬 Próximo vídeo…”), vai pro 🕘 histórico do canal e volta no prompt seguinte como “já prometido”. No roteiro em partes, cada parte recebe o escopo do plano.
+- Canais **explicativos** (canal com personagens, 🔬 Ciência; o pacote pode forçar com `"escopo_enxuto"`): o plano pede 3–7 pontos por capítulo (não 8–15) e a fonte não é dita em voz alta. O true crime continua igual.
+- 🎭 As tags erradas são consertadas sozinhas (`[narrator|contemplativ]` → `[narrador|contemplativo]`, `[vanta|neutral]` → `[vanta|neutra]`) e tag sem fala sai — também na hora do 🎙 Gerar voz, então roteiros antigos funcionam.
+
+## 🎬 Shorts e links curtos do YouTube (v84_177)
+
+Link de Shorts (`youtube.com/shorts/ID`), `youtu.be/ID`, live, embed ou com lixo no fim (`?si=`, `&xstg=`, `&sttick=`) vira `https://www.youtube.com/watch?v=ID` antes da transcrição (fontes, novo projeto, roteiro exemplo e as abas de transcrição) e no 📋 Copiar links. O mesmo vídeo colado de dois jeitos é transcrito uma vez só.
+
+## 🎬 Vídeos nas fontes, perfis no 🎭 e 📋 copiar links (v84_176)
+
+- Link de vídeo colado no campo de fontes **ao criar o projeto** agora também vira transcrição em “Roteiro / anotações seus” (antes ele entrava como matéria e dava “Não achei texto nem imagens”). Os que já tinham falhado assim se convertem sozinhos quando você abre o projeto; o ↻ num link de vídeo também transcreve.
+- 🎭 Vozes dos personagens: o seletor mostra as vozes cadastradas **e os seus perfis de voz**. Escolher um perfil cria sozinho a voz Chatterbox dele (uma vez; o idioma vem do projeto).
+- 📋 **Copiar links do projeto** (etapa 2): todos os links usados (matérias e vídeos transcritos), um por linha.
+
+## 🪟 Chatterbox: erro 1455 na primeira voz (v84_175)
+
+"O arquivo de paginação é muito pequeno… (os error 1455)" é o Windows sem memória virtual pra abrir o modelo. Agora o site libera memória, espera e tenta de novo sozinho (até 3 vezes). Se ainda assim falhar, a mensagem explica como aumentar o arquivo de paginação (16–32 GB no SSD), que resolve de vez.
+
+## ✂ Perfis de voz clipe a clipe (v84_174)
+
+Em **🗣️ Perfis de voz**, cada clipe aparece com a duração e dois botões:
+- **🗑** apaga só aquele clipe (ruim, com ruído ou de outra pessoa), junto com o original guardado;
+- **⭐** escolhe o **clipe principal** — o único que o **Chatterbox** (e o Turbo e o pod) usa, e só os ~10 s iniciais dele. O XTTS continua usando todos juntos (uns 30 s já bastam) e o Fish, vários.
+
+**➕ Adicionar mais áudio ou vídeo a este perfil** junta clipes novos sem apagar os que já estão lá (arquivo do PC, ou do YouTube escolhendo “➕ adicionar ao perfil” no 🎬). O perfil vai até 12 clipes; mais áudio não melhora a voz, serve pra ter opções e ficar com as melhores. Perfil marcado 🎵 limpa só os clipes novos. O ⭐ vai junto no 📦 Exportar/Importar.
+
+## 🎭 Canal com personagens: diálogos multi voz, emoção por fala, lore e histórico (v84_173)
+
+Pacote de canal com `personagens.json` (narrador + personagens: personalidade, como fala, **quando aparece e quando não**,
+motivação/segredo, emoções da voz, voz sugerida, desenho e fichas), `lore.md` (bíblia), `continuidade.json` (pistas) e
+`docs/` (manuais, roteiro exemplo). Exemplo pronto: o pacote **ASTRANEBEL** (Mira & Vanta).
+- **Modelo de vídeo do canal**: o roteiro sai só com narração e falas marcadas (`[narrador]`, `[mira|curiosa]`,
+  `[vanta|exag=0.35]`) — sem VISUAL (as imagens são feitas na edição). O prompt leva os personagens, a bíblia, as pistas e o
+  **histórico** do canal; a IA consulta o porquê de cada dinâmica e devolve `lore_registro`, que entra no histórico (e marca
+  as pistas usadas). O 📐 Roteiro exemplo do canal já vem preenchido (modo modelar). Título = promessa, como no true crime.
+- **🎭 Vozes dos personagens** (na página do Modelo de vídeo): a voz cadastrada de cada um + exag/cfg/vel padrão; com
+  **🤖 a IA escolhe a emoção de cada fala**, ela usa os presets do pacote ou números. As escolhas valem pros próximos vídeos.
+- **🎙 Gerar voz**: as tags viram as vozes escolhidas com a emoção de cada fala e o modo multi voice já vem ligado
+  (multi voice agora aceita `[slug|exag=0.7|cfg=0.3|vel=1.05]`: exag/cfg no Chatterbox, vel nos motores com velocidade).
+- **🎨 Identidade visual**: página do canal com personagens, bíblia (editar guarda a versão anterior), continuidade e
+  histórico (com notas/decisões suas). Nas batidas, quem fala aparece na imagem com a **ficha dela** como referência no
+  klein do pod (e a ficha da dupla quando são duas), no estilo simplificado das personagens; cenas científicas sem elas.
+  A conferência e a correção de paleta usam as cores da marca (azul e dourado contam como da paleta, não só o vermelho).
+- Importar de novo mantém o histórico, o estado das pistas e as vozes escolhidas; a bíblia que você editou vai pro histórico.
+
+## 🎬 A IA da edição fica DENTRO da direção (v84_172)
+
+No 🤖 IA do Estúdio (e na conversa de edição), a resposta da IA agora é conferida contra a **direção escolhida**:
+transição, movimento/overlay, entrada/saída, filtro, cena (template), estilo de destaque e tipo de quadro editorial que
+**não estão na direção** não são aplicados (a transição vira corte seco) — e aparece o aviso “🎬 N itens fora da direção”.
+Eixo que a direção deixa em 0% = nada daquele eixo; eixo sem lista numa direção do sistema = o catálogo todo (ex.: “Tudo”).
+Continuam liberados em qualquer direção: gráficos animados de dados, sons, quadros de PROVA (página/post citados na fala),
+fundo de cobertura de trecho sem mídia.
+
+## 🎬 Direção “True crime investigativo” + direção no pacote do canal (v84_171)
+
+- Nova direção do editor **True crime investigativo (documentário de caso)** (`sys_true_crime`): cor fria e dessaturada,
+  câmera chegando devagar, corte seco/pro preto, flash de câmera nas fotos de evidência, ficha das pessoas, quadro de
+  investigação, linha do tempo, documento do processo, carimbo e máquina de escrever — sem glitch. O modelo 🕵️ True Crime
+  já sugere essa direção quando o vídeo é feito a partir dele.
+- **Pacote do canal**: `direcao.json` (opcional) = o estilo de edição do canal. Ao importar, vira a direção
+  **“🎨 <canal>”** no editor e já vem escolhida nos vídeos do modelo de roteiro do canal. Sem ela, o `modelo_roteiro.json`
+  pode apontar uma direção existente com `"direcao_sugerida"`. A página 📘 Como montar o pacote mostra o exemplo e todos os
+  ids que o editor tem; o pedido pronto pra IA também pede a direção.
+
 ## 🎙 Gerar voz de qualquer lugar (v84_170)
 
 - Botão **🎙 Gerar voz** fixo no topo dos 🕵️ Modelos de vídeo (quando já tem roteiro), do 📜 Roteiro do YouTube e do 🛒 Vídeo

@@ -2492,7 +2492,8 @@ function resumoPlano(p) {
 }
 $('iaConferir').addEventListener('click', async () => {
   try {
-    const corpoResp = { texto: $('iaResposta').value, n_trechos: segs.length, foto: segs.map(s => tipoMidia(s) === 'image') };
+    const corpoResp = { texto: $('iaResposta').value, n_trechos: segs.length, foto: segs.map(s => tipoMidia(s) === 'image'),
+      direcao: $('dDirecao').value, kit: estadoParaIA().kit };
     if (iaPartes) {
       const faltam = iaPartes.filter(p => !(p.resposta || '').trim()).map(p => p.k);
       corpoResp.textos = iaPartes.map(p => p.resposta || '').filter(t => t.trim());

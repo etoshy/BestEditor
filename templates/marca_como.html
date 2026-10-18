@@ -51,6 +51,11 @@
 ├── reforcos.json            ← trava de proporção do mascote
 ├── poses_sugeridas.json
 ├── modelo_roteiro.json      ← o roteiro do canal (vira um Modelo de vídeo)
+├── direcao.json             ← opcional: o estilo de edição do canal no editor
+├── personagens.json         ← opcional: canal com personagens que falam (roteiro multi voz)
+├── lore.md                  ← opcional: a bíblia da lore
+├── continuidade.json        ← opcional: as pistas da lore
+├── docs/                    ← opcional: manuais e roteiro exemplo (.md)
 ├── LEIA-ME.txt
 ├── assets/                  ← imagens oficiais (obrigatório)
 ├── referencias/
@@ -77,6 +82,13 @@
   <p><b>reforcos.json</b> — derivado do JSON e das imagens: o que a IA erra no mascote. Entra no prompt e na revisão.</p><pre class="mv-pre">{{ ex_reforcos }}</pre>
   <p><b>poses_sugeridas.json</b></p><pre class="mv-pre">{{ ex_poses }}</pre>
   <p><b>modelo_roteiro.json</b> — vira o modelo <i>nome</i> nos 🕵️ Modelos de vídeo, ligado a esta identidade visual e falando sempre <i>nome_canal</i>.</p><pre class="mv-pre">{{ ex_modelo }}</pre>
+  <p class="mv-hint">Sem <code>direcao.json</code>, o modelo pode apontar uma direção que já existe no editor com <code>"direcao_sugerida"</code>: {% for d in direcoes %}{% if d.id.startswith('sys_') %}<code>{{ d.id }}</code> ({{ d.nome }}){{ ', ' if not loop.last }}{% endif %}{% endfor %}.</p>
+  <p style="margin-top:12px"><b>personagens.json</b> <span class="nv">opcional</span> — canal com <b>personagens fixos</b>: o roteiro sai multi voz (<code>[narrador]</code>, <code>[mira|curiosa]</code>…), a IA recebe a personalidade, <b>quando cada um aparece e quando não</b>, a bíblia (<code>lore.md</code>), as pistas (<code>continuidade.json</code>) e o histórico; no Modelo de vídeo você escolhe a voz e a emoção de cada um; nas imagens, a ficha de cada personagem vai como referência.</p><pre class="mv-pre">{{ ex_personagens }}</pre>
+  <p><b>continuidade.json</b> <span class="nv">opcional</span></p><pre class="mv-pre">{{ ex_continuidade }}</pre>
+  <p style="margin-top:12px"><b>direcao.json</b> <span class="nv">opcional</span> — o <b>estilo de direção do canal no editor</b>: vira a direção <i>“🎨 nome”</i> na lista de direções do editor e já vem escolhida nos vídeos feitos com o modelo de roteiro deste canal (quando o vídeo é criado a partir do 🕵️ Modelo de vídeo). <code>pct</code> = em quantos % das cenas o eixo aparece; <code>peso</code> = a chance de cada item; <code>ritmo</code> = calmo / equilibrado / dinamico. Id que não existe é ignorado.</p><pre class="mv-pre">{{ ex_direcao }}</pre>
+  <details><summary>Os ids que o editor tem (pra usar na direcao.json)</summary>
+    {% for eixo, ids in ids_editor.items() %}<p style="margin:8px 0 2px"><b>{{ eixo }}</b> ({{ ids|length }})</p><div class="mv-hint" style="font-family:ui-monospace,monospace;font-size:.76rem;line-height:1.5">{{ ids|join(' · ') }}</div>{% endfor %}
+  </details>
 </div>
 <script>
   document.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {

@@ -215,7 +215,120 @@ PROPAGANDA: Dict[str, Any] = {
     "som_transicoes": "auto",
 }
 
-DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS, PROPAGANDA]
+# ------------------------------------------------------------------ True crime investigativo (v84_171)
+# O documentário de caso clássico (Mindhunter/The Jinx/Making a Murderer, canais de true crime em português): fotos de
+# arquivo e de perícia, ficha das pessoas, mapas e linha do tempo, documento do processo em tela cheia; cor fria e
+# dessaturada com sombra verde/ocre de delegacia; câmera sempre chegando devagar (~4–6 s por plano, mais lento que o
+# Mistere), corte seco ou corte pro preto nas viradas, flash de câmera nas fotos de evidência, nada de glitch.
+# Texto na tela sóbrio: nome + papel (lower third), data/local em selo, carimbo CONFIDENCIAL, linha do tempo.
+TRUE_CRIME: Dict[str, Any] = {
+    "id": "sys_true_crime",
+    "nome": "True crime investigativo (documentário de caso)",
+    "descricao": "Documentário de caso real: cor fria e dessaturada, câmera chegando devagar, corte seco/pro preto, flash de "
+                 "câmera nas fotos de evidência, ficha das pessoas, linha do tempo, documento do processo, carimbo e máquina "
+                 "de escrever — sóbrio, sem glitch.",
+    "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "equilibrado", "marca": None, "universo": "predef",
+    "cores": {"ativa": True, "modo": "predef", "primaria": "#F2F2F2", "secundaria": "#111317", "acento": "#C8102E"},
+    "filtros": {"pct": 80, "itens": [
+        {"id": "frio_true_crime", "peso": 4}, {"id": "true_crime_interrogatorio", "peso": 2}, {"id": "documentary", "peso": 2},
+        {"id": "mindhunter_amarelo_verde", "peso": 1}, {"id": "the_wire_baltimore", "peso": 1}, {"id": "noir_soft", "peso": 1}]},
+    "efeitos": {"pct": 65, "itens": [
+        {"id": "zoom_respiro", "peso": 4}, {"id": "ken_burns_doc", "peso": 3}, {"id": "zoom_in", "peso": 2},
+        {"id": "travelling_arquivo", "peso": 2}, {"id": "fincher_travelling", "peso": 1}, {"id": "pan_dir", "peso": 1},
+        {"id": "vinheta_suspense", "peso": 3}, {"id": "suspense_vinheta_pulso", "peso": 1}, {"id": "grao_16mm", "peso": 1},
+        {"id": "pelicula_suja_arquivo", "peso": 1}, {"id": "ov_poeira", "peso": 1}, {"id": "ov_vinheta_pulso", "peso": 1}]},
+    "transicoes": {"pct": 20, "itens": [
+        {"id": "corte_pro_preto_doc", "peso": 4}, {"id": "caes_corte_preto_rapido", "peso": 2}, {"id": "fincher_foco_seco", "peso": 2},
+        {"id": "camera_flash", "peso": 2}, {"id": "errol_morris_corte", "peso": 1}, {"id": "fadeblack", "peso": 1},
+        {"id": "gl_fade_escuro", "peso": 1}, {"id": "film_burn", "peso": 1}]},
+    "entradas": {"pct": 18, "itens": [
+        {"id": "foto_arquivo_lenta", "peso": 3}, {"id": "documento_desliza", "peso": 3}, {"id": "revela_documento", "peso": 2},
+        {"id": "foto_cai_mesa", "peso": 2}, {"id": "true_crime_fumaca", "peso": 1}, {"id": "errol_morris_entra", "peso": 1},
+        {"id": "punch_in", "peso": 1}]},
+    "saidas": {"pct": 0, "itens": []},
+    "templates": {"pct": 8, "itens": [
+        {"id": "TRUE_CRIME_FICHA", "peso": 3}, {"id": "QUADRO_INVESTIGACAO", "peso": 2}, {"id": "ED_FICHA_ARQUIVO", "peso": 2},
+        {"id": "ED_PERFIL", "peso": 2}, {"id": "ED_LOWER_NOME", "peso": 2}, {"id": "DOC_ARQUIVO_MOSAICO", "peso": 1},
+        {"id": "ED_CITACAO", "peso": 1}]},
+    "templatesAvatar": {"pct": 0, "itens": []},
+    "overlays": {"pct": 0, "itens": [], "maxPorCena": 1},
+    "pares": {"modo": "livre", "itens": []},
+    "legenda": None,
+    "destaques": {"ativo": True, "densidade": "equilibrado", "estilos": [
+        "true_crime_linha_tempo", "carimbo_confidencial", "narcos_ficha", "selo_ano", "doc_tempo_marcos", "ed_local_id",
+        "sugar_man_nome", "dossie_maquina_escrever", "se7en_creditos", "capitulo", "estat", "impacto_red", "arquivo",
+        "doc_lower", "gancho_frio"]},
+    "editoriais": {"ativo": True, "densidade": "equilibrado",
+                   "tipos": ["ficha", "linha_tempo", "pagina", "nome", "numero", "mural", "recortes", "bilhetes"]},
+    "som_transicoes": "auto",
+    "referencia": {"estilo": "documentário de caso (true crime)", "plano_s": [4, 6]},
+}
+
+DIRECOES: List[Dict[str, Any]] = [MISTERE, DOSSIE_PAPEL, DALLAS, PROPAGANDA, TRUE_CRIME]
+
+# o mínimo que uma direção precisa ter (as que vêm de um pacote de canal são completadas com isto)
+_BASE_DIRECAO: Dict[str, Any] = {
+    "sistema": True, "v": 3, "intensidade": None, "conjuntos": {}, "ritmo": "equilibrado", "marca": None, "universo": "predef",
+    "cores": {"ativa": False}, "filtros": {"pct": 0, "itens": []}, "efeitos": {"pct": 0, "itens": []},
+    "transicoes": {"pct": 0, "itens": []}, "entradas": {"pct": 0, "itens": []}, "saidas": {"pct": 0, "itens": []},
+    "templates": {"pct": 0, "itens": []}, "templatesAvatar": {"pct": 0, "itens": []},
+    "overlays": {"pct": 0, "itens": [], "maxPorCena": 1}, "pares": {"modo": "livre", "itens": []}, "legenda": None,
+    "destaques": {"ativo": False, "densidade": "equilibrado", "estilos": []}, "editoriais": {"ativo": False},
+    "som_transicoes": "auto",
+}
+EIXOS_PACOTE = ("filtros", "efeitos", "transicoes", "entradas", "saidas", "templates")
+
+
+def direcao_de_pacote(d: Dict[str, Any], slug: str, nome_canal: str = "") -> Dict[str, Any]:
+    """🎨 v84_171: a direcao.json de um pacote de canal vira uma direção do editor (id marca_<slug>), completada e limpa."""
+    import json
+    out = json.loads(json.dumps(_BASE_DIRECAO))
+    for k, v in (d or {}).items():
+        if k in ("id", "sistema", "usuario"):
+            continue
+        if k in EIXOS_PACOTE and isinstance(v, dict):
+            itens = [{"id": str(i.get("id")), "peso": max(1, min(10, int(i.get("peso") or 1)))}
+                     for i in v.get("itens") or [] if isinstance(i, dict) and i.get("id")][:40]
+            out[k] = {"pct": max(0, min(100, int(v.get("pct") or 0))), "itens": itens}
+        elif k in ("nome", "descricao") and isinstance(v, str):
+            out[k] = v[:160 if k == "nome" else 600]
+        elif k in ("cores", "destaques", "editoriais", "legenda", "ritmo", "som_transicoes", "bordas", "cartao_fundo", "referencia"):
+            out[k] = v
+    out["id"] = "marca_" + slug
+    out.setdefault("nome", f"🎨 {nome_canal or slug}")
+    out.setdefault("descricao", f"Direção do canal {nome_canal or slug} (do pacote do canal).")
+    out["do_pacote"] = slug
+    if out.get("ritmo") not in ("calmo", "equilibrado", "dinamico"):
+        out["ritmo"] = "equilibrado"
+    return out
+
+
+def das_marcas() -> List[Dict[str, Any]]:
+    """As direções que vieram nos pacotes de canal (marcas/<slug>/direcao.json)."""
+    import json
+    import os
+    raiz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "marcas")
+    out = []
+    if not os.path.isdir(raiz):
+        return out
+    for slug in sorted(os.listdir(raiz)):
+        cam = os.path.join(raiz, slug, "direcao.json")
+        if not os.path.isfile(cam):
+            continue
+        try:
+            with open(cam, encoding="utf-8-sig") as f:
+                d = json.load(f)
+            nome = ""
+            try:
+                with open(os.path.join(raiz, slug, "brand_guide.json"), encoding="utf-8-sig") as f:
+                    nome = (json.load(f).get("project") or {}).get("name") or ""
+            except (OSError, ValueError):
+                pass
+            if isinstance(d, dict):
+                out.append(direcao_de_pacote(d, slug, nome))
+        except (OSError, ValueError):
+            continue
+    return out
 
 
 def _so_o_que_existe(d: Dict[str, Any]) -> Dict[str, Any]:
@@ -243,4 +356,4 @@ def _so_o_que_existe(d: Dict[str, Any]) -> Dict[str, Any]:
 
 def todas() -> List[Dict[str, Any]]:
     import json
-    return [_so_o_que_existe(json.loads(json.dumps(d))) for d in DIRECOES]
+    return [_so_o_que_existe(json.loads(json.dumps(d))) for d in DIRECOES + das_marcas()]

@@ -54,6 +54,44 @@ def _linha_eixo(p: Dict[str, Any], eixo: str, nome: str, rotulos: Dict[str, str]
     return f"- {nome}: ~{pct}% — {'qualquer um do catálogo abaixo' if sistema else 'nenhum marcado (não usar)'}"
 
 
+def permitidos(p: Optional[Dict[str, Any]]) -> Dict[str, Optional[set]]:
+    """🎬 v84_172: o que a IA PODE usar com esta direção (o mesmo que o prompt mostra). None = sem limite (a direção deixa
+    o catálogo todo); set() = nada. Usado pra jogar fora o que a IA trouxer de FORA da direção."""
+    if not p:
+        return {}
+    sistema = bool(p.get("sistema") or p.get("universo") == "sistema")
+
+    def eixo(nome: str) -> Optional[set]:
+        cat = p.get(nome) or {}
+        if not cat.get("pct", 0):
+            return set()
+        itens = {i for i, _w in _itens_eixo(p, nome)}
+        return itens if itens else (None if sistema else set())
+
+    def juntar(a: Optional[set], b: Optional[set]) -> Optional[set]:
+        return None if a is None or b is None else (a | b)
+
+    tr = eixo("transicoes")
+    out: Dict[str, Optional[set]] = {
+        "transicoes": None if tr is None else ({dp_visual.valor_transicao(i) for i in tr} | set(tr) | {"none"}),
+        "efeitos": juntar(eixo("efeitos"), eixo("overlays")),
+        "entradas": juntar(eixo("entradas"), eixo("saidas")),
+        "filtros": eixo("filtros"),
+        "templates": eixo("templates"),
+    }
+    dsq = p.get("destaques") or {}
+    kit = {e for e in (dsq.get("estilos") or []) if dp_destaques.estilo(e)}
+    out["destaques"] = kit or None
+    ped = dp_direcao.editoriais_da(p)
+    out["editoriais"] = (set(ped["tipos"]) | set(TIPOS_PROVA) if ped["tipos"] else None) if ped["ativo"] else set(TIPOS_PROVA)
+    return out
+
+
+def direcao_escolhida(job: Dict[str, Any], did: Optional[str] = None, kit: Any = None) -> Optional[Dict[str, Any]]:
+    did = str(did or (job.get("editor_defaults") or {}).get("direcao") or job.get("direcao_do_projeto") or "sys_tudo")
+    return dp_direcao.direcao(did, kit) or dp_direcao.direcao("sys_tudo")
+
+
 # ⬛ v84_111: trecho SEM CENA (nenhum banco achou mídia) → a IA cobre com um fundo gerado + o que a fala pede, como
 # se fosse escolha de edição. Quando a pessoa põe uma mídia ali e gera a edição de novo, ele volta a ser um trecho normal.
 FUNDOS_COBERTURA: List[Tuple[str, str]] = [
@@ -579,7 +617,8 @@ def _nulo(v: Any) -> bool:
 
 
 def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict[str, Any]],
-                 foto: Optional[List[bool]] = None, biblioteca: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+                 foto: Optional[List[bool]] = None, biblioteca: Optional[Dict[str, str]] = None,
+                 direcao: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Valida a resposta da IA → {trechos, destaques, substituir_destaques, graficos,
     filtro_cor, paleta, legenda, sons, observacoes, avisos}."""
     import dp_cores
@@ -591,6 +630,15 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
     ef_ok = {e["id"] for e in dp_visual.efeitos()}
     en_ok = {e["id"] for e in dp_visual.entradas()}
     fi_ok = {f["id"] for f in dp_visual.filtros()}
+    ef_todos, en_todos, fi_todos = set(ef_ok), set(en_ok), set(fi_ok)
+    perm = permitidos(direcao)  # 🎬 v84_172: só o que a direção escolhida tem (o resto sai, com aviso)
+    fora: List[str] = []
+    if perm.get("efeitos") is not None:
+        ef_ok = ef_ok & perm["efeitos"] | {"none"}
+    if perm.get("entradas") is not None:
+        en_ok = en_ok & perm["entradas"] | {"none"}
+    if perm.get("filtros") is not None:
+        fi_ok = fi_ok & perm["filtros"]
     out: Dict[str, Any] = {"trechos": [], "destaques": None, "graficos": None, "editoriais": None, "avisos": avisos,
                            "observacoes": str(d.get("observacoes") or "")[:1200]}
     da = d.get("direcao_arte")
@@ -648,6 +696,9 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
                 avisos.append(f"T{n}: mídia '{it['midia']}' não está na biblioteca — ignorada.")
         if "transition" in it:
             v = tr_valida(it["transition"])
+            if v is not None and perm.get("transicoes") is not None and v not in perm["transicoes"]:
+                fora.append(f"T{n} transição {v}")
+                v = "none"
             if v is None:
                 avisos.append(f"T{n}: transição '{it['transition']}' desconhecida.")
             else:
@@ -667,6 +718,8 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
                         avisos.append(f"T{n}: '{v}' é movimento de câmera e o trecho é vídeo — ignorado.")
                         continue
                     r[campo] = str(v)
+                elif str(v) in (ef_todos if campo == "efeito" else en_todos):
+                    fora.append(f"T{n} {campo} {v}")
                 else:
                     avisos.append(f"T{n}: {campo} '{v}' desconhecido.")
         if it.get("bordas") in ("black", "zoom", "mosaic", "smart", "cartao"):
@@ -694,6 +747,8 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
             v = it["template"]
             if _nulo(v):
                 r["template"] = None
+            elif perm.get("templates") is not None and str(v) not in perm["templates"]:
+                fora.append(f"T{n} cena {v}")
             elif cenas_dp.template(str(v)):
                 r["template"] = str(v)
                 campos = it.get("template_campos") if isinstance(it.get("template_campos"), dict) else {}
@@ -717,6 +772,9 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
         hl = []
         ws = [w for w in palavras or [] if str(w.get("word", "")).strip()]
         for x in d["destaques"]:
+            if isinstance(x, dict) and perm.get("destaques") is not None and str(x.get("estilo") or "") not in perm["destaques"]:
+                fora.append(f"destaque {x.get('estilo')}")
+                continue
             if not isinstance(x, dict) or not dp_destaques.estilo(str(x.get("estilo") or "")):
                 if isinstance(x, dict):
                     avisos.append(f"Destaque com estilo '{x.get('estilo')}' desconhecido — ignorado.")
@@ -758,6 +816,9 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
         import dp_editorial
         eds = []
         for x in d["editoriais"][:30]:
+            if isinstance(x, dict) and perm.get("editoriais") is not None and str(x.get("tipo") or "") not in perm["editoriais"]:
+                fora.append(f"quadro {x.get('tipo')}")
+                continue
             q = dp_editorial.normalizar(x, duracao)
             if q:
                 eds.append(q)
@@ -781,6 +842,8 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
             out["filtro_cor"] = "original"
         elif str(v) in fi_ok:
             out["filtro_cor"] = str(v)
+        elif str(v) in fi_todos:
+            fora.append(f"filtro {v}")
         else:
             avisos.append(f"Filtro '{v}' desconhecido.")
     if isinstance(d.get("paleta"), dict) and re.fullmatch(r"#[0-9a-fA-F]{6}", str(d["paleta"].get("primaria") or "")):
@@ -816,4 +879,8 @@ def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict
             except (TypeError, ValueError):
                 continue
         out["sons"] = sons
+    if fora:  # 🎬 v84_172
+        avisos.insert(0, f"🎬 {len(fora)} item(ns) fora da direção “{(direcao or {}).get('nome', '')}” — não aplicados: "
+                         + ", ".join(fora[:12]) + ("…" if len(fora) > 12 else ""))
+    out["fora_da_direcao"] = len(fora)
     return out

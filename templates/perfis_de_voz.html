@@ -47,7 +47,13 @@
 <div id="yt-error-box" class="error" style="display:none;"></div>
 
 <label>Nome do perfil</label>
-<input type="text" id="yt-nome-perfil" placeholder="ex: minha_voz, locutor_joao">
+<div style="display:flex;gap:8px;flex-wrap:wrap;">
+  <select id="yt-destino" style="width:auto;margin:0;" onchange="document.getElementById('yt-nome-perfil').style.display=this.value?'none':'';document.getElementById('yt-btn-extrair').textContent=this.value?'Baixar e adicionar ao perfil':'Baixar e criar perfil';">
+    <option value="">🆕 criar um perfil novo</option>
+    {% for p in perfis %}<option value="{{ p.nome }}">➕ adicionar ao perfil “{{ p.nome }}” ({{ p.quantidade_clipes }} clipe(s))</option>{% endfor %}
+  </select>
+  <input type="text" id="yt-nome-perfil" placeholder="ex: minha_voz, locutor_joao" style="flex:1;min-width:200px;margin:0;">
+</div>
 
 <h3 style="margin-top:20px;">🔍 Buscar no YouTube</h3>
 <div style="display:flex;gap:8px;">
@@ -291,7 +297,8 @@ function ytMontarItens() {
 async function ytExtrair() {
   document.getElementById('yt-error-box').style.display = 'none';
   document.getElementById('yt-resultado-box').style.display = 'none';
-  const nome = document.getElementById('yt-nome-perfil').value.trim();
+  const destino = document.getElementById('yt-destino').value;
+  const nome = destino || document.getElementById('yt-nome-perfil').value.trim();
   if (!nome) {
     ytMostrarErro('Dê um nome pro perfil antes de extrair.');
     return;
@@ -310,7 +317,7 @@ async function ytExtrair() {
   try {
     resp = await fetch("{{ url_for('perfis_de_voz_youtube_extrair') }}", {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome: nome, itens: itens, qualidade: '480p', audio: document.getElementById('yt-musica').checked ? 'musica' : 'limpo' }),
+      body: JSON.stringify({ nome: nome, adicionar: !!destino, itens: itens, qualidade: '480p', audio: document.getElementById('yt-musica').checked ? 'musica' : 'limpo' }),
     });
     data = await resp.json();
   } catch (e) {
@@ -347,7 +354,9 @@ async function ytPollStatus(jobId) {
     return;
   }
   document.getElementById('yt-texto-resultado').textContent =
-    `Pronto! Perfil "${data.nome_perfil}" criado com ${data.quantidade_clipes} clipe(s).`;
+    data.adicionados != null && document.getElementById('yt-destino').value
+      ? `Pronto! ${data.adicionados} clipe(s) adicionados ao perfil "${data.nome_perfil}" (agora com ${data.quantidade_clipes}).`
+      : `Pronto! Perfil "${data.nome_perfil}" criado com ${data.quantidade_clipes} clipe(s).`;
   document.getElementById('yt-resultado-box').style.display = '';
   setTimeout(function () { window.location.reload(); }, 1800);
 }
@@ -423,9 +432,34 @@ function ytMostrarErro(msg) {
       <button type="button" class="pf-restaurar" style="margin:0;padding:4px 10px;font-size:0.8rem;background:#666;{% if not p.n_originais %}display:none{% endif %}">↩ Voltar aos originais</button>
     </div>
     <p style="color:#666;font-size:0.85rem;margin:6px 0 8px;">{{ p.quantidade_clipes }} clipe(s) de referência{% if p.vozes_slug %} · usado pelas vozes {% for s in p.vozes_slug %}<code>[{{ s }}]</code> {% endfor %}{% endif %}{% if p.n_originais %} · 🎧 tocando a <b>voz limpa</b>{% endif %}</p>
+    {% set cl = p.clipes if p.clipes is defined else [] %}
+    {% if cl %}
+    {% set total = cl|sum(attribute='segundos') %}
+    <p style="color:#666;font-size:0.8rem;margin:0 0 6px;">⏱ {{ '%.0f'|format(total) }} s no total · o <b>⭐ principal</b> é o único clipe que o <b>Chatterbox</b> usa (só os ~10 s iniciais dele) — escolha o mais limpo e expressivo; o XTTS usa todos juntos (uns 30 s já bastam).</p>
+    <div class="pf-clipes" data-perfil="{{ p.nome }}">
+    {% for c in cl %}
+    <div class="pf-clipe" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;{% if c.principal %}background:#fffbeb;border-radius:6px;padding:2px 4px;{% endif %}">
+      <span style="font-size:0.78rem;min-width:62px;color:#666;" title="{{ c.arquivo }}">{% if c.principal %}⭐{% else %}#{{ loop.index }}{% endif %} {{ '%.0f'|format(c.segundos) }} s</span>
+      <audio controls preload="none" style="flex:1;min-width:0;" src="{{ url_for('perfis_de_voz_clipe', nome=p.nome, indice=c.indice) }}?v={{ c.arquivo }}"></audio>
+      {% if not c.principal %}<button type="button" class="pf-principal" data-i="{{ c.indice }}" title="Usar este como principal (o que o Chatterbox usa)" style="margin:0;padding:4px 8px;font-size:0.8rem;background:#c99a2e;">⭐</button>{% endif %}
+      {% if cl|length > 1 %}<button type="button" class="pf-apagar" data-i="{{ c.indice }}" title="Apagar este clipe (ruim ou de outra pessoa)" style="margin:0;padding:4px 8px;font-size:0.8rem;background:#dc2626;">🗑</button>{% endif %}
+    </div>
+    {% endfor %}
+    </div>
+    {% else %}
     {% for i in range(p.quantidade_clipes) %}
     <audio controls style="width:100%;margin-bottom:4px;" src="{{ url_for('perfis_de_voz_clipe', nome=p.nome, indice=i) }}"></audio>
     {% endfor %}
+    {% endif %}
+    <details class="pf-add" data-perfil="{{ p.nome }}" style="margin:6px 0;"><summary style="cursor:pointer;font-size:0.85rem;">➕ Adicionar mais áudio ou vídeo a este perfil</summary>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+        <input type="file" class="pf-add-arq" accept="audio/*,video/*" multiple style="flex:1;min-width:200px;margin:0;">
+        <label style="font-weight:normal;margin:0;font-size:0.82rem;"><input type="checkbox" class="pf-add-dividir" checked style="width:auto;"> dividir áudio longo em trechos</label>
+        <button type="button" class="pf-add-btn" style="margin:0;padding:5px 12px;font-size:0.85rem;">➕ Adicionar</button>
+        <span class="pf-add-st" style="font-size:0.82rem;"></span>
+      </div>
+      <p style="color:#666;font-size:0.78rem;margin:4px 0 0;">Os clipes atuais ficam. Até {{ max_clipes }} arquivos por vez · do YouTube: use “🎬 extrair de um vídeo” acima e escolha “➕ adicionar ao perfil”.{% if p.audio == 'musica' %} Este perfil é 🎵: os novos são limpos sozinhos.{% endif %}</p>
+    </details>
     {% if p.n_originais %}<details style="margin:2px 0 6px;"><summary style="cursor:pointer;font-size:0.82rem;color:#666;">🎵 ouvir os originais (com a música de fundo)</summary>
       {% for i in range(p.quantidade_clipes) %}<audio controls preload="none" style="width:100%;margin:4px 0 0;" src="{{ url_for('perfis_de_voz_original', nome=p.nome, indice=i) }}"></audio>{% endfor %}
     </details>{% endif %}
@@ -435,6 +469,41 @@ function ytMostrarErro(msg) {
 </div>
 {% endif %}
 <script>
+// ✂ clipe a clipe: ⭐ principal, 🗑 apagar, ➕ adicionar (v84_174)
+(() => {
+  const url = n => '/perfis-de-voz/' + encodeURIComponent(n);
+  async function post(rota, corpo) {
+    const r = await fetch(rota, { method: 'POST', body: corpo });
+    let d = {}; try { d = await r.json(); } catch (_) {}
+    if (!r.ok || !d.ok) { alert(d.erro || 'Não deu certo.'); return null; }
+    return d;
+  }
+  document.querySelectorAll('.pf-clipes').forEach(box => {
+    const n = box.dataset.perfil;
+    box.querySelectorAll('.pf-principal').forEach(b => b.addEventListener('click', async () => {
+      if (await post(url(n) + '/clipe/' + b.dataset.i + '/principal')) location.reload();
+    }));
+    box.querySelectorAll('.pf-apagar').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Apagar este clipe do perfil “' + n + '”? (não dá pra desfazer)')) return;
+      if (await post(url(n) + '/clipe/' + b.dataset.i + '/excluir')) location.reload();
+    }));
+  });
+  document.querySelectorAll('.pf-add').forEach(box => {
+    const n = box.dataset.perfil, st = box.querySelector('.pf-add-st'), btn = box.querySelector('.pf-add-btn');
+    btn.addEventListener('click', async () => {
+      const arqs = box.querySelector('.pf-add-arq').files;
+      if (!arqs.length) { st.textContent = 'escolha um arquivo'; return; }
+      const fd = new FormData();
+      for (const a of arqs) fd.append('audios', a);
+      fd.append('dividir', box.querySelector('.pf-add-dividir').checked ? 'on' : 'off');
+      btn.disabled = true; st.textContent = '⏳ processando…';
+      const d = await post(url(n) + '/adicionar', fd);
+      btn.disabled = false;
+      if (d) { st.textContent = '✅ ' + d.adicionados + ' clipe(s) novos' + (d.tarefa ? ' — limpando a música…' : ''); setTimeout(() => location.reload(), 900); }
+      else st.textContent = '';
+    });
+  });
+})();
 // 📦 exportar só os perfis marcados
 (() => {
   const btn = document.getElementById('pf-exportar-sel');

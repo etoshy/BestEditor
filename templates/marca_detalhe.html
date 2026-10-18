@@ -51,6 +51,8 @@
     {% for c in conferir %}<tr style="border-bottom:1px solid var(--borda)"><td style="padding:4px 6px">{{ '✅' if c.ok else ('❌' if c.nivel == 'obrigatório' else ('⚠' if c.nivel == 'recomendado' else '·')) }}</td><td style="padding:4px 6px"><code>{{ c.item }}</code>{% if c.n > 1 %} ({{ c.n }}){% endif %}</td><td style="padding:4px 6px" class="mv-hint">{{ c.nivel }} — {{ c.oque }}</td></tr>{% endfor %}
   </table>
   {% if modelo %}<p class="mv-hint">🕵️ Modelo de roteiro: <b>{{ modelo.nome }}</b> (fala o nome do canal: <b>{{ modelo.nome_canal or g.project.name }}</b>).</p>{% endif %}
+  {% if direcao %}<p class="mv-hint">🎬 Direção no editor: <b>{{ direcao.nome or ('🎨 ' ~ g.project.name) }}</b> (id <code>marca_{{ m.slug }}</code>) — já vem escolhida nos vídeos feitos com o modelo de roteiro deste canal; dá pra escolher em qualquer vídeo na lista de direções do editor.</p>
+  {% elif modelo and modelo.direcao_sugerida %}<p class="mv-hint">🎬 Direção sugerida no editor: <code>{{ modelo.direcao_sugerida }}</code>.</p>{% endif %}
 </div>
 
 <div class="mv-card">
@@ -61,14 +63,68 @@
     {% for c in paleta %}<div class="mv-cor"><div class="am" style="background:{{ c.hex }}"></div><div class="t"><b>{{ c.token }}</b> {{ c.hex }}<br>{{ c.share_guideline }}<br><span class="mv-hint" style="font-size:.74rem">{{ c.role }}</span></div></div>{% endfor %}
   </div>
   <ul class="mv-regras">{% for r in g.design_system.palette_rules %}<li>{{ r }}</li>{% endfor %}</ul>
-  <p class="mv-hint"><b>Mascote:</b> {{ g.mascot.role }}</p>
-  <ul class="mv-regras">{% for r in g.mascot.consistency_protocol %}<li>{{ r }}</li>{% endfor %}</ul>
-  <p class="mv-hint">📌 As imagens saem <b>sem texto</b>; títulos e anotações no idioma do canal ({{ g.project.channel_language }}) são postos depois (manchete slab, etiquetas de máquina de escrever em papel rasgado, palavra-chave em vermelho).</p>
+  {% if g.mascot and g.mascot.role %}<p class="mv-hint"><b>Mascote:</b> {{ g.mascot.role }}</p>
+  <ul class="mv-regras">{% for r in g.mascot.consistency_protocol %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  <p class="mv-hint">📌 As imagens saem <b>sem texto</b>; títulos e anotações no idioma do canal ({{ g.project.channel_language }}) são postos depois (na tipografia da marca, palavra-chave na cor de destaque).</p>
 </div>
 
+{% if perfil %}
+<div class="mv-card" id="perfil">
+  <h2>Personagens, lore e histórico</h2>
+  <p class="mv-hint">O perfil do canal: quem fala, como cada um é, <b>quando aparece e quando não</b>, a bíblia da lore, as pistas e o histórico do que já aconteceu. Tudo isso vai no prompt do roteiro (o modelo de vídeo do canal) — a IA consulta o PORQUÊ de cada dinâmica antes de escrever, e o que o vídeo usou/acrescentou entra no histórico sozinho.</p>
+  <div class="mv-grade" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
+    {% for f in [perfil.narrador] + perfil.personagens %}
+    <div class="mv-cel">
+      <header>[{{ f.slug }}] {{ f.nome }}{% if f.epiteto %} <small style="margin-left:6px">{{ f.epiteto }}</small>{% endif %}</header>
+      {% if f.referencias %}<div style="display:flex;gap:4px;margin-top:6px">{% for r in f.referencias[:3] %}<img src="/marca/{{ m.slug }}/arquivo/{{ r }}?mini=240" style="height:90px;border-radius:6px;background:#fff" alt="">{% endfor %}</div>{% endif %}
+      <div class="mv-hint" style="font-size:.8rem">{{ f.papel }}</div>
+      {% for rot, k in [('Personalidade','personalidade'),('Como fala','fala'),('Quando aparece','quando_aparece'),('Quando NÃO aparece','quando_nao_aparece'),('Segredo/ferida','segredo')] %}{% if f[k] %}<div style="font-size:.8rem;margin-top:3px"><b>{{ rot }}:</b> {{ f[k]|join('; ') if f[k] is not string else f[k] }}</div>{% endif %}{% endfor %}
+      {% if f.emocoes %}<div style="font-size:.76rem;margin-top:4px">🎚 {% for k, e in f.emocoes.items() %}<code title="{{ e.descricao }}">{{ k }}</code> {% endfor %}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <details style="margin-top:10px"><summary><b>📖 Bíblia da lore</b> (editar guarda a versão anterior no histórico)</summary>
+    <textarea id="loreTxt" rows="14" style="width:100%;font-size:.84rem;margin-top:6px">{{ perfil.lore }}</textarea>
+    <div class="mv-linha"><input type="text" id="loreMotivo" placeholder="por que mudou (fica no histórico)" style="flex:1"><button type="button" id="btnLore">💾 Salvar a bíblia</button><span class="mv-st" id="loreSt"></span></div>
+  </details>
+  {% set pistas = (perfil.continuidade or {}).get('pistas') or [] %}
+  {% if pistas %}<details style="margin-top:8px"><summary><b>🧩 Continuidade</b> — {{ pistas|length }} pistas</summary>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px">{% for p in pistas %}<tr style="border-bottom:1px solid var(--borda)"><td style="padding:4px"><code>{{ p.clue_id }}</code></td><td style="padding:4px">{{ p.simbolo }}</td><td style="padding:4px">{{ {'planned':'⏳ planejada','used':'👁 usada','paid_off':'✅ resolvida'}.get(p.estado or 'planned', p.estado) }}</td><td style="padding:4px" class="mv-hint">{{ p.pergunta }}{% if p.usos %} · usada em: {% for u in p.usos[-3:] %}“{{ u.titulo }}”{{ ', ' if not loop.last }}{% endfor %}{% endif %}</td></tr>{% endfor %}</table></details>{% endif %}
+  <details style="margin-top:8px" open><summary><b>🕘 Histórico do canal</b> — {{ perfil.historico|length }} registros</summary>
+    <div class="mv-linha"><input type="text" id="notaTxt" placeholder="nota/decisão pra próximos roteiros (ex.: “no ep. 5 a Vanta vai quase contar sobre o observatório”)" style="flex:1"><select id="notaTipo" style="width:auto"><option value="nota">nota</option><option value="decisao">decisão</option></select><button type="button" id="btnNota" class="secondary">➕ Anotar</button></div>
+    <div style="display:grid;gap:6px;margin-top:8px">
+    {% for e in perfil.historico|reverse %}
+      <div style="border:1px solid var(--borda);border-radius:8px;padding:6px 10px;font-size:.82rem">
+        {% if e.tipo == 'episodio' %}<b>🎬 {{ e.titulo }}</b> <a href="/modelos-video/{{ e.dossie }}" class="mv-hint">abrir</a>
+          {% if e.dinamica %}<div><b>Dinâmica:</b> {{ e.dinamica }}</div>{% endif %}
+          {% for k, v in (e.personagens or {}).items() %}<div><b>{{ k }}:</b> {{ v }}</div>{% endfor %}
+          {% if e.novidades_lore %}<div><b>Novidade na lore:</b> {{ e.novidades_lore }}</div>{% endif %}
+          {% if e.por_que %}<div class="mv-hint"><b>Por quê:</b> {{ e.por_que }}</div>{% endif %}
+          {% if e.proximos_videos %}<div>🎬 <b>Ficou pra outro vídeo:</b> {{ e.proximos_videos|join(' · ') }}</div>{% endif %}
+          {% if e.pistas %}<div>🧩 {% for p in e.pistas %}<code>{{ p.clue_id }}</code> ({{ p.estado }}) {{ p.o_que_aparece }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
+        {% elif e.tipo == 'mudanca' %}<b>✏️ A bíblia mudou</b>{% if e.motivo %} — {{ e.motivo }}{% endif %} <details><summary class="mv-hint">ver a versão de antes</summary><pre style="white-space:pre-wrap;font-size:.76rem;max-height:240px;overflow:auto">{{ e.antes }}</pre></details>
+        {% else %}<b>{{ '📌 Decisão' if e.tipo == 'decisao' else '📝 Nota' }}:</b> {{ e.texto }}{% endif %}
+        <button type="button" class="secondary" data-apagar="{{ e.quando }}" style="font-size:.7rem;padding:1px 7px;margin:4px 0 0">🗑</button>
+      </div>
+    {% else %}<p class="mv-hint">Nada ainda — cada roteiro do canal vai registrando aqui o que usou da lore.</p>{% endfor %}
+    </div>
+  </details>
+</div>
+<script>
+(() => {
+  const S = {{ m.slug|tojson }};
+  const post = (u, c) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c || {}) }).then(r => r.json());
+  const $ = (id) => document.getElementById(id);
+  $('btnLore').addEventListener('click', async () => { const d = await post(`/marca/${S}/lore`, { texto: $('loreTxt').value, motivo: $('loreMotivo').value }); $('loreSt').textContent = d.ok ? '✅ salva' : '❌ ' + d.erro; });
+  $('btnNota').addEventListener('click', async () => { const d = await post(`/marca/${S}/historico/nota`, { texto: $('notaTxt').value, tipo: $('notaTipo').value }); if (d.ok) location.reload(); else alert(d.erro); });
+  document.querySelectorAll('[data-apagar]').forEach(b => b.addEventListener('click', async () => { if (!confirm('Apagar este registro?')) return; await post(`/marca/${S}/historico/apagar`, { quando: b.dataset.apagar }); location.reload(); }));
+})();
+</script>
+{% endif %}
+
 <div class="mv-card" id="folha">
-  <h2>Folha mestra do mascote</h2>
-  <p class="mv-hint">Antes de gerar em quantidade: gere cada <b>vista</b> (frente, perfil, três quartos, silhueta) e cada <b>pose/expressão</b> com as referências oficiais, aprove a melhor de cada uma e monte a folha. A folha aprovada vira a referência canônica de todas as cenas (o FLUX.2 klein do pod recebe a folha + a pose + o mascote em alta). Enquanto não aprovar, vale a <b>v0</b>, montada direto das referências oficiais.</p>
+  <h2>Folha mestra {{ 'do mascote' if tem_mascote else 'dos personagens' }}</h2>
+  <p class="mv-hint"{% if not tem_mascote %} style="display:none"{% endif %}>Antes de gerar em quantidade: gere cada <b>vista</b> (frente, perfil, três quartos, silhueta) e cada <b>pose/expressão</b> com as referências oficiais, aprove a melhor de cada uma e monte a folha. A folha aprovada vira a referência canônica de todas as cenas (o FLUX.2 klein do pod recebe a folha + a pose + o mascote em alta). Enquanto não aprovar, vale a <b>v0</b>, montada direto das referências oficiais.</p>
   <div class="mv-linha mv-folha" style="align-items:flex-start">
     {% set fa = m.estado.get('folha_aprovada') %}
     <div style="flex:1;min-width:280px">
@@ -76,7 +132,7 @@
       {% else %}<b>Folha mestra v0</b> (das referências oficiais — em uso até aprovar a v1)<a href="/marca/{{ m.slug }}/arquivo/folha_mestra/folha_mestra_v0_rotulada.png" target="_blank"><img src="/marca/{{ m.slug }}/arquivo/folha_mestra/folha_mestra_v0_rotulada.png?mini=1100" alt="folha v0"></a>{% endif %}
     </div>
   </div>
-  <div class="mv-linha">
+  <div class="mv-linha"{% if not tem_mascote %} style="display:none"{% endif %}>
     <label>Gerar em<select id="fMotor" data-lembrar="mv_motor">{% for k, v in motores.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
     <label>Candidatas por célula<select id="fVar"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
     <button type="button" id="btnSelTodas" class="secondary">☑ Marcar as que faltam</button>
@@ -84,10 +140,11 @@
     <button type="button" id="btnCompor" class="secondary">🗂 Montar a folha com as aprovadas</button>
     <span class="mv-st" id="fSt"></span>
   </div>
-  <div class="mv-grade" id="celulas"></div>
+  <div class="mv-grade" id="celulas"{% if not tem_mascote %} style="display:none"{% endif %}></div>
+  {% if not tem_mascote %}<p class="mv-hint">Este canal tem personagens (não um mascote único): as referências de cada um estão em 🎭 Personagens e vão sozinhas em toda cena em que eles aparecem.</p>{% endif %}
 </div>
 
-<div class="mv-card" id="poses">
+<div class="mv-card" id="poses"{% if not tem_mascote %} style="display:none"{% endif %}>
   <h2>Poses e emoções novas</h2>
   <p class="mv-hint">Descreva o que quiser (“correndo assustado”, “rindo com a mão na barriga”, “dormindo em cima de um livro”, “com raiva, braços cruzados”): o sistema traduz pra instrução do gerador, escolhe a pose oficial mais parecida como referência e gera o <b>mesmo personagem</b> nessa pose. A que você aprovar entra na biblioteca — dá pra usar nas cenas e ela também passa a ser referência.</p>
   <div class="mv-linha">
@@ -96,11 +153,11 @@
     <button type="button" id="btnPose">🧍 Criar e gerar</button>
     <span class="mv-st" id="pSt"></span>
   </div>
-  {% if sugeridas %}<p class="mv-hint">Sugestões (clique pra preencher) — a lista veio da folha de poses de outra IA, que desenhou o fantasma <b>fora do modelo</b> (baixinho, pernas curtas, com boca). Por isso dela só usamos os <b>nomes</b>: cada pose é gerada com as referências do personagem verdadeiro, com a trava de proporção.</p>
+  {% if sugeridas %}<p class="mv-hint">Sugestões (clique pra preencher) — cada pose é gerada com as referências do personagem verdadeiro{% if tem_proporcoes %}, com a trava de proporção{% endif %}.</p>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">{% for x in sugeridas %}<button type="button" class="secondary" data-sug="{{ x }}" style="font-size:.74rem;padding:2px 9px;margin:0">{{ x }}</button>{% endfor %}</div>{% endif %}
-  <details style="margin-top:8px"><summary>Referências de proporção (o desenho original)</summary>
+  {% if tem_proporcoes %}<details style="margin-top:8px"><summary>Referências de proporção (o desenho original)</summary>
     <img src="/marca/{{ m.slug }}/arquivo/referencias/mascote_proporcoes.png?mini=1400" alt="" style="width:100%;border-radius:8px;margin-top:6px">
-    <p class="mv-hint">Vão junto em toda geração com o mascote: cabeça pequena, corpo fino e curvo, pernas de mangueira compridíssimas, sapatões. A revisão da IA reprova o mascote baixinho/gordinho.</p></details>
+    <p class="mv-hint">Vão junto em toda geração com o mascote; a revisão da IA reprova o mascote fora da proporção.</p></details>{% endif %}
 </div>
 
 <div class="mv-card" id="videos">
@@ -212,7 +269,7 @@
   document.querySelectorAll('[data-sug]').forEach(b => b.addEventListener('click', () => { $('pDesc').value = b.dataset.sug; $('pDesc').focus(); }));
   fetch(`/tarefas?tipo=marca_folha&pendentes=1&limite=3&pagina=${encodeURIComponent(location.pathname)}`).then(r => r.json())
     .then(d => (d.tarefas || []).slice(0, 1).forEach(t => acompanhar(t.id, $('fSt'), carregar))).catch(() => {});
-  carregar();
+  {% if tem_mascote %}carregar();{% endif %}
 })();
 </script>
 {% endblock %}

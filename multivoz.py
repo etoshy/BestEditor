@@ -120,6 +120,25 @@ def salvar(d: Dict[str, Any], slug_antigo: Optional[str] = None) -> Dict[str, An
     return voz
 
 
+def voz_de_perfil(perfil: str, motor: str = "chatterbox", idioma: str = "") -> Dict[str, Any]:
+    """🗣️ v84_176: a voz com slug de um PERFIL de voz (clonagem) — reaproveita a que já usa esse perfil nesse motor;
+    senão cria uma (slug = nome do perfil). É o que o 🎭 Vozes dos personagens usa quando você escolhe um perfil."""
+    perfil = str(perfil or "").strip()
+    if not perfil:
+        raise MultiVozError("Escolha um perfil de voz.")
+    for v in _ler():
+        if v.get("motor") == motor and (v.get("config") or {}).get("vozPerfil") == perfil:
+            return v
+    base = slugify(perfil) or "voz"
+    ja = {v["slug"] for v in _ler()}
+    slug, k = base, 2
+    while slug in ja:
+        slug = f"{base[:26]}_{k}"
+        k += 1
+    config = {"vozPerfil": perfil}  # sem idioma fixo: vale o idioma do projeto / da página (a mesma voz serve pra pt, de…)
+    return salvar({"nome": perfil.replace("_", " ")[:40], "slug": slug, "motor": motor, "config": config})
+
+
 def normalizar_genero(g: Any) -> str:
     """m/masc/male/homem -> masculino; f/female/mulher -> feminino; n -> neutro."""
     import perfis_info
@@ -220,23 +239,27 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
     pos = 0
     buf = ""
 
+    ajustes: Dict[str, float] = {}
+
     def fecha():
         nonlocal buf
         t = re.sub(r"\s+", " ", buf).strip()
         if t:
-            if falas and falas[-1]["slug"] == atual:
+            if falas and falas[-1]["slug"] == atual and falas[-1].get("ajustes", {}) == ajustes:
                 falas[-1]["texto"] += " " + t
             else:
-                falas.append({"slug": atual, "texto": t})
+                falas.append({"slug": atual, "texto": t, **({"ajustes": dict(ajustes)} if ajustes else {})})
         buf = ""
 
     for m in _RE_TAG.finditer(texto or ""):
         bruto = m.group(1).strip()
-        s = slugify(bruto)
+        base, _, mods = bruto.partition("|")
+        s = slugify(base)
         if s in vozes:
             buf += texto[pos:m.start()]
             fecha()
             atual = s
+            ajustes = ler_ajustes(mods)  # 🎭 v84_173: emoção desta fala — [mira|exag=0.7|cfg=0.3|vel=1.05]
             pos = m.end()
         elif bruto.lower() in extras or " " in bruto.strip():
             continue  # tag de emoção (Chatterbox Turbo / Fish S2, ex.: [excited], [whisper in small voice]): fica no texto
@@ -249,6 +272,41 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
         if f["slug"] and f["slug"] not in usadas:
             usadas.append(f["slug"])
     return {"falas": falas, "desconhecidas": sorted(set(desconhecidas)), "usadas": usadas, "ultima": atual}
+
+
+AJUSTES = {"exag": ("exaggeration", 0.0, 1.5), "emo": ("exaggeration", 0.0, 1.5), "cfg": ("cfg_weight", 0.0, 1.0),
+           "vel": ("velocidade", 0.5, 2.0)}
+
+
+def ler_ajustes(mods: str) -> Dict[str, float]:
+    """"exag=0.7|cfg=0.3|vel=1.1" → {"exag": 0.7, "cfg": 0.3, "vel": 1.1} (o que não for número/conhecido é ignorado)."""
+    out: Dict[str, float] = {}
+    for parte in re.split(r"[|,;]", str(mods or "")):
+        k, _, v = parte.partition("=")
+        k = k.strip().lower()
+        if k not in AJUSTES:
+            continue
+        try:
+            _n, lo, hi = AJUSTES[k]
+            out["exag" if k == "emo" else k] = round(max(lo, min(hi, float(v.strip().replace(",", ".")))), 2)
+        except ValueError:
+            continue
+    return out
+
+
+def aplicar_ajustes(motor: str, kw: Dict[str, Any], ajustes: Optional[Dict[str, float]]) -> Dict[str, Any]:
+    """Os ajustes da fala nos kwargs do motor: emoção (exaggeration) e cfg só no Chatterbox; velocidade nos que têm."""
+    if not ajustes:
+        return kw
+    kw = dict(kw)
+    if motor == "chatterbox":
+        if "exag" in ajustes:
+            kw["exaggeration"] = ajustes["exag"]
+        if "cfg" in ajustes:
+            kw["cfg_weight"] = ajustes["cfg"]
+    if "vel" in ajustes and "velocidade" in kw:
+        kw["velocidade"] = ajustes["vel"]
+    return kw
 
 
 def tem_tags(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None) -> bool:
@@ -310,7 +368,9 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
                 quem = vozes[f["slug"]]["nome"]
             else:
                 motor, kw, quem = motor_padrao, kwargs_padrao, "voz padrão"
-            log(f"[{k}/{len(d['falas'])}] {quem} ({motor}): \"{f['texto'][:60]}\"")
+            kw = aplicar_ajustes(motor, kw, f.get("ajustes"))
+            aj = " ".join(f"{a}={v}" for a, v in (f.get("ajustes") or {}).items())
+            log(f"[{k}/{len(d['falas'])}] {quem} ({motor}{' · ' + aj if aj else ''}): \"{f['texto'][:60]}\"")
             bruto = os.path.join(pasta, f"f{k:04d}_bruto.wav")
             gerar_fn(motor, limpar_fn(f["texto"], motor), bruto, **kw)
             wav = os.path.join(pasta, f"f{k:04d}.wav")

@@ -165,10 +165,22 @@ ESTRUTURA_PACOTE: List[Tuple[str, str, str]] = [
     ("reforcos.json", "recomendado", "{\"mascote_en\", \"evitar_en\", \"qa_pt\"}: a trava de proporção/o que a IA costuma errar"),
     ("poses_sugeridas.json", "opcional", "{\"poses\": [\"com lupa\", …]}: sugestões de poses novas"),
     ("modelo_roteiro.json", "recomendado", "o modelo de roteiro do canal (entra nos 🕵️ Modelos de vídeo, falando o nome do canal)"),
+    ("personagens.json", "opcional", "🎭 canal com PERSONAGENS fixos: narrador + cada personagem (personalidade, como fala, quando "
+                                     "aparece e quando não, segredo, emoções da voz, voz sugerida, desenho e fichas) — vira roteiro multi voz"),
+    ("lore.md", "opcional", "🎭 a bíblia da lore (a IA consulta o porquê de cada dinâmica antes de escrever)"),
+    ("continuidade.json", "opcional", "🎭 as pistas da lore (clue_id, símbolo, pergunta, estado) — o site marca o uso a cada roteiro"),
+    ("docs/*.md", "opcional", "manuais do canal (formatos, prompt do roteirista, roteiro exemplo, análise) — o roteiro exemplo pode "
+                              "virar o 📐 do modelo (\"roteiro_exemplo\" no modelo_roteiro.json)"),
+    ("direcao.json", "opcional", "o estilo de direção do canal no editor (cor, filtros, movimentos, transições, entradas, quadros, "
+                                 "destaques) — vira a direção “🎨 <canal>” e é sugerida sozinha nos vídeos desse modelo"),
     ("LEIA-ME.txt", "opcional", "notas pra humanos"),
 ]
-_JSON_PERMITIDOS = {"pacote.json", "brand_guide.json", "reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "manifest.json"}
+_JSON_PERMITIDOS = {"pacote.json", "brand_guide.json", "reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "manifest.json",
+                    "personagens.json", "continuidade.json", "lore.md",
+                    "direcao.json"}
 _PASTAS_PERMITIDAS = ("assets/", "referencias/", "folha_mestra/", "exemplos_alvo/", "referencias_rejeitadas/")
+_PASTAS_TEXTO = ("docs/", "fonte/")  # 🎭 v84_173: manuais do canal (.md/.txt) e o JSON original da marca (.json)
+_LOCAIS = ("projetos", "estado.json", "lore_historico.json", "vozes_escolhidas.json")  # o que é seu e o import nunca apaga
 
 
 def _slugificar(nome: str) -> str:
@@ -209,9 +221,16 @@ def importar_zip(base: str, dados: bytes) -> str:
             raise MarcaErro(f"pacote.json: \"formato\" deve ser \"{FORMATO_PACOTE}\".")
     slug = _slugificar(pac.get("slug") or (guia.get("project") or {}).get("name") or "marca")
     d = _pasta(base, slug)
-    if os.path.isdir(d):  # troca as referências, mantém os seus projetos e aprovações
+    cont_antes = _json(os.path.join(d, "continuidade.json"), {}) or {}  # 🧩 o estado das pistas é seu: sobrevive ao import
+    lore_antes = ""
+    try:
+        with open(os.path.join(d, "lore.md"), encoding="utf-8") as f:
+            lore_antes = f.read()
+    except OSError:
+        pass
+    if os.path.isdir(d):  # troca as referências, mantém os seus projetos, aprovações e o histórico da lore
         for item in os.listdir(d):
-            if item not in ("projetos", "estado.json") and not (item == "folha_mestra"):
+            if item not in _LOCAIS and not (item == "folha_mestra"):
                 cam = os.path.join(d, item)
                 shutil.rmtree(cam) if os.path.isdir(cam) else os.remove(cam)
         fm = os.path.join(d, "folha_mestra")
@@ -229,10 +248,12 @@ def importar_zip(base: str, dados: bytes) -> str:
             rel = "brand_guide.json"
         ext = os.path.splitext(rel)[1].lower()
         ok = (rel in _JSON_PERMITIDOS or (rel.upper().startswith("LEIA") and ext == ".txt")
-              or (rel.startswith(_PASTAS_PERMITIDAS) and ext in _IMG))
+              or (rel.startswith(_PASTAS_PERMITIDAS) and ext in _IMG)
+              or (rel.startswith(_PASTAS_TEXTO) and ext in (".md", ".txt", ".json")))
         if not ok:
             continue
-        if rel in ("reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "pacote.json", "manifest.json"):
+        if rel in ("reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "pacote.json", "manifest.json", "direcao.json",
+                   "personagens.json", "continuidade.json"):
             try:
                 json.loads(z.read(n).decode("utf-8-sig"))
             except (ValueError, UnicodeDecodeError) as exc:
@@ -246,11 +267,38 @@ def importar_zip(base: str, dados: bytes) -> str:
         copiados += 1
     if not os.path.isdir(os.path.join(d, "assets")):
         raise MarcaErro("O pacote precisa da pasta assets/ com as imagens oficiais da marca.")
+    _juntar_estado_do_canal(base, slug, d, cont_antes, lore_antes)
     m = carregar(base, slug)
     if not folha_atual(m):
         montar_folha_v0(m, base)
     registrar_modelos(base)
     return slug
+
+
+def _juntar_estado_do_canal(base: str, slug: str, d: str, cont_antes: Dict[str, Any], lore_antes: str) -> None:
+    """🎭 Import de novo: as pistas mantêm o estado/os usos que você já tem; a sua bíblia editada vai pro histórico."""
+    cam = os.path.join(d, "continuidade.json")
+    nova = _json(cam, None)
+    if isinstance(nova, dict) and cont_antes.get("pistas"):
+        velhas = {str(p.get("clue_id")): p for p in cont_antes.get("pistas") or [] if isinstance(p, dict)}
+        for p in nova.get("pistas") or []:
+            v = velhas.get(str(p.get("clue_id")))
+            if v:
+                for k in ("estado", "usos"):
+                    if v.get(k):
+                        p[k] = v[k]
+        _gravar(cam, nova)
+    try:
+        with open(os.path.join(d, "lore.md"), encoding="utf-8") as f:
+            lore_nova = f.read()
+    except OSError:
+        lore_nova = ""
+    if lore_antes and lore_nova and lore_antes != lore_nova:
+        import canal_perfil
+        h = canal_perfil.historico(base, slug)
+        h.append({"tipo": "mudanca", "arquivo": "lore.md", "motivo": "o pacote importado trouxe outra bíblia (esta era a de antes)",
+                  "antes": lore_antes[:60000], "quando": time.time()})
+        canal_perfil._salvar_hist(base, slug, h)
 
 
 def montar_folha_v0(m: Dict[str, Any], base: str = ".") -> Optional[str]:
@@ -267,6 +315,17 @@ def montar_folha_v0(m: Dict[str, Any], base: str = ".") -> Optional[str]:
     sil = os.path.join(R, "silhuetas")
     if os.path.isdir(sil):
         cel += [("Silhueta", os.path.join(sil, f)) for f in sorted(os.listdir(sil)) if f.lower().endswith(_IMG)][:2]
+    if not cel:  # 🎭 canal com personagens: a ficha de cada uma
+        pj = _json(os.path.join(m["dir"], "personagens.json"), {}) or {}
+        for p in pj.get("personagens") or []:
+            for rel in (p.get("referencias") or [])[:1]:
+                cam = os.path.join(m["dir"], os.path.normpath(rel))
+                if os.path.isfile(cam):
+                    cel.append((str(p.get("nome") or p.get("slug")), cam))
+        for rel in (pj.get("referencias_dupla") or [])[:1]:
+            cam = os.path.join(m["dir"], os.path.normpath(rel))
+            if os.path.isfile(cam):
+                cel.append(("Juntas", cam))
     if not cel:  # pacote só com o Brand Kit: os arquivos canônicos do mascote que o JSON aponta
         for rel in ((m["guia"].get("mascot") or {}).get("canonical_reference_files") or []):
             cam = os.path.join(m["dir"], os.path.normpath(rel))
@@ -285,7 +344,12 @@ def conferir_pacote(m: Dict[str, Any]) -> List[Dict[str, Any]]:
     """✅ O que o pacote tem e o que falta (pra página e pro import)."""
     import glob
     out = []
+    tem_pers = os.path.isfile(os.path.join(m["dir"], "personagens.json"))
+    so_mascote = ("referencias/poses/", "referencias/mascote_", "referencias/silhuetas/", "referencias/animacao_original/",
+                  "reforcos.json", "poses_sugeridas.json")
     for rel, nivel, oque in ESTRUTURA_PACOTE:
+        if tem_pers and rel.startswith(so_mascote):
+            continue  # 🎭 canal com personagens: as coisas do mascote único não se aplicam
         padrao = rel.replace("<id>", "*")
         if padrao.endswith("/"):
             achados = [x for x in glob.glob(os.path.join(m["dir"], padrao, "*")) if x.lower().endswith(_IMG)]
@@ -293,6 +357,8 @@ def conferir_pacote(m: Dict[str, Any]) -> List[Dict[str, Any]]:
             achados = glob.glob(os.path.join(m["dir"], padrao))
         out.append({"item": rel, "nivel": nivel, "oque": oque, "ok": bool(achados), "n": len(achados)})
     poses = [k for k in POSES if os.path.isfile(os.path.join(m["dir"], "referencias", "poses", f"pose_{k}.png"))]
+    if tem_pers:
+        return out
     out.append({"item": "poses oficiais recortadas", "nivel": "recomendado", "oque": f"{len(poses)} de 8: {', '.join(poses) or '—'}",
                 "ok": len(poses) >= 6, "n": len(poses)})
     return out
@@ -328,13 +394,33 @@ def registrar_modelos(base: str) -> List[str]:
         if not formatos:
             continue
         nome_canal = str(d.get("nome_canal") or (m["guia"].get("project") or {}).get("name") or "")[:80]
+        # 🎬 v84_171: a direção do editor — a do pacote (direcao.json) ou uma do sistema que o modelo aponta
+        direcao = ("marca_" + x["slug"]) if os.path.isfile(os.path.join(m["dir"], "direcao.json")) else str(d.get("direcao_sugerida") or "")[:60]
         ds.MODELOS[chave] = {"nome": str(d.get("nome") or f"🎨 {x['nome']}")[:100], "descricao": str(d.get("descricao") or "")[:600],
                              "identidade_visual": x["slug"], "nome_canal": nome_canal, "formatos": formatos,
                              "regras": [str(r)[:500] for r in d.get("regras") or []][:20],
                              **({"palavras_por_minuto": int(d["palavras_por_minuto"])} if d.get("palavras_por_minuto") else {}),
+                             **({"direcao_sugerida": direcao} if direcao else {}),
+                             # 🎭 v84_173: canal com personagens (falas multi voz, lore, histórico) e o roteiro exemplo do canal
+                             **({"perfil_canal": x["slug"]} if os.path.isfile(os.path.join(m["dir"], "personagens.json")) else {}),
+                             **_exemplo_do_modelo(m, d),
                              "do_pacote": True}
         feitos.append(chave)
     return feitos
+
+
+def _exemplo_do_modelo(m: Dict[str, Any], d: Dict[str, Any]) -> Dict[str, Any]:
+    """"roteiro_exemplo": "docs/roteiro_exemplo.md" no modelo_roteiro.json → o 📐 Roteiro exemplo já vem preenchido."""
+    rel = str(d.get("roteiro_exemplo") or "").strip()
+    if not rel:
+        return {}
+    try:
+        with open(arquivo(m, rel), encoding="utf-8-sig") as f:
+            texto = f.read()[:60000]
+    except (OSError, MarcaErro):
+        return {}
+    modo = d.get("roteiro_exemplo_modo") if d.get("roteiro_exemplo_modo") in ("modelar", "inspirar") else "modelar"
+    return {"referencia_padrao": texto, "referencia_modo_padrao": modo}
 
 
 def exportar_pacote(m: Dict[str, Any]) -> bytes:
@@ -346,7 +432,7 @@ def exportar_pacote(m: Dict[str, Any]) -> bytes:
             for f in sorted(fs):
                 cam = os.path.join(raiz, f)
                 rel = os.path.relpath(cam, m["dir"]).replace("\\", "/")
-                if rel.startswith(("projetos/", "folha_mestra/celulas/")) or rel == "estado.json" or rel.endswith(".tmp"):
+                if rel.startswith(("projetos/", "folha_mestra/celulas/")) or rel in ("estado.json", "lore_historico.json", "vozes_escolhidas.json") or rel.endswith(".tmp"):
                     continue
                 tem_pacote = tem_pacote or rel == "pacote.json"
                 z.write(cam, f"{m['slug']}/{rel}")
@@ -416,6 +502,8 @@ def referencias_para(m: Dict[str, Any], cena: Dict[str, Any], motor: str = "pod"
             alta = os.path.join(m["dir"], "referencias", "mascote_alta_res_tronco.png")
             if os.path.isfile(alta):
                 refs.append(("mascote_alta_res", alta))
+    for papel, cam in refs_personagens(m, cena.get("personagens")):  # 🎭 v84_173: cada personagem com a ficha dela
+        refs.append((papel, cam))
     for k, extra in enumerate(cena.get("refs_extras") or []):  # 📷 fotos suas: pessoa/objeto real da história
         if extra and os.path.isfile(extra):
             refs.append((f"foto_{k + 1}", extra))
@@ -423,11 +511,12 @@ def referencias_para(m: Dict[str, Any], cena: Dict[str, Any], motor: str = "pod"
         est = os.path.join(m["dir"], "referencias", "estilo_colagem_dir.png")
         if os.path.isfile(est):
             refs.append(("estilo", est))
-    if motor == "flow":  # 1 referência só: a sua foto quando a cena é sobre ela; senão a pose do mascote
+    if motor == "flow":  # 1 referência só: a sua foto quando a cena é sobre ela; senão a pose do mascote / a dupla
         fotos = [r for r in refs if r[0].startswith("foto_")]
-        if fotos and (cena.get("tipo_imagem") != "mascote" or not cena.get("mascote")):
+        if fotos and (cena.get("tipo_imagem") != "mascote" or not cena.get("mascote")) and not cena.get("personagens"):
             return fotos[:1]
-        return refs[:1]
+        dupla = [r for r in refs if r[0] == "personagens_dupla"]
+        return (dupla or refs)[:1]
     # o klein aceita 4: as fotos suas têm prioridade sobre a 2ª/3ª referência do mascote
     if len(refs) > 4:
         fotos = [r for r in refs if r[0].startswith("foto_")]
@@ -436,11 +525,84 @@ def referencias_para(m: Dict[str, Any], cena: Dict[str, Any], motor: str = "pod"
     return refs[:4]
 
 
+def perfil_de(m: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    try:
+        import canal_perfil
+        return canal_perfil.carregar(os.path.dirname(os.path.dirname(os.path.abspath(m["dir"]))), m["slug"])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _slugs_personagens(lista: Any) -> List[Dict[str, str]]:
+    out = []
+    for x in lista or []:
+        if isinstance(x, str):
+            x = {"slug": x}
+        if isinstance(x, dict) and x.get("slug"):
+            import canal_perfil
+            out.append({"slug": canal_perfil._slug(x["slug"]), "acao_en": str(x.get("acao_en") or x.get("acao") or "")[:300]})
+    return out[:3]
+
+
+def refs_personagens(m: Dict[str, Any], lista: Any) -> List[Tuple[str, str]]:
+    """As fichas das personagens da cena (a 1ª referência de cada uma) + a ficha da dupla quando são 2+."""
+    pers = _slugs_personagens(lista)
+    if not pers:
+        return []
+    perfil = perfil_de(m) or {}
+    por = {p["slug"]: p for p in perfil.get("personagens") or []}
+    refs: List[Tuple[str, str]] = []
+    for x in pers:
+        p = por.get(x["slug"])
+        for rel in (p or {}).get("referencias") or []:
+            try:
+                cam = arquivo(m, rel)
+            except MarcaErro:
+                continue
+            if os.path.isfile(cam):
+                refs.append((f"personagem_{x['slug']}", cam))
+                break
+    if len(pers) >= 2:
+        import json as _j
+        pj = _json(os.path.join(m["dir"], "personagens.json"), {}) or {}
+        for rel in pj.get("referencias_dupla") or []:
+            try:
+                cam = arquivo(m, rel)
+            except MarcaErro:
+                continue
+            if os.path.isfile(cam):
+                refs.append(("personagens_dupla", cam))
+                break
+    return refs
+
+
+def texto_personagens(m: Dict[str, Any], lista: Any) -> Tuple[str, str]:
+    """(o bloco "MASCOT/CHARACTERS" do prompt, o que evitar) pras personagens da cena — o lock de cada uma + o estilo
+    simplificado das personagens do canal."""
+    pers = _slugs_personagens(lista)
+    if not pers:
+        return "", ""
+    perfil = perfil_de(m) or {}
+    pj = _json(os.path.join(m["dir"], "personagens.json"), {}) or {}
+    por = {p["slug"]: p for p in perfil.get("personagens") or []}
+    partes, evitar = [], []
+    for x in pers:
+        p = por.get(x["slug"]) or {}
+        nome = p.get("nome") or x["slug"]
+        partes.append(f"{nome.upper()}: {p.get('visual_en') or nome}" + (f" Action: {x['acao_en']}." if x.get("acao_en") else ""))
+        if p.get("evitar_en"):
+            evitar.append(p["evitar_en"])
+    so = "exactly ONE character" if len(pers) == 1 else f"exactly {len(pers)} characters, clearly separated silhouettes, do not merge features or outfits"
+    estilo = pj.get("estilo_personagens_en") or ""
+    return (f"include {so}. " + " ".join(partes) + (f" {estilo}" if estilo else ""), ", ".join(evitar))
+
+
 _DESC_REF = {"mascote_pose": "the recurring mascot in the target pose (copy its exact design)",
              "folha_mestra": "the mascot master character sheet (canonical design: silhouette, eyes, cream body, outline)",
              "mascote_alta_res": "a high-resolution close view of the same mascot (linework and texture)",
              "mascote_proporcoes": "frames from the ORIGINAL vintage cartoon showing the mascot's true proportions (tiny head, thin curved body, extremely long rubber-hose legs, big shoes) — match these proportions exactly",
              "silhueta": "the mascot's canonical silhouette shape",
+             "personagens_dupla": "the canonical sheet of the recurring characters together (relationship and body language)",
              "estilo": "a brand style sample (palette, paper texture and collage language only — do not copy its objects)"}
 
 
@@ -451,6 +613,14 @@ def _preencher(template: str, valores: Dict[str, str]) -> str:
     for rotulo, valor in valores.items():
         out = re.sub(re.escape(rotulo) + r":\s*\[[^\]]*\]", lambda _m, v=valor: f"{rotulo}: {v}", out)
     return out
+
+
+def _desc_ref(m: Dict[str, Any], papel: str) -> str:
+    if papel.startswith("personagem_"):
+        slug = papel[len("personagem_"):]
+        p = next((x for x in (perfil_de(m) or {}).get("personagens") or [] if x["slug"] == slug), {})
+        return f"the canonical character sheet of {p.get('nome') or slug} (copy this exact design: face, hair, eyes, marks, outfit, accessories)"
+    return _DESC_REF.get(papel, "a photo of the real subject of this scene")
 
 
 def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[Tuple[str, str]]] = None) -> str:
@@ -478,10 +648,15 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
         evitar = reforcos(m).get("evitar_en")
         mascote_txt = (f"include the recurring mascot ({acao}). {ms.get('prompt_lock_en', '')} {reforcos(m).get('mascote_en', '')}"
                        f"{' The mascot is never: ' + evitar + '.' if evitar else ''}" if mascote else "no mascot in this frame")
+        pers_txt, pers_evitar = texto_personagens(m, cena.get("personagens"))
+        if pers_txt:  # 🎭 v84_173: as personagens do canal nesta cena (com a ficha de cada uma como referência)
+            mascote_txt = pers_txt if not mascote else f"{mascote_txt} Also {pers_txt}"
+        elif not mascote and perfil_de(m):
+            mascote_txt = "no characters in this frame"
         tpl = gs.get("base_prompt_template_en") or gs.get("scene_prompt_template_en") or ""
         p = _preencher(tpl, {"SUBJECT": cena.get("assunto_en") or cena.get("narracao") or "",
                              "VISUAL QUESTION": cena.get("pergunta_visual_en") or "what is this and why does it matter?",
-                             "COMPOSITION": cena.get("composicao_en") or "one clear focal point in the centre, layered archival collage at the edges, dark vignette",
+                             "COMPOSITION": cena.get("composicao_en") or (gs.get("default_composition_en") or "one clear focal point, readable silhouettes, quiet negative space for titles added later"),
                              "MASCOT": mascote_txt, "BRAND STYLE": estilo})
         if "[" in p:  # template diferente do esperado: completa por extenso
             p = re.sub(r"\[[^\]]*\]", "", p)
@@ -501,11 +676,14 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
             else:
                 p += f" Real subject {k}{' (' + desc + ')' if desc else ''} from the photo reference, {como}, matching the brand palette."
     if refs:
-        p = " ".join(f"Image {k + 1} is {_DESC_REF.get(papel, 'a photo of the real subject of this scene')}."
+        p = " ".join(f"Image {k + 1} is {_desc_ref(m, papel)}."
                      for k, (papel, _c) in enumerate(refs)) + " " + p
     neg = gs.get("negative_prompt_global_en") or ""
     if mascote or tipo == "folha":
         neg = ", ".join(x for x in (neg, ms.get("negative_prompt_en") or "", reforcos(m).get("evitar_en") or "") if x)
+    if tipo not in ("folha", "thumbnail") and cena.get("personagens"):
+        _t, pe = texto_personagens(m, cena.get("personagens"))
+        neg = ", ".join(x for x in (neg, pe) if x)
     if neg:
         p += f" Avoid: {neg}."
     return " ".join(p.split())
@@ -556,6 +734,23 @@ def _matiz_acento(m: Optional[Dict[str, Any]]) -> float:
     return colorsys.rgb_to_hsv(*(x / 255 for x in c))[0] * 360 if c else 357.0
 
 
+def _cores_permitidas(m: Optional[Dict[str, Any]]) -> List[Tuple[float, Tuple[int, int, int], float]]:
+    """As cores SATURADAS da paleta (matiz, rgb, luminância): no Dinge erklären só os vermelhos; numa marca com azul e
+    dourado (ex.: ASTRANEBEL), esses também. Sem paleta: o vermelho."""
+    out = []
+    for c in paleta(m) if m else []:
+        hh, ss, vv = colorsys.rgb_to_hsv(*(x / 255 for x in c["rgb"]))
+        if ss >= 0.25 and vv >= 0.2:
+            out.append((hh * 360, tuple(c["rgb"]), 0.2126 * c["rgb"][0] / 255 + 0.7152 * c["rgb"][1] / 255 + 0.0722 * c["rgb"][2] / 255))
+    return out or [(357.0, (197, 31, 39), 0.25)]
+
+
+def _dist_matiz(h, alvo: float):
+    import numpy as np
+    d = np.abs(h - alvo)
+    return np.minimum(d, 360 - d)
+
+
 def validar_paleta(caminho_ou_img: Any, m: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Confere as palette_rules do JSON: só preto/carvão/cinza/creme + vermelho de sinalização.
     Mede (numa miniatura): % de pixels de cor proibida (azul, verde, roxo, amarelo vivo), % de vermelho, % de escuro,
@@ -574,10 +769,13 @@ def validar_paleta(caminho_ou_img: Any, m: Optional[Dict[str, Any]] = None) -> D
     h = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60.0
     colorido = (s > 0.32) & (v > 0.22)
     ha = _matiz_acento(m)  # a cor de sinalização da marca (no Dinge erklären, o vermelho)
-    vermelho = colorido & (np.minimum(np.abs(h - ha), 360 - np.abs(h - ha)) < 30)
+    vermelho = colorido & (_dist_matiz(h, ha) < 30)
+    perto_paleta = np.zeros_like(colorido)
+    for hp, _rgb, _l in _cores_permitidas(m):  # 🎨 v84_173: as cores saturadas DA marca valem (azul, dourado…)
+        perto_paleta |= _dist_matiz(h, hp) < 25
     laranja_creme = (s <= 0.42) & (h >= 18) & (h <= 65)  # creme/sépia/papel (permitido)
-    proibido = colorido & ~vermelho & ~(laranja_creme)
-    frio = (h > 65) & (h < 330) & (v > 0.2) & ~vermelho  # fora dos tons quentes (papel/sépia/vermelho): deveria ser cinza
+    proibido = colorido & ~vermelho & ~perto_paleta & ~(laranja_creme)
+    frio = ~((h >= 18) & (h <= 65)) & (v > 0.2) & ~vermelho & ~perto_paleta  # fora das cores da marca: deveria ser neutro
     total = float(a.shape[0] * a.shape[1])
     lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
     met = {"proibida_pct": round(float(proibido.sum()) / total * 100, 1), "vermelho_pct": round(float(vermelho.sum()) / total * 100, 1),
@@ -587,16 +785,16 @@ def validar_paleta(caminho_ou_img: Any, m: Optional[Dict[str, Any]] = None) -> D
     problemas, pontos = [], 100.0
     if met["proibida_pct"] > 1.5:
         pontos -= min(60, met["proibida_pct"] * 6)
-        problemas.append(f"{met['proibida_pct']}% de cor fora da paleta (azul/verde/roxo/amarelo vivo)")
+        problemas.append(f"{met['proibida_pct']}% de cor fora da paleta da marca")
     if met["vermelho_pct"] > 22:
         pontos -= min(30, (met["vermelho_pct"] - 22) * 2)
-        problemas.append(f"vermelho demais ({met['vermelho_pct']}% — é cor de sinalização, ~8–12%)")
+        problemas.append(f"cor de destaque demais ({met['vermelho_pct']}% — é cor de sinalização, pouca área)")
     if met["escuro_pct"] < 30:
         pontos -= min(30, (30 - met["escuro_pct"]) * 1.2)
-        problemas.append(f"pouco preto/carvão ({met['escuro_pct']}% — o guia pede 40–55% de preto e 15–25% de carvão)")
+        problemas.append(f"pouco escuro ({met['escuro_pct']}% — a paleta da marca é dominada pelos tons escuros)")
     if met["saturacao_fora_vermelho"] > 0.28:
         pontos -= 15
-        problemas.append("imagem colorida demais fora do vermelho (as internas devem ser monocromáticas/dessaturadas)")
+        problemas.append("imagem colorida demais fora das cores da marca (o resto deve ficar neutro/dessaturado)")
     pontos = max(0, round(pontos))
     status = "aprovada" if pontos >= 80 and not met["proibida_pct"] > 4 else ("revisar" if pontos >= 50 else "reprovar")
     return {"score": pontos, "status": status, "problemas": problemas, "metricas": met}
@@ -627,10 +825,17 @@ def gradear(origem: str, destino: str, m: Optional[Dict[str, Any]] = None, grao:
     s = np.where(mx > 1e-6, (mx - mn) / np.maximum(mx, 1e-6), 0)
     d = np.maximum(mx - mn, 1e-6)
     h = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60.0
-    ha = _matiz_acento(m)
-    perto = (np.minimum(np.abs(h - ha), 360 - np.abs(h - ha)) < 22).astype("float32")
+    # 🎨 v84_173: as cores saturadas DA marca ficam, puxadas pra cor mais parecida da paleta (no Dinge: só os vermelhos)
+    cores = _cores_permitidas(m)
+    dist = np.stack([_dist_matiz(h, hp) for hp, _c, _l in cores])                      # (n, H, W)
+    score = dist + np.stack([np.abs(lum - lc) * 60 for _h, _c, lc in cores])           # matiz + luminância
+    score = np.where(dist < 25, score, 1e9)
+    idx = np.argmin(score, axis=0)
+    perto = (dist.min(axis=0) < 22).astype("float32")
     peso = np.clip((s - 0.3) / 0.25, 0, 1) * perto * np.clip((mx - 0.18) / 0.2, 0, 1)
-    alvo = np.where((mx > 0.55)[..., None], sinal / 255.0, fundo / 255.0)
+    paleta_rgb = np.array([c for _h, c, _l in cores], "float32") / 255.0
+    alvo = paleta_rgb[idx]
+    del sinal, fundo
     out = out * (1 - peso[..., None]) + alvo * peso[..., None]
     hh, ww = lum.shape
     yy, xx = np.mgrid[0:hh, 0:ww]
@@ -895,6 +1100,7 @@ def prompt_batidas(m: Dict[str, Any], narracao: str, alvo: int = 0, elenco: Opti
     ms = g.get("mascot") or {}
     poses = "; ".join(f"{k} = {v['en']}" for k, v in todas_poses(m).items())
     n_alvo = alvo or max(6, min(80, round(len(narracao.split()) / 28)))
+    _pp = _bloco_personagens_batidas(m)
     return f"""Você é diretor de arte do canal “{p.get('name')}” ({p.get('channel_language')}). Posicionamento: {p.get('positioning')}
 Regra editorial: {p.get('editorial_rule')}
 
@@ -917,13 +1123,31 @@ inteiro sem pular nada). Para cada batida decida (pipeline do guia, passos 1 e 2
   *asteriscos* — ela fica vermelha). Só quando ajuda (datas, lugares, nomes, uma pergunta). Escrita correta nesse idioma.
 - "anotacao": null ou "circulo" ou "seta" (marcação vermelha à mão no ponto que a narração destaca).
 Nada de gore; estética documental vintage. Pessoas reais: representação neutra e respeitosa.
-{_bloco_elenco(elenco)}
+{_bloco_elenco(elenco)}{_pp}
 Responda SÓ com JSON: {{"batidas": [{{"narracao": "...", "intencao_visual": "...", "emocao": "...", "objeto": "...",
 "tipo_imagem": "arquivo", "mascote": null, "acao_mascote_en": "", "assunto_en": "...", "pergunta_visual_en": "...",
-"composicao_en": "...", "texto_de": ["..."], "anotacao": null, "pessoas": [], "ano": 0, "lugar": ""}}]}}
+"composicao_en": "...", "texto_de": ["..."], "anotacao": null, "pessoas": [], "ano": 0, "lugar": ""{', "personagens": []' if _pp else ''}}}]}}
 
 NARRAÇÃO:
 {narracao.strip()}"""
+
+
+def _bloco_personagens_batidas(m: Dict[str, Any]) -> str:
+    """🎭 v84_173: canal com personagens — em que batidas elas aparecem na IMAGEM (e fazendo o quê)."""
+    perfil = perfil_de(m)
+    if not perfil or not perfil.get("personagens"):
+        return ""
+    L = ["", "PERSONAGENS DO CANAL (aparecem na imagem desenhadas no estilo delas, mais simples, com a ficha como referência):"]
+    for p in perfil["personagens"]:
+        L.append(f"- {p['slug']} = {p['nome']}" + (f" ({p.get('epiteto')})" if p.get("epiteto") else "")
+                 + (f" · aparece: {p['quando_aparece']}" if p.get("quando_aparece") else "")
+                 + (f" · NÃO aparece: {p['quando_nao_aparece']}" if p.get("quando_nao_aparece") else ""))
+    L += ["- \"personagens\": [{\"slug\": \"mira\", \"acao_en\": \"what she does/feels in this frame, in English\"}] — quem aparece na "
+          "imagem desta batida (0, 1 ou 2). Ponha quando a batida é uma fala/reação delas (as tags [mira], [vanta] na narração) "
+          "ou um momento de relação/lore; as batidas que explicam o fenômeno em si ficam SEM personagens (imagem científica). "
+          "Não use \"mascote\" pra elas.",
+          "- A narração tem tags de voz ([narrador], [mira|curiosa]…): copie a narração da batida COM as tags, sem mudar nada."]
+    return "\n".join(L) + "\n"
 
 
 def _bloco_elenco(elenco: Optional[Dict[str, Any]]) -> str:
@@ -999,13 +1223,14 @@ def ler_batidas(texto: str, m: Optional[Dict[str, Any]] = None) -> List[Dict[str
                     "texto_de": [str(x)[:80] for x in txt][:4],
                     "anotacao": b.get("anotacao") if b.get("anotacao") in ("circulo", "seta") else None,
                     "pessoas": _pessoas(b.get("pessoas")), "ano": _int0(b.get("ano")), "lugar": str(b.get("lugar") or "")[:120],
+                    "personagens": _slugs_personagens(b.get("personagens")),
                     "qa_status": "", "qa_notas": "", "geracoes": []})
     if not out:
         raise MarcaErro("Nenhuma batida válida na resposta.")
     return out
 
 
-def batidas_sem_ia(narracao: str, a_cada: int = 3) -> List[Dict[str, Any]]:
+def batidas_sem_ia(narracao: str, a_cada: int = 3, m: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Sem IA: corta por frases (~28 palavras por batida) e põe o mascote a cada `a_cada` batidas (pose curioso/explicando)."""
     frases = re.split(r"(?<=[.!?…])\s+", " ".join(str(narracao or "").split()))
     blocos, atual = [], []
@@ -1017,11 +1242,23 @@ def batidas_sem_ia(narracao: str, a_cada: int = 3) -> List[Dict[str, Any]]:
     if atual:
         blocos.append(" ".join(atual))
     out = []
+    perfil = perfil_de(m) if m else None
+    slugs = {p["slug"] for p in (perfil or {}).get("personagens") or []}
     for k, t in enumerate(blocos, 1):
-        pose = ("curioso" if "?" in t else "explicando") if k % a_cada == 1 else ""
+        pers = []
+        if perfil:  # 🎭 canal com personagens: aparece quem fala nesta batida (pela tag de voz); sem mascote
+            import canal_perfil
+            for tag in re.findall(r"\[\s*([^\]|]+)", t):
+                sl = canal_perfil._slug(tag)
+                if sl in slugs and sl not in [x["slug"] for x in pers]:
+                    pers.append({"slug": sl, "acao_en": ""})
+            pose = ""
+        else:
+            pose = ("curioso" if "?" in t else "explicando") if k % a_cada == 1 else ""
         out.append({"id": f"c{k:03d}", "narracao": t, "intencao_visual": "", "emocao": "", "objeto": "",
-                    "tipo_imagem": "mascote" if pose else "arquivo", "mascote": pose, "acao_mascote_en": "",
-                    "assunto_en": t[:400], "pergunta_visual_en": "", "composicao_en": "", "texto_de": [], "anotacao": None,
+                    "tipo_imagem": "mascote" if pose else ("ilustracao" if perfil else "arquivo"), "mascote": pose, "acao_mascote_en": "",
+                    "assunto_en": re.sub(r"\[[^\]]*\]", "", t)[:400].strip(), "pergunta_visual_en": "", "composicao_en": "",
+                    "texto_de": [], "anotacao": None, "personagens": pers[:2],
                     "qa_status": "", "qa_notas": "", "geracoes": []})
     return out
 
@@ -1597,6 +1834,42 @@ EXEMPLO_MODELO = {
     "formatos": {"longo": {"nome": "Vídeo longo", "minutos": 12, "estrutura": ["GANCHO: …", "VIRADA: …", "…", "FECHAMENTO: …"]},
                  "curto": {"nome": "Shorts", "minutos": 1, "estrutura": ["Fato estranho", "Explicação", "Pergunta final"]}},
     "regras": ["Falar o nome do canal no momento certo, sempre.", "Só fatos das fontes; lenda dita como lenda."]}
+EXEMPLO_DIRECAO = {
+    "_sobre": "Estilo de direção do canal no editor. Os ids vêm do catálogo do editor (veja a lista na página 📘 Como montar o "
+              "pacote); id que não existe nesta instalação é ignorado. pct = em quantos % das cenas o eixo aparece; peso = chance.",
+    "nome": "🎨 Meu Canal — colagem noir", "descricao": "Uma frase sobre o estilo.", "ritmo": "equilibrado",
+    "cores": {"ativa": True, "modo": "predef", "primaria": "#E8DDC5", "secundaria": "#080807", "acento": "#C51F27"},
+    "filtros": {"pct": 30, "itens": [{"id": "noir_soft", "peso": 2}]},
+    "efeitos": {"pct": 70, "itens": [{"id": "zoom_respiro", "peso": 4}, {"id": "ov_poeira", "peso": 2}]},
+    "transicoes": {"pct": 30, "itens": [{"id": "book_flip", "peso": 2}, {"id": "corte_pro_preto_doc", "peso": 2}]},
+    "entradas": {"pct": 20, "itens": [{"id": "recorte_cai", "peso": 3}]},
+    "templates": {"pct": 5, "itens": [{"id": "ED_ARTIGO", "peso": 1}]},
+    "destaques": {"ativo": True, "densidade": "equilibrado", "estilos": ["recorte", "dossie_maquina_escrever", "selo_ano"]},
+    "editoriais": {"ativo": True, "densidade": "equilibrado", "tipos": ["recortes", "pagina", "numero"]}}
+EXEMPLO_PERSONAGENS = {
+    "_sobre": "Canal com personagens fixos (opcional). O roteiro sai multi voz: [narrador] … [mira|curiosa] … [vanta] …",
+    "narrador": {"nome": "Narrador", "papel": "explica e organiza a evidência", "fala": "claro, contemplativo",
+                 "voz_sugerida": {"genero": "neutro", "idade": "adulto", "motor": "chatterbox", "descricao": "voz calma de documentário",
+                                  "exag": 0.45, "cfg": 0.5, "vel": 0.95},
+                 "emocoes": {"neutro": {"exag": 0.45, "cfg": 0.5}, "tenso": {"exag": 0.6, "cfg": 0.45, "descricao": "virada"}}},
+    "personagens": [{"slug": "mira", "nome": "Mira", "epiteto": "Die Sternensucherin", "papel": "abre a curiosidade do público",
+                     "personalidade": ["curiosa", "melancólica"], "fala": "perguntas sinceras e curtas",
+                     "funcao_no_video": "faz a pergunta leiga", "quando_aparece": "abre perguntas, reage à escala",
+                     "quando_nao_aparece": "no meio da explicação do mecanismo; nunca como fonte do dado científico",
+                     "motivacao": "entender o Universo", "segredo": "lacunas de memória (não revelar à toa)",
+                     "voz_sugerida": {"genero": "feminino", "idade": "jovem adulta", "motor": "chatterbox", "exag": 0.55, "cfg": 0.45},
+                     "emocoes": {"curiosa": {"exag": 0.6, "cfg": 0.45, "descricao": "pergunta"}, "triste": {"exag": 0.4, "cfg": 0.35}},
+                     "visual_en": "Mira, the same character as the attached sheet: …",
+                     "evitar_en": "different hair color, missing crescent ornament",
+                     "referencias": ["referencias/personagens/mira_ficha.png"]}],
+    "referencias_dupla": ["assets/ficha_das_duas.png"],
+    "estilo_personagens_en": "characters simpler and less detailed than the backgrounds, clean line art, flat cel shading",
+    "relacao": {"dinamica": "Mira pergunta, Vanta contesta", "regra": "a lore nunca é necessária pra entender a ciência"},
+    "regras_dialogo": ["Cada fala acrescenta pergunta, contraste, clareza ou ritmo; diálogo decorativo sai."],
+    "ferramentas_narrativas": ["Narração, pergunta, contestação, trecho só de diálogo, pista de lore — usadas quando servem."]}
+EXEMPLO_CONTINUIDADE = {"regras": ["uma pista por vez; respostas parciais"],
+                        "pistas": [{"clue_id": "estrela_riscada", "simbolo": "Estrela riscada numa foto antiga",
+                                    "pergunta": "quem tentou apagá-la?", "estado": "planned"}]}
 CHAVES_GUIA = {
     "schema": f'"{SCHEMA}" (obrigatório, exatamente assim)',
     "project": "name, channel_language, positioning, editorial_rule, brand_slogan_* (o nome do canal sai daqui)",
@@ -1608,6 +1881,32 @@ CHAVES_GUIA = {
                          "COMPOSITION: [..] MASCOT: [..] BRAND STYLE: [..]), scene_prompt_template_en, thumbnail_prompt_template_en "
                          "([topic]), quality_checklist",
 }
+
+
+def _ids_catalogo() -> Dict[str, List[str]]:
+    """Os ids do editor que uma direcao.json pode usar (por eixo) — vai no pedido pra IA e na página."""
+    out: Dict[str, List[str]] = {}
+    try:
+        import dp_destaques
+        import dp_direcao
+        import dp_visual
+        for e in ("filtros", "transicoes", "entradas", "templates"):
+            out[e] = sorted(dp_direcao._ids_validos(e))
+        out["efeitos"] = sorted(set(dp_visual.EFEITO_PARA_ZOOM) | {x["id"] for x in dp_visual.efeitos()})
+        out["destaques"] = sorted(dp_destaques.catalogo())
+    except Exception:  # noqa: BLE001
+        pass
+    out["editoriais"] = ["ficha", "linha_tempo", "pagina", "nome", "numero", "mural", "recortes", "bilhetes", "post",
+                         "reescrita", "titulo_video", "terminal"]
+    return out
+
+
+def direcoes_do_editor() -> List[Dict[str, str]]:
+    try:
+        import dp_direcao
+        return [{"id": d["id"], "nome": d["nome"]} for d in dp_direcao.direcoes(False)]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def prompt_montar_pacote(tem_brand_kit: bool = True) -> str:
@@ -1643,7 +1942,20 @@ Regras de cada parte:
 - poses_sugeridas.json: {json.dumps(EXEMPLO_POSES, ensure_ascii=False)} (20 a 100 poses que combinam com o canal).
 - modelo_roteiro.json (o roteiro do canal): {json.dumps(EXEMPLO_MODELO, ensure_ascii=False)}
   Se eu mandar um roteiro de exemplo, modele a estrutura dele (gancho, viradas, ritmo, humor, final) nos "formatos".
-  As regras seguem o editorial_rule do JSON; "nome_canal" é o nome falado no vídeo.
+  As regras seguem o editorial_rule do JSON; "nome_canal" é o nome falado no vídeo. Opcional: "direcao_sugerida" com o id de
+  uma direção do editor (ex.: "sys_true_crime", "sys_dossie_papel", "sys_mistere") quando o pacote não trouxer direcao.json.
+- personagens.json, lore.md, continuidade.json, docs/ (OPCIONAIS — só se o canal tem PERSONAGENS fixos que falam):
+  personagens.json: {json.dumps(EXEMPLO_PERSONAGENS, ensure_ascii=False)}
+  Para cada personagem: QUANDO aparece e QUANDO NÃO aparece, como fala, motivação/segredo (vindos da lore), emoções da voz
+  (Chatterbox: exag 0.25–1.0 intensidade, cfg 0.2–0.7, vel 0.85–1.15), voz sugerida, visual_en (o lock do desenho) e as fichas
+  em referencias/personagens/ (recortes oficiais, sem texto). lore.md = a bíblia da lore; continuidade.json:
+  {json.dumps(EXEMPLO_CONTINUIDADE, ensure_ascii=False)}; docs/ = manuais e roteiro exemplo (.md). No modelo_roteiro.json,
+  "roteiro_exemplo": "docs/<arquivo>.md" faz o 📐 do modelo vir preenchido. O roteiro sai só com narração e falas (sem VISUAL).
+- direcao.json (OPCIONAL — o estilo de edição do canal no editor): {json.dumps(EXEMPLO_DIRECAO, ensure_ascii=False)}
+  Monte a partir do JSON da marca (cores, textura, iluminação, composição, ritmo) e dos exemplos de vídeo: cor = paleta da marca,
+  movimentos/transições/entradas que combinem com o material (colagem de papel → páginas e recortes; documentário → corte
+  seco e corte pro preto), textos na tela no tipo da tipografia da marca. Use SÓ ids desta lista (os que não existirem são
+  ignorados): {", ".join(f"{k}: {', '.join(v)}" for k, v in _ids_catalogo().items())}
 - Só PNG/JPG/WEBP/GIF e os JSON acima; JSON em UTF-8 válido.
 4. No fim, me diga em uma lista o que ficou faltando (o que é [recomendado] e não deu pra fazer) e me entregue o .zip.
 Eu importo o .zip na aba 🎨 Identidade visual → Importar pacote."""
@@ -1658,6 +1970,11 @@ def zip_modelo_vazio() -> bytes:
         z.writestr(r + "reforcos.json", json.dumps(EXEMPLO_REFORCOS, ensure_ascii=False, indent=1))
         z.writestr(r + "poses_sugeridas.json", json.dumps(EXEMPLO_POSES, ensure_ascii=False, indent=1))
         z.writestr(r + "modelo_roteiro.json", json.dumps(EXEMPLO_MODELO, ensure_ascii=False, indent=1))
+        z.writestr(r + "direcao.json", json.dumps(EXEMPLO_DIRECAO, ensure_ascii=False, indent=1))
+        z.writestr(r + "personagens.json", json.dumps(EXEMPLO_PERSONAGENS, ensure_ascii=False, indent=1))
+        z.writestr(r + "continuidade.json", json.dumps(EXEMPLO_CONTINUIDADE, ensure_ascii=False, indent=1))
+        z.writestr(r + "lore.md", "# Bíblia da lore (opcional)\n\nPremissa, personagens, relação, lugares, pistas, regras de revelação.\n")
+        z.writestr(r + "docs/COLOQUE_AQUI.txt", "manuais do canal e roteiro exemplo (.md)")
         z.writestr(r + "brand_guide.json.LEIA.txt", "Coloque aqui o brand_guide.json da marca (schema " + SCHEMA + ").\nChaves usadas:\n"
                    + "\n".join(f"- {k}: {v}" for k, v in CHAVES_GUIA.items()))
         for pasta in ("assets", "referencias/poses", "referencias/silhuetas", "referencias/animacao_original", "folha_mestra",

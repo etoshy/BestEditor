@@ -62,6 +62,10 @@ def _arquivos_do_perfil(nome: str) -> List[tuple]:
         o = os.path.join(os.path.dirname(c), PASTA_ORIGINAL, os.path.basename(c))
         if os.path.isfile(o):
             out.append((o, f"{PASTA_ORIGINAL}/{os.path.basename(c)}"))
+    if clipes:
+        pr = os.path.join(os.path.dirname(clipes[0]), getattr(vg, "ARQ_PRINCIPAL", "_principal.txt"))
+        if os.path.isfile(pr):  # ⭐ qual clipe é o principal (v84_174)
+            out.append((pr, os.path.basename(pr)))
     return out
 
 
@@ -192,6 +196,9 @@ def _importar_manifesto(z: zipfile.ZipFile, membros: Dict[str, str], manifesto: 
         os.makedirs(pasta, exist_ok=True)
         for seg, rel in arquivos:
             partes = rel.split("/")
+            if rel == getattr(vg, "ARQ_PRINCIPAL", "_principal.txt"):
+                _extrair(z, seg, os.path.join(pasta, rel))  # ⭐ o principal volta junto
+                continue
             if not rel.lower().endswith(".wav") or len(partes) > 2 or (len(partes) == 2 and partes[0] != PASTA_ORIGINAL):
                 continue
             _extrair(z, seg, os.path.join(pasta, *partes))
