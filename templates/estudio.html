@@ -264,6 +264,15 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 .clip .curto-mk{position:absolute;top:0;bottom:0;width:2px;background:#f5b84a;opacity:.9;pointer-events:none}
 #listaCurtos .cc{border:1px solid var(--line);border-radius:6px;padding:8px;margin:6px 0;background:var(--panel2)}
 #listaCurtos .cc.ok{opacity:.7}
+#listaAnim .an{border:1px solid var(--line);border-radius:6px;padding:8px;margin:6px 0;background:var(--panel2)}
+#listaAnim .an.sug{border-color:#7c3aed}
+#listaAnim .an .topo{display:flex;gap:8px;align-items:flex-start}
+#listaAnim .an img.th,#listaAnim .an video{width:128px;height:72px;object-fit:cover;border-radius:4px;background:#000;flex:0 0 auto}
+#listaAnim .an textarea{width:100%;font-size:11px;min-height:54px}
+#listaAnim .an .jan button.on{background:#7c3aed;color:#fff}
+#listaAnim .an .est{font-size:11px;margin-top:4px}
+#listaAnim .an .est.erro{color:#f87171}
+#listaAnim .an .est.ok{color:#34d399}
 #listaCurtos .cc .bar{height:6px;background:#2a2e3a;border-radius:3px;margin:5px 0;position:relative;overflow:hidden}
 #listaCurtos .cc .bar i{position:absolute;top:0;bottom:0;background:#00d4b4}
 #listaCurtos .cc .bar i.f{background:#f5b84a}
@@ -392,6 +401,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <button data-tab="overlays">🧩 Overlays</button>
       <button data-tab="conteudoia">🤖 Conteúdo IA</button>
       <button data-tab="curtos">⏱ Clipes curtos <span id="nCurtos"></span></button>
+      <button data-tab="animar">🎞 Animar cenas <span id="nAnim"></span></button>
       <button data-tab="cortes">✂️ Cortes{% if dados.cortes %} ({{ dados.cortes|length }}){% endif %}</button>
     </div>
 
@@ -707,6 +717,16 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <div class="row" style="gap:6px;flex-wrap:wrap"><button class="mini" id="ccMedir">🔎 Medir os clipes de novo</button><span id="ccStatus" class="hint"></span></div>
       <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="hint">Em todos os curtos:</span><button class="mini" data-cc-todos="completar">➕ Completar</button><button class="mini" data-cc-todos="maior">🎯 Trocar por um maior</button><button class="mini" data-cc-todos="loop">🔁 Repetir</button></div>
       <div id="listaCurtos"></div>
+    </div>
+
+    <div class="tab" id="tab-animar">
+      <h3>🎞 Animar cenas com o Google Flow</h3>
+      <p class="hint">Uma cena de <b>imagem</b> vira <b>vídeo</b> no Flow (a imagem é o frame de início). A 🤖 IA escreve o movimento a partir do <b>prompt que gerou a imagem</b> (cena de IA) ou do <b>contexto</b> da cena. O vídeo volta cortado no <b>tempo da cena</b> (nunca passa do trecho) e já entra no lugar da imagem — <b>🖼 / 🎬</b> troca entre a imagem e o vídeo quando quiser, e <b>⏮ ⏺ ⏭</b> escolhe qual parte do vídeo usar. Os pedidos vão pro 🚀 Flow em massa (várias contas em paralelo; pode fechar o editor).</p>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><button class="primary mini" id="anSugerir">✨ Sugerir as melhores</button><button class="mini" id="anMarcarSug" title="marca as sugeridas com nota 7 ou mais">☑ Marcar as sugeridas (≥7)</button><button class="mini" id="anDesmarcar">☐ Desmarcar</button></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="primary" id="anEnviar" style="width:auto">🎞 Animar as marcadas (0)</button><button class="mini" id="anContinuar" title="liga o 🚀 Flow em massa de novo (depois de liberar uma conta, por exemplo)">▶ Continuar o Flow</button>
+        <select id="anFiltro" style="width:auto"><option value="tudo">todas as cenas de imagem</option><option value="sug">só as sugeridas</option><option value="anim">só as animadas</option></select></div>
+      <div class="hint" id="anStatus" style="margin-top:4px"></div>
+      <div id="listaAnim"></div>
     </div>
 
     <div class="tab" id="tab-cortes">
@@ -3557,6 +3577,7 @@ function propsTrecho(P, i) {
       ${campo('Ou colar link direto de um arquivo (vídeo/imagem)', `<input type="url" id="pUrl" placeholder="https://…/video.mp4" value="${ov.source === 'url' ? esc(ov.value) : ''}">`)}
       <div class="row">${campo('Ou link de post', `<input type="url" id="pPost" placeholder="https://www.pexels.com/video/…" value="${ov.source === 'provider_url' ? esc(ov.value) : ''}">`)}${campo('do banco', `<select id="pPostBanco">${opcoes(PIN_PROV.map(p => [p, p]), ov.provider || 'pexels')}</select>`)}</div>
     </div></details>
+    ${secaoAnimar(i)}
     ${secaoCena(i)}
     <details class="sec" ${s.efeito || s.entrada || s.saida ? 'open' : ''}><summary>✨ Efeito, entrada e saída (DarkPlanner)</summary><div class="in">
       ${campo('Efeito', `<select id="pDpEfeito"><option value="">— nenhum —</option>${opcoes(DPC.efeitos.filter(e => e.id !== 'none' && (!e.so_foto || img)).map(e => [e.id, (e.so_foto ? '🎥 ' : '✨ ') + e.rotulo]), s.efeito || '')}</select>`)}
@@ -3597,6 +3618,7 @@ function propsTrecho(P, i) {
   const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
   const muda = (fn, redesenhar) => (e) => { fn(e); marcarSujo(); if (redesenhar) desenharTimeline(); atualizarMonitor(true); };
   ligarSecaoCena(i, on, muda);
+  ligarSecaoAnimar(i, on);
   on('pDpEfeito', 'change', muda((e) => { s.efeito = e.target.value || null; }, true));
   on('pDpEntrada', 'change', muda((e) => { s.entrada = e.target.value || null; }, true));
   on('pDpSaida', 'change', muda((e) => { s.saida = e.target.value || null; }, true));
@@ -3941,6 +3963,7 @@ function montarForm(acao) {
     add(p + 'efeito', s.efeito || ''); add(p + 'entrada', s.entrada || ''); add(p + 'saida', s.saida || '');
     add(p + 'template', s.template || ''); add(p + 'template_campos', JSON.stringify(s.template_campos || {}));
     add(p + 'clipes_extra', JSON.stringify(s.clipes_extra || [])); add(p + 'curto', s.curto || '');
+    add(p + 'animacao_id', (s.animacao && s.animacao.id) || '');
     add(p + 'text_style_submitted', '1');
     add(p + 'text_position', st.position || 'bottom-center'); add(p + 'text_font', st.font || 'bold');
     if (st.border) add(p + 'text_border', 'on');
@@ -4168,6 +4191,166 @@ document.querySelectorAll('[data-cc-todos]').forEach(b => b.addEventListener('cl
 }));
 document.querySelector('#tabs button[data-tab="curtos"]').addEventListener('click', () => { desenharCurtos(); medirClipes(false); });
 setTimeout(() => medirClipes(false), 2500);  // mede sozinho: os curtos já aparecem marcados com ⏱ na timeline
+
+// ------------------------------------------------------------------ 🎞 Animar com Flow (v84_182)
+var AN = { sugestoes: [], animaveis: new Set(), marcados: new Set(), prompts: {}, timer: null, ia: false, ver: {} };
+var AN_ESPERA = ['fila', 'gerando', 'parado'];
+function idxAnim(id) { return id ? segs.findIndex(s => s.animacao && s.animacao.id === id) : -1; }
+function anDe(s) { return (s && s.animacao && s.animacao.id) ? s.animacao : null; }
+function aplicarItemAnim(it) {
+  const id = it.animacao && it.animacao.id;
+  let k = idxAnim(id); if (k < 0) k = it.i; const s = segs[k]; if (!s) return;
+  if (id) s.animacao = it.animacao; else delete s.animacao;
+  s.override_source = it.override_source || null; if (it.media_type) s.media_type = it.media_type;
+  if (it._preview) s._preview = Object.assign({}, s._preview, it._preview, { thumb_remoto: null, video_remoto: null });
+  AN.ver[k] = Date.now();
+}
+async function animEstado(redesenhar) {
+  clearTimeout(AN.timer);
+  try {
+    const r = await fetch(`/job/${JOB}/animar/estado`); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+    const antes = JSON.stringify(segs.map(s => anDe(s) && [anDe(s).estado, anDe(s).msg, anDe(s).em_uso, anDe(s).corte]));
+    d.itens.forEach(aplicarItemAnim);
+    AN.animaveis = new Set(d.animaveis); AN.sugestoes = d.sugestoes || []; AN.ia = d.ia;
+    const depois = JSON.stringify(segs.map(s => anDe(s) && [anDe(s).estado, anDe(s).msg, anDe(s).em_uso, anDe(s).corte]));
+    if (antes !== depois || redesenhar) {
+      desenharTimeline(); atualizarMonitor(true); desenharAnimar();
+      if (sel && sel.tipo === 'seg' && anDe(segs[sel.i]) && !document.activeElement.closest('#props')) renderProps();
+    }
+    if (d.esperando) AN.timer = setTimeout(() => animEstado(false), 5000);
+  } catch (e) { $('anStatus').textContent = '⚠ ' + e.message; AN.timer = setTimeout(() => animEstado(false), 15000); }
+}
+function animavel(i) { return !!AN && (AN.animaveis.has(i) || !!anDe(segs[i])); }
+function textoEstadoAnim(an) {
+  if (!an) return '';
+  if (an.estado === 'erro') return `<div class="est erro">❌ ${esc(an.erro || 'falhou')}</div>`;
+  if (an.estado === 'pronto') return `<div class="est ok">${an.em_uso ? '🎬 usando o vídeo' : '🖼 usando a imagem'} · janela ${esc({ inicio: 'início', meio: 'meio', fim: 'fim', livre: 'livre' }[an.janela] || an.janela)} (${segS(an.inicio_corte || 0)})${an.velocidade > 1.001 ? ` · ${an.velocidade}× mais lento (cena maior que o vídeo)` : ''}${an.msg && an.msg.startsWith('⚠') ? ' · ' + esc(an.msg) : ''}</div>`;
+  return `<div class="est">${esc(an.msg || an.estado)}</div>`;
+}
+function secaoAnimar(i) {
+  if (!AN || !animavel(i)) return '';
+  const an = anDe(segs[i]); const esperando = an && AN_ESPERA.includes(an.estado);
+  return `<details class="sec" ${an ? 'open' : ''}><summary>🎞 Animar com Flow</summary><div class="in">
+    ${textoEstadoAnim(an)}
+    ${an && an.estado === 'pronto' ? `<video src="/job/${JOB}/animar/${i}/video?id=${an.id}&t=${AN.ver[i] || 0}" muted loop autoplay playsinline style="width:100%;border-radius:4px;margin:4px 0;background:#000"></video>
+      <div class="row" style="gap:4px;flex-wrap:wrap">${an.em_uso ? '<button class="mini" id="pAnImg">🖼 Voltar pra imagem</button>' : '<button class="mini primary" id="pAnVid">🎬 Usar o vídeo</button>'}<button class="mini" id="pAnAba">⚙ janela / prompt</button></div>` : ''}
+    <div class="row" style="gap:4px;margin-top:4px;flex-wrap:wrap"><button class="mini ${an ? '' : 'primary'}" id="pAnimar" ${esperando ? 'disabled' : ''}>${an && an.estado !== 'erro' ? '🔁 Animar de novo' : '🎞 Animar com Flow'}</button>${esperando ? '<button class="mini" id="pAnCancelar">✖ Tirar da fila</button>' : ''}</div>
+    <p class="hint">${AN.ia ? '🤖 A IA escreve o movimento' : 'Sem a 🤖 IA (recurso “🎞 Animar cenas”): movimento padrão (sutil + aproximação lenta)'} — pra editar o prompt antes, use a aba 🎞 Animar cenas.</p>
+  </div></details>`;
+}
+function ligarSecaoAnimar(i, on) {
+  on('pAnimar', 'click', () => animarTrechos([i]));
+  on('pAnImg', 'click', () => usarAnim(i, 'imagem'));
+  on('pAnVid', 'click', () => usarAnim(i, 'video'));
+  on('pAnAba', 'click', () => { abrirTab('animar'); $('anFiltro').value = 'anim'; desenharAnimar(); });
+  on('pAnCancelar', 'click', () => cancelarAnim(i));
+}
+async function postAnim(url, corpo) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+  const d = await r.json(); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+}
+async function animarTrechos(idx) {
+  idx = idx.filter(i => animavel(i)); if (!idx.length) { toast('Marque cenas de imagem pra animar'); return; }
+  if (sujo && !(await salvar(true))) return;
+  const prompts = {}; idx.forEach(i => { if ((AN.prompts[i] || '').trim()) prompts[i] = AN.prompts[i]; });
+  $('anStatus').textContent = `⏳ ${AN.ia ? 'a IA está escrevendo os movimentos e ' : ''}mandando ${idx.length} cena(s) pro Flow…`;
+  try {
+    const d = await postAnim(`/job/${JOB}/animar/enviar`, { indices: idx, prompts });
+    (d.itens || []).forEach(aplicarItemAnim); idx.forEach(i => { AN.marcados.delete(i); delete AN.prompts[i]; });
+    $('anStatus').textContent = `🎞 ${d.enviadas} cena(s) na fila do Flow` + (d.erros && d.erros.length ? ` · ⚠ ${d.erros.join(' · ')}` : '') + (d.aviso ? ` · ⚠ ${d.aviso}` : '');
+    toast(`🎞 ${d.enviadas} cena(s) indo pro Flow — o vídeo entra sozinho quando ficar pronto`, 4000);
+    desenharTimeline(); desenharAnimar(); renderProps(); animEstado(false);
+  } catch (e) { $('anStatus').textContent = '⚠ ' + e.message; toast('⚠ ' + e.message, 6000); }
+}
+async function usarAnim(i, modo) {
+  const an = anDe(segs[i]); if (!an) return;
+  if (sujo && !(await salvar(true))) return;
+  try { const d = await postAnim(`/job/${JOB}/animar/${i}/usar`, { modo, id: an.id }); aplicarItemAnim(d); desenharTimeline(); atualizarMonitor(true); desenharAnimar(); renderProps(); }
+  catch (e) { toast('⚠ ' + e.message, 5000); }
+}
+async function janelaAnim(i, janela, offset) {
+  const an = anDe(segs[i]); if (!an) return;
+  if (sujo && !(await salvar(true))) return;
+  try { const d = await postAnim(`/job/${JOB}/animar/${i}/janela`, { janela, offset, id: an.id }); aplicarItemAnim(d); desenharTimeline(); atualizarMonitor(true); desenharAnimar(); renderProps(); toast('✂️ Corte novo aplicado'); }
+  catch (e) { toast('⚠ ' + e.message, 5000); }
+}
+async function cancelarAnim(i) {
+  const an = anDe(segs[i]); if (!an) return;
+  if (!confirm('Tirar a animação deste trecho? (a cena volta pra imagem)')) return;
+  if (sujo && !(await salvar(true))) return;
+  try { const d = await postAnim(`/job/${JOB}/animar/${i}/cancelar`, { id: an.id }); aplicarItemAnim(d); desenharTimeline(); atualizarMonitor(true); desenharAnimar(); renderProps(); }
+  catch (e) { toast('⚠ ' + e.message, 5000); }
+}
+async function promptAnim(i, area, botao) {
+  botao.disabled = true; botao.textContent = '⏳ escrevendo…';
+  try { const d = await postAnim(`/job/${JOB}/animar/prompt/${i}`, {}); area.value = d.prompt; AN.prompts[i] = d.prompt; botao.textContent = d.por === 'ia' ? '✍ de novo (IA)' : '✍ de novo (regra)'; if (d.resumo) toast('🎞 ' + d.resumo, 4000); }
+  catch (e) { toast('⚠ ' + e.message, 5000); botao.textContent = '✍ IA escreve'; }
+  botao.disabled = false;
+}
+function desenharAnimar() {
+  const box = $('listaAnim'); if (!box) return;
+  const sug = {}; AN.sugestoes.forEach(x => { sug[x.i] = x; });
+  const filtro = $('anFiltro').value;
+  let idx = segs.map((s, i) => i).filter(i => animavel(i));
+  if (filtro === 'sug') idx = idx.filter(i => sug[i]).sort((a, b) => sug[b].nota - sug[a].nota || a - b);
+  if (filtro === 'anim') idx = idx.filter(i => anDe(segs[i]));
+  const nAnim = segs.filter(s => anDe(s) && anDe(s).estado === 'pronto').length, nFila = segs.filter(s => anDe(s) && AN_ESPERA.includes(anDe(s).estado)).length;
+  $('nAnim').textContent = nFila ? `(⏳${nFila})` : nAnim ? `(${nAnim})` : '';
+  $('anEnviar').textContent = `🎞 Animar as marcadas (${AN.marcados.size})`;
+  if (!idx.length) { box.innerHTML = `<p class="hint">${filtro === 'tudo' ? 'Nenhuma cena de imagem neste vídeo (animar é pra cena de foto/imagem de IA).' : 'Nada aqui ainda.'}</p>`; return; }
+  box.innerHTML = idx.map(i => {
+    const s = segs[i], an = anDe(s), sg = sug[i], dur = s.end - s.start, esperando = an && AN_ESPERA.includes(an.estado);
+    const thumb = an && an.imagem ? `/job/${JOB}/animar/${i}/video?qual=frame&id=${an.id}` : ((s._preview || {}).thumbnail_url || '');
+    const folga = an && an.duracao_video ? Math.max(0, an.duracao_video - dur) : 0;
+    const prompt = AN.prompts[i] != null ? AN.prompts[i] : (an && an.prompt) || '';
+    return `<div class="an ${sg && sg.nota >= 7 ? 'sug' : ''}" data-i="${i}">
+      <div class="topo"><input type="checkbox" class="anChk" ${AN.marcados.has(i) ? 'checked' : ''} ${esperando ? 'disabled' : ''} style="width:auto;margin-top:4px">
+        ${an && an.estado === 'pronto' ? `<video src="/job/${JOB}/animar/${i}/video?id=${an.id}&t=${AN.ver[i] || 0}" muted loop playsinline onmouseenter="this.play()" onmouseleave="this.pause()"></video>` : (thumb ? `<img class="th" src="${esc(thumb)}" loading="lazy">` : '')}
+        <div style="min-width:0"><b>Trecho ${i + 1}</b> <span class="hint">${fmt(s.start, 1)}–${fmt(s.end, 1)} · ${segS(dur)} · ${esc(s.provider)}</span>
+          ${sg ? `<div class="hint">${sg.por === 'ia' ? '🤖' : '📏'} nota <b>${sg.nota}</b> · ${esc(sg.motivo)}${sg.movimento ? ' · ' + esc(sg.movimento) : ''}</div>` : ''}
+          ${textoEstadoAnim(an)}</div></div>
+      <details style="margin-top:4px"><summary class="hint" style="cursor:pointer">✍ prompt do movimento ${prompt ? '' : '(vazio = a IA escreve na hora)'}</summary>
+        <textarea class="anPrompt" placeholder="vazio = ${AN.ia ? 'a IA escreve' : 'movimento padrão'} quando mandar">${esc(prompt)}</textarea>
+        <button class="mini anPromptIA">✍ ${AN.ia ? 'IA escreve' : 'regra escreve'}</button></details>
+      ${an && an.estado === 'pronto' ? `<div class="row jan" style="gap:4px;flex-wrap:wrap;margin-top:4px">
+          ${an.em_uso ? '<button class="mini" data-an="imagem">🖼 Voltar pra imagem</button>' : '<button class="mini primary" data-an="video">🎬 Usar o vídeo</button>'}
+          ${folga > 0.05 ? `<span class="hint">parte do vídeo (${segS(an.duracao_video)}):</span>${[['inicio', '⏮ início'], ['meio', '⏺ meio'], ['fim', '⏭ fim']].map(([v, r]) => `<button class="mini ${an.janela === v ? 'on' : ''}" data-jan="${v}">${r}</button>`).join('')}
+            <input type="range" class="anOff" min="0" max="${folga.toFixed(2)}" step="0.1" value="${(an.inicio_corte || 0).toFixed(2)}" style="width:110px" title="começar em…"><span class="hint anOffTxt">${segS(an.inicio_corte || 0)}</span><button class="mini" data-jan="livre">✂ usar</button>`
+            : `<span class="hint">o vídeo (${segS(an.duracao_video || 0)}) cobre a cena inteira</span>`}
+          <a class="mini" href="/job/${JOB}/animar/${i}/video?qual=completo&id=${an.id}" target="_blank" rel="noopener">▶ vídeo inteiro</a></div>` : ''}
+      <div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${esperando ? '<button class="mini" data-acao="cancelar">✖ Tirar da fila</button>' : `<button class="mini" data-acao="animar">${an && an.estado !== 'erro' ? '🔁 Animar de novo' : '🎞 Animar só esta'}</button>`}${an && !esperando ? '<button class="mini" data-acao="cancelar">✖ Tirar a animação</button>' : ''}<button class="mini" data-acao="ver">👁 ver</button></div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.an').forEach(d => {
+    const i = Number(d.dataset.i);
+    const chk = d.querySelector('.anChk'); chk.addEventListener('change', () => { if (chk.checked) AN.marcados.add(i); else AN.marcados.delete(i); $('anEnviar').textContent = `🎞 Animar as marcadas (${AN.marcados.size})`; });
+    const area = d.querySelector('.anPrompt'); area.addEventListener('input', () => { AN.prompts[i] = area.value; });
+    d.querySelector('.anPromptIA').addEventListener('click', (e) => promptAnim(i, area, e.target));
+    d.querySelectorAll('[data-an]').forEach(b => b.addEventListener('click', () => usarAnim(i, b.dataset.an)));
+    const off = d.querySelector('.anOff'); if (off) off.addEventListener('input', () => { d.querySelector('.anOffTxt').textContent = segS(off.value); const v = d.querySelector('video'); if (v) { v.pause(); } });
+    d.querySelectorAll('[data-jan]').forEach(b => b.addEventListener('click', () => janelaAnim(i, b.dataset.jan, off ? parseFloat(off.value) : 0)));
+    d.querySelectorAll('[data-acao]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.acao === 'animar') return animarTrechos([i]);
+      if (b.dataset.acao === 'cancelar') return cancelarAnim(i);
+      selecionar({ tipo: 'seg', i }); seek(segs[i].start + 0.01);
+    }));
+  });
+}
+$('anSugerir').addEventListener('click', async (e) => {
+  e.target.disabled = true; $('anStatus').textContent = AN.ia ? '🤖 a IA está olhando as cenas…' : '📏 ordenando as cenas (sem a IA: regra simples)…';
+  try { const d = await postAnim(`/job/${JOB}/animar/sugerir`, {}); AN.sugestoes = d.sugestoes; $('anFiltro').value = 'sug';
+    $('anStatus').textContent = `✨ ${d.sugestoes.filter(x => x.nota >= 7).length} cena(s) com nota ≥ 7 de ${d.sugestoes.length}`; desenharAnimar(); }
+  catch (er) { $('anStatus').textContent = '⚠ ' + er.message; }
+  e.target.disabled = false;
+});
+$('anMarcarSug').addEventListener('click', () => { AN.sugestoes.filter(x => x.nota >= 7).forEach(x => { const an = anDe(segs[x.i]); if (!an || !AN_ESPERA.includes(an.estado)) AN.marcados.add(x.i); }); desenharAnimar(); });
+$('anDesmarcar').addEventListener('click', () => { AN.marcados.clear(); desenharAnimar(); });
+$('anEnviar').addEventListener('click', () => animarTrechos([...AN.marcados]));
+$('anFiltro').addEventListener('change', desenharAnimar);
+$('anContinuar').addEventListener('click', async () => { try { await postAnim(`/job/${JOB}/animar/continuar`, {}); toast('▶ Flow em massa ligado'); animEstado(false); } catch (e) { toast('⚠ ' + e.message, 6000); } });
+document.querySelector('#tabs button[data-tab="animar"]').addEventListener('click', () => animEstado(true));
+window.addEventListener('estudio:salvo', () => { if (segs.some(s => anDe(s))) animEstado(false); });
+setTimeout(() => animEstado(true), 1800);
 
 // ------------------------------------------------------------------ foto da telinha (diagnóstico pós-export)
 // Ao montar, a telinha é "fotografada" em vários momentos: clipe de cada trecho, texto dos

@@ -36,6 +36,8 @@
 
 <p><a href="{{ url_for('dossies_page') }}">← Modelos de vídeo</a></p>
 <h1 id="titulo">🕵️ {{ p.apelido or p.tema or 'Projeto' }}</h1>
+{% set _canal_zip = (modelos.get(p.config.modelo) or {}).get('identidade_visual') if modelos is defined else '' %}
+{% if _canal_zip %}<p style="margin:-6px 0 8px;font-size:.88rem;">🎨 Canal: <b>{{ _canal_zip }}</b> · <a href="/marca/{{ _canal_zip }}/pacote.zip" title="estética, personagens e modelo de roteiro — importe em outro PC em 🎨 Identidade visual">📦 Baixar o zip do canal</a></p>{% endif %}
 <div style="margin:-4px 0 8px;"><button type="button" id="plLigar" style="display:none;width:auto;margin:0 8px 0 0;padding:4px 12px;font-size:.82rem;background:#4338ca;color:#fff;" title="roda sozinho o que falta: fontes → roteiro → revisão/checagem → perguntas de fotos e termos → prompt da checagem na internet; para pra você; depois fotos → elenco → TTS">🚀 Piloto automático</button>{% set cl_tipo = 'dossie' %}{% set cl_id = p.id %}{% include "_clonar.html" %}{% if p.clonado_de %}<span style="font-size:.8rem;color:#666;margin-left:8px;">📑 cópia de <a href="/modelos-video/{{ p.clonado_de }}">outro projeto</a></span>{% endif %}</div>
 
 {% set pl_pid = p.id %}{% include "_piloto.html" %}

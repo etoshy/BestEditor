@@ -183,6 +183,8 @@ def criar(itens: List[Dict[str, Any]], config: Dict[str, Any], pod_url: str = ""
     cfg["estilo_extra"] = " ".join(str(config.get("estilo_extra") or "").split())[:300]
     cfg["rostos"] = config.get("rostos", True) is not False  # 🎭 rosto das pessoas do elenco (FLUX.2 klein no pod)
     cfg["epoca"] = config.get("epoca", True) is not False  # 🎞 visual de foto do ano de cada cena
+    canal = str(config.get("canal") or "").strip()  # 🎨 v84_181: "" = o do 🕵️ Modelo de vídeo · "-" = nenhum · slug da marca
+    cfg["canal"] = canal if canal == "-" or re.fullmatch(r"[a-z0-9_-]{1,60}", canal) else ""
     leg = config.get("legenda") if isinstance(config.get("legenda"), dict) else {}
     cfg["legenda"] = {"modo": leg.get("modo") if leg.get("modo") in ("legenda", "tempo", "palavra") else "legenda",
                       "max_palavras": int(_num(leg.get("max_palavras"), 5, 1, 15))}
@@ -205,6 +207,11 @@ def criar(itens: List[Dict[str, Any]], config: Dict[str, Any], pod_url: str = ""
             "estado": "aguardando", "mensagem": "", "log": [], "pod_voz": None, "pod_img": None,
             "job_id": None, "erro": None, "inicio": None, "fim": None, "cenas": None,
         })
+        try:  # 🎨 o canal (pacote) deste roteiro — pro 📦 Zip do canal e pra mostrar no lote
+            import canal_pod
+            prontos[-1]["canal"] = canal_pod.slug_do_item(_BASE, prontos[-1], cfg) or None
+        except Exception:  # noqa: BLE001
+            prontos[-1]["canal"] = None
     lote = {"id": uuid.uuid4().hex[:10], "nome": (nome or time.strftime("Lote %d/%m %H:%M")).strip()[:80],
             "criado": time.time(), "status": "rodando", "pod_url": (pod_url or "").strip().rstrip("/"),
             "config": cfg, "itens": prontos}
@@ -240,33 +247,85 @@ def baixar_imagens_de_novo(lid: str, iid: str) -> Dict[str, Any]:
     return lote
 
 
-def tentar_de_novo(lid: str, iid: str) -> Dict[str, Any]:
-    """Volta o item pra etapa onde parou (se o áudio já veio, não narra de novo)."""
+def _url_valida(url: str) -> str:
+    u = str(url or "").strip().rstrip("/")
+    if u and not re.fullmatch(r"https?://[^\s\"'<>]+", u):
+        raise ProducaoErro("Esse link do pod não parece um endereço (ex.: https://<id>-8000.proxy.runpod.net).")
+    return u
+
+
+def _aplicar_pod_novo(lote: Dict[str, Any], url: str) -> bool:
+    """🔗 v84_181: troca o pod do lote (VPS nova). Os jobs do pod antigo não existem no novo: os itens esquecem eles
+    (o que já veio pro PC fica) e os 🗣️ perfis de voz vão de novo. Também vira o pod das ⚙️ Configurações (o editor
+    usa o mesmo). → True se mudou."""
+    url = _url_valida(url)
+    if not url or url == (lote.get("pod_url") or ""):
+        return False
+    lote.setdefault("pods_antigos", []).append(lote.get("pod_url") or "")
+    lote["pod_url"] = url
+    for it in lote["itens"]:
+        it["pod_imgs"] = []
+        it["reenvios_img"] = 0
+        it["falhas_pod"] = 0
+        if it.get("pod_img"):
+            it["pod_img_antigo"] = it["pod_img"]
+            it["pod_img"] = None
+    _PERFIS_ENVIADOS.pop(lote["id"], None)
+    try:
+        from site_config import save_site_config
+        save_site_config({"runpod_pod_url": url})
+    except Exception:  # noqa: BLE001 — o lote já guarda o link; as Configurações são só conveniência
+        pass
+    return True
+
+
+def trocar_pod(lid: str, url: str) -> Dict[str, Any]:
+    """🔗 Só troca o link do pod do lote (os itens que estavam esperando o pod antigo precisam de 🔁 Tentar de novo)."""
+    with _TRAVA:
+        lote = carregar(lid)
+        if not _url_valida(url):
+            raise ProducaoErro("Cole o link do pod.")
+        mudou = _aplicar_pod_novo(lote, url)
+        salvar(lote)
+    return {"ok": True, "mudou": mudou, "pod_url": lote["pod_url"]}
+
+
+def tentar_de_novo(lid: str, iid: str, pod_url: str = "") -> Dict[str, Any]:
+    """Volta o item pra etapa onde parou (se o áudio já veio, não narra de novo).
+    🔗 v84_181: com `pod_url` novo (VPS nova) — sem áudio, pede a narração de novo; com áudio e cenas, manda pro pod
+    novo SÓ as imagens que ainda não estão no PC."""
     with _TRAVA:
         lote = carregar(lid)
         it = next((x for x in lote["itens"] if x["id"] == iid), None)
         if not it:
             raise ProducaoErro("Roteiro não encontrado no lote.")
+        if _aplicar_pod_novo(lote, pod_url):
+            _log(it, f"🔗 pod novo: {lote['pod_url']}")
         pasta_i = pasta_item(lid, iid)
         tem_imgs = os.path.isdir(os.path.join(pasta_i, "imagens")) and any(
             n.endswith(".png") for n in os.listdir(os.path.join(pasta_i, "imagens")))
-        if (not it.get("job_id") and tem_imgs and it.get("zip") and os.path.exists(it["zip"])
-                and os.path.exists(os.path.join(pasta_i, "cenas.json"))):
+        tem_cenas = os.path.exists(os.path.join(pasta_i, "cenas.json"))
+        tem_audio = (it.get("zip") and os.path.exists(it["zip"])) or (
+            it.get("audio") and os.path.exists(it["audio"]) and it.get("transcricao") and os.path.exists(it["transcricao"]))
+        faltam = faltam_no_pc(lid, iid) if tem_cenas else -1
+        if (not it.get("job_id") and tem_imgs and it.get("zip") and os.path.exists(it["zip"]) and tem_cenas
+                and (faltam == 0 or (not it.get("pod_img") and not lote.get("pod_url")))):
             # narração e imagens já estão no PC: só monta o projeto de novo (não precisa do pod)
             it.update(estado="montando", erro=None, mensagem="montando o projeto de novo")
             lote["status"] = "rodando"
             salvar(lote)
             garantir_runner()
             return lote
-        if it.get("pod_img") and os.path.exists(os.path.join(pasta_item(lid, iid), "cenas.json")):
-            # as imagens já estavam no pod: só baixa de novo (não narra nem gera de novo)
-            it.update(estado="imagens", erro=None, mensagem="baixando as imagens de novo")
+        if tem_cenas and tem_audio and (it.get("pod_img") or it.get("pod_img_antigo")):
+            # já tinha mandado as imagens: no MESMO pod só baixa de novo; num pod NOVO (pod_img vazio) o _tick manda
+            # pra ele só as que faltam no PC (não narra nem planeja de novo)
+            it.update(estado="imagens", erro=None, reenvios_img=0,
+                      mensagem="baixando as imagens de novo" if it.get("pod_img")
+                      else f"🔁 mandando pro pod novo as {faltam} imagem(ns) que faltam")
             lote["status"] = "rodando"
             salvar(lote)
             garantir_runner()
             return lote
-        tem_audio = (it.get("zip") and os.path.exists(it["zip"])) or (
-            it.get("audio") and os.path.exists(it["audio"]) and it.get("transcricao") and os.path.exists(it["transcricao"]))
         it.update(estado="cenas" if tem_audio else "aguardando", erro=None, mensagem="tentando de novo",
                   pod_img=None, pod_voz=None if not tem_audio else it.get("pod_voz"))
         lote["status"] = "rodando"
@@ -371,11 +430,23 @@ def _tick(lid: str) -> None:
                 else:
                     p = st.get("progresso") or {}
                     fila = f" — {st['posicao_fila']}º na fila" if st.get("posicao_fila") else ""
-                    _mudar(lid, it["id"], mensagem=f"🗣️ {st.get('mensagem') or st['status']} {p.get('feito', 0)}/{p.get('total', 0)}{fila}")
+                    _mudar(lid, it["id"], mensagem=f"🗣️ {st.get('mensagem') or st['status']} {p.get('feito', 0)}/{p.get('total', 0)}{fila}"
+                                                   + _vigiar_parado(it, st))
             elif it["estado"] == "cenas":
                 _em_segundo_plano(lid, it["id"], _planejar_cenas)
+            elif it["estado"] == "imagens" and not it.get("pod_img"):
+                # 🔗 pod novo (ou o job sumiu): manda só as imagens que faltam no PC
+                _em_segundo_plano(lid, it["id"], lambda l, i: _reenviar_faltantes(l, i, manual=True, pod_novo=True))
             elif it["estado"] == "imagens":
-                st = pod_studio.job(it["pod_img"], cfg)
+                try:
+                    st = pod_studio.job(it["pod_img"], cfg)
+                except pod_studio.PodErro as exc:
+                    if "404" not in str(exc):
+                        raise
+                    # o pod não conhece esse job (reiniciou do zero / outro pod no mesmo link): manda de novo o que falta
+                    _mudar(lid, it["id"], pod_img=None, pod_img_antigo=it["pod_img"],
+                           _log="⚠ o pod não tem mais o job das imagens — mandando de novo as que faltam")
+                    continue
                 if st["status"] in pod_studio.FINAIS:
                     if (st.get("erros") and int(it.get("reenvios_img") or 0) < 1
                             and st["status"] != "cancelado"):  # 🔁 falhou alguma (ex.: memória): manda só essas de novo, 1 vez
@@ -385,7 +456,8 @@ def _tick(lid: str) -> None:
                 else:
                     p = st.get("progresso") or {}
                     _mudar(lid, it["id"], mensagem=f"🖼 {p.get('feito', 0)}/{p.get('total', 0)} imagens"
-                                                   + (f" — {st['posicao_fila']}º na fila" if st.get("posicao_fila") else ""))
+                                                   + (f" — {st['posicao_fila']}º na fila" if st.get("posicao_fila") else "")
+                                                   + _vigiar_parado(it, st))
                     _baixar_parciais_bg(lid, it["id"], st)
             elif it["estado"] == "montando":
                 _em_segundo_plano(lid, it["id"], _montar)
@@ -401,6 +473,26 @@ def _tick(lid: str) -> None:
 
 
 _BAIXANDO: Dict[str, float] = {}
+PARADO_S = 600  # ⏱ 10 min sem andar nada no pod = provavelmente travou
+_MARCOS: Dict[str, Any] = {}
+
+
+def _vigiar_parado(it: Dict[str, Any], st: Dict[str, Any]) -> str:
+    """⏱ v84_181: o job do pod não anda (ex.: "0/8 imagens — 1º na fila" pra sempre: o processo de imagens do pod
+    caiu e ninguém pega a fila). Depois de PARADO_S sem mudar nada, o aviso diz o que fazer. → o texto do aviso ou ""."""
+    p = st.get("progresso") or {}
+    marco = (st.get("status"), p.get("feito"), p.get("total"), st.get("posicao_fila"), st.get("mensagem"))
+    chave = f"{it['id']}:{it.get('pod_img') if it['estado'] == 'imagens' else it.get('pod_voz')}"
+    antes = _MARCOS.get(chave)
+    agora = time.time()
+    if not antes or antes[0] != marco:
+        _MARCOS[chave] = (marco, agora)
+        return ""
+    parado = agora - antes[1]
+    if parado < PARADO_S:
+        return ""
+    return (f" — ⚠ parado há {int(parado // 60)} min: o pod pode ter travado (veja os logs do pod). "
+            "Se ligou outro pod, cole o link novo no topo e clique em 🔁 Tentar de novo")
 
 
 def _baixar_parciais_bg(lid: str, iid: str, st: Dict[str, Any]) -> None:
@@ -673,9 +765,10 @@ def _materiais_do_modelo(it: Dict[str, Any], cenas: List[Dict[str, Any]]) -> Dic
         import dossies
         p = dossies.carregar(_BASE, it["origem_id"])
         momentos = (p.get("resultado") or {}).get("momentos") or []
-        tipos = {m["id"].upper(): m["tipo"] for m in dossies.midias_para_editor(_BASE, p)}
-        por_cena = cenas_lote.cenas_dos_momentos(cenas, [mo for mo in momentos if str(mo.get("midia") or "").upper() in tipos])
-        return {i: {"id": mid, "tipo": tipos[mid], "provider": "material"} for i, mid in por_cena.items()}
+        ms = {m["id"].upper(): m for m in dossies.midias_para_editor(_BASE, p)}
+        por_cena = cenas_lote.cenas_dos_momentos(cenas, [mo for mo in momentos if str(mo.get("midia") or "").upper() in ms])
+        return {i: {"id": mid, "tipo": ms[mid]["tipo"], "provider": "material", "caminho": ms[mid].get("caminho") or ""}
+                for i, mid in por_cena.items()}
     except Exception:  # noqa: BLE001 — modelo apagado etc.: segue sem as fotos
         return {}
 
@@ -697,6 +790,20 @@ def _planejar_cenas(lid: str, iid: str) -> None:
     cenas = cenas_lote.cortar_cenas(segs, cfg_lote["intervalo"], total=total)
     _mudar(lid, iid, _log=f"🎬 {len(cenas)} cenas de ~{cfg_lote['intervalo']:g} s")
     roteiro = " ".join(str(s.get("text") or "").strip() for s in segs)
+    import canal_pod
+    marca = canal_pod.carregar(_BASE, canal_pod.slug_do_item(_BASE, it, cfg_lote))
+    if marca:  # 🎨 v84_181: roteiro de um canal de pacote — % , estética e personagens do zip do canal
+        resposta, rostos, escolhidas, avisos = _planejar_canal(lid, iid, it, cfg_lote, cenas, roteiro, marca)
+        ficha = resposta.get("_ficha")
+    else:
+        resposta, rostos, escolhidas, avisos, ficha = _planejar_padrao(lid, iid, it, cfg_lote, cenas, roteiro)
+    _enviar_cenas(lid, iid, it, lote, cenas, resposta, rostos, escolhidas, avisos)
+
+
+def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, Any], cenas: List[Dict[str, Any]],
+                     roteiro: str):
+    """O planejamento de sempre (true crime / roteiro sem canal): as ~pct% mais difíceis, foto realista."""
+    import cenas_lote
     ficha = None
     import ia_servico
     avisos = []
@@ -732,13 +839,94 @@ def _planejar_cenas(lid: str, iid: str) -> None:
     resposta = cenas_lote.montar_json(cenas, info, escolhidas, cfg_lote.get("estilo_extra") or "", materiais,
                                       epoca=cfg_lote.get("epoca", True))
     resposta["_ficha"] = ficha
-    pasta = pasta_item(lid, iid)
     rostos = _rostos(it, resposta, info) if info else {}
-    with open(os.path.join(pasta, "rostos.json"), "w", encoding="utf-8") as f:
-        json.dump(rostos, f, ensure_ascii=False, indent=1)
     if rostos:
         avisos.append(f"🎭 {len(rostos)} cena(s) com o rosto de pessoas reais ou um local do elenco (fotos de referência) — "
                       "FLUX.2 klein no pod")
+    return resposta, rostos, escolhidas, avisos, ficha
+
+
+def _planejar_canal(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, Any], cenas: List[Dict[str, Any]],
+                    roteiro: str, m: Dict[str, Any]):
+    """🎨 v84_181 — canal de pacote (canal_pod.py): a % do pacote, o prompt na estética da marca e os personagens
+    (pessoa genérica → personagem; personagem falando → aparece; pessoa real → rosto do elenco)."""
+    import canal_pod
+    import cenas_lote
+    import ia_servico
+    ccfg = canal_pod.config(m)
+    nome = (m["guia"].get("project") or {}).get("name") or m["slug"]
+    _mudar(lid, iid, canal=m["slug"], _log=f"🎨 canal {nome}: {ccfg['pct']}% das cenas no pod, estética e personagens do pacote "
+                                         "(o % do lote não vale pra este roteiro)")
+    avisos: List[str] = []
+    ficha = None
+    texto_tags = it.get("texto") or roteiro  # com as tags [mira|…]: a IA sabe quem fala em cada cena
+    if ia_servico.ativo("producao_pod"):
+        try:
+            import ia_midia
+            if ia_servico.ativo("buscas"):
+                _mudar(lid, iid, mensagem="🤖 lendo o roteiro (ficha do vídeo)…")
+                ficha = ia_midia.ficha_visual(roteiro, it["titulo"], it["idioma"])
+        except Exception:  # noqa: BLE001
+            ficha = None
+        el = _elenco_do_item(lid, iid, it, cfg_lote)
+        info = canal_pod.descrever(cenas, texto_tags, it["idioma"], m, elenco=el, ficha=ficha,
+                                   on_passo=lambda t: _mudar(lid, iid, mensagem=t))
+    else:
+        info = {}
+        avisos.append("🤖 IA desligada (recurso “🏭 Produção no pod”): as imagens saem na estética do canal, mas o assunto é a "
+                      "própria fala e sem personagens — ligue a IA em 🤖 IA pra a regra dos personagens funcionar.")
+    if not info:
+        info = {i + 1: canal_pod.sem_ia(c, m) for i, c in enumerate(cenas)}
+    materiais = _materiais_do_modelo(it, cenas)
+    # 📷 fotos marcadas no roteiro: canal 100% IA → viram referência e saem redesenhadas; vídeos entram como estão
+    fotos_ref = {i: x["caminho"] for i, x in materiais.items()
+                 if ccfg["fotos_do_roteiro"] == "referencia" and x.get("tipo") == "foto" and x.get("caminho")}
+    materiais = {i: x for i, x in materiais.items() if i not in fotos_ref}
+    if fotos_ref:
+        _mudar(lid, iid, _log=f"📷 {len(fotos_ref)} foto(s) marcada(s) no roteiro vão de referência e saem no estilo do canal")
+    if materiais:
+        _mudar(lid, iid, _log=f"🕵️ {len(materiais)} cena(s) com os vídeos/fotos do modelo como estão")
+    pct = ccfg["pct"] / 100.0
+    notas = [-1 if i in materiais else (10 if i in fotos_ref else min(10, (info.get(i + 1) or {}).get("dificil", 0)
+             + (2 if (info.get(i + 1) or {}).get("pessoas") or (info.get(i + 1) or {}).get("personagens")
+                or (info.get(i + 1) or {}).get("mascote") else 0)))
+             for i in range(len(cenas))]
+    escolhidas = cenas_lote.escolher(notas, pct) if pct < 1 else {i for i in range(len(cenas)) if i not in materiais}
+    escolhidas |= {i for i in fotos_ref if pct > 0}
+    resposta = cenas_lote.montar_json(cenas, info, escolhidas, "", materiais, epoca=False)
+    resposta["_ficha"] = ficha
+    rostos: Dict[str, List[List[str]]] = {}
+    n_pers = n_real = 0
+    for k, sg in enumerate(resposta["segments"]):
+        if sg["provider"] != "runpod":
+            continue
+        d = info.get(k + 1) or canal_pod.sem_ia(cenas[k], m)
+        prompt, refs = canal_pod.prompt_e_refs(m, d, it.get("origem_id") if it.get("origem") == "dossie" else "",
+                                               foto=fotos_ref.get(k, ""), estilo_extra=cfg_lote.get("estilo_extra") or "",
+                                               cfg=ccfg)
+        sg["query"] = prompt
+        quem = [x["slug"] for x in d.get("personagens") or []] + ([f"mascote:{d['mascote']}"] if d.get("mascote") else [])
+        if quem:
+            sg["personagens"] = quem
+            n_pers += 1
+        if d.get("pessoas"):
+            sg["rostos"] = [x["nome"] for x in d["pessoas"]]
+            n_real += 1
+        if refs:
+            rostos[str(k)] = refs
+    avisos.append(f"🎨 {nome}: {len(escolhidas)} cena(s) na estética do canal · 🎭 {n_pers} com personagem · "
+                  f"👤 {n_real} com rosto real do elenco · {len(rostos)} com referência (FLUX.2 klein)")
+    return resposta, rostos, escolhidas, avisos
+
+
+def _enviar_cenas(lid: str, iid: str, it: Dict[str, Any], lote: Dict[str, Any], cenas: List[Dict[str, Any]],
+                  resposta: Dict[str, Any], rostos: Dict[str, Any], escolhidas, avisos: List[str]) -> None:
+    import cenas_lote
+    import pod_studio
+    cfg_lote = lote["config"]
+    pasta = pasta_item(lid, iid)
+    with open(os.path.join(pasta, "rostos.json"), "w", encoding="utf-8") as f:
+        json.dump(rostos, f, ensure_ascii=False, indent=1)
     with open(os.path.join(pasta, "cenas.json"), "w", encoding="utf-8") as f:
         json.dump(resposta, f, ensure_ascii=False, indent=1)
     res = cenas_lote.resumo(cenas, escolhidas)
@@ -762,7 +950,7 @@ def _prontos_no_pod(it: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, str]:
     """{nome do arquivo: id do job do pod que tem ele} — juntando o job das imagens e os de reenvio."""
     import pod_studio
     out: Dict[str, str] = {}
-    for jid in list(it.get("pod_imgs") or []) + [it["pod_img"]]:
+    for jid in [j for j in list(it.get("pod_imgs") or []) + [it.get("pod_img")] if j]:
         try:
             st = pod_studio.job(jid, cfg)
         except Exception:  # noqa: BLE001 — job antigo apagado: segue com os outros
@@ -772,9 +960,23 @@ def _prontos_no_pod(it: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, str]:
     return out
 
 
-def _reenviar_faltantes(lid: str, iid: str, manual: bool = False) -> int:
+def faltam_no_pc(lid: str, iid: str) -> int:
+    """Quantas cenas do pod ainda não têm a imagem neste PC (-1 se as cenas ainda não foram planejadas)."""
+    pasta = pasta_item(lid, iid)
+    try:
+        with open(os.path.join(pasta, "cenas.json"), encoding="utf-8") as f:
+            segs = json.load(f).get("segments") or []
+    except (OSError, ValueError):
+        return -1
+    pasta_img = os.path.join(pasta, "imagens")
+    no_pc = set(os.listdir(pasta_img)) if os.path.isdir(pasta_img) else set()
+    return sum(1 for k, s in enumerate(segs) if s.get("provider") == "runpod" and f"cena-{k + 1:04d}.png" not in no_pc)
+
+
+def _reenviar_faltantes(lid: str, iid: str, manual: bool = False, pod_novo: bool = False) -> int:
     """🔁 As imagens que o pod não fez (erro, falta de memória…) vão de novo num job só com elas (com as mesmas fotos
-    de referência). Devolve quantas foram."""
+    de referência). Devolve quantas foram. `pod_novo`: o pod é outro (VPS nova) — nada do pod antigo existe lá, então
+    vai tudo que não está no PC; sem nada faltando, segue direto pro projeto."""
     import pod_studio
     lote = carregar(lid)
     it = next(x for x in lote["itens"] if x["id"] == iid)
@@ -787,36 +989,52 @@ def _reenviar_faltantes(lid: str, iid: str, manual: bool = False) -> int:
             rostos = json.load(f)
     except (OSError, ValueError):
         rostos = {}
-    prontos = _prontos_no_pod(it, cfg)
+    prontos = {} if pod_novo else _prontos_no_pod(it, cfg)
     pasta_img = os.path.join(pasta, "imagens")
     no_pc = set(os.listdir(pasta_img)) if os.path.isdir(pasta_img) else set()
     pedidos = []
     for k, s in enumerate(resposta["segments"]):
         nome = f"cena-{k + 1:04d}"
         if s["provider"] == "runpod" and f"{nome}.png" not in prontos and f"{nome}.png" not in no_pc:
-            pedidos.append({"prompt": s["query"], "nome": nome, **({"referencias": rostos[str(k)]} if str(k) in rostos else {})})
+            refs = [r for r in rostos.get(str(k)) or [] if os.path.isfile(r[1])]  # foto apagada do PC: vai sem ela
+            pedidos.append({"prompt": s["query"], "nome": nome, **({"referencias": refs} if refs else {})})
     if not pedidos:
-        if not manual:
+        if pod_novo:  # nada faltando: o que está no PC basta
+            _mudar(lid, iid, estado="pronto" if it.get("job_id") else "montando",
+                   _log="✅ todas as imagens já estão no PC" + (" — no editor clique em 🔁 Pôr as imagens do pod de volta"
+                                                              if it.get("job_id") else ""))
+        elif not manual:
             _receber_imagens(lid, iid)
         return 0
     w, h = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (1024, 1024)}[lote["config"]["orientacao"]]
     jid, _sem = pod_studio.enviar_imagens_com_refs(pedidos, largura=w, altura=h, nome=(it["titulo"] + " (de novo)")[:40], cfg=cfg)
-    _mudar(lid, iid, estado="imagens", pod_imgs=list(it.get("pod_imgs") or []) + [it["pod_img"]], pod_img=jid,
-           reenvios_img=int(it.get("reenvios_img") or 0) + 1, erro=None,
-           _log=f"🔁 {len(pedidos)} imagem(ns) que o pod não fez foram de novo pra fila")
+    antigos = [] if pod_novo else [j for j in list(it.get("pod_imgs") or []) + [it.get("pod_img")] if j]
+    _mudar(lid, iid, estado="imagens", pod_imgs=antigos, pod_img=jid,
+           reenvios_img=int(it.get("reenvios_img") or 0) + 1, erro=None, faltam_img=0,
+           _log=(f"🔁 {len(pedidos)} imagem(ns) que faltavam foram pro pod novo" if pod_novo
+                 else f"🔁 {len(pedidos)} imagem(ns) que o pod não fez foram de novo pra fila"))
     return len(pedidos)
 
 
-def refazer_imagens(lid: str, iid: str) -> Dict[str, Any]:
-    """Botão 🔁 Gerar de novo as que falharam (o pod precisa estar ligado)."""
+def refazer_imagens(lid: str, iid: str, pod_url: str = "") -> Dict[str, Any]:
+    """Botão 🔁 Gerar de novo as que falharam (o pod precisa estar ligado). 🔗 v84_181: com `pod_url` novo, manda pro
+    pod novo todas as que não estão no PC."""
     with _TRAVA:
         lote = carregar(lid)
         it = next((x for x in lote["itens"] if x["id"] == iid), None)
-        if not it or not it.get("pod_img"):
+        if not it or not os.path.exists(os.path.join(pasta_item(lid, iid), "cenas.json")):
             raise ProducaoErro("Esse roteiro ainda não mandou imagens pro pod.")
-    n = _reenviar_faltantes(lid, iid, manual=True)
+        pod_novo = _aplicar_pod_novo(lote, pod_url) or not it.get("pod_img")
+        lote["status"] = "rodando"  # senão ninguém acompanha o job novo (o lote já estava concluído)
+        salvar(lote)
+    n = _reenviar_faltantes(lid, iid, manual=True, pod_novo=pod_novo)
     if not n:
-        raise ProducaoErro("Não falta nenhuma imagem — todas foram feitas.")
+        with _TRAVA:
+            lote = carregar(lid)
+            if lote.get("status") == "rodando" and all(x["estado"] in ESTADOS_FINAIS for x in lote["itens"]):
+                lote["status"] = "concluido"
+                salvar(lote)
+        raise ProducaoErro("Não falta nenhuma imagem — todas já estão no PC.")
     garantir_runner()
     return {"ok": True, "reenviadas": n}
 
@@ -830,6 +1048,8 @@ def _receber_imagens(lid: str, iid: str) -> None:
     pasta = pasta_item(lid, iid)
     pasta_img = os.path.join(pasta, "imagens")
     try:
+        if not it.get("pod_img"):
+            raise ProducaoErro("sem job de imagens neste pod")
         pod_studio.job(it["pod_img"], cfg)
         donos = _prontos_no_pod(it, cfg)
     except Exception:

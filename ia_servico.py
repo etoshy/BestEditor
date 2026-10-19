@@ -112,6 +112,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                "No 🕵️ Modelo de vídeo (e sozinho na 🏭 Produção no pod), olha as fotos e o roteiro e diz quem é quem, a "
                "idade de cada pessoa em cada foto e o ano de nascimento — pra o pod gerar as cenas com o rosto certo, na "
                "idade certa daquele momento da história.", True),
+    "animar": ("🎞 Animar cenas com o Google Flow",
+               "No Estúdio, sugere quais cenas de imagem MAIS ganham com movimento e escreve o prompt de cada animação "
+               "(imagem → vídeo no Flow): a partir do prompt que gerou a imagem (cena de IA) ou do contexto da cena — "
+               "olhando a própria imagem.", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

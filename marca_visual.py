@@ -150,7 +150,8 @@ VERSAO_PACOTE = 1
 _IMG = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 # o que o pacote pode ter (caminho relativo à raiz do pacote) → nível, o que é
 ESTRUTURA_PACOTE: List[Tuple[str, str, str]] = [
-    ("pacote.json", "recomendado", "a etiqueta do pacote: formato, versão, slug, nome do canal, idioma"),
+    ("pacote.json", "recomendado", "a etiqueta do pacote: formato, versão, slug, nome do canal, idioma — e \"producao_pod\" (% de "
+                                   "cenas no pod, personagens, fotos do roteiro): como a 🏭 Produção no pod gera os vídeos do canal"),
     ("brand_guide.json", "obrigatório", "a especificação da marca (schema channel_visual_identity_spec) — nunca é reescrita"),
     ("assets/", "obrigatório", "as imagens oficiais da marca (mascote, painel, logo, banner…)"),
     ("referencias/poses/pose_<id>.png", "recomendado", "um recorte do mascote por pose oficial: normal, curioso, surpreso, investigando, explicando, estudando, sem_ideia, ideia"),
@@ -1821,7 +1822,15 @@ def exportar(m: Dict[str, Any], pid: str) -> bytes:
 
 # ------------------------------------------------------------------ 📘 como montar um pacote (página + prompt pra IA)
 EXEMPLO_PACOTE = {"formato": FORMATO_PACOTE, "versao": VERSAO_PACOTE, "slug": "meu_canal", "nome": "Meu Canal", "idioma": "de",
-                  "descricao": "Uma frase sobre o canal."}
+                  "descricao": "Uma frase sobre o canal.",
+                  # 🏭 v84_181: como a Produção no pod gera os vídeos deste canal (canal_pod.py)
+                  "producao_pod": {"_sobre": "pct = % das cenas geradas no pod (100 = canal 100% IA); personagens = pessoa genérica "
+                                             "vira personagem do canal e personagem falando aparece; fotos_do_roteiro = "
+                                             "\"referencia\" (redesenha as fotos marcadas [I3] no estilo do canal) ou \"real\" (usa "
+                                             "a foto como está); estilo_fotos = \"foto\" ou \"ilustracao\" (vazio = pela estética); "
+                                             "ref_estilo = manda a amostra de estilo como referência em toda cena",
+                                   "pct": 100, "personagens": True, "fotos_do_roteiro": "referencia", "estilo_fotos": "",
+                                   "ref_estilo": False}}
 EXEMPLO_REFORCOS = {
     "_sobre": "O que a IA de imagem costuma errar no mascote — DERIVADO do brand_guide.json e das imagens oficiais (não invente traços novos).",
     "mascote_en": "PROPORTION LOCK (match image references exactly): <cabeça, corpo, braços, pernas, pés, olhos, boca — proporções exatas, em inglês>",

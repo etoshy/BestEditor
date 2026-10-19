@@ -18,6 +18,9 @@ flow_lote.py
   • 🌐 Abrir o navegador de uma conta na mão (fazer login, ativar o premium/teste grátis, conferir os créditos…).
     Enquanto ela está aberta, o lote não usa essa conta; clique em "✔ Concluir" (ou feche a janela) pra devolver.
 
+  • 🎞 Animar (v84_182): o editor manda pedidos de VÍDEO com uma imagem de frame de Início ("inicio_arquivo") — a
+    cena de imagem vira vídeo. Esses nunca viram foto (esperam uma conta com crédito de vídeo).
+
 Tudo o que sai vai pra 🖼 Galeria da aba (outputs/flow_estudio/), como o ✨ Gerar.
 
 Enquanto o lote (ou uma janela aberta na mão) está rodando, ele reserva o Google Flow (`_FLOW_LOCK`): o ✨ Gerar da
@@ -274,7 +277,7 @@ def baixar_para_galeria(context, midias: List[Dict[str, str]], job: Dict[str, An
             f.write(resp.body())
         e = {"id": gid, "tipo": m.get("tipo") or job["tipo"], "arquivo": nome, "media_id": m.get("id") or "",
              "prompt": job.get("prompt") or "", "modelo": job.get("modelo") or "", "proporcao": job.get("proporcao") or "",
-             "origem": "lote", "frames": False, "referencia": False, "conta": conta, "projeto": projeto,
+             "origem": job.get("origem") or "lote", "frames": bool(job.get("inicio_arquivo")), "referencia": False, "conta": conta, "projeto": projeto,
              "criado": time.time(), "rotulo": "🚀 lote" + (" · 🔁 era vídeo" if job.get("convertido") else ""),
              "prompt_original": job.get("prompt_original") or ""}
         FE.adicionar_na_galeria(e)
@@ -344,6 +347,10 @@ class Lote:
                      "quantidade": quantidade, "estado": "pendente", "conta": None, "erro": None, "tentativas": 0,
                      "convertido": False, "prompt_original": None, "reescrito_por": None, "resultados": [],
                      "criado": time.time(), "inicio": None, "fim": None}
+                # 🎞 v84_182: vídeo a partir de uma imagem (frame de Início) — "Animar com Flow" do editor
+                if tipo == "video" and it.get("inicio_arquivo") and os.path.isfile(str(it["inicio_arquivo"])):
+                    j["inicio_arquivo"] = os.path.abspath(str(it["inicio_arquivo"]))
+                    j["origem"] = str(it.get("origem") or "animar")[:40]
                 self.fila.append(j)
                 novos.append(j)
             self._salvar()
@@ -455,7 +462,7 @@ class Lote:
                     continue
                 contas = self.contas_do_lote()
                 # 🔁 vídeo → foto: nenhuma conta (do lote) tem crédito de vídeo
-                if self.cfg.get("converter_para_foto") and any(j["tipo"] == "video" for j in pend) \
+                if self.cfg.get("converter_para_foto") and any(j["tipo"] == "video" and not j.get("inicio_arquivo") for j in pend) \
                         and not any(self._serve(c, "video") for c in contas):
                     self._converter_videos()
                     continue
@@ -512,7 +519,8 @@ class Lote:
 
     def _converter_videos(self) -> None:
         with self.trava:
-            j = next((x for x in self.fila if x["estado"] == "pendente" and x["tipo"] == "video"), None)
+            # 🎞 animação de uma imagem não vira foto (a imagem já existe): ela espera uma conta com crédito de vídeo
+            j = next((x for x in self.fila if x["estado"] == "pendente" and x["tipo"] == "video" and not x.get("inicio_arquivo")), None)
             if j is None:
                 return
             j["estado"] = "convertendo"
@@ -623,6 +631,9 @@ class Lote:
                             "quantidade": job["quantidade"]}
                     if job["tipo"] == "video":
                         trab["tipo_video"] = "Elementos"
+                        if job.get("inicio_arquivo") and os.path.isfile(job["inicio_arquivo"]):  # 🎞 animar uma imagem
+                            trab["inicio"] = {"arquivo": job["inicio_arquivo"]}
+                            trab["tipo_video"] = "Frames"
                     self.log(f"✨ “{conta}” enviou {'🎬 vídeo' if job['tipo'] == 'video' else '🖼 foto'}: {job['prompt'][:90]}")
                     midias = fd.gerar_um(page, trab, on_passo, max(timeout, 600) if job["tipo"] == "video" else timeout)
                     st[conta] = "baixando…"

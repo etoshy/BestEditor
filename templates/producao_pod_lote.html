@@ -14,6 +14,14 @@
 <h1 style="margin-bottom:4px;">🏭 {{ lote.nome }}</h1>
 <div id="resumo" style="color:#555;"></div>
 <p style="font-size:.85rem;color:#666;">Pode fechar esta aba: o site continua sozinho (e retoma se for reiniciado). Quando todos ficarem prontos, chega um aviso no 🔔. <b>Desligue o pod</b> depois que todos estiverem ✅ — as imagens e áudios já estão neste PC.</p>
+<div class="pl-item" style="background:#faf5ff;border-color:#e9d5ff;">
+  <label for="pod-url" style="font-weight:600;">🔗 Pod deste lote</label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+    <input type="url" id="pod-url" value="{{ lote.pod_url or '' }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net" style="flex:1;min-width:260px;margin:0;">
+    <button type="button" id="trocar-pod" style="width:auto;margin:0;">Usar este link</button>
+  </div>
+  <div style="font-size:.8rem;color:#666;margin-top:4px;">Ligou uma VPS nova? Cole o link aqui. O 🔁 Tentar de novo e o 🔁 Gerar de novo usam ele: quem não tem a narração pede ela de novo; quem já tem manda só as imagens que faltam neste PC.</div>
+</div>
 <div style="display:flex;gap:8px;">
   <button type="button" id="cancelar" style="width:auto;">⏹ Cancelar o lote</button>
   <button type="button" id="excluir" style="width:auto;">🗑 Excluir o lote</button>
@@ -23,7 +31,11 @@
 (function () {
   const LID = {{ lote.id|tojson }};
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-  async function post(url) { const r = await fetch(url, {method: 'POST'}); const d = await r.json(); if (!r.ok) alert(d.erro || r.status); return d; }
+  async function post(url, corpo) {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+    const d = await r.json(); if (!r.ok) alert(d.erro || r.status); return d;
+  }
+  const podUrl = () => (document.getElementById('pod-url').value || '').trim();
   async function atualizar() {
     let d;
     try { d = await (await fetch(`/producao-pod/${LID}/estado`)).json(); } catch (e) { return; }
@@ -32,10 +44,12 @@
     document.getElementById('itens').innerHTML = d.itens.map(it => {
       const c = it.cenas ? `🎬 ${it.cenas.cenas} cenas · 🖼 ${it.cenas.no_pod} no pod (${it.cenas.pct}%) · ⏳ ${it.cenas.pendentes} pendentes` : '';
       const zip = it.gv_id ? `<a href="/gerar-voz/baixar-zip/${it.gv_id}" title="narração + legenda + info.json — o mesmo .zip do Gerador de voz">⬇ ZIP</a>` : '';
-      const refazer = (it.pod_img && (it.faltam_img || it.estado === 'erro') && ['pronto', 'erro'].includes(it.estado)) ? ` <button type="button" data-refazer="${it.id}" title="o pod precisa estar ligado" style="width:auto;padding:2px 8px;font-size:.8rem;background:#7c3aed;">🔁 Gerar de novo as ${it.faltam_img || ''} que falharam</button>` : '';
+      const refazer = (it.cenas && it.cenas.no_pod && (it.faltam_img || it.estado === 'erro') && ['pronto', 'erro'].includes(it.estado)) ? ` <button type="button" data-refazer="${it.id}" title="manda pro pod do link acima só as que não estão neste PC" style="width:auto;padding:2px 8px;font-size:.8rem;background:#7c3aed;">🔁 Gerar de novo as ${it.faltam_img || ''} que faltam</button>` : '';
+      const canal = it.canal ? ` <a href="/marca/${encodeURIComponent(it.canal)}/pacote.zip" title="o pacote do canal (personagens, estética, modelo de roteiro) pra importar em outro PC">📦 Zip do canal</a>` : '';
       const rebaixar = (it.pod_img && ['pronto', 'erro'].includes(it.estado)) ? ` <button type="button" data-rebaixar="${it.id}" title="o pod precisa estar ligado" style="width:auto;padding:2px 8px;font-size:.8rem;">🖼 Baixar imagens de novo</button>` : '';
-      const acoes = zip + refazer + rebaixar + (it.job_id ? ` <a href="/job/${it.job_id}/edit-segments" style="font-weight:600;">📂 Abrir no editor →</a>`
-                  : (it.estado === 'erro' ? ` <button type="button" data-tentar="${it.id}" style="width:auto;">🔁 Tentar de novo</button>` : ''));
+      const tentar = (it.estado === 'erro' || ['narrando', 'imagens'].includes(it.estado))
+                  ? ` <button type="button" data-tentar="${it.id}" style="width:auto;${it.estado === 'erro' ? '' : 'padding:2px 8px;font-size:.8rem;'}" title="usa o link do pod acima: sem narração, pede de novo; com narração, manda só as imagens que faltam">🔁 Tentar de novo</button>` : '';
+      const acoes = zip + canal + refazer + rebaixar + (it.job_id ? ` <a href="/job/${it.job_id}/edit-segments" style="font-weight:600;">📂 Abrir no editor →</a>` : '') + tentar;
       return `<div class="pl-item"><div class="pl-topo">
           <div style="min-width:0;"><b>${esc(it.titulo)}</b> <span style="font-size:.8rem;color:#888;">${esc(it.idioma)} · ${esc(it.motor)}${it.perfil ? ' · 🗣️ ' + esc(it.perfil) : ''}</span></div>
           <div style="display:flex;gap:10px;align-items:center;"><span class="pl-estado ${esc(it.estado)}">${esc(it.rotulo)}</span>${acoes}</div></div>
@@ -52,11 +66,16 @@
   }
   document.getElementById('itens').addEventListener('click', async (e) => {
     const rf = e.target.dataset.refazer;
-    if (rf) { e.target.disabled = true; const d = await post(`/producao-pod/${LID}/${rf}/refazer-imagens`); if (d && d.erro) alert(d.erro); atualizar(); return; }
+    if (rf) { e.target.disabled = true; await post(`/producao-pod/${LID}/${rf}/refazer-imagens`, {pod_url: podUrl()}); atualizar(); return; }
     const re = e.target.dataset.rebaixar;
     if (re) { e.target.disabled = true; await post(`/producao-pod/${LID}/${re}/imagens-de-novo`); atualizar(); return; }
     const id = e.target.dataset.tentar; if (!id) return;
-    e.target.disabled = true; await post(`/producao-pod/${LID}/${id}/tentar`); atualizar();
+    e.target.disabled = true; await post(`/producao-pod/${LID}/${id}/tentar`, {pod_url: podUrl()}); atualizar();
+  });
+  document.getElementById('trocar-pod').addEventListener('click', async () => {
+    const d = await post(`/producao-pod/${LID}/pod-url`, {pod_url: podUrl()});
+    if (d && d.ok) alert(d.mudou ? 'Pronto: o lote usa o pod novo. Clique em 🔁 Tentar de novo nos roteiros que pararam.' : 'O lote já usa esse link.');
+    atualizar();
   });
   document.getElementById('cancelar').addEventListener('click', async () => { if (confirm('Cancelar os roteiros que ainda não terminaram?')) { await post(`/producao-pod/${LID}/cancelar`); atualizar(); } });
   document.getElementById('excluir').addEventListener('click', async () => {

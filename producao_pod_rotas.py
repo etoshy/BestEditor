@@ -22,6 +22,13 @@ def registrar(app, base_dir: str) -> None:
         import idiomas
         return [(k, v[0]) for k, v in idiomas.IDIOMAS.items()]
 
+    def _canais():
+        try:
+            import marca_visual
+            return marca_visual.listar(base_dir)
+        except Exception:  # noqa: BLE001
+            return []
+
     @app.route("/producao-pod", methods=["GET"])
     def producao_pod_page():
         import pod_studio
@@ -30,7 +37,7 @@ def registrar(app, base_dir: str) -> None:
         return render_template("producao_pod.html", lotes=lotes, roteiros=pp.roteiros_disponiveis(base_dir),
                                perfis=_perfis(), idiomas=_idiomas(), pod_url=pod_studio.url() or "",
                                chatterbox_onde=(pod_studio._cfg(None).get("chatterbox_onde") or "local"),
-                               padrao=dict(pp.PADRAO_ITEM, **pp.PADRAO_LOTE))
+                               padrao=dict(pp.PADRAO_ITEM, **pp.PADRAO_LOTE), canais=_canais())
 
     @app.route("/producao-pod/roteiro", methods=["GET"])
     def producao_pod_roteiro():
@@ -66,10 +73,10 @@ def registrar(app, base_dir: str) -> None:
         except pp.ProducaoErro:
             return jsonify({"erro": "lote não encontrado"}), 404
         itens = [{k: it.get(k) for k in ("id", "titulo", "estado", "mensagem", "job_id", "erro", "cenas", "idioma",
-                                          "motor", "perfil", "avisos", "inicio", "fim", "gv_id", "pod_img", "faltam_img", "baixadas", "recentes")}
+                                          "motor", "perfil", "avisos", "inicio", "fim", "gv_id", "pod_img", "faltam_img", "baixadas", "recentes", "canal")}
                  | {"rotulo": pp.ROTULOS.get(it["estado"], it["estado"]), "log": (it.get("log") or [])[-8:]}
                  for it in lote["itens"]]
-        return jsonify({"status": lote["status"], "resumo": pp.resumo_lote(lote), "itens": itens})
+        return jsonify({"status": lote["status"], "resumo": pp.resumo_lote(lote), "itens": itens, "pod_url": lote.get("pod_url") or ""})
 
     @app.route("/producao-pod/<lid>/cancelar", methods=["POST"])
     def producao_pod_cancelar(lid: str):
@@ -79,10 +86,22 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": str(exc)}), 400
         return jsonify({"ok": True})
 
+    def _pod_url_do_pedido() -> str:
+        d: Any = request.get_json(silent=True) or {}
+        return str(d.get("pod_url") or request.form.get("pod_url") or "").strip()
+
+    @app.route("/producao-pod/<lid>/pod-url", methods=["POST"])
+    def producao_pod_trocar_pod(lid: str):
+        """🔗 v84_181: o lote passa a usar outro pod (VPS nova)."""
+        try:
+            return jsonify(pp.trocar_pod(lid, _pod_url_do_pedido()))
+        except pp.ProducaoErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+
     @app.route("/producao-pod/<lid>/<iid>/tentar", methods=["POST"])
     def producao_pod_tentar(lid: str, iid: str):
         try:
-            pp.tentar_de_novo(lid, iid)
+            pp.tentar_de_novo(lid, iid, pod_url=_pod_url_do_pedido())
         except pp.ProducaoErro as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify({"ok": True})
@@ -117,7 +136,7 @@ def registrar(app, base_dir: str) -> None:
     @app.route("/producao-pod/<lid>/<iid>/refazer-imagens", methods=["POST"])
     def producao_pod_refazer_imagens(lid: str, iid: str):
         try:
-            return jsonify(pp.refazer_imagens(lid, iid))
+            return jsonify(pp.refazer_imagens(lid, iid, pod_url=_pod_url_do_pedido()))
         except pp.ProducaoErro as exc:
             return jsonify({"erro": str(exc)}), 400
         except Exception as exc:  # noqa: BLE001 — pod fora do ar etc.

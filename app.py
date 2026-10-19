@@ -9816,6 +9816,31 @@ def confirm_segments(job_id: str):
             _nv["revisao"] = _velho["revisao"]  # editor clássico (sem o campo): mantém
         if _velho.get("youtube_link") and (_nv.get("override_source") or {}).get("value") == (_velho.get("override_source") or {}).get("value"):
             _nv["youtube_link"] = _velho["youtube_link"]
+    # 🎞 v84_182: a animação do Flow fica no trecho (achada pelo id — o número muda quando divide/junta). O servidor é
+    # quem manda nela: se o vídeo chegou enquanto a página estava aberta, o trecho fica com ele.
+    _animacoes = {(_s.get("animacao") or {}).get("id"): _s for _s in _antigos if (_s.get("animacao") or {}).get("id")}
+    _usados_anim: set = set()
+    for _k, _nv in enumerate(_novos):
+        _aid = request.form.get(f"seg_{_k}_animacao_id")
+        if _aid is None:  # editor clássico (sem o campo): pelo número
+            _vel = _antigos[_k] if _k < len(_antigos) else {}
+            _aid = (_vel.get("animacao") or {}).get("id") if (_vel.get("start"), _vel.get("end")) == (_nv.get("start"), _nv.get("end")) else ""
+        _dono = _animacoes.get(_aid or "")
+        if not _dono:
+            continue
+        if _aid in _usados_anim:  # dividiu um trecho animado: a 2ª parte volta pra imagem (a animação fica na 1ª)
+            if os.path.normpath(str((_nv.get("override_source") or {}).get("value") or "")) == \
+                    os.path.normpath(str(_dono["animacao"].get("corte") or "-")):
+                _antes = _dono["animacao"].get("antes") or {}
+                _nv["override_source"] = _antes.get("override_source")
+                _nv["media_type"] = _antes.get("media_type") or "image"
+            continue
+        _usados_anim.add(_aid)
+        _nv["animacao"] = _dono["animacao"]
+        _ov_srv = _dono.get("override_source") or {}
+        if _ov_srv.get("animacao") == _aid and _animar.em_uso(_dono) and not (_nv.get("override_source") or {}).get("animacao") \
+                and (_nv.get("override_source") or {}).get("value") == ((_dono["animacao"].get("antes") or {}).get("override_source") or {}).get("value"):
+            _nv["override_source"], _nv["media_type"] = _ov_srv, "video"  # a página não sabia do vídeo novo
     job["pending_segments"] = _novos
     _destaques_do_form(job, request.form)
     _sfx_do_form(job, request.form)
@@ -11335,7 +11360,7 @@ def _momentos_do_projeto(mod, p: dict) -> List[Dict[str, Any]]:
 
 def info_projeto_editor(job: dict) -> Dict[str, Any]:
     """Pra caixa 🕵️ do editor: projeto ligado, quantos momentos/fotos, se dá pra desfazer."""
-    out: Dict[str, Any] = {"tipo": "", "id": "", "nome": "", "momentos": 0, "midias": 0,
+    out: Dict[str, Any] = {"tipo": "", "id": "", "nome": "", "momentos": 0, "midias": 0, "canal": "",
                            "encaixadas": sum(1 for d in job.get("pending_segments") or [] if d.get("_antes_material"))}
     if job.get("roteiro_id"):
         out.update(tipo="roteiro", id=job["roteiro_id"])
@@ -11348,6 +11373,8 @@ def info_projeto_editor(job: dict) -> Dict[str, Any]:
     if pj:
         tipo, mod, p, _prov = pj
         out.update(tipo=tipo, id=p.get("id"), nome=(mod.nome_do_projeto(p) if hasattr(mod, "nome_do_projeto") else p.get("nome") or "")[:80])
+        if tipo == "dossie":  # 🎨 v84_181: o canal (pacote) do modelo — botão 📦 Zip do canal
+            out["canal"] = str((getattr(mod, "MODELOS", {}).get((p.get("config") or {}).get("modelo") or "") or {}).get("identidade_visual") or "")
         try:
             out["momentos"] = len(_momentos_do_projeto(mod, p))
             out["midias"] = len(mod.midias_para_editor(BASE_DIR, p))
@@ -11504,6 +11531,10 @@ import producao_pod_rotas as _producao_rotas  # noqa: E402
 
 _producao.configurar(_criar_job_producao, _registrar_narracao_do_pod)
 _producao_rotas.registrar(app, BASE_DIR)
+import animar_flow as _animar  # noqa: E402  🎞 animar cenas de imagem com o Google Flow (v84_182)
+_animar.registrar(app, _JOBS.get, _save_state, _job_dir,
+                  lambda job: _falas_por_trecho(job, job.get("pending_segments") or [])[0],
+                  _seg_estudio, _orientacao_do_job, lambda job: str(job.get("language") or ""))
 import conteudo_ia as _conteudo_ia  # noqa: E402  🤖 selo nas cenas geradas por IA (v84_145)
 _conteudo_ia.registrar(app, BASE_DIR, _JOBS, _save_state)
 import clonar as _clonar  # noqa: E402  📑 clonar projeto (modelo de vídeo, roteiro, editor) (v84_146)
