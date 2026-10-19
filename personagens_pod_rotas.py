@@ -52,10 +52,11 @@ def registrar(app, base_dir: str) -> None:
         refs = [(f.filename, f.read()) for f in request.files.getlist("refs") if f and f.filename]
         url = (request.form.get("pod_url") or "").strip()
         try:
-            p = pp.criar(request.form.get("nome") or "", texto, refs, url, base_dir)
+            p = pp.criar(request.form.get("nome") or "", texto, refs, url, base_dir, motor=request.form.get("motor") or "flow")
         except pp.PersErro as exc:
             return redirect(url_for("personagens_pod_page", erro=str(exc)))
-        _guardar_pod_padrao(url)
+        if url:
+            _guardar_pod_padrao(url)
         return redirect(url_for("personagens_pod_projeto", pid=p["id"]))
 
     @app.route("/personagens-pod/<pid>", methods=["GET"])
@@ -102,7 +103,12 @@ def registrar(app, base_dir: str) -> None:
         except (TypeError, ValueError):
             passos = 0
         return _ok(lambda: pp.enviar(pid, [str(a) for a in c.get("arquivos") or []], str(c.get("extra") or ""), base_dir,
-                                     qualidade=str(c.get("qualidade") or ""), passos=passos))
+                                     qualidade=str(c.get("qualidade") or ""), passos=passos,
+                                     quantidade=str(c.get("quantidade") or "x1")))
+
+    @app.route("/personagens-pod/<pid>/motor", methods=["POST"])
+    def personagens_pod_motor(pid: str):
+        return _ok(pp.trocar_motor, pid, str(_corpo().get("motor") or ""), base_dir)
 
     @app.route("/personagens-pod/<pid>/json", methods=["GET", "POST"])
     def personagens_pod_json(pid: str):

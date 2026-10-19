@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Personagens no pod{% endblock %}
+{% block title %}Personagens{% endblock %}
 {% block content %}
 <style>
   .app-content { max-width: 1100px; }
@@ -9,9 +9,10 @@
   .pc-proj { display: flex; justify-content: space-between; gap: 10px; align-items: center; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
   .pc-tag { font-size: .75rem; border-radius: 999px; padding: 1px 8px; background: #f1f5f9; color: #475569; margin-left: 4px; }
 </style>
-<h1>🧍 Personagens no pod</h1>
-<p style="color:#555;">As poses PNG de uma personagem do canal (reações, segurando objetos, “_boca” pra fala), geradas no seu pod
-<b>personagens-pod</b> (Qwen-Image-Edit-2511 + recorte do fundo). Cada PNG sai 1200 × 1800, transparente, com a cabeça
+<h1>🧍 Personagens</h1>
+<p style="color:#555;">As poses PNG de uma personagem do canal (reações, segurando objetos, “_boca” pra fala), geradas no
+<b>🚀 Google Flow</b> (as contas do editor, com a ficha de referência — o fundo verde é recortado aqui no PC) ou no pod
+<b>personagens-pod</b>. Cada PNG sai 1200 × 1800, transparente, com a cabeça
 no mesmo lugar em todas — pronto pro editor pôr por cima do vídeo.</p>
 <div class="pc-passos"><span>1 · JSON de poses + a ficha</span><span>2 · ⭐ gerar a mestre e aprovar</span><span>3 · ▶ gerar o resto (com a mestre)</span><span>4 · ✔ aprovar / 🔁 refazer</span><span>5 · ⬇ baixar as aprovadas</span></div>
 {% if erro %}<div class="pc-card" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">⚠ {{ erro }}</div>{% endif %}
@@ -20,7 +21,13 @@ no mesmo lugar em todas — pronto pro editor pôr por cima do vídeo.</p>
   <h2 style="margin:0;">Nova personagem</h2>
   <form method="post" action="/personagens-pod/criar" enctype="multipart/form-data">
     <label>Nome</label><input type="text" name="nome" placeholder="ex.: Vanta (ASTRANEBEL)">
-    <label>Link do pod</label><input type="url" name="pod_url" value="{{ pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net">
+    <label>Onde gerar</label>
+    <select name="motor" id="motorNovo" style="width:auto;">
+      <option value="flow" selected>🚀 Google Flow (as contas do editor — o PNG é recortado aqui no PC)</option>
+      <option value="pod">🖥 Pod da RunPod (personagens-pod)</option>
+    </select>
+    <div id="podNovo" style="display:none;"><label>Link do pod</label><input type="url" name="pod_url" value="{{ pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net"></div>
+    <script>document.getElementById('motorNovo').addEventListener('change', e => { document.getElementById('podNovo').style.display = e.target.value === 'pod' ? '' : 'none'; });</script>
     <label>Imagens de referência <span style="font-weight:normal;color:#888;">(até 3 — a ficha da personagem e um detalhe; os nomes iguais aos do JSON usam a descrição dele)</span></label>
     <input type="file" name="refs" accept="image/*" multiple required>
     <label>JSON de poses <span style="font-weight:normal;color:#888;">(o arquivo personagens_&lt;nome&gt;.json — ou cole abaixo)</span></label>

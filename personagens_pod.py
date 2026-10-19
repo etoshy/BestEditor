@@ -13,6 +13,11 @@ Gera as poses PNG de uma personagem do canal (reações, objetos, "_boca") no po
   5. ⬇ baixar as aprovadas (.zip, com os nomes do JSON).
 
 Tudo fica em personagens_pod/<id>/ (projeto.json, refs/, imagens/ com todas as versões).
+
+🚀 v84_184 — motor "flow" (padrão nos projetos novos): em vez do pod, cada pose vai pra fila do 🚀 Flow em massa
+(as contas Google do editor) como FOTO com UMA imagem de referência — a ficha + a ⭐ mestre lado a lado numa
+colagem (flow_refs/). A imagem volta com fundo verde e o PNG transparente sai aqui mesmo, no PC
+(personagens_limpeza.py: chave de verde, limpeza, canvas 1200×1800). A original fica em brutos/.
 """
 from __future__ import annotations
 
@@ -125,7 +130,12 @@ def ler_json(texto: str) -> Dict[str, Any]:
     return d
 
 
-def criar(nome: str, texto_json: str, refs: List[Tuple[str, bytes]], pod_url: str = "", base: str = _BASE) -> Dict[str, Any]:
+MOTORES = ("flow", "pod")
+FLOW_PROPORCOES = ("3:4", "9:16", "1:1", "4:3", "16:9")
+
+
+def criar(nome: str, texto_json: str, refs: List[Tuple[str, bytes]], pod_url: str = "", base: str = _BASE,
+          motor: str = "flow") -> Dict[str, Any]:
     dados = ler_json(texto_json)
     if not refs:
         raise PersErro("Envie pelo menos uma imagem de referência (a ficha da personagem).")
@@ -141,6 +151,7 @@ def criar(nome: str, texto_json: str, refs: List[Tuple[str, bytes]], pod_url: st
         nomes.append(n)
     p = {"id": pid, "nome": (nome or dados.get("nome") or dados.get("personagem") or "Personagem").strip()[:80],
          "criado": time.time(), "pod_url": (pod_url or "").strip().rstrip("/"), "dados": dados, "refs": nomes,
+         "motor": motor if motor in MOTORES else "flow",
          "mestre": None, "jobs": [], "log": [],
          "imagens": {x["arquivo"]: {"estado": "nova", "versoes": [], "atual": -1, "erro": None, "job": None}
                      for x in dados["poses"]}}
@@ -215,7 +226,19 @@ def status_pod(url: str) -> Dict[str, Any]:
     return _pod(url, "GET", "/status", timeout=10).json()
 
 
-def enviar(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE, qualidade: str = "", passos: int = 0) -> Dict[str, Any]:
+def enviar(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE, qualidade: str = "", passos: int = 0,
+           quantidade: str = "x1") -> Dict[str, Any]:
+    """▶ Gera as poses no motor do projeto: 🚀 Flow (padrão) ou o pod."""
+    if motor_de(carregar(pid, base)) == "flow":
+        return _enviar_flow(pid, arquivos, extra, base, quantidade)
+    return _enviar_pod(pid, arquivos, extra, base, qualidade, passos)
+
+
+def motor_de(p: Dict[str, Any]) -> str:
+    return p.get("motor") if p.get("motor") in MOTORES else "pod"  # projetos antigos (v84_183) eram do pod
+
+
+def _enviar_pod(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE, qualidade: str = "", passos: int = 0) -> Dict[str, Any]:
     """Manda as poses pro pod num job só. Poses com a mestre aprovada vão com ela de referência; "_boca" leva a
     imagem base (se ela não está no mesmo lote, sobe a versão atual dela)."""
     with _TRAVA:
@@ -286,9 +309,12 @@ def sincronizar(pid: str, base: str = _BASE) -> Dict[str, Any]:
     """Pergunta ao pod como estão os jobs abertos e baixa as poses que ficaram prontas (cada uma vira uma versão)."""
     with _TRAVA:
         p = carregar(pid, base)
-        abertos = [j for j in p["jobs"] if not j.get("final")]
+        abertos = [j for j in p["jobs"] if not j.get("final") and j.get("motor") != "flow"]
+        mudou_flow, aviso_flow = _sincronizar_flow(p, base)
+        if mudou_flow:
+            salvar(p, base)
         if not abertos:
-            return {"mudou": False, "aviso": None}
+            return {"mudou": mudou_flow, "aviso": aviso_flow}
         d = _pasta(pid, base)
         mudou, aviso = False, None
         for j in abertos:
@@ -334,7 +360,255 @@ def sincronizar(pid: str, base: str = _BASE) -> Dict[str, Any]:
                 j["posicao"] = st["posicao"]
         if mudou:
             salvar(p, base)
-        return {"mudou": mudou, "aviso": aviso}
+        return {"mudou": mudou or mudou_flow, "aviso": aviso or aviso_flow}
+
+
+# ------------------------------------------------------------------ 🚀 motor Flow
+def _flow_cfg(p: Dict[str, Any]) -> Dict[str, Any]:
+    f = p["dados"].get("flow") if isinstance(p["dados"].get("flow"), dict) else {}
+    return {"proporcao": f.get("proporcao") if f.get("proporcao") in FLOW_PROPORCOES else "3:4",
+            "modelo": str(f.get("modelo") or "")[:60]}
+
+
+def _sobre_verde(cam: str):
+    """PNG transparente (versão/mestre) → RGB sobre o verde do chroma key (o Flow continua no mesmo fundo)."""
+    from PIL import Image
+    im = Image.open(cam).convert("RGBA")
+    fundo = Image.new("RGBA", im.size, (0, 255, 0, 255))
+    fundo.alpha_composite(im)
+    return fundo.convert("RGB")
+
+
+def _bruto_ou_png(p: Dict[str, Any], arquivo: str, base: str):
+    """A imagem atual de uma pose como o Flow deve ver: a original (fundo verde) se tiver, senão o PNG sobre verde."""
+    from PIL import Image
+    it = p["imagens"].get(arquivo) or {}
+    if it.get("atual", -1) >= 0 and it.get("versoes"):
+        v = it["versoes"][it["atual"]]
+        bruto = os.path.join(_pasta(p["id"], base), "brutos", v.get("bruto") or "")
+        if v.get("bruto") and os.path.isfile(bruto):
+            return Image.open(bruto).convert("RGB")
+    cam = arquivo_atual(p, arquivo, base)
+    return _sobre_verde(cam) if cam else None
+
+
+def _mestre_img(p: Dict[str, Any], base: str):
+    from PIL import Image
+    m = p.get("mestre") or None
+    if not m:
+        return None
+    d = _pasta(p["id"], base)
+    if m.get("bruto") and os.path.isfile(os.path.join(d, "brutos", m["bruto"])):
+        return Image.open(os.path.join(d, "brutos", m["bruto"])).convert("RGB")
+    cam = os.path.join(d, "imagens", m.get("local") or "")
+    return _sobre_verde(cam) if m.get("local") and os.path.isfile(cam) else None
+
+
+def prompt_flow(p: Dict[str, Any], x: Dict[str, Any], paineis: List[str], extra: str = "") -> str:
+    """O texto de uma pose pro Flow (uma imagem de referência = a colagem dos `paineis`)."""
+    dados = p["dados"]
+    fixo = dados.get("texto_fixo") or {}
+    if x["tipo"] == "boca":
+        partes = ["The reference image is the finished character image to edit.", x["prompt"]]
+    else:
+        if len(paineis) == 1:
+            partes = [f"The reference image is {paineis[0]}."]
+        else:
+            nomes = ["left", "middle", "right"] if len(paineis) == 3 else ["left", "right"]
+            partes = ["The reference image is a collage of " + str(len(paineis)) + " panels side by side: "
+                      + "; ".join(f"{nomes[k] if k < len(nomes) else f'panel {k + 1}'} = {t}" for k, t in enumerate(paineis)) + "."]
+        partes.append("Draw ONE new single image (not a collage, not a sheet) of this same character, alone, in a NEW POSE "
+                      "that is clearly different from the pose in the reference image(s) — change the body, arms, hands, "
+                      f"head angle and facial expression exactly as described here: {x['prompt']}")
+        for chave in ("trava", "estilo", "regras"):
+            if fixo.get(chave):
+                partes.append(str(fixo[chave]))
+    if extra:
+        partes.append(f"CORRECTION FOR THIS ATTEMPT: {extra}")
+    return " ".join(" ".join(partes).split())[:3900]
+
+
+def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidade: str) -> Dict[str, Any]:
+    from PIL import Image
+    import personagens_limpeza as L
+    with _TRAVA:
+        p = carregar(pid, base)
+        d = _pasta(pid, base)
+        alvo = [a for a in dict.fromkeys(arquivos) if a in p["imagens"] and p["imagens"][a]["estado"] not in ESTADOS_ESPERA]
+        if not alvo:
+            raise PersErro("Nada pra gerar (as escolhidas já estão na fila).")
+        os.makedirs(os.path.join(d, "flow_refs"), exist_ok=True)
+        desc = p["dados"].get("descricoes_referencias") or {}
+        mestre = _mestre_img(p, base)
+        refs = p["refs"][:2] if mestre is not None else p["refs"][:3]
+        ims, paineis = [], []
+        for n in refs:
+            try:
+                ims.append(Image.open(os.path.join(d, "refs", n)))
+                paineis.append(desc.get(n) or "the official character reference sheet")
+            except Exception:  # noqa: BLE001
+                continue
+        if mestre is not None:
+            ims.append(mestre)
+            paineis.append("the APPROVED MASTER image of this character — copy its identity exactly (face, hair, eyes, "
+                           "outfit, colors, line art, art style) and its scale, but NOT its pose")
+        if not ims:
+            raise PersErro("Sem imagem de referência no projeto.")
+        tag = secrets.token_hex(3)
+        col_pose = os.path.join(d, "flow_refs", f"colagem_{tag}.png")
+        L.colagem(ims).save(col_pose)
+        itens, por_item, depois = [], [], []
+        for a in alvo:
+            x = dict(pose(p, a))
+            ref = col_pose
+            if x["tipo"] == "boca":
+                # a _boca é edição da base PRONTA: base no mesmo envio (ainda vai mudar) ou sem imagem → fica pra depois
+                bimg = None if x["base"] in alvo else _bruto_ou_png(p, x["base"], base)
+                if bimg is None:
+                    depois.append(a)
+                    continue
+                ref = os.path.join(d, "flow_refs", f"base_{a[:-4]}_{tag}.png")
+                bimg.save(ref)
+            itens.append({"prompt": prompt_flow(p, x, paineis, extra), "tipo": "imagem", "referencia_arquivo": ref,
+                          "origem": "personagens"})
+            por_item.append(a)
+        if not itens:
+            raise PersErro("; ".join(f"{a}: gere (ou aprove) primeiro a imagem base {pose(p, a)['base']}." for a in depois[:3]))
+        alvo = por_item
+        fc = _flow_cfg(p)
+        import flow_lote
+        lote = flow_lote.lote()
+        try:
+            novos = lote.adicionar(itens, modelo=fc["modelo"], proporcao=fc["proporcao"],
+                                   quantidade=quantidade if quantidade in ("x1", "x2", "x3", "x4") else "x1")
+        except ValueError as exc:
+            raise PersErro(str(exc))
+        for a, j in zip(por_item, novos):
+            p["jobs"].append({"id": j["id"], "motor": "flow", "arquivos": [a], "criado": time.time(), "final": False,
+                              "extra": extra[:300] or None})
+            p["imagens"][a].update(estado="fila", job=j["id"], erro=None)
+        _log(p, f"🚀 {len(alvo)} pose(s) pro Flow" + (" com a ⭐ mestre" if mestre is not None else " (sem mestre)")
+             + (f" · {quantidade}" if quantidade and quantidade != "x1" else "") + (f" · correção: {extra[:80]}" if extra else ""))
+        salvar(p, base)
+    aviso = (f"{len(depois)} “_boca” ficaram pra depois: a base delas ainda não tem imagem (ou está neste envio) — "
+             "gere as _boca quando as bases estiverem prontas. ") if depois else ""
+    try:
+        lote.iniciar()
+    except Exception as exc:  # noqa: BLE001
+        aviso += f"o Flow em massa não ligou agora ({str(exc)[:200]}) — os pedidos ficam na fila; ▶ Continuar na aba Flow"
+    return {"ok": True, "enviadas": len(alvo), "com_mestre": mestre is not None, "aviso": aviso.strip(), "depois": depois}
+
+
+def _galeria_flow(arquivo: str) -> str:
+    import flow_estudio as FE
+    return os.path.join(FE.pasta_galeria(), arquivo)
+
+
+def _sincronizar_flow(p: Dict[str, Any], base: str) -> Tuple[bool, Optional[str]]:
+    """Olha a fila do 🚀 Flow em massa: imagem pronta → recorta o fundo verde aqui e vira uma versão."""
+    abertos = [j for j in p["jobs"] if not j.get("final") and j.get("motor") == "flow"]
+    if not abertos:
+        return False, None
+    from PIL import Image
+    import flow_lote
+    import personagens_limpeza as L
+    lote = flow_lote.lote()
+    with lote.trava:
+        fila = {j["id"]: dict(j) for j in lote.fila}
+        rodando, fim_msg = lote.rodando, lote.fim_msg
+    d = _pasta(p["id"], base)
+    canvas = tuple(p["dados"].get("canvas") or (1200, 1800))
+    alt = float(p["dados"].get("altura_personagem") or 0.95)
+    opl = p["dados"]["limpeza"] if isinstance(p["dados"].get("limpeza"), dict) else {}
+    mudou, aviso = False, None
+    for jb in abertos:
+        a = jb["arquivos"][0]
+        it = p["imagens"].get(a)
+        fj = fila.get(jb["id"])
+        if it is None or it.get("job") != jb["id"]:
+            jb["final"] = True
+            mudou = True
+            continue
+        antes = (it.get("estado"), it.get("erro"), it.get("msg"))
+        if fj is None:
+            jb["final"] = True
+            it.update(estado="erro", erro="o pedido sumiu da fila do 🚀 Flow em massa (limparam a fila?) — gere de novo")
+        elif fj["estado"] == "ok":
+            jb["final"] = True
+            novas = 0
+            for r in fj.get("resultados") or []:
+                orig = _galeria_flow(r.get("arquivo") or "")
+                if r.get("tipo") != "imagem" or not os.path.isfile(orig):
+                    continue
+                try:
+                    n = len(it["versoes"]) + 1
+                    os.makedirs(os.path.join(d, "brutos"), exist_ok=True)
+                    img = Image.open(orig).convert("RGB")
+                    bruto = f"{a[:-4]}_v{n}_{secrets.token_hex(2)}_flow.png"
+                    img.save(os.path.join(d, "brutos", bruto))
+                    final, info = L.recortar(img, canvas, alt, opl)
+                    local = f"{a[:-4]}_v{n}_{secrets.token_hex(2)}.png"
+                    final.save(os.path.join(d, "imagens", local), optimize=True)
+                    it["versoes"].append({"local": local, "bruto": bruto, "job": jb["id"], "motor": "flow", "quando": time.time(),
+                                          "aviso": info.get("aviso"), "conta": fj.get("conta"), "limpeza": info.get("limpeza"),
+                                          "cortada": bool(info.get("cortada_lados"))})
+                    novas += 1
+                except Exception as exc:  # noqa: BLE001
+                    aviso = f"{a}: a imagem chegou mas o recorte falhou ({type(exc).__name__}: {str(exc)[:160]})"
+            cortadas = novas and all(v.get("cortada") for v in it["versoes"][-novas:])
+            if cortadas and not jb.get("auto_refeito") and fj.get("referencia_arquivo") and os.path.isfile(fj["referencia_arquivo"]):
+                # ✂ veio com a cabeça/os lados cortados: refaz UMA vez sozinho, com a correção de enquadramento
+                corr = ("CORRECTION FOR THIS ATTEMPT: the previous image cut the character at the edge — zoom out: the whole head, "
+                        "all the hair and both sides must be inside the image with clear green margin.")
+                try:
+                    nj = lote.adicionar([{"prompt": (fj["prompt"] + " " + corr)[:3990], "tipo": "imagem",
+                                          "referencia_arquivo": fj["referencia_arquivo"], "origem": "personagens"}],
+                                        modelo=fj.get("modelo") or "", proporcao=fj.get("proporcao") or "3:4",
+                                        quantidade=fj.get("quantidade") or "x1")[0]
+                    p["jobs"].append({"id": nj["id"], "motor": "flow", "arquivos": [a], "criado": time.time(), "final": False,
+                                      "auto_refeito": True})
+                    it.update(atual=len(it["versoes"]) - 1, estado="fila", job=nj["id"], erro=None,
+                              msg="✂ veio cortada na borda — refazendo sozinho (1x) com mais margem")
+                    _log(p, f"✂ {a}: veio cortada na borda — refazendo 1x")
+                    try:
+                        lote.iniciar()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    mudou = True
+                    continue
+                except Exception:  # noqa: BLE001
+                    pass
+            if novas:
+                it.update(atual=len(it["versoes"]) - 1, estado="pronta", erro=None, msg=None)
+            else:
+                it.update(estado="erro", erro=aviso or "o Flow terminou mas não veio imagem")
+        elif fj["estado"] == "erro":
+            jb["final"] = True
+            it.update(estado="erro", erro=str(fj.get("erro") or "o Flow falhou")[:300])
+        elif fj["estado"] in ("rodando", "convertendo"):
+            it.update(estado="gerando", msg=f"🎨 gerando no Flow (conta “{fj.get('conta')}”)")
+        elif not rodando:
+            it.update(estado="fila", msg="⏸ o Flow em massa está parado" + (f": {fim_msg}" if fim_msg else "") + " — ▶ Continuar na aba Flow")
+            aviso = aviso or it["msg"]
+        else:
+            pos = 1 + sum(1 for x in fila.values() if x["estado"] == "pendente" and x.get("criado", 0) < fj.get("criado", 0))
+            it.update(estado="fila", msg=f"⏳ na fila do Flow ({pos}º)")
+        if (it.get("estado"), it.get("erro"), it.get("msg")) != antes:
+            mudou = True
+    return mudou, aviso
+
+
+def trocar_motor(pid: str, motor: str, base: str = _BASE) -> Dict[str, Any]:
+    if motor not in MOTORES:
+        raise PersErro("Motor inválido (flow ou pod).")
+    with _TRAVA:
+        p = carregar(pid, base)
+        if any(it.get("estado") in ESTADOS_ESPERA for it in p["imagens"].values()):
+            raise PersErro("Espere as poses que estão na fila terminarem antes de trocar o motor.")
+        p["motor"] = motor
+        _log(p, "🚀 motor: Flow" if motor == "flow" else "🖥 motor: pod")
+        salvar(p, base)
+        return p
 
 
 # ------------------------------------------------------------------ aprovar, mestre, versões
@@ -357,7 +631,9 @@ def usar_como_mestre(pid: str, arquivo: str, base: str = _BASE) -> Dict[str, Any
             raise PersErro("Essa pose ainda não tem imagem.")
         if pose(p, arquivo)["tipo"] == "boca":
             raise PersErro("A mestre tem que ser uma pose (não uma _boca).")
-        p["mestre"] = {"arquivo": arquivo, "local": os.path.basename(cam), "quando": time.time()}
+        it = p["imagens"][arquivo]
+        v = it["versoes"][it["atual"]] if it.get("versoes") and it.get("atual", -1) >= 0 else {}
+        p["mestre"] = {"arquivo": arquivo, "local": os.path.basename(cam), "quando": time.time(), "bruto": v.get("bruto")}
         p["imagens"][arquivo]["estado"] = "aprovada"
         _log(p, f"⭐ mestre: {arquivo}")
         salvar(p, base)
@@ -426,10 +702,12 @@ def para_tela(p: Dict[str, Any]) -> Dict[str, Any]:
         itens.append({"arquivo": x["arquivo"], "tipo": x["tipo"], "grupo": x.get("grupo") or "", "prioridade": x.get("prioridade") or 9,
                       "lado": x.get("lado") or "", "descricao": x.get("descricao_pt") or x["prompt"][:120],
                       "mestre_sugerida": bool(x.get("mestre")), "base": x.get("base"), "estado": it["estado"],
-                      "erro": it.get("erro"), "versoes": len(it["versoes"]), "atual": it["atual"],
+                      "erro": it.get("erro"), "msg": it.get("msg") if it["estado"] in ESTADOS_ESPERA else None,
+                      "versoes": len(it["versoes"]), "atual": it["atual"],
                       "aviso": (it["versoes"][it["atual"]].get("aviso") if it["atual"] >= 0 else None),
                       "img": (it["versoes"][it["atual"]]["local"] if it["atual"] >= 0 else None)})
     return {"id": p["id"], "nome": p["nome"], "pod_url": p.get("pod_url") or "", "mestre": p.get("mestre"),
+            "motor": motor_de(p), "flow": _flow_cfg(p),
             "refs": p["refs"], "itens": itens, "resumo": resumo(p), "log": (p.get("log") or [])[-12:],
             "esperando": any(i["estado"] in ESTADOS_ESPERA for i in itens),
             "fila": [{"id": j["id"], "posicao": j.get("posicao")} for j in p["jobs"] if not j.get("final")]}

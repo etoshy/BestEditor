@@ -97,7 +97,7 @@ def test_ponta_a_ponta(pod, tmp_path, monkeypatch):
     monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
     import app as A
     c = A.app.test_client()
-    r = c.post("/personagens-pod/criar", data={"nome": "Vanta", "pod_url": pod, "json": json.dumps(JSON_POSES),
+    r = c.post("/personagens-pod/criar", data={"nome": "Vanta", "pod_url": pod, "motor": "pod", "json": json.dumps(JSON_POSES),
                                                 "refs": [(io.BytesIO(_png()), "ficha.png")]}, content_type="multipart/form-data")
     assert r.status_code == 302
     pid = r.headers["Location"].rstrip("/").split("/")[-1]
@@ -160,7 +160,7 @@ def test_ponta_a_ponta(pod, tmp_path, monkeypatch):
 
 def test_boca_sem_base_pronta_avisa(tmp_path, monkeypatch):
     monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
-    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())], "http://127.0.0.1:9")
+    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())], "http://127.0.0.1:9", motor="pod")
     with pytest.raises(pp.PersErro, match="gere \\(ou aprove\\) primeiro"):
         pp.enviar(p["id"], ["vanta_neutra_esq_boca.png"])
     with pytest.raises(pp.PersErro, match="não respondeu"):
@@ -194,7 +194,7 @@ def test_qualidade_vai_no_pedido(pod, tmp_path, monkeypatch):
     monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
     import app as A
     c = A.app.test_client()
-    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())], pod)
+    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())], pod, motor="pod")
     assert c.get(f"/personagens-pod/{p['id']}/json").get_json()["json"].startswith("{")
     r = c.post(f"/personagens-pod/{p['id']}/gerar", json={"arquivos": ["vanta_neutra_esq.png"], "qualidade": "alta", "passos": 35}).get_json()
     assert r["ok"]

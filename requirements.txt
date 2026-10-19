@@ -67,3 +67,7 @@ pypdf>=4.0
 
 # --- 📘 Guia: python dp_guia.py fonte (renomeia a família da fonte pra "DP …") ---
 fonttools>=4.40
+
+# --- 🧍 Personagens (personagens_limpeza.py): recorte do fundo verde no PC (ilhas, furos, borda) ---
+# sem ele o recorte ainda funciona, só mais simples
+opencv-python-headless>=4.8

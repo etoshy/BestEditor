@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ p.nome }} — Personagens no pod{% endblock %}
+{% block title %}{{ p.nome }} — Personagens{% endblock %}
 {% block content %}
 <style>
   .app-content { max-width: 1400px; }
@@ -25,10 +25,17 @@
   .pj-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.8); display: none; align-items: center; justify-content: center; z-index: 999; }
   .pj-zoom img { max-height: 94vh; max-width: 94vw; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
 </style>
-<p><a href="/personagens-pod">← Personagens no pod</a></p>
+<p><a href="/personagens-pod">← Personagens</a></p>
 <h1 style="margin-bottom:4px;">🧍 {{ p.nome }}</h1>
 <div class="pj-card" style="background:#faf5ff;border-color:#e9d5ff;">
-  <div class="pj-barra"><b>🔗 Pod</b><input type="url" id="podUrl" value="{{ p.pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net" style="flex:1;min-width:280px;margin:0;">
+  <div class="pj-barra"><b>Onde gerar</b>
+    <select id="motor" style="width:auto;margin:0;">
+      <option value="flow" {% if p.motor == 'flow' %}selected{% endif %}>🚀 Google Flow (recorte aqui no PC)</option>
+      <option value="pod" {% if p.motor == 'pod' %}selected{% endif %}>🖥 Pod da RunPod</option>
+    </select>
+    <span class="so-flow" style="font-size:.85rem;color:#555;">vai pra fila do <a href="/flow#lote" target="_blank">🚀 Flow em massa</a> (as suas contas) · formato {{ p.flow.proporcao }}{% if p.flow.modelo %} · {{ p.flow.modelo }}{% endif %}</span>
+  </div>
+  <div class="pj-barra so-pod"><b>🔗 Pod</b><input type="url" id="podUrl" value="{{ p.pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net" style="flex:1;min-width:280px;margin:0;">
     <button type="button" id="podSalvar">Usar este link</button><button type="button" id="podTestar">🩺 Testar</button><span id="podSt" style="font-size:.85rem;"></span></div>
   <div class="pj-barra" style="font-size:.85rem;color:#555;">Referências: {% for r in p.refs %}<a href="/personagens-pod/{{ p.id }}/img/{{ r }}" target="_blank"><img src="/personagens-pod/{{ p.id }}/img/{{ r }}" style="height:46px;border-radius:4px;vertical-align:middle;"></a> {% endfor %}
     <span id="mestreInfo"></span></div>
@@ -42,7 +49,12 @@
     <button type="button" id="gMarcadasCorr" title="refaz as marcadas com uma correção (ex.: o olho de eclipse do outro lado)">🔁 Refazer as marcadas com correção</button>
     <a href="/personagens-pod/{{ p.id }}/aprovadas.zip" style="margin-left:auto;font-weight:600;">⬇ Baixar as aprovadas (.zip)</a>
   </div>
-  <div class="pj-barra" style="font-size:.85rem;">
+  <div class="pj-barra so-flow" style="font-size:.85rem;">
+    <b>Imagens por pedido</b>
+    <select id="quantidade" style="width:auto;margin:0;"><option value="x1">x1</option><option value="x2">x2 (2 versões pra escolher)</option><option value="x4">x4</option></select>
+    <span style="color:#666;">dica: a ⭐ mestre em x2/x4 e escolha a melhor nas setas ◀ ▶</span>
+  </div>
+  <div class="pj-barra so-pod" style="font-size:.85rem;">
     <b>Qualidade</b>
     <select id="qualidade" style="width:auto;margin:0;" title="vale pros próximos envios">
       <option value="">padrão do pod</option>
@@ -76,7 +88,7 @@
   const marc = new Set();
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-  const ROT = {nova: 'falta gerar', fila: '⏳ na fila do pod', gerando: '🎨 gerando…', pronta: '👀 pra revisar', aprovada: '✔ aprovada', erro: '❌ erro', descartada: '🗑 descartada'};
+  const ROT = {nova: 'falta gerar', fila: '⏳ na fila', gerando: '🎨 gerando…', pronta: '👀 pra revisar', aprovada: '✔ aprovada', erro: '❌ erro', descartada: '🗑 descartada'};
   async function post(url, corpo) {
     const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
     const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
@@ -88,7 +100,7 @@
           || (f === 'fila' && ['fila', 'gerando'].includes(it.estado)) || it.estado === f));
   }
   function desenhar() {
-    const r = D.resumo; $('resumo').textContent = `${r.total} poses · ✔ ${r.aprovada || 0} aprovadas · 👀 ${r.pronta || 0} pra revisar · ⏳ ${(r.fila || 0) + (r.gerando || 0)} no pod · ❌ ${r.erro || 0}`;
+    const r = D.resumo; $('resumo').textContent = `${r.total} poses · ✔ ${r.aprovada || 0} aprovadas · 👀 ${r.pronta || 0} pra revisar · ⏳ ${(r.fila || 0) + (r.gerando || 0)} na fila · ❌ ${r.erro || 0}`;
     $('mestreInfo').innerHTML = D.mestre ? ` · ⭐ mestre: <b>${esc(D.mestre.arquivo)}</b> <img src="/personagens-pod/${PID}/img/${esc(D.mestre.local)}" style="height:46px;vertical-align:middle;border:2px solid #a855f7;border-radius:4px;">`
       : ' · <b style="color:#7c3aed;">⭐ sem mestre ainda</b> — gere a mestre, refaça até ficar igual à ficha e clique em “⭐ usar como mestre”';
     $('nMarc').textContent = marc.size;
@@ -104,7 +116,7 @@
         <div class="pj-nome">${eMestre ? '⭐ ' : ''}${esc(it.arquivo)}</div>
         <div class="pj-desc">P${it.prioridade} · ${esc(it.descricao)}${it.tipo === 'boca' ? ` <i>(base: ${esc(it.base)})</i>` : ''}</div>
         <span class="pj-est ${it.estado}">${ROT[it.estado] || it.estado}</span>${it.mestre_sugerida && !D.mestre ? ' <span class="pj-est" style="background:#f3e8ff;">⭐ sugerida pra mestre</span>' : ''}
-        ${it.erro ? `<div class="pj-desc" style="color:#b91c1c;">${esc(it.erro)}</div>` : ''}${it.aviso ? `<div class="pj-desc" style="color:#92400e;">⚠ ${esc(it.aviso)}</div>` : ''}
+        ${it.msg ? `<div class="pj-desc" style="color:#1d4ed8;">${esc(it.msg)}</div>` : ''}${it.erro ? `<div class="pj-desc" style="color:#b91c1c;">${esc(it.erro)}</div>` : ''}${it.aviso ? `<div class="pj-desc" style="color:#92400e;">⚠ ${esc(it.aviso)}</div>` : ''}
         <div class="pj-acoes">
           ${it.img && pode && it.estado !== 'aprovada' ? '<button data-acao="aprovar" style="background:#16a34a;">✔</button>' : ''}
           ${it.img && pode && it.tipo !== 'boca' && !eMestre ? '<button data-acao="mestre" style="background:#7c3aed;" title="usar como mestre">⭐</button>' : ''}
@@ -127,7 +139,8 @@
   async function gerar(arquivos, extra) {
     if (!arquivos.length) { alert('Nada pra gerar aqui.'); return; }
     if (!D.mestre && arquivos.length > 1 && !confirm('Ainda não tem ⭐ mestre aprovada — sem ela a personagem varia mais. Gerar assim mesmo?')) return;
-    try { const d = await post(`/personagens-pod/${PID}/gerar`, {arquivos, extra, qualidade: $('qualidade').value, passos: parseInt($('passos').value || '0', 10) || 0}); arquivos.forEach(a => marc.delete(a)); $('aviso').style.display = 'none'; }
+    try { const d = await post(`/personagens-pod/${PID}/gerar`, {arquivos, extra, qualidade: $('qualidade').value, passos: parseInt($('passos').value || '0', 10) || 0, quantidade: $('quantidade').value});
+      arquivos.forEach(a => marc.delete(a)); $('aviso').style.display = d.aviso ? '' : 'none'; $('aviso').textContent = d.aviso ? '⚠ ' + d.aviso : ''; }
     catch (e) { alert(e.message); }
     estado();
   }
@@ -178,6 +191,19 @@
       const m = d.modelo || {}; $('podSt').textContent = `${d.mock ? '🧪 MOCK · ' : ''}modelo: ${m.modelo}${m.erro ? ' (' + m.erro + ')' : ''}${d.gpu ? ` · ${d.gpu.nome} ${d.gpu.total_gb} GB` : ''} · fila ${d.fila}`;
     } catch (e) { $('podSt').textContent = '❌ ' + e.message; }
   });
+  function motorVisivel() {
+    const m = $('motor').value;
+    document.querySelectorAll('.so-flow').forEach(e => { e.style.display = m === 'flow' ? '' : 'none'; });
+    document.querySelectorAll('.so-pod').forEach(e => { e.style.display = m === 'pod' ? '' : 'none'; });
+  }
+  $('motor').addEventListener('change', async () => {
+    try { await post(`/personagens-pod/${PID}/motor`, {motor: $('motor').value}); D.motor = $('motor').value; }
+    catch (e) { alert(e.message); $('motor').value = D.motor; }
+    motorVisivel();
+  });
+  try { const qt = localStorage.getItem('pp_quantidade'); if (qt) $('quantidade').value = qt; } catch (e) {}
+  $('quantidade').addEventListener('change', () => { try { localStorage.setItem('pp_quantidade', $('quantidade').value); } catch (e) {} });
+  motorVisivel();
   desenhar(); estado();
 })();
 </script>

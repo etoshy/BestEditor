@@ -19,7 +19,7 @@
   },
   "texto_fixo": {
    "trava": "MIRA — CHARACTER LOCK (copy exactly from the reference images) - Young woman (not a child, not chibi), gentle melancholic face, pale skin, small red lips. - Hair: long, straight, deep-black, blunt straight bangs; a dark navy headband with ribbons. - Eyes: blue-gray, with TWO stylized blue tear marks under each eye (always visible). - Ornament: an antique-gold crescent moon on the right side of the headband; a gold crescent brooch on the bow. - Outfit: black Victorian-gothic dress, ivory ruffled collar and ivory ruffled cuffs, black bow with the  crescent brooch, long puffy black sleeves; black tights and black platform shoes (only in full body). - NEVER: other hair color, short hair, missing tear marks, missing crescent, casual/modern clothes,  chibi or child proportions, cyclops/one-eye look, pink/green/blue dress.",
-   "estilo": "ART STYLE (ASTRANEBEL): original 2D gothic-cosmic anime illustration with a classic 1980s hand-painted anime feel — clean consistent line art, cel shading with one or two shadow levels, smooth clean flat colors (no grain, no noise, no paper texture, no speckles), melancholic elegant mood, strong readable silhouette. Exactly the drawing style of the character reference sheet. Palette: near-black #090A0F, charcoal #24232A, dusk blue #526F9A, soft blue #7C9EE8, ivory #F6E8D2, antique gold #C89B5B, muted crimson #A62636, silver gray #A7A9B3. Objects she holds are antique brass/gold, ivory paper or dark leather in the same style. Not 3D, not photorealistic, not glossy, not chibi, not a child.",
+   "estilo": "ART STYLE (ASTRANEBEL): original 2D gothic-cosmic anime illustration with a classic 1980s hand-painted anime feel — drawn like a finished hand-inked anime illustration: crisp dark ink OUTLINES around every shape (face, hair strands, hands, clothes, ruffles, objects), confident clean line art with slightly thicker outer contour lines and thin inner detail lines, cel shading with one or two hard-edged shadow levels, smooth clean flat colors (no grain, no noise, no paper texture, no speckles, no watercolor blotches, no blur), melancholic elegant mood, strong readable silhouette. Exactly the drawing style of the character reference sheet. Palette: near-black #090A0F, charcoal #24232A, dusk blue #526F9A, soft blue #7C9EE8, ivory #F6E8D2, antique gold #C89B5B, muted crimson #A62636, silver gray #A7A9B3. Objects she holds are antique brass/gold, ivory paper or dark leather in the same style. Not 3D, not photorealistic, not glossy, not chibi, not a child.",
    "regras": "FRAMING AND OUTPUT: a single character alone, half-body shot from the top of the head down to the hips; the hips are cut by the bottom edge of the image (no legs, no feet, no floor, no long skirt spreading out). The whole silhouette — hair, sleeves, ruffles — stays INSIDE the image with clear green margin on the left and on the right; nothing touches or is cut by the side edges. Mouth CLOSED unless the pose asks for speaking. Leave a little empty space above the head; the head is at the same height and scale as in the approved master. Plain flat solid chroma-key GREEN background (pure #00FF00) filling everything behind her, also between hair strands and between arms and body; no shadow on the ground, no gradient, no glow, no frame. Nothing green on the character or the objects (no green light, no green reflections, no green clothes). No text, no letters, no question marks, no speech bubbles, no sparkles, no watermark. Soft neutral front lighting. Clean edges."
   },
   "geracao": {
@@ -455,14 +455,26 @@
    "criado": 1792413007.086413,
    "final": true,
    "posicao": 1
+  },
+  {
+   "id": "20261019-123800-c36da3",
+   "pod_url": "https://lyotxzgsyx9q6t-8000.proxy.runpod.net",
+   "arquivos": [
+    "mira_neutra_esq.png"
+   ],
+   "criado": 1792413480.9441242,
+   "final": false,
+   "posicao": 1
   }
  ],
  "log": [
-  "19/10 09:30:07 ▶ 1 pose(s) pro pod (sem mestre)"
+  "19/10 09:30:07 ▶ 1 pose(s) pro pod (sem mestre)",
+  "19/10 09:37:51 ✏ JSON trocado: 43 pose(s)",
+  "19/10 09:38:00 ▶ 1 pose(s) pro pod (sem mestre) · qualidade alta"
  ],
  "imagens": {
   "mira_neutra_esq.png": {
-   "estado": "pronta",
+   "estado": "gerando",
    "versoes": [
     {
      "local": "mira_neutra_esq_v1_8604.png",
@@ -475,8 +487,8 @@
    ],
    "atual": 0,
    "erro": null,
-   "job": "20261019-123006-aae066",
-   "versao_pod": 1
+   "job": "20261019-123800-c36da3",
+   "versao_pod": 0
   },
   "mira_neutra_dir.png": {
    "estado": "nova",
@@ -773,5 +785,5 @@
    "job": null
   }
  },
- "atualizado": 1792413045.979489
+ "atualizado": 1792413482.2987075
 }

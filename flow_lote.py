@@ -20,6 +20,8 @@ flow_lote.py
 
   • 🎞 Animar (v84_182): o editor manda pedidos de VÍDEO com uma imagem de frame de Início ("inicio_arquivo") — a
     cena de imagem vira vídeo. Esses nunca viram foto (esperam uma conta com crédito de vídeo).
+  • 🧍 Personagens (v84_184): pedidos de FOTO com uma imagem de referência ("referencia_arquivo") — a ficha e a
+    ⭐ mestre da personagem; o editor recorta o fundo verde no PC.
 
 Tudo o que sai vai pra 🖼 Galeria da aba (outputs/flow_estudio/), como o ✨ Gerar.
 
@@ -277,7 +279,7 @@ def baixar_para_galeria(context, midias: List[Dict[str, str]], job: Dict[str, An
             f.write(resp.body())
         e = {"id": gid, "tipo": m.get("tipo") or job["tipo"], "arquivo": nome, "media_id": m.get("id") or "",
              "prompt": job.get("prompt") or "", "modelo": job.get("modelo") or "", "proporcao": job.get("proporcao") or "",
-             "origem": job.get("origem") or "lote", "frames": bool(job.get("inicio_arquivo")), "referencia": False, "conta": conta, "projeto": projeto,
+             "origem": job.get("origem") or "lote", "frames": bool(job.get("inicio_arquivo")), "referencia": bool(job.get("referencia_arquivo")), "conta": conta, "projeto": projeto,
              "criado": time.time(), "rotulo": "🚀 lote" + (" · 🔁 era vídeo" if job.get("convertido") else ""),
              "prompt_original": job.get("prompt_original") or ""}
         FE.adicionar_na_galeria(e)
@@ -351,6 +353,10 @@ class Lote:
                 if tipo == "video" and it.get("inicio_arquivo") and os.path.isfile(str(it["inicio_arquivo"])):
                     j["inicio_arquivo"] = os.path.abspath(str(it["inicio_arquivo"]))
                     j["origem"] = str(it.get("origem") or "animar")[:40]
+                # 🧍 v84_184: foto com UMA imagem de referência ("Personagens" do editor: a ficha + a mestre numa colagem)
+                if tipo == "imagem" and it.get("referencia_arquivo") and os.path.isfile(str(it["referencia_arquivo"])):
+                    j["referencia_arquivo"] = os.path.abspath(str(it["referencia_arquivo"]))
+                    j["origem"] = str(it.get("origem") or "referencia")[:40]
                 self.fila.append(j)
                 novos.append(j)
             self._salvar()
@@ -634,6 +640,8 @@ class Lote:
                         if job.get("inicio_arquivo") and os.path.isfile(job["inicio_arquivo"]):  # 🎞 animar uma imagem
                             trab["inicio"] = {"arquivo": job["inicio_arquivo"]}
                             trab["tipo_video"] = "Frames"
+                    elif job.get("referencia_arquivo") and os.path.isfile(job["referencia_arquivo"]):  # 🧍 foto com referência
+                        trab["referencia"] = {"arquivo": job["referencia_arquivo"]}
                     self.log(f"✨ “{conta}” enviou {'🎬 vídeo' if job['tipo'] == 'video' else '🖼 foto'}: {job['prompt'][:90]}")
                     midias = fd.gerar_um(page, trab, on_passo, max(timeout, 600) if job["tipo"] == "video" else timeout)
                     st[conta] = "baixando…"
