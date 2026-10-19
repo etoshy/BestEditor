@@ -39,7 +39,9 @@
 {% if erro %}<div class="error">{{ erro }}</div>{% endif %}
 {% if importado %}<div class="ok" style="border:1px solid #2e9e5b;border-radius:10px;padding:8px 12px;margin-top:8px">✅ Pacote importado. Confira abaixo o que veio e o que falta.{% if modelo %} O modelo de roteiro “{{ modelo.nome }}” já está nos 🕵️ Modelos de vídeo.{% endif %}</div>{% endif %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-  <a class="button secondary" href="/marca/{{ m.slug }}/pacote.zip" style="width:auto;margin:0">⬇ Baixar o pacote</a>
+  <a class="button secondary" href="/marca/{{ m.slug }}/pacote.zip" style="width:auto;margin:0" title="o pacote do canal + as poses ✔ aprovadas das personagens conectadas (em outro PC, importar recria os projetos já conectados)">⬇ Baixar o pacote (com as personagens)</a>
+  <a href="/marca/{{ m.slug }}/pacote.zip?personagens=tudo" style="font-size:.8rem" title="também as poses que estão pra revisar">+ as pra revisar</a>
+  <a href="/marca/{{ m.slug }}/pacote.zip?personagens=nao" style="font-size:.8rem">só o pacote</a>
   <a class="button secondary" href="/marca/como-montar" style="width:auto;margin:0">📘 Como montar o pacote</a>
   <a class="button secondary" href="/marca?todas=1" style="width:auto;margin:0">📥 Importar outro / atualizar</a>
   <form method="post" action="/marca/{{ m.slug }}/excluir" onsubmit="return confirm('Tirar este canal do site? (apaga a pasta dele, inclusive os vídeos gerados aqui)')" style="margin:0"><button type="submit" class="secondary" style="width:auto;margin:0">🗑 Tirar o canal</button></form>

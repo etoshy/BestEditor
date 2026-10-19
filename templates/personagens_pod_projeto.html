@@ -34,6 +34,19 @@
       <option value="pod" {% if p.motor == 'pod' %}selected{% endif %}>🖥 Pod da RunPod</option>
     </select>
     <span class="so-flow" style="font-size:.85rem;color:#555;">vai pra fila do <a href="/flow#lote" target="_blank">🚀 Flow em massa</a> (as suas contas) · formato {{ p.flow.proporcao }}{% if p.flow.modelo %} · {{ p.flow.modelo }}{% endif %}</span>
+    <label class="so-flow" style="margin:0;font-weight:normal;font-size:.85rem;" title="mostra as janelas do navegador de cada conta enquanto gera (vale pro Flow em massa todo)"><input type="checkbox" id="flowVisivel" style="width:auto;margin:0 4px 0 0;" {% if flow_visivel %}checked{% endif %}>👁 navegador visível</label>
+  </div>
+  <div class="pj-barra" style="font-size:.85rem;"><b>🎨 Canal</b>
+    {% if p.canal %}<span>🔗 <b>{{ p.canal.canal_nome }}</b> → {{ p.canal.nome }} <span style="color:#666;">(o editor usa as poses ✔ aprovadas daqui nos vídeos do canal)</span></span>
+      <button type="button" id="canalAtualizar" style="width:auto;padding:2px 10px;" title="troca as poses pelas do JSON do canal (as imagens das poses que continuam ficam)">⟳ Poses do JSON do canal</button>
+      <button type="button" id="canalDesligar" style="width:auto;padding:2px 10px;background:#64748b;">Desconectar</button>
+      <a href="/marca/{{ p.canal.slug }}/pacote.zip" title="o zip do canal com as poses ✔ aprovadas das personagens conectadas — importe em 🎨 Identidade visual no outro PC">📦 Zip do canal (com as personagens)</a>
+    {% else %}
+      <select id="canalSel" style="width:auto;margin:0;"><option value="">— não conectado a um canal —</option>
+        {% for c in canais %}<option value="{{ c.canal }}|{{ c.slug }}">{{ c.canal_nome }} → {{ c.nome }}{% if c.projeto %} (hoje: {{ c.projeto.nome }}){% endif %}</option>{% endfor %}</select>
+      <button type="button" id="canalLigar" style="width:auto;padding:2px 10px;">🔗 Conectar</button>
+      {% if not canais %}<span style="color:#888;">(nenhum canal importado tem personagens/&lt;slug&gt;.json)</span>{% endif %}
+    {% endif %}
   </div>
   <div class="pj-barra so-pod"><b>🔗 Pod</b><input type="url" id="podUrl" value="{{ p.pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net" style="flex:1;min-width:280px;margin:0;">
     <button type="button" id="podSalvar">Usar este link</button><button type="button" id="podTestar">🩺 Testar</button><span id="podSt" style="font-size:.85rem;"></span></div>
@@ -86,6 +99,7 @@
   const PID = {{ p.id|tojson }};
   let D = {{ p|tojson }};
   const marc = new Set();
+  let ULTIMA = '', OCUPADO = false, TIMER = null;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   const ROT = {nova: 'falta gerar', fila: '⏳ na fila', gerando: '🎨 gerando…', pronta: '👀 pra revisar', aprovada: '✔ aprovada', erro: '❌ erro', descartada: '🗑 descartada'};
@@ -132,9 +146,11 @@
       const r = await fetch(`/personagens-pod/${PID}/estado`); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
       D = d; $('aviso').style.display = d.aviso ? '' : 'none'; $('aviso').textContent = d.aviso ? '⚠ ' + d.aviso : '';
       for (const a of [...marc]) { const it = D.itens.find(x => x.arquivo === a); if (!it || ['fila', 'gerando'].includes(it.estado)) marc.delete(a); }
-      desenhar();
+      // só redesenha quando algo mudou (redesenhar a cada 4 s trocava os botões no meio do clique e ele se perdia)
+      const assin = JSON.stringify([d.itens, d.mestre, d.resumo, d.log]);
+      if (assin !== ULTIMA && !OCUPADO) { ULTIMA = assin; desenhar(); }
     } catch (e) { $('aviso').style.display = ''; $('aviso').textContent = '⚠ ' + e.message; }
-    setTimeout(estado, D.esperando ? 4000 : 15000);
+    clearTimeout(TIMER); TIMER = setTimeout(estado, D.esperando ? 4000 : 15000);  // um laço só (cada ação chamava estado() e os laços se multiplicavam)
   }
   async function gerar(arquivos, extra) {
     if (!arquivos.length) { alert('Nada pra gerar aqui.'); return; }
@@ -142,14 +158,16 @@
     try { const d = await post(`/personagens-pod/${PID}/gerar`, {arquivos, extra, qualidade: $('qualidade').value, passos: parseInt($('passos').value || '0', 10) || 0, quantidade: $('quantidade').value});
       arquivos.forEach(a => marc.delete(a)); $('aviso').style.display = d.aviso ? '' : 'none'; $('aviso').textContent = d.aviso ? '⚠ ' + d.aviso : ''; }
     catch (e) { alert(e.message); }
-    estado();
+    ULTIMA = ''; estado();
   }
   $('grade').addEventListener('click', async (e) => {
     const card = e.target.closest('.pj-it'); if (!card) return;
     const a = card.dataset.a, it = D.itens.find(x => x.arquivo === a);
     if (e.target.classList.contains('pj-chk')) { if (e.target.checked) marc.add(a); else marc.delete(a); $('nMarc').textContent = marc.size; return; }
     if (e.target.closest('[data-zoom]') && it.img) { $('zoomImg').src = `/personagens-pod/${PID}/img/${it.img}`; $('zoom').style.display = 'flex'; return; }
-    const b = e.target.closest('button'); if (!b) return;
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.acao === 'gerar' || b.dataset.acao === 'corrigir') { /* gerar() cuida */ }
+    else { b.disabled = true; OCUPADO = true; }
     try {
       if (b.dataset.v) { await post(`/personagens-pod/${PID}/versao`, {arquivo: a, idx: Math.max(0, Math.min(it.versoes - 1, it.atual + Number(b.dataset.v)))}); }
       else if (b.dataset.acao === 'aprovar') await post(`/personagens-pod/${PID}/aprovar`, {arquivo: a});
@@ -158,7 +176,8 @@
       else if (b.dataset.acao === 'gerar') return gerar([a], '');
       else if (b.dataset.acao === 'corrigir') { const t = prompt('O que corrigir? (em inglês funciona melhor — ex.: "the eclipse lens must be on her right eye", "no cigarette", "same hair as the master")'); if (t) return gerar([a], t); return; }
     } catch (er) { alert(er.message); }
-    estado();
+    finally { OCUPADO = false; b.disabled = false; }
+    ULTIMA = ''; estado();
   });
   $('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
   try { const q = localStorage.getItem('pp_qualidade'); if (q !== null) $('qualidade').value = q; const ps = localStorage.getItem('pp_passos'); if (ps) $('passos').value = ps; } catch (e) {}
@@ -191,6 +210,20 @@
       const m = d.modelo || {}; $('podSt').textContent = `${d.mock ? '🧪 MOCK · ' : ''}modelo: ${m.modelo}${m.erro ? ' (' + m.erro + ')' : ''}${d.gpu ? ` · ${d.gpu.nome} ${d.gpu.total_gb} GB` : ''} · fila ${d.fila}`;
     } catch (e) { $('podSt').textContent = '❌ ' + e.message; }
   });
+  const canalCorpo = (usar) => { const [canal, personagem] = ($('canalSel') ? $('canalSel').value : `${D.canal.slug}|${D.canal.personagem}`).split('|'); return {canal, personagem, usar_json: usar}; };
+  if ($('canalLigar')) $('canalLigar').addEventListener('click', async () => {
+    if (!$('canalSel').value) { alert('Escolha a personagem do canal.'); return; }
+    const usar = confirm('OK = também trocar as poses pelas do JSON do canal (as imagens das poses que continuam ficam)\nCancelar = só conectar');
+    try { await post(`/personagens-pod/${PID}/canal`, canalCorpo(usar)); location.reload(); } catch (e) { alert(e.message); }
+  });
+  if ($('canalAtualizar')) $('canalAtualizar').addEventListener('click', async () => {
+    if (!confirm('Trocar as poses pelas do JSON do canal? As imagens das poses que continuam (mesmo nome de arquivo) ficam.')) return;
+    try { await post(`/personagens-pod/${PID}/canal`, canalCorpo(true)); location.reload(); } catch (e) { alert(e.message); }
+  });
+  if ($('canalDesligar')) $('canalDesligar').addEventListener('click', async () => {
+    if (!confirm('Desconectar do canal? (as imagens continuam aqui)')) return;
+    try { await post(`/personagens-pod/${PID}/canal/desligar`, {}); location.reload(); } catch (e) { alert(e.message); }
+  });
   function motorVisivel() {
     const m = $('motor').value;
     document.querySelectorAll('.so-flow').forEach(e => { e.style.display = m === 'flow' ? '' : 'none'; });
@@ -200,6 +233,11 @@
     try { await post(`/personagens-pod/${PID}/motor`, {motor: $('motor').value}); D.motor = $('motor').value; }
     catch (e) { alert(e.message); $('motor').value = D.motor; }
     motorVisivel();
+  });
+  $('flowVisivel').addEventListener('change', async () => {
+    try { await post('/flow/lote/config', {visivel: $('flowVisivel').checked});
+      if (D.esperando) { $('aviso').style.display = ''; $('aviso').textContent = 'ℹ O navegador que já está aberto continua como estava até a fila esvaziar. Pra mudar agora: aba Google Flow → Em massa → ⏸ Pausar (termina a imagem atual) → ▶ Continuar.'; } }
+    catch (e) { alert(e.message); $('flowVisivel').checked = !$('flowVisivel').checked; }
   });
   try { const qt = localStorage.getItem('pp_quantidade'); if (qt) $('quantidade').value = qt; } catch (e) {}
   $('quantidade').addEventListener('change', () => { try { localStorage.setItem('pp_quantidade', $('quantidade').value); } catch (e) {} });

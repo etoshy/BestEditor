@@ -55,15 +55,38 @@ def test_config_do_pacote(canais):
     _b, c = canais
     d, a = canal_pod.config(c["dinge_erklaeren"]), canal_pod.config(c["astranebel"])
     assert d["pct"] == 100 and a["pct"] == 100
-    assert d["estilo_fotos"] == "foto" and a["estilo_fotos"] == "ilustracao"
+    # v84_185: ASTRANEBEL passou a ter cenas REALISTAS e as personagens por cima (PNG), não desenhadas na cena
+    assert d["estilo_fotos"] == "foto" and a["estilo_fotos"] == "foto" and a["personagens"] is False
     assert canal_pod.tem_mascote(c["dinge_erklaeren"]) and not canal_pod.tem_mascote(c["astranebel"])
     assert {p["slug"] for p in canal_pod.personagens(c["astranebel"])} >= {"mira", "vanta"}
-    assert "arquivo" not in canal_pod.tipos_imagem(c["astranebel"], a)  # canal desenhado: sem foto de arquivo
+    assert "arquivo" in canal_pod.tipos_imagem(c["astranebel"], a)
+    assert "arquivo" not in canal_pod.tipos_imagem(c["astranebel"], dict(a, estilo_fotos="ilustracao"))  # canal desenhado
+
+
+def test_dinge_cenas_so_com_o_estilo(canais):
+    """v84_186: no Dinge erklären o mascote saiu das cenas (fica só o estilo do canal) e entra por cima como PNG."""
+    _b, c = canais
+    m = c["dinge_erklaeren"]
+    assert canal_pod.config(m)["personagens"] is False
+    g = canal_pod.aplicar_regra(m, {"pessoa": "generica", "mascote": "curioso", "acao_en": "examining an old map"})
+    assert g["mascote"] == "" and g["personagens"] == []
+    pr, refs = canal_pod.prompt_e_refs(m, dict(g, assunto_en="a muddy 19th-century potato field in Brandenburg"))
+    assert m["guia"]["generation_system"]["style_lock_en"][:40] in pr and "no mascot in this frame" in pr and refs == []
+    import marca_visual as mv
+    c0 = mv.personagens_png(m)
+    assert [x["slug"] for x in c0] == ["mascote"] and len(c0[0]["fichas"]) == 3
+    import personagens_editor as pe
+    assert pe.config_do_canal(m)["narrador_personagem"] == "mascote"
 
 
 def test_regra_mascote_dinge(canais):
+    """A regra do mascote desenhado na cena (canal com "personagens": true no pacote.json)."""
     _b, c = canais
     m = c["dinge_erklaeren"]
+    cam = os.path.join(m["dir"], "pacote.json")
+    pac = json.load(open(cam, encoding="utf-8"))
+    pac["producao_pod"]["personagens"] = True
+    json.dump(pac, open(cam, "w", encoding="utf-8"))
     g = canal_pod.aplicar_regra(m, {"pessoa": "generica", "mascote": "", "acao_en": "examining an old map with a magnifying glass"})
     assert g["mascote"] == "investigando" and g["personagens"] == []
     assert canal_pod.aplicar_regra(m, {"pessoa": "nenhuma", "mascote": "curioso"})["mascote"] == ""
@@ -73,16 +96,32 @@ def test_regra_mascote_dinge(canais):
     pr, refs = canal_pod.prompt_e_refs(m, dict(g, assunto_en="a muddy 19th-century potato field in Brandenburg"))
     estilo = m["guia"]["generation_system"]["style_lock_en"][:40]
     assert estilo in pr and "PROPORTION LOCK" in pr and "potato field" in pr
-    assert refs and any("mascote_proporcoes" in n for n, _c in refs) and len(refs) <= 4
-    assert all(os.path.isfile(c_) for _n, c_ in refs)
+    assert len(refs) <= 4 and all(os.path.isfile(c_) for _n, c_ in refs)  # (as poses do mascote saíram do pacote)
     pr2, refs2 = canal_pod.prompt_e_refs(m, {"assunto_en": "an empty village road at dusk", "pessoa": "nenhuma"})
     assert estilo in pr2 and "no mascot in this frame" in pr2 and refs2 == []
     assert "photorealistic documentary" not in pr2
 
 
-def test_regra_personagens_astranebel(canais):
+def test_astranebel_cenas_realistas_sem_personagem(canais):
+    """v84_185: as cenas do ASTRANEBEL são fotos realistas e ninguém é desenhado nelas (Mira/Vanta entram por cima)."""
     _b, c = canais
     m = c["astranebel"]
+    d = canal_pod.aplicar_regra(m, {"pessoa": "generica", "fala_de": "mira", "personagens": ["vanta"]})
+    assert d["personagens"] == []
+    pr, refs = canal_pod.prompt_e_refs(m, dict(d, assunto_en="a red supergiant collapsing"))
+    assert "PHOTOREALISTIC" in pr and "MIRA" not in pr and not any(n.startswith("personagem_") for n, _c in refs)
+    import marca_visual as mv
+    assert [x["slug"] for x in mv.personagens_png(m)] == ["mira", "vanta"]
+
+
+def test_regra_personagens_astranebel(canais):
+    """A regra dos personagens desenhados na cena (canal com "personagens": true no pacote.json)."""
+    _b, c = canais
+    m = c["astranebel"]
+    cam = os.path.join(m["dir"], "pacote.json")
+    pac = json.load(open(cam, encoding="utf-8"))
+    pac["producao_pod"]["personagens"] = True
+    json.dump(pac, open(cam, "w", encoding="utf-8"))
     r = canal_pod.aplicar_regra
     assert [x["slug"] for x in r(m, {"pessoa": "nenhuma", "fala_de": "vanta"})["personagens"]] == ["vanta"]  # falando
     assert [x["slug"] for x in r(m, {"pessoa": "generica", "fala_de": ""})["personagens"]] == ["mira"]  # anônimo → personagem
@@ -90,10 +129,8 @@ def test_regra_personagens_astranebel(canais):
     assert r(m, {"pessoa": "real", "fala_de": "mira"})["personagens"] == []  # pessoa real citada: só ela
     d = r(m, {"pessoa": "generica", "fala_de": "mira", "personagens": ["vanta"], "acao_en": "pointing at the dying star"})
     assert [x["slug"] for x in d["personagens"]] == ["mira", "vanta"]
-    pr, refs = canal_pod.prompt_e_refs(m, dict(d, assunto_en="a red supergiant collapsing"))
-    assert "ASTRANEBEL visual style" in pr and "MIRA" in pr and "VANTA" in pr
-    papeis = [n for n, _c in refs]
-    assert any(n.startswith("personagem_mira") for n in papeis) and any(n.startswith("personagem_vanta") for n in papeis)
+    pr, _refs = canal_pod.prompt_e_refs(m, dict(d, assunto_en="a red supergiant collapsing"))
+    assert "ASTRANEBEL visual style" in pr and "MIRA" in pr and "VANTA" in pr  # (as fichas saíram do pacote: sem referência)
 
 
 # ------------------------------------------------------------------ no lote
@@ -133,11 +170,11 @@ def test_lote_do_canal_forca_100_e_estetica(pod_falso, canais, monkeypatch):
     itens = enviados[0]
     estilo = c["dinge_erklaeren"]["guia"]["generation_system"]["style_lock_en"][:40]
     assert all(estilo in i["prompt"] for i in itens)
-    assert itens[0].get("referencias") and "PROPORTION LOCK" in itens[0]["prompt"]  # cena 1: pessoa genérica → mascote
-    assert all(not i.get("referencias") and "no mascot in this frame" in i["prompt"] for i in itens[1:])
-    assert "REGRA DO CANAL" in sis[0] and "Dinge" in sis[0]
+    # v84_186: o mascote não vai mais dentro das cenas (entra por cima no editor): todas só com o estilo do canal
+    assert all(not i.get("referencias") and "no mascot in this frame" in i["prompt"] for i in itens)
+    assert "Dinge" in sis[0]
     seg = pod_falso["criados"][0]["resposta"]["segments"][0]
-    assert seg["provider"] == "runpod" and seg["personagens"] == ["mascote:curioso"]
+    assert seg["provider"] == "runpod" and not seg.get("personagens")
 
 
 def test_lote_sem_canal_continua_igual(pod_falso, canais, monkeypatch):

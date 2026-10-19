@@ -1,0 +1,2869 @@
+{
+ "id": "1e33097f4e",
+ "nome": "Mira 3",
+ "criado": 1792417443.2159345,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "canal": "astranebel",
+  "personagem": "mira",
+  "nome": "Mira",
+  "como_usar": "No BestEditor: 🧍 Personagens no pod → Novo → envie as imagens de 'referencias_sugeridas' (até 2) e este JSON. Gere a ⭐ mestre, aprove como mestre, depois gere o resto.",
+  "referencias_sugeridas": [
+   "01_mira_ficha_completa.png",
+   "03_mira_detalhe_olho_lagrima.png"
+  ],
+  "descricoes_referencias": {
+   "01_mira_ficha_completa.png": "the official character reference sheet of Mira (copy her design exactly)",
+   "03_mira_detalhe_olho_lagrima.png": "a close-up of Mira's blue-gray eye with the stylized blue tear mark under it"
+  },
+  "texto_fixo": {
+   "trava": "MIRA — CHARACTER LOCK (copy exactly from the reference images) - Young woman (not a child, not chibi), gentle melancholic face, pale skin, small red lips. - Hair: long, straight, deep-black, blunt straight bangs; a dark navy headband with ribbons. - Eyes: blue-gray, with TWO stylized blue tear marks under each eye (always visible). - Ornament: an antique-gold crescent moon on the right side of the headband; a gold crescent brooch on the bow. - Outfit: black Victorian-gothic dress, ivory ruffled collar and ivory ruffled cuffs, black bow with the  crescent brooch, long puffy black sleeves; black tights and black platform shoes (only in full body). - NEVER: other hair color, short hair, missing tear marks, missing crescent, casual/modern clothes,  chibi or child proportions, cyclops/one-eye look, pink/green/blue dress.",
+   "estilo": "ART STYLE (ASTRANEBEL): original 2D gothic-cosmic anime illustration with a classic 1980s hand-painted anime feel — drawn like a finished hand-inked anime illustration: crisp dark ink OUTLINES around every shape (face, hair strands, hands, clothes, ruffles, objects), confident clean line art with slightly thicker outer contour lines and thin inner detail lines, cel shading with one or two hard-edged shadow levels, smooth clean flat colors (no grain, no noise, no paper texture, no speckles, no watercolor blotches, no blur), melancholic elegant mood, strong readable silhouette. Exactly the drawing style of the character reference sheet. Palette: near-black #090A0F, charcoal #24232A, dusk blue #526F9A, soft blue #7C9EE8, ivory #F6E8D2, antique gold #C89B5B, muted crimson #A62636, silver gray #A7A9B3. Objects she holds are antique brass/gold, ivory paper or dark leather in the same style. Not 3D, not photorealistic, not glossy, not chibi, not a child.",
+   "regras": "FRAMING AND OUTPUT: a single character alone, half-body shot from the top of the head down to the hips; the hips are cut by the bottom edge of the image (no legs, no feet, no floor, no long skirt spreading out). The whole silhouette — hair, sleeves, ruffles — stays INSIDE the image with clear green margin on the left and on the right; nothing touches or is cut by the side edges; the character is centered and fills about 60–70% of the image width. Mouth CLOSED unless the pose asks for speaking. The WHOLE head and all the hair are inside the image, with clear empty green space above the top of the hair (never cut the head, the hair, the headband or ornaments by the top edge); the head is at the same height and scale as in the approved master. Plain flat solid chroma-key GREEN background (pure #00FF00) filling everything behind her, also between hair strands and between arms and body; no shadow on the ground, no gradient, no glow, no frame. Nothing green on the character or the objects (no green light, no green reflections, no green clothes). No text, no letters, no question marks, no speech bubbles, no sparkles, no watermark. Soft neutral front lighting. Clean edges."
+  },
+  "geracao": {
+   "largura": 1024,
+   "altura": 1536,
+   "passos": 40,
+   "cfg": 4.0
+  },
+  "fundo": "verde",
+  "flow": {
+   "proporcao": "3:4",
+   "modelo": ""
+  },
+  "limpeza": {
+   "ilhas": true,
+   "furos_px": 400,
+   "erodir": 1,
+   "suavizar": 0.6
+  },
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "poses": [
+   {
+    "arquivo": "mira_neutra_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "neutra, mãos juntas na frente (pose da ficha)",
+    "prompt": "neutral, hands gently clasped in front of her, calm melancholic look; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips.",
+    "mestre": true
+   },
+   {
+    "arquivo": "mira_neutra_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "neutra, mãos juntas na frente (pose da ficha)",
+    "prompt": "neutral, hands gently clasped in front of her, calm melancholic look; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_curiosa_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "curiosa, cabeça inclinada",
+    "prompt": "curious, head tilted, eyes wide and attentive; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_curiosa_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "curiosa, cabeça inclinada",
+    "prompt": "curious, head tilted, eyes wide and attentive; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_maravilhada_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "maravilhada, olhos brilhando, mãos no peito",
+    "prompt": "awestruck, sparkling eyes, both hands pressed to her chest, lips parted; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_maravilhada_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "maravilhada, olhos brilhando, mãos no peito",
+    "prompt": "awestruck, sparkling eyes, both hands pressed to her chest, lips parted; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_empolgada_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "empolgada, apontando pra cima (pose da ficha)",
+    "prompt": "excited, pointing up with one finger, open happy mouth; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_empolgada_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "empolgada, apontando pra cima (pose da ficha)",
+    "prompt": "excited, pointing up with one finger, open happy mouth; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_pensando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "pensando, dedo nos lábios (pose da ficha)",
+    "prompt": "thinking, index finger on her lips, looking up; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_pensando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "pensando, dedo nos lábios (pose da ficha)",
+    "prompt": "thinking, index finger on her lips, looking up; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_surpresa_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "surpresa, boca aberta",
+    "prompt": "surprised, small open mouth, eyes wide, hands raised slightly; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_perguntando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "fazendo uma pergunta, mão aberta",
+    "prompt": "asking a sincere question, one open hand raised, eyebrows lifted; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_perguntando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "fazendo uma pergunta, mão aberta",
+    "prompt": "asking a sincere question, one open hand raised, eyebrows lifted; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_insegura_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "insegura, tocando o pingente da lua (hábito dela)",
+    "prompt": "insecure, touching the gold crescent ornament with her fingers, looking down; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_globo_celeste_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "abraçando um globo/esfera celeste (pose da ficha)",
+    "prompt": "hugging a dark-blue celestial sphere with stars, eyes closed, content; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_globo_celeste_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "abraçando um globo/esfera celeste (pose da ficha)",
+    "prompt": "hugging a dark-blue celestial sphere with stars, eyes closed, content; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_caderno_constelacoes_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "desenhando constelações num caderno (hábito dela)",
+    "prompt": "drawing constellations in a small notebook with a pencil (no readable writing); 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_fotografia_antiga_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "segurando uma foto antiga (a estrela riscada — lore)",
+    "prompt": "holding an old faded photograph with both hands, melancholic (photo content not visible); 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_olhando_telescopio_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "olhando por um telescópio antigo de latão",
+    "prompt": "looking through an antique brass telescope; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_neutra_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_neutra_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "neutra, mãos juntas na frente (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_neutra_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_neutra_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "neutra, mãos juntas na frente (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_curiosa_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_curiosa_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "curiosa, cabeça inclinada — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_curiosa_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_curiosa_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "curiosa, cabeça inclinada — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_maravilhada_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_maravilhada_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "maravilhada, olhos brilhando, mãos no peito — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_maravilhada_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_maravilhada_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "maravilhada, olhos brilhando, mãos no peito — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_perguntando_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_perguntando_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "fazendo uma pergunta, mão aberta — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_perguntando_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_perguntando_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "fazendo uma pergunta, mão aberta — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_triste_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "triste / melancólica",
+    "prompt": "quietly sad, melancholic, eyes lowered; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_assustada_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "assustada",
+    "prompt": "frightened, shoulders raised, hands near her mouth; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_sorrindo_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "sorriso leve",
+    "prompt": "soft gentle smile, eyes slightly closed; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_ouvindo_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "ouvindo com atenção",
+    "prompt": "listening attentively, slight lean forward, hands clasped; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_confusa_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "confusa (sem desenhar '?')",
+    "prompt": "confused, eyebrows knit, finger on her cheek (do not draw any question mark); 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_pote_de_estrela_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando um pote de vidro com uma estrelinha brilhando",
+    "prompt": "holding a glass jar with a tiny glowing star inside, warm light on her face; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_pote_de_estrela_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "segurando um pote de vidro com uma estrelinha brilhando",
+    "prompt": "holding a glass jar with a tiny glowing star inside, warm light on her face; 3/4 view, body and face turned toward image-RIGHT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_mapa_estelar_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando um mapa estelar antigo",
+    "prompt": "holding an antique star chart open in front of her; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_lupa_meteorito_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "olhando um meteorito com uma lupa",
+    "prompt": "examining a small meteorite with a magnifying glass; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_livro_antigo_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando um livro antigo de astronomia",
+    "prompt": "holding an old astronomy book against her chest; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_chave_observatorio_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando uma chave antiga (observatório — lore)",
+    "prompt": "holding a large antique key, looking at it thoughtfully; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_determinada_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "determinada",
+    "prompt": "determined, fists lightly clenched, firm look; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_cansada_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "sonolenta, apoiada (pose da ficha)",
+    "prompt": "sleepy, resting her cheek on her hand; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_vela_lanterna_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "segurando uma vela/lanterna acesa",
+    "prompt": "holding a small lit lantern, soft glow; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_astrolabio_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "segurando um astrolábio",
+    "prompt": "holding a brass astrolabe, studying it; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_xicara_de_cha_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "segurando uma xícara de chá quente",
+    "prompt": "holding a warm cup of tea with both hands; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   }
+  ]
+ },
+ "refs": [
+  "Garota Gótica com Orbe Lunar-4.png",
+  "Garota Gótica e Orbe Lunar-2.png",
+  "Garota Lunar em Pose Mágica-3.png"
+ ],
+ "motor": "flow",
+ "mestre": {
+  "arquivo": "mira_neutra_esq.png",
+  "local": "mira_neutra_esq_v1_3d26.png",
+  "quando": 1792417701.2122939,
+  "bruto": "mira_neutra_esq_v1_bb3b_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "2617df90dc",
+   "motor": "flow",
+   "arquivos": [
+    "mira_neutra_esq.png"
+   ],
+   "criado": 1792417448.5903566,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a6de1e5210",
+   "motor": "flow",
+   "arquivos": [
+    "mira_curiosa_esq.png"
+   ],
+   "criado": 1792417595.6140208,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8313cb8fe8",
+   "motor": "flow",
+   "arquivos": [
+    "mira_neutra_dir.png"
+   ],
+   "criado": 1792417741.8098564,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e7ab7ecce0",
+   "motor": "flow",
+   "arquivos": [
+    "mira_curiosa_dir.png"
+   ],
+   "criado": 1792417741.809862,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "aacd7981e9",
+   "motor": "flow",
+   "arquivos": [
+    "mira_maravilhada_esq.png"
+   ],
+   "criado": 1792417741.8098636,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c10bd8d8de",
+   "motor": "flow",
+   "arquivos": [
+    "mira_maravilhada_dir.png"
+   ],
+   "criado": 1792417741.8098655,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d9accc5e16",
+   "motor": "flow",
+   "arquivos": [
+    "mira_empolgada_esq.png"
+   ],
+   "criado": 1792417741.809867,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5dd544c921",
+   "motor": "flow",
+   "arquivos": [
+    "mira_empolgada_dir.png"
+   ],
+   "criado": 1792417741.809868,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4552bceeae",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pensando_esq.png"
+   ],
+   "criado": 1792417741.8098693,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7d1a542af3",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pensando_dir.png"
+   ],
+   "criado": 1792417741.8098705,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8bbc5de296",
+   "motor": "flow",
+   "arquivos": [
+    "mira_surpresa_esq.png"
+   ],
+   "criado": 1792417741.809872,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "96a143c9b3",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_esq.png"
+   ],
+   "criado": 1792417741.8098729,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "04e29b62aa",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_dir.png"
+   ],
+   "criado": 1792417741.8098745,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "75d7851dcf",
+   "motor": "flow",
+   "arquivos": [
+    "mira_insegura_esq.png"
+   ],
+   "criado": 1792417741.8098757,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fdd2cd1fd5",
+   "motor": "flow",
+   "arquivos": [
+    "mira_globo_celeste_esq.png"
+   ],
+   "criado": 1792417741.809877,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "284a03e754",
+   "motor": "flow",
+   "arquivos": [
+    "mira_globo_celeste_dir.png"
+   ],
+   "criado": 1792417741.809878,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9cab49e5ca",
+   "motor": "flow",
+   "arquivos": [
+    "mira_caderno_constelacoes_esq.png"
+   ],
+   "criado": 1792417741.8098793,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b7a9f64e2e",
+   "motor": "flow",
+   "arquivos": [
+    "mira_fotografia_antiga_esq.png"
+   ],
+   "criado": 1792417741.8098803,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2d9b7c2075",
+   "motor": "flow",
+   "arquivos": [
+    "mira_olhando_telescopio_esq.png"
+   ],
+   "criado": 1792417741.809882,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "76a4e6aacf",
+   "motor": "flow",
+   "arquivos": [
+    "mira_triste_esq.png"
+   ],
+   "criado": 1792417741.8098829,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3235f7a977",
+   "motor": "flow",
+   "arquivos": [
+    "mira_assustada_esq.png"
+   ],
+   "criado": 1792417741.809884,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "bf649ec9f4",
+   "motor": "flow",
+   "arquivos": [
+    "mira_sorrindo_esq.png"
+   ],
+   "criado": 1792417741.8098862,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2ae510db66",
+   "motor": "flow",
+   "arquivos": [
+    "mira_ouvindo_esq.png"
+   ],
+   "criado": 1792417741.809888,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0323c8edff",
+   "motor": "flow",
+   "arquivos": [
+    "mira_confusa_esq.png"
+   ],
+   "criado": 1792417741.80989,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6e02120d0d",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pote_de_estrela_esq.png"
+   ],
+   "criado": 1792417741.809892,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "56a822a158",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pote_de_estrela_dir.png"
+   ],
+   "criado": 1792417741.8098934,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5890192df7",
+   "motor": "flow",
+   "arquivos": [
+    "mira_mapa_estelar_esq.png"
+   ],
+   "criado": 1792417741.8098948,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5115ca761a",
+   "motor": "flow",
+   "arquivos": [
+    "mira_lupa_meteorito_esq.png"
+   ],
+   "criado": 1792417741.8098972,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c5e3f3fc44",
+   "motor": "flow",
+   "arquivos": [
+    "mira_livro_antigo_esq.png"
+   ],
+   "criado": 1792417741.809899,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b5cbd86363",
+   "motor": "flow",
+   "arquivos": [
+    "mira_chave_observatorio_esq.png"
+   ],
+   "criado": 1792417741.8099005,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f9e8de33ac",
+   "motor": "flow",
+   "arquivos": [
+    "mira_determinada_esq.png"
+   ],
+   "criado": 1792417741.8099015,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ed08327963",
+   "motor": "flow",
+   "arquivos": [
+    "mira_cansada_esq.png"
+   ],
+   "criado": 1792417741.809903,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d99bec29cb",
+   "motor": "flow",
+   "arquivos": [
+    "mira_vela_lanterna_esq.png"
+   ],
+   "criado": 1792417741.8099039,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8459d1bce2",
+   "motor": "flow",
+   "arquivos": [
+    "mira_astrolabio_esq.png"
+   ],
+   "criado": 1792417741.809905,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e2150097ae",
+   "motor": "flow",
+   "arquivos": [
+    "mira_xicara_de_cha_esq.png"
+   ],
+   "criado": 1792417741.8099062,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4f88584b1e",
+   "motor": "flow",
+   "arquivos": [
+    "mira_neutra_esq_boca.png"
+   ],
+   "criado": 1792417741.8099074,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c8a1ade3be",
+   "motor": "flow",
+   "arquivos": [
+    "mira_curiosa_esq_boca.png"
+   ],
+   "criado": 1792417741.8099084,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "833fb22be1",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_dir.png"
+   ],
+   "criado": 1792418581.2753775,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3453fc5fd7",
+   "motor": "flow",
+   "arquivos": [
+    "mira_globo_celeste_esq.png"
+   ],
+   "criado": 1792418677.7061412,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "027041d9bd",
+   "motor": "flow",
+   "arquivos": [
+    "mira_globo_celeste_dir.png"
+   ],
+   "criado": 1792419114.7055094,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "bd71552bf2",
+   "motor": "flow",
+   "arquivos": [
+    "mira_caderno_constelacoes_esq.png"
+   ],
+   "criado": 1792419114.7055168,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9b2c92b940",
+   "motor": "flow",
+   "arquivos": [
+    "mira_fotografia_antiga_esq.png"
+   ],
+   "criado": 1792419114.70552,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ed9399fd70",
+   "motor": "flow",
+   "arquivos": [
+    "mira_olhando_telescopio_esq.png"
+   ],
+   "criado": 1792419114.7055216,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "da3326854e",
+   "motor": "flow",
+   "arquivos": [
+    "mira_ouvindo_esq.png"
+   ],
+   "criado": 1792419114.7055228,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b9d5e0083f",
+   "motor": "flow",
+   "arquivos": [
+    "mira_confusa_esq.png"
+   ],
+   "criado": 1792419114.7055247,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "545fc4b326",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pote_de_estrela_esq.png"
+   ],
+   "criado": 1792419114.7055264,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a2b92c9377",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pote_de_estrela_dir.png"
+   ],
+   "criado": 1792419114.7055283,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f8f3ec4e64",
+   "motor": "flow",
+   "arquivos": [
+    "mira_mapa_estelar_esq.png"
+   ],
+   "criado": 1792419114.7055306,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8cf1edb7dd",
+   "motor": "flow",
+   "arquivos": [
+    "mira_lupa_meteorito_esq.png"
+   ],
+   "criado": 1792419114.705532,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3d1b107b75",
+   "motor": "flow",
+   "arquivos": [
+    "mira_chave_observatorio_esq.png"
+   ],
+   "criado": 1792419114.7055337,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "65421da983",
+   "motor": "flow",
+   "arquivos": [
+    "mira_vela_lanterna_esq.png"
+   ],
+   "criado": 1792419114.7055352,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "cc96db3950",
+   "motor": "flow",
+   "arquivos": [
+    "mira_neutra_dir_boca.png"
+   ],
+   "criado": 1792419114.7055368,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "cee2b470ce",
+   "motor": "flow",
+   "arquivos": [
+    "mira_curiosa_dir_boca.png"
+   ],
+   "criado": 1792419114.705538,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1fc3db1311",
+   "motor": "flow",
+   "arquivos": [
+    "mira_maravilhada_esq_boca.png"
+   ],
+   "criado": 1792419114.7055392,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "dc9cdd720a",
+   "motor": "flow",
+   "arquivos": [
+    "mira_maravilhada_dir_boca.png"
+   ],
+   "criado": 1792419114.705541,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e32b2bbbf6",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_esq_boca.png"
+   ],
+   "criado": 1792419114.7055416,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0b6a234e5b",
+   "motor": "flow",
+   "arquivos": [
+    "mira_mapa_estelar_esq.png"
+   ],
+   "criado": 1792419594.1087878,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "88dbc1f42d",
+   "motor": "flow",
+   "arquivos": [
+    "mira_lupa_meteorito_esq.png"
+   ],
+   "criado": 1792419633.061182,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "f9cb556bc2",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_esq_boca.png"
+   ],
+   "criado": 1792419783.7407348,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "d6027eeaaf",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_dir_boca.png"
+   ],
+   "criado": 1792420527.258829,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9936fa710f",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_dir_boca.png"
+   ],
+   "criado": 1792420598.6382217,
+   "final": true,
+   "auto_refeito": true
+  }
+ ],
+ "log": [
+  "19/10 10:44:08 🚀 1 pose(s) pro Flow (sem mestre)",
+  "19/10 10:46:35 🚀 1 pose(s) pro Flow (sem mestre)",
+  "19/10 10:48:21 ⭐ mestre: mira_neutra_esq.png",
+  "19/10 10:49:01 🚀 35 pose(s) pro Flow com a ⭐ mestre · x2",
+  "19/10 11:03:01 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "19/10 11:04:37 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "19/10 11:11:54 🚀 17 pose(s) pro Flow com a ⭐ mestre",
+  "19/10 11:19:54 ✂ mira_mapa_estelar_esq.png: veio cortada na borda — refazendo 1x",
+  "19/10 11:20:33 ✂ mira_lupa_meteorito_esq.png: veio cortada na borda — refazendo 1x",
+  "19/10 11:23:03 ✂ mira_perguntando_esq_boca.png: veio cortada na borda — refazendo 1x",
+  "19/10 11:35:27 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "19/10 11:36:38 ✂ mira_perguntando_dir_boca.png: veio cortada na borda — refazendo 1x"
+ ],
+ "imagens": {
+  "mira_neutra_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_neutra_esq_v1_3d26.png",
+     "bruto": "mira_neutra_esq_v1_bb3b_flow.png",
+     "job": "2617df90dc",
+     "motor": "flow",
+     "quando": 1792417535.69365,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 8,
+      "verde_px": 502150
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2617df90dc",
+   "msg": null
+  },
+  "mira_neutra_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_neutra_dir_v1_1bde.png",
+     "bruto": "mira_neutra_dir_v1_1497_flow.png",
+     "job": "8313cb8fe8",
+     "motor": "flow",
+     "quando": 1792417832.6552513,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 5,
+      "verde_px": 513418
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_neutra_dir_v2_38d2.png",
+     "bruto": "mira_neutra_dir_v2_5340_flow.png",
+     "job": "8313cb8fe8",
+     "motor": "flow",
+     "quando": 1792417834.0847135,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 6,
+      "verde_px": 506328
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "8313cb8fe8",
+   "msg": null
+  },
+  "mira_curiosa_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_curiosa_esq_v1_a349.png",
+     "bruto": "mira_curiosa_esq_v1_54a9_flow.png",
+     "job": "a6de1e5210",
+     "motor": "flow",
+     "quando": 1792417689.158126,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 488985
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a6de1e5210",
+   "msg": null
+  },
+  "mira_curiosa_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_curiosa_dir_v1_0d8a.png",
+     "bruto": "mira_curiosa_dir_v1_dc86_flow.png",
+     "job": "e7ab7ecce0",
+     "motor": "flow",
+     "quando": 1792417835.4310386,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 503760
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_curiosa_dir_v2_4e2f.png",
+     "bruto": "mira_curiosa_dir_v2_c869_flow.png",
+     "job": "e7ab7ecce0",
+     "motor": "flow",
+     "quando": 1792417837.0104578,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 509160
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "e7ab7ecce0",
+   "msg": null
+  },
+  "mira_maravilhada_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_maravilhada_esq_v1_7415.png",
+     "bruto": "mira_maravilhada_esq_v1_6a3e_flow.png",
+     "job": "aacd7981e9",
+     "motor": "flow",
+     "quando": 1792417882.891103,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 9,
+      "verde_px": 493612
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_maravilhada_esq_v2_0554.png",
+     "bruto": "mira_maravilhada_esq_v2_8a14_flow.png",
+     "job": "aacd7981e9",
+     "motor": "flow",
+     "quando": 1792417884.344967,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 7,
+      "verde_px": 501893
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_maravilhada_esq_v3_90ad.png",
+     "bruto": "mira_maravilhada_esq_v3_536f_flow.png",
+     "job": "aacd7981e9",
+     "motor": "flow",
+     "quando": 1792417885.1263695,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "aacd7981e9",
+   "msg": null
+  },
+  "mira_maravilhada_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_maravilhada_dir_v1_1c61.png",
+     "bruto": "mira_maravilhada_dir_v1_820d_flow.png",
+     "job": "c10bd8d8de",
+     "motor": "flow",
+     "quando": 1792417898.738851,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 12,
+      "verde_px": 506437
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_maravilhada_dir_v2_b772.png",
+     "bruto": "mira_maravilhada_dir_v2_8a51_flow.png",
+     "job": "c10bd8d8de",
+     "motor": "flow",
+     "quando": 1792417900.1490157,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 5,
+      "verde_px": 461269
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "c10bd8d8de",
+   "msg": null
+  },
+  "mira_empolgada_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_empolgada_esq_v1_04ee.png",
+     "bruto": "mira_empolgada_esq_v1_17b0_flow.png",
+     "job": "d9accc5e16",
+     "motor": "flow",
+     "quando": 1792417941.904098,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 17,
+      "verde_px": 473237
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_empolgada_esq_v2_3cba.png",
+     "bruto": "mira_empolgada_esq_v2_e366_flow.png",
+     "job": "d9accc5e16",
+     "motor": "flow",
+     "quando": 1792417943.5248911,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 18,
+      "verde_px": 486267
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_empolgada_esq_v3_b739.png",
+     "bruto": "mira_empolgada_esq_v3_7d54_flow.png",
+     "job": "d9accc5e16",
+     "motor": "flow",
+     "quando": 1792417944.364222,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "d9accc5e16",
+   "msg": null
+  },
+  "mira_empolgada_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_empolgada_dir_v1_d11e.png",
+     "bruto": "mira_empolgada_dir_v1_5f89_flow.png",
+     "job": "5dd544c921",
+     "motor": "flow",
+     "quando": 1792417970.1635523,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 523460
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_empolgada_dir_v2_170c.png",
+     "bruto": "mira_empolgada_dir_v2_91f8_flow.png",
+     "job": "5dd544c921",
+     "motor": "flow",
+     "quando": 1792417971.9315093,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 462075
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_empolgada_dir_v3_78fd.png",
+     "bruto": "mira_empolgada_dir_v3_ac51_flow.png",
+     "job": "5dd544c921",
+     "motor": "flow",
+     "quando": 1792417972.7980747,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5dd544c921",
+   "msg": null
+  },
+  "mira_pensando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_pensando_esq_v1_0982.png",
+     "bruto": "mira_pensando_esq_v1_3736_flow.png",
+     "job": "4552bceeae",
+     "motor": "flow",
+     "quando": 1792418002.6582694,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 498342
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_pensando_esq_v2_6a75.png",
+     "bruto": "mira_pensando_esq_v2_3d7f_flow.png",
+     "job": "4552bceeae",
+     "motor": "flow",
+     "quando": 1792418004.2581484,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 536319
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_pensando_esq_v3_400a.png",
+     "bruto": "mira_pensando_esq_v3_6e94_flow.png",
+     "job": "4552bceeae",
+     "motor": "flow",
+     "quando": 1792418005.0659757,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "4552bceeae",
+   "msg": null
+  },
+  "mira_pensando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_pensando_dir_v1_9f10.png",
+     "bruto": "mira_pensando_dir_v1_e14a_flow.png",
+     "job": "7d1a542af3",
+     "motor": "flow",
+     "quando": 1792418029.6416907,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 5,
+      "verde_px": 516320
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_pensando_dir_v2_6423.png",
+     "bruto": "mira_pensando_dir_v2_a908_flow.png",
+     "job": "7d1a542af3",
+     "motor": "flow",
+     "quando": 1792418030.5536,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 519508
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "7d1a542af3",
+   "msg": null
+  },
+  "mira_surpresa_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_surpresa_esq_v1_e4da.png",
+     "bruto": "mira_surpresa_esq_v1_0875_flow.png",
+     "job": "8bbc5de296",
+     "motor": "flow",
+     "quando": 1792418059.487473,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 12,
+      "verde_px": 466737
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_surpresa_esq_v2_0d47.png",
+     "bruto": "mira_surpresa_esq_v2_cf54_flow.png",
+     "job": "8bbc5de296",
+     "motor": "flow",
+     "quando": 1792418060.7539654,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 13,
+      "verde_px": 508458
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_surpresa_esq_v3_2a06.png",
+     "bruto": "mira_surpresa_esq_v3_8bd0_flow.png",
+     "job": "8bbc5de296",
+     "motor": "flow",
+     "quando": 1792418061.3795235,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8bbc5de296",
+   "msg": null
+  },
+  "mira_perguntando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_perguntando_esq_v1_c516.png",
+     "bruto": "mira_perguntando_esq_v1_ade6_flow.png",
+     "job": "96a143c9b3",
+     "motor": "flow",
+     "quando": 1792418099.3797982,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 19,
+      "verde_px": 485037
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_perguntando_esq_v2_115c.png",
+     "bruto": "mira_perguntando_esq_v2_e6e0_flow.png",
+     "job": "96a143c9b3",
+     "motor": "flow",
+     "quando": 1792418100.7360437,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 16,
+      "verde_px": 501402
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_perguntando_esq_v3_a513.png",
+     "bruto": "mira_perguntando_esq_v3_77a6_flow.png",
+     "job": "96a143c9b3",
+     "motor": "flow",
+     "quando": 1792418101.6387389,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "96a143c9b3",
+   "msg": null
+  },
+  "mira_perguntando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_perguntando_dir_v1_b395.png",
+     "bruto": "mira_perguntando_dir_v1_1e94_flow.png",
+     "job": "833fb22be1",
+     "motor": "flow",
+     "quando": 1792419161.303823,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 8,
+      "verde_px": 492114
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_perguntando_dir_v2_d363.png",
+     "bruto": "mira_perguntando_dir_v2_a8eb_flow.png",
+     "job": "833fb22be1",
+     "motor": "flow",
+     "quando": 1792419162.2422333,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "833fb22be1",
+   "msg": null
+  },
+  "mira_insegura_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_insegura_esq_v1_ce00.png",
+     "bruto": "mira_insegura_esq_v1_a6ca_flow.png",
+     "job": "75d7851dcf",
+     "motor": "flow",
+     "quando": 1792418311.8881555,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 23,
+      "verde_px": 481045
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_insegura_esq_v2_b648.png",
+     "bruto": "mira_insegura_esq_v2_d2fb_flow.png",
+     "job": "75d7851dcf",
+     "motor": "flow",
+     "quando": 1792418313.016858,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 467188
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "75d7851dcf",
+   "msg": null
+  },
+  "mira_globo_celeste_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_globo_celeste_esq_v1_4da4.png",
+     "bruto": "mira_globo_celeste_esq_v1_e18f_flow.png",
+     "job": "3453fc5fd7",
+     "motor": "flow",
+     "quando": 1792419180.1904385,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 11,
+      "verde_px": 497342
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_globo_celeste_esq_v2_b3a5.png",
+     "bruto": "mira_globo_celeste_esq_v2_e96c_flow.png",
+     "job": "3453fc5fd7",
+     "motor": "flow",
+     "quando": 1792419181.0570931,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3453fc5fd7",
+   "msg": null
+  },
+  "mira_globo_celeste_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_globo_celeste_dir_v1_8573.png",
+     "bruto": "mira_globo_celeste_dir_v1_700e_flow.png",
+     "job": "027041d9bd",
+     "motor": "flow",
+     "quando": 1792419223.2470934,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 8,
+      "verde_px": 455141
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_globo_celeste_dir_v2_845e.png",
+     "bruto": "mira_globo_celeste_dir_v2_c9a9_flow.png",
+     "job": "027041d9bd",
+     "motor": "flow",
+     "quando": 1792419224.3426135,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "027041d9bd",
+   "msg": null
+  },
+  "mira_caderno_constelacoes_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_caderno_constelacoes_esq_v1_8e27.png",
+     "bruto": "mira_caderno_constelacoes_esq_v1_376d_flow.png",
+     "job": "bd71552bf2",
+     "motor": "flow",
+     "quando": 1792419238.003036,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 10,
+      "verde_px": 493114
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "bd71552bf2",
+   "msg": null
+  },
+  "mira_fotografia_antiga_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_fotografia_antiga_esq_v1_c4fe.png",
+     "bruto": "mira_fotografia_antiga_esq_v1_18e2_flow.png",
+     "job": "9b2c92b940",
+     "motor": "flow",
+     "quando": 1792419265.9065285,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 7,
+      "verde_px": 446994
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9b2c92b940",
+   "msg": null
+  },
+  "mira_olhando_telescopio_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_olhando_telescopio_esq_v1_c6a0.png",
+     "bruto": "mira_olhando_telescopio_esq_v1_acbe_flow.png",
+     "job": "ed9399fd70",
+     "motor": "flow",
+     "quando": 1792419450.692071,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 13,
+      "verde_px": 481277
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ed9399fd70",
+   "msg": null
+  },
+  "mira_neutra_esq_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_neutra_esq_boca_v1_b339.png",
+     "bruto": "mira_neutra_esq_boca_v1_ba7d_flow.png",
+     "job": "4f88584b1e",
+     "motor": "flow",
+     "quando": 1792419099.5020375,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 13,
+      "verde_px": 502284
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_neutra_esq_boca_v2_314d.png",
+     "bruto": "mira_neutra_esq_boca_v2_e0ac_flow.png",
+     "job": "4f88584b1e",
+     "motor": "flow",
+     "quando": 1792419100.9002538,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 502281
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "4f88584b1e",
+   "msg": null
+  },
+  "mira_neutra_dir_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_neutra_dir_boca_v1_144a.png",
+     "bruto": "mira_neutra_dir_boca_v1_3e02_flow.png",
+     "job": "cc96db3950",
+     "motor": "flow",
+     "quando": 1792419704.757045,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 19,
+      "verde_px": 506497
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_neutra_dir_boca_v2_327d.png",
+     "bruto": "mira_neutra_dir_boca_v2_1c65_flow.png",
+     "job": "cc96db3950",
+     "motor": "flow",
+     "quando": 1792419705.8736925,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 506374
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "cc96db3950",
+   "msg": null
+  },
+  "mira_curiosa_esq_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_curiosa_esq_boca_v1_7b16.png",
+     "bruto": "mira_curiosa_esq_boca_v1_c983_flow.png",
+     "job": "c8a1ade3be",
+     "motor": "flow",
+     "quando": 1792419128.4607773,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 489169
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_curiosa_esq_boca_v2_7b4d.png",
+     "bruto": "mira_curiosa_esq_boca_v2_fc94_flow.png",
+     "job": "c8a1ade3be",
+     "motor": "flow",
+     "quando": 1792419129.9801137,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 489141
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_curiosa_esq_boca_v3_ffc7.png",
+     "bruto": "mira_curiosa_esq_boca_v3_cba9_flow.png",
+     "job": "c8a1ade3be",
+     "motor": "flow",
+     "quando": 1792419131.4013767,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 488998
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 2,
+   "erro": null,
+   "job": "c8a1ade3be",
+   "msg": null
+  },
+  "mira_curiosa_dir_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_curiosa_dir_boca_v1_856a.png",
+     "bruto": "mira_curiosa_dir_boca_v1_b357_flow.png",
+     "job": "cee2b470ce",
+     "motor": "flow",
+     "quando": 1792419715.515893,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 29,
+      "verde_px": 509262
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_curiosa_dir_boca_v2_d97e.png",
+     "bruto": "mira_curiosa_dir_boca_v2_af8a_flow.png",
+     "job": "cee2b470ce",
+     "motor": "flow",
+     "quando": 1792419716.5013745,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 24,
+      "verde_px": 509185
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "cee2b470ce",
+   "msg": null
+  },
+  "mira_maravilhada_esq_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_maravilhada_esq_boca_v1_a4dc.png",
+     "bruto": "mira_maravilhada_esq_boca_v1_3dce_flow.png",
+     "job": "1fc3db1311",
+     "motor": "flow",
+     "quando": 1792419741.688167,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 13,
+      "verde_px": 493665
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_maravilhada_esq_boca_v2_930d.png",
+     "bruto": "mira_maravilhada_esq_boca_v2_37a8_flow.png",
+     "job": "1fc3db1311",
+     "motor": "flow",
+     "quando": 1792419742.9134881,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 10,
+      "verde_px": 493653
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "1fc3db1311",
+   "msg": null
+  },
+  "mira_maravilhada_dir_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_maravilhada_dir_boca_v1_e12d.png",
+     "bruto": "mira_maravilhada_dir_boca_v1_7e34_flow.png",
+     "job": "dc9cdd720a",
+     "motor": "flow",
+     "quando": 1792419756.346914,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 5,
+      "verde_px": 461333
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_maravilhada_dir_boca_v2_ca79.png",
+     "bruto": "mira_maravilhada_dir_boca_v2_9565_flow.png",
+     "job": "dc9cdd720a",
+     "motor": "flow",
+     "quando": 1792419757.3485515,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 4,
+      "verde_px": 461307
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "dc9cdd720a",
+   "msg": null
+  },
+  "mira_perguntando_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_perguntando_esq_boca_v1_c532.png",
+     "bruto": "mira_perguntando_esq_boca_v1_4eb4_flow.png",
+     "job": "e32b2bbbf6",
+     "motor": "flow",
+     "quando": 1792419782.9106476,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 505374
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_perguntando_esq_boca_v2_67f4.png",
+     "bruto": "mira_perguntando_esq_boca_v2_d370_flow.png",
+     "job": "e32b2bbbf6",
+     "motor": "flow",
+     "quando": 1792419783.7362685,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 16,
+      "verde_px": 324395
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_perguntando_esq_boca_v3_8f4f.png",
+     "bruto": "mira_perguntando_esq_boca_v3_f138_flow.png",
+     "job": "f9cb556bc2",
+     "motor": "flow",
+     "quando": 1792420038.0347767,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 503462
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 2,
+   "erro": null,
+   "job": "f9cb556bc2",
+   "msg": null
+  },
+  "mira_perguntando_dir_boca.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_perguntando_dir_boca_v1_2978.png",
+     "bruto": "mira_perguntando_dir_boca_v1_50ee_flow.png",
+     "job": "d6027eeaaf",
+     "motor": "flow",
+     "quando": 1792420598.6339152,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 10,
+      "verde_px": 512984
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_perguntando_dir_boca_v2_995c.png",
+     "bruto": "mira_perguntando_dir_boca_v2_2e5f_flow.png",
+     "job": "9936fa710f",
+     "motor": "flow",
+     "quando": 1792420661.6142848,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 6,
+      "verde_px": 516865
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "9936fa710f",
+   "msg": null
+  },
+  "mira_triste_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_triste_esq_v1_8bbd.png",
+     "bruto": "mira_triste_esq_v1_7d5e_flow.png",
+     "job": "76a4e6aacf",
+     "motor": "flow",
+     "quando": 1792418362.213614,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 9,
+      "verde_px": 512128
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_triste_esq_v2_358f.png",
+     "bruto": "mira_triste_esq_v2_0287_flow.png",
+     "job": "76a4e6aacf",
+     "motor": "flow",
+     "quando": 1792418363.4457636,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 6,
+      "verde_px": 530067
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_triste_esq_v3_4515.png",
+     "bruto": "mira_triste_esq_v3_875e_flow.png",
+     "job": "76a4e6aacf",
+     "motor": "flow",
+     "quando": 1792418364.062508,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "76a4e6aacf",
+   "msg": null
+  },
+  "mira_assustada_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_assustada_esq_v1_b381.png",
+     "bruto": "mira_assustada_esq_v1_0719_flow.png",
+     "job": "3235f7a977",
+     "motor": "flow",
+     "quando": 1792418429.2578895,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 502166
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_assustada_esq_v2_b352.png",
+     "bruto": "mira_assustada_esq_v2_d436_flow.png",
+     "job": "3235f7a977",
+     "motor": "flow",
+     "quando": 1792418430.4088717,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 8,
+      "verde_px": 497594
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_assustada_esq_v3_f0c1.png",
+     "bruto": "mira_assustada_esq_v3_573a_flow.png",
+     "job": "3235f7a977",
+     "motor": "flow",
+     "quando": 1792418431.0937207,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3235f7a977",
+   "msg": null
+  },
+  "mira_sorrindo_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_sorrindo_esq_v1_c1f7.png",
+     "bruto": "mira_sorrindo_esq_v1_da39_flow.png",
+     "job": "bf649ec9f4",
+     "motor": "flow",
+     "quando": 1792418695.6543944,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 5,
+      "furos_fechados": 12,
+      "verde_px": 515062
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_sorrindo_esq_v2_a493.png",
+     "bruto": "mira_sorrindo_esq_v2_1473_flow.png",
+     "job": "bf649ec9f4",
+     "motor": "flow",
+     "quando": 1792418696.8102784,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 8,
+      "verde_px": 508215
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "bf649ec9f4",
+   "msg": null
+  },
+  "mira_ouvindo_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_ouvindo_esq_v1_dc2f.png",
+     "bruto": "mira_ouvindo_esq_v1_4aad_flow.png",
+     "job": "da3326854e",
+     "motor": "flow",
+     "quando": 1792419334.485444,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 7,
+      "verde_px": 499695
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "da3326854e",
+   "msg": null
+  },
+  "mira_confusa_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_confusa_esq_v1_a21f.png",
+     "bruto": "mira_confusa_esq_v1_4f7f_flow.png",
+     "job": "b9d5e0083f",
+     "motor": "flow",
+     "quando": 1792419545.6590176,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 12,
+      "verde_px": 493411
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b9d5e0083f",
+   "msg": null
+  },
+  "mira_pote_de_estrela_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_pote_de_estrela_esq_v1_e7fc.png",
+     "bruto": "mira_pote_de_estrela_esq_v1_783a_flow.png",
+     "job": "545fc4b326",
+     "motor": "flow",
+     "quando": 1792419510.0823922,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 16,
+      "verde_px": 498375
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_pote_de_estrela_esq_v2_bc34.png",
+     "bruto": "mira_pote_de_estrela_esq_v2_028f_flow.png",
+     "job": "545fc4b326",
+     "motor": "flow",
+     "quando": 1792419510.688834,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "545fc4b326",
+   "msg": null
+  },
+  "mira_pote_de_estrela_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_pote_de_estrela_dir_v1_119b.png",
+     "bruto": "mira_pote_de_estrela_dir_v1_b096_flow.png",
+     "job": "a2b92c9377",
+     "motor": "flow",
+     "quando": 1792419568.0392642,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 585406
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_pote_de_estrela_dir_v2_90fe.png",
+     "bruto": "mira_pote_de_estrela_dir_v2_e13a_flow.png",
+     "job": "a2b92c9377",
+     "motor": "flow",
+     "quando": 1792419568.864209,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a2b92c9377",
+   "msg": null
+  },
+  "mira_mapa_estelar_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_mapa_estelar_esq_v1_ea81.png",
+     "bruto": "mira_mapa_estelar_esq_v1_420b_flow.png",
+     "job": "f8f3ec4e64",
+     "motor": "flow",
+     "quando": 1792419594.1057105,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 463875
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_mapa_estelar_esq_v2_2583.png",
+     "bruto": "mira_mapa_estelar_esq_v2_c429_flow.png",
+     "job": "0b6a234e5b",
+     "motor": "flow",
+     "quando": 1792419940.0343137,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 8,
+      "verde_px": 467992
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0b6a234e5b",
+   "msg": null
+  },
+  "mira_lupa_meteorito_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_lupa_meteorito_esq_v1_2ce9.png",
+     "bruto": "mira_lupa_meteorito_esq_v1_c2df_flow.png",
+     "job": "8cf1edb7dd",
+     "motor": "flow",
+     "quando": 1792419632.14522,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 33,
+      "verde_px": 442133
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_lupa_meteorito_esq_v2_94c1.png",
+     "bruto": "mira_lupa_meteorito_esq_v2_8585_flow.png",
+     "job": "8cf1edb7dd",
+     "motor": "flow",
+     "quando": 1792419633.0581925,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_lupa_meteorito_esq_v3_e983.png",
+     "bruto": "mira_lupa_meteorito_esq_v3_f136_flow.png",
+     "job": "88dbc1f42d",
+     "motor": "flow",
+     "quando": 1792419846.332612,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 11,
+      "verde_px": 438469
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "88dbc1f42d",
+   "msg": null
+  },
+  "mira_livro_antigo_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_livro_antigo_esq_v1_b669.png",
+     "bruto": "mira_livro_antigo_esq_v1_1f0e_flow.png",
+     "job": "c5e3f3fc44",
+     "motor": "flow",
+     "quando": 1792418768.3049479,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 512645
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_livro_antigo_esq_v2_6554.png",
+     "bruto": "mira_livro_antigo_esq_v2_0083_flow.png",
+     "job": "c5e3f3fc44",
+     "motor": "flow",
+     "quando": 1792418769.5139391,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 509550
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_livro_antigo_esq_v3_c41e.png",
+     "bruto": "mira_livro_antigo_esq_v3_96d7_flow.png",
+     "job": "c5e3f3fc44",
+     "motor": "flow",
+     "quando": 1792418770.2397373,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c5e3f3fc44",
+   "msg": null
+  },
+  "mira_chave_observatorio_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_chave_observatorio_esq_v1_5bb6.png",
+     "bruto": "mira_chave_observatorio_esq_v1_ffc7_flow.png",
+     "job": "3d1b107b75",
+     "motor": "flow",
+     "quando": 1792419660.5363774,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 13,
+      "verde_px": 526792
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_chave_observatorio_esq_v2_b5f5.png",
+     "bruto": "mira_chave_observatorio_esq_v2_f085_flow.png",
+     "job": "3d1b107b75",
+     "motor": "flow",
+     "quando": 1792419661.3468816,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3d1b107b75",
+   "msg": null
+  },
+  "mira_determinada_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_determinada_esq_v1_d766.png",
+     "bruto": "mira_determinada_esq_v1_55ac_flow.png",
+     "job": "f9e8de33ac",
+     "motor": "flow",
+     "quando": 1792418836.3310452,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 7,
+      "verde_px": 512248
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_determinada_esq_v2_2eb0.png",
+     "bruto": "mira_determinada_esq_v2_f43f_flow.png",
+     "job": "f9e8de33ac",
+     "motor": "flow",
+     "quando": 1792418837.591501,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 12,
+      "verde_px": 486374
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_determinada_esq_v3_82af.png",
+     "bruto": "mira_determinada_esq_v3_bb04_flow.png",
+     "job": "f9e8de33ac",
+     "motor": "flow",
+     "quando": 1792418838.4399257,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "f9e8de33ac",
+   "msg": null
+  },
+  "mira_cansada_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_cansada_esq_v1_8220.png",
+     "bruto": "mira_cansada_esq_v1_0273_flow.png",
+     "job": "ed08327963",
+     "motor": "flow",
+     "quando": 1792419059.7492385,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 450068
+     },
+     "cortada": true
+    },
+    {
+     "local": "mira_cansada_esq_v2_85c5.png",
+     "bruto": "mira_cansada_esq_v2_6575_flow.png",
+     "job": "ed08327963",
+     "motor": "flow",
+     "quando": 1792419061.2517614,
+     "aviso": "a personagem não encosta na borda de baixo (corpo inteiro?) — confira o enquadramento",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 493993
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ed08327963",
+   "msg": null
+  },
+  "mira_vela_lanterna_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_vela_lanterna_esq_v1_df6f.png",
+     "bruto": "mira_vela_lanterna_esq_v1_a373_flow.png",
+     "job": "65421da983",
+     "motor": "flow",
+     "quando": 1792419678.755511,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 11,
+      "verde_px": 467090
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_vela_lanterna_esq_v2_3257.png",
+     "bruto": "mira_vela_lanterna_esq_v2_5d80_flow.png",
+     "job": "65421da983",
+     "motor": "flow",
+     "quando": 1792419679.4403403,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "65421da983",
+   "msg": null
+  },
+  "mira_astrolabio_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_astrolabio_esq_v1_291d.png",
+     "bruto": "mira_astrolabio_esq_v1_9d35_flow.png",
+     "job": "8459d1bce2",
+     "motor": "flow",
+     "quando": 1792419041.2373042,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 11,
+      "verde_px": 469363
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_astrolabio_esq_v2_2c69.png",
+     "bruto": "mira_astrolabio_esq_v2_a6f8_flow.png",
+     "job": "8459d1bce2",
+     "motor": "flow",
+     "quando": 1792419042.817674,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 17,
+      "verde_px": 454740
+     },
+     "cortada": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "8459d1bce2",
+   "msg": null
+  },
+  "mira_xicara_de_cha_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mira_xicara_de_cha_esq_v1_30c5.png",
+     "bruto": "mira_xicara_de_cha_esq_v1_aa46_flow.png",
+     "job": "e2150097ae",
+     "motor": "flow",
+     "quando": 1792419092.0950177,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 11,
+      "verde_px": 492650
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_xicara_de_cha_esq_v2_6c02.png",
+     "bruto": "mira_xicara_de_cha_esq_v2_5a23_flow.png",
+     "job": "e2150097ae",
+     "motor": "flow",
+     "quando": 1792419093.1934605,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 8,
+      "verde_px": 498114
+     },
+     "cortada": false
+    },
+    {
+     "local": "mira_xicara_de_cha_esq_v3_a5e3.png",
+     "bruto": "mira_xicara_de_cha_esq_v3_2cb0_flow.png",
+     "job": "e2150097ae",
+     "motor": "flow",
+     "quando": 1792419093.9122694,
+     "aviso": "a personagem saiu cortada na borda (esquerda, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 324396
+     },
+     "cortada": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e2150097ae",
+   "msg": null
+  }
+ },
+ "atualizado": 1792427829.2090025
+}

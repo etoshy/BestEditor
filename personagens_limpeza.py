@@ -170,7 +170,7 @@ def alfa_do_verde(img: Image.Image) -> Image.Image:
 
 
 def recortar(img: Image.Image, canvas: Tuple[int, int] = (1200, 1800), altura_personagem: float = 0.95,
-             opcoes: Optional[Dict[str, Any]] = None) -> Tuple[Image.Image, Dict[str, Any]]:
+             opcoes: Optional[Dict[str, Any]] = None, corpo_inteiro: bool = False) -> Tuple[Image.Image, Dict[str, Any]]:
     """Imagem do Flow (fundo verde) → PNG RGBA no canvas fixo + o que foi feito (avisos)."""
     o = dict(opcoes or {})
     o["fundo"] = "verde"
@@ -179,11 +179,49 @@ def recortar(img: Image.Image, canvas: Tuple[int, int] = (1200, 1800), altura_pe
     import numpy as np
     if float(np.asarray(alfa).mean()) > 250:  # quase nada saiu: o fundo não veio verde
         feito["aviso_fundo"] = "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+    defeito = folha_ou_varias(img_l, alfa)
     final, info = alinhar(img_l, alfa, canvas, altura_personagem)
+    if corpo_inteiro and not info.get("cortada_lados") and info.get("aviso") and "borda de baixo" in info["aviso"]:
+        info["aviso"] = None  # corpo inteiro (o mascote de pernas compridas): os pés não encostam na borda — é o certo
     info["limpeza"] = feito
+    if defeito:
+        feito["aviso_fundo"] = (feito.get("aviso_fundo") + "; " if feito.get("aviso_fundo") else "") + defeito
     if feito.get("aviso_fundo"):
         info["aviso"] = feito["aviso_fundo"] + ("; " + info["aviso"] if info.get("aviso") else "")
+        info["defeito"] = True  # fundo errado / folha com várias figuras: o editor refaz sozinho 1x
     return final, info
+
+
+def folha_ou_varias(img: Image.Image, alfa: Image.Image) -> str:
+    """"" = ok. Detecta o que o Flow às vezes devolve copiando a referência: uma FOLHA (fundo branco/claro grande dentro
+    do recorte, painéis) ou VÁRIAS figuras separadas."""
+    import numpy as np
+    a = np.asarray(alfa.convert("L")) > 128
+    if not a.any():
+        return ""
+    rgb = np.asarray(img.convert("RGB")).astype(np.int16)
+    mn, mx = rgb.min(axis=2), rgb.max(axis=2)
+    claro = (mn >= 228) & ((mx - mn) <= 18) & a
+    ys, xs = np.where(a)
+    area = max(1, int(a.sum()))
+    try:
+        import cv2
+    except ImportError:
+        cv2 = None
+    if cv2 is not None:
+        n, lab, stats, _c = cv2.connectedComponentsWithStats(claro.astype(np.uint8), connectivity=8)
+        if n > 1:
+            maior = int(stats[1:, cv2.CC_STAT_AREA].max())
+            if maior >= area * 0.12:  # um "papel" branco grande e contínuo dentro da figura
+                return "veio com fundo branco/folha de referência (não é o fundo verde)"
+        n, lab, stats, _c = cv2.connectedComponentsWithStats(a.astype(np.uint8), connectivity=8)
+        if n > 2:
+            ar = sorted(stats[1:, cv2.CC_STAT_AREA].tolist(), reverse=True)
+            if ar[1] >= ar[0] * 0.35:  # duas figuras grandes separadas
+                return "veio mais de uma figura (folha com várias poses)"
+    elif claro.sum() >= area * 0.2:
+        return "veio com fundo branco/folha de referência (não é o fundo verde)"
+    return ""
 
 
 def colagem(imagens: List[Image.Image], altura: int = 1024, fundo=(128, 128, 128)) -> Image.Image:

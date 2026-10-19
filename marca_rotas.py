@@ -63,7 +63,7 @@ def registrar(app, base_dir: str) -> None:
     def marca_como_montar():
         return render_template("marca_como.html", estrutura=mv.ESTRUTURA_PACOTE, chaves=mv.CHAVES_GUIA,
                                prompt_com=mv.prompt_montar_pacote(True), prompt_sem=mv.prompt_montar_pacote(False),
-                               ex_pacote=_js(mv.EXEMPLO_PACOTE), ex_reforcos=_js(mv.EXEMPLO_REFORCOS), ex_poses=_js(mv.EXEMPLO_POSES),
+                               ex_pacote=_js(mv.EXEMPLO_PACOTE), ex_poses_personagem=_js(mv.EXEMPLO_POSES_PERSONAGEM), ex_reforcos=_js(mv.EXEMPLO_REFORCOS), ex_poses=_js(mv.EXEMPLO_POSES),
                                ex_modelo=_js(mv.EXEMPLO_MODELO), formato=mv.FORMATO_PACOTE, marcas=mv.listar(base_dir),
                                ex_direcao=_js(mv.EXEMPLO_DIRECAO), ex_personagens=_js(mv.EXEMPLO_PERSONAGENS),
                                ex_continuidade=_js(mv.EXEMPLO_CONTINUIDADE), ids_editor=mv._ids_catalogo(), direcoes=mv.direcoes_do_editor())
@@ -76,8 +76,9 @@ def registrar(app, base_dir: str) -> None:
     @app.route("/marca/<slug>/pacote.zip")
     def marca_pacote(slug: str):
         m = _marca(slug)
-        return send_file(io.BytesIO(mv.exportar_pacote(m)), mimetype="application/zip", as_attachment=True,
-                         download_name=f"pacote_{slug}.zip")
+        pers = request.args.get("personagens") or "aprovadas"  # 🧍 v84_188: aprovadas | tudo | nao
+        return send_file(io.BytesIO(mv.exportar_pacote(m, pers if pers in ("aprovadas", "tudo", "nao") else "aprovadas")),
+                         mimetype="application/zip", as_attachment=True, download_name=f"pacote_{slug}.zip")
 
     @app.route("/marca/<slug>/excluir", methods=["POST"])
     def marca_excluir(slug: str):

@@ -59,6 +59,10 @@ CONFIG_PADRAO: Dict[str, Any] = {
 }
 TIPOS = ("imagem", "video")
 QUANTIDADES = ("x1", "x2", "x3", "x4")
+# "Notamos uma atividade incomum. As extensões do navegador…" → problema da CONTA: troca de conta (v84_184)
+RE_TROCAR_CONTA = re.compile(r"atividade incomum|unusual activity|extens[õo]es do navegador|browser extensions|"
+                             r"actividad inusual|ungew[öo]hnliche aktivit", re.I)
+MINUTOS_INCOMUM = 60
 _RE_PREFIXO = re.compile(r"^\s*(foto|imagem|image|img|photo|v[ií]deo|video)\s*[:\-–—]\s*", re.I)
 
 INSTRUCAO_FOTO = (
@@ -680,6 +684,32 @@ class Lote:
                     job = None
                     break
                 except fd.FlowRecusou as exc:
+                    if RE_TROCAR_CONTA.search(exc.mensagem or ""):
+                        # 🔁 v84_184: "Notamos uma atividade incomum / extensões do navegador" é coisa da CONTA (o Google
+                        # desconfiou dela), não do prompt: a conta descansa e o pedido vai pra outra conta
+                        with self.trava:
+                            ja = list(job.get("contas_incomum") or [])
+                            if conta not in ja:
+                                ja.append(conta)
+                            todas = self.contas_do_lote()
+                            esgotou = all(c in ja for c in todas)
+                            job["contas_incomum"] = ja
+                            if esgotou:
+                                job.update(estado="erro", fim=time.time(),
+                                           erro=f"todas as contas deram “atividade incomum” no Flow: {exc.mensagem[:200]}")
+                            else:
+                                job.update(estado="pendente", conta=None,
+                                           erro=f"a conta “{conta}” deu “atividade incomum” — indo pra outra conta")
+                            self._salvar()
+                        try:
+                            gf.pular_conta(conta, f"o Flow acusou atividade incomum: {exc.mensagem[:120]}", minutos=MINUTOS_INCOMUM)
+                        except Exception:  # noqa: BLE001
+                            pass
+                        self.problema_conta[conta] = "atividade incomum no Flow (descansando)"
+                        self.log(f"🔁 “{conta}”: o Flow acusou atividade incomum — a conta descansa {MINUTOS_INCOMUM} min e o "
+                                 f"pedido vai pra outra conta" + (" (mas todas já deram isso: erro)" if esgotou else "") + ".", "aviso")
+                        job = None
+                        break
                     with self.trava:
                         job.update(estado="erro", erro=f"o Flow recusou: {exc.mensagem[:300]}", fim=time.time())
                         self._salvar()

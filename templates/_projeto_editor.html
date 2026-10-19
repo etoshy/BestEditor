@@ -15,7 +15,7 @@
     </select>
     <button type="button" id="pe-ligar" style="width:auto;margin:0;padding:5px 12px;background:#7e22ce;color:#fff;border:0;border-radius:6px;cursor:pointer;">🔗 Ligar este projeto</button>
     {% set cl_tipo = 'job' %}{% set cl_id = job.job_id %}{% include "_clonar.html" %}
-    {% if _pe.canal %}<a href="/marca/{{ _pe.canal }}/pacote.zip" title="o pacote do canal (estética, personagens, modelo de roteiro) pra importar em outro PC em 🎨 Identidade visual" style="font-size:.84rem;font-weight:600;color:#7e22ce;">📦 Zip do canal</a>{% endif %}
+    {% if _pe.canal %}<a href="/marca/{{ _pe.canal }}/pacote.zip" title="o pacote do canal (estética, personagens com as poses aprovadas, modelo de roteiro) pra importar em outro PC em 🎨 Identidade visual" style="font-size:.84rem;font-weight:600;color:#7e22ce;">📦 Zip do canal</a>{% endif %}
     <span id="pe-st" style="font-size:.84rem;"></span>
   </div>
   {% if _pe.tipo in ('dossie', 'venda') %}

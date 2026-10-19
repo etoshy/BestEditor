@@ -18,7 +18,32 @@ no mesmo lugar em todas — pronto pro editor pôr por cima do vídeo.</p>
 {% if erro %}<div class="pc-card" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">⚠ {{ erro }}</div>{% endif %}
 
 <div class="pc-card">
-  <h2 style="margin:0;">Nova personagem</h2>
+  <h2 style="margin:0;">🎨 Personagens dos canais</h2>
+  <p style="color:#555;font-size:.9rem;margin:4px 0 0;">As que vieram no zip do canal (<code>personagens/&lt;slug&gt;.json</code>, importado em <a href="/marca">🎨 Identidade visual</a>). Crie a partir delas ou conecte uma que você já criou — o editor usa as poses aprovadas do projeto conectado nos vídeos do canal.</p>
+  {% for c in canais %}
+  <div class="pc-proj" style="flex-wrap:wrap;">
+    <div><b>{{ c.nome }}</b> <span class="pc-tag">{{ c.canal_nome }}</span> <span class="pc-tag">{{ c.poses }} poses no JSON</span>
+      {% if c.projeto %}<span class="pc-tag" style="background:#dcfce7;color:#166534;">🔗 {{ c.projeto.nome }}</span>{% endif %}</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      {% if c.projeto %}<a href="/personagens-pod/{{ c.projeto.id }}">abrir →</a>
+      <a href="/marca/{{ c.canal }}/pacote.zip" style="font-size:.8rem" title="o zip do canal com as poses ✔ aprovadas das personagens: importe em 🎨 Identidade visual no outro PC e os projetos voltam já conectados">📦 levar pra outro PC</a>
+      {% else %}
+      <form method="post" action="/personagens-pod/criar-do-canal" enctype="multipart/form-data" style="display:flex;gap:6px;align-items:center;margin:0;">
+        <input type="hidden" name="canal" value="{{ c.canal }}"><input type="hidden" name="personagem" value="{{ c.slug }}">
+        <label style="margin:0;font-weight:normal;font-size:.8rem;" title="opcional: sem ficha, a ⭐ mestre sai só do texto do JSON">ficha (opcional) <input type="file" name="refs" accept="image/*" multiple style="width:auto;margin:0;font-size:.75rem;"></label>
+        <button type="submit" style="width:auto;padding:4px 12px;">➕ Criar</button>
+      </form>
+      {% if projetos %}
+      <select data-ligar-sel="{{ c.canal }}|{{ c.slug }}" style="width:auto;margin:0;font-size:.85rem;"><option value="">🔗 conectar a um projeto…</option>{% for x in projetos %}<option value="{{ x.id }}">{{ x.nome }}</option>{% endfor %}</select>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+  {% else %}<p class="hint" style="color:#888;font-size:.9rem;">Nenhum canal importado tem <code>personagens/&lt;slug&gt;.json</code> ainda.</p>{% endfor %}
+</div>
+
+<div class="pc-card">
+  <h2 style="margin:0;">Nova personagem (JSON avulso)</h2>
   <form method="post" action="/personagens-pod/criar" enctype="multipart/form-data">
     <label>Nome</label><input type="text" name="nome" placeholder="ex.: Vanta (ASTRANEBEL)">
     <label>Onde gerar</label>
@@ -28,8 +53,8 @@ no mesmo lugar em todas — pronto pro editor pôr por cima do vídeo.</p>
     </select>
     <div id="podNovo" style="display:none;"><label>Link do pod</label><input type="url" name="pod_url" value="{{ pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net"></div>
     <script>document.getElementById('motorNovo').addEventListener('change', e => { document.getElementById('podNovo').style.display = e.target.value === 'pod' ? '' : 'none'; });</script>
-    <label>Imagens de referência <span style="font-weight:normal;color:#888;">(até 3 — a ficha da personagem e um detalhe; os nomes iguais aos do JSON usam a descrição dele)</span></label>
-    <input type="file" name="refs" accept="image/*" multiple required>
+    <label>Imagens de referência <span style="font-weight:normal;color:#888;">(até 3 — a ficha da personagem e um detalhe; os nomes iguais aos do JSON usam a descrição dele. No Flow é opcional: sem ela a ⭐ mestre sai só do texto)</span></label>
+    <input type="file" name="refs" accept="image/*" multiple>
     <label>JSON de poses <span style="font-weight:normal;color:#888;">(o arquivo personagens_&lt;nome&gt;.json — ou cole abaixo)</span></label>
     <input type="file" name="json_arquivo" accept=".json,application/json">
     <textarea name="json" rows="5" placeholder='{"formato": "personagens_pod_v1", "poses": [...]}'></textarea>
@@ -46,6 +71,7 @@ no mesmo lugar em todas — pronto pro editor pôr por cima do vídeo.</p>
       {% if x.resumo.aprovada %}<span class="pc-tag" style="background:#dcfce7;color:#166534;">✔ {{ x.resumo.aprovada }}</span>{% endif %}
       {% if x.resumo.pronta %}<span class="pc-tag" style="background:#fef9c3;color:#854d0e;">👀 {{ x.resumo.pronta }} pra revisar</span>{% endif %}
       {% if x.mestre %}<span class="pc-tag">⭐ {{ x.mestre.arquivo }}</span>{% endif %}
+      {% if x.canal %}<span class="pc-tag" style="background:#ede9fe;color:#5b21b6;">🔗 {{ x.canal.canal_nome }} → {{ x.canal.nome }}</span>{% endif %}
     </div>
     <div style="display:flex;gap:8px;"><a href="/personagens-pod/{{ x.id }}">abrir →</a>
       <button type="button" data-excluir="{{ x.id }}" style="width:auto;padding:2px 10px;font-size:.8rem;background:#64748b;">🗑</button></div>
@@ -53,6 +79,14 @@ no mesmo lugar em todas — pronto pro editor pôr por cima do vídeo.</p>
   {% else %}<p class="hint" style="color:#888;">Nenhuma ainda.</p>{% endfor %}
 </div>
 <script>
+document.querySelectorAll('[data-ligar-sel]').forEach(sel => sel.addEventListener('change', async () => {
+  if (!sel.value) return;
+  const [canal, personagem] = sel.dataset.ligarSel.split('|');
+  const usar = confirm('Conectar este projeto à personagem do canal.\n\nOK = também trocar as poses pelas do JSON do canal (as imagens das poses que continuam ficam)\nCancelar = só conectar (mantém as poses do projeto)');
+  const r = await fetch(`/personagens-pod/${sel.value}/canal`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({canal, personagem, usar_json: usar})});
+  const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) { alert(d.erro || r.status); sel.value = ''; return; }
+  location.reload();
+}));
 document.querySelectorAll('[data-excluir]').forEach(b => b.addEventListener('click', async () => {
   if (!confirm('Excluir esta personagem e todas as imagens dela neste PC?')) return;
   const r = await fetch(`/personagens-pod/${b.dataset.excluir}/excluir`, {method: 'POST'}); if (r.ok) location.reload();

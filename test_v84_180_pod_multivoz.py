@@ -44,8 +44,9 @@ def test_texto_do_pod(vozes):
     t = "[narr] Im Jahr 1054 erschien ein Gaststern.\n\n[[INSCREVA]]\n\n[mira_v|exag=0.6|cfg=0.45] Wie geht das?\n[narr] So."
     m = pp.multivoz_para_pod(t, IT)
     assert m["perfis"] == ["Narr", "Mariana"]
-    assert m["texto"].startswith("{{perfil=Narr, emocao=0.40, cfg=0.50}} Im Jahr 1054")
-    assert "{{perfil=Mariana, emocao=0.60, cfg=0.45}} Wie geht das?" in m["texto"]
+    # v84_187: + quem=<voz> (o pod devolve o <nome>.falas.json: quem falou quando)
+    assert m["texto"].startswith("{{perfil=Narr, emocao=0.40, cfg=0.50, quem=narr}} Im Jahr 1054")
+    assert "{{perfil=Mariana, emocao=0.60, cfg=0.45, quem=mira_v}} Wie geht das?" in m["texto"]
     assert "[[INSCREVA]]" in m["legenda"] and "[narr]" not in m["legenda"] and "[mira_v" not in m["legenda"]
     assert pp.multivoz_para_pod("Ein Text ohne Tags, nur eine Stimme.", IT) is None
     with pytest.raises(pp.ProducaoErro, match="só roda Chatterbox"):

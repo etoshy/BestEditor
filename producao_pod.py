@@ -619,7 +619,8 @@ def multivoz_para_pod(texto: str, it: Dict[str, Any]) -> Optional[Dict[str, Any]
         fala = texto_para_tts(f["texto"], it["idioma"], it["motor"])
         if not fala:
             continue
-        marca = [f"emocao={float(exag):.2f}", f"cfg={float(cfgw):.2f}"]
+        # 🎭 v84_187: quem fala (a voz do personagem / narrador) → o pod devolve o <nome>.falas.json com o tempo exato
+        marca = [f"emocao={float(exag):.2f}", f"cfg={float(cfgw):.2f}", f"quem={f['slug'] or 'narrador'}"]
         if perfil:
             marca.insert(0, f"perfil={perfil}")
             if perfil not in perfis:
@@ -689,7 +690,14 @@ def _receber_narracao(lote: Dict[str, Any], it: Dict[str, Any], st: Dict[str, An
     pasta = pasta_item(lote["id"], it["id"])
     audio = pod_studio.baixar(it["pod_voz"], wav, os.path.join(pasta, "narracao.wav"), cfg)
     tr = pod_studio.baixar(it["pod_voz"], trans, os.path.join(pasta, "transcricao.json"), cfg)
-    _mudar(lote["id"], it["id"], audio=audio, transcricao=tr,
+    falas = next((a for a in arqs if a.endswith(".falas.json")), None)
+    extra: Dict[str, Any] = {}
+    if falas:  # 🎭 v84_187: quem falou quando (exato) — o editor põe as personagens do canal nesses momentos
+        try:
+            extra["falas_pod"] = pod_studio.baixar(it["pod_voz"], falas, os.path.join(pasta, "falas.json"), cfg)
+        except Exception:  # noqa: BLE001 — sem ele o editor casa o roteiro com as palavras
+            pass
+    _mudar(lote["id"], it["id"], audio=audio, transcricao=tr, **extra,
            _log="✅ narração e transcrição recebidas" + (" (com avisos do pod)" if st["status"] != "concluido" else ""))
     _gerar_zip(lote["id"], it["id"])
 

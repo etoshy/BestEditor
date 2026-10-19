@@ -78,6 +78,7 @@ class LoteFalso:
         self.trava = threading.RLock()
         self.fila, self.rodando, self.fim_msg, self.iniciou = [], False, None, 0
         self.pedidos = []
+        self.cfg = {"visivel": True}
 
     def adicionar(self, itens, modelo="", proporcao="16:9", quantidade="x1", **kw):
         novos = []
@@ -124,7 +125,7 @@ def test_ponta_a_ponta_no_flow(flow, tmp_path):
                                                 "refs": [(io.BytesIO(_png()), "ficha.png")]}, content_type="multipart/form-data")
     pid = r.headers["Location"].rstrip("/").split("/")[-1]
     pagina = c.get(f"/personagens-pod/{pid}").get_data(as_text=True)
-    assert 'id="motor"' in pagina and "Flow em massa" in pagina
+    assert 'id="motor"' in pagina and "Flow em massa" in pagina and 'id="flowVisivel"' in pagina
     # ⭐ mestre em x2 → 2 versões
     d = c.post(f"/personagens-pod/{pid}/gerar", json={"arquivos": ["vanta_neutra_esq.png"], "quantidade": "x2"}).get_json()
     assert d["ok"] and d["com_mestre"] is False and falso.iniciou == 1
@@ -151,10 +152,21 @@ def test_ponta_a_ponta_no_flow(flow, tmp_path):
                                                                    "vanta_neutra_esq_boca.png"]}).get_json()
     assert d["enviadas"] == 2 and d["depois"] == ["vanta_cetica_esq_boca.png"] and "pra depois" in d["aviso"]
     jc, jb = falso.fila[-2], falso.fila[-1]
-    assert "collage of 2 panels" in jc["prompt"] and "APPROVED MASTER" in jc["prompt"] and "NOT its pose" in jc["prompt"]
-    assert "NEW POSE" in jc["prompt"]
+    # v84_185: com a mestre, ela vai SOZINHA (a colagem com a ficha fazia o Flow devolver uma folha)
+    assert "APPROVED MASTER" in jc["prompt"] and "NOT its pose" in jc["prompt"] and "NEW POSE" in jc["prompt"]
     col = Image.open(jc["referencia_arquivo"])
-    assert col.width > col.height  # ficha + mestre lado a lado
+    assert col.width < col.height
+    # "flow": {"referencia": "colagem"} → ficha + mestre lado a lado
+    q = pp.carregar(pid)
+    q["dados"]["flow"] = {"referencia": "colagem"}
+    pp.salvar(q)
+    c.post(f"/personagens-pod/{pid}/gerar", json={"arquivos": ["vanta_relogio_esq.png"]})
+    jr = falso.fila.pop()
+    assert "collage of 2 panels" in jr["prompt"] and Image.open(jr["referencia_arquivo"]).width > Image.open(jr["referencia_arquivo"]).height
+    q = pp.carregar(pid)
+    q["imagens"]["vanta_relogio_esq.png"].update(estado="nova", job=None)
+    q["jobs"] = [x for x in q["jobs"] if x["id"] != jr["id"]]
+    pp.salvar(q)
     assert jb["prompt"].startswith("The reference image is the finished character image to edit")
     assert Image.open(jb["referencia_arquivo"]).getpixel((2, 2))[1] > 150  # a base vai com o fundo verde
     # erro do Flow aparece na pose; refazer com correção
@@ -216,3 +228,44 @@ def test_cortada_na_borda_refaz_uma_vez(flow):
     e = c.get(f"/personagens-pod/{p['id']}/estado").get_json()
     it = next(x for x in e["itens"] if x["arquivo"] == "vanta_neutra_esq.png")
     assert len(falso.fila) == 2 and it["estado"] == "pronta" and it["versoes"] == 2 and "borda" in it["aviso"]
+
+
+def test_atividade_incomum_troca_de_conta(tmp_path, monkeypatch):
+    """"Notamos uma atividade incomum…" é da CONTA: o pedido volta pra fila (outra conta pega) e a conta descansa;
+    quando todas as contas já deram isso, aí sim vira erro."""
+    import sys
+    import types
+    import app  # noqa: F401
+    import flow_lote as fl
+    from googleflow import flow_direto as fd
+    from googleflow import googleflow_client as gf
+    monkeypatch.setattr(fl, "pasta", lambda: str(tmp_path))
+    pw = types.ModuleType("playwright.sync_api")
+    pw.sync_playwright = lambda: types.SimpleNamespace(start=lambda: types.SimpleNamespace(stop=lambda: None))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", pw)
+    pagina = types.SimpleNamespace(is_closed=lambda: False, close=lambda: None, url="")
+    monkeypatch.setattr(gf, "_abrir", lambda p, cfg, headless, conta: (types.SimpleNamespace(close=lambda: None), False))
+    monkeypatch.setattr(gf, "salvar_sessao", lambda ctx, conta: None)
+    monkeypatch.setattr(fd, "preparar_projeto", lambda *a, **k: pagina)
+    puladas = []
+    monkeypatch.setattr(gf, "pular_conta", lambda conta, motivo, minutos=None: puladas.append((conta, minutos)))
+
+    def recusa(*a, **k):
+        raise fd.FlowRecusou("esperar", "o Flow não gerou: Notamos uma atividade incomum. As extensões do navegador que "
+                                        "modificam a página podem causar problemas.")
+    monkeypatch.setattr(fd, "gerar_um", recusa)
+    lote = fl.Lote()
+    monkeypatch.setattr(lote, "_aguardar_vez", lambda conta: None)
+    monkeypatch.setattr(lote, "_serve", lambda conta, tipo: True)
+    monkeypatch.setattr(lote, "contas_do_lote", lambda: ["a", "b"])
+    j = lote.adicionar([{"prompt": "x", "tipo": "imagem"}])[0]
+    lote._trabalhar("a")
+    assert j["estado"] == "pendente" and j["contas_incomum"] == ["a"] and "outra conta" in j["erro"]
+    assert puladas == [("a", fl.MINUTOS_INCOMUM)] and "a" in lote.problema_conta
+    lote._trabalhar("b")
+    assert j["estado"] == "erro" and "todas as contas" in j["erro"]
+    # recusa de verdade (política) continua sendo erro na hora
+    monkeypatch.setattr(fd, "gerar_um", lambda *a, **k: (_ for _ in ()).throw(fd.FlowRecusou("esperar", "viola as políticas")))
+    j2 = lote.adicionar([{"prompt": "y", "tipo": "imagem"}])[0]
+    lote._trabalhar("a")
+    assert j2["estado"] == "erro" and "recusou" in j2["erro"]

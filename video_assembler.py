@@ -1923,6 +1923,12 @@ def apply_overlays(
             current_label = next_label
             continue
 
+        if ov.get("personagem"):  # 🧍 v84_185: personagem do canal (PNG transparente) com entrada/saída e boca
+            next_input_index = _overlay_personagem(ov, idx, start, end, current_label, next_label, inputs, filter_parts,
+                                                   next_input_index, target_width)
+            current_label = next_label
+            continue
+
         media_path = ov["resolved_path"]
         is_video = media_type == "video"
         overlay_width = max(2, round(target_width * ov.get("size_percent", 20) / 100))
@@ -1968,6 +1974,64 @@ def apply_overlays(
     ]
     _run_ffmpeg(args)
     return output_path
+
+
+def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, atual: str, proximo: str,
+                        inputs: List[str], partes: List[str], n_in: int, target_width: int) -> int:
+    """🧍 A personagem (PNG com transparência) só na janela dela: a imagem entra no ffmpeg SÓ por esse tempo
+    (-t + setpts — não decodifica o PNG o vídeo inteiro), desliza do lado dela / aparece / some, e a 👄 boca alterna
+    com a pose "_boca" enquanto ela fala (boca_janelas = os trechos com palavra). → o próximo índice de entrada."""
+    dur = max(0.05, end - start)
+    d = max(0.05, min(float(ov.get("anim_dur") or 0.35), dur / 3))
+    largura = max(2, round(target_width * float(ov.get("size_percent", 30)) / 100))
+    largura += largura % 2
+    xp = max(0.0, min(100.0, float(ov.get("x_percent", 3)))) / 100
+    yp = max(0.0, min(100.0, float(ov.get("y_percent", 100)))) / 100
+    esquerda = (ov.get("lado") or ("esquerda" if xp < 0.5 else "direita")) == "esquerda"
+    alvo = f"(main_w-overlay_w)*{xp:.5f}"
+    fora = "(-overlay_w)" if esquerda else "main_w"
+    e_in, e_out = ov.get("anim_in") or "nenhuma", ov.get("anim_out") or "nenhuma"
+    def _prog(tipo: str) -> str:
+        p_in = f"min(1,(t-{start:.3f})/{d:.3f})" if e_in == tipo else "1"
+        p_out = f"min(1,({end:.3f}-t)/{d:.3f})" if e_out == tipo else "1"
+        prog = f"max(0,min({p_in},{p_out}))"
+        return f"(1-(1-{prog})*(1-{prog}))"  # suaviza (ease-out)
+    x = alvo
+    if e_in == "deslizar" or e_out == "deslizar":  # do lado dela
+        x = f"({fora}+(({alvo})-({fora}))*{_prog('deslizar')})"
+    y_alvo = f"(main_h-overlay_h)*{yp:.5f}"
+    y = y_alvo
+    if e_in == "subir" or e_out == "subir":  # de baixo pra cima
+        y = f"(main_h+(({y_alvo})-main_h)*{_prog('subir')})"
+
+    def _entrada(caminho: str, rot: str) -> int:
+        nonlocal n_in
+        inputs.extend(["-loop", "1", "-framerate", "25", "-t", f"{dur:.3f}", "-i", caminho])
+        k = n_in
+        n_in += 1
+        fade = ""
+        if e_in == "aparecer":
+            fade += f",fade=t=in:st=0:d={d:.3f}:alpha=1"
+        if e_out == "aparecer":
+            fade += f",fade=t=out:st={max(0.0, dur - d):.3f}:d={d:.3f}:alpha=1"
+        partes.append(f"[{k}:v]scale={largura}:-2,format=rgba{fade},setpts=PTS+{start:.3f}/TB{rot}")
+        return k
+
+    _entrada(ov["resolved_path"], f"[pp{idx}]")
+    janelas = [(max(start, float(a)), min(end, float(b))) for a, b in ov.get("boca_janelas") or [] if float(b) > float(a)]
+    boca = ov.get("boca_path") if ov.get("boca_path") and os.path.isfile(str(ov.get("boca_path"))) else None
+    enable = f"enable='between(t,{start:.3f},{end:.3f})':eof_action=pass"
+    if boca and janelas:
+        meio = f"[pm{idx}]"
+        partes.append(f"{atual}[pp{idx}]overlay=x='{x}':y='{y}':{enable}{meio}")
+        _entrada(boca, f"[pb{idx}]")
+        falando = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in janelas[:200])
+        # a boca abre e fecha ~4x por segundo só enquanto tem palavra
+        partes.append(f"{meio}[pb{idx}]overlay=x='{x}':y='{y}':enable='gt({falando},0)*lt(mod(t-{start:.3f},0.24),0.12)'"
+                      f":eof_action=pass{proximo}")
+    else:
+        partes.append(f"{atual}[pp{idx}]overlay=x='{x}':y='{y}':{enable}{proximo}")
+    return n_in
 
 
 _ZOOM_DIRECTIONS_VALIDAS = {"in", "out", "pan_left", "pan_right", "pan_up", "pan_down", "static",

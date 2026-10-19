@@ -402,6 +402,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <button data-tab="conteudoia">🤖 Conteúdo IA</button>
       <button data-tab="curtos">⏱ Clipes curtos <span id="nCurtos"></span></button>
       <button data-tab="animar">🎞 Animar cenas <span id="nAnim"></span></button>
+      <button data-tab="personagens">🧍 Personagens <span id="nPers"></span></button>
       <button data-tab="cortes">✂️ Cortes{% if dados.cortes %} ({{ dados.cortes|length }}){% endif %}</button>
     </div>
 
@@ -450,6 +451,10 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
         <div id="rdLista"></div>
         <div class="row" style="margin-top:6px;gap:6px"><button class="primary" id="rdAplicar" disabled>✅ Aplicar marcados</button><button class="mini" id="rdDesfazer" disabled>↩ Desfazer</button></div>
         <p class="hint" id="rdPrevias"></p>
+      </div></details>
+      <details class="sec" id="iaPersBox"><summary>🧍 Personagens no vídeo — a IA escolhe os melhores momentos, a pose e a animação</summary><div class="in">
+        <p class="hint">Canal com personagens (zip do canal com <code>personagens/</code>): elas entram como PNG por cima do vídeo nos melhores momentos em que falam — a 🤖 IA escolhe quais momentos, a pose de cada um e a animação de entrada/saída. Os detalhes (quanto aparece, lado, tamanho, ajustar uma a uma) ficam na aba 🧍 Personagens.</p>
+        <div class="row" style="gap:6px"><button class="primary mini" id="iaPersColocar">✨ Colocar as personagens</button><button class="mini danger" id="iaPersTirar">🗑 Tirar</button><button class="mini" id="iaPersAbrir">⚙ Ajustar…</button></div>
       </div></details>
       <h3>🤖 Prompt de edição (2ª etapa com a IA)</h3>
       <p class="hint">Gera um prompt com a <b>direção escolhida</b> (<span id="iaDirecao"></span> — troque na aba 🎨 Direção) e o que ela permite, a <b>timeline como está agora</b> (mídias, cenas, transições, efeitos, destaques) e a <b>fala com os tempos</b> (transcrição/SRT). Cole na sua IA; ela devolve um JSON mais caprichado — transições, efeitos, cenas com textos, destaques ancorados na fala e <b>gráficos com os dados</b> citados. Cole a resposta aqui embaixo, confira e aplique (dá pra desfazer).</p>
@@ -727,6 +732,26 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
         <select id="anFiltro" style="width:auto"><option value="tudo">todas as cenas de imagem</option><option value="sug">só as sugeridas</option><option value="anim">só as animadas</option></select></div>
       <div class="hint" id="anStatus" style="margin-top:4px"></div>
       <div id="listaAnim"></div>
+    </div>
+
+    <div class="tab" id="tab-personagens">
+      <h3>🧍 Personagens do canal</h3>
+      <p class="hint">Canal com personagens (ex.: Mira e Vanta): elas entram por cima do vídeo como PNG transparente <b>nos melhores momentos em que falam</b> (não em toda fala; o narrador não traz ninguém — num canal com mascote apresentador, ele ilustra algumas frases da narração). Com a 🤖 IA ligada, ela escolhe os momentos, a pose e a animação de entrada/saída; sem, a regra (emoção, pergunta, a 1ª vez de cada uma). Quem fala quando vem do <b>roteiro com as tags</b> (<code>[mira|curiosa]</code>, <code>[vanta]</code>, <code>[narrador]</code>) casado com o tempo das palavras do áudio. A pose segue a emoção da tag, virada pro centro; a 👄 boca mexe nas palavras (se a pose tiver a “_boca”). As poses vêm do projeto conectado na aba <a href="/personagens-pod" target="_blank">🧍 Personagens</a>. Cada aparição vira um overlay: mude tempo/posição na timeline e a pose/lado aqui.</p>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><b>Canal</b><select id="peCanal" style="width:auto"></select><span class="hint" id="peCanalInfo"></span></div>
+      <div id="pePers" style="margin-top:6px"></div>
+      <details id="peTxtBox" style="margin-top:6px"><summary class="hint" style="cursor:pointer">📝 Roteiro com as tags <span id="peDeOnde"></span></summary>
+        <textarea id="peTexto" rows="7" style="width:100%;font-size:.78rem" placeholder="[narrador] Was passiert, wenn ein Stern stirbt? [mira|curiosa] Und warum leuchtet er dann so hell? [vanta|ironica] Weil er sich gern in Szene setzt."></textarea>
+        <div class="hint">Vazio = o roteiro do áudio (multi voz) ou o da 🏭 Produção no pod. Cole aqui quando o áudio veio de outro lugar.</div></details>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;margin-top:8px;font-size:.82rem">
+        <span class="hint">Entrada</span><select id="peEntrada"></select>
+        <span class="hint">Saída</span><select id="peSaida"></select>
+        <span class="hint">Tamanho</span><div style="display:flex;gap:6px;align-items:center"><input type="range" id="peAltura" min="0.3" max="1" step="0.02" style="flex:1" title="altura da personagem (fração da altura do vídeo)"><span class="hint" id="peAlturaTxt"></span></div>
+        <span class="hint" title="quantos dos momentos possíveis viram aparição">Quanto aparece</span><div style="display:flex;gap:6px;align-items:center"><input type="range" id="peFreq" min="0.1" max="1" step="0.05" style="flex:1"><span class="hint" id="peFreqTxt"></span></div>
+        <span></span><label class="chk"><input type="checkbox" id="peBoca" checked> 👄 boca mexendo enquanto fala</label>
+        <span></span><label class="chk"><input type="checkbox" id="peIa" checked> 🤖 a IA escolhe os momentos, a pose e a animação <span class="dim" id="peIaSt"></span></label></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="primary" id="peAplicar" style="width:auto">✨ Colocar automaticamente</button><button class="mini danger" id="peTirar">🗑 Tirar todas</button></div>
+      <div class="hint" id="peStatus" style="margin-top:4px"></div>
+      <div id="listaPers"></div>
     </div>
 
     <div class="tab" id="tab-cortes">
@@ -4191,6 +4216,104 @@ document.querySelectorAll('[data-cc-todos]').forEach(b => b.addEventListener('cl
 }));
 document.querySelector('#tabs button[data-tab="curtos"]').addEventListener('click', () => { desenharCurtos(); medirClipes(false); });
 setTimeout(() => medirClipes(false), 2500);  // mede sozinho: os curtos já aparecem marcados com ⏱ na timeline
+
+// ------------------------------------------------------------------ 🧍 Personagens do canal (v84_185)
+var PE = { d: null, carregou: false };
+function peSincOverlays(lista) {
+  if (!Array.isArray(lista)) return;
+  overlays.splice(0, overlays.length, ...lista);
+  desenharTimeline(); atualizarMonitor(true);
+}
+async function pePost(url, corpo) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+  const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+}
+function peConfig() {
+  const lados = {};
+  document.querySelectorAll('[data-pe-lado]').forEach(s => { lados[s.dataset.peLado] = s.value; });
+  const alt = parseFloat($('peAltura').value);
+  return { lados, entrada: $('peEntrada').value, saida: $('peSaida').value, boca: $('peBoca').checked,
+           frequencia: parseFloat($('peFreq').value), ia: $('peIa').checked,
+           [($('gFormato') && $('gFormato').value) === '9:16' ? 'altura_vertical' : 'altura']: alt };
+}
+function desenharPers() {
+  const d = PE.d; if (!d) return;
+  $('nPers').textContent = d.aparicoes.length ? `(${d.aparicoes.length})` : '';
+  $('peCanal').innerHTML = `<option value="-">— nenhum —</option>` + d.canais.map(c => `<option value="${esc(c.slug)}" ${c.slug === d.canal ? 'selected' : ''}>${esc(c.nome)}</option>`).join('');
+  if (!d.canal) $('peCanal').value = '-';
+  $('peCanalInfo').textContent = d.canais.length ? '' : 'nenhum canal com personagens importado (🎨 Identidade visual)';
+  $('pePers').innerHTML = d.personagens.map(p => `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.82rem;margin:3px 0">
+      <b style="min-width:60px">${esc(p.nome)}</b>
+      <select data-pe-lado="${esc(p.slug)}" style="width:auto" title="lado da tela">${['esquerda', 'direita'].map(l => `<option ${((d.config.lados || {})[p.slug] || '') === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      ${p.projeto ? `<span class="hint">🔗 ${esc(p.projeto.nome)} · ${p.poses.length} pose(s) pronta(s)${p.poses.some(x => x.boca) ? ' · 👄' : ''}</span>` : `<span class="hint" style="color:#f59e0b">⚠ sem projeto conectado — conecte em <a href="/personagens-pod" target="_blank">🧍 Personagens</a></span>`}</div>`).join('');
+  $('peDeOnde').textContent = d.texto ? '(colado aqui)' : d.tem_roteiro ? `(usando ${d.roteiro_de})` : '(falta — cole aqui)';
+  if (!PE.carregou) {
+    $('peTexto').value = d.texto || '';
+    $('peEntrada').innerHTML = $('peSaida').innerHTML = d.entradas.map(e => `<option>${e}</option>`).join('');
+    $('peEntrada').value = d.config.entrada; $('peSaida').value = d.config.saida; $('peBoca').checked = d.config.boca !== false;
+    const vert = ($('gFormato') && $('gFormato').value) === '9:16';
+    $('peAltura').value = vert ? d.config.altura_vertical : d.config.altura; $('peAlturaTxt').textContent = Math.round($('peAltura').value * 100) + '%';
+    $('peFreq').value = d.config.frequencia; $('peFreqTxt').textContent = Math.round(d.config.frequencia * 100) + '% dos momentos';
+    $('peIa').checked = d.config.ia !== false;
+    if (!d.tem_roteiro) $('peTxtBox').open = true;
+    PE.carregou = true;
+  }
+  $('peIaSt').textContent = d.ia_ligada ? '' : '(a IA está desligada pra isso em 🤖 IA — vai a regra)';
+  if (d.aparicoes.length) $('peCanalInfo').textContent = `${d.aparicoes.length} aparição(ões)` + (d.candidatos ? ` de ${d.candidatos} momentos possíveis` : '') + (d.por ? ` · escolhidas pela ${d.por === 'ia' ? '🤖 IA' : 'regra'}` : '');
+  const pers = Object.fromEntries(d.personagens.map(p => [p.slug, p]));
+  $('peStatus').innerHTML = (d.avisos || []).map(a => `⚠ ${esc(a)}`).join('<br>');
+  $('listaPers').innerHTML = d.aparicoes.length ? d.aparicoes.map(a => {
+    const poses = ((pers[a.personagem] || {}).poses || []);
+    return `<div data-pe="${esc(a.id)}" style="border-top:1px solid var(--line);padding:6px 0;font-size:.8rem">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a href="#" data-pe-ir="${a.start}">⏱ ${segS(a.start)}–${segS(a.end)}</a><b>${esc(a.nome_personagem || a.personagem)}</b>${a.emocao ? `<span class="hint">${esc(a.emocao)}</span>` : ''}${a.manual ? '<span class="hint" title="você mexeu: “Colocar as personagens” de novo não troca esta">✋ ajustada</span>' : ''}
+        <button class="mini danger" data-pe-tirar title="tirar esta aparição" style="margin-left:auto">✕</button></div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;margin-top:3px;align-items:center">
+        <select data-pe-campo="pose" title="pose">${poses.map(o => `<option value="${esc(o.arquivo)}" ${o.arquivo === a.pose ? 'selected' : ''}>${esc(o.arquivo.replace(/\.png$/, ''))}${o.aprovada ? '' : ' (pra revisar)'}</option>`).join('') || `<option>${esc(a.pose)}</option>`}</select>
+        <select data-pe-campo="lado" title="lado da tela">${['esquerda', 'direita'].map(l => `<option ${a.lado === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <label class="chk" title="boca mexendo"><input type="checkbox" data-pe-campo="boca" ${a.boca ? 'checked' : ''}>👄</label></div>
+      <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px;margin-top:3px;align-items:center"><span class="hint">entra</span><select data-pe-campo="anim_in">${d.entradas.map(e => `<option ${a.anim_in === e ? 'selected' : ''}>${e}</option>`).join('')}</select><span class="hint">sai</span><select data-pe-campo="anim_out">${d.entradas.map(e => `<option ${a.anim_out === e ? 'selected' : ''}>${e}</option>`).join('')}</select></div>
+      <div class="hint" style="margin-top:2px">“${esc((a.fala || '').slice(0, 140))}”</div></div>`;
+  }).join('') : '<p class="hint">Nenhuma personagem no vídeo ainda.</p>';
+}
+async function persEstado() {
+  try { const r = await fetch(`/job/${JOB}/personagens/estado`); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); PE.d = d; desenharPers(); }
+  catch (e) { $('peStatus').textContent = '⚠ ' + e.message; }
+}
+$('peAltura').addEventListener('input', () => { $('peAlturaTxt').textContent = Math.round($('peAltura').value * 100) + '%'; });
+$('peFreq').addEventListener('input', () => { $('peFreqTxt').textContent = Math.round($('peFreq').value * 100) + '% dos momentos'; });
+$('peCanal').addEventListener('change', async () => {
+  try { PE.d = await pePost(`/job/${JOB}/personagens/canal`, { canal: $('peCanal').value }); desenharPers(); } catch (e) { toast('⚠ ' + e.message, 5000); }
+});
+$('peAplicar').addEventListener('click', async () => {
+  const b = $('peAplicar'); b.disabled = true; $('peStatus').textContent = '⏳ casando o roteiro com o áudio…';
+  try {
+    const d = await pePost(`/job/${JOB}/personagens/aplicar`, { canal: $('peCanal').value === '-' ? '' : $('peCanal').value, texto: $('peTexto').value, config: peConfig() });
+    PE.d = d.estado; peSincOverlays(d.overlays); desenharPers();
+    toast(`🧍 ${d.n} aparição(ões) nos melhores de ${d.falas} momento(s) — escolhidas pela ${d.por === 'ia' ? '🤖 IA' : 'regra'} (roteiro: ${d.de_onde})`, 6000);
+  } catch (e) { $('peStatus').textContent = '⚠ ' + e.message; }
+  finally { b.disabled = false; }
+});
+$('peTirar').addEventListener('click', async () => {
+  if (!confirm('Tirar todas as personagens do vídeo?')) return;
+  try { const d = await pePost(`/job/${JOB}/personagens/remover`, {}); PE.d = d.estado; peSincOverlays(d.overlays); desenharPers(); } catch (e) { toast('⚠ ' + e.message, 5000); }
+});
+$('listaPers').addEventListener('click', async (e) => {
+  const ir = e.target.closest('[data-pe-ir]'); if (ir) { e.preventDefault(); seek(parseFloat(ir.dataset.peIr)); return; }
+  const tb = e.target.closest('[data-pe-tirar]'); if (!tb) return;
+  const id = tb.closest('[data-pe]').dataset.pe;
+  try { const d = await pePost(`/job/${JOB}/personagens/${id}/remover`, {}); PE.d = d; peSincOverlays(d.overlays); desenharPers(); } catch (er) { toast('⚠ ' + er.message, 5000); }
+});
+$('listaPers').addEventListener('change', async (e) => {
+  const c = e.target.closest('[data-pe-campo]'); if (!c) return;
+  const id = c.closest('[data-pe]').dataset.pe, campo = c.dataset.peCampo;
+  try { const d = await pePost(`/job/${JOB}/personagens/${id}`, { [campo]: campo === 'boca' ? c.checked : c.value }); PE.d = d; peSincOverlays(d.overlays); desenharPers(); }
+  catch (er) { toast('⚠ ' + er.message, 5000); }
+});
+document.querySelector('#tabs button[data-tab="personagens"]').addEventListener('click', () => { if (!PE.d) persEstado(); });
+$('iaPersColocar').addEventListener('click', async () => { if (!PE.d) await persEstado(); $('peAplicar').click(); });
+$('iaPersTirar').addEventListener('click', async () => { if (!PE.d) await persEstado(); $('peTirar').click(); });
+$('iaPersAbrir').addEventListener('click', () => abrirTab('personagens'));
+if (overlays.some(o => o.origem === 'personagem')) $('nPers').textContent = `(${overlays.filter(o => o.origem === 'personagem').length})`;
 
 // ------------------------------------------------------------------ 🎞 Animar com Flow (v84_182)
 var AN = { sugestoes: [], animaveis: new Set(), marcados: new Set(), prompts: {}, timer: null, ia: false, ver: {} };

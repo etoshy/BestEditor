@@ -168,6 +168,12 @@ ESTRUTURA_PACOTE: List[Tuple[str, str, str]] = [
     ("modelo_roteiro.json", "recomendado", "o modelo de roteiro do canal (entra nos 🕵️ Modelos de vídeo, falando o nome do canal)"),
     ("personagens.json", "opcional", "🎭 canal com PERSONAGENS fixos: narrador + cada personagem (personalidade, como fala, quando "
                                      "aparece e quando não, segredo, emoções da voz, voz sugerida, desenho e fichas) — vira roteiro multi voz"),
+    ("personagens/<slug>.json", "opcional", "🧍 as POSES PNG de cada personagem (formato personagens_pod_v1: a trava do desenho, "
+                                           "o estilo e a lista de poses/reações/objetos/_boca) — na aba 🧍 Personagens você escolhe "
+                                           "a personagem do canal e gera os PNG transparentes que o editor põe por cima do vídeo "
+                                           "nos melhores momentos. A personagem NÃO é desenhada nas cenas"),
+    ("personagens/<slug>_ficha.png", "opcional", "🧍 a ficha da personagem (1 a 3 imagens: _ficha.png, _ficha_2.png…) — só pra gerar "
+                                                 "as poses na aba 🧍 Personagens (nunca vai pras cenas do vídeo)"),
     ("lore.md", "opcional", "🎭 a bíblia da lore (a IA consulta o porquê de cada dinâmica antes de escrever)"),
     ("continuidade.json", "opcional", "🎭 as pistas da lore (clue_id, símbolo, pergunta, estado) — o site marca o uso a cada roteiro"),
     ("docs/*.md", "opcional", "manuais do canal (formatos, prompt do roteirista, roteiro exemplo, análise) — o roteiro exemplo pode "
@@ -181,7 +187,9 @@ _JSON_PERMITIDOS = {"pacote.json", "brand_guide.json", "reforcos.json", "poses_s
                     "direcao.json"}
 _PASTAS_PERMITIDAS = ("assets/", "referencias/", "folha_mestra/", "exemplos_alvo/", "referencias_rejeitadas/")
 _PASTAS_TEXTO = ("docs/", "fonte/")  # 🎭 v84_173: manuais do canal (.md/.txt) e o JSON original da marca (.json)
-_LOCAIS = ("projetos", "estado.json", "lore_historico.json", "vozes_escolhidas.json")  # o que é seu e o import nunca apaga
+_PASTA_PERSONAGENS = "personagens/"  # 🧍 v84_185: personagens/<slug>.json = as poses PNG de cada personagem
+# o que é seu e o import nunca apaga (🧍 personagens_ligados.json: qual projeto da aba Personagens é de cada personagem)
+_LOCAIS = ("projetos", "estado.json", "lore_historico.json", "vozes_escolhidas.json", "personagens_ligados.json")
 
 
 def _slugificar(nome: str) -> str:
@@ -250,11 +258,12 @@ def importar_zip(base: str, dados: bytes) -> str:
         ext = os.path.splitext(rel)[1].lower()
         ok = (rel in _JSON_PERMITIDOS or (rel.upper().startswith("LEIA") and ext == ".txt")
               or (rel.startswith(_PASTAS_PERMITIDAS) and ext in _IMG)
-              or (rel.startswith(_PASTAS_TEXTO) and ext in (".md", ".txt", ".json")))
+              or (rel.startswith(_PASTAS_TEXTO) and ext in (".md", ".txt", ".json"))
+              or (rel.startswith(_PASTA_PERSONAGENS) and rel.count("/") == 1 and ext in (".json", ".png", ".jpg", ".jpeg", ".webp")))
         if not ok:
             continue
         if rel in ("reforcos.json", "poses_sugeridas.json", "modelo_roteiro.json", "pacote.json", "manifest.json", "direcao.json",
-                   "personagens.json", "continuidade.json"):
+                   "personagens.json", "continuidade.json") or (rel.startswith(_PASTA_PERSONAGENS) and ext == ".json"):
             try:
                 json.loads(z.read(n).decode("utf-8-sig"))
             except (ValueError, UnicodeDecodeError) as exc:
@@ -269,6 +278,12 @@ def importar_zip(base: str, dados: bytes) -> str:
     if not os.path.isdir(os.path.join(d, "assets")):
         raise MarcaErro("O pacote precisa da pasta assets/ com as imagens oficiais da marca.")
     _juntar_estado_do_canal(base, slug, d, cont_antes, lore_antes)
+    try:  # 🧍 v84_188: as poses das personagens que vieram no zip (📦 Zip do canal de outro PC) → os projetos, já conectados
+        import personagens_pod as _pp
+        _pp.importar_do_pacote(z, raiz, slug, base)
+    except Exception:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
     m = carregar(base, slug)
     if not folha_atual(m):
         montar_folha_v0(m, base)
@@ -345,13 +360,13 @@ def conferir_pacote(m: Dict[str, Any]) -> List[Dict[str, Any]]:
     """✅ O que o pacote tem e o que falta (pra página e pro import)."""
     import glob
     out = []
-    tem_pers = os.path.isfile(os.path.join(m["dir"], "personagens.json"))
+    tem_pers = os.path.isfile(os.path.join(m["dir"], "personagens.json")) or os.path.isdir(os.path.join(m["dir"], "personagens"))
     so_mascote = ("referencias/poses/", "referencias/mascote_", "referencias/silhuetas/", "referencias/animacao_original/",
                   "reforcos.json", "poses_sugeridas.json")
     for rel, nivel, oque in ESTRUTURA_PACOTE:
         if tem_pers and rel.startswith(so_mascote):
             continue  # 🎭 canal com personagens: as coisas do mascote único não se aplicam
-        padrao = rel.replace("<id>", "*")
+        padrao = rel.replace("<id>", "*").replace("<slug>", "*")
         if padrao.endswith("/"):
             achados = [x for x in glob.glob(os.path.join(m["dir"], padrao, "*")) if x.lower().endswith(_IMG)]
         else:
@@ -424,16 +439,26 @@ def _exemplo_do_modelo(m: Dict[str, Any], d: Dict[str, Any]) -> Dict[str, Any]:
     return {"referencia_padrao": texto, "referencia_modo_padrao": modo}
 
 
-def exportar_pacote(m: Dict[str, Any]) -> bytes:
-    """📦 A marca de volta em .zip no formato do pacote (sem os seus projetos e sem as células geradas)."""
+def exportar_pacote(m: Dict[str, Any], personagens: str = "aprovadas") -> bytes:
+    """📦 A marca de volta em .zip no formato do pacote (sem os seus projetos e sem as células geradas).
+    🧍 v84_188 `personagens`: "aprovadas" (padrão) leva junto as poses ✔ aprovadas (e a ⭐ mestre) das personagens
+    conectadas na aba 🧍 Personagens — em outro PC, importar o zip recria os projetos já conectados; "tudo" leva
+    também as que estão pra revisar; "nao" = só o pacote."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        if personagens in ("aprovadas", "tudo"):
+            try:
+                import personagens_pod as _pp
+                _pp.exportar_para_pacote(z, m, os.path.dirname(os.path.dirname(os.path.abspath(m["dir"]))),
+                                         so_aprovadas=personagens == "aprovadas")
+            except Exception:  # noqa: BLE001 — sem as personagens, o pacote sai igual
+                pass
         tem_pacote = False
         for raiz, _dirs, fs in os.walk(m["dir"]):
             for f in sorted(fs):
                 cam = os.path.join(raiz, f)
                 rel = os.path.relpath(cam, m["dir"]).replace("\\", "/")
-                if rel.startswith(("projetos/", "folha_mestra/celulas/")) or rel in ("estado.json", "lore_historico.json", "vozes_escolhidas.json") or rel.endswith(".tmp"):
+                if rel.startswith(("projetos/", "folha_mestra/celulas/")) or rel in ("estado.json", "lore_historico.json", "vozes_escolhidas.json", "personagens_ligados.json") or rel.endswith(".tmp"):
                     continue
                 tem_pacote = tem_pacote or rel == "pacote.json"
                 z.write(cam, f"{m['slug']}/{rel}")
@@ -443,6 +468,55 @@ def exportar_pacote(m: Dict[str, Any]) -> bytes:
                                                                "nome": p.get("name"), "idioma": p.get("channel_language")},
                                                               ensure_ascii=False, indent=1))
     return buf.getvalue()
+
+
+# ------------------------------------------------------------------ 🧍 v84_185: as personagens PNG do canal
+def personagens_png(m: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """As personagens do canal que têm JSON de poses (personagens/<slug>.json, apontado ou não pelo personagens.json)
+    → [{slug, nome, arquivo (rel), poses, projeto (o id do projeto ligado na aba 🧍 Personagens ou None)}]."""
+    pj = _json(os.path.join(m["dir"], "personagens.json"), {}) or {}
+    por_slug = {str(p.get("slug") or ""): p for p in pj.get("personagens") or [] if isinstance(p, dict)}
+    ligados = ligacoes_personagens(m)
+    vistos, out = set(), []
+    cand = [(str(p.get("poses_json") or ""), s) for s, p in por_slug.items() if p.get("poses_json")]
+    pasta = os.path.join(m["dir"], "personagens")
+    if os.path.isdir(pasta):
+        cand += [("personagens/" + f, os.path.splitext(f)[0]) for f in sorted(os.listdir(pasta)) if f.lower().endswith(".json")]
+    for rel, slug in cand:
+        rel = rel.replace("\\", "/")
+        if not rel or rel in vistos:
+            continue
+        try:
+            cam = arquivo(m, rel)
+        except MarcaErro:
+            continue
+        d = _json(cam)
+        if not isinstance(d, dict) or not isinstance(d.get("poses"), list):
+            continue
+        vistos.add(rel)
+        slug = _slugificar(d.get("personagem") or slug)
+        info = por_slug.get(slug) or {}
+        fichas = sorted(os.path.join(pasta, f) for f in (os.listdir(pasta) if os.path.isdir(pasta) else [])
+                        if f.lower().startswith(slug + "_ficha") and f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")))
+        out.append({"slug": slug, "nome": str(d.get("nome") or info.get("nome") or slug)[:60], "arquivo": rel,
+                    "poses": len(d["poses"]), "projeto": ligados.get(slug), "fichas": fichas[:3]})
+    return out
+
+
+def ligacoes_personagens(m: Dict[str, Any]) -> Dict[str, str]:
+    d = _json(os.path.join(m["dir"], "personagens_ligados.json"), {}) or {}
+    return {str(k): str(v) for k, v in d.items() if isinstance(v, str)} if isinstance(d, dict) else {}
+
+
+def ligar_personagem(m: Dict[str, Any], slug: str, projeto: Optional[str]) -> None:
+    """Qual projeto da aba 🧍 Personagens é desta personagem do canal (None = desliga). Fica só neste PC."""
+    d = ligacoes_personagens(m)
+    slug = _slugificar(slug)
+    if projeto:
+        d[slug] = projeto
+    else:
+        d.pop(slug, None)
+    _gravar(os.path.join(m["dir"], "personagens_ligados.json"), d)
 
 
 def arquivo(m: Dict[str, Any], rel: str) -> str:
@@ -1829,8 +1903,17 @@ EXEMPLO_PACOTE = {"formato": FORMATO_PACOTE, "versao": VERSAO_PACOTE, "slug": "m
                                              "\"referencia\" (redesenha as fotos marcadas [I3] no estilo do canal) ou \"real\" (usa "
                                              "a foto como está); estilo_fotos = \"foto\" ou \"ilustracao\" (vazio = pela estética); "
                                              "ref_estilo = manda a amostra de estilo como referência em toda cena",
-                                   "pct": 100, "personagens": True, "fotos_do_roteiro": "referencia", "estilo_fotos": "",
-                                   "ref_estilo": False}}
+                                   "pct": 100, "personagens": False, "fotos_do_roteiro": "referencia", "estilo_fotos": "",
+                                   "ref_estilo": False},
+                  # 🧍 v84_186: as personagens por cima do vídeo (aba 🧍 Personagens do Estúdio / projetos novos)
+                  "personagens_editor": {"_sobre": "ativo = já põe as personagens nos projetos novos do canal; frequencia = quanto "
+                                                   "dos momentos possíveis viram aparição (0.6 = os melhores ~60%; 1 = toda fala); "
+                                                   "narrador_personagem = o slug do mascote que ILUSTRA frases da narração (canal sem "
+                                                   "personagens que falam); lados/altura/entrada/saida/boca = o jeito delas na tela; "
+                                                   "a 🤖 IA escolhe os momentos, a pose e a animação (ia: false = só a regra)",
+                                         "ativo": True, "frequencia": 0.6, "min_intervalo": 6, "ia": True,
+                                         "lados": {"mira": "esquerda", "vanta": "direita"}, "altura": 0.72,
+                                         "entrada": "deslizar", "saida": "deslizar", "boca": True, "narrador_personagem": ""}}
 EXEMPLO_REFORCOS = {
     "_sobre": "O que a IA de imagem costuma errar no mascote — DERIVADO do brand_guide.json e das imagens oficiais (não invente traços novos).",
     "mascote_en": "PROPORTION LOCK (match image references exactly): <cabeça, corpo, braços, pernas, pés, olhos, boca — proporções exatas, em inglês>",
@@ -1868,14 +1951,29 @@ EXEMPLO_PERSONAGENS = {
                      "motivacao": "entender o Universo", "segredo": "lacunas de memória (não revelar à toa)",
                      "voz_sugerida": {"genero": "feminino", "idade": "jovem adulta", "motor": "chatterbox", "exag": 0.55, "cfg": 0.45},
                      "emocoes": {"curiosa": {"exag": 0.6, "cfg": 0.45, "descricao": "pergunta"}, "triste": {"exag": 0.4, "cfg": 0.35}},
-                     "visual_en": "Mira, the same character as the attached sheet: …",
+                     "visual_en": "Mira: pale young woman, long straight black hair with blunt bangs, crescent moon ornament …",
                      "evitar_en": "different hair color, missing crescent ornament",
-                     "referencias": ["referencias/personagens/mira_ficha.png"]}],
-    "referencias_dupla": ["assets/ficha_das_duas.png"],
+                     "poses_json": "personagens/mira.json"}],
     "estilo_personagens_en": "characters simpler and less detailed than the backgrounds, clean line art, flat cel shading",
     "relacao": {"dinamica": "Mira pergunta, Vanta contesta", "regra": "a lore nunca é necessária pra entender a ciência"},
     "regras_dialogo": ["Cada fala acrescenta pergunta, contraste, clareza ou ritmo; diálogo decorativo sai."],
     "ferramentas_narrativas": ["Narração, pergunta, contestação, trecho só de diálogo, pista de lore — usadas quando servem."]}
+EXEMPLO_POSES_PERSONAGEM = {
+    "formato": "personagens_pod_v1", "personagem": "mira", "nome": "Mira",
+    "texto_fixo": {"trava": "MIRA — CHARACTER LOCK: young woman, long straight deep-black hair, blunt bangs, navy headband, gold "
+                            "crescent moon on the right side, two blue tear marks under each eye, black gothic dress with ivory ruffles. "
+                            "NEVER: short hair, other hair color, missing tear marks.",
+                   "estilo": "ART STYLE: original 2D anime illustration, crisp dark ink outlines, cel shading, flat clean colors.",
+                   "regras": "FRAMING: one character alone, half-body from the top of the head to the hips, the whole head inside the "
+                             "image with green space above, margin on both sides. Flat chroma-key GREEN background (#00FF00). "
+                             "No text."},
+    "fundo": "verde", "flow": {"proporcao": "3:4"}, "canvas": [1200, 1800], "altura_personagem": 0.95,
+    "poses": [{"arquivo": "mira_neutra_esq.png", "tipo": "pose", "grupo": "reacao", "prioridade": 1, "mestre": True,
+               "descricao_pt": "neutra, mãos juntas", "prompt": "neutral, hands gently clasped; 3/4 view toward image-LEFT; half-body."},
+              {"arquivo": "mira_neutra_esq_boca.png", "tipo": "boca", "base": "mira_neutra_esq.png", "grupo": "boca", "prioridade": 1,
+               "prompt": "Keep everything identical; change ONLY the mouth: slightly open, as if speaking."},
+              {"arquivo": "mira_lupa_esq.png", "tipo": "pose", "grupo": "objeto", "prioridade": 2,
+               "descricao_pt": "olhando com uma lupa", "prompt": "holding an antique brass magnifying glass, curious; toward image-LEFT; half-body."}]}
 EXEMPLO_CONTINUIDADE = {"regras": ["uma pista por vez; respostas parciais"],
                         "pistas": [{"clue_id": "estrela_riscada", "simbolo": "Estrela riscada numa foto antiga",
                                     "pergunta": "quem tentou apagá-la?", "estado": "planned"}]}
@@ -1956,8 +2054,18 @@ Regras de cada parte:
 - personagens.json, lore.md, continuidade.json, docs/ (OPCIONAIS — só se o canal tem PERSONAGENS fixos que falam):
   personagens.json: {json.dumps(EXEMPLO_PERSONAGENS, ensure_ascii=False)}
   Para cada personagem: QUANDO aparece e QUANDO NÃO aparece, como fala, motivação/segredo (vindos da lore), emoções da voz
-  (Chatterbox: exag 0.25–1.0 intensidade, cfg 0.2–0.7, vel 0.85–1.15), voz sugerida, visual_en (o lock do desenho) e as fichas
-  em referencias/personagens/ (recortes oficiais, sem texto). lore.md = a bíblia da lore; continuidade.json:
+  (Chatterbox: exag 0.25–1.0 intensidade, cfg 0.2–0.7, vel 0.85–1.15), voz sugerida, visual_en (o lock do desenho) e
+  "poses_json": "personagens/<slug>.json". As personagens NÃO são desenhadas nas cenas e nada de character sheet / pose sheet
+  junto das referências de vídeo: elas viram PNG transparentes por cima do vídeo (nos melhores momentos em que falam),
+  geradas na aba 🧍 Personagens a partir do JSON de poses + a ficha em personagens/<slug>_ficha.png (um recorte limpo, sem
+  texto; até 3: _ficha.png, _ficha_2.png). Canal com UM mascote apresentador (sem personagens.json): o mesmo
+  personagens/<slug>.json e, no pacote.json, "personagens_editor": {{"ativo": true, "narrador_personagem": "<slug>",
+  "frequencia": 0.3, "boca": false}} — ele ilustra algumas frases da narração. A cena fica só com o ESTILO do canal (fotos
+  realistas ou a estética única dele); o personagem PNG é desenhado nesse mesmo estilo. personagens/<slug>.json (um por personagem): {json.dumps(EXEMPLO_POSES_PERSONAGEM, ensure_ascii=False)}
+  — "texto_fixo.trava" = a trava do desenho em inglês (cabelo, olhos, roupa, acessórios, o que NUNCA muda), "estilo" = o estilo
+  de desenho, "regras" = enquadramento (meio corpo, da cabeça ao quadril, cabeça inteira e margem dos lados) + fundo verde
+  chroma key; "poses" = 30 a 100 poses (reações, segurando objetos do canal, cada uma _esq/_dir, e as "_boca" das principais),
+  uma com "mestre": true. lore.md = a bíblia da lore; continuidade.json:
   {json.dumps(EXEMPLO_CONTINUIDADE, ensure_ascii=False)}; docs/ = manuais e roteiro exemplo (.md). No modelo_roteiro.json,
   "roteiro_exemplo": "docs/<arquivo>.md" faz o 📐 do modelo vir preenchido. O roteiro sai só com narração e falas (sem VISUAL).
 - direcao.json (OPCIONAL — o estilo de edição do canal no editor): {json.dumps(EXEMPLO_DIRECAO, ensure_ascii=False)}
@@ -1984,6 +2092,7 @@ def zip_modelo_vazio() -> bytes:
         z.writestr(r + "continuidade.json", json.dumps(EXEMPLO_CONTINUIDADE, ensure_ascii=False, indent=1))
         z.writestr(r + "lore.md", "# Bíblia da lore (opcional)\n\nPremissa, personagens, relação, lugares, pistas, regras de revelação.\n")
         z.writestr(r + "docs/COLOQUE_AQUI.txt", "manuais do canal e roteiro exemplo (.md)")
+        z.writestr(r + "personagens/mira.json", json.dumps(EXEMPLO_POSES_PERSONAGEM, ensure_ascii=False, indent=1))
         z.writestr(r + "brand_guide.json.LEIA.txt", "Coloque aqui o brand_guide.json da marca (schema " + SCHEMA + ").\nChaves usadas:\n"
                    + "\n".join(f"- {k}: {v}" for k, v in CHAVES_GUIA.items()))
         for pasta in ("assets", "referencias/poses", "referencias/silhuetas", "referencias/animacao_original", "folha_mestra",

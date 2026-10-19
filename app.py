@@ -1105,6 +1105,8 @@ def gerar_voz_gerar():
             pass
     st = _GERAR_VOZ_STATUS[job_id]
     st.update(na_fila=True, voz=_voz_do_kwargs(engine, kwargs), multivoz=multivoz_on, log="⏳ Na fila…\n")
+    if multivoz_on:
+        st["texto_falas"] = texto[:200000]  # 🧍 v84_185: vai no info.json do .zip — o editor sabe quem fala quando
     if not (st.get("dossie_id") or st.get("roteiro_id") or st.get("venda_id")):
         try:  # 📑 roteiro de um modelo de vídeo colado à mão: liga sozinho (capítulos + .zip com o projeto)
             import dossies
@@ -2105,7 +2107,8 @@ def _zip_da_voz(job_id: str, status: Dict[str, Any]) -> str:
                                                         origem_idioma=status.get("idioma_origem"),
                                                         **({"venda_id": status["venda_id"]} if status.get("venda_id") else {}),
                                                         **({"dossie_id": status["dossie_id"]} if status.get("dossie_id") else {}),
-                                                        **({"roteiro_id": status["roteiro_id"]} if status.get("roteiro_id") else {})))
+                                                        **({"roteiro_id": status["roteiro_id"]} if status.get("roteiro_id") else {}),
+                                                        **({"texto_falas": status["texto_falas"]} if status.get("texto_falas") else {})))
             if status.get("resultado_chamadas_filename"):
                 ch_path = os.path.join(VOZES_DIR, secure_filename(status["resultado_chamadas_filename"]))
                 if os.path.exists(ch_path):
@@ -3106,6 +3109,18 @@ def _roteiro_do_zip(zip_path: str) -> str:
     return ""
 
 
+def _texto_falas_do_zip(zip_path: str) -> str:
+    """🧍 v84_185: o roteiro multi voz (com as tags [mira] …) gravado no info.json do .zip do Gerar voz ("" se não tem)."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            info = next((n for n in zf.namelist() if os.path.basename(n).lower() == "info.json"), None)
+            if info:
+                return str((json.loads(zf.read(info).decode("utf-8", "replace")) or {}).get("texto_falas") or "")[:200000]
+    except (zipfile.BadZipFile, OSError, KeyError, ValueError, AttributeError):
+        pass
+    return ""
+
+
 def _venda_do_zip(zip_path: str) -> str:
     tipo, vid = _projeto_do_zip(zip_path)
     return vid if tipo == "venda" else ""
@@ -3532,6 +3547,10 @@ def transcribe():
             # (v84_92) não marca mais o "youtube" sozinho: as cenas só viram YouTube se VOCÊ marcou a fonte
     elif _pid:
         _ligar_projeto(_JOBS[job_id], _tipo, _pid)
+    if segments_do_zip is not None:  # 🧍 v84_185: o roteiro multi voz (com as tags) que gerou o áudio — quem fala quando
+        _tf = _texto_falas_do_zip(os.path.join(job_dir, "upload.zip"))
+        if _tf:
+            _JOBS[job_id]["texto_falas"] = _tf
     if segments_do_zip is not None and not _JOBS[job_id].get("roteiro_id"):  # 📝 Roteiro do YouTube: capítulos no tempo do vídeo final
         _rid = _roteiro_do_zip(os.path.join(job_dir, "upload.zip"))
         if _rid:
@@ -3628,6 +3647,11 @@ def transcribe():
                             extra_instructions=extra_instructions, usar_templates=_usa_templates_cena(),
                             mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
                 job["prompt"] = _com_produto(job, prompt_text)
+                if job.get("texto_falas"):  # 🧍 v84_185: canal com personagens (multi voz): elas já entram quando falam
+                    try:
+                        __import__("personagens_editor").auto(job, _job_dir(job_id), BASE_DIR, _palavras_da_narracao(job))
+                    except Exception:  # noqa: BLE001
+                        pass
                 job["status"] = "aguardando_json"
                 job["fase"] = "Pronto!"
         except TranscriptionError as exc:
@@ -5553,6 +5577,8 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                             "start": ov["start"], "end": ov["end"],
                             "position": ov.get("position", "top-right"),
                             "size_percent": ov.get("size_percent", 20),
+                            # 🧍 v84_185: personagem do canal — lado, entrada/saída e a boca
+                            **(__import__("personagens_editor").para_render(ov) if ov.get("origem") == "personagem" else {}),
                         })
                     except VideoAssemblyError as exc:
                         # um overlay que falha (link quebrado, busca sem
@@ -11183,8 +11209,20 @@ def _criar_job_producao(item: dict, lote: dict, zip_path: str, resposta: dict, f
         raise RuntimeError(f"o projeto não ficou pronto ({job.get('status')}): {str(job.get('error') or '')[:300]}")
     job["nome_projeto"] = item.get("titulo") or ""
     job["producao_pod"] = {"lote": lote.get("id"), "item": item.get("id")}
+    if item.get("texto") and "[" in item["texto"]:  # 🧍 v84_185: o roteiro com as tags de quem fala
+        job["texto_falas"] = item["texto"]
+    if item.get("falas_pod") and os.path.isfile(item["falas_pod"]):  # 🎭 v84_187: quem falou quando, exato (do pod)
+        try:
+            with open(item["falas_pod"], encoding="utf-8") as f:
+                job["falas_pod"] = json.load(f)
+        except (OSError, ValueError):
+            pass
     if ficha:
         job.setdefault("ia", {})["ficha"] = ficha
+    try:  # 🧍 v84_185: canal com personagens ("personagens_editor": {"ativo": true}): elas entram quando falam
+        __import__("personagens_editor").auto(job, _job_dir(job_id), BASE_DIR, _palavras_da_narracao(job))
+    except Exception:  # noqa: BLE001
+        pass
     _save_state(job_id)
     return _colar_json_producao(job_id, resposta)
 
@@ -11537,6 +11575,8 @@ _animar.registrar(app, _JOBS.get, _save_state, _job_dir,
                   _seg_estudio, _orientacao_do_job, lambda job: str(job.get("language") or ""))
 import personagens_pod_rotas as _personagens_rotas  # noqa: E402  🧍 poses PNG das personagens no pod (v84_183)
 _personagens_rotas.registrar(app, BASE_DIR)
+import personagens_editor as _pers_ed  # noqa: E402  🧍 as personagens do canal por cima do vídeo, quando falam (v84_185)
+_pers_ed.registrar(app, _JOBS.get, _save_state, _job_dir, _palavras_da_narracao, BASE_DIR)
 import conteudo_ia as _conteudo_ia  # noqa: E402  🤖 selo nas cenas geradas por IA (v84_145)
 _conteudo_ia.registrar(app, BASE_DIR, _JOBS, _save_state)
 import clonar as _clonar  # noqa: E402  📑 clonar projeto (modelo de vídeo, roteiro, editor) (v84_146)

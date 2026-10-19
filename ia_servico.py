@@ -116,6 +116,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                "No Estúdio, sugere quais cenas de imagem MAIS ganham com movimento e escreve o prompt de cada animação "
                "(imagem → vídeo no Flow): a partir do prompt que gerou a imagem (cena de IA) ou do contexto da cena — "
                "olhando a própria imagem.", True),
+    "personagens": ("🧍 Personagens no vídeo: momentos, poses e animação",
+                    "No Estúdio (aba 🧍 Personagens) e nos projetos novos de um canal com personagens: escolhe os MELHORES "
+                    "momentos pra cada personagem aparecer (não todas as falas), a pose que combina com o que ela diz e a "
+                    "animação de entrada/saída.", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

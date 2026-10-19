@@ -41,7 +41,32 @@ def registrar(app, base_dir: str) -> None:
     @app.route("/personagens-pod", methods=["GET"])
     def personagens_pod_page():
         return render_template("personagens_pod.html", projetos=pp.listar(base_dir), pod_url=_pod_padrao(),
-                               erro=request.args.get("erro") or "")
+                               erro=request.args.get("erro") or "", canais=_canais())
+
+    def _canais():
+        try:
+            return pp.personagens_dos_canais(base_dir)
+        except Exception:  # noqa: BLE001
+            return []
+
+    @app.route("/personagens-pod/criar-do-canal", methods=["POST"])
+    def personagens_pod_criar_do_canal():
+        refs = [(f.filename, f.read()) for f in request.files.getlist("refs") if f and f.filename]
+        try:
+            p = pp.criar_do_canal(request.form.get("canal") or "", request.form.get("personagem") or "", refs,
+                                  request.form.get("motor") or "flow", (request.form.get("pod_url") or "").strip(), "", base_dir)
+        except pp.PersErro as exc:
+            return redirect(url_for("personagens_pod_page", erro=str(exc)))
+        return redirect(url_for("personagens_pod_projeto", pid=p["id"]))
+
+    @app.route("/personagens-pod/<pid>/canal", methods=["POST"])
+    def personagens_pod_canal(pid: str):
+        c = _corpo()
+        return _ok(pp.ligar_canal, pid, str(c.get("canal") or ""), str(c.get("personagem") or ""), bool(c.get("usar_json")), base_dir)
+
+    @app.route("/personagens-pod/<pid>/canal/desligar", methods=["POST"])
+    def personagens_pod_canal_desligar(pid: str):
+        return _ok(pp.desligar_canal, pid, base_dir)
 
     @app.route("/personagens-pod/criar", methods=["POST"])
     def personagens_pod_criar():
@@ -65,7 +90,12 @@ def registrar(app, base_dir: str) -> None:
             p = pp.carregar(pid, base_dir)
         except pp.PersErro:
             abort(404)
-        return render_template("personagens_pod_projeto.html", p=pp.para_tela(p))
+        try:
+            import flow_lote
+            visivel = bool(flow_lote.lote().cfg.get("visivel"))
+        except Exception:  # noqa: BLE001
+            visivel = False
+        return render_template("personagens_pod_projeto.html", p=pp.para_tela(p), flow_visivel=visivel, canais=_canais())
 
     @app.route("/personagens-pod/<pid>/estado", methods=["GET"])
     def personagens_pod_estado(pid: str):
