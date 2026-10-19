@@ -20,7 +20,8 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 JSON_POSES = {
     "formato": "personagens_pod_v1", "personagem": "vanta", "nome": "Vanta",
     "descricoes_referencias": {"ficha.png": "the official character reference sheet of Vanta"},
-    "texto_fixo": {"trava": "VANTA LOCK", "estilo": "ART STYLE", "regras": "WHITE BACKGROUND"},
+    "texto_fixo": {"trava": "VANTA LOCK", "estilo": "ART STYLE", "regras": "flat chroma-key GREEN background"},
+    "fundo": "verde",
     "geracao": {"largura": 512, "altura": 768, "passos": 4, "cfg": 4.0}, "canvas": [600, 900],
     "poses": [
         {"arquivo": "vanta_neutra_esq.png", "tipo": "pose", "prioridade": 1, "mestre": True, "grupo": "reacao", "prompt": "neutral"},
@@ -110,6 +111,13 @@ def test_ponta_a_ponta(pod, tmp_path, monkeypatch):
     assert it["estado"] == "pronta" and it["versoes"] == 1
     img = Image.open(io.BytesIO(c.get(f"/personagens-pod/{pid}/img/{it['img']}").data))
     assert img.size == (600, 900) and img.mode == "RGBA"
+    import numpy as np
+    px = np.asarray(img).astype(int)
+    visivel = px[..., 3] > 128
+    assert visivel.any() and not (visivel & (px[..., 1] > np.maximum(px[..., 0], px[..., 2]) + 25)).any()  # 🟩 nada de verde
+    assert not visivel[:5].any()  # o fundo verde virou transparente
+    stj0 = json.loads(sorted((tmp_path / "pod" / "jobs").iterdir())[-1].joinpath("status.json").read_text(encoding="utf-8"))
+    assert stj0["itens"]["vanta_neutra_esq.png"]["limpeza"]["verde_px"] > 0
     assert c.post(f"/personagens-pod/{pid}/mestre", json={"arquivo": "vanta_neutra_esq.png"}).get_json()["ok"]
     # ▶ o resto: a boca da mestre (base fora do lote: sobe a imagem) e a cética + a boca dela (base no lote)
     r = c.post(f"/personagens-pod/{pid}/gerar", json={"arquivos": ["vanta_neutra_esq_boca.png", "vanta_cetica_esq.png",
@@ -122,7 +130,7 @@ def test_ponta_a_ponta(pod, tmp_path, monkeypatch):
     # o pedido que o pod recebeu: a mestre foi de referência, com a trava e a correção
     pedidos = sorted((tmp_path / "pod" / "jobs").iterdir())
     ped = json.loads((pedidos[-1] / "pedido.json").read_text(encoding="utf-8"))
-    assert ped["mestre"].startswith("MESTRE_") and ped["referencias"] == ["ficha.png"]
+    assert ped["mestre"].startswith("MESTRE_") and ped["referencias"] == ["ficha.png"] and ped["fundo"] == "verde"
     assert (pedidos[-1] / "refs" / "vanta_neutra_esq.png").exists()  # a base da _boca subiu
     stj = json.loads((pedidos[-1] / "status.json").read_text(encoding="utf-8"))
     assert "APPROVED MASTER" in stj["itens"]["vanta_cetica_esq.png"]["prompt"] and "VANTA LOCK" in stj["itens"]["vanta_cetica_esq.png"]["prompt"]
@@ -157,3 +165,41 @@ def test_boca_sem_base_pronta_avisa(tmp_path, monkeypatch):
         pp.enviar(p["id"], ["vanta_neutra_esq_boca.png"])
     with pytest.raises(pp.PersErro, match="não respondeu"):
         pp.enviar(p["id"], ["vanta_neutra_esq.png"])
+
+
+def test_trocar_json_mantem_imagens(tmp_path, monkeypatch):
+    monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
+    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())], "http://127.0.0.1:9")
+    p = pp.carregar(p["id"])
+    p["imagens"]["vanta_neutra_esq.png"].update(estado="aprovada", versoes=[{"local": "x.png"}], atual=0)
+    pp.salvar(p)
+    novo = json.loads(json.dumps(JSON_POSES))
+    novo["poses"] = [dict(novo["poses"][0], prompt="NEW PROMPT"), {"arquivo": "vanta_feliz_esq", "prompt": "happy"}]
+    r = pp.trocar_json(p["id"], json.dumps(novo))
+    assert r == {"ok": True, "poses": 2, "novas": 1, "sairam": 4}
+    q = pp.carregar(p["id"])
+    assert q["imagens"]["vanta_neutra_esq.png"]["estado"] == "aprovada"
+    assert q["imagens"]["vanta_feliz_esq.png"]["estado"] == "nova"
+    assert "vanta_cetica_esq.png" not in q["imagens"]
+    assert pp.pose(q, "vanta_neutra_esq.png")["prompt"] == "NEW PROMPT"
+    with pytest.raises(pp.PersErro):
+        pp.trocar_json(p["id"], "{}")
+    q["imagens"]["vanta_feliz_esq.png"]["estado"] = "fila"
+    pp.salvar(q)
+    with pytest.raises(pp.PersErro, match="ainda estão no pod"):
+        pp.trocar_json(p["id"], json.dumps(JSON_POSES))
+
+
+def test_qualidade_vai_no_pedido(pod, tmp_path, monkeypatch):
+    monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
+    import app as A
+    c = A.app.test_client()
+    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())], pod)
+    assert c.get(f"/personagens-pod/{p['id']}/json").get_json()["json"].startswith("{")
+    r = c.post(f"/personagens-pod/{p['id']}/gerar", json={"arquivos": ["vanta_neutra_esq.png"], "qualidade": "alta", "passos": 35}).get_json()
+    assert r["ok"]
+    _esperar(c, p["id"])
+    ped = json.loads(sorted((tmp_path / "pod" / "jobs").iterdir())[-1].joinpath("pedido.json").read_text(encoding="utf-8"))
+    assert ped["geracao"]["qualidade"] == "alta" and ped["geracao"]["passos"] == 35
+    stj = json.loads(sorted((tmp_path / "pod" / "jobs").iterdir())[-1].joinpath("status.json").read_text(encoding="utf-8"))
+    assert stj["itens"]["vanta_neutra_esq.png"]["passos"] == 35

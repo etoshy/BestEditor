@@ -43,6 +43,16 @@
     <a href="/personagens-pod/{{ p.id }}/aprovadas.zip" style="margin-left:auto;font-weight:600;">⬇ Baixar as aprovadas (.zip)</a>
   </div>
   <div class="pj-barra" style="font-size:.85rem;">
+    <b>Qualidade</b>
+    <select id="qualidade" style="width:auto;margin:0;" title="vale pros próximos envios">
+      <option value="">padrão do pod</option>
+      <option value="rapida">⚡ rápida (4 passos, ~1 min)</option>
+      <option value="alta">🎨 alta (modelo completo — melhor traço, mais lenta)</option>
+    </select>
+    <label style="margin:0;font-weight:normal;">passos <input type="number" id="passos" min="1" max="80" placeholder="auto" style="width:70px;margin:0;"></label>
+    <span style="color:#666;">dica: a ⭐ mestre em 🎨 alta (30–40 passos); o resto pode ir em ⚡ rápida</span>
+  </div>
+  <div class="pj-barra" style="font-size:.85rem;">
     <select id="filtro" style="width:auto;margin:0;"><option value="todas">todas</option><option value="revisar">👀 pra revisar</option><option value="faltam">faltam gerar</option><option value="aprovada">✔ aprovadas</option><option value="erro">❌ com erro</option><option value="fila">⏳ no pod</option></select>
     <select id="fGrupo" style="width:auto;margin:0;"><option value="">reações e objetos</option><option value="reacao">só reações</option><option value="objeto">só objetos</option><option value="boca">só _boca</option></select>
     <label style="margin:0;font-weight:normal;"><input type="checkbox" id="marcarVis" style="width:auto;margin:0 4px 0 0;">marcar as visíveis</label>
@@ -50,6 +60,12 @@
   </div>
   <div id="aviso" style="display:none;font-size:.85rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;"></div>
   <div class="pj-grade" id="grade"></div>
+  <details id="jsonBox" style="margin-top:10px;"><summary style="cursor:pointer;font-size:.85rem;color:#666;">✏ Editar o JSON das poses</summary>
+    <p style="font-size:.8rem;color:#666;margin:6px 0;">Poses com o mesmo "arquivo" mantêm as imagens e a aprovação; as novas entram como "falta gerar"; as removidas somem da galeria. Os prompts novos valem pras próximas gerações.</p>
+    <textarea id="jsonTxt" rows="18" style="width:100%;font-family:monospace;font-size:.75rem;"></textarea>
+    <div class="pj-barra"><button type="button" id="jsonSalvar">💾 Salvar JSON</button>
+      <label style="margin:0;font-weight:normal;">ou carregar arquivo <input type="file" id="jsonArq" accept=".json,application/json" style="width:auto;margin:0;"></label></div>
+  </details>
   <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:.85rem;color:#666;">registro</summary><pre id="log" style="font-size:.75rem;white-space:pre-wrap;"></pre></details>
 </div>
 <div class="pj-zoom" id="zoom"><img id="zoomImg"></div>
@@ -111,7 +127,7 @@
   async function gerar(arquivos, extra) {
     if (!arquivos.length) { alert('Nada pra gerar aqui.'); return; }
     if (!D.mestre && arquivos.length > 1 && !confirm('Ainda não tem ⭐ mestre aprovada — sem ela a personagem varia mais. Gerar assim mesmo?')) return;
-    try { const d = await post(`/personagens-pod/${PID}/gerar`, {arquivos, extra}); arquivos.forEach(a => marc.delete(a)); $('aviso').style.display = 'none'; }
+    try { const d = await post(`/personagens-pod/${PID}/gerar`, {arquivos, extra, qualidade: $('qualidade').value, passos: parseInt($('passos').value || '0', 10) || 0}); arquivos.forEach(a => marc.delete(a)); $('aviso').style.display = 'none'; }
     catch (e) { alert(e.message); }
     estado();
   }
@@ -132,6 +148,19 @@
     estado();
   });
   $('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+  try { const q = localStorage.getItem('pp_qualidade'); if (q !== null) $('qualidade').value = q; const ps = localStorage.getItem('pp_passos'); if (ps) $('passos').value = ps; } catch (e) {}
+  $('qualidade').addEventListener('change', () => { try { localStorage.setItem('pp_qualidade', $('qualidade').value); } catch (e) {} });
+  $('passos').addEventListener('change', () => { try { localStorage.setItem('pp_passos', $('passos').value); } catch (e) {} });
+  $('jsonBox').addEventListener('toggle', async () => {
+    if (!$('jsonBox').open || $('jsonTxt').value) return;
+    try { const r = await fetch(`/personagens-pod/${PID}/json`); const d = await r.json(); $('jsonTxt').value = d.json || ''; } catch (e) { alert(e.message); }
+  });
+  $('jsonArq').addEventListener('change', async () => { const f = $('jsonArq').files[0]; if (f) $('jsonTxt').value = await f.text(); });
+  $('jsonSalvar').addEventListener('click', async () => {
+    try { const d = await post(`/personagens-pod/${PID}/json`, {json: $('jsonTxt').value});
+      alert(`JSON salvo: ${d.poses} pose(s)` + (d.novas ? `, ${d.novas} nova(s)` : '') + (d.sairam ? `, ${d.sairam} removida(s)` : '')); estado(); }
+    catch (e) { alert(e.message); }
+  });
   $('gMestre').addEventListener('click', () => { const m = D.itens.find(x => x.mestre_sugerida) || D.itens.find(x => x.tipo !== 'boca'); gerar([m.arquivo], ''); });
   const semMestre = (x) => !(D.mestre && D.mestre.arquivo === x.arquivo);
   const pronto = (x) => ['nova', 'erro'].includes(x.estado) && semMestre(x);

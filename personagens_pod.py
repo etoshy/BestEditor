@@ -148,6 +148,29 @@ def criar(nome: str, texto_json: str, refs: List[Tuple[str, bytes]], pod_url: st
     return p
 
 
+def trocar_json(pid: str, texto_json: str, base: str = _BASE) -> Dict[str, Any]:
+    """✏ troca o JSON de um projeto que já existe: as poses que continuam (mesmo "arquivo") mantêm as imagens,
+    versões e a aprovação; as novas entram como "falta gerar"; as que saíram do JSON somem da galeria
+    (as imagens ficam na pasta). Os prompts novos valem pras próximas gerações."""
+    dados = ler_json(texto_json)
+    with _TRAVA:
+        p = carregar(pid, base)
+        novos = {x["arquivo"] for x in dados["poses"]}
+        na_fila = [a for a, it in p["imagens"].items() if a not in novos and it.get("estado") in ESTADOS_ESPERA]
+        if na_fila:
+            raise PersErro("Estas poses ainda estão no pod e sumiriam do JSON: " + ", ".join(na_fila[:5]) + " — espere terminar.")
+        antes = p["imagens"]
+        p["imagens"] = {a: antes.get(a) or {"estado": "nova", "versoes": [], "atual": -1, "erro": None, "job": None} for a in
+                        [x["arquivo"] for x in dados["poses"]]}
+        p["dados"] = dados
+        if p.get("mestre") and p["mestre"].get("arquivo") not in novos:
+            _log(p, f"⚠ a mestre {p['mestre']['arquivo']} não está no JSON novo — ela continua valendo de referência")
+        add, saiu = len(novos - set(antes)), len(set(antes) - novos)
+        _log(p, f"✏ JSON trocado: {len(novos)} pose(s)" + (f", {add} nova(s)" if add else "") + (f", {saiu} saiu(saíram)" if saiu else ""))
+        salvar(p, base)
+        return {"ok": True, "poses": len(novos), "novas": add, "sairam": saiu}
+
+
 def pose(p: Dict[str, Any], arquivo: str) -> Dict[str, Any]:
     x = next((y for y in p["dados"]["poses"] if y["arquivo"] == arquivo), None)
     if not x:
@@ -192,7 +215,7 @@ def status_pod(url: str) -> Dict[str, Any]:
     return _pod(url, "GET", "/status", timeout=10).json()
 
 
-def enviar(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE) -> Dict[str, Any]:
+def enviar(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE, qualidade: str = "", passos: int = 0) -> Dict[str, Any]:
     """Manda as poses pro pod num job só. Poses com a mestre aprovada vão com ela de referência; "_boca" leva a
     imagem base (se ela não está no mesmo lote, sobe a versão atual dela)."""
     with _TRAVA:
@@ -221,13 +244,21 @@ def enviar(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE) ->
                 x["extra"] = extra[:600]
             poses_job.append({k: x[k] for k in ("arquivo", "tipo", "prompt", "base", "extra") if x.get(k)})
         dados = p["dados"]
+        geracao = dict(dados.get("geracao") or {})
+        if qualidade in ("rapida", "alta"):  # ⚡ rápida (Lightning, 4 passos) ou 🎨 alta (modelo completo, mais passos)
+            geracao["qualidade"] = qualidade
+        if passos:
+            geracao["passos"] = max(1, min(80, int(passos)))
         pedido = {"nome": f"{p['nome']} · {len(poses_job)} pose(s)", "referencias": refs,
                   "descricoes": {n: (dados.get("descricoes_referencias") or {}).get(n) for n in refs
                                  if (dados.get("descricoes_referencias") or {}).get(n)},
                   "mestre": ("MESTRE_" + mestre["arquivo"]) if mestre else None,
-                  "texto_fixo": dados.get("texto_fixo") or {}, "geracao": dados.get("geracao") or {},
+                  "texto_fixo": dados.get("texto_fixo") or {}, "geracao": geracao,
                   "canvas": dados.get("canvas") or [1200, 1800], "altura_personagem": dados.get("altura_personagem") or 0.95,
-                  "recortar": True, "poses": poses_job}
+                  "recortar": True, "poses": poses_job,
+                  # 🟩 fundo da geração: "verde" (chroma key — o pod tira até o verde preso no cabelo) ou "branco"
+                  "fundo": dados.get("fundo") if dados.get("fundo") in ("verde", "branco") else "branco",
+                  **({"limpeza": dados["limpeza"]} if isinstance(dados.get("limpeza"), (dict, bool)) else {})}
         abertos = []
         try:
             files = []
@@ -245,6 +276,7 @@ def enviar(pid: str, arquivos: List[str], extra: str = "", base: str = _BASE) ->
         for a in alvo:
             p["imagens"][a].update(estado="fila", job=jid, erro=None, versao_pod=0)
         _log(p, f"▶ {len(alvo)} pose(s) pro pod" + (" com a ⭐ mestre" if mestre else " (sem mestre)")
+             + (f" · qualidade {qualidade}" if qualidade else "") + (f" · {geracao['passos']} passos" if passos else "")
              + (f" · correção: {extra[:80]}" if extra else ""))
         salvar(p, base)
         return {"ok": True, "job": jid, "enviadas": len(alvo), "com_mestre": bool(mestre)}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 from typing import Any
@@ -96,7 +97,22 @@ def registrar(app, base_dir: str) -> None:
     @app.route("/personagens-pod/<pid>/gerar", methods=["POST"])
     def personagens_pod_gerar(pid: str):
         c = _corpo()
-        return _ok(pp.enviar, pid, [str(a) for a in c.get("arquivos") or []], str(c.get("extra") or ""), base_dir)
+        try:
+            passos = int(c.get("passos") or 0)
+        except (TypeError, ValueError):
+            passos = 0
+        return _ok(lambda: pp.enviar(pid, [str(a) for a in c.get("arquivos") or []], str(c.get("extra") or ""), base_dir,
+                                     qualidade=str(c.get("qualidade") or ""), passos=passos))
+
+    @app.route("/personagens-pod/<pid>/json", methods=["GET", "POST"])
+    def personagens_pod_json(pid: str):
+        if request.method == "GET":
+            try:
+                p = pp.carregar(pid, base_dir)
+            except pp.PersErro as exc:
+                return jsonify({"erro": str(exc)}), 404
+            return jsonify({"json": json.dumps(p["dados"], ensure_ascii=False, indent=1)})
+        return _ok(pp.trocar_json, pid, str(_corpo().get("json") or ""), base_dir)
 
     @app.route("/personagens-pod/<pid>/aprovar", methods=["POST"])
     def personagens_pod_aprovar(pid: str):
