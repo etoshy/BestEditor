@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}{{ p.nome }} — Personagens no pod{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1400px; }
+  .pj-barra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+  .pj-barra button { width: auto; margin: 0; }
+  .pj-card { border: 1px solid #ddd; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .pj-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 10px; }
+  .pj-it { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; background: #fff; position: relative; }
+  .pj-it.aprovada { border-color: #22c55e; box-shadow: 0 0 0 2px #bbf7d0; }
+  .pj-it.mestre { border-color: #a855f7; box-shadow: 0 0 0 2px #e9d5ff; }
+  .pj-img { width: 100%; aspect-ratio: 2/3; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: .8rem; cursor: zoom-in;
+    background-color: #e5e7eb; background-image: linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
+    background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; overflow: hidden; }
+  .pj-img img { width: 100%; height: 100%; object-fit: contain; }
+  .pj-nome { font-size: .78rem; font-weight: 600; margin-top: 6px; word-break: break-all; }
+  .pj-desc { font-size: .75rem; color: #555; }
+  .pj-est { font-size: .72rem; border-radius: 999px; padding: 1px 8px; background: #f1f5f9; display: inline-block; margin-top: 4px; }
+  .pj-est.pronta { background: #fef9c3; } .pj-est.aprovada { background: #dcfce7; color: #166534; } .pj-est.erro { background: #fee2e2; color: #991b1b; }
+  .pj-est.fila, .pj-est.gerando { background: #e0e7ff; color: #3730a3; } .pj-est.descartada { background: #e5e7eb; color: #6b7280; }
+  .pj-acoes { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .pj-acoes button { width: auto; margin: 0; padding: 2px 7px; font-size: .75rem; }
+  .pj-chk { position: absolute; top: 12px; left: 12px; width: auto; transform: scale(1.3); }
+  .pj-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.8); display: none; align-items: center; justify-content: center; z-index: 999; }
+  .pj-zoom img { max-height: 94vh; max-width: 94vw; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
+</style>
+<p><a href="/personagens-pod">← Personagens no pod</a></p>
+<h1 style="margin-bottom:4px;">🧍 {{ p.nome }}</h1>
+<div class="pj-card" style="background:#faf5ff;border-color:#e9d5ff;">
+  <div class="pj-barra"><b>🔗 Pod</b><input type="url" id="podUrl" value="{{ p.pod_url }}" placeholder="https://<id-do-pod>-8000.proxy.runpod.net" style="flex:1;min-width:280px;margin:0;">
+    <button type="button" id="podSalvar">Usar este link</button><button type="button" id="podTestar">🩺 Testar</button><span id="podSt" style="font-size:.85rem;"></span></div>
+  <div class="pj-barra" style="font-size:.85rem;color:#555;">Referências: {% for r in p.refs %}<a href="/personagens-pod/{{ p.id }}/img/{{ r }}" target="_blank"><img src="/personagens-pod/{{ p.id }}/img/{{ r }}" style="height:46px;border-radius:4px;vertical-align:middle;"></a> {% endfor %}
+    <span id="mestreInfo"></span></div>
+</div>
+<div class="pj-card">
+  <div class="pj-barra">
+    <button type="button" id="gMestre" style="background:#7c3aed;">⭐ Gerar a mestre</button>
+    <button type="button" id="gP1">▶ Gerar prioridade 1</button>
+    <button type="button" id="gFaltam">▶ Gerar todas as que faltam</button>
+    <button type="button" id="gMarcadas">▶ Gerar as marcadas (<span id="nMarc">0</span>)</button>
+    <button type="button" id="gMarcadasCorr" title="refaz as marcadas com uma correção (ex.: o olho de eclipse do outro lado)">🔁 Refazer as marcadas com correção</button>
+    <a href="/personagens-pod/{{ p.id }}/aprovadas.zip" style="margin-left:auto;font-weight:600;">⬇ Baixar as aprovadas (.zip)</a>
+  </div>
+  <div class="pj-barra" style="font-size:.85rem;">
+    <select id="filtro" style="width:auto;margin:0;"><option value="todas">todas</option><option value="revisar">👀 pra revisar</option><option value="faltam">faltam gerar</option><option value="aprovada">✔ aprovadas</option><option value="erro">❌ com erro</option><option value="fila">⏳ no pod</option></select>
+    <select id="fGrupo" style="width:auto;margin:0;"><option value="">reações e objetos</option><option value="reacao">só reações</option><option value="objeto">só objetos</option><option value="boca">só _boca</option></select>
+    <label style="margin:0;font-weight:normal;"><input type="checkbox" id="marcarVis" style="width:auto;margin:0 4px 0 0;">marcar as visíveis</label>
+    <span id="resumo" style="color:#555;"></span>
+  </div>
+  <div id="aviso" style="display:none;font-size:.85rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;"></div>
+  <div class="pj-grade" id="grade"></div>
+  <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:.85rem;color:#666;">registro</summary><pre id="log" style="font-size:.75rem;white-space:pre-wrap;"></pre></details>
+</div>
+<div class="pj-zoom" id="zoom"><img id="zoomImg"></div>
+<script>
+(function () {
+  const PID = {{ p.id|tojson }};
+  let D = {{ p|tojson }};
+  const marc = new Set();
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const ROT = {nova: 'falta gerar', fila: '⏳ na fila do pod', gerando: '🎨 gerando…', pronta: '👀 pra revisar', aprovada: '✔ aprovada', erro: '❌ erro', descartada: '🗑 descartada'};
+  async function post(url, corpo) {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+  }
+  function visiveis() {
+    const f = $('filtro').value, g = $('fGrupo').value;
+    return D.itens.filter(it => (!g || it.grupo === g)
+      && (f === 'todas' || (f === 'revisar' && it.estado === 'pronta') || (f === 'faltam' && ['nova', 'erro'].includes(it.estado))
+          || (f === 'fila' && ['fila', 'gerando'].includes(it.estado)) || it.estado === f));
+  }
+  function desenhar() {
+    const r = D.resumo; $('resumo').textContent = `${r.total} poses · ✔ ${r.aprovada || 0} aprovadas · 👀 ${r.pronta || 0} pra revisar · ⏳ ${(r.fila || 0) + (r.gerando || 0)} no pod · ❌ ${r.erro || 0}`;
+    $('mestreInfo').innerHTML = D.mestre ? ` · ⭐ mestre: <b>${esc(D.mestre.arquivo)}</b> <img src="/personagens-pod/${PID}/img/${esc(D.mestre.local)}" style="height:46px;vertical-align:middle;border:2px solid #a855f7;border-radius:4px;">`
+      : ' · <b style="color:#7c3aed;">⭐ sem mestre ainda</b> — gere a mestre, refaça até ficar igual à ficha e clique em “⭐ usar como mestre”';
+    $('nMarc').textContent = marc.size;
+    $('log').textContent = (D.log || []).join('\n');
+    $('grade').innerHTML = visiveis().map(it => {
+      const eMestre = D.mestre && D.mestre.arquivo === it.arquivo;
+      const img = it.img ? `<img src="/personagens-pod/${PID}/img/${esc(it.img)}" loading="lazy">` : (['fila', 'gerando'].includes(it.estado) ? '⏳' : 'ainda não gerada');
+      const vers = it.versoes > 1 ? `<button data-v="-1" title="versão anterior">◀</button><span style="font-size:.72rem;">v${it.atual + 1}/${it.versoes}</span><button data-v="1" title="próxima versão">▶</button>` : '';
+      const pode = !['fila', 'gerando'].includes(it.estado);
+      return `<div class="pj-it ${it.estado} ${eMestre ? 'mestre' : ''}" data-a="${esc(it.arquivo)}">
+        <input type="checkbox" class="pj-chk" ${marc.has(it.arquivo) ? 'checked' : ''} ${pode ? '' : 'disabled'}>
+        <div class="pj-img" data-zoom>${img}</div>
+        <div class="pj-nome">${eMestre ? '⭐ ' : ''}${esc(it.arquivo)}</div>
+        <div class="pj-desc">P${it.prioridade} · ${esc(it.descricao)}${it.tipo === 'boca' ? ` <i>(base: ${esc(it.base)})</i>` : ''}</div>
+        <span class="pj-est ${it.estado}">${ROT[it.estado] || it.estado}</span>${it.mestre_sugerida && !D.mestre ? ' <span class="pj-est" style="background:#f3e8ff;">⭐ sugerida pra mestre</span>' : ''}
+        ${it.erro ? `<div class="pj-desc" style="color:#b91c1c;">${esc(it.erro)}</div>` : ''}${it.aviso ? `<div class="pj-desc" style="color:#92400e;">⚠ ${esc(it.aviso)}</div>` : ''}
+        <div class="pj-acoes">
+          ${it.img && pode && it.estado !== 'aprovada' ? '<button data-acao="aprovar" style="background:#16a34a;">✔</button>' : ''}
+          ${it.img && pode && it.tipo !== 'boca' && !eMestre ? '<button data-acao="mestre" style="background:#7c3aed;" title="usar como mestre">⭐</button>' : ''}
+          ${pode ? `<button data-acao="gerar" title="${it.img ? 'gerar de novo (nova versão)' : 'gerar'}">${it.img ? '🔁' : '▶'}</button>` : ''}
+          ${pode && it.img ? '<button data-acao="corrigir" title="refazer com uma correção">🔁✍</button>' : ''}
+          ${vers}
+          ${pode && it.estado !== 'descartada' && it.img ? '<button data-acao="descartar" style="background:#64748b;" title="descartar">🗑</button>' : ''}
+        </div></div>`;
+    }).join('') || '<p style="color:#888;">Nada neste filtro.</p>';
+  }
+  async function estado() {
+    try {
+      const r = await fetch(`/personagens-pod/${PID}/estado`); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      D = d; $('aviso').style.display = d.aviso ? '' : 'none'; $('aviso').textContent = d.aviso ? '⚠ ' + d.aviso : '';
+      for (const a of [...marc]) { const it = D.itens.find(x => x.arquivo === a); if (!it || ['fila', 'gerando'].includes(it.estado)) marc.delete(a); }
+      desenhar();
+    } catch (e) { $('aviso').style.display = ''; $('aviso').textContent = '⚠ ' + e.message; }
+    setTimeout(estado, D.esperando ? 4000 : 15000);
+  }
+  async function gerar(arquivos, extra) {
+    if (!arquivos.length) { alert('Nada pra gerar aqui.'); return; }
+    if (!D.mestre && arquivos.length > 1 && !confirm('Ainda não tem ⭐ mestre aprovada — sem ela a personagem varia mais. Gerar assim mesmo?')) return;
+    try { const d = await post(`/personagens-pod/${PID}/gerar`, {arquivos, extra}); arquivos.forEach(a => marc.delete(a)); $('aviso').style.display = 'none'; }
+    catch (e) { alert(e.message); }
+    estado();
+  }
+  $('grade').addEventListener('click', async (e) => {
+    const card = e.target.closest('.pj-it'); if (!card) return;
+    const a = card.dataset.a, it = D.itens.find(x => x.arquivo === a);
+    if (e.target.classList.contains('pj-chk')) { if (e.target.checked) marc.add(a); else marc.delete(a); $('nMarc').textContent = marc.size; return; }
+    if (e.target.closest('[data-zoom]') && it.img) { $('zoomImg').src = `/personagens-pod/${PID}/img/${it.img}`; $('zoom').style.display = 'flex'; return; }
+    const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.v) { await post(`/personagens-pod/${PID}/versao`, {arquivo: a, idx: Math.max(0, Math.min(it.versoes - 1, it.atual + Number(b.dataset.v)))}); }
+      else if (b.dataset.acao === 'aprovar') await post(`/personagens-pod/${PID}/aprovar`, {arquivo: a});
+      else if (b.dataset.acao === 'mestre') { if (!confirm(`Usar ${a} como ⭐ mestre? As próximas poses vão com ela de referência.`)) return; await post(`/personagens-pod/${PID}/mestre`, {arquivo: a}); }
+      else if (b.dataset.acao === 'descartar') await post(`/personagens-pod/${PID}/descartar`, {arquivo: a});
+      else if (b.dataset.acao === 'gerar') return gerar([a], '');
+      else if (b.dataset.acao === 'corrigir') { const t = prompt('O que corrigir? (em inglês funciona melhor — ex.: "the eclipse lens must be on her right eye", "no cigarette", "same hair as the master")'); if (t) return gerar([a], t); return; }
+    } catch (er) { alert(er.message); }
+    estado();
+  });
+  $('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+  $('gMestre').addEventListener('click', () => { const m = D.itens.find(x => x.mestre_sugerida) || D.itens.find(x => x.tipo !== 'boca'); gerar([m.arquivo], ''); });
+  const semMestre = (x) => !(D.mestre && D.mestre.arquivo === x.arquivo);
+  const pronto = (x) => ['nova', 'erro'].includes(x.estado) && semMestre(x);
+  const ordenar = (lista) => lista.filter(x => x.tipo !== 'boca').concat(lista.filter(x => x.tipo === 'boca'));
+  $('gP1').addEventListener('click', () => gerar(ordenar(D.itens.filter(x => x.prioridade === 1 && pronto(x))).map(x => x.arquivo), ''));
+  $('gFaltam').addEventListener('click', () => gerar(ordenar(D.itens.filter(pronto)).map(x => x.arquivo), ''));
+  $('gMarcadas').addEventListener('click', () => gerar([...marc], ''));
+  $('gMarcadasCorr').addEventListener('click', () => { if (!marc.size) { alert('Marque as poses primeiro.'); return; } const t = prompt('Correção pra todas as marcadas (inglês):'); if (t) gerar([...marc], t); });
+  $('marcarVis').addEventListener('change', (e) => { visiveis().filter(x => !['fila', 'gerando'].includes(x.estado)).forEach(x => e.target.checked ? marc.add(x.arquivo) : marc.delete(x.arquivo)); desenhar(); });
+  $('filtro').addEventListener('change', desenhar); $('fGrupo').addEventListener('change', desenhar);
+  $('podSalvar').addEventListener('click', async () => { try { await post(`/personagens-pod/${PID}/pod-url`, {pod_url: $('podUrl').value}); $('podSt').textContent = '✔ salvo'; } catch (e) { alert(e.message); } });
+  $('podTestar').addEventListener('click', async () => {
+    $('podSt').textContent = '⏳';
+    try { const r = await fetch(`/personagens-pod/${PID}/pod-status`); const d = await r.json(); if (!r.ok) throw new Error(d.erro);
+      const m = d.modelo || {}; $('podSt').textContent = `${d.mock ? '🧪 MOCK · ' : ''}modelo: ${m.modelo}${m.erro ? ' (' + m.erro + ')' : ''}${d.gpu ? ` · ${d.gpu.nome} ${d.gpu.total_gb} GB` : ''} · fila ${d.fila}`;
+    } catch (e) { $('podSt').textContent = '❌ ' + e.message; }
+  });
+  desenhar(); estado();
+})();
+</script>
+{% endblock %}

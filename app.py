@@ -11535,6 +11535,8 @@ import animar_flow as _animar  # noqa: E402  🎞 animar cenas de imagem com o G
 _animar.registrar(app, _JOBS.get, _save_state, _job_dir,
                   lambda job: _falas_por_trecho(job, job.get("pending_segments") or [])[0],
                   _seg_estudio, _orientacao_do_job, lambda job: str(job.get("language") or ""))
+import personagens_pod_rotas as _personagens_rotas  # noqa: E402  🧍 poses PNG das personagens no pod (v84_183)
+_personagens_rotas.registrar(app, BASE_DIR)
 import conteudo_ia as _conteudo_ia  # noqa: E402  🤖 selo nas cenas geradas por IA (v84_145)
 _conteudo_ia.registrar(app, BASE_DIR, _JOBS, _save_state)
 import clonar as _clonar  # noqa: E402  📑 clonar projeto (modelo de vídeo, roteiro, editor) (v84_146)
