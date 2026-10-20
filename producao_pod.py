@@ -823,7 +823,8 @@ def _planejar_cenas(lid: str, iid: str) -> None:
         _mudar(lid, iid, canal=marca["slug"], _log=f"🖼 canal {marca['slug']}: cenas no estilo padrão (foto documental), "
                                                    f"{ccfg_m['pct']}% no pod; personagens só por cima no editor")
         resposta, rostos, escolhidas, avisos, ficha = _planejar_padrao(lid, iid, it, dict(cfg_lote, pct=ccfg_m["pct"]),
-                                                                        cenas, roteiro)
+                                                                        cenas, roteiro,
+                                                                        setas=ccfg_m.get("texto_na_imagem") == "setas_numeros")
     elif marca:  # 🎨 v84_181: roteiro de um canal de pacote — % , estética e personagens do zip do canal
         resposta, rostos, escolhidas, avisos = _planejar_canal(lid, iid, it, cfg_lote, cenas, roteiro, marca)
         ficha = resposta.get("_ficha")
@@ -833,7 +834,7 @@ def _planejar_cenas(lid: str, iid: str) -> None:
 
 
 def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, Any], cenas: List[Dict[str, Any]],
-                     roteiro: str):
+                     roteiro: str, setas: bool = False):
     """O planejamento de sempre (true crime / roteiro sem canal): as ~pct% mais difíceis, foto realista."""
     import cenas_lote
     ficha = None
@@ -849,7 +850,7 @@ def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str,
             ficha = None
         el = _elenco_do_item(lid, iid, it, cfg_lote)
         info = cenas_lote.descrever(cenas, roteiro, it["idioma"], ficha,
-                                    on_passo=lambda m: _mudar(lid, iid, mensagem=m), elenco=el)
+                                    on_passo=lambda m: _mudar(lid, iid, mensagem=m), elenco=el, setas=setas)
     else:
         info = {}
         avisos.append("🤖 IA desligada (recurso “🏭 Produção no pod”): as cenas do pod foram espalhadas por igual e o "
@@ -869,7 +870,7 @@ def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str,
         escolhidas = cenas_lote.escolher_sem_ia(len(cenas), pct)
     escolhidas = {i for i in escolhidas if i not in materiais}
     resposta = cenas_lote.montar_json(cenas, info, escolhidas, cfg_lote.get("estilo_extra") or "", materiais,
-                                      epoca=cfg_lote.get("epoca", True))
+                                      epoca=cfg_lote.get("epoca", True), setas=setas)
     resposta["_ficha"] = ficha
     rostos = _rostos(it, resposta, info) if info else {}
     if rostos:

@@ -29,7 +29,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 PADRAO = {"pct": 100, "personagens": True, "fotos_do_roteiro": "referencia", "estilo_fotos": "", "ref_estilo": False,
-          "cenas": "canal"}  # 🖼 v84_191: "padrao" = as cenas como no roteiro sem canal (foto documental de sempre)
+          "cenas": "canal", "texto_na_imagem": ""}  # 🖼 v84_191: "padrao" = as cenas como no roteiro sem canal (foto documental de sempre)
 BLOCO_IA = 20
 PARALELO_IA = 3
 
@@ -74,6 +74,8 @@ def config(m: Dict[str, Any]) -> Dict[str, Any]:
         c["pct"] = max(0, min(100, int(c["pct"])))
     except (TypeError, ValueError):
         c["pct"] = 100
+    if c["texto_na_imagem"] not in ("", "setas_numeros"):  # "setas_numeros" = esquema só com setas/formas/números
+        c["texto_na_imagem"] = ""
     if c["cenas"] not in ("canal", "padrao"):
         c["cenas"] = "canal"
     if c["fotos_do_roteiro"] not in ("referencia", "real"):
@@ -95,7 +97,9 @@ def tem_mascote(m: Dict[str, Any]) -> bool:
 
 def tipos_imagem(m: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, str]:
     import marca_visual
-    t = {k: v for k, v in marca_visual.TIPOS_IMAGEM.items() if k != "mascote"}
+    # 🖼 sem "diagrama" nos canais de pacote — gráfico gerado sai com letras/números tortos; gráfico entra na edição
+    # (as setas/números só valem no modo "padrao", o do canal do espaço)
+    t = {k: v for k, v in marca_visual.TIPOS_IMAGEM.items() if k not in ("mascote", "diagrama")}
     if cfg.get("estilo_fotos") == "ilustracao":
         t.pop("arquivo", None)  # canal desenhado: nada de "foto de arquivo monocromática"
     return t
@@ -173,9 +177,8 @@ REGRA DAS IMAGENS DESTE CANAL (muito importante):
 - Gente só quando a fala é SOBRE pessoas (ex.: os astrônomos chineses de 1054, uma multidão, um cientista trabalhando);
   aí "pessoa": "generica" (ou "real" do elenco). Nos outros casos "pessoa": "nenhuma".
 - NADA de texto na imagem: sem perguntas, títulos, legendas, rótulos, setas com nome, logo — os textos entram na edição.
-  Também nada de enfeite solto: ponto de interrogação/exclamação, rabiscos, anotações escritas, folhas/páginas de livro
-  coladas nos cantos. Uma imagem limpa do assunto. Pra explicar etapas/comparação pode usar SETAS limpas, formas e no
-  máximo NÚMEROS grandes — nunca palavras ou rótulos.
+  Também nada de enfeite solto: ponto de interrogação/exclamação, setas, rabiscos, anotações, folhas/páginas de livro
+  coladas nos cantos, gráficos com números. Uma imagem limpa do assunto.
   Letras só quando fazem parte de um objeto real da cena (um livro, um cartaz, uma placa).
 - VARIE os cenários: não repita o mesmo lugar (ex.: observatório) cena após cena; cada imagem mostra o que a frase diz.""")
     if bloco_elenco:

@@ -78,16 +78,31 @@ def cortar_cenas(segments: List[Dict[str, Any]], intervalo: float = 5.0, total: 
 
 
 # ------------------------------------------------------------------ 2. descrever (IA)
-def _schema(com_elenco: bool = False):
+def _schema(com_elenco: bool = False, setas: bool = False):
     from ia_midia import _I, _S, _lista, _obj
     cena = {"n": _I, "visual": _S, "busca": _S, "dificil": _I, "prompt_imagem": _S, "ano": _I}
+    if setas:
+        cena["esquema"] = {"type": "boolean"}
     if com_elenco:
         cena.update(pessoas=_lista(_obj({"nome": _S, "idade": _I})), lugar=_S)
     return _obj({"cenas": _lista(_obj(cena))})
 
 
-SEM_TEXTO = ("No words and no letters anywhere in the image (no labels, no captions, no titles); if it explains something, "
-             "use only clean arrows, shapes and at most a few large digits.")
+SEM_TEXTO = ("A single realistic scene, not a diagram, not an infographic, not a chart; no text, no letters, no numbers, "
+             "no labels, no arrows.")
+# 🖼 v84_199: canal com "texto_na_imagem": "setas_numeros" no pacote (o do espaço) — esquema só com setas/formas/números
+SEM_TEXTO_SETAS = ("No words and no letters anywhere in the image (no labels, no captions, no titles); if it explains something, "
+                   "use only clean arrows, shapes and at most a few large digits.")
+REGRA_EXPLICACAO = """Explicação, conceito ou processo (camadas, etapas, comparação de tamanhos, linha do tempo)
+  NUNCA vira diagrama, infográfico, gráfico, esquema com setas/rótulos/números, ícones lado a lado ou fundo branco:
+  mostre UMA cena realista do fenômeno como seria vista de verdade, sem rótulos."""
+REGRA_EXPLICACAO_SETAS = """Explicação, conceito ou processo (camadas de uma estrela, etapas, comparação de tamanhos,
+  linha do tempo): de preferência UMA cena realista do fenômeno como seria vista de verdade (ex.: "a huge glowing red
+  supergiant star in deep space, turbulent surface, Hubble-style astrophotography"); quando precisar mostrar
+  etapas/comparação, pode ser um esquema visual limpo SÓ com formas, SETAS e no máximo NÚMEROS grandes (1, 2, 3, 10×) —
+  NUNCA palavras, nomes, rótulos ou legendas (o gerador escreve tudo errado; o texto entra na edição). Fundo escuro,
+  nunca branco. Esquema é EXCEÇÃO (só onde a fala explica etapas/comparação — poucas cenas no vídeo todo): marque
+  "esquema": true SÓ nelas; em todas as outras "esquema": false e o prompt não fala em setas nem números."""
 
 _SYS = """Você planeja as IMAGENS de um vídeo narrado de YouTube, cena por cena (cada cena tem uns segundos de fala).
 Use a FICHA (quem é quem, lugares, época, estilo) e o ROTEIRO para entender do que cada fala trata de verdade
@@ -104,18 +119,15 @@ Use a FICHA (quem é quem, lugares, época, estilo) e o ROTEIRO para entender do
 - "prompt_imagem": em INGLÊS, 40 a 80 palavras, para o gerador Z-Image Turbo: assunto principal primeiro, depois ação,
   cenário, época, roupas/materiais, luz, enquadramento e lente, e o estilo da ficha (vídeo de imagens REAIS =
   "photorealistic documentary photograph"; ilustração só se a ficha disser). Nada de texto, letreiro ou legenda na
-  imagem. Explicação, conceito ou processo (camadas de uma estrela, etapas, comparação de tamanhos, linha do tempo):
-  de preferência UMA cena realista do fenômeno como seria vista de verdade (ex.: "a huge glowing red supergiant star in
-  deep space, turbulent surface, Hubble-style astrophotography"); quando precisar mostrar etapas/comparação, pode ser
-  um esquema visual limpo SÓ com formas, SETAS e no máximo NÚMEROS grandes (1, 2, 3, 10×) — NUNCA palavras, nomes,
-  rótulos ou legendas (o gerador escreve tudo errado; o texto entra na edição). Fundo escuro, nunca branco. Nunca o NOME de uma pessoa real (descreva: idade, roupa, época). Coerência com as cenas vizinhas.
+  imagem. {REGRA_EXPLICACAO} Nunca o NOME de uma pessoa real (descreva: idade, roupa, época). Coerência com as cenas vizinhas.
 - "ano": o ano em que a cena SE PASSA na história (não o de hoje), pela cronologia do roteiro; 0 se não é um momento
   datado (explicação genérica, conceito). Carros, roupas, objetos e tecnologia do prompt são DESSE ano.
 Mantenha o "n" de cada cena."""
 
 
 def descrever(cenas: List[Dict[str, Any]], roteiro: str = "", idioma: str = "", ficha: Optional[Dict[str, Any]] = None,
-              job: Optional[str] = None, on_passo=None, elenco: Optional[Dict[str, Any]] = None) -> Dict[int, Dict[str, Any]]:
+              job: Optional[str] = None, on_passo=None, elenco: Optional[Dict[str, Any]] = None,
+              setas: bool = False) -> Dict[int, Dict[str, Any]]:
     """{n (1-based): {visual, busca, dificil, prompt_imagem, pessoas?, ano?}} — vazio sem IA (ou se ela falhar).
     Com `elenco` (🎭 pessoas reais com foto): diz quem aparece em cada cena e com que IDADE naquele momento."""
     import ia_servico as ia
@@ -126,7 +138,7 @@ def descrever(cenas: List[Dict[str, Any]], roteiro: str = "", idioma: str = "", 
     bloco_el = _el.bloco_para_cenas(elenco or {})
     nomes_el = {x["nome"].lower(): x["nome"] for x in (elenco or {}).get("pessoas") or [] if x.get("usar", True)}
     locais_el = {x["nome"].lower(): x["nome"] for x in (elenco or {}).get("locais") or [] if x.get("usar", True)}
-    system = _SYS + ("\n\n" + _el.REGRA_CENAS + "\n\n" + bloco_el if bloco_el else "") \
+    system = _SYS.replace("{REGRA_EXPLICACAO}", REGRA_EXPLICACAO_SETAS if setas else REGRA_EXPLICACAO) + ("\n\n" + _el.REGRA_CENAS + "\n\n" + bloco_el if bloco_el else "") \
         + "\n\n## FICHA DO VÍDEO\n" + json.dumps(ficha or {}, ensure_ascii=False) \
         + (f"\n\nIdioma da narração: {idioma}" if idioma else "") + ("\n\n## ROTEIRO\n" + roteiro[:60000] if roteiro else "")
     out: Dict[int, Dict[str, Any]] = {}
@@ -140,7 +152,7 @@ def descrever(cenas: List[Dict[str, Any]], roteiro: str = "", idioma: str = "", 
 
     def bloco(idx: List[int]) -> Dict[int, Dict[str, Any]]:
         """Uma chamada pra IA com ~20 cenas (o roteiro, a ficha e o elenco vão no começo, guardados em cache)."""
-        r = ia.chamar("producao_pod", system, "## CENAS\n" + "\n".join(linha(j) for j in idx), _schema(bool(bloco_el)),
+        r = ia.chamar("producao_pod", system, "## CENAS\n" + "\n".join(linha(j) for j in idx), _schema(bool(bloco_el), setas),
                       max_tokens=12000, effort="low", job=job, timeout=300)
         res: Dict[int, Dict[str, Any]] = {}
         for x in (r or {}).get("cenas") or []:
@@ -154,7 +166,8 @@ def descrever(cenas: List[Dict[str, Any]], roteiro: str = "", idioma: str = "", 
                  "busca": " ".join(str(x.get("busca") or "").split())[:120],
                  "dificil": max(0, min(10, int(x.get("dificil") or 0))),
                  "prompt_imagem": " ".join(str(x.get("prompt_imagem") or "").split())[:1200],
-                 "ano": max(0, min(2100, int(x.get("ano") or 0)))}
+                 "ano": max(0, min(2100, int(x.get("ano") or 0))),
+                 "esquema": bool(setas and x.get("esquema"))}
             if bloco_el:
                 ps = []
                 for pc in x.get("pessoas") or []:
@@ -259,7 +272,7 @@ def look_da_epoca(ano: int) -> str:
 
 def montar_json(cenas: List[Dict[str, Any]], info: Dict[int, Dict[str, Any]], escolhidas: Set[int],
                 estilo_extra: str = "", materiais: Optional[Dict[int, Dict[str, str]]] = None,
-                epoca: bool = False) -> Dict[str, Any]:
+                epoca: bool = False, setas: bool = False) -> Dict[str, Any]:
     """materiais = {índice da cena: {"id": "I3", "tipo": "foto"|"video", "provider": "material"}} (fotos do modelo)."""
     segs = []
     for i, c in enumerate(cenas):
@@ -276,7 +289,9 @@ def montar_json(cenas: List[Dict[str, Any]], info: Dict[int, Dict[str, Any]], es
             if epoca and d.get("ano"):
                 prompt = f"{prompt.rstrip('. ')}. {look_da_epoca(d['ano'])}"
             # 🖼 v84_196: o gerador escreve rótulos tortos em qualquer "diagrama" — sempre uma cena real, sem texto
-            prompt = f"{prompt.rstrip('. ')}. {SEM_TEXTO}"
+            # setas/números SÓ na cena marcada como esquema (falar disso no prompt de toda cena fazia o gerador pôr
+            # setas e números em todas)
+            prompt = f"{prompt.rstrip('. ')}. {SEM_TEXTO_SETAS if setas and d.get('esquema') else SEM_TEXTO}"
             if estilo_extra:
                 prompt = f"{prompt.rstrip('. ')}. {estilo_extra.strip()}"
             segs.append({"start": c["start"], "end": c["end"], "provider": "runpod", "media_type": "image",

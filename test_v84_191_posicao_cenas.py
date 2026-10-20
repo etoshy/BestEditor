@@ -96,3 +96,20 @@ def test_olhar_invertido_e_par_da_pose():
     cfg = dict(pe.PADRAO, lados={"mira": "esquerda"}, inverter_olhar=True)
     aps, _ = pe.montar([b], pers, cfg, 10.0, False, {1: {"pose": "mira_curiosa_dir.png"}})
     assert aps[0]["pose"] == "mira_curiosa_esq.png"  # a IA pediu a errada: vira a certa
+
+
+def test_setas_numeros_so_no_canal_que_pede(tmp_path):
+    """v84_199: "texto_na_imagem": "setas_numeros" (canal do espaço) libera setas/números; o resto: cena real, nada disso."""
+    import cenas_lote as cl
+    d = tmp_path / "m2"
+    d.mkdir()
+    (d / "pacote.json").write_text(json.dumps({"producao_pod": {"cenas": "padrao", "texto_na_imagem": "setas_numeros"}}), encoding="utf-8")
+    assert canal_pod.config({"dir": str(d), "guia": {}})["texto_na_imagem"] == "setas_numeros"
+    cenas = [{"start": 0.0, "end": 5.0, "fala": "a estrela"}]
+    info = {1: {"prompt_imagem": "a star", "esquema": True}}
+    com = cl.montar_json(cenas, info, {0}, setas=True)["segments"][0]["query"]
+    normal = cl.montar_json(cenas, {1: {"prompt_imagem": "a star"}}, {0}, setas=True)["segments"][0]["query"]
+    assert "no arrows" in normal  # cena comum do canal do espaço: nada de seta/número
+    sem = cl.montar_json(cenas, info, {0})["segments"][0]["query"]
+    assert "arrows, shapes" in com and "no arrows" in sem and "No words" in com
+    assert "{REGRA_EXPLICACAO}" in cl._SYS

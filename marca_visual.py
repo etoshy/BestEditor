@@ -698,9 +698,8 @@ def _desc_ref(m: Dict[str, Any], papel: str) -> str:
     return _DESC_REF.get(papel, "a photo of the real subject of this scene")
 
 
-SEM_TEXTO = ("No words and no letters in the image: no captions, no titles, no questions, no labels, no watermark, no logo "
-             "(clean arrows, shapes and a few large digits are fine when explaining; real printed text only on an object of the "
-             "scene, like a book page, a poster or a sign).")
+SEM_TEXTO = ("No words and no letters in the image: no captions, no titles, no questions, no labels, no arrows, no numbers, "
+             "no watermark, no logo (real printed text only on an object of the scene, like a book page, a poster or a sign).")
 
 
 def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[Tuple[str, str]]] = None) -> str:
@@ -744,7 +743,7 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
         p = " ".join(x for x in partes_p if x)
         tipo_img = cena.get("tipo_imagem") or ""
         if tipo_img and tipo_img in TIPOS_IMAGEM and tipo_img != "mascote":
-            p += f" Image type: {({'arquivo': 'monochrome archival photograph', 'ilustracao': 'explanatory vintage illustration without any lettering', 'close': 'symbolic close-up', 'ambiente': 'establishing environment shot', 'diagrama': 'clean visual diagram made only of shapes, arrows and at most a few large digits, with no words or labels'})[tipo_img]}."
+            p += f" Image type: {({'arquivo': 'monochrome archival photograph', 'ilustracao': 'explanatory vintage illustration without any lettering', 'close': 'symbolic close-up', 'ambiente': 'establishing environment shot', 'diagrama': 'symbolic still life of the concept made only of real objects (no chart, no letters, no numbers)'})[tipo_img]}."
         infos = cena.get("fotos_info") or [{} for _ in cena.get("refs_extras") or []]
         for k, fi in enumerate(infos, 1):  # 📷 a pessoa/animal/estátua/objeto real: as características + como desenhar
             desc = (fi.get("descricao_en") or "").strip()
