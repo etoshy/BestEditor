@@ -142,3 +142,28 @@ def test_revisao_no_dossie(A):
         assert 'id="revCard"' in c.get(f"/modelos-video/{p['id']}").get_data(as_text=True)
     finally:
         ds.excluir(base, p["id"])
+
+
+def test_correcao_livre_no_dossie(A, monkeypatch):
+    """v84_217: ✍ Correção — a pessoa escreve o que mudar, a IA devolve o roteiro inteiro corrigido; dá pra desfazer."""
+    import ia_servico
+    base = A.BASE_DIR
+    p = ds.criar(base, "Caso correção")
+    try:
+        p["config"]["modo_partes"] = "nao"
+        p["resultado"] = ds.ler_resultado(json.dumps({"roteiro": ROT, "titulos": ["T"]}), p)
+        ds.salvar(base, p)
+        c = A.app.test_client()
+        pr = c.post(f"/correcao/dossie/{p['id']}/prompt", json={"pedido": "troque tudo por isto"}).get_json()
+        assert pr["ok"] and "troque tudo por isto" in pr["prompt"] and ROT[:30] in pr["prompt"]
+        monkeypatch.setattr(ia_servico, "motivo_desligado", lambda r=None: None)
+        monkeypatch.setattr(ia_servico, "chamar", lambda *a, **k: {"roteiro": ROT.replace("Mas isso", "Porém isso"), "resumo": "trocou"})
+        r = c.post(f"/correcao/dossie/{p['id']}/ia", json={"pedido": "use porém"}).get_json()
+        assert r["ok"] and r["resumo"] == "trocou"
+        q = ds.carregar(base, p["id"])
+        assert "Porém isso" in q["resultado"]["roteiro"] and q["resultado"]["roteiro_antes_correcao"] == q["resultado"]["roteiro_antes_correcao"]
+        assert "Mas isso" in q["resultado"]["roteiro_antes_correcao"] and q["resultado"]["titulos"] == ["T"]
+        assert c.post(f"/correcao/dossie/{p['id']}/desfazer", json={}).get_json()["ok"]
+        assert "Mas isso" in ds.carregar(base, p["id"])["resultado"]["roteiro"]
+    finally:
+        ds.excluir(base, p["id"])

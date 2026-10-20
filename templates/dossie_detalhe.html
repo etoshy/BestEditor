@@ -154,6 +154,19 @@
   <textarea id="resp" rows="6" class="ds-mono" placeholder='{ "titulos": [...], "capitulos": [...], "roteiro": "..." }'></textarea>
   <button class="ds-mini" id="btnLerResp">✅ Ler resposta</button>
   <div id="resBox"></div>
+  <details id="corrBox" style="margin-top:12px;border:1px solid var(--borda);border-radius:10px;padding:8px 10px" {{ 'open' if (p.resultado or {}).roteiro_antes_correcao }}>
+    <summary><b>✍ Correção</b> <span class="ds-hint">— escreva o que corrigir ou mudar; a IA lê o roteiro e faz só isso (o resto fica igual)</span></summary>
+    <textarea id="corrPedido" rows="3" style="margin-top:6px" placeholder="ex.: a supernova de 1054 foi observada por astrônomos chineses, não árabes — corrija · a Vanta fala demais no começo, tire 2 falas dela · troque “Schwarzes Loch” por “Schwarzloch” no roteiro todo · deixe o final mais misterioso"></textarea>
+    <div class="ds-row" style="margin-top:6px">
+      <button class="ds-mini" id="corrIa" style="background:#4338ca;color:#fff">🤖 Corrigir com a IA</button>
+      <button class="ds-mini ds-sec" id="corrPrompt" title="copia o pedido + o roteiro pra colar em outra IA">📋 Copiar o prompt</button>
+      <button class="ds-mini ds-sec" id="corrDesfazer" {{ '' if (p.resultado or {}).roteiro_antes_correcao else 'style=display:none' }}>↩ Desfazer a correção</button>
+      <span class="ds-hint" id="corrSt"></span>
+    </div>
+    <details style="margin-top:6px"><summary class="ds-hint">colar a resposta de outra IA</summary>
+      <textarea id="corrResp" rows="4" class="ds-mono" placeholder='{"roteiro": "…", "resumo": "…"} ou o roteiro corrigido'></textarea>
+      <button class="ds-mini" id="corrLer">✅ Usar esta resposta</button></details>
+  </details>
 </div>
 
 {# v84_161: as etapas na ordem em que se usam (a mesma do 🚀 piloto automático): roteiro → revisão → checagem → fotos → elenco → TTS → thumbnails. O histórico fica no fim. #}
@@ -489,6 +502,30 @@ $('btnIaImg').addEventListener('click', async () => {
 });
 
 // 4 · prompt → resultado
+// ✍ v84_217: correção livre do roteiro
+(() => {
+  const st = (t) => { $('corrSt').textContent = t; };
+  const fim = (d) => { st(`✅ corrigido · ${d.palavras_antes} → ${d.palavras_depois} palavras` + (d.resumo ? ` — ${d.resumo}` : '')); $('corrDesfazer').style.display = ''; setTimeout(() => location.reload(), 1600); };
+  $('corrIa').addEventListener('click', async () => {
+    const pedido = $('corrPedido').value.trim(); if (!pedido) { st('Escreva o que corrigir.'); return; }
+    $('corrIa').disabled = true; st('⏳ a IA está lendo o roteiro e corrigindo… (pode levar 1-2 min)');
+    try { const d = await api(`/correcao/dossie/${PID}/ia`, { pedido }); fim(d); }
+    catch (e) { st('⚠ ' + e.message); } finally { $('corrIa').disabled = false; }
+  });
+  $('corrPrompt').addEventListener('click', async () => {
+    const pedido = $('corrPedido').value.trim(); if (!pedido) { st('Escreva o que corrigir.'); return; }
+    try { const d = await api(`/correcao/dossie/${PID}/prompt`, { pedido }); await navigator.clipboard.writeText(d.prompt); st('📋 prompt copiado — cole na IA e traga a resposta em “colar a resposta”.'); }
+    catch (e) { st('⚠ ' + e.message); }
+  });
+  $('corrLer').addEventListener('click', async () => {
+    try { const d = await api(`/correcao/dossie/${PID}/ler`, { texto: $('corrResp').value, pedido: $('corrPedido').value }); fim(d); }
+    catch (e) { st('⚠ ' + e.message); }
+  });
+  $('corrDesfazer').addEventListener('click', async () => {
+    if (!confirm('Voltar ao roteiro de antes da correção?')) return;
+    try { await api(`/correcao/dossie/${PID}/desfazer`, {}); st('↩ voltou'); setTimeout(() => location.reload(), 800); } catch (e) { st('⚠ ' + e.message); }
+  });
+})();
 $('btnPrompt').addEventListener('click', async () => {
   try {
     const d = await api(`/modelos-video/${PID}/prompt`, {});

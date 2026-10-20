@@ -5,6 +5,7 @@ Servem 🕵️ Modelos de vídeo ("dossie"), 📜 Roteiro do YouTube ("roteiro_y
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import jsonify, request, send_file
@@ -121,7 +122,7 @@ def registrar(app, base_dir: str) -> None:
                 p = ds.carregar(base_dir, pid)
                 velho = p.get("resultado") or {}
                 res = ds.roteiro_editado(p, novo)
-                for k in ("roteiro_antes_tts", "roteiro_antes_revisao"):  # o "voltar" de cada um sobrevive ao outro
+                for k in ("roteiro_antes_tts", "roteiro_antes_revisao", "roteiro_antes_correcao"):  # o "voltar" de cada um sobrevive ao outro
                     if velho.get(k):
                         res[k] = velho[k]
                 for k in ("partes", "checagem"):
@@ -138,7 +139,7 @@ def registrar(app, base_dir: str) -> None:
         p = ry.carregar_projeto(base_dir, pid)
         res, an = p.get("resultado") or {}, p.get("analise") or {}
         alvo, chave = (res, "roteiro_final") if res.get("roteiro_final") else (an, "roteiro")
-        ch = {"roteiro_antes_revisao": "antes_da_revisao"}.get(chave_antes, "antes_do_tts")
+        ch = {"roteiro_antes_revisao": "antes_da_revisao", "roteiro_antes_correcao": "antes_da_correcao"}.get(chave_antes, "antes_do_tts")
         if chave_antes == "-":
             pass
         elif antes is None:
@@ -261,6 +262,115 @@ def registrar(app, base_dir: str) -> None:
         g = _gravar(origem, pid, p, r["texto"], antes or texto, avisos, chave_antes="roteiro_antes_revisao",
                     hist=("🪄 revisão", f"{len(r['aplicadas'])} troca(s) · {r['palavras_antes']} → {r['palavras_depois']} palavras"))
         return jsonify({"ok": True, **{k: r[k] for k in ("aplicadas", "nao_achadas", "palavras_antes", "palavras_depois", "observacoes")}, **g})
+
+    # ---------------------------------------------------------------- ✍ v84_217: correção livre do roteiro pela IA
+    SISTEMA_CORRECAO = (
+        "Você é o editor do roteiro de um vídeo narrado de YouTube. A pessoa vai pedir uma correção ou mudança (corrigir "
+        "um fato, trocar um trecho, mudar o tom de uma parte, encurtar, acrescentar algo, padronizar nomes…). Faça "
+        "EXATAMENTE o que ela pediu e mantenha TODO o resto igual: o mesmo idioma, as mesmas tags de quem fala "
+        "([narrador], [mira|curiosa]…), as marcas de mídia ([I3], [V2]), as chamadas ([[INSCREVA]], [[VENDA]]…), as marcas "
+        "de cena, os parágrafos e o estilo. Não resuma nem reescreva o que ela não pediu. Devolva o roteiro COMPLETO "
+        "já corrigido em \"roteiro\" e, em \"resumo\", em português, 1-3 linhas do que mudou (ou por que não deu).")
+
+    def _prompt_correcao(texto: str, pedido: str) -> str:
+        return (f"## O QUE CORRIGIR / FAZER\n{pedido.strip()}\n\n## ROTEIRO ATUAL\n{texto}\n\n"
+                "Responda só com o JSON: {\"roteiro\": \"o roteiro completo corrigido\", \"resumo\": \"o que mudou\"}")
+
+    def _antes_correcao(origem: str, p: Dict[str, Any]) -> str:
+        if origem == "dossie":
+            return (p.get("resultado") or {}).get("roteiro_antes_correcao") or ""
+        res, an = p.get("resultado") or {}, p.get("analise") or {}
+        return (res if res.get("roteiro_final") else an).get("antes_da_correcao") or ""
+
+    def _gravar_correcao(origem: str, pid: str, p: Dict[str, Any], texto: str, novo: str, resumo: str, pedido: str):
+        antes = _antes_correcao(origem, p) or texto  # várias correções seguidas: o "desfazer" volta ao de antes da 1ª
+        return _gravar(origem, pid, p, novo, antes, [], chave_antes="roteiro_antes_correcao",
+                       hist=("✍ correção", (pedido.strip()[:120] + (" — " + resumo[:200] if resumo else ""))))
+
+    @app.route("/correcao/<origem>/<pid>/prompt", methods=["POST"])
+    def correcao_prompt(origem: str, pid: str):
+        try:
+            p, texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        pedido = str((request.get_json(silent=True) or {}).get("pedido") or "")
+        if not pedido.strip():
+            return jsonify({"erro": "Escreva o que corrigir."}), 400
+        if not texto.strip():
+            return jsonify({"erro": "Ainda não tem roteiro."}), 400
+        return jsonify({"ok": True, "prompt": SISTEMA_CORRECAO + "\n\n" + _prompt_correcao(texto, pedido)})
+
+    @app.route("/correcao/<origem>/<pid>/ia", methods=["POST"])
+    def correcao_ia(origem: str, pid: str):
+        import ia_servico
+        try:
+            p, texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        pedido = str((request.get_json(silent=True) or {}).get("pedido") or "")
+        if not pedido.strip():
+            return jsonify({"erro": "Escreva o que corrigir."}), 400
+        if not texto.strip():
+            return jsonify({"erro": "Ainda não tem roteiro."}), 400
+        motivo = ia_servico.motivo_desligado("roteiros")
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo + " — use 📋 Copiar o prompt e cole a resposta."}), 400
+        from ia_midia import _S, _obj
+        r = ia_servico.chamar("roteiros", SISTEMA_CORRECAO, _prompt_correcao(texto, pedido),
+                              schema=_obj({"roteiro": _S, "resumo": _S}), max_tokens=32000, effort="medium",
+                              job=pid, cache_local=False, timeout=600)
+        novo = str((r or {}).get("roteiro") or "").strip() if isinstance(r, dict) else ""
+        if not novo:
+            return jsonify({"erro": "A IA não respondeu (" + (ia_servico.motivo_desligado("roteiros") or "veja em 🤖 IA") + ")."}), 502
+        if len(novo.split()) < len(texto.split()) * 0.4 and not any(w in pedido.lower() for w in ("encurt", "resum", "cort", "reduz")):
+            return jsonify({"erro": "A IA devolveu um roteiro bem menor que o atual (parece cortado) — não troquei. Tente de novo."}), 502
+        resumo = str(r.get("resumo") or "")[:600]
+        g = _gravar_correcao(origem, pid, p, texto, novo, resumo, pedido)
+        return jsonify({"ok": True, "resumo": resumo, "palavras_antes": len(texto.split()), "palavras_depois": len(novo.split()), **g})
+
+    @app.route("/correcao/<origem>/<pid>/ler", methods=["POST"])
+    def correcao_ler(origem: str, pid: str):
+        """A resposta de outra IA colada (o JSON {"roteiro", "resumo"} ou só o roteiro)."""
+        import json as _j
+        try:
+            p, texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = request.get_json(silent=True) or {}
+        bruto = str(c.get("texto") or "").strip()
+        novo, resumo = bruto, ""
+        m = re.search(r"\{.*\}", bruto, re.S)
+        if m:
+            try:
+                d = _j.loads(m.group(0))
+                if isinstance(d, dict) and str(d.get("roteiro") or "").strip():
+                    novo, resumo = str(d["roteiro"]).strip(), str(d.get("resumo") or "")[:600]
+            except ValueError:
+                pass
+        if len(novo.split()) < 20:
+            return jsonify({"erro": "Cole o roteiro corrigido (ou o JSON que a IA devolveu)."}), 400
+        g = _gravar_correcao(origem, pid, p, texto, novo, resumo, str(c.get("pedido") or "correção colada"))
+        return jsonify({"ok": True, "resumo": resumo, "palavras_antes": len(texto.split()), "palavras_depois": len(novo.split()), **g})
+
+    @app.route("/correcao/<origem>/<pid>/desfazer", methods=["POST"])
+    def correcao_desfazer(origem: str, pid: str):
+        try:
+            p, _texto, _pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        antes = _antes_correcao(origem, p)
+        if not antes:
+            return jsonify({"erro": "Não tem correção pra desfazer."}), 400
+        _gravar(origem, pid, p, antes, None, [], chave_antes="roteiro_antes_correcao",
+                hist=("↩ desfazer", "voltou ao roteiro de antes da correção"))
+        if origem == "dossie":
+            import dossies as ds
+            import dossies_rotas
+            with dossies_rotas._TRAVA:
+                q = ds.carregar(base_dir, pid)
+                (q.get("resultado") or {}).pop("roteiro_antes_correcao", None)
+                ds.salvar(base_dir, q)
+        return jsonify({"ok": True})
 
     @app.route("/revisao/<origem>/<pid>/desfazer", methods=["POST"])
     def revisao_desfazer(origem: str, pid: str):
