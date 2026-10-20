@@ -274,3 +274,22 @@ def test_ia_escolheu_pouco_a_regra_completa(tmp_path, monkeypatch):
     monkeypatch.setattr(pe, "escolher_com_ia", ia_fake)
     r = pe.aplicar(job, str(tmp_path / "j"), base, _palavras(rot))
     assert chamado and r["por"] == "ia+regra" and r["n"] >= 3
+
+
+def test_voz_do_canal_diz_quem_falou(tmp_path, monkeypatch):
+    """v84_216: o falas.json do pod marca a VOZ ("voz_7"); a escolha do canal (🎙 Vozes das personagens) diz que é a Mira.
+    Sem ela (voz não reconhecida), o roteiro com as tags vale."""
+    import json
+    monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
+    base = _canal(tmp_path)
+    ws = _palavras(ROTEIRO)
+    fim = ws[-1]["end"]
+    falas = [{"quem": "voz_7", "voz": "voz_7", "inicio": 0.0, "fim": fim, "texto": ROTEIRO}]
+    job = {"orientation": "16:9", "total_duration": 12.0, "texto_falas": ROTEIRO, "overlays": [], "falas_pod": falas,
+           "personagens_canal": {"canal": "ast", "config": {"frequencia": 1, "ia": False}}}
+    assert pe.mapa_de_vozes(job, base) == {}
+    with open(os.path.join(base, "marcas", "ast", "vozes_escolhidas.json"), "w", encoding="utf-8") as f:
+        json.dump({"mira": {"voz": "voz_7"}, "narrador": {"voz": "voz_1"}}, f)
+    assert pe.mapa_de_vozes(job, base) == {"voz_7": "mira"}
+    r = pe.aplicar(job, str(tmp_path / "j"), base, ws)
+    assert r["n"] >= 1 and "pod" in r["de_onde"]

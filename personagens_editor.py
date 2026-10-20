@@ -279,16 +279,30 @@ def texto_do_job(job: Dict[str, Any]) -> Tuple[str, str]:
 
 
 def mapa_de_vozes(job: Dict[str, Any], base: str) -> Dict[str, str]:
-    """voz → personagem (o 🕵️ Modelo de vídeo guarda qual voz cada personagem usa)."""
-    if not job.get("dossie_id"):
-        return {}
+    """voz → personagem: a escolha do 🕵️ Modelo de vídeo do roteiro e, 🎙 v84_216, a do CANAL (🎨 Identidade visual →
+    🎙 Vozes das personagens) — sem isso, a fala da personagem com uma voz de outro nome caía como narrador."""
+    out: Dict[str, str] = {}
+
+    def juntar(vp: Any) -> None:
+        for k, v in (vp or {}).items() if isinstance(vp, dict) else []:
+            voz = (v or {}).get("voz") if isinstance(v, dict) else v
+            if voz and str(k) not in ("narrador",):
+                out.setdefault(str(voz), str(k))
+    if job.get("dossie_id"):
+        try:
+            import dossies
+            cfg = (dossies.carregar(base, job["dossie_id"]).get("config") or {})
+            juntar(cfg.get("vozes_personagens") or dossies.vozes_lembradas(cfg.get("modelo") or ""))
+        except Exception:  # noqa: BLE001
+            pass
     try:
-        import dossies
-        cfg = (dossies.carregar(base, job["dossie_id"]).get("config") or {})
-        vp = cfg.get("vozes_personagens") or dossies.vozes_lembradas(cfg.get("modelo") or "")
-        return {str((v or {}).get("voz") if isinstance(v, dict) else v): str(k) for k, v in (vp or {}).items() if v}
-    except Exception:  # noqa: BLE001
-        return {}
+        canal = canal_do_job(job, base)
+        if canal:
+            with open(os.path.join(base, "marcas", canal, "vozes_escolhidas.json"), encoding="utf-8") as f:
+                juntar(json.load(f))
+    except (OSError, ValueError, Exception):  # noqa: BLE001
+        pass
+    return out
 
 
 def personagens_do_canal(base: str, canal: str) -> List[Dict[str, Any]]:
@@ -924,6 +938,17 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
         if quem:
             mapa.setdefault(vs, quem)
     exatas = falas_do_pod(job.get("falas_pod"), palavras, slugs, mapa) if job.get("falas_pod") else []
+    if exatas and roteiro.strip():
+        # 🎙 v84_216: o pod marca a VOZ de quem falou; se a voz não for reconhecida como a personagem, a fala dela
+        # vira "narrador" — compara com o roteiro (as tags [mira]/[vanta]) e usa o que achou mais falas delas
+        try:
+            pelo_rot = linha_do_tempo(roteiro, palavras, slugs, mapa, list(cad))
+        except Exception:  # noqa: BLE001
+            pelo_rot = []
+        n_ex = sum(1 for f in exatas if f["slug"])
+        n_rot = sum(1 for f in pelo_rot if f.get("slug"))
+        if n_rot > max(2, n_ex * 1.5):
+            exatas = []
     if exatas and any(f["slug"] for f in exatas):
         falas = exatas  # 🎭 v84_187: o pod disse quem falou de que segundo a que segundo
         if roteiro.strip():  # a emoção ([mira|curiosa]) vem do roteiro

@@ -11217,6 +11217,8 @@ def _criar_job_producao(item: dict, lote: dict, zip_path: str, resposta: dict, f
         raise RuntimeError(f"o projeto não ficou pronto ({job.get('status')}): {str(job.get('error') or '')[:300]}")
     job["nome_projeto"] = item.get("titulo") or ""
     job["producao_pod"] = {"lote": lote.get("id"), "item": item.get("id")}
+    if item.get("origem") == "dossie" and item.get("origem_id"):  # 🎙 v84_216: as vozes do modelo (quem é quem)
+        job["dossie_id"] = item["origem_id"]
     if item.get("texto") and "[" in item["texto"]:  # 🧍 v84_185: o roteiro com as tags de quem fala
         job["texto_falas"] = item["texto"]
     if item.get("falas_pod") and os.path.isfile(item["falas_pod"]):  # 🎭 v84_187: quem falou quando, exato (do pod)
