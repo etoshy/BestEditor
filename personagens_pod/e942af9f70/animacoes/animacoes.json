@@ -1,46 +1,57 @@
 {
  "vanta_ironica_esq_v1_5fac__fala__5f849d4cb3": {
-  "estado": "fila",
+  "estado": "erro",
   "flow_job": "63fcd82d35",
   "prompt": "Subtle 2D anime character animation of Vanta (irônica, sorriso de canto, olhar de lado): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Die Frage ist gut. Die Antwort ist schlechter, weil sie mit Masse zu tun hat.\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_ironica_esq.png",
   "tipo": "fala",
   "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_ironica_esq_v1_5fac__fala__5f849d4cb3_frame.png",
   "criado": 1792487773.862735,
-  "erro": null,
+  "erro": "o pedido sumiu da fila do 🚀 Flow em massa — anime de novo",
   "msg": "na fila do Flow"
  },
  "vanta_explicando_esq_v1_9732__fala__6862bc18cd": {
-  "estado": "fila",
-  "flow_job": "d2d367e2d2",
+  "estado": "erro",
+  "flow_job": "a8d22bf9e0",
   "prompt": "Subtle 2D anime character animation of Vanta (explicando, uma mão aberta no ar): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Viel schneller. Die Kerntemperatur ist bei massereichen Sternen deutlich höher. Die massereichsten Sterne verbrauchen ih\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_explicando_esq.png",
   "tipo": "fala",
   "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_explicando_esq_v1_9732__fala__6862bc18cd_frame.png",
-  "criado": 1792487774.04278,
-  "erro": null,
-  "msg": "na fila do Flow"
+  "criado": 1792496506.8832119,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_084503_597816)",
+  "msg": "🎬 gerando no Flow"
  },
  "vanta_seria_esq_v1_326c__fala__6da2c20b1a": {
-  "estado": "fila",
+  "estado": "erro",
   "flow_job": "493c07b374",
   "prompt": "Subtle 2D anime character animation of Vanta (séria, sem sorriso): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Still ist die Sonne nicht ganz: Erst entsteht ein leuchtender Nebel aus der abgeworfenen Hülle. Danach kühlt der Weiße Z\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_seria_esq.png",
   "tipo": "fala",
   "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_seria_esq_v1_326c__fala__6da2c20b1a_frame.png",
   "criado": 1792487774.224847,
-  "erro": null,
+  "erro": "o pedido sumiu da fila do 🚀 Flow em massa — anime de novo",
   "msg": "na fila do Flow"
  },
  "vanta_provocando_esq_v1_548c__fala__ed2f80a9d6": {
-  "estado": "fila",
-  "flow_job": "02a18051ba",
-  "prompt": "Subtle 2D anime character animation of Vanta (provocando, inclinada pra frente, sorriso de quem sabe): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Genau. Bei schweren Sternen wächst der Kern so weit, dass der Druck nicht mehr ausreicht. Dazu kommen wir gleich. Vorher\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "estado": "erro",
+  "flow_job": "1eae2fbbcf",
+  "prompt": "Subtle 2D anime character animation of Vanta (provocando, inclinada pra frente, sorriso de quem sabe): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Das, Mira, sollten Sie sich selbst beantworten. Nicht ich.\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_provocando_esq.png",
   "tipo": "fala",
   "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_provocando_esq_v1_548c__fala__ed2f80a9d6_frame.png",
-  "criado": 1792487774.414111,
-  "erro": null,
-  "msg": "na fila do Flow"
+  "criado": 1792496507.1933107,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_084829_175909)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "vanta_seria_dir_v1_ac5b__fala__3f08c5b85f": {
+  "estado": "erro",
+  "flow_job": "ce82f68514",
+  "prompt": "Subtle 2D anime character animation of Vanta (séria, sem sorriso): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Still ist die Sonne nicht ganz: Erst entsteht ein leuchtender Nebel aus der abgeworfenen Hülle. Danach kühlt der Weiße Z\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "vanta_seria_dir.png",
+  "tipo": "fala",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_seria_dir_v1_ac5b__fala__3f08c5b85f_frame.png",
+  "criado": 1792496507.022831,
+  "erro": "FlowPassoErro: [configurar] cliquei nas configurações da caixa mas o pop-up não abriu. (diagnóstico 20261020_084650_789843)",
+  "msg": "🎬 gerando no Flow"
  }
 }

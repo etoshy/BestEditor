@@ -26,6 +26,7 @@ faltou. `on_passo(nome, estado, detalhe)` avisa o andamento (a área de teste mo
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from typing import Any, Callable, Dict, List, Optional
@@ -701,9 +702,13 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
             raise FlowPassoErro(passo, 'cliquei em "Enviar mídia" mas a janela de escolher arquivo não abriu.')
         origem = "enviada"
 
+        t0 = time.time()
+
         def _subiu() -> bool:
             aceitar_direitos(page, on_passo)  # o Flow só sobe a imagem depois do "Concordo"
-            return page.locator(S["midia_incluir"]).count() > 0 and page.locator(S["midia_item"]).count() > antes
+            n = page.locator(S["midia_item"]).count()
+            # a mesma imagem de novo (ex.: Fim = Início): o Flow não cria item novo — depois de 20 s vale a 1ª da lista
+            return page.locator(S["midia_incluir"]).count() > 0 and (n > antes or (n > 0 and time.time() - t0 > 20))
         if not _esperar(_subiu, 120):
             raise FlowPassoErro(passo, "enviei a imagem mas ela não apareceu na lista de mídias do Flow.")
         item = page.locator(S["midia_item"]).first  # a mais recente vem primeiro ("Recentes")
@@ -713,7 +718,13 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
         src = ""
     _ULTIMA_MIDIA[id(page)] = {"src": src, "ids": [t for t in re.findall(r"[0-9A-Za-z_-]{16,}", src)][:6], "origem": origem}
     item.click()
-    _primeiro(page, S["midia_previa"], 60, passo, "escolhi a imagem mas a prévia não carregou.")
+    if _primeiro(page, S["midia_previa"], 45) is None:  # 🎞 v84_202: imagem recém-enviada ainda processando: clica de novo
+        on_passo(passo, "andando", "a prévia não abriu — clicando de novo na imagem")
+        try:
+            item.click()
+        except Exception:  # noqa: BLE001
+            pass
+        _primeiro(page, S["midia_previa"], 60, passo, "escolhi a imagem mas a prévia não carregou.")
     _primeiro(page, S["midia_incluir"], 10, passo, 'não achei o botão "Incluir no comando".').click()
     if not _esperar(lambda: not _visivel(page, S["menu_midia"]), 8):
         raise FlowPassoErro(passo, 'cliquei em "Incluir no comando" mas o menu de mídia não fechou.')
@@ -922,10 +933,16 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
     frames = tipo == "video" and (trab.get("inicio") or trab.get("fim") or (trab.get("tipo_video") or "Frames") == "Frames")
     configurar_caixa(page, tipo, trab.get("proporcao") or "16:9", trab.get("modelo") or "", trab.get("quantidade") or "x1",
                      ("Frames" if frames else "Elementos") if tipo == "video" else "", on_passo=on_passo)
+    ja_subiu: Dict[str, str] = {}  # 🎞 v84_202: Fim = a MESMA imagem do Início → reusa a mídia (o Flow não sobe repetida)
     for qual, chave in (("Início", "inicio"), ("Fim", "fim")):
         f = trab.get(chave) or {}
         if tipo == "video" and (f.get("arquivo") or f.get("media_id")):
-            definir_frame(page, qual, f.get("arquivo"), f.get("media_id") or "", on_passo)
+            mid = f.get("media_id") or ja_subiu.get(os.path.abspath(f["arquivo"]) if f.get("arquivo") else "", "")
+            _ULTIMA_MIDIA.pop(id(page), None)
+            definir_frame(page, qual, f.get("arquivo"), mid, on_passo)
+            info = _ULTIMA_MIDIA.pop(id(page), None) or {}
+            if f.get("arquivo") and info.get("ids"):
+                ja_subiu[os.path.abspath(f["arquivo"])] = max(info["ids"], key=len)
     ref = trab.get("referencia") or {}
     ref_tokens: List[str] = []
     _ULTIMA_MIDIA.pop(id(page), None)

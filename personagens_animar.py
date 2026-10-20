@@ -97,7 +97,10 @@ def frame_verde(png: str, destino: str) -> str:
     W = int(round(h * 3 / 4))
     fundo = Image.new("RGBA", (max(W, w), h), (0, 255, 0, 255))
     fundo.alpha_composite(im, ((fundo.width - w) // 2, 0))
-    fundo.convert("RGB").save(destino)
+    rgb = fundo.convert("RGB")
+    if rgb.height > 1280:  # 🎞 v84_202: menor e em JPEG — o Flow processa rápido (PNG grande travava a prévia)
+        rgb = rgb.resize((int(rgb.width * 1280 / rgb.height), 1280))
+    rgb.save(destino, quality=92)
     return destino
 
 
@@ -119,7 +122,7 @@ def pedir(base: str, pid: str, pose: Dict[str, Any], tipo: str = "fala", nome: s
         if it and not refazer and (it.get("estado") in ESPERA or (it.get("estado") == "pronto" and os.path.isfile(str(it.get("webm"))))):
             return dict(it, chave=k)
         os.makedirs(pasta(pid, base), exist_ok=True)
-        fr = frame_verde(pose["caminho"], os.path.join(pasta(pid, base), f"{k}_frame.png"))
+        fr = frame_verde(pose["caminho"], os.path.join(pasta(pid, base), f"{k}_frame.jpg"))
         p = prompt_animacao(nome or "the character", pose.get("descricao") or "", tipo, fala, extra)
         j = _lote().adicionar([{"prompt": p, "tipo": "video", "inicio_arquivo": fr, "fim_arquivo": fr, "origem": "personagem"}],
                               proporcao="3:4")[0]
