@@ -776,6 +776,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <div class="layer" id="layerB"></div>
       <div id="layerCena"></div>
       <div id="layerCz"></div>
+      <div id="layerPers" style="position:absolute;inset:0;pointer-events:none"></div>
       <img id="layerEd" alt="" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none">
       <div id="layerHl" style="position:absolute;inset:0;pointer-events:none;display:none"></div>
       <img id="layerGr" alt="" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none">
@@ -4815,10 +4816,11 @@ function atualizarMonitor(forcar) {
   if (q >= 1 && !gCena) { const gs = gestoCss(s, t - s.start, s.end - s.start); A.style.transform = gs ? gs.tr : 'none'; A.style.opacity = gs ? gs.op : 1; }
   estiloTexto($('layerTxt'), s.on_screen_text, s.on_screen_text_style || {}, s.end - s.start, t - s.start);
   // overlays
-  const box = $('layerOv'); const ativos = overlays.filter(o => t >= o.start && t < o.end);
+  // 🧍 v84_206: a personagem fica numa camada logo acima da IMAGEM — destaques, legendas, gráficos e textos por cima dela
+  const box = $('layerOv'), boxP = $('layerPers'); const ativos = overlays.filter(o => t >= o.start && t < o.end);
   const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + (o._anim_url || '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
   if (forcar || box.dataset.chave !== chave) {
-    box.dataset.chave = chave; box.innerHTML = '';
+    box.dataset.chave = chave; box.innerHTML = ''; boxP.innerHTML = '';
     ativos.forEach(o => {
       if (o.media_type === 'text') { const d = document.createElement('div'); d.className = 'txt'; box.appendChild(d); estiloTexto(d, o.text, o.style || {}, o.end - o.start, t - o.start); return; }
       const d = document.createElement('div'); d.className = 'ov' + (o._url ? '' : ' box');
@@ -4827,7 +4829,7 @@ function atualizarMonitor(forcar) {
       else if (o._url && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(o._url)) d.innerHTML = `<img src="${esc(o._url)}">`;
       else if (o._url) d.innerHTML = `<video src="${esc(o._url)}" muted autoplay loop playsinline style="width:100%"></video>`;
       else d.textContent = '🧩 ' + ((o.source || {}).query || 'overlay (resolvido na montagem)');
-      box.appendChild(d);
+      (o.origem === 'personagem' ? boxP : box).appendChild(d);
     });
   }
   const p = s._preview || {};

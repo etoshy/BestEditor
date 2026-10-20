@@ -824,6 +824,11 @@ def _cenas_nos_candidatos(job: Dict[str, Any], cands: List[Dict[str, Any]]) -> N
         return
     for c in cands:
         meio = (float(c["start"]) + float(c["end"])) / 2
+        # 📝 v84_206: trecho com texto na tela (on_screen_text) no meio da fala: a personagem não entra (o texto é
+        # queimado na cena e ela ficaria POR CIMA dele)
+        c["texto_na_tela"] = any(isinstance(x, dict) and str(x.get("on_screen_text") or "").strip()
+                                 and float(x.get("start") or 0) < float(c["end"]) and float(x.get("end") or 0) > float(c["start"])
+                                 for x in segs)
         sg = next((x for x in segs if isinstance(x, dict)
                    and float(x.get("start") or 0) <= meio < float(x.get("end") or 0)), None)
         if sg:
@@ -890,6 +895,8 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
         raise PersEdErro("Não consegui casar o roteiro com as palavras do áudio (o projeto tem legenda/transcrição?).")
     cands = candidatos(falas, pers, cfg)
     _cenas_nos_candidatos(job, cands)
+    if any(not c.get("texto_na_tela") for c in cands):
+        cands = [c for c in cands if not c.get("texto_na_tela")]
     if not cands:
         raise PersEdErro("Não achei momento pra personagem: as tags do roteiro precisam ser os nomes delas ("
                          + ", ".join(f"[{p['slug']}]" for p in pers) + ").")

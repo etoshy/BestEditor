@@ -143,3 +143,12 @@ def test_ia_olha_pra_onde_a_pose_vira(tmp_path, monkeypatch):
     assert pe.par_da_pose(poses, poses[0], "esq") is poses[1]
     pe.normalizar_olhar([{"slug": "mira", "poses": [dict(o, lado="x") for o in poses]}], "b", inverter=True)
     assert len(chamadas) == 1  # já olhou: usa o guardado
+
+
+def test_personagem_nao_entra_em_trecho_com_texto_na_tela():
+    """v84_206: o texto da cena é queimado na imagem — a personagem ficaria por cima dele."""
+    job = {"pending_segments": [{"start": 0, "end": 5, "visual": "a", "on_screen_text": "1054"},
+                                {"start": 5, "end": 10, "visual": "b"}]}
+    cands = [{"start": 1.0, "end": 2.0}, {"start": 6.0, "end": 7.0}]
+    pe._cenas_nos_candidatos(job, cands)
+    assert cands[0]["texto_na_tela"] and not cands[1]["texto_na_tela"]
