@@ -4269,7 +4269,7 @@ function desenharPers() {
     PE.carregou = true;
   }
   $('peIaSt').textContent = d.ia_ligada ? '' : '(a IA está desligada pra isso em 🤖 IA — vai a regra)';
-  if (d.aparicoes.length) $('peCanalInfo').textContent = `${d.aparicoes.length} aparição(ões)` + (d.candidatos ? ` de ${d.candidatos} momentos possíveis` : '') + (d.por ? ` · escolhidas pela ${d.por === 'ia' ? '🤖 IA' : 'regra'}` : '');
+  if (d.aparicoes.length) $('peCanalInfo').textContent = `${d.aparicoes.length} aparição(ões)` + (d.candidatos ? ` de ${d.candidatos} momentos possíveis` : '') + (d.por ? ` · escolhidas pela ${d.por === 'ia' ? '🤖 IA' : d.por === 'ia+regra' ? '🤖 IA (completada pela regra)' : 'regra'}` : '');
   const pers = Object.fromEntries(d.personagens.map(p => [p.slug, p]));
   $('peStatus').innerHTML = (d.avisos || []).map(a => `⚠ ${esc(a)}`).join('<br>');
   $('listaPers').innerHTML = d.aparicoes.length ? d.aparicoes.map(a => {
@@ -4317,7 +4317,7 @@ $('peAplicar').addEventListener('click', async () => {
   try {
     const d = await pePost(`/job/${JOB}/personagens/aplicar`, { canal: $('peCanal').value === '-' ? '' : $('peCanal').value, texto: $('peTexto').value, config: peConfig() });
     PE.d = d.estado; peSincOverlays(d.overlays); desenharPers();
-    toast(`🧍 ${d.n} aparição(ões) nos melhores de ${d.falas} momento(s) — escolhidas pela ${d.por === 'ia' ? '🤖 IA' : 'regra'} (roteiro: ${d.de_onde})${d.animando ? ` · 🎞 ${d.animando} pose(s) indo pro Flow virar animação` : ''}`, 7000);
+    toast(`🧍 ${d.n} aparição(ões) nos melhores de ${d.falas} momento(s) — escolhidas pela ${d.por === 'ia' ? '🤖 IA' : d.por === 'ia+regra' ? '🤖 IA (completada pela regra)' : 'regra'} (roteiro: ${d.de_onde})${d.animando ? ` · 🎞 ${d.animando} pose(s) indo pro Flow virar animação` : ''}`, 7000);
   } catch (e) { $('peStatus').textContent = '⚠ ' + e.message; }
   finally { b.disabled = false; }
 });

@@ -257,3 +257,20 @@ def test_falas_exatas_do_pod(tmp_path, monkeypatch):
     assert r["de_onde"].startswith("o pod") and r["n"] == 1
     ov = job["overlays"][0]
     assert ov["personagem"] == "mira" and ov["emocao"] == "curiosa" and ov["pose"] == "mira_curiosa_dir.png"
+
+
+def test_ia_escolheu_pouco_a_regra_completa(tmp_path, monkeypatch):
+    """v84_215: a IA devolveu 1 momento só — a regra completa até a frequência (antes o vídeo ficava com 1 aparição)."""
+    monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
+    base = _canal(tmp_path)
+    rot = " ".join(f"[mira] Frage {k}? Wirklich seltsam, oder nicht? [narrador] Ja, das ist so. Und weiter geht es hier." for k in range(8))
+    job = {"orientation": "16:9", "total_duration": 120.0, "texto_falas": rot, "overlays": [],
+           "personagens_canal": {"canal": "ast", "config": {"frequencia": 0.6, "ia": True}}}
+    chamado = []
+
+    def ia_fake(cands, *a, **k):
+        chamado.append(len(cands))
+        return [{"id": cands[0]["id"], "pose": "", "entrada": "", "saida": ""}]
+    monkeypatch.setattr(pe, "escolher_com_ia", ia_fake)
+    r = pe.aplicar(job, str(tmp_path / "j"), base, _palavras(rot))
+    assert chamado and r["por"] == "ia+regra" and r["n"] >= 3

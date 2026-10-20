@@ -2757,6 +2757,86 @@
    "criado": 1792522428.936359,
    "final": true,
    "extra": null
+  },
+  {
+   "id": "e25a51c0cb",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_neutra_esq_boca.png"
+   ],
+   "criado": 1792524073.0950902,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e40891cb97",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_ironica_dir_boca.png"
+   ],
+   "criado": 1792524083.8287845,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1528b29826",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_cetica_esq_boca.png"
+   ],
+   "criado": 1792524089.9584236,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b5f0d80cb7",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_explicando_esq_boca.png"
+   ],
+   "criado": 1792524104.8885489,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "aa8ee7558c",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_cetica_dir_boca.png"
+   ],
+   "criado": 1792524106.7544732,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c2af6600e3",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_seria_esq_boca.png"
+   ],
+   "criado": 1792524123.0188708,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "330e1c268a",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_dando_de_ombros_esq_boca.png"
+   ],
+   "criado": 1792524188.1192472,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6ac2d1b463",
+   "motor": "flow",
+   "arquivos": [
+    "vanta_ironica_dir_boca.png"
+   ],
+   "criado": 1792524231.841743,
+   "final": true,
+   "extra": null
   }
  ],
  "log": [
@@ -2773,7 +2853,15 @@
   "20/10 15:01:50 🚀 29 pose(s) pro Flow com a ⭐ mestre",
   "20/10 15:24:09 🚀 29 pose(s) pro Flow com a ⭐ mestre",
   "20/10 15:38:34 🚀 29 pose(s) pro Flow com a ⭐ mestre",
-  "20/10 15:53:48 🚀 29 pose(s) pro Flow com a ⭐ mestre"
+  "20/10 15:53:48 🚀 29 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:21:13 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:21:23 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:21:29 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:21:44 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:21:46 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:22:03 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:23:08 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:23:51 🚀 1 pose(s) pro Flow com a ⭐ mestre"
  ],
  "imagens": {
   "vanta_neutra_esq.png": {
@@ -3483,11 +3571,27 @@
       "verde_px": 544205
      },
      "cortada": false
+    },
+    {
+     "local": "vanta_neutra_esq_boca_v3_2638.png",
+     "bruto": "vanta_neutra_esq_boca_v3_553c_flow.png",
+     "job": "e25a51c0cb",
+     "motor": "flow",
+     "quando": 1792524170.5400355,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 23,
+      "furos_fechados": 24,
+      "verde_px": 544402
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 1,
+   "atual": 2,
    "erro": null,
-   "job": "b0c8ca9745",
+   "job": "e25a51c0cb",
    "msg": null
   },
   "vanta_neutra_dir_boca.png": {
@@ -3555,11 +3659,43 @@
       "verde_px": 542237
      },
      "cortada": false
+    },
+    {
+     "local": "vanta_ironica_dir_boca_v2_5c1e.png",
+     "bruto": "vanta_ironica_dir_boca_v2_2f09_flow.png",
+     "job": "e40891cb97",
+     "motor": "flow",
+     "quando": 1792524195.2484763,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 16,
+      "furos_fechados": 20,
+      "verde_px": 570579
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "vanta_ironica_dir_boca_v3_6fc9.png",
+     "bruto": "vanta_ironica_dir_boca_v3_6c8b_flow.png",
+     "job": "6ac2d1b463",
+     "motor": "flow",
+     "quando": 1792524294.1616955,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 14,
+      "furos_fechados": 19,
+      "verde_px": 570546
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 0,
+   "atual": 2,
    "erro": null,
-   "job": "43a571ed6c",
+   "job": "6ac2d1b463",
    "msg": null
   },
   "vanta_cetica_esq_boca.png": {
@@ -3594,11 +3730,27 @@
       "verde_px": 586916
      },
      "cortada": false
+    },
+    {
+     "local": "vanta_cetica_esq_boca_v3_5384.png",
+     "bruto": "vanta_cetica_esq_boca_v3_ee9c_flow.png",
+     "job": "1528b29826",
+     "motor": "flow",
+     "quando": 1792524204.2432764,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 26,
+      "furos_fechados": 15,
+      "verde_px": 587094
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 1,
+   "atual": 2,
    "erro": null,
-   "job": "26f5c53352",
+   "job": "1528b29826",
    "msg": null
   },
   "vanta_cetica_dir_boca.png": {
@@ -3618,11 +3770,27 @@
       "verde_px": 603612
      },
      "cortada": false
+    },
+    {
+     "local": "vanta_cetica_dir_boca_v2_c09d.png",
+     "bruto": "vanta_cetica_dir_boca_v2_0f6e_flow.png",
+     "job": "aa8ee7558c",
+     "motor": "flow",
+     "quando": 1792524240.8088334,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 23,
+      "furos_fechados": 26,
+      "verde_px": 603627
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 0,
+   "atual": 1,
    "erro": null,
-   "job": "d510ada7aa",
+   "job": "aa8ee7558c",
    "msg": null
   },
   "vanta_explicando_esq_boca.png": {
@@ -3672,11 +3840,27 @@
       "verde_px": 552318
      },
      "cortada": false
+    },
+    {
+     "local": "vanta_explicando_esq_boca_v4_4b7d.png",
+     "bruto": "vanta_explicando_esq_boca_v4_3d96_flow.png",
+     "job": "b5f0d80cb7",
+     "motor": "flow",
+     "quando": 1792524231.2756443,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 12,
+      "furos_fechados": 18,
+      "verde_px": 552426
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 2,
+   "atual": 3,
    "erro": null,
-   "job": "902f8de713",
+   "job": "b5f0d80cb7",
    "msg": null
   },
   "vanta_explicando_dir_boca.png": {
@@ -3735,11 +3919,27 @@
       "verde_px": 325768
      },
      "cortada": true
+    },
+    {
+     "local": "vanta_seria_esq_boca_v3_94f2.png",
+     "bruto": "vanta_seria_esq_boca_v3_4237_flow.png",
+     "job": "c2af6600e3",
+     "motor": "flow",
+     "quando": 1792524291.2386138,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 9,
+      "furos_fechados": 22,
+      "verde_px": 587901
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 0,
+   "atual": 2,
    "erro": null,
-   "job": "04c79c8679",
+   "job": "c2af6600e3",
    "msg": null
   },
   "vanta_seria_dir_boca.png": {
@@ -4388,7 +4588,7 @@
    "msg": null
   },
   "vanta_apontando_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_apontando_esq_boca_v1_caf8.png",
@@ -4413,7 +4613,7 @@
    "msg": null
   },
   "vanta_apontando_dir_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_apontando_dir_boca_v1_18e3.png",
@@ -4438,7 +4638,7 @@
    "msg": null
   },
   "vanta_rindo_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_rindo_esq_boca_v1_efbe.png",
@@ -4463,7 +4663,7 @@
    "msg": null
   },
   "vanta_pensando_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_pensando_esq_boca_v1_1cd2.png",
@@ -4488,7 +4688,7 @@
    "msg": null
   },
   "vanta_buraco_negro_na_mao_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_buraco_negro_na_mao_esq_boca_v1_50c2.png",
@@ -4513,7 +4713,7 @@
    "msg": null
   },
   "vanta_buraco_negro_na_mao_dir_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_buraco_negro_na_mao_dir_boca_v1_7fab.png",
@@ -4538,7 +4738,7 @@
    "msg": null
   },
   "vanta_planeta_no_dedo_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_planeta_no_dedo_esq_boca_v1_bd52.png",
@@ -4563,7 +4763,7 @@
    "msg": null
   },
   "vanta_relogio_de_bolso_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_relogio_de_bolso_esq_boca_v1_2554.png",
@@ -4588,7 +4788,7 @@
    "msg": null
   },
   "vanta_fotografia_antiga_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_fotografia_antiga_esq_boca_v1_6b92.png",
@@ -4613,7 +4813,7 @@
    "msg": null
   },
   "vanta_gravador_stop_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_gravador_stop_esq_boca_v1_cb97.png",
@@ -4638,7 +4838,7 @@
    "msg": null
   },
   "vanta_entediada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_entediada_esq_boca_v1_4408.png",
@@ -4663,7 +4863,7 @@
    "msg": null
   },
   "vanta_provocando_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_provocando_esq_boca_v1_406b.png",
@@ -4688,7 +4888,7 @@
    "msg": null
   },
   "vanta_desconfiada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_desconfiada_esq_boca_v1_83d3.png",
@@ -4713,7 +4913,7 @@
    "msg": null
   },
   "vanta_surpresa_contida_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_surpresa_contida_esq_boca_v1_1edc.png",
@@ -4738,7 +4938,7 @@
    "msg": null
   },
   "vanta_assustada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_assustada_esq_boca_v1_24f4.png",
@@ -4763,7 +4963,7 @@
    "msg": null
   },
   "vanta_mudando_de_assunto_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_mudando_de_assunto_esq_boca_v1_69f2.png",
@@ -4788,7 +4988,7 @@
    "msg": null
   },
   "vanta_dando_de_ombros_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_dando_de_ombros_esq_boca_v1_c5c3.png",
@@ -4805,15 +5005,31 @@
      },
      "cortada": false,
      "defeito": false
+    },
+    {
+     "local": "vanta_dando_de_ombros_esq_boca_v2_b242.png",
+     "bruto": "vanta_dando_de_ombros_esq_boca_v2_b5dc_flow.png",
+     "job": "330e1c268a",
+     "motor": "flow",
+     "quando": 1792524292.96473,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 38,
+      "verde_px": 560746
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 0,
+   "atual": 1,
    "erro": null,
-   "job": "192fb5c8cd",
+   "job": "330e1c268a",
    "msg": null
   },
   "vanta_ampulheta_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_ampulheta_esq_boca_v1_0dd3.png",
@@ -4838,7 +5054,7 @@
    "msg": null
   },
   "vanta_luneta_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_luneta_esq_boca_v1_5faf.png",
@@ -4863,7 +5079,7 @@
    "msg": null
   },
   "vanta_olhando_luneta_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_olhando_luneta_esq_boca_v1_4d17.png",
@@ -4888,7 +5104,7 @@
    "msg": null
   },
   "vanta_livro_aberto_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_livro_aberto_esq_boca_v1_11e5.png",
@@ -4913,7 +5129,7 @@
    "msg": null
   },
   "vanta_mapa_estelar_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_mapa_estelar_esq_boca_v1_a18d.png",
@@ -4938,7 +5154,7 @@
    "msg": null
   },
   "vanta_ponteiro_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_ponteiro_esq_boca_v1_8ab8.png",
@@ -4963,7 +5179,7 @@
    "msg": null
   },
   "vanta_triste_escondido_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_triste_escondido_esq_boca_v1_1756.png",
@@ -4988,7 +5204,7 @@
    "msg": null
   },
   "vanta_prisma_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_prisma_esq_boca_v1_6e78.png",
@@ -5013,7 +5229,7 @@
    "msg": null
   },
   "vanta_xicara_de_cha_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_xicara_de_cha_esq_boca_v1_46a8.png",
@@ -5038,7 +5254,7 @@
    "msg": null
   },
   "vanta_maca_gravidade_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_maca_gravidade_esq_boca_v1_53e5.png",
@@ -5063,7 +5279,7 @@
    "msg": null
   },
   "vanta_lanterna_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_lanterna_esq_boca_v1_5ab0.png",
@@ -5088,7 +5304,7 @@
    "msg": null
   },
   "vanta_bussola_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "vanta_bussola_esq_boca_v1_6646.png",
@@ -5113,7 +5329,7 @@
    "msg": null
   }
  },
- "atualizado": 1792523122.5850098,
+ "atualizado": 1792524313.3433905,
  "canal": {
   "slug": "astranebel",
   "personagem": "vanta",

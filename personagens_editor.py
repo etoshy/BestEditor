@@ -939,8 +939,9 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
         raise PersEdErro("Não consegui casar o roteiro com as palavras do áudio (o projeto tem legenda/transcrição?).")
     cands = candidatos(falas, pers, cfg)
     _cenas_nos_candidatos(job, cands)
-    if any(not c.get("texto_na_tela") for c in cands):
-        cands = [c for c in cands if not c.get("texto_na_tela")]
+    livres = [c for c in cands if not c.get("texto_na_tela")]
+    if len(livres) >= max(1, len(cands) * 0.6):  # 🧯 v84_215: só tira os de texto na cena se sobrar a maioria
+        cands = livres
     if not cands:
         raise PersEdErro("Não achei momento pra personagem: as tags do roteiro precisam ser os nomes delas ("
                          + ", ".join(f"[{p['slug']}]" for p in pers) + ").")
@@ -954,6 +955,19 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
         por = "ia"
         idx = {c["id"]: c for c in cands}
         escolhidos = sorted((idx[x["id"]] for x in ia), key=lambda c: c["start"])
+        # 🧯 v84_215: a IA escolheu poucos (às vezes 1 só) — completa pela regra até a frequência pedida
+        if len(escolhidos) < max(1, round(quantos * 0.7)):
+            ja = {c["id"] for c in escolhidos}
+            gap = float(cfg.get("min_intervalo") or 0)
+            for c in escolher_momentos([c for c in cands if c["id"] not in ja], cfg, quantos):
+                if len(escolhidos) >= quantos:
+                    break
+                if any(e["slug"] == c["slug"] and not (c["start"] >= e["end"] + gap or c["end"] <= e["start"] - gap)
+                       for e in escolhidos):
+                    continue
+                escolhidos.append(c)
+            escolhidos.sort(key=lambda c: c["start"])
+            por = "ia+regra"
         novas, avisos = montar(escolhidos, pers, cfg, duracao, vertical, {x["id"]: x for x in ia})
     else:
         novas, avisos = montar(escolher_momentos(cands, cfg, quantos), pers, cfg, duracao, vertical)

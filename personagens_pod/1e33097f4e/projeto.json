@@ -1631,6 +1631,76 @@
    "criado": 1792523623.777233,
    "final": true,
    "auto_refeito": true
+  },
+  {
+   "id": "e7660142a2",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_dir_boca.png"
+   ],
+   "criado": 1792523937.964799,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6f6d6eef43",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_esq_boca.png"
+   ],
+   "criado": 1792523946.4816036,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "98d0536107",
+   "motor": "flow",
+   "arquivos": [
+    "mira_perguntando_dir_boca.png"
+   ],
+   "criado": 1792524030.5129302,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "de762c7c22",
+   "motor": "flow",
+   "arquivos": [
+    "mira_curiosa_dir_boca.png"
+   ],
+   "criado": 1792524042.2687058,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "22ed53833a",
+   "motor": "flow",
+   "arquivos": [
+    "mira_curiosa_esq_boca.png"
+   ],
+   "criado": 1792524046.2583027,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "780e33aaad",
+   "motor": "flow",
+   "arquivos": [
+    "mira_neutra_dir_boca.png"
+   ],
+   "criado": 1792524050.6680586,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ec4057eaf6",
+   "motor": "flow",
+   "arquivos": [
+    "mira_maravilhada_esq_boca.png"
+   ],
+   "criado": 1792524059.8793216,
+   "final": true,
+   "extra": null
   }
  ],
  "log": [
@@ -1652,7 +1722,14 @@
   "20/10 16:05:31 🚀 27 pose(s) pro Flow com a ⭐ mestre",
   "20/10 16:12:03 ✂ mira_mapa_estelar_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG) — refazendo 1x",
   "20/10 16:12:14 ✂ mira_lupa_meteorito_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG) — refazendo 1x",
-  "20/10 16:13:43 ✂ mira_cansada_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x"
+  "20/10 16:13:43 ✂ mira_cansada_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x",
+  "20/10 16:18:57 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:19:06 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:20:30 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:20:42 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:20:46 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:20:50 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:20:59 🚀 1 pose(s) pro Flow com a ⭐ mestre"
  ],
  "imagens": {
   "mira_neutra_esq.png": {
@@ -2482,11 +2559,27 @@
       "verde_px": 506374
      },
      "cortada": false
+    },
+    {
+     "local": "mira_neutra_dir_boca_v3_31bd.png",
+     "bruto": "mira_neutra_dir_boca_v3_a0b2_flow.png",
+     "job": "780e33aaad",
+     "motor": "flow",
+     "quando": 1792524254.9915195,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 25,
+      "verde_px": 506526
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 1,
+   "atual": 2,
    "erro": null,
-   "job": "cc96db3950",
+   "job": "780e33aaad",
    "msg": null
   },
   "mira_curiosa_esq_boca.png": {
@@ -2536,11 +2629,27 @@
       "verde_px": 488998
      },
      "cortada": false
+    },
+    {
+     "local": "mira_curiosa_esq_boca_v4_83b1.png",
+     "bruto": "mira_curiosa_esq_boca_v4_3703_flow.png",
+     "job": "22ed53833a",
+     "motor": "flow",
+     "quando": 1792524253.0927832,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 8,
+      "verde_px": 489146
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 2,
+   "atual": 3,
    "erro": null,
-   "job": "c8a1ade3be",
+   "job": "22ed53833a",
    "msg": null
   },
   "mira_curiosa_dir_boca.png": {
@@ -2575,11 +2684,27 @@
       "verde_px": 509185
      },
      "cortada": false
+    },
+    {
+     "local": "mira_curiosa_dir_boca_v3_55d0.png",
+     "bruto": "mira_curiosa_dir_boca_v3_03cb_flow.png",
+     "job": "de762c7c22",
+     "motor": "flow",
+     "quando": 1792524251.121276,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 25,
+      "verde_px": 509324
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 1,
+   "atual": 2,
    "erro": null,
-   "job": "cee2b470ce",
+   "job": "de762c7c22",
    "msg": null
   },
   "mira_maravilhada_esq_boca.png": {
@@ -2614,11 +2739,27 @@
       "verde_px": 493653
      },
      "cortada": false
+    },
+    {
+     "local": "mira_maravilhada_esq_boca_v3_05ec.png",
+     "bruto": "mira_maravilhada_esq_boca_v3_7599_flow.png",
+     "job": "ec4057eaf6",
+     "motor": "flow",
+     "quando": 1792524256.46486,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 19,
+      "verde_px": 493791
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 1,
+   "atual": 2,
    "erro": null,
-   "job": "1fc3db1311",
+   "job": "ec4057eaf6",
    "msg": null
   },
   "mira_maravilhada_dir_boca.png": {
@@ -2661,7 +2802,7 @@
    "msg": null
   },
   "mira_perguntando_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_perguntando_esq_boca_v1_c532.png",
@@ -2707,11 +2848,27 @@
       "verde_px": 503462
      },
      "cortada": false
+    },
+    {
+     "local": "mira_perguntando_esq_boca_v4_cfb6.png",
+     "bruto": "mira_perguntando_esq_boca_v4_2b50_flow.png",
+     "job": "6f6d6eef43",
+     "motor": "flow",
+     "quando": 1792524002.5675857,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 26,
+      "verde_px": 485172
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 2,
+   "atual": 3,
    "erro": null,
-   "job": "f9cb556bc2",
+   "job": "6f6d6eef43",
    "msg": null
   },
   "mira_perguntando_dir_boca.png": {
@@ -2746,11 +2903,27 @@
       "verde_px": 516865
      },
      "cortada": false
+    },
+    {
+     "local": "mira_perguntando_dir_boca_v3_ba76.png",
+     "bruto": "mira_perguntando_dir_boca_v3_7af4_flow.png",
+     "job": "98d0536107",
+     "motor": "flow",
+     "quando": 1792524249.3421957,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 19,
+      "verde_px": 492166
+     },
+     "cortada": false,
+     "defeito": false
     }
    ],
-   "atual": 1,
+   "atual": 2,
    "erro": null,
-   "job": "9936fa710f",
+   "job": "98d0536107",
    "msg": null
   },
   "mira_triste_esq.png": {
@@ -3438,7 +3611,7 @@
    "msg": null
   },
   "mira_empolgada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_empolgada_esq_boca_v1_e0a2.png",
@@ -3463,7 +3636,7 @@
    "msg": null
   },
   "mira_empolgada_dir_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_empolgada_dir_boca_v1_cf22.png",
@@ -3488,7 +3661,7 @@
    "msg": null
   },
   "mira_pensando_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_pensando_esq_boca_v1_99ec.png",
@@ -3513,7 +3686,7 @@
    "msg": null
   },
   "mira_pensando_dir_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_pensando_dir_boca_v1_b0c0.png",
@@ -3538,7 +3711,7 @@
    "msg": null
   },
   "mira_surpresa_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_surpresa_esq_boca_v1_bd92.png",
@@ -3563,7 +3736,7 @@
    "msg": null
   },
   "mira_insegura_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_insegura_esq_boca_v1_5e2e.png",
@@ -3588,7 +3761,7 @@
    "msg": null
   },
   "mira_globo_celeste_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_globo_celeste_esq_boca_v1_3739.png",
@@ -3613,7 +3786,7 @@
    "msg": null
   },
   "mira_globo_celeste_dir_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_globo_celeste_dir_boca_v1_1edf.png",
@@ -3638,7 +3811,7 @@
    "msg": null
   },
   "mira_caderno_constelacoes_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_caderno_constelacoes_esq_boca_v1_28d0.png",
@@ -3663,7 +3836,7 @@
    "msg": null
   },
   "mira_fotografia_antiga_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_fotografia_antiga_esq_boca_v1_1c57.png",
@@ -3688,7 +3861,7 @@
    "msg": null
   },
   "mira_olhando_telescopio_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_olhando_telescopio_esq_boca_v1_8dad.png",
@@ -3713,7 +3886,7 @@
    "msg": null
   },
   "mira_triste_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_triste_esq_boca_v1_cec0.png",
@@ -3738,7 +3911,7 @@
    "msg": null
   },
   "mira_assustada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_assustada_esq_boca_v1_a7fc.png",
@@ -3763,7 +3936,7 @@
    "msg": null
   },
   "mira_sorrindo_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_sorrindo_esq_boca_v1_032a.png",
@@ -3788,7 +3961,7 @@
    "msg": null
   },
   "mira_ouvindo_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_ouvindo_esq_boca_v1_4e1b.png",
@@ -3813,7 +3986,7 @@
    "msg": null
   },
   "mira_confusa_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_confusa_esq_boca_v1_8bca.png",
@@ -3838,7 +4011,7 @@
    "msg": null
   },
   "mira_pote_de_estrela_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_pote_de_estrela_esq_boca_v1_0604.png",
@@ -3863,7 +4036,7 @@
    "msg": null
   },
   "mira_pote_de_estrela_dir_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_pote_de_estrela_dir_boca_v1_c52e.png",
@@ -3888,7 +4061,7 @@
    "msg": null
   },
   "mira_mapa_estelar_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_mapa_estelar_esq_boca_v1_fcbb.png",
@@ -3929,7 +4102,7 @@
    "msg": null
   },
   "mira_lupa_meteorito_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_lupa_meteorito_esq_boca_v1_9650.png",
@@ -3970,7 +4143,7 @@
    "msg": null
   },
   "mira_livro_antigo_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_livro_antigo_esq_boca_v1_71d8.png",
@@ -3995,7 +4168,7 @@
    "msg": null
   },
   "mira_chave_observatorio_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_chave_observatorio_esq_boca_v1_ced4.png",
@@ -4020,7 +4193,7 @@
    "msg": null
   },
   "mira_determinada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_determinada_esq_boca_v1_d69d.png",
@@ -4045,7 +4218,7 @@
    "msg": null
   },
   "mira_cansada_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_cansada_esq_boca_v1_4fa0.png",
@@ -4086,7 +4259,7 @@
    "msg": null
   },
   "mira_vela_lanterna_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_vela_lanterna_esq_boca_v1_4606.png",
@@ -4111,7 +4284,7 @@
    "msg": null
   },
   "mira_astrolabio_esq_boca.png": {
-   "estado": "pronta",
+   "estado": "aprovada",
    "versoes": [
     {
      "local": "mira_astrolabio_esq_boca_v1_0198.png",
@@ -4144,7 +4317,7 @@
    "msg": "🎨 gerando no Flow (conta “principal”)"
   }
  },
- "atualizado": 1792523735.4302294,
+ "atualizado": 1792524275.4280112,
  "canal": {
   "slug": "astranebel",
   "personagem": "mira",
