@@ -1003,11 +1003,21 @@ def virar_pose(job: Dict[str, Any], oid: str, base: str, job_dir: str) -> None:
         normalizar_olhar([p], base, _inverter_do_job(job, base), detectar=False)
     poses = (p or {}).get("poses") or []
     atual = next((o for o in poses if o["arquivo"] == ov.get("pose")), None) if ov else None
-    certa = par_da_pose(poses, atual, olhar_para(ov.get("lado") or "esquerda")) if atual else None
-    if certa and certa is not atual:
-        manual = ov.get("manual")
+    if not atual:
+        return
+    quer = olhar_para(ov.get("lado") or "esquerda")
+    vira = {"esq": "dir", "dir": "esq"}
+    efetivo = vira.get(atual.get("lado"), atual.get("lado")) if ov.get("espelhar") else atual.get("lado")
+    if not efetivo or efetivo == quer:
+        return
+    certa = par_da_pose(poses, atual, quer)
+    manual = ov.get("manual")
+    if certa and certa is not atual and certa.get("lado") == quer:  # a mesma pose do outro lado existe: usa ela
         trocar_pose(job, oid, certa["arquivo"], base, job_dir)
-        ov["manual"] = manual or True
+        ov["espelhar"] = False
+    else:  # 🪞 v84_207: não tem o par — espelha a imagem pra ela olhar pro centro
+        ov["espelhar"] = not ov.get("espelhar")
+    ov["manual"] = manual or True
 
 
 def mudar(job: Dict[str, Any], oid: str, dados: Dict[str, Any]) -> Dict[str, Any]:
@@ -1029,6 +1039,8 @@ def mudar(job: Dict[str, Any], oid: str, dados: Dict[str, Any]) -> Dict[str, Any
     for k in ("anim_in", "anim_out"):
         if dados.get(k) in ENTRADAS:
             ov[k] = dados[k]
+    if "espelhar" in dados:  # 🪞 v84_207: inverter a imagem na horizontal
+        ov["espelhar"] = bool(dados["espelhar"])
     if "anim_usar" in dados:  # 🎞 usar o clipe ou a imagem parada
         if dados["anim_usar"]:
             ov.pop("anim_desligada", None)
@@ -1061,7 +1073,7 @@ def para_render(ov: Dict[str, Any]) -> Dict[str, Any]:
             "anim_in": ov.get("anim_in") or "nenhuma", "anim_out": ov.get("anim_out") or "nenhuma",
             "anim_dur": float(ov.get("anim_dur") or 0.35), "lado": ov.get("lado") or "esquerda",
             "boca_path": boca, "boca_janelas": ov.get("boca_janelas") or [],
-            "anim_video": anim, "anim_modo": ov.get("anim_modo") or "repetir"}
+            "anim_video": anim, "anim_modo": ov.get("anim_modo") or "repetir", "espelhar": bool(ov.get("espelhar"))}
 
 
 def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
@@ -1090,7 +1102,7 @@ def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
             pers = []
     aps = [{k: ov.get(k) for k in ("id", "personagem", "nome_personagem", "pose", "lado", "start", "end", "emocao", "fala",
                                     "anim_in", "anim_out", "manual", "tamanho",
-                                    "anim_tipo", "anim_modo", "anim_segundos", "anim_estado", "anim_msg", "anim_pedida")}
+                                    "anim_tipo", "anim_modo", "anim_segundos", "anim_estado", "anim_msg", "anim_pedida", "espelhar")}
            | {"anim_pronta": bool(ov.get("anim_video")) and os.path.isfile(str(ov.get("anim_video"))),
               "anim_usando": bool(ov.get("anim_video")) and not ov.get("anim_desligada")}
            | {"boca": bool(ov.get("boca_path")) and not ov.get("boca_desligada")}

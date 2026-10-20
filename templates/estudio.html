@@ -3779,12 +3779,19 @@ function propsOverlay(P, o) {
     <div class="row">${campo('Início (s)', `<input type="number" id="oIni" step="0.1" value="${o.start}">`)}${campo('Fim (s)', `<input type="number" id="oFim" step="0.1" value="${o.end}">`)}</div>
     <div class="row">${campo('X %', `<input type="number" id="oX" min="0" max="100" value="${texto ? (st.x_percent != null ? st.x_percent : 50) : (o.x_percent != null ? o.x_percent : 80)}">`)}${campo('Y %', `<input type="number" id="oY" min="0" max="100" value="${texto ? (st.y_percent != null ? st.y_percent : 88) : (o.y_percent != null ? o.y_percent : 20)}">`)}</div>
     <button class="primary mini" id="oSalvar" style="margin-top:10px;">Salvar overlay</button>
+    ${o.origem === 'personagem' ? `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="mini" id="oLado" title="leva pro outro lado da tela e vira a pose pro centro (usa a pose do outro lado; se não tiver, espelha)">⇄ Outro lado</button><button class="mini" id="oEspelhar" title="inverte a imagem na horizontal">🪞 ${o.espelhar ? 'Desespelhar' : 'Espelhar'}</button></div>` : ''}
     <form method="POST" action="/job/${JOB}/remove-overlay/${o.id}" class="form-salvar-antes" style="margin-top:10px;" onsubmit="return confirm('Remover este overlay?')"><button class="danger mini" type="submit">🗑 Remover overlay</button></form>`;
   $('oSalvar').addEventListener('click', () => {
     const campos = { start: parseFloat($('oIni').value), end: parseFloat($('oFim').value), x_percent: parseFloat($('oX').value), y_percent: parseFloat($('oY').value) };
     if (texto) { campos.text = $('oTxt').value; campos.font_size = $('oFonte').value; } else campos.size_percent = parseFloat($('oTam').value);
     salvarOverlay(o, campos).then(() => { desenharTimeline(); atualizarMonitor(true); });
   });
+  const pers = async (corpo) => {  // 🧍 v84_207: a personagem — outro lado / espelhar
+    try { const d = await pePost(`/job/${JOB}/personagens/${o.id}`, corpo); PE.d = d; peSincOverlays(d.overlays); if (PE.carregou) desenharPers(); propsOverlay(P, overlays.find(x => x.id === o.id)); }
+    catch (e) { toast('⚠ ' + e.message, 5000); }
+  };
+  if ($('oLado')) $('oLado').addEventListener('click', () => pers({ lado: (o.lado || (o.x_percent < 50 ? 'esquerda' : 'direita')) === 'esquerda' ? 'direita' : 'esquerda' }));
+  if ($('oEspelhar')) $('oEspelhar').addEventListener('click', () => pers({ espelhar: !o.espelhar }));
   ligarFormsSalvarAntes(P);
 }
 
@@ -4818,7 +4825,7 @@ function atualizarMonitor(forcar) {
   // overlays
   // 🧍 v84_206: a personagem fica numa camada logo acima da IMAGEM — destaques, legendas, gráficos e textos por cima dela
   const box = $('layerOv'), boxP = $('layerPers'); const ativos = overlays.filter(o => t >= o.start && t < o.end);
-  const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + (o._anim_url || '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
+  const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + (o._anim_url || '') + (o.espelhar ? 'E' : '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
   if (forcar || box.dataset.chave !== chave) {
     box.dataset.chave = chave; box.innerHTML = ''; boxP.innerHTML = '';
     ativos.forEach(o => {
@@ -4829,6 +4836,7 @@ function atualizarMonitor(forcar) {
       else if (o._url && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(o._url)) d.innerHTML = `<img src="${esc(o._url)}">`;
       else if (o._url) d.innerHTML = `<video src="${esc(o._url)}" muted autoplay loop playsinline style="width:100%"></video>`;
       else d.textContent = '🧩 ' + ((o.source || {}).query || 'overlay (resolvido na montagem)');
+      if (o.espelhar && d.firstElementChild) d.firstElementChild.style.transform = 'scaleX(-1)';  // 🪞
       (o.origem === 'personagem' ? boxP : box).appendChild(d);
     });
   }

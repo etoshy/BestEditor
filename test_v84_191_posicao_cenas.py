@@ -152,3 +152,27 @@ def test_personagem_nao_entra_em_trecho_com_texto_na_tela():
     cands = [{"start": 1.0, "end": 2.0}, {"start": 6.0, "end": 7.0}]
     pe._cenas_nos_candidatos(job, cands)
     assert cands[0]["texto_na_tela"] and not cands[1]["texto_na_tela"]
+
+
+def test_espelhar_personagem(tmp_path):
+    """v84_207: 🪞 espelhar a personagem — vai pro render como hflip."""
+    job = {"overlays": [{"id": "o1", "origem": "personagem", "lado": "direita", "size_percent": 20, "vertical": False}]}
+    ov = pe.mudar(job, "o1", {"espelhar": True})
+    assert ov["espelhar"] and pe.para_render(ov)["espelhar"]
+    base = str(tmp_path / "base.mp4")
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=1:r=25", "-f", "lavfi",
+                    "-i", "anullsrc=r=24000:cl=mono", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    "-shortest", base], check=True)
+    im = Image.new("RGBA", (100, 150), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rectangle([0, 0, 30, 150], fill=(255, 0, 0, 255))  # vermelho só na ESQUERDA da imagem
+    im.save(tmp_path / "p.png")
+    o = {"resolved_path": str(tmp_path / "p.png"), "media_type": "image", "start": 0.0, "end": 1.0, "size_percent": 50,
+         "personagem": "m", "x_percent": 50, "y_percent": 50, "ancora": "centro", "anim_in": "nenhuma", "anim_out": "nenhuma",
+         "lado": "esquerda", "espelhar": True}
+    out = str(tmp_path / "o.mp4")
+    va.apply_overlays(base, [o], out, 320, 180)
+    f = str(tmp_path / "f.png")
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", "0.5", "-i", out, "-frames:v", "1", f], check=True)
+    a = np.asarray(Image.open(f).convert("RGB")).astype(int)
+    ys, xs = np.nonzero((a[..., 0] > 200) & (a[..., 1] < 80))
+    assert xs.mean() > 160 + 20  # espelhada: o vermelho foi pra direita

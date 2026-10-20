@@ -1988,6 +1988,7 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
     xp = max(0.0, min(100.0, float(ov.get("x_percent", 3)))) / 100
     yp = max(0.0, min(100.0, float(ov.get("y_percent", 100)))) / 100
     esquerda = (ov.get("lado") or ("esquerda" if xp < 0.5 else "direita")) == "esquerda"
+    espelho = ",hflip" if ov.get("espelhar") else ""  # 🪞 v84_207
     centro = ov.get("ancora") == "centro"  # 📐 v84_191: x/y = o CENTRO da imagem (igual ao monitor do Estúdio)
     alvo = f"(main_w*{xp:.5f}-overlay_w/2)" if centro else f"(main_w-overlay_w)*{xp:.5f}"
     fora = "(-overlay_w)" if esquerda else "main_w"
@@ -2015,7 +2016,7 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
             fade += f",fade=t=in:st=0:d={d:.3f}:alpha=1"
         if e_out == "aparecer":
             fade += f",fade=t=out:st={max(0.0, dur - d):.3f}:d={d:.3f}:alpha=1"
-        partes.append(f"[{k}:v]scale={largura}:-2,format=rgba{fade},setpts=PTS+{start:.3f}/TB{rot}")
+        partes.append(f"[{k}:v]scale={largura}:-2{espelho},format=rgba{fade},setpts=PTS+{start:.3f}/TB{rot}")
         return k
 
     anim = ov.get("anim_video") if ov.get("anim_video") and os.path.isfile(str(ov.get("anim_video"))) else None
@@ -2031,7 +2032,7 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
             fade += f",fade=t=out:st={max(0.0, dur - d):.3f}:d={d:.3f}:alpha=1"
         # clipe mais curto que a aparição ("uma vez"): segura o último quadro (= a pose) até o fim — o fade de saída também
         partes.append(f"[{k}:v]fps=25,tpad=stop_mode=clone:stop_duration={dur:.3f},trim=duration={dur:.3f},"
-                      f"scale={largura}:-2,format=rgba{fade},setpts=PTS-STARTPTS+{start:.3f}/TB[pp{idx}]")
+                      f"scale={largura}:-2{espelho},format=rgba{fade},setpts=PTS-STARTPTS+{start:.3f}/TB[pp{idx}]")
         partes.append(f"{atual}[pp{idx}]overlay=x='{x}':y='{y}':enable='between(t,{start:.3f},{end:.3f})':eof_action=repeat{proximo}")
         return n_in
     _entrada(ov["resolved_path"], f"[pp{idx}]")
