@@ -436,6 +436,276 @@
     "lado": "esq",
     "descricao_pt": "segurando uma xícara de chá quente",
     "prompt": "holding a warm cup of tea with both hands; 3/4 view, body and face turned toward image-LEFT; half-body, head to hips."
+   },
+   {
+    "arquivo": "mira_empolgada_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_empolgada_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "empolgada, apontando pra cima (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_empolgada_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_empolgada_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "empolgada, apontando pra cima (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_pensando_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_pensando_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "pensando, dedo nos lábios (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_pensando_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_pensando_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "pensando, dedo nos lábios (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_surpresa_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_surpresa_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "surpresa, boca aberta — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_insegura_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_insegura_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "insegura, tocando o pingente da lua (hábito dela) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_globo_celeste_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_globo_celeste_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "abraçando um globo/esfera celeste (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_globo_celeste_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_globo_celeste_dir.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "abraçando um globo/esfera celeste (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_caderno_constelacoes_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_caderno_constelacoes_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "desenhando constelações num caderno (hábito dela) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_fotografia_antiga_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_fotografia_antiga_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "segurando uma foto antiga (a estrela riscada — lore) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_olhando_telescopio_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_olhando_telescopio_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "olhando por um telescópio antigo de latão — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_triste_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_triste_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "triste / melancólica — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_assustada_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_assustada_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "assustada — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_sorrindo_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_sorrindo_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "sorriso leve — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_ouvindo_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_ouvindo_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "ouvindo com atenção — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_confusa_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_confusa_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "confusa (sem desenhar '?') — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_pote_de_estrela_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_pote_de_estrela_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando um pote de vidro com uma estrelinha brilhando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_pote_de_estrela_dir_boca.png",
+    "tipo": "boca",
+    "base": "mira_pote_de_estrela_dir.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "segurando um pote de vidro com uma estrelinha brilhando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_mapa_estelar_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_mapa_estelar_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando um mapa estelar antigo — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_lupa_meteorito_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_lupa_meteorito_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "olhando um meteorito com uma lupa — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_livro_antigo_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_livro_antigo_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando um livro antigo de astronomia — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_chave_observatorio_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_chave_observatorio_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando uma chave antiga (observatório — lore) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_determinada_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_determinada_esq.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "determinada — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_cansada_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_cansada_esq.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "sonolenta, apoiada (pose da ficha) — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_vela_lanterna_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_vela_lanterna_esq.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "segurando uma vela/lanterna acesa — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_astrolabio_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_astrolabio_esq.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "segurando um astrolábio — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "mira_xicara_de_cha_esq_boca.png",
+    "tipo": "boca",
+    "base": "mira_xicara_de_cha_esq.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "segurando uma xícara de chá quente — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
    }
   ]
  },
@@ -1061,6 +1331,306 @@
    "criado": 1792420598.6382217,
    "final": true,
    "auto_refeito": true
+  },
+  {
+   "id": "2a9b158a01",
+   "motor": "flow",
+   "arquivos": [
+    "mira_empolgada_esq_boca.png"
+   ],
+   "criado": 1792523131.7332718,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "368aefc1e5",
+   "motor": "flow",
+   "arquivos": [
+    "mira_empolgada_dir_boca.png"
+   ],
+   "criado": 1792523131.7332785,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "20acfbf9a2",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pensando_esq_boca.png"
+   ],
+   "criado": 1792523131.7332804,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "85c0516e8f",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pensando_dir_boca.png"
+   ],
+   "criado": 1792523131.733282,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "241a51d29b",
+   "motor": "flow",
+   "arquivos": [
+    "mira_surpresa_esq_boca.png"
+   ],
+   "criado": 1792523131.7332847,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b1e576cc92",
+   "motor": "flow",
+   "arquivos": [
+    "mira_insegura_esq_boca.png"
+   ],
+   "criado": 1792523131.7332864,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1440af7bee",
+   "motor": "flow",
+   "arquivos": [
+    "mira_globo_celeste_esq_boca.png"
+   ],
+   "criado": 1792523131.733288,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4ebaa41fd8",
+   "motor": "flow",
+   "arquivos": [
+    "mira_globo_celeste_dir_boca.png"
+   ],
+   "criado": 1792523131.7332895,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b97b4d6b9c",
+   "motor": "flow",
+   "arquivos": [
+    "mira_caderno_constelacoes_esq_boca.png"
+   ],
+   "criado": 1792523131.7332911,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2d9707e82d",
+   "motor": "flow",
+   "arquivos": [
+    "mira_fotografia_antiga_esq_boca.png"
+   ],
+   "criado": 1792523131.7332928,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0cd1b688d4",
+   "motor": "flow",
+   "arquivos": [
+    "mira_olhando_telescopio_esq_boca.png"
+   ],
+   "criado": 1792523131.733294,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "575430e75c",
+   "motor": "flow",
+   "arquivos": [
+    "mira_triste_esq_boca.png"
+   ],
+   "criado": 1792523131.7332957,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e39054362a",
+   "motor": "flow",
+   "arquivos": [
+    "mira_assustada_esq_boca.png"
+   ],
+   "criado": 1792523131.733297,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "66517572e2",
+   "motor": "flow",
+   "arquivos": [
+    "mira_sorrindo_esq_boca.png"
+   ],
+   "criado": 1792523131.7332985,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ed71e3726a",
+   "motor": "flow",
+   "arquivos": [
+    "mira_ouvindo_esq_boca.png"
+   ],
+   "criado": 1792523131.7332997,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "df71659ae8",
+   "motor": "flow",
+   "arquivos": [
+    "mira_confusa_esq_boca.png"
+   ],
+   "criado": 1792523131.7333012,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f085b35678",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pote_de_estrela_esq_boca.png"
+   ],
+   "criado": 1792523131.7333028,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ba45e841cc",
+   "motor": "flow",
+   "arquivos": [
+    "mira_pote_de_estrela_dir_boca.png"
+   ],
+   "criado": 1792523131.7333043,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3e53f34dd6",
+   "motor": "flow",
+   "arquivos": [
+    "mira_mapa_estelar_esq_boca.png"
+   ],
+   "criado": 1792523131.733306,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8a14de9e8b",
+   "motor": "flow",
+   "arquivos": [
+    "mira_lupa_meteorito_esq_boca.png"
+   ],
+   "criado": 1792523131.733307,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fddea1833e",
+   "motor": "flow",
+   "arquivos": [
+    "mira_livro_antigo_esq_boca.png"
+   ],
+   "criado": 1792523131.7333083,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1907581c59",
+   "motor": "flow",
+   "arquivos": [
+    "mira_chave_observatorio_esq_boca.png"
+   ],
+   "criado": 1792523131.7333097,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fd78b230a3",
+   "motor": "flow",
+   "arquivos": [
+    "mira_determinada_esq_boca.png"
+   ],
+   "criado": 1792523131.733311,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7a3e18f8b6",
+   "motor": "flow",
+   "arquivos": [
+    "mira_cansada_esq_boca.png"
+   ],
+   "criado": 1792523131.7333126,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "25c84ab3ac",
+   "motor": "flow",
+   "arquivos": [
+    "mira_vela_lanterna_esq_boca.png"
+   ],
+   "criado": 1792523131.7333138,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2da2d959a4",
+   "motor": "flow",
+   "arquivos": [
+    "mira_astrolabio_esq_boca.png"
+   ],
+   "criado": 1792523131.7333152,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "06c4f4ee83",
+   "motor": "flow",
+   "arquivos": [
+    "mira_xicara_de_cha_esq_boca.png"
+   ],
+   "criado": 1792523131.7333171,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7719a83c36",
+   "motor": "flow",
+   "arquivos": [
+    "mira_mapa_estelar_esq_boca.png"
+   ],
+   "criado": 1792523523.8611078,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "9eafe28907",
+   "motor": "flow",
+   "arquivos": [
+    "mira_lupa_meteorito_esq_boca.png"
+   ],
+   "criado": 1792523534.8609693,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "f9479318d7",
+   "motor": "flow",
+   "arquivos": [
+    "mira_cansada_esq_boca.png"
+   ],
+   "criado": 1792523623.777233,
+   "final": true,
+   "auto_refeito": true
   }
  ],
  "log": [
@@ -1077,7 +1647,12 @@
   "19/10 11:35:27 🚀 1 pose(s) pro Flow com a ⭐ mestre",
   "19/10 11:36:38 ✂ mira_perguntando_dir_boca.png: veio cortada na borda — refazendo 1x",
   "19/10 15:21:28 ✏ JSON trocado: 43 pose(s)",
-  "19/10 15:21:28 🔗 conectado ao canal ASTRANEBEL → Mira (poses do JSON do canal)"
+  "19/10 15:21:28 🔗 conectado ao canal ASTRANEBEL → Mira (poses do JSON do canal)",
+  "20/10 16:05:25 👄 27 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "20/10 16:05:31 🚀 27 pose(s) pro Flow com a ⭐ mestre",
+  "20/10 16:12:03 ✂ mira_mapa_estelar_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG) — refazendo 1x",
+  "20/10 16:12:14 ✂ mira_lupa_meteorito_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG) — refazendo 1x",
+  "20/10 16:13:43 ✂ mira_cansada_esq_boca.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x"
  ],
  "imagens": {
   "mira_neutra_esq.png": {
@@ -2861,9 +3436,715 @@
    "erro": null,
    "job": "e2150097ae",
    "msg": null
+  },
+  "mira_empolgada_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_empolgada_esq_boca_v1_e0a2.png",
+     "bruto": "mira_empolgada_esq_boca_v1_d554_flow.png",
+     "job": "2a9b158a01",
+     "motor": "flow",
+     "quando": 1792523199.6776342,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 24,
+      "verde_px": 486345
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2a9b158a01",
+   "msg": null
+  },
+  "mira_empolgada_dir_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_empolgada_dir_boca_v1_cf22.png",
+     "bruto": "mira_empolgada_dir_boca_v1_2fd1_flow.png",
+     "job": "368aefc1e5",
+     "motor": "flow",
+     "quando": 1792523193.47448,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 28,
+      "verde_px": 523512
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "368aefc1e5",
+   "msg": null
+  },
+  "mira_pensando_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_pensando_esq_boca_v1_99ec.png",
+     "bruto": "mira_pensando_esq_boca_v1_290a_flow.png",
+     "job": "20acfbf9a2",
+     "motor": "flow",
+     "quando": 1792523229.9110029,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 536403
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "20acfbf9a2",
+   "msg": null
+  },
+  "mira_pensando_dir_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_pensando_dir_boca_v1_b0c0.png",
+     "bruto": "mira_pensando_dir_boca_v1_73fd_flow.png",
+     "job": "85c0516e8f",
+     "motor": "flow",
+     "quando": 1792523239.9339757,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 10,
+      "verde_px": 519674
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "85c0516e8f",
+   "msg": null
+  },
+  "mira_surpresa_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_surpresa_esq_boca_v1_bd92.png",
+     "bruto": "mira_surpresa_esq_boca_v1_ed0c_flow.png",
+     "job": "241a51d29b",
+     "motor": "flow",
+     "quando": 1792523261.2219985,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 41,
+      "verde_px": 466758
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "241a51d29b",
+   "msg": null
+  },
+  "mira_insegura_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_insegura_esq_boca_v1_5e2e.png",
+     "bruto": "mira_insegura_esq_boca_v1_52af_flow.png",
+     "job": "b1e576cc92",
+     "motor": "flow",
+     "quando": 1792523277.5863905,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 44,
+      "verde_px": 481151
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b1e576cc92",
+   "msg": null
+  },
+  "mira_globo_celeste_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_globo_celeste_esq_boca_v1_3739.png",
+     "bruto": "mira_globo_celeste_esq_boca_v1_87f4_flow.png",
+     "job": "1440af7bee",
+     "motor": "flow",
+     "quando": 1792523293.8464046,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 36,
+      "verde_px": 497397
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "1440af7bee",
+   "msg": null
+  },
+  "mira_globo_celeste_dir_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_globo_celeste_dir_boca_v1_1edf.png",
+     "bruto": "mira_globo_celeste_dir_boca_v1_e421_flow.png",
+     "job": "4ebaa41fd8",
+     "motor": "flow",
+     "quando": 1792523305.7372649,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 455173
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "4ebaa41fd8",
+   "msg": null
+  },
+  "mira_caderno_constelacoes_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_caderno_constelacoes_esq_boca_v1_28d0.png",
+     "bruto": "mira_caderno_constelacoes_esq_boca_v1_c099_flow.png",
+     "job": "b97b4d6b9c",
+     "motor": "flow",
+     "quando": 1792523331.970145,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 16,
+      "verde_px": 493217
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b97b4d6b9c",
+   "msg": null
+  },
+  "mira_fotografia_antiga_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_fotografia_antiga_esq_boca_v1_1c57.png",
+     "bruto": "mira_fotografia_antiga_esq_boca_v1_014b_flow.png",
+     "job": "2d9707e82d",
+     "motor": "flow",
+     "quando": 1792523343.4212418,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 14,
+      "verde_px": 447168
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2d9707e82d",
+   "msg": null
+  },
+  "mira_olhando_telescopio_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_olhando_telescopio_esq_boca_v1_8dad.png",
+     "bruto": "mira_olhando_telescopio_esq_boca_v1_54dd_flow.png",
+     "job": "0cd1b688d4",
+     "motor": "flow",
+     "quando": 1792523364.8701873,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 19,
+      "verde_px": 481218
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0cd1b688d4",
+   "msg": null
+  },
+  "mira_triste_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_triste_esq_boca_v1_cec0.png",
+     "bruto": "mira_triste_esq_boca_v1_371e_flow.png",
+     "job": "575430e75c",
+     "motor": "flow",
+     "quando": 1792523375.8519096,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 15,
+      "verde_px": 530083
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "575430e75c",
+   "msg": null
+  },
+  "mira_assustada_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_assustada_esq_boca_v1_a7fc.png",
+     "bruto": "mira_assustada_esq_boca_v1_2f15_flow.png",
+     "job": "e39054362a",
+     "motor": "flow",
+     "quando": 1792523401.6065276,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 10,
+      "verde_px": 502261
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e39054362a",
+   "msg": null
+  },
+  "mira_sorrindo_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_sorrindo_esq_boca_v1_032a.png",
+     "bruto": "mira_sorrindo_esq_boca_v1_1738_flow.png",
+     "job": "66517572e2",
+     "motor": "flow",
+     "quando": 1792523413.108944,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 5,
+      "furos_fechados": 18,
+      "verde_px": 515112
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "66517572e2",
+   "msg": null
+  },
+  "mira_ouvindo_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_ouvindo_esq_boca_v1_4e1b.png",
+     "bruto": "mira_ouvindo_esq_boca_v1_b26d_flow.png",
+     "job": "ed71e3726a",
+     "motor": "flow",
+     "quando": 1792523444.693857,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 22,
+      "verde_px": 499754
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ed71e3726a",
+   "msg": null
+  },
+  "mira_confusa_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_confusa_esq_boca_v1_8bca.png",
+     "bruto": "mira_confusa_esq_boca_v1_ad47_flow.png",
+     "job": "df71659ae8",
+     "motor": "flow",
+     "quando": 1792523450.9468157,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 14,
+      "verde_px": 493387
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "df71659ae8",
+   "msg": null
+  },
+  "mira_pote_de_estrela_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_pote_de_estrela_esq_boca_v1_0604.png",
+     "bruto": "mira_pote_de_estrela_esq_boca_v1_6aa6_flow.png",
+     "job": "f085b35678",
+     "motor": "flow",
+     "quando": 1792523486.8167157,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 34,
+      "verde_px": 498174
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f085b35678",
+   "msg": null
+  },
+  "mira_pote_de_estrela_dir_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_pote_de_estrela_dir_boca_v1_c52e.png",
+     "bruto": "mira_pote_de_estrela_dir_boca_v1_ab7a_flow.png",
+     "job": "ba45e841cc",
+     "motor": "flow",
+     "quando": 1792523498.0306318,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 5,
+      "verde_px": 585565
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ba45e841cc",
+   "msg": null
+  },
+  "mira_mapa_estelar_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_mapa_estelar_esq_boca_v1_fcbb.png",
+     "bruto": "mira_mapa_estelar_esq_boca_v1_1ada_flow.png",
+     "job": "3e53f34dd6",
+     "motor": "flow",
+     "quando": 1792523523.7737772,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 32,
+      "verde_px": 463980
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "mira_mapa_estelar_esq_boca_v2_fb14.png",
+     "bruto": "mira_mapa_estelar_esq_boca_v2_74f9_flow.png",
+     "job": "7719a83c36",
+     "motor": "flow",
+     "quando": 1792523707.7676556,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 14,
+      "verde_px": 463734
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "7719a83c36",
+   "msg": null
+  },
+  "mira_lupa_meteorito_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_lupa_meteorito_esq_boca_v1_9650.png",
+     "bruto": "mira_lupa_meteorito_esq_boca_v1_d674_flow.png",
+     "job": "8a14de9e8b",
+     "motor": "flow",
+     "quando": 1792523534.858525,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 15,
+      "verde_px": 442177
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "mira_lupa_meteorito_esq_boca_v2_3461.png",
+     "bruto": "mira_lupa_meteorito_esq_boca_v2_e176_flow.png",
+     "job": "9eafe28907",
+     "motor": "flow",
+     "quando": 1792523734.073153,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 17,
+      "verde_px": 442032
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "9eafe28907",
+   "msg": null
+  },
+  "mira_livro_antigo_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_livro_antigo_esq_boca_v1_71d8.png",
+     "bruto": "mira_livro_antigo_esq_boca_v1_5f48_flow.png",
+     "job": "fddea1833e",
+     "motor": "flow",
+     "quando": 1792523565.8411973,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 31,
+      "verde_px": 512771
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "fddea1833e",
+   "msg": null
+  },
+  "mira_chave_observatorio_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_chave_observatorio_esq_boca_v1_ced4.png",
+     "bruto": "mira_chave_observatorio_esq_boca_v1_7b4e_flow.png",
+     "job": "1907581c59",
+     "motor": "flow",
+     "quando": 1792523576.6587412,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 28,
+      "verde_px": 526773
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "1907581c59",
+   "msg": null
+  },
+  "mira_determinada_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_determinada_esq_boca_v1_d69d.png",
+     "bruto": "mira_determinada_esq_boca_v1_b116_flow.png",
+     "job": "fd78b230a3",
+     "motor": "flow",
+     "quando": 1792523607.9405415,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 486531
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "fd78b230a3",
+   "msg": null
+  },
+  "mira_cansada_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_cansada_esq_boca_v1_4fa0.png",
+     "bruto": "mira_cansada_esq_boca_v1_043c_flow.png",
+     "job": "7a3e18f8b6",
+     "motor": "flow",
+     "quando": 1792523623.7735586,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 1,
+      "verde_px": 450255
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "mira_cansada_esq_boca_v2_2e91.png",
+     "bruto": "mira_cansada_esq_boca_v2_1f92_flow.png",
+     "job": "f9479318d7",
+     "motor": "flow",
+     "quando": 1792523735.4294827,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 1,
+      "verde_px": 450256
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "f9479318d7",
+   "msg": null
+  },
+  "mira_vela_lanterna_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_vela_lanterna_esq_boca_v1_4606.png",
+     "bruto": "mira_vela_lanterna_esq_boca_v1_589d_flow.png",
+     "job": "25c84ab3ac",
+     "motor": "flow",
+     "quando": 1792523650.3776522,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 22,
+      "verde_px": 466670
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "25c84ab3ac",
+   "msg": null
+  },
+  "mira_astrolabio_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "mira_astrolabio_esq_boca_v1_0198.png",
+     "bruto": "mira_astrolabio_esq_boca_v1_32a2_flow.png",
+     "job": "2da2d959a4",
+     "motor": "flow",
+     "quando": 1792523662.2585013,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 34,
+      "verde_px": 454960
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2da2d959a4",
+   "msg": null
+  },
+  "mira_xicara_de_cha_esq_boca.png": {
+   "estado": "erro",
+   "versoes": [],
+   "atual": -1,
+   "erro": "o Flow recusou: o Flow não gerou: Esta geração talvez viole nossas políticas. Tente usar outro comando ou envie feedback.",
+   "job": "06c4f4ee83",
+   "msg": "🎨 gerando no Flow (conta “principal”)"
   }
  },
- "atualizado": 1792434088.4845314,
+ "atualizado": 1792523735.4302294,
  "canal": {
   "slug": "astranebel",
   "personagem": "mira",

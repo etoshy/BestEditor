@@ -222,3 +222,18 @@ def test_animar_todas_cria_a_boca_de_cada_pose(tmp_path, monkeypatch):
     monkeypatch.setattr(pp, "arquivo_atual", lambda p_, a, b=None: "/x.png" if a == "m_b.png" else None)
     r = pp.animar_todas(p["id"], str(tmp_path))
     assert r["enviadas"] == 1 and enviados == [["m_b_boca.png"]]
+
+
+def test_animar_uma_pose(tmp_path, monkeypatch):
+    """v84_214: 👄 animar só esta pose (no cartão dela)."""
+    import json
+    import personagens_pod as pp
+    monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
+    dados = {"formato": "personagens_pod_v1", "nome": "M", "poses": [{"arquivo": "m_a.png", "prompt": "a"}, {"arquivo": "m_b.png", "prompt": "b"}]}
+    p = pp.criar("M", json.dumps(dados), [], "", str(tmp_path))
+    enviados = []
+    monkeypatch.setattr(pp, "enviar", lambda pid, arqs, *a, **k: enviados.append(arqs) or {"ok": True})
+    monkeypatch.setattr(pp, "arquivo_atual", lambda p_, a, b=None: "/x.png")
+    r = pp.animar_pose(p["id"], "m_b.png", str(tmp_path))
+    assert r["boca"] == "m_b_boca.png" and enviados == [["m_b_boca.png"]]
+    assert [x["arquivo"] for x in pp.carregar(p["id"], str(tmp_path))["dados"]["poses"]] == ["m_a.png", "m_b.png", "m_b_boca.png"]

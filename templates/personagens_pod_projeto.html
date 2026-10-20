@@ -10,6 +10,11 @@
   .pj-it { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; background: #fff; position: relative; }
   .pj-it.aprovada { border-color: #22c55e; box-shadow: 0 0 0 2px #bbf7d0; }
   .pj-it.mestre { border-color: #a855f7; box-shadow: 0 0 0 2px #e9d5ff; }
+  .pj-it.animada { border-color: #0d9488; box-shadow: 0 0 0 3px #99f6e4; }
+  .pj-anim { position: absolute; top: 6px; right: 6px; background: #0d9488; color: #fff; font-size: .72rem; padding: 2px 7px; border-radius: 999px; z-index: 2; }
+  .pj-anim.fila { background: #f59e0b; } .pj-anim.erro { background: #dc2626; }
+  .pj-animbar { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #99f6e4; font-size: .74rem; align-items: center; }
+  .pj-animbar img { height: 46px; border-radius: 4px; background: #f1f5f9; }
   .pj-img { width: 100%; aspect-ratio: 2/3; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: .8rem; cursor: zoom-in;
     background-color: #e5e7eb; background-image: linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
     background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; overflow: hidden; }
@@ -79,8 +84,8 @@
     <span style="color:#666;">dica: a ⭐ mestre em 🎨 alta (30–40 passos); o resto pode ir em ⚡ rápida</span>
   </div>
   <div class="pj-barra" style="font-size:.85rem;">
-    <select id="filtro" style="width:auto;margin:0;"><option value="todas">todas</option><option value="revisar">👀 pra revisar</option><option value="faltam">faltam gerar</option><option value="aprovada">✔ aprovadas</option><option value="erro">❌ com erro</option><option value="fila">⏳ no pod</option></select>
-    <select id="fGrupo" style="width:auto;margin:0;"><option value="">reações e objetos</option><option value="reacao">só reações</option><option value="objeto">só objetos</option><option value="boca">só _boca</option></select>
+    <select id="filtro" style="width:auto;margin:0;"><option value="todas">todas</option><option value="revisar">👀 pra revisar</option><option value="faltam">faltam gerar</option><option value="aprovada">✔ aprovadas</option><option value="erro">❌ com erro</option><option value="fila">⏳ no pod</option><option value="animadas">👄 com animação</option><option value="sem_anim">sem animação</option></select>
+    <select id="fGrupo" style="width:auto;margin:0;"><option value="">reações e objetos (a 👄 boca aparece no cartão da pose)</option><option value="reacao">só reações</option><option value="objeto">só objetos</option><option value="boca">só _boca</option></select>
     <label style="margin:0;font-weight:normal;"><input type="checkbox" id="marcarVis" style="width:auto;margin:0 4px 0 0;">marcar as visíveis</label>
     <span id="resumo" style="color:#555;"></span>
   </div>
@@ -108,11 +113,27 @@
     const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
     const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
   }
+  // 👄 v84_214: a boca (a animação de fala) de cada pose
+  function bocaDe(it) { return it.tipo === 'boca' ? null : D.itens.find(x => x.tipo === 'boca' && x.base === it.arquivo); }
+  function animada(it) { const b = bocaDe(it); return !!(b && b.img && b.estado !== 'descartada'); }
   function visiveis() {
     const f = $('filtro').value, g = $('fGrupo').value;
-    return D.itens.filter(it => (!g || it.grupo === g)
+    return D.itens.filter(it => (g ? it.grupo === g : it.tipo !== 'boca')
       && (f === 'todas' || (f === 'revisar' && it.estado === 'pronta') || (f === 'faltam' && ['nova', 'erro'].includes(it.estado))
-          || (f === 'fila' && ['fila', 'gerando'].includes(it.estado)) || it.estado === f));
+          || (f === 'fila' && ['fila', 'gerando'].includes(it.estado)) || (f === 'animadas' && it.tipo !== 'boca' && animada(it))
+          || (f === 'sem_anim' && it.tipo !== 'boca' && it.img && !animada(it)) || it.estado === f));
+  }
+  function barraAnim(it) {
+    if (it.tipo === 'boca' || !it.img) return '';
+    const b = bocaDe(it);
+    if (!b) return `<div class="pj-animbar"><span style="color:#64748b">sem animação</span><button data-anim="criar" title="cria e gera a boca aberta desta pose">👄 animar</button></div>`;
+    const espera = ['fila', 'gerando'].includes(b.estado);
+    const st = espera ? '⏳ gerando a boca…' : b.estado === 'erro' ? `❌ ${esc(b.erro || 'erro')}` : b.estado === 'descartada' ? '🗑 boca apagada' : !b.img ? 'boca ainda não gerada' : (b.estado === 'aprovada' ? '✔ boca aprovada' : '👀 boca pra revisar');
+    return `<div class="pj-animbar">${b.img && b.estado !== 'descartada' ? `<img src="/personagens-pod/${PID}/img/${esc(b.img)}" data-zoom title="ver a animação">` : ''}<span>${st}</span>
+      ${b.img && b.estado !== 'descartada' ? '<button data-anim="ver" title="ver a animação (alterna pose e boca)">▶</button>' : ''}
+      ${b.img && !['aprovada', 'descartada'].includes(b.estado) && !espera ? '<button data-anim="aprovar" style="background:#16a34a" title="aprovar a boca">✔</button>' : ''}
+      ${!espera ? `<button data-anim="refazer" title="${b.img ? 'refazer a boca (nova versão)' : 'gerar a boca'}">🔁</button>` : ''}
+      ${b.img && b.estado !== 'descartada' && !espera ? '<button data-anim="apagar" style="background:#64748b" title="apagar a boca (o vídeo usa a pose parada)">🗑</button>' : ''}</div>`;
   }
   function desenhar() {
     const r = D.resumo; $('resumo').textContent = `${r.total} poses · ✔ ${r.aprovada || 0} aprovadas · 👀 ${r.pronta || 0} pra revisar · ⏳ ${(r.fila || 0) + (r.gerando || 0)} na fila · ❌ ${r.erro || 0}`;
@@ -125,7 +146,9 @@
       const img = it.img ? `<img src="/personagens-pod/${PID}/img/${esc(it.img)}" loading="lazy">` : (['fila', 'gerando'].includes(it.estado) ? '⏳' : 'ainda não gerada');
       const vers = it.versoes > 1 ? `<button data-v="-1" title="versão anterior">◀</button><span style="font-size:.72rem;">v${it.atual + 1}/${it.versoes}</span><button data-v="1" title="próxima versão">▶</button>` : '';
       const pode = !['fila', 'gerando'].includes(it.estado);
-      return `<div class="pj-it ${it.estado} ${eMestre ? 'mestre' : ''}" data-a="${esc(it.arquivo)}">
+      const bo = bocaDe(it), anim = animada(it), espA = bo && ['fila', 'gerando'].includes(bo.estado);
+      return `<div class="pj-it ${it.estado} ${eMestre ? 'mestre' : ''} ${anim ? 'animada' : ''}" data-a="${esc(it.arquivo)}">
+        ${anim ? '<span class="pj-anim" title="tem animação de fala (boca)">👄 animada</span>' : espA ? '<span class="pj-anim fila">👄 ⏳</span>' : (bo && bo.estado === 'erro') ? '<span class="pj-anim erro">👄 ❌</span>' : ''}
         <input type="checkbox" class="pj-chk" ${marc.has(it.arquivo) ? 'checked' : ''} ${pode ? '' : 'disabled'}>
         <div class="pj-img" data-zoom>${img}</div>
         <div class="pj-nome">${eMestre ? '⭐ ' : ''}${esc(it.arquivo)}${it.tipo !== 'boca' && D.itens.some(x => x.tipo === 'boca' && x.base === it.arquivo && x.img) ? ' <span title="tem a boca pronta — clique na imagem pra ver a animação">👄</span>' : ''}</div>
@@ -139,7 +162,7 @@
           ${pode && it.img ? '<button data-acao="corrigir" title="refazer com uma correção">🔁✍</button>' : ''}
           ${vers}
           ${pode && it.estado !== 'descartada' && it.img ? '<button data-acao="descartar" style="background:#64748b;" title="descartar">🗑</button>' : ''}
-        </div></div>`;
+        </div>${barraAnim(it)}</div>`;
     }).join('') || '<p style="color:#888;">Nada neste filtro.</p>';
   }
   async function estado() {
@@ -172,6 +195,20 @@
       if (par && par.img) { const a1 = `/personagens-pod/${PID}/img/${it.tipo === 'boca' ? par.img : it.img}`, a2 = `/personagens-pod/${PID}/img/${it.tipo === 'boca' ? it.img : par.img}`; let k = 0;
         new Image().src = a2; window._flap = setInterval(() => { if ($('zoom').style.display === 'none') { clearInterval(window._flap); return; } $('zoomImg').src = (k++ % 2) ? a1 : a2; }, 130); }
       return; }
+    const ba = e.target.closest('[data-anim]');
+    if (ba && !ba.disabled) {  // 👄 a boca desta pose
+      const bo = bocaDe(it);
+      if (ba.dataset.anim === 'ver') { card.querySelector('[data-zoom]').click(); return; }
+      ba.disabled = true; OCUPADO = true;
+      try {
+        if (ba.dataset.anim === 'criar') { const d = await post(`/personagens-pod/${PID}/boca`, {arquivo: a, quantidade: $('quantidade').value}); if (d.aviso) alert(d.aviso); }
+        else if (ba.dataset.anim === 'refazer') return gerar([bo.arquivo], '');
+        else if (ba.dataset.anim === 'aprovar') await post(`/personagens-pod/${PID}/aprovar`, {arquivo: bo.arquivo});
+        else if (ba.dataset.anim === 'apagar') { if (!confirm('Apagar a animação (boca) desta pose? O vídeo passa a usar a pose parada.')) return; await post(`/personagens-pod/${PID}/descartar`, {arquivo: bo.arquivo}); }
+      } catch (er) { alert(er.message); }
+      finally { OCUPADO = false; ba.disabled = false; }
+      ULTIMA = ''; estado(); return;
+    }
     const b = e.target.closest('button'); if (!b || b.disabled) return;
     if (b.dataset.acao === 'gerar' || b.dataset.acao === 'corrigir') { /* gerar() cuida */ }
     else { b.disabled = true; OCUPADO = true; }

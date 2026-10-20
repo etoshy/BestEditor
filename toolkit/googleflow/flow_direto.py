@@ -675,17 +675,26 @@ def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo
 _ULTIMA_MIDIA: Dict[int, Dict[str, Any]] = {}  # id(page) → a última mídia escolhida/enviada no menu (src + pedaços de id)
 
 
+def _ids_do_link(src: str) -> List[str]:
+    """Os ids de mídia de um link do Flow (…/image/<id>, …/video/<id>, ?name=<id>) — nunca pedaços genéricos do link."""
+    s = str(src or "")
+    ids = re.findall(r"/(?:image|video|media)/([0-9A-Za-z_-]{16,})", s) + re.findall(r"[?&](?:name|id|mediaId)=([0-9A-Za-z_-]{16,})", s)
+    return [i for i in dict.fromkeys(ids) if not re.search(r"cdn-key|^labs-|KeyName", i, re.I)]
+
+
 def _eh_referencia(m: Dict[str, str], estado: Dict[str, Any]) -> bool:
     """A mídia da galeria é a imagem de REFERÊNCIA que subimos (não o resultado)?"""
-    tokens = estado.get("ref_tokens") or []
-    alvo = f"{m.get('id') or ''} {m.get('url') or ''}"
-    return any(t and t in alvo for t in tokens)
+    tokens = [t for t in estado.get("ref_tokens") or [] if t and not re.search(r"cdn-key|^labs-|KeyName", t, re.I)]
+    meus = {str(m.get("id") or "")} | set(_ids_do_link(m.get("url") or ""))
+    return any(t in meus for t in tokens)
 
 
 def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, passo: str, on_passo: Passo = _nada) -> str:
     """Menu de mídia aberto → escolhe a imagem do projeto (`media_id`) ou envia `arquivo` → Incluir no comando."""
     _primeiro(page, S["menu_midia"], 8, passo, "o menu de mídia (imagens do projeto / Enviar mídia) não abriu.")
     item = None
+    if media_id and re.search(r"cdn-key|^labs-|KeyName", media_id, re.I):
+        media_id = ""  # v84_213: "id" errado guardado antes (pedaço do link que está em toda imagem) — sobe de novo
     if media_id:
         item = _primeiro(page, f'{S["midia_item"]}:has(img[src*="{media_id}"])', 6)
     origem = "do projeto"
@@ -722,7 +731,9 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
         src = item.locator("img").first.get_attribute("src") or ""
     except Exception:  # noqa: BLE001
         src = ""
-    _ULTIMA_MIDIA[id(page)] = {"src": src, "ids": [t for t in re.findall(r"[0-9A-Za-z_-]{16,}", src)][:6], "origem": origem}
+    # v84_213: SÓ o id da mídia (o /image/<id> do link) — o link novo do Flow tem "KeyName=labs-flow-prod-cdn-key", que
+    # está em TODA imagem: usado como "id da referência", fazia o resultado nunca ser aceito (ficava esperando)
+    _ULTIMA_MIDIA[id(page)] = {"src": src, "ids": _ids_do_link(src)[:6], "origem": origem}
     item.click()
     # 🖱 v84_211: o Flow mudou — agora clicar na imagem do menu JÁ inclui ela na caixa (o menu fecha, sem a prévia e
     # sem o "Incluir no comando"). Vale qualquer um dos dois jeitos.
@@ -1017,7 +1028,7 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
     try:
         for src in page.evaluate("""() => Array.from(document.querySelectorAll('flow-prompt-box img, .base-prompt-box img'))
                                      .map(i => i.currentSrc || i.src || '')""") or []:
-            ref_tokens += re.findall(r"/(?:image|video)/([0-9A-Za-z_-]{16,})", str(src))
+            ref_tokens += _ids_do_link(str(src))
     except Exception:  # noqa: BLE001
         pass
     if ref_tokens and tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")) and not trab["_ref_midia"].get("media_id"):

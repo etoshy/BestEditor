@@ -193,7 +193,7 @@ PROMPT_BOCA = ("Keep everything in this image identical — same character, same
                "in the middle of a sentence.")
 
 
-def criar_bocas(pid: str, base: str = _BASE) -> List[str]:
+def criar_bocas(pid: str, base: str = _BASE, so: Optional[List[str]] = None) -> List[str]:
     """👄 v84_209: a "animação" de cada pose = a mesma pose com a boca aberta (o editor alterna as duas enquanto ela
     fala). Põe no JSON do projeto a "_boca" de TODA pose que ainda não tem. → as que entraram."""
     with _TRAVA:
@@ -202,7 +202,7 @@ def criar_bocas(pid: str, base: str = _BASE) -> List[str]:
         tem = {x.get("base") for x in poses if x.get("tipo") == "boca"}
         novas = []
         for x in list(poses):
-            if x.get("tipo") == "boca" or x["arquivo"] in tem:
+            if x.get("tipo") == "boca" or x["arquivo"] in tem or (so is not None and x["arquivo"] not in so):
                 continue
             arq = x["arquivo"][:-4] + "_boca.png"
             if any(y["arquivo"] == arq for y in poses):
@@ -231,6 +231,19 @@ def animar_todas(pid: str, base: str = _BASE, quantidade: str = "x1") -> Dict[st
                 "aviso": "Nenhuma _boca pra gerar agora (as poses base ainda não têm imagem, ou todas já foram geradas)."}
     r = enviar(pid, alvo, "", base, quantidade=quantidade)
     return dict(r if isinstance(r, dict) else {}, ok=True, novas=len(novas), enviadas=len(alvo))
+
+
+def animar_pose(pid: str, arquivo: str, base: str = _BASE, quantidade: str = "x1") -> Dict[str, Any]:
+    """👄 A boca de UMA pose (cria no JSON se não tem) e manda gerar."""
+    criar_bocas(pid, base, [arquivo])
+    p = carregar(pid, base)
+    bo = next((x for x in p["dados"]["poses"] if x.get("tipo") == "boca" and x.get("base") == arquivo), None)
+    if not bo:
+        raise PersErro("Essa pose não aceita boca.")
+    if not arquivo_atual(p, arquivo, base):
+        return {"ok": True, "aviso": "A pose ainda não tem imagem — gere a pose antes da boca."}
+    r = enviar(pid, [bo["arquivo"]], "", base, quantidade=quantidade)
+    return dict(r if isinstance(r, dict) else {}, ok=True, boca=bo["arquivo"])
 
 
 def pose(p: Dict[str, Any], arquivo: str) -> Dict[str, Any]:
