@@ -356,11 +356,130 @@ def olhar_para(lado_tela: str, inverter: bool = False) -> str:
 
 
 def par_da_pose(poses: List[Dict[str, Any]], pose: Optional[Dict[str, Any]], olhar: str) -> Optional[Dict[str, Any]]:
-    """A mesma pose olhando pro lado certo (mira_curiosa_esq → mira_curiosa_dir), se existir."""
+    """A mesma pose olhando pro lado certo (mira_curiosa_esq ↔ mira_curiosa_dir), se existir e olhar pro lado certo."""
     if not pose or not pose.get("lado") or pose["lado"] == olhar:
         return pose
-    outro = re.sub(r"_(esq|dir)(?=(\.|_|$))", "_" + olhar, pose["arquivo"], count=1)
-    return next((o for o in poses if o["arquivo"] == outro), pose)
+    outro = re.sub(r"_(esq|dir)(?=(\.|_|$))", lambda m_: "_" + ("dir" if m_.group(1) == "esq" else "esq"), pose["arquivo"], count=1)
+    par = next((o for o in poses if o["arquivo"] == outro), None)
+    return par if par and par.get("lado") in (olhar, "") else pose
+
+
+# ------------------------------------------------------------------ 👀 pra onde a pose olha DE VERDADE (v84_201)
+def _olhar_cache_path(base: str) -> str:
+    try:
+        import personagens_pod as pp
+        return os.path.join(pp.pasta_raiz(base), "_olhar_das_poses.json")
+    except Exception:  # noqa: BLE001
+        return os.path.join(base, "personagens_pod", "_olhar_das_poses.json")
+
+
+def _olhar_cache(base: str) -> Dict[str, str]:
+    try:
+        with open(_olhar_cache_path(base), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _hash_png(caminho: str) -> str:
+    import hashlib
+    with open(caminho, "rb") as f:
+        return hashlib.sha1(f.read()).hexdigest()[:14]
+
+
+def detectar_olhar(poses: List[Dict[str, Any]], base: str, job_id: Optional[str] = None) -> int:
+    """O nome _esq/_dir nem sempre bate com a imagem (o gerador inverte às vezes): a 🤖 IA OLHA cada pose e diz pra que
+    lado da tela ela está virada. Guarda pelo conteúdo do PNG (cada pose é olhada uma vez só). → quantas olhou agora."""
+    cache = _olhar_cache(base)
+    faltam = []
+    for o in poses:
+        try:
+            h = _hash_png(o["caminho"])
+        except OSError:
+            continue
+        o["_h"] = h
+        if h not in cache:
+            faltam.append(o)
+    if not faltam:
+        return 0
+    try:
+        import ia_servico
+        from ia_midia import _I, _S, _lista, _obj
+        from PIL import Image
+        import tempfile
+    except Exception:  # noqa: BLE001
+        return 0
+    if not ia_servico.ativo("personagens"):
+        return 0
+    system = ("You look at character pose images (a single anime character on a gray background) and say where the "
+              "character is TURNED, from the VIEWER's point of view: \"esquerda\" = face and body turned toward the LEFT "
+              "edge of the image (we see more of the character's right side), \"direita\" = turned toward the RIGHT edge "
+              "of the image, \"frente\" = facing the viewer straight on. Judge mainly by where the face/nose and the "
+              "gaze point.")
+    schema = _obj({"poses": _lista(_obj({"i": _I, "olhar": _S}))})
+    n = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for k in range(0, len(faltam), 10):
+            lote = faltam[k:k + 10]
+            conteudo: List[Dict[str, Any]] = []
+            for i, o in enumerate(lote, 1):
+                try:
+                    im = Image.open(o["caminho"]).convert("RGBA")
+                    fundo = Image.new("RGBA", im.size, (200, 200, 200, 255))
+                    fundo.alpha_composite(im)
+                    cam = os.path.join(tmp, f"{i}.jpg")
+                    fundo.convert("RGB").save(cam, quality=85)
+                    b = ia_servico.imagem_bloco(cam, 256)
+                except Exception:  # noqa: BLE001
+                    b = None
+                if b:
+                    conteudo += [{"type": "text", "text": f"Image {i}:"}, b]
+            if not conteudo:
+                continue
+            try:
+                r = ia_servico.chamar("personagens", system, conteudo, schema=schema, max_tokens=600, job=job_id, timeout=90)
+            except Exception:  # noqa: BLE001
+                r = None
+            for x in (r or {}).get("poses") or []:
+                try:
+                    o = lote[int(x.get("i")) - 1]
+                except (TypeError, ValueError, IndexError):
+                    continue
+                v = {"esquerda": "esq", "direita": "dir", "frente": ""}.get(str(x.get("olhar") or "").strip().lower())
+                if v is not None:
+                    cache[o["_h"]] = v
+                    n += 1
+    if n:
+        try:
+            os.makedirs(os.path.dirname(_olhar_cache_path(base)), exist_ok=True)
+            with open(_olhar_cache_path(base), "w", encoding="utf-8") as f:
+                json.dump(cache, f, indent=1)
+        except OSError:
+            pass
+    return n
+
+
+def normalizar_olhar(pers: List[Dict[str, Any]], base: str, inverter: bool, detectar: bool = True,
+                     job_id: Optional[str] = None) -> None:
+    """Põe em cada pose o lado REAL pra onde ela olha: o que a IA viu (se já olhou) ou o do nome (_esq/_dir, trocado
+    com inverter_olhar). Depois disso a escolha usa inverter=False."""
+    todas = [o for p in pers for o in p.get("poses") or []]
+    if detectar:
+        try:
+            detectar_olhar(todas, base, job_id)
+        except Exception:  # noqa: BLE001
+            pass
+    cache = _olhar_cache(base)
+    for o in todas:
+        try:
+            h = o.get("_h") or _hash_png(o["caminho"])
+        except OSError:
+            h = ""
+        if h and h in cache:
+            o["lado"], o["lado_por"] = cache[h], "ia"
+        elif inverter and o.get("lado") in ("esq", "dir"):
+            o["lado"], o["lado_por"] = {"esq": "dir", "dir": "esq"}[o["lado"]], "nome_invertido"
 
 
 def escolher_pose(poses: List[Dict[str, Any]], emocao: str, lado_tela: str, evitar: str = "",
@@ -737,6 +856,8 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
     cfg.update({k: v for k, v in (cfg_extra or {}).items() if k in PADRAO})
     pc["config"] = {k: cfg[k] for k in _CFG_USUARIO}
     pers = personagens_do_canal(base, canal)
+    normalizar_olhar(pers, base, bool(cfg.get("inverter_olhar")), True, job_id)
+    cfg = dict(cfg, inverter_olhar=False)  # os lados das poses já são os reais
     if not pers:
         raise PersEdErro("Esse canal não tem personagens (personagens.json ou personagens/<slug>.json no zip do canal).")
     roteiro, de_onde = texto_do_job(job)
@@ -871,9 +992,11 @@ def virar_pose(job: Dict[str, Any], oid: str, base: str, job_dir: str) -> None:
     ov = next((x for x in job.get("overlays") or [] if x.get("id") == oid and x.get("origem") == "personagem"), None)
     canal = canal_do_job(job, base) if ov else ""
     p = next((x for x in personagens_do_canal(base, canal) if x["slug"] == ov["personagem"]), None) if canal else None
+    if p:
+        normalizar_olhar([p], base, _inverter_do_job(job, base), detectar=False)
     poses = (p or {}).get("poses") or []
     atual = next((o for o in poses if o["arquivo"] == ov.get("pose")), None) if ov else None
-    certa = par_da_pose(poses, atual, olhar_para(ov.get("lado") or "esquerda", _inverter_do_job(job, base))) if atual else None
+    certa = par_da_pose(poses, atual, olhar_para(ov.get("lado") or "esquerda")) if atual else None
     if certa and certa is not atual:
         manual = ov.get("manual")
         trocar_pose(job, oid, certa["arquivo"], base, job_dir)

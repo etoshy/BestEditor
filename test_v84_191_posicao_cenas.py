@@ -113,3 +113,33 @@ def test_setas_numeros_so_no_canal_que_pede(tmp_path):
     sem = cl.montar_json(cenas, info, {0})["segments"][0]["query"]
     assert "arrows, shapes" in com and "no arrows" in sem and "No words" in com
     assert "{REGRA_EXPLICACAO}" in cl._SYS
+
+
+def test_ia_olha_pra_onde_a_pose_vira(tmp_path, monkeypatch):
+    """v84_201: o nome _esq/_dir não bate com a imagem → a IA olha cada pose (uma vez) e o lado real é o que vale."""
+    import ia_servico
+    import personagens_pod as pp
+    monkeypatch.setattr(pp, "pasta_raiz", lambda base=None: str(tmp_path / "pp"))
+    poses = []
+    for k, nome in enumerate(("mira_a_esq.png", "mira_a_dir.png")):
+        im = Image.new("RGBA", (60, 90), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rectangle([10 + k * 20, 10, 40, 90], fill=(10 + k, 0, 0, 255))
+        cam = tmp_path / nome
+        im.save(cam)
+        poses.append({"arquivo": nome, "caminho": str(cam), "lado": "esq" if "esq" in nome else "dir", "boca": None,
+                      "aprovada": True, "grupo": "", "texto": nome, "descricao": ""})
+    chamadas = []
+    monkeypatch.setattr(ia_servico, "ativo", lambda r=None: True)
+
+    def chamar(recurso, system, conteudo, schema=None, **kw):
+        chamadas.append(recurso)
+        return {"poses": [{"i": 1, "olhar": "direita"}, {"i": 2, "olhar": "esquerda"}]}  # os nomes estão trocados
+    monkeypatch.setattr(ia_servico, "chamar", chamar)
+    pers = [{"slug": "mira", "poses": poses}]
+    pe.normalizar_olhar(pers, "b", inverter=False)
+    assert poses[0]["lado"] == "dir" and poses[1]["lado"] == "esq" and chamadas == ["personagens"]
+    # na esquerda da tela ela tem que olhar pra direita (centro): a "_esq" do nome é a certa aqui
+    assert pe.escolher_pose(poses, "", "esquerda")["arquivo"] == "mira_a_esq.png"
+    assert pe.par_da_pose(poses, poses[0], "esq") is poses[1]
+    pe.normalizar_olhar([{"slug": "mira", "poses": [dict(o, lado="x") for o in poses]}], "b", inverter=True)
+    assert len(chamadas) == 1  # já olhou: usa o guardado
