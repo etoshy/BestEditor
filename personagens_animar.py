@@ -5,8 +5,9 @@ personagens_animar.py — 🎞 personagem que se mexe (v84_193)
 A personagem por cima do vídeo não fica mais parada: cada POSE pode ganhar um clipe animado no Google Flow e o
 editor guarda o clipe pra REUSAR em qualquer vídeo.
 
-  • o pedido vai pro 🚀 Flow em massa como vídeo com frame de Início = a pose (sobre verde puro, 3:4); aqui o clipe
-    vai e volta (ida + volta) → começa e termina igual à imagem parada: entra e sai sem pulo e dá pra repetir em loop;
+  • v84_205: o Flow NÃO faz vídeo — faz UM quadro intermediário (foto com a pose de referência: a mesma pose um
+    instante depois, boca aberta / piscando); aqui ele é recortado igual às poses e ALTERNA com a pose em loop (com
+    uma fusão curta) → sensação de movimento, como desenho animado com poucos quadros, entra e sai sem pulo;
   • dois tipos: "fala" (ela fala, a boca mexe — no lugar do 👄 pisca-boca) e "parada" (respira, pisca, mexe pouco);
   • o verde sai aqui no PC (a mesma chave/limpeza das poses), quadro a quadro → WebM com transparência;
   • a biblioteca fica no projeto da personagem (personagens_pod/<id>/animacoes/): a mesma pose + tipo nunca vai pro
@@ -70,7 +71,7 @@ def chave(caminho_png: str, tipo: str) -> str:
     with open(caminho_png, "rb") as f:
         h = hashlib.sha1(f.read()).hexdigest()[:10]
     nome = re.sub(r"[^\w\-]", "_", os.path.splitext(os.path.basename(caminho_png))[0])[:60]
-    return f"{nome}__{tipo}__{h}"
+    return f"{nome}__{tipo}__{h}__q"  # __q = v84_205: quadro intermediário (imagem), não vídeo
 
 
 # ------------------------------------------------------------------ o pedido pro Flow
@@ -111,6 +112,42 @@ def _lote():
     return flow_lote.lote()
 
 
+def prompt_intermediario(nome: str, descricao: str, tipo: str, texto_fixo: Optional[Dict[str, Any]] = None,
+                         extra: str = "") -> str:
+    """🖼 v84_205: em vez de vídeo, UM quadro intermediário (a mesma pose um instante depois) — alternando com a pose
+    dá a sensação de movimento, como um desenho animado com poucos quadros."""
+    tf = texto_fixo or {}
+    acao = ("mid-word while talking: the mouth clearly OPEN, eyebrows slightly raised, the head tilted a few degrees and "
+            "the raised hand moved a little, as the next drawing of a talking animation" if tipo == "fala" else
+            "a moment later in a gentle idle motion: eyes half closed in a blink, the head tilted a few degrees, the "
+            "shoulders slightly raised by a breath and the hand moved a little")
+    partes = [str(tf.get("trava") or ""), str(tf.get("estilo") or ""),
+              f"IN-BETWEEN ANIMATION FRAME of {nome}" + (f" ({descricao})" if descricao else "") + ": the reference "
+              f"image is frame 1; draw frame 2 of the same shot — {acao}. Everything else IDENTICAL to the reference: same "
+              "character, same outfit, same pose and body position, same size, same framing and same place in the image, "
+              "same line art and colors. Only that small change. Plain flat solid chroma-key green background (#00FF00), "
+              "no text, no extra objects.",
+              str(tf.get("regras") or "")]
+    if extra:
+        partes.append(" ".join(str(extra).split())[:300])
+    return " ".join(x.strip() for x in partes if x and x.strip())[:3900]
+
+
+def frame_verde_34(png: str, destino: str) -> str:
+    """A pose sobre verde puro em 3:4 (o formato das fotos do Flow; as poses também nascem assim)."""
+    from PIL import Image
+    im = Image.open(png).convert("RGBA")
+    w, h = im.size
+    W = max(w, int(round(h * 3 / 4)))
+    fundo = Image.new("RGBA", (W, h), (0, 255, 0, 255))
+    fundo.alpha_composite(im, ((W - w) // 2, 0))
+    rgb = fundo.convert("RGB")
+    if rgb.height > 1280:
+        rgb = rgb.resize((int(rgb.width * 1280 / rgb.height), 1280))
+    rgb.save(destino, quality=92)
+    return destino
+
+
 def pedir(base: str, pid: str, pose: Dict[str, Any], tipo: str = "fala", nome: str = "", fala: str = "",
           extra: str = "", refazer: bool = False) -> Dict[str, Any]:
     """Põe a animação desta pose na fila do Flow (se ainda não existe/está vindo). → o item da biblioteca."""
@@ -124,12 +161,18 @@ def pedir(base: str, pid: str, pose: Dict[str, Any], tipo: str = "fala", nome: s
         if it and not refazer and (it.get("estado") in ESPERA or (it.get("estado") == "pronto" and os.path.isfile(str(it.get("webm"))))):
             return dict(it, chave=k)
         os.makedirs(pasta(pid, base), exist_ok=True)
-        fr = frame_verde(pose["caminho"], os.path.join(pasta(pid, base), f"{k}_frame.jpg"))
-        p = prompt_animacao(nome or "the character", pose.get("descricao") or "", tipo, fala, extra)
-        j = _lote().adicionar([{"prompt": p, "tipo": "video", "inicio_arquivo": fr, "origem": "personagem"}],
-                              proporcao="9:16")[0]
+        fr = frame_verde_34(pose["caminho"], os.path.join(pasta(pid, base), f"{k}_ref.jpg"))
+        try:
+            import personagens_pod as pp
+            tf = (pp.carregar(pid, base).get("dados") or {}).get("texto_fixo") or {}
+        except Exception:  # noqa: BLE001
+            tf = {}
+        p = prompt_intermediario(nome or "the character", pose.get("descricao") or "", tipo, tf, extra)
+        j = _lote().adicionar([{"prompt": p, "tipo": "imagem", "referencia_arquivo": fr, "origem": "personagem"}],
+                              proporcao="3:4")[0]
         it = {"estado": "fila", "flow_job": j["id"], "prompt": p, "pose": pose.get("arquivo") or os.path.basename(pose["caminho"]),
-              "tipo": tipo, "frame": fr, "criado": time.time(), "erro": None, "msg": "na fila do Flow"}
+              "tipo": tipo, "frame": fr, "pose_png": pose["caminho"], "criado": time.time(), "erro": None,
+              "msg": "na fila do Flow (quadro intermediário)"}
         d[k] = it
         _salvar(pid, base, d)
     try:
@@ -179,6 +222,42 @@ def processar(video: str, destino: str, opcoes: Optional[Dict[str, Any]] = None,
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def montar_loop(pose_png: str, quadro2: str, destino: str, tipo: str = "fala", fps: int = 24) -> Dict[str, Any]:
+    """Pose ↔ quadro intermediário em loop (com uma fusão curta entre eles) → WebM transparente. "fala" alterna rápido
+    (a boca abre e fecha); "parada" fica mais tempo na pose (respira/pisca de vez em quando)."""
+    from PIL import Image
+    a = Image.open(pose_png).convert("RGBA")
+    b = Image.open(quadro2).convert("RGBA")
+    if b.size != a.size:
+        b = b.resize(a.size)
+    if a.width > 720:  # menor: o overlay nunca passa de ~1/3 da tela
+        a = a.resize((720, int(a.height * 720 / a.width)))
+        b = b.resize(a.size)
+    seg = [(a, 5), ("ab", 2), (b, 5), ("ba", 2)] if tipo == "fala" else [(a, 30), ("ab", 4), (b, 12), ("ba", 4)]
+    tmp = tempfile.mkdtemp(prefix="pers_loop_")
+    try:
+        n = 0
+        for item, qtd in seg:
+            for i in range(qtd):
+                if item == "ab":
+                    q = Image.blend(a, b, (i + 1) / (qtd + 1))
+                elif item == "ba":
+                    q = Image.blend(b, a, (i + 1) / (qtd + 1))
+                else:
+                    q = item
+                n += 1
+                q.save(os.path.join(tmp, f"a_{n:05d}.png"))
+        os.makedirs(os.path.dirname(destino), exist_ok=True)
+        r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "a_%05d.png"),
+                            "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "30", "-auto-alt-ref", "0",
+                            "-row-mt", "1", destino], capture_output=True, text=True, timeout=600)
+        if r.returncode != 0 or not os.path.isfile(destino):
+            raise AnimErro(f"não consegui gravar o WebM transparente: {(r.stderr or '')[-200:]}")
+        return {"webm": destino, "duracao": round(n / fps, 3), "quadros": n}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def sincronizar(pid: str, base: str) -> Dict[str, Any]:
     """Olha a fila do Flow: clipe pronto → baixa, tira o verde, guarda. → o índice atualizado."""
     with _TRAVA:
@@ -195,11 +274,12 @@ def sincronizar(pid: str, base: str) -> Dict[str, Any]:
             if j is None:
                 it.update(estado="erro", erro="o pedido sumiu da fila do 🚀 Flow em massa — anime de novo")
             elif j["estado"] == "ok":
-                vid = next((r for r in j.get("resultados") or [] if r.get("tipo") == "video"), None)
-                if not vid:
-                    it.update(estado="erro", erro="o Flow terminou mas não veio vídeo")
+                res = next((r for r in j.get("resultados") or [] if r.get("tipo") in ("imagem", "video")), None)
+                if not res:
+                    it.update(estado="erro", erro="o Flow terminou mas não veio a imagem")
                 else:
-                    it.update(estado="processando", msg="🧹 tirando o verde…", arquivo_flow=vid["arquivo"])
+                    it.update(estado="processando", msg="🧹 tirando o verde…", arquivo_flow=res["arquivo"],
+                              tipo_flow=res.get("tipo"))
                     prontos.append(k)
             elif j["estado"] == "erro":
                 it.update(estado="erro", erro=str(j.get("erro") or "o Flow falhou")[:300])
@@ -218,14 +298,30 @@ def _finalizar(pid: str, base: str, k: str) -> None:
     it = d.get(k) or {}
     try:
         origem = os.path.join(FE.pasta_galeria(), it["arquivo_flow"])
-        verde = os.path.join(pasta(pid, base), f"{k}_verde.mp4")
+        verde = os.path.join(pasta(pid, base), f"{k}_verde" + os.path.splitext(it["arquivo_flow"])[1])
         shutil.copyfile(origem, verde)
         try:
             p = pp.carregar(pid, base)
             opl = p["dados"]["limpeza"] if isinstance(p["dados"].get("limpeza"), dict) else {}
         except Exception:  # noqa: BLE001
             opl = {}
-        r = processar(verde, os.path.join(pasta(pid, base), f"{k}.webm"), opl)
+        if it.get("tipo_flow") == "imagem":  # 🖼 v84_205: o quadro intermediário → recorta igual às poses e alterna
+            from PIL import Image
+            import personagens_limpeza as L
+            try:
+                p_ = pp.carregar(pid, base)
+                canvas = tuple(p_["dados"].get("canvas") or (1200, 1800))
+                alt = float(p_["dados"].get("altura_personagem") or 0.95)
+                corpo = bool(p_["dados"].get("corpo_inteiro"))
+            except Exception:  # noqa: BLE001
+                canvas, alt, corpo = (1200, 1800), 0.95, False
+            final, _info = L.recortar(Image.open(verde).convert("RGB"), canvas, alt, opl, corpo_inteiro=corpo)
+            quadro = os.path.join(pasta(pid, base), f"{k}_quadro2.png")
+            final.save(quadro)
+            it["quadro2"] = quadro
+            r = montar_loop(it.get("pose_png") or "", quadro, os.path.join(pasta(pid, base), f"{k}.webm"), it.get("tipo") or "fala")
+        else:
+            r = processar(verde, os.path.join(pasta(pid, base), f"{k}.webm"), opl)
         it.update(estado="pronto", webm=r["webm"], verde=verde, duracao=r["duracao"], msg="✅ pronta", erro=None,
                   pronto_em=time.time())
     except Exception as exc:  # noqa: BLE001

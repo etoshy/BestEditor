@@ -73,6 +73,8 @@ def test_processar_tira_o_verde(tmp_path):
 
 
 def test_pedir_reusa_e_aplica(tmp_path, monkeypatch):
+    """v84_205: o Flow faz UM quadro intermediário (foto com a pose de referência); aqui ele é recortado igual às poses
+    e alterna com a pose num WebM em loop."""
     import personagens_pod as pp
     import flow_estudio as FE
     monkeypatch.setattr(pp, "pasta_raiz", lambda base=None: str(tmp_path / "pp"))
@@ -83,16 +85,19 @@ def test_pedir_reusa_e_aplica(tmp_path, monkeypatch):
     monkeypatch.setattr(FE, "pasta_galeria", lambda: str(gal))
     pose = _pose(tmp_path / "mira_curiosa_dir.png")
     it = PA.pedir("b", "abc123", {"caminho": pose, "arquivo": "mira_curiosa_dir.png"}, "fala", "Mira", "Was?")
-    assert it["estado"] == "fila" and lote.pedidos[0]["inicio_arquivo"].endswith("_frame.jpg") and "fim_arquivo" not in lote.pedidos[0]
-    assert lote.fila[0]["proporcao"] == "9:16"
+    ped = lote.pedidos[0]
+    assert it["estado"] == "fila" and ped["tipo"] == "imagem" and ped["referencia_arquivo"].endswith("_ref.jpg")
+    assert lote.fila[0]["proporcao"] == "3:4" and "IN-BETWEEN" in ped["prompt"] and "mouth clearly OPEN" in ped["prompt"]
     PA.pedir("b", "abc123", {"caminho": pose}, "fala")
     assert len(lote.fila) == 1  # a mesma pose + tipo não vai duas vezes
-    _video_verde(str(gal / "clipe.mp4"))
-    lote.fila[0].update(estado="ok", resultados=[{"tipo": "video", "arquivo": "clipe.mp4"}])
+    q = Image.new("RGB", (300, 400), (0, 255, 0))  # o "quadro 2" do Flow: o boneco um pouco mexido, fundo verde
+    ImageDraw.Draw(q).rectangle([100, 60, 190, 400], fill=(200, 30, 40))
+    q.save(gal / "q2.png")
+    lote.fila[0].update(estado="ok", resultados=[{"tipo": "imagem", "arquivo": "q2.png"}])
     d = PA.sincronizar("abc123", "b")
     k = PA.chave(pose, "fala")
-    assert d[k]["estado"] == "pronto" and os.path.isfile(d[k]["webm"])
-    # numa aparição (cópia da pose no projeto do vídeo): o clipe entra
+    assert d[k]["estado"] == "pronto" and os.path.isfile(d[k]["webm"]) and os.path.isfile(d[k]["quadro2"]), d[k]
+    assert d[k]["duracao"] < 1.0  # fala: alterna rápido
     jd = tmp_path / "job"
     (jd / "personagens").mkdir(parents=True)
     copia = jd / "personagens" / "mira_curiosa_dir.png"
@@ -101,10 +106,6 @@ def test_pedir_reusa_e_aplica(tmp_path, monkeypatch):
           "boca_janelas": [[1, 2]], "anim_pedida": True}
     job = {"overlays": [ov]}
     assert PA.aplicar_prontas(job, "b", str(jd)) >= 1 and os.path.isfile(ov["anim_video"])
-    ov["anim_segundos"] = 0.5
-    ov.pop("anim_video")
-    PA.aplicar_prontas(job, "b", str(jd))
-    assert "_ida_volta_500" in ov["anim_video"]
     import personagens_editor as pe
     r = pe.para_render(ov)
     assert r["anim_video"] == ov["anim_video"] and r["boca_path"] is None

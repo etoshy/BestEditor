@@ -23,13 +23,13 @@
  },
  "mira_maravilhada_esq_v1_7415__fala__0fa863854c": {
   "estado": "erro",
-  "flow_job": "7b58fce573",
+  "flow_job": "835778bc76",
   "prompt": "Subtle 2D anime character animation of Mira (maravilhada, olhos brilhando, mãos no peito): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Das Ende eines Sterns soll heller sein als sein ganzes Leben?\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "mira_maravilhada_esq.png",
   "tipo": "fala",
   "frame": "E:\\editor2bancodevideos\\personagens_pod\\1e33097f4e\\animacoes\\mira_maravilhada_esq_v1_7415__fala__0fa863854c_frame.jpg",
-  "criado": 1792497086.7373004,
-  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_085710_199300)",
+  "criado": 1792497645.1315155,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_090615_714481)",
   "msg": "🎬 gerando no Flow"
  }
 }

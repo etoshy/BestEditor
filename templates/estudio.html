@@ -4288,7 +4288,7 @@ function peAnimLinha(a) {
     <select data-pe-anim="tipo" title="fala = a boca mexe · parada = respira/pisca">${['fala', 'parada'].map(t => `<option ${(a.anim_tipo || 'fala') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <select data-pe-campo="anim_modo" title="repetir = em loop a aparição toda · uma vez = mexe e para na pose">${[['repetir', 'repetir'], ['uma_vez', 'uma vez']].map(([v, t]) => `<option value="${v}" ${(a.anim_modo || 'repetir') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <input type="number" data-pe-anim="segundos" min="0" max="8" step="0.5" value="${a.anim_segundos || 0}" style="width:4.2em" title="só uns frames: usa os primeiros N segundos do clipe, ida e volta (0 = o clipe todo)">
-    ${a.anim_pronta ? `<label class="chk" title="usar o clipe animado"><input type="checkbox" data-pe-campo="anim_usar" ${a.anim_usando ? 'checked' : ''}>🎞</label>` : `<button class="mini" data-pe-animar ${espera ? 'disabled' : ''} title="manda esta pose pro Flow virar animação">🎞 Animar</button>`}
+    ${a.anim_pronta ? `<label class="chk" title="usar o clipe animado"><input type="checkbox" data-pe-campo="anim_usar" ${a.anim_usando ? 'checked' : ''}>🎞</label>` : `<button class="mini" data-pe-animar ${espera ? 'disabled' : ''} title="o Flow desenha um quadro intermediário desta pose (boca aberta / piscando) e o editor alterna os dois em loop">🎞 Animar</button>`}
   </div>`;
 }
 function peVigiarAnim() {
