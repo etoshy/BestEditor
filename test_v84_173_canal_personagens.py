@@ -132,7 +132,7 @@ def test_imagens_com_a_ficha_das_personagens(canal):
     assert "Action: looking up." in pr and "simpler, less detailed characters" in pr and "short hair" in pr
     assert m_v.referencias_para(m, cena, "flow")[0][0] == "personagens_dupla"
     sem = m_v.montar_prompt(m, {"tipo": "cena", "assunto_en": "a nebula"})
-    assert "no characters in this frame" in sem
+    assert "No words and no letters" in sem
     bs = m_v.batidas_sem_ia("[narrador] Erst Licht. [mira|curiosa] Und dann? Was passiert danach genau mit dem Licht im Loch?", m=m)
     assert bs[0]["personagens"] == [{"slug": "mira", "acao_en": ""}] and not bs[0]["mascote"] and bs[0]["tipo_imagem"] == "ilustracao"
     assert "PERSONAGENS DO CANAL" in m_v.prompt_batidas(m, "[mira] Hallo?")

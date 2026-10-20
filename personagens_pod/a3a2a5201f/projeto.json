@@ -1,0 +1,3391 @@
+{
+ "id": "a3a2a5201f",
+ "nome": "Mascote (Dinge erklären)",
+ "criado": 1792434120.7971623,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "canal": "dinge_erklaeren",
+  "personagem": "mascote",
+  "nome": "Mascote",
+  "como_usar": "BestEditor → 🧍 Personagens → Personagens dos canais → Criar (a ficha vem no zip: personagens/mascote_ficha*.png). Gere a ⭐ mestre (mascote_normal_esq), aprove como mestre, depois gere o resto.",
+  "descricoes_referencias": {
+   "mascote_ficha.png": "frames of the original drawing of the mascot side by side — its TRUE proportions (very long thin rubber-hose legs, small head); it is a reference sheet, draw only ONE figure",
+   "mascote_ficha_2.png": "a high-resolution close-up of the mascot's head and upper body (ink line, cream color, black oval eyes)",
+   "mascote_ficha_3.png": "the original mascot drawing (small image)"
+  },
+  "texto_fixo": {
+   "trava": "DINGE ERKLÄREN MASCOT — CHARACTER LOCK (copy exactly from the reference images): Use the same recurring mascot from the supplied reference images: a peculiar vintage 2D rubber-hose ghost-like creature, slim curved cream-colored body, two large black oval eyes, elongated flexible arms and legs, simple oversized feet, hand-inked dark outline, subtle aged-paper speckles. Preserve the exact silhouette, facial simplicity, body proportions, cream color and imperfect black linework. Only change pose, gaze and interaction with the scene. No clothes, no new facial features, no realistic human anatomy, no 3D redesign. PROPORTION LOCK (match image references exactly): very small rounded head merged into a thin draped body with ragged torn sheet edges at the shoulders; two big black oval eyes, no pupils, no mouth in neutral poses (only a tiny open mouth when startled); slim curved S-shaped torso that leans forward; extremely long, thin, rubber-hose tube legs that make up about two thirds of the total height; long noodle arms; large simple rounded shoes. Lanky, tall and slouched, never compact. NEVER: chubby body, stubby body, short legs, compact proportions, round blob ghost, symmetrical bedsheet ghost, kawaii, big head, smiling mouth, open cartoon mouth, eyebrows, mitten hands, cute toddler ghost, different character, inconsistent anatomy, blue skin, green skin, purple skin, bright white glossy body, realistic human, detailed fingers, teeth, hair, clothing, 3D render, glossy toy, anime style, modern vector mascot, different eye shape, extra arms, extra legs, duplicate mascot, chibi proportions, cute baby ghost.",
+   "estilo": "ART STYLE (Dinge erklären — the channel's own look): vintage 2D rubber-hose cartoon like a 1930s animation cel, hand-inked black/charcoal outline with small imperfections, slightly thicker outer contour, flat colors; the body is aged-paper cream #E8DDC5 (never pure white) with very subtle printed speckles; objects it holds in grayscale archival tones (old paper, brass, wood, black ink) with a rare deep red accent. Restricted palette: near-black, charcoal, grayscale, aged cream and deep red. Not 3D, not glossy, not modern vector, not anime, not cute.",
+   "regras": "FRAMING AND OUTPUT: the mascot alone, FULL BODY from the top of the head down to the shoes (its long rubber-hose legs are part of the identity — never cut them); the shoes rest near the bottom edge. The whole figure — head, arms, legs, shoes and any object — stays INSIDE the image with clear green margin above, left and right; nothing touches or is cut by the edges; centered. No mouth (only a tiny open mouth when startled). Plain flat solid chroma-key GREEN background (pure #00FF00) filling everything behind it, also between the arms, legs and body; no floor, no shadow, no gradient, no frame. Nothing green on the mascot or the objects. ONE figure only — never a sheet, never several poses. No text, no letters, no question marks, no speech bubbles, no watermark."
+  },
+  "geracao": {
+   "largura": 1024,
+   "altura": 1536,
+   "passos": 40,
+   "cfg": 4.0
+  },
+  "fundo": "verde",
+  "flow": {
+   "proporcao": "3:4",
+   "modelo": ""
+  },
+  "corpo_inteiro": true,
+  "limpeza": {
+   "ilhas": true,
+   "furos_px": 400,
+   "erodir": 1,
+   "suavizar": 0.6
+  },
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "poses": [
+   {
+    "arquivo": "mascote_normal_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "pose canônica: inclinado pra frente, braço estendido",
+    "prompt": "the canonical pose: leaning forward, torso curved, one long arm stretched out, attentive eyes; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes.",
+    "mestre": true
+   },
+   {
+    "arquivo": "mascote_normal_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "pose canônica: inclinado pra frente, braço estendido",
+    "prompt": "the canonical pose: leaning forward, torso curved, one long arm stretched out, attentive eyes; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_curioso_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "curioso, curvado pro assunto",
+    "prompt": "hunched forward with curiosity, head tilted toward something off-frame; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_curioso_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "curioso, curvado pro assunto",
+    "prompt": "hunched forward with curiosity, head tilted toward something off-frame; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_surpreso_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "surpreso, recuando com as mãos pra cima",
+    "prompt": "startled by a surprising fact, recoiling with raised hands, tiny open mouth; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_surpreso_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "surpreso, recuando com as mãos pra cima",
+    "prompt": "startled by a surprising fact, recoiling with raised hands, tiny open mouth; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_explicando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "explicando / apontando",
+    "prompt": "pointing firmly toward the center of the screen as if explaining it; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_explicando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "explicando / apontando",
+    "prompt": "pointing firmly toward the center of the screen as if explaining it; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_pensando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "pensando, mão no queixo",
+    "prompt": "thinking, one long hand under the chin, eyes looking up; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_pensando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "pensando, mão no queixo",
+    "prompt": "thinking, one long hand under the chin, eyes looking up; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_sem_ideia_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "sem ideia, dá de ombros",
+    "prompt": "shrugging with both long arms open, puzzled; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_sem_ideia_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "sem ideia, dá de ombros",
+    "prompt": "shrugging with both long arms open, puzzled; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_ideia_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "ideia, dedo pra cima",
+    "prompt": "one finger raised, struck by an idea, an old light bulb glowing above; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_ideia_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "ideia, dedo pra cima",
+    "prompt": "one finger raised, struck by an idea, an old light bulb glowing above; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_lupa_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "investigando com lupa",
+    "prompt": "examining a clue closely with an old brass magnifying glass; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_lupa_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "investigando com lupa",
+    "prompt": "examining a clue closely with an old brass magnifying glass; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_livro_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "lendo um livro antigo",
+    "prompt": "reading a thick old book held open; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_livro_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 1,
+    "lado": "dir",
+    "descricao_pt": "lendo um livro antigo",
+    "prompt": "reading a thick old book held open; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_olhando_cima_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "olhando pra cima maravilhado",
+    "prompt": "looking upward in wonder at something huge above; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_olhando_cima_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "olhando pra cima maravilhado",
+    "prompt": "looking upward in wonder at something huge above; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_desconfiado_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "desconfiado, olhando de lado",
+    "prompt": "suspicious sideways glance, leaning back, arms crossed; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_desconfiado_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "desconfiado, olhando de lado",
+    "prompt": "suspicious sideways glance, leaning back, arms crossed; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_assustado_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "assustado, encolhido",
+    "prompt": "scared, shrinking back, knees bent, hands up; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_assustado_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "assustado, encolhido",
+    "prompt": "scared, shrinking back, knees bent, hands up; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_feliz_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "feliz, saltitante",
+    "prompt": "happy little hop, arms swinging; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_feliz_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "feliz, saltitante",
+    "prompt": "happy little hop, arms swinging; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_comemorando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "comemorando, braços pro alto",
+    "prompt": "celebrating with both long arms raised; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_comemorando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "comemorando, braços pro alto",
+    "prompt": "celebrating with both long arms raised; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_saudando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "acenando (abertura/fim)",
+    "prompt": "waving hello with one long arm; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_saudando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "acenando (abertura/fim)",
+    "prompt": "waving hello with one long arm; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_espiando_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "espiando da borda",
+    "prompt": "peeking in, leaning in from the side, body tilted; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_espiando_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "espiando da borda",
+    "prompt": "peeking in, leaning in from the side, body tilted; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_fotografia_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "investigando uma fotografia antiga",
+    "prompt": "holding and inspecting an old black-and-white photograph; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_fotografia_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "investigando uma fotografia antiga",
+    "prompt": "holding and inspecting an old black-and-white photograph; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_mapa_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "com um mapa antigo",
+    "prompt": "holding an unfolded old paper map; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_mapa_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "com um mapa antigo",
+    "prompt": "holding an unfolded old paper map; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_lanterna_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "com lanterna",
+    "prompt": "holding an old flashlight pointing forward; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_lanterna_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "com lanterna",
+    "prompt": "holding an old flashlight pointing forward; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_relogio_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "com relógio de bolso",
+    "prompt": "holding an old pocket watch on a chain; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_relogio_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "com relógio de bolso",
+    "prompt": "holding an old pocket watch on a chain; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_documentos_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "lendo documentos",
+    "prompt": "reading a stack of old documents; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_documentos_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "lendo documentos",
+    "prompt": "reading a stack of old documents; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_placa_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "segurando uma placa em branco",
+    "prompt": "holding up a blank old wooden sign (no text on it); 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_placa_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 2,
+    "lado": "dir",
+    "descricao_pt": "segurando uma placa em branco",
+    "prompt": "holding up a blank old wooden sign (no text on it); 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_triste_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "triste, curvado",
+    "prompt": "sad, slouched, arms hanging; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_triste_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "triste, curvado",
+    "prompt": "sad, slouched, arms hanging; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_cansado_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "cansado, arrastando",
+    "prompt": "tired, dragging its feet, drooping; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_cansado_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "cansado, arrastando",
+    "prompt": "tired, dragging its feet, drooping; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_silencio_esq.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "fazendo silêncio",
+    "prompt": "finger in front of where the mouth would be, shushing; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_silencio_dir.png",
+    "tipo": "pose",
+    "grupo": "reacao",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "fazendo silêncio",
+    "prompt": "finger in front of where the mouth would be, shushing; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_binoculo_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "com binóculo",
+    "prompt": "looking through old binoculars; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_binoculo_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "com binóculo",
+    "prompt": "looking through old binoculars; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_camera_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "com câmera antiga",
+    "prompt": "holding an old box camera; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_camera_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "com câmera antiga",
+    "prompt": "holding an old box camera; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_globo_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "com um globo",
+    "prompt": "holding a small antique globe; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_globo_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "com um globo",
+    "prompt": "holding a small antique globe; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_telescopio_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "com telescópio",
+    "prompt": "looking through a small brass telescope; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_telescopio_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "com telescópio",
+    "prompt": "looking through a small brass telescope; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_caveira_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "com uma caveira (mistério)",
+    "prompt": "holding a skull and looking at it thoughtfully; 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_caveira_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "com uma caveira (mistério)",
+    "prompt": "holding a skull and looking at it thoughtfully; 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_quadro_esq.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "esq",
+    "descricao_pt": "explicando num quadro-negro",
+    "prompt": "pointing at a small blank chalkboard on a stand (no writing); 3/4 view, body and face turned toward image-LEFT; full body, head to shoes."
+   },
+   {
+    "arquivo": "mascote_quadro_dir.png",
+    "tipo": "pose",
+    "grupo": "objeto",
+    "prioridade": 3,
+    "lado": "dir",
+    "descricao_pt": "explicando num quadro-negro",
+    "prompt": "pointing at a small blank chalkboard on a stand (no writing); 3/4 view, body and face turned toward image-RIGHT; full body, head to shoes."
+   }
+  ]
+ },
+ "refs": [
+  "mascote_ficha.png",
+  "mascote_ficha_2.png",
+  "mascote_ficha_3.png"
+ ],
+ "motor": "flow",
+ "canal": {
+  "slug": "dinge_erklaeren",
+  "personagem": "mascote",
+  "nome": "Mascote",
+  "arquivo": "personagens/mascote.json",
+  "canal_nome": "Dinge erklären"
+ },
+ "mestre": {
+  "arquivo": "mascote_normal_esq.png",
+  "local": "mascote_normal_esq_v1_dea7.png",
+  "quando": 1792434354.6665542,
+  "bruto": "mascote_normal_esq_v1_db06_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "b59de7f0a8",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_normal_esq.png"
+   ],
+   "criado": 1792434128.9634328,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "923be0ecea",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_normal_dir.png"
+   ],
+   "criado": 1792434226.2518518,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "aa9800b05e",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_curioso_esq.png"
+   ],
+   "criado": 1792434226.2518597,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9f399adb71",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_curioso_dir.png"
+   ],
+   "criado": 1792434226.251863,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "aa19da71c8",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_surpreso_esq.png"
+   ],
+   "criado": 1792434226.2518651,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6e44e111e2",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_surpreso_dir.png"
+   ],
+   "criado": 1792434226.2518675,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "56db71e47d",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_explicando_esq.png"
+   ],
+   "criado": 1792434226.2518697,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "718564d02f",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_explicando_dir.png"
+   ],
+   "criado": 1792434226.251872,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b03468a81b",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_pensando_esq.png"
+   ],
+   "criado": 1792434226.2518737,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "24011ba02c",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_pensando_dir.png"
+   ],
+   "criado": 1792434226.2518759,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "25f20d9a10",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_sem_ideia_esq.png"
+   ],
+   "criado": 1792434226.2518783,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "095e6f5f9b",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_sem_ideia_dir.png"
+   ],
+   "criado": 1792434226.2518802,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5851d45e20",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_ideia_esq.png"
+   ],
+   "criado": 1792434226.2518826,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "000b8d1b0c",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_ideia_dir.png"
+   ],
+   "criado": 1792434226.2518847,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "647bfca50e",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_lupa_esq.png"
+   ],
+   "criado": 1792434226.251887,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8186ebe80a",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_lupa_dir.png"
+   ],
+   "criado": 1792434226.2518895,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ab6def3680",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_livro_esq.png"
+   ],
+   "criado": 1792434226.2518914,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1188efb918",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_livro_dir.png"
+   ],
+   "criado": 1792434226.2518933,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5bf105a060",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_olhando_cima_esq.png"
+   ],
+   "criado": 1792434226.2518942,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8b62342791",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_olhando_cima_dir.png"
+   ],
+   "criado": 1792434226.251896,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e82f597b61",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_desconfiado_esq.png"
+   ],
+   "criado": 1792434226.251897,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2352a6fd2e",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_desconfiado_dir.png"
+   ],
+   "criado": 1792434226.2518983,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "df88fd1758",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_assustado_esq.png"
+   ],
+   "criado": 1792434226.2519,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fb1ab7e573",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_assustado_dir.png"
+   ],
+   "criado": 1792434226.251901,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e06e5b20b8",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_feliz_esq.png"
+   ],
+   "criado": 1792434226.251902,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7fbfc08ddd",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_feliz_dir.png"
+   ],
+   "criado": 1792434226.2519038,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f88b02435b",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_comemorando_esq.png"
+   ],
+   "criado": 1792434226.251905,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "47a253ba01",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_comemorando_dir.png"
+   ],
+   "criado": 1792434226.2519064,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2af755081b",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_saudando_esq.png"
+   ],
+   "criado": 1792434226.2519076,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7eeae46c29",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_saudando_dir.png"
+   ],
+   "criado": 1792434226.251909,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e371868734",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_espiando_esq.png"
+   ],
+   "criado": 1792434226.2519104,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7ca0d6b352",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_espiando_dir.png"
+   ],
+   "criado": 1792434226.2519114,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b931be14be",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_fotografia_esq.png"
+   ],
+   "criado": 1792434226.2519126,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "25512ed61e",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_fotografia_dir.png"
+   ],
+   "criado": 1792434226.2519143,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3f58c132d4",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_mapa_esq.png"
+   ],
+   "criado": 1792434226.2519155,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d6d8682cd8",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_mapa_dir.png"
+   ],
+   "criado": 1792434226.251917,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5c3b70e01a",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_lanterna_esq.png"
+   ],
+   "criado": 1792434226.251918,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d5ffd91589",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_lanterna_dir.png"
+   ],
+   "criado": 1792434226.251919,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "59d8dcf877",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_relogio_esq.png"
+   ],
+   "criado": 1792434226.2519205,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "01843a7c63",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_relogio_dir.png"
+   ],
+   "criado": 1792434226.251922,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e107219610",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_documentos_esq.png"
+   ],
+   "criado": 1792434226.2519228,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d95f25c0b5",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_documentos_dir.png"
+   ],
+   "criado": 1792434226.2519245,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b9ffb1af61",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_placa_esq.png"
+   ],
+   "criado": 1792434226.2519255,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "87a43ebe49",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_placa_dir.png"
+   ],
+   "criado": 1792434226.251927,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "893c3768d7",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_triste_esq.png"
+   ],
+   "criado": 1792434226.251928,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0ebbd43791",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_triste_dir.png"
+   ],
+   "criado": 1792434226.2519293,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e3fa75faec",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_cansado_esq.png"
+   ],
+   "criado": 1792434226.2519305,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4a9ce5eebe",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_cansado_dir.png"
+   ],
+   "criado": 1792434226.2519314,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b5a0ecc8da",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_silencio_esq.png"
+   ],
+   "criado": 1792434226.2519329,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a51f7d1fbc",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_silencio_dir.png"
+   ],
+   "criado": 1792434226.251934,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "19d0d9fecb",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_binoculo_esq.png"
+   ],
+   "criado": 1792434226.251935,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "92f912a069",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_binoculo_dir.png"
+   ],
+   "criado": 1792434226.2519362,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4f1331663e",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_camera_esq.png"
+   ],
+   "criado": 1792434226.251937,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c2c5cf46c8",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_camera_dir.png"
+   ],
+   "criado": 1792434226.2519383,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "428dbcace6",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_globo_esq.png"
+   ],
+   "criado": 1792434226.2519393,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8d0774a582",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_globo_dir.png"
+   ],
+   "criado": 1792434226.2519405,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ee84cd74a4",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_telescopio_esq.png"
+   ],
+   "criado": 1792434226.251942,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d81a03ef0d",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_telescopio_dir.png"
+   ],
+   "criado": 1792434226.2519429,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2b7b5649fd",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_caveira_esq.png"
+   ],
+   "criado": 1792434226.2519438,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "998557555c",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_caveira_dir.png"
+   ],
+   "criado": 1792434226.2519453,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "91826fb672",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_quadro_esq.png"
+   ],
+   "criado": 1792434226.2519464,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7cea70a130",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_quadro_dir.png"
+   ],
+   "criado": 1792434226.2519474,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ce828d8c85",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_lupa_dir.png"
+   ],
+   "criado": 1792434773.1402931,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6440fdd1e6",
+   "motor": "flow",
+   "arquivos": [
+    "mascote_binoculo_dir.png"
+   ],
+   "criado": 1792435784.1678436,
+   "final": true,
+   "auto_refeito": true
+  }
+ ],
+ "log": [
+  "19/10 15:22:00 🔗 conectado ao canal Dinge erklären → Mascote",
+  "19/10 15:22:08 🚀 1 pose(s) pro Flow (sem mestre)",
+  "19/10 15:23:46 🚀 61 pose(s) pro Flow (sem mestre)",
+  "19/10 15:23:50 ⭐ mestre: mascote_normal_esq.png",
+  "19/10 15:25:43 ⭐ mestre: mascote_normal_dir.png",
+  "19/10 15:25:54 ⭐ mestre: mascote_normal_esq.png",
+  "19/10 15:32:53 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "19/10 15:49:44 ✂ mascote_binoculo_dir.png: veio com defeito (o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu ) — refazendo 1x"
+ ],
+ "imagens": {
+  "mascote_normal_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_normal_esq_v1_dea7.png",
+     "bruto": "mascote_normal_esq_v1_db06_flow.png",
+     "job": "b59de7f0a8",
+     "motor": "flow",
+     "quando": 1792434208.6305804,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 35,
+      "verde_px": 853759
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b59de7f0a8",
+   "msg": null
+  },
+  "mascote_normal_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_normal_dir_v1_22af.png",
+     "bruto": "mascote_normal_dir_v1_c7e8_flow.png",
+     "job": "923be0ecea",
+     "motor": "flow",
+     "quando": 1792434291.9706526,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 13,
+      "verde_px": 860655
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "923be0ecea",
+   "msg": null
+  },
+  "mascote_curioso_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_curioso_esq_v1_531b.png",
+     "bruto": "mascote_curioso_esq_v1_7f51_flow.png",
+     "job": "aa9800b05e",
+     "motor": "flow",
+     "quando": 1792434302.2371676,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 782520
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "aa9800b05e",
+   "msg": null
+  },
+  "mascote_curioso_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_curioso_dir_v1_897c.png",
+     "bruto": "mascote_curioso_dir_v1_fccc_flow.png",
+     "job": "9f399adb71",
+     "motor": "flow",
+     "quando": 1792434344.5410385,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 5,
+      "verde_px": 795048
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9f399adb71",
+   "msg": null
+  },
+  "mascote_surpreso_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_surpreso_esq_v1_80ed.png",
+     "bruto": "mascote_surpreso_esq_v1_9d68_flow.png",
+     "job": "aa19da71c8",
+     "motor": "flow",
+     "quando": 1792434355.6099665,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 21,
+      "verde_px": 845894
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_surpreso_esq_v2_b6de.png",
+     "bruto": "mascote_surpreso_esq_v2_a416_flow.png",
+     "job": "aa19da71c8",
+     "motor": "flow",
+     "quando": 1792434355.9622169,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "aa19da71c8",
+   "msg": null
+  },
+  "mascote_surpreso_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_surpreso_dir_v1_68eb.png",
+     "bruto": "mascote_surpreso_dir_v1_c584_flow.png",
+     "job": "6e44e111e2",
+     "motor": "flow",
+     "quando": 1792434391.1733286,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 10,
+      "verde_px": 806769
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6e44e111e2",
+   "msg": null
+  },
+  "mascote_explicando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_explicando_esq_v1_22dd.png",
+     "bruto": "mascote_explicando_esq_v1_93dc_flow.png",
+     "job": "56db71e47d",
+     "motor": "flow",
+     "quando": 1792434406.693585,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 867497
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_explicando_esq_v2_d5c8.png",
+     "bruto": "mascote_explicando_esq_v2_7697_flow.png",
+     "job": "56db71e47d",
+     "motor": "flow",
+     "quando": 1792434406.851559,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "56db71e47d",
+   "msg": null
+  },
+  "mascote_explicando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_explicando_dir_v1_2578.png",
+     "bruto": "mascote_explicando_dir_v1_55e9_flow.png",
+     "job": "718564d02f",
+     "motor": "flow",
+     "quando": 1792434437.0455222,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 6,
+      "verde_px": 856663
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "718564d02f",
+   "msg": null
+  },
+  "mascote_pensando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_pensando_esq_v1_a04b.png",
+     "bruto": "mascote_pensando_esq_v1_0155_flow.png",
+     "job": "b03468a81b",
+     "motor": "flow",
+     "quando": 1792434446.1409087,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 47,
+      "verde_px": 841993
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_pensando_esq_v2_6e8f.png",
+     "bruto": "mascote_pensando_esq_v2_1d3e_flow.png",
+     "job": "b03468a81b",
+     "motor": "flow",
+     "quando": 1792434446.5366435,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b03468a81b",
+   "msg": null
+  },
+  "mascote_pensando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_pensando_dir_v1_4adf.png",
+     "bruto": "mascote_pensando_dir_v1_6544_flow.png",
+     "job": "24011ba02c",
+     "motor": "flow",
+     "quando": 1792434492.3123868,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 8,
+      "verde_px": 864090
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "24011ba02c",
+   "msg": null
+  },
+  "mascote_sem_ideia_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_sem_ideia_esq_v1_6c84.png",
+     "bruto": "mascote_sem_ideia_esq_v1_1167_flow.png",
+     "job": "25f20d9a10",
+     "motor": "flow",
+     "quando": 1792434479.4057841,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 31,
+      "verde_px": 830423
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_sem_ideia_esq_v2_6ba3.png",
+     "bruto": "mascote_sem_ideia_esq_v2_e449_flow.png",
+     "job": "25f20d9a10",
+     "motor": "flow",
+     "quando": 1792434479.6973813,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "25f20d9a10",
+   "msg": null
+  },
+  "mascote_sem_ideia_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_sem_ideia_dir_v1_c96c.png",
+     "bruto": "mascote_sem_ideia_dir_v1_40f6_flow.png",
+     "job": "095e6f5f9b",
+     "motor": "flow",
+     "quando": 1792434516.965894,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 20,
+      "verde_px": 811758
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_sem_ideia_dir_v2_5dc5.png",
+     "bruto": "mascote_sem_ideia_dir_v2_f018_flow.png",
+     "job": "095e6f5f9b",
+     "motor": "flow",
+     "quando": 1792434517.17189,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "095e6f5f9b",
+   "msg": null
+  },
+  "mascote_ideia_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_ideia_esq_v1_43d8.png",
+     "bruto": "mascote_ideia_esq_v1_bdf6_flow.png",
+     "job": "5851d45e20",
+     "motor": "flow",
+     "quando": 1792434548.1294923,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 16,
+      "verde_px": 912877
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5851d45e20",
+   "msg": null
+  },
+  "mascote_ideia_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_ideia_dir_v1_cc30.png",
+     "bruto": "mascote_ideia_dir_v1_fdbf_flow.png",
+     "job": "000b8d1b0c",
+     "motor": "flow",
+     "quando": 1792434569.1848106,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 4,
+      "verde_px": 883487
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_ideia_dir_v2_fe10.png",
+     "bruto": "mascote_ideia_dir_v2_868f_flow.png",
+     "job": "000b8d1b0c",
+     "motor": "flow",
+     "quando": 1792434569.3876917,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "000b8d1b0c",
+   "msg": null
+  },
+  "mascote_lupa_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_lupa_esq_v1_0473.png",
+     "bruto": "mascote_lupa_esq_v1_8f7e_flow.png",
+     "job": "647bfca50e",
+     "motor": "flow",
+     "quando": 1792434605.4086976,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 774692
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_lupa_esq_v2_d3f1.png",
+     "bruto": "mascote_lupa_esq_v2_8121_flow.png",
+     "job": "647bfca50e",
+     "motor": "flow",
+     "quando": 1792434605.650833,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "647bfca50e",
+   "msg": null
+  },
+  "mascote_lupa_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_lupa_dir_v1_2dea.png",
+     "bruto": "mascote_lupa_dir_v1_cc23_flow.png",
+     "job": "ce828d8c85",
+     "motor": "flow",
+     "quando": 1792436187.9384987,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 14,
+      "verde_px": 821062
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_lupa_dir_v2_1efc.png",
+     "bruto": "mascote_lupa_dir_v2_c68e_flow.png",
+     "job": "ce828d8c85",
+     "motor": "flow",
+     "quando": 1792436188.722803,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 57,
+      "verde_px": 854046
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "ce828d8c85",
+   "msg": null
+  },
+  "mascote_livro_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_livro_esq_v1_a2a8.png",
+     "bruto": "mascote_livro_esq_v1_944f_flow.png",
+     "job": "ab6def3680",
+     "motor": "flow",
+     "quando": 1792434786.952566,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 9,
+      "verde_px": 800032
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ab6def3680",
+   "msg": null
+  },
+  "mascote_livro_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_livro_dir_v1_d235.png",
+     "bruto": "mascote_livro_dir_v1_4c3f_flow.png",
+     "job": "1188efb918",
+     "motor": "flow",
+     "quando": 1792434782.1249826,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 784137
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "1188efb918",
+   "msg": null
+  },
+  "mascote_olhando_cima_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_olhando_cima_esq_v1_aea1.png",
+     "bruto": "mascote_olhando_cima_esq_v1_b6c7_flow.png",
+     "job": "5bf105a060",
+     "motor": "flow",
+     "quando": 1792434819.5955484,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 11,
+      "verde_px": 875975
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_olhando_cima_esq_v2_3242.png",
+     "bruto": "mascote_olhando_cima_esq_v2_8395_flow.png",
+     "job": "5bf105a060",
+     "motor": "flow",
+     "quando": 1792434819.7455754,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5bf105a060",
+   "msg": null
+  },
+  "mascote_olhando_cima_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_olhando_cima_dir_v1_11d9.png",
+     "bruto": "mascote_olhando_cima_dir_v1_5792_flow.png",
+     "job": "8b62342791",
+     "motor": "flow",
+     "quando": 1792434832.3910844,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 9,
+      "verde_px": 832785
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8b62342791",
+   "msg": null
+  },
+  "mascote_desconfiado_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_desconfiado_esq_v1_ea7a.png",
+     "bruto": "mascote_desconfiado_esq_v1_31c6_flow.png",
+     "job": "e82f597b61",
+     "motor": "flow",
+     "quando": 1792434877.2517292,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 848510
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e82f597b61",
+   "msg": null
+  },
+  "mascote_desconfiado_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_desconfiado_dir_v1_a28e.png",
+     "bruto": "mascote_desconfiado_dir_v1_5a39_flow.png",
+     "job": "2352a6fd2e",
+     "motor": "flow",
+     "quando": 1792434897.9264667,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 853889
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2352a6fd2e",
+   "msg": null
+  },
+  "mascote_assustado_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_assustado_esq_v1_db77.png",
+     "bruto": "mascote_assustado_esq_v1_f1cd_flow.png",
+     "job": "df88fd1758",
+     "motor": "flow",
+     "quando": 1792434926.8225496,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 823810
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "df88fd1758",
+   "msg": null
+  },
+  "mascote_assustado_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_assustado_dir_v1_2a4e.png",
+     "bruto": "mascote_assustado_dir_v1_c5ec_flow.png",
+     "job": "fb1ab7e573",
+     "motor": "flow",
+     "quando": 1792434951.7501853,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 34,
+      "verde_px": 828696
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "fb1ab7e573",
+   "msg": null
+  },
+  "mascote_feliz_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_feliz_esq_v1_8a4d.png",
+     "bruto": "mascote_feliz_esq_v1_3e31_flow.png",
+     "job": "e06e5b20b8",
+     "motor": "flow",
+     "quando": 1792434988.7460907,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 11,
+      "verde_px": 846476
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e06e5b20b8",
+   "msg": null
+  },
+  "mascote_feliz_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_feliz_dir_v1_1b01.png",
+     "bruto": "mascote_feliz_dir_v1_80b0_flow.png",
+     "job": "7fbfc08ddd",
+     "motor": "flow",
+     "quando": 1792435001.3896728,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 818363
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7fbfc08ddd",
+   "msg": null
+  },
+  "mascote_comemorando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_comemorando_esq_v1_0be2.png",
+     "bruto": "mascote_comemorando_esq_v1_5944_flow.png",
+     "job": "f88b02435b",
+     "motor": "flow",
+     "quando": 1792435042.4286442,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 883924
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f88b02435b",
+   "msg": null
+  },
+  "mascote_comemorando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_comemorando_dir_v1_f65c.png",
+     "bruto": "mascote_comemorando_dir_v1_f6a5_flow.png",
+     "job": "47a253ba01",
+     "motor": "flow",
+     "quando": 1792435099.5532544,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 888893
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "47a253ba01",
+   "msg": null
+  },
+  "mascote_saudando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_saudando_esq_v1_2805.png",
+     "bruto": "mascote_saudando_esq_v1_2476_flow.png",
+     "job": "2af755081b",
+     "motor": "flow",
+     "quando": 1792435242.6338398,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 15,
+      "verde_px": 851246
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2af755081b",
+   "msg": null
+  },
+  "mascote_saudando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_saudando_dir_v1_ecd8.png",
+     "bruto": "mascote_saudando_dir_v1_4417_flow.png",
+     "job": "7eeae46c29",
+     "motor": "flow",
+     "quando": 1792435144.4403515,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 826493
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_saudando_dir_v2_da00.png",
+     "bruto": "mascote_saudando_dir_v2_10f3_flow.png",
+     "job": "7eeae46c29",
+     "motor": "flow",
+     "quando": 1792435144.5919654,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7eeae46c29",
+   "msg": null
+  },
+  "mascote_espiando_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_espiando_esq_v1_9e53.png",
+     "bruto": "mascote_espiando_esq_v1_0f5b_flow.png",
+     "job": "e371868734",
+     "motor": "flow",
+     "quando": 1792435177.8616042,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 39,
+      "verde_px": 795814
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_espiando_esq_v2_925a.png",
+     "bruto": "mascote_espiando_esq_v2_aa6b_flow.png",
+     "job": "e371868734",
+     "motor": "flow",
+     "quando": 1792435178.0177755,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e371868734",
+   "msg": null
+  },
+  "mascote_espiando_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_espiando_dir_v1_8fb1.png",
+     "bruto": "mascote_espiando_dir_v1_b905_flow.png",
+     "job": "7ca0d6b352",
+     "motor": "flow",
+     "quando": 1792435226.043964,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 9,
+      "verde_px": 786980
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7ca0d6b352",
+   "msg": null
+  },
+  "mascote_fotografia_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_fotografia_esq_v1_34bd.png",
+     "bruto": "mascote_fotografia_esq_v1_bef3_flow.png",
+     "job": "b931be14be",
+     "motor": "flow",
+     "quando": 1792435268.0090926,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 756789
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_fotografia_esq_v2_4e02.png",
+     "bruto": "mascote_fotografia_esq_v2_1017_flow.png",
+     "job": "b931be14be",
+     "motor": "flow",
+     "quando": 1792435268.1856124,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b931be14be",
+   "msg": null
+  },
+  "mascote_fotografia_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_fotografia_dir_v1_faed.png",
+     "bruto": "mascote_fotografia_dir_v1_0c00_flow.png",
+     "job": "25512ed61e",
+     "motor": "flow",
+     "quando": 1792435276.9266942,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 12,
+      "verde_px": 843986
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_fotografia_dir_v2_724a.png",
+     "bruto": "mascote_fotografia_dir_v2_1208_flow.png",
+     "job": "25512ed61e",
+     "motor": "flow",
+     "quando": 1792435277.146939,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "25512ed61e",
+   "msg": null
+  },
+  "mascote_mapa_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_mapa_esq_v1_57a5.png",
+     "bruto": "mascote_mapa_esq_v1_503f_flow.png",
+     "job": "3f58c132d4",
+     "motor": "flow",
+     "quando": 1792435306.2237847,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 3,
+      "verde_px": 791656
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_mapa_esq_v2_b0ea.png",
+     "bruto": "mascote_mapa_esq_v2_bed3_flow.png",
+     "job": "3f58c132d4",
+     "motor": "flow",
+     "quando": 1792435306.3792102,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3f58c132d4",
+   "msg": null
+  },
+  "mascote_mapa_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_mapa_dir_v1_6075.png",
+     "bruto": "mascote_mapa_dir_v1_8130_flow.png",
+     "job": "d6d8682cd8",
+     "motor": "flow",
+     "quando": 1792435311.0801935,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 805195
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d6d8682cd8",
+   "msg": null
+  },
+  "mascote_lanterna_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_lanterna_esq_v1_c1dc.png",
+     "bruto": "mascote_lanterna_esq_v1_3a96_flow.png",
+     "job": "5c3b70e01a",
+     "motor": "flow",
+     "quando": 1792435344.3322268,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 14,
+      "furos_fechados": 42,
+      "verde_px": 813562
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_lanterna_esq_v2_7a50.png",
+     "bruto": "mascote_lanterna_esq_v2_0bca_flow.png",
+     "job": "5c3b70e01a",
+     "motor": "flow",
+     "quando": 1792435344.5020053,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5c3b70e01a",
+   "msg": null
+  },
+  "mascote_lanterna_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_lanterna_dir_v1_9e8d.png",
+     "bruto": "mascote_lanterna_dir_v1_b053_flow.png",
+     "job": "d5ffd91589",
+     "motor": "flow",
+     "quando": 1792435353.282318,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 832166
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_lanterna_dir_v2_aae9.png",
+     "bruto": "mascote_lanterna_dir_v2_f9da_flow.png",
+     "job": "d5ffd91589",
+     "motor": "flow",
+     "quando": 1792435353.696098,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d5ffd91589",
+   "msg": null
+  },
+  "mascote_relogio_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_relogio_esq_v1_5ec9.png",
+     "bruto": "mascote_relogio_esq_v1_856c_flow.png",
+     "job": "59d8dcf877",
+     "motor": "flow",
+     "quando": 1792435526.31688,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 7,
+      "furos_fechados": 28,
+      "verde_px": 843522
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "59d8dcf877",
+   "msg": null
+  },
+  "mascote_relogio_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_relogio_dir_v1_36a4.png",
+     "bruto": "mascote_relogio_dir_v1_e1a0_flow.png",
+     "job": "01843a7c63",
+     "motor": "flow",
+     "quando": 1792435390.8896677,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 57,
+      "verde_px": 789536
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_relogio_dir_v2_ef4d.png",
+     "bruto": "mascote_relogio_dir_v2_ca6c_flow.png",
+     "job": "01843a7c63",
+     "motor": "flow",
+     "quando": 1792435391.0473409,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "01843a7c63",
+   "msg": null
+  },
+  "mascote_documentos_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_documentos_esq_v1_8a9c.png",
+     "bruto": "mascote_documentos_esq_v1_1a44_flow.png",
+     "job": "e107219610",
+     "motor": "flow",
+     "quando": 1792435428.0134513,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 7,
+      "verde_px": 782253
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_documentos_esq_v2_0aa7.png",
+     "bruto": "mascote_documentos_esq_v2_30b9_flow.png",
+     "job": "e107219610",
+     "motor": "flow",
+     "quando": 1792435428.1659071,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e107219610",
+   "msg": null
+  },
+  "mascote_documentos_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_documentos_dir_v1_9302.png",
+     "bruto": "mascote_documentos_dir_v1_96d2_flow.png",
+     "job": "d95f25c0b5",
+     "motor": "flow",
+     "quando": 1792435477.281799,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 18,
+      "verde_px": 839358
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_documentos_dir_v2_894e.png",
+     "bruto": "mascote_documentos_dir_v2_46b9_flow.png",
+     "job": "d95f25c0b5",
+     "motor": "flow",
+     "quando": 1792435477.442167,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d95f25c0b5",
+   "msg": null
+  },
+  "mascote_placa_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_placa_esq_v1_ec0b.png",
+     "bruto": "mascote_placa_esq_v1_48ef_flow.png",
+     "job": "b9ffb1af61",
+     "motor": "flow",
+     "quando": 1792435665.2574096,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 781921
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b9ffb1af61",
+   "msg": null
+  },
+  "mascote_placa_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_placa_dir_v1_9c43.png",
+     "bruto": "mascote_placa_dir_v1_d0cb_flow.png",
+     "job": "87a43ebe49",
+     "motor": "flow",
+     "quando": 1792435565.8765361,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 7,
+      "verde_px": 781748
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_placa_dir_v2_3539.png",
+     "bruto": "mascote_placa_dir_v2_20a7_flow.png",
+     "job": "87a43ebe49",
+     "motor": "flow",
+     "quando": 1792435566.1111677,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "87a43ebe49",
+   "msg": null
+  },
+  "mascote_triste_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_triste_esq_v1_50ea.png",
+     "bruto": "mascote_triste_esq_v1_abf9_flow.png",
+     "job": "893c3768d7",
+     "motor": "flow",
+     "quando": 1792435619.6985445,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 8,
+      "furos_fechados": 25,
+      "verde_px": 806722
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "893c3768d7",
+   "msg": null
+  },
+  "mascote_triste_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_triste_dir_v1_4d2b.png",
+     "bruto": "mascote_triste_dir_v1_34a5_flow.png",
+     "job": "0ebbd43791",
+     "motor": "flow",
+     "quando": 1792435670.8246634,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 1,
+      "verde_px": 776781
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_triste_dir_v2_bab8.png",
+     "bruto": "mascote_triste_dir_v2_1d2b_flow.png",
+     "job": "0ebbd43791",
+     "motor": "flow",
+     "quando": 1792435671.0384278,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0ebbd43791",
+   "msg": null
+  },
+  "mascote_cansado_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_cansado_esq_v1_3e8f.png",
+     "bruto": "mascote_cansado_esq_v1_5dbb_flow.png",
+     "job": "e3fa75faec",
+     "motor": "flow",
+     "quando": 1792435716.5245311,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 17,
+      "verde_px": 835506
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_cansado_esq_v2_75cf.png",
+     "bruto": "mascote_cansado_esq_v2_8a02_flow.png",
+     "job": "e3fa75faec",
+     "motor": "flow",
+     "quando": 1792435716.7327547,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e3fa75faec",
+   "msg": null
+  },
+  "mascote_cansado_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_cansado_dir_v1_23e9.png",
+     "bruto": "mascote_cansado_dir_v1_93a7_flow.png",
+     "job": "4a9ce5eebe",
+     "motor": "flow",
+     "quando": 1792435725.9449475,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 15,
+      "verde_px": 818185
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_cansado_dir_v2_b735.png",
+     "bruto": "mascote_cansado_dir_v2_03b6_flow.png",
+     "job": "4a9ce5eebe",
+     "motor": "flow",
+     "quando": 1792435726.3088067,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "4a9ce5eebe",
+   "msg": null
+  },
+  "mascote_silencio_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_silencio_esq_v1_cc18.png",
+     "bruto": "mascote_silencio_esq_v1_7cce_flow.png",
+     "job": "b5a0ecc8da",
+     "motor": "flow",
+     "quando": 1792435755.5305755,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 9,
+      "verde_px": 848462
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_silencio_esq_v2_f6fc.png",
+     "bruto": "mascote_silencio_esq_v2_954c_flow.png",
+     "job": "b5a0ecc8da",
+     "motor": "flow",
+     "quando": 1792435755.7377386,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b5a0ecc8da",
+   "msg": null
+  },
+  "mascote_silencio_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_silencio_dir_v1_77de.png",
+     "bruto": "mascote_silencio_dir_v1_e6de_flow.png",
+     "job": "a51f7d1fbc",
+     "motor": "flow",
+     "quando": 1792435768.410804,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 816485
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_silencio_dir_v2_255b.png",
+     "bruto": "mascote_silencio_dir_v2_c4a0_flow.png",
+     "job": "a51f7d1fbc",
+     "motor": "flow",
+     "quando": 1792435769.7187636,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a51f7d1fbc",
+   "msg": null
+  },
+  "mascote_binoculo_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_binoculo_esq_v1_5453.png",
+     "bruto": "mascote_binoculo_esq_v1_a040_flow.png",
+     "job": "19d0d9fecb",
+     "motor": "flow",
+     "quando": 1792435799.9032714,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 4,
+      "verde_px": 791487
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_binoculo_esq_v2_dc9f.png",
+     "bruto": "mascote_binoculo_esq_v2_9fce_flow.png",
+     "job": "19d0d9fecb",
+     "motor": "flow",
+     "quando": 1792435800.110904,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "19d0d9fecb",
+   "msg": null
+  },
+  "mascote_binoculo_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_binoculo_dir_v1_69f8.png",
+     "bruto": "mascote_binoculo_dir_v1_d236_flow.png",
+     "job": "92f912a069",
+     "motor": "flow",
+     "quando": 1792435784.1580493,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    },
+    {
+     "local": "mascote_binoculo_dir_v2_4c13.png",
+     "bruto": "mascote_binoculo_dir_v2_67ba_flow.png",
+     "job": "6440fdd1e6",
+     "motor": "flow",
+     "quando": 1792436203.7276382,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 14,
+      "verde_px": 861339
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_binoculo_dir_v3_e134.png",
+     "bruto": "mascote_binoculo_dir_v3_f1f1_flow.png",
+     "job": "6440fdd1e6",
+     "motor": "flow",
+     "quando": 1792436203.9242778,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "6440fdd1e6",
+   "msg": null
+  },
+  "mascote_camera_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_camera_esq_v1_496a.png",
+     "bruto": "mascote_camera_esq_v1_4de2_flow.png",
+     "job": "4f1331663e",
+     "motor": "flow",
+     "quando": 1792435966.8704588,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 9,
+      "verde_px": 837149
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "4f1331663e",
+   "msg": null
+  },
+  "mascote_camera_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_camera_dir_v1_481d.png",
+     "bruto": "mascote_camera_dir_v1_03b3_flow.png",
+     "job": "c2c5cf46c8",
+     "motor": "flow",
+     "quando": 1792435849.8016028,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 803258
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c2c5cf46c8",
+   "msg": null
+  },
+  "mascote_globo_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_globo_esq_v1_4b2e.png",
+     "bruto": "mascote_globo_esq_v1_cdab_flow.png",
+     "job": "428dbcace6",
+     "motor": "flow",
+     "quando": 1792435899.9608622,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 7,
+      "furos_fechados": 7,
+      "verde_px": 784893
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_globo_esq_v2_92bb.png",
+     "bruto": "mascote_globo_esq_v2_79a7_flow.png",
+     "job": "428dbcace6",
+     "motor": "flow",
+     "quando": 1792435900.2116485,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "428dbcace6",
+   "msg": null
+  },
+  "mascote_globo_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_globo_dir_v1_e2c7.png",
+     "bruto": "mascote_globo_dir_v1_917c_flow.png",
+     "job": "8d0774a582",
+     "motor": "flow",
+     "quando": 1792435950.8688948,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 815895
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_globo_dir_v2_45e7.png",
+     "bruto": "mascote_globo_dir_v2_0116_flow.png",
+     "job": "8d0774a582",
+     "motor": "flow",
+     "quando": 1792435951.1196558,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8d0774a582",
+   "msg": null
+  },
+  "mascote_telescopio_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_telescopio_esq_v1_31a5.png",
+     "bruto": "mascote_telescopio_esq_v1_c066_flow.png",
+     "job": "ee84cd74a4",
+     "motor": "flow",
+     "quando": 1792436141.1546702,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 20,
+      "verde_px": 813558
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ee84cd74a4",
+   "msg": null
+  },
+  "mascote_telescopio_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_telescopio_dir_v1_b3d6.png",
+     "bruto": "mascote_telescopio_dir_v1_be41_flow.png",
+     "job": "d81a03ef0d",
+     "motor": "flow",
+     "quando": 1792436007.0707023,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 5,
+      "furos_fechados": 117,
+      "verde_px": 866755
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d81a03ef0d",
+   "msg": null
+  },
+  "mascote_caveira_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_caveira_esq_v1_b8ac.png",
+     "bruto": "mascote_caveira_esq_v1_3c07_flow.png",
+     "job": "2b7b5649fd",
+     "motor": "flow",
+     "quando": 1792436053.1635978,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 5,
+      "furos_fechados": 11,
+      "verde_px": 803554
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_caveira_esq_v2_3596.png",
+     "bruto": "mascote_caveira_esq_v2_a00e_flow.png",
+     "job": "2b7b5649fd",
+     "motor": "flow",
+     "quando": 1792436053.371079,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2b7b5649fd",
+   "msg": null
+  },
+  "mascote_caveira_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_caveira_dir_v1_c9e6.png",
+     "bruto": "mascote_caveira_dir_v1_89ba_flow.png",
+     "job": "998557555c",
+     "motor": "flow",
+     "quando": 1792436089.0654356,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 807766
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_caveira_dir_v2_0770.png",
+     "bruto": "mascote_caveira_dir_v2_dec4_flow.png",
+     "job": "998557555c",
+     "motor": "flow",
+     "quando": 1792436089.540674,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "998557555c",
+   "msg": null
+  },
+  "mascote_quadro_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_quadro_esq_v1_409e.png",
+     "bruto": "mascote_quadro_esq_v1_a552_flow.png",
+     "job": "91826fb672",
+     "motor": "flow",
+     "quando": 1792436124.972973,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 20,
+      "verde_px": 710103
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "91826fb672",
+   "msg": null
+  },
+  "mascote_quadro_dir.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "mascote_quadro_dir_v1_b1e3.png",
+     "bruto": "mascote_quadro_dir_v1_7c8e_flow.png",
+     "job": "7cea70a130",
+     "motor": "flow",
+     "quando": 1792436162.5629764,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 661723
+     },
+     "cortada": false,
+     "defeito": false
+    },
+    {
+     "local": "mascote_quadro_dir_v2_a718.png",
+     "bruto": "mascote_quadro_dir_v2_b79e_flow.png",
+     "job": "7cea70a130",
+     "motor": "flow",
+     "quando": 1792436162.7772286,
+     "aviso": "o fundo não veio verde — o recorte pode ter falhado (refaça); a personagem saiu cortada na borda (esquerda, direita, topo) — refaça (fica um corte reto no PNG)",
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 0,
+      "aviso_fundo": "o fundo não veio verde — o recorte pode ter falhado (refaça)"
+     },
+     "cortada": true,
+     "defeito": true
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7cea70a130",
+   "msg": null
+  }
+ },
+ "atualizado": 1792437984.4421859
+}

@@ -326,6 +326,22 @@ def tentar_de_novo(lid: str, iid: str, pod_url: str = "") -> Dict[str, Any]:
             salvar(lote)
             garantir_runner()
             return lote
+        if not tem_audio and it.get("pod_voz") and not pod_url:
+            # 🗣️ v84_194: a narração ainda está no pod (rodando ou na fila)? continua acompanhando a MESMA — antes o
+            # "Tentar de novo" mandava outra e o pod narrava o roteiro duas vezes (a nova esperava a velha acabar)
+            try:
+                import pod_studio
+                st_v = pod_studio.job(it["pod_voz"], _cfg_pod(lote))
+            except Exception:  # noqa: BLE001 — pod fora / job sumiu: manda de novo
+                st_v = None
+            if st_v and st_v.get("status") not in pod_studio.FINAIS:
+                it.update(estado="narrando", erro=None, falhas_pod=0,
+                          mensagem="🗣️ a narração ainda está rodando no pod — continuo acompanhando a mesma")
+                _log(it, "🔁 tentar de novo: a narração continua no pod (não mandei outra)")
+                lote["status"] = "rodando"
+                salvar(lote)
+                garantir_runner()
+                return lote
         it.update(estado="cenas" if tem_audio else "aguardando", erro=None, mensagem="tentando de novo",
                   pod_img=None, pod_voz=None if not tem_audio else it.get("pod_voz"))
         lote["status"] = "rodando"
@@ -800,7 +816,15 @@ def _planejar_cenas(lid: str, iid: str) -> None:
     roteiro = " ".join(str(s.get("text") or "").strip() for s in segs)
     import canal_pod
     marca = canal_pod.carregar(_BASE, canal_pod.slug_do_item(_BASE, it, cfg_lote))
-    if marca:  # 🎨 v84_181: roteiro de um canal de pacote — % , estética e personagens do zip do canal
+    ccfg_m = canal_pod.config(marca) if marca else {}
+    if marca and ccfg_m.get("cenas") == "padrao":
+        # 🖼 v84_191: o canal pede as cenas de sempre (foto documental, sem personagem/narrador desenhado) — só a % e o
+        # canal vêm do pacote; as personagens entram por cima no editor (🧍 Personagens)
+        _mudar(lid, iid, canal=marca["slug"], _log=f"🖼 canal {marca['slug']}: cenas no estilo padrão (foto documental), "
+                                                   f"{ccfg_m['pct']}% no pod; personagens só por cima no editor")
+        resposta, rostos, escolhidas, avisos, ficha = _planejar_padrao(lid, iid, it, dict(cfg_lote, pct=ccfg_m["pct"]),
+                                                                        cenas, roteiro)
+    elif marca:  # 🎨 v84_181: roteiro de um canal de pacote — % , estética e personagens do zip do canal
         resposta, rostos, escolhidas, avisos = _planejar_canal(lid, iid, it, cfg_lote, cenas, roteiro, marca)
         ficha = resposta.get("_ficha")
     else:

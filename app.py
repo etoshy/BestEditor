@@ -5885,6 +5885,8 @@ def _dados_estudio(job_id: str, job: dict) -> Dict[str, Any]:
         src = ov.get("source") or {}
         o["_url"] = (f"/job/{job_id}/overlay/{ov['id']}" if src.get("source") == "local_file"
                      else src.get("value") if src.get("source") == "url" else None)
+        if ov.get("origem") == "personagem":  # 🎞 v84_193: a personagem animada (WebM transparente) no monitor
+            o["_anim_url"] = __import__("personagens_editor").url_anim(job_id, ov)
         overlays.append(o)
     clipes_ch = {t: _clipes_do_tipo(job, t) for t in {c.get("tipo") for c in job.get("cutaway_suggestions") or [] if c.get("chamada")} if t}
     cortes = [{k: c.get(k) for k in ("id", "insertion_point", "description", "audio_mode", "query", "chamada", "tipo", "texto", "remove_ate", "clipe_padrao")}

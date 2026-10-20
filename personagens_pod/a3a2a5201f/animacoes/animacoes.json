@@ -1,0 +1,134 @@
+{
+ "mascote_surpreso_esq_v1_80ed__parada__30c7a692de": {
+  "estado": "erro",
+  "flow_job": "a7b3b6fcfa",
+  "prompt": "Subtle 2D anime character animation of Mascote (surpreso, recuando com as mãos pra cima): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_surpreso_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_surpreso_esq_v1_80ed__parada__30c7a692de_frame.png",
+  "criado": 1792487123.8089254,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_060845_843587)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_assustado_esq_v1_db77__parada__f329155b40": {
+  "estado": "erro",
+  "flow_job": "e807e782f2",
+  "prompt": "Subtle 2D anime character animation of Mascote (assustado, encolhido): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_assustado_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_assustado_esq_v1_db77__parada__f329155b40_frame.png",
+  "criado": 1792487124.1501355,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_060854_873383)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_explicando_esq_v1_22dd__parada__911f74cb3b": {
+  "estado": "erro",
+  "flow_job": "bbb91774cf",
+  "prompt": "Subtle 2D anime character animation of Mascote (explicando / apontando): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_explicando_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_explicando_esq_v1_22dd__parada__911f74cb3b_frame.png",
+  "criado": 1792487124.2859583,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_061203_022483)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_binoculo_esq_v1_5453__parada__6461d72ef5": {
+  "estado": "erro",
+  "flow_job": "f143c1567e",
+  "prompt": "Subtle 2D anime character animation of Mascote (com binóculo): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_binoculo_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_binoculo_esq_v1_5453__parada__6461d72ef5_frame.png",
+  "criado": 1792487124.4322603,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_061215_889456)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_placa_esq_v1_ec0b__parada__eab9d14289": {
+  "estado": "erro",
+  "flow_job": "c8e9ef7943",
+  "prompt": "Subtle 2D anime character animation of Mascote (segurando uma placa em branco): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_placa_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_placa_esq_v1_ec0b__parada__eab9d14289_frame.png",
+  "criado": 1792487124.580878,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_061517_067633)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_comemorando_esq_v1_0be2__parada__9a2ccd747f": {
+  "estado": "erro",
+  "flow_job": "763252e811",
+  "prompt": "Subtle 2D anime character animation of Mascote (comemorando, braços pro alto): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_comemorando_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_comemorando_esq_v1_0be2__parada__9a2ccd747f_frame.png",
+  "criado": 1792487124.688072,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_061529_431898)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_desconfiado_esq_v1_ea7a__parada__36a44a1810": {
+  "estado": "erro",
+  "flow_job": "13540bee3c",
+  "prompt": "Subtle 2D anime character animation of Mascote (desconfiado, olhando de lado): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_desconfiado_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_desconfiado_esq_v1_ea7a__parada__36a44a1810_frame.png",
+  "criado": 1792487249.9923718,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_061836_253256)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_normal_esq_v1_dea7__parada__9c5039dab4": {
+  "estado": "erro",
+  "flow_job": "f908584f83",
+  "prompt": "Subtle 2D anime character animation of Mascote (pose canônica: inclinado pra frente, braço estendido): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_normal_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_normal_esq_v1_dea7__parada__9c5039dab4_frame.png",
+  "criado": 1792487250.481354,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_061849_339101)",
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_ideia_esq_v1_43d8__parada__523c580983": {
+  "estado": "gerando",
+  "flow_job": "6de4aea1ff",
+  "prompt": "Subtle 2D anime character animation of Mascote (ideia, dedo pra cima): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_ideia_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_ideia_esq_v1_43d8__parada__523c580983_frame.png",
+  "criado": 1792487250.6259112,
+  "erro": null,
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_triste_esq_v1_50ea__parada__f54a72c69e": {
+  "estado": "gerando",
+  "flow_job": "49a3e09be4",
+  "prompt": "Subtle 2D anime character animation of Mascote (triste, curvado): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_triste_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_triste_esq_v1_50ea__parada__f54a72c69e_frame.png",
+  "criado": 1792487250.9126792,
+  "erro": null,
+  "msg": "🎬 gerando no Flow"
+ },
+ "mascote_lupa_esq_v1_0473__parada__d683504a1e": {
+  "estado": "fila",
+  "flow_job": "987885fb54",
+  "prompt": "Subtle 2D anime character animation of Mascote (investigando com lupa): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_lupa_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_lupa_esq_v1_0473__parada__d683504a1e_frame.png",
+  "criado": 1792487251.0927596,
+  "erro": null,
+  "msg": "na fila do Flow"
+ },
+ "mascote_espiando_esq_v1_9e53__parada__5080ff63bb": {
+  "estado": "fila",
+  "flow_job": "5212b01a80",
+  "prompt": "Subtle 2D anime character animation of Mascote (espiando da borda): idle animation: gentle breathing, one or two natural blinks, a slight head tilt and a small hand movement. Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
+  "pose": "mascote_espiando_esq.png",
+  "tipo": "parada",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\a3a2a5201f\\animacoes\\mascote_espiando_esq_v1_9e53__parada__5080ff63bb_frame.png",
+  "criado": 1792487251.2726812,
+  "erro": null,
+  "msg": "na fila do Flow"
+ }
+}

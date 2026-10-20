@@ -748,8 +748,10 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
         <span class="hint">Tamanho</span><div style="display:flex;gap:6px;align-items:center"><input type="range" id="peAltura" min="0.3" max="1" step="0.02" style="flex:1" title="altura da personagem (fração da altura do vídeo)"><span class="hint" id="peAlturaTxt"></span></div>
         <span class="hint" title="quantos dos momentos possíveis viram aparição">Quanto aparece</span><div style="display:flex;gap:6px;align-items:center"><input type="range" id="peFreq" min="0.1" max="1" step="0.05" style="flex:1"><span class="hint" id="peFreqTxt"></span></div>
         <span></span><label class="chk"><input type="checkbox" id="peBoca" checked> 👄 boca mexendo enquanto fala</label>
-        <span></span><label class="chk"><input type="checkbox" id="peIa" checked> 🤖 a IA escolhe os momentos, a pose e a animação <span class="dim" id="peIaSt"></span></label></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="primary" id="peAplicar" style="width:auto">✨ Colocar automaticamente</button><button class="mini danger" id="peTirar">🗑 Tirar todas</button></div>
+        <span></span><label class="chk" title="as poses _esq/_dir do canal saíram olhando pro lado contrário do nome: marque e clique em Colocar de novo"><input type="checkbox" id="peInv"> ↔ personagens olhando pra fora? inverter o olhar das poses</label>
+        <span class="hint" title="clipe animado no Google Flow (começa e termina na pose; fica guardado pra reusar em outros vídeos)">🎞 Animar</span><select id="peAnimar"><option value="ia">a 🤖 IA escolhe quais aparições se mexem</option><option value="todas">todas as aparições se mexem</option><option value="nao">nenhuma (imagem parada)</option></select>
+        <span></span><label class="chk"><input type="checkbox" id="peIa" checked> 🤖 a IA escolhe os momentos, a pose, a posição (lado e tamanho, olhando a imagem da cena) e a animação <span class="dim" id="peIaSt"></span></label></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="primary" id="peAplicar" style="width:auto">✨ Colocar automaticamente</button><button class="mini" id="peAnimarSug" title="manda pro Google Flow as poses que a IA marcou pra se mexer (abre o navegador do Flow)">🎞 Animar as sugeridas</button><button class="mini danger" id="peTirar">🗑 Tirar todas</button></div>
       <div class="hint" id="peStatus" style="margin-top:4px"></div>
       <div id="listaPers"></div>
     </div>
@@ -4233,7 +4235,7 @@ function peConfig() {
   document.querySelectorAll('[data-pe-lado]').forEach(s => { lados[s.dataset.peLado] = s.value; });
   const alt = parseFloat($('peAltura').value);
   return { lados, entrada: $('peEntrada').value, saida: $('peSaida').value, boca: $('peBoca').checked,
-           frequencia: parseFloat($('peFreq').value), ia: $('peIa').checked,
+           frequencia: parseFloat($('peFreq').value), ia: $('peIa').checked, inverter_olhar: $('peInv').checked, animar: $('peAnimar').value,
            [($('gFormato') && $('gFormato').value) === '9:16' ? 'altura_vertical' : 'altura']: alt };
 }
 function desenharPers() {
@@ -4254,7 +4256,7 @@ function desenharPers() {
     const vert = ($('gFormato') && $('gFormato').value) === '9:16';
     $('peAltura').value = vert ? d.config.altura_vertical : d.config.altura; $('peAlturaTxt').textContent = Math.round($('peAltura').value * 100) + '%';
     $('peFreq').value = d.config.frequencia; $('peFreqTxt').textContent = Math.round(d.config.frequencia * 100) + '% dos momentos';
-    $('peIa').checked = d.config.ia !== false;
+    $('peIa').checked = d.config.ia !== false; $('peInv').checked = d.config.inverter_olhar === true; $('peAnimar').value = d.config.animar || 'ia';
     if (!d.tem_roteiro) $('peTxtBox').open = true;
     PE.carregou = true;
   }
@@ -4267,13 +4269,31 @@ function desenharPers() {
     return `<div data-pe="${esc(a.id)}" style="border-top:1px solid var(--line);padding:6px 0;font-size:.8rem">
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a href="#" data-pe-ir="${a.start}">⏱ ${segS(a.start)}–${segS(a.end)}</a><b>${esc(a.nome_personagem || a.personagem)}</b>${a.emocao ? `<span class="hint">${esc(a.emocao)}</span>` : ''}${a.manual ? '<span class="hint" title="você mexeu: “Colocar as personagens” de novo não troca esta">✋ ajustada</span>' : ''}
         <button class="mini danger" data-pe-tirar title="tirar esta aparição" style="margin-left:auto">✕</button></div>
-      <div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;margin-top:3px;align-items:center">
+      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;margin-top:3px;align-items:center">
         <select data-pe-campo="pose" title="pose">${poses.map(o => `<option value="${esc(o.arquivo)}" ${o.arquivo === a.pose ? 'selected' : ''}>${esc(o.arquivo.replace(/\.png$/, ''))}${o.aprovada ? '' : ' (pra revisar)'}</option>`).join('') || `<option>${esc(a.pose)}</option>`}</select>
         <select data-pe-campo="lado" title="lado da tela">${['esquerda', 'direita'].map(l => `<option ${a.lado === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <select data-pe-campo="tamanho" title="tamanho">${['pequeno', 'medio', 'grande'].map(l => `<option ${(a.tamanho || 'medio') === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
         <label class="chk" title="boca mexendo"><input type="checkbox" data-pe-campo="boca" ${a.boca ? 'checked' : ''}>👄</label></div>
       <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px;margin-top:3px;align-items:center"><span class="hint">entra</span><select data-pe-campo="anim_in">${d.entradas.map(e => `<option ${a.anim_in === e ? 'selected' : ''}>${e}</option>`).join('')}</select><span class="hint">sai</span><select data-pe-campo="anim_out">${d.entradas.map(e => `<option ${a.anim_out === e ? 'selected' : ''}>${e}</option>`).join('')}</select></div>
+      ${peAnimLinha(a)}
       <div class="hint" style="margin-top:2px">“${esc((a.fala || '').slice(0, 140))}”</div></div>`;
   }).join('') : '<p class="hint">Nenhuma personagem no vídeo ainda.</p>';
+  peVigiarAnim();
+}
+function peAnimLinha(a) {
+  const espera = ['fila', 'gerando', 'processando'].includes(a.anim_estado);
+  const st = a.anim_pronta ? (a.anim_usando ? '🎞 animada' : '🖼 parada (o clipe está guardado)') : espera ? `⏳ ${esc(a.anim_msg || a.anim_estado)}` : a.anim_estado === 'erro' ? `⚠ ${esc(a.anim_msg || 'falhou')}` : '🖼 parada';
+  return `<div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:4px;margin-top:3px;align-items:center">
+    <span class="hint" title="clipe do Flow: começa e termina na pose">${st}</span>
+    <select data-pe-anim="tipo" title="fala = a boca mexe · parada = respira/pisca">${['fala', 'parada'].map(t => `<option ${(a.anim_tipo || 'fala') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <select data-pe-campo="anim_modo" title="repetir = em loop a aparição toda · uma vez = mexe e para na pose">${[['repetir', 'repetir'], ['uma_vez', 'uma vez']].map(([v, t]) => `<option value="${v}" ${(a.anim_modo || 'repetir') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <input type="number" data-pe-anim="segundos" min="0" max="8" step="0.5" value="${a.anim_segundos || 0}" style="width:4.2em" title="só uns frames: usa os primeiros N segundos do clipe, ida e volta (0 = o clipe todo)">
+    ${a.anim_pronta ? `<label class="chk" title="usar o clipe animado"><input type="checkbox" data-pe-campo="anim_usar" ${a.anim_usando ? 'checked' : ''}>🎞</label>` : `<button class="mini" data-pe-animar ${espera ? 'disabled' : ''} title="manda esta pose pro Flow virar animação">🎞 Animar</button>`}
+  </div>`;
+}
+function peVigiarAnim() {
+  const espera = ((PE.d || {}).aparicoes || []).some(a => ['fila', 'gerando', 'processando'].includes(a.anim_estado));
+  if (espera && !PE.timerAnim) PE.timerAnim = setTimeout(async () => { PE.timerAnim = null; try { const r = await fetch(`/job/${JOB}/personagens/estado`); const d = await r.json(); if (r.ok) { PE.d = d; if (d.overlays) peSincOverlays(d.overlays); desenharPers(); } } catch (_) {} }, 15000);
 }
 async function persEstado() {
   try { const r = await fetch(`/job/${JOB}/personagens/estado`); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); PE.d = d; desenharPers(); }
@@ -4289,8 +4309,14 @@ $('peAplicar').addEventListener('click', async () => {
   try {
     const d = await pePost(`/job/${JOB}/personagens/aplicar`, { canal: $('peCanal').value === '-' ? '' : $('peCanal').value, texto: $('peTexto').value, config: peConfig() });
     PE.d = d.estado; peSincOverlays(d.overlays); desenharPers();
-    toast(`🧍 ${d.n} aparição(ões) nos melhores de ${d.falas} momento(s) — escolhidas pela ${d.por === 'ia' ? '🤖 IA' : 'regra'} (roteiro: ${d.de_onde})`, 6000);
+    toast(`🧍 ${d.n} aparição(ões) nos melhores de ${d.falas} momento(s) — escolhidas pela ${d.por === 'ia' ? '🤖 IA' : 'regra'} (roteiro: ${d.de_onde})${d.animando ? ` · 🎞 ${d.animando} pose(s) indo pro Flow virar animação` : ''}`, 7000);
   } catch (e) { $('peStatus').textContent = '⚠ ' + e.message; }
+  finally { b.disabled = false; }
+});
+$('peAnimarSug').addEventListener('click', async () => {
+  const b = $('peAnimarSug'); b.disabled = true;
+  try { const d = await pePost(`/job/${JOB}/personagens/animar-sugeridas`, {}); PE.d = d; peSincOverlays(d.overlays); desenharPers(); toast(d.aviso || (d.enviadas ? `🎞 ${d.enviadas} pose(s) no Flow` : 'nada novo pra animar (as sugeridas já têm clipe ou estão na fila)'), 6000); }
+  catch (e) { toast('⚠ ' + e.message, 6000); }
   finally { b.disabled = false; }
 });
 $('peTirar').addEventListener('click', async () => {
@@ -4299,14 +4325,31 @@ $('peTirar').addEventListener('click', async () => {
 });
 $('listaPers').addEventListener('click', async (e) => {
   const ir = e.target.closest('[data-pe-ir]'); if (ir) { e.preventDefault(); seek(parseFloat(ir.dataset.peIr)); return; }
+  const ab = e.target.closest('[data-pe-animar]');
+  if (ab) {
+    const box = ab.closest('[data-pe]'), id = box.dataset.pe;
+    const tipo = box.querySelector('[data-pe-anim="tipo"]').value, segundos = parseFloat(box.querySelector('[data-pe-anim="segundos"]').value) || 0;
+    ab.disabled = true;
+    try { const d = await pePost(`/job/${JOB}/personagens/${id}/animar`, { tipo, segundos, modo: box.querySelector('[data-pe-campo="anim_modo"]').value }); PE.d = d; peSincOverlays(d.overlays); desenharPers(); toast('🎞 pose na fila do Flow — o clipe entra sozinho quando chegar', 5000); }
+    catch (er) { toast('⚠ ' + er.message, 6000); ab.disabled = false; }
+    return;
+  }
   const tb = e.target.closest('[data-pe-tirar]'); if (!tb) return;
   const id = tb.closest('[data-pe]').dataset.pe;
   try { const d = await pePost(`/job/${JOB}/personagens/${id}/remover`, {}); PE.d = d; peSincOverlays(d.overlays); desenharPers(); } catch (er) { toast('⚠ ' + er.message, 5000); }
 });
 $('listaPers').addEventListener('change', async (e) => {
+  const an = e.target.closest('[data-pe-anim]');
+  if (an) {  // tipo / só uns frames: com o clipe já guardado, troca na hora (o mesmo tipo não vai pro Flow de novo)
+    const box = an.closest('[data-pe]'), a = ((PE.d || {}).aparicoes || []).find(x => x.id === box.dataset.pe);
+    if (!a || !(a.anim_pronta || a.anim_pedida)) return;
+    try { const d = await pePost(`/job/${JOB}/personagens/${a.id}/animar`, { tipo: box.querySelector('[data-pe-anim="tipo"]').value, segundos: parseFloat(box.querySelector('[data-pe-anim="segundos"]').value) || 0 }); PE.d = d; peSincOverlays(d.overlays); desenharPers(); }
+    catch (er) { toast('⚠ ' + er.message, 6000); }
+    return;
+  }
   const c = e.target.closest('[data-pe-campo]'); if (!c) return;
   const id = c.closest('[data-pe]').dataset.pe, campo = c.dataset.peCampo;
-  try { const d = await pePost(`/job/${JOB}/personagens/${id}`, { [campo]: campo === 'boca' ? c.checked : c.value }); PE.d = d; peSincOverlays(d.overlays); desenharPers(); }
+  try { const d = await pePost(`/job/${JOB}/personagens/${id}`, { [campo]: (campo === 'boca' || campo === 'anim_usar') ? c.checked : c.value }); PE.d = d; peSincOverlays(d.overlays); desenharPers(); }
   catch (er) { toast('⚠ ' + er.message, 5000); }
 });
 document.querySelector('#tabs button[data-tab="personagens"]').addEventListener('click', () => { if (!PE.d) persEstado(); });
@@ -4773,14 +4816,15 @@ function atualizarMonitor(forcar) {
   estiloTexto($('layerTxt'), s.on_screen_text, s.on_screen_text_style || {}, s.end - s.start, t - s.start);
   // overlays
   const box = $('layerOv'); const ativos = overlays.filter(o => t >= o.start && t < o.end);
-  const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
+  const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + (o._anim_url || '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
   if (forcar || box.dataset.chave !== chave) {
     box.dataset.chave = chave; box.innerHTML = '';
     ativos.forEach(o => {
       if (o.media_type === 'text') { const d = document.createElement('div'); d.className = 'txt'; box.appendChild(d); estiloTexto(d, o.text, o.style || {}, o.end - o.start, t - o.start); return; }
       const d = document.createElement('div'); d.className = 'ov' + (o._url ? '' : ' box');
       d.style.left = (o.x_percent != null ? o.x_percent : 80) + '%'; d.style.top = (o.y_percent != null ? o.y_percent : 20) + '%'; d.style.width = (o.size_percent || 20) + '%';
-      if (o._url && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(o._url)) d.innerHTML = `<img src="${esc(o._url)}">`;
+      if (o._anim_url) d.innerHTML = `<video src="${esc(o._anim_url)}" muted autoplay ${o.anim_modo === 'uma_vez' ? '' : 'loop'} playsinline style="width:100%"></video>`;
+      else if (o._url && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(o._url)) d.innerHTML = `<img src="${esc(o._url)}">`;
       else if (o._url) d.innerHTML = `<video src="${esc(o._url)}" muted autoplay loop playsinline style="width:100%"></video>`;
       else d.textContent = '🧩 ' + ((o.source || {}).query || 'overlay (resolvido na montagem)');
       box.appendChild(d);

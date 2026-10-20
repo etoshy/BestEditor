@@ -671,6 +671,16 @@ def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo
 
 
 # ------------------------------------------------------------------ 4. mídia: frames (início/fim) e referência
+_ULTIMA_MIDIA: Dict[int, Dict[str, Any]] = {}  # id(page) → a última mídia escolhida/enviada no menu (src + pedaços de id)
+
+
+def _eh_referencia(m: Dict[str, str], estado: Dict[str, Any]) -> bool:
+    """A mídia da galeria é a imagem de REFERÊNCIA que subimos (não o resultado)?"""
+    tokens = estado.get("ref_tokens") or []
+    alvo = f"{m.get('id') or ''} {m.get('url') or ''}"
+    return any(t and t in alvo for t in tokens)
+
+
 def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, passo: str, on_passo: Passo = _nada) -> str:
     """Menu de mídia aberto → escolhe a imagem do projeto (`media_id`) ou envia `arquivo` → Incluir no comando."""
     _primeiro(page, S["menu_midia"], 8, passo, "o menu de mídia (imagens do projeto / Enviar mídia) não abriu.")
@@ -697,6 +707,11 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
         if not _esperar(_subiu, 120):
             raise FlowPassoErro(passo, "enviei a imagem mas ela não apareceu na lista de mídias do Flow.")
         item = page.locator(S["midia_item"]).first  # a mais recente vem primeiro ("Recentes")
+    try:  # 🧍 v84_189: quem é essa mídia no projeto — pra reusar (sem subir de novo) e pra nunca ser confundida com o resultado
+        src = item.locator("img").first.get_attribute("src") or ""
+    except Exception:  # noqa: BLE001
+        src = ""
+    _ULTIMA_MIDIA[id(page)] = {"src": src, "ids": [t for t in re.findall(r"[0-9A-Za-z_-]{16,}", src)][:6], "origem": origem}
     item.click()
     _primeiro(page, S["midia_previa"], 60, passo, "escolhi a imagem mas a prévia não carregou.")
     _primeiro(page, S["midia_incluir"], 10, passo, 'não achei o botão "Incluir no comando".').click()
@@ -849,7 +864,7 @@ def acordar_videos(page) -> int:
 def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[Dict[str, str]]]:
     """Não bloqueia: None = ainda gerando; lista = as mídias NOVAS (imagem/vídeo). Erro nomeado se o Flow recusou."""
     novas = [m for m in midias_na_pagina(page) if m["id"] not in estado["antes"]
-             and (m["tipo"] == ("video" if tipo == "video" else "imagem"))]
+             and (m["tipo"] == ("video" if tipo == "video" else "imagem")) and not _eh_referencia(m, estado)]
     cartoes = page.evaluate(JS_CARTOES) or []
     if cartoes:
         estado["viu_cartao"] = True
@@ -866,7 +881,8 @@ def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[
             and estado.get("viu_cartao") and time.monotonic() - estado.get("acordou_em", 0) > 3:
         estado["acordou_em"] = time.monotonic()  # o vídeo ficou pronto mas o <video> só aparece com o mouse em cima
         if acordar_videos(page):
-            novas = [m for m in midias_na_pagina(page) if m["id"] not in estado["antes"] and m["tipo"] == "video"]
+            novas = [m for m in midias_na_pagina(page) if m["id"] not in estado["antes"] and m["tipo"] == "video"
+                     and not _eh_referencia(m, estado)]
             if novas and not (page.evaluate(JS_CARTOES) or []):
                 return novas
     av = avisos(page)
@@ -911,13 +927,23 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         if tipo == "video" and (f.get("arquivo") or f.get("media_id")):
             definir_frame(page, qual, f.get("arquivo"), f.get("media_id") or "", on_passo)
     ref = trab.get("referencia") or {}
+    ref_tokens: List[str] = []
+    _ULTIMA_MIDIA.pop(id(page), None)
     if tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")):
         incluir_referencia(page, ref.get("arquivo"), ref.get("media_id") or "", on_passo)
+        info = _ULTIMA_MIDIA.pop(id(page), None) or {}
+        ref_tokens = list(info.get("ids") or [])
+        if ref.get("media_id"):
+            ref_tokens.append(ref["media_id"])
+        # 🧍 v84_189: quem chamou guarda isso e, no próximo pedido com a MESMA imagem, reusa (não sobe de novo)
+        trab["_ref_midia"] = {"media_id": max(info.get("ids") or [""], key=len) or ref.get("media_id") or "",
+                              "origem": info.get("origem") or ""}
     escrever_prompt(page, trab["prompt"], on_passo)
     if trab.get("simular"):  # 🧪 teste sem gastar crédito: para aqui, antes do clique em gerar
         on_passo("gerar", "pulado", "modo teste sem gerar (nenhum crédito gasto)")
         return []
     estado = clicar_gerar(page, on_passo)
+    estado["ref_tokens"] = ref_tokens
     try:
         return esperar_resultado(page, estado, tipo, timeout_s, on_passo)
     except FlowRecusou as exc:

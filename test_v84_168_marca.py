@@ -141,14 +141,16 @@ def test_prompt_segue_o_json(marca):
     p = mv.montar_prompt(m, {"tipo": "cena", "mascote": "investigando", "assunto_en": "a 2,700-year-old tomb",
                              "composicao_en": "close-up"}, refs)
     assert p.startswith("Image 1 is the recurring mascot")
-    assert "SUBJECT: a 2,700-year-old tomb" in p and "COMPOSITION: close-up" in p
+    assert "a 2,700-year-old tomb" in p and "Framing: close-up" in p
+    assert "SUBJECT:" not in p and "VISUAL QUESTION" not in p and "BRAND STYLE:" not in p  # 🖼 v84_191: rótulo vira texto na imagem
+    assert "No words and no letters" in p
     assert g["mascot"]["prompt_lock_en"].split(".")[0] in p  # o prompt_lock do mascote vai inteiro
     assert g["generation_system"]["style_lock_en"][:60] in p
     assert "Avoid:" in p and "[" not in p  # sem prompt negativo no klein/Z-Image: vai como "Avoid:"
     assert "PROPORTION LOCK" in p and "short legs" in p  # 🦵 a trava contra o fantasminha baixinho da outra IA
     assert "true proportions" in p
     sem = mv.montar_prompt(m, {"tipo": "cena", "assunto_en": "a map of the silk road"})
-    assert "no mascot in this frame" in sem and not mv.referencias_para(m, {})
+    assert "mascot" not in sem.split("Avoid:")[0].lower() and not mv.referencias_para(m, {})  # nem "no mascot" (faz aparecer)
     assert len(mv.referencias_para(m, {"mascote": "normal"}, "flow")) == 1
     # 📷 foto sua (animal/estátua/pessoa): vai como referência + as características no prompt
     foto = os.path.join(m["dir"], "assets", "mascote.png")

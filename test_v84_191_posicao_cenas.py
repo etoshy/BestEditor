@@ -1,0 +1,98 @@
+"""v84_191: personagem centralizada no monitor = no render; a IA escolhe lado/tamanho; cenas sem texto e sem
+personagem; o canal do espaço pode gerar as cenas no padrão de sempre (foto documental)."""
+import json
+import os
+import subprocess
+
+import numpy as np
+from PIL import Image, ImageDraw
+
+import canal_pod
+import personagens_editor as pe
+import video_assembler as va
+
+
+def test_posicao_e_centro_encostada_embaixo():
+    size = pe._tamanho(0.72, False)
+    x, y = pe.posicao("esquerda", size, False, 2.0)
+    alt = size / 100 * 1920 * 1.5 / 1080 * 100
+    assert abs(x - (2 + size / 2)) < 0.01 and abs(y + alt / 2 - 100) < 0.01
+    x2, _ = pe.posicao("direita", size, False, 2.0)
+    assert abs(x2 - (100 - x)) < 0.01
+    assert pe._tamanho(0.72, False, pe.TAMANHOS["grande"]) > size > pe._tamanho(0.72, False, pe.TAMANHOS["pequeno"])
+
+
+def test_ia_lado_e_tamanho_no_montar():
+    pers = [{"slug": "mira", "nome": "Mira", "poses": [{"arquivo": "a.png", "caminho": "/x/a.png", "boca": None, "descricao": ""}]}]
+    b = {"id": 1, "slug": "mira", "start": 1.0, "end": 3.0, "texto": "Was?", "palavras": [[1.0, 1.5]], "tipo": "fala"}
+    cfg = dict(pe.PADRAO, lados={"mira": "esquerda"})
+    aps, _ = pe.montar([b], pers, cfg, 10.0, False, {1: {"pose": "a.png", "lado": "direita", "tamanho": "grande"}})
+    a = aps[0]
+    assert a["lado"] == "direita" and a["tamanho"] == "grande" and a["x_percent"] > 50 and a["y_percent"] < 100
+    ov = pe.overlay_de(dict(a, caminho=__file__), "/tmp", cfg, "o1") if False else None
+    job = {"overlays": [{"id": "o1", "origem": "personagem", "lado": "direita", "size_percent": a["size_percent"],
+                         "vertical": False, "altura_base": 0.72}]}
+    ov = pe.mudar(job, "o1", {"lado": "esquerda", "tamanho": "pequeno"})
+    assert ov["x_percent"] < 50 and ov["size_percent"] < a["size_percent"] and ov["ancora"] == "centro"
+    assert pe.para_render(ov)["ancora"] == "centro"
+
+
+def test_cena_do_momento_vai_pra_ia():
+    job = {"pending_segments": [{"start": 0, "end": 5, "visual": "a nebula on the left"}]}
+    cands = [{"start": 1.0, "end": 2.0}]
+    pe._cenas_nos_candidatos(job, cands)
+    assert cands[0]["cena"] == "a nebula on the left"
+
+
+def test_render_centro_bate_com_monitor(tmp_path):
+    base = str(tmp_path / "base.mp4")
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=640x360:d=2:r=25", "-f", "lavfi",
+                    "-i", "anullsrc=r=24000:cl=mono", "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    "-shortest", base], check=True)
+    im = Image.new("RGBA", (200, 300), (255, 0, 0, 255))
+    im.save(tmp_path / "p.png")
+    ov = {"resolved_path": str(tmp_path / "p.png"), "media_type": "image", "start": 0.0, "end": 2.0, "size_percent": 20,
+          "personagem": "mira", "x_percent": 50, "y_percent": 50, "ancora": "centro", "anim_in": "nenhuma",
+          "anim_out": "nenhuma", "lado": "esquerda"}
+    out = str(tmp_path / "out.mp4")
+    va.apply_overlays(base, [ov], out, 640, 360)
+    f = str(tmp_path / "f.png")
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", "1", "-i", out, "-frames:v", "1", f], check=True)
+    a = np.asarray(Image.open(f).convert("RGB")).astype(int)
+    ys, xs = np.nonzero((a[..., 0] > 200) & (a[..., 1] < 80))
+    assert abs(xs.mean() - 320) < 4 and abs(ys.mean() - 180) < 4  # centro da imagem no centro da tela
+
+
+def test_canal_cenas_padrao(tmp_path):
+    d = tmp_path / "m"
+    d.mkdir()
+    (d / "pacote.json").write_text(json.dumps({"producao_pod": {"cenas": "padrao", "pct": 100}}), encoding="utf-8")
+    c = canal_pod.config({"dir": str(d), "guia": {}})
+    assert c["cenas"] == "padrao"
+    (d / "pacote.json").write_text(json.dumps({"producao_pod": {"cenas": "xx"}}), encoding="utf-8")
+    assert canal_pod.config({"dir": str(d), "guia": {}})["cenas"] == "canal"
+
+
+def test_pacote_astranebel_no_padrao():
+    p = "/home/claude/x/astra/astranebel/pacote.json"
+    if not os.path.isfile(p):
+        return
+    pp = json.load(open(p, encoding="utf-8"))["producao_pod"]
+    assert pp["cenas"] == "padrao" and pp["personagens"] is False
+    g = json.load(open(os.path.join(os.path.dirname(p), "brand_guide.json"), encoding="utf-8"))
+    assert "observator" not in g["generation_system"]["style_lock_en"].lower()
+
+
+def test_olhar_invertido_e_par_da_pose():
+    """v84_192: personagem olhando pra fora → inverter_olhar usa a pose do outro lado; a escolha da IA é corrigida."""
+    poses = [{"arquivo": f"mira_curiosa_{l}.png", "caminho": "/x", "boca": None, "lado": l, "aprovada": True,
+              "grupo": "reacao", "texto": f"mira_curiosa_{l} curiosa", "descricao": ""} for l in ("esq", "dir")]
+    assert pe.olhar_para("esquerda") == "dir" and pe.olhar_para("esquerda", True) == "esq"
+    assert pe.escolher_pose(poses, "curiosa", "esquerda")["arquivo"].endswith("_dir.png")
+    assert pe.escolher_pose(poses, "curiosa", "esquerda", inverter=True)["arquivo"].endswith("_esq.png")
+    assert pe.par_da_pose(poses, poses[1], "esq") is poses[0]
+    pers = [{"slug": "mira", "nome": "Mira", "poses": poses}]
+    b = {"id": 1, "slug": "mira", "start": 1.0, "end": 3.0, "texto": "Was?", "palavras": [[1.0, 1.5]], "tipo": "fala"}
+    cfg = dict(pe.PADRAO, lados={"mira": "esquerda"}, inverter_olhar=True)
+    aps, _ = pe.montar([b], pers, cfg, 10.0, False, {1: {"pose": "mira_curiosa_dir.png"}})
+    assert aps[0]["pose"] == "mira_curiosa_esq.png"  # a IA pediu a errada: vira a certa

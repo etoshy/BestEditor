@@ -411,3 +411,24 @@ def test_galeria_e_imagens_parciais(monkeypatch, tmp_path):
     g = pp.galeria(lid, iid)
     assert [x["cena"] for x in g] == [1, 2] and g[1]["com_referencia"] and g[1]["rostos"] == ["John List"]
     assert g[0]["prompt"] == "a house at night 1971"
+
+
+def test_tentar_de_novo_nao_narra_duas_vezes(pod_falso, monkeypatch):
+    """v84_194: a narração ainda roda no pod → "Tentar de novo" continua acompanhando a mesma (não manda outra)."""
+    pp = pod_falso["pp"]
+    import pod_studio
+    real = pod_studio.job
+    monkeypatch.setattr(pod_studio, "job", lambda jid, cfg=None: {"status": "erro", "mensagem": "x", "erros": []}
+                        if jid.startswith("voz") else real(jid, cfg))
+    lote = pp.criar([{"origem": "texto", "titulo": "A", "texto": "Uma frase qualquer com palavras suficientes aqui."}], {})
+    l = _esperar(pp, lote["id"])
+    it = l["itens"][0]
+    assert it["estado"] == "erro" and it["pod_voz"]
+    voz = it["pod_voz"]
+    enviados = []
+    monkeypatch.setattr(pod_studio, "job", lambda jid, cfg=None: {"status": "em_andamento", "mensagem": "narrando",
+                                                                   "progresso": {"feito": 3, "total": 9}})
+    monkeypatch.setattr(pod_studio, "enviar_narracao", lambda *a, **k: enviados.append(1) or "voz-novo")
+    pp.tentar_de_novo(lote["id"], it["id"])
+    it2 = pp.carregar(lote["id"])["itens"][0]
+    assert it2["estado"] == "narrando" and it2["pod_voz"] == voz and not enviados

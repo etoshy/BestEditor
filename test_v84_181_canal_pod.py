@@ -71,7 +71,7 @@ def test_dinge_cenas_so_com_o_estilo(canais):
     g = canal_pod.aplicar_regra(m, {"pessoa": "generica", "mascote": "curioso", "acao_en": "examining an old map"})
     assert g["mascote"] == "" and g["personagens"] == []
     pr, refs = canal_pod.prompt_e_refs(m, dict(g, assunto_en="a muddy 19th-century potato field in Brandenburg"))
-    assert m["guia"]["generation_system"]["style_lock_en"][:40] in pr and "no mascot in this frame" in pr and refs == []
+    assert m["guia"]["generation_system"]["style_lock_en"][:40] in pr and "No words and no letters" in pr and refs == []
     import marca_visual as mv
     c0 = mv.personagens_png(m)
     assert [x["slug"] for x in c0] == ["mascote"] and len(c0[0]["fichas"]) == 3
@@ -98,7 +98,7 @@ def test_regra_mascote_dinge(canais):
     assert estilo in pr and "PROPORTION LOCK" in pr and "potato field" in pr
     assert len(refs) <= 4 and all(os.path.isfile(c_) for _n, c_ in refs)  # (as poses do mascote saíram do pacote)
     pr2, refs2 = canal_pod.prompt_e_refs(m, {"assunto_en": "an empty village road at dusk", "pessoa": "nenhuma"})
-    assert estilo in pr2 and "no mascot in this frame" in pr2 and refs2 == []
+    assert estilo in pr2 and "No words and no letters" in pr2 and refs2 == []
     assert "photorealistic documentary" not in pr2
 
 
@@ -171,7 +171,7 @@ def test_lote_do_canal_forca_100_e_estetica(pod_falso, canais, monkeypatch):
     estilo = c["dinge_erklaeren"]["guia"]["generation_system"]["style_lock_en"][:40]
     assert all(estilo in i["prompt"] for i in itens)
     # v84_186: o mascote não vai mais dentro das cenas (entra por cima no editor): todas só com o estilo do canal
-    assert all(not i.get("referencias") and "no mascot in this frame" in i["prompt"] for i in itens)
+    assert all(not i.get("referencias") and "No words and no letters" in i["prompt"] for i in itens)
     assert "Dinge" in sis[0]
     seg = pod_falso["criados"][0]["resposta"]["segments"][0]
     assert seg["provider"] == "runpod" and not seg.get("personagens")

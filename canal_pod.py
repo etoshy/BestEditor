@@ -28,7 +28,8 @@ import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-PADRAO = {"pct": 100, "personagens": True, "fotos_do_roteiro": "referencia", "estilo_fotos": "", "ref_estilo": False}
+PADRAO = {"pct": 100, "personagens": True, "fotos_do_roteiro": "referencia", "estilo_fotos": "", "ref_estilo": False,
+          "cenas": "canal"}  # 🖼 v84_191: "padrao" = as cenas como no roteiro sem canal (foto documental de sempre)
 BLOCO_IA = 20
 PARALELO_IA = 3
 
@@ -73,6 +74,8 @@ def config(m: Dict[str, Any]) -> Dict[str, Any]:
         c["pct"] = max(0, min(100, int(c["pct"])))
     except (TypeError, ValueError):
         c["pct"] = 100
+    if c["cenas"] not in ("canal", "padrao"):
+        c["cenas"] = "canal"
     if c["fotos_do_roteiro"] not in ("referencia", "real"):
         c["fotos_do_roteiro"] = "referencia"
     if c["estilo_fotos"] not in ("foto", "ilustracao"):  # pela estética: colagem de fotos de arquivo × desenho/anime
@@ -136,7 +139,11 @@ Para CADA cena devolva:
 - "pessoa": "nenhuma" (a imagem não mostra gente: lugar, objeto, fenômeno, mapa…), "generica" (mostraria alguém
   ANÔNIMO: um morador, um cientista, um soldado, "as pessoas", uma criança, um viajante…) ou "real" (mostra uma pessoa
   REAL citada no roteiro){' — pessoa real só se ela está no ELENCO abaixo; senão é "generica"' if bloco_elenco else ''};"""]
-    if pers:
+    com_pers = bool(cfg.get("personagens", True))  # 🧍 v84_191: false = ninguém do canal é desenhado na cena (entram por cima)
+    if pers and not com_pers:
+        L.append("- \"fala_de\": o slug do PERSONAGEM que está falando nesta cena (pelas tags de voz [mira], [vanta|curiosa]… "
+                 "no ROTEIRO), ou \"\" se é o narrador; \"personagens\": [] e \"mascote\": \"\" SEMPRE; \"acao_en\": \"\".")
+    elif pers:
         L.append("- \"fala_de\": o slug do PERSONAGEM que está falando nesta cena (pelas tags de voz [mira], [vanta|curiosa]… "
                  "no ROTEIRO), ou \"\" se é o narrador;")
         L.append("- \"personagens\": os slugs dos personagens que aparecem NA IMAGEM (0, 1 ou 2). REGRA DO CANAL: quem está "
@@ -149,14 +156,28 @@ Para CADA cena devolva:
         for x in pers:
             L.append(f"- {x['slug']} = {x.get('nome') or x['slug']}" + (f" ({x['epiteto']})" if x.get("epiteto") else "")
                      + (f" · papel: {x['papel']}" if x.get("papel") else ""))
-    elif tem_mascote(m):
+    elif tem_mascote(m) and com_pers:
         poses = "; ".join(f"{k} = {v['en']}" for k, v in marca_visual.todas_poses(m).items())
         L.append(f"""- "mascote": REGRA DO CANAL: só numa cena "generica" — a pessoa anônima VIRA o mascote do canal
   ({(g.get('mascot') or {}).get('role') or 'o guia do canal'}). Escolha a pose: {poses}. Cena "real" ou "nenhuma" → "".
 - "acao_en": se tem mascote, o que ele faz no lugar daquela pessoa (ex.: "carrying a heavy sack across the muddy
   field like a 19th-century farmer"), em inglês. "fala_de": "", "personagens": [].""")
-    else:
-        L.append('- "fala_de": "", "mascote": "", "acao_en": "", "personagens": [] (este canal não tem personagens).')
+    elif not pers:
+        L.append('- "fala_de": "", "mascote": "", "acao_en": "", "personagens": [] (este canal não tem personagens na imagem).')
+    if not com_pers:
+        L.append("""
+REGRA DAS IMAGENS DESTE CANAL (muito importante):
+- QUEM FALA NUNCA APARECE na imagem: nem o narrador (é só a voz), nem os personagens/mascote do canal (eles entram por
+  cima do vídeo depois, à parte). Não invente uma pessoa "reagindo", "perguntando", "olhando espantada" ou "pensativa"
+  no lugar de quem fala — a imagem mostra o ASSUNTO da fala: o fenômeno, o objeto, o lugar, o processo.
+- Gente só quando a fala é SOBRE pessoas (ex.: os astrônomos chineses de 1054, uma multidão, um cientista trabalhando);
+  aí "pessoa": "generica" (ou "real" do elenco). Nos outros casos "pessoa": "nenhuma".
+- NADA de texto na imagem: sem perguntas, títulos, legendas, rótulos, setas com nome, logo — os textos entram na edição.
+  Também nada de enfeite solto: ponto de interrogação/exclamação, rabiscos, anotações escritas, folhas/páginas de livro
+  coladas nos cantos. Uma imagem limpa do assunto. Pra explicar etapas/comparação pode usar SETAS limpas, formas e no
+  máximo NÚMEROS grandes — nunca palavras ou rótulos.
+  Letras só quando fazem parte de um objeto real da cena (um livro, um cartaz, uma placa).
+- VARIE os cenários: não repita o mesmo lugar (ex.: observatório) cena após cena; cada imagem mostra o que a frase diz.""")
     if bloco_elenco:
         import elenco as _el
         L.append("\n" + _el.REGRA_CENAS.replace("\"prompt_imagem\"", "\"assunto_en\"") + "\n\n" + bloco_elenco)

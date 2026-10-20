@@ -86,6 +86,9 @@ def _schema(com_elenco: bool = False):
     return _obj({"cenas": _lista(_obj(cena))})
 
 
+SEM_TEXTO = ("No words and no letters anywhere in the image (no labels, no captions, no titles); if it explains something, "
+             "use only clean arrows, shapes and at most a few large digits.")
+
 _SYS = """Você planeja as IMAGENS de um vídeo narrado de YouTube, cena por cena (cada cena tem uns segundos de fala).
 Use a FICHA (quem é quem, lugares, época, estilo) e o ROTEIRO para entender do que cada fala trata de verdade
 ("ele", "a cidade", "naquela noite" viram coisas concretas). Para CADA cena devolva:
@@ -101,7 +104,11 @@ Use a FICHA (quem é quem, lugares, época, estilo) e o ROTEIRO para entender do
 - "prompt_imagem": em INGLÊS, 40 a 80 palavras, para o gerador Z-Image Turbo: assunto principal primeiro, depois ação,
   cenário, época, roupas/materiais, luz, enquadramento e lente, e o estilo da ficha (vídeo de imagens REAIS =
   "photorealistic documentary photograph"; ilustração só se a ficha disser). Nada de texto, letreiro ou legenda na
-  imagem. Nunca o NOME de uma pessoa real (descreva: idade, roupa, época). Coerência com as cenas vizinhas.
+  imagem. Explicação, conceito ou processo (camadas de uma estrela, etapas, comparação de tamanhos, linha do tempo):
+  de preferência UMA cena realista do fenômeno como seria vista de verdade (ex.: "a huge glowing red supergiant star in
+  deep space, turbulent surface, Hubble-style astrophotography"); quando precisar mostrar etapas/comparação, pode ser
+  um esquema visual limpo SÓ com formas, SETAS e no máximo NÚMEROS grandes (1, 2, 3, 10×) — NUNCA palavras, nomes,
+  rótulos ou legendas (o gerador escreve tudo errado; o texto entra na edição). Fundo escuro, nunca branco. Nunca o NOME de uma pessoa real (descreva: idade, roupa, época). Coerência com as cenas vizinhas.
 - "ano": o ano em que a cena SE PASSA na história (não o de hoje), pela cronologia do roteiro; 0 se não é um momento
   datado (explicação genérica, conceito). Carros, roupas, objetos e tecnologia do prompt são DESSE ano.
 Mantenha o "n" de cada cena."""
@@ -268,6 +275,8 @@ def montar_json(cenas: List[Dict[str, Any]], info: Dict[int, Dict[str, Any]], es
                 f"{c['fala']}. Photorealistic documentary photograph, natural light, sharp focus, clean frame without text")
             if epoca and d.get("ano"):
                 prompt = f"{prompt.rstrip('. ')}. {look_da_epoca(d['ano'])}"
+            # 🖼 v84_196: o gerador escreve rótulos tortos em qualquer "diagrama" — sempre uma cena real, sem texto
+            prompt = f"{prompt.rstrip('. ')}. {SEM_TEXTO}"
             if estilo_extra:
                 prompt = f"{prompt.rstrip('. ')}. {estilo_extra.strip()}"
             segs.append({"start": c["start"], "end": c["end"], "provider": "runpod", "media_type": "image",

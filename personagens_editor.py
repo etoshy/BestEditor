@@ -36,9 +36,14 @@ PADRAO = {"ativo": False, "lados": {}, "altura": 0.72, "altura_vertical": 0.46, 
           "margem": 2.0,
           # 🎯 v84_186: nem toda fala — só os MELHORES momentos (frequencia 0.6 = ~60% dos momentos; 1 = todos)
           "frequencia": 0.6, "min_intervalo": 6.0, "ia": True,
+          # ↔ v84_192: as poses "_esq"/"_dir" saíram olhando pro lado contrário do nome → usa a outra
+          "inverter_olhar": False,
+          # 🎞 v84_193: personagem que se mexe (clipe do Flow, guardado pra reusar): "ia" = a IA marca as que mais
+          # ganham com movimento; "todas"; "nao". animar_max = no máximo N poses NOVAS pro Flow por vídeo
+          "animar": "ia", "animar_max": 6,
           # canal com UM mascote apresentador (sem tags no roteiro): ele ilustra frases da narração
           "narrador_personagem": ""}
-_CFG_USUARIO = ("lados", "altura", "altura_vertical", "entrada", "saida", "boca", "frequencia", "ia")
+_CFG_USUARIO = ("lados", "altura", "altura_vertical", "entrada", "saida", "boca", "frequencia", "ia", "inverter_olhar", "animar")
 _RE_TAG = re.compile(r"\[([^\[\]\n]{1,80})\]")
 _NARRADOR = {"narrador", "narrator", "erzahler", "erzaehler", "narradora", "voz", "off"}
 # emoção da tag → palavras que costumam estar no nome/descrição da pose
@@ -220,6 +225,8 @@ def config_do_canal(m: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         except (TypeError, ValueError):
             c[k] = PADRAO[k]
     c["ia"] = c.get("ia") is not False
+    c["inverter_olhar"] = c.get("inverter_olhar") is True
+    c["animar"] = c.get("animar") if c.get("animar") in ("ia", "todas", "nao") else ("nao" if c.get("animar") is False else "ia")
     c["narrador_personagem"] = _slug(c.get("narrador_personagem") or "")
     return c
 
@@ -341,11 +348,27 @@ def poses_prontas(p: Dict[str, Any], base: str) -> List[Dict[str, Any]]:
     return out
 
 
-def escolher_pose(poses: List[Dict[str, Any]], emocao: str, lado_tela: str, evitar: str = "") -> Optional[Dict[str, Any]]:
+def olhar_para(lado_tela: str, inverter: bool = False) -> str:
+    """Pra onde a pose tem que olhar: pro CENTRO (na direita da tela → _esq). inverter = as poses do canal saíram com o
+    nome trocado (a "_esq" olha pra direita)."""
+    o = "esq" if lado_tela == "direita" else "dir"
+    return ({"esq": "dir", "dir": "esq"}[o]) if inverter else o
+
+
+def par_da_pose(poses: List[Dict[str, Any]], pose: Optional[Dict[str, Any]], olhar: str) -> Optional[Dict[str, Any]]:
+    """A mesma pose olhando pro lado certo (mira_curiosa_esq → mira_curiosa_dir), se existir."""
+    if not pose or not pose.get("lado") or pose["lado"] == olhar:
+        return pose
+    outro = re.sub(r"_(esq|dir)(?=(\.|_|$))", "_" + olhar, pose["arquivo"], count=1)
+    return next((o for o in poses if o["arquivo"] == outro), pose)
+
+
+def escolher_pose(poses: List[Dict[str, Any]], emocao: str, lado_tela: str, evitar: str = "",
+                  inverter: bool = False) -> Optional[Dict[str, Any]]:
     """A pose da fala: a da emoção; senão uma neutra/reação; olhando pro centro (na direita da tela → pose _esq)."""
     if not poses:
         return None
-    olhar = "esq" if lado_tela == "direita" else "dir"
+    olhar = olhar_para(lado_tela, inverter)
     chaves = EMOCOES.get(_slug(emocao), [_slug(emocao)[:6]] if emocao else [])
 
     def nota(o: Dict[str, Any]) -> float:
@@ -476,8 +499,8 @@ def _lados(pers: List[Dict[str, Any]], cfg: Dict[str, Any]) -> Dict[str, str]:
 
 def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Dict[str, Any], quantos: int,
                     idioma: str = "", job_id: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
-    """🤖 A IA escolhe os MELHORES momentos (não todos), a pose de cada um e a animação de entrada/saída.
-    → [{"id", "pose", "entrada", "saida"}] ou None (IA desligada/erro: fica a regra)."""
+    """🤖 A IA escolhe os MELHORES momentos (não todos), a pose de cada um, a posição (lado e tamanho) e a animação.
+    → [{"id", "pose", "entrada", "saida", "lado", "tamanho"}] ou None (IA desligada/erro: fica a regra)."""
     try:
         import ia_servico
         from ia_midia import _S, _I, _lista, _obj
@@ -493,7 +516,8 @@ def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg
         cat.append(f"{p['nome']} [{p['slug']}] — fica na {lados.get(p['slug'])} da tela; poses: "
                    + "; ".join(f"{o['arquivo']}" + (f" ({o['descricao']})" if o.get("descricao") else "") for o in p["poses"][:80]))
     linhas = [f"[{c['id']}] {c['start']:.1f}-{c['end']:.1f}s {c['slug']} ({'fala' if c['tipo'] == 'fala' else 'narração'}"
-              + (f", {c['emocao']}" if c.get("emocao") else "") + f"): {c['texto'][:160]}" for c in cands[:400]]
+              + (f", {c['emocao']}" if c.get("emocao") else "") + f"): {c['texto'][:160]}"
+              + (f" || image on screen: {c['cena'][:140]}" if c.get("cena") else "") for c in cands[:400]]
     system = (
         "You direct the on-screen appearances of a YouTube channel's characters. Each character is a transparent PNG that "
         "slides/pops over the video at the side of the screen. You get the candidate MOMENTS (a character speaking, or — for "
@@ -504,10 +528,16 @@ def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg
         "For each chosen moment pick the pose (EXACT file name from that character's catalog) that best acts what is said "
         "(holding an object only when the line talks about it), and the entrance/exit animation: "
         + ", ".join(ENTRADAS) + " (deslizar = slides in from its side, subir = rises from the bottom, aparecer = fades in, "
-        "nenhuma = cut). Vary the animations a little; quick lines → aparecer/nenhuma.")
+        "nenhuma = cut). Vary the animations a little; quick lines → aparecer/nenhuma.\n"
+        "Also choose the POSITION: \"lado\" = esquerda or direita (keep each character on its usual side unless the image "
+        "on screen has its main subject on that side — then use the emptier side; two characters close in time stay on "
+        "opposite sides) and \"tamanho\" = pequeno, medio or grande (grande for big emotional beats, pequeno for quick "
+        "remarks or when the image is busy; most are medio).\n"
+        "\"animar\": true for the appearances that most deserve real MOTION (an animated clip instead of a still image): "
+        "longer lines, strong emotion, a gesture, a reveal — about a third of them; false for the rest.")
     conteudo = ("CHARACTERS AND POSES:\n" + "\n".join(cat) + "\n\nMOMENTS:\n" + "\n".join(linhas)
                 + (f"\n\nLanguage of the video: {idioma}" if idioma else ""))
-    schema = _obj({"aparicoes": _lista(_obj({"id": _I, "pose": _S, "entrada": _S, "saida": _S}))})
+    schema = _obj({"aparicoes": _lista(_obj({"id": _I, "pose": _S, "entrada": _S, "saida": _S, "lado": _S, "tamanho": _S, "animar": {"type": "boolean"}}))})
     try:
         r = ia_servico.chamar("personagens", system, conteudo, schema=schema, max_tokens=4000, job=job_id, timeout=120)
     except Exception:  # noqa: BLE001
@@ -519,14 +549,31 @@ def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg
     return out or None
 
 
+TAMANHOS = {"pequeno": 0.8, "medio": 1.0, "grande": 1.18}
+
+
+def _tamanho(altura: float, vertical: bool, fator: float = 1.0) -> float:
+    """A largura (% da tela) da PNG 2:3 pra personagem ocupar `altura` da altura da tela (ela ocupa ~95% da PNG)."""
+    W, H = (1080, 1920) if vertical else (1920, 1080)
+    return round(min(100.0, (min(0.98, altura * fator) / 0.95) * H / 1.5 / W * 100), 2)
+
+
+def posicao(lado: str, size: float, vertical: bool, margem: float) -> Tuple[float, float]:
+    """📐 v84_191: o CENTRO da PNG (x %, y %) — encostada embaixo, a `margem` % da borda do lado dela.
+    (O monitor do Estúdio centraliza o overlay em x/y; o render usa "ancora": "centro" — os dois batem.)"""
+    W, H = (1080, 1920) if vertical else (1920, 1080)
+    alt = size / 100 * W * 1.5 / H * 100  # altura da PNG em % da tela
+    x = margem + size / 2
+    x = x if lado == "esquerda" else 100 - x
+    return round(x, 2), round(100 - alt / 2, 2)
+
+
 def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Dict[str, Any], duracao: float,
            vertical: bool = False, ia: Optional[Dict[int, Dict[str, Any]]] = None) -> Tuple[List[Dict[str, Any]], List[str]]:
     """Os momentos escolhidos → as aparições (pose, lado, tamanho, animação, janelas da boca)."""
     por = {p["slug"]: p for p in pers}
     lados = _lados(pers, cfg)
     altura = float(cfg["altura_vertical"] if vertical else cfg["altura"])
-    W, H = (1080, 1920) if vertical else (1920, 1080)
-    size = round(min(100.0, (altura / 0.95) * H / 1.5 / W * 100), 2)  # o PNG é 2:3, a personagem ocupa 95% da altura
     margem = float(cfg["margem"])
     out: List[Dict[str, Any]] = []
     avisos: List[str] = []
@@ -537,10 +584,15 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
         if not p or not p.get("poses"):
             sem_pose.add(b["slug"])
             continue
-        lado = lados.get(b["slug"], "esquerda")
         dica = (ia or {}).get(b.get("id")) or {}
+        lado = dica.get("lado") if dica.get("lado") in ("esquerda", "direita") else lados.get(b["slug"], "esquerda")
+        tam = dica.get("tamanho") if dica.get("tamanho") in TAMANHOS else "medio"
+        size = _tamanho(altura, vertical, TAMANHOS[tam])
+        xc, yc = posicao(lado, size, vertical, margem)
         pose = next((o for o in p["poses"] if o["arquivo"] == dica.get("pose")), None) \
-            or escolher_pose(p["poses"], b.get("emocao") or "", lado, ultima_pose.get(b["slug"], ""))
+            or escolher_pose(p["poses"], b.get("emocao") or "", lado, ultima_pose.get(b["slug"], ""),
+                             bool(cfg.get("inverter_olhar")))
+        pose = par_da_pose(p["poses"], pose, olhar_para(lado, bool(cfg.get("inverter_olhar"))))  # a IA pode errar o lado
         ultima_pose[b["slug"]] = pose["arquivo"]
         ini = max(0.0, b["start"] - float(cfg["antes"]))
         fim = min(duracao or b["end"] + 1, b["end"] + float(cfg["depois"]))
@@ -549,10 +601,12 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
                     "emocao": b.get("emocao") or "", "pose": pose["arquivo"], "caminho": pose["caminho"],
                     "boca": pose["boca"] if cfg.get("boca") and fala_dela else None,
                     "boca_janelas": [[round(a, 3), round(c, 3)] for a, c in _janelas(b["palavras"])] if fala_dela else [],
-                    "texto": b["texto"][:200], "size_percent": size,
+                    "texto": b["texto"][:200], "size_percent": size, "altura_base": altura,
                     "entrada": dica.get("entrada") if dica.get("entrada") in ENTRADAS else cfg["entrada"],
                     "saida": dica.get("saida") if dica.get("saida") in ENTRADAS else cfg["saida"],
-                    "x_percent": margem if lado == "esquerda" else 100 - margem, "y_percent": 100.0})
+                    "tamanho": tam, "vertical": vertical, "x_percent": xc, "y_percent": yc,
+                    "projeto_id": (p.get("projeto") or {}).get("id"), "descricao_pose": pose.get("descricao") or "",
+                    "animar": bool(dica.get("animar")) if cfg.get("animar") == "ia" else cfg.get("animar") == "todas"})
     for s_ in sorted(sem_pose):
         nome = (por.get(s_) or {}).get("nome") or s_
         avisos.append(f"{nome} tem momento pra aparecer mas não tem pose pronta — conecte o projeto dela na aba 🧍 Personagens e gere/aprove as poses")
@@ -565,8 +619,103 @@ def aparicoes(falas: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Dict
     return montar(escolher_momentos(candidatos(falas, pers, cfg), cfg), pers, cfg, duracao, vertical)
 
 
+def pedir_animacoes(job: Dict[str, Any], base: str, cfg: Dict[str, Any], job_dir: str, enviar_flow: bool = True) -> Tuple[int, str]:
+    """🎞 As aparições marcadas pra animar: pose que já tem clipe → entra; senão vai pro Flow (no máximo animar_max
+    poses NOVAS por vídeo — o resto fica parado até ter o clipe). → (quantas poses foram pro Flow, aviso)."""
+    if cfg.get("animar") == "nao":
+        return 0, ""
+    try:
+        import personagens_animar as PA
+    except Exception:  # noqa: BLE001
+        return 0, ""
+    pedidas, erro = set(), ""
+    limite = max(0, int(cfg.get("animar_max") or 0)) if enviar_flow else 0  # 🛑 automático: nunca abre o Flow sozinho
+    sugeridas = sum(1 for ov in job.get("overlays") or [] if ov.get("origem") == "personagem" and ov.get("anim_pedida"))
+    for ov in job.get("overlays") or []:
+        if ov.get("origem") != "personagem" or not ov.get("anim_pedida") or not ov.get("projeto_id"):
+            continue
+        png = ov.get("pose_original") or (ov.get("source") or {}).get("value")
+        tipo = ov.get("anim_tipo") or "fala"
+        try:
+            ja = PA.item(ov["projeto_id"], base, png, tipo)
+            if ja and ja.get("estado") in ("pronto",) + PA.ESPERA:
+                continue
+            k = PA.chave(png, tipo)
+            if k in pedidas or len(pedidas) >= limite:
+                continue
+            PA.pedir(base, ov["projeto_id"], {"caminho": png, "arquivo": ov.get("pose"), "descricao": ov.get("descricao_pose")},
+                     tipo, ov.get("nome_personagem") or "", ov.get("fala") or "")
+            pedidas.add(k)
+        except Exception as exc:  # noqa: BLE001
+            erro = str(exc)[:200]
+    try:
+        PA.aplicar_prontas(job, base, job_dir)
+    except Exception:  # noqa: BLE001
+        pass
+    aviso = (f"🎞 {len(pedidas)} pose(s) foram pro Flow pra virar animação (o clipe entra sozinho quando chegar e fica "
+             "guardado pra reusar)" if pedidas else
+             f"🎞 a IA sugeriu animar {sugeridas} aparição(ões) — clique em 🎞 Animar as sugeridas (o Flow só abre quando você pede)"
+             if sugeridas and not enviar_flow else "") + (f" · ⚠ animação: {erro}" if erro else "")
+    return len(pedidas), aviso
+
+
+def animar_uma(job: Dict[str, Any], oid: str, base: str, job_dir: str, dados: Dict[str, Any]) -> Dict[str, Any]:
+    """🎞 Você pediu: anima ESTA aparição (tipo fala/parada, só os primeiros N s ida e volta, repetir ou uma vez)."""
+    import personagens_animar as PA
+    ov = next((x for x in job.get("overlays") or [] if x.get("id") == oid and x.get("origem") == "personagem"), None)
+    if not ov:
+        raise PersEdErro("Aparição não encontrada.")
+    if not ov.get("projeto_id"):  # aparição de antes desta versão: acha o projeto pela personagem
+        canal = canal_do_job(job, base)
+        p = next((x for x in personagens_do_canal(base, canal) if x["slug"] == ov.get("personagem")), None) if canal else None
+        ov["projeto_id"] = ((p or {}).get("projeto") or {}).get("id")
+        if not ov["projeto_id"]:
+            raise PersEdErro("Essa personagem não tem projeto conectado (aba 🧍 Personagens).")
+    if dados.get("tipo") in PA.TIPOS:
+        ov["anim_tipo"] = dados["tipo"]
+    if dados.get("modo") in PA.MODOS:
+        ov["anim_modo"] = dados["modo"]
+    if "segundos" in dados:
+        try:
+            ov["anim_segundos"] = max(0.0, min(8.0, float(dados.get("segundos") or 0)))
+        except (TypeError, ValueError):
+            pass
+        ov.pop("anim_video", None)  # corta de novo com o novo tamanho
+    ov["anim_pedida"] = True
+    ov.pop("anim_desligada", None)
+    png = ov.get("pose_original") or (ov.get("source") or {}).get("value")
+    if not png or not os.path.isfile(png):
+        png = (ov.get("source") or {}).get("value")
+    try:
+        it = PA.pedir(base, ov["projeto_id"], {"caminho": png, "arquivo": ov.get("pose"), "descricao": ov.get("descricao_pose")},
+                      ov.get("anim_tipo") or "fala", ov.get("nome_personagem") or "", ov.get("fala") or "",
+                      str(dados.get("extra") or ""), bool(dados.get("refazer")))
+    except PA.AnimErro as exc:
+        raise PersEdErro(str(exc))
+    ov["anim_estado"], ov["anim_msg"] = it.get("estado"), it.get("erro") or it.get("msg")
+    ov["manual"] = True
+    PA.aplicar_prontas(job, base, job_dir)
+    return ov
+
+
+def _cenas_nos_candidatos(job: Dict[str, Any], cands: List[Dict[str, Any]]) -> None:
+    """A descrição da imagem que está na tela no meio de cada momento (pra 🤖 IA escolher o lado mais vazio)."""
+    segs = job.get("pending_segments") or job.get("video_segments") or []
+    if not isinstance(segs, list):
+        return
+    for c in cands:
+        meio = (float(c["start"]) + float(c["end"])) / 2
+        sg = next((x for x in segs if isinstance(x, dict)
+                   and float(x.get("start") or 0) <= meio < float(x.get("end") or 0)), None)
+        if sg:
+            t = str(sg.get("visual") or sg.get("query") or sg.get("prompt") or "").strip()
+            if t:
+                c["cena"] = t
+
+
 def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[str, Any]],
-            canal: str = "", texto: str = "", cfg_extra: Optional[Dict[str, Any]] = None, job_id: Optional[str] = None) -> Dict[str, Any]:
+            canal: str = "", texto: str = "", cfg_extra: Optional[Dict[str, Any]] = None, job_id: Optional[str] = None,
+            enviar_flow: bool = True) -> Dict[str, Any]:
     """🧍 Põe (ou refaz) as aparições das personagens nos MELHORES momentos: tira as automáticas de antes (as que você
     mexeu à mão ficam) e cria as novas como overlays. Com a 🤖 IA (recurso "personagens"), ela escolhe os momentos, a
     pose e a animação; sem, a regra. → {"n", "falas", "avisos", "de_onde", "por"}."""
@@ -619,6 +768,7 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
     if not falas:
         raise PersEdErro("Não consegui casar o roteiro com as palavras do áudio (o projeto tem legenda/transcrição?).")
     cands = candidatos(falas, pers, cfg)
+    _cenas_nos_candidatos(job, cands)
     if not cands:
         raise PersEdErro("Não achei momento pra personagem: as tags do roteiro precisam ser os nomes delas ("
                          + ", ".join(f"[{p['slug']}]" for p in pers) + ").")
@@ -646,9 +796,13 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
             continue  # você já ajustou uma aparição dela nesse pedaço
         criadas.append(overlay_de(a, pasta, cfg, uuid.uuid4().hex[:8]))
     job["overlays"] = ficam + criadas
+    n_anim, aviso_anim = pedir_animacoes(job, base, cfg, job_dir, enviar_flow)
+    if aviso_anim:
+        avisos.append(aviso_anim)
     pc.update(ativo=True, canal=canal, n=len(criadas), avisos=avisos, de_onde=de_onde, por=por, candidatos=len(cands),
               falas=[{k: f[k] for k in ("slug", "emocao", "start", "end")} | {"texto": f["texto"][:120]} for f in falas][:800])
-    return {"n": len(criadas), "falas": len(cands), "avisos": avisos, "de_onde": de_onde, "canal": canal, "por": por}
+    return {"n": len(criadas), "falas": len(cands), "avisos": avisos, "de_onde": de_onde, "canal": canal, "por": por,
+            "animando": n_anim}
 
 
 def _copiar(origem: str, pasta: str) -> str:
@@ -664,10 +818,15 @@ def overlay_de(a: Dict[str, Any], pasta: str, cfg: Dict[str, Any], oid: str) -> 
             "lado": a["lado"], "emocao": a["emocao"], "fala": a["texto"],
             "source": {"source": "local_file", "value": png, "kind": "image"},
             "start": a["start"], "end": a["end"], "position": "bottom-left" if a["lado"] == "esquerda" else "bottom-right",
-            "size_percent": a["size_percent"], "x_percent": a["x_percent"], "y_percent": a["y_percent"],
+            "size_percent": a["size_percent"], "x_percent": a["x_percent"], "y_percent": a["y_percent"], "ancora": "centro",
+            "tamanho": a.get("tamanho") or "medio", "vertical": bool(a.get("vertical")), "altura_base": a.get("altura_base"),
             "anim_in": a.get("entrada") or cfg["entrada"], "anim_out": a.get("saida") or cfg["saida"],
             "anim_dur": float(cfg["duracao_anim"]),
-            "boca_path": _copiar(a["boca"], pasta) if a.get("boca") else None, "boca_janelas": a["boca_janelas"]}
+            "boca_path": _copiar(a["boca"], pasta) if a.get("boca") else None, "boca_janelas": a["boca_janelas"],
+            # 🎞 v84_193: a animação (personagens_animar.py)
+            "projeto_id": a.get("projeto_id"), "pose_original": a.get("caminho"), "descricao_pose": a.get("descricao_pose") or "",
+            "anim_tipo": "fala" if a["boca_janelas"] else "parada", "anim_modo": "repetir", "anim_segundos": 0,
+            "anim_pedida": bool(a.get("animar"))}
 
 
 def remover(job: Dict[str, Any]) -> int:
@@ -695,17 +854,58 @@ def trocar_pose(job: Dict[str, Any], oid: str, arquivo: str, base: str, job_dir:
     return ov
 
 
+def _inverter_do_job(job: Dict[str, Any], base: str) -> bool:
+    pc = job.get("personagens_canal") or {}
+    if "inverter_olhar" in (pc.get("config") or {}):
+        return bool(pc["config"]["inverter_olhar"])
+    canal = canal_do_job(job, base)
+    try:
+        import marca_visual as mv
+        return bool(config_do_canal(mv.carregar(base, canal)).get("inverter_olhar")) if canal else False
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def virar_pose(job: Dict[str, Any], oid: str, base: str, job_dir: str) -> None:
+    """Depois de trocar o lado: a mesma pose olhando pro centro (se existir a _esq/_dir dela)."""
+    ov = next((x for x in job.get("overlays") or [] if x.get("id") == oid and x.get("origem") == "personagem"), None)
+    canal = canal_do_job(job, base) if ov else ""
+    p = next((x for x in personagens_do_canal(base, canal) if x["slug"] == ov["personagem"]), None) if canal else None
+    poses = (p or {}).get("poses") or []
+    atual = next((o for o in poses if o["arquivo"] == ov.get("pose")), None) if ov else None
+    certa = par_da_pose(poses, atual, olhar_para(ov.get("lado") or "esquerda", _inverter_do_job(job, base))) if atual else None
+    if certa and certa is not atual:
+        manual = ov.get("manual")
+        trocar_pose(job, oid, certa["arquivo"], base, job_dir)
+        ov["manual"] = manual or True
+
+
 def mudar(job: Dict[str, Any], oid: str, dados: Dict[str, Any]) -> Dict[str, Any]:
     ov = next((x for x in job.get("overlays") or [] if x.get("id") == oid and x.get("origem") == "personagem"), None)
     if not ov:
         raise PersEdErro("Aparição não encontrada.")
-    if dados.get("lado") in ("esquerda", "direita"):
-        ov["lado"] = dados["lado"]
-        m = float(PADRAO["margem"])
-        ov["x_percent"] = m if dados["lado"] == "esquerda" else 100 - m
+    if dados.get("lado") in ("esquerda", "direita") or dados.get("tamanho") in TAMANHOS:
+        if dados.get("lado") in ("esquerda", "direita"):
+            ov["lado"] = dados["lado"]
+        vert = bool(ov.get("vertical"))
+        if dados.get("tamanho") in TAMANHOS:
+            ov["tamanho"] = dados["tamanho"]
+            base_alt = float(ov.get("altura_base") or (PADRAO["altura_vertical"] if vert else PADRAO["altura"]))
+            ov["size_percent"] = _tamanho(base_alt, vert, TAMANHOS[dados["tamanho"]])
+        ov["x_percent"], ov["y_percent"] = posicao(ov.get("lado") or "esquerda", float(ov.get("size_percent") or 20), vert,
+                                                   float(PADRAO["margem"]))
+        ov["ancora"] = "centro"
+        ov["position"] = "bottom-left" if ov["lado"] == "esquerda" else "bottom-right"
     for k in ("anim_in", "anim_out"):
         if dados.get(k) in ENTRADAS:
             ov[k] = dados[k]
+    if "anim_usar" in dados:  # 🎞 usar o clipe ou a imagem parada
+        if dados["anim_usar"]:
+            ov.pop("anim_desligada", None)
+        else:
+            ov["anim_desligada"] = True
+    if dados.get("anim_modo") in ("repetir", "uma_vez"):
+        ov["anim_modo"] = dados["anim_modo"]
     if "boca" in dados and not dados["boca"]:
         ov["boca_desligada"] = True
     elif dados.get("boca"):
@@ -714,13 +914,24 @@ def mudar(job: Dict[str, Any], oid: str, dados: Dict[str, Any]) -> Dict[str, Any
     return ov
 
 
+def url_anim(job_id: str, ov: Dict[str, Any]) -> Optional[str]:
+    """O clipe animado da aparição pro monitor do Estúdio (WebM com transparência), se estiver em uso."""
+    if ov.get("origem") != "personagem" or ov.get("anim_desligada") or not ov.get("anim_video") \
+            or not os.path.isfile(str(ov.get("anim_video"))):
+        return None
+    return f"/job/{job_id}/personagens/{ov['id']}/animacao.webm?v={int(os.path.getmtime(ov['anim_video']))}"
+
+
 def para_render(ov: Dict[str, Any]) -> Dict[str, Any]:
     """Os campos extras que o video_assembler.apply_overlays usa pra animar a personagem."""
-    boca = ov.get("boca_path") if not ov.get("boca_desligada") and ov.get("boca_path") and os.path.isfile(ov["boca_path"]) else None
+    anim = ov.get("anim_video") if not ov.get("anim_desligada") and ov.get("anim_video") and os.path.isfile(ov["anim_video"]) else None
+    boca = None if anim else ov.get("boca_path") if not ov.get("boca_desligada") and ov.get("boca_path") and os.path.isfile(ov["boca_path"]) else None
     return {"personagem": ov.get("personagem"), "x_percent": ov.get("x_percent", 3), "y_percent": ov.get("y_percent", 100),
+            "ancora": ov.get("ancora") or "",
             "anim_in": ov.get("anim_in") or "nenhuma", "anim_out": ov.get("anim_out") or "nenhuma",
             "anim_dur": float(ov.get("anim_dur") or 0.35), "lado": ov.get("lado") or "esquerda",
-            "boca_path": boca, "boca_janelas": ov.get("boca_janelas") or []}
+            "boca_path": boca, "boca_janelas": ov.get("boca_janelas") or [],
+            "anim_video": anim, "anim_modo": ov.get("anim_modo") or "repetir"}
 
 
 def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
@@ -748,7 +959,10 @@ def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
         except Exception:  # noqa: BLE001
             pers = []
     aps = [{k: ov.get(k) for k in ("id", "personagem", "nome_personagem", "pose", "lado", "start", "end", "emocao", "fala",
-                                    "anim_in", "anim_out", "manual")}
+                                    "anim_in", "anim_out", "manual", "tamanho",
+                                    "anim_tipo", "anim_modo", "anim_segundos", "anim_estado", "anim_msg", "anim_pedida")}
+           | {"anim_pronta": bool(ov.get("anim_video")) and os.path.isfile(str(ov.get("anim_video"))),
+              "anim_usando": bool(ov.get("anim_video")) and not ov.get("anim_desligada")}
            | {"boca": bool(ov.get("boca_path")) and not ov.get("boca_desligada")}
            for ov in job.get("overlays") or [] if ov.get("origem") == "personagem"]
     try:
@@ -776,7 +990,7 @@ def auto(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[str, 
         import marca_visual as mv
         if not config_do_canal(mv.carregar(base, canal)).get("ativo") or (job.get("personagens_canal") or {}).get("auto") is False:
             return None
-        r = aplicar(job, job_dir, base, palavras)
+        r = aplicar(job, job_dir, base, palavras, enviar_flow=False)  # 🛑 v84_197: o automático não abre o Flow
         return r
     except Exception as exc:  # noqa: BLE001
         job.setdefault("personagens_canal", {})["avisos"] = [f"🧍 não deu pra pôr as personagens sozinho: {str(exc)[:200]}"]
@@ -801,14 +1015,58 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
             return jsonify({"erro": str(exc)}), 400
         job = obter(job_id) if job_id else None
         if job is not None and isinstance(r, dict):  # os overlays no formato do Estúdio (a timeline/monitor atualizam)
-            r["overlays"] = [dict(ov, _url=(f"/job/{job_id}/overlay/{ov['id']}" if (ov.get("source") or {}).get("source") == "local_file"
+            r["overlays"] = [dict(ov, _anim_url=url_anim(job_id, ov), _url=(f"/job/{job_id}/overlay/{ov['id']}" if (ov.get("source") or {}).get("source") == "local_file"
                                             else (ov.get("source") or {}).get("value") if (ov.get("source") or {}).get("source") == "url" else None))
                              for ov in job.get("overlays") or []]
         return jsonify(r)
 
     @app.route("/job/<job_id>/personagens/estado", methods=["GET"])
     def personagens_editor_estado(job_id: str):
-        return _resp(lambda: estado(_job(job_id), base))
+        def _f():
+            job = _job(job_id)
+            if any(ov.get("origem") == "personagem" and ov.get("anim_pedida") and not ov.get("anim_video")
+                   for ov in job.get("overlays") or []):
+                try:  # 🎞 clipe que chegou do Flow entra sozinho
+                    import personagens_animar as PA
+                    if PA.aplicar_prontas(job, base, job_dir(job_id)):
+                        salvar(job_id)
+                except Exception:  # noqa: BLE001
+                    pass
+            return estado(job, base)
+        return _resp(_f, job_id)
+
+    @app.route("/job/<job_id>/personagens/animar-sugeridas", methods=["POST"])
+    def personagens_editor_animar_sugeridas(job_id: str):
+        def _f():
+            job = _job(job_id)
+            import marca_visual as mv
+            canal = canal_do_job(job, base)
+            cfg = config_do_canal(mv.carregar(base, canal)) if canal else dict(PADRAO)
+            cfg.update({k: v for k, v in ((job.get("personagens_canal") or {}).get("config") or {}).items() if k in PADRAO})
+            if cfg.get("animar") == "nao":
+                cfg["animar"] = "ia"
+            n, aviso = pedir_animacoes(job, base, cfg, job_dir(job_id), True)
+            salvar(job_id)
+            return dict(estado(job, base), enviadas=n, aviso=aviso)
+        return _resp(_f, job_id)
+
+    @app.route("/job/<job_id>/personagens/<oid>/animar", methods=["POST"])
+    def personagens_editor_animar(job_id: str, oid: str):
+        def _f():
+            job = _job(job_id)
+            animar_uma(job, oid, base, job_dir(job_id), request.get_json(silent=True) or {})
+            salvar(job_id)
+            return estado(job, base)
+        return _resp(_f, job_id)
+
+    @app.route("/job/<job_id>/personagens/<oid>/animacao.webm", methods=["GET"])
+    def personagens_editor_animacao(job_id: str, oid: str):
+        from flask import send_file, abort
+        job = obter(job_id)
+        ov = next((x for x in (job or {}).get("overlays") or [] if x.get("id") == oid), None)
+        if not ov or not ov.get("anim_video") or not os.path.isfile(ov["anim_video"]):
+            abort(404)
+        return send_file(ov["anim_video"], mimetype="video/webm", conditional=True)
 
     @app.route("/job/<job_id>/personagens/aplicar", methods=["POST"])
     def personagens_editor_aplicar(job_id: str):
@@ -820,7 +1078,8 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
                 pc["texto"] = str(c.get("texto") or "")[:200000]
             if isinstance(c.get("config"), dict):
                 pc["config"] = {**(pc.get("config") or {}), **{k: v for k, v in c["config"].items() if k in PADRAO}}
-            r = aplicar(job, job_dir(job_id), base, palavras_de(job), canal=str(c.get("canal") or ""), job_id=job_id)
+            r = aplicar(job, job_dir(job_id), base, palavras_de(job), canal=str(c.get("canal") or ""), job_id=job_id,
+                        enviar_flow=False)  # 🎞 o Flow só abre no botão 🎞 Animar
             salvar(job_id)
             return dict(r, estado=estado(job, base))
         return _resp(_f, job_id)
@@ -851,6 +1110,11 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
             if c.get("pose"):
                 trocar_pose(job, oid, str(c["pose"]), base, job_dir(job_id))
             mudar(job, oid, c)
+            if c.get("lado") in ("esquerda", "direita") and not c.get("pose"):
+                try:
+                    virar_pose(job, oid, base, job_dir(job_id))  # mudou de lado: a pose olhando pro centro
+                except Exception:  # noqa: BLE001 — canal/projeto sumiu: fica a pose que estava
+                    pass
             salvar(job_id)
             return estado(job, base)
         return _resp(_f, job_id)

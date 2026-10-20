@@ -259,6 +259,16 @@ def reservado() -> bool:
     return bool(_DONOS)
 
 
+def _chave_ref(caminho: str) -> str:
+    """A mesma imagem (mesmo conteúdo) = a mesma chave, mesmo com outro nome de arquivo."""
+    import hashlib
+    try:
+        with open(caminho, "rb") as f:
+            return hashlib.sha1(f.read()).hexdigest()
+    except OSError:
+        return os.path.abspath(caminho)
+
+
 # ------------------------------------------------------------------ baixar pra galeria
 def baixar_para_galeria(context, midias: List[Dict[str, str]], job: Dict[str, Any], conta: str,
                         projeto: str = "") -> List[Dict[str, Any]]:
@@ -357,6 +367,9 @@ class Lote:
                 if tipo == "video" and it.get("inicio_arquivo") and os.path.isfile(str(it["inicio_arquivo"])):
                     j["inicio_arquivo"] = os.path.abspath(str(it["inicio_arquivo"]))
                     j["origem"] = str(it.get("origem") or "animar")[:40]
+                    # 🎞 v84_193: frame de Fim também (a personagem animada começa e termina na mesma pose)
+                    if it.get("fim_arquivo") and os.path.isfile(str(it["fim_arquivo"])):
+                        j["fim_arquivo"] = os.path.abspath(str(it["fim_arquivo"]))
                 # 🧍 v84_184: foto com UMA imagem de referência ("Personagens" do editor: a ficha + a mestre numa colagem)
                 if tipo == "imagem" and it.get("referencia_arquivo") and os.path.isfile(str(it["referencia_arquivo"])):
                     j["referencia_arquivo"] = os.path.abspath(str(it["referencia_arquivo"]))
@@ -594,6 +607,7 @@ class Lote:
             st[conta] = f"{nome}: {estado}" + (f" — {detalhe[:120]}" if detalhe else "")
 
         job = None
+        refs_proj: Dict[str, str] = {}  # 🧍 v84_189: imagem de referência → a mídia dela no projeto aberto (sobe UMA vez, depois reusa)
         falhas_seguidas = 0  # ⏭ v84_110: a conta que falha seguido (ou pede login) é pulada — o pedido vai pra outra
 
         def _pular(motivo: str) -> None:
@@ -619,6 +633,7 @@ class Lote:
                 try:
                     if page is None or page.is_closed():
                         st[conta] = "abrindo um projeto no Flow…"
+                        refs_proj.clear()  # projeto novo: as mídias do outro não existem aqui
                         try:
                             page = fd.preparar_projeto(ctx, gf.FLOW_URL, headless=not visivel, agente=gf.agente_da_cfg(cfg),
                                                        on_passo=on_passo)
@@ -644,10 +659,15 @@ class Lote:
                         if job.get("inicio_arquivo") and os.path.isfile(job["inicio_arquivo"]):  # 🎞 animar uma imagem
                             trab["inicio"] = {"arquivo": job["inicio_arquivo"]}
                             trab["tipo_video"] = "Frames"
+                            if job.get("fim_arquivo") and os.path.isfile(job["fim_arquivo"]):
+                                trab["fim"] = {"arquivo": job["fim_arquivo"]}
                     elif job.get("referencia_arquivo") and os.path.isfile(job["referencia_arquivo"]):  # 🧍 foto com referência
-                        trab["referencia"] = {"arquivo": job["referencia_arquivo"]}
+                        trab["referencia"] = {"arquivo": job["referencia_arquivo"],
+                                              "media_id": refs_proj.get(_chave_ref(job["referencia_arquivo"]), "")}
                     self.log(f"✨ “{conta}” enviou {'🎬 vídeo' if job['tipo'] == 'video' else '🖼 foto'}: {job['prompt'][:90]}")
                     midias = fd.gerar_um(page, trab, on_passo, max(timeout, 600) if job["tipo"] == "video" else timeout)
+                    if (trab.get("_ref_midia") or {}).get("media_id") and job.get("referencia_arquivo"):
+                        refs_proj[_chave_ref(job["referencia_arquivo"])] = trab["_ref_midia"]["media_id"]
                     st[conta] = "baixando…"
                     salvos = baixar_para_galeria(ctx, midias, job, conta, getattr(page, "url", ""))
                     with self.trava:

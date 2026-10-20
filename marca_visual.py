@@ -698,6 +698,11 @@ def _desc_ref(m: Dict[str, Any], papel: str) -> str:
     return _DESC_REF.get(papel, "a photo of the real subject of this scene")
 
 
+SEM_TEXTO = ("No words and no letters in the image: no captions, no titles, no questions, no labels, no watermark, no logo "
+             "(clean arrows, shapes and a few large digits are fine when explaining; real printed text only on an object of the "
+             "scene, like a book page, a poster or a sign).")
+
+
 def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[Tuple[str, str]]] = None) -> str:
     """O prompt final (passo 3 do pipeline): template + style_lock + prompt_lock do mascote + cores + "Avoid:"."""
     g = m["guia"]
@@ -726,18 +731,20 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
         pers_txt, pers_evitar = texto_personagens(m, cena.get("personagens"))
         if pers_txt:  # 🎭 v84_173: as personagens do canal nesta cena (com a ficha de cada uma como referência)
             mascote_txt = pers_txt if not mascote else f"{mascote_txt} Also {pers_txt}"
-        elif not mascote and perfil_de(m):
-            mascote_txt = "no characters in this frame"
-        tpl = gs.get("base_prompt_template_en") or gs.get("scene_prompt_template_en") or ""
-        p = _preencher(tpl, {"SUBJECT": cena.get("assunto_en") or cena.get("narracao") or "",
-                             "VISUAL QUESTION": cena.get("pergunta_visual_en") or "what is this and why does it matter?",
-                             "COMPOSITION": cena.get("composicao_en") or (gs.get("default_composition_en") or "one clear focal point, readable silhouettes, quiet negative space for titles added later"),
-                             "MASCOT": mascote_txt, "BRAND STYLE": estilo})
-        if "[" in p:  # template diferente do esperado: completa por extenso
-            p = re.sub(r"\[[^\]]*\]", "", p)
+
+        # 🖼 v84_191: o prompt em PROSA, sem rótulos ("VISUAL QUESTION:", "BRAND STYLE:", "MASCOT:") — o gerador desenhava
+        # esses rótulos e a pergunta como texto na imagem, e "no mascot" fazia aparecer um mascote
+        assunto = (cena.get("assunto_en") or cena.get("narracao") or "").strip().rstrip(".")
+        compo = (cena.get("composicao_en") or gs.get("default_composition_en") or "one clear focal point, quiet negative space").strip().rstrip(".")
+        partes_p = [f"A single 16:9 still image: {assunto}.", f"Framing: {compo}."]
+        if mascote or pers_txt:
+            partes_p.append(mascote_txt.strip().rstrip(".") + ".")
+        partes_p.append(estilo)
+        partes_p.append(SEM_TEXTO)
+        p = " ".join(x for x in partes_p if x)
         tipo_img = cena.get("tipo_imagem") or ""
         if tipo_img and tipo_img in TIPOS_IMAGEM and tipo_img != "mascote":
-            p += f" Image type: {({'arquivo': 'monochrome archival photograph', 'ilustracao': 'explanatory vintage illustration', 'close': 'symbolic close-up', 'ambiente': 'establishing environment shot', 'diagrama': 'vintage hand-inked diagram or chart'})[tipo_img]}."
+            p += f" Image type: {({'arquivo': 'monochrome archival photograph', 'ilustracao': 'explanatory vintage illustration without any lettering', 'close': 'symbolic close-up', 'ambiente': 'establishing environment shot', 'diagrama': 'clean visual diagram made only of shapes, arrows and at most a few large digits, with no words or labels'})[tipo_img]}."
         infos = cena.get("fotos_info") or [{} for _ in cena.get("refs_extras") or []]
         for k, fi in enumerate(infos, 1):  # 📷 a pessoa/animal/estátua/objeto real: as características + como desenhar
             desc = (fi.get("descricao_en") or "").strip()

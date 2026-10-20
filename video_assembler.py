@@ -1988,7 +1988,8 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
     xp = max(0.0, min(100.0, float(ov.get("x_percent", 3)))) / 100
     yp = max(0.0, min(100.0, float(ov.get("y_percent", 100)))) / 100
     esquerda = (ov.get("lado") or ("esquerda" if xp < 0.5 else "direita")) == "esquerda"
-    alvo = f"(main_w-overlay_w)*{xp:.5f}"
+    centro = ov.get("ancora") == "centro"  # 📐 v84_191: x/y = o CENTRO da imagem (igual ao monitor do Estúdio)
+    alvo = f"(main_w*{xp:.5f}-overlay_w/2)" if centro else f"(main_w-overlay_w)*{xp:.5f}"
     fora = "(-overlay_w)" if esquerda else "main_w"
     e_in, e_out = ov.get("anim_in") or "nenhuma", ov.get("anim_out") or "nenhuma"
     def _prog(tipo: str) -> str:
@@ -1999,7 +2000,7 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
     x = alvo
     if e_in == "deslizar" or e_out == "deslizar":  # do lado dela
         x = f"({fora}+(({alvo})-({fora}))*{_prog('deslizar')})"
-    y_alvo = f"(main_h-overlay_h)*{yp:.5f}"
+    y_alvo = f"(main_h*{yp:.5f}-overlay_h/2)" if centro else f"(main_h-overlay_h)*{yp:.5f}"
     y = y_alvo
     if e_in == "subir" or e_out == "subir":  # de baixo pra cima
         y = f"(main_h+(({y_alvo})-main_h)*{_prog('subir')})"
@@ -2017,6 +2018,22 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
         partes.append(f"[{k}:v]scale={largura}:-2,format=rgba{fade},setpts=PTS+{start:.3f}/TB{rot}")
         return k
 
+    anim = ov.get("anim_video") if ov.get("anim_video") and os.path.isfile(str(ov.get("anim_video"))) else None
+    if anim:  # 🎞 v84_193: o clipe animado (WebM VP9 com alfa); a boca já mexe nele
+        k = n_in
+        n_in += 1
+        loop = ["-stream_loop", "-1"] if (ov.get("anim_modo") or "repetir") == "repetir" else []
+        inputs.extend(["-c:v", "libvpx-vp9"] + loop + ["-t", f"{dur:.3f}", "-i", anim])
+        fade = ""
+        if e_in == "aparecer":
+            fade += f",fade=t=in:st=0:d={d:.3f}:alpha=1"
+        if e_out == "aparecer":
+            fade += f",fade=t=out:st={max(0.0, dur - d):.3f}:d={d:.3f}:alpha=1"
+        # clipe mais curto que a aparição ("uma vez"): segura o último quadro (= a pose) até o fim — o fade de saída também
+        partes.append(f"[{k}:v]fps=25,tpad=stop_mode=clone:stop_duration={dur:.3f},trim=duration={dur:.3f},"
+                      f"scale={largura}:-2,format=rgba{fade},setpts=PTS-STARTPTS+{start:.3f}/TB[pp{idx}]")
+        partes.append(f"{atual}[pp{idx}]overlay=x='{x}':y='{y}':enable='between(t,{start:.3f},{end:.3f})':eof_action=repeat{proximo}")
+        return n_in
     _entrada(ov["resolved_path"], f"[pp{idx}]")
     janelas = [(max(start, float(a)), min(end, float(b))) for a, b in ov.get("boca_janelas") or [] if float(b) > float(a)]
     boca = ov.get("boca_path") if ov.get("boca_path") and os.path.isfile(str(ov.get("boca_path"))) else None

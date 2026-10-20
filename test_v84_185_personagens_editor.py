@@ -69,7 +69,7 @@ def test_aparicoes_juntam_e_respeitam_lado():
     cfg = dict(pe.PADRAO, lados={"mira": "direita"}, frequencia=1)
     aps, avisos = pe.aparicoes(falas, pers, cfg, 20.0)
     assert len(aps) == 1 and aps[0]["start"] == pytest.approx(0.85) and aps[0]["end"] == pytest.approx(3.95)  # juntou as 2 falas
-    assert aps[0]["lado"] == "direita" and aps[0]["x_percent"] == 98 and aps[0]["pose"].endswith("_esq.png")
+    assert aps[0]["lado"] == "direita" and aps[0]["x_percent"] > 50 and aps[0]["pose"].endswith("_esq.png")
     assert aps[0]["boca"] == "b.png" and aps[0]["boca_janelas"] == [[1.0, 2.0], [2.6, 3.5]]
     assert aps[0]["size_percent"] == pytest.approx(0.72 / 0.95 * 1080 / 1.5 / 1920 * 100, abs=0.01)
     assert any("Vanta" in a for a in avisos)  # fala mas não tem pose
@@ -159,7 +159,7 @@ def test_rotas_do_estudio(tmp_path, monkeypatch):
         oid = d["overlays"][0]["id"]
         d = c.post(f"/job/{jid}/personagens/{oid}", json={"lado": "direita", "boca": False}).get_json()
         ov = A._JOBS[jid]["overlays"][0]
-        assert ov["lado"] == "direita" and ov["x_percent"] == 98 and ov["boca_desligada"] and ov["manual"]
+        assert ov["lado"] == "direita" and ov["x_percent"] > 50 and ov["ancora"] == "centro" and ov["boca_desligada"] and ov["manual"]
         assert pe.para_render(ov)["boca_path"] is None
         d = c.post(f"/job/{jid}/personagens/{oid}/remover").get_json()
         assert d["overlays"] == []

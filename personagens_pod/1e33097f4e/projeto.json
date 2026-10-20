@@ -8,14 +8,10 @@
   "canal": "astranebel",
   "personagem": "mira",
   "nome": "Mira",
-  "como_usar": "No BestEditor: 🧍 Personagens no pod → Novo → envie as imagens de 'referencias_sugeridas' (até 2) e este JSON. Gere a ⭐ mestre, aprove como mestre, depois gere o resto.",
-  "referencias_sugeridas": [
-   "01_mira_ficha_completa.png",
-   "03_mira_detalhe_olho_lagrima.png"
-  ],
+  "como_usar": "BestEditor → 🧍 Personagens → Personagens dos canais → Criar (a ficha vem no zip: personagens/<slug>_ficha*.png) ou conectar o projeto que já existe.",
   "descricoes_referencias": {
-   "01_mira_ficha_completa.png": "the official character reference sheet of Mira (copy her design exactly)",
-   "03_mira_detalhe_olho_lagrima.png": "a close-up of Mira's blue-gray eye with the stylized blue tear mark under it"
+   "mira_ficha.png": "the official character reference sheet of Mira (copy her design exactly)",
+   "mira_ficha_2.png": "a close-up of Mira's blue-gray eye with the stylized blue tear mark under it"
   },
   "texto_fixo": {
    "trava": "MIRA — CHARACTER LOCK (copy exactly from the reference images) - Young woman (not a child, not chibi), gentle melancholic face, pale skin, small red lips. - Hair: long, straight, deep-black, blunt straight bangs; a dark navy headband with ribbons. - Eyes: blue-gray, with TWO stylized blue tear marks under each eye (always visible). - Ornament: an antique-gold crescent moon on the right side of the headband; a gold crescent brooch on the bow. - Outfit: black Victorian-gothic dress, ivory ruffled collar and ivory ruffled cuffs, black bow with the  crescent brooch, long puffy black sleeves; black tights and black platform shoes (only in full body). - NEVER: other hair color, short hair, missing tear marks, missing crescent, casual/modern clothes,  chibi or child proportions, cyclops/one-eye look, pink/green/blue dress.",
@@ -1079,7 +1075,9 @@
   "19/10 11:20:33 ✂ mira_lupa_meteorito_esq.png: veio cortada na borda — refazendo 1x",
   "19/10 11:23:03 ✂ mira_perguntando_esq_boca.png: veio cortada na borda — refazendo 1x",
   "19/10 11:35:27 🚀 1 pose(s) pro Flow com a ⭐ mestre",
-  "19/10 11:36:38 ✂ mira_perguntando_dir_boca.png: veio cortada na borda — refazendo 1x"
+  "19/10 11:36:38 ✂ mira_perguntando_dir_boca.png: veio cortada na borda — refazendo 1x",
+  "19/10 15:21:28 ✏ JSON trocado: 43 pose(s)",
+  "19/10 15:21:28 🔗 conectado ao canal ASTRANEBEL → Mira (poses do JSON do canal)"
  ],
  "imagens": {
   "mira_neutra_esq.png": {
@@ -2865,5 +2863,12 @@
    "msg": null
   }
  },
- "atualizado": 1792427829.2090025
+ "atualizado": 1792434088.4845314,
+ "canal": {
+  "slug": "astranebel",
+  "personagem": "mira",
+  "nome": "Mira",
+  "arquivo": "personagens/mira.json",
+  "canal_nome": "ASTRANEBEL"
+ }
 }

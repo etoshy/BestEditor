@@ -103,7 +103,8 @@ def status(cfg: Optional[Dict[str, Any]] = None, timeout: float = 8) -> Dict[str
     gpu = d.get("gpu") or []
     if gpu:
         g = gpu[0]
-        partes.append(f"GPU {g['nome']} ({g['vram_usada_mb'] // 1024}/{g['vram_total_mb'] // 1024} GB)")
+        u, t = g.get("vram_usada_mb"), g.get("vram_total_mb")  # alguns pods não deixam ler a memória (vem None)
+        partes.append(f"GPU {g.get('nome') or '?'}" + (f" ({u // 1024}/{t // 1024} GB)" if isinstance(u, int) and isinstance(t, int) else ""))
     return {"ok": True, "msg": " · ".join(partes), "workers": w, "gpu": gpu}
 
 
@@ -191,6 +192,11 @@ def narrar(texto: str, destino: str, motor: str = "chatterbox", idioma: str = "p
 def job(job_id: str, cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Status de um job do pod (sem esperar)."""
     return _pedir("GET", f"/jobs/{job_id}", cfg, timeout=30).json()
+
+
+def cancelar(job_id: str, cfg: Optional[Dict[str, Any]] = None) -> None:
+    """Cancela um job no pod (na fila ou rodando) — pra não narrar duas vezes o mesmo roteiro."""
+    _pedir("POST", f"/jobs/{job_id}/cancelar", cfg, timeout=15)
 
 
 def enviar_narracao(texto: str, motor: str = "chatterbox", idioma: str = "pt", referencia: Optional[str] = None,

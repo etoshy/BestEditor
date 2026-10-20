@@ -469,11 +469,11 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
             ims.append(mestre)
             paineis.append("the APPROVED MASTER image of this character — copy its identity exactly (face, hair, eyes, "
                            "outfit, colors, line art, art style) and its scale, but NOT its pose")
-        tag = secrets.token_hex(3)
         col_pose = None  # sem ficha e sem mestre: a 1ª geração sai só do texto (a trava do JSON)
         if ims:
-            col_pose = os.path.join(d, "flow_refs", f"colagem_{tag}.png")
-            L.colagem(ims).save(col_pose)
+            # 🧍 v84_189: o nome vem do CONTEÚDO — a mesma referência é o mesmo arquivo, e o Flow reusa a mídia que já
+            # subiu no projeto (não sobe a mesma imagem a cada pose)
+            col_pose = _salvar_ref(L.colagem(ims), os.path.join(d, "flow_refs"), "ref")
         itens, por_item, depois = [], [], []
         for a in alvo:
             x = dict(pose(p, a))
@@ -484,8 +484,7 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
                 if bimg is None:
                     depois.append(a)
                     continue
-                ref = os.path.join(d, "flow_refs", f"base_{a[:-4]}_{tag}.png")
-                bimg.save(ref)
+                ref = _salvar_ref(bimg, os.path.join(d, "flow_refs"), f"base_{a[:-4]}")
             item = {"prompt": prompt_flow(p, x, paineis, extra), "tipo": "imagem", "origem": "personagens"}
             if ref:
                 item["referencia_arquivo"] = ref
@@ -516,6 +515,19 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
     except Exception as exc:  # noqa: BLE001
         aviso += f"o Flow em massa não ligou agora ({str(exc)[:200]}) — os pedidos ficam na fila; ▶ Continuar na aba Flow"
     return {"ok": True, "enviadas": len(alvo), "com_mestre": mestre is not None, "aviso": aviso.strip(), "depois": depois}
+
+
+def _salvar_ref(img, pasta: str, prefixo: str) -> str:
+    """Salva a referência com o nome pelo conteúdo (a mesma imagem → o mesmo arquivo, sem duplicar)."""
+    import hashlib
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    dados = buf.getvalue()
+    cam = os.path.join(pasta, f"{prefixo}_{hashlib.sha1(dados).hexdigest()[:12]}.png")
+    if not os.path.isfile(cam):
+        with open(cam, "wb") as f:
+            f.write(dados)
+    return cam
 
 
 def _galeria_flow(arquivo: str) -> str:
@@ -759,6 +771,17 @@ def exportar_para_pacote(z: "zipfile.ZipFile", m: Dict[str, Any], base: str, so_
             cam = os.path.join(d, "refs", r)
             if os.path.isfile(cam):
                 z.write(cam, raiz + "refs/" + r)
+        try:  # 🎞 v84_193: os clipes animados prontos (WebM transparente) vão junto pra reusar no outro PC
+            import personagens_animar as PA
+            anims = {}
+            for k, a in PA.carregar(pid, base).items():
+                if a.get("estado") == "pronto" and os.path.isfile(str(a.get("webm"))):
+                    z.write(a["webm"], raiz + "animacoes/" + os.path.basename(a["webm"]))
+                    anims[k] = {x: a.get(x) for x in ("pose", "tipo", "prompt", "duracao")} | {"webm": os.path.basename(a["webm"])}
+            if anims:
+                z.writestr(raiz + "animacoes/animacoes.json", json.dumps(anims, ensure_ascii=False, indent=1))
+        except Exception:  # noqa: BLE001
+            pass
         z.writestr(raiz + "projeto.json", json.dumps({
             "formato": "personagens_projeto_v1", "nome": p["nome"], "motor": motor_de(p), "dados": p["dados"],
             "refs": p.get("refs") or [], "mestre": (p.get("mestre") or {}).get("arquivo"), "imagens": imagens},
@@ -834,6 +857,27 @@ def importar_do_pacote(z: "zipfile.ZipFile", raiz: str, canal: str, base: str = 
                 it["estado"] = "aprovada"
             _log(p, f"📦 poses que vieram no zip do canal {canal}")
             salvar(p, base)
+        try:  # 🎞 os clipes animados que vieram no zip (os que este PC ainda não tem)
+            import personagens_animar as PA
+            anims = json.loads((ler("animacoes/animacoes.json") or b"{}").decode("utf-8"))
+            if isinstance(anims, dict) and anims:
+                with PA._TRAVA:
+                    idx = PA.carregar(p["id"], base)
+                    for k, a in anims.items():
+                        if (idx.get(k) or {}).get("estado") == "pronto" or not re.fullmatch(r"[\w\-]{1,140}", k):
+                            continue
+                        dados = ler("animacoes/" + str(a.get("webm") or ""))
+                        if not dados:
+                            continue
+                        os.makedirs(PA.pasta(p["id"], base), exist_ok=True)
+                        destino = os.path.join(PA.pasta(p["id"], base), f"{k}.webm")
+                        with open(destino, "wb") as f:
+                            f.write(dados)
+                        idx[k] = {"estado": "pronto", "webm": destino, "pose": a.get("pose"), "tipo": a.get("tipo"),
+                                  "prompt": a.get("prompt"), "duracao": a.get("duracao"), "veio_do_pacote": True}
+                    PA._salvar(p["id"], base, idx)
+        except Exception:  # noqa: BLE001
+            pass
         ligar_canal(p["id"], canal, pslug, base=base)
         feitos.append(p["id"])
     return feitos

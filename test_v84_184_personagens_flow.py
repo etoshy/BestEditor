@@ -269,3 +269,59 @@ def test_atividade_incomum_troca_de_conta(tmp_path, monkeypatch):
     j2 = lote.adicionar([{"prompt": "y", "tipo": "imagem"}])[0]
     lote._trabalhar("a")
     assert j2["estado"] == "erro" and "recusou" in j2["erro"]
+
+
+def test_referencia_sobe_uma_vez_e_nao_vira_resultado(tmp_path, monkeypatch):
+    """v84_189: a imagem de referência sobe UMA vez por projeto do Flow (depois reusa pela mídia) e, quando ela
+    aparece na galeria, nunca é tomada pelo resultado gerado."""
+    import sys
+    import types
+    import app  # noqa: F401
+    import flow_lote as fl
+    from googleflow import flow_direto as fd
+    from googleflow import googleflow_client as gf
+    # 1) checar: a mídia que é a referência não conta como resultado
+    pagina = types.SimpleNamespace(evaluate=lambda js: [], is_closed=lambda: False, close=lambda: None, url="")
+    monkeypatch.setattr(fd, "midias_na_pagina", lambda page: [{"id": "REF1234567890ABCDEFGH", "url": "https://x/REF1234567890ABCDEFGH", "tipo": "imagem"},
+                                                               {"id": "novo", "url": "https://x/n", "tipo": "imagem"}])
+    monkeypatch.setattr(fd, "falhas", lambda page: [])
+    monkeypatch.setattr(fd, "avisos", lambda page: "")
+    est = {"antes": set(), "ref_tokens": ["REF1234567890ABCDEFGH"]}
+    assert [m["id"] for m in fd.checar(pagina, est)] == ["novo"]
+    monkeypatch.setattr(fd, "midias_na_pagina", lambda page: [{"id": "REF1234567890ABCDEFGH", "url": "u", "tipo": "imagem"}])
+    assert fd.checar(pagina, est) is None  # só a referência apareceu: ainda gerando
+    # 2) o lote reusa a mídia no mesmo projeto
+    monkeypatch.setattr(fl, "pasta", lambda: str(tmp_path))
+    pw = types.ModuleType("playwright.sync_api")
+    pw.sync_playwright = lambda: types.SimpleNamespace(start=lambda: types.SimpleNamespace(stop=lambda: None))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", pw)
+    monkeypatch.setattr(gf, "_abrir", lambda p, cfg, headless, conta: (types.SimpleNamespace(close=lambda: None), False))
+    monkeypatch.setattr(gf, "salvar_sessao", lambda ctx, conta: None)
+    monkeypatch.setattr(fd, "preparar_projeto", lambda *a, **k: pagina)
+    vistos = []
+
+    def gerar(page, trab, on_passo, timeout):
+        vistos.append(dict(trab.get("referencia") or {}))
+        trab["_ref_midia"] = {"media_id": "MIDIA_DO_PROJETO_123456", "origem": "enviada"}
+        return [{"id": f"r{len(vistos)}", "url": "u", "tipo": "imagem"}]
+    monkeypatch.setattr(fd, "gerar_um", gerar)
+    monkeypatch.setattr(fl, "baixar_para_galeria", lambda ctx, midias, job, conta, projeto="": [{"id": "g", "arquivo": "a.png", "tipo": "imagem"}])
+    lote = fl.Lote()
+    monkeypatch.setattr(lote, "_aguardar_vez", lambda conta: None)
+    monkeypatch.setattr(lote, "_serve", lambda conta, tipo: True)
+    ref = tmp_path / "ref.png"
+    Image.new("RGB", (8, 8), "red").save(ref)
+    copia = tmp_path / "outra_copia.png"
+    copia.write_bytes(ref.read_bytes())
+    lote.adicionar([{"prompt": "a", "tipo": "imagem", "referencia_arquivo": str(ref)},
+                    {"prompt": "b", "tipo": "imagem", "referencia_arquivo": str(copia)}])
+    lote._trabalhar("c1")
+    assert vistos[0]["media_id"] == "" and vistos[1]["media_id"] == "MIDIA_DO_PROJETO_123456"  # a 2ª não sobe de novo
+
+
+def test_referencia_com_nome_pelo_conteudo(flow, tmp_path):
+    c, falso, gal = flow
+    p = pp.criar("V", json.dumps(JSON_POSES), [("ficha.png", _png())])
+    pp.enviar(p["id"], ["vanta_neutra_esq.png"])
+    pp.enviar(p["id"], ["vanta_cetica_esq.png"])
+    assert falso.fila[0]["referencia_arquivo"] == falso.fila[1]["referencia_arquivo"]  # a mesma imagem, o mesmo arquivo
