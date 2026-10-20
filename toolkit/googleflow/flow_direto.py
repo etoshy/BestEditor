@@ -941,7 +941,9 @@ def checar(page, estado: Dict[str, Any], tipo: str = "imagem") -> Optional[List[
     fl = falhas(page)
     if len(fl) > int(estado.get("falhas_antes") or 0):  # v84_108: cartão "⚠ Falha" novo (ex.: pessoas famosas)
         raise recusa("esperar", "o Flow não gerou: " + fl[0][:300])
-    if novas and not cartoes:
+    # v84_212: uma imagem que "aparece" nos primeiros segundos sem nenhum cartão de "gerando" é a referência enviada
+    # entrando na grade atrasada, não o resultado
+    if novas and not cartoes and (estado.get("viu_cartao") or time.monotonic() - estado.get("t0", 0) > 8):
         return novas
     if tipo == "video" and not novas and (not cartoes or all((c.get("pct") or "").startswith("100") for c in cartoes)) \
             and estado.get("viu_cartao") and time.monotonic() - estado.get("acordou_em", 0) > 3:
@@ -1010,6 +1012,16 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         # 🧍 v84_189: quem chamou guarda isso e, no próximo pedido com a MESMA imagem, reusa (não sobe de novo)
         trab["_ref_midia"] = {"media_id": max(info.get("ids") or [""], key=len) or ref.get("media_id") or "",
                               "origem": info.get("origem") or ""}
+    # 🧷 v84_212: as imagens que estão na caixa (referência / frames) NUNCA são o resultado — o id delas vem do chip
+    # (no Flow novo a imagem enviada entra direto na caixa e a gente não vê o item do menu)
+    try:
+        for src in page.evaluate("""() => Array.from(document.querySelectorAll('flow-prompt-box img, .base-prompt-box img'))
+                                     .map(i => i.currentSrc || i.src || '')""") or []:
+            ref_tokens += re.findall(r"/(?:image|video)/([0-9A-Za-z_-]{16,})", str(src))
+    except Exception:  # noqa: BLE001
+        pass
+    if ref_tokens and tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")) and not trab["_ref_midia"].get("media_id"):
+        trab["_ref_midia"]["media_id"] = ref_tokens[0]
     escrever_prompt(page, trab["prompt"], on_passo)
     if trab.get("simular"):  # 🧪 teste sem gastar crédito: para aqui, antes do clique em gerar
         on_passo("gerar", "pulado", "modo teste sem gerar (nenhum crédito gasto)")
