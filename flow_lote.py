@@ -659,8 +659,7 @@ class Lote:
                         if job.get("inicio_arquivo") and os.path.isfile(job["inicio_arquivo"]):  # 🎞 animar uma imagem
                             trab["inicio"] = {"arquivo": job["inicio_arquivo"]}
                             trab["tipo_video"] = "Frames"
-                            if job.get("fim_arquivo") and os.path.isfile(job["fim_arquivo"]):
-                                trab["fim"] = {"arquivo": job["fim_arquivo"]}
+                            # (v84_203: o frame de Fim travava o Flow — os pedidos antigos com fim_arquivo vão só com o Início)
                     elif job.get("referencia_arquivo") and os.path.isfile(job["referencia_arquivo"]):  # 🧍 foto com referência
                         trab["referencia"] = {"arquivo": job["referencia_arquivo"],
                                               "media_id": refs_proj.get(_chave_ref(job["referencia_arquivo"]), "")}

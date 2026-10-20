@@ -12,13 +12,13 @@
  },
  "vanta_explicando_esq_v1_9732__fala__6862bc18cd": {
   "estado": "erro",
-  "flow_job": "a8d22bf9e0",
+  "flow_job": "60edcf46ce",
   "prompt": "Subtle 2D anime character animation of Vanta (explicando, uma mão aberta no ar): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Viel schneller. Die Kerntemperatur ist bei massereichen Sternen deutlich höher. Die massereichsten Sterne verbrauchen ih\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_explicando_esq.png",
   "tipo": "fala",
-  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_explicando_esq_v1_9732__fala__6862bc18cd_frame.png",
-  "criado": 1792496506.8832119,
-  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_084503_597816)",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_explicando_esq_v1_9732__fala__6862bc18cd_frame.jpg",
+  "criado": 1792497086.8143978,
+  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_085716_321273)",
   "msg": "🎬 gerando no Flow"
  },
  "vanta_seria_esq_v1_326c__fala__6da2c20b1a": {
@@ -33,25 +33,25 @@
   "msg": "na fila do Flow"
  },
  "vanta_provocando_esq_v1_548c__fala__ed2f80a9d6": {
-  "estado": "erro",
-  "flow_job": "1eae2fbbcf",
+  "estado": "gerando",
+  "flow_job": "c20dbad2cb",
   "prompt": "Subtle 2D anime character animation of Vanta (provocando, inclinada pra frente, sorriso de quem sabe): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Das, Mira, sollten Sie sich selbst beantworten. Nicht ich.\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_provocando_esq.png",
   "tipo": "fala",
-  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_provocando_esq_v1_548c__fala__ed2f80a9d6_frame.png",
-  "criado": 1792496507.1933107,
-  "erro": "FlowPassoErro: [frame_inicio] escolhi a imagem mas a prévia não carregou. (diagnóstico 20261020_084829_175909)",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_provocando_esq_v1_548c__fala__ed2f80a9d6_frame.jpg",
+  "criado": 1792497086.9691954,
+  "erro": null,
   "msg": "🎬 gerando no Flow"
  },
  "vanta_seria_dir_v1_ac5b__fala__3f08c5b85f": {
-  "estado": "erro",
-  "flow_job": "ce82f68514",
+  "estado": "gerando",
+  "flow_job": "0fd94003c9",
   "prompt": "Subtle 2D anime character animation of Vanta (séria, sem sorriso): talking naturally to the viewer: the mouth opens and closes as if speaking, small expressive head and hand gestures that match the pose, reacting to the line \"Still ist die Sonne nicht ganz: Erst entsteht ein leuchtender Nebel aus der abgeworfenen Hülle. Danach kühlt der Weiße Z\". Keep exactly the same character design, outfit, colors, line art and drawing style as the first frame; the body stays in the same place and the same size, the camera is completely static (no zoom, no pan, no cut). The whole background stays a flat solid pure chroma-key green (#00FF00) in every frame, no shadows, no other objects, no particles, no text. The last frame returns to the same pose as the first frame.",
   "pose": "vanta_seria_dir.png",
   "tipo": "fala",
-  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_seria_dir_v1_ac5b__fala__3f08c5b85f_frame.png",
-  "criado": 1792496507.022831,
-  "erro": "FlowPassoErro: [configurar] cliquei nas configurações da caixa mas o pop-up não abriu. (diagnóstico 20261020_084650_789843)",
+  "frame": "E:\\editor2bancodevideos\\personagens_pod\\e942af9f70\\animacoes\\vanta_seria_dir_v1_ac5b__fala__3f08c5b85f_frame.jpg",
+  "criado": 1792497086.8907723,
+  "erro": null,
   "msg": "🎬 gerando no Flow"
  }
 }

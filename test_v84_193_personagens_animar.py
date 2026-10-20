@@ -24,8 +24,8 @@ def _video_verde(path, n=24):
     """Um 'clipe do Flow': fundo verde 3:4 e o boneco vermelho mexendo."""
     pasta = os.path.dirname(path)
     for k in range(n):
-        im = Image.new("RGB", (240, 320), (0, 255, 0))
-        ImageDraw.Draw(im).rectangle([80 + (k % 6), 60, 160 + (k % 6), 320], fill=(200, 30, 40))
+        im = Image.new("RGB", (180, 320), (0, 255, 0))  # 9:16 como o Flow devolve
+        ImageDraw.Draw(im).rectangle([50 + (k % 6), 80, 130 + (k % 6), 300], fill=(200, 30, 40))
         im.save(os.path.join(pasta, f"v_{k:03d}.png"))
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-i", os.path.join(pasta, "v_%03d.png"),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", path], check=True)
@@ -55,13 +55,15 @@ def test_prompt_e_frame(tmp_path):
     assert "mouth opens" not in PA.prompt_animacao("Mira", "", "parada")
     fr = PA.frame_verde(_pose(tmp_path / "p.png"), str(tmp_path / "f.png"))
     im = Image.open(fr)
-    assert im.size == (225, 300) and im.getpixel((2, 2)) == (0, 255, 0)
+    assert abs(im.size[0] / im.size[1] - 9 / 16) < 0.01 and im.size[0] == 200  # 9:16, a pose inteira (nada cortado)
+    px = im.getpixel((2, 2))
+    assert px[1] > 240 and px[0] < 20 and px[2] < 20
 
 
 def test_processar_tira_o_verde(tmp_path):
     v = _video_verde(str(tmp_path / "v.mp4"))
     r = PA.processar(v, str(tmp_path / "out.webm"))
-    assert r["quadros"] == 24
+    assert r["quadros"] == 46  # ida (24) + volta (22): termina na pose
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-c:v", "libvpx-vp9", "-i", r["webm"], "-frames:v", "1",
                     str(tmp_path / "q.png")], check=True)
     q = Image.open(tmp_path / "q.png").convert("RGBA")
@@ -81,8 +83,8 @@ def test_pedir_reusa_e_aplica(tmp_path, monkeypatch):
     monkeypatch.setattr(FE, "pasta_galeria", lambda: str(gal))
     pose = _pose(tmp_path / "mira_curiosa_dir.png")
     it = PA.pedir("b", "abc123", {"caminho": pose, "arquivo": "mira_curiosa_dir.png"}, "fala", "Mira", "Was?")
-    assert it["estado"] == "fila" and lote.pedidos[0]["fim_arquivo"] == lote.pedidos[0]["inicio_arquivo"]
-    assert lote.fila[0]["proporcao"] == "3:4"
+    assert it["estado"] == "fila" and lote.pedidos[0]["inicio_arquivo"].endswith("_frame.jpg") and "fim_arquivo" not in lote.pedidos[0]
+    assert lote.fila[0]["proporcao"] == "9:16"
     PA.pedir("b", "abc123", {"caminho": pose}, "fala")
     assert len(lote.fila) == 1  # a mesma pose + tipo não vai duas vezes
     _video_verde(str(gal / "clipe.mp4"))

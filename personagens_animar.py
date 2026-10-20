@@ -5,8 +5,8 @@ personagens_animar.py — 🎞 personagem que se mexe (v84_193)
 A personagem por cima do vídeo não fica mais parada: cada POSE pode ganhar um clipe animado no Google Flow e o
 editor guarda o clipe pra REUSAR em qualquer vídeo.
 
-  • o pedido vai pro 🚀 Flow em massa como vídeo com frame de Início = a pose e frame de Fim = a MESMA pose (sobre
-    verde puro, 3:4) → o clipe começa e termina igual à imagem parada: entra e sai sem pulo e dá pra repetir em loop;
+  • o pedido vai pro 🚀 Flow em massa como vídeo com frame de Início = a pose (sobre verde puro, 3:4); aqui o clipe
+    vai e volta (ida + volta) → começa e termina igual à imagem parada: entra e sai sem pulo e dá pra repetir em loop;
   • dois tipos: "fala" (ela fala, a boca mexe — no lugar do 👄 pisca-boca) e "parada" (respira, pisca, mexe pouco);
   • o verde sai aqui no PC (a mesma chave/limpeza das poses), quadro a quadro → WebM com transparência;
   • a biblioteca fica no projeto da personagem (personagens_pod/<id>/animacoes/): a mesma pose + tipo nunca vai pro
@@ -90,13 +90,15 @@ def prompt_animacao(nome: str, descricao: str, tipo: str, fala: str = "", extra:
 
 
 def frame_verde(png: str, destino: str) -> str:
-    """A pose (PNG transparente 2:3) sobre verde puro, 3:4 (o Flow não tem 2:3): sobra verde nos lados."""
+    """A pose (PNG transparente 2:3) sobre verde puro, 9:16 — o vídeo do Flow é 9:16 (ele CORTAVA a imagem 3:4 pra
+    9:16): sobra verde em cima e embaixo, nada da pose é cortado."""
     from PIL import Image
     im = Image.open(png).convert("RGBA")
     w, h = im.size
-    W = int(round(h * 3 / 4))
-    fundo = Image.new("RGBA", (max(W, w), h), (0, 255, 0, 255))
-    fundo.alpha_composite(im, ((fundo.width - w) // 2, 0))
+    H = max(h, int(round(w * 16 / 9)))
+    W = max(w, int(round(H * 9 / 16)))
+    fundo = Image.new("RGBA", (W, H), (0, 255, 0, 255))
+    fundo.alpha_composite(im, ((W - w) // 2, (H - h) // 2))
     rgb = fundo.convert("RGB")
     if rgb.height > 1280:  # 🎞 v84_202: menor e em JPEG — o Flow processa rápido (PNG grande travava a prévia)
         rgb = rgb.resize((int(rgb.width * 1280 / rgb.height), 1280))
@@ -124,8 +126,8 @@ def pedir(base: str, pid: str, pose: Dict[str, Any], tipo: str = "fala", nome: s
         os.makedirs(pasta(pid, base), exist_ok=True)
         fr = frame_verde(pose["caminho"], os.path.join(pasta(pid, base), f"{k}_frame.jpg"))
         p = prompt_animacao(nome or "the character", pose.get("descricao") or "", tipo, fala, extra)
-        j = _lote().adicionar([{"prompt": p, "tipo": "video", "inicio_arquivo": fr, "fim_arquivo": fr, "origem": "personagem"}],
-                              proporcao="3:4")[0]
+        j = _lote().adicionar([{"prompt": p, "tipo": "video", "inicio_arquivo": fr, "origem": "personagem"}],
+                              proporcao="9:16")[0]
         it = {"estado": "fila", "flow_job": j["id"], "prompt": p, "pose": pose.get("arquivo") or os.path.basename(pose["caminho"]),
               "tipo": tipo, "frame": fr, "criado": time.time(), "erro": None, "msg": "na fila do Flow"}
         d[k] = it
@@ -149,7 +151,7 @@ def processar(video: str, destino: str, opcoes: Optional[Dict[str, Any]] = None,
     tmp = tempfile.mkdtemp(prefix="pers_anim_")
     try:
         r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", video, "-an", "-vf",
-                            f"fps={fps},crop='min(iw,ih*2/3)':ih", os.path.join(tmp, "q_%05d.png")],
+                            f"fps={fps},crop='min(iw,ih*2/3)':'min(ih,iw*3/2)'", os.path.join(tmp, "q_%05d.png")],
                            capture_output=True, text=True, timeout=600)
         quadros = sorted(x for x in os.listdir(tmp) if x.startswith("q_"))
         if r.returncode != 0 or not quadros:
@@ -160,6 +162,11 @@ def processar(video: str, destino: str, opcoes: Optional[Dict[str, Any]] = None,
             rgba = limpo.convert("RGBA")
             rgba.putalpha(alfa)
             rgba.save(os.path.join(tmp, "a" + q[1:]))
+        # 🔁 v84_203: sem frame de Fim no Flow (travava): o clipe vai e VOLTA — começa e termina na pose, loop sem pulo
+        n = len(quadros)
+        for k, q in enumerate(reversed(quadros[1:-1]), start=n + 1):
+            shutil.copyfile(os.path.join(tmp, "a" + q[1:]), os.path.join(tmp, f"a_{k:05d}.png"))
+        total = n + max(0, n - 2)
         os.makedirs(os.path.dirname(destino), exist_ok=True)
         r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "a_%05d.png"),
                             "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "30", "-auto-alt-ref", "0",
@@ -167,7 +174,7 @@ def processar(video: str, destino: str, opcoes: Optional[Dict[str, Any]] = None,
                            capture_output=True, text=True, timeout=900)
         if r.returncode != 0 or not os.path.isfile(destino):
             raise AnimErro(f"não consegui gravar o WebM transparente: {(r.stderr or '')[-200:]}")
-        return {"webm": destino, "duracao": round(len(quadros) / fps, 3), "quadros": len(quadros)}
+        return {"webm": destino, "duracao": round(total / fps, 3), "quadros": total}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
