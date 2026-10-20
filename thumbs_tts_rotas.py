@@ -151,6 +151,18 @@ def registrar(app, base_dir: str) -> None:
         ry.salvar_projeto(base_dir, p)
         return {"palavras": len(novo.split()), "avisos": avisos}
 
+    def _vozes(origem: str, p: Dict[str, Any]) -> List[str]:
+        """🎭 v84_219: as tags de quem fala que a adaptação/limpeza tem que manter."""
+        try:
+            import canal_perfil
+            perfil = None
+            if origem == "dossie":
+                import dossies as ds
+                perfil = ds.perfil_do_modelo((p.get("config") or {}).get("modelo"))
+            return canal_perfil.slugs_de_voz(base_dir, perfil)
+        except Exception:  # noqa: BLE001
+            return ["narrador"]
+
     @app.route("/tts-adaptar/<origem>/<pid>/prompt", methods=["POST"])
     def tts_adaptar_prompt(origem: str, pid: str):
         try:
@@ -166,7 +178,7 @@ def registrar(app, base_dir: str) -> None:
             p["tts_direcao"] = direcao
             ry.salvar_projeto(base_dir, p)
         try:
-            texto_p = at.prompt(texto, idioma, direcao, pad["canal"], motor, pad["inicios"])
+            texto_p = at.prompt(texto, idioma, direcao, pad["canal"], motor, pad["inicios"], vozes=_vozes(origem, p))
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
         R = at.regras_do_idioma(idioma)
@@ -180,7 +192,7 @@ def registrar(app, base_dir: str) -> None:
         except Exception:  # noqa: BLE001
             return jsonify({"erro": "Projeto não encontrado."}), 404
         try:
-            r = at.ler_resposta(str((request.get_json(silent=True) or {}).get("texto") or ""), texto)
+            r = at.ler_resposta(str((request.get_json(silent=True) or {}).get("texto") or ""), texto, vozes=_vozes(origem, p))
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
         avisos = ["🎙 " + a for a in r["avisos"]]
@@ -272,8 +284,19 @@ def registrar(app, base_dir: str) -> None:
         "de cena, os parágrafos e o estilo. Não resuma nem reescreva o que ela não pediu. Devolva o roteiro COMPLETO "
         "já corrigido em \"roteiro\" e, em \"resumo\", em português, 1-3 linhas do que mudou (ou por que não deu).")
 
-    def _prompt_correcao(texto: str, pedido: str) -> str:
-        return (f"## O QUE CORRIGIR / FAZER\n{pedido.strip()}\n\n## ROTEIRO ATUAL\n{texto}\n\n"
+    def _ctx_correcao(origem: str, p: Dict[str, Any]) -> str:
+        """🎭 v84_218: canal com personagens → as tags de quem fala e as emoções vão junto (pra corrigir/marcar as falas)."""
+        if origem != "dossie":
+            return ""
+        try:
+            import canal_perfil
+            import dossies as ds
+            return canal_perfil.bloco_tags(ds.perfil_do_modelo((p.get("config") or {}).get("modelo")))
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _prompt_correcao(texto: str, pedido: str, ctx: str = "") -> str:
+        return (f"## O QUE CORRIGIR / FAZER\n{pedido.strip()}\n\n" + (ctx + "\n\n" if ctx else "") + f"## ROTEIRO ATUAL\n{texto}\n\n"
                 "Responda só com o JSON: {\"roteiro\": \"o roteiro completo corrigido\", \"resumo\": \"o que mudou\"}")
 
     def _antes_correcao(origem: str, p: Dict[str, Any]) -> str:
@@ -298,7 +321,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Escreva o que corrigir."}), 400
         if not texto.strip():
             return jsonify({"erro": "Ainda não tem roteiro."}), 400
-        return jsonify({"ok": True, "prompt": SISTEMA_CORRECAO + "\n\n" + _prompt_correcao(texto, pedido)})
+        return jsonify({"ok": True, "prompt": SISTEMA_CORRECAO + "\n\n" + _prompt_correcao(texto, pedido, _ctx_correcao(origem, p))})
 
     @app.route("/correcao/<origem>/<pid>/ia", methods=["POST"])
     def correcao_ia(origem: str, pid: str):
@@ -316,7 +339,7 @@ def registrar(app, base_dir: str) -> None:
         if motivo:
             return jsonify({"erro": "IA: " + motivo + " — use 📋 Copiar o prompt e cole a resposta."}), 400
         from ia_midia import _S, _obj
-        r = ia_servico.chamar("roteiros", SISTEMA_CORRECAO, _prompt_correcao(texto, pedido),
+        r = ia_servico.chamar("roteiros", SISTEMA_CORRECAO, _prompt_correcao(texto, pedido, _ctx_correcao(origem, p)),
                               schema=_obj({"roteiro": _S, "resumo": _S}), max_tokens=32000, effort="medium",
                               job=pid, cache_local=False, timeout=600)
         novo = str((r or {}).get("roteiro") or "").strip() if isinstance(r, dict) else ""

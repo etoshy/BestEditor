@@ -414,7 +414,10 @@ def registrar_modelos(base: str) -> List[str]:
         direcao = ("marca_" + x["slug"]) if os.path.isfile(os.path.join(m["dir"], "direcao.json")) else str(d.get("direcao_sugerida") or "")[:60]
         ds.MODELOS[chave] = {"nome": str(d.get("nome") or f"🎨 {x['nome']}")[:100], "descricao": str(d.get("descricao") or "")[:600],
                              "identidade_visual": x["slug"], "nome_canal": nome_canal, "formatos": formatos,
-                             "regras": [str(r)[:500] for r in d.get("regras") or []][:20],
+                             "regras": [str(r)[:500] for r in d.get("regras") or []][:40],  # v84_218: eram 20 (as últimas sumiam)
+                             # 📣 v84_218: quantas chamadas o canal quer ({"inscreva": 1})
+                             **({"chamadas": {k: int(v) for k, v in d["chamadas"].items() if k in ("inscreva", "venda") and str(v).isdigit()}}
+                                if isinstance(d.get("chamadas"), dict) else {}),
                              **({"palavras_por_minuto": int(d["palavras_por_minuto"])} if d.get("palavras_por_minuto") else {}),
                              **({"direcao_sugerida": direcao} if direcao else {}),
                              # 🎭 v84_173: canal com personagens (falas multi voz, lore, histórico) e o roteiro exemplo do canal

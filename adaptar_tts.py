@@ -154,7 +154,7 @@ _GENERO = {"true_crime": "investigativos", "historia": "históricos", "biografia
 
 # ------------------------------------------------------------------ o prompt
 def prompt(texto: str, idioma: str, direcao: str = "true_crime", canal: str = "", motor: str = "chatterbox",
-           inicios_capitulos: Optional[List[str]] = None) -> str:
+           inicios_capitulos: Optional[List[str]] = None, vozes: Optional[List[str]] = None) -> str:
     """O prompt de adaptação pro TTS (com o roteiro no fim). A resposta esperada é SÓ o texto adaptado."""
     texto = str(texto or "").strip()
     if not texto:
@@ -167,6 +167,8 @@ def prompt(texto: str, idioma: str, direcao: str = "true_crime", canal: str = ""
     canal = " ".join(str(canal or "").split())[:80]
     titulo = "SISTEMA DE ADAPTAÇÃO DE ROTEIROS PARA TTS" + (f" — {canal.upper()}" if canal else "")
     tags_ok = motor == "chatterbox_turbo"
+    import marcas_seguras  # 🎭 v84_219: as tags de quem fala que estão no roteiro ([narrador|…], [mira|curiosa])
+    tags_voz = list(dict.fromkeys(m.group(0) for m in marcas_seguras.rx_vozes(vozes or []).finditer(texto)))
     L: List[str] = [f"# {titulo}", "", "## FUNÇÃO", "",
                     f"Você é um especialista em direção de voz, preparação de roteiros para síntese de fala e narrativa documental "
                     f"({D['nome'].split(' ', 1)[1]}) em {lingua}.", "",
@@ -203,7 +205,8 @@ def prompt(texto: str, idioma: str, direcao: str = "true_crime", canal: str = ""
           "finalidade narrativa.", ""]
     if not tags_ok:
         L += ["Evite escrever indicações como [pausa], [sussurrando], [dramático], [voz grave] ou instruções semelhantes. Elas podem "
-              "ser pronunciadas literalmente pelo TTS ou não produzir efeito algum.", ""]
+              "ser pronunciadas literalmente pelo TTS ou não produzir efeito algum."
+              + (" (As tags de QUEM FALA da seção 8.1 são outra coisa: elas ficam.)" if tags_voz else ""), ""]
     L += [f"Não use letras maiúsculas para forçar ênfase. {R['ortografia']}", "",
           "## 4. DIREÇÃO NARRATIVA", "",
           f"A narração deve lembrar {D['tom']}.", "",
@@ -252,6 +255,10 @@ def prompt(texto: str, idioma: str, direcao: str = "true_crime", canal: str = ""
           "- marcas de cena como [CENA 4];"]
     if tags_ok:
         L.append("- tags de voz do Chatterbox Turbo (ex.: [whispering], [sigh]).")
+    if tags_voz:
+        L.append("- tags de QUEM FALA no começo de cada fala — " + ", ".join(tags_voz[:12])
+                 + " — elas trocam a voz (narrador / personagem) e a emoção: mantenha CADA UMA, idêntica, antes da mesma fala; "
+                 "não junte falas de pessoas diferentes num parágrafo só.")
     if inicios_capitulos:
         L += ["", "Mantenha também EXATAMENTE estas frases de começo de capítulo (o site usa pra achar os capítulos): "
               + "; ".join(f"“{c}”" for c in inicios_capitulos if c) + "."]
@@ -266,7 +273,8 @@ def prompt(texto: str, idioma: str, direcao: str = "true_crime", canal: str = ""
                  "Não existem instruções técnicas ou comentários que possam ser lidos pelo TTS (as tags de voz da lista ficam).",
                  "O texto não contém repetições introduzidas durante a adaptação.",
                  f"{D['conferir']}" + (f" de {canal}." if canal else "."),
-                 "Todas as marcas do site (seção 8.1) continuam no texto, nos mesmos pontos.",
+                 "Todas as marcas do site (seção 8.1) continuam no texto, nos mesmos pontos"
+                 + (" — inclusive cada tag de quem fala." if tags_voz else "."),
                  "O texto final está pronto para síntese, sem necessidade de limpeza manual."]:
         L.append(f"{n}. {item}")
         n += 1
@@ -298,7 +306,7 @@ def palavras(texto: str) -> int:
     return len(re.sub(r"\[\[[^\]]*\]\]|\[[^\]]*\]", " ", str(texto or "")).split())
 
 
-def ler_resposta(resposta: str, original: str) -> Dict[str, Any]:
+def ler_resposta(resposta: str, original: str, vozes: Optional[List[str]] = None) -> Dict[str, Any]:
     """O texto adaptado (limpo) + avisos (marca que sumiu, texto que encolheu)."""
     t = str(resposta or "").strip()
     t = re.sub(r"^```[a-zA-Z]*\s*\n|\n?```\s*$", "", t).strip()
@@ -321,6 +329,10 @@ def ler_resposta(resposta: str, original: str) -> Dict[str, Any]:
     if volta:
         avisos.append(f"🔒 A IA tinha tirado {len(volta)} marca(s) — recoloquei no mesmo ponto: "
                       + ", ".join(dict.fromkeys(volta))[:300])
+    if vozes:  # 🎭 v84_219: a IA tirou as tags de quem fala? voltam antes da mesma fala
+        t, n_vz = marcas_seguras.restaurar_vozes(original, t, vozes)
+        if n_vz:
+            avisos.append(f"🎭 A IA tinha tirado as tags de quem fala — recoloquei {n_vz} no lugar de antes.")
     a, b = marcas(original), marcas(t)
     for k, nome in (("inscreva", "[[INSCREVA]]"), ("venda", "[[VENDA]]")):
         if b[k] < a[k]:
@@ -335,6 +347,7 @@ def ler_resposta(resposta: str, original: str) -> Dict[str, Any]:
     if pa and pb < pa * 0.85:
         avisos.append(f"O texto encolheu: {pa} → {pb} palavras ({100 * pb // pa}%). A adaptação não devia encurtar — confira se "
                       "nada importante sumiu.")
-    sobras = sorted({x for x in re.findall(r"\[([^\[\]\n]{2,30})\]", re.sub(r"\[\[[^\]]*\]\]", " ", t))
+    sem_vz = marcas_seguras.rx_vozes(vozes or []).sub(" ", t)
+    sobras = sorted({x for x in re.findall(r"\[([^\[\]\n]{2,30})\]", re.sub(r"\[\[[^\]]*\]\]", " ", sem_vz))
                      if not re.fullmatch(r"[MIT]\d+|cena \d+.*", x.strip(), re.I)})
     return {"texto": t, "avisos": avisos, "palavras_antes": pa, "palavras_depois": pb, "colchetes": sobras}

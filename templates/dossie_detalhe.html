@@ -160,6 +160,7 @@
     <div class="ds-row" style="margin-top:6px">
       <button class="ds-mini" id="corrIa" style="background:#4338ca;color:#fff">🤖 Corrigir com a IA</button>
       <button class="ds-mini ds-sec" id="corrPrompt" title="copia o pedido + o roteiro pra colar em outra IA">📋 Copiar o prompt</button>
+      <button class="ds-mini ds-sec" id="corrTags" title="preenche o pedido: cada parágrafo com a tag de quem fala (narrador / personagem) e a emoção">🎭 Marcar quem fala</button>
       <button class="ds-mini ds-sec" id="corrDesfazer" {{ '' if (p.resultado or {}).roteiro_antes_correcao else 'style=display:none' }}>↩ Desfazer a correção</button>
       <span class="ds-hint" id="corrSt"></span>
     </div>
@@ -511,6 +512,13 @@ $('btnIaImg').addEventListener('click', async () => {
     $('corrIa').disabled = true; st('⏳ a IA está lendo o roteiro e corrigindo… (pode levar 1-2 min)');
     try { const d = await api(`/correcao/dossie/${PID}/ia`, { pedido }); fim(d); }
     catch (e) { st('⚠ ' + e.message); } finally { $('corrIa').disabled = false; }
+  });
+  $('corrTags').addEventListener('click', () => {
+    $('corrPedido').value = 'Marque quem fala em CADA parágrafo: ponha no começo de cada um a tag certa (narrador ou a personagem que diz '
+      + 'aquilo, pela lógica do diálogo e pelo papel de cada uma na lista de vozes — explicação longa e números costumam ser do narrador) '
+      + 'e a emoção quando a fala pede, ex.: [narrador|contemplativo], [mira|curiosa]. NÃO mude nenhuma palavra '
+      + 'do texto, nem a ordem, nem as marcas [I3] e [[INSCREVA]]/[[VENDA]] — só acrescente as tags.';
+    st('✍ pedido preenchido — clique em 🤖 Corrigir com a IA (ou 📋 Copiar o prompt).');
   });
   $('corrPrompt').addEventListener('click', async () => {
     const pedido = $('corrPedido').value.trim(); if (!pedido) { st('Escreva o que corrigir.'); return; }

@@ -702,6 +702,27 @@ REGRA_MARCAS = (
     "menos uma a cada 3-4 minutos de narração (~450-600 palavras); roteiro curto (menos de ~400 palavras) leva uma só.\n"
     "- Nunca duas marcas seguidas, nem uma colada na outra: deixe pelo menos alguns parágrafos entre elas."
 )
+
+
+def regra_marcas(n_inscreva: Any = None) -> str:
+    """📣 v84_218: a regra das marcas com o número de [[INSCREVA]] do canal (o pacote pode pedir só 1)."""
+    try:
+        n = int(n_inscreva)
+    except (TypeError, ValueError):
+        return REGRA_MARCAS
+    if n <= 0:
+        return REGRA_MARCAS.replace(REGRA_MARCAS[REGRA_MARCAS.index("- [[INSCREVA]]"):REGRA_MARCAS.index("- [[VENDA]]")], "")
+    if n == 1:
+        return REGRA_MARCAS.replace(
+            "2 ou 3 no vídeo: uma logo depois do gancho/introdução "
+            "(quando a pessoa já se interessou, nunca na 1ª frase), uma no meio num respiro natural, e uma perto do fim "
+            "(antes da conclusão ou logo depois dela).",
+            "UMA SÓ no vídeo inteiro (mais que isso quebra a imersão): num respiro natural entre dois blocos, depois que a "
+            "pessoa já aprendeu algo (por volta de 25–40% do roteiro) — nunca no gancho, nunca no meio de uma explicação "
+            "nem no fechamento.")
+    return REGRA_MARCAS
+
+
 REGRA_SEM_EXPERIENCIAS = (
     "## Sem experiências anteriores nem referências a outros vídeos\n\n"
     "REMOVA do roteiro tudo que depende do canal ou da vida de quem gravou o vídeo original: citações a outros vídeos "
@@ -1154,7 +1175,13 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     validas = set(TAGS_SOM) | set(TAGS_ESTILO)
     import chamadas as _ch
     usadas = [t.strip().lower() for t in re.findall(r"\[([^\]\[]{2,30})\]", _ch.MARCADOR.sub(" ", roteiro))]
-    desconhecidas = sorted({t for t in usadas if t not in validas and not re.fullmatch(r"cena \d+", t)})
+    try:  # 🎭 v84_219: tag de quem fala não é tag desconhecida
+        import canal_perfil as _cpv
+        _vz = set(_cpv.slugs_de_voz())
+    except Exception:  # noqa: BLE001
+        _vz = {"narrador"}
+    desconhecidas = sorted({t for t in usadas if t not in validas and not re.fullmatch(r"cena \d+", t)
+                            and t.split("|")[0].strip() not in _vz})
     if desconhecidas:
         avisos.append("Tags que o Chatterbox Turbo não conhece (vão ser lidas em voz alta): " + ", ".join(f"[{t}]" for t in desconhecidas))
     palavras = len(re.sub(r"\[[^\]]*\]", " ", _ch.MARCADOR.sub(" ", roteiro)).split())
@@ -1402,6 +1429,11 @@ def limpar_para_tts(texto: str, idioma: str = "") -> Dict[str, Any]:
     (Palavra escrita errado e número por extenso precisam de contexto — isso é
     a opção 🧹 do passo 3, feita pela IA.)"""
     validas = set(TAGS_SOM) | set(TAGS_ESTILO)
+    try:  # 🎭 v84_219: [narrador|contemplativo], [mira|curiosa]… são de quem fala — ficam
+        import canal_perfil as _cpv
+        _vozes = set(_cpv.slugs_de_voz())
+    except Exception:  # noqa: BLE001
+        _vozes = {"narrador"}
     ingles = str(idioma or "").lower().startswith("en")
     mud: Dict[str, int] = {}
 
@@ -1433,7 +1465,7 @@ def limpar_para_tts(texto: str, idioma: str = "") -> Dict[str, Any]:
 
     def _tag(m: "re.Match[str]") -> str:
         dentro = m.group(1).strip().lower()
-        if dentro in validas or re.fullmatch(r"cena \d+", dentro):
+        if dentro in validas or re.fullmatch(r"cena \d+", dentro) or dentro.split("|")[0].strip() in _vozes:
             return m.group(0)
         mud["tags desconhecidas entre colchetes"] = mud.get("tags desconhecidas entre colchetes", 0) + 1
         return ""

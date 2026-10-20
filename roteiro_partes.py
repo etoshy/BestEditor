@@ -344,6 +344,10 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
         L += ["", "## Fontes (pra detalhar os fatos desta parte)", fontes]
     L += ["", "## Resposta", f"SOMENTE o texto narrado desta parte, em {contexto.get('idioma', 'português')} — sem JSON, sem markdown, "
           "sem título, sem comentário antes ou depois."]
+    if contexto.get("personagens_bloco"):  # 🎭 v84_218: sem isto a IA mandava o texto puro, sem dizer quem fala
+        L.append("MULTI VOZ: TODO parágrafo começa com a tag de quem fala — narrador, cada personagem — com a emoção quando a "
+                 "fala pede (ex.: [narrador|contemplativo] …, [mira|curiosa] …, [vanta|ironica] …), inclusive o 1º parágrafo "
+                 "e cada fala curta. Parágrafo sem tag = erro (a voz não sabe de quem é).")
     return "\n".join(L)
 
 
@@ -373,13 +377,16 @@ def ler_parte(texto: str, parte: Dict[str, Any]) -> str:
 
 
 # ------------------------------------------------------------------ juntar
-def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_palavras: int = 0) -> Tuple[str, List[Dict[str, str]]]:
-    """(roteiro inteiro com [[INSCREVA]]/[[VENDA]] entre as partes, capítulos com o começo exato)."""
+def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_palavras: int = 0,
+          max_inscreva: Optional[int] = None) -> Tuple[str, List[Dict[str, str]]]:
+    """(roteiro inteiro com [[INSCREVA]]/[[VENDA]] entre as partes, capítulos com o começo exato).
+    📣 v84_218: `max_inscreva=1` (o canal pede) → uma só, no 1º respiro entre partes depois de ~25% do vídeo."""
     blocos: List[str] = []
     caps: List[Dict[str, str]] = []
     total = sum(palavras(p.get("texto") or "") for p in partes) or 1
     acum = 0
     ultima_venda = 0
+    inscreva_posta = False
     n = len(partes)
     for i, p in enumerate(partes):
         txt = (p.get("texto") or "").strip()
@@ -392,11 +399,18 @@ def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_pal
         acum += palavras(txt)
         if not marcar_chamadas or i == n - 1:
             continue
-        if i == 0:
+        if max_inscreva is not None and max_inscreva <= 1:
+            if max_inscreva == 1 and not inscreva_posta and (acum / total >= 0.25 or i == n - 2):
+                blocos.append("[[INSCREVA]]")
+                inscreva_posta = True
+                continue
+        elif i == 0:
             blocos.append("[[INSCREVA]]")
+            continue
         elif i == n - 2 and n >= 4:
             blocos.append("[[INSCREVA]]")
-        elif acum / total >= 0.15 and acum - ultima_venda >= max(600, total // 4):  # v84_99: ~3 no vídeo, não 6
+            continue
+        if acum / total >= 0.15 and acum - ultima_venda >= max(600, total // 4):  # v84_99: ~3 no vídeo, não 6
             blocos.append("[[VENDA]]")
             ultima_venda = acum
     return "\n\n".join(blocos), caps

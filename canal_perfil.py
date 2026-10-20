@@ -231,7 +231,9 @@ def bloco_roteiro(perfil: Dict[str, Any], ia_emocao: bool = True, curto: bool = 
          "Não use colchetes pra mais nada além das tags de voz e das marcas de imagem [I3]; não escreva o nome antes da fala.",
          "Use as tags EXATAMENTE como estão (" + ", ".join(f"[{f['slug']}]" for f in fal) + ") e as emoções exatamente como nos "
          "presets — nada de traduzir ([narrator], [neutral]) nem abreviar. Toda tag tem a fala logo depois: tag sem texto não "
-         "existe (se a personagem não tem o que dizer ali, ela não aparece)."]
+         "existe (se a personagem não tem o que dizer ali, ela não aparece).",
+         "TODO parágrafo começa com a tag de quem fala — inclusive o narrador e o 1º parágrafo; nada de parágrafo sem tag "
+         "(🎭 v84_218: o gerador de voz precisa saber de quem é cada fala)."]
     if ia_emocao:
         emo = []
         for f in fal:
@@ -296,6 +298,90 @@ def bloco_roteiro(perfil: Dict[str, Any], ia_emocao: bool = True, curto: bool = 
                   "pode lembrar “como prometido”; se não, não puxe o assunto)"]
         L += [f"- {t} (adiado em “{tit}”)" for tit, t in prom]
     return "\n".join(L)
+
+
+def slugs_de_voz(base: Optional[str] = None, perfil: Optional[Dict[str, Any]] = None) -> List[str]:
+    """🎭 v84_219: os nomes que são tag de quem fala: o narrador, as personagens dos canais (personagens.json) e as vozes
+    cadastradas no 🎭 Gerador de voz. Servem pra limpeza/adaptação do TTS NÃO apagarem [mira|curiosa]."""
+    out = {"narrador"} | {f["slug"] for f in falantes(perfil)}
+    try:
+        import multivoz
+        out |= set(multivoz.por_slug().keys())
+    except Exception:  # noqa: BLE001
+        pass
+    base = base or os.path.dirname(os.path.abspath(__file__))
+    raiz = os.path.join(base, "marcas")
+    try:
+        for m in os.listdir(raiz):
+            pj = _json(os.path.join(raiz, m, "personagens.json"))
+            if isinstance(pj, dict):
+                out |= {_slug(p.get("slug") or p.get("nome")) for p in pj.get("personagens") or [] if isinstance(p, dict)}
+    except OSError:
+        pass
+    return sorted(s for s in out if s)
+
+
+def bloco_tags(perfil: Optional[Dict[str, Any]]) -> str:
+    """🎭 v84_218: só as tags de quem fala + as emoções (pra correção / marcar falas de um roteiro pronto)."""
+    fal = falantes(perfil)
+    if not fal:
+        return ""
+    L = ["## 🎭 Quem fala (tags de voz deste canal)",
+         "Cada parágrafo começa com a tag de quem fala, entre colchetes; a tag não é lida. Use SÓ estas: "
+         + ", ".join(f"[{f['slug']}] = {f['nome']}" for f in fal) + ".",
+         "Emoção (quando a fala pede) depois de uma barra, exatamente como nos presets:"]
+    for f in fal:
+        if f.get("emocoes"):
+            L.append(f"  [{f['slug']}|…]: " + ", ".join(f["emocoes"].keys()))
+        papel = f.get("papel") or f.get("funcao_no_video") or ""
+        if papel:
+            L.append(f"  {f['nome']}: {str(papel)[:220]}")
+    return "\n".join(L)
+
+
+_RX_SO_MARCA = re.compile(r"^\s*(?:\[\[[^\]]*\]\]|\[[A-Za-z]{1,2}\d+\]|\[\s*(?:cena|scene)[^\]]*\])\s*$", re.I)
+
+
+def paragrafos_sem_tag(texto: str, perfil: Optional[Dict[str, Any]]) -> int:
+    """🎭 v84_218: quantos parágrafos falados NÃO começam com a tag de quem fala (o canal quer cada fala marcada)."""
+    fal = falantes(perfil)
+    if not fal or not texto:
+        return 0
+    slugs = {f["slug"] for f in fal}
+    n = 0
+    for par in re.split(r"\n\s*\n", str(texto)):
+        par = par.strip()
+        if not par or _RX_SO_MARCA.match(par):
+            continue
+        par = re.sub(r"^(?:\s*\[[A-Za-z]{1,2}\d+\]\s*)+", "", par)  # [I3] antes da fala
+        m = re.match(r"\[\s*([^\[\]|\n]{1,30})", par)
+        if not m or _sem_acento(m.group(1)).replace(" ", "_") not in slugs:
+            n += 1
+    return n
+
+
+def limitar_inscreva(texto: str, maximo: Any) -> Tuple[str, int]:
+    """📣 v84_218: o canal quer no máximo N [[INSCREVA]] — fica(m) a(s) mais bem posicionada(s) (1 só: a mais perto de ~30%
+    do roteiro). → (texto, quantas tirou)."""
+    try:
+        maximo = int(maximo)
+    except (TypeError, ValueError):
+        return texto, 0
+    rx = re.compile(r"^[ \t]*\[\[\s*INSCREVA[^\]]*\]\][ \t]*$", re.I | re.M)
+    ms = list(rx.finditer(texto or ""))
+    if len(ms) <= max(0, maximo):
+        return texto, 0
+    total = len(texto) or 1
+    if maximo == 1:
+        ficar = {min(ms, key=lambda m: abs(m.start() / total - 0.3)).start()}
+    else:
+        ficar = {m.start() for m in ms[:max(0, maximo)]}
+    tirar = [m for m in ms if m.start() not in ficar]
+    out = texto
+    for m in reversed(tirar):
+        out = out[:m.start()] + out[m.end():]
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out, len(tirar)
 
 
 # ------------------------------------------------------------------ 🎭 conferir as tags que a IA escreveu (v84_178)

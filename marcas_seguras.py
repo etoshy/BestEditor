@@ -124,3 +124,55 @@ def restaurar(original: str, novo: str, chamadas: bool = True) -> Tuple[str, Lis
     texto = re.sub(r"[ \t]+\n", "\n", texto)
     texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
     return texto, [m["marca"] for _k, _i, m in inserir]
+
+
+# ------------------------------------------------------------------ 🎭 v84_219: tags de quem fala ([narrador|…], [mira|curiosa])
+def rx_vozes(slugs) -> "re.Pattern[str]":
+    nomes = sorted({str(s).strip().lower() for s in slugs or [] if str(s).strip()}, key=len, reverse=True)
+    if not nomes:
+        return re.compile(r"(?!x)x")
+    return re.compile(r"\[\s*(?:" + "|".join(re.escape(n) for n in nomes) + r")\s*(?:\|[^\[\]\n]*)?\]", re.IGNORECASE)
+
+
+def restaurar_vozes(original: str, novo: str, slugs) -> Tuple[str, int]:
+    """A IA (adaptar pro TTS, revisão…) tirou as tags de quem fala? Recoloca cada uma antes da mesma palavra do texto
+    novo (alinhando as palavras com o texto antigo). Se ela manteve quase todas, não mexe. → (texto, quantas recolocou)."""
+    rx = rx_vozes(slugs)
+    velhas = list(rx.finditer(original or ""))
+    if not velhas or not str(novo or "").strip():
+        return novo, 0
+    if len(rx.findall(novo)) >= 0.9 * len(velhas):
+        return novo, 0
+    novo = rx.sub("", novo)
+    novo = re.sub(r"^[ \t]+", "", novo, flags=re.M)
+
+    def toks(texto: str):
+        sem = rx.sub(lambda m: " " * len(m.group(0)), texto)
+        sem = MARCA.sub(lambda m: " " * len(m.group(0)), sem)
+        out, pos = [], []
+        for m in _PALAVRA.finditer(sem):
+            out.append(_norm(m.group(0)))
+            pos.append(m.start())
+        return out, pos
+
+    ta, pa = toks(original)
+    tb, pb = toks(novo)
+    blocos = [b for b in difflib.SequenceMatcher(None, ta, tb, autojunk=False).get_matching_blocks() if b[2]]
+    inserir = []
+    for m in velhas:
+        k = sum(1 for p in pa if p < m.start())
+        kb = _mapear(k, blocos, len(ta), len(tb))
+        inserir.append((kb, m.group(0)))
+    texto = novo
+    usados = set()
+    for kb, tag in sorted(inserir, key=lambda x: -x[0]):
+        if kb in usados:
+            continue  # duas tags no mesmo ponto: fica a última (a que vale)
+        usados.add(kb)
+        pos = pb[kb] if kb < len(pb) else len(texto)
+        # se a palavra vem logo depois de uma marca de mídia no começo da linha, a tag vai antes da marca
+        ini = texto.rfind("\n", 0, pos) + 1
+        if MARCA.fullmatch(texto[ini:pos].strip() or "-") and texto[ini:pos].strip():
+            pos = ini
+        texto = texto[:pos] + tag + " " + texto[pos:]
+    return re.sub(r"[ \t]{2,}", " ", texto).strip(), len(usados)

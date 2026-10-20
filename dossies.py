@@ -1173,7 +1173,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if cfg.get("marcar_chamadas", True) and fmt.get("minutos", 10) > 1:
         import roteiros_yt
         L.append("")
-        L.append(roteiros_yt.REGRA_MARCAS)
+        L.append(roteiros_yt.regra_marcas((mod.get("chamadas") or {}).get("inscreva")))  # 📣 v84_218: o canal pode pedir só 1
         L.append("")
     if cfg.get("sugerir_produto"):
         L.append("- " + REGRA_PRODUTO)
@@ -1324,6 +1324,16 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         rot, _cons = _cp.normalizar_falas(rot, _perf)
         if _cons:
             avisos.append("🎭 Tags corrigidas: " + " · ".join(_cons[:6]) + (f" (+{len(_cons) - 6})" if len(_cons) > 6 else ""))
+        _sem_tag = _cp.paragrafos_sem_tag(rot, _perf)  # 🎭 v84_218: cada fala com quem fala
+        if _sem_tag:
+            avisos.insert(0, f"🎭 {_sem_tag} parágrafo(s) sem a tag de quem fala (narrador / personagem) — no ✍ Correção, "
+                             "clique em 🎭 Marcar quem fala.")
+    _max_insc = (_modelo_cfg(p).get("chamadas") or {}).get("inscreva")
+    if _max_insc is not None:  # 📣 v84_218: o canal quer no máximo N [[INSCREVA]]
+        import canal_perfil as _cp2
+        rot, _tir = _cp2.limitar_inscreva(rot, _max_insc)
+        if _tir:
+            avisos.append(f"📣 {_tir} [[INSCREVA]] a mais tirada(s) — o canal usa {_max_insc} por vídeo.")
     rot, _rep = _mr.tirar_repeticoes(rot)  # 🔁 v84_169: frase quase igual logo em seguida sai
     if _rep:
         avisos.append(f"🔁 {len(_rep)} frase(s) repetida(s) logo em seguida tirada(s): " + " · ".join(f"“{x[:70]}…”" for x in _rep[:3]))
@@ -1488,7 +1498,8 @@ def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
     partes = res.get("partes") or []
     cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
     _min, alvo, _ppm = alvo_tamanho(p)
-    roteiro, caps = rp.montar(partes, cfg.get("marcar_chamadas", True) is not False, alvo)
+    roteiro, caps = rp.montar(partes, cfg.get("marcar_chamadas", True) is not False, alvo,
+                              max_inscreva=(_modelo_cfg(p).get("chamadas") or {}).get("inscreva"))  # 📣 v84_218
     d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano",
                                  "afirmacoes", "thumbnails", "lore_registro", "escopo")}
     d.update(roteiro=roteiro, capitulos=caps, momentos=[], partes=partes)
@@ -1619,6 +1630,10 @@ def vozes_lembradas(modelo: str) -> Dict[str, Any]:
         return d if isinstance(d, dict) else {}
     except (OSError, ValueError, TypeError):
         return {}
+
+
+def _modelo_cfg(p: Dict[str, Any]) -> Dict[str, Any]:
+    return MODELOS.get(str((p.get("config") or {}).get("modelo") or "")) or {}
 
 
 def perfil_do_modelo(modelo: Any) -> Optional[Dict[str, Any]]:
