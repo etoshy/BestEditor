@@ -706,11 +706,17 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
 
         def _subiu() -> bool:
             aceitar_direitos(page, on_passo)  # o Flow só sobe a imagem depois do "Concordo"
+            if not _visivel(page, S["menu_midia"]):  # v84_211: o Flow novo já põe a imagem enviada na caixa
+                return True
             n = page.locator(S["midia_item"]).count()
             # a mesma imagem de novo (ex.: Fim = Início): o Flow não cria item novo — depois de 20 s vale a 1ª da lista
-            return page.locator(S["midia_incluir"]).count() > 0 and (n > antes or (n > 0 and time.time() - t0 > 20))
+            return (n > antes or (n > 0 and time.time() - t0 > 20)) and (
+                page.locator(S["midia_incluir"]).count() > 0 or time.time() - t0 > 4)
         if not _esperar(_subiu, 120):
             raise FlowPassoErro(passo, "enviei a imagem mas ela não apareceu na lista de mídias do Flow.")
+        if not _visivel(page, S["menu_midia"]):
+            _ULTIMA_MIDIA[id(page)] = {"src": "", "ids": [], "origem": origem}
+            return origem
         item = page.locator(S["midia_item"]).first  # a mais recente vem primeiro ("Recentes")
     try:  # 🧍 v84_189: quem é essa mídia no projeto — pra reusar (sem subir de novo) e pra nunca ser confundida com o resultado
         src = item.locator("img").first.get_attribute("src") or ""
@@ -718,16 +724,31 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
         src = ""
     _ULTIMA_MIDIA[id(page)] = {"src": src, "ids": [t for t in re.findall(r"[0-9A-Za-z_-]{16,}", src)][:6], "origem": origem}
     item.click()
-    if _primeiro(page, S["midia_previa"], 45) is None:  # 🎞 v84_202: imagem recém-enviada ainda processando: clica de novo
-        on_passo(passo, "andando", "a prévia não abriu — clicando de novo na imagem")
+    # 🖱 v84_211: o Flow mudou — agora clicar na imagem do menu JÁ inclui ela na caixa (o menu fecha, sem a prévia e
+    # sem o "Incluir no comando"). Vale qualquer um dos dois jeitos.
+    estado = {"via": ""}
+
+    def _incluiu() -> bool:
+        if _visivel(page, S["midia_previa"]):
+            estado["via"] = "previa"
+            return True
+        if not _visivel(page, S["menu_midia"]):
+            estado["via"] = "direto"
+            return True
+        return False
+    if not _esperar(_incluiu, 45):
+        on_passo(passo, "andando", "a imagem não entrou — clicando de novo")
         try:
             item.click()
         except Exception:  # noqa: BLE001
             pass
-        _primeiro(page, S["midia_previa"], 60, passo, "escolhi a imagem mas a prévia não carregou.")
-    _primeiro(page, S["midia_incluir"], 10, passo, 'não achei o botão "Incluir no comando".').click()
-    if not _esperar(lambda: not _visivel(page, S["menu_midia"]), 8):
-        raise FlowPassoErro(passo, 'cliquei em "Incluir no comando" mas o menu de mídia não fechou.')
+        if not _esperar(_incluiu, 45):
+            raise FlowPassoErro(passo, "escolhi a imagem mas ela não entrou na caixa (nem prévia, nem o menu fechou).",
+                                page=page if hasattr(page, "goto") else None)
+    if estado["via"] == "previa":
+        _primeiro(page, S["midia_incluir"], 10, passo, 'não achei o botão "Incluir no comando".').click()
+        if not _esperar(lambda: not _visivel(page, S["menu_midia"]), 8):
+            raise FlowPassoErro(passo, 'cliquei em "Incluir no comando" mas o menu de mídia não fechou.')
     return origem
 
 
@@ -761,6 +782,33 @@ def incluir_referencia(page, arquivo: Optional[str] = None, media_id: str = "", 
 
 
 # ------------------------------------------------------------------ 5. prompt, gerar, esperar
+def _focar_editor(page, ed, tentativa: int = 0) -> None:
+    """🖱 v84_211: o Flow pôs um brilho animado (flow-border-glow "loop") por cima da caixa de comando — o clique
+    normal do Playwright espera a caixa "parar de mexer"/não ter nada por cima e não clica nunca. Tenta o clique
+    normal rápido, depois o forçado, e por fim põe o foco no editor via JS (com o cursor no fim)."""
+    try:
+        ed.click(timeout=3_000)
+        return
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        ed.click(timeout=3_000, force=True)
+        return
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        ed.evaluate("""(e) => { e.focus(); const r = document.createRange(); r.selectNodeContents(e); r.collapse(false);
+                     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }""")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _texto_por_js(ed, texto: str) -> None:
+    """Último recurso: insere o texto como se fosse colado (o ProseMirror aceita o evento de colar)."""
+    ed.evaluate("""(e, t) => { e.focus(); const dt = new DataTransfer(); dt.setData('text/plain', t);
+                 e.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true})); }""", texto)
+
+
 def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
     fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "prompt"
@@ -774,7 +822,7 @@ def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
     def _entrou() -> bool:
         return amostra in " ".join((ed.inner_text() or "").split()).lower()
     for k in range(3):
-        ed.click()
+        _focar_editor(page, ed, k)
         page.keyboard.press("Control+A")
         page.keyboard.press("Backspace")
         if k == 0:
@@ -784,6 +832,13 @@ def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
         if _esperar(_entrou, 3):
             on_passo(passo, "ok", "")
             return
+    try:  # o teclado não chegou na caixa: cola via JS
+        _texto_por_js(ed, texto)
+        if _esperar(_entrou, 3):
+            on_passo(passo, "ok", "texto colado direto na caixa")
+            return
+    except Exception:  # noqa: BLE001
+        pass
     raise FlowPassoErro(passo, "cliquei na caixa mas o texto do prompt não entrou nela.")
 
 
