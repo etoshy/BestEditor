@@ -99,6 +99,24 @@ def frame_do_trecho(job: Dict[str, Any], i: int, pasta: str) -> str:
     pv = _preview(job, i)
     if pv.get("thumbnail_path") and os.path.isfile(pv["thumbnail_path"]):
         return pv["thumbnail_path"]
+    # 🖼 v84_208: imagem gerada no pod (🏭 Produção no pod / RunPod) — a prévia aponta pra "/runpod/midias/<arquivo>"
+    # (link do próprio site, não http): é o arquivo no disco
+    try:
+        import runpod_gerador as rg
+        for url in (pv.get("result_url"), pv.get("thumbnail_url"), pv.get("url")):
+            c = rg.arquivo_local(url)
+            if c and re.search(r"\.(jpe?g|png|webp)$", c, re.I):
+                return c
+        if seg.get("provider") in PROVEDORES_IA and seg.get("query"):  # pelo prompt da cena, no cache das geradas
+            q = " ".join(str(seg["query"]).split())[:600]
+            for reg in list(rg._cache().values())[::-1]:
+                if isinstance(reg, dict) and reg.get("tipo") == "imagem" and reg.get("arquivo") \
+                        and " ".join(str(reg.get("descricao") or "").split())[:600] == q:
+                    c = os.path.join(rg.pasta(), "midias", reg["arquivo"])
+                    if os.path.isfile(c):
+                        return c
+    except Exception:  # noqa: BLE001
+        pass
     for url in (pv.get("result_url") if re.search(r"\.(jpe?g|png|webp)(\?|$)", str(pv.get("result_url") or ""), re.I) else None,
                 pv.get("thumbnail_url")):
         if url and str(url).startswith(("http://", "https://")):

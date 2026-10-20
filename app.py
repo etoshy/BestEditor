@@ -8024,6 +8024,12 @@ def edicao_resposta(job_id: str):
                                                _palavras_da_narracao(job), corpo.get("foto"), biblioteca=_bib, direcao=_dir)
     except ValueError as exc:
         return jsonify({"erro": str(exc)}), 400
+    if _dir and corpo.get("completar", True) is not False:  # 🎬 v84_208: efeitos espalhados pelo vídeo todo
+        try:
+            prompt_edicao.completar_efeitos(plano, n, _dir, corpo.get("foto"),
+                                            [s.get("efeito") for s in job.get("pending_segments") or []])
+        except Exception:  # noqa: BLE001
+            pass
     for d in (plano.get("destaques") or []) + (plano.get("editoriais") or []):
         d["id"] = uuid.uuid4().hex[:8]
     _gerar_coberturas(job_id, job, plano)

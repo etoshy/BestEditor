@@ -40,7 +40,7 @@ PADRAO = {"ativo": False, "lados": {}, "altura": 0.72, "altura_vertical": 0.46, 
           "inverter_olhar": False,
           # 🎞 v84_193: personagem que se mexe (clipe do Flow, guardado pra reusar): "ia" = a IA marca as que mais
           # ganham com movimento; "todas"; "nao". animar_max = no máximo N poses NOVAS pro Flow por vídeo
-          "animar": "ia", "animar_max": 6,
+          "animar": "nao", "animar_max": 6,
           # canal com UM mascote apresentador (sem tags no roteiro): ele ilustra frases da narração
           "narrador_personagem": ""}
 _CFG_USUARIO = ("lados", "altura", "altura_vertical", "entrada", "saida", "boca", "frequencia", "ia", "inverter_olhar", "animar")
@@ -226,7 +226,7 @@ def config_do_canal(m: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             c[k] = PADRAO[k]
     c["ia"] = c.get("ia") is not False
     c["inverter_olhar"] = c.get("inverter_olhar") is True
-    c["animar"] = c.get("animar") if c.get("animar") in ("ia", "todas", "nao") else ("nao" if c.get("animar") is False else "ia")
+    c["animar"] = c.get("animar") if c.get("animar") in ("ia", "todas", "nao") else "nao"
     c["narrador_personagem"] = _slug(c.get("narrador_personagem") or "")
     return c
 
@@ -704,8 +704,11 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
             sem_pose.add(b["slug"])
             continue
         dica = (ia or {}).get(b.get("id")) or {}
-        lado = dica.get("lado") if dica.get("lado") in ("esquerda", "direita") else lados.get(b["slug"], "esquerda")
-        tam = dica.get("tamanho") if dica.get("tamanho") in TAMANHOS else "medio"
+        prefs = cfg.get("_prefs") or {}
+        lado = dica.get("lado") if dica.get("lado") in ("esquerda", "direita") else \
+            (prefs.get("lado") or {}).get(b["slug"]) or lados.get(b["slug"], "esquerda")
+        tam = dica.get("tamanho") if dica.get("tamanho") in TAMANHOS else (prefs.get("tamanho") or {}).get(b["slug"], "medio")
+        tam = tam if tam in TAMANHOS else "medio"
         size = _tamanho(altura, vertical, TAMANHOS[tam])
         xc, yc = posicao(lado, size, vertical, margem)
         pose = next((o for o in p["poses"] if o["arquivo"] == dica.get("pose")), None) \
@@ -725,6 +728,7 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
                     "saida": dica.get("saida") if dica.get("saida") in ENTRADAS else cfg["saida"],
                     "tamanho": tam, "vertical": vertical, "x_percent": xc, "y_percent": yc,
                     "projeto_id": (p.get("projeto") or {}).get("id"), "descricao_pose": pose.get("descricao") or "",
+                    "espelhar": bool((prefs.get("espelhar") or {}).get(f"{b['slug']}|{pose['arquivo']}|{lado}", False)),
                     "animar": bool(dica.get("animar")) if cfg.get("animar") == "ia" else cfg.get("animar") == "todas"})
     for s_ in sorted(sem_pose):
         nome = (por.get(s_) or {}).get("nome") or s_
@@ -817,6 +821,43 @@ def animar_uma(job: Dict[str, Any], oid: str, base: str, job_dir: str, dados: Di
     return ov
 
 
+# ------------------------------------------------------------------ 🧠 suas edições viram o padrão (v84_208)
+def _prefs_path(base: str, canal: str) -> str:
+    return os.path.join(base, "marcas", canal, "personagens_preferencias.json")
+
+
+def carregar_prefs(base: str, canal: str) -> Dict[str, Any]:
+    try:
+        with open(_prefs_path(base, canal), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def lembrar(base: str, canal: str, ov: Dict[str, Any], dados: Dict[str, Any]) -> None:
+    """O que você ajusta à mão numa aparição fica guardado no canal e vale nas próximas: espelhar esta pose neste lado,
+    o tamanho da personagem, o lado dela."""
+    if not canal or not ov.get("personagem"):
+        return
+    d = carregar_prefs(base, canal)
+    slug, pose, lado = ov["personagem"], ov.get("pose") or "", ov.get("lado") or ""
+    if "espelhar" in dados:
+        d.setdefault("espelhar", {})[f"{slug}|{pose}|{lado}"] = bool(dados["espelhar"])
+    if dados.get("tamanho") in TAMANHOS:
+        d.setdefault("tamanho", {})[slug] = dados["tamanho"]
+    if dados.get("lado") in ("esquerda", "direita"):
+        d.setdefault("lado", {})[slug] = dados["lado"]
+        if ov.get("espelhar") is not None:  # o "⇄ Outro lado" pode ter espelhado sozinho: guarda o resultado
+            d.setdefault("espelhar", {})[f"{slug}|{pose}|{dados['lado']}"] = bool(ov.get("espelhar"))
+    try:
+        os.makedirs(os.path.dirname(_prefs_path(base, canal)), exist_ok=True)
+        with open(_prefs_path(base, canal), "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=1)
+    except OSError:
+        pass
+
+
 def _cenas_nos_candidatos(job: Dict[str, Any], cands: List[Dict[str, Any]]) -> None:
     """A descrição da imagem que está na tela no meio de cada momento (pra 🤖 IA escolher o lado mais vazio)."""
     segs = job.get("pending_segments") or job.get("video_segments") or []
@@ -862,7 +903,9 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
     pc["config"] = {k: cfg[k] for k in _CFG_USUARIO}
     pers = personagens_do_canal(base, canal)
     normalizar_olhar(pers, base, bool(cfg.get("inverter_olhar")), True, job_id)
-    cfg = dict(cfg, inverter_olhar=False)  # os lados das poses já são os reais
+    _pr = carregar_prefs(base, canal)
+    cfg = dict(cfg, inverter_olhar=False, _prefs=_pr,  # os lados das poses já são os reais
+               lados={**(cfg.get("lados") or {}), **(_pr.get("lado") or {})})  # 🧠 o lado que você escolheu vira o de costume
     if not pers:
         raise PersEdErro("Esse canal não tem personagens (personagens.json ou personagens/<slug>.json no zip do canal).")
     roteiro, de_onde = texto_do_job(job)
@@ -954,7 +997,7 @@ def overlay_de(a: Dict[str, Any], pasta: str, cfg: Dict[str, Any], oid: str) -> 
             # 🎞 v84_193: a animação (personagens_animar.py)
             "projeto_id": a.get("projeto_id"), "pose_original": a.get("caminho"), "descricao_pose": a.get("descricao_pose") or "",
             "anim_tipo": "fala" if a["boca_janelas"] else "parada", "anim_modo": "repetir", "anim_segundos": 0,
-            "anim_pedida": bool(a.get("animar"))}
+            "anim_pedida": bool(a.get("animar")), "espelhar": bool(a.get("espelhar"))}
 
 
 def remover(job: Dict[str, Any]) -> int:
@@ -1177,6 +1220,37 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
             return estado(job, base)
         return _resp(_f, job_id)
 
+    @app.route("/job/<job_id>/personagens/animacoes/resetar", methods=["POST"])
+    def personagens_editor_resetar_anim(job_id: str):
+        """🗑 Zera as animações: tira dos overlays deste vídeo e apaga a biblioteca de clipes das personagens do canal
+        (volta pra pose parada com a 👄 boca mexendo)."""
+        def _f():
+            job = _job(job_id)
+            n = 0
+            pids = set()
+            for ov in job.get("overlays") or []:
+                if ov.get("origem") == "personagem":
+                    for k in ("anim_video", "anim_estado", "anim_msg", "anim_pedida", "anim_desligada"):
+                        ov.pop(k, None)
+                    if ov.get("projeto_id"):
+                        pids.add(ov["projeto_id"])
+                    n += 1
+            canal = canal_do_job(job, base)
+            for p in personagens_do_canal(base, canal) if canal else []:
+                if (p.get("projeto") or {}).get("id"):
+                    pids.add(p["projeto"]["id"])
+            import personagens_animar as PA
+            for pid in pids:
+                try:
+                    shutil.rmtree(PA.pasta(pid, base), ignore_errors=True)
+                except Exception:  # noqa: BLE001
+                    pass
+            pc = job.setdefault("personagens_canal", {})
+            pc.setdefault("config", {})["animar"] = "nao"
+            salvar(job_id)
+            return dict(estado(job, base), resetadas=n)
+        return _resp(_f, job_id)
+
     @app.route("/job/<job_id>/personagens/animar-sugeridas", methods=["POST"])
     def personagens_editor_animar_sugeridas(job_id: str):
         def _f():
@@ -1256,6 +1330,12 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
                 try:
                     virar_pose(job, oid, base, job_dir(job_id))  # mudou de lado: a pose olhando pro centro
                 except Exception:  # noqa: BLE001 — canal/projeto sumiu: fica a pose que estava
+                    pass
+            ov_ = next((x for x in job.get("overlays") or [] if x.get("id") == oid), None)
+            if ov_ is not None:  # 🧠 a sua edição vira o padrão do canal
+                try:
+                    lembrar(base, canal_do_job(job, base), ov_, c)
+                except Exception:  # noqa: BLE001
                     pass
             salvar(job_id)
             return estado(job, base)

@@ -176,3 +176,44 @@ def test_espelhar_personagem(tmp_path):
     a = np.asarray(Image.open(f).convert("RGB")).astype(int)
     ys, xs = np.nonzero((a[..., 0] > 200) & (a[..., 1] < 80))
     assert xs.mean() > 160 + 20  # espelhada: o vermelho foi pra direita
+
+
+def test_suas_edicoes_viram_padrao(tmp_path):
+    """v84_208: espelhar/tamanho/lado que você ajusta numa aparição ficam guardados no canal e valem nas próximas."""
+    base = str(tmp_path)
+    ov = {"personagem": "mira", "pose": "mira_a_dir.png", "lado": "esquerda"}
+    pe.lembrar(base, "astra", ov, {"espelhar": True})
+    pe.lembrar(base, "astra", ov, {"tamanho": "grande"})
+    pr = pe.carregar_prefs(base, "astra")
+    assert pr["espelhar"]["mira|mira_a_dir.png|esquerda"] is True and pr["tamanho"]["mira"] == "grande"
+    pers = [{"slug": "mira", "nome": "Mira", "poses": [{"arquivo": "mira_a_dir.png", "caminho": "/x", "boca": None,
+                                                         "lado": "dir", "aprovada": True, "grupo": "", "texto": "", "descricao": ""}]}]
+    b = {"id": 1, "slug": "mira", "start": 1.0, "end": 3.0, "texto": "Was?", "palavras": [[1.0, 1.5]], "tipo": "fala"}
+    aps, _ = pe.montar([b], pers, dict(pe.PADRAO, lados={"mira": "esquerda"}, _prefs=pr), 10.0)
+    assert aps[0]["espelhar"] and aps[0]["tamanho"] == "grande"
+
+
+def test_completa_efeitos_no_fim_do_video():
+    """v84_208: a IA pôs efeito só no começo; a direção pede ~80% → o fim é completado (câmera só em foto)."""
+    import prompt_edicao as pe2
+    direcao = {"efeitos": {"pct": 80, "itens": [{"id": "zoom_respiro", "peso": 2}, {"id": "cosmos_estrelas", "peso": 1}]}}
+    plano = {"trechos": [{"indice": i, "efeito": "zoom_respiro"} for i in range(25)], "avisos": []}
+    n = pe2.completar_efeitos(plano, 90, direcao, foto=[True] * 90)
+    com = {t["indice"] for t in plano["trechos"] if t.get("efeito")}
+    assert n > 20 and any(i >= 60 for i in com) and plano["avisos"][0].startswith("🎬")
+    assert sum(1 for i in com if i >= 60) >= 18
+
+
+def test_animar_acha_imagem_do_pod(tmp_path, monkeypatch):
+    """v84_208: cena gerada no pod (prévia "/runpod/midias/…" ou só o prompt no cache) vira o frame do Flow."""
+    import animar_flow as af
+    import runpod_gerador as rg
+    (tmp_path / "midias").mkdir()
+    Image.new("RGB", (64, 36), (9, 9, 9)).save(tmp_path / "midias" / "rp_ab.png")
+    monkeypatch.setattr(rg, "pasta", lambda: str(tmp_path))
+    monkeypatch.setattr(rg, "_cache", lambda: {"k": {"tipo": "imagem", "arquivo": "rp_ab.png", "descricao": "a star  in space"}})
+    job = {"pending_segments": [{"start": 0, "end": 4, "provider": "runpod", "query": "a star in space", "media_type": "image"}],
+           "segment_previews": [{"result_url": "/runpod/midias/rp_ab.png"}]}
+    assert af.frame_do_trecho(job, 0, str(tmp_path)).endswith("rp_ab.png")
+    job["segment_previews"] = [{}]
+    assert af.frame_do_trecho(job, 0, str(tmp_path)).endswith("rp_ab.png")

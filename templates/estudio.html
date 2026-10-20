@@ -749,9 +749,9 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
         <span class="hint" title="quantos dos momentos possíveis viram aparição">Quanto aparece</span><div style="display:flex;gap:6px;align-items:center"><input type="range" id="peFreq" min="0.1" max="1" step="0.05" style="flex:1"><span class="hint" id="peFreqTxt"></span></div>
         <span></span><label class="chk"><input type="checkbox" id="peBoca" checked> 👄 boca mexendo enquanto fala</label>
         <span></span><label class="chk" title="as poses _esq/_dir do canal saíram olhando pro lado contrário do nome: marque e clique em Colocar de novo"><input type="checkbox" id="peInv"> ↔ personagens olhando pra fora? inverter o olhar das poses</label>
-        <span class="hint" title="clipe animado no Google Flow (começa e termina na pose; fica guardado pra reusar em outros vídeos)">🎞 Animar</span><select id="peAnimar"><option value="ia">a 🤖 IA escolhe quais aparições se mexem</option><option value="todas">todas as aparições se mexem</option><option value="nao">nenhuma (imagem parada)</option></select>
+        <span class="hint" title="clipe animado no Google Flow (começa e termina na pose; fica guardado pra reusar em outros vídeos)">🎞 Animar</span><select id="peAnimar"><option value="nao">nenhuma (pose parada + 👄 boca mexendo)</option><option value="ia">a 🤖 IA sugere quais aparições se mexem</option><option value="todas">todas as aparições se mexem</option></select>
         <span></span><label class="chk"><input type="checkbox" id="peIa" checked> 🤖 a IA escolhe os momentos, a pose, a posição (lado e tamanho, olhando a imagem da cena) e a animação <span class="dim" id="peIaSt"></span></label></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="primary" id="peAplicar" style="width:auto">✨ Colocar automaticamente</button><button class="mini" id="peAnimarSug" title="manda pro Google Flow as poses que a IA marcou pra se mexer (abre o navegador do Flow)">🎞 Animar as sugeridas</button><button class="mini danger" id="peTirar">🗑 Tirar todas</button></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="primary" id="peAplicar" style="width:auto">✨ Colocar automaticamente</button><button class="mini" id="peAnimarSug" title="manda pro Google Flow as poses que a IA marcou pra se mexer (abre o navegador do Flow)">🎞 Animar as sugeridas</button><button class="mini" id="peResetAnim" title="tira as animações deste vídeo e apaga os clipes guardados das personagens (volta pra pose parada com a boca mexendo)">♻ Zerar animações</button><button class="mini danger" id="peTirar">🗑 Tirar todas</button></div>
       <div class="hint" id="peStatus" style="margin-top:4px"></div>
       <div id="listaPers"></div>
     </div>
@@ -4264,7 +4264,7 @@ function desenharPers() {
     const vert = ($('gFormato') && $('gFormato').value) === '9:16';
     $('peAltura').value = vert ? d.config.altura_vertical : d.config.altura; $('peAlturaTxt').textContent = Math.round($('peAltura').value * 100) + '%';
     $('peFreq').value = d.config.frequencia; $('peFreqTxt').textContent = Math.round(d.config.frequencia * 100) + '% dos momentos';
-    $('peIa').checked = d.config.ia !== false; $('peInv').checked = d.config.inverter_olhar === true; $('peAnimar').value = d.config.animar || 'ia';
+    $('peIa').checked = d.config.ia !== false; $('peInv').checked = d.config.inverter_olhar === true; $('peAnimar').value = d.config.animar || 'nao';
     if (!d.tem_roteiro) $('peTxtBox').open = true;
     PE.carregou = true;
   }
@@ -4326,6 +4326,11 @@ $('peAnimarSug').addEventListener('click', async () => {
   try { const d = await pePost(`/job/${JOB}/personagens/animar-sugeridas`, {}); PE.d = d; peSincOverlays(d.overlays); desenharPers(); toast(d.aviso || (d.enviadas ? `🎞 ${d.enviadas} pose(s) no Flow` : 'nada novo pra animar (as sugeridas já têm clipe ou estão na fila)'), 6000); }
   catch (e) { toast('⚠ ' + e.message, 6000); }
   finally { b.disabled = false; }
+});
+$('peResetAnim').addEventListener('click', async () => {
+  if (!confirm('Zerar as animações das personagens (deste vídeo e os clipes guardados)?')) return;
+  try { const d = await pePost(`/job/${JOB}/personagens/animacoes/resetar`, {}); PE.d = d; peSincOverlays(d.overlays); desenharPers(); toast(`♻ animações zeradas (${d.resetadas} aparição(ões) voltaram pra pose parada)`, 5000); }
+  catch (e) { toast('⚠ ' + e.message, 5000); }
 });
 $('peTirar').addEventListener('click', async () => {
   if (!confirm('Tirar todas as personagens do vídeo?')) return;

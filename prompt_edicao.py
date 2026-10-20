@@ -373,6 +373,8 @@ def montar_prompt(job: Dict[str, Any], estado: Dict[str, Any]) -> str:
 4. Destaques: no máximo um por vez, cada um ancorado na fala — "texto" usa as palavras ditas (ou um resumo curto) e "palavra" é a PRIMEIRA palavra falada daquele momento (eu calculo o tempo exato). Não exagere: siga a densidade.
 5. Gráficos: SÓ com dados que a narração realmente cita (não invente números). 2 a 8 valores, rótulos curtos, "unidade" ("%", "R$", "US$ bi", "mi", "km"…), "start"/"end" em segundos cobrindo a fala dos dados (3–8 s). Evite gráfico e destaque ao mesmo tempo no mesmo ponto.
 6. Mande SÓ o que muda: trechos sem alteração podem ficar de fora. Use "null" pra tirar um efeito/cena existente.
+   COBRIR O VÍDEO INTEIRO: as % da direção valem pra CADA parte do vídeo (começo, meio e fim) — percorra a lista até o
+   ÚLTIMO trecho; não capriche só no começo e deixe o fim sem efeito.
 7. REFINO FINO — você decide a composição e a tipografia: em cada destaque escolha "zona" (onde fica na tela, sem cobrir o rosto/assunto da imagem), "enfase" (1–3 palavras do texto que ganham a cor de acento — o número, o nome, a palavra-chave), e se quiser "fonte", "maiusculas", "escala" (0.6–1.6), "anim_entrada"/"anim_saida"/"interna", "cor" (acento só dele), "fundo"/"fundo_cor"/"fundo_int" e "som" (id, ou "nenhum"). Textos livres que não seguem a fala: "avulso": true com "start"/"end".
 8. Sons: as transições e destaques já ganham som automático; use "sons" pra acentos extras (impacto numa revelação, whoosh numa virada, riser antes de um clímax), com "volume" 0.2–1.2, sem poluir.
 9. Quadros editoriais: use com moderação (a frequência da direção acima), SÓ com fatos que a narração cita (nomes, datas, números, posts, manchetes reais); "ficha"/"nome" quando a pessoa aparece; "post" pra citação de rede social (com "traducao" se for em outro idioma); "numero" pra um número-chave; "recortes"/"linha_tempo" pra sequência de fatos. Não ponha quadro e destaque ao mesmo tempo.
@@ -614,6 +616,69 @@ def extrair_json(texto: str) -> Dict[str, Any]:
 
 def _nulo(v: Any) -> bool:
     return v is None or (isinstance(v, str) and v.strip().lower() in ("", "null", "none", "nenhum", "nenhuma"))
+
+
+def completar_efeitos(plano: Dict[str, Any], n_trechos: int, direcao: Optional[Dict[str, Any]],
+                      foto: Optional[List[bool]] = None, atuais: Optional[List[Any]] = None, semente: int = 7) -> int:
+    """🎬 v84_208: a IA às vezes capricha no começo e deixa o fim quase sem efeito. A direção diz "~X% dos trechos com
+    efeito": em cada TERÇO do vídeo, se o plano + o que já está no trecho ficou bem abaixo disso, completa com os
+    efeitos da direção (pelos pesos; movimento de câmera só em foto). → quantos completou (aviso no plano)."""
+    import random
+    if not direcao or n_trechos < 6:
+        return 0
+    pct = int((direcao.get("efeitos") or {}).get("pct") or 0)
+    itens = _itens_eixo(direcao, "efeitos") + _itens_eixo(direcao, "overlays")
+    if pct <= 0 or not itens:
+        return 0
+    rnd = random.Random(semente)
+    por_i = {t["indice"]: t for t in plano.get("trechos") or [] if isinstance(t, dict) and "indice" in t}
+
+    def tem(i):
+        t = por_i.get(i)
+        if t is not None and "efeito" in t:
+            return bool(t["efeito"]) and t["efeito"] != "none"
+        a = (atuais or [None] * n_trechos)[i] if atuais and i < len(atuais) else None
+        return bool(a) and a != "none"
+
+    def escolher(i):
+        ok = [(e, p) for e, p in itens
+              if not (dp_visual.efeito_e_movimento(e) and foto is not None and i < len(foto) and not foto[i])]
+        if not ok:
+            return None
+        tot = sum(max(1, p) for _e, p in ok)
+        x = rnd.random() * tot
+        for e, p in ok:
+            x -= max(1, p)
+            if x <= 0:
+                return e
+        return ok[-1][0]
+    feitos = 0
+    for k in range(3):
+        a, b = n_trechos * k // 3, n_trechos * (k + 1) // 3
+        alvo = round(pct / 100 * (b - a))
+        livres = [i for i in range(a, b) if not tem(i)]
+        falta = alvo - ((b - a) - len(livres))
+        if falta <= max(1, alvo * 0.25) or not livres:  # perto do pedido: deixa como a IA fez
+            continue
+        passo = len(livres) / falta
+        for j in range(min(falta, len(livres))):
+            i = livres[int(j * passo)]
+            e = escolher(i)
+            if not e:
+                continue
+            t = por_i.get(i)
+            if t is None:
+                t = {"indice": i}
+                plano.setdefault("trechos", []).append(t)
+                por_i[i] = t
+            t["efeito"] = e
+            t["efeito_auto"] = True
+            feitos += 1
+    if feitos:
+        plano["trechos"].sort(key=lambda t: t.get("indice", 0))
+        plano.setdefault("avisos", []).insert(0, f"🎬 a IA deixou partes do vídeo quase sem efeito — completei {feitos} "
+                                                 f"efeito(s) pela direção (~{pct}% dos trechos, espalhados por todo o vídeo)")
+    return feitos
 
 
 def ler_resposta(texto: str, n_trechos: int, duracao: float, palavras: List[Dict[str, Any]],
