@@ -85,6 +85,23 @@
     </div>
     {% endfor %}
   </div>
+  <div id="vozesCanal" style="margin-top:12px;border:1px solid var(--borda);border-radius:10px;padding:10px">
+    <b>🎙 Vozes das personagens</b> <span class="mv-hint">— a voz de cada um vale pra TODOS os vídeos do canal (🕵️ Modelo de vídeo, 🎙 Gerar voz multi voz, 🏭 Produção no pod e 🧍 Personagens no Estúdio). As vozes vêm do <a href="/gerar-voz" target="_blank">🎙 Gerador de voz → 🎭 Vozes</a>; um perfil de clonagem vira voz Chatterbox sozinho.</span>
+    {% for f in [perfil.narrador] + perfil.personagens %}{% set a = vozes_canal.get(f.slug) or {} %}{% set sg = f.voz_sugerida or {} %}
+    <div data-fal="{{ f.slug }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--borda);padding-top:6px;margin-top:6px">
+      <b style="min-width:160px">[{{ f.slug }}] {{ f.nome }}</b>
+      <select data-k="voz" style="width:auto;min-width:220px;margin:0">
+        <option value="">— escolha a voz —</option>
+        {% if vozes_multi %}<optgroup label="🎭 Vozes cadastradas">{% for v in vozes_multi %}<option value="{{ v.slug }}" {{ 'selected' if a.voz == v.slug }}>{{ v.nome }} ({{ v.motor or '' }}{{ ', ' + v.genero if v.genero }})</option>{% endfor %}</optgroup>{% endif %}
+        {% if perfis_clonagem %}<optgroup label="🗣️ Perfis de voz (vira voz Chatterbox)">{% for x in perfis_clonagem %}<option value="perfil:{{ x.nome }}">{{ x.nome }}</option>{% endfor %}</optgroup>{% endif %}
+      </select>
+      exag <input type="number" step="0.05" min="0" max="2" data-k="exag" value="{{ a.exag if a.exag is not none else '' }}" placeholder="{{ sg.exag if sg.exag is not none else '' }}" style="width:72px;margin:0">
+      cfg <input type="number" step="0.05" min="0" max="2" data-k="cfg" value="{{ a.cfg if a.cfg is not none else '' }}" placeholder="{{ sg.cfg if sg.cfg is not none else '' }}" style="width:72px;margin:0">
+      vel <input type="number" step="0.05" min="0" max="2" data-k="vel" value="{{ a.vel if a.vel is not none else '' }}" placeholder="{{ sg.vel if sg.vel is not none else '' }}" style="width:72px;margin:0">
+      {% if sg.descricao or sg.genero %}<span class="mv-hint" style="flex-basis:100%;font-size:.78rem">voz sugerida: {{ [sg.genero, sg.idade, sg.motor, sg.descricao]|select|join(' · ') }}</span>{% endif %}
+    </div>{% endfor %}
+    <div style="margin-top:8px"><button type="button" id="btnVozes" style="width:auto">💾 Salvar as vozes</button> <span id="vozesSt" class="mv-hint"></span></div>
+  </div>
   <details style="margin-top:10px"><summary><b>📖 Bíblia da lore</b> (editar guarda a versão anterior no histórico)</summary>
     <textarea id="loreTxt" rows="14" style="width:100%;font-size:.84rem;margin-top:6px">{{ perfil.lore }}</textarea>
     <div class="mv-linha"><input type="text" id="loreMotivo" placeholder="por que mudou (fica no histórico)" style="flex:1"><button type="button" id="btnLore">💾 Salvar a bíblia</button><span class="mv-st" id="loreSt"></span></div>
@@ -117,6 +134,14 @@
   const S = {{ m.slug|tojson }};
   const post = (u, c) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c || {}) }).then(r => r.json());
   const $ = (id) => document.getElementById(id);
+  if ($('btnVozes')) $('btnVozes').addEventListener('click', async () => {
+    const vozes = {};
+    document.querySelectorAll('#vozesCanal [data-fal]').forEach(l => { const o = {}; l.querySelectorAll('[data-k]').forEach(el => { if (el.value !== '') o[el.dataset.k] = el.value; }); if (o.voz) vozes[l.dataset.fal] = o; });
+    $('vozesSt').textContent = '⏳ salvando…';
+    const d = await post(`/marca/${S}/vozes`, { vozes });
+    $('vozesSt').textContent = d.ok ? `✅ salvas — ${Object.keys(d.vozes).length} voz(es); ${d.projetos} projeto(s) do canal atualizado(s)` : '❌ ' + d.erro;
+    if (d.ok && Object.values(vozes).some(v => String(v.voz).startsWith('perfil:'))) setTimeout(() => location.reload(), 900);
+  });
   $('btnLore').addEventListener('click', async () => { const d = await post(`/marca/${S}/lore`, { texto: $('loreTxt').value, motivo: $('loreMotivo').value }); $('loreSt').textContent = d.ok ? '✅ salva' : '❌ ' + d.erro; });
   $('btnNota').addEventListener('click', async () => { const d = await post(`/marca/${S}/historico/nota`, { texto: $('notaTxt').value, tipo: $('notaTipo').value }); if (d.ok) location.reload(); else alert(d.erro); });
   document.querySelectorAll('[data-apagar]').forEach(b => b.addEventListener('click', async () => { if (!confirm('Apagar este registro?')) return; await post(`/marca/${S}/historico/apagar`, { quando: b.dataset.apagar }); location.reload(); }));

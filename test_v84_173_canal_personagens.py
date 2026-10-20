@@ -138,3 +138,15 @@ def test_imagens_com_a_ficha_das_personagens(canal):
     assert "PERSONAGENS DO CANAL" in m_v.prompt_batidas(m, "[mira] Hallo?")
     conf = {x["item"] for x in m_v.conferir_pacote(m)}
     assert "personagens.json" in conf and "referencias/mascote_proporcoes.png" not in conf  # coisas de mascote não se aplicam
+
+
+def test_vozes_das_personagens_no_canal(canal):
+    """v84_210: 🎙 a voz de cada personagem se escolhe na página do canal e vale pros projetos dele."""
+    a, c, S = canal
+    import dossies as ds
+    pag = c.get(f"/marca/{S}").get_data(as_text=True)
+    assert 'id="vozesCanal"' in pag and "Vozes das personagens" in pag
+    d = c.post(f"/marca/{S}/vozes", json={"vozes": {"mira": {"voz": "voz_x", "exag": "0.7"}, "vanta": {"voz": "voz_y"}}}).get_json()
+    assert d["ok"] and d["vozes"]["mira"] == {"voz": "voz_x", "exag": 0.7}
+    modelo = next(k for k, v in ds.MODELOS.items() if v.get("perfil_canal") == S)
+    assert ds.vozes_lembradas(modelo)["vanta"]["voz"] == "voz_y"

@@ -112,7 +112,82 @@ def registrar(app, base_dir: str) -> None:
                                modelo=mv.modelo_roteiro(m), direcao=mv._json(os.path.join(m["dir"], "direcao.json")),
                                perfil=__import__("canal_perfil").carregar(base_dir, slug),
                                tem_mascote=bool((m["guia"].get("mascot") or {}).get("prompt_lock_en")),
-                               tem_proporcoes=os.path.isfile(os.path.join(m["dir"], "referencias", "mascote_proporcoes.png")))
+                               tem_proporcoes=os.path.isfile(os.path.join(m["dir"], "referencias", "mascote_proporcoes.png")),
+                               vozes_canal=_vozes_canal(m), vozes_multi=_vozes_multi(), perfis_clonagem=_perfis_clonagem())
+
+    # ---------------------------------------------------------------- 🎙 v84_210: a voz de cada personagem, no canal
+    def _vozes_canal(m):
+        try:
+            import json as _j
+            with open(os.path.join(m["dir"], "vozes_escolhidas.json"), encoding="utf-8") as f:
+                d = _j.load(f)
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _vozes_multi():
+        try:
+            return [{"slug": v["slug"], "nome": v["nome"], "motor": v.get("motor"), "genero": v.get("genero") or "",
+                     "perfil": (v.get("config") or {}).get("vozPerfil") or ""} for v in __import__("multivoz").listar()]
+        except Exception:  # noqa: BLE001
+            return []
+
+    def _perfis_clonagem():
+        try:
+            from tts.voice_generator import listar_perfis_de_voz
+            return [{"nome": n} for n in listar_perfis_de_voz()]
+        except Exception:  # noqa: BLE001
+            return []
+
+    @app.route("/marca/<slug>/vozes", methods=["POST"])
+    def marca_vozes(slug: str):
+        """🎙 A voz (e a emoção padrão) de cada personagem do canal — vale pra TODOS os vídeos dele: o 🕵️ Modelo de
+        vídeo, o 🎙 Gerar voz multi voz, a 🏭 Produção no pod e o 🧍 Personagens do Estúdio."""
+        import json as _j
+        m = _marca(slug)
+        c = request.get_json(silent=True) or {}
+        lng = str(((m["guia"].get("project") or {}).get("channel_language")) or "")
+        mt = re.search(r"\(([a-z]{2})(?:-[A-Z]{2})?\)", lng)
+        idioma = mt.group(1) if mt else ""
+        vp = {}
+        for k, v in list((c.get("vozes") or {}).items())[:16]:
+            if not isinstance(v, dict):
+                continue
+            voz = str(v.get("voz") or "")[:80]
+            if voz.startswith("perfil:"):  # perfil de clonagem → a voz Chatterbox dele (criada uma vez)
+                try:
+                    voz = __import__("multivoz").voz_de_perfil(voz[7:], idioma=idioma)["slug"]
+                except Exception as exc:  # noqa: BLE001
+                    return jsonify({"erro": f"Não consegui criar a voz do perfil: {exc}"}), 400
+            item = {"voz": voz[:40]}
+            for kk in ("exag", "cfg", "vel"):
+                try:
+                    if v.get(kk) not in (None, ""):
+                        item[kk] = round(float(v[kk]), 2)
+                except (TypeError, ValueError):
+                    pass
+            vp[str(k)[:30]] = item
+        with open(os.path.join(m["dir"], "vozes_escolhidas.json"), "w", encoding="utf-8") as f:
+            _j.dump(vp, f, ensure_ascii=False, indent=1)
+        # os projetos (🕵️ Modelo de vídeo) deste canal passam a usar essas vozes
+        n = 0
+        try:
+            import dossies as ds
+            for it in ds.listar(base_dir):
+                try:
+                    p = ds.carregar(base_dir, it["id"])
+                except Exception:  # noqa: BLE001
+                    continue
+                cfg = p.get("config") or {}
+                if (ds.MODELOS.get(cfg.get("modelo") or "") or {}).get("perfil_canal") != slug:
+                    continue
+                cfg["vozes_personagens"] = vp
+                p["config"] = cfg
+                ds.salvar(base_dir, p)
+                n += 1
+        except Exception:  # noqa: BLE001
+            pass
+        return jsonify({"ok": True, "vozes": vp, "projetos": n, "vozes_multi": _vozes_multi()})
 
     # ---------------------------------------------------------------- 🎭 perfil do canal: lore e histórico
     @app.route("/marca/<slug>/lore", methods=["POST"])

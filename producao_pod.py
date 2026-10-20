@@ -600,10 +600,11 @@ def _texto_com_vozes(it: Dict[str, Any]) -> str:
         return it["texto"]
     import canal_perfil
     cfg = p.get("config") or {}
-    texto, faltam = canal_perfil.converter_para_vozes(it["texto"], perfil, cfg.get("vozes_personagens") or {},
+    vp = cfg.get("vozes_personagens") or dossies.vozes_lembradas(cfg.get("modelo") or "")  # 🎙 v84_210: as do canal
+    texto, faltam = canal_perfil.converter_para_vozes(it["texto"], perfil, vp or {},
                                                       usar_emocao=cfg.get("ia_emocao", True) is not False)
     if faltam:
-        raise ProducaoErro("falta escolher a voz de " + ", ".join(faltam) + " (🕵️ Modelo de vídeo → 🎭 Vozes dos personagens)")
+        raise ProducaoErro("falta escolher a voz de " + ", ".join(faltam) + " (🎨 Identidade visual → o canal → 🎙 Vozes das personagens)")
     return texto
 
 

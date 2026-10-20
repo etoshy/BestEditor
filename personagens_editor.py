@@ -285,7 +285,8 @@ def mapa_de_vozes(job: Dict[str, Any], base: str) -> Dict[str, str]:
     try:
         import dossies
         cfg = (dossies.carregar(base, job["dossie_id"]).get("config") or {})
-        return {str(v): str(k) for k, v in (cfg.get("vozes_personagens") or {}).items() if v}
+        vp = cfg.get("vozes_personagens") or dossies.vozes_lembradas(cfg.get("modelo") or "")
+        return {str((v or {}).get("voz") if isinstance(v, dict) else v): str(k) for k, v in (vp or {}).items() if v}
     except Exception:  # noqa: BLE001
         return {}
 
