@@ -58,6 +58,7 @@
     <button type="button" id="gMestre" style="background:#7c3aed;">⭐ Gerar a mestre</button>
     <button type="button" id="gP1">▶ Gerar prioridade 1</button>
     <button type="button" id="gFaltam">▶ Gerar todas as que faltam</button>
+    <button type="button" id="gBocas" style="background:#0f766e;" title="cria e gera a versão de boca aberta de TODA pose — é a animação de fala (o editor alterna as duas enquanto a personagem fala)">👄 Animar todas (boca de cada pose)</button>
     <button type="button" id="gMarcadas">▶ Gerar as marcadas (<span id="nMarc">0</span>)</button>
     <button type="button" id="gMarcadasCorr" title="refaz as marcadas com uma correção (ex.: o olho de eclipse do outro lado)">🔁 Refazer as marcadas com correção</button>
     <a href="/personagens-pod/{{ p.id }}/aprovadas.zip" style="margin-left:auto;font-weight:600;">⬇ Baixar as aprovadas (.zip)</a>
@@ -127,7 +128,7 @@
       return `<div class="pj-it ${it.estado} ${eMestre ? 'mestre' : ''}" data-a="${esc(it.arquivo)}">
         <input type="checkbox" class="pj-chk" ${marc.has(it.arquivo) ? 'checked' : ''} ${pode ? '' : 'disabled'}>
         <div class="pj-img" data-zoom>${img}</div>
-        <div class="pj-nome">${eMestre ? '⭐ ' : ''}${esc(it.arquivo)}</div>
+        <div class="pj-nome">${eMestre ? '⭐ ' : ''}${esc(it.arquivo)}${it.tipo !== 'boca' && D.itens.some(x => x.tipo === 'boca' && x.base === it.arquivo && x.img) ? ' <span title="tem a boca pronta — clique na imagem pra ver a animação">👄</span>' : ''}</div>
         <div class="pj-desc">P${it.prioridade} · ${esc(it.descricao)}${it.tipo === 'boca' ? ` <i>(base: ${esc(it.base)})</i>` : ''}</div>
         <span class="pj-est ${it.estado}">${ROT[it.estado] || it.estado}</span>${it.mestre_sugerida && !D.mestre ? ' <span class="pj-est" style="background:#f3e8ff;">⭐ sugerida pra mestre</span>' : ''}
         ${it.msg ? `<div class="pj-desc" style="color:#1d4ed8;">${esc(it.msg)}</div>` : ''}${it.erro ? `<div class="pj-desc" style="color:#b91c1c;">${esc(it.erro)}</div>` : ''}${it.aviso ? `<div class="pj-desc" style="color:#92400e;">⚠ ${esc(it.aviso)}</div>` : ''}
@@ -164,7 +165,13 @@
     const card = e.target.closest('.pj-it'); if (!card) return;
     const a = card.dataset.a, it = D.itens.find(x => x.arquivo === a);
     if (e.target.classList.contains('pj-chk')) { if (e.target.checked) marc.add(a); else marc.delete(a); $('nMarc').textContent = marc.size; return; }
-    if (e.target.closest('[data-zoom]') && it.img) { $('zoomImg').src = `/personagens-pod/${PID}/img/${it.img}`; $('zoom').style.display = 'flex'; return; }
+    if (e.target.closest('[data-zoom]') && it.img) {
+      // 👄 a pose com a boca dela pronta: o zoom mostra a animação de fala (alterna as duas)
+      const par = it.tipo === 'boca' ? D.itens.find(x => x.arquivo === it.base) : D.itens.find(x => x.tipo === 'boca' && x.base === it.arquivo);
+      clearInterval(window._flap); $('zoomImg').src = `/personagens-pod/${PID}/img/${it.img}`; $('zoom').style.display = 'flex';
+      if (par && par.img) { const a1 = `/personagens-pod/${PID}/img/${it.tipo === 'boca' ? par.img : it.img}`, a2 = `/personagens-pod/${PID}/img/${it.tipo === 'boca' ? it.img : par.img}`; let k = 0;
+        new Image().src = a2; window._flap = setInterval(() => { if ($('zoom').style.display === 'none') { clearInterval(window._flap); return; } $('zoomImg').src = (k++ % 2) ? a1 : a2; }, 130); }
+      return; }
     const b = e.target.closest('button'); if (!b || b.disabled) return;
     if (b.dataset.acao === 'gerar' || b.dataset.acao === 'corrigir') { /* gerar() cuida */ }
     else { b.disabled = true; OCUPADO = true; }
@@ -198,6 +205,13 @@
   const pronto = (x) => ['nova', 'erro'].includes(x.estado) && semMestre(x);
   const ordenar = (lista) => lista.filter(x => x.tipo !== 'boca').concat(lista.filter(x => x.tipo === 'boca'));
   $('gP1').addEventListener('click', () => gerar(ordenar(D.itens.filter(x => x.prioridade === 1 && pronto(x))).map(x => x.arquivo), ''));
+  $('gBocas').addEventListener('click', async () => {
+    if (!confirm('Criar e gerar a boca aberta de todas as poses (a animação de fala)?')) return;
+    try { const d = await post(`/personagens-pod/${PID}/animar-todas`, {quantidade: $('quantidade').value});
+      alert(`👄 ${d.novas} boca(s) nova(s) no JSON · ${d.enviadas} indo pra geração` + (d.aviso ? `\n${d.aviso}` : '')); }
+    catch (e) { alert(e.message); }
+    ULTIMA = ''; estado();
+  });
   $('gFaltam').addEventListener('click', () => gerar(ordenar(D.itens.filter(pronto)).map(x => x.arquivo), ''));
   $('gMarcadas').addEventListener('click', () => gerar([...marc], ''));
   $('gMarcadasCorr').addEventListener('click', () => { if (!marc.size) { alert('Marque as poses primeiro.'); return; } const t = prompt('Correção pra todas as marcadas (inglês):'); if (t) gerar([...marc], t); });

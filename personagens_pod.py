@@ -188,6 +188,51 @@ def trocar_json(pid: str, texto_json: str, base: str = _BASE) -> Dict[str, Any]:
         return {"ok": True, "poses": len(novos), "novas": add, "sairam": saiu}
 
 
+PROMPT_BOCA = ("Keep everything in this image identical — same character, same pose, same framing, same size, same colors, "
+               "on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking "
+               "in the middle of a sentence.")
+
+
+def criar_bocas(pid: str, base: str = _BASE) -> List[str]:
+    """👄 v84_209: a "animação" de cada pose = a mesma pose com a boca aberta (o editor alterna as duas enquanto ela
+    fala). Põe no JSON do projeto a "_boca" de TODA pose que ainda não tem. → as que entraram."""
+    with _TRAVA:
+        p = carregar(pid, base)
+        poses = p["dados"]["poses"]
+        tem = {x.get("base") for x in poses if x.get("tipo") == "boca"}
+        novas = []
+        for x in list(poses):
+            if x.get("tipo") == "boca" or x["arquivo"] in tem:
+                continue
+            arq = x["arquivo"][:-4] + "_boca.png"
+            if any(y["arquivo"] == arq for y in poses):
+                continue
+            poses.append({"arquivo": arq, "tipo": "boca", "base": x["arquivo"], "grupo": "boca",
+                          "prioridade": x.get("prioridade", 2), "lado": x.get("lado") or "",
+                          "descricao_pt": (x.get("descricao_pt") or x["arquivo"][:-4]) + " — falando (boca aberta)",
+                          "prompt": PROMPT_BOCA})
+            p["imagens"][arq] = {"estado": "nova", "versoes": [], "atual": -1, "erro": None, "job": None}
+            novas.append(arq)
+        if novas:
+            _log(p, f"👄 {len(novas)} “_boca” novas no JSON (a animação de fala de cada pose)")
+            salvar(p, base)
+        return novas
+
+
+def animar_todas(pid: str, base: str = _BASE, quantidade: str = "x1") -> Dict[str, Any]:
+    """👄 Cria as _boca que faltam e manda gerar as de toda pose que já tem imagem (as outras ficam pra depois)."""
+    novas = criar_bocas(pid, base)
+    p = carregar(pid, base)
+    alvo = [x["arquivo"] for x in p["dados"]["poses"] if x.get("tipo") == "boca"
+            and (p["imagens"].get(x["arquivo"]) or {}).get("estado") in ("nova", "erro", None)
+            and arquivo_atual(p, x["base"], base)]
+    if not alvo:
+        return {"ok": True, "novas": len(novas), "enviadas": 0,
+                "aviso": "Nenhuma _boca pra gerar agora (as poses base ainda não têm imagem, ou todas já foram geradas)."}
+    r = enviar(pid, alvo, "", base, quantidade=quantidade)
+    return dict(r if isinstance(r, dict) else {}, ok=True, novas=len(novas), enviadas=len(alvo))
+
+
 def pose(p: Dict[str, Any], arquivo: str) -> Dict[str, Any]:
     x = next((y for y in p["dados"]["poses"] if y["arquivo"] == arquivo), None)
     if not x:

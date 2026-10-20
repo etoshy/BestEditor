@@ -203,3 +203,22 @@ def test_qualidade_vai_no_pedido(pod, tmp_path, monkeypatch):
     assert ped["geracao"]["qualidade"] == "alta" and ped["geracao"]["passos"] == 35
     stj = json.loads(sorted((tmp_path / "pod" / "jobs").iterdir())[-1].joinpath("status.json").read_text(encoding="utf-8"))
     assert stj["itens"]["vanta_neutra_esq.png"]["passos"] == 35
+
+
+def test_animar_todas_cria_a_boca_de_cada_pose(tmp_path, monkeypatch):
+    """v84_209: 👄 Animar todas = a _boca de toda pose entra no JSON (a animação de fala) e vai pra geração."""
+    import json
+    import personagens_pod as pp
+    monkeypatch.setenv("PERSONAGENS_POD_DIR", str(tmp_path / "pp"))
+    dados = {"formato": "personagens_pod_v1", "nome": "M", "poses": [
+        {"arquivo": "m_a.png", "prompt": "a"}, {"arquivo": "m_b.png", "prompt": "b"},
+        {"arquivo": "m_a_boca.png", "tipo": "boca", "base": "m_a.png", "prompt": "x"}]}
+    p = pp.criar("M", json.dumps(dados), [], "", str(tmp_path))
+    novas = pp.criar_bocas(p["id"], str(tmp_path))
+    assert novas == ["m_b_boca.png"]
+    assert pp.criar_bocas(p["id"], str(tmp_path)) == []  # não duplica
+    enviados = []
+    monkeypatch.setattr(pp, "enviar", lambda pid, arqs, *a, **k: enviados.append(arqs) or {"ok": True})
+    monkeypatch.setattr(pp, "arquivo_atual", lambda p_, a, b=None: "/x.png" if a == "m_b.png" else None)
+    r = pp.animar_todas(p["id"], str(tmp_path))
+    assert r["enviadas"] == 1 and enviados == [["m_b_boca.png"]]

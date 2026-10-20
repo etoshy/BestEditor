@@ -136,6 +136,11 @@ def registrar(app, base_dir: str) -> None:
                                      qualidade=str(c.get("qualidade") or ""), passos=passos,
                                      quantidade=str(c.get("quantidade") or "x1")))
 
+    @app.route("/personagens-pod/<pid>/animar-todas", methods=["POST"])
+    def personagens_pod_animar_todas(pid: str):
+        """👄 v84_209: a boca aberta de TODA pose (a animação de fala), num clique — como a criação das poses."""
+        return _ok(lambda: pp.animar_todas(pid, base_dir, str(_corpo().get("quantidade") or "x1")))
+
     @app.route("/personagens-pod/<pid>/motor", methods=["POST"])
     def personagens_pod_motor(pid: str):
         return _ok(pp.trocar_motor, pid, str(_corpo().get("motor") or ""), base_dir)
