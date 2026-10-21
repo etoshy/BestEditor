@@ -351,12 +351,15 @@ def tentar_de_novo(lid: str, iid: str, pod_url: str = "") -> Dict[str, Any]:
 
 
 # ------------------------------------------------------------------ o motor
-def configurar(criar_projeto: Callable[..., str], registrar_narracao: Optional[Callable[..., Dict[str, Any]]] = None) -> None:
+def configurar(criar_projeto: Callable[..., str], registrar_narracao: Optional[Callable[..., Dict[str, Any]]] = None,
+               atualizar_projeto: Optional[Callable[..., int]] = None) -> None:
     """O app passa as funções que precisam dele: registrar a narração como uma geração do 🎙️ Gerador de voz (legenda,
     histórico, .zip) e criar o projeto do editor a partir desse .zip."""
     _CRIAR_PROJETO["fn"] = criar_projeto
     if registrar_narracao:
         _CRIAR_PROJETO["narracao"] = registrar_narracao
+    if atualizar_projeto:  # 🖼 v84_223: o projeto já criado passa a usar as cenas novas do pod
+        _CRIAR_PROJETO["atualizar"] = atualizar_projeto
 
 
 def garantir_runner() -> None:
@@ -798,6 +801,68 @@ def _materiais_do_modelo(it: Dict[str, Any], cenas: List[Dict[str, Any]]) -> Dic
         return {}
 
 
+def _anotar_alternativas(resposta: Dict[str, Any], alt: Dict[int, Dict[str, str]]) -> None:
+    """A foto/vídeo do roteiro que não entrou (100% no pod) fica anotada na cena: o editor pode trocar por ela."""
+    for i, m in (alt or {}).items():
+        if 0 <= i < len(resposta.get("segments") or []):
+            resposta["segments"][i]["material_alternativo"] = m.get("id")
+
+
+def completar_no_pod(lid: str, iid: str) -> Dict[str, Any]:
+    """🖼 v84_223: o roteiro já foi planejado com cenas ⏳ pendentes (ou com a foto do roteiro): TODAS viram imagem do pod
+    (sem narrar nem planejar de novo) e vão pra fila. Projeto já criado: no editor, 🔁 Pôr as imagens do pod de volta."""
+    import cenas_lote
+    with _TRAVA:
+        lote = carregar(lid)
+        it = next((x for x in lote["itens"] if x["id"] == iid), None)
+        pasta = pasta_item(lid, iid)
+        cam = os.path.join(pasta, "cenas.json")
+        if not it or not os.path.exists(cam):
+            raise ProducaoErro("Esse roteiro ainda não planejou as cenas.")
+        with open(cam, encoding="utf-8") as f:
+            resposta = json.load(f)
+        segs = resposta.get("segments") or []
+        n = 0
+        convertidas = set()
+        for k, s in enumerate(segs):
+            if s.get("provider") == "runpod":
+                continue
+            if s.get("provider") not in (cenas_lote.PROVIDER_ADIADO, "material"):
+                continue
+            if s.get("provider") == "material":
+                s["material_alternativo"] = s.get("query")
+            visual = str(s.get("visual") or s.get("query") or "").strip()[:400] or "cinematic documentary scene"
+            s.update(provider="runpod", media_type="image",
+                     query=f"{visual.rstrip('. ')}. Photorealistic documentary photograph, natural light, sharp focus. "
+                           f"{cenas_lote.SEM_TEXTO}")
+            convertidas.add(k)
+            n += 1
+        if not n:
+            raise ProducaoErro("Não tem cena pendente — todas já são do pod.")
+        with open(cam, "w", encoding="utf-8") as f:
+            json.dump(resposta, f, ensure_ascii=False, indent=1)
+        no_pod = sum(1 for s in segs if s.get("provider") == "runpod")
+        it["cenas"] = {"cenas": len(segs), "no_pod": no_pod, "pendentes": len(segs) - no_pod,
+                       "pct": round(100 * no_pod / max(1, len(segs)))}
+        _log(it, f"🖼 {n} cena(s) pendente(s) viraram imagem do pod (100%)")
+        salvar(lote)
+        if it["estado"] not in ("imagens", "pronto", "erro", "montando"):
+            return {"ok": True, "convertidas": n, "enviadas": 0}  # ainda nem chegou nas imagens: vão junto
+        import pod_studio
+        w, h = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (1024, 1024)}[lote["config"]["orientacao"]]
+        pedidos = [{"prompt": s["query"], "nome": f"cena-{k + 1:04d}"} for k, s in enumerate(segs) if k in convertidas]
+        jid, _sem = pod_studio.enviar_imagens_com_refs(pedidos, largura=w, altura=h, nome=(it["titulo"] + " (100%)")[:40],
+                                                       cfg=_cfg_pod(lote))
+        # o job novo entra na fila do pod DEPOIS do que já está rodando: acompanhar o novo = esperar os dois
+        antigos = [j for j in list(it.get("pod_imgs") or []) + [it.get("pod_img")] if j]
+        it.update(estado="imagens", pod_imgs=antigos, pod_img=jid, erro=None, faltam_img=0)
+        _log(it, f"🖼 {len(pedidos)} imagem(ns) das cenas pendentes na fila do pod")
+        lote["status"] = "rodando"
+        salvar(lote)
+    garantir_runner()
+    return {"ok": True, "convertidas": n, "enviadas": len(pedidos)}
+
+
 def _planejar_cenas(lid: str, iid: str) -> None:
     import cenas_lote
     import pod_studio
@@ -858,6 +923,12 @@ def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str,
                       "prompt é a própria fala — ligue a IA em 🤖 IA pra escolher as difíceis e escrever prompts bons.")
     pct = cfg_lote["pct"] / 100.0
     materiais = _materiais_do_modelo(it, cenas)
+    alt: Dict[int, Dict[str, str]] = {}
+    if materiais and pct >= 1:
+        # 🖼 v84_223: 100% = TODA cena no pod, mesmo a que tem foto real marcada no roteiro (a foto fica anotada na
+        # cena pra você usar no editor, se quiser)
+        alt, materiais = materiais, {}
+        _mudar(lid, iid, _log=f"🖼 100%: {len(alt)} cena(s) com foto do roteiro também vão pro pod (a foto fica de alternativa)")
     if materiais:
         _mudar(lid, iid, _log=f"🕵️ {len(materiais)} cenas com as fotos do modelo de vídeo (marcas [I…] do roteiro)")
     if info:
@@ -870,8 +941,11 @@ def _planejar_padrao(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str,
     else:
         escolhidas = cenas_lote.escolher_sem_ia(len(cenas), pct)
     escolhidas = {i for i in escolhidas if i not in materiais}
+    if pct >= 1:
+        escolhidas = {i for i in range(len(cenas)) if i not in materiais}
     resposta = cenas_lote.montar_json(cenas, info, escolhidas, cfg_lote.get("estilo_extra") or "", materiais,
                                       epoca=cfg_lote.get("epoca", True), setas=setas)
+    _anotar_alternativas(resposta, alt)
     resposta["_ficha"] = ficha
     rostos = _rostos(it, resposta, info) if info else {}
     if rostos:
@@ -916,6 +990,9 @@ def _planejar_canal(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, 
     fotos_ref = {i: x["caminho"] for i, x in materiais.items()
                  if ccfg["fotos_do_roteiro"] == "referencia" and x.get("tipo") == "foto" and x.get("caminho")}
     materiais = {i: x for i, x in materiais.items() if i not in fotos_ref}
+    alt: Dict[int, Dict[str, str]] = {}
+    if materiais and ccfg["pct"] >= 100:  # 🖼 v84_223: 100% = toda cena no pod (a foto/vídeo fica de alternativa)
+        alt, materiais = materiais, {}
     if fotos_ref:
         _mudar(lid, iid, _log=f"📷 {len(fotos_ref)} foto(s) marcada(s) no roteiro vão de referência e saem no estilo do canal")
     if materiais:
@@ -928,6 +1005,7 @@ def _planejar_canal(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, 
     escolhidas = cenas_lote.escolher(notas, pct) if pct < 1 else {i for i in range(len(cenas)) if i not in materiais}
     escolhidas |= {i for i in fotos_ref if pct > 0}
     resposta = cenas_lote.montar_json(cenas, info, escolhidas, "", materiais, epoca=False)
+    _anotar_alternativas(resposta, alt)
     resposta["_ficha"] = ficha
     rostos: Dict[str, List[List[str]]] = {}
     n_pers = n_real = 0
@@ -1127,6 +1205,17 @@ def _receber_imagens(lid: str, iid: str) -> None:
     if faltaram:
         _mudar(lid, iid, faltam_img=faltaram)
     if it.get("job_id"):  # o projeto já existe (baixou de novo): não cria outro
+        try:  # 🖼 v84_223: as cenas que viraram do pod (100%) passam a ser do pod no projeto também
+            with open(os.path.join(pasta, "cenas.json"), encoding="utf-8") as f:
+                resp = json.load(f)
+            _registrar_imagens_locais(lote, pasta, resp)
+            fn_at = _CRIAR_PROJETO.get("atualizar")
+            if fn_at:
+                n_at = fn_at(it["job_id"], resp)
+                if n_at:
+                    msg += f" · {n_at} cena(s) do projeto passaram a usar a imagem do pod"
+        except Exception as exc:  # noqa: BLE001
+            msg += f" (não consegui atualizar o projeto: {str(exc)[:120]})"
         _mudar(lid, iid, estado="pronto", _log=msg + " — no editor clique em 🔁 Pôr as imagens do pod de volta")
         return
     _mudar(lid, iid, estado="montando", _log=msg)

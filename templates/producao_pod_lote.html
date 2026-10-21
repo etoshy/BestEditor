@@ -49,7 +49,8 @@
       const rebaixar = (it.pod_img && ['pronto', 'erro'].includes(it.estado)) ? ` <button type="button" data-rebaixar="${it.id}" title="o pod precisa estar ligado" style="width:auto;padding:2px 8px;font-size:.8rem;">🖼 Baixar imagens de novo</button>` : '';
       const tentar = (it.estado === 'erro' || ['narrando', 'imagens'].includes(it.estado))
                   ? ` <button type="button" data-tentar="${it.id}" style="width:auto;${it.estado === 'erro' ? '' : 'padding:2px 8px;font-size:.8rem;'}" title="usa o link do pod acima: sem narração, pede de novo; com narração, manda só as imagens que faltam">🔁 Tentar de novo</button>` : '';
-      const acoes = zip + canal + refazer + rebaixar + (it.job_id ? ` <a href="/job/${it.job_id}/edit-segments" style="font-weight:600;">📂 Abrir no editor →</a>` : '') + tentar;
+      const completar = (it.cenas && it.cenas.pendentes > 0 && !['aguardando', 'narrando', 'cenas'].includes(it.estado)) ? ` <button type="button" data-completar="${it.id}" title="as cenas pendentes (inclusive as com foto do roteiro) também viram imagem do pod — sem narrar nem planejar de novo" style="width:auto;padding:2px 8px;font-size:.8rem;background:#0f766e;">🖼 Gerar as ${it.cenas.pendentes} pendentes no pod (100%)</button>` : '';
+      const acoes = zip + canal + refazer + completar + rebaixar + (it.job_id ? ` <a href="/job/${it.job_id}/edit-segments" style="font-weight:600;">📂 Abrir no editor →</a>` : '') + tentar;
       return `<div class="pl-item"><div class="pl-topo">
           <div style="min-width:0;"><b>${esc(it.titulo)}</b> <span style="font-size:.8rem;color:#888;">${esc(it.idioma)} · ${esc(it.motor)}${it.perfil ? ' · 🗣️ ' + esc(it.perfil) : ''}</span></div>
           <div style="display:flex;gap:10px;align-items:center;"><span class="pl-estado ${esc(it.estado)}">${esc(it.rotulo)}</span>${acoes}</div></div>
@@ -65,6 +66,8 @@
     if (d.status === 'rodando') setTimeout(atualizar, 3000);
   }
   document.getElementById('itens').addEventListener('click', async (e) => {
+    const cp = e.target.dataset.completar;
+    if (cp) { if (!confirm('Gerar no pod as cenas pendentes deste roteiro? (o pod precisa estar ligado)')) return; e.target.disabled = true; await post(`/producao-pod/${LID}/${cp}/completar-pod`); atualizar(); return; }
     const rf = e.target.dataset.refazer;
     if (rf) { e.target.disabled = true; await post(`/producao-pod/${LID}/${rf}/refazer-imagens`, {pod_url: podUrl()}); atualizar(); return; }
     const re = e.target.dataset.rebaixar;

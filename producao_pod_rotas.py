@@ -133,6 +133,16 @@ def registrar(app, base_dir: str) -> None:
             return "Roteiro não encontrado.", 404
         return render_template("producao_pod_galeria.html", lote=lote, it=it, imgs=pp.galeria(lid, iid))
 
+    @app.route("/producao-pod/<lid>/<iid>/completar-pod", methods=["POST"])
+    def producao_pod_completar(lid: str, iid: str):
+        """🖼 v84_223: as cenas ⏳ pendentes deste roteiro viram imagem do pod (100%)."""
+        try:
+            return jsonify(pp.completar_no_pod(lid, iid))
+        except pp.ProducaoErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001 — pod fora do ar etc.
+            return jsonify({"erro": str(exc)[:300]}), 400
+
     @app.route("/producao-pod/<lid>/<iid>/refazer-imagens", methods=["POST"])
     def producao_pod_refazer_imagens(lid: str, iid: str):
         try:

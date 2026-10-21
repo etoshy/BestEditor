@@ -11356,7 +11356,8 @@ def _cenas_pod_para_refazer(job: dict) -> List[int]:
             continue
         o = d.get("override_source") or {}
         p = pv[k] if k < len(pv) else None
-        if o.get("cartao") or d.get("cartao") or (p is not None and not (p or {}).get("ok")) or (p or {}).get("cartao"):
+        if o.get("cartao") or d.get("cartao") or p is None or not (p or {}).get("ok") or (p or {}).get("cartao"):
+            # v84_223: sem prévia (cena que virou do pod depois do projeto criado) também entra
             if not o or o.get("cartao"):  # não mexe no que VOCÊ escolheu no editor
                 out.append(k)
     return out
@@ -11577,7 +11578,36 @@ def completar_pendentes_rota(job_id: str):
 import producao_pod as _producao  # noqa: E402
 import producao_pod_rotas as _producao_rotas  # noqa: E402
 
-_producao.configurar(_criar_job_producao, _registrar_narracao_do_pod)
+def _atualizar_projeto_producao(job_id: str, resposta: Dict[str, Any]) -> int:
+    """🖼 v84_223: o roteiro da 🏭 Produção no pod ganhou cenas do pod depois do projeto criado (as pendentes a 100%):
+    as cenas do projeto no MESMO tempo passam a ser do pod (as que você já trocou no editor ficam). → quantas."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return 0
+    pend = job.get("pending_segments") or []
+    novas = [s for s in resposta.get("segments") or [] if s.get("provider") == "runpod"]
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    n = 0
+    for k, d in enumerate(pend):
+        if d.get("provider") == "runpod" or d.get("override_source"):
+            continue
+        try:
+            ini = float(d.get("start") or 0)
+        except (TypeError, ValueError):
+            continue
+        s = min(novas, key=lambda x: abs(float(x.get("start") or 0) - ini), default=None)
+        if not s or abs(float(s.get("start") or 0) - ini) > 0.6:
+            continue
+        d.update(provider="runpod", query=s["query"], media_type="image")
+        previas[k] = None
+        n += 1
+    if n:
+        job["segment_previews"] = previas
+        _save_state(job_id)
+    return n
+
+
+_producao.configurar(_criar_job_producao, _registrar_narracao_do_pod, _atualizar_projeto_producao)
 _producao_rotas.registrar(app, BASE_DIR)
 import animar_flow as _animar  # noqa: E402  🎞 animar cenas de imagem com o Google Flow (v84_182)
 _animar.registrar(app, _JOBS.get, _save_state, _job_dir,
