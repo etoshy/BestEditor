@@ -221,12 +221,51 @@ def criar(itens: List[Dict[str, Any]], config: Dict[str, Any], pod_url: str = ""
     return lote
 
 
+def _cancelar_no_pod(lote: Dict[str, Any], it: Dict[str, Any]) -> int:
+    """⏹ v84_224: cancela NO POD (VPS) a narração e os jobs de imagem deste roteiro (na fila ou rodando). → quantos."""
+    import pod_studio
+    n = 0
+    jobs = [it.get("pod_voz") if it.get("estado") in ("narrando", "aguardando") else None, it.get("pod_img")]
+    jobs += list(it.get("pod_imgs") or [])
+    for jid in dict.fromkeys(j for j in jobs if j):
+        try:
+            st = pod_studio.job(jid, _cfg_pod(lote))
+            if st.get("status") in pod_studio.FINAIS:
+                continue
+            pod_studio.cancelar(jid, _cfg_pod(lote))
+            n += 1
+        except Exception:  # noqa: BLE001 — pod desligado / job sumiu: nada a cancelar lá
+            continue
+    return n
+
+
+def parar(lid: str, iid: str) -> Dict[str, Any]:
+    """⏹ Para UM roteiro: cancela o que está no pod e marca como cancelado (🔁 Tentar de novo retoma de onde parou;
+    o que já veio pro PC fica)."""
+    with _TRAVA:
+        lote = carregar(lid)
+        it = next((x for x in lote["itens"] if x["id"] == iid), None)
+        if not it:
+            raise ProducaoErro("Roteiro não encontrado no lote.")
+        n = _cancelar_no_pod(lote, it)
+        if it.get("pod_img"):  # 🔁 Tentar de novo manda de novo só as imagens que ainda não estão no PC
+            it.update(pod_img_antigo=it["pod_img"], pod_img=None, pod_imgs=[])
+        it.update(estado="cancelado", mensagem=f"⏹ parado — {n} pedido(s) cancelado(s) no pod" if n else "⏹ parado")
+        _log(it, it["mensagem"])
+        if all(x["estado"] in ESTADOS_FINAIS for x in lote["itens"]):
+            lote["status"] = "concluido"
+        salvar(lote)
+    return {"ok": True, "cancelados_no_pod": n}
+
+
 def cancelar(lid: str) -> Dict[str, Any]:
     with _TRAVA:
         lote = carregar(lid)
+        n = 0
         for it in lote["itens"]:
             if it["estado"] not in ESTADOS_FINAIS:
-                it["estado"], it["mensagem"] = "cancelado", "cancelado (o que já estava na fila do pod pode terminar lá)"
+                n += _cancelar_no_pod(lote, it)  # ⏹ v84_224: cancela no pod também (antes continuava rodando lá)
+                it["estado"], it["mensagem"] = "cancelado", "cancelado (no pod também)"
         lote["status"] = "cancelado"
         salvar(lote)
     return lote

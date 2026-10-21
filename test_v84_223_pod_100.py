@@ -58,3 +58,22 @@ def test_projeto_existente_usa_as_cenas_novas(monkeypatch):
     assert A._atualizar_projeto_producao("jx", resp) == 1  # a cena que você trocou no editor fica
     assert job["pending_segments"][1]["provider"] == "runpod" and job["pending_segments"][1]["query"] == "new"
     assert A._cenas_pod_para_refazer(job) == [1]
+
+
+def test_parar_cancela_no_pod(monkeypatch, tmp_path):
+    import pod_studio
+    import producao_pod as pp
+    lote = {"id": "l", "config": {"orientacao": "16:9"}, "status": "rodando",
+            "itens": [{"id": "i", "titulo": "T", "estado": "imagens", "pod_img": "img-2", "pod_imgs": ["img-1"], "log": []}]}
+    monkeypatch.setattr(pp, "carregar", lambda l: lote)
+    monkeypatch.setattr(pp, "salvar", lambda l: None)
+    monkeypatch.setattr(pp, "_cfg_pod", lambda l: {})
+    st = {"img-1": "concluido", "img-2": "processando"}
+    monkeypatch.setattr(pod_studio, "job", lambda j, cfg=None: {"status": st[j]})
+    canc = []
+    monkeypatch.setattr(pod_studio, "cancelar", lambda j, cfg=None: canc.append(j))
+    r = pp.parar("l", "i")
+    it = lote["itens"][0]
+    assert r["cancelados_no_pod"] == 1 and canc == ["img-2"]
+    assert it["estado"] == "cancelado" and it["pod_img"] is None and it["pod_img_antigo"] == "img-2"
+    assert lote["status"] == "concluido"
