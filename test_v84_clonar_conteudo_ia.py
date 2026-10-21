@@ -52,4 +52,4 @@ def test_clonar_dossie_e_job(tmp_path):
     assert n["audio_path"] == os.path.join(jd(r["id"]), "narr.wav") and os.path.exists(n["audio_path"])
     assert n["pending_segments"][0]["override_source"]["value"].startswith(jd(r["id"]))
     assert "output_path" not in n and not os.path.exists(os.path.join(jd(r["id"]), "final.mp4"))
-    assert n["nome_projeto"] == "Una (cópia)" and n["status"] == "pronto_para_editar" and salvos == [r["id"]]
+    assert n["nome_projeto"] == "Una 2" and n["status"] == "pronto_para_editar" and salvos == [r["id"]]

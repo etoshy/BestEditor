@@ -71,6 +71,26 @@
   · <a href="{{ url_for('download_diagnostico', job_id=job.job_id, ver=1, refazer=1) }}" target="_blank" style="font-size:0.85rem;color:#666;">gerar de novo</a>
 </p>
 
+<details id="pub-box" style="margin-top:16px;padding:10px 12px;border:1px solid #c7d2fe;border-radius:8px;background:#eef2ff;">
+  <summary style="cursor:pointer;font-weight:700;">📣 Publicação — títulos, descrição, tags, hashtags e capas <span style="font-weight:400;color:#4338ca;">(fica guardado em <a href="/publicacoes/{{ job.job_id }}">📣 Publicações</a>)</span></summary>
+  <div id="pub-box-in" style="margin-top:8px"></div>
+</details>
+{% set pub_api = '/job/' ~ job.job_id ~ '/publicacao' %}
+<template id="pub-tpl">{% include "_publicacao_painel.html" %}</template>
+<script>
+(function () {  // 📣 v84_230: o painel só monta (e só chama o servidor) quando você abre
+  const box = document.getElementById('pub-box');
+  box.addEventListener('toggle', () => {
+    if (!box.open || box.dataset.ok) return; box.dataset.ok = '1';
+    const tpl = document.getElementById('pub-tpl').content.cloneNode(true);
+    const alvo = document.getElementById('pub-box-in');
+    const scripts = [...tpl.querySelectorAll('script')]; scripts.forEach(s => s.remove());
+    alvo.appendChild(tpl);
+    scripts.forEach(s => { const n = document.createElement('script'); n.textContent = s.textContent; alvo.appendChild(n); });
+  });
+})();
+</script>
+
 <div id="capitulos-box" style="display:none;margin-top:16px;padding:10px 12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;">
   <label style="font-weight:600;">📑 Descrição do YouTube com os capítulos no tempo DESTE vídeo</label>
   <p class="hint" style="font-size:.82rem;color:#065f46;margin:4px 0;">Os tempos já contam as chamadas e os cortes que entraram no vídeo — é só colar. A descrição do modelo de vídeo também foi atualizada.</p>

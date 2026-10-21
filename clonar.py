@@ -11,14 +11,26 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 import shutil
 import time
 import uuid
 from typing import Any, Dict, Optional
 
 
-def _nome(base_nome: str, nome: str) -> str:
-    return (nome or "").strip()[:120] or f"{(base_nome or 'Projeto')[:100]} (cópia)"
+def _nome(base_nome: str, nome: str, existentes: Any = None) -> str:
+    """Nome da cópia: o que você escreveu; sem nome, o MESMO título + o próximo número (“Título 2”, “Título 3”…).
+    v84_231: antes era “(cópia)”."""
+    if (nome or "").strip():
+        return nome.strip()[:120]
+    raiz = re.sub(r"\s+(\(cópia\)|\d{1,3})$", "", (base_nome or "Projeto").strip())[:110] or "Projeto"
+    maior = 1
+    for n in existentes or []:
+        n = str(n or "").strip()
+        m = re.fullmatch(re.escape(raiz) + r"\s+(\d{1,3})", n)
+        if m:
+            maior = max(maior, int(m.group(1)))
+    return f"{raiz} {maior + 1}"
 
 
 def clonar_dossie(base: str, pid: str, nome: str = "") -> Dict[str, Any]:
@@ -27,7 +39,8 @@ def clonar_dossie(base: str, pid: str, nome: str = "") -> Dict[str, Any]:
     novo = uuid.uuid4().hex[:10]
     shutil.copytree(ds._pasta(base, pid), ds._pasta(base, novo))
     q = copy.deepcopy(p)
-    q.update(id=novo, criado=time.time(), apelido=_nome(ds.nome_do_projeto(p), nome), clonado_de=pid)
+    q.update(id=novo, criado=time.time(), apelido=_nome(ds.nome_do_projeto(p), nome, [x["nome"] for x in ds.listar(base)]),
+             clonado_de=pid)
     ds.marcar_mudanca(q, "📑 clonado", f"cópia de “{ds.nome_do_projeto(p)}”")
     ds.salvar(base, q)
     return {"tipo": "dossie", "id": novo, "nome": q["apelido"], "url": f"/modelos-video/{novo}"}
@@ -39,7 +52,8 @@ def clonar_roteiro(base: str, pid: str, nome: str = "") -> Dict[str, Any]:
     novo = uuid.uuid4().hex[:10]
     shutil.copytree(ry._pasta(base, pid), ry._pasta(base, novo))
     q = copy.deepcopy(p)
-    q.update(id=novo, criado=time.time(), titulo=_nome(p.get("titulo") or p.get("url") or "", nome), clonado_de=pid)
+    q.update(id=novo, criado=time.time(), titulo=_nome(p.get("titulo") or p.get("url") or "", nome,
+                                                      [x["titulo"] for x in ry.listar_projetos(base)]), clonado_de=pid)
     ry.marcar_mudanca(q, "📑 clonado", f"cópia de “{p.get('titulo') or pid}”")
     ry.salvar_projeto(base, q)
     return {"tipo": "roteiro", "id": novo, "nome": q["titulo"], "url": f"/roteiros-yt/{novo}"}
@@ -81,7 +95,8 @@ def clonar_job(jobs: Dict[str, Any], job_dir, salvar_estado, job_id: str, nome: 
     for k in ("output_path", "progresso_montagem", "erro_montagem", "error"):
         q.pop(k, None)
     q.update(job_id=novo, clonado_de=job_id, criado_em=time.time(),
-             nome_projeto=_nome(job.get("nome_projeto") or job.get("original_filename") or job_id, nome))
+             nome_projeto=_nome(job.get("nome_projeto") or job.get("original_filename") or job_id, nome,
+                                [j.get("nome_projeto") for j in jobs.values() if isinstance(j, dict)]))
     if q.get("status") in ("concluido", "pronto", "erro"):
         q["status"] = "pronto_para_editar"
     jobs[novo] = q

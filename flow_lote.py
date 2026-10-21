@@ -375,6 +375,11 @@ class Lote:
                 if tipo == "imagem" and it.get("referencia_arquivo") and os.path.isfile(str(it["referencia_arquivo"])):
                     j["referencia_arquivo"] = os.path.abspath(str(it["referencia_arquivo"]))
                     j["origem"] = str(it.get("origem") or "referencia")[:40]
+                # ✏️ v84_231: editar uma imagem que já existe num projeto do Flow — a MESMA conta volta àquele projeto e usa
+                # a mídia que já está lá (sem subir de novo); sem crédito/ocupada, outra conta pega e sobe o arquivo
+                if it.get("conta_pref") and it.get("projeto_url"):
+                    j.update(conta_pref=str(it["conta_pref"])[:80], projeto_url=str(it["projeto_url"])[:400],
+                             ref_media_id=str(it.get("ref_media_id") or "")[:200])
                 self.fila.append(j)
                 novos.append(j)
             self._salvar()
@@ -581,11 +586,25 @@ class Lote:
             if self.pausando:
                 return None
             for j in self.fila:
-                if j["estado"] == "pendente" and self._serve(conta, j["tipo"]):
+                if j["estado"] == "pendente" and self._serve(conta, j["tipo"]) and self._pode_pegar(conta, j):
                     j.update(estado="rodando", conta=conta, inicio=time.time(), erro=None)
                     self._salvar()
                     return j
         return None
+
+    ESPERA_CONTA_PREF = 240  # s que um pedido de edição espera a conta dele antes de ir pra outra
+
+    def _pode_pegar(self, conta: str, j: Dict[str, Any]) -> bool:
+        """✏️ v84_231: o pedido de edição é da conta que tem o projeto — as outras só pegam se ela não puder (sem
+        crédito, fora do lote) ou depois de um tempo esperando."""
+        pref = j.get("conta_pref")
+        if not pref or pref == conta:
+            return True
+        try:
+            fora = pref not in self.contas_do_lote()
+        except Exception:  # noqa: BLE001
+            fora = True
+        return fora or not self._serve(pref, j["tipo"]) or time.time() - float(j.get("criado") or 0) > self.ESPERA_CONTA_PREF
 
     def _devolver(self, j: Dict[str, Any], erro: Optional[str] = None) -> None:
         with self.trava:
@@ -651,6 +670,16 @@ class Lote:
                             page = None
                             continue
                         gf.salvar_sessao(ctx, conta)
+                    if job.get("projeto_url") and job.get("conta_pref") == conta and page is not None \
+                            and str(getattr(page, "url", "")).split("?")[0] != job["projeto_url"].split("?")[0]:
+                        try:  # ✏️ volta ao projeto onde a imagem foi gerada (a mídia dela já está lá)
+                            st[conta] = "abrindo o projeto da imagem a editar…"
+                            page.goto(job["projeto_url"], wait_until="domcontentloaded", timeout=60_000)
+                            refs_proj.clear()
+                            if job.get("referencia_arquivo") and job.get("ref_media_id"):
+                                refs_proj[_chave_ref(job["referencia_arquivo"])] = job["ref_media_id"]
+                        except Exception as exc_ir:  # noqa: BLE001 — não abriu: segue no projeto atual subindo o arquivo
+                            self.log(f"⚠ “{conta}” não voltou ao projeto da imagem ({str(exc_ir)[:120]}) — vai com o arquivo.", "aviso")
                     self._aguardar_vez(conta)
                     trab = {"tipo": job["tipo"], "prompt": job["prompt"], "proporcao": job["proporcao"],
                             "modelo": job["modelo"] or str(cfg.get("flow_modelo_" + job["tipo"]) or ""),
@@ -672,7 +701,9 @@ class Lote:
                     salvos = baixar_para_galeria(ctx, midias, job, conta, getattr(page, "url", ""))
                     with self.trava:
                         job.update(estado="ok", fim=time.time(), resultados=[{"id": e["id"], "arquivo": e["arquivo"],
-                                                                              "tipo": e["tipo"]} for e in salvos])
+                                                                              "tipo": e["tipo"], "media_id": e.get("media_id") or "",
+                                                                              "projeto": e.get("projeto") or "", "conta": conta}
+                                                                             for e in salvos])
                         if not salvos:
                             job.update(estado="erro", erro="o Flow terminou mas não veio nenhuma mídia")
                         self._salvar()

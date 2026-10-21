@@ -48,6 +48,9 @@ aside.right{width:320px;border-left:1px solid var(--line);padding:12px}
 .tabs button{border:0;border-radius:0;background:none;padding:8px 9px;font-size:11.5px;color:var(--dim);border-bottom:2px solid transparent}
 .tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
 .tab{display:none;padding:12px}.tab.on{display:block}
+/* 📣 v84_230: aba Publicação (o painel vem de _publicacao_painel.html) — na janela grande, textos e capas lado a lado */
+#popCorpo #tab-publicacao .pub-cols{grid-template-columns:1fr 1.25fr}
+@media (max-width: 900px){ #popCorpo #tab-publicacao .pub-cols{grid-template-columns:1fr} }
 /* ⤢ v84_226: abrir o painel numa janela grande (o MESMO painel, movido pra lá — tudo continua sincronizado) */
 .btn-expandir{position:sticky;float:right;top:0;z-index:25;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:6px;padding:2px 7px;font-size:14px;line-height:1.2;cursor:pointer;margin:4px 4px 0 0}
 .btn-expandir:hover{border-color:var(--accent);color:var(--accent)}
@@ -501,6 +504,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <button data-tab="animar">🎞 Animar cenas <span id="nAnim"></span></button>
       <button data-tab="personagens">🧍 Personagens <span id="nPers"></span></button>
       <button data-tab="cortes">✂️ Cortes{% if dados.cortes %} ({{ dados.cortes|length }}){% endif %}</button>
+      <button data-tab="publicacao">📣 Publicação</button>
     </div>
 
     <div class="tab on" id="tab-midia">
@@ -854,6 +858,9 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
       <div id="listaPers"></div>
     </div>
 
+    <div class="tab" id="tab-publicacao">{% set pub_api = '/job/' ~ job.job_id ~ '/publicacao' %}{% include "_publicacao_painel.html" %}
+      <p class="hint" style="margin-top:10px">🗂 Fica guardado também no menu <a href="/publicacoes/{{ job.job_id }}" target="_blank">📣 Publicações</a> — mesmo se o projeto for apagado.</p></div>
+
     <div class="tab" id="tab-cortes">
       <h3>Cortes reais e chamadas</h3>
       <div id="listaCortes"></div>
@@ -1047,6 +1054,9 @@ function gruposCena() {   // mesma regra do montador (cenas_dp.planejar_grupos)
 function grupoDoTrecho(i) { return gruposCena().find(g => g.c && i >= g.a && i <= g.b) || null; }
 
 // ------------------------------------------------------------------ tabs
+// 📣 v84_230: o painel da Publicação carrega quando a aba abre
+$('tabs').addEventListener('click', (e) => { if (e.target.closest('button[data-tab="publicacao"]') && window.pubCarregar) window.pubCarregar(); });
+
 // ⤢ v84_226: a aba aberta (ou as Propriedades) numa janela grande — o próprio painel vai pra lá e volta ao fechar
 const POP = { no: null, marca: null };
 function abrirGrande(no, titulo) {

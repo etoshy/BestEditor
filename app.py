@@ -11815,6 +11815,20 @@ import personagens_pod_rotas as _personagens_rotas  # noqa: E402  🧍 poses PNG
 _personagens_rotas.registrar(app, BASE_DIR)
 import personagens_editor as _pers_ed  # noqa: E402  🧍 as personagens do canal por cima do vídeo, quando falam (v84_185)
 _pers_ed.registrar(app, _JOBS.get, _save_state, _job_dir, _palavras_da_narracao, BASE_DIR)
+
+
+def _projeto_para_publicacao(job: dict) -> Optional[Dict[str, Any]]:
+    pj = _projeto_do_job(job)
+    if not pj:
+        return None
+    _t, _mod, p, _prov = pj
+    res = p.get("resultado") or {}
+    return {"titulos": [str(x) for x in res.get("titulos") or []][:8], "tema": str(p.get("tema") or p.get("titulo") or "")[:300],
+            "roteiro": str(res.get("roteiro_final") or res.get("roteiro") or "")[:30000]}
+
+
+import publicacao as _publicacao  # noqa: E402  📣 títulos, descrições, tags, hashtags e capas do vídeo (v84_229)
+_publicacao.registrar(app, _JOBS.get, _job_dir, _palavras_da_narracao, BASE_DIR, _projeto_para_publicacao)
 import conteudo_ia as _conteudo_ia  # noqa: E402  🤖 selo nas cenas geradas por IA (v84_145)
 _conteudo_ia.registrar(app, BASE_DIR, _JOBS, _save_state)
 import clonar as _clonar  # noqa: E402  📑 clonar projeto (modelo de vídeo, roteiro, editor) (v84_146)

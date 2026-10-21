@@ -1,0 +1,577 @@
+{# 📣 v84_230: o painel da Publicação — o mesmo no Estúdio (aba), na tela do vídeo pronto e no histórico 📣 Publicações.
+   Precisa de: pub_api (ex.: "/job/<id>/publicacao" ou "/publicacoes/<id>/api"). Opcional: pub_mostrar_roteiro. #}
+<style>
+  .pub-raiz{--pl:var(--line,var(--borda,#d6dae1));--pp:var(--panel2,var(--card-2,#f8fafc));--pd:var(--dim,var(--mudo,#6b7280));--pc:var(--accent,var(--acento,#0d9488))}
+  .pub-raiz .pub-sec,.pub-raiz .pub-capa{color:inherit}
+  .pub-raiz .pub-sec{border:1px solid var(--pl);border-radius:8px;padding:8px;margin-top:10px;background:var(--pp)}
+  .pub-raiz .cab{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .pub-raiz .cab b{flex:1;font-size:12.5px}
+  .pub-raiz .pub-op{display:flex;gap:4px;align-items:flex-start;margin:4px 0}
+  .pub-raiz .pub-op input,.pub-raiz .pub-op textarea{flex:1;min-width:0;font-size:12px;margin:0}
+  .pub-raiz .pub-op textarea{min-height:110px}
+  .pub-raiz .pub-chips{display:flex;flex-wrap:wrap;gap:5px}
+  .pub-raiz .pub-chip{border:1px solid var(--pl);border-radius:999px;padding:2px 8px;font-size:11.5px;display:inline-flex;gap:5px;align-items:center}
+  .pub-raiz .pub-chip i{cursor:pointer;color:var(--pd);font-style:normal}.pub-raiz .pub-chip i:hover{color:#e11d48}
+  .pub-raiz .pub-capas{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+  .pub-raiz .pub-capa{border:1px solid var(--pl);border-radius:8px;padding:8px;background:var(--pp)}
+  .pub-raiz .pub-capa .img{aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;text-align:center;position:relative}
+  .pub-raiz .pub-capa .img img{width:100%;height:100%;object-fit:cover}
+  .pub-raiz .pub-capa .img .ref{position:absolute;left:6px;bottom:6px;width:32%;height:auto;border:2px solid #fff;border-radius:4px;box-shadow:0 2px 8px #000}
+  .pub-raiz button{width:auto;margin:0}
+  .pub-raiz .pub-mini{padding:3px 8px;font-size:12px}
+  .pub-raiz .pub-hint{font-size:12px;color:var(--pd)}
+  .pub-raiz .pub-cols{display:grid;grid-template-columns:1fr;gap:16px}
+  .pub-raiz.larga .pub-cols{grid-template-columns:1fr 1.25fr}
+  @media (max-width:900px){.pub-raiz.larga .pub-cols{grid-template-columns:1fr}}
+  .pub-raiz .pub-est{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:4px}
+  .pub-raiz .pub-est label{display:flex;flex-direction:column;font-size:11px;color:var(--pd);gap:2px}
+  .pub-raiz .pub-est label.chk{flex-direction:row;align-items:center;gap:4px}
+  .pub-raiz .pub-est select,.pub-raiz .pub-est input[type=number]{font-size:12px;padding:2px 4px;margin:0}
+  .pub-raiz .pub-est input[type=color]{width:100%;height:26px;padding:0;border:1px solid var(--pl);margin:0}
+  .pub-raiz .pub-mod{display:flex;gap:4px;margin-top:6px}.pub-raiz .pub-mod input{flex:1;min-width:0;font-size:12px;margin:0}
+  .pub-raiz .des-bar{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:4px 0}
+  .pub-raiz .des-bar .on{outline:2px solid var(--pc);outline-offset:1px}
+  .pub-raiz .des-cv{width:100%;aspect-ratio:16/9;border-radius:6px;border:1px solid var(--pl);touch-action:none;cursor:crosshair;display:block;background:#3a3f4a}
+  .pub-raiz .des-it{display:flex;gap:5px;align-items:center;flex-wrap:wrap;border:1px solid var(--pl);border-radius:6px;padding:4px 6px;margin-top:4px;cursor:pointer}
+  .pub-raiz .des-it.sel{border-color:var(--pc);box-shadow:0 0 0 1px var(--pc)}
+  .pub-raiz .des-it .bol{width:22px;height:22px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none}
+  .pub-raiz .des-it input[type=text]{flex:2;min-width:140px;font-size:12px;margin:0}
+  .pub-raiz .des-it select{flex:1;min-width:110px;font-size:12px;margin:0}
+  .pub-raiz .des-it input[type=file]{flex:1;min-width:150px;font-size:11px;margin:0}
+  .pub-raiz .pub-fontes{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:4px;max-height:150px;overflow:auto;padding:2px;border:1px solid var(--pl);border-radius:6px}
+  .pub-raiz .pub-fontes button{padding:4px 6px;font-size:17px;line-height:1.1;background:#111827;color:#fff;border:1px solid transparent;border-radius:5px;text-align:left;overflow:hidden;white-space:nowrap}
+  .pub-raiz .pub-fontes button small{display:block;font:10px system-ui,sans-serif;color:#9ca3af}
+  .pub-raiz .pub-fontes button.on{border-color:var(--pc);box-shadow:0 0 0 1px var(--pc)}
+  .pub-raiz .des-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin:6px 0}
+  .pub-raiz .des-presets button{padding:4px;display:flex;flex-direction:column;gap:3px;align-items:stretch;text-align:left;font-size:11.5px;line-height:1.2;background:var(--pp);color:inherit;border:1px solid var(--pl);border-radius:6px}
+  .pub-raiz .des-presets button:hover{border-color:var(--pc)}
+  .pub-raiz .des-presets canvas{width:100%;aspect-ratio:16/9;border-radius:4px;display:block}
+  .pub-raiz .des-presets small{color:var(--pd);font-size:10.5px}
+  .pub-raiz .pub-canal{border:1px solid var(--pc);border-radius:8px;padding:8px;margin-bottom:10px;background:var(--pp)}
+  .pub-raiz .pub-canal .linha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .pub-raiz .pub-canal select{width:auto;min-width:220px;margin:0;font-size:12.5px}
+  .pub-raiz .canal-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;max-height:340px;overflow:auto}
+  .pub-raiz .canal-thumbs button{padding:0;background:#000;border:1px solid var(--pl);border-radius:6px;overflow:hidden;text-align:left;color:#fff;position:relative}
+  .pub-raiz .canal-thumbs button:hover{border-color:var(--pc)}
+  .pub-raiz .canal-thumbs img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+  .pub-raiz .canal-thumbs span{display:block;font-size:10.5px;padding:3px 5px;line-height:1.2;max-height:2.6em;overflow:hidden}
+  .pub-raiz .canal-thumbs i{position:absolute;right:4px;top:4px;background:#000c;font-style:normal;font-size:10.5px;padding:1px 5px;border-radius:4px}
+  .pub-raiz .pub-thumbs{display:flex;gap:4px;margin-top:4px}.pub-raiz .pub-thumbs img{height:38px;border-radius:4px;border:1px solid var(--pl)}
+</style>
+<div class="pub-raiz{% if pub_larga %} larga{% endif %}" id="pubRaiz" data-api="{{ pub_api }}">
+  <div class="pub-canal" id="pubCanal">
+    <div class="linha"><b style="font-size:12.5px">📊 Modelar no estilo de um canal analisado</b>
+      <select id="pubCanalSel"><option value="">— nenhum (estilo próprio) —</option></select>
+      <a class="pub-hint" href="/analisador-canal" target="_blank">＋ analisar outro canal</a>
+      <span class="pub-hint" id="pubCanalInfo"></span></div>
+    <div id="pubCanalCorpo" style="display:none">
+      <p class="pub-hint" style="margin:6px 0 0">Com um canal escolhido, <b>tudo daqui</b> sai no estilo dele: títulos, descrições, tags, ideias de capa, capas recriadas e modelos copiados (o jeito, nunca o título/capa em si — e no idioma do vídeo).</p>
+      <div class="pub-hint" id="pubCanalResumo" style="margin-top:4px"></div>
+      <div class="linha" style="margin-top:6px">
+        <button class="primary pub-mini" type="button" id="pubCanalTit">🏷 Títulos no estilo do canal</button>
+        <button class="pub-mini" type="button" id="pubCanalIdeias">💡 Capas no estilo do canal</button></div>
+      <details style="margin-top:6px" open><summary class="pub-hint" style="cursor:pointer;font-weight:600">🖼 Thumbs do canal (mais vistas primeiro) — clique numa pra copiar o modelo dela pro ✏️ desenho</summary><div class="canal-thumbs" id="pubCanalThumbs"></div></details>
+    </div>
+  </div>
+  <div class="pub-cols">
+  <div id="pubColTextos">
+    <h3>📣 Títulos, descrição, tags e #hashtags</h3>
+    <p class="pub-hint">Tudo no idioma do vídeo (<b id="pubIdioma">…</b>), a partir da narração (e do projeto/canal). Cada parte tem <b>➕ mais alternativas</b>: a IA traz opções NOVAS, sem repetir as que já estão aqui. Dá pra editar, copiar e apagar cada uma.</p>
+    <label class="f"><span>Pedido extra pra IA <span class="pub-hint">(opcional — vale pra tudo daqui)</span></span><input type="text" id="pubPedido" placeholder="ex.: títulos mais curtos e misteriosos; citar a NASA; sem ponto de exclamação"></label>
+    <div style="display:flex;gap:6px;margin-top:6px"><button class="primary" id="pubTudo" type="button">🤖 Gerar títulos, descrições, tags e hashtags</button></div>
+    <div class="pub-hint" id="pubSt" style="margin-top:4px"></div>
+    <div id="pubTextos"></div>
+    {% if pub_mostrar_roteiro %}
+    <details class="pub-sec" id="pubRotBox" style="display:none"><summary style="cursor:pointer;font-weight:600">📜 Roteiro</summary><pre id="pubRoteiro" style="white-space:pre-wrap;font-size:12px;max-height:420px;overflow:auto;margin:6px 0 0"></pre></details>
+    <details class="pub-sec" id="pubNarBox" style="display:none"><summary style="cursor:pointer;font-weight:600">🎙 Narração (o que foi falado no vídeo)</summary><pre id="pubNarracao" style="white-space:pre-wrap;font-size:12px;max-height:420px;overflow:auto;margin:6px 0 0"></pre></details>
+    {% endif %}
+  </div>
+  <div id="pubColCapas">
+    <h3>🖼 Capas (thumbnails)</h3>
+    <p class="pub-hint">A imagem é gerada no 🚀 Google Flow <b>sem letras</b> (o Flow erra letra) e o site põe o texto grande por cima, no idioma do vídeo → 1280×720 pronta pra subir. Com a personagem do canal, ela vai de referência pro Flow manter o rosto igual.</p>
+    <div style="display:flex;gap:6px"><button class="primary pub-mini" id="pubIdeias" type="button">💡 Ideias de capa (+3)</button></div>
+    <details class="pub-sec" open><summary style="cursor:pointer;font-weight:600">📤 Recriar a partir de uma capa de referência</summary>
+      <p class="pub-hint">Envie a capa de outro vídeo/canal: a IA olha e recria a MESMA ideia (composição, fundo, luz, clima) — a pessoa que aparece vira a personagem escolhida, o texto vira o idioma do vídeo. Logos e texto da original não entram.</p>
+      <input type="file" id="pubRef" accept="image/*">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"><label class="f" style="flex:1;min-width:160px"><span>Personagem no lugar da pessoa</span><select id="pubRefPers"></select></label>
+        <label class="f" style="flex:2;min-width:200px"><span>Pedido extra</span><input type="text" id="pubRefPedido" placeholder="ex.: fundo mais escuro, ela apontando pro buraco negro"></label></div>
+      <label class="chk"><input type="checkbox" id="pubRefGerar" checked style="width:auto"> já mandar pro Flow</label>
+      <button class="primary pub-mini" id="pubRefIr" type="button" style="margin-top:4px">📤 Recriar esta capa</button>
+    </details>
+    <details class="pub-sec" id="pubCustom"><summary style="cursor:pointer;font-weight:600">🎛 Montar a minha capa (personalizar ao máximo)</summary>
+      <p class="pub-hint">Descreva a capa do seu jeito; escolha uma personagem do canal <b>ou</b> envie uma de fora (PNG com fundo transparente fica melhor); envie a foto de fundo; escreva o texto (Enter quebra a linha; a última linha sai na 2ª cor) e ajuste o estilo. <b>🎨 Gerar no Flow</b> cria a imagem com tudo isso de referência; <b>🧩 Montar aqui sem IA</b> cola a personagem sobre a sua foto na hora, sem gastar crédito.</p>
+      <label class="f"><span>Descrição da capa</span><textarea id="pcDesc" rows="3" placeholder="ex.: Vanta de óculos escuros na frente de uma pirâmide gigante, céu laranja, ela olhando de lado com cara de deboche"></textarea></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <label class="f" style="flex:1;min-width:150px"><span>Personagem do canal</span><select id="pcPers"></select></label>
+        <label class="f" style="flex:1;min-width:150px"><span>…ou personagem de fora</span><input type="file" id="pcPersArq" accept="image/*"></label>
+        <label class="f" style="flex:1;min-width:150px"><span>Foto de fundo</span><input type="file" id="pcFundo" accept="image/*"></label></div>
+      <label class="f" style="margin-top:4px"><span>Texto na capa</span><textarea id="pcTexto" rows="2" placeholder="ex.: A ESFINGE&#10;MENTIU?"></textarea></label>
+      <div class="pub-est" id="pcEstilo"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        <button class="primary pub-mini" type="button" data-pc="flow">🎨 Gerar no Flow</button>
+        <button class="pub-mini" type="button" data-pc="montar">🧩 Montar aqui sem IA</button>
+        <button class="pub-mini" type="button" data-pc="">💾 Só criar o cartão</button></div>
+    </details>
+    <details class="pub-sec" id="pubDes"><summary style="cursor:pointer;font-weight:600">✏️ Desenhar a capa (rascunho)</summary>
+      <p class="pub-hint">Contorne na tela onde vai cada coisa — cada contorno vira um <b>item numerado</b>. Em cada item diga o que é: escreva, mande uma <b>foto de exemplo</b> e/ou escolha uma personagem do canal. Clique num item da lista pra desenhar mais partes dele. Dá pra dar uma descrição e uma <b>textura/foto de fundo</b>. A IA olha o rascunho e monta o prompt respeitando onde e de que tamanho você desenhou.</p>
+      <details open><summary class="pub-hint" style="cursor:pointer;font-weight:600">🧩 Predefinições (os modelos de capa mais comuns no YouTube — clique pra começar dele e ajuste)</summary><div class="des-presets" id="desPresets"></div></details>
+      <details class="pub-sec" open style="margin-top:4px"><summary style="cursor:pointer;font-weight:600">📤 Copiar o modelo de uma thumb</summary>
+        <p class="pub-hint">Envie uma capa que você gostou: a IA lê a composição (onde fica a pessoa, cada objeto, o texto com posição/cores/tarja, setas e círculos) e abre aqui como rascunho editável, com a original por trás de guia. Depois é só preencher cada item — ou escrever o que você quer e deixar a IA preencher.</p>
+        <input type="file" id="desModeloArq" accept="image/*">
+        <label class="f" style="margin-top:4px"><span>O que você quer na sua versão <span class="pub-hint">(opcional)</span></span><textarea id="desModeloPedido" rows="2" placeholder="ex.: no lugar do homem, a Vanta assustada; no lugar do carro, um buraco negro; texto sobre cair no buraco negro"></textarea></label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px">
+          <label class="chk"><input type="radio" name="desModeloModo" value="0" checked style="width:auto"> 🙋 eu preencho cada item</label>
+          <label class="chk"><input type="radio" name="desModeloModo" value="1" style="width:auto"> 🤖 a IA preenche (tema do vídeo + o que eu escrevi)</label>
+          <button class="primary pub-mini" type="button" id="desModeloIr">📤 Copiar modelo</button></div>
+        <div id="desGuiaBox" style="display:none;gap:10px;flex-wrap:wrap;margin-top:4px">
+          <label class="chk"><input type="checkbox" id="desGuiaVer" checked style="width:auto"> mostrar a original por trás</label>
+          <label class="chk"><input type="checkbox" id="desGuiaRef" checked style="width:auto"> usar a original como referência de estilo/cores no Flow</label>
+          <span class="pub-hint" id="desGuiaInfo"></span></div>
+      </details>
+      <div class="des-bar">
+        <button class="pub-mini" type="button" data-fer="mover" title="arraste os itens e o texto; o quadradinho no canto muda o tamanho">✋ Mover</button>
+        <button class="pub-mini on" type="button" data-fer="livre" title="contorno livre (fecha sozinho)">✏️ Livre</button>
+        <button class="pub-mini" type="button" data-fer="ret">▭ Retângulo</button>
+        <button class="pub-mini" type="button" data-fer="eli">◯ Elipse</button>
+        <button class="pub-mini" type="button" data-fer="circulo" title="o círculo vermelho clássico (o site desenha por cima, a IA não)">🔴 Círculo</button>
+        <button class="pub-mini" type="button" data-fer="seta" title="arraste de onde sai até onde aponta (o site desenha por cima)">➡ Seta</button>
+        <span style="width:8px"></span>
+        <button class="pub-mini" type="button" id="desNovo" title="o próximo contorno vira um item novo">➕ Novo item</button>
+        <button class="pub-mini" type="button" id="desDesfazer">↶ Desfazer</button>
+        <button class="pub-mini" type="button" id="desLimpar">🗑 Limpar</button>
+        <span class="pub-hint" id="desModo" style="margin-left:auto"></span></div>
+      <canvas class="des-cv" id="desCv" width="1280" height="720"></canvas>
+      <div id="desItens"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <label class="f" style="flex:2;min-width:180px"><span>Fundo (descrição)</span><input type="text" id="desFundoDesc" placeholder="ex.: deserto ao pôr do sol, areia com textura de papiro"></label>
+        <label class="f" style="flex:1;min-width:160px"><span>Textura / foto de fundo</span><input type="file" id="desFundo" accept="image/*"></label></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <label class="f" style="flex:1;min-width:160px"><span>Texto na capa</span><textarea id="desTexto" rows="2" placeholder="Enter quebra a linha"></textarea></label>
+        <label class="f" style="flex:1;min-width:160px"><span>Pedido extra pra IA</span><textarea id="desPedido" rows="2" placeholder="ex.: estilo cartoon, luz dourada"></textarea></label></div>
+      <details style="margin-top:4px"><summary class="pub-hint" style="cursor:pointer">🎛 estilo do texto</summary><div class="pub-est" id="desEstilo"></div></details>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        <button class="primary pub-mini" type="button" data-des="flow">🎨 Gerar no Flow</button>
+        <button class="pub-mini" type="button" data-des="montar" title="cola as fotos de exemplo nos lugares desenhados, sobre a textura — sem IA">🧩 Montar com as fotos, sem IA</button>
+        <button class="pub-mini" type="button" data-des="">💾 Só criar o cartão</button></div>
+    </details>
+    <div id="pubCapas" class="pub-capas"></div>
+  </div>
+  </div>
+</div>
+<script>
+(function () {
+  const R = document.getElementById('pubRaiz'); if (!R) return;
+  const API = R.dataset.api;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const avisar = (m, ms) => { if (typeof window.toast === 'function') window.toast(m, ms); else { $('pubSt').textContent = m; } };
+  const TIT = { titulos: '🏷 Títulos', descricoes: '📝 Descrições', tags: '🔖 Tags', hashtags: '#️⃣ Hashtags' };
+  const P = { d: null, timer: null };
+  const POS = { auto: 'auto (lado vazio)', esquerda: 'esquerda', direita: 'direita', centro: 'centro', topo: 'topo', base: 'base', livre: 'livre (arrastado)' };
+  function estiloHtml(e, d) {
+    e = Object.assign({}, d.estilo_padrao || {}, e || {});
+    const op = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${esc(k)}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('');
+    carregarFontes(d);
+    const info = d.fontes_info || (d.fontes || ['bebas-neue']).map(n => ({ nome: n, pesos: ['Bold'] }));
+    const fi = info.find(f => f.nome === e.fonte) || info[0] || { pesos: ['Bold'] };
+    const PES = { Bold: 'Negrito', Regular: 'Normal', Italic: 'Itálico' };
+    return `<input type="hidden" data-est="fonte" value="${esc(e.fonte)}">${e.tx != null ? `<input type="hidden" data-est="tx" value="${esc(e.tx)}"><input type="hidden" data-est="ty" value="${esc(e.ty)}">` : ''}
+      <div class="pub-fontes" title="estilo da fonte">${info.map(f => `<button type="button" data-fonte="${esc(f.nome)}" class="${f.nome === e.fonte ? 'on' : ''}" style="font-family:'pubf-${esc(f.nome)}',sans-serif;font-weight:${f.pesos.includes('Bold') ? 700 : 400}">ÁBC 123<small>${esc(f.nome)}</small></button>`).join('')}</div>
+      <label>Posição do texto<select data-est="pos">${op(POS, e.pos)}</select></label>
+      <label>Peso<select data-est="peso">${op(Object.fromEntries(['Bold', 'Regular', 'Italic'].map(p => [p, PES[p] + (fi.pesos.includes(p) ? '' : ' (n/d)')])), e.peso || 'Bold')}</select></label>
+      <label>Tamanho %<input type="number" data-est="tamanho" min="30" max="200" step="5" value="${e.tamanho}"></label>
+      <label>Cor<input type="color" data-est="cor" value="${esc(e.cor)}"></label>
+      <label>2ª cor (última linha)<input type="color" data-est="cor2" value="${esc(e.cor2)}"></label>
+      <label>Contorno %<input type="number" data-est="contorno" min="0" max="300" step="10" value="${e.contorno}"></label>
+      <label>Personagem (sem IA)<select data-est="pers_lado">${op({ '': 'oposta ao texto', esquerda: 'esquerda', direita: 'direita', centro: 'centro' }, e.pers_lado || '')}</select></label>
+      <label>Tamanho personagem %<input type="number" data-est="pers_tam" min="30" max="120" step="5" value="${e.pers_tam || 95}"></label>
+      <label class="chk"><input type="checkbox" data-est="faixa" ${e.faixa ? 'checked' : ''} style="width:auto">faixa escura</label>
+      <label class="chk"><input type="checkbox" data-est="maiusculas" ${e.maiusculas ? 'checked' : ''} style="width:auto">MAIÚSCULAS</label>
+      <label class="chk"><input type="checkbox" data-est="sombra" ${e.sombra ? 'checked' : ''} style="width:auto">sombra</label>
+      <label class="chk"><input type="checkbox" data-est="caixa" ${e.caixa ? 'checked' : ''} style="width:auto">tarja atrás do texto</label>
+      <label>Cor da tarja<input type="color" data-est="cor_caixa" value="${esc(e.cor_caixa || '#e11d48')}"></label>`;
+  }
+  let fontesCss = false;
+  function carregarFontes(d) {
+    if (fontesCss || !d.fontes_info) return; fontesCss = true;
+    const css = d.fontes_info.map(f => f.pesos.map(p => `@font-face{font-family:'pubf-${f.nome}';src:url('/publicacao/fonte/${f.nome}-${p}.ttf');font-weight:${p === 'Bold' ? 700 : 400};font-style:${p === 'Italic' ? 'italic' : 'normal'};font-display:swap}`).join('')).join('');
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  }
+  R.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-fonte]'); if (!b) return;
+    const box = b.closest('.pub-est'); box.querySelector('[data-est="fonte"]').value = b.dataset.fonte;
+    box.querySelectorAll('[data-fonte]').forEach(x => x.classList.toggle('on', x === b));
+    if (box.id === 'desEstilo') redesenhar();
+  });
+  function lerEstilo(box) {
+    const e = {}; box.querySelectorAll('[data-est]').forEach(el => { e[el.dataset.est] = el.type === 'checkbox' ? el.checked : el.value; });
+    if (!e.pers_lado) delete e.pers_lado; return e;
+  }
+  async function req(url, corpo, form) {
+    const r = await fetch(API + url, form ? { method: 'POST', body: form } : corpo === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+  }
+  const copiar = (t) => { try { navigator.clipboard.writeText(t); avisar('📋 copiado'); } catch (e) { avisar('⚠ não deu pra copiar'); } };
+  function desenhar() {
+    const d = P.d; if (!d) return;
+    carregarCanais(); desenharCanal();
+    const idi = d.idioma_video || d.idioma || {}; $('pubIdioma').textContent = idi.nome || idi.codigo || '—';
+    const sel = $('pubRefPers');
+    sel.innerHTML = '<option value="">— sem personagem —</option>' + (d.personagens || []).map(p => `<option value="${esc(p.slug)}" ${p.tem_ref ? '' : 'disabled'}>${esc(p.nome)}${p.tem_ref ? '' : ' (sem pose aprovada)'}</option>`).join('');
+    if (!sel.dataset.mexeu) sel.value = ((d.personagens || []).find(p => p.tem_ref) || {}).slug || '';
+    const pc = $('pcPers'); const pv = pc.value;
+    pc.innerHTML = '<option value="">— nenhuma —</option>' + (d.personagens || []).map(p => `<option value="${esc(p.slug)}" ${p.tem_ref ? '' : 'disabled'}>${esc(p.nome)}</option>`).join(''); pc.value = pv;
+    if (!$('desEstilo').dataset.feito) { $('desEstilo').innerHTML = estiloHtml(null, d); $('desEstilo').dataset.feito = '1'; }
+    desLista(); presetsDesenhar(d); redesenhar();
+    if (!$('pcEstilo').dataset.feito) { $('pcEstilo').innerHTML = estiloHtml(null, d); $('pcEstilo').dataset.feito = '1'; }
+    if ($('pubRoteiro')) { $('pubRotBox').style.display = d.roteiro ? '' : 'none'; $('pubRoteiro').textContent = d.roteiro || ''; $('pubNarBox').style.display = d.narracao ? '' : 'none'; $('pubNarracao').textContent = d.narracao || ''; }
+    $('pubTextos').innerHTML = Object.keys(TIT).map(t => {
+      const l = d.textos[t] || [];
+      const lista = (t === 'tags' || t === 'hashtags')
+        ? `<div class="pub-chips">${l.map((x, k) => `<span class="pub-chip">${esc(x)}<i data-del="${t}:${k}" title="apagar">✕</i></span>`).join('') || '<span class="pub-hint">nada ainda</span>'}</div>`
+        : (l.map((x, k) => `<div class="pub-op">${t === 'descricoes' ? `<textarea data-ed="${t}:${k}">${esc(x)}</textarea>` : `<input type="text" data-ed="${t}:${k}" value="${esc(x)}">`}<button class="pub-mini" type="button" data-cp="${t}:${k}" title="copiar">📋</button><button class="pub-mini" type="button" data-del="${t}:${k}" title="apagar">✕</button></div>`).join('') || '<span class="pub-hint">nada ainda</span>');
+      const todas = t === 'tags' || t === 'hashtags' ? `<button class="pub-mini" type="button" data-cptodas="${t}" title="${t === 'tags' ? 'separadas por vírgula (cole no campo de tags do YouTube)' : 'separadas por espaço'}">📋 todas</button>` : '';
+      return `<div class="pub-sec"><div class="cab"><b>${TIT[t]} <span class="pub-hint">(${l.length})</span></b>${todas}<button class="pub-mini" type="button" data-mais="${t}" title="a IA traz opções NOVAS, sem repetir estas">➕ mais alternativas</button></div>${lista}</div>`;
+    }).join('');
+    $('pubCapas').innerHTML = (d.capas || []).map(c => {
+      const st = c.status === 'fila' ? '⏳ na fila do Flow' : c.status === 'gerando' ? '🎨 gerando no Flow…' : c.status === 'erro' ? `⚠ ${esc(c.erro)}` : c.status === 'pronta' ? '✅ pronta' : 'ainda não gerada';
+      const img = c.url_final ? `<img src="${esc(c.url_final)}" loading="lazy">` : `<span>${st}<br><i>${esc(c.ideia || '')}</i></span>`;
+      const pers = (d.personagens || []).map(p => `<option value="${esc(p.slug)}" ${p.slug === c.personagem ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
+      return `<div class="pub-capa" data-n="${c.n}"><div class="img">${img}${c.url_ref ? `<img class="ref" src="${esc(c.url_ref)}" title="a capa de referência">` : ''}</div>
+        <div class="pub-hint" style="margin-top:4px">${c.da_referencia ? '📤 da referência · ' : '💡 '}${esc(c.ideia || '')}${c.texto_original ? ` · original: “${esc(c.texto_original)}”` : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"><label class="f" style="flex:2;min-width:140px"><span>Texto na capa</span><textarea data-capa="texto" rows="2" style="font-size:12px;min-height:0" title="Enter quebra a linha (a última sai na 2ª cor)">${esc(c.texto || '')}</textarea></label>
+          <label class="f" style="flex:1;min-width:110px"><span>Personagem</span><select data-capa="personagem"><option value="">— nenhuma —</option>${pers}</select></label></div>
+        ${c.url_desenho ? `<div class="pub-hint" style="margin-top:4px">✏️ ${c.itens.map(it => `<b style="color:${esc(it.cor)}">#${it.n}</b> ${esc(it.o_que || (it.personagem ? it.personagem : (it.tem_foto ? '(foto)' : '')))}`).join(' · ')}${c.fundo_desc ? ` · fundo: ${esc(c.fundo_desc)}` : ''}</div>` : ''}
+        ${c.url_fundo || c.url_pers || c.url_desenho ? `<div class="pub-thumbs">${c.url_desenho ? `<img src="${esc(c.url_desenho)}" title="o rascunho">` : ''}${c.url_pers ? `<img src="${esc(c.url_pers)}" title="personagem de fora">` : ''}${c.url_fundo ? `<img src="${esc(c.url_fundo)}" title="foto de fundo">` : ''}</div>` : ''}
+        <details style="margin-top:4px" data-estbox><summary class="pub-hint" style="cursor:pointer">🎛 estilo do texto${c.estilo ? ' (personalizado)' : ''}</summary><div class="pub-est">${estiloHtml(c.estilo, d)}</div>
+          <div style="display:flex;gap:4px;margin-top:4px"><button class="pub-mini" type="button" data-aplicar-est>✅ Aplicar estilo</button>${c.estilo ? '<button class="pub-mini" type="button" data-est-padrao>↺ estilo automático</button>' : ''}</div></details>
+        <details style="margin-top:4px"><summary class="pub-hint" style="cursor:pointer">✍ cena (prompt em inglês)</summary><textarea data-capa="prompt" rows="4" style="width:100%;font-size:11px">${esc(c.prompt || '')}</textarea></details>
+        <div style="display:flex;gap:4px;margin-top:6px;align-items:center;flex-wrap:wrap"><span class="pub-hint" style="flex:1">${c.url_final ? st : ''}</span>
+          ${c.versoes > 1 ? `<button class="pub-mini" type="button" data-ver="-1">◀</button><span class="pub-hint">${c.versao + 1}/${c.versoes}</span><button class="pub-mini" type="button" data-ver="1">▶</button>` : ''}
+          ${c.url_final ? `<a class="pub-mini" href="${esc(c.url_final)}&baixar=1" style="text-decoration:none;padding:3px 8px;border:1px solid var(--pl);border-radius:6px">⬇</a>` : ''}
+          <button class="primary pub-mini" type="button" data-gerar ${['fila', 'gerando'].includes(c.status) ? 'disabled' : ''}>${c.url_final ? '🔁 Gerar outra' : '🎨 Gerar no Flow'}</button>
+          ${c.url_fundo || c.url_pers || c.personagem ? '<button class="pub-mini" type="button" data-montar title="cola a personagem sobre o fundo, sem IA">🧩</button>' : ''}
+          <button class="pub-mini" type="button" data-apagar title="apagar esta capa">✕</button></div>
+        ${c.url_final ? `<div class="pub-mod"><input type="text" data-mod-txt placeholder="✏️ o que mudar? ex.: céu à noite, ela sorrindo" ${['fila', 'gerando'].includes(c.status) ? 'disabled' : ''}><button class="pub-mini" type="button" data-modificar title="${c.origem_flow ? 'a mesma conta volta ao projeto do Flow desta imagem e edita lá (sem crédito: outra conta sobe a imagem)' : 'vai pro Flow com esta imagem de referência'}" ${['fila', 'gerando'].includes(c.status) ? 'disabled' : ''}>✏️ Modificar</button></div>
+          ${c.modificacoes && c.modificacoes.length ? `<div class="pub-hint">✏️ ${c.modificacoes.map(esc).join(' · ')}</div>` : ''}` : ''}</div>`;
+    }).join('') || '<p class="pub-hint">Nenhuma capa ainda — 💡 peça ideias ou 📤 envie uma de referência.</p>';
+    clearTimeout(P.timer);
+    if (d.esperando) P.timer = setTimeout(carregar, 8000);
+  }
+  let canaisCarregados = false;
+  async function carregarCanais() {
+    if (canaisCarregados) return; canaisCarregados = true;
+    try { const r = await req('/canais'); const sel = $('pubCanalSel'), atual = (P.d && P.d.canal_estilo || {}).id || '';
+      sel.innerHTML = '<option value="">— nenhum (estilo próprio) —</option>' + r.canais.map(c => `<option value="${esc(c.id)}">${esc(c.nome)} · ${c.n_videos} vídeos${c.tem_ia ? '' : ' (sem análise da IA)'}</option>`).join('');
+      sel.value = atual; if (!r.canais.length) $('pubCanalInfo').textContent = 'nenhum canal analisado ainda';
+    } catch (e) { canaisCarregados = false; }
+  }
+  function desenharCanal() {
+    const e = P.d && P.d.canal_estilo; $('pubCanalCorpo').style.display = e ? '' : 'none';
+    if ($('pubCanalSel').value !== ((e || {}).id || '') && canaisCarregados) $('pubCanalSel').value = (e || {}).id || '';
+    $('pubCanalInfo').textContent = e ? `✅ modelando: ${e.nome}` : ''; if (!e) return;
+    $('pubCanalResumo').innerHTML = [e.formulas && e.formulas.length ? `<b>Fórmulas:</b> ${e.formulas.map(esc).join(' · ')}` : '',
+      e.titulos_top && e.titulos_top.length ? `<b>Títulos que mais deram view:</b> ${e.titulos_top.map(esc).join(' · ')}` : '',
+      e.thumbs_receita ? `<b>Receita de capa:</b> ${esc(e.thumbs_receita)}` : '',
+      e.tem_ia ? '' : '⚠ esse canal ainda não tem a análise da IA (fórmulas/receita) — vão só os títulos e as thumbs; rode a 🤖 análise no Analisador pra ficar melhor'].filter(Boolean).join('<br>');
+    const box = $('pubCanalThumbs'); if (box.dataset.aid === e.id) return; box.dataset.aid = e.id;
+    box.innerHTML = (e.thumbs || []).map(t => `<button type="button" data-vid="${esc(t.id)}" title="copiar o modelo desta thumb"><img src="${esc(t.thumb)}" loading="lazy">${t.views_txt ? `<i>${esc(t.views_txt)}</i>` : ''}<span>${esc(t.titulo)}</span></button>`).join('') || '<p class="pub-hint">sem thumbs</p>';
+  }
+  $('pubCanalSel').addEventListener('change', async () => {
+    try { P.d = await req('/canal_estilo', { aid: $('pubCanalSel').value }); desenhar(); avisar($('pubCanalSel').value ? '📊 modelando no estilo do canal' : 'estilo próprio'); }
+    catch (er) { avisar('⚠ ' + er.message, 5000); }
+  });
+  $('pubCanalTit').addEventListener('click', () => textos({ tipos: ['titulos'], mais: true }, 'títulos no estilo do canal'));
+  $('pubCanalIdeias').addEventListener('click', () => $('pubIdeias').click());
+  $('pubCanalThumbs').addEventListener('click', (ev) => { const b = ev.target.closest('[data-vid]'); if (b) copiarModelo({ video_id: b.dataset.vid }); });
+  async function carregar() { try { P.d = await req(''); desenhar(); } catch (e) { $('pubSt').textContent = '⚠ ' + e.message; } }
+  window.pubCarregar = () => { if (!P.d) carregar(); };
+  async function textos(corpo, rotulo) {
+    $('pubSt').textContent = `⏳ a IA está escrevendo ${rotulo}…`;
+    try { P.d = await req('/textos', Object.assign({ pedido: $('pubPedido').value }, corpo)); desenhar(); $('pubSt').textContent = '✅ pronto'; }
+    catch (e) { $('pubSt').textContent = '⚠ ' + e.message; }
+  }
+  $('pubTudo').addEventListener('click', () => textos({}, 'títulos, descrições, tags e hashtags'));
+  $('pubRefPers').addEventListener('change', () => { $('pubRefPers').dataset.mexeu = '1'; });
+  $('pubTextos').addEventListener('click', (e) => {
+    const m = e.target.closest('[data-mais]'); if (m) return textos({ tipos: [m.dataset.mais], mais: true }, TIT[m.dataset.mais].toLowerCase());
+    const cp = e.target.closest('[data-cp]'); if (cp) { const [t, k] = cp.dataset.cp.split(':'); return copiar(P.d.textos[t][+k]); }
+    const ct = e.target.closest('[data-cptodas]'); if (ct) { const t = ct.dataset.cptodas; return copiar((P.d.textos[t] || []).join(t === 'tags' ? ', ' : ' ')); }
+    const dl = e.target.closest('[data-del]'); if (dl) { const [t, k] = dl.dataset.del.split(':');
+      req(`/textos/${t}/${k}`, { apagar: true }).then(d => { P.d = d; desenhar(); }).catch(er => avisar('⚠ ' + er.message)); }
+  });
+  $('pubTextos').addEventListener('change', (e) => {
+    const ed = e.target.closest('[data-ed]'); if (!ed) return; const [t, k] = ed.dataset.ed.split(':');
+    req(`/textos/${t}/${k}`, { valor: ed.value }).then(d => { P.d = d; avisar('📝 guardado'); }).catch(er => avisar('⚠ ' + er.message));
+  });
+  $('pubIdeias').addEventListener('click', async () => {
+    const b = $('pubIdeias'); b.disabled = true; $('pubSt').textContent = '💡 a IA está pensando nas capas…';
+    try { P.d = await req('/capas/ideias', { quantas: 3, pedido: $('pubPedido').value }); desenhar(); $('pubSt').textContent = '✅ 3 ideias novas de capa'; }
+    catch (e) { $('pubSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
+  });
+  $('pubRefIr').addEventListener('click', async () => {
+    const f = $('pubRef').files[0]; if (!f) { avisar('Escolha a imagem da capa de referência'); return; }
+    const fd = new FormData(); fd.append('imagem', f); fd.append('personagem', $('pubRefPers').value); fd.append('pedido', $('pubRefPedido').value || $('pubPedido').value); fd.append('gerar', $('pubRefGerar').checked ? '1' : '0');
+    const b = $('pubRefIr'); b.disabled = true; $('pubSt').textContent = '📤 a IA está olhando a capa…';
+    try { P.d = await req('/capas/referencia', null, fd); desenhar(); $('pubSt').textContent = P.d.aviso ? '⚠ ' + P.d.aviso : '✅ capa recriada' + ($('pubRefGerar').checked ? ' — indo pro Flow' : ''); }
+    catch (e) { $('pubSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
+  });
+  $('pubCapas').addEventListener('click', async (e) => {
+    const card = e.target.closest('.pub-capa'); if (!card) return; const n = card.dataset.n, c = P.d.capas.find(x => String(x.n) === n);
+    try {
+      if (e.target.closest('[data-gerar]')) { e.target.disabled = true; P.d = await req(`/capas/${n}/gerar`, {}); avisar(P.d.aviso ? '⚠ ' + P.d.aviso : '🎨 capa na fila do Flow', 6000); }
+      else if (e.target.closest('[data-modificar]')) { const t = card.querySelector('[data-mod-txt]').value.trim(); if (!t) { avisar('Escreva o que mudar'); return; }
+        P.d = await req(`/capas/${n}/modificar`, { pedido: t }); avisar(P.d.aviso ? '⚠ ' + P.d.aviso : P.d.mesmo_projeto ? '✏️ indo pro mesmo projeto do Flow' : '✏️ indo pro Flow com esta imagem', 6000); }
+      else if (e.target.closest('[data-montar]')) { P.d = await req(`/capas/${n}/montar`, {}); avisar('🧩 montada sem IA'); }
+      else if (e.target.closest('[data-aplicar-est]')) { P.d = await req(`/capas/${n}`, { estilo: lerEstilo(card.querySelector('[data-estbox]')) }); avisar('🎛 estilo aplicado'); }
+      else if (e.target.closest('[data-est-padrao]')) { P.d = await req(`/capas/${n}`, { estilo: null }); }
+      else if (e.target.closest('[data-apagar]')) { if (!confirm('Apagar esta capa?')) return; P.d = await req(`/capas/${n}`, { apagar: true }); }
+      else if (e.target.closest('[data-ver]')) { const v = (c.versao + Number(e.target.closest('[data-ver]').dataset.ver) + c.versoes) % c.versoes; P.d = await req(`/capas/${n}`, { versao: v }); }
+      else return;
+      desenhar();
+    } catch (er) { avisar('⚠ ' + er.message, 5000); }
+  });
+  $('pubCapas').addEventListener('change', async (e) => {
+    const el = e.target.closest('[data-capa]'); if (!el) return;  // (os [data-est] só valem no ✅ Aplicar) const n = el.closest('.pub-capa').dataset.n;
+    try { P.d = await req(`/capas/${n}`, { [el.dataset.capa]: el.value }); desenhar(); avisar(el.dataset.capa === 'texto' ? '📝 texto da capa atualizado' : '📝 guardado'); }
+    catch (er) { avisar('⚠ ' + er.message, 5000); }
+  });
+  $('pubCustom').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-pc]'); if (!b) return;
+    const fd = new FormData(); fd.append('descricao', $('pcDesc').value); fd.append('texto', $('pcTexto').value);
+    fd.append('personagem', $('pcPers').value); fd.append('estilo', JSON.stringify(lerEstilo($('pcEstilo')))); fd.append('acao', b.dataset.pc);
+    if ($('pcPersArq').files[0]) fd.append('personagem_img', $('pcPersArq').files[0]);
+    if ($('pcFundo').files[0]) fd.append('fundo', $('pcFundo').files[0]);
+    $('pubCustom').querySelectorAll('[data-pc]').forEach(x => x.disabled = true); $('pubSt').textContent = '🎛 montando a capa…';
+    try { P.d = await req('/capas/personalizada', null, fd); desenhar(); $('pubSt').textContent = P.d.aviso ? '⚠ ' + P.d.aviso : b.dataset.pc === 'flow' ? '🎨 capa na fila do Flow' : b.dataset.pc === 'montar' ? '🧩 capa montada' : '✅ cartão criado'; }
+    catch (er) { $('pubSt').textContent = '⚠ ' + er.message; } finally { $('pubCustom').querySelectorAll('[data-pc]').forEach(x => x.disabled = false); }
+  });
+  // ✏️ desenhar a capa
+  const CORES = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#84cc16'];
+  const D = { itens: [], fer: 'livre', junto: null, atual: null, hist: [], fundoImg: null, assinatura: '' };
+  const cv = $('desCv'), cx = cv.getContext('2d');
+  const novoN = () => (D.itens.reduce((m, i) => Math.max(m, i.n), 0) + 1);
+  function caixa(it) {
+    let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+    for (const f of it.formas) for (const [x, y] of (f.tipo === 'livre' ? f.pts : [[f.x0, f.y0], [f.x1, f.y1]])) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    return [x0, y0, x1, y1];
+  }
+  const GRAF = { circulo: '🔴 círculo', seta: '➡ seta' };
+  function seta(g, f, W, H, cor) {
+    const ax = f.x0 * W, ay = f.y0 * H, bx = f.x1 * W, by = f.y1 * H, ang = Math.atan2(by - ay, bx - ax), es = W / 90;
+    const cab = Math.max(es * 3, Math.min(W / 14, Math.hypot(bx - ax, by - ay) * .35));
+    const pts = [[bx, by], [bx - cab * Math.cos(ang - .45), by - cab * Math.sin(ang - .45)], [bx - cab * Math.cos(ang + .45), by - cab * Math.sin(ang + .45)]];
+    for (const [c, w] of [['#000', es * 2 + 5], [cor, es * 2]]) { g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx - cab * .8 * Math.cos(ang), by - cab * .8 * Math.sin(ang)); g.lineWidth = w; g.strokeStyle = c; g.lineCap = 'round'; g.stroke(); }
+    g.beginPath(); pts.forEach(([x, y], k) => k ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fillStyle = cor; g.fill(); g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
+  }
+  function textoPrevia(g, W, H) {
+    const t = $('desTexto').value.trim(); D.txt = null; if (!t) return; const e = lerEstilo($('desEstilo'));
+    let ls = (e.maiusculas ? t.toUpperCase() : t).split('\n').map(l => l.trim()).filter(Boolean);
+    const pos = e.pos === 'auto' ? 'esquerda' : e.pos, hz = ['topo', 'base', 'centro', 'livre'].includes(pos);
+    let px = H * .26 * (+e.tamanho || 100) / 100;
+    const fam = `'pubf-${e.fonte}',Impact,sans-serif`, wt = e.peso === 'Bold' ? 700 : 400, it = e.peso === 'Italic' ? 'italic ' : '';
+    const fnt = () => `${it}${wt} ${px}px ${fam}`; g.font = fnt();
+    while (px > 20 && (Math.max(...ls.map(l => g.measureText(l).width)) > W * (hz ? .9 : .46) || px * .95 * ls.length > H * (['topo', 'base'].includes(pos) ? .42 : .8))) { px *= .92; g.font = fnt(); }
+    const alt = px * .95 * ls.length; let y = (pos === 'livre' ? Math.max(H * .03, Math.min(H * .97 - alt, (+e.ty || .5) * H - alt / 2)) : { topo: H * .06, base: H * .94 - alt }[pos] ?? (H - alt) / 2) + px * .8;
+    const larg = Math.max(...ls.map(l => g.measureText(l).width));
+    D.txt = { x0: (pos === 'livre' ? Math.max(W * .02, Math.min(W * .98 - larg, (+e.tx || .5) * W - larg / 2)) : pos === 'esquerda' ? W * .05 : pos === 'direita' ? W * .95 - larg : (W - larg) / 2) / W, y0: (y - px * .8) / H, x1: 0, y1: (y - px * .8 + alt) / H };
+    D.txt.x1 = D.txt.x0 + larg / W;
+    g.textBaseline = 'alphabetic'; g.textAlign = 'left'; g.lineJoin = 'round'; g.globalAlpha = .9;
+    ls.forEach((l, i) => { const w = g.measureText(l).width, x = pos === 'livre' ? Math.max(W * .02, Math.min(W * .98 - w, (+e.tx || .5) * W - w / 2)) : pos === 'esquerda' ? W * .05 : pos === 'direita' ? W * .95 - w : (W - w) / 2;
+      if (e.caixa) { g.fillStyle = e.cor_caixa; g.fillRect(x - px * .12, y - px * .85, w + px * .24, px * 1.05); }
+      g.lineWidth = Math.max(2, px / 14) * (+e.contorno || 0) / 100 * 2; g.strokeStyle = '#000'; if (g.lineWidth) g.strokeText(l, x, y);
+      g.fillStyle = i === ls.length - 1 && ls.length > 1 ? e.cor2 : e.cor; g.fillText(l, x, y); y += px * .95; });
+    g.globalAlpha = 1;
+  }
+  function forma(g, f, W, H) {
+    g.beginPath();
+    if (f.tipo === 'livre') { f.pts.forEach(([x, y], k) => k ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H)); g.closePath(); }
+    else if (f.tipo === 'ret') g.rect(Math.min(f.x0, f.x1) * W, Math.min(f.y0, f.y1) * H, Math.abs(f.x1 - f.x0) * W, Math.abs(f.y1 - f.y0) * H);
+    else g.ellipse((f.x0 + f.x1) / 2 * W, (f.y0 + f.y1) / 2 * H, Math.abs(f.x1 - f.x0) / 2 * W || 1, Math.abs(f.y1 - f.y0) / 2 * H || 1, 0, 0, Math.PI * 2);
+  }
+  function desenharEm(g, comFundo) {
+    const W = g.canvas.width, H = g.canvas.height;
+    g.fillStyle = comFundo ? '#3a3f4a' : '#d9dbe0'; g.fillRect(0, 0, W, H);
+    if (comFundo && D.guiaImg && $('desGuiaVer').checked) { g.globalAlpha = .5; g.drawImage(D.guiaImg, 0, 0, W, H); g.globalAlpha = 1; }
+    if (comFundo && D.fundoImg) { g.globalAlpha = .55; const k = Math.max(W / D.fundoImg.width, H / D.fundoImg.height); g.drawImage(D.fundoImg, (W - D.fundoImg.width * k) / 2, (H - D.fundoImg.height * k) / 2, D.fundoImg.width * k, D.fundoImg.height * k); g.globalAlpha = 1; }
+    const todos = D.itens.map(it => ({ it, fs: it.formas })).concat(D.atual ? [{ it: D.itens.find(i => i.n === D.atual.n) || { cor: CORES[(D.atual.n - 1) % 8] }, fs: [D.atual.f] }] : []);
+    for (const { it, fs } of todos) for (const f of fs) {
+      if (f.tipo === 'seta') { if (comFundo) seta(g, f, W, H, it.cor_grafico || '#ef2323'); continue; }
+      if (it.tipo === 'circulo' || f.tipo === 'circulo') { if (!comFundo) continue; forma(g, Object.assign({}, f, { tipo: 'eli' }), W, H); g.lineWidth = W / 110 + 5; g.strokeStyle = '#000'; g.stroke(); g.lineWidth = W / 110; g.strokeStyle = it.cor_grafico || '#ef2323'; g.stroke(); continue; }
+      forma(g, f, W, H); g.fillStyle = it.cor + '66'; g.fill(); g.lineWidth = W / 220; g.strokeStyle = it.cor; g.stroke(); }
+    if (comFundo) textoPrevia(g, W, H);
+    for (const it of D.itens) { if (!it.formas.length || (it.tipo && it.tipo !== 'coisa')) continue; const [x0, y0, x1, y1] = caixa(it); const x = (x0 + x1) / 2 * W, y = (y0 + y1) / 2 * H, r = W / 40;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 3; g.strokeStyle = it.cor; g.stroke();
+      g.fillStyle = '#111'; g.font = `bold ${Math.round(r * 1.2)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(it.n), x, y + 1); }
+    if (comFundo && D.fer === 'mover') {  // ✋ as caixas pra arrastar
+      const caixas = D.itens.map(it => ({ b: caixa(it), sel: it.n === D.sel })).concat(D.txt ? [{ b: [D.txt.x0, D.txt.y0, D.txt.x1, D.txt.y1], sel: D.sel === 'texto' }] : []);
+      for (const { b: [x0, y0, x1, y1], sel } of caixas) { g.setLineDash([10, 8]); g.lineWidth = sel ? 3 : 1.5; g.strokeStyle = sel ? '#fff' : '#ffffff88'; g.strokeRect(x0 * W, y0 * H, (x1 - x0) * W, (y1 - y0) * H); g.setLineDash([]);
+        if (sel) { g.fillStyle = '#fff'; g.fillRect(x1 * W - 11, y1 * H - 11, 22, 22); g.strokeStyle = '#000'; g.lineWidth = 2; g.strokeRect(x1 * W - 11, y1 * H - 11, 22, 22); } }
+    }
+  }
+  function mexer(f, fx, fy) {  // aplica a transformação nos pontos da forma
+    if (f.tipo === 'livre') f.pts = f.pts.map(([x, y]) => [fx(x), fy(y)]); else { f.x0 = fx(f.x0); f.x1 = fx(f.x1); f.y0 = fy(f.y0); f.y1 = fy(f.y1); }
+  }
+  function acertarEstilo(mud) { const box = $('desEstilo'); for (const [k, v] of Object.entries(mud)) { let el = box.querySelector(`[data-est="${k}"]`);
+      if (!el) { el = document.createElement('input'); el.type = 'hidden'; el.dataset.est = k; box.appendChild(el); }
+      if (k === 'pos' && !el.querySelector('option[value="livre"]')) el.insertAdjacentHTML('beforeend', '<option value="livre">livre (arrastado)</option>');
+      el.value = v; } }
+  const redesenhar = () => desenharEm(cx, true);
+  function modo() { $('desModo').textContent = D.fer === 'mover' ? '✋ arraste os itens e o texto · quadradinho = tamanho' : D.junto ? `desenhando mais partes do item #${D.junto}` : 'o próximo contorno vira um item novo'; }
+  function ponto(e) { const r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))]; }
+  cv.addEventListener('pointerdown', (e) => {
+    cv.setPointerCapture(e.pointerId); const [x, y] = ponto(e);
+    if (D.fer === 'mover') {
+      const r = cv.getBoundingClientRect(), tol = 16 / r.width, perto = (b) => Math.abs(x - b[2]) < tol * 1.5 && Math.abs(y - b[3]) < tol * 2.5;
+      const selB = D.sel === 'texto' && D.txt ? [D.txt.x0, D.txt.y0, D.txt.x1, D.txt.y1] : D.sel ? (D.itens.find(i => i.n === D.sel) ? caixa(D.itens.find(i => i.n === D.sel)) : null) : null;
+      if (selB && perto(selB)) { D.arr = { modo: 'tam', b: selB, x, y, orig: D.sel === 'texto' ? +lerEstilo($('desEstilo')).tamanho || 100 : JSON.parse(JSON.stringify(D.itens.find(i => i.n === D.sel).formas)) }; return; }
+      const dentro = (b) => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
+      if (D.txt && dentro([D.txt.x0, D.txt.y0, D.txt.x1, D.txt.y1])) D.sel = 'texto';
+      else { const it = [...D.itens].reverse().find(i => dentro(caixa(i))); D.sel = it ? it.n : null; }
+      D.arr = D.sel ? { modo: 'mov', x, y } : null; redesenhar(); return;
+    }
+    const graf = D.fer === 'circulo' || D.fer === 'seta';
+    const n = (!graf && D.junto && (D.itens.find(i => i.n === D.junto) || {}).tipo === 'coisa') ? D.junto : novoN();
+    D.atual = { n, f: D.fer === 'livre' ? { tipo: 'livre', pts: [[x, y]] } : { tipo: D.fer, x0: x, y0: y, x1: x, y1: y } }; redesenhar();
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (D.fer === 'mover') { const [x, y] = ponto(e);
+      if (!D.arr) return;
+      if (D.arr.modo === 'mov') { const dx = x - D.arr.x, dy = y - D.arr.y; D.arr.x = x; D.arr.y = y;
+        if (D.sel === 'texto') { const t = D.txt; acertarEstilo({ pos: 'livre', tx: ((t.x0 + t.x1) / 2 + dx).toFixed(4), ty: ((t.y0 + t.y1) / 2 + dy).toFixed(4) }); }
+        else D.itens.find(i => i.n === D.sel).formas.forEach(f => mexer(f, v => v + dx, v => v + dy)); }
+      else { const b = D.arr.b, kx = Math.max(.05, (x - b[0]) / Math.max(.01, b[2] - b[0])), ky = Math.max(.05, (y - b[1]) / Math.max(.01, b[3] - b[1]));
+        if (D.sel === 'texto') { acertarEstilo({ tamanho: Math.round(Math.max(30, Math.min(200, D.arr.orig * Math.min(kx, ky)))) }); }
+        else { const it = D.itens.find(i => i.n === D.sel); it.formas = JSON.parse(JSON.stringify(D.arr.orig)); it.formas.forEach(f => mexer(f, v => b[0] + (v - b[0]) * kx, v => b[1] + (v - b[1]) * ky)); } }
+      redesenhar(); return; }
+    if (!D.atual) return; const [x, y] = ponto(e); const f = D.atual.f; if (f.tipo === 'livre') f.pts.push([x, y]); else { f.x1 = x; f.y1 = y; } redesenhar(); });
+  cv.addEventListener('pointerup', () => {
+    if (D.fer === 'mover') { D.arr = null; return; }
+    if (!D.atual) return; const { n, f } = D.atual; D.atual = null;
+    const peq = f.tipo === 'livre' ? f.pts.length < 3 : f.tipo === 'seta' ? Math.hypot(f.x1 - f.x0, f.y1 - f.y0) < .03 : Math.abs(f.x1 - f.x0) < .01 || Math.abs(f.y1 - f.y0) < .01;
+    if (!peq) { let it = D.itens.find(i => i.n === n); if (!it) { it = novoItem(n, f.tipo === 'circulo' || f.tipo === 'seta' ? f.tipo : 'coisa'); D.itens.push(it); } it.formas.push(f); D.hist.push(n); }
+    redesenhar(); desLista(); modo();
+  });
+  function novoItem(n, tipo) { return { n, tipo: tipo || 'coisa', cor: CORES[(n - 1) % 8], cor_grafico: '#ef2323', formas: [], o_que: '', dica: '', personagem: '', foto: null }; }
+  function desLista() {
+    const pers = (P.d && P.d.personagens) || [];
+    const ass = D.itens.map(i => i.n).join(',') + '|' + D.junto + '|' + pers.length;
+    if (ass === D.assinatura) return; D.assinatura = ass;
+    $('desItens').innerHTML = D.itens.map(it => it.tipo && it.tipo !== 'coisa' ? `<div class="des-it" data-it="${it.n}"><span class="bol" style="background:${esc(it.cor_grafico)}">${it.tipo === 'seta' ? '➡' : '◯'}</span>
+      <span style="flex:1;font-size:12px">${GRAF[it.tipo]} — o site desenha por cima (a IA não vê)</span><label class="pub-hint" style="display:flex;gap:4px;align-items:center">cor <input type="color" data-c="cor_grafico" value="${esc(it.cor_grafico)}" style="width:40px;height:24px;padding:0;margin:0"></label>
+      <button class="pub-mini" type="button" data-rm title="apagar">✕</button></div>` : `<div class="des-it ${it.n === D.junto ? 'sel' : ''}" data-it="${it.n}"><span class="bol" style="background:${it.cor}">${it.n}</span>
+      <input type="text" data-c="o_que" value="${esc(it.o_que)}" placeholder="${esc(it.dica ? 'o que é? (' + it.dica + ')' : 'o que é? ex.: pirâmide gigante, gato de óculos, explosão')}">
+      <select data-c="personagem"><option value="">— personagem do canal —</option>${pers.filter(p => p.tem_ref).map(p => `<option value="${esc(p.slug)}" ${p.slug === it.personagem ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>
+      <input type="file" data-c="foto" accept="image/*" title="foto de exemplo do que é">${it.foto ? `<span class="pub-hint">📎 ${esc(it.foto.name)}</span>` : ''}
+      <button class="pub-mini" type="button" data-rm title="apagar o item">✕</button></div>`).join('') || '<p class="pub-hint">Nenhum item ainda — desenhe na tela acima.</p>';
+  }
+  $('desItens').addEventListener('input', (e) => { const r = e.target.closest('[data-it]'); if (!r || e.target.type === 'file') return; const it = D.itens.find(i => i.n === +r.dataset.it); if (it) { it[e.target.dataset.c] = e.target.value; if (e.target.dataset.c === 'cor_grafico') redesenhar(); } });
+  $('desItens').addEventListener('change', (e) => { const r = e.target.closest('[data-it]'); if (!r) return; const it = D.itens.find(i => i.n === +r.dataset.it); if (!it) return;
+    if (e.target.dataset.c === 'foto') { it.foto = e.target.files[0] || null; D.assinatura = ''; desLista(); } else it[e.target.dataset.c] = e.target.value; });
+  $('desItens').addEventListener('click', (e) => { const r = e.target.closest('[data-it]'); if (!r) return; const n = +r.dataset.it;
+    if (e.target.closest('[data-rm]')) { D.itens = D.itens.filter(i => i.n !== n); if (D.junto === n) D.junto = null; }
+    else if (['INPUT', 'SELECT', 'LABEL'].includes(e.target.tagName)) return; else if ((D.itens.find(i => i.n === n) || {}).tipo === 'coisa') D.junto = D.junto === n ? null : n;
+    redesenhar(); desLista(); modo(); });
+  function ferramenta(f) { D.fer = f; cv.style.cursor = f === 'mover' ? 'move' : 'crosshair'; $('pubDes').querySelectorAll('[data-fer]').forEach(x => x.classList.toggle('on', x.dataset.fer === f)); redesenhar(); modo(); }
+  $('pubDes').querySelectorAll('[data-fer]').forEach(b => b.addEventListener('click', () => ferramenta(b.dataset.fer)));
+  $('desNovo').addEventListener('click', () => { D.junto = null; desLista(); modo(); });
+  $('desDesfazer').addEventListener('click', () => { let alvo = null;
+    while (D.hist.length && !alvo) alvo = D.itens.find(i => i.n === D.hist.pop() && i.formas.length) || null;
+    if (!alvo) return; alvo.formas.pop();
+    if (!alvo.formas.length) { D.itens = D.itens.filter(i => i !== alvo); if (D.junto === alvo.n) D.junto = null; }
+    redesenhar(); desLista(); modo(); });
+  $('desLimpar').addEventListener('click', () => { if (D.itens.length && !confirm('Apagar o desenho todo?')) return; D.itens = []; D.hist = []; D.junto = null; D.guiaImg = null; D.refGuia = null; $('desGuiaBox').style.display = 'none'; redesenhar(); desLista(); modo(); });
+  $('desFundo').addEventListener('change', () => { const f = $('desFundo').files[0]; if (!f) { D.fundoImg = null; redesenhar(); return; }
+    const im = new Image(); im.onload = () => { D.fundoImg = im; redesenhar(); }; im.src = URL.createObjectURL(f); });
+  $('pubDes').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-des]'); if (!b) return;
+    if (!D.itens.some(it => it.tipo === 'coisa') && !$('desFundo').files[0]) { avisar('Desenhe pelo menos um contorno (ou envie o fundo)'); return; }
+    const sem = D.itens.find(it => it.tipo === 'coisa' && !it.o_que.trim() && !it.foto && !it.personagem); if (sem) { avisar(`Diga o que é o item #${sem.n}`); return; }
+    const off = document.createElement('canvas'); off.width = 1280; off.height = 720; desenharEm(off.getContext('2d'), false);
+    const blob = await new Promise(r => off.toBlob(r, 'image/png'));
+    const fd = new FormData(); fd.append('desenho', blob, 'desenho.png');
+    fd.append('itens', JSON.stringify(D.itens.map(it => {
+      const f = it.formas[it.formas.length - 1] || {};
+      return { n: it.n, tipo: it.tipo, cor: it.cor, cor_grafico: it.cor_grafico, o_que: it.o_que, personagem: it.personagem, bbox: caixa(it),
+        de: it.tipo === 'seta' ? [f.x0, f.y0] : null, para: it.tipo === 'seta' ? [f.x1, f.y1] : null };
+    })));
+    D.itens.forEach(it => { if (it.foto) fd.append('foto_' + it.n, it.foto); });
+    if ($('desFundo').files[0]) fd.append('fundo', $('desFundo').files[0]);
+    fd.append('fundo_desc', $('desFundoDesc').value); fd.append('texto', $('desTexto').value); fd.append('pedido', $('desPedido').value);
+    fd.append('estilo', JSON.stringify(lerEstilo($('desEstilo')))); fd.append('acao', b.dataset.des);
+    if (D.refGuia && $('desGuiaRef').checked) fd.append('ref_guia', D.refGuia);
+    $('pubDes').querySelectorAll('[data-des]').forEach(x => x.disabled = true); $('pubSt').textContent = '✏️ a IA está lendo o desenho…';
+    try { P.d = await req('/capas/desenho', null, fd); desenhar(); $('pubSt').textContent = P.d.aviso ? '⚠ ' + P.d.aviso : b.dataset.des === 'flow' ? '🎨 capa desenhada na fila do Flow' : b.dataset.des === 'montar' ? '🧩 capa montada com as fotos' : '✅ cartão criado';
+      const card = document.querySelector(`.pub-capa[data-n="${P.d.capa_nova}"]`); if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (er) { $('pubSt').textContent = '⚠ ' + er.message; } finally { $('pubDes').querySelectorAll('[data-des]').forEach(x => x.disabled = false); }
+  });
+  // 🧩 predefinições
+  function presetsDesenhar(d) {
+    const box = $('desPresets'); if (box.dataset.feito || !d.presets) return; box.dataset.feito = '1';
+    box.innerHTML = d.presets.map(p => `<button type="button" data-preset="${esc(p.id)}" title="${esc(p.desc)}"><canvas width="320" height="180"></canvas><b>${esc(p.nome)}</b><small>${esc(p.desc)}</small></button>`).join('');
+    d.presets.forEach((p, k) => {
+      const g = box.querySelectorAll('canvas')[k].getContext('2d'), W = 320, H = 180;
+      g.fillStyle = '#2b3140'; g.fillRect(0, 0, W, H);
+      p.itens.forEach((it, j) => { const [x0, y0, x1, y1] = it.bbox; const f = it.tipo === 'seta' ? { tipo: 'seta', x0: it.de[0], y0: it.de[1], x1: it.para[0], y1: it.para[1] } : { tipo: it.forma || 'ret', x0, y0, x1, y1 };
+        if (f.tipo === 'seta') return seta(g, f, W, H, '#ef2323');
+        forma(g, Object.assign({}, f, { tipo: it.tipo === 'circulo' ? 'eli' : f.tipo }), W, H);
+        if (it.tipo === 'circulo') { g.lineWidth = 4; g.strokeStyle = '#ef2323'; g.stroke(); return; }
+        const cor = it.papel === 'personagem' ? '#a855f7' : CORES[(j + 1) % 8]; g.fillStyle = cor + '88'; g.fill(); g.lineWidth = 2; g.strokeStyle = cor; g.stroke();
+        g.fillStyle = '#fff'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(it.papel === 'personagem' ? '🧍' : '📦', (x0 + x1) / 2 * W, (y0 + y1) / 2 * H); });
+      const e = Object.assign({}, d.estilo_padrao, p.estilo), ls = (p.texto || '').split('\n'); g.textAlign = 'left'; g.font = `bold ${ls.length > 1 ? 24 : 30}px Impact,sans-serif`; g.textBaseline = 'alphabetic';
+      const pos = e.pos === 'auto' ? 'esquerda' : e.pos, alt = 26 * ls.length; let y = ({ topo: 12, base: H - 12 - alt }[pos] ?? (H - alt) / 2) + 24;
+      ls.forEach((l, i) => { const w = g.measureText(l).width, x = pos === 'esquerda' ? 12 : pos === 'direita' ? W - 12 - w : (W - w) / 2;
+        if (e.caixa) { g.fillStyle = e.cor_caixa; g.fillRect(x - 4, y - 24, w + 8, 30); }
+        g.textAlign = 'left'; g.lineWidth = 4; g.strokeStyle = '#000'; g.strokeText(l, x, y); g.fillStyle = i === ls.length - 1 && ls.length > 1 ? e.cor2 : e.cor; g.fillText(l, x, y); y += 26; });
+    });
+  }
+  $('desPresets').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-preset]'); if (!b) return; const p = (P.d.presets || []).find(x => x.id === b.dataset.preset); if (!p) return;
+    if (D.itens.length && !confirm('Trocar o desenho atual por este modelo?')) return;
+    const pers = (P.d.personagens || []).filter(x => x.tem_ref);
+    D.itens = []; D.hist = []; D.junto = null; D.guiaImg = null; D.refGuia = null; $('desGuiaBox').style.display = 'none'; let k = 0;
+    p.itens.forEach((it, j) => { const n = j + 1, tipo = it.tipo || 'coisa', obj = novoItem(n, tipo);
+      obj.formas = [tipo === 'seta' ? { tipo: 'seta', x0: it.de[0], y0: it.de[1], x1: it.para[0], y1: it.para[1] } : { tipo: tipo === 'circulo' ? 'circulo' : (it.forma || 'ret'), x0: it.bbox[0], y0: it.bbox[1], x1: it.bbox[2], y1: it.bbox[3] }];
+      obj.dica = it.dica || ''; if (it.papel === 'personagem' && pers.length) obj.personagem = pers[k++ % pers.length].slug;
+      D.itens.push(obj); D.hist.push(n); });
+    $('desTexto').value = p.texto || '';
+    $('desEstilo').innerHTML = estiloHtml(Object.assign({}, P.d.estilo_padrao, p.estilo), P.d);
+    D.assinatura = ''; ferramenta('mover'); desLista(); modo(); avisar(`🧩 modelo “${p.nome}” — diga o que é cada item e ajuste à vontade`, 5000);
+  });
+  // 📤 copiar o modelo de uma thumb
+  $('desModeloIr').addEventListener('click', () => {
+    const f = $('desModeloArq').files[0]; if (!f) { avisar('Escolha a thumb pra copiar o modelo'); return; } copiarModelo({ arquivo: f }); });
+  async function copiarModelo(origem) {
+    if (D.itens.length && !confirm('Trocar o desenho atual pelo modelo desta thumb?')) return;
+    $('pubDes').open = true;
+    const fd = new FormData(); if (origem.arquivo) fd.append('imagem', origem.arquivo); else fd.append('video_id', origem.video_id);
+    fd.append('pedido', $('desModeloPedido').value);
+    fd.append('preencher', (document.querySelector('input[name="desModeloModo"]:checked') || {}).value || '0');
+    const b = $('desModeloIr'); b.disabled = true; $('pubSt').textContent = '📤 a IA está lendo a composição da thumb…';
+    try {
+      const r = await req('/capas/copiar_modelo', null, fd); P.d = r; const m = r.modelo; desenhar();
+      const pers = (P.d.personagens || []).filter(x => x.tem_ref); let k = 0;
+      D.itens = []; D.hist = []; D.junto = null; D.refGuia = m.ref_guia;
+      m.itens.forEach((it, j) => { const o = novoItem(j + 1, 'coisa'); o.formas = [{ tipo: it.forma, x0: it.bbox[0], y0: it.bbox[1], x1: it.bbox[2], y1: it.bbox[3] }];
+        o.dica = it.dica ? 'na original: ' + it.dica : ''; o.o_que = it.nosso || ''; if (it.papel === 'personagem' && pers.length) o.personagem = pers[k++ % pers.length].slug;
+        D.itens.push(o); D.hist.push(o.n); });
+      m.graficos.forEach(gr => { const n = novoN(), o = novoItem(n, gr.tipo); o.cor_grafico = gr.cor;
+        o.formas = [gr.tipo === 'seta' ? { tipo: 'seta', x0: gr.de[0], y0: gr.de[1], x1: gr.para[0], y1: gr.para[1] } : { tipo: 'circulo', x0: gr.bbox[0], y0: gr.bbox[1], x1: gr.bbox[2], y1: gr.bbox[3] }];
+        D.itens.push(o); D.hist.push(n); });
+      $('desTexto').value = m.texto || ''; $('desTexto').placeholder = m.texto_original ? `na original: ${m.texto_original}` : 'Enter quebra a linha';
+      $('desFundoDesc').value = m.fundo || ''; $('desFundoDesc').placeholder = m.fundo_original ? `na original: ${m.fundo_original}` : '';
+      if (m.estilo) $('desEstilo').innerHTML = estiloHtml(m.estilo, P.d);
+      $('desGuiaBox').style.display = 'flex'; $('desGuiaInfo').textContent = m.estilo_visual ? '🎨 ' + m.estilo_visual : '';
+      const im = new Image(); im.onload = () => { D.guiaImg = im; redesenhar(); }; im.src = m.url_guia;
+      D.assinatura = ''; ferramenta('mover'); desLista(); modo();
+      $('pubSt').textContent = `📤 modelo copiado: ${m.itens.length} itens${m.graficos.length ? ` + ${m.graficos.length} seta/círculo` : ''} — ${m.itens.some(i => i.nosso) ? 'a IA já preencheu, confira' : 'diga o que vai em cada item'} e arraste o que quiser`;
+      $('pubDes').querySelector('#desCv').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (er) { $('pubSt').textContent = '⚠ ' + er.message; avisar('⚠ ' + er.message, 5000); } finally { b.disabled = false; }
+  }
+  $('desGuiaVer').addEventListener('change', redesenhar);
+  $('pubDes').addEventListener('input', (e) => { if (e.target.id === 'desTexto' || e.target.closest('#desEstilo')) redesenhar(); });
+  $('pubDes').addEventListener('change', (e) => { if (e.target.closest('#desEstilo')) redesenhar(); });
+  redesenhar(); modo();
+  if (R.dataset.auto !== '0' && !R.closest('.tab')) carregar();  // fora do Estúdio: carrega na hora
+})();
+</script>

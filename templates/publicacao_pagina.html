@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Publicação{% endblock %}
+{% block content %}
+<style> .app-content { max-width: 1400px; } </style>
+<p><a href="/publicacoes">← Publicações</a></p>
+<h1 style="margin-bottom:4px;">📣 {{ meta.titulo or pid }}</h1>
+<p style="color:#555;margin-top:0;">{% if tem_projeto %}<a href="/job/{{ pid }}/edit-segments?modo=estudio">✏ Abrir o projeto no Estúdio</a>{% else %}🗂 O projeto foi apagado — a narração, o roteiro e o canal ficaram guardados aqui, dá pra gerar tudo normalmente.{% endif %}
+  <form method="POST" action="/publicacoes/{{ pid }}/excluir" style="display:inline;margin-left:12px;" onsubmit="return confirm('Apagar esta publicação (títulos, capas…)? O projeto do vídeo não é mexido.');"><button type="submit" style="width:auto;padding:2px 10px;background:#64748b;font-size:.82rem;">🗑 Apagar a publicação</button></form></p>
+{% set pub_larga = true %}{% set pub_mostrar_roteiro = true %}{% include "_publicacao_painel.html" %}
+{% endblock %}

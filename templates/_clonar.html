@@ -5,7 +5,7 @@
   if (window._clonarPronto) return; window._clonarPronto = true;
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('.cl-btn'); if (!b) return;
-    const nome = prompt('Nome da cópia (ex.: "ângulo psicológico", "versão curta"). Vazio = "… (cópia)".\nO original não muda.', '');
+    const nome = prompt('Nome da cópia (ex.: "ângulo psicológico", "versão curta"). Vazio = o mesmo título com um número (2, 3…).\nO original não muda.', '');
     if (nome === null) return;
     b.disabled = true; const txt = b.textContent; b.textContent = '📑 clonando…';
     try {
