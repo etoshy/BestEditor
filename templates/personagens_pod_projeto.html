@@ -27,6 +27,10 @@
   .pj-acoes { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
   .pj-acoes button { width: auto; margin: 0; padding: 2px 7px; font-size: .75rem; }
   .pj-chk { position: absolute; top: 12px; left: 12px; width: auto; transform: scale(1.3); }
+  .pj-vis { position: absolute; bottom: auto; top: 34px; left: 8px; background: #db2777; color: #fff; font-size: .7rem; padding: 1px 7px; border-radius: 999px; z-index: 2; }
+  .pj-visuais { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .pj-visuais .chip { border: 1px solid #f9a8d4; background: #fdf2f8; border-radius: 999px; padding: 2px 10px; font-size: .8rem; cursor: pointer; }
+  .pj-visuais .chip.on { background: #db2777; color: #fff; border-color: #db2777; }
   .pj-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.8); display: none; align-items: center; justify-content: center; z-index: 999; }
   .pj-zoom img { max-height: 94vh; max-width: 94vw; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
 </style>
@@ -67,6 +71,22 @@
     <button type="button" id="gMarcadas">▶ Gerar as marcadas (<span id="nMarc">0</span>)</button>
     <button type="button" id="gMarcadasCorr" title="refaz as marcadas com uma correção (ex.: o olho de eclipse do outro lado)">🔁 Refazer as marcadas com correção</button>
     <a href="/personagens-pod/{{ p.id }}/aprovadas.zip" style="margin-left:auto;font-weight:600;">⬇ Baixar as aprovadas (.zip)</a>
+  </div>
+  <div class="pj-barra" style="font-size:.85rem;">
+    <label style="margin:0;font-weight:normal;" title="toda pose que ficar pronta já pede a boca aberta dela (a animação de fala) — sem precisar clicar em 👄"><input type="checkbox" id="bocaAuto" style="width:auto;margin:0 4px 0 0;" {% if p.boca_auto %}checked{% endif %}>👄 gerar a boca junto (toda pose nova já sai animada)</label>
+  </div>
+  <div class="pj-barra pj-visuais" style="font-size:.85rem;border-top:1px dashed #f9a8d4;padding-top:8px;">
+    <b>👗 Visuais</b> <span id="visChips"></span>
+    <button type="button" id="visNovo" style="width:auto;padding:3px 10px;background:#db2777;">👗 Novo visual (roupa / penteado)</button>
+    <span style="color:#666;">a mestra do visual define a roupa; as outras poses copiam dela (não muda de uma pra outra)</span>
+  </div>
+  <div id="visForm" class="pj-card" style="display:none;background:#fdf2f8;border-color:#f9a8d4;">
+    <div class="pj-barra"><b>Nome</b><input id="visNome" placeholder="ex.: Praia, Frio, Gala" style="width:180px;margin:0;">
+      <b>Roupa / penteado (inglês)</b><input id="visDesc" placeholder="ex.: light summer dress, straw hat, sunglasses on the head, hair in a high ponytail" style="flex:1;min-width:320px;margin:0;"></div>
+    <div class="pj-barra"><label style="margin:0;font-weight:normal;"><input type="radio" name="visPoses" value="mestra" checked style="width:auto;margin:0 4px 0 0;">só a mestra do visual (as outras poses entram quando o editor pedir)</label>
+      <label style="margin:0;font-weight:normal;"><input type="radio" name="visPoses" value="marcadas" style="width:auto;margin:0 4px 0 0;">+ as poses marcadas</label>
+      <label style="margin:0;font-weight:normal;"><input type="radio" name="visPoses" value="todas" style="width:auto;margin:0 4px 0 0;">+ todas as poses prontas</label>
+      <button type="button" id="visCriar" style="width:auto;background:#db2777;">👗 Criar e gerar</button></div>
   </div>
   <div class="pj-barra so-flow" style="font-size:.85rem;">
     <b>Imagens por pedido</b>
@@ -116,9 +136,10 @@
   // 👄 v84_214: a boca (a animação de fala) de cada pose
   function bocaDe(it) { return it.tipo === 'boca' ? null : D.itens.find(x => x.tipo === 'boca' && x.base === it.arquivo); }
   function animada(it) { const b = bocaDe(it); return !!(b && b.img && b.estado !== 'descartada'); }
+  let VIS = '*';  // 👗 v84_221: o visual mostrado ('*' = todos, '' = o normal)
   function visiveis() {
     const f = $('filtro').value, g = $('fGrupo').value;
-    return D.itens.filter(it => (g ? it.grupo === g : it.tipo !== 'boca')
+    return D.itens.filter(it => (VIS === '*' || (it.visual || '') === VIS) && (g ? it.grupo === g : it.tipo !== 'boca')
       && (f === 'todas' || (f === 'revisar' && it.estado === 'pronta') || (f === 'faltam' && ['nova', 'erro'].includes(it.estado))
           || (f === 'fila' && ['fila', 'gerando'].includes(it.estado)) || (f === 'animadas' && it.tipo !== 'boca' && animada(it))
           || (f === 'sem_anim' && it.tipo !== 'boca' && it.img && !animada(it)) || it.estado === f));
@@ -141,6 +162,9 @@
       : ' · <b style="color:#7c3aed;">⭐ sem mestre ainda</b> — gere a mestre, refaça até ficar igual à ficha e clique em “⭐ usar como mestre”';
     $('nMarc').textContent = marc.size;
     $('log').textContent = (D.log || []).join('\n');
+    const vs = D.visuais || [];
+    $('visChips').innerHTML = vs.length ? [['*', 'todos'], ['', 'normal']].concat(vs.map(v => [v.slug, '👗 ' + v.nome]))
+      .map(([s, n]) => [s, ((vs.find(v => v.slug === s) || {}).tipo === 'fantasia') ? n.replace('👗', '🎭') : n]).map(([s, n]) => `<span class="chip ${VIS === s ? 'on' : ''}" data-vis="${esc(s)}" title="${esc((vs.find(v => v.slug === s) || {}).descricao_en || '')}">${esc(n)}</span>`).join(' ') : '<span style="color:#888">só o visual normal</span>';
     $('grade').innerHTML = visiveis().map(it => {
       const eMestre = D.mestre && D.mestre.arquivo === it.arquivo;
       const img = it.img ? `<img src="/personagens-pod/${PID}/img/${esc(it.img)}" loading="lazy">` : (['fila', 'gerando'].includes(it.estado) ? '⏳' : 'ainda não gerada');
@@ -150,6 +174,7 @@
       return `<div class="pj-it ${it.estado} ${eMestre ? 'mestre' : ''} ${anim ? 'animada' : ''}" data-a="${esc(it.arquivo)}">
         ${anim ? '<span class="pj-anim" title="tem animação de fala (boca)">👄 animada</span>' : espA ? '<span class="pj-anim fila">👄 ⏳</span>' : (bo && bo.estado === 'erro') ? '<span class="pj-anim erro">👄 ❌</span>' : ''}
         <input type="checkbox" class="pj-chk" ${marc.has(it.arquivo) ? 'checked' : ''} ${pode ? '' : 'disabled'}>
+        ${it.visual ? (() => { const v = (D.visuais || []).find(v => v.slug === it.visual) || {}; return `<span class="pj-vis" title="${v.tipo === 'fantasia' ? 'fantasia de piada' : 'visual'}">${v.tipo === 'fantasia' ? '🎭' : '👗'} ${esc(v.nome || it.visual)}${it.mestra_visual && v.tipo !== 'fantasia' ? ' · mestra' : ''}</span>`; })() : ''}
         <div class="pj-img" data-zoom>${img}</div>
         <div class="pj-nome">${eMestre ? '⭐ ' : ''}${esc(it.arquivo)}${it.tipo !== 'boca' && D.itens.some(x => x.tipo === 'boca' && x.base === it.arquivo && x.img) ? ' <span title="tem a boca pronta — clique na imagem pra ver a animação">👄</span>' : ''}</div>
         <div class="pj-desc">P${it.prioridade} · ${esc(it.descricao)}${it.tipo === 'boca' ? ` <i>(base: ${esc(it.base)})</i>` : ''}</div>
@@ -224,6 +249,21 @@
     ULTIMA = ''; estado();
   });
   $('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+  // 👗 visuais
+  $('visChips').addEventListener('click', (e) => { const ch = e.target.closest('[data-vis]'); if (!ch) return; VIS = ch.dataset.vis; desenhar(); });
+  $('visNovo').addEventListener('click', () => { $('visForm').style.display = $('visForm').style.display === 'none' ? '' : 'none'; });
+  $('visCriar').addEventListener('click', async () => {
+    const modo = (document.querySelector('input[name=visPoses]:checked') || {}).value;
+    const poses = modo === 'todas' ? 'todas' : modo === 'marcadas' ? [...marc].filter(a => { const it = D.itens.find(x => x.arquivo === a); return it && it.tipo !== 'boca' && !it.visual; }) : [];
+    try { const d = await post(`/personagens-pod/${PID}/visual`, {nome: $('visNome').value, descricao_en: $('visDesc').value, poses, gerar: true, quantidade: $('quantidade').value});
+      VIS = d.visual; $('visForm').style.display = 'none';
+      alert(`👗 visual criado: ${d.novas.length} pose(s)` + (d.enviadas ? ` · ${d.enviadas} indo pro Flow agora` : '') + (d.aviso ? `\n${d.aviso}` : '')); }
+    catch (e) { alert(e.message); }
+    ULTIMA = ''; estado();
+  });
+  $('bocaAuto').addEventListener('change', async () => {
+    try { await post(`/personagens-pod/${PID}/boca-auto`, {ligado: $('bocaAuto').checked}); } catch (e) { alert(e.message); $('bocaAuto').checked = !$('bocaAuto').checked; }
+  });
   try { const q = localStorage.getItem('pp_qualidade'); if (q !== null) $('qualidade').value = q; const ps = localStorage.getItem('pp_passos'); if (ps) $('passos').value = ps; } catch (e) {}
   $('qualidade').addEventListener('change', () => { try { localStorage.setItem('pp_qualidade', $('qualidade').value); } catch (e) {} });
   $('passos').addEventListener('change', () => { try { localStorage.setItem('pp_passos', $('passos').value); } catch (e) {} });

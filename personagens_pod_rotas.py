@@ -146,6 +146,32 @@ def registrar(app, base_dir: str) -> None:
         c = _corpo()
         return _ok(lambda: pp.animar_pose(pid, str(c.get("arquivo") or ""), base_dir, str(c.get("quantidade") or "x1")))
 
+    @app.route("/personagens-pod/<pid>/visual", methods=["POST"])
+    def personagens_pod_visual(pid: str):
+        """👗 v84_221: visual novo (roupa/penteado) — a mestra do visual + as poses pedidas; "gerar" já manda pro Flow."""
+        c = _corpo()
+
+        def fazer():
+            poses = c.get("poses")
+            r = pp.criar_visual(pid, str(c.get("nome") or ""), str(c.get("descricao_en") or ""), str(c.get("descricao_pt") or ""),
+                                poses if poses == "todas" else [str(a) for a in poses or []], base_dir)
+            if c.get("gerar") and r["novas"]:
+                g = pp.enviar(pid, r["novas"], "", base_dir, quantidade=str(c.get("quantidade") or "x1"))
+                r.update(enviadas=g.get("enviadas", 0), aviso=g.get("aviso") or "")
+            return r
+        return _ok(fazer)
+
+    @app.route("/personagens-pod/<pid>/boca-auto", methods=["POST"])
+    def personagens_pod_boca_auto(pid: str):
+        """👄 v84_221: liga/desliga a boca automática (toda pose gerada já pede a boca dela)."""
+        def fazer():
+            with pp._TRAVA:
+                p = pp.carregar(pid, base_dir)
+                p["dados"]["boca_auto"] = bool(_corpo().get("ligado"))
+                pp.salvar(p, base_dir)
+            return {"ok": True, "boca_auto": p["dados"]["boca_auto"]}
+        return _ok(fazer)
+
     @app.route("/personagens-pod/<pid>/motor", methods=["POST"])
     def personagens_pod_motor(pid: str):
         return _ok(pp.trocar_motor, pid, str(_corpo().get("motor") or ""), base_dir)

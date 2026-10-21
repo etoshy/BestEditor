@@ -106,6 +106,8 @@ def flow(tmp_path, monkeypatch):
     gal = tmp_path / "galeria"
     gal.mkdir()
     monkeypatch.setattr(FE, "pasta_galeria", lambda: str(gal))
+    import personagens_pod as _pp
+    monkeypatch.setattr(_pp, "boca_auto", lambda p: False)  # v84_221: estes testes olham a fila exata (a boca automática tem teste próprio)
     return A.app.test_client(), falso, gal
 
 
@@ -150,7 +152,7 @@ def test_ponta_a_ponta_no_flow(flow, tmp_path):
     # ▶ resto: a cética + a boca dela (base no mesmo envio → fica pra depois) + a boca da mestre (base pronta)
     d = c.post(f"/personagens-pod/{pid}/gerar", json={"arquivos": ["vanta_cetica_esq.png", "vanta_cetica_esq_boca.png",
                                                                    "vanta_neutra_esq_boca.png"]}).get_json()
-    assert d["enviadas"] == 2 and d["depois"] == ["vanta_cetica_esq_boca.png"] and "pra depois" in d["aviso"]
+    assert d["enviadas"] == 2 and d["depois"] == ["vanta_cetica_esq_boca.png"] and "esperando" in d["aviso"]
     jc, jb = falso.fila[-2], falso.fila[-1]
     # v84_185: com a mestre, ela vai SOZINHA (a colagem com a ficha fazia o Flow devolver uma folha)
     assert "APPROVED MASTER" in jc["prompt"] and "NOT its pose" in jc["prompt"] and "NEW POSE" in jc["prompt"]
@@ -179,6 +181,12 @@ def test_ponta_a_ponta_no_flow(flow, tmp_path):
     c.post(f"/personagens-pod/{pid}/gerar", json={"arquivos": ["vanta_cetica_esq.png"], "extra": "no cigarette"})
     assert falso.fila[-1]["prompt"].endswith("CORRECTION FOR THIS ATTEMPT: no cigarette")
     _ok(falso, gal, falso.fila[-1]["id"])
+    c.get(f"/personagens-pod/{pid}/estado")
+    # v84_221: a boca que estava ⏳ esperando a base foi sozinha pro Flow quando a base ficou pronta
+    jbc = falso.fila[-1]
+    assert jbc["prompt"].startswith("The reference image is the finished character image to edit")
+    assert pp.carregar(pid)["imagens"]["vanta_cetica_esq_boca.png"]["estado"] == "fila"
+    _ok(falso, gal, jbc["id"])
     c.get(f"/personagens-pod/{pid}/estado")
     c.post(f"/personagens-pod/{pid}/aprovar", json={"arquivo": "vanta_cetica_esq.png"})
     z = c.get(f"/personagens-pod/{pid}/aprovadas.zip")

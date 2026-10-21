@@ -246,6 +246,139 @@ def animar_pose(pid: str, arquivo: str, base: str = _BASE, quantidade: str = "x1
     return dict(r if isinstance(r, dict) else {}, ok=True, boca=bo["arquivo"])
 
 
+# ------------------------------------------------------------------ 👗 v84_221: visuais (roupa / penteado) e poses novas
+def _slug_v(s: Any) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "_", t).strip("_")[:24]
+
+
+def visuais(p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    v = p["dados"].get("visuais")
+    return [x for x in v if isinstance(x, dict) and x.get("slug")] if isinstance(v, list) else []
+
+
+def visual(p: Dict[str, Any], slug: str) -> Optional[Dict[str, Any]]:
+    return next((v for v in visuais(p) if v["slug"] == slug), None)
+
+
+def _entrada(p: Dict[str, Any], x: Dict[str, Any]) -> str:
+    """Põe uma pose nova no JSON do projeto (se o arquivo ainda não existe) → o arquivo."""
+    if not any(y["arquivo"] == x["arquivo"] for y in p["dados"]["poses"]):
+        p["dados"]["poses"].append(x)
+        p["imagens"][x["arquivo"]] = {"estado": "nova", "versoes": [], "atual": -1, "erro": None, "job": None}
+    return x["arquivo"]
+
+
+def _base_da_mestra(p: Dict[str, Any], base: str) -> Optional[str]:
+    """A pose do visual padrão que vira a mestra de um visual novo: a ⭐ mestre, senão a 1ª aprovada/pronta."""
+    m = (p.get("mestre") or {}).get("arquivo")
+    if m and arquivo_atual(p, m, base):
+        return m
+    for x in p["dados"]["poses"]:
+        if x.get("tipo") == "pose" and not x.get("visual") and arquivo_atual(p, x["arquivo"], base):
+            return x["arquivo"]
+    return None
+
+
+def criar_visual(pid: str, nome: str, descricao_en: str, descricao_pt: str = "", poses: Optional[List[str]] = None,
+                 base: str = _BASE, tipo: str = "roupa", pose_mestra: str = "") -> Dict[str, Any]:
+    """👗 Um visual novo da personagem (roupa de praia, de frio, outro penteado…): a MESTRA do visual (a pose mestre com a
+    roupa nova) e a versão de cada pose pedida com a MESMA roupa (copiada da mestra do visual — não muda de uma pra
+    outra). `poses` = as poses do visual padrão que ganham a versão (None = nenhuma além da mestra; "todas" = todas
+    com imagem). 🎭 v84_222: tipo "fantasia" = transformação de piada (Vanta-esfinge, boina e baguete…) — a mestra sai
+    da `pose_mestra` (a pose da piada) e pode mudar mais que a roupa, mantendo a personagem reconhecível.
+    → {"visual", "novas"}"""
+    nome = " ".join(str(nome or "").split())[:40]
+    descricao_en = " ".join(str(descricao_en or "").split())[:600]
+    if not nome:
+        raise PersErro("O visual precisa de um nome.")
+    with _TRAVA:
+        p = carregar(pid, base)
+        if motor_de(p) != "flow":
+            raise PersErro("Visuais novos são gerados no 🚀 Flow — troque “Onde gerar” pra Flow.")
+        slug = _slug_v(nome) or "visual"
+        if visual(p, slug):  # já existe: só acrescenta as poses pedidas
+            v = visual(p, slug)
+        elif not descricao_en:
+            raise PersErro("Descreva a roupa/penteado do visual novo.")
+        else:
+            mb = pose_mestra if pose_mestra and arquivo_atual(p, pose_mestra, base) and \
+                not (next((y for y in p["dados"]["poses"] if y["arquivo"] == pose_mestra), {}) or {}).get("visual") \
+                else _base_da_mestra(p, base)
+            if not mb:
+                raise PersErro("Gere (e de preferência aprove a ⭐ mestre) uma pose do visual normal antes de criar outro visual.")
+            xb = pose(p, mb)
+            v = {"slug": slug, "nome": nome, "descricao_en": descricao_en, "descricao_pt": str(descricao_pt or "")[:300],
+                 "mestra": f"{mb[:-4]}__{slug}.png", "criado": time.time(),
+                 "tipo": "fantasia" if tipo == "fantasia" else "roupa"}
+            p["dados"].setdefault("visuais", []).append(v)
+            _entrada(p, {"arquivo": v["mestra"], "tipo": "pose", "visual": slug, "pose_base": mb, "mestra_visual": True,
+                         "grupo": xb.get("grupo") or "", "prioridade": 1, "lado": xb.get("lado") or "",
+                         "descricao_pt": (xb.get("descricao_pt") or mb[:-4]) + (f" — 🎭 fantasia {nome}" if v["tipo"] == "fantasia"
+                                                                                else f" — 👗 {nome} (mestra do visual)"),
+                         "prompt": xb.get("prompt") or ""})
+        novas = [v["mestra"]] if (p["imagens"].get(v["mestra"]) or {}).get("estado") in ("nova", None) else []
+        if poses == "todas":
+            poses = [x["arquivo"] for x in p["dados"]["poses"] if x.get("tipo") == "pose" and not x.get("visual")
+                     and arquivo_atual(p, x["arquivo"], base)]
+        for a in poses or []:
+            xb = next((y for y in p["dados"]["poses"] if y["arquivo"] == a and y.get("tipo") == "pose"), None)
+            if not xb or xb.get("visual") or f"{a[:-4]}__{slug}.png" == v["mestra"]:
+                continue
+            novas.append(_entrada(p, {"arquivo": f"{a[:-4]}__{slug}.png", "tipo": "pose", "visual": slug, "pose_base": a,
+                                      "grupo": xb.get("grupo") or "", "prioridade": xb.get("prioridade", 2),
+                                      "lado": xb.get("lado") or "", "prompt": xb.get("prompt") or "",
+                                      "descricao_pt": (xb.get("descricao_pt") or a[:-4]) + f" — 👗 {v['nome']}"}))
+        _log(p, f"👗 visual “{v['nome']}”: {len(novas)} pose(s) nova(s) no JSON")
+        salvar(p, base)
+        return {"ok": True, "visual": slug, "novas": novas}
+
+
+def adicionar_pose(pid: str, descricao_en: str, descricao_pt: str = "", visual_slug: str = "", grupo: str = "ia",
+                   base: str = _BASE) -> str:
+    """🆕 Uma pose que ainda não existe (a IA do editor pediu: nenhuma pose servia pra aquela fala). Entra no JSON do
+    projeto (no visual pedido) e fica na galeria. → o arquivo."""
+    descricao_en = " ".join(str(descricao_en or "").split())[:500]
+    if len(descricao_en) < 8:
+        raise PersErro("Descreva a pose nova.")
+    with _TRAVA:
+        p = carregar(pid, base)
+        if visual_slug and not visual(p, visual_slug):
+            raise PersErro(f"Visual não existe: {visual_slug}")
+        nome = "ia_" + (_slug_v(descricao_pt or descricao_en)[:28] or secrets.token_hex(3))
+        nome += f"__{visual_slug}" if visual_slug else ""
+        arq = nome + ".png"
+        k = 2
+        while any(y["arquivo"] == arq for y in p["dados"]["poses"]):
+            arq, k = f"{nome}_{k}.png", k + 1
+        _entrada(p, {"arquivo": arq, "tipo": "pose", "grupo": grupo, "prioridade": 2, "lado": "",
+                     "prompt": descricao_en, "descricao_pt": str(descricao_pt or descricao_en)[:160] + " (🆕 pedida pela IA)",
+                     **({"visual": visual_slug} if visual_slug else {})})
+        _log(p, f"🆕 pose nova pedida: {arq}")
+        salvar(p, base)
+        return arq
+
+
+def _deps(p: Dict[str, Any], x: Dict[str, Any]) -> List[str]:
+    """As poses de que esta depende (a base da boca, a pose de origem e a mestra do visual)."""
+    dep = []
+    if x.get("tipo") == "boca" and x.get("base"):
+        dep.append(x["base"])
+    v = visual(p, x.get("visual") or "")
+    if v and x.get("tipo") == "pose":
+        if x.get("pose_base"):
+            dep.append(x["pose_base"])
+        if x["arquivo"] != v["mestra"]:
+            dep.append(v["mestra"])
+    return [d for d in dep if d in p["imagens"]]
+
+
+def dependencias(p: Dict[str, Any], x: Dict[str, Any], base: str = _BASE) -> List[str]:
+    """As dependências que ainda NÃO têm imagem."""
+    return [d for d in _deps(p, x) if not arquivo_atual(p, d, base)]
+
+
 def pose(p: Dict[str, Any], arquivo: str) -> Dict[str, Any]:
     x = next((y for y in p["dados"]["poses"] if y["arquivo"] == arquivo), None)
     if not x:
@@ -370,6 +503,55 @@ def _enviar_pod(pid: str, arquivos: List[str], extra: str = "", base: str = _BAS
 
 
 def sincronizar(pid: str, base: str = _BASE) -> Dict[str, Any]:
+    r = _sincronizar(pid, base)
+    try:
+        seg = seguir(pid, base)
+    except Exception as exc:  # noqa: BLE001
+        seg = {"aviso": f"a geração seguinte (boca/visual) não foi: {str(exc)[:160]}"}
+    if seg.get("enviadas"):
+        r["mudou"] = True
+    if seg.get("aviso") and not r.get("aviso"):
+        r["aviso"] = seg["aviso"]
+    return r
+
+
+def boca_auto(p: Dict[str, Any]) -> bool:
+    return p["dados"].get("boca_auto", True) is not False
+
+
+def seguir(pid: str, base: str = _BASE) -> Dict[str, Any]:
+    """👄 v84_221: a cadeia depois de uma geração — cada pose que acabou de ficar pronta já pede a BOCA dela (se a boca
+    automática está ligada), e o que estava ⏳ esperando (poses do visual esperando a mestra, bocas esperando a base)
+    segue sozinho. Só continua o que VOCÊ mandou gerar (nada novo é inventado aqui)."""
+    with _TRAVA:
+        p = carregar(pid, base)
+        recem = list(dict.fromkeys(p.pop("_recem_prontas", None) or []))
+        if not recem and not any(it.get("aguarda") for it in p["imagens"].values()):
+            return {}
+        salvar(p, base)
+        if motor_de(p) != "flow":
+            return {}
+        ir: List[str] = []
+        if boca_auto(p):
+            bases = [a for a in recem if (next((x for x in p["dados"]["poses"] if x["arquivo"] == a), {}) or {}).get("tipo") == "pose"]
+            if bases:
+                criar_bocas(pid, base, bases)
+                p = carregar(pid, base)
+                for x in p["dados"]["poses"]:
+                    # a pose nova (ou uma versão nova dela) → a boca nova; a boca que você apagou (🗑) não volta
+                    if x.get("tipo") == "boca" and x.get("base") in bases and \
+                            (p["imagens"].get(x["arquivo"]) or {}).get("estado") not in ESTADOS_ESPERA + ("descartada",):
+                        ir.append(x["arquivo"])
+        for a, it in p["imagens"].items():
+            if it.get("aguarda") and it.get("estado") in ("nova", "erro") and not dependencias(p, pose(p, a), base) and a not in ir:
+                ir.append(a)
+    if not ir:
+        return {}
+    r = _enviar_flow(pid, ir, "", base, "x1")
+    return {"enviadas": r.get("enviadas", 0), "aviso": r.get("aviso") or ""}
+
+
+def _sincronizar(pid: str, base: str = _BASE) -> Dict[str, Any]:
     """Pergunta ao pod como estão os jobs abertos e baixa as poses que ficaram prontas (cada uma vira uma versão)."""
     with _TRAVA:
         p = carregar(pid, base)
@@ -473,8 +655,38 @@ def prompt_flow(p: Dict[str, Any], x: Dict[str, Any], paineis: List[str], extra:
     """O texto de uma pose pro Flow (uma imagem de referência = a colagem dos `paineis`)."""
     dados = p["dados"]
     fixo = dados.get("texto_fixo") or {}
+    v = visual(p, x.get("visual") or "")
     if x["tipo"] == "boca":
         partes = ["The reference image is the finished character image to edit.", x["prompt"]]
+    elif v and x.get("mestra_visual") and v.get("tipo") == "fantasia":
+        # 🎭 v84_222: fantasia de piada — a personagem se TRANSFORMA (pode mudar o rosto/cabeça), mas continua reconhecível
+        partes = ["The reference image is the finished character image to edit.",
+                  f"Playful comic transformation for a short joke: turn this character into: {v['descricao_en']}. Keep her "
+                  "RECOGNIZABLE as the same character — same eyes and expression, same color palette, her signature marks and "
+                  "accessories where they fit, same line art and art style — and keep the same pose, framing and size. "
+                  "Cute and funny, not scary. ONE single figure on a flat solid chroma-key green background (#00FF00)."]
+        if fixo.get("estilo"):
+            partes.append(str(fixo["estilo"]))
+    elif v and x.get("mestra_visual"):
+        # 👗 a mestra do visual: a pose pronta, só com a roupa/penteado novos
+        partes = ["The reference image is the finished character image to edit.",
+                  "Keep EXACTLY the same character identity — face, eyes, skin, body proportions, line art and art style — and "
+                  "the same pose, expression, framing and size, on a flat solid chroma-key green background (#00FF00). Change "
+                  f"ONLY the outfit, hairstyle and accessories to this new look: {v['descricao_en']}. Every piece of the new "
+                  "look must be clear and complete (it will be copied to all other poses of this character)."]
+        for chave in ("estilo", "regras"):
+            if fixo.get(chave):
+                partes.append(str(fixo[chave]))
+    elif v and x.get("pose_base"):
+        # 👗 outra pose do visual: a pose de origem + a mestra do visual (a roupa a copiar)
+        partes = ["The reference image is a collage of 2 panels side by side: left = the character in the POSE to keep; "
+                  f"right = the same character in the NEW LOOK ({v['nome']}).",
+                  "Redraw the LEFT image exactly — same pose, gesture, expression, framing and size — but wearing EXACTLY the "
+                  "outfit, hairstyle and accessories of the RIGHT image (same pieces, same colors, same details). Same face and "
+                  "art style. ONE single figure on a flat solid chroma-key green background (#00FF00), no panels."]
+        for chave in ("estilo", "regras"):
+            if fixo.get(chave):
+                partes.append(str(fixo[chave]))
     else:
         if not paineis:
             partes = []
@@ -494,7 +706,11 @@ def prompt_flow(p: Dict[str, Any], x: Dict[str, Any], paineis: List[str], extra:
             partes.append(f"Draw ONE single image of this character, alone: {x['prompt']}")
         for chave in ("trava", "estilo", "regras"):
             if fixo.get(chave):
+                if chave == "trava" and v:
+                    continue  # a trava descreve a roupa padrão: no visual novo, a roupa é a da mestra do visual
                 partes.append(str(fixo[chave]))
+        if v:
+            partes.append(f"Outfit, hairstyle and accessories: EXACTLY those of the reference ({v['nome']}: {v['descricao_en']}).")
     if extra:
         partes.append(f"CORRECTION FOR THIS ATTEMPT: {extra}")
     return " ".join(" ".join(partes).split())[:3900]
@@ -507,6 +723,15 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
         p = carregar(pid, base)
         d = _pasta(pid, base)
         alvo = [a for a in dict.fromkeys(arquivos) if a in p["imagens"] and p["imagens"][a]["estado"] not in ESTADOS_ESPERA]
+        # 👗 v84_221: a dependência sem imagem (a mestra do visual, a base da boca) entra junto, antes
+        k = 0
+        while k < len(alvo):
+            for dp in dependencias(p, pose(p, alvo[k]), base):
+                if dp not in alvo and p["imagens"][dp]["estado"] not in ESTADOS_ESPERA:
+                    alvo.insert(k, dp)
+                    break
+            else:
+                k += 1
         if not alvo:
             raise PersErro("Nada pra gerar (as escolhidas já estão na fila).")
         os.makedirs(os.path.join(d, "flow_refs"), exist_ok=True)
@@ -536,20 +761,36 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
         for a in alvo:
             x = dict(pose(p, a))
             ref = col_pose
+            pain = paineis
+            # a _boca / as poses de um 👗 visual dependem de outras PRONTAS: no mesmo envio (ainda vai mudar) ou sem imagem
+            # → ficam esperando (v84_221: seguem sozinhas quando a dependência ficar pronta)
+            faltam = [dp for dp in _deps(p, x) if dp in alvo or not arquivo_atual(p, dp, base)]
+            if faltam:
+                depois.append(a)
+                p["imagens"][a].update(aguarda=True, msg=f"⏳ esperando {faltam[0]} ficar pronta")
+                continue
+            v = visual(p, x.get("visual") or "")
             if x["tipo"] == "boca":
-                # a _boca é edição da base PRONTA: base no mesmo envio (ainda vai mudar) ou sem imagem → fica pra depois
-                bimg = None if x["base"] in alvo else _bruto_ou_png(p, x["base"], base)
-                if bimg is None:
-                    depois.append(a)
-                    continue
-                ref = _salvar_ref(bimg, os.path.join(d, "flow_refs"), f"base_{a[:-4]}")
-            item = {"prompt": prompt_flow(p, x, paineis, extra), "tipo": "imagem", "origem": "personagens"}
+                ref = _salvar_ref(_bruto_ou_png(p, x["base"], base), os.path.join(d, "flow_refs"), f"base_{a[:-4]}")
+            elif v and x.get("mestra_visual"):
+                ref = _salvar_ref(_bruto_ou_png(p, x["pose_base"], base), os.path.join(d, "flow_refs"), f"vb_{a[:-4]}")
+            elif v and x.get("pose_base"):
+                ref = _salvar_ref(L.colagem([_bruto_ou_png(p, x["pose_base"], base), _bruto_ou_png(p, v["mestra"], base)]),
+                                  os.path.join(d, "flow_refs"), f"vp_{a[:-4]}")
+            elif v:  # pose nova num visual: a mestra do visual é a referência (identidade + roupa)
+                ref = _salvar_ref(_bruto_ou_png(p, v["mestra"], base), os.path.join(d, "flow_refs"), f"vm_{v['slug']}")
+                pain = [f"the APPROVED image of this character in the look “{v['nome']}” — copy its identity, outfit, hairstyle, "
+                        "accessories, colors and art style exactly, and its scale, but NOT its pose"]
+            p["imagens"][a].pop("aguarda", None)
+            item = {"prompt": prompt_flow(p, x, pain, extra), "tipo": "imagem", "origem": "personagens"}
             if ref:
                 item["referencia_arquivo"] = ref
             itens.append(item)
             por_item.append(a)
         if not itens:
-            raise PersErro("; ".join(f"{a}: gere (ou aprove) primeiro a imagem base {pose(p, a)['base']}." for a in depois[:3]))
+            salvar(p, base)  # as que ficaram ⏳ esperando a dependência (que já está na fila)
+            return {"ok": True, "enviadas": 0, "depois": depois,
+                    "aviso": f"{len(depois)} pose(s) esperando outra ficar pronta — seguem sozinhas quando ela ficar."}
         alvo = por_item
         fc = _flow_cfg(p)
         import flow_lote
@@ -566,8 +807,8 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
         _log(p, f"🚀 {len(alvo)} pose(s) pro Flow" + (" com a ⭐ mestre" if mestre is not None else " (sem mestre)")
              + (f" · {quantidade}" if quantidade and quantidade != "x1" else "") + (f" · correção: {extra[:80]}" if extra else ""))
         salvar(p, base)
-    aviso = (f"{len(depois)} “_boca” ficaram pra depois: a base delas ainda não tem imagem (ou está neste envio) — "
-             "gere as _boca quando as bases estiverem prontas. ") if depois else ""
+    aviso = (f"{len(depois)} pose(s)/boca(s) esperando a imagem de que dependem — seguem sozinhas pro Flow quando ela "
+             "ficar pronta. ") if depois else ""
     try:
         lote.iniciar()
     except Exception as exc:  # noqa: BLE001
@@ -676,6 +917,7 @@ def _sincronizar_flow(p: Dict[str, Any], base: str) -> Tuple[bool, Optional[str]
                     pass
             if novas:
                 it.update(atual=len(it["versoes"]) - 1, estado="pronta", erro=None, msg=None)
+                p.setdefault("_recem_prontas", []).append(a)  # 👄 v84_221: a cadeia (boca automática, visual) segue daqui
             else:
                 it.update(estado="erro", erro=aviso or "o Flow terminou mas não veio imagem")
         elif fj["estado"] == "erro":
@@ -1055,12 +1297,15 @@ def para_tela(p: Dict[str, Any]) -> Dict[str, Any]:
         itens.append({"arquivo": x["arquivo"], "tipo": x["tipo"], "grupo": x.get("grupo") or "", "prioridade": x.get("prioridade") or 9,
                       "lado": x.get("lado") or "", "descricao": x.get("descricao_pt") or x["prompt"][:120],
                       "mestre_sugerida": bool(x.get("mestre")), "base": x.get("base"), "estado": it["estado"],
-                      "erro": it.get("erro"), "msg": it.get("msg") if it["estado"] in ESTADOS_ESPERA else None,
+                      "visual": x.get("visual") or "", "mestra_visual": bool(x.get("mestra_visual")),
+                      "pose_base": x.get("pose_base") or "", "aguarda": bool(it.get("aguarda")),
+                      "erro": it.get("erro"), "msg": it.get("msg") if it["estado"] in ESTADOS_ESPERA or it.get("aguarda") else None,
                       "versoes": len(it["versoes"]), "atual": it["atual"],
                       "aviso": (it["versoes"][it["atual"]].get("aviso") if it["atual"] >= 0 else None),
                       "img": (it["versoes"][it["atual"]]["local"] if it["atual"] >= 0 else None)})
     return {"id": p["id"], "nome": p["nome"], "pod_url": p.get("pod_url") or "", "mestre": p.get("mestre"),
             "motor": motor_de(p), "flow": _flow_cfg(p), "canal": p.get("canal"),
             "refs": p["refs"], "itens": itens, "resumo": resumo(p), "log": (p.get("log") or [])[-12:],
+            "visuais": visuais(p), "boca_auto": boca_auto(p),
             "esperando": any(i["estado"] in ESTADOS_ESPERA for i in itens),
             "fila": [{"id": j["id"], "posicao": j.get("posicao")} for j in p["jobs"] if not j.get("final")]}

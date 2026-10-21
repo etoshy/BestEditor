@@ -316,7 +316,8 @@ def personagens_do_canal(base: str, canal: str) -> List[Dict[str, Any]]:
     except (OSError, ValueError):
         pj = {}
     ligados = mv.ligacoes_personagens(m)
-    lista = [{"slug": _slug(p.get("slug") or p.get("nome")), "nome": str(p.get("nome") or p.get("slug"))}
+    lista = [{"slug": _slug(p.get("slug") or p.get("nome")), "nome": str(p.get("nome") or p.get("slug")),
+              "fantasias": str(p.get("fantasias") or "")[:400]}  # 🎭 v84_222: quando ela vira fantasia de piada
              for p in pj.get("personagens") or [] if isinstance(p, dict) and (p.get("slug") or p.get("nome"))]
     for c in mv.personagens_png(m):
         if c["slug"] not in {x["slug"] for x in lista}:
@@ -324,12 +325,14 @@ def personagens_do_canal(base: str, canal: str) -> List[Dict[str, Any]]:
     for x in lista:
         x["projeto"] = None
         x["poses"] = []
+        x["visuais"] = []
         pid = ligados.get(x["slug"])
         if pid:
             try:
                 p = pp.carregar(pid, base)
                 x["projeto"] = {"id": p["id"], "nome": p["nome"]}
                 x["poses"] = poses_prontas(p, base)
+                x["visuais"] = [{k: v.get(k) for k in ("slug", "nome", "descricao_en", "tipo")} for v in pp.visuais(p)]  # 👗 v84_221
             except pp.PersErro:
                 pass
     return lista
@@ -355,6 +358,7 @@ def poses_prontas(p: Dict[str, Any], base: str) -> List[Dict[str, Any]]:
         out.append({"arquivo": a, "caminho": cam, "aprovada": it["estado"] == "aprovada", "lado": lado,
                     "descricao": str(x.get("descricao_pt") or "")[:80],
                     "grupo": x.get("grupo") or "", "texto": f"{a} {x.get('descricao_pt') or ''} {x.get('prompt') or ''}".lower(),
+                    "visual": x.get("visual") or "", "pose_base": x.get("pose_base") or "",  # 👗 v84_221
                     "mestre": bool((p.get("mestre") or {}).get("arquivo") == a)})
     for o in out:
         b = bocas.get(o["arquivo"])
@@ -632,7 +636,8 @@ def _lados(pers: List[Dict[str, Any]], cfg: Dict[str, Any]) -> Dict[str, str]:
 
 
 def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Dict[str, Any], quantos: int,
-                    idioma: str = "", job_id: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
+                    idioma: str = "", job_id: Optional[str] = None,
+                    extra: Optional[Dict[str, Any]] = None) -> Optional[List[Dict[str, Any]]]:
     """🤖 A IA escolhe os MELHORES momentos (não todos), a pose de cada um, a posição (lado e tamanho) e a animação.
     → [{"id", "pose", "entrada", "saida", "lado", "tamanho"}] ou None (IA desligada/erro: fica a regra)."""
     try:
@@ -647,8 +652,15 @@ def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg
     for p in pers:
         if not p.get("poses"):
             continue
+        normais = [o for o in p["poses"] if not o.get("visual")] or p["poses"]
         cat.append(f"{p['nome']} [{p['slug']}] — fica na {lados.get(p['slug'])} da tela; poses: "
-                   + "; ".join(f"{o['arquivo']}" + (f" ({o['descricao']})" if o.get("descricao") else "") for o in p["poses"][:80]))
+                   + "; ".join(f"{o['arquivo']}" + (f" ({o['descricao']})" if o.get("descricao") else "") for o in normais[:80]))
+        vis = [v for v in p.get("visuais") or [] if v.get("tipo") != "fantasia"]  # 👗 v84_221
+        fan = [v for v in p.get("visuais") or [] if v.get("tipo") == "fantasia"]
+        cat.append(f"   looks (visuais) {p['nome']} already has: "
+                   + ("; ".join(f"{v['slug']} = {v['nome']} ({(v.get('descricao_en') or '')[:120]})" for v in vis) if vis else "none (only the normal one)"))
+        cat.append(f"   joke costumes (fantasias) {p['nome']} already has: " + ("; ".join(f"{v['nome']} ({(v.get('descricao_en') or '')[:80]})" for v in fan) if fan else "none")
+                   + (f" — who wears them: {p['fantasias']}" if p.get("fantasias") else ""))
     linhas = [f"[{c['id']}] {c['start']:.1f}-{c['end']:.1f}s {c['slug']} ({'fala' if c['tipo'] == 'fala' else 'narração'}"
               + (f", {c['emocao']}" if c.get("emocao") else "") + f"): {c['texto'][:160]}"
               + (f" || image on screen: {c['cena'][:140]}" if c.get("cena") else "") for c in cands[:400]]
@@ -668,10 +680,31 @@ def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg
         "opposite sides) and \"tamanho\" = pequeno, medio or grande (grande for big emotional beats, pequeno for quick "
         "remarks or when the image is busy; most are medio).\n"
         "\"animar\": true for the appearances that most deserve real MOTION (an animated clip instead of a still image): "
-        "longer lines, strong emotion, a gesture, a reveal — about a third of them; false for the rest.")
+        "longer lines, strong emotion, a gesture, a reveal — about a third of them; false for the rest.\n"
+        "NEW POSES: if for a chosen moment NO pose in the catalog acts what is said well enough, write in \"pose_nova\" a short "
+        "English description of the ideal pose (body, arms, hands, expression, object held) and in \"pose_nova_pt\" the same "
+        "in Portuguese — and still put the closest existing pose in \"pose\" (used until the new one exists). At most about "
+        "3 new poses per video, only when the gain is clear; otherwise leave them empty.\n"
+        "LOOK OF THE VIDEO (\"visuais\", one entry per character that appears): only when the TOPIC clearly calls for other "
+        "clothes (a hot place / beach → summer clothes, cold / snow → winter clothes, a gala, a space suit, a historical "
+        "costume…). Use an existing look (its slug in \"visual\") or create one (\"novo_nome\" short, \"novo_descricao_en\" = the "
+        "exact outfit, hairstyle and accessories, precise enough to stay identical in every pose; \"novo_descricao_pt\" = "
+        "Portuguese). Most videos keep the normal look: then leave visual and novo_nome empty. Same look for the whole video.\n"
+        "JOKE COSTUMES (fantasia, at most 2 per video, for ONE appearance each): when a character's line is a JOKE about ANY real "
+        "country, city, region or landmark the video talks about, give THAT appearance a costume themed on the place's ICONS "
+        "(monuments, famous food, sport, landscape, folklore) — examples only: Egypt's pyramids → she turns into a sphinx; "
+        "France → beret and a baguette; Italy → pizza chef; Brazil → football jersey and ball; Japan → a Mount Fuji hat; "
+        "Antarctica → a penguin suit. Affectionate, never mocking the people, their ethnicity or religion: \"fantasia_nome\" "
+        "(short, e.g. Esfinge), \"fantasia_descricao_en\" (the transformation/costume, precise) and \"fantasia_descricao_pt\". "
+        "Prefer the ironic character and the characters whose note says they wear costumes; reuse a costume she already has "
+        "(same name) when it fits. Never on serious or explanatory lines — only on the joke itself.")
     conteudo = ("CHARACTERS AND POSES:\n" + "\n".join(cat) + "\n\nMOMENTS:\n" + "\n".join(linhas)
                 + (f"\n\nLanguage of the video: {idioma}" if idioma else ""))
-    schema = _obj({"aparicoes": _lista(_obj({"id": _I, "pose": _S, "entrada": _S, "saida": _S, "lado": _S, "tamanho": _S, "animar": {"type": "boolean"}}))})
+    schema = _obj({"aparicoes": _lista(_obj({"id": _I, "pose": _S, "entrada": _S, "saida": _S, "lado": _S, "tamanho": _S,
+                                             "animar": {"type": "boolean"}, "pose_nova": _S, "pose_nova_pt": _S,
+                                             "fantasia_nome": _S, "fantasia_descricao_en": _S, "fantasia_descricao_pt": _S})),
+                   "visuais": _lista(_obj({"personagem": _S, "visual": _S, "novo_nome": _S, "novo_descricao_en": _S,
+                                           "novo_descricao_pt": _S}))})
     try:
         r = ia_servico.chamar("personagens", system, conteudo, schema=schema, max_tokens=4000, job=job_id, timeout=120)
     except Exception:  # noqa: BLE001
@@ -680,7 +713,33 @@ def escolher_com_ia(cands: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg
         return None
     ids = {c["id"] for c in cands}
     out = [x for x in r["aparicoes"] if isinstance(x, dict) and isinstance(x.get("id"), int) and x["id"] in ids]
+    if extra is not None and out:  # 👗 o visual do vídeo de cada personagem
+        extra["visuais"] = ler_visuais(r.get("visuais"), pers)
     return out or None
+
+
+def ler_visuais(lista: Any, pers: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """👗 v84_221: a resposta da IA → {personagem: {"slug": visual que ela já tem} ou {"novo": {nome, descricao_en, …}}}."""
+    out: Dict[str, Dict[str, Any]] = {}
+    por = {p["slug"]: p for p in pers}
+    for v in lista if isinstance(lista, list) else []:
+        if not isinstance(v, dict):
+            continue
+        s = _slug(v.get("personagem") or "")
+        p = por.get(s) or next((x for x in pers if _slug(x.get("nome")) == s), None)
+        if not p:
+            continue
+        existe = {x["slug"]: x for x in p.get("visuais") or []}
+        vs = _slug(v.get("visual") or "")
+        nome = " ".join(str(v.get("novo_nome") or "").split())[:40]
+        if vs in existe:
+            out[p["slug"]] = {"slug": vs, "nome": existe[vs]["nome"]}
+        elif nome and len(str(v.get("novo_descricao_en") or "")) >= 10:
+            igual = next((x for x in existe.values() if _slug(x["nome"]) == _slug(nome)), None)
+            out[p["slug"]] = {"slug": igual["slug"], "nome": igual["nome"]} if igual else \
+                {"slug": "", "novo": {"nome": nome, "descricao_en": str(v["novo_descricao_en"])[:600],
+                                      "descricao_pt": str(v.get("novo_descricao_pt") or "")[:300]}}
+    return out
 
 
 TAMANHOS = {"pequeno": 0.8, "medio": 1.0, "grande": 1.18}
@@ -713,6 +772,7 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
     avisos: List[str] = []
     ultima_pose: Dict[str, str] = {}
     sem_pose = set()
+    n_fantasias = 0
     for b in escolhidos:
         p = por.get(b["slug"])
         if not p or not p.get("poses"):
@@ -726,10 +786,48 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
         tam = tam if tam in TAMANHOS else "medio"
         size = _tamanho(altura, vertical, TAMANHOS[tam])
         xc, yc = posicao(lado, size, vertical, margem)
-        pose = next((o for o in p["poses"] if o["arquivo"] == dica.get("pose")), None) \
-            or escolher_pose(p["poses"], b.get("emocao") or "", lado, ultima_pose.get(b["slug"], ""),
-                             bool(cfg.get("inverter_olhar")))
-        pose = par_da_pose(p["poses"], pose, olhar_para(lado, bool(cfg.get("inverter_olhar"))))  # a IA pode errar o lado
+        # 👗 v84_221: o visual do vídeo — escolhe na pose normal e troca pela versão dela no visual (se já existe)
+        vis = (cfg.get("_visuais") or {}).get(b["slug"]) or {}
+        vslug = vis.get("slug") or ""
+        normais = [o for o in p["poses"] if not o.get("visual")] or p["poses"]
+        pose = next((o for o in p["poses"] if o["arquivo"] == dica.get("pose")), None)
+        if pose and pose.get("visual") and pose["visual"] != vslug:  # pose de outro visual: volta pra normal dela
+            pose = next((o for o in normais if o["arquivo"] == pose.get("pose_base")), None)
+        pose = pose or escolher_pose(normais, b.get("emocao") or "", lado, ultima_pose.get(b["slug"], ""),
+                                     bool(cfg.get("inverter_olhar")))
+        mesmo_visual = [o for o in p["poses"] if (o.get("visual") or "") == (pose.get("visual") or "")]
+        pose = par_da_pose(mesmo_visual, pose, olhar_para(lado, bool(cfg.get("inverter_olhar"))))  # a IA pode errar o lado
+        sugestao = None
+        fan_nome = " ".join(str(dica.get("fantasia_nome") or "").split())[:40]
+        if fan_nome and n_fantasias < 2 and len(str(dica.get("fantasia_descricao_en") or "")) >= 8 and not pose.get("visual"):
+            # 🎭 v84_222: fantasia de piada só NESTA aparição (já existe na galeria → usa; senão fica sugerida)
+            n_fantasias += 1
+            fv = next((v for v in p.get("visuais") or [] if _slug(v.get("nome")) == _slug(fan_nome)), None)
+            fpose = None
+            if fv:
+                fpose = next((o for o in p["poses"] if o.get("visual") == fv["slug"] and o.get("pose_base") == pose["arquivo"]), None) \
+                    or next((o for o in p["poses"] if o.get("visual") == fv["slug"]), None)
+            if fpose:
+                pose = fpose
+            else:
+                sugestao = {"tipo": "fantasia", "pose_base": pose["arquivo"],
+                            "visual_novo": {"nome": fan_nome, "descricao_en": str(dica["fantasia_descricao_en"]).strip()[:500],
+                                            "descricao_pt": str(dica.get("fantasia_descricao_pt") or "").strip()[:200],
+                                            "tipo": "fantasia"}}
+            vis, vslug = {}, ""  # a fantasia vale mais que o visual do vídeo nesta aparição
+        if sugestao:
+            pass
+        elif str(dica.get("pose_nova") or "").strip():
+            sugestao = {"tipo": "nova", "descricao_en": str(dica["pose_nova"]).strip()[:500],
+                        "descricao_pt": str(dica.get("pose_nova_pt") or "").strip()[:200], "visual": vslug,
+                        **({"visual_novo": vis["novo"]} if vis.get("novo") else {})}
+        if (vslug or vis.get("novo")) and not pose.get("visual") and not sugestao:
+            var = next((o for o in p["poses"] if vslug and o.get("visual") == vslug and o.get("pose_base") == pose["arquivo"]), None)
+            if var:
+                pose = var
+            elif not sugestao:
+                sugestao = {"tipo": "visual", "pose_base": pose["arquivo"], "visual": vslug,
+                            **({"visual_novo": vis["novo"]} if vis.get("novo") else {})}
         ultima_pose[b["slug"]] = pose["arquivo"]
         ini = max(0.0, b["start"] - float(cfg["antes"]))
         fim = min(duracao or b["end"] + 1, b["end"] + float(cfg["depois"]))
@@ -744,7 +842,8 @@ def montar(escolhidos: List[Dict[str, Any]], pers: List[Dict[str, Any]], cfg: Di
                     "tamanho": tam, "vertical": vertical, "x_percent": xc, "y_percent": yc,
                     "projeto_id": (p.get("projeto") or {}).get("id"), "descricao_pose": pose.get("descricao") or "",
                     "espelhar": bool((prefs.get("espelhar") or {}).get(f"{b['slug']}|{pose['arquivo']}|{lado}", False)),
-                    "animar": bool(dica.get("animar")) if cfg.get("animar") == "ia" else cfg.get("animar") == "todas"})
+                    "animar": bool(dica.get("animar")) if cfg.get("animar") == "ia" else cfg.get("animar") == "todas",
+                    "sugestao": sugestao})
     for s_ in sorted(sem_pose):
         nome = (por.get(s_) or {}).get("nome") or s_
         avisos.append(f"{nome} tem momento pra aparecer mas não tem pose pronta — conecte o projeto dela na aba 🧍 Personagens e gere/aprove as poses")
@@ -975,7 +1074,12 @@ def aplicar(job: Dict[str, Any], job_dir: str, base: str, palavras: List[Dict[st
     freq = max(0.0, min(1.0, float(cfg.get("frequencia", 1))))
     quantos = len(cands) if freq >= 1 else max(1, round(len(cands) * freq))
     por = "regra"
-    ia = escolher_com_ia(cands, pers, cfg, quantos, str(job.get("language") or ""), job_id) if cfg.get("ia", True) else None
+    extra_ia: Dict[str, Any] = {}
+    ia = escolher_com_ia(cands, pers, cfg, quantos, str(job.get("language") or ""), job_id, extra_ia) if cfg.get("ia", True) else None
+    if "visuais_video" in pc and isinstance(pc.get("visuais_video"), dict) and pc.get("visual_fixo"):
+        extra_ia["visuais"] = pc["visuais_video"]  # você escolheu o visual à mão: fica
+    cfg["_visuais"] = extra_ia.get("visuais") or {}
+    pc["visuais_video"] = cfg["_visuais"]
     if ia:
         por = "ia"
         idx = {c["id"]: c for c in cands}
@@ -1037,7 +1141,8 @@ def overlay_de(a: Dict[str, Any], pasta: str, cfg: Dict[str, Any], oid: str) -> 
             # 🎞 v84_193: a animação (personagens_animar.py)
             "projeto_id": a.get("projeto_id"), "pose_original": a.get("caminho"), "descricao_pose": a.get("descricao_pose") or "",
             "anim_tipo": "fala" if a["boca_janelas"] else "parada", "anim_modo": "repetir", "anim_segundos": 0,
-            "anim_pedida": bool(a.get("animar")), "espelhar": bool(a.get("espelhar"))}
+            "anim_pedida": bool(a.get("animar")), "espelhar": bool(a.get("espelhar")),
+            **({"sugestao": a["sugestao"]} if a.get("sugestao") else {})}  # 🆕👗 v84_221
 
 
 def remover(job: Dict[str, Any]) -> int:
@@ -1185,7 +1290,8 @@ def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
             pers = []
     aps = [{k: ov.get(k) for k in ("id", "personagem", "nome_personagem", "pose", "lado", "start", "end", "emocao", "fala",
                                     "anim_in", "anim_out", "manual", "tamanho",
-                                    "anim_tipo", "anim_modo", "anim_segundos", "anim_estado", "anim_msg", "anim_pedida", "espelhar")}
+                                    "anim_tipo", "anim_modo", "anim_segundos", "anim_estado", "anim_msg", "anim_pedida", "espelhar",
+                                    "sugestao", "pendente")}
            | {"anim_pronta": bool(ov.get("anim_video")) and os.path.isfile(str(ov.get("anim_video"))),
               "anim_usando": bool(ov.get("anim_video")) and not ov.get("anim_desligada")}
            | {"boca": bool(ov.get("boca_path")) and not ov.get("boca_desligada")}
@@ -1203,6 +1309,7 @@ def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
             "texto": pc.get("texto") or "", "tem_roteiro": bool(roteiro.strip()) or bool(cfg.get("narrador_personagem")),
             "roteiro_de": de_onde, "roteiro_inicio": roteiro[:400], "aparicoes": sorted(aps, key=lambda x: x["start"] or 0),
             "avisos": pc.get("avisos") or [], "ativo": bool(pc.get("ativo")), "entradas": list(ENTRADAS),
+            "sugestoes": __import__("personagens_sugestoes").resumo(job),  # 🆕👗 v84_221
             "auto_canal": bool(cfg.get("ativo"))}
 
 
@@ -1249,6 +1356,13 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
     def personagens_editor_estado(job_id: str):
         def _f():
             job = _job(job_id)
+            if any(ov.get("origem") == "personagem" and isinstance(ov.get("pendente"), dict) for ov in job.get("overlays") or []):
+                try:  # 🆕👗 v84_221: a pose sugerida ficou pronta → a aparição troca pra ela
+                    import personagens_sugestoes as PS
+                    if PS.atualizar_pendentes(job, base, job_dir(job_id), job_id):
+                        salvar(job_id)
+                except Exception:  # noqa: BLE001
+                    pass
             if any(ov.get("origem") == "personagem" and ov.get("anim_pedida") and not ov.get("anim_video")
                    for ov in job.get("overlays") or []):
                 try:  # 🎞 clipe que chegou do Flow entra sozinho
@@ -1257,6 +1371,30 @@ def registrar(app, obter: Callable[[str], Optional[Dict[str, Any]]], salvar: Cal
                         salvar(job_id)
                 except Exception:  # noqa: BLE001
                     pass
+            return estado(job, base)
+        return _resp(_f, job_id)
+
+    @app.route("/job/<job_id>/personagens/gerar-sugeridas", methods=["POST"])
+    def personagens_editor_gerar_sugeridas(job_id: str):
+        """🎨 v84_221: as poses que a IA sugeriu (pose nova / visual do vídeo) → projeto da personagem → Flow (só no clique)."""
+        def _f():
+            import personagens_sugestoes as PS
+            job = _job(job_id)
+            r = PS.gerar(job, base, str((request.get_json(silent=True) or {}).get("quantidade") or "x1"))
+            salvar(job_id)
+            return dict(estado(job, base), gerou=r)
+        return _resp(_f, job_id)
+
+    @app.route("/job/<job_id>/personagens/<oid>/sugestao", methods=["POST"])
+    def personagens_editor_ignorar_sugestao(job_id: str, oid: str):
+        """✖ ignora a pose sugerida desta aparição (fica a pose que está)."""
+        def _f():
+            job = _job(job_id)
+            for ov in job.get("overlays") or []:
+                if ov.get("id") == oid:
+                    ov.pop("sugestao", None)
+                    ov.pop("pendente", None)
+            salvar(job_id)
             return estado(job, base)
         return _resp(_f, job_id)
 
