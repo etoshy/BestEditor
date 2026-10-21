@@ -63,6 +63,7 @@ QUANTIDADES = ("x1", "x2", "x3", "x4")
 RE_TROCAR_CONTA = re.compile(r"atividade incomum|unusual activity|extens[õo]es do navegador|browser extensions|"
                              r"actividad inusual|ungew[öo]hnliche aktivit", re.I)
 MINUTOS_INCOMUM = 60
+PAUSAR_NO_INCOMUM = True  # ⏸ v84_220: "atividade incomum" pausa o lote em vez de passar pra outra conta
 _RE_PREFIXO = re.compile(r"^\s*(foto|imagem|image|img|photo|v[ií]deo|video)\s*[:\-–—]\s*", re.I)
 
 INSTRUCAO_FOTO = (
@@ -703,6 +704,24 @@ class Lote:
                     job = None
                     break
                 except fd.FlowRecusou as exc:
+                    if RE_TROCAR_CONTA.search(exc.mensagem or "") and PAUSAR_NO_INCOMUM:
+                        # ⏸ v84_220: o Google desconfiou da automação. Pular pra outra conta só espalha a desconfiança —
+                        # o pedido volta pra fila e o LOTE PAUSA; você retoma quando quiser (de preferência mais tarde).
+                        with self.trava:
+                            job.update(estado="pendente", conta=None,
+                                       erro="o Flow acusou “atividade incomum” — lote pausado (o pedido volta pra fila)")
+                            self._salvar()
+                        try:
+                            gf.pular_conta(conta, f"o Flow acusou atividade incomum: {exc.mensagem[:120]}", minutos=MINUTOS_INCOMUM)
+                        except Exception:  # noqa: BLE001
+                            pass
+                        self.problema_conta[conta] = "atividade incomum no Flow (descansando)"
+                        self.log(f"⏸ “{conta}”: o Flow acusou “atividade incomum” (o Google desconfiou da automação; nada foi "
+                                 f"cobrado). Pausei o lote — o pedido voltou pra fila. Espere um tempo antes de retomar e "
+                                 f"mande lotes menores.", "aviso")
+                        self.pausar(agora=True)
+                        job = None
+                        break
                     if RE_TROCAR_CONTA.search(exc.mensagem or ""):
                         # 🔁 v84_184: "Notamos uma atividade incomum / extensões do navegador" é coisa da CONTA (o Google
                         # desconfiou dela), não do prompt: a conta descansa e o pedido vai pra outra conta

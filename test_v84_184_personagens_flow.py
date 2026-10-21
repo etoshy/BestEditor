@@ -240,6 +240,7 @@ def test_atividade_incomum_troca_de_conta(tmp_path, monkeypatch):
     from googleflow import flow_direto as fd
     from googleflow import googleflow_client as gf
     monkeypatch.setattr(fl, "pasta", lambda: str(tmp_path))
+    monkeypatch.setattr(fl, "PAUSAR_NO_INCOMUM", getattr(test_atividade_incomum_troca_de_conta, "_pausar", False))
     pw = types.ModuleType("playwright.sync_api")
     pw.sync_playwright = lambda: types.SimpleNamespace(start=lambda: types.SimpleNamespace(stop=lambda: None))
     monkeypatch.setitem(sys.modules, "playwright.sync_api", pw)
@@ -325,3 +326,43 @@ def test_referencia_com_nome_pelo_conteudo(flow, tmp_path):
     pp.enviar(p["id"], ["vanta_neutra_esq.png"])
     pp.enviar(p["id"], ["vanta_cetica_esq.png"])
     assert falso.fila[0]["referencia_arquivo"] == falso.fila[1]["referencia_arquivo"]  # a mesma imagem, o mesmo arquivo
+
+
+def test_atividade_incomum_pausa_o_lote(tmp_path, monkeypatch):
+    """⏸ v84_220 (padrão): "atividade incomum" pausa o lote e o pedido volta pra fila — nada de pular pra outra conta."""
+    import sys
+    import types
+    import app  # noqa: F401
+    import flow_lote as fl
+    from googleflow import flow_direto as fd
+    from googleflow import googleflow_client as gf
+    monkeypatch.setattr(fl, "pasta", lambda: str(tmp_path))
+    assert fl.PAUSAR_NO_INCOMUM is True
+    pw = types.ModuleType("playwright.sync_api")
+    pw.sync_playwright = lambda: types.SimpleNamespace(start=lambda: types.SimpleNamespace(stop=lambda: None))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", pw)
+    pagina = types.SimpleNamespace(is_closed=lambda: False, close=lambda: None, url="")
+    monkeypatch.setattr(gf, "_abrir", lambda p, cfg, headless, conta: (types.SimpleNamespace(close=lambda: None), False))
+    monkeypatch.setattr(gf, "salvar_sessao", lambda ctx, conta: None)
+    monkeypatch.setattr(fd, "preparar_projeto", lambda *a, **k: pagina)
+    monkeypatch.setattr(gf, "pular_conta", lambda conta, motivo, minutos=None: None)
+    monkeypatch.setattr(fd, "gerar_um", lambda *a, **k: (_ for _ in ()).throw(
+        fd.FlowRecusou("esperar", "o Flow não gerou: Notamos uma atividade incomum.")))
+    lote = fl.Lote()
+    monkeypatch.setattr(lote, "_aguardar_vez", lambda conta: None)
+    monkeypatch.setattr(lote, "_serve", lambda conta, tipo: True)
+    monkeypatch.setattr(lote, "contas_do_lote", lambda: ["a", "b"])
+    lote.rodando = True
+    j = lote.adicionar([{"prompt": "x", "tipo": "imagem"}])[0]
+    try:
+        lote._trabalhar("a")
+    except Exception:  # noqa: BLE001 — o _Parado da pausa
+        pass
+    assert j["estado"] == "pendente" and "pausado" in j["erro"] and not j.get("contas_incomum")
+    assert lote.parar_ja is True
+
+
+def test_prompt_sem_js_na_pagina():
+    from googleflow import flow_direto as fd
+    import inspect
+    assert "dispatchEvent" not in inspect.getsource(fd.escrever_prompt) + inspect.getsource(fd._focar_editor)

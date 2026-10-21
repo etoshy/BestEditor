@@ -796,7 +796,7 @@ def incluir_referencia(page, arquivo: Optional[str] = None, media_id: str = "", 
 def _focar_editor(page, ed, tentativa: int = 0) -> None:
     """🖱 v84_211: o Flow pôs um brilho animado (flow-border-glow "loop") por cima da caixa de comando — o clique
     normal do Playwright espera a caixa "parar de mexer"/não ter nada por cima e não clica nunca. Tenta o clique
-    normal rápido, depois o forçado, e por fim põe o foco no editor via JS (com o cursor no fim)."""
+    normal rápido e depois o forçado. (v84_220: sem mexer na página via JS — o Flow acusa "atividade incomum".)"""
     try:
         ed.click(timeout=3_000)
         return
@@ -804,20 +804,8 @@ def _focar_editor(page, ed, tentativa: int = 0) -> None:
         pass
     try:
         ed.click(timeout=3_000, force=True)
-        return
     except Exception:  # noqa: BLE001
         pass
-    try:
-        ed.evaluate("""(e) => { e.focus(); const r = document.createRange(); r.selectNodeContents(e); r.collapse(false);
-                     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }""")
-    except Exception:  # noqa: BLE001
-        pass
-
-
-def _texto_por_js(ed, texto: str) -> None:
-    """Último recurso: insere o texto como se fosse colado (o ProseMirror aceita o evento de colar)."""
-    ed.evaluate("""(e, t) => { e.focus(); const dt = new DataTransfer(); dt.setData('text/plain', t);
-                 e.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true})); }""", texto)
 
 
 def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
@@ -843,13 +831,6 @@ def escrever_prompt(page, texto: str, on_passo: Passo = _nada) -> None:
         if _esperar(_entrou, 3):
             on_passo(passo, "ok", "")
             return
-    try:  # o teclado não chegou na caixa: cola via JS
-        _texto_por_js(ed, texto)
-        if _esperar(_entrou, 3):
-            on_passo(passo, "ok", "texto colado direto na caixa")
-            return
-    except Exception:  # noqa: BLE001
-        pass
     raise FlowPassoErro(passo, "cliquei na caixa mas o texto do prompt não entrou nela.")
 
 
