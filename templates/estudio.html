@@ -48,6 +48,103 @@ aside.right{width:320px;border-left:1px solid var(--line);padding:12px}
 .tabs button{border:0;border-radius:0;background:none;padding:8px 9px;font-size:11.5px;color:var(--dim);border-bottom:2px solid transparent}
 .tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
 .tab{display:none;padding:12px}.tab.on{display:block}
+/* ⤢ v84_226: abrir o painel numa janela grande (o MESMO painel, movido pra lá — tudo continua sincronizado) */
+.btn-expandir{position:sticky;float:right;top:0;z-index:25;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:6px;padding:2px 7px;font-size:14px;line-height:1.2;cursor:pointer;margin:4px 4px 0 0}
+.btn-expandir:hover{border-color:var(--accent);color:var(--accent)}
+.tabs button.btn-expandir{border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:14px;margin:4px 6px 4px auto;color:var(--text);background:var(--panel)}
+#popGrande{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:2vh 2vw}
+#popGrande.on{display:flex}
+#popCaixa{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(1200px,96vw);height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#popTopo{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+#popTopo b{flex:1;font-size:15px}
+#popFechar{border:0;background:none;color:var(--text);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;border-radius:6px}
+#popFechar:hover{background:#ffffff18}
+#popCorpo{flex:1;overflow:auto;padding:4px 8px}
+#popCorpo > .em-pop{display:block!important;zoom:1.12;width:auto!important;border:0!important;max-width:none;padding:10px 14px}
+/* ---- v84_227: cada aba com o seu layout na janela grande (no painel lateral nada muda) ---- */
+#popCorpo .em-pop > h3:first-child, #popCorpo .em-pop > h3{font-size:14px;margin-top:6px}
+#popCorpo .em-pop .hint{max-width:1000px}
+#popCorpo .em-pop .tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+#popCorpo .em-pop .gal{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+#popCorpo .em-pop .cands{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+#popCorpo .em-pop .lg-grade{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+#popCorpo .em-pop .paletas{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+#popCorpo .em-pop .ed-lista{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+#popCorpo .em-pop .cenas-filtro{max-width:620px}
+#popCorpo .em-pop textarea{min-height:120px}
+/* 📁 Mídia: cartões grandes em grade (imagem em cima, "o que é" e usar embaixo) */
+#popCorpo #tab-midia #listaBiblioteca{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+#popCorpo #tab-midia .card{flex-direction:column;align-items:stretch;margin:0;padding:8px;gap:6px}
+#popCorpo #tab-midia .card .ico{width:100%;height:auto;aspect-ratio:16/9;font-size:28px;background-size:cover}
+#popCorpo #tab-midia .card .nm{font-size:11px;color:var(--dim)}
+#popCorpo #tab-midia .card button{width:100%}
+#popCorpo #tab-midia #btnEnviarBiblioteca{max-width:420px}
+/* 🎬 Cenas / 🖼 Biblioteca / ✨ Efeitos / 🎞 Transições: miniaturas maiores */
+#popCorpo #tab-cenas .cena-tile{padding:8px;font-size:12px}
+#popCorpo #tab-transicoes .tile, #popCorpo #tab-efeitos .tile{padding:9px;font-size:12px}
+#popCorpo #tab-transicoes .tile .demo, #popCorpo #tab-efeitos .tile .demo{height:54px}
+/* 🔤 Textos: o formulário em cima, os estilos em grade */
+#popCorpo #tab-textos #listaTx{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+#popCorpo #tab-textos .hl-tile{margin:0}
+#popCorpo #tab-textos .hl-tile .am{height:64px;font-size:18px}
+#popCorpo #tab-textos > label.f, #popCorpo #tab-textos > .row{max-width:760px}
+/* 🔊 Áudios: sons em colunas */
+#popCorpo #tab-audios #listaSons .in{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:6px}
+#popCorpo #tab-audios .som{margin:0}
+/* 🎨 Direção e 📝 Legendas: as seções em duas colunas */
+#popCorpo #tab-direcao, #popCorpo #tab-legendas{column-count:2;column-gap:28px}
+#popCorpo #tab-direcao > *, #popCorpo #tab-legendas > *{break-inside:avoid}
+#popCorpo #tab-direcao > h3, #popCorpo #tab-legendas > h3{break-after:avoid}
+#popCorpo #tab-legendas .lg-grade{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+/* 🤖 IA: prompt e resposta lado a lado, textos grandes */
+#popCorpo #tab-ia{display:grid!important;grid-template-columns:1fr 1fr;column-gap:20px;align-items:start}
+#popCorpo #tab-ia > *{grid-column:1/-1}
+#popCorpo #tab-ia{grid-auto-flow:row dense}
+#popCorpo #tab-ia > #iaPromptBox{grid-column:1;grid-row:span 2}
+#popCorpo #tab-ia > #iaRespTit, #popCorpo #tab-ia > #iaResposta{grid-column:2}
+#popCorpo #tab-ia #iaPrompt, #popCorpo #tab-ia #iaResposta{min-height:300px}
+#popCorpo #tab-ia #rdLista{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:8px}
+/* 🔍 Buscar: o formulário numa coluna estreita, os resultados ocupando o resto */
+#popCorpo #tab-buscar #buscarComSel{display:grid;grid-template-columns:320px 1fr;column-gap:18px;align-items:start}
+#popCorpo #tab-buscar #buscarComSel > *{grid-column:1}
+#popCorpo #tab-buscar #buscarComSel > #bResultados{grid-column:2;grid-row:1 / span 30;margin-top:0}
+#popCorpo #tab-buscar #rbPrompt, #popCorpo #tab-buscar #rbResposta{min-height:220px}
+/* 🧩 Overlays: os dois formulários lado a lado */
+#popCorpo #tab-overlays{display:grid!important;grid-template-columns:1fr 1fr;column-gap:24px;align-items:start}
+#popCorpo #tab-overlays > h3:nth-of-type(1){grid-column:1;grid-row:1}
+#popCorpo #tab-overlays > form:nth-of-type(1){grid-column:1;grid-row:2}
+#popCorpo #tab-overlays > h3:nth-of-type(2){grid-column:2;grid-row:1;margin-top:6px!important}
+#popCorpo #tab-overlays > form:nth-of-type(2){grid-column:2;grid-row:2}
+#popCorpo #tab-overlays > p.hint{grid-column:1/-1;grid-row:3}
+/* ⏱ Clipes curtos e 🎞 Animar: cartões em grade, miniaturas maiores */
+#popCorpo #tab-curtos #listaCurtos{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+#popCorpo #tab-curtos #listaCurtos .cc{margin:0}
+#popCorpo #tab-animar #listaAnim{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:10px}
+#popCorpo #tab-animar #listaAnim .an{margin:0}
+#popCorpo #tab-animar #listaAnim .an img.th, #popCorpo #tab-animar #listaAnim .an video{width:200px;height:112px}
+/* 🧍 Personagens: ajustes à esquerda, as aparições à direita */
+#popCorpo #tab-personagens{display:grid!important;grid-template-columns:minmax(360px,0.9fr) 1.3fr;column-gap:20px;align-items:start}
+#popCorpo #tab-personagens > *{grid-column:1}
+#popCorpo #tab-personagens > #listaPers{grid-column:2;grid-row:1 / span 30;max-height:calc(94vh / 1.12 - 90px);overflow:auto;padding-right:4px}
+#popCorpo #tab-personagens #peTexto{min-height:220px}
+/* ✂️ Cortes: a lista e a chamada lado a lado */
+#popCorpo #tab-cortes{display:grid!important;grid-template-columns:1.2fr 1fr;column-gap:20px;align-items:start}
+#popCorpo #tab-cortes > h3{grid-column:1/-1}
+#popCorpo #tab-cortes > #listaCortes{grid-column:1}
+#popCorpo #tab-cortes > details{grid-column:2;margin-top:0!important}
+/* 🎬 YouTube: colar links à esquerda, o painel de busca à direita */
+#popCorpo #tab-youtube{display:grid!important;grid-template-columns:minmax(320px,0.8fr) 1.4fr;column-gap:20px;align-items:start}
+#popCorpo #tab-youtube > .yt-texto{grid-column:1}
+#popCorpo #tab-youtube > :not(.yt-texto){grid-column:2;grid-row:1 / span 10}
+#popCorpo #tab-youtube #ytTexto{min-height:240px}
+/* ⚙ Propriedades: as seções em duas colunas */
+#popCorpo #props.em-pop{column-count:2;column-gap:22px;padding-top:4px}
+#popCorpo #props.em-pop > *{break-inside:avoid}
+#popCorpo #props.em-pop > .prop-title, #popCorpo #props.em-pop > .prop-sub, #popCorpo #props.em-pop > .btn-expandir, #popCorpo #props.em-pop > .aviso, #popCorpo #props.em-pop > .erro, #popCorpo #props.em-pop > div:first-of-type{column-span:all}
+@media (max-width: 900px){
+  #popCorpo #tab-direcao, #popCorpo #tab-legendas, #popCorpo #props.em-pop{column-count:1}
+  #popCorpo #tab-ia, #popCorpo #tab-buscar #buscarComSel, #popCorpo #tab-overlays, #popCorpo #tab-personagens, #popCorpo #tab-cortes, #popCorpo #tab-youtube{display:block!important}
+}
 .preview-wrap{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#08090b;min-width:0;padding:10px;gap:8px}
 #stage{position:relative;background:#000;overflow:hidden;box-shadow:0 0 0 1px #26293350,0 20px 50px rgba(0,0,0,.5)}
 #stage .layer{position:absolute;inset:0;overflow:hidden}
@@ -383,7 +480,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 
 <div class="main">
   <aside class="left">
-    <div class="tabs" id="tabs">
+    <div class="tabs" id="tabs"><button type="button" class="btn-expandir" id="expandirTab" title="abrir esta aba numa janela grande (tudo continua sincronizado com o painel)" style="order:99;margin-left:auto">⤢</button>
       <button data-tab="midia" class="on">📁 Mídia</button>
       <button data-tab="cenas">🎬 Cenas</button>
       <button data-tab="direcao">🎨 Direção</button>
@@ -789,6 +886,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   </div>
 
   <aside class="right" id="props"></aside>
+  <div id="popGrande"><div id="popCaixa"><div id="popTopo"><b id="popTitulo"></b><button type="button" id="popFechar" title="fechar (Esc)">✕</button></div><div id="popCorpo"></div></div></div>
 </div>
 
 <div class="tl-wrap">
@@ -949,8 +1047,39 @@ function gruposCena() {   // mesma regra do montador (cenas_dp.planejar_grupos)
 function grupoDoTrecho(i) { return gruposCena().find(g => g.c && i >= g.a && i <= g.b) || null; }
 
 // ------------------------------------------------------------------ tabs
+// ⤢ v84_226: a aba aberta (ou as Propriedades) numa janela grande — o próprio painel vai pra lá e volta ao fechar
+const POP = { no: null, marca: null };
+function abrirGrande(no, titulo) {
+  if (!no) return;
+  fecharGrande();
+  POP.marca = document.createComment('lugar-do-painel');
+  no.parentNode.insertBefore(POP.marca, no);
+  POP.no = no;
+  no.classList.add('em-pop');
+  $('popCorpo').appendChild(no);
+  $('popTitulo').textContent = titulo || '';
+  $('popGrande').classList.add('on');
+  no.querySelectorAll('.btn-expandir').forEach(b => { b.textContent = '⤡'; b.title = 'voltar pro painel'; });
+}
+function fecharGrande() {
+  if (!POP.no) return;
+  POP.no.classList.remove('em-pop');
+  POP.no.querySelectorAll('.btn-expandir').forEach(b => { b.textContent = '⤢'; b.title = 'abrir numa janela grande'; });
+  POP.marca.parentNode.insertBefore(POP.no, POP.marca);
+  POP.marca.remove();
+  POP.no = POP.marca = null;
+  $('popGrande').classList.remove('on');
+}
+$('expandirTab').addEventListener('click', () => {
+  const t = document.querySelector('.tab.on'); const b = document.querySelector('#tabs button.on');
+  abrirGrande(t, b ? b.textContent.trim() : '');
+});
+$('popFechar').addEventListener('click', fecharGrande);
+$('popGrande').addEventListener('mousedown', (e) => { if (e.target === $('popGrande')) fecharGrande(); });  // clicou fora da janela
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && POP.no) fecharGrande(); });
 $('tabs').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
+  if (POP.no && POP.no.classList.contains('tab')) fecharGrande();  // trocou de aba (ou um botão abriu outra): volta pro painel
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab));
 });
@@ -3552,6 +3681,12 @@ function opcoes(lista, atual) { return lista.map(([v, r]) => `<option value="${e
 
 function renderProps() {
   renderProps0();
+  try {  // ⤢ v84_226: as Propriedades também abrem na janela grande
+    const P = $('props');
+    if (!P.querySelector('.btn-expandir')) { const bx = document.createElement('button'); bx.type = 'button'; bx.className = 'btn-expandir'; bx.textContent = POP.no === P ? '⤡' : '⤢';
+      bx.title = POP.no === P ? 'voltar pro painel' : 'abrir as propriedades numa janela grande (tudo continua sincronizado)';
+      bx.addEventListener('click', () => { if (POP.no === P) fecharGrande(); else abrirGrande(P, '⚙ Propriedades'); }); P.prepend(bx); }
+  } catch (e) { /* ainda carregando */ }
   try { barraRapida($('props')); if ($('chatIA').style.display !== 'none') $('chatFoco').textContent = focoChat().rotulo; } catch (e) { /* antes de tudo carregar */ }
 }
 function renderProps0() {
@@ -3603,6 +3738,8 @@ function propsTrecho(P, i) {
       <label class="f"><span>🔗 Link do YouTube + tempo</span><div class="row" style="gap:4px"><input type="text" id="pYtLink" placeholder="https://youtu.be/ID 1:35-1:42" value="${s.youtube_link ? esc(textoYtLink(s.youtube_link)) : ''}"><button class="mini" id="pYtUsar" style="flex:0 0 auto">⬇ Usar</button></div></label>
       <div class="row" style="gap:4px;flex-wrap:wrap"><button class="mini" id="pYtPrevia">🎬 Prévia / ajustar tempo</button><button class="mini" id="pYtCopiar" title="copia o link com os tempos pra colar em outro trecho">📋 Copiar</button><button class="mini" id="pYtColar" title="cola o link copiado de outro trecho">📥 Colar${ytClip ? ' <span class="dim">(' + esc(ytClip.slice(0, 18)) + '…)</span>' : ''}</button></div>
       <div class="row" style="margin-top:8px;"><button class="mini" id="pBuscar">🔍 Ver opções</button><button class="mini" id="pEnviar">⬆ Enviar arquivo</button></div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:4px"><button class="mini" id="pReal" title="as fotos e vídeos REAIS do projeto ligado (🕵️ Modelo de vídeo / 🛒 venda)">🕵️ Usar foto/vídeo real…</button><button class="mini" id="pGerarIa" title="gera uma imagem NOVA de IA pra este trecho (pod/Runpod) — dá pra mudar o pedido">🎨 Gerar nova de IA…</button></div>
+      <div id="pRealBox"></div>
       ${campo('Ou colar link direto de um arquivo (vídeo/imagem)', `<input type="url" id="pUrl" placeholder="https://…/video.mp4" value="${ov.source === 'url' ? esc(ov.value) : ''}">`)}
       <div class="row">${campo('Ou link de post', `<input type="url" id="pPost" placeholder="https://www.pexels.com/video/…" value="${ov.source === 'provider_url' ? esc(ov.value) : ''}">`)}${campo('do banco', `<select id="pPostBanco">${opcoes(PIN_PROV.map(p => [p, p]), ov.provider || 'pexels')}</select>`)}</div>
     </div></details>
@@ -3670,6 +3807,38 @@ function propsTrecho(P, i) {
   on('pYtPrevia', 'click', () => abrirYtModal(i, $('pYtLink').value.trim()));
   on('pBuscar', 'click', () => { abrirTab('buscar'); prepararBusca(); $('btnBuscar').click(); });
   on('pEnviar', 'click', () => $('arqTrecho').click());
+  // 🕵️🎨 v84_225: trocar pela foto/vídeo real do projeto, ou gerar outra de IA, direto daqui
+  on('pReal', 'click', async () => {
+    const box = $('pRealBox'); box.innerHTML = '<p class="hint">carregando as mídias do projeto…</p>';
+    try { const d = await (await fetch(`/job/${JOB}/real-ia/midias`)).json();
+      if (!(d.midias || []).length) { box.innerHTML = '<p class="hint">Nenhum projeto com fotos/vídeos ligado (📦 Projeto do vídeo, no topo).</p>'; return; }
+      box.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-top:6px;max-height:320px;overflow:auto">${d.midias.map(m => `<button class="mini" data-real="${esc(m.id)}" title="${esc(m.id + ' — ' + m.o_que_e)}" style="padding:2px;display:block;height:auto">${m.tipo === 'video' ? `<video src="${esc(m.url)}" muted preload="metadata" style="width:100%;aspect-ratio:16/9;object-fit:cover;pointer-events:none"></video>` : `<img src="${esc(m.url)}" loading="lazy" style="width:100%;aspect-ratio:16/9;object-fit:cover">`}<span style="font-size:10px">${m.tipo === 'video' ? '🎥' : '📷'} ${esc(m.id)}</span></button>`).join('')}</div>`;
+      box.querySelectorAll('[data-real]').forEach(b => b.addEventListener('click', async () => {
+        b.disabled = true;
+        try { if (sujo) await salvar(true);
+          const r = await fetch(`/job/${JOB}/segmento/${i}/usar-real`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mid: b.dataset.real }) });
+          const x = await r.json(); if (!r.ok || x.erro) throw new Error(x.erro || r.status);
+          toast(`🕵️ trecho ${i + 1} com ${b.dataset.real} — recarregando…`); setTimeout(() => location.reload(), 900); }
+        catch (e) { toast('⚠ ' + e.message, 5000); b.disabled = false; }
+      }));
+    } catch (e) { box.innerHTML = `<p class="hint">⚠ ${esc(e.message)}</p>`; }
+  });
+  on('pGerarIa', 'click', () => {
+    const box = $('pRealBox');
+    const atual = s.provider === 'runpod' ? (s.query || '') : (s.visual || s.query || '');
+    box.innerHTML = `<label class="f"><span>O que a imagem mostra (em inglês funciona melhor)</span><textarea id="pIaPrompt" rows="4">${esc(atual)}</textarea></label><button class="mini primary" id="pIaIr">🎨 Gerar</button> <span class="hint" id="pIaSt"></span>`;
+    $('pIaIr').addEventListener('click', async () => {
+      $('pIaIr').disabled = true; $('pIaSt').textContent = '⏳ gerando no pod… (até ~1 min)';
+      try { if (sujo) await salvar(true);
+        const r = await fetch(`/job/${JOB}/segmento/${i}/gerar-ia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: $('pIaPrompt').value }) });
+        const x = await r.json(); if (!r.ok || x.erro) throw new Error(x.erro || r.status);
+        const p = x.preview;
+        s.provider = 'runpod'; s.query = x.query; s.media_type = 'image'; s.override_source = null;
+        s._preview = Object.assign({}, s._preview, { thumb_remoto: null, video_remoto: null, thumbnail_url: p.thumbnail_url, video_preview_url: null, label: p.label, erro: null, provider: 'runpod', result_url: p.result_url, query: x.query, media_type: 'image', midia_local: null });
+        desenharTimeline(); atualizarMonitor(true); renderProps(); toast(`🎨 trecho ${i + 1}: imagem nova`); }
+      catch (e) { $('pIaSt').textContent = '⚠ ' + e.message; $('pIaIr').disabled = false; }
+    });
+  });
   on('pUrl', 'change', muda((e) => { const v = e.target.value.trim(); s.override_source = v ? { source: 'url', value: v, kind: /\.(jpe?g|png|webp|gif|bmp)(\?|$)/i.test(v) ? 'image' : 'video' } : null; }, true));
   const post = () => { const v = $('pPost').value.trim(); s.override_source = v ? { source: 'provider_url', provider: $('pPostBanco').value, value: v } : null; marcarSujo(); desenharTimeline(); };
   on('pPost', 'change', post); on('pPostBanco', 'change', post);

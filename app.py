@@ -11356,8 +11356,8 @@ def _cenas_pod_para_refazer(job: dict) -> List[int]:
             continue
         o = d.get("override_source") or {}
         p = pv[k] if k < len(pv) else None
-        if o.get("cartao") or d.get("cartao") or p is None or not (p or {}).get("ok") or (p or {}).get("cartao"):
-            # v84_223: sem prévia (cena que virou do pod depois do projeto criado) também entra
+        if o.get("cartao") or d.get("cartao") or (p is not None and not (p or {}).get("ok")) or (p or {}).get("cartao") \
+                or (p is None and d.get("_reprevia")):  # v84_225: só a cena que virou do pod depois (não todas sem prévia)
             if not o or o.get("cartao"):  # não mexe no que VOCÊ escolheu no editor
                 out.append(k)
     return out
@@ -11493,11 +11493,7 @@ def _encaixar_projeto(job_id: str, modo: str = "ia") -> Dict[str, Any]:
         if modo != "tudo" and not ia_ou_vazio:
             continue
         mo = next((x for x in por_id.get(mid, []) if x.get("inicio") is not None), por_id.get(mid, [{}])[0])
-        d.setdefault("_antes_material", {kk: d.get(kk) for kk in ("provider", "query", "override_source", "media_type", "venda_midia")})
-        d["provider"] = prov
-        d["query"] = mid + (f"@{mo['inicio']}-{mo['fim']}" if mo.get("tipo") == "video" and mo.get("inicio") is not None
-                            and mo.get("fim") is not None else "")
-        d["override_source"] = None
+        _por_real(job, k, mid, prov, mo)
         trocadas.append(k)
     if not trocadas:
         raise ValueError("Nenhum trecho pra trocar (os momentos caem em trechos que você já escolheu — use “trocar todas”).")
@@ -11535,6 +11531,206 @@ def _encaixar_projeto(job_id: str, modo: str = "ia") -> Dict[str, Any]:
     return {"ok": True, "trocadas": len(trocadas), "momentos": len(momentos), "achados": len(mapa), "paginas": paginas}
 
 
+def _por_real(job: dict, k: int, mid: str, prov: str, mo: Optional[dict] = None) -> None:
+    """O trecho k passa a usar a foto/vídeo REAL `mid` do projeto (guarda a cena de antes — e a prévia dela — pra voltar)."""
+    pend = job["pending_segments"]
+    d = pend[k]
+    mo = mo or {}
+    if d.get("provider") not in ("produto", "material") or not d.get("_antes_material"):  # guarda a cena ATUAL (de IA)
+        pv = (list(job.get("segment_previews") or []) + [None] * len(pend))[k]
+        d["_antes_material"] = {kk: d.get(kk) for kk in ("provider", "query", "override_source", "media_type", "venda_midia")}
+        if isinstance(pv, dict) and pv.get("ok"):
+            d["_antes_material"]["_preview"] = pv  # 🔀 v84_225: a de IA aparece na comparação
+    d["provider"] = prov
+    d["query"] = mid + (f"@{mo['inicio']}-{mo['fim']}" if mo.get("tipo") == "video" and mo.get("inicio") is not None
+                        and mo.get("fim") is not None else "")
+    d["override_source"] = None
+
+
+def _por_ia(job: dict, k: int) -> bool:
+    """O trecho k volta pra cena de IA que tinha antes da real. → se voltou."""
+    pend = job["pending_segments"]
+    ant = pend[k].pop("_antes_material", None)
+    if not ant:
+        return False
+    pv = ant.pop("_preview", None)
+    pend[k].update(ant)
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    previas[k] = pv if isinstance(pv, dict) else None
+    job["segment_previews"] = previas
+    return True
+
+
+def _real_ia_mapa(job: dict) -> Tuple[Any, Any, str, List[dict], Dict[int, str], Dict[str, list]]:
+    import cenas_lote
+    pj = _projeto_do_job(job)
+    if not pj:
+        raise ValueError("Ligue um 🕵️ Modelo de vídeo (ou 🛒 venda) neste vídeo primeiro.")
+    _t, mod, p, prov = pj
+    momentos = _momentos_do_projeto(mod, p)
+    pend = job.get("pending_segments") or []
+    segs = [_segmento_obj(d) for d in pend]
+    falas, _pal = _falas_por_trecho(job, segs)
+    mapa = cenas_lote.cenas_dos_momentos([{"fala": f} for f in falas], momentos) if momentos else {}
+    por_id: Dict[str, list] = {}
+    for mo in momentos:
+        por_id.setdefault(mo["midia"], []).append(mo)
+    return mod, p, prov, falas, mapa, por_id
+
+
+def _real_ia_lista(job_id: str) -> Dict[str, Any]:
+    """🔀 v84_225: cada momento do roteiro com foto/vídeo real: a REAL de um lado e a de IA do outro, pra escolher."""
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    mod, p, prov, falas, mapa, _por = _real_ia_mapa(job)
+    midias = {m["id"]: m for m in mod.midias_para_editor(BASE_DIR, p)}
+    pend = job.get("pending_segments") or []
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    itens = []
+    for k, mid in sorted(mapa.items()):
+        d, m = pend[k], midias.get(mid) or {}
+        real_agora = d.get("provider") in ("produto", "material") and str(d.get("query") or "").upper().startswith(mid.upper())
+        if real_agora:
+            ant = d.get("_antes_material") or {}
+            ia_pv = ant.get("_preview") or {}
+            ia = {"provider": ant.get("provider"), "query": ant.get("query"), "thumb": ia_pv.get("thumbnail_url"),
+                  "video": ia_pv.get("video_preview_url"), "existe": bool(ant)}
+        else:
+            pv = previas[k] or {}
+            ia = {"provider": d.get("provider"), "query": d.get("query"), "thumb": pv.get("thumbnail_url") if pv.get("ok") else None,
+                  "video": pv.get("video_preview_url"), "existe": True}
+        itens.append({"k": k, "start": d.get("start"), "end": d.get("end"), "fala": (falas[k] if k < len(falas) else "")[:200],
+                      "real": {"id": mid, "tipo": m.get("tipo"), "url": f"/job/{job_id}/real-ia/midia/{mid}", "o_que_e": m.get("o_que_e") or ""},
+                      "ia": ia, "atual": "real" if real_agora else "ia"})
+    return {"ok": True, "itens": itens}
+
+
+def _real_ia_aplicar(job_id: str, escolhas: Dict[str, str]) -> Dict[str, Any]:
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    if job.get("status") == "buscando_previas":
+        raise ValueError("O projeto ainda está buscando prévias — espere terminar.")
+    mod, p, prov, _f, mapa, por_id = _real_ia_mapa(job)
+    pend = job["pending_segments"]
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    job["segment_previews"] = previas
+    reais, ias = [], 0
+    for kk, quer in (escolhas or {}).items():
+        try:
+            k = int(kk)
+        except (TypeError, ValueError):
+            continue
+        if k not in mapa:
+            continue
+        mid = mapa[k]
+        e_real = pend[k].get("provider") in ("produto", "material") and str(pend[k].get("query") or "").upper().startswith(mid.upper())
+        if quer == "real" and not e_real:
+            mo = next((x for x in por_id.get(mid, []) if x.get("inicio") is not None), (por_id.get(mid) or [{}])[0])
+            _por_real(job, k, mid, prov, mo)
+            job["segment_previews"][k] = None
+            reais.append(k)
+        elif quer == "ia" and e_real:
+            if _por_ia(job, k):
+                ias += 1
+    if reais:
+        _aplicar_produto(job, [pend[k] for k in reais])
+    _save_state(job_id)
+    if reais or any(pv is None for pv in job["segment_previews"]):
+        _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
+    return {"ok": True, "reais": len(reais), "ias": ias}
+
+
+@app.route("/job/<job_id>/real-ia", methods=["GET", "POST"])
+def real_ia_rota(job_id: str):
+    try:
+        if request.method == "POST":
+            return jsonify(_real_ia_aplicar(job_id, (request.get_json(silent=True) or {}).get("escolhas") or {}))
+        return jsonify(_real_ia_lista(job_id))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+
+
+@app.route("/job/<job_id>/real-ia/midia/<mid>", methods=["GET"])
+def real_ia_midia(job_id: str, mid: str):
+    job = _JOBS.get(job_id)
+    pj = _projeto_do_job(job) if job else None
+    if not pj:
+        return "", 404
+    _t, mod, p, _prov = pj
+    m = next((x for x in mod.midias_para_editor(BASE_DIR, p) if x["id"].upper() == str(mid).upper()), None)
+    if not m or not os.path.isfile(m["caminho"]):
+        return "", 404
+    return send_file(m["caminho"], conditional=True)
+
+
+@app.route("/job/<job_id>/real-ia/midias", methods=["GET"])
+def real_ia_midias(job_id: str):
+    """As fotos/vídeos reais do projeto ligado (pro menu lateral: usar uma no trecho)."""
+    job = _JOBS.get(job_id)
+    pj = _projeto_do_job(job) if job else None
+    if not pj:
+        return jsonify({"midias": []})
+    _t, mod, p, _prov = pj
+    return jsonify({"midias": [{"id": m["id"], "tipo": m["tipo"], "o_que_e": (m.get("o_que_e") or "")[:120],
+                                "url": f"/job/{job_id}/real-ia/midia/{m['id']}"} for m in mod.midias_para_editor(BASE_DIR, p)]})
+
+
+@app.route("/job/<job_id>/segmento/<int:k>/usar-real", methods=["POST"])
+def segmento_usar_real(job_id: str, k: int):
+    """🕵️ v84_225: o trecho k usa uma foto/vídeo REAL do projeto (escolhida no menu lateral)."""
+    job = _JOBS.get(job_id)
+    if not job or not 0 <= k < len(job.get("pending_segments") or []):
+        return jsonify({"erro": "Trecho não encontrado."}), 404
+    pj = _projeto_do_job(job)
+    if not pj:
+        return jsonify({"erro": "Ligue um 🕵️ Modelo de vídeo neste vídeo primeiro."}), 400
+    mid = str((request.get_json(silent=True) or {}).get("mid") or "").upper()
+    _t, mod, p, prov = pj
+    if not any(m["id"].upper() == mid for m in mod.midias_para_editor(BASE_DIR, p)):
+        return jsonify({"erro": "Mídia não encontrada no projeto."}), 400
+    _por_real(job, k, mid, prov)
+    previas = (list(job.get("segment_previews") or []) + [None] * len(job["pending_segments"]))[:len(job["pending_segments"])]
+    previas[k] = None
+    job["segment_previews"] = previas
+    _aplicar_produto(job, [job["pending_segments"][k]])
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(d) for d in job["pending_segments"]], retomar=True)
+    return jsonify({"ok": True})
+
+
+@app.route("/job/<job_id>/segmento/<int:k>/gerar-ia", methods=["POST"])
+def segmento_gerar_ia(job_id: str, k: int):
+    """🎨 v84_225: uma imagem NOVA de IA pro trecho k (no pod/Runpod), com o prompt que você escrever (ou o mesmo)."""
+    import runpod_gerador
+    job = _JOBS.get(job_id)
+    pend = (job or {}).get("pending_segments") or []
+    if not job or not 0 <= k < len(pend):
+        return jsonify({"erro": "Trecho não encontrado."}), 404
+    d = pend[k]
+    prompt = " ".join(str((request.get_json(silent=True) or {}).get("prompt") or "").split())[:1500]
+    if not prompt:
+        prompt = str(d.get("query") or "").strip() if d.get("provider") == "runpod" else str(d.get("visual") or d.get("query") or "")
+    if len(prompt) < 4:
+        return jsonify({"erro": "Escreva o que a imagem deve mostrar."}), 400
+    try:
+        r = runpod_gerador.gerar(prompt, "imagem", _job_site_cfg(job), forcar=True)
+    except Exception as exc:  # noqa: BLE001 — pod desligado, sem chave…
+        return jsonify({"erro": f"Não deu pra gerar: {str(exc)[:300]}"}), 400
+    url = r["url"] + ("&" if "?" in r["url"] else "?") + f"t={int(time.time())}"
+    if d.get("provider") == "runpod":
+        d.pop("_antes_material", None)
+    d.update(provider="runpod", query=prompt, media_type="image", override_source=None)
+    pv = {"index": k, "ok": True, "thumbnail_url": url, "result_url": r["url"], "label": "🎨 gerada agora", "error": None,
+          "video_preview_url": None, "provider": "runpod", "original_provider": "runpod", "query": prompt, "media_type": "image"}
+    previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
+    previas[k] = pv
+    job["segment_previews"] = previas
+    _save_state(job_id)
+    return jsonify({"ok": True, "preview": pv, "query": prompt})
+
+
 def _desfazer_encaixe(job_id: str) -> Dict[str, Any]:
     job = _JOBS.get(job_id)
     if not job:
@@ -11546,7 +11742,9 @@ def _desfazer_encaixe(job_id: str) -> Dict[str, Any]:
     job["editoriais"] = [e for e in job.get("editoriais") or [] if e.get("origem") != "projeto_site"]
     previas = (list(job.get("segment_previews") or []) + [None] * len(pend))[:len(pend)]
     for k in idx:
-        pend[k].update(pend[k].pop("_antes_material"))
+        ant = pend[k].pop("_antes_material")
+        ant.pop("_preview", None)
+        pend[k].update(ant)
         previas[k] = None
     job["segment_previews"] = previas
     _save_state(job_id)
@@ -11598,7 +11796,7 @@ def _atualizar_projeto_producao(job_id: str, resposta: Dict[str, Any]) -> int:
         s = min(novas, key=lambda x: abs(float(x.get("start") or 0) - ini), default=None)
         if not s or abs(float(s.get("start") or 0) - ini) > 0.6:
             continue
-        d.update(provider="runpod", query=s["query"], media_type="image")
+        d.update(provider="runpod", query=s["query"], media_type="image", _reprevia=True)
         previas[k] = None
         n += 1
     if n:

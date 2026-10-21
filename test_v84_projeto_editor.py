@@ -59,3 +59,32 @@ def test_ligar_e_encaixar(cena):
     d = c.post(f"/job/{jid}/encaixar-projeto", json={"desfazer": True}).get_json()
     assert d["voltaram"] == 2 and pend[1]["provider"] == "adiado" and pend[2]["override_source"]["value"] == "/tmp/escolhida.mp4"
     assert c.post(f"/job/{jid}/ligar-projeto", json={"projeto": ""}).get_json()["tipo"] == ""
+
+
+def test_comparar_real_ia_e_escolher(cena, monkeypatch):
+    """🔀 v84_225: a lista real × IA, escolher uma ou outra (e voltar), mídia real servida, gerar IA nova no trecho."""
+    A, jid, p = cena
+    c = A.app.test_client()
+    c.post(f"/job/{jid}/ligar-projeto", json={"projeto": f"dossie:{p['id']}"})
+    job = A._JOBS[jid]
+    job["segment_previews"] = [None, {"ok": True, "thumbnail_url": "/ia/2.png"}, {"ok": True, "thumbnail_url": "/px.jpg"}]
+    d = c.get(f"/job/{jid}/real-ia").get_json()
+    assert [x["k"] for x in d["itens"]] == [1, 2] and all(x["atual"] == "ia" for x in d["itens"])
+    assert d["itens"][0]["ia"]["thumb"] == "/ia/2.png" and d["itens"][0]["real"]["id"] == "I1"
+    assert c.get(d["itens"][0]["real"]["url"]).status_code == 200
+    d = c.post(f"/job/{jid}/real-ia", json={"escolhas": {"1": "real", "2": "real"}}).get_json()
+    assert d["reais"] == 2
+    pend = job["pending_segments"]
+    assert pend[1]["provider"] == "material" and pend[2]["override_source"]["value"].endswith("b.jpg")
+    lst = c.get(f"/job/{jid}/real-ia").get_json()["itens"]
+    assert all(x["atual"] == "real" for x in lst) and lst[0]["ia"]["thumb"] == "/ia/2.png"  # a de IA ficou guardada
+    d = c.post(f"/job/{jid}/real-ia", json={"escolhas": {"1": "ia"}}).get_json()
+    assert d["ias"] == 1 and pend[1]["provider"] == "adiado" and job["segment_previews"][1]["thumbnail_url"] == "/ia/2.png"
+    # menu lateral: usar uma real qualquer e gerar IA nova
+    assert c.post(f"/job/{jid}/segmento/0/usar-real", json={"mid": "I2"}).get_json()["ok"]
+    assert pend[0]["provider"] == "material" and pend[0]["override_source"]["value"].endswith("b.jpg")
+    import runpod_gerador
+    monkeypatch.setattr(runpod_gerador, "gerar", lambda q, tipo, cfg, forcar=False: {"url": "/rp/x.png", "caminho": "/tmp/x.png"})
+    d = c.post(f"/job/{jid}/segmento/0/gerar-ia", json={"prompt": "a quiet suburban house at night, 1971"}).get_json()
+    assert d["ok"] and pend[0]["provider"] == "runpod" and pend[0]["query"].startswith("a quiet")
+    assert job["segment_previews"][0]["thumbnail_url"].startswith("/rp/x.png?t=")

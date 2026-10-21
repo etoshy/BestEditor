@@ -1972,8 +1972,35 @@ def apply_overlays(
         "-t", f"{base_duration:.3f}",  # nunca deixa um overlay em loop esticar o video final
         output_path,
     ]
-    _run_ffmpeg(args)
+    # ⏱ v84_228: o limite acompanha o tamanho do trabalho (vídeo de 13 min com 40 camadas não cabe em 5 min)
+    _run_ffmpeg(args, timeout=tempo_limite_overlays(base_duration, len(overlays)))
     return output_path
+
+
+def tempo_limite_overlays(duracao: float, n_overlays: int) -> int:
+    """Segundos pro passo dos overlays: no mínimo 5 min; ~3x a duração do vídeo + 20 s por camada."""
+    return int(max(300, float(duracao or 0) * 3 + 20 * max(0, n_overlays)))
+
+
+def _png_no_tamanho(caminho: str, largura: int, espelhar: bool) -> Optional[str]:
+    """A pose redimensionada (largura par) e espelhada uma vez só, guardada ao lado da original. None = deixa pro ffmpeg."""
+    try:
+        from PIL import Image, ImageOps
+        base, _ext = os.path.splitext(caminho)
+        destino = f"{base}__{largura}{'f' if espelhar else ''}.png"
+        if os.path.isfile(destino) and os.path.getmtime(destino) >= os.path.getmtime(caminho):
+            return destino
+        with Image.open(caminho) as im:
+            im = im.convert("RGBA")
+            alt = max(2, round(im.height * largura / max(1, im.width)))
+            alt += alt % 2
+            im = im.resize((largura, alt), Image.LANCZOS)
+            if espelhar:
+                im = ImageOps.mirror(im)
+            im.save(destino)
+        return destino
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, atual: str, proximo: str,
@@ -2008,7 +2035,10 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
 
     def _entrada(caminho: str, rot: str) -> int:
         nonlocal n_in
-        inputs.extend(["-loop", "1", "-framerate", "25", "-t", f"{dur:.3f}", "-i", caminho])
+        # ⚡ v84_228: a pose já vai no tamanho e no lado certos (PNG pronto) — o ffmpeg não redimensiona/espelha
+        # cada quadro (com ~40 poses num vídeo longo isso estourava o tempo da montagem)
+        pronto = _png_no_tamanho(caminho, largura, bool(espelho))
+        inputs.extend(["-loop", "1", "-framerate", "25", "-t", f"{dur:.3f}", "-i", pronto or caminho])
         k = n_in
         n_in += 1
         fade = ""
@@ -2016,7 +2046,8 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
             fade += f",fade=t=in:st=0:d={d:.3f}:alpha=1"
         if e_out == "aparecer":
             fade += f",fade=t=out:st={max(0.0, dur - d):.3f}:d={d:.3f}:alpha=1"
-        partes.append(f"[{k}:v]scale={largura}:-2{espelho},format=rgba{fade},setpts=PTS+{start:.3f}/TB{rot}")
+        escala = "" if pronto else f"scale={largura}:-2{espelho},"
+        partes.append(f"[{k}:v]{escala}format=rgba{fade},setpts=PTS+{start:.3f}/TB{rot}")
         return k
 
     anim = ov.get("anim_video") if ov.get("anim_video") and os.path.isfile(str(ov.get("anim_video"))) else None

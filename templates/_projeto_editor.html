@@ -22,6 +22,7 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #e9d5ff;">
     <button type="button" id="pe-encaixar" style="width:auto;margin:0;padding:6px 14px;background:#15803d;color:#fff;font-weight:700;border:0;border-radius:6px;cursor:pointer;">🕵️ Encaixar as fotos e vídeos reais</button>
     <label style="margin:0;font-weight:400;font-size:.84rem;"><input type="checkbox" id="pe-tudo" style="width:auto;margin:0 4px 0 0;">trocar também os trechos que você já escolheu</label>
+    <button type="button" id="pe-comparar" style="width:auto;margin:0;padding:6px 14px;background:#7e22ce;color:#fff;font-weight:700;border:0;border-radius:6px;cursor:pointer;" title="cada momento com foto/vídeo real: a real de um lado e a de IA do outro — escolha uma ou outra">🔀 Comparar real × IA</button>
     {% if _pe.encaixadas %}<button type="button" id="pe-desfazer" style="width:auto;margin:0;padding:5px 12px;background:#64748b;color:#fff;border:0;border-radius:6px;cursor:pointer;">↩ Voltar as cenas de antes</button>{% endif %}
   </div>
   <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">Em cada momento que o roteiro marcou ([I3] antes da frase), o trecho em que essa frase é falada troca a mídia pela foto/vídeo REAL do projeto (vídeo com o pedaço planejado). Por padrão só troca cena de IA (pod/Flow/Runpod), ⏳ pendente ou sem mídia — o que você escolheu à mão fica. As cenas de IA continuam guardadas: ↩ volta. Sem marcas? No Modelo de vídeo, 📸 → 📍 Posicionar.</div>
@@ -29,6 +30,30 @@
   <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">📝 Roteiro do YouTube ligado: as [CENA n] e os capítulos usam ele (gerar o prompt de novo pra valer nas buscas).</div>
   {% endif %}
 </details>
+<div id="ri-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.72);overflow:auto;padding:12px;">
+  <div style="max-width:1100px;margin:0 auto;background:#111827;color:#e5e7eb;border-radius:12px;padding:12px 14px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;top:0;background:#111827;padding:6px 0;z-index:1;border-bottom:1px solid #374151;">
+      <b style="font-size:1.05rem;">🔀 Real × IA</b><span id="ri-st" style="font-size:.85rem;color:#9ca3af;"></span>
+      <span style="flex:1"></span>
+      <button type="button" id="ri-todas-real" class="ri-b">🕵️ Todas reais</button>
+      <button type="button" id="ri-todas-ia" class="ri-b">🎨 Todas IA</button>
+      <button type="button" id="ri-salvar" class="ri-b" style="background:#15803d;">💾 Salvar</button>
+      <button type="button" id="ri-fechar" class="ri-b" style="background:#4b5563;">✕</button>
+    </div>
+    <div id="ri-lista"></div>
+  </div>
+</div>
+<style>
+  .ri-b { width:auto;margin:0;padding:6px 12px;background:#7e22ce;color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600; }
+  .ri-linha { border-bottom:1px solid #374151;padding:10px 0; }
+  .ri-par { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px; }
+  .ri-op { border:3px solid transparent;border-radius:10px;background:#1f2937;padding:6px;cursor:pointer;min-width:0; }
+  .ri-op.on { border-color:#22c55e;box-shadow:0 0 0 2px #14532d; }
+  .ri-op .ri-m { width:100%;aspect-ratio:16/9;background:#000;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#9ca3af;font-size:.8rem;text-align:center;padding:4px; }
+  .ri-op .ri-m img, .ri-op .ri-m video { width:100%;height:100%;object-fit:contain; }
+  .ri-op .ri-t { font-size:.8rem;margin-top:4px;word-break:break-word; }
+  @media (max-width: 640px) { .ri-par { grid-template-columns:1fr; } }
+</style>
 <script>
 (function () {
   const $p = (id) => document.getElementById(id);
@@ -45,6 +70,49 @@
       $p('pe-st').textContent = `✔ ${d.trocadas} trecho(s) com a mídia real (${d.achados} de ${d.momentos} momentos achados na fala)` + (d.paginas ? ` · 🌐 ${d.paginas} site(s) viraram 🖥 Página animada` : '') + ' — buscando as prévias…';
       setTimeout(() => location.reload(), 1500); }
     catch (e) { $p('pe-st').textContent = '⚠ ' + e.message; enc.disabled = false; }
+  });
+  // 🔀 v84_225: comparar real × IA e escolher
+  let RI = [], ESC = {};
+  const esc_ = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const tempo = (s) => { s = Number(s) || 0; return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`; };
+  function desenharRI() {
+    const mud = RI.filter(x => ESC[x.k] !== x.atual).length;
+    $p('ri-st').textContent = `${RI.length} momento(s) · ${RI.filter(x => ESC[x.k] === 'real').length} real · ${RI.filter(x => ESC[x.k] === 'ia').length} IA` + (mud ? ` · ${mud} mudança(s) pra salvar` : '');
+    $p('ri-lista').innerHTML = RI.map(x => {
+      const r = x.real, ia = x.ia;
+      const mReal = r.tipo === 'video' ? `<video src="${esc_(r.url)}" muted controls preload="metadata"></video>` : `<img src="${esc_(r.url)}" loading="lazy">`;
+      const mIa = ia.video ? `<video src="${esc_(ia.video)}" muted controls preload="metadata"></video>` : ia.thumb ? `<img src="${esc_(ia.thumb)}" loading="lazy">`
+        : `<span>${ia.existe ? '🎨 cena de IA sem prévia ainda' : 'não tinha cena de IA aqui'}<br><i>${esc_((ia.query || '').slice(0, 140))}</i></span>`;
+      return `<div class="ri-linha" data-k="${x.k}"><div style="font-size:.82rem;color:#9ca3af;">⏱ ${tempo(x.start)}–${tempo(x.end)} · trecho ${x.k + 1}${x.atual === 'real' ? ' · hoje: 🕵️ real' : ' · hoje: 🎨 IA'}</div>
+        <div style="font-size:.85rem;">“${esc_(x.fala)}”</div>
+        <div class="ri-par">
+          <div class="ri-op ${ESC[x.k] === 'real' ? 'on' : ''}" data-q="real"><div class="ri-m">${mReal}</div><div class="ri-t">🕵️ <b>Real</b> ${esc_(r.id)} — ${esc_(r.o_que_e)}</div></div>
+          <div class="ri-op ${ESC[x.k] === 'ia' ? 'on' : ''}" data-q="ia"><div class="ri-m">${mIa}</div><div class="ri-t">🎨 <b>IA</b> ${esc_(ia.provider || '')}</div></div>
+        </div></div>`;
+    }).join('') || '<p style="padding:12px;">Nenhum momento com foto/vídeo real achado na fala.</p>';
+  }
+  const cmp = $p('pe-comparar');
+  if (cmp) cmp.addEventListener('click', async () => {
+    $p('pe-st').textContent = '🔀 carregando…';
+    try { const r = await fetch("/job/{{ job.job_id }}/real-ia"); const d = await r.json(); if (!r.ok || d.erro) throw new Error(d.erro || r.status);
+      RI = d.itens; ESC = Object.fromEntries(RI.map(x => [x.k, x.atual])); desenharRI(); $p('ri-modal').style.display = ''; $p('pe-st').textContent = ''; }
+    catch (e) { $p('pe-st').textContent = '⚠ ' + e.message; }
+  });
+  $p('ri-lista').addEventListener('click', (e) => {
+    if (e.target.closest('video')) return;  // os controles do vídeo não trocam a escolha
+    const op = e.target.closest('.ri-op'); if (!op) return;
+    ESC[op.closest('.ri-linha').dataset.k] = op.dataset.q; desenharRI();
+  });
+  $p('ri-todas-real').addEventListener('click', () => { RI.forEach(x => { ESC[x.k] = 'real'; }); desenharRI(); });
+  $p('ri-todas-ia').addEventListener('click', () => { RI.forEach(x => { ESC[x.k] = 'ia'; }); desenharRI(); });
+  $p('ri-fechar').addEventListener('click', () => { $p('ri-modal').style.display = 'none'; });
+  $p('ri-salvar').addEventListener('click', async () => {
+    const mud = Object.fromEntries(RI.filter(x => ESC[x.k] !== x.atual).map(x => [x.k, ESC[x.k]]));
+    if (!Object.keys(mud).length) { $p('ri-modal').style.display = 'none'; return; }
+    if (typeof salvar === 'function' && typeof sujo !== 'undefined' && sujo) { try { await salvar(true); } catch (e) {} }
+    $p('ri-salvar').disabled = true; $p('ri-st').textContent = '💾 salvando…';
+    try { const d = await post("/job/{{ job.job_id }}/real-ia", { escolhas: mud }); $p('ri-st').textContent = `✔ ${d.reais} viraram real · ${d.ias} voltaram pra IA — recarregando…`; setTimeout(() => location.reload(), 1200); }
+    catch (e) { $p('ri-st').textContent = '⚠ ' + e.message; $p('ri-salvar').disabled = false; }
   });
   const des = $p('pe-desfazer');
   if (des) des.addEventListener('click', async () => {

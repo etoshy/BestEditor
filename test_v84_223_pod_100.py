@@ -58,6 +58,8 @@ def test_projeto_existente_usa_as_cenas_novas(monkeypatch):
     assert A._atualizar_projeto_producao("jx", resp) == 1  # a cena que você trocou no editor fica
     assert job["pending_segments"][1]["provider"] == "runpod" and job["pending_segments"][1]["query"] == "new"
     assert A._cenas_pod_para_refazer(job) == [1]
+    job["pending_segments"][0]["provider"] = "runpod"; job["segment_previews"][0] = None
+    assert A._cenas_pod_para_refazer(job) == [1]  # sem prévia mas não foi convertida: não conta (v84_225)
 
 
 def test_parar_cancela_no_pod(monkeypatch, tmp_path):
