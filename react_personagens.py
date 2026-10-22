@@ -3914,3 +3914,217 @@ def para_tela(p: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         out["gemini"] = False
     return out
+
+
+# ------------------------------------------------------------------ 🖼 thumbnail do react (v84_237)
+# A capa no padrão dos reacts: os personagens reagindo (alguns ou todos, com a cara escolhida) de um lado e o quadro do
+# vídeo do outro. Usa o sistema de capas das 📣 Publicações (texto, fontes, versões, modificar no Flow): o react vira
+# uma publicação (publicacoes/<id do react>) com o contexto guardado.
+EXPR_EN_CAPA = {k: v[1] for k, v in EXPRESSOES.items()}
+
+
+def ctx_publicacao(p: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
+    nomes = {c["id"]: c["nome"] for c in p["personagens"]}
+    falas = "\n".join(f"{mmss(f['t'])} {nomes.get(f['cid'], '?')}: {f['texto']}" for f in (p.get("roteiro") or {}).get("falas") or [])
+    pers = []
+    for c in p["personagens"]:
+        x, _cam = pose_capa(p, c, "neutro", "dir", base)
+        pers.append({"slug": c["id"], "nome": c["nome"], "visual_en": (c.get("aparencia_en") or "")[:700],
+                     "personalidade": (c.get("personalidade") or "")[:200], "ref": _cam})
+    idi = p.get("idioma") or "português do Brasil"
+    cod = "pt" if "portugu" in idi.lower() else "en" if "ingl" in idi.lower() or "english" in idi.lower() else "es" if "espanh" in idi.lower() else "pt"
+    return {"idioma": {"codigo": cod, "nome": idi}, "canal": "",
+            "narracao": ("VÍDEO REAGIDO: " + (p.get("titulo") or "") + "\nTRANSCRIÇÃO: " + transcricao_texto(p.get("transcricao") or [], 6000)
+                         + "\n\nFALAS DO REACT:\n" + falas)[:14000],
+            "personagens": pers, "projeto": {"tema": f"React de {', '.join(nomes.values())} a: {p.get('titulo') or ''}"[:300],
+                                              "roteiro": falas[:20000]},
+            "duracao": float((p.get("video") or {}).get("duracao") or 0)}
+
+
+def sincronizar_publicacao(p: Dict[str, Any], base: str = _BASE) -> str:
+    """O react como publicação (títulos, descrição, tags e capas no mesmo sistema da aba 📣 Publicações)."""
+    import publicacao as PB
+    pd = PB.pdir_de(base, p["id"])
+    PB.salvar_ctx(pd, ctx_publicacao(p, base), {"titulo": f"🎭 {p.get('titulo') or 'React'}", "tem_projeto": False, "react": p["id"]})
+    return pd
+
+
+def pose_capa(p: Dict[str, Any], c: Dict[str, Any], expr: str, olhar: str, base: str = _BASE) -> Tuple[bool, Optional[str]]:
+    """(espelhar, caminho) da pose do personagem com essa cara, olhando pra `olhar` — ou a imagem de referência."""
+    poses = poses_do_personagem(c, base, olhar)
+    x = poses.get(expr) or poses.get("neutro") or (next(iter(poses.values())) if poses else None)
+    if x:
+        return bool(x.get("espelhar")), x["pose"]
+    ref = next((os.path.join(pasta(p["id"], base), "refs", r) for r in c.get("refs") or []
+                if os.path.isfile(os.path.join(pasta(p["id"], base), "refs", r))), None)
+    return False, ref
+
+
+def _contorno(im, raio: int = 7, cor=(255, 255, 255, 255)):
+    """Contorno branco em volta do recorte (o jeito das thumbs)."""
+    from PIL import Image, ImageFilter
+    a = im.getchannel("A")
+    borda = a.filter(ImageFilter.MaxFilter(raio * 2 + 1))
+    out = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    out.paste(Image.new("RGBA", im.size, cor), (0, 0), borda)
+    out.alpha_composite(im)
+    return out
+
+
+def compor_capa_react(p: Dict[str, Any], base: str, cids: List[str], exprs: Dict[str, str], t: float, lado_video: str,
+                      destino: str, seta: bool = True) -> str:
+    """🧩 1280×720: o fundo do react (escurecido), o quadro do vídeo do lado escolhido (moldura branca, inclinado) e os
+    personagens do outro lado, grandes, virados pro vídeo, com contorno branco."""
+    from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
+    CW, CH = 1280, 720
+    video = _video_local(p, base)
+    quadro = None
+    if video:
+        q = destino + ".q.jpg"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}", "-i", video, "-frames:v", "1", q],
+                       capture_output=True, timeout=60)
+        if os.path.isfile(q):
+            quadro = Image.open(q).convert("RGB")
+            quadro.load()
+            os.remove(q)
+    fundo = camada_arquivo(p, "fundo", base)
+    if fundo:
+        bg = Image.open(fundo).convert("RGB")
+    elif quadro:
+        bg = quadro.copy()
+    else:
+        bg = Image.new("RGB", (CW, CH), (30, 24, 50))
+    k = max(CW / bg.width, CH / bg.height)
+    bg = bg.resize((int(bg.width * k + 0.5), int(bg.height * k + 0.5)), Image.LANCZOS)
+    x0, y0 = (bg.width - CW) // 2, (bg.height - CH) // 2
+    bg = bg.crop((x0, y0, x0 + CW, y0 + CH)).filter(ImageFilter.GaussianBlur(5))
+    bg = ImageEnhance.Brightness(bg).enhance(0.55).convert("RGBA")
+    direita = lado_video != "esquerda"
+    # o quadro do vídeo
+    fx1 = 0
+    if quadro:
+        fw = int(CW * 0.56)
+        fh = int(fw * quadro.height / quadro.width)
+        if fh > int(CH * 0.78):
+            fh = int(CH * 0.78)
+            fw = int(fh * quadro.width / quadro.height)
+        qd = ImageOps.fit(quadro, (fw, fh), Image.LANCZOS)
+        b = 10
+        mold = Image.new("RGBA", (fw + 2 * b, fh + 2 * b), (255, 255, 255, 255))
+        mold.paste(qd, (b, b))
+        mold = mold.rotate(-2.5 if direita else 2.5, expand=True, resample=Image.BICUBIC)
+        sombra = Image.new("RGBA", mold.size, (0, 0, 0, 0))
+        sombra.paste((0, 0, 0, 170), (0, 0), mold.getchannel("A"))
+        sombra = sombra.filter(ImageFilter.GaussianBlur(12))
+        mx = CW - mold.width - int(CW * 0.025) if direita else int(CW * 0.025)
+        my = int(CH * 0.47) - mold.height // 2
+        bg.alpha_composite(sombra, (mx + 10, my + 14))
+        bg.alpha_composite(mold, (mx, my))
+        fx1 = mx if direita else mx + mold.width
+    # os personagens, do outro lado, virados pro vídeo
+    olhar = "dir" if direita else "esq"
+    escolhidos = [c for c in (next((x for x in p["personagens"] if x["id"] == cid), None) for cid in cids) if c]
+    n = len(escolhidos)
+    if n:
+        area0, area1 = (0, max(fx1 + int(CW * 0.06), int(CW * 0.46))) if direita else (min(fx1 - int(CW * 0.06), int(CW * 0.54)), CW)
+        passo = (area1 - area0) / n
+        figs = []
+        for i, c in enumerate(escolhidos):
+            esp, cam = pose_capa(p, c, exprs.get(c["id"]) or "chocado", olhar, base)
+            if not cam:
+                continue
+            im = Image.open(cam).convert("RGBA")
+            bb = im.getchannel("A").point(lambda v: 255 if v > 30 else 0).getbbox()
+            if bb:
+                im = im.crop(bb)
+            if esp:
+                im = ImageOps.mirror(im)
+            alt = int(CH * (0.98 if n == 1 else max(0.62, 0.92 - 0.07 * i)))
+            im = im.resize((max(1, int(im.width * alt / im.height)), alt), Image.LANCZOS)
+            im = _contorno(im, 6)
+            # o 1º fica mais perto do vídeo e na frente
+            ordem = i if direita else n - 1 - i
+            cx = area1 - passo * (ordem + 0.5) if direita else area0 + passo * (ordem + 0.5)
+            figs.append((i, im, int(cx - im.width / 2), CH - im.height + int(CH * 0.04)))
+        for i, im, x, y in sorted(figs, key=lambda z: -z[0]):  # de trás pra frente
+            bg.alpha_composite(im, (max(-im.width // 2, x), y))
+    if seta and quadro and n:  # ➜ a seta vermelha (contorno branco) apontando pro vídeo
+        dr = ImageDraw.Draw(bg)
+        d = 1 if direita else -1
+        ax, ay = fx1 - d * int(CW * 0.06), int(CH * 0.24)
+
+        def seta_pts(esc: float) -> List[Tuple[float, float]]:
+            corpo, ponta, larg, abre = 90 * esc, 55 * esc, 17 * esc, 42 * esc
+            return [(ax - d * (corpo + ponta), ay - larg), (ax - d * ponta, ay - larg), (ax - d * ponta, ay - abre),
+                    (ax, ay), (ax - d * ponta, ay + abre), (ax - d * ponta, ay + larg), (ax - d * (corpo + ponta), ay + larg)]
+        dr.polygon(seta_pts(1.18), fill=(255, 255, 255, 255))
+        dr.polygon(seta_pts(1.0), fill=(229, 29, 46, 255))
+    bg.convert("RGB").save(destino, "JPEG", quality=92)
+    return destino
+
+
+def prompt_capa_react(p: Dict[str, Any], cids: List[str], exprs: Dict[str, str], lado_video: str, pedido: str = "") -> str:
+    est = estilo_final(p)
+    quem = []
+    for cid in cids:
+        c = next((x for x in p["personagens"] if x["id"] == cid), None)
+        if c:
+            quem.append(f"{c['nome']}" + (f" ({c['aparencia_en']})" if c.get("aparencia_en") else "")
+                        + f" — {EXPR_EN_CAPA.get(exprs.get(cid) or 'chocado', 'shocked')}, exaggerated")
+    lado_p = "left" if lado_video != "esquerda" else "right"
+    lado_v = "right" if lado_video != "esquerda" else "left"
+    return (("YouTube REACTION video thumbnail, 16:9. The reference image is a rough LAYOUT DRAFT: keep the same composition — "
+             f"the characters big on the {lado_p} side, reacting to the video, and the screenshot of the video in a white frame "
+             f"on the {lado_v} side (keep the screenshot content recognizable). Characters: " + "; ".join(quem) + ". "
+             "Each character must look exactly like in the draft (same face, hair, outfit). Redraw everything polished: "
+             "dramatic rim light, vivid saturated colors, high contrast, thick white outline around the characters, "
+             "expressive faces readable at small size; no text, no letters, no logos. "
+             + ESTILO_TXT[est] + "." + (f" Extra: {pedido}." if pedido else ""))[:3900])
+
+
+def capa_react(pid: str, base: str, dados: Dict[str, Any]) -> Dict[str, Any]:
+    """🖼 Cria a capa do react nas 📣 Publicações: 'montar' (aqui, na hora) ou 'flow' (o rascunho vai de referência)."""
+    import publicacao as PB
+    p = carregar(pid, base)
+    cids = [c for c in dados.get("cids") or [] if any(x["id"] == c for x in p["personagens"])]
+    if not cids:
+        raise ReactErro("Escolha pelo menos um personagem pra capa.")
+    exprs = {k: v for k, v in (dados.get("exprs") or {}).items() if v in EXPRESSOES}
+    t = segundos(dados.get("t")) or 0.0
+    lado = "esquerda" if dados.get("lado") == "esquerda" else "direita"
+    pd = sincronizar_publicacao(p, base)
+    d_capas = os.path.join(pd, "capas")
+    os.makedirs(d_capas, exist_ok=True)
+    rascunho = compor_capa_react(p, base, cids, exprs, t, lado, os.path.join(d_capas, f"react_{secrets.token_hex(4)}.jpg"),
+                                 seta=bool(dados.get("seta", True)))
+    ctx = PB.carregar_ctx(pd).get("ctx") or {}
+    estilo = PB.limpar_estilo(dict(dados.get("estilo") or {}, pos=(dados.get("estilo") or {}).get("pos") or "topo"))
+    nomes = ", ".join(x["nome"] for x in p["personagens"] if x["id"] in cids)
+    with PB._TRAVA:
+        d = PB.carregar(pd)
+        c = PB._nova_capa(d, ideia=f"🎭 react: {nomes} reagindo ao vídeo ({mmss(t)})", texto=str(dados.get("texto") or "")[:120],
+                          prompt="", personalizada=True, fundo=rascunho, estilo=estilo, react=True)
+        n = c["n"]
+        PB.salvar(pd, d)
+    if dados.get("modo") == "flow":
+        import flow_lote
+        item = {"prompt": prompt_capa_react(p, cids, exprs, lado, str(dados.get("pedido") or "")), "tipo": "imagem",
+                "origem": "publicacao", "referencia_arquivo": rascunho}
+        lote = flow_lote.lote()
+        try:
+            j = lote.adicionar([item], proporcao="16:9", quantidade="x1")[0]
+        except ValueError as exc:
+            raise ReactErro(str(exc))
+        with PB._TRAVA:
+            d = PB.carregar(pd)
+            c = next(x for x in d["capas"] if int(x["n"]) == n)
+            c.update(status="fila", flow_job=j["id"], erro="", prompt=item["prompt"], prompt_usado=item["prompt"])
+            PB.salvar(pd, d)
+        aviso = ""
+        try:
+            lote.iniciar()
+        except Exception as exc:  # noqa: BLE001
+            aviso = f"o Flow em massa não ligou agora ({str(exc)[:160]}) — ▶ Continuar na aba Flow"
+        return {"n": n, "aviso": aviso}
+    PB.montar_sem_ia(pd, ctx, n)
+    return {"n": n, "aviso": ""}

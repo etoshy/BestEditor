@@ -925,3 +925,99 @@ def test_poses_viradas_pro_lado_errado_sao_espelhadas(base, monkeypatch):
     # olhando pra esquerda: as _esq vieram viradas pra DIREITA (a IA disse) → são espelhadas
     pe = R.poses_do_personagem(ch, base, "esq")
     assert pe["neutro"]["espelhar"] and pe["feliz"]["virada"] == "esq" and not pe["feliz"]["espelhar"]
+
+
+def test_imagem_parada_entra_como_um_quadro_e_aparece_so_na_janela(tmp_path, monkeypatch):
+    """'Cannot allocate memory' num vídeo de 10 min: cada camada parada com -loop 1 virava 25 quadros/s. Agora entra
+    UM quadro (o overlay repete) — e continua aparecendo só na janela dela, com a boca alternando."""
+    import video_assembler as V
+    base = str(tmp_path / "base.mp4")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=gray:size=320x180:rate=25:duration=6",
+                    "-f", "lavfi", "-i", "sine=duration=6", "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", base], check=True)
+    for n, cor in (("a", (255, 0, 0, 255)), ("m", (0, 255, 0, 255)), ("f", (0, 0, 255, 255))):
+        Image.new("RGBA", (100, 150), cor).save(str(tmp_path / f"{n}.png"))
+    ovs = [{"personagem": "react_personagem", "media_type": "image", "resolved_path": str(tmp_path / "a.png"), "start": 2, "end": 4.5,
+            "size_percent": 30, "x_percent": 30, "y_percent": 50, "ancora": "centro",
+            "boca_path": str(tmp_path / "m.png"), "boca_janelas": [[3, 4]]},
+           {"media_type": "image", "resolved_path": str(tmp_path / "f.png"), "start": 1, "end": 2, "size_percent": 20,
+            "x_percent": 80, "y_percent": 50, "ancora": "centro"}]
+    visto = {}
+    real = V._run_ffmpeg
+
+    def espia(args, **kw):
+        visto["loop"] = args.count("-loop")
+        return real(args, **kw)
+    monkeypatch.setattr(V, "_run_ffmpeg", espia)
+    out = str(tmp_path / "out.mp4")
+    V.apply_overlays(base, ovs, out, 320, 180)
+    assert visto["loop"] == 0
+
+    def px(t, x):
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(t), "-i", out, "-frames:v", "1", "-vf", f"crop=2:2:{x}:90",
+                            "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+        return tuple(r[:3])
+    assert px(1.0, 96)[0] < 200 and px(2.5, 96)[0] > 200 and px(5.0, 96)[0] < 200  # o personagem só na janela
+    assert px(1.5, 256)[2] > 200 and px(3.0, 256)[2] < 200  # a imagem comum também
+    assert px(3.04, 96)[1] > 200 or px(3.2, 96)[1] > 200  # a boca abre
+
+
+def test_thumbnail_do_react_vira_capa_da_publicacao(base, tmp_path, monkeypatch):
+    """🖼 Capa no padrão dos reacts: os escolhidos de um lado (com a cara escolhida), o quadro do vídeo do outro — entra
+    nas capas da 📣 publicação do react (texto, versões, Flow)."""
+    import app as A
+    import flow_lote
+    import publicacao as PB
+    monkeypatch.setattr(PB, "RAIZ", "publicacoes_teste_" + os.path.basename(str(tmp_path)))
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 8)
+    with open(video, "rb") as f:
+        pid = c.post("/react-personagens/novo", data={"titulo": "Bleach TYBW", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                     content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    for nome in ("Ichigo", "Kenpachi", "Gojo"):
+        c.post(f"/react-personagens/{pid}/personagem", json={"nome": nome})
+    p = R.carregar(pid)
+    for ch, cor in zip(p["personagens"], ((250, 140, 0), (30, 30, 30), (240, 240, 250))):
+        R.guardar_ref(p, ch, _png(cor), "a.png")
+    R.salvar(p)
+    try:
+        html = c.get(f"/react-personagens/{pid}").get_data(as_text=True)
+        assert "🖼 Thumbnail e publicação" in html and f"/publicacoes/{pid}/api" in html
+        cids = [x["id"] for x in p["personagens"]]
+        r = c.get(f"/react-personagens/{pid}/capa/previa.jpg?cids={cids[0]},{cids[1]}&t=3&lado=direita&seta=1")
+        assert r.status_code == 200
+        im = Image.open(io.BytesIO(r.data))
+        assert im.size == (1280, 720)
+        # o quadro do vídeo (testsrc colorido) do lado direito; os personagens do esquerdo (o laranja do Ichigo)
+        dr = im.convert("RGB")
+        assert any(dr.getpixel((x, 600))[0] > 200 and dr.getpixel((x, 600))[2] < 80 for x in range(0, 600, 4))
+        d = c.post(f"/react-personagens/{pid}/capa", json={"cids": cids[:2], "exprs": {cids[0]: "chocado"}, "t": 3, "lado": "direita",
+                                                          "texto": "ELES SURTARAM"}).get_json()
+        assert d["ok"] and d["n"] == 1
+        pub = c.get(f"/publicacoes/{pid}/api").get_json()
+        capa = next(x for x in pub["capas"] if x["n"] == 1)
+        assert capa["status"] == "pronta" and capa["texto"] == "ELES SURTARAM"
+        assert c.get(f"/publicacoes/{pid}/api/capa/1/final").status_code == 200
+        # personagens do react no contexto da publicação (pras ideias de capa da IA)
+        assert [x["nome"] for x in PB.carregar_ctx(PB.pdir_de(R._BASE if False else A.BASE_DIR, pid))["ctx"]["personagens"]] == ["Ichigo", "Kenpachi", "Gojo"]
+        # 🎨 Flow: o rascunho vai de referência
+        visto = {}
+
+        class Lote:
+            trava = __import__("threading").Lock()
+            fila, rodando = [], False
+
+            def adicionar(self, itens, **k):
+                visto["it"] = itens[0]
+                return [{"id": "jcapa"}]
+
+            def iniciar(self):
+                pass
+        monkeypatch.setattr(flow_lote, "lote", lambda: Lote())
+        d = c.post(f"/react-personagens/{pid}/capa", json={"cids": [cids[2]], "t": 2, "lado": "esquerda", "modo": "flow",
+                                                          "pedido": "raios atrás"}).get_json()
+        assert d["ok"] and "REACTION" in visto["it"]["prompt"] and "raios atrás" in visto["it"]["prompt"]
+        assert os.path.isfile(visto["it"]["referencia_arquivo"])
+        assert not c.post(f"/react-personagens/{pid}/capa", json={"cids": []}).get_json()["ok"]
+    finally:
+        import shutil
+        shutil.rmtree(os.path.join(A.BASE_DIR, PB.RAIZ), ignore_errors=True)

@@ -82,6 +82,11 @@
   .rx-cena-palco { position: absolute; inset: 0; z-index: 900; background: #000 center/cover no-repeat; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; }
   .rx-cena-palco span { background: rgba(0,0,0,.7); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 0 0 6px 6px; }
   .rx-peca.fora { opacity: .25; outline-style: dotted; }
+  .rx-capa { display: grid; grid-template-columns: 1fr 1.1fr; gap: 12px; align-items: start; }
+  @media (max-width: 1000px) { .rx-capa { grid-template-columns: 1fr; } }
+  .rx-capa-p { display: flex; gap: 6px; align-items: center; padding: 3px 6px; border-radius: 8px; background: rgba(127,127,127,.08); }
+  .rx-capa-p img { width: 30px; height: 40px; object-fit: contain; }
+  .rx-capa-p select { width: auto; font-size: .82rem; }
   .rx-ps { display: grid; grid-template-columns: 1fr 250px; gap: 10px; align-items: start; }
   @media (max-width: 1000px) { .rx-ps { grid-template-columns: 1fr; } }
   .rx-ps-lado { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; background: var(--card); }
@@ -328,6 +333,37 @@
   <details style="margin-top:8px;"><summary class="rx-dica" style="cursor:pointer">🕘 registro</summary><div class="rx-log" id="log"></div></details>
 </div>
 
+<!-- 10 · thumbnail -->
+<div class="rx-card">
+  <h2><span class="rx-num">10</span>🖼 Thumbnail e publicação</h2>
+  <p class="rx-dica">A capa no padrão dos reacts: os personagens reagindo de um lado (todos ou só alguns, cada um com a cara que você escolher, virados pro vídeo, com contorno branco) e o quadro do vídeo do outro. Ela entra nas capas da 📣 publicação logo abaixo — lá você muda o texto, a fonte, gera versões, modifica no Flow e baixa. Títulos, descrição e tags também saem dali.</p>
+  <div class="rx-capa">
+    <div>
+      <div class="rx-dica" style="margin:0 0 4px">Quem aparece (a ordem: o 1º fica maior e mais perto do vídeo):</div>
+      <div id="capaPers" style="display:flex;flex-direction:column;gap:4px;"></div>
+      <div class="rx-linha" style="margin-top:8px;">
+        <label style="margin:0;flex:1;min-width:200px;">Quadro do vídeo <input type="range" id="capaT" min="0" max="{{ (p.video.duracao or 60)|round(0, 'ceil')|int }}" value="0" step="0.5" style="width:100%"></label>
+        <span id="capaTv" class="rx-dica" style="width:52px">0:00</span>
+        <button type="button" id="capaUsarT" class="rx-sec rx-mini" title="o segundo que está na prévia da seção 9">⤵ o da prévia</button>
+      </div>
+      <div class="rx-linha">
+        <label style="margin:0;">Vídeo do lado <select id="capaLado" style="width:auto;"><option value="direita">direito</option><option value="esquerda">esquerdo</option></select></label>
+        <label class="rx-dica" style="margin:0;"><input type="checkbox" id="capaSeta" checked> ➜ seta vermelha</label>
+      </div>
+      <label style="margin:6px 0 0;">Texto da capa (2 a 4 palavras) <input id="capaTexto" placeholder="ex.: ELES NÃO AGUENTARAM"></label>
+      <label style="margin:6px 0 0;">Pedido pro Flow (opcional) <input id="capaPedido" placeholder="ex.: mais dramático, raios atrás"></label>
+      <div class="rx-linha" style="margin-top:8px;">
+        <button type="button" id="capaPrev" class="rx-sec">👁 Ver o rascunho</button>
+        <button type="button" id="capaMontar" title="monta aqui, na hora (sem IA) e põe o texto">🧩 Montar a capa</button>
+        <button type="button" id="capaFlow" title="o rascunho vai de referência pro Flow redesenhar tudo caprichado">🎨 Gerar no Flow</button>
+        <span id="capaEst" class="rx-dica"></span>
+      </div>
+    </div>
+    <img id="capaImg" alt="rascunho da capa" class="rx-previa" style="cursor:zoom-in" data-zoom>
+  </div>
+  <div style="margin-top:12px;">{% include "_publicacao_painel.html" %}</div>
+</div>
+
 <div class="rx-zoom" id="zoom"><div style="display:flex;flex-direction:column;align-items:center;gap:10px;max-height:100vh;"><img alt=""><div id="zoomAcoes" style="display:none;gap:8px;"></div></div></div>
 
 <script>
@@ -374,7 +410,7 @@ function desenhar() {
   $('bChGemini').title = P.gemini ? 'o Gemini pesquisa no Google' : 'falta a chave do Gemini — cole na caixa “🔷 Gemini” da 🔎 Checagem de um Modelo de vídeo';
   $('avisos').textContent = (P.avisos || []).length ? '⚠ ' + P.avisos.join(' · ') : '';
   { const l = P.leitura_estado || {}; $('lEst').textContent = l.total ? (l.lidos >= l.total ? `✔ vídeo lido (${l.lidos} trechos)` : l.lidos ? `${l.lidos}/${l.total} trechos lidos` : '') : ''; }
-  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharPartes(); desenharChecagem(); desenharCamadas(); desenharPoses(); desenharEventos();
+  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharPartes(); desenharChecagem(); desenharCamadas(); desenharPoses(); desenharEventos(); desenharCapaPers();
   $('estFinal').textContent = `→ ${P.estilo_final === 'realista' ? '📷 realista' : '🎨 anime/cartoon'}` + (P.estilo === 'auto' ? ' (pelo elenco)' : '');
   $('log').textContent = (P.log || []).slice().reverse().join('\n');
   if (P.editor && P.editor.job_id && !$('eEst').dataset.fixo) $('eEst').innerHTML = `já mandado: <a href="/job/${esc(P.editor.job_id)}/edit-segments" target="_blank">abrir no editor ↗</a> (mandar de novo cria outro projeto)`;
@@ -868,6 +904,58 @@ $('bEvGerar').addEventListener('click', async () => {
   try { const d = await api(`/react-personagens/${PID}/eventos/gerar`, {}); avisar($('evEst'), `🚀 ${d.enviadas} imagem(ns) pro Flow` + (d.aviso ? ' — ' + d.aviso : ''), 'rx-ok'); recarregar(); } catch (e) { alert(e.message); }
 });
 
+// ------------------------------------------------------------------ 10 · 🖼 thumbnail
+let capaSel = null;
+function desenharCapaPers() {
+  const box = $('capaPers');
+  if (!capaSel) capaSel = P.personagens.map((c, i) => ({ cid: c.id, on: true, ex: i % 2 ? 'empolgado' : 'chocado' }));
+  P.personagens.forEach(c => { if (!capaSel.find(x => x.cid === c.id)) capaSel.push({ cid: c.id, on: false, ex: 'chocado' }); });
+  capaSel = capaSel.filter(x => P.personagens.find(c => c.id === x.cid));
+  if (focoEm(box)) return;
+  box.innerHTML = capaSel.map((x, i) => {
+    const c = P.personagens.find(y => y.id === x.cid);
+    const ref = (c.refs || [])[0];
+    return `<div class="rx-capa-p" data-i="${i}"><input type="checkbox" data-capa-on ${x.on ? 'checked' : ''} style="width:auto">
+      ${ref ? `<img src="/react-personagens/${PID}/arquivo/refs/${esc(ref)}">` : ''}<b style="flex:1">${esc(c.nome)}</b>
+      <select data-capa-ex>${(P.expressoes || Object.keys(EXPR)).map(k => `<option value="${k}" ${k === x.ex ? 'selected' : ''}>${EXPR[k] ? EXPR[k][0] : k}</option>`).join('')}</select>
+      <button type="button" class="rx-mini rx-sec" data-capa-mover="-1" ${i ? '' : 'disabled'}>↑</button><button type="button" class="rx-mini rx-sec" data-capa-mover="1" ${i < capaSel.length - 1 ? '' : 'disabled'}>↓</button></div>`;
+  }).join('') || '<p class="rx-dica">Monte o elenco primeiro.</p>';
+}
+$('capaPers').addEventListener('change', (e) => {
+  const r = e.target.closest('[data-i]'); if (!r) return; const x = capaSel[+r.dataset.i];
+  if (e.target.hasAttribute('data-capa-on')) x.on = e.target.checked;
+  if (e.target.hasAttribute('data-capa-ex')) x.ex = e.target.value;
+  capaPrevia();
+});
+$('capaPers').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-capa-mover]'); if (!b) return; const i = +b.closest('[data-i]').dataset.i, j = i + +b.dataset.capaMover;
+  [capaSel[i], capaSel[j]] = [capaSel[j], capaSel[i]]; desenharCapaPers(); capaPrevia();
+});
+function dadosCapa() {
+  const on = capaSel.filter(x => x.on);
+  return { cids: on.map(x => x.cid), exprs: Object.fromEntries(on.map(x => [x.cid, x.ex])), t: +$('capaT').value, lado: $('capaLado').value,
+           seta: $('capaSeta').checked, texto: $('capaTexto').value, pedido: $('capaPedido').value };
+}
+function capaPrevia() {
+  const d = dadosCapa(); $('capaTv').textContent = mmss(d.t);
+  $('capaImg').src = `/react-personagens/${PID}/capa/previa.jpg?cids=${encodeURIComponent(d.cids.join(','))}&exprs=${encodeURIComponent(JSON.stringify(d.exprs))}&t=${d.t}&lado=${d.lado}&seta=${d.seta ? 1 : 0}&r=${Date.now()}`;
+}
+$('capaT').addEventListener('input', () => { $('capaTv').textContent = mmss($('capaT').value); });
+['capaT', 'capaLado', 'capaSeta'].forEach(id => $(id).addEventListener('change', capaPrevia));
+$('capaPrev').addEventListener('click', capaPrevia);
+$('capaUsarT').addEventListener('click', () => { $('capaT').value = $('pT').value; capaPrevia(); });
+async function criarCapa(modo) {
+  const d = dadosCapa(); if (!d.cids.length) return alert('Marque pelo menos um personagem.');
+  avisar($('capaEst'), modo === 'flow' ? '🚀 mandando pro Flow…' : '🧩 montando…');
+  try {
+    const r = await api(`/react-personagens/${PID}/capa`, Object.assign(d, { modo }));
+    avisar($('capaEst'), modo === 'flow' ? `🚀 capa ${r.n} na fila do Flow — aparece nas capas abaixo quando ficar pronta` + (r.aviso ? ' · ' + r.aviso : '') : `✔ capa ${r.n} pronta — está nas capas abaixo (mude o texto/fonte lá)`, 'rx-ok');
+    if (window.pubRecarregar) window.pubRecarregar();
+  } catch (e) { avisar($('capaEst'), '❌ ' + e.message, 'rx-err'); }
+}
+$('capaMontar').addEventListener('click', () => criarCapa('montar'));
+$('capaFlow').addEventListener('click', () => criarCapa('flow'));
+
 // ------------------------------------------------------------------ 🎛 palco com camadas (estilo Photoshop)
 let PALCO = null, ajSel = null, renderizado = false;
 // 8 alças: os cantos e os lados — puxar um lado/canto aumenta ou diminui com o lado/canto OPOSTO parado
@@ -912,14 +1000,14 @@ function desenharPalco() {
     pal.appendChild(d);
     if (leg && !leg.oculta && PALCO.pilha.ordem[PALCO.pilha.ordem.length - 1] === 'legenda') elDe('legenda').style.zIndex = 950;
   }
-  desenharCamadas(); barraAjuste();
+  desenharPilha(); barraAjuste();
 }
 function miniDe(pc) {
   if (pc.tv) return `<img class="mini" src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}" onerror="this.style.visibility='hidden'">`;
   if (pc.img) return `<img class="mini" src="${pc.img}">`;
   return `<span class="mini" style="display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${pc.legenda ? '💬' : pc.foto ? '🖼' : '▭'}</span>`;
 }
-function desenharCamadas() {
+function desenharPilha() {
   const pil = PALCO.pilha, box = $('pilhaCam');
   box.innerHTML = pil.ordem.slice().reverse().map(ch => {
     const pc = pecaDe(ch); if (!pc) return '';
@@ -1152,6 +1240,6 @@ document.addEventListener('click', (e) => {
 });
 $('zoom').addEventListener('click', (e) => { if (e.target.id !== 'zoomRefazer') $('zoom').style.display = 'none'; });
 
-recarregar().then(() => { const f = (P.roteiro.falas || [])[0]; $('pT').value = f ? +f.t + 0.4 : 0; atualizarPrevia(); });
+recarregar().then(() => { const f = (P.roteiro.falas || [])[0]; $('pT').value = f ? +f.t + 0.4 : 0; atualizarPrevia(); $('capaT').value = $('pT').value; capaPrevia(); if (window.pubCarregar) window.pubCarregar(); });
 </script>
 {% endblock %}

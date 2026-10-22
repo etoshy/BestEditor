@@ -286,6 +286,7 @@
   $('pubCanalThumbs').addEventListener('click', (ev) => { const b = ev.target.closest('[data-vid]'); if (b) copiarModelo({ video_id: b.dataset.vid }); });
   async function carregar() { try { P.d = await req(''); desenhar(); } catch (e) { $('pubSt').textContent = '⚠ ' + e.message; } }
   window.pubCarregar = () => { if (!P.d) carregar(); };
+  window.pubRecarregar = carregar;  // 🎭 v84_237: a capa do react entrou — recarrega a lista
   async function textos(corpo, rotulo) {
     $('pubSt').textContent = `⏳ a IA está escrevendo ${rotulo}…`;
     try { P.d = await req('/textos', Object.assign({ pedido: $('pubPedido').value }, corpo)); desenhar(); $('pubSt').textContent = '✅ pronto'; }

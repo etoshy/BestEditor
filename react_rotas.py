@@ -165,7 +165,11 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     @app.route("/react-personagens/<pid>")
     def react_pagina(pid: str):
         p = _p(pid)
-        return render_template("react_detalhe.html", p=R.para_tela(p, base_dir), layouts=R.LAYOUTS, estilos=R.ESTILOS,
+        try:
+            R.sincronizar_publicacao(p, base_dir)  # 🖼 o react também é uma publicação (capas, títulos, descrição)
+        except Exception:  # noqa: BLE001
+            pass
+        return render_template("react_detalhe.html", p=R.para_tela(p, base_dir), pub_api=f"/publicacoes/{p['id']}/api", layouts=R.LAYOUTS, estilos=R.ESTILOS,
                                expressoes=R.EXPRESSOES, densidades=list(R.DENSIDADES),
                                intrigas=R.INTRIGAS, tipos_evento=R.TIPOS_EVENTO, estilos_arte=R.ESTILOS_ARTE, camadas=R.CAMADAS,
                                rotulo_camada=R.ROTULO_CAMADA)
@@ -714,6 +718,43 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         return _ok()
 
     # ------------------------------------------------------------------ 🧍 personagens no Flow
+    # ------------------------------------------------------------------ 🖼 thumbnail do react
+    def _dados_capa(c: Dict[str, Any]) -> Dict[str, Any]:
+        exprs = c.get("exprs")
+        if isinstance(exprs, str):
+            try:
+                exprs = json.loads(exprs)
+            except ValueError:
+                exprs = {}
+        cids = c.get("cids")
+        if isinstance(cids, str):
+            cids = [x for x in cids.split(",") if x]
+        return {"cids": cids or [], "exprs": exprs or {}, "t": c.get("t"), "lado": c.get("lado"),
+                "seta": str(c.get("seta", "1")) not in ("0", "false", "False", ""), "texto": c.get("texto"),
+                "modo": c.get("modo"), "pedido": c.get("pedido"), "estilo": c.get("estilo") if isinstance(c.get("estilo"), dict) else None}
+
+    @app.route("/react-personagens/<pid>/capa/previa.jpg")
+    def react_capa_previa(pid: str):
+        p = _p(pid)
+        dd = _dados_capa(request.args.to_dict())
+        cids = [c for c in dd["cids"] if any(x["id"] == c for x in p["personagens"])]
+        destino = os.path.join(R.pasta(pid, base_dir), "_capa_previa.jpg")
+        try:
+            R.compor_capa_react(p, base_dir, cids, dd["exprs"], R.segundos(dd["t"]) or 0.0,
+                                "esquerda" if dd["lado"] == "esquerda" else "direita", destino, dd["seta"])
+        except Exception as exc:  # noqa: BLE001
+            return f"não deu pra montar: {exc}", 500
+        return send_file(destino, max_age=0)
+
+    @app.route("/react-personagens/<pid>/capa", methods=["POST"])
+    def react_capa(pid: str):
+        _p(pid)
+        try:
+            r = R.capa_react(pid, base_dir, _dados_capa(request.get_json(silent=True) or {}))
+        except R.ReactErro as exc:
+            return _erro(str(exc))
+        return _ok(**r)
+
     @app.route("/react-personagens/<pid>/pose/<cid>/virar", methods=["POST"])
     def react_pose_virar(pid: str, cid: str):
         """↔ esta pose veio virada pro outro lado."""
