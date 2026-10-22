@@ -30,6 +30,7 @@
   function agente(ligado) {
     st.agente = ligado;
     const chip = $('flow-agent-mode-toggle-chip button.agent-mode-chip', caixa());
+    if (!chip) return;
     chip.setAttribute('aria-pressed', String(ligado)); chip.classList.toggle('agent-mode-chip-checked', ligado);
     const pes = $('.agent-footer-actions', caixa()); if (pes) pes.hidden = !ligado;
     const g = gatilho(); if (ligado) g.setAttribute('hidden', ''); else { g.removeAttribute('hidden'); resumo(); }
@@ -227,6 +228,11 @@
   });
   // começo: igual ao projeto novo (agente ligado, sem nada gerado)
   agente(true);
+  if (Q.get('semagente') === '1') {  // v84_236 (HTML REAL de out/2026): o Flow tirou o Agente — a caixa já vem direta
+    agente(false);
+    $$('flow-agent-mode-toggle-chip, .agent-footer-actions', caixa()).forEach(e => e.remove());
+  }
+  if (Q.get('semtune') === '1') $$('.agent-footer-actions', caixa()).forEach(e => e.remove());  // o Agente existe mas o "tune" sumiu
   if (Q.get('painel') === '1') {  // janela larga: o agente é um PAINEL à direita (sem o chip) e a caixa principal some
     caixa().style.display = 'none'; document.body.appendChild(T('painel_sessao'));
   }

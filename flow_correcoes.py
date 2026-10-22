@@ -288,6 +288,7 @@ def trecho_do_codigo(diag: Dict[str, Any], raiz: str) -> Dict[str, Any]:
     → {"funcoes": [{arquivo, nome, ini, fim, codigo}], "seletores": {chave: valor}, "chamadas": [...], "chaves_html": [...]}"""
     msg = re.sub(r"^\s*\[\w+\]\s*", "", diag.get("motivo") or "")
     msg = re.sub(r"^\w+(?:Erro|Error|Exception)\s*:\s*", "", msg)
+    msg = re.sub(r"\s*\(conta [^)]*\)\s*$", "", msg)  # o lote junta a conta no fim
     pedacos = [p for p in re.split(r'["“”()]', msg) if len(p.strip()) >= 12][:3] or [msg[:40]]
     funcoes: List[Dict[str, Any]] = []
     sels: Dict[str, Any] = {}
@@ -325,6 +326,13 @@ def trecho_do_codigo(diag: Dict[str, Any], raiz: str) -> Dict[str, Any]:
             for chave in set(re.findall(r'_achar\(\w+, "(\w+)"', codigo)) | set(re.findall(r'PISTAS\["(\w+)"\]', codigo)):
                 if f"PISTAS[{chave}]" in todos:
                     sels[f"{arq}: PISTAS[{chave}]"] = todos[f"PISTAS[{chave}]"]
+            # quem a chama no mesmo arquivo (ex.: configurar_agente → _configurar_agente), se for curta
+            for g in defs:
+                if g is f or len(funcoes) >= 5 or any(x["nome"] == g.name for x in funcoes) or (g.end_lineno - g.lineno) > 60:
+                    continue
+                cod_g = "\n".join(linhas[g.lineno - 1:g.end_lineno])
+                if re.search(rf"\b{re.escape(f.name)}\(", cod_g):
+                    funcoes.append({"arquivo": arq, "nome": g.name, "ini": g.lineno, "fim": g.end_lineno, "codigo": cod_g[:6000]})
             # as funções do mesmo arquivo que ela chama e que usam seletores (ex.: ligar_agente dentro de configurar_agente)
             for chamada in set(re.findall(r"\b(\w+)\(", codigo)):
                 g = next((d for d in defs if d.name == chamada and d is not f), None)

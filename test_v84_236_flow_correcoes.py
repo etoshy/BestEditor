@@ -51,11 +51,11 @@ def test_contexto_acha_a_funcao_os_seletores_e_o_html(amb):
     assert d["passo"] == "config_agente" and d["motivo"] == MOTIVO
     tr = FC.trecho_do_codigo(d, FC.ORIGINAL)
     nomes = [f["nome"] for f in tr["funcoes"]]
-    assert nomes[0] == "configurar_agente" and "ligar_agente" in nomes
+    assert nomes[0] == "_configurar_agente" and "configurar_agente" in nomes and "ligar_agente" in nomes
     assert "flow_direto.py: S[agente_config]" in tr["seletores"]
     assert any("preparar_projeto" in x or "configurar_agente(" in x for x in tr["chamadas"])
     pr = FC.prompt_outra_ia(amb["diag"])
-    for trecho in ("configurar_agente()", "toolkit/googleflow/flow_direto.py", "settings-trigger-button", '"mudancas"',
+    for trecho in ("_configurar_agente()", "configurar_agente()", "toolkit/googleflow/flow_direto.py", "settings-trigger-button", '"mudancas"',
                    "Gatilho de configurações", "TOLERANTE"):
         assert trecho in pr
     assert "<script" not in pr and "M0" not in pr  # o HTML vai limpo

@@ -526,13 +526,43 @@ def _escolher_no_menu_modelos(page, nome: str, passo: str) -> None:
         page.keyboard.press("Escape")
 
 
+def tem_agente(page, espera_s: float = 6.0) -> bool:
+    """🤖 v84_236: o Flow TIROU o Agente da caixa (out/2026 — a caixa vem direta: só o "Gatilho de configurações"
+    e o "Iniciar geração", sem o chip "Agente", sem o painel e sem o "tune"). True = o Agente ainda existe aqui."""
+    sel = ", ".join((S["agente_chip"], S["painel_sessao"], S["agente_config"]))
+    if _primeiro(page, sel, espera_s) is not None:
+        return True
+    garantir_largura(page)  # janela estreita esconde o chip
+    return _primeiro(page, sel, 2) is not None  # a caixa já carregou (o novo_projeto esperou o editor): sem nada = sem Agente
+
+
 def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "x1", img_modelo: str = "",
                       vid_proporcao: str = "16:9", vid_quantidade: str = "x1", vid_modelo: str = "",
                       on_passo: Passo = _nada) -> None:
-    """Agente ligado → "tune" → Confirmar antes de gerar = NUNCA + padrões de imagem/vídeo → Salvar."""
+    """Agente ligado → "tune" → Confirmar antes de gerar = NUNCA + padrões de imagem/vídeo → Salvar.
+    Flow sem o Agente (a caixa já vem direta): pula — os padrões vão na própria caixa a cada geração."""
     fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     passo = "config_agente"
     on_passo(passo, "andando", "")
+    if not tem_agente(page):
+        on_passo(passo, "ok", "este Flow não tem mais o Agente — a caixa já vem no modo direto (nada pra configurar)")
+        return
+    try:
+        _configurar_agente(page, passo, img_proporcao, img_quantidade, img_modelo, vid_proporcao, vid_quantidade, vid_modelo)
+    except FlowPassoErro as exc:
+        # 🩹 v84_236: configurar o Agente é um extra (a geração é na caixa direta, com o Agente desligado): se a tela do
+        # Agente mudou, segue sem ele em vez de pular a conta
+        try:
+            page.keyboard.press("Escape")
+        except Exception:  # noqa: BLE001
+            pass
+        on_passo(passo, "pulado", f"não deu pra configurar o Agente ({str(exc)[:160]}) — segue com a caixa direta")
+        return
+    on_passo(passo, "ok", f"Nunca · imagem {img_proporcao} {img_quantidade} {img_modelo} · vídeo {vid_proporcao} {vid_quantidade} {vid_modelo}")
+
+
+def _configurar_agente(page, passo: str, img_proporcao: str, img_quantidade: str, img_modelo: str, vid_proporcao: str,
+                       vid_quantidade: str, vid_modelo: str) -> None:
     ligar_agente(page, True)
     _primeiro(page, S["agente_config"], 10, passo, 'não achei o botão "Configurações" (ícone tune) do agente.').click()
     painel = _primeiro(page, S["agente_painel"], 10, passo, 'o painel "Configurações do agente" não abriu.')
@@ -559,7 +589,6 @@ def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "
     _primeiro(page, S["agente_salvar"], 5, passo, 'não achei o "Salvar" das configurações do agente.').click()
     if not _esperar(lambda: not _visivel(page, S["agente_painel"]), 8):
         raise FlowPassoErro(passo, 'cliquei em "Salvar" mas o painel do agente não fechou.')
-    on_passo(passo, "ok", f"Nunca · imagem {img_proporcao} {img_quantidade} {img_modelo} · vídeo {vid_proporcao} {vid_quantidade} {vid_modelo}")
 
 
 def ligar_agente(page, ligado: bool) -> None:

@@ -197,6 +197,32 @@ def test_janela_larga_agente_em_painel_sem_chip(sim, navegador, tmp_path):
     ctx.close()
 
 
+def test_flow_sem_agente_pula_a_configuracao_do_agente(sim, navegador):
+    """v84_236 — erro real (out/2026): o Flow tirou o Agente da caixa (sem chip, sem painel, sem "tune"); antes TODA
+    conta caía em "[config_agente] não achei o botão Configurações (ícone tune)". Agora pula e gera direto."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    passos = []
+    page = fd.preparar_projeto(ctx, sim + "?semagente=1", True, {"img_modelo": "Nano Banana Pro", "vid_modelo": "Veo 3.1 - Fast"},
+                               lambda n, e, d: passos.append((n, e, d)))
+    ok = [n for n, e, _ in passos if e == "ok"]
+    assert ok == ["abrir", "novo_projeto", "config_agente", "desligar_agente"]
+    assert any("não tem mais o Agente" in d for n, e, d in passos if n == "config_agente" and e == "ok")
+    r = fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple", "modelo": "Nano Banana 2.1"}, timeout_s=30)
+    assert len(r) == 1 and r[0]["tipo"] == "imagem"
+    ctx.close()
+
+
+def test_agente_sem_o_tune_nao_pula_a_conta(sim, navegador):
+    """v84_236: configurar o Agente é um extra — se o botão "tune" mudou, o passo é PULADO e o projeto segue."""
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    passos = []
+    page = fd.preparar_projeto(ctx, sim + "?semtune=1", True, {"img_modelo": "Nano Banana Pro"}, lambda n, e, d: passos.append((n, e, d)))
+    assert ("config_agente", "pulado") in [(n, e) for n, e, _ in passos] and ("desligar_agente", "ok") in [(n, e) for n, e, _ in passos]
+    r = fd.gerar_um(page, {"tipo": "imagem", "prompt": "a red apple", "modelo": "Nano Banana 2.1"}, timeout_s=30)
+    assert len(r) == 1
+    ctx.close()
+
+
 def test_sem_creditos_pra_video_vira_flowlimite(sim, navegador):
     """v84_104 (HTML real): sem créditos, o Flow troca o "Iniciar geração" pelo "Alerta de créditos insuficientes" —
     isso é FlowLimite (o site troca de conta), não "não achei o botão"."""

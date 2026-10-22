@@ -664,6 +664,12 @@ class Lote:
                             raise
                         except Exception as exc_proj:  # noqa: BLE001 — a CONTA não abriu o projeto: não é culpa do pedido
                             falhas_seguidas += 1
+                            try:  # 🩺 a foto e o HTML da tela vão pros erros recentes (e pro 🩹 Corrigir)
+                                pg_erro = getattr(exc_proj, "page", None) or next((x for x in reversed(ctx.pages) if not x.is_closed()), None)
+                                if pg_erro is not None:
+                                    gf.salvar_diagnostico(pg_erro, f"{str(exc_proj).splitlines()[0][:300] if str(exc_proj) else type(exc_proj).__name__} (conta “{conta}”)")
+                            except Exception:  # noqa: BLE001
+                                pass
                             self._devolver(job, f"a conta “{conta}” não abriu o projeto: {str(exc_proj)[:200]}")
                             job = None
                             if falhas_seguidas >= 2 or gf.RE_PROBLEMA_DE_LOGIN.search(str(exc_proj)):
