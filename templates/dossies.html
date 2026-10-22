@@ -15,11 +15,46 @@
   O sistema salva título, subtítulos e o texto inteiro de cada uma e <b>baixa todas as imagens</b> com a legenda e a OG. Junte também
   fotos, vídeos e textos seus. Sai um prompt no formato do modelo; a IA devolve títulos, ideias, descrição do caso, capítulos e o
   roteiro completo. Depois: 🎙️ Gerar voz → 🎬 Novo vídeo escolhendo este projeto (as imagens do tema entram nos momentos certos).</p>
+<p style="margin:4px 0 0;"><a href="#react"><b>🎭 React de personagens</b></a> — personagens no sofá reagindo a um vídeo na TV (estilo Gacha Life).</p>
 <div class="ds-passos"><span>1 · tema e modelo</span><span>2 · fontes (matérias)</span><span>3 · materiais</span><span>4 · prompt → roteiro</span><span>5 · voz → vídeo</span></div>
 
 {% if erro %}<div class="error">{{ erro }}</div>{% endif %}
 
 <div class="ds-card" style="background:#eef2ff;border-color:#c7d2fe;"><b>🚀 Piloto automático</b> — cole os links e o texto (roteiro ou anotações) e o site faz tudo até a parte que precisa de você. <a href="/piloto"><b>Abrir →</b></a></div>
+<div class="ds-card" id="react" style="background:#fdf4ff;border-color:#f0abfc;">
+  <h2 style="margin:0;">🎭 React de personagens</h2>
+  <p style="color:#555;margin:6px 0;">Estilo dos reacts de Gacha Life: personagens famosos sentados no sofá assistindo a um vídeo (música de anime, AMV, cena de filme) na TV, com as falas embaixo da TV.
+    A IA sugere o elenco (da obra, hypados, contraste — você mistura com os seus), escreve as falas pela transcrição e pelo vídeo, o cenário sai em camadas no Flow (fundo, sofá, mesa na frente) e os personagens sentados com uma pose por expressão. No fim, vai pro editor com tudo posicionado.</p>
+  <div class="ds-passos"><span>1 · vídeo + transcrição</span><span>2 · 🤖 sugerir personagens</span><span>3 · elenco + 🧲 imagens</span><span>4 · 🤖 roteiro</span><span>5 · cenário + personagens no Flow</span><span>6 · 🎬 editor</span></div>
+  <details{% if not react_lista() %} open{% endif %}><summary style="cursor:pointer;font-weight:600;">+ Novo react</summary>
+  <form method="post" action="/react-personagens/novo" enctype="multipart/form-data" id="formReact">
+    <label>Título do vídeo que vai ser reagido</label>
+    <input type="text" name="titulo" placeholder="ex.: Rap dos Quincys — Guerra Sangrenta dos Mil Anos">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:2;min-width:260px;">Link do vídeo <span style="font-weight:400;color:#888;">(YouTube ou outra rede)</span><input type="url" name="url" placeholder="https://www.youtube.com/watch?v=..."></label>
+      <label style="flex:1;min-width:200px;">…ou o arquivo<input type="file" name="video_arquivo" accept="video/*"></label>
+      <label style="flex:1;min-width:180px;">Obra <span style="font-weight:400;color:#888;">(opcional)</span><input type="text" name="obra" placeholder="ex.: Bleach"></label>
+    </div>
+    <label>Transcrição com o tempo <span style="font-weight:400;color:#888;">("0:13 frase", SRT ou VTT — repetições e créditos são limpos sozinhos; dá pra colar depois ou usar o Whisper)</span></label>
+    <textarea name="transcricao" rows="4" placeholder="0:13 Almas que viram hollows são seres imundos&#10;0:17 Eles devem ser exterminados do mundo"></textarea>
+    <label style="font-weight:400;">…ou o arquivo da transcrição <input type="file" name="transcricao_arquivo" accept=".txt,.srt,.vtt,text/plain" style="width:auto;"></label>
+    <button type="submit" id="btnReact">🎭 Começar o react</button>
+  </form>
+  </details>
+  {% for r in react_lista() %}
+  <div class="ds-proj">
+    <div style="min-width:0;">
+      <a href="/react-personagens/{{ r.id }}" style="font-weight:600;">🎭 {{ r.titulo }}</a>
+      <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ r.personagens }} personagem(ns) · {{ r.falas }} fala(s){% if not r.tem_video %} · sem vídeo{% endif %}{% if r.job %} <a class="ds-tag" href="/job/{{ r.job }}/edit-segments">🎬 no editor</a>{% endif %}</div>
+    </div>
+    <form method="post" action="/react-personagens/{{ r.id }}/excluir" onsubmit="return confirm('Excluir este react (o vídeo, as imagens de referência e o cenário)? Os personagens gerados continuam na aba 🧍 Personagens.')">
+      <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:0.8rem;">🗑</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+<script>document.getElementById('formReact').addEventListener('submit', () => { const b = document.getElementById('btnReact'); b.disabled = true; b.textContent = '⏳ criando…'; });</script>
+
 <div class="ds-card">
   <h2 style="margin:0;">+ Novo projeto</h2>
   <form method="post" action="{{ url_for('dossies_novo') }}" id="formNovo">

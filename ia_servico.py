@@ -120,6 +120,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                     "No Estúdio (aba 🧍 Personagens) e nos projetos novos de um canal com personagens: escolhe os MELHORES "
                     "momentos pra cada personagem aparecer (não todas as falas), a pose que combina com o que ela diz e a "
                     "animação de entrada/saída.", True),
+    "react": ("🎭 React de personagens: elenco e roteiro",
+              "Na aba 🕵️ Modelos de vídeo → 🎭 React de personagens: lê a transcrição e olha quadros do vídeo, sugere os "
+              "personagens (da obra, hypados, contraste), completa a ficha de cada um e escreve as falas — quem fala, quando, "
+              "com qual expressão e quem reage.", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

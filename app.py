@@ -5578,7 +5578,10 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                             "position": ov.get("position", "top-right"),
                             "size_percent": ov.get("size_percent", 20),
                             # 🧍 v84_185: personagem do canal — lado, entrada/saída e a boca
-                            **(__import__("personagens_editor").para_render(ov) if ov.get("origem") == "personagem" else {}),
+                            **(__import__("personagens_editor").para_render(ov) if ov.get("origem") in ("personagem", "react") else
+                               # 🎭 v84_236: camada posicionada pelo CENTRO (o vídeo na TV do react) — igual ao monitor
+                               {"x_percent": ov.get("x_percent", 80), "y_percent": ov.get("y_percent", 20), "ancora": "centro"}
+                               if ov.get("ancora") == "centro" else {}),
                         })
                     except VideoAssemblyError as exc:
                         # um overlay que falha (link quebrado, busca sem
@@ -11813,6 +11816,19 @@ _animar.registrar(app, _JOBS.get, _save_state, _job_dir,
                   _seg_estudio, _orientacao_do_job, lambda job: str(job.get("language") or ""))
 import personagens_pod_rotas as _personagens_rotas  # noqa: E402  🧍 poses PNG das personagens no pod (v84_183)
 _personagens_rotas.registrar(app, BASE_DIR)
+
+
+def _react_criar_job(job_id: str, job: Dict[str, Any]) -> None:
+    """🎭 v84_236: o React de personagens manda o projeto pronto (tudo posicionado) pro Estúdio."""
+    _JOBS[job_id] = job
+    perf = PerfLog(_job_dir(job_id), job_id=job_id)
+    _PERF_LOGS[job_id] = perf
+    perf.save()
+    _save_state(job_id)
+
+
+import react_rotas as _react_rotas  # noqa: E402  🎭 React de personagens (aba Modelos de vídeo, v84_236)
+_react_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir)
 import personagens_editor as _pers_ed  # noqa: E402  🧍 as personagens do canal por cima do vídeo, quando falam (v84_185)
 _pers_ed.registrar(app, _JOBS.get, _save_state, _job_dir, _palavras_da_narracao, BASE_DIR)
 

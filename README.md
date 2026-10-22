@@ -28,6 +28,21 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎭 React de personagens (v84_236)
+
+Na aba **🕵️ Modelos de vídeo → 🎭 React de personagens**: vídeo no estilo dos reacts de Gacha Life — personagens famosos sentados no sofá assistindo a um vídeo (música de anime, AMV, cena de filme) numa TV, com as falas escritas embaixo da TV, como legenda.
+
+1. **🎬 Vídeo** — título + link (YouTube/outras redes, baixa até 720p) ou o arquivo; a **transcrição com tempo** (“0:13 frase”, SRT, VTT, “[00:13] frase” ou o formato do YouTube). Legenda tirada da tela (a mesma frase em dezenas de linhas, duplicada, com o crédito “Personagem - Cantor” no meio) vira uma frase por vez, e os créditos entram como “quem canta”. Sem transcrição: 🎙 Whisper.
+2. **🤖 Personagens sugeridos** — a IA lê a transcrição e olha quadros do vídeo e sugere o elenco: **da obra**, **🔥 hypados** e **contraste**. Marque, troque o nome de qualquer um, adicione os seus e peça mais sugestões (as novas combinam com quem já está).
+3. **🧑‍🤝‍🧑 Elenco** — ficha de cada um: personalidade, jeito de falar, **⏳ cronologia** (o que o vídeo mostra é antes, durante ou depois do ponto da história dele — viveu aquilo ou vê pela 1ª vez), **🤝 relações** com quem aparece/canta no vídeo, aparência (pro desenho) e a imagem de referência — **🧲 Buscar** no navegador das imagens (o mesmo Brave + script do 🎭 Elenco; a imagem marcada entra direto no personagem), do PC ou por link. **♻ Personagem que já foi feito num react anterior** é reaproveitado: o mesmo projeto 🧍 com as poses prontas (só as expressões novas são geradas) e a ficha/referência.
+4. **📝 Roteiro** — a IA analisa a transcrição e o vídeo e escreve quem fala, **quando**, com qual **expressão** (pela personalidade e o momento) e quem **reage**; respeita a cronologia e as relações e marca **⚠ dúvida** quando não tem certeza de um fato da obra. O **pedido de like/inscrição é uma fala de um personagem** (sem corte de inscreva-se). Tudo editável.
+5. **🔎 Verificador de fatos** — lore, cronologia, relações e personalidade, nas fichas e/ou nas falas (as dúvidas primeiro): 🔷 Gemini com a busca do Google, a IA do site ou o prompt pra colar em outra IA. Cada correção: ✔ aplicar ou ✕ ignorar.
+6. **🏠 Cenário em camadas** (🚀 Flow em massa) — fundo, sofá(s) e a **mesa na frente** (sofá e mesa com fundo verde, recortados no PC), ou a sua imagem em qualquer camada. Estilo anime/cartoon ou realista (automático pelo elenco). Disposições: sofá na esquerda + TV na direita, ou um sofá de cada lado + TV no meio.
+7. **🧍 Personagens sentados** — cada um vira um projeto da aba 🧍 Personagens (motor Flow): a ⭐ neutra primeiro (vira a mestre sozinha), depois uma pose por expressão e a 👄 boca de cada uma.
+8. **👁 Prévia** (uma imagem do react em qualquer segundo) e **🎬 Mandar pro editor** — o projeto do Estúdio já sai montado: o áudio do vídeo, o fundo, sofá → personagens → mesa → TV → legendas → o vídeo na tela (sincronizado). Quem fala troca de expressão e mexe a boca enquanto a fala está na tela; quem ouve reage. Tudo continua editável no Estúdio.
+
+Também: overlay com `"ancora": "centro"` sai no vídeo final no mesmo lugar do monitor; grafo de overlays grande vai pra arquivo (`-filter_complex_script`, sem estourar a linha de comando do Windows); foto parada (`static`) não passa mais pelo zoompan em 4K.
+
 ## 🏭 Produção no pod com várias vozes (v84_180)
 
 Roteiro com tags de voz (canal com personagens: `[narrador]`, `[mira|curiosa]`… ou as 🎭 vozes com slug) agora vai pro pod como **um texto só** com `{{perfil=…, emocao=…, cfg=…}}` antes de cada fala: o pod troca a voz e a emoção no meio, devolve **um áudio** e transcreve com o Whisper. Os 🗣️ perfis usados vão pro pod sozinhos (uma vez por lote). Cada voz tem de ser **Chatterbox com um perfil de voz** (no pod não roda Piper/Kokoro/XTTS). A legenda sai sem as tags. Precisa do **studio-ia_pod_6** (o pod passa a respeitar o ⭐ clipe principal).

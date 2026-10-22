@@ -1950,8 +1950,12 @@ def apply_overlays(
         if "x_percent" in ov or "y_percent" in ov:
             xp = max(0.0, min(100.0, float(ov.get("x_percent", 80))))
             yp = max(0.0, min(100.0, float(ov.get("y_percent", 20))))
-            x_expr = f"(main_w-overlay_w)*{xp/100:.5f}"
-            y_expr = f"(main_h-overlay_h)*{yp/100:.5f}"
+            if ov.get("ancora") == "centro":  # 🎭 v84_236: x/y = o CENTRO do overlay (igual ao monitor do Estúdio)
+                x_expr = f"(main_w*{xp/100:.5f}-overlay_w/2)"
+                y_expr = f"(main_h*{yp/100:.5f}-overlay_h/2)"
+            else:
+                x_expr = f"(main_w-overlay_w)*{xp/100:.5f}"
+                y_expr = f"(main_h-overlay_h)*{yp/100:.5f}"
         else:
             x_expr, y_expr = _OVERLAY_POSITION_EXPRESSIONS.get(
                 ov.get("position", "top-right"), _OVERLAY_POSITION_EXPRESSIONS["top-right"]
@@ -1964,8 +1968,14 @@ def apply_overlays(
 
     filter_complex = ";".join(filter_parts)
 
-    args = inputs + [
-        "-filter_complex", filter_complex,
+    # 🎭 v84_236: com muitas camadas (o react tem uma por expressão/legenda) o grafo passa do limite da linha de
+    # comando do Windows (~32 mil caracteres) — vai num arquivo
+    script = None
+    if len(filter_complex) > 6000:
+        script = os.path.join(os.path.dirname(os.path.abspath(output_path)), f"_overlays_{uuid.uuid4().hex[:8]}.txt")
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(";\n".join(filter_parts))
+    args = inputs + (["-filter_complex_script", script] if script else ["-filter_complex", filter_complex]) + [
         "-map", "[vout]", "-map", "0:a?",
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
         "-c:a", "copy",
@@ -1973,7 +1983,22 @@ def apply_overlays(
         output_path,
     ]
     # ⏱ v84_228: o limite acompanha o tamanho do trabalho (vídeo de 13 min com 40 camadas não cabe em 5 min)
-    _run_ffmpeg(args, timeout=tempo_limite_overlays(base_duration, len(overlays)))
+    limite = tempo_limite_overlays(base_duration, len(overlays))
+    try:
+        try:
+            _run_ffmpeg(args, timeout=limite)
+        except VideoAssemblyError as exc:
+            # ffmpeg 8+ trocou `-filter_complex_script arq` por `-/filter_complex arq`
+            if not script or "filter_complex_script" not in str(exc) or ("nrecognized option" not in str(exc) and "not found" not in str(exc)):
+                raise
+            k = args.index("-filter_complex_script")
+            _run_ffmpeg(args[:k] + ["-/filter_complex"] + args[k + 1:], timeout=limite)
+    finally:
+        if script:
+            try:
+                os.remove(script)
+            except OSError:
+                pass
     return output_path
 
 
@@ -2381,6 +2406,11 @@ def _render_image_with_ken_burns(
         f"crop={target_width * 2}:{target_height * 2}",
         f"zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':d={total_frames}:s={target_width}x{target_height}:fps={fps}",
     ]
+    if zoom_direction == "static":
+        # ⚡ v84_236: parado não precisa do zoompan (nem da super-amostra em 2x) — o fundo do 🎭 react tem o vídeo
+        # inteiro (5–10 min) e o zoompan em 4K levava mais que o limite do passo
+        filters = [f"scale={target_width}:{target_height}:force_original_aspect_ratio=increase,"
+                   f"crop={target_width}:{target_height},setsar=1,fps={fps}"]
 
     if zoom_direction == "giro":  # leve rotação (o zoom de 1.2+ esconde os cantos)
         filters.append(f"rotate=a='0.05*sin(2*PI*t/{max(1.0, duration):.3f})':c=black")
@@ -2411,7 +2441,7 @@ def _render_image_with_ken_burns(
             "-t", f"{duration:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
             output_path,
-        ])
+        ], timeout=int(max(300, duration * 3)))  # 🎭 v84_236: uma imagem só cobrindo um vídeo longo (o fundo do react)
     finally:
         if composta:
             try:

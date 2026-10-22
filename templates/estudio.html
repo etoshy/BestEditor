@@ -5035,19 +5035,22 @@ function atualizarMonitor(forcar) {
   const box = $('layerOv'), boxP = $('layerPers'); const ativos = overlays.filter(o => t >= o.start && t < o.end);
   const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + (o._anim_url || '') + (o.espelhar ? 'E' : '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
   if (forcar || box.dataset.chave !== chave) {
+    const tvs = {}; box.querySelectorAll('video[data-sync]').forEach(v => { tvs[v.dataset.oid] = v; });  // 🎭 a TV não recarrega a cada legenda
     box.dataset.chave = chave; box.innerHTML = ''; boxP.innerHTML = '';
     ativos.forEach(o => {
       if (o.media_type === 'text') { const d = document.createElement('div'); d.className = 'txt'; box.appendChild(d); estiloTexto(d, o.text, o.style || {}, o.end - o.start, t - o.start); return; }
       const d = document.createElement('div'); d.className = 'ov' + (o._url ? '' : ' box');
       d.style.left = (o.x_percent != null ? o.x_percent : 80) + '%'; d.style.top = (o.y_percent != null ? o.y_percent : 20) + '%'; d.style.width = (o.size_percent || 20) + '%';
       if (o._anim_url) d.innerHTML = `<video src="${esc(o._anim_url)}" muted autoplay ${o.anim_modo === 'uma_vez' ? '' : 'loop'} playsinline style="width:100%"></video>`;
+      else if (o._url && o.sincronizar) { if (tvs[o.id]) d.appendChild(tvs[o.id]); else d.innerHTML = `<video src="${esc(o._url)}" muted playsinline preload="auto" data-oid="${esc(o.id)}" data-sync="${o.start || 0}" style="width:100%;display:block"></video>`; }  // 🎭 a TV do react: anda junto com o áudio
       else if (o._url && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(o._url)) d.innerHTML = `<img src="${esc(o._url)}">`;
       else if (o._url) d.innerHTML = `<video src="${esc(o._url)}" muted autoplay loop playsinline style="width:100%"></video>`;
       else d.textContent = '🧩 ' + ((o.source || {}).query || 'overlay (resolvido na montagem)');
       if (o.espelhar && d.firstElementChild) d.firstElementChild.style.transform = 'scaleX(-1)';  // 🪞
-      (o.origem === 'personagem' ? boxP : box).appendChild(d);
+      (o.origem === 'personagem' || o.origem === 'react' ? boxP : box).appendChild(d);  // 🎭 camadas do react: na ordem da lista
     });
   }
+  box.querySelectorAll('video[data-sync]').forEach(v => sincronizarVideo(v, Math.max(0, t - parseFloat(v.dataset.sync || 0))));
   const p = s._preview || {};
   $('stageInfo').textContent = `Trecho ${i + 1}/${segs.length} · ${s.provider}: ${s.query}` + (q < 1 ? ` · transição ${ROTULO_TRANS[tipo] || tipo}` : '') + (p.erro && !(s.override_source && s.override_source.source) ? ' · ⚠ sem prévia' : '');
 }
