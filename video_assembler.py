@@ -1965,7 +1965,8 @@ def apply_overlays(
             inputs += ["-loop", "1", "-i", media_path]
 
         scale_label = f"[ov{idx}]"
-        filter_parts.append(f"[{input_index}:v]scale={overlay_width}:-2{scale_label}")
+        espelho = ",hflip" if ov.get("espelhar") else ""  # 🎭 v84_237: a TV do react espelhada
+        filter_parts.append(f"[{input_index}:v]scale={overlay_width}:-2{espelho}{scale_label}")
 
         if "x_percent" in ov or "y_percent" in ov:
             xp = max(0.0, min(100.0, float(ov.get("x_percent", 80))))
