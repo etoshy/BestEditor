@@ -253,8 +253,15 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         if oque == "fichas":
             return _rodar(pid, oque, "🤖 Completar as fichas", lambda: f"{R.completar_fichas(pid, base_dir)} ficha(s)") or _ok()
         if oque == "roteiro":
-            return _rodar(pid, oque, "🤖 Escrever o roteiro",
-                          lambda: f"{len(R.gerar_roteiro(pid, base_dir)['falas'])} fala(s)") or _ok()
+            c = request.get_json(silent=True) or {}
+            parte = c.get("parte")
+            parte = int(parte) if isinstance(parte, (int, float, str)) and str(parte).isdigit() else None
+            so_vazias = bool(c.get("so_vazias"))
+            rot = ("🤖 Escrever a parte " + str(parte + 1) if parte is not None
+                   else "🤖 Completar as partes que faltam" if so_vazias else "🤖 Escrever o roteiro (em partes)")
+            return _rodar(pid, oque, rot, lambda: R.gerar_roteiro(
+                pid, base_dir, parte=parte, so_vazias=so_vazias,
+                on_log=lambda m: TAREFAS[pid].update(progresso=str(m)[:200]))["msg"]) or _ok()
         abort(404)
 
     @app.route("/react-personagens/<pid>/prompt/<tipo>")
@@ -262,7 +269,11 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         p = _p(pid)
         if tipo not in ("sugestoes", "fichas", "roteiro"):
             abort(404)
-        return jsonify({"ok": True, "prompt": R.prompt_copiar(p, tipo)})
+        parte = request.args.get("parte")
+        try:
+            return jsonify({"ok": True, "prompt": R.prompt_copiar(p, tipo, int(parte) if parte and parte.isdigit() else None)})
+        except R.ReactErro as exc:
+            return _erro(str(exc))
 
     @app.route("/react-personagens/<pid>/colar/<tipo>", methods=["POST"])
     def react_colar(pid: str, tipo: str):
@@ -280,7 +291,15 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 elif tipo == "fichas":
                     n = R.aplicar_fichas(p, r, [c["id"] for c in p["personagens"]])
                 elif tipo == "roteiro":
-                    n = len(R.aplicar_roteiro(p, r)["falas"])
+                    parte = (request.get_json(silent=True) or {}).get("parte")
+                    ps = R.partes_roteiro(p)
+                    if isinstance(parte, int) and 0 <= parte < len(ps):
+                        antes = len((p.get("roteiro") or {}).get("falas") or [])
+                        n = len(R.aplicar_roteiro(p, r, janela=ps[parte])["falas"]) - antes
+                        if all(not x["vazia"] for x in R.estado_partes(p)):
+                            R.garantir_cta(p)
+                    else:
+                        n = len(R.aplicar_roteiro(p, r)["falas"])
                 else:
                     abort(404)
             except R.ReactErro as exc:
@@ -420,7 +439,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         p = _p(pid)
         c = request.get_json(silent=True) or {}
         alvo = [x for x in p["personagens"] if x["id"] in (c.get("cids") or [])] or [x for x in p["personagens"] if not x.get("refs")]
-        alvo = alvo[:10]
+        alvo = alvo[:20]
         if not alvo:
             return _erro("Todos já têm imagem de referência (escolha quem buscar de novo).")
         site = request.host_url.rstrip("/")

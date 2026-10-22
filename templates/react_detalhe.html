@@ -137,7 +137,8 @@
     <input id="nObra" placeholder="obra (opcional)" style="flex:1;min-width:140px;">
     <button type="button" id="bAdd">➕ Adicionar</button>
     <button type="button" id="bFichas" class="rx-sec" title="personalidade, jeito de falar, aparência e o termo de busca de quem você digitou">🤖 Completar as fichas</button>
-    <button type="button" id="bBrave" title="abre no 🧲 navegador das imagens (o Brave do site) uma guia do Google Imagens pra cada personagem sem imagem — marque a imagem e clique em “Capturar e enviar ao site”">🧲 Buscar imagens de quem está sem</button>
+    <button type="button" id="bBraveTodos" title="abre o 🧲 navegador das imagens (o Brave do site) com TODOS os personagens, uma guia do Google Imagens pra cada — marque a imagem certa em cada guia e clique em “Capturar e enviar ao site”">🧲 Abrir todos em guias</button>
+    <button type="button" id="bBrave" class="rx-sec" title="só os personagens que ainda estão sem imagem de referência">🧲 Só quem está sem imagem</button>
   </div>
   <details class="rx-colar"><summary>fichas: copiar o prompt / colar a resposta de outra IA</summary><button type="button" class="rx-btn rx-sec" data-copiar="fichas">📋 Copiar o prompt</button><textarea id="cFichas" rows="3"></textarea><button type="button" class="rx-btn" data-colar="fichas">✔ Ler a resposta</button></details>
   <div id="elenco" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;"></div>
@@ -153,11 +154,12 @@
   <div class="rx-dica" style="margin-bottom:2px">Expressões de cada personagem (cada uma vira uma pose sentado + a boca de fala):</div>
   <div class="rx-chips" id="fExpr">{% for k, e in expressoes.items() %}<label><input type="checkbox" value="{{ k }}" {% if k in p.expressoes %}checked{% endif %} {% if k == 'neutro' %}disabled{% endif %}>{{ e[0] }}</label>{% endfor %}</div>
   <div class="rx-linha" style="margin-top:8px;">
-    <button type="button" id="bRoteiro">🤖 Escrever o roteiro</button>
-    <button type="button" class="rx-sec" data-copiar="roteiro">📋 Copiar o prompt</button>
+    <button type="button" id="bRoteiro" title="o vídeo inteiro, em partes de ~2,5 min (cada parte continua a conversa da anterior)">🤖 Escrever o roteiro</button>
+    <button type="button" id="bCompletar" class="rx-sec" title="só as partes sem falas (ou com poucas)">🤖 Completar o que falta</button>
     <span class="rx-dica" id="rEst"></span>
   </div>
-  <details class="rx-colar"><summary>colar a resposta de outra IA</summary><textarea id="cRoteiro" rows="4" placeholder='{"resumo": "...", "falas": [{"tempo": 14.5, "personagem": "...", "texto": "...", "expressao": "chocado", "pedido_inscricao": false, "reacoes": []}]}'></textarea><button type="button" class="rx-btn" data-colar="roteiro">✔ Ler a resposta</button></details>
+  <div class="rx-dica" style="margin:6px 0 2px">O roteiro sai em <b>partes</b> (num pedido só, a IA parava no meio de vídeo longo). Cada parte dá pra refazer, ou copiar o prompt e colar a resposta de outra IA:</div>
+  <div id="rPartes" style="display:flex;flex-direction:column;gap:4px;"></div>
   <div id="rResumo" class="rx-dica"></div>
   <div style="overflow:auto"><table class="rx-falas" id="falas"></table></div>
   <div class="rx-linha"><button type="button" id="bFalaAdd" class="rx-sec">➕ Fala</button><button type="button" id="bFalasSalvar">💾 Salvar as falas</button><span id="fEst" class="rx-dica"></span></div>
@@ -260,14 +262,14 @@ async function recarregar() {
 }
 function desenhar() {
   const t = P.tarefa, b = $('barra');
-  if (t && !t.fim) { b.className = 'rx-barra rodando'; b.textContent = `⏳ ${t.rotulo}… (${Math.round(Date.now() / 1000 - t.inicio)} s — pode sair da página, chega uma 🔔 quando terminar)`; }
+  if (t && !t.fim) { b.className = 'rx-barra rodando'; b.textContent = `⏳ ${t.rotulo}…${t.progresso ? ' ' + t.progresso : ''} (${Math.round(Date.now() / 1000 - t.inicio)} s — pode sair da página, chega uma 🔔 quando terminar)`; }
   else if (t && t.erro) { b.className = 'rx-barra erro'; b.textContent = `❌ ${t.rotulo}: ${t.erro}`; }
   else if (t && t.fim && Date.now() / 1000 - t.fim < 20) { b.className = 'rx-barra ok'; b.textContent = `✔ ${t.rotulo}${t.msg ? ' — ' + t.msg : ''}`; }
   else b.className = 'rx-barra';
   if (t && t.fim && ultimaTarefa !== t.fim) { ultimaTarefa = t.fim; if (t.oque === 'roteiro') falasEditadas = false; }
   $('bChGemini').title = P.gemini ? 'o Gemini pesquisa no Google' : 'falta a chave do Gemini — cole na caixa “🔷 Gemini” da 🔎 Checagem de um Modelo de vídeo';
   $('avisos').textContent = (P.avisos || []).length ? '⚠ ' + P.avisos.join(' · ') : '';
-  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharChecagem(); desenharCamadas(); desenharPoses();
+  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharPartes(); desenharChecagem(); desenharCamadas(); desenharPoses();
   $('estFinal').textContent = `→ ${P.estilo_final === 'realista' ? '📷 realista' : '🎨 anime/cartoon'}` + (P.estilo === 'auto' ? ' (pelo elenco)' : '');
   $('log').textContent = (P.log || []).slice().reverse().join('\n');
   if (P.editor && P.editor.job_id && !$('eEst').dataset.fixo) $('eEst').innerHTML = `já mandado: <a href="/job/${esc(P.editor.job_id)}/edit-segments" target="_blank">abrir no editor ↗</a> (mandar de novo cria outro projeto)`;
@@ -356,7 +358,31 @@ $('bYtTrans').addEventListener('click', async () => {
 async function ia(oque) { try { await api(`/react-personagens/${PID}/ia/${oque}`, {}); recarregar(); } catch (e) { alert(e.message); } }
 $('bSugerir').addEventListener('click', () => ia('sugerir'));
 $('bFichas').addEventListener('click', () => ia('fichas'));
-$('bRoteiro').addEventListener('click', () => { if ((P.roteiro.falas || []).length && !confirm('Escrever um roteiro NOVO (troca as falas atuais)?')) return; ia('roteiro'); });
+$('bRoteiro').addEventListener('click', () => { if ((P.roteiro.falas || []).length && !confirm('Escrever um roteiro NOVO do vídeo inteiro (troca as falas atuais)?')) return; roteiro({}); });
+$('bCompletar').addEventListener('click', () => roteiro({ so_vazias: true }));
+async function roteiro(corpo) {
+  if (falasEditadas && !confirm('As falas têm mudanças NÃO salvas — elas serão perdidas. Continuar?')) return;
+  try { await api(`/react-personagens/${PID}/ia/roteiro`, corpo); falasEditadas = false; recarregar(); } catch (e) { alert(e.message); }
+}
+function desenharPartes() {
+  const box = $('rPartes'); if (focoEm(box)) return;
+  const abertas = new Set([...box.querySelectorAll('details[open]')].map(d => d.dataset.k));
+  box.innerHTML = (P.partes || []).map(x => `<div class="rx-camada" style="padding:5px 8px"><div class="rx-linha" style="margin:0">
+      <b style="min-width:64px">Parte ${x.k + 1}</b><span class="rx-dica" style="margin:0;min-width:110px">${mmss(x.ini)} – ${mmss(x.fim)}</span>
+      <span class="${x.vazia ? 'rx-av' : 'rx-ok'}" style="font-size:.84rem;min-width:150px">${x.vazia ? '⚠ ' : '✔ '}${x.falas} fala(s)${x.vazia ? ` (umas ${x.esperado})` : ''}</span>
+      <button type="button" class="rx-mini" data-parte-ia="${x.k}">🤖 ${x.falas ? 'Refazer' : 'Escrever'}</button>
+      <button type="button" class="rx-mini rx-sec" data-parte-copiar="${x.k}">📋 Copiar o prompt</button></div>
+      <details data-k="${x.k}" ${abertas.has(String(x.k)) ? 'open' : ''}><summary class="rx-dica" style="cursor:pointer">colar a resposta de outra IA (só desta parte)</summary>
+      <textarea rows="3" data-parte-txt="${x.k}"></textarea><button type="button" class="rx-btn" data-parte-colar="${x.k}">✔ Ler a resposta</button></details></div>`).join('');
+}
+$('rPartes').addEventListener('click', async (e) => {
+  const d = e.target.dataset;
+  try {
+    if (d.parteIa != null) { if (+P.partes[+d.parteIa].falas && !confirm('Refazer as falas desta parte?')) return; return roteiro({ parte: +d.parteIa }); }
+    if (d.parteCopiar != null) { const r = await api(`/react-personagens/${PID}/prompt/roteiro?parte=${d.parteCopiar}`); await navigator.clipboard.writeText(r.prompt); e.target.textContent = '✔ copiado'; setTimeout(() => e.target.textContent = '📋 Copiar o prompt', 1800); }
+    if (d.parteColar != null) { const txt = $('rPartes').querySelector(`[data-parte-txt="${d.parteColar}"]`).value; const r = await api(`/react-personagens/${PID}/colar/roteiro`, { texto: txt, parte: +d.parteColar }); falasEditadas = false; alert(`✔ parte ${+d.parteColar + 1}: ${r.n >= 0 ? r.n : 0} fala(s) a mais`); recarregar(); }
+  } catch (er) { alert(er.message); }
+});
 document.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {
   try { const d = await api(`/react-personagens/${PID}/prompt/${b.dataset.copiar}`); await navigator.clipboard.writeText(d.prompt); b.textContent = '✔ copiado'; setTimeout(() => b.textContent = '📋 Copiar o prompt', 1800); }
   catch (e) { alert('Não deu pra copiar: ' + e.message); }
@@ -403,9 +429,16 @@ $('bAdd').addEventListener('click', async () => {
 $('nNome').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('bAdd').click(); });
 $('bBrave').addEventListener('click', () => brave([]));
 async function brave(cids) {
-  try { const d = await api(`/react-personagens/${PID}/brave`, { cids, trocar: true }); alert(`🧲 ${d.guias} guia(s) abertas no ${d.navegador}. Marque a imagem certa e clique em “Capturar e enviar ao site” — ela entra no personagem sozinha.`); }
-  catch (e) { alert(e.message); }
+  let d = {};
+  try { const r = await fetch(`/react-personagens/${PID}/brave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cids, trocar: true }) }); d = await r.json(); }
+  catch (e) { return alert(e.message); }
+  if (d.ok) return alert(`🧲 ${d.guias} guia(s) abertas no ${d.navegador} — uma por personagem. Em cada guia, marque a imagem certa e clique em “Capturar e enviar ao site”: ela entra no personagem sozinha e a guia fecha.` + (d.aviso ? '\n⚠ ' + d.aviso : ''));
+  // sem o navegador do site: abre as buscas no navegador normal (aí é salvar a imagem e mandar com 📁 Do PC / 🔗 Link)
+  if ((d.urls || []).length && confirm((d.erro || 'O navegador do site não abriu.') + `\n\nAbrir as ${d.urls.length} busca(s) aqui no seu navegador, uma guia por personagem? (o navegador pode pedir pra liberar pop-ups)`)) {
+    d.urls.forEach(u => window.open(u.split('#bes=')[0], '_blank'));
+  } else if (!(d.urls || []).length) alert(d.erro || 'Não deu pra abrir.');
 }
+$('bBraveTodos').addEventListener('click', () => { if (!P.personagens.length) return alert('Monte o elenco antes.'); brave(P.personagens.map(c => c.id)); });
 let elencoForcar = false;
 function desenharElenco() {
   const box = $('elenco'); if (focoEm(box) && !elencoForcar) return; elencoForcar = false;
@@ -477,6 +510,9 @@ function desenharFalas() {
   $('rResumo').textContent = r.resumo ? '🎬 ' + r.resumo : '';
   $('rEst').textContent = (r.falas || []).length ? `${r.falas.length} fala(s)` + (r.ignoradas ? ` · ${r.ignoradas} ignorada(s) (nome fora do elenco)` : '') : '';
   if (falasEditadas || focoEm($('falas'))) return;
+  const chaveF = JSON.stringify(r.falas || []);
+  if ($('falas').dataset.chave === chaveF) return;
+  $('falas').dataset.chave = chaveF;
   $('falas').innerHTML = `<tr><th>tempo</th><th>quem fala</th><th>cara</th><th>fala</th><th>seg.</th><th>📣</th><th></th></tr>` + (r.falas || []).map(linhaFala).join('');
 }
 $('falas').addEventListener('input', () => { falasEditadas = true; $('fEst').textContent = '✏ não salvo'; });

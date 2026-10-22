@@ -698,16 +698,21 @@ def transcrever_whisper(pid: str, base: str = _BASE) -> int:
     return len(p["transcricao"])
 
 
-def quadros(video: str, saida_dir: str, n: int = 24, largura: int = 320) -> List[Tuple[float, str]]:
-    """N quadros espalhados pelo vídeo (pula o comecinho e o finzinho) → [(segundo, caminho)]."""
+def quadros(video: str, saida_dir: str, n: int = 24, largura: int = 320, ini: Optional[float] = None,
+            fim: Optional[float] = None) -> List[Tuple[float, str]]:
+    """N quadros espalhados pelo vídeo — ou só pelo trecho [ini, fim] — → [(segundo, caminho)]."""
     info = sondar(video)
     dur = info["duracao"] or 0
     if dur <= 0:
         return []
     os.makedirs(saida_dir, exist_ok=True)
     out = []
+    a = max(0.0, ini or 0.0) if ini is not None else dur * 0.03
+    b = min(dur, fim) if fim is not None else dur * 0.97
+    if b <= a:
+        return []
     for k in range(n):
-        t = dur * (0.03 + 0.94 * (k + 0.5) / n)
+        t = a + (b - a) * (k + 0.5) / n
         cam = os.path.join(saida_dir, f"q{k:03d}.jpg")
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", video, "-frames:v", "1",
                         "-vf", f"scale={largura}:-2", cam], capture_output=True, timeout=60)
@@ -758,14 +763,15 @@ def mosaicos(qs: List[Tuple[float, str]], por: int = 9) -> List[Dict[str, Any]]:
     return blocos
 
 
-def blocos_do_video(p: Dict[str, Any], base: str = _BASE, n: int = 27) -> List[Dict[str, Any]]:
+def blocos_do_video(p: Dict[str, Any], base: str = _BASE, n: int = 27, ini: Optional[float] = None,
+                    fim: Optional[float] = None) -> List[Dict[str, Any]]:
     video = _video_local(p, base)
     if not video:
         return []
-    tmp = os.path.join(pasta(p["id"], base), "_quadros_ia")
+    tmp = os.path.join(pasta(p["id"], base), f"_quadros_ia_{secrets.token_hex(3)}")
     shutil.rmtree(tmp, ignore_errors=True)
     try:
-        return mosaicos(quadros(video, tmp, n))
+        return mosaicos(quadros(video, tmp, n, ini=ini, fim=fim))
     except Exception:  # noqa: BLE001
         return []
     finally:
@@ -1127,9 +1133,12 @@ def sys_roteiro(p: Dict[str, Any]) -> str:
         f"uma de {', '.join(exprs)}. Varie — não use a mesma o tempo todo.\n"
         "- 'reacoes' = 0 a 2 outros personagens que mudam a cara ao ouvir/ver (ex.: um fica chocado com o que o outro "
         "disse). Só quando faz sentido.\n"
-        "- PEDIDO DE LIKE/INSCRIÇÃO: exatamente 1 fala (no máximo 2 num vídeo longo), dita por UM dos personagens, no "
-        "jeito dele e ligada ao momento (ex.: no começo ou depois de um momento épico) — marque 'pedido_inscricao': true. "
-        "Não existe corte de 'inscreva-se': o pedido é só essa fala.\n"
+        "- O roteiro é escrito em PARTES (trechos de poucos minutos): escreva SÓ as falas do trecho pedido, com 'tempo' "
+        "DENTRO dele, cobrindo o trecho INTEIRO até o fim (não pare no meio), e continue a conversa das falas anteriores "
+        "sem repetir piadas nem bordões já usados.\n"
+        "- PEDIDO DE LIKE/INSCRIÇÃO: 1 fala no vídeo todo (no máximo 2 num vídeo longo), dita por UM dos personagens, no "
+        "jeito dele e ligada ao momento — marque 'pedido_inscricao': true. Siga o que o pedido diz sobre ESTA parte "
+        "(colocar aqui ou não). Não existe corte de 'inscreva-se': o pedido é só essa fala.\n"
         "- CRONOLOGIA E RELAÇÕES (muito importante): cada personagem só LEMBRA do que viveu até o ponto da história dele "
         "(veja 'cronologia' no elenco). Se o que o vídeo mostra acontece DEPOIS do ponto dele, ele reage como quem vê pela "
         "1ª vez (surpresa, spoiler, 'eu morri?!'); se ele VIVEU aquilo, pode lembrar e comentar de dentro ('eu estava lá'). "
@@ -1157,7 +1166,95 @@ def prompt_roteiro(p: Dict[str, Any]) -> str:
             + "\n\nELENCO (sentados no sofá, nesta ordem da esquerda pra direita):\n" + "\n".join(elenco))
 
 
-def prompt_copiar(p: Dict[str, Any], tipo: str) -> str:
+PARTE_S = 150.0  # o roteiro sai em partes de ~2,5 min (num pedido só, a IA parava no meio de vídeos longos)
+
+
+def duracao_total(p: Dict[str, Any]) -> float:
+    d = float((p.get("video") or {}).get("duracao") or 0)
+    if d <= 0:
+        d = max([float(e.get("fim") or e.get("ini") or 0) for e in p.get("transcricao") or [] if e.get("ini") is not None] or [0])
+    return d
+
+
+def partes_roteiro(p: Dict[str, Any]) -> List[List[float]]:
+    dur = duracao_total(p)
+    if dur <= 0:
+        return [[0.0, 1e6]]
+    n = max(1, int(round(dur / PARTE_S)))
+    tam = dur / n
+    return [[round(k * tam, 2), round(dur if k == n - 1 else (k + 1) * tam, 2)] for k in range(n)]
+
+
+def estado_partes(p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Cada parte com quantas falas tem e quantas deveria ter (pela quantidade de falas escolhida)."""
+    passo = DENSIDADES.get(p.get("densidade") or "normal", 9.0)
+    falas = (p.get("roteiro") or {}).get("falas") or []
+    out = []
+    for k, (a, b) in enumerate(partes_roteiro(p)):
+        n = sum(1 for f in falas if a <= float(f["t"]) < b or (k == len(out) and float(f["t"]) >= b and b >= duracao_total(p) - 0.01))
+        esperado = max(1, int(round((b - a) / passo)))
+        out.append({"k": k, "ini": a, "fim": b, "falas": n, "esperado": esperado,
+                    "vazia": n < max(1, esperado * 0.35)})
+    return out
+
+
+def _cta_aqui(p: Dict[str, Any], k: int) -> bool:
+    """O pedido de inscrição vai na parte que tem ~25% do vídeo (se ainda não tem um fora dela)."""
+    ps = partes_roteiro(p)
+    a, b = ps[k]
+    if any(f.get("cta") and not (a <= float(f["t"]) < b) for f in (p.get("roteiro") or {}).get("falas") or []):
+        return False
+    alvo = duracao_total(p) * 0.25
+    return a <= alvo < b or (k == 0 and len(ps) == 1)
+
+
+def prompt_roteiro_parte(p: Dict[str, Any], k: int) -> str:
+    ps = partes_roteiro(p)
+    if not 0 <= k < len(ps):
+        raise ReactErro("Parte inexistente.")
+    a, b = ps[k]
+    passo = DENSIDADES.get(p.get("densidade") or "normal", 9.0)
+    v = p.get("video") or {}
+    trans = [e for e in p["transcricao"] if e.get("ini") is None or (a - 12 <= e["ini"] < b + 4)]
+    falas = (p.get("roteiro") or {}).get("falas") or []
+    nomes = {c["id"]: c["nome"] for c in p["personagens"]}
+    antes = [f for f in falas if float(f["t"]) < a][-10:]
+    depois = [f for f in falas if float(f["t"]) >= b][:4]
+    L = [f"TÍTULO DO VÍDEO: {p.get('titulo') or ''}"]
+    if v.get("duracao"):
+        L.append(f"DURAÇÃO DO VÍDEO: {mmss(v['duracao'])}")
+    if p.get("obra"):
+        L.append(f"OBRA: {p['obra']}")
+    if p.get("contexto"):
+        L.append(f"CONTEXTO / PEDIDOS: {p['contexto']}")
+    if (p.get("sugestoes") or {}).get("resumo_video"):
+        L.append(f"RESUMO DO VÍDEO: {p['sugestoes']['resumo_video']}")
+    creditos = sorted({e["texto"] for e in p["transcricao"] if e["tipo"] == "credito"})
+    if creditos:
+        L.append("QUEM APARECE/CANTA NO VÍDEO TODO: " + ", ".join(creditos)[:1200])
+    L += ["", "ELENCO (sentados no sofá, nesta ordem da esquerda pra direita):"]
+    for c in p["personagens"]:
+        L.append(f"- {c['nome']}" + (f" ({c['obra']})" if c.get("obra") else "")
+                 + (f": {c['personalidade']}" if c.get("personalidade") else "")
+                 + (f" | jeito de falar: {c['jeito_de_falar']}" if c.get("jeito_de_falar") else "")
+                 + (f" | cronologia: {c['cronologia']}" if c.get("cronologia") else "")
+                 + (f" | relações com o vídeo: {c['relacoes']}" if c.get("relacoes") else ""))
+    L += ["", f"## ESTA É A PARTE {k + 1} DE {len(ps)}: do {mmss(a)} ({a:.0f} s) ao {mmss(b)} ({b:.0f} s)",
+          f"Escreva umas {max(1, int(round((b - a) / passo)))} falas, com 'tempo' entre {a:.0f} e {b:.0f}, cobrindo o trecho "
+          "inteiro até o fim dele.",
+          ("PEDIDO DE INSCRIÇÃO: coloque NESTA parte (1 fala, num bom momento)." if _cta_aqui(p, k)
+           else "PEDIDO DE INSCRIÇÃO: NÃO coloque nesta parte (fica em outra)."),
+          "", "TRANSCRIÇÃO DESTE TRECHO (tempo no vídeo):", transcricao_texto(trans, 12000) or "(sem transcrição — use os quadros)"]
+    if antes:
+        L += ["", "O QUE JÁ FOI FALADO LOGO ANTES (continue a conversa, não repita):"]
+        L += [f"- {mmss(f['t'])} {nomes.get(f['cid'], '?')}: {f['texto']}" for f in antes]
+    if depois:
+        L += ["", "O QUE VEM LOGO DEPOIS (não contradiga):"]
+        L += [f"- {mmss(f['t'])} {nomes.get(f['cid'], '?')}: {f['texto']}" for f in depois]
+    return "\n".join(L)
+
+
+def prompt_copiar(p: Dict[str, Any], tipo: str, parte: Optional[int] = None) -> str:
     """O prompt inteiro pra colar em outra IA (sem os quadros do vídeo) + o formato da resposta."""
     if tipo == "sugestoes":
         sis, txt, sch = SYS_SUGESTOES, prompt_sugestoes(p), SCHEMA_SUGESTOES
@@ -1165,7 +1262,8 @@ def prompt_copiar(p: Dict[str, Any], tipo: str) -> str:
         cids = [c["id"] for c in p["personagens"]]
         sis, txt, sch = SYS_FICHAS, prompt_fichas(p, cids), SCHEMA_FICHAS
     else:
-        sis, txt, sch = sys_roteiro(p), prompt_roteiro(p), _schema_roteiro(p.get("expressoes") or EXPRESSOES_PADRAO)
+        txt = prompt_roteiro_parte(p, parte) if parte is not None else prompt_roteiro(p)
+        sis, sch = sys_roteiro(p), _schema_roteiro(p.get("expressoes") or EXPRESSOES_PADRAO)
     return (sis + "\n\n" + txt + "\n\nResponda SÓ com um JSON neste formato (JSON Schema):\n"
             + json.dumps(sch, ensure_ascii=False))
 
@@ -1188,9 +1286,27 @@ def duracao_fala(texto: str) -> float:
     return round(max(2.2, min(7.0, 1.5 + 0.36 * n)), 2)
 
 
-def aplicar_roteiro(p: Dict[str, Any], r: Any) -> Dict[str, Any]:
+def garantir_cta(p: Dict[str, Any]) -> bool:
+    """A IA esqueceu o pedido de inscrição: o personagem que mais fala pede, lá pelo primeiro quarto do vídeo."""
+    falas = (p.get("roteiro") or {}).get("falas") or []
+    if not falas or any(f.get("cta") for f in falas):
+        return False
+    cont: Dict[str, int] = {}
+    for f in falas:
+        cont[f["cid"]] = cont.get(f["cid"], 0) + 1
+    quem = max(cont, key=lambda k: cont[k])
+    alvo = falas[min(len(falas) - 1, max(0, len(falas) // 4))]
+    texto = "Pausa rápida: se tá curtindo o react, deixa o like e se inscreve no canal!"
+    falas.append({"id": "f" + secrets.token_hex(3), "t": round(alvo["t"] + alvo["dur"] + 0.3, 2), "cid": quem, "cta": True,
+                  "reacoes": [], "texto": texto, "expressao": "empolgado", "dur": duracao_fala(texto), "duvida": ""})
+    falas.sort(key=lambda f: f["t"])
+    return True
+
+
+def aplicar_roteiro(p: Dict[str, Any], r: Any, janela: Optional[List[float]] = None) -> Dict[str, Any]:
     """A resposta da IA (ou colada) → as falas do projeto: o nome casado com o elenco, o tempo no vídeo, a
-    expressão válida, o tempo de leitura. Garante 1 pedido de inscrição."""
+    expressão válida, o tempo de leitura. Com `janela` (uma parte): troca só as falas daquele trecho. Sem janela
+    (o roteiro inteiro): garante 1 pedido de inscrição."""
     if isinstance(r, list):
         r = {"falas": r}
     if not isinstance(r, dict) or not isinstance(r.get("falas"), list):
@@ -1212,6 +1328,11 @@ def aplicar_roteiro(p: Dict[str, Any], r: Any) -> Dict[str, Any]:
             continue
         if dur_video:
             t = min(max(0.0, t), max(0.0, dur_video - 1.5))
+        if janela:
+            if t < janela[0] - 5 or t > janela[1] + 5:  # bem fora do trecho: a IA errou a parte
+                ignoradas += 1
+                continue
+            t = min(max(t, janela[0]), max(janela[0], janela[1] - 0.3))
         ex = _slug(x.get("expressao")) if _slug(x.get("expressao")) in exprs else "neutro"
         reacoes = []
         for y in x.get("reacoes") or []:
@@ -1225,39 +1346,75 @@ def aplicar_roteiro(p: Dict[str, Any], r: Any) -> Dict[str, Any]:
     if not falas:
         raise ReactErro("Nenhuma fala aproveitável (confira os nomes dos personagens).")
     falas.sort(key=lambda f: f["t"])
-    if not any(f["cta"] for f in falas):  # a IA esqueceu: o personagem que mais fala pede, no primeiro terço
-        cont: Dict[str, int] = {}
-        for f in falas:
-            cont[f["cid"]] = cont.get(f["cid"], 0) + 1
-        quem = max(cont, key=lambda k: cont[k])
-        alvo = falas[min(len(falas) - 1, max(0, len(falas) // 4))]
-        t = alvo["t"] + alvo["dur"] + 0.3
-        falas.append({"id": "f" + secrets.token_hex(3), "t": round(t, 2), "cid": quem, "cta": True, "reacoes": [],
-                      "texto": "Pausa rápida: se tá curtindo o react, deixa o like e se inscreve no canal!",
-                      "expressao": "empolgado", "dur": duracao_fala("Pausa rápida: se tá curtindo o react, deixa o like e se inscreve no canal!")})
-        falas.sort(key=lambda f: f["t"])
+    if janela:
+        a, b = janela
+        antigas = (p.get("roteiro") or {}).get("falas") or []
+        ultima = b >= duracao_total(p) - 0.01
+        ficam = [f for f in antigas if not (a <= float(f["t"]) < b or (ultima and float(f["t"]) >= b))]
+        resumo = str(r.get("resumo") or "") if not (p.get("roteiro") or {}).get("resumo") else p["roteiro"]["resumo"]
+        p["roteiro"] = dict(p.get("roteiro") or {}, resumo=resumo[:1000], quando=time.time(), ignoradas=ignoradas,
+                            falas=sorted(ficam + falas, key=lambda f: f["t"]))
+        log(p, f"📝 roteiro, {mmss(a)}–{mmss(b)}: {len(falas)} fala(s)" + (f" · {ignoradas} ignorada(s)" if ignoradas else ""))
+        return p["roteiro"]
     p["roteiro"] = {"resumo": str(r.get("resumo") or "")[:1000], "falas": falas, "quando": time.time(), "ignoradas": ignoradas}
-    log(p, f"📝 roteiro: {len(falas)} fala(s)" + (f" · {ignoradas} ignorada(s) (nome que não está no elenco)" if ignoradas else ""))
+    garantir_cta(p)
+    log(p, f"📝 roteiro: {len(p['roteiro']['falas'])} fala(s)" + (f" · {ignoradas} ignorada(s) (nome que não está no elenco)" if ignoradas else ""))
     return p["roteiro"]
 
 
-def gerar_roteiro(pid: str, base: str = _BASE) -> Dict[str, Any]:
+def gerar_roteiro(pid: str, base: str = _BASE, parte: Optional[int] = None, so_vazias: bool = False,
+                  on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+    """🤖 O roteiro em PARTES de ~2,5 min (cada uma com a transcrição e os quadros do trecho dela e as falas de antes,
+    pra continuar a conversa). Cada parte pronta já é salva. `parte` = só uma; `so_vazias` = só as que faltam."""
     p = carregar(pid, base)
     if not p["personagens"]:
         raise ReactErro("Monte o elenco antes do roteiro.")
     if not p["transcricao"] and not _video_local(p, base):
         raise ReactErro("Cole a transcrição (ou mande o vídeo) antes.")
     exprs = p.get("expressoes") or EXPRESSOES_PADRAO
-    conteudo = [{"type": "text", "text": prompt_roteiro(p)}] + blocos_do_video(p, base, 36)
-    r = _ia().chamar("react", sys_roteiro(p), conteudo, schema=_schema_roteiro(exprs), max_tokens=12000, effort="medium",
-                     timeout=300, cache_local=False)
-    if r is None:
-        raise ReactErro("A IA não respondeu (desligada, sem crédito ou erro) — copie o prompt e cole a resposta de outra IA.")
+    ps = partes_roteiro(p)
+    if parte is not None:
+        alvo = [parte] if 0 <= parte < len(ps) else []
+    elif so_vazias:
+        alvo = [x["k"] for x in estado_partes(p) if x["vazia"]]
+    else:
+        alvo = list(range(len(ps)))
+    if not alvo:
+        return {"feitas": 0, "erros": [], "falas": len((p.get("roteiro") or {}).get("falas") or []), "msg": "nenhuma parte faltando"}
+    feitas, erros = 0, []
+    for n, k in enumerate(alvo, 1):
+        a, b = ps[k]
+        on_log(f"parte {n} de {len(alvo)} ({mmss(a)}–{mmss(b)})…")
+        p = carregar(pid, base)
+        conteudo = [{"type": "text", "text": prompt_roteiro_parte(p, k)}] + blocos_do_video(p, base, 9, a, b)
+        r = None
+        for _tentativa in range(2):
+            r = _ia().chamar("react", sys_roteiro(p), conteudo, schema=_schema_roteiro(exprs), max_tokens=8000,
+                             effort="medium", timeout=240, cache_local=False)
+            if r is not None and isinstance(r, dict) and r.get("falas"):
+                break
+        if r is None:
+            erros.append(f"{mmss(a)}–{mmss(b)}")
+            continue
+        with _TRAVA:
+            p = carregar(pid, base)
+            try:
+                aplicar_roteiro(p, r, janela=[a, b])
+                feitas += 1
+            except ReactErro as exc:
+                erros.append(f"{mmss(a)}–{mmss(b)} ({exc})")
+            salvar(p, base)
     with _TRAVA:
         p = carregar(pid, base)
-        rot = aplicar_roteiro(p, r)
+        if garantir_cta(p):
+            log(p, "📣 a IA não pôs o pedido de inscrição — entrou uma fala padrão (troque se quiser)")
         salvar(p, base)
-    return rot
+    total = len((p.get("roteiro") or {}).get("falas") or [])
+    if not feitas:
+        raise ReactErro("A IA não respondeu (desligada, sem crédito ou erro) — copie o prompt de cada parte e cole a resposta "
+                        "de outra IA." + (f" Faltaram: {', '.join(erros)}" if erros else ""))
+    return {"feitas": feitas, "erros": erros, "falas": total,
+            "msg": f"{feitas} parte(s), {total} fala(s)" + (f" · ⚠ faltaram {', '.join(erros)} — use 🤖 Completar" if erros else "")}
 
 
 def ajustar_falas(falas: List[Dict[str, Any]], dur_video: Optional[float] = None) -> List[Dict[str, Any]]:
@@ -2353,6 +2510,7 @@ def para_tela(p: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
         out["personagens"].append(x)
     out["camadas"] = {q: dict((p["cenario"]["camadas"].get(q) or {}), tem=bool(camada_arquivo(p, q, base))) for q in CAMADAS}
     out["ia"] = ia_ligada()
+    out["partes"] = estado_partes(p)
     try:
         import gemini_servico as gm
         out["gemini"] = bool(gm.chave())

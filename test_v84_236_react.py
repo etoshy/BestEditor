@@ -378,3 +378,66 @@ def test_transcricao_do_youtube_pelo_sistema_dos_roteiros(base, monkeypatch):
     R.salvar(p, base)
     with pytest.raises(R.ReactErro):
         R.transcrever_youtube(p["id"], base)
+
+
+def test_roteiro_em_partes_cobre_o_video_inteiro(base, monkeypatch):
+    """Vídeo de 10 min: o roteiro sai em partes de ~2,5 min (num pedido só a IA parava nos 2 min)."""
+    import re as _re
+    import ia_servico
+    p = _proj(base, 3)
+    p["video"] = {"duracao": 600.0}
+    R.definir_transcricao(p, "\n".join(f"{m}:{s:02d} frase {m}-{s}" for m in range(10) for s in (5, 35)))
+    R.salvar(p, base)
+    pedidos = []
+
+    def ia_falsa(recurso, system, conteudo, **kw):
+        txt = conteudo[0]["text"]
+        m = _re.search(r"PARTE (\d+) DE (\d+): do \S+ \((\d+) s\) ao \S+ \((\d+) s\)", txt)
+        a, b = int(m.group(3)), int(m.group(4))
+        pedidos.append((int(m.group(1)), "coloque NESTA parte" in txt, "LOGO ANTES" in txt))
+        if "PARTE 3 DE" in txt and len(pedidos) <= 4:
+            return None  # uma parte falha: as outras ficam, e o 🤖 Completar faz só ela
+        return {"resumo": "r", "falas": [{"tempo": t, "personagem": "Sasuke" if t % 20 else "Naruto", "texto": f"olha isso aos {t} segundos",
+                                          "expressao": "feliz", "pedido_inscricao": False, "reacoes": [], "duvida": ""}
+                                         for t in range(a + 3, b, 12)]}
+    monkeypatch.setattr(ia_servico, "chamar", ia_falsa)
+    monkeypatch.setattr(R, "blocos_do_video", lambda *a, **k: [])
+    assert [x["fim"] for x in R.estado_partes(p)] == [150, 300, 450, 600]
+    r = R.gerar_roteiro(p["id"], base)
+    assert r["feitas"] == 3 and r["erros"] == ["5:00–7:30"]
+    assert [x[0] for x in pedidos] == [1, 2, 3, 3, 4] and pedidos[1][1] and not pedidos[0][1]  # o pedido de inscrição vai na parte de ~25%
+    assert pedidos[1][2]  # a parte 2 recebe as falas da parte 1 pra continuar a conversa
+    p = R.carregar(p["id"], base)
+    assert [x["vazia"] for x in R.estado_partes(p)] == [False, False, True, False]
+    r = R.gerar_roteiro(p["id"], base, so_vazias=True)
+    p = R.carregar(p["id"], base)
+    falas = p["roteiro"]["falas"]
+    assert r["feitas"] == 1 and not any(x["vazia"] for x in R.estado_partes(p))
+    assert max(f["t"] for f in falas) > 580 and sum(f["cta"] for f in falas) == 1
+    assert len({f["id"] for f in falas}) == len(falas)
+    # colar a resposta de outra IA numa parte só troca as falas daquele trecho
+    antes = [f for f in falas if f["t"] >= 150]
+    R.aplicar_roteiro(p, {"falas": [{"tempo": 10, "personagem": "Naruto", "texto": "nova", "expressao": "feliz",
+                                     "pedido_inscricao": False, "reacoes": [], "duvida": ""}]}, janela=[0, 150])
+    assert [f["texto"] for f in p["roteiro"]["falas"] if f["t"] < 150] == ["nova"]
+    assert [f["id"] for f in p["roteiro"]["falas"] if f["t"] >= 150] == [f["id"] for f in antes]
+    assert "PARTE 2 DE 4" in R.prompt_copiar(p, "roteiro", 1)
+
+
+def test_abrir_todos_os_personagens_em_guias(base, monkeypatch):
+    import app as A
+    import navegador_imagens as nav
+    abertas = {}
+    monkeypatch.setattr(nav, "abrir", lambda b, urls, cfg=None, chaves=None, pid="": abertas.update(urls=urls, chaves=chaves) or
+                        {"ok": True, "guias": len(urls), "navegador": "Brave", "confirmadas": list(range(len(urls)))})
+    monkeypatch.setattr(nav, "fechar_terminadas", lambda *a, **k: {"fechadas": [], "mantidas": []})
+    c = A.app.test_client()
+    p = _proj(base, 3)
+    R.guardar_ref(p, p["personagens"][0], _png(), base)  # um já tem imagem: no "abrir todos" ele vem também
+    R.salvar(p, base)
+    todos = [x["id"] for x in p["personagens"]]
+    d = c.post(f"/react-personagens/{p['id']}/brave", json={"cids": todos}).get_json()
+    assert d["guias"] == 3 and abertas["chaves"] == ["el:" + x for x in todos]
+    assert all("udm=2" in u and "#bes=" in u for u in abertas["urls"])
+    d = c.post(f"/react-personagens/{p['id']}/brave", json={}).get_json()  # só quem está sem imagem
+    assert d["guias"] == 2
