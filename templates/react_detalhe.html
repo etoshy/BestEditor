@@ -55,6 +55,46 @@
   .rx-poses .p { width: 62px; text-align: center; font-size: .66rem; color: var(--mudo); }
   .rx-poses .p div { width: 62px; height: 93px; border-radius: 6px; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/12px 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .rx-poses .p img { width: 100%; height: 100%; object-fit: contain; }
+  .rx-palco { position: relative; width: 100%; aspect-ratio: 16/9; background: #111 center/100% 100% no-repeat; border-radius: 10px; overflow: hidden; user-select: none; touch-action: none; }
+  .rx-peca { position: absolute; cursor: move; outline: 1px dashed rgba(255,255,255,.25); }
+  .rx-peca img { width: 100%; height: 100%; object-fit: fill; pointer-events: none; display: block; }
+  .rx-peca.sel { outline: 2px solid #f59e0b; z-index: 50 !important; }
+  .rx-peca.aj::after { content: '✋'; position: absolute; top: 2px; left: 3px; font-size: 11px; }
+  .rx-peca .rx-nome { position: absolute; bottom: 100%; left: 0; font-size: 11px; background: rgba(0,0,0,.7); color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; display: none; }
+  .rx-peca.sel .rx-nome, .rx-palco:hover .rx-peca .rx-nome { display: block; }
+  .rx-alca { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; background: #f59e0b; border: 2px solid #fff; border-radius: 50%; cursor: nwse-resize; display: none; }
+  .rx-peca.sel .rx-alca { display: block; }
+  .rx-tv { background: #000; border: 3px solid #333; box-sizing: border-box; border-radius: 6px; }
+  .rx-leg { background: rgba(0,0,0,.72); color: #fff; border-radius: 8px; font-size: 12px; padding: 4px 8px; box-sizing: border-box; }
+  .rx-ev { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; display: grid; grid-template-columns: 1fr 240px; gap: 10px; }
+  .rx-ev.briga { border-left: 4px solid #ef4444; } .rx-ev.cena { border-left: 4px solid #a855f7; } .rx-ev.sai { border-left: 4px solid #64748b; } .rx-ev.volta { border-left: 4px solid #22c55e; }
+  @media (max-width: 900px) { .rx-ev { grid-template-columns: 1fr; } }
+  .rx-ev img.cg { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: #111; cursor: zoom-in; }
+  .rx-ev .vaz { width: 100%; aspect-ratio: 16/9; border-radius: 8px; background: rgba(127,127,127,.12); display: flex; align-items: center; justify-content: center; font-size: .8rem; text-align: center; padding: 6px; box-sizing: border-box; }
+  .rx-cena-palco { position: absolute; inset: 0; z-index: 900; background: #000 center/cover no-repeat; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; }
+  .rx-cena-palco span { background: rgba(0,0,0,.7); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 0 0 6px 6px; }
+  .rx-peca.fora { opacity: .25; outline-style: dotted; }
+  .rx-ps { display: grid; grid-template-columns: 1fr 250px; gap: 10px; align-items: start; }
+  @media (max-width: 1000px) { .rx-ps { grid-template-columns: 1fr; } }
+  .rx-ps-lado { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; background: var(--card); }
+  .rx-ps-tit { font-weight: 600; font-size: .88rem; margin-bottom: 6px; }
+  .rx-camadas { display: flex; flex-direction: column; gap: 3px; max-height: 360px; overflow: auto; }
+  .rx-cam-l { display: flex; align-items: center; gap: 5px; padding: 3px 5px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-size: .82rem; background: rgba(127,127,127,.07); }
+  .rx-cam-l.sel { border-color: #f59e0b; background: rgba(245,158,11,.12); }
+  .rx-cam-l.arr { opacity: .4; }
+  .rx-cam-l.sobre { border-top: 2px solid #f59e0b; }
+  .rx-cam-l .ic { cursor: pointer; width: 20px; text-align: center; opacity: .9; user-select: none; }
+  .rx-cam-l .ic.off { opacity: .3; }
+  .rx-cam-l .mini { width: 34px; height: 24px; object-fit: contain; background: #222; border-radius: 3px; flex: none; }
+  .rx-cam-l .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rx-cam-l .ex { font-size: .72rem; opacity: .7; }
+  .rx-cam-l.fixa { cursor: default; opacity: .75; }
+  .rx-props { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin-bottom: 6px; }
+  .rx-props label { margin: 0; font-size: .78rem; }
+  .rx-props input[type=number] { width: 100%; }
+  .rx-peca.oc { display: none; }
+  .rx-peca.trav { cursor: default; }
+  .rx-peca.fala { box-shadow: 0 0 0 2px rgba(34,197,94,.8); }
   .rx-previa { width: 100%; border-radius: 10px; background: #000; aspect-ratio: 16/9; object-fit: contain; display: block; }
   .rx-log { font-family: var(--mono); font-size: .74rem; color: var(--mudo); max-height: 160px; overflow: auto; white-space: pre-wrap; }
   .rx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -150,6 +190,7 @@
   <p class="rx-dica">A IA analisa a transcrição e o vídeo e escreve quem fala, quando e com que cara — no jeito de cada um. O pedido de like/inscrição é uma fala de um dos personagens (linha amarela 📣), sem corte de inscreva-se.</p>
   <div class="rx-linha">
     <label style="margin:0;">Quantidade de falas <select id="fDens" style="width:auto;">{% for d in densidades %}<option value="{{ d }}" {% if p.densidade == d %}selected{% endif %}>{{ {'pouca': 'pouca (1 a cada ~15 s)', 'normal': 'normal (1 a cada ~9 s)', 'muita': 'muita (1 a cada ~6 s)'}[d] }}</option>{% endfor %}</select></label>
+    <label style="margin:0;">⚡ Intrigas entre eles <select id="fIntriga" style="width:auto;">{% for k, v in intrigas.items() %}<option value="{{ k }}" {% if p.intriga == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
   </div>
   <div class="rx-dica" style="margin-bottom:2px">Expressões de cada personagem (cada uma vira uma pose sentado + a boca de fala):</div>
   <div class="rx-chips" id="fExpr">{% for k, e in expressoes.items() %}<label><input type="checkbox" value="{{ k }}" {% if k in p.expressoes %}checked{% endif %} {% if k == 'neutro' %}disabled{% endif %}>{{ e[0] }}</label>{% endfor %}</div>
@@ -160,6 +201,11 @@
   </div>
   <div class="rx-dica" style="margin:6px 0 2px">O roteiro sai em <b>partes</b> (num pedido só, a IA parava no meio de vídeo longo). Cada parte dá pra refazer, ou copiar o prompt e colar a resposta de outra IA:</div>
   <div id="rPartes" style="display:flex;flex-direction:column;gap:4px;"></div>
+  <details id="dVersos" style="margin:8px 0"><summary style="cursor:pointer;font-size:.9rem;font-weight:600">⭐ Versos que um personagem TEM que comentar <span class="rx-dica" id="vEst" style="font-weight:400"></span></summary>
+    <p class="rx-dica">A IA já comenta sozinha os versos muito bons (rima, punchline, frase profunda) e a edição diferente (transição, efeito, sequência de cortes — o site acha esses momentos no vídeo). Aqui você marca ⭐ os versos que não podem passar batido: alguém vai citar, elogiar ou zoar cada um.</p>
+    <div class="rx-trans" id="vLista" style="max-height:300px"></div>
+  </details>
+  <div id="rEdicao" class="rx-dica"></div>
   <div id="rResumo" class="rx-dica"></div>
   <div style="overflow:auto"><table class="rx-falas" id="falas"></table></div>
   <div class="rx-linha"><button type="button" id="bFalaAdd" class="rx-sec">➕ Fala</button><button type="button" id="bFalasSalvar">💾 Salvar as falas</button><span id="fEst" class="rx-dica"></span></div>
@@ -208,15 +254,56 @@
   <div id="poses" style="display:flex;flex-direction:column;gap:8px;"></div>
 </div>
 
+<!-- 8 · intrigas -->
+<div class="rx-card">
+  <h2><span class="rx-num">8</span>⚡ Intrigas (brigas, cenas, quem sai e volta)</h2>
+  <p class="rx-dica">Como numa visual novel: um provoca o outro nas falas; se esquenta demais vira <b>👊 briga</b> — uma imagem da luta na própria sala, com os personagens do react, ocupa a tela por uns segundos (as legendas continuam por cima). Personagens podem <b>🚪 sair de cena</b> (somem do sofá) e <b>↩ voltar</b>. A IA cria isso junto do roteiro (escolha o nível em ⚡ Intrigas, na seção 4); aqui você confere, muda, apaga ou cria os seus.</p>
+  <div class="rx-linha">
+    <button type="button" id="bEvNovo" class="rx-sec">➕ Novo evento</button>
+    <button type="button" id="bEvSalvar">💾 Salvar intrigas</button>
+    <button type="button" id="bEvGerar" title="manda pro 🚀 Flow em massa as imagens das brigas/cenas que ainda não têm (com a sala e os personagens de referência)">🚀 Gerar as imagens que faltam</button>
+    <span class="rx-dica" id="evEst"></span>
+  </div>
+  <div id="eventos" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;"></div>
+</div>
+
 <!-- 7 · prévia e editor -->
 <div class="rx-card">
-  <h2><span class="rx-num">8</span>👁 Prévia e 🎬 editor</h2>
+  <h2><span class="rx-num">9</span>🎛 Montar a cena (camadas) e 🎬 editor</h2>
+  <p class="rx-dica">Monte a cena como no Photoshop: arraste cada camada no palco, mude o tamanho pela bolinha 🟠 (ou rodinha do mouse), vire, esconda 👁, trave 🔒 e mude a ordem arrastando na lista de 🗂 Camadas. Ande pelo vídeo e as poses de cada personagem trocam <b>no lugar que você deixou</b>. É exatamente isso que vai pro editor.</p>
   <div class="rx-linha">
     <label style="margin:0;flex:1;min-width:240px;">Segundo do vídeo <input type="range" id="pT" min="0" max="{{ (p.video.duracao or 60)|round(0, 'ceil')|int }}" value="0" step="0.5" style="width:100%"></label>
     <span id="pTv" class="rx-dica" style="width:70px">0:00</span>
-    <button type="button" id="bPrevia" class="rx-sec">👁 Atualizar a prévia</button>
+    <label class="rx-dica" style="margin:0;" title="se neste segundo tem uma briga/cena com imagem, mostra ela por cima"><input type="checkbox" id="verCena" checked> ver a cena ⚡</label>
+    <button type="button" id="bPrevia" class="rx-sec">🖼 Ver renderizado</button>
   </div>
-  <img id="previa" class="rx-previa" alt="prévia do react" src="">
+  <div class="rx-ps">
+    <div class="rx-ps-palco">
+      <div class="rx-palco" id="palco"></div>
+      <img id="previa" class="rx-previa" alt="prévia renderizada" src="" style="display:none;">
+    </div>
+    <div class="rx-ps-lado">
+      <div class="rx-ps-tit">🗂 Camadas <span class="rx-dica">(a de cima fica na frente)</span></div>
+      <div id="pilhaCam" class="rx-camadas"></div>
+      <div class="rx-ps-tit" style="margin-top:10px;">🎛 <span id="ajNome">clique numa camada</span></div>
+      <div class="rx-props">
+        <label>X <input type="number" id="ajX" step="1" disabled></label>
+        <label>Y <input type="number" id="ajY" step="1" disabled></label>
+        <label style="grid-column:1/-1;">Tamanho <input type="range" id="ajR" min="40" max="2400" step="1" disabled style="width:100%;"></label>
+        <label>Largura <input type="number" id="ajW" min="40" max="4000" step="10" disabled></label>
+        <span></span>
+      </div>
+      <div class="rx-linha" style="gap:5px;">
+        <button type="button" id="ajFrente" class="rx-sec" disabled title="Trazer pra frente">⬆</button>
+        <button type="button" id="ajTras" class="rx-sec" disabled title="Mandar pra trás">⬇</button>
+        <button type="button" id="ajVirar" class="rx-sec" disabled>↔ Virar</button>
+        <button type="button" id="ajAuto" class="rx-sec" disabled title="Volta esta camada pro lugar automático">↺</button>
+      </div>
+      <label class="rx-dica" style="margin:6px 0 0;"><input type="checkbox" id="ajJunto" checked> 🔗 quem senta no sofá vai junto</label>
+      <button type="button" id="ajTudo" class="rx-sec" style="margin-top:6px;width:100%;">↺ Tudo no automático</button>
+      <div id="ajEst" class="rx-dica" style="margin-top:4px;"></div>
+    </div>
+  </div>
   <div class="rx-linha" style="margin-top:10px;">
     <button type="button" id="bEditor" style="background:#16a34a;font-size:1rem;padding:9px 18px;">🎬 Mandar pro editor (tudo posicionado)</button>
     <span id="eEst" class="rx-dica"></span>
@@ -257,6 +344,7 @@ async function recarregar() {
   try { P = await api(`/react-personagens/${PID}/estado`); desenhar(); } catch (e) { $('avisos').textContent = '⚠ ' + e.message; }
   const t = P && P.tarefa;
   const esperando = (t && !t.fim) || (P && (P.video.estado === 'baixando' || Object.values(P.camadas).some(c => ['fila', 'gerando'].includes(c.estado))
+    || (P.eventos || []).some(e => ['fila', 'gerando'].includes((e.cena || {}).estado))
     || P.personagens.some(c => c.poses && c.poses.tem && (c.poses.esperando || (c.poses.fase === 'mestre' && !c.poses.mestre)))));
   timer = setTimeout(recarregar, esperando ? 3500 : 15000);
 }
@@ -269,7 +357,7 @@ function desenhar() {
   if (t && t.fim && ultimaTarefa !== t.fim) { ultimaTarefa = t.fim; if (t.oque === 'roteiro') falasEditadas = false; }
   $('bChGemini').title = P.gemini ? 'o Gemini pesquisa no Google' : 'falta a chave do Gemini — cole na caixa “🔷 Gemini” da 🔎 Checagem de um Modelo de vídeo';
   $('avisos').textContent = (P.avisos || []).length ? '⚠ ' + P.avisos.join(' · ') : '';
-  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharPartes(); desenharChecagem(); desenharCamadas(); desenharPoses();
+  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharPartes(); desenharChecagem(); desenharCamadas(); desenharPoses(); desenharEventos();
   $('estFinal').textContent = `→ ${P.estilo_final === 'realista' ? '📷 realista' : '🎨 anime/cartoon'}` + (P.estilo === 'auto' ? ' (pelo elenco)' : '');
   $('log').textContent = (P.log || []).slice().reverse().join('\n');
   if (P.editor && P.editor.job_id && !$('eEst').dataset.fixo) $('eEst').innerHTML = `já mandado: <a href="/job/${esc(P.editor.job_id)}/edit-segments" target="_blank">abrir no editor ↗</a> (mandar de novo cria outro projeto)`;
@@ -292,7 +380,21 @@ function desenharVideo() {
   }
   desenharCortes();
 }
+function desenharVersos() {
+  const marc = new Set((P.destaques || []).map(d => d.texto.toLowerCase() + '|' + d.ini));
+  $('vEst').textContent = (P.destaques || []).length ? `— ${(P.destaques || []).length} marcado(s)` : '';
+  const m = (P.edicao || {}).momentos || [];
+  $('rEdicao').textContent = m.length ? `🎬 momentos de edição forte no vídeo (os personagens podem comentar): ${m.map(x => mmss(x.ini)).join(', ')}` : '';
+  if (focoEm($('vLista'))) return;
+  $('vLista').innerHTML = (P.transcricao || []).filter(e => e.tipo === 'fala').map(e => { const on = marc.has(e.texto.toLowerCase() + '|' + e.ini);
+    return `<div style="${on ? 'background:var(--aviso-bg);' : ''}padding:1px 4px;border-radius:4px"><button type="button" class="rx-mini ${on ? '' : 'rx-sec'}" data-verso="${esc(e.texto)}" data-ini="${e.ini == null ? '' : e.ini}" data-on="${on ? 1 : 0}" title="${on ? 'desmarcar' : 'um personagem tem que comentar este verso'}">${on ? '⭐' : '☆'}</button> ${e.ini != null ? `<b>${mmss(e.ini)}</b> ` : ''}${esc(e.texto)}</div>`; }).join('') || '<span class="rx-dica">sem transcrição</span>';
+}
+$('vLista').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-verso]'); if (!b) return;
+  try { await api(`/react-personagens/${PID}/destaque`, { texto: b.dataset.verso, ini: b.dataset.ini === '' ? null : +b.dataset.ini, marcar: b.dataset.on !== '1' }); recarregar(); } catch (er) { alert(er.message); }
+});
 function desenharTrans() {
+  desenharVersos();
   const it = P.transcricao || [];
   if (!focoEm($('fTrans')) && P.transcricao_bruta !== undefined && $('fTrans').dataset.ultima !== P.transcricao_bruta) { $('fTrans').value = P.transcricao_bruta; $('fTrans').dataset.ultima = P.transcricao_bruta; }
   $('tEst').textContent = it.length ? `${it.filter(e => e.tipo === 'fala').length} frase(s) · ${it.filter(e => e.tipo === 'credito').length} crédito(s)` : 'sem transcrição';
@@ -302,7 +404,8 @@ async function salvarDados(campos) { try { await api(`/react-personagens/${PID}/
 [['fTitulo', 'titulo'], ['fObra', 'obra'], ['fIdioma', 'idioma'], ['fContexto', 'contexto'], ['fUrl', 'url'], ['fPedido', 'pedido_cenario']].forEach(([id, k]) =>
   $(id).addEventListener('change', async (e) => { await salvarDados({ [k]: e.target.value }); if (k === 'titulo') $('tTitulo').textContent = e.target.value; }));
 $('fDens').addEventListener('change', (e) => salvarDados({ densidade: e.target.value }));
-$('fLayout').addEventListener('change', async (e) => { await salvarDados({ layout: e.target.value }); atualizarPrevia(); });
+$('fIntriga').addEventListener('change', (e) => salvarDados({ intriga: e.target.value }));
+$('fLayout').addEventListener('change', async (e) => { await salvarDados({ layout: e.target.value }); atualizarPrevia();  });
 $('fEstilo').addEventListener('change', async (e) => { await salvarDados({ estilo: e.target.value }); recarregar(); });
 $('fExpr').addEventListener('change', () => salvarDados({ expressoes: [...$('fExpr').querySelectorAll('input:checked')].map(i => i.value) }));
 $('bTrans').addEventListener('click', async () => {
@@ -496,11 +599,11 @@ function linhaFala(f) {
   const ops = P.personagens.map(c => `<option value="${c.id}" ${c.id === f.cid ? 'selected' : ''}>${esc(c.nome)}</option>`).join('');
   const exs = Object.entries(EXPR).map(([k, v]) => `<option value="${k}" ${k === f.expressao ? 'selected' : ''}>${v[0]}</option>`).join('');
   const reac = (f.reacoes || []).map(r => { const c = P.personagens.find(x => x.id === r.cid); return c ? `${esc(c.nome)} ${EXPR[r.expressao] ? EXPR[r.expressao][0].split(' ')[0] : ''}` : ''; }).filter(Boolean).join(', ');
-  return `<tr data-id="${esc(f.id)}" class="${f.cta ? 'cta' : ''}" data-reacoes='${esc(JSON.stringify(f.reacoes || []))}' data-duvida="${esc(f.duvida || '')}">
+  return `<tr data-id="${esc(f.id)}" class="${f.cta ? 'cta' : ''}" data-reacoes='${esc(JSON.stringify(f.reacoes || []))}' data-duvida="${esc(f.duvida || '')}" data-destaque="${esc(f.destaque || '')}">
     <td style="width:74px"><input value="${mmss(f.t)}${(+f.t % 1) ? '.' + String(Math.round((+f.t % 1) * 10)) : ''}" data-f="t" style="width:68px"></td>
     <td style="width:150px"><select data-f="cid">${ops}</select></td>
     <td style="width:150px"><select data-f="expressao">${exs}</select></td>
-    <td><textarea data-f="texto">${esc(f.texto)}</textarea>${reac ? `<div class="rx-dica" style="margin:0">👀 reagem: ${reac}</div>` : ''}${f.duvida ? `<div class="rx-dica rx-av" style="margin:0" title="vai pro 🔎 verificador de fatos">⚠ dúvida da IA: ${esc(f.duvida)}</div>` : ''}</td>
+    <td><textarea data-f="texto">${esc(f.texto)}</textarea>${reac ? `<div class="rx-dica" style="margin:0">👀 reagem: ${reac}</div>` : ''}${f.duvida ? `<div class="rx-dica rx-av" style="margin:0" title="vai pro 🔎 verificador de fatos">⚠ dúvida da IA: ${esc(f.duvida)}</div>` : ''}${f.destaque === 'letra' ? '<div class="rx-dica" style="margin:0">🎤 comenta a letra</div>' : f.destaque === 'edicao' ? '<div class="rx-dica" style="margin:0">🎬 comenta a edição</div>' : ''}</td>
     <td style="width:60px"><input type="number" step="0.1" min="0.8" max="15" value="${f.dur}" data-f="dur" style="width:56px" title="segundos na tela"></td>
     <td style="width:38px;text-align:center"><input type="checkbox" data-f="cta" ${f.cta ? 'checked' : ''} title="📣 pedido de like/inscrição" style="width:auto"></td>
     <td style="width:66px;white-space:nowrap"><button type="button" class="rx-mini rx-sec" data-ver title="prévia neste segundo">👁</button> <button type="button" class="rx-mini rx-perigo" data-del>✕</button></td></tr>`;
@@ -520,7 +623,7 @@ $('falas').addEventListener('change', (e) => { falasEditadas = true; $('fEst').t
 $('falas').addEventListener('click', (e) => {
   const tr = e.target.closest('tr[data-id]'); if (!tr) return;
   if (e.target.hasAttribute('data-del')) { tr.remove(); falasEditadas = true; $('fEst').textContent = '✏ não salvo'; }
-  if (e.target.hasAttribute('data-ver')) { const t = seg(tr.querySelector('[data-f=t]').value); if (t != null) { $('pT').value = t + 0.4; atualizarPrevia(); $('previa').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+  if (e.target.hasAttribute('data-ver')) { const t = seg(tr.querySelector('[data-f=t]').value); if (t != null) { $('pT').value = t + 0.4; atualizarPrevia(); document.querySelector('.rx-ps').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
 });
 $('bFalaAdd').addEventListener('click', () => {
   if (!P.personagens.length) return alert('Monte o elenco antes.');
@@ -531,7 +634,7 @@ $('bFalaAdd').addEventListener('click', () => {
 $('bFalasSalvar').addEventListener('click', async () => {
   const falas = [...$('falas').querySelectorAll('tr[data-id]')].map(tr => ({ id: tr.dataset.id, t: seg(tr.querySelector('[data-f=t]').value), cid: tr.querySelector('[data-f=cid]').value,
     expressao: tr.querySelector('[data-f=expressao]').value, texto: tr.querySelector('[data-f=texto]').value, dur: parseFloat(tr.querySelector('[data-f=dur]').value),
-    cta: tr.querySelector('[data-f=cta]').checked, reacoes: JSON.parse(tr.dataset.reacoes || '[]'), duvida: tr.dataset.duvida || '' }));
+    cta: tr.querySelector('[data-f=cta]').checked, reacoes: JSON.parse(tr.dataset.reacoes || '[]'), duvida: tr.dataset.duvida || '', destaque: tr.dataset.destaque || '' }));
   try { const d = await api(`/react-personagens/${PID}/roteiro`, { falas }); falasEditadas = false; avisar($('fEst'), `✔ ${d.falas} fala(s) salvas`, 'rx-ok'); recarregar(); } catch (e) { avisar($('fEst'), '❌ ' + e.message, 'rx-err'); }
 });
 
@@ -577,13 +680,16 @@ document.addEventListener('click', async (e) => {
 // ------------------------------------------------------------------ 5 · cenário
 function desenharCamadas() {
   const box = $('camadas');
+  if ([...box.querySelectorAll('[data-galeria]')].some(g => g.style.display === 'flex')) return;  // a galeria ♻ aberta fica
   box.innerHTML = CAMADAS.map(q => {
     const c = P.camadas[q] || {}, st = c.estado === 'fila' || c.estado === 'gerando' ? (c.msg || '⏳ na fila') : c.estado === 'erro' ? '❌ ' + (c.erro || 'erro') : c.tem ? '✔ pronta' + (c.origem === 'upload' ? ' (sua imagem)' : '') : 'ainda não gerada';
     return `<div class="rx-camada" data-q="${q}"><b>${ROT_CAM[q]}</b> <span class="rx-dica ${c.estado === 'erro' ? 'rx-err' : ''}">${esc(st)}</span>
       <div class="img" style="margin-top:6px;">${c.tem ? `<img src="/react-personagens/${PID}/arquivo/cenario/${esc(c.arquivo)}" data-zoom>` : (q === 'fundo' ? '🧱' : q === 'sofa' ? '🛋' : '🪵')}</div>
       ${(c.versoes || []).length > 1 ? `<div class="rx-versoes">${c.versoes.map(v => `<img src="/react-personagens/${PID}/arquivo/cenario/${esc(v)}" data-versao="${esc(v)}" class="${v === c.arquivo ? 'atual' : ''}" title="usar esta versão">`).join('')}</div>` : ''}
       <div class="rx-linha"><button type="button" class="rx-mini" data-gerar ${['fila', 'gerando'].includes(c.estado) ? 'disabled' : ''}>🚀 ${c.tem ? 'Refazer' : 'Gerar'} no Flow</button>
-      <label class="rx-mini rx-sec" style="cursor:pointer;color:#fff;border-radius:6px;">📁 Minha imagem<input type="file" accept="image/*" data-up style="display:none"></label></div></div>`;
+      <label class="rx-mini rx-sec" style="cursor:pointer;color:#fff;border-radius:6px;">📁 Minha imagem<input type="file" accept="image/*" data-up style="display:none"></label>
+      <button type="button" class="rx-mini rx-sec" data-outros title="usar uma imagem desta camada já feita em outro react">♻ De outro react</button></div>
+      <div class="rx-versoes" data-galeria style="display:none"></div></div>`;
   }).join('');
 }
 $('bCamadas').addEventListener('click', async () => { try { const d = await api(`/react-personagens/${PID}/cenario/gerar`, {}); if (d.aviso) alert(d.aviso); recarregar(); } catch (e) { alert(e.message); } });
@@ -592,6 +698,14 @@ $('camadas').addEventListener('click', async (e) => {
   try {
     if (e.target.hasAttribute('data-gerar')) { const d = await api(`/react-personagens/${PID}/cenario/gerar`, { quais: [q.q] }); if (d.aviso) alert(d.aviso); recarregar(); }
     if (e.target.dataset.versao) { await api(`/react-personagens/${PID}/cenario/${q.q}/versao`, { arquivo: e.target.dataset.versao }); await recarregar(); atualizarPrevia(); }
+    if (e.target.hasAttribute('data-outros')) {
+      const g = e.target.closest('[data-q]').querySelector('[data-galeria]');
+      if (g.style.display !== 'none') { g.style.display = 'none'; return; }
+      const d = await api(`/react-personagens/${PID}/cenario/${q.q}/outros`);
+      g.innerHTML = (d.itens || []).map(x => `<img src="/react-personagens/${PID}/outro/${x.projeto}/${esc(x.arquivo)}" data-reusar="${x.projeto}|${esc(x.arquivo)}" title="${esc(x.titulo)} · ${x.estilo === 'realista' ? '📷 realista' : '🎨 anime'} — clique pra usar" style="height:54px">`).join('') || '<span class="rx-dica">nenhum outro react tem essa camada ainda</span>';
+      g.style.display = 'flex';
+    }
+    if (e.target.dataset.reusar) { const [projeto, arquivo] = e.target.dataset.reusar.split('|'); await api(`/react-personagens/${PID}/cenario/${q.q}/reusar`, { projeto, arquivo }); await recarregar(); atualizarPrevia(); }
   } catch (er) { alert(er.message); }
 });
 $('camadas').addEventListener('change', async (e) => {
@@ -609,9 +723,11 @@ function desenharPoses() {
     let st = 'ainda não gerado';
     if (s.erro) st = '❌ ' + s.erro;
     else if (s.tem && s.prontas && !s.esperando && c.pod && c.pod.reaproveitado && s.prontas >= s.total) st = `♻ reaproveitado de um react anterior · ${s.prontas}/${s.total} expressões · ${s.bocas} boca(s) ✔`;
+    else if (s.tem && s.por_lado && !(s.por_lado[c.lado] || {}).total) st = `⚠ no layout atual ele olha pra ${c.lado === 'esq' ? 'esquerda (sofá da direita)' : 'direita'} e ainda não tem as poses desse lado — 🔁 Gerar o que falta (as do outro lado ficam e são reaproveitadas)`;
     else if (s.tem) st = !s.mestre ? (s.esperando ? '⏳ gerando a ⭐ neutra (a mestre)…' : s.erros ? '❌ a neutra falhou — refaça' : '⏳ esperando a neutra') : `${s.prontas}/${s.total} expressões · ${s.bocas} boca(s)` + (s.esperando ? ` · ⏳ ${s.esperando} no Flow` : ' · ✔') + (s.erros ? ` · ❌ ${s.erros} com erro` : '');
-    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/react-personagens/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${esc(i.arquivo.replace(/\.png$/, '').split('_').pop())}</div>`).join('');
-    return `<div class="rx-camada" data-cid="${c.id}"><div class="rx-linha" style="margin:0"><b>${esc(c.nome)}</b> <span class="rx-dica" style="margin:0">${esc(st)}</span>
+    const lados = s.por_lado ? Object.entries(s.por_lado).filter(([, v]) => v.total).map(([l, v]) => `${l === 'esq' ? '←' : '→'} ${v.prontas}/${v.total}`).join(' · ') : '';
+    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/react-personagens/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${i.lado === 'esq' ? '← ' : ''}${esc(i.arquivo.replace(/\.png$/, '').replace(/_esq$/, '').split('_').pop())}</div>`).join('');
+    return `<div class="rx-camada" data-cid="${c.id}"><div class="rx-linha" style="margin:0"><b>${esc(c.nome)}</b> ${lados ? `<span class="rx-tag" title="poses prontas por lado: → olhando pra direita · ← olhando pra esquerda">${lados}</span>` : ''} <span class="rx-dica" style="margin:0">${esc(st)}</span>
       <button type="button" class="rx-mini" data-gerar-p>${s.tem ? '🔁 Gerar o que falta' : '🚀 Gerar'}</button>
       ${s.tem ? `<button type="button" class="rx-mini rx-sec" data-refazer-p title="cria o projeto de novo (com a referência e a ficha atuais)">♻ Do zero</button> <a href="/personagens-pod/${esc(s.pid)}" target="_blank" class="rx-dica">abrir na 🧍 aba Personagens ↗</a>` : ''}</div>
       ${imgs ? `<div class="rx-poses">${imgs}</div>` : ''}</div>`;
@@ -630,10 +746,288 @@ $('poses').addEventListener('click', (e) => {
 });
 
 // ------------------------------------------------------------------ 7 · prévia e editor
-function atualizarPrevia() { $('pTv').textContent = mmss($('pT').value); $('previa').src = `/react-personagens/${PID}/previa.jpg?t=${$('pT').value}&r=${Date.now()}`; }
+// ------------------------------------------------------------------ 8 · ⚡ intrigas
+const TIPOS_EV = {{ tipos_evento|tojson }};
+let EVS = null, evsEditados = false;
+function desenharEventos() {
+  if (evsEditados && EVS) return;
+  EVS = (P.eventos || []).map(e => Object.assign({}, e, { cids: (e.cids || []).slice() }));
+  pintarEventos();
+}
+function pintarEventos() {
+  const box = $('eventos');
+  if (!EVS.length) { box.innerHTML = '<div class="rx-dica">Nenhum evento ainda — escreva o roteiro com ⚡ Intrigas ligado, ou ➕ crie um.</div>'; return; }
+  box.innerHTML = EVS.map((e, k) => {
+    const img = ['briga', 'cena'].includes(e.tipo), c = e.cena || {};
+    const st = c.estado === 'erro' ? `❌ ${esc(c.erro || '')}` : (c.estado === 'fila' || c.estado === 'gerando') ? esc(c.msg || '⏳') : '';
+    const foto = img ? (e.tem_imagem && c.arquivo ? `<img class="cg" data-zoom src="/react-personagens/${PID}/arquivo/cenas/${esc(c.arquivo)}">` : `<div class="vaz">${st || '🖼 sem imagem ainda — 🚀 Gerar ou 📤 Enviar'}</div>`) : '';
+    return `<div class="rx-ev ${esc(e.tipo)}" data-k="${k}">
+      <div>
+        <div class="rx-linha" style="gap:6px;">
+          <input data-f="t" value="${mmss(e.t)}" style="width:70px" title="segundo do vídeo">
+          <select data-f="tipo" style="width:auto">${Object.entries(TIPOS_EV).map(([v, r]) => `<option value="${v}" ${v === e.tipo ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
+          ${img ? `<label class="rx-dica" style="margin:0">dura <input data-f="dur" type="number" min="1.5" max="12" step="0.5" value="${e.dur || 4.5}" style="width:64px"> s</label>` : ''}
+          <button type="button" class="rx-sec" data-ver title="ver este segundo no palco">👁</button>
+          <button type="button" class="rx-sec" data-apagar title="apagar">🗑</button>
+        </div>
+        <div class="rx-chips" style="margin:6px 0;">${P.personagens.map(c => `<label><input type="checkbox" data-cid="${esc(c.id)}" ${e.cids.includes(c.id) ? 'checked' : ''}>${esc(c.nome)}</label>`).join('')}</div>
+        <input data-f="descricao" value="${esc(e.descricao || '')}" placeholder="o que acontece (ex.: o Naruto dá um soco no Sasuke depois da provocação)" style="width:100%">
+        ${img ? `<details style="margin-top:4px"><summary class="rx-dica" style="cursor:pointer">🎨 descrição da imagem (inglês, vai pro Flow)</summary><textarea data-f="imagem_en" rows="3" style="width:100%">${esc(e.imagem_en || '')}</textarea></details>` : ''}
+      </div>
+      <div>${img ? `${foto}
+        <div class="rx-linha" style="gap:4px;margin-top:4px;">
+          <button type="button" class="rx-sec" data-gerar ${e.id ? '' : 'disabled title="salve primeiro"'}>🚀 ${e.tem_imagem ? 'Refazer' : 'Gerar'}</button>
+          <label class="rx-sec" style="margin:0;cursor:pointer;padding:4px 8px;border-radius:6px;">📤 Enviar<input type="file" accept="image/*" data-enviar hidden ${e.id ? '' : 'disabled'}></label>
+          ${(c.versoes || []).length > 1 ? `<select data-versao style="width:auto">${c.versoes.map((v, j) => `<option value="${esc(v)}" ${v === c.arquivo ? 'selected' : ''}>versão ${c.versoes.length - j}</option>`).join('')}</select>` : ''}
+        </div>${st && e.tem_imagem ? `<div class="rx-dica">${st}</div>` : ''}` : `<div class="rx-dica">${e.tipo === 'sai' ? '🚪 some do sofá a partir daqui (não fala nem reage) até um ↩ Volta' : '↩ aparece de novo no sofá a partir daqui'}</div>`}</div>
+    </div>`;
+  }).join('');
+}
+function lerEventos() {
+  document.querySelectorAll('#eventos .rx-ev').forEach(el => {
+    const e = EVS[+el.dataset.k];
+    el.querySelectorAll('[data-f]').forEach(i => { const f = i.dataset.f; e[f] = f === 't' ? (seg(i.value) ?? e.t) : f === 'dur' ? +i.value : i.value; });
+    e.cids = [...el.querySelectorAll('[data-cid]')].filter(i => i.checked).map(i => i.dataset.cid);
+  });
+}
+$('eventos').addEventListener('input', () => { evsEditados = true; avisar($('evEst'), '✏ mudanças não salvas', 'rx-av'); });
+$('eventos').addEventListener('change', async (ev) => {
+  const el = ev.target.closest('.rx-ev'); if (!el) return;
+  const e = EVS[+el.dataset.k];
+  if (ev.target.dataset.f === 'tipo') { lerEventos(); evsEditados = true; pintarEventos(); return; }
+  if (ev.target.hasAttribute('data-enviar') && ev.target.files[0]) {
+    const fd = new FormData(); fd.append('arquivo', ev.target.files[0]);
+    try { await api(`/react-personagens/${PID}/eventos/${e.id}/arquivo`, fd); evsEditados = false; await recarregar(); atualizarPrevia(); } catch (er) { alert(er.message); }
+  }
+  if (ev.target.hasAttribute('data-versao')) { try { await api(`/react-personagens/${PID}/eventos/${e.id}/versao`, { arquivo: ev.target.value }); evsEditados = false; recarregar(); } catch (er) { alert(er.message); } }
+});
+$('eventos').addEventListener('click', async (ev) => {
+  const el = ev.target.closest('.rx-ev'); if (!el) return;
+  const k = +el.dataset.k, e = EVS[k];
+  if (ev.target.closest('[data-apagar]')) { lerEventos(); EVS.splice(k, 1); evsEditados = true; pintarEventos(); avisar($('evEst'), '✏ mudanças não salvas', 'rx-av'); }
+  else if (ev.target.closest('[data-ver]')) { $('pT').value = (+e.t) + 0.5; atualizarPrevia(); document.querySelector('.rx-ps').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  else if (ev.target.closest('[data-gerar]')) {
+    if (evsEditados) await salvarEventos();
+    try { const d = await api(`/react-personagens/${PID}/eventos/gerar`, { ids: [e.id] }); avisar($('evEst'), '🚀 foi pro Flow' + (d.aviso ? ' — ' + d.aviso : ''), 'rx-ok'); recarregar(); } catch (er) { alert(er.message); }
+  }
+});
+async function salvarEventos() {
+  lerEventos();
+  try { const d = await api(`/react-personagens/${PID}/eventos`, { eventos: EVS }); evsEditados = false; avisar($('evEst'), `✔ ${d.eventos} evento(s) salvos`, 'rx-ok'); await recarregar(); atualizarPrevia(); }
+  catch (e) { avisar($('evEst'), '❌ ' + e.message, 'rx-err'); }
+}
+$('bEvSalvar').addEventListener('click', salvarEventos);
+$('bEvNovo').addEventListener('click', () => {
+  if (EVS) lerEventos(); else EVS = [];
+  EVS.push({ id: '', tipo: 'briga', t: +$('pT').value || 0, dur: 4.5, cids: P.personagens.slice(0, 2).map(c => c.id), descricao: '', imagem_en: '', cena: {} });
+  evsEditados = true; pintarEventos(); avisar($('evEst'), '✏ mudanças não salvas', 'rx-av');
+});
+$('bEvGerar').addEventListener('click', async () => {
+  if (evsEditados) await salvarEventos();
+  try { const d = await api(`/react-personagens/${PID}/eventos/gerar`, {}); avisar($('evEst'), `🚀 ${d.enviadas} imagem(ns) pro Flow` + (d.aviso ? ' — ' + d.aviso : ''), 'rx-ok'); recarregar(); } catch (e) { alert(e.message); }
+});
+
+// ------------------------------------------------------------------ 🎛 palco com camadas (estilo Photoshop)
+let PALCO = null, ajSel = null, renderizado = false;
+async function carregarPalco() {
+  try { PALCO = await api(`/react-personagens/${PID}/pecas?t=${$('pT').value}`); desenharPalco(); } catch (e) { avisar($('ajEst'), '⚠ ' + e.message, 'rx-err'); }
+}
+function kPalco() { return $('palco').clientWidth / PALCO.W; }
+function caixa(pc) {  // em px de 1920×1080 → {x, y, w, h}
+  if (pc.legenda) { const h = 0.11 * PALCO.H; return { x: pc.cx - pc.w / 2, y: pc.topo, w: pc.w, h }; }
+  return { x: pc.cx - pc.w / 2, y: pc.cy - pc.h / 2, w: pc.w, h: pc.h };
+}
+function posicionar(el, pc) {
+  if (!el) return;
+  const k = kPalco(), c = caixa(pc);
+  Object.assign(el.style, { left: c.x * k + 'px', top: c.y * k + 'px', width: c.w * k + 'px', height: c.h * k + 'px' });
+  if (pc.legenda) el.style.fontSize = Math.max(8, 30 * k) + 'px';
+}
+function htmlPeca(pc) {
+  if (pc.tv) return `<img src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}&r=${Date.now()}" onerror="this.style.display='none'">`;
+  if (pc.legenda) return pc.fala ? `<b style="color:${esc(pc.fala.cor)}">${esc(pc.fala.nome)}:</b> ${esc(pc.fala.texto)}` : '<span style="opacity:.6">(ninguém fala neste segundo — a legenda aparece aqui)</span>';
+  if (pc.img) { const esp = pc.personagem ? pc.espelhar_img : pc.espelhar; return `<img src="${pc.img}" style="${esp ? 'transform:scaleX(-1)' : ''}">`; }
+  return `<div style="width:100%;height:100%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">${esc(pc.nome)}</div>`;
+}
+function desenharPalco() {
+  const pal = $('palco'); pal.innerHTML = '';
+  pal.style.backgroundImage = PALCO.fundo ? `url("${PALCO.fundo}")` : '';
+  PALCO.pecas.forEach(pc => {
+    const el = document.createElement('div');
+    el.className = 'rx-peca' + (pc.tv ? ' rx-tv' : '') + (pc.legenda ? ' rx-leg' : '') + (PALCO.ajustadas.includes(pc.chave) ? ' aj' : '')
+      + (pc.oculta ? ' oc' : '') + (pc.travada ? ' trav' : '') + (pc.falando ? ' fala' : '') + (pc.fora ? ' fora' : '');
+    el.dataset.chave = pc.chave; el.style.zIndex = pc.z;
+    el.innerHTML = htmlPeca(pc) + `<span class="rx-nome">${esc(pc.nome)}</span>` + (pc.travada ? '' : '<span class="rx-alca"></span>');
+    posicionar(el, pc); pal.appendChild(el);
+  });
+  if (PALCO.cena && PALCO.cena.img && $('verCena').checked) {
+    const leg = pecaDe('legenda'), d = document.createElement('div');
+    d.className = 'rx-cena-palco'; d.style.backgroundImage = `url("${PALCO.cena.img}")`;
+    d.innerHTML = `<span>${esc(PALCO.cena.tipo)} neste segundo — desmarque “ver a cena” pra mexer nas camadas</span>`;
+    pal.appendChild(d);
+    if (leg && !leg.oculta && PALCO.pilha.ordem[PALCO.pilha.ordem.length - 1] === 'legenda') elDe('legenda').style.zIndex = 950;
+  }
+  desenharCamadas(); barraAjuste();
+}
+function miniDe(pc) {
+  if (pc.tv) return `<img class="mini" src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}" onerror="this.removeAttribute('src')">`;
+  if (pc.img) return `<img class="mini" src="${pc.img}">`;
+  return `<span class="mini" style="display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${pc.legenda ? '💬' : '▭'}</span>`;
+}
+function desenharCamadas() {
+  const pil = PALCO.pilha, box = $('pilhaCam');
+  box.innerHTML = pil.ordem.slice().reverse().map(ch => {
+    const pc = pecaDe(ch); if (!pc) return '';
+    return `<div class="rx-cam-l ${ch === ajSel ? 'sel' : ''}" draggable="true" data-chave="${esc(ch)}">
+      <span class="ic ${pc.oculta ? 'off' : ''}" data-ac="ver" title="Mostrar / esconder (escondida não vai pro vídeo)">👁</span>
+      <span class="ic ${pc.travada ? '' : 'off'}" data-ac="trava" title="Travar (não mexe no palco)">🔒</span>
+      ${miniDe(pc)}<span class="nm">${esc(pc.nome)}${pc.personagem ? `<br><span class="ex">${pc.fora ? '🚪 fora de cena · ' : ''}${pc.falando ? '🗣 ' : ''}${esc(pc.expressao || '')} · olha pra ${pc.lado === 'esq' ? '←' : '→'}</span>` : ''}</span></div>`;
+  }).join('') + `<div class="rx-cam-l fixa"><span class="ic">👁</span><span class="ic">🔒</span>${PALCO.fundo ? `<img class="mini" src="${PALCO.fundo}">` : '<span class="mini"></span>'}<span class="nm">🧱 Fundo</span></div>`;
+}
+function pecaDe(chave) { return PALCO && PALCO.pecas.find(x => x.chave === chave); }
+function elDe(chave) { return [...$('palco').children].find(x => x.dataset.chave === chave); }
+function barraAjuste() {
+  const pc = ajSel && pecaDe(ajSel), livre = pc && !pc.travada;
+  $('ajNome').textContent = pc ? pc.nome + (pc.travada ? ' 🔒' : '') : 'clique numa camada';
+  ['ajX', 'ajY', 'ajW', 'ajR', 'ajAuto'].forEach(id => { $(id).disabled = !livre; });
+  $('ajFrente').disabled = $('ajTras').disabled = !pc;
+  $('ajVirar').disabled = !(livre && (pc.personagem || pc.chave.startsWith('sofa')));
+  if (pc) { $('ajX').value = Math.round(pc.cx); $('ajY').value = Math.round(pc.legenda ? pc.topo : pc.cy); $('ajW').value = $('ajR').value = Math.round(pc.w); }
+  document.querySelectorAll('#palco .rx-peca').forEach(x => x.classList.toggle('sel', x.dataset.chave === ajSel));
+  document.querySelectorAll('#pilhaCam .rx-cam-l').forEach(x => x.classList.toggle('sel', x.dataset.chave === ajSel));
+}
+function selecionar(ch) { ajSel = ch; barraAjuste(); }
+function mudarTam(pc, w) {
+  w = Math.max(40, Math.min(4000, w));
+  if (pc.h) pc.h = pc.h * w / pc.w;
+  pc.w = w;
+}
+function sentadosNo(sofa) {  // quem está sentado em cima do sofá (centro dentro dele)
+  return PALCO.pecas.filter(x => x.personagem && !x.travada && Math.abs(x.cx - sofa.cx) < sofa.w / 2 && Math.abs(x.cy - sofa.cy) < sofa.h * 1.2);
+}
+async function salvarPeca(pc, extra) {
+  const corpo = Object.assign({ chave: pc.chave, cx: pc.cx, w: pc.w }, pc.legenda ? { topo: pc.topo } : { cy: pc.cy }, extra || {});
+  try { await api(`/react-personagens/${PID}/posicao`, corpo); if (!PALCO.ajustadas.includes(pc.chave)) PALCO.ajustadas.push(pc.chave); elDe(pc.chave)?.classList.add('aj'); avisar($('ajEst'), '✔ salvo', 'rx-ok'); }
+  catch (e) { avisar($('ajEst'), '⚠ ' + e.message, 'rx-err'); }
+}
+async function salvarPilha(mud) {
+  try { const d = await api(`/react-personagens/${PID}/pilha`, mud); PALCO.pilha = d.pilha;
+    PALCO.pecas.forEach(pc => { pc.z = d.pilha.ordem.indexOf(pc.chave) + 1; pc.oculta = d.pilha.ocultas.includes(pc.chave); pc.travada = d.pilha.travadas.includes(pc.chave); });
+    desenharPalco(); avisar($('ajEst'), '✔ camadas salvas', 'rx-ok');
+  } catch (e) { avisar($('ajEst'), '⚠ ' + e.message, 'rx-err'); }
+}
+function alternar(lista, ch) { return lista.includes(ch) ? lista.filter(x => x !== ch) : lista.concat([ch]); }
+// lista de camadas: clicar seleciona; 👁 / 🔒; arrastar muda a ordem
+let arrCam = null;
+$('pilhaCam').addEventListener('click', (ev) => {
+  const l = ev.target.closest('.rx-cam-l'); if (!l || !l.dataset.chave) return;
+  const ch = l.dataset.chave, ac = ev.target.closest('[data-ac]')?.dataset.ac;
+  if (ac === 'ver') salvarPilha({ ocultas: alternar(PALCO.pilha.ocultas, ch) });
+  else if (ac === 'trava') salvarPilha({ travadas: alternar(PALCO.pilha.travadas, ch) });
+  else selecionar(ch);
+});
+$('pilhaCam').addEventListener('dragstart', (ev) => { const l = ev.target.closest('.rx-cam-l'); if (!l || !l.dataset.chave) return; arrCam = l.dataset.chave; l.classList.add('arr'); ev.dataTransfer.effectAllowed = 'move'; });
+$('pilhaCam').addEventListener('dragover', (ev) => { if (!arrCam) return; ev.preventDefault(); document.querySelectorAll('#pilhaCam .sobre').forEach(x => x.classList.remove('sobre')); ev.target.closest('.rx-cam-l')?.classList.add('sobre'); });
+$('pilhaCam').addEventListener('dragend', () => { arrCam = null; document.querySelectorAll('#pilhaCam .arr, #pilhaCam .sobre').forEach(x => x.classList.remove('arr', 'sobre')); });
+$('pilhaCam').addEventListener('drop', (ev) => {
+  ev.preventDefault(); const alvo = ev.target.closest('.rx-cam-l'); const ch = arrCam; arrCam = null;
+  if (!ch || !alvo) return;
+  // a lista mostra de cima pra baixo; a ordem guardada é de baixo pra cima
+  const vis = PALCO.pilha.ordem.slice().reverse().filter(x => x !== ch);
+  const pos = alvo.dataset.chave ? vis.indexOf(alvo.dataset.chave) : vis.length;
+  vis.splice(pos < 0 ? vis.length : pos, 0, ch);
+  salvarPilha({ ordem: vis.reverse() });
+});
+function moverNaPilha(d) {
+  const o = PALCO.pilha.ordem.slice(), i = o.indexOf(ajSel), j = i + d;
+  if (i < 0 || j < 0 || j >= o.length) return;
+  [o[i], o[j]] = [o[j], o[i]]; salvarPilha({ ordem: o });
+}
+$('ajFrente').addEventListener('click', () => moverNaPilha(1));
+$('ajTras').addEventListener('click', () => moverNaPilha(-1));
+// palco: arrastar / redimensionar
+let arrasto = null;
+$('palco').addEventListener('pointerdown', (ev) => {
+  const el = ev.target.closest('.rx-peca'); if (!el) { selecionar(null); return; }
+  ev.preventDefault(); selecionar(el.dataset.chave);
+  const pc = pecaDe(ajSel); if (pc.travada) return;
+  const redim = ev.target.classList.contains('rx-alca');
+  const junto = !redim && ajSel.startsWith('sofa') && $('ajJunto').checked ? sentadosNo(pc) : [];
+  arrasto = { pc, redim, x0: ev.clientX, y0: ev.clientY, cx: pc.cx, cy: pc.cy, topo: pc.topo, w: pc.w, junto: junto.map(j => ({ pc: j, cx: j.cx, cy: j.cy })), mexeu: false };
+  $('palco').setPointerCapture(ev.pointerId);
+});
+$('palco').addEventListener('pointermove', (ev) => {
+  if (!arrasto) return;
+  const k = kPalco(), dx = (ev.clientX - arrasto.x0) / k, dy = (ev.clientY - arrasto.y0) / k, pc = arrasto.pc;
+  if (Math.abs(dx) + Math.abs(dy) > 1) arrasto.mexeu = true;
+  if (arrasto.redim) { mudarTam(pc, arrasto.w + 2 * dx); }  // cresce a partir do centro
+  else {
+    pc.cx = arrasto.cx + dx;
+    if (pc.legenda) pc.topo = arrasto.topo + dy; else pc.cy = arrasto.cy + dy;
+    arrasto.junto.forEach(j => { j.pc.cx = j.cx + dx; j.pc.cy = j.cy + dy; posicionar(elDe(j.pc.chave), j.pc); });
+  }
+  posicionar(elDe(pc.chave), pc); barraAjuste();
+});
+$('palco').addEventListener('pointerup', async () => {
+  const a = arrasto; arrasto = null;
+  if (!a || !a.mexeu) return;
+  await salvarPeca(a.pc);
+  for (const j of a.junto) await salvarPeca(j.pc);
+});
+function salvarDepois(pc) { clearTimeout(pc._t); pc._t = setTimeout(() => salvarPeca(pc), 400); }
+$('palco').addEventListener('wheel', (ev) => {
+  const el = ev.target.closest('.rx-peca'); if (!el) return;
+  const pc = pecaDe(el.dataset.chave); if (pc.travada) return;
+  ev.preventDefault(); selecionar(pc.chave);
+  mudarTam(pc, pc.w * (ev.deltaY < 0 ? 1.04 : 1 / 1.04)); posicionar(el, pc); barraAjuste(); salvarDepois(pc);
+}, { passive: false });
+document.addEventListener('keydown', (ev) => {
+  if (!ajSel || renderizado || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key]; if (!d) return;
+  const pc = pecaDe(ajSel); if (!pc || pc.travada) return;
+  ev.preventDefault(); const passo = ev.shiftKey ? 20 : 2;
+  pc.cx += d[0] * passo; if (pc.legenda) pc.topo += d[1] * passo; else pc.cy += d[1] * passo;
+  posicionar(elDe(ajSel), pc); barraAjuste(); salvarDepois(pc);
+});
+function campoMuda() {
+  const pc = pecaDe(ajSel); if (!pc || pc.travada) return;
+  pc.cx = +$('ajX').value; if (pc.legenda) pc.topo = +$('ajY').value; else pc.cy = +$('ajY').value;
+  posicionar(elDe(ajSel), pc); salvarDepois(pc);
+}
+$('ajX').addEventListener('change', campoMuda); $('ajY').addEventListener('change', campoMuda);
+$('ajW').addEventListener('change', () => { const pc = pecaDe(ajSel); if (!pc) return; mudarTam(pc, +$('ajW').value || pc.w); posicionar(elDe(ajSel), pc); barraAjuste(); salvarDepois(pc); });
+$('ajR').addEventListener('input', () => { const pc = pecaDe(ajSel); if (!pc) return; mudarTam(pc, +$('ajR').value); posicionar(elDe(ajSel), pc); $('ajW').value = Math.round(pc.w); salvarDepois(pc); });
+$('ajVirar').addEventListener('click', async () => {
+  const pc = pecaDe(ajSel); if (!pc) return;
+  const agora = pc.personagem ? pc.lado : (pc.espelhar ? 'esq' : 'dir');
+  await salvarPeca(pc, { lado: agora === 'esq' ? 'dir' : 'esq' });
+  if (pc.personagem) avisar($('ajEst'), '✔ virado — se ainda não tem as poses desse lado, a seção 7 mostra "🔁 Gerar o que falta" (até lá usa a espelhada)', 'rx-ok');
+  carregarPalco(); recarregar();
+});
+$('ajAuto').addEventListener('click', async () => {
+  if (!ajSel) return;
+  try { await api(`/react-personagens/${PID}/posicao`, { chave: ajSel, limpar: true }); carregarPalco(); } catch (e) { alert(e.message); }
+});
+$('ajTudo').addEventListener('click', async () => {
+  if (!confirm('Voltar TODAS as camadas desta disposição pro lugar e ordem automáticos?')) return;
+  try { await api(`/react-personagens/${PID}/posicao`, { limpar_tudo: true }); await api(`/react-personagens/${PID}/pilha`, { ordem: [], ocultas: [], travadas: [] }); ajSel = null; carregarPalco(); recarregar(); } catch (e) { alert(e.message); }
+});
+window.addEventListener('resize', () => { if (PALCO && !renderizado) desenharPalco(); });
+
+function atualizarPrevia() {
+  $('pTv').textContent = mmss($('pT').value);
+  if (renderizado) $('previa').src = `/react-personagens/${PID}/previa.jpg?t=${$('pT').value}&r=${Date.now()}`;
+  else carregarPalco();
+}
 $('pT').addEventListener('input', () => { $('pTv').textContent = mmss($('pT').value); });
 $('pT').addEventListener('change', atualizarPrevia);
-$('bPrevia').addEventListener('click', atualizarPrevia);
+$('verCena').addEventListener('change', () => { if (PALCO) desenharPalco(); });
+$('bPrevia').addEventListener('click', () => {
+  renderizado = !renderizado;
+  $('palco').style.display = renderizado ? 'none' : ''; $('previa').style.display = renderizado ? '' : 'none';
+  $('bPrevia').textContent = renderizado ? '🎛 Voltar a editar as camadas' : '🖼 Ver renderizado';
+  atualizarPrevia();
+});
 $('bEditor').addEventListener('click', async () => {
   if (falasEditadas && !confirm('As falas têm mudanças NÃO salvas — mandar sem elas?')) return;
   const b = $('bEditor'); b.disabled = true; $('eEst').dataset.fixo = '1'; $('eEst').textContent = '⏳ montando as camadas (tira o áudio, desenha a TV e as legendas)…';

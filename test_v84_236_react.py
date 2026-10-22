@@ -229,7 +229,8 @@ def test_fluxo_pelas_rotas_ate_o_editor(base, tmp_path, monkeypatch):
     camadas = [o.get("camada") for o in ovs]
     # a ordem das camadas: sofá → personagens → mesa → TV → legendas → o vídeo na tela
     assert camadas.index("sofa") < camadas.index("personagem") < camadas.index("mesa") < camadas.index("tv") < camadas.index("legenda")
-    assert camadas[-1] == "tela" and ovs[-1]["sincronizar"] and ovs[-1]["media_type"] == "video"
+    i = camadas.index("tela")  # o vídeo vai logo acima da moldura da TV (a legenda fica por cima)
+    assert camadas[i - 1] == "tv" and ovs[i]["sincronizar"] and ovs[i]["media_type"] == "video"
     goku = [o for o in ovs if o.get("cid") == cids[0] and o["camada"] == "personagem"]
     assert goku[0]["start"] == 0 and abs(goku[-1]["end"] - job["total_duration"]) < 0.01
     assert any(o["expressao"] == "empolgado" and o["falando"] for o in goku)
@@ -441,3 +442,216 @@ def test_abrir_todos_os_personagens_em_guias(base, monkeypatch):
     assert all("udm=2" in u and "#bes=" in u for u in abertas["urls"])
     d = c.post(f"/react-personagens/{p['id']}/brave", json={}).get_json()  # só quem está sem imagem
     assert d["guias"] == 2
+
+
+def test_letra_boa_e_edicao_forte_entram_no_roteiro(base, tmp_path):
+    """⭐ versos marcados (obrigatórios) e 🎬 momentos de edição forte (muitos cortes seguidos) vão pra parte certa."""
+    import subprocess as sp
+    cores = ["red", "blue", "green", "yellow", "white", "purple", "orange", "cyan", "pink", "gray", "black", "brown"]
+    lista = tmp_path / "l.txt"
+    pedacos = []
+    for k, (cor, d) in enumerate([("navy", 12)] + [(c, 0.5) for c in cores] + [("navy", 12)]):
+        arq = tmp_path / f"p{k}.mp4"
+        sp.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c={cor}:size=320x180:rate=10:duration={d}",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", str(arq)], check=True)
+        pedacos.append(f"file '{arq}'")
+    lista.write_text("\n".join(pedacos))
+    video = tmp_path / "v.mp4"
+    sp.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lista), "-c", "copy", str(video)], check=True)
+    p = _proj(base, 2)
+    R.guardar_video(p, str(video), base)
+    R.definir_transcricao(p, "0:03 mil anos de espera\n0:14 isso é uma declaração de guerra\n0:25 fim")
+    ed = R.analisar_edicao(p, base)
+    assert len(ed["cortes"]) >= 8 and len(ed["momentos"]) == 1 and 11 <= ed["momentos"][0]["ini"] <= 13
+    assert R.analisar_edicao(p, base) is ed or R.analisar_edicao(p, base)["chave"] == ed["chave"]  # não refaz
+    assert R.marcar_destaque(p, "isso é uma declaração de guerra", 14.0) == 1
+    assert R.marcar_destaque(p, "mil anos de espera", 3.0) == 2 and R.marcar_destaque(p, "mil anos de espera", 3.0, False) == 1
+    pr = R.prompt_roteiro_parte(p, 0)
+    assert "⭐ VERSOS MARCADOS" in pr and "“isso é uma declaração de guerra”" in pr and "mil anos" not in pr.split("⭐")[1][:200]
+    assert "🎬 MOMENTOS DE EDIÇÃO FORTE" in pr and "LETRA BOA E EDIÇÃO DIFERENTE" in R.sys_roteiro(p)
+    blocos = R.blocos_do_video(p, base, 9, 0, R.duracao_total(p))
+    assert len(blocos) == 2  # 9 quadros do trecho + 3 do momento de edição = 2 mosaicos 3×3
+    R.aplicar_roteiro(p, {"falas": [{"tempo": 15, "personagem": "Sasuke", "texto": "“declaração de guerra”... que verso", "expressao": "empolgado",
+                                     "pedido_inscricao": True, "reacoes": [], "duvida": "", "destaque": "letra"}]})
+    assert p["roteiro"]["falas"][0]["destaque"] == "letra"
+
+
+def test_poses_por_lado_reaproveita_e_gera_o_outro_lado(base, monkeypatch):
+    """♻ Mesma expressão e mesmo lado: reaproveita. Nos 2 sofás, quem senta no da direita olha pra esquerda: gera as poses
+    desse lado (sem perder as prontas); até ficarem prontas, o editor espelha as do outro lado e avisa."""
+    import personagens_pod as pp
+    enviadas = []
+    monkeypatch.setattr(pp, "enviar", lambda pid, arqs, *a, **k: enviadas.append(list(arqs)) or {"ok": True})
+    p = _proj(base, 2)
+    p["expressoes"] = ["neutro", "feliz"]
+    R.salvar(p, base)
+    ita, sas = p["personagens"]
+    R.criar_poses(p["id"], sas["id"], base)
+    sas = R.carregar(p["id"], base)["personagens"][1]
+    proj = pp.carregar(sas["pod"]["pid"], base)
+    assert sorted(x["arquivo"] for x in proj["dados"]["poses"]) == ["sasuke_feliz.png", "sasuke_neutro.png"]
+    for nome in ("sasuke_feliz.png", "sasuke_neutro.png"):
+        with open(os.path.join(pp._pasta(proj["id"], base), "imagens", nome), "wb") as f:
+            f.write(_png())
+        proj["imagens"][nome].update(estado="pronta", versoes=[{"local": nome}], atual=0)
+    proj["mestre"] = {"arquivo": "sasuke_neutro.png", "local": "sasuke_neutro.png"}
+    pp.salvar(proj, base)
+    # 2 sofás: o Sasuke (2º) senta no sofá da direita → olha pra esquerda
+    p = R.carregar(p["id"], base)
+    p["layout"] = "dois_sofas"
+    R.salvar(p, base)
+    assert R.lados_precisos(p, sas["id"], base) == ["esq"] and R.lados_precisos(p, ita["id"], base) == ["dir"]
+    poses = R.poses_do_personagem(sas, base, "esq")
+    assert poses["feliz"]["espelhar"] and poses["neutro"]["espelhar"]  # por enquanto: o outro lado espelhado
+    R.criar_poses(p["id"], sas["id"], base)  # 🔁 Gerar o que falta
+    proj = pp.carregar(sas["pod"]["pid"], base)
+    assert {"sasuke_feliz.png", "sasuke_neutro.png", "sasuke_feliz_esq.png", "sasuke_neutro_esq.png"} <= {x["arquivo"] for x in proj["dados"]["poses"]}
+    assert proj["imagens"]["sasuke_feliz.png"]["estado"] == "pronta"  # as prontas ficam
+    assert set(enviadas[-1]) == {"sasuke_feliz_esq.png", "sasuke_neutro_esq.png"}  # só o lado novo vai pro Flow
+    esq = next(x for x in proj["dados"]["poses"] if x["arquivo"] == "sasuke_feliz_esq.png")
+    assert "LEFT" in esq["prompt"]
+    with open(os.path.join(pp._pasta(proj["id"], base), "imagens", "e.png"), "wb") as f:
+        f.write(_png())
+    proj["imagens"]["sasuke_feliz_esq.png"].update(estado="pronta", versoes=[{"local": "e.png"}], atual=0)
+    pp.salvar(proj, base)
+    poses = R.poses_do_personagem(sas, base, "esq")
+    assert not poses["feliz"]["espelhar"] and poses["neutro"]["espelhar"]
+    assert R.estado_poses(sas, base)["por_lado"] == {"dir": {"prontas": 2, "total": 2}, "esq": {"prontas": 1, "total": 2}}
+
+
+def test_cenario_reaproveitado_de_outro_react(base):
+    p1 = R.criar("um", base)
+    im = Image.new("RGBA", (400, 200), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rectangle([20, 20, 380, 180], fill=(90, 90, 100, 255))
+    R.guardar_camada(p1, "sofa", im, base, recortar=False)
+    R.salvar(p1, base)
+    p2 = R.criar("dois", base)
+    outros = R.camadas_de_outros(p2, "sofa", base)
+    assert len(outros) == 1 and outros[0]["projeto"] == p1["id"] and outros[0]["atual"]
+    R.usar_camada_de_outro(p2, "sofa", p1["id"], outros[0]["arquivo"], base)
+    out = Image.open(R.camada_arquivo(p2, "sofa", base))
+    assert out.size == (361, 161) and p2["cenario"]["camadas"]["sofa"]["origem"] == "♻ outro react"
+    assert R.camadas_de_outros(p2, "mesa", base) == []
+    with pytest.raises(R.ReactErro):
+        R.usar_camada_de_outro(p2, "sofa", p1["id"], "../x.png", base)
+
+
+def test_posicoes_ajustadas_na_mao_vao_pro_editor(base, tmp_path):
+    """🎛 Arrastar / mudar tamanho / virar cada peça na prévia: fica salvo por disposição e vale pra prévia e pro editor."""
+    import app as A
+    p = _proj(base, 3)
+    R.salvar(p, base)
+    pid = p["id"]
+    auto = R.disposicao(p, base, (1280, 720))
+    cid = p["personagens"][1]["id"]
+    c = A.app.test_client()
+    pe = c.get(f"/react-personagens/{pid}/pecas").get_json()
+    chaves = [x["chave"] for x in pe["pecas"]]
+    assert {"tela", "legenda", "mesa", "sofa0", f"p:{cid}"} <= set(chaves) and pe["layout"] == "sofa_tv"
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": "tela", "cx": 1500, "cy": 300, "w": auto["tela"]["w"] * 1.2}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": f"p:{cid}", "cx": 777, "lado": "esq"}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": "legenda", "topo": 950}).get_json()["ok"]
+    assert not c.post(f"/react-personagens/{pid}/posicao", json={"chave": "nada", "cx": 1}).get_json()["ok"]
+    p = R.carregar(pid, base)
+    d = R.disposicao(p, base, (1280, 720))
+    assert d["tela"]["cx"] == 1500 and d["tela"]["cy"] == 300
+    assert abs(d["tela"]["h"] - auto["tela"]["h"] * 1.2) < 1  # o tamanho mantém a proporção
+    a = next(x for x in d["assentos"] if x["cid"] == cid)
+    assert a["cx"] == 777 and a["espelhar"] and a["cy"] == next(x for x in auto["assentos"] if x["cid"] == cid)["cy"]
+    assert R.lados_precisos(p, cid, base) == ["esq"]  # as poses desse lado passam a ser pedidas
+    assert d["legenda"]["topo"] == 950
+    # a outra disposição tem os seus próprios ajustes
+    p["layout"] = "dois_sofas"
+    assert R.disposicao(p, base, (1280, 720))["tela"]["cx"] == R.disposicao(dict(p, posicoes={}), base, (1280, 720))["tela"]["cx"]
+    p["layout"] = "sofa_tv"
+    R.salvar(p, base)
+    c.post(f"/react-personagens/{pid}/posicao", json={"chave": "tela", "limpar": True})
+    assert R.disposicao(R.carregar(pid, base), base, (1280, 720))["tela"]["cx"] == auto["tela"]["cx"]
+    c.post(f"/react-personagens/{pid}/posicao", json={"limpar_tudo": True})
+    assert R.carregar(pid, base)["posicoes"]["sofa_tv"] == {}
+    assert "🗂 Camadas" in c.get(f"/react-personagens/{pid}").get_data(as_text=True)
+
+
+def test_intrigas_briga_vira_imagem_e_quem_sai_some(base, tmp_path, monkeypatch):
+    """⚡ Provocação → briga (imagem da luta na sala, por cima de tudo menos a legenda); quem sai some do sofá até voltar."""
+    import app as A
+    import flow_lote
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 20)
+    with open(video, "rb") as f:
+        r = c.post("/react-personagens/novo", data={"titulo": "Briga", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                   content_type="multipart/form-data")
+    pid = r.headers["Location"].split("/")[-1]
+    for nome in ("Naruto", "Sasuke", "Sakura"):
+        c.post(f"/react-personagens/{pid}/personagem", json={"nome": nome})
+    p = R.carregar(pid)
+    for ch, cor in zip(p["personagens"], ((250, 140, 0), (40, 40, 120), (240, 120, 180))):
+        R.guardar_ref(p, ch, _png(cor), "a.png")
+    R.salvar(p)
+    assert c.post(f"/react-personagens/{pid}/dados", json={"intriga": "caos"}).get_json()["ok"]
+    p = R.carregar(pid)
+    assert "BRIGA" in R.sys_roteiro(p) and "eventos" in R._schema_roteiro(["neutro"])["required"]
+    rot = {"resumo": "", "falas": [
+        {"tempo": 2, "personagem": "Sasuke", "texto": "Você nunca vai ser Hokage, perdedor.", "expressao": "debochado", "pedido_inscricao": True, "reacoes": [], "duvida": "", "destaque": ""},
+        {"tempo": 5, "personagem": "Naruto", "texto": "REPETE ISSO!", "expressao": "bravo", "pedido_inscricao": False, "reacoes": [], "duvida": "", "destaque": ""},
+        {"tempo": 12, "personagem": "Sakura", "texto": "Eu vou buscar gelo...", "expressao": "triste", "pedido_inscricao": False, "reacoes": [], "duvida": "", "destaque": ""}],
+        "eventos": [
+        {"tempo": 7, "tipo": "briga", "personagens": ["Naruto", "Sasuke"], "descricao": "Naruto soca o Sasuke", "imagem_en": "Naruto punches Sasuke in the face", "duracao": 4},
+        {"tempo": 13, "tipo": "sai", "personagens": ["Sakura"], "descricao": "foi buscar gelo", "imagem_en": "", "duracao": 0},
+        {"tempo": 17, "tipo": "volta", "personagens": ["Sakura"], "descricao": "", "imagem_en": "", "duracao": 0},
+        {"tempo": 9, "tipo": "briga", "personagens": ["Ninguém"], "descricao": "x", "imagem_en": "x", "duracao": 4}]}
+    assert c.post(f"/react-personagens/{pid}/colar/roteiro", json={"texto": json.dumps(rot)}).get_json()["ok"]
+    p = R.carregar(pid)
+    evs = R.eventos(p)
+    assert [e["tipo"] for e in evs] == ["briga", "sai", "volta"]  # o de nome desconhecido sai
+    briga = evs[0]
+    sakura = R.achar_por_nome(p, "Sakura")["id"]
+    assert R.ausencias(p, 20) == {sakura: [[13.0, 17.0]]}
+    # 🚀 a imagem da briga vai pro Flow com a sala + os 2 personagens numa colagem de referência
+    visto = {}
+
+    class Lote:
+        trava = __import__("threading").Lock()
+        fila, rodando = [], False
+
+        def adicionar(self, itens, proporcao, quantidade):
+            visto["itens"] = itens
+            return [{"id": "j1"}]
+
+        def iniciar(self):
+            pass
+    monkeypatch.setattr(flow_lote, "lote", lambda: Lote())
+    assert c.post(f"/react-personagens/{pid}/eventos/gerar", json={}).get_json()["enviadas"] == 1
+    it = visto["itens"][0]
+    assert "Naruto punches Sasuke" in it["prompt"] and "Sakura" in it["prompt"] and os.path.isfile(it["referencia_arquivo"])
+    assert R.evento(R.carregar(pid), briga["id"])["cena"]["estado"] == "fila"
+    # sem imagem ainda: o editor avisa e deixa de fora
+    d = c.post(f"/react-personagens/{pid}/editor", json={}).get_json()
+    assert any("sem imagem" in a for a in d["avisos"])
+    # 📤 imagem enviada por você
+    im = io.BytesIO(_png((200, 0, 0), (1280, 720), (90, 10, 10)))
+    assert c.post(f"/react-personagens/{pid}/eventos/{briga['id']}/arquivo", data={"arquivo": (im, "b.png")}, content_type="multipart/form-data").get_json()["ok"]
+    d = c.post(f"/react-personagens/{pid}/editor", json={}).get_json()
+    ovs = A._JOBS[d["job_id"]]["overlays"]
+    cg = next(o for o in ovs if o.get("camada") == "cena")
+    assert (cg["start"], cg["end"], cg["size_percent"]) == (7.0, 11.0, 100.0)
+    camadas = [o.get("camada") for o in ovs]
+    assert camadas.index("cena") > camadas.index("tela") and camadas.index("cena") < camadas.index("legenda")
+    for o in ovs:  # 🚪 a Sakura não aparece entre 13 e 17
+        if o.get("cid") == sakura and o.get("camada") == "personagem":
+            assert o["end"] <= 13.0 or o["start"] >= 17.0
+    assert any(o.get("cid") == sakura and o.get("camada") == "personagem" and o["start"] >= 17.0 for o in ovs)
+    # o palco mostra a cena e quem está fora
+    pe = c.get(f"/react-personagens/{pid}/pecas?t=8").get_json()
+    assert pe["cena"]["img"] and "Briga" in pe["cena"]["tipo"]
+    pe = c.get(f"/react-personagens/{pid}/pecas?t=14").get_json()
+    assert next(x for x in pe["pecas"] if x["chave"] == f"p:{sakura}")["fora"] and not pe["cena"]
+    assert c.get(f"/react-personagens/{pid}/previa.jpg?t=8").status_code == 200
+    # ✏ editar na página mantém a imagem
+    p = R.carregar(pid)
+    lista = [dict(e, descricao="soco voador") if e["id"] == briga["id"] else e for e in R.eventos(p)][:2]
+    assert c.post(f"/react-personagens/{pid}/eventos", json={"eventos": lista}).get_json()["eventos"] == 2
+    p = R.carregar(pid)
+    assert R.arquivo_cena(p, R.evento(p, briga["id"])) and R.evento(p, briga["id"])["descricao"] == "soco voador"
+    assert R.ausencias(p, 20) == {sakura: [[13.0, 20]]}  # sem o "volta": fica fora até o fim
+    assert "⚡ Intrigas" in c.get(f"/react-personagens/{pid}").get_data(as_text=True)

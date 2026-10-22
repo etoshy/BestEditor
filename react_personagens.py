@@ -57,6 +57,20 @@ LAYOUTS = {
 }
 ESTILOS = {"auto": "Automático (pelo elenco)", "anime": "Anime / cartoon", "realista": "Realista"}
 DENSIDADES = {"pouca": 15.0, "normal": 9.0, "muita": 6.0}  # 1 fala a cada N segundos (mais ou menos)
+# ⚡ intrigas: quanto drama entre os personagens (provocação → briga com imagem estilo visual novel, sair de cena…)
+INTRIGAS = {
+    "nenhuma": "⚪ nenhuma (só reagem ao vídeo)",
+    "leve": "🟡 leve (provocações; briga só se for MUITO merecida)",
+    "media": "🟠 média (provocações frequentes; 1 briga a cada ~3 min)",
+    "caos": "🔴 caos (todo mundo se provoca; brigas, gente saindo e voltando)",
+}
+TIPOS_EVENTO = {
+    "briga": "👊 Briga (imagem da luta)",
+    "cena": "🎬 Cena especial (imagem)",
+    "sai": "🚪 Sai de cena",
+    "volta": "↩ Volta pra cena",
+}
+EVENTO_COM_IMAGEM = ("briga", "cena")
 
 # expressão → (nome na tela, como desenhar — o personagem SENTADO, virado pra TV)
 EXPRESSOES: Dict[str, Tuple[str, str]] = {
@@ -134,6 +148,7 @@ def _completar(p: Dict[str, Any]) -> Dict[str, Any]:
     p.setdefault("estilo", "auto")
     p.setdefault("layout", "sofa_tv")
     p.setdefault("densidade", "normal")
+    p.setdefault("intriga", "leve")
     p.setdefault("expressoes", list(EXPRESSOES_PADRAO))
     p.setdefault("sugestoes", {})
     p.setdefault("personagens", [])
@@ -143,6 +158,7 @@ def _completar(p: Dict[str, Any]) -> Dict[str, Any]:
     p.setdefault("editor", {})
     p.setdefault("checagem", {})
     p.setdefault("cortes", {"inicio": None, "fim": None, "meio": []})
+    p.setdefault("destaques", [])
     p.setdefault("log", [])
     return p
 
@@ -587,6 +603,13 @@ def aplicar_cortes(pid: str, base: str = _BASE, cortes: Optional[Dict[str, Any]]
             ficam.append(dict(f, t=t))
         if falas:
             p["roteiro"]["falas"] = ficam
+        evs = []
+        for e in (p.get("roteiro") or {}).get("eventos") or []:
+            t = mapear(inverso(float(e["t"]), rem_antes), rem)
+            if t is not None:
+                evs.append(dict(e, t=t))
+        if (p.get("roteiro") or {}).get("eventos"):
+            p["roteiro"]["eventos"] = evs
         total = sum(min(b, dur or b) - a for a, b in rem)
         log(p, (f"✂ {len(rem)} corte(s) — saíram {mmss(total)}; o vídeo ficou com {mmss(p['video'].get('duracao'))}" if rem
                 else "✂ sem cortes: o vídeo inteiro") + (f" · {sairam} fala(s) caíram num trecho cortado e saíram" if sairam else ""))
@@ -763,6 +786,53 @@ def mosaicos(qs: List[Tuple[float, str]], por: int = 9) -> List[Dict[str, Any]]:
     return blocos
 
 
+def analisar_edicao(p: Dict[str, Any], base: str = _BASE, on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+    """🎬 Onde a edição do vídeo é FORTE (muitos cortes seguidos — transição, efeito, sequência rápida): detecção de
+    troca de cena do ffmpeg. Guarda em p["edicao"] (refaz só se o vídeo mudou). → {"cortes": [...], "momentos": [...]}"""
+    video = _video_local(p, base)
+    if not video:
+        return {}
+    chave = f"{os.path.basename(video)}|{os.path.getsize(video)}|{int(os.path.getmtime(video))}"
+    ed = p.get("edicao") or {}
+    if ed.get("chave") == chave:
+        return ed
+    on_log("analisando a edição do vídeo (cortes e transições)…")
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-v", "info", "-i", video, "-an", "-vf",
+                        "scale=320:-2,select='gt(scene,0.32)',showinfo", "-f", "null", "-"],
+                       capture_output=True, text=True, timeout=1800)
+    cortes = sorted({round(float(m), 2) for m in re.findall(r"pts_time:([\d.]+)", r.stderr or "")})
+    dur = float((p.get("video") or {}).get("duracao") or 0) or (cortes[-1] if cortes else 0)
+    momentos: List[Dict[str, Any]] = []
+    jan = 6.0
+    if cortes and dur:
+        media = len(cortes) / max(dur, 1)  # cortes por segundo no vídeo todo
+        k = 0
+        while k < len(cortes):
+            dentro = [c for c in cortes[k:] if c < cortes[k] + jan]
+            # sequência rápida: bem acima da média do vídeo (e pelo menos 5 cortes em 6 s)
+            if len(dentro) >= max(5, int(media * jan * 2.5) + 1):
+                momentos.append({"ini": dentro[0], "fim": dentro[-1], "cortes": len(dentro)})
+                k += len(dentro)
+            else:
+                k += 1
+        momentos = sorted(momentos, key=lambda m: -m["cortes"])[:max(3, int(dur / 40))]
+        momentos.sort(key=lambda m: m["ini"])
+    p["edicao"] = {"chave": chave, "cortes": cortes[:3000], "momentos": momentos, "quando": time.time()}
+    return p["edicao"]
+
+
+def quadros_em(video: str, tempos: List[float], saida_dir: str, largura: int = 320) -> List[Tuple[float, str]]:
+    os.makedirs(saida_dir, exist_ok=True)
+    out = []
+    for k, t in enumerate(tempos):
+        cam = os.path.join(saida_dir, f"m{k:03d}.jpg")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}", "-i", video, "-frames:v", "1",
+                        "-vf", f"scale={largura}:-2", cam], capture_output=True, timeout=60)
+        if os.path.isfile(cam):
+            out.append((t, cam))
+    return out
+
+
 def blocos_do_video(p: Dict[str, Any], base: str = _BASE, n: int = 27, ini: Optional[float] = None,
                     fim: Optional[float] = None) -> List[Dict[str, Any]]:
     video = _video_local(p, base)
@@ -771,7 +841,13 @@ def blocos_do_video(p: Dict[str, Any], base: str = _BASE, n: int = 27, ini: Opti
     tmp = os.path.join(pasta(p["id"], base), f"_quadros_ia_{secrets.token_hex(3)}")
     shutil.rmtree(tmp, ignore_errors=True)
     try:
-        return mosaicos(quadros(video, tmp, n, ini=ini, fim=fim))
+        qs = quadros(video, tmp, n, ini=ini, fim=fim)
+        if ini is not None and fim is not None:  # 🎬 + 3 quadros em cada momento de edição forte do trecho
+            extra = []
+            for m in [m for m in (p.get("edicao") or {}).get("momentos") or [] if ini <= m["ini"] < fim][:3]:
+                extra += [m["ini"] + (m["fim"] - m["ini"]) * f for f in (0.1, 0.5, 0.9)]
+            qs += quadros_em(video, extra, os.path.join(tmp, "m"))
+        return mosaicos(qs)
     except Exception:  # noqa: BLE001
         return []
     finally:
@@ -1091,16 +1167,25 @@ def completar_fichas(pid: str, base: str = _BASE, cids: Optional[List[str]] = No
 
 def _schema_roteiro(exprs: List[str]) -> Dict[str, Any]:
     return {
-        "type": "object", "additionalProperties": False, "required": ["resumo", "falas"],
+        "type": "object", "additionalProperties": False, "required": ["resumo", "falas", "eventos"],
         "properties": {
             "resumo": {"type": "string"},
+            "eventos": {"type": "array", "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["tempo", "tipo", "personagens", "descricao", "imagem_en", "duracao"],
+                "properties": {
+                    "tempo": {"type": "number"}, "tipo": {"type": "string", "enum": list(TIPOS_EVENTO)},
+                    "personagens": {"type": "array", "items": {"type": "string"}},
+                    "descricao": {"type": "string"}, "imagem_en": {"type": "string"}, "duracao": {"type": "number"},
+                }}},
             "falas": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False,
-                "required": ["tempo", "personagem", "texto", "expressao", "pedido_inscricao", "reacoes", "duvida"],
+                "required": ["tempo", "personagem", "texto", "expressao", "pedido_inscricao", "reacoes", "duvida", "destaque"],
                 "properties": {
                     "tempo": {"type": "number"}, "personagem": {"type": "string"}, "texto": {"type": "string"},
                     "expressao": {"type": "string", "enum": exprs}, "pedido_inscricao": {"type": "boolean"},
                     "duvida": {"type": "string"},
+                    "destaque": {"type": "string", "enum": ["", "letra", "edicao"]},
                     "reacoes": {"type": "array", "items": {"type": "object", "additionalProperties": False,
                                                            "required": ["personagem", "expressao"],
                                                            "properties": {"personagem": {"type": "string"},
@@ -1144,13 +1229,46 @@ def sys_roteiro(p: Dict[str, Any]) -> str:
         "1ª vez (surpresa, spoiler, 'eu morri?!'); se ele VIVEU aquilo, pode lembrar e comentar de dentro ('eu estava lá'). "
         "Use as relações (quem lutou com quem, quem matou quem, mestre/aluno, família) para as falas mais fortes. Não "
         "invente encontros que não aconteceram na obra.\n"
+        "- LETRA BOA E EDIÇÃO DIFERENTE: quando a letra tiver um verso MUITO bom (rima forte, punchline, trocadilho, "
+        "referência esperta, frase profunda ou emocionante) ou a EDIÇÃO fizer algo diferente (transição criativa, efeito, "
+        "corte na batida, sequência de cortes rápidos, mudança de estilo — veja os quadros e os 'momentos de edição'), "
+        "um personagem COMENTA isso no jeito dele: às vezes citando o verso entre aspas ('\"mil anos de espera\"... "
+        "arrepiei'), elogiando o cantor pelo nome do crédito ou o editor ('quem editou isso tá de parabéns'), ou do "
+        "contra (o vilão odeia o verso sobre ele). Marque 'destaque': 'letra' ou 'edicao' nessas falas (\"\" nas outras). "
+        "Os versos ⭐ marcados são OBRIGATÓRIOS (alguém comenta cada um). Sem exagero: no máximo um comentário desses a "
+        "cada ~30 s, fora os ⭐.\n"
         "- 'duvida': se a fala depende de um fato da obra (quem conheceu quem, antes/depois, nome de técnica, quem morreu) "
         "e você NÃO tem certeza, escreva a dúvida aqui (ex.: 'não sei se o Itachi conheceu o Madara antes da guerra') — "
         "vai pro verificador de fatos. Com certeza: deixe \"\".\n"
+        + _regra_intriga(p) +
         "- 'personagem' = o NOME exatamente como está no elenco.\n"
         f"- Escreva as falas em {p.get('idioma') or 'português do Brasil'}.\n"
         "- 'resumo' = 1–2 frases sobre o vídeo e a dinâmica do react."
     )
+
+
+def _regra_intriga(p: Dict[str, Any]) -> str:
+    nivel = p.get("intriga") if p.get("intriga") in INTRIGAS else "leve"
+    if nivel == "nenhuma":
+        return "- 'eventos': deixe a lista VAZIA (sem brigas nem gente saindo nesta vez).\n"
+    quanto = {"leve": "RARO: no máximo 1 briga no vídeo inteiro, e só se uma provocação passar MUITO do ponto; saídas de cena raras",
+              "media": "de vez em quando: umas 1 briga a cada ~3 minutos, quando a provocação esquentar; pode ter quem saia irritado e volte",
+              "caos": "SEMPRE: provocação o tempo todo, brigas frequentes (mas não seguidas), gente saindo e voltando"}[nivel]
+    return (
+        "- ⚡ INTRIGAS ENTRE ELES (estilo visual novel) — " + quanto + ". Como funciona: alguém PROVOCA (fala debochada sobre "
+        "o outro, o vídeo ou a obra dele), o outro responde; se ESQUENTA (2–4 falas de ida e volta, com 'bravo'/'debochado'), "
+        "pode virar BRIGA: um evento 'briga' no segundo em que ela estoura (ex.: um dá um soco no outro, um voa no pescoço do "
+        "outro, guerra de almofada) — o vídeo mostra uma IMAGEM da luta no meio da sala por 'duracao' segundos (3–6) e as "
+        "falas continuam por cima (reclamação, 'PAREM!', o que apanhou xingando, os outros torcendo). Depois da briga, as "
+        "falas lembram dela (alguém com raiva, rindo, de olho roxo). Use a personalidade: quem é estourado briga, o frio "
+        "humilha sem levantar, o medroso se esconde.\n"
+        "  Outros eventos: 'sai' (o personagem SAI da sala — irritado, nocauteado, foi buscar pipoca, foi chamado; NÃO fala "
+        "nem reage enquanto estiver fora) e 'volta' (ele volta, normalmente com uma fala na volta); 'cena' = outro momento "
+        "especial com imagem (alguém joga pipoca, todos se abraçando chorando, alguém subindo no sofá). "
+        "Em cada evento: 'personagens' = os NOMES do elenco envolvidos (briga: quem briga; sai/volta: quem sai/volta); "
+        "'descricao' = o que acontece, em português, curto; 'imagem_en' = só em briga/cena: a descrição da IMAGEM em inglês, "
+        "concreta e visual (quem faz o quê com quem, poses, expressões, a ação congelada no auge — sem texto na imagem), "
+        "\"\" em sai/volta; 'duracao' = segundos que a imagem fica (briga/cena, 3–6) ou 0.\n")
 
 
 def prompt_roteiro(p: Dict[str, Any]) -> str:
@@ -1245,6 +1363,14 @@ def prompt_roteiro_parte(p: Dict[str, Any], k: int) -> str:
           ("PEDIDO DE INSCRIÇÃO: coloque NESTA parte (1 fala, num bom momento)." if _cta_aqui(p, k)
            else "PEDIDO DE INSCRIÇÃO: NÃO coloque nesta parte (fica em outra)."),
           "", "TRANSCRIÇÃO DESTE TRECHO (tempo no vídeo):", transcricao_texto(trans, 12000) or "(sem transcrição — use os quadros)"]
+    marcados = [d for d in p.get("destaques") or [] if d.get("ini") is not None and a - 2 <= float(d["ini"]) < b]
+    if marcados:
+        L += ["", "⭐ VERSOS MARCADOS POR VOCÊ NESTE TRECHO — algum personagem TEM que comentar cada um (citar, elogiar, zoar…):"]
+        L += [f"- {mmss(d['ini'])} “{d['texto']}”" for d in marcados]
+    momentos = [m for m in (p.get("edicao") or {}).get("momentos") or [] if a <= m["ini"] < b]
+    if momentos:
+        L += ["", "🎬 MOMENTOS DE EDIÇÃO FORTE NESTE TRECHO (muitos cortes seguidos — veja os quadros desses segundos):"]
+        L += [f"- {mmss(m['ini'])}–{mmss(m['fim'])}: {m['cortes']} cortes em {max(1, round(m['fim'] - m['ini']))} s" for m in momentos]
     if antes:
         L += ["", "O QUE JÁ FOI FALADO LOGO ANTES (continue a conversa, não repita):"]
         L += [f"- {mmss(f['t'])} {nomes.get(f['cid'], '?')}: {f['texto']}" for f in antes]
@@ -1284,6 +1410,16 @@ def limpar_texto_fala(texto: Any, nome: str = "") -> str:
 def duracao_fala(texto: str) -> float:
     n = len(str(texto or "").split())
     return round(max(2.2, min(7.0, 1.5 + 0.36 * n)), 2)
+
+
+def marcar_destaque(p: Dict[str, Any], texto: str, ini: Optional[float], marcar: bool = True) -> int:
+    """⭐ Verso da letra que um personagem TEM que comentar (marcado na transcrição limpa)."""
+    texto = " ".join(str(texto or "").split())[:400]
+    lista = [d for d in p.get("destaques") or [] if not (_norm(d["texto"]) == _norm(texto) and d.get("ini") == ini)]
+    if marcar and texto:
+        lista.append({"texto": texto, "ini": ini})
+    p["destaques"] = sorted(lista, key=lambda d: (d.get("ini") is None, d.get("ini") or 0))[:80]
+    return len(p["destaques"])
 
 
 def garantir_cta(p: Dict[str, Any]) -> bool:
@@ -1342,24 +1478,303 @@ def aplicar_roteiro(p: Dict[str, Any], r: Any, janela: Optional[List[float]] = N
                 reacoes.append({"cid": cy["id"], "expressao": ey})
         falas.append({"id": "f" + secrets.token_hex(3), "t": round(t, 2), "cid": c["id"], "texto": texto, "expressao": ex,
                       "dur": duracao_fala(texto), "cta": bool(x.get("pedido_inscricao")), "reacoes": reacoes[:2],
-                      "duvida": " ".join(str(x.get("duvida") or "").split())[:300]})
+                      "duvida": " ".join(str(x.get("duvida") or "").split())[:300],
+                      "destaque": x.get("destaque") if x.get("destaque") in ("letra", "edicao") else ""})
     if not falas:
         raise ReactErro("Nenhuma fala aproveitável (confira os nomes dos personagens).")
     falas.sort(key=lambda f: f["t"])
+    eventos = ler_eventos(p, r.get("eventos") or [], dur_video, janela)
     if janela:
         a, b = janela
         antigas = (p.get("roteiro") or {}).get("falas") or []
         ultima = b >= duracao_total(p) - 0.01
         ficam = [f for f in antigas if not (a <= float(f["t"]) < b or (ultima and float(f["t"]) >= b))]
         resumo = str(r.get("resumo") or "") if not (p.get("roteiro") or {}).get("resumo") else p["roteiro"]["resumo"]
+        ev_ficam = [e for e in (p.get("roteiro") or {}).get("eventos") or []
+                    if not (a <= float(e["t"]) < b or (ultima and float(e["t"]) >= b))]
         p["roteiro"] = dict(p.get("roteiro") or {}, resumo=resumo[:1000], quando=time.time(), ignoradas=ignoradas,
-                            falas=sorted(ficam + falas, key=lambda f: f["t"]))
+                            falas=sorted(ficam + falas, key=lambda f: f["t"]),
+                            eventos=sorted(ev_ficam + eventos, key=lambda e: e["t"]))
         log(p, f"📝 roteiro, {mmss(a)}–{mmss(b)}: {len(falas)} fala(s)" + (f" · {ignoradas} ignorada(s)" if ignoradas else ""))
         return p["roteiro"]
-    p["roteiro"] = {"resumo": str(r.get("resumo") or "")[:1000], "falas": falas, "quando": time.time(), "ignoradas": ignoradas}
+    p["roteiro"] = {"resumo": str(r.get("resumo") or "")[:1000], "falas": falas, "quando": time.time(), "ignoradas": ignoradas,
+                    "eventos": eventos}
     garantir_cta(p)
     log(p, f"📝 roteiro: {len(p['roteiro']['falas'])} fala(s)" + (f" · {ignoradas} ignorada(s) (nome que não está no elenco)" if ignoradas else ""))
     return p["roteiro"]
+
+
+def ler_eventos(p: Dict[str, Any], lista: Any, dur_video: Optional[float] = None,
+                janela: Optional[List[float]] = None) -> List[Dict[str, Any]]:
+    """⚡ Os eventos da IA (ou colados): briga / cena (com imagem) e sai / volta (quem está na sala)."""
+    out = []
+    for x in lista if isinstance(lista, list) else []:
+        if not isinstance(x, dict) or x.get("tipo") not in TIPOS_EVENTO:
+            continue
+        t = segundos(x.get("tempo"))
+        cids = []
+        for n in x.get("personagens") or []:
+            c = achar_por_nome(p, str(n or ""))
+            if c and c["id"] not in cids:
+                cids.append(c["id"])
+        if t is None or not cids:
+            continue
+        if dur_video:
+            t = min(max(0.0, t), max(0.0, dur_video - 1.0))
+        if janela and (t < janela[0] - 5 or t > janela[1] + 5):
+            continue
+        out.append(novo_evento(x["tipo"], t, cids, x.get("descricao"), x.get("imagem_en"), x.get("duracao")))
+    return sorted(out, key=lambda e: e["t"])
+
+
+def novo_evento(tipo: str, t: float, cids: List[str], descricao: Any = "", imagem_en: Any = "", duracao: Any = None,
+                eid: Optional[str] = None) -> Dict[str, Any]:
+    com_img = tipo in EVENTO_COM_IMAGEM
+    d = segundos(duracao) if duracao is not None else None
+    return {"id": eid or ("e" + secrets.token_hex(3)), "tipo": tipo, "t": round(float(t), 2), "cids": list(cids)[:6],
+            "descricao": " ".join(str(descricao or "").split())[:400],
+            "imagem_en": " ".join(str(imagem_en or "").split())[:900] if com_img else "",
+            "dur": round(max(1.5, min(12.0, d or 4.5)), 2) if com_img else 0.0, "cena": {}}
+
+
+def eventos(p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return sorted((p.get("roteiro") or {}).get("eventos") or [], key=lambda e: float(e["t"]))
+
+
+def ausencias(p: Dict[str, Any], duracao: float) -> Dict[str, List[List[float]]]:
+    """🚪 cid → [[saiu, voltou], …]: quando cada personagem está FORA da sala (some do sofá)."""
+    out: Dict[str, List[List[float]]] = {}
+    fora: Dict[str, float] = {}
+    for e in eventos(p):
+        for cid in e["cids"]:
+            if e["tipo"] == "sai" and cid not in fora:
+                fora[cid] = float(e["t"])
+            elif e["tipo"] == "volta" and cid in fora:
+                out.setdefault(cid, []).append([fora.pop(cid), float(e["t"])])
+    for cid, a in fora.items():
+        out.setdefault(cid, []).append([a, max(a, duracao)])
+    return out
+
+
+def presente(aus: Dict[str, List[List[float]]], cid: str, t: float) -> bool:
+    return not any(a <= t < b for a, b in aus.get(cid, []))
+
+
+def recortar_presenca(trechos: List[Dict[str, Any]], fora: List[List[float]]) -> List[Dict[str, Any]]:
+    """Tira de cada trecho [start, end] os intervalos em que o personagem está fora da sala."""
+    out = []
+    for e in trechos:
+        pedacos = [[e["start"], e["end"]]]
+        for a, b in fora:
+            novo = []
+            for x, y in pedacos:
+                if b <= x or a >= y:
+                    novo.append([x, y])
+                    continue
+                if a > x:
+                    novo.append([x, a])
+                if b < y:
+                    novo.append([b, y])
+            pedacos = novo
+        for x, y in pedacos:
+            if y - x >= 0.1:
+                out.append(dict(e, start=round(x, 3), end=round(y, 3)))
+    return out
+
+
+def cena_ativa(p: Dict[str, Any], t: float) -> Optional[Dict[str, Any]]:
+    return next((e for e in eventos(p) if e["tipo"] in EVENTO_COM_IMAGEM and float(e["t"]) <= t < float(e["t"]) + float(e["dur"])), None)
+
+
+def arquivo_cena(p: Dict[str, Any], e: Dict[str, Any], base: str = _BASE) -> Optional[str]:
+    arq = (e.get("cena") or {}).get("arquivo")
+    cam = os.path.join(pasta(p["id"], base), "cenas", arq) if arq else ""
+    return cam if arq and os.path.isfile(cam) else None
+
+
+def evento(p: Dict[str, Any], eid: str) -> Dict[str, Any]:
+    e = next((x for x in (p.get("roteiro") or {}).get("eventos") or [] if x["id"] == eid), None)
+    if not e:
+        raise ReactErro("Evento não encontrado.")
+    return e
+
+
+def salvar_eventos(p: Dict[str, Any], lista: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Os eventos editados na página (mantém a imagem de quem já tinha)."""
+    velhos = {e["id"]: e for e in (p.get("roteiro") or {}).get("eventos") or []}
+    ids = {c["id"] for c in p["personagens"]}
+    novos = []
+    for x in lista or []:
+        if not isinstance(x, dict) or x.get("tipo") not in TIPOS_EVENTO:
+            continue
+        t = segundos(x.get("t"))
+        cids = [c for c in x.get("cids") or [] if c in ids]
+        if t is None or not cids:
+            continue
+        eid = str(x.get("id") or "")[:12] or None
+        e = novo_evento(x["tipo"], t, cids, x.get("descricao"), x.get("imagem_en"), x.get("dur"), eid)
+        if eid in velhos:
+            e["cena"] = velhos[eid].get("cena") or {}
+        novos.append(e)
+    p.setdefault("roteiro", {})["eventos"] = sorted(novos, key=lambda e: e["t"])
+    return p["roteiro"]["eventos"]
+
+
+def prompt_cena(p: Dict[str, Any], e: Dict[str, Any]) -> str:
+    est = estilo_final(p)
+    quem = []
+    for cid in e["cids"]:
+        c = next((x for x in p["personagens"] if x["id"] == cid), None)
+        if c:
+            quem.append(f"{c['nome']}" + (f" from {c['obra']}" if c.get("obra") else "")
+                        + (f" ({c['aparencia_en']})" if c.get("aparencia_en") else ""))
+    outros = [c["nome"] for c in p["personagens"] if c["id"] not in e["cids"]]
+    acao = e.get("imagem_en") or e.get("descricao") or "a comedic fight"
+    return ("Visual novel CG illustration, wide 16:9, dynamic comedic scene inside the SAME cozy streamer living room of the "
+            "reference image (same wall, decorations, sofa, coffee table with snacks and the TV): " + acao + ". "
+            "Characters in the action: " + "; ".join(quem) + ". "
+            + (f"In the background, the others react ({', '.join(outros)}): shocked, cheering or hiding. " if outros else "")
+            + "Each character must look exactly like in the reference image (same face, hair, outfit). Motion lines, "
+            "impact effects, popcorn flying, cushions in the air; no text, no speech bubbles, no captions. "
+            + ESTILO_TXT[est] + ".")[:3900]
+
+
+def colagem_referencia(p: Dict[str, Any], e: Dict[str, Any], destino: str, base: str = _BASE) -> Optional[str]:
+    """Uma imagem só de referência pro Flow: a sala (o fundo) em cima e os personagens do evento embaixo, lado a lado."""
+    from PIL import Image
+    tela = Image.new("RGB", (1920, 1080), (24, 24, 28))
+    fundo = camada_arquivo(p, "fundo", base)
+    if fundo:
+        tela.paste(Image.open(fundo).convert("RGB").resize((1152, 648)), (384, 0))
+    fotos = []
+    for cid in e["cids"]:
+        c = next((x for x in p["personagens"] if x["id"] == cid), None)
+        if not c:
+            continue
+        poses = poses_do_personagem(c, base, "dir")
+        cam = (poses.get("neutro") or (next(iter(poses.values())) if poses else {}) or {}).get("pose")
+        if not cam:
+            cam = next((os.path.join(pasta(p["id"], base), "refs", r) for r in c.get("refs") or []
+                        if os.path.isfile(os.path.join(pasta(p["id"], base), "refs", r))), None)
+        if cam:
+            fotos.append(cam)
+    if not fotos and not fundo:
+        return None
+    if fotos:
+        larg = 1920 // len(fotos)
+        for k, cam in enumerate(fotos):
+            im = Image.open(cam).convert("RGBA")
+            esc = min((larg - 20) / im.width, 420 / im.height)
+            im = im.resize((max(1, int(im.width * esc)), max(1, int(im.height * esc))))
+            tela.paste(im, (k * larg + (larg - im.width) // 2, 1080 - im.height - 6), im)
+    tela.save(destino, "PNG")
+    return destino
+
+
+def guardar_cena(p: Dict[str, Any], e: Dict[str, Any], img, base: str = _BASE, origem: str = "flow") -> str:
+    from PIL import Image
+    d = os.path.join(pasta(p["id"], base), "cenas")
+    os.makedirs(d, exist_ok=True)
+    im = img.convert("RGB")
+    k = max(W / im.width, H / im.height)
+    im = im.resize((max(W, round(im.width * k)), max(H, round(im.height * k))), Image.LANCZOS)
+    x, y = (im.width - W) // 2, (im.height - H) // 2
+    im = im.crop((x, y, x + W, y + H))
+    arq = f"{e['id']}_{secrets.token_hex(3)}.jpg"
+    im.save(os.path.join(d, arq), "JPEG", quality=92)
+    cena = e.setdefault("cena", {})
+    cena.update(arquivo=arq, estado="pronta", erro=None, msg=None, origem=origem,
+                versoes=([arq] + [v for v in cena.get("versoes") or [] if v != arq])[:6])
+    return arq
+
+
+def gerar_cenas(pid: str, base: str = _BASE, eids: Optional[List[str]] = None) -> Dict[str, Any]:
+    """🚀 As imagens das brigas/cenas pro Flow em massa (com a sala e os personagens de referência)."""
+    import flow_lote
+    with _TRAVA:
+        p = carregar(pid, base)
+        alvo = [e for e in eventos(p) if e["tipo"] in EVENTO_COM_IMAGEM
+                and ((eids and e["id"] in eids) or (not eids and not arquivo_cena(p, e, base)))]
+        if not alvo:
+            raise ReactErro("Nenhuma cena pra gerar (as brigas/cenas já têm imagem).")
+        d = os.path.join(pasta(pid, base), "cenas")
+        os.makedirs(d, exist_ok=True)
+        itens = []
+        for e in alvo:
+            it = {"prompt": prompt_cena(p, e), "tipo": "imagem", "origem": "react"}
+            ref = colagem_referencia(p, e, os.path.join(d, f"_ref_{e['id']}.png"), base)
+            if ref:
+                it["referencia_arquivo"] = ref
+            itens.append(it)
+        lote = flow_lote.lote()
+        try:
+            novos = lote.adicionar(itens, proporcao="16:9", quantidade="x1")
+        except ValueError as exc:
+            raise ReactErro(str(exc))
+        for e, j, it in zip(alvo, novos, itens):
+            ev = evento(p, e["id"])
+            ev.setdefault("cena", {}).update(estado="fila", job=j["id"], erro=None, prompt=it["prompt"], msg="⏳ na fila do Flow")
+        log(p, f"👊 {len(alvo)} cena(s) de intriga pro Flow")
+        salvar(p, base)
+    aviso = ""
+    try:
+        lote.iniciar()
+    except Exception as exc:  # noqa: BLE001
+        aviso = f"o Flow em massa não ligou agora ({str(exc)[:160]}) — ▶ Continuar na aba Flow"
+    return {"ok": True, "enviadas": len(alvo), "aviso": aviso}
+
+
+def acompanhar_cenas(pid: str, base: str = _BASE) -> bool:
+    import flow_lote
+    p = carregar(pid, base)
+    if not any((e.get("cena") or {}).get("estado") in ("fila", "gerando") for e in eventos(p)):
+        return False
+    lote = flow_lote.lote()
+    with lote.trava:
+        fila = {j["id"]: dict(j) for j in lote.fila}
+        rodando = lote.rodando
+    mudou = False
+    with _TRAVA:
+        p = carregar(pid, base)
+        for e in (p.get("roteiro") or {}).get("eventos") or []:
+            c = e.get("cena") or {}
+            if c.get("estado") not in ("fila", "gerando") or not c.get("job"):
+                continue
+            fj = fila.get(c["job"])
+            antes = (c.get("estado"), c.get("msg"))
+            if fj is None:
+                c.update(estado="erro", erro="o pedido sumiu da fila do 🚀 Flow em massa — gere de novo")
+            elif fj["estado"] == "ok":
+                ok = False
+                for r in fj.get("resultados") or []:
+                    try:
+                        import flow_estudio as FE
+                        from PIL import Image
+                        orig = os.path.join(FE.pasta_galeria(), r.get("arquivo") or "")
+                        if r.get("tipo") == "imagem" and os.path.isfile(orig):
+                            guardar_cena(p, e, Image.open(orig), base)
+                            ok = True
+                            break
+                    except Exception as exc:  # noqa: BLE001
+                        c.update(estado="erro", erro=f"a imagem chegou mas não deu pra guardar: {str(exc)[:160]}")
+                if ok:
+                    log(p, f"✔ cena {mmss(e['t'])} pronta")
+                elif c.get("estado") != "erro":
+                    c.update(estado="erro", erro="o Flow terminou sem imagem")
+            elif fj["estado"] == "erro":
+                c.update(estado="erro", erro=str(fj.get("erro") or "o Flow falhou")[:300])
+            elif fj["estado"] in ("rodando", "convertendo"):
+                c.update(estado="gerando", msg=f"🎨 gerando no Flow (conta “{fj.get('conta')}”)")
+            elif not rodando:
+                c.update(msg="⏸ o Flow em massa está parado — ▶ Continuar na aba Flow")
+            else:
+                c.update(msg="⏳ na fila do Flow")
+            e["cena"] = c
+            if (c.get("estado"), c.get("msg")) != antes:
+                mudou = True
+        if mudou:
+            salvar(p, base)
+    return mudou
 
 
 def gerar_roteiro(pid: str, base: str = _BASE, parte: Optional[int] = None, so_vazias: bool = False,
@@ -1381,6 +1796,13 @@ def gerar_roteiro(pid: str, base: str = _BASE, parte: Optional[int] = None, so_v
         alvo = list(range(len(ps)))
     if not alvo:
         return {"feitas": 0, "erros": [], "falas": len((p.get("roteiro") or {}).get("falas") or []), "msg": "nenhuma parte faltando"}
+    try:
+        with _TRAVA:
+            p = carregar(pid, base)
+            if analisar_edicao(p, base, on_log):
+                salvar(p, base)
+    except Exception:  # noqa: BLE001 — sem a análise da edição o roteiro sai do mesmo jeito
+        pass
     feitas, erros = 0, []
     for n, k in enumerate(alvo, 1):
         a, b = ps[k]
@@ -1622,8 +2044,36 @@ def checar(pid: str, base: str = _BASE, alvo: str = "tudo", foco: str = "", moto
 
 
 # ------------------------------------------------------------------ 🧍 personagens (poses no Flow)
-def poses_json(p: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, Any]:
-    """O JSON de poses (personagens_pod_v1) do personagem SENTADO, uma pose por expressão."""
+LADOS = {"dir": "olhando pra direita →", "esq": "← olhando pra esquerda"}
+_VIRADO = {"dir": "body and face turned three-quarters toward the viewer's RIGHT, as if watching a TV on that side",
+           "esq": "body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side"}
+
+
+def arquivo_pose(sl: str, expressao: str, lado: str = "dir") -> str:
+    """O arquivo da pose: "goku_feliz.png" (virado pra direita — o padrão) / "goku_feliz_esq.png"."""
+    return f"{sl}_{expressao}{'_esq' if lado == 'esq' else ''}.png"
+
+
+def lado_da_pose(sl: str, arquivo: str) -> Tuple[str, str]:
+    """"goku_feliz_esq.png" → ("feliz", "esq")."""
+    nome = arquivo[len(sl) + 1:-4] if arquivo.startswith(sl + "_") else arquivo[:-4]
+    return (nome[:-4], "esq") if nome.endswith("_esq") else (nome, "dir")
+
+
+def lados_precisos(p: Dict[str, Any], cid: str, base: str = _BASE) -> List[str]:
+    """Pra que lado o personagem olha na disposição atual (sofá da direita nos 2 sofás = pra esquerda)."""
+    try:
+        a = next((x for x in disposicao(p, base)["assentos"] if x["cid"] == cid), None)
+    except Exception:  # noqa: BLE001
+        a = None
+    return ["esq" if a and a.get("espelhar") else "dir"]
+
+
+def poses_json(p: Dict[str, Any], c: Dict[str, Any], lados: Optional[List[str]] = None) -> Dict[str, Any]:
+    """O JSON de poses (personagens_pod_v1) do personagem SENTADO, uma pose por expressão e por LADO que ele olha
+    (virado pra direita = o padrão; pra esquerda = sofá da direita nos 2 sofás). Gerar o outro lado em vez de
+    espelhar: cabelo repartido, cicatriz, símbolo na roupa e texto continuam do lado certo."""
+    lados = [l for l in ("dir", "esq") if l in (lados or ["dir"])] or ["dir"]
     est = estilo_final(p)
     exprs = [e for e in (p.get("expressoes") or EXPRESSOES_PADRAO) if e in EXPRESSOES]
     if "neutro" not in exprs:
@@ -1633,16 +2083,17 @@ def poses_json(p: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, Any]:
     trava = (f"CHARACTER LOCK: {c['nome']}" + (f" from {c['obra']}" if c.get("obra") else "") + f". Appearance: {aparencia}. "
              "Keep exactly the same face, hairstyle, eye color, outfit and colors in every image.")
     estilo = ("ART STYLE: " + ESTILO_TXT[est] + ("." if est == "anime" else ". Keep the person looking like the reference."))
-    regras = ("Framing: the character is SITTING on an invisible seat as if on a couch, seen from the front, body turned "
-              "slightly (three-quarters) toward the viewer's right as if watching a TV there; head, both arms, torso and the "
-              "thighs/knees visible, cropped around the knees at the bottom edge; whole head and hair inside the image with "
+    regras = ("Framing: the character is SITTING on an invisible seat as if on a couch, seen from the front (the pose says to "
+              "which side the body is turned); head, both arms, torso and the thighs/knees visible, cropped around the knees at the bottom edge; whole head and hair inside the image with "
               "margin. Do NOT draw the couch, chair, table, TV or any other object. ONE single figure, no text, no panels, "
               "on a flat solid chroma-key green background (#00FF00), no shadow on the background.")
     poses = []
-    for k, e in enumerate(exprs):
-        poses.append({"arquivo": f"{sl}_{e}.png", "tipo": "pose", "prioridade": 1 if k < 4 else 2, "grupo": "reacao",
-                      "mestre": e == "neutro", "descricao_pt": f"sentado — {EXPRESSOES[e][0]}",
-                      "prompt": f"sitting, {EXPRESSOES[e][1]}."})
+    for lado in lados:
+        for k, e in enumerate(exprs):
+            poses.append({"arquivo": arquivo_pose(sl, e, lado), "tipo": "pose", "prioridade": 1 if k < 4 else 2,
+                          "grupo": "reacao", "lado": lado, "mestre": e == "neutro" and lado == lados[0],
+                          "descricao_pt": f"sentado — {EXPRESSOES[e][0]} · {LADOS[lado]}",
+                          "prompt": f"sitting, {_VIRADO[lado]}, {EXPRESSOES[e][1]}."})
     refs = {r: f"a reference picture of {c['nome']}" + (f" from {c['obra']}" if c.get("obra") else "") for r in c.get("refs") or []}
     return {"formato": "personagens_pod_v1", "personagem": sl, "nome": c["nome"], "react": True,
             "descricoes_referencias": refs, "texto_fixo": {"trava": trava, "estilo": estilo, "regras": regras},
@@ -1662,7 +2113,14 @@ def criar_poses(pid: str, cid: str, base: str = _BASE, refazer: bool = False) ->
     with _TRAVA:
         p = carregar(pid, base)
         c = personagem(p, cid)
-        dados = poses_json(p, c)
+        lados = lados_precisos(p, cid, base)
+        if (c.get("pod") or {}).get("pid"):
+            try:  # ♻ os lados que o projeto já tem continuam (as imagens prontas são reaproveitadas)
+                ja = _pp().carregar(c["pod"]["pid"], base)
+                lados += [lado_da_pose(_slug(c["nome"]), x["arquivo"])[1] for x in ja["dados"]["poses"] if x.get("tipo") == "pose"]
+            except Exception:  # noqa: BLE001
+                pass
+        dados = poses_json(p, c, list(dict.fromkeys(lados)))
         refs = []
         for r in (c.get("refs") or [])[:2]:
             try:
@@ -1672,7 +2130,13 @@ def criar_poses(pid: str, cid: str, base: str = _BASE, refazer: bool = False) ->
                 continue
         if not refazer and not (c.get("pod") or {}).get("pid"):
             reaproveitar(p, c, base)  # ♻ já foi gerado num react anterior: usa o mesmo projeto 🧍
-            dados = poses_json(p, c)
+            if (c.get("pod") or {}).get("pid"):
+                try:
+                    ja = _pp().carregar(c["pod"]["pid"], base)
+                    lados += [lado_da_pose(_slug(c["nome"]), x["arquivo"])[1] for x in ja["dados"]["poses"] if x.get("tipo") == "pose"]
+                except Exception:  # noqa: BLE001
+                    pass
+            dados = poses_json(p, c, list(dict.fromkeys(lados)))
         pod = c.get("pod") or {}
         existe = None
         if pod.get("pid") and not refazer:
@@ -1826,11 +2290,25 @@ def acompanhar(pid: str, base: str = _BASE) -> Dict[str, Any]:
         acompanhar_cenario(pid, base)
     except Exception as exc:  # noqa: BLE001
         avisos.append(f"cenário: {str(exc)[:160]}")
+    try:
+        acompanhar_cenas(pid, base)
+    except Exception as exc:  # noqa: BLE001
+        avisos.append(f"cenas: {str(exc)[:160]}")
     return {"avisos": avisos}
 
 
-def poses_do_personagem(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Dict[str, Optional[str]]]:
-    """expressão → {"pose": caminho, "boca": caminho} (só as que já têm imagem)."""
+def poses_do_personagem(c: Dict[str, Any], base: str = _BASE, lado: str = "dir") -> Dict[str, Dict[str, Any]]:
+    """expressão → {"pose", "boca", "espelhar"} (só as que já têm imagem) pro LADO que ele olha. Sem a pose daquele
+    lado ainda, usa a do outro lado espelhada (até a certa ficar pronta)."""
+    todas = _poses_por_lado(c, base)
+    out: Dict[str, Dict[str, Any]] = {e: dict(x, espelhar=False) for e, x in todas.get(lado, {}).items()}
+    outro = "esq" if lado == "dir" else "dir"
+    for e, x in todas.get(outro, {}).items():
+        out.setdefault(e, dict(x, espelhar=True))
+    return out
+
+
+def _poses_por_lado(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Dict[str, Dict[str, Optional[str]]]]:
     pod = c.get("pod") or {}
     if not pod.get("pid"):
         return {}
@@ -1840,16 +2318,16 @@ def poses_do_personagem(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Dict[
     except pp.PersErro:
         return {}
     sl = _slug(c["nome"])
-    out: Dict[str, Dict[str, Optional[str]]] = {}
+    out: Dict[str, Dict[str, Dict[str, Optional[str]]]] = {"dir": {}, "esq": {}}
     for x in proj["dados"]["poses"]:
         if x.get("tipo") != "pose":
             continue
-        e = x["arquivo"][len(sl) + 1:-4] if x["arquivo"].startswith(sl + "_") else x["arquivo"][:-4]
+        e, lado = lado_da_pose(sl, x["arquivo"])
         cam = pp.arquivo_atual(proj, x["arquivo"], base)
         if not cam or (proj["imagens"].get(x["arquivo"]) or {}).get("estado") == "descartada":
             continue
         boca = next((y["arquivo"] for y in proj["dados"]["poses"] if y.get("tipo") == "boca" and y.get("base") == x["arquivo"]), None)
-        out[e] = {"pose": cam, "boca": pp.arquivo_atual(proj, boca, base) if boca else None}
+        out[lado][e] = {"pose": cam, "boca": pp.arquivo_atual(proj, boca, base) if boca else None}
     return out
 
 
@@ -1868,7 +2346,12 @@ def estado_poses(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
         itens.append({"arquivo": x["arquivo"], "tipo": x.get("tipo"), "estado": it.get("estado"), "erro": it.get("erro"),
                       "msg": it.get("msg"), "img": (it["versoes"][it["atual"]]["local"] if it.get("atual", -1) >= 0 and it.get("versoes") else None)})
     poses = [i for i in itens if i["tipo"] == "pose"]
-    return {"tem": True, "pid": pod["pid"], "fase": pod.get("fase"), "mestre": bool(proj.get("mestre")),
+    sl = _slug(c["nome"])
+    por_lado = {l: {"prontas": sum(1 for i in poses if i["img"] and lado_da_pose(sl, i["arquivo"])[1] == l),
+                    "total": sum(1 for i in poses if lado_da_pose(sl, i["arquivo"])[1] == l)} for l in ("dir", "esq")}
+    for i in itens:
+        i["lado"] = lado_da_pose(sl, i["arquivo"].replace("_boca.png", ".png"))[1]
+    return {"tem": True, "pid": pod["pid"], "fase": pod.get("fase"), "mestre": bool(proj.get("mestre")), "por_lado": por_lado,
             "prontas": sum(1 for i in poses if i["img"]), "total": len(poses),
             "bocas": sum(1 for i in itens if i["tipo"] == "boca" and i["img"]),
             "esperando": sum(1 for i in itens if i["estado"] in ("fila", "gerando")),
@@ -2016,6 +2499,44 @@ def acompanhar_cenario(pid: str, base: str = _BASE) -> bool:
         if mudou:
             salvar(p, base)
     return mudou
+
+
+def camadas_de_outros(p: Dict[str, Any], camada: str, base: str = _BASE) -> List[Dict[str, Any]]:
+    """♻ As imagens dessa camada (fundo/sofá/mesa) já feitas em OUTROS reacts — as do mesmo estilo primeiro."""
+    if camada not in CAMADAS:
+        return []
+    est = estilo_final(p)
+    out = []
+    raiz = pasta_raiz(base)
+    for rid in os.listdir(raiz) if os.path.isdir(raiz) else []:
+        if rid == p["id"] or not RE_ID.match(rid):
+            continue
+        try:
+            o = carregar(rid, base)
+        except Exception:  # noqa: BLE001
+            continue
+        cam = (o["cenario"]["camadas"].get(camada) or {})
+        for arq in cam.get("versoes") or ([cam["arquivo"]] if cam.get("arquivo") else []):
+            if os.path.isfile(os.path.join(pasta(rid, base), "cenario", arq)):
+                out.append({"projeto": rid, "titulo": o.get("titulo") or "", "arquivo": arq, "estilo": estilo_final(o),
+                            "atual": arq == cam.get("arquivo"), "quando": o.get("atualizado", 0)})
+    out.sort(key=lambda x: (x["estilo"] != est, not x["atual"], -x["quando"]))
+    return out[:40]
+
+
+def usar_camada_de_outro(p: Dict[str, Any], camada: str, projeto: str, arquivo: str, base: str = _BASE) -> str:
+    """♻ Copia a imagem pronta de outro react pra esta camada (sem recortar de novo)."""
+    from PIL import Image
+    if camada not in CAMADAS or not RE_ID.match(projeto or "") or not re.fullmatch(r"[\w.\-]+\.png", arquivo or ""):
+        raise ReactErro("imagem inválida")
+    cam = os.path.join(pasta(projeto, base), "cenario", arquivo)
+    if not os.path.isfile(cam):
+        raise ReactErro("Essa imagem não existe mais.")
+    with Image.open(cam) as im:
+        im.load()
+        novo = guardar_camada(p, camada, im.copy(), base, recortar=False, origem="♻ outro react")
+    log(p, f"♻ {ROTULO_CAMADA[camada]} reaproveitado de outro react")
+    return novo
 
 
 def camada_arquivo(p: Dict[str, Any], camada: str, base: str = _BASE) -> Optional[str]:
@@ -2196,7 +2717,161 @@ def disposicao(p: Dict[str, Any], base: str = _BASE, video_wh: Optional[Tuple[in
                 assentos.append({"cid": p["personagens"][idx]["id"], "cx": cx, "cy": pe - png_h / 2 + dy, "w": png_w, "h": png_h,
                                  "espelhar": olha_esq})
     out["assentos"] = assentos
-    return out
+    return aplicar_posicoes(p, out)
+
+
+def chaves_posicao(lay: Dict[str, Any]) -> List[str]:
+    return (["tela", "legenda", "mesa"] + [f"sofa{k}" for k in range(len(lay["sofas"]))]
+            + [f"p:{a['cid']}" for a in lay["assentos"]])
+
+
+def aplicar_posicoes(p: Dict[str, Any], lay: Dict[str, Any]) -> Dict[str, Any]:
+    """🎛 Os ajustes que você fez arrastando na prévia (posição, tamanho, pra que lado olha) por cima da disposição
+    automática — guardados por disposição (sofa_tv e dois_sofas têm os seus)."""
+    aj = ((p.get("posicoes") or {}).get(lay["layout"]) or {})
+    if not aj:
+        return lay
+
+    def ap(d: Dict[str, Any], chave: str) -> None:
+        o = aj.get(chave) or {}
+        if not o:
+            return
+        if o.get("w"):
+            w = max(40.0, min(4000.0, float(o["w"])))
+            if d.get("w") and d.get("h"):
+                d["h"] = d["h"] * w / d["w"]
+            d["w"] = w
+        for k in ("cx", "cy", "topo"):
+            if o.get(k) is not None:
+                d[k] = max(-2000.0, min(4000.0, float(o[k])))
+        if o.get("lado") in ("dir", "esq") and "espelhar" in d:
+            d["espelhar"] = o["lado"] == "esq"
+        d["ajustado"] = True
+
+    ap(lay["tela"], "tela")
+    ap(lay["legenda"], "legenda")
+    ap(lay["mesa"], "mesa")
+    for k, sf in enumerate(lay["sofas"]):
+        ap(sf, f"sofa{k}")
+    for a in lay["assentos"]:
+        ap(a, f"p:{a['cid']}")
+    return lay
+
+
+def guardar_posicao(p: Dict[str, Any], chave: str, dados: Optional[Dict[str, Any]], base: str = _BASE) -> None:
+    """Guarda (ou tira, com dados=None) o ajuste de uma peça na disposição atual."""
+    lay = p.get("layout") if p.get("layout") in LAYOUTS else "sofa_tv"
+    validas = set(chaves_posicao(disposicao(dict(p, posicoes={}), base)))
+    if chave != "*" and chave not in validas:
+        raise ReactErro("peça desconhecida")
+    pos = p.setdefault("posicoes", {}).setdefault(lay, {})
+    if chave == "*":
+        p["posicoes"][lay] = {}
+        return
+    if not dados:
+        pos.pop(chave, None)
+        return
+    o = {k: round(float(dados[k]), 1) for k in ("cx", "cy", "w", "topo") if isinstance(dados.get(k), (int, float))}
+    if dados.get("lado") in ("dir", "esq"):
+        o["lado"] = dados["lado"]
+    pos[chave] = dict(pos.get(chave) or {}, **o)
+
+
+def pilha(p: Dict[str, Any], lay: Dict[str, Any]) -> Dict[str, Any]:
+    """🗂 As camadas como no Photoshop: a ordem (de baixo pra cima), quais estão ocultas (não vão pro vídeo) e quais
+    estão travadas (não mexem no palco). Por disposição. Peça nova (personagem que entrou depois) vai pro lugar padrão."""
+    padrao = ([f"sofa{k}" for k in range(len(lay["sofas"]))] + [f"p:{a['cid']}" for a in lay["assentos"]]
+              + ["mesa", "tela", "legenda"])
+    g = ((p.get("pilha") or {}).get(lay["layout"]) or {})
+    salva = [k for k in g.get("ordem") or [] if k in padrao]
+    ordem = list(salva)
+    for i, k in enumerate(padrao):
+        if k in ordem:
+            continue
+        # entra logo acima da peça padrão anterior que já está na ordem
+        ant = next((padrao[j] for j in range(i - 1, -1, -1) if padrao[j] in ordem), None)
+        ordem.insert(ordem.index(ant) + 1 if ant else 0, k)
+    return {"ordem": ordem, "ocultas": [k for k in g.get("ocultas") or [] if k in padrao],
+            "travadas": [k for k in g.get("travadas") or [] if k in padrao]}
+
+
+def guardar_pilha(p: Dict[str, Any], dados: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
+    lay = disposicao(p, base)
+    atual = pilha(p, lay)
+    validas = set(atual["ordem"])
+    novo = dict(atual)
+    if isinstance(dados.get("ordem"), list):
+        o = [k for k in dados["ordem"] if k in validas]
+        novo["ordem"] = o + [k for k in atual["ordem"] if k not in o]
+    for campo in ("ocultas", "travadas"):
+        if isinstance(dados.get(campo), list):
+            novo[campo] = [k for k in dados[campo] if k in validas]
+    p.setdefault("pilha", {})[lay["layout"]] = novo
+    return pilha(p, lay)
+
+
+def _pose_no_tempo(p: Dict[str, Any], c: Dict[str, Any], a: Dict[str, Any], base: str,
+                   linhas: Dict[str, List[Dict[str, Any]]], t: float) -> Tuple[Optional[Dict[str, Any]], str]:
+    poses = poses_do_personagem(c, base, "esq" if a["espelhar"] else "dir")
+    e = next((x for x in linhas.get(c["id"], []) if x["start"] <= t < x["end"]), None)
+    ex = (e or {}).get("expressao") or "neutro"
+    x = poses.get(ex) or poses.get("neutro") or (next(iter(poses.values())) if poses else None)
+    return x, ex
+
+
+def pecas_para_editar(p: Dict[str, Any], base: str = _BASE, t: Optional[float] = None) -> Dict[str, Any]:
+    """🎛 O que a página precisa pra montar o palco arrastável: cada peça com a imagem e o lugar (px de 1920×1080)."""
+    video = _video_local(p, base)
+    info = sondar(video) if video else {"largura": 16, "altura": 9}
+    lay = disposicao(p, base, (info.get("largura") or 16, info.get("altura") or 9))
+    pid = p["id"]
+    falas = ajustar_falas((p.get("roteiro") or {}).get("falas") or [], info.get("duracao") or None)
+    if t is None:
+        t = (falas[0]["t"] + 0.5) if falas else 0.0
+    linhas = linhas_personagens(p, falas, max(info.get("duracao") or 0, t + 1)) if falas else {}
+    ativa = next((f for f in falas if f["t"] <= t < f["t"] + f["dur"]), None)
+    aus = ausencias(p, max(info.get("duracao") or 0, t + 1))
+    cena = cena_ativa(p, t)
+
+    def url_cam(q: str) -> Optional[str]:
+        c = (p["cenario"]["camadas"].get(q) or {})
+        return f"/react-personagens/{pid}/arquivo/cenario/{c['arquivo']}" if camada_arquivo(p, q, base) else None
+
+    pecas = []
+    for k, sf in enumerate(lay["sofas"]):
+        pecas.append(dict(sf, chave=f"sofa{k}", nome="🛋 Sofá" + (" da direita" if k else ""), img=url_cam("sofa"), z=1))
+    for a in lay["assentos"]:
+        c = personagem(p, a["cid"])
+        lado = "esq" if a["espelhar"] else "dir"
+        x, ex = _pose_no_tempo(p, c, a, base, linhas, t)
+        img, esp = None, a["espelhar"]
+        if x:
+            ppid = (c.get("pod") or {}).get("pid")
+            img = f"/react-personagens/{pid}/pose/{c['id']}/{os.path.basename(x['pose'])}" if ppid else None
+            esp = bool(x.get("espelhar"))
+        elif c.get("refs"):
+            img = f"/react-personagens/{pid}/arquivo/refs/{c['refs'][0]}"
+        pecas.append(dict(a, chave=f"p:{c['id']}", nome=c["nome"], img=img, espelhar_img=esp, lado=lado, z=2, personagem=True,
+                          expressao=ex, falando=bool(ativa and ativa["cid"] == c["id"]), fora=not presente(aus, c["id"], t)))
+    pecas.append(dict(lay["mesa"], chave="mesa", nome="🪵 Mesa", img=url_cam("mesa"), z=3))
+    pecas.append(dict(lay["tela"], chave="tela", nome="📺 TV", z=4, tv=True))
+    fala = None
+    if ativa:
+        c = next((x for x in p["personagens"] if x["id"] == ativa["cid"]), None)
+        if c:
+            fala = {"nome": c["nome"], "texto": ativa["texto"], "cor": c.get("cor") or "#ffd54a"}
+    pecas.append(dict(lay["legenda"], chave="legenda", nome="💬 Legenda", z=5, legenda=True, fala=fala))
+    pil = pilha(p, lay)
+    for pc in pecas:
+        pc["z"] = pil["ordem"].index(pc["chave"]) + 1
+        pc["oculta"] = pc["chave"] in pil["ocultas"]
+        pc["travada"] = pc["chave"] in pil["travadas"]
+    cena_info = None
+    if cena:
+        cena_info = {"tipo": TIPOS_EVENTO[cena["tipo"]], "descricao": cena.get("descricao") or "",
+                     "img": (f"/react-personagens/{pid}/arquivo/cenas/{cena['cena']['arquivo']}" if arquivo_cena(p, cena, base) else None)}
+    return {"W": W, "H": H, "t": t, "layout": lay["layout"], "fundo": url_cam("fundo"), "pecas": pecas, "pilha": pil, "cena": cena_info,
+            "ajustadas": sorted(((p.get("posicoes") or {}).get(lay["layout"]) or {}).keys())}
 
 
 def _pct(v: float, total: float) -> float:
@@ -2305,6 +2980,8 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
         avisos.append("sem a camada do fundo — usei uma parede lisa (gere o 🧱 Fundo e mande de novo, ou troque no editor)")
     lay = disposicao(p, base, (info["largura"] or 16, info["altura"] or 9))
     overlays: List[Dict[str, Any]] = []
+    grupos: Dict[str, List[Dict[str, Any]]] = {}
+    grupo_atual = [""]
 
     def png(oid: str, nome: str, cam: str, cx: float, cy: float, w: float, start: float, end: float, camada: str,
             espelhar: bool = False, **extra: Any) -> Dict[str, Any]:
@@ -2315,22 +2992,30 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
               "anim_in": "nenhuma", "anim_out": "nenhuma", "anim_dur": 0.2, "espelhar": bool(espelhar),
               "boca_path": None, "boca_janelas": [], "manual": True}
         ov.update(extra)
-        overlays.append(ov)
+        grupos.setdefault(grupo_atual[0], []).append(ov)
         return ov
 
     sofa = camada_arquivo(p, "sofa", base)
     if sofa:
         sc = copiar(sofa, "sofa.png")
         for k, s in enumerate(lay["sofas"]):
+            grupo_atual[0] = f"sofa{k}"
             png(f"rsofa{k}", "🛋 Sofá", sc, s["cx"], s["cy"], s["w"], 0, dur, "sofa", espelhar=s.get("espelhar", False))
     else:
         avisos.append("sem a camada do sofá")
     # personagens
     falas = ajustar_falas(falas_proj, dur)
     linhas = linhas_personagens(p, falas, dur)
+    aus = ausencias(p, dur)  # 🚪 quem saiu da sala some do sofá até voltar
     for a in lay["assentos"]:
         c = personagem(p, a["cid"])
-        poses = poses_do_personagem(c, base)
+        grupo_atual[0] = f"p:{c['id']}"
+        lado = "esq" if a["espelhar"] else "dir"
+        poses = poses_do_personagem(c, base, lado)
+        espelhadas = sorted(e for e, x in poses.items() if x.get("espelhar"))
+        if espelhadas:
+            avisos.append(f"{c['nome']} olha pra {'esquerda' if lado == 'esq' else 'direita'} aqui e ainda não tem essas poses "
+                          f"({', '.join(espelhadas)}) — espelhei as do outro lado (🧍 Gerar o que falta faz as certas)")
         if not poses:
             ref = next((os.path.join(pasta(p["id"], base), "refs", r) for r in c.get("refs") or []
                         if os.path.isfile(os.path.join(pasta(p["id"], base), "refs", r))), None)
@@ -2343,12 +3028,12 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
                 canvas.paste(im, ((1200 - im.width) // 2, 1800 - im.height), im)
                 cam = os.path.join(d, f"{c['id']}_ref.png")
                 canvas.save(cam)
-                poses = {"neutro": {"pose": cam, "boca": None}}
+                poses = {"neutro": {"pose": cam, "boca": None, "espelhar": a["espelhar"]}}
             else:
                 continue
         copiados: Dict[str, str] = {}
 
-        def pose_de(ex: str) -> Tuple[str, Optional[str]]:
+        def pose_de(ex: str) -> Tuple[str, Optional[str], bool]:
             x = poses.get(ex) or poses.get("neutro") or next(iter(poses.values()))
             pc = x["pose"]
             if pc not in copiados:
@@ -2356,20 +3041,22 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
             bc = x.get("boca")
             if bc and bc not in copiados:
                 copiados[bc] = copiar(bc, f"{c['id']}_{os.path.basename(bc)}")
-            return copiados[pc], (copiados[bc] if bc else None)
+            return copiados[pc], (copiados[bc] if bc else None), bool(x.get("espelhar"))
 
         faltou = sorted({e["expressao"] for e in linhas.get(c["id"], []) if e["expressao"] not in poses})
         if faltou:
             avisos.append(f"{c['nome']}: sem a pose {', '.join(faltou)} ainda — usei a neutra nesses momentos")
-        for k, e in enumerate(linhas.get(c["id"], [])):
-            pc, bc = pose_de(e["expressao"])
+        for k, e in enumerate(recortar_presenca(linhas.get(c["id"], []), aus.get(c["id"], []))):
+            pc, bc, esp = pose_de(e["expressao"])
             jan = _boca_janelas(e.get("fala_ini", e["start"]), e.get("fala_fim", e["end"])) if e["falando"] and bc else []
+            jan = [[max(x, e["start"]), min(y, e["end"])] for x, y in jan if min(y, e["end"]) - max(x, e["start"]) > 0.1]
             png(f"r{c['id']}_{k}", c["nome"], pc, a["cx"], a["cy"], a["w"], e["start"], e["end"], "personagem",
-                espelhar=a["espelhar"], expressao=e["expressao"], falando=e["falando"], cid=c["id"],
+                espelhar=esp, expressao=e["expressao"], falando=e["falando"], cid=c["id"],
                 boca_path=bc if jan else None, boca_janelas=jan)
     mesa = camada_arquivo(p, "mesa", base)
     if mesa:
         m = lay["mesa"]
+        grupo_atual[0] = "mesa"
         png("rmesa", "🪵 Mesa", copiar(mesa, "mesa.png"), m["cx"], m["cy"], m["w"], 0, dur, "mesa")
     else:
         avisos.append("sem a camada da mesa")
@@ -2380,10 +3067,12 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
     # o centro da moldura: a tela fica a `borda` px da esquerda/topo do PNG
     tv_cx = t["cx"] - t["w"] / 2 - borda + tw / 2
     tv_cy = t["cy"] - t["h"] / 2 - borda + th / 2
+    grupo_atual[0] = "tela"
     png("rtv", "📺 TV", tv_png, tv_cx, tv_cy, tw, 0, dur, "tv")
     # legendas
     nomes = {c["id"]: c for c in p["personagens"]}
     leg = lay["legenda"]
+    grupo_atual[0] = "legenda"
     for k, f in enumerate(falas):
         c = nomes.get(f["cid"])
         if not c:
@@ -2392,11 +3081,34 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
                                        os.path.join(d, f"legenda_{k:03d}.png"))
         png(f"rleg{k:03d}", f"💬 {c['nome']}", cam, leg["cx"], leg["topo"] + lh / 2, lw, f["t"], f["t"] + f["dur"], "legenda",
             fala=f["texto"], cid=c["id"], cta=bool(f.get("cta")))
-    # o vídeo na TV (o último: por cima de tudo, igual no monitor do Estúdio)
-    overlays.append({"id": "rtela", "origem": "react_tela", "camada": "tela", "nome_personagem": "📺 Vídeo na TV",
+    # o vídeo na TV fica logo acima da moldura (a ordem das camadas é a da 🗂 pilha que você arrumou)
+    grupos.setdefault("tela", []).append({"id": "rtela", "origem": "react_tela", "camada": "tela", "nome_personagem": "📺 Vídeo na TV",
                      "source": {"source": "local_file", "value": video, "kind": "video"}, "media_type": "video",
                      "start": 0.0, "end": round(dur, 3), "position": "top-right", "ancora": "centro", "sincronizar": True,
                      "size_percent": _pct(t["w"], W), "x_percent": _pct(t["cx"], W), "y_percent": _pct(t["cy"], H)})
+    # ⚡ brigas / cenas especiais: a imagem ocupa a tela toda por uns segundos (a legenda continua por cima, como visual novel)
+    grupo_atual[0] = "cena"
+    for e in eventos(p):
+        if e["tipo"] not in EVENTO_COM_IMAGEM:
+            continue
+        cam = arquivo_cena(p, e, base)
+        if not cam:
+            avisos.append(f"{TIPOS_EVENTO[e['tipo']]} em {mmss(e['t'])} ainda sem imagem — ficou de fora (⚡ Intrigas → 🚀 Gerar)")
+            continue
+        ini = float(e["t"])
+        png(f"rcena_{e['id']}", TIPOS_EVENTO[e["tipo"]], copiar(cam, f"cena_{e['id']}.jpg"), W / 2, H / 2, W, ini,
+            min(dur, ini + float(e["dur"])), "cena", descricao=e.get("descricao") or "")
+    pil = pilha(p, lay)
+    ordem = [k for k in pil["ordem"] if k not in pil["ocultas"]]
+    # a cena fica por cima de tudo, menos da legenda (se a legenda é a camada de cima)
+    if ordem and ordem[-1] == "legenda":
+        ordem.insert(len(ordem) - 1, "cena")
+    else:
+        ordem.append("cena")
+    for chave in ordem:
+        overlays.extend(grupos.get(chave, []))
+    if pil["ocultas"]:
+        avisos.append(f"{len(pil['ocultas'])} camada(s) oculta(s) 👁 não foram pro editor")
     seg = {"start": 0.0, "end": round(dur, 3), "provider": "material", "query": f"🎭 react — cenário ({p.get('titulo') or ''})"[:150],
            "on_screen_text": None, "media_type": "image", "zoom_direction": "static", "efeito": None,
            "override_source": {"source": "local_file", "value": fundo, "kind": "image", "zoom_direction": "static",
@@ -2408,7 +3120,7 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
 
 # ------------------------------------------------------------------ 👁 prévia (uma imagem do react pronto)
 def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None) -> str:
-    """Uma imagem de como o react fica (no segundo t: quem fala, a legenda, o quadro do vídeo na TV)."""
+    """Uma imagem de como o react fica (no segundo t: quem fala, a legenda, o quadro do vídeo na TV), na ordem das camadas."""
     from PIL import Image, ImageOps
     est = estilo_final(p)
     video = _video_local(p, base)
@@ -2432,27 +3144,32 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
         tela.alpha_composite(im, (int(cx - w / 2), int(cy - h / 2))) if cx - w / 2 >= 0 and cy - h / 2 >= 0 else \
             _colar_cortando(tela, im, int(cx - w / 2), int(cy - h / 2))
 
-    sofa = camada_arquivo(p, "sofa", base)
-    if sofa:
-        for s in lay["sofas"]:
-            colar(sofa, s["cx"], s["cy"], s["w"], s.get("espelhar", False))
     falas = ajustar_falas((p.get("roteiro") or {}).get("falas") or [], info.get("duracao") or None)
     if t is None:
         t = (falas[0]["t"] + 0.5) if falas else 0.0
     ativa = next((f for f in falas if f["t"] <= t < f["t"] + f["dur"]), None)
     linhas = linhas_personagens(p, falas, max(info.get("duracao") or 0, t + 1)) if falas else {}
-    for a in lay["assentos"]:
-        c = personagem(p, a["cid"])
-        poses = poses_do_personagem(c, base)
-        e = next((x for x in linhas.get(c["id"], []) if x["start"] <= t < x["end"]), None)
-        ex = (e or {}).get("expressao") or "neutro"
-        x = poses.get(ex) or poses.get("neutro") or (next(iter(poses.values())) if poses else None)
+    sofa = camada_arquivo(p, "sofa", base)
+    mesa = camada_arquivo(p, "mesa", base)
+
+    def desenha_sofa(k: int) -> None:
+        if sofa and k < len(lay["sofas"]):
+            s = lay["sofas"][k]
+            colar(sofa, s["cx"], s["cy"], s["w"], s.get("espelhar", False))
+
+    def desenha_personagem(cid: str) -> None:
+        a = next((x for x in lay["assentos"] if x["cid"] == cid), None)
+        if not a:
+            return
+        c = personagem(p, cid)
+        x, _ex = _pose_no_tempo(p, c, a, base, linhas, t)
         cam = (x or {}).get("pose")
+        esp = bool((x or {}).get("espelhar")) if x else a["espelhar"]
         if not cam:
             ref = next((os.path.join(pasta(p["id"], base), "refs", r) for r in c.get("refs") or []
                         if os.path.isfile(os.path.join(pasta(p["id"], base), "refs", r))), None)
             if not ref:
-                continue
+                return
             im = Image.open(ref).convert("RGBA")
             canvas = Image.new("RGBA", (1200, 1800), (0, 0, 0, 0))
             k = min(1140 / im.width, 1700 / im.height)
@@ -2460,32 +3177,60 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
             canvas.paste(im, ((1200 - im.width) // 2, 1800 - im.height), im)
             cam = destino + f".{c['id']}.png"
             canvas.save(cam)
-        colar(cam, a["cx"], a["cy"], a["w"], a["espelhar"])
+        colar(cam, a["cx"], a["cy"], a["w"], esp)
         if cam.startswith(destino + "."):
             os.remove(cam)
-    mesa = camada_arquivo(p, "mesa", base)
-    if mesa:
-        m = lay["mesa"]
-        colar(mesa, m["cx"], m["cy"], m["w"])
-    tl = lay["tela"]
-    tv, borda = desenhar_tv(int(tl["w"]), int(tl["h"]), destino + ".tv.png")
-    tw, th = _tam(tv, (1, 1))
-    colar(tv, tl["cx"] - tl["w"] / 2 - borda + tw / 2, tl["cy"] - tl["h"] / 2 - borda + th / 2, tw)
-    os.remove(tv)
-    if video:
-        q = destino + ".q.jpg"
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}", "-i", video, "-frames:v", "1", q],
-                       capture_output=True, timeout=60)
-        if os.path.isfile(q):
-            colar(q, tl["cx"], tl["cy"], tl["w"])
-            os.remove(q)
-    if ativa:
+
+    def desenha_tela() -> None:
+        tl = lay["tela"]
+        tv, borda = desenhar_tv(int(tl["w"]), int(tl["h"]), destino + ".tv.png")
+        tw, th = _tam(tv, (1, 1))
+        colar(tv, tl["cx"] - tl["w"] / 2 - borda + tw / 2, tl["cy"] - tl["h"] / 2 - borda + th / 2, tw)
+        os.remove(tv)
+        if video:
+            q = destino + ".q.jpg"
+            subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}", "-i", video, "-frames:v", "1", q],
+                           capture_output=True, timeout=60)
+            if os.path.isfile(q):
+                colar(q, tl["cx"], tl["cy"], tl["w"])
+                os.remove(q)
+
+    def desenha_legenda() -> None:
+        if not ativa:
+            return
         c = next((x for x in p["personagens"] if x["id"] == ativa["cid"]), None)
         if c:
             leg = lay["legenda"]
             cam, lw, lh = desenhar_legenda(c["nome"], ativa["texto"], c.get("cor") or "#ffd54a", int(leg["w"]), destino + ".leg.png")
             colar(cam, leg["cx"], leg["topo"] + lh / 2, lw)
             os.remove(cam)
+
+    aus = ausencias(p, max(info.get("duracao") or 0, t + 1))
+    cena = cena_ativa(p, t)
+    cena_cam = arquivo_cena(p, cena, base) if cena else None
+    pil = pilha(p, lay)
+    ordem = [k for k in pil["ordem"] if k not in pil["ocultas"]]
+    if ordem and ordem[-1] == "legenda":
+        ordem.insert(len(ordem) - 1, "cena")
+    else:
+        ordem.append("cena")
+    for chave in ordem:
+        if chave == "cena":
+            if cena_cam:
+                colar(cena_cam, W / 2, H / 2, W)
+        elif chave.startswith("p:") and not presente(aus, chave[2:], t):
+            continue
+        elif chave.startswith("sofa"):
+            desenha_sofa(int(chave[4:]))
+        elif chave.startswith("p:"):
+            desenha_personagem(chave[2:])
+        elif chave == "mesa" and mesa:
+            m = lay["mesa"]
+            colar(mesa, m["cx"], m["cy"], m["w"])
+        elif chave == "tela":
+            desenha_tela()
+        elif chave == "legenda":
+            desenha_legenda()
     tela.convert("RGB").save(destino, "JPEG", quality=88)
     return destino
 
@@ -2507,10 +3252,12 @@ def para_tela(p: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
     for c in p["personagens"]:
         x = dict(c)
         x["poses"] = estado_poses(c, base)
+        x["lado"] = lados_precisos(p, c["id"], base)[0]
         out["personagens"].append(x)
     out["camadas"] = {q: dict((p["cenario"]["camadas"].get(q) or {}), tem=bool(camada_arquivo(p, q, base))) for q in CAMADAS}
     out["ia"] = ia_ligada()
     out["partes"] = estado_partes(p)
+    out["eventos"] = [dict(e, tem_imagem=bool(arquivo_cena(p, e, base))) for e in eventos(p)]
     try:
         import gemini_servico as gm
         out["gemini"] = bool(gm.chave())

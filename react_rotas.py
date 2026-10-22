@@ -137,6 +137,15 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         return _rodar(pid, "transcricao", "📺 Puxar a transcrição do YouTube",
                       lambda: f"{R.transcrever_youtube(pid, base_dir)} linha(s)") or _ok()
 
+    @app.route("/react-personagens/<pid>/destaque", methods=["POST"])
+    def react_destaque(pid: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            n = R.marcar_destaque(p, str(c.get("texto") or ""), R.segundos(c.get("ini")), bool(c.get("marcar", True)))
+            R.salvar(p, base_dir)
+        return _ok(destaques=n)
+
     @app.route("/react-personagens/<pid>/cortes", methods=["POST"])
     def react_cortes(pid: str):
         p = _p(pid)
@@ -157,7 +166,8 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     def react_pagina(pid: str):
         p = _p(pid)
         return render_template("react_detalhe.html", p=R.para_tela(p, base_dir), layouts=R.LAYOUTS, estilos=R.ESTILOS,
-                               expressoes=R.EXPRESSOES, densidades=list(R.DENSIDADES), camadas=R.CAMADAS,
+                               expressoes=R.EXPRESSOES, densidades=list(R.DENSIDADES),
+                               intrigas=R.INTRIGAS, tipos_evento=R.TIPOS_EVENTO, camadas=R.CAMADAS,
                                rotulo_camada=R.ROTULO_CAMADA)
 
     @app.route("/react-personagens/<pid>/estado")
@@ -193,6 +203,8 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 p["layout"] = c["layout"]
             if c.get("densidade") in R.DENSIDADES:
                 p["densidade"] = c["densidade"]
+            if c.get("intriga") in R.INTRIGAS:
+                p["intriga"] = c["intriga"]
             if isinstance(c.get("expressoes"), list):
                 ex = [e for e in c["expressoes"] if e in R.EXPRESSOES]
                 p["expressoes"] = (["neutro"] if "neutro" not in ex else []) + ex
@@ -415,7 +427,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     @app.route("/react-personagens/<pid>/arquivo/<pasta>/<nome>")
     def react_arquivo(pid: str, pasta: str, nome: str):
         _p(pid)
-        if pasta not in ("refs", "cenario"):
+        if pasta not in ("refs", "cenario", "cenas"):
             abort(404)
         cam = os.path.join(R.pasta(pid, base_dir), pasta, secure_filename(nome))
         return send_file(cam) if os.path.isfile(cam) else ("não achei", 404)
@@ -510,11 +522,64 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                            if isinstance(x, dict) and x.get("cid") in ids and x.get("cid") != f["cid"] and x.get("expressao") in R.EXPRESSOES][:2]
                 falas.append({"id": str(f.get("id") or ("f" + uuid.uuid4().hex[:6]))[:12], "t": round(t, 2), "cid": f["cid"],
                               "texto": texto, "expressao": ex, "dur": round(max(0.8, min(15.0, dur)), 2),
-                              "cta": bool(f.get("cta")), "reacoes": reacoes, "duvida": str(f.get("duvida") or "")[:300]})
+                              "cta": bool(f.get("cta")), "reacoes": reacoes, "duvida": str(f.get("duvida") or "")[:300],
+                              "destaque": f.get("destaque") if f.get("destaque") in ("letra", "edicao") else ""})
             falas.sort(key=lambda x: x["t"])
             p["roteiro"] = dict(p.get("roteiro") or {}, falas=falas, editado=time.time())
             R.salvar(p, base_dir)
         return _ok(falas=len(falas))
+
+    # ------------------------------------------------------------------ ⚡ intrigas (brigas, cenas, quem sai e volta)
+    @app.route("/react-personagens/<pid>/eventos", methods=["POST"])
+    def react_eventos(pid: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            evs = R.salvar_eventos(p, c.get("eventos") or [])
+            R.log(p, f"⚡ {len(evs)} evento(s) de intriga salvos")
+            R.salvar(p, base_dir)
+        return _ok(eventos=len(evs))
+
+    @app.route("/react-personagens/<pid>/eventos/gerar", methods=["POST"])
+    def react_eventos_gerar(pid: str):
+        c = request.get_json(silent=True) or {}
+        _p(pid)
+        try:
+            return _ok(**{k: v for k, v in R.gerar_cenas(pid, base_dir, c.get("ids") or None).items() if k != "ok"})
+        except R.ReactErro as exc:
+            return _erro(str(exc))
+
+    @app.route("/react-personagens/<pid>/eventos/<eid>/arquivo", methods=["POST"])
+    def react_evento_arquivo(pid: str, eid: str):
+        from PIL import Image
+        f = request.files.get("arquivo")
+        if not f:
+            return _erro("Escolha uma imagem.")
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                e = R.evento(p, eid)
+                R.guardar_cena(p, e, Image.open(f.stream), base_dir, origem="enviada")
+            except (R.ReactErro, OSError) as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok()
+
+    @app.route("/react-personagens/<pid>/eventos/<eid>/versao", methods=["POST"])
+    def react_evento_versao(pid: str, eid: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                e = R.evento(p, eid)
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            arq = str(c.get("arquivo") or "")
+            if arq not in ((e.get("cena") or {}).get("versoes") or []):
+                return _erro("Versão não encontrada.")
+            e["cena"]["arquivo"] = arq
+            R.salvar(p, base_dir)
+        return _ok()
 
     # ------------------------------------------------------------------ 🔎 verificador de fatos
     @app.route("/react-personagens/<pid>/checagem/prompt")
@@ -602,6 +667,31 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             R.salvar(p, base_dir)
         return _ok()
 
+    @app.route("/react-personagens/<pid>/cenario/<camada>/outros")
+    def react_cenario_outros(pid: str, camada: str):
+        p = _p(pid)
+        return _ok(itens=R.camadas_de_outros(p, camada, base_dir))
+
+    @app.route("/react-personagens/<pid>/outro/<projeto>/<nome>")
+    def react_cenario_outro_img(pid: str, projeto: str, nome: str):
+        _p(pid)
+        if not R.RE_ID.match(projeto):
+            abort(404)
+        cam = os.path.join(R.pasta(projeto, base_dir), "cenario", secure_filename(nome))
+        return send_file(cam) if os.path.isfile(cam) else ("não achei", 404)
+
+    @app.route("/react-personagens/<pid>/cenario/<camada>/reusar", methods=["POST"])
+    def react_cenario_reusar(pid: str, camada: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                R.usar_camada_de_outro(p, camada, str(c.get("projeto") or ""), str(c.get("arquivo") or ""), base_dir)
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok()
+
     @app.route("/react-personagens/<pid>/cenario/<camada>/versao", methods=["POST"])
     def react_cenario_versao(pid: str, camada: str):
         nome = str((request.get_json(silent=True) or {}).get("arquivo") or "")
@@ -646,6 +736,50 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         except Exception as exc:  # noqa: BLE001
             return f"não deu pra montar a prévia: {exc}", 500
         return send_file(destino, max_age=0)
+
+    @app.route("/react-personagens/<pid>/pecas")
+    def react_pecas(pid: str):
+        p = _p(pid)
+        return _ok(**R.pecas_para_editar(p, base_dir, R.segundos(request.args.get("t"))))
+
+    @app.route("/react-personagens/<pid>/pilha", methods=["POST"])
+    def react_pilha(pid: str):
+        """🗂 ordem das camadas / 👁 ocultas / 🔒 travadas."""
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            pil = R.guardar_pilha(p, c, base_dir)
+            R.salvar(p, base_dir)
+        return _ok(pilha=pil)
+
+    @app.route("/react-personagens/<pid>/posicao", methods=["POST"])
+    def react_posicao(pid: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                if c.get("limpar_tudo"):
+                    R.guardar_posicao(p, "*", None, base_dir)
+                else:
+                    R.guardar_posicao(p, str(c.get("chave") or ""), None if c.get("limpar") else c, base_dir)
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok()
+
+    @app.route("/react-personagens/<pid>/quadro.jpg")
+    def react_quadro(pid: str):
+        """Um quadro do vídeo (pra TV do palco de ajuste)."""
+        import subprocess
+        p = _p(pid)
+        video = R.video_local(p, base_dir)
+        if not video:
+            abort(404)
+        t = R.segundos(request.args.get("t")) or 0.0
+        destino = os.path.join(R.pasta(pid, base_dir), "_quadro.jpg")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}", "-i", video, "-frames:v", "1",
+                        "-vf", "scale=640:-2", destino], capture_output=True, timeout=60)
+        return send_file(destino, max_age=0) if os.path.isfile(destino) else ("sem quadro", 404)
 
     @app.route("/react-personagens/<pid>/editor", methods=["POST"])
     def react_editor(pid: str):
