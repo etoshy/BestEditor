@@ -361,7 +361,7 @@ def extrair_transcricao(url: str, pasta: str, preferidos: Optional[List[str]] = 
                 if linhas:
                     on_log(f"✔ {len(linhas)} linhas de legenda")
                     return dict(base, fonte="legenda automática" if faixa["auto"] else "legenda do vídeo",
-                                idioma=faixa["lang"].replace("-orig", ""), blocos=_juntar_linhas(linhas), com_tempo=True)
+                                idioma=faixa["lang"].replace("-orig", ""), blocos=_juntar_linhas(linhas), linhas=linhas, com_tempo=True)
     if not usar_whisper:
         raise RoteiroError("O vídeo não tem legenda. Cole a transcrição à mão, ou deixe marcado \"transcrever o áudio com Whisper\".")
     on_log("Sem legenda — baixando só o áudio pra transcrever com o Whisper (demora alguns minutos)…")
@@ -401,7 +401,7 @@ def _pelo_painel(url: str, alt: Any, on_log: Callable[[str], None]) -> Optional[
             idioma = (r.get("lang") or "").replace("-orig", "") or None
             return {"titulo": r.get("titulo") or "", "canal": r.get("canal") or "", "duracao": r.get("duracao"), "url": url,
                     "fonte": "transcrição do YouTube" + (" (automática)" if r.get("auto") else ""), "idioma": idioma,
-                    "blocos": _juntar_linhas(r["linhas"]), "com_tempo": True}
+                    "blocos": _juntar_linhas(r["linhas"]), "linhas": r["linhas"], "com_tempo": True}
         if r and r.get("tem_legenda") is False:
             on_log("  o vídeo não tem legenda/transcrição no YouTube")
             return None
@@ -422,7 +422,7 @@ def _whisper(caminho: str, whisper_fn: Optional[Callable], on_log: Callable[[str
         pass
     linhas = [{"inicio": float(s["start"]), "fim": float(s["end"]), "texto": s["text"]} for s in segs]
     on_log(f"✔ Whisper: {len(linhas)} trechos")
-    return {"fonte": "whisper", "idioma": extra.get("language"), "blocos": _juntar_linhas(linhas), "com_tempo": True}
+    return {"fonte": "whisper", "idioma": extra.get("language"), "blocos": _juntar_linhas(linhas), "linhas": linhas, "com_tempo": True}
 
 
 def _transcricao_sem_ytdlp(url: str, pasta: str, preferidos: List[str], on_log: Callable[[str], None],
@@ -439,7 +439,7 @@ def _transcricao_sem_ytdlp(url: str, pasta: str, preferidos: List[str], on_log: 
         if r and r.get("linhas"):
             on_log(f"✔ {len(r['linhas'])} linhas de legenda (youtube-transcript-api)")
             return dict(base, fonte="legenda automática" if r["auto"] else "legenda do vídeo", idioma=(r["lang"] or "").replace("-orig", ""),
-                        blocos=_juntar_linhas(r["linhas"]), com_tempo=True)
+                        blocos=_juntar_linhas(r["linhas"]), linhas=r["linhas"], com_tempo=True)
         erros.append("youtube-transcript-api: o vídeo não tem legenda")
     except Exception as exc:  # noqa: BLE001
         erros.append(f"youtube-transcript-api: {yt_cookies.limpar(exc)[:160]}")
@@ -464,7 +464,7 @@ def _transcricao_sem_ytdlp(url: str, pasta: str, preferidos: List[str], on_log: 
             if r.get("linhas"):
                 on_log(f"✔ {len(r['linhas'])} linhas de legenda (navegador)")
                 return dict(base, fonte="legenda automática" if r["auto"] else "legenda do vídeo", idioma=(r["lang"] or "").replace("-orig", ""),
-                            blocos=_juntar_linhas(r["linhas"]), com_tempo=True)
+                            blocos=_juntar_linhas(r["linhas"]), linhas=r["linhas"], com_tempo=True)
             if r.get("lang") is None:
                 sem_legenda = True
                 erros.append("navegador: o vídeo não tem legenda")

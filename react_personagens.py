@@ -142,6 +142,7 @@ def _completar(p: Dict[str, Any]) -> Dict[str, Any]:
     p["cenario"].setdefault("camadas", {})
     p.setdefault("editor", {})
     p.setdefault("checagem", {})
+    p.setdefault("cortes", {"inicio": None, "fim": None, "meio": []})
     p.setdefault("log", [])
     return p
 
@@ -415,7 +416,7 @@ def guardar_video(p: Dict[str, Any], origem: str, base: str = _BASE, url: str = 
     ext = os.path.splitext(origem)[1].lower() or ".mp4"
     destino = os.path.join(d, "video" + ext)
     for velho in os.listdir(d):
-        if velho.startswith("video.") and os.path.join(d, velho) != destino:
+        if (velho.startswith("video.") or velho == "video_cortado.mp4") and os.path.join(d, velho) != destino:
             try:
                 os.remove(os.path.join(d, velho))
             except OSError:
@@ -423,10 +424,211 @@ def guardar_video(p: Dict[str, Any], origem: str, base: str = _BASE, url: str = 
     if os.path.abspath(origem) != os.path.abspath(destino):
         shutil.move(origem, destino)
     info = sondar(destino)
-    p["video"] = dict(p.get("video") or {}, arquivo=os.path.basename(destino), estado="pronto", erro=None,
-                      url=url or (p.get("video") or {}).get("url") or "", nome=nome or (p.get("video") or {}).get("nome") or "",
-                      **info)
+    antes = p.get("video") or {}
+    p["video"] = dict(antes, arquivo=os.path.basename(destino), original=os.path.basename(destino), estado="pronto", erro=None,
+                      url=url or antes.get("url") or "", nome=nome or antes.get("nome") or "", original_info=dict(info), **info)
+    if any((p.get("cortes") or {}).get(k) for k in ("inicio", "fim", "meio")):
+        log(p, "✂ vídeo novo: os cortes do vídeo anterior foram tirados")
+    p["cortes"] = {"inicio": None, "fim": None, "meio": []}
+    definir_transcricao(p, p.get("transcricao_bruta") or "")
     return p["video"]
+
+
+def video_original(p: Dict[str, Any], base: str = _BASE) -> Optional[str]:
+    v = p.get("video") or {}
+    nome = v.get("original") or v.get("arquivo")
+    if nome:
+        cam = os.path.join(pasta(p["id"], base), nome)
+        if os.path.isfile(cam):
+            return cam
+    return None
+
+
+# ------------------------------------------------------------------ ✂ cortes (começo, cenas do meio, final)
+def removidos(p: Dict[str, Any]) -> List[List[float]]:
+    """Os trechos que SAEM do vídeo, no tempo do vídeo ORIGINAL, em ordem e sem sobreposição."""
+    c = p.get("cortes") or {}
+    dur = float(((p.get("video") or {}).get("original_info") or {}).get("duracao") or (p.get("video") or {}).get("duracao") or 0)
+    rs: List[List[float]] = []
+    ini = segundos(c.get("inicio"))
+    if ini and ini > 0:
+        rs.append([0.0, ini])
+    for a, b in c.get("meio") or []:
+        a, b = segundos(a), segundos(b)
+        if a is not None and b is not None and b > a:
+            rs.append([a, b])
+    fim = segundos(c.get("fim"))
+    if fim and (not dur or fim < dur):
+        rs.append([fim, max(dur, fim) + 1e6 if not dur else dur])
+    rs.sort()
+    juntos: List[List[float]] = []
+    for a, b in rs:
+        if juntos and a <= juntos[-1][1] + 0.01:
+            juntos[-1][1] = max(juntos[-1][1], b)
+        else:
+            juntos.append([a, b])
+    return [[round(a, 3), round(b, 3)] for a, b in juntos]
+
+
+def mapear(t: Optional[float], rem: List[List[float]]) -> Optional[float]:
+    """Segundo do vídeo ORIGINAL → segundo do vídeo cortado (None = caiu num trecho cortado)."""
+    if t is None:
+        return None
+    tira = 0.0
+    for a, b in rem:
+        if t < a:
+            break
+        if t < b:
+            return None
+        tira += b - a
+    return round(t - tira, 3)
+
+
+def inverso(t: float, rem: List[List[float]]) -> float:
+    """Segundo do vídeo cortado → segundo do ORIGINAL."""
+    for a, b in rem:
+        if t >= a - 1e-9:
+            t += b - a
+        else:
+            break
+    return round(t, 3)
+
+
+def definir_transcricao(p: Dict[str, Any], texto: str) -> None:
+    """A transcrição colada/puxada está no tempo do vídeo ORIGINAL; a que a IA lê segue os cortes."""
+    p["transcricao_bruta"] = str(texto or "")[:600000]
+    rem = removidos(p)
+    out = []
+    for e in parse_transcricao(p["transcricao_bruta"]):
+        if e.get("ini") is None or not rem:
+            out.append(e)
+            continue
+        ini = mapear(e["ini"], rem)
+        if ini is None:  # começou num trecho cortado: fica se ainda aparece depois do corte
+            ini = mapear(next((b for a, b in rem if a <= e["ini"] < b), e["ini"]), rem)
+            if ini is None or e["fim"] <= next((b for a, b in rem if a <= e["ini"] < b), e["fim"]):
+                continue
+        fim = mapear(e["fim"], rem)
+        if fim is None:
+            fim = mapear(next((a for a, b in rem if a <= e["fim"] < b), e["fim"]), rem) or ini
+        out.append(dict(e, ini=ini, fim=max(ini, fim)))
+    p["transcricao"] = out
+
+
+def cortar_video(entrada: str, saida: str, rem: List[List[float]], tem_audio: bool = True) -> str:
+    """Tira os trechos (re-encoda — o corte fica exato no segundo)."""
+    expr = "+".join(f"between(t,{a:.3f},{min(b, 1e7):.3f})" for a, b in rem)
+    cmd = ["ffmpeg", "-y", "-v", "error", "-i", entrada,
+           "-vf", f"fps=30,select='not({expr})',setpts=N/30/TB"]
+    if tem_audio:
+        cmd += ["-af", f"aselect='not({expr})',asetpts=N/SR/TB", "-c:a", "aac", "-b:a", "192k"]
+    else:
+        cmd += ["-an"]
+    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", saida]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+    if r.returncode != 0 or not os.path.isfile(saida):
+        raise ReactErro(f"o corte falhou: {r.stderr[-300:]}")
+    return saida
+
+
+def aplicar_cortes(pid: str, base: str = _BASE, cortes: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """✂ Corta o começo, cenas do meio e o final. As falas que já existem andam junto (as que caem num trecho cortado
+    saem) e a transcrição segue os cortes. Sem cortes: volta pro vídeo inteiro."""
+    with _TRAVA:
+        p = carregar(pid, base)
+        orig = video_original(p, base)
+        if not orig:
+            raise ReactErro("Baixe ou envie o vídeo antes.")
+        info_o = (p["video"].get("original_info") or sondar(orig))
+        dur = float(info_o.get("duracao") or 0)
+        c = cortes if cortes is not None else (p.get("cortes") or {})
+        novo = {"inicio": segundos(c.get("inicio")) or None, "fim": segundos(c.get("fim")) or None, "meio": []}
+        for x in c.get("meio") or []:
+            a, b = (segundos(x[0]), segundos(x[1])) if isinstance(x, (list, tuple)) and len(x) == 2 else (None, None)
+            if a is None or b is None or b <= a:
+                raise ReactErro(f"Corte do meio inválido: {x}")
+            novo["meio"].append([round(a, 2), round(b, 2)])
+        if novo["fim"] and dur and novo["fim"] >= dur - 0.05:
+            novo["fim"] = None
+        if novo["inicio"] and novo["fim"] and novo["fim"] <= novo["inicio"]:
+            raise ReactErro("O fim tem que vir depois do começo.")
+        rem_antes = removidos(p)
+        p["cortes"] = novo
+        rem = removidos(p)
+        sobra = dur - sum(min(b, dur) - a for a, b in rem) if dur else 1
+        if sobra < 3:
+            raise ReactErro("Os cortes tiram quase o vídeo inteiro.")
+    d = pasta(pid, base)
+    saida = os.path.join(d, "video_cortado.mp4")
+    if rem:
+        tmp = os.path.join(d, "_cortando.mp4")
+        cortar_video(orig, tmp, rem, bool(info_o.get("tem_audio", True)))
+        os.replace(tmp, saida)
+    with _TRAVA:
+        p = carregar(pid, base)
+        p["cortes"] = novo
+        if rem:
+            p["video"].update(arquivo="video_cortado.mp4", **sondar(saida))
+        else:
+            p["video"].update(arquivo=p["video"].get("original") or p["video"]["arquivo"], **info_o)
+            try:
+                os.remove(saida)
+            except OSError:
+                pass
+        p["video"]["original_info"] = info_o
+        definir_transcricao(p, p.get("transcricao_bruta") or "")
+        falas = (p.get("roteiro") or {}).get("falas") or []
+        ficam, sairam = [], 0
+        for f in falas:  # a fala estava no tempo dos cortes de ANTES → original → tempo dos cortes novos
+            t = mapear(inverso(float(f["t"]), rem_antes), rem)
+            if t is None:
+                sairam += 1
+                continue
+            ficam.append(dict(f, t=t))
+        if falas:
+            p["roteiro"]["falas"] = ficam
+        total = sum(min(b, dur or b) - a for a, b in rem)
+        log(p, (f"✂ {len(rem)} corte(s) — saíram {mmss(total)}; o vídeo ficou com {mmss(p['video'].get('duracao'))}" if rem
+                else "✂ sem cortes: o vídeo inteiro") + (f" · {sairam} fala(s) caíram num trecho cortado e saíram" if sairam else ""))
+        salvar(p, base)
+    return {"duracao": p["video"].get("duracao"), "cortes": len(rem), "falas_sairam": sairam}
+
+
+# ------------------------------------------------------------------ 📺 transcrição do YouTube (o sistema dos Roteiros do YouTube)
+def eh_youtube(url: str) -> bool:
+    return bool(re.match(r"^https?://(?:[\w-]+\.)*(?:youtube\.com|youtu\.be)/", str(url or "").strip(), re.I))
+
+
+def transcrever_youtube(pid: str, base: str = _BASE, on_log: Callable[[str], None] = lambda _m: None) -> int:
+    """📺 A transcrição do link do YouTube pelo mesmo sistema do 📝 Roteiro do YouTube (painel "Mostrar transcrição",
+    legenda do vídeo pelo yt-dlp, youtube-transcript-api… e, sem legenda, o Whisper) — linha a linha, com o tempo."""
+    import roteiros_yt as ry
+    p = carregar(pid, base)
+    url = str((p.get("video") or {}).get("url") or "").strip()
+    if not eh_youtube(url):
+        raise ReactErro("A transcrição automática é pra link do YouTube — cole o link no campo do vídeo.")
+    tmp = os.path.join(pasta(pid, base), "_transcricao_yt")
+    os.makedirs(tmp, exist_ok=True)
+    try:
+        tr = ry.extrair_transcricao(url, tmp, on_log=on_log)
+    except Exception as exc:  # noqa: BLE001
+        raise ReactErro(f"não consegui a transcrição do YouTube: {str(exc)[:300]}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    linhas = tr.get("linhas") or tr.get("blocos") or []
+    texto = "\n".join(f"{int(float(x['inicio']) // 60)}:{float(x['inicio']) % 60:04.1f} {' '.join(str(x.get('texto') or '').split())}"
+                      for x in linhas if str(x.get("texto") or "").strip() and x.get("inicio") is not None)
+    if not texto:
+        raise ReactErro("o vídeo não tem fala/legenda")
+    with _TRAVA:
+        p = carregar(pid, base)
+        definir_transcricao(p, texto)
+        p["video"]["transcricao_fonte"] = tr.get("fonte") or ""
+        if not p.get("titulo") or p["titulo"] == "React sem título":
+            p["titulo"] = (tr.get("titulo") or p.get("titulo") or "")[:200]
+        log(p, f"📺 transcrição do YouTube ({tr.get('fonte') or '?'}): {len(p['transcricao'])} linha(s)")
+        salvar(p, base)
+    return len(p["transcricao"])
 
 
 def baixar_video(pid: str, base: str = _BASE, on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
@@ -474,7 +676,7 @@ def extrair_audio(video: str, destino: str, duracao: float = 0) -> str:
 def transcrever_whisper(pid: str, base: str = _BASE) -> int:
     """🎙 Sem transcrição colada: o Whisper ouve o vídeo (letra cantada sai pior que fala — confira)."""
     p = carregar(pid, base)
-    video = _video_local(p, base)
+    video = video_original(p, base)
     if not video:
         raise ReactErro("Baixe ou envie o vídeo antes.")
     wav = os.path.join(pasta(pid, base), "_audio_whisper.wav")
@@ -490,8 +692,7 @@ def transcrever_whisper(pid: str, base: str = _BASE) -> int:
     texto = "\n".join(f"{mmss(s['start'])} {str(s['text']).strip()}" for s in segs if str(s.get("text") or "").strip())
     with _TRAVA:
         p = carregar(pid, base)
-        p["transcricao_bruta"] = texto
-        p["transcricao"] = parse_transcricao(texto)
+        definir_transcricao(p, texto)
         log(p, f"🎙 Whisper: {len(p['transcricao'])} linha(s)")
         salvar(p, base)
     return len(p["transcricao"])

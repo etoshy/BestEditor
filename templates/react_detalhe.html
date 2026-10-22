@@ -91,10 +91,24 @@
     <span id="vEst" class="rx-dica"></span>
   </div>
   <div id="vPlayer"></div>
+  <details class="rx-colar" id="cortesBox" style="margin-top:8px;"><summary style="font-size:.9rem;color:var(--texto);font-weight:600;">✂ Cortar o vídeo — o começo, cenas do meio ou o final <span class="rx-dica" id="cEst" style="font-weight:400"></span></summary>
+    <p class="rx-dica">Os tempos são do vídeo INTEIRO (o player acima mostra o original — dê play, pause no ponto e clique em ⏱ pra pegar o tempo). As falas que já existem andam junto com os cortes; as que caem num trecho cortado saem. A transcrição segue os cortes sozinha.</p>
+    <div class="rx-linha">
+      <label style="margin:0">Começar em <input id="cIni" placeholder="0:00" style="width:90px;display:inline-block"></label><button type="button" class="rx-mini rx-sec" data-agora="cIni" title="o tempo onde o player está">⏱</button>
+      <label style="margin:0 0 0 12px">Terminar em <input id="cFim" placeholder="até o fim" style="width:90px;display:inline-block"></label><button type="button" class="rx-mini rx-sec" data-agora="cFim">⏱</button>
+    </div>
+    <div id="cMeio"></div>
+    <div class="rx-linha">
+      <button type="button" class="rx-mini rx-sec" id="cAdd">➕ Cortar uma cena do meio</button>
+      <button type="button" id="cAplicar">✂ Aplicar os cortes</button>
+      <button type="button" class="rx-sec" id="cTirar">↩ Usar o vídeo inteiro</button>
+    </div>
+  </details>
   <label style="margin-top:8px;">Transcrição com o tempo <span class="rx-dica">— “0:13 frase”, SRT, VTT, “[00:13] frase” ou o formato do YouTube. Repetições e créditos (“Personagem - Cantor”) são limpos sozinhos.</span>
     <textarea id="fTrans" rows="6" placeholder="0:13 Almas que viram hollows são seres imundos">{{ p.transcricao_bruta }}</textarea></label>
   <div class="rx-linha">
     <button type="button" id="bTrans">💾 Salvar a transcrição</button>
+    <button type="button" id="bYtTrans" title="o mesmo sistema do 📝 Roteiro do YouTube: o painel “Mostrar transcrição”, a legenda do vídeo… (sem legenda, o Whisper)">📺 Puxar a transcrição do YouTube</button>
     <button type="button" id="bWhisper" class="rx-sec" title="sem transcrição: o Whisper ouve o vídeo (letra cantada sai pior — confira)">🎙 Transcrever com o Whisper</button>
     <span id="tEst" class="rx-dica"></span>
   </div>
@@ -265,15 +279,20 @@ function desenharVideo() {
   const v = P.video || {};
   const st = v.estado === 'baixando' ? '⏳ baixando…' : v.estado === 'erro' ? `❌ ${v.erro || 'erro ao baixar'}` : P.video_ok ? `✔ ${mmss(v.duracao)} · ${v.largura}×${v.altura}${v.tem_audio === false ? ' · ⚠ sem áudio' : ''}` : 'sem vídeo ainda';
   $('vEst').textContent = st;
+  const cortado = v.original && v.arquivo !== v.original;
+  if (cortado) $('vEst').textContent += ` · ✂ cortado (o original tem ${mmss((v.original_info || {}).duracao)})`;
   const chave = P.video_ok ? (v.arquivo + v.duracao) : '';
   if (chave !== videoAtual) {
     videoAtual = chave;
-    $('vPlayer').innerHTML = P.video_ok ? `<video src="/react-personagens/${PID}/video?v=${encodeURIComponent(chave)}" controls preload="metadata" style="max-width:520px;width:100%;border-radius:8px;margin-top:6px;"></video>` : '';
+    $('vPlayer').innerHTML = P.video_ok ? `<video id="vOrig" src="/react-personagens/${PID}/video?original=1&v=${encodeURIComponent(v.original || v.arquivo)}" controls preload="metadata" style="max-width:520px;width:100%;border-radius:8px;margin-top:6px;"></video>`
+      + (cortado ? `<div class="rx-dica">▶ o player mostra o vídeo <b>original</b> (pra marcar os cortes) · <a href="/react-personagens/${PID}/video?v=${encodeURIComponent(chave)}" target="_blank">ver o vídeo cortado ↗</a></div>` : '') : '';
     if (v.duracao) $('pT').max = Math.ceil(v.duracao);
   }
+  desenharCortes();
 }
 function desenharTrans() {
   const it = P.transcricao || [];
+  if (!focoEm($('fTrans')) && P.transcricao_bruta !== undefined && $('fTrans').dataset.ultima !== P.transcricao_bruta) { $('fTrans').value = P.transcricao_bruta; $('fTrans').dataset.ultima = P.transcricao_bruta; }
   $('tEst').textContent = it.length ? `${it.filter(e => e.tipo === 'fala').length} frase(s) · ${it.filter(e => e.tipo === 'credito').length} crédito(s)` : 'sem transcrição';
   $('tLimpa').innerHTML = it.map(e => `<div class="${e.tipo === 'credito' ? 'cr' : ''}">${e.ini != null ? `<b>${mmss(e.ini)}</b> ` : ''}${e.tipo === 'credito' ? '🎤 ' : ''}${esc(e.texto)}</div>`).join('') || '—';
 }
@@ -294,6 +313,44 @@ $('fVideo').addEventListener('change', async (e) => {
   try { await api(`/react-personagens/${PID}/video`, fd); recarregar(); } catch (er) { $('vEst').textContent = '❌ ' + er.message; }
 });
 $('bWhisper').addEventListener('click', async () => { if ($('fTrans').value.trim() && !confirm('Trocar a transcrição pela do Whisper?')) return; try { await api(`/react-personagens/${PID}/whisper`, {}); recarregar(); } catch (e) { alert(e.message); } });
+
+// ------------------------------------------------------------------ ✂ cortes
+const fmtT = (s) => s == null || s === '' ? '' : (mmss(s) + ((+s % 1) ? '.' + String(Math.round((+s % 1) * 10)) : ''));
+let cortesSujos = false;
+function linhaCorte(a, b) {
+  return `<div class="rx-linha" data-corte><span class="rx-dica" style="margin:0">cortar de</span><input value="${fmtT(a)}" data-c="a" placeholder="1:20" style="width:90px"><button type="button" class="rx-mini rx-sec" data-agora-rel="a">⏱</button>
+    <span class="rx-dica" style="margin:0">até</span><input value="${fmtT(b)}" data-c="b" placeholder="1:45" style="width:90px"><button type="button" class="rx-mini rx-sec" data-agora-rel="b">⏱</button>
+    <button type="button" class="rx-mini rx-perigo" data-tirar-corte>✕</button></div>`;
+}
+function desenharCortes() {
+  const c = P.cortes || {}, n = (c.meio || []).length + (c.inicio ? 1 : 0) + (c.fim ? 1 : 0);
+  $('cEst').textContent = n ? `— ${n} corte(s) aplicado(s)` : '';
+  if (cortesSujos || focoEm($('cortesBox'))) return;
+  $('cIni').value = fmtT(c.inicio); $('cFim').value = fmtT(c.fim);
+  $('cMeio').innerHTML = (c.meio || []).map(([a, b]) => linhaCorte(a, b)).join('');
+}
+const agoraPlayer = () => { const v = $('vOrig'); return v ? Math.round(v.currentTime * 10) / 10 : null; };
+$('cortesBox').addEventListener('input', () => { cortesSujos = true; });
+$('cortesBox').addEventListener('click', (e) => {
+  const alvo = e.target.dataset.agora ? $(e.target.dataset.agora) : e.target.dataset.agoraRel ? e.target.closest('[data-corte]').querySelector(`[data-c=${e.target.dataset.agoraRel}]`) : null;
+  if (alvo) { const t = agoraPlayer(); if (t == null) return alert('Sem o player do vídeo.'); alvo.value = fmtT(t); cortesSujos = true; }
+  if (e.target.hasAttribute('data-tirar-corte')) { e.target.closest('[data-corte]').remove(); cortesSujos = true; }
+});
+$('cAdd').addEventListener('click', () => { $('cMeio').insertAdjacentHTML('beforeend', linhaCorte(null, null)); cortesSujos = true; });
+async function mandarCortes(corpo) {
+  if ((P.roteiro.falas || []).length && !confirm('As falas andam junto com os cortes (as que caem num trecho cortado saem). Continuar?')) return;
+  try { await api(`/react-personagens/${PID}/cortes`, corpo); cortesSujos = false; recarregar(); } catch (e) { alert(e.message); }
+}
+$('cAplicar').addEventListener('click', () => {
+  const meio = [...$('cMeio').querySelectorAll('[data-corte]')].map(d => [seg(d.querySelector('[data-c=a]').value), seg(d.querySelector('[data-c=b]').value)]).filter(x => x[0] != null || x[1] != null);
+  if (meio.some(x => x[0] == null || x[1] == null || x[1] <= x[0])) return alert('Em cada corte do meio, preencha “de” e “até” (o “até” depois do “de”).');
+  mandarCortes({ inicio: seg($('cIni').value), fim: seg($('cFim').value), meio });
+});
+$('cTirar').addEventListener('click', () => mandarCortes({ inicio: null, fim: null, meio: [] }));
+$('bYtTrans').addEventListener('click', async () => {
+  if ($('fTrans').value.trim() && !confirm('Trocar a transcrição pela do YouTube?')) return;
+  try { await api(`/react-personagens/${PID}/transcricao/youtube`, { url: $('fUrl').value }); recarregar(); } catch (e) { alert(e.message); }
+});
 
 // ------------------------------------------------------------------ IA / copiar / colar
 async function ia(oque) { try { await api(`/react-personagens/${PID}/ia/${oque}`, {}); recarregar(); } catch (e) { alert(e.message); } }

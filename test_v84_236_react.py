@@ -327,3 +327,54 @@ def test_balao_sem_numeracao():
     assert R.limpar_texto_fala("#12 - que isso") == "que isso"
     assert R.limpar_texto_fala("Itachi: \"Sasuke...\"", "Itachi") == "Sasuke..."
     assert R.limpar_texto_fala("3 pessoas morreram?") == "3 pessoas morreram?"  # número que é da fala fica
+
+
+def test_cortes_mapeiam_tempo_transcricao_e_falas(base, tmp_path):
+    p = R.criar("cortes", base)
+    R.guardar_video(p, _video(str(tmp_path / "v.mp4"), 12), base)
+    assert p["video"]["original"] == p["video"]["arquivo"] and p["cortes"]["meio"] == []
+    R.definir_transcricao(p, "0:01 começo\n0:05 cena cortada\n0:09 depois do corte")
+    R.novo_personagem(p, "Goku")
+    R.aplicar_roteiro(p, {"falas": [{"tempo": t, "personagem": "Goku", "texto": f"fala em {t}", "expressao": "feliz",
+                                     "pedido_inscricao": t == 9.5, "reacoes": [], "duvida": ""} for t in (1.5, 5.5, 9.5)]})
+    R.salvar(p, base)
+    rem_teste = [[0.0, 1.0], [4.0, 7.0]]
+    assert R.mapear(0.5, rem_teste) is None and R.mapear(2.0, rem_teste) == 1.0 and R.mapear(8.0, rem_teste) == 4.0
+    assert R.inverso(4.0, rem_teste) == 8.0 and R.inverso(1.0, rem_teste) == 2.0
+    r = R.aplicar_cortes(p["id"], base, {"inicio": "0:01", "fim": None, "meio": [["0:04", "0:07"]]})
+    p = R.carregar(p["id"], base)
+    assert r["falas_sairam"] == 1 and abs(r["duracao"] - 8) < 0.4
+    assert p["video"]["arquivo"] == "video_cortado.mp4" and R.video_original(p, base).endswith("video.mp4")
+    assert [(e["ini"], e["texto"]) for e in p["transcricao"]] == [(0.0, "começo"), (5.0, "depois do corte")]
+    assert [f["t"] for f in p["roteiro"]["falas"]] == [0.5, 5.5]
+    # mudar os cortes de novo: as falas voltam pro tempo certo (passam pelo original)
+    R.aplicar_cortes(p["id"], base, {"inicio": None, "fim": "0:11", "meio": []})
+    p = R.carregar(p["id"], base)
+    assert [f["t"] for f in p["roteiro"]["falas"]] == [1.5, 9.5] and abs(p["video"]["duracao"] - 11) < 0.4
+    R.aplicar_cortes(p["id"], base, {"inicio": None, "fim": None, "meio": []})
+    p = R.carregar(p["id"], base)
+    assert p["video"]["arquivo"] == p["video"]["original"] and not os.path.exists(os.path.join(R.pasta(p["id"], base), "video_cortado.mp4"))
+    with pytest.raises(R.ReactErro):
+        R.aplicar_cortes(p["id"], base, {"inicio": "0:05", "fim": "0:04", "meio": []})
+
+
+def test_transcricao_do_youtube_pelo_sistema_dos_roteiros(base, monkeypatch):
+    import roteiros_yt as ry
+    p = R.criar("", base)
+    p["video"] = {"url": "https://youtu.be/abcdefghijk?si=x"}
+    R.salvar(p, base)
+    pedidos = []
+
+    def falso(url, pasta, **kw):
+        pedidos.append(url)
+        return {"fonte": "legenda do vídeo", "titulo": "Rap do Itachi", "blocos": [{"inicio": 0, "texto": "junto"}],
+                "linhas": [{"inicio": 3.2, "fim": 5, "texto": "Eu sou o Itachi"}, {"inicio": 65.0, "fim": 67, "texto": "Sharingan"}]}
+    monkeypatch.setattr(ry, "extrair_transcricao", falso)
+    assert R.transcrever_youtube(p["id"], base) == 2
+    p = R.carregar(p["id"], base)
+    assert [(e["ini"], e["texto"]) for e in p["transcricao"]] == [(3.2, "Eu sou o Itachi"), (65.0, "Sharingan")]
+    assert p["titulo"] == "Rap do Itachi" and p["video"]["transcricao_fonte"] == "legenda do vídeo"
+    p["video"]["url"] = "https://vimeo.com/1"
+    R.salvar(p, base)
+    with pytest.raises(R.ReactErro):
+        R.transcrever_youtube(p["id"], base)

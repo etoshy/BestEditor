@@ -86,8 +86,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         if arq_t and arq_t.filename:
             trans = arq_t.read().decode("utf-8-sig", errors="replace")
         if trans.strip():
-            p["transcricao_bruta"] = trans[:600000]
-            p["transcricao"] = R.parse_transcricao(trans)
+            R.definir_transcricao(p, trans)
         if url:
             p["video"] = {"url": url, "estado": "baixando"}
         arq_v = request.files.get("video_arquivo")
@@ -99,7 +98,12 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 p["titulo"] = os.path.splitext(arq_v.filename)[0][:200]
         R.salvar(p, base_dir)
         if url and not (arq_v and arq_v.filename):
-            _rodar(p["id"], "baixar", "⬇ Baixar o vídeo", lambda: _baixar(p["id"]))
+            pid_ = p["id"]
+            if R.eh_youtube(url) and not trans.strip():
+                _rodar(pid_, "baixar", "⬇ Baixar o vídeo e 📺 puxar a transcrição do YouTube",
+                       lambda: _baixar(pid_) + " · " + _transcrever_yt(pid_))
+            else:
+                _rodar(pid_, "baixar", "⬇ Baixar o vídeo", lambda: _baixar(pid_))
         return redirect(url_for("react_pagina", pid=p["id"]))
 
     def _baixar(pid: str) -> str:
@@ -112,6 +116,42 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 R.salvar(p, base_dir)
             raise
         return f"vídeo de {R.mmss(v.get('duracao'))}"
+
+    def _transcrever_yt(pid: str) -> str:
+        try:
+            return f"transcrição do YouTube: {R.transcrever_youtube(pid, base_dir)} linha(s)"
+        except R.ReactErro as exc:  # o vídeo baixou: a transcrição falhar não derruba a tarefa
+            return f"⚠ transcrição do YouTube: {exc} (cole a transcrição ou use o Whisper)"
+
+    @app.route("/react-personagens/<pid>/transcricao/youtube", methods=["POST"])
+    def react_transcricao_youtube(pid: str):
+        p = _p(pid)
+        url = str((request.get_json(silent=True) or {}).get("url") or "").strip()
+        if url:
+            with R._TRAVA:
+                p = _p(pid)
+                p["video"]["url"] = url[:500]
+                R.salvar(p, base_dir)
+        if not R.eh_youtube(p["video"].get("url") or url):
+            return _erro("A transcrição automática é pra link do YouTube — cole o link no campo do vídeo.")
+        return _rodar(pid, "transcricao", "📺 Puxar a transcrição do YouTube",
+                      lambda: f"{R.transcrever_youtube(pid, base_dir)} linha(s)") or _ok()
+
+    @app.route("/react-personagens/<pid>/cortes", methods=["POST"])
+    def react_cortes(pid: str):
+        p = _p(pid)
+        if not R.video_original(p, base_dir):
+            return _erro("Baixe ou envie o vídeo antes.")
+        c = request.get_json(silent=True) or {}
+        cortes = {"inicio": c.get("inicio"), "fim": c.get("fim"), "meio": c.get("meio") or []}
+        for x in cortes["meio"]:
+            if not (isinstance(x, (list, tuple)) and len(x) == 2 and R.segundos(x[0]) is not None and R.segundos(x[1]) is not None
+                    and R.segundos(x[1]) > R.segundos(x[0])):
+                return _erro(f"Corte do meio inválido: {x} (o “até” tem que vir depois do “de”).")
+        def fazer():
+            r = R.aplicar_cortes(pid, base_dir, cortes)
+            return (f"vídeo com {R.mmss(r['duracao'])}" + (f" · {r['falas_sairam']} fala(s) saíram" if r["falas_sairam"] else ""))
+        return _rodar(pid, "cortes", "✂ Cortar o vídeo", fazer) or _ok()
 
     @app.route("/react-personagens/<pid>")
     def react_pagina(pid: str):
@@ -161,8 +201,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             if "url" in c:
                 p["video"]["url"] = str(c["url"] or "").strip()[:500]
             if "transcricao_bruta" in c:
-                p["transcricao_bruta"] = str(c["transcricao_bruta"] or "")[:600000]
-                p["transcricao"] = R.parse_transcricao(p["transcricao_bruta"])
+                R.definir_transcricao(p, str(c["transcricao_bruta"] or ""))
             R.salvar(p, base_dir)
         return _ok(linhas=len(p["transcricao"]), creditos=sum(1 for e in p["transcricao"] if e["tipo"] == "credito"))
 
@@ -171,7 +210,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     def react_video(pid: str):
         p = _p(pid)
         if request.method == "GET":
-            cam = R.video_local(p, base_dir)
+            cam = R.video_original(p, base_dir) if request.args.get("original") else R.video_local(p, base_dir)
             return send_file(cam, conditional=True) if cam else ("sem vídeo", 404)
         arq = request.files.get("video")
         if not arq or not arq.filename:
