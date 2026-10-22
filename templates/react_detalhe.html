@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+{% block title %}🎭 {{ p.titulo }} — React{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1250px; }
+  .rx-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .rx-card h2 { margin: 0 0 6px; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; }
+  .rx-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; flex: none; }
+  .rx-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .rx-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .rx-linha > * { margin: 0; }
+  .rx-linha button, .rx-btn { width: auto; margin: 0; padding: 6px 12px; }
+  .rx-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .rx-sec { background: #64748b !important; }
+  .rx-perigo { background: #dc2626 !important; }
+  .rx-ok { color: var(--ok); } .rx-err { color: var(--erro); } .rx-av { color: var(--aviso); }
+  .rx-barra { position: sticky; top: 0; z-index: 20; border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; font-size: .9rem; }
+  .rx-barra.rodando { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .rx-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .rx-barra.ok { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .rx-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; }
+  .rx-sug { border: 1px solid var(--borda); border-radius: 10px; padding: 8px 10px; position: relative; }
+  .rx-sug.on { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento-suave); }
+  .rx-sug input[type=checkbox] { width: auto; margin: 0 6px 0 0; transform: scale(1.2); }
+  .rx-tag { font-size: .7rem; border-radius: 999px; padding: 1px 8px; background: var(--code-bg); }
+  .rx-tag.da_obra { background: #dbeafe; color: #1e3a8a; } .rx-tag.hypado { background: #fde68a; color: #78350f; } .rx-tag.contraste { background: #fbcfe8; color: #831843; }
+  .rx-pers { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; display: grid; grid-template-columns: 130px 1fr; gap: 10px; }
+  .rx-pers textarea { min-height: 44px; font-size: .84rem; }
+  .rx-pers input, .rx-pers select, .rx-pers textarea { margin: 2px 0 4px; }
+  .rx-pers label { font-size: .76rem; color: var(--mudo); margin: 0; }
+  .rx-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  @media (max-width: 900px) { .rx-campos { grid-template-columns: 1fr; } }
+  .rx-refs { display: flex; flex-direction: column; gap: 6px; }
+  .rx-ref { position: relative; width: 130px; height: 150px; border-radius: 8px; overflow: hidden; background: var(--code-bg); display: flex; align-items: center; justify-content: center; color: var(--mudo); font-size: .75rem; text-align: center; }
+  .rx-ref img { width: 100%; height: 100%; object-fit: cover; }
+  .rx-ref button { position: absolute; top: 3px; right: 3px; }
+  .rx-mini-refs { display: flex; gap: 4px; }
+  .rx-mini-refs img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer; }
+  .rx-falas { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .rx-falas td, .rx-falas th { border-bottom: 1px solid var(--borda); padding: 4px; vertical-align: top; }
+  .rx-falas th { text-align: left; color: var(--mudo); font-weight: 600; font-size: .78rem; }
+  .rx-falas input, .rx-falas select, .rx-falas textarea { margin: 0; font-size: .84rem; padding: 4px 6px; }
+  .rx-falas textarea { min-height: 38px; }
+  .rx-falas tr.cta { background: #fef9c3; } html[data-tema="escuro"] .rx-falas tr.cta { background: #3a3315; }
+  .rx-cam { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 900px) { .rx-cam { grid-template-columns: 1fr; } .rx-pers { grid-template-columns: 1fr; } }
+  .rx-camada { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; }
+  .rx-camada .img { aspect-ratio: 16/9; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--mudo); font-size: .8rem; overflow: hidden;
+    background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/18px 18px; }
+  .rx-camada .img img { max-width: 100%; max-height: 100%; }
+  .rx-versoes { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .rx-versoes img { height: 36px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; background: #8883; }
+  .rx-versoes img.atual { border-color: var(--acento); }
+  .rx-poses { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .rx-poses .p { width: 62px; text-align: center; font-size: .66rem; color: var(--mudo); }
+  .rx-poses .p div { width: 62px; height: 93px; border-radius: 6px; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/12px 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .rx-poses .p img { width: 100%; height: 100%; object-fit: contain; }
+  .rx-previa { width: 100%; border-radius: 10px; background: #000; aspect-ratio: 16/9; object-fit: contain; display: block; }
+  .rx-log { font-family: var(--mono); font-size: .74rem; color: var(--mudo); max-height: 160px; overflow: auto; white-space: pre-wrap; }
+  .rx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rx-chips label { border: 1px solid var(--borda); border-radius: 999px; padding: 3px 10px; font-size: .8rem; font-weight: 400; cursor: pointer; margin: 0; }
+  .rx-chips input { width: auto; margin: 0 4px 0 0; }
+  .rx-trans { max-height: 220px; overflow: auto; font-size: .8rem; background: var(--code-bg); border-radius: 8px; padding: 6px 10px; }
+  .rx-trans .cr { color: var(--mudo); font-style: italic; }
+  .rx-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 999; cursor: zoom-out; }
+  .rx-zoom img { max-width: 94vw; max-height: 94vh; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
+  details.rx-colar summary { cursor: pointer; color: var(--mudo); font-size: .84rem; }
+</style>
+
+<p style="margin:0"><a href="/modelos-video#react">← Modelos de vídeo</a></p>
+<div class="rx-linha" style="justify-content:space-between">
+  <h1 style="margin:4px 0;">🎭 <span id="tTitulo">{{ p.titulo }}</span></h1>
+  <span class="rx-dica" id="tIa">{% if p.ia %}🤖 IA do site ligada{% else %}🤖 IA do site desligada — use “copiar o prompt” e cole a resposta de outra IA (ou ligue em <a href="/ia">/ia</a>){% endif %}</span>
+</div>
+<div class="rx-barra" id="barra"></div>
+<div id="avisos" class="rx-dica rx-av"></div>
+
+<!-- 1 · vídeo -->
+<div class="rx-card">
+  <h2><span class="rx-num">1</span>🎬 Vídeo que vai ser reagido</h2>
+  <div class="rx-linha">
+    <label style="flex:2;min-width:240px;">Título<input id="fTitulo" value="{{ p.titulo }}"></label>
+    <label style="flex:1;min-width:160px;">Obra<input id="fObra" value="{{ p.obra }}" placeholder="ex.: Bleach, Naruto, Todo Mundo Odeia o Chris"></label>
+    <label style="flex:1;min-width:160px;">Idioma das falas<input id="fIdioma" value="{{ p.idioma }}"></label>
+  </div>
+  <label>Contexto / pedidos pra IA <span class="rx-dica">(opcional — ex.: “o canal zoa muito o Sasuke”, “react de pai e filho”)</span><textarea id="fContexto" rows="2">{{ p.contexto }}</textarea></label>
+  <div class="rx-linha">
+    <input id="fUrl" type="url" value="{{ p.video.url or '' }}" placeholder="https://www.youtube.com/watch?v=..." style="flex:1;min-width:260px;">
+    <button type="button" id="bBaixar">⬇ Baixar o vídeo</button>
+    <label class="rx-btn" style="cursor:pointer;background:var(--acento);color:#fff;border-radius:8px;font-weight:400;">📁 Enviar o arquivo<input type="file" id="fVideo" accept="video/*" style="display:none"></label>
+    <span id="vEst" class="rx-dica"></span>
+  </div>
+  <div id="vPlayer"></div>
+  <label style="margin-top:8px;">Transcrição com o tempo <span class="rx-dica">— “0:13 frase”, SRT, VTT, “[00:13] frase” ou o formato do YouTube. Repetições e créditos (“Personagem - Cantor”) são limpos sozinhos.</span>
+    <textarea id="fTrans" rows="6" placeholder="0:13 Almas que viram hollows são seres imundos">{{ p.transcricao_bruta }}</textarea></label>
+  <div class="rx-linha">
+    <button type="button" id="bTrans">💾 Salvar a transcrição</button>
+    <button type="button" id="bWhisper" class="rx-sec" title="sem transcrição: o Whisper ouve o vídeo (letra cantada sai pior — confira)">🎙 Transcrever com o Whisper</button>
+    <span id="tEst" class="rx-dica"></span>
+  </div>
+  <details><summary class="rx-dica" style="cursor:pointer">👁 ver como ficou a transcrição limpa (o que a IA lê)</summary><div class="rx-trans" id="tLimpa"></div></details>
+</div>
+
+<!-- 2 · sugestões -->
+<div class="rx-card">
+  <h2><span class="rx-num">2</span>🤖 Personagens sugeridos</h2>
+  <p class="rx-dica">A IA lê a transcrição, olha quadros do vídeo e sugere quem rende o melhor react: <span class="rx-tag da_obra">da obra</span> <span class="rx-tag hypado">hypado</span> <span class="rx-tag contraste">contraste</span>. Marque os que quer (dá pra trocar o nome antes de usar), misture com os seus e peça mais sugestões depois — as novas combinam com quem já está no elenco.</p>
+  <div class="rx-linha">
+    <button type="button" id="bSugerir">🤖 Sugerir personagens</button>
+    <button type="button" class="rx-sec" data-copiar="sugestoes">📋 Copiar o prompt</button>
+  </div>
+  <details class="rx-colar"><summary>colar a resposta de outra IA</summary><textarea id="cSugestoes" rows="4" placeholder='{"obra": "...", "personagens": [...]}'></textarea><button type="button" class="rx-btn" data-colar="sugestoes">✔ Ler a resposta</button></details>
+  <div id="sugResumo" class="rx-dica"></div>
+  <div class="rx-grade" id="sugLista"></div>
+  <div class="rx-linha" id="sugAcoes" style="display:none"><button type="button" id="bUsar">➕ Usar os marcados no elenco</button><span class="rx-dica" id="sugN"></span></div>
+</div>
+
+<!-- 3 · elenco -->
+<div class="rx-card">
+  <h2><span class="rx-num">3</span>🧑‍🤝‍🧑 Elenco <span class="rx-dica" style="margin:0">(sentados nesta ordem, da esquerda pra direita)</span></h2>
+  <div class="rx-linha">
+    <input id="nNome" placeholder="nome do personagem (ex.: Gojo Satoru)" style="flex:2;min-width:200px;">
+    <input id="nObra" placeholder="obra (opcional)" style="flex:1;min-width:140px;">
+    <button type="button" id="bAdd">➕ Adicionar</button>
+    <button type="button" id="bFichas" class="rx-sec" title="personalidade, jeito de falar, aparência e o termo de busca de quem você digitou">🤖 Completar as fichas</button>
+    <button type="button" id="bBrave" title="abre no 🧲 navegador das imagens (o Brave do site) uma guia do Google Imagens pra cada personagem sem imagem — marque a imagem e clique em “Capturar e enviar ao site”">🧲 Buscar imagens de quem está sem</button>
+  </div>
+  <details class="rx-colar"><summary>fichas: copiar o prompt / colar a resposta de outra IA</summary><button type="button" class="rx-btn rx-sec" data-copiar="fichas">📋 Copiar o prompt</button><textarea id="cFichas" rows="3"></textarea><button type="button" class="rx-btn" data-colar="fichas">✔ Ler a resposta</button></details>
+  <div id="elenco" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;"></div>
+</div>
+
+<!-- 4 · roteiro -->
+<div class="rx-card">
+  <h2><span class="rx-num">4</span>📝 Roteiro (as falas embaixo da TV)</h2>
+  <p class="rx-dica">A IA analisa a transcrição e o vídeo e escreve quem fala, quando e com que cara — no jeito de cada um. O pedido de like/inscrição é uma fala de um dos personagens (linha amarela 📣), sem corte de inscreva-se.</p>
+  <div class="rx-linha">
+    <label style="margin:0;">Quantidade de falas <select id="fDens" style="width:auto;">{% for d in densidades %}<option value="{{ d }}" {% if p.densidade == d %}selected{% endif %}>{{ {'pouca': 'pouca (1 a cada ~15 s)', 'normal': 'normal (1 a cada ~9 s)', 'muita': 'muita (1 a cada ~6 s)'}[d] }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="rx-dica" style="margin-bottom:2px">Expressões de cada personagem (cada uma vira uma pose sentado + a boca de fala):</div>
+  <div class="rx-chips" id="fExpr">{% for k, e in expressoes.items() %}<label><input type="checkbox" value="{{ k }}" {% if k in p.expressoes %}checked{% endif %} {% if k == 'neutro' %}disabled{% endif %}>{{ e[0] }}</label>{% endfor %}</div>
+  <div class="rx-linha" style="margin-top:8px;">
+    <button type="button" id="bRoteiro">🤖 Escrever o roteiro</button>
+    <button type="button" class="rx-sec" data-copiar="roteiro">📋 Copiar o prompt</button>
+    <span class="rx-dica" id="rEst"></span>
+  </div>
+  <details class="rx-colar"><summary>colar a resposta de outra IA</summary><textarea id="cRoteiro" rows="4" placeholder='{"resumo": "...", "falas": [{"tempo": 14.5, "personagem": "...", "texto": "...", "expressao": "chocado", "pedido_inscricao": false, "reacoes": []}]}'></textarea><button type="button" class="rx-btn" data-colar="roteiro">✔ Ler a resposta</button></details>
+  <div id="rResumo" class="rx-dica"></div>
+  <div style="overflow:auto"><table class="rx-falas" id="falas"></table></div>
+  <div class="rx-linha"><button type="button" id="bFalaAdd" class="rx-sec">➕ Fala</button><button type="button" id="bFalasSalvar">💾 Salvar as falas</button><span id="fEst" class="rx-dica"></span></div>
+</div>
+
+<!-- 5 · verificador -->
+<div class="rx-card">
+  <h2><span class="rx-num">5</span>🔎 Verificador de fatos (lore, cronologia e personalidade)</h2>
+  <p class="rx-dica">Confere se as fichas e as falas batem com a obra: a <b>cronologia</b> (o que o vídeo mostra é antes ou depois do ponto da história de cada personagem — ele viveu aquilo ou vê pela 1ª vez), quem <b>já interagiu</b> com quem aparece/canta no vídeo, nomes, técnicas, mortes e a personalidade. As falas com ⚠ dúvida da IA vão primeiro. Use o 🔷 Gemini (pesquisa no Google), a IA do site ou cole a resposta de outra IA (ChatGPT/Perplexity com busca). Cada correção você aplica ou ignora.</p>
+  <div class="rx-linha">
+    <label style="margin:0;">Conferir <select id="chAlvo" style="width:auto;"><option value="tudo">fichas + roteiro</option><option value="fichas">só as fichas</option><option value="roteiro">só as falas</option></select></label>
+    <input id="chFoco" placeholder="pedido extra (opcional) — ex.: confira se o Kenpachi já lutou com o Ichigo antes dessa cena" style="flex:1;min-width:260px;">
+  </div>
+  <div class="rx-linha">
+    <button type="button" id="bChGemini" title="o Gemini pesquisa no Google (precisa da chave do Gemini — a mesma da 🔎 Checagem dos Modelos de vídeo)">🔷 Checar com o Gemini + Google</button>
+    <button type="button" id="bChIa" class="rx-sec" title="a IA do site, sem internet — o que ela sabe da obra">🤖 Checar com a IA do site</button>
+    <button type="button" id="bChCopiar" class="rx-sec">📋 Copiar o prompt (outra IA com busca)</button>
+    <span class="rx-dica" id="chEst"></span>
+  </div>
+  <details class="rx-colar"><summary>colar a resposta de outra IA</summary><textarea id="cChecagem" rows="4" placeholder='{"fichas": [...], "falas": [...], "conferidos": [...], "resumo": "..."}'></textarea><button type="button" class="rx-btn" id="bChColar">✔ Ler a resposta</button></details>
+  <div id="chResumo" class="rx-dica"></div>
+  <div id="chItens" style="display:flex;flex-direction:column;gap:6px;"></div>
+  <div class="rx-linha" id="chTodas" style="display:none"><button type="button" class="rx-btn" data-ch="todas" data-acao="aplicar">✔ Aplicar todas as pendentes</button><button type="button" class="rx-btn rx-sec" data-ch="todas" data-acao="ignorar">✕ Ignorar todas</button></div>
+  <details><summary class="rx-dica" style="cursor:pointer" id="chConfSum">✔ conferidos</summary><div class="rx-dica" id="chConf"></div></details>
+</div>
+
+<!-- 5 · cenário -->
+<div class="rx-card">
+  <h2><span class="rx-num">6</span>🏠 Cenário em camadas</h2>
+  <p class="rx-dica">Fundo → sofá → personagens → mesa na frente (dá a sensação de proximidade) → TV. As camadas vão pra fila do <a href="/flow#lote" target="_blank">🚀 Flow em massa</a>; sofá e mesa voltam com fundo verde e são recortados aqui no PC. Dá pra mandar a sua imagem em qualquer camada.</p>
+  <div class="rx-linha">
+    <label style="margin:0;">Disposição <select id="fLayout" style="width:auto;">{% for k, v in layouts.items() %}<option value="{{ k }}" {% if p.layout == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label style="margin:0;">Estilo <select id="fEstilo" style="width:auto;">{% for k, v in estilos.items() %}<option value="{{ k }}" {% if p.estilo == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <span class="rx-dica" id="estFinal"></span>
+  </div>
+  <label>Pedido extra pro fundo <span class="rx-dica">(opcional — ex.: “parede de tijolos com um pôster da Akatsuki e um sol vermelho”)</span><input id="fPedido" value="{{ p.cenario.pedido or '' }}"></label>
+  <div class="rx-linha"><button type="button" id="bCamadas">🚀 Gerar as 3 camadas no Flow</button></div>
+  <div class="rx-cam" id="camadas"></div>
+</div>
+
+<!-- 6 · personagens -->
+<div class="rx-card">
+  <h2><span class="rx-num">7</span>🧍 Personagens sentados (uma pose por expressão)</h2>
+  <p class="rx-dica">Cada personagem vira um projeto da aba <a href="/personagens-pod" target="_blank">🧍 Personagens</a> (motor Flow): primeiro a ⭐ neutra (com a imagem de referência), que vira a mestre sozinha; depois as outras expressões e a 👄 boca de cada uma (a animação de fala). Refaça ou troque qualquer pose lá.</p>
+  <div class="rx-linha"><button type="button" id="bPoses">🚀 Gerar todos os personagens</button><span class="rx-dica" id="pEst"></span></div>
+  <div id="poses" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
+<!-- 7 · prévia e editor -->
+<div class="rx-card">
+  <h2><span class="rx-num">8</span>👁 Prévia e 🎬 editor</h2>
+  <div class="rx-linha">
+    <label style="margin:0;flex:1;min-width:240px;">Segundo do vídeo <input type="range" id="pT" min="0" max="{{ (p.video.duracao or 60)|round(0, 'ceil')|int }}" value="0" step="0.5" style="width:100%"></label>
+    <span id="pTv" class="rx-dica" style="width:70px">0:00</span>
+    <button type="button" id="bPrevia" class="rx-sec">👁 Atualizar a prévia</button>
+  </div>
+  <img id="previa" class="rx-previa" alt="prévia do react" src="">
+  <div class="rx-linha" style="margin-top:10px;">
+    <button type="button" id="bEditor" style="background:#16a34a;font-size:1rem;padding:9px 18px;">🎬 Mandar pro editor (tudo posicionado)</button>
+    <span id="eEst" class="rx-dica"></span>
+  </div>
+  <div id="eAvisos" class="rx-dica rx-av"></div>
+  <details style="margin-top:8px;"><summary class="rx-dica" style="cursor:pointer">🕘 registro</summary><div class="rx-log" id="log"></div></details>
+</div>
+
+<div class="rx-zoom" id="zoom"><img alt=""></div>
+
+<script>
+const PID = {{ p.id|tojson }};
+const EXPR = {{ expressoes|tojson }};
+const ROT_CAM = {{ rotulo_camada|tojson }};
+const CAMADAS = {{ camadas|list|tojson }};
+const TIPOS_SUG = { da_obra: 'da obra', hypado: '🔥 hypado', contraste: 'contraste' };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+const mmss = (s) => { s = Math.max(0, Math.round(+s || 0)); const m = Math.floor(s / 60), x = s % 60; return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
+const seg = (v) => { const t = String(v || '').trim().replace(',', '.'); if (!t) return null; let s = 0; for (const x of t.split(':')) { const n = parseFloat(x); if (isNaN(n)) return null; s = s * 60 + n; } return s; };
+let P = null, falasEditadas = false, sugMarcadas = new Set(), sugNomes = {}, timer = null, ultimaTarefa = null;
+
+async function api(url, dados, metodo) {
+  const op = { method: metodo || (dados === undefined ? 'GET' : 'POST') };
+  if (dados instanceof FormData) op.body = dados;
+  else if (dados !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(dados); }
+  const r = await fetch(url, op);
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('HTTP ' + r.status));
+  return d;
+}
+function focoEm(el) { return el && el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName); }
+function avisar(el, msg, cls) { el.className = 'rx-dica ' + (cls || ''); el.textContent = msg; }
+
+// ------------------------------------------------------------------ estado
+async function recarregar() {
+  clearTimeout(timer);
+  try { P = await api(`/react-personagens/${PID}/estado`); desenhar(); } catch (e) { $('avisos').textContent = '⚠ ' + e.message; }
+  const t = P && P.tarefa;
+  const esperando = (t && !t.fim) || (P && (P.video.estado === 'baixando' || Object.values(P.camadas).some(c => ['fila', 'gerando'].includes(c.estado))
+    || P.personagens.some(c => c.poses && c.poses.tem && (c.poses.esperando || (c.poses.fase === 'mestre' && !c.poses.mestre)))));
+  timer = setTimeout(recarregar, esperando ? 3500 : 15000);
+}
+function desenhar() {
+  const t = P.tarefa, b = $('barra');
+  if (t && !t.fim) { b.className = 'rx-barra rodando'; b.textContent = `⏳ ${t.rotulo}… (${Math.round(Date.now() / 1000 - t.inicio)} s — pode sair da página, chega uma 🔔 quando terminar)`; }
+  else if (t && t.erro) { b.className = 'rx-barra erro'; b.textContent = `❌ ${t.rotulo}: ${t.erro}`; }
+  else if (t && t.fim && Date.now() / 1000 - t.fim < 20) { b.className = 'rx-barra ok'; b.textContent = `✔ ${t.rotulo}${t.msg ? ' — ' + t.msg : ''}`; }
+  else b.className = 'rx-barra';
+  if (t && t.fim && ultimaTarefa !== t.fim) { ultimaTarefa = t.fim; if (t.oque === 'roteiro') falasEditadas = false; }
+  $('bChGemini').title = P.gemini ? 'o Gemini pesquisa no Google' : 'falta a chave do Gemini — cole na caixa “🔷 Gemini” da 🔎 Checagem de um Modelo de vídeo';
+  $('avisos').textContent = (P.avisos || []).length ? '⚠ ' + P.avisos.join(' · ') : '';
+  desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharChecagem(); desenharCamadas(); desenharPoses();
+  $('estFinal').textContent = `→ ${P.estilo_final === 'realista' ? '📷 realista' : '🎨 anime/cartoon'}` + (P.estilo === 'auto' ? ' (pelo elenco)' : '');
+  $('log').textContent = (P.log || []).slice().reverse().join('\n');
+  if (P.editor && P.editor.job_id && !$('eEst').dataset.fixo) $('eEst').innerHTML = `já mandado: <a href="/job/${esc(P.editor.job_id)}/edit-segments" target="_blank">abrir no editor ↗</a> (mandar de novo cria outro projeto)`;
+}
+
+// ------------------------------------------------------------------ 1 · vídeo
+let videoAtual = null;
+function desenharVideo() {
+  const v = P.video || {};
+  const st = v.estado === 'baixando' ? '⏳ baixando…' : v.estado === 'erro' ? `❌ ${v.erro || 'erro ao baixar'}` : P.video_ok ? `✔ ${mmss(v.duracao)} · ${v.largura}×${v.altura}${v.tem_audio === false ? ' · ⚠ sem áudio' : ''}` : 'sem vídeo ainda';
+  $('vEst').textContent = st;
+  const chave = P.video_ok ? (v.arquivo + v.duracao) : '';
+  if (chave !== videoAtual) {
+    videoAtual = chave;
+    $('vPlayer').innerHTML = P.video_ok ? `<video src="/react-personagens/${PID}/video?v=${encodeURIComponent(chave)}" controls preload="metadata" style="max-width:520px;width:100%;border-radius:8px;margin-top:6px;"></video>` : '';
+    if (v.duracao) $('pT').max = Math.ceil(v.duracao);
+  }
+}
+function desenharTrans() {
+  const it = P.transcricao || [];
+  $('tEst').textContent = it.length ? `${it.filter(e => e.tipo === 'fala').length} frase(s) · ${it.filter(e => e.tipo === 'credito').length} crédito(s)` : 'sem transcrição';
+  $('tLimpa').innerHTML = it.map(e => `<div class="${e.tipo === 'credito' ? 'cr' : ''}">${e.ini != null ? `<b>${mmss(e.ini)}</b> ` : ''}${e.tipo === 'credito' ? '🎤 ' : ''}${esc(e.texto)}</div>`).join('') || '—';
+}
+async function salvarDados(campos) { try { await api(`/react-personagens/${PID}/dados`, campos); } catch (e) { alert(e.message); } }
+[['fTitulo', 'titulo'], ['fObra', 'obra'], ['fIdioma', 'idioma'], ['fContexto', 'contexto'], ['fUrl', 'url'], ['fPedido', 'pedido_cenario']].forEach(([id, k]) =>
+  $(id).addEventListener('change', async (e) => { await salvarDados({ [k]: e.target.value }); if (k === 'titulo') $('tTitulo').textContent = e.target.value; }));
+$('fDens').addEventListener('change', (e) => salvarDados({ densidade: e.target.value }));
+$('fLayout').addEventListener('change', async (e) => { await salvarDados({ layout: e.target.value }); atualizarPrevia(); });
+$('fEstilo').addEventListener('change', async (e) => { await salvarDados({ estilo: e.target.value }); recarregar(); });
+$('fExpr').addEventListener('change', () => salvarDados({ expressoes: [...$('fExpr').querySelectorAll('input:checked')].map(i => i.value) }));
+$('bTrans').addEventListener('click', async () => {
+  try { const d = await api(`/react-personagens/${PID}/dados`, { transcricao_bruta: $('fTrans').value }); avisar($('tEst'), `✔ ${d.linhas} linha(s) limpas`, 'rx-ok'); recarregar(); } catch (e) { avisar($('tEst'), '❌ ' + e.message, 'rx-err'); }
+});
+$('bBaixar').addEventListener('click', async () => { try { await api(`/react-personagens/${PID}/video/baixar`, { url: $('fUrl').value }); recarregar(); } catch (e) { alert(e.message); } });
+$('fVideo').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('video', f);
+  $('vEst').textContent = '⬆ enviando…';
+  try { await api(`/react-personagens/${PID}/video`, fd); recarregar(); } catch (er) { $('vEst').textContent = '❌ ' + er.message; }
+});
+$('bWhisper').addEventListener('click', async () => { if ($('fTrans').value.trim() && !confirm('Trocar a transcrição pela do Whisper?')) return; try { await api(`/react-personagens/${PID}/whisper`, {}); recarregar(); } catch (e) { alert(e.message); } });
+
+// ------------------------------------------------------------------ IA / copiar / colar
+async function ia(oque) { try { await api(`/react-personagens/${PID}/ia/${oque}`, {}); recarregar(); } catch (e) { alert(e.message); } }
+$('bSugerir').addEventListener('click', () => ia('sugerir'));
+$('bFichas').addEventListener('click', () => ia('fichas'));
+$('bRoteiro').addEventListener('click', () => { if ((P.roteiro.falas || []).length && !confirm('Escrever um roteiro NOVO (troca as falas atuais)?')) return; ia('roteiro'); });
+document.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {
+  try { const d = await api(`/react-personagens/${PID}/prompt/${b.dataset.copiar}`); await navigator.clipboard.writeText(d.prompt); b.textContent = '✔ copiado'; setTimeout(() => b.textContent = '📋 Copiar o prompt', 1800); }
+  catch (e) { alert('Não deu pra copiar: ' + e.message); }
+}));
+document.querySelectorAll('[data-colar]').forEach(b => b.addEventListener('click', async () => {
+  const tipo = b.dataset.colar, campo = { sugestoes: 'cSugestoes', fichas: 'cFichas', roteiro: 'cRoteiro' }[tipo];
+  try { const d = await api(`/react-personagens/${PID}/colar/${tipo}`, { texto: $(campo).value }); $(campo).value = ''; if (tipo === 'roteiro') falasEditadas = false; alert(`✔ ${d.n} item(ns) lidos`); recarregar(); } catch (e) { alert(e.message); }
+}));
+
+// ------------------------------------------------------------------ 2 · sugestões
+function desenharSugestoes() {
+  const s = P.sugestoes || {}, lista = s.personagens || [];
+  if (focoEm($('sugLista'))) return;
+  $('sugResumo').textContent = s.resumo_video ? `🎬 ${s.obra ? s.obra + ' — ' : ''}${s.resumo_video}` : '';
+  const no = new Set(P.personagens.map(c => c.nome.toLowerCase()));
+  $('sugLista').innerHTML = lista.map((x, k) => {
+    const ja = no.has(x.nome.toLowerCase());
+    return `<div class="rx-sug ${sugMarcadas.has(x.nome) ? 'on' : ''}" data-k="${k}">
+      <div class="rx-linha" style="margin:0"><input type="checkbox" ${sugMarcadas.has(x.nome) ? 'checked' : ''} ${ja ? 'disabled' : ''} data-n="${esc(x.nome)}">
+      <input value="${esc(sugNomes[x.nome] || x.nome)}" data-nome="${esc(x.nome)}" style="flex:1;min-width:120px;margin:0;font-weight:600;" ${ja ? 'disabled' : ''}></div>
+      <div style="margin-top:4px;"><span class="rx-tag ${esc(x.tipo)}">${TIPOS_SUG[x.tipo] || esc(x.tipo)}</span> <span class="rx-dica">${esc(x.obra)}${x.estilo === 'realista' ? ' · 📷 real' : ''}</span>${ja ? ' <b class="rx-ok">✔ no elenco</b>' : ''}</div>
+      <div style="font-size:.82rem;margin-top:4px;">💡 ${esc(x.motivo)}</div>
+      <div class="rx-dica" style="margin:2px 0 0;">${esc(x.personalidade)}</div></div>`;
+  }).join('');
+  $('sugAcoes').style.display = lista.length ? '' : 'none';
+  $('sugN').textContent = sugMarcadas.size ? `${sugMarcadas.size} marcado(s)` : 'marque quem entra (ou troque o nome por outro personagem)';
+}
+$('sugLista').addEventListener('change', (e) => {
+  if (e.target.dataset.n) { e.target.checked ? sugMarcadas.add(e.target.dataset.n) : sugMarcadas.delete(e.target.dataset.n); e.target.closest('.rx-sug').classList.toggle('on', e.target.checked); $('sugN').textContent = `${sugMarcadas.size} marcado(s)`; }
+  if (e.target.dataset.nome) { sugNomes[e.target.dataset.nome] = e.target.value; if (!sugMarcadas.has(e.target.dataset.nome)) { sugMarcadas.add(e.target.dataset.nome); const cb = e.target.closest('.rx-sug').querySelector('input[type=checkbox]'); cb.checked = true; e.target.closest('.rx-sug').classList.add('on'); } }
+});
+$('bUsar').addEventListener('click', async () => {
+  if (!sugMarcadas.size) return alert('Marque pelo menos um.');
+  const editados = {}; for (const n of sugMarcadas) if (sugNomes[n] && sugNomes[n] !== n) editados[n] = { nome: sugNomes[n] };
+  try { await api(`/react-personagens/${PID}/sugestoes/usar`, { nomes: [...sugMarcadas], editados }); sugMarcadas.clear(); sugNomes = {}; await recarregar();
+    if (Object.keys(editados).length && P.ia && confirm('Você trocou nomes — completar a ficha deles com a IA?')) ia('fichas'); } catch (e) { alert(e.message); }
+});
+
+// ------------------------------------------------------------------ 3 · elenco
+$('bAdd').addEventListener('click', async () => {
+  const nome = $('nNome').value.trim(); if (!nome) return $('nNome').focus();
+  try { const d = await api(`/react-personagens/${PID}/personagem`, { nome, obra: $('nObra').value.trim() }); $('nNome').value = ''; $('nObra').value = ''; if (d.reaproveitado) alert(`♻ ${nome} já existia — reaproveitei ${d.reaproveitado}.`); recarregar(); } catch (e) { alert(e.message); }
+});
+$('nNome').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('bAdd').click(); });
+$('bBrave').addEventListener('click', () => brave([]));
+async function brave(cids) {
+  try { const d = await api(`/react-personagens/${PID}/brave`, { cids, trocar: true }); alert(`🧲 ${d.guias} guia(s) abertas no ${d.navegador}. Marque a imagem certa e clique em “Capturar e enviar ao site” — ela entra no personagem sozinha.`); }
+  catch (e) { alert(e.message); }
+}
+let elencoForcar = false;
+function desenharElenco() {
+  const box = $('elenco'); if (focoEm(box) && !elencoForcar) return; elencoForcar = false;
+  const n = P.personagens.length;
+  box.innerHTML = P.personagens.map((c, k) => `
+    <div class="rx-pers" data-cid="${c.id}">
+      <div class="rx-refs">
+        <div class="rx-ref">${c.refs.length ? `<img src="/react-personagens/${PID}/arquivo/refs/${esc(c.refs[0])}" data-zoom><button type="button" class="rx-mini rx-perigo" data-apagar-ref="${esc(c.refs[0])}" title="apagar esta referência">✕</button>` : '🖼 sem imagem de referência'}</div>
+        ${c.refs.length > 1 ? `<div class="rx-mini-refs">${c.refs.slice(1).map(r => `<img src="/react-personagens/${PID}/arquivo/refs/${esc(r)}" data-zoom title="outra referência">`).join('')}</div>` : ''}
+        <button type="button" class="rx-mini" data-brave title="Google Imagens no navegador do site com: ${esc(c.busca_imagem)}">🧲 Buscar</button>
+        <label class="rx-mini" style="cursor:pointer;background:var(--acento);color:#fff;border-radius:6px;text-align:center;">📁 Do PC<input type="file" accept="image/*" data-ref-arq style="display:none"></label>
+        <button type="button" class="rx-mini rx-sec" data-ref-link>🔗 Link</button>
+      </div>
+      <div>
+        <div class="rx-linha" style="margin-top:0">
+          <input value="${esc(c.nome)}" data-campo="nome" style="flex:2;min-width:150px;font-weight:700;">
+          <input value="${esc(c.obra)}" data-campo="obra" placeholder="obra" style="flex:1;min-width:120px;">
+          <select data-campo="estilo" style="width:auto;" title="anime/desenho ou pessoa real"><option value="">estilo?</option><option value="anime" ${c.estilo === 'anime' ? 'selected' : ''}>🎨 anime</option><option value="realista" ${c.estilo === 'realista' ? 'selected' : ''}>📷 real</option></select>
+          <input type="color" value="${esc(c.cor || '#ffd54a')}" data-campo="cor" title="cor do nome na legenda" style="width:42px;height:34px;padding:2px;">
+          <button type="button" class="rx-mini rx-sec" data-mover="-1" ${k === 0 ? 'disabled' : ''} title="sentar mais pra esquerda">◀</button>
+          <button type="button" class="rx-mini rx-sec" data-mover="1" ${k === n - 1 ? 'disabled' : ''} title="sentar mais pra direita">▶</button>
+          <button type="button" class="rx-mini rx-perigo" data-tirar title="tirar do elenco">🗑</button>
+        </div>
+        ${c.motivo ? `<div class="rx-dica" style="margin:0 0 4px;">💡 ${esc(c.motivo)}</div>` : ''}
+        ${c.reaproveitado ? `<div class="rx-dica rx-ok" style="margin:0 0 4px;">♻ já existia — reaproveitei ${esc(c.reaproveitado)} (não gera de novo)</div>` : ''}
+        <div class="rx-campos">
+        <label>Personalidade<textarea data-campo="personalidade">${esc(c.personalidade)}</textarea></label>
+        <label>Jeito de falar (bordões, gírias)<textarea data-campo="jeito_de_falar">${esc(c.jeito_de_falar)}</textarea></label>
+        <label>⏳ Cronologia — em que ponto da história dele está; o que o vídeo mostra é antes, durante ou depois<textarea data-campo="cronologia" placeholder="ex.: já morreu quando isso acontece — vê pela 1ª vez">${esc(c.cronologia || '')}</textarea></label>
+        <label>🤝 Relações com quem aparece/canta no vídeo (já interagiu? lutou? parente?)<textarea data-campo="relacoes" placeholder="ex.: foi derrotado pelo Yhwach; mestre do Ichigo">${esc(c.relacoes || '')}</textarea></label>
+        <label>Aparência pro desenho (em inglês)<textarea data-campo="aparencia_en">${esc(c.aparencia_en)}</textarea></label>
+        <label>Termo da busca de imagem<input value="${esc(c.busca_imagem)}" data-campo="busca_imagem"></label>
+        </div>
+      </div>
+    </div>`).join('') || '<p class="rx-dica">Ninguém ainda — use as sugestões ou adicione pelo nome.</p>';
+}
+$('elenco').addEventListener('change', async (e) => {
+  const card = e.target.closest('[data-cid]'); if (!card) return; const cid = card.dataset.cid;
+  if (e.target.dataset.campo) { try { await api(`/react-personagens/${PID}/personagem/${cid}`, { [e.target.dataset.campo]: e.target.value }); } catch (er) { alert(er.message); } return; }
+  if (e.target.hasAttribute('data-ref-arq')) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(`/react-personagens/${PID}/personagem/${cid}/ref`, fd); recarregar(); } catch (er) { alert(er.message); } }
+});
+$('elenco').addEventListener('click', async (e) => {
+  const card = e.target.closest('[data-cid]'); if (!card) return; const cid = card.dataset.cid;
+  try {
+    if (e.target.hasAttribute('data-brave')) return brave([cid]);
+    if (e.target.hasAttribute('data-ref-link')) { const u = prompt('Link da imagem:'); if (!u) return; await api(`/react-personagens/${PID}/personagem/${cid}/ref`, { url: u }); return recarregar(); }
+    if (e.target.dataset.apagarRef) { await api(`/react-personagens/${PID}/personagem/${cid}/ref/${encodeURIComponent(e.target.dataset.apagarRef)}`, undefined, 'DELETE'); return recarregar(); }
+    if (e.target.hasAttribute('data-tirar')) { if (!confirm('Tirar do elenco (as falas dele saem do roteiro)?')) return; await api(`/react-personagens/${PID}/personagem/${cid}`, undefined, 'DELETE'); return recarregar(); }
+    if (e.target.dataset.mover) { const ids = P.personagens.map(c => c.id), i = ids.indexOf(cid), j = i + (+e.target.dataset.mover); [ids[i], ids[j]] = [ids[j], ids[i]]; await api(`/react-personagens/${PID}/personagens/ordem`, { ids }); recarregar(); atualizarPrevia(); }
+  } catch (er) { alert(er.message); }
+});
+
+// ------------------------------------------------------------------ 4 · falas
+function linhaFala(f) {
+  const ops = P.personagens.map(c => `<option value="${c.id}" ${c.id === f.cid ? 'selected' : ''}>${esc(c.nome)}</option>`).join('');
+  const exs = Object.entries(EXPR).map(([k, v]) => `<option value="${k}" ${k === f.expressao ? 'selected' : ''}>${v[0]}</option>`).join('');
+  const reac = (f.reacoes || []).map(r => { const c = P.personagens.find(x => x.id === r.cid); return c ? `${esc(c.nome)} ${EXPR[r.expressao] ? EXPR[r.expressao][0].split(' ')[0] : ''}` : ''; }).filter(Boolean).join(', ');
+  return `<tr data-id="${esc(f.id)}" class="${f.cta ? 'cta' : ''}" data-reacoes='${esc(JSON.stringify(f.reacoes || []))}' data-duvida="${esc(f.duvida || '')}">
+    <td style="width:74px"><input value="${mmss(f.t)}${(+f.t % 1) ? '.' + String(Math.round((+f.t % 1) * 10)) : ''}" data-f="t" style="width:68px"></td>
+    <td style="width:150px"><select data-f="cid">${ops}</select></td>
+    <td style="width:150px"><select data-f="expressao">${exs}</select></td>
+    <td><textarea data-f="texto">${esc(f.texto)}</textarea>${reac ? `<div class="rx-dica" style="margin:0">👀 reagem: ${reac}</div>` : ''}${f.duvida ? `<div class="rx-dica rx-av" style="margin:0" title="vai pro 🔎 verificador de fatos">⚠ dúvida da IA: ${esc(f.duvida)}</div>` : ''}</td>
+    <td style="width:60px"><input type="number" step="0.1" min="0.8" max="15" value="${f.dur}" data-f="dur" style="width:56px" title="segundos na tela"></td>
+    <td style="width:38px;text-align:center"><input type="checkbox" data-f="cta" ${f.cta ? 'checked' : ''} title="📣 pedido de like/inscrição" style="width:auto"></td>
+    <td style="width:66px;white-space:nowrap"><button type="button" class="rx-mini rx-sec" data-ver title="prévia neste segundo">👁</button> <button type="button" class="rx-mini rx-perigo" data-del>✕</button></td></tr>`;
+}
+function desenharFalas() {
+  const r = P.roteiro || {};
+  $('rResumo').textContent = r.resumo ? '🎬 ' + r.resumo : '';
+  $('rEst').textContent = (r.falas || []).length ? `${r.falas.length} fala(s)` + (r.ignoradas ? ` · ${r.ignoradas} ignorada(s) (nome fora do elenco)` : '') : '';
+  if (falasEditadas || focoEm($('falas'))) return;
+  $('falas').innerHTML = `<tr><th>tempo</th><th>quem fala</th><th>cara</th><th>fala</th><th>seg.</th><th>📣</th><th></th></tr>` + (r.falas || []).map(linhaFala).join('');
+}
+$('falas').addEventListener('input', () => { falasEditadas = true; $('fEst').textContent = '✏ não salvo'; });
+$('falas').addEventListener('change', (e) => { falasEditadas = true; $('fEst').textContent = '✏ não salvo'; if (e.target.dataset.f === 'cta') e.target.closest('tr').classList.toggle('cta', e.target.checked); });
+$('falas').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  if (e.target.hasAttribute('data-del')) { tr.remove(); falasEditadas = true; $('fEst').textContent = '✏ não salvo'; }
+  if (e.target.hasAttribute('data-ver')) { const t = seg(tr.querySelector('[data-f=t]').value); if (t != null) { $('pT').value = t + 0.4; atualizarPrevia(); $('previa').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+});
+$('bFalaAdd').addEventListener('click', () => {
+  if (!P.personagens.length) return alert('Monte o elenco antes.');
+  const ult = (P.roteiro.falas || []).slice(-1)[0];
+  const f = { id: 'n' + Math.random().toString(16).slice(2, 8), t: ult ? +ult.t + +ult.dur + 1 : 1, cid: P.personagens[0].id, expressao: 'neutro', texto: '', dur: 3, cta: false, reacoes: [] };
+  $('falas').insertAdjacentHTML('beforeend', linhaFala(f)); falasEditadas = true; $('fEst').textContent = '✏ não salvo';
+});
+$('bFalasSalvar').addEventListener('click', async () => {
+  const falas = [...$('falas').querySelectorAll('tr[data-id]')].map(tr => ({ id: tr.dataset.id, t: seg(tr.querySelector('[data-f=t]').value), cid: tr.querySelector('[data-f=cid]').value,
+    expressao: tr.querySelector('[data-f=expressao]').value, texto: tr.querySelector('[data-f=texto]').value, dur: parseFloat(tr.querySelector('[data-f=dur]').value),
+    cta: tr.querySelector('[data-f=cta]').checked, reacoes: JSON.parse(tr.dataset.reacoes || '[]'), duvida: tr.dataset.duvida || '' }));
+  try { const d = await api(`/react-personagens/${PID}/roteiro`, { falas }); falasEditadas = false; avisar($('fEst'), `✔ ${d.falas} fala(s) salvas`, 'rx-ok'); recarregar(); } catch (e) { avisar($('fEst'), '❌ ' + e.message, 'rx-err'); }
+});
+
+// ------------------------------------------------------------------ 🔎 verificador
+const CAMPO_NOME = { obra: 'obra', personalidade: 'personalidade', jeito_de_falar: 'jeito de falar', cronologia: '⏳ cronologia', relacoes: '🤝 relações', aparencia_en: 'aparência' };
+function desenharChecagem() {
+  const ch = P.checagem || {}, itens = ch.itens || [];
+  const pend = itens.filter(i => i.estado === 'pendente');
+  $('chResumo').textContent = ch.quando ? `${ch.origem || ''} · ${new Date(ch.quando * 1000).toLocaleString()} — ${itens.length} correção(ões), ${pend.length} pendente(s)${ch.resumo ? ' · ' + ch.resumo : ''}` : '';
+  $('chTodas').style.display = pend.length > 1 ? '' : 'none';
+  $('chItens').innerHTML = itens.map(i => `<div class="rx-camada" style="${i.estado !== 'pendente' ? 'opacity:.55' : ''}">
+    <div class="rx-linha" style="margin:0"><b>${i.tipo === 'ficha' ? `🧑 ${esc(i.nome)} · ${CAMPO_NOME[i.campo] || esc(i.campo)}` : `💬 ${mmss(i.t)} · ${esc(i.nome)}`}</b>
+      <span class="rx-dica" style="margin:0">${i.estado === 'aplicado' ? '✔ aplicado' : i.estado === 'ignorado' ? '✕ ignorado' : ''}</span>
+      ${i.estado === 'pendente' ? `<button type="button" class="rx-mini" data-ch="${i.id}" data-acao="aplicar">✔ Aplicar</button><button type="button" class="rx-mini rx-sec" data-ch="${i.id}" data-acao="ignorar">✕ Ignorar</button>` : ''}</div>
+    ${i.problema ? `<div style="font-size:.84rem;margin-top:3px">❗ ${esc(i.problema)}</div>` : ''}
+    <div class="rx-dica" style="margin:3px 0 0"><s>${esc(i.de)}</s></div>
+    <div style="font-size:.86rem">→ ${i.apagar ? '<i>apagar a fala</i>' : esc(i.para)}${i.expressao && EXPR[i.expressao] ? ` <span class="rx-tag">${EXPR[i.expressao][0]}</span>` : ''}</div>
+    ${i.fonte ? `<div class="rx-dica" style="margin:2px 0 0">🔗 ${/^https?:/.test(i.fonte) ? `<a href="${esc(i.fonte)}" target="_blank" rel="noopener">${esc(i.fonte)}</a>` : esc(i.fonte)}</div>` : ''}</div>`).join('');
+  const conf = ch.conferidos || [];
+  $('chConfSum').textContent = `✔ ${conf.length} conferido(s) e certo(s)`;
+  $('chConf').innerHTML = conf.map(c => `• <b>${esc(c.item)}</b> — ${esc(c.nota)}`).join('<br>');
+}
+async function checar(motor) {
+  if (motor === 'gemini' && !P.gemini) return alert('Falta a chave do Gemini — cole na caixa “🔷 Gemini” da 🔎 Checagem de um Modelo de vídeo (ou use a IA do site / copie o prompt).');
+  if (falasEditadas && !confirm('As falas têm mudanças NÃO salvas — checar a versão salva?')) return;
+  try { await api(`/react-personagens/${PID}/checagem/rodar`, { alvo: $('chAlvo').value, foco: $('chFoco').value, motor }); recarregar(); } catch (e) { alert(e.message); }
+}
+$('bChGemini').addEventListener('click', () => checar('gemini'));
+$('bChIa').addEventListener('click', () => checar('claude'));
+$('bChCopiar').addEventListener('click', async (e) => {
+  try { const d = await api(`/react-personagens/${PID}/checagem/prompt?alvo=${$('chAlvo').value}&foco=${encodeURIComponent($('chFoco').value)}`); await navigator.clipboard.writeText(d.prompt); e.target.textContent = '✔ copiado'; setTimeout(() => e.target.textContent = '📋 Copiar o prompt (outra IA com busca)', 1800); }
+  catch (er) { alert(er.message); }
+});
+$('bChColar').addEventListener('click', async () => {
+  try { const d = await api(`/react-personagens/${PID}/checagem/colar`, { texto: $('cChecagem').value, alvo: $('chAlvo').value }); $('cChecagem').value = ''; alert(`✔ ${d.n} correção(ões) pra conferir`); recarregar(); } catch (e) { alert(e.message); }
+});
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest && e.target.closest('[data-ch]'); if (!b) return;
+  if (falasEditadas && !confirm('As falas têm mudanças NÃO salvas — elas serão perdidas ao aplicar. Continuar?')) return;
+  try { await api(`/react-personagens/${PID}/checagem/${b.dataset.ch}/${b.dataset.acao}`, {}); falasEditadas = false; elencoForcar = true; recarregar(); } catch (er) { alert(er.message); }
+});
+
+// ------------------------------------------------------------------ 5 · cenário
+function desenharCamadas() {
+  const box = $('camadas');
+  box.innerHTML = CAMADAS.map(q => {
+    const c = P.camadas[q] || {}, st = c.estado === 'fila' || c.estado === 'gerando' ? (c.msg || '⏳ na fila') : c.estado === 'erro' ? '❌ ' + (c.erro || 'erro') : c.tem ? '✔ pronta' + (c.origem === 'upload' ? ' (sua imagem)' : '') : 'ainda não gerada';
+    return `<div class="rx-camada" data-q="${q}"><b>${ROT_CAM[q]}</b> <span class="rx-dica ${c.estado === 'erro' ? 'rx-err' : ''}">${esc(st)}</span>
+      <div class="img" style="margin-top:6px;">${c.tem ? `<img src="/react-personagens/${PID}/arquivo/cenario/${esc(c.arquivo)}" data-zoom>` : (q === 'fundo' ? '🧱' : q === 'sofa' ? '🛋' : '🪵')}</div>
+      ${(c.versoes || []).length > 1 ? `<div class="rx-versoes">${c.versoes.map(v => `<img src="/react-personagens/${PID}/arquivo/cenario/${esc(v)}" data-versao="${esc(v)}" class="${v === c.arquivo ? 'atual' : ''}" title="usar esta versão">`).join('')}</div>` : ''}
+      <div class="rx-linha"><button type="button" class="rx-mini" data-gerar ${['fila', 'gerando'].includes(c.estado) ? 'disabled' : ''}>🚀 ${c.tem ? 'Refazer' : 'Gerar'} no Flow</button>
+      <label class="rx-mini rx-sec" style="cursor:pointer;color:#fff;border-radius:6px;">📁 Minha imagem<input type="file" accept="image/*" data-up style="display:none"></label></div></div>`;
+  }).join('');
+}
+$('bCamadas').addEventListener('click', async () => { try { const d = await api(`/react-personagens/${PID}/cenario/gerar`, {}); if (d.aviso) alert(d.aviso); recarregar(); } catch (e) { alert(e.message); } });
+$('camadas').addEventListener('click', async (e) => {
+  const q = (e.target.closest('[data-q]') || {}).dataset; if (!q || !q.q) return;
+  try {
+    if (e.target.hasAttribute('data-gerar')) { const d = await api(`/react-personagens/${PID}/cenario/gerar`, { quais: [q.q] }); if (d.aviso) alert(d.aviso); recarregar(); }
+    if (e.target.dataset.versao) { await api(`/react-personagens/${PID}/cenario/${q.q}/versao`, { arquivo: e.target.dataset.versao }); await recarregar(); atualizarPrevia(); }
+  } catch (er) { alert(er.message); }
+});
+$('camadas').addEventListener('change', async (e) => {
+  if (!e.target.hasAttribute('data-up')) return; const q = e.target.closest('[data-q]').dataset.q, f = e.target.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f);
+  if (q !== 'fundo') fd.append('verde', confirm('A imagem tem FUNDO VERDE pra recortar? (OK = recortar o verde · Cancelar = ela já é PNG transparente)') ? '1' : '0');
+  try { await api(`/react-personagens/${PID}/cenario/${q}/arquivo`, fd); await recarregar(); atualizarPrevia(); } catch (er) { alert(er.message); }
+});
+
+// ------------------------------------------------------------------ 6 · poses
+function desenharPoses() {
+  const box = $('poses');
+  box.innerHTML = P.personagens.map(c => {
+    const s = c.poses || {};
+    let st = 'ainda não gerado';
+    if (s.erro) st = '❌ ' + s.erro;
+    else if (s.tem && s.prontas && !s.esperando && c.pod && c.pod.reaproveitado && s.prontas >= s.total) st = `♻ reaproveitado de um react anterior · ${s.prontas}/${s.total} expressões · ${s.bocas} boca(s) ✔`;
+    else if (s.tem) st = !s.mestre ? (s.esperando ? '⏳ gerando a ⭐ neutra (a mestre)…' : s.erros ? '❌ a neutra falhou — refaça' : '⏳ esperando a neutra') : `${s.prontas}/${s.total} expressões · ${s.bocas} boca(s)` + (s.esperando ? ` · ⏳ ${s.esperando} no Flow` : ' · ✔') + (s.erros ? ` · ❌ ${s.erros} com erro` : '');
+    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/react-personagens/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${esc(i.arquivo.replace(/\.png$/, '').split('_').pop())}</div>`).join('');
+    return `<div class="rx-camada" data-cid="${c.id}"><div class="rx-linha" style="margin:0"><b>${esc(c.nome)}</b> <span class="rx-dica" style="margin:0">${esc(st)}</span>
+      <button type="button" class="rx-mini" data-gerar-p>${s.tem ? '🔁 Gerar o que falta' : '🚀 Gerar'}</button>
+      ${s.tem ? `<button type="button" class="rx-mini rx-sec" data-refazer-p title="cria o projeto de novo (com a referência e a ficha atuais)">♻ Do zero</button> <a href="/personagens-pod/${esc(s.pid)}" target="_blank" class="rx-dica">abrir na 🧍 aba Personagens ↗</a>` : ''}</div>
+      ${imgs ? `<div class="rx-poses">${imgs}</div>` : ''}</div>`;
+  }).join('') || '<p class="rx-dica">Monte o elenco primeiro.</p>';
+}
+async function gerarPoses(cids, refazer) {
+  const corpo = { cids, refazer };
+  try { const d = await api(`/react-personagens/${PID}/poses/gerar`, corpo); if ((d.avisos || []).length) alert(d.avisos.join('\n')); recarregar(); }
+  catch (e) { if (/Sem imagem de referência/.test(e.message) && confirm(e.message + '\n\nGerar mesmo assim (só pelo nome)?')) { try { await api(`/react-personagens/${PID}/poses/gerar`, Object.assign(corpo, { mesmo_assim: true })); recarregar(); } catch (e2) { alert(e2.message); } } else alert(e.message); }
+}
+$('bPoses').addEventListener('click', () => gerarPoses([], false));
+$('poses').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-cid]'); if (!c) return;
+  if (e.target.hasAttribute('data-gerar-p')) gerarPoses([c.dataset.cid], false);
+  if (e.target.hasAttribute('data-refazer-p') && confirm('Criar o projeto deste personagem de novo, do zero?')) gerarPoses([c.dataset.cid], true);
+});
+
+// ------------------------------------------------------------------ 7 · prévia e editor
+function atualizarPrevia() { $('pTv').textContent = mmss($('pT').value); $('previa').src = `/react-personagens/${PID}/previa.jpg?t=${$('pT').value}&r=${Date.now()}`; }
+$('pT').addEventListener('input', () => { $('pTv').textContent = mmss($('pT').value); });
+$('pT').addEventListener('change', atualizarPrevia);
+$('bPrevia').addEventListener('click', atualizarPrevia);
+$('bEditor').addEventListener('click', async () => {
+  if (falasEditadas && !confirm('As falas têm mudanças NÃO salvas — mandar sem elas?')) return;
+  const b = $('bEditor'); b.disabled = true; $('eEst').dataset.fixo = '1'; $('eEst').textContent = '⏳ montando as camadas (tira o áudio, desenha a TV e as legendas)…';
+  try {
+    const d = await api(`/react-personagens/${PID}/editor`, {});
+    $('eEst').innerHTML = `✔ pronto — <a href="${d.link}" target="_blank"><b>abrir no editor ↗</b></a>`;
+    $('eAvisos').innerHTML = (d.avisos || []).map(a => '⚠ ' + esc(a)).join('<br>');
+    if (!(d.avisos || []).length) window.open(d.link, '_blank');
+  } catch (e) { $('eEst').textContent = '❌ ' + e.message; }
+  b.disabled = false;
+});
+document.addEventListener('click', (e) => { if (e.target.hasAttribute && e.target.hasAttribute('data-zoom')) { $('zoom').querySelector('img').src = e.target.src; $('zoom').style.display = 'flex'; } });
+$('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+
+recarregar().then(() => { const f = (P.roteiro.falas || [])[0]; $('pT').value = f ? +f.t + 0.4 : 0; atualizarPrevia(); });
+</script>
+{% endblock %}
