@@ -655,3 +655,126 @@ def test_intrigas_briga_vira_imagem_e_quem_sai_some(base, tmp_path, monkeypatch)
     assert R.arquivo_cena(p, R.evento(p, briga["id"])) and R.evento(p, briga["id"])["descricao"] == "soco voador"
     assert R.ausencias(p, 20) == {sakura: [[13.0, 20]]}  # sem o "volta": fica fora até o fim
     assert "⚡ Intrigas" in c.get(f"/react-personagens/{pid}").get_data(as_text=True)
+
+
+def test_render_junta_camadas_em_trilhas_sem_linha_de_comando_gigante(tmp_path, monkeypatch):
+    """WinError 206: centenas de "-i pose.png" passavam do limite do Windows. As camadas do react no mesmo lugar viram
+    uma trilha (concat) — a troca de pose fica contínua (sem piscar) e a boca alterna igual."""
+    import video_assembler as V
+    base = str(tmp_path / "base.mp4")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=gray:size=320x180:rate=25:duration=6",
+                    "-f", "lavfi", "-i", "sine=duration=6", "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", base], check=True)
+    cores = {"a": (255, 0, 0, 255), "b": (0, 0, 255, 255), "m": (0, 255, 0, 255)}
+    for n, c in cores.items():
+        Image.new("RGBA", (100, 150), c).save(str(tmp_path / f"{n}.png"))
+    ovs = []
+    for k in range(120):  # 120 camadas de 0,04 s alternando + uma com boca
+        ovs.append({"personagem": "react_personagem", "media_type": "image", "resolved_path": str(tmp_path / ("a.png" if k % 2 else "b.png")),
+                    "start": k * 0.02, "end": (k + 1) * 0.02, "size_percent": 30, "x_percent": 50, "y_percent": 50, "ancora": "centro"})
+    ovs.append({"personagem": "react_personagem", "media_type": "image", "resolved_path": str(tmp_path / "a.png"), "start": 2.4, "end": 5,
+                "size_percent": 30, "x_percent": 50, "y_percent": 50, "ancora": "centro",
+                "boca_path": str(tmp_path / "m.png"), "boca_janelas": [[3, 4]]})
+    visto = {}
+    real = V._run_ffmpeg
+
+    def espia(args, **kw):
+        visto["n_i"] = args.count("-i")
+        return real(args, **kw)
+    monkeypatch.setattr(V, "_run_ffmpeg", espia)
+    out = str(tmp_path / "out.mp4")
+    V.apply_overlays(base, ovs, out, 320, 180)
+    assert visto["n_i"] == 2  # o vídeo base + UMA trilha
+    r = subprocess.run(["ffmpeg", "-v", "error", "-i", out, "-vf", "select='between(t,2.9,3.3)',crop=2:2:160:90,scale=1:1",
+                        "-vsync", "0", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+    px = ["G" if r[i + 1] > 200 else "R" if r[i] > 200 else "?" for i in range(0, len(r), 3)]
+    assert px[:2] == ["R", "R"] and "G" in px and px.count("G") >= 3  # a boca abre e fecha nas janelas
+    assert not [f for f in os.listdir(tmp_path) if f.startswith("_trilha_") and f.endswith(".txt")]
+
+
+def test_cara_fica_ate_a_proxima_fala_e_muda_no_meio(base):
+    p = _proj(base, 2)
+    a, b = p["personagens"]
+    falas = [{"id": "1", "t": 10.0, "dur": 4.0, "cid": a["id"], "texto": "x", "expressao": "debochado", "expressao_depois": "chocado", "reacoes": [{"cid": b["id"], "expressao": "bravo"}]},
+             {"id": "2", "t": 30.0, "dur": 3.0, "cid": a["id"], "texto": "y", "expressao": "feliz", "reacoes": []}]
+    ls = R.linhas_personagens(p, falas, 60)
+    la = ls[a["id"]]
+    assert [e["expressao"] for e in la] == ["neutro", "debochado", "chocado", "feliz"]  # sem voltar pro neutro entre as falas
+    assert la[2]["end"] == la[3]["start"] and la[2]["start"] < 14  # o 'chocado' começa no meio da fala e fica até a próxima
+    assert la[-1]["end"] == 60 and la[1]["bocas"] and la[2]["bocas"]
+    assert [e["expressao"] for e in ls[b["id"]]] == ["neutro", "bravo"]  # a reação fica
+    # 📐 a pose deslocada se encaixa no lugar da neutra
+    from PIL import Image as I
+    n = I.new("RGBA", (300, 450), (0, 0, 0, 0))
+    n.paste((255, 0, 0, 255), (100, 100, 200, 450))
+    x = I.new("RGBA", (300, 450), (0, 0, 0, 0))
+    x.paste((0, 0, 255, 255), (130, 80, 230, 430))
+    cn, cx = os.path.join(base, "n.png"), os.path.join(base, "x.png")
+    n.save(cn)
+    x.save(cx)
+    ref = (n.size, R._ancora_alfa(n))
+    feito = R.alinhar_pose(cx, ref, os.path.join(base, "x_al.png"))
+    assert R._ancora_alfa(I.open(feito)) == R._ancora_alfa(n)
+
+
+def test_momentos_especiais_e_leitura_do_video(base, tmp_path, monkeypatch):
+    import app as A
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 20)
+    with open(video, "rb") as f:
+        pid = c.post("/react-personagens/novo", data={"titulo": "AMV", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                     content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    for nome in ("Gojo", "Sukuna"):
+        c.post(f"/react-personagens/{pid}/personagem", json={"nome": nome})
+    p = R.carregar(pid)
+    gojo, sukuna = [x["id"] for x in p["personagens"]]
+    # 👁 a IA "assiste" (quadros + transcrição) e o roteiro recebe o que ela leu
+    import ia_servico
+    chamadas = []
+
+    def falsa(recurso, system, conteudo, **kw):
+        chamadas.append(system)
+        if "QUADROS" in system:
+            return {"momentos": [{"tempo": 3, "o_que_acontece": "Sukuna corta o prédio ao meio", "texto_na_tela": "Fukuma Mizushi",
+                                  "quem_aparece": "Sukuna", "clima": "épico"}]}
+        return None
+    monkeypatch.setattr(ia_servico, "chamar", falsa)
+    r = R.ler_video(pid)
+    assert r["feitos"] == 1 and "QUADROS" in chamadas[0]
+    pr = R.prompt_roteiro_parte(R.carregar(pid), 0)
+    assert "Fukuma Mizushi" in pr and "Sukuna corta o prédio" in pr
+    assert R.ler_video(pid)["feitos"] == 0  # já lido: não gasta de novo
+    assert "estilo_arte" in R._schema_roteiro(["neutro"])["properties"]["eventos"]["items"]["required"]
+    p = R.carregar(pid)
+    assert "interacao" in R.sys_roteiro(p) and "QUEBRA DE EXPECTATIVA" in R.sys_roteiro(p)
+    # 🤝 interação (tela) · 🖼 foto (quadro) · 🎨 desenhado diferente (no lugar)
+    p["roteiro"]["falas"] = [{"id": "f1", "t": 1.0, "dur": 2.0, "cid": gojo, "texto": "Relaxa.", "expressao": "debochado", "reacoes": [], "cta": True}]
+    R.salvar_eventos(p, [{"tipo": "interacao", "t": 2, "dur": 3, "cids": [gojo, sukuna], "descricao": "abraço"},
+                         {"tipo": "foto", "t": 8, "dur": 3, "cids": [gojo], "descricao": "Gojo de terno", "imagem_en": "Gojo in a suit"},
+                         {"tipo": "estilo", "t": 13, "dur": 3, "cids": [sukuna, gojo], "descricao": "pintura", "estilo_arte": "pintura_antiga"}])
+    R.salvar(p)
+    evs = R.eventos(R.carregar(pid))
+    assert evs[2]["cids"] == [sukuna] and evs[2]["estilo_arte"] == "pintura_antiga"
+    assert "Renaissance" in R.prompt_cena(p, evs[2]) and "chroma-key green" in R.prompt_cena(p, evs[2])
+    assert "visual example" in R.prompt_cena(p, evs[1])
+    for e, im in ((evs[0], _png((0, 200, 0), (1280, 720), (0, 90, 0))), (evs[1], _png((0, 0, 200), (800, 600), (0, 0, 90))),
+                  (evs[2], _png((200, 200, 0), (300, 450), (0, 255, 0)))):
+        assert c.post(f"/react-personagens/{pid}/eventos/{e['id']}/arquivo", data={"arquivo": (io.BytesIO(im), "x.png")},
+                      content_type="multipart/form-data").get_json()["ok"]
+    pe = c.get(f"/react-personagens/{pid}/pecas?t=9").get_json()
+    foto = next(x for x in pe["pecas"] if x["chave"] == "foto")
+    assert foto["img"] and foto["ativa"] and "foto" in pe["pilha"]["ordem"]
+    pe = c.get(f"/react-personagens/{pid}/pecas?t=14").get_json()
+    assert next(x for x in pe["pecas"] if x["chave"] == f"p:{sukuna}")["estilo"]
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": "foto", "cx": 300, "cy": 250, "w": 500}).get_json()["ok"]
+    d = c.post(f"/react-personagens/{pid}/editor", json={}).get_json()
+    ovs = A._JOBS[d["job_id"]]["overlays"]
+    fo = next(o for o in ovs if o.get("camada") == "foto")
+    assert (fo["start"], fo["end"], round(fo["x_percent"], 2)) == (8.0, 11.0, round(300 / 1920 * 100, 2))
+    assert any(o.get("camada") == "cena" and o["start"] == 2.0 for o in ovs)
+    est = [o for o in ovs if o.get("expressao") == "estilo"]
+    assert len(est) == 1 and (est[0]["start"], est[0]["end"]) == (13.0, 16.0)
+    for o in ovs:  # o Sukuna normal some enquanto está "pintado"
+        if o.get("cid") == sukuna and o.get("camada") == "personagem" and o.get("expressao") != "estilo":
+            assert o["end"] <= 13.0 or o["start"] >= 16.0
+    assert c.get(f"/react-personagens/{pid}/previa.jpg?t=9").status_code == 200
+    assert c.get(f"/react-personagens/{pid}/previa.jpg?t=14").status_code == 200

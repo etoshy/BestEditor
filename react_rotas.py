@@ -167,7 +167,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         p = _p(pid)
         return render_template("react_detalhe.html", p=R.para_tela(p, base_dir), layouts=R.LAYOUTS, estilos=R.ESTILOS,
                                expressoes=R.EXPRESSOES, densidades=list(R.DENSIDADES),
-                               intrigas=R.INTRIGAS, tipos_evento=R.TIPOS_EVENTO, camadas=R.CAMADAS,
+                               intrigas=R.INTRIGAS, tipos_evento=R.TIPOS_EVENTO, estilos_arte=R.ESTILOS_ARTE, camadas=R.CAMADAS,
                                rotulo_camada=R.ROTULO_CAMADA)
 
     @app.route("/react-personagens/<pid>/estado")
@@ -274,6 +274,14 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             return _rodar(pid, oque, rot, lambda: R.gerar_roteiro(
                 pid, base_dir, parte=parte, so_vazias=so_vazias,
                 on_log=lambda m: TAREFAS[pid].update(progresso=str(m)[:200]))["msg"]) or _ok()
+        if oque == "ler":
+            c = request.get_json(silent=True) or {}
+            refazer = bool(c.get("refazer"))
+
+            def ler():
+                r = R.ler_video(pid, base_dir, refazer=refazer, on_log=lambda m: TAREFAS[pid].update(progresso=str(m)[:200]))
+                return f"{r['trechos']} de {r['total']} trecho(s) lidos" + (f" · {r['erros']} com erro" if r["erros"] else "")
+            return _rodar(pid, oque, "👁 A IA assistindo ao vídeo", ler) or _ok()
         abort(404)
 
     @app.route("/react-personagens/<pid>/prompt/<tipo>")
@@ -522,6 +530,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                            if isinstance(x, dict) and x.get("cid") in ids and x.get("cid") != f["cid"] and x.get("expressao") in R.EXPRESSOES][:2]
                 falas.append({"id": str(f.get("id") or ("f" + uuid.uuid4().hex[:6]))[:12], "t": round(t, 2), "cid": f["cid"],
                               "texto": texto, "expressao": ex, "dur": round(max(0.8, min(15.0, dur)), 2),
+                              "expressao_depois": f.get("expressao_depois") if f.get("expressao_depois") in R.EXPRESSOES and f.get("expressao_depois") != ex else "",
                               "cta": bool(f.get("cta")), "reacoes": reacoes, "duvida": str(f.get("duvida") or "")[:300],
                               "destaque": f.get("destaque") if f.get("destaque") in ("letra", "edicao") else ""})
             falas.sort(key=lambda x: x["t"])

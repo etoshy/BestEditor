@@ -3675,6 +3675,18 @@ def transcribe():
     return redirect(url_for("transcribing_status_page", job_id=job_id))
 
 
+@app.route("/job/<job_id>/limpar-erro", methods=["POST"])
+def limpar_erro_montagem(job_id: str):
+    """✕ no aviso "A montagem anterior falhou" do Estúdio: tira o aviso (o erro continua no log da montagem)."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"ok": False, "erro": "job não encontrado"}), 404
+    job.pop("assembly_error", None)
+    job["assembly_error_segment_index"] = None
+    _save_state(job_id)
+    return jsonify({"ok": True})
+
+
 @app.route("/job/<job_id>/transcribing", methods=["GET"])
 def transcribing_status_page(job_id: str):
     job = _JOBS.get(job_id)

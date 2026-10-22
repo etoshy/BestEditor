@@ -62,7 +62,12 @@
   .rx-peca.aj::after { content: '✋'; position: absolute; top: 2px; left: 3px; font-size: 11px; }
   .rx-peca .rx-nome { position: absolute; bottom: 100%; left: 0; font-size: 11px; background: rgba(0,0,0,.7); color: #fff; padding: 1px 5px; border-radius: 4px; white-space: nowrap; display: none; }
   .rx-peca.sel .rx-nome, .rx-palco:hover .rx-peca .rx-nome { display: block; }
-  .rx-alca { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; background: #f59e0b; border: 2px solid #fff; border-radius: 50%; cursor: nwse-resize; display: none; }
+  .rx-alca { position: absolute; width: 12px; height: 12px; margin: -7px 0 0 -7px; background: #f59e0b; border: 2px solid #fff; border-radius: 50%; display: none; z-index: 2; }
+  .rx-alca[data-h=nw] { left: 0; top: 0; cursor: nwse-resize; } .rx-alca[data-h=n] { left: 50%; top: 0; cursor: ns-resize; }
+  .rx-alca[data-h=ne] { left: 100%; top: 0; cursor: nesw-resize; } .rx-alca[data-h=e] { left: 100%; top: 50%; cursor: ew-resize; }
+  .rx-alca[data-h=se] { left: 100%; top: 100%; cursor: nwse-resize; } .rx-alca[data-h=s] { left: 50%; top: 100%; cursor: ns-resize; }
+  .rx-alca[data-h=sw] { left: 0; top: 100%; cursor: nesw-resize; } .rx-alca[data-h=w] { left: 0; top: 50%; cursor: ew-resize; }
+  .rx-alca[data-h=n], .rx-alca[data-h=s], .rx-alca[data-h=e], .rx-alca[data-h=w] { border-radius: 3px; }
   .rx-peca.sel .rx-alca { display: block; }
   .rx-tv { background: #000; border: 3px solid #333; box-sizing: border-box; border-radius: 6px; }
   .rx-leg { background: rgba(0,0,0,.72); color: #fff; border-radius: 8px; font-size: 12px; padding: 4px 8px; box-sizing: border-box; }
@@ -195,6 +200,8 @@
   <div class="rx-dica" style="margin-bottom:2px">Expressões de cada personagem (cada uma vira uma pose sentado + a boca de fala):</div>
   <div class="rx-chips" id="fExpr">{% for k, e in expressoes.items() %}<label><input type="checkbox" value="{{ k }}" {% if k in p.expressoes %}checked{% endif %} {% if k == 'neutro' %}disabled{% endif %}>{{ e[0] }}</label>{% endfor %}</div>
   <div class="rx-linha" style="margin-top:8px;">
+    <button type="button" id="bLer" class="rx-sec" title="a IA assiste ao vídeo (quadros a cada ~5 s + a transcrição) e anota a cena, o texto que aparece na tela e quem aparece — o roteiro usa isso. O 🤖 Escrever o roteiro já faz isso sozinho no que faltar.">👁 A IA assistir ao vídeo</button>
+    <span class="rx-dica" id="lEst"></span>
     <button type="button" id="bRoteiro" title="o vídeo inteiro, em partes de ~2,5 min (cada parte continua a conversa da anterior)">🤖 Escrever o roteiro</button>
     <button type="button" id="bCompletar" class="rx-sec" title="só as partes sem falas (ou com poucas)">🤖 Completar o que falta</button>
     <span class="rx-dica" id="rEst"></span>
@@ -256,8 +263,12 @@
 
 <!-- 8 · intrigas -->
 <div class="rx-card">
-  <h2><span class="rx-num">8</span>⚡ Intrigas (brigas, cenas, quem sai e volta)</h2>
-  <p class="rx-dica">Como numa visual novel: um provoca o outro nas falas; se esquenta demais vira <b>👊 briga</b> — uma imagem da luta na própria sala, com os personagens do react, ocupa a tela por uns segundos (as legendas continuam por cima). Personagens podem <b>🚪 sair de cena</b> (somem do sofá) e <b>↩ voltar</b>. A IA cria isso junto do roteiro (escolha o nível em ⚡ Intrigas, na seção 4); aqui você confere, muda, apaga ou cria os seus.</p>
+  <h2><span class="rx-num">8</span>⚡ Intrigas e momentos especiais</h2>
+  <p class="rx-dica">Como numa visual novel, com imagens geradas no Flow (com a sala e os personagens do react de referência) ou enviadas por você:
+  <b>👊 briga</b> quando a provocação esquenta · <b>🤝 interação</b> (abraço, toca aqui, consolar) · <b>🎬 cena</b> — cobrem a tela por uns segundos com as legendas por cima;
+  <b>🖼 foto / exemplo</b> — um quadro que aparece por cima pra exemplificar o que alguém falou (“imagina o X de terno”, o rosto trocado, o meme);
+  <b>🎨 desenhado diferente</b> — quebra de expectativa: o personagem aparece no lugar dele mal desenhado, em pintura antiga, hiper detalhado, chibi…;
+  <b>🚪 sai de cena</b> / <b>↩ volta</b>. A IA cria isso junto do roteiro (nível em ⚡ Intrigas, na seção 4); aqui você confere, muda, apaga ou cria os seus.</p>
   <div class="rx-linha">
     <button type="button" id="bEvNovo" class="rx-sec">➕ Novo evento</button>
     <button type="button" id="bEvSalvar">💾 Salvar intrigas</button>
@@ -357,6 +368,7 @@ function desenhar() {
   if (t && t.fim && ultimaTarefa !== t.fim) { ultimaTarefa = t.fim; if (t.oque === 'roteiro') falasEditadas = false; }
   $('bChGemini').title = P.gemini ? 'o Gemini pesquisa no Google' : 'falta a chave do Gemini — cole na caixa “🔷 Gemini” da 🔎 Checagem de um Modelo de vídeo';
   $('avisos').textContent = (P.avisos || []).length ? '⚠ ' + P.avisos.join(' · ') : '';
+  { const l = P.leitura_estado || {}; $('lEst').textContent = l.total ? (l.lidos >= l.total ? `✔ vídeo lido (${l.lidos} trechos)` : l.lidos ? `${l.lidos}/${l.total} trechos lidos` : '') : ''; }
   desenharVideo(); desenharTrans(); desenharSugestoes(); desenharElenco(); desenharFalas(); desenharPartes(); desenharChecagem(); desenharCamadas(); desenharPoses(); desenharEventos();
   $('estFinal').textContent = `→ ${P.estilo_final === 'realista' ? '📷 realista' : '🎨 anime/cartoon'}` + (P.estilo === 'auto' ? ' (pelo elenco)' : '');
   $('log').textContent = (P.log || []).slice().reverse().join('\n');
@@ -461,6 +473,11 @@ $('bYtTrans').addEventListener('click', async () => {
 async function ia(oque) { try { await api(`/react-personagens/${PID}/ia/${oque}`, {}); recarregar(); } catch (e) { alert(e.message); } }
 $('bSugerir').addEventListener('click', () => ia('sugerir'));
 $('bFichas').addEventListener('click', () => ia('fichas'));
+$('bLer').addEventListener('click', async () => {
+  const lidos = (P.leitura_estado || {}).lidos || 0;
+  const refazer = lidos > 0 && confirm('O vídeo já foi lido (' + lidos + ' trecho(s)). Ler TUDO de novo? (Cancelar = só o que falta)');
+  try { await api(`/react-personagens/${PID}/ia/ler`, { refazer }); recarregar(); } catch (e) { alert(e.message); }
+});
 $('bRoteiro').addEventListener('click', () => { if ((P.roteiro.falas || []).length && !confirm('Escrever um roteiro NOVO do vídeo inteiro (troca as falas atuais)?')) return; roteiro({}); });
 $('bCompletar').addEventListener('click', () => roteiro({ so_vazias: true }));
 async function roteiro(corpo) {
@@ -602,7 +619,7 @@ function linhaFala(f) {
   return `<tr data-id="${esc(f.id)}" class="${f.cta ? 'cta' : ''}" data-reacoes='${esc(JSON.stringify(f.reacoes || []))}' data-duvida="${esc(f.duvida || '')}" data-destaque="${esc(f.destaque || '')}">
     <td style="width:74px"><input value="${mmss(f.t)}${(+f.t % 1) ? '.' + String(Math.round((+f.t % 1) * 10)) : ''}" data-f="t" style="width:68px"></td>
     <td style="width:150px"><select data-f="cid">${ops}</select></td>
-    <td style="width:150px"><select data-f="expressao">${exs}</select></td>
+    <td style="width:150px"><select data-f="expressao">${exs}</select><select data-f="expressao_depois" title="a cara muda no meio da fala (e fica até a próxima)" style="margin-top:3px;font-size:.8rem"><option value="">→ (não muda)</option>${Object.entries(EXPR).map(([k, v]) => `<option value="${k}" ${k === f.expressao_depois ? 'selected' : ''}>→ ${v[0]}</option>`).join('')}</select></td>
     <td><textarea data-f="texto">${esc(f.texto)}</textarea>${reac ? `<div class="rx-dica" style="margin:0">👀 reagem: ${reac}</div>` : ''}${f.duvida ? `<div class="rx-dica rx-av" style="margin:0" title="vai pro 🔎 verificador de fatos">⚠ dúvida da IA: ${esc(f.duvida)}</div>` : ''}${f.destaque === 'letra' ? '<div class="rx-dica" style="margin:0">🎤 comenta a letra</div>' : f.destaque === 'edicao' ? '<div class="rx-dica" style="margin:0">🎬 comenta a edição</div>' : ''}</td>
     <td style="width:60px"><input type="number" step="0.1" min="0.8" max="15" value="${f.dur}" data-f="dur" style="width:56px" title="segundos na tela"></td>
     <td style="width:38px;text-align:center"><input type="checkbox" data-f="cta" ${f.cta ? 'checked' : ''} title="📣 pedido de like/inscrição" style="width:auto"></td>
@@ -633,7 +650,7 @@ $('bFalaAdd').addEventListener('click', () => {
 });
 $('bFalasSalvar').addEventListener('click', async () => {
   const falas = [...$('falas').querySelectorAll('tr[data-id]')].map(tr => ({ id: tr.dataset.id, t: seg(tr.querySelector('[data-f=t]').value), cid: tr.querySelector('[data-f=cid]').value,
-    expressao: tr.querySelector('[data-f=expressao]').value, texto: tr.querySelector('[data-f=texto]').value, dur: parseFloat(tr.querySelector('[data-f=dur]').value),
+    expressao: tr.querySelector('[data-f=expressao]').value, expressao_depois: tr.querySelector('[data-f=expressao_depois]').value, texto: tr.querySelector('[data-f=texto]').value, dur: parseFloat(tr.querySelector('[data-f=dur]').value),
     cta: tr.querySelector('[data-f=cta]').checked, reacoes: JSON.parse(tr.dataset.reacoes || '[]'), duvida: tr.dataset.duvida || '', destaque: tr.dataset.destaque || '' }));
   try { const d = await api(`/react-personagens/${PID}/roteiro`, { falas }); falasEditadas = false; avisar($('fEst'), `✔ ${d.falas} fala(s) salvas`, 'rx-ok'); recarregar(); } catch (e) { avisar($('fEst'), '❌ ' + e.message, 'rx-err'); }
 });
@@ -748,6 +765,10 @@ $('poses').addEventListener('click', (e) => {
 // ------------------------------------------------------------------ 7 · prévia e editor
 // ------------------------------------------------------------------ 8 · ⚡ intrigas
 const TIPOS_EV = {{ tipos_evento|tojson }};
+const ESTILOS_ARTE = {{ estilos_arte|tojson }};
+const COM_IMG = ['briga', 'interacao', 'cena', 'foto', 'estilo'];
+const EXIB = { briga: 'tela', interacao: 'tela', cena: 'tela', foto: 'quadro', estilo: 'no_lugar' };
+const EXIB_TXT = { tela: '🖥 a imagem cobre a tela toda (as legendas continuam por cima)', quadro: '🖼 aparece como uma foto por cima — a posição/tamanho é a peça “Foto” na seção 9', no_lugar: '🎨 o personagem aparece desenhado assim NO LUGAR dele no sofá' };
 let EVS = null, evsEditados = false;
 function desenharEventos() {
   if (evsEditados && EVS) return;
@@ -758,7 +779,7 @@ function pintarEventos() {
   const box = $('eventos');
   if (!EVS.length) { box.innerHTML = '<div class="rx-dica">Nenhum evento ainda — escreva o roteiro com ⚡ Intrigas ligado, ou ➕ crie um.</div>'; return; }
   box.innerHTML = EVS.map((e, k) => {
-    const img = ['briga', 'cena'].includes(e.tipo), c = e.cena || {};
+    const img = COM_IMG.includes(e.tipo), c = e.cena || {};
     const st = c.estado === 'erro' ? `❌ ${esc(c.erro || '')}` : (c.estado === 'fila' || c.estado === 'gerando') ? esc(c.msg || '⏳') : '';
     const foto = img ? (e.tem_imagem && c.arquivo ? `<img class="cg" data-zoom src="/react-personagens/${PID}/arquivo/cenas/${esc(c.arquivo)}">` : `<div class="vaz">${st || '🖼 sem imagem ainda — 🚀 Gerar ou 📤 Enviar'}</div>`) : '';
     return `<div class="rx-ev ${esc(e.tipo)}" data-k="${k}">
@@ -766,11 +787,13 @@ function pintarEventos() {
         <div class="rx-linha" style="gap:6px;">
           <input data-f="t" value="${mmss(e.t)}" style="width:70px" title="segundo do vídeo">
           <select data-f="tipo" style="width:auto">${Object.entries(TIPOS_EV).map(([v, r]) => `<option value="${v}" ${v === e.tipo ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
-          ${img ? `<label class="rx-dica" style="margin:0">dura <input data-f="dur" type="number" min="1.5" max="12" step="0.5" value="${e.dur || 4.5}" style="width:64px"> s</label>` : ''}
+          ${img ? `<label class="rx-dica" style="margin:0">dura <input data-f="dur" type="number" min="1.5" max="12" step="0.5" value="${e.dur || 4.5}" style="width:64px"> s</label>
+            <select data-f="estilo_arte" style="width:auto" title="estilo de arte da imagem (quebra de expectativa)">${Object.entries(ESTILOS_ARTE).filter(([v]) => v || e.tipo !== 'estilo').map(([v, r]) => `<option value="${v}" ${v === (e.estilo_arte || '') ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>` : ''}
           <button type="button" class="rx-sec" data-ver title="ver este segundo no palco">👁</button>
           <button type="button" class="rx-sec" data-apagar title="apagar">🗑</button>
         </div>
-        <div class="rx-chips" style="margin:6px 0;">${P.personagens.map(c => `<label><input type="checkbox" data-cid="${esc(c.id)}" ${e.cids.includes(c.id) ? 'checked' : ''}>${esc(c.nome)}</label>`).join('')}</div>
+        <div class="rx-chips" style="margin:6px 0;">${P.personagens.map(c => `<label><input type="${e.tipo === 'estilo' ? 'radio' : 'checkbox'}" name="ev${k}" data-cid="${esc(c.id)}" ${e.cids.includes(c.id) ? 'checked' : ''}>${esc(c.nome)}</label>`).join('')}</div>
+        <div class="rx-dica" style="margin:0 0 4px">${EXIB_TXT[EXIB[e.tipo]] || ''}</div>
         <input data-f="descricao" value="${esc(e.descricao || '')}" placeholder="o que acontece (ex.: o Naruto dá um soco no Sasuke depois da provocação)" style="width:100%">
         ${img ? `<details style="margin-top:4px"><summary class="rx-dica" style="cursor:pointer">🎨 descrição da imagem (inglês, vai pro Flow)</summary><textarea data-f="imagem_en" rows="3" style="width:100%">${esc(e.imagem_en || '')}</textarea></details>` : ''}
       </div>
@@ -787,6 +810,7 @@ function lerEventos() {
   document.querySelectorAll('#eventos .rx-ev').forEach(el => {
     const e = EVS[+el.dataset.k];
     el.querySelectorAll('[data-f]').forEach(i => { const f = i.dataset.f; e[f] = f === 't' ? (seg(i.value) ?? e.t) : f === 'dur' ? +i.value : i.value; });
+    if (!el.querySelector('[data-f=estilo_arte]')) e.estilo_arte = '';
     e.cids = [...el.querySelectorAll('[data-cid]')].filter(i => i.checked).map(i => i.dataset.cid);
   });
 }
@@ -794,7 +818,7 @@ $('eventos').addEventListener('input', () => { evsEditados = true; avisar($('evE
 $('eventos').addEventListener('change', async (ev) => {
   const el = ev.target.closest('.rx-ev'); if (!el) return;
   const e = EVS[+el.dataset.k];
-  if (ev.target.dataset.f === 'tipo') { lerEventos(); evsEditados = true; pintarEventos(); return; }
+  if (ev.target.dataset.f === 'tipo') { lerEventos(); if (e.tipo === 'estilo') { e.cids = e.cids.slice(0, 1); if (!e.estilo_arte) e.estilo_arte = 'mal_desenhado'; } evsEditados = true; pintarEventos(); return; }
   if (ev.target.hasAttribute('data-enviar') && ev.target.files[0]) {
     const fd = new FormData(); fd.append('arquivo', ev.target.files[0]);
     try { await api(`/react-personagens/${PID}/eventos/${e.id}/arquivo`, fd); evsEditados = false; await recarregar(); atualizarPrevia(); } catch (er) { alert(er.message); }
@@ -829,6 +853,8 @@ $('bEvGerar').addEventListener('click', async () => {
 
 // ------------------------------------------------------------------ 🎛 palco com camadas (estilo Photoshop)
 let PALCO = null, ajSel = null, renderizado = false;
+// 8 alças: os cantos e os lados — puxar um lado/canto aumenta ou diminui com o lado/canto OPOSTO parado
+const ALCAS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(h => `<span class="rx-alca" data-h="${h}"></span>`).join('');
 async function carregarPalco() {
   try { PALCO = await api(`/react-personagens/${PID}/pecas?t=${$('pT').value}`); desenharPalco(); } catch (e) { avisar($('ajEst'), '⚠ ' + e.message, 'rx-err'); }
 }
@@ -845,6 +871,7 @@ function posicionar(el, pc) {
 }
 function htmlPeca(pc) {
   if (pc.tv) return `<img src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}&r=${Date.now()}" onerror="this.style.display='none'">`;
+  if (pc.foto) return pc.img ? `<img src="${pc.img}" style="object-fit:contain;background:#fafaf6;padding:4%;box-sizing:border-box;">` : '<div style="width:100%;height:100%;border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;text-align:center;background:rgba(0,0,0,.25);opacity:.55">🖼 aqui aparece a foto/exemplo (⚡ Intrigas)</div>';
   if (pc.legenda) return pc.fala ? `<b style="color:${esc(pc.fala.cor)}">${esc(pc.fala.nome)}:</b> ${esc(pc.fala.texto)}` : '<span style="opacity:.6">(ninguém fala neste segundo — a legenda aparece aqui)</span>';
   if (pc.img) { const esp = pc.personagem ? pc.espelhar_img : pc.espelhar; return `<img src="${pc.img}" style="${esp ? 'transform:scaleX(-1)' : ''}">`; }
   return `<div style="width:100%;height:100%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">${esc(pc.nome)}</div>`;
@@ -857,7 +884,7 @@ function desenharPalco() {
     el.className = 'rx-peca' + (pc.tv ? ' rx-tv' : '') + (pc.legenda ? ' rx-leg' : '') + (PALCO.ajustadas.includes(pc.chave) ? ' aj' : '')
       + (pc.oculta ? ' oc' : '') + (pc.travada ? ' trav' : '') + (pc.falando ? ' fala' : '') + (pc.fora ? ' fora' : '');
     el.dataset.chave = pc.chave; el.style.zIndex = pc.z;
-    el.innerHTML = htmlPeca(pc) + `<span class="rx-nome">${esc(pc.nome)}</span>` + (pc.travada ? '' : '<span class="rx-alca"></span>');
+    el.innerHTML = htmlPeca(pc) + `<span class="rx-nome">${esc(pc.nome)}</span>` + (pc.travada ? '' : ALCAS);
     posicionar(el, pc); pal.appendChild(el);
   });
   if (PALCO.cena && PALCO.cena.img && $('verCena').checked) {
@@ -870,9 +897,9 @@ function desenharPalco() {
   desenharCamadas(); barraAjuste();
 }
 function miniDe(pc) {
-  if (pc.tv) return `<img class="mini" src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}" onerror="this.removeAttribute('src')">`;
+  if (pc.tv) return `<img class="mini" src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}" onerror="this.style.visibility='hidden'">`;
   if (pc.img) return `<img class="mini" src="${pc.img}">`;
-  return `<span class="mini" style="display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${pc.legenda ? '💬' : '▭'}</span>`;
+  return `<span class="mini" style="display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${pc.legenda ? '💬' : pc.foto ? '🖼' : '▭'}</span>`;
 }
 function desenharCamadas() {
   const pil = PALCO.pilha, box = $('pilhaCam');
@@ -881,7 +908,7 @@ function desenharCamadas() {
     return `<div class="rx-cam-l ${ch === ajSel ? 'sel' : ''}" draggable="true" data-chave="${esc(ch)}">
       <span class="ic ${pc.oculta ? 'off' : ''}" data-ac="ver" title="Mostrar / esconder (escondida não vai pro vídeo)">👁</span>
       <span class="ic ${pc.travada ? '' : 'off'}" data-ac="trava" title="Travar (não mexe no palco)">🔒</span>
-      ${miniDe(pc)}<span class="nm">${esc(pc.nome)}${pc.personagem ? `<br><span class="ex">${pc.fora ? '🚪 fora de cena · ' : ''}${pc.falando ? '🗣 ' : ''}${esc(pc.expressao || '')} · olha pra ${pc.lado === 'esq' ? '←' : '→'}</span>` : ''}</span></div>`;
+      ${miniDe(pc)}<span class="nm">${esc(pc.nome)}${pc.personagem ? `<br><span class="ex">${pc.fora ? '🚪 fora de cena · ' : ''}${pc.estilo ? '🎨 desenhado diferente · ' : ''}${pc.falando ? '🗣 ' : ''}${esc(pc.expressao || '')} · olha pra ${pc.lado === 'esq' ? '←' : '→'}</span>` : ''}</span></div>`;
   }).join('') + `<div class="rx-cam-l fixa"><span class="ic">👁</span><span class="ic">🔒</span>${PALCO.fundo ? `<img class="mini" src="${PALCO.fundo}">` : '<span class="mini"></span>'}<span class="nm">🧱 Fundo</span></div>`;
 }
 function pecaDe(chave) { return PALCO && PALCO.pecas.find(x => x.chave === chave); }
@@ -951,16 +978,16 @@ $('palco').addEventListener('pointerdown', (ev) => {
   const el = ev.target.closest('.rx-peca'); if (!el) { selecionar(null); return; }
   ev.preventDefault(); selecionar(el.dataset.chave);
   const pc = pecaDe(ajSel); if (pc.travada) return;
-  const redim = ev.target.classList.contains('rx-alca');
+  const alca = ev.target.closest('.rx-alca'), redim = alca ? alca.dataset.h : null;
   const junto = !redim && ajSel.startsWith('sofa') && $('ajJunto').checked ? sentadosNo(pc) : [];
-  arrasto = { pc, redim, x0: ev.clientX, y0: ev.clientY, cx: pc.cx, cy: pc.cy, topo: pc.topo, w: pc.w, junto: junto.map(j => ({ pc: j, cx: j.cx, cy: j.cy })), mexeu: false };
+  arrasto = { pc, redim, x0: ev.clientX, y0: ev.clientY, cx: pc.cx, cy: pc.cy, topo: pc.topo, w: pc.w, h: pc.h, junto: junto.map(j => ({ pc: j, cx: j.cx, cy: j.cy })), mexeu: false };
   $('palco').setPointerCapture(ev.pointerId);
 });
 $('palco').addEventListener('pointermove', (ev) => {
   if (!arrasto) return;
   const k = kPalco(), dx = (ev.clientX - arrasto.x0) / k, dy = (ev.clientY - arrasto.y0) / k, pc = arrasto.pc;
   if (Math.abs(dx) + Math.abs(dy) > 1) arrasto.mexeu = true;
-  if (arrasto.redim) { mudarTam(pc, arrasto.w + 2 * dx); }  // cresce a partir do centro
+  if (arrasto.redim) redimensionar(arrasto, dx, dy);
   else {
     pc.cx = arrasto.cx + dx;
     if (pc.legenda) pc.topo = arrasto.topo + dy; else pc.cy = arrasto.cy + dy;
@@ -974,6 +1001,21 @@ $('palco').addEventListener('pointerup', async () => {
   await salvarPeca(a.pc);
   for (const j of a.junto) await salvarPeca(j.pc);
 });
+function redimensionar(a, dx, dy) {
+  // canto: proporcional, o canto oposto fica parado · lado: o lado oposto fica parado (a imagem mantém a proporção)
+  const pc = a.pc, h = a.redim, sx = h.includes('e') ? 1 : h.includes('w') ? -1 : 0, sy = h.includes('s') ? 1 : h.includes('n') ? -1 : 0;
+  const leg = !!pc.legenda, h0 = leg ? 0 : (a.h || a.w);
+  let w1 = a.w;
+  if (sx && sy && h0) w1 = Math.abs(dx) >= Math.abs(dy) * a.w / h0 ? a.w + sx * dx : (h0 + sy * dy) * a.w / h0;
+  else if (sx) w1 = a.w + sx * dx;
+  else if (sy && h0) w1 = (h0 + sy * dy) * a.w / h0;
+  else return;
+  w1 = Math.max(40, Math.min(4000, w1));
+  mudarTam(pc, w1);
+  if (sx) pc.cx = a.cx + sx * (w1 - a.w) / 2;  // o lado oposto parado
+  if (!leg && sy) { const h1 = h0 * w1 / a.w; pc.cy = a.cy + sy * (h1 - h0) / 2; }
+  else if (!leg && sx && !sy) pc.cy = a.cy;
+}
 function salvarDepois(pc) { clearTimeout(pc._t); pc._t = setTimeout(() => salvarPeca(pc), 400); }
 $('palco').addEventListener('wheel', (ev) => {
   const el = ev.target.closest('.rx-peca'); if (!el) return;

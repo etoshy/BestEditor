@@ -474,7 +474,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
 </header>
 
 {% if job.assembly_error %}
-<div class="erro" id="avisoErro" style="margin:6px 12px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><span style="flex:1;min-width:240px;"><strong>A montagem anterior falhou:</strong> {{ job.assembly_error }}{% if job.assembly_error_segment_index is not none %} — o trecho problemático está marcado em vermelho na timeline.{% endif %}</span>
+<div class="erro" id="avisoErro" style="margin:6px 12px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:relative;padding-right:40px;"><button type="button" class="mini" title="tirar este aviso" style="position:absolute;top:6px;right:6px;" onclick="fetch('/job/{{ job.job_id }}/limpar-erro', {method: 'POST'}).catch(() => {}); this.parentNode.remove();">✕</button><span style="flex:1;min-width:240px;max-height:7.5em;overflow:auto;"><strong>A montagem anterior falhou:</strong> {{ job.assembly_error }}{% if job.assembly_error_segment_index is not none %} — o trecho problemático está marcado em vermelho na timeline.{% endif %}</span>
 {% if job.assembly_error_segment_index is not none %}<button class="primary corrigir-auto" data-indice="{{ job.assembly_error_segment_index }}">🔧 Corrigir automaticamente</button>{% endif %}</div>
 {% endif %}
 {% if job.aviso_buscas %}<div class="aviso" id="avisoBuscas" style="margin:6px 12px 0;display:flex;gap:8px;align-items:center;"><span style="flex:1">🔎 {{ job.aviso_buscas }}</span><button class="mini" onclick="abrirRevisaoBuscas()">🧠 Revisar buscas com IA</button><button class="mini" onclick="this.parentNode.remove()">✕</button></div>{% endif %}

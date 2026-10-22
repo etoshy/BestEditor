@@ -1895,6 +1895,11 @@ def apply_overlays(
         return output_path
 
     base_duration = _probe_duration(base_video_path)
+    trilhas_tmp: List[str] = []
+    # 🎭 v84_237: as camadas do react (cada pose/legenda de um mesmo personagem no mesmo lugar) viram UMA trilha só
+    # (lista do concat) — no Windows centenas de "-i arquivo.png" estouravam a linha de comando (WinError 206) e a
+    # troca de pose entre duas camadas separadas piscava
+    overlays = _juntar_trilhas(overlays, target_width, os.path.dirname(os.path.abspath(output_path)), trilhas_tmp)
     inputs: List[str] = ["-i", base_video_path]
     filter_parts: List[str] = []
     current_label = "[0:v]"
@@ -1920,6 +1925,21 @@ def apply_overlays(
                 filter_parts.append(
                     f"{current_label}{text_filter}:enable='between(t,{start:.3f},{end:.3f})'{next_label}"
                 )
+            current_label = next_label
+            continue
+
+        if media_type == "trilha":
+            k = next_input_index
+            next_input_index += 1
+            inputs += ["-f", "concat", "-safe", "0", "-i", ov["lista"]]
+            xp, yp = ov["x_percent"] / 100, ov["y_percent"] / 100
+            if ov.get("ancora") == "centro":
+                x_expr, y_expr = f"(main_w*{xp:.5f}-overlay_w/2)", f"(main_h*{yp:.5f}-overlay_h/2)"
+            else:
+                x_expr, y_expr = f"(main_w-overlay_w)*{xp:.5f}", f"(main_h-overlay_h)*{yp:.5f}"
+            filter_parts.append(f"[{k}:v]fps=25,format=rgba,setpts=PTS-STARTPTS+{start:.3f}/TB[tr{idx}]")
+            filter_parts.append(f"{current_label}[tr{idx}]overlay=x='{x_expr}':y='{y_expr}':"
+                                f"enable='between(t,{start:.3f},{end:.3f})':eof_action=pass{next_label}")
             current_label = next_label
             continue
 
@@ -1994,12 +2014,145 @@ def apply_overlays(
             k = args.index("-filter_complex_script")
             _run_ffmpeg(args[:k] + ["-/filter_complex"] + args[k + 1:], timeout=limite)
     finally:
-        if script:
+        for tmp in ([script] if script else []) + trilhas_tmp:
             try:
-                os.remove(script)
+                os.remove(tmp)
             except OSError:
                 pass
     return output_path
+
+
+def _trilha_de(ov: Dict[str, Any]) -> str:
+    """A trilha do overlay — os do react feitos antes da v84_237 não têm a chave: usa o tipo da camada (o lugar e o
+    tamanho iguais é que decidem se juntam)."""
+    t = ov.get("trilha") or ""
+    if not t and str(ov.get("personagem") or "").startswith("react_"):
+        t = str(ov["personagem"])
+    return t
+
+
+def _trilha_ok(ov: Dict[str, Any]) -> bool:
+    return (bool(_trilha_de(ov)) and bool(ov.get("personagem")) and ov.get("media_type", "image") == "image"
+            and not ov.get("anim_video") and (ov.get("anim_in") or "nenhuma") == "nenhuma"
+            and (ov.get("anim_out") or "nenhuma") == "nenhuma" and os.path.isfile(str(ov.get("resolved_path") or "")))
+
+
+def _png_na_tela(caminho: str, largura: int, espelhar: bool, w: int, h: int) -> str:
+    """A imagem no tamanho da trilha (todas do mesmo tamanho: centralizada numa tela transparente w×h)."""
+    from PIL import Image
+    pronto = _png_no_tamanho(caminho, largura, espelhar) or caminho
+    base, _ext = os.path.splitext(pronto)
+    destino = f"{base}__t{w}x{h}.png"
+    if os.path.isfile(destino) and os.path.getmtime(destino) >= os.path.getmtime(pronto):
+        return destino
+    with Image.open(pronto) as im:
+        im = im.convert("RGBA")
+        if im.size == (w, h):
+            return pronto
+        tela = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        tela.paste(im, ((w - im.width) // 2, (h - im.height) // 2), im)
+        tela.save(destino)
+    return destino
+
+
+def _juntar_trilhas(overlays: List[Dict[str, Any]], target_width: int, pasta: str, tmp: List[str]) -> List[Dict[str, Any]]:
+    """Camadas com a mesma `trilha` e o mesmo lugar/tamanho → um overlay "trilha" (concat de imagens com duração).
+    Mantém a ordem (a trilha entra onde estava a 1ª camada dela). A 👄 boca alterna a cada 0,12 s nas janelas de fala,
+    igual ao overlay normal; onde duas camadas se cruzam ganha a que vem depois (a que ficava por cima)."""
+    from PIL import Image
+    import math
+    grupos: Dict[Any, List[int]] = {}
+    for i, ov in enumerate(overlays):
+        if _trilha_ok(ov):
+            chave = (_trilha_de(ov), round(float(ov.get("size_percent", 30)), 3), round(float(ov.get("x_percent", 0)), 3),
+                     round(float(ov.get("y_percent", 0)), 3), ov.get("ancora") or "", bool(ov.get("espelhar")))
+            grupos.setdefault(chave, []).append(i)
+    grupos = {k: v for k, v in grupos.items() if len(v) >= 2}
+    if not grupos:
+        return overlays
+    trocar: Dict[int, Dict[str, Any]] = {}
+    tirar = set()
+    for n, (chave, idxs) in enumerate(grupos.items()):
+        membros = [overlays[i] for i in idxs]
+        largura = max(2, round(target_width * float(membros[0].get("size_percent", 30)) / 100))
+        largura += largura % 2
+        esp = bool(membros[0].get("espelhar"))
+        # pedaços (a, b, imagem, prioridade)
+        pedacos = []
+        for pr, ov in enumerate(membros):
+            a, b = max(0.0, float(ov["start"])), float(ov["end"])
+            if b - a < 0.02:
+                continue
+            pedacos.append((a, b, ov["resolved_path"], pr * 2))
+            boca = ov.get("boca_path") if ov.get("boca_path") and os.path.isfile(str(ov.get("boca_path"))) else None
+            if boca:
+                for ja, jb in ov.get("boca_janelas") or []:
+                    ja, jb = max(a, float(ja)), min(b, float(jb))
+                    k = math.floor((ja - a) / 0.24)
+                    while a + 0.24 * k < jb:
+                        x, y = max(ja, a + 0.24 * k), min(jb, a + 0.24 * k + 0.12)
+                        if y > x:
+                            pedacos.append((x, y, boca, pr * 2 + 1))
+                        k += 1
+        if not pedacos:
+            continue
+        t0, t1 = min(p[0] for p in pedacos), max(p[1] for p in pedacos)
+        pontos = sorted({round(t, 4) for p in pedacos for t in (p[0], p[1])})
+        seq: List[List[Any]] = []  # [img|None, a, b]
+        # varredura: em cada intervalo elementar, a imagem do pedaço de maior prioridade que cobre o meio
+        ativos = sorted(pedacos, key=lambda p: p[0])
+        for a, b in zip(pontos, pontos[1:]):
+            m = (a + b) / 2
+            melhor = None
+            for p in ativos:
+                if p[0] > m:
+                    break
+                if p[0] <= m < p[1] and (melhor is None or p[3] > melhor[3]):
+                    melhor = p
+            img = melhor[2] if melhor else None
+            if seq and seq[-1][0] == img:
+                seq[-1][2] = b
+            else:
+                seq.append([img, a, b])
+        # todas do mesmo tamanho
+        tams = []
+        for img in {x[0] for x in seq if x[0]}:
+            pronto = _png_no_tamanho(img, largura, esp) or img
+            with Image.open(pronto) as im:
+                tams.append(im.size)
+        w = max(t[0] for t in tams)
+        h = max(t[1] for t in tams)
+        h += h % 2
+        w += w % 2
+        vazio = os.path.join(pasta, f"_trilha_vazia_{w}x{h}.png")
+        if not os.path.isfile(vazio):
+            Image.new("RGBA", (w, h), (0, 0, 0, 0)).save(vazio)
+        prontos = {img: _png_na_tela(img, largura, esp, w, h) for img in {x[0] for x in seq if x[0]}}
+        lista = os.path.join(pasta, f"_trilha_{n}_{uuid.uuid4().hex[:6]}.txt")
+        linhas = ["ffconcat version 1.0"]
+        ultimo = None
+        # durações no passo dos quadros (25 fps), acumuladas a partir do início — pedacinho menor que 1 quadro some
+        # sem empurrar o resto (a trilha não atrasa)
+        for img, a, b in seq:
+            qa, qb = round((a - t0) * 25), round((b - t0) * 25)
+            if qb <= qa:
+                continue
+            arq = prontos[img] if img else vazio
+            linhas.append("file '" + os.path.abspath(arq).replace("\\", "/").replace("'", "'\\''") + "'")
+            linhas.append(f"duration {(qb - qa) / 25:.4f}")
+            ultimo = arq
+        if ultimo is None:
+            continue
+        linhas.append("file '" + os.path.abspath(ultimo).replace("\\", "/").replace("'", "'\\''") + "'")
+        with open(lista, "w", encoding="utf-8") as f:
+            f.write("\n".join(linhas) + "\n")
+        tmp.append(lista)
+        ov0 = membros[0]
+        trocar[idxs[0]] = {"media_type": "trilha", "lista": lista, "start": t0, "end": t1,
+                           "x_percent": float(ov0.get("x_percent", 0)), "y_percent": float(ov0.get("y_percent", 0)),
+                           "ancora": ov0.get("ancora") or ""}
+        tirar.update(idxs[1:])
+    return [trocar.get(i, ov) for i, ov in enumerate(overlays) if i not in tirar]
 
 
 def tempo_limite_overlays(duracao: float, n_overlays: int) -> int:

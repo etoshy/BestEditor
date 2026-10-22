@@ -1261,7 +1261,8 @@ def para_render(ov: Dict[str, Any]) -> Dict[str, Any]:
             "anim_in": ov.get("anim_in") or "nenhuma", "anim_out": ov.get("anim_out") or "nenhuma",
             "anim_dur": float(ov.get("anim_dur") or 0.35), "lado": ov.get("lado") or "esquerda",
             "boca_path": boca, "boca_janelas": ov.get("boca_janelas") or [],
-            "anim_video": anim, "anim_modo": ov.get("anim_modo") or "repetir", "espelhar": bool(ov.get("espelhar"))}
+            "anim_video": anim, "anim_modo": ov.get("anim_modo") or "repetir", "espelhar": bool(ov.get("espelhar")),
+            "trilha": ov.get("trilha") or ""}
 
 
 def estado(job: Dict[str, Any], base: str) -> Dict[str, Any]:
