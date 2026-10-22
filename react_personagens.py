@@ -1899,7 +1899,7 @@ def guardar_cena(p: Dict[str, Any], e: Dict[str, Any], img, base: str = _BASE, o
     return arq
 
 
-def gerar_cenas(pid: str, base: str = _BASE, eids: Optional[List[str]] = None) -> Dict[str, Any]:
+def gerar_cenas(pid: str, base: str = _BASE, eids: Optional[List[str]] = None, pedido: str = "") -> Dict[str, Any]:
     """🚀 As imagens das brigas/cenas pro Flow em massa (com a sala e os personagens de referência)."""
     import flow_lote
     with _TRAVA:
@@ -1912,7 +1912,10 @@ def gerar_cenas(pid: str, base: str = _BASE, eids: Optional[List[str]] = None) -
         os.makedirs(d, exist_ok=True)
         itens = []
         for e in alvo:
-            it = {"prompt": prompt_cena(p, e), "tipo": "imagem", "origem": "react"}
+            pr = prompt_cena(p, e)
+            if pedido:
+                pr = (pr + " CHANGE FROM THE PREVIOUS VERSION: " + " ".join(str(pedido).split())[:400])[:3990]
+            it = {"prompt": pr, "tipo": "imagem", "origem": "react"}
             ref = colagem_referencia(p, e, os.path.join(d, f"_ref_{e['id']}.png"), base)
             if ref:
                 it["referencia_arquivo"] = ref
@@ -2467,6 +2470,37 @@ def reaproveitar(p: Dict[str, Any], c: Dict[str, Any], base: str = _BASE) -> str
     return c.get("reaproveitado") or ""
 
 
+def refazer_pose(pid: str, cid: str, arquivo: str, pedido: str = "", base: str = _BASE) -> Dict[str, Any]:
+    """🔁 Gera DE NOVO uma pose (e a 👄 boca dela, que espera a pose nova ficar pronta). `pedido` = o que mudar
+    (vai junto do prompt). A versão antiga fica guardada no projeto 🧍 (dá pra voltar pra ela lá)."""
+    pp = _pp()
+    p = carregar(pid, base)
+    c = personagem(p, cid)
+    ppid = (c.get("pod") or {}).get("pid")
+    if not ppid:
+        raise ReactErro("Esse personagem ainda não tem as poses — 🚀 Gerar primeiro.")
+    proj = pp.carregar(ppid, base)
+    nomes = {x["arquivo"]: x for x in proj["dados"]["poses"]}
+    arquivo = os.path.basename(str(arquivo or ""))
+    if arquivo not in nomes:
+        raise ReactErro("Pose não encontrada.")
+    if nomes[arquivo].get("tipo") == "boca":
+        alvo = [arquivo]
+    else:
+        boca = arquivo[:-4] + "_boca.png"
+        alvo = [arquivo] + ([boca] if boca in nomes else [])
+    pedido = " ".join(str(pedido or "").split())[:400]
+    try:
+        r = pp.enviar(ppid, alvo, pedido, base)
+    except pp.PersErro as exc:
+        raise ReactErro(str(exc))
+    with _TRAVA:
+        q = carregar(pid, base)
+        log(q, f"🔁 {c['nome']}: {arquivo} de novo" + (f" ({pedido})" if pedido else ""))
+        salvar(q, base)
+    return r if isinstance(r, dict) else {}
+
+
 def _mandar_resto(ppid: str, base: str) -> Dict[str, Any]:
     pp = _pp()
     proj = pp.carregar(ppid, base)
@@ -2518,18 +2552,146 @@ def acompanhar(pid: str, base: str = _BASE) -> Dict[str, Any]:
         acompanhar_cenas(pid, base)
     except Exception as exc:  # noqa: BLE001
         avisos.append(f"cenas: {str(exc)[:160]}")
+    try:
+        conferir_lados_fundo(pid, base)
+    except Exception:  # noqa: BLE001
+        pass
     return {"avisos": avisos}
 
 
+def virado(c: Dict[str, Any], arquivo: str, versao: str, lado_arquivo: str) -> str:
+    """🧭 Pra que lado a imagem da pose REALMENTE olha: "dir", "esq" ou "frente". O Flow às vezes desenha virado pro
+    lado errado — vale o que a IA conferiu nas imagens (ou o que você marcou ↔); sem conferir, o lado do arquivo."""
+    f = (c.get("viradas") or {}).get(arquivo) or {}
+    if f.get("versao") == versao and f.get("lado") in ("dir", "esq", "frente"):
+        return f["lado"]
+    return lado_arquivo
+
+
 def poses_do_personagem(c: Dict[str, Any], base: str = _BASE, lado: str = "dir") -> Dict[str, Dict[str, Any]]:
-    """expressão → {"pose", "boca", "espelhar"} (só as que já têm imagem) pro LADO que ele olha. Sem a pose daquele
-    lado ainda, usa a do outro lado espelhada (até a certa ficar pronta)."""
+    """expressão → {"pose", "boca", "espelhar", "arquivo", "virada"} (só as que já têm imagem) pro LADO que ele olha.
+    v84_237: escolhe por expressão a imagem que de fato olha pro lado certo (🧭 conferido nas imagens); se só tem
+    virada pro outro lado, espelha; de frente, usa como está."""
     todas = _poses_por_lado(c, base)
-    out: Dict[str, Dict[str, Any]] = {e: dict(x, espelhar=False) for e, x in todas.get(lado, {}).items()}
     outro = "esq" if lado == "dir" else "dir"
-    for e, x in todas.get(outro, {}).items():
-        out.setdefault(e, dict(x, espelhar=True))
+    out: Dict[str, Dict[str, Any]] = {}
+    for e in set(todas.get(lado, {})) | set(todas.get(outro, {})):
+        cands = []
+        for la in (lado, outro):
+            x = todas.get(la, {}).get(e)
+            if not x:
+                continue
+            v = virado(c, x.get("arquivo") or "", os.path.basename(x["pose"]), la)
+            cands.append((0 if v == lado else 1 if v == "frente" else 2, la != lado, x, v))
+        cands.sort(key=lambda z: (z[0], z[1]))
+        _r, _l, x, v = cands[0]
+        out[e] = dict(x, espelhar=(v != lado and v != "frente"), virada=v)
     return out
+
+
+SCHEMA_LADOS = {"type": "object", "additionalProperties": False, "required": ["figuras"],
+                "properties": {"figuras": {"type": "array", "items": {
+                    "type": "object", "additionalProperties": False, "required": ["n", "lado"],
+                    "properties": {"n": {"type": "integer"}, "lado": {"type": "string", "enum": ["direita", "esquerda", "frente"]}}}}}}
+SYS_LADOS = ("Cada figura numerada é o MESMO personagem sentado, em expressões diferentes. Pra cada número diga pra que "
+             "lado da IMAGEM o corpo e o rosto dele estão virados (de quem olha a imagem): 'direita' (virado pro lado direito "
+             "da imagem), 'esquerda' (pro lado esquerdo) ou 'frente' (de frente, sem lado claro). Olhe o tronco, os joelhos "
+             "e pra onde o rosto aponta — não a mão.")
+_CONFERINDO: set = set()
+
+
+def conferir_lados(pid: str, cid: str, base: str = _BASE, todas: bool = False) -> Dict[str, Any]:
+    """🧭 A IA olha as poses prontas (numa folha numerada) e marca pra que lado cada uma está virada de verdade — o
+    react espelha as que vieram viradas pro lado errado. Não mexe no que você marcou ↔ (a não ser com todas=True)."""
+    from PIL import Image, ImageDraw
+    p = carregar(pid, base)
+    c = personagem(p, cid)
+    lados = _poses_por_lado(c, base)
+    fig = []
+    for la in ("dir", "esq"):
+        for e, x in lados.get(la, {}).items():
+            arq, ver = x.get("arquivo") or "", os.path.basename(x["pose"])
+            f = (c.get("viradas") or {}).get(arq) or {}
+            if not todas and f.get("versao") == ver:
+                continue
+            fig.append((arq, ver, x["pose"]))
+    if not fig:
+        return {"conferidas": 0}
+    cel_w, cel_h = 220, 330
+    cols = min(6, len(fig))
+    linhas = math.ceil(len(fig) / cols)
+    folha = Image.new("RGB", (cols * cel_w, linhas * cel_h), (235, 235, 235))
+    dr = ImageDraw.Draw(folha)
+    for k, (_a, _v, cam) in enumerate(fig):
+        im = Image.open(cam).convert("RGBA")
+        esc = min((cel_w - 10) / im.width, (cel_h - 40) / im.height)
+        im = im.resize((max(1, int(im.width * esc)), max(1, int(im.height * esc))))
+        x0, y0 = (k % cols) * cel_w, (k // cols) * cel_h
+        folha.paste(im, (x0 + (cel_w - im.width) // 2, y0 + 34), im)
+        dr.rectangle([x0 + 4, y0 + 4, x0 + 40, y0 + 30], fill=(20, 20, 20))
+        dr.text((x0 + 10, y0 + 6), str(k + 1), font=_fonte(22), fill=(255, 220, 0))
+    buf = io.BytesIO()
+    folha.save(buf, "JPEG", quality=85)
+    bloco = {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64.b64encode(buf.getvalue()).decode()}}
+    r = _ia().chamar("react", SYS_LADOS, [{"type": "text", "text": f"{len(fig)} figuras de {c['nome']}."}, bloco],
+                     schema=SCHEMA_LADOS, max_tokens=800, effort="low", timeout=120, cache_local=False)
+    if not isinstance(r, dict) or not isinstance(r.get("figuras"), list):
+        raise ReactErro("A IA não respondeu (desligada, sem crédito ou erro).")
+    mapa = {"direita": "dir", "esquerda": "esq", "frente": "frente"}
+    n = 0
+    with _TRAVA:
+        p = carregar(pid, base)
+        c = personagem(p, cid)
+        vir = c.setdefault("viradas", {})
+        for f in r["figuras"]:
+            k = int(f.get("n") or 0) - 1 if isinstance(f, dict) else -1
+            if 0 <= k < len(fig) and f.get("lado") in mapa:
+                arq, ver, _cam = fig[k]
+                vir[arq] = {"versao": ver, "lado": mapa[f["lado"]], "fonte": "ia"}
+                n += 1
+        log(p, f"🧭 {c['nome']}: {n} pose(s) conferidas — as viradas pro lado errado são espelhadas")
+        salvar(p, base)
+    return {"conferidas": n}
+
+
+def marcar_virada(p: Dict[str, Any], cid: str, arquivo: str, base: str = _BASE) -> str:
+    """↔ Você marca: esta pose está virada pro OUTRO lado (troca dir ⇄ esq; de frente → o lado do arquivo ao contrário)."""
+    c = personagem(p, cid)
+    for la in ("dir", "esq"):
+        x = next((y for y in _poses_por_lado(c, base).get(la, {}).values() if y.get("arquivo") == arquivo), None)
+        if x:
+            ver = os.path.basename(x["pose"])
+            atual = virado(c, arquivo, ver, la)
+            novo = {"dir": "esq", "esq": "dir"}.get(atual, "esq" if la == "dir" else "dir")
+            c.setdefault("viradas", {})[arquivo] = {"versao": ver, "lado": novo, "fonte": "voce"}
+            return novo
+    raise ReactErro("Essa pose ainda não tem imagem.")
+
+
+def conferir_lados_fundo(pid: str, base: str = _BASE) -> None:
+    """Chamado pelo acompanhar: confere sozinho (numa thread) os personagens com pose nova sem conferir."""
+    if not ia_ligada():
+        return
+    p = carregar(pid, base)
+    for c in p["personagens"]:
+        chave = (pid, c["id"])
+        if chave in _CONFERINDO:
+            continue
+        lados = _poses_por_lado(c, base)
+        falta = any(((c.get("viradas") or {}).get(x.get("arquivo") or "") or {}).get("versao") != os.path.basename(x["pose"])
+                    for la in lados.values() for x in la.values())
+        if not falta:
+            continue
+        _CONFERINDO.add(chave)
+
+        def rodar(cid: str = c["id"], ch: Tuple[str, str] = chave) -> None:
+            try:
+                conferir_lados(pid, cid, base)
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                _CONFERINDO.discard(ch)
+        threading.Thread(target=rodar, daemon=True).start()
 
 
 def _poses_por_lado(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Dict[str, Dict[str, Optional[str]]]]:
@@ -2551,7 +2713,7 @@ def _poses_por_lado(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Dict[str,
         if not cam or (proj["imagens"].get(x["arquivo"]) or {}).get("estado") == "descartada":
             continue
         boca = next((y["arquivo"] for y in proj["dados"]["poses"] if y.get("tipo") == "boca" and y.get("base") == x["arquivo"]), None)
-        out[lado][e] = {"pose": cam, "boca": pp.arquivo_atual(proj, boca, base) if boca else None}
+        out[lado][e] = {"pose": cam, "boca": pp.arquivo_atual(proj, boca, base) if boca else None, "arquivo": x["arquivo"]}
     return out
 
 
@@ -2575,6 +2737,10 @@ def estado_poses(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
                     "total": sum(1 for i in poses if lado_da_pose(sl, i["arquivo"])[1] == l)} for l in ("dir", "esq")}
     for i in itens:
         i["lado"] = lado_da_pose(sl, i["arquivo"].replace("_boca.png", ".png"))[1]
+        if i["tipo"] == "pose" and i["img"]:
+            i["virada"] = virado(c, i["arquivo"], i["img"], i["lado"])
+            i["conferida"] = ((c.get("viradas") or {}).get(i["arquivo"]) or {}).get("versao") == i["img"]
+            i["fonte"] = ((c.get("viradas") or {}).get(i["arquivo"]) or {}).get("fonte")
     return {"tem": True, "pid": pod["pid"], "fase": pod.get("fase"), "mestre": bool(proj.get("mestre")), "por_lado": por_lado,
             "prontas": sum(1 for i in poses if i["img"]), "total": len(poses),
             "bocas": sum(1 for i in itens if i["tipo"] == "boca" and i["img"]),
@@ -2903,7 +3069,7 @@ def disposicao(p: Dict[str, Any], base: str = _BASE, video_wh: Optional[Tuple[in
     if tela_h > 0.46 * H:  # vídeo em pé: a TV fica mais estreita
         tela_h = 0.46 * H
         tela_w = tela_h * asp_v
-    out["tela"] = {"cx": tela_cx, "cy": tela_cy, "w": tela_w, "h": tela_h}
+    out["tela"] = {"cx": tela_cx, "cy": tela_cy, "w": tela_w, "h": tela_h, "espelhar": False}
     out["legenda"] = {"cx": tela_cx, "topo": tela_cy + tela_h / 2 + 0.045 * H, "w": max(tela_w * 1.05, 0.30 * W)}
     sofa_h = sofa_w * sh / sw
     if sofa_h > 0.50 * H:
@@ -2918,7 +3084,7 @@ def disposicao(p: Dict[str, Any], base: str = _BASE, video_wh: Optional[Tuple[in
     if mesa_h > 0.27 * H:
         mesa_h = 0.27 * H
         mesa_w = mesa_h * mw / mh
-    out["mesa"] = {"cx": mesa_cx, "cy": 1.015 * H - mesa_h / 2, "w": mesa_w, "h": mesa_h}
+    out["mesa"] = {"cx": mesa_cx, "cy": 1.015 * H - mesa_h / 2, "w": mesa_w, "h": mesa_h, "espelhar": False}
     # personagens: PNG 2:3 (a figura ocupa ~95% da altura, encostada embaixo)
     maior = max(len(g) for g in grupos)
     alt_pers = min(0.56 * H, (sofa_w_real * 0.92 / max(1, maior)) * 1.5 * 1.45)
@@ -2943,13 +3109,14 @@ def disposicao(p: Dict[str, Any], base: str = _BASE, video_wh: Optional[Tuple[in
     out["assentos"] = assentos
     # 🖼 onde aparece a foto/exemplo (⚡ Intrigas): por cima, perto do meio
     fw = 0.30 * W
-    out["foto"] = ({"cx": 0.50 * W, "cy": 0.36 * H, "w": fw, "h": fw * 0.75} if lay == "dois_sofas"
-                   else {"cx": 0.42 * W, "cy": 0.33 * H, "w": fw, "h": fw * 0.75})
+    out["foto"] = ({"cx": 0.50 * W, "cy": 0.36 * H, "w": fw, "h": fw * 0.75, "espelhar": False} if lay == "dois_sofas"
+                   else {"cx": 0.42 * W, "cy": 0.33 * H, "w": fw, "h": fw * 0.75, "espelhar": False})
+    out["fundo"] = {"espelhar": False}
     return aplicar_posicoes(p, out)
 
 
 def chaves_posicao(lay: Dict[str, Any]) -> List[str]:
-    return (["tela", "legenda", "mesa", "foto"] + [f"sofa{k}" for k in range(len(lay["sofas"]))]
+    return ([c["chave"] for c in lay.get("copias") or []] + ["tela", "legenda", "mesa", "foto", "fundo"] + [f"sofa{k}" for k in range(len(lay["sofas"]))]
             + [f"p:{a['cid']}" for a in lay["assentos"]])
 
 
@@ -2957,8 +3124,6 @@ def aplicar_posicoes(p: Dict[str, Any], lay: Dict[str, Any]) -> Dict[str, Any]:
     """🎛 Os ajustes que você fez arrastando na prévia (posição, tamanho, pra que lado olha) por cima da disposição
     automática — guardados por disposição (sofa_tv e dois_sofas têm os seus)."""
     aj = ((p.get("posicoes") or {}).get(lay["layout"]) or {})
-    if not aj:
-        return lay
 
     def ap(d: Dict[str, Any], chave: str) -> None:
         o = aj.get(chave) or {}
@@ -2980,11 +3145,71 @@ def aplicar_posicoes(p: Dict[str, Any], lay: Dict[str, Any]) -> Dict[str, Any]:
     ap(lay["legenda"], "legenda")
     ap(lay["mesa"], "mesa")
     ap(lay["foto"], "foto")
+    ap(lay["fundo"], "fundo")
     for k, sf in enumerate(lay["sofas"]):
         ap(sf, f"sofa{k}")
     for a in lay["assentos"]:
         ap(a, f"p:{a['cid']}")
+    # ⧉ cópias (duplicar a mesa, um sofá, a TV, um personagem…): nascem ao lado da original e mexem sozinhas
+    lay["copias"] = []
+    for cp in ((p.get("copias") or {}).get(lay["layout"]) or []):
+        src = peca_geo(lay, cp["de"])
+        if not src:
+            continue
+        d = {k: src[k] for k in ("cx", "cy", "w", "h", "espelhar") if k in src}
+        d["cx"] = d["cx"] + 0.05 * W
+        d.update(id=cp["id"], de=cp["de"], chave=f"c:{cp['id']}")
+        d.setdefault("espelhar", False)
+        ap(d, d["chave"])
+        lay["copias"].append(d)
     return lay
+
+
+DUPLICAVEIS = ("sofa", "p:", "mesa", "tela")
+
+
+def peca_geo(lay: Dict[str, Any], chave: str) -> Optional[Dict[str, Any]]:
+    """A geometria (cx, cy, w, h, espelhar) da peça `chave` na disposição."""
+    if chave.startswith("sofa"):
+        k = int(chave[4:] or 0)
+        return lay["sofas"][k] if k < len(lay["sofas"]) else None
+    if chave.startswith("p:"):
+        return next((a for a in lay["assentos"] if a["cid"] == chave[2:]), None)
+    if chave in ("mesa", "tela"):
+        return lay[chave]
+    return None
+
+
+def duplicar(p: Dict[str, Any], chave: str, base: str = _BASE) -> str:
+    """⧉ Duplica uma peça (mesa, sofá, TV com o vídeo, personagem — o clone faz as mesmas caras e falas)."""
+    lay_nome = p.get("layout") if p.get("layout") in LAYOUTS else "sofa_tv"
+    if chave.startswith("c:"):  # duplicar uma cópia = outra cópia da mesma original, no lugar dela
+        orig = next((x for x in (p.get("copias") or {}).get(lay_nome) or [] if f"c:{x['id']}" == chave), None)
+        if not orig:
+            raise ReactErro("Cópia não encontrada.")
+        de = orig["de"]
+    else:
+        de = chave
+    if not de.startswith(DUPLICAVEIS) or not peca_geo(disposicao(p, base), de):
+        raise ReactErro("Essa camada não dá pra duplicar.")
+    cid = secrets.token_hex(3)
+    p.setdefault("copias", {}).setdefault(lay_nome, []).append({"id": cid, "de": de})
+    if chave.startswith("c:"):  # a nova nasce ao lado da cópia que você duplicou
+        o = ((p.get("posicoes") or {}).get(lay_nome) or {}).get(chave) or {}
+        lay = disposicao(p, base)
+        x = next((c for c in lay["copias"] if c["chave"] == chave), None)
+        if x:
+            p.setdefault("posicoes", {}).setdefault(lay_nome, {})[f"c:{cid}"] = dict(o, cx=x["cx"] + 0.05 * W, cy=x["cy"], w=x["w"])
+    return f"c:{cid}"
+
+
+def apagar_copia(p: Dict[str, Any], chave: str) -> None:
+    lay_nome = p.get("layout") if p.get("layout") in LAYOUTS else "sofa_tv"
+    lista = (p.get("copias") or {}).get(lay_nome) or []
+    if not any(f"c:{x['id']}" == chave for x in lista):
+        raise ReactErro("Só dá pra apagar as cópias (⧉) — a original você pode esconder 👁.")
+    p["copias"][lay_nome] = [x for x in lista if f"c:{x['id']}" != chave]
+    ((p.get("posicoes") or {}).get(lay_nome) or {}).pop(chave, None)
 
 
 def guardar_posicao(p: Dict[str, Any], chave: str, dados: Optional[Dict[str, Any]], base: str = _BASE) -> None:
@@ -3011,6 +3236,8 @@ def pilha(p: Dict[str, Any], lay: Dict[str, Any]) -> Dict[str, Any]:
     estão travadas (não mexem no palco). Por disposição. Peça nova (personagem que entrou depois) vai pro lugar padrão."""
     padrao = ([f"sofa{k}" for k in range(len(lay["sofas"]))] + [f"p:{a['cid']}" for a in lay["assentos"]]
               + ["mesa", "tela", "foto", "legenda"])
+    for c in lay.get("copias") or []:  # a cópia entra logo acima da original
+        padrao.insert(padrao.index(c["de"]) + 1 if c["de"] in padrao else len(padrao), c["chave"])
     g = ((p.get("pilha") or {}).get(lay["layout"]) or {})
     salva = [k for k in g.get("ordem") or [] if k in padrao]
     ordem = list(salva)
@@ -3102,6 +3329,17 @@ def pecas_para_editar(p: Dict[str, Any], base: str = _BASE, t: Optional[float] =
         if c:
             fala = {"nome": c["nome"], "texto": ativa["texto"], "cor": c.get("cor") or "#ffd54a"}
     pecas.append(dict(lay["legenda"], chave="legenda", nome="💬 Legenda", z=5, legenda=True, fala=fala))
+    for cp in lay.get("copias") or []:
+        src = next((x for x in pecas if x["chave"] == cp["de"]), None)
+        if not src:
+            continue
+        n = dict(src, cx=cp["cx"], cy=cp["cy"], w=cp["w"], h=cp.get("h", src.get("h")), espelhar=bool(cp.get("espelhar")),
+                 chave=cp["chave"], de=cp["de"], copia=True, nome=src["nome"] + " ⧉")
+        if src.get("personagem") and bool(cp.get("espelhar")) != bool(src.get("espelhar")):
+            n["espelhar_img"] = not src.get("espelhar_img")
+        if src.get("personagem"):
+            n["lado"] = "esq" if cp.get("espelhar") else "dir"
+        pecas.append(n)
     pil = pilha(p, lay)
     for pc in pecas:
         pc["z"] = pil["ordem"].index(pc["chave"]) + 1
@@ -3111,7 +3349,7 @@ def pecas_para_editar(p: Dict[str, Any], base: str = _BASE, t: Optional[float] =
     if cena:
         cena_info = {"tipo": TIPOS_EVENTO[cena["tipo"]], "descricao": cena.get("descricao") or "",
                      "img": (f"/react-personagens/{pid}/arquivo/cenas/{cena['cena']['arquivo']}" if arquivo_cena(p, cena, base) else None)}
-    return {"W": W, "H": H, "t": t, "layout": lay["layout"], "fundo": url_cam("fundo"), "pecas": pecas, "pilha": pil, "cena": cena_info,
+    return {"W": W, "H": H, "t": t, "layout": lay["layout"], "fundo": url_cam("fundo"), "fundo_espelhar": bool(lay["fundo"].get("espelhar")), "pecas": pecas, "pilha": pil, "cena": cena_info,
             "ajustadas": sorted(((p.get("posicoes") or {}).get(lay["layout"]) or {}).keys())}
 
 
@@ -3267,6 +3505,9 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
     if not camada_arquivo(p, "fundo", base):
         avisos.append("sem a camada do fundo — usei uma parede lisa (gere o 🧱 Fundo e mande de novo, ou troque no editor)")
     lay = disposicao(p, base, (info["largura"] or 16, info["altura"] or 9))
+    if lay["fundo"].get("espelhar"):  # ↔ o fundo espelhado
+        from PIL import ImageOps
+        ImageOps.mirror(Image.open(fundo).convert("RGB")).save(fundo)
     overlays: List[Dict[str, Any]] = []
     grupos: Dict[str, List[Dict[str, Any]]] = {}
     grupo_atual = [""]
@@ -3369,7 +3610,7 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
     if mesa:
         m = lay["mesa"]
         grupo_atual[0] = "mesa"
-        png("rmesa", "🪵 Mesa", copiar(mesa, "mesa.png"), m["cx"], m["cy"], m["w"], 0, dur, "mesa")
+        png("rmesa", "🪵 Mesa", copiar(mesa, "mesa.png"), m["cx"], m["cy"], m["w"], 0, dur, "mesa", espelhar=bool(m.get("espelhar")))
     else:
         avisos.append("sem a camada da mesa")
     # TV: a moldura (PNG) + o vídeo na tela
@@ -3398,7 +3639,8 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
     grupos.setdefault("tela", []).append({"id": "rtela", "origem": "react_tela", "camada": "tela", "nome_personagem": "📺 Vídeo na TV",
                      "source": {"source": "local_file", "value": video, "kind": "video"}, "media_type": "video",
                      "start": 0.0, "end": round(dur, 3), "position": "top-right", "ancora": "centro", "sincronizar": True,
-                     "size_percent": _pct(t["w"], W), "x_percent": _pct(t["cx"], W), "y_percent": _pct(t["cy"], H)})
+                     "size_percent": _pct(t["w"], W), "x_percent": _pct(t["cx"], W), "y_percent": _pct(t["cy"], H),
+                     "espelhar": bool(t.get("espelhar"))})
     # ⚡ brigas / interações / cenas: a imagem ocupa a tela toda por uns segundos (a legenda continua por cima, como
     # visual novel); 🖼 foto/exemplo: um quadro por cima, onde a peça "Foto" está no palco
     fo = lay["foto"]
@@ -3420,7 +3662,26 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
             moldurada = moldura_foto(cam, os.path.join(d, f"foto_{e['id']}.png"))
             iw, ih = _tam(moldurada, (4, 3))
             png(f"rfoto_{e['id']}", TIPOS_EVENTO[e["tipo"]], moldurada, fo["cx"], fo["cy"], fo["w"], ini, fim, "foto",
-                descricao=e.get("descricao") or "", anim_in="aparecer", anim_out="aparecer", anim_dur=0.25)
+                descricao=e.get("descricao") or "", anim_in="aparecer", anim_out="aparecer", anim_dur=0.25,
+                espelhar=bool(fo.get("espelhar")))
+    # ⧉ as cópias: as mesmas camadas da original, levadas pro lugar/tamanho (e lado) da cópia
+    for cp in lay.get("copias") or []:
+        src = peca_geo(lay, cp["de"])
+        if not src:
+            continue
+        k = cp["w"] / max(1.0, src["w"])
+        virar = bool(cp.get("espelhar")) != bool(src.get("espelhar"))
+        for ov in grupos.get(cp["de"], []):
+            n = dict(ov)
+            ox, oy = float(ov["x_percent"]) * W / 100, float(ov["y_percent"]) * H / 100
+            dx = (ox - src["cx"]) * (-1 if virar else 1)
+            n.update(id=f"{ov['id']}_{cp['id']}", x_percent=_pct(cp["cx"] + dx * k, W), y_percent=_pct(cp["cy"] + (oy - src["cy"]) * k, H),
+                     size_percent=round(float(ov["size_percent"]) * k, 4), copia=cp["chave"])
+            if virar:
+                n["espelhar"] = not ov.get("espelhar")
+            if ov.get("trilha"):
+                n["trilha"] = f"{ov['trilha']}|{cp['id']}"
+            grupos.setdefault(cp["chave"], []).append(n)
     pil = pilha(p, lay)
     ordem = [k for k in pil["ordem"] if k not in pil["ocultas"]]
     # a cena fica por cima de tudo, menos da legenda (se a legenda é a camada de cima)
@@ -3457,6 +3718,8 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
         except OSError:
             pass
     tela = tela.resize((W, H))
+    if lay["fundo"].get("espelhar"):
+        tela = ImageOps.mirror(tela)
 
     def colar(cam: str, cx: float, cy: float, w: float, espelhar: bool = False) -> None:
         im = Image.open(cam).convert("RGBA")
@@ -3480,10 +3743,12 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
             s = lay["sofas"][k]
             colar(sofa, s["cx"], s["cy"], s["w"], s.get("espelhar", False))
 
-    def desenha_personagem(cid: str) -> None:
+    def desenha_personagem(cid: str, geo: Optional[Dict[str, Any]] = None) -> None:
         a = next((x for x in lay["assentos"] if x["cid"] == cid), None)
         if not a:
             return
+        if geo:  # ⧉ cópia: o mesmo personagem (mesma cara no segundo t) no lugar da cópia
+            a = dict(a, cx=geo["cx"], cy=geo["cy"], w=geo["w"], h=geo.get("h", a["h"]), espelhar=bool(geo.get("espelhar")))
         c = personagem(p, cid)
         est_cam = next((cam for ini, fim, cam in estilos.get(cid, []) if ini <= t < fim), None)
         if est_cam:
@@ -3512,8 +3777,8 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
         if cam.startswith(destino + "."):
             os.remove(cam)
 
-    def desenha_tela() -> None:
-        tl = lay["tela"]
+    def desenha_tela(tl: Optional[Dict[str, Any]] = None) -> None:
+        tl = tl or lay["tela"]
         tv, borda = desenhar_tv(int(tl["w"]), int(tl["h"]), destino + ".tv.png")
         tw, th = _tam(tv, (1, 1))
         colar(tv, tl["cx"] - tl["w"] / 2 - borda + tw / 2, tl["cy"] - tl["h"] / 2 - borda + th / 2, tw)
@@ -3523,7 +3788,7 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
             subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}", "-i", video, "-frames:v", "1", q],
                            capture_output=True, timeout=60)
             if os.path.isfile(q):
-                colar(q, tl["cx"], tl["cy"], tl["w"])
+                colar(q, tl["cx"], tl["cy"], tl["w"], bool(tl.get("espelhar")))
                 os.remove(q)
 
     def desenha_legenda() -> None:
@@ -3556,8 +3821,20 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
             if foto_cam:
                 fo = lay["foto"]
                 mold = moldura_foto(foto_cam, destino + ".foto.png")
-                colar(mold, fo["cx"], fo["cy"], fo["w"])
+                colar(mold, fo["cx"], fo["cy"], fo["w"], bool(fo.get("espelhar")))
                 os.remove(mold)
+        elif chave.startswith("c:"):
+            cp = next((x for x in lay.get("copias") or [] if x["chave"] == chave), None)
+            if not cp:
+                continue
+            if cp["de"].startswith("sofa") and sofa:
+                colar(sofa, cp["cx"], cp["cy"], cp["w"], bool(cp.get("espelhar")))
+            elif cp["de"] == "mesa" and mesa:
+                colar(mesa, cp["cx"], cp["cy"], cp["w"], bool(cp.get("espelhar")))
+            elif cp["de"] == "tela":
+                desenha_tela(cp)
+            elif cp["de"].startswith("p:") and presente(aus, cp["de"][2:], t):
+                desenha_personagem(cp["de"][2:], cp)
         elif chave.startswith("p:") and not presente(aus, chave[2:], t):
             continue
         elif chave.startswith("sofa"):
@@ -3566,7 +3843,7 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
             desenha_personagem(chave[2:])
         elif chave == "mesa" and mesa:
             m = lay["mesa"]
-            colar(mesa, m["cx"], m["cy"], m["w"])
+            colar(mesa, m["cx"], m["cy"], m["w"], bool(m.get("espelhar")))
         elif chave == "tela":
             desenha_tela()
         elif chave == "legenda":

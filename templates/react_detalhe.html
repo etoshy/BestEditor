@@ -53,7 +53,10 @@
   .rx-versoes img.atual { border-color: var(--acento); }
   .rx-poses { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
   .rx-poses .p { width: 62px; text-align: center; font-size: .66rem; color: var(--mudo); }
-  .rx-poses .p div { width: 62px; height: 93px; border-radius: 6px; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/12px 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .rx-poses .p div .vir { position: absolute; left: 2px; bottom: 2px; font-size: 11px; line-height: 1; padding: 1px 3px; border-radius: 4px; background: rgba(0,0,0,.65); color: #fff; }
+  .rx-poses .p div .vir.err { background: #ea580c; }
+  .rx-poses .p div.errada { box-shadow: inset 0 0 0 2px #ea580c; }
+  .rx-poses .p div { position: relative; width: 62px; height: 93px; border-radius: 6px; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/12px 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .rx-poses .p img { width: 100%; height: 100%; object-fit: contain; }
   .rx-palco { position: relative; width: 100%; aspect-ratio: 16/9; background: #111 center/100% 100% no-repeat; border-radius: 10px; overflow: hidden; user-select: none; touch-action: none; }
   .rx-peca { position: absolute; cursor: move; outline: 1px dashed rgba(255,255,255,.25); }
@@ -108,7 +111,7 @@
   .rx-trans { max-height: 220px; overflow: auto; font-size: .8rem; background: var(--code-bg); border-radius: 8px; padding: 6px 10px; }
   .rx-trans .cr { color: var(--mudo); font-style: italic; }
   .rx-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 999; cursor: zoom-out; }
-  .rx-zoom img { max-width: 94vw; max-height: 94vh; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
+  .rx-zoom img { max-width: 94vw; max-height: 86vh; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
   details.rx-colar summary { cursor: pointer; color: var(--mudo); font-size: .84rem; }
 </style>
 
@@ -307,8 +310,10 @@
       <div class="rx-linha" style="gap:5px;">
         <button type="button" id="ajFrente" class="rx-sec" disabled title="Trazer pra frente">⬆</button>
         <button type="button" id="ajTras" class="rx-sec" disabled title="Mandar pra trás">⬇</button>
-        <button type="button" id="ajVirar" class="rx-sec" disabled>↔ Virar</button>
+        <button type="button" id="ajVirar" class="rx-sec" disabled title="espelhar (virar pro outro lado)">↔ Espelhar</button>
         <button type="button" id="ajAuto" class="rx-sec" disabled title="Volta esta camada pro lugar automático">↺</button>
+        <button type="button" id="ajDup" class="rx-sec" disabled title="Duplicar esta camada (Ctrl+D) — mesa, sofá, TV ou personagem">⧉ Duplicar</button>
+        <button type="button" id="ajApagar" class="rx-sec" disabled title="Apagar esta cópia (Delete)" style="display:none">🗑 Apagar cópia</button>
       </div>
       <label class="rx-dica" style="margin:6px 0 0;"><input type="checkbox" id="ajJunto" checked> 🔗 quem senta no sofá vai junto</label>
       <button type="button" id="ajTudo" class="rx-sec" style="margin-top:6px;width:100%;">↺ Tudo no automático</button>
@@ -323,7 +328,7 @@
   <details style="margin-top:8px;"><summary class="rx-dica" style="cursor:pointer">🕘 registro</summary><div class="rx-log" id="log"></div></details>
 </div>
 
-<div class="rx-zoom" id="zoom"><img alt=""></div>
+<div class="rx-zoom" id="zoom"><div style="display:flex;flex-direction:column;align-items:center;gap:10px;max-height:100vh;"><img alt=""><div id="zoomAcoes" style="display:none;gap:8px;"></div></div></div>
 
 <script>
 const PID = {{ p.id|tojson }};
@@ -332,7 +337,7 @@ const ROT_CAM = {{ rotulo_camada|tojson }};
 const CAMADAS = {{ camadas|list|tojson }};
 const TIPOS_SUG = { da_obra: 'da obra', hypado: '🔥 hypado', contraste: 'contraste' };
 const $ = (id) => document.getElementById(id);
-const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
 const mmss = (s) => { s = Math.max(0, Math.round(+s || 0)); const m = Math.floor(s / 60), x = s % 60; return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
 const seg = (v) => { const t = String(v || '').trim().replace(',', '.'); if (!t) return null; let s = 0; for (const x of t.split(':')) { const n = parseFloat(x); if (isNaN(n)) return null; s = s * 60 + n; } return s; };
 let P = null, falasEditadas = false, sugMarcadas = new Set(), sugNomes = {}, timer = null, ultimaTarefa = null;
@@ -743,9 +748,16 @@ function desenharPoses() {
     else if (s.tem && s.por_lado && !(s.por_lado[c.lado] || {}).total) st = `⚠ no layout atual ele olha pra ${c.lado === 'esq' ? 'esquerda (sofá da direita)' : 'direita'} e ainda não tem as poses desse lado — 🔁 Gerar o que falta (as do outro lado ficam e são reaproveitadas)`;
     else if (s.tem) st = !s.mestre ? (s.esperando ? '⏳ gerando a ⭐ neutra (a mestre)…' : s.erros ? '❌ a neutra falhou — refaça' : '⏳ esperando a neutra') : `${s.prontas}/${s.total} expressões · ${s.bocas} boca(s)` + (s.esperando ? ` · ⏳ ${s.esperando} no Flow` : ' · ✔') + (s.erros ? ` · ❌ ${s.erros} com erro` : '');
     const lados = s.por_lado ? Object.entries(s.por_lado).filter(([, v]) => v.total).map(([l, v]) => `${l === 'esq' ? '←' : '→'} ${v.prontas}/${v.total}`).join(' · ') : '';
-    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/react-personagens/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${i.lado === 'esq' ? '← ' : ''}${esc(i.arquivo.replace(/\.png$/, '').replace(/_esq$/, '').split('_').pop())}</div>`).join('');
+    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => {
+      const gerando = ['fila', 'gerando'].includes(i.estado), ref = esc(JSON.stringify({ tipo: 'pose', cid: c.id, arq: i.arquivo, nome: c.nome }));
+      // 🧭 pra onde a imagem olha de verdade; virada pro lado errado = o react espelha (borda laranja)
+      const errada = i.img && i.virada && i.virada !== 'frente' && i.virada !== i.lado;
+      const seta = !i.img ? '' : `<span class="vir ${errada ? 'err' : ''}" title="${i.conferida ? (i.fonte === 'voce' ? 'você marcou' : 'a IA conferiu') : 'ainda não conferida'}: olha pra ${i.virada === 'frente' ? 'frente' : i.virada === 'esq' ? 'a esquerda' : 'a direita'}${errada ? ' — veio do lado errado, o react espelha' : ''}">${i.virada === 'frente' ? '•' : i.virada === 'esq' ? '←' : '→'}${i.conferida ? '' : '?'}</span>`;
+      return `<div class="p"><div class="${errada ? 'errada' : ''}">${i.img ? `<img src="/react-personagens/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom data-refazer="${ref}">${seta}${gerando ? '<span style="position:absolute;top:2px;right:2px">⏳</span>' : ''}` : (gerando ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${i.lado === 'esq' ? '← ' : ''}${esc(i.arquivo.replace(/\.png$/, '').replace(/_esq$/, '').split('_').pop())}<br>${i.img ? `<button type="button" class="rx-mini rx-sec" data-virar-pose="${esc(i.arquivo)}" title="esta pose está virada pro OUTRO lado (o react passa a espelhar)">↔</button>` : ''}${(i.img || i.estado === 'erro') && !gerando ? ` <button type="button" class="rx-mini rx-sec" data-refazer-btn="${ref}" title="gerar esta pose de novo (e a boca dela) — dá pra dizer o que mudar">🔁</button>` : ''}</div>`;
+    }).join('');
     return `<div class="rx-camada" data-cid="${c.id}"><div class="rx-linha" style="margin:0"><b>${esc(c.nome)}</b> ${lados ? `<span class="rx-tag" title="poses prontas por lado: → olhando pra direita · ← olhando pra esquerda">${lados}</span>` : ''} <span class="rx-dica" style="margin:0">${esc(st)}</span>
       <button type="button" class="rx-mini" data-gerar-p>${s.tem ? '🔁 Gerar o que falta' : '🚀 Gerar'}</button>
+      ${s.tem && s.prontas ? `<button type="button" class="rx-mini rx-sec" data-conferir-p title="a IA olha as poses e marca pra que lado cada uma está virada de verdade (as do lado errado são espelhadas). Já roda sozinho quando chega pose nova.">🧭 Conferir os lados</button>` : ''}
       ${s.tem ? `<button type="button" class="rx-mini rx-sec" data-refazer-p title="cria o projeto de novo (com a referência e a ficha atuais)">♻ Do zero</button> <a href="/personagens-pod/${esc(s.pid)}" target="_blank" class="rx-dica">abrir na 🧍 aba Personagens ↗</a>` : ''}</div>
       ${imgs ? `<div class="rx-poses">${imgs}</div>` : ''}</div>`;
   }).join('') || '<p class="rx-dica">Monte o elenco primeiro.</p>';
@@ -759,6 +771,9 @@ $('bPoses').addEventListener('click', () => gerarPoses([], false));
 $('poses').addEventListener('click', (e) => {
   const c = e.target.closest('[data-cid]'); if (!c) return;
   if (e.target.hasAttribute('data-gerar-p')) gerarPoses([c.dataset.cid], false);
+  const vb = e.target.closest('[data-virar-pose]');
+  if (vb) { api(`/react-personagens/${PID}/pose/${c.dataset.cid}/virar`, { arquivo: vb.dataset.virarPose }).then(() => { recarregar(); if (PALCO) carregarPalco(); }).catch(er => alert(er.message)); return; }
+  if (e.target.closest('[data-conferir-p]')) { const b = e.target.closest('[data-conferir-p]'); b.disabled = true; b.textContent = '🧭 conferindo…'; api(`/react-personagens/${PID}/pose/${c.dataset.cid}/conferir`, {}).then(d => { recarregar(); if (PALCO) carregarPalco(); }).catch(er => { alert(er.message); recarregar(); }); return; }
   if (e.target.hasAttribute('data-refazer-p') && confirm('Criar o projeto deste personagem de novo, do zero?')) gerarPoses([c.dataset.cid], true);
 });
 
@@ -781,7 +796,7 @@ function pintarEventos() {
   box.innerHTML = EVS.map((e, k) => {
     const img = COM_IMG.includes(e.tipo), c = e.cena || {};
     const st = c.estado === 'erro' ? `❌ ${esc(c.erro || '')}` : (c.estado === 'fila' || c.estado === 'gerando') ? esc(c.msg || '⏳') : '';
-    const foto = img ? (e.tem_imagem && c.arquivo ? `<img class="cg" data-zoom src="/react-personagens/${PID}/arquivo/cenas/${esc(c.arquivo)}">` : `<div class="vaz">${st || '🖼 sem imagem ainda — 🚀 Gerar ou 📤 Enviar'}</div>`) : '';
+    const foto = img ? (e.tem_imagem && c.arquivo ? `<img class="cg" data-zoom data-refazer="${esc(JSON.stringify({ tipo: 'cena', eid: e.id, nome: TIPOS_EV[e.tipo] }))}" src="/react-personagens/${PID}/arquivo/cenas/${esc(c.arquivo)}" style="${e.tipo === 'estilo' ? 'object-fit:contain;' : ''}">` : `<div class="vaz">${st || '🖼 sem imagem ainda — 🚀 Gerar ou 📤 Enviar'}</div>`) : '';
     return `<div class="rx-ev ${esc(e.tipo)}" data-k="${k}">
       <div>
         <div class="rx-linha" style="gap:6px;">
@@ -832,7 +847,9 @@ $('eventos').addEventListener('click', async (ev) => {
   else if (ev.target.closest('[data-ver]')) { $('pT').value = (+e.t) + 0.5; atualizarPrevia(); document.querySelector('.rx-ps').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   else if (ev.target.closest('[data-gerar]')) {
     if (evsEditados) await salvarEventos();
-    try { const d = await api(`/react-personagens/${PID}/eventos/gerar`, { ids: [e.id] }); avisar($('evEst'), '🚀 foi pro Flow' + (d.aviso ? ' — ' + d.aviso : ''), 'rx-ok'); recarregar(); } catch (er) { alert(er.message); }
+    const pedido = e.tem_imagem ? prompt('O que mudar nesta imagem? (deixe vazio pra só gerar de novo)', '') : '';
+    if (pedido === null) return;
+    try { const d = await api(`/react-personagens/${PID}/eventos/gerar`, { ids: [e.id], pedido }); avisar($('evEst'), '🚀 foi pro Flow' + (d.aviso ? ' — ' + d.aviso : ''), 'rx-ok'); recarregar(); } catch (er) { alert(er.message); }
   }
 });
 async function salvarEventos() {
@@ -870,15 +887,16 @@ function posicionar(el, pc) {
   if (pc.legenda) el.style.fontSize = Math.max(8, 30 * k) + 'px';
 }
 function htmlPeca(pc) {
-  if (pc.tv) return `<img src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}&r=${Date.now()}" onerror="this.style.display='none'">`;
-  if (pc.foto) return pc.img ? `<img src="${pc.img}" style="object-fit:contain;background:#fafaf6;padding:4%;box-sizing:border-box;">` : '<div style="width:100%;height:100%;border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;text-align:center;background:rgba(0,0,0,.25);opacity:.55">🖼 aqui aparece a foto/exemplo (⚡ Intrigas)</div>';
+  if (pc.tv) return `<img src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}&r=${Date.now()}" onerror="this.style.display='none'" style="${pc.espelhar ? 'transform:scaleX(-1)' : ''}">`;
+  if (pc.foto) return pc.img ? `<img src="${pc.img}" style="object-fit:contain;background:#fafaf6;padding:4%;box-sizing:border-box;${pc.espelhar ? 'transform:scaleX(-1)' : ''}">` : '<div style="width:100%;height:100%;border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;text-align:center;background:rgba(0,0,0,.25);opacity:.55">🖼 aqui aparece a foto/exemplo (⚡ Intrigas)</div>';
   if (pc.legenda) return pc.fala ? `<b style="color:${esc(pc.fala.cor)}">${esc(pc.fala.nome)}:</b> ${esc(pc.fala.texto)}` : '<span style="opacity:.6">(ninguém fala neste segundo — a legenda aparece aqui)</span>';
   if (pc.img) { const esp = pc.personagem ? pc.espelhar_img : pc.espelhar; return `<img src="${pc.img}" style="${esp ? 'transform:scaleX(-1)' : ''}">`; }
   return `<div style="width:100%;height:100%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">${esc(pc.nome)}</div>`;
 }
 function desenharPalco() {
   const pal = $('palco'); pal.innerHTML = '';
-  pal.style.backgroundImage = PALCO.fundo ? `url("${PALCO.fundo}")` : '';
+  pal.style.backgroundImage = '';
+  if (PALCO.fundo) { const f = document.createElement('div'); f.style.cssText = `position:absolute;inset:0;background:url("${PALCO.fundo}") center/100% 100% no-repeat;${PALCO.fundo_espelhar ? 'transform:scaleX(-1);' : ''}`; pal.appendChild(f); }
   PALCO.pecas.forEach(pc => {
     const el = document.createElement('div');
     el.className = 'rx-peca' + (pc.tv ? ' rx-tv' : '') + (pc.legenda ? ' rx-leg' : '') + (PALCO.ajustadas.includes(pc.chave) ? ' aj' : '')
@@ -909,7 +927,7 @@ function desenharCamadas() {
       <span class="ic ${pc.oculta ? 'off' : ''}" data-ac="ver" title="Mostrar / esconder (escondida não vai pro vídeo)">👁</span>
       <span class="ic ${pc.travada ? '' : 'off'}" data-ac="trava" title="Travar (não mexe no palco)">🔒</span>
       ${miniDe(pc)}<span class="nm">${esc(pc.nome)}${pc.personagem ? `<br><span class="ex">${pc.fora ? '🚪 fora de cena · ' : ''}${pc.estilo ? '🎨 desenhado diferente · ' : ''}${pc.falando ? '🗣 ' : ''}${esc(pc.expressao || '')} · olha pra ${pc.lado === 'esq' ? '←' : '→'}</span>` : ''}</span></div>`;
-  }).join('') + `<div class="rx-cam-l fixa"><span class="ic">👁</span><span class="ic">🔒</span>${PALCO.fundo ? `<img class="mini" src="${PALCO.fundo}">` : '<span class="mini"></span>'}<span class="nm">🧱 Fundo</span></div>`;
+  }).join('') + `<div class="rx-cam-l fixa"><span class="ic">👁</span><span class="ic">🔒</span>${PALCO.fundo ? `<img class="mini" src="${PALCO.fundo}" style="${PALCO.fundo_espelhar ? 'transform:scaleX(-1)' : ''}">` : '<span class="mini"></span>'}<span class="nm">🧱 Fundo</span><button type="button" class="rx-mini rx-sec" data-espelhar-fundo title="espelhar o fundo">↔${PALCO.fundo_espelhar ? ' ✓' : ''}</button></div>`;
 }
 function pecaDe(chave) { return PALCO && PALCO.pecas.find(x => x.chave === chave); }
 function elDe(chave) { return [...$('palco').children].find(x => x.dataset.chave === chave); }
@@ -918,7 +936,10 @@ function barraAjuste() {
   $('ajNome').textContent = pc ? pc.nome + (pc.travada ? ' 🔒' : '') : 'clique numa camada';
   ['ajX', 'ajY', 'ajW', 'ajR', 'ajAuto'].forEach(id => { $(id).disabled = !livre; });
   $('ajFrente').disabled = $('ajTras').disabled = !pc;
-  $('ajVirar').disabled = !(livre && (pc.personagem || pc.chave.startsWith('sofa')));
+  const virar = pc && !pc.legenda;  // ↔ espelhar: qualquer camada menos a legenda (o texto ficaria ao contrário)
+  $('ajVirar').disabled = !(livre && virar);
+  $('ajDup').disabled = !(pc && (pc.copia || pc.personagem || pc.tv || pc.chave === 'mesa' || pc.chave.startsWith('sofa')));
+  $('ajApagar').style.display = pc && pc.copia ? '' : 'none'; $('ajApagar').disabled = !(pc && pc.copia);
   if (pc) { $('ajX').value = Math.round(pc.cx); $('ajY').value = Math.round(pc.legenda ? pc.topo : pc.cy); $('ajW').value = $('ajR').value = Math.round(pc.w); }
   document.querySelectorAll('#palco .rx-peca').forEach(x => x.classList.toggle('sel', x.dataset.chave === ajSel));
   document.querySelectorAll('#pilhaCam .rx-cam-l').forEach(x => x.classList.toggle('sel', x.dataset.chave === ajSel));
@@ -946,7 +967,11 @@ async function salvarPilha(mud) {
 function alternar(lista, ch) { return lista.includes(ch) ? lista.filter(x => x !== ch) : lista.concat([ch]); }
 // lista de camadas: clicar seleciona; 👁 / 🔒; arrastar muda a ordem
 let arrCam = null;
-$('pilhaCam').addEventListener('click', (ev) => {
+$('pilhaCam').addEventListener('click', async (ev) => {
+  if (ev.target.closest('[data-espelhar-fundo]')) {
+    try { await api(`/react-personagens/${PID}/posicao`, { chave: 'fundo', lado: PALCO.fundo_espelhar ? 'dir' : 'esq' }); carregarPalco(); } catch (e) { alert(e.message); }
+    return;
+  }
   const l = ev.target.closest('.rx-cam-l'); if (!l || !l.dataset.chave) return;
   const ch = l.dataset.chave, ac = ev.target.closest('[data-ac]')?.dataset.ac;
   if (ac === 'ver') salvarPilha({ ocultas: alternar(PALCO.pilha.ocultas, ch) });
@@ -979,7 +1004,7 @@ $('palco').addEventListener('pointerdown', (ev) => {
   ev.preventDefault(); selecionar(el.dataset.chave);
   const pc = pecaDe(ajSel); if (pc.travada) return;
   const alca = ev.target.closest('.rx-alca'), redim = alca ? alca.dataset.h : null;
-  const junto = !redim && ajSel.startsWith('sofa') && $('ajJunto').checked ? sentadosNo(pc) : [];
+  const junto = (ajSel.startsWith('sofa') || (pc.copia && pc.de.startsWith('sofa'))) && $('ajJunto').checked ? sentadosNo(pc) : [];
   arrasto = { pc, redim, x0: ev.clientX, y0: ev.clientY, cx: pc.cx, cy: pc.cy, topo: pc.topo, w: pc.w, h: pc.h, junto: junto.map(j => ({ pc: j, cx: j.cx, cy: j.cy })), mexeu: false };
   $('palco').setPointerCapture(ev.pointerId);
 });
@@ -987,8 +1012,12 @@ $('palco').addEventListener('pointermove', (ev) => {
   if (!arrasto) return;
   const k = kPalco(), dx = (ev.clientX - arrasto.x0) / k, dy = (ev.clientY - arrasto.y0) / k, pc = arrasto.pc;
   if (Math.abs(dx) + Math.abs(dy) > 1) arrasto.mexeu = true;
-  if (arrasto.redim) redimensionar(arrasto, dx, dy);
-  else {
+  if (arrasto.redim) {
+    redimensionar(arrasto, dx, dy);
+    // 🔗 quem senta no sofá acompanha: mesma posição relativa e o tamanho na mesma proporção
+    const k = pc.w / arrasto.w;
+    arrasto.junto.forEach(j => { j.pc.cx = pc.cx + (j.cx - arrasto.cx) * k; j.pc.cy = pc.cy + (j.cy - arrasto.cy) * k; if (j.w == null) { j.w = j.pc.w; j.h = j.pc.h; } j.pc.w = j.w * k; j.pc.h = j.h * k; posicionar(elDe(j.pc.chave), j.pc); });
+  } else {
     pc.cx = arrasto.cx + dx;
     if (pc.legenda) pc.topo = arrasto.topo + dy; else pc.cy = arrasto.cy + dy;
     arrasto.junto.forEach(j => { j.pc.cx = j.cx + dx; j.pc.cy = j.cy + dy; posicionar(elDe(j.pc.chave), j.pc); });
@@ -1033,15 +1062,19 @@ document.addEventListener('keydown', (ev) => {
 });
 function campoMuda() {
   const pc = pecaDe(ajSel); if (!pc || pc.travada) return;
+  const junto = pc.chave.startsWith('sofa') && $('ajJunto').checked ? sentadosNo(pc) : [];
+  const dx = +$('ajX').value - pc.cx, dy = pc.legenda ? 0 : +$('ajY').value - pc.cy;
   pc.cx = +$('ajX').value; if (pc.legenda) pc.topo = +$('ajY').value; else pc.cy = +$('ajY').value;
   posicionar(elDe(ajSel), pc); salvarDepois(pc);
+  junto.forEach(j => { j.cx += dx; j.cy += dy; posicionar(elDe(j.chave), j); salvarDepois(j); });
 }
 $('ajX').addEventListener('change', campoMuda); $('ajY').addEventListener('change', campoMuda);
 $('ajW').addEventListener('change', () => { const pc = pecaDe(ajSel); if (!pc) return; mudarTam(pc, +$('ajW').value || pc.w); posicionar(elDe(ajSel), pc); barraAjuste(); salvarDepois(pc); });
 $('ajR').addEventListener('input', () => { const pc = pecaDe(ajSel); if (!pc) return; mudarTam(pc, +$('ajR').value); posicionar(elDe(ajSel), pc); $('ajW').value = Math.round(pc.w); salvarDepois(pc); });
 $('ajVirar').addEventListener('click', async () => {
   const pc = pecaDe(ajSel); if (!pc) return;
-  const agora = pc.personagem ? pc.lado : (pc.espelhar ? 'esq' : 'dir');
+  const agora = (pc.personagem && !pc.copia) ? pc.lado : (pc.espelhar ? 'esq' : 'dir');
+  if (pc.tv) avisar($('ajEst'), '↔ a TV espelhada vira o vídeo também', 'rx-ok');
   await salvarPeca(pc, { lado: agora === 'esq' ? 'dir' : 'esq' });
   if (pc.personagem) avisar($('ajEst'), '✔ virado — se ainda não tem as poses desse lado, a seção 7 mostra "🔁 Gerar o que falta" (até lá usa a espelhada)', 'rx-ok');
   carregarPalco(); recarregar();
@@ -1049,6 +1082,22 @@ $('ajVirar').addEventListener('click', async () => {
 $('ajAuto').addEventListener('click', async () => {
   if (!ajSel) return;
   try { await api(`/react-personagens/${PID}/posicao`, { chave: ajSel, limpar: true }); carregarPalco(); } catch (e) { alert(e.message); }
+});
+async function duplicarSel() {
+  if (!ajSel || $('ajDup').disabled) return;
+  try { const d = await api(`/react-personagens/${PID}/duplicar`, { chave: ajSel }); ajSel = d.chave; await carregarPalco(); avisar($('ajEst'), '⧉ duplicada — arraste a cópia pro lugar', 'rx-ok'); }
+  catch (e) { avisar($('ajEst'), '⚠ ' + e.message, 'rx-err'); }
+}
+async function apagarSel() {
+  const pc = pecaDe(ajSel); if (!pc || !pc.copia) return;
+  try { await api(`/react-personagens/${PID}/duplicar`, { apagar: ajSel }); ajSel = null; carregarPalco(); } catch (e) { alert(e.message); }
+}
+$('ajDup').addEventListener('click', duplicarSel);
+$('ajApagar').addEventListener('click', apagarSel);
+document.addEventListener('keydown', (ev) => {
+  if (!ajSel || renderizado || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'd') { ev.preventDefault(); duplicarSel(); }
+  else if (ev.key === 'Delete' && (pecaDe(ajSel) || {}).copia) { ev.preventDefault(); apagarSel(); }
 });
 $('ajTudo').addEventListener('click', async () => {
   if (!confirm('Voltar TODAS as camadas desta disposição pro lugar e ordem automáticos?')) return;
@@ -1081,8 +1130,27 @@ $('bEditor').addEventListener('click', async () => {
   } catch (e) { $('eEst').textContent = '❌ ' + e.message; }
   b.disabled = false;
 });
-document.addEventListener('click', (e) => { if (e.target.hasAttribute && e.target.hasAttribute('data-zoom')) { $('zoom').querySelector('img').src = e.target.src; $('zoom').style.display = 'flex'; } });
-$('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+async function refazerItem(info) {
+  const pedido = prompt(`🔁 Gerar de novo — ${info.nome}${info.tipo === 'pose' ? ' · ' + info.arq.replace(/\.png$/, '') : ''}\nO que mudar? (deixe vazio pra só gerar de novo)`, '');
+  if (pedido === null) return false;
+  try {
+    if (info.tipo === 'pose') await api(`/react-personagens/${PID}/pose/${info.cid}/refazer`, { arquivo: info.arq, pedido });
+    else { if (evsEditados) await salvarEventos(); await api(`/react-personagens/${PID}/eventos/gerar`, { ids: [info.eid], pedido }); }
+    recarregar(); return true;
+  } catch (e) { alert(e.message); return false; }
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('[data-refazer-btn]');
+  if (b) { refazerItem(JSON.parse(b.dataset.refazerBtn)); return; }
+  if (e.target.hasAttribute && e.target.hasAttribute('data-zoom')) {
+    $('zoom').querySelector('img').src = e.target.src; $('zoom').style.display = 'flex';
+    const ref = e.target.dataset.refazer, ac = $('zoomAcoes');
+    ac.style.display = ref ? 'flex' : 'none';
+    ac.innerHTML = ref ? `<button type="button" id="zoomRefazer">🔁 Gerar de novo</button><button type="button" class="rx-sec">✕ Fechar</button>` : '';
+    if (ref) $('zoomRefazer').onclick = async (ev) => { ev.stopPropagation(); if (await refazerItem(JSON.parse(ref))) $('zoom').style.display = 'none'; };
+  }
+});
+$('zoom').addEventListener('click', (e) => { if (e.target.id !== 'zoomRefazer') $('zoom').style.display = 'none'; });
 
 recarregar().then(() => { const f = (P.roteiro.falas || [])[0]; $('pT').value = f ? +f.t + 0.4 : 0; atualizarPrevia(); });
 </script>

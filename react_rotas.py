@@ -554,7 +554,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         c = request.get_json(silent=True) or {}
         _p(pid)
         try:
-            return _ok(**{k: v for k, v in R.gerar_cenas(pid, base_dir, c.get("ids") or None).items() if k != "ok"})
+            return _ok(**{k: v for k, v in R.gerar_cenas(pid, base_dir, c.get("ids") or None, str(c.get("pedido") or "")).items() if k != "ok"})
         except R.ReactErro as exc:
             return _erro(str(exc))
 
@@ -714,6 +714,38 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         return _ok()
 
     # ------------------------------------------------------------------ 🧍 personagens no Flow
+    @app.route("/react-personagens/<pid>/pose/<cid>/virar", methods=["POST"])
+    def react_pose_virar(pid: str, cid: str):
+        """↔ esta pose veio virada pro outro lado."""
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                novo = R.marcar_virada(p, cid, os.path.basename(str(c.get("arquivo") or "")), base_dir)
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok(virada=novo)
+
+    @app.route("/react-personagens/<pid>/pose/<cid>/conferir", methods=["POST"])
+    def react_pose_conferir(pid: str, cid: str):
+        """🧭 a IA confere pra que lado cada pose está virada."""
+        _p(pid)
+        try:
+            return _ok(**R.conferir_lados(pid, cid, base_dir, todas=True))
+        except R.ReactErro as exc:
+            return _erro(str(exc))
+
+    @app.route("/react-personagens/<pid>/pose/<cid>/refazer", methods=["POST"])
+    def react_pose_refazer(pid: str, cid: str):
+        c = request.get_json(silent=True) or {}
+        _p(pid)
+        try:
+            R.refazer_pose(pid, cid, str(c.get("arquivo") or ""), str(c.get("pedido") or ""), base_dir)
+        except (R.ReactErro, KeyError) as exc:
+            return _erro(str(exc))
+        return _ok()
+
     @app.route("/react-personagens/<pid>/poses/gerar", methods=["POST"])
     def react_poses(pid: str):
         p = _p(pid)
@@ -750,6 +782,23 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     def react_pecas(pid: str):
         p = _p(pid)
         return _ok(**R.pecas_para_editar(p, base_dir, R.segundos(request.args.get("t"))))
+
+    @app.route("/react-personagens/<pid>/duplicar", methods=["POST"])
+    def react_duplicar(pid: str):
+        """⧉ duplica uma camada (mesa, sofá, TV, personagem) — ou {"apagar": chave} tira uma cópia."""
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                if c.get("apagar"):
+                    R.apagar_copia(p, str(c["apagar"]))
+                    nova = None
+                else:
+                    nova = R.duplicar(p, str(c.get("chave") or ""), base_dir)
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok(chave=nova)
 
     @app.route("/react-personagens/<pid>/pilha", methods=["POST"])
     def react_pilha(pid: str):

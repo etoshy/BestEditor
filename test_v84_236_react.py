@@ -778,3 +778,150 @@ def test_momentos_especiais_e_leitura_do_video(base, tmp_path, monkeypatch):
             assert o["end"] <= 13.0 or o["start"] >= 16.0
     assert c.get(f"/react-personagens/{pid}/previa.jpg?t=9").status_code == 200
     assert c.get(f"/react-personagens/{pid}/previa.jpg?t=14").status_code == 200
+
+
+def test_duplicar_mesa_tv_e_personagem(base, tmp_path):
+    """⧉ Duplicar qualquer camada: a cópia nasce ao lado, mexe sozinha, entra na pilha acima da original e vai pro editor."""
+    import app as A
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 10)
+    with open(video, "rb") as f:
+        pid = c.post("/react-personagens/novo", data={"titulo": "Dup", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                     content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    c.post(f"/react-personagens/{pid}/personagem", json={"nome": "Goku"})
+    p = R.carregar(pid)
+    goku = p["personagens"][0]["id"]
+    R.guardar_ref(p, p["personagens"][0], _png(), "a.png")
+    p["roteiro"]["falas"] = [{"id": "f1", "t": 1.0, "dur": 2.0, "cid": goku, "texto": "Oi!", "expressao": "feliz", "reacoes": [], "cta": True}]
+    R.salvar(p)
+    for q, im in (("fundo", _png((30, 30, 60), (640, 360), (10, 10, 10))), ("sofa", _png((80, 80, 90), (600, 300))), ("mesa", _png((120, 70, 40), (600, 200)))):
+        c.post(f"/react-personagens/{pid}/cenario/{q}/arquivo", data={"arquivo": (io.BytesIO(im), "x.png")}, content_type="multipart/form-data")
+    mesa2 = c.post(f"/react-personagens/{pid}/duplicar", json={"chave": "mesa"}).get_json()["chave"]
+    tv2 = c.post(f"/react-personagens/{pid}/duplicar", json={"chave": "tela"}).get_json()["chave"]
+    clone = c.post(f"/react-personagens/{pid}/duplicar", json={"chave": f"p:{goku}"}).get_json()["chave"]
+    mesa3 = c.post(f"/react-personagens/{pid}/duplicar", json={"chave": mesa2}).get_json()["chave"]
+    assert not c.post(f"/react-personagens/{pid}/duplicar", json={"chave": "legenda"}).get_json()["ok"]
+    p = R.carregar(pid)
+    lay = R.disposicao(p)
+    m2 = next(x for x in lay["copias"] if x["chave"] == mesa2)
+    assert m2["cx"] == lay["mesa"]["cx"] + 0.05 * 1920 and m2["w"] == lay["mesa"]["w"]
+    m3 = next(x for x in lay["copias"] if x["chave"] == mesa3)
+    assert m3["cx"] > m2["cx"] and m3["de"] == "mesa"  # cópia da cópia nasce ao lado dela
+    ordem = R.pilha(p, lay)["ordem"]
+    assert ordem.index(mesa2) == ordem.index("mesa") + 1 or ordem.index(mesa3) == ordem.index("mesa") + 1
+    # mexe na cópia: muda só ela, e vira (a mesa espelhada)
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": mesa2, "cx": 300, "cy": 900, "w": 500, "lado": "esq"}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": clone, "cx": 1500, "cy": 700, "w": 300, "lado": "esq"}).get_json()["ok"]
+    pe = c.get(f"/react-personagens/{pid}/pecas?t=1.5").get_json()
+    pc = {x["chave"]: x for x in pe["pecas"]}
+    assert pc[mesa2]["cx"] == 300 and pc[mesa2]["copia"] and pc["mesa"]["cx"] != 300
+    assert pc[clone]["personagem"] and pc[clone]["expressao"] == "feliz" and pc[clone]["lado"] == "esq"
+    assert c.get(f"/react-personagens/{pid}/previa.jpg?t=1.5").status_code == 200
+    d = c.post(f"/react-personagens/{pid}/editor", json={}).get_json()
+    ovs = A._JOBS[d["job_id"]]["overlays"]
+    om = [o for o in ovs if o.get("copia") == mesa2]
+    assert len(om) == 1 and round(om[0]["x_percent"], 2) == round(300 / 1920 * 100, 2) and om[0]["espelhar"]
+    ov_tv = [o for o in ovs if o.get("copia") == tv2]
+    assert any(o.get("media_type") == "video" and o.get("sincronizar") for o in ov_tv)  # a TV duplicada passa o vídeo também
+    oc = [o for o in ovs if o.get("copia") == clone]
+    assert oc and all(o["trilha"].endswith(clone[2:]) for o in oc) and all(round(o["x_percent"], 1) == round(1500 / 19.2, 1) for o in oc)
+    # apagar a cópia; a original não se apaga
+    assert c.post(f"/react-personagens/{pid}/duplicar", json={"apagar": mesa2}).get_json()["ok"]
+    assert not c.post(f"/react-personagens/{pid}/duplicar", json={"apagar": "mesa"}).get_json()["ok"]
+    assert mesa2 not in R.pilha(R.carregar(pid), R.disposicao(R.carregar(pid)))["ordem"]
+    assert "⧉ Duplicar" in c.get(f"/react-personagens/{pid}").get_data(as_text=True)
+
+
+def test_espelhar_qualquer_camada_e_refazer_pose(base, tmp_path, monkeypatch):
+    import app as A
+    import personagens_pod as pp
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 8)
+    with open(video, "rb") as f:
+        pid = c.post("/react-personagens/novo", data={"titulo": "Esp", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                     content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    c.post(f"/react-personagens/{pid}/personagem", json={"nome": "Kenpachi"})
+    p = R.carregar(pid)
+    ken = p["personagens"][0]["id"]
+    R.guardar_ref(p, p["personagens"][0], _png(), "a.png")
+    p["roteiro"]["falas"] = [{"id": "f1", "t": 1.0, "dur": 2.0, "cid": ken, "texto": "Luta!", "expressao": "feliz", "reacoes": [], "cta": True}]
+    R.salvar(p)
+    for q, im in (("fundo", _png((30, 30, 60), (640, 360), (10, 10, 10))), ("mesa", _png((120, 70, 40), (600, 200)))):
+        c.post(f"/react-personagens/{pid}/cenario/{q}/arquivo", data={"arquivo": (io.BytesIO(im), "x.png")}, content_type="multipart/form-data")
+    for chave in ("mesa", "tela", "foto", "fundo"):
+        assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": chave, "lado": "esq"}).get_json()["ok"]
+    lay = R.disposicao(R.carregar(pid))
+    assert lay["mesa"]["espelhar"] and lay["tela"]["espelhar"] and lay["foto"]["espelhar"] and lay["fundo"]["espelhar"]
+    pe = c.get(f"/react-personagens/{pid}/pecas").get_json()
+    assert pe["fundo_espelhar"] and next(x for x in pe["pecas"] if x["chave"] == "mesa")["espelhar"]
+    assert c.get(f"/react-personagens/{pid}/previa.jpg?t=1.5").status_code == 200
+    d = c.post(f"/react-personagens/{pid}/editor", json={}).get_json()
+    job = A._JOBS[d["job_id"]]
+    ovs = job["overlays"]
+    assert next(o for o in ovs if o.get("camada") == "mesa")["espelhar"]
+    assert next(o for o in ovs if o.get("origem") == "react_tela")["espelhar"]
+    # o fundo do editor sai espelhado
+    from PIL import Image as I
+    fundo_job = job["pending_segments"][0]["override_source"]["value"]
+    orig = I.open(R.camada_arquivo(R.carregar(pid), "fundo")).convert("RGB").resize((1920, 1080))
+    assert I.open(fundo_job).convert("RGB").getpixel((60, 300)) == orig.getpixel((1859, 300))
+    # 🔁 refazer UMA pose (vai junto a boca dela)
+    monkeypatch.setattr(pp, "enviar", lambda *a, **k: {"ok": True})
+    assert c.post(f"/react-personagens/{pid}/poses/gerar", json={"cids": [ken]}).get_json()["ok"]
+    visto = {}
+    monkeypatch.setattr(pp, "enviar", lambda ppid, arquivos, extra="", base=None, **k: visto.update(arq=arquivos, extra=extra) or {"ok": True})
+    proj = pp.carregar(R.personagem(R.carregar(pid), ken)["pod"]["pid"])
+    pose = next(x["arquivo"] for x in proj["dados"]["poses"] if x.get("tipo") == "pose" and "feliz" in x["arquivo"])
+    r = c.post(f"/react-personagens/{pid}/pose/{ken}/refazer", json={"arquivo": pose, "pedido": "sem o tapa-olho"}).get_json()
+    assert r["ok"] and visto["arq"][0] == pose and visto["extra"] == "sem o tapa-olho"
+    assert not c.post(f"/react-personagens/{pid}/pose/{ken}/refazer", json={"arquivo": "nada.png"}).get_json()["ok"]
+
+
+def test_poses_viradas_pro_lado_errado_sao_espelhadas(base, monkeypatch):
+    """🧭 O Flow às vezes desenha a pose virada pro outro lado: a IA confere (ou você marca ↔) e o react espelha só
+    aquela pose — virar o personagem continua funcionando mesmo quando as poses do outro lado vieram erradas."""
+    import personagens_pod as pp
+    import ia_servico
+    p = _proj(base, 2)
+    p["expressoes"] = ["neutro", "feliz"]
+    R.salvar(p, base)
+    ch = p["personagens"][1]
+    monkeypatch.setattr(pp, "enviar", lambda *a, **k: {"ok": True})
+    R.criar_poses(p["id"], ch["id"], base)
+    p = R.carregar(p["id"], base)
+    p["layout"] = "dois_sofas"
+    R.salvar(p, base)
+    R.criar_poses(p["id"], ch["id"], base)  # + as do lado esquerdo
+    p = R.carregar(p["id"], base)
+    ch = R.personagem(p, ch["id"])
+    proj = pp.carregar(ch["pod"]["pid"], base)
+    assert any("_esq" in x["arquivo"] for x in proj["dados"]["poses"])
+    for x in proj["dados"]["poses"]:
+        local = x["arquivo"][:-4] + "_v1.png"
+        Image.new("RGBA", (300, 450), (0, 0, 200, 255)).save(os.path.join(pp._pasta(proj["id"], base), "imagens", local))
+        proj["imagens"][x["arquivo"]].update(estado="pronta", versoes=[{"local": local}], atual=0)
+    pp.salvar(proj, base)
+    poses = R.poses_do_personagem(ch, base, "dir")
+    assert not poses["neutro"]["espelhar"] and poses["neutro"]["virada"] == "dir"
+    # a IA diz que a 'feliz' veio virada pra esquerda
+    nomes = [x["arquivo"] for x in proj["dados"]["poses"] if x.get("tipo") == "pose"]
+
+    def falsa(recurso, system, conteudo, **kw):
+        assert conteudo[1]["type"] == "image"
+        n = int(conteudo[0]["text"].split()[0])
+        return {"figuras": [{"n": k + 1, "lado": "direita"} for k in range(n)]}
+    monkeypatch.setattr(ia_servico, "chamar", falsa)
+    r = R.conferir_lados(p["id"], ch["id"], base)
+    assert r["conferidas"] == len([n for n in nomes if "_boca" not in n])
+    p = R.carregar(p["id"], base)
+    feliz = next(n for n in nomes if "feliz" in n and "_esq" not in n)
+    assert R.marcar_virada(p, ch["id"], feliz, base) == "esq"  # ↔ você corrige uma
+    R.salvar(p, base)
+    ch = R.personagem(R.carregar(p["id"], base), ch["id"])
+    pd = R.poses_do_personagem(ch, base, "dir")
+    assert not pd["neutro"]["espelhar"]
+    # pra 'feliz' olhando pra direita: a do arquivo da direita está virada errada → usa outra que olha pra direita
+    assert pd["feliz"]["virada"] == "dir" and not pd["feliz"]["espelhar"]
+    # olhando pra esquerda: as _esq vieram viradas pra DIREITA (a IA disse) → são espelhadas
+    pe = R.poses_do_personagem(ch, base, "esq")
+    assert pe["neutro"]["espelhar"] and pe["feliz"]["virada"] == "esq" and not pe["feliz"]["espelhar"]
