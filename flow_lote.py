@@ -636,8 +636,11 @@ class Lote:
                 gf.pular_conta(conta, motivo)
             except Exception:  # noqa: BLE001
                 pass
+            # 🩹 v84_236: "[passo] não achei…" em TODAS as contas costuma ser o Flow que mudou a tela, não o login
+            tela = bool(re.search(r"\[\w+\]\s*(não achei|o painel|o pop-up|cliquei)", motivo))
             self.log(f"⏭ Pulando a conta “{conta}”: {motivo}. Os pedidos dela vão pra outra conta. "
-                     f"(🌐 Abrir navegador → faça o login → ✔ Concluir pra ela voltar.)", "erro")
+                     + ("(Se isso acontece em todas as contas, o Flow mudou a tela: 🩹 Corrigir, aqui na aba Flow.)" if tela
+                        else "(🌐 Abrir navegador → faça o login → ✔ Concluir pra ela voltar.)"), "erro")
 
         try:
             from playwright.sync_api import sync_playwright

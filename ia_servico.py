@@ -120,6 +120,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                     "No Estúdio (aba 🧍 Personagens) e nos projetos novos de um canal com personagens: escolhe os MELHORES "
                     "momentos pra cada personagem aparecer (não todas as falas), a pose que combina com o que ela diz e a "
                     "animação de entrada/saída.", True),
+    "flow_correcao": ("🩹 Flow: corrigir quando a tela muda",
+                      "Na aba 🎬 Google Flow → 🩹 Corrigir: lê o erro, a foto e o HTML da tela e o trecho do código e propõe a "
+                      "correção — aplicada numa CÓPIA do código do Flow (o original não muda), testada e reversível.", True),
     "react": ("🎭 React de personagens: elenco e roteiro",
               "Na aba 🕵️ Modelos de vídeo → 🎭 React de personagens: lê a transcrição e olha quadros do vídeo, sugere os "
               "personagens (da obra, hypados, contraste), completa a ficha de cada um e escreve as falas — quem fala, quando, "

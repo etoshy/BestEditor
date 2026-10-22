@@ -1,0 +1,121 @@
+<details class="fl-box" id="correcoes">
+  <summary style="cursor:pointer;font-weight:600">🩹 Corrigir — quando o Flow muda a tela e um passo quebra <span class="fl-hint" id="corStatusMini"></span></summary>
+  <p class="fl-hint">Pegue um erro da lista: <b>🤖 a IA do site analisa</b> (o erro, a foto, o HTML da tela e o trecho do código) e propõe a correção, ou <b>📋 gere o prompt completo</b> pra outra IA (ChatGPT, Claude, Gemini…) e cole a resposta aqui.
+    A correção vai numa <b>CÓPIA</b> do código do Flow (<code>flow_correcoes/&lt;id&gt;/</code>) — o código original nunca muda. Cada correção fica no catálogo com o diagnóstico, as mudanças (diff) e os testes; você <b>✔ ativa</b> e <b>↩ volta ao original</b> quando quiser.</p>
+  <div class="cor-status" id="corStatus"></div>
+
+  <h4 style="margin:12px 0 4px">1 · O erro</h4>
+  <ul class="fl-diag-lista" id="corErros" style="padding:0;margin:0"></ul>
+
+  <details style="margin-top:8px"><summary style="cursor:pointer" class="fl-hint">📋 colar a resposta de outra IA</summary>
+    <div class="fl-row" style="margin-top:6px"><label class="fl-hint" style="margin:0">De qual erro? <select id="corDiag" style="width:auto"></select></label></div>
+    <textarea id="corColar" rows="5" placeholder='{"diagnostico": "...", "causa": "...", "confianca": "alta", "mudancas": [{"arquivo": "flow_direto.py", "de": "...", "para": "...", "motivo": "..."}], "seletores_esperados": [], "observacoes": ""}' style="width:100%;margin-top:6px"></textarea>
+    <button type="button" id="corColarBtn" style="width:auto;margin-top:4px">✔ Criar a correção (na cópia)</button>
+  </details>
+
+  <h4 style="margin:14px 0 4px">2 · Catálogo de correções</h4>
+  <div id="corItens"></div>
+</details>
+<style>
+  .cor-status { border-radius: 8px; padding: 8px 12px; margin: 6px 0; font-size: .9rem; }
+  .cor-status.original { background: var(--code-bg, #f1f2f6); }
+  .cor-status.ativa { background: var(--ok-bg, #ecfdf3); border: 1px solid var(--ok, #15803d); }
+  .cor-item { border: 1px solid var(--borda, #ddd); border-radius: 10px; padding: 8px 12px; margin-top: 8px; }
+  .cor-item.ativa { border-color: var(--ok, #15803d); box-shadow: 0 0 0 2px var(--ok-bg, #ecfdf3); }
+  .cor-tag { font-size: .72rem; border-radius: 999px; padding: 1px 8px; background: var(--code-bg, #eee); margin-left: 4px; }
+  .cor-tag.ativa, .cor-tag.testada { background: #dcfce7; color: #166534; } .cor-tag.falhou { background: #fee2e2; color: #991b1b; }
+  .cor-tag.pronta { background: #fef9c3; color: #854d0e; } .cor-tag.revertida { background: #e5e7eb; color: #4b5563; }
+  .cor-diff { font: 12px/1.35 var(--mono, monospace); white-space: pre; overflow: auto; max-height: 340px; background: #0b1020; color: #cbd5e1; border-radius: 6px; padding: 6px 8px; }
+  .cor-diff .a { color: #86efac; } .cor-diff .r { color: #fca5a5; } .cor-diff .h { color: #93c5fd; }
+  .cor-mini { width: auto !important; margin: 0 4px 0 0 !important; padding: 3px 9px !important; font-size: .8rem !important; }
+  .cor-tab td, .cor-tab th { font-size: .78rem; padding: 2px 6px; border-bottom: 1px solid var(--borda, #eee); text-align: left; vertical-align: top; }
+</style>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const quando = t => t ? new Date(t * 1000).toLocaleString().slice(0, 17) : '';
+  let C = null, timer = null;
+  const ROT_EST = { ativa: '✔ ativa', testada: '🧪 testada', pronta: 'pronta pra testar', falhou: '✖ falhou', revertida: '↩ revertida' };
+  async function post(url, corpo) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    let d = {}; try { d = await r.json(); } catch (_) {}
+    if (!r.ok || d.ok === false) throw new Error(d.erro || ('HTTP ' + r.status));
+    return d;
+  }
+  function diffHtml(t) {
+    return esc(t).split('\n').map(l => l.startsWith('+') && !l.startsWith('+++') ? `<span class="a">${l}</span>` : l.startsWith('-') && !l.startsWith('---') ? `<span class="r">${l}</span>` : l.startsWith('@@') ? `<span class="h">${l}</span>` : l).join('\n');
+  }
+  async function carregarErros() {
+    let d = {}; try { d = await (await fetch('/flow/diagnosticos')).json(); } catch (_) {}
+    const itens = d.itens || [];
+    const rodando = (C && C.testes_rodando) || {};
+    $('corErros').innerHTML = itens.map(x => `<li style="margin:4px 0"><b>${quando(x.quando)}</b> — ${esc(x.motivo)}<br>
+      <button type="button" class="cor-mini" data-ia="${x.id}" ${rodando['ia:' + x.id] ? 'disabled' : ''}>${rodando['ia:' + x.id] ? '⏳ analisando…' : '🤖 Analisar e corrigir com a IA'}</button>
+      <button type="button" class="cor-mini yt-sec" data-prompt="${x.id}">📋 Prompt completo pra outra IA</button>
+      ${x.foto ? `<a href="/flow/diagnostico/${x.id}/foto" target="_blank" class="fl-hint">📷 foto</a> ·` : ''} <a href="/flow/diagnostico/${x.id}/zip" class="fl-hint">⬇ zip</a></li>`).join('')
+      || '<li class="fl-hint">Nenhum erro guardado (quando um passo do Flow falhar, ele aparece aqui).</li>';
+    $('corDiag').innerHTML = itens.map(x => `<option value="${x.id}">${quando(x.quando)} — ${esc(x.motivo.slice(0, 80))}</option>`).join('');
+  }
+  function desenhar() {
+    const ativa = C.ativa;
+    $('corStatus').className = 'cor-status ' + (ativa ? 'ativa' : 'original');
+    $('corStatus').innerHTML = ativa
+      ? `✔ Em uso: a correção <b>${esc(ativa)}</b> (cópia em <code>flow_correcoes/${esc(ativa)}/</code>). <button type="button" class="cor-mini yt-sec" id="corOriginal">↩ Voltar ao código original</button>`
+      : 'Em uso: o <b>código original</b> do Flow.';
+    $('corStatusMini').textContent = ativa ? `· ✔ correção ${ativa} em uso` : '';
+    if ($('corOriginal')) $('corOriginal').onclick = async () => { if (!confirm('Voltar ao código original do Flow?')) return; try { const d = await post('/flow/correcoes/original'); if (d.aviso) alert(d.aviso); carregar(); } catch (e) { alert(e.message); } };
+    const rod = C.testes_rodando || {};
+    $('corItens').innerHTML = (C.itens || []).map(x => {
+      const th = (x.testes || {}).html, ts = (x.testes || {}).suite;
+      const mud = (x.mudancas || []).map(m => `<li>${m.aplicada ? '✔' : '✖'} <b>${esc(m.arquivo)}</b> — ${esc(m.motivo)}${m.erro ? ` <span style="color:#b91c1c">(${esc(m.erro)})</span>` : ''}</li>`).join('');
+      const tabela = th ? `<table class="cor-tab" style="margin-top:4px"><tr><th>seletor</th><th>antes</th><th>depois</th></tr>${th.linhas.filter(l => l.mudou || l.envolvido).map(l => `<tr><td>${l.mudou ? '✏ ' : ''}${esc(l.seletor)}${l.erro ? ` <span style="color:#b91c1c">${esc(l.erro)}</span>` : ''}</td><td>${l.antes == null ? '—' : l.antes}</td><td><b>${l.depois == null ? '—' : l.depois}</b></td></tr>`).join('')}${(th.esperados || []).map(e => `<tr><td>🎯 ${esc(e.seletor)}</td><td></td><td><b>${e.achou}</b> ${e.achou ? '✔' : '✖'}</td></tr>`).join('')}</table>` : '';
+      return `<div class="cor-item ${x.id === ativa ? 'ativa' : ''}">
+        <div class="fl-row" style="justify-content:space-between;flex-wrap:wrap"><div><b>${esc(x.id)}</b> <span class="cor-tag ${esc(x.estado)}">${ROT_EST[x.estado] || esc(x.estado)}</span>
+          <span class="fl-hint">${quando(x.criado)} · ${esc(x.origem)} · feita em cima do ${x.base === 'original' ? 'original' : esc(x.base)}${x.confianca ? ' · confiança ' + esc(x.confianca) : ''}</span></div>
+          <div>${x.id !== ativa ? `<button type="button" class="cor-mini" data-acao="ativar" data-id="${x.id}" ${x.estado === 'falhou' ? 'disabled' : ''}>✔ Ativar</button>` : ''}
+            <button type="button" class="cor-mini yt-sec" data-acao="testar_html" data-id="${x.id}">🧪 Testar no HTML do erro</button>
+            <button type="button" class="cor-mini yt-sec" data-acao="testar_suite" data-id="${x.id}" ${rod['suite:' + x.id] ? 'disabled' : ''}>${rod['suite:' + x.id] ? '⏳ suíte rodando…' : '🧪 Suíte do Flow simulado (~8 min)'}</button>
+            <a class="fl-hint" href="/flow/correcoes/${x.id}.zip">⬇ arquivos</a>
+            ${x.id !== ativa ? `<button type="button" class="cor-mini yt-sec" data-acao="apagar" data-id="${x.id}" title="apaga a cópia e o registro">🗑</button>` : ''}</div></div>
+        <div style="font-size:.86rem;margin-top:4px"><b>Erro:</b> ${esc(x.erro)}</div>
+        ${x.diagnostico ? `<div style="font-size:.86rem"><b>O que mudou no Flow:</b> ${esc(x.diagnostico)}</div>` : ''}
+        ${x.causa ? `<div style="font-size:.86rem"><b>Causa:</b> ${esc(x.causa)}</div>` : ''}
+        ${x.observacoes ? `<div class="fl-hint">💬 ${esc(x.observacoes)}</div>` : ''}
+        <ul style="margin:4px 0 0 0;padding-left:18px;font-size:.84rem">${mud}</ul>
+        ${(x.compilacao || []).length ? `<div style="color:#b91c1c;font-size:.84rem">❌ não compila: ${esc(x.compilacao.join(' · '))}</div>` : ''}
+        ${th ? `<div style="font-size:.84rem;margin-top:4px"><b>🧪 No HTML do erro:</b> ${esc(th.resumo)}</div>${tabela}` : ''}
+        ${ts ? `<div style="font-size:.84rem;margin-top:4px"><b>🧪 Suíte do Flow simulado:</b> ${ts.ok ? '✔' : '✖'} ${esc(ts.resumo)} (${ts.segundos}s)</div>` : ''}
+        ${Object.keys(x.diffs || {}).length ? `<details style="margin-top:4px"><summary class="fl-hint" style="cursor:pointer">📄 ver as mudanças (diff contra o original)</summary>${Object.entries(x.diffs).map(([a, d]) => `<div class="cor-diff">${diffHtml(d)}</div>`).join('')}</details>` : ''}
+        <details><summary class="fl-hint" style="cursor:pointer">🕘 histórico</summary><div class="fl-hint">${(x.historico || []).map(h => `${quando(h.quando)} — ${esc(h.o_que)}`).join('<br>')}</div></details>
+      </div>`;
+    }).join('') || '<p class="fl-hint">Nenhuma correção ainda.</p>';
+  }
+  async function carregar() {
+    clearTimeout(timer);
+    try { C = await (await fetch('/flow/correcoes')).json(); desenhar(); await carregarErros(); } catch (_) {}
+    if (C && Object.keys(C.testes_rodando || {}).length) timer = setTimeout(carregar, 4000);
+  }
+  $('correcoes').addEventListener('toggle', () => { if ($('correcoes').open) carregar(); });
+  $('correcoes').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.ia) { await post('/flow/correcoes/analisar/' + b.dataset.ia); b.disabled = true; b.textContent = '⏳ analisando…'; return carregar(); }
+      if (b.dataset.prompt) { const d = await (await fetch('/flow/correcoes/prompt/' + b.dataset.prompt)).json(); if (!d.ok) throw new Error(d.erro); await navigator.clipboard.writeText(d.prompt); $('corDiag').value = b.dataset.prompt; b.textContent = '✔ prompt copiado — cole na outra IA (anexe a 📷 foto) e cole a resposta abaixo'; return; }
+      const id = b.dataset.id, acao = b.dataset.acao; if (!acao) return;
+      if (acao === 'apagar' && !confirm(`Apagar a correção ${id} (a cópia e o registro)?`)) return;
+      if (acao === 'ativar' && !confirm(`Usar a correção ${id}? (o código original continua guardado — dá pra voltar quando quiser)`)) return;
+      b.disabled = true; const txt = b.textContent; if (acao === 'testar_html') b.textContent = '⏳ testando…';
+      const d = await post(`/flow/correcoes/${id}/${acao}`);
+      if (d.aviso) alert(d.aviso);
+      b.disabled = false; b.textContent = txt;
+      carregar();
+    } catch (er) { alert(er.message); carregar(); }
+  });
+  $('corColarBtn').addEventListener('click', async () => {
+    try { const d = await post('/flow/correcoes/colar', { texto: $('corColar').value, diag: $('corDiag').value }); $('corColar').value = ''; alert(`✔ Correção ${d.item.id} criada na cópia — ${d.item.estado === 'falhou' ? 'mas nem tudo foi aplicado (veja o que falhou)' : 'confira o teste e ✔ ative'}.`); carregar(); }
+    catch (e) { alert(e.message); }
+  });
+  if (location.hash === '#correcoes') { $('correcoes').open = true; carregar(); }
+})();
+</script>

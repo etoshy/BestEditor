@@ -51,6 +51,8 @@ from werkzeug.utils import secure_filename
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "toolkit"))
+import flow_correcoes as _flow_correcoes  # noqa: E402  🩹 v84_236: a correção do Flow ativa (cópia) vale desde o começo
+_flow_correcoes.aplicar_no_boot()
 
 from prompt_builder import BROWSER_IMAGE_SEARCH_PROVIDERS, DEFAULT_PROVIDERS, PHOTO_SEARCH_PROVIDERS, PromptBuilderError, VideoSegment, build_animepexels_prompt, build_buscadores_search_terms_prompt, build_prompt, build_wikipedia_search_terms_prompt, parse_ai_response, parse_wikipedia_search_terms_response
 import wikipedia_enrichment
@@ -11827,6 +11829,7 @@ def _react_criar_job(job_id: str, job: Dict[str, Any]) -> None:
     _save_state(job_id)
 
 
+_flow_correcoes.registrar(app, BASE_DIR)  # 🩹 aba Flow → Corrigir (v84_236)
 import react_rotas as _react_rotas  # noqa: E402  🎭 React de personagens (aba Modelos de vídeo, v84_236)
 _react_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir)
 import personagens_editor as _pers_ed  # noqa: E402  🧍 as personagens do canal por cima do vídeo, quando falam (v84_185)
