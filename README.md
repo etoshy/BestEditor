@@ -3959,3 +3959,44 @@ referência principal. *Escrever as cenas* manda as páginas de cada cena pra IA
 japonesa); cada momento ganha o campo **🔊 som** (efeito sonoro anotado — a busca de efeitos vem depois). ⬇ *JSON da
 adaptação* baixa o “segundo JSON”; o zip exportado leva páginas, adaptação e designs (aprovados ou não). Estilo novo:
 🖋 *Mangá em tinta P&B (tipo o anime Uzumaki)* — monocromático: preto, branco e cinzas, hachuras finas, sombreado cinza suave, fundos detalhados. Código: `anime2d_manga.py`.
+🚫🔤 **Sem texto nas imagens**: todo prompt (fundos, frente, itens, destaques, design anime, poses, vídeo do momento)
+leva `SEM_TEXTO` — nada de letras, balões, onomatopeias, caixas de narração ou placas com escrita, e "não copie os
+balões/letras das referências". Na adaptação de mangá a IA é instruída a escolher recortes sem balões e a nunca pedir
+texto nos campos _en (um bilhete vira papel com rabiscos ilegíveis); o texto fica na voz, na legenda e no 🔊 som.
+
+### 🩹 Flow em massa parando com coisa na fila (v84_237)
+
+Três causas corrigidas em `flow_lote.py`: (1) um pedido que chegava enquanto o supervisor concluía "acabou" (ex.: a
+🎞 Animação 2D mandando mais) — agora ele só termina se a fila continua vazia; (2) o lote ficava marcado "rodando"
+com o supervisor já fechado e o ▶ Iniciar não fazia nada — agora ele recomeça; (3) a conta que tinha erros seguidos /
+não abria o projeto / o navegador não abria ficava fora até o fim → "nenhuma conta". Agora ela descansa (5 min; 2 min
+se foi o navegador; 60 min na "atividade incomum") e volta sozinha, e o lote ESPERA ligado ("⏳ volto a tentar às
+HH:MM") em vez de parar. Só para de vez se for login (✔ Concluir), sem crédito, ou se a espera passar de 3 h. A conta
+que fica esperando um pedido que ainda não pode pegar (o da conta do projeto) segura o navegador em vez de fechar.
+
+## 🎬 Animação 2D com cara de anime (v84_238)
+
+- **🎥 Planos de câmera por momento** (`anime2d_cena.py`): `geral` (o cenário todo), `medio` (da cintura pra cima de
+  quem está em foco), `close` (o rosto — usa o 🙂 *busto* do personagem) e `reacao` (o rosto num fundo abstrato
+  desenhado aqui: linhas de velocidade, brilho, sombrio, impacto; P&B nos estilos de mangá). O médio/close é um
+  RECORTE do mesmo cenário em volta do foco — cada corte mostra outra parte do mesmo lugar, como num anime. Um trecho
+  de fundo por momento no editor.
+- **🪑 Móveis em camadas + 📐 Montar o cenário**: cada local tem `props` (mesa, cadeira, balcão — gerados à parte,
+  recortados) com camada `atras`/`frente`, e `lugares` (onde cada um fica em pé ou SENTADO, com x/y dos pés e a escala
+  da perspectiva). O fundo é gerado SEM os móveis. Na seção 5, 📐 abre o palco: arraste os lugares e os móveis, ou
+  🤖 *IA posiciona* (ela olha o fundo e devolve chão, altura de quem está em pé, lugares e móveis).
+- **👣 Sem flutuar**: as poses são recortadas rente ao desenho (os pés no chão do lugar) com sombra suave no chão.
+- **🔁 Sem loop**: a pose fica parada; o 2º quadro só aparece na TRANSIÇÃO de uma pose pra outra; `poses_seguintes`
+  tocam em sequência dentro do momento; a boca mexe só na fala; e o personagem PISCA de vez em quando (quadro
+  `_pisca` gerado no Flow). Quem muda de lugar ANDA até lá (quadros de andar + deslocamento, `mov` tipo `de/para`),
+  quem entra no meio da cena entra andando.
+- **🧍 Mesmo design em tudo**: destaques e objetos levam a referência do 🎨 design aprovado (ou da neutra) de quem
+  aparece neles (`personagens` do item, nomes no prompt ou quem está em cena) e o fundo do lugar; as poses nunca trazem
+  móveis.
+- **✍ Texto que faz parte da piada**: o item tem `texto` (a etiqueta “BULLYING”, o bilhete) — escrito exatamente;
+  balões, onomatopeias e legendas continuam proibidos.
+- **🎙 Vozes**: aparecem as do 🎭 multi voice E todos os 🗣️ perfis de voz (com o motor escolhido pros perfis); a
+  geração faz todas as falas de UMA voz em seguida e depois a próxima (o motor carrega cada voz uma vez).
+- **🎬 Vídeo de referência**: no passo 1 (📖 Mangá / 🎬 vídeo → anime) ou a pasta `video/` do zip: os cortes do vídeo
+  viram os quadros (com o segundo de cada um), o áudio pode virar o do episódio (transcrito), e a IA recria a cena com
+  os SEUS personagens (diga quem é quem no texto) — mesmo fluxo do mangá: ler → aprovar os designs → gerar.

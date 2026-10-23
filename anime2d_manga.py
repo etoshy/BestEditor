@@ -50,13 +50,10 @@ SCHEMA_ADAPTACAO = {
                 "idade": {"type": "string", "enum": ["crianca", "jovem", "adulto", "idoso"]},
                 "recorte": _CAIXA}}},
         "locais": {"type": "array", "items": {
-            "type": "object", "additionalProperties": False, "required": ["nome", "descricao", "prompt_en", "frente_en", "recorte"],
-            "properties": {"nome": {"type": "string"}, "descricao": {"type": "string"}, "prompt_en": {"type": "string"},
-                           "frente_en": {"type": "string"}, "recorte": _CAIXA}}},
-        "itens": {"type": "array", "items": {
-            "type": "object", "additionalProperties": False, "required": ["nome", "tipo", "prompt_en"],
-            "properties": {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": ["objeto", "destaque"]},
-                           "prompt_en": {"type": "string"}}}},
+            "type": "object", "additionalProperties": False,
+            "required": ["nome", "descricao", "prompt_en", "frente_en", "recorte", "props", "lugares"],
+            "properties": dict(A.SCHEMA_LOCAL["properties"], recorte=_CAIXA)}},
+        "itens": {"type": "array", "items": A.SCHEMA_ITEM},
         "cenas": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["titulo", "local", "resumo", "personagens", "paginas", "nota_adaptacao"],
@@ -100,9 +97,60 @@ def guardar_paginas(p: Dict[str, Any], arquivos: List[Tuple[str, bytes]], base: 
         pg.append(arq)
         n += 1
     p.setdefault("manga", {})["paginas"] = pg
+    if substituir or not p["manga"].get("tempos"):
+        p["manga"].pop("fonte", None)
+        p["manga"].pop("tempos", None)
     if n:
         A.log(p, f"📖 {n} página(s) do mangá ({len(pg)} no total)")
     return n
+
+
+def quadros_do_video(cam: str, destino: str, max_quadros: int = 48, cena: float = 0.28, passo: float = 2.5) -> List[Tuple[float, str]]:
+    """Os quadros-chave do vídeo: cada corte (mudança de cena) e, num plano longo, um a cada `passo` s. → [(segundo, arquivo)]."""
+    import re as _re
+    import subprocess
+    os.makedirs(destino, exist_ok=True)
+    for f in os.listdir(destino):
+        os.remove(os.path.join(destino, f))
+    filtro = (f"select='isnan(prev_selected_t)+gt(scene\\,{cena})+gte(t-prev_selected_t\\,{passo})',"
+              "scale='min(1280,iw)':-2,showinfo")
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-y", "-i", cam, "-vf", filtro, "-vsync", "vfr", "-q:v", "3",
+                        os.path.join(destino, "q_%05d.jpg")], capture_output=True, text=True, timeout=900)
+    tempos = [float(x) for x in _re.findall(r"pts_time:([0-9.]+)", r.stderr)]
+    arqs = sorted(f for f in os.listdir(destino) if f.startswith("q_"))
+    pares = list(zip(tempos, arqs))
+    if len(pares) > max_quadros:  # muitos cortes: espalha
+        k = len(pares) / float(max_quadros)
+        pares = [pares[int(i * k)] for i in range(max_quadros)]
+    return [(t, os.path.join(destino, a)) for t, a in pares]
+
+
+def guardar_video(p: Dict[str, Any], nome: str, dados: bytes, base: str = A._BASE, usar_audio: bool = True) -> Dict[str, Any]:
+    """🎬 v84_238: um VÍDEO de referência (cena de anime, filme, gente real) → os quadros-chave viram as “páginas” (com o
+    segundo de cada um) e, se pedir, o áudio vira o áudio do episódio (🎧 modo áudio, transcrito). Daí em diante é o
+    mesmo fluxo do mangá: 🤖 ler → personagens/cenários/cenas → aprovar os designs → gerar."""
+    d = A.pasta(p["id"], base)
+    vd = os.path.join(d, "video")
+    os.makedirs(vd, exist_ok=True)
+    cam = os.path.join(vd, "referencia" + (os.path.splitext(nome)[1].lower() or ".mp4"))
+    with open(cam, "wb") as f:
+        f.write(dados)
+    pares = quadros_do_video(cam, os.path.join(vd, "_quadros"))
+    if not pares:
+        raise MangaErro("Não consegui tirar quadros desse vídeo (o arquivo abriu?).")
+    arqs = []
+    for t, q in pares:
+        with open(q, "rb") as f:
+            arqs.append((f"{len(arqs) + 1:04d}.jpg", f.read()))
+    n = guardar_paginas(p, arqs, base, substituir=True)
+    p["manga"].update(fonte="video", tempos=[round(t, 2) for t, _ in pares][:n], video={"arquivo": os.path.basename(cam), "nome": nome[:120]})
+    if usar_audio:
+        try:
+            A.guardar_audio(p, nome, dados, base)
+        except A.AnimeErro:
+            pass
+    A.log(p, f"🎬 vídeo de referência: {n} quadro(s)" + (" + o áudio dele" if usar_audio else ""))
+    return {"quadros": n, "audio": bool(usar_audio and A.audio_ok(p, base))}
 
 
 def recortar(p: Dict[str, Any], pagina: int, caixa: Any, tipo: str, nome: str, base: str = A._BASE, nota: str = "") -> Optional[Dict[str, Any]]:
@@ -134,6 +182,8 @@ def recortar(p: Dict[str, Any], pagina: int, caixa: Any, tipo: str, nome: str, b
 # ------------------------------------------------------------------ 🤖 ler o mangá → a adaptação
 def sys_adaptacao(p: Dict[str, Any]) -> str:
     est = A.ESTILOS.get(p.get("estilo") or "anime", A.ESTILOS["anime"])
+    if A.e_video(p):
+        return sys_video(p, est)
     return (
         "Você é diretor de uma ADAPTAÇÃO DE MANGÁ PARA ANIME feita do jeito simples: o episódio é montado com IMAGENS (o "
         "fundo de cada lugar, os personagens recortados em poses com 2 quadros e boca que abre quando falam, objetos, "
@@ -154,17 +204,60 @@ def sys_adaptacao(p: Dict[str, Any]) -> str:
         "- locais: cada lugar (loja, rua, floresta, casa por fora, sala…). 'prompt_en' = o FUNDO em inglês, VAZIO de "
         "pessoas, visto de frente na altura dos olhos, com o chão embaixo; 'frente_en' = objeto de primeiro plano opcional "
         "(\"\" se não tiver); 'recorte' = o quadro que melhor mostra o lugar.\n"
+        "- locais.props: os MÓVEIS em que alguém senta/se apoia/fica atrás (mesa, cadeira, balcão, sofá) — cada um uma "
+        "camada separada ('prompt_en' do objeto sozinho; 'camada' 'atras' = cadeira/encosto, 'frente' = mesa/balcão) e "
+        "FORA do 'prompt_en' do fundo (o fundo deixa o espaço livre). locais.lugares: onde os personagens ficam (\"atrás da "
+        "mesa\" sentado=true, \"na porta\"…), além dos padrões esquerda/centro/direita.\n"
         "- itens: objetos importantes ('objeto', recortado em cena: a carteira, o saco de doces) e momentos de impacto "
-        "que pedem uma imagem em tela cheia ('destaque': o soco, a reação exagerada, o close dramático).\n"
+        "que pedem uma imagem em tela cheia ('destaque': o soco, a reação exagerada, o close dramático). 'personagens' = "
+        "quem aparece na imagem (vai a referência do design aprovado — mesmo cabelo e cores); 'texto' = o texto ESCRITO "
+        "que é parte da cena e da piada (a etiqueta da pasta, o que está no bilhete, inclusive o riscado), exatamente "
+        "como deve aparecer — \"\" se nenhum.\n"
+        "- 🚫 NUNCA balões, onomatopeias, caixas de narração ou legendas desenhados nas imagens (isso vai pra fala/"
+        "narração/legenda/🔊 som); o único texto permitido é o 'texto' do item. O 'recorte' deve evitar balões, caixas de "
+        "texto e onomatopeias sempre que der.\n"
         "- cenas: na ordem, cada uma num local, com quem está, as PÁGINAS que ela adapta e uma 'nota_adaptacao' (ritmo, "
         "câmera, o que destacar). Normalmente uma cena por mudança de lugar/tempo.\n"
         f"- Escreva em {p.get('idioma') or 'português do Brasil'} (menos os campos _en). Use os nomes como aparecem nas falas."
     )
 
 
+def sys_video(p: Dict[str, Any], est: Tuple[str, str]) -> str:
+    """🎬 v84_238: um VÍDEO de referência (cena de anime, filme, gente real) → a mesma estrutura da adaptação, mas com os
+    PERSONAGENS DO USUÁRIO no lugar de quem aparece (ou os do vídeo redesenhados, se ele pedir)."""
+    return (
+        "Você é diretor de um ANIME 2D montado com imagens (cenários, personagens recortados em poses, móveis em camadas, "
+        "planos de câmera geral/médio/close/reação) e vai RECRIAR uma cena a partir de um VÍDEO DE REFERÊNCIA. Os quadros "
+        "anexados são os cortes do vídeo em ordem, com o segundo de cada um (e, se houver, a transcrição do áudio). Entenda "
+        "a encenação: quem está onde, quem entra, as ações, os planos, o ritmo, o lugar e o tom. Devolva:\n"
+        "- titulo, sinopse, tom, notas (como a cena foi adaptada: o que virou corte, destaque, câmera).\n"
+        f"- estilo_sugerido: o do catálogo que melhor combina (o usuário escolheu: {est[0]}).\n"
+        "- personagens: os PERSONAGENS DO PROJETO/das instruções do usuário (ele diz quem faz o papel de quem no vídeo — "
+        "\"o homem de terno = Kenta\"). Se ele não disser, crie personagens ORIGINAIS de anime pra cada papel (NUNCA copie o "
+        "rosto de uma pessoa real nem um personagem de outra obra): 'aparencia_manga_en' = como a pessoa/personagem do "
+        "VÍDEO é (só a roupa/silhueta, pra referência de papel); 'design_en' = o personagem do projeto no estilo "
+        f"\"{est[1]}\" (com cores, ou os tons se o estilo for P&B); 'mudancas_anime' = quem faz o papel de quem; 'recorte' = "
+        "um quadro onde o papel aparece (só referência de pose — o rosto não é usado).\n"
+        "- locais: os lugares do vídeo como cenários de anime ('prompt_en' do fundo VAZIO, de frente, chão embaixo; os "
+        "móveis em que sentam/se apoiam em 'props' separados — 'atras'/'frente' — e os 'lugares' onde cada um fica); "
+        "'recorte' = o quadro que melhor mostra o lugar.\n"
+        "- itens: objetos importantes ('objeto') e momentos de impacto em tela cheia ('destaque'), com 'personagens' e o "
+        "'texto' escrito que faz parte da cena (\"\" se nenhum). NUNCA balões, onomatopeias ou legendas nas imagens.\n"
+        "- cenas: na ordem, cada uma num local, com quem está, os QUADROS (números) que ela recria em 'paginas' e uma "
+        "'nota_adaptacao' (planos, ritmo, o que destacar).\n"
+        f"- Escreva em {p.get('idioma') or 'português do Brasil'} (menos os campos _en)."
+    )
+
+
 def prompt_adaptacao(p: Dict[str, Any]) -> str:
     n = len(A.paginas_manga(p))
-    L = [f"TÍTULO (provisório): {p.get('titulo') or ''}", f"PÁGINAS DO MANGÁ: {n} (anexadas em ordem, “📖 Página 1”, “📖 Página 2”…)"]
+    L = [f"TÍTULO (provisório): {p.get('titulo') or ''}",
+         (f"QUADROS DO VÍDEO DE REFERÊNCIA: {n} (anexados em ordem, cada um com o segundo do vídeo)" if A.e_video(p) else
+          f"PÁGINAS DO MANGÁ: {n} (anexadas em ordem, “📖 Página 1”, “📖 Página 2”…)")]
+    au = p.get("audio") or {}
+    if A.e_video(p) and au.get("transcricao"):
+        L.append("🎧 TRANSCRIÇÃO DO ÁUDIO DO VÍDEO (segundo · texto):")
+        L += [f"- {x['ini']:.1f} · {x['texto']}" for x in au["transcricao"]][:600]
     if (p.get("premissa") or "").strip():
         L.append(f"INSTRUÇÕES / CONTEXTO DO USUÁRIO:\n{p['premissa']}")
     ja = [c["nome"] for c in p["personagens"]]
@@ -228,7 +321,7 @@ def aplicar_adaptacao(p: Dict[str, Any], r: Any, base: str = A._BASE) -> Dict[st
                 c[k] = x[k]
         rel["personagens"] += 1
         rc = x.get("recorte")
-        if isinstance(rc, dict) and 1 <= int(rc.get("pagina") or 0) <= n_pag and not c.get("refs"):
+        if isinstance(rc, dict) and 1 <= int(rc.get("pagina") or 0) <= n_pag and not c.get("refs") and not A.e_video(p):
             if recortar(p, int(rc["pagina"]), rc, "personagem", nome, base, "recorte do mangá (a IA escolheu)"):
                 rel["recortes"] += 1
     for x in r.get("locais") or []:
@@ -242,6 +335,7 @@ def aplicar_adaptacao(p: Dict[str, Any], r: Any, base: str = A._BASE) -> Dict[st
         for k in ("descricao", "prompt_en", "frente_en"):
             if x.get(k) is not None and (_txt(x.get(k)) or k == "frente_en"):
                 lo[k] = _txt(x[k])
+        A.aplicar_props_lugares(lo, x)
         rel["locais"] += 1
         rc = x.get("recorte")
         if isinstance(rc, dict) and 1 <= int(rc.get("pagina") or 0) <= n_pag and not lo.get("refs"):
@@ -258,6 +352,7 @@ def aplicar_adaptacao(p: Dict[str, Any], r: Any, base: str = A._BASE) -> Dict[st
         it["tipo"] = x.get("tipo") if x.get("tipo") in ("objeto", "destaque") else it.get("tipo") or "objeto"
         if _txt(x.get("prompt_en")):
             it["prompt_en"] = _txt(x["prompt_en"])
+        A.aplicar_item_extras(p, it, x)
         rel["itens"] += 1
     cenas = [s for s in r.get("cenas") or [] if isinstance(s, dict)]
     if cenas:
@@ -310,10 +405,14 @@ def json_adaptacao(p: Dict[str, Any]) -> Dict[str, Any]:
         rc = next(((refs.get(a) or {}).get("manga") for a in lo.get("refs") or [] if (refs.get(a) or {}).get("manga")), None)
         out["locais"].append({"nome": lo["nome"], "descricao": lo.get("descricao") or "", "prompt_en": lo.get("prompt_en") or "",
                               "frente_en": lo.get("frente_en") or "",
+                              "props": [{k: pr.get(k) for k in ("nome", "prompt_en", "camada", "x", "y", "w") if pr.get(k) is not None}
+                                        for pr in lo.get("props") or []],
+                              "lugares": [dict(lg) for lg in lo.get("lugares") or []], "chao": lo.get("chao") or {},
                               "recorte": ({"pagina": rc["pagina"], "x0": rc["caixa"][0], "y0": rc["caixa"][1], "x1": rc["caixa"][2],
                                            "y1": rc["caixa"][3]} if rc else None)})
     for it in p["itens"]:
-        out["itens"].append({"nome": it["nome"], "tipo": it.get("tipo") or "objeto", "prompt_en": it.get("prompt_en") or ""})
+        out["itens"].append({"nome": it["nome"], "tipo": it.get("tipo") or "objeto", "prompt_en": it.get("prompt_en") or "",
+                             "personagens": it.get("personagens") or [], "texto": it.get("texto") or ""})
     for s in p["cenas"]:
         lo = next((x for x in p["locais"] if x["id"] == s.get("local")), None)
         out["cenas"].append({"titulo": s.get("titulo") or "", "local": (lo or {}).get("nome") or "", "resumo": s.get("resumo") or "",
@@ -329,7 +428,7 @@ def prompt_design(p: Dict[str, Any], c: Dict[str, Any]) -> str:
             "Redraw the character from the manga reference faithfully (same face shape, hairstyle, ears/tail, outfit, "
             "accessories and body proportions) as an anime character with the colors/tones described. FULL BODY from head to "
             "feet, standing, 3/4 view turned to the RIGHT, neutral expression, the whole figure inside the image with "
-            "margin, one single figure, plain flat light gray background, no text, no panels, no screentone background. "
+            "margin, one single figure, plain flat light gray background, no panels, no screentone background. " + A.SEM_TEXTO + " "
             f"ART STYLE: {A.estilo_en(p)}.")[:3900]
 
 

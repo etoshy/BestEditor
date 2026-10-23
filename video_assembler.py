@@ -1937,7 +1937,11 @@ def apply_overlays(
                 x_expr, y_expr = f"(main_w*{xp:.5f}-overlay_w/2)", f"(main_h*{yp:.5f}-overlay_h/2)"
             else:
                 x_expr, y_expr = f"(main_w-overlay_w)*{xp:.5f}", f"(main_h-overlay_h)*{yp:.5f}"
-            filter_parts.append(f"[{k}:v]fps=25,format=rgba,setpts=PTS-STARTPTS+{start:.3f}/TB[tr{idx}]")
+            x_expr, y_expr = x_expr + _mov_expr(ov.get("mov"), "x"), y_expr + _mov_expr(ov.get("mov"), "y")
+            # 🧠 sem "fps": cada imagem é UM quadro com o tempo dela e o overlay segura o último até o próximo. Com fps=25
+            # o ffmpeg duplicava de uma vez todos os quadros de um trecho parado longo (ex.: 5 min sem cena = 7500
+            # quadros 1920×1080 na fila) → "Cannot allocate memory"
+            filter_parts.append(f"[{k}:v]format=rgba,setpts=PTS-STARTPTS+{start:.3f}/TB[tr{idx}]")
             filter_parts.append(f"{current_label}[tr{idx}]overlay=x='{x_expr}':y='{y_expr}':"
                                 f"enable='between(t,{start:.3f},{end:.3f})':eof_action=pass{next_label}")
             current_label = next_label
@@ -1962,7 +1966,7 @@ def apply_overlays(
         if is_video:
             inputs += ["-stream_loop", "-1", "-i", media_path]
         else:
-            inputs += ["-loop", "1", "-i", media_path]
+            inputs += ["-i", media_path]  # 🧠 v84_237: um quadro só (o overlay repete) — sem gerar 25 quadros/s
 
         scale_label = f"[ov{idx}]"
         espelho = ",hflip" if ov.get("espelhar") else ""  # 🎭 v84_237: a TV do react espelhada
@@ -1981,9 +1985,11 @@ def apply_overlays(
             x_expr, y_expr = _OVERLAY_POSITION_EXPRESSIONS.get(
                 ov.get("position", "top-right"), _OVERLAY_POSITION_EXPRESSIONS["top-right"]
             )
+        if ov.get("mov"):  # 🌄 parallax
+            x_expr, y_expr = f"'{x_expr}{_mov_expr(ov['mov'], 'x')}'", f"'{y_expr}{_mov_expr(ov['mov'], 'y')}'"
         filter_parts.append(
             f"{current_label}{scale_label}overlay={x_expr}:{y_expr}:"
-            f"enable='between(t,{start:.3f},{end:.3f})'{next_label}"
+            f"enable='between(t,{start:.3f},{end:.3f})'{'' if is_video else ':eof_action=repeat'}{next_label}"
         )
         current_label = next_label
 
@@ -2021,6 +2027,38 @@ def apply_overlays(
             except OSError:
                 pass
     return output_path
+
+
+def _mov_expr(movs: Any, eixo: str) -> str:
+    """🌄 v84_237: o deslocamento da camada no tempo (parallax da 🎞 Animação 2D / câmera tremida), somado ao x ou y do
+    overlay. Cada mov: {"a","b","dx","dy"} (fração de W/H na cena toda, de -d/2 a +d/2) ou {"a","b","tremor"}
+    (tremida que some em 0,8 s). "" = parado. Mesma conta do anime2d.deslocamento (a prévia)."""
+    termos = []
+    for m in (movs or [])[:120]:
+        try:
+            a, b = float(m["a"]), float(m["b"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if b <= a:
+            continue
+        if "de" in m:  # 🚶 v84_238: andar — de `de` até `para` (fração da largura) entre a e b, parado até z
+            if eixo != "x":
+                continue
+            z = float(m.get("z") or b)
+            de, para = float(m["de"]), float(m.get("para") or 0)
+            termos.append(f"between(t,{a:.3f},{z:.3f})*main_w*({de:.5f}+({para - de:.5f})*min(1,max(0,(t-{a:.3f})/{b - a:.3f})))")
+            continue
+        if m.get("tremor"):
+            amp = float(m["tremor"]) * (1 if eixo == "x" else 0.6)
+            onda = f"sin(t*47)" if eixo == "x" else "sin(t*31+1)"
+            termos.append(f"between(t,{a:.3f},{b:.3f})*main_w*{amp:.5f}*max(0,1-(t-{a:.3f})/0.8)*{onda}")
+            continue
+        d = float(m.get("dx" if eixo == "x" else "dy") or 0)
+        if abs(d) < 1e-5:
+            continue
+        lado = "main_w" if eixo == "x" else "main_h"
+        termos.append(f"between(t,{a:.3f},{b:.3f})*{lado}*{d:.5f}*((t-{a:.3f})/{b - a:.3f}-0.5)")
+    return "".join("+" + x for x in termos)
 
 
 def _trilha_de(ov: Dict[str, Any]) -> str:
@@ -2151,7 +2189,9 @@ def _juntar_trilhas(overlays: List[Dict[str, Any]], target_width: int, pasta: st
         ov0 = membros[0]
         trocar[idxs[0]] = {"media_type": "trilha", "lista": lista, "start": t0, "end": t1,
                            "x_percent": float(ov0.get("x_percent", 0)), "y_percent": float(ov0.get("y_percent", 0)),
-                           "ancora": ov0.get("ancora") or ""}
+                           "ancora": ov0.get("ancora") or "",
+                           # 🌄 cada cena com o seu movimento (as janelas não se cruzam: uma vez cada)
+                           "mov": [dict(t) for t in {tuple(sorted(m.items())) for o in membros for m in (o.get("mov") or [])}]}
         tirar.update(idxs[1:])
     return [trocar.get(i, ov) for i, ov in enumerate(overlays) if i not in tirar]
 
@@ -2212,12 +2252,21 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
     if e_in == "subir" or e_out == "subir":  # de baixo pra cima
         y = f"(main_h+(({y_alvo})-main_h)*{_prog('subir')})"
 
+    x, y = x + _mov_expr(ov.get("mov"), "x"), y + _mov_expr(ov.get("mov"), "y")  # 🌄 parallax / tremida
+    parada = e_in != "aparecer" and e_out != "aparecer" and e_in != "deslizar" and e_out != "deslizar" \
+        and e_in != "subir" and e_out != "subir"
+
     def _entrada(caminho: str, rot: str) -> int:
         nonlocal n_in
         # ⚡ v84_228: a pose já vai no tamanho e no lado certos (PNG pronto) — o ffmpeg não redimensiona/espelha
         # cada quadro (com ~40 poses num vídeo longo isso estourava o tempo da montagem)
         pronto = _png_no_tamanho(caminho, largura, bool(espelho))
-        inputs.extend(["-loop", "1", "-framerate", "25", "-t", f"{dur:.3f}", "-i", pronto or caminho])
+        if parada:
+            # 🧠 v84_237: imagem parada entra como UM quadro só (o overlay repete) — com "-loop 1" o ffmpeg fazia 25
+            # quadros por segundo de cada camada e, num vídeo de 10 min, estourava a memória ("Cannot allocate memory")
+            inputs.extend(["-i", pronto or caminho])
+        else:
+            inputs.extend(["-loop", "1", "-framerate", "25", "-t", f"{dur:.3f}", "-i", pronto or caminho])
         k = n_in
         n_in += 1
         fade = ""
@@ -2248,15 +2297,15 @@ def _overlay_personagem(ov: Dict[str, Any], idx: int, start: float, end: float, 
     _entrada(ov["resolved_path"], f"[pp{idx}]")
     janelas = [(max(start, float(a)), min(end, float(b))) for a, b in ov.get("boca_janelas") or [] if float(b) > float(a)]
     boca = ov.get("boca_path") if ov.get("boca_path") and os.path.isfile(str(ov.get("boca_path"))) else None
-    enable = f"enable='between(t,{start:.3f},{end:.3f})':eof_action=pass"
+    enable = f"enable='between(t,{start:.3f},{end:.3f})':eof_action={'repeat' if parada else 'pass'}"
     if boca and janelas:
         meio = f"[pm{idx}]"
         partes.append(f"{atual}[pp{idx}]overlay=x='{x}':y='{y}':{enable}{meio}")
         _entrada(boca, f"[pb{idx}]")
         falando = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in janelas[:200])
         # a boca abre e fecha ~4x por segundo só enquanto tem palavra
-        partes.append(f"{meio}[pb{idx}]overlay=x='{x}':y='{y}':enable='gt({falando},0)*lt(mod(t-{start:.3f},0.24),0.12)'"
-                      f":eof_action=pass{proximo}")
+        partes.append(f"{meio}[pb{idx}]overlay=x='{x}':y='{y}':enable='between(t,{start:.3f},{end:.3f})*gt({falando},0)*lt(mod(t-{start:.3f},0.24),0.12)'"
+                      f":eof_action={'repeat' if parada else 'pass'}{proximo}")
     else:
         partes.append(f"{atual}[pp{idx}]overlay=x='{x}':y='{y}':{enable}{proximo}")
     return n_in

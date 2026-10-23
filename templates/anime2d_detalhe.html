@@ -1,0 +1,848 @@
+{% extends "base.html" %}
+{% block title %}🎞 {{ p.titulo }} — Animação 2D{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1250px; }
+  .an-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .an-card h2 { margin: 0 0 6px; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; }
+  .an-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; flex: none; }
+  .an-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .an-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .an-linha > * { margin: 0; }
+  .an-linha button { width: auto; margin: 0; padding: 6px 12px; }
+  .an-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .an-sec { background: #64748b !important; }
+  .an-perigo { background: #dc2626 !important; }
+  .an-ok { color: var(--ok); } .an-err { color: var(--erro); } .an-av { color: var(--aviso); }
+  .an-barra { position: sticky; top: 0; z-index: 20; border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; font-size: .9rem; }
+  .an-barra.rodando { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .an-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .an-barra.ok { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .an-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .an-item { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; }
+  .an-item label { font-size: .76rem; color: var(--mudo); margin: 0; }
+  .an-item input, .an-item select, .an-item textarea { margin: 2px 0 4px; font-size: .84rem; }
+  .an-item textarea { min-height: 42px; }
+  .an-img { aspect-ratio: 16/9; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--mudo); font-size: .8rem; overflow: hidden; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/16px 16px; }
+  .an-img img { max-width: 100%; max-height: 100%; cursor: zoom-in; }
+  .an-refs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .an-ref { width: 150px; border: 1px solid var(--borda); border-radius: 8px; padding: 4px; font-size: .78rem; }
+  .an-ref img { width: 100%; height: 110px; object-fit: contain; background: #8882; border-radius: 6px; }
+  .an-ref input, .an-ref select { margin: 2px 0; font-size: .76rem; padding: 2px 4px; }
+  .an-poses { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .an-poses .p { width: 66px; text-align: center; font-size: .64rem; color: var(--mudo); }
+  .an-poses .p div { width: 66px; height: 99px; border-radius: 6px; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0/12px 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .an-poses .p img { width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; }
+  .an-cena { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; margin-top: 10px; }
+  .an-cena > .an-linha input[data-c=titulo] { flex: 1; min-width: 200px; font-weight: 600; }
+  .an-mom { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 6px; }
+  .an-mom td, .an-mom th { border-bottom: 1px solid var(--borda); padding: 3px; vertical-align: top; }
+  .an-mom th { text-align: left; color: var(--mudo); font-weight: 600; font-size: .74rem; }
+  .an-mom input, .an-mom select, .an-mom textarea { margin: 0; font-size: .8rem; padding: 3px 5px; }
+  .an-mom textarea { min-height: 36px; }
+  .an-em { display: flex; flex-direction: column; gap: 2px; }
+  .an-em div { display: flex; gap: 3px; align-items: center; font-size: .72rem; }
+  .an-em select { font-size: .72rem !important; padding: 1px 3px !important; width: auto; }
+  .an-previa { width: 100%; border-radius: 10px; background: #000; display: block; object-fit: contain; }
+  .an-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 999; cursor: zoom-out; }
+  .an-zoom img { max-width: 94vw; max-height: 94vh; background: repeating-conic-gradient(#ccc 0 25%, #eee 0 50%) 0 0/24px 24px; }
+  .an-log { white-space: pre-wrap; font-size: .76rem; color: var(--mudo); max-height: 220px; overflow: auto; }
+  .an-ex { white-space: pre-wrap; font-size: .8rem; background: var(--code-bg); border-radius: 8px; padding: 8px; }
+  .an-pags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .an-pags figure { margin: 0; text-align: center; font-size: .7rem; cursor: crosshair; }
+  .an-pags img { height: 120px; border-radius: 4px; border: 1px solid var(--borda); display: block; }
+  #recorte { position: fixed; inset: 0; background: rgba(0,0,0,.82); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 8px; }
+  #recorte .rc-palco { position: relative; user-select: none; }
+  #recorte .rc-palco img { max-height: 78vh; max-width: 90vw; display: block; }
+  #recorte .rc-caixa { position: absolute; border: 2px dashed #ffd54a; background: rgba(255,213,74,.15); pointer-events: none; }
+  .an-design { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin: 6px 0; padding: 8px; border-radius: 8px; background: var(--code-bg); }
+  .an-design figure { margin: 0; text-align: center; font-size: .7rem; }
+  .an-design img { height: 150px; border-radius: 6px; border: 2px solid transparent; display: block; }
+  .an-design img.ok { border-color: #22c55e; }
+  .ly-el { position: absolute; cursor: move; }
+  .ly-prop { height: auto; }
+  .ly-lugar { width: 0; pointer-events: none; }
+  .ly-lugar::before { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); height: 100%; aspect-ratio: 1/4;
+    background: rgba(255,213,74,.18); border: 2px dashed #ffd54a; border-radius: 45% 45% 6px 6px; pointer-events: none; }
+  .ly-lugar span { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); white-space: nowrap; font-size: .72rem; color: #111;
+    background: #ffd54a; padding: 2px 8px; border-radius: 10px; pointer-events: auto; cursor: move; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+  .ly-sentado::before { background: rgba(79,195,255,.18); border-color: #4fc3ff; }
+  .ly-sentado span { background: #4fc3ff; }
+  .ly-sel::before, img.ly-sel { outline: 3px solid #fff; }
+  .an-chip { font-size: .72rem; border-radius: 999px; padding: 1px 8px; background: var(--code-bg); }
+</style>
+
+<p><a href="/modelos-video#anime2d">← Modelos de vídeo</a></p>
+<h1 style="margin-bottom:2px;">🎞 <span id="hTitulo">{{ p.titulo }}</span></h1>
+<p class="an-dica" style="margin:0;">Desenho animado montado com imagens — fundos, personagens em poses (quadros A/B + boca), objetos, destaques e câmera — e tudo posicionado no editor.</p>
+<div class="an-barra" id="barra"></div>
+<div id="avisos" class="an-dica an-av"></div>
+
+<!-- 1 · premissa -->
+<div class="an-card">
+  <h2><span class="an-num">1</span>📝 Premissa, história ou instruções</h2>
+  <div class="an-linha">
+    <label style="flex:2;min-width:240px;">Título <input id="fTitulo" value="{{ p.titulo }}"></label>
+    <label style="flex:1;min-width:170px;">Estilo <select id="fEstilo">{% for k, v in estilos.items() %}<option value="{{ k }}" {% if p.estilo == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}</select></label>
+    <label style="flex:1;min-width:120px;">Formato <select id="fProp"><option value="16:9" {% if p.proporcao == '16:9' %}selected{% endif %}>16:9</option><option value="9:16" {% if p.proporcao == '9:16' %}selected{% endif %}>9:16</option></select></label>
+    <label style="flex:1;min-width:150px;">Duração (min) <input id="fDur" type="number" min="0" max="40" step="0.5" value="{{ p.duracao_alvo or 0 }}" title="0 = automática: a IA decide pelo tamanho da história; se for longa, as cenas saem em partes"></label>
+  </div>
+  <div class="an-dica" style="margin-top:-2px">Duração 0 = 🤖 automática (a IA decide pelo tamanho da história). Episódio longo sai cena por cena.</div>
+  <label>O que é o episódio <span class="an-dica">— uma premissa curta, a história inteira, ou instruções (personagens, estilo, lugares, tom…)</span>
+    <textarea id="fPremissa" rows="7">{{ p.premissa }}</textarea></label>
+  <details style="margin:4px 0;"><summary class="an-dica" style="cursor:pointer;font-weight:600">💡 Exemplo de instruções (clique pra ver ou usar)</summary>
+    <div class="an-ex" id="exemplo">{{ exemplo }}</div>
+    <button type="button" class="an-mini an-sec" id="bExemplo" style="margin-top:4px !important">📋 Usar o exemplo como ponto de partida</button>
+  </details>
+  <div class="an-linha">
+    <label style="flex:2;min-width:240px;">Detalhe extra do estilo <span class="an-dica">(opcional, em inglês ou português)</span><input id="fEstiloExtra" value="{{ p.estilo_extra }}" placeholder="ex.: cores pastel, contornos grossos, luz de fim de tarde"></label>
+    <label style="flex:1;min-width:150px;">Idioma das falas <input id="fIdioma" value="{{ p.idioma }}"></label>
+    <label style="margin:0;"><input type="checkbox" id="fNarr" {% if p.narrador.ativo %}checked{% endif %} style="width:auto"> 🎙 narrador quando a história precisar</label>
+    <label style="margin:0;"><input type="checkbox" id="fLeg" {% if p.legendas %}checked{% endif %} style="width:auto"> 💬 legendas</label>
+    <label style="margin:0;" title="Quando a câmera anda (pan/zoom) o fundo anda devagar, personagens e objetos um pouco mais e a camada da frente bem mais — dá profundidade. Na câmera tremida a frente treme mais."><input type="checkbox" id="fPar" {% if p.paralaxe %}checked{% endif %} style="width:auto"> 🌄 parallax (camadas em velocidades diferentes)</label>
+  </div>
+  <div class="an-linha"><button type="button" id="bSalvarDados">💾 Salvar</button><span id="dEst" class="an-dica"></span></div>
+
+  <details style="margin-top:10px;" id="dAudio" {% if p.modo_audio %}open{% endif %}>
+    <summary style="cursor:pointer;font-weight:600">🎧 Áudio pronto <span class="an-dica" id="auEst" style="font-weight:400"></span></summary>
+    <p class="an-dica">Tem um diálogo, uma narração ou um podcast pronto? Envie o áudio: o Whisper transcreve com os tempos, a IA descobre os personagens pelas falas (junte as instruções acima: quem é quem, estilo, lugares) e monta as cenas em cima do áudio — não precisa gerar vozes.</p>
+    <div class="an-linha">
+      <label class="an-sec" style="margin:0;cursor:pointer;padding:6px 12px;border-radius:8px;color:#fff;">📤 Enviar o áudio<input type="file" id="auArq" accept="audio/*,video/*" hidden></label>
+      <button type="button" id="bAuTrans" class="an-sec">🎙 Transcrever de novo</button>
+      <button type="button" id="bAuTirar" class="an-sec">🗑 Tirar o áudio</button>
+    </div>
+    <audio id="auPlayer" controls style="width:100%;display:none;margin-top:4px;"></audio>
+    <label style="margin-top:6px;">Transcrição com os tempos <span class="an-dica">(“0:13 texto” por linha — corrija o que o Whisper errou)</span><textarea id="auTrans" rows="5"></textarea></label>
+    <div class="an-linha"><button type="button" id="bAuSalvar">💾 Salvar a transcrição</button></div>
+  </details>
+
+  <details style="margin-top:10px;" open>
+    <summary style="cursor:pointer;font-weight:600">📎 Referências <span class="an-dica" style="font-weight:400">(fotos de personagens, lugares, itens ou do estilo de desenho)</span></summary>
+    <p class="an-dica">O nome liga a foto ao personagem/local/item com o mesmo nome (vai de referência pro Flow). “Estilo” vai junto em todas as imagens.</p>
+    <div class="an-linha">
+      <select id="rTipo" style="width:auto;">{% for k, v in tipos_ref.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+      <input id="rNome" placeholder="nome (ex.: Kenta)" style="width:160px;">
+      <input id="rNota" placeholder="nota (opcional)" style="width:220px;">
+      <label class="an-sec" style="margin:0;cursor:pointer;padding:6px 12px;border-radius:8px;color:#fff;">📤 Enviar foto(s)<input type="file" id="rArq" accept="image/*" multiple hidden></label>
+    </div>
+    <div class="an-refs" id="refs"></div>
+  </details>
+
+  <details style="margin-top:10px;" id="dZip">
+    <summary style="cursor:pointer;font-weight:600">📦 Zip com tudo <span class="an-dica" style="font-weight:400">(história, personagens com fotos/personalidade/poses prontas, locais, itens, estilo, áudio e cenas — importar, exportar e como montar)</span></summary>
+    <p class="an-dica">Importar <b>junta</b> com o que já está aqui: personagem/local/item com o mesmo nome é completado (não duplica). O que vier pronto (poses, fundos, itens) não vai pro Flow; o resto a IA cria (🤖) e o Flow gera (🚀).</p>
+    <div class="an-linha">
+      <label class="an-sec" style="margin:0;cursor:pointer;padding:6px 12px;border-radius:8px;color:#fff;">📦 Importar um .zip<input type="file" id="zArq" accept=".zip,application/zip" hidden></label>
+      <a class="an-mini an-sec" href="/anime2d/{{ p.id }}/zip" style="text-decoration:none;color:#fff;padding:6px 12px;border-radius:8px;">⬇ Exportar este projeto (.zip)</a>
+      <a class="an-mini an-sec" href="/anime2d/zip-exemplo.zip" style="text-decoration:none;color:#fff;padding:6px 12px;border-radius:8px;">⬇ Baixar o zip de exemplo</a>
+      <span id="zEst" class="an-dica"></span>
+    </div>
+    <div id="zRel" class="an-dica" style="white-space:pre-wrap"></div>
+    <details style="margin-top:8px;"><summary style="cursor:pointer">📖 Como criar e organizar o zip (pastas e nomes)</summary>
+      <pre style="white-space:pre-wrap;font-size:.8rem;line-height:1.35;background:rgba(0,0,0,.25);padding:10px;border-radius:8px;overflow:auto;">{{ guia_zip }}</pre>
+    </details>
+    <details style="margin-top:6px;"><summary style="cursor:pointer">🧾 Os JSONs (modelos pra copiar)</summary>
+      {% for nome, js in ex_zip.items() %}
+      <div style="margin-top:8px;"><b style="font-size:.85rem">{{ nome }}</b> <button type="button" class="an-mini an-sec" data-copiar-js="zj{{ loop.index }}">📋 copiar</button>
+      <pre id="zj{{ loop.index }}" style="white-space:pre-wrap;font-size:.78rem;background:rgba(0,0,0,.25);padding:8px;border-radius:8px;margin:4px 0;overflow:auto;">{{ js|tojson(indent=2) }}</pre></div>
+      {% endfor %}
+      <p class="an-dica">Campos que começam com “_” são só explicação (pode apagar). Na pose das cenas, um nome fora do catálogo vira pose nova — se for o nome de uma pose pronta do zip, usa ela.</p>
+    </details>
+  </details>
+
+  <details style="margin-top:10px;" id="dManga" {% if p.n_paginas %}open{% endif %}>
+    <summary style="cursor:pointer;font-weight:600">📖 Mangá / 🎬 vídeo → anime <span class="an-dica" style="font-weight:400">(adaptar as páginas de um mangá seu, ou recriar uma cena de um vídeo de referência com os SEUS personagens: a IA lê, monta personagens, cenários e cenas — você aprova os designs)</span></summary>
+    <div class="an-linha" style="background:var(--code-bg);padding:8px;border-radius:8px">
+      <label class="an-sec" style="margin:0;cursor:pointer;padding:6px 12px;border-radius:8px;color:#fff;">🎬 Vídeo de referência<input type="file" id="mVideo" accept="video/*" hidden></label>
+      <label class="an-dica" style="margin:0"><input type="checkbox" id="mVideoAudio" checked style="width:auto"> usar o áudio do vídeo (vira o áudio do episódio, transcrito)</label>
+      <span class="an-dica">Cena de anime, filme ou gente real → a encenação (quem está onde, cortes, ações, falas) recriada com os seus personagens. Diga quem é quem no texto do passo 1 (ex.: “o homem de terno = Kenta”) e mande as fotos dos seus personagens em 📎 Referências.</span>
+    </div>
+    <p class="an-dica">1 · envie as páginas em ordem (imagens ou um .zip) → 2 · 🤖 Ler o mangá (ou copie o prompt + anexe as páginas em outra IA e cole a resposta) → 3 · no passo 4, gere e ✔ aprove o 🎨 design anime de cada personagem → 4 · escreva as cenas (cada uma lê as suas páginas) → poses, fundos, vozes, editor. Clique numa página pra ✂ recortar um personagem/lugar como referência.</p>
+    <div class="an-linha">
+      <label class="an-sec" style="margin:0;cursor:pointer;padding:6px 12px;border-radius:8px;color:#fff;">📤 Enviar páginas<input type="file" id="mArq" accept="image/*,.zip" multiple hidden></label>
+      <label style="margin:0" class="an-dica"><input type="checkbox" id="mSubst" style="width:auto"> substituir as que já estão</label>
+      <button type="button" id="bLerManga">🤖 Ler o mangá e montar a adaptação</button>
+      <button type="button" class="an-sec" data-copiar="manga">📋 Copiar o prompt</button>
+      <button type="button" class="an-sec" data-colar="manga">📥 Colar a resposta</button>
+      <a class="an-mini an-sec" href="/anime2d/{{ p.id }}/adaptacao.json" style="text-decoration:none;color:#fff;padding:6px 12px;border-radius:8px;">⬇ JSON da adaptação</a>
+      <span id="mEst" class="an-dica"></span>
+    </div>
+    <div id="mAdapt" class="an-dica"></div>
+    <div class="an-pags" id="mPags"></div>
+  </details>
+</div>
+
+<!-- 2 · plano -->
+<div class="an-card">
+  <h2><span class="an-num">2</span>🤖 Plano: personagens, locais, itens e cenas</h2>
+  <div class="an-linha">
+    <button type="button" id="bPlano">🤖 Planejar o episódio</button>
+    <button type="button" class="an-sec" data-copiar="plano">📋 Copiar o prompt</button>
+    <button type="button" class="an-sec" data-colar="plano">📥 Colar a resposta</button>
+    <span id="plEst" class="an-dica"></span>
+  </div>
+  <div id="sinopse" class="an-dica"></div>
+  <h3 style="font-size:.95rem;margin:10px 0 4px;">🧑 Personagens</h3>
+  <div class="an-grade" id="pers"></div>
+  <div class="an-linha"><input id="novoPers" placeholder="nome do personagem" style="width:200px;"><button type="button" class="an-mini" id="bNovoPers">➕ personagem</button></div>
+  <h3 style="font-size:.95rem;margin:10px 0 4px;">🏞 Locais</h3>
+  <div class="an-grade" id="locais"></div>
+  <div class="an-linha"><input id="novoLocal" placeholder="nome do lugar" style="width:200px;"><button type="button" class="an-mini" id="bNovoLocal">➕ local</button></div>
+  <h3 style="font-size:.95rem;margin:10px 0 4px;">📦 Itens <span class="an-dica" style="font-weight:400">— objeto (aparece em cena, recortado) ou 🌟 destaque (imagem em tela cheia)</span></h3>
+  <div class="an-grade" id="itens"></div>
+  <div class="an-linha"><input id="novoItem" placeholder="nome do item" style="width:200px;"><select id="novoItemTipo" style="width:auto;"><option value="objeto">objeto</option><option value="destaque">🌟 destaque</option></select><button type="button" class="an-mini" id="bNovoItem">➕ item</button></div>
+</div>
+
+<!-- 3 · cenas -->
+<div class="an-card">
+  <h2><span class="an-num">3</span>🎬 Cenas e momentos</h2>
+  <p class="an-dica">Cada cena é uma lista de momentos: 💬 fala, 🎙 narração, 🎬 ação (sem fala, com duração) e 🌟 destaque (imagem em tela cheia). Em cada momento: quem está em cena, onde, em que pose e pra onde olha. Poses de movimento (andando, correndo, rindo…) têm 2 quadros que alternam; quem fala mexe a boca. A mesma pose é reaproveitada em todo o episódio (só gera o que muda).</p>
+  <div class="an-linha">
+    <button type="button" id="bCenas">🤖 Escrever todas as cenas</button>
+    <button type="button" id="bCenasVazias" class="an-sec">🤖 Só as que faltam</button>
+    <button type="button" id="bNovaCena" class="an-sec">➕ Cena</button>
+    <span id="cEst" class="an-dica"></span>
+  </div>
+  <div id="cenas"></div>
+</div>
+
+<!-- 4 · personagens no Flow -->
+<div class="an-card">
+  <h2><span class="an-num">4</span>🧍 Personagens no Flow</h2>
+  <p class="an-dica">Cada personagem vira um projeto da aba <a href="/personagens-pod" target="_blank">🧍 Personagens</a> com SÓ as poses que o roteiro usa: primeiro a ⭐ neutra (com a referência), depois as outras, os 2ºs quadros e as bocas — sozinhos. O mesmo personagem num episódio anterior do mesmo estilo é ♻ reaproveitado.</p>
+  <div class="an-linha"><button type="button" id="bDesigns" class="an-sec" style="display:none">🎨 Gerar os designs anime que faltam</button><button type="button" id="bPoses">🚀 Gerar todos</button><span id="pEst" class="an-dica"></span></div>
+  <div id="poses" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
+<!-- 5 · locais e itens -->
+<div class="an-card">
+  <h2><span class="an-num">5</span>🏞 Imagens dos locais e itens</h2>
+  <p class="an-dica">O fundo de cada lugar (vazio, com o chão embaixo), a camada da frente (opcional, na frente dos personagens) e os itens — no <a href="/flow" target="_blank">🚀 Flow em massa</a>, com as suas referências e a de estilo. Ou 📁 a sua imagem.</p>
+  <div class="an-linha">
+    <button type="button" id="bImgs">🚀 Gerar o que falta</button>
+    <button type="button" id="bReap" class="an-sec" title="mesmo nome, mesmo estilo e formato em outro episódio">♻ Reaproveitar de outros episódios</button>
+    <span id="iEst" class="an-dica"></span>
+  </div>
+  <div class="an-grade" id="imgs"></div>
+</div>
+
+<!-- 6 · vozes -->
+<div class="an-card" id="cardVozes">
+  <h2><span class="an-num">6</span>🎙 Vozes</h2>
+  <p class="an-dica">Cada personagem com uma voz do site (as do <a href="/gerar-voz" target="_blank">🎭 multi voice</a>) e a do narrador. Cada fala vira um áudio — a duração dele marca o tempo no vídeo. Sem voz escolhida, a fala fica muda pelo tempo de leitura (só a legenda).</p>
+  <div id="vozes" class="an-grade"></div>
+  <div class="an-linha">
+    <button type="button" id="bVozes">🎙 Gerar as vozes que faltam</button>
+    <button type="button" id="bVozesTudo" class="an-sec">🔁 Refazer todas</button>
+    <span id="vEst" class="an-dica"></span>
+  </div>
+</div>
+
+<!-- 7 · prévia e editor -->
+<div class="an-card">
+  <h2><span class="an-num">7</span>👁 Prévia e 🎬 editor</h2>
+  <div class="an-linha">
+    <label style="flex:1;min-width:240px;margin:0;">Segundo <input type="range" id="pT" min="0" max="60" value="0" step="0.25" style="width:100%"></label>
+    <span id="pTv" class="an-dica" style="width:90px">0:00</span>
+    <button type="button" id="bPrevia" class="an-sec">👁 Atualizar</button>
+  </div>
+  <img id="previa" class="an-previa" alt="prévia" style="max-height:620px;">
+  <div class="an-linha" style="margin-top:10px;">
+    <button type="button" id="bEditor" style="background:#16a34a;font-size:1rem;padding:9px 18px;">🎬 Mandar pro editor</button>
+    <span id="eEst" class="an-dica"></span>
+  </div>
+  <div id="eAvisos" class="an-dica an-av"></div>
+  <details style="margin-top:8px;"><summary class="an-dica" style="cursor:pointer">🕘 registro</summary><div class="an-log" id="log"></div></details>
+</div>
+
+<div id="recorte"><div class="an-linha" style="color:#fff;margin:0">✂ arraste na página pra marcar · <select id="rcTipo" style="width:auto"><option value="personagem">🧑 personagem</option><option value="local">🏞 local</option><option value="item">📦 item</option><option value="estilo">🎨 estilo</option></select>
+  <input id="rcNome" list="rcNomes" placeholder="de quem / qual lugar" style="width:180px"><datalist id="rcNomes"></datalist>
+  <button type="button" id="rcSalvar">✂ Guardar como referência</button><button type="button" class="an-sec" id="rcFechar">✕</button><span id="rcEst" style="color:#ffd54a"></span></div>
+  <div class="rc-palco" id="rcPalco"><img id="rcImg" draggable="false"><div class="rc-caixa" id="rcCaixa" style="display:none"></div></div></div>
+<div id="layout" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:12px">
+  <div class="an-linha" style="color:#fff;margin:0;flex-wrap:wrap"><b id="lyTitulo"></b>
+    <label class="an-dica" style="color:#ddd">altura de quem está em pé no chão da frente <input type="range" id="lyAlt" min="0.15" max="1.2" step="0.01"></label>
+    <button type="button" class="an-mini an-sec" id="lyNovoLugar">➕ lugar</button>
+    <button type="button" class="an-mini an-sec" id="lyNovoProp">➕ móvel</button>
+    <button type="button" class="an-mini an-sec" id="lyIA" title="a IA olha o fundo e posiciona os lugares e os móveis">🤖 IA posiciona</button>
+    <button type="button" id="lySalvar">💾 Salvar</button><button type="button" class="an-sec" id="lyFechar">✕</button></div>
+  <div id="lyProp" style="color:#fff;min-height:28px"></div>
+  <div id="lyPalco" style="position:relative;max-width:92vw;max-height:76vh;aspect-ratio:{{ '16/9' if p.proporcao == '16:9' else '9/16' }};height:76vh;overflow:hidden;user-select:none;touch-action:none">
+    <img id="lyFundo" style="width:100%;height:100%;object-fit:cover;display:block" draggable="false"></div>
+</div>
+<div class="an-zoom" id="zoom"><img alt=""></div>
+
+<script>
+const PID = {{ p.id|tojson }};
+const POSES = {{ poses|tojson }};
+const POSICOES = {{ posicoes|tojson }};
+const CAMERAS = {{ cameras|tojson }};
+const ESTILOS = {{ estilos|tojson }};
+const TIPOS = {{ tipos_momento|tojson }};
+const TIPOS_REF = {{ tipos_ref|tojson }};
+const ROT_TIPO = { fala: '💬 fala', narracao: '🎙 narração', acao: '🎬 ação', destaque: '🌟 destaque' };
+const ROT_CAM = { fixa: 'câmera fixa', zoom_in: '🔍 zoom in', zoom_out: '🔎 zoom out', pan_esq: '⬅ pan', pan_dir: '➡ pan', tremida: '💥 tremida' };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+const mmss = (s) => { s = Math.max(0, Math.round(+s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+let P = null, timer = null, editando = new Set(), ultimaTarefa = null;
+
+async function api(url, dados) {
+  const op = { method: dados === undefined ? 'GET' : 'POST' };
+  if (dados instanceof FormData) op.body = dados;
+  else if (dados !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(dados); }
+  const r = await fetch(url, op);
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('HTTP ' + r.status));
+  return d;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-copiar-js]'); if (!b) return;
+  navigator.clipboard.writeText($(b.dataset.copiarJs).textContent).then(() => { b.textContent = '✔ copiado'; setTimeout(() => b.textContent = '📋 copiar', 1500); });
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'zArq') return;
+  const f = e.target.files[0]; if (!f) return; e.target.value = '';
+  const fd = new FormData(); fd.append('arquivo', f);
+  avisar($('zEst'), '⏳ importando ' + f.name + '…'); $('zRel').textContent = '';
+  try {
+    const r = await api(`/anime2d/${PID}/zip`, fd);
+    avisar($('zEst'), '✔ entrou: ' + r.resumo, 'an-ok');
+    $('zRel').textContent = (r.avisos || []).join('\n');
+    await recarregar();
+    if (P) {  // o zip pode ter trazido título, história e configurações: o passo 1 mostra o que ficou salvo
+      $('fTitulo').value = P.titulo || ''; $('hTitulo').textContent = P.titulo || ''; $('fPremissa').value = P.premissa || '';
+      $('fEstilo').value = P.estilo; $('fProp').value = P.proporcao; $('fDur').value = P.duracao_alvo || 0;
+      $('fEstiloExtra').value = P.estilo_extra || ''; $('fIdioma').value = P.idioma || '';
+      $('fNarr').checked = !!(P.narrador || {}).ativo; $('fLeg').checked = !!P.legendas; $('fPar').checked = P.paralaxe !== false;
+    }
+  } catch (err) { avisar($('zEst'), '❌ ' + err.message, 'an-err'); }
+});
+// ------------------------------------------------------------------ 📖 mangá → anime
+function desenharManga() {
+  const n = P.n_paginas || 0, ad = (P.manga || {}).adaptacao, pg = (P.manga || {}).paginas || [];
+  const box = $('mPags'), chave = n + ':' + pg.join(',');
+  if (box.dataset.n !== chave) {
+    box.dataset.n = chave;
+    const tps = (P.manga || {}).tempos || [];
+    box.innerHTML = Array.from({ length: n }, (_, i) => `<figure data-pag="${i + 1}" title="clique pra ✂ recortar"><img src="/anime2d/${PID}/manga/${i + 1}.jpg?v=${esc(pg[i] || '')}">${i + 1}${tps[i] != null ? ' · ' + mmss(tps[i]) : ''}</figure>`).join('') || '<span class="an-dica">nenhuma página ainda</span>';
+  }
+  $('mAdapt').innerHTML = ad ? `🎌 <b>${esc(ad.titulo || '')}</b> — ${esc(ad.tom || '')}${ad.estilo_sugerido && ad.estilo_sugerido !== P.estilo ? ` · estilo sugerido: <b>${esc((ESTILOS[ad.estilo_sugerido] || [ad.estilo_sugerido])[0])}</b> <button type="button" class="an-mini" id="bUsarEstilo">usar</button>` : ''}
+    ${(ad.notas || []).length ? '<br>📝 ' + ad.notas.map(esc).join(' · ') : ''}` : '';
+  $('bDesigns').style.display = P.personagens.some(c => c.design) ? '' : 'none';
+  $('rcNomes').innerHTML = [...P.personagens, ...P.locais, ...P.itens].map(x => `<option value="${esc(x.nome)}">`).join('');
+}
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'mVideo') return;
+  const f = e.target.files[0]; if (!f) return; e.target.value = '';
+  const fd = new FormData(); fd.append('video', f); fd.append('usar_audio', $('mVideoAudio').checked ? '1' : '0');
+  avisar($('mEst'), '⏳ enviando o vídeo…');
+  try { await api(`/anime2d/${PID}/manga/video`, fd); avisar($('mEst'), '🎬 lendo o vídeo (quadros' + ($('mVideoAudio').checked ? ' + áudio' : '') + ')…', 'an-ok'); recarregar(); }
+  catch (er) { avisar($('mEst'), '❌ ' + er.message, 'an-err'); }
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'mArq') return;
+  const fs = [...e.target.files]; if (!fs.length) return; e.target.value = '';
+  const fd = new FormData(); fs.forEach(f => fd.append('paginas', f)); if ($('mSubst').checked) fd.append('substituir', '1');
+  avisar($('mEst'), '⏳ enviando…');
+  try { const r = await api(`/anime2d/${PID}/manga/paginas`, fd); avisar($('mEst'), `✔ ${r.n} página(s) · ${r.total} no total`, 'an-ok'); recarregar(); } catch (er) { avisar($('mEst'), '❌ ' + er.message, 'an-err'); }
+});
+document.addEventListener('click', async e => {
+  if (e.target.id === 'bLerManga') { try { await api(`/anime2d/${PID}/ia/manga`, {}); recarregar(); } catch (er) { alert(er.message); } }
+  if (e.target.id === 'bUsarEstilo') { $('fEstilo').value = P.manga.adaptacao.estilo_sugerido; $('bSalvarDados').click(); }
+  if (e.target.id === 'bDesigns') { try { const d = await api(`/anime2d/${PID}/design/gerar`, {}); avisar($('pEst'), `🎨 ${d.enviadas} pro Flow` + (d.aviso ? ' · ' + d.aviso : ''), 'an-ok'); recarregar(); } catch (er) { alert(er.message); } }
+  const fig = e.target.closest('#mPags figure[data-pag]');
+  if (fig) abrirRecorte(+fig.dataset.pag);
+});
+let rcPag = 0, rcIni = null, rcBox = null;
+function abrirRecorte(n) {
+  rcPag = n; rcBox = null; $('rcCaixa').style.display = 'none'; $('rcEst').textContent = 'página ' + n;
+  $('rcImg').src = `/anime2d/${PID}/manga/${n}.jpg`; $('recorte').style.display = 'flex';
+}
+$('rcFechar').addEventListener('click', () => { $('recorte').style.display = 'none'; });
+$('rcPalco').addEventListener('mousedown', e => { const r = $('rcImg').getBoundingClientRect(); rcIni = [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; e.preventDefault(); });
+window.addEventListener('mousemove', e => {
+  if (!rcIni) return; const r = $('rcImg').getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+  rcBox = [Math.min(rcIni[0], x), Math.min(rcIni[1], y), Math.max(rcIni[0], x), Math.max(rcIni[1], y)];
+  const c = $('rcCaixa'); c.style.display = 'block';
+  Object.assign(c.style, { left: rcBox[0] * 100 + '%', top: rcBox[1] * 100 + '%', width: (rcBox[2] - rcBox[0]) * 100 + '%', height: (rcBox[3] - rcBox[1]) * 100 + '%' });
+});
+window.addEventListener('mouseup', () => { rcIni = null; });
+$('rcSalvar').addEventListener('click', async () => {
+  if (!rcBox) { $('rcEst').textContent = 'arraste na página primeiro'; return; }
+  try { await api(`/anime2d/${PID}/manga/recorte`, { pagina: rcPag, caixa: rcBox, tipo: $('rcTipo').value, nome: $('rcNome').value }); $('rcEst').textContent = '✔ guardado como referência'; recarregar(); }
+  catch (er) { $('rcEst').textContent = '❌ ' + er.message; }
+});
+// ------------------------------------------------------------------ 📐 montar o cenário (lugares e móveis)
+let LY = null;  // {lid, lugares, props, alt, sel}
+function abrirLayout(lid) {
+  const l = P.locais.find(x => x.id === lid); if (!l) return;
+  if (!(l.img || {}).arquivo) { alert('Gere (ou envie) o fundo deste local antes.'); return; }
+  const lay = (P.layout || {})[lid] || {};
+  LY = { lid, alt: lay.alt || 0.62, lugares: JSON.parse(JSON.stringify(lay.lugares || [])),
+         props: (l.props || []).map(pr => Object.assign({ x: 0.5, y: pr.camada === 'atras' ? 0.8 : 1.0, w: pr.camada === 'atras' ? 0.16 : 0.35 }, pr)), sel: null };
+  $('lyFundo').src = U('imagens', l.img.arquivo);
+  $('lyTitulo').textContent = '📐 ' + l.nome;
+  $('lyAlt').value = LY.alt;
+  $('layout').style.display = 'flex';
+  desenharLayout();
+}
+function desenharLayout() {
+  const st = $('lyPalco'), r = st.getBoundingClientRect();
+  st.querySelectorAll('.ly-el').forEach(x => x.remove());
+  const H = r.height || 1;
+  const add = (html) => { st.insertAdjacentHTML('beforeend', html); };
+  for (const [i, pr] of LY.props.entries()) {
+    if (!(pr.img || {}).arquivo) continue;
+    add(`<img class="ly-el ly-prop${LY.sel === 'p' + i ? ' ly-sel' : ''}" data-ly="p${i}" src="${U('imagens', pr.img.arquivo)}" draggable="false"
+      style="left:${(pr.x - pr.w / 2) * 100}%;width:${pr.w * 100}%;bottom:${(1 - pr.y) * 100}%;z-index:${pr.camada === 'atras' ? 2 : 6}">`);
+  }
+  for (const [i, lg] of LY.lugares.entries()) {
+    const h = LY.alt * (lg.escala || 1) * (lg.sentado ? 0.7 : 1) * 100;
+    add(`<div class="ly-el ly-lugar${LY.sel === 'l' + i ? ' ly-sel' : ''}${lg.sentado ? ' ly-sentado' : ''}" data-ly="l${i}"
+      style="left:${lg.x * 100}%;bottom:${(1 - lg.y) * 100}%;height:${h}%;z-index:8"><span title="arraste pelos pés">${esc(lg.nome)}${lg.sentado ? ' 🪑' : ''}</span></div>`);
+  }
+  const s = LY.sel;
+  const pn = $('lyProp');
+  if (s && s[0] === 'l') {
+    const lg = LY.lugares[+s.slice(1)];
+    pn.innerHTML = `<b>📍 ${esc(lg.nome)}</b> <label class="an-dica">escala <input type="range" min="0.3" max="2" step="0.02" value="${lg.escala || 1}" data-lyk="escala"></label>
+      <label class="an-dica"><input type="checkbox" ${lg.sentado ? 'checked' : ''} data-lyk="sentado" style="width:auto"> sentado</label>
+      ${lg.padrao ? '' : '<button type="button" class="an-mini an-perigo" data-ly-del>🗑</button>'}`;
+  } else if (s && s[0] === 'p') {
+    const pr = LY.props[+s.slice(1)];
+    pn.innerHTML = `<b>🪑 ${esc(pr.nome)}</b> <label class="an-dica">largura <input type="range" min="0.03" max="1.2" step="0.01" value="${pr.w}" data-lyk="w"></label>
+      <select data-lyk="camada" style="width:auto"><option value="atras" ${pr.camada === 'atras' ? 'selected' : ''}>atrás do personagem</option><option value="frente" ${pr.camada !== 'atras' ? 'selected' : ''}>na frente</option></select>`;
+  } else pn.innerHTML = '<span class="an-dica" style="color:#ddd">Arraste a etiqueta de um lugar (fica nos pés da silhueta) ou um móvel; clique pra ajustar o tamanho. A silhueta mostra o tamanho de quem fica ali.</span>';
+}
+(function () {
+  let arr = null;
+  $('lyPalco').addEventListener('pointerdown', e => {
+    const el = e.target.closest('[data-ly]'); if (!el) { LY.sel = null; desenharLayout(); return; }
+    LY.sel = el.dataset.ly; const r = $('lyPalco').getBoundingClientRect();
+    const o = LY.sel[0] === 'l' ? LY.lugares[+LY.sel.slice(1)] : LY.props[+LY.sel.slice(1)];
+    arr = { o, x0: e.clientX, y0: e.clientY, ox: o.x, oy: o.y, w: r.width, h: r.height };
+    e.preventDefault(); desenharLayout();
+  });
+  window.addEventListener('pointermove', e => {
+    if (!arr) return;
+    arr.o.x = Math.round(Math.max(-0.2, Math.min(1.2, arr.ox + (e.clientX - arr.x0) / arr.w)) * 1000) / 1000;
+    arr.o.y = Math.round(Math.max(0.2, Math.min(1.3, arr.oy + (e.clientY - arr.y0) / arr.h)) * 1000) / 1000;
+    desenharLayout();
+  });
+  window.addEventListener('pointerup', () => { arr = null; });
+})();
+$('lyProp').addEventListener('input', e => {
+  const k = e.target.dataset.lyk; if (!k || !LY.sel) return;
+  const o = LY.sel[0] === 'l' ? LY.lugares[+LY.sel.slice(1)] : LY.props[+LY.sel.slice(1)];
+  o[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'range' ? +e.target.value : e.target.value;
+  desenharLayout();
+});
+$('lyProp').addEventListener('click', e => { if (e.target.closest('[data-ly-del]')) { LY.lugares.splice(+LY.sel.slice(1), 1); LY.sel = null; desenharLayout(); } });
+$('lyAlt').addEventListener('input', e => { LY.alt = +e.target.value; desenharLayout(); });
+$('lyNovoLugar').addEventListener('click', () => {
+  const nome = prompt('Nome do lugar (ex.: atrás da mesa, na porta, no sofá):'); if (!nome) return;
+  LY.lugares.push({ nome, x: 0.5, y: 0.85, escala: 1, sentado: confirm('É um lugar onde a pessoa fica SENTADA?') });
+  LY.sel = 'l' + (LY.lugares.length - 1); desenharLayout();
+});
+$('lyNovoProp').addEventListener('click', async () => {
+  const nome = prompt('Nome do móvel (ex.: mesa da senpai, cadeira, balcão):'); if (!nome) return;
+  const en = prompt('Como ele é (em inglês, pro Flow desenhar):', nome); if (en === null) return;
+  const camada = confirm('Ele fica NA FRENTE do personagem (mesa, balcão)? (Cancelar = atrás, tipo cadeira)') ? 'frente' : 'atras';
+  try { await api(`/anime2d/${PID}/local/${LY.lid}/prop`, { nome, prompt_en: en, camada }); await salvarLayout(false); await recarregar(); abrirLayout(LY.lid);
+        alert('Móvel criado — gere a imagem dele na seção 5 (🚀) ou mande a sua (📁).'); } catch (er) { alert(er.message); }
+});
+async function salvarLayout(fechar = true) {
+  await api(`/anime2d/${PID}/local/${LY.lid}/layout`, { lugares: LY.lugares, props: LY.props.map(p => ({ id: p.id, x: p.x, y: p.y, w: p.w, camada: p.camada })),
+    chao: { y: Math.max(...LY.lugares.filter(l => l.padrao).map(l => l.y), 0.9), alt: LY.alt } });
+  if (fechar) { $('layout').style.display = 'none'; recarregar(); }
+}
+$('lySalvar').addEventListener('click', () => salvarLayout().catch(er => alert(er.message)));
+$('lyFechar').addEventListener('click', () => { $('layout').style.display = 'none'; });
+$('lyIA').addEventListener('click', async () => { try { await salvarLayout(false); await api(`/anime2d/${PID}/local/${LY.lid}/ia`, {}); $('layout').style.display = 'none'; recarregar(); } catch (er) { alert(er.message); } });
+window.addEventListener('resize', () => { if (LY && $('layout').style.display === 'flex') desenharLayout(); });
+$('imgs').addEventListener('click', e => { const b = e.target.closest('[data-layout]'); if (b) abrirLayout(b.dataset.layout); });
+function avisar(el, msg, cls) { el.className = 'an-dica ' + (cls || ''); el.textContent = msg; }
+function focoEm(el) { return el && el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName); }
+const U = (pasta, nome) => `/anime2d/${PID}/arquivo/${pasta}/${encodeURIComponent(nome)}`;
+
+async function recarregar() {
+  clearTimeout(timer);
+  try { P = await api(`/anime2d/${PID}/estado`); desenhar(); } catch (e) { $('avisos').textContent = '⚠ ' + e.message; }
+  const t = P && P.tarefa;
+  const espera = (t && !t.fim) || (P && (P.personagens.some(c => c.poses && c.poses.esperando)
+    || [...P.locais, ...P.itens].some(x => ['fila', 'gerando'].includes((x.img || {}).estado) || ['fila', 'gerando'].includes((x.frente || {}).estado))
+    || P.cenas.some(s => (s.momentos || []).some(m => ['fila', 'gerando'].includes((m.video || {}).estado)))));
+  timer = setTimeout(recarregar, espera ? 3500 : 15000);
+}
+
+function desenhar() {
+  const t = P.tarefa, b = $('barra');
+  if (t && !t.fim) { b.className = 'an-barra rodando'; b.textContent = `⏳ ${t.rotulo}…${t.progresso ? ' ' + t.progresso : ''} (${Math.round(Date.now() / 1000 - t.inicio)} s — pode sair da página, chega uma 🔔)`; }
+  else if (t && t.erro) { b.className = 'an-barra erro'; b.textContent = `❌ ${t.rotulo}: ${t.erro}`; }
+  else if (t && t.fim && Date.now() / 1000 - t.fim < 20) { b.className = 'an-barra ok'; b.textContent = `✔ ${t.rotulo}${t.msg ? ' — ' + t.msg : ''}`; }
+  else b.className = 'an-barra';
+  if (t && t.fim && ultimaTarefa !== t.fim) { ultimaTarefa = t.fim; editando.clear(); }
+  $('avisos').textContent = (P.avisos || []).length ? '⚠ ' + P.avisos.join(' · ') : '';
+  desenharAudio(); desenharRefs(); desenharManga(); desenharPlano(); desenharCenas(); desenharPoses(); desenharImgs(); desenharVozes();
+  $('pT').max = Math.max(1, Math.ceil(P.duracao || 1));
+  $('plEst').textContent = P.ia ? '' : '⚠ IA desligada — copie o prompt e cole a resposta de outra IA';
+  $('log').textContent = (P.log || []).slice().reverse().join('\n');
+  if (P.editor && P.editor.job_id && !$('eEst').dataset.fixo) $('eEst').innerHTML = `já mandado: <a href="/job/${esc(P.editor.job_id)}/edit-segments" target="_blank">abrir no editor ↗</a> (mandar de novo cria outro)`;
+}
+
+// ------------------------------------------------------------------ 1 · dados
+$('bSalvarDados').addEventListener('click', async () => {
+  try {
+    await api(`/anime2d/${PID}/dados`, { titulo: $('fTitulo').value, premissa: $('fPremissa').value, estilo: $('fEstilo').value, proporcao: $('fProp').value,
+      duracao_alvo: $('fDur').value, estilo_extra: $('fEstiloExtra').value, idioma: $('fIdioma').value,
+      narrador: { ativo: $('fNarr').checked, voz: (P.narrador || {}).voz || '' }, legendas: $('fLeg').checked, paralaxe: $('fPar').checked });
+    $('hTitulo').textContent = $('fTitulo').value; avisar($('dEst'), '✔ salvo', 'an-ok'); recarregar();
+  } catch (e) { avisar($('dEst'), '❌ ' + e.message, 'an-err'); }
+});
+$('bExemplo').addEventListener('click', () => { if ($('fPremissa').value.trim() && !confirm('Trocar o texto atual pelo exemplo?')) return; $('fPremissa').value = $('exemplo').textContent; $('fPremissa').focus(); });
+function desenharAudio() {
+  const au = P.audio || {};
+  $('auEst').textContent = P.modo_audio ? `— ${au.nome || 'áudio'} (${mmss(au.dur)}) · ${(au.transcricao || []).length} trecho(s)` : '— nenhum';
+  $('auPlayer').style.display = P.modo_audio ? '' : 'none';
+  if (P.modo_audio && !$('auPlayer').dataset.ok) { $('auPlayer').src = `/anime2d/${PID}/audio.wav?v=${Date.now()}`; $('auPlayer').dataset.ok = 1; }
+  if (!focoEm($('auTrans')) && !editando.has('au')) $('auTrans').value = (au.transcricao || []).map(x => `${mmss(x.ini)} ${x.texto}`).join('\n');
+  $('cardVozes').style.opacity = P.modo_audio ? .5 : 1;
+}
+$('auTrans').addEventListener('input', () => editando.add('au'));
+$('auArq').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
+  try { await api(`/anime2d/${PID}/audio`, fd); $('auPlayer').dataset.ok = ''; editando.delete('au'); recarregar(); } catch (er) { alert(er.message); }
+  e.target.value = '';
+});
+$('bAuTrans').addEventListener('click', async () => { try { await api(`/anime2d/${PID}/audio`, { transcrever: true }); editando.delete('au'); recarregar(); } catch (e) { alert(e.message); } });
+$('bAuTirar').addEventListener('click', async () => { if (!confirm('Tirar o áudio (volta pras vozes geradas)?')) return; try { await api(`/anime2d/${PID}/audio`, { tirar: true }); $('auPlayer').dataset.ok = ''; recarregar(); } catch (e) { alert(e.message); } });
+$('bAuSalvar').addEventListener('click', async () => { try { const d = await api(`/anime2d/${PID}/audio`, { transcricao: $('auTrans').value }); editando.delete('au'); alert(`✔ ${d.linhas} trecho(s)`); recarregar(); } catch (e) { alert(e.message); } });
+
+function desenharRefs() {
+  $('refs').innerHTML = (P.referencias || []).map(r => `<div class="an-ref" data-rid="${esc(r.id)}"><img src="${U('refs', r.arquivo)}" data-zoom>
+    <select data-r="tipo">${Object.entries(TIPOS_REF).map(([k, v]) => `<option value="${k}" ${k === r.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <input data-r="nome" value="${esc(r.nome)}" placeholder="nome"><input data-r="nota" value="${esc(r.nota)}" placeholder="nota">
+    <button type="button" class="an-mini an-perigo" data-r-apagar>🗑</button></div>`).join('') || '<span class="an-dica">nenhuma ainda</span>';
+}
+$('rArq').addEventListener('change', async (e) => {
+  for (const f of e.target.files) {
+    const fd = new FormData(); fd.append('arquivo', f); fd.append('tipo', $('rTipo').value);
+    fd.append('nome', $('rNome').value || f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')); fd.append('nota', $('rNota').value);
+    try { await api(`/anime2d/${PID}/referencia`, fd); } catch (er) { alert(er.message); }
+  }
+  e.target.value = ''; recarregar();
+});
+$('refs').addEventListener('change', async (e) => {
+  const r = e.target.closest('[data-rid]'); if (!r || !e.target.dataset.r) return;
+  try { await api(`/anime2d/${PID}/referencia/${r.dataset.rid}`, { [e.target.dataset.r]: e.target.value }); recarregar(); } catch (er) { alert(er.message); }
+});
+$('refs').addEventListener('click', async (e) => {
+  const r = e.target.closest('[data-rid]'); if (!r || !e.target.closest('[data-r-apagar]')) return;
+  if (!confirm('Apagar esta referência?')) return;
+  try { await api(`/anime2d/${PID}/referencia/${r.dataset.rid}`, { apagar: true }); recarregar(); } catch (er) { alert(er.message); }
+});
+
+// ------------------------------------------------------------------ 2 · plano
+$('bPlano').addEventListener('click', async () => {
+  if (P.cenas.length && !confirm('Planejar de novo (as cenas atuais são trocadas; personagens/locais que já existem continuam)?')) return;
+  try { await api(`/anime2d/${PID}/dados`, { premissa: $('fPremissa').value }); await api(`/anime2d/${PID}/ia/plano`, {}); recarregar(); } catch (e) { alert(e.message); }
+});
+document.addEventListener('click', async (e) => {
+  const cp = e.target.closest('[data-copiar]'), cl = e.target.closest('[data-colar]');
+  if (cp) { try { const d = await api(`/anime2d/${PID}/prompt/${cp.dataset.copiar}?k=${cp.dataset.k || 0}`); await navigator.clipboard.writeText(d.prompt); cp.textContent = '✔ copiado'; setTimeout(() => cp.textContent = '📋 Copiar o prompt', 1600); } catch (er) { alert(er.message); } }
+  if (cl) { const txt = prompt('Cole aqui a resposta (o JSON) da outra IA:'); if (!txt) return; try { await api(`/anime2d/${PID}/colar/${cl.dataset.colar}`, { texto: txt, k: +(cl.dataset.k || 0) }); recarregar(); } catch (er) { alert(er.message); } }
+  if (e.target.hasAttribute && e.target.hasAttribute('data-zoom')) { $('zoom').querySelector('img').src = e.target.src; $('zoom').style.display = 'flex'; }
+});
+$('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+const CAMPOS = {
+  personagens: [['descricao', 'quem é'], ['personalidade', 'personalidade'], ['jeito_de_falar', 'jeito de falar'], ['aparencia_en', 'aparência pro desenho (inglês)']],
+  locais: [['descricao', 'o lugar'], ['prompt_en', 'fundo (inglês) — vazio, de frente, chão embaixo'], ['frente_en', 'camada da frente (opcional, inglês)']],
+  itens: [['prompt_en', 'como é (inglês)'], ['texto', '✍ texto ESCRITO na imagem (placa, etiqueta, bilhete — exatamente; vazio = nenhum)'], ['personagens_txt', '🧍 quem aparece (nomes, separados por vírgula) — vai a referência do design']],
+};
+function cardLista(lista, x) {
+  const refs = (x.refs || []).map(a => `<img src="${U('refs', a)}" style="height:34px;border-radius:4px" data-zoom>`).join(' ');
+  return `<div class="an-item" data-lista="${lista}" data-id="${esc(x.id)}"><div class="an-linha" style="margin:0 0 4px">
+    <input data-f="nome" value="${esc(x.nome)}" style="flex:1;font-weight:600">${lista === 'itens' ? `<select data-f="tipo" style="width:auto"><option value="objeto" ${x.tipo !== 'destaque' ? 'selected' : ''}>objeto</option><option value="destaque" ${x.tipo === 'destaque' ? 'selected' : ''}>🌟 destaque</option></select>` : ''}
+    ${lista === 'personagens' && (x.pod || {}).reaproveitado ? '<span class="an-chip">♻</span>' : ''}
+    <button type="button" class="an-mini an-perigo" data-apagar-x>🗑</button></div>
+    ${CAMPOS[lista].map(([k, r]) => `<label>${r}<textarea data-f="${k}">${esc(x[k] || '')}</textarea></label>`).join('')}
+    ${lista === 'personagens' && x.design ? `<label>🎨 versão anime (inglês) — o design pra aprovar<textarea data-f="design_en">${esc(x.design_en || '')}</textarea></label>
+      ${x.mudancas_anime ? `<div class="an-dica" style="margin:0 0 4px">📖→🎌 ${esc(x.mudancas_anime)}</div>` : ''}` : ''}
+    ${refs ? `<div class="an-dica" style="margin:0">📎 ${refs}</div>` : ''}</div>`;
+}
+function desenharPlano() {
+  const pl = P.plano || {};
+  $('sinopse').innerHTML = pl.sinopse ? `📖 ${esc(pl.sinopse)} · ⏱ ~${(+P.duracao_planejada || 0).toFixed(1)} min planejados${P.modo_audio ? ' (o áudio)' : ''}` : '';
+  for (const lista of ['personagens', 'locais', 'itens']) {
+    const box = $(lista === 'personagens' ? 'pers' : lista);
+    if (focoEm(box)) continue;
+    box.innerHTML = P[lista].map(x => cardLista(lista, x)).join('') || '<span class="an-dica">nenhum ainda — 🤖 planejar ou ➕</span>';
+  }
+}
+['pers', 'locais', 'itens'].forEach(id => {
+  $(id).addEventListener('change', async (e) => {
+    const c = e.target.closest('[data-lista]'); if (!c || !e.target.dataset.f) return;
+    try { await api(`/anime2d/${PID}/${c.dataset.lista}/${c.dataset.id}`, { [e.target.dataset.f]: e.target.value }); } catch (er) { alert(er.message); }
+  });
+  $(id).addEventListener('click', async (e) => {
+    const c = e.target.closest('[data-lista]'); if (!c || !e.target.closest('[data-apagar-x]')) return;
+    if (!confirm('Apagar?')) return; try { await api(`/anime2d/${PID}/${c.dataset.lista}/${c.dataset.id}`, { apagar: true }); recarregar(); } catch (er) { alert(er.message); }
+  });
+});
+async function novo(lista, input, extra) { const nome = $(input).value.trim(); if (!nome) return; try { await api(`/anime2d/${PID}/${lista}/novo`, Object.assign({ nome }, extra || {})); $(input).value = ''; recarregar(); } catch (e) { alert(e.message); } }
+$('bNovoPers').addEventListener('click', () => novo('personagens', 'novoPers'));
+$('bNovoLocal').addEventListener('click', () => novo('locais', 'novoLocal'));
+$('bNovoItem').addEventListener('click', () => novo('itens', 'novoItem', { tipo: $('novoItemTipo').value }));
+
+// ------------------------------------------------------------------ 3 · cenas
+function opcoes(lista, atual, vazio) { return (vazio ? `<option value="">${vazio}</option>` : '') + lista.map(([v, r]) => `<option value="${esc(v)}" ${v === atual ? 'selected' : ''}>${esc(r)}</option>`).join(''); }
+function lugaresDe(lid) { return ((P.lugares || {})[lid]) || POSICOES; }
+function linhaMomento(m, tl, lug) {
+  lug = lug || POSICOES;
+  const pers = P.personagens.map(c => [c.id, c.nome]);
+  const poses = Object.entries(POSES).map(([k, v]) => [k, v[0]]).concat([['outra', '✏ outra…']]);
+  const em = P.personagens.map(c => {
+    const e = (m.em_cena || []).find(x => x.cid === c.id);
+    return `<div data-cid="${c.id}"><b style="min-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.nome)}</b>
+      <select data-e="posicao">${opcoes(lug.concat(e && !lug.includes(e.posicao) ? [e.posicao] : []).map(x => [x, x.replace('_', ' ')]), e ? e.posicao : '', '— fora')}</select>
+      <select data-e="pose">${opcoes(poses, e ? e.pose : 'neutro')}</select>
+      <select data-e="olha">${opcoes([['direita', '→'], ['esquerda', '←']], e ? e.olha : 'direita')}</select>
+      ${e && e.pose === 'outra' ? `<input data-e="pose_en" value="${esc(e.pose_en || '')}" placeholder="pose em inglês" style="width:110px">` : ''}
+      ${e ? `<input data-e="poses" value="${esc((e.poses || []).map(z => z.pose === 'outra' ? z.pose_en : z.pose).join('; '))}" placeholder="➡ depois (poses em sequência; separe com ;)" title="poses que vêm em seguida DENTRO do momento — catálogo ou inglês curto, separadas por ;" style="width:100%;font-size:.7rem">` : ''}</div>`;
+  }).join('');
+  const objs = P.itens.filter(i => i.tipo !== 'destaque').map(i => [i.id, i.nome]);
+  const dest = P.itens.filter(i => i.tipo === 'destaque').map(i => [i.id, i.nome]);
+  const v = m.video || {};
+  return `<tr data-mid="${esc(m.id)}">
+    <td style="width:96px"><select data-m="tipo">${opcoes(TIPOS.map(x => [x, ROT_TIPO[x]]), m.tipo)}</select>
+      ${tl ? `<div class="an-dica" style="margin:2px 0 0">${mmss(tl.ini)}–${mmss(tl.fim)}</div>` : ''}
+      ${P.modo_audio ? `<input data-m="tempo" type="number" step="0.1" value="${m.tempo != null ? m.tempo : ''}" title="segundo no áudio" style="width:70px">` : ''}</td>
+    <td style="width:110px"><select data-m="quem">${opcoes([['narrador', '🎙 Narrador']].concat(pers), m.quem, '—')}</select>
+      <select data-m="camera" style="margin-top:2px">${opcoes(CAMERAS.map(x => [x, ROT_CAM[x] || x]), m.camera)}</select>
+      <select data-m="plano" style="margin-top:2px" title="🎥 o plano (enquadramento) deste momento">${opcoes(Object.entries(P.planos || {}).map(([k, v]) => [k, v]), m.plano || 'geral')}</select>
+      <select data-m="foco" style="margin-top:2px" title="quem a câmera enquadra">${opcoes(pers, m.foco || '', '🎯 foco: quem fala')}</select>
+      ${m.plano === 'reacao' ? `<select data-m="fundo_reacao" style="margin-top:2px">${opcoes(Object.entries(P.fundos_reacao || {}), m.fundo_reacao || 'linhas')}</select>` : ''}</td>
+    <td><textarea data-m="texto">${esc(m.texto)}</textarea>
+      <div class="an-linha" style="margin:2px 0 0;gap:4px">
+        ${objs.length ? `<select data-m="objeto" style="width:auto;font-size:.72rem">${opcoes(objs, m.objeto, '📦 sem objeto')}</select>` : ''}
+        ${m.tipo === 'destaque' ? `<select data-m="destaque" style="width:auto;font-size:.72rem">${opcoes(dest, m.destaque, '🌟 qual destaque?')}</select>` : ''}
+        ${['acao', 'destaque'].includes(m.tipo) ? `<label class="an-dica" style="margin:0">dura <input data-m="duracao" type="number" step="0.5" min="0.5" max="15" value="${m.duracao || 2}" style="width:56px"> s</label>` : ''}
+        ${(m.audio || {}).arquivo ? `<audio src="${U('vozes', m.audio.arquivo)}" controls style="height:26px;width:150px"></audio>` : ''}
+        <input data-m="som" value="${esc(m.som || '')}" placeholder="🔊 som (anotação)" title="efeito sonoro do momento — por enquanto só anotado; a busca de efeitos vem depois" style="width:130px;font-size:.72rem">
+      </div></td>
+    <td class="an-em" style="width:300px">${em}</td>
+    <td style="width:70px;white-space:nowrap">
+      <button type="button" class="an-mini an-sec" data-ver title="ver na prévia">👁</button>
+      <button type="button" class="an-mini an-sec" data-animar title="${v.estado === 'pronta' ? 'momento animado no Flow — clique pra tirar' : 'animar este momento no Flow (vídeo) — só quando você pedir'}">${v.estado === 'pronta' ? '🎞✔' : ['fila', 'gerando'].includes(v.estado) ? '⏳' : '🎞'}</button>
+      <button type="button" class="an-mini an-sec" data-sobe>↑</button><button type="button" class="an-mini an-perigo" data-del>✕</button>
+      ${v.erro ? `<div class="an-dica an-err" style="white-space:normal">${esc(v.erro)}</div>` : ''}</td></tr>`;
+}
+function desenharCenas() {
+  const box = $('cenas');
+  if (focoEm(box) || editando.size) return;
+  const tl = Object.fromEntries((P.tl || []).map(x => [x.id, x]));
+  box.innerHTML = P.cenas.map((s, k) => `<div class="an-cena" data-k="${k}">
+    <div class="an-linha"><b>${k + 1}.</b><input data-c="titulo" value="${esc(s.titulo)}">
+      <select data-c="local" style="width:auto">${opcoes(P.locais.map(l => [l.id, '🏞 ' + l.nome]), s.local, '🏞 local?')}</select>
+      <span class="an-dica">${tl[s.id] ? `${mmss(tl[s.id].ini)}–${mmss(tl[s.id].fim)}` : ''} · ${(s.momentos || []).length} momento(s)</span></div>
+    <textarea data-c="resumo" rows="2" placeholder="o que acontece">${esc(s.resumo)}</textarea>
+    <div class="an-linha">
+      <button type="button" class="an-mini" data-ia-cena>🤖 Escrever esta cena</button>
+      <button type="button" class="an-mini an-sec" data-copiar="cena" data-k="${k}">📋 Copiar o prompt</button>
+      <button type="button" class="an-mini an-sec" data-colar="cena" data-k="${k}">📥 Colar</button>
+      <button type="button" class="an-mini" data-salvar-cena style="background:#16a34a">💾 Salvar a cena</button>
+      <button type="button" class="an-mini an-sec" data-add-m>➕ momento</button>
+      <button type="button" class="an-mini an-sec" data-mover="-1">↑ cena</button><button type="button" class="an-mini an-sec" data-mover="1">↓ cena</button>
+      <button type="button" class="an-mini an-perigo" data-apagar-cena>🗑 cena</button>
+      <span class="an-dica" data-est></span></div>
+    <table class="an-mom"><tr><th>tipo</th><th>quem · câmera</th><th>texto</th><th>em cena (onde · pose · olha)</th><th></th></tr>
+    ${(s.momentos || []).map(m => { const x = tl[s.id] && tl[s.id].momentos[m.id]; return linhaMomento(m, x ? { ini: x[0], fim: x[1] } : null, lugaresDe(s.local)); }).join('')}</table></div>`).join('') || '<p class="an-dica">Sem cenas — 🤖 planeje o episódio (seção 2) ou ➕ crie uma.</p>';
+}
+function lerCena(div) {
+  const s = P.cenas[+div.dataset.k];
+  const momentos = [...div.querySelectorAll('tr[data-mid]')].map(tr => {
+    const g = (k) => { const el = tr.querySelector(`[data-m="${k}"]`); return el ? el.value : undefined; };
+    const em = [...tr.querySelectorAll('.an-em [data-cid]')].map(d => ({ personagem: d.dataset.cid, posicao: d.querySelector('[data-e=posicao]').value,
+      pose: d.querySelector('[data-e=pose]').value, olha: d.querySelector('[data-e=olha]').value, pose_en: (d.querySelector('[data-e=pose_en]') || {}).value || '',
+      poses_seguintes: ((d.querySelector('[data-e=poses]') || {}).value || '').split(';').map(x => x.trim()).filter(Boolean) }))
+      .filter(x => x.posicao);
+    const quem = g('quem');
+    const meu = em.find(x => x.personagem === quem);
+    return { id: tr.dataset.mid, tipo: g('tipo'), quem: quem, texto: g('texto'), camera: g('camera'), objeto: g('objeto') || '', destaque: g('destaque') || '',
+             duracao: g('duracao') ? +g('duracao') : 0, tempo: g('tempo') !== undefined && g('tempo') !== '' ? +g('tempo') : null,
+             pose: meu ? meu.pose : 'neutro', pose_en: meu ? meu.pose_en : '', em_cena: em, som: g('som') || '',
+             plano: g('plano') || 'geral', foco: g('foco') || '', fundo_reacao: g('fundo_reacao') || '' };
+  });
+  return { titulo: div.querySelector('[data-c=titulo]').value, local: div.querySelector('[data-c=local]').value, resumo: div.querySelector('[data-c=resumo]').value, momentos };
+}
+$('cenas').addEventListener('input', (e) => { const d = e.target.closest('.an-cena'); if (d) { editando.add('c' + d.dataset.k); d.querySelector('[data-est]').textContent = '✏ não salvo'; } });
+$('cenas').addEventListener('change', (e) => {
+  const d = e.target.closest('.an-cena'); if (!d) return; editando.add('c' + d.dataset.k); d.querySelector('[data-est]').textContent = '✏ não salvo';
+  if (e.target.dataset.e === 'pose' || e.target.dataset.m === 'tipo' || e.target.dataset.m === 'plano') {  // mostra o campo da pose livre / o seletor do destaque
+    const k = +d.dataset.k; const lida = lerCena(d); const tr = e.target.closest('tr'); const i = [...d.querySelectorAll('tr[data-mid]')].indexOf(tr);
+    tr.outerHTML = linhaMomento(Object.assign({}, lida.momentos[i], { em_cena: lida.momentos[i].em_cena.map(x => Object.assign({ cid: x.personagem, poses: (x.poses_seguintes || []).map(z => ({ pose: POSES[z] ? z : 'outra', pose_en: POSES[z] ? '' : z })) }, x)), audio: (P.cenas[k].momentos[i] || {}).audio, video: (P.cenas[k].momentos[i] || {}).video }), null, lugaresDe(P.cenas[k].local));
+  }
+});
+async function salvarCena(div) {
+  const k = +div.dataset.k;
+  try { await api(`/anime2d/${PID}/cena/${k}`, lerCena(div)); editando.delete('c' + k); await recarregar(); } catch (er) { alert(er.message); }
+}
+$('cenas').addEventListener('click', async (e) => {
+  const d = e.target.closest('.an-cena'); if (!d) return; const k = +d.dataset.k;
+  const b = (sel) => e.target.closest(sel);
+  if (b('[data-salvar-cena]')) return salvarCena(d);
+  if (b('[data-ia-cena]')) { if ((P.cenas[k].momentos || []).length && !confirm('Escrever esta cena de novo (troca os momentos)?')) return; try { await api(`/anime2d/${PID}/ia/cenas`, { ks: [k] }); editando.clear(); recarregar(); } catch (er) { alert(er.message); } return; }
+  if (b('[data-add-m]')) { const tb = d.querySelector('table'); const ult = (lerCena(d).momentos.slice(-1)[0]) || {}; tb.insertAdjacentHTML('beforeend', linhaMomento({ id: 'm' + Math.random().toString(16).slice(2, 8), tipo: 'fala', quem: '', texto: '', camera: 'fixa', plano: 'medio', em_cena: (ult.em_cena || []).map(x => Object.assign({ cid: x.personagem }, x)) }, null, lugaresDe(P.cenas[k].local))); editando.add('c' + k); return; }
+  if (b('[data-mover]')) { try { await api(`/anime2d/${PID}/cenas`, { acao: 'mover', k, d: +b('[data-mover]').dataset.mover }); editando.clear(); recarregar(); } catch (er) { alert(er.message); } return; }
+  if (b('[data-apagar-cena]')) { if (!confirm('Apagar esta cena?')) return; try { await api(`/anime2d/${PID}/cenas`, { acao: 'apagar', k }); editando.clear(); recarregar(); } catch (er) { alert(er.message); } return; }
+  const tr = e.target.closest('tr[data-mid]'); if (!tr) return;
+  if (b('[data-del]')) { tr.remove(); editando.add('c' + k); d.querySelector('[data-est]').textContent = '✏ não salvo'; return; }
+  if (b('[data-sobe]')) { const ant = tr.previousElementSibling; if (ant && ant.dataset.mid) { tr.parentNode.insertBefore(tr, ant); editando.add('c' + k); } return; }
+  if (b('[data-ver]')) {
+    if (editando.has('c' + k)) await salvarCena(d);
+    const sc = (P.tl || [])[k]; const mid = tr.dataset.mid;
+    try { const est = await api(`/anime2d/${PID}/estado`); P = est; } catch (_) {}
+    $('pT').value = momentoT(k, mid); atualizarPrevia(); $('previa').scrollIntoView({ behavior: 'smooth', block: 'center' }); return;
+  }
+  if (b('[data-animar]')) {
+    const m = (P.cenas[k].momentos || []).find(x => x.id === tr.dataset.mid) || {};
+    if ((m.video || {}).estado === 'pronta') { if (!confirm('Tirar o vídeo deste momento (volta pra montagem com imagens)?')) return; try { await api(`/anime2d/${PID}/momento/${m.id}/animar`, { tirar: true }); recarregar(); } catch (er) { alert(er.message); } return; }
+    if (editando.has('c' + k)) await salvarCena(d);
+    const pedido = prompt('🎞 Animar este momento no Flow (vídeo curto no lugar dele)?\nO que deve acontecer (opcional):', ''); if (pedido === null) return;
+    try { const r = await api(`/anime2d/${PID}/momento/${tr.dataset.mid}/animar`, { pedido }); if (r.aviso) alert(r.aviso); recarregar(); } catch (er) { alert(er.message); }
+  }
+});
+function momentoT(k, mid) {
+  // o meio do momento na linha do tempo (o servidor manda os tempos das cenas; dentro da cena, estimamos pela ordem)
+  const sc = (P.tl || [])[k]; if (!sc) return 0;
+  const x = sc.momentos[mid]; if (x) return (x[0] + x[1]) / 2;
+  return (sc.ini + sc.fim) / 2;
+}
+$('bCenas').addEventListener('click', async () => { if (P.cenas.some(s => (s.momentos || []).length) && !confirm('Escrever TODAS as cenas de novo?')) return; try { await api(`/anime2d/${PID}/ia/cenas`, {}); editando.clear(); recarregar(); } catch (e) { alert(e.message); } });
+$('bCenasVazias').addEventListener('click', async () => { try { await api(`/anime2d/${PID}/ia/cenas`, { so_vazias: true }); recarregar(); } catch (e) { alert(e.message); } });
+$('bNovaCena').addEventListener('click', async () => { try { await api(`/anime2d/${PID}/cenas`, { acao: 'nova', k: P.cenas.length }); editando.clear(); recarregar(); } catch (e) { alert(e.message); } });
+
+// ------------------------------------------------------------------ 4 · personagens no Flow
+function desenharPoses() {
+  $('poses').innerHTML = P.personagens.map(c => {
+    const s = c.poses || {};
+    const st = !s.tem ? 'ainda não gerado' : s.erro ? '❌ ' + s.erro : !s.mestre ? (s.esperando ? '⏳ gerando a ⭐ neutra…' : '⏳ esperando a neutra') : `${s.prontas}/${s.total} poses · ${s.bocas} boca(s)` + (s.esperando ? ` · ⏳ ${s.esperando} no Flow` : ' · ✔') + (s.erros ? ` · ❌ ${s.erros}` : '');
+    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/anime2d/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${esc(i.arquivo.replace(/\.png$/, '').split('_').slice(1).join(' '))}</div>`).join('');
+    return `<div class="an-item" data-cid="${c.id}">${blocoDesign(c)}<div class="an-linha" style="margin:0"><b>${esc(c.nome)}</b> <span class="an-dica" style="margin:0">${esc(c.aprovar ? '🔒 aprove o design anime primeiro' : st)}</span>
+      ${(c.pod || {}).reaproveitado ? `<span class="an-chip">♻ de “${esc(c.pod.reaproveitado)}”</span>` : ''}
+      <button type="button" class="an-mini" data-gerar-p ${c.aprovar ? 'disabled title="aprove o design anime primeiro"' : ''}>${s.tem ? '🔁 Gerar o que falta' : '🚀 Gerar'}</button>
+      ${s.tem ? `<a href="/personagens-pod/${esc(s.pid)}" target="_blank" class="an-dica">abrir na 🧍 aba Personagens ↗</a>` : ''}</div>
+      <div class="an-dica" style="margin:2px 0">o roteiro usa: ${(c.usadas || []).map(x => `<span class="an-chip">${esc(POSES[x] ? POSES[x][0] : x.replace(/^x_/, '✏ ').replace(/_/g, ' '))}</span>`).join(' ')}</div>
+      ${imgs ? `<div class="an-poses">${imgs}</div>` : ''}</div>`;
+  }).join('') || '<p class="an-dica">Sem personagens ainda.</p>';
+}
+function blocoDesign(c) {
+  const d = c.design; if (!d) return '';
+  const mg = (c.refs || []).slice(0, 2).map(a => `<figure><img src="${U('refs', a)}" data-zoom>mangá</figure>`).join('');
+  const vs = (d.versoes || (d.arquivo ? [d.arquivo] : [])).map(a => `<figure><img src="${U('imagens', a)}" data-zoom class="${d.aprovado === a ? 'ok' : ''}">
+      ${d.aprovado === a ? '✔ aprovado' : `<button type="button" class="an-mini" data-aprovar="${esc(a)}">✔ Aprovar</button>`}</figure>`).join('');
+  const msg = d.estado === 'erro' ? '❌ ' + (d.erro || '') : ['fila', 'gerando'].includes(d.estado) ? (d.msg || '⏳') : '';
+  return `<div class="an-design"><b style="align-self:center">🎨 ${esc(c.nome)}</b>${mg}${mg ? '<span style="align-self:center;font-size:1.4rem">→</span>' : ''}${vs || '<span class="an-dica">(sem design ainda)</span>'}
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <button type="button" class="an-mini" data-design-gerar ${['fila', 'gerando'].includes(d.estado) ? 'disabled' : ''}>${d.arquivo ? '🔁 Refazer (com pedido)' : '🎨 Gerar o design'}</button>
+      <label class="an-mini an-sec" style="cursor:pointer;color:#fff;border-radius:6px">📁 Seu design<input type="file" accept="image/*" data-design-seu hidden></label>
+      ${d.aprovado ? '<button type="button" class="an-mini an-sec" data-desaprovar>↺ desfazer aprovação</button>' : ''}
+      <span class="an-dica" style="margin:0">${esc(msg)}</span></div></div>`;
+}
+$('bPoses').addEventListener('click', () => gerarPoses([]));
+$('poses').addEventListener('click', async (e) => {
+  const c = e.target.closest('[data-cid]'); if (!c) return;
+  try {
+    if (e.target.closest('[data-design-gerar]')) {
+      const tem = (P.personagens.find(x => x.id === c.dataset.cid).design || {}).arquivo;
+      const pedido = tem ? prompt('O que mudar no design (opcional):', '') : ''; if (pedido === null) return;
+      const d = await api(`/anime2d/${PID}/design/gerar`, { cids: [c.dataset.cid], pedido }); if (d.aviso) alert(d.aviso); recarregar();
+    } else if (e.target.closest('[data-aprovar]')) { await api(`/anime2d/${PID}/design/${c.dataset.cid}`, { arquivo: e.target.closest('[data-aprovar]').dataset.aprovar }); recarregar(); }
+    else if (e.target.closest('[data-desaprovar]')) { await api(`/anime2d/${PID}/design/${c.dataset.cid}`, { aprovar: false }); recarregar(); }
+  } catch (er) { alert(er.message); }
+});
+$('poses').addEventListener('change', async (e) => {
+  const c = e.target.closest('[data-cid]'); if (!c || !e.target.hasAttribute('data-design-seu')) return;
+  const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
+  try { await api(`/anime2d/${PID}/design/${c.dataset.cid}`, fd); recarregar(); } catch (er) { alert(er.message); }
+});
+$('poses').addEventListener('click', (e) => { const c = e.target.closest('[data-cid]'); if (c && e.target.closest('[data-gerar-p]')) gerarPoses([c.dataset.cid]); });
+async function gerarPoses(cids) { try { const d = await api(`/anime2d/${PID}/poses/gerar`, { cids }); if ((d.avisos || []).length) alert(d.avisos.join('\n')); recarregar(); } catch (e) { alert(e.message); } }
+
+// ------------------------------------------------------------------ 5 · imagens
+function cardImg(alvo, nome, st, sub) {
+  st = st || {};
+  const msg = st.estado === 'erro' ? '❌ ' + (st.erro || '') : ['fila', 'gerando'].includes(st.estado) ? (st.msg || '⏳') : st.origem && st.arquivo ? (st.origem === 'flow' ? '' : st.origem === 'sua' ? '📁 sua' : st.origem) : '';
+  return `<div class="an-item" data-alvo="${esc(alvo)}"><b>${esc(nome)}</b> <span class="an-dica">${esc(sub)}</span>
+    <div class="an-img">${st.arquivo ? `<img src="${U('imagens', st.arquivo)}" data-zoom>` : '—'}</div>
+    <div class="an-dica" style="margin:2px 0">${esc(msg)}</div>
+    <div class="an-linha" style="margin:0"><button type="button" class="an-mini" data-gerar-img>${st.arquivo ? '🔁 Refazer' : '🚀 Gerar'}</button>
+    <label class="an-mini an-sec" style="cursor:pointer;color:#fff;border-radius:6px">📁 Sua imagem<input type="file" accept="image/*" data-sua hidden></label></div></div>`;
+}
+function desenharImgs() {
+  const html = [];
+  for (const l of P.locais) {
+    html.push(cardImg(l.id + ':fundo', '🏞 ' + l.nome, l.img, 'fundo').replace('</div></div>', `<button type="button" class="an-mini" data-layout="${l.id}" title="onde cada um fica em pé/sentado e onde vão os móveis">📐 Montar o cenário</button></div></div>`));
+    for (const pr of (l.props || [])) html.push(cardImg(l.id + ':' + pr.id, '🪑 ' + pr.nome, pr.img, (pr.camada === 'atras' ? 'móvel atrás' : 'móvel na frente') + ' · ' + l.nome));
+    if ((l.frente_en || '').trim() || (l.frente || {}).arquivo) html.push(cardImg(l.id + ':frente', '🌿 ' + l.nome, l.frente, 'na frente dos personagens'));
+  }
+  for (const i of P.itens) html.push(cardImg(i.id, (i.tipo === 'destaque' ? '🌟 ' : '📦 ') + i.nome, i.img, i.tipo === 'destaque' ? 'destaque (tela cheia)' : 'objeto'));
+  $('imgs').innerHTML = html.join('') || '<p class="an-dica">Sem locais/itens ainda.</p>';
+}
+$('bImgs').addEventListener('click', async () => { try { const d = await api(`/anime2d/${PID}/imagens/gerar`, {}); avisar($('iEst'), `🚀 ${d.enviadas} pro Flow` + (d.aviso ? ' · ' + d.aviso : ''), 'an-ok'); recarregar(); } catch (e) { alert(e.message); } });
+$('bReap').addEventListener('click', async () => { try { const d = await api(`/anime2d/${PID}/imagens/reaproveitar`, {}); avisar($('iEst'), d.n ? `♻ ${d.n} reaproveitada(s)` : 'nada pra reaproveitar', d.n ? 'an-ok' : ''); recarregar(); } catch (e) { alert(e.message); } });
+$('imgs').addEventListener('click', async (e) => {
+  const c = e.target.closest('[data-alvo]'); if (!c || !e.target.closest('[data-gerar-img]')) return;
+  const pedido = prompt('O que mudar / detalhe extra (opcional):', ''); if (pedido === null) return;
+  try { const d = await api(`/anime2d/${PID}/imagens/gerar`, { alvos: [c.dataset.alvo], pedido }); if (d.aviso) alert(d.aviso); recarregar(); } catch (er) { alert(er.message); }
+});
+$('imgs').addEventListener('change', async (e) => {
+  const c = e.target.closest('[data-alvo]'); if (!c || !e.target.hasAttribute('data-sua')) return;
+  const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
+  try { await api(`/anime2d/${PID}/imagem/${encodeURIComponent(c.dataset.alvo)}`, fd); recarregar(); } catch (er) { alert(er.message); }
+});
+
+// ------------------------------------------------------------------ 6 · vozes
+function desenharVozes() {
+  if (focoEm($('vozes'))) return;
+  const grupos = {};
+  (P.vozes_disponiveis || []).forEach(v => { (grupos[v.grupo || 'vozes'] = grupos[v.grupo || 'vozes'] || []).push(v); });
+  const ops = (atual) => '<option value="">— sem voz (só legenda)</option>' + Object.entries(grupos).map(([g, vs]) => `<optgroup label="${esc(g)}">` +
+    vs.map(v => `<option value="${esc(v.slug)}" ${v.slug === atual ? 'selected' : ''}>${esc(v.nome)} · ${esc(v.resumo)}</option>`).join('') + '</optgroup>').join('');
+  const linhas = P.personagens.map(c => `<div class="an-item" data-cid="${c.id}"><b>${esc(c.nome)}</b> <span class="an-dica">${esc([c.genero, c.idade].filter(Boolean).join(' · '))}</span><select data-voz>${ops(c.voz)}</select></div>`);
+  if ((P.narrador || {}).ativo) linhas.unshift(`<div class="an-item" data-narr><b>🎙 Narrador</b><select data-voz>${ops((P.narrador || {}).voz)}</select></div>`);
+  linhas.push(`<div class="an-item"><b>🗣️ Motor dos perfis de voz</b> <span class="an-dica">(os perfis clonados usam este motor)</span><select id="vMotor">${(P.motores_perfil || []).map(m => `<option value="${m}" ${m === P.motor_perfil ? 'selected' : ''}>${m}</option>`).join('')}</select></div>`);
+  $('vozes').innerHTML = linhas.join('') + ((P.vozes_disponiveis || []).length ? '' : '<p class="an-dica">Nenhuma voz cadastrada — cadastre no <a href="/gerar-voz" target="_blank">Gerador de voz → 🎭 multi voice</a> ou crie um <a href="/perfis-de-voz" target="_blank">🗣️ perfil de voz</a>.</p>');
+  const ve = P.vozes_estado || {};
+  $('vEst').textContent = P.modo_audio ? '🎧 usando o áudio enviado — não precisa gerar vozes' : `${ve.com_audio || 0}/${ve.falas || 0} fala(s) com voz · episódio de ${mmss(P.duracao)}`;
+}
+$('vozes').addEventListener('change', async (e) => {
+  if (e.target.id === 'vMotor') { try { await api(`/anime2d/${PID}/dados`, { motor_perfil: e.target.value }); recarregar(); } catch (er) { alert(er.message); } return; }
+  if (!e.target.hasAttribute('data-voz')) return;
+  try {
+    if (e.target.closest('[data-narr]')) await api(`/anime2d/${PID}/dados`, { narrador: { ativo: true, voz: e.target.value } });
+    else await api(`/anime2d/${PID}/personagens/${e.target.closest('[data-cid]').dataset.cid}`, { voz: e.target.value });
+    recarregar();
+  } catch (er) { alert(er.message); }
+});
+$('bVozes').addEventListener('click', async () => { try { await api(`/anime2d/${PID}/vozes/gerar`, {}); recarregar(); } catch (e) { alert(e.message); } });
+$('bVozesTudo').addEventListener('click', async () => { if (!confirm('Gerar TODAS as falas de novo?')) return; try { await api(`/anime2d/${PID}/vozes/gerar`, { tudo: true }); recarregar(); } catch (e) { alert(e.message); } });
+
+// ------------------------------------------------------------------ 7 · prévia e editor
+function atualizarPrevia() { $('pTv').textContent = mmss($('pT').value) + ' / ' + mmss(P ? P.duracao : 0); $('previa').src = `/anime2d/${PID}/previa.jpg?t=${$('pT').value}&r=${Date.now()}`; }
+$('pT').addEventListener('input', () => { $('pTv').textContent = mmss($('pT').value) + ' / ' + mmss(P ? P.duracao : 0); });
+$('pT').addEventListener('change', atualizarPrevia);
+$('bPrevia').addEventListener('click', atualizarPrevia);
+$('bEditor').addEventListener('click', async () => {
+  if (editando.size && !confirm('Tem cena com mudança NÃO salva — mandar sem ela?')) return;
+  const b = $('bEditor'); b.disabled = true; $('eEst').dataset.fixo = '1'; $('eEst').textContent = '⏳ montando (áudio, fundos, personagens, legendas)…';
+  try { const d = await api(`/anime2d/${PID}/editor`, {}); $('eEst').innerHTML = `✔ pronto — <a href="${d.link}" target="_blank"><b>abrir no editor ↗</b></a>`; $('eAvisos').innerHTML = (d.avisos || []).map(a => '⚠ ' + esc(a)).join('<br>'); recarregar(); }
+  catch (e) { $('eEst').textContent = '❌ ' + e.message; }
+  finally { b.disabled = false; }
+});
+
+recarregar().then(() => atualizarPrevia());
+</script>
+{% endblock %}
