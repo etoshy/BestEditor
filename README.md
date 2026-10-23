@@ -50,7 +50,9 @@ Na aba **🕵️ Modelos de vídeo → 🎭 React de personagens**: vídeo no es
 
 **👁 A IA assistir ao vídeo**: além da transcrição, a IA olha o vídeo (quadros a cada ~5 s) e anota o que acontece, o texto que aparece na tela (legenda embutida, letreiro, nome de golpe) e quem aparece; o roteiro usa isso. O 🤖 Escrever o roteiro já faz sozinho no trecho que falta ler.
 
-**🖼 Thumbnail e publicação (seção 10)**: a capa no padrão dos reacts — os personagens escolhidos (todos ou alguns, cada um com a cara que você quiser, virados pro vídeo, com contorno branco) de um lado e o quadro do vídeo (o segundo que você escolher) do outro, com seta vermelha opcional. 🧩 Montar faz na hora; 🎨 Gerar no Flow manda o rascunho de referência pra redesenhar caprichado. A capa entra nas 📣 Publicações do react (o mesmo painel da aba Publicações: texto, fontes, versões, modificar, baixar; títulos, descrição, tags).
+**📖 Bíblia da obra (seção 1) e do personagem (seção 3)**: anime pouco conhecido? Cole a descrição dos episódios (ANN, wiki, resenha) e quem é quem — ou escreva como cada personagem é e responderia na ficha dele. Vira a fonte principal das sugestões, fichas, roteiro, leitura do vídeo e verificador de fatos. 🤖 Organizar com a IA separa episódios, personagens, tom e piadas recorrentes e completa as fichas vazias.
+
+**🖼 Thumbnail e publicação (seção 10)**: a capa no padrão dos reacts — os personagens escolhidos (todos ou alguns, cada um com a cara que você quiser, virados pro vídeo, com contorno branco) de um lado e o quadro do vídeo (o segundo que você escolher) do outro, com seta vermelha opcional. 🧩 Montar faz na hora; 🎨 Gerar no Flow manda o rascunho de referência pra redesenhar caprichado. A capa entra nas 📣 Publicações do react (o mesmo painel da aba Publicações: texto, fontes, versões, modificar, baixar; títulos, descrição, tags). A capa também é montada por peças: arraste e redimensione cada personagem, o quadro do vídeo, a seta e uma imagem sua (📤 — PNG transparente entra recortado; pode ir no lugar do quadro do vídeo), mude a ordem e esconda; os personagens ficam lado a lado cobrindo no máximo ~30% do vizinho.
 
 1. **🎬 Vídeo** — título + link (YouTube/outras redes, baixa até 720p) ou o arquivo. **📺 Link do YouTube: a transcrição vem sozinha** pelo mesmo sistema do 📝 Roteiro do YouTube (painel “Mostrar transcrição”, legenda do vídeo, youtube-transcript-api… e, sem legenda, o Whisper), linha a linha com o tempo — ao criar o projeto (link do YouTube sem transcrição colada) ou no botão. **✂ Cortes**: começar em, terminar em e quantas cenas do meio quiser (marcando o tempo no player do vídeo original); a transcrição e as falas que já existem seguem os cortes (as que caem num trecho cortado saem), e dá pra voltar pro vídeo inteiro. Ou cole a **transcrição com tempo** (“0:13 frase”, SRT, VTT, “[00:13] frase” ou o formato do YouTube). Legenda tirada da tela (a mesma frase em dezenas de linhas, duplicada, com o crédito “Personagem - Cantor” no meio) vira uma frase por vez, e os créditos entram como “quem canta”. Sem transcrição: 🎙 Whisper.
 2. **🤖 Personagens sugeridos** — a IA lê a transcrição e olha quadros do vídeo e sugere o elenco: **da obra**, **🔥 hypados** e **contraste**. Marque, troque o nome de qualquer um, adicione os seus e peça mais sugestões (as novas combinam com quem já está).
@@ -3906,3 +3908,54 @@ reutilizado em várias abas do shortmaker, fora do escopo desse
 "roteiro para áudio" específico. Aqui todas as falas usam um dos três
 motores de IA. Se fizer falta, dá pra portar depois como uma extensão
 separada.
+
+## 🎞 Animação 2D (aba Modelos de vídeo, v84_237)
+
+Desenho animado montado com imagens, no estilo "Shin-chan mais simples": fundos, personagens em poses
+(quadro A/B + boca), objetos, imagens de destaque, camada da frente e câmera — tudo posicionado e
+mandado pro editor.
+
+1. **Premissa, história ou instruções** — escreva uma premissa curta, cole a história inteira, ou instruções
+   (personagens, estilo, lugar, tom...). Há um 💡 exemplo pronto pra usar. Também dá pra **enviar um áudio**:
+   o Whisper transcreve, a IA descobre os personagens e as cenas seguem o tempo do áudio (o áudio vira a trilha).
+   📎 Referências: fotos de personagem/local/item/estilo — o nome liga a foto ao item e ela vai pro Flow.
+2. **Plano** — a IA cria personagens, locais, itens e a lista de cenas. Duração 0 = automática (a IA estima);
+   episódio longo sai cena por cena.
+3. **Cenas e momentos** — fala, narração, ação ou destaque; quem fala, câmera (fixa, zoom, pan, tremida),
+   onde cada personagem está, a pose e pra onde olha. Tudo editável.
+4. **Personagens no Flow** — só as poses usadas são geradas (corpo inteiro), com segundo quadro de movimento
+   e bocas. Personagem com o mesmo nome em outro episódio é **reaproveitado**.
+5. **Imagens** — locais e itens; ♻ reaproveita imagens já geradas; 📁 aceita a sua imagem.
+6. **Vozes** — narrador (se a história precisar) e uma voz por personagem; legendas opcionais.
+7. **Prévia e editor** — cada cena vira um segmento; personagens alternam quadros A/B, boca mexe nas falas.
+
+Vídeo do Flow é **opcional**: só quando você clicar 🎞 num momento.
+
+**🌄 Parallax** (ligado por padrão, caixinha no passo 1): quando a câmera anda, cada camada anda numa velocidade —
+no pan o fundo desliza ~15% da largura na cena, personagens e objetos ~20% e a camada da frente ~32%; no zoom in os
+personagens abrem pros lados e a frente desce (zoom out: o contrário); na câmera tremida a frente treme mais que os
+personagens. No meio da cena cada camada está onde foi posicionada. A prévia 👁 mostra igual ao render
+(`anime2d.movimento`/`deslocamento` ↔ `video_assembler._mov_expr`, campo `mov` do overlay).
+
+### 📦 Zip com tudo (Animação 2D)
+
+Na criação (aba Modelos de vídeo) ou no passo 1 do projeto (“📦 Zip com tudo”): um .zip com a história, as
+configurações, os personagens (fotos de referência, `personagem.json` com personalidade/jeito de falar/aparência/voz,
+e `poses/` já desenhadas — `neutro.png`, `correndo_b.png` = 2º quadro, `neutro_boca.png` = boca aberta, nome livre =
+pose nova), os locais (`local.json`, `fundo.png`, `frente.png`, referências), os itens (`item.json` objeto/destaque,
+`imagem.png`), `estilo/`, `audio.mp3` e `cenas.json`. Tudo é opcional; o que vem pronto não vai pro Flow. Importar num
+projeto existente junta pelo nome (não duplica). ⬇ Exportar gera o mesmo formato; ⬇ zip de exemplo e o guia
+(`/anime2d/zip-guia.txt`) mostram a estrutura. Código: `anime2d_zip.py`.
+
+### 📖 Mangá → anime (Animação 2D)
+
+No passo 1 (“📖 Mangá → anime”) ou na pasta `manga/` do zip: as páginas de um mangá seu, em ordem. 🤖 *Ler o mangá*
+(ou copiar o prompt + anexar as páginas em outra IA) devolve a **adaptação** — os personagens como são no mangá
+(`aparencia_manga_en`) e a versão anime (`design_en`, `mudancas_anime`), locais, itens, cenas com as páginas de cada
+uma e notas — e recorta cada personagem/lugar das páginas como referência (✂ dá pra recortar à mão clicando na
+página). No passo 4 cada personagem tem a etapa **🎨 design anime**: gerar no Flow (entra sozinho quando fica pronto),
+🔁 refazer com pedido ou 📁 mandar o seu, e **✔ aprovar** — só depois as poses são geradas, com o design aprovado como
+referência principal. *Escrever as cenas* manda as páginas de cada cena pra IA (balão por balão, ordem de leitura
+japonesa); cada momento ganha o campo **🔊 som** (efeito sonoro anotado — a busca de efeitos vem depois). ⬇ *JSON da
+adaptação* baixa o “segundo JSON”; o zip exportado leva páginas, adaptação e designs (aprovados ou não). Estilo novo:
+🖋 *Mangá em tinta P&B (tipo o anime Uzumaki)* — monocromático: preto, branco e cinzas, hachuras finas, sombreado cinza suave, fundos detalhados. Código: `anime2d_manga.py`.
