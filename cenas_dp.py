@@ -464,7 +464,11 @@ def layout(tid: str) -> Dict[str, Any]:
         return {"janelas": [tuple(float(v) for v in j) for j in t["janelas"]][:max(1, n)],
                 "texto": tuple(t.get("texto") or (0.06, 0.80, 0.88, 0.15)), "arranjo": "personalizado",
                 **({"movimento": t["movimento"]} if t.get("movimento") in _MOVIMENTOS else {}),
-                **({"fundo_fixo": t["fundo_fixo"]} if t.get("fundo_fixo") else {})}
+                **({"fundo_fixo": t["fundo_fixo"]} if t.get("fundo_fixo") else {}),
+                # ⚡ v84_246: cena dos extras pode trazer a cor do fundo liso e a borda da janela (0 = só a sombra)
+                **({"cor_fundo": t["cor_fundo"]} if re.fullmatch(r"#[0-9a-fA-F]{6}", str(t.get("cor_fundo") or "")) else {}),
+                **({"borda": float(t["borda"])} if isinstance(t.get("borda"), (int, float)) else {}),
+                **({"sem_transpor": True} if t.get("sem_transpor") else {})}
     if not nome_arr and t.get("arranjo") in _ARRANJOS:
         nome_arr = t["arranjo"]
         opc = {k: t[k] for k in _OPCOES_ARRANJO if k in t}
@@ -485,7 +489,7 @@ def adaptar_layout(lay: Dict[str, Any], W: int, H: int) -> Dict[str, Any]:
     "transpostas" (lado a lado vira um em cima do outro) e espremidas na parte
     de cima; o texto vai pra faixa de baixo, largo. Tela cheia continua tela
     cheia. Quadrado (1:1) usa o arranjo original (já cabe bem)."""
-    if H <= W * 1.2:
+    if H <= W * 1.2 or lay.get("sem_transpor"):  # ⚡ v84_246: cena feita pro vertical já vem no lugar certo
         return lay
     novo = dict(lay)
     if lay.get("arranjo") in _ARRANJOS_TELA_CHEIA:
@@ -714,7 +718,7 @@ def renderizar_cena(
     estilos = fundos_do_template(tid)
     import dp_fundos
     estilo = campos.get("_fundo") if campos.get("_fundo") in (estilos + sorted(dp_fundos.IDS_CENA)) else estilos[0]
-    cor_fundo = campos.get("_fundo_cor") if re.fullmatch(r"#[0-9a-fA-F]{6}", str(campos.get("_fundo_cor") or "")) else None
+    cor_fundo = campos.get("_fundo_cor") if re.fullmatch(r"#[0-9a-fA-F]{6}", str(campos.get("_fundo_cor") or "")) else lay.get("cor_fundo")
     papel = estilo == "papel"
     cor_texto = "0x1b1a17" if papel else "white"
     caixa_texto = None if papel else "black@0.55"

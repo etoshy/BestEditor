@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% block title %}⚡ {{ p.titulo }} — Vídeos curtos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1280px; }
+  .ct-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .ct-card h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ct-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .ct-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .ct-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .ct-linha > * { margin: 0; }
+  .ct-linha button, .ct-btn { width: auto; margin: 0; padding: 6px 12px; }
+  .ct-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .ct-sec { background: #64748b !important; } .ct-perigo { background: #dc2626 !important; } .ct-ok { background: #16a34a !important; }
+  .ct-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; position: sticky; top: 0; z-index: 10; }
+  .ct-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .ct-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .ct-barra.okk { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .ct-midias { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .ct-midias > div { border: 1px solid var(--borda); border-radius: 8px; padding: 5px; font-size: .75rem; }
+  .ct-midias img, .ct-midias video { width: 100%; height: 110px; object-fit: cover; border-radius: 6px; background: #111; }
+  .ct-midias textarea { font-size: .72rem; min-height: 40px; margin: 3px 0; }
+  .ct-bloco { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; margin: 10px 0; }
+  .ct-bloco .cab { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .ct-bloco select, .ct-bloco input { width: auto; margin: 0; font-size: .82rem; }
+  .ct-bloco textarea.fala { font-size: 1rem; min-height: 54px; margin: 6px 0; font-family: inherit; }
+  .ct-cenas { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 6px; }
+  .ct-cena { border: 1px dashed var(--borda); border-radius: 8px; padding: 6px; font-size: .78rem; display: grid; gap: 3px; }
+  .ct-cena input, .ct-cena select { width: 100% !important; }
+  .ct-sub { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: .8rem; }
+  .ct-sub input { font-size: .78rem; }
+  .ct-al { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .ct-al td, .ct-al th { border-bottom: 1px solid var(--borda); padding: 4px 6px; vertical-align: top; text-align: left; }
+  .ct-al .dif { color: #b45309; }
+  .tele { background: #0b0b0f; color: #f5f5f5; border-radius: 12px; padding: 24px; height: 46vh; overflow: auto; font-size: 1.9rem; line-height: 1.35; scroll-behavior: smooth; }
+  .tele p { margin: 0 0 18px; opacity: .35; transition: opacity .2s; }
+  .tele p.atual { opacity: 1; }
+  .tele p.atual::before { content: '▶ '; color: #f59e0b; }
+  .medidor { height: 8px; background: #1f2937; border-radius: 4px; overflow: hidden; width: 200px; }
+  .medidor div { height: 100%; background: linear-gradient(90deg, #16a34a, #f59e0b, #dc2626); width: 0; }
+  .rec { color: #dc2626; font-weight: 700; animation: pisca 1s infinite; }
+  @keyframes pisca { 50% { opacity: .3; } }
+  .ct-tl { position: relative; height: 70px; background: var(--code-bg); border-radius: 8px; overflow: hidden; margin-top: 6px; }
+  .ct-tl div { position: absolute; top: 0; height: 22px; border-right: 1px solid var(--card); font-size: .62rem; overflow: hidden; white-space: nowrap; padding: 2px 3px; color: #fff; }
+  .ct-tl .d { top: 24px; background: #b45309; } .ct-tl .s { top: 48px; width: 3px !important; background: #2563eb; padding: 0; }
+  .ct-res { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; margin-top: 6px; }
+  .ct-res > div { border: 1px solid var(--borda); border-radius: 8px; padding: 6px; font-size: .78rem; }
+  audio { width: 100%; max-width: 520px; }
+</style>
+
+<div class="ct-linha" style="justify-content:space-between">
+  <h1 style="margin:0">⚡ <span id="tTitulo">{{ p.titulo }}</span> <span class="ct-dica" id="tInfo"></span></h1>
+  <div class="ct-linha"><a href="/curtos">← vídeos curtos</a>
+    <form method="post" action="/curtos/{{ p.id }}/excluir" onsubmit="return confirm('Excluir este vídeo curto (roteiro, gravação, mídias)?')" style="margin:0"><button class="ct-mini ct-perigo">🗑</button></form></div>
+</div>
+<div id="barra" class="ct-barra"></div>
+<div class="ct-card" style="background:var(--acento-suave)">
+  <div class="ct-linha" style="justify-content:space-between">
+    <div><b style="font-size:1.05rem">🚀 Fazer tudo</b> <span class="ct-dica">notícia → roteiro no estilo do canal → narração com a voz guia → vídeo montado no editor (com legenda, textos, sons e as mídias sendo buscadas). Pula o que já está feito.</span></div>
+    <div class="ct-linha"><button id="bTudo" style="font-weight:700">🚀 Fazer tudo</button>
+      <label style="font-weight:400;font-size:.82rem"><input type="checkbox" id="cRefazer" style="width:auto"> roteiro novo</label>
+      <span id="lnkEditor"></span></div>
+  </div>
+  <div class="ct-dica">Depois, se quiser a SUA voz: grave ou suba o áudio na seção 4 e use <b>🔁 Trocar a voz no editor</b> — as mídias já escolhidas ficam, só o tempo, a legenda, os textos e os sons se ajustam ao seu ritmo. Exporta normal pelo Estúdio.</div>
+</div>
+
+<!-- 1 notícia -->
+<div class="ct-card">
+  <h2><span class="ct-num">1</span> Notícia e mídias</h2>
+  <div class="ct-linha">
+    <label>Canal<select id="cCanal">{% for c in canais %}<option value="{{ c.id }}" {% if c.id == p.canal_id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}<option value="" {% if not p.canal_id %}selected{% endif %}>(sem canal)</option></select></label>
+    <label>Título<input type="text" id="cTitulo" value="{{ p.titulo }}" style="min-width:280px"></label>
+    <label>Duração (s, 0 = do canal)<input type="number" id="cDur" min="0" max="180" value="{{ p.config.duracao_alvo_s or 0 }}" style="width:90px"></label>
+  </div>
+  <div id="fontes"></div>
+  <div class="ct-linha"><input type="text" id="cLinks" placeholder="+ link da matéria" style="flex:1;min-width:280px"><button id="bLinks">📰 Ler</button></div>
+  <label>Texto / anotações (vai junto da matéria)</label><textarea id="cTexto" rows="3">{{ p.noticia.texto }}</textarea>
+  <label>Pedido extra pro roteiro (opcional)</label><textarea id="cExtra" rows="1" placeholder="ex.: terminar perguntando a opinião; não citar o nome do filho">{{ p.config.extra }}</textarea>
+  <div class="ct-linha"><button id="bSalvarCfg">💾 Salvar</button></div>
+  <p class="ct-dica" style="margin-top:10px">Mídias: <b>I</b> = fotos da matéria · <b>M</b> = suas · <b>K</b> = memes/bordões do canal. Escreva o que cada uma mostra — é isso que a IA lê.</p>
+  <div class="ct-linha"><input type="file" id="fMidia" accept="image/*,video/*" multiple style="width:auto"><button id="bMidia">⬆ Subir mídia</button></div>
+  <div class="ct-midias" id="midias"></div>
+</div>
+
+<!-- 2 roteiro -->
+<div class="ct-card">
+  <h2><span class="ct-num">2</span> Roteiro <span class="ct-dica" id="rInfo"></span></h2>
+  <div class="ct-linha">
+    <button id="bRotIA">🤖 Escrever com a IA</button>
+    <button class="ct-sec" id="bRotPrompt">📋 Prompt pra outra IA</button>
+    <button class="ct-sec" id="bRotNovo">+ bloco</button>
+    <button class="ct-ok" id="bRotSalvar">💾 Salvar roteiro</button>
+  </div>
+  <div id="rPromptBox" style="display:none"><textarea id="rPrompt" rows="6" readonly></textarea>
+    <label>Resposta da outra IA (JSON)</label><textarea id="rResp" rows="5"></textarea><button id="bRotColar">✔ Usar a resposta</button></div>
+  <div id="rMeta"></div>
+  <div id="blocos"></div>
+</div>
+
+<!-- 3 voz guia -->
+<div class="ct-card">
+  <h2><span class="ct-num">3</span> 🎙 Voz guia (TTS)</h2>
+  <p class="ct-dica">Ouça o ritmo antes de gravar — ou use ela como a narração do vídeo.</p>
+  <div class="ct-linha">
+    <select id="vVoz">{% for v in vozes %}<option value="{{ v.slug }}" {% if v.slug == p.config.voz_tts %}selected{% endif %}>{{ v.grupo }} · {{ v.nome }}</option>{% else %}<option value="">(nenhuma voz cadastrada — 🎙 Gerar voz)</option>{% endfor %}</select>
+    <button id="bTTS" {% if not tem_tts %}disabled{% endif %}>🎙 Gerar voz guia</button>
+    <button class="ct-sec" id="bUsarGuia">➡ Usar a voz guia no vídeo</button>
+  </div>
+  <div id="tts"></div>
+</div>
+
+<!-- 4 sua voz -->
+<div class="ct-card">
+  <h2><span class="ct-num">4</span> 🎤 Sua voz</h2>
+  <p class="ct-dica">Leia no teleprompter (espaço / → = próximo bloco, ← = voltar). Pode errar e repetir a frase: as repetições, as muletas (“é…”, “ahn”) e as pausas longas saem sozinhas, e tudo (cortes, textos, sons, legenda) segue o ritmo da SUA voz.</p>
+  <div class="ct-linha" id="trocaBox" style="display:none;background:var(--ok-bg);border-radius:8px;padding:6px 10px">
+    <label style="font-weight:600;margin:0"><input type="checkbox" id="cDireto" checked style="width:auto"> 🔁 levar a gravação direto pro projeto do editor (mantém as mídias)</label>
+    <button class="ct-sec" id="bTrocar" title="usa a gravação que já está aqui embaixo">🔁 Trocar a voz no editor agora</button>
+  </div>
+  <div class="ct-linha">
+    <button id="bGravar">⏺ Gravar</button><button id="bParar" class="ct-perigo" style="display:none">⏹ Parar e usar</button>
+    <span id="recInfo"></span><div class="medidor"><div id="nivel"></div></div>
+    <label style="font-weight:400">ou suba o arquivo <input type="file" id="fAudio" accept="audio/*,video/*" style="width:auto"></label>
+  </div>
+  <div class="ct-linha">
+    <label style="font-weight:400"><input type="checkbox" id="oPausas" checked style="width:auto"> cortar pausas maiores que</label>
+    <input type="number" id="oPausa" step="0.05" min="0.1" max="1.5" style="width:80px"> s
+    <label style="font-weight:400"><input type="checkbox" id="oRep" checked style="width:auto"> cortar repetições e muletas</label>
+    <button class="ct-sec" id="bRefazer">✂ Refazer os cortes</button>
+  </div>
+  <div class="tele" id="tele"></div>
+  <div id="grav"></div>
+</div>
+
+<!-- 5 sons -->
+<div class="ct-card">
+  <h2><span class="ct-num">5</span> 🔊 Efeitos sonoros</h2>
+  <p class="ct-dica">Cada deixa do roteiro já tem um som da base (▶ ouvir, trocar). 🔎 Pixabay abre a busca num navegador (na 1ª vez pode pedir a verificação “sou humano” — resolva na janela), baixa, corta o silêncio e o som entra na base do editor.</p>
+  <div id="deixas"></div>
+  <div class="ct-linha"><input type="text" id="pxTermo" placeholder="procurar no Pixabay (em inglês: whoosh, cinematic hit, pop…)" style="flex:1;min-width:260px">
+    <input type="number" id="pxLim" value="6" min="1" max="12" style="width:70px" title="quantos sons"><button id="bPx">🔎 Pixabay</button></div>
+  <div class="ct-res" id="pxRes"></div>
+</div>
+
+<!-- 6 editor -->
+<div class="ct-card">
+  <h2><span class="ct-num">6</span> 🎬 Editor</h2>
+  <p class="ct-dica">Fontes das mídias (os planos vão pra fonte certa: banco de vídeo, foto real, YouTube, mídias da notícia…). O ⚖️ juiz da IA escolhe o melhor candidato de cada plano nas prévias.</p>
+  <div class="ct-linha" id="provs">{% set ligados = p.config.providers or providers_padrao %}{% for pv in todos_providers %}<label style="font-weight:400;font-size:.82rem"><input type="checkbox" value="{{ pv }}" {% if pv in ligados %}checked{% endif %} style="width:auto"> {{ pv }}</label>{% endfor %}</div>
+  <div class="ct-linha"><button class="ct-sec" id="bPrevia">👁 Ver o plano</button><button id="bEditor">🎬 Montar no editor</button><span id="edLink"></span></div>
+  <div id="previa"></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }}, BASE = '/curtos/' + PID;
+const LAYOUTS = {{ layouts|tojson }}, SFX = {{ tipos_sfx|tojson }}, FUNCOES = {{ funcoes|tojson }}, EFEITOS = {{ efeitos|tojson }}, ENTRADAS = {{ entradas|tojson }};
+const $ = id => document.getElementById(id);
+let P = null, ultimoFim = null, sujo = false, SONS = {};
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const arq = p => BASE + '/arquivo/' + p;
+const opts = (lista, atual) => lista.map(([v, t]) => `<option value="${esc(v)}" ${v === atual ? 'selected' : ''}>${esc(t)}</option>`).join('');
+async function api(url, corpo, metodo) {
+  const op = { method: metodo || 'POST' };
+  if (corpo instanceof FormData) op.body = corpo;
+  else if (corpo !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(corpo); }
+  const r = await fetch(url, op); const d = await r.json().catch(() => ({ ok: false, erro: 'resposta inválida (' + r.status + ')' }));
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('erro ' + r.status));
+  return d;
+}
+function barra(msg, tipo) { const b = $('barra'); b.className = 'ct-barra ' + (tipo || 'on'); b.textContent = msg; if (!msg) b.className = 'ct-barra'; }
+async function rodar(url, corpo) { try { await api(url, corpo); ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+
+// ---------------------------------------------------------------- 1 notícia
+function desenharNoticia() {
+  $('fontes').innerHTML = (P.noticia.fontes || []).map((f, i) => `<div class="ct-linha" style="font-size:.84rem">
+     <span>${f.estado === 'lida' ? '✅' : f.estado === 'erro' ? '❌' : '⏳'}</span><a href="${esc(f.url)}" target="_blank">${esc(f.titulo || f.url)}</a>
+     <span class="ct-dica">${esc(f.site || '')} ${f.texto ? '· ' + f.texto.split(/\s+/).length + ' palavras' : ''} ${f.erro ? '· ' + esc(f.erro) : ''}</span>
+     ${f.estado === 'erro' ? '<button class="ct-mini ct-sec" data-reler="1">🔁</button>' : ''}<button class="ct-mini ct-perigo" data-fdel="${i}">✕</button></div>`).join('');
+  const todas = (P.midias || []).map(m => ({ ...m, canal: false })).concat((P.midias_canal || []).map(m => ({ ...m, canal: true })));
+  $('midias').innerHTML = todas.map(m => m.canal ? `<div><b>${m.id}</b> 😂 <span class="ct-dica">${esc(m.descricao)}</span><div class="ct-dica">(do canal)</div></div>` :
+    `<div>${m.tipo === 'video' ? `<video src="${arq(m.arquivo)}" muted></video>` : `<img src="${arq(m.arquivo)}">`}
+      <b>${m.id}</b> <textarea data-mdesc="${m.id}">${esc(m.descricao)}</textarea><button class="ct-mini ct-perigo" data-mdel="${m.id}">🗑</button></div>`).join('');
+}
+$('bSalvarCfg').onclick = salvarCfg;
+async function salvarCfg() {
+  try {
+    await api(BASE + '/config', { titulo: $('cTitulo').value, canal_id: $('cCanal').value, duracao_alvo_s: +$('cDur').value || 0,
+      texto_noticia: $('cTexto').value, extra: $('cExtra').value });
+    $('tTitulo').textContent = $('cTitulo').value; barra('✅ salvo', 'okk'); recarregar();
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('bLinks').onclick = async () => { try { await api(BASE + '/config', { links: $('cLinks').value }); $('cLinks').value = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bMidia').onclick = async () => { const fd = new FormData(); for (const f of $('fMidia').files) fd.append('arquivos', f); try { await api(BASE + '/midia', fd); $('fMidia').value = ''; recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+
+// ---------------------------------------------------------------- 2 roteiro
+function idsMidia() { return [''].concat((P.midias || []).concat(P.midias_canal || []).map(m => m.id)); }
+function cenaHtml(bi, ci, c) {
+  return `<div class="ct-cena" data-b="${bi}" data-c="${ci}">
+    <div style="display:flex;gap:4px"><select data-k="layout">${opts(Object.entries(LAYOUTS).map(([k, v]) => [k, v[0]]), c.layout)}</select>
+      <select data-k="material" title="mídia da notícia / do canal">${opts(idsMidia().map(x => [x, x || '— mídia —']), c.material)}</select>
+      <button class="ct-mini ct-perigo" data-cdel="${bi}:${ci}">✕</button></div>
+    <input data-k="query" value="${esc(c.query)}" placeholder="busca (inglês)">
+    <input data-k="alternativas" value="${esc((c.alternativas || []).join(' | '))}" placeholder="reservas (separe com |)">
+    <input data-k="visual" value="${esc(c.visual)}" placeholder="o que aparece (português)">
+    <div style="display:flex;gap:4px"><input data-k="palavra" value="${esc(c.palavra)}" placeholder="${ci ? 'começa na palavra…' : '(começa com o bloco)'}" ${ci ? '' : 'disabled'}>
+      <select data-k="efeito">${opts([['', '— movimento —']].concat(EFEITOS.map(x => [x, x])), c.efeito)}</select>
+      <select data-k="entrada">${opts(ENTRADAS.map(x => [x, x === 'none' ? '— entrada —' : x]), c.entrada)}</select></div></div>`;
+}
+function desenharRoteiro() {
+  const r = P.roteiro;
+  $('rInfo').textContent = `${P.palavras_roteiro || 0} de ~${P.palavras_alvo} palavras`;
+  if (!r) { $('blocos').innerHTML = '<p class="ct-dica">Sem roteiro ainda.</p>'; $('rMeta').innerHTML = ''; return; }
+  $('rMeta').innerHTML = `<div class="ct-linha"><label style="flex:1">Título do vídeo<input id="rTit" value="${esc(r.titulo_video)}"></label></div>
+    ${(r.titulos_alt || []).length ? `<div class="ct-dica">outras ideias: ${r.titulos_alt.map(esc).join(' · ')}</div>` : ''}
+    <details><summary class="ct-dica" style="cursor:pointer">descrição e hashtags</summary><textarea id="rDesc" rows="2">${esc(r.descricao)}</textarea>
+    <input id="rTags" value="${esc((r.hashtags || []).join(' '))}"></details>`;
+  $('blocos').innerHTML = r.blocos.map((b, bi) => `<div class="ct-bloco" data-b="${bi}">
+    <div class="cab"><b>${b.id}</b><select data-bk="funcao">${opts(FUNCOES.map(x => [x, x]), b.funcao)}</select>
+      <span class="ct-dica">${b.fala.split(/\s+/).length} palavras</span>
+      <button class="ct-mini ct-sec" data-bup="${bi}">⬆</button><button class="ct-mini ct-sec" data-bdown="${bi}">⬇</button>
+      <button class="ct-mini ct-sec" data-cadd="${bi}">+ plano</button><button class="ct-mini ct-sec" data-sadd="${bi}">+ som</button>
+      <button class="ct-mini ct-perigo" data-bdel="${bi}">🗑</button></div>
+    <textarea class="fala" data-bk="fala">${esc(b.fala)}</textarea>
+    <div class="ct-cenas">${b.cenas.map((c, ci) => cenaHtml(bi, ci, c)).join('')}</div>
+    <div class="ct-sub">🔤 texto na tela <input data-tk="texto" value="${esc(b.texto_tela.texto)}" placeholder="(nenhum)" style="width:200px">
+      estilo <input data-tk="estilo" value="${esc(b.texto_tela.estilo)}" placeholder="do canal" style="width:110px">
+      na palavra <input data-tk="palavra" value="${esc(b.texto_tela.palavra)}" style="width:120px"></div>
+    ${b.sfx.map((s, si) => `<div class="ct-sub" data-s="${si}">🔊 <select data-sk="tipo">${opts(Object.entries(SFX), s.tipo)}</select>
+      na palavra <input data-sk="palavra" value="${esc(s.palavra)}" placeholder="(começo do bloco)" style="width:130px">
+      Pixabay <input data-sk="busca" value="${esc(s.busca)}" style="width:150px"><button class="ct-mini ct-perigo" data-sdel="${bi}:${si}">✕</button></div>`).join('')}
+  </div>`).join('');
+}
+function lerRoteiroDaTela() {
+  const r = JSON.parse(JSON.stringify(P.roteiro));
+  if ($('rTit')) { r.titulo_video = $('rTit').value; r.descricao = $('rDesc').value; r.hashtags = $('rTags').value.split(/\s+/).filter(Boolean); }
+  document.querySelectorAll('.ct-bloco').forEach(el => {
+    const b = r.blocos[+el.dataset.b];
+    el.querySelectorAll('[data-bk]').forEach(i => { b[i.dataset.bk] = i.value; });
+    el.querySelectorAll('[data-tk]').forEach(i => { b.texto_tela[i.dataset.tk] = i.value; });
+    el.querySelectorAll('.ct-cena').forEach(ce => { const c = b.cenas[+ce.dataset.c];
+      ce.querySelectorAll('[data-k]').forEach(i => { c[i.dataset.k] = i.dataset.k === 'alternativas' ? i.value.split('|').map(x => x.trim()).filter(Boolean) : i.value; }); });
+    el.querySelectorAll('[data-s]').forEach(se => { const s = b.sfx[+se.dataset.s]; se.querySelectorAll('[data-sk]').forEach(i => { s[i.dataset.sk] = i.value; }); });
+  });
+  return r;
+}
+async function salvarRoteiro(r) {
+  try { const d = await api(BASE + '/roteiro', { roteiro: r || lerRoteiroDaTela() }); sujo = false; P.roteiro = d.roteiro; barra('✅ roteiro salvo', 'okk'); recarregar(); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+function mexer(fn) { const r = lerRoteiroDaTela(); fn(r); P.roteiro = r; sujo = true; desenharRoteiro(); desenharTele(); }
+$('blocos').addEventListener('input', () => { sujo = true; });
+$('bRotSalvar').onclick = () => salvarRoteiro();
+$('bRotIA').onclick = () => { if (P.roteiro && !confirm('Escrever um roteiro novo (o atual é substituído)?')) return; rodar(BASE + '/roteiro/gerar', {}); };
+$('bRotPrompt').onclick = async () => { const d = await api(BASE + '/roteiro/prompt', undefined, 'GET'); $('rPrompt').value = d.prompt; $('rPromptBox').style.display = 'block'; try { navigator.clipboard.writeText(d.prompt); barra('📋 prompt copiado', 'okk'); } catch (_) {} };
+$('bRotColar').onclick = async () => { try { const d = await api(BASE + '/roteiro', { resposta: $('rResp').value }); P.roteiro = d.roteiro; $('rPromptBox').style.display = 'none'; barra('✅ roteiro', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bRotNovo').onclick = () => { if (!P.roteiro) P.roteiro = { titulo_video: '', titulos_alt: [], descricao: '', hashtags: [], blocos: [] };
+  mexer(r => r.blocos.push({ id: 'B' + (r.blocos.length + 1), funcao: 'fato', fala: '', cenas: [{ layout: 'video', query: '', alternativas: [], visual: '', material: '', palavra: '', efeito: 'zoom_in', entrada: 'none', composicao: '' }], texto_tela: { texto: '', estilo: '', palavra: '' }, sfx: [] })); };
+
+// ---------------------------------------------------------------- 3 voz guia
+function desenharTTS() {
+  const t = P.tts;
+  $('tts').innerHTML = t ? `<div class="ct-linha"><audio controls src="${arq(t.arquivo)}?v=${t.quando}"></audio><span class="ct-dica">${t.dur.toFixed(1)} s${t.desatualizada ? ' · ⚠ o roteiro mudou depois' : ''}</span></div>` : '';
+}
+$('bTTS').onclick = () => rodar(BASE + '/tts', { voz: $('vVoz').value });
+$('bUsarGuia').onclick = () => rodar(BASE + '/gravacao/usar-guia', opcoes());
+
+// ---------------------------------------------------------------- 4 gravação
+let blocoAtual = 0;
+function desenharTele() {
+  const bs = (P.roteiro || {}).blocos || [];
+  $('tele').innerHTML = bs.map((b, i) => `<p data-i="${i}" class="${i === blocoAtual ? 'atual' : ''}">${esc(b.fala)}</p>`).join('') || '<p class="atual">(faça o roteiro antes)</p>';
+}
+function irPara(i) {
+  const bs = (P.roteiro || {}).blocos || []; blocoAtual = Math.max(0, Math.min(bs.length - 1, i));
+  document.querySelectorAll('#tele p').forEach(p => p.classList.toggle('atual', +p.dataset.i === blocoAtual));
+  const el = document.querySelector(`#tele p[data-i="${blocoAtual}"]`); if (el) $('tele').scrollTop = el.offsetTop - $('tele').offsetTop - 40;
+}
+$('tele').onclick = ev => { if (ev.target.dataset.i) irPara(+ev.target.dataset.i); };
+document.addEventListener('keydown', ev => { if (!gravando) return; if (ev.code === 'Space' || ev.code === 'ArrowRight') { ev.preventDefault(); irPara(blocoAtual + 1); } if (ev.code === 'ArrowLeft') { ev.preventDefault(); irPara(blocoAtual - 1); } });
+function opcoes() { return { cortar_pausas: $('oPausas').checked, cortar_repeticoes: $('oRep').checked, pausa_max: +$('oPausa').value || undefined }; }
+let gravando = false, rec = null, pedacos = [], stream = null, t0 = 0, timer = null, ctxA = null;
+$('bGravar').onclick = async () => {
+  if (sujo) await salvarRoteiro();
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } }); }
+  catch (e) { barra('❌ microfone: ' + e.message, 'erro'); return; }
+  const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  rec = new MediaRecorder(stream, tipo ? { mimeType: tipo, audioBitsPerSecond: 192000 } : undefined); pedacos = [];
+  rec.ondataavailable = e => { if (e.data.size) pedacos.push(e.data); };
+  rec.onstop = enviarGravacao;
+  ctxA = new AudioContext(); const an = ctxA.createAnalyser(); ctxA.createMediaStreamSource(stream).connect(an); const buf = new Uint8Array(an.fftSize);
+  (function medir() { if (!gravando) return; an.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128)); $('nivel').style.width = Math.min(100, m / 1.28) + '%'; requestAnimationFrame(medir); })();
+  rec.start(1000); gravando = true; t0 = Date.now(); irPara(0);
+  $('bGravar').style.display = 'none'; $('bParar').style.display = '';
+  timer = setInterval(() => { $('recInfo').innerHTML = `<span class="rec">● REC</span> ${((Date.now() - t0) / 1000).toFixed(0)} s`; }, 250);
+  requestAnimationFrame(() => {});
+};
+$('bParar').onclick = () => { gravando = false; clearInterval(timer); rec.stop(); stream.getTracks().forEach(t => t.stop()); if (ctxA) ctxA.close(); $('bParar').style.display = 'none'; $('bGravar').style.display = ''; $('recInfo').textContent = '⬆ enviando…'; };
+async function enviarGravacao() {
+  const blob = new Blob(pedacos, { type: rec.mimeType || 'audio/webm' });
+  const ext = (rec.mimeType || '').includes('mp4') ? '.m4a' : (rec.mimeType || '').includes('ogg') ? '.ogg' : '.webm';
+  const fd = new FormData(); fd.append('audio', blob, 'gravacao' + ext); const o = opcoes(); for (const k in o) if (o[k] !== undefined) fd.append(k, o[k]);
+  try { await api(destinoAudio(), fd); $('recInfo').textContent = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+function destinoAudio() { return (P.editor && P.editor.job_id && $('cDireto').checked) ? BASE + '/trocar-voz' : BASE + '/gravacao'; }
+$('fAudio').onchange = async () => { const fd = new FormData(); fd.append('audio', $('fAudio').files[0]); const o = opcoes(); for (const k in o) if (o[k] !== undefined) fd.append(k, o[k]);
+  try { await api(destinoAudio(), fd); $('fAudio').value = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bTrocar').onclick = () => rodar(BASE + '/trocar-voz', opcoes());
+$('bTudo').onclick = async () => {
+  if (sujo) await salvarRoteiro();
+  if ($('cRefazer').checked && P.roteiro && !confirm('Escrever um roteiro novo (o atual é substituído)?')) return;
+  rodar(BASE + '/fazer-tudo', { voz: $('vVoz').value, providers: provs(), refazer_roteiro: $('cRefazer').checked });
+};
+$('bRefazer').onclick = () => rodar(BASE + '/gravacao/refazer', opcoes());
+function desenharGravacao() {
+  const g = P.gravacao;
+  if (!g) { $('grav').innerHTML = ''; return; }
+  const bs = (P.roteiro || {}).blocos || [];
+  const linhas = (g.alinhamento || []).map((a, i) => { const b = bs[i] || {}; const dif = a.similaridade < 0.97;
+    return `<tr><td><b>${a.bloco}</b><br><span class="ct-dica">${a.start.toFixed(1)}–${a.end.toFixed(1)} s</span></td><td>${esc(b.fala)}</td>
+      <td class="${dif ? 'dif' : ''}">${esc(a.falado) || '<i>(não achei)</i>'}</td><td>${Math.round(a.similaridade * 100)}%
+      ${dif && a.falado ? `<button class="ct-mini ct-sec" data-falado="${a.bloco}" title="a fala do roteiro vira o que você disse">✔ usar o que falei</button>` : ''}</td></tr>`; }).join('');
+  $('grav').innerHTML = `<div class="ct-linha" style="margin-top:10px"><b>${g.fonte === 'guia' ? '🎙 voz guia' : '🎤 sua gravação'}:</b>
+      <audio controls src="${arq(g.arquivo)}?v=${g.quando}"></audio><span class="ct-dica">${g.dur_original.toFixed(1)} s → ${g.dur.toFixed(1)} s · ${g.cortes.length} corte(s)${g.desatualizada ? ' · ⚠ o roteiro mudou: realinhado' : ''}</span></div>
+    ${(g.repeticoes || []).length ? `<div class="ct-dica">✂ saiu: ${g.repeticoes.map(x => '“' + esc(x) + '”').join(', ')}</div>` : ''}
+    <details><summary class="ct-dica" style="cursor:pointer">ouvir o original</summary><audio controls src="${arq(g.original)}"></audio></details>
+    <table class="ct-al"><tr><th>bloco</th><th>roteiro</th><th>o que você falou</th><th></th></tr>${linhas}</table>
+    ${linhas.includes('data-falado') ? '<button class="ct-sec" data-falado="*" style="width:auto;margin-top:6px">✔ usar o que falei em todos</button>' : ''}`;
+}
+
+// ---------------------------------------------------------------- 5 sons
+async function sonsDo(tipo) { if (!SONS[tipo]) SONS[tipo] = (await api('/curtos/sons/' + tipo, undefined, 'GET')).sons; return SONS[tipo]; }
+async function desenharDeixas() {
+  const ds = P.deixas || [];
+  if (!ds.length) { $('deixas').innerHTML = '<p class="ct-dica">O roteiro não tem deixas de som (➕ som num bloco).</p>'; return; }
+  const linhas = [];
+  for (const d of ds) {
+    const sons = await sonsDo(d.tipo);
+    linhas.push(`<div class="ct-linha" style="font-size:.84rem"><b>${d.bloco}</b> ${esc(SFX[d.tipo] || d.tipo)} ${d.palavra ? '· em “' + esc(d.palavra) + '”' : '· no começo'}
+      <select data-som="${d.bloco}:${d.indice}" style="width:auto">${sons.map(s => `<option value="${esc(s.id)}" data-arq="${esc(s.arquivo)}" ${s.id === d.som ? 'selected' : ''}>${esc(s.nome)} (${esc(s.categoria)})</option>`).join('')}</select>
+      <button class="ct-mini ct-sec" data-ouvir="${d.bloco}:${d.indice}">▶</button>
+      <button class="ct-mini ct-sec" data-pxb="${esc(d.busca)}" data-pxd="${d.bloco}:${d.indice}">🔎 Pixabay: ${esc(d.busca)}</button></div>`);
+  }
+  $('deixas').innerHTML = linhas.join('');
+}
+let pxAlvo = null, pxTermoAtual = '';
+async function pixabay(termo, alvo) {
+  pxAlvo = alvo; pxTermoAtual = termo; $('pxTermo').value = termo;
+  try { await api('/curtos/pixabay/buscar', { termo, limite: +$('pxLim').value || 6 }); pollPx(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+async function pollPx() {
+  const d = await (await fetch('/curtos/pixabay/estado?termo=' + encodeURIComponent(pxTermoAtual), { cache: 'no-store' })).json();
+  const t = d.tarefa;
+  if (t && !t.fim) { barra('🔎 ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); setTimeout(pollPx, 1500); }
+  else if (t && t.erro) barra('❌ ' + t.erro, 'erro'); else if (t) barra('✅ ' + (t.msg || 'pronto'), 'okk');
+  $('pxRes').innerHTML = (d.sons || []).map(s => `<div><b>${esc(s.nome || s.titulo)}</b> <span class="ct-dica">${(s.dur || 0).toFixed(2)} s · ${esc(s.autor)}</span>
+     <div class="ct-dica">${esc(s.descricao || (s.tags || []).join(', '))}</div>
+     <audio controls src="/curtos/pixabay/arquivo/${s.arquivo}" style="height:30px"></audio>
+     <button class="ct-mini ${s.na_base ? 'ct-sec' : ''}" data-pxusar="${s.id}">${s.na_base ? '✔ na base — usar' : '➕ pôr na base' + (pxAlvo ? ' e usar' : '')}</button></div>`).join('');
+}
+$('bPx').onclick = () => { if ($('pxTermo').value.trim()) pixabay($('pxTermo').value.trim(), null); };
+
+// ---------------------------------------------------------------- 6 editor
+function provs() { return [...document.querySelectorAll('#provs input:checked')].map(i => i.value); }
+$('bPrevia').onclick = async () => {
+  if (sujo) await salvarRoteiro();
+  try {
+    const d = await api(BASE + '/previa', { providers: provs() }); const W = d.dur;
+    const cor = { video: '#2563eb', foto: '#0891b2', foto_real: '#7c3aed', clipe_real: '#dc2626', materia: '#16a34a', cartao: '#111827', cartao_cinza: '#6b7280', ia: '#db2777', meme: '#ea580c' };
+    $('previa').innerHTML = `<div class="ct-tl">${d.planos.map(x => `<div style="left:${x.start / W * 100}%;width:${(x.end - x.start) / W * 100}%;background:${cor[x.layout] || '#475569'}" title="${esc(x.layout + ' · ' + x.provider + ': ' + x.query)}">${esc(x.query)}</div>`).join('')}
+      ${d.destaques.map(x => `<div class="d" style="left:${x.start / W * 100}%;width:${(x.end - x.start) / W * 100}%" title="${esc(x.estilo)}">${esc(x.texto)}</div>`).join('')}
+      ${d.sfx.map(x => `<div class="s" style="left:${x.start / W * 100}%" title="${esc(x.som)}"></div>`).join('')}</div>
+      <div class="ct-dica">${d.planos.length} planos em ${W.toFixed(1)} s (um a cada ${(W / d.planos.length).toFixed(1)} s) · ${d.destaques.length} texto(s) na tela · ${d.sfx.length} som(ns) · legenda: ${esc(d.legendas.estilo)} (${esc(d.legendas.posicao)})</div>
+      <table class="ct-al">${d.planos.map(x => `<tr><td>${x.start.toFixed(2)}–${x.end.toFixed(2)}</td><td>${x.bloco}</td><td>${esc(LAYOUTS[x.layout] ? LAYOUTS[x.layout][0] : x.layout)}</td><td>${esc(x.provider)}</td><td>${esc(x.query)}</td><td class="ct-dica">${esc(x.visual)}</td></tr>`).join('')}</table>`;
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bEditor').onclick = async () => {
+  if (sujo) await salvarRoteiro();
+  barra('🎬 montando o projeto do editor…');
+  try { const d = await api(BASE + '/editor', { providers: provs() }); barra('✅ no editor — buscando as mídias', 'okk'); $('edLink').innerHTML = `<a href="${d.link}"><b>abrir →</b></a>`; location.href = d.link; }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+
+// ---------------------------------------------------------------- cliques e estado
+document.addEventListener('click', async ev => {
+  const t = ev.target, ds = t.dataset;
+  try {
+    if (ds.fdel !== undefined && ds.fdel !== '') { await api(BASE + '/fonte/' + ds.fdel + '/apagar', {}); recarregar(); }
+    if (ds.reler) rodar(BASE + '/noticias/ler', {});
+    if (ds.mdel && confirm('Apagar a mídia ' + ds.mdel + '?')) { await api(BASE + '/midia/' + ds.mdel, { apagar: true }); recarregar(); }
+    if (ds.bdel !== undefined && confirm('Apagar o bloco?')) mexer(r => r.blocos.splice(+ds.bdel, 1));
+    if (ds.bup !== undefined) mexer(r => { const i = +ds.bup; if (i > 0) [r.blocos[i - 1], r.blocos[i]] = [r.blocos[i], r.blocos[i - 1]]; });
+    if (ds.bdown !== undefined) mexer(r => { const i = +ds.bdown; if (i < r.blocos.length - 1) [r.blocos[i + 1], r.blocos[i]] = [r.blocos[i], r.blocos[i + 1]]; });
+    if (ds.cadd !== undefined) mexer(r => r.blocos[+ds.cadd].cenas.push({ layout: 'meme', query: '', alternativas: [], visual: '', material: '', palavra: '', efeito: '', entrada: 'punch_in', composicao: '' }));
+    if (ds.sadd !== undefined) mexer(r => r.blocos[+ds.sadd].sfx.push({ tipo: 'whoosh', palavra: '', busca: 'whoosh' }));
+    if (ds.cdel) mexer(r => { const [b, c] = ds.cdel.split(':').map(Number); if (r.blocos[b].cenas.length > 1) r.blocos[b].cenas.splice(c, 1); });
+    if (ds.sdel) mexer(r => { const [b, s] = ds.sdel.split(':').map(Number); r.blocos[b].sfx.splice(s, 1); });
+    if (ds.falado) { const n = await api(BASE + '/gravacao/usar-falado', { blocos: ds.falado === '*' ? null : [ds.falado] }); barra(`✅ ${n.mudou} bloco(s) agora com o que você falou`, 'okk'); recarregar(true); }
+    if (ds.ouvir) { const sel = document.querySelector(`[data-som="${ds.ouvir}"]`); const o = sel.selectedOptions[0]; if (o && o.dataset.arq) new Audio('/sons/' + o.dataset.arq).play(); }
+    if (ds.pxb !== undefined && ds.pxd) { const [b, i] = ds.pxd.split(':'); pixabay(ds.pxb, { bloco: b, indice: +i }); }
+    if (ds.pxusar) { const d = await api('/curtos/pixabay/usar', Object.assign({ id: ds.pxusar, pid: PID }, pxAlvo || {})); SONS = {}; barra('✅ ' + d.som + ' na base' + (pxAlvo ? ' e na deixa ' + pxAlvo.bloco : ''), 'okk'); recarregar(true); pollPx(); }
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+document.addEventListener('change', async ev => {
+  const ds = ev.target.dataset;
+  if (ds.mdesc) await api(BASE + '/midia/' + ds.mdesc, { descricao: ev.target.value });
+  if (ds.som) { const [b, i] = ds.som.split(':'); await api(BASE + '/som', { bloco: b, indice: +i, som: ev.target.value }); }
+});
+window.addEventListener('beforeunload', ev => { if (sujo) { ev.preventDefault(); ev.returnValue = ''; } });
+
+async function recarregar(forcar) {
+  const d = await (await fetch(BASE + '/estado', { cache: 'no-store' })).json();
+  const roteiroAntes = JSON.stringify((P || {}).roteiro);
+  P = d;
+  $('tInfo').textContent = d.canal_id ? '' : '(sem canal)';
+  desenharNoticia(); desenharTTS(); desenharGravacao();
+  const jid = (d.editor || {}).job_id;
+  $('lnkEditor').innerHTML = jid ? `<a href="/job/${jid}/edit-segments"><b>🎬 abrir no editor →</b></a>` : '';
+  $('trocaBox').style.display = jid ? '' : 'none';
+  if (!sujo || forcar) { if (forcar || JSON.stringify(d.roteiro) !== roteiroAntes || !document.querySelector('.ct-bloco')) { desenharRoteiro(); desenharTele(); } }
+  if (!$('oPausa').value) $('oPausa').value = ((d.perfil || {}).ritmo || {}).pausa_max_s || 0.3;
+  desenharDeixas();
+  const t = d.tarefa;
+  if (t && !t.fim) { barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); setTimeout(recarregar, 1500); }
+  else if (t && t.fim && t.fim !== ultimoFim) { ultimoFim = t.fim; t.erro ? barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro') : barra('✅ ' + t.rotulo + (t.msg ? ' — ' + t.msg : ''), 'okk'); if (!t.erro) { sujo = false; desenharRoteiro(); desenharTele(); } }
+}
+recarregar();
+</script>
+{% endblock %}

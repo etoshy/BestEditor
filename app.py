@@ -3078,6 +3078,7 @@ def _cortes_com_chamadas(job: dict, cortes: List[Dict[str, Any]]) -> List[Dict[s
 _PROJETOS_MIDIA = {
     "venda": ("vendas", "produto", "venda_id", "🛒 projeto de venda"),
     "dossie": ("dossies", "material", "dossie_id", "🕵️ modelo de vídeo"),
+    "curto": ("curtos", "material", "curto_id", "⚡ vídeo curto"),  # v84_246
 }
 
 
@@ -4399,13 +4400,22 @@ def submit_json(job_id: str):
 
     raw_json = request.form.get("ai_response", "")
     try:
-        parsed = parse_ai_response(
-            raw_json,
-            valid_providers=job["providers"] + _provider_do_projeto(job),
-            total_duration=job["total_duration"],
-        )
+        _aplicar_resposta_ia(job_id, raw_json)
     except PromptBuilderError as exc:
         return render_template("prompt.html", job=job, json_error=str(exc), previous_json=raw_json, opcoes=_opcoes_do_job(job), all_providers=DEFAULT_PROVIDERS)
+
+    return redirect(url_for("fetching_previews_page", job_id=job_id))
+
+
+def _aplicar_resposta_ia(job_id: str, raw_json: str) -> None:
+    """A resposta (JSON) da 1ª IA → trechos, overlays, destaques, cortes… e dispara as buscas das prévias.
+    Levanta PromptBuilderError se o JSON não serve. (v84_246: saiu de dentro do submit_json pra o ⚡ Vídeos curtos usar.)"""
+    job = _JOBS[job_id]
+    parsed = parse_ai_response(
+        raw_json,
+        valid_providers=job["providers"] + _provider_do_projeto(job),
+        total_duration=job["total_duration"],
+    )
 
     _aplicar_produto(job, parsed.segments)  # 🛒 "produto" -> arquivo do projeto de venda
     # ✂️ trecho de 1-2 min que a IA mandou (cansou no fim da transcrição): vira pedaços do tamanho do intervalo
@@ -4457,7 +4467,6 @@ def submit_json(job_id: str):
 
     _fetch_previews(job_id, job, parsed.segments)
 
-    return redirect(url_for("fetching_previews_page", job_id=job_id))
 
 
 _IA_PULA_BUSCA = {"youtube", "flow", "runpod", "produto", "material", "adiado"}
@@ -11860,6 +11869,128 @@ _anime2d_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir, tts_gerar_au
 import anime_cine_rotas as _anime_cine_rotas  # noqa: E402  🎬 Anime quadro a quadro (aba Modelos de vídeo, v84_243)
 _anime_cine_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir, tts_gerar_audio_isolado,
                             lambda t, m: na.limpar_texto_para_tts(t, motor=m))
+
+
+def _curto_transcrever(audio: str, language=None, word_timestamps: bool = True, info=None):
+    """⚡ Whisper dos Vídeos curtos (palavra por palavra). Modelo: "curtos_whisper_modelo" nas configurações (padrão base)."""
+    cfg = load_site_config()
+    return transcribe_audio(audio, model_size=str(cfg.get("curtos_whisper_modelo") or "base"), language=language,
+                            word_timestamps=word_timestamps, device=cfg.get("whisper_device", "auto"), info=info)
+
+
+def _curto_para_estudio(d: Dict[str, Any]) -> str:
+    """⚡ v84_246: o curto (sua voz alinhada + planos + destaques + sons) vira um projeto do Estúdio, com as buscas das
+    prévias já rodando. Devolve o job_id."""
+    p = d["projeto"]
+    job_id = uuid.uuid4().hex[:12]
+    jd = _job_dir(job_id)
+    os.makedirs(jd, exist_ok=True)
+    audio = os.path.join(jd, "narracao.wav")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", d["audio"], "-ar", "48000", "-ac", "2", audio], capture_output=True, timeout=600)
+    if not os.path.isfile(audio):
+        shutil.copy(d["audio"], audio)
+    providers = [x for x in d["providers"] if x in DEFAULT_PROVIDERS] or ["pexels"]
+    import idiomas
+    nome = f"⚡ {p.get('titulo') or 'curto'}"[:60]
+    _JOBS[job_id] = {
+        "job_id": job_id, "audio_path": audio, "music_path": None, "music_volume": 0.12, "providers": providers,
+        "add_word_captions": True, "caption_style": {}, "status": "aguardando_json", "fase": "Pronto!", "created_at": time.time(),
+        "cancel_requested": False, "original_filename": nome, "nome_projeto": nome, "interval_seconds": 30.0, "ritmo_cenas": "livre",
+        "language": idiomas.normalizar(d.get("idioma")) or "pt", "language_origem": "escolhido", "extra_instructions": "",
+        "usar_wikipedia_inteligente": False, "usar_buscadores_inteligente": False, "mix_midia": None, "bibliotecas": {},
+        "chamadas": [], "segments": d["trechos"], "total_duration": float(d["dur"]), "word_timestamps": d["palavras"],
+        "orientation": "9:16", "prompt": "", "legendas": d["legendas"], "sfx": d["sfx"], "whisper_skipped": True,
+        "export_quality": "1080p",
+    }
+    job = _JOBS[job_id]
+    _ligar_projeto(job, "curto", p["id"])
+    if d.get("sons_volume"):
+        job.setdefault("cfg_overrides", {})["sons_volume"] = float(d["sons_volume"])
+    perf = PerfLog(_job_dir(job_id), job_id=job_id)
+    _PERF_LOGS[job_id] = perf
+    _save_state(job_id)
+    try:
+        _aplicar_resposta_ia(job_id, d["resposta_json"])
+    except PromptBuilderError as exc:
+        job["prompt"] = "(⚡ Vídeos curtos) o plano não passou na conferência: " + str(exc)
+        _save_state(job_id)
+        raise
+    job["legendas"], job["sfx"] = d["legendas"], d["sfx"]
+    pend = job.get("pending_segments") or []
+    if len(pend) == len(d.get("planos") or []):  # 🔁 cada trecho sabe de qual plano do roteiro veio (pra trocar a voz depois)
+        import curtos as _ct
+        for s_, pl in zip(pend, d["planos"]):
+            s_["curto_chave"] = _ct.chave_do_plano(pl)
+    job["curto_alinhamento"] = [{"bloco": a["bloco"], "start": a["start"], "end": a["end"]}
+                                for a in (d["projeto"].get("gravacao") or {}).get("alinhamento") or []]
+    import cenas_dp
+    for s_ in job.get("pending_segments") or []:  # ⬜ cartão cinza: o fundo liso é da própria cena (sem a fala por cima da cena)
+        if s_.get("template") and (cenas_dp.template(s_["template"]) or {}).get("_extra") and s_["template"].startswith("CURTO_"):
+            s_["template_campos"] = dict(s_.get("template_campos") or {}, _fala=False)
+    perf.save()
+    _save_state(job_id)
+    return job_id
+
+
+def _curto_trocar_voz(job_id: str, d: Dict[str, Any]) -> Dict[str, Any]:
+    """🔁 v84_247: a voz NOVA (sua gravação ou outra voz guia) entra no projeto do editor que JÁ existe: a mídia de cada
+    trecho fica (só o tempo muda, pelo plano de onde ele veio), a legenda/os textos/os sons da IA são refeitos no ritmo
+    novo e os que VOCÊ pôs no editor são levados pro tempo novo. Trecho novo (o roteiro mudou) ganha prévia própria."""
+    import curtos as _ct
+    import dp_destaques
+    job = _JOBS.get(job_id)
+    if not job or "pending_segments" not in job:
+        raise _ct.CurtoErro("O projeto do editor não existe mais — use 🎬 Montar no editor.")
+    if not any(s_.get("curto_chave") for s_ in job["pending_segments"]):
+        raise _ct.CurtoErro("Esse projeto do editor é de antes da troca de voz (v84_247) — use 🎬 Montar no editor.")
+    jd = _job_dir(job_id)
+    audio = os.path.join(jd, f"narracao_{uuid.uuid4().hex[:6]}.wav")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", d["audio"], "-ar", "48000", "-ac", "2", audio], capture_output=True, timeout=600)
+    if not os.path.isfile(audio):
+        raise _ct.CurtoErro("Não consegui preparar o áudio novo.")
+    antigo = job.get("curto_alinhamento") or []
+    novo = [{"bloco": a["bloco"], "start": a["start"], "end": a["end"]} for a in d["projeto"]["gravacao"]["alinhamento"]]
+    mapa = (lambda t: _ct.mapear_tempo(float(t), antigo, novo)) if antigo else (lambda t: float(t))
+    resp = {x["start"]: x for x in d["resposta"]["segments"]}
+
+    def campos(pl):
+        x = resp.get(pl["start"]) or {}
+        c = {k: x[k] for k in ("provider", "query", "alternativas", "visual", "media_type", "efeito", "entrada", "template") if k in x}
+        c.setdefault("provider", pl["provider"])
+        c.setdefault("query", pl["query"])
+        c.setdefault("media_type", "video")
+        if c.get("template"):
+            c["template_campos"] = {"_fala": False}
+        return c
+    segs, prevs, sem = _ct.reencaixar_planos(job["pending_segments"], list(job.get("segment_previews") or []), d["planos"], campos)
+    if segs:
+        segs[-1]["end"] = round(float(d["dur"]), 3)
+    _aplicar_produto(job, [s_ for i, s_ in enumerate(segs) if i in sem])  # material novo → o arquivo do projeto
+    meus_d = [dict(x, start=mapa(x["start"]), end=mapa(x["end"])) for x in job.get("destaques") or [] if x.get("origem") != "ia_busca"]
+    ia_d = [dict(x, id=uuid.uuid4().hex[:8], origem="ia_busca") for x in d["resposta"].get("highlights") or []]
+    ia_d = dp_destaques.ancorar(ia_d, d["palavras"], d["dur"]) if ia_d else []
+    meus_s = [dict(x, start=round(max(0.0, mapa(x["start"])), 3)) for x in job.get("sfx") or [] if x.get("origem") != "ia"]
+    job.update(audio_path=audio, segments=d["trechos"], word_timestamps=d["palavras"], total_duration=float(d["dur"]),
+               pending_segments=segs, segment_previews=[dict(p_, index=k) if p_ else None for k, p_ in enumerate(prevs)],
+               destaques=sorted(ia_d + meus_d, key=lambda x: float(x["start"])),
+               sfx=sorted(d["sfx"] + meus_s, key=lambda x: float(x["start"])), curto_alinhamento=novo)
+    try:
+        wf = os.path.join(jd, "waveform.png")
+        generate_waveform_image(audio, wf)
+        job["waveform_path"] = wf
+    except Exception:  # noqa: BLE001
+        pass
+    _reindexar_previas_e_youtube(job)
+    _save_state(job_id)
+    if sem:
+        threading.Thread(target=_previas_dos_pedacos, args=(job_id, sem), daemon=True).start()
+    return {"mantidos": len(segs) - len(sem), "novos": len(sem), "dur": float(d["dur"])}
+
+
+import curtos_rotas as _curtos_rotas  # noqa: E402  ⚡ Vídeos curtos (aba Modelos de vídeo, v84_246)
+_curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isolado,
+                        lambda t, m: na.limpar_texto_para_tts(t, motor=m), _curto_para_estudio,
+                        trocar_no_estudio=_curto_trocar_voz)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)

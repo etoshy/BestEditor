@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}⚡ Vídeos curtos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1000px; }
+  .ct-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .ct-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .ct-passos span { background: var(--acento-suave); border: 1px solid var(--borda); border-radius: 999px; padding: 3px 10px; font-size: .8rem; }
+  .ct-lin { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--borda); border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .ct-dica { color: var(--mudo); font-size: .84rem; }
+  .ct-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .ct-row > label { flex: 1; min-width: 200px; }
+</style>
+<h1>⚡ Vídeos curtos</h1>
+<p class="ct-dica">Shorts / Reels / TikTok de <b>notícia</b> no estilo de um canal. <b>1)</b> crie o canal e suba 5–10 vídeos dele — o site mede o ritmo
+  (a 8 quadros/s), transcreve e a IA olha os quadros (4 por segundo) → sai o <b>perfil de estilo</b>. <b>2)</b> Cada vídeo novo: link da notícia → roteiro
+  no estilo → voz guia → <b>você grava</b> (o ritmo da sua voz manda) → editor com mídias, legenda, textos e sons no lugar.</p>
+<div class="ct-passos"><span>1 · 🧬 canal + referências</span><span>2 · 📰 notícia</span><span>3 · 📝 roteiro</span><span>4 · 🎙 voz guia</span><span>5 · 🎤 sua voz</span><span>6 · 🔊 sons</span><span>7 · 🎬 editor</span></div>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+<div class="ct-card">
+  <h2 style="margin:0;">🧬 Canais (o estilo)</h2>
+  {% for c in canais %}
+  <div class="ct-lin"><div><a href="/curtos/canal/{{ c.id }}"><b>🧬 {{ c.nome }}</b></a>
+    <div class="ct-dica">{{ c.refs }} vídeo(s) de referência · {{ c.analisadas }} analisado(s){% if c.perfil_ia %} · ✅ perfil escrito pela IA{% endif %}</div></div></div>
+  {% else %}<p class="ct-dica">Nenhum canal ainda.</p>{% endfor %}
+  <details{% if not canais %} open{% endif %} style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;">+ Novo canal</summary>
+    <form method="post" action="/curtos/canal/novo" enctype="multipart/form-data">
+      <div class="ct-row"><label>Nome do canal<input type="text" name="nome" placeholder="ex.: Laestro" required></label>
+        <label style="max-width:160px">Idioma (opcional)<input type="text" name="idioma" placeholder="pt"></label></div>
+      {% if prontos %}<label>Começar do perfil<select name="pronto"><option value="">(vazio — vou analisar os vídeos)</option>{% for k, v in prontos.items() %}<option value="{{ k }}">✅ {{ v.nome }} (pronto, analisado de {{ (v.metricas or {}).videos or '?' }} vídeos)</option>{% endfor %}</select></label>{% endif %}
+      <label style="font-weight:400">…ou de um perfil exportado (.json) <input type="file" name="perfil" accept=".json" style="width:auto"></label>
+      <button type="submit">🧬 Criar canal</button>
+    </form></details>
+</div>
+
+<div class="ct-card">
+  <h2 style="margin:0;">⚡ Vídeos</h2>
+  {% for p in projetos %}
+  <div class="ct-lin"><div style="min-width:0"><a href="/curtos/{{ p.id }}"><b>⚡ {{ p.titulo }}</b></a>
+    <div class="ct-dica">{% if p.canal %}🧬 {{ p.canal }} · {% endif %}{{ p.blocos }} bloco(s){% if p.gravado %} · 🎤 gravado{% if p.dur %} ({{ '%.1f'|format(p.dur) }} s){% endif %}{% endif %}{% if p.editor %} · <a href="/job/{{ p.editor }}/edit-segments">🎬 no editor</a>{% endif %}</div></div></div>
+  {% else %}<p class="ct-dica">Nenhum vídeo ainda.</p>{% endfor %}
+  <details open style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;">+ Novo vídeo</summary>
+    <form method="post" action="/curtos/novo">
+      <div class="ct-row">
+        <label>Canal<select name="canal_id">{% for c in canais %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}<option value="">(sem canal — estilo padrão)</option></select></label>
+        <label>Título (opcional)<input type="text" name="titulo" placeholder="vem do título da matéria"></label>
+        <label style="max-width:140px">Duração (s)<input type="number" name="duracao" min="10" max="180" placeholder="do canal"></label>
+      </div>
+      <label>Link(s) da notícia (um por linha)</label><textarea name="links" rows="2" placeholder="https://g1.globo.com/…"></textarea>
+      <label>…e/ou o texto / suas anotações</label><textarea name="texto" rows="3" placeholder="cole a notícia, o tweet, o que aconteceu…"></textarea>
+      <div class="ct-linha" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0">
+        <label style="font-weight:600;margin:0"><input type="checkbox" name="tudo" value="1" checked style="width:auto"> 🚀 fazer tudo sozinho (roteiro → narração → editor)</label>
+        <label style="margin:0">voz <select name="voz" style="width:auto">{% for v in vozes %}<option value="{{ v.slug }}">{{ v.grupo }} · {{ v.nome }}</option>{% else %}<option value="">(nenhuma voz cadastrada)</option>{% endfor %}</select></label>
+      </div>
+      <button type="submit">⚡ Começar</button>
+    </form></details>
+</div>
+{% endblock %}

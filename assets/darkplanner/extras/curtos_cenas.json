@@ -1,0 +1,33 @@
+{
+ "_sobre": "⚡ Vídeos curtos (curtos.py) — gerado sozinho, não precisa mexer",
+ "cenas": {
+  "CURTO_CARTAO_CINZA": {
+   "nome": "Curto - Cartão cinza",
+   "slots": 1,
+   "janelas": [
+    [
+     0.29,
+     0.57,
+     0.42,
+     0.23
+    ]
+   ],
+   "fundo_fixo": "cor_solida",
+   "cor_fundo": "#8E8E8E",
+   "borda": 0,
+   "sem_transpor": true,
+   "movimento": "assenta",
+   "textFields": [],
+   "coversCaption": false,
+   "manualOnly": true,
+   "papel": "apoio",
+   "familia": "meus",
+   "durMinS": 0.4,
+   "durIdealS": 1.5,
+   "durMaxS": 30,
+   "whenToUse": [
+    "Short: small photo/meme centered on flat gray, caption above"
+   ]
+  }
+ }
+}

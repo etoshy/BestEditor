@@ -140,6 +140,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "sons_pixabay": ("🔊 Efeitos sonoros do Pixabay: a ficha de cada som",
                      "No teste dos sons do Pixabay (pixabay_sons_teste.py --ia): olha o título, as tags, as medidas e o "
                      "espectrograma de cada efeito baixado e escreve o nome, a descrição, a categoria e onde usar.", True),
+    "curtos": ("⚡ Vídeos curtos: estilo do canal e roteiro",
+               "Na aba ⚡ Vídeos curtos: olha os quadros (4 por segundo) e as medidas de cada vídeo de referência e escreve a "
+               "ficha, junta tudo no perfil de estilo do canal e escreve o roteiro de cada notícia nesse estilo (falas, planos, "
+               "buscas, textos na tela e efeitos sonoros).", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

@@ -28,6 +28,26 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🚀 Vídeos curtos: fazer tudo e trocar a voz (v84_247)
+
+- **🚀 Fazer tudo** (no topo do vídeo, e marcado por padrão no “+ Novo vídeo”): notícia (+ link opcional) → lê a matéria → 🤖 roteiro no estilo do canal → narra com a voz guia (TTS) → alinha → **projeto pronto no editor**, com legenda, textos, sons e as mídias sendo buscadas. Pula o que já está feito e em dia (roteiro existente, voz guia do mesmo roteiro, gravação sua em dia). “roteiro novo” pede outro roteiro.
+- **🔁 Trocar a voz no editor**: grave (teleprompter) ou suba o seu áudio — na página do curto (com “levar direto pro projeto do editor” marcado) ou **dentro do próprio Estúdio** (caixa 📦 Projeto do vídeo → 🔁 Trocar pela minha voz). O áudio novo entra no lugar da narração no MESMO projeto: cada trecho sabe de qual plano do roteiro veio e **mantém a mídia** (inclusive as que você trocou ou dividiu no editor — o tempo novo é repartido na mesma proporção); a legenda, os textos e os sons da IA são refeitos no seu ritmo e os textos/sons que você pôs no editor vão pro tempo novo do bloco. Plano novo (se o roteiro mudou) ganha prévia própria. Depois exporta normal.
+
+## ⚡ Vídeos curtos (v84_246)
+
+Menu **Roteiros e modelos → ⚡ Vídeos curtos** (também em 🕵️ Modelos de vídeo): Shorts/Reels/TikTok de **notícia** no estilo de um canal.
+
+1. **🧬 Canal** — suba 5–10 vídeos do canal (arquivo ou link). Cada um é **medido a 8 quadros/s** (o filtro de cena comum perdia metade dos cortes de um short; aqui corte = pico de diferença entre quadros, movimento de câmera não conta, fusão rápida de ~0,25 s conta), ganha uma **folha de contato** (um quadro por plano) e **folhas densas a 4 quadros/s**, é **transcrito palavra por palavra** (Whisper) e tem o áudio lido (música de fundo nos buracos da fala, % de cortes com som junto). A IA (recurso **⚡ Vídeos curtos** em /ia) olha as folhas e escreve a ficha de cada vídeo e o **perfil de estilo**: gancho, estrutura, composições, tom, linguagem, legenda (já num preset do editor), textos na tela, sons, CTA e o que evitar. Sem IA: 📋 prompt pra outra IA, ou o perfil só com as medidas. Perfil exporta/importa em .json. **😂 Memes e bordões recorrentes** (K1, K2…): o que o canal usa em todo vídeo — sobe uma vez e a IA usa nos roteiros.
+   - Vem pronto o perfil **Laestro** (analisado de 8 vídeos): colagem de memes de reação a cada frase, **⬜ cartão cinza** (foto pequena no centro de um fundo cinza liso, trocando a cada frase), legenda dourada #F2A81E no meio com 2–3 palavras e ênfase em MAIÚSCULAS, gancho em CAPS, plano a cada ~1,4 s, pausas de no máximo 0,18 s, som em ~metade dos cortes — e **sem** a propaganda de curso do final. Escolha “Começar do perfil: Laestro” ao criar o canal.
+2. **📰 Notícia** — link(s) da matéria (o site lê o texto e baixa as fotos → I1, I2…), texto colado e as suas mídias (M1…).
+3. **📝 Roteiro** — 🤖 ou 📋 prompt: blocos de fala, cada um com os **planos** (composição: vídeo de banco, foto real, clipe real do YouTube, mídia da notícia, meme, cartão cinza, cartão de texto, imagem gerada — e a palavra onde cada corte acontece), texto na tela e as **deixas de som**. Tudo editável na página.
+4. **🎙 Voz guia** (TTS com as vozes do site) pra ouvir o ritmo — ou usar como narração.
+5. **🎤 Sua voz** — grave na página com **teleprompter** (espaço/→ avança o bloco) ou suba o arquivo. O Whisper lê palavra por palavra e **alinha ao roteiro**: tira as pausas longas, as **tentativas refeitas** (errou e falou de novo) e as muletas (“ahn”, “é…” com pausa). Os cortes de imagem, textos, sons e a legenda seguem o ritmo da SUA voz; a tabela mostra o roteiro × o que você falou e **✔ usar o que falei** passa a sua fala pro roteiro (a legenda fica igual ao áudio).
+6. **🔊 Efeitos sonoros** — cada deixa já tem um som da base (▶ ouvir, trocar); **🔎 Pixabay** busca no Pixabay (o mesmo motor do `pixabay_sons_teste.py`), baixa, corta o silêncio e **➕ põe na base do editor** (assets/sons/pixabay + extras `pixabay_sons.json`) — passa a valer na faixa Sons do Estúdio também.
+7. **🎬 Editor** — 👁 Ver o plano (linha do tempo dos planos, textos e sons) e **Montar no editor**: projeto 9:16 do Estúdio com a sua voz, legenda do canal (com a ênfase em MAIÚSCULAS do roteiro), destaques, sons, mídias da notícia/canal ligadas e as buscas das prévias já rodando (com o ⚖️ juiz da IA).
+
+Também: o `submit_json` virou `_aplicar_resposta_ia()` (o mesmo caminho pro curto); cenas dos extras do DarkPlanner aceitam `cor_fundo`, `borda` e `sem_transpor` (a ⬜ cena `CURTO_CARTAO_CINZA` é instalada sozinha em `assets/darkplanner/extras/curtos_cenas.json`). Whisper dos curtos: chave `curtos_whisper_modelo` no arquivo de configurações do site (padrão `base`; `small` alinha melhor). Testes: `test_v84_246_curtos.py`.
+
 ## 🩹 Flow: Corrigir quando a tela muda (v84_236)
 
 Na aba **🎬 Google Flow → 🩹 Corrigir**: pegue um erro guardado pelo 🩺 (foto + HTML da tela) e

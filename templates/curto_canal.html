@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}🧬 {{ c.nome }} — Vídeos curtos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1200px; }
+  .ct-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .ct-card h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; gap: 8px; align-items: center; }
+  .ct-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .ct-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .ct-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .ct-linha > * { margin: 0; }
+  .ct-linha button, .ct-btn { width: auto; margin: 0; padding: 6px 12px; }
+  .ct-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .ct-sec { background: #64748b !important; } .ct-perigo { background: #dc2626 !important; }
+  .ct-refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .ct-ref { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; font-size: .82rem; }
+  .ct-ref img { width: 100%; border-radius: 6px; cursor: zoom-in; background: #111; }
+  .ct-ref .est { font-weight: 600; }
+  .ct-ref .est.erro { color: var(--erro); } .ct-ref .est.pronta { color: var(--ok); }
+  .ct-med { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin-top: 4px; }
+  .ct-med span:nth-child(odd) { color: var(--mudo); }
+  .ct-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; position: sticky; top: 0; z-index: 10; }
+  .ct-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .ct-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .ct-barra.okk { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .ct-perfil { white-space: pre-wrap; font-size: .86rem; background: var(--code-bg); border-radius: 8px; padding: 10px; max-height: 420px; overflow: auto; }
+  .ct-metr { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ct-metr div { border: 1px solid var(--borda); border-radius: 8px; padding: 6px 10px; font-size: .8rem; }
+  .ct-metr b { display: block; font-size: 1.05rem; }
+  .ct-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; z-index: 100; overflow: auto; padding: 20px; text-align: center; }
+  .ct-zoom img { max-width: 100%; margin: 6px auto; display: block; }
+  .ct-k { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .ct-k > div { border: 1px solid var(--borda); border-radius: 8px; padding: 6px; font-size: .78rem; }
+  .ct-k video, .ct-k img { width: 100%; height: 150px; object-fit: contain; background: #111; border-radius: 6px; }
+  textarea.json { font-family: var(--mono, monospace); font-size: .78rem; min-height: 260px; }
+</style>
+
+<div class="ct-linha" style="justify-content:space-between">
+  <h1 style="margin:0">🧬 <span id="cNome">{{ c.nome }}</span></h1>
+  <div class="ct-linha"><a href="/curtos">← vídeos curtos</a>
+    <button class="ct-mini ct-sec" id="bRenomear">✏ renomear</button>
+    <form method="post" action="/curtos/canal/{{ c.id }}/excluir" onsubmit="return confirm('Excluir este canal (os vídeos de referência e o perfil)? Os vídeos curtos feitos com ele continuam.')" style="margin:0"><button class="ct-mini ct-perigo">🗑</button></form></div>
+</div>
+<div id="barra" class="ct-barra"></div>
+{% if not ia %}<div class="ct-dica" style="margin-top:8px">🤖 A IA está desligada (ou o recurso “⚡ Vídeos curtos” em <a href="/ia">/ia</a>): os vídeos são só medidos (ritmo, cortes, fala, sons) e o perfil sai com esses números — o resto você pede a outra IA pelo 📋 prompt.</div>{% endif %}
+
+<div class="ct-card">
+  <h2><span class="ct-num">1</span> Vídeos de referência</h2>
+  <p class="ct-dica">Suba 5 a 10 vídeos do canal (arquivo ou link de Shorts/TikTok/Reels). Cada um é medido a 8 quadros/s (edição de short é rápida), transcrito palavra por palavra e a IA olha as folhas a 4 quadros/s. Clique na folha pra ver tudo.</p>
+  <form id="fRefs" class="ct-linha">
+    <input type="file" name="videos" accept="video/*" multiple style="width:auto">
+    <textarea name="links" rows="1" placeholder="…ou links, um por linha" style="flex:1;min-width:240px;margin:0"></textarea>
+    <button type="submit">➕ Adicionar</button>
+  </form>
+  <div class="ct-linha"><button id="bAnalisar">🔍 Analisar os que faltam</button>
+    <label style="font-weight:400;margin:0"><input type="checkbox" id="cIA" {% if ia %}checked{% endif %} style="width:auto"> com a IA</label></div>
+  <div class="ct-metr" id="metricas"></div>
+  <div class="ct-refs" id="refs" style="margin-top:10px"></div>
+</div>
+
+<div class="ct-card">
+  <h2><span class="ct-num">2</span> 😂 Memes e bordões recorrentes</h2>
+  <p class="ct-dica">O que o canal usa em TODO vídeo (ex.: “se você não viu… relaxa e agacha que eu vou te explicar”, a reação de sempre, a vinheta). Suba uma vez com uma descrição de quando entra — a IA usa nos roteiros (K1, K2…).</p>
+  <form id="fK" class="ct-linha">
+    <input type="file" name="arquivos" accept="image/*,video/*" multiple style="width:auto">
+    <input type="text" name="descricao" placeholder="o que é e quando usar (ex.: dançarina de natal — 'relaxa e agacha que eu vou te explicar')" style="flex:1;min-width:260px">
+    <button type="submit">➕ Subir</button>
+  </form>
+  <div class="ct-k" id="kList"></div>
+</div>
+
+<div class="ct-card">
+  <h2><span class="ct-num">3</span> Perfil de estilo</h2>
+  <p class="ct-dica">É o que guia o roteiro (gancho, estrutura, composições, tom) e a montagem (ritmo, legenda, textos, sons, pausas). Edite à vontade.</p>
+  <div class="ct-linha">
+    <button id="bPerfilIA">🤖 Escrever com a IA</button>
+    <button class="ct-sec" id="bPrompt">📋 Prompt pra outra IA</button>
+    <button class="ct-sec" id="bMedidas">📏 Só com as medidas</button>
+    <a href="/curtos/canal/{{ c.id }}/perfil.json" class="ct-mini" style="padding:6px 10px!important">⬇ exportar</a>
+    <label class="ct-mini" style="cursor:pointer;padding:6px 10px!important">⬆ importar<input type="file" id="iImport" accept=".json" style="display:none"></label>
+  </div>
+  <div id="promptBox" style="display:none">
+    <textarea id="tPrompt" rows="6" readonly></textarea>
+    <label>Resposta da outra IA (JSON)</label><textarea id="tResp" rows="5"></textarea>
+    <button id="bColar">✔ Usar a resposta</button>
+  </div>
+  <div class="ct-perfil" id="perfilTexto"></div>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">🎛 Legenda, textos e sons</summary>
+    <div class="ct-linha">
+      <label>Legenda<select id="pLeg">{% for e in estilos_legenda %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
+      <label>Posição<select id="pPos"><option value="meio">meio</option><option value="base">embaixo</option><option value="topo">em cima</option></select></label>
+      <label>Palavras por vez<input type="number" id="pMax" min="1" max="10" style="width:70px"></label>
+      <label>Tamanho<input type="number" id="pTam" min="0.03" max="0.14" step="0.005" style="width:80px"></label>
+      <label>Cor<input type="color" id="pCor" style="width:50px;padding:0"></label>
+      <label>Cor da palavra<input type="color" id="pCorA" style="width:50px;padding:0"></label>
+      <label style="font-weight:400"><input type="checkbox" id="pMai" style="width:auto"> tudo maiúsculo</label>
+      <label style="font-weight:400"><input type="checkbox" id="pGancho" style="width:auto"> gancho em MAIÚSCULAS</label>
+    </div>
+    <div class="ct-linha">
+      <label>Destaque (texto grande)<select id="pDest">{% for d in destaques %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
+      <label>Duração alvo (s)<input type="number" id="pDur" min="10" max="180" style="width:80px"></label>
+      <label>Plano médio (s)<input type="number" id="pPlano" min="0.5" max="8" step="0.1" style="width:80px"></label>
+      <label>Pausa máx. (s)<input type="number" id="pPausa" min="0.1" max="1.5" step="0.05" style="width:80px"></label>
+      <label style="font-weight:400"><input type="checkbox" id="pSfx" style="width:auto"> efeitos sonoros</label>
+      <label style="font-weight:400"><input type="checkbox" id="pSfxC" style="width:auto"> som nas trocas de assunto</label>
+      <label>Volume dos sons<input type="number" id="pSfxV" min="0.1" max="2" step="0.05" style="width:80px"></label>
+    </div>
+    <button id="bSalvarRapido">💾 Salvar</button>
+  </details>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">{ } Editar o perfil inteiro (JSON)</summary>
+    <textarea class="json" id="tPerfil"></textarea><button id="bSalvarJSON">💾 Salvar JSON</button></details>
+</div>
+<div class="ct-zoom" id="zoom"></div>
+
+<script>
+const CID = {{ c.id|tojson }}, BASE = '/curtos/canal/' + CID;
+const $ = id => document.getElementById(id);
+let C = null, ultimoFim = null;
+async function api(url, corpo, metodo) {
+  const op = { method: metodo || 'POST' };
+  if (corpo instanceof FormData) op.body = corpo;
+  else if (corpo !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(corpo); }
+  const r = await fetch(url, op); const d = await r.json().catch(() => ({ ok: false, erro: 'resposta inválida (' + r.status + ')' }));
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('erro ' + r.status));
+  return d;
+}
+function barra(msg, tipo) { const b = $('barra'); b.className = 'ct-barra ' + (tipo || 'on'); b.textContent = msg; if (!msg) b.className = 'ct-barra'; }
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const arq = p => BASE + '/arquivo/' + p;
+function fmt(v, suf) { return (v === null || v === undefined) ? '—' : (typeof v === 'number' ? (Math.round(v * 100) / 100) : v) + (suf || ''); }
+
+function desenhar() {
+  const m = C.metricas || {};
+  $('metricas').innerHTML = m.videos ? [
+    ['vídeos', m.videos], ['duração', fmt(m.dur, ' s')], ['plano (mediana)', fmt(m.plano_mediano_s, ' s')], ['cortes/s', fmt(m.cortes_por_s)],
+    ['palavras/s', fmt(m.palavras_por_s)], ['1ª fala', fmt(m.primeira_fala_s, ' s')], ['som nos cortes', m.sfx_nos_cortes == null ? '—' : Math.round(m.sfx_nos_cortes * 100) + '%'],
+    ['música de fundo', m.musica_fundo == null ? '—' : Math.round(m.musica_fundo * 100) + '% dos vídeos']].map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('') : '';
+  $('refs').innerHTML = (C.referencias || []).map(r => {
+    const md = r.medidas || {};
+    const f = r.ficha || {};
+    return `<div class="ct-ref">
+      ${r.folha ? `<img src="${arq(r.folha)}" data-rid="${r.id}" title="ver o vídeo a 4 quadros/s">` : ''}
+      <div class="ct-linha" style="justify-content:space-between"><b>${esc(r.id)} · ${esc(r.titulo)}</b>
+        <span><button class="ct-mini ct-sec" data-refazer="${r.id}" title="analisar de novo">🔁</button> <button class="ct-mini ct-perigo" data-apagar="${r.id}">🗑</button></span></div>
+      <div class="est ${r.estado}">${esc(r.estado)}${r.erro ? ' — ' + esc(r.erro) : ''}</div>
+      ${md.dur ? `<div class="ct-med"><span>duração</span><span>${fmt(md.dur, ' s')}</span><span>planos</span><span>${md.n_planos} (mediana ${fmt(md.plano_mediano_s, ' s')})</span>
+        <span>palavras/s</span><span>${fmt(md.palavras_por_s)}</span><span>1ª fala</span><span>${fmt(md.primeira_fala_s, ' s')}</span>
+        <span>som nos cortes</span><span>${md.sfx_nos_cortes == null ? '—' : Math.round(md.sfx_nos_cortes * 100) + '%'}</span>
+        <span>música</span><span>${md.musica_fundo == null ? '—' : (md.musica_fundo ? 'sim' : 'não')}</span></div>` : ''}
+      ${md.gancho ? `<div style="margin-top:4px"><i>gancho:</i> “${esc(md.gancho)}”</div>` : ''}
+      ${f.resumo ? `<details style="margin-top:4px"><summary>🤖 ficha</summary><div style="white-space:pre-wrap">${esc(f.resumo)}\n\n🪝 ${esc((f.gancho || {}).texto)} — ${esc((f.gancho || {}).por_que_prende)}\n\n🎞 ${(f.composicoes || []).map(x => '• ' + x.nome + ' (' + x.layout + '): ' + x.descricao).join('\n')}\n\n💬 legenda: ${esc((f.legenda || {}).descricao)}\n🔤 textos: ${esc((f.textos_tela || {}).descricao)}\n🎥 ${esc(f.movimento)}\n🎭 ${esc(f.tom)}</div></details>` : ''}
+    </div>`;
+  }).join('') || '<p class="ct-dica">Nenhum vídeo ainda.</p>';
+  $('kList').innerHTML = (C.midias || []).map(m => `<div>${m.tipo === 'video' ? `<video src="${arq(m.arquivo)}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>` : `<img src="${arq(m.arquivo)}">`}
+      <b>${m.id}</b> <input type="text" value="${esc(m.descricao)}" data-kdesc="${m.id}" style="font-size:.75rem;margin:2px 0">
+      <button class="ct-mini ct-perigo" data-kdel="${m.id}">🗑</button></div>`).join('');
+  $('perfilTexto').textContent = C.perfil_texto || '';
+  const p = C.perfil || {}, l = p.legenda || {}, s = p.sfx || {}, r = p.ritmo || {};
+  if (document.activeElement && document.activeElement.closest('details') ) return;
+  $('pLeg').value = l.estilo; $('pPos').value = l.posicao; $('pMax').value = l.max_palavras; $('pTam').value = l.tamanho;
+  $('pCor').value = l.cor_texto || '#FFFFFF'; $('pCorA').value = l.cor_ativa || l.cor_texto || '#FFFFFF'; $('pMai').checked = !!l.maiusculas;
+  $('pGancho').checked = !!p.gancho_maiusculas; $('pDest').value = (p.textos_tela || {}).estilo_destaque; $('pDur').value = p.duracao_alvo_s;
+  $('pPlano').value = r.plano_medio_s; $('pPausa').value = r.pausa_max_s; $('pSfx').checked = s.usa !== false; $('pSfxC').checked = !!s.nos_cortes; $('pSfxV').value = s.volume;
+  if (document.activeElement !== $('tPerfil')) $('tPerfil').value = JSON.stringify(p, null, 1);
+}
+async function recarregar() {
+  C = await (await fetch(BASE + '/estado', { cache: 'no-store' })).json();
+  desenhar();
+  const t = C.tarefa;
+  if (t && !t.fim) { barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); setTimeout(recarregar, 1500); }
+  else if (t && t.fim && t.fim !== ultimoFim) { ultimoFim = t.fim; t.erro ? barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro') : barra('✅ ' + t.rotulo + (t.msg ? ' — ' + t.msg : ''), 'okk'); }
+}
+async function rodar(url, corpo) { try { await api(url, corpo); ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+
+$('fRefs').addEventListener('submit', async ev => {
+  ev.preventDefault(); barra('⬆ enviando…');
+  try { const d = await api(BASE + '/refs', new FormData($('fRefs'))); $('fRefs').reset(); barra('✅ ' + d.novos.length + ' vídeo(s) — agora 🔍 Analisar', 'okk'); recarregar(); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+$('fK').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  try { await api(BASE + '/midia', new FormData($('fK'))); $('fK').reset(); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+$('bAnalisar').onclick = () => rodar(BASE + '/analisar', { ia: $('cIA').checked });
+document.addEventListener('click', async ev => {
+  const t = ev.target;
+  if (t.dataset.refazer) rodar(BASE + '/analisar', { rids: [t.dataset.refazer], ia: $('cIA').checked });
+  if (t.dataset.apagar && confirm('Tirar este vídeo de referência?')) { await api(BASE + '/ref/' + t.dataset.apagar + '/apagar', {}); recarregar(); }
+  if (t.dataset.kdel && confirm('Apagar esta mídia do canal?')) { await api(BASE + '/midia/' + t.dataset.kdel, { apagar: true }); recarregar(); }
+  if (t.dataset.rid) {
+    const r = C.referencias.find(x => x.id === t.dataset.rid);
+    $('zoom').innerHTML = [r.folha].concat(r.densas || []).map(p => `<img src="${arq(p)}">`).join('') + '<p style="color:#fff">clique pra fechar</p>';
+    $('zoom').style.display = 'block';
+  }
+});
+document.addEventListener('change', async ev => { if (ev.target.dataset.kdesc) await api(BASE + '/midia/' + ev.target.dataset.kdesc, { descricao: ev.target.value }); });
+$('zoom').onclick = () => { $('zoom').style.display = 'none'; };
+$('bPerfilIA').onclick = () => rodar(BASE + '/perfil/gerar', {});
+$('bMedidas').onclick = async () => { if (!confirm('Refazer o perfil só com as medidas (mantém o resto)?')) return; await api(BASE + '/perfil/medidas', {}); recarregar(); };
+$('bPrompt').onclick = async () => { const d = await api(BASE + '/perfil/prompt', undefined, 'GET'); $('tPrompt').value = d.prompt; $('promptBox').style.display = 'block'; $('tPrompt').select(); try { navigator.clipboard.writeText(d.prompt); barra('📋 prompt copiado', 'okk'); } catch (_) {} };
+$('bColar').onclick = async () => { try { await api(BASE + '/perfil', { resposta: $('tResp').value }); barra('✅ perfil atualizado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bSalvarJSON').onclick = async () => { try { await api(BASE + '/perfil', { perfil: JSON.parse($('tPerfil').value) }); barra('✅ salvo', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bSalvarRapido').onclick = async () => {
+  const p = JSON.parse(JSON.stringify(C.perfil));
+  Object.assign(p.legenda, { estilo: $('pLeg').value, posicao: $('pPos').value, max_palavras: +$('pMax').value, tamanho: +$('pTam').value,
+    cor_texto: $('pCor').value.toUpperCase(), cor_ativa: $('pCorA').value.toUpperCase(), maiusculas: $('pMai').checked, ativa: true });
+  p.gancho_maiusculas = $('pGancho').checked; p.textos_tela.estilo_destaque = $('pDest').value; p.duracao_alvo_s = +$('pDur').value;
+  p.ritmo.plano_medio_s = +$('pPlano').value; p.ritmo.pausa_max_s = +$('pPausa').value;
+  Object.assign(p.sfx, { usa: $('pSfx').checked, nos_cortes: $('pSfxC').checked, volume: +$('pSfxV').value });
+  try { await api(BASE + '/perfil', { perfil: p }); barra('✅ salvo', 'okk'); document.activeElement.blur(); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('iImport').onchange = async () => { const fd = new FormData(); fd.append('arquivo', $('iImport').files[0]); try { await api(BASE + '/perfil/importar', fd); barra('✅ perfil importado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bRenomear').onclick = async () => { const n = prompt('Nome do canal', C.nome); if (n) { await api(BASE + '/renomear', { nome: n }); $('cNome').textContent = n; } };
+recarregar();
+</script>
+{% endblock %}

@@ -9,6 +9,7 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;">
     <select id="pe-projeto" style="width:auto;max-width:420px;margin:0;">
       <option value="">— nenhum —</option>
+      {% set _curtos = curtos_lista() if curtos_lista is defined else [] %}{% if _curtos %}<optgroup label="⚡ Vídeos curtos">{% for v in _curtos %}<option value="curto:{{ v.id }}" {% if _pe.tipo == 'curto' and _pe.id == v.id %}selected{% endif %}>{{ v.titulo }}</option>{% endfor %}</optgroup>{% endif %}
       {% if _dossies %}<optgroup label="🕵️ Modelos de vídeo">{% for v in _dossies %}<option value="dossie:{{ v.id }}" {% if _pe.tipo == 'dossie' and _pe.id == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
       {% if _roteiros %}<optgroup label="📝 Roteiros do YouTube">{% for v in _roteiros %}<option value="roteiro:{{ v.id }}" {% if _pe.tipo == 'roteiro' and _pe.id == v.id %}selected{% endif %}>{{ v.titulo }} ({{ v.cenas }} cenas)</option>{% endfor %}</optgroup>{% endif %}
       {% if _vendas %}<optgroup label="🛒 Vídeos de venda">{% for v in _vendas %}<option value="venda:{{ v.id }}" {% if _pe.tipo == 'venda' and _pe.id == v.id %}selected{% endif %}>{{ v.nome }} ({{ v.midias }} materiais)</option>{% endfor %}</optgroup>{% endif %}
@@ -26,6 +27,39 @@
     {% if _pe.encaixadas %}<button type="button" id="pe-desfazer" style="width:auto;margin:0;padding:5px 12px;background:#64748b;color:#fff;border:0;border-radius:6px;cursor:pointer;">↩ Voltar as cenas de antes</button>{% endif %}
   </div>
   <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">Em cada momento que o roteiro marcou ([I3] antes da frase), o trecho em que essa frase é falada troca a mídia pela foto/vídeo REAL do projeto (vídeo com o pedaço planejado). Por padrão só troca cena de IA (pod/Flow/Runpod), ⏳ pendente ou sem mídia — o que você escolheu à mão fica. As cenas de IA continuam guardadas: ↩ volta. Sem marcas? No Modelo de vídeo, 📸 → 📍 Posicionar.</div>
+  {% elif _pe.tipo == 'curto' %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #e9d5ff;">
+    <b>🔁 Trocar pela minha voz</b>
+    <input type="file" id="pe-voz" accept="audio/*,video/*" style="width:auto;margin:0;">
+    <label style="margin:0;font-weight:400;font-size:.84rem;"><input type="checkbox" id="pe-voz-pausas" checked style="width:auto;margin:0 4px 0 0;">cortar pausas e repetições</label>
+    <button type="button" id="pe-voz-ir" style="width:auto;margin:0;padding:6px 14px;background:#15803d;color:#fff;font-weight:700;border:0;border-radius:6px;cursor:pointer;">🔁 Trocar a voz</button>
+    <a href="/curtos/{{ _pe.id }}#tele" style="font-size:.84rem;font-weight:600;color:#7e22ce;">🎤 gravar com o teleprompter</a>
+    <span id="pe-voz-st" style="font-size:.84rem;"></span>
+  </div>
+  <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">⚡ Vídeo curto: o seu áudio lendo o roteiro entra no lugar da narração. A mídia de cada trecho fica (inclusive as que você trocou); só o tempo, a legenda, os textos e os sons da IA se ajustam ao seu ritmo — os textos e sons que você pôs aqui vão junto pro tempo novo.</div>
+  <script>
+  (function () {
+    const b = document.getElementById('pe-voz-ir'); if (!b) return;
+    const st = document.getElementById('pe-voz-st'), PID = {{ _pe.id|tojson }};
+    async function poll() {
+      const d = await (await fetch('/curtos/' + PID + '/estado', { cache: 'no-store' })).json(); const t = d.tarefa || {};
+      if (!t.fim) { st.textContent = '⏳ ' + (t.prog || t.rotulo || ''); setTimeout(poll, 1500); return; }
+      if (t.erro) { st.textContent = '❌ ' + t.erro; b.disabled = false; return; }
+      st.textContent = '✅ ' + (t.msg || 'pronto') + ' — recarregando…'; setTimeout(() => location.reload(), 1200);
+    }
+    b.onclick = async () => {
+      const f = document.getElementById('pe-voz').files[0];
+      if (!f) { st.textContent = 'Escolha o arquivo do seu áudio.'; return; }
+      const fd = new FormData(); fd.append('audio', f);
+      const corta = document.getElementById('pe-voz-pausas').checked;
+      fd.append('cortar_pausas', corta); fd.append('cortar_repeticoes', corta);
+      b.disabled = true; st.textContent = '⬆ enviando…';
+      const r = await fetch('/curtos/' + PID + '/trocar-voz', { method: 'POST', body: fd }); const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.ok === false) { st.textContent = '❌ ' + (d.erro || r.status); b.disabled = false; return; }
+      poll();
+    };
+  })();
+  </script>
   {% elif _pe.tipo == 'roteiro' %}
   <div style="font-size:.78rem;color:#7e22ce;margin-top:4px;">📝 Roteiro do YouTube ligado: as [CENA n] e os capítulos usam ele (gerar o prompt de novo pra valer nas buscas).</div>
   {% endif %}
