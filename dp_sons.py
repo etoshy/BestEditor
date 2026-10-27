@@ -167,23 +167,39 @@ def evento(sid: str, t: float, volume: float = 1.0, alinhar: str = "pico") -> Op
     return {"som": sid, "inicio": round(max(0.0, t - ref), 3), "volume": float(volume)}
 
 
-def mixar(narracao: str, eventos: List[Dict[str, Any]], saida: str, volume_sfx: float = 0.55) -> str:
-    """Narração + efeitos sonoros num WAV só (a narração não muda de volume)."""
+def _taxa(caminho_audio: str) -> int:
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=sample_rate",
+                            "-of", "default=nw=1:nk=1", caminho_audio], capture_output=True, text=True, timeout=60)
+        return int(r.stdout.strip().splitlines()[0])
+    except Exception:  # noqa: BLE001
+        return 48000
+
+
+def mixar(narracao: str, eventos: List[Dict[str, Any]], saida: str, volume_sfx: float = 0.55, preservar: bool = False) -> str:
+    """Narração + efeitos sonoros num WAV só (a narração não muda de volume).
+    preservar (🎭 react: o áudio é a música original): a música fica na taxa dela, sem limitador — só os efeitos
+    entram por cima."""
     eventos = [e for e in eventos if caminho(e.get("som")) and os.path.exists(caminho(e["som"]))]
     if not eventos:
         return narracao
     eventos = sorted(eventos, key=lambda e: e["inicio"])[:400]
+    taxa = _taxa(narracao) if preservar else 48000
     args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", narracao]
     partes = []
     for k, e in enumerate(eventos, start=1):
         args += ["-i", caminho(e["som"])]
         atraso = int(round(float(e["inicio"]) * 1000))
         vol = max(0.0, min(3.0, float(e.get("volume", 1.0)) * volume_sfx))
-        partes.append(f"[{k}:a]aresample=48000,aformat=channel_layouts=stereo,volume={vol:.3f},adelay={atraso}|{atraso}[s{k}]")
+        partes.append(f"[{k}:a]aresample={taxa},aformat=channel_layouts=stereo,volume={vol:.3f},adelay={atraso}|{atraso}[s{k}]")
     rot = "".join(f"[s{k}]" for k in range(1, len(eventos) + 1))
     partes.append(f"{rot}amix=inputs={len(eventos)}:normalize=0:dropout_transition=0[sfx]")
-    partes.append("[0:a]aresample=48000,aformat=channel_layouts=stereo[nar]")
-    partes.append("[nar][sfx]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.97[out]")
+    if preservar:
+        partes.append("[0:a]aformat=channel_layouts=stereo[nar]")
+        partes.append("[nar][sfx]amix=inputs=2:duration=first:normalize=0[out]")
+    else:
+        partes.append("[0:a]aresample=48000,aformat=channel_layouts=stereo[nar]")
+        partes.append("[nar][sfx]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.97[out]")
     script = saida + ".filtro.txt"
     with open(script, "w", encoding="utf-8") as f:
         f.write(";\n".join(partes))

@@ -136,3 +136,6 @@ anime2d/
 
 # 🩹 correções do Flow (cópias do código do Flow com as mudanças, o catálogo e os testes)
 flow_correcoes/
+
+# 🔊 teste dos sons do Pixabay: os áudios baixados e o perfil do navegador (cookies)
+pixabay_sons/

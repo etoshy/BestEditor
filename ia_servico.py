@@ -137,6 +137,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "anime_cine": ("🎬 Anime quadro a quadro: planos e desenhos",
                    "Na aba 🕵️ Modelos de vídeo → 🎬 Anime quadro a quadro: lê o roteiro e as páginas de mangá e divide a cena em "
                    "planos (câmera, efeitos, falas, sons) e os desenhos do movimento de cada um.", True),
+    "sons_pixabay": ("🔊 Efeitos sonoros do Pixabay: a ficha de cada som",
+                     "No teste dos sons do Pixabay (pixabay_sons_teste.py --ia): olha o título, as tags, as medidas e o "
+                     "espectrograma de cada efeito baixado e escreve o nome, a descrição, a categoria e onde usar.", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

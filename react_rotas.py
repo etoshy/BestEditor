@@ -211,6 +211,8 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 p["intriga"] = c["intriga"]
             if "imagens_destaque" in c:
                 p["imagens_destaque"] = bool(c["imagens_destaque"])
+            if "escutar" in c:  # 👂 v84_245
+                p["escutar"] = bool(c["escutar"])
             for k in ("abertura", "encerramento", "movimentos"):
                 if k in c:
                     p[k] = bool(c[k])
@@ -554,6 +556,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
         with R._TRAVA:
             p = _p(pid)
             ids = {x["id"] for x in p["personagens"]}
+            antes = {x["id"]: x for x in (p.get("roteiro") or {}).get("falas") or []}
             falas = []
             for f in c.get("falas") or []:
                 t = R.segundos(f.get("t"))
@@ -570,6 +573,12 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                               "expressao_depois": f.get("expressao_depois") if f.get("expressao_depois") in R.EXPRESSOES and f.get("expressao_depois") != ex else "",
                               "cta": bool(f.get("cta")), "reacoes": reacoes, "duvida": str(f.get("duvida") or "")[:300],
                               "destaque": f.get("destaque") if f.get("destaque") in ("letra", "edicao") else ""})
+                # 👂 o tempo que você mexeu fica; o que veio igual guarda o "já ouviu" (ou ainda vai ser ajustado)
+                velha = antes.get(falas[-1]["id"])
+                if velha and abs(float(velha["t"]) - falas[-1]["t"]) < 0.01:
+                    falas[-1].update({k: velha[k] for k in ("ouviu", "t_ia") if k in velha})
+                else:
+                    falas[-1]["ouviu"] = True
             falas.sort(key=lambda x: x["t"])
             p["roteiro"] = dict(p.get("roteiro") or {}, falas=falas, editado=time.time())
             R.salvar(p, base_dir)
@@ -878,12 +887,17 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     def _pecas_capa(p: Dict[str, Any]) -> Dict[str, Any]:
         cfg = R.capa_cfg(p)
         pc = R.capa_pecas(p, base_dir, cfg)
-        v = str(int(time.time() * 1000))
+        import hashlib
 
-        def url(cam: str) -> str:
+        def url(cam: str) -> str:  # v84_244: a versão é o CONTEÚDO — a imagem só recarrega (e pisca) quando muda de verdade
+            try:
+                with open(cam, "rb") as fh:
+                    v = hashlib.md5(fh.read()).hexdigest()[:10]
+            except OSError:
+                v = str(int(time.time()))
             return f"/react-personagens/{p['id']}/capa/arq/{os.path.basename(cam)}?v={v}"
         return {"fundo": url(pc["fundo"]), "W": R.CAPA_W, "H": R.CAPA_H, "tem_video": pc["tem_video"],
-                "pecas": [dict({k: x[k] for k in ("chave", "nome", "x", "y", "w", "h", "oculta")}, img=url(x["arq"]),
+                "pecas": [dict({k: x[k] for k in ("chave", "nome", "x", "y", "w", "h", "oculta", "rot", "esp")}, img=url(x["arq"]),
                                ajustada=bool(x.get("ajustada"))) for x in pc["pecas"]],
                 "cfg": {k: cfg[k] for k in ("cids", "exprs", "t", "lado", "seta", "quadro_off", "ocultas")} | {"imagem": bool(cfg.get("imagem"))}}
 
@@ -903,10 +917,15 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                         if v is None:
                             cfg["pos"].pop(k, None)
                         elif isinstance(v, dict):
-                            cfg["pos"][k] = {kk: round(float(v[kk]), 1) for kk in ("x", "y", "w") if isinstance(v.get(kk), (int, float))}
+                            novo = {kk: round(float(v[kk]), 1) for kk in ("x", "y", "w", "rot") if isinstance(v.get(kk), (int, float))}
+                            if "esp" in v:
+                                novo["esp"] = bool(v["esp"])
+                            cfg["pos"][k] = dict(cfg["pos"].get(k) or {}, **novo)
                 p["capa"] = R.capa_cfg(p, dict({k: v for k, v in c.items() if k not in ("pos", "pos_limpar")}, pos=cfg["pos"],
                                                ordem=c.get("ordem", cfg["ordem"])))
                 R.salvar(p, base_dir)
+        if c.get("leve"):  # só lugar/tamanho/giro/ordem/ocultar: a página já mostra — não remonta as peças (era o que travava)
+            return _ok()
         try:
             return _ok(**_pecas_capa(_p(pid)))
         except Exception as exc:  # noqa: BLE001

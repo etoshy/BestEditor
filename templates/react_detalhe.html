@@ -216,6 +216,7 @@
     <label style="margin:0;">Quantidade de falas <select id="fDens" style="width:auto;">{% for d in densidades %}<option value="{{ d }}" {% if p.densidade == d %}selected{% endif %}>{{ {'pouca': 'pouca (1 a cada ~15 s)', 'normal': 'normal (1 a cada ~9 s)', 'muita': 'muita (1 a cada ~6 s)'}[d] }}</option>{% endfor %}</select></label>
     <label style="margin:0;">⚡ Intrigas entre eles <select id="fIntriga" style="width:auto;">{% for k, v in intrigas.items() %}<option value="{{ k }}" {% if p.intriga == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
     <label style="margin:0;" title="Desligado: nada de imagem de briga/interação/cena/foto/estilo — as intrigas ficam só nas falas (e quem sai/volta da sala). As imagens já feitas não entram no vídeo."><input type="checkbox" id="fImgDest" style="width:auto" {% if p.imagens_destaque is not defined or p.imagens_destaque %}checked{% endif %}> 🖼 imagens de destaque (briga, interação, foto…)</label>
+    <label style="margin:0;" title="Ligado: quem vai comentar ESCUTA a frase/o verso do vídeo até o fim e só então fala (a fala que caía no meio de um verso vai pra logo depois dele). Os tempos que você mexer à mão na tabela ficam como você deixou."><input type="checkbox" id="fEscutar" style="width:auto" {% if p.escutar is not defined or p.escutar %}checked{% endif %}> 👂 escutam a frase até o fim antes de falar</label>
     <label style="margin:0;" title="Só no 🎬 Cinema de perto: pega pipoca do vizinho, dá na boca, cochicha, olha pra trás, chega atrasado entrando pela fileira, sai andando, alguém passa na frente (silhueta ou inteiro). Precisa das poses de gesto (🧍 Gerar o que falta). Desligado por padrão."><input type="checkbox" id="fMovimentos" style="width:auto" {% if p.movimentos %}checked{% endif %}> 🍿 movimentos naturais (cinema de perto)</label>
     <label style="margin:0;" title="Os personagens vão chegando e sentando um por um nos primeiros segundos (o roteiro faz as falas de chegada). Desligado por padrão."><input type="checkbox" id="fAbertura" style="width:auto" {% if p.abertura %}checked{% endif %}> 🚪 abertura (chegam e sentam)</label>
     <label style="margin:0;" title="Nos últimos segundos eles comentam o fim, se despedem e vão saindo um por um. Desligado por padrão."><input type="checkbox" id="fEncerramento" style="width:auto" {% if p.encerramento %}checked{% endif %}> 👋 encerramento (se despedem e saem)</label>
@@ -416,6 +417,10 @@
         <button type="button" id="capaFrente" class="rx-sec rx-mini" disabled title="trazer pra frente">⬆</button>
         <button type="button" id="capaTras" class="rx-sec rx-mini" disabled title="mandar pra trás">⬇</button>
         <button type="button" id="capaOcultar" class="rx-sec rx-mini" disabled title="esconder / mostrar">👁</button>
+        <button type="button" id="capaGirarE" class="rx-sec rx-mini" disabled title="girar pra esquerda (Shift: 15°)">⟲</button>
+        <input type="range" id="capaRot" min="-180" max="180" step="1" value="0" disabled style="width:90px;margin:0" title="girar (graus) — duplo clique zera">
+        <button type="button" id="capaGirarD" class="rx-sec rx-mini" disabled title="girar pra direita (Shift: 15°)">⟳</button>
+        <button type="button" id="capaEsp" class="rx-sec rx-mini" disabled title="espelhar (virar pro outro lado)">↔</button>
         <button type="button" id="capaAuto" class="rx-sec rx-mini" disabled title="volta esta peça pro lugar automático">↺</button>
         <button type="button" id="capaTudo" class="rx-sec rx-mini" title="tudo no lugar automático">↺ tudo</button>
       </div>
@@ -522,6 +527,7 @@ $('fMovimentos').addEventListener('change', async (e) => { await salvarDados({ m
 $('fAbertura').addEventListener('change', async (e) => { await salvarDados({ abertura: e.target.checked }); recarregar(); });
 $('fEncerramento').addEventListener('change', async (e) => { await salvarDados({ encerramento: e.target.checked }); recarregar(); });
 $('fImgDest').addEventListener('change', async (e) => { await salvarDados({ imagens_destaque: e.target.checked }); atualizarPrevia(); });
+$('fEscutar').addEventListener('change', async (e) => { await salvarDados({ escutar: e.target.checked }); atualizarPrevia(); });
 $('fLayout').addEventListener('change', async (e) => { sofasSujo = false; await salvarDados({ layout: e.target.value }); atualizarPrevia();  });
 $('fEstilo').addEventListener('change', async (e) => { await salvarDados({ estilo: e.target.value }); recarregar(); });
 $('fExpr').addEventListener('change', () => salvarDados({ expressoes: [...$('fExpr').querySelectorAll('input:checked')].map(i => i.value) }));
@@ -1170,6 +1176,7 @@ function cfgCapa() {
            seta: $('capaSeta').checked, quadro_off: $('capaNoLugar').checked };
 }
 async function capaSalvar(extra) {
+  await capaFila;  // espera o que estava salvando (a ordem não embaralha)
   try { CAPA = await api(`/react-personagens/${PID}/capa/estado`, Object.assign(extra && extra.so ? {} : cfgCapa(), extra || {})); delete (extra || {}).so; pintarCapa(); }
   catch (e) { avisar($('capaEst'), '⚠ ' + e.message, 'rx-err'); }
 }
@@ -1185,7 +1192,20 @@ async function iniciarCapa() {
 }
 const ALCAS_CAPA = ['nw', 'ne', 'se', 'sw'].map(h => `<span class="rx-alca" data-h="${h}"></span>`).join('');
 function kCapa() { return $('capaPalco').clientWidth / CAPA.W; }
-function posCapa(el, pc) { const k = kCapa(); Object.assign(el.style, { left: pc.x * k + 'px', top: pc.y * k + 'px', width: pc.w * k + 'px', height: pc.h * k + 'px' }); }
+function posCapa(el, pc) {
+  if (!el) return;
+  const k = kCapa(); Object.assign(el.style, { left: pc.x * k + 'px', top: pc.y * k + 'px', width: pc.w * k + 'px', height: pc.h * k + 'px',
+    transform: pc.rot ? `rotate(${pc.rot}deg)` : '' });
+  const im = el.querySelector('img'); if (im) im.style.transform = pc.esp ? 'scaleX(-1)' : '';
+}
+// 💾 v84_244: mexer no palco salva "leve" (sem remontar as peças) e em fila — a página não pisca nem volta pro lugar antigo
+let capaFila = Promise.resolve();
+function capaGuardarLeve(corpo) {
+  capaFila = capaFila.then(() => api(`/react-personagens/${PID}/capa/estado`, Object.assign({ leve: true }, corpo)))
+    .then(() => avisar($('capaEst'), '✔ salvo', 'rx-ok')).catch(e => avisar($('capaEst'), '⚠ ' + e.message, 'rx-err'));
+  return capaFila;
+}
+function capaGuardarPeca(pc) { pc.ajustada = true; return capaGuardarLeve({ pos: { [pc.chave]: { x: pc.x, y: pc.y, w: pc.w, rot: pc.rot || 0, esp: !!pc.esp } } }); }
 function pintarCapa() {
   if (!CAPA) return;
   const pal = $('capaPalco'); pal.innerHTML = '';
@@ -1194,7 +1214,7 @@ function pintarCapa() {
     const el = document.createElement('div');
     el.className = 'rx-peca' + (pc.chave === capaPeca ? ' sel' : '') + (pc.ajustada ? ' aj' : '');
     el.dataset.chave = pc.chave; el.style.zIndex = i + 1; if (pc.oculta) el.style.opacity = .2;
-    el.innerHTML = `<img src="${pc.img}"><span class="rx-nome">${esc(pc.nome)}</span>${ALCAS_CAPA}`;
+    el.innerHTML = `<img src="${pc.img}" draggable="false"><span class="rx-nome">${esc(pc.nome)}</span>${ALCAS_CAPA}`;
     posCapa(el, pc); pal.appendChild(el);
   });
   const temImg = !!CAPA.cfg.imagem;
@@ -1205,7 +1225,8 @@ function pecaCapa(ch) { return CAPA && CAPA.pecas.find(x => x.chave === ch); }
 function barraCapa() {
   const pc = pecaCapa(capaPeca);
   $('capaSelNome').textContent = pc ? pc.nome : 'arraste cada peça; a bolinha 🟠 muda o tamanho';
-  ['capaFrente', 'capaTras', 'capaOcultar', 'capaAuto'].forEach(id => { $(id).disabled = !pc; });
+  ['capaFrente', 'capaTras', 'capaOcultar', 'capaAuto', 'capaGirarE', 'capaGirarD', 'capaEsp', 'capaRot'].forEach(id => { $(id).disabled = !pc; });
+  $('capaRot').value = pc ? Math.round(pc.rot || 0) : 0; $('capaEsp').textContent = pc && pc.esp ? '↔ ✓' : '↔';
   document.querySelectorAll('#capaPalco .rx-peca').forEach(x => x.classList.toggle('sel', x.dataset.chave === capaPeca));
 }
 let capaArr = null;
@@ -1230,22 +1251,41 @@ $('capaPalco').addEventListener('pointermove', (ev) => {
 });
 $('capaPalco').addEventListener('pointerup', () => {
   const a = capaArr; capaArr = null; if (!a || !a.mexeu) return;
-  capaSalvar({ so: true, pos: { [a.pc.chave]: { x: a.pc.x, y: a.pc.y, w: a.pc.w } } });
+  capaGuardarPeca(a.pc);
 });
+$('capaPalco').addEventListener('pointercancel', () => { capaArr = null; });
 $('capaPalco').addEventListener('wheel', (ev) => {
   const el = ev.target.closest('.rx-peca'); if (!el) return; ev.preventDefault();
   const pc = pecaCapa(el.dataset.chave); capaPeca = pc.chave; barraCapa();
   const f = ev.deltaY < 0 ? 1.05 : 1 / 1.05, cx = pc.x + pc.w / 2, cy = pc.y + pc.h / 2;
   pc.w *= f; pc.h *= f; pc.x = cx - pc.w / 2; pc.y = cy - pc.h / 2; posCapa(el, pc);
-  clearTimeout(pc._t); pc._t = setTimeout(() => capaSalvar({ so: true, pos: { [pc.chave]: { x: pc.x, y: pc.y, w: pc.w } } }), 450);
+  clearTimeout(pc._t); pc._t = setTimeout(() => capaGuardarPeca(pc), 450);
 }, { passive: false });
 function moverCapa(d) {
-  const o = CAPA.pecas.map(x => x.chave), i = o.indexOf(capaPeca), j = i + d; if (i < 0 || j < 0 || j >= o.length) return;
-  [o[i], o[j]] = [o[j], o[i]]; capaSalvar({ so: true, ordem: o });
+  const o = CAPA.pecas, i = o.findIndex(x => x.chave === capaPeca), j = i + d; if (i < 0 || j < 0 || j >= o.length) return;
+  [o[i], o[j]] = [o[j], o[i]]; pintarCapa(); capaGuardarLeve({ ordem: o.map(x => x.chave) });
 }
+function girarCapa(g, abs) {
+  const pc = pecaCapa(capaPeca); if (!pc) return;
+  let r = abs ? g : (pc.rot || 0) + g; r = ((r + 180) % 360 + 360) % 360 - 180; pc.rot = Math.round(r * 10) / 10;
+  posCapa(document.querySelector(`#capaPalco .rx-peca[data-chave="${CSS.escape(pc.chave)}"]`), pc); $('capaRot').value = Math.round(pc.rot);
+  clearTimeout(pc._g); pc._g = setTimeout(() => capaGuardarPeca(pc), 350);
+}
+$('capaGirarE').addEventListener('click', (e) => girarCapa(e.shiftKey ? -15 : -5));
+$('capaGirarD').addEventListener('click', (e) => girarCapa(e.shiftKey ? 15 : 5));
+$('capaRot').addEventListener('input', (e) => girarCapa(+e.target.value, true));
+$('capaRot').addEventListener('dblclick', () => girarCapa(0, true));
+$('capaEsp').addEventListener('click', () => {
+  const pc = pecaCapa(capaPeca); if (!pc) return; pc.esp = !pc.esp;
+  posCapa(document.querySelector(`#capaPalco .rx-peca[data-chave="${CSS.escape(pc.chave)}"]`), pc); barraCapa(); capaGuardarPeca(pc);
+});
 $('capaFrente').addEventListener('click', () => moverCapa(1));
 $('capaTras').addEventListener('click', () => moverCapa(-1));
-$('capaOcultar').addEventListener('click', () => { const oc = CAPA.cfg.ocultas || []; capaSalvar({ so: true, ocultas: oc.includes(capaPeca) ? oc.filter(x => x !== capaPeca) : oc.concat([capaPeca]) }); });
+$('capaOcultar').addEventListener('click', () => {
+  const oc = CAPA.cfg.ocultas || [], pc = pecaCapa(capaPeca); if (!pc) return;
+  CAPA.cfg.ocultas = oc.includes(capaPeca) ? oc.filter(x => x !== capaPeca) : oc.concat([capaPeca]); pc.oculta = CAPA.cfg.ocultas.includes(capaPeca);
+  pintarCapa(); capaGuardarLeve({ ocultas: CAPA.cfg.ocultas });
+});
 $('capaAuto').addEventListener('click', () => capaSalvar({ so: true, pos: { [capaPeca]: null } }));
 $('capaTudo').addEventListener('click', () => capaSalvar({ so: true, pos_limpar: true }));
 window.addEventListener('resize', () => { if (CAPA) pintarCapa(); });
@@ -1311,6 +1351,7 @@ function desenharPalco() {
   pal.style.backgroundImage = '';
   if (PALCO.fundo) { const f = document.createElement('div'); f.style.cssText = `position:absolute;inset:0;background:url("${PALCO.fundo}") center/100% 100% no-repeat;${PALCO.fundo_espelhar ? 'transform:scaleX(-1);' : ''}`; pal.appendChild(f); }
   PALCO.pecas.forEach(pc => {
+    if (pc.cena_tela) return;  // 🎬 a cena em tela cheia só aparece quando tem uma no segundo (embaixo)
     const el = document.createElement('div');
     el.className = 'rx-peca' + (pc.tv ? ' rx-tv' : '') + (pc.legenda ? ' rx-leg' : '') + (PALCO.ajustadas.includes(pc.chave) ? ' aj' : '')
       + (pc.oculta ? ' oc' : '') + (pc.travada ? ' trav' : '') + (pc.falando ? ' fala' : '') + (pc.fora ? ' fora' : '');
@@ -1318,7 +1359,7 @@ function desenharPalco() {
     el.innerHTML = htmlPeca(pc) + `<span class="rx-nome">${esc(pc.nome)}</span>` + (pc.travada ? '' : ALCAS);
     posicionar(el, pc); pal.appendChild(el);
   });
-  if (PALCO.cena && PALCO.cena.img && $('verCena').checked) {
+  if (PALCO.cena && PALCO.cena.img && $('verCena').checked && !(pecaDe('cena') || {}).oculta) {
     const leg = pecaDe('legenda'), d = document.createElement('div');
     d.className = 'rx-cena-palco'; d.style.backgroundImage = `url("${PALCO.cena.img}")`;
     d.innerHTML = `<span>${esc(PALCO.cena.tipo)} neste segundo — desmarque “ver a cena” pra mexer nas camadas</span>`;
@@ -1330,7 +1371,7 @@ function desenharPalco() {
 function miniDe(pc) {
   if (pc.tv) return `<img class="mini" src="/react-personagens/${PID}/quadro.jpg?t=${PALCO.t}" onerror="this.style.visibility='hidden'">`;
   if (pc.img) return `<img class="mini" src="${pc.img}">`;
-  return `<span class="mini" style="display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${pc.legenda ? '💬' : pc.foto ? '🖼' : '▭'}</span>`;
+  return `<span class="mini" style="display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${pc.legenda ? '💬' : pc.foto ? '🖼' : pc.cena_tela ? '🎬' : '▭'}</span>`;
 }
 function desenharPilha() {
   const pil = PALCO.pilha, box = $('pilhaCam');
@@ -1345,7 +1386,7 @@ function desenharPilha() {
 function pecaDe(chave) { return PALCO && PALCO.pecas.find(x => x.chave === chave); }
 function elDe(chave) { return [...$('palco').children].find(x => x.dataset.chave === chave); }
 function barraAjuste() {
-  const pc = ajSel && pecaDe(ajSel), livre = pc && !pc.travada;
+  const pc = ajSel && pecaDe(ajSel), livre = pc && !pc.travada && !pc.cena_tela;
   $('ajNome').textContent = pc ? pc.nome + (pc.travada ? ' 🔒' : '') : 'clique numa camada';
   ['ajX', 'ajY', 'ajW', 'ajR', 'ajAuto'].forEach(id => { $(id).disabled = !livre; });
   $('ajFrente').disabled = $('ajTras').disabled = !pc;

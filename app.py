@@ -4053,6 +4053,9 @@ def _job_site_cfg(job: dict) -> dict:
         cfg["sons_auto"] = editor["sons_auto"]
     if editor.get("sons_volume") is not None:
         cfg["sons_volume"] = editor["sons_volume"]
+    if job.get("react"):  # 🎭 v84_244: o som do react é a MÚSICA original — sem sons automáticos nem limitador por cima
+        cfg["audio_original"] = True
+        cfg["sons_auto"] = {"transicoes": False, "cenas": False, "destaques": False, "editoriais": False}
     tipo = editor.get("transition_type")
     if tipo and tipo != "site" and tipo in {v for v, _r in TRANSITION_LABELS}:
         cfg["transition_type"] = tipo
@@ -5568,6 +5571,12 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
             except Exception:  # noqa: BLE001
                 pass
             resolved_overlays = None
+            if job.get("react"):  # 🎭 v84_244: camadas ocultas 👁 no palco do react (inclusive depois de mandar pro editor) não saem
+                try:
+                    import react_personagens as _rp
+                    job["overlays"] = _rp.filtrar_ocultas_editor(job["react"].get("projeto"), job.get("overlays") or [])
+                except Exception:  # noqa: BLE001
+                    pass
             if job.get("overlays"):
                 resolved_overlays = []
                 overlay_factory = ClientFactory(_job_site_cfg(job))

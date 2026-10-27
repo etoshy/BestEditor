@@ -1622,12 +1622,12 @@ def _concat_clips_com_plano(clip_paths: List[str], durations: List[float], plano
         return _concat_clips(cortados, output_path, work_dir)
 
 
-def _mux_audio(video_only_path: str, audio_path: str, output_path: str) -> str:
+def _mux_audio(video_only_path: str, audio_path: str, output_path: str, bitrate: str = "192k") -> str:
     """Junta o vídeo concatenado (sem áudio) com a narração original."""
     _run_ffmpeg([
         "-i", video_only_path, "-i", audio_path,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", bitrate,
         "-shortest", output_path,
     ])
     return output_path
@@ -5372,7 +5372,8 @@ def assemble_video(
         with (perf_log.timed("montagem:sons", quantidade=len(eventos_sons)) if perf_log else nullcontext()):
             try:
                 audio_path = dp_sons.mixar(audio_path, eventos_sons, os.path.join(work_dir, "_narracao_com_sons.wav"),
-                                           volume_sfx=float(cfg.get("sons_volume", 0.55)))
+                                           volume_sfx=float(cfg.get("sons_volume", 0.55)),
+                                           preservar=bool(cfg.get("audio_original")))
             except Exception as exc:  # noqa: BLE001
                 raise VideoAssemblyError(f"Falha ao mixar os efeitos sonoros: {str(exc)[-300:]}") from exc
 
@@ -5392,7 +5393,7 @@ def assemble_video(
         if music_path and os.path.exists(music_path):
             _mux_audio_with_music(concat_path, audio_path, music_path, output_path, music_volume)
         else:
-            _mux_audio(concat_path, audio_path, output_path)
+            _mux_audio(concat_path, audio_path, output_path, bitrate="320k" if cfg.get("audio_original") else "192k")
 
     if overlays:
         if on_progress:

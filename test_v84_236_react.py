@@ -337,6 +337,7 @@ def test_cortes_mapeiam_tempo_transcricao_e_falas(base, tmp_path):
     assert p["video"]["original"] == p["video"]["arquivo"] and p["cortes"]["meio"] == []
     R.definir_transcricao(p, "0:01 começo\n0:05 cena cortada\n0:09 depois do corte")
     R.novo_personagem(p, "Goku")
+    p["escutar"] = False  # v84_245: aqui o teste é só dos cortes (o 👂 empurraria as falas pro fim das frases)
     R.aplicar_roteiro(p, {"falas": [{"tempo": t, "personagem": "Goku", "texto": f"fala em {t}", "expressao": "feliz",
                                      "pedido_inscricao": t == 9.5, "reacoes": [], "duvida": ""} for t in (1.5, 5.5, 9.5)]})
     R.salvar(p, base)

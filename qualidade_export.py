@@ -188,7 +188,7 @@ def passe_final(caminho: str, q: Optional[str]) -> bool:
         return True
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", caminho, "-map", "0:v:0", "-map", "0:a?",
            "-c:v", "libx264", "-crf", str(cfg["crf"]), "-preset", cfg["preset"], "-pix_fmt", "yuv420p",
-           "-c:a", "aac", "-b:a", cfg["audio"], "-movflags", "+faststart", tmp]
+           "-c:a", "copy", "-movflags", "+faststart", tmp]  # v84_244: o áudio já sai pronto — recodificar de novo só piorava
     r = rodar(cmd, timeout=7200)
     if r.returncode != 0:
         try:

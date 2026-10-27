@@ -4227,6 +4227,34 @@ Aba 🕵️ Modelos de vídeo → 🧬 Criador de personagens (`/criador-persona
 - **🧬 Criador**: o aspecto “🌈 cores reais (é a versão colorida)” numa imagem de referência.
 - `personagens_pod.COR_REF_EN` = o texto comum da referência colorida.
 
+### v84_245 — 🔊 Teste: efeitos sonoros do Pixabay · 👂 react: escuta antes de falar
+- **🔊 Pixabay (só o teste, fora do site por enquanto)**: `pixabay_sons.py` (partes sem navegador) e
+  `pixabay_sons_teste.py` (o teste). `python pixabay_sons_teste.py "whoosh tall" --paginas 2 --limite 5 --ia`:
+  abre a busca num Chromium com perfil próprio (`pixabay_sons/_perfil` — a verificação da Cloudflare, se aparecer,
+  resolve uma vez na janela), lê as linhas (título, autor, tema, tags, curtidas, forma de onda → onde está o som),
+  pega o .mp3 (no JSON da página `__BOOTSTRAP_URL__` ou clicando no ▶ e capturando a request do `cdn.pixabay.com`),
+  baixa, mede, corta o silêncio das pontas (`_cortado.m4a`), faz o espectrograma e (com `--ia`, recurso
+  `sons_pixabay`) a ficha: nome, descrição, categoria, usos, tags. Saída: `pixabay_sons/catalogo.json` e
+  `base_sons.json` (no formato de `assets/sons/sons.json`). `--html arquivo.html` só lê uma página salva.
+  A pasta `pixabay_sons/` está no `.gitignore`.
+- **👂 React**: `depois_de_ouvir` — a fala que caía no MEIO de uma frase/verso da transcrição vai pra logo depois
+  dela (`ESCUTA_FOLGA` 0,3 s; não empurra mais que `ESCUTA_MAX` 7 s). Guarda o segundo da IA em `t_ia` e marca
+  `ouviu`; o tempo que você mexer na tabela fica. Vale nos roteiros novos, no palco/prévia/editor dos projetos antigos
+  (`falas_no_tempo`) e o prompt pede pra falar só depois do fim do verso. Caixa “👂 escutam a frase até o fim antes
+  de falar” (`p["escutar"]`, ligada).
+
+### v84_244 — 🎭 React: o som igual à música original · 🎬 camada das imagens de destaque · 🖼 capa que não trava
+- **Som**: job de react (`job["react"]`) monta com `cfg["audio_original"]` — sem sons automáticos (transição/cena/
+  destaque/editorial), e os efeitos que VOCÊ pôs entram com `dp_sons.mixar(..., preservar=True)` (a música na taxa dela,
+  sem `alimiter`). Mux em AAC 320k. `extrair_audio` não reamostra mais (taxa original). O passe final de qualidade
+  (`qualidade_export`) copia o áudio em vez de recodificar. Vale pro projeto que já estava no editor (é na exportação).
+- **🎬 Imagens de destaque (tela cheia)** viram camada da 🗂 pilha (logo abaixo da legenda) — 👁 esconde. Na exportação,
+  `R.filtrar_ocultas_editor` tira do vídeo o que está oculto AGORA no palco (e cena/foto com 🖼 desligado), inclusive
+  em jobs antigos (`chave_do_overlay` deduz a camada; os novos guardam `pilha_chave`).
+- **🖼 Capa**: ⟲ ⟳ / régua de giro e ↔ espelhar por peça (`pos[chave].rot/esp`, aplicados no rascunho e no Flow);
+  mexer salva “leve” (`{"leve": true}`, em fila, sem remontar as peças) e a URL das imagens só muda quando o conteúdo
+  muda — acabou o pisca/some/volta e a peça voltando pro tamanho antigo.
+
 ### v84_243 — 🎬 Anime quadro a quadro (cenas curtas de ação — o Flow só DESENHA)
 Aba 🕵️ Modelos de vídeo → 🎬 Anime quadro a quadro (`anime_cine.py`, `anime_cine_rotas.py`, `templates/anime_cine.html`,
 recurso de IA `anime_cine`). SEM vídeo de IA: o Flow só gera imagens e a animação é montada aqui.

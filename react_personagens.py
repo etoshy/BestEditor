@@ -261,6 +261,7 @@ def _completar(p: Dict[str, Any]) -> Dict[str, Any]:
     p.setdefault("checagem", {})
     p.setdefault("cortes", {"inicio": None, "fim": None, "meio": []})
     p.setdefault("destaques", [])
+    p.setdefault("escutar", True)  # 👂 v84_245
     p.setdefault("log", [])
     return p
 
@@ -702,7 +703,14 @@ def aplicar_cortes(pid: str, base: str = _BASE, cortes: Optional[Dict[str, Any]]
             if t is None:
                 sairam += 1
                 continue
-            ficam.append(dict(f, t=t))
+            n = dict(f, t=t)
+            if "t_ia" in f:  # 👂 o segundo da IA anda junto
+                t_ia = mapear(inverso(float(f["t_ia"]), rem_antes), rem)
+                if t_ia is None:
+                    n.pop("t_ia")
+                else:
+                    n["t_ia"] = t_ia
+            ficam.append(n)
         if falas:
             p["roteiro"]["falas"] = ficam
         evs = []
@@ -787,7 +795,8 @@ def extrair_audio(video: str, destino: str, duracao: float = 0) -> str:
     """O áudio do vídeo (o som do react) — sem áudio: silêncio do mesmo tamanho."""
     info = sondar(video)
     if info["tem_audio"]:
-        cmd = ["ffmpeg", "-y", "-v", "error", "-i", video, "-vn", "-ac", "2", "-ar", "44100", "-c:a", "pcm_s16le", destino]
+        # v84_244: na taxa ORIGINAL do vídeo (sem reamostrar) — a música chega igual no editor
+        cmd = ["ffmpeg", "-y", "-v", "error", "-i", video, "-vn", "-ac", "2", "-c:a", "pcm_s16le", destino]
     else:
         dur = duracao or info["duracao"] or 1
         cmd = ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", f"{dur:.3f}",
@@ -1584,7 +1593,8 @@ def sys_roteiro(p: Dict[str, Any]) -> str:
         "- 'texto' = SÓ o que o personagem diz — sem numerar (nada de 'Fala 1:'), sem o nome dele na frente (o balão já "
         "mostra 'Nome:'), sem aspas.\n"
         "- Cada fala: no máximo ~22 palavras (cabe em 2–3 linhas embaixo da TV). 'tempo' = o segundo do vídeo em que a "
-        "fala aparece (número, ex.: 73.5) — logo DEPOIS do que ela comenta.\n"
+        "fala aparece (número, ex.: 73.5) — logo DEPOIS do que ela comenta: o personagem ESCUTA a frase/o verso até o FIM "
+        "(veja o [início–fim] de cada frase na transcrição) e só então fala; nunca no meio de um verso.\n"
         "- 'expressao' = a cara de quem fala naquele momento, de acordo com a personalidade e o que ele está sentindo: "
         f"uma de {', '.join(exprs)}. Varie — não use a mesma o tempo todo. A cara FICA depois da fala até a próxima fala ou "
         "reação dele, então pense no que ele sente nesse intervalo também.\n"
@@ -1972,7 +1982,7 @@ def aplicar_roteiro(p: Dict[str, Any], r: Any, janela: Optional[List[float]] = N
                       "destaque": x.get("destaque") if x.get("destaque") in ("letra", "edicao") else ""})
     if not falas:
         raise ReactErro("Nenhuma fala aproveitável (confira os nomes dos personagens).")
-    falas.sort(key=lambda f: f["t"])
+    falas = depois_de_ouvir(p, falas)  # 👂 só fala depois de ouvir a frase do vídeo até o fim
     eventos = ler_eventos(p, r.get("eventos") or [], dur_video, janela)
     if janela:
         a, b = janela
@@ -2686,6 +2696,50 @@ def gerar_roteiro(pid: str, base: str = _BASE, parte: Optional[int] = None, so_v
                         "de outra IA." + (f" Faltaram: {', '.join(erros)}" if erros else ""))
     return {"feitas": feitas, "erros": erros, "falas": total,
             "msg": f"{feitas} parte(s), {total} fala(s)" + (f" · ⚠ faltaram {', '.join(erros)} — use 🤖 Completar" if erros else "")}
+
+
+ESCUTA_FOLGA = 0.3   # 👂 depois que a frase do vídeo acaba, uma respiração e aí fala
+ESCUTA_MAX = 7.0     # se a frase do vídeo é muito longa, não empurra mais que isso
+
+
+def escutar_ligado(p: Dict[str, Any]) -> bool:
+    return p.get("escutar", True) is not False
+
+
+def depois_de_ouvir(p: Dict[str, Any], falas: List[Dict[str, Any]], forcar: bool = False) -> List[Dict[str, Any]]:
+    """👂 v84_245: o personagem ESCUTA a frase do vídeo até o fim e só então comenta — a fala que caía no meio de uma
+    frase (da letra/da fala do vídeo) vai pra logo depois dela. As que já passaram por aqui ("ouviu") ou que você pôs
+    o tempo à mão ficam como estão (forcar=True refaz)."""
+    if not escutar_ligado(p):  # desligado: volta pro segundo que a IA escolheu (o que você mexeu à mão fica)
+        return sorted([dict(f, t=f["t_ia"]) if "t_ia" in f else dict(f) for f in falas], key=lambda x: float(x["t"]))
+    frases = sorted([(float(e["ini"]), float(e.get("fim") or e["ini"])) for e in p.get("transcricao") or []
+                     if e.get("ini") is not None and e.get("tipo") != "credito" and float(e.get("fim") or 0) > float(e["ini"])])
+    out = []
+    for f in falas:
+        f = dict(f)
+        if f.get("ouviu") and not forcar:
+            out.append(f)
+            continue
+        t0 = float(f.get("t_ia", f["t"])) if forcar else float(f["t"])
+        t = t0
+        for ini, fim in frases:
+            if ini + 0.05 <= t < fim - 0.05:  # caiu no meio da frase
+                if fim + ESCUTA_FOLGA - t <= ESCUTA_MAX:
+                    t = fim + ESCUTA_FOLGA
+                break
+            if ini > t:
+                break
+        if abs(t - t0) > 0.01:
+            f["t_ia"] = round(t0, 2)
+            f["t"] = round(t, 2)
+        f["ouviu"] = True
+        out.append(f)
+    return sorted(out, key=lambda x: float(x["t"]))
+
+
+def falas_no_tempo(p: Dict[str, Any], falas: List[Dict[str, Any]], dur_video: Optional[float] = None) -> List[Dict[str, Any]]:
+    """As falas como vão pro vídeo: 👂 depois de ouvir a frase + uma legenda de cada vez."""
+    return ajustar_falas(depois_de_ouvir(p, falas), dur_video)
 
 
 def ajustar_falas(falas: List[Dict[str, Any]], dur_video: Optional[float] = None) -> List[Dict[str, Any]]:
@@ -4261,6 +4315,8 @@ def pilha(p: Dict[str, Any], lay: Dict[str, Any]) -> Dict[str, Any]:
     else:
         padrao = ([f"sofa{k}" for k in range(len(lay["sofas"]))] + [f"p:{a['cid']}" for a in lay["assentos"]]
                   + ["mesa", "tela", "foto", "legenda"])
+    # 🎬 v84_244: as imagens de destaque em tela cheia (briga/interação/cena) viram camada — dá pra esconder 👁
+    padrao.insert(padrao.index("legenda") if "legenda" in padrao else len(padrao), "cena")
     for c in lay.get("copias") or []:  # a cópia entra logo acima da original
         padrao.insert(padrao.index(c["de"]) + 1 if c["de"] in padrao else len(padrao), c["chave"])
     for o in lay.get("objetos") or []:  # 🍿 o item logo acima da mesa dele (no cinema: logo acima de quem segura)
@@ -4314,7 +4370,7 @@ def pecas_para_editar(p: Dict[str, Any], base: str = _BASE, t: Optional[float] =
     info = sondar(video) if video else {"largura": 16, "altura": 9}
     lay = disposicao(p, base, (info.get("largura") or 16, info.get("altura") or 9))
     pid = p["id"]
-    falas = ajustar_falas((p.get("roteiro") or {}).get("falas") or [], info.get("duracao") or None)
+    falas = falas_no_tempo(p, (p.get("roteiro") or {}).get("falas") or [], info.get("duracao") or None)
     if t is None:
         t = (falas[0]["t"] + 0.5) if falas else 0.0
     linhas = linhas_personagens(p, falas, max(info.get("duracao") or 0, t + 1)) if falas else {}
@@ -4369,6 +4425,8 @@ def pecas_para_editar(p: Dict[str, Any], base: str = _BASE, t: Optional[float] =
         if c:
             fala = {"nome": c["nome"], "texto": ativa["texto"], "cor": c.get("cor") or "#ffd54a"}
     pecas.append(dict(lay["legenda"], chave="legenda", nome="💬 Legenda", z=5, legenda=True, fala=fala))
+    pecas.append({"chave": "cena", "nome": "🎬 Imagens de destaque (tela cheia)", "cx": W / 2, "cy": H / 2, "w": W, "h": H, "z": 6,
+                  "cena_tela": True, "img": None})
     for cp in lay.get("copias") or []:
         src = next((x for x in pecas if x["chave"] == cp["de"]), None)
         if not src:
@@ -4561,6 +4619,7 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
               "anim_in": "nenhuma", "anim_out": "nenhuma", "anim_dur": 0.2, "espelhar": bool(espelhar),
               "boca_path": None, "boca_janelas": [], "manual": True}
         ov.update(extra)
+        ov.setdefault("pilha_chave", grupo_atual[0])
         grupos.setdefault(grupo_atual[0], []).append(ov)
         return ov
 
@@ -4574,7 +4633,7 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
         png(f"rsofa{k}", ("💺 Encostos (primeiro plano)" if s.get("plano") else "💺 Fileira" if layout_de(p) in CINEMA else "🛋 Sofá"),
             copiar(im_s, f"sofa{k}.png"), s["cx"], s["cy"], s["w"], 0, dur, "sofa", espelhar=s.get("espelhar", False))
     # personagens
-    falas = ajustar_falas(falas_proj, dur)
+    falas = falas_no_tempo(p, falas_proj, dur)
     linhas = linhas_personagens(p, falas, dur)
     aus = ausencias(p, dur)  # 🚪 quem saiu da sala some do sofá até voltar
     estilos = estilos_no_lugar(p, base)  # 🎨 desenhado diferente no lugar dele por uns segundos
@@ -4750,12 +4809,7 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
                 n["trilha"] = f"{ov['trilha']}|{cp['id']}"
             grupos.setdefault(cp["chave"], []).append(n)
     pil = pilha(p, lay)
-    ordem = [k for k in pil["ordem"] if k not in pil["ocultas"]]
-    # a cena fica por cima de tudo, menos da legenda (se a legenda é a camada de cima)
-    if ordem and ordem[-1] == "legenda":
-        ordem.insert(len(ordem) - 1, "cena")
-    else:
-        ordem.append("cena")
+    ordem = [k for k in pil["ordem"] if k not in pil["ocultas"]]  # a 🎬 cena também é camada da pilha (v84_244)
     for fila, antes in ((1, "sofa0"), (0, "sofa1")):  # 🚶 quem anda: logo antes das poltronas que o cobrem
         if f"andar{fila}" in grupos:
             ordem.insert(ordem.index(antes) if antes in ordem else len(ordem), f"andar{fila}")
@@ -4770,6 +4824,48 @@ def montar_editor(p: Dict[str, Any], base: str, job_dir: str) -> Dict[str, Any]:
     return {"audio": audio, "duracao": dur, "segmento": seg, "overlays": overlays, "avisos": avisos,
             "falas": [{"start": f["t"], "end": round(f["t"] + f["dur"], 3), "text": f"{nomes[f['cid']]['nome']}: {f['texto']}"}
                       for f in falas if f["cid"] in nomes]}
+
+
+def chave_do_overlay(ov: Dict[str, Any]) -> Optional[str]:
+    """A camada da 🗂 pilha de onde veio a camada do editor (os projetos antigos não guardavam: deduz)."""
+    if ov.get("copia"):
+        return str(ov["copia"])
+    if ov.get("pilha_chave"):
+        return str(ov["pilha_chave"])
+    cam = ov.get("camada")
+    if cam in ("cena", "foto", "legenda", "tela", "mesa"):
+        return cam
+    tr = str(ov.get("trilha") or "")
+    if tr.startswith("p:"):
+        return tr.split("|")[0]
+    if cam == "personagem" and ov.get("cid") and not str(ov.get("nome_personagem") or "").startswith("🚶"):
+        return f"p:{ov['cid']}"
+    if cam == "sofa" and str(ov.get("id") or "").startswith("rsofa"):
+        return "sofa" + str(ov["id"])[5:]
+    return None
+
+
+def filtrar_ocultas_editor(pid: Optional[str], overlays: List[Dict[str, Any]], base: str = _BASE) -> List[Dict[str, Any]]:
+    """🎭 Na hora de exportar: o que está escondido 👁 no palco do react AGORA não vai pro vídeo (vale pro projeto que
+    já estava no editor) — e com o 🖼 imagens de destaque desligado, nem as cenas/fotos."""
+    if not pid:
+        return overlays
+    try:
+        p = carregar(pid, base)
+        pil = pilha(p, disposicao(p, base))
+    except Exception:  # noqa: BLE001
+        return overlays
+    fora = set(pil["ocultas"])
+    if not p.get("imagens_destaque", True):
+        fora |= {"cena", "foto"}
+    if not fora:
+        return overlays
+    out = []
+    for ov in overlays:
+        if ov.get("origem") in ("react", "react_tela") and chave_do_overlay(ov) in fora:
+            continue
+        out.append(ov)
+    return out
 
 
 # ------------------------------------------------------------------ 👁 prévia (uma imagem do react pronto)
@@ -4800,7 +4896,7 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
         tela.alpha_composite(im, (int(cx - w / 2), int(cy - h / 2))) if cx - w / 2 >= 0 and cy - h / 2 >= 0 else \
             _colar_cortando(tela, im, int(cx - w / 2), int(cy - h / 2))
 
-    falas = ajustar_falas((p.get("roteiro") or {}).get("falas") or [], info.get("duracao") or None)
+    falas = falas_no_tempo(p, (p.get("roteiro") or {}).get("falas") or [], info.get("duracao") or None)
     if t is None:
         t = (falas[0]["t"] + 0.5) if falas else 0.0
     ativa = next((f for f in falas if f["t"] <= t < f["t"] + f["dur"]), None)
@@ -4894,10 +4990,6 @@ def previa(p: Dict[str, Any], base: str, destino: str, t: Optional[float] = None
 
     pil = pilha(p, lay)
     ordem = [k for k in pil["ordem"] if k not in pil["ocultas"]]
-    if ordem and ordem[-1] == "legenda":
-        ordem.insert(len(ordem) - 1, "cena")
-    else:
-        ordem.append("cena")
     for fila, antes in ((1, "sofa0"), (0, "sofa1")):
         if any(w_["fila"] == fila for w_ in anda):
             ordem.insert(ordem.index(antes) if antes in ordem else len(ordem), f"andar{fila}")
@@ -5012,6 +5104,8 @@ def para_tela(p: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
     out["partes"] = estado_partes(p)
     out["eventos"] = [dict(e, tem_imagem=bool(arquivo_cena(p, e, base))) for e in eventos(p)]
     out["leitura_estado"] = estado_leitura(p, base)
+    if (p.get("roteiro") or {}).get("falas"):  # 👂 a tabela já mostra o segundo em que cada um fala (depois de ouvir)
+        out["roteiro"] = dict(p["roteiro"], falas=depois_de_ouvir(p, p["roteiro"]["falas"]))
     b = p.get("biblia") or {}
     out["biblia_info"] = {"chars": len(b.get("texto") or ""), "resumo": b.get("resumo") or {},
                           "desatualizado": bool(b.get("resumo_desatualizado"))}
@@ -5280,6 +5374,9 @@ def capa_pecas(p: Dict[str, Any], base: str, cfg: Dict[str, Any]) -> Dict[str, A
                 if o.get(kk) is not None:
                     pc[kk] = int(max(-2000, min(3000, float(o[kk]))))
             pc["ajustada"] = True
+        o = o or {}
+        pc["rot"] = round(max(-180.0, min(180.0, float(o.get("rot") or 0))), 1)  # ⟳ v84_244: girar
+        pc["esp"] = bool(o.get("esp"))  # ↔ espelhar
     padrao = [pc["chave"] for pc in pecas]
     ordem = [k for k in cfg["ordem"] if k in padrao] + [k for k in padrao if k not in cfg["ordem"]]
     pecas.sort(key=lambda pc: ordem.index(pc["chave"]))
@@ -5296,11 +5393,16 @@ def compor_capa_react(p: Dict[str, Any], base: str, cfg: Dict[str, Any], destino
     for x in pc["pecas"]:
         if x["oculta"]:
             continue
+        from PIL import ImageOps
         im = Image.open(x["arq"]).convert("RGBA").resize((max(1, x["w"]), max(1, x["h"])), Image.LANCZOS)
-        if x["x"] >= 0 and x["y"] >= 0:
-            bg.alpha_composite(im, (x["x"], x["y"]))
-        else:
-            _colar_cortando(bg, im, x["x"], x["y"])
+        px, py = x["x"], x["y"]
+        if x.get("esp"):
+            im = ImageOps.mirror(im)
+        if x.get("rot"):  # gira em volta do centro (como na página: graus no sentido do relógio)
+            cx, cy = px + im.width / 2, py + im.height / 2
+            im = im.rotate(-float(x["rot"]), expand=True, resample=Image.BICUBIC)
+            px, py = int(round(cx - im.width / 2)), int(round(cy - im.height / 2))
+        _colar_cortando(bg, im, px, py)
     bg.convert("RGB").save(destino, "JPEG", quality=92)
     return destino
 
