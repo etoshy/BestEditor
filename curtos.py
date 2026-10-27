@@ -228,6 +228,31 @@ def perfis_prontos() -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def garantir_canais_prontos(base: str) -> List[str]:
+    """Os canais de perfil pronto (ex.: Laestro) já existem desde o 1º uso — criados UMA vez (se você apagar, não volta).
+    Devolve os ids criados agora."""
+    marca = os.path.join(raiz(base), "prontos_criados.json")
+    try:
+        feitos = set(_ler_json(marca)) if os.path.isfile(marca) else set()
+    except (OSError, ValueError):
+        feitos = set()
+    novos = []
+    with _TRAVA:
+        for chave, pr in perfis_prontos().items():
+            if chave in feitos:
+                continue
+            c = criar_canal(base, pr.get("nome") or chave, pr.get("idioma") or "")
+            c["perfil"] = aplicar_perfil(c["perfil"], pr.get("perfil") or {})
+            c["perfil_ia"] = True
+            c["perfil_origem"] = chave
+            salvar_canal(base, c)
+            feitos.add(chave)
+            novos.append(c["id"])
+        if novos:
+            _gravar_json(marca, sorted(feitos))
+    return novos
+
+
 def listar_canais(base: str) -> List[Dict[str, Any]]:
     d = os.path.join(raiz(base), "canais")
     out = []

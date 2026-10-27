@@ -470,3 +470,17 @@ def test_reencaixar_bloco_novo():
     assert [x["end"] for x in s] == [3, 4, 6] and s[0]["override_source"] == {"value": "x"}
     assert "override_source" not in s[1] and s[2]["query"] == "b" and sem == [1, 2] and p[0] == {"ok": 1}
     assert CT.mapear_tempo(1.0, [{"bloco": "B1", "start": 0, "end": 2}], [{"bloco": "B1", "start": 0, "end": 4}]) == 2.0
+
+
+def test_laestro_ja_vem_como_canal(cliente, base):
+    _A, cl = cliente
+    html = cl.get("/curtos").get_data(as_text=True)
+    cs = CT.listar_canais(base)
+    assert [c["nome"] for c in cs] == ["Laestro"] and f'<option value="{cs[0]["id"]}">Laestro</option>' in html
+    c = CT.carregar_canal(base, cs[0]["id"])
+    assert c["perfil"]["legenda"]["cor_texto"] == "#F2A81E" and c["perfil_origem"] == "laestro"
+    cl.get("/curtos")
+    assert len(CT.listar_canais(base)) == 1  # não duplica
+    CT.excluir_canal(base, cs[0]["id"])
+    cl.get("/curtos")
+    assert CT.listar_canais(base) == []  # apagou? não volta

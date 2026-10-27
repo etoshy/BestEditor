@@ -179,6 +179,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     # ------------------------------------------------------------------ hub
     @app.route("/curtos", methods=["GET"])
     def curtos_hub():
+        CT.garantir_canais_prontos(base_dir)
         try:
             import anime2d as A
             vozes = A.vozes_disponiveis("xtts")
