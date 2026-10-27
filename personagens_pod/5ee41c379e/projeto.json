@@ -1,0 +1,968 @@
+{
+ "id": "5ee41c379e",
+ "nome": "🎞 Professora (Go senpai EP 2)",
+ "criado": 1792752098.421465,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "personagem": "professora",
+  "nome": "Professora",
+  "anime2d": true,
+  "descricoes_referencias": {
+   "ref_6d5f43ab.png": "a reference picture of Professora",
+   "design_anime_aprovado.png": "the APPROVED anime character design of Professora — follow it exactly (face, hair, outfit, colors)"
+  },
+  "texto_fixo": {
+   "trava": "CHARACTER LOCK: Professora. Appearance: adult woman teacher, straight shoulder-length hair fading from dark brown roots to platinum-blonde tips, thin rectangular silver glasses, stern half-lidded amber eyes, black suit jacket, white shirt and burgundy tie, black trousers. Keep exactly the same face, hairstyle, hair color, eye color, body, outfit and colors in every image (follow the approved design reference).",
+   "estilo": "ART STYLE: 2D anime TV-series style, clean line art, flat cel shading, vibrant colors.",
+   "regras": "ONE single figure, framed as the pose says, seen in a 3/4 view turned to the RIGHT side of the image, the whole figure inside the image with margin. NO furniture, NO chair, NO table, NO desk, NO floor, NO background objects (a sitting pose sits on NOTHING — an invisible seat; the furniture is a separate layer); a small handheld object only if the pose needs it. No panels, on a flat solid chroma-key green background (#00FF00), no shadow on the background. ABSOLUTELY NO TEXT in the image: no letters, no words, no speech balloons, no thought bubbles, no sound-effect onomatopoeia lettering, no captions, no narration boxes, no signs or labels with writing, no watermark. If the reference images contain speech balloons, lettering or sound effects, do NOT copy them."
+  },
+  "fundo": "verde",
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "corpo_inteiro": true,
+  "boca_auto": true,
+  "flow": {
+   "proporcao": "3:4"
+  },
+  "poses": [
+   {
+    "arquivo": "professora_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": true,
+    "descricao_pt": "😐 em pé, neutro",
+    "prompt": "standing, relaxed neutral expression, arms down. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "professora_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "professora_neutro.png"
+   },
+   {
+    "arquivo": "professora_x_adjusting_her_glasses_st.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "adjusting her glasses, stern",
+    "prompt": "adjusting her glasses, stern. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "professora_x_adjusting_her_glasses_st_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "adjusting her glasses, stern — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "professora_x_adjusting_her_glasses_st.png"
+   },
+   {
+    "arquivo": "professora_busto_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🙂 busto 😐 em pé, neutro",
+    "prompt": "BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer in 3/4 turned to the RIGHT. Expression: standing, relaxed neutral expression, arms down."
+   },
+   {
+    "arquivo": "professora_busto_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "professora_busto_neutro.png"
+   },
+   {
+    "arquivo": "professora_andando.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🚶 andando",
+    "prompt": "walking, mid-stride. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "professora_andando_b.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "descricao_pt": "🚶 andando — 2º quadro",
+    "prompt": "walking, the OTHER leg forward (next step of the same walk cycle). Same character, same framing and size as the first frame. FULL BODY from head to feet, feet at the bottom of the figure.",
+    "pose_base": "professora_andando.png"
+   },
+   {
+    "arquivo": "professora_costas.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🔙 de costas",
+    "prompt": "seen from behind, standing. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "professora_costas_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🔙 de costas — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "professora_costas.png"
+   },
+   {
+    "arquivo": "professora_neutro_boca.png",
+    "tipo": "boca",
+    "base": "professora_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_x_adjusting_her_glasses_st_boca.png",
+    "tipo": "boca",
+    "base": "professora_x_adjusting_her_glasses_st.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "adjusting her glasses, stern — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_costas_boca.png",
+    "tipo": "boca",
+    "base": "professora_costas.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🔙 de costas — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "professora_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_x_adjusting_her_glasses_st_pisca_boca.png",
+    "tipo": "boca",
+    "base": "professora_x_adjusting_her_glasses_st_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "adjusting her glasses, stern — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_busto_neutro_boca.png",
+    "tipo": "boca",
+    "base": "professora_busto_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_busto_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "professora_busto_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_andando_boca.png",
+    "tipo": "boca",
+    "base": "professora_andando.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🚶 andando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_andando_b_boca.png",
+    "tipo": "boca",
+    "base": "professora_andando_b.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "🚶 andando — 2º quadro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "professora_costas_pisca_boca.png",
+    "tipo": "boca",
+    "base": "professora_costas_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🔙 de costas — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   }
+  ]
+ },
+ "refs": [
+  "design_anime_aprovado.png",
+  "ref_415ac2c2.png"
+ ],
+ "motor": "flow",
+ "canal": null,
+ "mestre": {
+  "arquivo": "professora_neutro.png",
+  "local": "professora_neutro_v1_d0f2.png",
+  "quando": 1792752402.6750534,
+  "bruto": "professora_neutro_v1_0c7e_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "d628b408a9",
+   "motor": "flow",
+   "arquivos": [
+    "professora_neutro.png"
+   ],
+   "criado": 1792752098.6314886,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fff76be08f",
+   "motor": "flow",
+   "arquivos": [
+    "professora_neutro_boca.png"
+   ],
+   "criado": 1792752402.5499105,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f9ccca57f3",
+   "motor": "flow",
+   "arquivos": [
+    "professora_x_adjusting_her_glasses_st.png"
+   ],
+   "criado": 1792752402.8188512,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "aad2b3b97f",
+   "motor": "flow",
+   "arquivos": [
+    "professora_costas.png"
+   ],
+   "criado": 1792752402.8188562,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "818fb0fcc0",
+   "motor": "flow",
+   "arquivos": [
+    "professora_x_adjusting_her_glasses_st_boca.png"
+   ],
+   "criado": 1792753404.1300898,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5182271825",
+   "motor": "flow",
+   "arquivos": [
+    "professora_costas_boca.png"
+   ],
+   "criado": 1792753426.6151218,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9b67e5f60c",
+   "motor": "flow",
+   "arquivos": [
+    "professora_neutro_pisca.png"
+   ],
+   "criado": 1792766062.7124228,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9dd15c8245",
+   "motor": "flow",
+   "arquivos": [
+    "professora_x_adjusting_her_glasses_st_pisca.png"
+   ],
+   "criado": 1792766062.71243,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9dda094417",
+   "motor": "flow",
+   "arquivos": [
+    "professora_busto_neutro.png"
+   ],
+   "criado": 1792766062.7124324,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "bf4b3bf5a7",
+   "motor": "flow",
+   "arquivos": [
+    "professora_busto_neutro_pisca.png"
+   ],
+   "criado": 1792766062.7124345,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b83a9242c5",
+   "motor": "flow",
+   "arquivos": [
+    "professora_andando.png"
+   ],
+   "criado": 1792766062.7124364,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b4239f4fcb",
+   "motor": "flow",
+   "arquivos": [
+    "professora_andando_b.png"
+   ],
+   "criado": 1792766062.7124386,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c860c3b446",
+   "motor": "flow",
+   "arquivos": [
+    "professora_costas_pisca.png"
+   ],
+   "criado": 1792766062.7124398,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "35a5eb45d5",
+   "motor": "flow",
+   "arquivos": [
+    "professora_neutro_pisca_boca.png"
+   ],
+   "criado": 1792766991.3028982,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6b56331022",
+   "motor": "flow",
+   "arquivos": [
+    "professora_x_adjusting_her_glasses_st_pisca_boca.png"
+   ],
+   "criado": 1792767004.4445992,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "027823df33",
+   "motor": "flow",
+   "arquivos": [
+    "professora_busto_neutro_boca.png"
+   ],
+   "criado": 1792767018.345347,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7d0bcc78c7",
+   "motor": "flow",
+   "arquivos": [
+    "professora_busto_neutro_pisca_boca.png"
+   ],
+   "criado": 1792767027.2254324,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c84e22c92d",
+   "motor": "flow",
+   "arquivos": [
+    "professora_andando_boca.png"
+   ],
+   "criado": 1792767044.398742,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6708513297",
+   "motor": "flow",
+   "arquivos": [
+    "professora_andando_b_boca.png"
+   ],
+   "criado": 1792767057.6355238,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ffca24fb8b",
+   "motor": "flow",
+   "arquivos": [
+    "professora_costas_pisca_boca.png"
+   ],
+   "criado": 1792767063.025703,
+   "final": true,
+   "extra": null
+  }
+ ],
+ "log": [
+  "23/10 07:41:38 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 07:46:41 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:46:42 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 07:46:42 ⭐ mestre: professora_neutro.png",
+  "23/10 07:46:42 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 08:03:23 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 08:03:24 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 08:03:46 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 08:03:46 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:34:22 ✏ JSON trocado: 13 pose(s), 7 nova(s)",
+  "23/10 11:34:22 🚀 7 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:49:50 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:49:51 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:50:04 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:50:04 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:50:17 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:50:18 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:50:26 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:50:27 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:50:44 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:50:44 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:50:57 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:50:57 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:51:02 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:51:03 🚀 1 pose(s) pro Flow com a ⭐ mestre"
+ ],
+ "imagens": {
+  "professora_neutro.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "professora_neutro_v1_d0f2.png",
+     "bruto": "professora_neutro_v1_0c7e_flow.png",
+     "job": "d628b408a9",
+     "motor": "flow",
+     "quando": 1792752401.9646845,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 33,
+      "verde_px": 887502
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d628b408a9",
+   "msg": null
+  },
+  "professora_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_neutro_pisca_v1_0d43.png",
+     "bruto": "professora_neutro_pisca_v1_6fcb_flow.png",
+     "job": "9b67e5f60c",
+     "motor": "flow",
+     "quando": 1792766990.8500302,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 14,
+      "verde_px": 887784
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9b67e5f60c",
+   "msg": null
+  },
+  "professora_x_adjusting_her_glasses_st.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_x_adjusting_her_glasses_st_v1_4231.png",
+     "bruto": "professora_x_adjusting_her_glasses_st_v1_4587_flow.png",
+     "job": "f9ccca57f3",
+     "motor": "flow",
+     "quando": 1792753403.837848,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 14,
+      "verde_px": 878266
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f9ccca57f3",
+   "msg": null
+  },
+  "professora_x_adjusting_her_glasses_st_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_x_adjusting_her_glasses_st_pisca_v1_02bf.png",
+     "bruto": "professora_x_adjusting_her_glasses_st_pisca_v1_01f4_flow.png",
+     "job": "9dd15c8245",
+     "motor": "flow",
+     "quando": 1792767003.9952362,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 27,
+      "verde_px": 887703
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9dd15c8245",
+   "msg": null
+  },
+  "professora_busto_neutro.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_busto_neutro_v1_0fd4.png",
+     "bruto": "professora_busto_neutro_v1_4b84_flow.png",
+     "job": "9dda094417",
+     "motor": "flow",
+     "quando": 1792767017.9556305,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 19,
+      "verde_px": 587050
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9dda094417",
+   "msg": null
+  },
+  "professora_busto_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_busto_neutro_pisca_v1_b221.png",
+     "bruto": "professora_busto_neutro_pisca_v1_a58a_flow.png",
+     "job": "bf4b3bf5a7",
+     "motor": "flow",
+     "quando": 1792767026.872219,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 19,
+      "verde_px": 887797
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "bf4b3bf5a7",
+   "msg": null
+  },
+  "professora_andando.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_andando_v1_45d8.png",
+     "bruto": "professora_andando_v1_caed_flow.png",
+     "job": "b83a9242c5",
+     "motor": "flow",
+     "quando": 1792767044.1039972,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 27,
+      "verde_px": 874473
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b83a9242c5",
+   "msg": null
+  },
+  "professora_andando_b.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_andando_b_v1_0034.png",
+     "bruto": "professora_andando_b_v1_ef7d_flow.png",
+     "job": "b4239f4fcb",
+     "motor": "flow",
+     "quando": 1792767057.2710016,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 18,
+      "verde_px": 876216
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b4239f4fcb",
+   "msg": null
+  },
+  "professora_costas.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_costas_v1_544f.png",
+     "bruto": "professora_costas_v1_cd20_flow.png",
+     "job": "aad2b3b97f",
+     "motor": "flow",
+     "quando": 1792753426.347031,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 6,
+      "verde_px": 887169
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "aad2b3b97f",
+   "msg": null
+  },
+  "professora_costas_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_costas_pisca_v1_d2a6.png",
+     "bruto": "professora_costas_pisca_v1_e9d5_flow.png",
+     "job": "c860c3b446",
+     "motor": "flow",
+     "quando": 1792767062.7229917,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 20,
+      "verde_px": 887849
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c860c3b446",
+   "msg": null
+  },
+  "professora_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_neutro_boca_v1_7ac6.png",
+     "bruto": "professora_neutro_boca_v1_6e26_flow.png",
+     "job": "fff76be08f",
+     "motor": "flow",
+     "quando": 1792753367.041345,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 14,
+      "verde_px": 887806
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "fff76be08f",
+   "msg": null
+  },
+  "professora_x_adjusting_her_glasses_st_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_x_adjusting_her_glasses_st_boca_v1_b034.png",
+     "bruto": "professora_x_adjusting_her_glasses_st_boca_v1_4a74_flow.png",
+     "job": "818fb0fcc0",
+     "motor": "flow",
+     "quando": 1792753927.307365,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 7,
+      "furos_fechados": 12,
+      "verde_px": 878540
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "818fb0fcc0",
+   "msg": null
+  },
+  "professora_costas_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_costas_boca_v1_51c3.png",
+     "bruto": "professora_costas_boca_v1_ab62_flow.png",
+     "job": "5182271825",
+     "motor": "flow",
+     "quando": 1792753939.823151,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 887122
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5182271825",
+   "msg": null
+  },
+  "professora_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_neutro_pisca_boca_v1_6691.png",
+     "bruto": "professora_neutro_pisca_boca_v1_c68d_flow.png",
+     "job": "35a5eb45d5",
+     "motor": "flow",
+     "quando": 1792768308.7122905,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 8,
+      "furos_fechados": 16,
+      "verde_px": 888101
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "35a5eb45d5",
+   "msg": null
+  },
+  "professora_x_adjusting_her_glasses_st_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_x_adjusting_her_glasses_st_pisca_boca_v1_72c0.png",
+     "bruto": "professora_x_adjusting_her_glasses_st_pisca_boca_v1_9d00_flow.png",
+     "job": "6b56331022",
+     "motor": "flow",
+     "quando": 1792768346.1227083,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 8,
+      "furos_fechados": 34,
+      "verde_px": 887949
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6b56331022",
+   "msg": null
+  },
+  "professora_busto_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_busto_neutro_boca_v1_afc1.png",
+     "bruto": "professora_busto_neutro_boca_v1_26d6_flow.png",
+     "job": "027823df33",
+     "motor": "flow",
+     "quando": 1792768354.985661,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 6,
+      "furos_fechados": 52,
+      "verde_px": 587235
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "027823df33",
+   "msg": null
+  },
+  "professora_busto_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_busto_neutro_pisca_boca_v1_a322.png",
+     "bruto": "professora_busto_neutro_pisca_boca_v1_8068_flow.png",
+     "job": "7d0bcc78c7",
+     "motor": "flow",
+     "quando": 1792768387.9643888,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 11,
+      "furos_fechados": 19,
+      "verde_px": 888107
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7d0bcc78c7",
+   "msg": null
+  },
+  "professora_andando_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_andando_boca_v1_e720.png",
+     "bruto": "professora_andando_boca_v1_167e_flow.png",
+     "job": "c84e22c92d",
+     "motor": "flow",
+     "quando": 1792768393.19004,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 1,
+      "verde_px": 874699
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c84e22c92d",
+   "msg": null
+  },
+  "professora_andando_b_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_andando_b_boca_v1_54a4.png",
+     "bruto": "professora_andando_b_boca_v1_2cc6_flow.png",
+     "job": "6708513297",
+     "motor": "flow",
+     "quando": 1792768428.8098319,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 876589
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6708513297",
+   "msg": null
+  },
+  "professora_costas_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "professora_costas_pisca_boca_v1_eac9.png",
+     "bruto": "professora_costas_pisca_boca_v1_ff00_flow.png",
+     "job": "ffca24fb8b",
+     "motor": "flow",
+     "quando": 1792768437.2932363,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 17,
+      "furos_fechados": 41,
+      "verde_px": 888055
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ffca24fb8b",
+   "msg": null
+  }
+ },
+ "atualizado": 1792768437.3930485
+}

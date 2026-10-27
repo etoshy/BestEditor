@@ -1,0 +1,827 @@
+{
+ "id": "12132452de",
+ "nome": "🎭 Yuji Itadori (react)",
+ "criado": 1792694945.218625,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "personagem": "yuji_itadori",
+  "nome": "Yuji Itadori",
+  "react": true,
+  "descricoes_referencias": {
+   "c2f6f08_3d6f70.png": "a reference picture of Yuji Itadori from Jujutsu Kaisen"
+  },
+  "texto_fixo": {
+   "trava": "CHARACTER LOCK: Yuji Itadori from Jujutsu Kaisen. Appearance: Young boy with pink spiky hair, black high-collar school uniform, energetic expression, sometimes with a shocked face.. Keep exactly the same face, hairstyle, eye color, outfit and colors in every image.",
+   "estilo": "ART STYLE: 2D anime / cartoon illustration style like a Gacha Life reaction video, clean line art, flat cel shading, vibrant colors.",
+   "regras": "Framing: the character is SITTING on an invisible seat as if on a couch, seen from the front (the pose says to which side the body is turned); head, both arms, torso and the thighs/knees visible, cropped around the knees at the bottom edge; whole head and hair inside the image with margin. Do NOT draw the couch, chair, table, TV or any other object. ONE single figure, no text, no panels, on a flat solid chroma-key green background (#00FF00), no shadow on the background."
+  },
+  "fundo": "verde",
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "boca_auto": true,
+  "flow": {
+   "proporcao": "3:4"
+  },
+  "poses": [
+   {
+    "arquivo": "yuji_itadori_neutro_esq.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": true,
+    "descricao_pt": "sentado — 😐 Neutro · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, calm neutral expression, relaxed, attentively watching."
+   },
+   {
+    "arquivo": "yuji_itadori_feliz_esq.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 😄 Feliz / rindo · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, big happy smile, laughing, eyes squinting with joy."
+   },
+   {
+    "arquivo": "yuji_itadori_chocado_esq.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 😱 Chocado · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, shocked, eyes wide open, jaw dropped, leaning slightly back."
+   },
+   {
+    "arquivo": "yuji_itadori_bravo_esq.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 😠 Bravo · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, angry, furrowed brows, gritted teeth, clenched fist."
+   },
+   {
+    "arquivo": "yuji_itadori_pensativo_esq.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 🤔 Pensativo / desconfiado · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, thinking, skeptical, one eyebrow raised, hand on chin."
+   },
+   {
+    "arquivo": "yuji_itadori_empolgado_esq.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 🤩 Empolgado / hypado · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, hyped and excited, sparkling eyes, both fists raised."
+   },
+   {
+    "arquivo": "yuji_itadori_debochado_esq.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 😏 Debochado · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, smug sarcastic smirk, half-closed eyes, arms crossed."
+   },
+   {
+    "arquivo": "yuji_itadori_triste_esq.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "lado": "esq",
+    "mestre": false,
+    "descricao_pt": "sentado — 😢 Triste / emocionado · ← olhando pra esquerda",
+    "prompt": "sitting, body and face turned three-quarters toward the viewer's LEFT, as if watching a TV on that side, sad and emotional, teary eyes, frowning mouth."
+   },
+   {
+    "arquivo": "yuji_itadori_neutro_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_neutro_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "sentado — 😐 Neutro · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_feliz_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_feliz_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "sentado — 😄 Feliz / rindo · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_chocado_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_chocado_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "sentado — 😱 Chocado · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_pensativo_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_pensativo_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "sentado — 🤔 Pensativo / desconfiado · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_debochado_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_debochado_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "sentado — 😏 Debochado · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_triste_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_triste_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "sentado — 😢 Triste / emocionado · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_bravo_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_bravo_esq.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "esq",
+    "descricao_pt": "sentado — 😠 Bravo · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "yuji_itadori_empolgado_esq_boca.png",
+    "tipo": "boca",
+    "base": "yuji_itadori_empolgado_esq.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "esq",
+    "descricao_pt": "sentado — 🤩 Empolgado / hypado · ← olhando pra esquerda — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   }
+  ]
+ },
+ "refs": [
+  "c2f6f08_3d6f70.png"
+ ],
+ "motor": "flow",
+ "canal": null,
+ "mestre": {
+  "arquivo": "yuji_itadori_neutro_esq.png",
+  "local": "yuji_itadori_neutro_esq_v1_167d.png",
+  "quando": 1792695017.591657,
+  "bruto": "yuji_itadori_neutro_esq_v1_70de_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "38c6ac224b",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_neutro_esq.png"
+   ],
+   "criado": 1792694945.4688833,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1c1010a850",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_neutro_esq_boca.png"
+   ],
+   "criado": 1792695017.5848334,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6c4a8bdd5f",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_feliz_esq.png"
+   ],
+   "criado": 1792695017.7057211,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d09ce30154",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_chocado_esq.png"
+   ],
+   "criado": 1792695017.7057276,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "cc22fa40f0",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_bravo_esq.png"
+   ],
+   "criado": 1792695017.70573,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f8a1c25ede",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_pensativo_esq.png"
+   ],
+   "criado": 1792695017.705732,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c3ec476c60",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_empolgado_esq.png"
+   ],
+   "criado": 1792695017.7057402,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "785b12815a",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_debochado_esq.png"
+   ],
+   "criado": 1792695017.7057421,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "16e2bb723a",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_triste_esq.png"
+   ],
+   "criado": 1792695017.7057433,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0325f59293",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_feliz_esq_boca.png"
+   ],
+   "criado": 1792695384.3606133,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "777dc8ef2b",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_bravo_esq.png"
+   ],
+   "criado": 1792695411.2740767,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "ed8cdb44a2",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_chocado_esq_boca.png"
+   ],
+   "criado": 1792695430.6641705,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "17ed5b95fd",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_pensativo_esq_boca.png"
+   ],
+   "criado": 1792695489.6503136,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "799f1e6da6",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_debochado_esq_boca.png"
+   ],
+   "criado": 1792695509.0181308,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "df11845ed0",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_triste_esq_boca.png"
+   ],
+   "criado": 1792695568.2607698,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "efb84f4bba",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_bravo_esq_boca.png"
+   ],
+   "criado": 1792695988.3844833,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fe4839508e",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_empolgado_esq.png"
+   ],
+   "criado": 1792697157.852941,
+   "final": true,
+   "extra": "não foi gerado"
+  },
+  {
+   "id": "0a17166f1b",
+   "motor": "flow",
+   "arquivos": [
+    "yuji_itadori_empolgado_esq_boca.png"
+   ],
+   "criado": 1792697382.9201946,
+   "final": true,
+   "extra": null
+  }
+ ],
+ "log": [
+  "22/10 15:49:05 🚀 1 pose(s) pro Flow (sem mestre)",
+  "22/10 15:50:17 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 15:50:17 🚀 1 pose(s) pro Flow (sem mestre)",
+  "22/10 15:50:17 ⭐ mestre: yuji_itadori_neutro_esq.png",
+  "22/10 15:50:17 🚀 7 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 15:56:24 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 15:56:24 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 15:56:51 ✂ yuji_itadori_bravo_esq.png: veio com defeito (a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG) — refazendo 1x",
+  "22/10 15:57:10 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 15:57:10 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 15:58:09 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 15:58:09 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 15:58:28 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 15:58:29 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 15:59:28 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 15:59:28 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 16:06:28 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 16:06:28 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 16:25:57 🚀 1 pose(s) pro Flow com a ⭐ mestre · correção: não foi gerado",
+  "22/10 16:29:42 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 16:29:42 🚀 1 pose(s) pro Flow com a ⭐ mestre"
+ ],
+ "imagens": {
+  "yuji_itadori_neutro_esq.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "yuji_itadori_neutro_esq_v1_167d.png",
+     "bruto": "yuji_itadori_neutro_esq_v1_70de_flow.png",
+     "job": "38c6ac224b",
+     "motor": "flow",
+     "quando": 1792695017.1423552,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 586537
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "38c6ac224b",
+   "msg": null
+  },
+  "yuji_itadori_feliz_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_feliz_esq_v1_b4b2.png",
+     "bruto": "yuji_itadori_feliz_esq_v1_15ac_flow.png",
+     "job": "6c4a8bdd5f",
+     "motor": "flow",
+     "quando": 1792695383.9915986,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 586925
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6c4a8bdd5f",
+   "msg": null
+  },
+  "yuji_itadori_chocado_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_chocado_esq_v1_1c5e.png",
+     "bruto": "yuji_itadori_chocado_esq_v1_95ab_flow.png",
+     "job": "d09ce30154",
+     "motor": "flow",
+     "quando": 1792695430.3942406,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 574687
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d09ce30154",
+   "msg": null
+  },
+  "yuji_itadori_bravo_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_bravo_esq_v1_d40d.png",
+     "bruto": "yuji_itadori_bravo_esq_v1_6f52_flow.png",
+     "job": "cc22fa40f0",
+     "motor": "flow",
+     "quando": 1792695411.270671,
+     "aviso": "a personagem saiu cortada na borda (direita) — refaça (fica um corte reto no PNG)",
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 534470
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "yuji_itadori_bravo_esq_v2_2b1d.png",
+     "bruto": "yuji_itadori_bravo_esq_v2_d2ca_flow.png",
+     "job": "777dc8ef2b",
+     "motor": "flow",
+     "quando": 1792695987.9900475,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 588007
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "777dc8ef2b",
+   "msg": null
+  },
+  "yuji_itadori_pensativo_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_pensativo_esq_v1_64a9.png",
+     "bruto": "yuji_itadori_pensativo_esq_v1_c02d_flow.png",
+     "job": "f8a1c25ede",
+     "motor": "flow",
+     "quando": 1792695489.1589403,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 590122
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f8a1c25ede",
+   "msg": null
+  },
+  "yuji_itadori_empolgado_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_empolgado_esq_v1_870c.png",
+     "bruto": "yuji_itadori_empolgado_esq_v1_33df_flow.png",
+     "job": "fe4839508e",
+     "motor": "flow",
+     "quando": 1792697382.699471,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 569548
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "fe4839508e",
+   "msg": null
+  },
+  "yuji_itadori_debochado_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_debochado_esq_v1_a319.png",
+     "bruto": "yuji_itadori_debochado_esq_v1_cf6d_flow.png",
+     "job": "785b12815a",
+     "motor": "flow",
+     "quando": 1792695508.7318666,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 593359
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "785b12815a",
+   "msg": null
+  },
+  "yuji_itadori_triste_esq.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_triste_esq_v1_aab3.png",
+     "bruto": "yuji_itadori_triste_esq_v1_fb1b_flow.png",
+     "job": "16e2bb723a",
+     "motor": "flow",
+     "quando": 1792695568.0333223,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 586691
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "16e2bb723a",
+   "msg": null
+  },
+  "yuji_itadori_neutro_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_neutro_esq_boca_v1_bc85.png",
+     "bruto": "yuji_itadori_neutro_esq_boca_v1_8fe6_flow.png",
+     "job": "1c1010a850",
+     "motor": "flow",
+     "quando": 1792695343.0727308,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 586883
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "1c1010a850",
+   "msg": null
+  },
+  "yuji_itadori_feliz_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_feliz_esq_boca_v1_06c1.png",
+     "bruto": "yuji_itadori_feliz_esq_boca_v1_cb4f_flow.png",
+     "job": "0325f59293",
+     "motor": "flow",
+     "quando": 1792695962.3105588,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 28,
+      "verde_px": 587108
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0325f59293",
+   "msg": null
+  },
+  "yuji_itadori_chocado_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_chocado_esq_boca_v1_eb67.png",
+     "bruto": "yuji_itadori_chocado_esq_boca_v1_0ee1_flow.png",
+     "job": "ed8cdb44a2",
+     "motor": "flow",
+     "quando": 1792696006.089101,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 29,
+      "verde_px": 574782
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ed8cdb44a2",
+   "msg": null
+  },
+  "yuji_itadori_pensativo_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_pensativo_esq_boca_v1_2129.png",
+     "bruto": "yuji_itadori_pensativo_esq_boca_v1_b2b3_flow.png",
+     "job": "17ed5b95fd",
+     "motor": "flow",
+     "quando": 1792696032.5275502,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 47,
+      "verde_px": 590156
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "17ed5b95fd",
+   "msg": null
+  },
+  "yuji_itadori_debochado_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_debochado_esq_boca_v1_9dab.png",
+     "bruto": "yuji_itadori_debochado_esq_boca_v1_b493_flow.png",
+     "job": "799f1e6da6",
+     "motor": "flow",
+     "quando": 1792696041.2304254,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 593609
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "799f1e6da6",
+   "msg": null
+  },
+  "yuji_itadori_triste_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_triste_esq_boca_v1_ef0a.png",
+     "bruto": "yuji_itadori_triste_esq_boca_v1_f578_flow.png",
+     "job": "df11845ed0",
+     "motor": "flow",
+     "quando": 1792696075.0134363,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 3,
+      "verde_px": 586982
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "df11845ed0",
+   "msg": null
+  },
+  "yuji_itadori_bravo_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_bravo_esq_boca_v1_9141.png",
+     "bruto": "yuji_itadori_bravo_esq_boca_v1_a2a7_flow.png",
+     "job": "efb84f4bba",
+     "motor": "flow",
+     "quando": 1792696246.1825762,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 12,
+      "verde_px": 588256
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "efb84f4bba",
+   "msg": null
+  },
+  "yuji_itadori_empolgado_esq_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "yuji_itadori_empolgado_esq_boca_v1_246e.png",
+     "bruto": "yuji_itadori_empolgado_esq_boca_v1_d2a5_flow.png",
+     "job": "0a17166f1b",
+     "motor": "flow",
+     "quando": 1792697448.1116126,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 570060
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0a17166f1b",
+   "msg": null
+  }
+ },
+ "atualizado": 1792697448.124985
+}

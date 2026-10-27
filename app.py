@@ -5594,7 +5594,8 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                             # 🧍 v84_185: personagem do canal — lado, entrada/saída e a boca
                             **(__import__("personagens_editor").para_render(ov) if ov.get("origem") in ("personagem", "react") else
                                # 🎭 v84_236: camada posicionada pelo CENTRO (o vídeo na TV do react) — igual ao monitor
-                               {"x_percent": ov.get("x_percent", 80), "y_percent": ov.get("y_percent", 20), "ancora": "centro"}
+                               {"x_percent": ov.get("x_percent", 80), "y_percent": ov.get("y_percent", 20), "ancora": "centro",
+                                "espelhar": bool(ov.get("espelhar"))}
                                if ov.get("ancora") == "centro" else {}),
                         })
                     except VideoAssemblyError as exc:
@@ -11844,6 +11845,16 @@ def _react_criar_job(job_id: str, job: Dict[str, Any]) -> None:
 _flow_correcoes.registrar(app, BASE_DIR)  # 🩹 aba Flow → Corrigir (v84_236)
 import react_rotas as _react_rotas  # noqa: E402  🎭 React de personagens (aba Modelos de vídeo, v84_236)
 _react_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir)
+import anime2d_rotas as _anime2d_rotas  # noqa: E402  🎞 Animação 2D (aba Modelos de vídeo, v84_237)
+_anime2d_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir, tts_gerar_audio_isolado,
+                         lambda t, m: na.limpar_texto_para_tts(t, motor=m))
+import anime_cine_rotas as _anime_cine_rotas  # noqa: E402  🎬 Anime quadro a quadro (aba Modelos de vídeo, v84_243)
+_anime_cine_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir, tts_gerar_audio_isolado,
+                            lambda t, m: na.limpar_texto_para_tts(t, motor=m))
+import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
+_remover_fundo.registrar(app)
+import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)
+_criador_rotas.registrar(app, BASE_DIR)
 import personagens_editor as _pers_ed  # noqa: E402  🧍 as personagens do canal por cima do vídeo, quando falam (v84_185)
 _pers_ed.registrar(app, _JOBS.get, _save_state, _job_dir, _palavras_da_narracao, BASE_DIR)
 

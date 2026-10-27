@@ -153,7 +153,8 @@ def test_disposicoes_sem_personagem_atras_da_tv(base):
         assert len(d["assentos"]) == 4
         for a in d["assentos"]:  # o rosto (meio da PNG) nunca fica dentro da tela da TV
             assert not (tl["cx"] - tl["w"] / 2 < a["cx"] < tl["cx"] + tl["w"] / 2 and a["cy"] - a["h"] / 4 < tl["cy"] + tl["h"] / 2)
-        assert d["legenda"]["topo"] > tl["cy"] + tl["h"] / 2
+        if lay != "cinema_frente":  # 🎬 de frente: a legenda fica em cima, do lado do quadro do filme
+            assert d["legenda"]["topo"] > tl["cy"] + tl["h"] / 2
     p["layout"] = "dois_sofas"
     d = R.disposicao(p, base, (720, 1280))  # vídeo em pé: a TV fica mais estreita
     assert d["tela"]["h"] <= 0.46 * R.H + 1 and len(d["sofas"]) == 2 and d["assentos"][-1]["espelhar"]
@@ -983,13 +984,31 @@ def test_thumbnail_do_react_vira_capa_da_publicacao(base, tmp_path, monkeypatch)
         html = c.get(f"/react-personagens/{pid}").get_data(as_text=True)
         assert "🖼 Thumbnail e publicação" in html and f"/publicacoes/{pid}/api" in html
         cids = [x["id"] for x in p["personagens"]]
-        r = c.get(f"/react-personagens/{pid}/capa/previa.jpg?cids={cids[0]},{cids[1]}&t=3&lado=direita&seta=1")
+        e = c.post(f"/react-personagens/{pid}/capa/estado", json={"cids": cids, "t": 3, "lado": "direita", "seta": True}).get_json()
+        chaves = [x["chave"] for x in e["pecas"]]
+        assert chaves[0] == "quadro" and chaves[-1] == "seta" and chaves[-2] == f"p:{cids[0]}"  # o 1º na frente dos outros
+        figs = {x["chave"]: x for x in e["pecas"] if x["chave"].startswith("p:")}
+        # lado a lado: cada um cobre no máximo ~30% do vizinho
+        a, b = figs[f"p:{cids[0]}"], figs[f"p:{cids[1]}"]
+        sobre = max(0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+        assert sobre <= 0.32 * min(a["w"], b["w"])
+        assert c.get(e["pecas"][0]["img"]).status_code == 200
+        # 📤 uma imagem sua (PNG transparente entra recortado) e mexer nela
+        e = c.post(f"/react-personagens/{pid}/capa/imagem", data={"arquivo": (io.BytesIO(_png((0, 200, 0))), "x.png")},
+                   content_type="multipart/form-data").get_json()
+        assert "imagem" in [x["chave"] for x in e["pecas"]]
+        e = c.post(f"/react-personagens/{pid}/capa/estado", json={"pos": {"imagem": {"x": 50, "y": 40, "w": 300}}}).get_json()
+        im_p = next(x for x in e["pecas"] if x["chave"] == "imagem")
+        assert (im_p["x"], im_p["y"], im_p["w"]) == (50, 40, 300) and im_p["ajustada"]
+        e = c.post(f"/react-personagens/{pid}/capa/estado", json={"quadro_off": True}).get_json()
+        assert "quadro" not in [x["chave"] for x in e["pecas"]] and e["cfg"]["quadro_off"]
+        e = c.post(f"/react-personagens/{pid}/capa/estado", json={"quadro_off": False, "ocultas": ["seta"]}).get_json()
+        assert next(x for x in e["pecas"] if x["chave"] == "seta")["oculta"]
+        r = c.get(f"/react-personagens/{pid}/capa/previa.jpg")
         assert r.status_code == 200
         im = Image.open(io.BytesIO(r.data))
         assert im.size == (1280, 720)
-        # o quadro do vídeo (testsrc colorido) do lado direito; os personagens do esquerdo (o laranja do Ichigo)
-        dr = im.convert("RGB")
-        assert any(dr.getpixel((x, 600))[0] > 200 and dr.getpixel((x, 600))[2] < 80 for x in range(0, 600, 4))
+        assert im.convert("RGB").getpixel((200, 190))[1] > 150  # a imagem enviada (verde) onde você pôs
         d = c.post(f"/react-personagens/{pid}/capa", json={"cids": cids[:2], "exprs": {cids[0]: "chocado"}, "t": 3, "lado": "direita",
                                                           "texto": "ELES SURTARAM"}).get_json()
         assert d["ok"] and d["n"] == 1
@@ -1017,7 +1036,419 @@ def test_thumbnail_do_react_vira_capa_da_publicacao(base, tmp_path, monkeypatch)
                                                           "pedido": "raios atrás"}).get_json()
         assert d["ok"] and "REACTION" in visto["it"]["prompt"] and "raios atrás" in visto["it"]["prompt"]
         assert os.path.isfile(visto["it"]["referencia_arquivo"])
+        assert c.post(f"/react-personagens/{pid}/capa/imagem", json={"apagar": True}).get_json()["ok"]
         assert not c.post(f"/react-personagens/{pid}/capa", json={"cids": []}).get_json()["ok"]
     finally:
         import shutil
         shutil.rmtree(os.path.join(A.BASE_DIR, PB.RAIZ), ignore_errors=True)
+
+
+def test_biblia_da_obra_e_do_personagem_guiam_a_ia(base, monkeypatch):
+    """📖 Obra pouco conhecida: o material colado (episódios do ANN, personalidade de cada um) vira a FONTE PRINCIPAL
+    das sugestões, fichas, roteiro, verificador e leitura do vídeo — e a IA pode organizar e completar as fichas."""
+    import app as A
+    import ia_servico
+    c = A.app.test_client()
+    pid = c.post("/react-personagens/novo", data={"titulo": "Dark Summoner OP", "transcricao": "0:01 a\n0:30 b"},
+                 content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    for nome in ("Amona", "Roni"):
+        c.post(f"/react-personagens/{pid}/personagem", json={"nome": nome})
+    texto = ("Amona is a demi-human dark summoner who joins the party of the righteous cleric Roni. Episode 1: they bicker "
+             "and end up together at the inn. Episode 2: trapped in a dungeon room; Imp offers help. Eury is the sane one.")
+    assert c.post(f"/react-personagens/{pid}/dados", json={"biblia": texto}).get_json()["ok"]
+    p = R.carregar(pid)
+    roni = R.achar_por_nome(p, "Roni")["id"]
+    assert c.post(f"/react-personagens/{pid}/personagem/{roni}", json={"biblia": "certinho e religioso; fica vermelho e nega tudo"}).get_json()["ok"]
+    p = R.carregar(pid)
+    pr = R.prompt_roteiro_parte(p, 0)
+    assert "📖 BÍBLIA DA OBRA" in pr and "righteous cleric" in pr and "fica vermelho e nega tudo" in pr
+    assert "BÍBLIA" in R.sys_roteiro(p)
+    assert "righteous cleric" in R.prompt_sugestoes(p) and "righteous cleric" in R.prompt_fichas(p, [roni])
+    assert "Bíblia" in R.prompt_checagem(p, "fichas") and "fica vermelho" in R.prompt_checagem(p, "fichas")
+    # o estado não carrega o texto inteiro a cada atualização; a página mostra
+    e = c.get(f"/react-personagens/{pid}/estado").get_json()
+    assert "biblia" not in e and e["biblia_info"]["chars"] == len(texto)
+    assert "righteous cleric" in c.get(f"/react-personagens/{pid}").get_data(as_text=True)
+    # 🤖 organizar: episódios, personagens, e as fichas vazias se completam
+    def falsa(recurso, system, conteudo, **kw):
+        assert "BÍBLIA" in system
+        return {"obra": "I'm Dating a Dark Summoner", "sinopse": "s", "tom": "comédia romântica adulta",
+                "episodios": [{"ep": "1", "o_que_acontece": "brigam e acabam juntos"}],
+                "personagens": [{"nome": "Amona", "quem_e": "invocadora sombria", "personalidade": "sarcástica e provocadora",
+                                 "jeito_de_falar": "debochada", "relacoes": "briga e se envolve com Roni"},
+                                {"nome": "Roni", "quem_e": "clérigo", "personalidade": "certinho", "jeito_de_falar": "formal",
+                                 "relacoes": "Amona"}],
+                "piadas_recorrentes": ["o Imp fala tudo errado"]}
+    monkeypatch.setattr(ia_servico, "chamar", falsa)
+    r = R.resumir_biblia(pid)
+    assert r["fichas"] == 2
+    p = R.carregar(pid)
+    amona = R.achar_por_nome(p, "Amona")
+    assert amona["personalidade"] == "sarcástica e provocadora" and p["obra"] == "I'm Dating a Dark Summoner"
+    assert "o Imp fala tudo errado" in R.biblia_bloco(p)
+    # mudou o texto depois de organizar: avisa
+    c.post(f"/react-personagens/{pid}/dados", json={"biblia": texto + " Episode 3: more."})
+    assert c.get(f"/react-personagens/{pid}/estado").get_json()["biblia_info"]["desatualizado"]
+    r = c.post(f"/react-personagens/{pid}/biblia/arquivo", data={"arquivo": (io.BytesIO("Episódio 4: praia.".encode()), "b.txt")},
+               content_type="multipart/form-data").get_json()
+    assert r["ok"] and r["texto"].endswith("Episódio 4: praia.")
+
+
+def test_itens_da_mesa_mesa_por_sofa_mapa_e_poderes(base, tmp_path, monkeypatch):
+    """🍿 v84_238i: itens da mesa (camadas em cima da mesa escolhida), uma mesa por sofá nos dois sofás, o mapa da sala
+    e os ⚡ poderes no roteiro e nas imagens; a imagem da briga leva o QUADRO ATUAL do react como referência."""
+    import app as A
+    import flow_lote
+    import react_objetos as RO
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 10)
+    with open(video, "rb") as f:
+        pid = c.post("/react-personagens/novo", data={"titulo": "Mesa", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                     content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    for n in ("Tatsumaki", "Luffy", "Saitama", "Genos"):
+        c.post(f"/react-personagens/{pid}/personagem", json={"nome": n})
+    p = R.carregar(pid)
+    tats, luffy = p["personagens"][0], p["personagens"][1]
+    tats.update(poderes="telecinese", poderes_en="psychic telekinesis with a green glow, levitates objects")
+    luffy.update(poderes="corpo de borracha", poderes_en="rubber body, stretches his arms across the room, toon face")
+    p["layout"] = "dois_sofas"
+    for x in p["personagens"]:
+        R.guardar_ref(p, x, _png(), "a.png")
+    p["roteiro"]["falas"] = [{"id": "f1", "t": 1.0, "dur": 2.0, "cid": tats["id"], "texto": "Oi!", "expressao": "feliz", "reacoes": [], "cta": True}]
+    R.salvar(p)
+    for q, im in (("fundo", _png((30, 30, 60), (640, 360), (10, 10, 10))), ("sofa", _png((80, 80, 90), (600, 300))), ("mesa", _png((120, 70, 40), (600, 200)))):
+        c.post(f"/react-personagens/{pid}/cenario/{q}/arquivo", data={"arquivo": (io.BytesIO(im), "x.png")}, content_type="multipart/form-data")
+    lay = R.disposicao(R.carregar(pid))
+    m2 = next(x for x in lay["copias"] if x["chave"] == "c:mesa2")
+    assert lay["mesa"]["cx"] < 960 < m2["cx"] and m2["espelhar"]  # uma mesa na frente de cada sofá
+    # itens: um em cada mesa
+    assert c.post(f"/react-personagens/{pid}/objetos", json={"acao": "novo", "nome": "Pipoca", "en": "a bowl of popcorn", "mesa": "mesa"}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/objetos", json={"acao": "novo", "nome": "Refrigerante", "en": "two soda cans", "mesa": "c:mesa2"}).get_json()["ok"]
+    pedidos = []
+
+    class Lote:
+        def adicionar(self, itens, **kw):
+            pedidos.extend(itens)
+            return [{"id": f"j{i}"} for i in range(len(itens))]
+
+        def iniciar(self):
+            pass
+    monkeypatch.setattr(flow_lote, "lote", lambda: Lote())
+    assert c.post(f"/react-personagens/{pid}/objetos/gerar", json={}).get_json()["enviadas"] == 2
+    assert "chroma-key green" in pedidos[0]["prompt"] and "popcorn" in pedidos[0]["prompt"]
+    assert "EMPTY top" in R.prompt_camada(R.carregar(pid), "mesa")
+    for o in R.carregar(pid)["objetos"]:
+        c.post(f"/react-personagens/{pid}/objetos/{o['id']}/arquivo", data={"arquivo": (io.BytesIO(_png((250, 220, 90), (200, 160))), "o.png")},
+               content_type="multipart/form-data")
+    p = R.carregar(pid)
+    lay = R.disposicao(p)
+    obs = {o["nome"]: o for o in lay["objetos"]}
+    assert abs(obs["Pipoca"]["cx"] - lay["mesa"]["cx"]) < lay["mesa"]["w"] / 2 and abs(obs["Refrigerante"]["cx"] - m2["cx"]) < m2["w"] / 2
+    assert obs["Pipoca"]["cy"] < lay["mesa"]["cy"]  # em cima do tampo
+    ordem = R.pilha(p, lay)["ordem"]
+    assert ordem.index(obs["Pipoca"]["chave"]) > ordem.index("mesa")
+    # arrastar um item
+    assert c.post(f"/react-personagens/{pid}/posicao", json={"chave": obs["Pipoca"]["chave"], "cx": 500, "cy": 800, "w": 120}).get_json()["ok"]
+    pe = {x["chave"]: x for x in c.get(f"/react-personagens/{pid}/pecas?t=1.5").get_json()["pecas"]}
+    assert pe[obs["Pipoca"]["chave"]]["cx"] == 500 and "c:mesa2" in pe
+    assert c.get(f"/react-personagens/{pid}/previa.jpg?t=1.5").status_code == 200
+    d = c.post(f"/react-personagens/{pid}/editor", json={}).get_json()
+    ovs = A._JOBS[d["job_id"]]["overlays"]
+    assert sum(1 for o in ovs if o.get("camada") == "objeto") == 2
+    # o mapa e os poderes vão pro roteiro e pra imagem; a referência é o quadro atual
+    mapa = RO.mapa(p, lay)
+    assert "Tatsumaki" in mapa and "popcorn" in mapa and "TV" in mapa
+    assert "MAPA DA SALA" in R.prompt_roteiro_parte(p, 0) and "poderes/jeito: telecinese" in R.prompt_roteiro_parte(p, 0)
+    assert "OBJETOS E PODERES" in R.sys_roteiro(dict(p, intriga="media"))
+    e = R.novo_evento("interacao", 2.0, [tats["id"], luffy["id"]], "ela levita a pipoca", "Tatsumaki levitates the popcorn to Luffy")
+    pr = R.prompt_cena(p, e)
+    assert "SCENE LAYOUT" in pr and "green glow" in pr and "rubber body" in pr and "CURRENT FRAME" in pr
+    ref = R.colagem_referencia(p, e, str(tmp_path / "ref.png"), R._BASE)
+    assert ref and os.path.isfile(ref)
+    # desligar a mesa por sofá
+    assert c.post(f"/react-personagens/{pid}/objetos", json={"mesa_por_sofa": False}).get_json()["ok"]
+    assert not any(x["chave"] == "c:mesa2" for x in R.disposicao(R.carregar(pid))["copias"])
+
+
+def test_marcacoes_no_tempo_viram_ordem_pro_roteiro(base, tmp_path):
+    """📌 v84_238k: marcar um segundo com observação (vídeo / quem fala / quem aparece) ou uma fala pra um personagem;
+    vai pro pedido da parte certa do roteiro e a fala EXATA entra mesmo se a IA esquecer."""
+    import app as A
+    c = A.app.test_client()
+    video = _video(str(tmp_path / "v.mp4"), 10)
+    with open(video, "rb") as f:
+        pid = c.post("/react-personagens/novo", data={"titulo": "Notas", "video_arquivo": (f, "v.mp4"), "transcricao": "0:01 a"},
+                     content_type="multipart/form-data").headers["Location"].split("/")[-1]
+    for n in ("Naruto", "Sasuke"):
+        c.post(f"/react-personagens/{pid}/personagem", json={"nome": n})
+    p = R.carregar(pid)
+    nar, sas = p["personagens"][0]["id"], p["personagens"][1]["id"]
+    assert c.post(f"/react-personagens/{pid}/notas", json={"t": "0:03", "tipo": "aparece", "texto": "o Itachi de criança"}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/notas", json={"t": "0:05", "tipo": "quem_fala", "texto": "quem canta é o Gojo"}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/notas", json={"t": "6", "tipo": "fala", "texto": "Eu falei que ele ia voltar!", "cids": [nar], "exata": True}).get_json()["ok"]
+    assert not c.post(f"/react-personagens/{pid}/notas", json={"t": "7", "tipo": "fala", "texto": "x"}).get_json()["ok"]  # fala sem quem
+    p = R.carregar(pid)
+    assert [n["tipo"] for n in p["notas"]] == ["aparece", "quem_fala", "fala"]
+    pr = R.prompt_roteiro_parte(p, 0)
+    assert "MARCAÇÕES DO AUTOR" in pr and "Naruto DIZ EXATAMENTE: “Eu falei que ele ia voltar!”" in pr and "Itachi de criança" in pr
+    assert "MARCAÇÕES DO AUTOR (se vierem" in R.sys_roteiro(p)
+    # a IA esqueceu a fala exata → entra sozinha no segundo marcado
+    R.aplicar_roteiro(p, {"falas": [{"personagem": "Sasuke", "tempo": 2, "texto": "Hm.", "expressao": "debochado"}]}, [0.0, 10.0])
+    fs = p["roteiro"]["falas"]
+    assert any(f["cid"] == nar and f["texto"] == "Eu falei que ele ia voltar!" and f["t"] == 6.0 for f in fs)
+    # apagar
+    nid = p["notas"][0]["id"]
+    R.salvar(p)
+    assert c.post(f"/react-personagens/{pid}/notas", json={"acao": "apagar", "id": nid}).get_json()["ok"]
+    assert len(R.carregar(pid)["notas"]) == 2 and "Marcações num segundo" in c.get(f"/react-personagens/{pid}").get_data(as_text=True)
+
+
+def test_quem_senta_onde_imagens_desligadas_e_maximo(base, tmp_path):
+    """🛋 v84_238l: escolher a ordem e o sofá de cada um (os ajustes à mão dos personagens voltam pro automático);
+    🖼 desligar as imagens de destaque; máximo de personagens."""
+    p = _proj(base, 4)
+    ids = [c["id"] for c in p["personagens"]]
+    p["layout"] = "dois_sofas"
+    assert R.sofas_de(p, "dois_sofas") == [ids[:2], ids[2:]]
+    p.setdefault("posicoes", {})["dois_sofas"] = {f"p:{ids[0]}": {"cx": 100}, "mesa": {"cx": 300}}
+    R.guardar_assentos(p, [[ids[3], ids[0]], [ids[1]]])  # o 3º (ids[2]) não foi mandado → entra no sofá mais vazio
+    assert R.sofas_de(p, "dois_sofas") == [[ids[3], ids[0]], [ids[1], ids[2]]]
+    assert f"p:{ids[0]}" not in p["posicoes"]["dois_sofas"] and "mesa" in p["posicoes"]["dois_sofas"]
+    lay = R.disposicao(p)
+    xs = {a["cid"]: a["cx"] for a in lay["assentos"]}
+    assert xs[ids[3]] < xs[ids[0]] < 960 < xs[ids[1]] < xs[ids[2]]
+    # num sofá só: junta na mesma ordem
+    p["layout"] = "sofa_tv"
+    p["assentos"]["sofa_tv"] = [[ids[2], ids[1], ids[0], ids[3]]]
+    xs = {a["cid"]: a["cx"] for a in R.disposicao(p)["assentos"]}
+    assert xs[ids[2]] < xs[ids[1]] < xs[ids[0]] < xs[ids[3]]
+    # 🖼 imagens desligadas
+    p["imagens_destaque"] = False
+    evs = R.ler_eventos(p, [{"tipo": "briga", "tempo": 5, "personagens": [p["personagens"][0]["nome"], p["personagens"][1]["nome"]]},
+                            {"tipo": "sai", "tempo": 9, "personagens": [p["personagens"][0]["nome"]]}])
+    assert [e["tipo"] for e in evs] == ["sai"] and "SEM IMAGEM" in R._regra_intriga(dict(p, intriga="media"))
+    p["roteiro"] = {"eventos": [R.novo_evento("briga", 2.0, ids[:2])]}
+    assert R.cena_ativa(p, 3.0) is None
+    # máximo
+    for k in range(R.MAXIMO_LAYOUT[R.layout_de(p)] - len(p["personagens"])):
+        R.novo_personagem(p, f"Extra {k}")
+    with pytest.raises(R.ReactErro):
+        R.novo_personagem(p, "Um a mais")
+
+
+def test_cinema_de_costas_e_de_frente_abertura_e_encerramento(base, tmp_path):
+    """🎬 v84_238m: cinema com até 3 fileiras de 6 (de costas: a poltrona NA FRENTE de quem senta e só o corpo reage;
+    de frente: fileiras em degraus), poses de costas, itens de cinema com quem segura, regras no roteiro; 🚪👋 abertura
+    e encerramento (desligados por padrão)."""
+    p = _proj(base, 4)
+    for k in range(10):
+        R.novo_personagem(p, f"Extra {k}") if len(p["personagens"]) < R.MAXIMO_LAYOUT["sofa_tv"] else None
+    p["layout"] = "cinema_costas"
+    while len(p["personagens"]) < 11:
+        R.novo_personagem(p, f"Mais {len(p['personagens'])}")
+    lay = R.disposicao(p, base)
+    filas = R.sofas_de(p, "cinema_costas")
+    assert len(filas) == 2 and all(len(f) <= R.POR_FILEIRA for f in filas) and sum(map(len, filas)) == 11 and [len(f) for f in filas] == [6, 5]
+    a0 = [a for a in lay["assentos"] if a["fila"] == 0]
+    a2 = [a for a in lay["assentos"] if a["fila"] == 1]
+    assert a0[0]["h"] > a2[0]["h"] and a0[0]["cy"] > a2[0]["cy"] and all(a["lado"] == "costas" for a in lay["assentos"])
+    ordem = R.pilha(p, lay)["ordem"]
+    assert ordem.index(f"p:{a0[0]['cid']}") < ordem.index("sofa0")  # de costas: a poltrona cobre quem senta
+    assert ordem.index("sofa1") < ordem.index(f"p:{a0[0]['cid']}") and "mesa" not in ordem
+    assert R.lados_precisos(p, a0[0]["cid"]) == ["costas"]
+    pj = R.poses_json(p, p["personagens"][0], ["costas"])
+    arqs = [x["arquivo"] for x in pj["poses"]]
+    assert any(a.endswith("_falando_costas.png") for a in arqs) and "seen from BEHIND" in pj["poses"][0]["prompt"]
+    assert R.lado_da_pose("itachi_uchiha", "itachi_uchiha_feliz_costas.png") == ("feliz", "costas")
+    assert R.expr_lado("empolgado", "costas") == "feliz" and R.expr_lado("bravo", "costas", True) == "falando"
+    assert R.camadas_do_layout(p) == ("cine_costas_fundo", "cine_costas_fileira")
+    assert "seen from BEHIND" in R.prompt_camada(p, "cine_costas_fileira") and "screen" in R.prompt_camada(p, "cine_costas_fundo")
+    assert "Shhh" in R.sys_roteiro(p) and "cinema" in R.prompt_cena(p, R.novo_evento("briga", 3.0, [a0[0]["cid"]], "x", "x"))
+    # de frente: fileiras em degraus, poltrona atrás
+    p["layout"] = "cinema_frente"
+    lay = R.disposicao(p, base)
+    a0 = [a for a in lay["assentos"] if a["fila"] == 0][0]
+    ordem = R.pilha(p, lay)["ordem"]
+    assert ordem.index("sofa0") < ordem.index(f"p:{a0['cid']}") and a0["lado"] == "frente"
+    # itens de cinema ficam com quem segura
+    import react_objetos as RO
+    o = RO.novo(p, "Balde de pipoca", "a popcorn bucket", f"p:{a0['cid']}")
+    d = tmp_path / "o.png"
+    Image.new("RGBA", (100, 120), (250, 200, 50, 255)).save(d)
+    RO.guardar(p, o, Image.open(d), base)
+    lay = R.disposicao(p, base)
+    ob = lay["objetos"][0]
+    assert abs(ob["cx"] - a0["cx"]) < a0["w"] and "holding" in RO.mapa(p, lay)
+    # 🚪👋 abertura/encerramento: desligados por padrão; ligados, chegam e saem um por um
+    assert not p["abertura"] and not p["encerramento"] and R.ausencias(p, 60) == {}
+    p.update(abertura=True, encerramento=True)
+    aus = R.ausencias(p, 60)
+    ch = sorted(v[0][1] for v in aus.values())
+    assert len(aus) == len(p["personagens"]) and ch[0] < ch[-1] <= R.ABERTURA_S
+    assert all(any(x[1] == 60 and x[0] >= 60 - R.ENCERRAMENTO_S for x in v) for v in aus.values())
+    assert "ABERTURA" in R.regra_lugar(p, 0, 150) and "ENCERRAMENTO" in R.regra_lugar(dict(p, video={"duracao": 60}), 0, 60)
+
+
+def test_cinema_video_grande_e_nenhuma_cabeca_em_cima(base):
+    """🎬 v84_238n: o vídeo do cinema é grande e a plateia fica TODA abaixo dele (nenhuma cabeça por cima)."""
+    p = _proj(base, 4)
+    for lay_nome, larg_min in (("cinema_costas", 0.53), ("cinema_frente", 0.42)):
+        p["layout"] = lay_nome
+        p["personagens"] = p["personagens"][:4]
+        p.pop("assentos", None)
+        while len(p["personagens"]) < R.MAXIMO_LAYOUT[lay_nome]:
+            R.novo_personagem(p, f"Extra {len(p['personagens'])}")
+        with pytest.raises(R.ReactErro):
+            R.novo_personagem(p, "Um a mais")
+        lay = R.disposicao(p, base)
+        t = lay["tela"]
+        assert t["w"] >= larg_min * R.W
+        for a in lay["assentos"]:
+            assert a["cy"] - a["h"] / 2 >= t["cy"] + t["h"] / 2, (lay_nome, a)
+        assert lay["legenda"]["topo"] > 0.8 * R.H  # a legenda embaixo nos dois
+        g0 = sorted(a["cx"] for a in lay["assentos"] if a["fila"] == 0)
+        g1 = sorted(a["cx"] for a in lay["assentos"] if a["fila"] == 1)
+        assert all(g0[j] < g1[j] < g0[j + 1] for j in range(min(len(g1), len(g0) - 1)))  # intercaladas nos dois
+    # de frente: 2 fileiras, a de trás nos vãos da da frente
+    f0 = sorted(a["cx"] for a in lay["assentos"] if a["fila"] == 0)
+    f1 = sorted(a["cx"] for a in lay["assentos"] if a["fila"] == 1)
+    assert len(lay["sofas"]) == 2 and len(f0) == 6 and len(f1) == 5
+    assert all(f0[j] < f1[j] < f0[j + 1] for j in range(5))
+
+
+def test_referencia_do_cenario_recriar_ou_virar_anime(base, monkeypatch):
+    """🖼 v84_238q: uma imagem de REFERÊNCIA por camada — o Flow recria o lugar (🏠 ambiente, no visual da foto) ou
+    redesenha no traço dos personagens (🎨 anime); a 📁 Minha imagem continua usando a imagem como está."""
+    import app as A
+    import flow_lote
+    p = _proj(base, 2)
+    R.salvar(p, base)
+    pid = p["id"]
+    c = A.app.test_client()
+    pedidos = []
+
+    class Lote:
+        def adicionar(self, itens, **kw):
+            pedidos.extend(itens)
+            return [{"id": f"j{i}"} for i in range(len(itens))]
+
+        def iniciar(self):
+            pass
+    monkeypatch.setattr(flow_lote, "lote", lambda: Lote())
+    foto = _png((90, 120, 160), (640, 360), fundo=(200, 180, 150))
+    r = c.post(f"/react-personagens/{pid}/cenario/fundo/referencia", data={"arquivo": (io.BytesIO(foto), "sala.png"), "modo": "anime", "gerar": "1"},
+               content_type="multipart/form-data").get_json()
+    assert r["ok"] and r["enviadas"] == 1
+    it = pedidos[-1]
+    assert os.path.isfile(it["referencia_arquivo"]) and "REDRAW this SAME place as an ANIME" in it["prompt"] and "NOT a photo" in it["prompt"]
+    assert "photorealistic" not in it["prompt"]
+    # trocar o modo e gerar de novo (o botão de gerar normal também usa a referência)
+    assert c.post(f"/react-personagens/{pid}/cenario/fundo/referencia", json={"modo": "ambiente"}).get_json()["ok"]
+    assert c.post(f"/react-personagens/{pid}/cenario/gerar", json={"quais": ["fundo"]}).get_json()["enviadas"] == 1
+    assert "RECREATE this SAME place faithfully" in pedidos[-1]["prompt"] and pedidos[-1].get("referencia_arquivo")
+    # o sofá sem referência continua como sempre
+    c.post(f"/react-personagens/{pid}/cenario/gerar", json={"quais": ["sofa"]})
+    assert "referencia_arquivo" not in pedidos[-1] and "REFERENCE" not in pedidos[-1]["prompt"]
+    # tirar a referência
+    assert c.post(f"/react-personagens/{pid}/cenario/fundo/referencia", json={"apagar": True}).get_json()["ok"]
+    assert R.arquivo_referencia(R.carregar(pid, base), "fundo", base) is None
+    assert c.post(f"/react-personagens/{pid}/cenario/fundo/referencia", data={"modo": "anime"}, content_type="multipart/form-data").status_code == 400
+
+
+def test_cinema_de_perto_gestos_atrasado_e_quem_passa(base, tmp_path, monkeypatch):
+    """🎬 v84_238r: cinema de perto (o jeito do encerramento de anime) — a fileira grande, a de trás pequena nos vãos, os
+    encostos no primeiro plano, o vídeo em cima sem cabeça por cima; 🍿 gestos naturais (pose no lugar, virada pro
+    vizinho), ⏰ chegou atrasado / 🚪 sai andando pela fileira, 🌑 alguém passa na frente (silhueta)."""
+    p = _proj(base, 4)
+    p["layout"] = "cinema_plateia"
+    p["movimentos"] = True
+    while len(p["personagens"]) < 9:
+        R.novo_personagem(p, f"Extra {len(p['personagens'])}")
+    with pytest.raises(R.ReactErro):
+        for k in range(5):
+            R.novo_personagem(p, f"Demais {k}")
+    p["personagens"] = p["personagens"][:9]
+    assert R.camadas_do_layout(p) == ("cine_plateia_fundo", "cine_frente_fileira", "cine_costas_fileira", "cine_passante")
+    assert "projector" in R.prompt_camada(p, "cine_plateia_fundo") and "chroma-key" in R.prompt_camada(p, "cine_passante")
+    lay = R.disposicao(p, base)
+    t = lay["tela"]
+    f0 = sorted((a for a in lay["assentos"] if a["fila"] == 0), key=lambda a: a["cx"])
+    f1 = sorted((a for a in lay["assentos"] if a["fila"] == 1), key=lambda a: a["cx"])
+    assert len(f0) + len(f1) == 9 and len(f1) <= 5 and f1[0]["h"] < f0[0]["h"]
+    for a in lay["assentos"]:
+        assert a["cy"] - a["h"] / 2 + 0.05 * a["h"] >= t["cy"] + t["h"] / 2  # nenhuma cabeça em cima do vídeo
+    assert lay["sofas"][1]["plano"] and lay["sofas"][1]["camada"] == "cine_costas_fileira"
+    ordem = R.pilha(p, lay)["ordem"]
+    assert ordem.index(f"p:{f1[0]['cid']}") < ordem.index("sofa0") < ordem.index(f"p:{f0[0]['cid']}") < ordem.index("sofa1") < ordem.index("tela")
+    assert R.lados_precisos(p, f0[0]["cid"]) == ["frente"]
+    arqs = [x["arquivo"] for x in R.poses_json(p, p["personagens"][0], ["frente"])["poses"]]
+    assert any(a.endswith("_pega_pipoca_frente.png") for a in arqs) and any(a.endswith("_andando_frente.png") for a in arqs)
+    # poses de mentira (frente + gestos + andando)
+    d = tmp_path / "poses"
+    d.mkdir()
+
+    def poses(c, base_=None):
+        out = {"dir": {}, "esq": {}, "costas": {}, "frente": {}}
+        for e in ("neutro", "feliz", "pega_pipoca", "olha_tras", "andando"):
+            cam = d / f"{c['id']}_{e}.png"
+            if not cam.exists():
+                Image.new("RGBA", (120, 180), (200, 80, 80, 255)).save(cam)
+            out["frente"][e] = {"pose": str(cam), "boca": None, "arquivo": cam.name}
+        return out
+    monkeypatch.setattr(R, "_poses_por_lado", poses)
+    # eventos: a IA manda gesto/passa/atrasado
+    nomes = {a["cid"]: R.personagem(p, a["cid"])["nome"] for a in lay["assentos"]}
+    ev = R.ler_eventos(p, [
+        {"tempo": 10, "tipo": "gesto", "personagens": [nomes[f0[1]["cid"]], nomes[f0[0]["cid"]]], "gesto": "pega_pipoca", "duracao": 3},
+        {"tempo": 20, "tipo": "passa", "personagens": [], "gesto": "silhueta", "duracao": 3.5},
+        {"tempo": 30, "tipo": "volta", "personagens": [nomes[f0[-1]["cid"]]]},
+        {"tempo": 40, "tipo": "sai", "personagens": [nomes[f0[2]["cid"]]]},
+    ], 120)
+    assert [e["tipo"] for e in ev] == ["gesto", "passa", "volta", "sai"] and ev[1]["cids"] == []
+    p.setdefault("roteiro", {})["eventos"] = ev
+    aus = R.ausencias(p, 120)
+    assert aus[f0[-1]["cid"]] == [[0.0, 30.0]]  # ⏰ chegou atrasado: fora desde o começo
+    g, faltam = R.gestos_no_lugar(p, lay, base)
+    ini, fim, _cam, esp, nome_g = g[f0[1]["cid"]][0]
+    assert (ini, fim, nome_g) == (10.0, 13.0, "pega_pipoca") and esp  # o vizinho está à esquerda → espelhada
+    anda, _av = R.andantes(p, lay, 120, base)
+    chega = next(w for w in anda if w["cid"] == f0[-1]["cid"])
+    assert chega["b"] == 30.0 and chega["a"] < 30.0 and chega["para"] == 0 and chega["de"] > 0  # vem da ponta da direita
+    sai = next(w for w in anda if w["cid"] == f0[2]["cid"])
+    assert sai["a"] == 40.0 and sai["de"] == 0
+    passa = next(w for w in anda if not w["cid"])
+    assert os.path.isfile(passa["cam"]) and "silhueta" in os.path.basename(passa["cam"]) and abs(passa["de"]) > 0.5
+    # outra disposição: gesto/passa da IA são ignorados
+    q = dict(p, layout="sofa_tv")
+    assert [e["tipo"] for e in R.ler_eventos(q, [{"tempo": 5, "tipo": "passa", "personagens": [], "gesto": "silhueta"}], 60)] == []
+    assert "CINEMA DE PERTO" in R.sys_roteiro(p) and "'pega_pipoca'" in R.sys_roteiro(p)
+    # 🍿 os movimentos são OPCIONAIS (desligados por padrão): sem eles, nada de gesto/passa/andar
+    sem = dict(p, movimentos=False)
+    assert R.ler_eventos(sem, [{"tempo": 5, "tipo": "gesto", "personagens": [nomes[f0[0]["cid"]]], "gesto": "olha_tras"}], 60) == []
+    assert R.gestos_no_lugar(sem, lay, base)[0] == {} and R.andantes(sem, lay, 120, base)[0] == []
+    assert "'pega_pipoca'" not in R.sys_roteiro(sem) and not any("pega_pipoca" in x["arquivo"] for x in R.poses_json(sem, p["personagens"][0], ["frente"])["poses"])
+    assert R.criar("x", base)["movimentos"] is False
+    # 🎬 no editor: o gesto no lugar, quem anda com mov (de/para + passinhos) antes dos encostos da frente
+    import shutil
+    vid = _video(str(tmp_path / "v.mp4"), 60)
+    os.makedirs(R.pasta(p["id"], base), exist_ok=True)
+    shutil.copy(vid, os.path.join(R.pasta(p["id"], base), "video.mp4"))
+    p["video"] = {"duracao": 60.0, "arquivo": "video.mp4"}
+    p["roteiro"]["eventos"] = [e for e in ev if e["t"] < 50]
+    R.aplicar_roteiro(p, {"resumo": "x", "eventos": [], "falas": [{"tempo": 11, "personagem": nomes[f0[0]["cid"]], "texto": "Ei, a pipoca é minha!",
+                                                                   "expressao": "bravo", "pedido_inscricao": False, "reacoes": []}]})
+    p["roteiro"]["eventos"] = [e for e in ev if e["t"] < 50]
+    for q_ in ("cine_plateia_fundo", "cine_frente_fileira", "cine_costas_fileira"):
+        R.guardar_camada(p, q_, Image.new("RGBA", (1200, 300), (120, 20, 30, 255)), base, recortar=False, origem="upload")
+    R.salvar(p, base)
+    m = R.montar_editor(p, base, str(tmp_path / "job"))
+    ovs = m["overlays"]
+    ids = [o["id"] for o in ovs]
+    andam = [o for o in ovs if o["id"].startswith("randa")]
+    assert len(andam) == 3 and all(any("de" in x for x in o["mov"]) and any("pulo" in x for x in o["mov"]) for o in andam)
+    assert all(ids.index(o["id"]) < ids.index("rsofa1") for o in andam)
+    gest = next(o for o in ovs if "_gesto" in o["id"])
+    assert gest["start"] == 10.0 and gest["espelhar"]
+    normal = [o for o in ovs if o.get("cid") == f0[1]["cid"] and "_gesto" not in o["id"] and o["start"] < 13 and o["end"] > 10]
+    assert all(o["end"] <= 10.0 or o["start"] >= 13.0 for o in normal)  # a pose normal some durante o gesto
+    assert R.previa(p, base, str(tmp_path / "pv.jpg"), t=20.5)

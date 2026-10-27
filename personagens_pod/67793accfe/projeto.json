@@ -1,0 +1,1824 @@
+{
+ "id": "67793accfe",
+ "nome": "🎞 Ceifadora (Ceifadora 0)",
+ "criado": 1792781428.3101594,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "personagem": "ceifadora",
+  "nome": "Ceifadora",
+  "anime2d": true,
+  "descricoes_referencias": {
+   "ref_65ed0087.png": "a reference picture of Ceifadora",
+   "design_anime_aprovado.png": "the APPROVED anime character design of Ceifadora — follow it exactly (face, hair, outfit, colors)"
+  },
+  "texto_fixo": {
+   "trava": "CHARACTER LOCK: Ceifadora. Appearance: drawn EXACTLY like the manga reference: petite girl with very long straight pale pink-white hair down to her knees, a long red-tipped ahoge and two small black-and-red hair ribbons, big red eyes, one small fang, a tiny beauty mark under her left eye, soft blush, an oversized black zip jacket with red lining, red straps and a silver chain, white shirt, loose red necktie, black shorts, a black thigh garter with a red strap, a thin black devil-like tail ending in an arrowhead, black boots. Keep exactly the same face, hairstyle, hair color, eye color, body, outfit and colors in every image (follow the approved design reference).",
+   "estilo": "ART STYLE: colored anime adaptation that keeps the ORIGINAL MANGA ARTIST'S drawing style exactly: the same hand-drawn loose ink linework with varied, slightly rough line weight, hatching kept as texture in the shadows, the same character proportions and face shapes (as in the manga references), flat muted colors laid under the black ink lines like a hand-colored manga page, soft limited shading, subtle paper grain — NOT generic glossy anime; FAITHFUL TO THE MANGA: copy the original artist's line art and character drawing style from the manga references (face shape, eye shape and pupils, nose, hair silhouette, body proportions), soft pastel watercolor coloring with sketchy colored-pencil line art and a thin white outline around the characters.",
+   "regras": "ONE single figure, framed as the pose says, seen in a 3/4 view turned to the RIGHT side of the image, the whole figure inside the image with margin. NO furniture, NO chair, NO table, NO desk, NO floor, NO background objects (a sitting pose sits on NOTHING — an invisible CHAIR-HEIGHT seat: hips at knee height, thighs level, lower legs down to the feet; NEVER sitting on the floor or kneeling unless the pose says so; the furniture is a separate layer); a small handheld object only if the pose needs it. No panels, on a flat solid chroma-key green background (#00FF00), no shadow on the background. ABSOLUTELY NO TEXT in the image: no letters, no words, no speech balloons, no thought bubbles, no sound-effect onomatopoeia lettering, no captions, no narration boxes, no signs or labels with writing, no watermark. If the reference images contain speech balloons, lettering or sound effects, do NOT copy them."
+  },
+  "fundo": "verde",
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "corpo_inteiro": true,
+  "boca_auto": true,
+  "flow": {
+   "proporcao": "3:4"
+  },
+  "poses": [
+   {
+    "arquivo": "ceifadora_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": true,
+    "descricao_pt": "😐 em pé, neutro",
+    "prompt": "standing, relaxed neutral expression, arms down. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_neutro.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_x_jumping_in_the_air_with_.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "jumping in the air with both arms wide open, a big happy fanged smile, long hair flying",
+    "prompt": "jumping in the air with both arms wide open, a big happy fanged smile, long hair flying. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_x_jumping_in_the_air_with__pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "jumping in the air with both arms wide open, a big happy fanged smile, long hair flying — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_x_jumping_in_the_air_with_.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_x_floating_noticing_someth.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "floating, noticing something with a surprised blink",
+    "prompt": "floating, noticing something with a surprised blink. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_x_floating_noticing_someth_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "floating, noticing something with a surprised blink — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_x_floating_noticing_someth.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_x_arms_crossed_pouting_wit.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "arms crossed, pouting with puffed cheeks, blushing, annoyed",
+    "prompt": "arms crossed, pouting with puffed cheeks, blushing, annoyed. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_x_arms_crossed_pouting_wit_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "arms crossed, pouting with puffed cheeks, blushing, annoyed — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_x_arms_crossed_pouting_wit.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_busto_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🙂 busto 😐 em pé, neutro",
+    "prompt": "BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer in 3/4 turned to the RIGHT. Expression: standing, relaxed neutral expression, arms down."
+   },
+   {
+    "arquivo": "ceifadora_busto_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_busto_neutro.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_andando.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🚶 andando",
+    "prompt": "walking, mid-stride. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_andando_b.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "descricao_pt": "🚶 andando — 2º quadro",
+    "prompt": "Draw the NEXT FRAME of this motion: walking, the OTHER leg forward (next step of the same walk cycle). Same character, same framing and size.",
+    "pose_base": "ceifadora_andando.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_x_standing_angry_puffed_ch.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, angry puffed cheeks, fists clenched, leaning forward, scolding",
+    "prompt": "standing, angry puffed cheeks, fists clenched, leaning forward, scolding. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_angry_puffed_ch_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, angry puffed cheeks, fists clenched, leaning forward, scolding — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_x_standing_angry_puffed_ch.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_x_standing_worried_hands_u.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, worried, hands up near her chest, teary eyes",
+    "prompt": "standing, worried, hands up near her chest, teary eyes. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_worried_hands_u_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, worried, hands up near her chest, teary eyes — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_x_standing_worried_hands_u.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_x_standing_sighing_with_a_.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, sighing with a soft resigned smile, one finger raised, about to help",
+    "prompt": "standing, sighing with a soft resigned smile, one finger raised, about to help. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_sighing_with_a__pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, sighing with a soft resigned smile, one finger raised, about to help — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "ceifadora_x_standing_sighing_with_a_.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "ceifadora_neutro_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_jumping_in_the_air_with__boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_jumping_in_the_air_with_.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "jumping in the air with both arms wide open, a big happy fanged smile, long hair flying — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_floating_noticing_someth_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_floating_noticing_someth.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "floating, noticing something with a surprised blink — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_andando_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_andando.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "🚶 andando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_angry_puffed_ch_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_standing_angry_puffed_ch.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, angry puffed cheeks, fists clenched, leaning forward, scolding — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_worried_hands_u_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_standing_worried_hands_u.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, worried, hands up near her chest, teary eyes — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_sighing_with_a__boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_standing_sighing_with_a_.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, sighing with a soft resigned smile, one finger raised, about to help — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_jumping_in_the_air_with__pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_jumping_in_the_air_with__pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "jumping in the air with both arms wide open, a big happy fanged smile, long hair flying — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_floating_noticing_someth_pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_floating_noticing_someth_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "floating, noticing something with a surprised blink — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_andando_b_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_andando_b.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "🚶 andando — 2º quadro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_angry_puffed_ch_pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_standing_angry_puffed_ch_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, angry puffed cheeks, fists clenched, leaning forward, scolding — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_busto_neutro_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_busto_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_worried_hands_u_pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_standing_worried_hands_u_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, worried, hands up near her chest, teary eyes — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_standing_sighing_with_a__pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_standing_sighing_with_a__pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, sighing with a soft resigned smile, one finger raised, about to help — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_busto_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_busto_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_arms_crossed_pouting_wit_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_arms_crossed_pouting_wit.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "arms crossed, pouting with puffed cheeks, blushing, annoyed — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "ceifadora_x_arms_crossed_pouting_wit_pisca_boca.png",
+    "tipo": "boca",
+    "base": "ceifadora_x_arms_crossed_pouting_wit_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "arms crossed, pouting with puffed cheeks, blushing, annoyed — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   }
+  ]
+ },
+ "refs": [
+  "design_anime_aprovado.png",
+  "ref_65ed0087.png"
+ ],
+ "motor": "flow",
+ "canal": null,
+ "mestre": {
+  "arquivo": "ceifadora_neutro.png",
+  "local": "ceifadora_neutro_v1_41a8.png",
+  "quando": 1792781505.1688054,
+  "bruto": "ceifadora_neutro_v1_aa30_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "12328215c3",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_neutro.png"
+   ],
+   "criado": 1792781428.81759,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0f1428f21c",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_neutro_boca.png"
+   ],
+   "criado": 1792781505.1589413,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d23f99e7e1",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_neutro_pisca.png"
+   ],
+   "criado": 1792781505.3717978,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9f87f0ac2c",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_jumping_in_the_air_with_.png"
+   ],
+   "criado": 1792781505.3718054,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "02eed75b6f",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_floating_noticing_someth.png"
+   ],
+   "criado": 1792781505.3718078,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "023bdb9dca",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_arms_crossed_pouting_wit.png"
+   ],
+   "criado": 1792781505.3718097,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2262fe0c76",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro.png"
+   ],
+   "criado": 1792781505.3718119,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ef10c021f0",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_andando.png"
+   ],
+   "criado": 1792781505.3718143,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c20535ec92",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_angry_puffed_ch.png"
+   ],
+   "criado": 1792781505.3718162,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f44e8c5934",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_worried_hands_u.png"
+   ],
+   "criado": 1792781505.3718183,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1d58aaa474",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_sighing_with_a_.png"
+   ],
+   "criado": 1792781505.3718202,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0d7de61d11",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_neutro_pisca_boca.png"
+   ],
+   "criado": 1792781843.621071,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e7a639a41f",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_jumping_in_the_air_with__boca.png"
+   ],
+   "criado": 1792781862.5916905,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ae22aeab60",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_jumping_in_the_air_with__pisca.png"
+   ],
+   "criado": 1792781862.5916967,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5ec288d37c",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_floating_noticing_someth_boca.png"
+   ],
+   "criado": 1792781917.277367,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4827a3a33f",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_floating_noticing_someth_pisca.png"
+   ],
+   "criado": 1792781917.2773736,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "914d07cb9f",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_andando_boca.png"
+   ],
+   "criado": 1792781943.5611866,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8011ae56f5",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_andando_b.png"
+   ],
+   "criado": 1792781943.561194,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "965b58e63d",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_angry_puffed_ch_boca.png"
+   ],
+   "criado": 1792781980.6155624,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3022ba9843",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_angry_puffed_ch_pisca.png"
+   ],
+   "criado": 1792781980.6155686,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4aaee77a0b",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro.png"
+   ],
+   "criado": 1792782021.2779787,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "68dac24861",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro_pisca.png"
+   ],
+   "criado": 1792782021.5347805,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "bfe3ed2aa2",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_worried_hands_u_boca.png"
+   ],
+   "criado": 1792782040.6258752,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "17d5ed3ddc",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_worried_hands_u_pisca.png"
+   ],
+   "criado": 1792782040.6258821,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a4c2b49106",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_sighing_with_a__boca.png"
+   ],
+   "criado": 1792782063.3637412,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9d57fe7a27",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_sighing_with_a__pisca.png"
+   ],
+   "criado": 1792782063.3637483,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "bc970dd316",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_jumping_in_the_air_with__pisca_boca.png"
+   ],
+   "criado": 1792782539.288489,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "535792bf92",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_floating_noticing_someth_pisca_boca.png"
+   ],
+   "criado": 1792782581.6996632,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "35f71147fa",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_andando_b_boca.png"
+   ],
+   "criado": 1792782652.9652975,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6125c9c1ec",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_angry_puffed_ch_pisca_boca.png"
+   ],
+   "criado": 1792782671.9025855,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fb37c20212",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro_boca.png"
+   ],
+   "criado": 1792782713.0948863,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "24e14f8dfe",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro_pisca.png"
+   ],
+   "criado": 1792782717.8618944,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "00d5d982fa",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_worried_hands_u_pisca_boca.png"
+   ],
+   "criado": 1792782766.1841505,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2666a734a7",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_standing_sighing_with_a__pisca_boca.png"
+   ],
+   "criado": 1792782811.8906891,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "77c39111d5",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro_boca.png"
+   ],
+   "criado": 1792783114.3711467,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "8e44fdf1b3",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro_pisca_boca.png"
+   ],
+   "criado": 1792783155.533784,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6c750fca21",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_busto_neutro_pisca_boca.png"
+   ],
+   "criado": 1792783236.2343645,
+   "final": true,
+   "auto_refeito": true
+  },
+  {
+   "id": "4991e4c538",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_arms_crossed_pouting_wit.png"
+   ],
+   "criado": 1792783297.964283,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "22760fff26",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_arms_crossed_pouting_wit_boca.png"
+   ],
+   "criado": 1792783362.0863137,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c32c41bd68",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_arms_crossed_pouting_wit_pisca.png"
+   ],
+   "criado": 1792783362.0863202,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3849163f5e",
+   "motor": "flow",
+   "arquivos": [
+    "ceifadora_x_arms_crossed_pouting_wit_pisca_boca.png"
+   ],
+   "criado": 1792783427.6582057,
+   "final": true,
+   "extra": null
+  }
+ ],
+ "log": [
+  "23/10 15:50:28 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 15:51:44 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:51:45 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 15:51:45 ⭐ mestre: ceifadora_neutro.png",
+  "23/10 15:51:45 🚀 9 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:57:23 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:57:23 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:57:42 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:57:42 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:58:36 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:58:37 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:59:03 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:59:03 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:59:40 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:59:40 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:00:21 ✂ ceifadora_busto_neutro.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x",
+  "23/10 16:00:21 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:00:39 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:00:40 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:01:02 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:01:03 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:08:58 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:08:59 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:09:41 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:09:41 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:10:52 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:10:52 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:11:11 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:11:11 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:11:52 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:11:53 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:11:57 ✂ ceifadora_busto_neutro_pisca.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x",
+  "23/10 16:12:45 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:12:46 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:13:31 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:13:31 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:18:34 ✂ ceifadora_busto_neutro_boca.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x",
+  "23/10 16:19:15 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:19:15 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:20:36 ✂ ceifadora_busto_neutro_pisca_boca.png: veio com defeito (a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PN) — refazendo 1x",
+  "23/10 16:21:37 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:21:44 ✏ JSON trocado: 34 pose(s)",
+  "23/10 16:22:41 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:22:42 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:23:47 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:23:47 🚀 1 pose(s) pro Flow com a ⭐ mestre"
+ ],
+ "imagens": {
+  "ceifadora_neutro.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "ceifadora_neutro_v1_41a8.png",
+     "bruto": "ceifadora_neutro_v1_aa30_flow.png",
+     "job": "12328215c3",
+     "motor": "flow",
+     "quando": 1792781504.7301052,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 1,
+      "verde_px": 790314
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "12328215c3",
+   "msg": null
+  },
+  "ceifadora_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_neutro_pisca_v1_d0e7.png",
+     "bruto": "ceifadora_neutro_pisca_v1_4396_flow.png",
+     "job": "d23f99e7e1",
+     "motor": "flow",
+     "quando": 1792781843.2830453,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 791191
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d23f99e7e1",
+   "msg": null
+  },
+  "ceifadora_x_jumping_in_the_air_with_.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_jumping_in_the_air_with__v1_2231.png",
+     "bruto": "ceifadora_x_jumping_in_the_air_with__v1_9824_flow.png",
+     "job": "9f87f0ac2c",
+     "motor": "flow",
+     "quando": 1792781862.241155,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 679101
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9f87f0ac2c",
+   "msg": null
+  },
+  "ceifadora_x_jumping_in_the_air_with__pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_jumping_in_the_air_with__pisca_v1_d6ec.png",
+     "bruto": "ceifadora_x_jumping_in_the_air_with__pisca_v1_844b_flow.png",
+     "job": "ae22aeab60",
+     "motor": "flow",
+     "quando": 1792782538.9628146,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 678740
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ae22aeab60",
+   "msg": null
+  },
+  "ceifadora_x_floating_noticing_someth.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_floating_noticing_someth_v1_42c8.png",
+     "bruto": "ceifadora_x_floating_noticing_someth_v1_746e_flow.png",
+     "job": "02eed75b6f",
+     "motor": "flow",
+     "quando": 1792781916.694817,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 778602
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "02eed75b6f",
+   "msg": null
+  },
+  "ceifadora_x_floating_noticing_someth_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_floating_noticing_someth_pisca_v1_64e7.png",
+     "bruto": "ceifadora_x_floating_noticing_someth_pisca_v1_43f4_flow.png",
+     "job": "4827a3a33f",
+     "motor": "flow",
+     "quando": 1792782581.1326244,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 778680
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "4827a3a33f",
+   "msg": null
+  },
+  "ceifadora_x_arms_crossed_pouting_wit.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_arms_crossed_pouting_wit_v1_de9b.png",
+     "bruto": "ceifadora_x_arms_crossed_pouting_wit_v1_6e1c_flow.png",
+     "job": "4991e4c538",
+     "motor": "flow",
+     "quando": 1792783361.4761462,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 790755
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "4991e4c538",
+   "msg": null
+  },
+  "ceifadora_x_arms_crossed_pouting_wit_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_arms_crossed_pouting_wit_pisca_v1_64c9.png",
+     "bruto": "ceifadora_x_arms_crossed_pouting_wit_pisca_v1_a2e3_flow.png",
+     "job": "c32c41bd68",
+     "motor": "flow",
+     "quando": 1792783427.402913,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 791415
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c32c41bd68",
+   "msg": null
+  },
+  "ceifadora_busto_neutro.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_busto_neutro_v1_2d3b.png",
+     "bruto": "ceifadora_busto_neutro_v1_07bd_flow.png",
+     "job": "2262fe0c76",
+     "motor": "flow",
+     "quando": 1792782021.258076,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 474111
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "ceifadora_busto_neutro_v2_8510.png",
+     "bruto": "ceifadora_busto_neutro_v2_f3b6_flow.png",
+     "job": "4aaee77a0b",
+     "motor": "flow",
+     "quando": 1792782712.772953,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 530310
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "4aaee77a0b",
+   "msg": null
+  },
+  "ceifadora_busto_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_busto_neutro_pisca_v1_0785.png",
+     "bruto": "ceifadora_busto_neutro_pisca_v1_a823_flow.png",
+     "job": "68dac24861",
+     "motor": "flow",
+     "quando": 1792782717.8553567,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 475310
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "ceifadora_busto_neutro_pisca_v2_79e0.png",
+     "bruto": "ceifadora_busto_neutro_pisca_v2_b430_flow.png",
+     "job": "24e14f8dfe",
+     "motor": "flow",
+     "quando": 1792783155.1794121,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 475117
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "24e14f8dfe",
+   "msg": null
+  },
+  "ceifadora_andando.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_andando_v1_cc25.png",
+     "bruto": "ceifadora_andando_v1_7750_flow.png",
+     "job": "ef10c021f0",
+     "motor": "flow",
+     "quando": 1792781943.248731,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 781433
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ef10c021f0",
+   "msg": null
+  },
+  "ceifadora_andando_b.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_andando_b_v1_b7de.png",
+     "bruto": "ceifadora_andando_b_v1_a772_flow.png",
+     "job": "8011ae56f5",
+     "motor": "flow",
+     "quando": 1792782652.6760287,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 782471
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8011ae56f5",
+   "msg": null
+  },
+  "ceifadora_x_standing_angry_puffed_ch.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_angry_puffed_ch_v1_a2b6.png",
+     "bruto": "ceifadora_x_standing_angry_puffed_ch_v1_8091_flow.png",
+     "job": "c20535ec92",
+     "motor": "flow",
+     "quando": 1792781980.26902,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 689216
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c20535ec92",
+   "msg": null
+  },
+  "ceifadora_x_standing_angry_puffed_ch_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_angry_puffed_ch_pisca_v1_4a05.png",
+     "bruto": "ceifadora_x_standing_angry_puffed_ch_pisca_v1_2ce4_flow.png",
+     "job": "3022ba9843",
+     "motor": "flow",
+     "quando": 1792782671.6115947,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 690423
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3022ba9843",
+   "msg": null
+  },
+  "ceifadora_x_standing_worried_hands_u.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_worried_hands_u_v1_b2bf.png",
+     "bruto": "ceifadora_x_standing_worried_hands_u_v1_2fdb_flow.png",
+     "job": "f44e8c5934",
+     "motor": "flow",
+     "quando": 1792782039.9013073,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 785197
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f44e8c5934",
+   "msg": null
+  },
+  "ceifadora_x_standing_worried_hands_u_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_worried_hands_u_pisca_v1_5186.png",
+     "bruto": "ceifadora_x_standing_worried_hands_u_pisca_v1_f7a5_flow.png",
+     "job": "17d5ed3ddc",
+     "motor": "flow",
+     "quando": 1792782765.9018903,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 786225
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "17d5ed3ddc",
+   "msg": null
+  },
+  "ceifadora_x_standing_sighing_with_a_.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_sighing_with_a__v1_77a6.png",
+     "bruto": "ceifadora_x_standing_sighing_with_a__v1_ba95_flow.png",
+     "job": "1d58aaa474",
+     "motor": "flow",
+     "quando": 1792782062.8592477,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 775938
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "1d58aaa474",
+   "msg": null
+  },
+  "ceifadora_x_standing_sighing_with_a__pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_sighing_with_a__pisca_v1_1067.png",
+     "bruto": "ceifadora_x_standing_sighing_with_a__pisca_v1_b46a_flow.png",
+     "job": "9d57fe7a27",
+     "motor": "flow",
+     "quando": 1792782811.543269,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 776424
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9d57fe7a27",
+   "msg": null
+  },
+  "ceifadora_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_neutro_boca_v1_4dd0.png",
+     "bruto": "ceifadora_neutro_boca_v1_6594_flow.png",
+     "job": "0f1428f21c",
+     "motor": "flow",
+     "quando": 1792781832.0583236,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 791043
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0f1428f21c",
+   "msg": null
+  },
+  "ceifadora_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_neutro_pisca_boca_v1_4da9.png",
+     "bruto": "ceifadora_neutro_pisca_boca_v1_bac4_flow.png",
+     "job": "0d7de61d11",
+     "motor": "flow",
+     "quando": 1792782497.3787315,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 792307
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0d7de61d11",
+   "msg": null
+  },
+  "ceifadora_x_jumping_in_the_air_with__boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_jumping_in_the_air_with__boca_v1_1940.png",
+     "bruto": "ceifadora_x_jumping_in_the_air_with__boca_v1_a381_flow.png",
+     "job": "e7a639a41f",
+     "motor": "flow",
+     "quando": 1792782516.5145583,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 679143
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e7a639a41f",
+   "msg": null
+  },
+  "ceifadora_x_floating_noticing_someth_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_floating_noticing_someth_boca_v1_d299.png",
+     "bruto": "ceifadora_x_floating_noticing_someth_boca_v1_ca4e_flow.png",
+     "job": "5ec288d37c",
+     "motor": "flow",
+     "quando": 1792782558.8236413,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 779162
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5ec288d37c",
+   "msg": null
+  },
+  "ceifadora_andando_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_andando_boca_v1_3548.png",
+     "bruto": "ceifadora_andando_boca_v1_9bdb_flow.png",
+     "job": "914d07cb9f",
+     "motor": "flow",
+     "quando": 1792782604.3492718,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 781395
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "914d07cb9f",
+   "msg": null
+  },
+  "ceifadora_x_standing_angry_puffed_ch_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_angry_puffed_ch_boca_v1_9bed.png",
+     "bruto": "ceifadora_x_standing_angry_puffed_ch_boca_v1_81cd_flow.png",
+     "job": "965b58e63d",
+     "motor": "flow",
+     "quando": 1792782648.1761239,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 690615
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "965b58e63d",
+   "msg": null
+  },
+  "ceifadora_x_standing_worried_hands_u_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_worried_hands_u_boca_v1_6c72.png",
+     "bruto": "ceifadora_x_standing_worried_hands_u_boca_v1_76a4_flow.png",
+     "job": "bfe3ed2aa2",
+     "motor": "flow",
+     "quando": 1792782757.9230547,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 785037
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "bfe3ed2aa2",
+   "msg": null
+  },
+  "ceifadora_x_standing_sighing_with_a__boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_sighing_with_a__boca_v1_63cc.png",
+     "bruto": "ceifadora_x_standing_sighing_with_a__boca_v1_6e64_flow.png",
+     "job": "a4c2b49106",
+     "motor": "flow",
+     "quando": 1792782810.3981557,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 776864
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a4c2b49106",
+   "msg": null
+  },
+  "ceifadora_x_jumping_in_the_air_with__pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_jumping_in_the_air_with__pisca_boca_v1_7374.png",
+     "bruto": "ceifadora_x_jumping_in_the_air_with__pisca_boca_v1_a08d_flow.png",
+     "job": "bc970dd316",
+     "motor": "flow",
+     "quando": 1792783030.9229655,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 679471
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "bc970dd316",
+   "msg": null
+  },
+  "ceifadora_x_floating_noticing_someth_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_floating_noticing_someth_pisca_boca_v1_a19f.png",
+     "bruto": "ceifadora_x_floating_noticing_someth_pisca_boca_v1_d3a5_flow.png",
+     "job": "535792bf92",
+     "motor": "flow",
+     "quando": 1792783060.2554877,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 780294
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "535792bf92",
+   "msg": null
+  },
+  "ceifadora_andando_b_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_andando_b_boca_v1_652b.png",
+     "bruto": "ceifadora_andando_b_boca_v1_5ac7_flow.png",
+     "job": "35f71147fa",
+     "motor": "flow",
+     "quando": 1792783072.035178,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 16,
+      "verde_px": 783732
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "35f71147fa",
+   "msg": null
+  },
+  "ceifadora_x_standing_angry_puffed_ch_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_angry_puffed_ch_pisca_boca_v1_11a1.png",
+     "bruto": "ceifadora_x_standing_angry_puffed_ch_pisca_boca_v1_f8e6_flow.png",
+     "job": "6125c9c1ec",
+     "motor": "flow",
+     "quando": 1792783105.129697,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 33,
+      "verde_px": 692851
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6125c9c1ec",
+   "msg": null
+  },
+  "ceifadora_busto_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_busto_neutro_boca_v1_7d3e.png",
+     "bruto": "ceifadora_busto_neutro_boca_v1_dfe2_flow.png",
+     "job": "fb37c20212",
+     "motor": "flow",
+     "quando": 1792783114.3615322,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 531830
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "ceifadora_busto_neutro_boca_v2_8389.png",
+     "bruto": "ceifadora_busto_neutro_boca_v2_4fda_flow.png",
+     "job": "77c39111d5",
+     "motor": "flow",
+     "quando": 1792783193.8456664,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 531587
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "77c39111d5",
+   "msg": null
+  },
+  "ceifadora_x_standing_worried_hands_u_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_worried_hands_u_pisca_boca_v1_8193.png",
+     "bruto": "ceifadora_x_standing_worried_hands_u_pisca_boca_v1_c84c_flow.png",
+     "job": "00d5d982fa",
+     "motor": "flow",
+     "quando": 1792783160.2450273,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 29,
+      "verde_px": 787509
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "00d5d982fa",
+   "msg": null
+  },
+  "ceifadora_x_standing_sighing_with_a__pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_standing_sighing_with_a__pisca_boca_v1_188d.png",
+     "bruto": "ceifadora_x_standing_sighing_with_a__pisca_boca_v1_94e1_flow.png",
+     "job": "2666a734a7",
+     "motor": "flow",
+     "quando": 1792783208.8944442,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 776673
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2666a734a7",
+   "msg": null
+  },
+  "ceifadora_busto_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_busto_neutro_pisca_boca_v1_fa75.png",
+     "bruto": "ceifadora_busto_neutro_pisca_boca_v1_05fe_flow.png",
+     "job": "8e44fdf1b3",
+     "motor": "flow",
+     "quando": 1792783236.167205,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 476102
+     },
+     "cortada": true,
+     "defeito": false
+    },
+    {
+     "local": "ceifadora_busto_neutro_pisca_boca_v2_b63f.png",
+     "bruto": "ceifadora_busto_neutro_pisca_boca_v2_3aa4_flow.png",
+     "job": "6c750fca21",
+     "motor": "flow",
+     "quando": 1792783297.8518493,
+     "aviso": "a personagem saiu cortada na borda (esquerda) — refaça (fica um corte reto no PNG)",
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 476319
+     },
+     "cortada": true,
+     "defeito": false
+    }
+   ],
+   "atual": 1,
+   "erro": null,
+   "job": "6c750fca21",
+   "msg": null
+  },
+  "ceifadora_x_arms_crossed_pouting_wit_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_arms_crossed_pouting_wit_boca_v1_d8f8.png",
+     "bruto": "ceifadora_x_arms_crossed_pouting_wit_boca_v1_c9c7_flow.png",
+     "job": "22760fff26",
+     "motor": "flow",
+     "quando": 1792783418.3129096,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 791560
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "22760fff26",
+   "msg": null
+  },
+  "ceifadora_x_arms_crossed_pouting_wit_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "ceifadora_x_arms_crossed_pouting_wit_pisca_boca_v1_cfec.png",
+     "bruto": "ceifadora_x_arms_crossed_pouting_wit_pisca_boca_v1_bde1_flow.png",
+     "job": "3849163f5e",
+     "motor": "flow",
+     "quando": 1792783487.5015168,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 12,
+      "verde_px": 792005
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3849163f5e",
+   "msg": null
+  }
+ },
+ "atualizado": 1792783487.5123749
+}

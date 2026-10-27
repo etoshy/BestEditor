@@ -1,5 +1,42 @@
 {
- "textos": {},
+ "textos": {
+  "titulos": [
+   "Der Moment, in dem es kein Zurück mehr gibt: Was der Horizont wirklich bedeutet",
+   "Stell dir vor, du fällst: Was Gezeitenkräfte mit deinem Körper machen",
+   "Warum von außen niemand sieht, wie du verschwindest",
+   "Zeit im Schwarzen Loch: Warum der Fallende nichts davon merkt",
+   "Was wir über das Innere wissen und was uns die Gleichungen verschweigen",
+   "Die Singularität: Wo Physik aufhört und Fragen anfangen",
+   "Schwarzes Loch mit Drehung: Warum der Sturz nicht einfach geradeaus geht",
+   "Angst vor dem Unbekannten oder Verständnis? Was du beim Fall wirklich erfährst"
+  ],
+  "descricoes": [
+   "Hast du dich jemals gefragt, was mit deinem Körper passiert, wenn du in ein Schwarzes Loch fällst? In diesem Video gehen wir Schritt für Schritt durch die Physik: von der Spaghettifizierung über den Ereignishorizont bis zu den Fragen, auf die selbst die Wissenschaft noch keine Antwort hat. Wir zeigen, was die NASA berechnet hat, was wir beobachten können und wo unser Wissen endet. Wenn dich solche Fragen aus dem Weltall faszinieren, abonniere ASTRANEBEL und bleib neugierig, denn beim nächsten Video geht die Reise weiter.",
+   "Ein Schwarzes Loch klingt nach Science-Fiction, ist aber eine der strengsten Vorhersagen der Physik. In diesem Video begleitet dich ASTRANEBEL auf dem Weg eines Astronauten: Wie wirken die Gezeitenkräfte, warum scheint seine Zeit von außen langsamer zu werden und was verschwindet hinter dem Horizont, ohne dass jemand es je zurückmelden kann? Wir trennen gesicherte Erkenntnisse von Hypothesen und zeigen, wo die bekannten Gleichungen aufhören. Wenn dir diese Mischung aus Staunen und klarem Denken gefällt, dann abonniere ASTRANEBEL und lass uns gemeinsam weiter ins Dunkle blicken."
+  ],
+  "tags": [
+   "Schwarzes Loch Erklärung",
+   "Schwarzes Loch Dokumentation",
+   "Was passiert im Schwarzen Loch",
+   "Schwarzes Loch Ereignishorizont erklärt",
+   "Spaghettifizierung Schwarzes Loch",
+   "Gezeitenkräfte Schwarzes Loch",
+   "Zeitdilatation Schwarzes Loch",
+   "Schwarzes Loch Singularität erklärt",
+   "Schwarzes Loch Rotation Kerr",
+   "Rotierendes Schwarzes Loch innerer Horizont",
+   "Sagittarius A* Masse",
+   "NASA Simulation Schwarzes Loch",
+   "M87 Schwarzes Loch Schatten",
+   "Gravitative Rotverschiebung erklärt",
+   "Allgemeine Relativitätstheorie einfach erklärt",
+   "Quantengravitation Schwarzes Loch",
+   "Wurmloch Schwarzes Loch Theorie",
+   "Schwarzes Loch Informationsparadoxon",
+   "Astronomie Wissen Deutsch",
+   "Weltraum Physik für Einsteiger"
+  ]
+ },
  "capas": [
   {
    "n": 1,
@@ -55,5 +92,10 @@
    "imagem": "E:\\editor2bancodevideos\\publicacoes\\f9c668cd3d8f\\capas\\capa_3_1792598158_0.jpg",
    "final": "E:\\editor2bancodevideos\\publicacoes\\f9c668cd3d8f\\capas\\capa_3_1792598158_0_final_3f78.jpg"
   }
- ]
+ ],
+ "idioma": {
+  "codigo": "de",
+  "nome": "alemão — Deutsch (de)"
+ },
+ "gerado_em": 1792608334.3585896
 }

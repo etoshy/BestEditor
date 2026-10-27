@@ -1,0 +1,1869 @@
+{
+ "id": "9505403303",
+ "nome": "🎞 Assalariado (Ceifadora 0)",
+ "criado": 1792781424.1677892,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "personagem": "assalariado",
+  "nome": "Assalariado",
+  "anime2d": true,
+  "descricoes_referencias": {
+   "ref_2af6d06c.png": "a reference picture of Assalariado",
+   "design_anime_aprovado.png": "the APPROVED anime character design of Assalariado — follow it exactly (face, hair, outfit, colors)"
+  },
+  "texto_fixo": {
+   "trava": "CHARACTER LOCK: Assalariado. Appearance: drawn EXACTLY like the manga reference: slim young office worker, messy short black hair with soft bangs falling over his eyes, tired half-closed dark gray eyes, a gray suit jacket and gray trousers, white shirt, navy-blue tie, a black messenger bag with the strap across his chest, black backpack straps, black shoes, fair skin. Keep exactly the same face, hairstyle, hair color, eye color, body, outfit and colors in every image (follow the approved design reference).",
+   "estilo": "ART STYLE: colored anime adaptation that keeps the ORIGINAL MANGA ARTIST'S drawing style exactly: the same hand-drawn loose ink linework with varied, slightly rough line weight, hatching kept as texture in the shadows, the same character proportions and face shapes (as in the manga references), flat muted colors laid under the black ink lines like a hand-colored manga page, soft limited shading, subtle paper grain — NOT generic glossy anime; FAITHFUL TO THE MANGA: copy the original artist's line art and character drawing style from the manga references (face shape, eye shape and pupils, nose, hair silhouette, body proportions), soft pastel watercolor coloring with sketchy colored-pencil line art and a thin white outline around the characters.",
+   "regras": "ONE single figure, framed as the pose says, seen in a 3/4 view turned to the RIGHT side of the image, the whole figure inside the image with margin. NO furniture, NO chair, NO table, NO desk, NO floor, NO background objects (a sitting pose sits on NOTHING — an invisible CHAIR-HEIGHT seat: hips at knee height, thighs level, lower legs down to the feet; NEVER sitting on the floor or kneeling unless the pose says so; the furniture is a separate layer); a small handheld object only if the pose needs it. No panels, on a flat solid chroma-key green background (#00FF00), no shadow on the background. ABSOLUTELY NO TEXT in the image: no letters, no words, no speech balloons, no thought bubbles, no sound-effect onomatopoeia lettering, no captions, no narration boxes, no signs or labels with writing, no watermark. If the reference images contain speech balloons, lettering or sound effects, do NOT copy them."
+  },
+  "fundo": "verde",
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "corpo_inteiro": true,
+  "boca_auto": true,
+  "flow": {
+   "proporcao": "3:4"
+  },
+  "poses": [
+   {
+    "arquivo": "assalariado_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": true,
+    "descricao_pt": "😐 em pé, neutro",
+    "prompt": "standing, relaxed neutral expression, arms down. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_neutro.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_x_walking_slowly_exhausted.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "walking slowly, exhausted, eyes half closed, shoulders slumped, holding the strap of his shoulder bag",
+    "prompt": "walking slowly, exhausted, eyes half closed, shoulders slumped, holding the strap of his shoulder bag. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_x_walking_slowly_exhausted_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "walking slowly, exhausted, eyes half closed, shoulders slumped, holding the strap of his shoulder bag — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_x_walking_slowly_exhausted.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_busto_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🙂 busto 😐 em pé, neutro",
+    "prompt": "BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer in 3/4 turned to the RIGHT. Expression: standing, relaxed neutral expression, arms down."
+   },
+   {
+    "arquivo": "assalariado_busto_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_busto_neutro.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_andando.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🚶 andando",
+    "prompt": "walking, mid-stride. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_andando_b.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "descricao_pt": "🚶 andando — 2º quadro",
+    "prompt": "Draw the NEXT FRAME of this motion: walking, the OTHER leg forward (next step of the same walk cycle). Same character, same framing and size.",
+    "pose_base": "assalariado_andando.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_costas.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🔙 de costas",
+    "prompt": "seen from behind, standing. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_costas_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🔙 de costas — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_costas.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_x_standing_turning_his_hea.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, turning his head back over his shoulder, startled, blank tired eyes",
+    "prompt": "standing, turning his head back over his shoulder, startled, blank tired eyes. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_x_standing_turning_his_hea_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, turning his head back over his shoulder, startled, blank tired eyes — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_x_standing_turning_his_hea.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_x_standing_startled_leanin.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, startled, leaning back slightly, sweat drop, eyes wide",
+    "prompt": "standing, startled, leaning back slightly, sweat drop, eyes wide. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_x_standing_startled_leanin_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, startled, leaning back slightly, sweat drop, eyes wide — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_x_standing_startled_leanin.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_x_standing_staring_blankly.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, staring blankly at someone in front of him, tired expressionless face",
+    "prompt": "standing, staring blankly at someone in front of him, tired expressionless face. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_x_standing_staring_blankly_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, staring blankly at someone in front of him, tired expressionless face — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_x_standing_staring_blankly.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_x_standing_exhausted_eyes_.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, exhausted, eyes closed, a tired sweat drop, holding his bag, mumbling",
+    "prompt": "standing, exhausted, eyes closed, a tired sweat drop, holding his bag, mumbling. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_x_standing_exhausted_eyes__pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, exhausted, eyes closed, a tired sweat drop, holding his bag, mumbling — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_x_standing_exhausted_eyes_.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_x_standing_surprised_eyebr.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "standing, surprised, eyebrows raised, mouth slightly open",
+    "prompt": "standing, surprised, eyebrows raised, mouth slightly open. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "assalariado_x_standing_surprised_eyebr_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "standing, surprised, eyebrows raised, mouth slightly open — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "assalariado_x_standing_surprised_eyebr.png",
+    "edita_base": true
+   },
+   {
+    "arquivo": "assalariado_neutro_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_busto_neutro_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_busto_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_walking_slowly_exhausted_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_walking_slowly_exhausted.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "walking slowly, exhausted, eyes half closed, shoulders slumped, holding the strap of his shoulder bag — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_andando_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_andando.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🚶 andando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_costas_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_costas.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🔙 de costas — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_startled_leanin_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_startled_leanin.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, startled, leaning back slightly, sweat drop, eyes wide — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_turning_his_hea_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_turning_his_hea.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, turning his head back over his shoulder, startled, blank tired eyes — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_exhausted_eyes__boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_exhausted_eyes_.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, exhausted, eyes closed, a tired sweat drop, holding his bag, mumbling — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_surprised_eyebr_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_surprised_eyebr.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, surprised, eyebrows raised, mouth slightly open — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_staring_blankly_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_staring_blankly.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "standing, staring blankly at someone in front of him, tired expressionless face — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_busto_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_busto_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_walking_slowly_exhausted_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_walking_slowly_exhausted_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "walking slowly, exhausted, eyes half closed, shoulders slumped, holding the strap of his shoulder bag — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_andando_b_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_andando_b.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "🚶 andando — 2º quadro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_costas_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_costas_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🔙 de costas — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_startled_leanin_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_startled_leanin_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, startled, leaning back slightly, sweat drop, eyes wide — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_turning_his_hea_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_turning_his_hea_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, turning his head back over his shoulder, startled, blank tired eyes — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_exhausted_eyes__pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_exhausted_eyes__pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, exhausted, eyes closed, a tired sweat drop, holding his bag, mumbling — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_surprised_eyebr_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_surprised_eyebr_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, surprised, eyebrows raised, mouth slightly open — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "assalariado_x_standing_staring_blankly_pisca_boca.png",
+    "tipo": "boca",
+    "base": "assalariado_x_standing_staring_blankly_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "standing, staring blankly at someone in front of him, tired expressionless face — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   }
+  ]
+ },
+ "refs": [
+  "design_anime_aprovado.png",
+  "ref_2af6d06c.png"
+ ],
+ "motor": "flow",
+ "canal": null,
+ "mestre": {
+  "arquivo": "assalariado_neutro.png",
+  "local": "assalariado_neutro_v1_ca02.png",
+  "quando": 1792781499.418255,
+  "bruto": "assalariado_neutro_v1_f333_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "0f7e1a9497",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_neutro.png"
+   ],
+   "criado": 1792781424.3171337,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "190d1a1680",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_neutro_boca.png"
+   ],
+   "criado": 1792781499.4091668,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a3e37c1e10",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_neutro_pisca.png"
+   ],
+   "criado": 1792781499.9726403,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a732c9b7d6",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_walking_slowly_exhausted.png"
+   ],
+   "criado": 1792781499.9726465,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e85cae1f1f",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_busto_neutro.png"
+   ],
+   "criado": 1792781499.9726496,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2172e5a7ea",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_andando.png"
+   ],
+   "criado": 1792781499.972652,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "cc7f0efa64",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_costas.png"
+   ],
+   "criado": 1792781499.9726539,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "043b92e5ad",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_turning_his_hea.png"
+   ],
+   "criado": 1792781499.9726555,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "218e982fd7",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_startled_leanin.png"
+   ],
+   "criado": 1792781499.9726574,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c5b775540b",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_staring_blankly.png"
+   ],
+   "criado": 1792781499.9726593,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ad24396395",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_exhausted_eyes_.png"
+   ],
+   "criado": 1792781499.9726613,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "51e9bdaccb",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_surprised_eyebr.png"
+   ],
+   "criado": 1792781499.9726634,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "284745efdb",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_neutro_pisca_boca.png"
+   ],
+   "criado": 1792781646.8120337,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7382203deb",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_busto_neutro_boca.png"
+   ],
+   "criado": 1792781669.3799937,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ae88067c12",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_busto_neutro_pisca.png"
+   ],
+   "criado": 1792781669.3799982,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "337446b0b6",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_walking_slowly_exhausted_boca.png"
+   ],
+   "criado": 1792781674.4645402,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "91eaa8fbd9",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_walking_slowly_exhausted_pisca.png"
+   ],
+   "criado": 1792781674.464548,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "393c9fa8d8",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_andando_boca.png"
+   ],
+   "criado": 1792781693.3636599,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a6e9a806b4",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_andando_b.png"
+   ],
+   "criado": 1792781693.3636653,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "2895da39fd",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_costas_boca.png"
+   ],
+   "criado": 1792781701.274081,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e9c1ae39b1",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_costas_pisca.png"
+   ],
+   "criado": 1792781701.2740874,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3b8ad59e05",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_startled_leanin_boca.png"
+   ],
+   "criado": 1792781728.0764213,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ff1c5e370f",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_startled_leanin_pisca.png"
+   ],
+   "criado": 1792781728.0764287,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1348a032e1",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_turning_his_hea_boca.png"
+   ],
+   "criado": 1792781733.1093984,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "61b5c728d7",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_turning_his_hea_pisca.png"
+   ],
+   "criado": 1792781733.1094058,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "45367ded09",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_exhausted_eyes__boca.png"
+   ],
+   "criado": 1792781763.5331597,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f23c3e2f04",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_exhausted_eyes__pisca.png"
+   ],
+   "criado": 1792781763.533167,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "401f3656be",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_surprised_eyebr_boca.png"
+   ],
+   "criado": 1792781793.3311336,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0532699c3a",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_surprised_eyebr_pisca.png"
+   ],
+   "criado": 1792781793.3311417,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "15159a99a6",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_staring_blankly_boca.png"
+   ],
+   "criado": 1792781809.4212055,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "898f3e7461",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_staring_blankly_pisca.png"
+   ],
+   "criado": 1792781809.4212167,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "76c15baa4d",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_busto_neutro_pisca_boca.png"
+   ],
+   "criado": 1792782130.8789675,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ff2f0403cf",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_walking_slowly_exhausted_pisca_boca.png"
+   ],
+   "criado": 1792782175.3578565,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "415c31a56a",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_andando_b_boca.png"
+   ],
+   "criado": 1792782236.722701,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "58de10bbe5",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_costas_pisca_boca.png"
+   ],
+   "criado": 1792782244.9915643,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ca1749f1f7",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_startled_leanin_pisca_boca.png"
+   ],
+   "criado": 1792782289.3766444,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "db581a2977",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_turning_his_hea_pisca_boca.png"
+   ],
+   "criado": 1792782329.5926728,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "87e9857963",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_exhausted_eyes__pisca_boca.png"
+   ],
+   "criado": 1792782381.552381,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b848e98290",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_surprised_eyebr_pisca_boca.png"
+   ],
+   "criado": 1792782426.8596833,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "733bbe126a",
+   "motor": "flow",
+   "arquivos": [
+    "assalariado_x_standing_staring_blankly_pisca_boca.png"
+   ],
+   "criado": 1792782467.8786602,
+   "final": true,
+   "extra": null
+  }
+ ],
+ "log": [
+  "23/10 15:50:24 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 15:51:39 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:51:39 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 15:51:39 ⭐ mestre: assalariado_neutro.png",
+  "23/10 15:51:39 🚀 10 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:54:06 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:54:06 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:54:28 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:54:29 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:54:34 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:54:34 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:54:52 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:54:53 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:55:01 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:55:01 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:55:27 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:55:28 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:55:32 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:55:33 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:56:03 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:56:03 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:56:32 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:56:33 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 15:56:48 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 15:56:49 🚀 2 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:02:10 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:02:10 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:02:55 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:02:55 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:03:55 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:03:56 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:04:04 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:04:04 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:04:48 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:04:49 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:05:29 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:05:29 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:06:21 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:06:21 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:07:06 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:07:06 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 16:07:47 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 16:07:47 🚀 1 pose(s) pro Flow com a ⭐ mestre"
+ ],
+ "imagens": {
+  "assalariado_neutro.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "assalariado_neutro_v1_ca02.png",
+     "bruto": "assalariado_neutro_v1_f333_flow.png",
+     "job": "0f7e1a9497",
+     "motor": "flow",
+     "quando": 1792781499.044138,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 841407
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0f7e1a9497",
+   "msg": null
+  },
+  "assalariado_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_neutro_pisca_v1_cbfc.png",
+     "bruto": "assalariado_neutro_pisca_v1_b4e8_flow.png",
+     "job": "a3e37c1e10",
+     "motor": "flow",
+     "quando": 1792781646.3029988,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 841357
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a3e37c1e10",
+   "msg": null
+  },
+  "assalariado_x_walking_slowly_exhausted.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_walking_slowly_exhausted_v1_c911.png",
+     "bruto": "assalariado_x_walking_slowly_exhausted_v1_5e38_flow.png",
+     "job": "a732c9b7d6",
+     "motor": "flow",
+     "quando": 1792781674.1673543,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 837592
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a732c9b7d6",
+   "msg": null
+  },
+  "assalariado_x_walking_slowly_exhausted_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_walking_slowly_exhausted_pisca_v1_4982.png",
+     "bruto": "assalariado_x_walking_slowly_exhausted_pisca_v1_43a5_flow.png",
+     "job": "91eaa8fbd9",
+     "motor": "flow",
+     "quando": 1792782175.0666404,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 837650
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "91eaa8fbd9",
+   "msg": null
+  },
+  "assalariado_busto_neutro.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_busto_neutro_v1_a4bc.png",
+     "bruto": "assalariado_busto_neutro_v1_f844_flow.png",
+     "job": "e85cae1f1f",
+     "motor": "flow",
+     "quando": 1792781668.8795302,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 517688
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e85cae1f1f",
+   "msg": null
+  },
+  "assalariado_busto_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_busto_neutro_pisca_v1_0073.png",
+     "bruto": "assalariado_busto_neutro_pisca_v1_4549_flow.png",
+     "job": "ae88067c12",
+     "motor": "flow",
+     "quando": 1792782130.549746,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 517868
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ae88067c12",
+   "msg": null
+  },
+  "assalariado_andando.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_andando_v1_cca7.png",
+     "bruto": "assalariado_andando_v1_c021_flow.png",
+     "job": "2172e5a7ea",
+     "motor": "flow",
+     "quando": 1792781692.9280872,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 845260
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2172e5a7ea",
+   "msg": null
+  },
+  "assalariado_andando_b.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_andando_b_v1_7d58.png",
+     "bruto": "assalariado_andando_b_v1_ac82_flow.png",
+     "job": "a6e9a806b4",
+     "motor": "flow",
+     "quando": 1792782235.090378,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 846121
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a6e9a806b4",
+   "msg": null
+  },
+  "assalariado_costas.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_costas_v1_c173.png",
+     "bruto": "assalariado_costas_v1_f55a_flow.png",
+     "job": "cc7f0efa64",
+     "motor": "flow",
+     "quando": 1792781700.94555,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 847461
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "cc7f0efa64",
+   "msg": null
+  },
+  "assalariado_costas_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_costas_pisca_v1_9005.png",
+     "bruto": "assalariado_costas_pisca_v1_115f_flow.png",
+     "job": "e9c1ae39b1",
+     "motor": "flow",
+     "quando": 1792782244.689929,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 847125
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e9c1ae39b1",
+   "msg": null
+  },
+  "assalariado_x_standing_turning_his_hea.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_turning_his_hea_v1_2d23.png",
+     "bruto": "assalariado_x_standing_turning_his_hea_v1_cab8_flow.png",
+     "job": "043b92e5ad",
+     "motor": "flow",
+     "quando": 1792781732.618825,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 852339
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "043b92e5ad",
+   "msg": null
+  },
+  "assalariado_x_standing_turning_his_hea_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_turning_his_hea_pisca_v1_6424.png",
+     "bruto": "assalariado_x_standing_turning_his_hea_pisca_v1_20b3_flow.png",
+     "job": "61b5c728d7",
+     "motor": "flow",
+     "quando": 1792782329.1587381,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 852387
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "61b5c728d7",
+   "msg": null
+  },
+  "assalariado_x_standing_startled_leanin.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_startled_leanin_v1_f436.png",
+     "bruto": "assalariado_x_standing_startled_leanin_v1_294c_flow.png",
+     "job": "218e982fd7",
+     "motor": "flow",
+     "quando": 1792781727.509781,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 823690
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "218e982fd7",
+   "msg": null
+  },
+  "assalariado_x_standing_startled_leanin_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_startled_leanin_pisca_v1_8537.png",
+     "bruto": "assalariado_x_standing_startled_leanin_pisca_v1_4230_flow.png",
+     "job": "ff1c5e370f",
+     "motor": "flow",
+     "quando": 1792782288.9024253,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 823921
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ff1c5e370f",
+   "msg": null
+  },
+  "assalariado_x_standing_staring_blankly.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_staring_blankly_v1_1def.png",
+     "bruto": "assalariado_x_standing_staring_blankly_v1_bde0_flow.png",
+     "job": "c5b775540b",
+     "motor": "flow",
+     "quando": 1792781808.8964424,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 837665
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c5b775540b",
+   "msg": null
+  },
+  "assalariado_x_standing_staring_blankly_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_staring_blankly_pisca_v1_e73a.png",
+     "bruto": "assalariado_x_standing_staring_blankly_pisca_v1_35d9_flow.png",
+     "job": "898f3e7461",
+     "motor": "flow",
+     "quando": 1792782467.53106,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 838049
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "898f3e7461",
+   "msg": null
+  },
+  "assalariado_x_standing_exhausted_eyes_.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_exhausted_eyes__v1_82a8.png",
+     "bruto": "assalariado_x_standing_exhausted_eyes__v1_529a_flow.png",
+     "job": "ad24396395",
+     "motor": "flow",
+     "quando": 1792781763.077763,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 839003
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ad24396395",
+   "msg": null
+  },
+  "assalariado_x_standing_exhausted_eyes__pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_exhausted_eyes__pisca_v1_373a.png",
+     "bruto": "assalariado_x_standing_exhausted_eyes__pisca_v1_6976_flow.png",
+     "job": "f23c3e2f04",
+     "motor": "flow",
+     "quando": 1792782381.1967118,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 839094
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f23c3e2f04",
+   "msg": null
+  },
+  "assalariado_x_standing_surprised_eyebr.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_surprised_eyebr_v1_3d7e.png",
+     "bruto": "assalariado_x_standing_surprised_eyebr_v1_c5de_flow.png",
+     "job": "51e9bdaccb",
+     "motor": "flow",
+     "quando": 1792781792.868805,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 828390
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "51e9bdaccb",
+   "msg": null
+  },
+  "assalariado_x_standing_surprised_eyebr_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_surprised_eyebr_pisca_v1_2097.png",
+     "bruto": "assalariado_x_standing_surprised_eyebr_pisca_v1_078a_flow.png",
+     "job": "0532699c3a",
+     "motor": "flow",
+     "quando": 1792782426.4512746,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 828338
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0532699c3a",
+   "msg": null
+  },
+  "assalariado_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_neutro_boca_v1_c851.png",
+     "bruto": "assalariado_neutro_boca_v1_489e_flow.png",
+     "job": "190d1a1680",
+     "motor": "flow",
+     "quando": 1792781626.9177814,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 841311
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "190d1a1680",
+   "msg": null
+  },
+  "assalariado_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_neutro_pisca_boca_v1_af43.png",
+     "bruto": "assalariado_neutro_pisca_boca_v1_dfce_flow.png",
+     "job": "284745efdb",
+     "motor": "flow",
+     "quando": 1792782096.2871277,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 841469
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "284745efdb",
+   "msg": null
+  },
+  "assalariado_busto_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_busto_neutro_boca_v1_9f0a.png",
+     "bruto": "assalariado_busto_neutro_boca_v1_b1bb_flow.png",
+     "job": "7382203deb",
+     "motor": "flow",
+     "quando": 1792782118.5716987,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 517761
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7382203deb",
+   "msg": null
+  },
+  "assalariado_x_walking_slowly_exhausted_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_walking_slowly_exhausted_boca_v1_8a2f.png",
+     "bruto": "assalariado_x_walking_slowly_exhausted_boca_v1_f7a3_flow.png",
+     "job": "337446b0b6",
+     "motor": "flow",
+     "quando": 1792782152.8575473,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 837539
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "337446b0b6",
+   "msg": null
+  },
+  "assalariado_andando_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_andando_boca_v1_a65d.png",
+     "bruto": "assalariado_andando_boca_v1_924a_flow.png",
+     "job": "393c9fa8d8",
+     "motor": "flow",
+     "quando": 1792782186.739901,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 845316
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "393c9fa8d8",
+   "msg": null
+  },
+  "assalariado_costas_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_costas_boca_v1_a5cb.png",
+     "bruto": "assalariado_costas_boca_v1_2b6e_flow.png",
+     "job": "2895da39fd",
+     "motor": "flow",
+     "quando": 1792782220.0066934,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 846953
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "2895da39fd",
+   "msg": null
+  },
+  "assalariado_x_standing_startled_leanin_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_startled_leanin_boca_v1_6259.png",
+     "bruto": "assalariado_x_standing_startled_leanin_boca_v1_26aa_flow.png",
+     "job": "3b8ad59e05",
+     "motor": "flow",
+     "quando": 1792782277.5498977,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 824130
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3b8ad59e05",
+   "msg": null
+  },
+  "assalariado_x_standing_turning_his_hea_boca.png": {
+   "estado": "erro",
+   "versoes": [],
+   "atual": -1,
+   "erro": "o Flow recusou: o Flow não gerou: Falha ao carregar a imagem.",
+   "job": "1348a032e1",
+   "msg": "🎨 gerando no Flow (conta “melojonas03500@gmail.com”)"
+  },
+  "assalariado_x_standing_exhausted_eyes__boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_exhausted_eyes__boca_v1_e467.png",
+     "bruto": "assalariado_x_standing_exhausted_eyes__boca_v1_1eae_flow.png",
+     "job": "45367ded09",
+     "motor": "flow",
+     "quando": 1792782366.070607,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 839058
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "45367ded09",
+   "msg": null
+  },
+  "assalariado_x_standing_surprised_eyebr_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_surprised_eyebr_boca_v1_bb44.png",
+     "bruto": "assalariado_x_standing_surprised_eyebr_boca_v1_f848_flow.png",
+     "job": "401f3656be",
+     "motor": "flow",
+     "quando": 1792782411.1197643,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 828442
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "401f3656be",
+   "msg": null
+  },
+  "assalariado_x_standing_staring_blankly_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_staring_blankly_boca_v1_b2a0.png",
+     "bruto": "assalariado_x_standing_staring_blankly_boca_v1_98ca_flow.png",
+     "job": "15159a99a6",
+     "motor": "flow",
+     "quando": 1792782452.6188278,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 837647
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "15159a99a6",
+   "msg": null
+  },
+  "assalariado_busto_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_busto_neutro_pisca_boca_v1_33e4.png",
+     "bruto": "assalariado_busto_neutro_pisca_boca_v1_dbf0_flow.png",
+     "job": "76c15baa4d",
+     "motor": "flow",
+     "quando": 1792782849.412671,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 518075
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "76c15baa4d",
+   "msg": null
+  },
+  "assalariado_x_walking_slowly_exhausted_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_walking_slowly_exhausted_pisca_boca_v1_d0b9.png",
+     "bruto": "assalariado_x_walking_slowly_exhausted_pisca_boca_v1_fbae_flow.png",
+     "job": "ff2f0403cf",
+     "motor": "flow",
+     "quando": 1792782857.374343,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 837885
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ff2f0403cf",
+   "msg": null
+  },
+  "assalariado_andando_b_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_andando_b_boca_v1_0e62.png",
+     "bruto": "assalariado_andando_b_boca_v1_b31c_flow.png",
+     "job": "415c31a56a",
+     "motor": "flow",
+     "quando": 1792782890.8755999,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 846131
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "415c31a56a",
+   "msg": null
+  },
+  "assalariado_costas_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_costas_pisca_boca_v1_811c.png",
+     "bruto": "assalariado_costas_pisca_boca_v1_13c1_flow.png",
+     "job": "58de10bbe5",
+     "motor": "flow",
+     "quando": 1792782898.8758774,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 847262
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "58de10bbe5",
+   "msg": null
+  },
+  "assalariado_x_standing_startled_leanin_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_startled_leanin_pisca_boca_v1_9f7f.png",
+     "bruto": "assalariado_x_standing_startled_leanin_pisca_boca_v1_08b5_flow.png",
+     "job": "ca1749f1f7",
+     "motor": "flow",
+     "quando": 1792782931.8335714,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 12,
+      "verde_px": 824133
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ca1749f1f7",
+   "msg": null
+  },
+  "assalariado_x_standing_turning_his_hea_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_turning_his_hea_pisca_boca_v1_e097.png",
+     "bruto": "assalariado_x_standing_turning_his_hea_pisca_boca_v1_3126_flow.png",
+     "job": "db581a2977",
+     "motor": "flow",
+     "quando": 1792782944.0504146,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 852680
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "db581a2977",
+   "msg": null
+  },
+  "assalariado_x_standing_exhausted_eyes__pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_exhausted_eyes__pisca_boca_v1_c577.png",
+     "bruto": "assalariado_x_standing_exhausted_eyes__pisca_boca_v1_be1f_flow.png",
+     "job": "87e9857963",
+     "motor": "flow",
+     "quando": 1792782973.880374,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 11,
+      "verde_px": 839321
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "87e9857963",
+   "msg": null
+  },
+  "assalariado_x_standing_surprised_eyebr_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_surprised_eyebr_pisca_boca_v1_1a1f.png",
+     "bruto": "assalariado_x_standing_surprised_eyebr_pisca_boca_v1_b2ce_flow.png",
+     "job": "b848e98290",
+     "motor": "flow",
+     "quando": 1792782988.9438527,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 828487
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b848e98290",
+   "msg": null
+  },
+  "assalariado_x_standing_staring_blankly_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "assalariado_x_standing_staring_blankly_pisca_boca_v1_03d7.png",
+     "bruto": "assalariado_x_standing_staring_blankly_pisca_boca_v1_fe47_flow.png",
+     "job": "733bbe126a",
+     "motor": "flow",
+     "quando": 1792783018.4969392,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 838280
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "733bbe126a",
+   "msg": null
+  }
+ },
+ "atualizado": 1792783018.5074496
+}

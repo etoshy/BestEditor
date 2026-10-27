@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}🧬 Criador de personagens{% endblock %}
+{% block content %}
+<style>
+  .cr-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .cr-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+  .cr-item { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; text-align: center; text-decoration: none; color: inherit; }
+  .cr-item img { height: 150px; object-fit: contain; background: repeating-conic-gradient(#e2e8f0 0 25%, #fff 0 50%) 50% / 16px 16px; border-radius: 6px; width: 100%; }
+  .cr-item .vazio { height: 150px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; background: var(--code-bg); border-radius: 6px; }
+  .cr-dica { color: var(--mudo); font-size: .86rem; }
+</style>
+<h1>🧬 Criador de personagens e 🗺 mundos</h1>
+<p><a href="#personagens">🧍 Personagens</a> · <a href="#lugares">🗺 Lugares e mundos</a> (do quarto ao universo, com história, pessoas importantes, fotos e mapa)</p>
+<h2 id="personagens" style="margin-top:18px">🧍 Personagens</h2>
+<p class="cr-dica">Crie um personagem <b>verdadeiramente único</b> no 🚀 Google Flow: <b>clone</b> um personagem com mudanças, <b>misture</b>
+  várias imagens (rosto da 1, cabelo da 2, roupa da 5, corpo da 3…), ou só <b>descreva</b>. A 🤖 IA monta a ficha (nomes, personalidade,
+  voz, paleta), você aprova o design e as poses saem sozinhas (giro, expressões, ação, sentado pro React).</p>
+<div class="cr-card">
+  <form method="post" action="/criador-personagens/novo" enctype="multipart/form-data">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:200px;">Nome <span class="cr-dica">(opcional — a IA sugere)</span><input name="nome" placeholder="ex.: Akemi"></label>
+      <label style="flex:1;min-width:200px;">Estilo<select name="estilo">{% for k, v in estilos.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}<option value="outro">✍ Outro (escrever)…</option></select></label>
+      <label style="flex:1;min-width:200px;">…outro estilo <span class="cr-dica">(se escolheu “Outro”)</span><input name="estilo_livre" placeholder="ex.: expressionismo alemão, vitral gótico"></label>
+    </div>
+    <label>O que você quer <span class="cr-dica">(descreva, diga o que mudar no clone, ou o que pegar de cada imagem — dá pra ajustar depois)</span></label>
+    <textarea name="descricao" rows="3" placeholder="ex.: uma caçadora de demônios de 19 anos, séria mas que adora doce; cabelo branco curto com uma mecha vermelha; casaco longo preto"></textarea>
+    <label>Imagens de referência <span class="cr-dica">(até 6 — na página você diz o que pegar de cada uma)</span><input type="file" name="refs" accept="image/*" multiple></label>
+    <button type="submit" style="width:auto;">🧬 Começar</button>
+  </form>
+</div>
+<div class="cr-grade">
+  {% for x in lista %}
+  <a class="cr-item" href="/criador-personagens/{{ x.id }}">
+    {% if x.miniatura %}<img src="/criador-personagens/{{ x.id }}/arquivo/design/{{ x.miniatura }}" alt="">{% else %}<div class="vazio">🧬</div>{% endif %}
+    <div style="font-weight:600;margin-top:4px;">{{ x.nome }}</div>
+    <div class="cr-dica">{{ x.fase }}</div>
+  </a>
+  {% endfor %}
+</div>
+
+<h2 id="lugares" style="margin-top:26px">🗺 Lugares e mundos</h2>
+<p class="cr-dica">Um quarto, uma casa, um bairro, uma cidade, um estado, um país, um continente, um mundo, um sistema, uma galáxia, um universo…
+  Cada lugar pode ficar <b>dentro</b> de outro (a cidade dentro do país, o país dentro do mundo). A 🤖 IA escreve a história, a linha do tempo, as
+  pessoas importantes (que viram personagens com 1 clique) e os pontos do mapa; as fotos e o 🗺 mapa saem no Flow, e o mapa é navegável
+  (zoom, 📍 pinos, 📏 régua, entrar nos sub-lugares).</p>
+<div class="cr-card">
+  <form method="post" action="/criador-lugares/novo" enctype="multipart/form-data">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:180px;">Nome <span class="cr-dica">(opcional)</span><input name="nome" placeholder="ex.: Vale de Aurora"></label>
+      <label style="flex:1;min-width:180px;">Escala<select name="escala">{% for k, v in escalas.items() %}<option value="{{ k }}" {% if k == 'cidade' %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      <label style="flex:1;min-width:180px;">Fica dentro de <select name="pai"><option value="">— nenhum (o topo)</option>{% for x in lugares %}<option value="{{ x.id }}">{{ x.nome }} · {{ x.escala }}</option>{% endfor %}</select></label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:180px;">Estilo<select name="estilo">{% for k, v in estilos.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}<option value="outro">✍ Outro…</option></select></label>
+      <label style="flex:1;min-width:180px;">…outro estilo<input name="estilo_livre"></label>
+      <label style="flex:1;min-width:180px;">Época<select name="epoca">{% for k, v in epocas.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}<option value="outro">✍ Outra…</option></select></label>
+      <label style="flex:1;min-width:180px;">…outra época<input name="epoca_livre" placeholder="ex.: 3200 d.C., era do gelo mágica"></label>
+    </div>
+    <label>Como é <span class="cr-dica">(o que você imagina — dá pra completar depois)</span></label>
+    <textarea name="descricao" rows="3" placeholder="ex.: uma cidade portuária construída sobre casco de baleias gigantes, sempre com neblina, comércio de âmbar"></textarea>
+    <label>Imagens de referência <span class="cr-dica">(fotos de lugares reais ou desenhos — até 6; na página diz o que pegar de cada)</span><input type="file" name="refs" accept="image/*" multiple></label>
+    <button type="submit" style="width:auto;">🗺 Criar o lugar</button>
+  </form>
+</div>
+<div class="cr-grade">
+  {% for x in lugares %}
+  <a class="cr-item" href="/criador-lugares/{{ x.id }}">
+    {% if x.miniatura %}<img src="/criador-lugares/{{ x.id }}/arquivo/fotos/{{ x.miniatura }}" alt="" style="object-fit:cover">{% else %}<div class="vazio">🗺</div>{% endif %}
+    <div style="font-weight:600;margin-top:4px;">{{ x.nome }}</div>
+    <div class="cr-dica">{{ x.escala }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -9,6 +9,7 @@ comportamento. `iniciar()` sobe um servidor local e devolve a URL base — passe
     url + "?falha=1"                # o cartão "gerando" vira "Não foi possível gerar"
     url + "?login=1"                # sem o botão "Novo projeto" (pediu login)
     url + "?painel=1"               # janela larga: o agente é um painel à direita, sem o chip "Agente"
+    url + "?semagente=1"            # o Flow de out/2026: sem o Agente (a caixa já vem direta)
     url + "?semcaixa=1"             # o projeto abre sem a caixa "O que você quer criar?" (1x = só na 1ª vez)
 """
 from __future__ import annotations

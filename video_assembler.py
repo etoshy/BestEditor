@@ -2029,6 +2029,9 @@ def apply_overlays(
     return output_path
 
 
+RESP_W = 2 * 3.14159265 / 2.6  # 🫁 um ciclo de respiração a cada 2,6 s
+
+
 def _mov_expr(movs: Any, eixo: str) -> str:
     """🌄 v84_237: o deslocamento da camada no tempo (parallax da 🎞 Animação 2D / câmera tremida), somado ao x ou y do
     overlay. Cada mov: {"a","b","dx","dy"} (fração de W/H na cena toda, de -d/2 a +d/2) ou {"a","b","tremor"}
@@ -2040,6 +2043,14 @@ def _mov_expr(movs: Any, eixo: str) -> str:
         except (KeyError, TypeError, ValueError):
             continue
         if b <= a:
+            continue
+        if m.get("resp"):  # 🫁 v84_238c: o personagem "respira" (sobe e desce de leve, sem parar) — tipo Jashin-chan
+            if eixo == "y":
+                termos.append(f"between(t,{a:.3f},{b:.3f})*main_h*{float(m['resp']):.5f}*sin(t*{RESP_W:.4f}+{float(m.get('f') or 0):.3f})")
+            continue
+        if m.get("pulo"):  # 🦘 o pulinho de reação quando a emoção muda (sobe e volta em `b - a`)
+            if eixo == "y":
+                termos.append(f"between(t,{a:.3f},{b:.3f})*main_h*{-float(m['pulo']):.5f}*sin(PI*(t-{a:.3f})/{b - a:.3f})")
             continue
         if "de" in m:  # 🚶 v84_238: andar — de `de` até `para` (fração da largura) entre a e b, parado até z
             if eixo != "x":
@@ -2076,13 +2087,31 @@ def _trilha_ok(ov: Dict[str, Any]) -> bool:
             and (ov.get("anim_out") or "nenhuma") == "nenhuma" and os.path.isfile(str(ov.get("resolved_path") or "")))
 
 
+def _png_valido(caminho: str) -> bool:
+    """O PNG abre de verdade (um arquivo pela metade — montagem interrompida no meio — não serve de cache)."""
+    try:
+        from PIL import Image
+        with Image.open(caminho) as im:
+            im.verify()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _salvar_png(im: Any, destino: str) -> None:
+    """Salva num temporário e troca de uma vez — nunca fica um PNG pela metade com o nome do cache."""
+    tmp = f"{destino}.{uuid.uuid4().hex[:6]}.tmp.png"
+    im.save(tmp)
+    os.replace(tmp, destino)
+
+
 def _png_na_tela(caminho: str, largura: int, espelhar: bool, w: int, h: int) -> str:
     """A imagem no tamanho da trilha (todas do mesmo tamanho: centralizada numa tela transparente w×h)."""
     from PIL import Image
     pronto = _png_no_tamanho(caminho, largura, espelhar) or caminho
     base, _ext = os.path.splitext(pronto)
     destino = f"{base}__t{w}x{h}.png"
-    if os.path.isfile(destino) and os.path.getmtime(destino) >= os.path.getmtime(pronto):
+    if os.path.isfile(destino) and os.path.getmtime(destino) >= os.path.getmtime(pronto) and _png_valido(destino):
         return destino
     with Image.open(pronto) as im:
         im = im.convert("RGBA")
@@ -2090,7 +2119,7 @@ def _png_na_tela(caminho: str, largura: int, espelhar: bool, w: int, h: int) -> 
             return pronto
         tela = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         tela.paste(im, ((w - im.width) // 2, (h - im.height) // 2), im)
-        tela.save(destino)
+        _salvar_png(tela, destino)
     return destino
 
 
@@ -2100,6 +2129,12 @@ def _juntar_trilhas(overlays: List[Dict[str, Any]], target_width: int, pasta: st
     igual ao overlay normal; onde duas camadas se cruzam ganha a que vem depois (a que ficava por cima)."""
     from PIL import Image
     import math
+    # 🛡 PNG estragado (montagem anterior interrompida no meio de salvar) não derruba a montagem: a camada sai
+    ruins = [ov for ov in overlays if ov.get("media_type", "image") == "image" and str(ov.get("resolved_path") or "").lower().endswith(".png")
+             and os.path.isfile(str(ov.get("resolved_path"))) and not _png_valido(str(ov["resolved_path"]))]
+    if ruins:
+        print(f"[overlays] {len(ruins)} imagem(ns) estragada(s) ignorada(s): " + ", ".join(os.path.basename(str(o["resolved_path"])) for o in ruins[:5]))
+        overlays = [ov for ov in overlays if ov not in ruins]
     grupos: Dict[Any, List[int]] = {}
     for i, ov in enumerate(overlays):
         if _trilha_ok(ov):
@@ -2153,12 +2188,20 @@ def _juntar_trilhas(overlays: List[Dict[str, Any]], target_width: int, pasta: st
                 seq[-1][2] = b
             else:
                 seq.append([img, a, b])
-        # todas do mesmo tamanho
+        # todas do mesmo tamanho (uma imagem que não abre — arquivo estragado — sai da trilha em vez de derrubar a montagem)
         tams = []
+        ruins = set()
         for img in {x[0] for x in seq if x[0]}:
             pronto = _png_no_tamanho(img, largura, esp) or img
-            with Image.open(pronto) as im:
-                tams.append(im.size)
+            try:
+                with Image.open(pronto) as im:
+                    tams.append(im.size)
+            except Exception:  # noqa: BLE001
+                ruins.add(img)
+        if ruins:
+            seq = [[None if x[0] in ruins else x[0], x[1], x[2]] for x in seq]
+        if not tams:
+            continue
         w = max(t[0] for t in tams)
         h = max(t[1] for t in tams)
         h += h % 2
@@ -2207,7 +2250,7 @@ def _png_no_tamanho(caminho: str, largura: int, espelhar: bool) -> Optional[str]
         from PIL import Image, ImageOps
         base, _ext = os.path.splitext(caminho)
         destino = f"{base}__{largura}{'f' if espelhar else ''}.png"
-        if os.path.isfile(destino) and os.path.getmtime(destino) >= os.path.getmtime(caminho):
+        if os.path.isfile(destino) and os.path.getmtime(destino) >= os.path.getmtime(caminho) and _png_valido(destino):
             return destino
         with Image.open(caminho) as im:
             im = im.convert("RGBA")
@@ -2216,7 +2259,7 @@ def _png_no_tamanho(caminho: str, largura: int, espelhar: bool) -> Optional[str]
             im = im.resize((largura, alt), Image.LANCZOS)
             if espelhar:
                 im = ImageOps.mirror(im)
-            im.save(destino)
+            _salvar_png(im, destino)
         return destino
     except Exception:  # noqa: BLE001
         return None

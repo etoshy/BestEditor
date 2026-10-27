@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}🎬 {{ p.titulo }} — Anime quadro a quadro{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1280px; }
+  .ac-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .ac-card h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; gap: 8px; align-items: center; }
+  .ac-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .ac-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .ac-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .ac-linha > * { margin: 0; }
+  .ac-linha button, .ac-btn { width: auto; margin: 0; padding: 6px 12px; }
+  .ac-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .ac-sec { background: #64748b !important; } .ac-perigo { background: #dc2626 !important; } .ac-ok { background: #16a34a !important; }
+  .ac-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .ac-pers { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; }
+  .ac-pers img { width: 100%; height: 170px; object-fit: contain; background: repeating-conic-gradient(#e2e8f0 0 25%, #fff 0 50%) 50% / 14px 14px; border-radius: 6px; }
+  .ac-pag { position: relative; } .ac-pag img { height: 120px; border-radius: 6px; }
+  .ac-plano { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; margin: 10px 0; }
+  .ac-plano.ok { border-color: #16a34a; }
+  .ac-plano .cab { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .ac-plano .cab b { font-size: 1rem; }
+  .ac-plano select, .ac-plano input { width: auto; margin: 0; }
+  .ac-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+  .ac-chips label { font-size: .74rem; border: 1px solid var(--borda); border-radius: 999px; padding: 1px 7px; margin: 0; cursor: pointer; }
+  .ac-chips input { width: auto; margin: 0 3px 0 0; }
+  .ac-des { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 8px; }
+  .ac-q { border: 1px solid var(--borda); border-radius: 8px; padding: 6px; font-size: .8rem; }
+  .ac-q.imp { border-color: #f59e0b; }
+  .ac-q .img { aspect-ratio: 16/9; background: var(--code-bg); border-radius: 6px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; }
+  .ac-q.vert .img { aspect-ratio: 9/16; }
+  .ac-q .img img { width: 100%; height: 100%; object-fit: cover; }
+  .ac-q textarea { font-size: .78rem; min-height: 54px; margin: 4px 0; }
+  .ac-falas > div { display: flex; gap: 4px; align-items: center; margin: 2px 0; flex-wrap: wrap; }
+  .ac-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; position: sticky; top: 0; z-index: 10; }
+  .ac-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .ac-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .ac-barra.okk { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  video { width: 100%; max-height: 70vh; border-radius: 10px; background: #000; }
+</style>
+
+<div class="ac-linha" style="justify-content:space-between">
+  <h1 style="margin:0">🎬 <span id="tTitulo">{{ p.titulo }}</span> <span class="ac-dica" id="tDur"></span></h1>
+  <div class="ac-linha"><a href="/modelos-video#animecine">← modelos</a>
+    <form method="post" action="/anime-cine/{{ p.id }}/excluir" onsubmit="return confirm('Excluir esta cena (os desenhos, as vozes e o vídeo)?')" style="margin:0"><button class="ac-mini ac-perigo">🗑</button></form></div>
+</div>
+<div class="ac-barra" id="barra"></div>
+
+<!-- 1 · cena -->
+<div class="ac-card">
+  <h2><span class="ac-num">1</span>📥 A cena</h2>
+  <p class="ac-dica">Sem vídeo de IA: o 🚀 Flow só <b>desenha</b> (o quadro-chave e os desenhos do movimento, cada um a partir do anterior) e a animação é montada aqui — tempo de cada desenho, câmera, tremor, linhas de velocidade, impacto, flash, partículas, transições, vozes e sons.</p>
+  <div class="ac-linha">
+    <label style="flex:1;min-width:220px">Título <input data-e="titulo" value="{{ p.titulo }}"></label>
+    <label>Duração <input data-e="duracao" type="number" min="2" max="60" value="{{ p.entrada.duracao }}" style="width:70px"> s</label>
+    <label>Proporção <select data-e="proporcao" style="width:auto"><option value="16:9" {% if p.entrada.proporcao == '16:9' %}selected{% endif %}>16:9 (deitado)</option><option value="9:16" {% if p.entrada.proporcao == '9:16' %}selected{% endif %}>9:16 (Shorts/Reels)</option></select></label>
+  </div>
+  <div class="ac-linha">
+    <label>🎨 Estilo <select data-e="estilo" style="width:auto">{% for k, v in estilos.items() %}<option value="{{ k }}" {% if p.entrada.estilo == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}<option value="outro" {% if p.entrada.estilo == 'outro' %}selected{% endif %}>✍ Outro…</option></select></label>
+    <label id="lLivre" style="flex:1;min-width:220px">…qual <input data-e="estilo_livre" value="{{ p.entrada.estilo_livre }}"></label>
+  </div>
+  <label>Roteiro / o que acontece <span class="ac-dica">(ex.: “Kaito encara o demônio na ponte sob a chuva; corre, desvia de um golpe, gira a espada envolta em água e corta — o demônio grita e se desfaz em cinzas”)</span></label>
+  <textarea data-e="roteiro" rows="4">{{ p.entrada.roteiro }}</textarea>
+  <div class="ac-linha"><b>📖 Páginas de mangá</b> <span class="ac-dica" style="margin:0">(opcional — a IA segue os quadros)</span>
+    <label class="ac-btn ac-sec" style="cursor:pointer;color:#fff;border-radius:6px">➕ Páginas<input type="file" id="pagUp" accept="image/*" multiple style="display:none"></label></div>
+  <div class="ac-linha" id="paginas"></div>
+  <div class="ac-linha">
+    <label>🗺 Cenário <select data-e="lugar" style="width:auto"><option value="">— só o texto</option>{% for x in lugares %}<option value="{{ x.id }}" {% if p.entrada.lugar == x.id %}selected{% endif %}>{{ x.nome }} · {{ x.escala }}</option>{% endfor %}</select></label>
+    <label style="flex:1;min-width:240px">…ou descreva <input data-e="cenario" value="{{ p.entrada.cenario }}" placeholder="ex.: ponte de madeira sobre um rio, noite de lua cheia, chuva forte"></label>
+    <label class="ac-btn ac-sec" style="cursor:pointer;color:#fff;border-radius:6px">📁 Imagem do cenário<input type="file" id="cenUp" accept="image/*" style="display:none"></label>
+    <span class="ac-dica" id="cenEst" style="margin:0"></span>
+  </div>
+</div>
+
+<!-- 2 · personagens -->
+<div class="ac-card">
+  <h2><span class="ac-num">2</span>🧍 Personagens</h2>
+  <p class="ac-dica">Puxe de outra parte do site (o design aprovado / a ⭐ mestre vira a referência de cada desenho) ou mande uma imagem. A voz é a do TTS do site.</p>
+  <div class="ac-linha">
+    <select id="fonte" style="width:auto;max-width:420px">{% for x in fontes %}<option value="{{ x.fonte }}">{{ x.grupo }} — {{ x.nome }}</option>{% endfor %}</select>
+    <button type="button" id="bImportar" class="ac-sec" {% if not fontes %}disabled title="nenhum personagem com imagem no site ainda"{% endif %}>➕ Puxar</button>
+    <span class="ac-dica" style="margin:0">ou</span>
+    <input id="pNome" placeholder="nome" style="width:140px"><input id="pApar" placeholder="aparência (inglês, opcional)" style="width:240px">
+    <label class="ac-btn ac-sec" style="cursor:pointer;color:#fff;border-radius:6px">📁 Imagem<input type="file" id="pUp" accept="image/*" style="display:none"></label>
+  </div>
+  <div class="ac-grade" id="pers"></div>
+</div>
+
+<!-- 3 · planos e desenhos -->
+<div class="ac-card">
+  <h2><span class="ac-num">3</span>🎞 Planos e desenhos (storyboard)</h2>
+  <p class="ac-dica"><b>1)</b> 🤖 Planejar divide a cena em planos e desenhos (dá pra editar tudo). <b>2)</b> 🚀 os quadros-chave (o 1º desenho de cada plano) → ✔ aprove o que ficou bom (🔁 refaz com correção). <b>3)</b> 🎞 os desenhos do movimento: saem um depois do outro, cada um a partir do anterior. <b>▶ Prévia</b> anima só o plano.</p>
+  <div class="ac-linha">
+    <button type="button" id="bPlanejar">🤖 Planejar a cena</button>
+    <button type="button" id="bChaves" class="ac-sec">🚀 Gerar os quadros-chave que faltam</button>
+    <button type="button" id="bSeq" class="ac-sec">🎞 Desenhos do movimento (planos aprovados)</button>
+    <button type="button" id="bSalvar" class="ac-sec">💾 Salvar os planos</button><span class="ac-dica" id="sEst" style="margin:0"></span>
+  </div>
+  <div id="planos"></div>
+  <button type="button" id="bNovoPlano" class="ac-mini ac-sec">➕ plano</button>
+</div>
+
+<!-- 4 · som e montagem -->
+<div class="ac-card">
+  <h2><span class="ac-num">4</span>🎙 Som e 🎬 montagem</h2>
+  <div class="ac-linha">
+    <button type="button" id="bVozes" {% if not tem_tts %}disabled title="o gerador de voz não está disponível aqui"{% endif %}>🎙 Gerar as vozes</button><span class="ac-dica" id="vEst" style="margin:0"></span>
+    <label><input type="checkbox" data-e="legendas" style="width:auto" {% if p.entrada.legendas %}checked{% endif %}> legendas das falas</label>
+    <label>volume dos efeitos <input type="range" data-e="volume_sfx" min="0" max="1.5" step="0.1" value="{{ p.entrada.volume_sfx }}" style="width:120px"></label>
+  </div>
+  <div class="ac-linha"><button type="button" id="bMontar">🎬 Montar a cena</button>
+    <a id="lBaixar" class="ac-btn ac-sec" style="display:none;text-decoration:none;color:#fff" download>⬇ mp4</a>
+    <button type="button" id="bEditor" class="ac-sec" style="display:none">🎞 Mandar pro editor</button></div>
+  <div id="video"></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }};
+const TIPOS = {{ tipos|tojson }}, CAMERAS = {{ cameras|tojson }}, EFEITOS = {{ efeitos|tojson }}, TRANS = {{ transicoes|tojson }}, SFX = {{ sfx|tojson }};
+const VOZES = {{ vozes|tojson }};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+let P = null, PL = [], sujo = false, timer = null, ultimaTarefa = null;
+const U = (sub, a) => `/anime-cine/${PID}/arquivo/${sub}/${encodeURIComponent(a)}`;
+async function api(url, dados) {
+  const op = { method: dados === undefined ? 'GET' : 'POST' };
+  if (dados instanceof FormData) op.body = dados;
+  else if (dados !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(dados); }
+  const r = await fetch(url, op); let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('HTTP ' + r.status)); return d;
+}
+function emFoco(box) { return box.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName); }
+function barra(msg, cls) { const b = $('barra'); b.className = 'ac-barra ' + (msg ? cls : ''); b.textContent = msg || ''; }
+async function recarregar() {
+  clearTimeout(timer);
+  try { P = await api(`/anime-cine/${PID}/estado`); desenhar(); } catch (e) { barra('⚠ ' + e.message, 'erro'); }
+  const t = P && P.tarefa;
+  const esp = (t && !t.fim) || (P && P.planos.some(pl => pl.sequencia || pl.quadros.some(q => ['fila', 'gerando'].includes(q.estado))));
+  timer = setTimeout(recarregar, esp ? 3000 : 20000);
+}
+function desenhar() {
+  $('tTitulo').textContent = P.titulo; $('tDur').textContent = `· ${P.planos.length} plano(s) · ${P.duracao_total} s · ${P.prontos}/${P.total_desenhos} desenhos`;
+  $('lLivre').style.display = P.entrada.estilo === 'outro' ? '' : 'none';
+  const t = P.tarefa;
+  if (t && !t.fim) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '') + '…', 'on');
+  else if (t && t.erro) barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro');
+  else if (t && t.fim && ultimaTarefa !== t.inicio) { barra('✔ ' + t.rotulo + (t.msg ? ' — ' + t.msg : ''), 'okk'); ultimaTarefa = t.inicio; if (t.rotulo.includes('prévia') && t.msg) mostrarVideo(t.msg, true); if (t.rotulo.includes('planejando')) sujo = false; }
+  $('paginas').innerHTML = P.entrada.paginas.map(a => `<div class="ac-pag"><a href="${U('refs', a)}" target="_blank"><img src="${U('refs', a)}"></a><button type="button" class="ac-mini ac-perigo" data-pag-del="${esc(a)}" style="position:absolute;top:2px;right:2px">✕</button></div>`).join('') || '<span class="ac-dica" style="margin:0">nenhuma</span>';
+  $('cenEst').innerHTML = P.entrada.lugar_img ? `<img src="${U('refs', P.entrada.lugar_img)}" style="height:40px;border-radius:4px;vertical-align:middle"> <button type="button" class="ac-mini ac-perigo" id="cenDel">✕</button>` : (P.lugar_tem_img ? '🗺 com a foto do lugar' : '');
+  if (!emFoco($('pers'))) $('pers').innerHTML = P.personagens.map(c => `<div class="ac-pers" data-cid="${c.id}"><img src="${U('refs', c.imagem)}">
+    <input data-c="nome" value="${esc(c.nome)}" style="font-weight:700;margin:4px 0">
+    <textarea data-c="aparencia_en" rows="2" placeholder="aparência (inglês)">${esc(c.aparencia_en || '')}</textarea>
+    <select data-c="voz" style="width:100%"><option value="">🔇 sem voz (só legenda)</option>${VOZES.map(v => `<option value="${esc(v.slug)}" ${v.slug === c.voz ? 'selected' : ''}>${esc(v.grupo)} · ${esc(v.nome)}</option>`).join('')}</select>
+    <button type="button" class="ac-mini ac-perigo" data-c-del>✕ tirar</button></div>`).join('') || '<p class="ac-dica">Nenhum personagem ainda.</p>';
+  // os planos: sem mudança sua, vem do servidor; com mudança, só o estado das imagens é atualizado
+  if (!sujo) PL = JSON.parse(JSON.stringify(P.planos));
+  else { const st = {}; P.planos.forEach(pl => pl.quadros.forEach(q => st[q.id] = q)); const pst = Object.fromEntries(P.planos.map(pl => [pl.id, pl]));
+    PL.forEach(pl => { if (pst[pl.id]) { pl.chave_ok = pst[pl.id].chave_ok; pl.sequencia = pst[pl.id].sequencia; } pl.quadros.forEach(q => { const s = st[q.id]; if (s) Object.assign(q, { estado: s.estado, arquivo: s.arquivo, versoes: s.versoes, msg: s.msg, erro: s.erro }); }); }); }
+  if (!emFoco($('planos'))) pintarPlanos();
+  $('vEst').textContent = P.falas_sem_audio ? `${P.falas_sem_audio} fala(s) sem voz ainda` : (P.planos.some(pl => pl.falas.length) ? '✔ todas as falas com voz' : '');
+  const mp4 = (P.saida || {}).mp4;
+  $('lBaixar').style.display = mp4 ? '' : 'none'; $('bEditor').style.display = mp4 ? '' : 'none';
+  if (mp4) { $('lBaixar').href = U('saida', mp4); if (!$('video').dataset.mp4 || $('video').dataset.mp4 !== mp4) mostrarVideo(mp4, false); }
+}
+function mostrarVideo(nome, previa) { $('video').dataset.mp4 = previa ? '' : nome; $('video').innerHTML = `<div class="ac-dica">${previa ? '▶ prévia do plano (metade da resolução)' : '🎬 a cena montada'}</div><video controls src="${U('saida', nome)}?v=${Date.now()}"></video>`; if (previa) $('video').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+const nomeDe = (cid) => (P.personagens.find(c => c.id === cid) || {}).nome || '?';
+function sel(obj, v, attr) { return `<select ${attr}>${Object.entries(obj).map(([k, r]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>`; }
+function pintarPlanos() {
+  const vert = P.entrada.proporcao === '9:16';
+  let t0 = 0;
+  $('planos').innerHTML = PL.map((pl, i) => {
+    const ini = t0; t0 += +pl.dur || 0;
+    const qs = pl.quadros.map((q, k) => {
+      const esp = ['fila', 'gerando'].includes(q.estado);
+      const vs = q.versoes || [], vi = vs.indexOf(q.arquivo);
+      return `<div class="ac-q ${q.impacto ? 'imp' : ''} ${vert ? 'vert' : ''}" data-q="${k}"><div class="img">${q.arquivo ? `<a href="${U('quadros', q.arquivo)}" target="_blank"><img src="${U('quadros', q.arquivo)}"></a>` : esc(q.estado === 'erro' ? '❌ ' + (q.erro || '') : esp ? (q.msg || '⏳') : k === 0 ? '🎨 quadro-chave' : `desenho ${k + 1}`)}</div>
+        <div class="ac-linha" style="margin:3px 0"><b>${k === 0 ? '🔑 chave' : '#' + (k + 1)}</b>
+          ${vs.length > 1 ? `<button type="button" class="ac-mini ac-sec" data-ver="${esc(vs[(vi - 1 + vs.length) % vs.length])}">◀</button><span>${vi + 1}/${vs.length}</span><button type="button" class="ac-mini ac-sec" data-ver="${esc(vs[(vi + 1) % vs.length])}">▶</button>` : ''}
+          ${esp ? '' : `<button type="button" class="ac-mini ac-sec" data-refazer title="${k === 0 ? 'gerar o quadro-chave' : 'refazer a partir do desenho anterior'}">🔁</button>`}
+          <label class="ac-mini ac-sec" style="cursor:pointer;color:#fff;border-radius:6px" title="um desenho seu">📤<input type="file" accept="image/*" data-up hidden></label>
+          ${k > 0 ? '<button type="button" class="ac-mini ac-perigo" data-q-del>✕</button>' : ''}</div>
+        <textarea data-qf="prompt_en" placeholder="o desenho (inglês)">${esc(q.prompt_en || '')}</textarea>
+        <div class="ac-linha" style="margin:0"><label>segura <input data-qf="segura" type="number" min="0.3" max="8" step="0.5" value="${q.segura}" style="width:56px"></label>
+        <label title="quadro de IMPACTO: negativo em alto contraste + flash + tremor + som"><input type="checkbox" data-qf="impacto" style="width:auto" ${q.impacto ? 'checked' : ''}> 💥 impacto</label></div></div>`;
+    }).join('');
+    return `<div class="ac-plano ${pl.chave_ok ? 'ok' : ''}" data-i="${i}">
+      <div class="cab"><b>Plano ${i + 1}</b><span class="ac-dica" style="margin:0">${ini.toFixed(1)}–${t0.toFixed(1)} s</span>
+        <label><input data-f="dur" type="number" min="0.4" max="10" step="0.1" value="${pl.dur}" style="width:62px"> s</label>
+        ${sel(TIPOS, pl.tipo, 'data-f="tipo"')} ${sel(CAMERAS, pl.camera, 'data-f="camera"')} → ${sel(TRANS, pl.transicao, 'data-f="transicao"')}
+        <button type="button" class="ac-mini ac-sec" data-mover="-1">↑</button><button type="button" class="ac-mini ac-sec" data-mover="1">↓</button>
+        <button type="button" class="ac-mini ac-perigo" data-pl-del>🗑</button></div>
+      <input data-f="acao_pt" value="${esc(pl.acao_pt || '')}" placeholder="o que acontece no plano" style="width:100%;margin:4px 0">
+      <div class="ac-chips">${Object.entries(EFEITOS).map(([k, r]) => `<label><input type="checkbox" data-ef="${k}" ${(pl.efeitos || []).includes(k) ? 'checked' : ''}>${esc(r)}</label>`).join('')}</div>
+      <div class="ac-chips" style="margin-top:4px">👥 ${P.personagens.map(c => `<label><input type="checkbox" data-quem="${c.id}" ${(pl.quem || []).includes(c.id) ? 'checked' : ''}>${esc(c.nome)}</label>`).join('') || '<span class="ac-dica" style="margin:0">(sem personagens)</span>'}</div>
+      <div class="ac-falas">${(pl.falas || []).map((f, j) => `<div data-j="${j}">💬 <select data-fl="quem">${P.personagens.map(c => `<option value="${c.id}" ${c.id === f.quem ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}<option value="" ${!f.quem ? 'selected' : ''}>(ninguém)</option></select>
+        <input data-fl="texto" value="${esc(f.texto)}" style="flex:1;min-width:200px"> em <input data-fl="t" type="number" step="0.1" min="0" value="${f.t}" style="width:56px"> s ${(f.audio || {}).arquivo ? '🔊' : ''}<button type="button" class="ac-mini ac-perigo" data-fl-del>✕</button></div>`).join('')}
+        ${(pl.sfx || []).map((s, j) => `<div data-s="${j}">🔊 ${sel(SFX, s.som, 'data-sx="som"')} em <input data-sx="t" type="number" step="0.1" min="0" value="${s.t}" style="width:56px"> s <button type="button" class="ac-mini ac-perigo" data-sx-del>✕</button></div>`).join('')}
+        <div><button type="button" class="ac-mini ac-sec" data-fala-novo>➕ fala</button><button type="button" class="ac-mini ac-sec" data-sfx-novo>➕ som</button>
+          <button type="button" class="ac-mini ac-sec" data-q-novo>➕ desenho</button>
+          ${pl.quadros[0].arquivo ? `<button type="button" class="ac-mini ${pl.chave_ok ? 'ac-sec' : 'ac-ok'}" data-chave>${pl.chave_ok ? '↺ desaprovar a chave' : '✔ aprovar a chave'}</button>` : ''}
+          ${pl.chave_ok && pl.quadros.length > 1 ? `<button type="button" class="ac-mini" data-seq ${pl.sequencia ? 'disabled' : ''}>${pl.sequencia ? '⏳ desenhando o movimento…' : '🎞 desenhos do movimento'}</button>` : ''}
+          <button type="button" class="ac-mini" data-previa>▶ Prévia</button></div></div>
+      <div class="ac-des">${qs}</div></div>`;
+  }).join('') || '<p class="ac-dica">Sem planos — 🤖 Planejar (ou ➕ plano).</p>';
+}
+function marcarSujo() { sujo = true; $('sEst').textContent = '✏ não salvo'; }
+$('planos').addEventListener('input', (e) => {
+  const box = e.target.closest('[data-i]'); if (!box) return; const pl = PL[+box.dataset.i];
+  const qb = e.target.closest('[data-q]'), fb = e.target.closest('[data-j]'), sb = e.target.closest('[data-s]');
+  const v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' ? +e.target.value : e.target.value;
+  if (e.target.dataset.f) pl[e.target.dataset.f] = v;
+  else if (e.target.dataset.qf && qb) pl.quadros[+qb.dataset.q][e.target.dataset.qf] = v;
+  else if (e.target.dataset.fl && fb) pl.falas[+fb.dataset.j][e.target.dataset.fl] = v;
+  else if (e.target.dataset.sx && sb) pl.sfx[+sb.dataset.s][e.target.dataset.sx] = v;
+  else if (e.target.dataset.ef) pl.efeitos = [...box.querySelectorAll('[data-ef]:checked')].map(i => i.dataset.ef);
+  else if (e.target.dataset.quem) pl.quem = [...box.querySelectorAll('[data-quem]:checked')].map(i => i.dataset.quem);
+  else return;
+  marcarSujo();
+});
+$('planos').addEventListener('change', async (e) => {
+  const box = e.target.closest('[data-i]'), qb = e.target.closest('[data-q]');
+  if (box && qb && e.target.hasAttribute('data-up')) {
+    const f = e.target.files[0]; if (!f) return; if (sujo) await salvar();
+    const pl = PL[+box.dataset.i], q = pl.quadros[+qb.dataset.q]; const fd = new FormData(); fd.append('arquivo', f);
+    try { await api(`/anime-cine/${PID}/quadro/${pl.id}/${q.id}/enviar`, fd); recarregar(); } catch (er) { alert(er.message); }
+  }
+});
+// os selects e checkboxes também disparam 'input' nos navegadores modernos; o change acima cobre os que não
+$('planos').addEventListener('click', async (e) => {
+  const box = e.target.closest('[data-i]'); if (!box) return; const i = +box.dataset.i, pl = PL[i];
+  const qb = e.target.closest('[data-q]'), q = qb ? pl.quadros[+qb.dataset.q] : null;
+  const b = (s) => e.target.closest(s);
+  try {
+    if (b('[data-mover]')) { const j = i + +b('[data-mover]').dataset.mover; if (j < 0 || j >= PL.length) return; [PL[i], PL[j]] = [PL[j], PL[i]]; marcarSujo(); pintarPlanos(); }
+    else if (b('[data-pl-del]')) { if (!confirm('Apagar este plano?')) return; PL.splice(i, 1); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-fala-novo]')) { pl.falas.push({ quem: (pl.quem || [])[0] || '', texto: '', t: 0 }); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-sfx-novo]')) { (pl.sfx = pl.sfx || []).push({ som: 'impacto', t: 0 }); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-q-novo]')) { if (pl.quadros.length >= 8) return alert('No máximo 8 desenhos por plano.'); pl.quadros.push({ id: '', prompt_en: '', segura: 1, impacto: false }); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-fl-del]')) { pl.falas.splice(+b('[data-j]').dataset.j, 1); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-sx-del]')) { pl.sfx.splice(+b('[data-s]').dataset.s, 1); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-q-del]')) { pl.quadros.splice(+qb.dataset.q, 1); marcarSujo(); pintarPlanos(); }
+    else if (b('[data-ver]')) { if (sujo) await salvar(); await api(`/anime-cine/${PID}/quadro/${pl.id}/${q.id}/versao`, { arquivo: b('[data-ver]').dataset.ver }); recarregar(); }
+    else if (b('[data-refazer]')) {
+      if (sujo) await salvar(); const pl2 = PL[i], q2 = pl2.quadros[+qb.dataset.q];
+      if (!q2.id) return alert('Salve os planos primeiro.');
+      const c = q2.arquivo ? prompt('O que mudar neste desenho? (vazio = só gerar de novo)', '') : ''; if (c === null) return;
+      const d = await api(`/anime-cine/${PID}/quadro/${pl2.id}/${q2.id}/refazer`, { correcao: c }); if (d.aviso) alert(d.aviso); recarregar();
+    }
+    else if (b('[data-chave]')) { if (sujo) await salvar(); await api(`/anime-cine/${PID}/plano/${PL[i].id}/chave`, { ok: !PL[i].chave_ok }); recarregar(); }
+    else if (b('[data-seq]')) { if (sujo) await salvar(); const d = await api(`/anime-cine/${PID}/sequencia`, { plids: [PL[i].id] }); if (d.aviso) alert(d.aviso); recarregar(); }
+    else if (b('[data-previa]')) { if (sujo) await salvar(); await api(`/anime-cine/${PID}/previa/${PL[i].id}`, {}); recarregar(); }
+  } catch (er) { alert(er.message); }
+});
+async function salvar() {
+  try { await api(`/anime-cine/${PID}/planos`, { planos: PL }); sujo = false; $('sEst').textContent = '✔ salvo'; P = await api(`/anime-cine/${PID}/estado`); PL = JSON.parse(JSON.stringify(P.planos)); desenhar(); }
+  catch (er) { alert(er.message); throw er; }
+}
+$('bSalvar').addEventListener('click', salvar);
+$('bNovoPlano').addEventListener('click', () => { PL.push({ id: '', dur: 2, tipo: 'medio', camera: 'fixa', transicao: 'corte', efeitos: [], quem: [], falas: [], sfx: [], acao_pt: '', quadros: [{ id: '', prompt_en: '', segura: 1, impacto: false }] }); marcarSujo(); pintarPlanos(); });
+$('bPlanejar').addEventListener('click', async () => {
+  if (PL.length && !confirm('Planejar de novo? Os planos (e os desenhos) atuais serão trocados.')) return;
+  try { await api(`/anime-cine/${PID}/planejar`, {}); recarregar(); } catch (er) { alert(er.message); }
+});
+$('bChaves').addEventListener('click', async () => { try { if (sujo) await salvar(); const d = await api(`/anime-cine/${PID}/chaves`, {}); if (d.aviso) alert(d.aviso); recarregar(); } catch (er) { alert(er.message); } });
+$('bSeq').addEventListener('click', async () => { try { if (sujo) await salvar(); const d = await api(`/anime-cine/${PID}/sequencia`, {}); if (d.aviso) alert(d.aviso); recarregar(); } catch (er) { alert(er.message); } });
+$('bVozes').addEventListener('click', async () => { try { if (sujo) await salvar(); await api(`/anime-cine/${PID}/vozes`, {}); recarregar(); } catch (er) { alert(er.message); } });
+$('bMontar').addEventListener('click', async () => { try { if (sujo) await salvar(); await api(`/anime-cine/${PID}/montar`, {}); recarregar(); } catch (er) { alert(er.message); } });
+$('bEditor').addEventListener('click', async () => { try { const d = await api(`/anime-cine/${PID}/editor`, {}); location.href = d.link; } catch (er) { alert(er.message); } });
+// 1 · cena e 2 · personagens
+document.querySelectorAll('[data-e]').forEach(el => el.addEventListener('change', async () => {
+  const v = el.type === 'checkbox' ? el.checked : el.value;
+  try { await api(`/anime-cine/${PID}/dados`, { [el.dataset.e]: v }); recarregar(); } catch (er) { alert(er.message); }
+}));
+$('pagUp').addEventListener('change', async (e) => { for (const f of e.target.files) { const fd = new FormData(); fd.append('arquivo', f); try { await api(`/anime-cine/${PID}/pagina`, fd); } catch (er) { alert(er.message); break; } } e.target.value = ''; recarregar(); });
+$('paginas').addEventListener('click', async (e) => { const a = e.target.dataset.pagDel; if (!a) return; try { await api(`/anime-cine/${PID}/pagina/${encodeURIComponent(a)}/apagar`, {}); recarregar(); } catch (er) { alert(er.message); } });
+$('cenUp').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(`/anime-cine/${PID}/cenario-img`, fd); recarregar(); } catch (er) { alert(er.message); } e.target.value = ''; });
+$('cenEst').addEventListener('click', async (e) => { if (e.target.id !== 'cenDel') return; try { await api(`/anime-cine/${PID}/cenario-img`, { apagar: true }); recarregar(); } catch (er) { alert(er.message); } });
+$('bImportar').addEventListener('click', async () => { try { await api(`/anime-cine/${PID}/personagem/importar`, { fonte: $('fonte').value }); recarregar(); } catch (er) { alert(er.message); } });
+$('pUp').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); fd.append('nome', $('pNome').value); fd.append('aparencia', $('pApar').value);
+  try { await api(`/anime-cine/${PID}/personagem/seu`, fd); $('pNome').value = ''; $('pApar').value = ''; recarregar(); } catch (er) { alert(er.message); } e.target.value = ''; });
+$('pers').addEventListener('change', async (e) => { const c = e.target.closest('[data-cid]'); if (!c || !e.target.dataset.c) return;
+  try { await api(`/anime-cine/${PID}/personagem/${c.dataset.cid}`, { [e.target.dataset.c]: e.target.value }); document.activeElement.blur(); recarregar(); } catch (er) { alert(er.message); } });
+$('pers').addEventListener('click', async (e) => { const c = e.target.closest('[data-cid]'); if (!c || !e.target.hasAttribute('data-c-del') || !confirm('Tirar este personagem da cena?')) return;
+  try { await api(`/anime-cine/${PID}/personagem/${c.dataset.cid}`, { apagar: true }); recarregar(); } catch (er) { alert(er.message); } });
+recarregar();
+</script>
+{% endblock %}

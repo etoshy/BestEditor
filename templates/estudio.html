@@ -5035,7 +5035,7 @@ function atualizarMonitor(forcar) {
   const box = $('layerOv'), boxP = $('layerPers'); const ativos = overlays.filter(o => t >= o.start && t < o.end);
   const chave = ativos.map(o => o.id + o.x_percent + o.y_percent + o.size_percent + (o.text || '') + (o._anim_url || '') + (o.espelhar ? 'E' : '') + JSON.stringify(o.style || {})).join('|') + stage.clientWidth;
   if (forcar || box.dataset.chave !== chave) {
-    const tvs = {}; box.querySelectorAll('video[data-sync]').forEach(v => { tvs[v.dataset.oid] = v; });  // 🎭 a TV não recarrega a cada legenda
+    const tvs = {}; [box, boxP].forEach(b => b.querySelectorAll('video[data-sync]').forEach(v => { tvs[v.dataset.oid] = v; }));  // 🎭 a TV não recarrega a cada legenda
     box.dataset.chave = chave; box.innerHTML = ''; boxP.innerHTML = '';
     ativos.forEach(o => {
       if (o.media_type === 'text') { const d = document.createElement('div'); d.className = 'txt'; box.appendChild(d); estiloTexto(d, o.text, o.style || {}, o.end - o.start, t - o.start); return; }
@@ -5047,10 +5047,10 @@ function atualizarMonitor(forcar) {
       else if (o._url) d.innerHTML = `<video src="${esc(o._url)}" muted autoplay loop playsinline style="width:100%"></video>`;
       else d.textContent = '🧩 ' + ((o.source || {}).query || 'overlay (resolvido na montagem)');
       if (o.espelhar && d.firstElementChild) d.firstElementChild.style.transform = 'scaleX(-1)';  // 🪞
-      (o.origem === 'personagem' || o.origem === 'react' ? boxP : box).appendChild(d);  // 🎭 camadas do react: na ordem da lista
+      (o.origem === 'personagem' || o.origem === 'react' || o.origem === 'react_tela' ? boxP : box).appendChild(d);  // 🎭 camadas do react (o vídeo da TV também): na ordem da lista — a foto, a cena e a legenda ficam por cima dele
     });
   }
-  box.querySelectorAll('video[data-sync]').forEach(v => sincronizarVideo(v, Math.max(0, t - parseFloat(v.dataset.sync || 0))));
+  [box, boxP].forEach(b => b.querySelectorAll('video[data-sync]').forEach(v => sincronizarVideo(v, Math.max(0, t - parseFloat(v.dataset.sync || 0)))));
   const p = s._preview || {};
   $('stageInfo').textContent = `Trecho ${i + 1}/${segs.length} · ${s.provider}: ${s.query}` + (q < 1 ? ` · transição ${ROTULO_TRANS[tipo] || tipo}` : '') + (p.erro && !(s.override_source && s.override_source.source) ? ' · ⚠ sem prévia' : '');
 }

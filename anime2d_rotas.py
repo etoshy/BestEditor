@@ -200,6 +200,15 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 p["legendas"] = bool(c["legendas"])
             if "paralaxe" in c:
                 p["paralaxe"] = bool(c["paralaxe"])
+            if "cobertura" in c:
+                p["cobertura"] = bool(c["cobertura"])
+            if "troca_angulo_s" in c:
+                try:
+                    p["troca_angulo_s"] = max(0.0, min(120.0, float(c["troca_angulo_s"] or 0)))
+                except (TypeError, ValueError):
+                    pass
+            if "abertura_texto" in c:
+                p["abertura_texto"] = " ".join(str(c["abertura_texto"] or "").split())[:80]
             if c.get("motor_perfil") in A.MOTORES_PERFIL:
                 p["motor_perfil"] = c["motor_perfil"]
             A.salvar(p, base_dir)
@@ -309,7 +318,80 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             A.salvar(p, base_dir)
         return _ok()
 
+    # ------------------------------------------------------------------ ◀ ▶ as versões geradas
+    @app.route("/anime2d/<pid>/versao", methods=["POST"])
+    def anime2d_versao(pid: str):
+        """Escolhe qual versão de uma imagem (fundo, frente, móvel, item) é a usada — as setinhas ◀ ▶ embaixo dela."""
+        c = request.get_json(silent=True) or {}
+        alvo, arq = str(c.get("alvo") or ""), str(c.get("arquivo") or "")
+        with A._TRAVA:
+            p = _p(pid)
+            xid, _, camada = alvo.partition(":")
+            if xid.startswith("l"):
+                lo = next((y for y in p["locais"] if y["id"] == xid), None)
+                if not lo:
+                    return _erro("Local não encontrado.")
+                st = (lo.get("frente") if camada == "frente" else
+                      (next((y for y in lo.get("props") or [] if y["id"] == camada), {}) or {}).get("img") if camada.startswith("p") else lo.get("img"))
+            elif xid.startswith("i"):
+                st = (next((y for y in p["itens"] if y["id"] == xid), {}) or {}).get("img")
+            elif xid.startswith("c"):
+                st = (next((y for y in p["personagens"] if y["id"] == xid), {}) or {}).get("design")
+            else:
+                st = None
+            if not st or arq not in (st.get("versoes") or []):
+                return _erro("Versão não encontrada.")
+            st["arquivo"] = arq
+            A.salvar(p, base_dir)
+        return _ok()
+
+    @app.route("/anime2d/<pid>/pose/<cid>/versao", methods=["POST"])
+    def anime2d_pose_versao(pid: str, cid: str):
+        c = request.get_json(silent=True) or {}
+        p = _p(pid)
+        ch = next((x for x in p["personagens"] if x["id"] == cid), None)
+        ppid = ((ch or {}).get("pod") or {}).get("pid")
+        if not ppid:
+            return _erro("Esse personagem ainda não tem poses.")
+        import personagens_pod as pp
+        try:
+            pp.escolher_versao(ppid, str(c.get("arquivo") or ""), int(c.get("idx") or 0), base_dir)
+        except (pp.PersErro, ValueError) as exc:
+            return _erro(str(exc))
+        return _ok()
+
     # ------------------------------------------------------------------ 📐 montar o cenário (lugares e móveis)
+    @app.route("/anime2d/<pid>/local/<lid>/storyboard", methods=["POST"])
+    def anime2d_storyboard(pid: str, lid: str):
+        """🎬 o Flow desenha os personagens e os móveis no fundo (ensaio) — depois a IA lê onde ficou cada um."""
+        import anime2d_revisao as RV
+        _p(pid)
+        try:
+            return _ok(**RV.pedir_storyboard(pid, lid, base_dir))
+        except A.AnimeErro as exc:
+            return _erro(str(exc))
+        except ValueError as exc:
+            return _erro(str(exc))
+
+    @app.route("/anime2d/<pid>/local/<lid>/storyboard/ler", methods=["POST"])
+    def anime2d_storyboard_ler(pid: str, lid: str):
+        import anime2d_revisao as RV
+        _p(pid)
+        return _rodar(pid, "story", "📐 Lendo o storyboard", lambda: RV.ler_storyboard(pid, lid, base_dir)) or _ok()
+
+    @app.route("/anime2d/<pid>/local/<lid>/planta.png")
+    def anime2d_planta_png(pid: str, lid: str):
+        """🗺 o esboço de layout da planta (o mesmo que vai de referência pro Flow gerar o fundo)."""
+        import anime2d_planta as PL
+        p = _p(pid)
+        lo = next((x for x in p["locais"] if x["id"] == lid), None)
+        if not lo:
+            abort(404)
+        W, H = A.tamanho(p)
+        cam = PL.esboco((A.layout_do_local(p, lo) or {}).get("planta"), os.path.join(A.pasta(pid, base_dir), "imagens"), W, H,
+                        float((lo.get("chao") or {}).get("y_fundo") or 0.72))
+        return send_file(cam) if cam else ("", 404)
+
     @app.route("/anime2d/<pid>/local/<lid>/layout", methods=["POST"])
     def anime2d_layout(pid: str, lid: str):
         """Salva onde ficam os LUGARES (x, y = os pés, escala, sentado) e os MÓVEIS (x, y = a base, w = largura) — tudo
@@ -328,16 +410,26 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                         continue
                     novos.append({"nome": " ".join(str(y["nome"]).split())[:40], "x": num(y.get("x"), 0, 1, 0.5),
                                   "y": num(y.get("y"), 0.2, 1.1, 0.97), "escala": num(y.get("escala"), 0.2, 2.5, 1.0),
-                                  "sentado": bool(y.get("sentado")), "descricao": str(y.get("descricao") or "")[:200]})
+                                  "sentado": bool(y.get("sentado")) or y.get("corpo") == "cintura",
+                                  "corpo": y.get("corpo") if y.get("corpo") in ("inteiro", "cintura") else "inteiro",
+                                  "descricao": str(y.get("descricao") or "")[:200]})
                 lo["lugares"] = novos
             for y in c.get("props") or []:
                 pr = next((z for z in lo.get("props") or [] if isinstance(y, dict) and z["id"] == y.get("id")), None)
                 if pr:
                     pr.update(x=num(y.get("x"), -0.3, 1.3, 0.5), y=num(y.get("y"), 0, 1.4, 1.0), w=num(y.get("w"), 0.02, 2, 0.3))
+                    if y.get("w_manual"):
+                        pr["w_manual"] = True
                     if y.get("camada") in ("atras", "frente"):
                         pr["camada"] = y["camada"]
             if isinstance(c.get("chao"), dict):
-                lo["chao"] = {"y": num(c["chao"].get("y"), 0.3, 1.1, 0.97), "alt": num(c["chao"].get("alt"), 0.1, 1.5, 0.62)}
+                ch = c["chao"]
+                lo["chao"] = {"y": num(ch.get("y"), 0.3, 1.1, 0.97), "alt": num(ch.get("alt"), 0.1, 1.5, 0.62)}
+                if isinstance(ch.get("y_fundo"), (int, float)):
+                    lo["chao"].update(y_fundo=num(ch["y_fundo"], 0.1, 1.0, 0.7), esc_fundo=num(ch.get("esc_fundo"), 0.15, 1.0, 0.6))
+                if isinstance(ch.get("area"), list) and len(ch["area"]) >= 3:
+                    lo["chao"]["area"] = [[num(q[0], 0, 1, 0.5), num(q[1], 0, 1.1, 0.9)] for q in ch["area"][:10]
+                                          if isinstance(q, list) and len(q) == 2]
             A.salvar(p, base_dir)
         return _ok()
 
@@ -424,6 +516,27 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             A.salvar(p, base_dir)
         return _ok(ref=r)
 
+    @app.route("/anime2d/<pid>/personagem/<cid>/cor", methods=["POST", "DELETE"])
+    def anime2d_cor_ref(pid: str, cid: str):
+        """🌈 A foto COLORIDA do personagem (só pras cores reais) — enviar/trocar ou tirar."""
+        with A._TRAVA:
+            p = _p(pid)
+            c = next((x for x in p["personagens"] if x["id"] == cid), None)
+            if not c:
+                return _erro("Personagem não encontrado.")
+            try:
+                if request.method == "DELETE" or (request.get_json(silent=True) or {}).get("apagar"):
+                    A.tirar_cor_ref(p, c, base_dir)
+                else:
+                    f = request.files.get("arquivo")
+                    if not f or not f.filename:
+                        return _erro("Escolha a imagem colorida.")
+                    A.guardar_cor_ref(p, c, f.filename, f.read(), base_dir)
+            except A.AnimeErro as exc:
+                return _erro(str(exc))
+            A.salvar(p, base_dir)
+        return _ok()
+
     @app.route("/anime2d/<pid>/referencia/<rid>", methods=["POST"])
     def anime2d_ref_editar(pid: str, rid: str):
         c = request.get_json(silent=True) or {}
@@ -437,6 +550,8 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 for lista in ("personagens", "locais", "itens"):
                     for x in p[lista]:
                         x["refs"] = [a for a in x.get("refs") or [] if a != r["arquivo"]]
+                        if x.get("cor_ref") == r["arquivo"]:
+                            x.pop("cor_ref", None)
             else:
                 for k in ("nome", "nota"):
                     if k in c:
@@ -467,6 +582,9 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             return _rodar(pid, oque, "📖 Ler o mangá e planejar a adaptação", lambda: (
                 lambda r: f"{r['personagens']} personagem(ns), {r['cenas']} cena(s), {r['recortes']} recorte(s)")(
                     AM.ler_manga(pid, base_dir))) or _ok()
+        if oque == "revisar":  # 🔎 a IA olha um quadro de cada corte e corrige o que der
+            import anime2d_revisao as RV
+            return _rodar(pid, oque, "🔎 IA revisando os quadros", lambda: RV.revisar(pid, base_dir, _prog(pid))) or _ok()
         if oque == "cenas":
             ks = [int(k) for k in c.get("ks") or [] if str(k).isdigit()] or None
             so = bool(c.get("so_vazias"))

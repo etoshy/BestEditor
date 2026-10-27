@@ -33,6 +33,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
 FORMATO = "personagens_pod_v1"
+# 🌈 v84_242: a foto COLORIDA do personagem (quando a referência é mangá P&B) — só pras cores reais
+COR_REF_EN = ("a COLORED picture of the same character — use it ONLY for the REAL COLORS (hair, eyes, skin, outfit, "
+              "accessories); keep the shapes/design from the other references and the art style asked; if a text "
+              "description disagrees with these colors, THESE colors win")
 MAX_REFS = 3          # o Qwen-Image-Edit-2511 trabalha com até 3 imagens: com a mestre, ficam 2 referências
 ESTADOS_ESPERA = ("fila", "gerando")
 _TRAVA = threading.RLock()
@@ -365,6 +369,8 @@ def _deps(p: Dict[str, Any], x: Dict[str, Any]) -> List[str]:
     dep = []
     if x.get("tipo") == "boca" and x.get("base"):
         dep.append(x["base"])
+    if x.get("edita_base") and x.get("pose_base"):  # ✏️ v84_238c: o piscando / 2º quadro edita a pose de base — espera ela
+        dep.append(x["pose_base"])
     v = visual(p, x.get("visual") or "")
     if v and x.get("tipo") == "pose":
         if x.get("pose_base"):
@@ -658,6 +664,14 @@ def prompt_flow(p: Dict[str, Any], x: Dict[str, Any], paineis: List[str], extra:
     v = visual(p, x.get("visual") or "")
     if x["tipo"] == "boca":
         partes = ["The reference image is the finished character image to edit.", x["prompt"]]
+    elif x.get("edita_base") and x.get("pose_base"):
+        # ✏️ v84_238: um quadro derivado (piscando, 2º quadro de movimento) = EDITAR a pose de base, não uma pose nova
+        # (antes ia com a ficha/colagem e o pedido de "pose diferente" — saía outra pose, às vezes no estilo da ficha)
+        partes = ["The reference image is the finished character image to edit. Keep EXACTLY the same character, art "
+                  "style, colors, line art, framing, size and position in the image.", x["prompt"]]
+        for chave in ("estilo", "regras"):
+            if fixo.get(chave):
+                partes.append(str(fixo[chave]))
     elif v and x.get("mestra_visual") and v.get("tipo") == "fantasia":
         # 🎭 v84_222: fantasia de piada — a personagem se TRANSFORMA (pode mudar o rosto/cabeça), mas continua reconhecível
         partes = ["The reference image is the finished character image to edit.",
@@ -772,6 +786,8 @@ def _enviar_flow(pid: str, arquivos: List[str], extra: str, base: str, quantidad
             v = visual(p, x.get("visual") or "")
             if x["tipo"] == "boca":
                 ref = _salvar_ref(_bruto_ou_png(p, x["base"], base), os.path.join(d, "flow_refs"), f"base_{a[:-4]}")
+            elif x.get("edita_base") and x.get("pose_base"):  # ✏️ v84_238: piscando / 2º quadro = editar a pose de base
+                ref = _salvar_ref(_bruto_ou_png(p, x["pose_base"], base), os.path.join(d, "flow_refs"), f"eb_{a[:-4]}")
             elif v and x.get("mestra_visual"):
                 ref = _salvar_ref(_bruto_ou_png(p, x["pose_base"], base), os.path.join(d, "flow_refs"), f"vb_{a[:-4]}")
             elif v and x.get("pose_base"):

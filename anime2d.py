@@ -51,6 +51,11 @@ ESTILOS = {
     "oleo": ("🖼 Pintura a óleo", "classical oil painting, visible brush strokes, rich textured colors, dramatic light"),
     "aquarela": ("💧 Aquarela", "soft watercolor illustration, paper texture, gentle washes of color, light ink lines"),
     "paint": ("✏ Desenho no Paint", "deliberately crude MS Paint drawing, wobbly mouse lines, flat bucket-fill colors, funny low-effort meme look"),
+    "manga_cor": ("🖋🎨 Anime colorido com o traço do mangá", "colored anime adaptation that keeps the ORIGINAL MANGA ARTIST'S "
+                  "drawing style exactly: the same hand-drawn loose ink linework with varied, slightly rough line weight, "
+                  "hatching kept as texture in the shadows, the same character proportions and face shapes (as in the manga "
+                  "references), flat muted colors laid under the black ink lines like a hand-colored manga page, soft limited "
+                  "shading, subtle paper grain — NOT generic glossy anime"),
     "manga_pb": ("📖 Mangá P&B", "black and white manga style, screentones, ink lines, high contrast"),
     "manga_tinta": ("🖋 Mangá em tinta P&B (tipo o anime Uzumaki)", "monochrome black-and-white anime that looks like a moving horror manga: "
                     "NO color at all, only black, white and soft gray gradients; detailed pen ink linework with fine "
@@ -171,6 +176,8 @@ def _completar(p: Dict[str, Any]) -> Dict[str, Any]:
     p.setdefault("narrador", {"ativo": True, "voz": ""})
     p.setdefault("legendas", True)
     p.setdefault("paralaxe", True)
+    p.setdefault("cobertura", True)
+    p.setdefault("troca_angulo_s", 10)  # 🎥 troca de ângulo sozinha depois de N s no mesmo (0 = não troca)  # 🎬 fala longa vira cortes (quem fala / quem escuta / aberto)
     p.setdefault("motor_perfil", "xtts")
     p.setdefault("audio", {})  # 🎧 modo áudio: {"arquivo", "dur", "transcricao": [{ini, fim, texto}]}
     p.setdefault("referencias", [])
@@ -253,6 +260,10 @@ def tamanho(p: Dict[str, Any]) -> Tuple[int, int]:
 
 def estilo_en(p: Dict[str, Any]) -> str:
     e = ESTILOS.get(p.get("estilo") or "anime", ESTILOS["anime"])[1]
+    if (p.get("manga") or {}).get("paginas") and (p.get("estilo") or "anime") in ("anime", "manga_cor", "manga_pb", "manga_tinta"):
+        # 📖 adaptação de mangá: o traço é o do autor (rosto, olhos, proporções), não um anime genérico
+        e += ("; FAITHFUL TO THE MANGA: copy the original artist's line art and character drawing style from the manga "
+              "references (face shape, eye shape and pupils, nose, hair silhouette, body proportions)")
     return e + (f", {p['estilo_extra']}" if p.get("estilo_extra") else "")
 
 
@@ -270,7 +281,8 @@ def achar(lista: List[Dict[str, Any]], nome_ou_id: Any) -> Optional[Dict[str, An
 
 
 # ------------------------------------------------------------------ 📎 referências (personagens, locais, estilo, itens)
-TIPOS_REF = {"personagem": "🧑 personagem", "local": "🏞 local", "item": "📦 item", "estilo": "🎨 estilo (o jeito de desenhar)"}
+TIPOS_REF = {"personagem": "🧑 personagem", "cores": "🌈 cores reais (a versão COLORIDA de um personagem do mangá)",
+             "local": "🏞 local", "item": "📦 item", "estilo": "🎨 estilo (o jeito de desenhar)"}
 
 
 def guardar_referencia(p: Dict[str, Any], nome_arq: str, dados: bytes, tipo: str, nome: str = "", nota: str = "",
@@ -294,6 +306,11 @@ def guardar_referencia(p: Dict[str, Any], nome_arq: str, dados: bytes, tipo: str
 def vincular_referencias(p: Dict[str, Any]) -> None:
     """A referência com o nome de um personagem/local/item vai pra ficha dele."""
     for r in p["referencias"]:
+        if r["tipo"] == "cores":  # 🌈 a foto colorida: só as cores reais (não vira referência de forma)
+            x = achar(p["personagens"], r.get("nome") or "") if r.get("nome") else None
+            if x is not None:
+                x["cor_ref"] = r["arquivo"]
+            continue
         lista = {"personagem": p["personagens"], "local": p["locais"], "item": p["itens"]}.get(r["tipo"])
         if lista is None or not r.get("nome"):
             continue
@@ -305,6 +322,32 @@ def vincular_referencias(p: Dict[str, Any]) -> None:
 def refs_de(p: Dict[str, Any], x: Dict[str, Any], base: str = _BASE) -> List[str]:
     return [os.path.join(pasta(p["id"], base), "refs", a) for a in x.get("refs") or []
             if os.path.isfile(os.path.join(pasta(p["id"], base), "refs", a))]
+
+
+def cor_ref(p: Dict[str, Any], c: Dict[str, Any], base: str = _BASE) -> Optional[str]:
+    """🌈 A foto colorida do personagem (opcional — pras cores reais quando a referência é mangá P&B)."""
+    a = c.get("cor_ref")
+    cam = os.path.join(pasta(p["id"], base), "refs", a) if a else None
+    return cam if cam and os.path.isfile(cam) else None
+
+
+def guardar_cor_ref(p: Dict[str, Any], c: Dict[str, Any], nome_arq: str, dados: bytes, base: str = _BASE) -> Dict[str, Any]:
+    """🌈 Troca a foto colorida do personagem (a anterior sai)."""
+    tirar_cor_ref(p, c, base)
+    r = guardar_referencia(p, nome_arq, dados, "cores", c["nome"], "a versão colorida (só as cores)", base)
+    c["cor_ref"] = r["arquivo"]
+    return r
+
+
+def tirar_cor_ref(p: Dict[str, Any], c: Dict[str, Any], base: str = _BASE) -> None:
+    a = c.pop("cor_ref", None)
+    if not a:
+        return
+    p["referencias"] = [r for r in p["referencias"] if r["arquivo"] != a]
+    try:
+        os.remove(os.path.join(pasta(p["id"], base), "refs", a))
+    except OSError:
+        pass
 
 
 def refs_estilo(p: Dict[str, Any], base: str = _BASE) -> List[str]:
@@ -328,25 +371,30 @@ def ia_ligada() -> bool:
 # 🪑 v84_238: os MÓVEIS em que os personagens sentam/se apoiam são camadas separadas (props) — o fundo vem sem eles —
 # pra dar profundidade (cadeira ATRÁS do personagem, mesa NA FRENTE) e não mudarem de cena pra cena; e os LUGARES do
 # cenário (onde cada um fica em pé ou sentado)
+import anime2d_planta as _PL  # noqa: E402 — 📐 a planta do cenário (layout)
+
 SCHEMA_LOCAL = {
     "type": "object", "additionalProperties": False,
-    "required": ["nome", "descricao", "prompt_en", "frente_en", "props", "lugares"],
+    "required": ["nome", "descricao", "prompt_en", "frente_en", "props", "lugares", "planta", "angulo_de", "angulo_en", "variante_de"],
     "properties": {"nome": {"type": "string"}, "descricao": {"type": "string"}, "prompt_en": {"type": "string"},
                    "frente_en": {"type": "string"},
+                   "planta": _PL.SCHEMA_PLANTA, "angulo_de": {"type": "string"}, "angulo_en": {"type": "string"},
+                   "variante_de": {"type": "string"},
                    "props": {"type": "array", "items": {
                        "type": "object", "additionalProperties": False, "required": ["nome", "prompt_en", "camada"],
                        "properties": {"nome": {"type": "string"}, "prompt_en": {"type": "string"},
                                       "camada": {"type": "string", "enum": ["atras", "frente"]}}}},
                    "lugares": {"type": "array", "items": {
-                       "type": "object", "additionalProperties": False, "required": ["nome", "sentado", "descricao"],
+                       "type": "object", "additionalProperties": False, "required": ["nome", "sentado", "corpo", "descricao"],
                        "properties": {"nome": {"type": "string"}, "sentado": {"type": "boolean"},
+                                      "corpo": {"type": "string", "enum": ["inteiro", "cintura"]},
                                       "descricao": {"type": "string"}}}}}}
 # 🌟 itens: quem aparece neles (a referência dos designs vai junto) e o texto ESCRITO que faz parte da piada
 SCHEMA_ITEM = {
-    "type": "object", "additionalProperties": False, "required": ["nome", "tipo", "prompt_en", "personagens", "texto"],
+    "type": "object", "additionalProperties": False, "required": ["nome", "tipo", "prompt_en", "personagens", "texto", "onde"],
     "properties": {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": ["objeto", "destaque"]},
                    "prompt_en": {"type": "string"}, "personagens": {"type": "array", "items": {"type": "string"}},
-                   "texto": {"type": "string"}}}
+                   "texto": {"type": "string"}, "onde": {"type": "string"}}}
 
 SCHEMA_PLANO = {
     "type": "object", "additionalProperties": False,
@@ -391,12 +439,21 @@ def sys_plano(p: Dict[str, Any]) -> str:
         "\"\" se não tiver.\n"
         "- locais.props: os MÓVEIS/objetos grandes em que os personagens sentam, se apoiam ou ficam atrás (mesa, cadeira, "
         "balcão, sofá) — cada um uma imagem separada ('prompt_en' em inglês, o objeto inteiro sozinho) com a 'camada': "
-        "'atras' (atrás de quem está ali: cadeira, encosto) ou 'frente' (na frente: mesa, balcão). Esses móveis NÃO vão no "
+        "'atras' (atrás de quem está ali: cadeira, encosto) ou 'frente' (na frente: mesa, balcão); o 'prompt_en' descreve o "
+        "LADO QUE A CÂMERA VÊ (a mesa de quem senta de frente pra câmera mostra o painel da FRENTE — gavetas e o vão das "
+        "pernas ficam do outro lado, escondidos). Esses móveis NÃO vão no "
         "'prompt_en' do fundo (diga no fundo que aquele espaço está livre). locais.lugares: onde os personagens ficam (ex.: "
-        "\"atrás da mesa\" sentado=true, \"na porta\", \"perto da janela\") — além dos padrões esquerda/centro/direita.\n"
+        "\"atrás da mesa\" sentado=true corpo=cintura, \"na porta\", \"perto da janela\") — além dos padrões "
+        "esquerda/centro/direita; 'corpo' = 'cintura' quando um móvel da frente esconde as pernas.\n"
+        + _PL.INSTRUCOES_IA +
         "- itens: 'personagens' = os NOMES de quem aparece na imagem (a referência do design deles vai junto, pra não mudar "
         "cabelo/cores); 'texto' = o texto ESCRITO que faz parte da cena e da piada (o que está numa placa, etiqueta, "
-        "bilhete — exatamente como deve aparecer; \"\" se nenhum). Nunca balões nem onomatopeias.\n"
+        "bilhete, quadro, tela — exatamente como deve aparecer; \"\" se nenhum); 'onde' (objeto) = em cima de qual móvel ou "
+        "em qual lugar ele fica (\"\" = no chão perto de quem está em foco). Nunca balões nem onomatopeias.\n"
+        "- 🎞 itens 'destaque' de EXEMPLO (cutaways, como num anime de comédia): quando alguém descreve uma situação ou "
+        "conta algo (\"sou baixinho e todo mundo me ignora\"), crie um destaque que MOSTRA isso, mesmo que não esteja na "
+        "história (o personagem minúsculo no meio de alunos gigantes na aula de educação física); e imagens "
+        "CINEMATOGRÁFICAS pros momentos fortes (a saída decidida, a revelação).\n"
         "- itens: 'objeto' = coisa que aparece na cena (recortada, ex.: um bolo, uma placa); 'destaque' = imagem em tela "
         "cheia pra um momento forte (close de reação exagerada, plano detalhe, cena de impacto, flashback). 'prompt_en' em inglês.\n"
         "- cenas: em ordem, cada uma com o local (nome exato da lista), um resumo do que acontece e quem está nela.\n"
@@ -432,6 +489,18 @@ def _txt(v: Any, n: int = 900) -> str:
 
 def aplicar_props_lugares(lo: Dict[str, Any], x: Dict[str, Any]) -> None:
     """🪑 Os móveis (camadas separadas) e os lugares do cenário que vieram da IA/zip — junta pelo nome."""
+    if x.get("variante_de") is not None:  # 🌫 o mesmo cenário em outro estado (usa o fundo e os móveis do original)
+        lo["variante_de"] = _txt(x.get("variante_de"), 80)
+    if x.get("angulo_de") is not None:  # 🎥 o mesmo cômodo visto de OUTRA câmera (planta, lugares e chão próprios)
+        lo["angulo_de"] = _txt(x.get("angulo_de"), 80)
+    for k in ("angulo_en", "angulo"):
+        if x.get(k) is not None:
+            lo[k] = _txt(x.get(k), 300)
+    if isinstance(x.get("planta"), dict):  # 📐 o layout do cenário (onde fica cada coisa)
+        import anime2d_planta as PL
+        pl = PL.normalizar(x["planta"])
+        if pl:
+            lo["planta"] = pl
     props = lo.setdefault("props", [])
     for y in x.get("props") or []:
         if not isinstance(y, dict) or not _txt(y.get("nome")):
@@ -444,9 +513,11 @@ def aplicar_props_lugares(lo: Dict[str, Any], x: Dict[str, Any]) -> None:
             pr["prompt_en"] = _txt(y["prompt_en"])
         if y.get("camada") in ("atras", "frente"):
             pr["camada"] = y["camada"]
-        for k in ("x", "y", "w"):
+        for k in ("x", "y", "w", "real"):
             if isinstance(y.get(k), (int, float)):
                 pr[k] = round(float(y[k]), 4)
+        if isinstance(y.get("w"), (int, float)):
+            pr["w_manual"] = True
     lug = lo.setdefault("lugares", [])
     for y in x.get("lugares") or []:
         if not isinstance(y, dict) or not _txt(y.get("nome")):
@@ -462,10 +533,19 @@ def aplicar_props_lugares(lo: Dict[str, Any], x: Dict[str, Any]) -> None:
         for k in ("x", "y", "escala"):
             if isinstance(y.get(k), (int, float)):
                 lg[k] = round(float(y[k]), 4)
+        if y.get("corpo") in ("inteiro", "cintura"):
+            lg["corpo"] = y["corpo"]
         if y.get("prop"):
             lg["prop"] = _txt(y["prop"], 60)
     if isinstance(x.get("chao"), dict):
-        lo["chao"] = {k: round(float(v), 4) for k, v in x["chao"].items() if k in ("y", "alt") and isinstance(v, (int, float))}
+        ch = {k: round(float(v), 4) for k, v in x["chao"].items() if k in ("y", "alt", "y_fundo", "esc_fundo") and isinstance(v, (int, float))}
+        area = x["chao"].get("area")
+        if isinstance(area, list) and len(area) >= 3:
+            ch["area"] = [[round(float(q[0]), 4), round(float(q[1]), 4)] for q in area if isinstance(q, (list, tuple)) and len(q) == 2][:10]
+        lo["chao"] = ch
+    if lo.get("planta"):
+        import anime2d_planta as PL
+        PL.sincronizar_moveis(lo)
 
 
 def aplicar_item_extras(p: Dict[str, Any], it: Dict[str, Any], x: Dict[str, Any]) -> None:
@@ -474,37 +554,102 @@ def aplicar_item_extras(p: Dict[str, Any], it: Dict[str, Any], x: Dict[str, Any]
         it["personagens"] = [c["nome"] for c in (achar(p["personagens"], n) for n in x["personagens"]) if c] or \
             [_txt(n, 60) for n in x["personagens"] if _txt(n)]
     if x.get("texto") is not None:
-        it["texto"] = _txt(x.get("texto"), 200)
+        it["texto"] = _txt(x.get("texto"), 300)
+    if x.get("onde") is not None:  # 📦 o objeto fica em cima de qual móvel / em qual lugar
+        it["onde"] = _txt(x.get("onde"), 60)
+    if x.get("painel") is not None:
+        it["painel"] = bool(x.get("painel"))
+
+
+def escala_em(lo: Optional[Dict[str, Any]], y: float) -> float:
+    """📏 A escala pela PERSPECTIVA do chão: 1 no chão da frente (chao.y), esc_fundo no fundo (chao.y_fundo)."""
+    ch = (lo or {}).get("chao") or {}
+    yf, y0 = ch.get("y_fundo"), float(ch.get("y") or 0.97)
+    if yf is None or y0 - float(yf) < 0.02:
+        return 1.0
+    t = max(0.0, min(1.2, (float(y) - float(yf)) / (y0 - float(yf))))
+    return round(float(ch.get("esc_fundo") or 0.6) + (1 - float(ch.get("esc_fundo") or 0.6)) * t, 4)
+
+
+def area_livre(lo: Optional[Dict[str, Any]]) -> Optional[List[List[float]]]:
+    a = ((lo or {}).get("chao") or {}).get("area")
+    return a if isinstance(a, list) and len(a) >= 3 else None
+
+
+def dentro(area: List[List[float]], x: float, y: float) -> bool:
+    d = False
+    for i in range(len(area)):
+        (x1, y1), (x2, y2) = area[i], area[i - 1]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-9) + x1:
+            d = not d
+    return d
 
 
 def lugares_do_local(p: Dict[str, Any], lo: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    """nome → {x, y (onde ficam os pés, 0–1), escala, sentado}: os 5 padrões + os do cenário (📐 Montar o cenário)."""
-    W, H = tamanho(p)
+    """nome → {x, y (onde ficam os pés; na 'cintura' = a linha da cintura), escala, sentado, corpo}: os 5 padrões
+    (espalhados DENTRO da área livre do chão, se houver) + os do cenário (📐 Montar o cenário). A escala vem da
+    perspectiva do chão quando o lugar não tem uma escolhida."""
+    lo = layout_do_local(p, lo)  # 🌫 variante → os lugares do original
     chao = (lo or {}).get("chao") or {}
     y0 = float(chao.get("y") or 0.97)
-    out = {k: {"nome": k, "x": v, "y": y0, "escala": 1.0, "sentado": False, "padrao": True} for k, v in POSICOES.items()}
+    area = area_livre(lo)
+    pad = {}
+    for k, v in POSICOES.items():
+        x, y = v, y0
+        if area:  # 👣 os padrões ficam no chão livre (perto da frente), não em cima de armário/mesa
+            ys = [q[1] for q in area]
+            y = max(ys) - (max(ys) - min(ys)) * 0.12
+            xs = [q[0] for q in area]
+            x = min(xs) + (max(xs) - min(xs)) * (0.08 + 0.84 * (v - 0.16) / 0.68)
+            for _ in range(12):
+                if dentro(area, x, y):
+                    break
+                y -= (max(ys) - min(ys)) * 0.06
+        pad[k] = {"nome": k, "x": round(x, 4), "y": round(y, 4), "escala": escala_em(lo, y), "sentado": False, "padrao": True,
+                  "corpo": "inteiro"}
+    out = dict(pad)
+    tem_frente = any(pr.get("camada") != "atras" for pr in (lo or {}).get("props") or [])
     for lg in (lo or {}).get("lugares") or []:
         k = lg.get("nome")
         if not k:
             continue
-        base = out.get(k, {"x": 0.5, "y": y0 if not lg.get("sentado") else y0 - 0.12, "escala": 1.0, "sentado": False})
-        out[k] = {"nome": k, "x": float(lg.get("x", base["x"])), "y": float(lg.get("y", base["y"])),
-                  "escala": float(lg.get("escala", base.get("escala", 1.0))), "sentado": bool(lg.get("sentado", base.get("sentado"))),
-                  "descricao": lg.get("descricao") or "", "prop": lg.get("prop") or "", "padrao": k in POSICOES}
+        base = out.get(k, {"x": 0.5, "y": y0 if not lg.get("sentado") else y0 - 0.12, "sentado": False})
+        y = float(lg.get("y", base["y"]))
+        sent = bool(lg.get("sentado", base.get("sentado")))
+        corpo = lg.get("corpo") or ("cintura" if sent and tem_frente else "inteiro")
+        esc = lg.get("escala")
+        out[k] = {"nome": k, "x": float(lg.get("x", base["x"])), "y": y,
+                  "escala": float(esc) if isinstance(esc, (int, float)) else (1.0 if corpo == "cintura" else escala_em(lo, y)),
+                  "sentado": sent, "corpo": corpo, "descricao": lg.get("descricao") or "", "prop": lg.get("prop") or "",
+                  "padrao": k in POSICOES}
     return out
 
 
+def chave_pose(lug: Dict[str, Any], e: Dict[str, Any], po: Optional[str] = None, en: Optional[str] = None) -> str:
+    """O nome da imagem da pose: atrás da mesa/balcão (lugar 'cintura') usa a versão DA CINTURA PRA CIMA ('meio_…') — a
+    mesa esconde as pernas e o Flow não inventa ninguém sentado no chão."""
+    k = nome_pose(e["pose"] if po is None else po, (e.get("pose_en") or "") if en is None else en)
+    v = lug.get(e.get("posicao")) or {}
+    if v.get("corpo") == "cintura" and not k.startswith(("busto_", "meio_")) and k not in POSES_MOVIMENTO:
+        return "meio_" + k
+    return k
+
+
 SCHEMA_LAYOUT = {
-    "type": "object", "additionalProperties": False, "required": ["chao_y", "altura_em_pe", "lugares", "props"],
+    "type": "object", "additionalProperties": False,
+    "required": ["chao_y", "altura_em_pe", "chao_fundo_y", "escala_fundo", "area_livre", "lugares", "props"],
     "properties": {
         "chao_y": {"type": "number"}, "altura_em_pe": {"type": "number"},
+        "chao_fundo_y": {"type": "number"}, "escala_fundo": {"type": "number"},
+        "area_livre": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
         "lugares": {"type": "array", "items": {"type": "object", "additionalProperties": False,
-                                               "required": ["nome", "x", "y", "escala", "sentado"],
+                                               "required": ["nome", "x", "y", "escala", "sentado", "corpo"],
                                                "properties": {"nome": {"type": "string"}, "x": {"type": "number"}, "y": {"type": "number"},
-                                                              "escala": {"type": "number"}, "sentado": {"type": "boolean"}}}},
-        "props": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["nome", "x", "y", "largura"],
+                                                              "escala": {"type": "number"}, "sentado": {"type": "boolean"},
+                                                              "corpo": {"type": "string", "enum": ["inteiro", "cintura"]}}}},
+        "props": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["nome", "x", "y", "largura_m"],
                                              "properties": {"nome": {"type": "string"}, "x": {"type": "number"}, "y": {"type": "number"},
-                                                            "largura": {"type": "number"}}}}}}
+                                                            "largura_m": {"type": "number"}}}}}}
 
 
 def ajustar_cenario(pid: str, lid: str, base: str = _BASE) -> str:
@@ -532,13 +677,16 @@ def ajustar_cenario(pid: str, lid: str, base: str = _BASE) -> str:
            "MÓVEIS (camadas separadas que vão por cima do fundo): " + ("; ".join(f"{x['nome']} ({'atrás' if x.get('camada') == 'atras' else 'na frente'} do personagem)"
                                                                                  for x in props) or "(nenhum)"))
     sis = ("Você posiciona as camadas de um anime 2D montado com recortes. Olhe o fundo e responda em FRAÇÕES da imagem "
-           "(x: 0 = esquerda, 1 = direita; y: 0 = topo, 1 = base). chao_y = onde fica o chão na frente (onde pisam os pés de "
-           "quem está mais perto); altura_em_pe = a altura (fração da altura da imagem) de um adulto em pé nesse chão da "
-           "frente, coerente com a perspectiva (portas, janelas, móveis). Pra CADA lugar: x e y = onde ficam os PÉS (ou o "
-           "assento, se sentado), escala = o tamanho relativo pela distância (1 = no chão da frente; mais longe < 1), "
-           "sentado. Os lugares padrão (esquerda, centro_esq, centro, centro_dir, direita) ficam no chão, espalhados, sem "
-           "cair em cima de móveis do fundo. Pra cada MÓVEL: x = o centro, y = a BASE (onde ele toca o chão), largura = "
-           "fração da largura da imagem — a cadeira atrás e a mesa na frente de quem senta ali, encaixados no chão.")
+           "(x: 0 = esquerda, 1 = direita; y: 0 = topo, 1 = base). chao_y = a linha do chão mais perto da câmera (onde pisam "
+           "os pés de quem está na frente); altura_em_pe = a altura (fração da altura da imagem) de um adulto em pé nesse "
+           "chão da frente, coerente com a perspectiva (portas ~2 m, janelas, móveis); chao_fundo_y = a linha onde o chão "
+           "encontra a parede do fundo e escala_fundo = o tamanho de uma pessoa lá (fração da da frente). area_livre = o "
+           "polígono (4–6 pontos [x,y]) do CHÃO LIVRE onde dá pra ficar em pé e andar — sem armários, estantes, mesas, "
+           "paredes. Pra CADA lugar: x e y = onde ficam os PÉS (dentro da área livre), escala (pela distância), sentado, "
+           "corpo ('cintura' = atrás de uma mesa/balcão: y = a linha da cintura, logo abaixo do tampo da mesa; 'inteiro' = "
+           "o resto). Os padrões (esquerda, centro_esq, centro, centro_dir, direita) espalhados DENTRO da área livre. Pra "
+           "cada MÓVEL: x = o centro, y = a BASE (onde ele toca o chão), largura_m = a largura real em metros (mesa ~1.4, "
+           "cadeira ~0.6) — a cadeira atrás e a mesa na frente de quem senta ali.")
     conteudo = [{"type": "text", "text": txt},
                 {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64.b64encode(b.getvalue()).decode()}}]
     r = _ia().chamar("anime2d", sis, conteudo, schema=SCHEMA_LAYOUT, max_tokens=2500, effort="medium", timeout=180, cache_local=False)
@@ -547,20 +695,27 @@ def ajustar_cenario(pid: str, lid: str, base: str = _BASE) -> str:
     with _TRAVA:
         p = carregar(pid, base)
         lo = next((x for x in p["locais"] if x["id"] == lid), None)
-        lo["chao"] = {"y": max(0.4, min(1.05, float(r.get("chao_y") or 0.97))), "alt": max(0.15, min(1.2, float(r.get("altura_em_pe") or 0.62)))}
+        lo["chao"] = {"y": max(0.4, min(1.05, float(r.get("chao_y") or 0.97))), "alt": max(0.15, min(1.2, float(r.get("altura_em_pe") or 0.62))),
+                      "y_fundo": max(0.2, min(1.0, float(r.get("chao_fundo_y") or 0.7))), "esc_fundo": max(0.2, min(1.0, float(r.get("escala_fundo") or 0.6)))}
+        if isinstance(r.get("area_livre"), list) and len(r["area_livre"]) >= 3:
+            lo["chao"]["area"] = [[round(max(0.0, min(1.0, float(q[0]))), 4), round(max(0.0, min(1.1, float(q[1]))), 4)]
+                                  for q in r["area_livre"] if isinstance(q, list) and len(q) == 2][:10]
         lgs = []
         for y in r.get("lugares") or []:
             if isinstance(y, dict) and _txt(y.get("nome")):
                 lgs.append({"nome": _txt(y["nome"], 40), "x": max(0.0, min(1.0, float(y.get("x") or 0.5))),
                             "y": max(0.2, min(1.1, float(y.get("y") or 0.97))), "escala": max(0.2, min(2.0, float(y.get("escala") or 1))),
-                            "sentado": bool(y.get("sentado")),
+                            "sentado": bool(y.get("sentado")), "corpo": y.get("corpo") if y.get("corpo") in ("inteiro", "cintura") else "inteiro",
                             "descricao": (next((z for z in lo.get("lugares") or [] if R._norm(z.get("nome")) == R._norm(y["nome"])), {}) or {}).get("descricao", "")})
         if lgs:
             lo["lugares"] = lgs
         for y in r.get("props") or []:
             pr = next((z for z in lo.get("props") or [] if isinstance(y, dict) and R._norm(z["nome"]) == R._norm(y.get("nome"))), None)
             if pr:
-                pr.update(x=round(float(y.get("x") or 0.5), 4), y=round(float(y.get("y") or 1.0), 4), w=round(float(y.get("largura") or 0.3), 4))
+                pr.update(x=round(float(y.get("x") or 0.5), 4), y=round(float(y.get("y") or 1.0), 4))
+                if isinstance(y.get("largura_m"), (int, float)) and y["largura_m"] > 0:
+                    pr["real"] = round(float(y["largura_m"]), 3)
+                    pr.pop("w_manual", None)
         log(p, f"📐 {lo['nome']}: a IA posicionou {len(lgs)} lugar(es) e {len(r.get('props') or [])} móvel(is)")
         salvar(p, base)
     return f"{len(lgs)} lugar(es)"
@@ -568,6 +723,63 @@ def ajustar_cenario(pid: str, lid: str, base: str = _BASE) -> str:
 
 def local_da_cena(p: Dict[str, Any], s: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return next((x for x in p["locais"] if x["id"] == s.get("local")), None)
+
+
+def base_do_local(p: Dict[str, Any], lo: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """🌫 v84_238e: o local é uma VARIANTE de outro (o mesmo quarto cheio de fumaça, de noite, destruído…) → o original."""
+    n = R._norm((lo or {}).get("variante_de") or "")
+    if not n:
+        return None
+    return next((x for x in p["locais"] if x is not lo and (R._norm(x["nome"]) == n or x["id"] == lo.get("variante_de"))), None)
+
+
+def angulo_base(p: Dict[str, Any], lo: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """🎥 o local é um ÂNGULO de outro (o mesmo cômodo, outra câmera) → o principal."""
+    n = R._norm((lo or {}).get("angulo_de") or "")
+    if not n:
+        return None
+    return next((x for x in p["locais"] if x is not lo and (R._norm(x["nome"]) == n or x["id"] == lo.get("angulo_de"))), None)
+
+
+def familia_do_local(p: Dict[str, Any], lo: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """O local, os ângulos e as variantes dele (o mesmo cômodo) — o que um momento pode usar como 'angulo'."""
+    if not lo:
+        return []
+    raiz = lo
+    for _ in range(4):
+        b = base_do_local(p, raiz) or angulo_base(p, raiz)
+        if not b:
+            break
+        raiz = b
+    fam, novos = [raiz], [raiz]
+    while novos:
+        n = novos.pop()
+        for x in p["locais"]:
+            if x not in fam and (base_do_local(p, x) is n or angulo_base(p, x) is n):
+                fam.append(x)
+                novos.append(x)
+    return fam
+
+
+def local_do_momento(p: Dict[str, Any], s: Dict[str, Any], m: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """🎥 O cenário do momento: o da cena, ou o 'angulo' escolhido (outro local do mesmo cômodo)."""
+    lo = local_da_cena(p, s)
+    a = m.get("angulo")
+    if a:
+        x = next((y for y in p["locais"] if y["id"] == a), None) or achar(p["locais"], a)
+        if x:
+            return x
+    return lo
+
+
+def layout_do_local(p: Dict[str, Any], lo: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """O local com o arranjo (móveis, lugares, chão) do original quando é uma variante — o mesmo cômodo, os mesmos
+    móveis no mesmo lugar; só o fundo muda."""
+    b = base_do_local(p, lo)
+    if not b:
+        return lo
+    return dict(lo, props=b.get("props") or [], lugares=b.get("lugares") or [], chao=b.get("chao") or lo.get("chao") or {},
+                planta=b.get("planta") or lo.get("planta"))
 
 
 def aplicar_plano(p: Dict[str, Any], r: Any) -> Dict[str, Any]:
@@ -680,7 +892,7 @@ def _schema_cena() -> Dict[str, Any]:
         "properties": {"momentos": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["tipo", "quem", "texto", "pose", "pose_en", "em_cena", "camera", "plano", "foco", "fundo_reacao",
-                         "destaque", "objeto", "duracao", "tempo", "som"],
+                         "destaque", "objeto", "duracao", "tempo", "som", "visao", "angulo"],
             "properties": {
                 "tipo": {"type": "string", "enum": list(TIPOS_MOMENTO)}, "quem": {"type": "string"},
                 "texto": {"type": "string"}, "pose": {"type": "string", "enum": poses}, "pose_en": {"type": "string"},
@@ -696,7 +908,7 @@ def _schema_cena() -> Dict[str, Any]:
                 "foco": {"type": "string"}, "fundo_reacao": {"type": "string", "enum": list(FUNDOS_REACAO) + [""]},
                 "destaque": {"type": "string"},
                 "objeto": {"type": "string"}, "duracao": {"type": "number"}, "tempo": {"type": "number"},
-                "som": {"type": "string"}}}}},
+                "som": {"type": "string"}, "visao": {"type": "string"}, "angulo": {"type": "string"}}}}},
     }
 
 
@@ -705,7 +917,17 @@ def sys_cena(p: Dict[str, Any]) -> str:
         "Você é diretor de ANIME e escreve UMA CENA de um anime 2D montado com imagens (como uma série de TV de comédia, "
         "tipo Jashin-chan Dropkick): personagens recortados em poses sobre os cenários, com móveis em camadas, câmera que "
         "CORTA entre planos (geral, médio, close, reação), poses que mudam com a emoção, boca que mexe na fala. A cena vira "
-        "uma lista de MOMENTOS (cada momento = um corte de câmera), em ordem:\n"
+        "uma lista de MOMENTOS (cada momento = um corte de câmera), em ordem. RITMO de comédia de TV: cortes curtos "
+        "(~2 s; nenhum plano parado mais de ~3 s — fala comprida vira 2 momentos, e a reação de quem escuta ganha o seu "
+        "corte), exagero nas reações (pose nova + plano 'reacao' ou câmera 'tremida' no susto/impacto), gente ENTRANDO e "
+        "SAINDO de cena andando, e um momento de 'destaque' (cutaway/imagem hipotética) quando a fala descreve algo que "
+        "dá pra mostrar. Pense como LAYOUT de anime: a PLANTA do cenário (abaixo) diz onde fica cada coisa; pra cada "
+        "momento decida o que o PÚBLICO VÊ — 'visao' = o que está no quadro e o que fica de fora (ex.: \"médio dela na "
+        "poltrona; a fornalha fora de quadro à direita, só a fumaça entrando pelo canto\") — e se precisa de OUTRO ÂNGULO "
+        "do cômodo ('angulo' = o nome de um dos ângulos listados; \"\" = a câmera principal — sem 'angulo' a câmera já troca "
+        "sozinha a cada ~10 s pra um ângulo que condiz; use 'angulo' quando o momento PRECISA de um, ex.: a ação no canto da "
+        "fornalha). Os personagens ficam nos "
+        "LUGARES do ângulo usado e nunca atravessam um objeto da planta:\n"
         "- tipo 'fala' (um personagem fala — 'quem' = o nome EXATO dele, 'texto' = só o que ele diz, curto: até ~25 "
         "palavras), 'narracao' (o narrador conta — 'quem' = \"Narrador\"; use só quando a história precisa), 'acao' (algo "
         "acontece sem fala: alguém entra correndo, cai, sai; 'texto' = descrição curta pro editor, 'duracao' em segundos "
@@ -730,6 +952,9 @@ def sys_cena(p: Dict[str, Any]) -> str:
         "na pose (a cadeira e a mesa são do cenário).\n"
         "- 'camera': fixa, zoom_in (tensão/revelação), zoom_out, pan_esq, pan_dir, tremida (susto/impacto).\n"
         "- 'objeto': o nome de um item 'objeto' que aparece em cena nesse momento (\"\" se nenhum).\n"
+        "- 'destaque' também vale numa 'fala'/'narracao': a imagem em tela cheia aparece ENQUANTO a voz fala (a "
+        "imagem cinematográfica durante a narração, o exemplo/cutaway enquanto o personagem descreve a situação). Use os "
+        "destaques de exemplo da lista sempre que alguém descreve algo.\n"
         "- Humor de timing: reações, silêncio constrangedor (acao com duracao), quebra de expectativa com destaque.\n"
         "- 'som': o efeito sonoro do momento, curto, em português (ex.: \"porta rangendo\", \"soco\", \"mastigando\") ou \"\" "
         "— por enquanto só anotado (a busca de efeitos vem depois).\n"
@@ -771,7 +996,13 @@ def prompt_cena(p: Dict[str, Any], k: int) -> str:
     L.append("ITENS: " + ("; ".join(f"{i['nome']} ({i.get('tipo')}" + (f", escrito: “{i['texto']}”" if i.get("texto") else "") + ")"
                                     for i in p["itens"]) or "(nenhum)"))
     lug = lugares_do_local(p, lo)
+    pl_txt = _PL.descricao_pt((layout_do_local(p, lo) or {}).get("planta") or (lo or {}).get("planta"))
+    angs = [x for x in familia_do_local(p, lo) if x is not lo and angulo_base(p, x) is not None]
     L += ["", f"## CENA {k + 1} DE {len(p['cenas'])}: {s['titulo']}", f"Local: {lo['nome'] if lo else '?'} — {(lo or {}).get('descricao') or ''}",
+          "📐 PLANTA (câmera principal): " + (pl_txt or "(sem planta — use a descrição)"),
+          "🎥 ÂNGULOS deste cômodo (use em 'angulo'): " + ("; ".join(
+              f"{x['nome']} — {x.get('angulo') or x.get('angulo_en') or ''}; lugares: " + ", ".join(lugares_do_local(p, x))
+              + (f"; planta: {_PL.descricao_pt(x.get('planta'))}" if x.get("planta") else "") for x in angs) or "(só a câmera principal)"),
           "LUGARES deste cenário (posicao): " + "; ".join(f"{n}" + (" [SENTADO]" if v["sentado"] else "") + (f" — {v['descricao']}" if v.get("descricao") else "")
                                                          for n, v in lug.items()),
           "Móveis (camadas): " + (", ".join(f"{x['nome']} ({'atrás' if x.get('camada') == 'atras' else 'na frente'} de quem está ali)"
@@ -870,6 +1101,10 @@ def limpar_momento(p: Dict[str, Any], x: Any, lugares: Optional[Dict[str, Any]] 
     """Um momento da IA/colado/editado → o formato do projeto (ids no lugar dos nomes). `lugares` = os do cenário."""
     if not isinstance(x, dict):
         return None
+    ang = (next((y for y in p.get("locais") or [] if y["id"] == x.get("angulo")), None) or achar(p.get("locais") or [], x.get("angulo"))
+           ) if x.get("angulo") else None
+    if ang:  # 🎥 o momento usa outro ângulo do cômodo: os lugares são os dele
+        lugares = lugares_do_local(p, ang)
     lugares = lugares or {k: {"sentado": False} for k in POSICOES}
     tipo = x.get("tipo") if x.get("tipo") in TIPOS_MOMENTO else "fala"
     quem_n = str(x.get("quem") or "").strip()
@@ -917,6 +1152,7 @@ def limpar_momento(p: Dict[str, Any], x: Any, lugares: Optional[Dict[str, Any]] 
             "destaque": (achar([i for i in p["itens"] if i.get("tipo") == "destaque"], x.get("destaque")) or {}).get("id", ""),
             "objeto": (achar([i for i in p["itens"] if i.get("tipo") == "objeto"], x.get("objeto")) or {}).get("id", ""),
             "duracao": round(max(0.0, min(15.0, dur)), 2), "som": " ".join(str(x.get("som") or "").split())[:200],
+            "visao": " ".join(str(x.get("visao") or "").split())[:400], "angulo": ang["id"] if ang else "",
             "tempo": (round(float(R.segundos(x.get("tempo"))), 2) if R.segundos(x.get("tempo")) is not None and (p.get("audio") or {}).get("arquivo") else None)}
 
 
@@ -989,13 +1225,18 @@ def poses_usadas(p: Dict[str, Any], cid: str) -> Dict[str, str]:
     momento, as 'poses_seguintes', o 🙂 busto (close/reação) e 'andando' se ele muda de lugar/entra andando."""
     out: Dict[str, str] = {"neutro": POSES["neutro"][1]}
 
-    def por(po: str, en: str) -> None:
+    def por(po: str, en: str, meio: bool = False) -> None:
         if po == "outra":
             en = (en or "").strip()
             if en:
-                out["x_" + R._slug(en)[:24]] = en
+                k, d = "x_" + R._slug(en)[:24], en
+            else:
+                return
         elif po in POSES:
-            out[po] = POSES[po][1]
+            k, d = po, POSES[po][1]
+        else:
+            return
+        out[("meio_" + k) if meio and k not in POSES_MOVIMENTO else k] = d
     for s in p["cenas"]:
         lug = lugares_do_local(p, local_da_cena(p, s))
         antes: Dict[str, str] = {}
@@ -1005,9 +1246,10 @@ def poses_usadas(p: Dict[str, Any], cid: str) -> Dict[str, str]:
                 agora[e["cid"]] = e["posicao"]
                 if e["cid"] != cid:
                     continue
-                por(e["pose"], e.get("pose_en") or "")
+                meio = (lug.get(e.get("posicao")) or {}).get("corpo") == "cintura"
+                por(e["pose"], e.get("pose_en") or "", meio)
                 for z in e.get("poses") or []:
-                    por(z.get("pose"), z.get("pose_en") or "")
+                    por(z.get("pose"), z.get("pose_en") or "", meio)
                 if m.get("plano") in ("close", "reacao") and foco_do_momento(m) == cid:
                     ex = expressao_busto(e["pose"])
                     out["busto_" + ex] = POSES[ex][1]
@@ -1096,27 +1338,43 @@ def poses_json(p: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, Any]:
     estilo = "ART STYLE: " + estilo_en(p) + "."
     regras = ("ONE single figure, framed as the pose says, seen in a 3/4 view turned to the RIGHT side of the image, the "
               "whole figure inside the image with margin. NO furniture, NO chair, NO table, NO desk, NO floor, NO background "
-              "objects (a sitting pose sits on NOTHING — an invisible seat; the furniture is a separate layer); a small "
+              "objects (a sitting pose sits on NOTHING — an invisible CHAIR-HEIGHT seat: hips at knee height, thighs level, lower "
+              "legs down to the feet; NEVER sitting on the floor or kneeling unless the pose says so; the furniture is a "
+              "separate layer); a small "
               "handheld object only if the pose needs it. No panels, on a flat solid chroma-key green background (#00FF00), "
               "no shadow on the background. " + SEM_TEXTO)
     corpo = "FULL BODY from head to feet, feet at the bottom of the figure."
     poses = []
     for k, (nome, en) in enumerate(poses_usadas(p, c["id"]).items()):
         busto = nome.startswith("busto_")
-        quadro = ("BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer "
-                  "in 3/4 turned to the RIGHT. Expression: " + en + ".") if busto else f"{en}. {corpo}"
-        desc = (POSES[nome][0] if nome in POSES else ("🙂 busto " + POSES[nome[6:]][0] if busto and nome[6:] in POSES else en))
+        meio = nome.startswith("meio_")
+        if busto:
+            quadro = ("BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer "
+                      "in 3/4 turned to the RIGHT. Expression: " + en + ".")
+        elif meio:  # 🪑 atrás da mesa: da cintura pra cima, sentada numa cadeira (a mesa e a cadeira são do cenário)
+            quadro = ("WAIST-UP SHOT, cropped at the waist: the character is SEATED on an office chair behind a desk, upper "
+                      "body upright, facing the viewer (3/4 turned slightly to the RIGHT), arms and hands as described; do NOT "
+                      f"draw the desk, the chair or the legs. Pose: {en}.")
+        else:
+            quadro = f"{en}. {corpo}"
+        bnome = nome[6:] if busto else nome[5:] if meio else nome
+        desc = (("🙂 busto " if busto else "🪑 da cintura pra cima — " if meio else "") +
+                (POSES[bnome][0] if bnome in POSES else en))
         poses.append({"arquivo": f"{sl}_{nome}.png", "tipo": "pose", "prioridade": 1 if k < 5 else 2, "grupo": "anime2d",
                       "mestre": nome == "neutro", "descricao_pt": desc, "prompt": quadro})
         if nome in QUADRO_B:
             poses.append({"arquivo": f"{sl}_{nome}_b.png", "tipo": "pose", "prioridade": 2, "grupo": "anime2d",
                           "descricao_pt": desc + " — 2º quadro",
-                          "prompt": f"{QUADRO_B[nome]}. Same character, same framing and size as the first frame. {corpo}",
-                          "pose_base": f"{sl}_{nome}.png"})
+                          "prompt": f"Draw the NEXT FRAME of this motion: {QUADRO_B[nome]}. Same character, same framing and size.",
+                          "pose_base": f"{sl}_{nome}.png", "edita_base": True})
         if nome not in POSES_MOVIMENTO:  # 😑 o quadro piscando (a animação pisca de vez em quando — sem loop)
             poses.append({"arquivo": f"{sl}_{nome}_pisca.png", "tipo": "pose", "prioridade": 3, "grupo": "anime2d",
-                          "descricao_pt": desc + " — piscando", "prompt": PROMPT_PISCA, "pose_base": f"{sl}_{nome}.png"})
+                          "descricao_pt": desc + " — piscando", "prompt": PROMPT_PISCA, "pose_base": f"{sl}_{nome}.png",
+                          "edita_base": True})
     refs = {os.path.basename(r): f"a reference picture of {c['nome']}" for r in c.get("refs") or []}
+    if c.get("cor_ref"):
+        refs[os.path.basename(c["cor_ref"])] = _pp().COR_REF_EN
+        trava += " Use the COLORED reference for the exact real colors."
     return {"formato": "personagens_pod_v1", "personagem": sl, "nome": c["nome"], "anime2d": True,
             "descricoes_referencias": refs, "texto_fixo": {"trava": trava, "estilo": estilo, "regras": regras},
             "fundo": "verde", "canvas": [1200, 1800], "altura_personagem": 0.95, "corpo_inteiro": True, "boca_auto": True,
@@ -1147,7 +1405,11 @@ def criar_poses(pid: str, cid: str, base: str = _BASE) -> Dict[str, Any]:
                 refs.append(("design_anime_aprovado.png", f.read()))
             dados["descricoes_referencias"]["design_anime_aprovado.png"] = (
                 f"the APPROVED anime character design of {c['nome']} — follow it exactly (face, hair, outfit, colors)")
-        for cam in refs_de(p, c, base)[:2]:
+        cor = cor_ref(p, c, base)
+        if cor:  # 🌈 a colorida logo depois do design (as cores reais)
+            with open(cor, "rb") as f:
+                refs.append((os.path.basename(cor), f.read()))
+        for cam in refs_de(p, c, base)[:max(0, 3 - len(refs))]:
             with open(cam, "rb") as f:
                 refs.append((os.path.basename(cam), f.read()))
         if not (c.get("pod") or {}).get("pid"):
@@ -1294,7 +1556,8 @@ def estado_poses(c: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
     for x in proj["dados"]["poses"]:
         it = proj["imagens"].get(x["arquivo"]) or {}
         itens.append({"arquivo": x["arquivo"], "tipo": x.get("tipo"), "estado": it.get("estado"),
-                      "img": (it["versoes"][it["atual"]]["local"] if it.get("atual", -1) >= 0 and it.get("versoes") else None)})
+                      "img": (it["versoes"][it["atual"]]["local"] if it.get("atual", -1) >= 0 and it.get("versoes") else None),
+                      "nver": len(it.get("versoes") or []), "atual": it.get("atual", -1)})
     poses = [i for i in itens if i["tipo"] == "pose"]
     return {"tem": True, "pid": pod["pid"], "mestre": bool(proj.get("mestre")), "prontas": sum(1 for i in poses if i["img"]),
             "total": len(poses), "bocas": sum(1 for i in itens if i["tipo"] == "boca" and i["img"]),
@@ -1351,28 +1614,55 @@ def ref_personagem(p: Dict[str, Any], c: Dict[str, Any], base: str = _BASE) -> O
 def prompt_imagem(p: Dict[str, Any], tipo: str, x: Dict[str, Any], camada: str = "fundo") -> str:
     W, H = tamanho(p)
     est = estilo_en(p)
+    import anime2d_planta as PL
+    if tipo == "local" and camada == "fundo" and x.get("angulo_de"):
+        lay = PL.texto_en(x.get("planta"), com_esboco=bool(PL.visiveis(x.get("planta"))))
+        return (f"Background of a 2D anime TV series, {'wide 16:9' if W > H else 'vertical 9:16'}: the SAME room as the "
+                f"room picture in the references (same objects, materials, colors, light and line art), now seen from ANOTHER "
+                f"CAMERA ANGLE: {x.get('angulo_en') or x.get('angulo') or ''}. {x.get('prompt_en') or ''} {lay} EMPTY: no "
+                f"people, no characters. {SEM_TEXTO} ART STYLE: {est}.")[:3900]
+    if tipo == "local" and camada == "fundo" and x.get("variante_de"):
+        return (f"EDIT the reference image: it is the background of this 2D anime. Keep EXACTLY the same room, the same camera "
+                f"angle and framing, the same walls, window, objects and their positions, the same line art and colors — and "
+                f"change ONLY this: {x.get('prompt_en') or x['nome']}. EMPTY: no people, no characters. {SEM_TEXTO} "
+                f"ART STYLE: {est}.")[:3900]
     if tipo == "local" and camada == "fundo":
         props = [pr["nome"] + (f" ({pr['prompt_en']})" if pr.get("prompt_en") else "") for pr in x.get("props") or []]
         livre = (f" The furniture {'; '.join(props)} is NOT in this image (it is a separate layer): leave that space EMPTY "
                  "floor/wall." if props else "")
+        lay = PL.texto_en(x.get("planta"), com_esboco=bool(PL.visiveis(x.get("planta"))))
         return (f"Background of a 2D anime TV series, {'wide 16:9' if W > H else 'vertical 9:16'}: {x.get('prompt_en') or x['nome']}. "
                 "Seen from the front at eye level; the lower part is floor/ground where characters will stand." + livre +
+                (" " + lay if lay else "") +
                 f" EMPTY: no people, no characters, no animals. {SEM_TEXTO} ART STYLE: {est}.")[:3900]
     if tipo == "local":  # a camada da frente
         return (f"{x.get('frente_en')}, a foreground prop for a 2D anime seen from the front, the whole object visible "
                 "with margin, isolated on a flat solid chroma-key green background (#00FF00), no shadow, no people. " + SEM_TEXTO + " "
                 f"ART STYLE: {est}.")[:3900]
     if tipo == "prop":  # 🪑 um móvel do cenário (camada)
-        return (f"{x.get('prompt_en') or x['nome']}, a single piece of furniture/prop for a 2D anime, seen from the front at "
-                "eye level, the whole object visible with margin, isolated on a flat solid chroma-key green background "
-                "(#00FF00), no shadow, no people. " + SEM_TEXTO + f" ART STYLE: {est}.")[:3900]
+        lado = ""
+        if re.search(r"\b(desk|table|counter|mesa|balc)", (x.get("prompt_en") or "") + " " + x["nome"], re.I) and x.get("camada") != "atras":
+            lado = (" Seen from the VISITOR'S side, facing the camera: we see the solid FRONT panel of the desk; the drawers "
+                    "and the knee space are on the far side (hidden); the top seen slightly from above.")
+        elif re.search(r"\b(chair|cadeira|poltrona|armchair|stool)", (x.get("prompt_en") or "") + " " + x["nome"], re.I):
+            lado = " Seen from the front, facing the camera (a person would sit facing the viewer), empty."
+        return (f"{x.get('prompt_en') or x['nome']}, a single piece of furniture/prop for a 2D anime, the SAME camera angle as "
+                f"the background reference (eye level, frontal).{lado} The whole object visible with margin, isolated on a "
+                "flat solid chroma-key green background (#00FF00), no shadow, no people. " + SEM_TEXTO + f" ART STYLE: {est}.")[:3900]
     pers = personagens_do_item(p, x)
     quem = (" CHARACTERS IN THIS IMAGE (match the reference designs EXACTLY — same face, hairstyle, hair color, eye color, "
             "outfit and colors): " + "; ".join(f"{c['nome']}: {c.get('aparencia_en') or ''}" for c in pers) + ".") if pers else ""
     lo = local_do_item(p, x)
-    onde = f" SETTING: {lo.get('prompt_en') or lo['nome']} (the same place as the reference background)." if lo and x.get("tipo") == "destaque" else ""
+    onde = (f" SETTING: {lo.get('prompt_en') or lo['nome']}" + ("." if x.get("painel") else " (the same place as the reference background).")
+            if lo and x.get("tipo") == "destaque" else "")
+    comp = (" THIS IS AN ADAPTATION OF A MANGA PANEL: the FIRST (largest) reference image IS that panel. Redraw it as the "
+            "colored anime frame keeping EXACTLY its composition — the same camera angle and distance, the same framing/crop, "
+            "the same pose and gesture of each character (hands, head tilt, where they look), the same position of every "
+            "element in the frame, the same foreground objects and the same motion/impact lines; do NOT invent a different "
+            "shot. The other references only give the colors and the designs. Ignore balloons, sound-effect lettering and "
+            "panel borders." if x.get("painel") else "")
     if x.get("tipo") == "destaque":
-        return (f"Full-frame key image for a 2D anime TV series: {x.get('prompt_en') or x['nome']}.{quem}{onde} Dramatic, "
+        return (f"Full-frame key image for a 2D anime TV series: {x.get('prompt_en') or x['nome']}.{quem}{onde}{comp} Dramatic, "
                 f"expressive composition. {regra_texto(x.get('texto'))} ART STYLE: {est}.")[:3900]
     return (f"{x.get('prompt_en') or x['nome']}, a single prop/object for a 2D anime, the whole object visible with "
             f"margin, isolated on a flat solid chroma-key green background (#00FF00), no shadow.{quem} " + regra_texto(x.get("texto")) + " "
@@ -1382,7 +1672,10 @@ def prompt_imagem(p: Dict[str, Any], tipo: str, x: Dict[str, Any], camada: str =
 def _ref_flow(p: Dict[str, Any], x: Dict[str, Any], base: str, extra: Optional[List[str]] = None) -> Optional[str]:
     """A referência que vai pro Flow: as fotos do próprio local/item + as de estilo (e personagens), lado a lado."""
     from PIL import Image
-    cams = (extra or [])[:4] + refs_de(p, x, base)[:2] + refs_estilo(p, base)[:1]  # os personagens/o cenário primeiro
+    if x.get("painel"):  # 📖 o quadro do mangá primeiro e GRANDE (a composição a recriar) + só o design de quem aparece
+        cams = refs_de(p, x, base)[:1] + (extra or [])[:1]
+    else:
+        cams = (extra or [])[:4] + refs_de(p, x, base)[:2] + refs_estilo(p, base)[:1]  # os personagens/o cenário primeiro
     if not cams:
         return None
     ims = []
@@ -1397,7 +1690,15 @@ def _ref_flow(p: Dict[str, Any], x: Dict[str, Any], base: str, extra: Optional[L
     if not ims:
         return None
     import personagens_limpeza as L
-    col = L.colagem(ims) if len(ims) > 1 else ims[0]
+    if x.get("painel") and len(ims) > 1:  # 📖 o quadro grande à esquerda; o design pequeno (45% da altura) embaixo à direita
+        alt = 1024
+        q = ims[0].resize((max(1, round(ims[0].width * alt / ims[0].height)), alt), Image.LANCZOS)
+        dz = ims[1].resize((max(1, round(ims[1].width * alt * 0.45 / ims[1].height)), round(alt * 0.45)), Image.LANCZOS)
+        col = Image.new("RGB", (q.width + 24 + dz.width, alt), (128, 128, 128))
+        col.paste(q, (0, 0))
+        col.paste(dz, (q.width + 24, alt - dz.height))
+    else:
+        col = L.colagem(ims) if len(ims) > 1 else ims[0]
     d = os.path.join(pasta(p["id"], base), "imagens")
     os.makedirs(d, exist_ok=True)
     cam = os.path.join(d, f"_ref_{x['id']}_{secrets.token_hex(2)}.png")
@@ -1412,15 +1713,46 @@ def gerar_imagens(pid: str, base: str = _BASE, alvos: Optional[List[str]] = None
     with _TRAVA:
         p = carregar(pid, base)
         lista: List[Tuple[str, Dict[str, Any], str]] = []
+        esperando: List[str] = []
         for lo in p["locais"]:
+            b_ = base_do_local(p, lo)
+            if b_ is not None:  # 🌫 variante: o fundo sai EDITANDO o do original (precisa dele pronto); os móveis são os dele
+                chave = f"{lo['id']}:fundo"
+                st = lo.get("img") or {}
+                if (alvos and chave in alvos) or (not alvos and not arquivo_img(p, st, base) and st.get("estado") not in ("fila", "gerando")):
+                    fb = arquivo_img(p, b_.get("img") or {}, base)
+                    if fb:
+                        lo["_refs_extra"] = [fb]
+                        lista.append(("local", lo, "fundo"))
+                    else:
+                        esperando.append(lo["nome"])
+                continue
+            ab = angulo_base(p, lo)
             for camada in ("fundo", "frente"):
                 if camada == "frente" and not (lo.get("frente_en") or "").strip():
                     continue
                 chave = f"{lo['id']}:{camada}"
                 st = lo.get("img" if camada == "fundo" else "frente") or {}
                 if (alvos and chave in alvos) or (not alvos and not arquivo_img(p, st, base) and st.get("estado") not in ("fila", "gerando")):
+                    extra = []
+                    if camada == "fundo":  # 📐 o esboço da planta primeiro (onde fica cada coisa)
+                        import anime2d_planta as PL
+                        Wq, Hq = tamanho(p)
+                        esb = PL.esboco(lo.get("planta"), os.path.join(pasta(p["id"], base), "imagens"), Wq, Hq,
+                                        float((lo.get("chao") or {}).get("y_fundo") or 0.72))
+                        extra = [esb] if esb else []
+                        if ab is not None:  # 🎥 outro ângulo: o fundo principal mostra os objetos/cores do cômodo
+                            fb = arquivo_img(p, ab.get("img") or {}, base)
+                            if not fb:
+                                esperando.append(lo["nome"])
+                                continue
+                            extra.append(fb)
+                        lo["_refs_extra"] = extra
                     lista.append(("local", lo, camada))
             for pr in lo.get("props") or []:  # 🪑 os móveis (camadas)
+                if ab is not None and any(R._norm(q["nome"]) == R._norm(pr["nome"]) and arquivo_img(p, q.get("img") or {}, base)
+                                          for q in ab.get("props") or []):
+                    continue  # 🎥 o mesmo móvel do ângulo principal (a mesma imagem)
                 st = pr.get("img") or {}
                 chave = f"{lo['id']}:{pr['id']}"
                 if (alvos and chave in alvos) or (not alvos and not arquivo_img(p, st, base) and st.get("estado") not in ("fila", "gerando")):
@@ -1436,7 +1768,8 @@ def gerar_imagens(pid: str, base: str = _BASE, alvos: Optional[List[str]] = None
                 lista.append(("item", it, "destaque" if it.get("tipo") == "destaque" else "objeto"))
                 it["_refs_extra"] = extra[:3] + ([fundo] if fundo else [])
         if not lista:
-            raise AnimeErro("Nada pra gerar (tudo já tem imagem ou está na fila).")
+            raise AnimeErro("Nada pra gerar (tudo já tem imagem ou está na fila)." + (
+                f" 🌫 {', '.join(esperando)}: gere antes o cenário principal (a variante/o ângulo sai a partir dele)." if esperando else ""))
         W, H = tamanho(p)
         lote = flow_lote.lote()
         por_prop: Dict[str, List[int]] = {}
@@ -1450,7 +1783,10 @@ def gerar_imagens(pid: str, base: str = _BASE, alvos: Optional[List[str]] = None
                 lo_ = x.pop("_local", None)
                 f_ = arquivo_img(p, (lo_ or {}).get("img") or {}, base) if lo_ else None
                 x["_refs_extra"] = [f_] if f_ else []
-            ref = _ref_flow(p, x, base, x.pop("_refs_extra", None))
+            if tipo == "local" and base_do_local(p, x) is not None:  # 🌫 a variante: SÓ o fundo original como referência
+                ref = (x.pop("_refs_extra", None) or [None])[0]
+            else:
+                ref = _ref_flow(p, x, base, x.pop("_refs_extra", None))
             if ref:
                 it["referencia_arquivo"] = ref
             itens.append(it)
@@ -1468,14 +1804,15 @@ def gerar_imagens(pid: str, base: str = _BASE, alvos: Optional[List[str]] = None
             campo = "frente" if camada == "frente" else "img"
             st = x.setdefault(campo, {})
             st.update(estado="fila", job=jobs[k]["id"], erro=None, msg="⏳ na fila do Flow", recortar=camada in ("frente", "objeto", "prop"))
-        log(p, f"🚀 {len(lista)} imagem(ns) pro Flow (locais/itens)")
+        log(p, f"🚀 {len(lista)} imagem(ns) pro Flow (locais/itens)" + (f" · 🌫 esperando o principal: {', '.join(esperando)}" if esperando else ""))
         salvar(p, base)
-    aviso = ""
+    aviso = (f"🌫 {', '.join(esperando)}: gere de novo quando o cenário principal ficar pronto (a variante/o ângulo sai a partir dele). "
+             if esperando else "")
     try:
         lote.iniciar()
     except Exception as exc:  # noqa: BLE001
-        aviso = f"o Flow em massa não ligou agora ({str(exc)[:160]}) — ▶ Continuar na aba Flow"
-    return {"enviadas": len(lista), "aviso": aviso}
+        aviso += f"o Flow em massa não ligou agora ({str(exc)[:160]}) — ▶ Continuar na aba Flow"
+    return {"enviadas": len(lista), "aviso": aviso.strip()}
 
 
 def arquivo_img(p: Dict[str, Any], st: Dict[str, Any], base: str = _BASE) -> Optional[str]:
@@ -1528,6 +1865,9 @@ def _todas_imgs(p: Dict[str, Any]) -> List[Tuple[Dict[str, Any], bool, bool]]:
     for lo in p["locais"]:  # 🪑 os móveis do cenário (recortados do verde)
         for pr in lo.get("props") or []:
             out.append((pr.setdefault("img", {}), True, False))
+    for lo in p["locais"]:  # 🎬 o storyboard do cenário (os personagens/móveis desenhados no fundo)
+        if lo.get("story"):
+            out.append((lo["story"], False, True))
     for c in p["personagens"]:  # 🎨 o design anime (adaptação de mangá) — entra sozinho quando o Flow termina
         if c.get("design"):
             out.append((c["design"], False, False))
@@ -2072,6 +2412,14 @@ def deslocamento(movs: List[Dict[str, float]], t: float, W: int, H: int) -> Tupl
     x = y = 0.0
     for m in movs or []:
         a, b = float(m["a"]), float(m["b"])
+        if m.get("resp"):  # 🫁 respirando
+            if a <= t <= b:
+                y += H * float(m["resp"]) * math.sin(t * 2 * 3.14159265 / 2.6 + float(m.get("f") or 0))
+            continue
+        if m.get("pulo"):  # 🦘 pulinho de reação
+            if a <= t <= b:
+                y -= H * float(m["pulo"]) * math.sin(math.pi * (t - a) / max(0.001, b - a))
+            continue
         if "de" in m:  # 🚶 andar: de `de` até `para` (fração da largura) entre a e b, e fica até z
             z = float(m.get("z") or b)
             if not (a <= t <= z):
@@ -2174,6 +2522,12 @@ def para_tela(p: Dict[str, Any], base: str = _BASE) -> Dict[str, Any]:
     out["motores_perfil"] = list(MOTORES_PERFIL)
     out["planos"], out["fundos_reacao"] = PLANOS, FUNDOS_REACAO
     out["lugares"] = {lo["id"]: list(lugares_do_local(p, lo)) for lo in p["locais"]}
+    # 📐 a planta (texto) e 🎥 os ângulos/variantes de cada cômodo (o que um momento pode usar)
+    out["plantas"] = {lo["id"]: _PL.descricao_pt((layout_do_local(p, lo) or {}).get("planta")) for lo in p["locais"]}
+    out["familias"] = {lo["id"]: [[x["id"], ("🎥 " if angulo_base(p, x) else "🌫 " if base_do_local(p, x) else "🏞 ") + x["nome"]]
+                                  for x in familia_do_local(p, lo)] for lo in p["locais"]}
+    out["origem_local"] = {lo["id"]: (f"🎥 ângulo de {angulo_base(p, lo)['nome']}" if angulo_base(p, lo) else
+                                      f"🌫 variante de {base_do_local(p, lo)['nome']}" if base_do_local(p, lo) else "") for lo in p["locais"]}
     out["itens"] = [dict(it, personagens_txt=", ".join(it.get("personagens") or [])) for it in p["itens"]]
     out["layout"] = {lo["id"]: {"lugares": list(lugares_do_local(p, lo).values()), "chao": lo.get("chao") or {},
                                 "alt": float((lo.get("chao") or {}).get("alt") or (0.62 if tamanho(p)[0] > tamanho(p)[1] else 0.40))}

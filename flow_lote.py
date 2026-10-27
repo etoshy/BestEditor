@@ -38,6 +38,7 @@ import random
 import re
 import secrets
 import threading
+from datetime import datetime
 import time
 import traceback
 from typing import Any, Callable, Dict, List, Optional
@@ -63,6 +64,8 @@ QUANTIDADES = ("x1", "x2", "x3", "x4")
 RE_TROCAR_CONTA = re.compile(r"atividade incomum|unusual activity|extens[õo]es do navegador|browser extensions|"
                              r"actividad inusual|ungew[öo]hnliche aktivit", re.I)
 MINUTOS_INCOMUM = 60
+DESCANSO_MIN = 5            # 🩹 v84_237: conta com erros seguidos / que não abriu o projeto descansa e volta sozinha
+DESCANSO_NAVEGADOR_MIN = 2  # o navegador dela não abriu (perfil preso, Chrome fechando…)
 PAUSAR_NO_INCOMUM = True  # ⏸ v84_220: "atividade incomum" pausa o lote em vez de passar pra outra conta
 _RE_PREFIXO = re.compile(r"^\s*(foto|imagem|image|img|photo|v[ií]deo|video)\s*[:\-–—]\s*", re.I)
 
@@ -326,6 +329,10 @@ class Lote:
         self.trabalhadores: Dict[str, threading.Thread] = {}
         self.status_conta: Dict[str, str] = {}     # conta -> o que está fazendo agora
         self.problema_conta: Dict[str, str] = {}   # conta -> "precisa de login" / erro ao abrir (pula até concluir/limpar)
+        # 🩹 v84_237: até quando a conta descansa (time.time()); sem entrada = até você concluir o login. O lote ESPERA
+        # uma conta que volta logo em vez de parar com pedidos na fila
+        self.problema_ate: Dict[str, float] = {}
+        self.esperando_volta: Optional[float] = None
         self.manuais: Dict[str, "_Manual"] = {}
         self.proximo_envio = 0.0
         self.ultimo_envio_conta: Optional[str] = None
@@ -443,6 +450,9 @@ class Lote:
     # -- controle
     def iniciar(self) -> None:
         with self.trava:
+            vivo = self.supervisor is not None and self.supervisor.is_alive()
+            if self.rodando and not vivo:  # 🩹 v84_237: marcado "rodando" mas o supervisor já tinha saído — começa de novo
+                self.rodando, self.pausando, self.parar_ja = False, False, False
             if self.rodando and not self.pausando:
                 return
             if self.rodando and self.pausando:  # estava pausando: continua
@@ -455,6 +465,8 @@ class Lote:
         with self.trava:
             self.rodando, self.pausando, self.parar_ja, self.fim_msg = True, False, False, None
             self.problema_conta = {c: m for c, m in self.problema_conta.items() if c in self.manuais}
+            self.problema_ate = {c: t for c, t in self.problema_ate.items() if c in self.problema_conta}
+            self.esperando_volta = None
             self.supervisor = threading.Thread(target=self._supervisionar, name="flow-lote", daemon=True)
             self.supervisor.start()
         self.log(f"▶ Lote iniciado: até {self._paralelo()} conta(s) em paralelo, cooldown de "
@@ -490,6 +502,7 @@ class Lote:
                     time.sleep(0.5)
                     continue
                 contas = self.contas_do_lote()
+                self._devolver_contas_descansadas()
                 # 🔁 vídeo → foto: nenhuma conta (do lote) tem crédito de vídeo
                 if self.cfg.get("converter_para_foto") and any(j["tipo"] == "video" and not j.get("inicio_arquivo") for j in pend) \
                         and not any(self._serve(c, "video") for c in contas):
@@ -513,8 +526,19 @@ class Lote:
                     if not pend:
                         n_ok = sum(1 for j in self.fila if j["estado"] == "ok")
                         n_err = sum(1 for j in self.fila if j["estado"] == "erro")
-                        self._encerrar(f"✅ Lote terminou: {n_ok} ok, {n_err} com erro.", "ok")
-                        return
+                        # 🩹 v84_237: só termina se continuar vazio AGORA (um pedido que chegou nesse meio-tempo — ex.: a
+                        # 🎞 Animação 2D mandando mais — fazia o lote parar com coisa na fila)
+                        if self._encerrar(f"✅ Lote terminou: {n_ok} ok, {n_err} com erro.", "ok", so_se_vazio=True):
+                            return
+                        continue
+                    volta = self._proxima_volta(contas, pend)
+                    if volta is not None:  # 🩹 v84_237: uma conta descansando volta logo — espera em vez de parar
+                        if self.esperando_volta != volta:
+                            self.esperando_volta = volta
+                            self.log(f"⏳ {len(pend)} pedido(s) na fila e as contas estão descansando — volto a tentar às "
+                                     f"{time.strftime('%H:%M', time.localtime(volta))} (o lote continua ligado; ⏸ Pausar pra parar).", "aviso")
+                        time.sleep(2.0)
+                        continue
                     falta = sorted({j["tipo"] for j in pend})
                     motivo = ("; ".join(f"“{c}”: {m}" for c, m in self.problema_conta.items()) if self.problema_conta else "")
                     self._encerrar(f"💳 Parei: {len(pend)} pendente(s) ({', '.join(falta)}) e nenhuma conta com crédito pra isso"
@@ -530,8 +554,60 @@ class Lote:
                 t.join(60)
             self._encerrar(f"❌ Lote parou com erro: {exc}", "erro")
 
-    def _encerrar(self, msg: str, nivel: str = "info") -> None:
+    ESPERA_VOLTA_MAX = 3 * 3600  # s: espera uma conta descansando voltar até isso; mais que isso, para e avisa
+
+    def _devolver_contas_descansadas(self) -> None:
+        """A conta que descansou o tempo dela volta pro lote (o login que falhou não volta sozinho)."""
+        agora = time.time()
+        voltaram = []
         with self.trava:
+            for c, ate in list(self.problema_ate.items()):
+                if ate and ate <= agora and c not in self.manuais:
+                    self.problema_ate.pop(c, None)
+                    self.problema_conta.pop(c, None)
+                    voltaram.append(c)
+        for c in voltaram:
+            try:
+                _gf().despular_conta(c)
+            except Exception:  # noqa: BLE001
+                pass
+            self.log(f"🔁 A conta “{c}” descansou — voltando a usar.", "ok")
+
+    def _proxima_volta(self, contas: List[str], pend: List[Dict[str, Any]]) -> Optional[float]:
+        """Quando (time.time()) a 1ª conta que serviria pra algum pendente volta do descanso — None = nenhuma volta sozinha
+        (login, sem crédito) ou demora demais."""
+        agora = time.time()
+        tipos = {j["tipo"] for j in pend}
+        melhor = None
+        for c in contas:
+            if c in self.manuais:
+                continue
+            ate = self.problema_ate.get(c) if c in self.problema_conta else None
+            if c in self.problema_conta and not ate:
+                continue  # precisa de login: só volta com ✔ Concluir
+            if ate is None:
+                try:
+                    info = _gf().conta_pulada(c)
+                    ate = datetime.fromisoformat(info["ate"]).timestamp() if info and info.get("ate") else None
+                except Exception:  # noqa: BLE001
+                    ate = None
+            if ate is None:
+                continue
+            try:  # sem crédito pros tipos da fila não adianta esperar o descanso
+                c_info = next((x for x in _gf().listar_contas() if x["nome"] == c), None)
+                if c_info is None or c_info.get("esgotada") or all(c_info.get("esgotada_" + _gf().tipo_do_limite(t)) for t in tipos):
+                    continue
+            except Exception:  # noqa: BLE001
+                pass
+            if ate - agora <= self.ESPERA_VOLTA_MAX:
+                melhor = ate if melhor is None else min(melhor, ate)
+        return max(melhor, agora + 1) if melhor is not None else None
+
+    def _encerrar(self, msg: str, nivel: str = "info", so_se_vazio: bool = False) -> bool:
+        with self.trava:
+            if so_se_vazio and any(j["estado"] in ("pendente", "convertendo") for j in self.fila):
+                return False
+            self.esperando_volta = None
             self.rodando, self.pausando, self.parar_ja = False, False, False
             self.fim_msg = msg
             for c in list(self.status_conta):
@@ -545,6 +621,7 @@ class Lote:
                                 "erro" if nivel == "erro" else "info", tipo="flow")
         except Exception:  # noqa: BLE001
             pass
+        return True
 
     def _converter_videos(self) -> None:
         with self.trava:
@@ -592,6 +669,10 @@ class Lote:
                     return j
         return None
 
+    def _tem_para(self, conta: str) -> bool:
+        with self.trava:
+            return not self.pausando and any(j["estado"] == "pendente" and self._serve(conta, j["tipo"]) for j in self.fila)
+
     ESPERA_CONTA_PREF = 240  # s que um pedido de edição espera a conta dele antes de ir pra outra
 
     def _pode_pegar(self, conta: str, j: Dict[str, Any]) -> bool:
@@ -630,10 +711,15 @@ class Lote:
         refs_proj: Dict[str, str] = {}  # 🧍 v84_189: imagem de referência → a mídia dela no projeto aberto (sobe UMA vez, depois reusa)
         falhas_seguidas = 0  # ⏭ v84_110: a conta que falha seguido (ou pede login) é pulada — o pedido vai pra outra
 
-        def _pular(motivo: str) -> None:
-            self.problema_conta[conta] = motivo
+        def _pular(motivo: str, minutos: Optional[float] = None) -> None:
+            """minutos: a conta descansa e volta sozinha (o lote espera); None = só volta com o login (✔ Concluir)."""
+            self.problema_conta[conta] = motivo + (f" (volta em {minutos:g} min)" if minutos else "")
+            if minutos:
+                self.problema_ate[conta] = time.time() + minutos * 60
+            else:
+                self.problema_ate.pop(conta, None)
             try:
-                gf.pular_conta(conta, motivo)
+                gf.pular_conta(conta, motivo, minutos=minutos) if minutos else gf.pular_conta(conta, motivo)
             except Exception:  # noqa: BLE001
                 pass
             # 🩹 v84_236: "[passo] não achei…" em TODAS as contas costuma ser o Flow que mudou a tela, não o login
@@ -652,6 +738,12 @@ class Lote:
             while not self.parar_ja:
                 job = self._pegar(conta)
                 if job is None:
+                    # 🩹 v84_237: ainda tem pedido que essa conta pode fazer (ex.: esperando a conta do projeto dele) —
+                    # espera aqui com o navegador aberto em vez de fechar e o lote achar que acabou
+                    if self._tem_para(conta):
+                        st[conta] = "⏳ esperando um pedido liberar…"
+                        time.sleep(2.0)
+                        continue
                     break
                 try:
                     if page is None or page.is_closed():
@@ -673,7 +765,8 @@ class Lote:
                             self._devolver(job, f"a conta “{conta}” não abriu o projeto: {str(exc_proj)[:200]}")
                             job = None
                             if falhas_seguidas >= 2 or gf.RE_PROBLEMA_DE_LOGIN.search(str(exc_proj)):
-                                _pular(f"não abriu o projeto no Flow ({str(exc_proj).splitlines()[0][:140] if str(exc_proj) else type(exc_proj).__name__})")
+                                _pular(f"não abriu o projeto no Flow ({str(exc_proj).splitlines()[0][:140] if str(exc_proj) else type(exc_proj).__name__})",
+                                       None if gf.RE_PROBLEMA_DE_LOGIN.search(str(exc_proj)) else DESCANSO_MIN)
                                 break
                             self.log(f"⚠ “{conta}” não abriu o projeto ({str(exc_proj)[:160]}) — tentando de novo.", "aviso")
                             page = None
@@ -784,6 +877,7 @@ class Lote:
                         except Exception:  # noqa: BLE001
                             pass
                         self.problema_conta[conta] = "atividade incomum no Flow (descansando)"
+                        self.problema_ate[conta] = time.time() + MINUTOS_INCOMUM * 60
                         self.log(f"🔁 “{conta}”: o Flow acusou atividade incomum — a conta descansa {MINUTOS_INCOMUM} min e o "
                                  f"pedido vai pra outra conta" + (" (mas todas já deram isso: erro)" if esgotou else "") + ".", "aviso")
                         job = None
@@ -822,14 +916,15 @@ class Lote:
                         pass
                     page = None
                     if falhas_seguidas >= 3:  # 3 erros seguidos na mesma conta: o problema é ela
-                        _pular(f"{falhas_seguidas} erros seguidos (o último: {str(exc).splitlines()[0][:120] if str(exc) else type(exc).__name__})")
+                        _pular(f"{falhas_seguidas} erros seguidos (o último: {str(exc).splitlines()[0][:120] if str(exc) else type(exc).__name__})",
+                               DESCANSO_MIN)
                         break
         except _Parado:
             if job is not None:
                 self._devolver(job)
         except Exception as exc:  # noqa: BLE001 — não abriu o navegador
             msg = str(exc).splitlines()[0][:200] if str(exc) else type(exc).__name__
-            _pular(f"não abriu o navegador: {msg}")
+            _pular(f"não abriu o navegador: {msg}", DESCANSO_NAVEGADOR_MIN)
             if job is not None:
                 self._devolver(job)
         finally:
@@ -905,7 +1000,7 @@ class Lote:
             espera = max(0.0, self.proximo_envio - time.monotonic())
             return {"rodando": self.rodando, "pausando": self.pausando, "config": dict(self.cfg), "contagem": cont,
                     "fila": fila[-400:], "total": len(fila), "contas": contas, "log": self.logs[-120:],
-                    "proximo_envio_s": round(espera, 1), "fim_msg": self.fim_msg, "reservado": reservado(),
+                    "proximo_envio_s": round(espera, 1), "fim_msg": self.fim_msg, "esperando_volta": self.esperando_volta, "reservado": reservado(),
                     "cdp": str(_site_cfg().get("flow_navegador") or "auto").lower() == "cdp", "paralelo_max": PARALELO_MAX}
 
 

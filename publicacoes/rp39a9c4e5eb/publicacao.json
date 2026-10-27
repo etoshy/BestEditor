@@ -1,0 +1,38 @@
+{
+ "textos": {},
+ "capas": [
+  {
+   "n": 1,
+   "ideia": "🎭 react: Ichigo Kurosaki, Kenpachi Zaraki, Yuji Itadori, Gojo Satoru reagindo ao vídeo (8:54)",
+   "texto": "",
+   "prompt": "",
+   "personagem": "",
+   "ref": "",
+   "status": "pronta",
+   "erro": "",
+   "criado": 1792703722.1187866,
+   "personalizada": true,
+   "fundo": "E:\\editor2bancodevideos\\publicacoes\\rp39a9c4e5eb\\capas\\react_7627f5c7.jpg",
+   "estilo": {
+    "pos": "topo",
+    "cor": "#ffffff",
+    "cor2": "#ffd600",
+    "tamanho": 100,
+    "fonte": "bebas-neue",
+    "peso": "Bold",
+    "contorno": 100,
+    "faixa": true,
+    "maiusculas": true,
+    "sombra": true,
+    "caixa": false,
+    "cor_caixa": "#e11d48"
+   },
+   "react": true,
+   "versoes": [
+    "E:\\editor2bancodevideos\\publicacoes\\rp39a9c4e5eb\\capas\\capa_1_1792703722_montada.png"
+   ],
+   "imagem": "E:\\editor2bancodevideos\\publicacoes\\rp39a9c4e5eb\\capas\\capa_1_1792703722_montada.png",
+   "final": "E:\\editor2bancodevideos\\publicacoes\\rp39a9c4e5eb\\capas\\capa_1_1792703722_montada_final_89ee.jpg"
+  }
+ ]
+}

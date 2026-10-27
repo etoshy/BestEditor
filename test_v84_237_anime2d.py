@@ -734,3 +734,210 @@ def test_video_de_referencia(base, tmp_path):
     assert "s do vídeo" in A.rotulo_pagina(p, 2) and "RECRIAR uma cena" in AM.sys_adaptacao(p) and "QUADROS DO VÍDEO" in AM.prompt_adaptacao(p)
     AM.guardar_paginas(p, [("1.png", _png())], base, substituir=True)
     assert not A.e_video(p)  # páginas de mangá de novo: volta a ser mangá
+
+
+def test_ritmo_jashin_cobertura_respira_pulo():
+    """🎬 v84_238c: fala longa vira cortes; respiração e pulinho batem entre a prévia e o render."""
+    import anime2d as A
+    import anime2d_cena as C
+    import video_assembler as VA
+    ms = [{"id": "m1", "tipo": "fala", "quem": "a", "foco": "", "plano": "geral", "camera": "fixa", "ini": 0.0, "fim": 7.0,
+           "em_cena": [{"cid": "a"}, {"cid": "b"}]},
+          {"id": "m2", "tipo": "fala", "quem": "b", "plano": "medio", "camera": "tremida", "ini": 7.0, "fim": 8.5,
+           "em_cena": [{"cid": "a"}, {"cid": "b"}]}]
+    ts = {"ini": 0.0, "fim": 8.5}
+    cs = C.cobertura({}, ms, ts)
+    assert [c["corte"] for c in cs] == [0, 1, 2, 0]
+    assert [(c["plano"], c["foco"]) for c in cs[:3]] == [("geral", "a"), ("close", "a"), ("medio", "b")]
+    assert cs[1]["corte_ini"] > 0 and cs[3]["corte_ini"] == 7.0
+    assert len(C.cobertura({"cobertura": False}, ms, ts)) == 2
+    mov = [{"a": 0.0, "b": 99999.0, "resp": 0.004, "f": 1.0}, {"a": 2.0, "b": 2.28, "pulo": 0.03}]
+    x, y = A.deslocamento(mov, 2.14, 1920, 1080)
+    assert x == 0 and y < -20  # no meio do pulo: lá em cima
+    assert "sin(t*" in VA._mov_expr(mov, "y") and "PI" in VA._mov_expr(mov, "y") and VA._mov_expr(mov, "x") == ""
+
+
+def test_pisca_espera_a_pose_de_base(tmp_path, monkeypatch):
+    """🐛 v84_238c: 'Gerar o que falta' com a pose ainda sem imagem quebrava ('NoneType' has no attribute 'save') —
+    o piscando/2º quadro (edita_base) agora espera a pose de base e segue sozinho depois."""
+    import json as _j
+    import personagens_pod as pp
+    import flow_lote
+
+    class Lote:
+        def __init__(self):
+            self.itens = []
+
+        def adicionar(self, itens, **kw):
+            self.itens += itens
+            return [{"id": f"j{i}"} for i in range(len(itens))]
+
+        def iniciar(self):
+            pass
+    lt = Lote()
+    monkeypatch.setattr(flow_lote, "lote", lambda: lt)
+    dados = {"formato": "personagens_pod_v1", "personagem": "g", "nome": "G", "texto_fixo": {"trava": "girl"},
+             "fundo": "verde", "flow": {"proporcao": "3:4"},
+             "poses": [{"arquivo": "g_neutro.png", "tipo": "pose", "prompt": "standing", "mestre": True},
+                       {"arquivo": "g_x.png", "tipo": "pose", "prompt": "sitting"},
+                       {"arquivo": "g_x_pisca.png", "tipo": "pose", "prompt": "blink", "pose_base": "g_x.png", "edita_base": True}]}
+    base = str(tmp_path)
+    q = pp.criar("G", _j.dumps(dados), [], base=base, motor="flow")
+    r = pp.enviar(q["id"], ["g_x_pisca.png"], base=base)
+    assert r["ok"]
+    assert len(lt.itens) == 1 and "g_x_pisca.png" in r["depois"]  # mandou a pose; o piscando espera
+
+
+def test_local_variante_usa_o_original(tmp_path):
+    """🌫 v84_238e: 'Quarto cheio de fumaça' (variante_de 'Quarto') usa os lugares/móveis/chão do original."""
+    import anime2d as A
+    p = {"locais": [{"id": "l1", "nome": "Quarto", "props": [{"nome": "Poltrona", "x": 0.2, "y": 0.9}],
+                     "lugares": [{"nome": "na poltrona", "sentado": True, "x": 0.2, "y": 0.88, "escala": 1}],
+                     "chao": {"y": 0.97, "alt": 0.6}},
+                    {"id": "l2", "nome": "Quarto cheio de fumaça", "variante_de": "Quarto", "props": [], "lugares": []}]}
+    v = p["locais"][1]
+    assert A.base_do_local(p, v)["id"] == "l1" and A.base_do_local(p, p["locais"][0]) is None
+    assert "na poltrona" in A.lugares_do_local(p, v)
+    assert A.layout_do_local(p, v)["props"][0]["nome"] == "Poltrona"
+    pr = A.prompt_imagem({"estilo": "anime", "proporcao": "16:9"}, "local", dict(v, prompt_en="filled with smoke"))
+    assert pr.startswith("EDIT the reference image") and "filled with smoke" in pr
+
+
+def test_planta_layout_angulo(tmp_path):
+    """📐 v84_238f: a planta vira o esboço + o texto de layout do fundo; móveis pegam a posição dela; ângulos e visão."""
+    import anime2d as A
+    import anime2d_planta as PL
+    lo = {"id": "l1", "nome": "Quarto", "props": [], "lugares": []}
+    A.aplicar_props_lugares(lo, {"props": [{"nome": "Poltrona", "camada": "atras", "real": 0.95}],
+                                 "planta": {"camera": "da porta", "camera_en": "from the door, facing the window wall",
+                                            "fora_de_quadro": "a porta", "fora_de_quadro_en": "the door",
+                                            "elementos": [{"nome": "Fornalha", "en": "a round iron furnace", "onde": "direita",
+                                                           "x": 0.8, "y": 0.92, "w": 0.3, "h": 0.55, "camada": "fundo"},
+                                                          {"nome": "Poltrona", "en": "an armchair", "onde": "chao",
+                                                           "x": 0.22, "y": 0.93, "w": 0.2, "h": 0.3, "camada": "movel"}]}})
+    assert lo["props"][0]["x"] == 0.22 and lo["props"][0]["y"] == 0.93  # o móvel pegou a posição da planta
+    p = {"id": "x", "estilo": "anime", "proporcao": "16:9", "locais": [lo], "personagens": [], "itens": []}
+    pr = A.prompt_imagem(p, "local", lo)
+    assert "RED block = a round iron furnace" in pr and "RIGHT third" in pr and "WHITE DASHED" in pr and "the door" in pr
+    cam = PL.esboco(lo["planta"], str(tmp_path), 1920, 1080)
+    assert cam and os.path.isfile(cam)
+    ang = {"id": "l2", "nome": "Canto da fornalha", "props": [], "lugares": [{"nome": "na fornalha", "x": 0.3, "y": 0.95}]}
+    A.aplicar_props_lugares(ang, {"angulo_de": "Quarto", "angulo_en": "close to the furnace corner"})
+    p["locais"].append(ang)
+    assert A.angulo_base(p, ang) is lo and [x["id"] for x in A.familia_do_local(p, lo)] == ["l1", "l2"]
+    assert "ANOTHER CAMERA ANGLE: close to the furnace corner" in A.prompt_imagem(p, "local", ang)
+    s = {"id": "s1", "local": "l1"}
+    m = A.limpar_momento(p, {"tipo": "acao", "texto": "x", "angulo": "Canto da fornalha", "visao": "ela de perto; a janela fora"})
+    assert m["angulo"] == "l2" and m["visao"].startswith("ela de perto") and A.local_do_momento(p, s, m) is ang
+
+
+def test_texto_de_abertura_no_editor(tmp_path):
+    """🔤 v84_238g: p['abertura_texto'] (ex.: 'Prólogo') vira o texto do 1º trecho do editor, em cima."""
+    import anime2d_cena as C
+    src = open(C.__file__, encoding="utf-8").read()
+    assert "abertura_texto" in src and "ABERTURA_DUR" in src and '"position": "top-center"' in src
+
+
+def test_png_estragado_nao_derruba_a_montagem(tmp_path):
+    """🐛 v84_238g: 'cannot identify image file …_pisca__36.png' (cache pela metade de uma montagem interrompida)."""
+    import video_assembler as VA
+    from PIL import Image
+    src = tmp_path / "0016_g_x_pisca.png"
+    Image.new("RGBA", (80, 120), (255, 0, 0, 255)).save(src)
+    ruim = tmp_path / "0016_g_x_pisca__36.png"
+    ruim.write_bytes(b"\x89PNG\r\n\x1a\n pela metade")
+    os.utime(ruim, (os.path.getmtime(src) + 10, os.path.getmtime(src) + 10))  # mais novo que a original: antes era aceito
+    pronto = VA._png_no_tamanho(str(src), 36, False)
+    assert pronto and VA._png_valido(pronto)
+    with Image.open(pronto) as im:
+        assert im.size[0] == 36
+
+
+def test_storyboard_e_revisao_pela_ia(base, monkeypatch, tmp_path):
+    """🎬🔎 v84_238h: o Flow desenha a cena no fundo (storyboard) → a IA lê as posições → lugares/móveis; e a revisão:
+    um quadro por corte, a IA aponta o erro com uma correção (mover lugar, trocar plano, corte de reação, regerar)."""
+    import anime2d_revisao as RV
+    import flow_lote
+    import ia_servico
+    p = A.criar("Story", "x", "anime", base)
+    A.aplicar_plano(p, dict(PLANO, locais=[dict(PLANO["locais"][0], props=[{"nome": "Sofá", "prompt_en": "a sofa", "camada": "atras"}],
+                                                 lugares=[{"nome": "no sofá", "sentado": True, "descricao": ""}])]))
+    lo = p["locais"][0]
+    A.guardar_img(p, lo.setdefault("img", {}), Image.open(io.BytesIO(_png((90, 140, 200), (1280, 720), (90, 140, 200)))), False, base, tela_cheia=True)
+    A.aplicar_cena(p, 0, {"momentos": [
+        {"tipo": "fala", "quem": "Kenta", "texto": "Oi!", "em_cena": [{"personagem": "Kenta", "posicao": "esquerda", "pose": "feliz"},
+                                                                     {"personagem": "Mãe", "posicao": "no sofá", "pose": "sentado"}], "plano": "geral"},
+        {"tipo": "fala", "quem": "Mãe", "texto": "Oi, filho.", "em_cena": [{"personagem": "Kenta", "posicao": "esquerda", "pose": "feliz"},
+                                                                          {"personagem": "Mãe", "posicao": "no sofá", "pose": "sentado"}], "plano": "medio"}]})
+    A.salvar(p, base)
+    pedidos = []
+
+    class Lote:
+        def adicionar(self, itens, **kw):
+            pedidos.extend(itens)
+            return [{"id": "j1"}]
+
+        def iniciar(self):
+            pass
+    monkeypatch.setattr(flow_lote, "lote", lambda: Lote())
+    RV.pedir_storyboard(p["id"], lo["id"], base)
+    assert "STORYBOARD" in pedidos[0]["prompt"] and "Kenta" in pedidos[0]["prompt"] and "sitting ON the seat" in pedidos[0]["prompt"]
+    p = A.carregar(p["id"], base)
+    lo = p["locais"][0]
+    assert lo["story"]["estado"] == "fila" and {o["lugar"] for o in lo["story"]["ocupantes"]} == {"esquerda", "no sofá"}
+    A.guardar_img(p, lo["story"], Image.open(io.BytesIO(_png((90, 140, 200), (1280, 720), (90, 140, 200)))), False, base, tela_cheia=True)
+    A.salvar(p, base)
+
+    def falsa(recurso, system, conteudo, **kw):
+        if "STORYBOARD" in conteudo[0]["text"]:
+            return {"lugares": [{"lugar": "esquerda", "visivel": True, "x0": 0.1, "y0": 0.4, "x1": 0.3, "y1": 0.95, "pes_x": 0.2, "pes_y": 0.95},
+                                {"lugar": "no sofá", "visivel": True, "x0": 0.5, "y0": 0.45, "x1": 0.7, "y1": 0.85, "pes_x": 0.6, "pes_y": 0.85}],
+                    "moveis": [{"nome": "Sofá", "visivel": True, "x0": 0.45, "y0": 0.5, "x1": 0.8, "y1": 0.9}]}
+        return {"quadros": [{"n": 1, "ok": False, "problemas": [
+            dict({k: "" for k in ("local", "lugar", "movel", "plano", "foco", "angulo", "personagem", "pose_en", "alvo", "pedido")},
+                 descricao="Kenta flutuando", acao="lugar", local="Sala", lugar="esquerda", x=0.22, y=0.97, escala=1.1, w=0),
+            dict({k: "" for k in ("local", "lugar", "movel", "plano", "foco", "angulo", "personagem", "pose_en", "alvo", "pedido")},
+                 descricao="falta a reação da mãe", acao="corte_reacao", personagem="Mãe", pose_en="smiling softly", x=0, y=0, escala=0, w=0),
+            dict({k: "" for k in ("local", "lugar", "movel", "plano", "foco", "angulo", "personagem", "pose_en", "alvo", "pedido")},
+                 descricao="mão deformada", acao="regerar", alvo="pose:Kenta:feliz", pedido="mão com 5 dedos", x=0, y=0, escala=0, w=0)]}]} \
+            if "QUADRO 1" in str(conteudo) and not getattr(falsa, "feito", False) and not setattr(falsa, "feito", True) else {"quadros": []}
+    monkeypatch.setattr(ia_servico, "chamar", falsa)
+    msg = RV.ler_storyboard(p["id"], lo["id"], base)
+    p = A.carregar(p["id"], base)
+    lo = p["locais"][0]
+    lg = {x["nome"]: x for x in lo["lugares"]}
+    assert "posição" in msg and lg["esquerda"]["x"] == 0.2 and lg["no sofá"]["y"] == 0.85 and lg["esquerda"]["escala"] > 0.5
+    assert lo["props"][0]["x"] == pytest.approx(0.625) and lo["props"][0]["w_manual"]
+    fig = tmp_path / "f.png"
+    im = Image.new("RGBA", (600, 900), (0, 0, 0, 0)); ImageDraw.Draw(im).rectangle([200, 100, 400, 880], fill=(30, 30, 30, 255)); im.save(fig)
+    monkeypatch.setattr(A, "poses_prontas", lambda c, base=None: {k: {"pose": str(fig)} for k in ("neutro", "feliz", "sentado", "busto_neutro")})
+    msg = RV.revisar(p["id"], base)
+    p = A.carregar(p["id"], base)
+    lg = {x["nome"]: x for x in p["locais"][0]["lugares"]}
+    ms = p["cenas"][0]["momentos"]
+    assert lg["esquerda"]["escala"] == 1.1 and len(ms) == 3 and ms[1]["plano"] == "close" and ms[1]["em_cena"][1]["pose_en"] == "smiling softly"
+    assert p["revisao"]["sugestoes"] and "mão com 5 dedos" in p["revisao"]["sugestoes"][0] and "corrigido" in msg
+
+
+def test_troca_de_angulo_a_cada_10s_que_condiz():
+    """🎥 v84_238j: sem 'angulo', depois de ~10 s no mesmo ângulo a câmera troca pra outro ângulo do MESMO cômodo e
+    estado em que os lugares de quem está em cena existem (vai pra onde a ação está); nunca pra variante; volta pra
+    câmera principal quando quem está em cena não cabe no ângulo."""
+    import anime2d_cena as C
+    q = {"id": "l1", "nome": "Quarto", "lugares": [{"nome": "na poltrona", "sentado": True, "x": .2, "y": .9}, {"nome": "na fornalha", "x": .5, "y": .97}]}
+    canto = {"id": "l2", "nome": "Canto", "angulo_de": "Quarto", "lugares": [{"nome": "na fornalha", "x": .6, "y": .98}]}
+    fum = {"id": "l3", "nome": "Quarto com fumaça", "variante_de": "Quarto", "lugares": []}
+    p = {"locais": [q, canto, fum], "personagens": [{"id": "c1", "nome": "G"}], "troca_angulo_s": 10}
+    s = {"id": "s1", "local": "l1"}
+
+    def mm(t, pos, **kw):
+        return dict({"id": f"m{t}", "tipo": "acao", "corte_ini": t, "em_cena": [{"cid": "c1", "posicao": pos}], "foco": "c1"}, **kw)
+    ms = [mm(0, "na poltrona"), mm(4, "na poltrona"), mm(11, "na poltrona"), mm(13, "na fornalha"), mm(25, "na fornalha"),
+          mm(37, "na poltrona"), mm(40, "centro", angulo="l1")]
+    los = [x["id"] for x in C.angulos_auto(p, s, {"ini": 0}, ms)]
+    assert los[:3] == ["l1", "l1", "l1"]  # a poltrona não existe no canto: não troca
+    assert los[3] == "l2"  # 13 s, ela foi pra fornalha: a câmera vai pro canto da fornalha
+    assert los[4] == "l1"  # mais 10 s: troca de novo (pode repetir)
+    assert los[5] == "l1" and los[6] == "l1" and "l3" not in los  # nunca vira a variante (fumaça)
+    p["troca_angulo_s"] = 0
+    assert {x["id"] for x in C.angulos_auto(p, s, {"ini": 0}, ms)} == {"l1"}

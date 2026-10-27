@@ -4000,3 +4000,247 @@ que fica esperando um pedido que ainda não pode pegar (o da conta do projeto) s
 - **🎬 Vídeo de referência**: no passo 1 (📖 Mangá / 🎬 vídeo → anime) ou a pasta `video/` do zip: os cortes do vídeo
   viram os quadros (com o segundo de cada um), o áudio pode virar o do episódio (transcrito), e a IA recria a cena com
   os SEUS personagens (diga quem é quem no texto) — mesmo fluxo do mangá: ler → aprovar os designs → gerar.
+
+### v84_238b — correções do teste com a Go-senpai
+
+- **🪑 Sentado atrás da mesa = da cintura pra cima**: lugar com `corpo: "cintura"` (automático quando o lugar é sentado
+  e tem móvel na frente) usa as poses `meio_*` (geradas da cintura pra cima, sem pernas, sem móvel); poses sentadas de
+  corpo inteiro sentam numa cadeira invisível na altura certa (nunca no chão).
+- **📏 Móveis em tamanho real**: prop com `real` (largura em metros — mesa 1,6, cadeira 0,62) escala pela altura de
+  quem está em pé e pela perspectiva do chão; a mesa é gerada pelo lado do VISITANTE (painel fechado, sem gavetas nem
+  vão das pernas). `w` manual continua valendo quando você arrasta no 📐.
+- **🚶 Chão livre**: `chao.area` (polígono arrastável no 📐) diz onde dá pra andar/ficar; `y_fundo`/`esc_fundo` dão a
+  escala da perspectiva (mais ao fundo = menor). Os lugares padrão caem dentro da área; a 🤖 IA posiciona devolve a área.
+- **📦 Objeto no lugar certo**: item com `onde` (um móvel ou um lugar) aparece em cima daquele móvel; sombra mais sutil.
+- **😑 Pisca / 2º quadro editam a pose pronta** (`edita_base` no Flow) — não sai mais imagem de mangá como pose.
+- **🎬 Cutaways e planos cinematográficos**: o destaque pode cobrir uma fala/narração (`destaque` no momento) — imagem
+  hipotética (o kouhai minúsculo entre garotos gigantes) ou a saída dele já no corredor enquanto o narrador fala.
+- **✍ Texto diegético fica**: só somem balão, onomatopeia e caixa de narração; placas, papéis, etiquetas e notas que
+  fazem parte da lógica ficam (e os recortes do mangá também mantêm esse texto).
+- **📖 Mais mangá no anime**: item com `painel: true` usa o quadro do mangá como referência de COMPOSIÇÃO (mesmo
+  enquadramento/ângulo), com o design aprovado por cima.
+- **◀ ▶ Versões**: ao regerar, as setinhas embaixo da imagem (cenário, item, móvel, pose) passam pelas versões; a que
+  estiver selecionada é a usada.
+
+### v84_238c — ritmo de anime de TV (comparado com o clipe da Jashin-chan)
+
+A análise do episódio exportado: ~40% dos quadros totalmente parados e planos de até 7 s (no clipe de referência:
+~16% parados, cortes a cada ~2 s, todo mundo sempre se mexendo). Agora:
+- **🎬 Cobertura automática** (`anime2d_cena.cobertura`): fala/narração com mais de ~3,4 s num plano parado vira 2–4
+  cortes de ~2,3 s — o plano pedido → close de quem fala → médio de quem escuta (a reação) → o aberto. Legenda, som e
+  tremida só no 1º corte. Desliga no projeto (☐ 🎬 cortes automáticos) ou por momento (`"cobertura": false`).
+- **🫁 Respiração**: todo personagem parado sobe e desce de leve sem parar (mov `resp`, fase por personagem).
+- **🦘 Pulinho de reação**: quando a emoção muda pra uma forte (chocado, assustado, feliz, bravo…) o personagem dá um
+  pulinho (mov `pulo`, 0,28 s).
+- **💥 Impacto**: câmera tremida começa com um quadro branco (0,07 s).
+- **🎥 Direção da IA**: a cena é escrita no ritmo de comédia de TV (cortes curtos, reação de quem escuta, entra/sai
+  andando, cutaway quando a fala descreve algo).
+
+### v84_238d — anime com o traço do mangá
+- **🖋🎨 Novo estilo “Anime colorido com o traço do mangá”** (`manga_cor`): o traço solto a nanquim do autor (rosto,
+  olhos, proporções, hachura como textura) com cores chapadas por baixo — não o anime genérico brilhante. Em projeto
+  com páginas de mangá, todo estilo anime/mangá ganha a regra “fiel ao traço do autor”.
+- **📖 Destaque com `painel`** redesenha O QUADRO: a referência vai com o quadro grande e só o design de quem aparece
+  pequeno no canto; o pedido manda manter ângulo, enquadramento, gesto e posição de tudo (sem inventar outro plano).
+- **🌫 Local variante** (`variante_de` no local.json/adaptação): o mesmo cômodo em outro estado (cheio de fumaça, de
+  noite, destruído). O fundo sai EDITANDO o do original (só ele de referência: mesma câmera, mesmos objetos) e a variante
+  usa os móveis, lugares e chão do original — a poltrona não muda de uma cena pra outra. Gere o original primeiro.
+
+### v84_238f — 📐 planta (layout) dos cenários, 🎥 ângulos e 👁 o que o público vê
+- **📐 Planta do cenário** (`local.planta`, `anime2d_planta.py`): como o LAYOUT de um anime — de onde a câmera olha,
+  cada elemento com parede, posição (x = centro na largura, y = base), tamanho (w/h), forma (redondo/retângulo) e se é
+  🪑 móvel separado; e o que fica FORA do quadro. Vira um 🗺 esboço de blocos coloridos (sem texto) que vai como 1ª
+  referência pro Flow gerar o fundo + o texto de layout do pedido (“RED circle = a round furnace: right third…”).
+  Os móveis começam na posição da planta. A IA (plano/adaptação) agora devolve a planta de cada lugar.
+- **🎥 Ângulos** (`angulo_de` + `angulo_en`): o mesmo cômodo visto de outra câmera (contraplano, um canto de perto),
+  com planta, lugares e chão próprios; o fundo sai com o principal como referência (objetos/cores) e os móveis de mesmo
+  nome reaproveitam a imagem. Cada momento escolhe o ângulo (🎥 no editor da cena); o motor troca o fundo, os lugares
+  e os móveis naquele corte.
+- **👁 Visão do momento** (`visao`): o que o público vê e o que fica fora do quadro — a IA diretora escreve isso por
+  corte (e o editor mostra/edita). A cena recebe a planta e a lista de ângulos.
+- **🔤 Texto de abertura** (`abertura_texto` no projeto/projeto.json, campo “🔤 texto de abertura” na página): um texto
+  simples no começo do vídeo (ex.: “Prólogo”), em cima, no 1º trecho — editável depois no editor como o texto do trecho.
+
+### v84_238h — 🎬 storyboard do cenário e 🔎 revisão dos quadros pela IA (`anime2d_revisao.py`)
+- **🎬 Storyboard** (botão no card do fundo, seção 5): o Flow recebe o fundo pronto + os designs + os móveis e DESENHA
+  a cena nele (cada personagem no lugar em que ele mais fica nas cenas, com a pose mais usada, sentado no assento,
+  pés no chão, tamanho pela perspectiva). Depois **📐 Ler o storyboard**: a IA (visão) mede a caixa e os pés de cada
+  um e dos móveis → vira x/y/escala dos lugares e x/y/largura dos móveis. A animação continua com os recortes, mas
+  exatamente onde o Flow compôs a cena.
+- **🔎 IA revisa os quadros** (seção 7): o motor desenha um quadro de cada corte (até 36), a IA olha em lotes de 6 com
+  o que cada corte devia mostrar (👁 visão, quem está onde com x/y/escala, plano, ângulos, móveis) e aponta os erros
+  com UMA correção de um vocabulário fechado: `lugar` (mover/escalar — flutuar, afundar, tamanho, atravessar),
+  `movel`, `plano` (+foco), `angulo`, `corte_reacao` (insere um close de reação de 1,2 s — até 6 por rodada),
+  `regerar` (vira sugestão — custa Flow). As correções entram, o quadro é redesenhado e conferido de novo (até 2
+  rodadas). O relatório com as miniaturas fica na seção 7.
+- `anime2d_cena.quadro(plano, destino, t)`: desenha vários quadros de um plano já calculado.
+
+### v84_238i — 🎭 React: 🍿 itens da mesa, uma mesa por sofá, mapa da sala e ⚡ poderes (`react_objetos.py`)
+- **🛋🛋 Uma mesa por sofá**: na disposição de dois sofás, a mesa vai na frente do sofá da esquerda e o da direita
+  ganha uma cópia automática (`c:mesa2`, espelhada). Desliga em “🛋🛋 uma mesa na frente de cada sofá” ou esconda 👁.
+- **🍿 Itens da mesa** (seção 🏠 Cenário): pipoca, lata, pizza… cada um uma camada (Flow com fundo verde → recorte, ou a
+  sua imagem), em cima da mesa escolhida, arrastável no 🎛 palco, na pilha logo acima da mesa dele, na prévia e no
+  editor. Com itens, a mesa é gerada com o tampo vazio.
+- **🗺 Mapa da sala**: quem senta em qual sofá (da esquerda pra direita), as mesas com os itens e a TV. Vai pro roteiro
+  (a IA sabe quem pode pegar o quê de quem) e pro pedido de cada imagem de intriga, que agora leva como referência o
+  QUADRO ATUAL do react (prévia sem legenda no segundo do evento) — cada um no lugar dele, as mesas e os itens certos.
+- **⚡ Poderes / jeito de interagir** na ficha (`poderes` e `poderes_en`; a IA preenche): quem tem poder usa nas
+  interações (telecinese, braço de borracha, cara de desenho/toon), o estressado mostra o estresse; o roteiro pode
+  encadear 2–3 eventos seguidos (pega → oferece → joga), um quadro cada.
+
+### v84_238j — 🎥 troca de ângulo automática (a cada ~10 s, que condiz)
+- `anime2d_cena.angulos_auto`: sem `angulo` no momento, depois de `troca_angulo_s` (padrão 10; 0 = desliga; campo
+  “🎥 trocar de ângulo a cada N s”) no mesmo ângulo, a câmera troca — num corte que não é destaque — pra outro ÂNGULO
+  do MESMO cômodo e estado (nunca pra uma variante: fumaça/noite é outra coisa). Só troca pra um ângulo que CONDIZ:
+  os lugares de quem está em cena existem nele (os próprios, ex. “na poltrona”; os padrões existem em todos) e, de
+  preferência, o lugar de quem está em foco é um lugar próprio desse ângulo (a câmera vai pra onde a ação está).
+  Pode repetir (escolhe o menos usado). Se alguém vai pra um lugar que o ângulo atual não tem, volta pra câmera
+  principal. O `angulo` escolhido à mão/pela IA sempre manda.
+- A IA cria 1–2 ângulos pros lugares onde a ação dura mais de ~20 s, com os mesmos nomes de lugar quando é o mesmo ponto.
+
+### v84_238k — 🎭 React: 📌 marcações num segundo do vídeo
+- Na seção 📝 Roteiro: marque um tempo (⏱ pega o segundo do player) e o que é — 🎬 observação sobre o vídeo, 🎤 quem
+  fala/canta ali, 👤 personagem que aparece, ou 💬 uma FALA pra um personagem do elenco (exata ou só a ideia).
+  O tempo é do vídeo original (vira o do vídeo cortado sozinho). As marcações vão pro pedido da PARTE certa do roteiro
+  (e pro prompt de copiar) como ordens; a fala exata entra no segundo marcado mesmo se a IA esquecer.
+
+### v84_238l — 🎭 React: 🛋 quem senta onde, 🖼 desligar imagens de destaque, máximo de personagens
+- **🛋 Quem senta onde** (seção 🏠 Cenário): arraste os nomes (ou ◀ ▶ ⇄) pra escolher a ordem da esquerda pra direita
+  e em qual sofá cada um fica — por disposição (`p['assentos'][layout]`). Quem entra depois vai pro sofá mais vazio.
+  Ao salvar, os ajustes à mão dos personagens daquela disposição voltam pro automático.
+- **🖼 Imagens de destaque** (seção 📝 Roteiro): desligado = sem briga/interação/cena/foto/estilo com imagem — as
+  intrigas ficam nas falas e em sai/volta; imagens já feitas não entram no vídeo nem na prévia; gerar fica bloqueado.
+- **Quantos personagens**: ideal até 6 num sofá e até 8 nos dois sofás (mais que isso encolhem até o mínimo e se
+  sobrepõem, e o roteiro perde personalidade); máximo 10 por react (a página avisa).
+
+### v84_238m — 🎭 React: 🎬 modo cinema (de costas e de frente) e 🚪👋 abertura/encerramento
+- Duas disposições novas pra muitos personagens (até 3 fileiras de 6 poltronas; `sofas_de` reparte, `/assentos` salva):
+  - **🎬 de costas** (`cinema_costas`): a câmera atrás das poltronas, o vídeo no TELÃO; a fileira vista de trás fica
+    NA FRENTE de quem senta (só cabeça e ombros aparecem, no escuro). Poses próprias de costas (`*_costas.png`:
+    neutro/feliz/chocado/bravo/falando — quem fala vira o rosto de perfil; as outras emoções viram reação de corpo).
+    O roteiro ganha as regras do cinema: “Shhh!”, “cala a boca!”, cochichos. Mínimo 4 · ideal até 12 · máximo 18.
+  - **🎬 de frente** (`cinema_frente`): a plateia em degraus (a fileira de trás mais alta e menor), poltronas atrás
+    de quem senta, o vídeo num quadro no canto, legenda em cima. Poses `*_frente.png`. Mínimo 5 · ideal/máximo 18.
+  - Camadas próprias: `cine_*_fundo` (sala escura) e `cine_*_fileira` (6 poltronas no verde); “Gerar as camadas desta
+    disposição”. Sem mesa: os itens são lanches de cinema (balde de pipoca, refri, nachos, doces, óculos 3D,
+    cachorro-quente) — com dono (`p:<cid>`, no colo / no braço da poltrona) ou um pra cada.
+- **🚪 Abertura / 👋 Encerramento** (seção 📝 Roteiro, DESLIGADOS por padrão): ligados, nos primeiros 8 s eles chegam e
+  sentam um por um (ausentes até chegar) e nos últimos 8 s se despedem e saem; o roteiro escreve essas falas.
+
+### v84_238n — 🎬 cinema: vídeo maior e nenhuma cabeça em cima dele
+- De costas: o telão ocupa até 58% da altura (num vídeo 16:9, ~55% da largura; antes eram 44%) no topo. De frente: o vídeo vai num quadro de ~44% da
+  largura no canto de cima. Se a plateia subir além da base do vídeo, as fileiras e os personagens encolhem (de costas: até 80%, e o resto
+  desce — a fileira da frente sai por baixo da tela) até caberem abaixo dele (cada um continua na sua poltrona).
+
+### v84_238o — 🎬 cinema de frente: 2 fileiras intercaladas, legenda embaixo, vídeo maior
+- De frente agora são só **2 fileiras** de até 6 (máximo 12): a de trás fica meia poltrona pro lado, então cada rosto
+  aparece no vão entre duas cabeças da fileira da frente.
+- A legenda vai pra baixo, igual à do modo de costas. O vídeo fica grande em cima, no meio: até 52% da altura, ~52% da
+  largura num vídeo 16:9 (antes eram 44%, no canto).
+
+### v84_238p — 🎬 cinema: as duas disposições com 2 fileiras intercaladas (6 + 5)
+- De costas também: 2 fileiras, a de trás nos vãos da da frente — 6 na frente e 5 atrás (máximo 11 no cinema).
+- As duas fileiras têm o mesmo passo de poltrona (a de trás só fica mais baixa e menor), pra intercalação não escorregar.
+- Camadas: a sala (`cine_*_fundo`) e UMA fileira de 6 poltronas no verde (`cine_*_fileira`), gerada uma vez e usada
+  nas duas fileiras (a de trás menor e meia poltrona pro lado); a ordem: sala → fileira de trás ↔ pessoas de trás →
+  fileira da frente ↔ pessoas da frente (de costas a poltrona cobre quem senta; de frente fica atrás) → itens → vídeo.
+
+### v84_238q — 🖼 Imagem de referência pro cenário (🏠 recriar o ambiente / 🎨 virar anime)
+- Em cada camada do 🏠 Cenário (fundo, sofá, mesa, sala/fileira do cinema): **🖼 Enviar referência** + o modo:
+  - **🏠 Recriar o ambiente** — o Flow recria o MESMO lugar da imagem (arquitetura, cores, decoração, luz; foto
+    continua foto), mas enquadrado e vazio do jeito que o react precisa (sem gente, sem texto, espaço pro sofá…).
+  - **🎨 Virar anime** — o mesmo lugar redesenhado no traço anime dos personagens (e da obra, se tiver).
+  A imagem vai como referência pro Flow (`referencia_arquivo`) e já entra na fila; trocar o modo pergunta se refaz.
+  O ✕ tira a referência. O 📁 Minha imagem continua usando a imagem como está (sem recriar).
+- Corrigido: “Gerar as camadas” respondia erro (o `ok` ia duas vezes na resposta).
+
+### v84_238r — 🎬 Cinema de perto (estilo encerramento de anime) + 🍿 movimentos naturais (opcional)
+- Disposição nova `cinema_plateia`: a câmera numa fileira da frente virada pra plateia — a fileira grande (até 6, da
+  cintura pra cima, as poltronas atrás deles), a fileira de trás pequena e intercalada (até 5), os ENCOSTOS da fileira
+  da câmera no primeiro plano e o vídeo em cima, no meio (sem cabeça por cima). Mínimo 3 · ideal 9 · máximo 11.
+  Camadas: `cine_plateia_fundo` (as fileiras indo pro fundo e a luz do projetor), a fileira de frente, os encostos de
+  costas (as mesmas do cinema) e `cine_passante` (alguém qualquer andando de lado). Os lanches ficam na mão, no peito.
+- **🍿 Movimentos naturais** (seção 📝 Roteiro, DESLIGADO por padrão; só no cinema de perto):
+  - eventos `gesto` (pose própria no lugar dele, virada pro vizinho): pega pipoca do vizinho, dá pipoca na boca,
+    cochicha, olha pra trás — as poses de gesto + 🚶 andando entram no “Gerar o que falta”;
+  - ⏰ chegou atrasado (`volta` sem `sai` antes): entra andando pela fileira da ponta mais perto até a poltrona;
+    `sai` / abertura / encerramento: levanta e sai andando; (o andar usa `mov` de/para + passinhos no editor);
+  - `passa`: alguém de fora atravessa na frente da fileira — 🌑 só a silhueta ou 🧍 inteiro (da camada de quem passa).
+  O roteiro da IA recebe as regras e usa ~1 movimento a cada 20–30 s.
+- Volta sem sai antes = chegou atrasado (fora desde o começo) em qualquer disposição.
+- As fileiras do cinema agora usam a altura de verdade da imagem (o vídeo mantém a proporção).
+
+### v84_239 — 🧬 Criador de personagens (módulo novo, à parte)
+Aba 🕵️ Modelos de vídeo → 🧬 Criador de personagens (`/criador-personagens`). Arquivos novos: `criador_personagens.py`,
+`criador_rotas.py`, `templates/criador_lista.html`, `templates/criador_detalhe.html`, `test_v84_239_criador.py`
+(+ o registro no `app.py`, o recurso `criador` em 🤖 IA e o cartão na página de modelos).
+1. **📥 Entrada** (tudo junto, se quiser): 🧬 clonar (1 imagem com “tudo” + o que mudar), 🧩 misturar (até 6 imagens,
+   em cada uma o que pegar: rosto, olhos, cabelo, corpo/estatura, roupa, cores, acessórios, expressão/jeito, traço) ou
+   ✍ descrever; 💡 inspirações (personagens famosos só pra UM aspecto); 🎨 47 estilos (anime, mangá, shōjo, chibi,
+   webtoon, cartoon, rubber hose, quadrinhos, 3D de cinema, massinha, pixel, realista, aquarela, óleo, impressionismo,
+   expressionismo, cubismo, ukiyo-e, vitral, cyberpunk…) + ✍ outro escrito à mão; detalhes (gênero, idade, corpo,
+   paleta, marcas que SEMPRE aparecem, o que evitar, ideias de nome, “bem original”).
+2. **📝 Ficha** (🤖 IA olhando as imagens numeradas, ou à mão): 5 nomes com o porquê, a aparência travada em inglês (vai
+   em todo pedido), personalidade, jeito de falar, bordões, história, gostos, medos, voz (pro TTS), paleta HEX, de onde
+   veio cada coisa e um aviso de originalidade.
+3. **🎨 Design no Flow**: 1–4 variações (colagem numerada como referência, corpo inteiro no verde → PNG transparente),
+   ✔ aprovar, 🎯 variar a partir de uma (com o que mudar), 📤 mandar o seu.
+4. **🧍 Poses**: o aprovado vira a ⭐ mestre (já aprovada) de um projeto da aba 🧍 Personagens e os pacotes vão pro
+   Flow — 🔄 giro (frente/¾/lado/costas), 😀 expressões, 🏃 ação e dia a dia, 🎭 sentado pro React — + poses suas.
+   Rodar de novo adiciona pacotes sem perder as prontas.
+5. **⬇ zip**: o design, as poses aprovadas e a ficha (.txt e .json).
+
+### v84_240 — 🧽 Remover fundo (aba 🧰 Ferramentas)
+- `/remover-fundo` (`remover_fundo.py`, `templates/remover_fundo.html`): 📦 mande um ZIP e receba o MESMO zip (mesmas
+  pastas e nomes) com cada imagem em PNG transparente — os outros arquivos voltam iguais; 🖼 mande uma imagem e receba o
+  PNG (várias = um zip), com o antes/depois na tela.
+- Fundo 🟩 verde (chroma key, a mesma limpeza das poses dos 🧍 Personagens — o melhor), ⬜ branco ou 🎨 cor lisa (o que é
+  da cor da borda E encosta nela sai; o branco DENTRO da figura fica); modo automático olha a borda. Opções: recortar na
+  figura (margem) e lado máximo. Avisa quando o fundo não era do tipo escolhido.
+
+### v84_241 — 🗺 Lugares e mundos (no 🧬 Criador) + 🕰 época e 👶🧓 idades nos personagens
+- `criador_lugares.py`, `templates/criador_lugar.html` (+ rotas em `criador_rotas.py`, a lista em `criador_lista.html`):
+  lugares fictícios em 12 escalas — cômodo, casa, bairro, cidade, estado/região, país/reino, continente, mundo, sistema
+  estelar, galáxia, universo/plano, ✍ outro — cada um DENTRO de outro (a trilha no topo navega; sub-lugares herdam
+  estilo e época; apagar um do meio sobe os de baixo).
+- Entrada: descrição, até 6 referências numeradas com o que pegar (arquitetura, terreno, luz, clima, mobília, cultura,
+  traço, 🗺 estilo do mapa), inspirações, 🎨 estilo, 🕰 época (+ outra), evitar.
+- 🤖 Ficha: nomes, descrição visual travada (inglês), história, 📜 linha do tempo, 👤 pessoas importantes (🧬 viram
+  personagens com a época, o estilo e o lugar de origem), cultura, clima, economia, curiosidades, segredos, os PONTOS do
+  mapa com posição e como desenhar o mapa — coerente com o lugar de cima e os sub-lugares.
+- 🗺 Mapa: gerado no Flow (planta baixa → mapa de bairro/cidade → atlas → carta orbital/galáctica… SEM texto) ou o seu;
+  na página: zoom (rodinha/pinça/botões), arrastar, 📍 pinos (clicar = ficha do ponto; ✏ arrastar; ➕ criar), 🔵
+  “virar sub-lugar”/🔎 entrar, 📏 régua com a escala (largura do mapa em m/km/UA/anos-luz — editável), distância até o
+  último pino visto, ⬇ o mapa com os nomes desenhados.
+- 📷 Fotos 16:9 nas vistas da escala (fachada, rua, skyline, paisagem, vista do espaço, nebulosa…), ⭐ favoritas.
+- ⬇ zip: fotos, mapa, mapa com nomes, lugar.json (ficha + pinos + escala) e ficha.txt.
+- Personagens: 🕰 época (vai na roupa e nos prompts), 🗺 “de onde vem” (o lugar entra na ficha e no design) e o pacote
+  de poses 👶🧓 outras idades (criança, adolescente, adulto, idoso).
+
+### v84_242 — 🌈 Foto colorida opcional do personagem (quando a referência é mangá P&B)
+- **🎞 Animação 2D**: botão “🌈 Foto colorida” no bloco do 🎨 design anime de cada personagem (ou, na lista de
+  referências, o tipo “🌈 cores reais” com o nome dele). O design vai pro Flow com os painéis rotulados (mangá = a forma,
+  colorida = SÓ as cores reais, estilo) e a ordem “as cores da foto vencem o texto”; nas poses, a colorida entra logo
+  depois do design aprovado (`c["cor_ref"]`).
+- **🎭 React**: “🌈 Foto colorida” no cartão do personagem (rota `/personagem/<cid>/cor`); vai pro projeto 🧍 das
+  poses junto da referência principal, descrita como “só as cores reais”.
+- **🧬 Criador**: o aspecto “🌈 cores reais (é a versão colorida)” numa imagem de referência.
+- `personagens_pod.COR_REF_EN` = o texto comum da referência colorida.
+
+### v84_243 — 🎬 Anime quadro a quadro (cenas curtas de ação — o Flow só DESENHA)
+Aba 🕵️ Modelos de vídeo → 🎬 Anime quadro a quadro (`anime_cine.py`, `anime_cine_rotas.py`, `templates/anime_cine.html`,
+recurso de IA `anime_cine`). SEM vídeo de IA: o Flow só gera imagens e a animação é montada aqui.
+1. 📥 Cena: roteiro, duração (2–60 s), 16:9 ou 9:16, estilo (+ outro), páginas de mangá (a IA segue os quadros),
+   cenário do 🗺 Criador (descrição + foto) / texto / imagem sua.
+2. 🧍 Personagens: puxados do 🧬 Criador (design aprovado), da 🎞 Animação 2D e do 🎭 React (design / ⭐ mestre) ou
+   imagem sua; voz do TTS do site.
+3. 🤖 Planejar: planos de 0,5–8 s (tipo de plano, câmera, efeitos, transição, quem, falas, sons) e os DESENHOS de cada
+   plano (1–8, peso do tempo na tela, quadros de impacto) — tudo editável.
+4. 🎨 Storyboard no Flow: o quadro-chave de cada plano (colagem dos designs + cenário) → ✔ aprovar / 🔁 refazer com
+   correção / 📤 o seu / ◀ ▶ versões; 🎞 os desenhos do movimento saem UM DEPOIS DO OUTRO, cada um A PARTIR DO
+   ANTERIOR (a referência é o desenho de antes), sozinhos.
+5. 🎞 Animação (PIL + ffmpeg, 24 fps): cada desenho fica N quadros (em 2), câmera (aproxima, afasta, pan, sobe, desce,
+   chicote, gira), tremor (e o tremor que decai depois do impacto), quadro de IMPACTO (negativo em alto contraste + flash),
+   flash, linhas de velocidade/de foco, brasas/chuva, vinheta, transições (corte, flash, preto, dissolver), legendas.
+6. 🎙 Vozes (TTS por personagem, não refaz o que não mudou) + efeitos da biblioteca de sons (impacto automático no
+   quadro de impacto) → ▶ prévia do plano (meia resolução), 🎬 mp4 da cena, 🎞 mandar pro editor.

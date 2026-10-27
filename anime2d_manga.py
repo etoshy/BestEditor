@@ -53,7 +53,9 @@ SCHEMA_ADAPTACAO = {
             "type": "object", "additionalProperties": False,
             "required": ["nome", "descricao", "prompt_en", "frente_en", "recorte", "props", "lugares"],
             "properties": dict(A.SCHEMA_LOCAL["properties"], recorte=_CAIXA)}},
-        "itens": {"type": "array", "items": A.SCHEMA_ITEM},
+        "itens": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                             "required": A.SCHEMA_ITEM["required"] + ["recorte"],
+                                             "properties": dict(A.SCHEMA_ITEM["properties"], recorte=_CAIXA)}},
         "cenas": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["titulo", "local", "resumo", "personagens", "paginas", "nota_adaptacao"],
@@ -208,14 +210,27 @@ def sys_adaptacao(p: Dict[str, Any]) -> str:
         "camada separada ('prompt_en' do objeto sozinho; 'camada' 'atras' = cadeira/encosto, 'frente' = mesa/balcão) e "
         "FORA do 'prompt_en' do fundo (o fundo deixa o espaço livre). locais.lugares: onde os personagens ficam (\"atrás da "
         "mesa\" sentado=true, \"na porta\"…), além dos padrões esquerda/centro/direita.\n"
+        + A._PL.INSTRUCOES_IA +
+        "- 📖 Monte a PLANTA olhando os quadros: junte o que aparece em quadros diferentes do MESMO lugar (a janela de "
+        "um quadro, a fornalha de outro) num cômodo só e coerente — cada objeto num lugar fixo, com o tamanho certo.\n"
         "- itens: objetos importantes ('objeto', recortado em cena: a carteira, o saco de doces) e momentos de impacto "
         "que pedem uma imagem em tela cheia ('destaque': o soco, a reação exagerada, o close dramático). 'personagens' = "
         "quem aparece na imagem (vai a referência do design aprovado — mesmo cabelo e cores); 'texto' = o texto ESCRITO "
         "que é parte da cena e da piada (a etiqueta da pasta, o que está no bilhete, inclusive o riscado), exatamente "
         "como deve aparecer — \"\" se nenhum.\n"
         "- 🚫 NUNCA balões, onomatopeias, caixas de narração ou legendas desenhados nas imagens (isso vai pra fala/"
-        "narração/legenda/🔊 som); o único texto permitido é o 'texto' do item. O 'recorte' deve evitar balões, caixas de "
-        "texto e onomatopeias sempre que der.\n"
+        "narração/legenda/🔊 som). MANTENHA o texto que é parte do mundo e da lógica da cena (placas, etiquetas, papéis, "
+        "bilhetes, quadros, telas, diagramas): ele vai no 'texto' do item, exatamente. O 'recorte' de personagem/lugar "
+        "deve evitar balões, caixas de texto e onomatopeias sempre que der.\n"
+        "- 📖 FIDELIDADE AO MANGÁ: os quadros mais marcantes (reações, revelações, a piada visual) viram itens 'destaque' "
+        "com 'recorte' = aquele quadro (a composição é recriada no estilo do anime). Itens sem quadro: 'recorte' com "
+        "pagina 0.\n"
+        "- 🎞 Crie também destaques de EXEMPLO (cutaways) quando alguém descreve uma situação que não aparece (\"sou "
+        "baixinho e excluído\" → ele minúsculo entre alunos gigantes na educação física) e imagens CINEMATOGRÁFICAS pros "
+        "momentos fortes (a saída decidida).\n"
+        "- locais.props/lugares: o 'prompt_en' do móvel descreve o lado que a CÂMERA vê (a mesa de quem senta de frente "
+        "pra câmera mostra o painel da frente; gavetas e vão das pernas ficam escondidos); lugares atrás de mesa = "
+        "corpo 'cintura'.\n"
         "- cenas: na ordem, cada uma num local, com quem está, as PÁGINAS que ela adapta e uma 'nota_adaptacao' (ritmo, "
         "câmera, o que destacar). Normalmente uma cena por mudança de lugar/tempo.\n"
         f"- Escreva em {p.get('idioma') or 'português do Brasil'} (menos os campos _en). Use os nomes como aparecem nas falas."
@@ -353,6 +368,11 @@ def aplicar_adaptacao(p: Dict[str, Any], r: Any, base: str = A._BASE) -> Dict[st
         if _txt(x.get("prompt_en")):
             it["prompt_en"] = _txt(x["prompt_en"])
         A.aplicar_item_extras(p, it, x)
+        rc = x.get("recorte")
+        if isinstance(rc, dict) and 1 <= int(rc.get("pagina") or 0) <= n_pag and not it.get("refs"):
+            if recortar(p, int(rc["pagina"]), rc, "item", nome, base, "o quadro do mangá (composição a recriar)"):
+                it["painel"] = True
+                rel["recortes"] += 1
         rel["itens"] += 1
     cenas = [s for s in r.get("cenas") or [] if isinstance(s, dict)]
     if cenas:
@@ -422,8 +442,49 @@ def json_adaptacao(p: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ------------------------------------------------------------------ 🎨 o design anime (pra aprovar)
-def prompt_design(p: Dict[str, Any], c: Dict[str, Any]) -> str:
-    return (f"Official anime character design of {c['nome']} for the anime adaptation of a manga: "
+def ref_design(p: Dict[str, Any], c: Dict[str, Any], base: str = A._BASE) -> Tuple[Optional[str], List[str]]:
+    """A colagem do design: os recortes do mangá, a 🌈 foto colorida (se tiver) e o estilo — e o que é cada painel."""
+    from PIL import Image
+    import personagens_limpeza as L
+    cams, rot = [], []
+    for cam in A.refs_de(p, c, base)[:2]:
+        cams.append(cam)
+        rot.append("the manga picture of the character (the SHAPE and design to follow)")
+    cor = A.cor_ref(p, c, base)
+    if cor:
+        cams.append(cor)
+        rot.append("a COLORED picture of the same character (ONLY its REAL COLORS)")
+    for cam in A.refs_estilo(p, base)[:1]:
+        cams.append(cam)
+        rot.append("the ART STYLE reference")
+    ims = []
+    for cam in cams:
+        try:
+            im = Image.open(cam).convert("RGBA")
+            fundo = Image.new("RGBA", im.size, (128, 128, 128, 255))
+            fundo.alpha_composite(im)
+            ims.append(fundo.convert("RGB"))
+        except Exception:  # noqa: BLE001
+            continue
+    if not ims or len(ims) != len(rot):
+        return A._ref_flow(p, c, base), []
+    col = L.colagem(ims) if len(ims) > 1 else ims[0]
+    d = os.path.join(A.pasta(p["id"], base), "imagens")
+    os.makedirs(d, exist_ok=True)
+    cam = os.path.join(d, f"_ref_design_{c['id']}_{secrets.token_hex(2)}.png")
+    col.save(cam)
+    return cam, rot
+
+
+def prompt_design(p: Dict[str, Any], c: Dict[str, Any], paineis: Optional[List[str]] = None) -> str:
+    pre = ""
+    if paineis and len(paineis) > 1:
+        pre = ("The reference image has " + str(len(paineis)) + " panels side by side, from left to right: "
+               + "; ".join(f"{k + 1}) {t}" for k, t in enumerate(paineis)) + ". ")
+    if c.get("cor_ref"):
+        pre += ("COLORS: copy the REAL colors of the COLORED picture exactly (hair, eyes, skin, outfit, accessories) — "
+                "they win over any color written below. ")
+    return pre + (f"Official anime character design of {c['nome']} for the anime adaptation of a manga: "
             f"{c.get('design_en') or c.get('aparencia_en') or c['nome']}. "
             "Redraw the character from the manga reference faithfully (same face shape, hairstyle, ears/tail, outfit, "
             "accessories and body proportions) as an anime character with the colors/tones described. FULL BODY from head to "
@@ -453,11 +514,11 @@ def gerar_designs(pid: str, cids: Optional[List[str]] = None, pedido: str = "", 
             raise MangaErro("Nada pra gerar (sem design anime pedido, já gerado ou na fila).")
         itens = []
         for c in alvo:
-            pr = prompt_design(p, c)
+            ref, paineis = ref_design(p, c, base)
+            pr = prompt_design(p, c, paineis)
             if pedido:
                 pr = (pr + " " + pedido)[:3990]
             it = {"prompt": pr, "tipo": "imagem", "origem": "anime2d"}
-            ref = A._ref_flow(p, c, base)
             if ref:
                 it["referencia_arquivo"] = ref
             itens.append(it)

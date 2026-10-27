@@ -127,6 +127,16 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
               "Na aba 🕵️ Modelos de vídeo → 🎭 React de personagens: lê a transcrição e olha quadros do vídeo, sugere os "
               "personagens (da obra, hypados, contraste), completa a ficha de cada um e escreve as falas — quem fala, quando, "
               "com qual expressão e quem reage.", True),
+    "anime2d": ("🎞 Animação 2D: plano, roteiro e cenas",
+                "Na aba 🕵️ Modelos de vídeo → 🎞 Animação 2D: a partir da premissa cria os personagens, os locais e os "
+                "itens, escreve as cenas (falas, narração, poses, câmera, imagens de destaque) e os prompts de cada imagem.", True),
+    "criador": ("🧬 Criador de personagens: ficha, nomes e mistura",
+                "Na aba 🕵️ Modelos de vídeo → 🧬 Criador de personagens: olha as imagens de referência (o que pegar de cada "
+                "uma), as inspirações e o estilo e escreve a ficha — ideias de nome, a aparência travada pros prompts, "
+                "personalidade, jeito de falar, história, voz, paleta — e avisa se ficou parecido demais com alguém.", True),
+    "anime_cine": ("🎬 Anime quadro a quadro: planos e desenhos",
+                   "Na aba 🕵️ Modelos de vídeo → 🎬 Anime quadro a quadro: lê o roteiro e as páginas de mangá e divide a cena em "
+                   "planos (câmera, efeitos, falas, sons) e os desenhos do movimento de cada um.", True),
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),

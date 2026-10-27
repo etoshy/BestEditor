@@ -256,3 +256,46 @@ def test_abrir_navegador_da_conta_na_mao(ctx, monkeypatch):
         assert any("sessão salva" in l["msg"] for l in FL.lote().estado()["log"])
     finally:
         parar()
+
+
+def test_lote_nao_para_com_coisa_na_fila(ctx, monkeypatch):
+    """🩹 v84_237: o lote parava "do nada" com pedidos na fila — (1) um pedido que chegava enquanto o supervisor decidia
+    que tinha acabado; (2) "rodando" marcado com o supervisor já morto (o ▶ Iniciar não fazia nada); (3) uma conta que
+    descansava (erros seguidos, não abriu o projeto) ficava fora até o fim → "nenhuma conta". Agora: só termina se a fila
+    continua vazia, ▶ reinicia o supervisor morto, e o lote ESPERA a conta voltar do descanso."""
+    _c, FL, _FE, gf, _tmp = ctx
+    L = FL.lote()
+    # (1) termina só se continuar vazio
+    L.adicionar([{"prompt": "um gato", "tipo": "imagem"}])
+    L.rodando = True
+    assert L._encerrar("fim", so_se_vazio=True) is False and L.rodando
+    L.fila[0]["estado"] = "ok"
+    assert L._encerrar("fim", so_se_vazio=True) is True and not L.rodando
+    # (2) "rodando" com o supervisor morto: o ▶ Iniciar começa de novo
+    L.fila[0]["estado"] = "pendente"
+    L.rodando = True
+    L.supervisor = None
+    chamados = []
+    monkeypatch.setattr(FL, "_reservar", lambda dono, timeout=0: chamados.append(dono))
+    monkeypatch.setattr(L, "_supervisionar", lambda: None)
+    L.iniciar()
+    assert chamados == ["lote"]
+    L.rodando = False
+    FL._liberar("lote")
+    # (3) a conta descansando volta sozinha; a que precisa de login não
+    contas = L.contas_do_lote()
+    c = contas[0]
+    L.problema_conta[c] = "3 erros seguidos"
+    L.problema_ate[c] = time.time() + 120
+    pend = [j for j in L.fila if j["estado"] == "pendente"]
+    volta = L._proxima_volta(contas, pend)
+    assert volta is not None and volta - time.time() > 100
+    L.problema_ate[c] = time.time() - 1
+    L._devolver_contas_descansadas()
+    assert c not in L.problema_conta
+    L.problema_conta[c] = "precisa de login"
+    L.problema_ate.pop(c, None)
+    assert L._proxima_volta([c], pend) is None
+    L.problema_conta.clear()
+    # (4) a conta espera um pedido que ela pode fazer (em vez de fechar)
+    assert L._tem_para(c) == gf.conta_serve(c, "imagem")

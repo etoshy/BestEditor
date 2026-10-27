@@ -1,0 +1,1332 @@
+{
+ "id": "d5dc0d114f",
+ "nome": "🎞 Kouhai (de uniforme feminino) (Go senpai EP 2)",
+ "criado": 1792752097.6282423,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "personagem": "kouhai_de_uniforme_feminino",
+  "nome": "Kouhai (de uniforme feminino)",
+  "anime2d": true,
+  "descricoes_referencias": {
+   "ref_298b6c2a.png": "a reference picture of Kouhai (de uniforme feminino)",
+   "design_anime_aprovado.png": "the APPROVED anime character design of Kouhai (de uniforme feminino) — follow it exactly (face, hair, outfit, colors)"
+  },
+  "texto_fixo": {
+   "trava": "CHARACTER LOCK: Kouhai (de uniforme feminino). Appearance: the same short slim teenage boy now dressed as a schoolgirl: ash-blond silver hair tied in a small high ponytail with two silver hairclips, light-gray eyes visible, flustered blush, navy-blue sailor uniform with a white sailor collar and white neckerchief, navy pleated skirt, black knee socks, brown loafers. Keep exactly the same face, hairstyle, hair color, eye color, body, outfit and colors in every image (follow the approved design reference).",
+   "estilo": "ART STYLE: 2D anime TV-series style, clean line art, flat cel shading, vibrant colors.",
+   "regras": "ONE single figure, framed as the pose says, seen in a 3/4 view turned to the RIGHT side of the image, the whole figure inside the image with margin. NO furniture, NO chair, NO table, NO desk, NO floor, NO background objects (a sitting pose sits on NOTHING — an invisible seat; the furniture is a separate layer); a small handheld object only if the pose needs it. No panels, on a flat solid chroma-key green background (#00FF00), no shadow on the background. ABSOLUTELY NO TEXT in the image: no letters, no words, no speech balloons, no thought bubbles, no sound-effect onomatopoeia lettering, no captions, no narration boxes, no signs or labels with writing, no watermark. If the reference images contain speech balloons, lettering or sound effects, do NOT copy them."
+  },
+  "fundo": "verde",
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "corpo_inteiro": true,
+  "boca_auto": true,
+  "flow": {
+   "proporcao": "3:4"
+  },
+  "poses": [
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": true,
+    "descricao_pt": "😐 em pé, neutro",
+    "prompt": "standing, relaxed neutral expression, arms down. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "kouhai_de_uniforme_feminino_neutro.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "showing off the new outfit, flustered, hands open",
+    "prompt": "showing off the new outfit, flustered, hands open. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "showing off the new outfit, flustered, hands open — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🙂 busto 😐 em pé, neutro",
+    "prompt": "BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer in 3/4 turned to the RIGHT. Expression: standing, relaxed neutral expression, arms down."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_neutro_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "kouhai_de_uniforme_feminino_busto_neutro.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_andando.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🚶 andando",
+    "prompt": "walking, mid-stride. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_andando_b.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "descricao_pt": "🚶 andando — 2º quadro",
+    "prompt": "walking, the OTHER leg forward (next step of the same walk cycle). Same character, same framing and size as the first frame. FULL BODY from head to feet, feet at the bottom of the figure.",
+    "pose_base": "kouhai_de_uniforme_feminino_andando.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_envergonhado.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "😳 envergonhado",
+    "prompt": "embarrassed, blushing, scratching the back of the head. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_envergonhado_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "😳 envergonhado — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "kouhai_de_uniforme_feminino_envergonhado.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_envergonhado.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "🙂 busto 😳 envergonhado",
+    "prompt": "BUST SHOT: head, shoulders and chest only (cropped at mid-chest), big and detailed, facing the viewer in 3/4 turned to the RIGHT. Expression: embarrassed, blushing, scratching the back of the head."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "🙂 busto 😳 envergonhado — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "kouhai_de_uniforme_feminino_busto_envergonhado.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_determined_clenched_fist.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "anime2d",
+    "mestre": false,
+    "descricao_pt": "determined, clenched fist, blushing",
+    "prompt": "determined, clenched fist, blushing. FULL BODY from head to feet, feet at the bottom of the figure."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca.png",
+    "tipo": "pose",
+    "prioridade": 3,
+    "grupo": "anime2d",
+    "descricao_pt": "determined, clenched fist, blushing — piscando",
+    "prompt": "Exactly the same image — same character, same pose, same framing, same size, same colors, same mouth — on a flat solid chroma-key green background (#00FF00). Change ONLY the eyes: CLOSED, in the middle of a blink.",
+    "pose_base": "kouhai_de_uniforme_feminino_x_determined_clenched_fist.png"
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_neutro_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_envergonhado_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_envergonhado.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "😳 envergonhado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "showing off the new outfit, flustered — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_andando_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_andando.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🚶 andando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_x_determined_clenched_fist.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "determined, clenched fist, blushing — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_andando_b_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_andando_b.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "🚶 andando — 2º quadro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "showing off the new outfit, flustered, hands open — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_neutro_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_busto_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_neutro_pisca_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_busto_neutro_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😐 em pé, neutro — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_envergonhado_pisca_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_envergonhado_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "😳 envergonhado — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_envergonhado_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_busto_envergonhado.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😳 envergonhado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "🙂 busto 😳 envergonhado — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_boca.png",
+    "tipo": "boca",
+    "base": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca.png",
+    "grupo": "boca",
+    "prioridade": 3,
+    "lado": "",
+    "descricao_pt": "determined, clenched fist, blushing — piscando — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   }
+  ]
+ },
+ "refs": [
+  "design_anime_aprovado.png",
+  "ref_a7fadcff.png"
+ ],
+ "motor": "flow",
+ "canal": null,
+ "mestre": {
+  "arquivo": "kouhai_de_uniforme_feminino_neutro.png",
+  "local": "kouhai_de_uniforme_feminino_neutro_v1_3f50.png",
+  "quando": 1792752211.5433311,
+  "bruto": "kouhai_de_uniforme_feminino_neutro_v1_98c8_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "b14e034621",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_neutro.png"
+   ],
+   "criado": 1792752097.869905,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "86c6c78fe7",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_neutro_boca.png"
+   ],
+   "criado": 1792752211.526911,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e146ac1b1c",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf.png"
+   ],
+   "criado": 1792752211.8945465,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8596f8e86d",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_envergonhado.png"
+   ],
+   "criado": 1792752211.8945513,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5928b02ee6",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_andando.png"
+   ],
+   "criado": 1792752211.8945532,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "4f7e5d6719",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_andando_b.png"
+   ],
+   "criado": 1792752211.8945546,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e70208472c",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_determined_clenched_fist.png"
+   ],
+   "criado": 1792752211.894556,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "1ef8b461da",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_envergonhado_boca.png"
+   ],
+   "criado": 1792753108.9378943,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8efeb0fc1b",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_boca.png"
+   ],
+   "criado": 1792753113.302439,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3af310ecb8",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_andando_boca.png"
+   ],
+   "criado": 1792753132.3138177,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6cfb9303da",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_determined_clenched_fist_boca.png"
+   ],
+   "criado": 1792753154.9921877,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3ad57755d0",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_andando_b_boca.png"
+   ],
+   "criado": 1792753191.7607749,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "bcf16fc9a3",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_neutro_pisca.png"
+   ],
+   "criado": 1792766075.0269592,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "fb346a84ac",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca.png"
+   ],
+   "criado": 1792766075.0269673,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "db63d70866",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_neutro.png"
+   ],
+   "criado": 1792766075.0269701,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "7b51bb6b87",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_neutro_pisca.png"
+   ],
+   "criado": 1792766075.0269735,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "6002cc6909",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_envergonhado_pisca.png"
+   ],
+   "criado": 1792766075.026976,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "11dd3ad161",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_envergonhado.png"
+   ],
+   "criado": 1792766075.0269783,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b9ed72b6bf",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_envergonhado_pisca.png"
+   ],
+   "criado": 1792766075.0269806,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9b9142f7d2",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca.png"
+   ],
+   "criado": 1792766075.0269825,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d0dba9af30",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_neutro_pisca_boca.png"
+   ],
+   "criado": 1792767104.2706912,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "cec6db0034",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_boca.png"
+   ],
+   "criado": 1792767109.1237843,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "27a0284b35",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_neutro_boca.png"
+   ],
+   "criado": 1792767133.6726668,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ddcc0f63d7",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_neutro_pisca_boca.png"
+   ],
+   "criado": 1792767138.8606844,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d02a27ccad",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_envergonhado_pisca_boca.png"
+   ],
+   "criado": 1792767154.378196,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ef646160ee",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_envergonhado_boca.png"
+   ],
+   "criado": 1792767171.3251553,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "3538ff19c1",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_boca.png"
+   ],
+   "criado": 1792767176.398412,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "9eba7aac72",
+   "motor": "flow",
+   "arquivos": [
+    "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_boca.png"
+   ],
+   "criado": 1792767192.8579235,
+   "final": true,
+   "extra": null
+  }
+ ],
+ "log": [
+  "23/10 07:41:37 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 07:43:31 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:43:31 🚀 1 pose(s) pro Flow (sem mestre)",
+  "23/10 07:43:31 ⭐ mestre: kouhai_de_uniforme_feminino_neutro.png",
+  "23/10 07:43:31 🚀 5 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 07:58:28 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:58:28 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 07:58:33 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:58:33 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 07:58:52 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:58:52 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 07:59:14 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:59:14 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 07:59:51 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 07:59:51 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:34:34 ✏ JSON trocado: 20 pose(s), 8 nova(s)",
+  "23/10 11:34:35 🚀 8 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:51:43 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:51:44 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:51:48 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:51:49 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:52:13 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:52:13 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:52:18 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:52:18 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:52:34 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:52:34 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:52:50 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:52:51 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:52:56 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:52:56 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "23/10 11:53:12 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "23/10 11:53:12 🚀 1 pose(s) pro Flow com a ⭐ mestre"
+ ],
+ "imagens": {
+  "kouhai_de_uniforme_feminino_neutro.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_neutro_v1_3f50.png",
+     "bruto": "kouhai_de_uniforme_feminino_neutro_v1_98c8_flow.png",
+     "job": "b14e034621",
+     "motor": "flow",
+     "quando": 1792752211.134791,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 24,
+      "verde_px": 890707
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b14e034621",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_neutro_pisca_v1_aa41.png",
+     "bruto": "kouhai_de_uniforme_feminino_neutro_pisca_v1_1642_flow.png",
+     "job": "bcf16fc9a3",
+     "motor": "flow",
+     "quando": 1792767103.8762171,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 3,
+      "verde_px": 891066
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "bcf16fc9a3",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_v1_208a.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_v1_0198_flow.png",
+     "job": "e146ac1b1c",
+     "motor": "flow",
+     "quando": 1792753113.090083,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 8,
+      "verde_px": 877274
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e146ac1b1c",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_v1_4e5a.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_v1_74d2_flow.png",
+     "job": "fb346a84ac",
+     "motor": "flow",
+     "quando": 1792767108.782697,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 1,
+      "verde_px": 891105
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "fb346a84ac",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_neutro.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_neutro_v1_0cb0.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_neutro_v1_f616_flow.png",
+     "job": "db63d70866",
+     "motor": "flow",
+     "quando": 1792767133.4446814,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 5,
+      "furos_fechados": 174,
+      "verde_px": 682134
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "db63d70866",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_neutro_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_neutro_pisca_v1_f95c.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_neutro_pisca_v1_08b2_flow.png",
+     "job": "7b51bb6b87",
+     "motor": "flow",
+     "quando": 1792767138.420621,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 891041
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "7b51bb6b87",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_andando.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_andando_v1_4baf.png",
+     "bruto": "kouhai_de_uniforme_feminino_andando_v1_e930_flow.png",
+     "job": "5928b02ee6",
+     "motor": "flow",
+     "quando": 1792753132.0820282,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 6,
+      "verde_px": 877991
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5928b02ee6",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_andando_b.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_andando_b_v1_823e.png",
+     "bruto": "kouhai_de_uniforme_feminino_andando_b_v1_8604_flow.png",
+     "job": "4f7e5d6719",
+     "motor": "flow",
+     "quando": 1792753191.5442986,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 8,
+      "verde_px": 880530
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "4f7e5d6719",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_envergonhado.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_envergonhado_v1_bc39.png",
+     "bruto": "kouhai_de_uniforme_feminino_envergonhado_v1_6e78_flow.png",
+     "job": "8596f8e86d",
+     "motor": "flow",
+     "quando": 1792753108.7088082,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 5,
+      "verde_px": 894287
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8596f8e86d",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_envergonhado_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_envergonhado_pisca_v1_90f6.png",
+     "bruto": "kouhai_de_uniforme_feminino_envergonhado_pisca_v1_d475_flow.png",
+     "job": "6002cc6909",
+     "motor": "flow",
+     "quando": 1792767154.0778143,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 3,
+      "furos_fechados": 5,
+      "verde_px": 891106
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6002cc6909",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_envergonhado.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_envergonhado_v1_1345.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_envergonhado_v1_a9df_flow.png",
+     "job": "11dd3ad161",
+     "motor": "flow",
+     "quando": 1792767170.6474943,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 11,
+      "furos_fechados": 154,
+      "verde_px": 474810
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "11dd3ad161",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_envergonhado_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_v1_aed7.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_v1_3509_flow.png",
+     "job": "b9ed72b6bf",
+     "motor": "flow",
+     "quando": 1792767176.0711079,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 4,
+      "furos_fechados": 5,
+      "verde_px": 891051
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b9ed72b6bf",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_determined_clenched_fist.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_v1_f300.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_v1_52de_flow.png",
+     "job": "e70208472c",
+     "motor": "flow",
+     "quando": 1792753154.5968573,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 886505
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e70208472c",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_v1_8048.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_v1_9029_flow.png",
+     "job": "9b9142f7d2",
+     "motor": "flow",
+     "quando": 1792767192.6277187,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 2,
+      "verde_px": 891114
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9b9142f7d2",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_neutro_boca_v1_4762.png",
+     "bruto": "kouhai_de_uniforme_feminino_neutro_boca_v1_c61e_flow.png",
+     "job": "86c6c78fe7",
+     "motor": "flow",
+     "quando": 1792753082.63214,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 890920
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "86c6c78fe7",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_envergonhado_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_envergonhado_boca_v1_98d4.png",
+     "bruto": "kouhai_de_uniforme_feminino_envergonhado_boca_v1_d133_flow.png",
+     "job": "1ef8b461da",
+     "motor": "flow",
+     "quando": 1792753746.406256,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 2,
+      "verde_px": 894579
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "1ef8b461da",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_boca_v1_6e7f.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_boca_v1_a410_flow.png",
+     "job": "8efeb0fc1b",
+     "motor": "flow",
+     "quando": 1792753776.132553,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 10,
+      "verde_px": 877694
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8efeb0fc1b",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_andando_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_andando_boca_v1_10a8.png",
+     "bruto": "kouhai_de_uniforme_feminino_andando_boca_v1_08a3_flow.png",
+     "job": "3af310ecb8",
+     "motor": "flow",
+     "quando": 1792753780.7984586,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 878461
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3af310ecb8",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_determined_clenched_fist_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_boca_v1_707f.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_boca_v1_4332_flow.png",
+     "job": "6cfb9303da",
+     "motor": "flow",
+     "quando": 1792753814.6683612,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 0,
+      "verde_px": 886817
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "6cfb9303da",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_andando_b_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_andando_b_boca_v1_b423.png",
+     "bruto": "kouhai_de_uniforme_feminino_andando_b_boca_v1_c8fc_flow.png",
+     "job": "3ad57755d0",
+     "motor": "flow",
+     "quando": 1792753841.7789013,
+     "aviso": null,
+     "conta": "leandrolincor@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 881073
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3ad57755d0",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_neutro_pisca_boca_v1_2b82.png",
+     "bruto": "kouhai_de_uniforme_feminino_neutro_pisca_boca_v1_476e_flow.png",
+     "job": "d0dba9af30",
+     "motor": "flow",
+     "quando": 1792768470.9381347,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 5,
+      "verde_px": 891327
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d0dba9af30",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_boca_v1_ebcc.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_showing_off_the_new_outf_pisca_boca_v1_9476_flow.png",
+     "job": "cec6db0034",
+     "motor": "flow",
+     "quando": 1792768485.771743,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 2,
+      "verde_px": 891439
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "cec6db0034",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_neutro_boca_v1_abd6.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_neutro_boca_v1_446b_flow.png",
+     "job": "27a0284b35",
+     "motor": "flow",
+     "quando": 1792768512.6331055,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 54,
+      "verde_px": 682405
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "27a0284b35",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_neutro_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_neutro_pisca_boca_v1_0beb.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_neutro_pisca_boca_v1_40cd_flow.png",
+     "job": "ddcc0f63d7",
+     "motor": "flow",
+     "quando": 1792768535.2018733,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 5,
+      "verde_px": 891119
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ddcc0f63d7",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_envergonhado_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_envergonhado_pisca_boca_v1_13a7.png",
+     "bruto": "kouhai_de_uniforme_feminino_envergonhado_pisca_boca_v1_e8df_flow.png",
+     "job": "d02a27ccad",
+     "motor": "flow",
+     "quando": 1792768555.443461,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 891419
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d02a27ccad",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_envergonhado_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_envergonhado_boca_v1_b1cb.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_envergonhado_boca_v1_2229_flow.png",
+     "job": "ef646160ee",
+     "motor": "flow",
+     "quando": 1792768577.7883594,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 6,
+      "furos_fechados": 176,
+      "verde_px": 475002
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ef646160ee",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_boca_v1_fc31.png",
+     "bruto": "kouhai_de_uniforme_feminino_busto_envergonhado_pisca_boca_v1_9326_flow.png",
+     "job": "3538ff19c1",
+     "motor": "flow",
+     "quando": 1792768595.2183068,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 3,
+      "verde_px": 891461
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3538ff19c1",
+   "msg": null
+  },
+  "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_boca_v1_a2ae.png",
+     "bruto": "kouhai_de_uniforme_feminino_x_determined_clenched_fist_pisca_boca_v1_7edf_flow.png",
+     "job": "9eba7aac72",
+     "motor": "flow",
+     "quando": 1792768625.8241987,
+     "aviso": null,
+     "conta": "melojonas03500@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 2,
+      "furos_fechados": 5,
+      "verde_px": 891303
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "9eba7aac72",
+   "msg": null
+  }
+ },
+ "atualizado": 1792768625.8354092
+}

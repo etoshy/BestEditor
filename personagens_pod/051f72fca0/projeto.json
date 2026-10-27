@@ -1,0 +1,776 @@
+{
+ "id": "051f72fca0",
+ "nome": "🎭 Naruto Uzumaki (react)",
+ "criado": 1792682969.0141857,
+ "pod_url": "",
+ "dados": {
+  "formato": "personagens_pod_v1",
+  "personagem": "naruto_uzumaki",
+  "nome": "Naruto Uzumaki",
+  "react": true,
+  "descricoes_referencias": {
+   "cdd6cf3_369270.png": "a reference picture of Naruto Uzumaki from Naruto"
+  },
+  "texto_fixo": {
+   "trava": "CHARACTER LOCK: Naruto Uzumaki from Naruto. Appearance: Young boy with spiky blond hair, blue eyes, whisker-like marks on his cheeks, an orange and black jumpsuit, and a big, excited grin.. Keep exactly the same face, hairstyle, eye color, outfit and colors in every image.",
+   "estilo": "ART STYLE: 2D anime / cartoon illustration style like a Gacha Life reaction video, clean line art, flat cel shading, vibrant colors.",
+   "regras": "Framing: the character is SITTING on an invisible seat as if on a couch, seen from the front, body turned slightly (three-quarters) toward the viewer's right as if watching a TV there; head, both arms, torso and the thighs/knees visible, cropped around the knees at the bottom edge; whole head and hair inside the image with margin. Do NOT draw the couch, chair, table, TV or any other object. ONE single figure, no text, no panels, on a flat solid chroma-key green background (#00FF00), no shadow on the background."
+  },
+  "fundo": "verde",
+  "canvas": [
+   1200,
+   1800
+  ],
+  "altura_personagem": 0.95,
+  "boca_auto": true,
+  "flow": {
+   "proporcao": "3:4"
+  },
+  "poses": [
+   {
+    "arquivo": "naruto_uzumaki_neutro.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "mestre": true,
+    "descricao_pt": "sentado — 😐 Neutro",
+    "prompt": "sitting, calm neutral expression, relaxed, attentively watching."
+   },
+   {
+    "arquivo": "naruto_uzumaki_feliz.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 😄 Feliz / rindo",
+    "prompt": "sitting, big happy smile, laughing, eyes squinting with joy."
+   },
+   {
+    "arquivo": "naruto_uzumaki_chocado.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 😱 Chocado",
+    "prompt": "sitting, shocked, eyes wide open, jaw dropped, leaning slightly back."
+   },
+   {
+    "arquivo": "naruto_uzumaki_bravo.png",
+    "tipo": "pose",
+    "prioridade": 1,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 😠 Bravo",
+    "prompt": "sitting, angry, furrowed brows, gritted teeth, clenched fist."
+   },
+   {
+    "arquivo": "naruto_uzumaki_pensativo.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 🤔 Pensativo / desconfiado",
+    "prompt": "sitting, thinking, skeptical, one eyebrow raised, hand on chin."
+   },
+   {
+    "arquivo": "naruto_uzumaki_empolgado.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 🤩 Empolgado / hypado",
+    "prompt": "sitting, hyped and excited, sparkling eyes, both fists raised."
+   },
+   {
+    "arquivo": "naruto_uzumaki_debochado.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 😏 Debochado",
+    "prompt": "sitting, smug sarcastic smirk, half-closed eyes, arms crossed."
+   },
+   {
+    "arquivo": "naruto_uzumaki_triste.png",
+    "tipo": "pose",
+    "prioridade": 2,
+    "grupo": "reacao",
+    "mestre": false,
+    "descricao_pt": "sentado — 😢 Triste / emocionado",
+    "prompt": "sitting, sad and emotional, teary eyes, frowning mouth."
+   },
+   {
+    "arquivo": "naruto_uzumaki_neutro_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_neutro.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "sentado — 😐 Neutro — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_feliz_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_feliz.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "sentado — 😄 Feliz / rindo — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_chocado_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_chocado.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "sentado — 😱 Chocado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_bravo_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_bravo.png",
+    "grupo": "boca",
+    "prioridade": 1,
+    "lado": "",
+    "descricao_pt": "sentado — 😠 Bravo — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_pensativo_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_pensativo.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "sentado — 🤔 Pensativo / desconfiado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_empolgado_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_empolgado.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "sentado — 🤩 Empolgado / hypado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_debochado_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_debochado.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "sentado — 😏 Debochado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   },
+   {
+    "arquivo": "naruto_uzumaki_triste_boca.png",
+    "tipo": "boca",
+    "base": "naruto_uzumaki_triste.png",
+    "grupo": "boca",
+    "prioridade": 2,
+    "lado": "",
+    "descricao_pt": "sentado — 😢 Triste / emocionado — falando (boca aberta)",
+    "prompt": "Keep everything in this image identical — same character, same pose, same framing, same size, same colors, on a flat solid chroma-key green background (#00FF00). Change ONLY the mouth: slightly open, as if speaking in the middle of a sentence."
+   }
+  ]
+ },
+ "refs": [
+  "cdd6cf3_369270.png"
+ ],
+ "motor": "flow",
+ "canal": null,
+ "mestre": {
+  "arquivo": "naruto_uzumaki_neutro.png",
+  "local": "naruto_uzumaki_neutro_v1_ded0.png",
+  "quando": 1792683077.9891622,
+  "bruto": "naruto_uzumaki_neutro_v1_6f86_flow.png"
+ },
+ "jobs": [
+  {
+   "id": "3f8af94b78",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_neutro.png"
+   ],
+   "criado": 1792682969.0895329,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "31a4ef9189",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_neutro_boca.png"
+   ],
+   "criado": 1792683077.9796736,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "5060c9772a",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_feliz.png"
+   ],
+   "criado": 1792683078.1056924,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "d724457eba",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_chocado.png"
+   ],
+   "criado": 1792683078.1056986,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "e5ffbf6409",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_bravo.png"
+   ],
+   "criado": 1792683078.1057014,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "8dddcfc7f1",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_pensativo.png"
+   ],
+   "criado": 1792683078.1057034,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "58d897418c",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_empolgado.png"
+   ],
+   "criado": 1792683078.105705,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "eaff4b1ec5",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_debochado.png"
+   ],
+   "criado": 1792683078.1057065,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "ac8dcf08ec",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_triste.png"
+   ],
+   "criado": 1792683078.1057081,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "f5847aff92",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_chocado_boca.png"
+   ],
+   "criado": 1792683588.6185389,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "b6916a292e",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_feliz_boca.png"
+   ],
+   "criado": 1792683608.8168852,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "84f4191ea3",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_bravo_boca.png"
+   ],
+   "criado": 1792683617.8001556,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "0c12610af9",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_pensativo_boca.png"
+   ],
+   "criado": 1792683637.7635093,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "a0b61f0a24",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_empolgado_boca.png"
+   ],
+   "criado": 1792683642.568022,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "de59440e8c",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_debochado_boca.png"
+   ],
+   "criado": 1792683665.5571625,
+   "final": true,
+   "extra": null
+  },
+  {
+   "id": "c4f1812341",
+   "motor": "flow",
+   "arquivos": [
+    "naruto_uzumaki_triste_boca.png"
+   ],
+   "criado": 1792683685.9834306,
+   "final": true,
+   "extra": null
+  }
+ ],
+ "log": [
+  "22/10 12:29:29 🚀 1 pose(s) pro Flow (sem mestre)",
+  "22/10 12:31:17 👄 1 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 12:31:17 🚀 1 pose(s) pro Flow (sem mestre)",
+  "22/10 12:31:17 ⭐ mestre: naruto_uzumaki_neutro.png",
+  "22/10 12:31:18 🚀 7 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:38:24 ✏ JSON trocado: 9 pose(s)",
+  "22/10 12:38:24 👄 7 “_boca” novas no JSON (a animação de fala de cada pose)",
+  "22/10 12:39:48 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:40:08 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:40:17 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:40:37 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:40:42 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:41:05 🚀 1 pose(s) pro Flow com a ⭐ mestre",
+  "22/10 12:41:25 🚀 1 pose(s) pro Flow com a ⭐ mestre"
+ ],
+ "imagens": {
+  "naruto_uzumaki_neutro.png": {
+   "estado": "aprovada",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_neutro_v1_ded0.png",
+     "bruto": "naruto_uzumaki_neutro_v1_6f86_flow.png",
+     "job": "3f8af94b78",
+     "motor": "flow",
+     "quando": 1792683077.8088064,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 22,
+      "verde_px": 524262
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "3f8af94b78",
+   "msg": null
+  },
+  "naruto_uzumaki_feliz.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_feliz_v1_b8b9.png",
+     "bruto": "naruto_uzumaki_feliz_v1_ecf7_flow.png",
+     "job": "5060c9772a",
+     "motor": "flow",
+     "quando": 1792683608.4755368,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 521818
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "5060c9772a",
+   "msg": null
+  },
+  "naruto_uzumaki_chocado.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_chocado_v1_38a5.png",
+     "bruto": "naruto_uzumaki_chocado_v1_9635_flow.png",
+     "job": "d724457eba",
+     "motor": "flow",
+     "quando": 1792683588.2713227,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 533462
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "d724457eba",
+   "msg": null
+  },
+  "naruto_uzumaki_bravo.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_bravo_v1_d526.png",
+     "bruto": "naruto_uzumaki_bravo_v1_4d31_flow.png",
+     "job": "e5ffbf6409",
+     "motor": "flow",
+     "quando": 1792683617.4730477,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 18,
+      "verde_px": 527821
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "e5ffbf6409",
+   "msg": null
+  },
+  "naruto_uzumaki_pensativo.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_pensativo_v1_8f68.png",
+     "bruto": "naruto_uzumaki_pensativo_v1_72ca_flow.png",
+     "job": "8dddcfc7f1",
+     "motor": "flow",
+     "quando": 1792683636.963477,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 3,
+      "verde_px": 555541
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "8dddcfc7f1",
+   "msg": null
+  },
+  "naruto_uzumaki_empolgado.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_empolgado_v1_b479.png",
+     "bruto": "naruto_uzumaki_empolgado_v1_6746_flow.png",
+     "job": "58d897418c",
+     "motor": "flow",
+     "quando": 1792683642.3222556,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 38,
+      "verde_px": 494473
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "58d897418c",
+   "msg": null
+  },
+  "naruto_uzumaki_debochado.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_debochado_v1_5315.png",
+     "bruto": "naruto_uzumaki_debochado_v1_e189_flow.png",
+     "job": "eaff4b1ec5",
+     "motor": "flow",
+     "quando": 1792683665.3196788,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 563382
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "eaff4b1ec5",
+   "msg": null
+  },
+  "naruto_uzumaki_triste.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_triste_v1_f33b.png",
+     "bruto": "naruto_uzumaki_triste_v1_1d76_flow.png",
+     "job": "ac8dcf08ec",
+     "motor": "flow",
+     "quando": 1792683685.6917667,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 524306
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "ac8dcf08ec",
+   "msg": null
+  },
+  "naruto_uzumaki_neutro_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_neutro_boca_v1_29d8.png",
+     "bruto": "naruto_uzumaki_neutro_boca_v1_28aa_flow.png",
+     "job": "31a4ef9189",
+     "motor": "flow",
+     "quando": 1792683424.8815095,
+     "aviso": null,
+     "conta": "manoelbatidao98@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 10,
+      "verde_px": 524331
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "31a4ef9189",
+   "msg": null
+  },
+  "naruto_uzumaki_feliz_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_feliz_boca_v1_5889.png",
+     "bruto": "naruto_uzumaki_feliz_boca_v1_7238_flow.png",
+     "job": "b6916a292e",
+     "motor": "flow",
+     "quando": 1792683997.0440621,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 6,
+      "verde_px": 522298
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "b6916a292e",
+   "msg": null
+  },
+  "naruto_uzumaki_chocado_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_chocado_boca_v1_1102.png",
+     "bruto": "naruto_uzumaki_chocado_boca_v1_7962_flow.png",
+     "job": "f5847aff92",
+     "motor": "flow",
+     "quando": 1792683967.704359,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 533982
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "f5847aff92",
+   "msg": null
+  },
+  "naruto_uzumaki_bravo_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_bravo_boca_v1_8153.png",
+     "bruto": "naruto_uzumaki_bravo_boca_v1_7f0d_flow.png",
+     "job": "84f4191ea3",
+     "motor": "flow",
+     "quando": 1792684010.6798706,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 4,
+      "verde_px": 528128
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "84f4191ea3",
+   "msg": null
+  },
+  "naruto_uzumaki_pensativo_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_pensativo_boca_v1_0214.png",
+     "bruto": "naruto_uzumaki_pensativo_boca_v1_5ce0_flow.png",
+     "job": "0c12610af9",
+     "motor": "flow",
+     "quando": 1792684059.683745,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 1,
+      "furos_fechados": 5,
+      "verde_px": 555782
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "0c12610af9",
+   "msg": null
+  },
+  "naruto_uzumaki_empolgado_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_empolgado_boca_v1_ed2f.png",
+     "bruto": "naruto_uzumaki_empolgado_boca_v1_2279_flow.png",
+     "job": "a0b61f0a24",
+     "motor": "flow",
+     "quando": 1792684068.998571,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 11,
+      "verde_px": 495057
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "a0b61f0a24",
+   "msg": null
+  },
+  "naruto_uzumaki_debochado_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_debochado_boca_v1_6ac0.png",
+     "bruto": "naruto_uzumaki_debochado_boca_v1_47f7_flow.png",
+     "job": "de59440e8c",
+     "motor": "flow",
+     "quando": 1792684106.8589416,
+     "aviso": null,
+     "conta": "principal",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 2,
+      "verde_px": 563740
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "de59440e8c",
+   "msg": null
+  },
+  "naruto_uzumaki_triste_boca.png": {
+   "estado": "pronta",
+   "versoes": [
+    {
+     "local": "naruto_uzumaki_triste_boca_v1_f6b4.png",
+     "bruto": "naruto_uzumaki_triste_boca_v1_80d2_flow.png",
+     "job": "c4f1812341",
+     "motor": "flow",
+     "quando": 1792684115.566438,
+     "aviso": null,
+     "conta": "marcosmou856@gmail.com",
+     "limpeza": {
+      "ilhas_removidas": 0,
+      "furos_fechados": 7,
+      "verde_px": 524570
+     },
+     "cortada": false,
+     "defeito": false
+    }
+   ],
+   "atual": 0,
+   "erro": null,
+   "job": "c4f1812341",
+   "msg": null
+  }
+ },
+ "atualizado": 1792684115.5759282
+}

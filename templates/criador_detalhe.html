@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}🧬 {{ p.nome }} — Criador de personagens{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1200px; }
+  .cr-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .cr-card h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; gap: 8px; align-items: center; }
+  .cr-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .cr-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .cr-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .cr-linha > * { margin: 0; }
+  .cr-linha button, .cr-btn { width: auto; margin: 0; padding: 6px 12px; }
+  .cr-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .cr-sec { background: #64748b !important; } .cr-perigo { background: #dc2626 !important; }
+  .cr-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+  .cr-ref, .cr-var, .cr-pose { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; position: relative; }
+  .cr-ref img { width: 100%; height: 170px; object-fit: contain; background: var(--code-bg); border-radius: 6px; }
+  .cr-ref .n { position: absolute; top: 12px; left: 12px; background: #000; color: #ffeb3b; font-weight: 800; border-radius: 6px; padding: 0 8px; font-size: 1.2rem; }
+  .cr-chips { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0; }
+  .cr-chips label { font-size: .74rem; border: 1px solid var(--borda); border-radius: 999px; padding: 1px 7px; margin: 0; cursor: pointer; }
+  .cr-chips input { width: auto; margin: 0 3px 0 0; }
+  .cr-xadrez { background: repeating-conic-gradient(#e2e8f0 0 25%, #fff 0 50%) 50% / 16px 16px; border-radius: 6px; }
+  .cr-var img { width: 100%; height: 300px; object-fit: contain; }
+  .cr-var.ok { border-color: #16a34a; box-shadow: 0 0 0 3px #bbf7d0; }
+  .cr-var .vaz { height: 300px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; }
+  .cr-pose img { width: 100%; height: 200px; object-fit: contain; }
+  .cr-pose .vaz { height: 200px; display: flex; align-items: center; justify-content: center; font-size: .8rem; text-align: center; }
+  .cr-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 12px; }
+  .cr-campos label { font-size: .8rem; color: var(--mudo); margin: 0; }
+  .cr-campos textarea { min-height: 54px; font-size: .86rem; }
+  .cr-nome { display: inline-block; border: 1px solid var(--borda); border-radius: 999px; padding: 2px 10px; margin: 2px; cursor: pointer; font-size: .85rem; }
+  .cr-nome:hover { border-color: var(--acento); }
+  .cr-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; }
+  .cr-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .cr-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+</style>
+
+<div class="cr-linha" style="justify-content:space-between">
+  <h1 style="margin:0">🧬 <span id="tNome">{{ p.nome }}</span></h1>
+  <div class="cr-linha"><a href="/criador-personagens">← todos</a> <a class="cr-btn" href="/criador-personagens/{{ p.id }}/zip" style="text-decoration:none">⬇ zip (design, poses e ficha)</a>
+    <form method="post" action="/criador-personagens/{{ p.id }}/excluir" onsubmit="return confirm('Excluir este personagem (as referências e os designs)? As poses continuam na aba 🧍 Personagens.')" style="margin:0"><button class="cr-mini cr-perigo">🗑</button></form></div>
+</div>
+<div class="cr-barra" id="barra"></div>
+
+<!-- 1 · entrada -->
+<div class="cr-card">
+  <h2><span class="cr-num">1</span>📥 O que você quer</h2>
+  <p class="cr-dica">Misture como quiser: <b>clonar</b> (1 imagem com “🧬 tudo” + o que mudar), <b>misturar</b> (várias imagens — marque em cada uma o que pegar) ou só <b>descrever</b>. Tudo salva sozinho.</p>
+  <label>Descrição / o que mudar</label>
+  <textarea data-e="descricao" rows="3" placeholder="ex.: igual à imagem 1, mas mais velha, com cabelo azul e uma cicatriz no queixo — ou descreva do zero">{{ p.entrada.descricao }}</textarea>
+  <h3 style="margin:10px 0 4px;font-size:1rem">🧩 Imagens de referência <span class="cr-dica">(até {{ max_refs }} — o número vai grande no canto pro Flow saber qual é qual; se a referência é mangá P&B, mande também uma <b>colorida</b> e marque só “🌈 cores reais” nela)</span></h3>
+  <div class="cr-grade" id="refs"></div>
+  <div class="cr-linha"><label class="cr-btn cr-sec" style="cursor:pointer;color:#fff;border-radius:6px;padding:6px 12px">➕ Adicionar imagem(ns)<input type="file" id="refUp" accept="image/*" multiple style="display:none"></label>
+    <span class="cr-dica" id="refEst"></span></div>
+  <label>💡 Inspirações <span class="cr-dica">(personagens famosos pra pegar UM aspecto — ex.: “a personalidade fria do Levi, o jeito de falar da Nami, a postura do Jotaro”)</span></label>
+  <textarea data-e="inspiracoes" rows="2">{{ p.entrada.inspiracoes }}</textarea>
+  <div class="cr-linha">
+    <label>🎨 Estilo <select data-e="estilo" style="width:auto">{% for k, v in estilos.items() %}<option value="{{ k }}" {% if p.entrada.estilo == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}<option value="outro" {% if p.entrada.estilo == 'outro' %}selected{% endif %}>✍ Outro (escrever)…</option></select></label>
+    <label id="lLivre" style="flex:1;min-width:240px">…qual <input data-e="estilo_livre" value="{{ p.entrada.estilo_livre }}" placeholder="ex.: expressionismo, vitral gótico, Moebius, cerâmica grega"></label>
+  </div>
+  <div class="cr-linha">
+    <label>🕰 Época <select data-e="epoca" style="width:auto">{% for k, v in epocas.items() %}<option value="{{ k }}" {% if p.entrada.epoca == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}<option value="outro" {% if p.entrada.epoca == 'outro' %}selected{% endif %}>✍ Outra…</option></select></label>
+    <label id="lEpoca" style="flex:1;min-width:200px">…qual <input data-e="epoca_livre" value="{{ p.entrada.epoca_livre }}" placeholder="ex.: 3200 d.C.; Brasil 1500"></label>
+    <label>🗺 De onde vem <select data-e="lugar" style="width:auto"><option value="">— nenhum lugar</option>{% for x in lugares %}<option value="{{ x.id }}" {% if p.entrada.lugar == x.id %}selected{% endif %}>{{ x.nome }} · {{ x.escala }}</option>{% endfor %}</select></label>
+    {% if p.entrada.lugar %}<a href="/criador-lugares/{{ p.entrada.lugar }}">abrir o lugar ↗</a>{% endif %}
+  </div>
+  <details open><summary style="cursor:pointer;font-weight:600">Detalhes (opcionais)</summary>
+    <div class="cr-campos" style="margin-top:6px">
+      <label>Gênero<input data-e="genero" value="{{ p.entrada.genero }}"></label>
+      <label>Idade aparente<input data-e="idade" value="{{ p.entrada.idade }}" placeholder="ex.: 19 anos"></label>
+      <label>Corpo / estatura<input data-e="corpo" value="{{ p.entrada.corpo }}" placeholder="ex.: alta e magra, 1,80 m"></label>
+      <label>Paleta de cores<input data-e="paleta" value="{{ p.entrada.paleta }}" placeholder="ex.: preto, vermelho e prata"></label>
+      <label>Sempre tem (marcas travadas)<input data-e="travas" value="{{ p.entrada.travas }}" placeholder="ex.: cicatriz no olho esquerdo, brinco de lua"></label>
+      <label>Evitar<input data-e="evitar" value="{{ p.entrada.evitar }}" placeholder="ex.: nada de armadura, sem asas"></label>
+      <label>Ideias de nome<input data-e="nomes_ideia" value="{{ p.entrada.nomes_ideia }}" placeholder="ex.: algo japonês que lembre neve"></label>
+      <label style="align-self:end"><input type="checkbox" data-e="original" style="width:auto" {% if p.entrada.original %}checked{% endif %}> ✨ bem original (nada de cópia)</label>
+    </div>
+  </details>
+</div>
+
+<!-- 2 · ficha -->
+<div class="cr-card">
+  <h2><span class="cr-num">2</span>📝 Ficha</h2>
+  <p class="cr-dica">A 🤖 IA olha as imagens numeradas, o que pegar de cada uma, as inspirações e o estilo e escreve a ficha — <b>a aparência em inglês</b> vai em todo pedido pro Flow (é ela que trava o personagem). Dá pra editar tudo.</p>
+  <div class="cr-linha"><button type="button" id="bFicha">🤖 Montar a ficha</button><span class="cr-dica" id="iaEst"></span></div>
+  <div id="nomes"></div>
+  <div class="cr-campos" id="ficha" style="margin-top:6px"></div>
+  <div class="cr-linha"><button type="button" id="bFichaSalvar" class="cr-sec">💾 Salvar a ficha</button><span class="cr-dica" id="fEst"></span></div>
+</div>
+
+<!-- 3 · design -->
+<div class="cr-card">
+  <h2><span class="cr-num">3</span>🎨 Design no Flow</h2>
+  <p class="cr-dica">Corpo inteiro no fundo verde (vira PNG transparente). <b>✔ Aprove</b> o melhor; <b>🎯 Variar</b> faz outras a partir de um, com o que mudar.</p>
+  <div class="cr-linha">
+    <label>Variações <select id="dN" style="width:auto">{% for k in range(1, max_var + 1) %}<option {% if k == max_var %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
+    <input id="dCorr" placeholder="o que mudar nesta rodada (opcional) — ex.: olhos mais finos, casaco mais curto" style="flex:1;min-width:260px">
+    <button type="button" id="bDesign">🚀 Gerar</button>
+    <label class="cr-btn cr-sec" style="cursor:pointer;color:#fff;border-radius:6px">📤 Meu design<input type="file" id="dUp" accept="image/*" style="display:none"></label>
+  </div>
+  <div class="cr-grade" id="design"></div>
+</div>
+
+<!-- 4 · poses -->
+<div class="cr-card">
+  <h2><span class="cr-num">4</span>🧍 Poses</h2>
+  <p class="cr-dica">O design aprovado vira a ⭐ mestre (já aprovada) de um projeto da aba 🧍 Personagens e os pacotes vão pro Flow — lá dá pra aprovar, refazer, criar roupas novas (👗 visuais) e baixar.</p>
+  <div class="cr-chips" id="pacotes">{% for k, v in pacotes.items() %}<label><input type="checkbox" value="{{ k }}" {% if k in ('giro', 'expressoes') %}checked{% endif %}>{{ v }}</label>{% endfor %}</div>
+  <label>✍ Poses suas <span class="cr-dica">(uma por linha, em inglês ou português — ex.: “segurando uma espada nas costas”, “dormindo encolhida”)</span></label>
+  <textarea id="pExtras" rows="2"></textarea>
+  <div class="cr-linha"><button type="button" id="bPoses">🧍 Gerar as poses</button><a id="lPod" target="_blank" style="display:none">abrir na aba 🧍 Personagens ↗</a><span class="cr-dica" id="pEst"></span></div>
+  <div class="cr-grade" id="poses"></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }};
+const ASPECTOS = {{ aspectos|tojson }};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+let P = null, timer = null, fichaSuja = false;
+const FICHA = [['aparencia_en', '🎨 Aparência (inglês — vai em todo pedido)', 4], ['aparencia_pt', 'Aparência (português)', 2], ['personalidade', '🧠 Personalidade', 3],
+  ['jeito_de_falar', '🗣 Jeito de falar', 2], ['bordoes', '💬 Bordões', 2], ['historia', '📜 História', 4], ['gostos', '❤ Gostos', 2], ['medos', '😨 Medos', 2],
+  ['voz', '🎙 Voz (pro TTS)', 2], ['paleta', '🎨 Paleta (HEX)', 1], ['mistura', '🧩 De onde veio cada coisa', 2], ['originalidade', '✨ Originalidade', 2]];
+
+async function api(url, dados) {
+  const op = { method: dados === undefined ? 'GET' : 'POST' };
+  if (dados instanceof FormData) op.body = dados;
+  else if (dados !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(dados); }
+  const r = await fetch(url, op); let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('HTTP ' + r.status)); return d;
+}
+function emFoco(box) { return box.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName); }
+
+async function recarregar() {
+  clearTimeout(timer);
+  try { P = await api(`/criador-personagens/${PID}/estado`); desenhar(); } catch (e) { barra('⚠ ' + e.message, 'erro'); }
+  const t = P && P.tarefa;
+  const esperando = (t && !t.fim) || (P && (P.design.variacoes.some(v => ['fila', 'gerando'].includes(v.estado))
+    || (P.poses_estado.itens || []).some(x => ['fila', 'gerando'].includes(x.estado))));
+  timer = setTimeout(recarregar, esperando ? 3500 : 15000);
+}
+function barra(msg, cls) { const b = $('barra'); b.className = 'cr-barra ' + (msg ? cls : ''); b.textContent = msg || ''; }
+function desenhar() {
+  $('tNome').textContent = P.nome;
+  $('lLivre').style.display = P.entrada.estilo === 'outro' ? '' : 'none';
+  $('lEpoca').style.display = P.entrada.epoca === 'outro' ? '' : 'none';
+  const t = P.tarefa;
+  if (t && !t.fim) barra('⏳ ' + t.rotulo + '…', 'on'); else if (t && t.erro) barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro'); else barra('');
+  $('iaEst').textContent = P.ia ? '' : '🤖 IA desligada — a ficha sai dos campos (ligue em 🤖 IA → 🧬 Criador de personagens) ou escreva à mão';
+  desenharRefs(); desenharFicha(); desenharDesign(); desenharPoses();
+}
+// 1 · refs
+function desenharRefs() {
+  if (emFoco($('refs'))) return;
+  $('refs').innerHTML = P.entrada.refs.map((r, k) => `<div class="cr-ref" data-arq="${esc(r.arquivo)}"><span class="n">${k + 1}</span>
+    <img src="/criador-personagens/${PID}/arquivo/refs/${esc(r.arquivo)}">
+    <div class="cr-chips">${Object.entries(ASPECTOS).map(([a, rot]) => `<label><input type="checkbox" data-pegar="${a}" ${r.pegar.includes(a) ? 'checked' : ''}>${esc(rot)}</label>`).join('')}</div>
+    <input data-nota value="${esc(r.nota || '')}" placeholder="nota (ex.: só a franja; a cor mais escura)">
+    <div class="cr-linha"><button type="button" class="cr-mini cr-sec" data-mover="-1">◀</button><button type="button" class="cr-mini cr-sec" data-mover="1">▶</button><button type="button" class="cr-mini cr-perigo" data-apagar>✕</button></div></div>`).join('')
+    || '<p class="cr-dica">Nenhuma imagem — tudo vai sair da descrição.</p>';
+  $('refEst').textContent = P.entrada.refs.length ? (P.mapa_refs || []).join(' · ') : '';
+}
+$('refUp').addEventListener('change', async (e) => {
+  for (const f of e.target.files) { const fd = new FormData(); fd.append('arquivo', f); fd.append('pegar', 'tudo'); try { await api(`/criador-personagens/${PID}/refs`, fd); } catch (er) { alert(er.message); break; } }
+  e.target.value = ''; recarregar();
+});
+$('refs').addEventListener('change', async (e) => {
+  const box = e.target.closest('[data-arq]'); if (!box) return;
+  const dados = {};
+  if (e.target.dataset.pegar !== undefined) dados.pegar = [...box.querySelectorAll('[data-pegar]:checked')].map(i => i.dataset.pegar);
+  if (e.target.hasAttribute('data-nota')) dados.nota = e.target.value;
+  try { await api(`/criador-personagens/${PID}/refs/${encodeURIComponent(box.dataset.arq)}`, dados); document.activeElement.blur(); recarregar(); } catch (er) { alert(er.message); }
+});
+$('refs').addEventListener('click', async (e) => {
+  const box = e.target.closest('[data-arq]'); if (!box) return;
+  let dados = null;
+  if (e.target.dataset.mover) dados = { mover: +e.target.dataset.mover };
+  if (e.target.hasAttribute('data-apagar') && confirm('Tirar esta imagem?')) dados = { apagar: true };
+  if (!dados) return;
+  try { await api(`/criador-personagens/${PID}/refs/${encodeURIComponent(box.dataset.arq)}`, dados); recarregar(); } catch (er) { alert(er.message); }
+});
+document.querySelectorAll('[data-e]').forEach(el => el.addEventListener('change', async () => {
+  const v = el.type === 'checkbox' ? el.checked : el.value;
+  try { await api(`/criador-personagens/${PID}/dados`, { [el.dataset.e]: v }); recarregar(); } catch (er) { alert(er.message); }
+}));
+// 2 · ficha
+function desenharFicha() {
+  const f = P.ficha || {};
+  $('nomes').innerHTML = (f.nomes || []).length ? '<span class="cr-dica">💡 nomes (clique pra usar):</span> ' + f.nomes.map(x => `<span class="cr-nome" data-nome="${esc(x.nome)}" title="${esc(x.porque)}">${esc(x.nome)}</span>`).join('') : '';
+  if (fichaSuja || emFoco($('ficha'))) return;
+  $('ficha').innerHTML = `<label>Nome<input data-f="nome" value="${esc(P.nome)}"></label>` + FICHA.map(([k, rot, l]) => `<label>${rot}<textarea data-f="${k}" rows="${l}">${esc(f[k] || '')}</textarea></label>`).join('');
+}
+$('ficha').addEventListener('input', () => { fichaSuja = true; $('fEst').textContent = '✏ não salvo'; });
+$('nomes').addEventListener('click', (e) => { const n = e.target.dataset.nome; if (!n) return; const i = $('ficha').querySelector('[data-f=nome]'); i.value = n; fichaSuja = true; salvarFicha(); });
+async function salvarFicha() {
+  const d = {}; $('ficha').querySelectorAll('[data-f]').forEach(i => d[i.dataset.f] = i.value);
+  try { await api(`/criador-personagens/${PID}/ficha`, d); fichaSuja = false; $('fEst').textContent = '✔ salva'; recarregar(); } catch (er) { alert(er.message); }
+}
+$('bFichaSalvar').addEventListener('click', salvarFicha);
+$('bFicha').addEventListener('click', async () => {
+  if (fichaSuja && !confirm('A ficha tem mudanças não salvas — a IA vai escrever por cima. Continuar?')) return;
+  try { fichaSuja = false; await api(`/criador-personagens/${PID}/ficha/ia`, {}); recarregar(); } catch (er) { alert(er.message); }
+});
+// 3 · design
+function desenharDesign() {
+  const vs = P.design.variacoes.slice().reverse();
+  $('design').innerHTML = vs.map(v => {
+    const ap = P.aprovada === v.id, esp = ['fila', 'gerando'].includes(v.estado);
+    return `<div class="cr-var ${ap ? 'ok' : ''}" data-v="${v.id}">${v.arquivo ? `<img class="cr-xadrez" src="/criador-personagens/${PID}/arquivo/design/${esc(v.arquivo)}">` : `<div class="vaz cr-xadrez">${esc(v.estado === 'erro' ? '❌ ' + (v.erro || 'erro') : v.msg || '⏳')}</div>`}
+      ${ap ? '<div style="font-weight:700;color:#16a34a">✔ aprovado</div>' : ''}${v.aviso ? `<div class="cr-dica">⚠ ${esc(v.aviso)}</div>` : ''}${v.correcao ? `<div class="cr-dica">✏ ${esc(v.correcao)}</div>` : ''}
+      <div class="cr-linha">${v.arquivo && !ap ? '<button type="button" class="cr-mini" data-aprovar>✔ Aprovar</button>' : ''}${v.arquivo ? '<button type="button" class="cr-mini cr-sec" data-variar>🎯 Variar desta</button>' : ''}${esp ? '' : '<button type="button" class="cr-mini cr-perigo" data-apagar>🗑</button>'}</div></div>`;
+  }).join('') || '<p class="cr-dica">Nenhum design ainda.</p>';
+}
+$('bDesign').addEventListener('click', async () => {
+  try { const d = await api(`/criador-personagens/${PID}/design/gerar`, { n: +$('dN').value, correcao: $('dCorr').value }); if (d.aviso) alert(d.aviso); recarregar(); } catch (er) { alert(er.message); }
+});
+$('dUp').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(`/criador-personagens/${PID}/design/enviar`, fd); recarregar(); } catch (er) { alert(er.message); } e.target.value = ''; });
+$('design').addEventListener('click', async (e) => {
+  const box = e.target.closest('[data-v]'); if (!box) return; const v = box.dataset.v;
+  try {
+    if (e.target.hasAttribute('data-aprovar')) await api(`/criador-personagens/${PID}/design/${v}/aprovar`, {});
+    else if (e.target.hasAttribute('data-apagar')) { if (!confirm('Apagar esta variação?')) return; await api(`/criador-personagens/${PID}/design/${v}/apagar`, {}); }
+    else if (e.target.hasAttribute('data-variar')) { const c = prompt('O que mudar a partir desta? (ex.: cabelo mais comprido, sem o colete)', ''); if (c === null) return; const d = await api(`/criador-personagens/${PID}/design/gerar`, { n: 2, correcao: c, a_partir: v }); if (d.aviso) alert(d.aviso); }
+    else return;
+    recarregar();
+  } catch (er) { alert(er.message); }
+});
+// 4 · poses
+function desenharPoses() {
+  const st = P.poses_estado || {};
+  $('lPod').style.display = st.tem ? '' : 'none'; if (st.tem) $('lPod').href = `/personagens-pod/${st.pid}`;
+  $('bPoses').disabled = !P.aprovada; $('bPoses').title = P.aprovada ? '' : 'aprove um design primeiro';
+  $('poses').innerHTML = (st.itens || []).map(x => `<div class="cr-pose">${x.img ? `<img class="cr-xadrez" src="/criador-personagens/${PID}/pose/${esc(x.img)}">` : `<div class="vaz cr-xadrez">${esc(x.estado === 'erro' ? '❌ ' + (x.erro || '') : ['fila', 'gerando'].includes(x.estado) ? '⏳ no Flow' : 'ainda não gerada')}</div>`}
+    <div class="cr-dica" style="margin:4px 0 0">${esc(x.descricao)}${x.estado === 'aprovada' ? ' ✔' : ''}</div></div>`).join('');
+}
+$('bPoses').addEventListener('click', async () => {
+  const pacotes = [...document.querySelectorAll('#pacotes input:checked')].map(i => i.value);
+  try { const d = await api(`/criador-personagens/${PID}/poses`, { pacotes, extras: $('pExtras').value }); $('pEst').textContent = `🚀 ${d.enviadas} pose(s) pro Flow` + (d.aviso ? ' — ' + d.aviso : ''); recarregar(); } catch (er) { alert(er.message); }
+});
+recarregar();
+</script>
+{% endblock %}

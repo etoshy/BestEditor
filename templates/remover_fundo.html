@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}🧽 Remover fundo{% endblock %}
+{% block content %}
+<style>
+  .rf-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .rf-dica { color: var(--mudo); font-size: .86rem; }
+  .rf-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+  .rf-linha > * { margin: 0; }
+  .rf-solta { border: 2px dashed var(--borda); border-radius: 12px; padding: 22px; text-align: center; cursor: pointer; }
+  .rf-solta.on { border-color: var(--acento); background: var(--acento-suave); }
+  .rf-par { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .rf-par img { width: 100%; max-height: 420px; object-fit: contain; border-radius: 8px; }
+  .rf-xadrez { background: repeating-conic-gradient(#cbd5e1 0 25%, #fff 0 50%) 50% / 18px 18px; }
+  .rf-res { margin-top: 10px; }
+</style>
+<h1>🧽 Remover fundo</h1>
+<p class="rf-dica">Fundo <b>verde</b> é o que sai mais limpo (chroma key — o mesmo das poses dos 🧍 Personagens). Também tira fundo branco
+  ou de uma cor lisa. <b>📦 Zip:</b> volta o mesmo zip, nas mesmas pastas e com os mesmos nomes, só que cada imagem vira <b>PNG transparente</b>
+  (o resto do zip volta igual). <b>🖼 Imagem:</b> volta o PNG (várias = um zip).</p>
+
+<div class="rf-card">
+  <div class="rf-linha">
+    <label>Fundo <select id="modo" style="width:auto">{% for k, v in modos.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label><input type="checkbox" id="recortar" style="width:auto"> ✂ recortar na figura</label>
+    <label>margem <input id="margem" type="number" value="12" min="0" max="400" style="width:70px"> px</label>
+    <label>lado máximo <input id="ladoMax" type="number" value="0" min="0" max="8000" style="width:84px"> px <span class="rf-dica">(0 = igual)</span></label>
+  </div>
+</div>
+
+<div class="rf-par" style="margin-top:14px">
+  <div class="rf-card" style="margin:0">
+    <h3 style="margin:0 0 8px">📦 Zip com imagens</h3>
+    <label class="rf-solta" id="soltaZip">Arraste o .zip aqui ou clique<input type="file" id="fZip" accept=".zip,application/zip" style="display:none"></label>
+  </div>
+  <div class="rf-card" style="margin:0">
+    <h3 style="margin:0 0 8px">🖼 Imagem(ns)</h3>
+    <label class="rf-solta" id="soltaImg">Arraste a(s) imagem(ns) aqui ou clique<input type="file" id="fImg" accept="image/*" multiple style="display:none"></label>
+  </div>
+</div>
+
+<div class="rf-card rf-res" id="res" style="display:none"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+function opcoes(fd) { fd.append('modo', $('modo').value); fd.append('recortar', $('recortar').checked ? '1' : '0'); fd.append('margem', $('margem').value); fd.append('lado_max', $('ladoMax').value); return fd; }
+const MODO_TXT = { verde: '🟩 verde', branco: '⬜ branco', cor: '🎨 cor lisa', ja_transparente: '✔ já era transparente' };
+async function enviar(url, fd, original) {
+  const res = $('res'); res.style.display = ''; res.innerHTML = '⏳ tirando o fundo…';
+  try {
+    const r = await fetch(url, { method: 'POST', body: opcoes(fd) });
+    if (!r.ok) { let d = {}; try { d = await r.json(); } catch (_) {} throw new Error(d.erro || ('HTTP ' + r.status)); }
+    const blob = await r.blob();
+    const nome = decodeURIComponent(r.headers.get('X-Nome') || 'sem_fundo');
+    let rel = {}; try { rel = JSON.parse(decodeURIComponent(r.headers.get('X-Relatorio') || '{}')); } catch (_) {}
+    const link = URL.createObjectURL(blob);
+    const modos = Object.entries(rel.modos || {}).map(([m, n]) => `${MODO_TXT[m] || m}: ${n}`).join(' · ');
+    let html = `<div class="rf-linha"><b>✔ ${rel.imagens || 0} imagem(ns)</b>${rel.copiados ? ` · ${rel.copiados} outro(s) arquivo(s) iguais` : ''}${modos ? ` · ${esc(modos)}` : ''}
+      <a class="btn" href="${link}" download="${esc(nome)}" style="width:auto">⬇ Baixar ${esc(nome)}</a></div>`;
+    if (blob.type === 'image/png' && original) html += `<div class="rf-par"><div><div class="rf-dica">antes</div><img src="${original}"></div><div><div class="rf-dica">depois</div><img class="rf-xadrez" src="${link}"></div></div>`;
+    if ((rel.avisos || []).length) html += `<details ${rel.avisos.length < 6 ? 'open' : ''}><summary class="rf-dica">⚠ ${rel.avisos.length} aviso(s)</summary>${rel.avisos.map(a => `<div class="rf-dica">${esc(a)}</div>`).join('')}</details>`;
+    res.innerHTML = html;
+  } catch (e) { res.innerHTML = '❌ ' + esc(e.message); }
+}
+function soltar(area, input, fn) {
+  area.addEventListener('dragover', (e) => { e.preventDefault(); area.classList.add('on'); });
+  area.addEventListener('dragleave', () => area.classList.remove('on'));
+  area.addEventListener('drop', (e) => { e.preventDefault(); area.classList.remove('on'); fn([...e.dataTransfer.files]); });
+  input.addEventListener('change', () => { fn([...input.files]); input.value = ''; });
+}
+soltar($('soltaZip'), $('fZip'), (fs) => { const f = fs[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); enviar('/remover-fundo/zip', fd); });
+soltar($('soltaImg'), $('fImg'), (fs) => { if (!fs.length) return; const fd = new FormData(); fs.forEach(f => fd.append('arquivos', f)); enviar('/remover-fundo/imagens', fd, fs.length === 1 ? URL.createObjectURL(fs[0]) : null); });
+</script>
+{% endblock %}

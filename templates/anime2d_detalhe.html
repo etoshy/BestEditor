@@ -61,6 +61,9 @@
   .an-design img.ok { border-color: #22c55e; }
   .ly-el { position: absolute; cursor: move; }
   .ly-prop { height: auto; }
+  .an-ver { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 2px 0; }
+  .an-ver .an-mini { padding: 0 6px !important; min-width: 0; }
+  .ly-vert { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; z-index: 9; }
   .ly-lugar { width: 0; pointer-events: none; }
   .ly-lugar::before { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); height: 100%; aspect-ratio: 1/4;
     background: rgba(255,213,74,.18); border: 2px dashed #ffd54a; border-radius: 45% 45% 6px 6px; pointer-events: none; }
@@ -100,6 +103,9 @@
     <label style="margin:0;"><input type="checkbox" id="fNarr" {% if p.narrador.ativo %}checked{% endif %} style="width:auto"> 🎙 narrador quando a história precisar</label>
     <label style="margin:0;"><input type="checkbox" id="fLeg" {% if p.legendas %}checked{% endif %} style="width:auto"> 💬 legendas</label>
     <label style="margin:0;" title="Quando a câmera anda (pan/zoom) o fundo anda devagar, personagens e objetos um pouco mais e a camada da frente bem mais — dá profundidade. Na câmera tremida a frente treme mais."><input type="checkbox" id="fPar" {% if p.paralaxe %}checked{% endif %} style="width:auto"> 🌄 parallax (camadas em velocidades diferentes)</label>
+    <label style="margin:0;" title="Ritmo de anime de TV: fala ou narração mais longa que ~3 s num plano parado vira 2–4 cortes (o plano pedido, close de quem fala, médio de quem escuta, o aberto). Os personagens respiram, dão um pulinho quando a emoção muda e o impacto (câmera tremida) pisca branco."><input type="checkbox" id="fCob" {% if p.cobertura is not defined or p.cobertura %}checked{% endif %} style="width:auto"> 🎬 cortes automáticos nas falas longas</label>
+    <label style="margin:0;" title="Depois de N segundos no mesmo ângulo, a câmera troca sozinha pra outro ÂNGULO do mesmo cômodo (pode repetir) — só num corte que não é destaque e só pra um ângulo em que os lugares de quem está em cena existem (vai pra onde a ação está). 0 = não troca. Precisa de ângulos criados (angulo_de).">🎥 trocar de ângulo a cada <input id="fAng" type="number" min="0" max="120" step="1" value="{{ p.troca_angulo_s if p.troca_angulo_s is defined else 10 }}" style="width:56px"> s</label>
+    <label style="margin:0;" title="Um texto simples no começo do vídeo (os primeiros ~2,5 s), editável depois no editor — ex.: Prólogo, Capítulo 1">🔤 texto de abertura <input id="fAbre" value="{{ p.abertura_texto or '' }}" placeholder="ex.: Prólogo" style="width:140px"></label>
   </div>
   <div class="an-linha"><button type="button" id="bSalvarDados">💾 Salvar</button><span id="dEst" class="an-dica"></span></div>
 
@@ -252,6 +258,11 @@
     <span id="eEst" class="an-dica"></span>
   </div>
   <div id="eAvisos" class="an-dica an-av"></div>
+  <div class="an-linha" style="margin-top:8px;">
+    <button type="button" id="bRevisar" class="an-sec" title="desenha um quadro de cada corte, a IA aponta os erros (flutuando, tamanho, atravessando, plano ruim, falta corte) e corrige o que dá sozinha — e confere de novo">🔎 IA revisa os quadros</button>
+    <span class="an-dica">posições, planos, ângulos e cortes de reação entram sozinhos; regerar imagem fica como sugestão</span>
+  </div>
+  <div id="revisao" class="an-dica" style="white-space:normal"></div>
   <details style="margin-top:8px;"><summary class="an-dica" style="cursor:pointer">🕘 registro</summary><div class="an-log" id="log"></div></details>
 </div>
 
@@ -261,7 +272,8 @@
   <div class="rc-palco" id="rcPalco"><img id="rcImg" draggable="false"><div class="rc-caixa" id="rcCaixa" style="display:none"></div></div></div>
 <div id="layout" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:12px">
   <div class="an-linha" style="color:#fff;margin:0;flex-wrap:wrap"><b id="lyTitulo"></b>
-    <label class="an-dica" style="color:#ddd">altura de quem está em pé no chão da frente <input type="range" id="lyAlt" min="0.15" max="1.2" step="0.01"></label>
+    <label class="an-dica" style="color:#ddd">altura de quem está em pé na frente <input type="range" id="lyAlt" min="0.15" max="1.2" step="0.01"></label>
+    <label class="an-dica" style="color:#ddd">tamanho no fundo <input type="range" id="lyFundoEsc" min="0.2" max="1" step="0.01"></label>
     <button type="button" class="an-mini an-sec" id="lyNovoLugar">➕ lugar</button>
     <button type="button" class="an-mini an-sec" id="lyNovoProp">➕ móvel</button>
     <button type="button" class="an-mini an-sec" id="lyIA" title="a IA olha o fundo e posiciona os lugares e os móveis">🤖 IA posiciona</button>
@@ -314,7 +326,8 @@ document.addEventListener('change', async e => {
       $('fTitulo').value = P.titulo || ''; $('hTitulo').textContent = P.titulo || ''; $('fPremissa').value = P.premissa || '';
       $('fEstilo').value = P.estilo; $('fProp').value = P.proporcao; $('fDur').value = P.duracao_alvo || 0;
       $('fEstiloExtra').value = P.estilo_extra || ''; $('fIdioma').value = P.idioma || '';
-      $('fNarr').checked = !!(P.narrador || {}).ativo; $('fLeg').checked = !!P.legendas; $('fPar').checked = P.paralaxe !== false;
+      $('fNarr').checked = !!(P.narrador || {}).ativo; $('fLeg').checked = !!P.legendas; $('fPar').checked = P.paralaxe !== false; if ($('fCob')) $('fCob').checked = P.cobertura !== false; if ($('fAbre') && document.activeElement !== $('fAbre')) $('fAbre').value = P.abertura_texto || '';
+  if ($('fAng') && document.activeElement !== $('fAng')) $('fAng').value = P.troca_angulo_s != null ? P.troca_angulo_s : 10;
     }
   } catch (err) { avisar($('zEst'), '❌ ' + err.message, 'an-err'); }
 });
@@ -380,17 +393,29 @@ function abrirLayout(lid) {
   const l = P.locais.find(x => x.id === lid); if (!l) return;
   if (!(l.img || {}).arquivo) { alert('Gere (ou envie) o fundo deste local antes.'); return; }
   const lay = (P.layout || {})[lid] || {};
-  LY = { lid, alt: lay.alt || 0.62, lugares: JSON.parse(JSON.stringify(lay.lugares || [])),
+  const ch = lay.chao || {};
+  LY = { lid, alt: lay.alt || 0.62, escFundo: ch.esc_fundo || 0.6,
+         area: (ch.area && ch.area.length >= 3) ? JSON.parse(JSON.stringify(ch.area)) : [[0.12, 0.74], [0.88, 0.74], [0.99, 0.99], [0.01, 0.99]],
+         lugares: JSON.parse(JSON.stringify(lay.lugares || [])),
          props: (l.props || []).map(pr => Object.assign({ x: 0.5, y: pr.camada === 'atras' ? 0.8 : 1.0, w: pr.camada === 'atras' ? 0.16 : 0.35 }, pr)), sel: null };
   $('lyFundo').src = U('imagens', l.img.arquivo);
   $('lyTitulo').textContent = '📐 ' + l.nome;
-  $('lyAlt').value = LY.alt;
+  $('lyAlt').value = LY.alt; $('lyFundoEsc').value = LY.escFundo;
   $('layout').style.display = 'flex';
   desenharLayout();
+}
+function escalaEm(y) {  // 📏 a perspectiva: 1 na frente da área livre, escFundo no fundo
+  const ys = LY.area.map(q => q[1]), y0 = Math.max(...ys), yf = Math.min(...ys);
+  if (y0 - yf < 0.02) return 1;
+  const t = Math.max(0, Math.min(1.2, (y - yf) / (y0 - yf)));
+  return Math.round((LY.escFundo + (1 - LY.escFundo) * t) * 1000) / 1000;
 }
 function desenharLayout() {
   const st = $('lyPalco'), r = st.getBoundingClientRect();
   st.querySelectorAll('.ly-el').forEach(x => x.remove());
+  st.insertAdjacentHTML('beforeend', `<svg class="ly-el" viewBox="0 0 1000 1000" preserveAspectRatio="none" style="left:0;top:0;width:100%;height:100%;z-index:1;pointer-events:none;cursor:default">
+    <polygon points="${LY.area.map(q => `${q[0] * 1000},${q[1] * 1000}`).join(' ')}" fill="rgba(34,197,94,.18)" stroke="#22c55e" stroke-width="3" stroke-dasharray="10 6"/></svg>`);
+  LY.area.forEach((q, i) => st.insertAdjacentHTML('beforeend', `<div class="ly-el ly-vert" data-ly="a${i}" title="canto do chão livre (onde dá pra andar)" style="left:${q[0] * 100}%;top:${q[1] * 100}%"></div>`));
   const H = r.height || 1;
   const add = (html) => { st.insertAdjacentHTML('beforeend', html); };
   for (const [i, pr] of LY.props.entries()) {
@@ -399,7 +424,8 @@ function desenharLayout() {
       style="left:${(pr.x - pr.w / 2) * 100}%;width:${pr.w * 100}%;bottom:${(1 - pr.y) * 100}%;z-index:${pr.camada === 'atras' ? 2 : 6}">`);
   }
   for (const [i, lg] of LY.lugares.entries()) {
-    const h = LY.alt * (lg.escala || 1) * (lg.sentado ? 0.7 : 1) * 100;
+    if (lg.corpo !== 'cintura' && lg.auto !== false) lg.escala = escalaEm(lg.y);
+    const h = LY.alt * (lg.escala || 1) * (lg.corpo === 'cintura' ? 0.5 : lg.sentado ? 0.7 : 1) * 100;
     add(`<div class="ly-el ly-lugar${LY.sel === 'l' + i ? ' ly-sel' : ''}${lg.sentado ? ' ly-sentado' : ''}" data-ly="l${i}"
       style="left:${lg.x * 100}%;bottom:${(1 - lg.y) * 100}%;height:${h}%;z-index:8"><span title="arraste pelos pés">${esc(lg.nome)}${lg.sentado ? ' 🪑' : ''}</span></div>`);
   }
@@ -408,19 +434,27 @@ function desenharLayout() {
   if (s && s[0] === 'l') {
     const lg = LY.lugares[+s.slice(1)];
     pn.innerHTML = `<b>📍 ${esc(lg.nome)}</b> <label class="an-dica">escala <input type="range" min="0.3" max="2" step="0.02" value="${lg.escala || 1}" data-lyk="escala"></label>
+      <label class="an-dica"><input type="checkbox" ${lg.auto !== false && lg.corpo !== 'cintura' ? 'checked' : ''} data-lyk="auto" style="width:auto"> escala pela perspectiva</label>
       <label class="an-dica"><input type="checkbox" ${lg.sentado ? 'checked' : ''} data-lyk="sentado" style="width:auto"> sentado</label>
+      <select data-lyk="corpo" style="width:auto"><option value="inteiro" ${lg.corpo !== 'cintura' ? 'selected' : ''}>corpo inteiro (os pés aqui)</option><option value="cintura" ${lg.corpo === 'cintura' ? 'selected' : ''}>da cintura pra cima — atrás de mesa/balcão (a cintura aqui)</option></select>
       ${lg.padrao ? '' : '<button type="button" class="an-mini an-perigo" data-ly-del>🗑</button>'}`;
   } else if (s && s[0] === 'p') {
     const pr = LY.props[+s.slice(1)];
     pn.innerHTML = `<b>🪑 ${esc(pr.nome)}</b> <label class="an-dica">largura <input type="range" min="0.03" max="1.2" step="0.01" value="${pr.w}" data-lyk="w"></label>
       <select data-lyk="camada" style="width:auto"><option value="atras" ${pr.camada === 'atras' ? 'selected' : ''}>atrás do personagem</option><option value="frente" ${pr.camada !== 'atras' ? 'selected' : ''}>na frente</option></select>`;
-  } else pn.innerHTML = '<span class="an-dica" style="color:#ddd">Arraste a etiqueta de um lugar (fica nos pés da silhueta) ou um móvel; clique pra ajustar o tamanho. A silhueta mostra o tamanho de quem fica ali.</span>';
+  } else pn.innerHTML = '<span class="an-dica" style="color:#ddd">🟩 a área verde é o CHÃO LIVRE (onde dá pra ficar em pé e andar — arraste os cantos). Arraste a etiqueta de um lugar (nos pés da silhueta) ou um móvel; clique pra ajustar. A silhueta mostra o tamanho de quem fica ali (pela perspectiva).</span>';
 }
 (function () {
   let arr = null;
   $('lyPalco').addEventListener('pointerdown', e => {
     const el = e.target.closest('[data-ly]'); if (!el) { LY.sel = null; desenharLayout(); return; }
     LY.sel = el.dataset.ly; const r = $('lyPalco').getBoundingClientRect();
+    if (LY.sel[0] === 'a') {  // um canto do chão livre
+      const q = LY.area[+LY.sel.slice(1)];
+      arr = { o: { get x() { return q[0]; }, set x(v) { q[0] = Math.max(0, Math.min(1, v)); }, get y() { return q[1]; }, set y(v) { q[1] = Math.max(0.1, Math.min(1.05, v)); } },
+              x0: e.clientX, y0: e.clientY, ox: q[0], oy: q[1], w: r.width, h: r.height };
+      LY.sel = null; e.preventDefault(); return;
+    }
     const o = LY.sel[0] === 'l' ? LY.lugares[+LY.sel.slice(1)] : LY.props[+LY.sel.slice(1)];
     arr = { o, x0: e.clientX, y0: e.clientY, ox: o.x, oy: o.y, w: r.width, h: r.height };
     e.preventDefault(); desenharLayout();
@@ -437,10 +471,14 @@ $('lyProp').addEventListener('input', e => {
   const k = e.target.dataset.lyk; if (!k || !LY.sel) return;
   const o = LY.sel[0] === 'l' ? LY.lugares[+LY.sel.slice(1)] : LY.props[+LY.sel.slice(1)];
   o[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'range' ? +e.target.value : e.target.value;
+  if (k === 'escala') o.auto = false;
+  if (k === 'w') o.w_manual = true;
+  if (k === 'corpo' && o.corpo === 'cintura') o.sentado = true;
   desenharLayout();
 });
 $('lyProp').addEventListener('click', e => { if (e.target.closest('[data-ly-del]')) { LY.lugares.splice(+LY.sel.slice(1), 1); LY.sel = null; desenharLayout(); } });
 $('lyAlt').addEventListener('input', e => { LY.alt = +e.target.value; desenharLayout(); });
+$('lyFundoEsc').addEventListener('input', e => { LY.escFundo = +e.target.value; desenharLayout(); });
 $('lyNovoLugar').addEventListener('click', () => {
   const nome = prompt('Nome do lugar (ex.: atrás da mesa, na porta, no sofá):'); if (!nome) return;
   LY.lugares.push({ nome, x: 0.5, y: 0.85, escala: 1, sentado: confirm('É um lugar onde a pessoa fica SENTADA?') });
@@ -454,8 +492,9 @@ $('lyNovoProp').addEventListener('click', async () => {
         alert('Móvel criado — gere a imagem dele na seção 5 (🚀) ou mande a sua (📁).'); } catch (er) { alert(er.message); }
 });
 async function salvarLayout(fechar = true) {
-  await api(`/anime2d/${PID}/local/${LY.lid}/layout`, { lugares: LY.lugares, props: LY.props.map(p => ({ id: p.id, x: p.x, y: p.y, w: p.w, camada: p.camada })),
-    chao: { y: Math.max(...LY.lugares.filter(l => l.padrao).map(l => l.y), 0.9), alt: LY.alt } });
+  const ys = LY.area.map(q => q[1]);
+  await api(`/anime2d/${PID}/local/${LY.lid}/layout`, { lugares: LY.lugares, props: LY.props.map(p => ({ id: p.id, x: p.x, y: p.y, w: p.w, camada: p.camada, w_manual: !!p.w_manual })),
+    chao: { y: Math.max(...ys), alt: LY.alt, y_fundo: Math.min(...ys), esc_fundo: LY.escFundo, area: LY.area } });
   if (fechar) { $('layout').style.display = 'none'; recarregar(); }
 }
 $('lySalvar').addEventListener('click', () => salvarLayout().catch(er => alert(er.message)));
@@ -463,6 +502,21 @@ $('lyFechar').addEventListener('click', () => { $('layout').style.display = 'non
 $('lyIA').addEventListener('click', async () => { try { await salvarLayout(false); await api(`/anime2d/${PID}/local/${LY.lid}/ia`, {}); $('layout').style.display = 'none'; recarregar(); } catch (er) { alert(er.message); } });
 window.addEventListener('resize', () => { if (LY && $('layout').style.display === 'flex') desenharLayout(); });
 $('imgs').addEventListener('click', e => { const b = e.target.closest('[data-layout]'); if (b) abrirLayout(b.dataset.layout); });
+$('imgs').addEventListener('click', async e => {
+  const s = e.target.closest('[data-story]'), l = e.target.closest('[data-story-ler]');
+  try {
+    if (s) { await api(`/anime2d/${PID}/local/${s.dataset.story}/storyboard`, {}); recarregar(); }
+    if (l) { await api(`/anime2d/${PID}/local/${l.dataset.storyLer}/storyboard/ler`, {}); recarregar(); }
+  } catch (er) { alert(er.message); }
+});
+$('imgs').addEventListener('click', async e => {
+  const b = e.target.closest('[data-ver-arq]'); if (!b) return; const c = b.closest('[data-alvo]');
+  try { await api(`/anime2d/${PID}/versao`, { alvo: c.dataset.alvo, arquivo: b.dataset.verArq }); recarregar(); } catch (er) { alert(er.message); }
+});
+$('poses').addEventListener('click', async e => {
+  const b = e.target.closest('[data-pv]'); if (!b) return; const c = b.closest('[data-cid]');
+  try { await api(`/anime2d/${PID}/pose/${c.dataset.cid}/versao`, { arquivo: b.dataset.arq, idx: +b.dataset.pv }); recarregar(); } catch (er) { alert(er.message); }
+});
 function avisar(el, msg, cls) { el.className = 'an-dica ' + (cls || ''); el.textContent = msg; }
 function focoEm(el) { return el && el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName); }
 const U = (pasta, nome) => `/anime2d/${PID}/arquivo/${pasta}/${encodeURIComponent(nome)}`;
@@ -489,6 +543,7 @@ function desenhar() {
   $('pT').max = Math.max(1, Math.ceil(P.duracao || 1));
   $('plEst').textContent = P.ia ? '' : '⚠ IA desligada — copie o prompt e cole a resposta de outra IA';
   $('log').textContent = (P.log || []).slice().reverse().join('\n');
+  desenharRevisao();
   if (P.editor && P.editor.job_id && !$('eEst').dataset.fixo) $('eEst').innerHTML = `já mandado: <a href="/job/${esc(P.editor.job_id)}/edit-segments" target="_blank">abrir no editor ↗</a> (mandar de novo cria outro)`;
 }
 
@@ -497,11 +552,22 @@ $('bSalvarDados').addEventListener('click', async () => {
   try {
     await api(`/anime2d/${PID}/dados`, { titulo: $('fTitulo').value, premissa: $('fPremissa').value, estilo: $('fEstilo').value, proporcao: $('fProp').value,
       duracao_alvo: $('fDur').value, estilo_extra: $('fEstiloExtra').value, idioma: $('fIdioma').value,
-      narrador: { ativo: $('fNarr').checked, voz: (P.narrador || {}).voz || '' }, legendas: $('fLeg').checked, paralaxe: $('fPar').checked });
+      narrador: { ativo: $('fNarr').checked, voz: (P.narrador || {}).voz || '' }, legendas: $('fLeg').checked, paralaxe: $('fPar').checked, cobertura: $('fCob').checked, abertura_texto: $('fAbre').value, troca_angulo_s: +$('fAng').value });
     $('hTitulo').textContent = $('fTitulo').value; avisar($('dEst'), '✔ salvo', 'an-ok'); recarregar();
   } catch (e) { avisar($('dEst'), '❌ ' + e.message, 'an-err'); }
 });
 $('bExemplo').addEventListener('click', () => { if ($('fPremissa').value.trim() && !confirm('Trocar o texto atual pelo exemplo?')) return; $('fPremissa').value = $('exemplo').textContent; $('fPremissa').focus(); });
+function desenharRevisao() {
+  const r = P.revisao; if (!r) { $('revisao').innerHTML = ''; return; }
+  const linhas = [];
+  for (const ro of r.rodadas || []) {
+    linhas.push(`<b>Rodada ${ro.n}</b> · ${ro.quadros} quadro(s) · ${(ro.problemas || []).length} problema(s)`);
+    for (const x of ro.problemas || []) linhas.push(`<div style="display:flex;gap:6px;align-items:center;margin:2px 0"><a href="${U('imagens', x.img)}" target="_blank"><img src="${U('imagens', x.img)}" style="width:96px;border-radius:4px"></a><span>${x.feito ? '✅ ' + esc(x.feito) + ' — ' : (x.acao === 'regerar' ? '🔁 ' : '📝 ')}${esc(x.descricao)}</span></div>`);
+  }
+  if ((r.sugestoes || []).length) linhas.push('<b>Pra regerar (Refazer com pedido):</b><br>' + r.sugestoes.map(esc).join('<br>'));
+  $('revisao').innerHTML = linhas.join('');
+}
+$('bRevisar').addEventListener('click', async () => { try { await api(`/anime2d/${PID}/ia/revisar`, {}); recarregar(); } catch (e) { alert(e.message); } });
 function desenharAudio() {
   const au = P.audio || {};
   $('auEst').textContent = P.modo_audio ? `— ${au.nome || 'áudio'} (${mmss(au.dur)}) · ${(au.transcricao || []).length} trecho(s)` : '— nenhum';
@@ -599,7 +665,9 @@ $('bNovoItem').addEventListener('click', () => novo('itens', 'novoItem', { tipo:
 // ------------------------------------------------------------------ 3 · cenas
 function opcoes(lista, atual, vazio) { return (vazio ? `<option value="">${vazio}</option>` : '') + lista.map(([v, r]) => `<option value="${esc(v)}" ${v === atual ? 'selected' : ''}>${esc(r)}</option>`).join(''); }
 function lugaresDe(lid) { return ((P.lugares || {})[lid]) || POSICOES; }
-function linhaMomento(m, tl, lug) {
+function linhaMomento(m, tl, lug, lid) {
+  const fam = ((P.familias || {})[lid]) || [];
+  if (m.angulo && fam.some(x => x[0] === m.angulo)) lug = lugaresDe(m.angulo);
   lug = lug || POSICOES;
   const pers = P.personagens.map(c => [c.id, c.nome]);
   const poses = Object.entries(POSES).map(([k, v]) => [k, v[0]]).concat([['outra', '✏ outra…']]);
@@ -631,7 +699,9 @@ function linhaMomento(m, tl, lug) {
         ${['acao', 'destaque'].includes(m.tipo) ? `<label class="an-dica" style="margin:0">dura <input data-m="duracao" type="number" step="0.5" min="0.5" max="15" value="${m.duracao || 2}" style="width:56px"> s</label>` : ''}
         ${(m.audio || {}).arquivo ? `<audio src="${U('vozes', m.audio.arquivo)}" controls style="height:26px;width:150px"></audio>` : ''}
         <input data-m="som" value="${esc(m.som || '')}" placeholder="🔊 som (anotação)" title="efeito sonoro do momento — por enquanto só anotado; a busca de efeitos vem depois" style="width:130px;font-size:.72rem">
-      </div></td>
+        ${fam.length > 1 ? `<select data-m="angulo" style="width:auto;font-size:.72rem" title="🎥 de que ângulo do cômodo este momento é visto">${opcoes(fam.filter(x => x[0] !== lid), m.angulo || '', '🎥 câmera principal')}</select>` : ''}
+      </div>
+      <input data-m="visao" value="${esc(m.visao || '')}" placeholder="👁 o que o público vê (e o que fica fora do quadro)" title="o layout deste corte: o que aparece no quadro e o que fica de fora" style="width:100%;font-size:.72rem;margin-top:2px"></td>
     <td class="an-em" style="width:300px">${em}</td>
     <td style="width:70px;white-space:nowrap">
       <button type="button" class="an-mini an-sec" data-ver title="ver na prévia">👁</button>
@@ -658,7 +728,7 @@ function desenharCenas() {
       <button type="button" class="an-mini an-perigo" data-apagar-cena>🗑 cena</button>
       <span class="an-dica" data-est></span></div>
     <table class="an-mom"><tr><th>tipo</th><th>quem · câmera</th><th>texto</th><th>em cena (onde · pose · olha)</th><th></th></tr>
-    ${(s.momentos || []).map(m => { const x = tl[s.id] && tl[s.id].momentos[m.id]; return linhaMomento(m, x ? { ini: x[0], fim: x[1] } : null, lugaresDe(s.local)); }).join('')}</table></div>`).join('') || '<p class="an-dica">Sem cenas — 🤖 planeje o episódio (seção 2) ou ➕ crie uma.</p>';
+    ${(s.momentos || []).map(m => { const x = tl[s.id] && tl[s.id].momentos[m.id]; return linhaMomento(m, x ? { ini: x[0], fim: x[1] } : null, lugaresDe(s.local), s.local); }).join('')}</table></div>`).join('') || '<p class="an-dica">Sem cenas — 🤖 planeje o episódio (seção 2) ou ➕ crie uma.</p>';
 }
 function lerCena(div) {
   const s = P.cenas[+div.dataset.k];
@@ -673,16 +743,17 @@ function lerCena(div) {
     return { id: tr.dataset.mid, tipo: g('tipo'), quem: quem, texto: g('texto'), camera: g('camera'), objeto: g('objeto') || '', destaque: g('destaque') || '',
              duracao: g('duracao') ? +g('duracao') : 0, tempo: g('tempo') !== undefined && g('tempo') !== '' ? +g('tempo') : null,
              pose: meu ? meu.pose : 'neutro', pose_en: meu ? meu.pose_en : '', em_cena: em, som: g('som') || '',
-             plano: g('plano') || 'geral', foco: g('foco') || '', fundo_reacao: g('fundo_reacao') || '' };
+             plano: g('plano') || 'geral', foco: g('foco') || '', fundo_reacao: g('fundo_reacao') || '',
+             angulo: g('angulo') || '', visao: g('visao') || '' };
   });
   return { titulo: div.querySelector('[data-c=titulo]').value, local: div.querySelector('[data-c=local]').value, resumo: div.querySelector('[data-c=resumo]').value, momentos };
 }
 $('cenas').addEventListener('input', (e) => { const d = e.target.closest('.an-cena'); if (d) { editando.add('c' + d.dataset.k); d.querySelector('[data-est]').textContent = '✏ não salvo'; } });
 $('cenas').addEventListener('change', (e) => {
   const d = e.target.closest('.an-cena'); if (!d) return; editando.add('c' + d.dataset.k); d.querySelector('[data-est]').textContent = '✏ não salvo';
-  if (e.target.dataset.e === 'pose' || e.target.dataset.m === 'tipo' || e.target.dataset.m === 'plano') {  // mostra o campo da pose livre / o seletor do destaque
+  if (e.target.dataset.e === 'pose' || e.target.dataset.m === 'tipo' || e.target.dataset.m === 'plano' || e.target.dataset.m === 'angulo') {  // mostra o campo da pose livre / o seletor do destaque
     const k = +d.dataset.k; const lida = lerCena(d); const tr = e.target.closest('tr'); const i = [...d.querySelectorAll('tr[data-mid]')].indexOf(tr);
-    tr.outerHTML = linhaMomento(Object.assign({}, lida.momentos[i], { em_cena: lida.momentos[i].em_cena.map(x => Object.assign({ cid: x.personagem, poses: (x.poses_seguintes || []).map(z => ({ pose: POSES[z] ? z : 'outra', pose_en: POSES[z] ? '' : z })) }, x)), audio: (P.cenas[k].momentos[i] || {}).audio, video: (P.cenas[k].momentos[i] || {}).video }), null, lugaresDe(P.cenas[k].local));
+    tr.outerHTML = linhaMomento(Object.assign({}, lida.momentos[i], { em_cena: lida.momentos[i].em_cena.map(x => Object.assign({ cid: x.personagem, poses: (x.poses_seguintes || []).map(z => ({ pose: POSES[z] ? z : 'outra', pose_en: POSES[z] ? '' : z })) }, x)), audio: (P.cenas[k].momentos[i] || {}).audio, video: (P.cenas[k].momentos[i] || {}).video }), null, lugaresDe(P.cenas[k].local), P.cenas[k].local);
   }
 });
 async function salvarCena(div) {
@@ -694,7 +765,7 @@ $('cenas').addEventListener('click', async (e) => {
   const b = (sel) => e.target.closest(sel);
   if (b('[data-salvar-cena]')) return salvarCena(d);
   if (b('[data-ia-cena]')) { if ((P.cenas[k].momentos || []).length && !confirm('Escrever esta cena de novo (troca os momentos)?')) return; try { await api(`/anime2d/${PID}/ia/cenas`, { ks: [k] }); editando.clear(); recarregar(); } catch (er) { alert(er.message); } return; }
-  if (b('[data-add-m]')) { const tb = d.querySelector('table'); const ult = (lerCena(d).momentos.slice(-1)[0]) || {}; tb.insertAdjacentHTML('beforeend', linhaMomento({ id: 'm' + Math.random().toString(16).slice(2, 8), tipo: 'fala', quem: '', texto: '', camera: 'fixa', plano: 'medio', em_cena: (ult.em_cena || []).map(x => Object.assign({ cid: x.personagem }, x)) }, null, lugaresDe(P.cenas[k].local))); editando.add('c' + k); return; }
+  if (b('[data-add-m]')) { const tb = d.querySelector('table'); const ult = (lerCena(d).momentos.slice(-1)[0]) || {}; tb.insertAdjacentHTML('beforeend', linhaMomento({ id: 'm' + Math.random().toString(16).slice(2, 8), tipo: 'fala', quem: '', texto: '', camera: 'fixa', plano: 'medio', em_cena: (ult.em_cena || []).map(x => Object.assign({ cid: x.personagem }, x)) }, null, lugaresDe(P.cenas[k].local), P.cenas[k].local)); editando.add('c' + k); return; }
   if (b('[data-mover]')) { try { await api(`/anime2d/${PID}/cenas`, { acao: 'mover', k, d: +b('[data-mover]').dataset.mover }); editando.clear(); recarregar(); } catch (er) { alert(er.message); } return; }
   if (b('[data-apagar-cena]')) { if (!confirm('Apagar esta cena?')) return; try { await api(`/anime2d/${PID}/cenas`, { acao: 'apagar', k }); editando.clear(); recarregar(); } catch (er) { alert(er.message); } return; }
   const tr = e.target.closest('tr[data-mid]'); if (!tr) return;
@@ -729,7 +800,8 @@ function desenharPoses() {
   $('poses').innerHTML = P.personagens.map(c => {
     const s = c.poses || {};
     const st = !s.tem ? 'ainda não gerado' : s.erro ? '❌ ' + s.erro : !s.mestre ? (s.esperando ? '⏳ gerando a ⭐ neutra…' : '⏳ esperando a neutra') : `${s.prontas}/${s.total} poses · ${s.bocas} boca(s)` + (s.esperando ? ` · ⏳ ${s.esperando} no Flow` : ' · ✔') + (s.erros ? ` · ❌ ${s.erros}` : '');
-    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/anime2d/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${esc(i.arquivo.replace(/\.png$/, '').split('_').slice(1).join(' '))}</div>`).join('');
+    const imgs = (s.itens || []).filter(i => i.tipo === 'pose').map(i => `<div class="p"><div>${i.img ? `<img src="/anime2d/${PID}/pose/${c.id}/${esc(i.img)}" data-zoom>` : (['fila', 'gerando'].includes(i.estado) ? '⏳' : i.estado === 'erro' ? '❌' : '·')}</div>${esc(i.arquivo.replace(/\.png$/, '').split('_').slice(1).join(' '))}
+      ${i.nver > 1 ? `<div class="an-ver"><button type="button" class="an-mini an-sec" data-pv="${(i.atual - 1 + i.nver) % i.nver}" data-arq="${esc(i.arquivo)}">◀</button><span class="an-dica" style="margin:0">${i.atual + 1}/${i.nver}</span><button type="button" class="an-mini an-sec" data-pv="${(i.atual + 1) % i.nver}" data-arq="${esc(i.arquivo)}">▶</button></div>` : ''}</div>`).join('');
     return `<div class="an-item" data-cid="${c.id}">${blocoDesign(c)}<div class="an-linha" style="margin:0"><b>${esc(c.nome)}</b> <span class="an-dica" style="margin:0">${esc(c.aprovar ? '🔒 aprove o design anime primeiro' : st)}</span>
       ${(c.pod || {}).reaproveitado ? `<span class="an-chip">♻ de “${esc(c.pod.reaproveitado)}”</span>` : ''}
       <button type="button" class="an-mini" data-gerar-p ${c.aprovar ? 'disabled title="aprove o design anime primeiro"' : ''}>${s.tem ? '🔁 Gerar o que falta' : '🚀 Gerar'}</button>
@@ -740,7 +812,8 @@ function desenharPoses() {
 }
 function blocoDesign(c) {
   const d = c.design; if (!d) return '';
-  const mg = (c.refs || []).slice(0, 2).map(a => `<figure><img src="${U('refs', a)}" data-zoom>mangá</figure>`).join('');
+  const mg = (c.refs || []).slice(0, 2).map(a => `<figure><img src="${U('refs', a)}" data-zoom>mangá</figure>`).join('')
+    + (c.cor_ref ? `<figure><img src="${U('refs', c.cor_ref)}" data-zoom>🌈 cores <button type="button" class="an-mini an-perigo" data-cor-del title="tirar a foto colorida">✕</button></figure>` : '');
   const vs = (d.versoes || (d.arquivo ? [d.arquivo] : [])).map(a => `<figure><img src="${U('imagens', a)}" data-zoom class="${d.aprovado === a ? 'ok' : ''}">
       ${d.aprovado === a ? '✔ aprovado' : `<button type="button" class="an-mini" data-aprovar="${esc(a)}">✔ Aprovar</button>`}</figure>`).join('');
   const msg = d.estado === 'erro' ? '❌ ' + (d.erro || '') : ['fila', 'gerando'].includes(d.estado) ? (d.msg || '⏳') : '';
@@ -748,6 +821,7 @@ function blocoDesign(c) {
     <div style="display:flex;flex-direction:column;gap:4px">
       <button type="button" class="an-mini" data-design-gerar ${['fila', 'gerando'].includes(d.estado) ? 'disabled' : ''}>${d.arquivo ? '🔁 Refazer (com pedido)' : '🎨 Gerar o design'}</button>
       <label class="an-mini an-sec" style="cursor:pointer;color:#fff;border-radius:6px">📁 Seu design<input type="file" accept="image/*" data-design-seu hidden></label>
+      <label class="an-mini an-sec" style="cursor:pointer;color:#fff;border-radius:6px" title="opcional: uma imagem COLORIDA do personagem (ex.: capa colorida, anime, fanart) — o design e as poses pegam as cores reais dela">🌈 ${c.cor_ref ? 'Trocar a colorida' : 'Foto colorida'}<input type="file" accept="image/*" data-cor-up hidden></label>
       ${d.aprovado ? '<button type="button" class="an-mini an-sec" data-desaprovar>↺ desfazer aprovação</button>' : ''}
       <span class="an-dica" style="margin:0">${esc(msg)}</span></div></div>`;
 }
@@ -761,10 +835,14 @@ $('poses').addEventListener('click', async (e) => {
       const d = await api(`/anime2d/${PID}/design/gerar`, { cids: [c.dataset.cid], pedido }); if (d.aviso) alert(d.aviso); recarregar();
     } else if (e.target.closest('[data-aprovar]')) { await api(`/anime2d/${PID}/design/${c.dataset.cid}`, { arquivo: e.target.closest('[data-aprovar]').dataset.aprovar }); recarregar(); }
     else if (e.target.closest('[data-desaprovar]')) { await api(`/anime2d/${PID}/design/${c.dataset.cid}`, { aprovar: false }); recarregar(); }
+    else if (e.target.closest('[data-cor-del]')) { if (!confirm('Tirar a foto colorida?')) return; await api(`/anime2d/${PID}/personagem/${c.dataset.cid}/cor`, { apagar: true }); recarregar(); }
   } catch (er) { alert(er.message); }
 });
 $('poses').addEventListener('change', async (e) => {
-  const c = e.target.closest('[data-cid]'); if (!c || !e.target.hasAttribute('data-design-seu')) return;
+  const c = e.target.closest('[data-cid]'); if (!c) return;
+  if (e.target.hasAttribute('data-cor-up')) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
+    try { await api(`/anime2d/${PID}/personagem/${c.dataset.cid}/cor`, fd); recarregar(); } catch (er) { alert(er.message); } return; }
+  if (!e.target.hasAttribute('data-design-seu')) return;
   const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
   try { await api(`/anime2d/${PID}/design/${c.dataset.cid}`, fd); recarregar(); } catch (er) { alert(er.message); }
 });
@@ -772,11 +850,20 @@ $('poses').addEventListener('click', (e) => { const c = e.target.closest('[data-
 async function gerarPoses(cids) { try { const d = await api(`/anime2d/${PID}/poses/gerar`, { cids }); if ((d.avisos || []).length) alert(d.avisos.join('\n')); recarregar(); } catch (e) { alert(e.message); } }
 
 // ------------------------------------------------------------------ 5 · imagens
+function setinhas(st) {  // ◀ 2/4 ▶ — qual versão gerada é a usada
+  const vs = (st || {}).versoes || [];
+  if (vs.length < 2) return '';
+  const i = Math.max(0, vs.indexOf(st.arquivo));
+  return `<div class="an-ver"><button type="button" class="an-mini an-sec" data-ver-arq="${esc(vs[(i + 1) % vs.length])}" title="versão anterior">◀</button>
+    <span class="an-dica" style="margin:0">${vs.length - i}/${vs.length}</span>
+    <button type="button" class="an-mini an-sec" data-ver-arq="${esc(vs[(i - 1 + vs.length) % vs.length])}" title="próxima versão">▶</button></div>`;
+}
 function cardImg(alvo, nome, st, sub) {
   st = st || {};
   const msg = st.estado === 'erro' ? '❌ ' + (st.erro || '') : ['fila', 'gerando'].includes(st.estado) ? (st.msg || '⏳') : st.origem && st.arquivo ? (st.origem === 'flow' ? '' : st.origem === 'sua' ? '📁 sua' : st.origem) : '';
   return `<div class="an-item" data-alvo="${esc(alvo)}"><b>${esc(nome)}</b> <span class="an-dica">${esc(sub)}</span>
     <div class="an-img">${st.arquivo ? `<img src="${U('imagens', st.arquivo)}" data-zoom>` : '—'}</div>
+    ${setinhas(st)}
     <div class="an-dica" style="margin:2px 0">${esc(msg)}</div>
     <div class="an-linha" style="margin:0"><button type="button" class="an-mini" data-gerar-img>${st.arquivo ? '🔁 Refazer' : '🚀 Gerar'}</button>
     <label class="an-mini an-sec" style="cursor:pointer;color:#fff;border-radius:6px">📁 Sua imagem<input type="file" accept="image/*" data-sua hidden></label></div></div>`;
@@ -784,7 +871,13 @@ function cardImg(alvo, nome, st, sub) {
 function desenharImgs() {
   const html = [];
   for (const l of P.locais) {
-    html.push(cardImg(l.id + ':fundo', '🏞 ' + l.nome, l.img, 'fundo').replace('</div></div>', `<button type="button" class="an-mini" data-layout="${l.id}" title="onde cada um fica em pé/sentado e onde vão os móveis">📐 Montar o cenário</button></div></div>`));
+    const orig = (P.origem_local || {})[l.id] || '', pt = (P.plantas || {})[l.id] || '';
+    html.push(cardImg(l.id + ':fundo', '🏞 ' + l.nome, l.img, orig || 'fundo').replace('</div></div>', `<button type="button" class="an-mini" data-layout="${l.id}" title="onde cada um fica em pé/sentado e onde vão os móveis">📐 Montar o cenário</button>`
+      + `<button type="button" class="an-mini" data-story="${l.id}" title="🎬 o Flow desenha os personagens e os móveis NESTE fundo (um ensaio, como storyboard de anime); depois a IA lê onde cada um ficou e posiciona os recortes">🎬 Storyboard</button>`
+      + (['fila', 'gerando'].includes((l.story || {}).estado) ? `<span class="an-dica">⏳ storyboard ${esc((l.story || {}).msg || '')}</span>` : '')
+      + ((l.story || {}).erro ? `<span class="an-dica an-err">${esc(l.story.erro)}</span>` : '')
+      + ((l.story || {}).arquivo ? `<a href="${U('imagens', l.story.arquivo)}" target="_blank"><img src="${U('imagens', l.story.arquivo)}" style="width:120px;border-radius:4px;vertical-align:middle" title="storyboard"></a><button type="button" class="an-mini" data-story-ler="${l.id}" title="a IA olha o storyboard e põe cada lugar/móvel onde ele ficou">📐 ${l.story.lido ? 'Ler de novo' : 'Ler o storyboard'}</button>` : '')
+      + (pt ? `<a class="an-mini an-sec" href="/anime2d/${PID}/local/${l.id}/planta.png" target="_blank" title="${esc('📐 PLANTA — ' + pt)}" style="color:#fff;text-decoration:none">🗺 planta</a><div class="an-dica" style="white-space:normal;max-width:260px;font-size:.68rem">📐 ${esc(pt)}</div>` : '') + `</div></div>`));
     for (const pr of (l.props || [])) html.push(cardImg(l.id + ':' + pr.id, '🪑 ' + pr.nome, pr.img, (pr.camada === 'atras' ? 'móvel atrás' : 'móvel na frente') + ' · ' + l.nome));
     if ((l.frente_en || '').trim() || (l.frente || {}).arquivo) html.push(cardImg(l.id + ':frente', '🌿 ' + l.nome, l.frente, 'na frente dos personagens'));
   }

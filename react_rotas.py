@@ -169,9 +169,9 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             R.sincronizar_publicacao(p, base_dir)  # 🖼 o react também é uma publicação (capas, títulos, descrição)
         except Exception:  # noqa: BLE001
             pass
-        return render_template("react_detalhe.html", p=R.para_tela(p, base_dir), pub_api=f"/publicacoes/{p['id']}/api", layouts=R.LAYOUTS, estilos=R.ESTILOS,
+        return render_template("react_detalhe.html", p=R.para_tela(p, base_dir), biblia=p.get("biblia") or {}, pub_api=f"/publicacoes/{p['id']}/api", layouts=R.LAYOUTS, estilos=R.ESTILOS,
                                expressoes=R.EXPRESSOES, densidades=list(R.DENSIDADES),
-                               intrigas=R.INTRIGAS, tipos_evento=R.TIPOS_EVENTO, estilos_arte=R.ESTILOS_ARTE, camadas=R.CAMADAS,
+                               intrigas=R.INTRIGAS, tipos_evento=R.TIPOS_EVENTO, estilos_arte=R.ESTILOS_ARTE, camadas=R.CAMADAS, tipos_nota=R.TIPOS_NOTA, modos_ref=R.MODOS_REF, gestos={k: v[0] for k, v in R.GESTOS.items()}, passante=R.PASSANTE,
                                rotulo_camada=R.ROTULO_CAMADA)
 
     @app.route("/react-personagens/<pid>/estado")
@@ -209,6 +209,13 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 p["densidade"] = c["densidade"]
             if c.get("intriga") in R.INTRIGAS:
                 p["intriga"] = c["intriga"]
+            if "imagens_destaque" in c:
+                p["imagens_destaque"] = bool(c["imagens_destaque"])
+            for k in ("abertura", "encerramento", "movimentos"):
+                if k in c:
+                    p[k] = bool(c[k])
+            if "biblia" in c:
+                R.definir_biblia(p, str(c["biblia"] or ""))
             if isinstance(c.get("expressoes"), list):
                 ex = [e for e in c["expressoes"] if e in R.EXPRESSOES]
                 p["expressoes"] = (["neutro"] if "neutro" not in ex else []) + ex
@@ -278,6 +285,11 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             return _rodar(pid, oque, rot, lambda: R.gerar_roteiro(
                 pid, base_dir, parte=parte, so_vazias=so_vazias,
                 on_log=lambda m: TAREFAS[pid].update(progresso=str(m)[:200]))["msg"]) or _ok()
+        if oque == "biblia":
+            def bib():
+                r = R.resumir_biblia(pid, base_dir)
+                return f"{r['episodios']} episódio(s), {r['personagens']} personagem(ns)" + (f" · {r['fichas']} ficha(s) completadas" if r["fichas"] else "")
+            return _rodar(pid, oque, "📖 Organizar a bíblia da obra", bib) or _ok()
         if oque == "ler":
             c = request.get_json(silent=True) or {}
             refazer = bool(c.get("refazer"))
@@ -387,6 +399,8 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             for k in R.CAMPOS_FICHA_TXT:
                 if k in c:
                     ch[k] = str(c[k] or "").strip()[:600]
+            if "biblia" in c:  # 📖 a bíblia do personagem (como ele é, como responderia)
+                ch["biblia"] = str(c["biblia"] or "").strip()[:4000]
             if c.get("estilo") in ("anime", "realista", ""):
                 ch["estilo"] = c["estilo"]
             if re.fullmatch(r"#[0-9a-fA-F]{6}", str(c.get("cor") or "")):
@@ -422,6 +436,25 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
                 return _erro(str(exc))
             R.salvar(p, base_dir)
         return _ok(ref=nome)
+
+    @app.route("/react-personagens/<pid>/personagem/<cid>/cor", methods=["POST"])
+    def react_cor_ref(pid: str, cid: str):
+        """🌈 A foto COLORIDA do personagem (só pras cores reais) — enviar/trocar ou tirar ({"apagar": true})."""
+        arq = request.files.get("arquivo")
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                ch = R.personagem(p, cid)
+                if (request.get_json(silent=True) or {}).get("apagar"):
+                    R.tirar_cor_ref(p, ch, base_dir)
+                elif arq and arq.filename:
+                    R.guardar_cor_ref(p, ch, arq.read(), base_dir)
+                else:
+                    return _erro("Escolha a imagem colorida.")
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok()
 
     @app.route("/react-personagens/<pid>/personagem/<cid>/ref/<nome>", methods=["DELETE"])
     def react_ref_apagar(pid: str, cid: str, nome: str):
@@ -651,7 +684,7 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     @app.route("/react-personagens/<pid>/cenario/gerar", methods=["POST"])
     def react_cenario_gerar(pid: str):
         _p(pid)
-        quais = (request.get_json(silent=True) or {}).get("quais") or list(R.CAMADAS)
+        quais = (request.get_json(silent=True) or {}).get("quais") or list(R.camadas_do_layout(R.carregar(pid, base_dir)))
         try:
             return _ok(**R.gerar_camadas(pid, base_dir, quais))
         except R.ReactErro as exc:
@@ -677,6 +710,129 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             except R.ReactErro as exc:
                 return _erro(str(exc))
             R.log(p, f"📁 {R.ROTULO_CAMADA[camada]} enviado")
+            R.salvar(p, base_dir)
+        return _ok()
+
+    @app.route("/react-personagens/<pid>/cenario/<camada>/referencia", methods=["POST"])
+    def react_cenario_referencia(pid: str, camada: str):
+        """🖼 A sua imagem como REFERÊNCIA (o Flow recria o lugar: 🏠 ambiente ou 🎨 anime). Com 'gerar', já manda."""
+        from PIL import Image
+        if camada not in R.CAMADAS:
+            abort(404)
+        c = request.get_json(silent=True) or {}
+        arq = request.files.get("arquivo")
+        modo = request.form.get("modo") or c.get("modo") or "ambiente"
+        with R._TRAVA:
+            p = _p(pid)
+            cam = p["cenario"]["camadas"].setdefault(camada, {})
+            if c.get("apagar"):
+                cam.pop("ref", None)
+                R.log(p, f"🖼 referência de {R.ROTULO_CAMADA[camada]} tirada")
+            elif arq and arq.filename:
+                try:
+                    im = Image.open(arq.stream)
+                    im.load()
+                except Exception:  # noqa: BLE001
+                    return _erro("Isso não é uma imagem.")
+                try:
+                    R.guardar_referencia(p, camada, im, modo, base_dir)
+                except R.ReactErro as exc:
+                    return _erro(str(exc))
+                R.log(p, f"🖼 referência de {R.ROTULO_CAMADA[camada]} ({R.MODOS_REF[modo]})")
+            elif cam.get("ref"):
+                if modo not in R.MODOS_REF:
+                    return _erro("Modo desconhecido.")
+                cam["ref"]["modo"] = modo
+            else:
+                return _erro("Escolha a imagem.")
+            R.salvar(p, base_dir)
+        gerar = (request.form.get("gerar") or c.get("gerar")) in ("1", 1, True, "true")
+        if gerar and not c.get("apagar"):
+            try:
+                return _ok(**R.gerar_camadas(pid, base_dir, [camada]))
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+        return _ok()
+
+    # 🛋 quem senta onde
+    @app.route("/react-personagens/<pid>/assentos", methods=["POST"])
+    def react_assentos(pid: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                sofas = R.guardar_assentos(p, c.get("sofas"))
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok(sofas=sofas)
+
+    # 📌 marcações num segundo do vídeo
+    @app.route("/react-personagens/<pid>/notas", methods=["POST"])
+    def react_notas(pid: str):
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                if c.get("acao") == "apagar":
+                    p["notas"] = [n for n in p.get("notas") or [] if n["id"] != c.get("id")]
+                else:
+                    R.nova_nota(p, c.get("t"), str(c.get("tipo") or "video"), str(c.get("texto") or ""),
+                                [str(x) for x in c.get("cids") or []], bool(c.get("exata")), c.get("original", True) is not False)
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok()
+
+    # 🍿 itens da mesa
+    @app.route("/react-personagens/<pid>/objetos", methods=["POST"])
+    def react_objetos(pid: str):
+        import react_objetos as RO
+        c = request.get_json(silent=True) or {}
+        with R._TRAVA:
+            p = _p(pid)
+            try:
+                if c.get("acao") == "novo":
+                    RO.novo(p, c.get("nome"), c.get("en"), c.get("mesa") or "mesa")
+                elif c.get("acao") == "editar":
+                    RO.editar(p, str(c.get("id") or ""), c)
+                if "mesa_por_sofa" in c:
+                    p["mesa_por_sofa"] = bool(c["mesa_por_sofa"])
+            except R.ReactErro as exc:
+                return _erro(str(exc))
+            R.salvar(p, base_dir)
+        return _ok()
+
+    @app.route("/react-personagens/<pid>/objetos/gerar", methods=["POST"])
+    def react_objetos_gerar(pid: str):
+        import react_objetos as RO
+        _p(pid)
+        try:
+            return _ok(**RO.gerar(pid, base_dir, (request.get_json(silent=True) or {}).get("ids") or None))
+        except R.ReactErro as exc:
+            return _erro(str(exc))
+
+    @app.route("/react-personagens/<pid>/objetos/<oid>/arquivo", methods=["POST"])
+    def react_objeto_upload(pid: str, oid: str):
+        import react_objetos as RO
+        from PIL import Image
+        arq = request.files.get("arquivo")
+        if not arq or not arq.filename:
+            return _erro("Escolha a imagem.")
+        try:
+            im = Image.open(arq.stream)
+            im.load()
+        except Exception:  # noqa: BLE001
+            return _erro("Isso não é uma imagem.")
+        with R._TRAVA:
+            p = _p(pid)
+            o = next((x for x in RO.objetos(p) if x["id"] == oid), None)
+            if not o:
+                return _erro("Item não encontrado.")
+            try:
+                RO.guardar(p, o, im, base_dir, origem="upload")
+            except R.ReactErro as exc:
+                return _erro(str(exc))
             R.salvar(p, base_dir)
         return _ok()
 
@@ -719,29 +875,77 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
 
     # ------------------------------------------------------------------ 🧍 personagens no Flow
     # ------------------------------------------------------------------ 🖼 thumbnail do react
-    def _dados_capa(c: Dict[str, Any]) -> Dict[str, Any]:
-        exprs = c.get("exprs")
-        if isinstance(exprs, str):
-            try:
-                exprs = json.loads(exprs)
-            except ValueError:
-                exprs = {}
-        cids = c.get("cids")
-        if isinstance(cids, str):
-            cids = [x for x in cids.split(",") if x]
-        return {"cids": cids or [], "exprs": exprs or {}, "t": c.get("t"), "lado": c.get("lado"),
-                "seta": str(c.get("seta", "1")) not in ("0", "false", "False", ""), "texto": c.get("texto"),
-                "modo": c.get("modo"), "pedido": c.get("pedido"), "estilo": c.get("estilo") if isinstance(c.get("estilo"), dict) else None}
+    def _pecas_capa(p: Dict[str, Any]) -> Dict[str, Any]:
+        cfg = R.capa_cfg(p)
+        pc = R.capa_pecas(p, base_dir, cfg)
+        v = str(int(time.time() * 1000))
+
+        def url(cam: str) -> str:
+            return f"/react-personagens/{p['id']}/capa/arq/{os.path.basename(cam)}?v={v}"
+        return {"fundo": url(pc["fundo"]), "W": R.CAPA_W, "H": R.CAPA_H, "tem_video": pc["tem_video"],
+                "pecas": [dict({k: x[k] for k in ("chave", "nome", "x", "y", "w", "h", "oculta")}, img=url(x["arq"]),
+                               ajustada=bool(x.get("ajustada"))) for x in pc["pecas"]],
+                "cfg": {k: cfg[k] for k in ("cids", "exprs", "t", "lado", "seta", "quadro_off", "ocultas")} | {"imagem": bool(cfg.get("imagem"))}}
+
+    @app.route("/react-personagens/<pid>/capa/estado", methods=["GET", "POST"])
+    def react_capa_estado(pid: str):
+        """A capa (o que entra, as caras, o quadro, o lado) e as peças pra arrastar. POST guarda o que mudou;
+        {"pos": {chave: null}} volta uma peça pro automático; {"pos_limpar": true} volta todas."""
+        c = request.get_json(silent=True) or {} if request.method == "POST" else {}
+        with R._TRAVA:
+            p = _p(pid)
+            if c:
+                cfg = R.capa_cfg(p)
+                if c.get("pos_limpar"):
+                    cfg["pos"], cfg["ordem"] = {}, []
+                if isinstance(c.get("pos"), dict):
+                    for k, v in c["pos"].items():
+                        if v is None:
+                            cfg["pos"].pop(k, None)
+                        elif isinstance(v, dict):
+                            cfg["pos"][k] = {kk: round(float(v[kk]), 1) for kk in ("x", "y", "w") if isinstance(v.get(kk), (int, float))}
+                p["capa"] = R.capa_cfg(p, dict({k: v for k, v in c.items() if k not in ("pos", "pos_limpar")}, pos=cfg["pos"],
+                                               ordem=c.get("ordem", cfg["ordem"])))
+                R.salvar(p, base_dir)
+        try:
+            return _ok(**_pecas_capa(_p(pid)))
+        except Exception as exc:  # noqa: BLE001
+            return _erro(f"não deu pra montar a capa: {exc}")
+
+    @app.route("/react-personagens/<pid>/capa/arq/<nome>")
+    def react_capa_arq(pid: str, nome: str):
+        p = _p(pid)
+        cam = os.path.join(R.pasta(p["id"], base_dir), "_capa", secure_filename(nome))
+        return send_file(cam, max_age=0) if os.path.isfile(cam) else ("", 404)
+
+    @app.route("/react-personagens/<pid>/capa/imagem", methods=["POST"])
+    def react_capa_imagem(pid: str):
+        """📤 uma imagem sua na capa (ou {"apagar": true})."""
+        f = request.files.get("arquivo")
+        with R._TRAVA:
+            p = _p(pid)
+            cfg = R.capa_cfg(p)
+            if f and f.filename:
+                try:
+                    cfg["imagem"] = R.guardar_imagem_capa(p, f.filename, f.read(), base_dir)
+                except R.ReactErro as exc:
+                    return _erro(str(exc))
+                cfg["pos"].pop("imagem", None)
+            elif (request.get_json(silent=True) or {}).get("apagar") or request.form.get("apagar"):
+                cfg["imagem"] = None
+                cfg["quadro_off"] = False
+            else:
+                return _erro("Escolha a imagem.")
+            p["capa"] = cfg
+            R.salvar(p, base_dir)
+        return _ok(**_pecas_capa(_p(pid)))
 
     @app.route("/react-personagens/<pid>/capa/previa.jpg")
     def react_capa_previa(pid: str):
         p = _p(pid)
-        dd = _dados_capa(request.args.to_dict())
-        cids = [c for c in dd["cids"] if any(x["id"] == c for x in p["personagens"])]
         destino = os.path.join(R.pasta(pid, base_dir), "_capa_previa.jpg")
         try:
-            R.compor_capa_react(p, base_dir, cids, dd["exprs"], R.segundos(dd["t"]) or 0.0,
-                                "esquerda" if dd["lado"] == "esquerda" else "direita", destino, dd["seta"])
+            R.compor_capa_react(p, base_dir, R.capa_cfg(p), destino)
         except Exception as exc:  # noqa: BLE001
             return f"não deu pra montar: {exc}", 500
         return send_file(destino, max_age=0)
@@ -749,8 +953,12 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
     @app.route("/react-personagens/<pid>/capa", methods=["POST"])
     def react_capa(pid: str):
         _p(pid)
+        c = request.get_json(silent=True) or {}
+        dados = {k: c.get(k) for k in ("cids", "exprs", "t", "lado", "seta") if k in c}
+        dados.update(texto=c.get("texto"), modo=c.get("modo"), pedido=c.get("pedido"),
+                     estilo=c.get("estilo") if isinstance(c.get("estilo"), dict) else None)
         try:
-            r = R.capa_react(pid, base_dir, _dados_capa(request.get_json(silent=True) or {}))
+            r = R.capa_react(pid, base_dir, dados)
         except R.ReactErro as exc:
             return _erro(str(exc))
         return _ok(**r)
@@ -776,6 +984,27 @@ def registrar(app, base_dir: str, criar_job: Callable[[str, Dict[str, Any]], Non
             return _ok(**R.conferir_lados(pid, cid, base_dir, todas=True))
         except R.ReactErro as exc:
             return _erro(str(exc))
+
+    @app.route("/react-personagens/<pid>/biblia/arquivo", methods=["POST"])
+    def react_biblia_arquivo(pid: str):
+        """📖 a bíblia num .txt (ou .md) — junta no fim do que já tem."""
+        f = request.files.get("arquivo")
+        if not f:
+            return _erro("Escolha o arquivo.")
+        dados = f.read()
+        txt = ""
+        for cod in ("utf-8", "utf-16", "latin-1"):
+            try:
+                txt = dados.decode(cod)
+                break
+            except UnicodeDecodeError:
+                continue
+        with R._TRAVA:
+            p = _p(pid)
+            atual = str((p.get("biblia") or {}).get("texto") or "")
+            R.definir_biblia(p, (atual + "\n\n" + txt).strip() if atual else txt)
+            R.salvar(p, base_dir)
+        return _ok(chars=len((p.get("biblia") or {}).get("texto") or ""), texto=(p.get("biblia") or {}).get("texto") or "")
 
     @app.route("/react-personagens/<pid>/pose/<cid>/refazer", methods=["POST"])
     def react_pose_refazer(pid: str, cid: str):

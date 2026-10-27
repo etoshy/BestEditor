@@ -16,6 +16,9 @@
   fotos, vídeos e textos seus. Sai um prompt no formato do modelo; a IA devolve títulos, ideias, descrição do caso, capítulos e o
   roteiro completo. Depois: 🎙️ Gerar voz → 🎬 Novo vídeo escolhendo este projeto (as imagens do tema entram nos momentos certos).</p>
 <p style="margin:4px 0 0;"><a href="#react"><b>🎭 React de personagens</b></a> — personagens no sofá reagindo a um vídeo na TV (estilo Gacha Life).</p>
+<p style="margin:4px 0 0;"><a href="#animecine"><b>🎬 Anime quadro a quadro</b></a> — cenas curtas de ação animadas desenho a desenho (o Flow desenha, a animação é montada aqui).</p>
+<p style="margin:4px 0 0;"><a href="#criador"><b>🧬 Criador de personagens</b></a> — clone, misture (rosto da 1, cabelo da 2…) ou descreva e crie um personagem único, com ficha, design e poses.</p>
+<p style="margin:4px 0 0;"><a href="#anime2d"><b>🎞 Animação 2D</b></a> — desenho animado montado com imagens (estilo Shin-chan): premissa, história ou um áudio → personagens, cenas, vozes e tudo posicionado no editor.</p>
 <div class="ds-passos"><span>1 · tema e modelo</span><span>2 · fontes (matérias)</span><span>3 · materiais</span><span>4 · prompt → roteiro</span><span>5 · voz → vídeo</span></div>
 
 {% if erro %}<div class="error">{{ erro }}</div>{% endif %}
@@ -53,6 +56,70 @@
   </div>
   {% endfor %}
 </div>
+<div class="ds-card" id="animecine" style="background:#fef2f2;border-color:#fca5a5;">
+  <h2 style="margin:0;">🎬 Anime quadro a quadro</h2>
+  <p style="color:#555;margin:6px 0;">Cenas curtas (3–30 s) de ação com animação de verdade, no espírito das lutas de anime de TV: o Flow só <b>desenha</b> — o quadro-chave de cada plano e os desenhos do movimento, cada um a partir do anterior — e a animação é montada aqui (tempo de cada desenho, câmera, tremor, linhas de velocidade, quadro de impacto, flash, partículas, transições, vozes e sons). Comece por um roteiro, páginas de mangá, personagens do 🧬 Criador / 🎞 Animação 2D / 🎭 React e um 🗺 lugar.</p>
+  <div class="ds-passos"><span>1 · roteiro / mangá</span><span>2 · personagens e cenário</span><span>3 · 🤖 planos e desenhos</span><span>4 · 🎨 storyboard no Flow</span><span>5 · 🎙 vozes + sons</span><span>6 · 🎬 mp4</span></div>
+  <details{% if not anime_cine_lista() %} open{% endif %}><summary style="cursor:pointer;font-weight:600;">+ Nova cena</summary>
+  <form method="post" action="/anime-cine/novo" enctype="multipart/form-data">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:2;min-width:220px;">Título<input type="text" name="titulo" placeholder="ex.: A ponte na chuva"></label>
+      <label style="flex:1;min-width:120px;">Duração (s)<input type="number" name="duracao" value="15" min="2" max="60"></label>
+      <label style="flex:1;min-width:140px;">Proporção<select name="proporcao"><option value="16:9">16:9</option><option value="9:16">9:16</option></select></label>
+    </div>
+    <label>O que acontece</label>
+    <textarea name="roteiro" rows="3" placeholder="ex.: o espadachim encara o demônio na ponte sob a chuva; avança, desvia de um golpe e corta com a lâmina envolta em água"></textarea>
+    <label style="font-weight:400;">…e/ou páginas de mangá <input type="file" name="paginas" accept="image/*" multiple style="width:auto;"></label>
+    <button type="submit">🎬 Começar a cena</button>
+  </form>
+  </details>
+  {% for r in anime_cine_lista() %}
+  <div class="ds-proj"><div style="min-width:0;"><a href="/anime-cine/{{ r.id }}" style="font-weight:600;">🎬 {{ r.titulo }}</a>
+    <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ r.planos }} plano(s) · {{ r.dur }} s{% if r.video %} · 🎬 mp4 pronto{% endif %}</div></div></div>
+  {% endfor %}
+</div>
+<div class="ds-card" id="criador" style="background:#fff7ed;border-color:#fdba74;">
+  <h2 style="margin:0;">🧬 Criador de personagens</h2>
+  <p style="color:#555;margin:6px 0;">Crie um personagem <b>único</b> no Flow: clone um com mudanças, misture várias imagens (rosto da 1, cabelo da 2, roupa da 5…) ou só descreva; escolha o estilo (anime, mangá, realista, aquarela, expressionismo… ou escreva outro). A 🤖 IA monta a ficha (nomes, personalidade, voz, paleta), você aprova o design e as poses saem sozinhas.</p>
+  <div class="ds-passos"><span>1 · imagens + o que pegar</span><span>2 · 🤖 ficha e nomes</span><span>3 · 🎨 design (variações)</span><span>4 · 🧍 poses</span></div>
+  <p style="margin:6px 0 0;"><a href="/criador-personagens"><b>Abrir o criador →</b></a>{% if criador_lista() %} · {{ criador_lista()|length }} personagem(ns){% endif %}</p>
+</div>
+<div class="ds-card" id="anime2d" style="background:#f0fdf4;border-color:#86efac;">
+  <h2 style="margin:0;">🎞 Animação 2D</h2>
+  <p style="color:#555;margin:6px 0;">Desenho animado do jeito simples (como Crayon Shin-chan): em vez de gerar vídeo com IA, o episódio é <b>montado com imagens</b> — o fundo de cada lugar, os personagens em poses (com 2 quadros que alternam pra dar movimento e a boca que abre quando falam), objetos na frente, imagens de destaque em tela cheia — e câmera. Estilo à sua escolha (anime, cartoon, pintura a óleo, Paint, realista…). Comece por uma premissa, pela história inteira ou por um <b>áudio</b> pronto.</p>
+  <div class="ds-passos"><span>1 · premissa / história / áudio</span><span>2 · 🤖 plano</span><span>3 · 🤖 cenas</span><span>4 · personagens, locais e itens no Flow</span><span>5 · 🎙 vozes</span><span>6 · 🎬 editor</span></div>
+  <details{% if not anime2d_lista() %} open{% endif %}><summary style="cursor:pointer;font-weight:600;">+ Nova animação</summary>
+  <form method="post" action="/anime2d/novo" enctype="multipart/form-data" id="formAnime">
+    <label>Título</label><input type="text" name="titulo" placeholder="ex.: Kenta e o vaso quebrado">
+    <label>Premissa, história ou instruções <span style="font-weight:400;color:#888;">(personagens, estilo, lugares, tom… — tem um exemplo na página do projeto)</span></label>
+    <textarea name="premissa" rows="5" placeholder="Um garoto de 5 anos tenta esconder da mãe que quebrou o vaso favorito dela…"></textarea>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:180px;">Estilo<select name="estilo">{% for k, v in anime2d_estilos.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}</select></label>
+      <label style="flex:1;min-width:140px;">Formato<select name="proporcao"><option value="16:9">16:9 (YouTube)</option><option value="9:16">9:16 (Shorts/Reels)</option></select></label>
+      <label style="flex:1;min-width:160px;">Duração<select name="duracao"><option value="0">🤖 automática (a IA decide)</option><option value="1">~1 min</option><option value="3">~3 min</option><option value="5">~5 min</option><option value="10">~10 min</option><option value="20">~20 min</option></select></label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:220px;">🎧 Áudio pronto <span style="font-weight:400;color:#888;">(opcional — diálogo/narração; a IA monta em volta)</span><input type="file" name="audio" accept="audio/*,video/*"></label>
+      <label style="flex:1;min-width:220px;">📎 Referências <span style="font-weight:400;color:#888;">(fotos de personagens/lugares — o nome do arquivo vira o nome)</span><input type="file" name="referencias" accept="image/*" multiple></label>
+    </div>
+    <label>📦 Ou um <b>zip com tudo</b> <span style="font-weight:400;color:#888;">(história, personagens com fotos/personalidade/poses prontas, locais, itens, estilo, áudio, cenas — <a href="/anime2d/zip-guia.txt" target="_blank">como montar</a> · <a href="/anime2d/zip-exemplo.zip">⬇ zip de exemplo</a>)</span></label>
+    <input type="file" name="zip" accept=".zip,application/zip">
+    <button type="submit" id="btnAnime">🎞 Começar a animação</button>
+  </form>
+  </details>
+  {% for r in anime2d_lista() %}
+  <div class="ds-proj">
+    <div style="min-width:0;">
+      <a href="/anime2d/{{ r.id }}" style="font-weight:600;">🎞 {{ r.titulo }}</a>
+      <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ r.estilo }} · {{ r.personagens }} personagem(ns) · {{ r.cenas }} cena(s) · {{ r.momentos }} momento(s){% if r.job %} <a class="ds-tag" href="/job/{{ r.job }}/edit-segments">🎬 no editor</a>{% endif %}</div>
+    </div>
+    <form method="post" action="/anime2d/{{ r.id }}/excluir" onsubmit="return confirm('Excluir esta animação (as referências, imagens e vozes)? Os personagens gerados continuam na aba 🧍 Personagens.')">
+      <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:0.8rem;">🗑</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+<script>document.getElementById('formAnime').addEventListener('submit', () => { const b = document.getElementById('btnAnime'); b.disabled = true; b.textContent = '⏳ criando…'; });</script>
 <script>document.getElementById('formReact').addEventListener('submit', () => { const b = document.getElementById('btnReact'); b.disabled = true; b.textContent = '⏳ criando…'; });</script>
 
 <div class="ds-card">

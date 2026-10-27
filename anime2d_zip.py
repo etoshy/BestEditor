@@ -145,6 +145,18 @@ EXEMPLO_LOCAL = {
     "lugares": [{"nome": "no sofá", "sentado": True, "descricao": "sentado no sofá, atrás da mesa", "x": 0.5, "y": 0.8, "escala": 0.9}],
     "_props": "móveis em camadas separadas: 'atras' (cadeira, sofá — atrás de quem senta) ou 'frente' (mesa, balcão). O fundo vem SEM eles. x/y/w opcionais (frações da tela; y = a base) — ajuste depois no 📐 Montar o cenário",
     "_lugares": "onde os personagens ficam além de esquerda/centro_esq/centro/centro_dir/direita; sentado=true pede pose sentada",
+    "planta": {"camera": "do meio da sala, olhando a parede do sofá", "camera_en": "eye level from the middle of the room, facing the sofa wall",
+               "fora_de_quadro": "a porta (atrás da câmera)", "fora_de_quadro_en": "the door, behind the camera",
+               "elementos": [{"nome": "Janela", "en": "a wide window with curtains", "onde": "fundo", "x": 0.25, "y": 0.6, "w": 0.3, "h": 0.4, "camada": "fundo", "forma": "retangulo"},
+                             {"nome": "Sofá", "en": "the sofa", "onde": "chao", "x": 0.5, "y": 0.85, "w": 0.5, "h": 0.3, "camada": "movel", "forma": "retangulo"}]},
+    "_planta": "📐 (opcional, recomendado) o LAYOUT do cenário: de onde a câmera olha e ONDE fica cada coisa no quadro (x = centro na "
+               "largura 0–1, y = a base 0–1, w/h = tamanho), 'movel' = um dos props (o fundo deixa o espaço vazio), e o que fica "
+               "fora do quadro. Vira um esboço de blocos que vai de referência pro Flow desenhar o fundo com tudo no lugar.",
+    "_angulo_de": "(opcional) o nome do local de que este é OUTRO ÂNGULO (o mesmo cômodo, outra câmera: contraplano, um canto de "
+                  "perto) — com a sua própria planta/lugares/chão; 'angulo_en' = onde a câmera está. Um momento usa com \"angulo\".",
+    "_variante_de": "(opcional) o nome de OUTRO local de que este é uma variante — o mesmo cômodo cheio de fumaça, à noite, "
+                    "destruído… O fundo sai EDITANDO o do original (mesma câmera e mesmos objetos) e usa os móveis, lugares e "
+                    "chão dele. Aí o prompt_en descreve só o que muda.",
 }
 EXEMPLO_ITEM = {
     "nome": "Vaso quebrado",
@@ -396,9 +408,13 @@ def _config(p: Dict[str, Any], cfg: Dict[str, Any], historia: str, avisos: List[
         p["narrador"]["ativo"] = bool(nar)
     if cfg.get("narrador_voz"):
         p["narrador"]["voz"] = _voz(cfg["narrador_voz"], avisos, "narrador") or p["narrador"].get("voz", "")
-    for k in ("legendas", "paralaxe"):
+    for k in ("legendas", "paralaxe", "cobertura"):
         if k in cfg:
             p[k] = bool(cfg[k])
+    if isinstance(cfg.get("troca_angulo_s"), (int, float)):
+        p["troca_angulo_s"] = max(0.0, min(120.0, float(cfg["troca_angulo_s"])))
+    if cfg.get("abertura_texto") is not None:  # 🔤 texto simples no começo do vídeo (ex.: "Prólogo")
+        p["abertura_texto"] = " ".join(str(cfg["abertura_texto"]).split())[:80]
 
 
 def _voz(v: Any, avisos: List[str], quem: str) -> str:
@@ -923,7 +939,8 @@ def exportar(pid: str, base: str = A._BASE) -> bytes:
                                        "duracao_min": p.get("duracao_alvo") or 0, "idioma": p.get("idioma"),
                                        "narrador": bool((p.get("narrador") or {}).get("ativo")),
                                        "narrador_voz": (p.get("narrador") or {}).get("voz") or "",
-                                       "legendas": bool(p.get("legendas", True)), "paralaxe": bool(p.get("paralaxe", True))}))
+                                       "legendas": bool(p.get("legendas", True)), "paralaxe": bool(p.get("paralaxe", True)),
+                                       "abertura_texto": p.get("abertura_texto") or ""}))
         for r in p["referencias"]:
             if r["tipo"] == "estilo":
                 x = ler(os.path.join(d, "refs", r["arquivo"]))
@@ -966,7 +983,8 @@ def exportar(pid: str, base: str = A._BASE) -> bytes:
         for lo in p["locais"]:
             pn = "locais/" + pasta_nome(lo["nome"]) + "/"
             z.writestr(pn + "local.json", js({"nome": lo["nome"], **{k: lo.get(k) or "" for k in ("descricao", "prompt_en", "frente_en")},
-                                              "props": [{k: pr.get(k) for k in ("nome", "prompt_en", "camada", "x", "y", "w") if pr.get(k) is not None}
+                                              **{k: lo[k] for k in ("variante_de", "angulo_de", "angulo_en", "angulo", "planta") if lo.get(k)},
+                                              "props": [{k: pr.get(k) for k in ("nome", "prompt_en", "camada", "x", "y", "w", "real") if pr.get(k) is not None}
                                                         for pr in lo.get("props") or []],
                                               "lugares": [dict(lg) for lg in lo.get("lugares") or []], "chao": lo.get("chao") or {}}))
             for pr in lo.get("props") or []:
@@ -987,7 +1005,8 @@ def exportar(pid: str, base: str = A._BASE) -> bytes:
         for it in p["itens"]:
             pn = "itens/" + pasta_nome(it["nome"]) + "/"
             z.writestr(pn + "item.json", js({"nome": it["nome"], "tipo": it.get("tipo") or "objeto", "prompt_en": it.get("prompt_en") or "",
-                                             "personagens": it.get("personagens") or [], "texto": it.get("texto") or ""}))
+                                             "personagens": it.get("personagens") or [], "texto": it.get("texto") or "",
+                                             "onde": it.get("onde") or "", "painel": bool(it.get("painel"))}))
             cam = A.arquivo_img(p, it.get("img") or {}, base)
             x = ler(cam) if cam else None
             if x:

@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block title %}🗺 {{ p.nome }} — Lugares e mundos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1250px; }
+  .cr-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .cr-card h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; gap: 8px; align-items: center; }
+  .cr-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .cr-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .cr-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .cr-linha > * { margin: 0; }
+  .cr-linha button, .cr-btn { width: auto; margin: 0; padding: 6px 12px; }
+  .cr-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .cr-sec { background: #64748b !important; } .cr-perigo { background: #dc2626 !important; } .cr-on { background: #f59e0b !important; }
+  .cr-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .cr-ref, .cr-foto, .cr-pessoa { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; position: relative; }
+  .cr-ref img { width: 100%; height: 140px; object-fit: cover; border-radius: 6px; }
+  .cr-ref .n { position: absolute; top: 12px; left: 12px; background: #000; color: #ffeb3b; font-weight: 800; border-radius: 6px; padding: 0 8px; font-size: 1.2rem; }
+  .cr-chips { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0; }
+  .cr-chips label { font-size: .74rem; border: 1px solid var(--borda); border-radius: 999px; padding: 1px 7px; margin: 0; cursor: pointer; }
+  .cr-chips input { width: auto; margin: 0 3px 0 0; }
+  .cr-foto img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; }
+  .cr-foto .vaz { aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--code-bg); border-radius: 6px; font-size: .8rem; padding: 6px; }
+  .cr-foto.ok { border-color: #f59e0b; box-shadow: 0 0 0 2px #fde68a; }
+  .cr-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 12px; }
+  .cr-campos label { font-size: .8rem; color: var(--mudo); margin: 0; }
+  .cr-campos textarea { min-height: 54px; font-size: .86rem; }
+  .cr-nome { display: inline-block; border: 1px solid var(--borda); border-radius: 999px; padding: 2px 10px; margin: 2px; cursor: pointer; font-size: .85rem; }
+  .cr-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; }
+  .cr-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .cr-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .cr-trilha a { text-decoration: none; } .cr-trilha span.sep { color: var(--mudo); margin: 0 4px; }
+  /* 🗺 o mapa */
+  .mp-wrap { display: grid; grid-template-columns: 1fr 260px; gap: 10px; }
+  @media (max-width: 900px) { .mp-wrap { grid-template-columns: 1fr; } }
+  .mp-box { position: relative; overflow: hidden; border-radius: 10px; background: #0f172a; border: 1px solid var(--borda); touch-action: none; user-select: none; }
+  .mp-plano { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+  .mp-plano img { width: 100%; height: 100%; display: block; pointer-events: none; }
+  .mp-vazio { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; text-align: center; padding: 20px; }
+  .mp-pino { position: absolute; transform-origin: 50% 100%; cursor: pointer; white-space: nowrap; }
+  .mp-pino .alf { width: 18px; height: 18px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #dc2626; border: 2px solid #fff; box-shadow: 0 1px 4px #0008; margin: 0 auto; }
+  .mp-pino.sub .alf { background: #2563eb; } .mp-pino.sel .alf { background: #f59e0b; }
+  .mp-pino .nm { position: absolute; left: 22px; top: -6px; color: #fff; font-weight: 700; font-size: 13px; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 2px #000; }
+  .mp-pop { position: absolute; z-index: 5; background: var(--card); border: 1px solid var(--borda); border-radius: 10px; padding: 8px 10px; width: 260px; box-shadow: 0 6px 20px #0006; display: none; }
+  .mp-ctrl { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 4; }
+  .mp-ctrl button { width: 34px !important; height: 34px; padding: 0 !important; margin: 0 !important; }
+  .mp-info { position: absolute; left: 8px; bottom: 8px; z-index: 4; background: #000a; color: #fff; border-radius: 6px; padding: 3px 8px; font-size: .8rem; }
+  .mp-lista { max-height: 520px; overflow: auto; border: 1px solid var(--borda); border-radius: 10px; padding: 6px; }
+  .mp-lista div { padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: .86rem; }
+  .mp-lista div:hover { background: var(--acento-suave); }
+  .mp-vars { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .mp-vars img, .mp-vars .vaz { height: 64px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; border: 2px solid transparent; cursor: pointer; background: var(--code-bg); font-size: .7rem; display: flex; align-items: center; justify-content: center; }
+  .mp-vars img.atual { border-color: #f59e0b; }
+</style>
+
+<div class="cr-linha" style="justify-content:space-between">
+  <div>
+    <div class="cr-trilha cr-dica" id="trilha"></div>
+    <h1 style="margin:0">🗺 <span id="tNome">{{ p.nome }}</span> <span class="cr-dica" id="tEscala"></span></h1>
+  </div>
+  <div class="cr-linha"><a href="/criador-personagens#lugares">← todos</a>
+    <a class="cr-btn" href="/criador-lugares/{{ p.id }}/zip" style="text-decoration:none">⬇ zip (fotos, mapa, ficha)</a>
+    <form method="post" action="/criador-lugares/{{ p.id }}/excluir" onsubmit="return confirm('Excluir este lugar? Os sub-lugares sobem um nível e os personagens continuam.')" style="margin:0"><button class="cr-mini cr-perigo">🗑</button></form></div>
+</div>
+<div class="cr-barra" id="barra"></div>
+
+<!-- 1 · entrada -->
+<div class="cr-card">
+  <h2><span class="cr-num">1</span>📥 O lugar</h2>
+  <div class="cr-linha">
+    <label>Escala <select data-e="escala" style="width:auto">{% for k, v in escalas.items() %}<option value="{{ k }}" {% if p.escala == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label id="lEscalaLivre">…qual <input data-e="escala_livre" value="{{ p.entrada.escala_livre }}" placeholder="ex.: estação espacial, ilha, dungeon"></label>
+    <label>Fica dentro de <select data-e="pai" style="width:auto"><option value="">— nenhum (o topo)</option>{% for x in lugares %}<option value="{{ x.id }}" {% if p.pai == x.id %}selected{% endif %}>{{ x.nome }} · {{ x.escala }}</option>{% endfor %}</select></label>
+  </div>
+  <label>Como é <span class="cr-dica">(o que você imagina)</span></label>
+  <textarea data-e="descricao" rows="3">{{ p.entrada.descricao }}</textarea>
+  <h3 style="margin:10px 0 4px;font-size:1rem">🧩 Referências <span class="cr-dica">(fotos de lugares reais, desenhos, outros mapas — até {{ max_refs }}; marque o que pegar de cada uma — “🗺 estilo do mapa” vale só pro mapa)</span></h3>
+  <div class="cr-grade" id="refs"></div>
+  <div class="cr-linha"><label class="cr-btn cr-sec" style="cursor:pointer;color:#fff;border-radius:6px">➕ Adicionar imagem(ns)<input type="file" id="refUp" accept="image/*" multiple style="display:none"></label></div>
+  <label>💡 Inspirações <span class="cr-dica">(lugares de obras ou reais pra pegar um aspecto — ex.: “a verticalidade de Hong Kong, o clima de Silent Hill”)</span></label>
+  <textarea data-e="inspiracoes" rows="2">{{ p.entrada.inspiracoes }}</textarea>
+  <div class="cr-linha">
+    <label>🎨 Estilo <select data-e="estilo" style="width:auto">{% for k, v in estilos.items() %}<option value="{{ k }}" {% if p.entrada.estilo == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}<option value="outro" {% if p.entrada.estilo == 'outro' %}selected{% endif %}>✍ Outro…</option></select></label>
+    <label id="lLivre">…qual <input data-e="estilo_livre" value="{{ p.entrada.estilo_livre }}"></label>
+    <label>🕰 Época <select data-e="epoca" style="width:auto">{% for k, v in epocas.items() %}<option value="{{ k }}" {% if p.entrada.epoca == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}<option value="outro" {% if p.entrada.epoca == 'outro' %}selected{% endif %}>✍ Outra…</option></select></label>
+    <label id="lEpoca">…qual <input data-e="epoca_livre" value="{{ p.entrada.epoca_livre }}"></label>
+  </div>
+  <div class="cr-linha">
+    <label style="flex:1;min-width:240px">Evitar <input data-e="evitar" value="{{ p.entrada.evitar }}"></label>
+    <label><input type="checkbox" data-e="original" style="width:auto" {% if p.entrada.original %}checked{% endif %}> ✨ bem original</label>
+  </div>
+</div>
+
+<!-- 2 · ficha -->
+<div class="cr-card">
+  <h2><span class="cr-num">2</span>📝 Ficha, história e pessoas</h2>
+  <p class="cr-dica">A 🤖 IA escreve a história, a linha do tempo, as pessoas importantes e os pontos do mapa (com a posição) — coerente com o lugar de cima e os sub-lugares que já existem. Os pinos que você mexeu ficam.</p>
+  <div class="cr-linha"><button type="button" id="bFicha">🤖 Montar a ficha</button><span class="cr-dica" id="iaEst"></span></div>
+  <div id="nomes"></div>
+  <div class="cr-campos" id="ficha"></div>
+  <h3 style="margin:12px 0 4px;font-size:1rem">📜 Linha do tempo</h3>
+  <div id="tempo"></div>
+  <button type="button" class="cr-mini cr-sec" id="bTempo">➕ marco</button>
+  <h3 style="margin:12px 0 4px;font-size:1rem">👤 Pessoas importantes <span class="cr-dica">(🧬 vira um personagem no criador — com a época, o estilo e este lugar de origem)</span></h3>
+  <div class="cr-grade" id="pessoas"></div>
+  <button type="button" class="cr-mini cr-sec" id="bPessoa">➕ pessoa</button>
+  <div class="cr-linha"><button type="button" id="bFichaSalvar" class="cr-sec">💾 Salvar a ficha</button><span class="cr-dica" id="fEst"></span></div>
+</div>
+
+<!-- 3 · mapa -->
+<div class="cr-card">
+  <h2><span class="cr-num">3</span>🗺 Mapa</h2>
+  <p class="cr-dica">Gire a rodinha / pinça pra dar zoom e arraste pra andar. Clique num 📍 pra ver; os <b style="color:#2563eb">azuis</b> são sub-lugares (🔎 entra no mapa deles). <b>✏ Editar</b>: arraste os pinos; <b>➕ Pino</b>: clique onde quer; <b>📏 Régua</b>: clique em 2 pontos.</p>
+  <div class="cr-linha">
+    <label>Mapas <select id="mN" style="width:auto"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+    <input id="mCorr" placeholder="o que mudar (ex.: mais montanhas ao norte, rio cortando a cidade)" style="flex:1;min-width:220px">
+    <button type="button" id="bMapa">🚀 Gerar no Flow</button>
+    <label class="cr-btn cr-sec" style="cursor:pointer;color:#fff;border-radius:6px">📤 Meu mapa<input type="file" id="mUp" accept="image/*" style="display:none"></label>
+    <a id="lMapaPinos" class="cr-btn cr-sec" style="text-decoration:none;color:#fff" href="/criador-lugares/{{ p.id }}/mapa-com-pinos.png">⬇ mapa com os nomes</a>
+  </div>
+  <div class="cr-linha">
+    <button type="button" class="cr-sec" id="bEditar">✏ Editar pinos</button>
+    <button type="button" class="cr-sec" id="bNovoPino">➕ Pino</button>
+    <button type="button" class="cr-sec" id="bRegua">📏 Régua</button>
+    <span class="cr-dica" style="margin:0">Escala: o mapa inteiro tem</span> <input id="eLarg" style="width:90px"> <input id="eUni" style="width:120px"> <span class="cr-dica" style="margin:0">de largura</span>
+  </div>
+  <div class="mp-wrap">
+    <div>
+      <div class="mp-box" id="mapaBox">
+        <div class="mp-plano" id="plano"><img id="mapaImg" alt=""><div id="pinos"></div><svg id="regua" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible"></svg></div>
+        <div class="mp-vazio" id="mapaVazio">Ainda sem mapa — 🚀 gere no Flow ou 📤 mande o seu. Dá pra pôr pinos mesmo assim.</div>
+        <div class="mp-ctrl"><button type="button" id="zMais" class="cr-sec">+</button><button type="button" id="zMenos" class="cr-sec">−</button><button type="button" id="zReset" class="cr-sec">⟲</button></div>
+        <div class="mp-info" id="mpInfo"></div>
+        <div class="mp-pop" id="pop"></div>
+      </div>
+      <div class="mp-vars" id="mVars"></div>
+    </div>
+    <div class="mp-lista" id="mLista"></div>
+  </div>
+</div>
+
+<!-- 4 · fotos -->
+<div class="cr-card">
+  <h2><span class="cr-num">4</span>📷 Fotos do lugar</h2>
+  <p class="cr-dica">16:9 no Flow, nas vistas que fazem sentido pra escala. ⭐ marca as favoritas (a 1ª vira a capa).</p>
+  <div class="cr-chips" id="vistas"></div>
+  <div class="cr-linha"><input id="fCorr" placeholder="o que mudar nesta rodada (opcional)" style="flex:1;min-width:240px"><button type="button" id="bFotos">🚀 Gerar as fotos</button>
+    <label class="cr-btn cr-sec" style="cursor:pointer;color:#fff;border-radius:6px">📤 Minha foto<input type="file" id="fUp" accept="image/*" style="display:none"></label></div>
+  <div class="cr-grade" id="fotos"></div>
+</div>
+
+<!-- 5 · dentro deste lugar -->
+<div class="cr-card">
+  <h2><span class="cr-num">5</span>🧭 Dentro deste lugar</h2>
+  <div class="cr-linha"><b>Sub-lugares:</b> <span id="filhos"></span></div>
+  <form method="post" action="/criador-lugares/novo" class="cr-linha">
+    <input type="hidden" name="pai" value="{{ p.id }}">
+    <input name="nome" placeholder="nome do sub-lugar" style="width:200px">
+    <select name="escala" style="width:auto">{% for k, v in escalas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+    <input name="descricao" placeholder="como é (opcional)" style="flex:1;min-width:200px">
+    <button type="submit" class="cr-sec">➕ Criar dentro deste</button>
+  </form>
+  <div class="cr-linha"><b>🧍 Personagens daqui:</b> <span id="pers"></span></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }};
+const ASPECTOS = {{ aspectos|tojson }};
+const ESCALAS = {{ escalas|tojson }};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+let P = null, timer = null, fichaSuja = false, TEMPO = [], PESSOAS = [];
+const FICHA = [['descricao_en', '🎨 Descrição visual (inglês — vai em todo pedido)', 4], ['descricao_pt', 'Como é (português)', 3], ['historia', '📖 História', 5],
+  ['cultura', '🎎 Cultura', 3], ['clima', '🌦 Clima', 2], ['economia', '💰 Economia / recursos', 2], ['curiosidades', '✨ Curiosidades', 3], ['segredos', '🗝 Segredos', 3],
+  ['mapa_en', '🗺 Como desenhar o mapa (inglês)', 3], ['originalidade', '✨ Originalidade', 2]];
+async function api(url, dados) {
+  const op = { method: dados === undefined ? 'GET' : 'POST' };
+  if (dados instanceof FormData) op.body = dados;
+  else if (dados !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(dados); }
+  const r = await fetch(url, op); let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('HTTP ' + r.status)); return d;
+}
+function emFoco(box) { return box.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName); }
+function barra(msg, cls) { const b = $('barra'); b.className = 'cr-barra ' + (msg ? cls : ''); b.textContent = msg || ''; }
+async function recarregar() {
+  clearTimeout(timer);
+  try { P = await api(`/criador-lugares/${PID}/estado`); desenhar(); } catch (e) { barra('⚠ ' + e.message, 'erro'); }
+  const t = P && P.tarefa;
+  const esp = (t && !t.fim) || (P && [...P.fotos, ...P.mapa.variacoes].some(x => ['fila', 'gerando'].includes(x.estado)));
+  timer = setTimeout(recarregar, esp ? 3500 : 20000);
+}
+function desenhar() {
+  $('tNome').textContent = P.nome; $('tEscala').textContent = P.escala_nome;
+  $('trilha').innerHTML = P.caminho.map((c, k) => k === P.caminho.length - 1 ? `<b>${esc(c.nome)}</b>` : `<a href="/criador-lugares/${c.id}">${esc(c.nome)}</a>`).join('<span class="sep">›</span>');
+  $('lLivre').style.display = P.entrada.estilo === 'outro' ? '' : 'none';
+  $('lEpoca').style.display = P.entrada.epoca === 'outro' ? '' : 'none';
+  $('lEscalaLivre').style.display = P.escala === 'outro' ? '' : 'none';
+  const t = P.tarefa;
+  if (t && !t.fim) barra('⏳ ' + t.rotulo + '…', 'on'); else if (t && t.erro) barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro'); else barra('');
+  $('iaEst').textContent = P.ia ? '' : '🤖 IA desligada — a ficha sai da descrição (ligue em 🤖 IA → 🧬 Criador) ou escreva à mão';
+  desenharRefs(); desenharFicha(); desenharMapa(); desenharFotos();
+  $('filhos').innerHTML = P.filhos.map(f => `<a href="/criador-lugares/${f.id}">${esc(f.nome)}</a> <span class="cr-dica">${esc(f.escala)}</span>`).join(' · ') || '<span class="cr-dica">nenhum ainda (crie aqui ou num 📍 do mapa)</span>';
+  $('pers').innerHTML = P.personagens.map(c => `<a href="/criador-personagens/${c.id}">${esc(c.nome)}</a>`).join(' · ') || '<span class="cr-dica">nenhum (escolha este lugar em “De onde vem” no personagem, ou 🧬 numa pessoa importante)</span>';
+}
+// 1 · entrada
+function desenharRefs() {
+  if (emFoco($('refs'))) return;
+  $('refs').innerHTML = P.entrada.refs.map((r, k) => `<div class="cr-ref" data-arq="${esc(r.arquivo)}"><span class="n">${k + 1}</span>
+    <img src="/criador-lugares/${PID}/arquivo/refs/${esc(r.arquivo)}">
+    <div class="cr-chips">${Object.entries(ASPECTOS).map(([a, rot]) => `<label><input type="checkbox" data-pegar="${a}" ${r.pegar.includes(a) ? 'checked' : ''}>${esc(rot)}</label>`).join('')}</div>
+    <input data-nota value="${esc(r.nota || '')}" placeholder="nota (ex.: só as torres)">
+    <button type="button" class="cr-mini cr-perigo" data-apagar>✕</button></div>`).join('') || '<p class="cr-dica">Nenhuma imagem.</p>';
+}
+$('refUp').addEventListener('change', async (e) => {
+  for (const f of e.target.files) { const fd = new FormData(); fd.append('arquivo', f); try { await api(`/criador-lugares/${PID}/refs`, fd); } catch (er) { alert(er.message); break; } }
+  e.target.value = ''; recarregar();
+});
+$('refs').addEventListener('change', async (e) => {
+  const box = e.target.closest('[data-arq]'); if (!box) return; const d = {};
+  if (e.target.dataset.pegar !== undefined) d.pegar = [...box.querySelectorAll('[data-pegar]:checked')].map(i => i.dataset.pegar);
+  if (e.target.hasAttribute('data-nota')) d.nota = e.target.value;
+  try { await api(`/criador-lugares/${PID}/refs/${encodeURIComponent(box.dataset.arq)}`, d); document.activeElement.blur(); recarregar(); } catch (er) { alert(er.message); }
+});
+$('refs').addEventListener('click', async (e) => {
+  const box = e.target.closest('[data-arq]'); if (!box || !e.target.hasAttribute('data-apagar') || !confirm('Tirar esta imagem?')) return;
+  try { await api(`/criador-lugares/${PID}/refs/${encodeURIComponent(box.dataset.arq)}`, { apagar: true }); recarregar(); } catch (er) { alert(er.message); }
+});
+document.querySelectorAll('[data-e]').forEach(el => el.addEventListener('change', async () => {
+  const v = el.type === 'checkbox' ? el.checked : el.value;
+  try { await api(`/criador-lugares/${PID}/dados`, { [el.dataset.e]: v }); recarregar(); } catch (er) { alert(er.message); }
+}));
+// 2 · ficha
+function desenharFicha() {
+  const f = P.ficha || {};
+  $('nomes').innerHTML = (f.nomes || []).length ? '<span class="cr-dica">💡 nomes (clique pra usar):</span> ' + f.nomes.map(x => `<span class="cr-nome" data-nome="${esc(x.nome)}" title="${esc(x.porque)}">${esc(x.nome)}</span>`).join('') : '';
+  if (fichaSuja || emFoco($('ficha')) || emFoco($('tempo')) || emFoco($('pessoas'))) return;
+  $('ficha').innerHTML = `<label>Nome<input data-f="nome" value="${esc(P.nome)}"></label>` + FICHA.map(([k, rot, l]) => `<label>${rot}<textarea data-f="${k}" rows="${l}">${esc(f[k] || '')}</textarea></label>`).join('');
+  TEMPO = (f.linha_do_tempo || []).map(x => Object.assign({}, x)); PESSOAS = (f.pessoas || []).map(x => Object.assign({}, x));
+  pintarTempo(); pintarPessoas();
+}
+function pintarTempo() {
+  $('tempo').innerHTML = TEMPO.map((x, k) => `<div class="cr-linha" data-k="${k}"><input data-t="quando" value="${esc(x.quando)}" style="width:150px" placeholder="quando"><input data-t="evento" value="${esc(x.evento)}" style="flex:1;min-width:240px" placeholder="o que aconteceu"><button type="button" class="cr-mini cr-perigo" data-del>✕</button></div>`).join('') || '<p class="cr-dica">Sem marcos.</p>';
+}
+function pintarPessoas() {
+  $('pessoas').innerHTML = PESSOAS.map((x, k) => `<div class="cr-pessoa" data-k="${k}"><input data-p="nome" value="${esc(x.nome)}" placeholder="nome" style="font-weight:700">
+    <input data-p="papel" value="${esc(x.papel || '')}" placeholder="papel (rainha, ferreiro, vilão…)"><textarea data-p="descricao" rows="2" placeholder="quem é">${esc(x.descricao || '')}</textarea>
+    <textarea data-p="aparencia_en" rows="2" placeholder="aparência (inglês)">${esc(x.aparencia_en || '')}</textarea>
+    <div class="cr-linha">${x.personagem ? `<a href="/criador-personagens/${x.personagem}">🧬 abrir o personagem</a>` : (x.id ? '<button type="button" class="cr-mini" data-pers>🧬 virar personagem</button>' : '<span class="cr-dica">salve primeiro</span>')}<button type="button" class="cr-mini cr-perigo" data-del>✕</button></div></div>`).join('');
+}
+['ficha', 'tempo', 'pessoas'].forEach(id => $(id).addEventListener('input', (e) => {
+  fichaSuja = true; $('fEst').textContent = '✏ não salvo';
+  const r = e.target.closest('[data-k]'); if (!r) return;
+  if (e.target.dataset.t) TEMPO[+r.dataset.k][e.target.dataset.t] = e.target.value;
+  if (e.target.dataset.p) PESSOAS[+r.dataset.k][e.target.dataset.p] = e.target.value;
+}));
+$('tempo').addEventListener('click', (e) => { const r = e.target.closest('[data-k]'); if (r && e.target.hasAttribute('data-del')) { TEMPO.splice(+r.dataset.k, 1); fichaSuja = true; pintarTempo(); } });
+$('pessoas').addEventListener('click', async (e) => {
+  const r = e.target.closest('[data-k]'); if (!r) return; const x = PESSOAS[+r.dataset.k];
+  if (e.target.hasAttribute('data-del')) { PESSOAS.splice(+r.dataset.k, 1); fichaSuja = true; pintarPessoas(); }
+  if (e.target.hasAttribute('data-pers')) { if (fichaSuja) await salvarFicha(); try { const d = await api(`/criador-lugares/${PID}/pessoa/${x.id}/personagem`, {}); location.href = `/criador-personagens/${d.id}`; } catch (er) { alert(er.message); } }
+});
+$('bTempo').addEventListener('click', () => { TEMPO.push({ quando: '', evento: '' }); fichaSuja = true; pintarTempo(); });
+$('bPessoa').addEventListener('click', () => { PESSOAS.push({ nome: '', papel: '', descricao: '', aparencia_en: '' }); fichaSuja = true; pintarPessoas(); });
+$('nomes').addEventListener('click', (e) => { const n = e.target.dataset.nome; if (!n) return; $('ficha').querySelector('[data-f=nome]').value = n; fichaSuja = true; salvarFicha(); });
+async function salvarFicha() {
+  const d = { linha_do_tempo: TEMPO.filter(x => x.evento), pessoas: PESSOAS.filter(x => x.nome) };
+  $('ficha').querySelectorAll('[data-f]').forEach(i => d[i.dataset.f] = i.value);
+  try { await api(`/criador-lugares/${PID}/ficha`, d); fichaSuja = false; $('fEst').textContent = '✔ salva'; await recarregar(); } catch (er) { alert(er.message); }
+}
+$('bFichaSalvar').addEventListener('click', salvarFicha);
+$('bFicha').addEventListener('click', async () => {
+  if (fichaSuja && !confirm('A ficha tem mudanças não salvas — a IA vai escrever por cima. Continuar?')) return;
+  try { fichaSuja = false; await api(`/criador-lugares/${PID}/ficha/ia`, {}); recarregar(); } catch (er) { alert(er.message); }
+});
+// 3 · 🗺 mapa (zoom, arrastar, pinos, régua)
+let Z = 1, TX = 0, TY = 0, modo = '', selPino = null, regua = [], arrastando = null, panInicio = null;
+function aplicar() {
+  const box = $('mapaBox').getBoundingClientRect();
+  TX = Math.min(0, Math.max(box.width - box.width * Z, TX)); TY = Math.min(0, Math.max(box.height - box.height * Z, TY));
+  $('plano').style.transform = `translate(${TX}px, ${TY}px) scale(${Z})`;
+  document.querySelectorAll('.mp-pino').forEach(el => el.style.transform = `translate(-50%, -100%) scale(${1 / Z})`);
+  $('regua').querySelectorAll('text').forEach(t => t.setAttribute('font-size', 14 / Z));
+}
+function zoom(f, cx, cy) {
+  const box = $('mapaBox').getBoundingClientRect();
+  cx = cx == null ? box.width / 2 : cx; cy = cy == null ? box.height / 2 : cy;
+  const nz = Math.min(14, Math.max(1, Z * f)); TX = cx - (cx - TX) * nz / Z; TY = cy - (cy - TY) * nz / Z; Z = nz; aplicar();
+}
+function fracao(ev) { const r = $('plano').getBoundingClientRect(); return [Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height))]; }
+function distTxt(a, b) {
+  const L = P.escala_mapa.largura, u = P.escala_mapa.unidade, prop = P.mapa_prop || 16 / 9;
+  const d = Math.hypot((b[0] - a[0]) * L, (b[1] - a[1]) * L / prop);
+  return `≈ ${d >= 100 ? Math.round(d).toLocaleString('pt-BR') : d.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${u}`;
+}
+function desenharMapa() {
+  $('mapaBox').style.aspectRatio = String(P.mapa_prop || 16 / 9);
+  if (P.mapa_img) { $('mapaImg').src = `/criador-lugares/${PID}/arquivo/mapa/${P.mapa_img}`; $('mapaImg').style.display = ''; $('mapaVazio').style.display = 'none'; }
+  else { $('mapaImg').style.display = 'none'; $('mapaVazio').style.display = ''; }
+  $('lMapaPinos').style.display = P.mapa_img ? '' : 'none';
+  if (![$('eLarg'), $('eUni')].includes(document.activeElement)) { $('eLarg').value = P.escala_mapa.largura; $('eUni').value = P.escala_mapa.unidade; }
+  if (!arrastando) $('pinos').innerHTML = P.pinos.map(x => `<div class="mp-pino ${x.lugar ? 'sub' : ''} ${selPino === x.id ? 'sel' : ''}" data-pino="${x.id}" style="left:${x.x * 100}%;top:${x.y * 100}%"><div class="alf"></div><span class="nm">${esc(x.nome)}</span></div>`).join('');
+  $('mLista').innerHTML = P.pinos.length ? P.pinos.map(x => `<div data-ir="${x.id}">${x.lugar ? '🔵' : '📍'} <b>${esc(x.nome)}</b> <span class="cr-dica">${esc(x.tipo || '')}</span></div>`).join('') : '<p class="cr-dica">Sem pinos — 🤖 monte a ficha ou ➕ ponha à mão.</p>';
+  $('mVars').innerHTML = P.mapa.variacoes.slice().reverse().map(v => v.arquivo ? `<img src="/criador-lugares/${PID}/arquivo/mapa/${esc(v.arquivo)}" data-mapa="${v.id}" class="${P.mapa.aprovado === v.id ? 'atual' : ''}" title="usar este mapa">`
+    : `<div class="vaz" title="${esc(v.erro || '')}">${esc(v.estado === 'erro' ? '❌' : '⏳')}</div>`).join('');
+  aplicar(); desenharRegua();
+  $('mpInfo').textContent = (modo === 'novo' ? '➕ clique onde vai o pino · ' : modo === 'regua' ? '📏 clique em 2 pontos · ' : modo === 'editar' ? '✏ arraste os pinos · ' : '') + `${Math.round(Z * 100)}% · mapa: ${Number(P.escala_mapa.largura).toLocaleString('pt-BR')} ${P.escala_mapa.unidade}`;
+}
+function desenharRegua() {
+  const s = $('regua'); if (!regua.length) { s.innerHTML = ''; return; }
+  const pts = regua.map(([x, y]) => [x * 100 + '%', y * 100 + '%']);
+  s.innerHTML = regua.map(([x, y]) => `<circle cx="${x * 100}%" cy="${y * 100}%" r="${5 / Z}" fill="#facc15" stroke="#000" stroke-width="${1 / Z}"/>`).join('')
+    + (regua.length === 2 ? `<line x1="${pts[0][0]}" y1="${pts[0][1]}" x2="${pts[1][0]}" y2="${pts[1][1]}" stroke="#facc15" stroke-width="${3 / Z}" stroke-dasharray="${8 / Z} ${5 / Z}"/>
+      <text x="${(regua[0][0] + regua[1][0]) * 50}%" y="${(regua[0][1] + regua[1][1]) * 50}%" fill="#fff" stroke="#000" stroke-width="${3 / Z}" paint-order="stroke" font-weight="700" font-size="${14 / Z}">${esc(distTxt(regua[0], regua[1]))}</text>` : '');
+}
+function pop(x, ev) {
+  const p = $('pop'), box = $('mapaBox').getBoundingClientRect();
+  if (!x) { p.style.display = 'none'; selPino = null; return; }
+  selPino = x.id;
+  const outro = P.pinos.find(y => y.id !== x.id && y.id === pop.ultimo);
+  p.innerHTML = `<b>${x.lugar ? '🔵' : '📍'} ${esc(x.nome)}</b> <span class="cr-dica">${esc(x.tipo || '')}${x.escala ? ' · ' + esc(ESCALAS[x.escala] || '') : ''}</span>
+    <div style="font-size:.86rem;margin:4px 0">${esc(x.descricao || '')}</div>${outro ? `<div class="cr-dica">📏 até ${esc(outro.nome)}: ${esc(distTxt([outro.x, outro.y], [x.x, x.y]))}</div>` : ''}
+    <div class="cr-linha">${x.lugar ? `<a class="cr-btn" style="text-decoration:none" href="/criador-lugares/${x.lugar}">🔎 Entrar</a>` : '<button type="button" class="cr-mini" data-sub>🗺 Virar sub-lugar</button>'}
+    <button type="button" class="cr-mini cr-sec" data-edit>✏</button><button type="button" class="cr-mini cr-perigo" data-del>🗑</button></div>`;
+  pop.ultimo = x.id;
+  p.style.display = 'block';
+  p.style.left = Math.min(box.width - 270, Math.max(4, ev.clientX - box.left + 10)) + 'px';
+  p.style.top = Math.min(box.height - 150, Math.max(4, ev.clientY - box.top + 10)) + 'px';
+  p.dataset.pino = x.id; desenharMapa();
+}
+$('pop').addEventListener('click', async (e) => {
+  const x = P.pinos.find(y => y.id === $('pop').dataset.pino); if (!x) return;
+  try {
+    if (e.target.hasAttribute('data-sub')) { const d = await api(`/criador-lugares/${PID}/pinos/${x.id}/sub`, {}); location.href = `/criador-lugares/${d.id}`; }
+    if (e.target.hasAttribute('data-del')) { if (!confirm(`Apagar o pino ${x.nome}?`)) return; await api(`/criador-lugares/${PID}/pinos/${x.id}`, { apagar: true }); pop(null); recarregar(); }
+    if (e.target.hasAttribute('data-edit')) {
+      const nome = prompt('Nome do pino:', x.nome); if (nome === null) return;
+      const desc = prompt('Descrição:', x.descricao || ''); if (desc === null) return;
+      const tipo = prompt('Tipo (cidade, castelo, montanha, planeta…):', x.tipo || ''); if (tipo === null) return;
+      await api(`/criador-lugares/${PID}/pinos/${x.id}`, { nome, descricao: desc, tipo }); pop(null); recarregar();
+    }
+  } catch (er) { alert(er.message); }
+});
+const box = $('mapaBox');
+box.addEventListener('wheel', (e) => { e.preventDefault(); const r = box.getBoundingClientRect(); zoom(e.deltaY < 0 ? 1.18 : 1 / 1.18, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+const toques = new Map(); let pinca = null;
+box.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.mp-pop') || e.target.closest('.mp-ctrl')) return;
+  toques.set(e.pointerId, [e.clientX, e.clientY]);
+  if (toques.size === 2) { const [a, b] = [...toques.values()]; pinca = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: Z }; return; }
+  const pinoEl = e.target.closest('[data-pino]');
+  if (pinoEl && modo === 'editar') { arrastando = { id: pinoEl.dataset.pino, el: pinoEl, mexeu: false }; box.setPointerCapture(e.pointerId); return; }
+  panInicio = { x: e.clientX, y: e.clientY, tx: TX, ty: TY, mexeu: false, alvo: pinoEl };
+  box.setPointerCapture(e.pointerId);
+});
+box.addEventListener('pointermove', (e) => {
+  if (toques.has(e.pointerId)) toques.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pinca && toques.size === 2) { const [a, b] = [...toques.values()]; const r = box.getBoundingClientRect(); const nz = pinca.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinca.d; zoom(nz / Z, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top); return; }
+  if (arrastando) { const [fx, fy] = fracao(e); arrastando.el.style.left = fx * 100 + '%'; arrastando.el.style.top = fy * 100 + '%'; arrastando.mexeu = true; arrastando.f = [fx, fy]; return; }
+  if (panInicio) { const dx = e.clientX - panInicio.x, dy = e.clientY - panInicio.y; if (Math.abs(dx) + Math.abs(dy) > 4) panInicio.mexeu = true; TX = panInicio.tx + dx; TY = panInicio.ty + dy; aplicar(); }
+});
+box.addEventListener('pointerup', async (e) => {
+  toques.delete(e.pointerId); if (toques.size < 2) pinca = null;
+  if (arrastando) {
+    const a = arrastando; arrastando = null;
+    if (a.mexeu) { try { await api(`/criador-lugares/${PID}/pinos/${a.id}`, { x: a.f[0], y: a.f[1] }); recarregar(); } catch (er) { alert(er.message); } }
+    else pop(P.pinos.find(y => y.id === a.id), e);
+    return;
+  }
+  if (!panInicio) return;
+  const pi = panInicio; panInicio = null;
+  if (pi.mexeu) return;
+  if (pi.alvo && modo !== 'novo' && modo !== 'regua') { pop(P.pinos.find(y => y.id === pi.alvo.dataset.pino), e); return; }
+  const f = fracao(e);
+  if (modo === 'novo') {
+    const nome = prompt('Nome do novo pino:'); if (!nome) return;
+    try { await api(`/criador-lugares/${PID}/pinos/novo`, { nome, x: f[0], y: f[1], descricao: prompt('Descrição (opcional):', '') || '' }); recarregar(); } catch (er) { alert(er.message); }
+  } else if (modo === 'regua') { regua = regua.length >= 2 ? [f] : regua.concat([f]); desenharRegua(); }
+  else pop(null);
+});
+function trocarModo(m, btn) { modo = modo === m ? '' : m; ['bEditar', 'bNovoPino', 'bRegua'].forEach(id => $(id).classList.toggle('cr-on', $(id) === btn && modo === m)); if (m !== 'regua') { regua = []; } desenharMapa(); }
+$('bEditar').addEventListener('click', (e) => trocarModo('editar', e.target));
+$('bNovoPino').addEventListener('click', (e) => trocarModo('novo', e.target));
+$('bRegua').addEventListener('click', (e) => trocarModo('regua', e.target));
+$('zMais').addEventListener('click', () => zoom(1.4)); $('zMenos').addEventListener('click', () => zoom(1 / 1.4)); $('zReset').addEventListener('click', () => { Z = 1; TX = TY = 0; aplicar(); desenharRegua(); });
+$('mLista').addEventListener('click', (e) => {
+  const id = (e.target.closest('[data-ir]') || {}).dataset; if (!id || !id.ir) return; const x = P.pinos.find(y => y.id === id.ir); if (!x) return;
+  const r = box.getBoundingClientRect(); if (Z < 2.5) Z = 2.5; TX = r.width / 2 - x.x * r.width * Z; TY = r.height / 2 - x.y * r.height * Z; aplicar();
+  const pr = $('plano').getBoundingClientRect(); pop(x, { clientX: pr.left + x.x * pr.width, clientY: pr.top + x.y * pr.height });
+});
+$('mVars').addEventListener('click', async (e) => { const v = e.target.dataset.mapa; if (!v) return; try { await api(`/criador-lugares/${PID}/imagem/${v}/aprovar`, {}); recarregar(); } catch (er) { alert(er.message); } });
+[$('eLarg'), $('eUni')].forEach(i => i.addEventListener('change', async () => { try { await api(`/criador-lugares/${PID}/escala`, { largura: $('eLarg').value, unidade: $('eUni').value }); recarregar(); } catch (er) { alert(er.message); } }));
+$('bMapa').addEventListener('click', async () => { try { const d = await api(`/criador-lugares/${PID}/mapa/gerar`, { n: +$('mN').value, correcao: $('mCorr').value }); if (d.aviso) alert(d.aviso); recarregar(); } catch (er) { alert(er.message); } });
+$('mUp').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); fd.append('tipo', 'mapa'); try { await api(`/criador-lugares/${PID}/imagem/enviar`, fd); recarregar(); } catch (er) { alert(er.message); } e.target.value = ''; });
+window.addEventListener('resize', aplicar);
+// 4 · fotos
+function desenharFotos() {
+  if (!emFoco($('vistas'))) { const marc = new Set([...$('vistas').querySelectorAll('input:checked')].map(i => i.value)); const tem = $('vistas').children.length;
+    $('vistas').innerHTML = P.vistas.map(v => `<label><input type="checkbox" value="${v.chave}" ${!tem || marc.has(v.chave) ? 'checked' : ''}>${esc(v.rotulo)}</label>`).join(''); }
+  const rot = Object.fromEntries(P.vistas.map(v => [v.chave, v.rotulo]));
+  $('fotos').innerHTML = P.fotos.slice().reverse().map(x => `<div class="cr-foto ${x.aprovada ? 'ok' : ''}" data-f="${x.id}">${x.arquivo ? `<a href="/criador-lugares/${PID}/arquivo/fotos/${esc(x.arquivo)}" target="_blank"><img src="/criador-lugares/${PID}/arquivo/fotos/${esc(x.arquivo)}"></a>` : `<div class="vaz">${esc(x.estado === 'erro' ? '❌ ' + (x.erro || '') : x.msg || '⏳')}</div>`}
+    <div class="cr-linha"><span class="cr-dica" style="margin:0">${esc(rot[x.vista] || x.vista || '')}</span>${x.arquivo ? `<button type="button" class="cr-mini ${x.aprovada ? '' : 'cr-sec'}" data-ap>⭐</button>` : ''}${['fila', 'gerando'].includes(x.estado) ? '' : '<button type="button" class="cr-mini cr-perigo" data-del>🗑</button>'}</div></div>`).join('') || '<p class="cr-dica">Nenhuma foto ainda.</p>';
+}
+$('fotos').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-f]'); if (!b) return; const id = b.dataset.f;
+  try { if (e.target.hasAttribute('data-ap')) await api(`/criador-lugares/${PID}/imagem/${id}/aprovar`, {}); else if (e.target.hasAttribute('data-del')) { if (!confirm('Apagar esta foto?')) return; await api(`/criador-lugares/${PID}/imagem/${id}/apagar`, {}); } else return; recarregar(); } catch (er) { alert(er.message); }
+});
+$('bFotos').addEventListener('click', async () => {
+  const vistas = [...$('vistas').querySelectorAll('input:checked')].map(i => i.value);
+  try { const d = await api(`/criador-lugares/${PID}/fotos/gerar`, { vistas, correcao: $('fCorr').value }); if (d.aviso) alert(d.aviso); recarregar(); } catch (er) { alert(er.message); }
+});
+$('fUp').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); fd.append('tipo', 'foto'); try { await api(`/criador-lugares/${PID}/imagem/enviar`, fd); recarregar(); } catch (er) { alert(er.message); } e.target.value = ''; });
+recarregar();
+</script>
+{% endblock %}
