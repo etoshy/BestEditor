@@ -28,6 +28,12 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## ⚡ Geração rápida (v84_258)
+
+No painel **💡 ideias** de um canal de nicho: marque as ideias (⚡ marcar) e **⚡ fazer as marcadas** — ou **⚡ fazer todas as livres**. Sem clicar em mais nada, cada ideia vira um vídeo 📚: roteiro (+ títulos em inglês e português) → 1 take da voz → editor → as imagens **geradas no Flow** → legenda, sons, marca → **exporta** em **Full HD 1080p, 2K 1440p ou 4K 2160p**, no formato escolhido (9:16 ou 1:1).
+- **🎬 com vídeo do Flow**: a IA põe vídeo na maioria dos planos; quando o crédito de vídeo das contas acaba, aqueles planos saem como foto gerada. Desligado: só fotos.
+- No fim, no próprio painel: cada vídeo com **⬇ baixar / ▶ ver**, os **títulos** (idioma do post + português), **⬇ todos (.zip)** (vídeos + títulos.txt) e **📋 títulos** (títulos, descrição e hashtags de cada um, pronto pra postar). Uma ideia que falhou não para as outras; **🔁 retomar** refaz só as que faltaram. Pode fechar a página — segue sozinho.
+
 ## 💡 Nichos de canais + 📚 explicativo do zero no Flow (v84_256)
 
 > v84_257: “💡 gerar ideias” com mais espaço pra resposta (e, se ela vier cortada, tenta de novo pedindo 5) e mais tempo; o roteiro do 💬/📚 também. Quando a IA falha, a mensagem diz o motivo de verdade (cortada, tempo esgotado, chave inválida, sem crédito, limite, desligada).

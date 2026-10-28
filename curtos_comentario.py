@@ -423,10 +423,20 @@ def regra_lingua(p: Dict[str, Any]) -> str:
             "(no tags)" + (" (the same as fala_en)." if lp == "pt" else "."))
 
 
+def _regra_video_flow(p: Dict[str, Any]) -> str:
+    v = (p.get("config") or {}).get("flow_video")
+    if v is True:
+        return (" VIDEO MODE: prefer 'ia_video' for MOST cenas (2 of every 3 or more) — when the Flow video credits run out they "
+                "automatically become generated photos, so describe each shot so it also works as a still.")
+    if v is False:
+        return " PHOTO MODE: use ONLY layout 'ia' (generated photos) — no 'ia_video'."
+    return ""
+
+
 def _regra_fontes(p: Dict[str, Any]) -> str:
     m = modo_midia(p)
     if m == "flow":
-        return REGRA_FLOW
+        return REGRA_FLOW + _regra_video_flow(p)
     if m == "misto":
         return REGRA_MISTO if _tem_fontes(p) else REGRA_FLOW
     return REGRA_SO_FONTES if _tem_fontes(p) else REGRA_FONTES_LIVRES

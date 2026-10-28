@@ -162,3 +162,88 @@ def video_da_ideia(base: str, cid: str, iid: str, proporcao: str = "9:16", voz: 
         i["pid"] = p["id"]
         CT.salvar_canal(base, c)
     return p
+
+
+# ------------------------------------------------------------------ ⚡ geração rápida (v84_258): várias ideias → vídeos exportados
+QUALIDADES_RAPIDO = ("1080p", "1440p", "2160p")
+
+
+def _pasta_lotes(base: str) -> str:
+    d = os.path.join(CT.raiz(base), "lotes")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def criar_lote(base: str, cid: str, ids: List[str], video: bool = False, qualidade: str = "1080p", proporcao: str = "9:16",
+               voz: str = "") -> Dict[str, Any]:
+    c = CT.carregar_canal(base, cid)
+    todas = {i["id"]: i for i in c.get("ideias") or []}
+    ids = [i for i in ids if i in todas]
+    if not ids:
+        raise CT.CurtoErro("Escolha as ideias (ou gere algumas antes).")
+    lote = {"id": uuid.uuid4().hex[:10], "canal": cid, "canal_nome": c["nome"], "criado": time.time(), "fim": None,
+            "opcoes": {"video": bool(video), "qualidade": qualidade if qualidade in QUALIDADES_RAPIDO else "1080p",
+                       "proporcao": proporcao if proporcao in CT.PROPORCOES else "9:16", "voz": voz[:120]},
+            "itens": [{"ideia": i, "titulo_en": todas[i]["titulo_en"], "titulo_pt": todas[i].get("titulo_pt") or "", "pid": None,
+                       "estado": "na fila", "msg": "", "erro": None, "arquivo": None, "titulos": []} for i in ids]}
+    salvar_lote(base, lote)
+    return lote
+
+
+def salvar_lote(base: str, lote: Dict[str, Any]) -> None:
+    with CT._TRAVA:
+        cam = os.path.join(_pasta_lotes(base), lote["id"] + ".json")
+        with open(cam + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(lote, f, ensure_ascii=False, indent=1)
+        os.replace(cam + ".tmp", cam)
+
+
+def carregar_lote(base: str, lid: str) -> Dict[str, Any]:
+    if not CT._valido(lid):
+        raise CT.CurtoErro("Lote inválido.")
+    cam = os.path.join(_pasta_lotes(base), lid + ".json")
+    if not os.path.isfile(cam):
+        raise CT.CurtoErro("Lote não encontrado.")
+    with open(cam, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def lotes_do_canal(base: str, cid: str) -> List[Dict[str, Any]]:
+    out = []
+    for f in os.listdir(_pasta_lotes(base)):
+        if f.endswith(".json"):
+            try:
+                lt = carregar_lote(base, f[:-5])
+            except (CT.CurtoErro, OSError, ValueError):
+                continue
+            if lt.get("canal") == cid:
+                out.append(lt)
+    return sorted(out, key=lambda x: -float(x.get("criado") or 0))
+
+
+def titulos_do_projeto(p: Dict[str, Any]) -> List[Dict[str, str]]:
+    r = p.get("roteiro") or {}
+    ts = [{"en": t.get("en") or "", "pt": t.get("pt") or ""} for t in r.get("titulos") or []]
+    if r.get("titulo_video") and not any(t["en"] == r["titulo_video"] for t in ts):
+        ts.insert(0, {"en": r["titulo_video"], "pt": r.get("titulo_pt") or ""})
+    return ts[:8]
+
+
+def texto_dos_titulos(base: str, lote: Dict[str, Any]) -> str:
+    """📋 Os títulos de cada vídeo (idioma do post + português), a descrição e as hashtags — pronto pra copiar na postagem."""
+    L = [f"{lote.get('canal_nome') or ''} — geração rápida ({time.strftime('%d/%m/%Y %H:%M', time.localtime(lote.get('criado') or 0))})", ""]
+    for k, it in enumerate(lote["itens"], 1):
+        L.append(f"#{k} {it['titulo_en']}" + ("" if it["estado"] == "pronto" else f"   [{it['estado']}]"))
+        try:
+            p = CT.carregar(base, it["pid"]) if it.get("pid") else None
+        except CT.CurtoErro:
+            p = None
+        for t in (titulos_do_projeto(p) if p else it.get("titulos") or []):
+            L.append(f"   • {t['en']}" + (f"  |  {t['pt']}" if t.get("pt") else ""))
+        r = (p or {}).get("roteiro") or {}
+        if r.get("descricao"):
+            L.append(f"   descrição: {r['descricao']}")
+        if r.get("hashtags"):
+            L.append("   " + " ".join(r["hashtags"]))
+        L.append("")
+    return "\n".join(L)

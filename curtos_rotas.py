@@ -38,8 +38,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
               para_estudio: Optional[Callable[[Dict[str, Any]], str]] = None,
               rodar_pixabay: Optional[Callable[[Any], int]] = None,
               trocar_no_estudio: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
-              marca_no_estudio: Optional[Callable[[str, Dict[str, Any]], None]] = None) -> None:
-    CB.update(transcrever=transcrever, tts=tts, para_estudio=para_estudio, trocar=trocar_no_estudio, marca=marca_no_estudio)
+              marca_no_estudio: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+              exportar: Optional[Callable[..., str]] = None) -> None:
+    CB.update(transcrever=transcrever, tts=tts, para_estudio=para_estudio, trocar=trocar_no_estudio, marca=marca_no_estudio,
+              exportar=exportar, limpar=limpar_tts)
 
     def _ok(**kw: Any):
         return jsonify(dict(ok=True, **kw))
@@ -200,6 +202,130 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos", methods=["GET"])
     def curtos_hub():
         return _hub()
+
+    # ------------------------------------------------------------------ ⚡ geração rápida (v84_258)
+    def _rodar_lote(lid: str, prog: Callable[[str], None]) -> str:
+        """As ideias, uma por uma: vídeo 📚 no Flow → roteiro → 1 take → editor → as mídias (Flow) → EXPORTA. Sem clicar em nada."""
+        lote = CN.carregar_lote(base_dir, lid)
+        op, cid = lote["opcoes"], lote["canal"]
+        n = len(lote["itens"])
+        for k, it in enumerate(lote["itens"], 1):
+            if it["estado"] == "pronto":
+                continue
+            rot = f"{k}/{n} · {it['titulo_en'][:50]}"
+
+            def log(m: str, it=it, rot=rot) -> None:
+                it["msg"] = str(m)[:200]
+                prog(f"{rot} — {m}")
+            try:
+                it.update(estado="fazendo", erro=None)
+                CN.salvar_lote(base_dir, lote)
+                p = CN.video_da_ideia(base_dir, cid, it["ideia"], op["proporcao"], op.get("voz") or "")
+                it["pid"] = p["id"]
+                with CT._TRAVA:
+                    q = CT.carregar(base_dir, p["id"])
+                    q["config"].update(flow_video=bool(op.get("video")), takes=1, qualidade=op["qualidade"],
+                                       providers=["flow", "pexels", "pixabay", "brave", "google", "bing", "wikipedia"])
+                    CT.salvar(base_dir, q)
+                CN.salvar_lote(base_dir, lote)
+                _fazer_tudo(p["id"], op.get("voz") or "", None, log)
+                if not CB.get("exportar"):
+                    raise CT.CurtoErro("A exportação automática não está disponível aqui.")
+                job_id = (CT.carregar(base_dir, p["id"]).get("editor") or {}).get("job_id")
+                arq = CB["exportar"](job_id, op["qualidade"], log)
+                with CT._TRAVA:
+                    q = CT.carregar(base_dir, p["id"])
+                    q["exportado"] = {"arquivo": arq, "quando": time.time(), "qualidade": op["qualidade"], "job_id": job_id}
+                    CT.salvar(base_dir, q)
+                it.update(estado="pronto", arquivo=arq, msg="✅ exportado", titulos=CN.titulos_do_projeto(CT.carregar(base_dir, p["id"])))
+            except Exception as exc:  # noqa: BLE001  (uma ideia que falhou não para as outras)
+                it.update(estado="erro", erro=str(exc)[:400])
+            CN.salvar_lote(base_dir, lote)
+        lote["fim"] = time.time()
+        CN.salvar_lote(base_dir, lote)
+        ok = sum(1 for x in lote["itens"] if x["estado"] == "pronto")
+        return f"{ok} de {n} vídeo(s) exportado(s)"
+
+    @app.route("/curtos/canal/<cid>/rapido", methods=["POST"])
+    def curtos_rapido(cid: str):
+        _canal(cid)
+        b = _corpo()
+        ids = b.get("ideias")
+        if ids == "todas" or not ids:
+            ids = [i["id"] for i in CN.ideias(base_dir, cid) if not i.get("pid")]
+        try:
+            lote = CN.criar_lote(base_dir, cid, [str(x) for x in ids][:50], bool(b.get("video")), str(b.get("qualidade") or "1080p"),
+                                 str(b.get("proporcao") or "9:16"), str(b.get("voz") or ""))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        r = _rodar("lote:" + lote["id"], f"⚡ geração rápida ({len(lote['itens'])} vídeo(s))", lambda prog: _rodar_lote(lote["id"], prog))
+        if isinstance(r, tuple):
+            return r
+        return _ok(lote=lote["id"])
+
+    @app.route("/curtos/canal/<cid>/lotes", methods=["GET"])
+    def curtos_lotes(cid: str):
+        _canal(cid)
+        return _ok(lotes=[dict(lt, tarefa=TAREFAS.get("lote:" + lt["id"])) for lt in CN.lotes_do_canal(base_dir, cid)[:10]])
+
+    @app.route("/curtos/lote/<lid>", methods=["GET"])
+    def curtos_lote(lid: str):
+        try:
+            lt = CN.carregar_lote(base_dir, lid)
+        except CT.CurtoErro:
+            abort(404)
+        return _ok(lote=lt, tarefa=TAREFAS.get("lote:" + lid))
+
+    @app.route("/curtos/lote/<lid>/retomar", methods=["POST"])
+    def curtos_lote_retomar(lid: str):
+        try:
+            lt = CN.carregar_lote(base_dir, lid)
+        except CT.CurtoErro:
+            abort(404)
+        for it in lt["itens"]:
+            if it["estado"] in ("erro", "fazendo"):
+                it["estado"] = "na fila"
+        CN.salvar_lote(base_dir, lt)
+        r = _rodar("lote:" + lid, "⚡ geração rápida (retomando)", lambda prog: _rodar_lote(lid, prog))
+        return r if isinstance(r, tuple) else _ok()
+
+    @app.route("/curtos/lote/<lid>/titulos.txt", methods=["GET"])
+    def curtos_lote_titulos(lid: str):
+        try:
+            lt = CN.carregar_lote(base_dir, lid)
+        except CT.CurtoErro:
+            abort(404)
+        from flask import Response
+        return Response(CN.texto_dos_titulos(base_dir, lt), mimetype="text/plain; charset=utf-8",
+                        headers={"Content-Disposition": f"attachment; filename=titulos_{lid}.txt"} if request.args.get("baixar") else {})
+
+    @app.route("/curtos/lote/<lid>/todos.zip", methods=["GET"])
+    def curtos_lote_zip(lid: str):
+        """⬇ todos os vídeos prontos do lote + os títulos (o zip é só "guardado", sem recomprimir: vídeo já é comprimido)."""
+        import zipfile
+        try:
+            lt = CN.carregar_lote(base_dir, lid)
+        except CT.CurtoErro:
+            abort(404)
+        prontos = [it for it in lt["itens"] if it["estado"] == "pronto" and it.get("arquivo") and os.path.isfile(it["arquivo"])]
+        if not prontos:
+            abort(404)
+        cam = os.path.join(tempfile.mkdtemp(prefix="lote_"), f"videos_{lid}.zip")
+        with zipfile.ZipFile(cam, "w", zipfile.ZIP_STORED) as z:
+            for k, it in enumerate(prontos, 1):
+                z.write(it["arquivo"], f"{k:02d}_{secure_filename(it['titulo_en'])[:60] or 'video'}.mp4")
+            z.writestr("titulos.txt", CN.texto_dos_titulos(base_dir, lt))
+        return send_file(cam, as_attachment=True, download_name=f"videos_{lt.get('canal_nome') or lid}.zip")
+
+    @app.route("/curtos/<pid>/video.mp4", methods=["GET"])
+    def curto_video_exportado(pid: str):
+        p = _proj(pid)
+        arq = (p.get("exportado") or {}).get("arquivo")
+        if not arq or not os.path.isfile(arq):
+            jid = (p.get("editor") or {}).get("job_id")
+            return redirect(f"/job/{jid}/edit-segments") if jid else abort(404)
+        return send_file(arq, as_attachment=bool(request.args.get("baixar", "1") != "0"),
+                         download_name=f"{secure_filename(p.get('titulo') or 'video')[:60] or 'video'}.mp4", conditional=True)
 
     # ------------------------------------------------------------------ 💡 nichos e ideias (v84_256)
     @app.route("/curtos/nicho/<chave>/criar", methods=["POST"])

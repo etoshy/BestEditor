@@ -12056,6 +12056,39 @@ def _curto_trocar_voz(job_id: str, d: Dict[str, Any]) -> Dict[str, Any]:
     return {"mantidos": len(segs) - len(sem), "novos": len(sem), "dur": float(d["dur"])}
 
 
+def _curto_exportar(job_id: str, qualidade: str = "1080p", on_log=lambda _m: None, limite_s: float = 6 * 3600) -> str:
+    """⚡ v84_258 (geração rápida): espera as prévias (o Flow gera as fotos/vídeos aí), monta e exporta SEM abrir o editor —
+    com o que o editor mostraria. Devolve o caminho do vídeo final (com legenda, se tiver)."""
+    import qualidade_export
+    job = _JOBS.get(job_id)
+    if not job:
+        raise RuntimeError("projeto do editor não encontrado")
+    t0 = time.time()
+    while job.get("status") in ("buscando_previas", "aguardando_json", "transcrevendo") and time.time() - t0 < limite_s:
+        pr = job.get("preview_progress") or {}
+        on_log(f"🎞 gerando/buscando as mídias… {pr.get('current', '')}/{pr.get('total', '?')}")
+        time.sleep(3)
+    if job.get("status") == "montando":
+        pass
+    elif not job.get("pending_segments"):
+        raise RuntimeError("o projeto do editor não tem trechos")
+    else:
+        job["export_quality"] = qualidade if qualidade in qualidade_export.RESOLUCOES else "1080p"
+        segs = [_segmento_obj(d) for d in job["pending_segments"]]
+        on_log("🎬 montando e exportando…")
+        _start_assembly(job_id, job, _fixar_midias_da_previa(job, segs))
+    while job.get("status") == "montando" and time.time() - t0 < limite_s:
+        pr = job.get("progress") or {}
+        on_log(f"🎬 exportando — {NOMES_ETAPAS_MONTAGEM.get(pr.get('stage'), pr.get('stage') or '')}")
+        time.sleep(3)
+    if job.get("status") != "concluido":
+        raise RuntimeError(str(job.get("assembly_error") or f"a exportação parou ({job.get('status')})")[:400])
+    final = job.get("captioned_output_path") or os.path.join(OUTPUTS_DIR, f"{job_id}.mp4")
+    if not os.path.isfile(final):
+        raise RuntimeError("a exportação terminou mas o arquivo não apareceu")
+    return final
+
+
 def _curto_marca(job_id: str, cfg: Dict[str, Any]) -> None:
     """🏷 a marca mudou na página do curto: o projeto do editor passa a exportar com ela."""
     job = _JOBS.get(job_id)
@@ -12068,7 +12101,7 @@ def _curto_marca(job_id: str, cfg: Dict[str, Any]) -> None:
 import curtos_rotas as _curtos_rotas  # noqa: E402  ⚡ Vídeos curtos (aba Modelos de vídeo, v84_246)
 _curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isolado,
                         lambda t, m: na.limpar_texto_para_tts(t, motor=m), _curto_para_estudio,
-                        trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca)
+                        trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca, exportar=_curto_exportar)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)

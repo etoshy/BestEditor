@@ -47,6 +47,14 @@
       <button class="ct-mini" id="piGerar">💡 gerar 10 ideias</button>
       <select id="piProp" style="width:auto;margin:0">{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
       <select id="piVoz" style="width:auto;margin:0">{% for v in vozes_ingles %}<option value="{{ v.slug }}">🎙 {{ v.nome }}</option>{% else %}<option value="">(sem voz)</option>{% endfor %}</select></div>
+    <div class="ct-linha" style="background:var(--acento-suave);border:1px solid var(--acento);border-radius:10px;padding:8px 10px">
+      <b>⚡ Geração rápida</b>
+      <label style="font-weight:400;margin:0"><input type="checkbox" id="piVideo" style="width:auto"> 🎬 com vídeo do Flow (acabou o crédito de vídeo → foto)</label>
+      <select id="piQual" style="width:auto;margin:0"><option value="1080p">Full HD 1080p</option><option value="1440p">2K 1440p</option><option value="2160p">4K 2160p</option></select>
+      <button class="ct-mini" id="piRapSel">⚡ fazer as marcadas</button><button class="ct-mini ct-sec" id="piRapTodas">⚡ fazer todas as livres</button>
+      <span class="ct-dica" style="margin:0">— roteiro, voz, imagens no Flow, legenda, sons e EXPORTA sozinho; no fim: os títulos e os vídeos pra baixar</span>
+    </div>
+    <div id="piLotes"></div>
     <div id="piBarra" class="ct-dica"></div>
     <div id="piLista"></div>
   </div>
@@ -66,14 +74,38 @@
         <b>${esc(i.titulo_en)}</b> <span class="ct-dica">· ${esc(i.titulo_pt)}</span>
         <div class="ct-dica">🪝 ${esc(i.gancho_en)}</div><div class="ct-dica">📌 ${esc(i.tema)}</div><div class="ct-dica">🎞 ${esc(i.visual)} · ${esc(i.por_que)}</div></div>
         <div style="display:flex;gap:4px;flex-direction:column">${i.pid ? `<a href="/curtos/${i.pid}">📚 abrir o vídeo</a>` :
-        `<button class="ct-mini" data-ivid="${i.id}">📚 criar vídeo</button><button class="ct-mini" data-ivid="${i.id}" data-tudo="1">🚀 criar e fazer tudo</button>`}</div></div>`).join('')
+        `<label style="font-weight:400;margin:0;font-size:.8rem"><input type="checkbox" class="piSel" value="${i.id}" style="width:auto"> ⚡ marcar</label>
+         <button class="ct-mini" data-ivid="${i.id}">📚 criar vídeo</button><button class="ct-mini" data-ivid="${i.id}" data-tudo="1">🚀 criar e fazer tudo</button>`}</div></div>`).join('')
       || '<p class="ct-dica">Nenhuma ideia ainda — 💡 gerar.</p>';
   }
+  const EST = { 'na fila': '⏳ na fila', fazendo: '⚙ fazendo', pronto: '✅ pronto', erro: '❌ erro' };
+  async function lotes() {
+    if (!CID) return;
+    const d = await j('/curtos/canal/' + CID + '/lotes'); let rodando = false;
+    g('piLotes').innerHTML = (d.lotes || []).map(lt => { const t = lt.tarefa, vivo = t && !t.fim; rodando = rodando || vivo;
+      const ok = lt.itens.filter(x => x.estado === 'pronto').length;
+      return `<div class="ct-lin" style="display:block"><div class="ct-linha" style="justify-content:space-between"><b>⚡ lote de ${lt.itens.length} · ${ok} pronto(s) · ${esc(lt.opcoes.qualidade)}${lt.opcoes.video ? ' · 🎬 vídeo' : ' · 🖼 fotos'}</b>
+        <span>${vivo ? '<span class="ct-dica">⏳ ' + esc(t.prog || t.rotulo) + '</span>' : ''}
+        ${ok ? `<a href="/curtos/lote/${lt.id}/todos.zip">⬇ todos (.zip)</a> · <a href="/curtos/lote/${lt.id}/titulos.txt" target="_blank">📋 títulos</a>` : ''}
+        ${!vivo && lt.itens.some(x => x.estado === 'erro' || x.estado === 'fazendo') ? `<button class="ct-mini ct-sec" data-retomar="${lt.id}">🔁 retomar</button>` : ''}</span></div>
+        ${lt.itens.map(x => `<div class="ct-dica" style="margin:2px 0">${EST[x.estado] || x.estado} <b>${esc(x.titulo_en)}</b> ${x.estado === 'fazendo' ? '— ' + esc(x.msg) : ''}${x.erro ? ' — ' + esc(x.erro) : ''}
+          ${x.estado === 'pronto' ? ` · <a href="/curtos/${x.pid}/video.mp4">⬇ baixar</a> · <a href="/curtos/${x.pid}/video.mp4?baixar=0" target="_blank">▶ ver</a>` : ''}${x.pid ? ` · <a href="/curtos/${x.pid}">abrir</a>` : ''}
+          ${(x.titulos || []).length ? '<br>🏷 ' + x.titulos.map(tt => esc(tt.en) + (tt.pt ? ' <i>(' + esc(tt.pt) + ')</i>' : '')).join(' · ') : ''}</div>`).join('')}</div>`; }).join('');
+    if (rodando) setTimeout(lotes, 3000);
+  }
+  async function rapido(ids) {
+    try { await j('/curtos/canal/' + CID + '/rapido', { ideias: ids, video: g('piVideo').checked, qualidade: g('piQual').value, proporcao: g('piProp').value, voz: g('piVoz').value });
+      g('piBarra').textContent = '⚡ começou — pode fechar a página, ele segue sozinho'; setTimeout(() => { lotes(); carregar(); }, 800); }
+    catch (e) { g('piBarra').textContent = '❌ ' + e.message; }
+  }
+  g('piRapSel').onclick = () => { const ids = [...document.querySelectorAll('.piSel:checked')].map(x => x.value); if (!ids.length) { g('piBarra').textContent = 'marque as ideias (⚡ marcar)'; return; } rapido(ids); };
+  g('piRapTodas').onclick = () => { if (confirm('Fazer TODAS as ideias livres deste canal? (usa os créditos do Flow e da IA)')) rapido('todas'); };
   function abrir(cid, nome) { CID = cid; g('painelIdeias').style.display = ''; g('piNome').textContent = '💡 ' + nome; carregar(); g('painelIdeias').scrollIntoView({ block: 'start' }); }
   document.addEventListener('click', async ev => {
     const ds = ev.target.dataset;
     try {
-      if (ds.ideias) abrir(ds.ideias, ev.target.closest('.ct-modelo').querySelector('b').textContent);
+      if (ds.ideias) { abrir(ds.ideias, ev.target.closest('.ct-modelo').querySelector('b').textContent); lotes(); }
+      if (ds.retomar) { await j('/curtos/lote/' + ds.retomar + '/retomar', {}); setTimeout(lotes, 500); }
       if (ds.ivid) { ev.target.disabled = true; const d = await j('/curtos/canal/' + CID + '/ideia/' + ds.ivid + '/video', { tudo: !!ds.tudo, proporcao: g('piProp').value, voz: g('piVoz').value }); location.href = d.link; }
     } catch (e) { g('piBarra').textContent = '❌ ' + e.message; ev.target.disabled = false; }
   });

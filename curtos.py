@@ -2262,7 +2262,8 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
             limites = [s0] + cortes + [s1]
             buscas = [cn["query"]] + list(cn.get("alternativas") or [])
             for j in range(len(limites) - 1):
-                prov, mt = ("material", "video") if cn.get("material") else rota_da_cena(cn["layout"], providers)
+                prov, mt = ("material", "video") if cn.get("material") else rota_da_cena(
+                    "ia" if cn["layout"] == "ia_video" and (p.get("config") or {}).get("flow_video") is False else cn["layout"], providers)
                 q = cn["material"] if prov == "material" else buscas[j % len(buscas)] if buscas else cn.get("visual") or "news"
                 alts = [x for x in buscas if x != q][:3] if prov != "material" else []
                 out.append({"start": round(limites[j], 3), "end": round(limites[j + 1], 3), "bloco": b["id"], "cena": k, "parte": j,
