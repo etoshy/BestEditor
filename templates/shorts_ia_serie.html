@@ -50,8 +50,9 @@
     <button id="bFichasP" class="si-mini">📋 fichas que faltam</button> <button id="bVozesP" class="si-mini">🎙 vozes que faltam</button>
     <button id="bTudoP" class="si-mini">🧍📋🎙 preparar todos</button></div>
   <form id="fImg" class="si-linha" style="border:1px dashed var(--borda);border-radius:8px;padding:6px 8px">
-    <b>➕ personagem a partir de uma imagem sua</b>
-    <input type="file" name="arquivo" accept="image/*" required style="width:auto">
+    <b>➕ personagem a partir de imagens</b>
+    <input type="file" name="arquivo" accept="image/*" multiple required style="width:auto">
+    <select name="modo" style="width:auto"><option value="inspiracao">✨ inspiração — criar um ORIGINAL parecido</option><option value="minha">🔒 é meu personagem — usar igual</option></select>
     <input name="nota" placeholder="nota (opcional): ex.: é a avó dela, rabugenta mas doce" style="flex:1;min-width:200px">
     <label><input type="checkbox" name="preparar" value="1" checked> já fazer ficha + voz</label>
     <button class="si-mini">🤖 criar o perfil</button>
@@ -148,10 +149,18 @@ function cardItem(it, tipo) {
        ${it.estreia ? `<div class="si-st">👤 estreou no capítulo ${esc(it.estreia)}${it.fixo ? ' · fixo' : ' · participação'}</div>` : ''}`
     : `<input data-k="nome" value="${esc(it.nome)}" placeholder="nome">
        <textarea data-k="descricao" rows="4" placeholder="descrição (EN), sem personagens">${esc(it.descricao)}</textarea>`;
-  return `<div class="si-item" data-id="${it.id}"><b>${esc(it.id)} · ${esc(it.nome)}</b>${img}${status(r)}${fichas}${campos}
+  let insp = '';
+  if (tipo === 'P') {
+    const ims = (it.inspiracoes || []).map(n => `<span style="position:relative;display:inline-block"><img src="${arqRef(n)}" style="width:54px;height:72px;object-fit:cover;border-radius:6px" loading="lazy"><button class="si-mini si-perigo" data-tirarinsp="${n}" style="position:absolute;top:-4px;right:-4px;padding:0 4px !important">✕</button></span>`).join(' ');
+    insp = `<div class="si-st">🖼 inspirações ${ims ? '' : '(nenhuma)'}</div><div>${ims}</div>
+      <div class="si-linha"><label class="si-mini si-sec" style="cursor:pointer">⬆ inspirações (várias)<input type="file" accept="image/*" multiple data-insp hidden></label></div>
+      <div class="si-linha"><button class="si-mini" data-refazer="referencia" ${r.arquivo ? '' : 'disabled'} title="a IA reescreve o perfil olhando a referência travada (+ inspirações) e refaz a ficha e a voz">🔁 refazer tudo pela referência</button>
+        <button class="si-mini" data-refazer="inspiracao" ${(it.inspiracoes || []).length ? '' : 'disabled'} title="um personagem ORIGINAL parecido com as inspirações: perfil novo, referência nova no Flow, ficha e voz">✨ criar parecido (original)</button></div>`;
+  }
+  return `<div class="si-item" data-id="${it.id}"><b>${esc(it.id)} · ${esc(it.nome)}</b>${img}${status(r)}${insp}${fichas}${campos}
     <div class="si-linha"><button class="si-mini" data-salvar>💾</button>${tipo === 'P' ? '<button class="si-mini" data-preparar title="referência → ficha → voz, sozinho">🧍📋🎙 tudo</button>' : ''}
       <button class="si-mini si-sec" data-ref>${r.arquivo ? '🔁' : '🧍'} ${tipo === 'P' ? 'referência' : 'imagem'} no Flow</button>
-      <label class="si-mini si-sec" style="cursor:pointer">⬆ enviar<input type="file" accept="image/*" data-enviar hidden></label>
+      <label class="si-mini si-sec" style="cursor:pointer" title="a imagem vira a referência travada (use pra personagem SEU)">⬆ ${tipo === 'P' ? 'é meu (travar)' : 'enviar'}<input type="file" accept="image/*" data-enviar hidden></label>
       <button class="si-mini si-perigo" data-apagar>🗑</button></div></div>`;
 }
 function desenhar() {
@@ -172,12 +181,24 @@ document.addEventListener('click', async ev => {
     else if (b.hasAttribute('data-ficha') && card) { await api(BASE + '/personagem', dadosDo(card)); const r = await api(BASE + '/fichas', { ids: [card.dataset.id] }); barra('📋 ficha na fila do Flow' + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); }
     else if (b.hasAttribute('data-voz') && card) { await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/vozes', { ids: [card.dataset.id] }); recarregar(); }
     else if (b.hasAttribute('data-preparar') && card) { await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/preparar', { ids: [card.dataset.id] }); barra('🧍📋🎙 preparando (referência → ficha → voz, sozinho)', 'on'); recarregar(); }
+    else if (b.dataset.refazer && card) {
+      const insp = b.dataset.refazer === 'inspiracao';
+      if (!confirm(insp ? 'Criar um personagem ORIGINAL parecido com as inspirações? (perfil, referência, ficha e voz novos — o nome fica)' : 'Refazer o perfil, a ficha e a voz a partir da referência travada?')) return;
+      await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/item/' + card.dataset.id + '/refazer', { modo: b.dataset.refazer }); recarregar();
+    }
+    else if (b.dataset.tirarinsp && card) { await api(BASE + '/item/' + card.dataset.id + '/inspiracao/' + b.dataset.tirarinsp + '/apagar', {}); recarregar(); }
     else if (b.hasAttribute('data-apagar') && card) { if (!confirm('Apagar ' + card.dataset.id + '?')) return; await api(BASE + '/item/' + card.dataset.id + '/apagar', {}); recarregar(); }
     else if (b.dataset.ideia) { b.disabled = true; const r = await api(BASE + '/ep/novo', { ideia: b.dataset.ideia }); location.href = r.url; }
   } catch (e) { barra('❌ ' + e.message, 'erro'); }
 });
 document.addEventListener('change', async ev => {
-  const f = ev.target; if (!f.hasAttribute('data-enviar') || !f.files[0]) return;
+  const f = ev.target;
+  if (f.hasAttribute('data-insp') && f.files.length) {
+    const card = f.closest('.si-item[data-id]'); const fd = new FormData(); [...f.files].forEach(x => fd.append('arquivo', x));
+    try { await api(BASE + '/item/' + card.dataset.id + '/inspiracoes', fd); barra('🖼 inspirações guardadas — ✨ criar parecido', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+    return;
+  }
+  if (!f.hasAttribute('data-enviar') || !f.files[0]) return;
   const card = f.closest('.si-item[data-id]'); const fd = new FormData(); fd.append('arquivo', f.files[0]);
   try { await api(BASE + '/item/' + card.dataset.id + '/ref', fd); barra('🔒 referência travada', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
 });

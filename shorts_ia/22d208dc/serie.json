@@ -1,0 +1,338 @@
+{
+ "id": "22d208dc",
+ "nome": "Hinoura Vizinhança",
+ "premissa": "Sora Takeda, engenheiro de som esgotado de Tóquio, se muda para a casa antiga da avó falecida em Hinoura, vila de pomares de mikan à beira do mar de Seto, buscando silêncio para gravar sons da natureza. No primeiro dia, Mame, uma menina de 6 anos, entra pelo buraco da cerca, rouba seu microfone e decide que ele é agora o 'vizinho dela'. Ela transforma cada coisa banal em aventura, e Sora reaprende a ouvir o mundo pelos olhos dela, com a vila inteira participando e a vovó Fumi sempre sabendo onde a neta está.",
+ "estilo": "anime_cotidiano",
+ "idioma": "pt",
+ "proporcao": "9:16",
+ "tom": "Comédia leve de cotidiano no interior: caos doméstico e de vila, piada visual com punchline no fim, cada episódio é uma pequena descoberta que vira bagunça e termina num momento quente e acolhedor.",
+ "bordoes": [
+  "Você é o meu vizinho agora!",
+  "Isso é um bicho peludo!",
+  "Shhh, tem que ouvir direito...",
+  "Eu já achei ela, vó Fumi!",
+  "Vizinho, vem ver!",
+  "O trovão tá falando comigo!"
+ ],
+ "regras": "",
+ "elenco": [
+  {
+   "id": "P1",
+   "nome": "Sora Takeda",
+   "papel": "Protagonista, o vizinho adulto desajeitado que quer silêncio",
+   "aparencia": "early 30s man, tired but gentle face, messy dark brown hair slightly longer at the neck, sleepy dark eyes with faint under-eye shadows, slim build, wears a faded olive green cardigan over a cream shirt, dark trousers, a headphone set hanging around his neck as a signature detail",
+   "personalidade": "Cansado, introvertido e atrapalhado com criança, mas sensível e curioso com sons. Aos poucos se apega à vila e à menina, reaprendendo a ouvir e a se abrir.",
+   "jeito_de_falar": "Fala baixo e educado, frases curtas e pausadas, às vezes se corrige sozinho. Tique: começa a responder com 'Hm...' e 'Tá bom, tá bom...' quando é derrotado pela menina.",
+   "voz": "adult male, calm soft low voice, mid-30s, tired but warm, slightly hesitant Japanese-accented Brazilian Portuguese feel, gentle pace",
+   "genero": "male",
+   "idade": "31",
+   "altura": "178 cm",
+   "ref": {
+    "estado": "pronto",
+    "arquivo": "P1_a4c6ba4630.jpg",
+    "flow_job": "a4c6ba4630",
+    "erro": null,
+    "msg": "🔒 travada (gerada no Flow)",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Character design reference sheet of ONE original character named Sora Takeda: early 30s man, tired but gentle face, messy dark brown hair slightly longer at the neck, sleepy dark eyes with faint under-eye shadows, slim build, wears a faded olive green cardigan over a cream shirt, dark trousers, a headphone set hanging around his neck as a signature detail. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.",
+    "anterior": "P1_3e4afc.png",
+    "conta": "marcosmou856@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793223055.0018883
+   },
+   "ficha": {
+    "estado": "pronto",
+    "arquivo": "P1_ficha_419d2cca92.jpg",
+    "flow_job": "419d2cca92",
+    "erro": null,
+    "msg": "✅ pronto",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. CHARACTER SHEET (model sheet) of the EXACT same character as the reference image (Sora Takeda): early 30s man, tired but gentle face, messy dark brown hair slightly longer at the neck, sleepy dark eyes with faint under-eye shadows, slim build, wears a faded olive green cardigan over a cream shirt, dark trousers, a headphone set hanging around his neck as a signature detail. The character is male — keep the same gender. Layout on a clean light gray background: full body front view, three-quarter view, side profile and back view standing in a row, same scale, same outfit and colors in every view; plus a row of 4 head close-ups with expressions (neutral, happy, angry, surprised). A small clean text label area with: NAME: SORA TAKEDA · GENDER: MALE · AGE: 31 · HEIGHT: 178 cm. Do not change the face, hair, eye color, outfit or proportions. No other characters, no scenery, no watermark.",
+    "anterior": null,
+    "conta": "marcosmou856@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793222788.3245592
+   },
+   "voz_ficha": {
+    "estado": "pronto",
+    "arquivo": "P1_voz_66993b.png",
+    "flow_job": null,
+    "erro": null,
+    "msg": "🔒 voz travada (🤖)",
+    "prompt": ""
+   },
+   "voz_perfil": {
+    "idioma": "Português (Brasil), com variante paulista neutra e leve cadência de interior",
+    "sotaque": "Leve sotaque nipo-brasileiro: entonação suave, vogais levemente alongadas e ênfase ocasional diferente em palavras, sem exagero caricatural",
+    "genero": "Masculino",
+    "idade_vocal": "Aparenta cerca de 31 a 35 anos, adulto cansado mas jovem o suficiente para soar gentil",
+    "timbre": "Suave e aveludado, levemente rouco no fim das frases, com um tom de sono e calma, sem agudos ásperos",
+    "tom": "Grave a médio-grave, faixa estreita e estável, sem subidas bruscas; em momentos de surpresa sobe um pouco sem perder o calor",
+    "ritmo": "Lento e pausado, com frases curtas, silêncios entre as palavras e hesitações naturais; acelera levemente só quando se atrapalha",
+    "diccao": "Clara e educada, consoantes suaves, sem pressa, com leve arrastar nas sílabas finais quando está cansado",
+    "atitude": "Introvertido, tímido e atencioso; fala como quem pede licença, com cuidado para não incomodar, mas sincero e carinhoso com quem convive",
+    "maneirismos": "Começa respostas derrotadas com 'Hm...' e depois 'Tá bom, tá bom...' quando a menina vence a discussão; se corrige sozinho no meio da frase; faz 'Shhh' baixinho quando quer silêncio para ouvir sons; riso curto, abafado e tímido, quase um suspiro; catchphrases ditas com meio sorriso audível, como 'Você é o meu vizinho agora!' entregue quase num sussurro carinhoso",
+    "emocoes": [
+     {
+      "emocao": "Cansaço",
+      "como_soa": "Voz arrastada, pausas longas, sussurrada, com suspiro antes de falar e sílabas finais caindo"
+     },
+     {
+      "emocao": "Curiosidade sonora",
+      "como_soa": "Mais baixa e atenta, quase sussurrada, com pausas para escutar; 'Shhh, tem que ouvir direito...' com ritmo lento e cuidadoso"
+     },
+     {
+      "emocao": "Derrota para a menina",
+      "como_soa": "Hesitante e resignada, 'Hm... tá bom, tá bom...', tom levemente mais agudo e risonho"
+     },
+     {
+      "emocao": "Carinho e afeto",
+      "como_soa": "Mais quente e aberta, com o grave suave ficando um pouco mais encorpado e menos hesitante"
+     },
+     {
+      "emocao": "Susto ou empolgação",
+      "como_soa": "Um pulo breve no tom, frase quebrada e meio atropelada, logo recuperada com um tom baixo e tímido"
+     }
+    ],
+    "frase_exemplo": "Hm... tá bom, tá bom. Shhh, tem que ouvir direito... o trovão tá falando comigo.",
+    "resumo": "Voz masculina adulta de 31 anos, aveludada e levemente rouca, em tom grave-médio estável, com sotaque nipo-brasileiro suave, ritmo lento e pausado, e atitude tímida, cansada e carinhosa, sempre baixa como quem não quer acordar a vila.",
+    "por": "ia"
+   },
+   "historico": [],
+   "estreia": null,
+   "fixo": true,
+   "preparar": false
+  },
+  {
+   "id": "P2",
+   "nome": "Mame",
+   "papel": "A menina caótica e entusiasmada que adota o vizinho",
+   "aparencia": "6 year old girl, round cheeks, big sparkling brown eyes, short bowl-cut black hair with a yellow star hairclip, bright energetic expression, wears a mustard yellow sundress with white polka dots and red rain boots, a small straw hat hanging on her back",
+   "personalidade": "Energia infinita, curiosa, literal e destemida. Entende tudo ao pé da letra, transforma o banal em aventura e acha que todo mundo é seu amigo.",
+   "jeito_de_falar": "Fala alto e rápido, frases exclamativas, leva tudo ao pé da letra e faz afirmações absolutas sobre o mundo. Tique: sempre declara 'agora você é meu vizinho!' e pede pra todo mundo 'ouvir'.",
+   "voz": "young girl, high bright energetic voice, around 6 years old, excited and cheerful, quick pace, playful and slightly loud",
+   "genero": "female",
+   "idade": "6",
+   "altura": "112 cm",
+   "ref": {
+    "estado": "pronto",
+    "arquivo": "P2_252ad6861e.jpg",
+    "flow_job": "252ad6861e",
+    "erro": null,
+    "msg": "🔒 travada (gerada no Flow)",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Character design reference sheet of ONE original character named Mame: 6 year old girl, round cheeks, big sparkling brown eyes, short bowl-cut black hair with a yellow star hairclip, bright energetic expression, wears a mustard yellow sundress with white polka dots and red rain boots, a small straw hat hanging on her back. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.",
+    "anterior": "P2_703a82.png",
+    "conta": "manoelbatidao98@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793223029.3319502
+   },
+   "ficha": {
+    "estado": "pronto",
+    "arquivo": "P2_ficha_b471f0a373.jpg",
+    "flow_job": "b471f0a373",
+    "erro": null,
+    "msg": "✅ pronto",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. CHARACTER SHEET (model sheet) of the EXACT same character as the reference image (Mame): 6 year old girl, round cheeks, big sparkling brown eyes, short bowl-cut black hair with a yellow star hairclip, bright energetic expression, wears a mustard yellow sundress with white polka dots and red rain boots, a small straw hat hanging on her back. The character is female — keep the same gender. Layout on a clean light gray background: full body front view, three-quarter view, side profile and back view standing in a row, same scale, same outfit and colors in every view; plus a row of 4 head close-ups with expressions (neutral, happy, angry, surprised). A small clean text label area with: NAME: MAME · GENDER: FEMALE · AGE: 6 · HEIGHT: 112 cm. Do not change the face, hair, eye color, outfit or proportions. No other characters, no scenery, no watermark.",
+    "anterior": null,
+    "conta": "manoelbatidao98@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793222788.333675
+   },
+   "voz_ficha": {
+    "estado": "pronto",
+    "arquivo": "P2_voz_9f0f3e.png",
+    "flow_job": null,
+    "erro": null,
+    "msg": "🔒 voz travada (🤖)",
+    "prompt": ""
+   },
+   "voz_perfil": {
+    "idioma": "Português (Brasil), sotaque interiorano paulista leve, com vogais abertas e cadência de vila",
+    "sotaque": "Brasileiro do interior, neutro-caipira suave, sem exagero regional, vogais abertas e 'r' leve",
+    "genero": "feminino infantil",
+    "idade_vocal": "aparenta 6 anos, voz de criança pequena sem traços adultos",
+    "timbre": "agudo, brilhante e arredondado, com leve brilho de entusiasmo e um pouco de projeção, sem rouquidão",
+    "tom": "agudo (médio-alto), faixa estreita e alegre, sobe bastante nas exclamações e cai de forma abrupta nas declarações",
+    "ritmo": "rápido e embolado, frases curtas e exclamativas, pausas mínimas, às vezes atropela a própria fala quando empolga; pausa dramática curta antes de 'shhh' e das declarações finais",
+    "diccao": "clara mas um pouco apressada, consoantes bem marcadas, sílabas finais às vezes engolidas quando anima; pronúncia infantil leve",
+    "atitude": "destemida, convicta e alegre, fala como quem anuncia uma verdade absoluta para todo mundo ouvir, sempre com certeza e entusiasmo",
+    "maneirismos": "começa frases com 'Vizinho,' ou 'Shhh,'; declara 'você é o meu vizinho agora!' com tom de decreto solene; ri em rajadas agudas e curtas ao achar algo engraçado; repete 'isso é!' antes de descrever bichos; ao ver algo que acha mágico, sussurra de repente e depois explode em volume",
+    "emocoes": [
+     {
+      "emocao": "euforia",
+      "como_soa": "volume alto, agudo, palavras atropeladas e risadinhas curtas entre as frases"
+     },
+     {
+      "emocao": "curiosidade",
+      "como_soa": "tom subindo em pergunta, pausa breve, sussurro de 'shhh, tem que ouvir direito'"
+     },
+     {
+      "emocao": "determinação",
+      "como_soa": "frases firmes e curtas, afirmações absolutas, queixo erguido na voz, sem hesitação"
+     },
+     {
+      "emocao": "encantamento",
+      "como_soa": "fala mais lenta e baixa por um instante, depois explosão de volume ao anunciar a descoberta"
+     },
+     {
+      "emocao": "carinho",
+      "como_soa": "voz mais doce e suave, arrastando levemente as vogais, falando com a vó Fumi ou o vizinho"
+     }
+    ],
+    "frase_exemplo": "Vizinho, vem ver! Isso é um bicho peludo! Você é o meu vizinho agora!",
+    "resumo": "Voz de menina de 6 anos, aguda, brilhante e arredondada, com sotaque brasileiro do interior suave, ritmo rápido e atropelado, dicção infantil clara e atitude destemida e convicta, sempre em tom de anúncio alegre e exclamativo.",
+    "por": "ia"
+   },
+   "historico": [],
+   "estreia": null,
+   "fixo": true,
+   "preparar": false
+  },
+  {
+   "id": "P3",
+   "nome": "Vovó Fumi",
+   "papel": "Avó de Mame, sempre sabe onde a neta está",
+   "aparencia": "elderly woman looks 68, warm wrinkled face, silver-white hair in a low bun with a wooden pin, kind narrow eyes, wears a faded indigo work apron over a light grey kimono-style top, always carries a small woven basket",
+   "personalidade": "Calma, perspicaz e bem-humorada, parece saber de tudo que acontece na vila. Acolhedora, mas firme quando precisa botar ordem na neta.",
+   "jeito_de_falar": "Fala devagar, com sabedoria e um humor seco. Chama Mame de 'pequena encrenqueira' e costuma responder perguntas com outra pergunta.",
+   "voz": "elderly female, warm gravelly soft voice, slow gentle pace, dry humorous undertone, calm and motherly",
+   "genero": "female",
+   "idade": "68",
+   "altura": "152 cm",
+   "ref": {
+    "estado": "pronto",
+    "arquivo": "P3_2755f39e25.jpg",
+    "flow_job": "2755f39e25",
+    "erro": null,
+    "msg": "🔒 travada (gerada no Flow)",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Character design reference sheet of ONE original character named Vovó Fumi: elderly woman looks 68, warm wrinkled face, silver-white hair in a low bun with a wooden pin, kind narrow eyes, wears a faded indigo work apron over a light grey kimono-style top, always carries a small woven basket. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.",
+    "anterior": "P3_ffcadf.png",
+    "conta": "marcosmou856@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793223029.3369708
+   },
+   "ficha": {
+    "estado": "pronto",
+    "arquivo": "P3_ficha_088a0b17d6.jpg",
+    "flow_job": "088a0b17d6",
+    "erro": null,
+    "msg": "✅ pronto",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. CHARACTER SHEET (model sheet) of the EXACT same character as the reference image (Vovó Fumi): elderly woman looks 68, warm wrinkled face, silver-white hair in a low bun with a wooden pin, kind narrow eyes, wears a faded indigo work apron over a light grey kimono-style top, always carries a small woven basket. The character is female — keep the same gender. Layout on a clean light gray background: full body front view, three-quarter view, side profile and back view standing in a row, same scale, same outfit and colors in every view; plus a row of 4 head close-ups with expressions (neutral, happy, angry, surprised). A small clean text label area with: NAME: VOVÓ FUMI · GENDER: FEMALE · AGE: 68 · HEIGHT: 152 cm. Do not change the face, hair, eye color, outfit or proportions. No other characters, no scenery, no watermark.",
+    "anterior": null,
+    "conta": "manoelbatidao98@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793222849.3234117
+   },
+   "voz_ficha": {
+    "estado": "pronto",
+    "arquivo": "P3_voz_8efc24.png",
+    "flow_job": null,
+    "erro": null,
+    "msg": "🔒 voz travada (🤖)",
+    "prompt": ""
+   },
+   "voz_perfil": {
+    "idioma": "Português (Brasil)",
+    "sotaque": "Interiorano brasileiro, neutro, com leve cadência rural de vila do interior, sem caricatura regional",
+    "genero": "Feminino",
+    "idade_vocal": "Aparenta 68 anos, madura e serena, com a voz de quem já viveu muito",
+    "timbre": "Quente, levemente rouco e macio, com um fundo gravelly suave que dá textura de avó acolhedora",
+    "tom": "Médio-grave, em torno de médio para grave, com faixa estreita e controlada; sobe pouco e desce nas frases finais",
+    "ritmo": "Lento e gentil, com pausas longas antes de respostas importantes e silêncios intencionais para criar suspense cômico",
+    "diccao": "Clara e deliberada, vogais bem abertas e consoantes firmes, sem pressa; cada palavra é pronunciada com cuidado",
+    "atitude": "Calma, perspicaz e de humor seco; fala como quem sabe de tudo e acha graça da confusão alheia, mas firme quando precisa botar ordem",
+    "maneirismos": "Responde perguntas com outra pergunta; chama Mame de 'pequena encrenqueira'; usa o 'Shhh, tem que ouvir direito...' antes de revelar algo; ri baixinho, de forma curta e contida, em vez de gargalhar; ao anunciar novidades diz 'Vizinho, vem ver!' em tom quase sussurrado",
+    "emocoes": [
+     {
+      "emocao": "Calma e sabedoria",
+      "como_soa": "Voz baixa e lenta, com pausas amplas, transmitindo segurança e tranquilidade"
+     },
+     {
+      "emocao": "Humor seco",
+      "como_soa": "Entonação plana com uma pequena pausa antes da piada, e um riso breve pelo nariz"
+     },
+     {
+      "emocao": "Ordem firme",
+      "como_soa": "Tom um pouco mais grave e pausado, frases curtas e diretas, sem elevar o volume"
+     },
+     {
+      "emocao": "Ternura",
+      "como_soa": "Voz mais suave e aveludada, com leve rouquidão, quase em tom de cochicho"
+     },
+     {
+      "emocao": "Surpresa controlada",
+      "como_soa": "Subida breve e contida no tom, seguida de silêncio, sem perder a compostura"
+     }
+    ],
+    "frase_exemplo": "Shhh, tem que ouvir direito... Você acha mesmo que ela não tá lá em cima no telhado, pequena encrenqueira?",
+    "resumo": "Voz feminina de avó de 68 anos, quente e levemente rouca com textura gravelly suave, em tom médio-grave, sotaque brasileiro interiorano neutro, ritmo lento com pausas longas, dicção clara, atitude calma e perspicaz de humor seco que responde com perguntas e fala como quem sabe de tudo.",
+    "por": "ia"
+   },
+   "historico": [],
+   "estreia": null,
+   "fixo": true,
+   "preparar": false
+  }
+ ],
+ "cenarios": [
+  {
+   "id": "L1",
+   "nome": "Casa antiga da vovó",
+   "descricao": "Traditional Japanese wooden house with sliding paper doors, tatami floor, a wide engawa veranda facing a garden, weathered wooden fence with a gap in it, summer sunlight, watercolor painted style, clean lines, soft warm tones",
+   "ref": {
+    "estado": null,
+    "arquivo": null,
+    "flow_job": null,
+    "erro": null,
+    "msg": "",
+    "prompt": ""
+   }
+  },
+  {
+   "id": "L2",
+   "nome": "Pomar de mikan",
+   "descricao": "Hillside orchard of mikan citrus trees with bright orange fruits among green leaves, narrow dirt paths, cicadas in the trees, a distant view of the calm Seto Sea, watercolor painted style, summer light, soft and bright",
+   "ref": {
+    "estado": null,
+    "arquivo": null,
+    "flow_job": null,
+    "erro": null,
+    "msg": "",
+    "prompt": ""
+   }
+  },
+  {
+   "id": "L3",
+   "nome": "Vendinha da vila",
+   "descricao": "Small old country general store with a wooden counter, shelves of snacks and drinks, a red vending machine outside, paper lanterns and a faded noren curtain at the entrance, watercolor painted style, warm summer afternoon light",
+   "ref": {
+    "estado": null,
+    "arquivo": null,
+    "flow_job": null,
+    "erro": null,
+    "msg": "",
+    "prompt": ""
+   }
+  }
+ ],
+ "ideias": [],
+ "eps": [],
+ "marca": {
+  "ativa": true,
+  "texto": "@hinouravizinhanca",
+  "posicao": "meio",
+  "tamanho": 0.035,
+  "opacidade": 0.5,
+  "fonte": "DP Poppins",
+  "cor": "#FFFFFF",
+  "contorno": true,
+  "desvio_y": 0.0
+ },
+ "criado": 1793222614.6083858,
+ "padroes": {
+  "dur_plano": 5.0,
+  "modelo_video": "Omni 1.1 Flash",
+  "modo_video": "elementos",
+  "modelo_imagem": ""
+ },
+ "formato_serie": "episodica",
+ "atualizado": 1793223055.001915
+}

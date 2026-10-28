@@ -84,6 +84,16 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         f.save(c)
         return c
 
+    def _uploads(campo: str = "arquivo") -> list:
+        out = []
+        d = tempfile.mkdtemp(prefix="shorts_ia_up_")
+        for k, f in enumerate(request.files.getlist(campo)[:SI.MAX_INSPIRACOES]):
+            if f and f.filename:
+                c = os.path.join(d, f"{k:02d}_{secure_filename(f.filename) or 'img.png'}")
+                f.save(c)
+                out.append(c)
+        return out
+
     def _tentar(fn: Callable[[], Any]):
         try:
             r = fn()
@@ -139,20 +149,47 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def shorts_ia_personagem_img(sid: str):
         """➕ personagem a partir de uma imagem sua (a IA escreve o perfil; a imagem fica travada como referência)."""
         _serie(sid)
-        try:
-            c = _upload()
-        except SI.ShortsIAErro as exc:
-            return _erro(str(exc))
+        imagens = _uploads()
+        if not imagens:
+            return _erro("Escolha a(s) imagem(ns).")
         nota = str(request.form.get("nota") or "")[:600]
         preparar = request.form.get("preparar") == "1"
+        modo = "inspiracao" if request.form.get("modo") == "inspiracao" else "minha"
 
         def fazer(prog):
-            prog("🤖 a IA está olhando a imagem…")
-            p = SI.personagem_da_imagem(base_dir, sid, c, nota, CB.get("chamar"))
+            prog(f"🤖 a IA está olhando {len(imagens)} imagem(ns)…")
+            p = SI.personagem_da_imagem(base_dir, sid, imagens, nota, CB.get("chamar"), modo)
             if preparar:
                 SI.preparar_personagens(base_dir, sid, [p["id"]])
             return f"➕ {p['nome']}"
         return _rodar("serie:" + sid, "➕ personagem da imagem", fazer)
+
+    @app.route("/shorts-ia/s/<sid>/item/<iid>/inspiracoes", methods=["POST"])
+    def shorts_ia_inspiracoes(sid: str, iid: str):
+        """🖼 imagens de inspiração do personagem (várias de uma vez)."""
+        _serie(sid)
+        return _tentar(lambda: {"inspiracoes": SI.guardar_inspiracoes(base_dir, sid, iid, _uploads())})
+
+    @app.route("/shorts-ia/s/<sid>/item/<iid>/inspiracao/<nome>/apagar", methods=["POST"])
+    def shorts_ia_inspiracao_tirar(sid: str, iid: str, nome: str):
+        _serie(sid)
+        SI.tirar_inspiracao(base_dir, sid, iid, nome)
+        return _ok()
+
+    @app.route("/shorts-ia/s/<sid>/item/<iid>/refazer", methods=["POST"])
+    def shorts_ia_refazer(sid: str, iid: str):
+        """🔁 refaz tudo: perfil (IA olhando as imagens) → 🧍 referência (só no modo inspiração) → 📋 ficha → 🎙 voz."""
+        _serie(sid)
+        d = _corpo()
+        modo = "inspiracao" if d.get("modo") == "inspiracao" else "referencia"
+        nota = str(d.get("nota") or "")[:600]
+
+        def fazer(prog):
+            prog("🤖 a IA está olhando as imagens e refazendo o perfil…")
+            p = SI.refazer_personagem(base_dir, sid, iid, modo, nota, CB.get("chamar"))
+            return f"🔁 {p['nome']}: perfil novo — " + ("🧍 referência nova, 📋 ficha e 🎙 voz no Flow (sozinho)" if modo == "inspiracao"
+                                                         else "📋 ficha e 🎙 voz refeitas a partir da referência")
+        return _rodar("serie:" + sid, "🔁 refazendo o personagem", fazer)
 
     @app.route("/shorts-ia/s/<sid>/capitulo/premissa", methods=["POST"])
     def shorts_ia_cap_premissa(sid: str):

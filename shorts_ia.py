@@ -91,6 +91,7 @@ MODELO_VIDEO_PADRAO = "Omni 1.1 Flash"  # o que a técnica da ficha de voz usa
 MODELO_VIDEO_MAXIMO = "Veo 3.1 - Quality"  # a qualidade máxima do Flow
 MODELOS_IMAGEM = ("Nano Banana Pro", "Nano Banana 2.1", "Nano Banana 2 Lite", "")
 MAX_REFS_CENA = 3
+MAX_INSPIRACOES = 6
 MAX_ELENCO = 24          # o elenco cresce com os episódios (personagens novos)
 DUR_PLANO_PADRAO = 5.0   # cada plano (um vídeo do Flow) — cortes rápidos, vários ângulos do mesmo momento
 DUR_VIDEO_FLOW = 8.0
@@ -172,6 +173,7 @@ def _personagem(d: Dict[str, Any], pid: str) -> Dict[str, Any]:
             "voz_ficha": d.get("voz_ficha") if isinstance(d.get("voz_ficha"), dict) else _slot(),  # 🎙 folha de voz (imagem)
             "voz_perfil": d.get("voz_perfil") if isinstance(d.get("voz_perfil"), dict) else None,
             "historico": _historico_normal(d), "estreia": d.get("estreia"), "fixo": d.get("fixo", True) is not False,
+            "inspiracoes": [str(x) for x in d.get("inspiracoes") or [] if isinstance(x, str)][:MAX_INSPIRACOES],
             "preparar": bool(d.get("preparar"))}
 
 
@@ -299,7 +301,8 @@ def salvar_personagem(base: str, sid: str, d: Dict[str, Any]) -> Dict[str, Any]:
         pid = str(d.get("id") or "")
         velho = next((p for p in s["elenco"] if p["id"] == pid), None)
         if velho:
-            novo = _personagem(dict(velho, **{k: v for k, v in d.items() if k not in ("ref", "ficha", "voz_ficha", "voz_perfil", "historico")}), pid)
+            novo = _personagem(dict(velho, **{k: v for k, v in d.items()
+                                              if k not in ("ref", "ficha", "voz_ficha", "voz_perfil", "historico", "inspiracoes")}), pid)
             if novo["aparencia"] != velho.get("aparencia") and (velho.get("ref") or {}).get("arquivo"):
                 novo["ref"] = dict(velho["ref"], desatualizada=True)  # mudou a aparência: a referência antiga ainda vale até gerar outra
             s["elenco"][s["elenco"].index(velho)] = novo
@@ -502,15 +505,138 @@ PERFIL_IMG_SYS = (
 )
 
 
-def personagem_da_imagem(base: str, sid: str, imagem: str, nota: str = "", chamar: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
-    """➕ um personagem a partir de uma imagem sua: a 🤖 IA escreve o perfil e a imagem vira a referência travada."""
+INSPIRACAO_SYS = (
+    "Você recebe IMAGENS DE INSPIRAÇÃO (de outras obras ou fotos) e o universo de uma série de shorts de anime. Crie um "
+    "personagem ORIGINAL que fique PRÓXIMO delas — mesmo arquétipo, idade aparente, energia, tipo de corpo e silhueta, "
+    "paleta e clima — mas com design PRÓPRIO, que não seja cópia de nenhum personagem existente: mude o penteado, os "
+    "traços do rosto, a roupa e os acessórios, e dê 1–2 detalhes marcantes novos. Nunca use nome, marca ou obra das "
+    "imagens. 'aparencia' e 'voz' e 'genero' em INGLÊS (aparência sem pose e sem cenário); 'papel', 'personalidade' e "
+    "'jeito_de_falar' em português, combinando com a série. Mantenha o NOME e o PAPEL atuais se vierem (a NOTA do criador "
+    "manda). 'imagem' = 0. Criança só em contexto inocente e seguro; nunca romance/sexual."
+)
+REDESCREVER_SYS = (
+    "Você recebe a(s) imagem(ns) de referência de UM personagem do criador (a primeira é a referência travada; as outras, "
+    "o mesmo personagem em outros ângulos) e o perfil atual. Reescreva o perfil FIEL às imagens: 'aparencia' em INGLÊS "
+    "(idade aparente, corpo, rosto, cabelo, olhos, roupa e cores, detalhes marcantes — sem pose e sem cenário), 'genero' "
+    "em inglês, 'idade', 'altura', 'voz' em INGLÊS combinando com quem ele é; 'papel', 'personalidade' e 'jeito_de_falar' "
+    "em português — mantenha o que o criador já escreveu e só complete/ajuste o que não bate com a imagem. Mantenha o "
+    "NOME. 'imagem' = 1."
+)
+
+
+def pasta_refs(base: str, sid: str) -> str:
+    d = os.path.join(pasta_serie(base, sid), "refs")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def guardar_inspiracoes(base: str, sid: str, pid: str, arquivos: List[str]) -> List[str]:
+    """🖼 imagens de inspiração do personagem (várias): a IA cria um personagem original PRÓXIMO delas."""
+    from PIL import Image
+    with TRAVA:
+        s = carregar_serie(base, sid)
+        p = item(s, pid)
+        if not p or not pid.startswith("P"):
+            raise ShortsIAErro("Personagem não encontrado.")
+        for c in arquivos:
+            if len(p["inspiracoes"]) >= MAX_INSPIRACOES:
+                break
+            nome = f"{pid}_insp_{secrets.token_hex(3)}.png"
+            try:
+                im = Image.open(c).convert("RGB")
+                im.thumbnail((1600, 1600))
+                im.save(os.path.join(pasta_refs(base, sid), nome))
+            except Exception:  # noqa: BLE001
+                continue
+            p["inspiracoes"].append(nome)
+        salvar_serie(base, s)
+        return p["inspiracoes"]
+
+
+def tirar_inspiracao(base: str, sid: str, pid: str, nome: str) -> None:
+    with TRAVA:
+        s = carregar_serie(base, sid)
+        p = item(s, pid)
+        if p and nome in p.get("inspiracoes", []):
+            p["inspiracoes"].remove(nome)
+            try:
+                os.remove(os.path.join(pasta_refs(base, sid), os.path.basename(nome)))
+            except OSError:
+                pass
+            salvar_serie(base, s)
+
+
+def _perfil_atual_txt(p: Dict[str, Any]) -> str:
+    return json.dumps({k: p.get(k) for k in PERSONAGEM_SCHEMA["properties"]}, ensure_ascii=False)
+
+
+def refazer_personagem(base: str, sid: str, pid: str, modo: str = "referencia", nota: str = "",
+                       chamar: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    """🔁 refaz o personagem inteiro.
+    modo "referencia": a imagem travada (sua) manda — a IA reescreve o perfil fiel a ela (+ inspirações como outros
+      ângulos), e refaz 📋 ficha (do Flow, a partir da referência) e 🎙 voz.
+    modo "inspiracao": as imagens de inspiração (de outras obras/fotos) viram um personagem ORIGINAL parecido — perfil
+      novo, 🧍 referência nova gerada no Flow só pelo texto (sem copiar a imagem), depois 📋 ficha e 🎙 voz sozinhas."""
+    s = carregar_serie(base, sid)
+    p = item(s, pid)
+    if not p or not pid.startswith("P"):
+        raise ShortsIAErro("Personagem não encontrado.")
+    refs_dir = pasta_refs(base, sid)
+    insp = [os.path.join(refs_dir, x) for x in p.get("inspiracoes") or [] if os.path.isfile(os.path.join(refs_dir, x))]
+    ref = caminho_ref(base, s, p)
+    texto = (contexto_serie(s, base) + f"\n\nPERFIL ATUAL DE {p['id']}: {_perfil_atual_txt(p)}"
+             + (f"\nNOTA DO CRIADOR: {nota}" if nota else ""))
+    if modo == "inspiracao":
+        if not insp:
+            raise ShortsIAErro("Mande uma ou mais imagens de inspiração primeiro (🖼 inspirações).")
+        r = _ia(INSPIRACAO_SYS, _blocos_imagens(insp, texto), PERSONAGEM_IMG_SCHEMA, chamar, max_tokens=2000, timeout=150)
+    else:
+        if not ref:
+            raise ShortsIAErro("Esse personagem ainda não tem referência travada (⬆ é minha / 🧍 no Flow).")
+        r = _ia(REDESCREVER_SYS, _blocos_imagens([ref] + insp, texto), PERSONAGEM_IMG_SCHEMA, chamar, max_tokens=2000, timeout=150)
+    dados = {k: r.get(k) for k in PERSONAGEM_SCHEMA["properties"] if str(r.get(k) or "").strip()}
+    dados["nome"] = p["nome"] if p.get("nome") and not nota else dados.get("nome") or p["nome"]
+    with TRAVA:
+        s = carregar_serie(base, sid)
+        p = item(s, pid)
+        novo = _personagem(dict(p, **dados), pid)
+        velha_ficha = (p.get("ficha") or {}).get("arquivo")
+        novo["ficha"] = dict(_slot(), anterior=velha_ficha, arquivo=velha_ficha)  # a antiga vale até a nova chegar
+        novo["ficha"]["estado"] = None
+        novo["preparar"] = True
+        if modo == "inspiracao":
+            velha_ref = (p.get("ref") or {}).get("arquivo")
+            novo["ref"] = dict(_slot(), anterior=velha_ref)  # a referência nova sai do texto (personagem original)
+        s["elenco"][s["elenco"].index(p)] = novo
+        salvar_serie(base, s)
+    if modo == "inspiracao":
+        pedir_refs(base, sid, [pid])  # → 🧍 pronta → 📋 ficha + 🎙 voz (sozinho, no sincronizar)
+    else:
+        _continuar_preparo(base, sid, [pid])  # 📋 ficha no Flow + 🎙 voz
+    return item(carregar_serie(base, sid), pid)
+
+
+def personagem_da_imagem(base: str, sid: str, imagem: Any, nota: str = "", chamar: Optional[Callable[..., Any]] = None,
+                         modo: str = "minha") -> Dict[str, Any]:
+    """➕ um personagem a partir de imagem(ns).
+    "minha": é um personagem seu — a IA escreve o perfil fiel e a 1ª imagem vira a referência travada.
+    "inspiracao": imagens de outras obras/fotos — a IA cria um personagem ORIGINAL próximo e a referência é gerada no Flow."""
+    imagens = [imagem] if isinstance(imagem, str) else [c for c in imagem or [] if c]
+    if not imagens:
+        raise ShortsIAErro("Escolha a(s) imagem(ns).")
     s = carregar_serie(base, sid)
     if len(s["elenco"]) >= MAX_ELENCO:
         raise ShortsIAErro(f"O elenco tem no máximo {MAX_ELENCO} personagens.")
     texto = contexto_serie(s, base) + (f"\n\nNOTA DO CRIADOR SOBRE ESTE PERSONAGEM: {nota}" if nota else "")
-    r = _ia(PERFIL_IMG_SYS, _blocos_imagens([imagem], texto), PERSONAGEM_IMG_SCHEMA, chamar, max_tokens=2000, timeout=120)
+    sistema = INSPIRACAO_SYS if modo == "inspiracao" else PERFIL_IMG_SYS
+    r = _ia(sistema, _blocos_imagens(imagens[:MAX_INSPIRACOES], texto), PERSONAGEM_IMG_SCHEMA, chamar, max_tokens=2000, timeout=150)
     novo = salvar_personagem(base, sid, {k: r.get(k) for k in PERSONAGEM_SCHEMA["properties"]})
-    guardar_ref(base, sid, novo["id"], imagem)
+    if modo == "inspiracao":
+        guardar_inspiracoes(base, sid, novo["id"], imagens)
+    else:
+        guardar_ref(base, sid, novo["id"], imagens[0])
+        if len(imagens) > 1:
+            guardar_inspiracoes(base, sid, novo["id"], imagens[1:])
     return item(carregar_serie(base, sid), novo["id"])
 
 

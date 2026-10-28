@@ -424,3 +424,29 @@ def test_momento_em_corte_seco(base):
     final = SI.exportar(base, s["id"], e["id"])
     # 3 planos de 3,6 s (3 s + folga limitada pelo vídeo de 3 s → 3 s): M1+M1 em corte seco (6 s) + M2 (3 s) − 1 transição
     assert abs(SI._ffprobe_dur(final) - (9.0 - 0.16)) < 0.25
+
+
+def test_inspiracoes_e_refazer(base, lote, tmp_path):
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    sid = s["id"]
+    SI.guardar_ref(base, sid, "P1", _img(str(tmp_path / "r.png")))
+    ins = SI.guardar_inspiracoes(base, sid, "P1", [_img(str(tmp_path / "i1.png")), _img(str(tmp_path / "i2.png"), (0, 0, 200))])
+    assert len(ins) == 2
+    novo = {"nome": "Outro", "papel": "a dragoa", "aparencia": "tall woman, short silver bob, teal eyes, red apron", "personalidade": "p",
+            "jeito_de_falar": "j", "voz": "calm alto", "genero": "female", "idade": "25", "altura": "175 cm", "imagem": 0}
+    ia = _ia(novo)
+    p = SI.refazer_personagem(base, sid, "P1", "inspiracao", chamar=ia)
+    assert "ORIGINAL" in ia.vistos[0][0] and sum(1 for b in ia.vistos[0][1] if b.get("type") == "image") == 2
+    assert p["nome"] == "Ignis" and "silver bob" in p["aparencia"] and p["preparar"]  # o nome fica
+    assert p["ref"]["estado"] == "fila" and not p["ref"].get("arquivo")  # referência NOVA, gerada só pelo texto
+    j = lote.fila[-1]
+    assert "silver bob" in j["prompt"] and not j.get("referencia_arquivo")  # nada de copiar a imagem
+    lote.terminar(lote.galeria)
+    SI.sincronizar_serie(base, sid)  # 🧍 chegou → 📋 ficha pedida sozinha
+    assert "CHARACTER SHEET" in lote.fila[-1]["prompt"]
+    ia2 = _ia(dict(novo, aparencia="exactly as the reference"))
+    p = SI.refazer_personagem(base, sid, "P1", "referencia", chamar=ia2)
+    assert "FIEL às imagens" in ia2.vistos[0][0] and sum(1 for b in ia2.vistos[0][1] if b.get("type") == "image") == 3  # ref + 2
+    assert p["aparencia"] == "exactly as the reference" and "CHARACTER SHEET" in lote.fila[-1]["prompt"]
+    q = SI.personagem_da_imagem(base, sid, [_img(str(tmp_path / "a.png")), _img(str(tmp_path / "b.png"))], chamar=_ia(novo), modo="inspiracao")
+    assert len(q["inspiracoes"]) == 2 and not (q["ref"] or {}).get("arquivo")
