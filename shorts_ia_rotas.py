@@ -19,6 +19,7 @@ import shorts_ia as SI
 TAREFAS: Dict[str, Dict[str, Any]] = {}
 CB: Dict[str, Any] = {}  # transcrever, chamar (IA), baixador — os testes trocam aqui
 _TRAVA_T = threading.Lock()
+_CANCELAR: set = set()  # ⏹ chaves de tarefa que você mandou parar (param no próximo passo)
 
 
 def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = None) -> None:
@@ -37,11 +38,18 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         with _TRAVA_T:
             t = TAREFAS.get(chave)
             if t and not t.get("fim"):
-                return _erro(f"Espere terminar: {t['rotulo']}", 409)
+                # 409 com o que está rodando: a página mostra o progresso em vez de dar erro (e dá pra ⏹ parar)
+                return jsonify({"ok": False, "ocupado": True, "erro": f"Já está rodando: {t['rotulo']}"
+                                + (f" — {t['prog']}" if t.get("prog") else "") + " (⏹ parar, se travou)",
+                                "tarefa": dict(t, rodando=True)}), 409
+            _CANCELAR.discard(chave)
             TAREFAS[chave] = {"rotulo": rotulo, "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": ""}
 
         def prog(m: str) -> None:
+            if chave in _CANCELAR:
+                raise SI.ShortsIAErro("⏹ parado por você")
             TAREFAS[chave]["prog"] = str(m)[:300]
+            TAREFAS[chave]["prog_em"] = time.time()
 
         def corpo():
             try:
@@ -58,6 +66,17 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     pass
         threading.Thread(target=corpo, daemon=True, name="shorts-ia:" + chave).start()
         return _ok(tarefa=chave)
+
+    @app.route("/shorts-ia/tarefa/parar", methods=["POST"])
+    def shorts_ia_tarefa_parar():
+        """⏹ para a tarefa (exportar/modelar/analisar): ela para no próximo passo e a chave fica livre na hora."""
+        chave = str(_corpo().get("chave") or "")
+        t = TAREFAS.get(chave)
+        if not t or t.get("fim"):
+            return _ok(parada=False)
+        _CANCELAR.add(chave)
+        t.update(fim=time.time(), erro="⏹ parado por você")
+        return _ok(parada=True)
 
     def _tarefa(chave: str) -> Optional[Dict[str, Any]]:
         t = TAREFAS.get(chave)

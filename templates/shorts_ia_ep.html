@@ -82,7 +82,7 @@
     <button id="bTirarMus" class="si-mini si-sec">sem música</button>
     <label>volume <input id="eMusVol" type="number" step="0.02" min="0" max="0.6" style="width:70px"></label>
   </div>
-  <div class="si-linha"><button id="bExportar">📤 exportar</button><span class="si-dica" style="margin:0">a 🏷 marca ({{ s.marca.texto }}) e o formato {{ s.proporcao }} vêm da série</span></div>
+  <div class="si-linha"><button id="bExportar">📤 exportar</button><button id="bParar" class="si-mini si-perigo" hidden>⏹ parar</button><span class="si-dica" style="margin:0">a 🏷 marca ({{ s.marca.texto }}) e o formato {{ s.proporcao }} vêm da série</span></div>
   <div id="xFinal"></div>
 </div>
 
@@ -258,7 +258,13 @@ $('bFlow').onclick = async () => { try { await api('/shorts-ia/flow/continuar', 
 ['eVel', 'eCorte', 'eTrans', 'eWhoosh', 'eZoom', 'eFiltro', 'eLeg', 'eLegPos', 'eLegEst', 'eQual', 'eMusVol', 'eModo', 'eModelo'].forEach(id => $(id).onchange = async () => { try { E.edicao = (await api(BASE + '/edicao', lerEdicao())).edicao; if (id === 'eModo') desenharCenas(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } });
 $('fMusica').onchange = async () => { const f = $('fMusica').files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(BASE + '/musica', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bTirarMus').onclick = async () => { const fd = new FormData(); fd.append('tirar', '1'); try { await api(BASE + '/musica', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
-$('bExportar').onclick = async () => { try { if (sujo) await salvarCenas(); await api(BASE + '/exportar', lerEdicao()); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bExportar').onclick = async () => {
+  $('bExportar').disabled = true;
+  try { if (sujo) await salvarCenas(); await api(BASE + '/exportar', lerEdicao()); }
+  catch (e) { barra((/Já está rodando/.test(e.message) ? '⏳ ' : '❌ ') + e.message, /Já está rodando/.test(e.message) ? 'on' : 'erro'); }
+  recarregar();
+};
+$('bParar').onclick = async () => { if (!confirm('Parar o que está rodando neste episódio?')) return; try { await api('/shorts-ia/tarefa/parar', { chave: 'ep:' + E.id }); barra('⏹ parado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 
 async function recarregar() {
   clearTimeout(timer);
@@ -267,7 +273,9 @@ async function recarregar() {
     E = d.ep; if (d.serie) S = d.serie;
     const t = d.tarefa;
     desenharOrigem(); desenharCenas(false); desenharFinal(); edicao();
-    if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : ''));
+    if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '') + ` (${Math.round(Date.now() / 1000 - t.inicio)} s)`);
+    $('bParar').hidden = !(t && t.rodando); $('bExportar').disabled = !!(t && t.rodando);
+    ['bModelar', 'bAnalisar'].forEach(id => { if ($(id)) $(id).disabled = !!(t && t.rodando); });
     else if (t && tarefaAntes && tarefaAntes.rodando) { if (t.erro) barra('❌ ' + t.erro, 'erro'); else { barra('✅ ' + (t.msg || 'pronto'), 'okk'); sujo = false; desenharCenas(true); } }
     tarefaAntes = t;
     const espera = E.cenas.some(cn => ['img_inicio', 'img_fim', 'video'].some(s => ESPERA.includes((cn[s] || {}).estado)));

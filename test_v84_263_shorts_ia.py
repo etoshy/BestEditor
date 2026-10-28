@@ -503,3 +503,22 @@ def test_cenario_no_traco_dos_personagens(base, lote, tmp_path):
     assert "ONLY a STYLE reference" in j["prompt"] and "Do NOT draw the character" in j["prompt"]
     nome = SI.guardar_estilo_ref(base, sid, _img(str(tmp_path / "e.png"), (0, 0, 0)))
     assert SI.ancora_estilo(base, SI.carregar_serie(base, sid)).endswith(nome)
+
+
+def test_tarefa_ocupada_e_parar(base, monkeypatch):
+    """v84_271: exportar com outra tarefa rodando → 409 com o progresso (não “erro”); ⏹ parar libera na hora."""
+    monkeypatch.setenv("NARRATION_SITE_NAO_CARREGAR_PROJETOS", "1")
+    monkeypatch.setenv("CURTOS_VIGIA", "0")
+    import app as A
+    import shorts_ia_rotas as R
+    c = A.app.test_client()
+    sid = c.post("/shorts-ia/nova", data={"premissa": "x", "gerar": "0"}).headers["Location"].rsplit("/", 1)[-1]
+    eid = c.post(f"/shorts-ia/s/{sid}/ep/novo", json={"titulo": "t", "modelar": "0"}).get_json()["ep"]
+    import time as _t
+    R.TAREFAS["ep:" + eid] = {"rotulo": "📤 exportando", "inicio": _t.time(), "fim": None, "erro": None, "msg": "", "prog": "✂ cena 3"}
+    r = c.post(f"/shorts-ia/s/{sid}/ep/{eid}/exportar", json={})
+    d = r.get_json()
+    assert r.status_code == 409 and d["ocupado"] and "cena 3" in d["erro"]
+    assert c.post("/shorts-ia/tarefa/parar", json={"chave": "ep:" + eid}).get_json()["parada"]
+    assert R.TAREFAS["ep:" + eid]["fim"] and "ep:" + eid in R._CANCELAR
+    assert c.post(f"/shorts-ia/s/{sid}/ep/{eid}/exportar", json={}).status_code == 200  # livre de novo

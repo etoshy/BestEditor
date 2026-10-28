@@ -30,6 +30,8 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ## ⚡ Geração rápida (v84_258)
 
+> v84_271 — **Shorts de IA: tarefa ocupada não vira erro**: clicar em 📤 exportar (ou modelar) enquanto algo já roda no episódio mostra o que está rodando, o passo e há quanto tempo (antes: vários 409 sem explicação); o botão fica desligado enquanto roda e aparece **⏹ parar** (para no próximo passo e libera o episódio na hora — pra quando travar).
+
 > v84_270 — **🎨 cenários no traço dos personagens** (Shorts de IA): o estilo 🌾 cotidiano não pede mais “fundo em aquarela” (puxava pintura semi-realista) — personagens e cenários no MESMO anime de linha limpa e cor chapada; e cada cenário vai pro Flow com a **imagem de estilo** como referência (só o traço; padrão: a referência do 1º personagem; dá pra escolher outro personagem ou subir uma imagem). Botão “🎨 refazer todos no traço dos personagens”.
 
 > v84_269 — **🚀 Flow em massa: “atividade incomum” troca de conta** (não pausa mais o lote): a conta que levou o aviso descansa 60 min e o pedido vai pra próxima conta; se TODAS derem o aviso no mesmo pedido, só ele vira erro. Quem preferir o jeito antigo marca “⏸ atividade incomum pausa o lote” na aba Flow.

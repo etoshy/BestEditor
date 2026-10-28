@@ -96,7 +96,12 @@
     "resumo": "Voz masculina adulta de 28 anos com timbre suave e levemente áspero, tom médio-grave de faixa estreita, sotaque japonês de Tóquio, ritmo lento com suspiros e pausas, atitude polida, reservada e cansada que esquenta quando se empolga com sons.",
     "por": "ia"
    },
-   "historico": [],
+   "historico": [
+    {
+     "fato": "Descobriu, ouvindo o microfone no pomar, que a vila tem sons ricos (cigarras, mar, vento nos mikan) e começou a se encantar com Hinoura.",
+     "ep": "1993884d"
+    }
+   ],
    "estreia": null,
    "fixo": true,
    "inspiracoes": [
@@ -185,7 +190,12 @@
     "resumo": "Voz feminina infantil de 6 anos, brilhante e aguda com tom médio-alto que dispara em empolgação, sotaque japonês leve ao falar português, ritmo rápido e atropelado com pausas curtas, atitude alegre, mandona e teimosa, marcada pelos tiques 'Ó!' no início e 'né?!' no fim.",
     "por": "ia"
    },
-   "historico": [],
+   "historico": [
+    {
+     "fato": "Chama o microfone de 'Bicho' e acredita que ele precisa de comida; decidiu que Sora é seu vizinho e passou a aparecer todo dia pelo buraco da cerca.",
+     "ep": "1993884d"
+    }
+   ],
    "estreia": null,
    "fixo": true,
    "inspiracoes": [
@@ -274,7 +284,12 @@
     "resumo": "Voz feminina de avó japonesa de cerca de 70 anos, timbre quente e levemente rouco, tom médio-grave, sotaque suave de interior, ritmo lento com pausas longas, atitude calma, sábia e bem-humorada, com um sorriso audível em cada fala.",
     "por": "ia"
    },
-   "historico": [],
+   "historico": [
+    {
+     "fato": "Recebeu a neta de volta, puxou sua orelha e levou arroz e conservas para pedir desculpas a Sora.",
+     "ep": "1993884d"
+    }
+   ],
    "estreia": null,
    "fixo": true,
    "inspiracoes": [
@@ -290,16 +305,16 @@
    "descricao": "Traditional old Japanese wooden house with dark timber beams, sliding paper shoji doors, a tatami room, a worn wooden engawa porch overlooking a garden, a stone path, a low wooden fence with a hole at the bottom, warm summer afternoon light in watercolor style",
    "ref": {
     "estado": "pronto",
-    "arquivo": "L1_bfd9e8c5a7.jpg",
-    "flow_job": "bfd9e8c5a7",
+    "arquivo": "L1_dea2c7f61d.jpg",
+    "flow_job": "dea2c7f61d",
     "erro": null,
     "msg": "🔒 travada (gerada no Flow)",
-    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Background art of an empty location (Casa da vovó em Hinoura): Traditional old Japanese wooden house with dark timber beams, sliding paper shoji doors, a tatami room, a worn wooden engawa porch overlooking a garden, a stone path, a low wooden fence with a hole at the bottom, warm summer afternoon light in watercolor style. Establishing view, no characters, no people, no text, no logo.",
-    "anterior": null,
-    "com_foto": false,
-    "conta": "marcosmou856@gmail.com",
+    "prompt": "2D Japanese slice-of-life TV anime style, flat cel shading with clean thin lineart, simple flat color fills with one soft shadow tone, the SAME simple anime look for characters and backgrounds (backgrounds drawn with clean lines and flat colors, not painterly, not photorealistic), warm summer daylight, soft pastel palette, Japanese countryside, big expressive eyes, cute exaggerated comedic reactions on the gags, original characters. Anime background art of an empty location (Casa da vovó em Hinoura): Traditional old Japanese wooden house with dark timber beams, sliding paper shoji doors, a tatami room, a worn wooden engawa porch overlooking a garden, a stone path, a low wooden fence with a hole at the bottom, warm summer afternoon light in watercolor style. Establishing view, no characters, no people, no text, no logo. The reference image is ONLY a STYLE reference: match its art style EXACTLY — same lineart thickness, same flat cel shading, same color palette and saturation, same simplicity and level of detail — so this background looks like it belongs to the same anime as that image. Do NOT draw the character or any person from the reference.",
+    "anterior": "L1_bfd9e8c5a7.jpg",
+    "com_foto": true,
+    "conta": "melojonas03500@gmail.com",
     "desatualizada": false,
-    "pronto_em": 1793226633.3526964
+    "pronto_em": 1793227275.7497923
    }
   },
   {
@@ -308,16 +323,16 @@
    "descricao": "Hillside orchard of mikan citrus trees with bright orange fruit among dark green leaves, narrow dirt paths, wooden stakes, distant view of the calm blue Seto Inland Sea, soft summer sunlight in watercolor painting style",
    "ref": {
     "estado": "pronto",
-    "arquivo": "L2_63b6346934.jpg",
-    "flow_job": "63b6346934",
+    "arquivo": "L2_016df052e1.jpg",
+    "flow_job": "016df052e1",
     "erro": null,
     "msg": "🔒 travada (gerada no Flow)",
-    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Background art of an empty location (Pomar de mikan): Hillside orchard of mikan citrus trees with bright orange fruit among dark green leaves, narrow dirt paths, wooden stakes, distant view of the calm blue Seto Inland Sea, soft summer sunlight in watercolor painting style. Establishing view, no characters, no people, no text, no logo.",
-    "anterior": null,
-    "com_foto": false,
-    "conta": "melojonas03500@gmail.com",
+    "prompt": "2D Japanese slice-of-life TV anime style, flat cel shading with clean thin lineart, simple flat color fills with one soft shadow tone, the SAME simple anime look for characters and backgrounds (backgrounds drawn with clean lines and flat colors, not painterly, not photorealistic), warm summer daylight, soft pastel palette, Japanese countryside, big expressive eyes, cute exaggerated comedic reactions on the gags, original characters. Anime background art of an empty location (Pomar de mikan): Hillside orchard of mikan citrus trees with bright orange fruit among dark green leaves, narrow dirt paths, wooden stakes, distant view of the calm blue Seto Inland Sea, soft summer sunlight in watercolor painting style. Establishing view, no characters, no people, no text, no logo. The reference image is ONLY a STYLE reference: match its art style EXACTLY — same lineart thickness, same flat cel shading, same color palette and saturation, same simplicity and level of detail — so this background looks like it belongs to the same anime as that image. Do NOT draw the character or any person from the reference.",
+    "anterior": "L2_63b6346934.jpg",
+    "com_foto": true,
+    "conta": "marcosmou856@gmail.com",
     "desatualizada": false,
-    "pronto_em": 1793226628.3240988
+    "pronto_em": 1793227260.331562
    }
   },
   {
@@ -326,21 +341,23 @@
    "descricao": "Small quiet fishing village beach at the edge of the Seto Sea, smooth pebbles and sand, old wooden boats pulled up on the shore, low stone seawall, bright summer sky with fluffy clouds, watercolor style",
    "ref": {
     "estado": "pronto",
-    "arquivo": "L3_cc73415507.jpg",
-    "flow_job": "cc73415507",
+    "arquivo": "L3_cb63f4de5a.jpg",
+    "flow_job": "cb63f4de5a",
     "erro": null,
     "msg": "🔒 travada (gerada no Flow)",
-    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Background art of an empty location (Praia da vila): Small quiet fishing village beach at the edge of the Seto Sea, smooth pebbles and sand, old wooden boats pulled up on the shore, low stone seawall, bright summer sky with fluffy clouds, watercolor style. Establishing view, no characters, no people, no text, no logo.",
-    "anterior": null,
-    "com_foto": false,
-    "conta": "melojonas03500@gmail.com",
+    "prompt": "2D Japanese slice-of-life TV anime style, flat cel shading with clean thin lineart, simple flat color fills with one soft shadow tone, the SAME simple anime look for characters and backgrounds (backgrounds drawn with clean lines and flat colors, not painterly, not photorealistic), warm summer daylight, soft pastel palette, Japanese countryside, big expressive eyes, cute exaggerated comedic reactions on the gags, original characters. Anime background art of an empty location (Praia da vila): Small quiet fishing village beach at the edge of the Seto Sea, smooth pebbles and sand, old wooden boats pulled up on the shore, low stone seawall, bright summer sky with fluffy clouds, watercolor style. Establishing view, no characters, no people, no text, no logo. The reference image is ONLY a STYLE reference: match its art style EXACTLY — same lineart thickness, same flat cel shading, same color palette and saturation, same simplicity and level of detail — so this background looks like it belongs to the same anime as that image. Do NOT draw the character or any person from the reference.",
+    "anterior": "L3_cc73415507.jpg",
+    "com_foto": true,
+    "conta": "marcosmou856@gmail.com",
     "desatualizada": false,
-    "pronto_em": 1793226658.3215528
+    "pronto_em": 1793227288.3355806
    }
   }
  ],
  "ideias": [],
- "eps": [],
+ "eps": [
+  "1993884d"
+ ],
  "marca": {
   "ativa": true,
   "texto": "@hinouranooto",
@@ -361,5 +378,5 @@
   "auto_preparar": false
  },
  "formato_serie": "episodica",
- "atualizado": 1793226658.3215683
+ "atualizado": 1793227453.9138298
 }
