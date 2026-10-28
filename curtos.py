@@ -74,9 +74,18 @@ LAYOUTS: Dict[str, Tuple[str, str]] = {
     "meme": ("😂 meme de reação", "meme/reação conhecido (anime, bicho, famoso fazendo cara) — busca de imagem/GIF pelo nome do meme"),
     "cartao_cinza": ("⬜ cartão cinza", "foto/print/meme PEQUENO no centro de um fundo cinza liso, com sombra — pra explicar, listar, "
                      "mostrar quem é quem, um tweet ou uma manchete (a imagem pode trocar a cada 1-2 s no mesmo fundo)"),
+    "anime_reacao": ("🎌 reação em anime", "clipe de anime em que um personagem REAGE com a emoção do momento (choque, risada, choro, "
+                     "raiva, vergonha, sorriso maligno, cara de 'que?') — o meme de reação, só que de anime"),
+    "anime_cena": ("🎌 cena de anime que explica", "cena de anime que mostra POR COMPARAÇÃO o que está acontecendo (traição, plano maligno, "
+                   "alguém sendo humilhado, poder subindo, caos, multidão revoltada, dinheiro, fuga) — metáfora visual, não o fato real"),
     "cartao": ("🃏 cartão de texto", "número, data ou frase de impacto sobre fundo escuro, sem imagem"),
     "ia": ("✨ imagem gerada", "cena que não existe em banco nem na matéria — gerada no Flow/Runpod"),
 }
+LAYOUTS_ANIME = ("anime_reacao", "anime_cena")
+PROVEDORES_ANIME = ("animepexels", "animepexels_online")
+MODOS_ANIME = {"nao": "não", "reacoes": "🎌 reações e sentimentos", "tudo": "🎌 tudo que não precisa ser real"}
+EMOCOES_ANIME = ("choque", "risada", "choro", "raiva", "vergonha", "medo", "sorriso_maligno", "confusao", "decepcao", "determinacao",
+                 "alivio", "nojo", "tedio", "orgulho", "tristeza")
 EFEITOS_CURTOS = ("zoom_in", "zoom_out", "zoom_rapido", "pan_esq", "pan_dir", "pan_cima", "zoom_respiro", "flicker", "chroma")
 ENTRADAS_CURTOS = ("punch_in", "pop", "flash", "shake", "zoom_in", "slide_left", "slide_up", "blur_in", "none")
 
@@ -143,6 +152,7 @@ PERFIL_PADRAO: Dict[str, Any] = {
     "cta": {"texto": "", "onde": "final"},
     "gancho_maiusculas": False,
     # 🧭 v84_249: o canal não só dá a notícia — traz um contraponto e uma pequena reflexão (padrão: ligado)
+    "anime": {"modo": "nao", "obras": ""},  # 🎌 v84_250: padrão do canal (o projeto pode trocar)
     "ponto_de_vista": {"usa": True, "descricao": "Além de dar a notícia, traga pelo menos um ponto de discordância ou contraponto (o outro "
                        "lado, o que a manchete não conta, o que a reação geral exagera ou esquece) e feche com uma pequena reflexão."},
     "titulos": {"descricao": "", "exemplos": []},
@@ -359,6 +369,8 @@ def normalizar_perfil(p: Any) -> Dict[str, Any]:
     for k in ("estrutura", "composicoes", "evitar"):
         if not isinstance(out.get(k), list):
             out[k] = []
+    an = out.get("anime") if isinstance(out.get("anime"), dict) else {}
+    out["anime"] = {"modo": an.get("modo") if an.get("modo") in MODOS_ANIME else "nao", "obras": str(an.get("obras") or "")[:300]}
     tt = out["textos_tela"]
     try:
         import dp_destaques
@@ -1135,6 +1147,43 @@ def canal_do(base: str, p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
 
+def anime_do(base: str, p: Dict[str, Any]) -> Dict[str, str]:
+    """🎌 modo anime do projeto (ou o padrão do canal): {"modo": nao|reacoes|tudo, "obras": "Naruto, One Piece…"}."""
+    pa = (perfil_do(base, p).get("anime") or {}) if p.get("canal_id") else {}
+    cfg = p.get("config") or {}
+    modo = cfg.get("modo_anime") or pa.get("modo") or "nao"
+    return {"modo": modo if modo in MODOS_ANIME else "nao", "obras": str(cfg.get("anime_obras") or pa.get("obras") or "")[:300]}
+
+
+REGRA_ANIME = (
+    "\n## 🎌 MODO ANIME ({modo})\n"
+    "Este vídeo usa CENAS DE ANIME pra exemplificar momentos e sentimentos. {quando}\n"
+    "- 'anime_reacao' = um personagem de anime REAGINDO com a emoção da frase — preencha 'emocao' ({emocoes}). Use no lugar do "
+    "meme de reação, a cada virada forte. Busca de emoção: rosto/corpo + emoção + contexto, ex.: 'anime girl shocked wide eyes', "
+    "'anime boy laughing on floor', 'villain evil smile shadow', 'character crying in rain', 'anime facepalm embarrassed'.\n"
+    "- 'anime_cena' = uma cena de anime que mostra POR COMPARAÇÃO o que acontece na notícia (metáfora visual): traição → "
+    "'friend stabbing in the back', plano maligno → 'villain plotting dark room', caos → 'city destroyed explosion', humilhação → "
+    "'character kneeling defeated', poder → 'aura power up scream', multidão revoltada → 'angry crowd shouting'.\n"
+    "- A busca do acervo de anime é por DESCRIÇÃO VISUAL LITERAL: cena concreta e filmável, 2 a 5 palavras em inglês "
+    "([personagem/tipo] + [ação/pose] + [cenário]); NUNCA conceito solto ('betrayal', 'sense of power'). 2 'alternativas' cada vez "
+    "mais simples. 'obra'/'personagem' SÓ quando você tem certeza que a cena existe naquele anime (ex.: 'Naruto' + 'Naruto Uzumaki' "
+    "pra 'boy crying alone in rain'); senão deixe vazio.{obras}\n"
+    "- Fato REAL (quem é a pessoa, o que ela postou, o vídeo do acontecimento) continua com 'materia'/'foto_real'/'clipe_real'/"
+    "'cartao_cinza' — anime é pra reação, sentimento e comparação, nunca pra fingir que mostra o fato.\n")
+
+
+def _regra_anime(anime: Dict[str, str]) -> str:
+    if (anime or {}).get("modo", "nao") == "nao":
+        return "\nNÃO use os layouts 'anime_reacao' nem 'anime_cena' neste vídeo.\n"
+    quando = ("Troque os memes de reação por 'anime_reacao' e use 'anime_cena' pra comparar; o resto segue o estilo do canal."
+              if anime["modo"] == "reacoes" else
+              "Use anime em TUDO que não precisa ser real: reações ('anime_reacao') e ilustrações/comparações ('anime_cena') no lugar "
+              "de meme, vídeo e foto de banco.")
+    obras = (f" Animes preferidos deste canal (use quando combinar, pra manter coerência): {anime['obras']}." if anime.get("obras") else "")
+    return (REGRA_ANIME.replace("{modo}", MODOS_ANIME[anime["modo"]]).replace("{quando}", quando)
+            .replace("{emocoes}", ", ".join(EMOCOES_ANIME)).replace("{obras}", obras))
+
+
 def ids_extras(base: str, p: Dict[str, Any]) -> List[str]:
     return [m["id"] for m in midias_do_canal(base, canal_do(base, p))]
 
@@ -1285,7 +1334,8 @@ ROTEIRO_SCHEMA = _o({
             "layout": {"type": "string", "enum": list(LAYOUTS)},
             "composicao": _s(), "visual": _s(), "query": _s(), "alternativas": _ls(), "material": _s(), "palavra": _s(),
             "efeito": {"type": "string", "enum": list(EFEITOS_CURTOS) + [""]},
-            "entrada": {"type": "string", "enum": list(ENTRADAS_CURTOS)}})},
+            "entrada": {"type": "string", "enum": list(ENTRADAS_CURTOS)},
+            "emocao": {"type": "string", "enum": list(EMOCOES_ANIME) + [""]}, "obra": _s(), "personagem": _s()})},
         "texto_tela": _o({"texto": _s(), "estilo": _s(), "palavra": _s()}),
         "sfx": {"type": "array", "items": _o({"tipo": {"type": "string", "enum": list(TIPOS_SFX)}, "palavra": _s(), "busca": _s()})},
     })},
@@ -1355,6 +1405,7 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
         L.append("## MEMES / BORDÕES RECORRENTES DO CANAL (use com layout 'materia' e o ID em 'material', nos momentos que eles pedem)")
         L += [f"- {m['id']} ({m.get('tipo')}): {m.get('descricao') or 'sem descrição'}" for m in km]
         L.append("")
+    L.append(_regra_anime(anime_do(base, p)))
     if perfil["textos_tela"].get("usa", True) is False:
         L += ["⚠ Este canal NÃO usa texto grande separado na tela (a legenda faz esse papel): deixe 'texto_tela.texto' vazio, "
               "a não ser num layout 'cartao'.", ""]
@@ -1438,7 +1489,10 @@ def ler_roteiro(dados: Any, p: Dict[str, Any], extras_ids: Iterable[str] = ()) -
                           "alternativas": [_limpo(a, 120) for a in (cn.get("alternativas") or []) if _limpo(a, 120)][:4],
                           "material": mat, "palavra": _limpo(cn.get("palavra"), 60),
                           "efeito": cn.get("efeito") if cn.get("efeito") in EFEITOS_CURTOS else "",
-                          "entrada": cn.get("entrada") if cn.get("entrada") in ENTRADAS_CURTOS else "none"})
+                          "entrada": cn.get("entrada") if cn.get("entrada") in ENTRADAS_CURTOS else "none",
+                          **({"emocao": cn["emocao"] if cn.get("emocao") in EMOCOES_ANIME else "",
+                              "obra": _limpo(cn.get("obra"), 80), "personagem": _limpo(cn.get("personagem"), 80)}
+                             if lay in LAYOUTS_ANIME else {})})
         if not cenas:
             cenas = [{"layout": "video", "composicao": "", "visual": fala[:120], "query": "breaking news background", "alternativas": [],
                       "material": "", "palavra": "", "efeito": "zoom_in", "entrada": "none"}]
@@ -1930,6 +1984,10 @@ def rota_da_cena(layout: str, providers: List[str]) -> Tuple[str, str]:
     real = next((x for x in _FOTOS_REAIS if x in lig), None)
     if layout == "materia":
         return "material", "video"
+    if layout in LAYOUTS_ANIME:  # 🎌 acervo de anime (local, depois o online); sem ele: YouTube, depois foto de anime
+        for pv in PROVEDORES_ANIME + ("youtube",):
+            if pv in lig:
+                return pv, "video"
     if layout == "clipe_real" and "youtube" in lig:
         return "youtube", "video"
     if layout in ("foto_real", "clipe_real", "meme", "cartao_cinza") and real:
@@ -1960,7 +2018,19 @@ def _divisoes(a: float, b: float, n: int, palavras: List[Dict[str, Any]]) -> Lis
     return pts
 
 
-def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def _layout_no_modo(layout: str, modo: str) -> str:
+    """🎌 o modo anime manda: meme vira reação de anime; em "tudo", banco genérico/IA vira cena de anime."""
+    if modo in ("reacoes", "tudo") and layout == "meme":
+        return "anime_reacao"
+    if modo == "tudo" and layout in ("video", "foto", "ia"):
+        return "anime_cena"
+    if modo == "nao" and layout in LAYOUTS_ANIME:
+        return "meme" if layout == "anime_reacao" else "video"
+    return layout
+
+
+def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Dict[str, Any]] = None,
+                    modo_anime: str = "nao") -> List[Dict[str, Any]]:
     """Os PLANOS no tempo da gravação: cada cena do roteiro começa na palavra dela; plano longo demais pro ritmo do canal é
     dividido (com as buscas de reserva da cena). Cobre o áudio de 0 até o fim, sem buracos."""
     g = p.get("gravacao") or {}
@@ -1993,7 +2063,8 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
                 marcos[k] = marcos[k - 1] + (prox - marcos[k - 1]) / (falta + 1)
         marcos = [m for k, m in enumerate(marcos) if k == 0 or m > marcos[k - 1] + 0.3] + [fim]
         for k in range(len(marcos) - 1):
-            cn = cenas[min(k, len(cenas) - 1)]
+            cn = dict(cenas[min(k, len(cenas) - 1)])
+            cn["layout"] = _layout_no_modo(cn["layout"], modo_anime)
             s0, s1 = marcos[k], marcos[k + 1]
             n = max(1, int(round((s1 - s0) / (alvo * 1.35)))) if cn["layout"] not in ("cartao", "materia") and not cn.get("material") else 1
             n = min(n, 1 + len(cn.get("alternativas") or []), 4) if cn["layout"] not in ("video", "foto") else min(n, 4)
@@ -2008,6 +2079,8 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
                             "layout": cn["layout"], "provider": prov, "media_type": mt, "query": q or "news", "alternativas": alts,
                             "visual": cn.get("visual") or "", "efeito": cn.get("efeito") or "",
                             "template": CENA_CARTAO_CINZA if cn["layout"] == "cartao_cinza" else "",
+                            **({"emocao": cn.get("emocao") or "", "obra": cn.get("obra") or "", "personagem": cn.get("personagem") or ""}
+                               if cn["layout"] in LAYOUTS_ANIME else {}),
                             "entrada": (cn.get("entrada") if j == 0 else ("punch_in" if cn.get("entrada") in ("punch_in", "flash", "shake") else "none")) or "none"})
     # sem buracos: cada plano termina onde o próximo começa, o último no fim
     out = [x for x in out if x["end"] - x["start"] >= 0.05]
@@ -2119,7 +2192,8 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     perfil = perfil_do(base, p)
     garantir_cenas()
     providers = [x for x in (providers or (p.get("config") or {}).get("providers") or PROVIDERS_PADRAO) if x]
-    planos_v = planos_do_video(p, providers, perfil)
+    anime = anime_do(base, p)
+    planos_v = planos_do_video(p, providers, perfil, anime["modo"])
     # 🃏 cartões: um fundo escuro gerado aqui vira a mídia C1, C2… do projeto
     precisa_cartao = any(x["layout"] == "cartao" for x in planos_v)
     if precisa_cartao:
@@ -2149,6 +2223,16 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             s["template"] = x["template"]
         if x.get("entrada") and x["entrada"] != "none":
             s["entrada"] = x["entrada"]
+        if x["layout"] in LAYOUTS_ANIME:
+            if x["provider"] in PROVEDORES_ANIME:  # 🎌 o acervo: emoção → peso semântico; cena concreta → peso na palavra
+                s["keyword_weight"], s["semantic_weight"] = (0.5, 2) if x["layout"] == "anime_reacao" else (2, 0.5)
+                for k in ("obra", "personagem"):
+                    if x.get(k):
+                        s[k] = x[k]
+            else:  # sem o acervo: busca "anime" no YouTube / buscador de imagem
+                s["query"] = (s["query"] + " anime").strip()
+                if s.get("alternativas"):
+                    s["alternativas"] = [a + " anime" for a in s["alternativas"]]
         segs.append(s)
     dests = destaques_do_video(p, perfil, planos_v)
     resposta = {"busca_reserva": "breaking news background", "segments": segs, "highlights": dests,

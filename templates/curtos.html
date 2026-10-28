@@ -51,6 +51,8 @@
       <label>…e/ou o texto / suas anotações</label><textarea name="texto" rows="3" placeholder="cole a notícia, o tweet, o que aconteceu…"></textarea>
       <div class="ct-linha" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0">
         <label style="font-weight:600;margin:0"><input type="checkbox" name="tudo" value="1" checked style="width:auto"> 🚀 fazer tudo sozinho (roteiro → narração → editor)</label>
+        <label style="margin:0">🎌 modo anime <select name="modo_anime" style="width:auto"><option value="">(o do canal)</option>{% for k, v in modos_anime.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+        <input type="text" name="anime_obras" placeholder="animes preferidos (opcional): Naruto, JJK…" style="width:240px;margin:0">
         <label style="margin:0">voz <select name="voz" style="width:auto">{% for v in vozes %}<option value="{{ v.slug }}">{{ v.grupo }} · {{ v.nome }}</option>{% else %}<option value="">(nenhuma voz cadastrada)</option>{% endfor %}</select></label>
       </div>
       <button type="submit">⚡ Começar</button>

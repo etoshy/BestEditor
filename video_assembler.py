@@ -1300,15 +1300,30 @@ def _duracao_ou_zero(path: str) -> float:
 
 
 def _assinatura_stream(path: str) -> tuple:
+    """O que precisa ser IGUAL pra emendar com "-c copy". v84_251: inclui o ÁUDIO (taxa/canais/codec) — o react com a
+    música a 44,1 kHz + intro/final a 48 kHz, copiados juntos, saía com a música inteira 8,8% mais rápida e aguda."""
     try:
         r = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
              "stream=codec_name,profile,width,height,pix_fmt,r_frame_rate,time_base,sample_aspect_ratio",
              "-of", "csv=p=0", path],
             capture_output=True, text=True, timeout=30)
-        return (r.stdout.strip(),)
+        a = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels",
+             "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=30)
+        return (r.stdout.strip(), a.stdout.strip())
     except Exception:
         return ("?",)
+
+
+def _taxa_audio(path: str, padrao: int = 48000) -> int:
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=sample_rate",
+                            "-of", "default=nw=1:nk=1", path], capture_output=True, text=True, timeout=30)
+        return int(r.stdout.strip().splitlines()[0])
+    except Exception:
+        return padrao
 
 
 def _concat_recodificando(clip_paths: List[str], output_path: str) -> None:
@@ -1317,13 +1332,14 @@ def _concat_recodificando(clip_paths: List[str], output_path: str) -> None:
     for p in clip_paths:
         args += ["-i", p]
     partes = []
+    taxa = _taxa_audio(clip_paths[0]) if clip_paths else 48000  # v84_251: a taxa do 1º (a música do react fica intacta)
     for i in range(len(clip_paths)):
         escala = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2," if w and h else ""
         partes.append(f"[{i}:v]{escala}setsar=1,fps={TARGET_FPS},format=yuv420p,settb=AVTB,setpts=PTS-STARTPTS[v{i}]")
     n = len(clip_paths)
     com_audio = all(_tem_audio_seguro(p) for p in clip_paths)
     if com_audio:
-        partes += [f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo,asetpts=PTS-STARTPTS[a{i}]" for i in range(n)]
+        partes += [f"[{i}:a]aresample={taxa},aformat=channel_layouts=stereo,asetpts=PTS-STARTPTS[a{i}]" for i in range(n)]
         filtro = ";".join(partes) + ";" + "".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[out][aout]"
         saida = ["-map", "[out]", "-map", "[aout]", "-c:a", "aac", "-b:a", "192k"]
     else:
@@ -1684,6 +1700,7 @@ def _normalize_cutaway_clip(
     target_width: int,
     target_height: int,
     has_own_audio: bool,
+    taxa_audio: int = 44100,
 ) -> str:
     """Ajusta o clipe de CORTE (inserção real, não overlay) pra mesma
     resolução/fps/codec do resto do vídeo, preservando a duração
@@ -1699,8 +1716,8 @@ def _normalize_cutaway_clip(
     )
     args = ["-i", input_path]
     if not has_own_audio:
-        args += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
-    args += ["-vf", scale_pad, "-r", str(TARGET_FPS)]
+        args += ["-f", "lavfi", "-i", f"anullsrc=channel_layout=stereo:sample_rate={int(taxa_audio)}"]
+    args += ["-vf", scale_pad, "-r", str(TARGET_FPS), "-ar", str(int(taxa_audio)), "-ac", "2"]
     if has_own_audio:
         args += ["-map", "0:v", "-map", "0:a?", "-c:a", "aac", "-shortest"]
     else:
@@ -1806,6 +1823,7 @@ def insert_cutaways(
     pieces: List[str] = []
     cursor = 0.0
     base_duration = _probe_duration(base_video_path)
+    taxa = _taxa_audio(base_video_path, 48000)  # v84_251: todos os pedaços na taxa do vídeo base (sem acelerar a música)
 
     for idx, cut in enumerate(ordered):
         point = max(cursor, min(base_duration, float(cut["insertion_point"])))
@@ -1815,14 +1833,14 @@ def insert_cutaways(
                 "-i", base_video_path, "-ss", f"{cursor:.3f}", "-to", f"{point:.3f}",
                 "-r", str(TARGET_FPS),
                 "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-                "-c:a", "aac", piece_path,
+                "-c:a", "aac", "-ar", str(taxa), "-ac", "2", piece_path,
             ])
             pieces.append(piece_path)
 
         cutaway_path = cut["resolved_path"]
         has_audio = _has_audio_stream(cutaway_path)
         normalized_cutaway = os.path.join(work_dir, f"_cutaway_clip_{idx}_{uuid.uuid4().hex[:8]}.mp4")
-        _normalize_cutaway_clip(cutaway_path, normalized_cutaway, target_width, target_height, has_audio)
+        _normalize_cutaway_clip(cutaway_path, normalized_cutaway, target_width, target_height, has_audio, taxa)
         pieces.append(normalized_cutaway)
 
         fim = cut.get("remove_ate")
@@ -1834,7 +1852,7 @@ def insert_cutaways(
             "-i", base_video_path, "-ss", f"{cursor:.3f}",
             "-r", str(TARGET_FPS),
             "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", final_piece,
+            "-c:a", "aac", "-ar", str(taxa), "-ac", "2", final_piece,
         ])
         pieces.append(final_piece)
 

@@ -12,28 +12,28 @@
     "nome": "Light Yagami",
     "visual_en": "Neat brown hair, sharp confident eyes, school uniform or dark coat, smug smirk, calm composed look",
     "personalidade": "Arrogante, inteligente e obcecado pelo controle, se vê como superior e acha que seus atos são justificados.",
-    "ref": "E:\\editor2bancodevideos\\react_personagens\\rp0082e243b7\\refs\\c1edb0f_238f1f.png"
+    "ref": "E:\\editor2bancodevideos\\personagens_pod\\d80c185bbf\\imagens\\light_yagami_neutro_v2_cf1b.png"
    },
    {
     "slug": "c8ab669",
     "nome": "Kiyotaka Ayanokoji",
     "visual_en": "",
     "personalidade": "",
-    "ref": "E:\\editor2bancodevideos\\react_personagens\\rp0082e243b7\\refs\\c8ab669_37b7cd.png"
+    "ref": "E:\\editor2bancodevideos\\personagens_pod\\88ecd53cdd\\imagens\\kiyotaka_ayanokoji_neutro_v1_44e0.png"
    },
    {
     "slug": "cd31b31",
     "nome": "Makima",
     "visual_en": "",
     "personalidade": "",
-    "ref": "E:\\editor2bancodevideos\\react_personagens\\rp0082e243b7\\refs\\cd31b31_742987.png"
+    "ref": "E:\\editor2bancodevideos\\personagens_pod\\fad26b3271\\imagens\\makima_neutro_v1_18be.png"
    },
    {
     "slug": "c05131c",
     "nome": "Griffith",
     "visual_en": "",
     "personalidade": "",
-    "ref": "E:\\editor2bancodevideos\\react_personagens\\rp0082e243b7\\refs\\c05131c_474224.png"
+    "ref": "E:\\editor2bancodevideos\\personagens_pod\\9ca77faccf\\imagens\\griffith_neutro_v2_f854.png"
    }
   ],
   "projeto": {
@@ -46,7 +46,7 @@
   "titulo": "🎭 7 Minutoz - MONSTRO | Johan Liebert (Monster)",
   "tem_projeto": false,
   "react": "rp0082e243b7",
-  "atualizado": 1793122888.3812733,
+  "atualizado": 1793178270.2208884,
   "criado": 1793122242.5103571
  }
 }

@@ -1,0 +1,38 @@
+{
+ "textos": {},
+ "capas": [
+  {
+   "n": 1,
+   "ideia": "🎭 react: Light Yagami, Kiyotaka Ayanokoji, Makima, Griffith reagindo ao vídeo (0:19)",
+   "texto": "",
+   "prompt": "",
+   "personagem": "",
+   "ref": "",
+   "status": "pronta",
+   "erro": "",
+   "criado": 1793177749.657311,
+   "personalizada": true,
+   "fundo": "E:\\editor2bancodevideos\\publicacoes\\rp0082e243b7\\capas\\react_9feeb027.jpg",
+   "estilo": {
+    "pos": "topo",
+    "cor": "#ffffff",
+    "cor2": "#ffd600",
+    "tamanho": 100,
+    "fonte": "bebas-neue",
+    "peso": "Bold",
+    "contorno": 100,
+    "faixa": true,
+    "maiusculas": true,
+    "sombra": true,
+    "caixa": false,
+    "cor_caixa": "#e11d48"
+   },
+   "react": true,
+   "versoes": [
+    "E:\\editor2bancodevideos\\publicacoes\\rp0082e243b7\\capas\\capa_1_1793177749_montada.png"
+   ],
+   "imagem": "E:\\editor2bancodevideos\\publicacoes\\rp0082e243b7\\capas\\capa_1_1793177749_montada.png",
+   "final": "E:\\editor2bancodevideos\\publicacoes\\rp0082e243b7\\capas\\capa_1_1793177749_montada_final_8093.jpg"
+  }
+ ]
+}

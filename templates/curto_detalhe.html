@@ -74,6 +74,11 @@
   </div>
   <div id="fontes"></div>
   <div class="ct-linha"><input type="text" id="cLinks" placeholder="+ link da matéria" style="flex:1;min-width:280px"><button id="bLinks">📰 Ler</button></div>
+  <div class="ct-linha">
+    <label>🎌 Modo anime<select id="cAnime"><option value="" {% if not p.config.modo_anime %}selected{% endif %}>(o do canal: {{ modos_anime[anime.modo] }})</option>{% for k, v in modos_anime.items() %}<option value="{{ k }}" {% if p.config.modo_anime == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label style="flex:1;min-width:240px">Animes preferidos (opcional)<input type="text" id="cObras" value="{{ p.config.anime_obras or '' }}" placeholder="ex.: Naruto, One Piece, Jujutsu Kaisen — ajuda a manter a cara do vídeo"></label>
+  </div>
+  <div class="ct-dica" id="avisoAnime" style="display:none">🎌 Modo anime: <b>reações</b> = os memes de reação viram personagens de anime reagindo (choque, risada, choro…) e as comparações viram cenas de anime; <b>tudo</b> = anime em tudo que não precisa ser real. Fato real (a pessoa, o print, o vídeo do acontecimento) continua real. As cenas vêm do seu acervo de anime — marque <b>animepexels</b> (ou o online) nas fontes da seção 6.</div>
   <label>Texto / anotações (vai junto da matéria)</label><textarea id="cTexto" rows="3">{{ p.noticia.texto }}</textarea>
   <label>Pedido extra pro roteiro (opcional)</label><textarea id="cExtra" rows="1" placeholder="ex.: terminar perguntando a opinião; não citar o nome do filho">{{ p.config.extra }}</textarea>
   <div class="ct-linha"><button id="bSalvarCfg">💾 Salvar</button></div>
@@ -153,6 +158,7 @@
 
 <script>
 const PID = {{ p.id|tojson }}, BASE = '/curtos/' + PID;
+const EMOCOES = {{ emocoes|tojson }}, ANIME_LAY = ['anime_reacao', 'anime_cena'];
 const LAYOUTS = {{ layouts|tojson }}, SFX = {{ tipos_sfx|tojson }}, FUNCOES = {{ funcoes|tojson }}, EFEITOS = {{ efeitos|tojson }}, ENTRADAS = {{ entradas|tojson }};
 const $ = id => document.getElementById(id);
 let P = null, ultimoFim = null, sujo = false, SONS = {};
@@ -185,7 +191,7 @@ $('bSalvarCfg').onclick = salvarCfg;
 async function salvarCfg() {
   try {
     await api(BASE + '/config', { titulo: $('cTitulo').value, canal_id: $('cCanal').value, duracao_alvo_s: +$('cDur').value || 0,
-      texto_noticia: $('cTexto').value, extra: $('cExtra').value });
+      texto_noticia: $('cTexto').value, extra: $('cExtra').value, modo_anime: $('cAnime').value, anime_obras: $('cObras').value });
     $('tTitulo').textContent = $('cTitulo').value; barra('✅ salvo', 'okk'); recarregar();
   } catch (e) { barra('❌ ' + e.message, 'erro'); }
 }
@@ -204,7 +210,9 @@ function cenaHtml(bi, ci, c) {
     <input data-k="visual" value="${esc(c.visual)}" placeholder="o que aparece (português)">
     <div style="display:flex;gap:4px"><input data-k="palavra" value="${esc(c.palavra)}" placeholder="${ci ? 'começa na palavra…' : '(começa com o bloco)'}" ${ci ? '' : 'disabled'}>
       <select data-k="efeito">${opts([['', '— movimento —']].concat(EFEITOS.map(x => [x, x])), c.efeito)}</select>
-      <select data-k="entrada">${opts(ENTRADAS.map(x => [x, x === 'none' ? '— entrada —' : x]), c.entrada)}</select></div></div>`;
+      <select data-k="entrada">${opts(ENTRADAS.map(x => [x, x === 'none' ? '— entrada —' : x]), c.entrada)}</select></div>
+    ${ANIME_LAY.includes(c.layout) ? `<div style="display:flex;gap:4px">${c.layout === 'anime_reacao' ? `<select data-k="emocao">${opts([['', '— emoção —']].concat(EMOCOES.map(x => [x, x])), c.emocao)}</select>` : ''}
+      <input data-k="obra" value="${esc(c.obra)}" placeholder="anime (se tiver certeza)"><input data-k="personagem" value="${esc(c.personagem)}" placeholder="personagem"></div>` : ''}</div>`;
 }
 function desenharRoteiro() {
   const r = P.roteiro;
@@ -249,6 +257,9 @@ async function salvarRoteiro(r) {
 }
 function mexer(fn) { const r = lerRoteiroDaTela(); fn(r); P.roteiro = r; sujo = true; desenharRoteiro(); desenharTele(); }
 $('blocos').addEventListener('input', () => { sujo = true; });
+$('blocos').addEventListener('change', ev => { if (ev.target.dataset.k === 'layout') mexer(() => {}); });
+function avisoAnime() { const m = $('cAnime').value || {{ anime.modo|tojson }}; $('avisoAnime').style.display = m && m !== 'nao' ? '' : 'none'; }
+$('cAnime').onchange = () => { avisoAnime(); salvarCfg(); }; avisoAnime();
 $('bRotSalvar').onclick = () => salvarRoteiro();
 $('bRotIA').onclick = () => { if (P.roteiro && !confirm('Escrever um roteiro novo (o atual é substituído)?')) return; rodar(BASE + '/roteiro/gerar', {}); };
 $('bRotPrompt').onclick = async () => { const d = await api(BASE + '/roteiro/prompt', undefined, 'GET'); $('rPrompt').value = d.prompt; $('rPromptBox').style.display = 'block'; try { navigator.clipboard.writeText(d.prompt); barra('📋 prompt copiado', 'okk'); } catch (_) {} };
@@ -365,7 +376,7 @@ $('bPrevia').onclick = async () => {
   if (sujo) await salvarRoteiro();
   try {
     const d = await api(BASE + '/previa', { providers: provs() }); const W = d.dur;
-    const cor = { video: '#2563eb', foto: '#0891b2', foto_real: '#7c3aed', clipe_real: '#dc2626', materia: '#16a34a', cartao: '#111827', cartao_cinza: '#6b7280', ia: '#db2777', meme: '#ea580c' };
+    const cor = { video: '#2563eb', foto: '#0891b2', foto_real: '#7c3aed', clipe_real: '#dc2626', materia: '#16a34a', cartao: '#111827', cartao_cinza: '#6b7280', ia: '#db2777', meme: '#ea580c', anime_reacao: '#e11d48', anime_cena: '#9333ea' };
     $('previa').innerHTML = `<div class="ct-tl">${d.planos.map(x => `<div style="left:${x.start / W * 100}%;width:${(x.end - x.start) / W * 100}%;background:${cor[x.layout] || '#475569'}" title="${esc(x.layout + ' · ' + x.provider + ': ' + x.query)}">${esc(x.query)}</div>`).join('')}
       ${d.destaques.map(x => `<div class="d" style="left:${x.start / W * 100}%;width:${(x.end - x.start) / W * 100}%" title="${esc(x.estilo)}">${esc(x.texto)}</div>`).join('')}
       ${d.sfx.map(x => `<div class="s" style="left:${x.start / W * 100}%" title="${esc(x.som)}"></div>`).join('')}</div>

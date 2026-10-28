@@ -28,6 +28,13 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🎌 Vídeos curtos: modo anime (v84_250)
+
+Cenas de anime pra exemplificar momentos e sentimentos. No vídeo (seção 1), no “+ Novo vídeo” ou como padrão do canal (🎛 no perfil): **🎌 Modo anime** = não / **reações e sentimentos** / **tudo que não precisa ser real**, e os **animes preferidos** (ex.: Naruto, JJK — mantém a cara do vídeo).
+- Composições novas: **🎌 reação em anime** (personagem reagindo com a emoção da frase — choque, risada, choro, raiva, sorriso maligno…; campo *emoção*) e **🎌 cena de anime que explica** (comparação visual: traição, plano maligno, caos, humilhação, poder…). Cada plano pode ter *anime* e *personagem* (só quando a IA tem certeza).
+- O prompt do roteiro ganha as regras do acervo de anime (descrição visual literal, 2–5 palavras em inglês, nada de conceito solto, reservas mais simples). Na montagem: **reações** → o meme de reação vira reação de anime; **tudo** → vídeo/foto de banco também vira cena de anime. Fato real (a pessoa, o print, o vídeo do acontecimento) continua real.
+- Fonte: o acervo **animepexels** (ou o online), com os pesos de busca certos (emoção → semântico; cena concreta → palavra) e o filtro de obra/personagem. Sem o acervo ligado: YouTube (ou buscador de imagem) com “anime” na busca.
+
 ## 🧭 Vídeos curtos: contraponto e reflexão (v84_249)
 
 - Todo roteiro, além de dar a notícia, traz um bloco **contraponto** (pelo menos um ponto de discordância: o outro lado com o melhor argumento dele, o que a manchete não conta, o que a reação da internet exagera ou esquece) e um bloco **reflexão** curto (1–2 frases, sem sermão; pode fechar perguntando o que quem assiste acha). Opinião soa como opinião e nada é inventado pra sustentar o contraponto. Fica no perfil do canal em **ponto_de_vista** (ligado por padrão; dá pra desligar no JSON do perfil).

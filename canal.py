@@ -75,7 +75,8 @@ def do_job(job: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         cam = proprio or escolhido or clipe_padrao(tipo, pid)
         vid = next((v["id"] for v in opcoes if v["arquivo"] == cam), None)
         nome = next((v["nome"] for v in opcoes if v["id"] == vid), None) or (os.path.basename(cam) if cam else "")
-        out[tipo] = {"usar": bool(c.get("usar", True)) and bool(cam), "caminho": cam, "proprio": bool(proprio),
+        # v84_251: DESLIGADAS por padrão — só entram se você ligar (ou enviar/escolher uma) neste vídeo
+        out[tipo] = {"usar": bool(c.get("usar", False)) and bool(cam), "caminho": cam, "proprio": bool(proprio),
                      "nome": nome, "rotulo": VINHETAS[tipo], "video_id": vid,
                      "opcoes": [{"id": v["id"], "nome": v["nome"], "padrao": v["padrao"], "duracao": v.get("duracao") or 0}
                                 for v in opcoes]}

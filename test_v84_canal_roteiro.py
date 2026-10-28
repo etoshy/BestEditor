@@ -111,7 +111,12 @@ def test_vinhetas_padrao_e_do_job(padrao):
     assert canal.clipe_padrao("abertura") and canal.clipe_padrao("abertura") != ab  # uma cópia
     job = {}
     v = canal.do_job(job)
-    assert v["abertura"]["usar"] and not v["abertura"]["proprio"] and not v["encerramento"]["usar"]
+    # v84_251: a vinheta padrão fica DESLIGADA até você ligar no vídeo
+    assert not v["abertura"]["usar"] and v["abertura"]["caminho"] and not v["abertura"]["proprio"]
+    assert canal.cortes_para_montagem(job) == []
+    job["vinhetas"] = {"abertura": {"usar": True}}
+    v = canal.do_job(job)
+    assert v["abertura"]["usar"] and not v["encerramento"]["usar"]
     cortes = canal.cortes_para_montagem(job)
     assert len(cortes) == 1 and cortes[0]["insertion_point"] == 0.0 and cortes[0]["audio_mode"] == "pause"
     job["vinhetas"] = {"abertura": {"usar": False}}
@@ -133,7 +138,8 @@ def test_montagem_poe_abertura_e_encerramento(padrao):
     canal.definir_padrao("abertura", _video(str(padrao / "ab.mp4"), 1.0))
     canal.definir_padrao("encerramento", _video(str(padrao / "en.mp4"), 1.5, "blue"))
     dur = va._probe_duration(base)
-    cortes = [dict(c, insertion_point=min(c["insertion_point"], dur)) for c in canal.cortes_para_montagem({})]
+    ligadas = {"vinhetas": {"abertura": {"usar": True}, "encerramento": {"usar": True}}}  # v84_251: desligadas por padrão
+    cortes = [dict(c, insertion_point=min(c["insertion_point"], dur)) for c in canal.cortes_para_montagem(ligadas)]
     saida = str(padrao / "final.mp4")
     va.insert_cutaways(base, cortes, saida, str(padrao), 320, 180)
     assert abs(va._probe_duration(saida) - 4.5) < 0.3

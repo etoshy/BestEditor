@@ -518,3 +518,51 @@ def test_laestro_v2_sem_bordao_e_atualiza_canal_antigo(base):
     assert c["perfil_versao"] == 2 and "agacha" not in _j.dumps(c["perfil"]["estrutura"])
     assert c["perfil"]["legenda"]["cor_texto"] == "#123456"  # o que você ajustou ficou
     assert len(CT.listar_canais(base)) == 1
+
+
+# ------------------------------------------------------------------ v84_250: 🎌 modo anime
+def test_modo_anime_prompt(base):
+    c = CT.criar_canal(base, "X")
+    p = CT.criar(base, c["id"], "x", texto="notícia")
+    assert "NÃO use os layouts 'anime_reacao'" in CT.prompt_roteiro(base, p)
+    p["config"].update(modo_anime="reacoes", anime_obras="Naruto, Jujutsu Kaisen")
+    CT.salvar(base, p)
+    pr = CT.prompt_roteiro(base, p)
+    assert "MODO ANIME" in pr and "anime_reacao" in pr and "Naruto, Jujutsu Kaisen" in pr and "DESCRIÇÃO VISUAL LITERAL" in pr
+    c["perfil"]["anime"] = {"modo": "tudo", "obras": ""}  # o padrão do canal vale quando o projeto não escolhe
+    CT.salvar_canal(base, c)
+    p["config"]["modo_anime"] = ""
+    CT.salvar(base, p)
+    assert CT.anime_do(base, p)["modo"] == "tudo"
+    r = CT.ler_roteiro({"blocos": [{"fala": "oi", "cenas": [{"layout": "anime_reacao", "query": "anime girl shocked", "emocao": "choque",
+                                                            "obra": "Naruto", "personagem": "Sakura"}]}]}, p)
+    cn = r["blocos"][0]["cenas"][0]
+    assert cn["emocao"] == "choque" and cn["obra"] == "Naruto" and cn["personagem"] == "Sakura"
+
+
+def test_modo_anime_na_montagem(base, tmp_path, monkeypatch):
+    monkeypatch.setenv("DP_EXTRAS_DIR", str(tmp_path / "extras"))
+    import dp_extras
+    dp_extras.recarregar()
+    pid, _g = _projeto_gravado(base, tmp_path)
+    p = CT.carregar(base, pid)
+    p["config"]["modo_anime"] = "reacoes"
+    CT.salvar(base, p)
+    d = CT.montar_dados_editor(base, pid, ["pexels", "bing", "animepexels"])
+    ani = [s for s in d["resposta"]["segments"] if s["provider"] == "animepexels"]
+    assert ani and ani[0]["query"] == "dog side eye meme"  # o meme de reação virou reação de anime, no acervo
+    assert ani[0]["semantic_weight"] == 2 and ani[0]["keyword_weight"] == 0.5
+    assert any(s["provider"] == "bing" and s.get("media_type") == "image" for s in d["resposta"]["segments"])  # fato real continua real
+    import prompt_builder as PB
+    PB.parse_ai_response(d["resposta_json"], valid_providers=["pexels", "bing", "animepexels", "material"], total_duration=d["dur"])
+    # sem o acervo ligado: cai no YouTube com "anime" na busca
+    d2 = CT.montar_dados_editor(base, pid, ["pexels", "bing", "youtube"])
+    yt = [s for s in d2["resposta"]["segments"] if s["provider"] == "youtube"]
+    assert yt and yt[-1]["query"].endswith(" anime")
+    # modo "tudo": vídeo de banco também vira cena de anime
+    p = CT.carregar(base, pid)
+    p["config"]["modo_anime"] = "tudo"
+    CT.salvar(base, p)
+    d3 = CT.montar_dados_editor(base, pid, ["pexels", "bing", "animepexels"])
+    assert not any(s["provider"] == "pexels" for s in d3["resposta"]["segments"])
+    assert any(s["provider"] == "animepexels" and s["keyword_weight"] == 2 for s in d3["resposta"]["segments"])

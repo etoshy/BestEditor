@@ -185,7 +185,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             vozes = A.vozes_disponiveis("xtts")
         except Exception:  # noqa: BLE001
             vozes = []
-        return render_template("curtos.html", canais=CT.listar_canais(base_dir), projetos=CT.listar(base_dir),
+        return render_template("curtos.html", canais=CT.listar_canais(base_dir), projetos=CT.listar(base_dir), modos_anime=CT.MODOS_ANIME,
                                prontos=CT.perfis_prontos(), vozes=vozes, erro=request.args.get("erro"))
 
     @app.route("/curtos/canal/novo", methods=["POST"])
@@ -222,9 +222,14 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             dur = int(float(f.get("duracao") or 0))
             if dur:
                 p["config"]["duracao_alvo_s"] = max(10, min(180, dur))
-                CT.salvar(base_dir, p)
         except ValueError:
             pass
+        if f.get("modo_anime") in CT.MODOS_ANIME:
+            p["config"]["modo_anime"] = f["modo_anime"]
+            if f.get("modo_anime") != "nao":
+                p["config"]["providers"] = list(dict.fromkeys(CT.PROVIDERS_PADRAO + ["animepexels"]))
+        p["config"]["anime_obras"] = " ".join(str(f.get("anime_obras") or "").split())[:300]
+        CT.salvar(base_dir, p)
         if f.get("tudo"):
             slug = f.get("voz") or ""
             _rodar(p["id"], "🚀 fazendo tudo", lambda prog: _fazer_tudo(p["id"], slug, None, prog))
@@ -240,7 +245,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         import dp_legendas
         return render_template("curto_canal.html", c=c, layouts=CT.LAYOUTS, tipos_sfx={k: v["nome"] for k, v in CT.TIPOS_SFX.items()},
                                funcoes=CT.FUNCOES_BLOCO, estilos_legenda=dp_legendas.ESTILOS,
-                               destaques=sorted(dp_destaques.catalogo().keys()), ia=_ia_ligada())
+                               destaques=sorted(dp_destaques.catalogo().keys()), ia=_ia_ligada(), modos_anime=CT.MODOS_ANIME)
 
     def _canal_tela(c: Dict[str, Any]) -> Dict[str, Any]:
         out = json.loads(json.dumps(c))
@@ -464,6 +469,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         return render_template("curto_detalhe.html", p=p, canais=CT.listar_canais(base_dir), layouts=CT.LAYOUTS,
                                tipos_sfx={k: v["nome"] for k, v in CT.TIPOS_SFX.items()}, funcoes=CT.FUNCOES_BLOCO,
                                efeitos=CT.EFEITOS_CURTOS, entradas=CT.ENTRADAS_CURTOS, vozes=vozes, ia=_ia_ligada(),
+                               modos_anime=CT.MODOS_ANIME, emocoes=CT.EMOCOES_ANIME, anime=CT.anime_do(base_dir, p),
                                todos_providers=prompt_builder.DEFAULT_PROVIDERS, providers_padrao=CT.PROVIDERS_PADRAO,
                                tem_tts=bool(CB["tts"]), tem_whisper=bool(CB["transcrever"]))
 
@@ -493,7 +499,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     cfg["duracao_alvo_s"] = max(0, min(180, int(float(b["duracao_alvo_s"] or 0))))
                 except (TypeError, ValueError):
                     pass
-            for k, n in (("extra", 3000), ("voz_tts", 120), ("motor_perfil", 20)):
+            if "modo_anime" in b and (b["modo_anime"] in CT.MODOS_ANIME or b["modo_anime"] == ""):
+                cfg["modo_anime"] = b["modo_anime"]
+            for k, n in (("extra", 3000), ("voz_tts", 120), ("motor_perfil", 20), ("anime_obras", 300)):
                 if k in b:
                     cfg[k] = str(b[k] or "")[:n]
             if isinstance(b.get("providers"), list):
