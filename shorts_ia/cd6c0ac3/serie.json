@@ -1,0 +1,342 @@
+{
+ "id": "cd6c0ac3",
+ "nome": "Hinoura no Oto",
+ "premissa": "Sora Takeda, engenheiro de som esgotado de Tóquio, se muda para a casa antiga da avó falecida em Hinoura, vila de pomares de mikan à beira do mar de Seto, buscando silêncio para gravar sons da natureza. No primeiro dia, Mame, uma menina de 6 anos, entra pelo buraco da cerca, rouba seu microfone e decide que ele é agora o 'vizinho dela'. Ela transforma cada coisa banal em aventura, e Sora reaprende a ouvir o mundo pelos olhos dela, com a vila inteira participando e a vovó Fumi sempre sabendo onde a neta está.",
+ "estilo": "anime_cotidiano",
+ "idioma": "pt",
+ "proporcao": "9:16",
+ "tom": "Slice-of-life calmo e caloroso com humor de contraste: o silêncio sonhado de Sora é constantemente invadido pelo caos fofo da Mame, e a piada geralmente cai numa punchline gentil no fim, com a vila toda reagindo.",
+ "bordoes": [
+  "Shhh, Sora-san, tem que escutar!",
+  "Ele é meu vizinho agora, tá decidido!",
+  "Isso é um som de verdade, eu juro!",
+  "A vovó Fumi sabe tudo, cuidado!",
+  "Silêncio é chato, bora fazer barulho!"
+ ],
+ "regras": "",
+ "elenco": [
+  {
+   "id": "P1",
+   "nome": "Sora Takeda",
+   "papel": "protagonista, engenheiro de som cansado de Tóquio que se muda para a vila",
+   "aparencia": "late 20s Japanese man, messy short black hair with a soft side part, tired dark eyes with heavy eyebrows, slim build, wears an oversized faded olive-green cardigan over a cream t-shirt, dark grey trousers, a cross-body strap holding a small silver field recorder, round wire-frame glasses",
+   "personalidade": "Cansado, introvertido, perfeccionista com os sons e com a própria rotina, mas com um coração mole que vai se abrindo aos poucos. Vive preocupado com o silêncio perfeito e se irrita fácil, mas acaba se encantando com a vila.",
+   "jeito_de_falar": "Educado e formal, quase sempre com 'desculpa' e 'hm'. Fala pouco e quando se empolga com um som escapa uma palavra técnica. Tique: suspira antes de responder 'tá bom...'.",
+   "voz": "Calm adult male voice in his late 20s, soft and tired, low energy with a gentle Tokyo accent, slightly monotone that warms up when excited",
+   "genero": "male",
+   "idade": "28",
+   "altura": "178 cm",
+   "ref": {
+    "estado": "pronto",
+    "arquivo": "P1_59ecbf6637.jpg",
+    "flow_job": "59ecbf6637",
+    "erro": null,
+    "msg": "🔒 travada (gerada no Flow)",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Character design reference sheet of ONE original character named Sora Takeda: late 20s Japanese man, messy short black hair with a soft side part, tired dark eyes with heavy eyebrows, slim build, wears an oversized faded olive-green cardigan over a cream t-shirt, dark grey trousers, a cross-body strap holding a small silver field recorder, round wire-frame glasses. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.",
+    "anterior": null,
+    "conta": "melojonas03500@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793225585.3433135
+   },
+   "ficha": {
+    "estado": "pronto",
+    "arquivo": "P1_ficha_e368d9f289.jpg",
+    "flow_job": "e368d9f289",
+    "erro": null,
+    "msg": "✅ pronto",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. CHARACTER SHEET (model sheet) of the EXACT same character as the reference image (Sora Takeda): late 20s Japanese man, messy short black hair with a soft side part, tired dark eyes with heavy eyebrows, slim build, wears an oversized faded olive-green cardigan over a cream t-shirt, dark grey trousers, a cross-body strap holding a small silver field recorder, round wire-frame glasses. The character is male — keep the same gender. Layout on a clean light gray background: full body front view, three-quarter view, side profile and back view standing in a row, same scale, same outfit and colors in every view; plus a row of 4 head close-ups with expressions (neutral, happy, angry, surprised). A small clean text label area with: NAME: SORA TAKEDA · GENDER: MALE · AGE: 28 · HEIGHT: 178 cm. Do not change the face, hair, eye color, outfit or proportions. No other characters, no scenery, no watermark.",
+    "anterior": "P1_ficha_db4dfc2624.jpg",
+    "conta": "melojonas03500@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793225660.52808
+   },
+   "voz_ficha": {
+    "estado": "pronto",
+    "arquivo": "P1_voz_bdd242.png",
+    "flow_job": null,
+    "erro": null,
+    "msg": "🔒 voz travada (🤖)",
+    "prompt": ""
+   },
+   "voz_perfil": {
+    "idioma": "Japonês (dialeto padrão de Tóquio, Tokyo-ben suave) falado em Português (Brasil) como idioma da dublagem, com a entonação japonesa preservada",
+    "sotaque": "Japonês de Tóquio, leve e urbano, com vogais limpas e o padrão de entonação plano-subindo típico de Tóquio; nada regional forte",
+    "genero": "Masculino",
+    "idade_vocal": "Adulto jovem de cerca de 28 anos, soando cansado e um pouco mais velho que a idade nos dias de baixa energia",
+    "timbre": "Suave e levemente rouco, com textura fosca e um toque de cansaço; nada brilhante, nada anasalado",
+    "tom": "Médio-grave, em torno de uma faixa estreita de baixa a média; pouca variação de altura, com leve elevação quando se empolga",
+    "ritmo": "Lento e espaçado, com pausas longas antes de responder; frases curtas, respiração audível entre elas, acelera só levemente quando fala de som",
+    "diccao": "Clara e contida, consoantes suaves e bem definidas sem ênfase exagerada; murmura em momentos de cansaço",
+    "atitude": "Educado, reservado e levemente resignado; formal com os outros, com um fundo de paciência esgotada que vai cedendo ao calor da vila",
+    "maneirismos": "Começa as respostas com um suspiro seguido de 'tá bom...'; usa 'desculpa' e 'hm' com frequência; ao se empolgar com um som, solta uma palavra técnica (como 'frequência', 'reverberação' ou 'ruído de fundo') e a voz sobe um degrau; quando sorri, o tom aquece e a fala fica mais macia",
+    "emocoes": [
+     {
+      "emocao": "Irritação com barulho",
+      "como_soa": "Voz baixa e seca, fala cortada, um 'hm' curto e áspero; quase sussurra o 'Shhh' com impaciência"
+     },
+     {
+      "emocao": "Encantamento com um som",
+      "como_soa": "Voz sobe um pouco e ganha brilho, fala mais rápida, escapa uma palavra técnica e para no meio como quem se surpreende consigo mesmo"
+     },
+     {
+      "emocao": "Cansaço resignado",
+      "como_soa": "Suspiro longo, fala arrastada e grave, sem energia, frases quase monótonas"
+     },
+     {
+      "emocao": "Carinho escondido",
+      "como_soa": "Tom mais macio e baixo, pausas gentis, 'desculpa' dito quase como um agradecimento; o calor aparece sem ele admitir"
+     }
+    ],
+    "frase_exemplo": "Hm... tá bom. Shhh, Mame-san, tem que escutar! Esse é o som da chuva batendo no telhado, desculpa, eu juro que é um som de verdade.",
+    "resumo": "Voz masculina adulta de cerca de 28 anos, suave, levemente rouca e cansada, em tom médio-grave, com sotaque japonês de Tóquio, ritmo lento e pausado, atitude reservada e resignada que aquece e se anima quando fala de sons.",
+    "por": "ia"
+   },
+   "historico": [],
+   "estreia": null,
+   "fixo": true,
+   "inspiracoes": [
+    "P1_insp_af8274.png"
+   ],
+   "preparar": false
+  },
+  {
+   "id": "P2",
+   "nome": "Mame",
+   "papel": "a vizinha de 6 anos, caos em forma de menina, que adota Sora como 'vizinho'",
+   "aparencia": "6 year old Japanese girl, short bob haircut with messy bangs, bright round brown eyes, round cheeks, sun-tanned skin, wears a yellow sun hat with a red ribbon, a faded orange sleeveless summer dress over a white shirt, red rubber sandals, a small wooden bead bracelet, scabbed knees, holds a plastic bug net",
+   "personalidade": "Enérgica, curiosa, destemida e cheia de imaginação. Transforma qualquer coisa banal em aventura, não tem medo de nada e adora fazer amigos. Gentil e generosa, mas um pouco teimosa quando decide algo.",
+   "jeito_de_falar": "Frases curtas e animadas, fala alto e rápido, adora dar ordens e decretar coisas. Tique: começa frases com 'Ó!' e termina com 'né?!'. Chama Sora de 'vizinho'.",
+   "voz": "Bright high-pitched young girl voice around 6 years old, energetic and excited, slightly loud, playful and cheeky, cute child Japanese accent",
+   "genero": "female",
+   "idade": "6",
+   "altura": "112 cm",
+   "ref": {
+    "estado": "pronto",
+    "arquivo": "P2_f8a349afb0.jpg",
+    "flow_job": "f8a349afb0",
+    "erro": null,
+    "msg": "🔒 travada (gerada no Flow)",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Character design reference sheet of ONE original character named Mame: 6 year old Japanese girl, short bob haircut with messy bangs, bright round brown eyes, round cheeks, sun-tanned skin, wears a yellow sun hat with a red ribbon, a faded orange sleeveless summer dress over a white shirt, red rubber sandals, a small wooden bead bracelet, scabbed knees, holds a plastic bug net. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.",
+    "anterior": null,
+    "conta": "marcosmou856@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793225148.3361802
+   },
+   "ficha": {
+    "estado": "pronto",
+    "arquivo": "P2_ficha_c7c5522aab.jpg",
+    "flow_job": "c7c5522aab",
+    "erro": null,
+    "msg": "✅ pronto",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. CHARACTER SHEET (model sheet) of the EXACT same character as the reference image (Mame): 6 year old Japanese girl, short bob haircut with messy bangs, bright round brown eyes, round cheeks, sun-tanned skin, wears a yellow sun hat with a red ribbon, a faded orange sleeveless summer dress over a white shirt, red rubber sandals, a small wooden bead bracelet, scabbed knees, holds a plastic bug net. The character is female — keep the same gender. Layout on a clean light gray background: full body front view, three-quarter view, side profile and back view standing in a row, same scale, same outfit and colors in every view; plus a row of 4 head close-ups with expressions (neutral, happy, angry, surprised). A small clean text label area with: NAME: MAME · GENDER: FEMALE · AGE: 6 · HEIGHT: 112 cm. Do not change the face, hair, eye color, outfit or proportions. No other characters, no scenery, no watermark.",
+    "anterior": null,
+    "conta": "melojonas03500@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793225439.32546
+   },
+   "voz_ficha": {
+    "estado": "pronto",
+    "arquivo": "P2_voz_f9d4a5.png",
+    "flow_job": null,
+    "erro": null,
+    "msg": "🔒 voz travada (🤖)",
+    "prompt": ""
+   },
+   "voz_perfil": {
+    "idioma": "Português (Brasil), falado com a fala infantil japonesa de uma menina de 6 anos",
+    "sotaque": "Sotaque japonês infantil e leve, com vogais bem abertas e entonação ascendente, como uma criança japonesa aprendendo a falar português; sem caricatura, soando natural e fofo",
+    "genero": "Feminino",
+    "idade_vocal": "Aparenta 6 anos, bem infantil, sem nenhum traço de adulta",
+    "timbre": "Brilhante e agudo, com textura leve e um pouco áspera de tanto gritar de alegria; nítido, sem ser nasal nem sussurrado",
+    "tom": "Agudo, na faixa alta de uma criança pequena, oscilando amplamente entre frases de pergunta e exclamação; quando anima, sobe bastante",
+    "ritmo": "Rápido e acelerado, com frases curtas e encavaladas; pausas breves e repentinas, como se não conseguisse esperar para falar; quando dá ordem, faz uma pausa dramática antes do comando",
+    "diccao": "Clara e enfática, pronunciando cada sílaba com força; consoantes marcadas e vogais abertas, com tendência a aumentar o volume ao final das frases",
+    "atitude": "Enérgica, destemida, animada e um pouco mandona; fala com a confiança de quem decreta as coisas, mas com carinho e alegria, sempre cheia de entusiasmo",
+    "maneirismos": "Começa muitas frases com 'Ó!' em tom de chamado e termina com 'né?!' em subida; chama Sora de 'vizinho' com ênfase; ao decretar algo diz 'tá decidido!'; quando pede silêncio fala 'Shhh' de forma exagerada, seguido de um risinho travesso",
+    "emocoes": [
+     {
+      "emocao": "Alegria e empolgação",
+      "como_soa": "Voz aguda e acelerada, quase gritando de tanta animação, com risadinhas agudas e frases atropeladas"
+     },
+     {
+      "emocao": "Curiosidade",
+      "como_soa": "Tom ascendente e cheio de perguntas rápidas, com a voz subindo no final e um 'hm?!' ansioso"
+     },
+     {
+      "emocao": "Teimosia",
+      "como_soa": "Voz firme e um pouco mais grave, com ritmo cadenciado e o 'né?!' carregado de certeza, sem admitir contestação"
+     },
+     {
+      "emocao": "Surpresa",
+      "como_soa": "Um grito agudo e curto, seguido de respiração ofegante e frases exclamadas"
+     },
+     {
+      "emocao": "Carinho",
+      "como_soa": "Voz mais suave e doce, ainda aguda mas sem gritar, com o nome 'vizinho' dito de forma calorosa"
+     }
+    ],
+    "frase_exemplo": "Ó, vizinho! Tem que escutar, né?! Esse som é de verdade, eu juro!",
+    "resumo": "Voz de menina japonesa de 6 anos, aguda e brilhante, com sotaque infantil leve, ritmo acelerado e rápido, dicção enfática e atitude enérgica, mandona e cheia de alegria, com entonação ascendente e exclamativa.",
+    "por": "ia"
+   },
+   "historico": [],
+   "estreia": null,
+   "fixo": true,
+   "inspiracoes": [
+    "P2_insp_6a6bfd.png"
+   ],
+   "preparar": false
+  },
+  {
+   "id": "P3",
+   "nome": "Fumi Takeda",
+   "papel": "a avó de Sora, que mora ao lado e sempre sabe onde a Mame está",
+   "aparencia": "elderly Japanese grandmother, looks 70, short silver-white hair in a neat bun with a bamboo hairpin, warm wrinkled smile, kind squinting eyes, faded teal indigo work top with rolled sleeves, dark navy apron with a small embroidered mikan leaf patch, white tabi socks and straw sandals, a folded straw hat hanging on her back, a small brass bell charm on a cord at her wrist",
+   "personalidade": "Calma, sábia, bem-humorada e observadora. Conhece cada canto da vila e parece saber de tudo antes de acontecer. Protetora com a neta, mas deixa ela explorar com liberdade.",
+   "jeito_de_falar": "Fala devagar e com carinho, usa expressões antigas do interior e ri baixinho. Tique: diz 'ara ara' quando se surpreende e sempre aponta a direção onde a Mame foi.",
+   "voz": "Warm elderly Japanese woman voice around 70, soft, gentle and slow, raspy with a friendly countryside accent, cheerful laugh",
+   "genero": "female",
+   "idade": "70",
+   "altura": "150 cm",
+   "ref": {
+    "estado": "pronto",
+    "arquivo": "P3_b3e02b1bc6.jpg",
+    "flow_job": "b3e02b1bc6",
+    "erro": null,
+    "msg": "🔒 travada (gerada no Flow)",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. Character design reference sheet of ONE original character named Fumi Takeda: elderly Japanese grandmother, looks 70, short silver-white hair in a neat bun with a bamboo hairpin, warm wrinkled smile, kind squinting eyes, faded teal indigo work top with rolled sleeves, dark navy apron with a small embroidered mikan leaf patch, white tabi socks and straw sandals, a folded straw hat hanging on her back, a small brass bell charm on a cord at her wrist. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.",
+    "anterior": null,
+    "conta": "marcosmou856@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793225580.4324107
+   },
+   "ficha": {
+    "estado": "pronto",
+    "arquivo": "P3_ficha_8358dfc1f6.jpg",
+    "flow_job": "8358dfc1f6",
+    "erro": null,
+    "msg": "✅ pronto",
+    "prompt": "2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic reactions on the gags, cinematic framing, original characters. CHARACTER SHEET (model sheet) of the EXACT same character as the reference image (Fumi Takeda): elderly Japanese grandmother, looks 70, short silver-white hair in a neat bun with a bamboo hairpin, warm wrinkled smile, kind squinting eyes, faded teal indigo work top with rolled sleeves, dark navy apron with a small embroidered mikan leaf patch, white tabi socks and straw sandals, a folded straw hat hanging on her back, a small brass bell charm on a cord at her wrist. The character is female — keep the same gender. Layout on a clean light gray background: full body front view, three-quarter view, side profile and back view standing in a row, same scale, same outfit and colors in every view; plus a row of 4 head close-ups with expressions (neutral, happy, angry, surprised). A small clean text label area with: NAME: FUMI TAKEDA · GENDER: FEMALE · AGE: 70 · HEIGHT: 150 cm. Do not change the face, hair, eye color, outfit or proportions. No other characters, no scenery, no watermark.",
+    "anterior": "P3_ficha_ee5607cb8e.jpg",
+    "conta": "marcosmou856@gmail.com",
+    "desatualizada": false,
+    "pronto_em": 1793225650.3322086
+   },
+   "voz_ficha": {
+    "estado": "pronto",
+    "arquivo": "P3_voz_99c548.png",
+    "flow_job": null,
+    "erro": null,
+    "msg": "🔒 voz travada (🤖)",
+    "prompt": ""
+   },
+   "voz_perfil": {
+    "idioma": "Português (Brasil) com sotaque de interior japonês, falado de forma natural e calorosa",
+    "sotaque": "Sotaque caipira japonês suave, com a melodia de uma senhora do interior; vogais arredondadas e cadência de conversa de vizinhança, sem caricatura",
+    "genero": "feminino",
+    "idade_vocal": "Soa como uma mulher de cerca de 70 anos, com corpo de voz maduro e envelhecido, mas sem fragilidade",
+    "timbre": "Voz quente e macia, levemente rouca e áspera nas bordas, com textura de tabaco de palha e risadinha aguda e curta no fim das frases",
+    "tom": "Médio-grave, em torno de uma oitava estreita; sobe um pouco ao se surpreender e desce suavemente nas frases de carinho",
+    "ritmo": "Lento e deliberado, com pausas longas antes de respostas e falas em tom de confidência; acelera apenas ao anunciar algo engraçado",
+    "diccao": "Clara e macia, com consoantes suaves e sílabas bem separadas, fala quase sussurrada quando quer dar segredo",
+    "atitude": "Calma, acolhedora e levemente maliciosa, como quem já sabe o fim da história e espera você chegar lá",
+    "maneirismos": "Diz 'ara ara' ao se surpreender, aponta mentalmente ou com a fala a direção onde a Mame foi, ri baixinho antes das punchlines e costuma terminar as falas com 'hmm' ou 'né?' carinhoso",
+    "emocoes": [
+     {
+      "emocao": "Carinho",
+      "como_soa": "Voz baixa, arredondada e lenta, com um sorriso audível e um leve 'hmm' de aconchego"
+     },
+     {
+      "emocao": "Surpresa",
+      "como_soa": "Um 'ara ara' agudo e curto, seguido de respiração rápida e risada contida"
+     },
+     {
+      "emocao": "Humor malicioso",
+      "como_soa": "Risadinha grave e baixinha, sussurrada, com pausa antes da punchline"
+     },
+     {
+      "emocao": "Alerta protetor",
+      "como_soa": "Fala mais firme e pausada, com 'Shhh, Sora-san, tem que escutar!' em tom de pedido sério"
+     },
+     {
+      "emocao": "Sabedoria serena",
+      "como_soa": "Tom calmo e grave, falando devagar como quem compartilha um ensinamento antigo"
+     }
+    ],
+    "frase_exemplo": "Shhh, Sora-san, tem que escutar! Ara ara, a Mame foi pro lado do rio, hmm... ela já sabia que você ia sair pra procurar.",
+    "resumo": "Voz de avó japonesa de cerca de 70 anos, quente, macia e levemente rouca, com tom médio-grave, sotaque caipira suave, ritmo lento e calmo com pausas e risadinhas, atitude acolhedora e maliciosa.",
+    "por": "ia"
+   },
+   "historico": [],
+   "estreia": null,
+   "fixo": true,
+   "inspiracoes": [
+    "P3_insp_ac359d.png"
+   ],
+   "preparar": false
+  }
+ ],
+ "cenarios": [
+  {
+   "id": "L1",
+   "nome": "Casa da vovó em Hinoura",
+   "descricao": "Traditional old Japanese wooden house with dark timber beams, sliding paper shoji doors, a tatami room, a worn wooden engawa porch overlooking a garden, a stone path, a low wooden fence with a hole at the bottom, warm summer afternoon light in watercolor style",
+   "ref": {
+    "estado": null,
+    "arquivo": null,
+    "flow_job": null,
+    "erro": null,
+    "msg": "",
+    "prompt": ""
+   }
+  },
+  {
+   "id": "L2",
+   "nome": "Pomar de mikan",
+   "descricao": "Hillside orchard of mikan citrus trees with bright orange fruit among dark green leaves, narrow dirt paths, wooden stakes, distant view of the calm blue Seto Inland Sea, soft summer sunlight in watercolor painting style",
+   "ref": {
+    "estado": null,
+    "arquivo": null,
+    "flow_job": null,
+    "erro": null,
+    "msg": "",
+    "prompt": ""
+   }
+  },
+  {
+   "id": "L3",
+   "nome": "Praia da vila",
+   "descricao": "Small quiet fishing village beach at the edge of the Seto Sea, smooth pebbles and sand, old wooden boats pulled up on the shore, low stone seawall, bright summer sky with fluffy clouds, watercolor style",
+   "ref": {
+    "estado": null,
+    "arquivo": null,
+    "flow_job": null,
+    "erro": null,
+    "msg": "",
+    "prompt": ""
+   }
+  }
+ ],
+ "ideias": [],
+ "eps": [],
+ "marca": {
+  "ativa": true,
+  "texto": "@hinouranooto",
+  "posicao": "meio",
+  "tamanho": 0.035,
+  "opacidade": 0.5,
+  "fonte": "DP Poppins",
+  "cor": "#FFFFFF",
+  "contorno": true,
+  "desvio_y": 0.0
+ },
+ "criado": 1793225079.4072168,
+ "padroes": {
+  "dur_plano": 5.0,
+  "modelo_video": "Omni 1.1 Flash",
+  "modo_video": "elementos",
+  "modelo_imagem": ""
+ },
+ "formato_serie": "episodica",
+ "atualizado": 1793225660.5280986
+}

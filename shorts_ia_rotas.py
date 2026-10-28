@@ -182,11 +182,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _serie(sid)
         d = _corpo()
         modo = "inspiracao" if d.get("modo") == "inspiracao" else "referencia"
+        com_foto = d.get("com_foto", True) is not False
         nota = str(d.get("nota") or "")[:600]
 
         def fazer(prog):
             prog("🤖 a IA está olhando as imagens e refazendo o perfil…")
-            p = SI.refazer_personagem(base_dir, sid, iid, modo, nota, CB.get("chamar"))
+            p = SI.refazer_personagem(base_dir, sid, iid, modo, nota, CB.get("chamar"), com_foto)
             return f"🔁 {p['nome']}: perfil novo — " + ("🧍 referência nova, 📋 ficha e 🎙 voz no Flow (sozinho)" if modo == "inspiracao"
                                                          else "📋 ficha e 🎙 voz refeitas a partir da referência")
         return _rodar("serie:" + sid, "🔁 refazendo o personagem", fazer)
@@ -288,8 +289,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def shorts_ia_refs(sid: str):
         """🧍 gera no Flow a referência isolada (personagem de corpo inteiro / cenário vazio)."""
         _serie(sid)
-        ids = [str(x) for x in _corpo().get("ids") or []]
-        return _tentar(lambda: SI.pedir_refs(base_dir, sid, ids))
+        d = _corpo()
+        ids = [str(x) for x in d.get("ids") or []]
+        return _tentar(lambda: SI.pedir_refs(base_dir, sid, ids, com_foto=bool(d.get("com_foto")), preparar=bool(d.get("preparar"))))
 
     @app.route("/shorts-ia/s/<sid>/fichas", methods=["POST"])
     def shorts_ia_fichas(sid: str):

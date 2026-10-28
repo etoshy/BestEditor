@@ -217,6 +217,9 @@ def carregar_serie(base: str, sid: str) -> Dict[str, Any]:
     s.setdefault("cenarios", [])
     s.setdefault("ideias", [])
     s.setdefault("eps", [])
+    # 🩹 v84_267: séries criadas antes de um campo novo (inspirações, histórico, fichas…) — completa tudo ao abrir
+    s["elenco"] = [_personagem(p, str(p.get("id") or f"P{k}")) for k, p in enumerate(s["elenco"], 1) if isinstance(p, dict)]
+    s["cenarios"] = [_cenario(c, str(c.get("id") or f"L{k}")) for k, c in enumerate(s["cenarios"], 1) if isinstance(c, dict)]
     s["marca"] = marca_da(s)
     s["padroes"] = padroes_normais(s.get("padroes"))
     s.setdefault("formato_serie", "episodica")
@@ -236,8 +239,11 @@ def series(base: str) -> List[Dict[str, Any]]:
 
 def padroes_normais(d: Any) -> Dict[str, Any]:
     """O padrão de cada episódio novo da série: duração do plano e os modelos do Flow."""
-    out = {"dur_plano": DUR_PLANO_PADRAO, "modelo_video": MODELO_VIDEO_PADRAO, "modo_video": "elementos", "modelo_imagem": ""}
+    out = {"dur_plano": DUR_PLANO_PADRAO, "modelo_video": MODELO_VIDEO_PADRAO, "modo_video": "elementos", "modelo_imagem": "",
+           "auto_preparar": False}
     if isinstance(d, dict):
+        if "auto_preparar" in d:
+            out["auto_preparar"] = d["auto_preparar"] is True or str(d["auto_preparar"]).lower() in ("1", "true", "on", "sim")
         try:
             if d.get("dur_plano") not in (None, ""):
                 out["dur_plano"] = round(max(2.0, min(DUR_VIDEO_FLOW, float(d["dur_plano"]))), 1)
@@ -479,7 +485,7 @@ def gerar_universo(base: str, sid: str, premissa: str = "", chamar: Optional[Cal
                 k = int(p.get("imagem") or 0)
             except (TypeError, ValueError):
                 k = 0
-            if velho and 1 <= k <= len(imagens) and not (velho.get("ref") or {}).get("arquivo"):
+            if velho and 1 <= k <= len(imagens):
                 com_imagem.append((velho["id"], imagens[k - 1]))
         if not s["cenarios"]:
             for c in (r.get("cenarios") or [])[:4]:
@@ -487,9 +493,9 @@ def gerar_universo(base: str, sid: str, premissa: str = "", chamar: Optional[Cal
         if (s.get("marca") or {}).get("texto") in (None, "", "@seucanal", slug_marca(nome_velho)):
             s["marca"] = dict(marca_da(s), texto=slug_marca(s["nome"]))
         salvar_serie(base, s)
-    for pid, img in com_imagem:  # 🔒 a sua imagem vira a referência travada do personagem
+    for pid, img in com_imagem:  # 🖼 a imagem vira INSPIRAÇÃO do personagem — você gera depois (🧍 com a foto / sem foto)
         try:
-            guardar_ref(base, sid, pid, img)
+            guardar_inspiracoes(base, sid, pid, [img])
         except ShortsIAErro:
             pass
     return carregar_serie(base, sid)
@@ -513,6 +519,15 @@ INSPIRACAO_SYS = (
     "imagens. 'aparencia' e 'voz' e 'genero' em INGLÊS (aparência sem pose e sem cenário); 'papel', 'personalidade' e "
     "'jeito_de_falar' em português, combinando com a série. Mantenha o NOME e o PAPEL atuais se vierem (a NOTA do criador "
     "manda). 'imagem' = 0. Criança só em contexto inocente e seguro; nunca romance/sexual."
+)
+INSPIRACAO_FOTO_SYS = (
+    "Você recebe IMAGENS DE REFERÊNCIA de um personagem e o universo de uma série de shorts de anime. Escreva o perfil "
+    "desse personagem PARECIDO com as imagens, adaptado ao mundo da série: 'aparencia' em INGLÊS descrevendo o rosto, "
+    "o cabelo (corte e cor), os olhos, a pele, a idade aparente e o corpo como nas imagens, com a roupa e os acessórios "
+    "que ele usaria na série (sem pose e sem cenário); 'voz' e 'genero' em INGLÊS; 'papel', 'personalidade' e "
+    "'jeito_de_falar' em português combinando com a série. Mantenha o NOME, o PAPEL e o GÊNERO atuais se vierem (a NOTA "
+    "do criador manda — se a nota disser gênero/idade, siga). Nunca use nome ou marca de obra existente. 'imagem' = 1. "
+    "Criança só em contexto inocente e seguro; nunca romance/sexual."
 )
 REDESCREVER_SYS = (
     "Você recebe a(s) imagem(ns) de referência de UM personagem do criador (a primeira é a referência travada; as outras, "
@@ -571,7 +586,7 @@ def _perfil_atual_txt(p: Dict[str, Any]) -> str:
 
 
 def refazer_personagem(base: str, sid: str, pid: str, modo: str = "referencia", nota: str = "",
-                       chamar: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+                       chamar: Optional[Callable[..., Any]] = None, com_foto: bool = True) -> Dict[str, Any]:
     """🔁 refaz o personagem inteiro.
     modo "referencia": a imagem travada (sua) manda — a IA reescreve o perfil fiel a ela (+ inspirações como outros
       ângulos), e refaz 📋 ficha (do Flow, a partir da referência) e 🎙 voz.
@@ -589,7 +604,8 @@ def refazer_personagem(base: str, sid: str, pid: str, modo: str = "referencia", 
     if modo == "inspiracao":
         if not insp:
             raise ShortsIAErro("Mande uma ou mais imagens de inspiração primeiro (🖼 inspirações).")
-        r = _ia(INSPIRACAO_SYS, _blocos_imagens(insp, texto), PERSONAGEM_IMG_SCHEMA, chamar, max_tokens=2000, timeout=150)
+        r = _ia(INSPIRACAO_FOTO_SYS if com_foto else INSPIRACAO_SYS, _blocos_imagens(insp, texto), PERSONAGEM_IMG_SCHEMA, chamar,
+                max_tokens=2000, timeout=150)
     else:
         if not ref:
             raise ShortsIAErro("Esse personagem ainda não tem referência travada (⬆ é minha / 🧍 no Flow).")
@@ -610,7 +626,7 @@ def refazer_personagem(base: str, sid: str, pid: str, modo: str = "referencia", 
         s["elenco"][s["elenco"].index(p)] = novo
         salvar_serie(base, s)
     if modo == "inspiracao":
-        pedir_refs(base, sid, [pid])  # → 🧍 pronta → 📋 ficha + 🎙 voz (sozinho, no sincronizar)
+        pedir_refs(base, sid, [pid], com_foto=com_foto)  # → 🧍 pronta → 📋 ficha + 🎙 voz (sozinho, no sincronizar)
     else:
         _continuar_preparo(base, sid, [pid])  # 📋 ficha no Flow + 🎙 voz
     return item(carregar_serie(base, sid), pid)
@@ -628,7 +644,7 @@ def personagem_da_imagem(base: str, sid: str, imagem: Any, nota: str = "", chama
     if len(s["elenco"]) >= MAX_ELENCO:
         raise ShortsIAErro(f"O elenco tem no máximo {MAX_ELENCO} personagens.")
     texto = contexto_serie(s, base) + (f"\n\nNOTA DO CRIADOR SOBRE ESTE PERSONAGEM: {nota}" if nota else "")
-    sistema = INSPIRACAO_SYS if modo == "inspiracao" else PERFIL_IMG_SYS
+    sistema = INSPIRACAO_FOTO_SYS if modo == "inspiracao" else PERFIL_IMG_SYS
     r = _ia(sistema, _blocos_imagens(imagens[:MAX_INSPIRACOES], texto), PERSONAGEM_IMG_SCHEMA, chamar, max_tokens=2000, timeout=150)
     novo = salvar_personagem(base, sid, {k: r.get(k) for k in PERSONAGEM_SCHEMA["properties"]})
     if modo == "inspiracao":
@@ -1216,7 +1232,7 @@ def registrar_novos_personagens(base: str, sid: str, eid: str, lista: List[Dict[
             if len(s["elenco"]) >= MAX_ELENCO:
                 break
             p = _personagem(n, _proximo("P", s["elenco"]))
-            p.update(estreia=eid, fixo=bool(n.get("fixo", True)), preparar=True)
+            p.update(estreia=eid, fixo=bool(n.get("fixo", True)), preparar=bool(s["padroes"].get("auto_preparar")))
             s["elenco"].append(p)
             por_nome[nome.lower()] = p
             mapa[tid] = p["id"]
@@ -1277,6 +1293,18 @@ def prompt_ref_personagem(s: Dict[str, Any], p: Dict[str, Any]) -> str:
             f"{p['aparencia']}. Full body, front view, standing in a neutral relaxed pose, arms slightly away from the body, "
             "neutral friendly expression, centered, whole figure visible from head to toe, plain flat light gray background, "
             "even soft studio lighting, no other characters, no text, no logo, no watermark.")
+
+
+def prompt_ref_com_foto(s: Dict[str, Any], p: Dict[str, Any], n_fotos: int) -> str:
+    """🧍 com a foto: a(s) imagem(ns) de inspiração vão como REFERÊNCIA — o personagem sai parecido com elas, redesenhado no
+    estilo da série e com a roupa/aparência do perfil."""
+    paineis = (f"The reference image shows {n_fotos} numbered panels of the same character." if n_fotos > 1 else "")
+    return (f"{ESTILOS[s['estilo']]['prompt']}. Character design reference sheet of ONE character named {p['nome']}, based on "
+            f"the person in the reference image. {paineis} Keep the same face shape, facial features, hairstyle, hair color, "
+            "eye shape, skin tone, age and body type as the reference, redrawn cleanly in this series' art style. "
+            f"Character details: {p['aparencia']}. Full body, front view, standing in a neutral relaxed pose, arms slightly "
+            "away from the body, neutral friendly expression, centered, whole figure visible from head to toe, plain flat "
+            "light gray background, even soft studio lighting, no other characters, no text, no logo, no watermark.")[:3800]
 
 
 def prompt_ficha_personagem(s: Dict[str, Any], p: Dict[str, Any]) -> str:
@@ -1415,8 +1443,10 @@ def _colagem(refs: List[Tuple[str, str]], pasta: str) -> Optional[str]:
     return CP.colagem_de([c for _r, c in refs], pasta)
 
 
-def pedir_refs(base: str, sid: str, ids: List[str]) -> Dict[str, Any]:
-    """🧍 a referência ISOLADA de cada personagem (corpo inteiro, fundo liso) / cenário vazio, no Flow."""
+def pedir_refs(base: str, sid: str, ids: List[str], com_foto: bool = False, preparar: bool = False) -> Dict[str, Any]:
+    """🧍 a referência ISOLADA de cada personagem (corpo inteiro, fundo liso) / cenário vazio, no Flow.
+    `com_foto`: as imagens de inspiração do personagem vão como referência (sai parecido com elas); sem: só pelo texto.
+    `preparar`: quando ela chegar, já pede a 📋 ficha e faz a 🎙 voz."""
     with TRAVA:
         s = carregar_serie(base, sid)
         itens, alvo = [], []
@@ -1424,18 +1454,30 @@ def pedir_refs(base: str, sid: str, ids: List[str]) -> Dict[str, Any]:
             it = item(s, iid)
             if not it or (it.get("ref") or {}).get("estado") in ESTADOS_ESPERA:
                 continue
-            pr = prompt_ref_personagem(s, it) if iid.startswith("P") else prompt_ref_cenario(s, it)
             if iid.startswith("P") and not it.get("aparencia"):
                 continue
-            itens.append({"prompt": pr, "tipo": "imagem", "origem": "shorts_ia"})
+            pedido = {"tipo": "imagem", "origem": "shorts_ia"}
+            fotos = [os.path.join(pasta_refs(base, sid), x) for x in it.get("inspiracoes") or []] if iid.startswith("P") and com_foto else []
+            fotos = [c for c in fotos if os.path.isfile(c)][:MAX_REFS_CENA]
+            if fotos:
+                col = fotos[0] if len(fotos) == 1 else _colagem([(f"photo {k}", c) for k, c in enumerate(fotos, 1)],
+                                                                 os.path.join(pasta_serie(base, sid), "_colagens"))
+                pedido.update(prompt=prompt_ref_com_foto(s, it, len(fotos)), referencia_arquivo=col)
+            else:
+                pedido["prompt"] = prompt_ref_personagem(s, it) if iid.startswith("P") else prompt_ref_cenario(s, it)
+            if preparar and iid.startswith("P"):
+                it["preparar"] = True
+                it["ficha"] = dict(_slot(), arquivo=(it.get("ficha") or {}).get("arquivo"))  # a ficha velha não vale pra ref nova
+            itens.append(pedido)
             alvo.append(it)
         if not itens:
             raise ShortsIAErro("Nada pra gerar (falta a aparência, ou já está na fila).")
         novos = _lote().adicionar(itens, proporcao="9:16" if s["proporcao"] == "9:16" else "1:1")
         for it, j, pedido in zip(alvo, novos, itens):
             velho = it.get("ref") or {}
-            it["ref"] = dict(_slot(), estado="fila", flow_job=j["id"], prompt=pedido["prompt"], msg="⏳ na fila do Flow",
-                             anterior=velho.get("arquivo"))
+            it["ref"] = dict(_slot(), estado="fila", flow_job=j["id"], prompt=pedido["prompt"], msg="⏳ na fila do Flow"
+                             + (" (com a foto)" if pedido.get("referencia_arquivo") else ""),
+                             anterior=velho.get("arquivo"), com_foto=bool(pedido.get("referencia_arquivo")))
             if velho.get("arquivo"):
                 it["ref"]["arquivo"] = velho["arquivo"]  # a antiga continua valendo até a nova chegar
         salvar_serie(base, s)
@@ -1651,8 +1693,8 @@ def preparar_personagens(base: str, sid: str, ids: List[str]) -> Dict[str, Any]:
     com_ref = [pid for pid in ids if caminho_ref(base, s, item(s, pid))]
     sem_ref = [pid for pid in ids if pid not in com_ref and item(s, pid)]
     r: Dict[str, Any] = {"refs": 0, "fichas": 0}
-    if sem_ref:
-        r["refs"] = pedir_refs(base, sid, sem_ref)["enviadas"]
+    if sem_ref:  # com inspirações: a referência sai parecida com elas (com a foto)
+        r["refs"] = pedir_refs(base, sid, sem_ref, com_foto=True)["enviadas"]
     if com_ref:
         _continuar_preparo(base, sid, [pid for pid in com_ref if not arquivo_serie(base, s, item(s, pid).get("ficha"))] or com_ref)
         r["fichas"] = len(com_ref)

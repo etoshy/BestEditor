@@ -347,7 +347,8 @@ def test_universo_com_imagens_e_personagem_da_imagem(base, tmp_path):
     blocos = ia.vistos[0][1]
     assert [b["text"] for b in blocos if b.get("type") == "text"][:2] == ["IMAGEM 1:", "IMAGEM 2:"]
     assert "CRIANÇAS" in ia.vistos[0][0] and "Nunca romance" in ia.vistos[0][0]
-    assert SI.caminho_ref(base, s, s["elenco"][0]) and not SI.caminho_ref(base, s, s["elenco"][1])  # a imagem 2 virou a ref da Ignis
+    assert len(s["elenco"][0]["inspiracoes"]) == 1 and not s["elenco"][1]["inspiracoes"]  # a imagem 2 virou inspiração da Ignis
+    assert not SI.caminho_ref(base, s, s["elenco"][0])  # nada gerado/travado sozinho: você manda gerar (com ou sem foto)
     ia2 = _ia({"nome": "Vovó Fumi", "papel": "a avó", "aparencia": "small old woman, gray bun, apron", "personalidade": "rabugenta e doce",
                "jeito_de_falar": "resmunga", "voz": "raspy old female voice", "genero": "female", "idade": "78", "altura": "148 cm", "imagem": 1})
     p = SI.personagem_da_imagem(base, s["id"], _img(str(tmp_path / "c.png")), "é a avó", chamar=ia2)
@@ -357,7 +358,7 @@ def test_universo_com_imagens_e_personagem_da_imagem(base, tmp_path):
 def test_capitulo_premissa_novos_personagens_e_memoria(base, lote):
     s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
     sid = s["id"]
-    s = SI.atualizar_serie(base, sid, {"formato_serie": "continua", "padroes": {"dur_plano": 4, "modelo_video": "Veo 3.1 - Quality"}})
+    s = SI.atualizar_serie(base, sid, {"formato_serie": "continua", "padroes": {"dur_plano": 4, "modelo_video": "Veo 3.1 - Quality", "auto_preparar": True}})
     SI.salvar_personagem(base, sid, {"id": "P1", "historico_txt": "tem medo de caranguejo"})
     premissa = {"titulo": "O ovo", "logline": "Ignis quer chocar um ovo", "gancho": "um ovo enorme", "desenvolvimento": "d", "virada": "é de pato",
                 "final": "o pato segue o Ken", "quem": ["P1", "N1"], "continuidade": "depois do micro-ondas", "tom": "fofo",
@@ -435,7 +436,7 @@ def test_inspiracoes_e_refazer(base, lote, tmp_path):
     novo = {"nome": "Outro", "papel": "a dragoa", "aparencia": "tall woman, short silver bob, teal eyes, red apron", "personalidade": "p",
             "jeito_de_falar": "j", "voz": "calm alto", "genero": "female", "idade": "25", "altura": "175 cm", "imagem": 0}
     ia = _ia(novo)
-    p = SI.refazer_personagem(base, sid, "P1", "inspiracao", chamar=ia)
+    p = SI.refazer_personagem(base, sid, "P1", "inspiracao", chamar=ia, com_foto=False)
     assert "ORIGINAL" in ia.vistos[0][0] and sum(1 for b in ia.vistos[0][1] if b.get("type") == "image") == 2
     assert p["nome"] == "Ignis" and "silver bob" in p["aparencia"] and p["preparar"]  # o nome fica
     assert p["ref"]["estado"] == "fila" and not p["ref"].get("arquivo")  # referência NOVA, gerada só pelo texto
@@ -450,3 +451,37 @@ def test_inspiracoes_e_refazer(base, lote, tmp_path):
     assert p["aparencia"] == "exactly as the reference" and "CHARACTER SHEET" in lote.fila[-1]["prompt"]
     q = SI.personagem_da_imagem(base, sid, [_img(str(tmp_path / "a.png")), _img(str(tmp_path / "b.png"))], chamar=_ia(novo), modo="inspiracao")
     assert len(q["inspiracoes"]) == 2 and not (q["ref"] or {}).get("arquivo")
+
+
+def test_serie_antiga_sem_campos_novos(base, tmp_path):
+    """v84_267: personagem salvo antes das inspirações/histórico não dá KeyError."""
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    cam = os.path.join(SI.pasta_serie(base, s["id"]), "serie.json")
+    d = json.load(open(cam, encoding="utf-8"))
+    for p in d["elenco"]:
+        for k in ("inspiracoes", "historico", "ficha", "voz_ficha", "voz_perfil", "genero", "preparar"):
+            p.pop(k, None)
+    json.dump(d, open(cam, "w", encoding="utf-8"))
+    assert SI.guardar_inspiracoes(base, s["id"], "P1", [_img(str(tmp_path / "i.png"))])
+    assert SI.carregar_serie(base, s["id"])["elenco"][1]["historico"] == []
+
+
+def test_gerar_com_foto_e_sem_foto(base, lote, tmp_path):
+    """v84_268: 🧍 com a foto (as inspirações vão como referência) × sem foto (só o texto); depois ficha + voz sozinhas."""
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    sid = s["id"]
+    assert not lote.fila  # criar a série não gera nada sozinho
+    SI.guardar_inspiracoes(base, sid, "P1", [_img(str(tmp_path / "a.png")), _img(str(tmp_path / "b.png"), (0, 0, 200))])
+    SI.pedir_refs(base, sid, ["P1"], com_foto=True, preparar=True)
+    j = lote.fila[-1]
+    assert j.get("referencia_arquivo") and os.path.isfile(j["referencia_arquivo"]) and "Keep the same face shape" in j["prompt"]
+    assert "2 numbered panels" in j["prompt"]
+    SI.pedir_refs(base, sid, ["P2"], com_foto=True)  # sem inspiração: cai pro texto
+    assert not lote.fila[-1].get("referencia_arquivo") and "original character" in lote.fila[-1]["prompt"]
+    lote.terminar(lote.galeria)
+    SI.sincronizar_serie(base, sid)
+    assert "CHARACTER SHEET" in lote.fila[-1]["prompt"] and "Ignis" in lote.fila[-1]["prompt"]  # só o P1 (preparar) seguiu
+    assert sum(1 for x in lote.fila if "CHARACTER SHEET" in x["prompt"]) == 1
+    ia = _ia(dict(UNIVERSO["elenco"][0], aparencia="like the photos", imagem=1))
+    SI.refazer_personagem(base, sid, "P1", "inspiracao", chamar=ia)  # padrão: com a foto
+    assert "PARECIDO com as imagens" in ia.vistos[0][0] and lote.fila[-1].get("referencia_arquivo")
