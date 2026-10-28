@@ -28,6 +28,26 @@ Rodar
 
 from __future__ import annotations
 
+# 🚀 v84_262: o reloader do modo debug roda o app.py DUAS vezes — o processo "vigia" (que só reinicia o site quando
+# um .py muda) importava o site inteiro também: o dobro de RAM e de threads, e o dobro do tempo pra abrir.
+# Agora o vigia é um processo minúsculo que só segura a porta e relança o site; o site carrega UMA vez.
+if __name__ == "__main__":
+    import os as _os
+    import sys as _sys
+    if (_os.environ.get("WERKZEUG_RUN_MAIN") != "true"
+            and _os.environ.get("SEM_RELOADER", "").strip() not in ("1", "true", "sim")):
+        from werkzeug._reloader import ReloaderLoop as _RL
+        from werkzeug.serving import make_server as _ms
+        _porta = int(_os.environ.get("PORT", 5050))
+        _srv = _ms("0.0.0.0", _porta, lambda e, s: [], threaded=True)  # só reserva a porta; quem atende é o filho
+        _srv.socket.set_inheritable(True)
+        _os.environ["WERKZEUG_SERVER_FD"] = str(_srv.fileno())
+        print(f"=== abrindo o site em http://127.0.0.1:{_porta} (reinicia sozinho se um .py mudar) ===", flush=True)
+        try:
+            _sys.exit(_RL().restart_with_reloader())
+        except KeyboardInterrupt:
+            _sys.exit(0)
+
 import concurrent.futures
 import hashlib
 from contextlib import nullcontext
@@ -321,9 +341,12 @@ def _carregar_projetos_salvos() -> int:
     return carregados
 
 
-_carregar_projetos_salvos()
+_t_proj = time.time()
+_n_proj = _carregar_projetos_salvos()
+if _n_proj:
+    print(f"📂 {_n_proj or 0} projeto(s) carregado(s) em {time.time() - _t_proj:.1f}s", flush=True)
 if os.environ.get("NARRATION_SITE_NAO_CARREGAR_PROJETOS") != "1":  # nos testes, só quando uma página pedir
-    threading.Timer(1.0, lambda: _gpu_cache()).start()
+    threading.Timer(8.0, lambda: _gpu_cache()).start()  # 🧹 v84_262: num processo à parte, depois que o site já abriu
 
 # Estado das capturas de página (feature "Capturar página" — print +
 # mapa de blocos + galeria de qualquer site, ver webpage_capture.py) —
@@ -596,9 +619,20 @@ _GPU_CACHE: Dict[str, Any] = {"pronto": False, "gpu": {}, "diag": {}}
 
 
 def _verificar_gpu_em_segundo_plano() -> None:
+    # 🧹 v84_262: roda num processo SEPARADO — antes o `import torch` do diagnóstico ficava carregado no servidor
+    # pra sempre (1–2 GB de RAM só pra mostrar "GPU: sim/não"), mesmo sem você usar voz/Whisper.
+    codigo = ("import json, sys\n"
+              "from tts.voice_generator import gpu_status, diagnosticar_gpu\n"
+              "print('@@GPU@@' + json.dumps({'gpu': gpu_status(), 'diag': diagnosticar_gpu()}, default=str))\n")
     try:
-        _GPU_CACHE["gpu"] = tts_gpu_status()
-        _GPU_CACHE["diag"] = tts_diagnosticar_gpu()
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in sys.path if p), PYTHONIOENCODING="utf-8")
+        r = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=180, env=env, cwd=BASE_DIR)
+        linha = next((l for l in (r.stdout or "").splitlines() if l.startswith("@@GPU@@")), None)
+        if linha is None:
+            raise RuntimeError(((r.stderr or "").strip().splitlines() or ["sem resposta"])[-1][:300])
+        dados = json.loads(linha[len("@@GPU@@"):])
+        _GPU_CACHE["gpu"], _GPU_CACHE["diag"] = dados.get("gpu") or {}, dados.get("diag") or {}
     except Exception as exc:  # noqa: BLE001 -- diagnóstico nunca derruba o site
         _GPU_CACHE["diag"] = {"diagnostico": f"Não consegui verificar a GPU: {exc}"}
     finally:
@@ -12105,6 +12139,8 @@ import curtos_rotas as _curtos_rotas  # noqa: E402  ⚡ Vídeos curtos (aba Mode
 _curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isolado,
                         lambda t, m: na.limpar_texto_para_tts(t, motor=m), _curto_para_estudio,
                         trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca, exportar=_curto_exportar)
+import shorts_ia_rotas as _shorts_ia_rotas  # noqa: E402  🎌 Shorts de IA: série com elenco fixo + modelar viral (v84_263)
+_shorts_ia_rotas.registrar(app, BASE_DIR, _curto_transcrever)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)
@@ -12243,7 +12279,19 @@ def _padroes_excluidos_do_reloader() -> list:
         os.environ.get("CURTOS_DIR") or os.path.join(BASE_DIR, "curtos"),  # 📱 vídeos curtos: quadros, takes, clipes, lotes
         os.environ.get("RASTREIO_DIR") or os.path.join(BASE_DIR, "rastreios"),
         os.path.join(BASE_DIR, "pixabay_sons"),
+        os.environ.get("SHORTS_IA_DIR") or os.path.join(BASE_DIR, "shorts_ia"),  # 🎌 shorts de IA: refs, quadros, vídeos
     ]
+    # 🚀 v84_262: as bibliotecas instaladas (torch, transformers… milhares de arquivos) não mudam enquanto o site roda —
+    # o reloader conferia a data de TODAS a cada segundo
+    import site
+    import sysconfig
+    libs = {sys.prefix, sys.base_prefix, sysconfig.get_paths().get("purelib"), sysconfig.get_paths().get("stdlib")}
+    try:
+        libs.update(site.getsitepackages() + [site.getusersitepackages()])
+    except Exception:  # noqa: BLE001  (virtualenv antigo sem getsitepackages)
+        pass
+    pastas_sem_codigo += [p for p in libs if p and os.path.realpath(p) != os.path.realpath(BASE_DIR)
+                          and not os.path.realpath(BASE_DIR).startswith(os.path.realpath(p) + os.sep)]
     return [os.path.join(p, "*") for p in pastas_sem_codigo]
 
 
@@ -12261,4 +12309,4 @@ if __name__ == "__main__":
     # com a memória apertada — voz + Whisper + Flow —, é o primeiro a dar MemoryError e derrubar o site)
     _reloader = os.environ.get("SEM_RELOADER", "").strip() not in ("1", "true", "sim")
     app.run(debug=True, host="0.0.0.0", port=port, threaded=True, use_reloader=_reloader,
-            exclude_patterns=_padroes_excluidos_do_reloader())
+            exclude_patterns=_padroes_excluidos_do_reloader(), reloader_interval=2)

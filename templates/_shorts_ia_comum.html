@@ -1,0 +1,40 @@
+<style>
+  .app-content { max-width: 1100px; }
+  .si-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .si-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .si-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .si-linha > * { margin: 0; } .si-linha button { width: auto; } .si-linha > label { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; flex: 0 0 auto; }
+  .si-linha > label > input:not([type=checkbox]), .si-linha > label > select { width: auto; min-width: 70px; }
+  .si-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-top: 10px; }
+  .si-item { border: 1px solid var(--borda); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; background: var(--card); }
+  .si-item textarea, .si-item input, .si-item select { font-size: .82rem; margin: 0; }
+  .si-item img, .si-item video { width: 100%; border-radius: 8px; background: var(--code-bg); object-fit: contain; max-height: 340px; }
+  .si-vazio { width: 100%; aspect-ratio: 9/16; max-height: 300px; border-radius: 8px; background: var(--code-bg); display: flex; align-items: center; justify-content: center; color: var(--mudo); font-size: .8rem; text-align: center; padding: 8px; box-sizing: border-box; }
+  .si-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .si-sec { background: #64748b !important; } .si-perigo { background: #dc2626 !important; } .si-ok { background: #16a34a !important; }
+  .si-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; position: sticky; top: 0; z-index: 10; }
+  .si-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .si-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .si-barra.okk { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .si-tag { display: inline-block; border: 1px solid var(--borda); border-radius: 999px; padding: 1px 8px; font-size: .74rem; background: var(--acento-suave); }
+  .si-st { font-size: .76rem; color: var(--mudo); } .si-st.erro { color: var(--erro); } .si-st.ok { color: var(--ok); }
+  .si-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; } .si-passos span { background: var(--acento-suave); border: 1px solid var(--borda); border-radius: 999px; padding: 3px 10px; font-size: .8rem; }
+</style>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function api(url, corpo, metodo) {
+  const op = { method: metodo || 'POST' };
+  if (corpo instanceof FormData) op.body = corpo;
+  else if (corpo !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(corpo); }
+  const r = await fetch(url, op); const d = await r.json().catch(() => ({ ok: false, erro: 'resposta inválida (' + r.status + ')' }));
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('erro ' + r.status));
+  return d;
+}
+function barra(msg, tipo) { const b = $('barra'); if (!b) return; b.className = 'si-barra ' + (tipo || 'on'); b.textContent = msg; if (!msg) b.className = 'si-barra'; }
+function status(slot) {
+  if (!slot || !slot.estado) return '';
+  const cls = slot.estado === 'erro' ? 'erro' : (slot.estado === 'pronto' ? 'ok' : '');
+  return `<div class="si-st ${cls}">${esc(slot.estado === 'erro' ? '❌ ' + (slot.erro || 'erro') : (slot.msg || slot.estado))}${slot.desatualizada ? ' · ⚠ o texto mudou — 🔁 refaça' : ''}</div>`;
+}
+</script>

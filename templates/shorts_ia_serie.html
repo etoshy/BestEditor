@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}🎌 {{ s.nome }}{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<p class="si-dica"><a href="/shorts-ia">← Shorts de IA</a></p>
+<h1 id="tNome">🎌 {{ s.nome }}</h1>
+<div id="barra" class="si-barra"></div>
+
+<div class="si-card">
+  <h2 style="margin:0">🌌 Universo da série</h2>
+  <p class="si-dica">O que vale pra TODO episódio. A IA usa isso pra escrever as cenas e as falas no tom certo.</p>
+  <div class="si-linha">
+    <label>Nome <input id="uNome" value="{{ s.nome }}"></label>
+    <label>Estilo <select id="uEstilo">{% for k, v in estilos.items() %}<option value="{{ k }}" {% if s.estilo == k %}selected{% endif %}>{{ v.nome }}</option>{% endfor %}</select></label>
+    <label>Idioma do post <select id="uIdioma">{% for k, v in linguas.items() %}<option value="{{ k }}" {% if s.idioma == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Formato <select id="uProp">{% for p in proporcoes %}<option {% if s.proporcao == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="si-linha">
+    <label>Capítulos <select id="uFmt">{% for k, v in formatos_serie.items() %}<option value="{{ k }}" {% if s.formato_serie == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="si-linha">
+    <label>⏱ cada plano <input id="pDur" type="number" step="0.5" min="2" max="8" value="{{ s.padroes.dur_plano }}" style="width:70px"> s</label>
+    <label>🎬 vídeo <select id="pModo">{% for k, v in modos_video.items() %}<option value="{{ k }}" {% if s.padroes.modo_video == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>modelo de vídeo <select id="pModelo">{% for m in modelos_video %}<option value="{{ m }}" {% if s.padroes.modelo_video == m %}selected{% endif %}>{{ m or 'o da conta' }}{{ ' (máxima)' if m == 'Veo 3.1 - Quality' else '' }}</option>{% endfor %}</select></label>
+    <label>modelo de imagem <select id="pModeloImg">{% for m in modelos_imagem %}<option value="{{ m }}" {% if s.padroes.modelo_imagem == m %}selected{% endif %}>{{ m or 'o da conta' }}</option>{% endfor %}</select></label>
+  </div>
+  <p class="si-dica">Padrão dos episódios novos. Qualidade máxima do Flow = <b>Veo 3.1 - Quality</b> + <b>Nano Banana Pro</b> (gasta mais crédito); a técnica da ficha de voz foi mostrada com o Omni 1.1 Flash — teste os dois na sua voz.</p>
+  <label>Premissa <textarea id="uPremissa" rows="2">{{ s.premissa }}</textarea></label>
+  <label>Tom / humor <textarea id="uTom" rows="2">{{ s.tom }}</textarea></label>
+  <label>Bordões (um por linha) <textarea id="uBordoes" rows="3">{{ s.bordoes|join('\n') }}</textarea></label>
+  <label>Regras suas (opcional) <textarea id="uRegras" rows="2" placeholder="ex.: sem palavrão; o P2 nunca ganha; todo episódio termina com o P1 comendo">{{ s.regras }}</textarea></label>
+  <div class="si-linha">
+    <label>🏷 @ do canal <input id="mTexto" value="{{ s.marca.texto }}" style="width:180px"></label>
+    <label><input type="checkbox" id="mAtiva" {% if s.marca.ativa %}checked{% endif %}> mostrar no vídeo</label>
+    <label>onde <select id="mPos">{% for k in ['meio','topo','base','terco','sup_esq','sup_dir','inf_esq','inf_dir'] %}<option {% if s.marca.posicao == k %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
+    <label>opacidade <input id="mOpac" type="number" min="0.05" max="1" step="0.05" value="{{ s.marca.opacidade }}" style="width:70px"></label>
+  </div>
+  <div class="si-linha">
+    <button id="bSalvarU">💾 salvar</button>
+    <button id="bUniverso" class="si-sec">🌌 completar com a IA</button>
+    <span class="si-dica">a IA mantém o que você já escreveu e completa o que falta (elenco, cenários, bordões)</span>
+  </div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🧍 Elenco fixo</h2>
+  <p class="si-dica">Cada personagem tem uma <b>imagem de referência travada</b> (corpo inteiro, fundo liso), gerada isolada no Flow ou enviada por você. Toda cena manda as referências de quem aparece (até 3) — é o que mantém o rosto, o cabelo e a roupa iguais em todos os episódios. Aparência e voz em inglês (vão pro Flow).</p>
+  <p class="si-dica">Consistência de <b>rosto e voz</b> nos vídeos: 1) 🧍 referência → 2) 📋 <b>ficha</b> (vistas de frente/lado/costas + expressões + nome, gênero, idade, altura — gerada no Flow a partir da referência) → 3) 🎙 <b>ficha de voz</b> (a 🤖 IA descreve idioma, sotaque, timbre, tom, ritmo, emoções; o site desenha a folha nas cores da personagem). Os vídeos vão com a ficha + a ficha de voz como ingredientes (Omni Flash) e “mantenha a consistência da voz e do personagem”.</p>
+  <div class="si-linha"><button id="bAddP" class="si-mini">➕ personagem</button> <button id="bRefsP" class="si-mini">🧍 referências que faltam</button>
+    <button id="bFichasP" class="si-mini">📋 fichas que faltam</button> <button id="bVozesP" class="si-mini">🎙 vozes que faltam</button>
+    <button id="bTudoP" class="si-mini">🧍📋🎙 preparar todos</button></div>
+  <form id="fImg" class="si-linha" style="border:1px dashed var(--borda);border-radius:8px;padding:6px 8px">
+    <b>➕ personagem a partir de uma imagem sua</b>
+    <input type="file" name="arquivo" accept="image/*" required style="width:auto">
+    <input name="nota" placeholder="nota (opcional): ex.: é a avó dela, rabugenta mas doce" style="flex:1;min-width:200px">
+    <label><input type="checkbox" name="preparar" value="1" checked> já fazer ficha + voz</label>
+    <button class="si-mini">🤖 criar o perfil</button>
+  </form>
+  <div class="si-grade" id="gElenco"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🏠 Cenários que se repetem</h2>
+  <div class="si-linha"><button id="bAddL" class="si-mini">➕ cenário</button> <button id="bRefsL" class="si-mini">🖼 gerar os que faltam</button></div>
+  <div class="si-grade" id="gCenarios"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🎬 Episódios</h2>
+  <h3 style="margin:10px 0 0">📖 Novo capítulo</h3>
+  <p class="si-dica">Escreva a ideia do capítulo (ou deixe em branco), marque quem entra e a IA escreve a <b>premissa</b> — respeitando a personalidade e o 🧠 histórico de cada um, e (se você deixar) criando personagens novos, que entram no elenco e já ganham referência, ficha e voz. Na série <b>episódica</b> cada capítulo se fecha sozinho; na <b>contínua</b> ele continua o anterior.</p>
+  <details style="margin:4px 0 8px"><summary class="si-dica" style="cursor:pointer">📝 como escrever a ideia (o estilo de prompt que funciona melhor)</summary>
+<pre style="white-space:pre-wrap;font-size:.8rem;background:var(--code-bg);padding:10px;border-radius:8px;margin-top:6px">SITUAÇÃO: o que dispara a história (1 frase concreta)
+   ex.: a Mame acha um ovo enorme no galinheiro e decide chocar sozinha
+QUEM: quem entra e o papel de cada um neste capítulo
+   ex.: Mame (a que insiste), Sora (o que tenta explicar), vovó Fumi (sabe a verdade e não conta)
+QUER × ATRAPALHA: o que alguém quer e o que impede
+   ex.: Mame quer o pintinho nascer antes do festival; o ovo é de pato
+VIRADA: a surpresa no meio ou no fim
+   ex.: nasce um patinho que segue o Sora pra todo lado
+FINAL: punchline, momento fofo ou gancho
+   ex.: Sora, rendido, dá nome pro pato — e a Mame já arrumou outro ovo
+TOM / RITMO: ex.: comédia leve, 30 s, termina fofo
+CONTINUIDADE (série contínua): o que vem do capítulo anterior / o que este deixa
+NÃO PODE: ex.: sem chuva (muda a voz), sem personagem novo</pre></details>
+  <textarea id="cIdeia" rows="3" placeholder="a ideia do capítulo (pode ser 1 frase ou o modelo acima)"></textarea>
+  <div class="si-linha" id="cQuem"></div>
+  <div class="si-linha"><label><input type="checkbox" id="cNovos" checked> pode criar personagens novos</label>
+    <button id="bPremissa">📖 escrever a premissa</button></div>
+  <div id="cRascunho"></div>
+  <h3 style="margin:14px 0 0">📺 Modelar um viral</h3>
+  <p class="si-dica">Cole o link do short que bombou (YouTube, TikTok, Instagram, Kwai…): o site baixa, corta nos planos, a IA monta o storyboard e você troca o elenco pelo da série.</p>
+  <form method="post" action="/shorts-ia/s/{{ s.id }}/ep/novo" class="si-linha">
+    <input name="url" placeholder="https://… link do viral" style="flex:1;min-width:260px" required>
+    <input name="titulo" placeholder="nome do episódio (opcional)" style="width:220px">
+    <button>📺 modelar</button>
+  </form>
+  <form method="post" action="/shorts-ia/s/{{ s.id }}/ep/novo" class="si-linha">
+    <input name="titulo" placeholder="ou: um tema livre (sem viral) — ex.: a dragoa descobre o micro-ondas" style="flex:1;min-width:260px" required>
+    <input type="hidden" name="modelar" value="0"><button class="si-sec">✏ episódio livre</button>
+  </form>
+  <h3 style="margin:14px 0 0">💡 Ideias da série</h3>
+  <p class="si-dica">Formatos que viralizam: {{ formatos|join(' · ') }}</p>
+  <div class="si-linha"><button id="bIdeias" class="si-mini">💡 gerar ideias</button></div>
+  <div id="lIdeias"></div>
+  <h3 style="margin:14px 0 0">Feitos</h3>
+  <div class="si-grade">
+  {% for e in eps %}
+    <a class="si-item" href="/shorts-ia/s/{{ s.id }}/ep/{{ e.id }}" style="color:inherit;text-decoration:none">
+      <b>{{ e.titulo }}</b>
+      <span class="si-dica" style="margin:0">{{ {'viral':'📺 viral','ideia':'💡 ideia','livre':'✏ livre','capitulo':'📖 capítulo'}[e.tipo] }} · {{ e.cenas }} cena(s) · 🖼 {{ e.imgs }} · 🎬 {{ e.videos }}{% if e.exportado %} · ✅ exportado{% endif %}</span>
+    </a>
+  {% else %}<p class="si-dica">Nenhum ainda.</p>{% endfor %}
+  </div>
+</div>
+<form method="post" action="/shorts-ia/s/{{ s.id }}/apagar" onsubmit="return confirm('Apagar a série inteira (elenco, referências e episódios)?')" style="margin-top:20px"><button class="si-mini si-perigo">🗑 apagar a série</button></form>
+
+<script>
+const SID = {{ s.id|tojson }};
+const BASE = '/shorts-ia/s/' + SID;
+let S = {{ s|tojson }};
+let tarefaAntes = null;
+const arqRef = a => BASE + '/arquivo/refs/' + a;
+
+function cardItem(it, tipo) {
+  const r = it.ref || {};
+  const img = r.arquivo ? `<img src="${arqRef(r.arquivo)}" loading="lazy">` : `<div class="si-vazio">${tipo === 'P' ? 'sem referência — 🧍 gere no Flow ou ⬆ envie' : 'sem imagem'}</div>`;
+  let fichas = '';
+  if (tipo === 'P') {
+    const f = it.ficha || {}, v = it.voz_ficha || {};
+    const mini = (sl, rot) => sl.arquivo ? `<a href="${arqRef(sl.arquivo)}" target="_blank"><img src="${arqRef(sl.arquivo)}" style="max-height:120px" loading="lazy"></a>` : `<div class="si-vazio" style="aspect-ratio:16/9;max-height:90px">${rot}</div>`;
+    fichas = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <div>${mini(f, 'sem 📋 ficha')}<div class="si-st">📋 ficha (vistas + expressões)</div>${status(f)}<button class="si-mini si-sec" data-ficha>${f.arquivo ? '🔁' : '📋'} ficha</button></div>
+      <div>${mini(v, 'sem 🎙 voz')}<div class="si-st">🎙 ficha de voz</div>${status(v)}<button class="si-mini si-sec" data-voz>${v.arquivo ? '🔁' : '🎙'} voz</button></div></div>
+      ${it.voz_perfil && it.voz_perfil.resumo ? `<div class="si-st">🎙 ${esc(it.voz_perfil.resumo)}</div>` : ''}`;
+  }
+  const campos = tipo === 'P'
+    ? `<input data-k="nome" value="${esc(it.nome)}" placeholder="nome">
+       <input data-k="papel" value="${esc(it.papel)}" placeholder="papel (ex.: a caótica)">
+       <textarea data-k="aparencia" rows="4" placeholder="aparência (EN): hair, eyes, outfit, colors, details">${esc(it.aparencia)}</textarea>
+       <textarea data-k="personalidade" rows="2" placeholder="personalidade">${esc(it.personalidade)}</textarea>
+       <textarea data-k="jeito_de_falar" rows="2" placeholder="jeito de falar / tique">${esc(it.jeito_de_falar)}</textarea>
+       <input data-k="voz" value="${esc(it.voz)}" placeholder="voz (EN): high-pitched, energetic…">
+       <div class="si-linha"><input data-k="genero" value="${esc(it.genero)}" placeholder="gênero (EN): male/female" style="flex:1">
+         <input data-k="idade" value="${esc(it.idade)}" placeholder="idade" style="width:70px"><input data-k="altura" value="${esc(it.altura)}" placeholder="altura" style="width:80px"></div>
+       <label class="si-st">🧠 histórico (o que já aconteceu — um por linha; os capítulos completam)</label>
+       <textarea data-k="historico_txt" rows="3" placeholder="ex.: tem medo de caranguejo; ganhou uma bicicleta vermelha no cap. 3">${esc((it.historico || []).map(h => h.fato).join('\n'))}</textarea>
+       ${it.estreia ? `<div class="si-st">👤 estreou no capítulo ${esc(it.estreia)}${it.fixo ? ' · fixo' : ' · participação'}</div>` : ''}`
+    : `<input data-k="nome" value="${esc(it.nome)}" placeholder="nome">
+       <textarea data-k="descricao" rows="4" placeholder="descrição (EN), sem personagens">${esc(it.descricao)}</textarea>`;
+  return `<div class="si-item" data-id="${it.id}"><b>${esc(it.id)} · ${esc(it.nome)}</b>${img}${status(r)}${fichas}${campos}
+    <div class="si-linha"><button class="si-mini" data-salvar>💾</button>${tipo === 'P' ? '<button class="si-mini" data-preparar title="referência → ficha → voz, sozinho">🧍📋🎙 tudo</button>' : ''}
+      <button class="si-mini si-sec" data-ref>${r.arquivo ? '🔁' : '🧍'} ${tipo === 'P' ? 'referência' : 'imagem'} no Flow</button>
+      <label class="si-mini si-sec" style="cursor:pointer">⬆ enviar<input type="file" accept="image/*" data-enviar hidden></label>
+      <button class="si-mini si-perigo" data-apagar>🗑</button></div></div>`;
+}
+function desenhar() {
+  $('gElenco').innerHTML = S.elenco.map(p => cardItem(p, 'P')).join('') || '<p class="si-dica">Ninguém ainda — 🌌 completar com a IA ou ➕ personagem.</p>';
+  $('gCenarios').innerHTML = S.cenarios.map(c => cardItem(c, 'L')).join('') || '<p class="si-dica">Nenhum.</p>';
+  $('lIdeias').innerHTML = S.ideias.slice().reverse().map(i => `<div class="si-item" style="margin-top:8px">
+      <b>${esc(i.titulo)}</b> <span class="si-tag">${esc(i.formato)}</span>
+      <span>${esc(i.sinopse)}</span><span class="si-dica" style="margin:0">gancho: ${esc(i.gancho)} · ${(i.quem || []).map(q => esc((S.elenco.find(p => p.id === q) || {}).nome || q)).join(', ')}</span>
+      <div class="si-linha">${i.ep ? `<a href="${BASE}/ep/${i.ep}">▶ abrir o episódio</a>` : `<button class="si-mini" data-ideia="${i.id}">🎬 criar o episódio</button>`}</div></div>`).join('') || '<p class="si-dica">Nenhuma ainda.</p>';
+}
+function dadosDo(card) { const d = { id: card.dataset.id }; card.querySelectorAll('[data-k]').forEach(x => d[x.dataset.k] = x.value); return d; }
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const card = b.closest('.si-item[data-id]');
+  try {
+    if (b.hasAttribute('data-salvar') && card) { await api(BASE + (card.dataset.id[0] === 'P' ? '/personagem' : '/cenario'), dadosDo(card)); barra('💾 salvo', 'okk'); recarregar(); }
+    else if (b.hasAttribute('data-ref') && card) { await api(BASE + (card.dataset.id[0] === 'P' ? '/personagem' : '/cenario'), dadosDo(card)); const r = await api(BASE + '/refs', { ids: [card.dataset.id] }); barra('🧍 na fila do Flow' + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); }
+    else if (b.hasAttribute('data-ficha') && card) { await api(BASE + '/personagem', dadosDo(card)); const r = await api(BASE + '/fichas', { ids: [card.dataset.id] }); barra('📋 ficha na fila do Flow' + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); }
+    else if (b.hasAttribute('data-voz') && card) { await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/vozes', { ids: [card.dataset.id] }); recarregar(); }
+    else if (b.hasAttribute('data-preparar') && card) { await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/preparar', { ids: [card.dataset.id] }); barra('🧍📋🎙 preparando (referência → ficha → voz, sozinho)', 'on'); recarregar(); }
+    else if (b.hasAttribute('data-apagar') && card) { if (!confirm('Apagar ' + card.dataset.id + '?')) return; await api(BASE + '/item/' + card.dataset.id + '/apagar', {}); recarregar(); }
+    else if (b.dataset.ideia) { b.disabled = true; const r = await api(BASE + '/ep/novo', { ideia: b.dataset.ideia }); location.href = r.url; }
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+document.addEventListener('change', async ev => {
+  const f = ev.target; if (!f.hasAttribute('data-enviar') || !f.files[0]) return;
+  const card = f.closest('.si-item[data-id]'); const fd = new FormData(); fd.append('arquivo', f.files[0]);
+  try { await api(BASE + '/item/' + card.dataset.id + '/ref', fd); barra('🔒 referência travada', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+$('bSalvarU').onclick = async () => {
+  try {
+    const r = await api(BASE + '/salvar', { nome: $('uNome').value, estilo: $('uEstilo').value, idioma: $('uIdioma').value, proporcao: $('uProp').value,
+      premissa: $('uPremissa').value, tom: $('uTom').value, bordoes: $('uBordoes').value, regras: $('uRegras').value, formato_serie: $('uFmt').value,
+      padroes: { dur_plano: $('pDur').value, modo_video: $('pModo').value, modelo_video: $('pModelo').value, modelo_imagem: $('pModeloImg').value },
+      marca: { texto: $('mTexto').value, ativa: $('mAtiva').checked, posicao: $('mPos').value, opacidade: $('mOpac').value } });
+    S = r.serie; $('tNome').textContent = '🎌 ' + S.nome; $('mTexto').value = S.marca.texto; barra('💾 salvo', 'okk');
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bUniverso').onclick = async () => { try { await api(BASE + '/universo', { premissa: $('uPremissa').value }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+function desenharCapitulo() {
+  if (!$('cQuem').dataset.feito || $('cQuem').children.length !== S.elenco.length) {
+    const marcados = new Set([...document.querySelectorAll('#cQuem input:checked')].map(x => x.value));
+    $('cQuem').innerHTML = S.elenco.map(p => `<label><input type="checkbox" value="${p.id}" ${marcados.has(p.id) ? 'checked' : ''}> ${esc(p.nome)}</label>`).join('');
+    $('cQuem').dataset.feito = '1';
+  }
+  const r = S.rascunho_capitulo;
+  if (!r) { $('cRascunho').innerHTML = ''; return; }
+  if ($('cRascunho').dataset.sig === JSON.stringify(r)) return;
+  $('cRascunho').dataset.sig = JSON.stringify(r);
+  const campo = (k, rot, n) => `<label>${rot}<textarea data-cap="${k}" rows="${n || 2}">${esc(r[k])}</textarea></label>`;
+  const nomes = id => (S.elenco.find(p => p.id === id) || (r.novos_personagens || []).find(n => n.id === id) || {}).nome || id;
+  $('cRascunho').innerHTML = `<div class="si-item" style="margin-top:8px"><b>📖 premissa (edite à vontade)</b>
+    <label>título<input data-cap="titulo" value="${esc(r.titulo)}"></label>${campo('logline', 'logline')}${campo('gancho', 'gancho (2 primeiros segundos)')}
+    ${campo('desenvolvimento', 'desenvolvimento', 3)}${campo('virada', 'virada')}${campo('final', 'final')}${campo('tom', 'tom')}${campo('continuidade', 'continuidade')}
+    <div class="si-st">👥 ${(r.quem || []).map(nomes).map(esc).join(', ')}</div>
+    ${(r.novos_personagens || []).map(n => `<div class="si-st">👤 novo: <b>${esc(n.nome)}</b> (${esc(n.papel)}) — ${esc(n.personalidade)}${n.fixo ? ' · fixo' : ' · participação'}</div>`).join('')}
+    <div class="si-linha"><button id="bCriarCap">🎬 criar o capítulo e escrever os planos</button><button id="bRefazerCap" class="si-mini si-sec">🔁 outra premissa</button></div></div>`;
+  $('bCriarCap').onclick = async () => {
+    const pr = Object.assign({}, r); document.querySelectorAll('[data-cap]').forEach(x => pr[x.dataset.cap] = x.value);
+    try { $('bCriarCap').disabled = true; const d = await api(BASE + '/capitulo/criar', { premissa: pr }); location.href = d.url; } catch (e) { $('bCriarCap').disabled = false; barra('❌ ' + e.message, 'erro'); }
+  };
+  $('bRefazerCap').onclick = () => $('bPremissa').click();
+}
+$('bPremissa').onclick = async () => {
+  try { await api(BASE + '/capitulo/premissa', { ideia: $('cIdeia').value, quem: [...document.querySelectorAll('#cQuem input:checked')].map(x => x.value), novos: $('cNovos').checked }); recarregar(); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bIdeias').onclick = async () => { try { await api(BASE + '/ideias', { n: 8 }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bAddP').onclick = async () => { try { await api(BASE + '/personagem', { nome: 'Nova personagem' }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bAddL').onclick = async () => { try { await api(BASE + '/cenario', { nome: 'Novo cenário' }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+async function refsQueFaltam(lista) {
+  const ids = lista.filter(x => !(x.ref || {}).arquivo && !['fila', 'gerando', 'parado'].includes((x.ref || {}).estado)).map(x => x.id);
+  if (!ids.length) { barra('todas já têm imagem', 'okk'); return; }
+  try { const r = await api(BASE + '/refs', { ids }); barra(`🧍 ${r.enviadas} na fila do Flow` + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('bRefsP').onclick = () => refsQueFaltam(S.elenco);
+$('bTudoP').onclick = async () => { try { await api(BASE + '/preparar', { ids: S.elenco.map(p => p.id) }); barra('🧍📋🎙 preparando todos (referência → ficha → voz)', 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('fImg').onsubmit = async ev => { ev.preventDefault(); const fd = new FormData($('fImg')); if (!$('fImg').preparar.checked) fd.delete('preparar');
+  try { await api(BASE + '/personagem-da-imagem', fd); $('fImg').reset(); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bFichasP').onclick = async () => {
+  const ids = S.elenco.filter(p => (p.ref || {}).arquivo && !(p.ficha || {}).arquivo && !['fila', 'gerando', 'parado'].includes((p.ficha || {}).estado)).map(p => p.id);
+  if (!ids.length) { barra('todas têm ficha (ou falta a 🧍 referência primeiro)', 'okk'); return; }
+  try { const r = await api(BASE + '/fichas', { ids }); barra(`📋 ${r.enviadas} ficha(s) na fila do Flow` + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bVozesP').onclick = async () => {
+  const ids = S.elenco.filter(p => !(p.voz_ficha || {}).arquivo).map(p => p.id);
+  if (!ids.length) { barra('todas têm ficha de voz', 'okk'); return; }
+  try { await api(BASE + '/vozes', { ids }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bRefsL').onclick = () => refsQueFaltam(S.cenarios);
+
+let timer = null;
+async function recarregar() {
+  clearTimeout(timer);
+  try {
+    const d = await api(BASE + '/estado', undefined, 'GET');
+    const focado = document.activeElement && document.activeElement.closest('.si-item[data-id]');
+    S = d.serie;
+    if (!focado) desenhar();
+    if (!(document.activeElement && document.activeElement.closest('#cRascunho'))) desenharCapitulo();
+    const t = d.tarefa;
+    if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : ''));
+    else if (t && tarefaAntes && tarefaAntes.rodando) { if (t.erro) barra('❌ ' + t.erro, 'erro'); else { barra('✅ ' + (t.msg || 'pronto'), 'okk'); location.reload(); return; } }
+    tarefaAntes = t;
+    const espera = [...S.elenco, ...S.cenarios].some(x => ['fila', 'gerando', 'parado'].includes((x.ref || {}).estado) || ['fila', 'gerando', 'parado'].includes((x.ficha || {}).estado) || x.preparar);
+    if ((t && t.rodando) || espera) timer = setTimeout(recarregar, 4000);
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+desenhar(); desenharCapitulo(); recarregar();
+</script>
+{% endblock %}

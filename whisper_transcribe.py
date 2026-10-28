@@ -25,6 +25,60 @@ from typing import Any, Dict, List, Optional
 
 _MODEL_CACHE: Dict[tuple, Any] = {}
 
+# 🧹 v84_262: o modelo do Whisper ficava na memória PARA SEMPRE depois da 1ª transcrição (centenas de MB a alguns GB).
+# Agora, parado por WHISPER_OCIOSO_S segundos (padrão 5 min) e sem nenhuma transcrição rodando, ele é descarregado.
+import threading as _threading
+import time as _time
+
+_USO = {"ultimo": 0.0, "rodando": 0, "vigia": False}
+_LOCK = _threading.RLock()
+
+
+def _ocioso_s() -> float:
+    try:
+        return float(os.environ.get("WHISPER_OCIOSO_S") or 300)
+    except ValueError:
+        return 300.0
+
+
+def descarregar_modelos() -> bool:
+    """Tira o(s) modelo(s) do Whisper da memória (RAM e VRAM). Devolve True se havia algum carregado."""
+    with _LOCK:
+        if not _MODEL_CACHE or _USO["rodando"]:
+            return False
+        _MODEL_CACHE.clear()
+    import gc
+    gc.collect()
+    try:
+        import sys
+        if "torch" in sys.modules:  # só limpa a VRAM se o torch já estiver carregado (nunca importa só pra isso)
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
+    return True
+
+
+def _vigia_ocioso() -> None:
+    while True:
+        _time.sleep(30)
+        with _LOCK:
+            vazio = not _MODEL_CACHE
+            parado = not _USO["rodando"] and _time.time() - _USO["ultimo"] > _ocioso_s()
+        if vazio:
+            _USO["vigia"] = False
+            return
+        if parado:
+            descarregar_modelos()
+
+
+def _marcar_uso() -> None:
+    _USO["ultimo"] = _time.time()
+    if not _USO["vigia"] and _ocioso_s() > 0:
+        _USO["vigia"] = True
+        _threading.Thread(target=_vigia_ocioso, daemon=True, name="whisper-ocioso").start()
+
 
 class TranscriptionError(Exception):
     """Erro genérico de transcrição (arquivo inválido, modelo não carregou, etc.)."""
@@ -72,6 +126,7 @@ def _get_model(model_size: str = "base", device: str = "auto"):
     """
     resolved_device = _resolve_device(device)
     cache_key = (model_size, resolved_device)
+    _marcar_uso()
 
     if cache_key not in _MODEL_CACHE:
         try:
@@ -129,18 +184,25 @@ def transcribe_audio(
     if not os.path.exists(audio_path):
         raise TranscriptionError(f"Arquivo de áudio não encontrado: {audio_path}")
 
-    model = _get_model(model_size, device=device)
-
-    kwargs: Dict[str, Any] = {"verbose": False}
-    if language:
-        kwargs["language"] = language
-    if word_timestamps:
-        kwargs["word_timestamps"] = True
-
+    with _LOCK:
+        _USO["rodando"] += 1
     try:
-        result = model.transcribe(audio_path, **kwargs)
-    except Exception as exc:  # noqa: BLE001
-        raise TranscriptionError(f"Falha ao transcrever '{audio_path}': {exc}") from exc
+        model = _get_model(model_size, device=device)
+
+        kwargs: Dict[str, Any] = {"verbose": False}
+        if language:
+            kwargs["language"] = language
+        if word_timestamps:
+            kwargs["word_timestamps"] = True
+
+        try:
+            result = model.transcribe(audio_path, **kwargs)
+        except Exception as exc:  # noqa: BLE001
+            raise TranscriptionError(f"Falha ao transcrever '{audio_path}': {exc}") from exc
+    finally:
+        with _LOCK:
+            _USO["rodando"] -= 1
+        _marcar_uso()
 
     if info is not None:  # quem chama quer saber o idioma detectado (\"Automático\")
         info["language"] = result.get("language") or language

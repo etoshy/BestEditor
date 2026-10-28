@@ -1008,7 +1008,8 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
     trab = {"tipo": "imagem"|"video", "prompt", "proporcao", "modelo", "tipo_video": "Frames"|"Elementos",
             "inicio": {"arquivo", "media_id"}, "fim": {...}, "referencia": {...}, "simular": bool}"""
     tipo = "video" if trab.get("tipo") in ("video", "animar") else "imagem"
-    frames = tipo == "video" and (trab.get("inicio") or trab.get("fim") or (trab.get("tipo_video") or "Frames") == "Frames")
+    frames = tipo == "video" and bool(trab.get("inicio") or trab.get("fim") or
+                                      ((trab.get("tipo_video") or "Frames") == "Frames" and not trab.get("referencias")))
     configurar_caixa(page, tipo, trab.get("proporcao") or "16:9", trab.get("modelo") or "", trab.get("quantidade") or "x1",
                      ("Frames" if frames else "Elementos") if tipo == "video" else "", on_passo=on_passo)
     ja_subiu: Dict[str, str] = {}  # 🎞 v84_202: Fim = a MESMA imagem do Início → reusa a mídia (o Flow não sobe repetida)
@@ -1024,6 +1025,16 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
     ref = trab.get("referencia") or {}
     ref_tokens: List[str] = []
     _ULTIMA_MIDIA.pop(id(page), None)
+    # 🎙 v84_264: vídeo "Elementos" (ingredientes) — até 3 imagens: a ficha da personagem, a ficha de VOZ e a cena.
+    # É a técnica de consistência de rosto + voz do Flow (Omni Flash): o vídeo lê as fichas e mantém o mesmo timbre.
+    if tipo == "video" and not frames:
+        for r in (trab.get("referencias") or [])[:3]:
+            if not (r.get("arquivo") or r.get("media_id")):
+                continue
+            incluir_referencia(page, r.get("arquivo"), r.get("media_id") or "", on_passo)
+            info = _ULTIMA_MIDIA.pop(id(page), None) or {}
+            ref_tokens += list(info.get("ids") or [])
+            r["_media_id"] = max(info.get("ids") or [""], key=len) or r.get("media_id") or ""
     if tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")):
         incluir_referencia(page, ref.get("arquivo"), ref.get("media_id") or "", on_passo)
         info = _ULTIMA_MIDIA.pop(id(page), None) or {}

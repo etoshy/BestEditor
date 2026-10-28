@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}🎌 Shorts de IA{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<h1>🎌 Shorts de IA <span class="si-dica" style="font-weight:400">séries com elenco fixo · modelar virais · tudo gerado no Flow</span></h1>
+<div class="si-passos"><span>🌌 universo + elenco fixo</span><span>🧍 referência travada de cada personagem</span><span>📺 link do viral → storyboard</span><span>🔁 troca o elenco + falas novas</span><span>🖼 quadro A (+ B)</span><span>🎬 imagem → vídeo com fala</span><span>✂ edição rápida</span><span>📤 exporta</span></div>
+
+<div class="si-card">
+  <h2 style="margin:0">➕ Nova série</h2>
+  <p class="si-dica">Escreva a ideia em uma frase (ou deixe em branco e a IA inventa). A IA cria o nome, o elenco (2–4 personagens originais com aparência, personalidade, jeito de falar e voz), os cenários e os bordões — tudo editável depois.</p>
+  <form method="post" action="/shorts-ia/nova" enctype="multipart/form-data">
+    <label>Ideia / premissa
+      <textarea name="premissa" rows="2" placeholder="ex.: uma dragoa milenar que virou a empregada de um programador cansado e leva tudo ao pé da letra"></textarea></label>
+    <div class="si-linha">
+      <label>Nome (opcional) <input name="nome" placeholder="a IA sugere"></label>
+      <label>Estilo <select name="estilo">{% for k, v in estilos.items() %}<option value="{{ k }}">{{ v.nome }}</option>{% endfor %}</select></label>
+      <label>Idioma do post <select name="idioma">{% for k, v in linguas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>Formato <select name="proporcao">{% for p in proporcoes %}<option>{{ p }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="si-linha">
+      <label>🖼 imagens de referência (opcional) <input type="file" name="refs" accept="image/*" multiple style="width:auto"></label>
+      <span class="si-dica" style="margin:0">cada imagem pode virar um personagem (a IA descreve a partir dela e ela fica travada)</span>
+    </div>
+    <div class="si-linha">
+      <label>⏱ cada plano <input name="dur_plano" type="number" step="0.5" min="2" max="8" value="5" style="width:70px"> s</label>
+      <label>modelo de vídeo <select name="modelo_video"><option value="Omni 1.1 Flash">Omni 1.1 Flash (ficha de voz)</option><option value="Veo 3.1 - Quality">Veo 3.1 - Quality (máxima)</option><option value="Veo 3.1 - Fast">Veo 3.1 - Fast</option></select></label>
+      <label><input type="checkbox" name="preparar" value="1" checked> já fazer referência + ficha + voz de todos</label>
+    </div>
+    <div class="si-linha">
+      <button name="gerar" value="1">🌌 criar com a IA</button>
+      <button name="gerar" value="0" class="si-sec">✏ começar em branco</button>
+    </div>
+  </form>
+  <p class="si-dica">Os personagens são sempre <b>originais</b>: o estilo é descrito em palavras (sem nome de anime/estúdio) — o Flow recusa nome de obra e o canal não corre risco de direitos autorais.</p>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">📺 Suas séries</h2>
+  {% if not series %}<p class="si-dica">Nenhuma ainda.</p>{% endif %}
+  <div class="si-grade">
+  {% for s in series %}
+    <a class="si-item" href="/shorts-ia/s/{{ s.id }}" style="color:inherit;text-decoration:none">
+      <b>{{ s.nome }}</b>
+      <span class="si-dica" style="margin:0">{{ estilos[s.estilo].nome }} · {{ s.proporcao }} · {{ linguas[s.idioma] }}</span>
+      <div class="si-linha">{% for p in s.elenco %}{% if p.ref and p.ref.arquivo %}<img src="/shorts-ia/s/{{ s.id }}/arquivo/refs/{{ p.ref.arquivo }}" style="width:48px;height:64px;object-fit:cover" title="{{ p.nome }}">{% else %}<span class="si-tag">{{ p.nome }}</span>{% endif %}{% endfor %}</div>
+      <span class="si-dica" style="margin:0">{{ s.eps|length }} episódio(s) · {{ s.marca.texto }}</span>
+    </a>
+  {% endfor %}
+  </div>
+</div>
+{% endblock %}

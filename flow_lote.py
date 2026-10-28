@@ -378,6 +378,12 @@ class Lote:
                     # 🎞 v84_193: frame de Fim também (a personagem animada começa e termina na mesma pose)
                     if it.get("fim_arquivo") and os.path.isfile(str(it["fim_arquivo"])):
                         j["fim_arquivo"] = os.path.abspath(str(it["fim_arquivo"]))
+                # 🎙 v84_264: vídeo com ingredientes (ficha da personagem + ficha de voz + cena) — modo "Elementos"
+                if tipo == "video" and not j.get("inicio_arquivo") and isinstance(it.get("referencias_arquivos"), list):
+                    refs = [os.path.abspath(str(a)) for a in it["referencias_arquivos"] if a and os.path.isfile(str(a))][:3]
+                    if refs:
+                        j["referencias_arquivos"] = refs
+                        j["origem"] = str(it.get("origem") or "elementos")[:40]
                 # 🧍 v84_184: foto com UMA imagem de referência ("Personagens" do editor: a ficha + a mestre numa colagem)
                 if tipo == "imagem" and it.get("referencia_arquivo") and os.path.isfile(str(it["referencia_arquivo"])):
                     j["referencia_arquivo"] = os.path.abspath(str(it["referencia_arquivo"]))
@@ -626,7 +632,8 @@ class Lote:
     def _converter_videos(self) -> None:
         with self.trava:
             # 🎞 animação de uma imagem não vira foto (a imagem já existe): ela espera uma conta com crédito de vídeo
-            j = next((x for x in self.fila if x["estado"] == "pendente" and x["tipo"] == "video" and not x.get("inicio_arquivo")), None)
+            j = next((x for x in self.fila if x["estado"] == "pendente" and x["tipo"] == "video" and not x.get("inicio_arquivo")
+                      and not x.get("referencias_arquivos")), None)  # 🎙 vídeo com fichas (fala) também não vira foto
             if j is None:
                 return
             j["estado"] = "convertendo"
@@ -792,6 +799,9 @@ class Lote:
                             trab["inicio"] = {"arquivo": job["inicio_arquivo"]}
                             trab["tipo_video"] = "Frames"
                             # (v84_203: o frame de Fim travava o Flow — os pedidos antigos com fim_arquivo vão só com o Início)
+                        elif job.get("referencias_arquivos"):  # 🎙 v84_264: ingredientes (ficha + voz + cena)
+                            trab["referencias"] = [{"arquivo": a, "media_id": refs_proj.get(_chave_ref(a), "")}
+                                                   for a in job["referencias_arquivos"] if os.path.isfile(a)]
                     elif job.get("referencia_arquivo") and os.path.isfile(job["referencia_arquivo"]):  # 🧍 foto com referência
                         trab["referencia"] = {"arquivo": job["referencia_arquivo"],
                                               "media_id": refs_proj.get(_chave_ref(job["referencia_arquivo"]), "")}
@@ -799,6 +809,9 @@ class Lote:
                     midias = fd.gerar_um(page, trab, on_passo, max(timeout, 600) if job["tipo"] == "video" else timeout)
                     if (trab.get("_ref_midia") or {}).get("media_id") and job.get("referencia_arquivo"):
                         refs_proj[_chave_ref(job["referencia_arquivo"])] = trab["_ref_midia"]["media_id"]
+                    for r in trab.get("referencias") or []:  # 🎙 a ficha já está no projeto: o próximo vídeo reusa
+                        if r.get("_media_id"):
+                            refs_proj[_chave_ref(r["arquivo"])] = r["_media_id"]
                     st[conta] = "baixando…"
                     salvos = baixar_para_galeria(ctx, midias, job, conta, getattr(page, "url", ""))
                     with self.trava:

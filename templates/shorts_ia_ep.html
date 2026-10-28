@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}🎬 {{ e.titulo }}{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .si-sb { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .si-sb > div { border: 1px solid var(--borda); border-radius: 8px; padding: 5px; font-size: .74rem; }
+  .si-sb img { width: 100%; border-radius: 6px; }
+  .si-cena { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; margin-top: 10px; display: grid; grid-template-columns: 1fr 330px; gap: 12px; }
+  @media (max-width: 860px) { .si-cena { grid-template-columns: 1fr; } }
+  .si-cena textarea, .si-cena input, .si-cena select { font-size: .82rem; margin: 2px 0; }
+  .si-cena label { font-size: .78rem; color: var(--mudo); display: block; }
+  .si-midia { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start; }
+  .si-midia .full { grid-column: 1 / -1; }
+  .si-midia img, .si-midia video { width: 100%; border-radius: 6px; background: var(--code-bg); max-height: 300px; object-fit: contain; }
+  .si-fala { display: grid; grid-template-columns: 120px 1fr 110px auto; gap: 4px; align-items: center; }
+  .si-quem label { display: inline-flex !important; gap: 3px; align-items: center; margin-right: 8px; color: inherit !important; font-size: .82rem !important; }
+</style>
+<p class="si-dica"><a href="/shorts-ia/s/{{ s.id }}">← {{ s.nome }}</a></p>
+<div class="si-linha"><input id="tTitulo" value="{{ e.titulo }}" style="font-size:1.3rem;font-weight:700;flex:1"></div>
+<div id="barra" class="si-barra"></div>
+
+<div class="si-card" id="cOrigem">
+  <h2 style="margin:0">📺 1 · O viral de origem <span class="si-dica" style="font-weight:400">(opcional — sem ele, o episódio sai da ideia/tema)</span></h2>
+  <div class="si-linha">
+    <input id="oUrl" value="{{ e.origem.url }}" placeholder="link do viral (Shorts, TikTok, Reels, Kwai…)" style="flex:1;min-width:260px">
+    <button id="bAnalisar">📺 baixar e analisar</button>
+    <label class="si-mini si-sec" style="cursor:pointer">⬆ enviar o vídeo<input type="file" accept="video/*" id="fOrigem" hidden></label>
+  </div>
+  <div id="oConteudo"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">✍ 2 · Modelar com o elenco da série</h2>
+  <p class="si-dica">A IA escreve as cenas: mesma estrutura e ritmo do viral, mas com o elenco da série e falas novas no tom da série. Você edita tudo depois.</p>
+  <label>Pedido pra este episódio (opcional)
+    <textarea id="mNotas" rows="2" placeholder="ex.: a dragoa no lugar do cara de vermelho; final com o bordão; deixa mais curto">{{ e.origem.notas }}</textarea></label>
+  <div class="si-linha"><label>⏱ cada plano <input id="mDur" type="number" step="0.5" min="2" max="8" value="{{ e.dur_plano or s.padroes.dur_plano }}" style="width:70px"> s</label>
+    <span class="si-dica" style="margin:0">vários ângulos do mesmo momento (situação → close → contraplano → detalhe) entram em corte seco; a transição fica entre um momento e outro</span></div>
+  <div id="mCap"></div>
+  <div class="si-linha"><button id="bModelar">✍ escrever os planos</button> <button id="bVoltar" class="si-mini si-sec" {% if not e.cenas_anteriores %}hidden{% endif %}>↩ versão anterior</button></div>
+  <div id="mLogica" class="si-dica"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🎬 3 · Cenas</h2>
+  <p class="si-dica">Cada cena = 1 vídeo do Flow (até 8 s). <b>🎙 fichas + voz</b> (padrão): o vídeo vai com a 📋 ficha de quem aparece + a 🎙 ficha de voz de quem fala (+ o quadro A, se couber — são 3 ingredientes no máximo) → o mesmo rosto e o mesmo timbre em todo episódio. <b>🖼 animar o quadro A</b>: o Flow anima a imagem da cena (rosto fiel à imagem, voz livre). O “como termina” vai no texto do vídeo.</p>
+  <div class="si-linha">
+    <label>vídeo <select id="eModo">{% for k, v in modos_video.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>modelo <select id="eModelo">{% for m in modelos_video %}<option value="{{ m }}">{{ m or 'o da conta' }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="si-linha">
+    <button id="bSalvarC">💾 salvar cenas</button>
+    <button id="bImgs">🖼 gerar os quadros (todas)</button>
+    <button id="bVids">🎬 gerar os vídeos</button>
+    <button id="bFlow" class="si-mini si-sec">⚡ religar o Flow em massa</button>
+    <button id="bAddC" class="si-mini si-sec">➕ cena</button>
+    <a class="si-mini" href="/shorts-ia/s/{{ s.id }}/ep/{{ e.id }}/cenas.zip">⬇ baixar todas as cenas</a>
+  </div>
+  <div id="lCenas"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">✂ 4 · Edição e exportar</h2>
+  <div class="si-linha">
+    <label>velocidade <input id="eVel" type="number" step="0.05" min="0.8" max="1.6" style="width:70px"></label>
+    <label>cortar do fim de cada vídeo (s) <input id="eCorte" type="number" step="0.05" min="0" max="2" style="width:70px"></label>
+    <label>transição <select id="eTrans"><option value="rapida">⚡ rápida</option><option value="corte">✂ corte seco</option></select></label>
+    <label><input type="checkbox" id="eWhoosh"> whoosh</label>
+    <label><input type="checkbox" id="eZoom"> zoom suave</label>
+    <label>filtro <select id="eFiltro">{% for f in filtros %}<option>{{ f }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="si-linha">
+    <label><input type="checkbox" id="eLeg"> legenda</label>
+    <label>onde <select id="eLegPos"><option value="meio">meio</option><option value="terco">terço de baixo</option><option value="base">embaixo</option><option value="topo">topo</option></select></label>
+    <label>estilo <select id="eLegEst"><option value="pop">pop</option><option value="palavra_unica">palavra única</option><option value="classico">clássico</option><option value="contorno">contorno</option><option value="preenchimento">preenchimento</option></select></label>
+    <label>qualidade <select id="eQual">{% for q in qualidades %}<option>{{ q }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="si-linha">
+    <span id="eMusica" class="si-dica" style="margin:0"></span>
+    <label class="si-mini si-sec" style="cursor:pointer">🎵 música de fundo<input type="file" accept="audio/*" id="fMusica" hidden></label>
+    <button id="bTirarMus" class="si-mini si-sec">sem música</button>
+    <label>volume <input id="eMusVol" type="number" step="0.02" min="0" max="0.6" style="width:70px"></label>
+  </div>
+  <div class="si-linha"><button id="bExportar">📤 exportar</button><span class="si-dica" style="margin:0">a 🏷 marca ({{ s.marca.texto }}) e o formato {{ s.proporcao }} vêm da série</span></div>
+  <div id="xFinal"></div>
+</div>
+
+<form method="post" action="/shorts-ia/s/{{ s.id }}/ep/{{ e.id }}/apagar" onsubmit="return confirm('Apagar este episódio?')" style="margin-top:20px"><button class="si-mini si-perigo">🗑 apagar o episódio</button></form>
+
+<script>
+let S = {{ s|tojson }};
+const BASE = '/shorts-ia/s/' + S.id + '/ep/' + {{ e.id|tojson }};
+const ARQ = '/shorts-ia/s/' + S.id + '/arquivo/eps/' + {{ e.id|tojson }} + '/';
+let E = {{ e|tojson }};
+let sujo = false, tarefaAntes = null, timer = null;
+const ESPERA = ['fila', 'gerando', 'parado'];
+const nomeP = id => (S.elenco.find(p => p.id === id) || {}).nome || id;
+const optsP = (atual, vazio) => (vazio ? `<option value="">${vazio}</option>` : '') + S.elenco.map(p => `<option value="${p.id}" ${p.id === atual ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
+
+function desenharOrigem() {
+  const o = E.origem;
+  let h = '';
+  if (o.video) h += `<video src="${ARQ}origem.mp4" controls style="max-height:360px;border-radius:8px;margin-top:6px"></video>`;
+  if (o.analise) {
+    const a = o.analise, st = a.estrutura || {};
+    h += `<p><b>Resumo:</b> ${esc(a.resumo)}</p><p><b>Por que viraliza:</b> ${esc(a.por_que_viraliza)}</p>
+      <p class="si-dica"><b>gancho</b> ${esc(st.gancho)} · <b>desenvolvimento</b> ${esc(st.desenvolvimento)} · <b>virada</b> ${esc(st.virada)} · <b>final</b> ${esc(st.final)}</p>`;
+  }
+  const rots = Object.keys(E.papeis || {});
+  if (rots.length) {
+    h += `<h3 style="margin:8px 0 2px">🔁 Troca de elenco</h3><div class="si-linha">` + rots.map(r => {
+      const d = ((o.analise || {}).personagens || []).find(x => x.rotulo === r) || {};
+      return `<label title="${esc(d.descricao)}"><b>${esc(r)}</b> <span class="si-dica" style="margin:0">${esc((d.descricao || '').slice(0, 50))}</span> → <select data-papel="${esc(r)}">${optsP(E.papeis[r], '— ninguém/extra —')}</select></label>`;
+    }).join('') + `<button class="si-mini" id="bPapeis">💾 salvar papéis</button></div>`;
+  }
+  if ((o.storyboard || []).length) {
+    h += `<h3 style="margin:8px 0 4px">🗂 Storyboard (${o.storyboard.length} âncoras · ${o.duracao}s)</h3><div class="si-sb">` + o.storyboard.map(x => `<div>
+      <img src="${ARQ}quadros/${x.quadro}" loading="lazy"><b>#${x.n}</b> ${x.de}–${x.ate}s ${x.camera ? '· ' + esc(x.camera) : ''}<br>${esc(x.o_que)}
+      ${(x.quem || []).length ? '<br>👥 ' + x.quem.map(esc).join(', ') : ''}${(x.falas || []).map(f => `<br>💬 <b>${esc(f.quem)}</b>: ${esc(f.texto)}`).join('')}</div>`).join('') + '</div>';
+  }
+  $('oConteudo').innerHTML = h;
+  const bp = $('bPapeis');
+  if (bp) bp.onclick = async () => { const papeis = {}; document.querySelectorAll('[data-papel]').forEach(x => papeis[x.dataset.papel] = x.value); try { await api(BASE + '/papeis', { papeis }); barra('💾 papéis salvos — agora ✍ modelar', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+}
+
+function midiaCena(cn, k) {
+  const a = cn.img_inicio || {}, b = cn.img_fim || {}, v = cn.video || {};
+  const img = (sl, rot) => sl.arquivo ? `<img src="${ARQ}midia/${sl.arquivo}" loading="lazy">` : `<div class="si-vazio" style="aspect-ratio:${S.proporcao.replace(':', '/')}">${rot}</div>`;
+  return `<div>${img(a, 'quadro A')}<div class="si-st">A · início</div>${status(a)}
+      <label class="si-mini si-sec" style="cursor:pointer">⬆ A<input type="file" accept="image/*" data-up="inicio" data-k="${k}" hidden></label></div>
+    <div class="si-st">${E.edicao.modo_video === 'elementos' ? '🎙 o vídeo vai com: ' + ingr(cn) : '🖼 o Flow anima o quadro A'}</div>
+    <div class="full">${v.arquivo ? `<video src="${ARQ}midia/${v.arquivo}" controls preload="metadata"></video>` : ''}${status(v)}</div>
+    <div class="full si-linha">
+      <button class="si-mini" data-gimg="${k}">${a.arquivo ? '🔁' : '🖼'} quadros</button>
+      <button class="si-mini" data-gvid="${k}" ${a.arquivo || E.edicao.modo_video === 'elementos' ? '' : 'disabled'}>${v.arquivo ? '🔁' : '🎬'} vídeo</button>
+      <label class="si-mini si-sec" style="cursor:pointer">⬆ vídeo<input type="file" accept="video/*" data-up="video" data-k="${k}" hidden></label></div>`;
+}
+function campoCena(cn, k) {
+  const quem = S.elenco.map(p => `<label><input type="checkbox" data-c="quem" value="${p.id}" ${cn.quem.includes(p.id) ? 'checked' : ''}> ${esc(p.nome)}</label>`).join('');
+  const cen = `<option value="">— outro lugar —</option>` + S.cenarios.map(c => `<option value="${c.id}" ${c.id === cn.cenario ? 'selected' : ''}>${esc(c.nome)}</option>`).join('');
+  const falas = (cn.falas || []).map((f, j) => `<div class="si-fala" data-fala="${j}"><select data-f="quem">${optsP(f.quem)}</select>
+      <input data-f="texto" value="${esc(f.texto)}" placeholder="fala (${esc(S.idioma)})"><input data-f="emocao" value="${esc(f.emocao)}" placeholder="emoção (EN)">
+      <button class="si-mini si-perigo" data-tirarfala="${k}:${j}">✕</button></div>`).join('');
+  const base = (cn.base || []).length ? ` · modela ${cn.base.map(n => '#' + n).join(' ')}` : '';
+  const c = cn.corte || {};
+  return `<div class="si-linha"><b>Plano ${k + 1}</b>${cn.momento ? `<span class="si-tag">🎬 ${esc(cn.momento)}</span>` : ''}<span class="si-dica" style="margin:0">${esc(cn.plano)}${base}</span>
+      <button class="si-mini si-sec" data-mover="${k}:-1">↑</button><button class="si-mini si-sec" data-mover="${k}:1">↓</button>
+      <button class="si-mini si-perigo" data-tirar="${k}">🗑</button></div>
+    <div class="si-linha"><label>momento <input data-c="momento" value="${esc(cn.momento)}" placeholder="M1 · a melancia" style="width:170px"></label>
+      <label>ângulo (EN) <input data-c="angulo" value="${esc(cn.angulo)}" placeholder="close-up on Mame" style="width:230px"></label></div>
+    <div class="si-quem">👥 ${quem} <span class="si-dica">(até 3)</span></div>
+    <div class="si-linha"><label>cenário <select data-c="cenario">${cen}</select></label>
+      <label>duração (s) <input data-c="duracao" type="number" step="0.5" min="2" max="8" value="${cn.duracao}" style="width:70px"></label>
+      <label>plano <input data-c="plano" value="${esc(cn.plano)}" style="width:140px"></label>
+      <label>usar do vídeo: de <input data-c="corte_ini" type="number" step="0.1" min="0" value="${c.ini || 0}" style="width:60px"> até <input data-c="corte_fim" type="number" step="0.1" min="0" value="${c.fim == null ? '' : c.fim}" placeholder="auto" style="width:60px"> s</label></div>
+    <label>o que acontece <textarea data-c="acao" rows="2">${esc(cn.acao)}</textarea></label>
+    <label>💬 falas</label>${falas}<button class="si-mini si-sec" data-addfala="${k}">➕ fala</button>
+    <label>🖼 quadro A — a primeira imagem (EN) <textarea data-c="inicio" rows="3">${esc(cn.inicio)}</textarea></label>
+    <label>🏁 como a cena termina (EN, opcional — vai no texto do vídeo) <textarea data-c="fim" rows="2" placeholder="ex.: Ken ends lying flat on the floor">${esc(cn.fim)}</textarea></label>
+    <label>🎬 movimento / câmera (EN) <textarea data-c="movimento" rows="2">${esc(cn.movimento)}</textarea></label>`;
+}
+function desenharCenas(forcar) {
+  const l = $('lCenas');
+  if (!E.cenas.length) { l.innerHTML = '<p class="si-dica">Nenhuma cena ainda — ✍ modelar (ou ➕ cena).</p>'; return; }
+  const editando = sujo || (document.activeElement && document.activeElement.closest('.si-cena'));
+  if (editando && !forcar && l.children.length === E.cenas.length) {  // você está editando: só atualiza as imagens/vídeos
+    E.cenas.forEach((cn, k) => { const m = $('md-' + k); if (m && m.dataset.sig !== sig(cn)) { m.innerHTML = midiaCena(cn, k); m.dataset.sig = sig(cn); } });
+    return;
+  }
+  l.innerHTML = E.cenas.map((cn, k) => `<div class="si-cena" data-cena="${k}"><div>${campoCena(cn, k)}</div><div class="si-midia" id="md-${k}" data-sig="${sig(cn)}">${midiaCena(cn, k)}</div></div>`).join('');
+}
+const sig = cn => ['img_inicio', 'img_fim', 'video'].map(s => (cn[s] || {}).estado + '|' + (cn[s] || {}).arquivo + '|' + (cn[s] || {}).msg).join('/') + cn.fim;
+function lerCenas() {
+  return [...document.querySelectorAll('.si-cena')].map((div, k) => {
+    const cn = JSON.parse(JSON.stringify(E.cenas[k]));
+    cn.quem = [...div.querySelectorAll('[data-c="quem"]:checked')].map(x => x.value).slice(0, 3);
+    for (const c of ['momento', 'angulo', 'cenario', 'duracao', 'plano', 'acao', 'inicio', 'fim', 'movimento']) cn[c] = div.querySelector(`[data-c="${c}"]`).value;
+    cn.duracao = parseFloat(cn.duracao) || 6;
+    const ci = div.querySelector('[data-c="corte_ini"]').value, cf = div.querySelector('[data-c="corte_fim"]').value;
+    cn.corte = { ini: parseFloat(ci) || 0, fim: cf === '' ? null : parseFloat(cf) };
+    cn.falas = [...div.querySelectorAll('[data-fala]')].map(f => ({ quem: f.querySelector('[data-f="quem"]').value, texto: f.querySelector('[data-f="texto"]').value, emocao: f.querySelector('[data-f="emocao"]').value }));
+    return cn;
+  });
+}
+async function salvarCenas(cenas) {
+  const r = await api(BASE + '/cenas', { titulo: $('tTitulo').value, cenas: cenas || lerCenas() });
+  E = r.ep; sujo = false; desenharCenas(true); return r;
+}
+function ingr(cn) {
+  const pres = [...cn.quem]; (cn.falas || []).forEach(f => { if (f.quem && !pres.includes(f.quem)) pres.push(f.quem); });
+  const P = id => S.elenco.find(p => p.id === id) || {};
+  const fal = [...new Set((cn.falas || []).map(f => f.quem).filter(Boolean))];
+  const it = pres.slice(0, 3).map(id => '📋 ' + esc(P(id).nome || id) + ((P(id).ficha || {}).arquivo ? '' : ' ⚠ sem ficha')).concat(fal.map(id => '🎙 ' + esc(P(id).nome || id) + ((P(id).voz_ficha || {}).arquivo ? '' : ' ⚠ sem voz')));
+  return it.join(' · ') || '—';
+}
+function edicao() { const x = E.edicao; $('eModo').value = x.modo_video; $('eModelo').value = x.modelo_video;
+  $('eVel').value = x.velocidade; $('eCorte').value = x.corte_fim; $('eTrans').value = x.transicao; $('eWhoosh').checked = x.whoosh; $('eZoom').checked = x.zoom;
+  $('eFiltro').value = x.filtro; $('eLeg').checked = x.legenda; $('eLegPos').value = x.legenda_pos; $('eLegEst').value = x.legenda_estilo; $('eQual').value = x.qualidade; $('eMusVol').value = x.musica_vol;
+  $('eMusica').textContent = x.musica ? '🎵 com música (' + x.musica + ')' : 'sem música de fundo'; }
+const lerEdicao = () => ({ velocidade: $('eVel').value, corte_fim: $('eCorte').value, transicao: $('eTrans').value, whoosh: $('eWhoosh').checked, zoom: $('eZoom').checked,
+  filtro: $('eFiltro').value, legenda: $('eLeg').checked, legenda_pos: $('eLegPos').value, legenda_estilo: $('eLegEst').value, qualidade: $('eQual').value, musica_vol: $('eMusVol').value,
+  modo_video: $('eModo').value, modelo_video: $('eModelo').value });
+function desenharFinal() {
+  const x = E.export; let h = '';
+  if (x) h += `<p class="si-st ok">✅ exportado: ${x.duracao}s · ${x.qualidade} · ${x.cenas} cena(s)${(x.faltaram || []).length ? ' · ⚠ sem vídeo: cena ' + x.faltaram.join(', ') : ''}</p>
+     <video src="${BASE}/video.mp4?t=${Math.round(x.quando)}" controls style="max-height:520px;border-radius:10px"></video>
+     <div class="si-linha"><a href="${BASE}/video.mp4?baixar=1">⬇ baixar o vídeo</a> · <a href="${BASE}/titulos.txt" target="_blank">📝 títulos.txt</a></div>`;
+  if ((E.titulos || []).length) h += '<h3 style="margin:8px 0 2px">📝 Títulos</h3>' + E.titulos.map(t => `<div class="si-linha"><button class="si-mini si-sec" data-copiar="${esc(t.post)}">📋</button> <b>${esc(t.post)}</b> <span class="si-dica" style="margin:0">${esc(t.pt)}</span></div>`).join('');
+  $('xFinal').innerHTML = h;
+  $('mLogica').textContent = (E.logica || '') + (E.resumo ? ' · 📝 ' + E.resumo : '');
+  const c = E.origem.capitulo;
+  let hc = c ? `<div class="si-item"><b>📖 ${esc(c.titulo)}</b><span>${esc(c.logline)}</span><span class="si-dica" style="margin:0">gancho: ${esc(c.gancho)} · virada: ${esc(c.virada)} · final: ${esc(c.final)}</span></div>` : '';
+  const novos = (E.novos_personagens || []).map(id => S.elenco.find(p => p.id === id)).filter(Boolean);
+  if (novos.length) hc += `<div class="si-st">👤 personagens novos neste capítulo: ${novos.map(p => '<b>' + esc(p.nome) + '</b>').join(', ')} — <a href="/shorts-ia/s/${S.id}">referência, ficha e voz na página da série</a> (já pedidas no Flow)</div>`;
+  $('mCap').innerHTML = hc;
+  $('bVoltar').hidden = !E.cenas_anteriores;
+}
+
+document.addEventListener('input', ev => { if (ev.target.closest('.si-cena') || ev.target.id === 'tTitulo') sujo = true; });
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  try {
+    if (b.dataset.copiar !== undefined) { await navigator.clipboard.writeText(b.dataset.copiar); barra('📋 copiado', 'okk'); return; }
+    if (b.dataset.addfala !== undefined) { const c = lerCenas(); const k = +b.dataset.addfala; c[k].falas.push({ quem: c[k].quem[0] || (S.elenco[0] || {}).id || '', texto: '', emocao: '' }); E.cenas = c; sujo = true; desenharCenas(true); return; }
+    if (b.dataset.tirarfala) { const [k, j] = b.dataset.tirarfala.split(':').map(Number); const c = lerCenas(); c[k].falas.splice(j, 1); E.cenas = c; sujo = true; desenharCenas(true); return; }
+    if (b.dataset.mover) { const [k, d] = b.dataset.mover.split(':').map(Number); const c = lerCenas(); if (k + d < 0 || k + d >= c.length) return; [c[k], c[k + d]] = [c[k + d], c[k]]; await salvarCenas(c); return; }
+    if (b.dataset.tirar !== undefined) { if (!confirm('Tirar a cena ' + (+b.dataset.tirar + 1) + '?')) return; const c = lerCenas(); c.splice(+b.dataset.tirar, 1); await salvarCenas(c); return; }
+    if (b.dataset.gimg !== undefined || b.dataset.gvid !== undefined) {
+      if (sujo) await salvarCenas();
+      const vid = b.dataset.gvid !== undefined, k = +(vid ? b.dataset.gvid : b.dataset.gimg);
+      const cn = E.cenas[k], ja = vid ? (cn.video || {}).arquivo : (cn.img_inicio || {}).arquivo;
+      const r = await api(BASE + '/gerar', { o_que: vid ? 'videos' : 'imagens', cenas: [k], refazer: !!ja });
+      barra(`${vid ? '🎬' : '🖼'} ${r.enviadas} pedido(s) na fila do Flow` + [...(r.avisos || []), ...(r.erros || []), r.aviso].filter(Boolean).map(x => ' · ' + x).join(''), r.aviso ? 'erro' : 'on');
+      recarregar(); return;
+    }
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+document.addEventListener('change', async ev => {
+  const f = ev.target; if (!f.dataset.up || !f.files[0]) return;
+  const fd = new FormData(); fd.append('arquivo', f.files[0]);
+  try { if (sujo) await salvarCenas(); await api(BASE + '/cena/' + f.dataset.k + '/' + f.dataset.up, fd); barra('✅ enviado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+$('bAnalisar').onclick = async () => { try { await api(BASE + '/analisar', { url: $('oUrl').value }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('fOrigem').onchange = async () => { const f = $('fOrigem').files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(BASE + '/analisar', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bModelar').onclick = async () => { if (E.cenas.length && !confirm('Escrever as cenas de novo? (a versão atual fica no ↩)')) return; try { await api(BASE + '/modelar', { notas: $('mNotas').value, dur_plano: $('mDur').value }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bVoltar').onclick = async () => { try { const r = await api(BASE + '/voltar', {}); E = r.ep; sujo = false; desenharCenas(true); desenharFinal(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bSalvarC').onclick = async () => { try { await salvarCenas(); barra('💾 cenas salvas', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bAddC').onclick = async () => { try { const c = E.cenas.length ? lerCenas() : []; c.push({ quem: [], duracao: 6, falas: [], inicio: '', fim: '', movimento: '', acao: '' }); await salvarCenas(c); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+async function gerarTodas(o_que) {
+  try { if (sujo) await salvarCenas(); const r = await api(BASE + '/gerar', { o_que });
+    barra(`${o_que === 'videos' ? '🎬' : '🖼'} ${r.enviadas} pedido(s) na fila do Flow` + [...(r.avisos || []), ...(r.erros || []), r.aviso].filter(Boolean).map(x => ' · ' + x).join(''), r.aviso ? 'erro' : 'on'); recarregar();
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('bImgs').onclick = () => gerarTodas('imagens');
+$('bVids').onclick = () => gerarTodas('videos');
+$('bFlow').onclick = async () => { try { await api('/shorts-ia/flow/continuar', {}); barra('⚡ Flow em massa ligado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+['eVel', 'eCorte', 'eTrans', 'eWhoosh', 'eZoom', 'eFiltro', 'eLeg', 'eLegPos', 'eLegEst', 'eQual', 'eMusVol', 'eModo', 'eModelo'].forEach(id => $(id).onchange = async () => { try { E.edicao = (await api(BASE + '/edicao', lerEdicao())).edicao; if (id === 'eModo') desenharCenas(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } });
+$('fMusica').onchange = async () => { const f = $('fMusica').files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(BASE + '/musica', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bTirarMus').onclick = async () => { const fd = new FormData(); fd.append('tirar', '1'); try { await api(BASE + '/musica', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bExportar').onclick = async () => { try { if (sujo) await salvarCenas(); await api(BASE + '/exportar', lerEdicao()); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+
+async function recarregar() {
+  clearTimeout(timer);
+  try {
+    const d = await api(BASE + '/estado', undefined, 'GET');
+    E = d.ep; if (d.serie) S = d.serie;
+    const t = d.tarefa;
+    desenharOrigem(); desenharCenas(false); desenharFinal(); edicao();
+    if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : ''));
+    else if (t && tarefaAntes && tarefaAntes.rodando) { if (t.erro) barra('❌ ' + t.erro, 'erro'); else { barra('✅ ' + (t.msg || 'pronto'), 'okk'); sujo = false; desenharCenas(true); } }
+    tarefaAntes = t;
+    const espera = E.cenas.some(cn => ['img_inicio', 'img_fim', 'video'].some(s => ESPERA.includes((cn[s] || {}).estado)));
+    if ((t && t.rodando) || espera) timer = setTimeout(recarregar, 4000);
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+desenharOrigem(); desenharCenas(true); desenharFinal(); edicao(); recarregar();
+</script>
+{% endblock %}
