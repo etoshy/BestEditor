@@ -1,0 +1,70 @@
+{# 🏷 marca @canal + ⬛ proporção — incluído nas páginas dos curtos (precisa de: p, proporcoes, fontes_dp, posicoes_marca; JS: BASE, api, barra) #}
+<div class="ct-card" id="marcaCard">
+  <h2>🏷 Marca do canal e formato</h2>
+  <div class="ct-linha">
+    <span class="ct-dica" style="margin:0">formato</span>
+    {% for k, v in proporcoes.items() %}<button class="ct-mini {% if (p.config.proporcao or '9:16') != k %}ct-sec{% endif %}" data-prop="{{ k }}">{{ v }}</button>{% endfor %}
+    <span class="ct-dica" style="margin:0">— vale desde o roteiro (a IA pensa os planos pro formato) até a legenda e a exportação</span>
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+    <div id="mkTela" style="position:relative;width:135px;height:240px;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,#334155,#0f172a);flex:none">
+      <div id="mkTxt" style="position:absolute;white-space:nowrap;font-weight:700"></div>
+      <div id="mkLeg" style="position:absolute;left:0;right:0;text-align:center;color:#fff;font-weight:800;font-size:13px;text-shadow:0 0 3px #000">legenda</div>
+    </div>
+    <div style="flex:1;min-width:260px">
+      <div class="ct-linha">
+        <label style="font-weight:600;margin:0"><input type="checkbox" id="mkAtiva" style="width:auto"> mostrar a marca</label>
+        <input type="text" id="mkTexto" placeholder="@seucanal" style="width:180px">
+        <select id="mkPos" style="width:auto">{% for k in posicoes_marca %}<option value="{{ k }}">{{ {'meio': 'meio', 'topo': 'topo', 'base': 'base', 'terco': 'terço de baixo', 'sup_esq': '↖ canto', 'sup_dir': '↗ canto', 'inf_esq': '↙ canto', 'inf_dir': '↘ canto'}[k] }}</option>{% endfor %}</select>
+      </div>
+      <div class="ct-linha">
+        <label style="margin:0">tamanho <input type="range" id="mkTam" min="0.015" max="0.09" step="0.005" style="width:110px"></label>
+        <label style="margin:0">opacidade <input type="range" id="mkOp" min="0.05" max="1" step="0.05" style="width:110px"> <span id="mkOpV"></span></label>
+        <label style="margin:0">↕ <input type="range" id="mkDy" min="-0.3" max="0.3" step="0.01" style="width:90px"></label>
+      </div>
+      <div class="ct-linha">
+        <select id="mkFonte" style="width:auto">{% for f in fontes_dp %}<option value="{{ f }}">{{ f[3:] }}</option>{% endfor %}</select>
+        <input type="color" id="mkCor" style="width:48px;padding:0;height:30px">
+        <label style="font-weight:400;margin:0"><input type="checkbox" id="mkCont" style="width:auto"> contorno</label>
+        <button class="ct-mini ct-ok" id="mkSalvar">💾 Salvar</button>
+        <label style="font-weight:400;margin:0"><input type="checkbox" id="mkPadrao" style="width:auto"> e usar como padrão do canal</label>
+      </div>
+      <p class="ct-dica">Por cima do vídeo inteiro, embaixo da legenda. Se a legenda estiver no mesmo lugar, a marca sobe um pouco sozinha. Já está no editor? A exportação passa a sair com ela.</p>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const g = id => document.getElementById(id);
+  const LUG = { meio: [50, 50, 'c'], topo: [50, 5, 'c'], base: [50, 95, 'c'], terco: [50, 76, 'c'], sup_esq: [4, 4, 'l'], sup_dir: [96, 4, 'r'], inf_esq: [4, 96, 'l'], inf_dir: [96, 96, 'r'] };
+  let M = null;
+  const st = () => (typeof P !== 'undefined' && P) ? P : {};
+  function ler() { return { ativa: g('mkAtiva').checked, texto: g('mkTexto').value, posicao: g('mkPos').value, tamanho: +g('mkTam').value,
+    opacidade: +g('mkOp').value, desvio_y: +g('mkDy').value, fonte: g('mkFonte').value, cor: g('mkCor').value, contorno: g('mkCont').checked }; }
+  function previa() {
+    const m = ler(), quad = !!document.querySelector('[data-prop="1:1"]:not(.ct-sec)');
+    const tela = g('mkTela'); tela.style.height = quad ? '135px' : '240px'; const H = quad ? 135 : 240;
+    const [x, y0, al] = LUG[m.posicao] || LUG.meio; let y = y0 + m.desvio_y * 100;
+    const legPos = ((st().perfil || {}).legenda || {}).posicao || 'meio';
+    if ({ meio: 'meio', topo: 'topo', base: 'base', terco: 'terco' }[m.posicao] === legPos) y += y > 15 ? -9 : 9;
+    const t = g('mkTxt'); t.textContent = m.texto; t.style.display = m.ativa ? '' : 'none';
+    t.style.fontSize = Math.max(6, H * m.tamanho * 0.9) + 'px'; t.style.opacity = m.opacidade; t.style.color = m.cor;
+    t.style.fontFamily = m.fonte.replace('DP ', '') + ', sans-serif'; t.style.textShadow = m.contorno ? '0 0 2px #000, 0 0 1px #000' : 'none';
+    t.style.left = x + '%'; t.style.top = Math.max(2, Math.min(98, y)) + '%';
+    t.style.transform = `translate(${al === 'c' ? '-50%' : al === 'r' ? '-100%' : '0'}, -50%)`;
+    const L = g('mkLeg'); L.style.top = { topo: '6%', meio: '50%', terco: '76%', base: '90%' }[legPos] || '50%'; L.style.transform = 'translateY(-50%)';
+    g('mkOpV').textContent = Math.round(m.opacidade * 100) + '%';
+  }
+  function encher(m) {
+    M = m; g('mkAtiva').checked = !!m.ativa; g('mkTexto').value = m.texto; g('mkPos').value = m.posicao; g('mkTam').value = m.tamanho;
+    g('mkOp').value = m.opacidade; g('mkDy').value = m.desvio_y || 0; g('mkFonte').value = m.fonte; g('mkCor').value = m.cor; g('mkCont').checked = !!m.contorno; previa();
+  }
+  ['mkAtiva', 'mkTexto', 'mkPos', 'mkTam', 'mkOp', 'mkDy', 'mkFonte', 'mkCor', 'mkCont'].forEach(id => g(id).addEventListener('input', previa));
+  g('mkSalvar').onclick = async () => { try { const d = await api(BASE + '/marca', { marca: ler(), padrao_canal: g('mkPadrao').checked }); encher(d.marca); barra('✅ marca salva' + (d.no_editor ? ' (e no projeto do editor)' : ''), 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+  document.querySelectorAll('[data-prop]').forEach(b => b.onclick = async () => {
+    try { await api(BASE + '/proporcao', { proporcao: b.dataset.prop }); document.querySelectorAll('[data-prop]').forEach(x => x.classList.toggle('ct-sec', x !== b)); previa(); barra('✅ formato ' + b.dataset.prop + ' — monte no editor de novo pra valer', 'okk'); }
+    catch (e) { barra('❌ ' + e.message, 'erro'); } });
+  window.encherMarca = m => { if (!M || JSON.stringify(M) !== JSON.stringify(m)) encher(m); };
+  fetch(BASE + '/estado', { cache: 'no-store' }).then(r => r.json()).then(d => { encher(d.marca); });
+})();
+</script>

@@ -80,6 +80,7 @@ LAYOUTS: Dict[str, Tuple[str, str]] = {
                    "alguém sendo humilhado, poder subindo, caos, multidão revoltada, dinheiro, fuga) — metáfora visual, não o fato real"),
     "cartao": ("🃏 cartão de texto", "número, data ou frase de impacto sobre fundo escuro, sem imagem"),
     "ia": ("✨ imagem gerada", "cena que não existe em banco nem na matéria — gerada no Flow/Runpod"),
+    "ia_video": ("🎬 vídeo gerado", "cena com MOVIMENTO gerada no Flow (vídeo de ~8 s) — sem Flow, vira a imagem gerada"),
 }
 LAYOUTS_ANIME = ("anime_reacao", "anime_cena")
 PROVEDORES_ANIME = ("animepexels", "animepexels_online")
@@ -157,6 +158,13 @@ PERFIL_PADRAO: Dict[str, Any] = {
                        "lado, o que a manchete não conta, o que a reação geral exagera ou esquece) e feche com uma pequena reflexão."},
     "titulos": {"descricao": "", "exemplos": []},
     "evitar": [],
+    # v84_253/255: 💬📚 o enquadramento do vídeo de outra proporção, cortes/tamanho pelo conteúdo, 1º plano curto e a 🏷 marca
+    "enquadramento": "",
+    "cortes_por_contexto": False,
+    "duracao_pelo_conteudo": False,
+    "primeiro_plano_max_s": None,
+    "marca": {},
+    "estilo_ia": "",  # v84_256: imagem/vídeo gerado (Flow) "realista" ou livre
 }
 
 
@@ -260,6 +268,8 @@ def garantir_canais_prontos(base: str) -> List[str]:
             c["perfil_ia"] = True
             c["perfil_origem"] = chave
             c["perfil_versao"] = int(pr.get("versao") or 1)
+            if pr.get("modelo"):
+                c["modelo"] = pr["modelo"]
             salvar_canal(base, c)
             feitos.add(chave)
             novos.append(c["id"])
@@ -300,7 +310,8 @@ def listar_canais(base: str) -> List[Dict[str, Any]]:
         refs = c.get("referencias") or []
         out.append({"id": c["id"], "nome": c["nome"], "refs": len(refs),
                     "analisadas": sum(1 for r in refs if r.get("estado") == "pronta"),
-                    "perfil_ia": bool(c.get("perfil_ia")), "atualizado": c.get("atualizado") or 0})
+                    "perfil_ia": bool(c.get("perfil_ia")), "atualizado": c.get("atualizado") or 0,
+                    "modelo": c.get("modelo") or "noticia"})
     return sorted(out, key=lambda x: -x["atualizado"])
 
 
@@ -1084,13 +1095,117 @@ def texto_do_perfil(p: Dict[str, Any]) -> str:
 
 
 # ------------------------------------------------------------------ ⚡ projetos
-def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] = (), texto: str = "") -> Dict[str, Any]:
+MODELOS = {"noticia": "📰 Notícia (estilo Laestro)", "comentario": "💬 Comentário (clipe viral narrado)",
+           "explicativo": "📚 Explicativo (curiosidade explicada com vários vídeos)"}
+MODELOS_CLIPE = ("comentario", "explicativo")  # os que montam com os vídeos que você sobe (curtos_comentario.py)
+PROPORCOES = {"9:16": "📱 9:16 (vertical)", "1:1": "⬛ 1:1 (quadrado)"}
+LINGUAS = {"en": "English", "pt": "Português (Brasil)", "es": "Español", "it": "Italiano", "fr": "Français", "de": "Deutsch"}
+
+
+TEXTO_QUADRADO_PT = ("FORMATO: QUADRADO 1:1 (não vertical) — pense cada plano pro quadrado: o que importa no CENTRO, "
+                     "nada de coisa alta e estreita que só funciona no vertical; buscas de vídeo/foto podem ser horizontais.")
+TEXTO_QUADRADO_EN = ("FORMAT: SQUARE 1:1 (not vertical) — think every shot for a square frame: what matters in the CENTER; "
+                     "horizontal sources work well, tall narrow shots do not.")
+
+
+ESTILO_REALISTA = (". Photorealistic, looks like real footage shot on a real camera, natural light, true-to-life colors and textures, "
+                   "documentary style — no illustration, no cartoon, no 3D render look, no text, no watermark")
+ESTILOS_IA = {"realista": "📷 realista (parece filmado)", "livre": "🎨 livre (o que a cena pedir)"}
+
+
+def estilo_ia_do(p: Dict[str, Any], perfil: Optional[Dict[str, Any]] = None) -> str:
+    v = (p.get("config") or {}).get("estilo_ia") or (perfil or {}).get("estilo_ia") or ""
+    return v if v in ESTILOS_IA else "livre"
+
+
+def proporcao_do(p: Dict[str, Any]) -> str:
+    v = (p.get("config") or {}).get("proporcao")
+    return v if v in PROPORCOES else "9:16"
+
+
+def idioma_narrado(p: Dict[str, Any], perfil: Optional[Dict[str, Any]] = None) -> str:
+    """O idioma da voz: no 💬/📚 é o da postagem ou o português (o que você escolheu narrar); no 📰, o do canal."""
+    c = p.get("comentario") or {}
+    if p.get("modelo") in MODELOS_CLIPE and c:
+        return "pt" if c.get("idioma") == "pt" else (c.get("lingua_post") or "en")
+    return (perfil or {}).get("idioma") or ""
+
+
+# ------------------------------------------------------------------ 🏷 marca do canal (@canal por cima do vídeo)
+MARCA_POSICOES = ("meio", "topo", "base", "terco", "sup_esq", "sup_dir", "inf_esq", "inf_dir")
+
+
+def marca_padrao(nome_canal: str = "") -> Dict[str, Any]:
+    slug = re.sub(r"[^a-z0-9_.]+", "", unicodedata.normalize("NFKD", str(nome_canal or "")).encode("ascii", "ignore").decode().lower())
+    return {"ativa": True, "texto": f"@{slug}" if slug else "@seucanal", "posicao": "meio", "tamanho": 0.035, "opacidade": 0.5,
+            "fonte": "DP Poppins", "cor": "#FFFFFF", "contorno": True, "desvio_y": 0.0}
+
+
+def normalizar_marca(m: Any, nome_canal: str = "") -> Dict[str, Any]:
+    out = marca_padrao(nome_canal)
+    if isinstance(m, dict):
+        if "ativa" in m:
+            out["ativa"] = m["ativa"] is not False and str(m["ativa"]).lower() not in ("0", "false", "nao", "não", "off")
+        if str(m.get("texto") or "").strip():
+            out["texto"] = " ".join(str(m["texto"]).split())[:60]
+        if m.get("posicao") in MARCA_POSICOES:
+            out["posicao"] = m["posicao"]
+        for k, lo, hi in (("tamanho", 0.012, 0.12), ("opacidade", 0.05, 1.0), ("desvio_y", -0.45, 0.45)):
+            try:
+                if m.get(k) not in (None, ""):
+                    out[k] = round(max(lo, min(hi, float(m[k]))), 3)
+            except (TypeError, ValueError):
+                pass
+        if re.fullmatch(r"#[0-9A-Fa-f]{6}", str(m.get("cor") or "")):
+            out["cor"] = m["cor"].upper()
+        if str(m.get("fonte") or "").startswith("DP "):
+            out["fonte"] = str(m["fonte"])[:40]
+        if "contorno" in m:
+            out["contorno"] = bool(m["contorno"])
+    return out
+
+
+def marca_do(base: str, p: Dict[str, Any]) -> Dict[str, Any]:
+    """A marca do vídeo: a do projeto (se você mexeu) por cima da do canal."""
+    c = canal_do(base, p)
+    m = dict((c or {}).get("perfil", {}).get("marca") or {})
+    m.update((p.get("config") or {}).get("marca") or {})
+    return normalizar_marca(m, "" if (c or {}).get("perfil_origem") else (c or {}).get("nome") or "")  # canal pronto: @seucanal
+
+
+def canal_do_modelo(base: str, modelo: str) -> str:
+    """O canal pronto que veio do perfil daquele modelo (ex.: 💬 comentário) — o id, ou ""."""
+    garantir_canais_prontos(base)
+    for c in listar_canais(base):
+        try:
+            cc = carregar_canal(base, c["id"])
+        except CurtoErro:
+            continue
+        if cc.get("perfil_origem") == modelo and not cc.get("nicho"):
+            return cc["id"]
+    for c in listar_canais(base):  # 💡 os canais de nicho (v84_256) não são o "padrão" do modelo
+        try:
+            cc = carregar_canal(base, c["id"])
+        except CurtoErro:
+            continue
+        if cc.get("modelo") == modelo and not cc.get("nicho"):
+            return cc["id"]
+    return ""
+
+
+def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] = (), texto: str = "",
+          modelo: str = "noticia") -> Dict[str, Any]:
     if canal_id:
         carregar_canal(base, canal_id)  # confere
     p = {"id": _novo_id(), "canal_id": canal_id or "", "titulo": " ".join(str(titulo or "").split())[:120] or "Novo curto",
          "criado": _hoje(), "noticia": {"fontes": [], "texto": str(texto or "")[:60000]}, "midias": [],
          "config": {"duracao_alvo_s": 0, "extra": "", "providers": [], "voz_tts": "", "motor_perfil": "xtts"},
-         "roteiro": None, "tts": None, "gravacao": None, "editor": None}
+         "roteiro": None, "tts": None, "gravacao": None, "editor": None, "modelo": modelo if modelo in MODELOS else "noticia"}
+    if p["modelo"] in MODELOS_CLIPE:
+        p["config"]["motor_perfil"] = "chatterbox_turbo"
+        if p["modelo"] == "explicativo":  # 💡 sugestões aceitas: foto real (buscadores), YouTube, imagem gerada
+            p["config"]["providers"] = ["pexels", "pixabay", "brave", "google", "bing", "wikipedia", "youtube", "flow", "runpod"]
+        p["comentario"] = {"linhas": [], "referencia": "", "idioma": "en", "lingua_post": "en"}
     for u in links:
         u = str(u or "").strip()
         if re.match(r"https?://", u) and len(p["noticia"]["fontes"]) < 8:
@@ -1126,7 +1241,8 @@ def listar(base: str) -> List[Dict[str, Any]]:
         g = p.get("gravacao") or {}
         out.append({"id": p["id"], "titulo": p.get("titulo") or "", "canal": canais.get(p.get("canal_id") or "", ""),
                     "blocos": len((p.get("roteiro") or {}).get("blocos") or []), "gravado": bool(g.get("arquivo")),
-                    "dur": g.get("dur"), "editor": (p.get("editor") or {}).get("job_id"), "atualizado": p.get("atualizado") or 0})
+                    "dur": g.get("dur"), "editor": (p.get("editor") or {}).get("job_id"), "atualizado": p.get("atualizado") or 0,
+                    "modelo": p.get("modelo") or "noticia"})
     return sorted(out, key=lambda x: -x["atualizado"])
 
 
@@ -1190,6 +1306,9 @@ def ids_extras(base: str, p: Dict[str, Any]) -> List[str]:
 
 def perfil_do(base: str, p: Dict[str, Any]) -> Dict[str, Any]:
     c = canal_do(base, p)
+    if not c and p.get("modelo") in MODELOS_CLIPE:  # 💬 sem canal: o perfil pronto do modelo
+        pr = perfis_prontos().get(p["modelo"]) or {}
+        return normalizar_perfil(pr.get("perfil"))
     return normalizar_perfil((c or {}).get("perfil"))
 
 
@@ -1209,6 +1328,8 @@ def adicionar_midia(base: str, p: Dict[str, Any], caminho: str, tipo: str, descr
         shutil.move(caminho, destino)
     m = {"id": mid, "arquivo": os.path.relpath(destino, pasta(base, p["id"])).replace("\\", "/"), "tipo": tipo,
          "descricao": " ".join(str(descricao or "").split())[:400], "origem": origem[:500]}
+    if tipo == "video":
+        m["dur"] = duracao_audio(destino)
     p["midias"].append(m)
     return m
 
@@ -1393,7 +1514,8 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
     dur = float((p.get("config") or {}).get("duracao_alvo_s") or 0) or perfil["duracao_alvo_s"]
     idioma = perfil.get("idioma") or (c or {}).get("idioma") or "o idioma da notícia"
     L = [f"CANAL: {(c or {}).get('nome') or '(sem canal — estilo padrão de shorts de notícia)'} · idioma da fala: {idioma}",
-         f"DURAÇÃO DO VÍDEO: ~{int(dur)} s → cerca de {palavras_alvo(perfil, dur)} palavras de fala no total.", "",
+         f"DURAÇÃO DO VÍDEO: ~{int(dur)} s → cerca de {palavras_alvo(perfil, dur)} palavras de fala no total.",
+         *([TEXTO_QUADRADO_PT] if proporcao_do(p) == "1:1" else []), "",
          "## GUIA DE ESTILO DO CANAL", texto_do_perfil(perfil), ""]
     ms = [m for m in p.get("midias") or [] if not m["id"].startswith("C")]
     if ms:
@@ -1492,7 +1614,8 @@ def ler_roteiro(dados: Any, p: Dict[str, Any], extras_ids: Iterable[str] = ()) -
                           "entrada": cn.get("entrada") if cn.get("entrada") in ENTRADAS_CURTOS else "none",
                           **({"emocao": cn["emocao"] if cn.get("emocao") in EMOCOES_ANIME else "",
                               "obra": _limpo(cn.get("obra"), 80), "personagem": _limpo(cn.get("personagem"), 80)}
-                             if lay in LAYOUTS_ANIME else {})})
+                             if lay in LAYOUTS_ANIME else {}),
+                          **(_trecho_da_cena(cn) if mat else {}), **_sugestao_da_cena(cn)})
         if not cenas:
             cenas = [{"layout": "video", "composicao": "", "visual": fala[:120], "query": "breaking news background", "alternativas": [],
                       "material": "", "palavra": "", "efeito": "zoom_in", "entrada": "none"}]
@@ -1514,12 +1637,44 @@ def ler_roteiro(dados: Any, p: Dict[str, Any], extras_ids: Iterable[str] = ()) -
                         pass
                 sfx.append(item)
         blocos.append({"id": f"B{len(blocos) + 1}", "funcao": b.get("funcao") if b.get("funcao") in FUNCOES_BLOCO else ("gancho" if not blocos else "fato"),
-                       "fala": fala, "cenas": cenas, "texto_tela": tt, "sfx": sfx})
+                       "fala": fala, "cenas": cenas, "texto_tela": tt, "sfx": sfx,
+                       **({"fala_pt": _limpo(b.get("fala_pt"), 1500)} if b.get("fala_pt") else {}),
+                       **({"fala_en": _limpo(b.get("fala_en"), 1500)} if b.get("fala_en") else {})})
     if not blocos:
         raise CurtoErro("Nenhum bloco com fala no roteiro.")
-    return {"titulo_video": _limpo(dados.get("titulo_video"), 140), "titulos_alt": [_limpo(t, 140) for t in dados.get("titulos_alt") or []][:5],
+    return {**({k: dados[k] for k in ("ganchos", "finais", "titulos", "roteiro_en", "roteiro_pt", "idioma", "titulo_pt",
+                                    "ganchos_escolhido", "finais_escolhido", "titulos_escolhido") if dados.get(k) not in (None, "", [])}),
+            "titulo_video": _limpo(dados.get("titulo_video"), 140), "titulos_alt": [_limpo(t, 140) for t in dados.get("titulos_alt") or []][:5],
             "descricao": str(dados.get("descricao") or "")[:2000], "hashtags": [_limpo(h, 40) for h in dados.get("hashtags") or []][:10],
             "blocos": blocos}
+
+
+def _trecho_da_cena(cn: Dict[str, Any]) -> Dict[str, Any]:
+    """💬 cena de clipe: de/até (segundos do vídeo cru) e o destaque (círculo/seta rastreando algo)."""
+    out: Dict[str, Any] = {}
+    try:
+        if cn.get("de") not in (None, ""):
+            out["de"] = round(max(0.0, float(cn["de"])), 2)
+            out["ate"] = round(max(out["de"], float(cn.get("ate") if cn.get("ate") not in (None, "") else out["de"])), 2)
+    except (TypeError, ValueError):
+        pass
+    d = cn.get("destaque") if isinstance(cn.get("destaque"), dict) else {}
+    if d.get("alvo"):
+        import rastreio
+        out["destaque"] = {"alvo": _limpo(d["alvo"], 120), "tipo": d.get("tipo") if d.get("tipo") in rastreio.TIPOS else "circulo",
+                           "texto": _limpo(d.get("texto"), 40)}
+    return out
+
+
+def _sugestao_da_cena(cn: Dict[str, Any]) -> Dict[str, Any]:
+    """💡 📚 a mídia que a IA sugere buscar (e, se você aceitou, o seu vídeo que estava ali — pra voltar)."""
+    out: Dict[str, Any] = {}
+    sg = cn.get("sugestao") if isinstance(cn.get("sugestao"), dict) else {}
+    if sg.get("layout") in ("foto_real", "clipe_real", "ia", "ia_video") and _limpo(sg.get("query"), 160):
+        out["sugestao"] = {"layout": sg["layout"], "query": _limpo(sg["query"], 160), "por_que": _limpo(sg.get("por_que"), 160)}
+        if isinstance(cn.get("reserva"), dict) and cn["reserva"].get("material"):
+            out["reserva"] = {k: cn["reserva"][k] for k in ("layout", "material", "de", "ate", "destaque") if k in cn["reserva"]}
+    return out
 
 
 def texto_completo(roteiro: Optional[Dict[str, Any]]) -> str:
@@ -1541,7 +1696,7 @@ def duracao_audio(cam: str) -> float:
 
 def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callable[[str, str], str] = lambda t, m: t,
                    voz: Optional[Dict[str, Any]] = None, pausa: float = 0.12,
-                   on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+                   on_log: Callable[[str], None] = lambda _m: None, sub: str = "tts", guardar: bool = True) -> Dict[str, Any]:
     """Uma fala por bloco (dá o tempo de cada bloco) → guia.wav com uma pausinha entre os blocos."""
     import multivoz
     p = carregar(base, pid)
@@ -1551,7 +1706,7 @@ def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callabl
     if not voz:
         raise CurtoErro("Escolha a voz da voz guia.")
     motor, kw = multivoz.kwargs_da_voz(voz)
-    d = os.path.join(pasta(base, pid), "tts")
+    d = os.path.join(pasta(base, pid), sub)
     shutil.rmtree(d, ignore_errors=True)
     os.makedirs(d, exist_ok=True)
     partes, por_bloco = [], []
@@ -1575,12 +1730,13 @@ def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callabl
     r = _rodar(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lista, "-ar", "48000", "-ac", "1", guia], 300)
     if not os.path.isfile(guia):
         raise CurtoErro(f"Não consegui juntar a voz guia: {(r.stderr or '')[-200:]}")
-    info = {"arquivo": "tts/guia.wav", "dur": duracao_audio(guia), "por_bloco": por_bloco, "voz": voz.get("slug") or "",
+    info = {"arquivo": f"{sub}/guia.wav", "dur": duracao_audio(guia), "por_bloco": por_bloco, "voz": voz.get("slug") or "",
             "chave": chave_roteiro(p.get("roteiro")), "quando": _hoje()}
-    with _TRAVA:
-        q = carregar(base, pid)
-        q["tts"] = info
-        salvar(base, q)
+    if guardar:
+        with _TRAVA:
+            q = carregar(base, pid)
+            q["tts"] = info
+            salvar(base, q)
     return info
 
 
@@ -1591,8 +1747,15 @@ def norm(t: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", t)
 
 
+RE_TAG_VOZ = re.compile(r"\[[^\[\]]{1,30}\]")  # [gasp], [surprised]… do Chatterbox: não são faladas
+
+
+def sem_tags(texto: str) -> str:
+    return re.sub(r"\s{2,}", " ", RE_TAG_VOZ.sub(" ", str(texto or ""))).strip()
+
+
 def tokens(texto: str) -> List[str]:
-    return [x for x in (norm(w) for w in str(texto or "").split()) if x]
+    return [x for x in (norm(w) for w in sem_tags(texto).split()) if x]
 
 
 def _tokens_roteiro(blocos: List[Dict[str, Any]]) -> Tuple[List[str], List[int]]:
@@ -1821,7 +1984,8 @@ def processar_gravacao(base: str, pid: str, transcrever: Callable[..., List[Dict
     if palavras is None:
         on_log("📝 transcrevendo a sua voz (Whisper, palavra por palavra)…")
         meta: Dict[str, Any] = {}
-        segs = transcrever(wav, language=(perfil.get("idioma") or (c or {}).get("idioma") or None), word_timestamps=True, info=meta)
+        segs = transcrever(wav, language=(idioma_narrado(p, perfil) or (c or {}).get("idioma") or None),
+                           word_timestamps=True, info=meta)
         palavras = [{"word": str(w["word"]).strip(), "start": float(w["start"]), "end": float(w["end"])}
                     for s in segs for w in s.get("words") or [] if str(w.get("word", "")).strip()]
     if not palavras:
@@ -1888,7 +2052,7 @@ def caixa_da_legenda(blocos: List[Dict[str, Any]], palavras: List[Dict[str, Any]
                      al: List[Dict[str, Any]], gancho_maiusculas: bool = False) -> List[Dict[str, Any]]:
     """A legenda sai do Whisper (tudo minúsculo). Aqui ela ganha a ÊNFASE do roteiro: palavra que está em MAIÚSCULAS no
     roteiro fica em maiúsculas na legenda; com `gancho_maiusculas`, o 1º bloco (o gancho) sai todo em maiúsculas."""
-    crus = [w for b in blocos for w in str(b["fala"]).split() if norm(w)]
+    crus = [w for b in blocos for w in sem_tags(b["fala"]).split() if norm(w)]
     out = [dict(w) for w in palavras]
     for si, wi in mapa.items():
         if si < len(crus) and wi < len(out):
@@ -1992,12 +2156,14 @@ def rota_da_cena(layout: str, providers: List[str]) -> Tuple[str, str]:
         return "youtube", "video"
     if layout in ("foto_real", "clipe_real", "meme", "cartao_cinza") and real:
         return real, "image"
-    if layout == "ia":
+    if layout == "ia_video" and "flow" in lig:  # 🎬 vídeo do Flow (Veo); sem Flow, segue como a imagem gerada
+        return "flow", "video"
+    if layout in ("ia", "ia_video"):
         if "flow" in lig:
             return "flow", "image"
         if "runpod" in lig:
             return "runpod", "image"
-    if layout in ("foto", "foto_real", "ia", "clipe_real", "meme", "cartao_cinza") and "pexels" in lig:
+    if layout in ("foto", "foto_real", "ia", "ia_video", "clipe_real", "meme", "cartao_cinza") and "pexels" in lig:
         return "pexels", "image"
     if video:
         return video, "video"
@@ -2066,8 +2232,10 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
             cn = dict(cenas[min(k, len(cenas) - 1)])
             cn["layout"] = _layout_no_modo(cn["layout"], modo_anime)
             s0, s1 = marcos[k], marcos[k + 1]
-            n = max(1, int(round((s1 - s0) / (alvo * 1.35)))) if cn["layout"] not in ("cartao", "materia") and not cn.get("material") else 1
-            n = min(n, 1 + len(cn.get("alternativas") or []), 4) if cn["layout"] not in ("video", "foto") else min(n, 4)
+            clipe = cn.get("material") and cn.get("de") not in (None, "")  # 💬 pedaço do vídeo cru (comentário)
+            contexto = clipe and perfil.get("cortes_por_contexto")  # 💬 os cortes são os do roteiro; só um plano MUITO longo ganha um respiro
+            n = max(1, int(round((s1 - s0) / (alvo * (2.2 if contexto else 1.35))))) if (cn["layout"] not in ("cartao", "materia") and not cn.get("material")) or clipe else 1
+            n = min(n, 1 + len(cn.get("alternativas") or []), 4) if cn["layout"] not in ("video", "foto") and not clipe else min(n, 4)
             cortes = _divisoes(s0, s1, n, palavras) if n > 1 else []
             limites = [s0] + cortes + [s1]
             buscas = [cn["query"]] + list(cn.get("alternativas") or [])
@@ -2081,7 +2249,13 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
                             "template": CENA_CARTAO_CINZA if cn["layout"] == "cartao_cinza" else "",
                             **({"emocao": cn.get("emocao") or "", "obra": cn.get("obra") or "", "personagem": cn.get("personagem") or ""}
                                if cn["layout"] in LAYOUTS_ANIME else {}),
-                            "entrada": (cn.get("entrada") if j == 0 else ("punch_in" if cn.get("entrada") in ("punch_in", "flash", "shake") else "none")) or "none"})
+                            "entrada": (cn.get("entrada") if j == 0 else ("punch_in" if cn.get("entrada") in ("punch_in", "flash", "shake") else "none")) or "none",
+                            **({"clipe": {"mid": cn["material"], "de": float(cn["de"]), "ate": float(cn.get("ate") or cn["de"]),
+                                          "off": round(limites[j] - s0, 3)},
+                                "efeito": (cn.get("efeito") or "") if j == 0 else
+                                (_efeito_seguinte(cn.get("efeito") or "", j) if contexto else ("zoom_in", "zoom_out", "zoom_respiro")[j % 3]),
+                                "entrada": (cn.get("entrada") or "none") if j == 0 else ("none" if contexto else "punch_in")} if clipe else {}),
+                            **({"destaque": cn["destaque"]} if clipe and j == 0 and (cn.get("destaque") or {}).get("alvo") else {})})
     # sem buracos: cada plano termina onde o próximo começa, o último no fim
     out = [x for x in out if x["end"] - x["start"] >= 0.05]
     for i in range(len(out)):
@@ -2097,7 +2271,47 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
     if len(junto) > 1 and junto[0]["end"] - junto[0]["start"] < 0.35:
         junto[1]["start"] = 0.0
         junto.pop(0)
+    pmax = perfil.get("primeiro_plano_max_s")
+    if pmax and junto and junto[0]["end"] - junto[0]["start"] > float(pmax) + 0.2:  # 1º plano curto (retém o swipe)
+        a0 = dict(junto[0])
+        corte = _divisoes(0.0, min(a0["end"], float(pmax) * 2), 2, palavras)
+        t = corte[0] if corte and corte[0] <= float(pmax) + 0.3 else float(pmax)
+        b0 = dict(a0, start=round(t, 3), parte=(a0.get("parte") or 0) + 100, entrada="punch_in",
+                  efeito="zoom_out" if a0.get("efeito") != "zoom_out" else "zoom_in")
+        b0.pop("destaque", None)
+        if b0.get("clipe"):
+            b0["clipe"] = dict(b0["clipe"], off=round(b0["clipe"]["off"] + t, 3))
+        a0["end"] = round(t, 3)
+        junto[0:1] = [a0, b0]
     return junto
+
+
+def _efeito_seguinte(efeito: str, j: int) -> str:
+    """Continuação de um momento longo do clipe: o movimento segue o sentido do anterior (aproxima → continua devagar; afasta → assenta)."""
+    return {"zoom_in": "zoom_respiro", "zoom_rapido": "zoom_respiro", "zoom_out": "zoom_respiro", "": "zoom_respiro" if j % 2 else ""}.get(efeito, "zoom_respiro")
+
+
+def chave_destaque(x: Dict[str, Any]) -> str:
+    c, d = x.get("clipe") or {}, x.get("destaque") or {}
+    if not c or not d.get("alvo"):
+        return ""
+    return f"{c.get('mid')}|{c.get('ini')}|{c.get('fim')}|{d.get('alvo')}|{d.get('tipo')}|{d.get('texto', '')}"
+
+
+def fixar_trechos_do_clipe(planos_v: List[Dict[str, Any]], duracoes: Dict[str, float]) -> None:
+    """💬 Cada plano de clipe vira "M1@ini-fim": começa onde a cena manda (+ o quanto o plano já andou dentro dela), dura
+    o tempo do plano (a fala manda) e cabe no vídeo cru (se passar do fim, recua)."""
+    for x in planos_v:
+        c = x.get("clipe")
+        if not c:
+            continue
+        d = max(0.3, float(x["end"]) - float(x["start"]))
+        total = float(duracoes.get(c["mid"]) or 0) or (c["ate"] + d)
+        ini = float(c["de"]) + float(c.get("off") or 0)
+        if ini + d > total:
+            ini = max(0.0, total - d)
+        x["query"] = f"{c['mid']}@{ini:.2f}-{min(total, ini + d):.2f}"
+        x["clipe"] = dict(c, ini=round(ini, 3), fim=round(min(total, ini + d), 3))
 
 
 def cartao_fundo(base: str, p: Dict[str, Any], tom: Optional[str] = None) -> str:
@@ -2119,7 +2333,7 @@ def destaques_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List
         cartoes = [x for x in planos_v if x["bloco"] == b["id"] and x["layout"] == "cartao"]
         texto = (tt.get("texto") or "") if usa or cartoes else ""
         if not texto and cartoes:
-            texto = " ".join(b["fala"].split()[:5])
+            texto = " ".join(sem_tags(b["fala"]).split()[:5])
         if not texto:
             continue
         est = tt.get("estilo") if dp_destaques.estilo(tt.get("estilo") or "") else padrao
@@ -2194,6 +2408,11 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     providers = [x for x in (providers or (p.get("config") or {}).get("providers") or PROVIDERS_PADRAO) if x]
     anime = anime_do(base, p)
     planos_v = planos_do_video(p, providers, perfil, anime["modo"])
+    fixar_trechos_do_clipe(planos_v, {m["id"]: float(m.get("dur") or 0) for m in p.get("midias") or []})
+    for x in planos_v:  # 🎯 destaque já rastreado (curtos_comentario.preparar_destaques): o pedaço com o círculo/seta
+        pronto = (p.get("destaques_prontos") or {}).get(chave_destaque(x))
+        if pronto and any(m["id"] == pronto for m in p.get("midias") or []):
+            x.update(query=pronto, destaque_pronto=pronto)
     # 🃏 cartões: um fundo escuro gerado aqui vira a mídia C1, C2… do projeto
     precisa_cartao = any(x["layout"] == "cartao" for x in planos_v)
     if precisa_cartao:
@@ -2223,6 +2442,8 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             s["template"] = x["template"]
         if x.get("entrada") and x["entrada"] != "none":
             s["entrada"] = x["entrada"]
+        if x["layout"] in ("ia", "ia_video") and x["provider"] in ("flow", "runpod") and estilo_ia_do(p, perfil) == "realista":
+            s["query"] = (s["query"].rstrip(" .") + ESTILO_REALISTA)[:600]  # 📷 parece filmado de verdade
         if x["layout"] in LAYOUTS_ANIME:
             if x["provider"] in PROVEDORES_ANIME:  # 🎌 o acervo: emoção → peso semântico; cena concreta → peso na palavra
                 s["keyword_weight"], s["semantic_weight"] = (0.5, 2) if x["layout"] == "anime_reacao" else (2, 0.5)
@@ -2246,6 +2467,9 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
         trechos.append({"start": float(ws[0]["start"]), "end": float(ws[-1]["end"]), "text": a.get("falado") or b["fala"], "words": ws})
     leg = dict(perfil["legenda"])
     leg["ativa"] = perfil["legenda"].get("ativa", True) is not False
+    prop = proporcao_do(p)
+    if prop == "1:1":  # ⬛ quadrado: a letra (que é medida pela altura) cresce pra ocupar a mesma largura de antes
+        leg["tamanho"] = round(min(0.12, float(leg.get("tamanho") or 0.06) * 1.35), 4)
     mapa = {int(k): int(v) for k, v in (g.get("mapa") or {}).items()}
     palavras_leg = caixa_da_legenda(blocos, g["palavras"], mapa, g["alinhamento"], bool(perfil.get("gancho_maiusculas")))
     for t in trechos:
@@ -2253,8 +2477,9 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     return {"projeto": p, "perfil": perfil, "providers": providers, "audio": os.path.join(pasta(base, pid), g["arquivo"]),
             "dur": float(g["dur"]), "palavras": palavras_leg, "trechos": trechos, "resposta": resposta,
             "resposta_json": json.dumps(resposta, ensure_ascii=False), "sfx": sfx_do_video(p, perfil, planos_v),
-            "legendas": dp_legendas.normalizar(leg), "planos": planos_v, "idioma": perfil.get("idioma") or "",
-            "sons_volume": perfil["sfx"].get("volume")}
+            "legendas": dp_legendas.normalizar(leg), "planos": planos_v, "idioma": idioma_narrado(p, perfil),
+            "sons_volume": perfil["sfx"].get("volume"), "orientation": prop, "marca": marca_do(base, p),
+            "enquadramento": perfil.get("enquadramento") or ""}
 
 
 # ------------------------------------------------------------------ tela
@@ -2277,6 +2502,8 @@ def resumo_tela(base: str, p: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         pass
     out["midias_canal"] = [{k: m[k] for k in ("id", "tipo", "descricao")} for m in midias_do_canal(base, canal_do(base, p))]
+    out["marca"] = marca_do(base, p)
+    out["proporcao"] = proporcao_do(p)
     perfil = perfil_do(base, p)
     out["palavras_alvo"] = palavras_alvo(perfil, (p.get("config") or {}).get("duracao_alvo_s") or None)
     out["palavras_roteiro"] = len(texto_completo(p.get("roteiro")).split())

@@ -5751,6 +5751,14 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                     # nao falha o job inteiro so porque a legenda deu problema.
                     job["captions_error"] = traceback.format_exc()
 
+            if (job.get("marca") or {}).get("ativa"):  # 🏷 v84_255: o @canal por cima do vídeo (com e sem legenda)
+                try:
+                    import marca_canal
+                    _pos_leg = (job.get("legendas") or {}).get("posicao") if (job.get("legendas") or {}).get("ativa") else ""
+                    for _arq in {output_path, job.get("captioned_output_path")} - {None}:
+                        marca_canal.aplicar(_arq, job["marca"], _job_dir(job_id), _pos_leg)
+                except Exception:  # noqa: BLE001
+                    job["marca_erro"] = traceback.format_exc()[-800:]
             _capitulos_do_video_final(job_id, job, output_path, cutaways_to_apply)
             if qualidade_export.valida(job.get("qualidade_exportacao")) != "normal":
                 on_progress("qualidade_final", len(segments), len(segments))
@@ -11871,6 +11879,64 @@ _anime_cine_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir, tts_gerar
                             lambda t, m: na.limpar_texto_para_tts(t, motor=m))
 
 
+def _rastreio_clipe_do_trecho(job_id: str, i: int) -> str:
+    """🎯 v84_252: o vídeo que o trecho i do Estúdio usa (o escolhido na prévia/à mão), baixado se ainda não está."""
+    import video_assembler as _va
+    job = _JOBS.get(job_id)
+    if not job or not 0 <= i < len(job.get("pending_segments") or []):
+        raise ValueError("Trecho não encontrado.")
+    diag = job.get("fixacao_previa")
+    try:
+        segs = _fixar_midias_da_previa(job, [_segmento_obj(d) for d in job["pending_segments"]])
+    finally:
+        if diag is None:
+            job.pop("fixacao_previa", None)
+        else:
+            job["fixacao_previa"] = diag
+    ov = segs[i].override_source
+    if not ov:
+        raise ValueError("Esse trecho ainda não tem um vídeo escolhido (espere a prévia ou escolha um).")
+    if ov.get("source") == "local_file":
+        cam, tipo = ov.get("value"), ov.get("kind") or _va._infer_media_kind(ov.get("value") or "")
+    else:
+        cache = os.path.join(_job_dir(job_id), "prebaixados")
+        fab = _va.ClientFactory(_job_site_cfg(job))
+        try:
+            cam, tipo = _va.resolver_override_cacheado(ov, cache, fab.get_client, cache_dir=cache)
+        finally:
+            fab.close_all()
+    if not cam or not os.path.isfile(cam):
+        raise ValueError("Não achei o arquivo do vídeo desse trecho.")
+    if tipo == "image":
+        raise ValueError("Esse trecho é uma FOTO — o rastreio é pra vídeo.")
+    return cam
+
+
+def _rastreio_aplicar(job_id: str, i: int, caminho: str) -> None:
+    """🎯 o vídeo com o círculo/seta seguindo o objeto entra no trecho i (a mídia de antes fica guardada pra voltar)."""
+    job = _JOBS.get(job_id)
+    if not job or not 0 <= i < len(job.get("pending_segments") or []):
+        raise ValueError("O trecho do editor não existe mais.")
+    destino_dir = os.path.join(_job_dir(job_id), "rastreios")
+    os.makedirs(destino_dir, exist_ok=True)
+    destino = os.path.join(destino_dir, f"trecho{i}_{uuid.uuid4().hex[:6]}.mp4")
+    shutil.copy(caminho, destino)
+    d = job["pending_segments"][i]
+    d.setdefault("_antes_rastreio", d.get("override_source"))
+    d["override_source"] = {"source": "local_file", "value": destino, "kind": "video"}
+    d["media_type"] = "video"
+    d["rastreio"] = True
+    previas = (list(job.get("segment_previews") or []) + [None] * len(job["pending_segments"]))[:len(job["pending_segments"])]
+    previas[i] = None
+    job["segment_previews"] = previas
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(x) for x in job["pending_segments"]], retomar=True)
+
+
+import rastreio_rotas as _rastreio_rotas  # noqa: E402  🎯 Rastrear objeto (v84_252)
+_rastreio_rotas.registrar(app, BASE_DIR, _rastreio_clipe_do_trecho, _rastreio_aplicar)
+
+
 def _curto_transcrever(audio: str, language=None, word_timestamps: bool = True, info=None):
     """⚡ Whisper dos Vídeos curtos (palavra por palavra). Modelo: "curtos_whisper_modelo" nas configurações (padrão base)."""
     cfg = load_site_config()
@@ -11899,9 +11965,10 @@ def _curto_para_estudio(d: Dict[str, Any]) -> str:
         "language": idiomas.normalizar(d.get("idioma")) or "pt", "language_origem": "escolhido", "extra_instructions": "",
         "usar_wikipedia_inteligente": False, "usar_buscadores_inteligente": False, "mix_midia": None, "bibliotecas": {},
         "chamadas": [], "segments": d["trechos"], "total_duration": float(d["dur"]), "word_timestamps": d["palavras"],
-        "orientation": "9:16", "prompt": "", "legendas": d["legendas"], "sfx": d["sfx"], "whisper_skipped": True,
-        "export_quality": "1080p",
+        "orientation": d.get("orientation") or "9:16", "prompt": "", "legendas": d["legendas"], "sfx": d["sfx"], "whisper_skipped": True,
+        "export_quality": "1080p", "marca": d.get("marca"),
     }
+
     job = _JOBS[job_id]
     _ligar_projeto(job, "curto", p["id"])
     if d.get("sons_volume"):
@@ -11916,6 +11983,8 @@ def _curto_para_estudio(d: Dict[str, Any]) -> str:
         _save_state(job_id)
         raise
     job["legendas"], job["sfx"] = d["legendas"], d["sfx"]
+    if d.get("enquadramento"):  # 💬📚 vídeo de outra proporção: o próprio vídeo desfocado atrás (não barra preta)
+        job["editor_defaults"] = dict(job.get("editor_defaults") or {}, aspect_fill=d["enquadramento"], trim_start_frames=0)
     pend = job.get("pending_segments") or []
     if len(pend) == len(d.get("planos") or []):  # 🔁 cada trecho sabe de qual plano do roteiro veio (pra trocar a voz depois)
         import curtos as _ct
@@ -11973,7 +12042,7 @@ def _curto_trocar_voz(job_id: str, d: Dict[str, Any]) -> Dict[str, Any]:
     job.update(audio_path=audio, segments=d["trechos"], word_timestamps=d["palavras"], total_duration=float(d["dur"]),
                pending_segments=segs, segment_previews=[dict(p_, index=k) if p_ else None for k, p_ in enumerate(prevs)],
                destaques=sorted(ia_d + meus_d, key=lambda x: float(x["start"])),
-               sfx=sorted(d["sfx"] + meus_s, key=lambda x: float(x["start"])), curto_alinhamento=novo)
+               sfx=sorted(d["sfx"] + meus_s, key=lambda x: float(x["start"])), curto_alinhamento=novo, marca=d.get("marca"))
     try:
         wf = os.path.join(jd, "waveform.png")
         generate_waveform_image(audio, wf)
@@ -11987,10 +12056,19 @@ def _curto_trocar_voz(job_id: str, d: Dict[str, Any]) -> Dict[str, Any]:
     return {"mantidos": len(segs) - len(sem), "novos": len(sem), "dur": float(d["dur"])}
 
 
+def _curto_marca(job_id: str, cfg: Dict[str, Any]) -> None:
+    """🏷 a marca mudou na página do curto: o projeto do editor passa a exportar com ela."""
+    job = _JOBS.get(job_id)
+    if job is None:
+        return
+    job["marca"] = cfg
+    _save_state(job_id)
+
+
 import curtos_rotas as _curtos_rotas  # noqa: E402  ⚡ Vídeos curtos (aba Modelos de vídeo, v84_246)
 _curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isolado,
                         lambda t, m: na.limpar_texto_para_tts(t, motor=m), _curto_para_estudio,
-                        trocar_no_estudio=_curto_trocar_voz)
+                        trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)

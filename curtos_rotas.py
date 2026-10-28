@@ -21,6 +21,8 @@ from flask import abort, jsonify, redirect, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 import curtos as CT
+import curtos_comentario as CC
+import curtos_nichos as CN
 
 TAREFAS: Dict[str, Dict[str, Any]] = {}
 CB: Dict[str, Any] = {}  # os ganchos do app (transcrever, tts, para_estudio, trocar) — os testes trocam aqui
@@ -35,8 +37,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
               limpar_tts: Optional[Callable[[str, str], str]] = None,
               para_estudio: Optional[Callable[[Dict[str, Any]], str]] = None,
               rodar_pixabay: Optional[Callable[[Any], int]] = None,
-              trocar_no_estudio: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None) -> None:
-    CB.update(transcrever=transcrever, tts=tts, para_estudio=para_estudio, trocar=trocar_no_estudio)
+              trocar_no_estudio: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
+              marca_no_estudio: Optional[Callable[[str, Dict[str, Any]], None]] = None) -> None:
+    CB.update(transcrever=transcrever, tts=tts, para_estudio=para_estudio, trocar=trocar_no_estudio, marca=marca_no_estudio)
 
     def _ok(**kw: Any):
         return jsonify(dict(ok=True, **kw))
@@ -108,6 +111,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def _fazer_tudo(pid: str, slug: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
         """🚀 notícia → roteiro (IA) → voz guia (TTS) → alinhada → projeto no editor. Pula o que já está feito e em dia."""
         p = CT.carregar(base_dir, pid)
+        if p.get("modelo") in CT.MODELOS_CLIPE:
+            return _fazer_tudo_comentario(pid, slug, providers, prog)
         if any(f.get("estado") != "lida" for f in p["noticia"]["fontes"]):
             prog("📰 lendo a notícia…")
             CT.ler_noticias(base_dir, pid)
@@ -177,16 +182,66 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         return {"curtos_canais": lambda: CT.listar_canais(base_dir), "curtos_lista": lambda: CT.listar(base_dir)}
 
     # ------------------------------------------------------------------ hub
-    @app.route("/curtos", methods=["GET"])
-    def curtos_hub():
+    def _hub(foco: str = ""):
         CT.garantir_canais_prontos(base_dir)
         try:
             import anime2d as A
             vozes = A.vozes_disponiveis("xtts")
+            vozes_en = A.vozes_disponiveis("chatterbox_turbo")
         except Exception:  # noqa: BLE001
-            vozes = []
+            vozes, vozes_en = [], []
         return render_template("curtos.html", canais=CT.listar_canais(base_dir), projetos=CT.listar(base_dir), modos_anime=CT.MODOS_ANIME,
-                               prontos=CT.perfis_prontos(), vozes=vozes, erro=request.args.get("erro"))
+                               prontos=CT.perfis_prontos(), vozes=vozes, vozes_ingles=vozes_en, foco=foco, modelos=CT.MODELOS,
+                               linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES, modos_midia=CC.MODOS_MIDIA, estilos_ia=CT.ESTILOS_IA,
+                               nichos=CN.nichos(), canais_nicho=CN.canais_de_nicho(base_dir), canal_sel=request.args.get("canal") or "",
+                               tema_sel=request.args.get("tema") or "",
+                               erro=request.args.get("erro"))
+
+    @app.route("/curtos", methods=["GET"])
+    def curtos_hub():
+        return _hub()
+
+    # ------------------------------------------------------------------ 💡 nichos e ideias (v84_256)
+    @app.route("/curtos/nicho/<chave>/criar", methods=["POST"])
+    def curtos_nicho_criar(chave: str):
+        try:
+            c = CN.criar_canal_do_nicho(base_dir, chave)
+        except CT.CurtoErro as exc:
+            return redirect(f"/curtos/modelo/explicativo?erro={exc}")
+        return redirect(f"/curtos/modelo/explicativo?canal={c['id']}#nichos")
+
+    @app.route("/curtos/canal/<cid>/ideias", methods=["GET", "POST"])
+    def curtos_ideias(cid: str):
+        _canal(cid)
+        if request.method == "GET":
+            return _ok(ideias=CN.ideias(base_dir, cid), tarefa=TAREFAS.get("ideias:" + cid))
+        b = _corpo()
+        if not _ia_ligada():
+            return _erro("A IA está desligada (ou o recurso “⚡ Vídeos curtos” desligado em /ia).")
+        try:
+            n = int(b.get("n") or 10)
+        except (TypeError, ValueError):
+            n = 10
+        pedido = str(b.get("pedido") or "")[:400]
+        return _rodar("ideias:" + cid, "💡 pensando em ideias", lambda prog: f"{len(CN.gerar_ideias(base_dir, cid, n, pedido=pedido))} ideia(s) nova(s)")
+
+    @app.route("/curtos/canal/<cid>/ideia/<iid>/video", methods=["POST"])
+    def curtos_ideia_video(cid: str, iid: str):
+        _canal(cid)
+        b = _corpo()
+        try:
+            p = CN.video_da_ideia(base_dir, cid, iid, str(b.get("proporcao") or "9:16"), str(b.get("voz") or ""))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        if b.get("tudo"):
+            _rodar(p["id"], "🚀 fazendo tudo", lambda prog: _fazer_tudo(p["id"], str(b.get("voz") or ""), None, prog))
+        return _ok(pid=p["id"], link=f"/curtos/{p['id']}")
+
+    @app.route("/curtos/modelo/<modelo>", methods=["GET"])
+    def curtos_hub_modelo(modelo: str):
+        if modelo not in CT.MODELOS:
+            abort(404)
+        return _hub(modelo)
 
     @app.route("/curtos/canal/novo", methods=["POST"])
     def curtos_canal_novo():
@@ -213,6 +268,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos/novo", methods=["POST"])
     def curtos_novo():
         f = request.form
+        if f.get("modelo") in CT.MODELOS_CLIPE:
+            return _novo_comentario()
         try:
             p = CT.criar(base_dir, f.get("canal_id") or "", f.get("titulo") or "", (f.get("links") or "").split(),
                          f.get("texto") or "")
@@ -229,6 +286,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             if f.get("modo_anime") != "nao":
                 p["config"]["providers"] = list(dict.fromkeys(CT.PROVIDERS_PADRAO + ["animepexels"]))
         p["config"]["anime_obras"] = " ".join(str(f.get("anime_obras") or "").split())[:300]
+        if f.get("proporcao") in CT.PROPORCOES:
+            p["config"]["proporcao"] = f["proporcao"]
         CT.salvar(base_dir, p)
         if f.get("tudo"):
             slug = f.get("voz") or ""
@@ -460,6 +519,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos/<pid>", methods=["GET"])
     def curto_pagina(pid: str):
         p = _proj(pid)
+        if p.get("modelo") in CT.MODELOS_CLIPE:
+            return _pagina_comentario(p)
         try:
             import anime2d as A
             vozes = A.vozes_disponiveis((p.get("config") or {}).get("motor_perfil") or "xtts")
@@ -471,7 +532,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                                efeitos=CT.EFEITOS_CURTOS, entradas=CT.ENTRADAS_CURTOS, vozes=vozes, ia=_ia_ligada(),
                                modos_anime=CT.MODOS_ANIME, emocoes=CT.EMOCOES_ANIME, anime=CT.anime_do(base_dir, p),
                                todos_providers=prompt_builder.DEFAULT_PROVIDERS, providers_padrao=CT.PROVIDERS_PADRAO,
-                               tem_tts=bool(CB["tts"]), tem_whisper=bool(CB["transcrever"]))
+                               tem_tts=bool(CB["tts"]), tem_whisper=bool(CB["transcrever"]),
+                               proporcoes=CT.PROPORCOES, fontes_dp=_fontes_dp(), posicoes_marca=CT.MARCA_POSICOES)
 
     @app.route("/curtos/<pid>/estado", methods=["GET"])
     def curto_estado(pid: str):
@@ -479,6 +541,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         out = CT.resumo_tela(base_dir, p)
         out["tarefa"] = TAREFAS.get(pid)
         out["perfil"] = CT.perfil_do(base_dir, p)
+        if p.get("modelo") in CT.MODELOS_CLIPE:
+            out["sugestoes"] = CC.sugestoes(p)
+            out["so_fontes"] = CC.so_fontes(p)
+            out["midia_modo"] = CC.modo_midia(p)
+            out["estilo_ia"] = CT.estilo_ia_do(p, out["perfil"])
         return jsonify(out)
 
     @app.route("/curtos/<pid>/config", methods=["POST"])
@@ -590,14 +657,15 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _proj(pid)
 
         def fn(prog):
-            r = CT.gerar_roteiro(base_dir, pid)
+            r = (CC.gerar_roteiro if _proj(pid).get("modelo") in CT.MODELOS_CLIPE else CT.gerar_roteiro)(base_dir, pid)
             CT.realinhar(base_dir, pid)
             return f"{len(r['blocos'])} bloco(s)"
         return _rodar(pid, "📝 escrevendo o roteiro", fn)
 
     @app.route("/curtos/<pid>/roteiro/prompt", methods=["GET"])
     def curto_roteiro_prompt(pid: str):
-        return _ok(prompt=CT.prompt_roteiro(base_dir, _proj(pid)))
+        p = _proj(pid)
+        return _ok(prompt=(CC.prompt_roteiro if p.get("modelo") in CT.MODELOS_CLIPE else CT.prompt_roteiro)(base_dir, p))
 
     @app.route("/curtos/<pid>/roteiro", methods=["POST"])
     def curto_roteiro_salvar(pid: str):
@@ -608,7 +676,14 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 dados = b.get("resposta") if b.get("resposta") else b.get("roteiro")
                 if not dados:
                     return _erro("Nada pra salvar.")
-                novo = CT.ler_roteiro(dados, p)
+                if p.get("modelo") in CT.MODELOS_CLIPE and b.get("resposta"):  # a resposta de outra IA (fala_en/fala_pt, ganchos…)
+                    novo = CC.ler_roteiro(dados, p, CC.dados(p).get("idioma") or "en")
+                else:
+                    novo = CT.ler_roteiro(dados, p)
+                    for k in ("ganchos", "finais", "titulos", "roteiro_en", "roteiro_pt", "idioma", "titulo_pt", "ganchos_escolhido", "finais_escolhido",
+                              "titulos_escolhido"):
+                        if k not in novo and (p.get("roteiro") or {}).get(k) is not None:
+                            novo[k] = p["roteiro"][k]
                 if isinstance(dados, dict) and not b.get("resposta"):  # editado na tela: mantém títulos/descrição de antes se não vieram
                     for k in ("titulo_video", "titulos_alt", "descricao", "hashtags"):
                         if k not in dados and p.get("roteiro"):
@@ -865,6 +940,468 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             arq.save(cam)
         op = _opcoes()
         return _rodar(pid, "🔁 trocando a voz no editor", lambda prog: _trocar(pid, cam, op, prog))
+
+    # ------------------------------------------------------------------ 💬 comentário
+    def _ia_ou_erro() -> None:
+        if not _ia_ligada():
+            raise CT.CurtoErro("A IA está desligada (ou o recurso “⚡ Vídeos curtos” desligado em /ia).")
+
+    def _mandar_pro_editor(pid: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
+        if not CB["para_estudio"]:
+            raise CT.CurtoErro("O editor não está disponível aqui.")
+        prog("🎬 montando no editor…")
+        d = CT.montar_dados_editor(base_dir, pid, providers or None)
+        job_id = CB["para_estudio"](d)
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            q["editor"] = {"job_id": job_id, "quando": time.time()}
+            CT.salvar(base_dir, q)
+        return f"pronto: {len(d['planos'])} planos em {d['dur']:.1f} s — abra no editor"
+
+    def _fazer_tudo_comentario(pid: str, slug: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
+        """🚀 💬 o que acontece (transcreve/descreve se faltar) → roteiro EN/PT → 3 takes → take 1 alinhado → 🎯 destaques → editor."""
+        p = CT.carregar(base_dir, pid)
+        c = CC.dados(p)
+        expl = CC.explicativo(p)
+        if not expl and not CC.clipes(base_dir, p):
+            raise CT.CurtoErro("Suba o vídeo cru (o clipe).")
+        if expl and any(f.get("estado") != "lida" for f in p["noticia"]["fontes"]):
+            prog("📰 lendo a matéria…")
+            CT.ler_noticias(base_dir, pid)
+            p = CT.carregar(base_dir, pid)
+        if not (p.get("roteiro") or {}).get("blocos"):
+            for m in CC.clipes(base_dir, p):
+                if not CC.sem_linha_do_tempo(CT.carregar(base_dir, pid), m["id"]):
+                    continue
+                if CB["transcrever"] and not expl:  # 📚 a fala das fontes não importa (é a narração que manda): só o que se VÊ
+                    try:
+                        CC.transcrever_clipe(base_dir, pid, m["id"], CB["transcrever"], prog)
+                    except Exception:  # noqa: BLE001
+                        pass
+                if _ia_ligada():  # o que se VÊ também (clipe sem fala, ou pra completar)
+                    try:
+                        CC.descrever_clipe(base_dir, pid, m["id"], on_log=prog)
+                    except Exception as exc:  # noqa: BLE001
+                        prog(f"👁 não deu pra descrever {m['id']}: {exc}")
+            prog(f"📝 escrevendo o roteiro ({CT.LINGUAS[CC.lingua_post(p)]} + português, 5 ganchos, 5 finais e 5 títulos)…")
+            CC.gerar_roteiro(base_dir, pid)
+            p = CT.carregar(base_dir, pid)
+        chave = CT.chave_roteiro(p.get("roteiro"))
+        g = p.get("gravacao") or {}
+        if not (g.get("arquivo") and g.get("chave_roteiro") == chave):
+            if not CB["tts"]:
+                raise CT.CurtoErro("O gerador de voz não está disponível aqui.")
+            takes = [t for t in p.get("takes") or [] if t.get("chave") == chave]
+            if not takes:
+                voz = _voz(p, slug)
+                if not voz:
+                    raise CT.CurtoErro("Nenhuma voz de TTS cadastrada (🎙 Gerar voz → vozes).")
+                with CT._TRAVA:
+                    q = CT.carregar(base_dir, pid)
+                    q["config"]["voz_tts"] = voz.get("slug") or slug
+                    CT.salvar(base_dir, q)
+                CC.gerar_takes(base_dir, pid, CB["tts"], limpar_tts or (lambda t_, m: t_), voz,
+                               int((p.get("config") or {}).get("takes") or 3), prog)
+            prog("🎯 alinhando o take 1 ao roteiro (Whisper)…")
+            CC.usar_take(base_dir, pid, int(CT.carregar(base_dir, pid).get("take_escolhido") or 1), _transcrever(), {}, prog)
+        if _ia_ligada():
+            r = CC.preparar_destaques(base_dir, pid, providers, on_log=prog)
+            if r["pendentes"]:
+                prog(f"🎯 {len(r['pendentes'])} destaque(s) pra fazer à mão no 🎯 Rastrear objeto")
+        return _mandar_pro_editor(pid, providers, prog)
+
+    def _novo_comentario():
+        f = request.form
+        modelo = f.get("modelo") if f.get("modelo") in CT.MODELOS_CLIPE else "comentario"
+        expl = modelo == "explicativo"
+        clipes_ = [a for a in request.files.getlist("clipe") if a and a.filename]
+        links = [u for u in str(f.get("link") or "").split() if u.startswith("http")][:20 if expl else 6]
+        artigos = [u for u in str(f.get("artigos") or "").split() if u.startswith("http")][:8]
+        if not expl and not clipes_ and not links:
+            return redirect("/curtos/modelo/comentario?erro=Suba o vídeo cru (o clipe) ou cole o link dele.")
+        if expl and not (f.get("texto") or "").strip() and not (f.get("titulo") or "").strip() and not artigos and not clipes_ and not links:
+            return redirect("/curtos/modelo/explicativo?erro=Diga o assunto e mande os vídeos (ou o link de uma matéria).")
+        cid = f.get("canal_id") if CT._valido(f.get("canal_id")) else CT.canal_do_modelo(base_dir, modelo)
+        p = CT.criar(base_dir, cid, f.get("titulo") or (os.path.splitext(clipes_[0].filename)[0] if clipes_ else
+                     " ".join(str(f.get("texto") or "").split()[:8]) or ("Explicativo" if expl else "Comentário")), artigos,
+                     str(f.get("texto") or "") if expl else "", modelo=modelo)
+        pid = p["id"]
+        tmpd = tempfile.mkdtemp(prefix="curto_c_")
+        with CT._TRAVA:
+            p = CT.carregar(base_dir, pid)
+            for arq in clipes_[:20 if expl else 6]:
+                cam = os.path.join(tmpd, secure_filename(arq.filename) or "clipe.mp4")
+                arq.save(cam)
+                if CT.tipo_arquivo(cam) == "video":
+                    CT.adicionar_midia(base_dir, p, cam, "video", os.path.splitext(arq.filename)[0][:120])
+            try:
+                dur = int(float(f.get("duracao") or 0))
+                if dur:
+                    p["config"]["duracao_alvo_s"] = max(10, min(180, dur))
+            except ValueError:
+                pass
+            c = CC.dados(p)
+            c["idioma"] = "pt" if f.get("idioma") == "pt" else "en"
+            c["lingua_post"] = f.get("lingua_post") if f.get("lingua_post") in CT.LINGUAS else "en"
+            narrada = "pt" if c["idioma"] == "pt" else c["lingua_post"]
+            p["config"]["motor_perfil"] = "chatterbox_turbo" if narrada == "en" else "chatterbox"
+            if f.get("proporcao") in CT.PROPORCOES:
+                p["config"]["proporcao"] = f["proporcao"]
+            if expl:
+                p["config"]["so_fontes"] = ("so_fontes" in f) if "tem_so_fontes" in f else True
+                if f.get("midia") in CC.MODOS_MIDIA:
+                    p["config"]["midia"] = f["midia"]
+                    p["config"]["so_fontes"] = f["midia"] == "minhas"
+                p["config"]["estilo_ia"] = f.get("estilo_ia") if f.get("estilo_ia") in CT.ESTILOS_IA else "realista"
+            c["referencia"] = str(f.get("referencia") or "")[:20000]
+            if f.get("voz"):
+                p["config"]["voz_tts"] = str(f["voz"])[:120]
+            CT.salvar(base_dir, p)
+        shutil.rmtree(tmpd, ignore_errors=True)
+        if not expl and clipes_ and not links and not CC.clipes(base_dir, CT.carregar(base_dir, pid)):
+            CT.excluir(base_dir, pid)
+            return redirect("/curtos/modelo/comentario?erro=Isso não parece um vídeo.")
+        if (f.get("linhas") or "").strip():
+            CC.salvar_o_que_acontece(base_dir, pid, f["linhas"], "M1")
+        ref = request.files.get("referencia_video")
+        cam_ref = ""
+        if ref and ref.filename:
+            d = os.path.join(CT.pasta(base_dir, pid), "referencia")
+            os.makedirs(d, exist_ok=True)
+            cam_ref = os.path.join(d, secure_filename(ref.filename) or "ref.mp4")
+            ref.save(cam_ref)
+        slug = f.get("voz") or ""
+        tudo = bool(f.get("tudo"))
+
+        ref_link = str(f.get("referencia_link") or "").strip()
+
+        def fn(prog):
+            feito = []
+            for k, u in enumerate(links):
+                try:
+                    CC.baixar_clipe(base_dir, pid, u, CB.get("baixar"), lambda m, k=k: prog(f"⬇ vídeo {k + 1}/{len(links)} — {m}"))
+                    feito.append("vídeo baixado")
+                except Exception as exc:  # noqa: BLE001  (📚 um link ruim não derruba os outros)
+                    if not expl:
+                        raise
+                    feito.append(f"❌ {u[:50]}: {str(exc)[:80]}")
+            if expl and CT.carregar(base_dir, pid)["noticia"]["fontes"]:
+                prog("📰 lendo a matéria…")
+                CT.ler_noticias(base_dir, pid)
+            if ref_link and not cam_ref:
+                prog("⬇ baixando o vídeo de referência…")
+                cam = CC.baixar_link(ref_link, os.path.join(CT.pasta(base_dir, pid), "referencia"), CB.get("baixar"))
+            else:
+                cam = cam_ref
+            if cam:
+                prog("📺 transcrevendo o vídeo de referência…")
+                CC.transcrever_referencia(base_dir, pid, cam, _transcrever())
+                feito.append("referência transcrita")
+            if tudo:
+                return _fazer_tudo_comentario(pid, slug, None, prog)
+            q = CT.carregar(base_dir, pid)
+            if _ia_ligada():  # sem linha do tempo (sem texto, ou só a transcrição corrida): a IA olha o vídeo
+                for m in CC.clipes(base_dir, q):
+                    if CC.sem_linha_do_tempo(q, m["id"]):
+                        CC.descrever_clipe(base_dir, pid, m["id"], on_log=prog)
+                        feito.append(f"👁 {m['id']} descrito")
+            return " · ".join(feito)
+        if cam_ref or tudo or links or ref_link or artigos or _ia_ligada():
+            _rodar(pid, "🚀 fazendo tudo" if tudo else ("⬇ preparando as fontes" if expl else "⬇ preparando o clipe"), fn)
+        return redirect(f"/curtos/{pid}")
+
+    def _pagina_comentario(p: Dict[str, Any]):
+        try:
+            import anime2d as A
+            vozes = A.vozes_disponiveis((p.get("config") or {}).get("motor_perfil") or "chatterbox_turbo")
+        except Exception:  # noqa: BLE001
+            vozes = []
+        return render_template("curto_comentario.html", p=p, vozes=vozes, ia=_ia_ligada(), tags=CC.TAGS_VOZ, linguas=CT.LINGUAS,
+                               modos_midia=CC.MODOS_MIDIA, estilos_ia=CT.ESTILOS_IA,
+                               proporcoes=CT.PROPORCOES, fontes_dp=_fontes_dp(), posicoes_marca=CT.MARCA_POSICOES,
+                               tipos_sfx={k: v["nome"] for k, v in CT.TIPOS_SFX.items()},
+                               tem_tts=bool(CB["tts"]), tem_whisper=bool(CB["transcrever"]))
+
+    def _fontes_dp() -> List[str]:
+        try:
+            import dp_legendas
+            return sorted(dp_legendas._mapa_fontes())
+        except Exception:  # noqa: BLE001
+            return ["DP Poppins"]
+
+    @app.route("/curtos/<pid>/comentario/lingua", methods=["POST"])
+    def curto_c_lingua(pid: str):
+        _modelo_comentario(pid)
+        try:
+            CC.definir_lingua_post(base_dir, pid, str(_corpo().get("lingua") or ""))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok()
+
+    @app.route("/curtos/<pid>/comentario/sugestao", methods=["POST"])
+    def curto_c_sugestao(pid: str):
+        _modelo_comentario(pid)
+        b = _corpo()
+        try:
+            CC.usar_sugestao(base_dir, pid, int(b.get("bloco")), int(b.get("cena")), bool(b.get("usar", True)))
+        except (CT.CurtoErro, TypeError, ValueError) as exc:
+            return _erro(str(exc) or "Cena inválida.")
+        return _ok()
+
+    def _modelo_comentario(pid: str) -> Dict[str, Any]:
+        p = _proj(pid)
+        if p.get("modelo") not in CT.MODELOS_CLIPE:
+            abort(404)
+        return p
+
+    @app.route("/curtos/<pid>/comentario/linhas", methods=["POST"])
+    def curto_c_linhas(pid: str):
+        _modelo_comentario(pid)
+        b = _corpo()
+        mid = str(b.get("mid") or "M1").upper()[:6]
+        tipo = b.get("tipo") if b.get("tipo") in ("texto", "fala", "visual") else "texto"
+        texto = str(b.get("texto") or "")[:30000]
+        if tipo == "texto" and texto.strip() and not CC.tem_tempos(texto):
+            return _ok(**CC.salvar_o_que_acontece(base_dir, pid, texto, mid))
+        return _ok(linhas=CC.salvar_texto_do_clipe(base_dir, pid, texto, mid, tipo), referencia=False)
+
+    @app.route("/curtos/<pid>/comentario/baixar", methods=["POST"])
+    def curto_c_baixar(pid: str):
+        _modelo_comentario(pid)
+        b = _corpo()
+        urls = [str(u).strip() for u in (b.get("urls") or [b.get("url")]) if str(u or "").strip().startswith("http")][:20]
+        url, ref = (urls[0] if urls else ""), bool(b.get("referencia"))
+        if not url:
+            return _erro("Cole o link do vídeo.")
+
+        def fn(prog):
+            if len(urls) > 1 and not ref:  # 📚 vários links de uma vez
+                feitos, erros = [], []
+                for k, u in enumerate(urls):
+                    try:
+                        mid = CC.baixar_clipe(base_dir, pid, u, CB.get("baixar"), lambda m, k=k: prog(f"⬇ {k + 1}/{len(urls)} — {m}"))
+                        feitos.append(mid)
+                        if _ia_ligada() and CC.sem_linha_do_tempo(CT.carregar(base_dir, pid), mid):
+                            CC.descrever_clipe(base_dir, pid, mid, on_log=prog)
+                    except Exception as exc:  # noqa: BLE001
+                        erros.append(f"{u[:40]}: {str(exc)[:60]}")
+                return f"{len(feitos)} vídeo(s) baixado(s)" + (f" · ❌ {'; '.join(erros)}" if erros else "")
+            if ref:
+                cam = CC.baixar_link(url, os.path.join(CT.pasta(base_dir, pid), "referencia"), CB.get("baixar"))
+                prog("📺 transcrevendo a referência…")
+                return f"referência: {len(CC.transcrever_referencia(base_dir, pid, cam, _transcrever()).split())} palavras"
+            mid = CC.baixar_clipe(base_dir, pid, url, CB.get("baixar"), prog)
+            if _ia_ligada() and CC.sem_linha_do_tempo(CT.carregar(base_dir, pid), mid):
+                CC.descrever_clipe(base_dir, pid, mid, on_log=prog)
+                return f"{mid} baixado e descrito pela IA"
+            return f"{mid} baixado"
+        return _rodar(pid, "⬇ baixando o vídeo", fn)
+
+    @app.route("/curtos/<pid>/comentario/transcrever", methods=["POST"])
+    def curto_c_transcrever(pid: str):
+        _modelo_comentario(pid)
+        mid = str(_corpo().get("mid") or "M1").upper()[:6]
+        if not CB["transcrever"]:
+            return _erro("O Whisper não está disponível aqui.")
+        return _rodar(pid, f"🎙 transcrevendo {mid}",
+                      lambda prog: f"{CC.transcrever_clipe(base_dir, pid, mid, CB['transcrever'], prog)} linha(s)")
+
+    @app.route("/curtos/<pid>/comentario/descrever", methods=["POST"])
+    def curto_c_descrever(pid: str):
+        _modelo_comentario(pid)
+        mid = str(_corpo().get("mid") or "M1").upper()[:6]
+        try:
+            _ia_ou_erro()
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _rodar(pid, f"👁 a IA está olhando o {mid}", lambda prog: f"{CC.descrever_clipe(base_dir, pid, mid, on_log=prog)} linha(s)")
+
+    @app.route("/curtos/<pid>/comentario/referencia", methods=["POST"])
+    def curto_c_referencia(pid: str):
+        _modelo_comentario(pid)
+        arq = request.files.get("video")
+        if arq and arq.filename:
+            d = os.path.join(CT.pasta(base_dir, pid), "referencia")
+            os.makedirs(d, exist_ok=True)
+            cam = os.path.join(d, secure_filename(arq.filename) or "ref.mp4")
+            arq.save(cam)
+            if not CB["transcrever"]:
+                return _erro("O Whisper não está disponível aqui.")
+            return _rodar(pid, "📺 transcrevendo a referência",
+                          lambda prog: f"referência: {len(CC.transcrever_referencia(base_dir, pid, cam, CB['transcrever']).split())} palavras")
+        texto = str((request.form.get("texto") if request.form else None) or _corpo().get("texto") or "")[:20000]
+        with CT._TRAVA:
+            p = _proj(pid)
+            CC.dados(p)["referencia"] = texto
+            CT.salvar(base_dir, p)
+        return _ok(dur=CC.duracao_da_referencia(texto))
+
+    @app.route("/curtos/<pid>/comentario/idioma", methods=["POST"])
+    def curto_c_idioma(pid: str):
+        _modelo_comentario(pid)
+        try:
+            CC.trocar_idioma(base_dir, pid, str(_corpo().get("idioma") or ""))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        CT.realinhar(base_dir, pid)
+        return _ok()
+
+    @app.route("/curtos/<pid>/comentario/mais", methods=["POST"])
+    def curto_c_mais(pid: str):
+        _modelo_comentario(pid)
+        qual = str(_corpo().get("qual") or "")
+        if qual not in ("ganchos", "finais", "titulos"):
+            return _erro("Pedido inválido.")
+        try:
+            _ia_ou_erro()
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _rodar(pid, f"➕ mais 5 {qual}", lambda prog: f"{len(CC.mais_opcoes(base_dir, pid, qual))} {qual} novos")
+
+    @app.route("/curtos/<pid>/comentario/escolher", methods=["POST"])
+    def curto_c_escolher(pid: str):
+        _modelo_comentario(pid)
+        b = _corpo()
+        try:
+            CC.escolher(base_dir, pid, str(b.get("qual") or ""), int(b.get("i")))
+        except (CT.CurtoErro, TypeError, ValueError) as exc:
+            return _erro(str(exc) or "Opção inválida.")
+        return _ok()
+
+    @app.route("/curtos/<pid>/comentario/takes", methods=["POST"])
+    def curto_c_takes(pid: str):
+        p = _modelo_comentario(pid)
+        if not CB["tts"]:
+            return _erro("O gerador de voz não está disponível aqui.")
+        b = _corpo()
+        voz = _voz(p, str(b.get("voz") or ""))
+        if not voz:
+            return _erro("Escolha a voz.")
+        with CT._TRAVA:
+            q = _proj(pid)
+            q["config"]["voz_tts"] = voz.get("slug") or ""
+            CT.salvar(base_dir, q)
+        try:
+            n = max(1, min(5, int(b.get("n") or 3)))
+        except (TypeError, ValueError):
+            n = 3
+        return _rodar(pid, f"🎙 gerando {n} takes",
+                      lambda prog: f"{len(CC.gerar_takes(base_dir, pid, CB['tts'], limpar_tts or (lambda t, m: t), voz, n, prog))} take(s) — ouça e escolha")
+
+    @app.route("/curtos/<pid>/comentario/take", methods=["POST"])
+    def curto_c_take(pid: str):
+        _modelo_comentario(pid)
+        try:
+            k = int(_corpo().get("k"))
+        except (TypeError, ValueError):
+            return _erro("Take inválido.")
+        if not CB["transcrever"]:
+            return _erro("O Whisper não está disponível aqui.")
+        op = _opcoes()
+        return _rodar(pid, f"🎯 usando o take {k}",
+                      lambda prog: f"take {k} alinhado ({CC.usar_take(base_dir, pid, k, CB['transcrever'], op, prog)['dur']:.1f} s)")
+
+    @app.route("/curtos/<pid>/comentario/destaques", methods=["POST"])
+    def curto_c_destaques(pid: str):
+        _modelo_comentario(pid)
+        b = _corpo()
+        if b.get("refazer"):
+            with CT._TRAVA:
+                q = _proj(pid)
+                q["destaques_prontos"] = {}
+                CT.salvar(base_dir, q)
+
+        def fn(prog):
+            r = CC.preparar_destaques(base_dir, pid, on_log=prog)
+            return f"🎯 {len(r['feitos'])} destaque(s) prontos" + (f", {len(r['pendentes'])} pendente(s)" if r["pendentes"] else "")
+        return _rodar(pid, "🎯 preparando os destaques", fn)
+
+    @app.route("/curtos/<pid>/comentario/destaque-manual", methods=["POST"])
+    def curto_c_destaque_manual(pid: str):
+        """🎯 destaque pendente → um rastreio com o pedaço do clipe; quando você gerar lá, “usar no curto” volta pra cá."""
+        p = _modelo_comentario(pid)
+        b = _corpo()
+        pend = next((x for x in p.get("destaques_pendentes") or [] if x.get("chave") == b.get("chave")), None)
+        if not pend or not pend.get("mid"):
+            return _erro("Destaque não encontrado.")
+        import rastreio as RT
+        m = next((mm for mm in CC.clipes(base_dir, p) if mm["id"] == pend["mid"]), None)
+        if not m:
+            return _erro("Clipe não encontrado.")
+        tmp = os.path.join(CT.pasta(base_dir, pid), "_destaque")
+        os.makedirs(tmp, exist_ok=True)
+        pedaco = os.path.join(tmp, "manual.mp4")
+        import subprocess
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{float(pend['ini']):.3f}", "-i", m["caminho"], "-t",
+                        f"{float(pend['fim']) - float(pend['ini']):.3f}", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                        "-pix_fmt", "yuv420p", pedaco], capture_output=True, timeout=600)
+        try:
+            r = RT.criar(base_dir, pedaco, f"{p.get('titulo') or 'curto'} · {pend['alvo']}")
+        except Exception as exc:  # noqa: BLE001
+            return _erro(str(exc))
+        with RT._TRAVA:
+            r = RT.carregar(base_dir, r["id"])
+            r["curto"] = {"pid": pid, "chave": pend["chave"], "alvo": pend["alvo"]}
+            RT.salvar(base_dir, r)
+        return _ok(link=f"/rastrear/{r['id']}")
+
+    @app.route("/curtos/<pid>/comentario/usar-rastreio", methods=["POST"])
+    def curto_c_usar_rastreio(pid: str):
+        """O vídeo gerado no 🎯 Rastrear objeto vira o destaque daquele plano (mídia R…)."""
+        _modelo_comentario(pid)
+        import rastreio as RT
+        try:
+            r = RT.carregar(base_dir, str(_corpo().get("rid") or ""))
+        except RT.RastreioErro:
+            return _erro("Rastreio não encontrado.", 404)
+        cur = r.get("curto") or {}
+        if cur.get("pid") != pid or not r.get("saida"):
+            return _erro("Gere o vídeo no rastreio antes (🎬).")
+        with CT._TRAVA:
+            p = _proj(pid)
+            copia = os.path.join(tempfile.mkdtemp(prefix="curto_r_"), "r.mp4")
+            shutil.copy(os.path.join(RT.pasta(base_dir, r["id"]), r["saida"]), copia)
+            mm = CT.adicionar_midia(base_dir, p, copia, "video", f"🎯 {cur.get('alvo')}", "R")
+            p.setdefault("destaques_prontos", {})[cur["chave"]] = mm["id"]
+            p["destaques_pendentes"] = [x for x in p.get("destaques_pendentes") or [] if x.get("chave") != cur["chave"]]
+            CT.salvar(base_dir, p)
+        return _ok(link=f"/curtos/{pid}")
+
+    @app.route("/curtos/<pid>/marca", methods=["POST"])
+    def curto_marca(pid: str):
+        """🏷 a marca @canal deste vídeo (e, se pedir, o padrão do canal); vai junto pro projeto do editor."""
+        b = _corpo()
+        with CT._TRAVA:
+            p = _proj(pid)
+            c = CT.canal_do(base_dir, p)
+            m = CT.normalizar_marca(dict(CT.marca_do(base_dir, p), **(b.get("marca") or {})))
+            p["config"]["marca"] = m
+            CT.salvar(base_dir, p)
+            if b.get("padrao_canal") and c:
+                c["perfil"]["marca"] = m
+                CT.salvar_canal(base_dir, c)
+        jid = (p.get("editor") or {}).get("job_id")
+        if jid and CB.get("marca"):
+            CB["marca"](jid, m)
+        return _ok(marca=m, no_editor=bool(jid))
+
+    @app.route("/curtos/<pid>/proporcao", methods=["POST"])
+    def curto_proporcao(pid: str):
+        b = _corpo()
+        if b.get("proporcao") not in CT.PROPORCOES:
+            return _erro("Proporção inválida.")
+        with CT._TRAVA:
+            p = _proj(pid)
+            p["config"]["proporcao"] = b["proporcao"]
+            if "so_fontes" in b:
+                p["config"]["so_fontes"] = bool(b["so_fontes"])
+            if b.get("midia") in CC.MODOS_MIDIA:
+                p["config"]["midia"] = b["midia"]
+                p["config"]["so_fontes"] = b["midia"] == "minhas"
+            if b.get("estilo_ia") in CT.ESTILOS_IA:
+                p["config"]["estilo_ia"] = b["estilo_ia"]
+            CT.salvar(base_dir, p)
+        return _ok()
 
     @app.route("/curtos/<pid>/excluir", methods=["POST"])
     def curto_excluir(pid: str):

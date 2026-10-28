@@ -1,0 +1,843 @@
+"""
+💬 VÍDEOS CURTOS DE COMENTÁRIO (v84_253) — o jeito dos tutoriais "How I edit commentary shorts":
+
+  clipe → roteiro → voz → edição.
+
+  1. CLIPE: o vídeo cru (M1, M2…) + o que acontece nele: a transcrição dele, uma descrição com os segundos, a transcrição
+     de OUTRO vídeo que fala dele, ou um vídeo comentando (transcrito aqui). Sem texto? o Whisper transcreve o clipe, ou a
+     IA OLHA o vídeo (2 quadros por segundo) e descreve o que acontece segundo a segundo.
+  2. ROTEIRO em INGLÊS + tradução em português: mesmo tamanho/ritmo/fluxo da história, um parágrafo só, gancho forte e um
+     final com PERGUNTA que puxa comentário (de preferência o ponto em que as pessoas discordam). Vêm 5 ganchos e 5 finais
+     pra escolher, e “➕ mais 5”. As tags de emoção do Chatterbox Turbo ([gasp], [surprised]…) já vêm na fala.
+  3. VOZ: Chatterbox Turbo (inglês) — 3 TAKES da mesma fala (cada um sai um pouco diferente), você escolhe o melhor.
+  4. EDIÇÃO: tira os silêncios; cada frase mostra o pedaço do vídeo cru que ela conta; 1º plano < 3 s com zoom + whoosh;
+     algo muda a cada 3-4 s (corte, zoom, legenda, rastreio, som); corta no fim da fala. 🎯 DESTAQUES: quando a fala aponta
+     algo ("the cardboard sign"), a IA acha o objeto no quadro e o rastreio põe o círculo/seta seguindo ele.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+from typing import Any, Callable, Dict, List, Optional
+
+import curtos as CT
+
+TAGS_VOZ = ("gasp", "laugh", "chuckle", "sigh", "groan", "sniff", "surprised", "sarcastic", "dramatic", "whispering", "happy",
+            "angry", "fear", "crying", "narration")
+
+
+# ------------------------------------------------------------------ o que acontece no clipe (linhas com tempo)
+_RE_LINHA = re.compile(r"^\s*[\[(]?\s*(\d{1,2}:\d{2}(?:\.\d+)?|\d+(?:\.\d+)?)\s*s?\s*(?:[-–—>]+\s*(\d{1,2}:\d{2}(?:\.\d+)?|\d+(?:\.\d+)?)\s*s?)?\s*[\])]?\s*[-–—:]?\s*(.+)$")
+
+
+def _seg(v: str) -> Optional[float]:
+    v = (v or "").strip()
+    if not v:
+        return None
+    try:
+        if ":" in v:
+            m, s = v.split(":", 1)
+            return int(m) * 60 + float(s)
+        return float(v)
+    except ValueError:
+        return None
+
+
+def ler_linhas(texto: str, mid: str = "M1", tipo: str = "texto") -> List[Dict[str, Any]]:
+    """“0:12 ele pega a placa”, “[00:12] …”, “12s - …”, “0:12-0:15 …”, SRT/YouTube (tempo numa linha, texto na outra)
+    → [{mid, t0, t1, texto, tipo}]. Linha sem tempo junta na anterior (ou vira uma linha solta sem tempo)."""
+    out: List[Dict[str, Any]] = []
+    pend_t: Optional[float] = None
+    for bruta in str(texto or "").replace("\r", "").split("\n"):
+        linha = bruta.strip()
+        if not linha or re.fullmatch(r"\d+", linha):
+            continue
+        srt = re.match(r"^(\d{1,2}:)?(\d{1,2}):(\d{2})[,.](\d+)\s*-->\s*", linha)
+        if srt:  # 00:00:12,500 --> 00:00:15,000
+            h = int((srt.group(1) or "0:")[:-1] or 0)
+            pend_t = h * 3600 + int(srt.group(2)) * 60 + int(srt.group(3)) + float("0." + srt.group(4))
+            continue
+        if re.fullmatch(r"\d{1,2}:\d{2}(?:\.\d+)?", linha):  # YouTube: o tempo sozinho na linha
+            pend_t = _seg(linha)
+            continue
+        m = _RE_LINHA.match(linha)
+        if m and _seg(m.group(1)) is not None and m.group(3).strip():
+            out.append({"mid": mid, "t0": _seg(m.group(1)), "t1": _seg(m.group(2) or ""), "texto": m.group(3).strip()[:400], "tipo": tipo})
+            pend_t = None
+        elif pend_t is not None:
+            out.append({"mid": mid, "t0": pend_t, "t1": None, "texto": linha[:400], "tipo": tipo})
+            pend_t = None
+        elif out:
+            out[-1]["texto"] = (out[-1]["texto"] + " " + linha)[:600]
+        else:
+            out.append({"mid": mid, "t0": None, "t1": None, "texto": linha[:400], "tipo": tipo})
+    for i, l in enumerate(out):  # fim de cada linha = começo da próxima
+        if l["t1"] is None and l["t0"] is not None:
+            prox = next((x["t0"] for x in out[i + 1:] if x["t0"] is not None and x["mid"] == l["mid"]), None)
+            l["t1"] = prox
+    return out
+
+
+def dados(p: Dict[str, Any]) -> Dict[str, Any]:
+    c = p.setdefault("comentario", {})
+    c.setdefault("linhas", [])
+    c.setdefault("referencia", "")
+    c.setdefault("idioma", "en")  # "en" = narra no idioma da POSTAGEM (lingua_post); "pt" = narra em português
+    c.setdefault("lingua_post", "en")
+    c.setdefault("ganchos", [])
+    c.setdefault("finais", [])
+    return c
+
+
+def lingua_post(p: Dict[str, Any]) -> str:
+    lp = dados(p).get("lingua_post") or "en"
+    return lp if lp in CT.LINGUAS else "en"
+
+
+def nome_lingua(lp: str) -> str:
+    return {"en": "ENGLISH", "pt": "BRAZILIAN PORTUGUESE", "es": "SPANISH", "it": "ITALIAN", "fr": "FRENCH", "de": "GERMAN"}.get(lp, "ENGLISH")
+
+
+def explicativo(p: Dict[str, Any]) -> bool:
+    return p.get("modelo") == "explicativo"
+
+
+def salvar_texto_do_clipe(base: str, pid: str, texto: str, mid: str = "M1", tipo: str = "texto") -> int:
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        c = dados(p)
+        c["linhas"] = [l for l in c["linhas"] if not (l.get("mid") == mid and l.get("tipo") == tipo)] + ler_linhas(texto, mid, tipo)
+        c["linhas"].sort(key=lambda l: (l.get("mid") or "", l.get("t0") if l.get("t0") is not None else -1))
+        CT.salvar(base, p)
+        return len(c["linhas"])
+
+
+def tem_tempos(texto: str) -> bool:
+    """O texto tem segundos marcados (dá pra virar linha do tempo) ou é só a transcrição/descrição corrida?"""
+    return any(l.get("t0") is not None for l in ler_linhas(texto))
+
+
+def salvar_o_que_acontece(base: str, pid: str, texto: str, mid: str = "M1") -> Dict[str, Any]:
+    """O que você colou: COM tempos → a linha do tempo do clipe; SEM tempos (a transcrição corrida que alguns shorts têm, com
+    [music], letra de música, a descrição repetida…) → vira a REFERÊNCIA do roteiro (a IA separa a história do ruído) e a
+    linha do tempo sai da IA olhando o vídeo (👁)."""
+    texto = str(texto or "").strip()
+    if not texto:
+        return {"linhas": 0, "referencia": False}
+    if tem_tempos(texto):
+        return {"linhas": salvar_texto_do_clipe(base, pid, texto, mid, "texto"), "referencia": False}
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        c = dados(p)
+        if texto not in (c.get("referencia") or ""):
+            c["referencia"] = ((c.get("referencia") or "").strip() + "\n\n" + texto).strip()[:20000]
+        CT.salvar(base, p)
+    return {"linhas": 0, "referencia": True}
+
+
+def sem_linha_do_tempo(p: Dict[str, Any], mid: str) -> bool:
+    return not any(l.get("mid") == mid and l.get("t0") is not None for l in dados(p)["linhas"])
+
+
+def _baixador_padrao(url: str, pasta_dest: str) -> str:
+    """YouTube (Shorts) pelo cortador do YouTube; TikTok, Instagram, Kwai, X… pelo 📱 baixar de outras redes."""
+    import sys
+    raiz = os.path.dirname(os.path.abspath(__file__))
+    if os.path.join(raiz, "toolkit") not in sys.path:
+        sys.path.insert(0, os.path.join(raiz, "toolkit"))
+    if re.search(r"(youtube\.com|youtu\.be)/", url):
+        import youtube_clipper
+        return (youtube_clipper.baixar_video(url, pasta_dest, qualidade="720p") or {}).get("caminho") or ""
+    import pathlib
+    import redes_sociais
+    return redes_sociais.baixar_video(url, pathlib.Path(pasta_dest))
+
+
+def baixar_link(url: str, destino_dir: str, baixador: Optional[Callable[[str, str], str]] = None) -> str:
+    url = str(url or "").strip()
+    if not re.match(r"https?://", url):
+        raise CT.CurtoErro("Link inválido.")
+    os.makedirs(destino_dir, exist_ok=True)
+    cam = (baixador or _baixador_padrao)(url, destino_dir)
+    if not cam or not os.path.isfile(cam):
+        raise CT.CurtoErro("Não consegui baixar o vídeo desse link.")
+    return cam
+
+
+def baixar_clipe(base: str, pid: str, url: str, baixador: Optional[Callable[[str, str], str]] = None,
+                 on_log: Callable[[str], None] = lambda _m: None) -> str:
+    """⬇ O link do vídeo original (Shorts, TikTok, Reels…) vira o clipe M1, M2…"""
+    import tempfile
+    on_log("⬇ baixando o vídeo do link…")
+    d = tempfile.mkdtemp(prefix="curto_link_")
+    cam = baixar_link(url, d, baixador)
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        if any(m.get("origem") == url for m in p["midias"]):
+            return next(m["id"] for m in p["midias"] if m.get("origem") == url)
+        m = CT.adicionar_midia(base, p, cam, "video", "vídeo do link", "M", origem=url)
+        CT.salvar(base, p)
+    import shutil
+    shutil.rmtree(d, ignore_errors=True)
+    return m["id"]
+
+
+def clipes(base: str, p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [dict(m, caminho=CT.caminho_midia(base, p, m)) for m in p.get("midias") or []
+            if m.get("tipo") == "video" and m["id"].startswith("M") and CT.caminho_midia(base, p, m)]
+
+
+def transcrever_clipe(base: str, pid: str, mid: str, transcrever: Callable[..., Any],
+                      on_log: Callable[[str], None] = lambda _m: None) -> int:
+    """🎙 A fala do clipe (Whisper) vira as linhas com tempo."""
+    p = CT.carregar(base, pid)
+    m = next((x for x in clipes(base, p) if x["id"] == mid), None)
+    if not m:
+        raise CT.CurtoErro("Clipe não encontrado.")
+    on_log(f"🎙 transcrevendo {mid}…")
+    wav = os.path.join(CT.pasta(base, pid), "voz", f"_clipe_{mid}.wav")
+    os.makedirs(os.path.dirname(wav), exist_ok=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", m["caminho"], "-vn", "-ac", "1", "-ar", "16000", wav], capture_output=True, timeout=600)
+    segs = transcrever(wav, language=None, word_timestamps=False, info={})
+    texto = "\n".join(f"{float(s['start']):.1f} - {float(s['end']):.1f} {s['text'].strip()}" for s in segs if s.get("text", "").strip())
+    return salvar_texto_do_clipe(base, pid, texto, mid, "fala")
+
+
+DESCRICAO_SCHEMA = CT._o({"momentos": {"type": "array", "items": CT._o({"de": CT._n(), "ate": CT._n(), "o_que": CT._s()})},
+                          "resumo": CT._s()})
+DESCRICAO_SYS = ("Você descreve um vídeo curto (clipe viral) pra um roteirista de vídeos de comentário que NÃO vê o vídeo. Você recebe "
+                 "folhas com o vídeo a 2 quadros por segundo, em ordem (esquerda→direita, linha a linha), com o relógio no canto. "
+                 "Divida em momentos de 1 a 4 s e diga, concreto e curto, o que ACONTECE (quem, a ação, o objeto, a reação do público, "
+                 "o texto que aparece na tela). Não invente nome de pessoa nem lugar que não esteja escrito no vídeo. Em português.")
+
+
+DESCRICAO_FONTE_SYS = ("Você descreve um vídeo-FONTE pra um roteirista de shorts explicativos (curiosidades) que NÃO vê o vídeo e vai "
+                       "escolher pedaços dele pra ilustrar cada frase. Você recebe folhas com o vídeo em ordem (esquerda→direita, linha a "
+                       "linha), com o relógio no canto. Divida em momentos de 1 a 5 s (um por plano/ângulo) e diga, concreto e curto, o que "
+                       "se VÊ (o objeto, o lugar, a ação, close ou plano aberto, se é animação/desenho/imagem de IA, texto/logo na tela). "
+                       "No 'resumo', o assunto do vídeo em uma frase. Não invente nome de pessoa nem lugar. Em português.")
+
+
+def descrever_clipe(base: str, pid: str, mid: str, chamar: Optional[Callable[..., Any]] = None,
+                    on_log: Callable[[str], None] = lambda _m: None) -> int:
+    """👁 A IA olha o clipe e escreve o que acontece em cada momento (pra vídeo sem fala, ou pra completar a transcrição)."""
+    p = CT.carregar(base, pid)
+    m = next((x for x in clipes(base, p) if x["id"] == mid), None)
+    if not m:
+        raise CT.CurtoErro("Clipe não encontrado.")
+    on_log(f"👁 a IA está olhando o {mid}…")
+    dur = CT.duracao_audio(m["caminho"])
+    fonte = explicativo(p)  # 📚 muitas fontes: 1 quadro/s basta pra saber o que cada pedaço mostra
+    folhas = CT.folhas_densas(m["caminho"], os.path.join(CT.pasta(base, pid), "quadros", mid), dur, fps=1.0 if fonte else 2.0,
+                              max_folhas=3 if fonte else 6)
+    import ia_servico
+    blocos: List[Dict[str, Any]] = []
+    for k, f in enumerate(folhas):
+        b = ia_servico.imagem_bloco(f, largura=1080)
+        if b:
+            blocos += [{"type": "text", "text": f"FOLHA {k + 1}:"}, b]
+    if not blocos:
+        raise CT.CurtoErro("Não consegui tirar quadros do clipe.")
+    blocos.append({"type": "text", "text": f"Duração do clipe: {dur:.1f} s. " + (f"O que já se sabe: {m.get('descricao')}" if m.get("descricao") else "")})
+    r = (chamar or ia_servico.chamar)("curtos", DESCRICAO_FONTE_SYS if fonte else DESCRICAO_SYS, blocos, schema=DESCRICAO_SCHEMA,
+                                      max_tokens=2500, job=pid)
+    if not r:
+        raise CT.CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia).")
+    texto = "\n".join(f"{float(x['de']):.1f} - {float(x['ate']):.1f} {x['o_que']}" for x in r.get("momentos") or [])
+    if r.get("resumo"):
+        with CT._TRAVA:
+            q = CT.carregar(base, pid)
+            for mm in q["midias"]:
+                if mm["id"] == mid and not mm.get("descricao"):
+                    mm["descricao"] = r["resumo"][:400]
+            CT.salvar(base, q)
+    return salvar_texto_do_clipe(base, pid, texto, mid, "visual")
+
+
+def transcrever_referencia(base: str, pid: str, caminho: str, transcrever: Callable[..., Any]) -> str:
+    """📺 Um vídeo comentando o clipe (ou o short viral que você quer recriar): a transcrição vira a REFERÊNCIA do roteiro."""
+    wav = caminho + ".16k.wav"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", caminho, "-vn", "-ac", "1", "-ar", "16000", wav], capture_output=True, timeout=900)
+    segs = transcrever(wav, language=None, word_timestamps=False, info={})
+    texto = "\n".join(f"{float(s['start']):.1f} {s['text'].strip()}" for s in segs if s.get("text", "").strip())
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        dados(p)["referencia"] = texto[:20000]
+        CT.salvar(base, p)
+    try:
+        os.remove(wav)
+    except OSError:
+        pass
+    return texto
+
+
+def duracao_da_referencia(texto: str) -> Optional[float]:
+    """Os tempos da transcrição de referência → quanto ela dura (o roteiro novo tem o MESMO tamanho)."""
+    ts = [_seg(m.group(1)) for m in re.finditer(r"(?m)^\s*[\[(]?(\d{1,2}:\d{2}(?:\.\d+)?|\d+(?:\.\d+)?)\b", texto or "")]
+    ts = [t for t in ts if t is not None]
+    if len(ts) < 2:
+        return None
+    return round(max(ts) - min(ts) + 2.5, 1)
+
+
+# ------------------------------------------------------------------ roteiro (inglês + português)
+OPCAO = CT._o({"en": CT._s(), "pt": CT._s()})
+ROTEIRO_SCHEMA = CT._o({
+    "titulo_video": CT._s(), "descricao": CT._s(), "hashtags": CT._ls(),
+    "roteiro_en": CT._s(), "roteiro_pt": CT._s(),
+    "ganchos": {"type": "array", "items": OPCAO}, "finais": {"type": "array", "items": OPCAO}, "titulos": {"type": "array", "items": OPCAO},
+    "blocos": {"type": "array", "items": CT._o({
+        "funcao": {"type": "string", "enum": list(CT.FUNCOES_BLOCO)},
+        "fala_en": CT._s(), "fala_pt": CT._s(),
+        "cenas": {"type": "array", "items": CT._o({
+            "layout": {"type": "string", "enum": ["clipe", "video", "foto", "ia", "ia_video"]}, "query": CT._s(),
+            "material": CT._s(), "de": CT._n(), "ate": CT._n(), "palavra": CT._s(),
+            "efeito": {"type": "string", "enum": list(CT.EFEITOS_CURTOS) + [""]},
+            "entrada": {"type": "string", "enum": list(CT.ENTRADAS_CURTOS)},
+            "destaque": CT._o({"alvo": CT._s(), "tipo": {"type": "string", "enum": ["", "circulo", "seta", "quadrado", "mira", "holofote"]},
+                               "texto": CT._s()}),
+            "sugestao": CT._o({"layout": {"type": "string", "enum": ["", "foto_real", "clipe_real", "ia", "ia_video"]}, "query": CT._s(),
+                               "por_que": CT._s()})})},
+        "sfx": {"type": "array", "items": CT._o({"tipo": {"type": "string", "enum": list(CT.TIPOS_SFX)}, "palavra": CT._s(), "busca": CT._s()})},
+    })},
+})
+
+ROTEIRO_SYS = (
+    "You write COMMENTARY SHORTS (YouTube Shorts / TikTok / Reels): a narrator retells and comments a viral clip while the clip plays. "
+    "Follow this proven workflow:\n"
+    "1. The LENGTH is whatever THIS story needs (a 6-second clip with one twist ≠ a 40-second clip with three moments) — when there "
+    "is a reference transcript, stay close to its length, pacing and storytelling flow, but rewrite EVERYTHING in your own, more "
+    "engaging words — never copy sentences. Take the idea, improve it, make it original and transformative.\n"
+    "2. One single flowing paragraph when read aloud (no lists, no headings). Short spoken sentences.\n"
+    "3. A STRONGER HOOK in the first sentence (curiosity, contradiction or a surprising claim — e.g. 'Everyone thought this young "
+    "cyclist was being rude…'), landing fast on the first moment of the clip.\n"
+    "4. Usually: what people thought / what happened → the twist nobody noticed → the payoff. Only facts the inputs support.\n"
+    "5. END with ONE engaging QUESTION that makes people comment — ideally the point people would argue about.\n"
+    "6. {REGRA_LINGUA}\n"
+    "7. Split the paragraph into 'blocos' (one per sentence or two). In each block, 'cenas' = the moments of the clip that show "
+    "EXACTLY what that line says ('material' = clip id like M1; 'de'/'ate' = seconds in that clip — use the timeline you were given; "
+    "the narrator talks about a dog → show the dog immediately). CUTS follow the story, not a timer: a new cena when the narration "
+    "moves to another moment of the clip (each one after the first starts at 'palavra', a word of that line); a long moment that "
+    "speaks for itself stays on screen. 'efeito' = camera move chosen by what the moment needs: zoom_in to point at a detail or an "
+    "emotion, zoom_out to reveal, zoom_rapido for a shock, '' when the image already works — not alternating by habit. 'entrada' = "
+    "punch_in/flash only on an impact or a turn (usually the first cena and the twist), otherwise none.\n"
+    "8. 'destaque' = when the line POINTS at something on screen (the sign he grabbed, the fan, the dessert), describe that object in "
+    "ENGLISH in 'alvo' so it can be found and tracked in the frame, with 'tipo' circulo (object) or seta (person/where to look) and an "
+    "optional 1-3 word 'texto'; otherwise alvo ''. Use 1 to 3 per video, on the key moments.\n"
+    "9. 'sfx' = sound cues ONLY where something happens in that moment and fits ITS context (a fast move → whoosh, a hit/fall → "
+    "impacto, the circle appearing → pop, a reveal → boom, a laugh → the matching type) with a 'busca' (Pixabay search in English) "
+    "describing that exact sound; many moments have NO sound; never repeat the same pattern in every video.\n"
+    "10. {REGRA_OPCOES}")
+
+REGRA_OPCOES = ("'ganchos' = 5 alternative HOOKS and 'finais' = 5 alternative endings (each with 'en' = in {LINGUA}, the language of the "
+                "post, and 'pt' = Brazilian Portuguese); the first of each is the one you used. 'titulos' = 5 post TITLES (short, "
+                "curiosity, no clickbait lies) with 'en' in {LINGUA} and 'pt' in Brazilian Portuguese. 'roteiro_en' = the whole "
+                "paragraph in {LINGUA}, 'roteiro_pt' in Portuguese. Also 'titulo_video' (= your best title, in {LINGUA}), 'descricao' "
+                "(short, in {LINGUA}) and 3-6 'hashtags'.")
+
+EXPLICATIVO_SYS = (
+    "You write EXPLAINER / CURIOSITY SHORTS (YouTube Shorts / TikTok / Reels): a narrator explains one surprising thing (why an object "
+    "has that shape, how an animal survives, the secret behind an invention) over a FAST collage of real videos. Rules:\n"
+    "1. LENGTH: what the topic needs — usually 25-55 s; never pad.\n"
+    "2. One flowing paragraph when read aloud, short spoken sentences, simple words, concrete facts and numbers (only facts from "
+    "the topic notes / articles or well-established knowledge — never invent numbers or names).\n"
+    "3. Structure (fixed): HOOK = a surprising question or claim about the object/animal on screen ('Why is the farmer's scythe "
+    "the symbol of death?') → the common belief / what it looks like → the explanation step by step → the twist or the most "
+    "surprising detail → a short ending (a curious last fact or a question for the comments).\n"
+    "4. {REGRA_LINGUA}\n"
+    "5. Split the paragraph into 'blocos' (one per sentence). In each block, 'cenas' = WHAT THE VIEWER SEES while that line is said, "
+    "matching it LITERALLY (talks about waves destroying a house → the house being hit). {REGRA_FONTES} Each cena after the first "
+    "starts at 'palavra' (a word of that line). 'efeito': slow zoom_in on most shots, zoom_out to reveal, zoom_rapido for a shock, '' when the motion is already strong; "
+    "'entrada': flash only when the topic turns (1-3 per video), punch_in on the hook, otherwise none.\n"
+    "6. 'destaque' = point at the key object the hook talks about (usually 1 in the first 2 s, 0-2 more later): 'alvo' = the object "
+    "in English (it will be found and tracked in the frame), 'tipo' seta (arrow, the channel's signature) or circulo, 'texto' "
+    "usually ''. Only on 'clipe' cenas.\n"
+    "7. 'sfx' = only where something happens on screen and fits it (a fast move → whoosh, a crash → impacto, the arrow appearing "
+    "→ pop, a reveal → boom); many lines have no sound; 'busca' = an English Pixabay search for that exact sound.\n"
+    "8. {REGRA_OPCOES}")
+
+
+REGRA_SO_FONTES = (
+    "Build the WHOLE video ONLY from the creator's VIDEO SOURCES: every cena is layout 'clipe' + 'material' (M1, M2…) + 'de'/'ate' "
+    "(seconds in that source, from its timeline) — even with few sources (e.g. 5 videos), use their different moments, angles and "
+    "details (cutting twice in a row inside the same source is normal, coming back to a source is fine; this channel changes the "
+    "picture about every 2-3 seconds). When a line REALLY needs something no source shows, still pick the closest source moment, "
+    "and add a 'sugestao' the creator may accept: layout 'foto_real' (a real photo to find with an image search — 'query' = what to "
+    "search), 'clipe_real' (a YouTube clip — 'query' = YouTube search) or 'ia' (an image to generate, e.g. a character or a scene "
+    "that cannot be filmed — 'query' = an English image prompt), with a short 'por_que' in Portuguese. 0-4 suggestions per video; "
+    "otherwise sugestao.layout ''.")
+REGRA_FONTES_LIVRES = (
+    "Use the creator's VIDEO SOURCES first: layout 'clipe' + 'material' (M1, M2…) + 'de'/'ate' (seconds in that source, from its "
+    "timeline). This channel changes source about every 2-3 seconds (~16 different videos in a 40 s short) — cutting twice in a row "
+    "inside the SAME source is normal, and coming back to a source is fine. When no source shows the line, use layout 'video' (stock "
+    "video search, 'query' = 2-5 literal English words) or 'foto', or 'ia' for what cannot be filmed (an angel, the reaper, a "
+    "historical scene) with 'query' = an English image prompt. sugestao.layout ''.")
+
+
+REGRA_FLOW = (
+    "There are NO source videos: EVERY cena is GENERATED with AI (Google Flow) and must look like REAL footage. Layout 'ia' = a "
+    "generated PHOTO (the default — it gets a slow zoom) or 'ia_video' = a generated ~8 s VIDEO, only when MOTION is the point "
+    "(waves crashing, an animal running, a machine working, something falling) — at most 1 in 3 cenas. 'query' = a detailed, "
+    "concrete, REALISTIC shot description in English: the subject, what it is doing, where, the camera (extreme close-up / wide / "
+    "aerial / handheld / macro), the light and time of day — like a frame from a documentary; never an illustration, cartoon, "
+    "diagram or text on screen; no real famous people or brands. Keep the look CONSISTENT: describe the same object/animal/place "
+    "the same way every time it appears. Change the picture about every 2-3 s (a line can have 1-2 cenas). No 'destaque' (it only "
+    "works on real clips); sugestao.layout ''.")
+REGRA_MISTO = (
+    "Mix freely: the creator's VIDEO SOURCES when they show the line (layout 'clipe' + 'material' + 'de'/'ate'), stock video "
+    "('video', 'query' = 2-5 literal English words) and AI generation that looks like real footage ('ia' photo / 'ia_video' ~8 s "
+    "video when motion matters, 'query' = a detailed realistic shot description in English). Change the picture about every 2-3 s. "
+    "sugestao.layout ''.")
+MODOS_MIDIA = {"minhas": "🎞 só com os meus vídeos (o que faltar vira 💡 sugestão)",
+               "flow": "✨ gerar tudo no Flow (realista: fotos e vídeos)",
+               "misto": "🔀 misto (meus vídeos + banco + Flow)"}
+
+
+def _tem_fontes(p: Dict[str, Any]) -> bool:
+    return any(m.get("tipo") == "video" and m["id"].startswith("M") for m in p.get("midias") or [])
+
+
+def modo_midia(p: Dict[str, Any]) -> str:
+    """📚 De onde vem a imagem: dos seus vídeos, toda gerada no Flow, ou misto. Sem escolha: com vídeos → só eles; sem → Flow."""
+    cfg = p.get("config") or {}
+    if cfg.get("midia") in MODOS_MIDIA:
+        return cfg["midia"]
+    if not _tem_fontes(p):
+        return "flow"
+    return "minhas" if cfg.get("so_fontes", True) is not False else "misto"
+
+
+def so_fontes(p: Dict[str, Any]) -> bool:
+    """📚 Só com os vídeos que você mandou (o resto vira SUGESTÃO)?"""
+    return modo_midia(p) == "minhas" and _tem_fontes(p)
+
+
+def regra_lingua(p: Dict[str, Any]) -> str:
+    lp = lingua_post(p)
+    lingua = nome_lingua(lp)
+    tags = (f" and add 1 to 4 voice tags at natural moments, from: {', '.join(f'[{t}]' for t in TAGS_VOZ)} (e.g. '[gasp] But what no one "
+            "realized…') — it will be read by Chatterbox Turbo. Never other brackets." if lp == "en" else " (no brackets/tags).")
+    return (f"Write 'fala_en' in {lingua} — the language of the POST{tags} 'fala_pt' = the same line in natural Brazilian Portuguese "
+            "(no tags)" + (" (the same as fala_en)." if lp == "pt" else "."))
+
+
+def _regra_fontes(p: Dict[str, Any]) -> str:
+    m = modo_midia(p)
+    if m == "flow":
+        return REGRA_FLOW
+    if m == "misto":
+        return REGRA_MISTO if _tem_fontes(p) else REGRA_FLOW
+    return REGRA_SO_FONTES if _tem_fontes(p) else REGRA_FONTES_LIVRES
+
+
+def sistema(p: Dict[str, Any]) -> str:
+    base_ = EXPLICATIVO_SYS if explicativo(p) else ROTEIRO_SYS
+    return (base_.replace("{REGRA_LINGUA}", regra_lingua(p)).replace("{REGRA_OPCOES}", REGRA_OPCOES)
+            .replace("{REGRA_FONTES}", _regra_fontes(p))
+            .replace("{LINGUA}", nome_lingua(lingua_post(p))))
+
+
+def _texto_linhas(base: str, p: Dict[str, Any]) -> str:
+    c = dados(p)
+    L = []
+    for m in clipes(base, p):
+        L.append(f"### {m['id']} — {m.get('descricao') or 'clip'} ({float(m.get('dur') or CT.duracao_audio(m['caminho'])):.1f} s)")
+        for l in [x for x in c["linhas"] if x.get("mid") == m["id"]]:
+            t = (f"[{l['t0']:.1f}s" + (f"-{l['t1']:.1f}s" if l.get("t1") is not None else "") + "]") if l.get("t0") is not None else "[?]"
+            L.append(f"{t} ({'speech' if l.get('tipo') == 'fala' else 'what you see' if l.get('tipo') == 'visual' else 'note'}) {l['texto']}")
+    soltas = [x for x in c["linhas"] if x.get("mid") not in {m["id"] for m in clipes(base, p)}]
+    for l in soltas:
+        L.append(f"[{l.get('t0') or '?'}] {l['texto']}")
+    return "\n".join(L)
+
+
+def conteudo_explicativo(base: str, p: Dict[str, Any]) -> str:
+    perfil = CT.perfil_do(base, p)
+    pedido = float((p.get("config") or {}).get("duracao_alvo_s") or 0)
+    L = [f"LENGTH: about {int(pedido)} seconds ≈ {int(pedido * 2.6)} words (asked by the creator)." if pedido else
+         "LENGTH: what the topic needs (usually 25-55 s).", f"POST LANGUAGE: {nome_lingua(lingua_post(p))}."]
+    if CT.proporcao_do(p) == "1:1":
+        L.append(CT.TEXTO_QUADRADO_EN)
+    n = (p.get("noticia") or {})
+    L += ["", "## THE TOPIC (from the creator)", (n.get("texto") or "(see the sources)")[:4000], ""]
+    for f in n.get("fontes") or []:
+        if f.get("texto"):
+            L += [f"## ARTICLE: {f.get('titulo') or f.get('url')}", f["texto"][:3500], ""]
+    ref = (dados(p).get("referencia") or "").strip()
+    if ref:
+        L += ["## REFERENCE (a short about the same topic — rewrite, never copy; ignore [music] and song lyrics)", ref[:5000], ""]
+    if modo_midia(p) != "flow":
+        L += ["## YOUR VIDEO SOURCES (seconds of each source)", _texto_linhas(base, p) or "(none — use 'video'/'foto'/'ia' cenas)", ""]
+    if (p.get("config") or {}).get("extra"):
+        L += ["## EXTRA REQUEST", p["config"]["extra"], ""]
+    ni = perfil.get("nicho") if isinstance(perfil.get("nicho"), dict) else {}
+    if ni.get("tema"):
+        L += ["## CHANNEL NICHE", f"{ni['tema']}" + (f" — typical shots: {ni['visual']}" if ni.get("visual") else "")
+              + (f" — hashtags: {' '.join(ni.get('hashtags') or [])}" if ni.get("hashtags") else ""), ""]
+    estilo = CT.texto_do_perfil(perfil)
+    if estilo:
+        L += ["## CHANNEL STYLE", estilo]
+    return "\n".join(L)
+
+
+def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
+    if explicativo(p):
+        return conteudo_explicativo(base, p)
+    c = dados(p)
+    perfil = CT.perfil_do(base, p)
+    ref = (c.get("referencia") or "").strip()
+    dur_ref = duracao_da_referencia(ref) if ref else None
+    pedido = float((p.get("config") or {}).get("duracao_alvo_s") or 0)
+    dur_clipes = sum(float(m.get("dur") or 0) for m in clipes(base, p))
+    if pedido:
+        alvo = f"LENGTH: about {int(pedido)} seconds of narration ≈ {int(pedido * 2.6)} words (asked by the creator)."
+    elif dur_ref:
+        alvo = f"LENGTH: close to the reference — about {int(dur_ref)} seconds ≈ {int(dur_ref * 2.6)} words."
+    else:
+        alvo = (f"LENGTH: what this story needs — the clip(s) last {dur_clipes:.0f} s in total; usually the narration covers the clip "
+                f"once (roughly {max(8, int(dur_clipes * 0.8))}-{max(15, int(dur_clipes * 1.4))} s), shorter if there is little to tell.")
+    L = [alvo, f"POST LANGUAGE: {nome_lingua(lingua_post(p))}.", *([CT.TEXTO_QUADRADO_EN] if CT.proporcao_do(p) == "1:1" else []), "",
+         "## THE CLIP(S) — timeline (seconds of each clip)", _texto_linhas(base, p) or "(no timeline — use the notes)", ""]
+    if ref:
+        L += ["## REFERENCE — transcript of the original short / a video talking about this clip (rewrite it, don't copy). It may be "
+              "messy: an uploader's description, the same story told twice, '[music]' marks and the LYRICS of the background song "
+              "mixed in. Keep only the story (what happens, the twist, the payoff) and ignore the noise; the seconds of each moment "
+              "come from the clip timeline above, not from here.", ref[:6000], ""]
+    if (p.get("noticia") or {}).get("texto"):
+        L += ["## NOTES FROM THE CREATOR", p["noticia"]["texto"][:4000], ""]
+    if (p.get("config") or {}).get("extra"):
+        L += ["## EXTRA REQUEST", p["config"]["extra"], ""]
+    estilo = CT.texto_do_perfil(perfil)
+    if estilo:
+        L += ["## CHANNEL STYLE", estilo]
+    return "\n".join(L)
+
+
+def prompt_roteiro(base: str, p: Dict[str, Any]) -> str:
+    return (sistema(p) + "\n\n" + conteudo_roteiro(base, p) + "\n\nAnswer ONLY with JSON in this format (no ```):\n"
+            + json.dumps(CT._exemplo_schema(ROTEIRO_SCHEMA), ensure_ascii=False, indent=1))
+
+
+def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, Any]:
+    """Resposta da IA → o roteiro do curto (a "fala" é a do idioma narrado; a outra fica do lado)."""
+    if isinstance(resp, str):
+        import json_ia
+        try:
+            resp = json_ia.carregar(resp)
+        except Exception as exc:  # noqa: BLE001
+            raise CT.CurtoErro(f"Não entendi o JSON do roteiro: {exc}") from exc
+    if not isinstance(resp, dict):
+        raise CT.CurtoErro("O roteiro precisa ser um objeto JSON.")
+    blocos = []
+    for b in resp.get("blocos") or []:
+        if not isinstance(b, dict):
+            continue
+        en, pt = str(b.get("fala_en") or b.get("fala") or "").strip(), str(b.get("fala_pt") or "").strip()
+        fala = en if idioma == "en" or not pt else pt
+        cenas = []
+        for cn in b.get("cenas") or []:
+            if not isinstance(cn, dict):
+                continue
+            lay = cn.get("layout") or ("clipe" if cn.get("material") else "video")
+            if lay == "clipe" or (cn.get("material") and lay not in ("video", "foto", "ia", "ia_video")):
+                cenas.append(dict(cn, layout="materia", query="", visual=cn.get("visual") or ""))
+            else:  # 📚 nenhuma fonte mostra: banco de vídeo / foto / imagem de IA
+                q = str(cn.get("query") or cn.get("visual") or "").strip()
+                if q:
+                    cenas.append({"layout": lay if lay in ("video", "foto", "ia", "ia_video") else "ia", "query": q, "visual": q,
+                                  "alternativas": [], "material": "", "palavra": cn.get("palavra") or "", "efeito": cn.get("efeito") or "",
+                                  "entrada": cn.get("entrada") or "none", "composicao": ""})
+        blocos.append(dict(b, fala=fala, fala_en=en, fala_pt=pt, cenas=cenas))
+    r = CT.ler_roteiro(dict(resp, blocos=blocos), p)
+    for k in ("ganchos", "finais", "titulos"):
+        r[k] = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get(k) or []
+                if isinstance(o, dict) and (o.get("en") or o.get("pt"))][:20]
+    r["idioma"] = idioma
+    return r
+
+
+def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    p = CT.carregar(base, pid)
+    if explicativo(p):
+        n = p.get("noticia") or {}
+        if not (n.get("texto") or any(f.get("texto") for f in n.get("fontes") or []) or dados(p).get("referencia") or p.get("titulo")):
+            raise CT.CurtoErro("Diga o assunto (o que o vídeo explica) ou cole o link de uma matéria sobre ele.")
+    elif not clipes(base, p):
+        raise CT.CurtoErro("Suba o vídeo cru (o clipe) antes.")
+    elif not dados(p)["linhas"] and not dados(p).get("referencia") and not (p.get("noticia") or {}).get("texto"):
+        raise CT.CurtoErro("Diga o que acontece no clipe: a transcrição, uma descrição com os segundos, ou use 🎙/👁 pra tirar sozinho.")
+    import ia_servico
+    r = (chamar or ia_servico.chamar)("curtos", sistema(p), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=7000,
+                                      effort="medium", job=pid, cache_local=False)
+    if not r:
+        raise CT.CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia). "
+                           "Use o 📋 prompt numa outra IA e cole a resposta.")
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        p["roteiro"] = ler_roteiro(r, p, dados(p).get("idioma") or "en")
+        p["tts"] = None
+        CT.salvar(base, p)
+    return p["roteiro"]
+
+
+MAIS_SCHEMA = CT._o({"opcoes": {"type": "array", "items": OPCAO}})
+
+
+def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., Any]] = None) -> List[Dict[str, str]]:
+    """➕ mais 5 ganchos (ou 5 finais), diferentes dos que já tem."""
+    if qual not in ("ganchos", "finais", "titulos"):
+        raise CT.CurtoErro("Pedido inválido.")
+    p = CT.carregar(base, pid)
+    r = p.get("roteiro") or {}
+    if not r.get("blocos"):
+        raise CT.CurtoErro("Faça o roteiro antes.")
+    corpo = " ".join(CT.sem_tags(b.get("fala_en") or b["fala"]) for b in r["blocos"])
+    ja = "\n".join(f"- {o['en']}" for o in r.get(qual) or [])
+    tipo = "explainer/curiosity short" if explicativo(p) else "commentary short"
+    lingua = nome_lingua(lingua_post(p))
+    pedido = {"ganchos": f"Write 5 NEW, stronger HOOKS (first sentence) for this {tipo} — curiosity, contradiction, surprising claim; under 15 words.",
+              "finais": f"Write 5 NEW engaging ENDINGS for this {tipo} — a question people argue about in the comments, or a last curious fact; one sentence.",
+              "titulos": f"Write 5 NEW post TITLES for this {tipo} — short, curiosity, honest (no fake claims)."}[qual]
+    tag = " (may use one voice tag like [gasp])" if lingua_post(p) == "en" and qual != "titulos" else ""
+    txt = f"{pedido}\nDifferent from these:\n{ja or '(none)'}\n\nSCRIPT:\n{corpo}\n\nEach with 'en' (in {lingua}{tag}) and 'pt' (Brazilian Portuguese)."
+    import ia_servico
+    resp = (chamar or ia_servico.chamar)("curtos", sistema(p), txt, schema=MAIS_SCHEMA, max_tokens=1200, job=pid, cache_local=False)
+    if not resp:
+        raise CT.CurtoErro("A IA não respondeu.")
+    novas = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get("opcoes") or [] if o.get("en")]
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        p["roteiro"][qual] = (p["roteiro"].get(qual) or []) + novas
+        CT.salvar(base, p)
+    return novas
+
+
+def escolher(base: str, pid: str, qual: str, i: int) -> Dict[str, Any]:
+    """O gancho (1º bloco) ou o final (último bloco) passa a ser a opção i — nas duas línguas."""
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        r = p.get("roteiro") or {}
+        ops = r.get(qual) or []
+        if not (0 <= i < len(ops)) or not r.get("blocos"):
+            raise CT.CurtoErro("Opção não encontrada.")
+        o = ops[i]
+        if qual == "titulos":  # 🏷 o título da postagem (não mexe na fala)
+            r["titulo_video"], r["titulo_pt"], r["titulos_escolhido"] = o["en"], o["pt"], i
+            CT.salvar(base, p)
+            return r
+        b = r["blocos"][0] if qual == "ganchos" else r["blocos"][-1]
+        b["fala_en"], b["fala_pt"] = o["en"], o["pt"]
+        b["fala"] = o["en"] if (r.get("idioma") or "en") == "en" or not o["pt"] else o["pt"]
+        r[f"{qual}_escolhido"] = i
+        CT.salvar(base, p)
+    CT.realinhar(base, pid)
+    return p["roteiro"]
+
+
+def trocar_idioma(base: str, pid: str, idioma: str) -> None:
+    """🇺🇸/🇧🇷 qual das duas versões é NARRADA (a outra fica do lado pra conferir)."""
+    if idioma not in ("en", "pt"):
+        raise CT.CurtoErro("Idioma inválido.")
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        dados(p)["idioma"] = idioma
+        narrada = "pt" if idioma == "pt" else lingua_post(p)  # 🎙 Chatterbox Turbo só fala inglês (com as tags); o resto vai no multilíngue
+        p["config"]["motor_perfil"] = "chatterbox_turbo" if narrada == "en" else "chatterbox"
+        r = p.get("roteiro") or {}
+        for b in r.get("blocos") or []:
+            alvo = b.get("fala_en") if idioma == "en" else b.get("fala_pt")
+            if alvo:
+                b["fala"] = alvo
+        r["idioma"] = idioma
+        CT.salvar(base, p)
+
+
+def sugestoes(p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """💡 As mídias que a IA sugeriu buscar (quando seus vídeos não mostram a frase)."""
+    out = []
+    for bi, b in enumerate((p.get("roteiro") or {}).get("blocos") or []):
+        for ci, c in enumerate(b.get("cenas") or []):
+            sg = c.get("sugestao") or {}
+            if sg.get("layout") and sg.get("query"):
+                out.append({"bloco": bi, "id": b["id"], "cena": ci, "fala": CT.sem_tags(b.get("fala_pt") or b["fala"])[:160],
+                            "layout": sg["layout"], "query": sg["query"], "por_que": sg.get("por_que") or "",
+                            "usada": c.get("layout") == sg["layout"],
+                            "fonte": c.get("material") or (c.get("reserva") or {}).get("material") or ""})
+    return out
+
+
+def usar_sugestao(base: str, pid: str, bloco: int, cena: int, usar: bool = True) -> Dict[str, Any]:
+    """✔ A cena passa a buscar a mídia sugerida (buscador de imagem / YouTube / imagem gerada) — ou volta pro seu vídeo."""
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        try:
+            c = p["roteiro"]["blocos"][bloco]["cenas"][cena]
+        except (KeyError, IndexError, TypeError):
+            raise CT.CurtoErro("Cena não encontrada.")
+        sg = c.get("sugestao") or {}
+        if not sg.get("layout"):
+            raise CT.CurtoErro("Essa cena não tem sugestão.")
+        if usar and c.get("layout") != sg["layout"]:
+            c["reserva"] = {k: c.get(k) for k in ("layout", "material", "de", "ate", "destaque") if c.get(k) is not None}
+            c.update(layout=sg["layout"], query=sg["query"], visual=sg["query"], material="")
+            for k in ("de", "ate", "destaque"):
+                c.pop(k, None)
+        elif not usar and c.get("reserva"):
+            c.update(c.pop("reserva"))
+            c["query"] = ""
+        CT.salvar(base, p)
+        return c
+
+
+def definir_lingua_post(base: str, pid: str, lp: str) -> None:
+    """🌍 Em que idioma o vídeo é POSTADO (o roteiro sai nele + a tradução em português). Vale pro próximo roteiro."""
+    if lp not in CT.LINGUAS:
+        raise CT.CurtoErro("Idioma inválido.")
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        dados(p)["lingua_post"] = lp
+        if dados(p).get("idioma") != "pt":
+            p["config"]["motor_perfil"] = "chatterbox_turbo" if lp == "en" else "chatterbox"
+        CT.salvar(base, p)
+
+
+# ------------------------------------------------------------------ voz: 3 takes
+def gerar_takes(base: str, pid: str, tts, limpar, voz: Dict[str, Any], n: int = 3, on_log: Callable[[str], None] = lambda _m: None) -> List[Dict[str, Any]]:
+    """🎙 A mesma fala n vezes (o Chatterbox sai um pouco diferente a cada vez) — escolha o take com a melhor pronúncia."""
+    takes = []
+    for k in range(1, max(1, min(5, n)) + 1):
+        on_log(f"🎙 take {k}/{n}")
+        info = CT.gerar_voz_guia(base, pid, tts, limpar, voz, on_log=lambda m, k=k: on_log(f"🎙 take {k}/{n} — {m}"),
+                                 sub=f"takes/t{k}", guardar=False)
+        takes.append(dict(info, take=k))
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        p["takes"] = takes
+        p["tts"] = dict(takes[0])
+        CT.salvar(base, p)
+    return takes
+
+
+def usar_take(base: str, pid: str, k: int, transcrever, opcoes: Optional[Dict[str, Any]] = None,
+              on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+    p = CT.carregar(base, pid)
+    t = next((x for x in p.get("takes") or [] if int(x.get("take") or 0) == int(k)), None)
+    if not t:
+        raise CT.CurtoErro("Take não encontrado.")
+    with CT._TRAVA:
+        q = CT.carregar(base, pid)
+        q["tts"] = dict(t)
+        q["take_escolhido"] = int(k)
+        CT.salvar(base, q)
+    return CT.processar_gravacao(base, pid, transcrever, os.path.join(CT.pasta(base, pid), t["arquivo"]), opcoes or {}, on_log, fonte="guia")
+
+
+# ------------------------------------------------------------------ 🎯 destaques (a IA acha o objeto, o rastreio segue)
+CAIXA_SCHEMA = CT._o({"achou": CT._b(), "x": CT._n(), "y": CT._n(), "w": CT._n(), "h": CT._n()})
+CAIXA_SYS = ("You locate an object in a video frame for an automatic tracker. The image has a light grid every 10% of the width/height. "
+             "Return the bounding box of the requested object as FRACTIONS of the image (x,y = top-left, w,h = size, all 0..1), tight "
+             "around it. If it is not clearly visible, achou=false.")
+
+
+def _quadro(video: str, t: float, destino: str) -> Optional[str]:
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, t):.3f}", "-i", video, "-frames:v", "1", "-vf",
+                    "drawgrid=w=iw/10:h=ih/10:t=1:c=white@0.25", destino], capture_output=True, timeout=60)
+    return destino if os.path.isfile(destino) else None
+
+
+def achar_objeto(video: str, t: float, alvo: str, pasta_tmp: str, chamar: Optional[Callable[..., Any]] = None) -> Optional[List[float]]:
+    """[x, y, w, h] em px do vídeo, ou None."""
+    import ia_servico
+    import rastreio
+    info = rastreio.sondar(video)
+    q = _quadro(video, t, os.path.join(pasta_tmp, "quadro_alvo.jpg"))
+    if not q:
+        return None
+    b = ia_servico.imagem_bloco(q, largura=768)
+    if not b:
+        return None
+    r = (chamar or ia_servico.chamar)("curtos", CAIXA_SYS, [b, {"type": "text", "text": f"Object: {alvo}"}], schema=CAIXA_SCHEMA,
+                                      max_tokens=200)
+    if not r or not r.get("achou"):
+        return None
+    try:
+        x, y, w, h = (max(0.0, min(1.0, float(r[k]))) for k in ("x", "y", "w", "h"))
+    except (TypeError, ValueError, KeyError):
+        return None
+    if w < 0.01 or h < 0.01:
+        return None
+    W, H = info["largura"], info["altura"]
+    return [round(x * W, 1), round(y * H, 1), round(min(w, 1 - x) * W, 1), round(min(h, 1 - y) * H, 1)]
+
+
+def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = None, chamar: Optional[Callable[..., Any]] = None,
+                       on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+    """Pra cada plano com destaque: recorta o pedaço do clipe, a IA acha o objeto, o rastreio segue e desenha → a mídia
+    R1, R2… (o plano passa a usar ela). Sem IA / não achou: fica como PENDENTE (dá pra fazer no 🎯 Rastrear objeto)."""
+    import rastreio
+    p = CT.carregar(base, pid)
+    perfil = CT.perfil_do(base, p)
+    providers = providers or (p.get("config") or {}).get("providers") or CT.PROVIDERS_PADRAO
+    planos_v = CT.planos_do_video(p, providers, perfil)
+    CT.fixar_trechos_do_clipe(planos_v, {m["id"]: float(m.get("dur") or 0) for m in p.get("midias") or []})
+    feitos, pendentes = [], []
+    prontos = dict(p.get("destaques_prontos") or {})
+    for x in planos_v:
+        k = CT.chave_destaque(x)
+        if not k:
+            continue
+        if k in prontos and any(m["id"] == prontos[k] for m in p.get("midias") or []):
+            feitos.append(prontos[k])
+            continue
+        c, d = x["clipe"], x["destaque"]
+        m = next((mm for mm in clipes(base, p) if mm["id"] == c["mid"]), None)
+        if not m:
+            continue
+        tmp = os.path.join(CT.pasta(base, pid), "_destaque")
+        os.makedirs(tmp, exist_ok=True)
+        pedaco = os.path.join(tmp, "pedaco.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{c['ini']:.3f}", "-i", m["caminho"], "-t", f"{c['fim'] - c['ini']:.3f}",
+                        "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", pedaco],
+                       capture_output=True, timeout=600)
+        if not os.path.isfile(pedaco):
+            pendentes.append({"chave": k, "alvo": d["alvo"], "motivo": "não consegui recortar o pedaço"})
+            continue
+        on_log(f"🎯 procurando “{d['alvo']}”…")
+        caixa = None
+        try:
+            caixa = achar_objeto(pedaco, 0.25, d["alvo"], tmp, chamar)
+        except Exception:  # noqa: BLE001
+            caixa = None
+        if not caixa:
+            pendentes.append({"chave": k, "alvo": d["alvo"], "bloco": x["bloco"], "mid": c["mid"], "ini": c["ini"], "fim": c["fim"],
+                              "motivo": "a IA não achou (ou está desligada) — faça no 🎯 Rastrear objeto"})
+            continue
+        on_log(f"🎯 rastreando “{d['alvo']}”…")
+        try:
+            r = rastreio.criar(base, pedaco, f"{p.get('titulo') or 'curto'} · {d['alvo']}")
+            info = r["info"]
+            r["caixas"] = rastreio.rastrear(rastreio.caminho_video(base, r), [{"t": 0.25, "caixa": caixa}], 0, info["dur"], info["fps"])
+            r["estilo"] = rastreio.normalizar_estilo({"tipo": d.get("tipo") or "circulo", "texto": d.get("texto") or "", "cor": "#FF2D2D",
+                                                       "direcao": "cima_esquerda", "entrada": "desenhar"})
+            rastreio.salvar(base, r)
+            saida = rastreio.gerar(base, r["id"])
+        except Exception as exc:  # noqa: BLE001
+            pendentes.append({"chave": k, "alvo": d["alvo"], "motivo": f"rastreio falhou: {str(exc)[:120]}"})
+            continue
+        with CT._TRAVA:
+            q = CT.carregar(base, pid)
+            novo = os.path.join(tmp, "r.mp4")
+            import shutil
+            shutil.copy(saida, novo)
+            mm = CT.adicionar_midia(base, q, novo, "video", f"🎯 {d['alvo']} ({c['mid']} {c['ini']:.1f}-{c['fim']:.1f}s)", "R")
+            q.setdefault("destaques_prontos", {})[k] = mm["id"]
+            CT.salvar(base, q)
+            prontos[k] = mm["id"]
+            feitos.append(mm["id"])
+    with CT._TRAVA:
+        q = CT.carregar(base, pid)
+        q["destaques_pendentes"] = pendentes
+        CT.salvar(base, q)
+    return {"feitos": feitos, "pendentes": pendentes}

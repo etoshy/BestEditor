@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}🎯 {{ r.nome }} — Rastrear objeto{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1280px; }
+  .rt-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+  @media (max-width: 980px) { .rt-grid { grid-template-columns: 1fr; } }
+  .rt-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 12px 14px; }
+  .rt-fundo { background: #000; border-radius: 10px; display: flex; justify-content: center; }
+  .rt-palco { position: relative; display: inline-block; max-width: 100%; user-select: none; line-height: 0; }
+  .rt-palco video { display: block; max-width: 100%; max-height: 70vh; width: auto; height: auto; }
+  .rt-palco canvas { position: absolute; left: 0; top: 0; cursor: crosshair; }
+  .rt-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .rt-linha > * { margin: 0; }
+  .rt-linha button { width: auto; padding: 6px 12px; }
+  .rt-mini { width: auto !important; padding: 2px 8px !important; font-size: .78rem !important; margin: 0 !important; }
+  .rt-sec { background: #64748b !important; } .rt-ok { background: #16a34a !important; } .rt-perigo { background: #dc2626 !important; }
+  .rt-dica { color: var(--mudo); font-size: .82rem; margin: 4px 0; }
+  .rt-barra { border-radius: 10px; padding: 8px 12px; margin: 8px 0; display: none; }
+  .rt-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .rt-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .rt-barra.okk { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .rt-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .rt-tipos button { width: 100%; margin: 0; padding: 8px; background: var(--code-bg) !important; color: var(--texto, inherit); border: 2px solid transparent; }
+  .rt-tipos button.on { border-color: var(--acento); }
+  .rt-chaves span { display: inline-flex; gap: 4px; align-items: center; border: 1px solid var(--borda); border-radius: 999px; padding: 1px 8px; font-size: .78rem; margin: 2px; cursor: pointer; }
+  .rt-tl { position: relative; height: 16px; background: var(--code-bg); border-radius: 6px; overflow: hidden; margin-top: 6px; cursor: pointer; }
+  .rt-tl div { position: absolute; top: 0; height: 100%; }
+  .rt-panel label { display: block; font-size: .84rem; margin-top: 6px; }
+  .rt-panel input, .rt-panel select { margin: 2px 0 0; }
+</style>
+<div class="rt-linha" style="justify-content:space-between">
+  <h1 style="margin:0">🎯 {{ r.nome }}</h1>
+  <div class="rt-linha"><a href="/rastrear">← rastreios</a>{% if r.job %} · <a href="/job/{{ r.job }}/edit-segments">🎞 voltar ao editor</a>{% endif %}
+    <form method="post" action="/rastrear/{{ r.id }}/excluir" onsubmit="return confirm('Excluir este rastreio?')" style="margin:0"><button class="rt-mini rt-perigo">🗑</button></form></div>
+</div>
+<div id="barra" class="rt-barra"></div>
+<div class="rt-grid">
+  <div>
+    <div class="rt-fundo"><div class="rt-palco" id="palco"><video id="vid" src="/rastrear/{{ r.id }}/video" preload="auto" playsinline></video><canvas id="cv"></canvas></div></div>
+    <div class="rt-tl" id="tl" title="clique pra ir pro ponto"></div>
+    <div class="rt-linha">
+      <button id="bPlay">▶</button><button class="rt-sec" id="bVolta" title="← quadro anterior">⏮</button><button class="rt-sec" id="bFrente" title="→ próximo quadro">⏭</button>
+      <span id="tAgora" style="font-variant-numeric:tabular-nums">0.00 s</span>
+      <span class="rt-dica">⏸ pause e <b>arraste uma caixa</b> em volta do objeto (cada caixa = um ponto de correção)</span>
+    </div>
+    <div class="rt-linha rt-chaves" id="chaves"></div>
+    <div class="rt-linha">
+      <label style="font-weight:400">Rastrear de <input type="number" id="fIni" step="0.1" min="0" style="width:80px"> s</label>
+      <button class="rt-mini rt-sec" id="bIniAqui">◀ aqui</button>
+      <label style="font-weight:400">até <input type="number" id="fFim" step="0.1" min="0" style="width:80px"> s</label>
+      <button class="rt-mini rt-sec" id="bFimAqui">aqui ▶</button>
+      <button id="bRastrear" style="font-weight:700">🎯 Rastrear</button>
+      <select id="sRast" title="rastreador" style="width:auto"><option value="auto">rastreador: automático (CSRT)</option><option value="fluxo">rastreador: fluxo (rápido)</option></select>
+    </div>
+  </div>
+  <div class="rt-card rt-panel">
+    <b>O que aparece</b>
+    <div class="rt-tipos" id="tipos" style="margin-top:6px">{% for k, v in tipos.items() %}<button data-tipo="{{ k }}">{{ v }}</button>{% endfor %}</div>
+    <div class="rt-linha"><label>Cor <input type="color" id="eCor" style="width:60px;padding:0"></label>
+      <label>Espessura <input type="range" id="eEsp" min="0.3" max="4" step="0.1"></label></div>
+    <label>Tamanho em volta (folga) <input type="range" id="eFolga" min="0.5" max="3" step="0.05"></label>
+    <label id="lDir">Seta vem de <select id="eDir">{% for d in direcoes %}<option value="{{ d }}">{{ d.replace('_', ' ') }}</option>{% endfor %}</select></label>
+    <label id="lEsc">Escurecer o resto <input type="range" id="eEsc" min="0.1" max="0.95" step="0.05"></label>
+    <label>Texto (opcional) <input type="text" id="eTxt" placeholder="ex.: OLHA ISSO"></label>
+    <label>Cor do texto <input type="color" id="eCorT" style="width:60px;padding:0"></label>
+    <label>Entrada <select id="eEnt"><option value="desenhar">✍ desenhando</option><option value="pop">💥 pop</option><option value="nenhuma">nenhuma</option></select></label>
+    <label style="font-weight:400"><input type="checkbox" id="eSombra" style="width:auto"> sombra</label>
+    <div class="rt-linha"><label style="margin:0">Aparece em <input type="number" id="eAp" step="0.1" placeholder="início" style="width:80px"></label><button class="rt-mini rt-sec" id="bApAqui">aqui</button></div>
+    <div class="rt-linha"><label style="margin:0">Some em <input type="number" id="eSo" step="0.1" placeholder="fim" style="width:80px"></label><button class="rt-mini rt-sec" id="bSoAqui">aqui</button></div>
+    <hr>
+    <button id="bGerar" class="rt-ok" style="width:100%">🎬 Gerar o vídeo</button>
+    <div id="saida" style="margin-top:8px"></div>
+  </div>
+</div>
+<script>
+const RID = {{ r.id|tojson }}, BASE = '/rastrear/' + RID;
+const $ = id => document.getElementById(id);
+let R = null, ultimoFim = null, desenhando = null, salvarT = null;
+const vid = $('vid'), cv = $('cv'), ctx = cv.getContext('2d');
+async function api(url, corpo, metodo) {
+  const r = await fetch(url, { method: metodo || 'POST', headers: { 'Content-Type': 'application/json' }, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+  const d = await r.json().catch(() => ({ ok: false, erro: 'resposta inválida' }));
+  if (!r.ok || d.ok === false) throw new Error(d.erro || r.status);
+  return d;
+}
+function barra(m, t) { const b = $('barra'); b.className = 'rt-barra ' + (t || 'on'); b.textContent = m; if (!m) b.className = 'rt-barra'; }
+const W = () => R.info.largura, H = () => R.info.altura;
+function escala() { const r = cv.getBoundingClientRect(); return { sx: W() / r.width, sy: H() / r.height, r }; }
+function ajustarCanvas() {  // a camada de desenho fica EXATAMENTE em cima da imagem (sem as faixas pretas do player)
+  if (!R) return;
+  const vw = vid.clientWidth, vh = vid.clientHeight, ar = W() / H();
+  let w = vw, h = vw / ar; if (h > vh) { h = vh; w = vh * ar; }
+  cv.style.left = (vid.offsetLeft + (vw - w) / 2) + 'px'; cv.style.top = (vid.offsetTop + (vh - h) / 2) + 'px';
+  cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  cv.width = Math.round(w * devicePixelRatio); cv.height = Math.round(h * devicePixelRatio);
+}
+function caixaAgora(t) {
+  const c = R.caixas; if (!c || !c.caixas) return null;
+  const i = Math.round(t * c.fps) - c.q0; return (i >= 0 && i < c.caixas.length) ? c.caixas[i] : null;
+}
+function estiloTela() {
+  return { tipo: (document.querySelector('#tipos .on') || {}).dataset?.tipo || 'circulo', cor: $('eCor').value.toUpperCase(), espessura: +$('eEsp').value,
+    folga: +$('eFolga').value, direcao: $('eDir').value, escurecer: +$('eEsc').value, texto: $('eTxt').value, cor_texto: $('eCorT').value.toUpperCase(),
+    entrada: $('eEnt').value, sombra: $('eSombra').checked, aparece: $('eAp').value === '' ? null : +$('eAp').value, some: $('eSo').value === '' ? null : +$('eSo').value };
+}
+const DIR = { cima_esquerda: [-1, -1], cima: [0, -1], cima_direita: [1, -1], direita: [1, 0], baixo_direita: [1, 1], baixo: [0, 1], baixo_esquerda: [-1, 1], esquerda: [-1, 0] };
+function desenharPrevia(c, e) {  // a mesma conta do rastreio.py, em pequeno (prévia na tela)
+  const k = cv.width / W(); const [x, y, w, h] = c.map(v => v * k); const cx = x + w / 2, cy = y + h / 2;
+  const esp = Math.max(2, H() * 0.008 * e.espessura * k);
+  ctx.save(); ctx.strokeStyle = e.cor; ctx.fillStyle = e.cor; ctx.lineWidth = esp; ctx.lineCap = 'round';
+  if (e.sombra) { ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = esp * 2; }
+  if (e.tipo === 'circulo') { ctx.beginPath(); ctx.ellipse(cx, cy, w / 2 * 1.3 * e.folga + esp, h / 2 * 1.3 * e.folga + esp, 0, 0, Math.PI * 2); ctx.stroke(); }
+  else if (e.tipo === 'quadrado') { const pw = w * 1.15 * e.folga / 2 + esp, ph = h * 1.15 * e.folga / 2 + esp; ctx.strokeRect(cx - pw, cy - ph, pw * 2, ph * 2); }
+  else if (e.tipo === 'mira') { const r_ = Math.max(w, h) / 2 * 1.2 * e.folga + esp, g = r_ * 0.45; ctx.beginPath(); ctx.arc(cx, cy, r_, 0, Math.PI * 2); ctx.stroke();
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { ctx.beginPath(); ctx.moveTo(cx + dx * (r_ - g), cy + dy * (r_ - g)); ctx.lineTo(cx + dx * (r_ + g), cy + dy * (r_ + g)); ctx.stroke(); }); }
+  else if (e.tipo === 'seta') { let [vx, vy] = DIR[e.direcao]; const n = Math.hypot(vx, vy); vx /= n; vy /= n;
+    const raio = Math.hypot(w, h) / 2 * e.folga, comp = Math.max(80 * k, H() * 0.18 * k) * e.folga;
+    const px = cx + vx * (raio + esp), py = cy + vy * (raio + esp), bx = px + vx * comp, by = py + vy * comp;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(px, py); ctx.stroke();
+    const a = Math.atan2(py - by, px - bx), L = esp * 4; ctx.beginPath(); ctx.moveTo(px, py);
+    ctx.lineTo(px - L * Math.cos(a - .5), py - L * Math.sin(a - .5)); ctx.lineTo(px - L * Math.cos(a + .5), py - L * Math.sin(a + .5)); ctx.closePath(); ctx.fill(); }
+  else if (e.tipo === 'holofote') { ctx.shadowBlur = 0; ctx.fillStyle = `rgba(0,0,0,${e.escurecer})`; ctx.beginPath(); ctx.rect(0, 0, cv.width, cv.height);
+    ctx.ellipse(cx, cy, w / 2 * 1.25 * e.folga + esp * 2, h / 2 * 1.25 * e.folga + esp * 2, 0, 0, Math.PI * 2, true); ctx.fill('evenodd'); }
+  if (e.texto) { ctx.shadowBlur = 0; ctx.font = `bold ${Math.max(12, H() * 0.05 * k)}px Poppins, sans-serif`; ctx.textAlign = 'center';
+    ctx.lineWidth = Math.max(2, H() * 0.005 * k); ctx.strokeStyle = '#000'; ctx.fillStyle = e.cor_texto; const ty = y - h * 0.15 * e.folga - esp * 2;
+    ctx.strokeText(e.texto, cx, ty); ctx.fillText(e.texto, cx, ty); }
+  ctx.restore();
+}
+function quadro() {
+  if (!R) return requestAnimationFrame(quadro);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const t = vid.currentTime; $('tAgora').textContent = t.toFixed(2) + ' s';
+  const e = estiloTela();
+  const ap = e.aparece == null ? -1 : e.aparece, so = e.some == null ? 1e9 : e.some;
+  const c = caixaAgora(t); if (c && t >= ap && t <= so) desenharPrevia(c, e);
+  const k = cv.width / W();
+  (R.chaves || []).forEach(ch => { if (Math.abs(ch.t - t) < 0.5 / R.info.fps + 0.02) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2;
+    ctx.strokeRect(ch.caixa[0] * k, ch.caixa[1] * k, ch.caixa[2] * k, ch.caixa[3] * k); ctx.restore(); } });
+  if (desenhando) { const d = desenhando; ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2; ctx.strokeRect(d.x0, d.y0, d.x1 - d.x0, d.y1 - d.y0); ctx.restore(); }
+  requestAnimationFrame(quadro);
+}
+cv.addEventListener('mousedown', ev => { vid.pause(); const r = cv.getBoundingClientRect(); const x = (ev.clientX - r.left) * devicePixelRatio, y = (ev.clientY - r.top) * devicePixelRatio; desenhando = { x0: x, y0: y, x1: x, y1: y }; });
+cv.addEventListener('mousemove', ev => { if (!desenhando) return; const r = cv.getBoundingClientRect(); desenhando.x1 = (ev.clientX - r.left) * devicePixelRatio; desenhando.y1 = (ev.clientY - r.top) * devicePixelRatio; });
+window.addEventListener('mouseup', async () => {
+  if (!desenhando) return; const d = desenhando; desenhando = null;
+  const k = W() / cv.width; const x = Math.min(d.x0, d.x1) * k, y = Math.min(d.y0, d.y1) * k, w = Math.abs(d.x1 - d.x0) * k, h = Math.abs(d.y1 - d.y0) * k;
+  if (w < 6 || h < 6) return;
+  const t = +vid.currentTime.toFixed(3);
+  const chaves = (R.chaves || []).filter(c => Math.abs(c.t - t) > 0.04).concat([{ t, caixa: [x, y, w, h] }]);
+  const ini = Math.min(+$('fIni').value, t), fim = Math.max(+$('fFim').value, t);
+  try { const r = await api(BASE + '/salvar', { chaves, faixa: [ini, fim] }); R = Object.assign(R, r.r); desenharChaves(true); barra('📌 caixa marcada em ' + t.toFixed(2) + ' s — agora 🎯 Rastrear' + (R.caixas ? ' (de novo)' : ''), 'okk'); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+function desenharChaves(faixa) {
+  $('chaves').innerHTML = (R.chaves || []).length ? '📌 caixas: ' + R.chaves.map((c, i) => `<span data-ir="${c.t}">${c.t.toFixed(2)} s <b data-del="${i}" title="tirar">✕</b></span>`).join('') : '';
+  if (faixa) { $('fIni').value = R.faixa[0]; $('fFim').value = R.faixa[1]; }
+  const c = R.caixas, D = R.info.dur;
+  let html = `<div style="left:${R.faixa[0] / D * 100}%;width:${(R.faixa[1] - R.faixa[0]) / D * 100}%;background:rgba(34,211,238,.25)"></div>`;
+  if (c && c.caixas) { const seg = []; let ini = null; c.caixas.forEach((b, i) => { if (b && ini === null) ini = i; if ((!b || i === c.caixas.length - 1) && ini !== null) { seg.push([ini, b ? i : i - 1]); ini = null; } });
+    html += seg.map(([a, b]) => `<div style="left:${(c.q0 + a) / c.fps / D * 100}%;width:${(b - a + 1) / c.fps / D * 100}%;background:#16a34a;top:10px;height:6px"></div>`).join(''); }
+  html += (R.chaves || []).map(ch => `<div style="left:${ch.t / D * 100}%;width:3px;background:#22d3ee"></div>`).join('');
+  $('tl').innerHTML = html;
+}
+$('chaves').onclick = async ev => {
+  if (ev.target.dataset.del !== undefined) { const ch = R.chaves.filter((_, i) => i !== +ev.target.dataset.del); const r = await api(BASE + '/salvar', { chaves: ch }); R = Object.assign(R, r.r); desenharChaves(); return; }
+  const s = ev.target.closest('[data-ir]'); if (s) { vid.pause(); vid.currentTime = +s.dataset.ir; }
+};
+$('tl').onclick = ev => { const r = $('tl').getBoundingClientRect(); vid.currentTime = (ev.clientX - r.left) / r.width * R.info.dur; };
+$('bPlay').onclick = () => vid.paused ? vid.play() : vid.pause();
+vid.onplay = () => $('bPlay').textContent = '⏸'; vid.onpause = () => $('bPlay').textContent = '▶';
+$('bVolta').onclick = () => { vid.pause(); vid.currentTime = Math.max(0, vid.currentTime - 1 / R.info.fps); };
+$('bFrente').onclick = () => { vid.pause(); vid.currentTime = Math.min(R.info.dur, vid.currentTime + 1 / R.info.fps); };
+document.addEventListener('keydown', ev => { if (ev.target.tagName === 'INPUT') return; if (ev.code === 'Space') { ev.preventDefault(); $('bPlay').click(); }
+  if (ev.code === 'ArrowLeft') { ev.preventDefault(); $('bVolta').click(); } if (ev.code === 'ArrowRight') { ev.preventDefault(); $('bFrente').click(); } });
+$('bIniAqui').onclick = () => { $('fIni').value = vid.currentTime.toFixed(2); salvarFaixa(); };
+$('bFimAqui').onclick = () => { $('fFim').value = vid.currentTime.toFixed(2); salvarFaixa(); };
+$('fIni').onchange = $('fFim').onchange = salvarFaixa;
+async function salvarFaixa() { const r = await api(BASE + '/salvar', { faixa: [+$('fIni').value, +$('fFim').value] }); R = Object.assign(R, r.r); desenharChaves(); }
+$('bApAqui').onclick = () => { $('eAp').value = vid.currentTime.toFixed(2); salvarEstilo(); };
+$('bSoAqui').onclick = () => { $('eSo').value = vid.currentTime.toFixed(2); salvarEstilo(); };
+function salvarEstilo() { clearTimeout(salvarT); salvarT = setTimeout(() => api(BASE + '/salvar', { estilo: estiloTela() }).catch(() => {}), 400); mostrarCampos(); }
+document.querySelectorAll('.rt-panel input, .rt-panel select').forEach(el => el.addEventListener('input', salvarEstilo));
+$('tipos').onclick = ev => { const b = ev.target.closest('[data-tipo]'); if (!b) return; document.querySelectorAll('#tipos button').forEach(x => x.classList.toggle('on', x === b)); salvarEstilo(); };
+function mostrarCampos() { const t = estiloTela().tipo; $('lDir').style.display = t === 'seta' ? '' : 'none'; $('lEsc').style.display = t === 'holofote' ? '' : 'none'; }
+async function rodar(url, corpo) { try { await api(url, corpo); ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+$('bRastrear').onclick = () => rodar(BASE + '/rastrear', { rastreador: $('sRast').value });
+$('bGerar').onclick = async () => { await api(BASE + '/salvar', { estilo: estiloTela() }); rodar(BASE + '/gerar', {}); };
+function desenharSaida() {
+  $('saida').innerHTML = R.saida ? `<video src="${BASE}/saida.mp4?v=${R.atualizado}" controls style="width:100%;border-radius:8px"></video>
+    <div class="rt-linha"><a href="${BASE}/saida.mp4?baixar=1">⬇ baixar</a>${R.job != null && {{ no_editor|tojson }} ? `<button class="rt-mini rt-ok" id="bAplicar">↩ Usar no trecho ${R.trecho + 1} do editor</button>` : ''}${R.curto ? `<button class="rt-mini rt-ok" id="bCurto">↩ Usar no curto (🎯 ${R.curto.alvo})</button>` : ''}</div>` : '';
+  const bc = $('bCurto'); if (bc) bc.onclick = async () => { try { const r = await fetch('/curtos/' + R.curto.pid + '/comentario/usar-rastreio', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({rid: R.id})}); const d = await r.json(); if (!d.ok) throw new Error(d.erro); barra('✅ no curto', 'okk'); location.href = d.link; } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+  const b = $('bAplicar'); if (b) b.onclick = async () => { try { const d = await api(BASE + '/aplicar', {}); barra('✅ no trecho do editor', 'okk'); location.href = d.link; } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+}
+async function recarregar() {
+  const d = await (await fetch(BASE + '/estado', { cache: 'no-store' })).json(); const primeira = !R; R = d;
+  if (primeira) { const e = R.estilo; document.querySelectorAll('#tipos button').forEach(x => x.classList.toggle('on', x.dataset.tipo === e.tipo));
+    $('eCor').value = e.cor; $('eEsp').value = e.espessura; $('eFolga').value = e.folga; $('eDir').value = e.direcao; $('eEsc').value = e.escurecer;
+    $('eTxt').value = e.texto; $('eCorT').value = e.cor_texto; $('eEnt').value = e.entrada; $('eSombra').checked = e.sombra;
+    $('eAp').value = e.aparece == null ? '' : e.aparece; $('eSo').value = e.some == null ? '' : e.some; mostrarCampos(); ajustarCanvas(); }
+  desenharChaves(primeira); desenharSaida();
+  const t = d.tarefa;
+  if (t && !t.fim) { barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); setTimeout(recarregar, 1000); }
+  else if (t && t.fim && t.fim !== ultimoFim) { ultimoFim = t.fim; t.erro ? barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro') : barra('✅ ' + (t.msg || t.rotulo) + (t.rotulo.includes('rastreando') ? ' — dê play pra ver; escorregou? pause e desenhe de novo' : ''), 'okk'); }
+}
+window.addEventListener('resize', ajustarCanvas); vid.addEventListener('loadedmetadata', ajustarCanvas);
+if (window.ResizeObserver) new ResizeObserver(ajustarCanvas).observe(vid);
+recarregar(); requestAnimationFrame(quadro);
+</script>
+{% endblock %}

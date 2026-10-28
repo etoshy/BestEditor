@@ -28,6 +28,48 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 💡 Nichos de canais + 📚 explicativo do zero no Flow (v84_256)
+
+Na página **📱 Vídeos curtos → Explicativo**:
+- **💡 Nichos de canais explicativos** (em inglês, do zero, 1 vídeo por dia): Shape Reason, Wild Trickcraft, Saved By Design, Hidden Origins Daily, Made In Minutes e Bite Behind It (`assets/curtos/nichos.json`). **➕ criar o canal** = o perfil 📚 Explicativo + o tema do nicho (a marca já vem com o @ do nome). **💡 ideias** → **gerar 10 ideias** (com pedido extra opcional): título em inglês + português, o gancho, o assunto com os fatos e o que mostrar — sem repetir as que já saíram. Cada ideia → **📚 criar vídeo** (ou **🚀 criar e fazer tudo**), já no modo Flow.
+- **As imagens do vídeo** (no projeto e no formulário): **🎞 só com os meus vídeos** (o que faltar vira 💡 sugestão), **✨ gerar tudo no Flow** — cada plano é uma FOTO gerada (com zoom lento) ou, quando o movimento importa, um **vídeo de ~8 s** (novo layout 🎬 vídeo gerado) — ou **🔀 misto**. Estilo **📷 realista** (o padrão: cada pedido vai como filmagem de verdade — luz natural, sem ilustração/3D/texto) ou 🎨 livre. A geração acontece nas prévias do editor, com os créditos das suas contas do Flow; sem crédito, o editor pesquisa a cena.
+- O 💬 Comentário não mudou.
+
+## 📚 Vídeos curtos: modelo Explicativo, títulos, idioma do post, 1:1 e marca @canal (v84_255)
+
+**📚 Explicativo** (menu 📱 Vídeos curtos → *Explicativo (curiosidades)*) — uma curiosidade explicada sobre uma colagem rápida de vídeos, modelada em 4 shorts de referência (~43 s, **~16 vídeos distintos por short**, um vídeo novo a cada ~2,6 s; ~20% dos cortes ficam no mesmo vídeo e ~10% voltam a uma fonte; seta vermelha no 1º segundo; legenda de uma palavra branca no terço de baixo; zoom lento; flash na troca de assunto; vídeo horizontal no meio com o próprio vídeo desfocado atrás; som em ~30% dos cortes).
+- Entrada: o **assunto** + **links dos vídeos brutos** (um por linha — ex.: 5; YouTube/Shorts/TikTok/Instagram…; o site baixa) ou arquivos + link de matéria (opcional). A IA olha cada vídeo (1 quadro/s) e escreve a linha do tempo de cada fonte.
+- **🎞 Só com os meus vídeos** (padrão): o vídeo inteiro sai só das suas fontes (momentos, ângulos e detalhes diferentes). Onde elas não mostram a frase, fica o momento mais próximo e aparece uma **💡 sugestão** — foto real (buscadores: Brave, Google, Bing…), YouTube ou imagem gerada (personagem/cena) — que você aceita (✔) ou não (fica o seu vídeo; ↩ volta). Desmarcado: a IA já usa banco de vídeo e imagem gerada sozinha.
+- Roteiro, ganchos, finais, takes, 🎯 seta rastreada e editor: o mesmo fluxo do 💬 Comentário.
+
+**Nos dois (💬 e 📚)**: **🌍 Postar em** inglês, português, espanhol, italiano, francês ou alemão — o roteiro sai nesse idioma + a tradução em português; narra no idioma do post (Chatterbox Turbo com as tags em inglês; o Chatterbox multilíngue nos outros) ou em português. **🏷 5 títulos do post** no idioma do post + português (escolher / ➕ mais 5). O vídeo de outra proporção entra com o fundo desfocado (preencher inteligente).
+
+**Em todos os curtos (📰 💬 📚)**:
+- **⬛ Formato 9:16 ou 1:1**: escolhido ao criar ou na página; a IA pensa os planos pro quadrado, a legenda cresce na mesma proporção e o editor monta/exporta em 1:1.
+- **🏷 Marca do canal**: o “@canal” por cima do vídeo inteiro (embaixo da legenda) — texto, posição (meio, topo, base, terço de baixo, cantos), tamanho, opacidade, ajuste ↕, fonte, cor e contorno, com prévia. Padrão: **ligada, no meio, 50%**. Se a legenda está no mesmo lugar, a marca sobe um pouco. “Usar como padrão do canal” guarda no canal; já no editor, a exportação passa a sair com ela (com e sem legenda).
+- Legenda: nova posição **terço de baixo** (também no Estúdio).
+
+## 📱 Vídeos curtos — área própria + 💬 modelo Comentário (v84_253)
+
+Menu novo **📱 Vídeos curtos (Shorts, TikTok, Reels)**: *Todos os curtos* · *Notícia (Laestro)* · *Comentário de clipe* · *Rastrear objeto*. Cada modelo tem a sua página (`/curtos/modelo/noticia`, `/curtos/modelo/comentario`) com o “+ Novo vídeo” dele; o canal pronto **Comentário (shorts virais)** é criado sozinho como o Laestro.
+
+**💬 Comentário** — um clipe viral narrado e comentado enquanto passa:
+1. **Clipe + o que acontece**: cole o **🔗 link do vídeo original** (YouTube Shorts, TikTok, Instagram, Kwai… — o site baixa; v84_254) ou suba o vídeo cru (M1, M2…) e diga o que acontece. **Transcrição sem tempos** (a que alguns shorts têm, com a descrição, `[music]` e a letra da música misturadas) vira a 📺 referência — a IA fica só com a história — e a linha do tempo sai da IA olhando o vídeo (👁, automático quando a IA está ligada). Com tempos: a transcrição, uma descrição com segundos (`0:04 ele pega a placa`, `[0:07]`, `12s -`, SRT, tempos do YouTube), a transcrição de OUTRO vídeo que fala dele, ou o vídeo comentando (o site transcreve). Sem texto: **🎙 transcrever a fala** (Whisper) ou **👁 a IA descreve** (olha o clipe a 2 quadros/s e escreve os momentos). ⏱ marca o segundo do vídeo pausado.
+2. **Roteiro em inglês + português** lado a lado, um parágrafo só, reescrito (nunca copiado), gancho forte e um final com PERGUNTA. **5 ganchos e 5 finais** pra escolher (EN/PT) e **➕ mais 5**. Narrar em 🇺🇸 ou 🇧🇷. As **tags do Chatterbox Turbo** (`[gasp]`, `[surprised]`, `[sarcastic]`…) já vêm na fala em inglês (clique numa tag pra pôr no cursor); elas não entram na legenda.
+3. **Voz**: Chatterbox Turbo, **3 takes** (1–5) — ouça e escolha; ou grave/suba a sua (troca no editor mantendo as mídias).
+4. **Edição**: sem silêncio; cada frase mostra o pedaço do clipe que ela conta (`M1@4.00-6.80`) e o vídeo termina junto com a voz. **Tamanho, cortes, zoom e sons variam com cada vídeo** — saem do roteiro pelo contexto de cada momento (corte quando a narração vai pra outro momento, zoom in num detalhe/emoção, zoom out pra revelar, som só onde algo acontece); só a estrutura (gancho → o que todos acharam → a virada → a pergunta) é fixa. Sem referência, o tamanho segue o clipe e a história.
+5. **🎯 Destaques**: quando a fala aponta algo (“the white sign”), a IA acha o objeto no quadro e o 🎯 rastreio põe o círculo/seta vermelho seguindo ele (mídia R1…). Não achou / IA desligada: **✋ fazer no Rastrear objeto** e **↩ Usar no curto**.
+6. **🎬 Editor** com a legenda de uma palavra (branca, contorno, no meio) e os sons da base ou do Pixabay. 🚀 **Fazer tudo** faz 1→6 sozinho.
+
+## 🎯 Rastrear objeto (v84_252)
+
+Menu **Produção → 🎯 Rastrear objeto**, ou no Estúdio, no trecho de vídeo: **🎞 Mídia → 🎯 Rastrear objeto neste trecho** (abre o vídeo do trecho e o resultado volta pra ele). Um **⭕ círculo**, **⬜ quadrado**, **➡ seta**, **🎯 mira** ou **🔦 holofote** (escurece o resto) que segue o objeto sozinho:
+1. Pause no quadro (espaço = play/pause, ← → = quadro a quadro) e **arraste uma caixa** em volta do objeto; escolha o trecho (de/até).
+2. **🎯 Rastrear** — segue o objeto pra frente e pra trás da caixa (CSRT do OpenCV quando a sua versão tem; senão um rastreador próprio de fluxo óptico que roda em qualquer OpenCV), sem tremedeira (trajeto suavizado) e preenchendo sumiços curtos. Dê play: a prévia do desenho segue o objeto na tela, ao vivo.
+3. Escorregou em algum ponto? Pause ali e desenhe outra caixa — cada caixa é um ponto de correção e o rastreio é refeito a partir delas. **Troca de cena**: o rastreio para no corte (não inventa o objeto no plano novo); pra continuar depois dele, desenhe uma caixa no plano novo.
+4. Cor, espessura, folga em volta, de onde vem a seta, quanto escurece, texto (ex.: “OLHA ISSO”), entrada (✍ desenhando / 💥 pop), sombra, quando aparece e some.
+5. **🎬 Gerar o vídeo** (o vídeo inteiro com o desenho e o som original) → ⬇ baixar ou **↩ Usar no trecho do editor** (a mídia de antes fica guardada).
+
 ## 🎌 Vídeos curtos: modo anime (v84_250)
 
 Cenas de anime pra exemplificar momentos e sentimentos. No vídeo (seção 1), no “+ Novo vídeo” ou como padrão do canal (🎛 no perfil): **🎌 Modo anime** = não / **reações e sentimentos** / **tudo que não precisa ser real**, e os **animes preferidos** (ex.: Naruto, JJK — mantém a cara do vídeo).

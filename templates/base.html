@@ -45,9 +45,15 @@
         {{ item('/roteiros-yt', 'scroll', 'Roteiro do YouTube') }}
         {{ item('/vendas', 'cart-shopping', 'Vídeo de venda') }}
         {{ item('/modelados', 'film', 'Vídeos modelados') }}
-        {{ item('/curtos', 'bolt', 'Vídeos curtos', ['/curtos']) }}
         {{ item('/marca', 'palette', 'Identidade visual') }}
         {{ item('/narracoes', 'file-pen', 'Roteiro para Áudio') }}
+      {% endcall %}
+      {% call grupo('curtos', 'mobile-screen-button', 'Vídeos curtos (Shorts, TikTok, Reels)') %}
+        {{ item('/curtos', 'bolt', 'Todos os curtos', ['/curtos/canal']) }}
+        {{ item('/curtos/modelo/noticia', 'newspaper', 'Notícia (Laestro)') }}
+        {{ item('/curtos/modelo/explicativo', 'lightbulb', 'Explicativo (curiosidades)') }}
+        {{ item('/curtos/modelo/comentario', 'comment-dots', 'Comentário de clipe') }}
+        {{ item('/rastrear', 'crosshairs', 'Rastrear objeto') }}
       {% endcall %}
       {% call grupo('producao', 'industry', 'Produção') %}
         {{ item('/producao-pod', 'industry', 'Produção no pod') }}

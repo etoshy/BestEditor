@@ -59,7 +59,7 @@ def normalizar(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     out["ativa"] = bool(c.get("ativa"))
     if c.get("estilo") in _IDS:
         out["estilo"] = c["estilo"]
-    if c.get("posicao") in ("base", "meio", "topo"):
+    if c.get("posicao") in ("base", "meio", "topo", "terco"):
         out["posicao"] = c["posicao"]
     try:
         out["tamanho"] = max(0.03, min(0.14, float(c.get("tamanho", out["tamanho"]))))
@@ -206,9 +206,9 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
     r, g, b = dp_cores.rgb(cor_ativa)
     sobre_ativa = "#111111" if (0.299 * r + 0.587 * g + 0.114 * b) > 140 else "#FFFFFF"
     branco = _c(cfg["cor_texto"])
-    an = {"base": 2, "meio": 5, "topo": 8}[cfg["posicao"]]
+    an = {"base": 2, "meio": 5, "topo": 8, "terco": 5}[cfg["posicao"]]
     cx = W // 2
-    cy = {"base": int(H * 0.93), "meio": H // 2, "topo": int(H * 0.06)}[cfg["posicao"]]  # telinha: bottom 7% / top 6%
+    cy = {"base": int(H * 0.93), "meio": H // 2, "topo": int(H * 0.06), "terco": int(H * 0.76)}[cfg["posicao"]]  # terço de baixo (v84_255)  # telinha: bottom 7% / top 6%
     bord = max(2, int(round(fs_css / 24))) if cfg["contorno"] else 0  # contorno da telinha: fs/14 centrado na borda da letra
     estilos_ass = [
         f"Style: Leg,{fam},{fs},{branco},{branco},&H00000000,&H80000000,1,{1 if estilo == 'cinema' else 0},0,0,100,100,0,0,1,{bord},{1 if estilo != 'cinema' else 2},{an},20,20,0,1",

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}🎯 Rastrear objeto{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 900px; }
+  .rt-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .rt-lin { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--borda); border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+  .rt-dica { color: var(--mudo); font-size: .86rem; }
+</style>
+<h1>🎯 Rastrear objeto</h1>
+<p class="rt-dica">Um <b>círculo</b>, <b>quadrado</b>, <b>seta</b>, <b>mira</b> ou <b>holofote</b> que segue um objeto no vídeo, sozinho. Pause no quadro, desenhe uma caixa em volta do objeto,
+  escolha o tipo e clique em 🎯 Rastrear. Escorregou em algum ponto? Pause ali e desenhe de novo — o rastreio é refeito a partir de cada caixa sua.
+  No Estúdio, o botão <b>🎯 Rastrear objeto neste trecho</b> abre o vídeo do trecho aqui, e o resultado volta pro trecho.</p>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+<div class="rt-card">
+  <form method="post" action="/rastrear/novo" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input type="file" name="video" accept="video/*" required style="width:auto"><button type="submit" style="width:auto">🎯 Começar</button>
+  </form>
+</div>
+<div class="rt-card">
+  <h2 style="margin:0">Rastreios</h2>
+  {% for r in lista %}
+  <div class="rt-lin"><div><a href="/rastrear/{{ r.id }}"><b>🎯 {{ r.nome }}</b></a>
+    <div class="rt-dica">{% if r.job %}🎞 do editor (trecho {{ r.trecho + 1 }}){% endif %}{% if r.saida %} · 🎬 vídeo pronto{% endif %}</div></div></div>
+  {% else %}<p class="rt-dica">Nenhum ainda.</p>{% endfor %}
+</div>
+{% endblock %}

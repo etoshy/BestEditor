@@ -475,15 +475,16 @@ def test_reencaixar_bloco_novo():
 def test_laestro_ja_vem_como_canal(cliente, base):
     _A, cl = cliente
     html = cl.get("/curtos").get_data(as_text=True)
-    cs = CT.listar_canais(base)
-    assert [c["nome"] for c in cs] == ["Laestro"] and f'<option value="{cs[0]["id"]}">Laestro</option>' in html
+    cs = [c for c in CT.listar_canais(base) if c["nome"] == "Laestro"]  # (v84_253: o 💬 comentário também vem pronto)
+    assert len(cs) == 1 and f'<option value="{cs[0]["id"]}">Laestro</option>' in html
     c = CT.carregar_canal(base, cs[0]["id"])
     assert c["perfil"]["legenda"]["cor_texto"] == "#F2A81E" and c["perfil_origem"] == "laestro"
+    n = len(CT.listar_canais(base))
     cl.get("/curtos")
-    assert len(CT.listar_canais(base)) == 1  # não duplica
+    assert len(CT.listar_canais(base)) == n  # não duplica
     CT.excluir_canal(base, cs[0]["id"])
     cl.get("/curtos")
-    assert CT.listar_canais(base) == []  # apagou? não volta
+    assert not [c for c in CT.listar_canais(base) if c["nome"] == "Laestro"]  # apagou? não volta
 
 
 
@@ -517,7 +518,7 @@ def test_laestro_v2_sem_bordao_e_atualiza_canal_antigo(base):
     c = CT.carregar_canal(base, c["id"])
     assert c["perfil_versao"] == 2 and "agacha" not in _j.dumps(c["perfil"]["estrutura"])
     assert c["perfil"]["legenda"]["cor_texto"] == "#123456"  # o que você ajustou ficou
-    assert len(CT.listar_canais(base)) == 1
+    assert [x["nome"] for x in CT.listar_canais(base)].count("Laestro") == 1  # (o 💬 comentário é outro canal pronto)
 
 
 # ------------------------------------------------------------------ v84_250: 🎌 modo anime

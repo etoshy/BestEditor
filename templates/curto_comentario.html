@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% block title %}{{ '📚' if p.modelo == 'explicativo' else '💬' }} {{ p.titulo }} — Vídeos curtos{% endblock %}
+{% block content %}{% set EXPL = p.modelo == 'explicativo' %}
+<style>
+  .app-content { max-width: 1280px; }
+  .ct-card { border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 14px; }
+  .ct-card h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ct-num { background: var(--acento); color: var(--acento-txt); border-radius: 999px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .ct-dica { color: var(--mudo); font-size: .84rem; margin: 2px 0 8px; }
+  .ct-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .ct-linha > * { margin: 0; }
+  .ct-linha button { width: auto; margin: 0; padding: 6px 12px; }
+  .ct-mini { width: auto !important; margin: 0 !important; padding: 2px 8px !important; font-size: .78rem !important; }
+  .ct-sec { background: #64748b !important; } .ct-perigo { background: #dc2626 !important; } .ct-ok { background: #16a34a !important; }
+  .ct-barra { border-radius: 10px; padding: 8px 12px; margin-top: 8px; display: none; position: sticky; top: 0; z-index: 10; }
+  .ct-barra.on { display: block; background: var(--acento-suave); border: 1px solid var(--acento); }
+  .ct-barra.erro { display: block; background: var(--erro-bg); color: var(--erro); border: 1px solid var(--erro); }
+  .ct-barra.okk { display: block; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .ct-clipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .ct-clipe { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; font-size: .8rem; }
+  .ct-clipe video { width: 100%; max-height: 300px; background: #000; border-radius: 6px; }
+  .ct-tab { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  .ct-tab td, .ct-tab th { border-bottom: 1px solid var(--borda); padding: 3px 5px; vertical-align: top; text-align: left; }
+  .ct-ops { display: grid; gap: 4px; }
+  .ct-op { display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px; align-items: start; border: 1px solid var(--borda); border-radius: 8px; padding: 6px 8px; font-size: .86rem; }
+  .ct-op.on { border-color: var(--ok); background: var(--ok-bg); }
+  .ct-op .pt { color: var(--mudo); }
+  .ct-bloco { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; margin: 10px 0; }
+  .ct-bloco .cab { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .ct-bloco select, .ct-bloco input { width: auto; margin: 0; font-size: .82rem; }
+  .ct-falas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ct-falas textarea { font-size: .98rem; min-height: 58px; margin: 6px 0; font-family: inherit; }
+  .ct-falas .narrada { outline: 2px solid var(--acento); }
+  .ct-cena { border: 1px dashed var(--borda); border-radius: 8px; padding: 6px; font-size: .78rem; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+  .ct-cena input.n { width: 64px !important; }
+  .ct-tags button { background: #334155 !important; }
+  .ct-takes { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  .ct-takes > div { border: 1px solid var(--borda); border-radius: 8px; padding: 8px; }
+  .ct-takes > div.on { border-color: var(--ok); background: var(--ok-bg); }
+  .ct-tl { position: relative; height: 48px; background: var(--code-bg); border-radius: 8px; overflow: hidden; margin-top: 6px; }
+  .ct-tl div { position: absolute; top: 0; height: 22px; border-right: 1px solid var(--card); font-size: .62rem; overflow: hidden; white-space: nowrap; padding: 2px 3px; color: #fff; }
+  .ct-tl .s { top: 24px; width: 3px !important; background: #2563eb; padding: 0; }
+  .ct-res { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; margin-top: 6px; }
+  .ct-res > div { border: 1px solid var(--borda); border-radius: 8px; padding: 6px; font-size: .78rem; }
+  audio { width: 100%; max-width: 520px; }
+  @media (max-width: 760px) { .ct-falas, .ct-op { grid-template-columns: 1fr; } }
+</style>
+
+<div class="ct-linha" style="justify-content:space-between">
+  <h1 style="margin:0">{{ '📚' if EXPL else '💬' }} <span id="tTitulo">{{ p.titulo }}</span> <span class="ct-dica">{{ 'explicativo' if EXPL else 'comentário' }}</span></h1>
+  <div class="ct-linha"><a href="/curtos/modelo/{{ p.modelo }}">← {{ 'explicativos' if EXPL else 'comentários' }}</a>
+    <form method="post" action="/curtos/{{ p.id }}/excluir" onsubmit="return confirm('Excluir este vídeo (clipe, roteiro, voz)?')" style="margin:0"><button class="ct-mini ct-perigo">🗑</button></form></div>
+</div>
+<div id="barra" class="ct-barra"></div>
+
+<div class="ct-card" style="background:var(--acento-suave)">
+  <div class="ct-linha" style="justify-content:space-between">
+    <div><b style="font-size:1.05rem">🚀 Fazer tudo</b> <span class="ct-dica">{% if EXPL %}lê a matéria → a IA olha cada vídeo-fonte → roteiro no idioma da postagem + português (ganchos, finais e títulos) → 3 takes → take 1 alinhado → 🎯 seta/círculo rastreado → editor{% else %}o que acontece no clipe (transcreve/olha se faltar) → roteiro no idioma da postagem + português → 3 takes do Chatterbox → take 1 alinhado → 🎯 destaques rastreados → editor{% endif %}. Pula o que já está feito.</span></div>
+    <div class="ct-linha"><button id="bTudo" style="font-weight:700">🚀 Fazer tudo</button><span id="lnkEditor"></span></div>
+  </div>
+</div>
+
+<!-- 1 clipe -->
+<div class="ct-card">
+  <h2><span class="ct-num">1</span> {% if EXPL %}📚 O assunto e os vídeos-fonte{% else %}🎞 O clipe e o que acontece nele{% endif %}</h2>
+  {% if EXPL %}
+  <label>O que o vídeo explica <span class="ct-dica">(o assunto, os fatos que você quer, de onde veio a curiosidade)</span></label>
+  <textarea id="cTema" rows="3">{{ p.noticia.texto }}</textarea>
+  <div class="ct-linha"><input type="text" id="cArt" placeholder="+ link de uma matéria/artigo sobre o assunto (opcional)" style="flex:1;min-width:260px"><button class="ct-sec" id="bArt">📰 Ler</button>
+    <span class="ct-dica" id="artInfo"></span></div>
+  <div class="ct-linha"><b>As imagens do vídeo</b>
+    <select id="cMidia" style="width:auto;margin:0">{% for k, v in modos_midia.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+    <select id="cEstilo" style="width:auto;margin:0" title="imagem/vídeo gerado">{% for k, v in estilos_ia.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+  <p class="ct-dica" id="midiaDica"></p>
+  {% endif %}
+  <div class="ct-linha">
+    <label>Título<input type="text" id="cTitulo" value="{{ p.titulo }}" style="min-width:260px"></label>
+    <label>Duração (s, 0 = {{ 'o que o assunto pedir' if EXPL else 'a da referência' }})<input type="number" id="cDur" min="0" max="180" value="{{ p.config.duracao_alvo_s or 0 }}" style="width:90px"></label>
+    <label style="flex:1;min-width:260px">Pedido extra pro roteiro (opcional)<input type="text" id="cExtra" value="{{ p.config.extra }}" placeholder="ex.: focar no fã; terminar perguntando quem estava certo"></label>
+    <button id="bSalvarCfg">💾</button>
+  </div>
+  <div class="ct-clipes" id="clipes"></div>
+  <div class="ct-linha"><textarea id="cLink" rows="1" placeholder="🔗 link(s) do vídeo — um por linha (Shorts, TikTok, Reels, YouTube…)" style="flex:1;min-width:260px"></textarea><button class="ct-sec" id="bLink">⬇ Baixar</button>
+    <input type="file" id="fClipe" accept="video/*" multiple style="width:auto"><button class="ct-sec" id="bClipe">⬆ + clipe</button></div>
+  <p class="ct-dica">Na descrição: com segundos (“0:04 ele pega a placa”) vira a linha do tempo. Sem tempos (a transcrição corrida do short, mesmo com [music] e letra de música) vai pra 📺 Referência — a IA separa a história do ruído — e o 👁 acha os segundos olhando o vídeo.</p>
+  <details style="margin-top:8px" id="refBox"><summary style="cursor:pointer;font-weight:600">📺 Referência <span class="ct-dica" id="refInfo"></span></summary>
+    <p class="ct-dica">A transcrição do short original (ou de outro vídeo que fala desse clipe). O roteiro sai com o MESMO tamanho, ritmo e fluxo — reescrito, nunca copiado.</p>
+    <textarea id="refTexto" rows="5"></textarea>
+    <div class="ct-linha"><button id="bRefSalvar">💾 Salvar a referência</button>
+      <label style="font-weight:400">…ou o vídeo (o site transcreve) <input type="file" id="fRef" accept="video/*,audio/*" style="width:auto"></label>
+      <input type="text" id="cRefLink" placeholder="…ou o link dele" style="width:240px"><button class="ct-sec" id="bRefLink">⬇</button></div>
+  </details>
+</div>
+
+<!-- 2 roteiro -->
+<div class="ct-card">
+  <h2><span class="ct-num">2</span> 📝 Roteiro <span class="ct-dica" id="rInfo"></span></h2>
+  <div class="ct-linha">
+    <button id="bRotIA" {% if not ia %}title="IA desligada — use o prompt"{% endif %}>🤖 Escrever com a IA</button>
+    <button class="ct-sec" id="bRotPrompt">📋 Prompt pra outra IA</button>
+    <button class="ct-ok" id="bRotSalvar">💾 Salvar roteiro</button>
+    <span class="ct-dica" style="margin-left:auto">postar em</span>
+    <select id="cLingua" style="width:auto;margin:0">{% for k, v in linguas.items() %}<option value="{{ k }}" {% if (p.comentario or {}).lingua_post == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    <span class="ct-dica">narrar em</span>
+    <button class="ct-mini" id="bEN">🌍 idioma do post</button><button class="ct-mini ct-sec" id="bPT">🇧🇷 português</button>
+  </div>
+  <div id="rPromptBox" style="display:none"><textarea id="rPrompt" rows="6" readonly></textarea>
+    <label>Resposta da outra IA (JSON)</label><textarea id="rResp" rows="5"></textarea><button id="bRotColar">✔ Usar a resposta</button></div>
+  <div id="titulos"></div>
+  <div id="ganchos"></div>
+  <div id="finais"></div>
+  <div class="ct-linha ct-tags" id="tags"><span class="ct-dica">🎭 tags do Chatterbox Turbo — só em inglês (clique pra pôr no cursor da fala):</span>{% for t in tags %}<button class="ct-mini" data-tag="{{ t }}">[{{ t }}]</button>{% endfor %}</div>
+  <div id="blocos"></div>
+</div>
+
+<!-- 3 voz -->
+<div class="ct-card">
+  <h2><span class="ct-num">3</span> 🎙 Voz</h2>
+  <p class="ct-dica">O Chatterbox Turbo lê as tags de emoção do roteiro em inglês. Cada take sai um pouco diferente — ouça e escolha o que pronunciou melhor. (Em português, as tags saem do texto.)</p>
+  <div class="ct-linha">
+    <select id="vVoz">{% for v in vozes %}<option value="{{ v.slug }}" {% if v.slug == p.config.voz_tts %}selected{% endif %}>{{ v.grupo }} · {{ v.nome }}</option>{% else %}<option value="">(nenhuma voz cadastrada — 🎙 Gerar voz)</option>{% endfor %}</select>
+    <input type="number" id="vN" value="3" min="1" max="5" style="width:64px" title="quantos takes">
+    <button id="bTakes" {% if not tem_tts %}disabled{% endif %}>🎙 Gerar takes</button>
+  </div>
+  <div class="ct-takes" id="takes"></div>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">🎤 ou a SUA voz</summary>
+    <p class="ct-dica">Leia o roteiro (a versão narrada). Pausas, repetições e muletas saem sozinhas. Se o vídeo já está no editor, a voz é trocada lá mantendo as mídias.</p>
+    <div class="ct-linha"><button id="bGravar">⏺ Gravar</button><button id="bParar" class="ct-perigo" style="display:none">⏹ Parar e usar</button><span id="recInfo"></span>
+      <label style="font-weight:400">ou suba o arquivo <input type="file" id="fAudio" accept="audio/*,video/*" style="width:auto"></label></div>
+  </details>
+  <div id="grav"></div>
+</div>
+
+<!-- 4 destaques e sons -->
+<div class="ct-card">
+  <h2><span class="ct-num">4</span> 🎯 Destaques e 🔊 sons</h2>
+  <p class="ct-dica">Quando a fala aponta algo (“the cardboard sign”), a IA acha o objeto no quadro e o rastreio põe o círculo/seta vermelho seguindo ele naquele pedaço do clipe. O que ela não achar fica pendente: ✋ abre o pedaço no 🎯 Rastrear objeto pra você desenhar a caixa.</p>
+  <div class="ct-linha"><button id="bDest">🎯 Preparar os destaques</button><button class="ct-sec" id="bDestRefazer">🔁 refazer todos</button></div>
+  <div id="dests"></div>
+  <div id="sugs"></div>
+  <div id="deixas" style="margin-top:8px"></div>
+  <div class="ct-linha"><input type="text" id="pxTermo" placeholder="procurar no Pixabay (whoosh, swipe, pop, cinematic hit…)" style="flex:1;min-width:260px">
+    <button id="bPx">🔎 Pixabay</button></div>
+  <div class="ct-res" id="pxRes"></div>
+</div>
+
+<!-- 5 editor -->
+<div class="ct-card">
+  <h2><span class="ct-num">5</span> 🎬 Editor</h2>
+  <p class="ct-dica">Sem silêncio, cada frase no pedaço {{ 'do vídeo-fonte que mostra o que ela diz' if EXPL else 'do clipe que ela conta' }}. Cortes, zoom e sons saem do roteiro, escolhidos pelo que acontece em cada momento (não é um padrão igual pra todo vídeo); legenda de uma palavra; o vídeo termina quando a voz termina. Exporta pelo Estúdio.</p>
+  <div class="ct-linha"><button class="ct-sec" id="bPrevia">👁 Ver o plano</button><button id="bEditor">🎬 Montar no editor</button><span id="edLink"></span></div>
+  <div id="previa"></div>
+</div>
+
+<script>
+const PID = {{ p.id|tojson }}, BASE = '/curtos/' + PID, EXPL = {{ EXPL|tojson }}, LINGUAS = {{ linguas|tojson }};
+const SFX = {{ tipos_sfx|tojson }};
+const EFEITOS = ['', 'zoom_in', 'zoom_out', 'zoom_rapido', 'zoom_respiro', 'pan_esq', 'pan_dir', 'pan_cima'];
+const ENTRADAS = ['none', 'punch_in', 'flash', 'pop', 'shake', 'zoom_in', 'blur_in'];
+const TIPOS_D = ['', 'circulo', 'seta', 'quadrado', 'mira', 'holofote'];
+const $ = id => document.getElementById(id);
+let P = null, ultimoFim = null, sujo = false, SONS = {}, campoTag = null;
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const arq = p => BASE + '/arquivo/' + p;
+const opts = (lista, atual) => lista.map(([v, t]) => `<option value="${esc(v)}" ${v === atual ? 'selected' : ''}>${esc(t)}</option>`).join('');
+async function api(url, corpo, metodo) {
+  const op = { method: metodo || 'POST' };
+  if (corpo instanceof FormData) op.body = corpo;
+  else if (corpo !== undefined) { op.headers = { 'Content-Type': 'application/json' }; op.body = JSON.stringify(corpo); }
+  const r = await fetch(url, op); const d = await r.json().catch(() => ({ ok: false, erro: 'resposta inválida (' + r.status + ')' }));
+  if (!r.ok || d.ok === false) throw new Error(d.erro || ('erro ' + r.status));
+  return d;
+}
+function barra(msg, tipo) { const b = $('barra'); b.className = 'ct-barra ' + (tipo || 'on'); b.textContent = msg; if (!msg) b.className = 'ct-barra'; }
+async function rodar(url, corpo) { try { await api(url, corpo); ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+const C = () => P.comentario || { linhas: [], referencia: '', idioma: 'en' };
+const idioma = () => C().idioma || 'en';
+const fmt = t => t == null ? '?' : (Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0'));
+
+// ---------------------------------------------------------------- 1 clipe
+function desenharClipes() {
+  const clipes = (P.midias || []).filter(m => m.tipo === 'video' && m.id[0] === 'M');
+  const ROT = { fala: '🎙', visual: '👁', texto: '✍' };
+  $('clipes').innerHTML = clipes.map(m => {
+    const ls = C().linhas.filter(l => l.mid === m.id);
+    const meu = ls.filter(l => l.tipo === 'texto').map(l => (l.t0 != null ? fmt(l.t0) + ' ' : '') + l.texto).join('\n');
+    return `<div class="ct-clipe"><div class="ct-linha"><b>${m.id}</b><span class="ct-dica">${(m.dur || 0).toFixed(1)} s</span>
+        <input data-mdesc="${m.id}" value="${esc(m.descricao)}" placeholder="o que é o clipe" style="flex:1;font-size:.8rem">
+        <button class="ct-mini ct-perigo" data-mdel="${m.id}">🗑</button></div>
+      <video src="${arq(m.arquivo)}" controls preload="metadata" data-vid="${m.id}"></video>
+      <div class="ct-linha"><button class="ct-mini" data-transc="${m.id}" {% if not tem_whisper %}disabled{% endif %}>🎙 transcrever a fala</button>
+        <button class="ct-mini" data-desc="${m.id}" {% if not ia %}disabled title="IA desligada"{% endif %}>👁 a IA descreve o que acontece</button>
+        <button class="ct-mini ct-sec" data-marca="${m.id}" title="põe o segundo do vídeo pausado na sua descrição">⏱ marcar o tempo</button></div>
+      <textarea data-linhas="${m.id}" rows="3" placeholder="0:03 ele pega a placa do fã…">${esc(meu)}</textarea>
+      <button class="ct-mini ct-ok" data-lsalvar="${m.id}">💾 salvar a descrição</button>
+      ${ls.length ? `<table class="ct-tab">${ls.map(l => `<tr><td>${ROT[l.tipo] || ''}</td><td style="white-space:nowrap">${fmt(l.t0)}${l.t1 != null ? '–' + fmt(l.t1) : ''}</td><td>${esc(l.texto)}</td></tr>`).join('')}</table>` : '<p class="ct-dica">Sem linha do tempo ainda.</p>'}
+    </div>`; }).join('') || (EXPL && P.midia_modo === 'flow' ? '<p class="ct-dica">✨ Sem vídeo-fonte: as imagens deste vídeo serão GERADAS no Flow (você ainda pode subir ou colar vídeos aqui).</p>' : '<p class="ct-dica">Suba o vídeo cru.</p>');
+  const ref = C().referencia || '';
+  if (document.activeElement !== $('refTexto')) $('refTexto').value = ref;
+  $('refInfo').textContent = ref ? `· ${ref.split(/\s+/).length} palavras` : '· (nenhuma)';
+}
+$('bSalvarCfg').onclick = async () => { try { await api(BASE + '/config', Object.assign({ titulo: $('cTitulo').value, duracao_alvo_s: +$('cDur').value || 0, extra: $('cExtra').value }, EXPL ? { texto_noticia: $('cTema').value } : {}));
+    if (EXPL) await api(BASE + '/proporcao', { proporcao: (P && P.proporcao) || '9:16', midia: $('cMidia').value, estilo_ia: $('cEstilo').value }); $('tTitulo').textContent = $('cTitulo').value; barra('✅ salvo', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bClipe').onclick = async () => { const fd = new FormData(); for (const f of $('fClipe').files) fd.append('arquivos', f); try { await api(BASE + '/midia', fd); $('fClipe').value = ''; recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bLink').onclick = async () => { const us = $('cLink').value.split(/\s+/).filter(u => u.startsWith('http')); if (!us.length) return;
+  try { await api(BASE + '/comentario/baixar', { urls: us }); $('cLink').value = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+if (EXPL) {
+  $('bArt').onclick = async () => { try { await api(BASE + '/config', { links: $('cArt').value }); $('cArt').value = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+  const DICA_MIDIA = { minhas: 'O vídeo sai só dos seus vídeos-fonte (momentos e ângulos diferentes). O que eles não mostram vira 💡 sugestão (foto real, YouTube, imagem gerada) — você aceita ou não.',
+    flow: 'Sem vídeo-fonte: cada plano é GERADO no Flow — foto (com zoom lento) ou, quando o movimento importa, um vídeo de ~8 s. No 📷 realista tudo é pedido como filmagem de verdade. Gera no editor (as prévias), usa os créditos das suas contas do Flow; sem crédito, o editor pesquisa a cena.',
+    misto: 'Seus vídeos onde eles mostram a frase, banco de vídeo e o Flow no resto.' };
+  const mudouMidia = () => { $('midiaDica').textContent = DICA_MIDIA[$('cMidia').value] || '';
+    api(BASE + '/proporcao', { proporcao: (P && P.proporcao) || '9:16', midia: $('cMidia').value, estilo_ia: $('cEstilo').value }).then(() => barra('✅ vale pro próximo roteiro', 'okk')); };
+  $('cMidia').onchange = mudouMidia; $('cEstilo').onchange = mudouMidia;
+}
+$('cLingua').onchange = async () => { try { await api(BASE + '/comentario/lingua', { lingua: $('cLingua').value }); barra('✅ o próximo roteiro sai em ' + LINGUAS[$('cLingua').value] + ' (+ português)', 'okk'); recarregar(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bRefLink').onclick = async () => { const u = $('cRefLink').value.trim(); if (!u) return; await rodar(BASE + '/comentario/baixar', { url: u, referencia: true }); $('cRefLink').value = ''; };
+$('bRefSalvar').onclick = async () => { try { const d = await api(BASE + '/comentario/referencia', { texto: $('refTexto').value }); barra('✅ referência salva' + (d.dur ? ` (~${d.dur} s)` : ''), 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('fRef').onchange = async () => { const fd = new FormData(); fd.append('video', $('fRef').files[0]); try { await api(BASE + '/comentario/referencia', fd); $('fRef').value = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+
+// ---------------------------------------------------------------- 2 roteiro
+function opcoesHtml(qual, titulo) {
+  const r = P.roteiro || {}, ops = r[qual] || [], esc_ = r[qual + '_escolhido'] || 0;
+  if (!ops.length) return '';
+  return `<details open style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">${titulo} <span class="ct-dica">(${ops.length})</span></summary>
+    <div class="ct-ops">${ops.map((o, i) => `<div class="ct-op ${i === esc_ ? 'on' : ''}"><button class="ct-mini ${i === esc_ ? 'ct-ok' : 'ct-sec'}" data-escolher="${qual}:${i}">${i === esc_ ? '✔ em uso' : 'usar'}</button>
+      <span>${esc(o.en)}</span><span class="pt">${esc(o.pt)}</span></div>`).join('')}</div>
+    <button class="ct-mini ct-sec" data-mais="${qual}" style="margin-top:4px !important" {% if not ia %}disabled{% endif %}>➕ mais 5</button></details>`;
+}
+function idsClipe() { return (P.midias || []).filter(m => m.tipo === 'video').map(m => m.id); }
+const LAY_LIVRE = { video: '🎞 vídeo de banco', foto: '🖼 foto de banco', foto_real: '🖼 foto real (buscador)', clipe_real: '📺 YouTube', ia: '✨ foto gerada (Flow)', ia_video: '🎬 vídeo gerado (Flow)' };
+function cenaHtml(bi, ci, c) {
+  if (c.layout && c.layout !== 'materia') return `<div class="ct-cena" data-b="${bi}" data-c="${ci}" data-livre="1">
+    <select data-k="layout">${opts(Object.entries(LAY_LIVRE), c.layout)}</select>
+    <input data-k="query" value="${esc(c.query)}" placeholder="o que buscar / gerar (inglês)" style="flex:1;min-width:220px">
+    ${ci ? `na palavra <input data-k="palavra" value="${esc(c.palavra)}" style="width:110px">` : ''}
+    <select data-k="efeito">${opts(EFEITOS.map(x => [x, x || '— movimento —']), c.efeito || '')}</select>
+    <select data-k="entrada">${opts(ENTRADAS.map(x => [x, x === 'none' ? '— entrada —' : x]), c.entrada || 'none')}</select>
+    ${c.reserva ? '<span class="ct-dica" style="margin:0">💡 sugestão aceita</span>' : ''}
+    <button class="ct-mini ct-perigo" data-cdel="${bi}:${ci}">✕</button></div>`;
+  const d = c.destaque || {};
+  return `<div class="ct-cena" data-b="${bi}" data-c="${ci}">🎞 <select data-k="material">${opts(idsClipe().map(x => [x, x]), c.material)}</select>
+    de <input class="n" data-k="de" type="number" step="0.1" value="${c.de ?? ''}"> até <input class="n" data-k="ate" type="number" step="0.1" value="${c.ate ?? ''}">
+    <button class="ct-mini ct-sec" data-ver="${c.material}:${c.de ?? 0}" title="ver esse trecho no clipe">▶</button>
+    ${ci ? `na palavra <input data-k="palavra" value="${esc(c.palavra)}" style="width:110px">` : ''}
+    <select data-k="efeito">${opts(EFEITOS.map(x => [x, x || '— movimento —']), c.efeito || '')}</select>
+    <select data-k="entrada">${opts(ENTRADAS.map(x => [x, x === 'none' ? '— entrada —' : x]), c.entrada || 'none')}</select>
+    🎯 <input data-d="alvo" value="${esc(d.alvo)}" placeholder="destacar (inglês): the cardboard sign" style="width:200px">
+    <select data-d="tipo">${opts(TIPOS_D.map(x => [x, x || '—']), d.tipo || '')}</select>
+    <input data-d="texto" value="${esc(d.texto)}" placeholder="texto" style="width:80px">
+    <button class="ct-mini ct-perigo" data-cdel="${bi}:${ci}">✕</button></div>`;
+}
+function desenharRoteiro() {
+  const r = P.roteiro, en = idioma() === 'en';
+  $('bEN').className = 'ct-mini' + (en ? '' : ' ct-sec'); $('bPT').className = 'ct-mini' + (en ? ' ct-sec' : '');
+  const LP = (P.comentario || {}).lingua_post || 'en', LN = LINGUAS[LP] || LP;
+  $('bEN').textContent = '🌍 ' + LN; $('tags').style.display = LP === 'en' ? '' : 'none';
+  $('rInfo').textContent = r ? `${P.palavras_roteiro || 0} palavras · post em ${LN} · narrado em ${en ? LN : 'português'}` : '';
+  if (!r) { $('blocos').innerHTML = '<p class="ct-dica">Sem roteiro ainda.</p>'; $('ganchos').innerHTML = $('finais').innerHTML = $('titulos').innerHTML = ''; return; }
+  $('titulos').innerHTML = opcoesHtml('titulos', '🏷 Títulos do post (' + LN + ' · português)');
+  $('ganchos').innerHTML = opcoesHtml('ganchos', '🪝 Ganchos');
+  $('finais').innerHTML = opcoesHtml('finais', '❓ Finais (a pergunta que puxa comentário)');
+  $('blocos').innerHTML = `<div class="ct-linha"><label style="flex:1">Título<input id="rTit" value="${esc(r.titulo_video)}"></label></div>` +
+    r.blocos.map((b, bi) => `<div class="ct-bloco" data-b="${bi}">
+    <div class="cab"><b>${b.id}</b><span class="ct-dica">${esc(b.funcao)}</span>
+      <button class="ct-mini ct-sec" data-cadd="${bi}">+ trecho</button><button class="ct-mini ct-sec" data-sadd="${bi}">+ som</button>
+      <button class="ct-mini ct-perigo" data-bdel="${bi}">🗑</button></div>
+    <div class="ct-falas"><div><span class="ct-dica">🌍 ${esc(LN)}</span><textarea data-bk="fala_en" class="${en ? 'narrada' : ''}">${esc(b.fala_en || (en ? b.fala : ''))}</textarea></div>
+      <div><span class="ct-dica">🇧🇷 português</span><textarea data-bk="fala_pt" class="${en ? '' : 'narrada'}">${esc(b.fala_pt || (en ? '' : b.fala))}</textarea></div></div>
+    ${b.cenas.map((c, ci) => cenaHtml(bi, ci, c)).join('')}
+    ${(b.sfx || []).map((s, si) => `<div class="ct-cena" data-s="${si}">🔊 <select data-sk="tipo">${opts(Object.entries(SFX), s.tipo)}</select>
+      na palavra <input data-sk="palavra" value="${esc(s.palavra)}" placeholder="(começo)" style="width:120px">
+      Pixabay <input data-sk="busca" value="${esc(s.busca)}" style="width:140px"><button class="ct-mini ct-perigo" data-sdel="${bi}:${si}">✕</button></div>`).join('')}
+  </div>`).join('');
+}
+function lerRoteiroDaTela() {
+  const r = JSON.parse(JSON.stringify(P.roteiro)), en = idioma() === 'en';
+  if ($('rTit')) r.titulo_video = $('rTit').value;
+  document.querySelectorAll('.ct-bloco').forEach(el => {
+    const b = r.blocos[+el.dataset.b];
+    el.querySelectorAll('[data-bk]').forEach(i => { b[i.dataset.bk] = i.value; });
+    b.fala = (en ? b.fala_en : b.fala_pt) || b.fala_en || b.fala_pt || b.fala;
+    el.querySelectorAll('.ct-cena[data-c]').forEach(ce => { const c = b.cenas[+ce.dataset.c]; if (!ce.dataset.livre) c.layout = 'materia';
+      ce.querySelectorAll('[data-k]').forEach(i => { c[i.dataset.k] = ['de', 'ate'].includes(i.dataset.k) ? (i.value === '' ? null : +i.value) : i.value; });
+      c.destaque = {}; ce.querySelectorAll('[data-d]').forEach(i => { c.destaque[i.dataset.d] = i.value; });
+      if (!c.destaque.alvo) delete c.destaque; });
+    el.querySelectorAll('[data-s]').forEach(se => { const s = b.sfx[+se.dataset.s]; se.querySelectorAll('[data-sk]').forEach(i => { s[i.dataset.sk] = i.value; }); });
+  });
+  return r;
+}
+async function salvarRoteiro() {
+  try { const d = await api(BASE + '/roteiro', { roteiro: lerRoteiroDaTela() }); sujo = false; P.roteiro = d.roteiro; barra('✅ roteiro salvo', 'okk'); recarregar(true); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+function mexer(fn) { const r = lerRoteiroDaTela(); fn(r); P.roteiro = r; sujo = true; desenharRoteiro(); }
+$('blocos').addEventListener('input', () => { sujo = true; });
+$('blocos').addEventListener('focusin', ev => { if (ev.target.dataset.bk === 'fala_en') campoTag = ev.target; });
+$('bRotSalvar').onclick = salvarRoteiro;
+$('bRotIA').onclick = () => { if (P.roteiro && !confirm('Escrever um roteiro novo (o atual é substituído)?')) return; rodar(BASE + '/roteiro/gerar', {}); };
+$('bRotPrompt').onclick = async () => { const d = await api(BASE + '/roteiro/prompt', undefined, 'GET'); $('rPrompt').value = d.prompt; $('rPromptBox').style.display = 'block'; try { navigator.clipboard.writeText(d.prompt); barra('📋 prompt copiado', 'okk'); } catch (_) {} };
+$('bRotColar').onclick = async () => { try { const d = await api(BASE + '/roteiro', { resposta: $('rResp').value }); P.roteiro = d.roteiro; $('rPromptBox').style.display = 'none'; barra('✅ roteiro', 'okk'); recarregar(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+async function trocarIdioma(i) { if (sujo) await salvarRoteiro(); try { await api(BASE + '/comentario/idioma', { idioma: i }); recarregar(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+$('bEN').onclick = () => trocarIdioma('en'); $('bPT').onclick = () => trocarIdioma('pt');
+
+// ---------------------------------------------------------------- 3 voz
+function desenharVoz() {
+  const ts = P.takes || [], k = P.take_escolhido, g = P.gravacao;
+  $('takes').innerHTML = ts.map(t => `<div class="${g && g.fonte === 'guia' && k === t.take ? 'on' : ''}"><b>take ${t.take}</b> <span class="ct-dica">${t.dur.toFixed(1)} s${t.chave !== (P.tts || {}).chave ? '' : ''}</span>
+    <audio controls src="${arq(t.arquivo)}?v=${t.quando}"></audio>
+    <button class="ct-mini ${g && g.fonte === 'guia' && k === t.take ? 'ct-ok' : ''}" data-take="${t.take}">${g && g.fonte === 'guia' && k === t.take ? '✔ em uso' : '✔ usar este take'}</button></div>`).join('');
+  $('grav').innerHTML = g ? `<div class="ct-linha" style="margin-top:8px"><b>${g.fonte === 'guia' ? '🎙 take ' + (k || 1) : '🎤 sua voz'} no vídeo:</b><audio controls src="${arq(g.arquivo)}?v=${g.quando}"></audio>
+    <span class="ct-dica">${g.dur_original.toFixed(1)} s → ${g.dur.toFixed(1)} s sem os silêncios${g.desatualizada ? ' · ⚠ o roteiro mudou depois (gere a voz de novo)' : ''}</span></div>` : '';
+}
+$('bTakes').onclick = async () => { if (sujo) await salvarRoteiro(); rodar(BASE + '/comentario/takes', { voz: $('vVoz').value, n: +$('vN').value || 3 }); };
+let rec = null, pedacos = [], stream = null, t0 = 0, timer = null;
+$('bGravar').onclick = async () => {
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } }); }
+  catch (e) { barra('❌ microfone: ' + e.message, 'erro'); return; }
+  const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  rec = new MediaRecorder(stream, tipo ? { mimeType: tipo } : undefined); pedacos = [];
+  rec.ondataavailable = e => { if (e.data.size) pedacos.push(e.data); };
+  rec.onstop = () => { const blob = new Blob(pedacos, { type: rec.mimeType || 'audio/webm' }); enviarAudio(blob, 'gravacao' + ((rec.mimeType || '').includes('mp4') ? '.m4a' : (rec.mimeType || '').includes('ogg') ? '.ogg' : '.webm')); };
+  rec.start(1000); t0 = Date.now(); $('bGravar').style.display = 'none'; $('bParar').style.display = '';
+  timer = setInterval(() => { $('recInfo').textContent = `● REC ${((Date.now() - t0) / 1000).toFixed(0)} s`; }, 250);
+};
+$('bParar').onclick = () => { clearInterval(timer); rec.stop(); stream.getTracks().forEach(t => t.stop()); $('bParar').style.display = 'none'; $('bGravar').style.display = ''; $('recInfo').textContent = '⬆ enviando…'; };
+async function enviarAudio(blob, nome) {
+  const fd = new FormData(); fd.append('audio', blob, nome);
+  try { await api((P.editor && P.editor.job_id) ? BASE + '/trocar-voz' : BASE + '/gravacao', fd); $('recInfo').textContent = ''; ultimoFim = null; setTimeout(recarregar, 300); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('fAudio').onchange = () => { const f = $('fAudio').files[0]; if (f) enviarAudio(f, f.name); $('fAudio').value = ''; };
+
+// ---------------------------------------------------------------- 4 destaques e sons
+function desenharSugestoes() {
+  const ss = P.sugestoes || [];
+  const ROT = { foto_real: '🖼 foto real (buscador de imagem)', clipe_real: '📺 YouTube', ia: '✨ imagem gerada / personagem' };
+  $('sugs').innerHTML = ss.length ? `<b>💡 Sugestões de mídia</b> <span class="ct-dica">— onde os seus vídeos não mostram a frase. Sem aceitar, fica o seu vídeo.</span>` +
+    ss.map(x => `<div class="ct-linha" style="font-size:.84rem;border:1px solid var(--borda);border-radius:8px;padding:6px 8px">
+      <b>${x.id}</b> <span>${esc(ROT[x.layout] || x.layout)}: <b>${esc(x.query)}</b></span><span class="ct-dica" style="margin:0">${esc(x.por_que)} · “${esc(x.fala)}”</span>
+      ${x.usada ? `<span class="ct-ok" style="padding:2px 8px;border-radius:6px;color:#fff">✔ em uso</span><button class="ct-mini ct-sec" data-sug="${x.bloco}:${x.cena}:0">↩ voltar pro ${esc(x.fonte || 'meu vídeo')}</button>`
+        : `<button class="ct-mini" data-sug="${x.bloco}:${x.cena}:1">✔ usar a sugestão</button><span class="ct-dica" style="margin:0">(agora: ${esc(x.fonte || 'seu vídeo')})</span>`}</div>`).join('') : '';
+}
+function desenharDestaques() {
+  const prontos = P.destaques_prontos || {}, pend = P.destaques_pendentes || [];
+  const feitos = Object.values(prontos).map(id => (P.midias || []).find(m => m.id === id)).filter(Boolean);
+  $('dests').innerHTML = (feitos.length ? `<div class="ct-clipes">${feitos.map(m => `<div class="ct-clipe"><b>${m.id}</b> ${esc(m.descricao)}<video src="${arq(m.arquivo)}" controls preload="metadata"></video></div>`).join('')}</div>` : '') +
+    pend.map(x => `<div class="ct-linha" style="font-size:.84rem">⏳ <b>🎯 ${esc(x.alvo)}</b> <span class="ct-dica">${esc(x.motivo || '')}</span>${x.mid ? `<button class="ct-mini" data-manual="${esc(x.chave)}">✋ fazer no 🎯 Rastrear objeto</button>` : ''}</div>`).join('');
+}
+$('bDest').onclick = async () => { if (sujo) await salvarRoteiro(); rodar(BASE + '/comentario/destaques', {}); };
+$('bDestRefazer').onclick = () => { if (confirm('Procurar e rastrear todos os destaques de novo?')) rodar(BASE + '/comentario/destaques', { refazer: true }); };
+async function sonsDo(tipo) { if (!SONS[tipo]) SONS[tipo] = (await api('/curtos/sons/' + tipo, undefined, 'GET')).sons; return SONS[tipo]; }
+async function desenharDeixas() {
+  const ds = P.deixas || [];
+  if (!ds.length) { $('deixas').innerHTML = ''; return; }
+  const linhas = [];
+  for (const d of ds) {
+    const sons = await sonsDo(d.tipo);
+    linhas.push(`<div class="ct-linha" style="font-size:.84rem"><b>${d.bloco}</b> ${esc(SFX[d.tipo] || d.tipo)} ${d.palavra ? '· em “' + esc(d.palavra) + '”' : '· no começo'}
+      <select data-som="${d.bloco}:${d.indice}" style="width:auto">${sons.map(s => `<option value="${esc(s.id)}" data-arq="${esc(s.arquivo)}" ${s.id === d.som ? 'selected' : ''}>${esc(s.nome)} (${esc(s.categoria)})</option>`).join('')}</select>
+      <button class="ct-mini ct-sec" data-ouvir="${d.bloco}:${d.indice}">▶</button>
+      <button class="ct-mini ct-sec" data-pxb="${esc(d.busca)}" data-pxd="${d.bloco}:${d.indice}">🔎 Pixabay: ${esc(d.busca)}</button></div>`);
+  }
+  $('deixas').innerHTML = '<b>🔊 Sons</b>' + linhas.join('');
+}
+let pxAlvo = null, pxTermoAtual = '';
+async function pixabay(termo, alvo) { pxAlvo = alvo; pxTermoAtual = termo; $('pxTermo').value = termo; try { await api('/curtos/pixabay/buscar', { termo, limite: 6 }); pollPx(); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+async function pollPx() {
+  const d = await (await fetch('/curtos/pixabay/estado?termo=' + encodeURIComponent(pxTermoAtual), { cache: 'no-store' })).json();
+  const t = d.tarefa;
+  if (t && !t.fim) { barra('🔎 ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); setTimeout(pollPx, 1500); }
+  else if (t && t.erro) barra('❌ ' + t.erro, 'erro'); else if (t) barra('✅ ' + (t.msg || 'pronto'), 'okk');
+  $('pxRes').innerHTML = (d.sons || []).map(s => `<div><b>${esc(s.nome || s.titulo)}</b> <span class="ct-dica">${(s.dur || 0).toFixed(2)} s</span>
+     <audio controls src="/curtos/pixabay/arquivo/${s.arquivo}" style="height:30px"></audio>
+     <button class="ct-mini ${s.na_base ? 'ct-sec' : ''}" data-pxusar="${s.id}">${s.na_base ? '✔ na base — usar' : '➕ pôr na base' + (pxAlvo ? ' e usar' : '')}</button></div>`).join('');
+}
+$('bPx').onclick = () => { if ($('pxTermo').value.trim()) pixabay($('pxTermo').value.trim(), null); };
+
+// ---------------------------------------------------------------- 5 editor
+$('bPrevia').onclick = async () => {
+  if (sujo) await salvarRoteiro();
+  try {
+    const d = await api(BASE + '/previa', {}), W = d.dur;
+    $('previa').innerHTML = `<div class="ct-tl">${d.planos.map((x, i) => `<div style="left:${x.start / W * 100}%;width:${(x.end - x.start) / W * 100}%;background:${x.destaque_pronto ? '#dc2626' : ['#2563eb', '#1d4ed8'][i % 2]}" title="${esc(x.query)}">${esc(x.query)}</div>`).join('')}
+      ${d.sfx.map(x => `<div class="s" style="left:${x.start / W * 100}%" title="${esc(x.som)}"></div>`).join('')}</div>
+      <div class="ct-dica">${d.planos.length} planos em ${W.toFixed(1)} s (um a cada ${(W / d.planos.length).toFixed(1)} s) · 1º plano ${(d.planos[0].end - d.planos[0].start).toFixed(1)} s · ${d.sfx.length} som(ns) · legenda: ${esc(d.legendas.estilo)}</div>
+      <table class="ct-tab">${d.planos.map(x => `<tr><td>${x.start.toFixed(2)}–${x.end.toFixed(2)}</td><td>${x.bloco}</td><td>${esc(x.query)}</td><td>${esc(x.efeito || '')} ${x.entrada && x.entrada !== 'none' ? '· ' + esc(x.entrada) : ''}</td><td>${x.destaque_pronto ? '🎯 ' + x.destaque_pronto : x.destaque ? '⏳ 🎯 ' + esc(x.destaque.alvo) : ''}</td></tr>`).join('')}</table>`;
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bEditor').onclick = async () => {
+  if (sujo) await salvarRoteiro();
+  barra('🎬 montando o projeto do editor…');
+  try { const d = await api(BASE + '/editor', {}); barra('✅ no editor', 'okk'); location.href = d.link; } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bTudo').onclick = async () => { if (sujo) await salvarRoteiro(); rodar(BASE + '/fazer-tudo', { voz: $('vVoz').value }); };
+
+// ---------------------------------------------------------------- cliques e estado
+document.addEventListener('click', async ev => {
+  const t = ev.target, ds = t.dataset;
+  try {
+    if (ds.tag) { const c = campoTag; if (!c) { barra('clique antes numa fala em inglês', 'erro'); return; }
+      const i = c.selectionStart || 0; c.value = c.value.slice(0, i) + '[' + ds.tag + '] ' + c.value.slice(i); c.focus(); c.selectionStart = c.selectionEnd = i + ds.tag.length + 3; sujo = true; }
+    if (ds.mdel && confirm('Apagar ' + ds.mdel + '?')) { await api(BASE + '/midia/' + ds.mdel, { apagar: true }); recarregar(); }
+    if (ds.transc) rodar(BASE + '/comentario/transcrever', { mid: ds.transc });
+    if (ds.desc) rodar(BASE + '/comentario/descrever', { mid: ds.desc });
+    if (ds.marca) { const v = document.querySelector(`[data-vid="${ds.marca}"]`), ta = document.querySelector(`[data-linhas="${ds.marca}"]`);
+      ta.value = (ta.value ? ta.value.replace(/\s*$/, '\n') : '') + fmt(v.currentTime) + ' '; ta.focus(); }
+    if (ds.lsalvar) { const n = await api(BASE + '/comentario/linhas', { mid: ds.lsalvar, tipo: 'texto', texto: document.querySelector(`[data-linhas="${ds.lsalvar}"]`).value }); barra(n.referencia ? '✅ sem tempos: foi pra 📺 Referência — use 👁 pra IA achar os segundos no vídeo' : '✅ ' + n.linhas + ' linha(s) na linha do tempo', 'okk'); if (n.referencia) document.querySelector(`[data-linhas="${ds.lsalvar}"]`).value = ''; recarregar(); }
+    if (ds.ver) { const [mid, s] = ds.ver.split(':'); const v = document.querySelector(`[data-vid="${mid}"]`); if (v) { v.currentTime = +s; v.play(); v.scrollIntoView({ block: 'center' }); } }
+    if (ds.escolher) { if (sujo) await salvarRoteiro(); const [q, i] = ds.escolher.split(':'); await api(BASE + '/comentario/escolher', { qual: q, i: +i }); recarregar(true); }
+    if (ds.mais) rodar(BASE + '/comentario/mais', { qual: ds.mais });
+    if (ds.bdel !== undefined && confirm('Apagar o bloco?')) mexer(r => r.blocos.splice(+ds.bdel, 1));
+    if (ds.cadd !== undefined) mexer(r => { const b = r.blocos[+ds.cadd], u = b.cenas[b.cenas.length - 1] || {}; b.cenas.push({ layout: 'materia', material: u.material || 'M1', de: u.ate ?? 0, ate: (u.ate ?? 0) + 2, palavra: '', efeito: 'zoom_in', entrada: 'none' }); });
+    if (ds.sadd !== undefined) mexer(r => r.blocos[+ds.sadd].sfx.push({ tipo: 'swipe', palavra: '', busca: 'swipe' }));
+    if (ds.cdel) mexer(r => { const [b, c] = ds.cdel.split(':').map(Number); if (r.blocos[b].cenas.length > 1) r.blocos[b].cenas.splice(c, 1); });
+    if (ds.sdel) mexer(r => { const [b, s] = ds.sdel.split(':').map(Number); r.blocos[b].sfx.splice(s, 1); });
+    if (ds.take) rodar(BASE + '/comentario/take', { k: +ds.take });
+    if (ds.sug) { if (sujo) await salvarRoteiro(); const [b, c, u] = ds.sug.split(':').map(Number); await api(BASE + '/comentario/sugestao', { bloco: b, cena: c, usar: !!u }); recarregar(true); }
+    if (ds.manual) { const d = await api(BASE + '/comentario/destaque-manual', { chave: ds.manual }); location.href = d.link; }
+    if (ds.ouvir) { const sel = document.querySelector(`[data-som="${ds.ouvir}"]`); const o = sel.selectedOptions[0]; if (o && o.dataset.arq) new Audio('/sons/' + o.dataset.arq).play(); }
+    if (ds.pxb !== undefined && ds.pxd) { const [b, i] = ds.pxd.split(':'); pixabay(ds.pxb, { bloco: b, indice: +i }); }
+    if (ds.pxusar) { const d = await api('/curtos/pixabay/usar', Object.assign({ id: ds.pxusar, pid: PID }, pxAlvo || {})); SONS = {}; barra('✅ ' + d.som + ' na base', 'okk'); recarregar(true); pollPx(); }
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+document.addEventListener('change', async ev => {
+  const ds = ev.target.dataset;
+  if (ds.mdesc) await api(BASE + '/midia/' + ds.mdesc, { descricao: ev.target.value });
+  if (ds.som) { const [b, i] = ds.som.split(':'); await api(BASE + '/som', { bloco: b, indice: +i, som: ev.target.value }); }
+});
+window.addEventListener('beforeunload', ev => { if (sujo) { ev.preventDefault(); ev.returnValue = ''; } });
+
+async function recarregar(forcar) {
+  const d = await (await fetch(BASE + '/estado', { cache: 'no-store' })).json();
+  const antes = JSON.stringify((P || {}).roteiro);
+  const focoClipe = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.linhas;
+  P = d;
+  if (!focoClipe) desenharClipes();
+  desenharVoz(); desenharDestaques(); desenharSugestoes();
+  if (EXPL && document.activeElement !== $('cMidia')) { $('cMidia').value = d.midia_modo || 'minhas'; $('cEstilo').value = d.estilo_ia || 'realista';
+    $('midiaDica').textContent = { minhas: 'O vídeo sai só dos seus vídeos-fonte; o que faltar vira 💡 sugestão.', flow: 'Cada plano é gerado no Flow (foto ou vídeo de ~8 s) — nas prévias do editor, com os créditos das suas contas.', misto: 'Seus vídeos + banco de vídeo + Flow.' }[d.midia_modo] || ''; }
+  if (EXPL) { $('artInfo').textContent = (d.noticia.fontes || []).map(f => (f.estado === 'lida' ? '✅ ' : f.estado === 'erro' ? '❌ ' : '⏳ ') + (f.titulo || f.url)).join(' · ');
+    if (document.activeElement !== $('cTema')) $('cTema').value = d.noticia.texto || ''; }
+  if (window.encherMarca) encherMarca(d.marca);
+  const jid = (d.editor || {}).job_id;
+  $('lnkEditor').innerHTML = jid ? `<a href="/job/${jid}/edit-segments"><b>🎬 abrir no editor →</b></a>` : '';
+  if (!sujo || forcar) { if (forcar || JSON.stringify(d.roteiro) !== antes || !document.querySelector('.ct-bloco')) desenharRoteiro(); }
+  desenharDeixas();
+  const t = d.tarefa;
+  if (t && !t.fim) { barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); setTimeout(recarregar, 1500); }
+  else if (t && t.fim && t.fim !== ultimoFim) { ultimoFim = t.fim; t.erro ? barra('❌ ' + t.rotulo + ': ' + t.erro, 'erro') : barra('✅ ' + t.rotulo + (t.msg ? ' — ' + t.msg : ''), 'okk'); if (!t.erro) { sujo = false; desenharRoteiro(); } }
+}
+recarregar();
+</script>
+{% include "_curto_marca.html" %}
+{% endblock %}
