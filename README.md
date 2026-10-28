@@ -30,6 +30,8 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ## 💡 Nichos de canais + 📚 explicativo do zero no Flow (v84_256)
 
+> v84_257: “💡 gerar ideias” com mais espaço pra resposta (e, se ela vier cortada, tenta de novo pedindo 5) e mais tempo; o roteiro do 💬/📚 também. Quando a IA falha, a mensagem diz o motivo de verdade (cortada, tempo esgotado, chave inválida, sem crédito, limite, desligada).
+
 Na página **📱 Vídeos curtos → Explicativo**:
 - **💡 Nichos de canais explicativos** (em inglês, do zero, 1 vídeo por dia): Shape Reason, Wild Trickcraft, Saved By Design, Hidden Origins Daily, Made In Minutes e Bite Behind It (`assets/curtos/nichos.json`). **➕ criar o canal** = o perfil 📚 Explicativo + o tema do nicho (a marca já vem com o @ do nome). **💡 ideias** → **gerar 10 ideias** (com pedido extra opcional): título em inglês + português, o gancho, o assunto com os fatos e o que mostrar — sem repetir as que já saíram. Cada ideia → **📚 criar vídeo** (ou **🚀 criar e fazer tudo**), já no modo Flow.
 - **As imagens do vídeo** (no projeto e no formulário): **🎞 só com os meus vídeos** (o que faltar vira 💡 sugestão), **✨ gerar tudo no Flow** — cada plano é uma FOTO gerada (com zoom lento) ou, quando o movimento importa, um **vídeo de ~8 s** (novo layout 🎬 vídeo gerado) — ou **🔀 misto**. Estilo **📷 realista** (o padrão: cada pedido vai como filmagem de verdade — luz natural, sem ilustração/3D/texto) ou 🎨 livre. A geração acontece nas prévias do editor, com os créditos das suas contas do Flow; sem crédito, o editor pesquisa a cena.

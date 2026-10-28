@@ -103,11 +103,18 @@ def gerar_ideias(base: str, cid: str, n: int = 10, chamar: Optional[Callable[...
         f"WHAT IT SHOWS: {ni.get('visual') or ''}", "EXAMPLES OF THE KIND OF VIDEO: " + "; ".join(ni.get("temas") or []),
         *( [f"EXTRA REQUEST: {pedido}"] if pedido else []),
         "", f"ALREADY DONE (do not repeat, not even reworded): {'; '.join(ja[-120:]) or '(none)'}",
-        "", f"Give {max(3, min(20, int(n)))} NEW ideas."])
+        "", "Give {N} NEW ideas. Keep 'tema' to 2-3 short sentences and 'visual' to one line."])
     import ia_servico
-    r = (chamar or ia_servico.chamar)("curtos", IDEIAS_SYS, txt, schema=IDEIAS_SCHEMA, max_tokens=4000, job=cid, cache_local=False)
+    r = None
+    for k in (max(3, min(20, int(n))), 5):  # resposta cortada (grande demais)? tenta de novo com menos ideias
+        kw: Dict[str, Any] = {"schema": IDEIAS_SCHEMA, "max_tokens": 9000, "job": cid, "cache_local": False}
+        if chamar is None:
+            kw["timeout"] = 180.0
+        r = (chamar or ia_servico.chamar)("curtos", IDEIAS_SYS, txt.replace("{N}", str(k)), **kw)
+        if r or "cortada" not in CT.motivo_ia():
+            break
     if not r:
-        raise CT.CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia).")
+        raise CT.CurtoErro(CT.motivo_ia())
     vistos = {CT.norm(t) for t in ja}
     novas = []
     for i in r.get("ideias") or []:

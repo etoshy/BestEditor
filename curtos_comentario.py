@@ -244,7 +244,7 @@ def descrever_clipe(base: str, pid: str, mid: str, chamar: Optional[Callable[...
     r = (chamar or ia_servico.chamar)("curtos", DESCRICAO_FONTE_SYS if fonte else DESCRICAO_SYS, blocos, schema=DESCRICAO_SCHEMA,
                                       max_tokens=2500, job=pid)
     if not r:
-        raise CT.CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia).")
+        raise CT.CurtoErro(CT.motivo_ia())
     texto = "\n".join(f"{float(x['de']):.1f} - {float(x['ate']):.1f} {x['o_que']}" for x in r.get("momentos") or [])
     if r.get("resumo"):
         with CT._TRAVA:
@@ -569,11 +569,11 @@ def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = No
     elif not dados(p)["linhas"] and not dados(p).get("referencia") and not (p.get("noticia") or {}).get("texto"):
         raise CT.CurtoErro("Diga o que acontece no clipe: a transcrição, uma descrição com os segundos, ou use 🎙/👁 pra tirar sozinho.")
     import ia_servico
-    r = (chamar or ia_servico.chamar)("curtos", sistema(p), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=7000,
+    r = (chamar or ia_servico.chamar)("curtos", sistema(p), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=12000,
+                                      **({} if chamar else {"timeout": 240.0}),
                                       effort="medium", job=pid, cache_local=False)
     if not r:
-        raise CT.CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia). "
-                           "Use o 📋 prompt numa outra IA e cole a resposta.")
+        raise CT.CurtoErro(CT.motivo_ia() + " Use o 📋 prompt numa outra IA e cole a resposta.")
     with CT._TRAVA:
         p = CT.carregar(base, pid)
         p["roteiro"] = ler_roteiro(r, p, dados(p).get("idioma") or "en")
@@ -605,7 +605,7 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
     import ia_servico
     resp = (chamar or ia_servico.chamar)("curtos", sistema(p), txt, schema=MAIS_SCHEMA, max_tokens=1200, job=pid, cache_local=False)
     if not resp:
-        raise CT.CurtoErro("A IA não respondeu.")
+        raise CT.CurtoErro(CT.motivo_ia())
     novas = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get("opcoes") or [] if o.get("en")]
     with CT._TRAVA:
         p = CT.carregar(base, pid)

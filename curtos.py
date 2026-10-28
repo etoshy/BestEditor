@@ -1004,8 +1004,7 @@ def gerar_perfil(base: str, cid: str, chamar: Optional[Callable[..., Any]] = Non
         c["metricas"] = metricas_canal(c)
         salvar_canal(base, c)
     if not bruto:
-        raise CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia). "
-                        "Os números do canal já entraram no perfil; use o 📋 prompt pra outra IA se quiser o resto.")
+        raise CurtoErro(motivo_ia() + " Os números do canal já entraram no perfil; use o 📋 prompt pra outra IA se quiser o resto.")
     return c["perfil"]
 
 
@@ -1116,6 +1115,30 @@ ESTILOS_IA = {"realista": "📷 realista (parece filmado)", "livre": "🎨 livre
 def estilo_ia_do(p: Dict[str, Any], perfil: Optional[Dict[str, Any]] = None) -> str:
     v = (p.get("config") or {}).get("estilo_ia") or (perfil or {}).get("estilo_ia") or ""
     return v if v in ESTILOS_IA else "livre"
+
+
+def motivo_ia(recurso: str = "curtos") -> str:
+    """Por que a IA não respondeu — o motivo DE VERDADE (desligada, sem crédito, resposta cortada, tempo esgotado, chave…)."""
+    try:
+        import ia_servico
+        m = ia_servico.motivo_desligado(recurso)
+        if m:
+            return f"A IA está desligada aqui: {m}"
+        ult = next((r for r in reversed(ia_servico._RECENTES) if r.get("recurso") == recurso and not r.get("ok")
+                    and time.time() - float(r.get("quando") or 0) < 600), None)
+    except Exception:  # noqa: BLE001
+        ult = None
+    if not ult:
+        return "A IA não respondeu (sem detalhe — veja as últimas chamadas em /ia)."
+    e = str(ult.get("erro") or "")
+    traducao = [("max_tokens", "a resposta ficou grande demais e foi cortada"), ("refusal", "a IA se recusou a responder esse pedido"),
+                ("timed out", "demorou demais (tempo esgotado)"), ("rede:", "falha de rede"), ("401", "a chave da IA é inválida (/ia)"),
+                ("credit", "sem crédito na conta da IA"), ("429", "limite de uso da IA — espere um pouco"),
+                ("json", "a IA respondeu fora do formato"), ("529", "a IA está sobrecarregada — tente de novo")]
+    for k, t in traducao:
+        if k in e.lower():
+            return f"A IA não respondeu: {t} ({e[:120]})."
+    return f"A IA não respondeu: {e[:200]}"
 
 
 def proporcao_do(p: Dict[str, Any]) -> str:
@@ -1554,8 +1577,7 @@ def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = No
     r = chamar("curtos", _sys_roteiro(perfil), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=6000,
                effort="medium", job=pid, cache_local=False)
     if not r:
-        raise CurtoErro("A IA não respondeu (desligada, sem crédito ou o recurso “⚡ Vídeos curtos” desligado em /ia). "
-                        "Use o 📋 prompt numa outra IA e cole a resposta.")
+        raise CurtoErro(motivo_ia() + " Use o 📋 prompt numa outra IA e cole a resposta.")
     with _TRAVA:
         p = carregar(base, pid)
         p["roteiro"] = ler_roteiro(r, p, ids_extras(base, p))

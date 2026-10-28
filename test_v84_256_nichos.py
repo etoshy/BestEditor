@@ -165,3 +165,25 @@ def test_rotas_nichos_ideias(cliente, base, monkeypatch):
     _esperar(pid) if __import__("curtos_rotas").TAREFAS.get(pid) else None
     p = CT.carregar(base, pid)
     assert p["canal_id"] == cid and p["config"]["midia"] == "flow" and not p["midias"]
+
+
+def test_motivo_da_ia_e_tenta_com_menos(base, monkeypatch):
+    import ia_servico
+    import time as _t
+    monkeypatch.setattr(ia_servico, "motivo_desligado", lambda *a, **k: None)
+    monkeypatch.setattr(ia_servico, "_RECENTES", [{"quando": _t.time(), "recurso": "curtos", "ok": False, "erro": "stop_reason=max_tokens"}])
+    assert "grande demais" in CT.motivo_ia()
+    c = CN.criar_canal_do_nicho(base, "made_in_minutes")
+    pedidos = []
+
+    def chamar(recurso, sistema, conteudo, **kw):
+        pedidos.append(conteudo)
+        return None if len(pedidos) == 1 else json.loads(json.dumps(IDEIAS))
+    novas = CN.gerar_ideias(base, c["id"], 10, chamar)
+    assert len(pedidos) == 2 and "Give 10 NEW" in pedidos[0] and "Give 5 NEW" in pedidos[1] and len(novas) == 2
+    monkeypatch.setattr(ia_servico, "_RECENTES", [{"quando": _t.time(), "recurso": "curtos", "ok": False, "erro": "401: invalid x-api-key"}])
+    with pytest.raises(CT.CurtoErro) as e:
+        CN.gerar_ideias(base, c["id"], 10, lambda *a, **k: None)
+    assert "chave da IA é inválida" in str(e.value)
+    monkeypatch.setattr(ia_servico, "motivo_desligado", lambda *a, **k: "o recurso está desligado")
+    assert "desligada" in CT.motivo_ia()
