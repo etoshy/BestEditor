@@ -57,6 +57,7 @@ CONFIG_PADRAO: Dict[str, Any] = {
     "visivel": False,            # mostrar os navegadores
     "contas": [],                # quais contas usar ([] = todas, na ordem de 🔑 Contas Google)
     "tentativas": 2,             # erro comum (não é crédito/recusa): tenta de novo até N vezes
+    "pausar_no_incomum": False,  # 🔁 v84_269: "atividade incomum" → a conta descansa e o pedido vai pra OUTRA conta (True = pausa o lote)
 }
 TIPOS = ("imagem", "video")
 QUANTIDADES = ("x1", "x2", "x3", "x4")
@@ -66,7 +67,7 @@ RE_TROCAR_CONTA = re.compile(r"atividade incomum|unusual activity|extens[õo]es 
 MINUTOS_INCOMUM = 60
 DESCANSO_MIN = 5            # 🩹 v84_237: conta com erros seguidos / que não abriu o projeto descansa e volta sozinha
 DESCANSO_NAVEGADOR_MIN = 2  # o navegador dela não abriu (perfil preso, Chrome fechando…)
-PAUSAR_NO_INCOMUM = True  # ⏸ v84_220: "atividade incomum" pausa o lote em vez de passar pra outra conta
+PAUSAR_NO_INCOMUM = False  # v84_269: padrão = trocar de conta (v84_220 pausava o lote); liga em "pausar_no_incomum" da config
 _RE_PREFIXO = re.compile(r"^\s*(foto|imagem|image|img|photo|v[ií]deo|video)\s*[:\-–—]\s*", re.I)
 
 INSTRUCAO_FOTO = (
@@ -141,7 +142,7 @@ def normalizar_config(d: Dict[str, Any], base: Optional[Dict[str, Any]] = None) 
                 c[k] = max(0.0, min(600.0, float(v)))
             elif k == "tentativas":
                 c[k] = max(1, min(5, int(v)))
-            elif k in ("converter_para_foto", "visivel"):
+            elif k in ("converter_para_foto", "visivel", "pausar_no_incomum"):
                 c[k] = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on", "sim", "yes")
             elif k == "contas":
                 c[k] = [str(x) for x in (v or []) if str(x).strip()][:50]
@@ -850,7 +851,7 @@ class Lote:
                     job = None
                     break
                 except fd.FlowRecusou as exc:
-                    if RE_TROCAR_CONTA.search(exc.mensagem or "") and PAUSAR_NO_INCOMUM:
+                    if RE_TROCAR_CONTA.search(exc.mensagem or "") and (PAUSAR_NO_INCOMUM or self.cfg.get("pausar_no_incomum")):
                         # ⏸ v84_220: o Google desconfiou da automação. Pular pra outra conta só espalha a desconfiança —
                         # o pedido volta pra fila e o LOTE PAUSA; você retoma quando quiser (de preferência mais tarde).
                         with self.trava:

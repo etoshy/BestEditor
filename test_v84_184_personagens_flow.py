@@ -337,7 +337,7 @@ def test_referencia_com_nome_pelo_conteudo(flow, tmp_path):
 
 
 def test_atividade_incomum_pausa_o_lote(tmp_path, monkeypatch):
-    """⏸ v84_220 (padrão): "atividade incomum" pausa o lote e o pedido volta pra fila — nada de pular pra outra conta."""
+    """⏸ v84_220 (opção desde v84_269): "atividade incomum" pausa o lote e o pedido volta pra fila — nada de pular pra outra conta."""
     import sys
     import types
     import app  # noqa: F401
@@ -345,7 +345,7 @@ def test_atividade_incomum_pausa_o_lote(tmp_path, monkeypatch):
     from googleflow import flow_direto as fd
     from googleflow import googleflow_client as gf
     monkeypatch.setattr(fl, "pasta", lambda: str(tmp_path))
-    assert fl.PAUSAR_NO_INCOMUM is True
+    monkeypatch.setattr(fl, "PAUSAR_NO_INCOMUM", True)  # v84_269: o padrão agora é trocar de conta; pausar é opção
     pw = types.ModuleType("playwright.sync_api")
     pw.sync_playwright = lambda: types.SimpleNamespace(start=lambda: types.SimpleNamespace(stop=lambda: None))
     monkeypatch.setitem(sys.modules, "playwright.sync_api", pw)

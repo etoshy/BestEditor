@@ -63,7 +63,10 @@
 
 <div class="si-card">
   <h2 style="margin:0">🏠 Cenários que se repetem</h2>
-  <div class="si-linha"><button id="bAddL" class="si-mini">➕ cenário</button> <button id="bRefsL" class="si-mini">🖼 gerar os que faltam</button></div>
+  <div class="si-linha"><button id="bAddL" class="si-mini">➕ cenário</button> <button id="bRefsL" class="si-mini">🖼 gerar os que faltam</button>
+    <button id="bRefazerL" class="si-mini">🎨 refazer todos no traço dos personagens</button></div>
+  <div class="si-linha" id="lEstilo"></div>
+  <p class="si-dica">Os cenários são gerados com a <b>imagem de estilo</b> como referência (só o traço: linha, sombra chapada, paleta) — assim saem do mesmo anime dos personagens, não pintura realista.</p>
   <div class="si-grade" id="gCenarios"></div>
 </div>
 
@@ -267,6 +270,21 @@ $('bVozesP').onclick = async () => {
   try { await api(BASE + '/vozes', { ids }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
 };
 $('bRefsL').onclick = () => refsQueFaltam(S.cenarios);
+$('bRefazerL').onclick = async () => {
+  const ids = S.cenarios.filter(c => !['fila', 'gerando', 'parado'].includes((c.ref || {}).estado)).map(c => c.id);
+  if (!ids.length) return;
+  try { const r = await api(BASE + '/refs', { ids }); barra(`🎨 ${r.enviadas} cenário(s) na fila, no traço da imagem de estilo` + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+function desenharEstilo() {
+  const com = S.elenco.filter(p => (p.ref || {}).arquivo);
+  const atual = S.estilo_ref || ((com[0] || {}).ref || {}).arquivo;
+  const de = S.estilo_ref ? (S.elenco.find(p => (p.ref || {}).arquivo === S.estilo_ref) || {}).nome || 'imagem sua' : (com[0] ? com[0].nome + ' (padrão)' : '—');
+  $('lEstilo').innerHTML = `<b>🎨 imagem de estilo:</b> ${atual ? `<img src="${arqRef(atual)}" style="height:64px;border-radius:6px">` : ''} <span class="si-dica" style="margin:0">${esc(de)}</span>
+    <select id="selEstilo" style="width:auto"><option value="">usar de…</option>${com.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
+    <label class="si-mini si-sec" style="cursor:pointer">⬆ imagem<input type="file" accept="image/*" id="fEstilo" hidden></label>`;
+  $('selEstilo').onchange = async ev => { if (!ev.target.value) return; try { await api(BASE + '/estilo', { de: ev.target.value }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+  $('fEstilo').onchange = async ev => { const f = ev.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(BASE + '/estilo', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+}
 
 let timer = null;
 async function recarregar() {
@@ -275,7 +293,7 @@ async function recarregar() {
     const d = await api(BASE + '/estado', undefined, 'GET');
     const focado = document.activeElement && document.activeElement.closest('.si-item[data-id]');
     S = d.serie;
-    if (!focado) desenhar();
+    if (!focado) { desenhar(); desenharEstilo(); }
     if (!(document.activeElement && document.activeElement.closest('#cRascunho'))) desenharCapitulo();
     const t = d.tarefa;
     if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : ''));
@@ -285,6 +303,6 @@ async function recarregar() {
     if ((t && t.rodando) || espera) timer = setTimeout(recarregar, 4000);
   } catch (e) { barra('❌ ' + e.message, 'erro'); }
 }
-desenhar(); desenharCapitulo(); recarregar();
+desenhar(); desenharEstilo(); desenharCapitulo(); recarregar();
 </script>
 {% endblock %}

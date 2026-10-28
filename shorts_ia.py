@@ -55,11 +55,13 @@ ESTILOS: Dict[str, Dict[str, str]] = {
     },
     "anime_cotidiano": {
         "nome": "🌾 Anime de cotidiano (interior, aconchegante)",
-        "dica": "slice-of-life no interior: luz de verão, cenários pintados em aquarela, traço limpo, expressões grandes e fofas",
-        "prompt": ("2D Japanese slice-of-life anime style, clean soft lineart, gentle cel shading, warm natural sunlight, lush "
-                   "hand-painted watercolor backgrounds of the Japanese countryside (rice fields, old wooden houses, sea, "
-                   "mountains, cicadas summer mood), soft pastel palette, big expressive eyes, cute exaggerated comedic "
-                   "reactions on the gags, cinematic framing, original characters"),
+        "dica": "slice-of-life no interior: luz de verão, traço limpo, cores chapadas suaves, expressões grandes e fofas",
+        # v84_270: "watercolor backgrounds" puxava os cenários pra pintura semi-realista — fora do traço dos personagens
+        "prompt": ("2D Japanese slice-of-life TV anime style, flat cel shading with clean thin lineart, simple flat color "
+                   "fills with one soft shadow tone, the SAME simple anime look for characters and backgrounds (backgrounds "
+                   "drawn with clean lines and flat colors, not painterly, not photorealistic), warm summer daylight, soft "
+                   "pastel palette, Japanese countryside, big expressive eyes, cute exaggerated comedic reactions on the "
+                   "gags, original characters"),
     },
     "anime_3d": {
         "nome": "🧸 3D estilizado",
@@ -1327,9 +1329,49 @@ def prompt_ficha_personagem(s: Dict[str, Any], p: Dict[str, Any]) -> str:
             "other characters, no scenery, no watermark.")[:3800]
 
 
-def prompt_ref_cenario(s: Dict[str, Any], c: Dict[str, Any]) -> str:
-    return (f"{ESTILOS[s['estilo']]['prompt']}. Background art of an empty location ({c['nome']}): {c['descricao']}. "
-            "Establishing view, no characters, no people, no text, no logo.")
+def prompt_ref_cenario(s: Dict[str, Any], c: Dict[str, Any], com_estilo: bool = False) -> str:
+    estilo = (" The reference image is ONLY a STYLE reference: match its art style EXACTLY — same lineart thickness, same "
+              "flat cel shading, same color palette and saturation, same simplicity and level of detail — so this "
+              "background looks like it belongs to the same anime as that image. Do NOT draw the character or any person "
+              "from the reference." if com_estilo else "")
+    return (f"{ESTILOS[s['estilo']]['prompt']}. Anime background art of an empty location ({c['nome']}): {c['descricao']}. "
+            f"Establishing view, no characters, no people, no text, no logo.{estilo}")[:3800]
+
+
+def ancora_estilo(base: str, s: Dict[str, Any]) -> Optional[str]:
+    """🎨 a imagem que dita o TRAÇO da série (cenários e tudo mais seguem ela): a que você escolheu, senão a 📋 ficha /
+    🧍 referência do 1º personagem que tiver."""
+    if s.get("estilo_ref"):
+        c = os.path.join(pasta_serie(base, s["id"]), "refs", os.path.basename(s["estilo_ref"]))
+        if os.path.isfile(c):
+            return c
+    for p in s["elenco"]:
+        c = caminho_ref(base, s, p)
+        if c:
+            return c
+    return None
+
+
+def guardar_estilo_ref(base: str, sid: str, origem: Optional[str], de_personagem: str = "") -> Optional[str]:
+    """🎨 escolhe a imagem de estilo: um arquivo seu, a referência de um personagem (`de_personagem`) ou nada (volta ao padrão)."""
+    from PIL import Image
+    with TRAVA:
+        s = carregar_serie(base, sid)
+        nome = None
+        if de_personagem:
+            c = caminho_ref(base, s, item(s, de_personagem))
+            if not c:
+                raise ShortsIAErro("Esse personagem ainda não tem referência.")
+            nome = os.path.basename(c)
+        elif origem:
+            nome = f"estilo_{secrets.token_hex(3)}.png"
+            try:
+                Image.open(origem).convert("RGB").save(os.path.join(pasta_refs(base, sid), nome))
+            except Exception as exc:  # noqa: BLE001
+                raise ShortsIAErro("Não consegui abrir essa imagem.") from exc
+        s["estilo_ref"] = nome
+        salvar_serie(base, s)
+        return nome
 
 
 def refs_da_cena(base: str, s: Dict[str, Any], cena: Dict[str, Any]) -> List[Tuple[str, str]]:
@@ -1443,6 +1485,10 @@ def _colagem(refs: List[Tuple[str, str]], pasta: str) -> Optional[str]:
     return CP.colagem_de([c for _r, c in refs], pasta)
 
 
+def iid_p(it: Dict[str, Any]) -> bool:
+    return str(it.get("id") or "").startswith("P")
+
+
 def pedir_refs(base: str, sid: str, ids: List[str], com_foto: bool = False, preparar: bool = False) -> Dict[str, Any]:
     """🧍 a referência ISOLADA de cada personagem (corpo inteiro, fundo liso) / cenário vazio, no Flow.
     `com_foto`: as imagens de inspiração do personagem vão como referência (sai parecido com elas); sem: só pelo texto.
@@ -1463,8 +1509,13 @@ def pedir_refs(base: str, sid: str, ids: List[str], com_foto: bool = False, prep
                 col = fotos[0] if len(fotos) == 1 else _colagem([(f"photo {k}", c) for k, c in enumerate(fotos, 1)],
                                                                  os.path.join(pasta_serie(base, sid), "_colagens"))
                 pedido.update(prompt=prompt_ref_com_foto(s, it, len(fotos)), referencia_arquivo=col)
-            else:
-                pedido["prompt"] = prompt_ref_personagem(s, it) if iid.startswith("P") else prompt_ref_cenario(s, it)
+            elif iid.startswith("P"):
+                pedido["prompt"] = prompt_ref_personagem(s, it)
+            else:  # 🏞 cenário: o traço vem da imagem de estilo (o personagem), pra não sair pintura realista
+                anc = ancora_estilo(base, s)
+                pedido["prompt"] = prompt_ref_cenario(s, it, bool(anc))
+                if anc:
+                    pedido["referencia_arquivo"] = anc
             if preparar and iid.startswith("P"):
                 it["preparar"] = True
                 it["ficha"] = dict(_slot(), arquivo=(it.get("ficha") or {}).get("arquivo"))  # a ficha velha não vale pra ref nova
@@ -1476,7 +1527,7 @@ def pedir_refs(base: str, sid: str, ids: List[str], com_foto: bool = False, prep
         for it, j, pedido in zip(alvo, novos, itens):
             velho = it.get("ref") or {}
             it["ref"] = dict(_slot(), estado="fila", flow_job=j["id"], prompt=pedido["prompt"], msg="⏳ na fila do Flow"
-                             + (" (com a foto)" if pedido.get("referencia_arquivo") else ""),
+                             + ((" (com a foto)" if iid_p(it) else " (no traço da imagem de estilo)") if pedido.get("referencia_arquivo") else ""),
                              anterior=velho.get("arquivo"), com_foto=bool(pedido.get("referencia_arquivo")))
             if velho.get("arquivo"):
                 it["ref"]["arquivo"] = velho["arquivo"]  # a antiga continua valendo até a nova chegar

@@ -485,3 +485,21 @@ def test_gerar_com_foto_e_sem_foto(base, lote, tmp_path):
     ia = _ia(dict(UNIVERSO["elenco"][0], aparencia="like the photos", imagem=1))
     SI.refazer_personagem(base, sid, "P1", "inspiracao", chamar=ia)  # padrão: com a foto
     assert "PARECIDO com as imagens" in ia.vistos[0][0] and lote.fila[-1].get("referencia_arquivo")
+
+
+def test_cenario_no_traco_dos_personagens(base, lote, tmp_path):
+    """v84_270: o cenário vai com a imagem de estilo (o personagem) como referência — sem pintura realista."""
+    s = SI.gerar_universo(base, SI.nova_serie(base, estilo="anime_cotidiano")["id"], "x", chamar=_ia(UNIVERSO))
+    sid = s["id"]
+    assert "watercolor" not in SI.ESTILOS["anime_cotidiano"]["prompt"] and "not painterly" in SI.ESTILOS["anime_cotidiano"]["prompt"]
+    SI.pedir_refs(base, sid, ["L1"])
+    assert not lote.fila[-1].get("referencia_arquivo")  # ninguém tem referência ainda: só o texto
+    SI.guardar_ref(base, sid, "P2", _img(str(tmp_path / "k.png")))
+    lote.terminar(lote.galeria)
+    SI.sincronizar_serie(base, sid)
+    SI.pedir_refs(base, sid, ["L1"])
+    j = lote.fila[-1]
+    assert j["referencia_arquivo"] == SI.caminho_ref(base, SI.carregar_serie(base, sid), SI.item(SI.carregar_serie(base, sid), "P2"))
+    assert "ONLY a STYLE reference" in j["prompt"] and "Do NOT draw the character" in j["prompt"]
+    nome = SI.guardar_estilo_ref(base, sid, _img(str(tmp_path / "e.png"), (0, 0, 0)))
+    assert SI.ancora_estilo(base, SI.carregar_serie(base, sid)).endswith(nome)

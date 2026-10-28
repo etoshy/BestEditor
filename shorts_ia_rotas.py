@@ -293,6 +293,19 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         ids = [str(x) for x in d.get("ids") or []]
         return _tentar(lambda: SI.pedir_refs(base_dir, sid, ids, com_foto=bool(d.get("com_foto")), preparar=bool(d.get("preparar"))))
 
+    @app.route("/shorts-ia/s/<sid>/estilo", methods=["POST"])
+    def shorts_ia_estilo(sid: str):
+        """🎨 a imagem que dita o traço (cenários seguem ela): arquivo seu, a referência de um personagem, ou padrão."""
+        _serie(sid)
+        try:
+            if request.files.get("arquivo"):
+                nome = SI.guardar_estilo_ref(base_dir, sid, _upload())
+            else:
+                nome = SI.guardar_estilo_ref(base_dir, sid, None, str(_corpo().get("de") or ""))
+        except SI.ShortsIAErro as exc:
+            return _erro(str(exc))
+        return _ok(estilo_ref=nome)
+
     @app.route("/shorts-ia/s/<sid>/fichas", methods=["POST"])
     def shorts_ia_fichas(sid: str):
         """📋 a folha de personagem (várias vistas + expressões + nome/gênero/idade) no Flow, a partir da referência."""
