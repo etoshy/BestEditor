@@ -28,6 +28,11 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ---
 
+## 🧭 Vídeos curtos: contraponto e reflexão (v84_249)
+
+- Todo roteiro, além de dar a notícia, traz um bloco **contraponto** (pelo menos um ponto de discordância: o outro lado com o melhor argumento dele, o que a manchete não conta, o que a reação da internet exagera ou esquece) e um bloco **reflexão** curto (1–2 frases, sem sermão; pode fechar perguntando o que quem assiste acha). Opinião soa como opinião e nada é inventado pra sustentar o contraponto. Fica no perfil do canal em **ponto_de_vista** (ligado por padrão; dá pra desligar no JSON do perfil).
+- Perfil **Laestro v2**: sem o bordão “relaxa e agacha que eu vou te explicar” (é do canal original), estrutura gancho → contexto → fato → contraponto → reflexão → final. O canal Laestro que já existe no seu site é atualizado sozinho ao abrir a aba — só esses campos (estrutura, composições, linguagem, tom, ponto de vista, o que evitar); legenda, ritmo e o resto que você ajustou ficam.
+
 ## 🚀 Vídeos curtos: fazer tudo e trocar a voz (v84_247)
 
 - **🚀 Fazer tudo** (no topo do vídeo, e marcado por padrão no “+ Novo vídeo”): notícia (+ link opcional) → lê a matéria → 🤖 roteiro no estilo do canal → narra com a voz guia (TTS) → alinha → **projeto pronto no editor**, com legenda, textos, sons e as mídias sendo buscadas. Pula o que já está feito e em dia (roteiro existente, voz guia do mesmo roteiro, gravação sua em dia). “roteiro novo” pede outro roteiro.

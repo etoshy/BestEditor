@@ -267,7 +267,7 @@ def test_midias_do_editor_inclui_canal(base, tmp_path):
     img = tmp_path / "k.png"
     from PIL import Image
     Image.new("RGB", (300, 300), "white").save(img)
-    CT.adicionar_midia_canal(base, c, str(img), "foto", "dançarina — relaxa e agacha")
+    CT.adicionar_midia_canal(base, c, str(img), "foto", "gato pensando — no contraponto")
     CT.salvar_canal(base, c)
     p = CT.criar(base, c["id"], "x")
     ms = CT.midias_para_editor(base, p)
@@ -484,3 +484,37 @@ def test_laestro_ja_vem_como_canal(cliente, base):
     CT.excluir_canal(base, cs[0]["id"])
     cl.get("/curtos")
     assert CT.listar_canais(base) == []  # apagou? não volta
+
+
+
+def test_contraponto_e_reflexao_no_roteiro(base):
+    c = CT.criar_canal(base, "X")
+    p = CT.criar(base, c["id"], "x", texto="notícia")
+    pr = CT.prompt_roteiro(base, p)
+    assert "contraponto" in pr and "reflexao" in pr and "PONTO DE VISTA" in pr
+    c["perfil"]["ponto_de_vista"]["usa"] = False
+    CT.salvar_canal(base, c)
+    assert "9b. PONTO DE VISTA" not in CT.prompt_roteiro(base, p)
+    r = CT.ler_roteiro({"blocos": [{"funcao": "contraponto", "fala": "mas pensa comigo"}, {"funcao": "reflexao", "fala": "fica a dica"}]}, p)
+    assert [b["funcao"] for b in r["blocos"]] == ["contraponto", "reflexao"]
+
+
+def test_laestro_v2_sem_bordao_e_atualiza_canal_antigo(base):
+    import json as _j
+    pr = CT.perfis_prontos()["laestro"]
+    assert "agacha" not in _j.dumps(pr["perfil"]["estrutura"]) + _j.dumps(pr["perfil"]["composicoes"]) + pr["perfil"]["linguagem"]
+    assert any(e["funcao"] == "contraponto" for e in pr["perfil"]["estrutura"]) and pr["perfil"]["ponto_de_vista"]["usa"]
+    # canal criado com a v1 (com o bordão) e uma legenda que você mudou
+    c = CT.criar_canal(base, "Laestro")
+    c["perfil"]["estrutura"] = [{"funcao": "pergunta", "descricao": "relaxa e agacha", "segundos": 3}]
+    c["perfil"]["legenda"]["cor_texto"] = "#123456"
+    c["perfil_origem"], c["perfil_versao"] = "laestro", 1
+    CT.salvar_canal(base, c)
+    os.makedirs(CT.raiz(base), exist_ok=True)
+    with open(os.path.join(CT.raiz(base), "prontos_criados.json"), "w") as f:
+        _j.dump(["laestro"], f)
+    CT.garantir_canais_prontos(base)
+    c = CT.carregar_canal(base, c["id"])
+    assert c["perfil_versao"] == 2 and "agacha" not in _j.dumps(c["perfil"]["estrutura"])
+    assert c["perfil"]["legenda"]["cor_texto"] == "#123456"  # o que você ajustou ficou
+    assert len(CT.listar_canais(base)) == 1

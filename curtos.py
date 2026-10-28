@@ -121,7 +121,7 @@ def garantir_cenas() -> bool:
         return False
 
 
-FUNCOES_BLOCO = ("gancho", "contexto", "fato", "virada", "detalhe", "consequencia", "pergunta", "cta", "final")
+FUNCOES_BLOCO = ("gancho", "contexto", "fato", "virada", "detalhe", "consequencia", "contraponto", "reflexao", "pergunta", "cta", "final")
 
 PERFIL_PADRAO: Dict[str, Any] = {
     "resumo": "",
@@ -142,6 +142,9 @@ PERFIL_PADRAO: Dict[str, Any] = {
     "musica": {"usa": True, "descricao": "batida eletrônica tensa, baixinha"},
     "cta": {"texto": "", "onde": "final"},
     "gancho_maiusculas": False,
+    # 🧭 v84_249: o canal não só dá a notícia — traz um contraponto e uma pequena reflexão (padrão: ligado)
+    "ponto_de_vista": {"usa": True, "descricao": "Além de dar a notícia, traga pelo menos um ponto de discordância ou contraponto (o outro "
+                       "lado, o que a manchete não conta, o que a reação geral exagera ou esquece) e feche com uma pequena reflexão."},
     "titulos": {"descricao": "", "exemplos": []},
     "evitar": [],
 }
@@ -240,17 +243,40 @@ def garantir_canais_prontos(base: str) -> List[str]:
     with _TRAVA:
         for chave, pr in perfis_prontos().items():
             if chave in feitos:
+                _atualizar_pronto(base, chave, pr)
                 continue
             c = criar_canal(base, pr.get("nome") or chave, pr.get("idioma") or "")
             c["perfil"] = aplicar_perfil(c["perfil"], pr.get("perfil") or {})
             c["perfil_ia"] = True
             c["perfil_origem"] = chave
+            c["perfil_versao"] = int(pr.get("versao") or 1)
             salvar_canal(base, c)
             feitos.add(chave)
             novos.append(c["id"])
         if novos:
             _gravar_json(marca, sorted(feitos))
     return novos
+
+
+def _atualizar_pronto(base: str, chave: str, pr: Dict[str, Any]) -> None:
+    """O perfil pronto mudou de versão (ex.: Laestro v2 tirou o bordão e ganhou contraponto + reflexão): o canal que veio dele
+    recebe SÓ os campos que mudaram naquela versão (legenda, ritmo e o resto que você ajustou ficam)."""
+    versao = int(pr.get("versao") or 1)
+    d = os.path.join(raiz(base), "canais")
+    for cid in os.listdir(d) if os.path.isdir(d) else []:
+        try:
+            c = carregar_canal(base, cid)
+        except (CurtoErro, OSError, ValueError):
+            continue
+        if c.get("perfil_origem") != chave or int(c.get("perfil_versao") or 1) >= versao:
+            continue
+        for v in range(int(c.get("perfil_versao") or 1) + 1, versao + 1):
+            for campo in (pr.get("atualiza") or {}).get(str(v)) or []:
+                if campo in (pr.get("perfil") or {}):
+                    c["perfil"][campo] = json.loads(json.dumps(pr["perfil"][campo]))
+        c["perfil"] = normalizar_perfil(c["perfil"])
+        c["perfil_versao"] = versao
+        salvar_canal(base, c)
 
 
 def listar_canais(base: str) -> List[Dict[str, Any]]:
@@ -273,7 +299,7 @@ def excluir_canal(base: str, cid: str) -> None:
 
 
 def adicionar_midia_canal(base: str, c: Dict[str, Any], caminho: str, tipo: str, descricao: str = "") -> Dict[str, Any]:
-    """😂 Meme/bordão/vinheta que o canal usa SEMPRE (ex.: a dançarina do “relaxa e agacha que eu vou te explicar”):
+    """😂 Meme/bordão/vinheta que o canal usa SEMPRE (ex.: a reação de sempre, a vinheta de abertura):
     sobe uma vez e entra em todos os curtos do canal como K1, K2…"""
     c.setdefault("midias", [])
     n = [int(m["id"][1:]) for m in c["midias"] if m["id"][1:].isdigit()]
@@ -728,6 +754,7 @@ PERFIL_SCHEMA = _o({
     "musica": _o({"usa": _b(), "descricao": _s()}),
     "cta": _o({"texto": _s(), "onde": _s()}),
     "gancho_maiusculas": _b(),
+    "ponto_de_vista": _o({"usa": _b(), "descricao": _s()}),
     "titulos": _o({"descricao": _s(), "exemplos": _ls()}),
     "evitar": _ls(),
 })
@@ -1032,6 +1059,9 @@ def texto_do_perfil(p: Dict[str, Any]) -> str:
     if s.get("usa"):
         L.append(f"EFEITOS SONOROS: {s.get('descricao') or ''}; preferidos: {', '.join(s['tipos_preferidos'])}"
                  + ("; som em quase todo corte" if s.get("nos_cortes") else ""))
+    pv = p.get("ponto_de_vista") or {}
+    if pv.get("usa"):
+        L.append(f"PONTO DE VISTA (obrigatório): {pv.get('descricao') or ''}")
     if p["cta"].get("texto"):
         L.append(f"CTA ({p['cta'].get('onde') or 'final'}): {p['cta']['texto']}")
     if p["titulos"].get("descricao") or p["titulos"].get("exemplos"):
@@ -1282,6 +1312,7 @@ ROTEIRO_SYS = (
     "8. 'sfx' = as deixas de efeito sonoro do bloco (tipo + a 'palavra' onde o som bate, '' = no começo do bloco) seguindo o "
     "estilo de som do canal; 'busca' = termos em inglês pra procurar esse som no Pixabay. Não exagere: 0 a 2 por bloco.\n"
     "9. Palavras de ÊNFASE (o que o apresentador fala mais forte) vão em MAIÚSCULAS na própria fala — a legenda copia.\n"
+    "{ponto_de_vista}"
     "10. Termine com o CTA do canal quando ele tiver (sem propaganda de produto/curso, a não ser que o PEDIDO EXTRA peça). 'titulo_video' + 3 'titulos_alt' no estilo dos títulos do canal; "
     "'descricao' curta; 3 a 6 'hashtags'.")
 
@@ -1289,7 +1320,13 @@ ROTEIRO_SYS = (
 def _sys_roteiro(perfil: Dict[str, Any]) -> str:
     est = (perfil.get("textos_tela") or {}).get("estilo_destaque") or "impacto_red"
     r = perfil.get("ritmo") or {}
-    return (ROTEIRO_SYS.replace("{plano}", str(r.get("plano_medio_s") or 1.8)).replace("{pps}", str(r.get("palavras_por_s") or 2.8))
+    pv = perfil.get("ponto_de_vista") or {}
+    regra_pv = ("9b. PONTO DE VISTA — não seja só mais um canal que repete a notícia: depois do fato, um bloco 'contraponto' com PELO "
+                "MENOS um ponto de discordância (o outro lado com o melhor argumento dele, não um espantalho; o que a manchete não conta; "
+                "o que a reação da internet exagera ou esquece; a pergunta incômoda) e um bloco 'reflexao' curto (1-2 frases, sem sermão) "
+                "— dá pra fechar perguntando o que quem assiste acha. Opinião soa como opinião ('agora pensa comigo…'), separada do fato; "
+                "nada de fato, número ou fala inventada pra sustentar o contraponto. " + (pv.get("descricao") or "") + "\n") if pv.get("usa", True) else ""
+    return (ROTEIRO_SYS.replace("{ponto_de_vista}", regra_pv).replace("{plano}", str(r.get("plano_medio_s") or 1.8)).replace("{pps}", str(r.get("palavras_por_s") or 2.8))
             .replace("{layouts}", "; ".join(f"{k} = {v[1]}" for k, v in LAYOUTS.items()))
             .replace("{efeitos}", ", ".join(EFEITOS_CURTOS)).replace("{entradas}", ", ".join(ENTRADAS_CURTOS))
             .replace("{destaque}", est))
