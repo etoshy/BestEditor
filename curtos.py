@@ -2439,6 +2439,10 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     perfil = perfil_do(base, p)
     garantir_cenas()
     providers = [x for x in (providers or (p.get("config") or {}).get("providers") or PROVIDERS_PADRAO) if x]
+    if p.get("modelo") in MODELOS_CLIPE and (p.get("config") or {}).get("midia") == "flow":
+        providers = ["flow"] + [x for x in providers if x == "runpod"]  # 🖼 só gerado — nada de banco/buscador da internet
+        if any(m.get("tipo") == "video" and m["id"].startswith("M") for m in p.get("midias") or []):
+            providers.append("material")
     anime = anime_do(base, p)
     planos_v = planos_do_video(p, providers, perfil, anime["modo"])
     fixar_trechos_do_clipe(planos_v, {m["id"]: float(m.get("dur") or 0) for m in p.get("midias") or []})
@@ -2512,6 +2516,7 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             "resposta_json": json.dumps(resposta, ensure_ascii=False), "sfx": sfx_do_video(p, perfil, planos_v),
             "legendas": dp_legendas.normalizar(leg), "planos": planos_v, "idioma": idioma_narrado(p, perfil),
             "sons_volume": perfil["sfx"].get("volume"), "orientation": prop, "marca": marca_do(base, p),
+            "so_flow": p.get("modelo") in MODELOS_CLIPE and (p.get("config") or {}).get("midia") == "flow",
             "enquadramento": perfil.get("enquadramento") or ""}
 
 

@@ -185,8 +185,9 @@ def criar_lote(base: str, cid: str, ids: List[str], video: bool = False, qualida
     lote = {"id": uuid.uuid4().hex[:10], "canal": cid, "canal_nome": c["nome"], "criado": time.time(), "fim": None,
             "opcoes": {"video": bool(video), "qualidade": qualidade if qualidade in QUALIDADES_RAPIDO else "1080p",
                        "proporcao": proporcao if proporcao in CT.PROPORCOES else "9:16", "voz": voz[:120]},
-            "itens": [{"ideia": i, "titulo_en": todas[i]["titulo_en"], "titulo_pt": todas[i].get("titulo_pt") or "", "pid": None,
-                       "estado": "na fila", "msg": "", "erro": None, "arquivo": None, "titulos": []} for i in ids]}
+            "parado": False, "itens": [{"ideia": i, "titulo_en": todas[i]["titulo_en"], "titulo_pt": todas[i].get("titulo_pt") or "",
+                                        "pid": None, "estado": "na fila", "msg": "", "erro": None, "arquivo": None, "titulos": [],
+                                        "tentativas": 0} for i in ids]}
     salvar_lote(base, lote)
     return lote
 
@@ -207,6 +208,25 @@ def carregar_lote(base: str, lid: str) -> Dict[str, Any]:
         raise CT.CurtoErro("Lote não encontrado.")
     with open(cam, encoding="utf-8") as f:
         return json.load(f)
+
+
+def lotes_pendentes(base: str) -> List[Dict[str, Any]]:
+    """Os lotes que pararam no meio (o site reiniciou/caiu) e que você NÃO parou — o vigia retoma sozinho."""
+    out = []
+    for f in os.listdir(_pasta_lotes(base)):
+        if f.endswith(".json"):
+            try:
+                lt = carregar_lote(base, f[:-5])
+            except (CT.CurtoErro, OSError, ValueError):
+                continue
+            if not lt.get("parado") and any(it["estado"] in ("na fila", "fazendo") or
+                                             (it["estado"] == "erro" and int(it.get("tentativas") or 0) < TENTATIVAS_POR_IDEIA)
+                                             for it in lt["itens"]):
+                out.append(lt)
+    return sorted(out, key=lambda x: float(x.get("criado") or 0))
+
+
+TENTATIVAS_POR_IDEIA = 3
 
 
 def lotes_do_canal(base: str, cid: str) -> List[Dict[str, Any]]:

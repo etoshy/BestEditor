@@ -171,3 +171,89 @@ def test_voz_tenta_de_novo_quando_o_motor_trava(tmp_path, monkeypatch):
         raise RuntimeError("crash nativo")
     with pytest.raises(RuntimeError, match="crash nativo"):
         CT.gerar_voz_guia(base, p["id"], sempre, lambda t, m: t, {"slug": "v", "motor": "chatterbox_turbo", "config": {}})
+
+
+# ------------------------------------------------------------------ v84_261: só Flow (nada da internet), parar e retomar sozinho
+def test_so_flow_nao_pesquisa_na_internet(tmp_path, monkeypatch):
+    import video_assembler as VA
+    seg = VA.VideoSegment(start=0, end=2, provider="flow", query="a hognose snake flipping on its back", media_type="image")
+    chamou_pesquisa = []
+    monkeypatch.setattr(VA, "prefetch_browser_images", lambda *a, **k: chamou_pesquisa.append(1) or {})
+    monkeypatch.setattr(VA, "flow_tem_conta", lambda tipo, cfg=None: False)
+    monkeypatch.setattr(VA, "flow_ja_gerado", lambda *a, **k: False)
+    cfg = {"flow_sem_pesquisa": True, "_providers_marcados": ["flow", "pexels", "brave"], "flow_espera_s": 0}
+    with pytest.raises(VA.VideoAssemblyError, match="crédito de IMAGEM"):
+        VA._pesquisa_no_lugar_do_flow(seg, str(tmp_path), None, cfg, ["pexels", "brave"])
+    monkeypatch.setattr(VA, "flow_tem_conta", lambda tipo, cfg=None: None)
+    tent = []
+
+    def gera(segment, d, f, used_tracker=None):
+        tent.append(segment.provider)
+        if len(tent) < 3:
+            raise VA.VideoAssemblyError("o Flow demorou")
+        return str(tmp_path / "flow.png")
+    monkeypatch.setattr(VA, "_download_image_segment_with_fallbacks", gera)
+    assert VA._pesquisa_no_lugar_do_flow(seg, str(tmp_path), None, cfg, ["pexels"]) == ([str(tmp_path / "flow.png")], "image")
+    assert tent == ["flow"] * 3 and not chamou_pesquisa
+    tent.clear()
+    monkeypatch.setattr(VA, "_download_image_segment_with_fallbacks", lambda *a, **k: (_ for _ in ()).throw(VA.VideoAssemblyError("x")))
+    with pytest.raises(VA.VideoAssemblyError, match="não usa foto da internet"):
+        VA._pesquisa_no_lugar_do_flow(seg, str(tmp_path), None, cfg, ["pexels"])
+    assert not chamou_pesquisa
+
+
+def test_projeto_flow_vai_pro_editor_so_com_flow(cliente, monkeypatch, tmp_path):
+    A, cl, base = cliente
+    c = CN.criar_canal_do_nicho(base, "shape_reason")
+    p = CT.criar(base, c["id"], "Manhole", texto="tampa redonda", modelo="explicativo")
+    with CT._TRAVA:
+        q = CT.carregar(base, p["id"])
+        q["config"].update(midia="flow", providers=["pexels", "brave", "flow", "google"])
+        CT.salvar(base, q)
+    CC.gerar_roteiro(base, p["id"], _ia(ROTEIRO_FLOW))
+    CC.gerar_takes(base, p["id"], _tts, lambda t, m: t, {"slug": "v", "motor": "chatterbox_turbo", "config": {}}, 1)
+    CC.usar_take(base, p["id"], 1, _whisper(base, p["id"]))
+    d = CT.montar_dados_editor(base, p["id"])
+    assert d["so_flow"] and d["providers"] == ["flow"] and all(x["provider"] == "flow" for x in d["planos"])
+    r = cl.post(f"/curtos/{p['id']}/editor", json={}).get_json()
+    job = A._JOBS[r["job_id"]]
+    assert job["providers"] == ["flow"] and job["cfg_overrides"]["flow_sem_pesquisa"] is True
+    assert A._job_site_cfg(job)["flow_sem_pesquisa"] is True and A._job_site_cfg(job)["_providers_marcados"] == ["flow"]
+
+
+def test_parar_e_lote_pendente(cliente, monkeypatch, tmp_path):
+    A, cl, base = cliente
+    import curtos_rotas as R
+    import threading
+    c = CN.criar_canal_do_nicho(base, "saved_by_design")
+    CN.gerar_ideias(base, c["id"], 10, _ia(IDEIAS))
+    pode = threading.Event()
+
+    def gerar(b, pid, chamar=None):  # o 1º vídeo fica "pensando" até a gente parar
+        pode.wait(5)
+        raise CT.CurtoErro("não chegou a fazer")
+    monkeypatch.setattr(CC, "gerar_roteiro", gerar)
+    monkeypatch.setitem(R.CB, "tts", _tts)
+    r = cl.post(f"/curtos/canal/{c['id']}/rapido", json={"ideias": "todas"}).get_json()
+    lid = r["lote"]
+    import time as _t
+    _t.sleep(0.3)
+    assert cl.post(f"/curtos/lote/{lid}/parar", json={}).get_json()["ok"]
+    pode.set()
+    t = _esperar("lote:" + lid)
+    assert "parado" in t["msg"]
+    lt = CN.carregar_lote(base, lid)
+    assert lt["parado"] and not lt["fim"] and all(x["estado"] == "na fila" for x in lt["itens"])
+    assert lid not in [x["id"] for x in CN.lotes_pendentes(base)]  # você parou: o vigia não retoma
+    # o site caiu no meio (não foi você): fica pendente pro vigia
+    lt.update(parado=False)
+    lt["itens"][0]["estado"] = "fazendo"
+    CN.salvar_lote(base, lt)
+    assert lid in [x["id"] for x in CN.lotes_pendentes(base)]
+    # retomar à mão: tenta de novo e o erro conta (até 3 por ideia)
+    pode.set()
+    assert cl.post(f"/curtos/lote/{lid}/retomar", json={}).get_json()["ok"]
+    _esperar("lote:" + lid)
+    lt = CN.carregar_lote(base, lid)
+    assert all(x["estado"] == "erro" and x["tentativas"] == 3 for x in lt["itens"]) and lt["fim"]
+    assert lid not in [x["id"] for x in CN.lotes_pendentes(base)]  # já tentou 3 vezes: não fica tentando pra sempre

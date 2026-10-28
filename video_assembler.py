@@ -4102,7 +4102,13 @@ def _pesquisa_no_lugar_do_flow(segment: VideoSegment, downloads_dir: str, client
     """Nenhuma conta do Flow consegue gerar mais nada (nem vídeo nem foto): PESQUISA a cena nos mecanismos de busca
     MARCADOS pro vídeo (`cfg["_providers_marcados"]`, os que você marcou ao criar; sem isso, a prioridade das
     Configurações). Trecho de vídeo: bancos de vídeo → buscadores de imagem → bancos de foto. Trecho de foto:
-    buscadores de imagem → bancos de foto → bancos de vídeo. → (arquivos, "video"|"image")."""
+    buscadores de imagem → bancos de foto → bancos de vídeo. → (arquivos, "video"|"image").
+
+    v84_261 — `cfg["flow_sem_pesquisa"]` (📚 curtos no modo "gerar tudo no Flow"): NUNCA pesquisa na internet. Tenta o Flow
+    de novo (foto; o prompt de vídeo vira de foto), esperando um pouco entre as tentativas; não saiu → erro (o vídeo não
+    sai com foto da web no lugar da imagem gerada)."""
+    if cfg.get("flow_sem_pesquisa"):
+        return _so_flow_de_novo(segment, downloads_dir, client_factory, cfg, video, used_tracker, motivo)
     termo = _termo_de_pesquisa(segment)
     marcados = [p for p in (cfg.get("_providers_marcados") or provider_priority or []) if p not in GERADORES_IA]
     ordem = [p for p in (provider_priority or []) if p in marcados] + [p for p in marcados if p not in (provider_priority or [])]
@@ -4154,6 +4160,28 @@ def _pesquisa_no_lugar_do_flow(segment: VideoSegment, downloads_dir: str, client
         erros.append("nenhum mecanismo de busca marcado pra este vídeo além do Flow")
     raise VideoAssemblyError(f"Flow: {motivo or 'não gerou'} — e a pesquisa por '{termo}' nos mecanismos marcados também "
                              f"não achou ({'; '.join(erros)}).")
+
+
+def _so_flow_de_novo(segment: VideoSegment, downloads_dir: str, client_factory: "ClientFactory", cfg: Dict[str, Any],
+                     video: bool, used_tracker, motivo: str) -> Tuple[List[str], str]:
+    """🖼 Modo só Flow: tenta gerar a FOTO de novo no Flow (algumas vezes, com espera) em vez de pesquisar na internet."""
+    tentativas = max(1, int(cfg.get("flow_tentativas") or 3))
+    espera = float(cfg.get("flow_espera_s") if cfg.get("flow_espera_s") is not None else 20)
+    q = prompt_de_foto(segment.query) if (video or getattr(segment, "media_type", "video") != "image") else segment.query
+    ultimo = motivo or "não gerou"
+    for k in range(tentativas):
+        if flow_tem_conta("imagem", cfg) is False and not flow_ja_gerado(q, cfg, "imagem"):
+            raise VideoAssemblyError("Flow: nenhuma conta com crédito de IMAGEM (Ferramentas → Contas Google) — no modo "
+                                     "“só Flow” o vídeo não usa foto da internet no lugar.")
+        if k:
+            time.sleep(espera * k)
+        try:
+            return [_download_image_segment_with_fallbacks(replace(segment, provider="flow", media_type="image", query=q),
+                                                           downloads_dir, client_factory, used_tracker=used_tracker)], "image"
+        except Exception as exc:  # noqa: BLE001
+            ultimo = str(exc)[:300]
+    raise VideoAssemblyError(f"Flow: a imagem não saiu depois de {tentativas} tentativa(s) ({ultimo}) — no modo “só Flow” "
+                             "o vídeo não usa foto da internet no lugar.")
 
 
 def _download_image_segment_with_fallbacks(

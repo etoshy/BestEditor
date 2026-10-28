@@ -30,6 +30,8 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ## ⚡ Geração rápida (v84_258)
 
+> v84_261 — **só Flow de verdade**: no modo “✨ gerar tudo no Flow” (e em todo vídeo da geração rápida) o projeto vai pro editor só com o Flow marcado e a montagem **nunca pesquisa a cena na internet**: se o Flow não gerar uma imagem, tenta de novo (3 vezes, esperando entre elas); sem nenhuma conta com crédito de imagem, o vídeo para com esse aviso em vez de sair com foto da web. **Lote que não para**: se o site reiniciar ou cair, um vigia retoma o lote sozinho (~1 min depois); uma ideia que deu erro tenta de novo no fim (até 3 vezes); só para quando você clica em **⏹ parar** (aí só volta no 🔁 retomar).
+
 > v84_260: no painel 💡 ideias, **🏷 @ do canal** (e ligar/desligar a marca) — vale pra todos os vídeos do canal que ainda não foram exportados, inclusive os que estão na fila do lote.
 
 > v84_259 — lotes longos: o 🎙 motor de voz que trava (crash nativo do PyTorch, código 3221225477) é tentado de novo até 3 vezes por bloco; a memória é solta entre um vídeo e outro; as pastas dos 📱 curtos/🎯 rastreios saíram do reinício automático. Pra lotes grandes, abra o site com **`iniciar_sem_reloader.bat`** (ou `set SEM_RELOADER=1`) — sem o reloader varrendo as pastas a cada segundo, o site não cai com `MemoryError` quando a memória aperta. O site reiniciou no meio? O lote mostra **🔁 retomar** e continua de onde parou. Dica: o PyTorch ainda não é estável no Python 3.14 — pra voz, o 3.12 trava bem menos.

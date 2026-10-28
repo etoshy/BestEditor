@@ -209,23 +209,47 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         lote = CN.carregar_lote(base_dir, lid)
         op, cid = lote["opcoes"], lote["canal"]
         n = len(lote["itens"])
-        for k, it in enumerate(lote["itens"], 1):
-            if it["estado"] == "pronto":
-                continue
-            rot = f"{k}/{n} · {it['titulo_en'][:50]}"
+        lote["parado"], lote["fim"] = False, None
+        CN.salvar_lote(base_dir, lote)
+        for rodada in range(CN.TENTATIVAS_POR_IDEIA):  # 🔁 no fim, as que deram erro tentam de novo (até 3 vezes cada)
+            fila = [(k, it) for k, it in enumerate(lote["itens"], 1) if it["estado"] in ("na fila", "fazendo")
+                    or (it["estado"] == "erro" and int(it.get("tentativas") or 0) < CN.TENTATIVAS_POR_IDEIA)]
+            if not fila or _lote_parado(lid):
+                break
+            for k, it in fila:
+                if _lote_parado(lid):
+                    break
+                _fazer_item(lote, k, n, it, op, cid, prog, lid)
+        lote["fim"] = time.time() if not _lote_parado(lid) else None
+        lote["parado"] = _lote_parado(lid)
+        CN.salvar_lote(base_dir, lote)
+        ok = sum(1 for x in lote["itens"] if x["estado"] == "pronto")
+        return (f"⏹ parado: {ok} de {n} pronto(s)" if lote["parado"] else f"{ok} de {n} vídeo(s) exportado(s)")
+
+    _PARAR: Dict[str, bool] = {}
+
+    def _lote_parado(lid: str) -> bool:
+        return bool(_PARAR.get(lid))
+
+    def _fazer_item(lote: Dict[str, Any], k: int, n: int, it: Dict[str, Any], op: Dict[str, Any], cid: str,
+                    prog: Callable[[str], None], lid: str) -> None:
+        rot = f"{k}/{n} · {it['titulo_en'][:50]}"
+        if rot:
 
             def log(m: str, it=it, rot=rot) -> None:
+                if _lote_parado(lid):
+                    raise CT.CurtoErro("⏹ parado por você")
                 it["msg"] = str(m)[:200]
                 prog(f"{rot} — {m}")
             try:
-                it.update(estado="fazendo", erro=None)
+                it.update(estado="fazendo", erro=None, tentativas=int(it.get("tentativas") or 0) + 1)
                 CN.salvar_lote(base_dir, lote)
                 p = CN.video_da_ideia(base_dir, cid, it["ideia"], op["proporcao"], op.get("voz") or "")
                 it["pid"] = p["id"]
                 with CT._TRAVA:
                     q = CT.carregar(base_dir, p["id"])
-                    q["config"].update(flow_video=bool(op.get("video")), takes=1, qualidade=op["qualidade"],
-                                       providers=["flow", "pexels", "pixabay", "brave", "google", "bing", "wikipedia"])
+                    q["config"].update(flow_video=bool(op.get("video")), takes=1, qualidade=op["qualidade"], midia="flow",
+                                       providers=["flow"])  # 🖼 só Flow: nenhuma foto da internet
                     CT.salvar(base_dir, q)
                 CN.salvar_lote(base_dir, lote)
                 _fazer_tudo(p["id"], op.get("voz") or "", None, log)
@@ -239,14 +263,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     CT.salvar(base_dir, q)
                 it.update(estado="pronto", arquivo=arq, msg="✅ exportado", titulos=CN.titulos_do_projeto(CT.carregar(base_dir, p["id"])))
             except Exception as exc:  # noqa: BLE001  (uma ideia que falhou não para as outras)
-                it.update(estado="erro", erro=str(exc)[:400])
+                if _lote_parado(lid):
+                    it.update(estado="na fila", msg="⏹ parado", tentativas=max(0, int(it.get("tentativas") or 1) - 1))
+                else:
+                    it.update(estado="erro", erro=str(exc)[:400])
             CN.salvar_lote(base_dir, lote)
             import gc
             gc.collect()  # 🧹 solta a memória do vídeo anterior (Whisper, áudio, quadros) antes do próximo
-        lote["fim"] = time.time()
-        CN.salvar_lote(base_dir, lote)
-        ok = sum(1 for x in lote["itens"] if x["estado"] == "pronto")
-        return f"{ok} de {n} vídeo(s) exportado(s)"
 
     @app.route("/curtos/canal/<cid>/rapido", methods=["POST"])
     def curtos_rapido(cid: str):
@@ -278,17 +301,58 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             abort(404)
         return _ok(lote=lt, tarefa=TAREFAS.get("lote:" + lid))
 
-    @app.route("/curtos/lote/<lid>/retomar", methods=["POST"])
-    def curtos_lote_retomar(lid: str):
+    @app.route("/curtos/lote/<lid>/parar", methods=["POST"])
+    def curtos_lote_parar(lid: str):
+        """⏹ para o lote (o vídeo que está sendo feito para no próximo passo; volta pra fila). O vigia não retoma mais."""
         try:
             lt = CN.carregar_lote(base_dir, lid)
         except CT.CurtoErro:
             abort(404)
-        for it in lt["itens"]:
-            if it["estado"] in ("erro", "fazendo"):
-                it["estado"] = "na fila"
+        _PARAR[lid] = True
+        lt["parado"] = True
         CN.salvar_lote(base_dir, lt)
-        r = _rodar("lote:" + lid, "⚡ geração rápida (retomando)", lambda prog: _rodar_lote(lid, prog))
+        return _ok()
+
+    def _retomar(lid: str, zerar_erros: bool = True):
+        lt = CN.carregar_lote(base_dir, lid)
+        for it in lt["itens"]:
+            if it["estado"] == "fazendo" or (zerar_erros and it["estado"] == "erro"):
+                it["estado"] = "na fila"
+                if zerar_erros:
+                    it["tentativas"] = 0
+        lt["parado"] = False
+        CN.salvar_lote(base_dir, lt)
+        _PARAR.pop(lid, None)
+        return _rodar("lote:" + lid, "⚡ geração rápida (retomando)", lambda prog: _rodar_lote(lid, prog))
+
+    def _vigia_lotes() -> None:
+        """🔁 o lote parou porque o site reiniciou/caiu? Retoma sozinho (a não ser que você tenha parado)."""
+        time.sleep(float(os.environ.get("CURTOS_VIGIA_INICIO_S") or 25))
+        while True:
+            try:
+                for lt in CN.lotes_pendentes(base_dir):
+                    t = TAREFAS.get("lote:" + lt["id"])
+                    if (t and not t.get("fim")) or _lote_parado(lt["id"]):
+                        continue
+                    if any(x for k, x in TAREFAS.items() if k.startswith("lote:") and not x.get("fim")):
+                        break  # um lote por vez: o próximo espera este terminar
+                    _retomar(lt["id"], zerar_erros=False)
+                    break
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(60)
+
+    import sys as _sys
+    if "pytest" not in _sys.modules and os.environ.get("CURTOS_VIGIA", "1") != "0":
+        threading.Thread(target=_vigia_lotes, daemon=True, name="vigia-lotes").start()
+
+    @app.route("/curtos/lote/<lid>/retomar", methods=["POST"])
+    def curtos_lote_retomar(lid: str):
+        try:
+            CN.carregar_lote(base_dir, lid)
+        except CT.CurtoErro:
+            abort(404)
+        r = _retomar(lid)
         return r if isinstance(r, tuple) else _ok()
 
     @app.route("/curtos/lote/<lid>/titulos.txt", methods=["GET"])

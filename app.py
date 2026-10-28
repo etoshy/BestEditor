@@ -3927,7 +3927,7 @@ def _remontar_prompt(job_id: str, job: dict) -> None:
 
 # Opções que a pessoa pode escolher SÓ PARA UM VÍDEO, na página do prompt —
 # sobrescrevem a config do site (Configurações) apenas nesse job.
-_JOB_CFG_OVERRIDE_KEYS = ("browser_visible", "evitar_repeticao_clipes")
+_JOB_CFG_OVERRIDE_KEYS = ("browser_visible", "evitar_repeticao_clipes", "flow_sem_pesquisa")  # v84_261: 📚 modo só Flow
 
 
 @app.context_processor
@@ -11973,6 +11973,9 @@ def _curto_para_estudio(d: Dict[str, Any]) -> str:
     _ligar_projeto(job, "curto", p["id"])
     if d.get("sons_volume"):
         job.setdefault("cfg_overrides", {})["sons_volume"] = float(d["sons_volume"])
+    if d.get("so_flow"):  # 🖼 v84_261: 📚 "gerar tudo no Flow" — imagem que o Flow não gerar NÃO vira foto da internet
+        job.setdefault("cfg_overrides", {})["flow_sem_pesquisa"] = True
+        job["providers"] = [x for x in providers if x in ("flow", "runpod")] or ["flow"]
     perf = PerfLog(_job_dir(job_id), job_id=job_id)
     _PERF_LOGS[job_id] = perf
     _save_state(job_id)

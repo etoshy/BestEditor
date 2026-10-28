@@ -95,7 +95,9 @@
       return `<div class="ct-lin" style="display:block"><div class="ct-linha" style="justify-content:space-between"><b>⚡ lote de ${lt.itens.length} · ${ok} pronto(s) · ${esc(lt.opcoes.qualidade)}${lt.opcoes.video ? ' · 🎬 vídeo' : ' · 🖼 fotos'}</b>
         <span>${vivo ? '<span class="ct-dica">⏳ ' + esc(t.prog || t.rotulo) + '</span>' : ''}
         ${ok ? `<a href="/curtos/lote/${lt.id}/todos.zip">⬇ todos (.zip)</a> · <a href="/curtos/lote/${lt.id}/titulos.txt" target="_blank">📋 títulos</a>` : ''}
-        ${!vivo && lt.itens.some(x => x.estado === 'erro' || x.estado === 'fazendo' || (x.estado === 'na fila' && !lt.fim)) ? `<button class="ct-mini ct-sec" data-retomar="${lt.id}">🔁 retomar${lt.fim ? '' : ' (o site reiniciou no meio)'}</button>` : ''}</span></div>
+        ${vivo ? `<button class="ct-mini ct-perigo" data-parar="${lt.id}">⏹ parar</button>` : ''}
+        ${!vivo && lt.itens.some(x => x.estado === 'erro' || x.estado === 'fazendo' || (x.estado === 'na fila' && !lt.fim)) ? `<button class="ct-mini ct-sec" data-retomar="${lt.id}">🔁 retomar${lt.parado ? ' (você parou)' : lt.fim ? '' : ' (retoma sozinho em ~1 min)'}</button>` : ''}</span></div>
+        ${vivo ? '<div class="ct-dica" style="margin:0">🔁 se o site reiniciar ou cair, o lote continua sozinho — só para se você clicar em ⏹ parar. Erro numa ideia: tenta de novo até 3 vezes.</div>' : ''}
         ${lt.itens.map(x => `<div class="ct-dica" style="margin:2px 0">${EST[x.estado] || x.estado} <b>${esc(x.titulo_en)}</b> ${x.estado === 'fazendo' ? '— ' + esc(x.msg) : ''}${x.erro ? ' — ' + esc(x.erro) : ''}
           ${x.estado === 'pronto' ? ` · <a href="/curtos/${x.pid}/video.mp4">⬇ baixar</a> · <a href="/curtos/${x.pid}/video.mp4?baixar=0" target="_blank">▶ ver</a>` : ''}${x.pid ? ` · <a href="/curtos/${x.pid}">abrir</a>` : ''}
           ${(x.titulos || []).length ? '<br>🏷 ' + x.titulos.map(tt => esc(tt.en) + (tt.pt ? ' <i>(' + esc(tt.pt) + ')</i>' : '')).join(' · ') : ''}</div>`).join('')}</div>`; }).join('');
@@ -114,6 +116,7 @@
     try {
       if (ds.ideias) { abrir(ds.ideias, ev.target.closest('.ct-modelo').querySelector('b').textContent); g('piMarca').value = ds.marca || ''; g('piMarcaOn').checked = ds.marcaon === '1'; lotes(); }
       if (ds.retomar) { await j('/curtos/lote/' + ds.retomar + '/retomar', {}); setTimeout(lotes, 500); }
+      if (ds.parar && confirm('Parar o lote? O vídeo que está sendo feito volta pra fila; o lote só continua quando você clicar em 🔁 retomar.')) { await j('/curtos/lote/' + ds.parar + '/parar', {}); g('piBarra').textContent = '⏹ parando — termina o passo atual'; setTimeout(lotes, 1500); }
       if (ds.ivid) { ev.target.disabled = true; const d = await j('/curtos/canal/' + CID + '/ideia/' + ds.ivid + '/video', { tudo: !!ds.tudo, proporcao: g('piProp').value, voz: g('piVoz').value }); location.href = d.link; }
     } catch (e) { g('piBarra').textContent = '❌ ' + e.message; ev.target.disabled = false; }
   });
