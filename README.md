@@ -30,6 +30,10 @@ Testes: `pip install -r requirements-dev.txt` e `python -m pytest -q`.
 
 ## ⚡ Geração rápida (v84_258)
 
+> v84_260: no painel 💡 ideias, **🏷 @ do canal** (e ligar/desligar a marca) — vale pra todos os vídeos do canal que ainda não foram exportados, inclusive os que estão na fila do lote.
+
+> v84_259 — lotes longos: o 🎙 motor de voz que trava (crash nativo do PyTorch, código 3221225477) é tentado de novo até 3 vezes por bloco; a memória é solta entre um vídeo e outro; as pastas dos 📱 curtos/🎯 rastreios saíram do reinício automático. Pra lotes grandes, abra o site com **`iniciar_sem_reloader.bat`** (ou `set SEM_RELOADER=1`) — sem o reloader varrendo as pastas a cada segundo, o site não cai com `MemoryError` quando a memória aperta. O site reiniciou no meio? O lote mostra **🔁 retomar** e continua de onde parou. Dica: o PyTorch ainda não é estável no Python 3.14 — pra voz, o 3.12 trava bem menos.
+
 No painel **💡 ideias** de um canal de nicho: marque as ideias (⚡ marcar) e **⚡ fazer as marcadas** — ou **⚡ fazer todas as livres**. Sem clicar em mais nada, cada ideia vira um vídeo 📚: roteiro (+ títulos em inglês e português) → 1 take da voz → editor → as imagens **geradas no Flow** → legenda, sons, marca → **exporta** em **Full HD 1080p, 2K 1440p ou 4K 2160p**, no formato escolhido (9:16 ou 1:1).
 - **🎬 com vídeo do Flow**: a IA põe vídeo na maioria dos planos; quando o crédito de vídeo das contas acaba, aqueles planos saem como foto gerada. Desligado: só fotos.
 - No fim, no próprio painel: cada vídeo com **⬇ baixar / ▶ ver**, os **títulos** (idioma do post + português), **⬇ todos (.zip)** (vídeos + títulos.txt) e **📋 títulos** (títulos, descrição e hashtags de cada um, pronto pra postar). Uma ideia que falhou não para as outras; **🔁 retomar** refaz só as que faltaram. Pode fechar a página — segue sozinho.

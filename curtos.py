@@ -1737,7 +1737,17 @@ def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callabl
     for i, b in enumerate(blocos):
         on_log(f"🎙 bloco {i + 1}/{len(blocos)}")
         bruto, arq = os.path.join(d, f"_b{i}.wav"), os.path.join(d, f"b{i}.wav")
-        tts(motor, limpar(b["fala"], motor), bruto, **kw)
+        for tentativa in range(1, 4):  # 🎙 o motor às vezes trava (crash nativo do PyTorch): tenta de novo antes de desistir
+            try:
+                tts(motor, limpar(b["fala"], motor), bruto, **kw)
+                if os.path.isfile(bruto) and os.path.getsize(bruto) > 1000:
+                    break
+                raise CurtoErro("o motor de voz não gerou o áudio")
+            except Exception as exc:  # noqa: BLE001
+                if tentativa == 3:
+                    raise
+                on_log(f"🎙 bloco {i + 1}: o motor de voz falhou ({str(exc)[:60]}…) — tentando de novo ({tentativa + 1}/3)")
+                time.sleep(3 * tentativa)
         _rodar(["ffmpeg", "-v", "error", "-y", "-i", bruto, "-af",
                 "silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_duration=0.25:stop_threshold=-45dB",
                 "-ar", "48000", "-ac", "1", arq], 120)

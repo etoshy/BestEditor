@@ -10,6 +10,10 @@
   .ct-dica { color: var(--mudo); font-size: .84rem; }
   .ct-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .ct-row > label { flex: 1; min-width: 200px; }
+  .ct-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .ct-linha > * { margin: 0; }
+  .ct-linha > label { display: inline-flex; gap: 6px; align-items: center; }
+  .ct-linha button { width: auto; }
   .ct-modelos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
   .ct-modelo { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--borda); background: var(--card); border-radius: 12px; padding: 14px 16px; color: inherit; text-decoration: none; }
   .ct-modelo span { color: var(--mudo); font-size: .84rem; }
@@ -33,7 +37,7 @@
       <b>{{ n.emoji }} {{ n.nome }}</b><span>{{ n.nicho }}</span>
       <span style="font-size:.78rem">ex.: {{ n.temas[:3]|join(' · ') }}</span>
       {% if cn %}
-        <div class="ct-linha"><button class="ct-mini" data-ideias="{{ cn[0].id }}">💡 ideias ({{ cn[0].livres }} livre{{ '' if cn[0].livres == 1 else 's' }})</button>
+        <div class="ct-linha"><button class="ct-mini" data-ideias="{{ cn[0].id }}" data-marca="{{ cn[0].marca.texto }}" data-marcaon="{{ 1 if cn[0].marca.ativa else 0 }}">💡 ideias ({{ cn[0].livres }} livre{{ '' if cn[0].livres == 1 else 's' }})</button>
           <a class="ct-dica" href="/curtos/canal/{{ cn[0].id }}" style="margin:0">🧬 canal</a></div>
       {% else %}
         <form method="post" action="/curtos/nicho/{{ n.chave }}/criar" style="margin:0"><button class="ct-mini">➕ criar o canal</button></form>
@@ -43,6 +47,10 @@
   </div>
   <div id="painelIdeias" style="display:none;margin-top:10px">
     <div class="ct-linha"><b id="piNome"></b>
+      <label style="margin:0;font-weight:400">🏷 @ do canal <input type="text" id="piMarca" placeholder="@seucanal" style="width:180px;margin:0"></label>
+      <label style="margin:0;font-weight:400"><input type="checkbox" id="piMarcaOn" style="width:auto"> no vídeo</label>
+      <button class="ct-mini ct-ok" id="piMarcaSalvar">💾</button></div>
+    <div class="ct-linha">
       <input type="text" id="piPedido" placeholder="pedido extra (opcional): ex.: só sobre o oceano" style="flex:1;min-width:220px;margin:0">
       <button class="ct-mini" id="piGerar">💡 gerar 10 ideias</button>
       <select id="piProp" style="width:auto;margin:0">{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
@@ -87,7 +95,7 @@
       return `<div class="ct-lin" style="display:block"><div class="ct-linha" style="justify-content:space-between"><b>⚡ lote de ${lt.itens.length} · ${ok} pronto(s) · ${esc(lt.opcoes.qualidade)}${lt.opcoes.video ? ' · 🎬 vídeo' : ' · 🖼 fotos'}</b>
         <span>${vivo ? '<span class="ct-dica">⏳ ' + esc(t.prog || t.rotulo) + '</span>' : ''}
         ${ok ? `<a href="/curtos/lote/${lt.id}/todos.zip">⬇ todos (.zip)</a> · <a href="/curtos/lote/${lt.id}/titulos.txt" target="_blank">📋 títulos</a>` : ''}
-        ${!vivo && lt.itens.some(x => x.estado === 'erro' || x.estado === 'fazendo') ? `<button class="ct-mini ct-sec" data-retomar="${lt.id}">🔁 retomar</button>` : ''}</span></div>
+        ${!vivo && lt.itens.some(x => x.estado === 'erro' || x.estado === 'fazendo' || (x.estado === 'na fila' && !lt.fim)) ? `<button class="ct-mini ct-sec" data-retomar="${lt.id}">🔁 retomar${lt.fim ? '' : ' (o site reiniciou no meio)'}</button>` : ''}</span></div>
         ${lt.itens.map(x => `<div class="ct-dica" style="margin:2px 0">${EST[x.estado] || x.estado} <b>${esc(x.titulo_en)}</b> ${x.estado === 'fazendo' ? '— ' + esc(x.msg) : ''}${x.erro ? ' — ' + esc(x.erro) : ''}
           ${x.estado === 'pronto' ? ` · <a href="/curtos/${x.pid}/video.mp4">⬇ baixar</a> · <a href="/curtos/${x.pid}/video.mp4?baixar=0" target="_blank">▶ ver</a>` : ''}${x.pid ? ` · <a href="/curtos/${x.pid}">abrir</a>` : ''}
           ${(x.titulos || []).length ? '<br>🏷 ' + x.titulos.map(tt => esc(tt.en) + (tt.pt ? ' <i>(' + esc(tt.pt) + ')</i>' : '')).join(' · ') : ''}</div>`).join('')}</div>`; }).join('');
@@ -104,11 +112,14 @@
   document.addEventListener('click', async ev => {
     const ds = ev.target.dataset;
     try {
-      if (ds.ideias) { abrir(ds.ideias, ev.target.closest('.ct-modelo').querySelector('b').textContent); lotes(); }
+      if (ds.ideias) { abrir(ds.ideias, ev.target.closest('.ct-modelo').querySelector('b').textContent); g('piMarca').value = ds.marca || ''; g('piMarcaOn').checked = ds.marcaon === '1'; lotes(); }
       if (ds.retomar) { await j('/curtos/lote/' + ds.retomar + '/retomar', {}); setTimeout(lotes, 500); }
       if (ds.ivid) { ev.target.disabled = true; const d = await j('/curtos/canal/' + CID + '/ideia/' + ds.ivid + '/video', { tudo: !!ds.tudo, proporcao: g('piProp').value, voz: g('piVoz').value }); location.href = d.link; }
     } catch (e) { g('piBarra').textContent = '❌ ' + e.message; ev.target.disabled = false; }
   });
+  g('piMarcaSalvar').onclick = async () => { try { const d = await j('/curtos/canal/' + CID + '/marca', { texto: g('piMarca').value, ativa: g('piMarcaOn').checked });
+    g('piMarca').value = d.marca.texto; const bt = document.querySelector(`[data-ideias="${CID}"]`); if (bt) { bt.dataset.marca = d.marca.texto; bt.dataset.marcaon = d.marca.ativa ? '1' : '0'; }
+    g('piBarra').textContent = '✅ ' + d.marca.texto + (d.marca.ativa ? ' — vai em todos os vídeos do canal que ainda não foram exportados' : ' — marca desligada'); } catch (e) { g('piBarra').textContent = '❌ ' + e.message; } };
   g('piGerar').onclick = async () => { try { await j('/curtos/canal/' + CID + '/ideias', { n: 10, pedido: g('piPedido').value }); setTimeout(carregar, 400); } catch (e) { g('piBarra').textContent = '❌ ' + e.message; } };
   const sel = new URLSearchParams(location.search).get('canal');
   const b = sel && document.querySelector(`[data-ideias="${sel}"]`); if (b) b.click();

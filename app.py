@@ -12237,6 +12237,9 @@ def _padroes_excluidos_do_reloader() -> list:
         os.path.join(BASE_DIR, "vendas"),
         os.path.join(BASE_DIR, "dossies"),
         os.path.join(BASE_DIR, "toolkit", "tts", "models"),  # inclui os perfis de voz salvos (models/perfis_de_voz)
+        os.environ.get("CURTOS_DIR") or os.path.join(BASE_DIR, "curtos"),  # 📱 vídeos curtos: quadros, takes, clipes, lotes
+        os.environ.get("RASTREIO_DIR") or os.path.join(BASE_DIR, "rastreios"),
+        os.path.join(BASE_DIR, "pixabay_sons"),
     ]
     return [os.path.join(p, "*") for p in pastas_sem_codigo]
 
@@ -12251,4 +12254,8 @@ if __name__ == "__main__":
     # pé). Pra mudar a porta, defina a variável de ambiente PORT antes
     # de rodar (ex: no Windows, `set PORT=5001 && python app.py`).
     port = int(os.environ.get("PORT", 5050))
-    app.run(debug=True, host="0.0.0.0", port=port, threaded=True, exclude_patterns=_padroes_excluidos_do_reloader())
+    # v84_259: SEM_RELOADER=1 desliga o reinício automático (pra lotes longos: o reloader varre as pastas a cada segundo e,
+    # com a memória apertada — voz + Whisper + Flow —, é o primeiro a dar MemoryError e derrubar o site)
+    _reloader = os.environ.get("SEM_RELOADER", "").strip() not in ("1", "true", "sim")
+    app.run(debug=True, host="0.0.0.0", port=port, threaded=True, use_reloader=_reloader,
+            exclude_patterns=_padroes_excluidos_do_reloader())

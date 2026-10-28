@@ -241,6 +241,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             except Exception as exc:  # noqa: BLE001  (uma ideia que falhou não para as outras)
                 it.update(estado="erro", erro=str(exc)[:400])
             CN.salvar_lote(base_dir, lote)
+            import gc
+            gc.collect()  # 🧹 solta a memória do vídeo anterior (Whisper, áudio, quadros) antes do próximo
         lote["fim"] = time.time()
         CN.salvar_lote(base_dir, lote)
         ok = sum(1 for x in lote["itens"] if x["estado"] == "pronto")
@@ -335,6 +337,22 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         except CT.CurtoErro as exc:
             return redirect(f"/curtos/modelo/explicativo?erro={exc}")
         return redirect(f"/curtos/modelo/explicativo?canal={c['id']}#nichos")
+
+    @app.route("/curtos/canal/<cid>/marca", methods=["POST"])
+    def curtos_canal_marca(cid: str):
+        """🏷 o @ do canal (a marca por cima do vídeo) — vale pros vídeos do canal que ainda não foram exportados."""
+        b = _corpo()
+        with CT._TRAVA:
+            c = _canal(cid)
+            texto = " ".join(str(b.get("texto") or "").split())[:60]
+            if texto and not texto.startswith("@"):
+                texto = "@" + texto.lstrip("@")
+            m = dict(CT.normalizar_marca(c["perfil"].get("marca"), c["nome"]), texto=texto or "@seucanal")
+            if "ativa" in b:
+                m["ativa"] = bool(b["ativa"])
+            c["perfil"]["marca"] = CT.normalizar_marca(m)
+            CT.salvar_canal(base_dir, c)
+        return _ok(marca=c["perfil"]["marca"])
 
     @app.route("/curtos/canal/<cid>/ideias", methods=["GET", "POST"])
     def curtos_ideias(cid: str):

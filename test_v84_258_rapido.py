@@ -144,3 +144,30 @@ def test_exportar_sem_abrir_o_editor(cliente, monkeypatch, tmp_path):
         A._JOBS.pop(job_id, None)
         if os.path.isfile(arq):
             os.remove(arq)
+
+
+def test_voz_tenta_de_novo_quando_o_motor_trava(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "c"))
+    base = str(tmp_path)
+    p = CT.criar(base, "", "x", texto="y", modelo="explicativo")
+    with CT._TRAVA:
+        q = CT.carregar(base, p["id"])
+        q["roteiro"] = CT.ler_roteiro({"blocos": [{"fala": "uma frase curta"}, {"fala": "outra frase"}]}, q)
+        CT.salvar(base, q)
+    falhas = {"n": 0}
+
+    def tts(motor, texto, saida, **kw):
+        if texto.startswith("outra") and falhas["n"] < 2:  # trava 2 vezes no 2º bloco
+            falhas["n"] += 1
+            raise RuntimeError("O motor de voz travou o processo (código de saída 3221225477)")
+        _tts(motor, texto, saida)
+    monkeypatch.setattr(CT.time, "sleep", lambda s: None)
+    logs = []
+    info = CT.gerar_voz_guia(base, p["id"], tts, lambda t, m: t, {"slug": "v", "motor": "chatterbox_turbo", "config": {}}, on_log=logs.append)
+    assert falhas["n"] == 2 and len(info["por_bloco"]) == 2 and any("tentando de novo (3/3)" in m for m in logs)
+    falhas["n"] = -10  # trava sempre: aí sim desiste, com o erro do motor
+
+    def sempre(motor, texto, saida, **kw):
+        raise RuntimeError("crash nativo")
+    with pytest.raises(RuntimeError, match="crash nativo"):
+        CT.gerar_voz_guia(base, p["id"], sempre, lambda t, m: t, {"slug": "v", "motor": "chatterbox_turbo", "config": {}})

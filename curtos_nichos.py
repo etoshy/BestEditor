@@ -44,6 +44,7 @@ def canais_de_nicho(base: str) -> List[Dict[str, Any]]:
         if cc.get("nicho"):
             ideias = cc.get("ideias") or []
             out.append({"id": cc["id"], "nome": cc["nome"], "nicho": cc["nicho"], "ideias": len(ideias),
+                        "marca": CT.normalizar_marca((cc.get("perfil") or {}).get("marca"), cc["nome"]),
                         "livres": sum(1 for i in ideias if not i.get("pid"))})
     return out
 

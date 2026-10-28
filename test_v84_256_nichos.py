@@ -187,3 +187,16 @@ def test_motivo_da_ia_e_tenta_com_menos(base, monkeypatch):
     assert "chave da IA é inválida" in str(e.value)
     monkeypatch.setattr(ia_servico, "motivo_desligado", lambda *a, **k: "o recurso está desligado")
     assert "desligada" in CT.motivo_ia()
+
+
+def test_arroba_do_canal_no_painel(cliente, base):
+    _A, cl = cliente
+    c = CN.criar_canal_do_nicho(base, "wild_trickcraft")
+    html = cl.get("/curtos/modelo/explicativo").get_data(as_text=True)
+    assert 'data-marca="@wildtrickcraft"' in html and 'id="piMarca"' in html
+    d = cl.post(f"/curtos/canal/{c['id']}/marca", json={"texto": "wild.trickcraft", "ativa": True}).get_json()
+    assert d["ok"] and d["marca"]["texto"] == "@wild.trickcraft"
+    p = CT.criar(base, c["id"], "x", modelo="explicativo")
+    assert CT.marca_do(base, p)["texto"] == "@wild.trickcraft" and CT.marca_do(base, p)["ativa"]
+    cl.post(f"/curtos/canal/{c['id']}/marca", json={"texto": "@wild.trickcraft", "ativa": False})
+    assert not CT.marca_do(base, CT.carregar(base, p["id"]))["ativa"]
