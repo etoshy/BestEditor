@@ -57,6 +57,7 @@
     <button id="bFlow" class="si-mini si-sec">⚡ religar o Flow em massa</button>
     <button id="bConferirQ" class="si-mini" title="antes de gastar crédito de vídeo: a IA confere os quadros A com as fichas">👁 conferir quadros</button>
     <button id="bConferir" class="si-mini">👁 conferir vídeos</button>
+    <button id="bErros" class="si-mini" title="todos os quadros/vídeos que deram ❌ erro (ou vieram corrompidos), de uma vez">🔁 refazer os que deram erro</button>
     <button id="bRefazerM" class="si-mini" title="refaz só o que o conferir marcou com ⚠">🔁 refazer os marcados</button>
     <button id="bRecuperar" class="si-mini si-sec" title="planos ou vídeos sumiram? volta a versão com mais imagens/vídeos (atual, anterior ou um dos backups) e junta os vídeos gerados que ficaram fora">🩹 recuperar planos/vídeos</button>
     <button id="bAddC" class="si-mini si-sec">➕ cena</button>
@@ -147,13 +148,14 @@ function desenharOrigem() {
 
 function midiaCena(cn, k) {
   const a = cn.img_inicio || {}, b = cn.img_fim || {}, v = cn.video || {};
-  const img = (sl, rot) => sl.arquivo ? `<img src="${ARQ}midia/${sl.arquivo}" loading="lazy">` : `<div class="si-vazio" style="aspect-ratio:${S.proporcao.replace(':', '/')}">${rot}</div>`;
+  const img = (sl, rot) => sl.arquivo ? `<img src="${ARQ}midia/${sl.arquivo}" loading="lazy" onerror="this.outerHTML='<div class=&quot;si-vazio&quot;>⚠ a imagem não abriu — 🔁 refaça</div>'">` : `<div class="si-vazio" style="aspect-ratio:${S.proporcao.replace(':', '/')}">${rot}</div>`;
   return `<div>${img(a, 'quadro A')}<div class="si-st">A · início</div>${status(a)}
       <label class="si-mini si-sec" style="cursor:pointer">⬆ A<input type="file" accept="image/*" data-up="inicio" data-k="${k}" hidden></label></div>
     <div class="si-st">${E.edicao.modo_video === 'elementos' ? '🎙 o vídeo vai com: ' + ingr(cn) : '🖼 o Flow anima o quadro A'}</div>
     <div class="full">${v.arquivo ? `<video src="${ARQ}midia/${v.arquivo}" controls preload="metadata"></video>` : ''}${status(v)}
       ${v.conferido ? (v.conferido.ok ? '<div class="si-st ok">👁 personagens fiéis às fichas</div>' : `<div class="si-st erro">👁 ⚠ ${esc(v.conferido.problema || 'personagem diferente')} — 🔁 refaça o vídeo</div>`) : ''}</div>
     <div class="full si-linha">
+      ${a.estado === 'erro' || v.estado === 'erro' ? `<button class="si-mini si-perigo" data-erros="${k}">🔁 refazer o que deu erro</button>` : ''}
       <button class="si-mini" data-gimg="${k}">${a.arquivo ? '🔁' : '🖼'} quadros</button>
       <button class="si-mini" data-gvid="${k}" ${a.arquivo || E.edicao.modo_video === 'elementos' ? '' : 'disabled'}>${v.arquivo ? '🔁' : '🎬'} vídeo</button>
       <label class="si-mini si-sec" style="cursor:pointer">⬆ vídeo<input type="file" accept="video/*" data-up="video" data-k="${k}" hidden></label></div>`;
@@ -252,6 +254,7 @@ document.addEventListener('input', ev => { if (ev.target.closest('.si-cena') || 
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   try {
+    if (b.dataset.erros !== undefined) { if (sujo) await salvarCenas(); const r = await api(BASE + '/refazer-erros', { cenas: [+b.dataset.erros] }); barra(`🔁 plano ${+b.dataset.erros + 1}: ${r.quadros} quadro e ${r.videos} vídeo de novo`, 'on'); recarregar(); return; }
     if (b.dataset.copiar !== undefined) { await navigator.clipboard.writeText(b.dataset.copiar); barra('📋 copiado', 'okk'); return; }
     if (b.dataset.addfala !== undefined) { const c = lerCenas(); const k = +b.dataset.addfala; c[k].falas.push({ quem: c[k].quem[0] || (S.elenco[0] || {}).id || '', texto: '', emocao: '' }); E.cenas = c; sujo = true; desenharCenas(true); return; }
     if (b.dataset.tirarfala) { const [k, j] = b.dataset.tirarfala.split(':').map(Number); const c = lerCenas(); c[k].falas.splice(j, 1); E.cenas = c; sujo = true; desenharCenas(true); return; }
@@ -305,6 +308,7 @@ $('bRecuperar').onclick = async () => {
 $('bPreset').onclick = async () => { try { E.edicao = (await api(BASE + '/preset-anime', {})).edicao; edicao(); barra('🎌 edição de anime ligada — 📤 exporte de novo', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bConferir').onclick = async () => { try { await api(BASE + '/conferir', {}); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bConferirQ').onclick = async () => { try { await api(BASE + '/conferir', { alvo: 'quadros' }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bErros').onclick = async () => { try { const r = await api(BASE + '/refazer-erros', {}); barra(`🔁 ${r.quadros} quadro(s) e ${r.videos} vídeo(s) de novo` + (r.aguardando ? ` · ${r.aguardando} esperando o anterior` : '') + ' — o vídeo de quem ganhou quadro novo vai sozinho', 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bRefazerM').onclick = async () => { try { const r = await api(BASE + '/refazer-marcados', {}); barra(`🔁 ${r.quadros} quadro(s) e ${r.videos} vídeo(s) de novo (o vídeo de quem ganhou quadro novo vai sozinho)`, 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bMarca').onclick = async () => {
   try { const r = await api('/shorts-ia/s/' + S.id + '/marca', { texto: $('mkTexto').value, ativa: $('mkAtiva').checked, posicao: $('mkPos').value, opacidade: $('mkOpac').value, tamanho: $('mkTam').value });

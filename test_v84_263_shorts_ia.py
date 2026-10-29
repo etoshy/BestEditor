@@ -703,3 +703,34 @@ def test_flow_lote_resolucao_e_duracao(tmp_path, monkeypatch):
     assert fd.GRUPO["duracao"] == "Duração do vídeo" and fd.GRUPO["resolucao"] == "Resolução do vídeo"
     import inspect
     assert "resolucao = resolucao or \"360p\"" in inspect.getsource(fd.configurar_caixa)
+
+
+def test_refazer_os_que_deram_erro(base, lote, tmp_path):
+    """v84_276: arquivo corrompido/sumido vira ❌; 🔁 refaz os com erro de uma vez (ou um plano só)."""
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    sid = s["id"]
+    e = SI.novo_ep(base, sid, "t")
+    cenas = [SI._nova_cena({"quem": ["P1"], "inicio": t}, {"P1"}, set()) for t in ("a", "b", "c")]
+    e = SI.salvar_cenas(base, sid, e["id"], cenas)
+    eid = e["id"]
+    pe = SI.pasta_ep(base, sid, eid)
+    os.makedirs(os.path.join(pe, "midia"))
+    _img(os.path.join(pe, "midia", "ok.png"))
+    open(os.path.join(pe, "midia", "ruim.png"), "w").write("<html>erro</html>" * 30)
+    e = SI.carregar_ep(base, sid, eid)
+    e["cenas"][0]["img_inicio"] = dict(SI._slot(), estado="pronto", arquivo="ok.png")
+    e["cenas"][1]["img_inicio"] = dict(SI._slot(), estado="pronto", arquivo="ruim.png")
+    e["cenas"][2]["img_inicio"] = dict(SI._slot(), estado="erro", erro="o Flow recusou")
+    SI.salvar_ep(base, e)
+    assert SI.verificar_midias(base, sid, eid) == 1
+    e = SI.carregar_ep(base, sid, eid)
+    assert e["cenas"][1]["img_inicio"]["estado"] == "erro" and "corrompido" in e["cenas"][1]["img_inicio"]["erro"]
+    with SI.TRAVA:
+        e = SI.carregar_ep(base, sid, eid)
+        e["edicao"]["encadear"] = False
+        SI.salvar_ep(base, e)
+    r = SI.refazer_erros(base, sid, eid, [2])
+    assert r["quadros"] == 1 and len(lote.fila) == 1
+    r = SI.refazer_erros(base, sid, eid)
+    assert r["quadros"] == 1 and len(lote.fila) == 2  # o 3 já estava na fila; foi o 2
+    assert SI.carregar_ep(base, sid, eid)["cenas"][1]["video"]["estado"] == SI.AGUARDANDO  # o vídeo vai sozinho depois

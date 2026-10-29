@@ -12141,6 +12141,8 @@ _curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isola
                         trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca, exportar=_curto_exportar)
 import shorts_ia_rotas as _shorts_ia_rotas  # noqa: E402  🎌 Shorts de IA: série com elenco fixo + modelar viral (v84_263)
 _shorts_ia_rotas.registrar(app, BASE_DIR, _curto_transcrever)
+import poker_rotas as _poker_rotas  # noqa: E402  🃏 Poker: mesa animada, ranking, roteiros com pesquisa (v84_277)
+_poker_rotas.registrar(app, BASE_DIR, tts_gerar_audio_isolado, lambda t, m: na.limpar_texto_para_tts(t, motor=m))
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)
@@ -12280,6 +12282,7 @@ def _padroes_excluidos_do_reloader() -> list:
         os.environ.get("RASTREIO_DIR") or os.path.join(BASE_DIR, "rastreios"),
         os.path.join(BASE_DIR, "pixabay_sons"),
         os.environ.get("SHORTS_IA_DIR") or os.path.join(BASE_DIR, "shorts_ia"),  # 🎌 shorts de IA: refs, quadros, vídeos
+        os.environ.get("POKER_DIR") or os.path.join(BASE_DIR, "poker"),  # 🃏 poker: mãos, fotos, vídeos, roteiros
     ]
     # 🚀 v84_262: as bibliotecas instaladas (torch, transformers… milhares de arquivos) não mudam enquanto o site roda —
     # o reloader conferia a data de TODAS a cada segundo

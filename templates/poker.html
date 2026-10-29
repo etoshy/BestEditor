@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}🃏 Poker{% endblock %}
+{% block content %}
+{% include "_poker_comum.html" %}
+<h1>🃏 Poker <span class="si-dica" style="font-weight:400">mesa animada · ranking das mãos · roteiros de documentário, tutorial e shorts</span></h1>
+<div id="barra" class="si-barra"></div>
+<div class="pk-abas">
+  <button data-aba="mesa" class="on">🃏 Mesa / mão</button>
+  <button data-aba="ranking">🏆 Ranking das mãos</button>
+  <button data-aba="roteiros">🎬 Roteiros (documentário · tutorial · shorts)</button>
+  <button data-aba="arquivos">📁 Mãos e vídeos</button>
+</div>
+
+<!-- ====================================================================== MESA -->
+<div class="pk-aba on" id="aba-mesa">
+<div class="pk-grid">
+  <div class="si-card">
+    <h2 style="margin:0">✏ A mão</h2>
+    <p class="si-dica">Escreva no formato da mesa, cole uma <b>hand history</b> (PokerStars/GG) ou descreva em português e a 🤖 IA converte.</p>
+    <div class="si-linha"><label>Título <input id="titulo" placeholder="nome da mão (pra salvar)" style="min-width:260px"></label><input type="hidden" id="maoId"></div>
+    <textarea id="texto" class="pk-dsl" spellcheck="false">{{ exemplo }}</textarea>
+    <div class="si-linha">
+      <button id="bPrevia">▶ prévia</button>
+      <button id="bSalvar" class="si-sec">💾 salvar</button>
+      <button id="bExportar" class="si-ok">🎞 exportar MP4</button>
+      <button id="bParar" class="si-perigo si-mini">⏹ parar</button>
+    </div>
+    <details><summary>🤖 descrever em português (a IA monta a mão)</summary>
+      <textarea id="desc" rows="4" placeholder="ex.: final do Main Event 2003, Moneymaker com K♠7♥ contra Farha com Q♠9♥, flop 9♠2♦6♠, Moneymaker blefa all-in no river e Farha folda"></textarea>
+      <button id="bIA" class="si-mini">🤖 converter</button>
+    </details>
+    <details class="pk-ajuda"><summary>📖 o formato (tudo o que dá pra fazer)</summary>
+<pre>mesa: blinds=0.5/1 unidade=bb titulo="Título" jogo=holdem
+      (jogo: holdem · plo · plo5 · plo6 · 6+)  (unidade: bb · fichas · US$ · R$ · €)
+      estetica=vegas70|tv2000|neon80|noir|macau|monaco|brasil|moderno
+      mostrar=pov|todas|heroi|showdown   ritmo=shorts   pov=auto   gancho="ELE FOI ALL-IN COM NADA"
+      dinheiro="US$ 2,5 mi em 2003 ≈ R$ 25 mi hoje — 10 apartamentos"   (aparece no final)
+jogador: Nome 100 As Kd heroi pais=BR foto=arquivo.jpg
+botao: Nome
+preflop: Fulano raise 3; Ciclano call; Beltrano fold
+flop: 7c 2d 9h | Ciclano check; Fulano bet 4
+turn: Ks | ...            river: 3c | ...
+nota: texto na tela          camera: Ciclano (gira a mesa pra vista dele)
+mostrar: pov                 (troca o que aparece no meio da mão)
+zoom: Fulano 1.4 / zoom: board / zoom: pot / zoom: off
+emocao: Fulano ansioso "ele tem o flush?"     (😠 irritado · 😰 ansioso · 😎 confiante · 😱 chocado · 🤔 pensativo · 😏 blefando…)
+range: Fulano AA-TT, AKs, AQo+, 22+, top 15%     (mostra a grade 13×13 com a mão dele marcada)
+acordo: dividir · acordo: equidade · acordo: Fulano 60 Ciclano 40      (dividem o pote e a mão acaba)
+correr: 2  +  board2: 4c 5d Qs Ac 8h      (run it twice: as cartas que faltavam quando correram)
+mesa: limite=pl (pot-limit; o Omaha já é) · straddle=sim · estrategia=sim
+mesa: jogo=stud → jogador: Nome 200 As Ks Ah 7d 9c Kh 2s (na ordem; 3ª a 6ª abertas) · ruas 3a: 4a: 5a: 6a: 7a:
+mesa: jogo=draw → preflop: … · troca: Fulano 7c 2s > Ks 5d; Ciclano fica · pos: …
+Dentro das ações, no momento exato, entre colchetes:
+river: 7c | Ciclano check; [zoom: Fulano]; Fulano allin; [emocao: Ciclano pensativo]; Ciclano call; [zoom: off]</pre>
+      <p>Emoções: {% for k, v in emocoes.items() %}{{ v }} {{ k }} · {% endfor %}</p>
+    </details>
+  </div>
+  <div class="si-card">
+    <h2 style="margin:0">🎥 Prévia</h2>
+    <div class="pk-ops">
+      <label>Tema / cores <select id="o_tema">{% for t in temas %}<option {% if t == op.tema %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+      <label>Estética (época/lugar) <select id="o_estetica">{% for k, v in esteticas.items() %}<option value="{{ k }}">{{ v.nome }}</option>{% endfor %}</select></label>
+      <label>Formato <select id="o_formato">{% for f in formatos %}<option>{{ f }}</option>{% endfor %}</select></label>
+      <label>Cartas visíveis <select id="o_mostrar">{% for k, v in mostrar.items() %}<option value="{{ k }}" {% if k == op.mostrar %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      <label>Modo <select id="o_modo"><option value="2d">🃏 2D (mesa de cima, padrão)</option><option value="3d">🎲 3D primeira pessoa (estilo Buckshot)</option></select></label>
+      <label>Estilo do 3D <select id="o_estilo3d">{% for k, v in estilos3d.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>Troca de vista <select id="o_camera"><option value="mover">🎥 câmera vai pro lugar do jogador (ponto de vista dele)</option><option value="girar">🔄 só gira a mesa (sem efeito de câmera)</option></select></label>
+      <label>Estilo <select id="o_estilo"><option value="normal">🎬 normal (vídeo/tutorial)</option><option value="shorts">⚡ shorts (jogada insana)</option></select></label>
+      <label>Velocidade <input id="o_velocidade" type="number" step="0.1" min="0.4" max="3" value="1"></label>
+      <label>Gancho (shorts) <input id="o_gancho" placeholder="ELE FOI ALL-IN COM NADA"></label>
+      <label>Logo na mesa <input id="o_logo" placeholder="seu canal"></label>
+      <label>FPS <select id="o_fps"><option>30</option><option>60</option><option>24</option></select></label>
+      <label class="chk"><input type="checkbox" id="o_pov"> 👁 POV automático (câmera em quem decide)</label>
+      <label class="chk"><input type="checkbox" id="o_estrategia"> 🧠 estratégia (pot odds, EV, SPR na decisão)</label>
+      <label class="chk"><input type="checkbox" id="o_emocoes"> 😰 emoções na foto</label>
+      <label class="chk"><input type="checkbox" id="o_zoom" checked> 🔍 zooms</label>
+      <label class="chk"><input type="checkbox" id="o_equidade" checked> % de equidade</label>
+      <label class="chk"><input type="checkbox" id="o_posicoes" checked> posições (BTN, SB…)</label>
+      <label class="chk"><input type="checkbox" id="o_titulo" checked> título</label>
+      <label class="chk"><input type="checkbox" id="o_dinheiro" checked> 💰 nota do dinheiro</label>
+      <label class="chk"><input type="checkbox" id="o_sons" checked> 🔊 sons</label>
+      <label class="chk"><input type="checkbox" id="o_tema_fixo"> manter meu tema (ignora o da estética)</label>
+    </div>
+    <iframe id="tela" class="pk-tela"></iframe>
+    <p class="si-dica" id="info"></p>
+    <div id="jogadores" class="pk-jog"></div>
+    <details id="pers3d" style="margin-top:8px"><summary>🎭 Personagens do modo 3D (sentados na mesa)</summary>
+      <p class="si-dica">Cada jogador aparece sentado do outro lado da mesa. Sem imagem, entra um personagem genérico no mesmo estilo (só ilustrativo). 🎨 Gere no Flow (sai com fundo verde e o site recorta; se o jogador tiver foto, ela vai de referência) ou 📤 envie a sua.</p>
+      <div id="persLista" class="si-grade"></div>
+      <input type="file" id="persArq" accept="image/*" style="display:none">
+    </details>
+    <p class="si-dica">📷 Foto do jogador: clique no jogador e escolha a foto (fica guardada pelo nome e aparece em todas as mãos dele).</p>
+    <input type="file" id="fotoArq" accept="image/*" style="display:none">
+    <div id="videoPronto"></div>
+  </div>
+</div>
+</div>
+
+<!-- ====================================================================== RANKING -->
+<div class="pk-aba" id="aba-ranking">
+<div class="pk-grid">
+  <div class="si-card">
+    <h2 style="margin:0">🏆 Explicador do ranking</h2>
+    <p class="si-dica">Motion graphics: cada mão com as cartas voando, as que formam o jogo brilhando, a explicação e a chance — e os ⚔ duelos (o motor decide quem ganha). A narração sai junto.</p>
+    <div class="pk-ops">
+      <label>Modalidade <select id="r_variante">{% for k, v in variantes.items() %}<option value="{{ k }}">{{ v.nome }}</option>{% endfor %}</select></label>
+      <label>Tema <select id="r_tema">{% for t in temas %}<option {% if t == op_rank.tema %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+      <label>Formato <select id="r_formato">{% for f in formatos %}<option>{{ f }}</option>{% endfor %}</select></label>
+      <label>Ordem <select id="r_ordem"><option value="crescente">da carta alta ao royal (suspense)</option><option value="decrescente">do royal à carta alta</option></select></label>
+      <label>Velocidade <input id="r_velocidade" type="number" step="0.1" min="0.5" max="2.5" value="1"></label>
+      <label>Título <input id="r_titulo" placeholder="Ranking das mãos — …"></label>
+      <label>Logo <input id="r_logo"></label>
+      <label class="chk"><input type="checkbox" id="r_duelos" checked> ⚔ duelos</label>
+      <label class="chk"><input type="checkbox" id="r_chances" checked> % de chance</label>
+      <label class="chk"><input type="checkbox" id="r_sons" checked> 🔊 sons</label>
+    </div>
+    <label>⚔ Seus duelos (opcional — um por linha; vazio = os exemplos)
+      <textarea id="r_duelos_texto" rows="4" class="pk-dsl" style="min-height:90px" placeholder="Kicker: Ah Kd vs Ac Qs | As 8d 5c 3h 2s&#10;Set × flush: 7h 7c vs Ah 5h | 7s Kh 9h 2h 3c"></textarea></label>
+    <div class="si-linha"><button id="rPrevia">▶ prévia</button><button id="rExportar" class="si-ok">🎞 exportar MP4</button></div>
+    <label>🎙 Narração (pra mandar pra voz) <textarea id="r_narr" rows="8" readonly></textarea></label>
+  </div>
+  <div class="si-card"><iframe id="rTela" class="pk-tela"></iframe><p class="si-dica" id="rInfo"></p><div id="rVideo"></div></div>
+</div>
+</div>
+
+<!-- ====================================================================== ROTEIROS -->
+<div class="pk-aba" id="aba-roteiros">
+<div class="si-card">
+  <h2 style="margin:0">🎬 Novo roteiro</h2>
+  <p class="si-dica">Escreva o tema e o que você já sabe (detalhado ou não). A 🔎 pesquisa busca a história, os torneios e as mãos famosas com fontes; a IA escreve um roteiro <b>divertido</b> (não 100% análise), com o contexto antes e depois de cada jogada — e só coloca mãos animadas onde elas ajudam a entender. Depois dá pra checar os fatos na web ou colar o prompt em outra IA (como no 🕵️ true crime).</p>
+  <form method="post" action="/poker/doc/novo">
+    <label>Tema <input name="tema" placeholder="ex.: o gênio do poker — a história de Stu Ungar" required></label>
+    <label>O que você sabe / quer (opcional) <textarea name="infos" rows="5" placeholder="infância, vida, jogos que jogou, a mão que quer mostrar, o tom do vídeo…"></textarea></label>
+    <div class="si-linha">
+      <label>Tipo <select name="tipo">{% for k, v in tipos_doc.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>Duração <input name="minutos" type="number" min="1" max="40" step="0.5" value="8" style="width:70px"> min</label>
+      <label>Moeda do canal <input name="moeda" value="R$" style="width:60px"></label>
+      <button>🎬 criar</button>
+    </div>
+  </form>
+</div>
+<div class="si-card"><h2 style="margin:0">📚 Seus roteiros</h2>
+  {% if not docs %}<p class="si-dica">Nenhum ainda.</p>{% endif %}
+  <div class="pk-lista">{% for d in docs %}<a href="/poker/doc/{{ d.id }}">{{ tipos_doc[d.tipo][:2] }} <b>{{ d.titulo or d.tema }}</b> <span class="si-dica">· {{ d.blocos|length }} bloco(s) · {{ d.blocos|selectattr('tipo', 'equalto', 'mao')|list|length }} mão(s)</span></a>{% endfor %}</div>
+</div>
+</div>
+
+<!-- ====================================================================== ARQUIVOS -->
+<div class="pk-aba" id="aba-arquivos">
+<div class="si-card"><h2 style="margin:0">💾 Mãos salvas</h2>
+  {% if not maos %}<p class="si-dica">Nenhuma ainda.</p>{% endif %}
+  <div class="pk-lista">{% for m in maos %}<div class="si-linha"><a href="#" data-mao="{{ m.id }}">🃏 {{ m.titulo }}</a>{% if m.video %}<a href="/poker/video/{{ m.video }}" target="_blank">🎞 vídeo</a>{% endif %}<button class="si-mini si-perigo" data-apagar="{{ m.id }}">🗑</button></div>{% endfor %}</div>
+</div>
+<div class="si-card"><h2 style="margin:0">🎞 Vídeos</h2>
+  {% if not videos %}<p class="si-dica">Nenhum ainda.</p>{% endif %}
+  <div class="pk-lista">{% for v in videos %}<div class="si-linha"><a href="/poker/video/{{ v }}" target="_blank">{{ v }}</a><a href="/poker/video/{{ v }}?baixar=1">⬇</a></div>{% endfor %}</div>
+</div>
+<div class="si-card"><h2 style="margin:0">📷 Fotos dos jogadores</h2>
+  <div class="pk-jog">{% for a in avatares %}<span class="j"><img src="/poker/avatar/{{ a }}">{{ a }}<button class="si-mini si-perigo" data-apagar-av="{{ a }}">🗑</button></span>{% endfor %}</div>
+</div>
+</div>
+
+<script>
+document.querySelectorAll('.pk-abas button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.pk-abas button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pk-aba').forEach(x => x.classList.toggle('on', x.id === 'aba-' + b.dataset.aba));
+  try { localStorage.setItem('poker_aba', b.dataset.aba); } catch (e) {}
+});
+try { const a = localStorage.getItem('poker_aba'); if (a) document.querySelector(`.pk-abas [data-aba="${a}"]`)?.click(); } catch (e) {}
+
+const OPS = ['estrategia', 'modo', 'estilo3d', 'camera', 'tema', 'estetica', 'formato', 'mostrar', 'estilo', 'velocidade', 'gancho', 'logo', 'fps', 'pov', 'emocoes', 'zoom', 'equidade', 'posicoes', 'titulo', 'dinheiro', 'sons', 'tema_fixo'];
+function op() { const o = {}; OPS.forEach(k => { const e = $('o_' + k); o[k] = e.type === 'checkbox' ? e.checked : e.value; }); if (o.pov) o.pov = 'auto'; else o.pov = ''; return o; }
+function porOp(o) { OPS.forEach(k => { const e = $('o_' + k); if (!e || !(k in o)) return; if (e.type === 'checkbox') e.checked = k === 'pov' ? o.pov === 'auto' : !!o[k]; else e.value = o[k]; }); }
+try { const s = JSON.parse(localStorage.getItem('poker_op') || 'null'); if (s) porOp(s); } catch (e) {}
+OPS.forEach(k => $('o_' + k).addEventListener('change', () => { try { localStorage.setItem('poker_op', JSON.stringify(op())); } catch (e) {} previa(); }));
+
+function jogadores(js) {
+  $('jogadores').innerHTML = js.map(j => `<span class="j" data-nome="${esc(j.nome)}" style="cursor:pointer" title="📷 trocar a foto">${j.avatar ? `<img src="/poker/avatar/${esc(j.avatar)}?${Date.now()}">` : `<span class="sem">${esc(j.nome[0] || '?')}</span>`}${esc(j.nome)}${j.pais ? ' · ' + esc(j.pais) : ''}</span>`).join('');
+  $('jogadores').querySelectorAll('.j').forEach(x => x.onclick = () => { $('fotoArq').dataset.nome = x.dataset.nome; $('fotoArq').click(); });
+}
+$('fotoArq').onchange = async () => {
+  const f = $('fotoArq').files[0]; if (!f) return; const fd = new FormData(); fd.append('nome', $('fotoArq').dataset.nome); fd.append('arquivo', f);
+  try { await api('/poker/avatar', fd); barra('📷 foto salva', 'okk'); previa(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+  $('fotoArq').value = '';
+};
+let tPrevia = null;
+let ULTIMOS = [], tPers = null;
+async function carregarPersonagens() {
+  clearTimeout(tPers);
+  if (!ULTIMOS.length) return;
+  try {
+    const d = await api('/poker/personagens?nomes=' + encodeURIComponent(ULTIMOS.join('|')), undefined, 'GET');
+    $('persLista').innerHTML = d.personagens.map(p => `<div class="si-item" data-nome="${esc(p.nome)}">
+      <b>${esc(p.nome)}</b>
+      ${p.url ? `<img src="${esc(p.url)}" style="max-height:200px;object-fit:contain;background:#222">` : '<div class="si-vazio" style="max-height:120px">genérico (ilustrativo)</div>'}
+      <textarea data-desc rows="2" placeholder="como ele é (ex.: velho de chapéu, óculos escuros, máscara de gás)">${esc(p.descricao)}</textarea>
+      ${p.foto ? '<label class="si-linha" style="margin:0"><input type="checkbox" data-foto checked> usar a foto dele de referência</label>' : ''}
+      <div class="si-linha"><button class="si-mini" data-gerar>🎨 gerar no Flow</button><button class="si-mini si-sec" data-enviar>📤 enviar</button>${p.url ? '<button class="si-mini si-perigo" data-tirar>🗑</button>' : ''}</div>
+      ${p.slot && p.slot.estado ? `<div class="si-st ${p.slot.estado === 'erro' ? 'erro' : p.slot.estado === 'pronto' ? 'ok' : ''}">${esc(p.slot.estado === 'erro' ? '❌ ' + (p.slot.erro || '') : (p.slot.msg || p.slot.estado))}</div>` : ''}
+    </div>`).join('') + (d.aviso ? `<p class="si-dica">⚠ ${esc(d.aviso)}</p>` : '');
+    $('persLista').querySelectorAll('[data-nome]').forEach(c => {
+      const nome = c.dataset.nome;
+      c.querySelector('[data-gerar]').onclick = async () => { try { const r = await api('/poker/personagem/gerar', { nome, descricao: c.querySelector('[data-desc]').value, com_foto: !!c.querySelector('[data-foto]')?.checked }); barra('🎨 pedido no Flow' + (r.aviso ? ' — ' + r.aviso : ''), 'okk'); carregarPersonagens(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+      c.querySelector('[data-enviar]').onclick = () => { $('persArq').dataset.nome = nome; $('persArq').click(); };
+      const tb = c.querySelector('[data-tirar]'); if (tb) tb.onclick = async () => { await api('/poker/personagem/apagar', { nome }); carregarPersonagens(); previa(); };
+    });
+    if (d.personagens.some(p => ['fila', 'gerando', 'parado'].includes((p.slot || {}).estado))) tPers = setTimeout(async () => { const antes = $('persLista').innerHTML; await carregarPersonagens(); if ($('persLista').innerHTML.includes('✅') && !antes.includes('✅')) previa(); }, 5000);
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('persArq').onchange = async () => {
+  const f = $('persArq').files[0]; if (!f) return; const fd = new FormData(); fd.append('nome', $('persArq').dataset.nome); fd.append('arquivo', f);
+  fd.append('tirar_fundo', confirm('Tirar o fundo da imagem? (OK se o fundo é verde/branco/liso)') ? '1' : '0');
+  try { await api('/poker/personagem/enviar', fd); barra('📤 personagem salvo', 'okk'); carregarPersonagens(); previa(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+  $('persArq').value = '';
+};
+$('pers3d').addEventListener('toggle', () => { if ($('pers3d').open) carregarPersonagens(); });
+async function previa() {
+  clearTimeout(tPrevia);
+  try {
+    const d = await api('/poker/previa', { texto: $('texto').value, op: op() });
+    mostrarTela($('tela'), d.html, op().formato);
+    $('info').textContent = `⏱ ${d.duracao.toFixed(1)} s · ${d.variante}` + (d.resumo ? ' · 🏆 ' + d.resumo : '') + (d.cameras ? ` · 🎥 ${d.cameras} troca(s) de vista` : '') + (d.zooms ? ` · 🔍 ${d.zooms} zoom(s)` : '') + (d.emocoes ? ` · 😰 ${d.emocoes} emoção(ões)${op().emocoes ? '' : ' (desligadas — marque “emoções na foto”)'}` : '');
+    jogadores(d.jogadores); barra('');
+    ULTIMOS = d.jogadores.map(j => j.nome); if ($('pers3d').open || op().modo === '3d') carregarPersonagens();
+  } catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('texto').addEventListener('input', () => { clearTimeout(tPrevia); tPrevia = setTimeout(previa, 1200); });
+$('bPrevia').onclick = previa;
+$('bSalvar').onclick = async () => {
+  try { const d = await api('/poker/mao/salvar', { id: $('maoId').value, titulo: $('titulo').value, texto: $('texto').value, op: op() }); $('maoId').value = d.mao.id; barra('💾 salva: ' + d.mao.titulo, 'okk'); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bExportar').onclick = () => rodar('/poker/exportar', { id: $('maoId').value, texto: $('texto').value, op: op() }, t => {
+  if (t.res && t.res.video) $('videoPronto').innerHTML = `<video src="/poker/video/${esc(t.res.video)}" controls style="width:100%;border-radius:10px;margin-top:8px"></video><a href="/poker/video/${esc(t.res.video)}?baixar=1">⬇ baixar ${esc(t.res.video)}</a>`;
+});
+$('bParar').onclick = async () => { await api('/poker/tarefa/parar', { chave: 'exp:' + ($('maoId').value || 'avulsa') }).catch(() => {}); await api('/poker/tarefa/parar', { chave: 'ranking' }).catch(() => {}); barra('⏹ parando…', 'okk'); };
+$('bIA').onclick = async () => {
+  barra('🤖 montando a mão…');
+  try { const d = await api('/poker/ia/mao', { descricao: $('desc').value }); $('texto').value = d.texto; previa(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+document.querySelectorAll('[data-mao]').forEach(a => a.onclick = async ev => {
+  ev.preventDefault();
+  try { const d = await api('/poker/mao/' + a.dataset.mao, undefined, 'GET'); $('maoId').value = d.mao.id; $('titulo').value = d.mao.titulo; $('texto').value = d.mao.texto; porOp(d.mao.op || {}); document.querySelector('[data-aba="mesa"]').click(); previa(); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+});
+document.querySelectorAll('[data-apagar]').forEach(b => b.onclick = async () => { if (!confirm('Apagar essa mão?')) return; await api('/poker/mao/' + b.dataset.apagar + '/apagar', {}); location.reload(); });
+document.querySelectorAll('[data-apagar-av]').forEach(b => b.onclick = async () => { if (!confirm('Apagar essa foto?')) return; await api('/poker/avatar/apagar', { arquivo: b.dataset.apagarAv }); location.reload(); });
+// abre uma mão vinda do roteiro (?mao=id)
+const qMao = new URLSearchParams(location.search).get('mao');
+if (qMao) { document.querySelector(`[data-mao="${qMao}"]`)?.click(); } else previa();
+
+// ---- ranking
+const ROPS = ['variante', 'tema', 'formato', 'ordem', 'velocidade', 'titulo', 'logo', 'duelos', 'chances', 'sons', 'duelos_texto'];
+function rop() { const o = {}; ROPS.forEach(k => { const e = $('r_' + k); o[k] = e.type === 'checkbox' ? e.checked : e.value; }); return o; }
+async function rPrevia() {
+  try { const d = await api('/poker/ranking/previa', { op: rop() }); mostrarTela($('rTela'), d.html, rop().formato); $('r_narr').value = d.narracao; $('rInfo').textContent = `⏱ ${d.duracao.toFixed(1)} s · ${d.cenas} cenas`; barra(''); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+$('rPrevia').onclick = rPrevia;
+ROPS.forEach(k => $('r_' + k).addEventListener('change', () => { if ($('aba-ranking').classList.contains('on')) rPrevia(); }));
+document.querySelector('[data-aba="ranking"]').addEventListener('click', () => { if (!$('rTela').srcdoc) rPrevia(); });
+if ($('aba-ranking').classList.contains('on')) rPrevia();
+$('rExportar').onclick = () => rodar('/poker/ranking/exportar', { op: rop() }, t => {
+  if (t.res && t.res.video) $('rVideo').innerHTML = `<video src="/poker/video/${esc(t.res.video)}" controls style="width:100%;border-radius:10px;margin-top:8px"></video><a href="/poker/video/${esc(t.res.video)}?baixar=1">⬇ baixar</a> · <a href="/poker/narracao/${esc(t.res.video.replace('.mp4', '_narracao.txt'))}">🎙 narração .txt</a>`;
+});
+</script>
+{% endblock %}

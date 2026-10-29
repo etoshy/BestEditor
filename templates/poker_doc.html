@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}🎬 {{ d.titulo or d.tema }}{% endblock %}
+{% block content %}
+{% include "_poker_comum.html" %}
+<p><a href="/poker">← 🃏 Poker</a></p>
+<h1 id="hTitulo">🎬 {{ d.titulo or d.tema }}</h1>
+<div id="barra" class="si-barra"></div>
+
+<div class="si-card">
+  <h2 style="margin:0">1 · 📝 Tema e o que você sabe</h2>
+  <label>Tema <input id="tema" value="{{ d.tema }}"></label>
+  <label>O que você sabe / quer <textarea id="infos" rows="5">{{ d.infos }}</textarea></label>
+  <div class="si-linha">
+    <label>Tipo <select id="tipo">{% for k, v in tipos.items() %}<option value="{{ k }}" {% if k == d.tipo %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Duração <input id="minutos" type="number" min="1" max="40" step="0.5" value="{{ d.minutos }}" style="width:70px"> min</label>
+    <label>Moeda do canal <input id="moeda" value="{{ d.moeda or 'R$' }}" style="width:60px"></label>
+    <button id="bSalvarTema" class="si-sec si-mini">💾 salvar</button>
+  </div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">2 · 🔎 Pesquisa</h2>
+  <p class="si-dica">A 🔎 IA do Google pesquisa a biografia, a carreira e as mãos famosas (com fontes). Não tem a IA do Google ligada, ou quer mais? Pesquise em outras IAs/sites e cole embaixo — a IA usa tudo.</p>
+  <div class="si-linha"><button id="bPesquisar">🔎 pesquisar na web</button><span class="si-dica" id="pesqQuando"></span></div>
+  <details id="pesqBox"><summary>📄 o que a pesquisa achou</summary><div id="pesqTexto" style="white-space:pre-wrap;font-size:.84rem"></div><div id="pesqFontes" class="pk-lista"></div></details>
+  <label>📋 Pesquisa colada (outras IAs, sites, livros) <textarea id="notas" rows="5">{{ d.notas_pesquisa }}</textarea></label>
+  <details><summary>💡 prompt pra pesquisar em outra IA</summary><textarea id="promptPesq" rows="6" readonly></textarea><button class="si-mini" id="bCopiarPesq">📋 copiar</button></details>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">3 · ✍ Roteiro</h2>
+  <div class="si-linha">
+    <button id="bEscrever">✍ escrever com a IA</button>
+    <label>máx. de mãos <input id="maxMaos" type="number" min="0" max="8" value="0" style="width:60px"></label>
+    <span class="si-dica">0 = a IA decide (só as decisivas)</span>
+  </div>
+  <div class="pk-ops" style="margin-top:4px">
+    <label>Tema da mesa <select id="o_tema">{% for t in temas %}<option {% if t == (d.op or op).tema %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Estética padrão <select id="o_estetica">{% for k, v in esteticas.items() %}<option value="{{ k }}" {% if k == (d.op or op).estetica %}selected{% endif %}>{{ v.nome }}</option>{% endfor %}</select></label>
+    <label>Formato <select id="o_formato">{% for f in formatos %}<option {% if f == (d.op or op).formato %}selected{% endif %}>{{ f }}</option>{% endfor %}</select></label>
+    <label>Cartas <select id="o_mostrar">{% for k, v in mostrar.items() %}<option value="{{ k }}" {% if k == (d.op or op).mostrar %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Modo <select id="o_modo"><option value="2d">🃏 2D</option><option value="3d" {% if (d.op or op).modo == '3d' %}selected{% endif %}>🎲 3D (Buckshot)</option></select></label>
+    <label>Estilo 3D <select id="o_estilo3d">{% for k, v in estilos3d.items() %}<option value="{{ k }}" {% if (d.op or op).estilo3d == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Troca de vista <select id="o_camera"><option value="mover">🎥 câmera vai pro lugar do jogador (ponto de vista dele)</option><option value="girar" {% if (d.op or op).camera == 'girar' %}selected{% endif %}>🔄 só gira a mesa</option></select></label>
+    <label>Estilo <select id="o_estilo"><option value="normal">🎬 normal</option><option value="shorts" {% if (d.op or op).estilo == 'shorts' %}selected{% endif %}>⚡ shorts</option></select></label>
+    <label class="chk"><input type="checkbox" id="o_estrategia" {% if (d.op or op).estrategia %}checked{% endif %}> 🧠 estratégia</label>
+    <label class="chk"><input type="checkbox" id="o_emocoes" {% if (d.op or op).emocoes %}checked{% endif %}> 😰 emoções</label>
+    <label class="chk"><input type="checkbox" id="o_zoom" {% if (d.op or op).zoom %}checked{% endif %}> 🔍 zooms</label>
+  </div>
+  <div id="titulos" class="si-dica"></div>
+  <div id="blocos"></div>
+  <div class="si-linha">
+    <button class="si-sec si-mini" id="bAddNarr">＋ narração</button><button class="si-sec si-mini" id="bAddMao">＋ 🃏 mão</button>
+    <button id="bSalvarBlocos">💾 salvar o roteiro</button>
+    <a href="/poker/doc/{{ d.id }}/texto">📄 baixar a narração (.txt)</a>
+  </div>
+</div>
+
+<input type="file" id="midiaArq" accept="image/*,video/*" style="display:none">
+<input type="file" id="musicaArq" accept="audio/*" style="display:none">
+<div class="si-card">
+  <h2 style="margin:0">4 · ✅ Checagem de fontes</h2>
+  <p class="si-dica">Como no 🕵️ true crime: copie o prompt e cole em outra IA (ChatGPT, Gemini, Perplexity…) — ela confere fatos, cronologia e as mãos e devolve um JSON; cole a resposta aqui e aplique as correções. Ou rode a checagem na web.</p>
+  <div class="si-linha"><button id="bPrompt">📋 gerar o prompt de checagem</button><button id="bChecarWeb" class="si-sec">✅ checar na web (IA do Google)</button></div>
+  <textarea id="promptChec" rows="6" readonly style="display:none"></textarea>
+  <label>Resposta da outra IA (JSON) <textarea id="respChec" rows="5"></textarea></label>
+  <button id="bLerChec" class="si-mini">📥 ler a resposta</button>
+  <div id="checagem"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">5 · 🎞 Montar o vídeo final</h2>
+  <p class="si-dica">Narra cada fala com a voz do site, põe a peça de cada bloco, roda as mãos no ritmo da narração (a mesa espera o "antes", a mão anda no "durante", 🧠 a estratégia num cartão, o "depois" sobre a mesa final), põe os sons e a trilha (abaixa sozinha quando o narrador fala) e emenda tudo — com a legenda .srt. Cada pedaço fica guardado: mudou um bloco, só ele é refeito. ⏱ Cada peça fica no mínimo o tempo de ler (título ~5 s, cartão ~4 s + 1,3 s por número, linha do tempo ~3 s + 1,8 s por data, gráfico ~5 s, citação pelo tamanho) — se a fala for mais longa, ela fica o tempo da fala.</p>
+  <div class="si-linha">
+    <label>🎙 Voz <select id="voz"><option value="">(a primeira cadastrada)</option></select></label>
+    <label>⏱ Tempo das peças <select id="ritmoPecas"><option value="normal" {% if (d.ritmo_pecas or 'normal') == 'normal' %}selected{% endif %}>normal (recomendado)</option><option value="calmo" {% if d.ritmo_pecas == 'calmo' %}selected{% endif %}>mais tempo na tela</option><option value="rapido" {% if d.ritmo_pecas == 'rapido' %}selected{% endif %}>rápido (shorts)</option></select></label>
+    <button class="si-sec si-mini" id="bMusica">🎵 trilha de fundo</button><span class="si-dica" id="musicaNome">{{ d.musica or 'sem trilha (ou poker/sons/musica.mp3)' }}</span>
+  </div>
+  <div class="si-linha"><button id="bMontar" class="si-ok">🎞 montar o vídeo</button><button id="bPararMont" class="si-perigo si-mini">⏹ parar</button></div>
+  <div id="montado"></div>
+</div>
+
+<div class="pk-modal" id="modal"><div class="caixa"><div class="si-linha"><b id="mTit"></b><button class="si-mini si-sec" id="mFechar" style="margin-left:auto">✕</button></div><iframe id="mTela" class="pk-tela"></iframe><p class="si-dica" id="mInfo"></p></div></div>
+
+<script>
+const DID = {{ d.id|tojson }}, TEMA = {{ d.tema|tojson }};
+const STATUS = {{ status|tojson }};
+const TIPOS_G = {{ tipos_graf|tojson }};
+let DOC = null;
+const OPS = ['estrategia', 'modo', 'estilo3d', 'camera', 'tema', 'estetica', 'formato', 'mostrar', 'estilo', 'emocoes', 'zoom'];
+function op() { const o = Object.assign({}, DOC && DOC.op || {}); OPS.forEach(k => { const e = $('o_' + k); o[k] = e.type === 'checkbox' ? e.checked : e.value; }); return o; }
+
+function campo(rot, k, v, linhas, ph) { return `<label>${rot} ${linhas ? `<textarea data-k="${k}" rows="${linhas}" placeholder="${esc(ph || '')}">${esc(v)}</textarea>` : `<input data-k="${k}" value="${esc(v)}" placeholder="${esc(ph || '')}">`}</label>`; }
+function blocoHtml(b, k) {
+  const topo = `<div class="si-linha"><b>${k + 1}. ${b.tipo === 'mao' ? '🃏 mão' : '🎙 narração'}</b><span style="margin-left:auto"></span>
+    <button class="si-mini si-sec" data-mover="-1">▲</button><button class="si-mini si-sec" data-mover="1">▼</button><button class="si-mini si-perigo" data-tirar>🗑</button></div>`;
+  if (b.tipo !== 'mao') {
+    const g = b.grafico || {}, it = g.itens || [];
+    const linhas = it.map(x => g.tipo === 'linha_do_tempo' ? `${x.ano || x.rotulo} | ${x.texto || x.valor}` : `${x.rotulo || x.ano} | ${x.valor || x.texto}`).join('\n');
+    return `<div class="si-card" data-id="${b.id}" data-tipo="narracao">${topo}${campo('🎙 Narração', 'texto', b.texto, 4)}${campo('Na tela (nota)', 'visual', b.visual, 0, 'foto, arquivo, gráfico, título…')}
+      <details ${g.tipo ? 'open' : ''}><summary>🎬 Peça na tela: <b>${esc(TIPOS_G[g.tipo || ''] || '')}</b>${g.arquivo ? ' · 📎 ' + esc(g.arquivo) : ''}</summary>
+        <div class="pk-ops">
+          <label>Tipo <select data-g="tipo">${Object.entries(TIPOS_G).map(([k, n]) => `<option value="${k}" ${k === (g.tipo || '') ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <label>Título / nome <input data-g="titulo" value="${esc(g.titulo)}"></label>
+          <label>Subtítulo / apelido <input data-g="subtitulo" value="${esc(g.subtitulo)}"></label>
+          <label>Número (cap. ou valor) <input data-g="numero" value="${esc(g.numero)}"></label>
+          <label>Autor <input data-g="autor" value="${esc(g.autor)}"></label>
+          <label>País <input data-g="pais" value="${esc(g.pais)}" maxlength="3"></label>
+        </div>
+        <label>Texto (citação, legenda, contexto) <textarea data-g="texto" rows="2">${esc(g.texto)}</textarea></label>
+        <label>Itens — um por linha: “rótulo | valor” (cartão, gráfico) ou “ano | o que aconteceu” (linha do tempo)<textarea data-gi rows="3" class="pk-dsl" style="min-height:60px">${esc(linhas)}</textarea></label>
+        <input type="hidden" data-g="arquivo" value="${esc(g.arquivo)}">
+        <div class="si-linha"><button class="si-mini" data-pprev>▶ prévia da peça</button><button class="si-mini si-sec" data-pmidia>📎 enviar foto/vídeo</button>
+          ${g.arquivo ? `<a href="/poker/doc/${DID}/midia/${esc(g.arquivo)}" target="_blank">ver o arquivo</a>` : ''}</div>
+      </details></div>`;
+  }
+  const m = b.mao || {}, v = b.validacao || {};
+  return `<div class="si-card" data-id="${b.id}" data-tipo="mao" style="border-color:var(--acento)">${topo}
+    <div class="si-linha"><label>Título <input data-m="titulo" value="${esc(m.titulo)}" style="min-width:260px"></label>
+      <label>Status <select data-m="status">${Object.entries(STATUS).map(([s, n]) => `<option value="${s}" ${s === m.status ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
+    <label>Fonte <input data-m="fonte" value="${esc(m.fonte)}" placeholder="de onde veio (link, vídeo, livro)"></label>
+    <label>Por que mostrar <input data-m="por_que" value="${esc(m.por_que)}"></label>
+    <label>🎙 Contexto antes <textarea data-m="contexto_antes" rows="3">${esc(m.contexto_antes)}</textarea></label>
+    ${campo('🎙 Durante a mão', 'texto', b.texto, 2)}
+    <label>🧠 Estratégia / o que aprender <textarea data-m="estrategia" rows="2">${esc(m.estrategia)}</textarea></label>
+    <label>🎙 Contexto depois <textarea data-m="contexto_depois" rows="3">${esc(m.contexto_depois)}</textarea></label>
+    <label>🃏 A mão (formato da mesa) <textarea data-m="mao" rows="10" class="pk-dsl" style="min-height:160px" spellcheck="false">${esc(m.mao)}</textarea></label>
+    <div class="si-linha"><span class="si-st ${v.ok ? 'ok' : 'erro'}">${v.ok ? `✅ roda no motor · ${(v.duracao || 0).toFixed(1)} s${v.resumo ? ' · ' + esc(v.resumo) : ''}` : '❌ ' + esc(v.erro || 'não validada (salve)')}</span></div>
+    <div class="si-linha"><button class="si-mini" data-previa>▶ prévia</button><button class="si-mini si-sec" data-abrir>🃏 abrir na mesa</button><button class="si-mini si-ok" data-exportar>🎞 exportar</button>
+      ${b.video ? `<a href="/poker/video/${esc(b.video)}" target="_blank">🎞 vídeo</a> <a href="/poker/video/${esc(b.video)}?baixar=1">⬇</a>` : ''}</div></div>`;
+}
+function lerGrafico(c) {
+  const g = {}; c.querySelectorAll('[data-g]').forEach(e => g[e.dataset.g] = e.value);
+  const tx = (c.querySelector('[data-gi]') || {}).value || '';
+  g.itens = tx.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const [a, ...r] = l.split('|'); const b = r.join('|').trim(); a.trim();
+    return g.tipo === 'linha_do_tempo' ? { ano: a.trim(), texto: b, rotulo: '', valor: '' } : { rotulo: a.trim(), valor: b, ano: '', texto: '' }; });
+  return g;
+}
+function lerBlocos() {
+  return [...$('blocos').querySelectorAll(':scope > [data-tipo]')].map(c => {
+    const b = { id: c.dataset.id, tipo: c.dataset.tipo };
+    c.querySelectorAll('[data-k]').forEach(e => b[e.dataset.k] = e.value);
+    if (b.tipo === 'narracao') b.grafico = lerGrafico(c);
+    if (b.tipo === 'mao') { b.mao = {}; c.querySelectorAll('[data-m]').forEach(e => b.mao[e.dataset.m] = e.value); }
+    return b;
+  });
+}
+function desenhar() {
+  const d = DOC;
+  $('hTitulo').textContent = '🎬 ' + (d.titulo || d.tema);
+  $('titulos').innerHTML = (d.titulos || []).length ? '💡 títulos: ' + d.titulos.map(esc).join(' · ') : '';
+  $('blocos').innerHTML = (d.blocos || []).map(blocoHtml).join('') || '<p class="si-dica" id="semBlocos">Sem roteiro ainda — ✍ escreva com a IA ou adicione blocos.</p>';
+  const p = d.pesquisa || {};
+  $('pesqTexto').textContent = p.texto || '(ainda não pesquisou)';
+  $('pesqFontes').innerHTML = (p.fontes || []).map(f => `<a href="${esc(f.url)}" target="_blank">🔗 ${esc(f.titulo || f.url)} <span class="si-dica">${esc(f.site || '')}</span></a>`).join('');
+  $('pesqQuando').textContent = p.quando ? `✔ ${(p.fontes || []).length} fonte(s)` : '';
+  if (p.texto) $('pesqBox').open = false;
+  ligarBlocos();
+  desenharChecagem();
+}
+function desenharChecagem() {
+  const c = DOC.checagem; if (!c) { $('checagem').innerHTML = ''; return; }
+  if (c.origem === 'web') { $('checagem').innerHTML = `<h3>✅ Checagem na web</h3><div style="white-space:pre-wrap;font-size:.84rem">${esc(c.texto)}</div>` + (c.fontes || []).map(f => `<a href="${esc(f.url)}" target="_blank">🔗 ${esc(f.titulo || f.url)}</a>`).join('<br>'); return; }
+  $('checagem').innerHTML = `<h3>📥 Correções da outra IA</h3><p class="si-dica">${esc(c.resumo || '')}</p>` +
+    (c.trocas || []).map((t, i) => `<label class="si-linha" style="align-items:flex-start"><input type="checkbox" data-troca="${i}" ${t.aplicada ? 'disabled checked' : 'checked'}> <span><b>${esc(t.status)}</b> ${esc(t.motivo)}<br><s>${esc(t.de)}</s> → ${esc(t.para)}${t.fonte ? `<br><span class="si-dica">fonte: ${esc(t.fonte)}</span>` : ''}${t.aplicada ? ' ✔ aplicada' : ''}</span></label>`).join('') +
+    ((c.trocas || []).some(t => !t.aplicada) ? '<button id="bAplicar">✔ aplicar as marcadas</button>' : '') +
+    ((c.verificar || []).length ? '<h4>🔍 Pra você conferir</h4><ul>' + c.verificar.map(v => `<li>${esc(v.afirmacao)} <span class="si-dica">— ${esc(v.por_que)} ${esc(v.como)}</span></li>`).join('') + '</ul>' : '') +
+    ((c.inconsistencias || []).length ? '<h4>⚠ Inconsistências</h4><ul>' + c.inconsistencias.map(v => `<li>${esc(v.descricao)}</li>`).join('') + '</ul>' : '');
+  const b = $('bAplicar'); if (b) b.onclick = async () => {
+    const idx = [...document.querySelectorAll('[data-troca]')].filter(x => x.checked && !x.disabled).map(x => +x.dataset.troca);
+    try { const d = await api(`/poker/doc/${DID}/aplicar`, { indices: idx }); DOC = d.doc; desenhar(); barra('✔ correções aplicadas', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+  };
+}
+function ligarBlocos() {
+  if ($('blocos').querySelector('[data-tipo]')) $('semBlocos')?.remove();
+  [...$('blocos').querySelectorAll(':scope > [data-tipo]')].forEach(c => {
+    const q = s => c.querySelector(s);
+    q('[data-tirar]').onclick = () => { if (confirm('Tirar esse bloco?')) { c.remove(); } };
+    c.querySelectorAll('[data-mover]').forEach(b => b.onclick = () => { const dir = +b.dataset.mover; if (dir < 0 && c.previousElementSibling) c.parentNode.insertBefore(c, c.previousElementSibling); if (dir > 0 && c.nextElementSibling) c.parentNode.insertBefore(c.nextElementSibling, c); });
+    if (c.dataset.tipo !== 'mao') {
+      const pv = q('[data-pprev]');
+      if (pv) pv.onclick = async () => { try { const d = await api('/poker/grafico/previa', { grafico: lerGrafico(c), op: op(), did: DID, duracao: 6, frase: (q('[data-k="texto"]').value || '').split(/(?<=[.!?])\s/)[0] });
+        $('mTit').textContent = '🎬 prévia da peça'; $('modal').classList.add('on'); mostrarTela($('mTela'), d.html, op().formato); $('mInfo').textContent = ''; } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+      const pm = q('[data-pmidia]');
+      if (pm) pm.onclick = async () => { if (!c.dataset.id) { await salvarBlocos(); return barra('💾 salvei o roteiro — clique de novo pra enviar', 'okk'); }
+        $('midiaArq').dataset.bid = c.dataset.id; $('midiaArq').click(); };
+      return;
+    }
+    q('[data-previa]').onclick = async () => {
+      try { const d = await api('/poker/previa', { texto: q('[data-m="mao"]').value, op: op() });
+        $('mTit').textContent = q('[data-m="titulo"]').value; $('modal').classList.add('on'); mostrarTela($('mTela'), d.html, op().formato);
+        $('mInfo').textContent = `⏱ ${d.duracao.toFixed(1)} s` + (d.resumo ? ' · 🏆 ' + d.resumo : ''); }
+      catch (e) { barra('❌ ' + e.message, 'erro'); }
+    };
+    q('[data-abrir]').onclick = async () => { await salvarBlocos(); try { const d = await api(`/poker/doc/${DID}/mao/${c.dataset.id}/abrir`, {}); location.href = '/poker?mao=' + d.mao.id; } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+    q('[data-exportar]').onclick = async () => { await salvarBlocos(); rodar(`/poker/doc/${DID}/mao/${c.dataset.id}/exportar`, { op: op() }, () => recarregar()); };
+  });
+}
+async function recarregar() { try { const d = await api(`/poker/doc/${DID}/estado`, undefined, 'GET'); DOC = d.doc; desenhar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+async function salvarTema() { const d = await api(`/poker/doc/${DID}/salvar`, { tema: $('tema').value, infos: $('infos').value, tipo: $('tipo').value, minutos: $('minutos').value, moeda: $('moeda').value, notas_pesquisa: $('notas').value, op: op() }); DOC = d.doc; }
+async function salvarBlocos() { try { await salvarTema(); const d = await api(`/poker/doc/${DID}/salvar`, { blocos: lerBlocos() }); DOC = d.doc; desenhar(); barra('💾 roteiro salvo', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+$('bSalvarTema').onclick = () => salvarTema().then(() => barra('💾 salvo', 'okk')).catch(e => barra('❌ ' + e.message, 'erro'));
+$('notas').addEventListener('change', () => salvarTema().catch(() => {}));
+OPS.forEach(k => $('o_' + k).addEventListener('change', () => salvarTema().catch(() => {})));
+$('bPesquisar').onclick = async () => { await salvarTema(); rodar(`/poker/doc/${DID}/pesquisar`, {}, () => { recarregar(); $('pesqBox').open = true; }); };
+$('bEscrever').onclick = async () => {
+  if ((DOC.blocos || []).length && !confirm('Reescrever o roteiro? (o atual fica guardado como versão anterior)')) return;
+  await salvarTema(); rodar(`/poker/doc/${DID}/escrever`, { max_maos: +$('maxMaos').value }, () => recarregar());
+};
+$('bSalvarBlocos').onclick = salvarBlocos;
+$('bAddNarr').onclick = () => { $('blocos').insertAdjacentHTML('beforeend', blocoHtml({ id: '', tipo: 'narracao', texto: '', visual: '' }, $('blocos').children.length)); ligarBlocos(); };
+$('bAddMao').onclick = () => { const n = $('blocos').children.length; $('blocos').insertAdjacentHTML('beforeend', blocoHtml({ id: '', tipo: 'mao', texto: '', mao: { titulo: 'Nova mão', status: 'ilustrativa', fonte: '', por_que: '', contexto_antes: '', contexto_depois: '', estrategia: '', mao: 'mesa: blinds=0.5/1 unidade=bb\njogador: Herói 100 As Kd heroi\njogador: Vilão 100 Qh Qs\nbotao: Herói\npreflop: Herói raise 2.5; Vilão call\nflop: Ah 7c 2d | Vilão check; Herói bet 3; Vilão call\nturn: 9s | Vilão check; Herói check\nriver: 3h | Vilão bet 6; Herói call' } }, n)); ligarBlocos(); };
+$('mFechar').onclick = () => { $('modal').classList.remove('on'); $('mTela').srcdoc = ''; };
+$('bPrompt').onclick = async () => { await salvarBlocos(); try { const d = await api(`/poker/doc/${DID}/checagem`, undefined, 'GET'); $('promptChec').style.display = 'block'; $('promptChec').value = d.prompt; $('promptChec').select(); navigator.clipboard?.writeText(d.prompt).then(() => barra('📋 prompt copiado — cole na outra IA', 'okk')).catch(() => {}); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bChecarWeb').onclick = async () => { await salvarBlocos(); rodar(`/poker/doc/${DID}/checar_web`, {}, () => recarregar()); };
+$('bLerChec').onclick = async () => { try { const d = await api(`/poker/doc/${DID}/checagem_ler`, { resposta: $('respChec').value }); DOC = d.doc; desenharChecagem(); barra('📥 checagem lida', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('promptPesq').value = `Pesquise com fontes confiáveis (Wikipedia, Hendon Mob, PokerNews, entrevistas) para um vídeo sobre: ${TEMA}. Quero a biografia (infância, como começou, vida), a carreira (torneios, títulos, ganhos, rivalidades) e as MÃOS mais famosas — evento, ano, jogadores, stacks, cartas, board e ações rua por rua — dizendo o que é registrado e o que é incerto. Liste as fontes com link.`;
+$('bCopiarPesq').onclick = () => { $('promptPesq').select(); navigator.clipboard?.writeText($('promptPesq').value); barra('📋 copiado', 'okk'); };
+$('midiaArq').onchange = async () => {
+  const f = $('midiaArq').files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
+  await salvarBlocos();
+  try { const d = await api(`/poker/doc/${DID}/bloco/${$('midiaArq').dataset.bid}/midia`, fd); DOC = d.doc; desenhar(); barra('📎 arquivo no bloco', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+  $('midiaArq').value = '';
+};
+$('bMusica').onclick = () => $('musicaArq').click();
+$('musicaArq').onchange = async () => { const f = $('musicaArq').files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f);
+  try { const d = await api(`/poker/doc/${DID}/musica`, fd); $('musicaNome').textContent = '🎵 ' + d.musica; barra('🎵 trilha salva', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+function mostrarMontagem(m) {
+  if (!m || !m.video) { $('montado').innerHTML = ''; return; }
+  $('montado').innerHTML = `<video src="/poker/video/${esc(m.video)}?${m.quando || ''}" controls style="width:100%;max-height:70vh;border-radius:10px;margin-top:8px;background:#000"></video>
+    <div class="si-linha"><a href="/poker/video/${esc(m.video)}?baixar=1">⬇ baixar o MP4</a><a href="/poker/narracao/${esc(m.srt)}">📝 legenda .srt</a><span class="si-dica">⏱ ${Math.round(m.duracao || 0)} s · ${m.pedacos || 0} pedaços</span></div>`;
+}
+$('bMontar').onclick = async () => { await salvarBlocos(); rodar(`/poker/doc/${DID}/montar`, { op: op(), voz: $('voz').value, ritmo_pecas: $('ritmoPecas').value }, () => recarregar().then(() => mostrarMontagem(DOC.montagem))); };
+$('bPararMont').onclick = async () => { await api('/poker/tarefa/parar', { chave: 'mont:' + DID }).catch(() => {}); barra('⏹ parando…', 'okk'); };
+api('/poker/vozes', undefined, 'GET').then(d => {
+  $('voz').innerHTML = '<option value="">(a primeira cadastrada)</option>' + d.vozes.map(v => `<option value="${esc(v.slug)}">${esc(v.nome)}</option>`).join('');
+  if (DOC && DOC.voz) $('voz').value = DOC.voz;
+  if (!d.tts) barra('⚠ o gerador de voz não está disponível — a montagem precisa dele', 'erro');
+}).catch(() => {});
+recarregar().then(() => mostrarMontagem(DOC && DOC.montagem));
+</script>
+{% endblock %}

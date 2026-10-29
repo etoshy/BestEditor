@@ -1,0 +1,31 @@
+{
+ "ctx": {
+  "idioma": {
+   "codigo": "pt",
+   "nome": "português do Brasil"
+  },
+  "canal": "",
+  "narracao": "VÍDEO REAGIDO: Teste\nTRANSCRIÇÃO: \n\nFALAS DO REACT:\n",
+  "personagens": [
+   {
+    "slug": "c858502",
+    "nome": "Itachi",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": "/tmp/pytest-of-root/pytest-116/test_react_e_criador0/react/rpba9dcba27c/refs/c858502_c16c8c.png"
+   }
+  ],
+  "projeto": {
+   "tema": "React de Itachi a: Teste",
+   "roteiro": ""
+  },
+  "duracao": 0.0
+ },
+ "meta": {
+  "titulo": "🎭 Teste",
+  "tem_projeto": false,
+  "react": "rpba9dcba27c",
+  "atualizado": 1793283937.590636,
+  "criado": 1793283937.5906377
+ }
+}

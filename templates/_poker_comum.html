@@ -1,0 +1,46 @@
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .pk-abas { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .pk-abas button { width: auto; background: var(--card); color: var(--texto); border: 1px solid var(--borda); }
+  .pk-abas button.on { background: var(--acento); color: #fff; border-color: var(--acento); }
+  .pk-aba { display: none; } .pk-aba.on { display: block; }
+  .pk-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.25fr); gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .pk-grid { grid-template-columns: 1fr; } }
+  .pk-dsl { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; min-height: 360px; white-space: pre; tab-size: 2; }
+  .pk-tela { width: 100%; border: 0; border-radius: 10px; background: #000; display: block; }
+  .pk-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 6px 10px; margin: 8px 0; }
+  .pk-ops label { display: flex; flex-direction: column; gap: 2px; font-size: .8rem; margin: 0; }
+  .pk-ops label.chk { flex-direction: row; align-items: center; gap: 6px; }
+  .pk-ops input, .pk-ops select { margin: 0; font-size: .82rem; }
+  .pk-jog { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pk-jog .j { display: flex; align-items: center; gap: 6px; border: 1px solid var(--borda); border-radius: 999px; padding: 3px 10px 3px 3px; font-size: .8rem; }
+  .pk-jog img, .pk-jog .sem { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--code-bg); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; }
+  .pk-ajuda { font-size: .8rem; } .pk-ajuda code { font-size: .78rem; }
+  .pk-ajuda pre { background: var(--code-bg); padding: 8px; border-radius: 8px; white-space: pre-wrap; font-size: .76rem; }
+  .pk-lista a { display: block; padding: 4px 0; }
+  .pk-modal { position: fixed; inset: 0; background: #000c; z-index: 3000; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .pk-modal.on { display: flex; } .pk-modal .caixa { width: min(1100px, 96vw); background: var(--card); border-radius: 12px; padding: 10px; }
+</style>
+<script>
+function aspecto(formato) { return formato === '9:16' ? 16 / 9 : formato === '1:1' ? 1 : 9 / 16; }
+function mostrarTela(iframe, html, formato) {
+  const w = iframe.clientWidth || 600;
+  const h = Math.min(window.innerHeight * 0.8, w * aspecto(formato)) + 40;
+  iframe.style.height = h + 'px'; iframe.srcdoc = html;
+}
+async function acompanhar(chave, aoFim) {
+  for (;;) {
+    await new Promise(r => setTimeout(r, 1500));
+    let d; try { d = await api('/poker/tarefa/' + encodeURIComponent(chave), undefined, 'GET'); } catch (e) { barra('❌ ' + e.message, 'erro'); return; }
+    const t = d.tarefa; if (!t) return;
+    if (t.rodando) { barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); continue; }
+    if (t.erro) { barra('❌ ' + t.erro, 'erro'); } else { barra('✅ ' + t.rotulo + ' — pronto', 'okk'); }
+    if (aoFim) aoFim(t);
+    return;
+  }
+}
+async function rodar(url, corpo, aoFim) {
+  try { const d = await api(url, corpo); barra('⏳ começando…'); acompanhar(d.tarefa, aoFim); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+}
+</script>

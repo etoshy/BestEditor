@@ -26,6 +26,7 @@
    "genero": "male",
    "idade": "28",
    "altura": "178 cm",
+   "detalhes": "",
    "ref": {
     "estado": "pronto",
     "arquivo": "P1_b9144df957.jpg",
@@ -104,6 +105,10 @@
     {
      "fato": "Passou a ouvir a vila com atenção depois de gravar as cigarras e o vento no pomar com o microfone que Mame roubou.",
      "ep": "1f060e8b"
+    },
+    {
+     "fato": "Ele gravou sem querer as cigarras e o grito da Mame no balanço e percebeu que o caos dela também tem som bonito; passou a rir com ela.",
+     "ep": "6dd13d20"
     }
    ],
    "estreia": null,
@@ -124,6 +129,7 @@
    "genero": "female",
    "idade": "6",
    "altura": "112 cm",
+   "detalhes": "",
    "ref": {
     "estado": "pronto",
     "arquivo": "P2_66ccd1c4a8.jpg",
@@ -202,6 +208,10 @@
     {
      "fato": "Confirmou que o microfone 'Bicho' precisa de comida e que Sora é seu vizinho oficial, aparecendo pelo buraco da cerca todo dia.",
      "ep": "1f060e8b"
+    },
+    {
+     "fato": "Passou a chamar o balanço de bicho perigoso e acredita que ele dorme pendurado; ensinou o Sora a empurrar no balanço.",
+     "ep": "6dd13d20"
     }
    ],
    "estreia": null,
@@ -222,6 +232,7 @@
    "genero": "female",
    "idade": "70",
    "altura": "150 cm",
+   "detalhes": "",
    "ref": {
     "estado": "pronto",
     "arquivo": "P3_67c849b100.jpg",
@@ -368,6 +379,7 @@
  ],
  "ideias": [],
  "eps": [
+  "6dd13d20",
   "1f060e8b",
   "1993884d"
  ],
@@ -391,5 +403,6 @@
   "auto_preparar": false
  },
  "formato_serie": "episodica",
- "atualizado": 1793262105.4877095
+ "atualizado": 1793264891.0309782,
+ "objetos": []
 }

@@ -144,3 +144,7 @@ pixabay_sons/
 curtos/
 assets/sons/pixabay/
 assets/darkplanner/extras/pixabay_sons.json
+# 🎌 Shorts de IA (v84_263): séries, referências, quadros e vídeos gerados
+shorts_ia/
+# 🃏 Poker (v84_277): mãos salvas, fotos dos jogadores, vídeos e roteiros
+poker/

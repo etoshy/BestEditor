@@ -1956,7 +1956,12 @@ def _sync_slot(slot: Dict[str, Any], fila: Dict[str, Dict[str, Any]], rodando: b
             ext = os.path.splitext(org)[1] or (".mp4" if tipo == "video" else ".png")
             nome = f"{prefixo}_{j['id']}{ext}"
             shutil.copyfile(org, os.path.join(destino_dir, nome))
-            slot.update(estado="pronto", arquivo=nome, erro=None, msg="✅ pronto", conta=j.get("conta"), desatualizada=False, pronto_em=time.time())
+            ruim = midia_ruim(os.path.join(destino_dir, nome), tipo)
+            if ruim:
+                slot.update(estado="erro", erro=f"o Flow mandou um arquivo {ruim} — 🔁 refaça", arquivo=slot.get("arquivo"))
+            else:
+                slot.update(estado="pronto", arquivo=nome, erro=None, msg="✅ pronto", conta=j.get("conta"), desatualizada=False,
+                            pronto_em=time.time())
     elif j["estado"] == "erro":
         slot.update(estado="erro", erro=str(j.get("erro") or "o Flow falhou")[:300])
     elif j["estado"] in ("rodando", "convertendo"):
@@ -1966,6 +1971,77 @@ def _sync_slot(slot: Dict[str, Any], fila: Dict[str, Dict[str, Any]], rodando: b
     else:
         slot.update(estado="fila", msg="⏳ na fila do Flow")
     return (slot.get("estado"), slot.get("msg"), slot.get("erro"), slot.get("arquivo")) != antes
+
+
+def midia_ruim(caminho: str, tipo: str) -> str:
+    """"" se a imagem/vídeo abre; senão o motivo curto ("vazio", "corrompido")."""
+    try:
+        if not os.path.isfile(caminho) or os.path.getsize(caminho) < 200:
+            return "vazio"
+        if tipo == "video":
+            return "" if _ffprobe_dur(caminho) > 0.2 else "corrompido"
+        from PIL import Image
+        with Image.open(caminho) as im:
+            im.verify()
+        return ""
+    except Exception:  # noqa: BLE001
+        return "corrompido"
+
+
+def verificar_midias(base: str, sid: str, eid: str) -> int:
+    """🩺 imagem/vídeo marcado como pronto mas que sumiu ou não abre → vira ❌ erro (aparece no 🔁 refazer os que deram erro).
+    Cada arquivo é conferido uma vez só (guarda o tamanho)."""
+    pe = pasta_ep(base, sid, eid)
+    n = 0
+    with TRAVA:
+        e = carregar_ep(base, sid, eid)
+        for cn in e["cenas"]:
+            for k in ("img_inicio", "video"):
+                sl = cn.get(k) or {}
+                if sl.get("estado") != "pronto" or not sl.get("arquivo"):
+                    continue
+                c = os.path.join(pe, "midia", os.path.basename(sl["arquivo"]))
+                tam = os.path.getsize(c) if os.path.isfile(c) else -1
+                if sl.get("_verif") == tam:
+                    continue
+                ruim = "sumiu" if tam < 0 else midia_ruim(c, "video" if k == "video" else "imagem")
+                if ruim:
+                    cn[k] = dict(sl, estado="erro", erro=f"o arquivo {ruim} — 🔁 refaça", _verif=None)
+                    n += 1
+                else:
+                    sl["_verif"] = tam
+        salvar_ep(base, e)
+    return n
+
+
+def com_erro(e: Dict[str, Any], k: str) -> List[int]:
+    return [i for i, cn in enumerate(e["cenas"]) if (cn.get(k) or {}).get("estado") == "erro"]
+
+
+def refazer_erros(base: str, sid: str, eid: str, indices: Optional[List[int]] = None) -> Dict[str, Any]:
+    """🔁 de uma vez (ou só os planos dados): o quadro A que deu erro sai de novo (e o vídeo dele vai sozinho depois);
+    o vídeo que deu erro com quadro bom sai de novo."""
+    verificar_midias(base, sid, eid)
+    e = carregar_ep(base, sid, eid)
+    ims = [i for i in com_erro(e, "img_inicio") if indices is None or i in indices]
+    vids = [i for i in com_erro(e, "video") if (indices is None or i in indices) and i not in ims]
+    if not ims and not vids:
+        raise ShortsIAErro("Nenhum plano com erro.")
+    r = {"quadros": 0, "videos": 0, "aguardando": 0}
+    if ims:
+        x = pedir_imagens(base, sid, eid, ims, refazer=True)
+        r["quadros"], r["aguardando"] = x.get("enviadas", 0), x.get("aguardando", 0)
+        with TRAVA:
+            e = carregar_ep(base, sid, eid)
+            for i in ims:
+                cn = e["cenas"][i]
+                if (cn.get("video") or {}).get("estado") in (None, "erro") or not (cn.get("video") or {}).get("arquivo"):
+                    cn["video"] = dict(_slot(), estado=AGUARDANDO, arquivo=(cn.get("video") or {}).get("arquivo"),
+                                       msg="⛓ esperando o quadro A novo")
+            salvar_ep(base, e)
+    if vids:
+        r["videos"] = pedir_videos(base, sid, eid, vids, refazer=True).get("enviadas", 0)
+    return r
 
 
 def _foto_da_fila():

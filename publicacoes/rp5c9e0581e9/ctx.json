@@ -1,0 +1,38 @@
+{
+ "ctx": {
+  "idioma": {
+   "codigo": "pt",
+   "nome": "português do Brasil"
+  },
+  "canal": "",
+  "narracao": "VÍDEO REAGIDO: Dark Summoner OP\nTRANSCRIÇÃO: [0:01–0:02] a\n[0:30–0:31] b\n\nFALAS DO REACT:\n",
+  "personagens": [
+   {
+    "slug": "c86a064",
+    "nome": "Amona",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   },
+   {
+    "slug": "c87eeeb",
+    "nome": "Roni",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   }
+  ],
+  "projeto": {
+   "tema": "React de Amona, Roni a: Dark Summoner OP",
+   "roteiro": ""
+  },
+  "duracao": 0.0
+ },
+ "meta": {
+  "titulo": "🎭 Dark Summoner OP",
+  "tem_projeto": false,
+  "react": "rp5c9e0581e9",
+  "atualizado": 1793282930.0065017,
+  "criado": 1793282930.006503
+ }
+}

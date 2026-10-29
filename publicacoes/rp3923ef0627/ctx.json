@@ -1,0 +1,45 @@
+{
+ "ctx": {
+  "idioma": {
+   "codigo": "pt",
+   "nome": "português do Brasil"
+  },
+  "canal": "",
+  "narracao": "VÍDEO REAGIDO: Briga\nTRANSCRIÇÃO: [0:01–0:02] a\n\nFALAS DO REACT:\n0:02 Sasuke: Você nunca vai ser Hokage, perdedor.\n0:05 Naruto: REPETE ISSO!\n0:12 Sakura: Eu vou buscar gelo...",
+  "personagens": [
+   {
+    "slug": "c5b6d5e",
+    "nome": "Naruto",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": "/tmp/pytest-of-root/pytest-114/test_intrigas_briga_vira_image0/react/rp3923ef0627/refs/c5b6d5e_93f457.png"
+   },
+   {
+    "slug": "c0fc0f0",
+    "nome": "Sasuke",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": "/tmp/pytest-of-root/pytest-114/test_intrigas_briga_vira_image0/react/rp3923ef0627/refs/c0fc0f0_5aef9c.png"
+   },
+   {
+    "slug": "c28005c",
+    "nome": "Sakura",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": "/tmp/pytest-of-root/pytest-114/test_intrigas_briga_vira_image0/react/rp3923ef0627/refs/c28005c_28b58c.png"
+   }
+  ],
+  "projeto": {
+   "tema": "React de Naruto, Sasuke, Sakura a: Briga",
+   "roteiro": "0:02 Sasuke: Você nunca vai ser Hokage, perdedor.\n0:05 Naruto: REPETE ISSO!\n0:12 Sakura: Eu vou buscar gelo..."
+  },
+  "duracao": 20.0
+ },
+ "meta": {
+  "titulo": "🎭 Briga",
+  "tem_projeto": false,
+  "react": "rp3923ef0627",
+  "atualizado": 1793282924.1153994,
+  "criado": 1793282924.1154017
+ }
+}

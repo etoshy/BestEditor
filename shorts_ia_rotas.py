@@ -410,10 +410,19 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _ep(sid, eid)
         try:
             SI.sincronizar_ep(base_dir, sid, eid)
+            SI.verificar_midias(base_dir, sid, eid)
         except Exception:  # noqa: BLE001
             pass
         e = _ep(sid, eid)
         return jsonify({"ep": e, "serie": _serie(sid), "tarefa": _tarefa("ep:" + eid)})
+
+    @app.route("/shorts-ia/s/<sid>/ep/<eid>/refazer-erros", methods=["POST"])
+    def shorts_ia_ep_refazer_erros(sid: str, eid: str):
+        """🔁 os quadros/vídeos que deram erro (ou que vieram corrompidos) — todos de uma vez, ou só os planos dados."""
+        _ep(sid, eid)
+        d = _corpo()
+        idx = [int(x) for x in d["cenas"]] if isinstance(d.get("cenas"), list) else None
+        return _tentar(lambda: SI.refazer_erros(base_dir, sid, eid, idx))
 
     @app.route("/shorts-ia/s/<sid>/ep/<eid>/analisar", methods=["POST"])
     def shorts_ia_ep_analisar(sid: str, eid: str):

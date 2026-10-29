@@ -1,0 +1,38 @@
+{
+ "ctx": {
+  "idioma": {
+   "codigo": "pt",
+   "nome": "português do Brasil"
+  },
+  "canal": "",
+  "narracao": "VÍDEO REAGIDO: Notas\nTRANSCRIÇÃO: [0:01–0:02] a\n\nFALAS DO REACT:\n0:02 Sasuke: Hm.\n0:06 Naruto: Eu falei que ele ia voltar!",
+  "personagens": [
+   {
+    "slug": "cee7bb8",
+    "nome": "Naruto",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   },
+   {
+    "slug": "c92a480",
+    "nome": "Sasuke",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   }
+  ],
+  "projeto": {
+   "tema": "React de Naruto, Sasuke a: Notas",
+   "roteiro": "0:02 Sasuke: Hm.\n0:06 Naruto: Eu falei que ele ia voltar!"
+  },
+  "duracao": 10.0
+ },
+ "meta": {
+  "titulo": "🎭 Notas",
+  "tem_projeto": false,
+  "react": "rp54c0f8e0cd",
+  "atualizado": 1793282931.3343246,
+  "criado": 1793282931.3343263
+ }
+}
