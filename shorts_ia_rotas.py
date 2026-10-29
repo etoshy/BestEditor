@@ -465,6 +465,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 SI.salvar_ep(base_dir, e)
         return _tentar(lambda: {"ep": SI.salvar_cenas(base_dir, sid, eid, d.get("cenas") or [])})
 
+    @app.route("/shorts-ia/s/<sid>/ep/<eid>/recuperar", methods=["POST"])
+    def shorts_ia_ep_recuperar(sid: str, eid: str):
+        """🩹 planos/vídeos sumiram: volta a versão com mais mídias (atual, anterior ou backup) + os arquivos órfãos."""
+        _ep(sid, eid)
+        return _tentar(lambda: SI.recuperar_planos(base_dir, sid, eid))
+
     @app.route("/shorts-ia/s/<sid>/ep/<eid>/voltar", methods=["POST"])
     def shorts_ia_ep_voltar(sid: str, eid: str):
         _ep(sid, eid)
@@ -478,6 +484,21 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         refazer = bool(d.get("refazer"))
         if d.get("o_que") == "videos":
             return _tentar(lambda: SI.pedir_videos(base_dir, sid, eid, idx, refazer))
+        if d.get("o_que") == "tudo":  # 🎬 em sequência: os quadros (o anterior primeiro) e cada vídeo assim que o quadro chegar
+            def tudo():
+                r: Dict[str, Any] = {"enviadas": 0, "aguardando": 0, "avisos": [], "erros": []}
+                for fn in (SI.pedir_imagens, SI.pedir_videos):
+                    try:
+                        x = fn(base_dir, sid, eid, idx, refazer)
+                        r["enviadas"] += x.get("enviadas", 0)
+                        r["aguardando"] += x.get("aguardando", 0)
+                        r["avisos"] += x.get("avisos") or []
+                        r["erros"] += x.get("erros") or []
+                        r["aviso"] = x.get("aviso") or r.get("aviso", "")
+                    except SI.ShortsIAErro as exc:
+                        r["erros"].append(str(exc))
+                return r
+            return _tentar(tudo)
         return _tentar(lambda: SI.pedir_imagens(base_dir, sid, eid, idx, refazer))
 
     @app.route("/shorts-ia/s/<sid>/ep/<eid>/cena/<int:k>/<qual>", methods=["POST"])
@@ -511,6 +532,27 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         except SI.ShortsIAErro as exc:
             return _erro(str(exc))
         return _ok()
+
+    @app.route("/shorts-ia/s/<sid>/ep/<eid>/conferir", methods=["POST"])
+    def shorts_ia_ep_conferir(sid: str, eid: str):
+        """👁 a IA compara um quadro de cada vídeo com as fichas (personagem diferente? alguém a mais?)."""
+        _ep(sid, eid)
+
+        def fazer(prog):
+            r = SI.conferir_personagens(base_dir, sid, eid, CB.get("chamar"), prog)
+            return (f"👁 {r['conferidos']} plano(s) conferidos — ⚠ diferente em: {', '.join(map(str, r['ruins']))} (🔁 refaça esses)"
+                    if r["ruins"] else f"👁 {r['conferidos']} plano(s) conferidos — todos fiéis às fichas")
+        return _rodar("ep:" + eid, "👁 conferindo os personagens", fazer)
+
+    @app.route("/shorts-ia/s/<sid>/ep/<eid>/preset-anime", methods=["POST"])
+    def shorts_ia_ep_preset(sid: str, eid: str):
+        """🎌 a edição com cara de anime (12 fps, câmera parada, legenda de anime, vídeo inteiro) + a marca no canto."""
+        _ep(sid, eid)
+        ed = SI.salvar_opcoes(base_dir, sid, eid, dict(SI.PRESET_ANIME))
+        s2 = _serie(sid)
+        if (s2.get("marca") or {}).get("posicao") == "meio":
+            SI.atualizar_serie(base_dir, sid, {"marca": dict(s2["marca"], posicao="sup_dir", tamanho=0.026, opacidade=0.45)})
+        return _ok(edicao=ed)
 
     @app.route("/shorts-ia/s/<sid>/ep/<eid>/exportar", methods=["POST"])
     def shorts_ia_ep_exportar(sid: str, eid: str):

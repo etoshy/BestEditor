@@ -199,12 +199,10 @@ def test_flow_refs_quadros_videos(base, lote):
     j = lote.fila[3]
     assert j.get("referencia_arquivo") and os.path.isfile(j["referencia_arquivo"]) and "panel 1 = Ignis" in j["prompt"]
     SI.salvar_opcoes(base, sid, e["id"], {"modo_video": "frames"})
-    with pytest.raises(SI.ShortsIAErro):
-        SI.pedir_videos(base, sid, e["id"])  # modo "animar o quadro A": ainda sem quadro A
+    assert SI.pedir_videos(base, sid, e["id"])["aguardando"] == 2  # ⛓ o vídeo espera o quadro A chegar (e vai sozinho)
     lote.terminar(lote.galeria)
-    SI.sincronizar_ep(base, sid, e["id"])
-    r = SI.pedir_videos(base, sid, e["id"])
-    assert r["enviadas"] == 2
+    SI.sincronizar_ep(base, sid, e["id"])  # ⛓ os quadros chegaram: os 2 vídeos que esperavam já foram sozinhos
+    assert sum(1 for j in lote.fila if j["tipo"] == "video") == 2
     v2 = lote.fila[-1]
     assert v2["tipo"] == "video" and v2.get("inicio_arquivo") and "The shot ends with: Ken lying on the floor" in v2["prompt"]
     lote.terminar(lote.galeria)
@@ -227,7 +225,7 @@ def test_exportar(base, monkeypatch):
         _video(os.path.join(md, f"v{k}.mp4"), 4, som=(k == 0), size="270x480")
         cn["video"] = dict(SI._slot(), estado="pronto", arquivo=f"v{k}.mp4")
     SI.salvar_ep(base, e)
-    SI.salvar_opcoes(base, s["id"], e["id"], {"qualidade": "1080p", "zoom": False, "legenda": True})
+    SI.salvar_opcoes(base, s["id"], e["id"], {"qualidade": "1080p", "zoom": False, "legenda": True, "corte_modo": "plano", "velocidade": 1.15, "transicao": "rapida"})
     final = SI.exportar(base, s["id"], e["id"])
     assert os.path.isfile(final)
     dur = SI._ffprobe_dur(final)
@@ -303,7 +301,8 @@ def test_fichas_e_voz_consistentes(base, lote):
     im = Image.open(SI.arquivo_serie(base, s, s["elenco"][0]["voz_ficha"]))
     assert im.size == (1920, 1080)
     e = SI.modelar(base, sid, SI.novo_ep(base, sid, "t")["id"], chamar=_ia(CENAS))
-    assert e["edicao"]["modo_video"] == "elementos" and e["edicao"]["modelo_video"] == "Omni 1.1 Flash"
+    assert e["edicao"]["modelo_video"] == "Omni 1.1 Flash"
+    SI.salvar_opcoes(base, sid, e["id"], {"modo_video": "elementos"})
     r = SI.pedir_videos(base, sid, e["id"])  # sem quadro A: vai só com as fichas
     assert r["enviadas"] == 2
     v1, v2 = lote.fila[-2], lote.fila[-1]
@@ -338,7 +337,7 @@ def _img(caminho, cor=(200, 60, 60)):
 
 def test_universo_com_imagens_e_personagem_da_imagem(base, tmp_path):
     s = SI.nova_serie(base, "", "vila no interior", estilo="anime_cotidiano")
-    assert s["estilo"] == "anime_cotidiano" and s["padroes"]["dur_plano"] == 5.0
+    assert s["estilo"] == "anime_cotidiano" and s["padroes"]["dur_plano"] == 8.0
     u = json.loads(json.dumps(UNIVERSO))
     u["elenco"][0]["imagem"] = 2
     u["elenco"][1]["imagem"] = 0
@@ -522,3 +521,123 @@ def test_tarefa_ocupada_e_parar(base, monkeypatch):
     assert c.post("/shorts-ia/tarefa/parar", json={"chave": "ep:" + eid}).get_json()["parada"]
     assert R.TAREFAS["ep:" + eid]["fim"] and "ep:" + eid in R._CANCELAR
     assert c.post(f"/shorts-ia/s/{sid}/ep/{eid}/exportar", json={}).status_code == 200  # livre de novo
+
+
+def test_cara_de_anime_corte_e_legenda_do_roteiro(base, monkeypatch, tmp_path):
+    """v84_272: preset anime (12 fps, sem zoom/filtro, legenda clássica embaixo), vídeo inteiro, legenda com o TEXTO do roteiro."""
+    s = SI.gerar_universo(base, SI.nova_serie(base, estilo="anime_cotidiano")["id"], "x", chamar=_ia(UNIVERSO))
+    e = SI.novo_ep(base, s["id"], "t")
+    assert e["edicao"]["animacao"] == "anime" and e["edicao"]["zoom"] is False and e["edicao"]["corte_modo"] == "inteiro"
+    assert SI.janela({"duracao": 5}, 8.0, 0.35, "inteiro") == (0.0, 7.65)  # o Flow faz 8 s: não corta no meio
+    v = _video(str(tmp_path / "f.mp4"), 4)  # som o tempo todo: "fala" não acha silêncio → inteiro
+    assert SI.janela({"duracao": 2, "falas": [{"texto": "oi"}]}, 4.0, 0.35, "fala", v) == (0.0, 3.65)
+    cenas = [SI._nova_cena({"quem": ["P1"], "duracao": 3, "inicio": "Ignis and Ken in the kitchen",
+                            "falas": [{"quem": "P1", "texto": "Sora-chan, olha!"}]}, {"P1", "P2"}, set())]
+    SI._completar_quem(SI.carregar_serie(base, s["id"]), cenas[0])
+    assert cenas[0]["quem"] == ["P1", "P2"]  # o Ken citado no texto entrou (sem a ficha dele o gerador inventa outro)
+    ouvidas = [{"word": "Soraçã,", "start": 1.2, "end": 1.6}, {"word": "olha!", "start": 1.7, "end": 2.0}]
+    ps = SI.palavras_do_roteiro(cenas, [0.0], [3.0], ouvidas)
+    assert [p["word"] for p in ps] == ["Sora-chan,", "olha!"] and ps[0]["start"] == 1.2 and abs(ps[-1]["end"] - 2.0) < 0.01
+    pv = SI.prompt_video_elementos(SI.carregar_serie(base, s["id"]), cenas[0], ["the character sheet of Ignis"])
+    assert "no other people" in pv
+    e = SI.salvar_cenas(base, s["id"], e["id"], cenas)
+    pe = SI.pasta_ep(base, s["id"], e["id"])
+    os.makedirs(os.path.join(pe, "midia"))
+    _video(os.path.join(pe, "midia", "v.mp4"), 3, size="180x320")
+    e["cenas"][0]["video"] = dict(SI._slot(), estado="pronto", arquivo="v.mp4")
+    SI.salvar_ep(base, e)
+    final = SI.exportar(base, s["id"], e["id"])
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", final],
+                       capture_output=True, text=True)
+    assert r.stdout.strip() == "30/1" and abs(SI._ffprobe_dur(final) - 2.65) < 0.2  # 3 s − ponta, velocidade 1×
+    vistos = []
+    resp = {"planos": [{"n": 1, "ok": False, "problema": "a Ignis está com cabelo comprido"}]}
+
+    def chamar(*a, **k):
+        vistos.append(a[2])
+        return resp
+    r = SI.conferir_personagens(base, s["id"], e["id"], chamar=chamar)
+    assert r["ruins"] == [1] and SI.carregar_ep(base, s["id"], e["id"])["cenas"][0]["video"]["conferido"]["problema"].startswith("a Ignis")
+    assert any("PLANO 1 — devia ter: Ignis, Ken" == b.get("text") for b in vistos[0])
+
+
+def test_planos_nunca_somem(base):
+    """v84_272: lista vazia não apaga; backups; 🩹 recuperar pega a versão com mais vídeos + os arquivos soltos."""
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    e = SI.modelar(base, s["id"], SI.novo_ep(base, s["id"], "t")["id"], chamar=_ia(CENAS))
+    pe = SI.pasta_ep(base, s["id"], e["id"])
+    md = os.path.join(pe, "midia")
+    os.makedirs(md)
+    c0 = e["cenas"][0]["id"]
+    _video(os.path.join(md, f"{c0}_video_abc123.mp4"), 1)
+    _video(os.path.join(md, "deadbeef_video_ff00ff.mp4"), 1)  # gerado, mas de um plano que não existe mais
+    e["cenas"][0]["video"] = dict(SI._slot(), estado="pronto", arquivo=f"{c0}_video_abc123.mp4")
+    SI.salvar_ep(base, e)
+    with pytest.raises(SI.ShortsIAErro):
+        SI.salvar_cenas(base, s["id"], e["id"], [])
+    SI.modelar(base, s["id"], e["id"], chamar=_ia(CENAS))  # escreveu de novo: os planos novos vêm sem vídeo
+    assert not any((c["video"] or {}).get("arquivo") for c in SI.carregar_ep(base, s["id"], e["id"])["cenas"])
+    assert os.listdir(os.path.join(pe, "backups"))
+    r = SI.recuperar_planos(base, s["id"], e["id"])
+    e = SI.carregar_ep(base, s["id"], e["id"])
+    assert r["midias"] == 2 and r["orfaos"] == 1 and e["cenas"][0]["video"]["arquivo"] == f"{c0}_video_abc123.mp4"
+    assert e["cenas"][-1]["id"] == "deadbeef" and e["cenas"][-1]["video"]["msg"] == "🩹 recuperado"
+
+
+def test_js_das_paginas_sem_erro_de_sintaxe(base, monkeypatch, tmp_path):
+    """v84_272: um erro de sintaxe no JS deixava a página do episódio VAZIA (parecia que os vídeos tinham sumido)."""
+    import re as _re
+    import shutil as _sh
+    if not _sh.which("node"):
+        pytest.skip("sem node")
+    monkeypatch.setenv("NARRATION_SITE_NAO_CARREGAR_PROJETOS", "1")
+    monkeypatch.setenv("CURTOS_VIGIA", "0")
+    import app as A
+    c = A.app.test_client()
+    sid = c.post("/shorts-ia/nova", data={"premissa": "x", "gerar": "0"}).headers["Location"].rsplit("/", 1)[-1]
+    eid = c.post(f"/shorts-ia/s/{sid}/ep/novo", json={"titulo": "t", "modelar": "0"}).get_json()["ep"]
+    for url in ("/shorts-ia", f"/shorts-ia/s/{sid}", f"/shorts-ia/s/{sid}/ep/{eid}"):
+        html = c.get(url).get_data(as_text=True)
+        for k, js in enumerate(_re.findall(r"<script>(.*?)</script>", html, _re.S)):
+            f = tmp_path / f"p{k}.js"
+            f.write_text(js, encoding="utf-8")
+            r = subprocess.run(["node", "--check", str(f)], capture_output=True, text=True)
+            assert r.returncode == 0, (url, r.stderr[-400:])
+
+
+def test_continuidade_em_sequencia(base, lote, tmp_path):
+    """v84_273: ⛓ o 2º plano do momento espera o quadro do 1º (vai de referência); o que "continua" começa do último
+    quadro do vídeo anterior; cada vídeo sai sozinho quando o quadro chega; a bíblia do momento e os beats vão no prompt."""
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    sid = s["id"]
+    e = SI.novo_ep(base, sid, "t")
+    assert e["edicao"]["modo_video"] == "frames"
+    bib = "Old kitchen: window on the left, morning light from the left, Ignis by the stove facing right, Ken at the table."
+    cenas = [SI._nova_cena({"momento": "M1", "angulo": "wide", "quem": ["P1", "P2"], "inicio": "a", "continuidade": bib,
+                            "beats": "0-3s: Ignis sniffs the pot; 3-8s: she gasps"}, {"P1", "P2"}, set()),
+             SI._nova_cena({"momento": "M1", "angulo": "close-up on Ignis", "quem": ["P1"], "inicio": "b", "continuidade": bib}, {"P1", "P2"}, set()),
+             SI._nova_cena({"momento": "M1", "angulo": "close-up on Ignis", "continua": True, "quem": ["P1"], "inicio": "c"}, {"P1", "P2"}, set()),
+             SI._nova_cena({"momento": "M2", "angulo": "wide", "quem": ["P2"], "inicio": "d"}, {"P1", "P2"}, set())]
+    e = SI.salvar_cenas(base, sid, e["id"], cenas)
+    eid = e["id"]
+    r = SI.pedir_imagens(base, sid, eid)
+    assert r["enviadas"] == 2 and r["aguardando"] == 2  # o 1º de cada momento vai; os outros esperam
+    assert "Continuity (must match" in lote.fila[0]["prompt"] and "window on the left" in lote.fila[0]["prompt"]
+    r = SI.pedir_videos(base, sid, eid)
+    assert r["aguardando"] == 4 and r["enviadas"] == 0  # cada vídeo espera o seu quadro
+    lote.terminar(lote.galeria)
+    SI.sincronizar_ep(base, sid, eid)  # chegou o quadro 1 → vai o quadro 2 (com o 1 de referência) e os vídeos 1 e 4
+    e = SI.carregar_ep(base, sid, eid)
+    assert e["cenas"][1]["img_inicio"]["estado"] == "fila" and "previous shot of this same moment" in lote.fila[-3]["prompt"] or \
+        any("previous shot of this same moment" in j["prompt"] for j in lote.fila)
+    vids = [j for j in lote.fila if j["tipo"] == "video"]
+    assert len(vids) == 2 and "Action, beat by beat: 0-3s" in vids[0]["prompt"]
+    assert e["cenas"][2]["img_inicio"]["estado"] == SI.AGUARDANDO  # continua: espera o VÍDEO do plano 2
+    for _ in range(3):
+        lote.terminar(lote.galeria)
+        SI.sincronizar_ep(base, sid, eid)
+    e = SI.carregar_ep(base, sid, eid)
+    assert e["cenas"][2]["img_inicio"]["msg"].startswith("⛓ último quadro")
+    assert all(c["video"]["estado"] == "pronto" for c in e["cenas"])
+    assert "continues seamlessly from the previous shot" in [j for j in lote.fila if j["tipo"] == "video"][-1]["prompt"] or \
+        any("continues seamlessly" in j["prompt"] for j in lote.fila)

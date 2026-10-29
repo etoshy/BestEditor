@@ -87,7 +87,8 @@ FILTROS = {
     "nenhum": "",
 }
 TRANSICOES = ("rapida", "corte")
-MODOS_VIDEO = {"elementos": "🎙 fichas + voz (rosto e voz consistentes)", "frames": "🖼 animar o quadro A"}
+MODOS_VIDEO = {"frames": "🎬 continuidade: quadro A → vídeo, em sequência (recomendado)",
+               "elementos": "🎙 fichas + voz (voz mais igual, continuidade mais solta)"}
 MODELOS_VIDEO = ("Omni 1.1 Flash", "Veo 3.1 - Lite", "Veo 3.1 - Fast", "Veo 3.1 - Quality", "")
 MODELO_VIDEO_PADRAO = "Omni 1.1 Flash"  # o que a técnica da ficha de voz usa
 MODELO_VIDEO_MAXIMO = "Veo 3.1 - Quality"  # a qualidade máxima do Flow
@@ -95,7 +96,7 @@ MODELOS_IMAGEM = ("Nano Banana Pro", "Nano Banana 2.1", "Nano Banana 2 Lite", ""
 MAX_REFS_CENA = 3
 MAX_INSPIRACOES = 6
 MAX_ELENCO = 24          # o elenco cresce com os episódios (personagens novos)
-DUR_PLANO_PADRAO = 5.0   # cada plano (um vídeo do Flow) — cortes rápidos, vários ângulos do mesmo momento
+DUR_PLANO_PADRAO = 8.0   # cada plano (um vídeo do Flow) — cortes rápidos, vários ângulos do mesmo momento
 DUR_VIDEO_FLOW = 8.0
 ESTADOS_ESPERA = ("fila", "gerando", "parado")
 
@@ -241,7 +242,7 @@ def series(base: str) -> List[Dict[str, Any]]:
 
 def padroes_normais(d: Any) -> Dict[str, Any]:
     """O padrão de cada episódio novo da série: duração do plano e os modelos do Flow."""
-    out = {"dur_plano": DUR_PLANO_PADRAO, "modelo_video": MODELO_VIDEO_PADRAO, "modo_video": "elementos", "modelo_imagem": "",
+    out = {"dur_plano": DUR_PLANO_PADRAO, "modelo_video": MODELO_VIDEO_PADRAO, "modo_video": "frames", "modelo_imagem": "",
            "auto_preparar": False}
     if isinstance(d, dict):
         if "auto_preparar" in d:
@@ -742,7 +743,7 @@ def novo_ep(base: str, sid: str, titulo: str = "", url: str = "", ideia: str = "
                         "video": None, "duracao": 0.0, "transcricao": [], "storyboard": [], "analise": None,
                         "ideia": idd, "notas": ""},
              "papeis": {}, "cenas": [], "titulos": [], "export": None,
-             "edicao": dict(opcoes_padrao(), **{k: s["padroes"][k] for k in ("modo_video", "modelo_video")}),
+             "edicao": dict(opcoes_padrao(s.get("estilo") or ""), **{k: s["padroes"][k] for k in ("modo_video", "modelo_video")}),
              "dur_plano": s["padroes"]["dur_plano"]}
         salvar_ep(base, e)
         s["eps"] = [eid] + [x for x in s["eps"] if x != eid]
@@ -752,10 +753,89 @@ def novo_ep(base: str, sid: str, titulo: str = "", url: str = "", ideia: str = "
         return e
 
 
+MAX_BACKUPS = 25
+
+
 def salvar_ep(base: str, e: Dict[str, Any]) -> None:
+    """Grava o episódio — e guarda a versão anterior em backups/ (as últimas 25), pra nunca perder planos e vídeos."""
     with TRAVA:
         e["atualizado"] = time.time()
-        _gravar(os.path.join(pasta_ep(base, e["serie"], e["id"]), "ep.json"), e)
+        cam = os.path.join(pasta_ep(base, e["serie"], e["id"]), "ep.json")
+        if os.path.isfile(cam):
+            try:
+                bk = os.path.join(os.path.dirname(cam), "backups")
+                os.makedirs(bk, exist_ok=True)
+                velho = _ler(cam)
+                if velho.get("cenas"):  # só guarda versão que tinha planos (as gravações de status não enchem a pasta)
+                    assin = json.dumps([(c.get("id"), (c.get("video") or {}).get("arquivo"), (c.get("img_inicio") or {}).get("arquivo"))
+                                        for c in velho["cenas"]], ensure_ascii=False)
+                    ult = sorted(os.listdir(bk))
+                    if not ult or _ler(os.path.join(bk, ult[-1])).get("_assin") != assin:
+                        velho["_assin"] = assin
+                        _gravar(os.path.join(bk, f"ep_{time.strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(2)}.json"), velho)
+                        for x in sorted(os.listdir(bk))[:-MAX_BACKUPS]:
+                            os.remove(os.path.join(bk, x))
+            except (OSError, ShortsIAErro, ValueError):
+                pass
+        _gravar(cam, e)
+
+
+def _midias_da_cena(pe: str, cn: Dict[str, Any]) -> int:
+    return sum(1 for k in ("img_inicio", "video") if _arquivo_ep(pe, (cn or {}).get(k) or {}))
+
+
+def recuperar_planos(base: str, sid: str, eid: str) -> Dict[str, Any]:
+    """🩹 os planos/vídeos sumiram? Pega a versão (atual, ↩ anterior ou um backup) com MAIS imagens/vídeos que ainda existem
+    no disco e junta os arquivos órfãos da pasta midia/ (gerados mas fora de qualquer plano) como planos novos."""
+    pe = pasta_ep(base, sid, eid)
+    with TRAVA:
+        e = carregar_ep(base, sid, eid)
+        candidatos = [("atual", e.get("cenas") or []), ("anterior", e.get("cenas_anteriores") or [])]
+        bk = os.path.join(pe, "backups")
+        if os.path.isdir(bk):
+            for x in sorted(os.listdir(bk), reverse=True):
+                try:
+                    candidatos.append((x, _ler(os.path.join(bk, x)).get("cenas") or []))
+                except ShortsIAErro:
+                    pass
+        nome, melhor = max(candidatos, key=lambda c: (sum(_midias_da_cena(pe, cn) for cn in c[1]), len(c[1])))
+        cenas = json.loads(json.dumps(melhor))
+        usados = {(cn.get(k) or {}).get("arquivo") for cn in cenas for k in ("img_inicio", "img_fim", "video")}
+        md = os.path.join(pe, "midia")
+        orfaos: Dict[str, Dict[str, str]] = {}
+        try:
+            fila = {j["id"]: j for j in _foto_da_fila()[0].values()}
+        except Exception:  # noqa: BLE001
+            fila = {}
+        for f in sorted(os.listdir(md)) if os.path.isdir(md) else []:
+            m = re.match(r"([0-9a-f]{8})_(img_inicio|img_fim|video)_(.+)\.[a-z0-9]+$", f)
+            if not m or f in usados:
+                continue
+            o = orfaos.setdefault(m.group(1), {})
+            if m.group(2) not in o or os.path.getmtime(os.path.join(md, f)) > os.path.getmtime(os.path.join(md, o[m.group(2)])):
+                o[m.group(2)] = f
+            j = fila.get(m.group(3).split("_")[-1]) or fila.get(m.group(3))
+            if j and m.group(2) == "video":
+                o["_prompt"] = j.get("prompt") or ""
+        ids = {cn.get("id") for cn in cenas}
+        novos = 0
+        def _quando(o: Dict[str, str]) -> float:
+            return min(os.path.getmtime(os.path.join(md, v)) for k, v in o.items() if not k.startswith("_"))
+        for cid, o in sorted(orfaos.items(), key=lambda x: _quando(x[1])):  # na ordem em que foram gerados
+            alvo = next((cn for cn in cenas if cn.get("id") == cid), None)
+            if alvo is None:
+                alvo = _nova_cena({"id": cid, "duracao": 8, "acao": "(recuperado) " + o.get("_prompt", "")[:400]}, set(), set())
+                cenas.append(alvo)
+                novos += 1
+            for k in ("img_inicio", "img_fim", "video"):
+                if o.get(k) and not _arquivo_ep(pe, alvo.get(k) or {}):
+                    alvo[k] = dict(_slot(), estado="pronto", arquivo=o[k], msg="🩹 recuperado")
+        if e.get("cenas"):
+            e["cenas_anteriores"] = e["cenas"]
+        e["cenas"] = cenas
+        e["export"] = None
+        salvar_ep(base, e)
+        return {"de": nome, "planos": len(cenas), "midias": sum(_midias_da_cena(pe, cn) for cn in cenas), "orfaos": novos, "ep": e}
 
 
 def carregar_ep(base: str, sid: str, eid: str) -> Dict[str, Any]:
@@ -980,7 +1060,8 @@ def analisar_viral(base: str, sid: str, eid: str, transcrever: Optional[Callable
 
 
 # ------------------------------------------------------------------ modelar → cenas
-CENA_SCHEMA = _o({"momento": _S, "angulo": _S, "quem": _a(_S), "cenario": _S, "duracao": _N, "plano": _S, "acao": _S, "inicio": _S,
+CENA_SCHEMA = _o({"momento": _S, "angulo": _S, "continua": {"type": "boolean"}, "continuidade": _S, "beats": _S,
+                  "quem": _a(_S), "cenario": _S, "duracao": _N, "plano": _S, "acao": _S, "inicio": _S,
                   "fim": _S, "movimento": _S,
                   "falas": _a(_o({"quem": _S, "texto": _S, "emocao": _S})), "base": _a(_N)})
 OPCAO = _o({"post": _S, "pt": _S})
@@ -1003,8 +1084,22 @@ CENAS_SYS = (
     "• CONTINUIDADE dentro do momento: mesmo lugar, mesma hora/luz, mesmas roupas, mesmas posições (regra dos 180°: quem "
     "está à esquerda continua à esquerda); repita no 'inicio' de cada plano o lugar, a luz e onde cada um está.\n"
     "• Entre momentos: muda o lugar ou o tempo (um corte maior; a edição põe uma transição).\n"
+    "• 'continuidade' (INGLÊS, DETALHADO, o MESMO texto em todos os planos do momento — só atualize o que mudou): a "
+    "'bíblia' do momento — o lugar com a planta (onde fica a porta, a janela, a mesa, a cerca…), a hora e a direção da "
+    "luz, o clima, onde cada personagem está e pra que lado olha, a roupa e o estado de cada um (chapéu na cabeça, "
+    "sujo de terra…), os objetos e com quem estão (o microfone na mão da Mame). É o que mantém os planos iguais entre si.\n"
+    "• 'beats' (INGLÊS): a ação do plano em tempos, preenchendo os 8 s do gerador — ex.: '0-2s: Mame peeks through the "
+    "fence hole; 2-5s: she crawls in on all fours, eyes wide; 5-8s: she spots the fluffy microphone and freezes, "
+    "pointing'. Cada beat com uma ação clara e visível.\n"
+    "• 'continua' = true quando o plano é a MESMA câmera continuando o plano anterior do mesmo momento (a ação segue sem "
+    "corte de ângulo) — o vídeo começa do último quadro do anterior. false quando muda o ângulo.\n"
     "Regras dos planos:\n"
-    "• {N_PLANOS} planos; 'duracao' de cada plano ≈ {DUR} s (no máximo 8). Ritmo de short: corte a cada {DUR} s ou menos.\n"
+    "• {N_PLANOS} planos; 'duracao' de cada plano ≈ {DUR} s (no máximo 8). O gerador SEMPRE faz um vídeo de 8 s: escreva "
+    "ação e reação que preencham o plano inteiro (sem ficar parado esperando).\n"
+    "• Todo plano tem um personagem fazendo algo (ou um detalhe de objeto ligado à ação). NADA de plano só de paisagem "
+    "vazia, a não ser UM plano de situação curto no começo de um momento — e mesmo ele com alguém entrando/se mexendo.\n"
+    "• O 1º plano já é o gancho com AÇÃO (alguém entra, cai, grita, rouba algo) — nunca alguém parado sentado.\n"
+    "• Atuação de anime: poses claras, expressões grandes, reações cômicas exageradas, gestos legíveis.\n"
     "• Gancho nos 2 primeiros segundos (o 1º plano já começa no conflito/na curiosidade). Final com punchline, "
     "momento fofo ou loop.\n"
     "• 'quem': ids dos personagens que APARECEM no plano (no máximo 3; em close, 1). Cada personagem age e fala do "
@@ -1071,6 +1166,29 @@ def _conteudo_modelar(s: Dict[str, Any], e: Dict[str, Any], base: str = "") -> s
     return "\n\n".join(partes)
 
 
+def nomes_citados(s: Dict[str, Any], cn: Dict[str, Any]) -> List[str]:
+    """👥 os personagens citados pelo NOME no texto do plano (início, ação, ângulo, falas) — entram em 'quem' (sem a ficha
+    deles o gerador inventa outra pessoa)."""
+    texto = " ".join(str(cn.get(k) or "") for k in ("inicio", "acao", "angulo", "movimento", "fim")).lower()
+    out = []
+    for p in s["elenco"]:
+        partes = [x for x in re.split(r"\s+", p["nome"].lower()) if len(x) >= 3]
+        if any(re.search(r"\b" + re.escape(x) + r"\b", texto) for x in partes):
+            out.append(p["id"])
+    return out
+
+
+def _completar_quem(s: Dict[str, Any], cn: Dict[str, Any]) -> None:
+    quem = list(cn.get("quem") or [])
+    for f in cn.get("falas") or []:
+        if f.get("quem") and f["quem"] not in quem:
+            quem.append(f["quem"])
+    for q in nomes_citados(s, cn):
+        if q not in quem:
+            quem.append(q)
+    cn["quem"] = quem[:MAX_REFS_CENA]
+
+
 def _nova_cena(c: Dict[str, Any], ids_el: set, ids_ce: set) -> Dict[str, Any]:
     g = lambda k, n: " ".join(str(c.get(k) or "").split())[:n]  # noqa: E731
     try:
@@ -1088,6 +1206,8 @@ def _nova_cena(c: Dict[str, Any], ids_el: set, ids_ce: set) -> Dict[str, Any]:
             falas.append({"quem": f.get("quem") if f.get("quem") in ids_el else (quem[0] if quem else ""), "texto": t,
                           "emocao": " ".join(str(f.get("emocao") or "").split())[:40]})
     return {"id": c.get("id") or _id(), "momento": g("momento", 60), "angulo": g("angulo", 120),
+            "continuidade": g("continuidade", 1800), "beats": g("beats", 1200),
+            "continua": c.get("continua") is True or str(c.get("continua")).lower() in ("1", "true", "on", "sim"),
             "quem": quem[:MAX_REFS_CENA], "cenario": c.get("cenario") if c.get("cenario") in ids_ce else "",
             "duracao": round(dur, 1), "plano": g("plano", 80), "acao": g("acao", 600), "inicio": g("inicio", 1500),
             "fim": g("fim", 1200), "movimento": g("movimento", 800), "falas": falas,
@@ -1109,7 +1229,7 @@ def modelar(base: str, sid: str, eid: str, notas: Optional[str] = None, chamar: 
             salvar_ep(base, e)
     modo = MODO_VIRAL if e["origem"].get("storyboard") else MODO_IDEIA
     dur = float(e.get("dur_plano") or s["padroes"]["dur_plano"])
-    n_planos = "8 a 14" if dur <= 5.5 else "5 a 9"
+    n_planos = "8 a 14" if dur <= 5.5 else "6 a 10"
     sistema = CENAS_SYS.replace("{MODO}", modo).replace("{DUR}", f"{dur:g}").replace("{N_PLANOS}", n_planos)
     r = _ia(sistema, _conteudo_modelar(s, e, base), CENAS_SCHEMA, chamar, max_tokens=12000, timeout=280, job=eid)
     novos = registrar_novos_personagens(base, sid, eid, r.get("novos_personagens") or [])
@@ -1120,6 +1240,8 @@ def modelar(base: str, sid: str, eid: str, notas: Optional[str] = None, chamar: 
     s = carregar_serie(base, sid)
     ids_el, ids_ce = {p["id"] for p in s["elenco"]}, {c["id"] for c in s["cenarios"]}
     cenas = [_nova_cena(c, ids_el, ids_ce) for c in (r.get("cenas") or [])[:18]]
+    for cn in cenas:
+        _completar_quem(s, cn)
     if not cenas:
         raise ShortsIAErro("A IA não devolveu nenhuma cena — tente de novo.")
     with TRAVA:
@@ -1254,6 +1376,8 @@ def salvar_cenas(base: str, sid: str, eid: str, cenas: List[Dict[str, Any]]) -> 
     ids_el, ids_ce = {p["id"] for p in s["elenco"]}, {c["id"] for c in s["cenarios"]}
     with TRAVA:
         e = carregar_ep(base, sid, eid)
+        if not cenas and e["cenas"]:  # 🛡 a página mandou a lista vazia (erro de tela): nunca apaga os planos assim
+            raise ShortsIAErro("Não salvei: a lista de planos veio vazia (o episódio continua como estava).")
         velhas = {c["id"]: c for c in e["cenas"]}
         novas = []
         for c in cenas[:14]:
@@ -1404,8 +1528,10 @@ def prompt_imagem_cena(s: Dict[str, Any], cena: Dict[str, Any], qual: str, refs:
                    + ". Keep every character EXACTLY as in their panel (same face, hair, eye color, outfit, colors, proportions)"
                    + (" and use the location panel as the setting" if any(r[0] == "location" for r in refs) else "") + ".")
     cam = f"Camera: {cena['angulo']}. " if cena.get("angulo") and qual != "fim" else ""
+    cont = f"Continuity (must match the other shots of this moment): {cena['continuidade']} " if cena.get("continuidade") else ""
+    so = (f"Only these characters appear: {', '.join(p['nome'] for p in pers if p)} — no other people. " if any(pers) else "")
     return (f"{ESTILOS[s['estilo']]['prompt']}. {_proporcao_txt(s)}, a single anime still frame. {cam}{texto} "
-            + (f"Characters: {desc} " if desc else "") + (f"Location: {lugar['descricao']}. " if lugar else "")
+            + (f"Characters: {desc} " if desc else "") + so + (f"Location: {lugar['descricao']}. " if lugar else "") + cont
             + ref_txt + " No text, no speech bubbles, no subtitles, no watermark.")[:3800]
 
 
@@ -1427,9 +1553,12 @@ def prompt_video_elementos(s: Dict[str, Any], cena: Dict[str, Any], rotulos: Lis
     pers = [item(s, q) for q in cena.get("quem") or []]
     partes = [f"{ESTILOS[s['estilo']]['prompt']}. {_proporcao_txt(s)}.", refs_txt,
               "Characters must look EXACTLY like their character sheets (same face, hair, eyes, outfit, colors, body).",
-              ("Characters in the scene: " + ", ".join(p["nome"] for p in pers if p) + ".") if any(pers) else "",
+              ("Characters in the scene: " + ", ".join(p["nome"] for p in pers if p) + ". Only these characters appear — no "
+               "other people, no new characters.") if any(pers) else "",
               (f"Camera: {cena['angulo']}.") if cena.get("angulo") else "",
-              f"Scene: {cena.get('inicio') or ''} {cena.get('acao') or ''}".strip(), cena.get("movimento") or "",
+              f"Scene: {cena.get('inicio') or ''} {cena.get('acao') or ''}".strip(),
+              (f"Action, beat by beat: {cena['beats']}") if cena.get("beats") else "", cena.get("movimento") or "",
+              (f"Continuity: {cena['continuidade']}") if cena.get("continuidade") else "",
               (f"The shot ends with: {cena['fim']}") if cena.get("fim") else ""]
     if vozes:
         partes.append(" ".join(vozes) + ".")
@@ -1451,8 +1580,23 @@ def prompt_video_cena(s: Dict[str, Any], cena: Dict[str, Any], com_fim: bool) ->
         voz = f" ({p['voz']})" if p and p.get("voz") else ""
         emo = f", {f['emocao']}" if f.get("emocao") else ""
         falas.append(f'{quem}{voz}{emo} says in {LINGUAS[s["idioma"]]}: "{f["texto"]}"')
-    partes = [f"{ESTILOS[s['estilo']]['prompt']}. Animate this image in the same art style, keeping every character exactly as shown.",
-              cena.get("movimento") or "", cena.get("acao") or ""]
+    vozes = []
+    for q in dict.fromkeys(f.get("quem") for f in cena.get("falas") or []):
+        p = item(s, q or "")
+        vp = (p or {}).get("voz_perfil") or {}
+        if p and (vp.get("resumo") or p.get("voz")):
+            vozes.append(f"{p['nome']}'s voice (always the same): {vp.get('resumo') or p['voz']}")
+    pers = [item(s, q) for q in cena.get("quem") or []]
+    partes = [f"{ESTILOS[s['estilo']]['prompt']}. Animate this image in the same art style, keeping every character, the "
+              "place, the light and the clothes exactly as shown in the first frame.",
+              ("This shot continues seamlessly from the previous shot: same camera, same moment, the action simply goes on."
+               if cena.get("continua") else ""),
+              (f"Camera: {cena['angulo']}.") if cena.get("angulo") else "",
+              cena.get("acao") or "", (f"Action, beat by beat: {cena['beats']}") if cena.get("beats") else "",
+              cena.get("movimento") or "",
+              (f"Continuity: {cena['continuidade']}") if cena.get("continuidade") else "",
+              ("Only these characters appear: " + ", ".join(p["nome"] for p in pers if p) + " — no other people.") if any(pers) else "",
+              " ".join(vozes)]
     if cena.get("fim"):
         partes.append(f"The shot ends with: {cena['fim']}")
     if falas:
@@ -1535,8 +1679,36 @@ def pedir_refs(base: str, sid: str, ids: List[str], com_foto: bool = False, prep
     return {"enviadas": len(novos), "aviso": _iniciar_lote()}
 
 
+AGUARDANDO = "aguardando"
+
+
+def _anterior(e: Dict[str, Any], i: int) -> Optional[Dict[str, Any]]:
+    """O plano anterior do MESMO momento (a continuidade vem dele)."""
+    if i <= 0:
+        return None
+    cn, ant = e["cenas"][i], e["cenas"][i - 1]
+    return ant if cn.get("momento") and ant.get("momento") == cn["momento"] else None
+
+
+def ultimo_quadro(video: str, destino: str, corte_fim: float = 0.35) -> Optional[str]:
+    """O último quadro BOM do vídeo (antes da ponta bugada) — o próximo plano começa dele."""
+    d = _ffprobe_dur(video)
+    if d <= 0:
+        return None
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, d - corte_fim - 0.12):.3f}", "-i", video, "-frames:v", "1",
+                    destino], capture_output=True, timeout=120)
+    return destino if os.path.isfile(destino) else None
+
+
+def _encadear(e: Dict[str, Any]) -> bool:
+    return e["edicao"].get("encadear", True) is not False
+
+
 def pedir_imagens(base: str, sid: str, eid: str, indices: Optional[List[int]] = None, refazer: bool = False) -> Dict[str, Any]:
-    """🖼 os quadros A (início) e B (fim, quando a cena tem) — com a colagem das referências da cena."""
+    """🖼 os quadros A — com a colagem das referências do plano. ⛓ em sequência: o plano que vem depois no mesmo momento
+    espera o quadro do anterior (vai como referência de continuidade); o que "continua" a mesma câmera nem pede imagem —
+    começa do último quadro do vídeo anterior."""
     s = carregar_serie(base, sid)
     pe = pasta_ep(base, sid, eid)
     avisos = []
@@ -1544,11 +1716,33 @@ def pedir_imagens(base: str, sid: str, eid: str, indices: Optional[List[int]] = 
         e = carregar_ep(base, sid, eid)
         idx = range(len(e["cenas"])) if indices is None else [i for i in indices if 0 <= i < len(e["cenas"])]
         itens, alvo = [], []
+        esperando = continuou = 0
         for i in idx:
             cn = e["cenas"][i]
+            slot0 = cn["img_inicio"]
+            if slot0.get("estado") in ESTADOS_ESPERA or (slot0.get("arquivo") and not refazer and not slot0.get("desatualizada")
+                                                         and slot0.get("estado") != AGUARDANDO):
+                continue
+            ant = _anterior(e, i)
+            if ant and _encadear(e) and e["edicao"].get("modo_video") == "frames" and cn.get("continua"):
+                if not _arquivo_ep(pe, ant["video"]):
+                    cn["img_inicio"] = dict(_slot(), estado=AGUARDANDO, arquivo=slot0.get("arquivo"),
+                                            msg="⛓ começa do último quadro do vídeo do plano anterior — esperando ele")
+                    esperando += 1
+                    continue
+                q = ultimo_quadro(_arquivo_ep(pe, ant["video"]), os.path.join(pe, "midia", f"{cn['id']}_img_inicio_ult_{secrets.token_hex(3)}.png"),
+                                  float(e["edicao"].get("corte_fim") or 0.35))
+                if q:
+                    cn["img_inicio"] = dict(_slot(), estado="pronto", arquivo=os.path.basename(q), msg="⛓ último quadro do plano anterior")
+                    continuou += 1
+                    continue
+            if ant and _encadear(e) and not _arquivo_ep(pe, ant["img_inicio"]):
+                cn["img_inicio"] = dict(_slot(), estado=AGUARDANDO, arquivo=slot0.get("arquivo"),
+                                        msg="⛓ esperando o quadro do plano anterior (continuidade)")
+                esperando += 1
+                continue
             refs = refs_da_cena(base, s, cn)
-            ant = e["cenas"][i - 1] if i > 0 else None
-            prev = _arquivo_ep(pe, ant["img_inicio"]) if ant and cn.get("momento") and ant.get("momento") == cn["momento"] else None
+            prev = _arquivo_ep(pe, ant["img_inicio"]) if ant else None
             if prev and len(refs) < MAX_REFS_CENA:  # 🎬 mesmo momento: o plano anterior segura o lugar, a luz e as roupas
                 refs.append(("previous shot of this same moment (keep the same place, light, clothes and positions)", prev))
             faltam = [item(s, q)["nome"] for q in cn["quem"] if item(s, q) and not caminho_ref(base, s, item(s, q))]
@@ -1557,7 +1751,7 @@ def pedir_imagens(base: str, sid: str, eid: str, indices: Optional[List[int]] = 
             col = _colagem(refs, os.path.join(pe, "refs_cena"))
             for qual in ("inicio",):  # (o quadro B virou texto: o Flow em massa não manda o frame de Fim — travava, v84_203)
                 slot = cn["img_" + qual]
-                if slot.get("estado") in ESTADOS_ESPERA or (slot.get("arquivo") and not refazer and not slot.get("desatualizada")):
+                if slot.get("estado") in ESTADOS_ESPERA:
                     continue
                 pr = prompt_imagem_cena(s, cn, qual, refs)
                 it = {"prompt": pr, "tipo": "imagem", "origem": "shorts_ia"}
@@ -1566,6 +1760,9 @@ def pedir_imagens(base: str, sid: str, eid: str, indices: Optional[List[int]] = 
                 itens.append(it)
                 alvo.append((cn, qual, pr))
         if not itens:
+            if esperando or continuou:
+                salvar_ep(base, e)
+                return {"enviadas": 0, "aguardando": esperando, "continuou": continuou, "avisos": avisos, "aviso": ""}
             raise ShortsIAErro("Nenhuma imagem pra gerar (já estão prontas — use 🔁 refazer na cena).")
         novos = _lote().adicionar(itens, proporcao=s["proporcao"], modelo=s["padroes"].get("modelo_imagem") or "")
         for (cn, qual, pr), j in zip(alvo, novos):
@@ -1573,7 +1770,7 @@ def pedir_imagens(base: str, sid: str, eid: str, indices: Optional[List[int]] = 
             cn["img_" + qual] = dict(_slot(), estado="fila", flow_job=j["id"], prompt=pr, msg="⏳ na fila do Flow",
                                      arquivo=velho.get("arquivo"))
         salvar_ep(base, e)
-    return {"enviadas": len(novos), "avisos": avisos, "aviso": _iniciar_lote()}
+    return {"enviadas": len(novos), "aguardando": esperando, "continuou": continuou, "avisos": avisos, "aviso": _iniciar_lote()}
 
 
 def pedir_videos(base: str, sid: str, eid: str, indices: Optional[List[int]] = None, refazer: bool = False) -> Dict[str, Any]:
@@ -1586,12 +1783,19 @@ def pedir_videos(base: str, sid: str, eid: str, indices: Optional[List[int]] = N
         modo = e["edicao"].get("modo_video") or "elementos"
         idx = range(len(e["cenas"])) if indices is None else [i for i in indices if 0 <= i < len(e["cenas"])]
         itens, alvo = [], []
+        esperando = 0
         for i in idx:
             cn = e["cenas"][i]
             v = cn["video"]
-            if v.get("estado") in ESTADOS_ESPERA or (v.get("arquivo") and not refazer):
+            if v.get("estado") in ESTADOS_ESPERA or (v.get("arquivo") and not refazer and v.get("estado") != AGUARDANDO):
                 continue
             ini = _arquivo_ep(pe, cn["img_inicio"])
+            a_estado = (cn["img_inicio"] or {}).get("estado")
+            if modo == "frames" and not ini and (a_estado in ESTADOS_ESPERA or a_estado == AGUARDANDO):
+                cn["video"] = dict(_slot(), estado=AGUARDANDO, arquivo=v.get("arquivo"),
+                                   msg="⛓ esperando o quadro A deste plano — o vídeo vai sozinho quando ele chegar")
+                esperando += 1
+                continue
             if modo == "elementos":
                 arquivos, rotulos, falta = ingredientes(base, s, cn, ini, os.path.join(pe, "refs_cena"))
                 if falta:
@@ -1610,13 +1814,16 @@ def pedir_videos(base: str, sid: str, eid: str, indices: Optional[List[int]] = N
             itens.append(it)
             alvo.append((cn, pr))
         if not itens:
+            if esperando:
+                salvar_ep(base, e)
+                return {"enviadas": 0, "aguardando": esperando, "erros": erros, "aviso": ""}
             raise ShortsIAErro("; ".join(erros) or "Nenhum vídeo pra gerar (já estão prontos — use 🔁 refazer na cena).")
         novos = _lote().adicionar(itens, proporcao=s["proporcao"], modelo_video=e["edicao"].get("modelo_video") or "")
         for (cn, pr), j in zip(alvo, novos):
             cn["video"] = dict(_slot(), estado="fila", flow_job=j["id"], prompt=pr, msg="⏳ na fila do Flow", arquivo=cn["video"].get("arquivo"))
         e["export"] = None
         salvar_ep(base, e)
-    return {"enviadas": len(novos), "erros": erros, "aviso": _iniciar_lote()}
+    return {"enviadas": len(novos), "aguardando": esperando, "erros": erros, "aviso": _iniciar_lote()}
 
 
 def _arquivo_ep(pe: str, slot: Dict[str, Any]) -> Optional[str]:
@@ -1669,6 +1876,10 @@ def _foto_da_fila():
 
 def _algum_esperando(slots: List[Dict[str, Any]]) -> bool:
     return any((x or {}).get("estado") in ESTADOS_ESPERA for x in slots)
+
+
+def tem_cadeia(e: Dict[str, Any]) -> bool:
+    return any((cn.get(k) or {}).get("estado") == AGUARDANDO for cn in e.get("cenas") or [] for k in ("img_inicio", "video"))
 
 
 def sincronizar_serie(base: str, sid: str) -> bool:
@@ -1756,17 +1967,40 @@ def sincronizar_ep(base: str, sid: str, eid: str) -> bool:
     with TRAVA:
         e = carregar_ep(base, sid, eid)
         slots = [(cn, k) for cn in e["cenas"] for k in ("img_inicio", "img_fim", "video")]
-        if not _algum_esperando([cn[k] for cn, k in slots]):
-            return False
-        fila, rodando = _foto_da_fila()
-        md = os.path.join(pasta_ep(base, sid, eid), "midia")
+        no_flow = _algum_esperando([cn[k] for cn, k in slots])
         mudou = False
-        for cn, k in slots:
-            if _sync_slot(cn[k], fila, rodando, "video" if k == "video" else "imagem", md, f"{cn['id']}_{k}"):
-                mudou = True
-        if mudou:
-            salvar_ep(base, e)
-        return mudou
+        if no_flow:
+            fila, rodando = _foto_da_fila()
+            md = os.path.join(pasta_ep(base, sid, eid), "midia")
+            for cn, k in slots:
+                if _sync_slot(cn[k], fila, rodando, "video" if k == "video" else "imagem", md, f"{cn['id']}_{k}"):
+                    mudou = True
+            if mudou:
+                salvar_ep(base, e)
+        cadeia = tem_cadeia(e)
+    if cadeia and (mudou or not no_flow):  # ⛓ chegou algo (ou nada mais no Flow): manda o próximo da sequência
+        if despachar_cadeia(base, sid, eid):
+            mudou = True
+    return mudou
+
+
+def despachar_cadeia(base: str, sid: str, eid: str) -> int:
+    """⛓ chegou um quadro/vídeo: manda o próximo da fila de continuidade (o que estava "aguardando")."""
+    e = carregar_ep(base, sid, eid)
+    n = 0
+    for i, cn in enumerate(e["cenas"]):
+        try:
+            if (cn.get("img_inicio") or {}).get("estado") == AGUARDANDO:
+                r = pedir_imagens(base, sid, eid, [i])
+                n += r.get("enviadas", 0) + r.get("continuou", 0)
+            e2 = carregar_ep(base, sid, eid)
+            if (e2["cenas"][i].get("video") or {}).get("estado") == AGUARDANDO and _arquivo_ep(pasta_ep(base, sid, eid), e2["cenas"][i]["img_inicio"]):
+                n += pedir_videos(base, sid, eid, [i]).get("enviadas", 0)
+        except ShortsIAErro:
+            pass
+        except Exception:  # noqa: BLE001 — Flow fora: tenta de novo na próxima atualização
+            pass
+    return n
 
 
 def usar_imagem_enviada(base: str, sid: str, eid: str, k: int, qual: str, origem: str) -> None:
@@ -2046,15 +2280,91 @@ def ingredientes(base: str, s: Dict[str, Any], cn: Dict[str, Any], quadro_a: Opt
     return arquivos[:3], rotulos[:3], "; ".join(falta)
 
 
+# ------------------------------------------------------------------ 👁 conferir se o personagem saiu igual
+CONFERIR_SCHEMA = _o({"planos": _a(_o({"n": _N, "ok": {"type": "boolean"}, "problema": _S}))})
+CONFERIR_SYS = (
+    "Você é o supervisor de continuidade de um anime feito com IA. Você recebe as FICHAS dos personagens (as referências "
+    "oficiais) e um quadro de cada PLANO. Para cada plano diga se os personagens que deviam aparecer estão IGUAIS às fichas "
+    "(rosto, cabelo — corte e cor —, olhos, roupa e cores, idade, proporções) e se não apareceu ninguém a mais. "
+    "'ok' = true se está fiel; senão 'problema' curto em português (ex.: 'a Mame está com cabelo comprido e sem chapéu', "
+    "'apareceu uma menina que não é do elenco', 'o traço mudou pra realista'). Pequenas diferenças de ângulo/expressão são ok."
+)
+
+
+def conferir_personagens(base: str, sid: str, eid: str, chamar: Optional[Callable[..., Any]] = None,
+                         on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+    """👁 a IA compara um quadro de cada vídeo com as fichas — aponta o plano em que o personagem saiu diferente."""
+    import ia_servico
+    s = carregar_serie(base, sid)
+    e = carregar_ep(base, sid, eid)
+    pe = pasta_ep(base, sid, eid)
+    tmp = os.path.join(pe, "_conferir")
+    os.makedirs(tmp, exist_ok=True)
+    planos = [(k, cn, _arquivo_ep(pe, cn["video"])) for k, cn in enumerate(e["cenas"])]
+    planos = [(k, cn, v) for k, cn, v in planos if v]
+    if not planos:
+        raise ShortsIAErro("Nenhum plano tem vídeo ainda.")
+    blocos: List[Dict[str, Any]] = []
+    usados = []
+    for k, cn, v in planos:
+        for q in cn.get("quem") or []:
+            if q not in usados:
+                usados.append(q)
+    for q in usados[:6]:
+        p = item(s, q)
+        c = arquivo_serie(base, s, (p or {}).get("ficha")) or caminho_ref(base, s, p)
+        b = ia_servico.imagem_bloco(c, largura=900) if c else None
+        if b:
+            blocos += [{"type": "text", "text": f"FICHA de {p['nome']} ({q}):"}, b]
+    on_log(f"👁 tirando um quadro de {len(planos)} plano(s)…")
+    for k, cn, v in planos[:16]:
+        q = extrair_quadro(v, max(0.5, _ffprobe_dur(v) * 0.45), os.path.join(tmp, f"p{k:02d}.jpg"), 540)
+        b = ia_servico.imagem_bloco(q, largura=540) if q else None
+        if b:
+            nomes = ", ".join((item(s, x) or {}).get("nome", x) for x in cn.get("quem") or []) or "(ninguém do elenco)"
+            blocos += [{"type": "text", "text": f"PLANO {k + 1} — devia ter: {nomes}"}, b]
+    on_log("👁 a IA está comparando com as fichas…")
+    r = _ia(CONFERIR_SYS, blocos, CONFERIR_SCHEMA, chamar, max_tokens=2500, timeout=150, job=eid)
+    res = {int(x.get("n") or 0): x for x in r.get("planos") or []}
+    ruins = []
+    with TRAVA:
+        e = carregar_ep(base, sid, eid)
+        for k, cn in enumerate(e["cenas"]):
+            x = res.get(k + 1)
+            if x is not None and (cn.get("video") or {}).get("arquivo"):
+                cn["video"]["conferido"] = {"ok": bool(x.get("ok")), "problema": str(x.get("problema") or "")[:240], "quando": time.time()}
+                if not x.get("ok"):
+                    ruins.append(k + 1)
+        salvar_ep(base, e)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return {"ruins": ruins, "conferidos": len(res)}
+
+
 # ------------------------------------------------------------------ edição + export
-def opcoes_padrao() -> Dict[str, Any]:
-    return {"velocidade": 1.15, "corte_fim": 0.35, "transicao": "rapida", "dur_transicao": 0.16, "whoosh": True, "zoom": True,
-            "filtro": "vivo", "legenda": True, "legenda_pos": "meio", "legenda_estilo": "pop", "musica": None,
-            "musica_vol": 0.12, "qualidade": "1080p", "modo_video": "elementos", "modelo_video": MODELO_VIDEO_PADRAO}
+CORTES = {"inteiro": "o vídeo inteiro (só tira a ponta bugada do fim)", "fala": "corta o silêncio depois da última fala",
+          "plano": "corta no tempo do plano"}
+ANIMACOES = {"anime": "🎌 anime (12 quadros/s, como desenho à mão)", "suave": "suave (30 quadros/s)"}
 
 
-def normalizar_opcoes(o: Any) -> Dict[str, Any]:
-    out = opcoes_padrao()
+def opcoes_padrao(estilo: str = "") -> Dict[str, Any]:
+    o = {"velocidade": 1.15, "corte_fim": 0.35, "transicao": "rapida", "dur_transicao": 0.16, "whoosh": True, "zoom": True,
+         "filtro": "vivo", "legenda": True, "legenda_pos": "meio", "legenda_estilo": "pop", "musica": None,
+         "musica_vol": 0.12, "qualidade": "1080p", "modo_video": "frames", "modelo_video": MODELO_VIDEO_PADRAO,
+         "corte_modo": "inteiro", "animacao": "suave", "legenda_texto": "roteiro", "encadear": True}
+    if estilo.startswith("anime_") and estilo != "anime_3d":
+        o.update(PRESET_ANIME)
+    return o
+
+
+# 🎌 o que faz parecer ANIME de verdade e não "vídeo de IA": 12 quadros/s (animação em 2s), câmera parada (sem zoom
+# digital), sem filtro de saturação, legenda de anime (frase embaixo, branca com contorno, sem caixa alta), o vídeo
+# inteiro (cortar no meio quebra a ação), velocidade normal e corte seco/rápido
+PRESET_ANIME = {"animacao": "anime", "zoom": False, "filtro": "nenhum", "legenda_pos": "base", "legenda_estilo": "classico",
+                "velocidade": 1.0, "corte_modo": "inteiro", "whoosh": False, "transicao": "corte", "legenda_texto": "roteiro"}
+
+
+def normalizar_opcoes(o: Any, estilo: str = "") -> Dict[str, Any]:
+    out = opcoes_padrao(estilo)
     if not isinstance(o, dict):
         return out
     for k, lo, hi in (("velocidade", 0.8, 1.6), ("corte_fim", 0.0, 2.0), ("dur_transicao", 0.06, 0.5), ("musica_vol", 0.0, 0.6)):
@@ -2063,7 +2373,13 @@ def normalizar_opcoes(o: Any) -> Dict[str, Any]:
                 out[k] = round(max(lo, min(hi, float(o[k]))), 3)
         except (TypeError, ValueError):
             pass
-    for k in ("whoosh", "zoom", "legenda"):
+    if o.get("corte_modo") in CORTES:
+        out["corte_modo"] = o["corte_modo"]
+    if o.get("animacao") in ANIMACOES:
+        out["animacao"] = o["animacao"]
+    if o.get("legenda_texto") in ("roteiro", "ouvido"):
+        out["legenda_texto"] = o["legenda_texto"]
+    for k in ("whoosh", "zoom", "legenda", "encadear"):
         if k in o:
             out[k] = o[k] is True or str(o[k]).lower() in ("1", "true", "on", "sim")
     if o.get("transicao") in TRANSICOES:
@@ -2122,13 +2438,35 @@ def _rodar(cmd: List[str], timeout: int = 3600) -> None:
         raise ShortsIAErro("ffmpeg: " + (r.stderr or "").strip()[-500:])
 
 
-def janela(cena: Dict[str, Any], dur_video: float, corte_fim: float) -> Tuple[float, float]:
-    """Que pedaço do vídeo da cena entra: corta a ponta bugada do fim (o Veo costuma deformar/congelar no fim) e não passa
-    do tempo da cena (+0,6 s de folga pra reação)."""
+def fim_da_fala(video: str, ini: float, fim: float) -> Optional[float]:
+    """Onde a última fala termina dentro de [ini, fim] (silencedetect). None = não deu pra saber / não tem silêncio no fim."""
+    try:
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-ss", f"{ini:.3f}", "-t", f"{fim - ini:.3f}", "-i", video,
+                            "-af", "silencedetect=n=-33dB:d=0.35", "-vn", "-f", "null", "-"], capture_output=True, text=True, timeout=120)
+    except (subprocess.SubprocessError, OSError):
+        return None
+    ini_s = [float(x) for x in re.findall(r"silence_start: ([0-9.]+)", r.stderr or "")]
+    fim_s = [float(x) for x in re.findall(r"silence_end: ([0-9.]+)", r.stderr or "")]
+    if not ini_s or (fim_s and fim_s[-1] > ini_s[-1]):
+        return None  # termina falando (ou sem silêncio nenhum)
+    return ini + ini_s[-1]
+
+
+def janela(cena: Dict[str, Any], dur_video: float, corte_fim: float, modo: str = "plano", video: str = "") -> Tuple[float, float]:
+    """Que pedaço do vídeo da cena entra. Sempre tira a ponta bugada do fim (o gerador costuma deformar/congelar ali).
+    modo "inteiro": o resto do vídeo todo (o Flow faz 8 s — cortar no meio quebra a ação); "fala": corta o silêncio
+    depois da última fala (+0,6 s de reação); "plano": no tempo do plano (+0,6 s)."""
     c = cena.get("corte") or {}
     ini = max(0.0, min(float(c.get("ini") or 0.0), max(0.0, dur_video - 1.0)))
     if c.get("fim") not in (None, ""):
         fim = min(dur_video, float(c["fim"]))
+    elif modo == "inteiro":
+        fim = dur_video - corte_fim
+    elif modo == "fala" and video and cena.get("falas"):
+        fim = dur_video - corte_fim
+        fala = fim_da_fala(video, ini, fim)
+        if fala is not None:
+            fim = min(fim, max(ini + 1.5, fala + 0.6))
     else:
         fim = min(dur_video - corte_fim, ini + float(cena.get("duracao") or dur_video) + 0.6)
     if fim - ini < 0.8:
@@ -2141,7 +2479,10 @@ def preparar_cena(video: str, saida: str, ini: float, fim: float, W: int, H: int
     v = float(op["velocidade"])
     dur = (fim - ini) / v
     frames = max(1, int(round(dur * 30)))
-    vf = [f"setpts=(PTS-STARTPTS)/{v}", f"scale={W}:{H}:force_original_aspect_ratio=increase", f"crop={W}:{H}", "setsar=1", "fps=30"]
+    vf = [f"setpts=(PTS-STARTPTS)/{v}"]
+    if op.get("animacao") == "anime":  # 🎌 animação "em 2s": 12 desenhos por segundo (cada um repetido) — tira a cara de IA lisa
+        vf.append("fps=12")
+    vf += [f"scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos", f"crop={W}:{H}", "setsar=1", "fps=30"]
     if op.get("zoom"):
         # alterna: aproxima devagar / começa perto e abre (o "respiro" que os editores de shorts fazem)
         z = f"1+0.05*on/{frames}" if k % 2 == 0 else f"1.06-0.05*on/{frames}"
@@ -2232,6 +2573,22 @@ def juntar(clipes: List[Tuple[str, float]], saida: str, op: Dict[str, Any], musi
     return inicios
 
 
+def palavras_do_roteiro(cenas: List[Dict[str, Any]], inicios: List[float], duracoes: List[float],
+                        ouvidas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """As palavras ESCRITAS das falas de cada plano, espalhadas no trecho em que o Whisper ouviu fala dentro do plano
+    (sem fala ouvida: o meio do plano)."""
+    import dp_legendas
+    blocos = []
+    for cn, t0, d in zip(cenas, inicios, duracoes):
+        txt = " ".join(f["texto"] for f in cn.get("falas") or [] if f.get("texto"))
+        if not txt.strip():
+            continue
+        dentro = [w for w in ouvidas if t0 - 0.05 <= float(w["start"]) < t0 + d]
+        a, b = (float(dentro[0]["start"]), float(dentro[-1]["end"])) if dentro else (t0 + 0.4, t0 + max(1.0, d - 0.5))
+        blocos.append({"text": txt, "start": a, "end": max(a + 0.6, b)})
+    return dp_legendas.palavras_dos_blocos(blocos)
+
+
 def _palavras_das_falas(cenas: List[Dict[str, Any]], inicios: List[float], duracoes: List[float]) -> List[Dict[str, Any]]:
     """Sem Whisper: as falas escritas espalhadas no tempo de cada cena (aproximado)."""
     import dp_legendas
@@ -2263,7 +2620,7 @@ def exportar(base: str, sid: str, eid: str, transcrever: Optional[Callable[..., 
     clipes, cenas_usadas = [], []
     for n, (k, cn, v) in enumerate([x for x in usaveis if x[2]]):
         on_log(f"✂ cena {k + 1}: corte, velocidade {op['velocidade']}×, zoom e filtro…")
-        ini, fim = janela(cn, _ffprobe_dur(v), float(op["corte_fim"]))
+        ini, fim = janela(cn, _ffprobe_dur(v), float(op["corte_fim"]), op.get("corte_modo") or "inteiro", v)
         c = os.path.join(tmp, f"c{n:02d}.mp4")
         d = preparar_cena(v, c, ini, fim, W, H, op, n)
         clipes.append((c, d))
@@ -2306,12 +2663,19 @@ def exportar(base: str, sid: str, eid: str, transcrever: Optional[Callable[..., 
                             palavras.append({"word": w["word"].strip(), "start": float(w["start"]), "end": float(w["end"])})
             except Exception:  # noqa: BLE001
                 palavras = []
+        if op.get("legenda_texto", "roteiro") == "roteiro":
+            # 📝 o gerador às vezes fala torto ("Sora-chan" vira "Soraçã") e o Whisper escreve o que ouviu: a legenda usa
+            # o TEXTO do roteiro, com o tempo de onde a fala aconteceu
+            palavras = palavras_do_roteiro(cenas_usadas, inicios, [d for _c, d in clipes], palavras)
         if not palavras:
             palavras = _palavras_das_falas(cenas_usadas, inicios, [d for _c, d in clipes])
         if palavras:
             import dp_legendas
-            cfg = {"ativa": True, "estilo": op["legenda_estilo"], "posicao": op["legenda_pos"], "tamanho": 0.058 if s["proporcao"] != "1:1" else 0.075,
-                   "maiusculas": True, "max_palavras": 3, "fonte": "DP Poppins" if "DP Poppins" in _fontes_ok() else "DP Inter"}
+            anime = op.get("legenda_estilo") == "classico"
+            cfg = {"ativa": True, "estilo": op["legenda_estilo"], "posicao": op["legenda_pos"],
+                   "tamanho": (0.042 if anime else 0.058) if s["proporcao"] != "1:1" else (0.055 if anime else 0.075),
+                   "maiusculas": not anime, "max_palavras": 7 if anime else 3,
+                   "fonte": "DP Poppins" if "DP Poppins" in _fontes_ok() else "DP Inter"}
             ass = dp_legendas.gerar_ass(palavras, cfg, W, H, os.path.join(tmp, "legenda.ass"))
             com = os.path.join(tmp, "legendado.mp4")
             dp_legendas.queimar(atual, ass, com)

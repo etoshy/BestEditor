@@ -51,9 +51,12 @@
   </div>
   <div class="si-linha">
     <button id="bSalvarC">💾 salvar cenas</button>
-    <button id="bImgs">🖼 gerar os quadros (todas)</button>
+    <button id="bTudo" title="quadro A de cada plano, um depois do outro (o anterior vai de referência), e o vídeo de cada um assim que o quadro chega">⛓ gerar tudo em sequência</button>
+    <button id="bImgs" class="si-sec">🖼 gerar os quadros (todas)</button>
     <button id="bVids">🎬 gerar os vídeos</button>
     <button id="bFlow" class="si-mini si-sec">⚡ religar o Flow em massa</button>
+    <button id="bConferir" class="si-mini">👁 conferir personagens</button>
+    <button id="bRecuperar" class="si-mini si-sec" title="planos ou vídeos sumiram? volta a versão com mais imagens/vídeos (atual, anterior ou um dos backups) e junta os vídeos gerados que ficaram fora">🩹 recuperar planos/vídeos</button>
     <button id="bAddC" class="si-mini si-sec">➕ cena</button>
     <a class="si-mini" href="/shorts-ia/s/{{ s.id }}/ep/{{ e.id }}/cenas.zip">⬇ baixar todas as cenas</a>
   </div>
@@ -62,6 +65,13 @@
 
 <div class="si-card">
   <h2 style="margin:0">✂ 4 · Edição e exportar</h2>
+  <div class="si-linha"><button id="bPreset" class="si-mini">🎌 deixar com cara de anime</button>
+    <span class="si-dica" style="margin:0">12 quadros/s (como desenho à mão), câmera parada (sem zoom digital), sem filtro, legenda de anime embaixo com o texto do roteiro, vídeo inteiro, marca pequena no canto</span></div>
+  <div class="si-linha">
+    <label>vídeo de cada plano <select id="eCorteModo"><option value="inteiro">inteiro (só tira a ponta do fim)</option><option value="fala">corta o silêncio depois da fala</option><option value="plano">corta no tempo do plano</option></select></label>
+    <label>animação <select id="eAnim"><option value="anime">🎌 anime (12 quadros/s)</option><option value="suave">suave (30 quadros/s)</option></select></label>
+    <label>texto da legenda <select id="eLegTxt"><option value="roteiro">📝 o do roteiro</option><option value="ouvido">👂 o que o Whisper ouviu</option></select></label>
+  </div>
   <div class="si-linha">
     <label>velocidade <input id="eVel" type="number" step="0.05" min="0.8" max="1.6" style="width:70px"></label>
     <label>cortar do fim de cada vídeo (s) <input id="eCorte" type="number" step="0.05" min="0" max="2" style="width:70px"></label>
@@ -94,7 +104,7 @@ const BASE = '/shorts-ia/s/' + S.id + '/ep/' + {{ e.id|tojson }};
 const ARQ = '/shorts-ia/s/' + S.id + '/arquivo/eps/' + {{ e.id|tojson }} + '/';
 let E = {{ e|tojson }};
 let sujo = false, tarefaAntes = null, timer = null;
-const ESPERA = ['fila', 'gerando', 'parado'];
+const ESPERA = ['fila', 'gerando', 'parado', 'aguardando'];
 const nomeP = id => (S.elenco.find(p => p.id === id) || {}).nome || id;
 const optsP = (atual, vazio) => (vazio ? `<option value="">${vazio}</option>` : '') + S.elenco.map(p => `<option value="${p.id}" ${p.id === atual ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
 
@@ -130,7 +140,8 @@ function midiaCena(cn, k) {
   return `<div>${img(a, 'quadro A')}<div class="si-st">A · início</div>${status(a)}
       <label class="si-mini si-sec" style="cursor:pointer">⬆ A<input type="file" accept="image/*" data-up="inicio" data-k="${k}" hidden></label></div>
     <div class="si-st">${E.edicao.modo_video === 'elementos' ? '🎙 o vídeo vai com: ' + ingr(cn) : '🖼 o Flow anima o quadro A'}</div>
-    <div class="full">${v.arquivo ? `<video src="${ARQ}midia/${v.arquivo}" controls preload="metadata"></video>` : ''}${status(v)}</div>
+    <div class="full">${v.arquivo ? `<video src="${ARQ}midia/${v.arquivo}" controls preload="metadata"></video>` : ''}${status(v)}
+      ${v.conferido ? (v.conferido.ok ? '<div class="si-st ok">👁 personagens fiéis às fichas</div>' : `<div class="si-st erro">👁 ⚠ ${esc(v.conferido.problema || 'personagem diferente')} — 🔁 refaça o vídeo</div>`) : ''}</div>
     <div class="full si-linha">
       <button class="si-mini" data-gimg="${k}">${a.arquivo ? '🔁' : '🖼'} quadros</button>
       <button class="si-mini" data-gvid="${k}" ${a.arquivo || E.edicao.modo_video === 'elementos' ? '' : 'disabled'}>${v.arquivo ? '🔁' : '🎬'} vídeo</button>
@@ -148,7 +159,10 @@ function campoCena(cn, k) {
       <button class="si-mini si-sec" data-mover="${k}:-1">↑</button><button class="si-mini si-sec" data-mover="${k}:1">↓</button>
       <button class="si-mini si-perigo" data-tirar="${k}">🗑</button></div>
     <div class="si-linha"><label>momento <input data-c="momento" value="${esc(cn.momento)}" placeholder="M1 · a melancia" style="width:170px"></label>
-      <label>ângulo (EN) <input data-c="angulo" value="${esc(cn.angulo)}" placeholder="close-up on Mame" style="width:230px"></label></div>
+      <label>ângulo (EN) <input data-c="angulo" value="${esc(cn.angulo)}" placeholder="close-up on Mame" style="width:230px"></label>
+      <label title="a mesma câmera continuando o plano anterior: o vídeo começa do último quadro dele"><input type="checkbox" data-c="continua" ${cn.continua ? 'checked' : ''}> ⛓ continua o anterior</label></div>
+    <label>🧭 continuidade do momento (EN — lugar, luz, posições, roupas, objetos; igual em todos os planos do momento) <textarea data-c="continuidade" rows="3">${esc(cn.continuidade)}</textarea></label>
+    <label>⏱ ação em tempos (EN — 0-2s…, 2-5s…, 5-8s…) <textarea data-c="beats" rows="2">${esc(cn.beats)}</textarea></label>
     <div class="si-quem">👥 ${quem} <span class="si-dica">(até 3)</span></div>
     <div class="si-linha"><label>cenário <select data-c="cenario">${cen}</select></label>
       <label>duração (s) <input data-c="duracao" type="number" step="0.5" min="2" max="8" value="${cn.duracao}" style="width:70px"></label>
@@ -175,7 +189,8 @@ function lerCenas() {
   return [...document.querySelectorAll('.si-cena')].map((div, k) => {
     const cn = JSON.parse(JSON.stringify(E.cenas[k]));
     cn.quem = [...div.querySelectorAll('[data-c="quem"]:checked')].map(x => x.value).slice(0, 3);
-    for (const c of ['momento', 'angulo', 'cenario', 'duracao', 'plano', 'acao', 'inicio', 'fim', 'movimento']) cn[c] = div.querySelector(`[data-c="${c}"]`).value;
+    for (const c of ['momento', 'angulo', 'continuidade', 'beats', 'cenario', 'duracao', 'plano', 'acao', 'inicio', 'fim', 'movimento']) cn[c] = div.querySelector(`[data-c="${c}"]`).value;
+    cn.continua = div.querySelector('[data-c="continua"]').checked;
     cn.duracao = parseFloat(cn.duracao) || 6;
     const ci = div.querySelector('[data-c="corte_ini"]').value, cf = div.querySelector('[data-c="corte_fim"]').value;
     cn.corte = { ini: parseFloat(ci) || 0, fim: cf === '' ? null : parseFloat(cf) };
@@ -197,10 +212,11 @@ function ingr(cn) {
 function edicao() { const x = E.edicao; $('eModo').value = x.modo_video; $('eModelo').value = x.modelo_video;
   $('eVel').value = x.velocidade; $('eCorte').value = x.corte_fim; $('eTrans').value = x.transicao; $('eWhoosh').checked = x.whoosh; $('eZoom').checked = x.zoom;
   $('eFiltro').value = x.filtro; $('eLeg').checked = x.legenda; $('eLegPos').value = x.legenda_pos; $('eLegEst').value = x.legenda_estilo; $('eQual').value = x.qualidade; $('eMusVol').value = x.musica_vol;
-  $('eMusica').textContent = x.musica ? '🎵 com música (' + x.musica + ')' : 'sem música de fundo'; }
+  $('eMusica').textContent = x.musica ? '🎵 com música (' + x.musica + ')' : 'sem música de fundo';
+  $('eCorteModo').value = x.corte_modo || 'inteiro'; $('eAnim').value = x.animacao || 'suave'; $('eLegTxt').value = x.legenda_texto || 'roteiro'; }
 const lerEdicao = () => ({ velocidade: $('eVel').value, corte_fim: $('eCorte').value, transicao: $('eTrans').value, whoosh: $('eWhoosh').checked, zoom: $('eZoom').checked,
   filtro: $('eFiltro').value, legenda: $('eLeg').checked, legenda_pos: $('eLegPos').value, legenda_estilo: $('eLegEst').value, qualidade: $('eQual').value, musica_vol: $('eMusVol').value,
-  modo_video: $('eModo').value, modelo_video: $('eModelo').value });
+  modo_video: $('eModo').value, modelo_video: $('eModelo').value, corte_modo: $('eCorteModo').value, animacao: $('eAnim').value, legenda_texto: $('eLegTxt').value });
 function desenharFinal() {
   const x = E.export; let h = '';
   if (x) h += `<p class="si-st ok">✅ exportado: ${x.duracao}s · ${x.qualidade} · ${x.cenas} cena(s)${(x.faltaram || []).length ? ' · ⚠ sem vídeo: cena ' + x.faltaram.join(', ') : ''}</p>
@@ -249,13 +265,14 @@ $('bSalvarC').onclick = async () => { try { await salvarCenas(); barra('💾 cen
 $('bAddC').onclick = async () => { try { const c = E.cenas.length ? lerCenas() : []; c.push({ quem: [], duracao: 6, falas: [], inicio: '', fim: '', movimento: '', acao: '' }); await salvarCenas(c); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 async function gerarTodas(o_que) {
   try { if (sujo) await salvarCenas(); const r = await api(BASE + '/gerar', { o_que });
-    barra(`${o_que === 'videos' ? '🎬' : '🖼'} ${r.enviadas} pedido(s) na fila do Flow` + [...(r.avisos || []), ...(r.erros || []), r.aviso].filter(Boolean).map(x => ' · ' + x).join(''), r.aviso ? 'erro' : 'on'); recarregar();
+    barra(`${o_que === 'videos' ? '🎬' : o_que === 'tudo' ? '⛓' : '🖼'} ${r.enviadas} pedido(s) na fila do Flow` + (r.aguardando ? ` · ${r.aguardando} esperando o plano anterior (vão sozinhos)` : '') + [...(r.avisos || []), ...(r.erros || []), r.aviso].filter(Boolean).map(x => ' · ' + x).join(''), r.aviso ? 'erro' : 'on'); recarregar();
   } catch (e) { barra('❌ ' + e.message, 'erro'); }
 }
 $('bImgs').onclick = () => gerarTodas('imagens');
+$('bTudo').onclick = () => gerarTodas('tudo');
 $('bVids').onclick = () => gerarTodas('videos');
 $('bFlow').onclick = async () => { try { await api('/shorts-ia/flow/continuar', {}); barra('⚡ Flow em massa ligado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
-['eVel', 'eCorte', 'eTrans', 'eWhoosh', 'eZoom', 'eFiltro', 'eLeg', 'eLegPos', 'eLegEst', 'eQual', 'eMusVol', 'eModo', 'eModelo'].forEach(id => $(id).onchange = async () => { try { E.edicao = (await api(BASE + '/edicao', lerEdicao())).edicao; if (id === 'eModo') desenharCenas(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } });
+['eVel', 'eCorte', 'eTrans', 'eWhoosh', 'eZoom', 'eFiltro', 'eLeg', 'eLegPos', 'eLegEst', 'eQual', 'eMusVol', 'eModo', 'eModelo', 'eCorteModo', 'eAnim', 'eLegTxt'].forEach(id => $(id).onchange = async () => { try { E.edicao = (await api(BASE + '/edicao', lerEdicao())).edicao; if (id === 'eModo') desenharCenas(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } });
 $('fMusica').onchange = async () => { const f = $('fMusica').files[0]; if (!f) return; const fd = new FormData(); fd.append('arquivo', f); try { await api(BASE + '/musica', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bTirarMus').onclick = async () => { const fd = new FormData(); fd.append('tirar', '1'); try { await api(BASE + '/musica', fd); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bExportar').onclick = async () => {
@@ -264,6 +281,14 @@ $('bExportar').onclick = async () => {
   catch (e) { barra((/Já está rodando/.test(e.message) ? '⏳ ' : '❌ ') + e.message, /Já está rodando/.test(e.message) ? 'on' : 'erro'); }
   recarregar();
 };
+$('bRecuperar').onclick = async () => {
+  if (!confirm('Recuperar os planos? Volta a versão que tem mais imagens/vídeos (a atual fica no ↩ versão anterior).')) return;
+  try { const r = await api(BASE + '/recuperar', {}); E = r.ep; sujo = false; desenharCenas(true); desenharFinal();
+    barra(`🩹 ${r.planos} plano(s), ${r.midias} imagem(ns)/vídeo(s) — de: ${r.de}` + (r.orfaos ? ` · +${r.orfaos} vídeo(s) que estavam soltos` : ''), 'okk'); }
+  catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
+$('bPreset').onclick = async () => { try { E.edicao = (await api(BASE + '/preset-anime', {})).edicao; edicao(); barra('🎌 edição de anime ligada — 📤 exporte de novo', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bConferir').onclick = async () => { try { await api(BASE + '/conferir', {}); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bParar').onclick = async () => { if (!confirm('Parar o que está rodando neste episódio?')) return; try { await api('/shorts-ia/tarefa/parar', { chave: 'ep:' + E.id }); barra('⏹ parado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 
 async function recarregar() {
@@ -273,9 +298,9 @@ async function recarregar() {
     E = d.ep; if (d.serie) S = d.serie;
     const t = d.tarefa;
     desenharOrigem(); desenharCenas(false); desenharFinal(); edicao();
-    if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '') + ` (${Math.round(Date.now() / 1000 - t.inicio)} s)`);
     $('bParar').hidden = !(t && t.rodando); $('bExportar').disabled = !!(t && t.rodando);
     ['bModelar', 'bAnalisar'].forEach(id => { if ($(id)) $(id).disabled = !!(t && t.rodando); });
+    if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '') + ` (${Math.round(Date.now() / 1000 - t.inicio)} s)`);
     else if (t && tarefaAntes && tarefaAntes.rodando) { if (t.erro) barra('❌ ' + t.erro, 'erro'); else { barra('✅ ' + (t.msg || 'pronto'), 'okk'); sujo = false; desenharCenas(true); } }
     tarefaAntes = t;
     const espera = E.cenas.some(cn => ['img_inicio', 'img_fim', 'video'].some(s => ESPERA.includes((cn[s] || {}).estado)));
