@@ -71,6 +71,13 @@
 </div>
 
 <div class="si-card">
+  <h2 style="margin:0">🧸 Objetos que se repetem</h2>
+  <p class="si-dica">O que aparece em vários planos e NÃO pode mudar (o microfone peludo, a bicicleta, o chapéu…). Cada um ganha a própria imagem de referência e vai junto no plano em que aparece (pelo nome no texto ou marcado no plano), com a mesma descrição sempre.</p>
+  <div class="si-linha"><button id="bAddO" class="si-mini">➕ objeto</button> <button id="bRefsO" class="si-mini">🖼 gerar os que faltam</button></div>
+  <div class="si-grade" id="gObjetos"></div>
+</div>
+
+<div class="si-card">
   <h2 style="margin:0">🎬 Episódios</h2>
   <h3 style="margin:10px 0 0">📖 Novo capítulo</h3>
   <p class="si-dica">Escreva a ideia do capítulo (ou deixe em branco), marque quem entra e a IA escreve a <b>premissa</b> — respeitando a personalidade e o 🧠 histórico de cada um, e (se você deixar) criando personagens novos, que entram no elenco e já ganham referência, ficha e voz. Na série <b>episódica</b> cada capítulo se fecha sozinho; na <b>contínua</b> ele continua o anterior.</p>
@@ -148,6 +155,7 @@ function cardItem(it, tipo) {
        <input data-k="voz" value="${esc(it.voz)}" placeholder="voz (EN): high-pitched, energetic…">
        <div class="si-linha"><input data-k="genero" value="${esc(it.genero)}" placeholder="gênero (EN): male/female" style="flex:1">
          <input data-k="idade" value="${esc(it.idade)}" placeholder="idade" style="width:70px"><input data-k="altura" value="${esc(it.altura)}" placeholder="altura" style="width:80px"></div>
+       <input data-k="detalhes" value="${esc(it.detalhes)}" placeholder="🎒 sempre visível (EN): crossbody bag strap across the chest, round glasses…">
        <label class="si-st">🧠 histórico (o que já aconteceu — um por linha; os capítulos completam)</label>
        <textarea data-k="historico_txt" rows="3" placeholder="ex.: tem medo de caranguejo; ganhou uma bicicleta vermelha no cap. 3">${esc((it.historico || []).map(h => h.fato).join('\n'))}</textarea>
        ${it.estreia ? `<div class="si-st">👤 estreou no capítulo ${esc(it.estreia)}${it.fixo ? ' · fixo' : ' · participação'}</div>` : ''}`
@@ -170,9 +178,11 @@ function cardItem(it, tipo) {
       <label class="si-mini si-sec" style="cursor:pointer" title="a imagem vira a referência travada (use pra personagem SEU)">⬆ ${tipo === 'P' ? 'é meu (travar)' : 'enviar'}<input type="file" accept="image/*" data-enviar hidden></label>
       <button class="si-mini si-perigo" data-apagar>🗑</button></div></div>`;
 }
+const rotaItem = id => id[0] === 'P' ? '/personagem' : id[0] === 'O' ? '/objeto' : '/cenario';
 function desenhar() {
   $('gElenco').innerHTML = S.elenco.map(p => cardItem(p, 'P')).join('') || '<p class="si-dica">Ninguém ainda — 🌌 completar com a IA ou ➕ personagem.</p>';
   $('gCenarios').innerHTML = S.cenarios.map(c => cardItem(c, 'L')).join('') || '<p class="si-dica">Nenhum.</p>';
+  $('gObjetos').innerHTML = (S.objetos || []).map(c => cardItem(c, 'O')).join('') || '<p class="si-dica">Nenhum — ➕ o objeto que aparece sempre (ex.: o microfone peludo do Sora).</p>';
   $('lIdeias').innerHTML = S.ideias.slice().reverse().map(i => `<div class="si-item" style="margin-top:8px">
       <b>${esc(i.titulo)}</b> <span class="si-tag">${esc(i.formato)}</span>
       <span>${esc(i.sinopse)}</span><span class="si-dica" style="margin:0">gancho: ${esc(i.gancho)} · ${(i.quem || []).map(q => esc((S.elenco.find(p => p.id === q) || {}).nome || q)).join(', ')}</span>
@@ -183,8 +193,8 @@ document.addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   const card = b.closest('.si-item[data-id]');
   try {
-    if (b.hasAttribute('data-salvar') && card) { await api(BASE + (card.dataset.id[0] === 'P' ? '/personagem' : '/cenario'), dadosDo(card)); barra('💾 salvo', 'okk'); recarregar(); }
-    else if (b.hasAttribute('data-ref') && card) { await api(BASE + (card.dataset.id[0] === 'P' ? '/personagem' : '/cenario'), dadosDo(card)); const foto = b.dataset.foto === '1'; const r = await api(BASE + '/refs', { ids: [card.dataset.id], com_foto: foto, preparar: card.dataset.id[0] === 'P' }); barra('🧍 na fila do Flow' + (foto ? ' (com a foto)' : ' (sem foto)') + ' — quando chegar, a 📋 ficha e a 🎙 voz vêm sozinhas' + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); }
+    if (b.hasAttribute('data-salvar') && card) { await api(BASE + rotaItem(card.dataset.id), dadosDo(card)); barra('💾 salvo', 'okk'); recarregar(); }
+    else if (b.hasAttribute('data-ref') && card) { await api(BASE + rotaItem(card.dataset.id), dadosDo(card)); const foto = b.dataset.foto === '1'; const r = await api(BASE + '/refs', { ids: [card.dataset.id], com_foto: foto, preparar: card.dataset.id[0] === 'P' }); barra('🧍 na fila do Flow' + (foto ? ' (com a foto)' : ' (sem foto)') + ' — quando chegar, a 📋 ficha e a 🎙 voz vêm sozinhas' + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); }
     else if (b.hasAttribute('data-ficha') && card) { await api(BASE + '/personagem', dadosDo(card)); const r = await api(BASE + '/fichas', { ids: [card.dataset.id] }); barra('📋 ficha na fila do Flow' + (r.aviso ? ' — ' + r.aviso : ''), r.aviso ? 'erro' : 'on'); recarregar(); }
     else if (b.hasAttribute('data-voz') && card) { await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/vozes', { ids: [card.dataset.id] }); recarregar(); }
     else if (b.hasAttribute('data-preparar') && card) { await api(BASE + '/personagem', dadosDo(card)); await api(BASE + '/preparar', { ids: [card.dataset.id] }); barra('🧍📋🎙 preparando (referência → ficha → voz, sozinho)', 'on'); recarregar(); }
@@ -270,6 +280,8 @@ $('bVozesP').onclick = async () => {
   try { await api(BASE + '/vozes', { ids }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); }
 };
 $('bRefsL').onclick = () => refsQueFaltam(S.cenarios);
+$('bRefsO').onclick = () => refsQueFaltam(S.objetos || []);
+$('bAddO').onclick = async () => { try { await api(BASE + '/objeto', { nome: 'Novo objeto', descricao: '' }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bRefazerL').onclick = async () => {
   const ids = S.cenarios.filter(c => !['fila', 'gerando', 'parado'].includes((c.ref || {}).estado)).map(c => c.id);
   if (!ids.length) return;
@@ -299,7 +311,7 @@ async function recarregar() {
     if (t && t.rodando) barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : ''));
     else if (t && tarefaAntes && tarefaAntes.rodando) { if (t.erro) barra('❌ ' + t.erro, 'erro'); else { barra('✅ ' + (t.msg || 'pronto'), 'okk'); location.reload(); return; } }
     tarefaAntes = t;
-    const espera = [...S.elenco, ...S.cenarios].some(x => ['fila', 'gerando', 'parado'].includes((x.ref || {}).estado) || ['fila', 'gerando', 'parado'].includes((x.ficha || {}).estado) || x.preparar);
+    const espera = [...S.elenco, ...S.cenarios, ...(S.objetos || [])].some(x => ['fila', 'gerando', 'parado'].includes((x.ref || {}).estado) || ['fila', 'gerando', 'parado'].includes((x.ficha || {}).estado) || x.preparar);
     if ((t && t.rodando) || espera) timer = setTimeout(recarregar, 4000);
   } catch (e) { barra('❌ ' + e.message, 'erro'); }
 }

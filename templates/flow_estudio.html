@@ -136,6 +136,8 @@
     <div class="fl-row" style="margin-top:6px">
       <label title="Quando nenhuma conta do lote tem crédito de vídeo, cada vídeo que falta vira foto: a IA reescreve o prompt (🤖 IA do site → 🔎 IA do Google → regra simples)"><input type="checkbox" id="loteConverter" style="width:auto"> 🔁 sem crédito de vídeo em todas → vira foto (a IA reescreve o prompt)</label>
       <label title="Desmarcado (padrão): a conta que levou “atividade incomum” descansa 60 min e o pedido vai pra outra conta. Marcado: o lote inteiro pausa."><input type="checkbox" id="lotePausarIncomum" style="width:auto"> ⏸ “atividade incomum” pausa o lote (senão: troca de conta)</label>
+      <label>🎞 vídeo: <select id="loteResol" style="width:auto"><option value="360p">360p (rápido, pra testar)</option><option value="720p">720p (máxima)</option></select>
+        <select id="loteDur" style="width:auto"><option value="">duração do Flow</option><option>4s</option><option>6s</option><option>8s</option><option>10s</option></select></label>
       <label><input type="checkbox" id="loteVisivel" style="width:auto"> 👁 mostrar os navegadores</label>
       <button type="button" class="mini" id="loteSalvarCfg">💾 salvar</button><span class="fl-hint" id="loteCfgOk"></span>
     </div>
@@ -434,7 +436,7 @@
     if (!cfgCarregada) {
       cfgCarregada = true;
       $('loteParalelo').value = d.config.paralelo; $('loteCdMin').value = d.config.cooldown_min; $('loteCdMax').value = d.config.cooldown_max;
-      $('loteTent').value = d.config.tentativas; $('loteConverter').checked = !!d.config.converter_para_foto; $('loteVisivel').checked = !!d.config.visivel; $('lotePausarIncomum').checked = !!d.config.pausar_no_incomum;
+      $('loteTent').value = d.config.tentativas; $('loteConverter').checked = !!d.config.converter_para_foto; $('loteVisivel').checked = !!d.config.visivel; $('lotePausarIncomum').checked = !!d.config.pausar_no_incomum; $('loteResol').value = d.config.video_resolucao || '360p'; $('loteDur').value = d.config.video_duracao || '';
       if (d.cdp) $('loteParalelo').disabled = true;
     }
     if (!document.activeElement || !document.activeElement.closest('#loteContas')) desenharContas(d);
@@ -456,7 +458,7 @@
     const contas = [...document.querySelectorAll('[data-usar]')].filter(x => x.checked).map(x => x.dataset.usar);
     const todas = document.querySelectorAll('[data-usar]').length;
     return { paralelo: +$('loteParalelo').value, cooldown_min: +$('loteCdMin').value, cooldown_max: +$('loteCdMax').value,
-             tentativas: +$('loteTent').value, converter_para_foto: $('loteConverter').checked, visivel: $('loteVisivel').checked, pausar_no_incomum: $('lotePausarIncomum').checked,
+             tentativas: +$('loteTent').value, converter_para_foto: $('loteConverter').checked, visivel: $('loteVisivel').checked, pausar_no_incomum: $('lotePausarIncomum').checked, video_resolucao: $('loteResol').value, video_duracao: $('loteDur').value,
              contas: contas.length === todas ? [] : contas };
   }
   async function salvarCfg() {

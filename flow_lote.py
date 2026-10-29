@@ -57,7 +57,9 @@ CONFIG_PADRAO: Dict[str, Any] = {
     "visivel": False,            # mostrar os navegadores
     "contas": [],                # quais contas usar ([] = todas, na ordem de 🔑 Contas Google)
     "tentativas": 2,             # erro comum (não é crédito/recusa): tenta de novo até N vezes
-    "pausar_no_incomum": False,  # 🔁 v84_269: "atividade incomum" → a conta descansa e o pedido vai pra OUTRA conta (True = pausa o lote)
+    "pausar_no_incomum": False,
+    "video_resolucao": "360p",   # 🎞 v84_275: 360p por padrão (testes, mais rápido/barato); 720p = a máxima, você escolhe
+    "video_duracao": "",         # "" = a do Flow; 4s / 6s / 8s / 10s  # 🔁 v84_269: "atividade incomum" → a conta descansa e o pedido vai pra OUTRA conta (True = pausa o lote)
 }
 TIPOS = ("imagem", "video")
 QUANTIDADES = ("x1", "x2", "x3", "x4")
@@ -144,6 +146,10 @@ def normalizar_config(d: Dict[str, Any], base: Optional[Dict[str, Any]] = None) 
                 c[k] = max(1, min(5, int(v)))
             elif k in ("converter_para_foto", "visivel", "pausar_no_incomum"):
                 c[k] = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on", "sim", "yes")
+            elif k == "video_resolucao":
+                c[k] = v if v in ("360p", "720p") else "360p"
+            elif k == "video_duracao":
+                c[k] = v if v in ("", "4s", "6s", "8s", "10s") else ""
             elif k == "contas":
                 c[k] = [str(x) for x in (v or []) if str(x).strip()][:50]
         except (TypeError, ValueError):
@@ -372,6 +378,8 @@ class Lote:
                      "quantidade": quantidade, "estado": "pendente", "conta": None, "erro": None, "tentativas": 0,
                      "convertido": False, "prompt_original": None, "reescrito_por": None, "resultados": [],
                      "criado": time.time(), "inicio": None, "fim": None}
+                if tipo == "video" and it.get("duracao") in ("4s", "6s", "8s", "10s"):  # 🎞 v84_274: duração pedida
+                    j["duracao"] = it["duracao"]
                 # 🎞 v84_182: vídeo a partir de uma imagem (frame de Início) — "Animar com Flow" do editor
                 if tipo == "video" and it.get("inicio_arquivo") and os.path.isfile(str(it["inicio_arquivo"])):
                     j["inicio_arquivo"] = os.path.abspath(str(it["inicio_arquivo"]))
@@ -793,7 +801,9 @@ class Lote:
                     self._aguardar_vez(conta)
                     trab = {"tipo": job["tipo"], "prompt": job["prompt"], "proporcao": job["proporcao"],
                             "modelo": job["modelo"] or str(cfg.get("flow_modelo_" + job["tipo"]) or ""),
-                            "quantidade": job["quantidade"]}
+                            "quantidade": job["quantidade"],
+                            "resolucao": job.get("resolucao") or str(cfg.get("video_resolucao") or "360p"),
+                            "duracao": job.get("duracao") or str(cfg.get("video_duracao") or "")}
                     if job["tipo"] == "video":
                         trab["tipo_video"] = "Elementos"
                         if job.get("inicio_arquivo") and os.path.isfile(job["inicio_arquivo"]):  # 🎞 animar uma imagem

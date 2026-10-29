@@ -105,7 +105,10 @@ S = {
 # grupos de opções do pop-up / do painel (aria-label do flow-toggles)
 GRUPO = {"modo": "Modo", "tipo_video": "Tipo de vídeo", "proporcao": "Proporção", "quantidade": "Quantidade de resultados",
          "img_proporcao": "Proporção padrão da geração de imagens", "img_quantidade": "Quantidade padrão de imagens geradas",
-         "vid_proporcao": "Proporção padrão para geração de vídeo", "vid_quantidade": "Quantidade padrão de vídeos gerados"}
+         "vid_proporcao": "Proporção padrão para geração de vídeo", "vid_quantidade": "Quantidade padrão de vídeos gerados",
+         "duracao": "Duração do vídeo", "resolucao": "Resolução do vídeo"}
+DURACOES_VIDEO = ("4s", "6s", "8s", "10s")
+RESOLUCOES_VIDEO = ("360p", "720p")
 PROPORCOES = ("16:9", "4:3", "1:1", "3:4", "9:16")
 MODELOS_IMAGEM = ("Nano Banana Pro", "Nano Banana 2 Lite", "Nano Banana 2.1")
 MODELOS_VIDEO = ("Omni 1.1 Flash", "Veo 3.1 - Lite", "Veo 3.1 - Fast", "Veo 3.1 - Quality")
@@ -663,7 +666,7 @@ def resumo(page) -> str:
 
 
 def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo: str = "", quantidade: str = "x1",
-                     tipo_video: str = "Frames", on_passo: Passo = _nada) -> Dict[str, str]:
+                     tipo_video: str = "Frames", on_passo: Passo = _nada, duracao: str = "", resolucao: str = "") -> Dict[str, str]:
     """tipo "imagem" ou "video". Vídeo: `tipo_video` "Frames" (início/fim) ou "Elementos" (só o texto).
     Devolve {"resumo", "creditos"}."""
     fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
@@ -685,6 +688,12 @@ def configurar_caixa(page, tipo: str = "imagem", proporcao: str = "16:9", modelo
             b = _primeiro(page, S["popup_modelo"], 4, passo, 'o pop-up fechou depois de escolher o modelo.')
             if modelo.lower() not in (b.inner_text() or "").lower():
                 raise FlowPassoErro(passo, f'escolhi "{modelo}" mas o modelo ficou "{" ".join((b.inner_text() or "").split())}".')
+    resolucao = resolucao or "360p"  # 🎞 v84_275: padrão 360p (rápido, pra testar); 720p quando você escolher
+    if tipo == "video":  # 🎞 v84_274: duração (4/6/8/10 s) e resolução (720p > 360p) — nem todo modelo mostra; se não tem, segue
+        if resolucao in RESOLUCOES_VIDEO:
+            _toggle(pop, GRUPO["resolucao"], resolucao, passo, obrigatorio=False)
+        if duracao in DURACOES_VIDEO:
+            _toggle(pop, GRUPO["duracao"], duracao, passo, obrigatorio=False)
     if quantidade:
         _toggle(pop, GRUPO["quantidade"], quantidade, passo, obrigatorio=False)
     creditos = ""
@@ -1011,7 +1020,8 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
     frames = tipo == "video" and bool(trab.get("inicio") or trab.get("fim") or
                                       ((trab.get("tipo_video") or "Frames") == "Frames" and not trab.get("referencias")))
     configurar_caixa(page, tipo, trab.get("proporcao") or "16:9", trab.get("modelo") or "", trab.get("quantidade") or "x1",
-                     ("Frames" if frames else "Elementos") if tipo == "video" else "", on_passo=on_passo)
+                     ("Frames" if frames else "Elementos") if tipo == "video" else "", on_passo=on_passo,
+                     duracao=trab.get("duracao") or "", resolucao=trab.get("resolucao") or "")
     ja_subiu: Dict[str, str] = {}  # 🎞 v84_202: Fim = a MESMA imagem do Início → reusa a mídia (o Flow não sobe repetida)
     for qual, chave in (("Início", "inicio"), ("Fim", "fim")):
         f = trab.get(chave) or {}

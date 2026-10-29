@@ -96,8 +96,14 @@ MODELOS_IMAGEM = ("Nano Banana Pro", "Nano Banana 2.1", "Nano Banana 2 Lite", ""
 MAX_REFS_CENA = 3
 MAX_INSPIRACOES = 6
 MAX_ELENCO = 24          # o elenco cresce com os episódios (personagens novos)
-DUR_PLANO_PADRAO = 8.0   # cada plano (um vídeo do Flow) — cortes rápidos, vários ângulos do mesmo momento
-DUR_VIDEO_FLOW = 8.0
+DUR_PLANO_PADRAO = 6.0   # cada plano (um vídeo do Flow) — cortes rápidos, vários ângulos do mesmo momento
+DUR_VIDEO_FLOW = 10.0  # o Flow faz 4, 6, 8 ou 10 s
+DURACOES_FLOW = (4, 6, 8, 10)
+
+
+def duracao_flow(dur: float) -> str:
+    """A duração do Flow pro plano: a menor de 4/6/8/10 s que cobre o plano."""
+    return f"{next((d for d in DURACOES_FLOW if d >= float(dur or 6) - 0.25), 10)}s"
 ESTADOS_ESPERA = ("fila", "gerando", "parado")
 
 FORMATOS_VIRAIS = [
@@ -171,6 +177,7 @@ def _personagem(d: Dict[str, Any], pid: str) -> Dict[str, Any]:
     return {"id": pid, "nome": g("nome", 60) or pid, "papel": g("papel", 160), "aparencia": g("aparencia", 900),
             "personalidade": g("personalidade", 500), "jeito_de_falar": g("jeito_de_falar", 400), "voz": g("voz", 300),
             "genero": g("genero", 40), "idade": g("idade", 40), "altura": g("altura", 40),
+            "detalhes": g("detalhes", 500),  # 🎒 o que SEMPRE aparece nele (alça da bolsa, óculos redondos…) — em inglês
             "ref": d.get("ref") if isinstance(d.get("ref"), dict) else _slot(),
             "ficha": d.get("ficha") if isinstance(d.get("ficha"), dict) else _slot(),       # 📋 folha de personagem (várias vistas)
             "voz_ficha": d.get("voz_ficha") if isinstance(d.get("voz_ficha"), dict) else _slot(),  # 🎙 folha de voz (imagem)
@@ -201,7 +208,7 @@ def nova_serie(base: str, nome: str = "", premissa: str = "", estilo: str = ESTI
     s = {"id": sid, "nome": " ".join(str(nome or "").split())[:80] or "Nova série", "premissa": str(premissa or "").strip()[:2000],
          "estilo": estilo if estilo in ESTILOS else ESTILO_PADRAO, "idioma": idioma if idioma in LINGUAS else "en",
          "proporcao": proporcao if proporcao in PROPORCOES else "9:16", "tom": "", "bordoes": [], "regras": "",
-         "elenco": [], "cenarios": [], "ideias": [], "eps": [], "marca": None, "criado": time.time(),
+         "elenco": [], "cenarios": [], "objetos": [], "ideias": [], "eps": [], "marca": None, "criado": time.time(),
          "padroes": padroes_normais(None), "formato_serie": "episodica"}
     s["marca"] = marca_da(s)
     salvar_serie(base, s)
@@ -223,6 +230,7 @@ def carregar_serie(base: str, sid: str) -> Dict[str, Any]:
     # 🩹 v84_267: séries criadas antes de um campo novo (inspirações, histórico, fichas…) — completa tudo ao abrir
     s["elenco"] = [_personagem(p, str(p.get("id") or f"P{k}")) for k, p in enumerate(s["elenco"], 1) if isinstance(p, dict)]
     s["cenarios"] = [_cenario(c, str(c.get("id") or f"L{k}")) for k, c in enumerate(s["cenarios"], 1) if isinstance(c, dict)]
+    s["objetos"] = [_cenario(c, str(c.get("id") or f"O{k}")) for k, c in enumerate(s.get("objetos") or [], 1) if isinstance(c, dict)]
     s["marca"] = marca_da(s)
     s["padroes"] = padroes_normais(s.get("padroes"))
     s.setdefault("formato_serie", "episodica")
@@ -324,19 +332,21 @@ def salvar_personagem(base: str, sid: str, d: Dict[str, Any]) -> Dict[str, Any]:
         return novo
 
 
-def salvar_cenario(base: str, sid: str, d: Dict[str, Any]) -> Dict[str, Any]:
+def salvar_cenario(base: str, sid: str, d: Dict[str, Any], lista: str = "cenarios") -> Dict[str, Any]:
+    """🏞 cenário (L1…) ou 🧸 objeto que se repete (O1…: o microfone, a bicicleta… com imagem de referência própria)."""
+    pre = "O" if lista == "objetos" else "L"
     with TRAVA:
         s = carregar_serie(base, sid)
         lid = str(d.get("id") or "")
-        velho = next((c for c in s["cenarios"] if c["id"] == lid), None)
+        velho = next((c for c in s[lista] if c["id"] == lid), None)
         if velho:
             novo = _cenario(dict(velho, **{k: v for k, v in d.items() if k != "ref"}), lid)
-            s["cenarios"][s["cenarios"].index(velho)] = novo
+            s[lista][s[lista].index(velho)] = novo
         else:
-            if len(s["cenarios"]) >= 10:
-                raise ShortsIAErro("No máximo 10 cenários.")
-            novo = _cenario(d, _proximo("L", s["cenarios"]))
-            s["cenarios"].append(novo)
+            if len(s[lista]) >= 12:
+                raise ShortsIAErro("No máximo 12.")
+            novo = _cenario(d, _proximo(pre, s[lista]))
+            s[lista].append(novo)
         salvar_serie(base, s)
         return novo
 
@@ -344,13 +354,13 @@ def salvar_cenario(base: str, sid: str, d: Dict[str, Any]) -> Dict[str, Any]:
 def apagar_item(base: str, sid: str, tipo: str, iid: str) -> None:
     with TRAVA:
         s = carregar_serie(base, sid)
-        lista = s["elenco"] if tipo == "personagem" else s["cenarios"]
-        s["elenco" if tipo == "personagem" else "cenarios"] = [x for x in lista if x["id"] != iid]
+        chave = "elenco" if tipo == "personagem" else ("objetos" if iid.startswith("O") else "cenarios")
+        s[chave] = [x for x in s[chave] if x["id"] != iid]
         salvar_serie(base, s)
 
 
 def item(s: Dict[str, Any], iid: str) -> Optional[Dict[str, Any]]:
-    return next((x for x in s["elenco"] + s["cenarios"] if x["id"] == iid), None)
+    return next((x for x in s["elenco"] + s["cenarios"] + s.get("objetos", []) if x["id"] == iid), None)
 
 
 def caminho_ref(base: str, s: Dict[str, Any], it: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -405,9 +415,10 @@ def _a(x: Dict[str, Any]) -> Dict[str, Any]:
 
 
 PERSONAGEM_SCHEMA = _o({"nome": _S, "papel": _S, "aparencia": _S, "personalidade": _S, "jeito_de_falar": _S, "voz": _S,
-                        "genero": _S, "idade": _S, "altura": _S})
+                        "genero": _S, "idade": _S, "altura": _S, "detalhes": _S})
 PERSONAGEM_IMG_SCHEMA = _o(dict(PERSONAGEM_SCHEMA["properties"], imagem=_N))
 UNIVERSO_SCHEMA = _o({"nome": _S, "premissa": _S, "tom": _S, "bordoes": _a(_S), "elenco": _a(PERSONAGEM_IMG_SCHEMA),
+                      "objetos": _a(_o({"nome": _S, "descricao": _S})),
                       "cenarios": _a(_o({"nome": _S, "descricao": _S}))})
 UNIVERSO_SYS = (
     "Você cria o UNIVERSO de uma série de shorts (YouTube Shorts / TikTok / Reels) feita com vídeos de IA, no formato de "
@@ -428,9 +439,14 @@ UNIVERSO_SYS = (
     "imagem (fiel a ela) e ponha o número em 'imagem' (0 = personagem sem imagem).\n"
     "• 'voz' em INGLÊS: como a voz soa (tom, idade, energia, sotaque) — vai pro gerador de vídeo que fala.\n"
     "• 'genero' (male/female/other, em inglês), 'idade' (ex.: '25', 'looks 20, is 900 years old') e 'altura' (ex.: '171 cm').\n"
+    "• 'detalhes' (INGLÊS): os detalhes que SEMPRE têm que aparecer nele em qualquer plano (ex.: 'brown crossbody bag "
+    "strap across the chest, round thin glasses, sleeves rolled up') — é o que o gerador mais esquece.\n"
     "• 'personalidade' e 'jeito_de_falar' em português (o jeito_de_falar pode ter um tique/bordão próprio).\n"
-    "• 'bordoes': 3 a 6 bordões curtos da série, no idioma do post.\n"
+    "• 'bordoes': 3 a 6 bordões curtos da série, no idioma do post — fáceis de falar em voz alta, SEM honoríficos ou "
+    "expressões japonesas (nada de -san/-chan/'ara ara'); no português, jeito brasileiro.\n"
     "• 'cenarios': 1 a 3 lugares que se repetem (descrição em INGLÊS, sem personagens).\n"
+    "• 'objetos': 0 a 3 objetos que aparecem sempre (o microfone dele, a bicicleta dela…) — descrição em INGLÊS bem "
+    "precisa (forma, cor, tamanho, material), que vai se repetir igual em todo plano.\n"
     "• 'tom' (português): o tipo de humor e o ritmo (ex.: caos doméstico, piada visual + punchline no fim).\n"
     "• 'nome': o nome da série/canal (curto, fácil de virar @)."
 )
@@ -477,7 +493,7 @@ def gerar_universo(base: str, sid: str, premissa: str = "", chamar: Optional[Cal
         for p in (r.get("elenco") or [])[:8]:
             velho = existentes.get(str(p.get("nome") or "").lower())
             if velho:
-                for k in ("papel", "aparencia", "personalidade", "jeito_de_falar", "voz", "genero", "idade", "altura"):
+                for k in ("papel", "aparencia", "personalidade", "jeito_de_falar", "voz", "genero", "idade", "altura", "detalhes"):
                     if not velho.get(k):
                         velho[k] = str(p.get(k) or "")[:900]
             elif len(s["elenco"]) < MAX_ELENCO:
@@ -490,6 +506,8 @@ def gerar_universo(base: str, sid: str, premissa: str = "", chamar: Optional[Cal
                 k = 0
             if velho and 1 <= k <= len(imagens):
                 com_imagem.append((velho["id"], imagens[k - 1]))
+        if not s.get("objetos"):
+            s["objetos"] = [_cenario(o, f"O{k}") for k, o in enumerate((r.get("objetos") or [])[:4], 1)]
         if not s["cenarios"]:
             for c in (r.get("cenarios") or [])[:4]:
                 s["cenarios"].append(_cenario(c, _proximo("L", s["cenarios"])))
@@ -725,9 +743,12 @@ def contexto_serie(s: Dict[str, Any], base: str = "") -> str:
                  "FORMATO DA SÉRIE: EPISÓDICA — o capítulo se fecha sozinho e não depende dos outros, MAS os personagens são "
                  "os mesmos: personalidade, relações e o que já aconteceu com eles (histórico) nunca são contraditos.")
     ce = "\n".join(f"- {c['id']} · {c['nome']}: {c['descricao']}" for c in s["cenarios"])
+    ob = "\n".join(f"- {c['id']} · {c['nome']}: {c['descricao']}" for c in s.get("objetos") or [])
     return (f"SÉRIE: {s['nome']}\nPREMISSA: {s.get('premissa') or ''}\nTOM: {s.get('tom') or ''}\n"
             f"BORDÕES: {' | '.join(s.get('bordoes') or [])}\n" + (f"REGRAS DO CRIADOR: {s['regras']}\n" if s.get("regras") else "")
-            + f"ELENCO:\n{el or '(vazio)'}\nCENÁRIOS:\n{ce or '(nenhum)'}\nIDIOMA DO POST: {NOME_LINGUA[s['idioma']]}\n"
+            + f"ELENCO:\n{el or '(vazio)'}\nCENÁRIOS:\n{ce or '(nenhum)'}\n"
+            + (f"OBJETOS QUE SE REPETEM (use o id em 'objetos' do plano e descreva com as MESMAS palavras):\n{ob}\n" if ob else "")
+            + f"IDIOMA DO POST: {NOME_LINGUA[s['idioma']]}\n"
             f"FORMATO DE TELA: {s['proporcao']}\n{regra_fmt}{tl}")
 
 
@@ -1060,7 +1081,7 @@ def analisar_viral(base: str, sid: str, eid: str, transcrever: Optional[Callable
 
 
 # ------------------------------------------------------------------ modelar → cenas
-CENA_SCHEMA = _o({"momento": _S, "angulo": _S, "continua": {"type": "boolean"}, "continuidade": _S, "beats": _S,
+CENA_SCHEMA = _o({"momento": _S, "angulo": _S, "continua": {"type": "boolean"}, "continuidade": _S, "beats": _S, "objetos": _a(_S),
                   "quem": _a(_S), "cenario": _S, "duracao": _N, "plano": _S, "acao": _S, "inicio": _S,
                   "fim": _S, "movimento": _S,
                   "falas": _a(_o({"quem": _S, "texto": _S, "emocao": _S})), "base": _a(_N)})
@@ -1068,11 +1089,21 @@ OPCAO = _o({"post": _S, "pt": _S})
 NOVO_PERSONAGEM_SCHEMA = _o(dict(PERSONAGEM_SCHEMA["properties"], id=_S, fixo={"type": "boolean"}))
 CENAS_SCHEMA = _o({"titulo": _S, "titulos": _a(OPCAO), "logica": _S, "novos_personagens": _a(NOVO_PERSONAGEM_SCHEMA),
                    "resumo": _S, "memoria": _a(_o({"quem": _S, "fato": _S})), "cenas": _a(CENA_SCHEMA)})
+REGRA_FALA = (
+    "ESCRITA DAS FALAS (vão ser FALADAS por uma IA — escreva pro ouvido): frases curtas e naturais, como gente de verdade "
+    "fala no idioma do post (no português: português do Brasil do dia a dia); pontuação marca as pausas (vírgula, "
+    "reticências, ponto de exclamação/interrogação); nada de caixa alta, emoji, símbolo, sigla, número em algarismo "
+    "(escreva por extenso), palavra estrangeira ou trava-língua. NADA de honoríficos e expressões japonesas — sem -san, "
+    "-chan, -kun, -sama, senpai, sensei, onii-chan, nee-chan, 'ara ara', 'nani', 'sugoi', 'kawaii', 'baka', "
+    "'itadakimasu', 'gomen': adapte pro jeito brasileiro (ex.: 'ara ara' → 'ai, ai, ai…' / 'olha só'; 'Sora-san' → "
+    "'Sora' ou 'moço'; 'obaa-chan' → 'vó') mantendo os NOMES dos personagens. Onomatopeia só simples ('ai!', 'ué?', "
+    "'hã?'); risada escrita 'haha'. Nada que a IA possa ler errado.\n"
+)
 CENAS_SYS = (
     "Você é o diretor de uma série de shorts de anime feita com IA (imagens e vídeos gerados). Escreva o EPISÓDIO em "
     "PLANOS. Cada plano vira UM vídeo curto no gerador (com as falas faladas e a boca sincronizada), e a edição corta "
     "entre eles como num anime de verdade.\n"
-    "{MODO}\n"
+    "{MODO}\n" + REGRA_FALA +
     "MOMENTOS E ÂNGULOS (o que faz parecer filmado, não um slide atrás do outro):\n"
     "• Agrupe os planos em MOMENTOS ('momento' = um nome curto igual pra todos os planos do mesmo momento, ex.: "
     "'M1 · a melancia'). Um momento = o mesmo lugar e o mesmo instante, coberto por 2 a 4 ÂNGULOS diferentes que se "
@@ -1088,14 +1119,18 @@ CENAS_SYS = (
     "'bíblia' do momento — o lugar com a planta (onde fica a porta, a janela, a mesa, a cerca…), a hora e a direção da "
     "luz, o clima, onde cada personagem está e pra que lado olha, a roupa e o estado de cada um (chapéu na cabeça, "
     "sujo de terra…), os objetos e com quem estão (o microfone na mão da Mame). É o que mantém os planos iguais entre si.\n"
-    "• 'beats' (INGLÊS): a ação do plano em tempos, preenchendo os 8 s do gerador — ex.: '0-2s: Mame peeks through the "
-    "fence hole; 2-5s: she crawls in on all fours, eyes wide; 5-8s: she spots the fluffy microphone and freezes, "
-    "pointing'. Cada beat com uma ação clara e visível.\n"
+    "• 'beats' (INGLÊS): a ação do plano em tempos, preenchendo os {DUR} s do vídeo — ex. (6 s): '0-2s: Mame peeks "
+    "through the fence hole; 2-4s: she crawls in on all fours, eyes wide; 4-6s: she spots the fluffy microphone and "
+    "freezes, pointing'. Cada beat com uma ação clara e visível.\n"
+    "• 'objetos': ids dos OBJETOS QUE SE REPETEM que aparecem no plano (a imagem de referência deles vai junto).\n"
+    "• OBJETOS e ROUPAS que se repetem: descreva SEMPRE com as MESMAS palavras, em todo plano e todo momento (ex.: 'a "
+    "fluffy gray furry windscreen microphone on a short black handle' — nunca 'microfone' num plano e 'gravador' no "
+    "outro). Roupa = a da aparência do personagem, igual.\n"
     "• 'continua' = true quando o plano é a MESMA câmera continuando o plano anterior do mesmo momento (a ação segue sem "
     "corte de ângulo) — o vídeo começa do último quadro do anterior. false quando muda o ângulo.\n"
     "Regras dos planos:\n"
-    "• {N_PLANOS} planos; 'duracao' de cada plano ≈ {DUR} s (no máximo 8). O gerador SEMPRE faz um vídeo de 8 s: escreva "
-    "ação e reação que preencham o plano inteiro (sem ficar parado esperando).\n"
+    "• {N_PLANOS} planos; 'duracao' de cada plano = {DUR} s (o vídeo do gerador tem {DUR} s): escreva ação e reação que "
+    "preencham o plano inteiro (sem ficar parado esperando).\n"
     "• Todo plano tem um personagem fazendo algo (ou um detalhe de objeto ligado à ação). NADA de plano só de paisagem "
     "vazia, a não ser UM plano de situação curto no começo de um momento — e mesmo ele com alguém entrando/se mexendo.\n"
     "• O 1º plano já é o gancho com AÇÃO (alguém entra, cai, grita, rouba algo) — nunca alguém parado sentado.\n"
@@ -1166,6 +1201,28 @@ def _conteudo_modelar(s: Dict[str, Any], e: Dict[str, Any], base: str = "") -> s
     return "\n\n".join(partes)
 
 
+_JP_SUFIXOS = re.compile(r"(?<=\w)-(?:san|chan|kun|sama|senpai|sensei|dono|tan|chin)\b", re.I)
+_JP_EXPR = [(re.compile(p, re.I), b) for p, b in (
+    (r"\bara[\s,]*ara\b", "ai, ai, ai"), (r"\b(?:obaa|baa|oba)-?(?:chan|san|sama)\b", "vó"),
+    (r"\b(?:ojii|jii|oji)-?(?:chan|san|sama)\b", "vô"), (r"\b(?:onii|nii)-?(?:chan|san|sama)\b", "mano"),
+    (r"\b(?:onee|nee)-?(?:chan|san|sama)\b", "mana"),
+    (r"\bitadakimasu\b", "bom apetite"), (r"\bgomen(?:nasai)?\b", "desculpa"), (r"\barigat(?:ou|o)(?:\s+gozaimasu)?\b", "obrigado"),
+    (r"\bsugoi\b", "que demais"), (r"\bkawaii\b", "que fofo"), (r"\bnani\b", "o quê"), (r"\bbaka\b", "bobo"),
+    (r"\bsumimasen\b", "com licença"), (r"\bohayou?\b", "bom dia"), (r"\bkonnichiwa\b", "oi"), (r"\bsenpai\b", ""),
+    (r"\bsensei\b", "professor"))]
+
+
+def limpar_fala(texto: str) -> str:
+    """🗣 tira honorífico/expressão japonesa que a voz lê errado ("Sora-san" → "Sora", "ara ara" → "ai, ai, ai")."""
+    t = str(texto or "")
+    for rx, troca in _JP_EXPR:
+        t = rx.sub(troca, t)
+    t = _JP_SUFIXOS.sub("", t)
+    t = re.sub(r"\s+([,.!?…])", r"\1", re.sub(r"\s{2,}", " ", t)).strip(" ,")
+    t = re.sub(r"^([,.;:]\s*)+", "", t)
+    return t[:1].upper() + t[1:] if t else t
+
+
 def nomes_citados(s: Dict[str, Any], cn: Dict[str, Any]) -> List[str]:
     """👥 os personagens citados pelo NOME no texto do plano (início, ação, ângulo, falas) — entram em 'quem' (sem a ficha
     deles o gerador inventa outra pessoa)."""
@@ -1201,12 +1258,13 @@ def _nova_cena(c: Dict[str, Any], ids_el: set, ids_ce: set) -> Dict[str, Any]:
             quem.append(q)
     falas = []
     for f in (c.get("falas") or [])[:3]:
-        t = " ".join(str(f.get("texto") or "").split())[:300]
+        t = limpar_fala(" ".join(str(f.get("texto") or "").split())[:300])
         if t:
             falas.append({"quem": f.get("quem") if f.get("quem") in ids_el else (quem[0] if quem else ""), "texto": t,
                           "emocao": " ".join(str(f.get("emocao") or "").split())[:40]})
     return {"id": c.get("id") or _id(), "momento": g("momento", 60), "angulo": g("angulo", 120),
-            "continuidade": g("continuidade", 1800), "beats": g("beats", 1200),
+            "objetos": [str(x)[:8] for x in c.get("objetos") or [] if re.fullmatch(r"O\d+", str(x))][:3],
+            "continuidade": g("continuidade", 1800), "beats": g("beats", 1200), "legenda": g("legenda", 600),
             "continua": c.get("continua") is True or str(c.get("continua")).lower() in ("1", "true", "on", "sim"),
             "quem": quem[:MAX_REFS_CENA], "cenario": c.get("cenario") if c.get("cenario") in ids_ce else "",
             "duracao": round(dur, 1), "plano": g("plano", 80), "acao": g("acao", 600), "inicio": g("inicio", 1500),
@@ -1229,7 +1287,7 @@ def modelar(base: str, sid: str, eid: str, notas: Optional[str] = None, chamar: 
             salvar_ep(base, e)
     modo = MODO_VIRAL if e["origem"].get("storyboard") else MODO_IDEIA
     dur = float(e.get("dur_plano") or s["padroes"]["dur_plano"])
-    n_planos = "8 a 14" if dur <= 5.5 else "6 a 10"
+    n_planos = "8 a 14" if dur <= 6.5 else "6 a 10"
     sistema = CENAS_SYS.replace("{MODO}", modo).replace("{DUR}", f"{dur:g}").replace("{N_PLANOS}", n_planos)
     r = _ia(sistema, _conteudo_modelar(s, e, base), CENAS_SCHEMA, chamar, max_tokens=12000, timeout=280, job=eid)
     novos = registrar_novos_personagens(base, sid, eid, r.get("novos_personagens") or [])
@@ -1289,7 +1347,7 @@ CAPITULO_SYS = (
     "• Personalidade, relações e o HISTÓRICO de cada personagem valem sempre: nada de contradizer o que já aconteceu.\n"
     "• {FORMATO}\n"
     "• 'continuidade': o que este capítulo herda dos anteriores (ou 'independente').\n"
-    "• {NOVOS}\n"
+    "• {NOVOS}\n" + REGRA_FALA +
     "Personagens originais; criança sempre em situação inocente e segura; nunca romance/sexual."
 )
 
@@ -1462,6 +1520,14 @@ def prompt_ref_cenario(s: Dict[str, Any], c: Dict[str, Any], com_estilo: bool = 
             f"Establishing view, no characters, no people, no text, no logo.{estilo}")[:3800]
 
 
+def prompt_ref_objeto(s: Dict[str, Any], o: Dict[str, Any], com_estilo: bool = False) -> str:
+    estilo = (" The reference image is ONLY a STYLE reference: match its art style exactly (lineart, flat cel shading, "
+              "palette). Do NOT draw the character from it." if com_estilo else "")
+    return (f"{ESTILOS[s['estilo']]['prompt']}. Prop design reference sheet of ONE object ({o['nome']}): {o['descricao']}. "
+            "Shown alone, centered, front view and a three-quarter view side by side, plain flat light gray background, "
+            f"no people, no hands, no text, no logo.{estilo}")[:3800]
+
+
 def ancora_estilo(base: str, s: Dict[str, Any]) -> Optional[str]:
     """🎨 a imagem que dita o TRAÇO da série (cenários e tudo mais seguem ela): a que você escolheu, senão a 📋 ficha /
     🧍 referência do 1º personagem que tiver."""
@@ -1498,14 +1564,31 @@ def guardar_estilo_ref(base: str, sid: str, origem: Optional[str], de_personagem
         return nome
 
 
+def objetos_do_plano(s: Dict[str, Any], cena: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """🧸 os objetos que se repetem neste plano: os marcados + os citados pelo NOME no texto."""
+    texto = " ".join(str(cena.get(k) or "") for k in ("inicio", "acao", "beats", "continuidade", "movimento", "fim")).lower()
+    out = []
+    for o in s.get("objetos") or []:
+        if o["id"] in (cena.get("objetos") or []) or (len(o["nome"]) >= 3 and o["nome"].lower() in texto):
+            out.append(o)
+    return out
+
+
 def refs_da_cena(base: str, s: Dict[str, Any], cena: Dict[str, Any]) -> List[Tuple[str, str]]:
-    """(rótulo, arquivo) das referências da cena — as personagens primeiro, o cenário se couber (máx. 3)."""
+    """(rótulo, arquivo) das referências do plano: até 2 personagens, o 🧸 objeto que se repete, o cenário — máx. 3
+    (a imagem do plano anterior entra depois, se couber)."""
     out: List[Tuple[str, str]] = []
+    objs = [(f"object: {o['nome']}", caminho_ref(base, s, o)) for o in objetos_do_plano(s, cena)]
+    objs = [x for x in objs if x[1]]
+    vagas_p = MAX_REFS_CENA - (1 if objs else 0)
     for q in cena.get("quem") or []:
         p = item(s, q)
         c = caminho_ref(base, s, p)
-        if p and c and len(out) < MAX_REFS_CENA:
+        if p and c and len(out) < vagas_p:
             out.append((p["nome"], c))
+    for o in objs:
+        if len(out) < MAX_REFS_CENA:
+            out.append(o)
     if cena.get("cenario") and len(out) < MAX_REFS_CENA:
         c = caminho_ref(base, s, item(s, cena["cenario"]))
         if c:
@@ -1520,19 +1603,29 @@ def _proporcao_txt(s: Dict[str, Any]) -> str:
 def prompt_imagem_cena(s: Dict[str, Any], cena: Dict[str, Any], qual: str, refs: List[Tuple[str, str]]) -> str:
     texto = cena["fim"] if qual == "fim" else cena["inicio"]
     pers = [item(s, q) for q in cena.get("quem") or []]
-    desc = " ".join(f"{p['nome']}: {p['aparencia']}." for p in pers if p)
+    desc = " ".join(f"{p['nome']}: {p['aparencia']}." + (f" ALWAYS visible on {p['nome']}: {p['detalhes']}." if p.get("detalhes") else "")
+                    for p in pers if p)
     lugar = item(s, cena["cenario"]) if cena.get("cenario") else None
     ref_txt = ""
     if refs:
         ref_txt = (" The reference image is a numbered sheet: " + ", ".join(f"panel {k} = {r[0]}" for k, r in enumerate(refs, 1))
                    + ". Keep every character EXACTLY as in their panel (same face, hair, eye color, outfit, colors, proportions)"
+                   + (" and every object EXACTLY as in its panel (same shape, color, size)" if any(r[0].startswith("object:") for r in refs) else "")
                    + (" and use the location panel as the setting" if any(r[0] == "location" for r in refs) else "") + ".")
     cam = f"Camera: {cena['angulo']}. " if cena.get("angulo") and qual != "fim" else ""
     cont = f"Continuity (must match the other shots of this moment): {cena['continuidade']} " if cena.get("continuidade") else ""
     so = (f"Only these characters appear: {', '.join(p['nome'] for p in pers if p)} — no other people. " if any(pers) else "")
+    so += " ".join(f"The {o['nome']} looks exactly like this every time: {o['descricao']}." for o in objetos_do_plano(s, cena)) + " "
     return (f"{ESTILOS[s['estilo']]['prompt']}. {_proporcao_txt(s)}, a single anime still frame. {cam}{texto} "
             + (f"Characters: {desc} " if desc else "") + so + (f"Location: {lugar['descricao']}. " if lugar else "") + cont
             + ref_txt + " No text, no speech bubbles, no subtitles, no watermark.")[:3800]
+
+
+def _sempre_visivel(s: Dict[str, Any], cena: Dict[str, Any], pers: List[Optional[Dict[str, Any]]]) -> str:
+    """🎒 os detalhes que o gerador esquece (a alça da bolsa, os óculos) e os 🧸 objetos com a MESMA cara em todo plano."""
+    partes = [f"ALWAYS visible on {p['nome']} for the whole shot: {p['detalhes']}." for p in pers if p and p.get("detalhes")]
+    partes += [f"The {o['nome']} must look exactly the same in every frame: {o['descricao']}." for o in objetos_do_plano(s, cena)]
+    return " ".join(partes)
 
 
 def prompt_video_elementos(s: Dict[str, Any], cena: Dict[str, Any], rotulos: List[str]) -> str:
@@ -1554,7 +1647,7 @@ def prompt_video_elementos(s: Dict[str, Any], cena: Dict[str, Any], rotulos: Lis
     partes = [f"{ESTILOS[s['estilo']]['prompt']}. {_proporcao_txt(s)}.", refs_txt,
               "Characters must look EXACTLY like their character sheets (same face, hair, eyes, outfit, colors, body).",
               ("Characters in the scene: " + ", ".join(p["nome"] for p in pers if p) + ". Only these characters appear — no "
-               "other people, no new characters.") if any(pers) else "",
+               "other people, no new characters.") if any(pers) else "", _sempre_visivel(s, cena, pers),
               (f"Camera: {cena['angulo']}.") if cena.get("angulo") else "",
               f"Scene: {cena.get('inicio') or ''} {cena.get('acao') or ''}".strip(),
               (f"Action, beat by beat: {cena['beats']}") if cena.get("beats") else "", cena.get("movimento") or "",
@@ -1596,7 +1689,7 @@ def prompt_video_cena(s: Dict[str, Any], cena: Dict[str, Any], com_fim: bool) ->
               cena.get("movimento") or "",
               (f"Continuity: {cena['continuidade']}") if cena.get("continuidade") else "",
               ("Only these characters appear: " + ", ".join(p["nome"] for p in pers if p) + " — no other people.") if any(pers) else "",
-              " ".join(vozes)]
+              _sempre_visivel(s, cena, pers), " ".join(vozes)]
     if cena.get("fim"):
         partes.append(f"The shot ends with: {cena['fim']}")
     if falas:
@@ -1655,6 +1748,11 @@ def pedir_refs(base: str, sid: str, ids: List[str], com_foto: bool = False, prep
                 pedido.update(prompt=prompt_ref_com_foto(s, it, len(fotos)), referencia_arquivo=col)
             elif iid.startswith("P"):
                 pedido["prompt"] = prompt_ref_personagem(s, it)
+            elif iid.startswith("O"):  # 🧸 objeto sozinho, fundo liso, no traço da série
+                anc = ancora_estilo(base, s)
+                pedido["prompt"] = prompt_ref_objeto(s, it, bool(anc))
+                if anc:
+                    pedido["referencia_arquivo"] = anc
             else:  # 🏞 cenário: o traço vem da imagem de estilo (o personagem), pra não sair pintura realista
                 anc = ancora_estilo(base, s)
                 pedido["prompt"] = prompt_ref_cenario(s, it, bool(anc))
@@ -1791,7 +1889,7 @@ def pedir_videos(base: str, sid: str, eid: str, indices: Optional[List[int]] = N
                 continue
             ini = _arquivo_ep(pe, cn["img_inicio"])
             a_estado = (cn["img_inicio"] or {}).get("estado")
-            if modo == "frames" and not ini and (a_estado in ESTADOS_ESPERA or a_estado == AGUARDANDO):
+            if modo == "frames" and (a_estado in ESTADOS_ESPERA or a_estado == AGUARDANDO):  # o quadro (novo) ainda não chegou
                 cn["video"] = dict(_slot(), estado=AGUARDANDO, arquivo=v.get("arquivo"),
                                    msg="⛓ esperando o quadro A deste plano — o vídeo vai sozinho quando ele chegar")
                 esperando += 1
@@ -1818,6 +1916,8 @@ def pedir_videos(base: str, sid: str, eid: str, indices: Optional[List[int]] = N
                 salvar_ep(base, e)
                 return {"enviadas": 0, "aguardando": esperando, "erros": erros, "aviso": ""}
             raise ShortsIAErro("; ".join(erros) or "Nenhum vídeo pra gerar (já estão prontos — use 🔁 refazer na cena).")
+        for it2 in itens:  # 🎞 v84_274: o Flow gera na duração do plano (4/6/8/10 s) — sem cortar a ação depois
+            it2["duracao"] = duracao_flow(float(e.get("dur_plano") or s["padroes"]["dur_plano"]))
         novos = _lote().adicionar(itens, proporcao=s["proporcao"], modelo_video=e["edicao"].get("modelo_video") or "")
         for (cn, pr), j in zip(alvo, novos):
             cn["video"] = dict(_slot(), estado="fila", flow_job=j["id"], prompt=pr, msg="⏳ na fila do Flow", arquivo=cn["video"].get("arquivo"))
@@ -1885,7 +1985,7 @@ def tem_cadeia(e: Dict[str, Any]) -> bool:
 def sincronizar_serie(base: str, sid: str) -> bool:
     with TRAVA:
         s = carregar_serie(base, sid)
-        itens = s["elenco"] + s["cenarios"]
+        itens = s["elenco"] + s["cenarios"] + s.get("objetos", [])
         if not _algum_esperando([x.get("ref") for x in itens] + [p.get("ficha") for p in s["elenco"]]):
             return False
         fila, rodando = _foto_da_fila()
@@ -1994,7 +2094,8 @@ def despachar_cadeia(base: str, sid: str, eid: str) -> int:
                 r = pedir_imagens(base, sid, eid, [i])
                 n += r.get("enviadas", 0) + r.get("continuou", 0)
             e2 = carregar_ep(base, sid, eid)
-            if (e2["cenas"][i].get("video") or {}).get("estado") == AGUARDANDO and _arquivo_ep(pasta_ep(base, sid, eid), e2["cenas"][i]["img_inicio"]):
+            if (e2["cenas"][i].get("video") or {}).get("estado") == AGUARDANDO and (e2["cenas"][i].get("img_inicio") or {}).get("estado") == "pronto" \
+                    and _arquivo_ep(pasta_ep(base, sid, eid), e2["cenas"][i]["img_inicio"]):
                 n += pedir_videos(base, sid, eid, [i]).get("enviadas", 0)
         except ShortsIAErro:
             pass
@@ -2287,12 +2388,15 @@ CONFERIR_SYS = (
     "oficiais) e um quadro de cada PLANO. Para cada plano diga se os personagens que deviam aparecer estão IGUAIS às fichas "
     "(rosto, cabelo — corte e cor —, olhos, roupa e cores, idade, proporções) e se não apareceu ninguém a mais. "
     "'ok' = true se está fiel; senão 'problema' curto em português (ex.: 'a Mame está com cabelo comprido e sem chapéu', "
-    "'apareceu uma menina que não é do elenco', 'o traço mudou pra realista'). Pequenas diferenças de ângulo/expressão são ok."
+    "'apareceu uma menina que não é do elenco', 'o traço mudou pra realista', 'sumiu a alça da bolsa do Sora', 'o "
+    "microfone virou um gravador'). Confira também os detalhes 'sempre com' de cada personagem e os OBJETOS descritos. "
+    "Pequenas diferenças de ângulo/expressão são ok."
 )
 
 
 def conferir_personagens(base: str, sid: str, eid: str, chamar: Optional[Callable[..., Any]] = None,
-                         on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
+                         on_log: Callable[[str], None] = lambda _m: None, alvo: str = "video") -> Dict[str, Any]:
+    """alvo "video" (um quadro de cada vídeo) ou "img_inicio" (os quadros A — confere ANTES de gastar crédito de vídeo)."""
     """👁 a IA compara um quadro de cada vídeo com as fichas — aponta o plano em que o personagem saiu diferente."""
     import ia_servico
     s = carregar_serie(base, sid)
@@ -2300,10 +2404,11 @@ def conferir_personagens(base: str, sid: str, eid: str, chamar: Optional[Callabl
     pe = pasta_ep(base, sid, eid)
     tmp = os.path.join(pe, "_conferir")
     os.makedirs(tmp, exist_ok=True)
-    planos = [(k, cn, _arquivo_ep(pe, cn["video"])) for k, cn in enumerate(e["cenas"])]
+    alvo = alvo if alvo in ("video", "img_inicio") else "video"
+    planos = [(k, cn, _arquivo_ep(pe, cn[alvo])) for k, cn in enumerate(e["cenas"])]
     planos = [(k, cn, v) for k, cn, v in planos if v]
     if not planos:
-        raise ShortsIAErro("Nenhum plano tem vídeo ainda.")
+        raise ShortsIAErro("Nenhum plano tem " + ("vídeo" if alvo == "video" else "quadro A") + " ainda.")
     blocos: List[Dict[str, Any]] = []
     usados = []
     for k, cn, v in planos:
@@ -2318,10 +2423,12 @@ def conferir_personagens(base: str, sid: str, eid: str, chamar: Optional[Callabl
             blocos += [{"type": "text", "text": f"FICHA de {p['nome']} ({q}):"}, b]
     on_log(f"👁 tirando um quadro de {len(planos)} plano(s)…")
     for k, cn, v in planos[:16]:
-        q = extrair_quadro(v, max(0.5, _ffprobe_dur(v) * 0.45), os.path.join(tmp, f"p{k:02d}.jpg"), 540)
+        q = extrair_quadro(v, max(0.5, _ffprobe_dur(v) * 0.45), os.path.join(tmp, f"p{k:02d}.jpg"), 540) if alvo == "video" else v
         b = ia_servico.imagem_bloco(q, largura=540) if q else None
         if b:
-            nomes = ", ".join((item(s, x) or {}).get("nome", x) for x in cn.get("quem") or []) or "(ninguém do elenco)"
+            nomes = ", ".join((item(s, x) or {}).get("nome", x) + (f" (sempre com: {(item(s, x) or {}).get('detalhes')})" if (item(s, x) or {}).get("detalhes") else "")
+                              for x in cn.get("quem") or []) or "(ninguém do elenco)"
+            nomes += "".join(f"; objeto {o['nome']}: {o['descricao']}" for o in objetos_do_plano(s, cn))
             blocos += [{"type": "text", "text": f"PLANO {k + 1} — devia ter: {nomes}"}, b]
     on_log("👁 a IA está comparando com as fichas…")
     r = _ia(CONFERIR_SYS, blocos, CONFERIR_SCHEMA, chamar, max_tokens=2500, timeout=150, job=eid)
@@ -2331,13 +2438,35 @@ def conferir_personagens(base: str, sid: str, eid: str, chamar: Optional[Callabl
         e = carregar_ep(base, sid, eid)
         for k, cn in enumerate(e["cenas"]):
             x = res.get(k + 1)
-            if x is not None and (cn.get("video") or {}).get("arquivo"):
-                cn["video"]["conferido"] = {"ok": bool(x.get("ok")), "problema": str(x.get("problema") or "")[:240], "quando": time.time()}
+            if x is not None and (cn.get(alvo) or {}).get("arquivo"):
+                cn[alvo]["conferido"] = {"ok": bool(x.get("ok")), "problema": str(x.get("problema") or "")[:240], "quando": time.time()}
                 if not x.get("ok"):
                     ruins.append(k + 1)
         salvar_ep(base, e)
     shutil.rmtree(tmp, ignore_errors=True)
     return {"ruins": ruins, "conferidos": len(res)}
+
+
+def refazer_marcados(base: str, sid: str, eid: str) -> Dict[str, Any]:
+    """🔁 refaz só o que o 👁 conferir marcou como diferente (o quadro A e, depois, o vídeo; ou só o vídeo)."""
+    e = carregar_ep(base, sid, eid)
+    ruins_a = [k for k, cn in enumerate(e["cenas"]) if ((cn.get("img_inicio") or {}).get("conferido") or {}).get("ok") is False]
+    ruins_v = [k for k, cn in enumerate(e["cenas"]) if ((cn.get("video") or {}).get("conferido") or {}).get("ok") is False and k not in ruins_a]
+    if not ruins_a and not ruins_v:
+        raise ShortsIAErro("Nada marcado — rode 👁 conferir antes.")
+    r = {"quadros": 0, "videos": 0}
+    if ruins_a:
+        r["quadros"] = pedir_imagens(base, sid, eid, ruins_a, refazer=True).get("enviadas", 0)
+        with TRAVA:  # o vídeo desses sai de novo sozinho quando o quadro novo chegar
+            e = carregar_ep(base, sid, eid)
+            for k in ruins_a:
+                cn = e["cenas"][k]
+                cn["video"] = dict(_slot(), estado=AGUARDANDO, arquivo=(cn.get("video") or {}).get("arquivo"),
+                                   msg="⛓ esperando o quadro A novo")
+            salvar_ep(base, e)
+    if ruins_v:
+        r["videos"] = pedir_videos(base, sid, eid, ruins_v, refazer=True).get("enviadas", 0)
+    return r
 
 
 # ------------------------------------------------------------------ edição + export
@@ -2579,14 +2708,44 @@ def palavras_do_roteiro(cenas: List[Dict[str, Any]], inicios: List[float], durac
     (sem fala ouvida: o meio do plano)."""
     import dp_legendas
     blocos = []
+    import difflib
+    norm = lambda w: re.sub(r"[^\w]", "", unicodedata.normalize("NFKD", str(w)).encode("ascii", "ignore").decode().lower())  # noqa: E731
+    out: List[Dict[str, Any]] = []
     for cn, t0, d in zip(cenas, inicios, duracoes):
-        txt = " ".join(f["texto"] for f in cn.get("falas") or [] if f.get("texto"))
+        txt = (cn.get("legenda") or "").strip() or " ".join(f["texto"] for f in cn.get("falas") or [] if f.get("texto"))
         if not txt.strip():
             continue
         dentro = [w for w in ouvidas if t0 - 0.05 <= float(w["start"]) < t0 + d]
-        a, b = (float(dentro[0]["start"]), float(dentro[-1]["end"])) if dentro else (t0 + 0.4, t0 + max(1.0, d - 0.5))
-        blocos.append({"text": txt, "start": a, "end": max(a + 0.6, b)})
-    return dp_legendas.palavras_dos_blocos(blocos)
+        if not dentro:
+            out += dp_legendas.palavras_dos_blocos([{"text": txt, "start": t0 + 0.4, "end": t0 + max(1.0, d - 0.5)}])
+            continue
+        # 🎯 casa cada palavra ESCRITA com a palavra OUVIDA (o tempo dela); as que não casam ficam entre as vizinhas
+        escritas = txt.split()
+        sm = difflib.SequenceMatcher(a=[norm(w) for w in escritas], b=[norm(w["word"]) for w in dentro], autojunk=False)
+        tempo: Dict[int, Tuple[float, float]] = {}
+        for bl in sm.get_matching_blocks():
+            for k in range(bl.size):
+                w = dentro[bl.b + k]
+                tempo[bl.a + k] = (float(w["start"]), float(w["end"]))
+        a0, b0 = float(dentro[0]["start"]), float(dentro[-1]["end"])
+        k = 0
+        while k < len(escritas):
+            if k in tempo:
+                out.append({"word": escritas[k], "start": tempo[k][0], "end": tempo[k][1]})
+                k += 1
+                continue
+            j = k
+            while j < len(escritas) and j not in tempo:
+                j += 1
+            ini = tempo[k - 1][1] if k - 1 in tempo else a0
+            fim = tempo[j][0] if j in tempo else b0
+            if fim - ini < 0.15 * (j - k):
+                fim = ini + 0.25 * (j - k)
+            passo = (fim - ini) / (j - k)
+            for n in range(k, j):
+                out.append({"word": escritas[n], "start": round(ini + (n - k) * passo, 3), "end": round(ini + (n - k + 1) * passo, 3)})
+            k = j
+    return out
 
 
 def _palavras_das_falas(cenas: List[Dict[str, Any]], inicios: List[float], duracoes: List[float]) -> List[Dict[str, Any]]:

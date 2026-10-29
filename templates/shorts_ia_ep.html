@@ -55,7 +55,9 @@
     <button id="bImgs" class="si-sec">🖼 gerar os quadros (todas)</button>
     <button id="bVids">🎬 gerar os vídeos</button>
     <button id="bFlow" class="si-mini si-sec">⚡ religar o Flow em massa</button>
-    <button id="bConferir" class="si-mini">👁 conferir personagens</button>
+    <button id="bConferirQ" class="si-mini" title="antes de gastar crédito de vídeo: a IA confere os quadros A com as fichas">👁 conferir quadros</button>
+    <button id="bConferir" class="si-mini">👁 conferir vídeos</button>
+    <button id="bRefazerM" class="si-mini" title="refaz só o que o conferir marcou com ⚠">🔁 refazer os marcados</button>
     <button id="bRecuperar" class="si-mini si-sec" title="planos ou vídeos sumiram? volta a versão com mais imagens/vídeos (atual, anterior ou um dos backups) e junta os vídeos gerados que ficaram fora">🩹 recuperar planos/vídeos</button>
     <button id="bAddC" class="si-mini si-sec">➕ cena</button>
     <a class="si-mini" href="/shorts-ia/s/{{ s.id }}/ep/{{ e.id }}/cenas.zip">⬇ baixar todas as cenas</a>
@@ -91,6 +93,15 @@
     <label class="si-mini si-sec" style="cursor:pointer">🎵 música de fundo<input type="file" accept="audio/*" id="fMusica" hidden></label>
     <button id="bTirarMus" class="si-mini si-sec">sem música</button>
     <label>volume <input id="eMusVol" type="number" step="0.02" min="0" max="0.6" style="width:70px"></label>
+  </div>
+  <div class="si-linha" style="border:1px dashed var(--borda);border-radius:8px;padding:6px 8px">
+    <b>🏷 marca</b>
+    <label><input type="checkbox" id="mkAtiva" {% if s.marca.ativa %}checked{% endif %}> mostrar</label>
+    <input id="mkTexto" value="{{ s.marca.texto }}" style="width:160px">
+    <select id="mkPos" style="width:auto">{% for k, v in [('sup_dir','canto de cima, direita'),('sup_esq','canto de cima, esquerda'),('inf_dir','canto de baixo, direita'),('inf_esq','canto de baixo, esquerda'),('topo','topo'),('meio','meio'),('terco','terço de baixo'),('base','embaixo')] %}<option value="{{ k }}" {% if s.marca.posicao == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    <label>tamanho <input id="mkTam" type="number" step="0.005" min="0.012" max="0.12" value="{{ s.marca.tamanho }}" style="width:70px"></label>
+    <label>opacidade <input id="mkOpac" type="number" step="0.05" min="0.05" max="1" value="{{ s.marca.opacidade }}" style="width:70px"></label>
+    <button id="bMarca" class="si-mini">💾 marca</button>
   </div>
   <div class="si-linha"><button id="bExportar">📤 exportar</button><button id="bParar" class="si-mini si-perigo" hidden>⏹ parar</button><span class="si-dica" style="margin:0">a 🏷 marca ({{ s.marca.texto }}) e o formato {{ s.proporcao }} vêm da série</span></div>
   <div id="xFinal"></div>
@@ -162,14 +173,16 @@ function campoCena(cn, k) {
       <label>ângulo (EN) <input data-c="angulo" value="${esc(cn.angulo)}" placeholder="close-up on Mame" style="width:230px"></label>
       <label title="a mesma câmera continuando o plano anterior: o vídeo começa do último quadro dele"><input type="checkbox" data-c="continua" ${cn.continua ? 'checked' : ''}> ⛓ continua o anterior</label></div>
     <label>🧭 continuidade do momento (EN — lugar, luz, posições, roupas, objetos; igual em todos os planos do momento) <textarea data-c="continuidade" rows="3">${esc(cn.continuidade)}</textarea></label>
-    <label>⏱ ação em tempos (EN — 0-2s…, 2-5s…, 5-8s…) <textarea data-c="beats" rows="2">${esc(cn.beats)}</textarea></label>
+    <label>⏱ ação em tempos (EN — 0-2s…, 2-4s…, 4-6s…) <textarea data-c="beats" rows="2">${esc(cn.beats)}</textarea></label>
+    ${(S.objetos || []).length ? `<div class="si-quem">🧸 ${(S.objetos || []).map(o => `<label><input type="checkbox" data-c="objetos" value="${o.id}" ${(cn.objetos || []).includes(o.id) ? 'checked' : ''}> ${esc(o.nome)}</label>`).join('')}</div>` : ''}
     <div class="si-quem">👥 ${quem} <span class="si-dica">(até 3)</span></div>
     <div class="si-linha"><label>cenário <select data-c="cenario">${cen}</select></label>
       <label>duração (s) <input data-c="duracao" type="number" step="0.5" min="2" max="8" value="${cn.duracao}" style="width:70px"></label>
       <label>plano <input data-c="plano" value="${esc(cn.plano)}" style="width:140px"></label>
       <label>usar do vídeo: de <input data-c="corte_ini" type="number" step="0.1" min="0" value="${c.ini || 0}" style="width:60px"> até <input data-c="corte_fim" type="number" step="0.1" min="0" value="${c.fim == null ? '' : c.fim}" placeholder="auto" style="width:60px"> s</label></div>
     <label>o que acontece <textarea data-c="acao" rows="2">${esc(cn.acao)}</textarea></label>
-    <label>💬 falas</label>${falas}<button class="si-mini si-sec" data-addfala="${k}">➕ fala</button>
+    <label>💬 falas <span class="si-dica">(escreva como se fala; sem -san/-chan/“ara ara”)</span></label>${falas}<button class="si-mini si-sec" data-addfala="${k}">➕ fala</button>
+    <label>📝 legenda deste plano (só se o vídeo falou diferente do roteiro) <input data-c="legenda" value="${esc(cn.legenda)}" placeholder="vazio = o texto das falas"></label>
     <label>🖼 quadro A — a primeira imagem (EN) <textarea data-c="inicio" rows="3">${esc(cn.inicio)}</textarea></label>
     <label>🏁 como a cena termina (EN, opcional — vai no texto do vídeo) <textarea data-c="fim" rows="2" placeholder="ex.: Ken ends lying flat on the floor">${esc(cn.fim)}</textarea></label>
     <label>🎬 movimento / câmera (EN) <textarea data-c="movimento" rows="2">${esc(cn.movimento)}</textarea></label>`;
@@ -191,6 +204,8 @@ function lerCenas() {
     cn.quem = [...div.querySelectorAll('[data-c="quem"]:checked')].map(x => x.value).slice(0, 3);
     for (const c of ['momento', 'angulo', 'continuidade', 'beats', 'cenario', 'duracao', 'plano', 'acao', 'inicio', 'fim', 'movimento']) cn[c] = div.querySelector(`[data-c="${c}"]`).value;
     cn.continua = div.querySelector('[data-c="continua"]').checked;
+    cn.objetos = [...div.querySelectorAll('[data-c="objetos"]:checked')].map(x => x.value);
+    const lg = div.querySelector('[data-c="legenda"]'); if (lg) cn.legenda = lg.value;
     cn.duracao = parseFloat(cn.duracao) || 6;
     const ci = div.querySelector('[data-c="corte_ini"]').value, cf = div.querySelector('[data-c="corte_fim"]').value;
     cn.corte = { ini: parseFloat(ci) || 0, fim: cf === '' ? null : parseFloat(cf) };
@@ -289,6 +304,12 @@ $('bRecuperar').onclick = async () => {
 };
 $('bPreset').onclick = async () => { try { E.edicao = (await api(BASE + '/preset-anime', {})).edicao; edicao(); barra('🎌 edição de anime ligada — 📤 exporte de novo', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bConferir').onclick = async () => { try { await api(BASE + '/conferir', {}); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bConferirQ').onclick = async () => { try { await api(BASE + '/conferir', { alvo: 'quadros' }); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bRefazerM').onclick = async () => { try { const r = await api(BASE + '/refazer-marcados', {}); barra(`🔁 ${r.quadros} quadro(s) e ${r.videos} vídeo(s) de novo (o vídeo de quem ganhou quadro novo vai sozinho)`, 'on'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bMarca').onclick = async () => {
+  try { const r = await api('/shorts-ia/s/' + S.id + '/marca', { texto: $('mkTexto').value, ativa: $('mkAtiva').checked, posicao: $('mkPos').value, opacidade: $('mkOpac').value, tamanho: $('mkTam').value });
+    S.marca = r.marca; barra('🏷 marca salva (vale no próximo 📤 exportar)', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); }
+};
 $('bParar').onclick = async () => { if (!confirm('Parar o que está rodando neste episódio?')) return; try { await api('/shorts-ia/tarefa/parar', { chave: 'ep:' + E.id }); barra('⏹ parado', 'okk'); recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 
 async function recarregar() {

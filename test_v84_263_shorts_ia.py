@@ -142,7 +142,7 @@ def test_ideia_vira_episodio_e_cenas(base):
     ia = _ia(CENAS)
     e = SI.modelar(base, s["id"], e["id"], "mais curto", chamar=ia)
     assert "EPISÓDIO A PARTIR DE UMA IDEIA" in ia.vistos[0][0] and "mais curto" in ia.vistos[0][1]
-    assert len(e["cenas"]) == 2 and e["cenas"][1]["duracao"] == 8.0  # nunca passa de 8 s (um vídeo do Flow)
+    assert len(e["cenas"]) == 2 and e["cenas"][1]["duracao"] == 10.0  # nunca passa de 10 s (o máximo do Flow)
     assert e["titulos"][0]["post"] == "She thought it was a portal"
     c = json.loads(json.dumps(e["cenas"]))
     c[0]["falas"][0]["texto"] = "What dark magic is this?"
@@ -337,7 +337,7 @@ def _img(caminho, cor=(200, 60, 60)):
 
 def test_universo_com_imagens_e_personagem_da_imagem(base, tmp_path):
     s = SI.nova_serie(base, "", "vila no interior", estilo="anime_cotidiano")
-    assert s["estilo"] == "anime_cotidiano" and s["padroes"]["dur_plano"] == 8.0
+    assert s["estilo"] == "anime_cotidiano" and s["padroes"]["dur_plano"] == 6.0
     u = json.loads(json.dumps(UNIVERSO))
     u["elenco"][0]["imagem"] = 2
     u["elenco"][1]["imagem"] = 0
@@ -385,7 +385,7 @@ def test_capitulo_premissa_novos_personagens_e_memoria(base, lote):
     ia2 = _ia(cenas)
     e = SI.modelar(base, sid, e["id"], chamar=ia2)
     sis2, txt2 = ia2.vistos[0]
-    assert "≈ 4 s" in sis2 and "8 a 14" in sis2 and "MOMENTOS E ÂNGULOS" in sis2 and "PREMISSA DESTE CAPÍTULO: O ovo" in txt2
+    assert "= 4 s" in sis2 and "8 a 14" in sis2 and "MOMENTOS E ÂNGULOS" in sis2 and "PREMISSA DESTE CAPÍTULO: O ovo" in txt2
     s = SI.carregar_serie(base, sid)
     pato = next(p for p in s["elenco"] if p["nome"] == "Patinho")
     assert e["cenas"][0]["quem"] == ["P1", pato["id"]] and e["cenas"][0]["falas"][0]["quem"] == pato["id"]
@@ -537,7 +537,7 @@ def test_cara_de_anime_corte_e_legenda_do_roteiro(base, monkeypatch, tmp_path):
     assert cenas[0]["quem"] == ["P1", "P2"]  # o Ken citado no texto entrou (sem a ficha dele o gerador inventa outro)
     ouvidas = [{"word": "Soraçã,", "start": 1.2, "end": 1.6}, {"word": "olha!", "start": 1.7, "end": 2.0}]
     ps = SI.palavras_do_roteiro(cenas, [0.0], [3.0], ouvidas)
-    assert [p["word"] for p in ps] == ["Sora-chan,", "olha!"] and ps[0]["start"] == 1.2 and abs(ps[-1]["end"] - 2.0) < 0.01
+    assert [p["word"] for p in ps] == ["Sora,", "olha!"] and ps[0]["start"] == 1.2 and abs(ps[-1]["end"] - 2.0) < 0.01
     pv = SI.prompt_video_elementos(SI.carregar_serie(base, s["id"]), cenas[0], ["the character sheet of Ignis"])
     assert "no other people" in pv
     e = SI.salvar_cenas(base, s["id"], e["id"], cenas)
@@ -641,3 +641,65 @@ def test_continuidade_em_sequencia(base, lote, tmp_path):
     assert all(c["video"]["estado"] == "pronto" for c in e["cenas"])
     assert "continues seamlessly from the previous shot" in [j for j in lote.fila if j["tipo"] == "video"][-1]["prompt"] or \
         any("continues seamlessly" in j["prompt"] for j in lote.fila)
+
+
+def test_v84_274_fala_legenda_objetos_6s(base, lote, tmp_path, monkeypatch):
+    """v84_274: falas sem honorífico, legenda casada palavra a palavra, 🧸 objeto com referência, detalhes fixos, vídeo de 6 s."""
+    assert SI.limpar_fala("Shhh, Sora-san, tem que escutar!") == "Shhh, Sora, tem que escutar!"
+    assert SI.limpar_fala("Ara ara, minha neta de novo...") == "Ai, ai, ai, minha neta de novo..."
+    assert SI.limpar_fala("Obaa-chan!") == "Vó!"
+    assert "honoríficos" in SI.CENAS_SYS and "honoríficos" in SI.CAPITULO_SYS
+    cn = SI._nova_cena({"falas": [{"quem": "P1", "texto": "Desculpa, Sora-san, ela não te incomodou?"}]}, {"P1"}, set())
+    assert cn["falas"][0]["texto"] == "Desculpa, Sora, ela não te incomodou?"
+    # legenda: o texto escrito com o tempo de cada palavra ouvida (o Whisper ouviu "Soraçã" e pulou uma)
+    ouvidas = [{"word": w, "start": t, "end": t + 0.3} for w, t in (("Desculpa,", 1.0), ("Soraçã,", 1.4), ("ela", 1.8), ("te", 2.4), ("incomodou?", 2.8))]
+    ps = SI.palavras_do_roteiro([cn], [0.0], [6.0], ouvidas)
+    assert [p["word"] for p in ps] == ["Desculpa,", "Sora,", "ela", "não", "te", "incomodou?"]
+    assert ps[0]["start"] == 1.0 and ps[2]["start"] == 1.8 and 2.1 <= ps[3]["start"] < 2.4 and ps[4]["start"] == 2.4
+    cn["legenda"] = "Foi mal, Sora."
+    assert [p["word"] for p in SI.palavras_do_roteiro([cn], [0.0], [6.0], ouvidas)] == ["Foi", "mal,", "Sora."]
+    # 🧸 objeto + detalhes fixos
+    s = SI.gerar_universo(base, SI.nova_serie(base)["id"], "x", chamar=_ia(UNIVERSO))
+    sid = s["id"]
+    SI.salvar_personagem(base, sid, {"id": "P2", "detalhes": "brown crossbody bag strap across the chest"})
+    o = SI.salvar_cenario(base, sid, {"nome": "Bicho", "descricao": "fluffy gray furry windscreen microphone on a short black handle"}, "objetos")
+    assert o["id"] == "O1"
+    SI.pedir_refs(base, sid, ["O1"])
+    assert "Prop design reference sheet" in lote.fila[-1]["prompt"]
+    for pid in ("P1", "P2", "O1"):
+        SI.guardar_ref(base, sid, pid, _img(str(tmp_path / f"{pid}.png")))
+    e = SI.novo_ep(base, sid, "t")
+    e = SI.salvar_cenas(base, sid, e["id"], [SI._nova_cena({"quem": ["P1", "P2"], "inicio": "Ignis hugs the Bicho, Ken watches",
+                                                              "falas": [{"quem": "P1", "texto": "É meu!"}]}, {"P1", "P2"}, set())])
+    SI.atualizar_serie(base, sid, {})
+    with SI.TRAVA:
+        e = SI.carregar_ep(base, sid, e["id"])
+        e["dur_plano"] = 6
+        SI.salvar_ep(base, e)
+    s = SI.carregar_serie(base, sid)
+    refs = SI.refs_da_cena(base, s, e["cenas"][0])
+    assert [r[0] for r in refs] == ["Ignis", "Ken", "object: Bicho"]  # o objeto citado pelo nome entrou
+    SI.pedir_imagens(base, sid, e["id"])
+    pi = lote.fila[-1]["prompt"]
+    assert "ALWAYS visible on Ken: brown crossbody bag strap" in pi and "every object EXACTLY" in pi and "The Bicho looks exactly" in pi
+    lote.terminar(lote.galeria)
+    SI.sincronizar_ep(base, sid, e["id"])  # quadro chegou → vídeo... só se pedido: peça
+    SI.pedir_videos(base, sid, e["id"])
+    v = lote.fila[-1]
+    assert v["tipo"] == "video" and v.get("duracao") == "6s" and "ALWAYS visible on Ken" in v["prompt"]
+    assert SI.duracao_flow(7) == "8s" and SI.duracao_flow(4) == "4s"
+
+
+def test_flow_lote_resolucao_e_duracao(tmp_path, monkeypatch):
+    import flow_lote
+    monkeypatch.setattr(flow_lote, "pasta", lambda: str(tmp_path))
+    lt = flow_lote.Lote()
+    assert lt.cfg["video_resolucao"] == "360p"  # v84_275: padrão 360p; 720p quando escolher
+    j = lt.adicionar([{"prompt": "x", "tipo": "video", "duracao": "6s"}, {"prompt": "y", "tipo": "video", "duracao": "7s"}])
+    assert j[0]["duracao"] == "6s" and "duracao" not in j[1]
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "toolkit"))
+    from googleflow import flow_direto as fd
+    assert fd.GRUPO["duracao"] == "Duração do vídeo" and fd.GRUPO["resolucao"] == "Resolução do vídeo"
+    import inspect
+    assert "resolucao = resolucao or \"360p\"" in inspect.getsource(fd.configurar_caixa)

@@ -298,6 +298,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _serie(sid)
         return _tentar(lambda: {"item": SI.salvar_cenario(base_dir, sid, _corpo())})
 
+    @app.route("/shorts-ia/s/<sid>/objeto", methods=["POST"])
+    def shorts_ia_objeto(sid: str):
+        """🧸 objeto que se repete (o microfone, a bicicleta…) — com imagem de referência própria."""
+        _serie(sid)
+        return _tentar(lambda: {"item": SI.salvar_cenario(base_dir, sid, _corpo(), "objetos")})
+
     @app.route("/shorts-ia/s/<sid>/item/<iid>/apagar", methods=["POST"])
     def shorts_ia_item_apagar(sid: str, iid: str):
         _serie(sid)
@@ -535,14 +541,26 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
     @app.route("/shorts-ia/s/<sid>/ep/<eid>/conferir", methods=["POST"])
     def shorts_ia_ep_conferir(sid: str, eid: str):
-        """👁 a IA compara um quadro de cada vídeo com as fichas (personagem diferente? alguém a mais?)."""
+        """👁 a IA compara um quadro de cada vídeo (ou os quadros A) com as fichas (personagem diferente? alguém a mais?)."""
         _ep(sid, eid)
+        alvo = "img_inicio" if _corpo().get("alvo") == "quadros" else "video"
 
         def fazer(prog):
-            r = SI.conferir_personagens(base_dir, sid, eid, CB.get("chamar"), prog)
+            r = SI.conferir_personagens(base_dir, sid, eid, CB.get("chamar"), prog, alvo)
             return (f"👁 {r['conferidos']} plano(s) conferidos — ⚠ diferente em: {', '.join(map(str, r['ruins']))} (🔁 refaça esses)"
                     if r["ruins"] else f"👁 {r['conferidos']} plano(s) conferidos — todos fiéis às fichas")
         return _rodar("ep:" + eid, "👁 conferindo os personagens", fazer)
+
+    @app.route("/shorts-ia/s/<sid>/ep/<eid>/refazer-marcados", methods=["POST"])
+    def shorts_ia_ep_refazer_marcados(sid: str, eid: str):
+        _ep(sid, eid)
+        return _tentar(lambda: SI.refazer_marcados(base_dir, sid, eid))
+
+    @app.route("/shorts-ia/s/<sid>/marca", methods=["POST"])
+    def shorts_ia_marca(sid: str):
+        """🏷 muda a marca (@ do canal) da série — vale pra todos os episódios no próximo exportar."""
+        _serie(sid)
+        return _tentar(lambda: {"marca": SI.atualizar_serie(base_dir, sid, {"marca": _corpo()})["marca"]})
 
     @app.route("/shorts-ia/s/<sid>/ep/<eid>/preset-anime", methods=["POST"])
     def shorts_ia_ep_preset(sid: str, eid: str):

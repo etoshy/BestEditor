@@ -100,6 +100,10 @@
     {
      "fato": "Descobriu, ouvindo o microfone no pomar, que a vila tem sons ricos (cigarras, mar, vento nos mikan) e começou a se encantar com Hinoura.",
      "ep": "1993884d"
+    },
+    {
+     "fato": "Passou a ouvir a vila com atenção depois de gravar as cigarras e o vento no pomar com o microfone que Mame roubou.",
+     "ep": "1f060e8b"
     }
    ],
    "estreia": null,
@@ -194,6 +198,10 @@
     {
      "fato": "Chama o microfone de 'Bicho' e acredita que ele precisa de comida; decidiu que Sora é seu vizinho e passou a aparecer todo dia pelo buraco da cerca.",
      "ep": "1993884d"
+    },
+    {
+     "fato": "Confirmou que o microfone 'Bicho' precisa de comida e que Sora é seu vizinho oficial, aparecendo pelo buraco da cerca todo dia.",
+     "ep": "1f060e8b"
     }
    ],
    "estreia": null,
@@ -288,6 +296,10 @@
     {
      "fato": "Recebeu a neta de volta, puxou sua orelha e levou arroz e conservas para pedir desculpas a Sora.",
      "ep": "1993884d"
+    },
+    {
+     "fato": "Entregou arroz e conservas a Sora como pedido de desculpas e puxou a orelha da neta.",
+     "ep": "1f060e8b"
     }
    ],
    "estreia": null,
@@ -356,6 +368,7 @@
  ],
  "ideias": [],
  "eps": [
+  "1f060e8b",
   "1993884d"
  ],
  "marca": {
@@ -378,5 +391,5 @@
   "auto_preparar": false
  },
  "formato_serie": "episodica",
- "atualizado": 1793227453.9138298
+ "atualizado": 1793262105.4877095
 }
