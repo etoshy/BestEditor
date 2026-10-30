@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}🔗 Link → vídeo pronto{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .lk-form label { display: flex; flex-direction: column; gap: 3px; font-weight: 600; font-size: .86rem; margin: 8px 0 0; }
+  .lk-form textarea, .lk-form input:not([type=checkbox]) { width: 100%; box-sizing: border-box; }
+  .lk-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0 10px; }
+  .lk-link { font-size: 1.05rem !important; padding: 12px !important; }
+  .lk-modos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .lk-modos label { flex-direction: row !important; align-items: center; gap: 6px !important; border: 1px solid var(--borda); border-radius: 10px;
+                    padding: 8px 12px; cursor: pointer; font-weight: 500 !important; margin: 0 !important; }
+  .lk-modos label:has(input:checked) { border-color: var(--acento); background: var(--acento-suave); }
+  .lk-modos input { width: auto !important; margin: 0; }
+  .lk-v { border: 1px solid var(--borda); border-radius: 12px; padding: 12px; margin-top: 10px; background: var(--card); }
+  .lk-v.ok { border-color: var(--ok); } .lk-v.err { border-color: var(--erro); }
+  .lk-cab { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lk-cab b { font-size: .95rem; }
+  .lk-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; margin: 6px 0; }
+  .lk-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: lkg 1s linear infinite; flex: 0 0 auto; }
+  @keyframes lkg { to { transform: rotate(360deg); } }
+  .lk-corpo { display: grid; grid-template-columns: 240px 1fr; gap: 12px; margin-top: 8px; }
+  @media (max-width: 800px) { .lk-corpo { grid-template-columns: 1fr; } }
+  .lk-corpo video { width: 100%; max-height: 420px; border-radius: 10px; background: #000; }
+  .lk-rot { font-size: .9rem; line-height: 1.45; background: var(--code-bg); border-radius: 8px; padding: 8px 10px; }
+  .lk-tit { display: flex; gap: 6px; align-items: flex-start; font-size: .88rem; padding: 3px 0; }
+  .lk-tit small { color: var(--mudo); }
+</style>
+<h1>🔗 Link → vídeo pronto <span class="si-dica" style="font-weight:400">cole o link e espere: baixa, lê os comentários, roteiro, narração, edição e o MP4 pronto</span></h1>
+<div id="barra" class="si-barra"></div>
+<div class="si-passos"><span>⬇ baixa o vídeo</span><span>💬 lê a legenda e os comentários</span><span>👁 a IA entende o vídeo</span><span>📝 roteiro + títulos</span><span>🎙 narração com tags</span><span>✂ edição + 🎯 destaques</span><span>🎬 MP4</span></div>
+
+<div class="si-card lk-form">
+  <label>🔗 Link do vídeo <span class="si-dica" style="font-weight:400">— TikTok, YouTube Shorts, Reels, Kwai… (vários? um por linha: faz um depois do outro)</span>
+    <textarea id="link" class="lk-link" rows="1" placeholder="https://www.tiktok.com/@…/video/…"></textarea></label>
+  <label>Como narrar</label>
+  <div class="lk-modos">{% for k, v in modos.items() %}<label><input type="radio" name="modo" value="{{ k }}"{% if k == 'auto' %} checked{% endif %}> {{ v }}</label>{% endfor %}</div>
+  <div class="lk-ops">
+    <label>Postar em<select id="lingua_post">{% for k, v in linguas.items() %}<option value="{{ k }}"{% if k == 'en' %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Narrar em<select id="idioma"><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
+    <label>Voz<select id="voz"></select></label>
+    <label>Duração<select id="duracao"><option value="0">🤖 o que o clipe pede</option><option value="15">~15 s</option><option value="20">~20 s</option><option value="30">~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select></label>
+    <label>Formato<select id="proporcao">{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>Qualidade<select id="qualidade">{% for r in resolucoes %}<option value="{{ r }}"{% if r == '1080p' %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+  </div>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="exportar" checked style="width:auto;margin:0"> 🎬 exportar o MP4 no fim (desmarcado: para no editor pra você conferir)</label>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ opcional: comentários à mão e pedido extra</summary>
+    <label>💬 Comentários <span class="si-dica" style="font-weight:400">— o site tenta ler sozinho; se o TikTok não deixar, cole os principais aqui (um por linha, as curtidas no fim: “why did he stop?? 12K”)</span>
+      <textarea id="comentarios" rows="4"></textarea></label>
+    <label>Pedido extra<textarea id="extra" rows="2" placeholder="ex.: mais engraçado, falar como narrador de futebol, não citar o nome…"></textarea></label>
+  </details>
+  <div class="si-linha" style="margin-top:12px"><button id="bgo" class="si-ok" onclick="lkGo()">🚀 fazer o vídeo</button>
+    {% if not ia %}<span class="si-dica">⚠ a IA está desligada pros curtos (Configurações) — sem ela não dá pra fazer sozinho.</span>{% endif %}
+    {% if not tem_tts %}<span class="si-dica">⚠ o gerador de voz não está disponível.</span>{% endif %}</div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🎞 Vídeos</h2>
+  <div id="lista"><p class="si-dica">Nenhum ainda.</p></div>
+</div>
+
+<script>
+(() => {
+const VOZES_EN = {{ vozes_en|tojson }}, VOZES = {{ vozes|tojson }}, MODOS = {{ modos|tojson }};
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3500); }
+async function post(url, corpo) { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'})); if (!j.ok) throw new Error(j.erro || 'erro'); return j; }
+async function copiar(t) { try { await navigator.clipboard.writeText(t); aviso('📋 copiado', 'okk'); } catch (e) { prompt('Copie:', t); } }
+function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post').value === 'en', vs = turbo ? VOZES_EN : VOZES, s = el('voz'), atual = s.value;
+  s.innerHTML = vs.length ? vs.map(v => `<option value="${esc(v.slug)}">${esc(v.grupo)} · ${esc(v.nome)}</option>`).join('') : '<option value="">(nenhuma voz cadastrada)</option>';
+  if ([...s.options].some(o => o.value === atual)) s.value = atual; }
+['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
+const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
+try { const sv = JSON.parse(localStorage.getItem('lk_op') || '{}'); ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'].forEach(k => { if (sv[k]) el(k).value = sv[k]; });
+  vozes(); if (sv.voz) el('voz').value = sv.voz; if (sv.modo) { const r = document.querySelector(`input[name=modo][value="${sv.modo}"]`); if (r) r.checked = true; }
+  if (sv.exportar === false) el('exportar').checked = false; } catch (e) { vozes(); }
+window.lkGo = async () => {
+  const d = {link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked,
+    comentarios: el('comentarios').value, extra: el('extra').value};
+  SALVAR.forEach(k => d[k] = el(k).value);
+  try { localStorage.setItem('lk_op', JSON.stringify(Object.assign({}, d, {link: '', comentarios: '', extra: ''}))); } catch (e) {}
+  if (!d.link) { aviso('Cole o link do vídeo.', 'erro'); return; }
+  el('bgo').disabled = true;
+  try { const j = await post('/curtos/link/novo', d); el('link').value = ''; el('comentarios').value = ''; desenhar(j.videos);
+    aviso(`🚀 começou${j.criados.length > 1 ? ` (${j.criados.length} vídeos, um depois do outro)` : ''} — pode sair da página, ele continua`, 'okk'); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  el('bgo').disabled = false; atualizar();
+};
+let timer = null;
+function desenhar(vs) {
+  const L = el('lista');
+  if (!vs.length) { L.innerHTML = '<p class="si-dica">Nenhum ainda.</p>'; return false; }
+  const abertos = new Set([...document.querySelectorAll('.lk-v details[open]')].map(d => d.dataset.k));
+  L.innerHTML = vs.map(v => { const cls = v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : '');
+    const modo = v.modo_usado ? MODOS[v.modo_usado] : MODOS[v.modo];
+    return `<div class="lk-v ${cls}">
+      <div class="lk-cab"><b>${esc(v.titulo)}</b><span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
+        ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
+        <a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a></div>
+      ${v.rodando ? `<div class="lk-prog"><div class="lk-gira"></div><span><b>${esc(v.etapa)}</b> — ${esc(v.prog)}</span></div>` : ''}
+      ${!v.rodando && v.erro ? `<div class="lk-prog" style="color:var(--erro)">❌ ${esc(v.erro)} <button class="si-mini" data-refazer="${v.id}">🔁 tentar de novo</button></div>` : ''}
+      ${!v.rodando && !v.erro && !v.pronto && v.etapa ? `<div class="lk-prog">${esc(v.etapa)}</div>` : ''}
+      ${v.comentarios_erro && !v.n_comentarios ? `<div class="si-dica">💬 não deu pra ler os comentários (${esc(v.comentarios_erro)}) — o roteiro saiu só do vídeo.</div>` : ''}
+      ${(v.roteiro || v.pronto) ? `<div class="lk-corpo">
+        <div>${v.pronto ? `<video src="/curtos/${v.id}/video.mp4?baixar=0" controls preload="metadata"></video>` : '<div class="si-vazio">🎬 o vídeo aparece aqui quando exportar</div>'}
+          <div class="si-linha">${v.pronto ? `<a href="/curtos/${v.id}/video.mp4"><button class="si-ok si-mini">⬇️ baixar MP4</button></a>` : ''}
+            ${v.editor ? `<a href="/job/${v.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
+            <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a></div></div>
+        <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div><div class="si-linha"><button class="si-mini si-sec" data-copiar="${esc(v.roteiro)}">📋 roteiro</button></div>` : ''}
+          ${v.titulos.length ? `<details data-k="t${v.id}"${abertos.has('t' + v.id) || v.pronto ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🏷 Títulos</summary>
+            ${v.titulos.map(t => `<div class="lk-tit"><button class="si-mini si-sec" data-copiar="${esc(t.en)}">📋</button><div>${esc(t.en)}${t.pt && t.pt !== t.en ? `<br><small>🇧🇷 ${esc(t.pt)}</small>` : ''}</div></div>`).join('')}</details>` : ''}
+          ${v.descricao ? `<details data-k="d${v.id}"${abertos.has('d' + v.id) ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">📝 Descrição + hashtags</summary>
+            <div style="font-size:.88rem;white-space:pre-wrap">${esc(v.descricao)}\n${esc(v.hashtags.join(' '))}</div>
+            <button class="si-mini si-sec" data-copiar="${esc(v.descricao + '\n\n' + v.hashtags.join(' '))}">📋 copiar</button></details>` : ''}</div></div>` : ''}</div>`; }).join('');
+  L.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
+  L.querySelectorAll('[data-refazer]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/link/${b.dataset.refazer}/refazer`)).videos); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  return vs.some(v => v.rodando);
+}
+let tinha = new Set();
+async function atualizar() {
+  try { const j = await (await fetch('/curtos/link/estado')).json(); const rod = desenhar(j.videos || []);
+    (j.videos || []).forEach(v => { if (tinha.has(v.id) && !v.rodando && v.pronto) aviso(`✅ pronto: ${v.titulo}`, 'okk'); });
+    tinha = new Set((j.videos || []).filter(v => v.rodando).map(v => v.id));
+    clearTimeout(timer); timer = setTimeout(atualizar, rod ? 2000 : 15000); }
+  catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 10000); }
+}
+atualizar();
+})();
+</script>
+{% endblock %}

@@ -517,6 +517,13 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
               "come from the clip timeline above, not from here.", ref[:6000], ""]
     if (p.get("noticia") or {}).get("texto"):
         L += ["## NOTES FROM THE CREATOR", p["noticia"]["texto"][:4000], ""]
+    if c.get("info_link") or c.get("modo_link"):  # 🔗 v84_286: a legenda do post original e o que o público comenta
+        import curtos_link as CL
+        bloco = CL.texto_para_ia(c.get("info_link") or {})
+        if bloco:
+            L += [bloco, ""]
+        if c.get("modo_link"):
+            L += ["## " + CL.regra_modo(c["modo_link"]), ""]
     if (p.get("config") or {}).get("extra"):
         L += ["## EXTRA REQUEST", p["config"]["extra"], ""]
     estilo = CT.texto_do_perfil(perfil)

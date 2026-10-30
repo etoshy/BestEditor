@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}🔗 Juntar vídeos{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .jv-solta { border: 2px dashed var(--borda); border-radius: 12px; padding: 22px; text-align: center; color: var(--mudo); cursor: pointer; transition: .15s; }
+  .jv-solta.on { border-color: var(--acento); background: var(--acento-suave); color: inherit; }
+  .jv-lista { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  .jv-item { display: grid; grid-template-columns: 34px 160px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--borda); border-radius: 10px; padding: 8px; background: var(--card); }
+  .jv-item.arrasta { opacity: .45; } .jv-item.alvo { outline: 2px solid var(--acento); }
+  .jv-alca { cursor: grab; font-size: 1.2rem; text-align: center; user-select: none; color: var(--mudo); }
+  .jv-num { display: block; font-weight: 700; color: inherit; font-size: .9rem; }
+  .jv-item video { width: 160px; aspect-ratio: 16/9; background: #000; border-radius: 6px; object-fit: contain; }
+  .jv-nome { font-weight: 600; word-break: break-all; font-size: .88rem; }
+  .jv-acoes { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .jv-barra { height: 10px; border-radius: 99px; background: var(--code-bg); overflow: hidden; margin: 6px 0; }
+  .jv-barra > div { height: 100%; width: 0; background: var(--acento); transition: width .3s; }
+  .jv-envios { font-size: .8rem; margin-top: 6px; }
+  .jv-saida video { width: 100%; max-height: 420px; background: #000; border-radius: 10px; }
+  @media (max-width: 700px) { .jv-item { grid-template-columns: 28px 1fr; } .jv-item video { width: 100%; grid-column: 2; } .jv-meio, .jv-acoes { grid-column: 2; justify-content: flex-start; } }
+</style>
+<h1>🔗 Juntar vídeos <span class="si-dica" style="font-weight:400">envie, arraste pra pôr na ordem, junte e baixe na qualidade original</span></h1>
+<div id="barra" class="si-barra"></div>
+
+{% if not p %}
+<div class="si-card">
+  <h2 style="margin:0">➕ Nova junção</h2>
+  <form method="post" action="/juntar/novo" class="si-linha">
+    <label>Nome do vídeo final <input name="titulo" placeholder="Stu Ungar The Kid 4K" style="min-width:280px"></label>
+    <button class="si-ok">➕ criar</button>
+  </form>
+</div>
+<div class="si-card">
+  <h2 style="margin:0">📁 Junções</h2>
+  {% if not projetos %}<p class="si-dica">Nenhuma ainda.</p>{% endif %}
+  {% for x in projetos %}
+  <div class="si-linha"><a href="/juntar/{{ x.id }}">🔗 {{ x.titulo }}</a>
+    <span class="si-tag">{{ x.n }} vídeos</span>
+    <span class="si-tag">{{ '%d:%02d' % ((x.duracao or 0) // 60, (x.duracao or 0) % 60) }}</span>
+    {% if x.pronto %}<span class="si-tag">✅ pronto</span>{% endif %}</div>
+  {% endfor %}
+</div>
+{% else %}
+<p><a href="/juntar">← todas as junções</a></p>
+<div class="si-card">
+  <div class="si-linha"><label>Nome do vídeo final <input id="titulo" value="{{ p.titulo }}" style="min-width:300px"></label>
+    <button class="si-mini si-sec" onclick="jvRenomear()">💾</button>
+    <form method="post" action="/juntar/{{ p.id }}/apagar" onsubmit="return confirm('Apagar esta junção e os vídeos enviados?')" style="margin-left:auto">
+      <button class="si-mini si-perigo">🗑 apagar</button></form></div>
+  <div id="solta" class="jv-solta">📥 <b>Arraste os vídeos aqui</b> ou clique pra escolher (pode mandar vários de uma vez)
+    <input id="arqs" type="file" accept="video/*,.mkv,.ts,.mts" multiple hidden></div>
+  <div id="envios" class="jv-envios"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🎞 Ordem <span class="si-dica" id="resumo" style="font-weight:400"></span></h2>
+  <p class="si-dica">Arraste pela ☰ (ou use ▲ ▼) pra mudar a ordem. O vídeo 1 é o primeiro.</p>
+  <ul id="lista" class="jv-lista"></ul>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🔗 Juntar</h2>
+  <p id="compat" class="si-dica"></p>
+  <div class="si-linha">
+    <label>Modo <select id="modo"><option value="auto">automático (sem recodificar quando der)</option><option value="recodificar">sempre recodificar</option></select></label>
+    <label id="lq">Qualidade ao recodificar <select id="qual"></select></label>
+    <button id="bjuntar" class="si-ok" onclick="jvJuntar()">🔗 juntar</button>
+    <button id="bparar" class="si-mini si-perigo" onclick="jvParar()" style="display:none">⏹ parar</button>
+  </div>
+  <div id="prog" style="display:none"><div class="jv-barra"><div id="pb"></div></div><span id="pt" class="si-st"></span></div>
+  <div id="saida" class="jv-saida"></div>
+</div>
+
+<script>
+(() => {
+const PID = {{ p.id|tojson }};
+let E = null, timer = null;
+const $ = id => document.getElementById(id);
+const fmt = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+const mb = b => b > 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 1048576).toFixed(1) + ' MB';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function aviso(t, cls) { const b = $('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3500); }
+async function api(url, corpo) {
+  const r = await fetch(url, corpo === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'}));
+  if (!j.ok) throw new Error(j.erro || 'erro');
+  return j;
+}
+function desenhar(j) {
+  E = j; const vs = j.projeto.videos || [];
+  $('resumo').textContent = vs.length ? `${vs.length} vídeos · ${fmt(j.total)} no total` : '';
+  const ul = $('lista'); ul.innerHTML = '';
+  if (!vs.length) ul.innerHTML = '<li class="si-dica">Nenhum vídeo ainda.</li>';
+  vs.forEach((v, k) => {
+    const i = v.info, li = document.createElement('li');
+    li.className = 'jv-item'; li.draggable = true; li.dataset.arq = v.arq;
+    li.innerHTML = `<div class="jv-alca" title="arraste">☰<span class="jv-num">${k + 1}</span></div>
+      <video src="/juntar/${PID}/video/${encodeURIComponent(v.arq)}#t=0.5" preload="metadata" controls muted></video>
+      <div class="jv-meio"><div class="jv-nome">${esc(v.nome)}</div>
+        <div class="si-linha"><span class="si-tag">${fmt(i.dur)}</span><span class="si-tag">${i.w}×${i.h}</span><span class="si-tag">${i.fps} fps</span>
+        <span class="si-tag">${esc(i.vcodec)}</span><span class="si-tag">${i.audio ? '🔊 ' + esc(i.acodec) : '🔇 sem som'}</span><span class="si-tag">${mb(i.bytes)}</span></div></div>
+      <div class="jv-acoes"><button class="si-mini si-sec" data-a="sobe" ${k ? '' : 'disabled'}>▲</button><button class="si-mini si-sec" data-a="desce" ${k < vs.length - 1 ? '' : 'disabled'}>▼</button>
+        <button class="si-mini si-perigo" data-a="tira">✕</button></div>`;
+    li.querySelectorAll('button').forEach(b => b.onclick = () => acao(b.dataset.a, k));
+    ul.appendChild(li);
+  });
+  const c = j.compat;
+  $('compat').innerHTML = !c ? 'Envie pelo menos 2 vídeos.' : (c.copia ? '✅ ' : '⚠️ ') + esc(c.motivo) +
+    (!c.copia && j.destino ? ` → saída em <b>${j.destino.w}×${j.destino.h}</b>, ${j.destino.fps} fps.` : '');
+  const qs = $('qual'); if (!qs.options.length) Object.entries(j.qualidades).forEach(([k, r]) => qs.add(new Option(r, k)));
+  $('lq').style.display = (c && c.copia && $('modo').value === 'auto') ? 'none' : '';
+  const t = j.tarefa, rod = t && t.rodando;
+  $('bjuntar').disabled = rod || vs.length < 2; $('bparar').style.display = rod ? '' : 'none';
+  $('prog').style.display = rod ? '' : 'none';
+  if (rod) { const pc = Math.round((t.prog || 0) * 100), gasto = Date.now() / 1000 - t.inicio;
+    $('pb').style.width = pc + '%';
+    $('pt').textContent = `juntando… ${pc}%` + (t.prog > 0.02 ? ` · falta ~${fmt(gasto / t.prog - gasto)}` : ''); }
+  if (t && t.fim && t.erro && !t.visto) { aviso('❌ ' + t.erro, 'erro'); t.visto = 1; }
+  const s = j.projeto.saida;
+  $('saida').innerHTML = s ? `<h3 style="margin:10px 0 4px">${j.saida_atual ? '✅ Pronto' : '⚠️ Versão antiga (a ordem ou os vídeos mudaram — junte de novo)'}</h3>
+    <div class="si-linha"><span class="si-tag">${esc(s.arq)}</span><span class="si-tag">${fmt(s.dur)}</span><span class="si-tag">${s.w}×${s.h}</span><span class="si-tag">${mb(s.bytes)}</span>
+    <span class="si-tag">${s.copia ? '🎯 qualidade original (sem recodificar)' : '🎞 recodificado em alta'}</span>
+    <a href="/juntar/${PID}/baixar"><button class="si-ok">⬇️ baixar</button></a></div>
+    <video src="/juntar/${PID}/baixar?ver=1&q=${s.quando}" controls preload="metadata"></video>` : '';
+  clearTimeout(timer); if (rod) timer = setTimeout(atualizar, 1000);
+}
+async function atualizar() { try { desenhar(await api(`/juntar/${PID}/estado`)); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+async function mandarOrdem(ordem) { try { desenhar(await api(`/juntar/${PID}/ordem`, {ordem})); } catch (e) { aviso('❌ ' + e.message, 'erro'); atualizar(); } }
+function ordemAtual() { return (E.projeto.videos || []).map(v => v.arq); }
+async function acao(a, k) {
+  const o = ordemAtual();
+  if (a === 'tira') { if (!confirm('Tirar ' + E.projeto.videos[k].nome + '?')) return;
+    try { desenhar(await api(`/juntar/${PID}/remover`, {arq: o[k]})); } catch (e) { aviso('❌ ' + e.message, 'erro'); } return; }
+  const n = a === 'sobe' ? k - 1 : k + 1; [o[k], o[n]] = [o[n], o[k]]; mandarOrdem(o);
+}
+// arrastar pra reordenar
+let arrastando = null;
+$('lista').addEventListener('dragstart', e => { const li = e.target.closest('.jv-item'); if (!li) return; arrastando = li; li.classList.add('arrasta'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', li.dataset.arq); });
+$('lista').addEventListener('dragover', e => { if (!arrastando) return; e.preventDefault(); const li = e.target.closest('.jv-item');
+  document.querySelectorAll('.jv-item.alvo').forEach(x => x.classList.remove('alvo'));
+  if (li && li !== arrastando) { const r = li.getBoundingClientRect(); li.classList.add('alvo'); li.parentNode.insertBefore(arrastando, e.clientY < r.top + r.height / 2 ? li : li.nextSibling); } });
+$('lista').addEventListener('dragend', () => { if (!arrastando) return; arrastando.classList.remove('arrasta'); arrastando = null;
+  document.querySelectorAll('.jv-item.alvo').forEach(x => x.classList.remove('alvo'));
+  const o = [...document.querySelectorAll('#lista .jv-item')].map(li => li.dataset.arq);
+  if (o.join('|') !== ordemAtual().join('|')) mandarOrdem(o); });
+// envio (um arquivo por vez, com barra)
+const solta = $('solta');
+solta.onclick = () => $('arqs').click();
+$('arqs').onchange = e => enviar([...e.target.files]);
+['dragenter', 'dragover'].forEach(ev => solta.addEventListener(ev, e => { if (arrastando) return; e.preventDefault(); solta.classList.add('on'); }));
+['dragleave', 'drop'].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.remove('on'); }));
+solta.addEventListener('drop', e => { if (!arrastando) enviar([...e.dataTransfer.files]); });
+async function enviar(arqs) {
+  arqs = arqs.filter(f => f.type.startsWith('video/') || /\.(mkv|ts|mts|m4v|flv|wmv|avi|mpg|mpeg|3gp)$/i.test(f.name));
+  arqs.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const box = $('envios');
+  for (const f of arqs) {
+    const linha = document.createElement('div'); linha.innerHTML = `<span>${esc(f.name)}</span><div class="jv-barra"><div></div></div>`; box.appendChild(linha);
+    const barra = linha.querySelector('.jv-barra > div');
+    await new Promise(res => {
+      const x = new XMLHttpRequest(), fd = new FormData(); fd.append('arquivos', f);
+      x.upload.onprogress = e => { if (e.lengthComputable) barra.style.width = (e.loaded / e.total * 100) + '%'; };
+      x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (_) {}
+        if (j.ok) { desenhar(j); (j.erros || []).forEach(m => aviso('⚠️ ' + m, 'erro')); linha.remove(); } else { linha.innerHTML = '❌ ' + esc(f.name) + ': ' + esc(j.erro || x.status); } res(); };
+      x.onerror = () => { linha.innerHTML = '❌ ' + esc(f.name) + ': falha no envio'; res(); };
+      x.open('POST', `/juntar/${PID}/enviar`); x.send(fd);
+    });
+  }
+  $('arqs').value = '';
+}
+async function juntar() {
+  try { const j = await api(`/juntar/${PID}/juntar`, {modo: $('modo').value, qualidade: $('qual').value}); desenhar(j); setTimeout(atualizar, 400); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); }
+}
+async function parar() { try { await api(`/juntar/${PID}/parar`, {}); } catch (e) {} setTimeout(atualizar, 500); }
+async function renomear() { try { desenhar(await api(`/juntar/${PID}/titulo`, {titulo: $('titulo').value})); aviso('💾 nome salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+$('modo').onchange = () => E && desenhar(E);
+let tinhaRodando = false;
+const _d = desenhar; desenhar = j => { const rod = !!(j.tarefa && j.tarefa.rodando);
+  if (tinhaRodando && !rod && j.tarefa && !j.tarefa.erro) aviso('✅ Vídeo juntado — é só baixar', 'okk'); tinhaRodando = rod; _d(j); };
+window.jvRenomear = renomear; window.jvJuntar = juntar; window.jvParar = parar;
+atualizar();
+})();
+</script>
+{% endif %}
+{% endblock %}

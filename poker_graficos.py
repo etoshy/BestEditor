@@ -23,7 +23,8 @@ import poker_render as PR
 
 TIPOS = {"titulo": "🎬 título de capítulo", "jogador": "🪪 cartão do jogador", "linha_do_tempo": "📅 linha do tempo",
          "grafico": "📈 gráfico (linha)", "barras": "📊 gráfico (barras)", "citacao": "💬 citação", "fato": "🔢 número/fato",
-         "midia": "🖼 a sua imagem (Ken Burns)", "": "— nenhuma (fundo animado com a frase)"}
+         "midia": "🖼 a sua imagem (Ken Burns)", "gancho": "💥 frase impactante (gancho / final)",
+         "": "— nenhuma (foto do jogador citado, se tiver; senão a frase sobre o fundo)"}
 
 
 def normalizar(g: Any) -> Dict[str, Any]:
@@ -56,6 +57,7 @@ def tempo_minimo(g: Any, frase: str = "", ritmo: str = "normal") -> float:
          "citacao": 2.5 + leitura(g["texto"] or frase),
          "fato": 4.5 + leitura(g["texto"]) * 0.6,
          "midia": 4.0 + leitura(g["texto"]) * 0.5,
+         "gancho": 2.6 + leitura(g["titulo"] or frase) * 0.8 + leitura(g["subtitulo"]) * 0.6,
          "": 3.0 + leitura(g["titulo"] or g["texto"] or frase) * 0.6}[g["tipo"]]
     return round(max(2.5, t) * RITMOS.get(ritmo, 1.0), 2)
 
@@ -259,6 +261,23 @@ if (G.tipo === 'titulo') {
   anima = t => { const o = saida(t); nm.textContent = D.num ? conta(G.numero, D.num, fase(t, 0.2, Math.min(1.8, DUR * 0.5))) : G.numero;
     nm.style.opacity = fase(t, 0.1, 0.4) * o; nm.style.transform = `translateX(-50%) scale(${0.8 + 0.2 * fase(t, 0.1, 0.6)})`;
     tx.style.opacity = fase(t, 0.9, 0.6) * o; };
+} else if (G.tipo === 'gancho') {
+  // 💥 a frase que prende (ou fecha): as palavras entram uma a uma com soco, a última no destaque, tremida + flash
+  const frase = (G.titulo || D.frase || '').trim(), pal = frase.split(/\s+/);
+  const caixa = el('div', `left:50%;top:${H * (VERT ? 0.42 : 0.42)}px;transform:translate(-50%,-50%);width:${W * 0.88}px;text-align:center;line-height:1.05`, area); caixa.className = 'a';
+  const spans = pal.map((w, k) => { const sp = el('span', F(VERT ? 104 : 112, 900) + `display:inline-block;margin:0 ${12 * S}px;text-transform:uppercase;text-shadow:0 ${8 * S}px ${30 * S}px #000;color:${k === pal.length - 1 ? VAL : TXT}`, caixa); sp.textContent = w; return sp; });
+  const sub = el('div', F(VERT ? 40 : 38, 700) + `left:50%;transform:translateX(-50%);width:${W * 0.8}px;text-align:center;opacity:0`, area); sub.className = 'a'; sub.textContent = G.subtitulo;
+  const au = el('div', F(VERT ? 30 : 28, 600) + `color:${AC};left:50%;transform:translateX(-50%);text-align:center;width:${W * 0.8}px`, area); au.className = 'a'; au.textContent = G.autor ? '— ' + G.autor : '';
+  const flash = el('div', 'inset:0;background:#fff;opacity:0;mix-blend-mode:overlay', area); flash.className = 'a';
+  const passo = Math.min(0.32, Math.max(0.12, (DUR * 0.45) / Math.max(1, pal.length)));
+  anima = t => { const o = saida(t);
+    spans.forEach((sp, k) => { const q = clamp((t - 0.15 - k * passo) / 0.22, 0, 1), soco = 1 + 0.6 * Math.pow(1 - q, 3);
+      sp.style.opacity = (q > 0 ? 1 : 0) * o; sp.style.transform = `scale(${soco}) rotate(${(1 - q) * (k % 2 ? 4 : -4)}deg)`; });
+    const fimP = 0.15 + pal.length * passo, tre = t > fimP && t < fimP + 0.25 ? 1 : 0;
+    caixa.style.transform = `translate(-50%,-50%) translate(${tre * Math.sin(t * 97) * 8 * S}px, ${tre * Math.cos(t * 83) * 6 * S}px) scale(${1 + 0.03 * clamp((t - fimP) / DUR, 0, 1)})`;
+    flash.style.opacity = Math.max(0, 0.5 - Math.abs(t - fimP) * 3) * o;
+    sub.style.top = (caixa.offsetTop + caixa.offsetHeight / 2 + 40 * S) + 'px'; sub.style.opacity = fase(t, fimP + 0.2, 0.4) * o;
+    au.style.top = (caixa.offsetTop + caixa.offsetHeight / 2 + 110 * S) + 'px'; au.style.opacity = fase(t, fimP + 0.4, 0.4) * o; };
 } else if (G.tipo === 'midia' && D.midia) {
   const im = el('img', `left:0;top:0;width:${W}px;height:${H}px;object-fit:cover`, area); im.className = 'a'; im.src = D.midia;
   const sombra = el('div', `left:0;right:0;bottom:0;height:${H * 0.35}px;background:linear-gradient(transparent, #000c)`, area); sombra.className = 'a';

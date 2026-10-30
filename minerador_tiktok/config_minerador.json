@@ -1,0 +1,57 @@
+{
+  "filtro": {
+    "min_curtidas": 20000,
+    "min_comentarios": 200,
+    "duracao_min_s": 5,
+    "duracao_max_s": 90,
+    "hashtags_bloqueadas": ["ad", "publi", "parceria", "tiktokshop", "sponsored", "giveaway"],
+    "palavras_bloqueadas_descricao": ["link na bio", "link in bio", "cupom", "promo code", "use code"],
+    "razao_comentarios_curtidas_boa": 0.008,
+    "razao_compart_curtidas_boa": 0.02,
+    "razao_salvos_curtidas_boa": 0.03,
+    "curtidas_viral": 500000,
+    "pontuacao_minima": 2
+  },
+  "visao": {
+    "backend": "nenhum",
+    "modelo_ollama": "moondream",
+    "url_ollama": "http://localhost:11434",
+    "revisao_hf": null,
+    "fracoes_quadros": [0.08, 0.3, 0.5, 0.7, 0.92],
+    "largura_quadro": 640,
+    "descartar_se": [
+      "Is this a video game or a screen recording?",
+      "Is the image mostly text on a plain background?"
+    ]
+  },
+  "claude": {
+    "modelo_triagem": "claude-haiku-5-5",
+    "modelo_roteiro": "claude-sonnet-5-5",
+    "max_tokens_roteiro": 8000,
+    "enviar_quadros": true,
+    "nota_minima": 7,
+    "max_triagens_por_hora": 60,
+    "max_roteiros_por_hora": 20,
+    "lingua_post": "en",
+    "tags_chatterbox": true,
+    "modelos_aceitos": ["comentario", "explicativo", "noticia", "explicador_poker", "documentario"],
+    "nichos_desejados": ["momentos engraçados", "animais", "esportes", "histórias emocionantes", "reviravoltas", "curiosidades", "poker"],
+    "estilo_canal": "Canal de shorts de comentário: narração com IA, frases curtas, gancho forte nos 3 primeiros segundos, cortes a cada 2-4 s, pergunta final que gera discussão."
+  },
+  "coleta": {
+    "interesses": ["Animais", "Comédia", "Esportes"],
+    "comentarios_candidato": 60,
+    "videos_por_sessao": 80,
+    "pausa_entre_sessoes_s": 120,
+    "persona": "persona_minerador.json",
+    "mostrar_navegador": true
+  },
+  "site": {
+    "url": "http://localhost:5050",
+    "enviar": true
+  },
+  "saida": {
+    "pasta": "minerados",
+    "intervalo_min": 60
+  }
+}

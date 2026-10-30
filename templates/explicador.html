@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}🎬 Explicador animado{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .ex-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.35fr); gap: 14px; align-items: start; }
+  @media (max-width: 1000px) { .ex-grid { grid-template-columns: 1fr; } }
+  .ex-plano { font-family: ui-monospace, Consolas, monospace; font-size: .76rem; min-height: 420px; white-space: pre; tab-size: 1; }
+  .ex-tela { width: 100%; aspect-ratio: 16/9.4; border: 0; border-radius: 10px; background: #000; display: block; }
+  .ex-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 10px; margin: 8px 0; }
+  .ex-ops label { display: flex; flex-direction: column; gap: 2px; font-size: .8rem; margin: 0; }
+  .ex-ops label.chk { flex-direction: row; align-items: center; gap: 6px; }
+  .ex-ops input, .ex-ops select { margin: 0; font-size: .82rem; }
+  .ex-cenas { width: 100%; font-size: .8rem; border-collapse: collapse; } .ex-cenas td { padding: 2px 6px; border-bottom: 1px solid var(--borda); }
+  .ex-cenas tr { cursor: pointer; } .ex-cenas tr:hover { background: var(--acento-suave); }
+  .ex-aviso { color: var(--erro); font-size: .78rem; }
+  .ex-ajuda pre { background: var(--code-bg); padding: 8px; border-radius: 8px; white-space: pre-wrap; font-size: .74rem; }
+</style>
+<h1>🎬 Explicador animado <span class="si-dica" style="font-weight:400">narração → vídeo em motion graphics (textos, cartas, ranking, listas, dicas, mãos de poker no simulador 2D)</span></h1>
+<div id="barra" class="si-barra"></div>
+
+{% if not p %}
+<div class="si-card">
+  <h2 style="margin:0">➕ Novo vídeo</h2>
+  <p class="si-dica">Suba a narração pronta (a mesma do zip de narração e legenda) e a legenda .srt. Sem .srt, dá pra 🎙 transcrever depois com o Whisper. A legenda só serve pra saber <b>quando</b> cada coisa entra — o vídeo sai <b>sem legenda</b>.</p>
+  <form method="post" action="/explicador/novo" enctype="multipart/form-data">
+    <div class="si-linha"><label>Título <input name="titulo" placeholder="How to Play Poker in 6 Minutes" style="min-width:300px"></label></div>
+    <div class="si-linha"><label>🎙 Narração <input type="file" name="audio" accept="audio/*,.wav,.mp3,.m4a" required></label>
+      <label>📝 Legenda (.srt) <input type="file" name="srt" accept=".srt,text/plain"></label></div>
+    <div class="si-linha"><label>Marca (linha 1) <input name="marca1" placeholder="POKER"></label><label>Marca (linha 2) <input name="marca2" placeholder="UNCOVERED"></label></div>
+    <button class="si-ok" style="width:auto">➕ criar</button>
+  </form>
+</div>
+<div class="si-card">
+  <h2 style="margin:0">📁 Vídeos</h2>
+  {% if not projetos %}<p class="si-dica">Nenhum ainda.</p>{% endif %}
+  {% for x in projetos %}
+  <div class="si-linha"><a href="/explicador/{{ x.id }}">🎬 {{ x.titulo }}</a>
+    <span class="si-tag">{{ '%d:%02d' % ((x.duracao or 0) // 60, (x.duracao or 0) % 60) }}</span>
+    <span class="si-tag">{{ x.cenas }} cenas</span>{% if x.mp4 %}<span class="si-tag">✅ MP4</span>{% endif %}</div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="si-linha"><a href="/explicador">← todos</a> <b id="tit">{{ p.titulo }}</b> <span id="stLeg" class="si-tag"></span> <span id="stDur" class="si-tag"></span></div>
+<div class="ex-grid">
+  <div>
+    <div class="si-card">
+      <h2 style="margin:0">1 · 📝 Legenda (só pro tempo)</h2>
+      <div class="si-linha">
+        <input type="file" id="fSrt" accept=".srt,text/plain"><button class="si-mini" id="bSrt">⬆ subir .srt</button>
+        <button class="si-mini si-sec" id="bWhisper">🎙 transcrever com Whisper</button>
+      </div>
+    </div>
+    <div class="si-card">
+      <h2 style="margin:0">2 · 🎨 Estilo</h2>
+      <div class="ex-ops">
+        <label>Estilo <select id="o_estilo"><option value="dinamico">⚡ dinâmico (YouTube, dopamina)</option><option value="documentario">🎞 documentário (cinema, arquivo)</option></select></label>
+        <label>Resolução <select id="o_resolucao"><option value="2160p">4K (3840×2160)</option><option value="1080p">1080p</option></select></label>
+        <label>Cor de destaque <input type="color" id="o_acento"></label>
+        <label>Fundo <select id="o_fundo">{% for f in fundos %}<option>{{ f }}</option>{% endfor %}</select></label>
+        <label>Símbolos no fundo <input id="o_simbolos" placeholder="♠♥♦♣ (vazio = nenhum)"></label>
+        <label>Marca linha 1 <input id="o_marca1"></label>
+        <label>Marca linha 2 <input id="o_marca2"></label>
+        <label>Símbolo do logo <input id="o_marca_simbolo" maxlength="2"></label>
+        <label>Música <select id="o_musica"><option value="sintetizada">🎹 sintetizada (leve)</option><option value="arquivo">📁 o meu arquivo</option><option value="nenhuma">🔇 nenhuma</option></select></label>
+        <label>Volume da música <input type="number" id="o_volume_musica" min="0" max="1" step="0.02"></label>
+        <label class="chk"><input type="checkbox" id="o_sfx"> 🔊 efeitos sonoros</label>
+        <label class="chk" title="só pra vídeos em que o tempo importa (ex.: aprenda em 6 minutos)"><input type="checkbox" id="o_barra_topo"> ⏱ barra de progresso no topo</label>
+        <label>Trabalhadores (render) <input type="number" id="o_trabalhadores" min="1" max="6"></label>
+        <label>Idioma (Whisper) <input id="o_idioma" placeholder="en"></label>
+      </div>
+      <div class="si-linha"><input type="file" id="fMus" accept="audio/*"><button class="si-mini si-sec" id="bMus">⬆ subir música</button> <span id="stMus" class="si-dica"></span></div>
+    </div>
+    <div class="si-card">
+      <h2 style="margin:0">📁 Fotos e vídeos (material de arquivo)</h2>
+      <p class="si-dica">Fotos e vídeos que as cenas <code>foto</code>/<code>video</code> usam pelo nome. Vídeo antigo é limpo, ampliado e as bordas pretas saem sozinhas.</p>
+      <div class="si-linha"><input type="file" id="fMidia" multiple accept="image/*,video/*"><button class="si-mini" id="bMidia">⬆ subir</button></div>
+      <div id="listaMidia" class="si-dica"></div>
+      <details><summary>🎙 trechos com o som original (cortam a narração)</summary>
+        <p class="si-dica">Lista JSON: <code>[{"arquivo":"v1997.mp4","ini":2553,"fim":2570,"antes_de":"Twenty-four hours before"}]</code> — o trecho entra logo antes da frase indicada (no silêncio), a narração para e volta depois. Use <code>"trecho": 1</code> numa cena <code>video</code> pra mostrar a imagem do trecho 1.</p>
+        <textarea id="trechos" class="ex-plano" style="min-height:160px" spellcheck="false"></textarea>
+      </details>
+      <div class="si-linha"><button class="si-mini si-sec" id="bPreparar">🎞 preparar trechos (vídeo + áudio)</button></div>
+    </div>
+    <div class="si-card">
+      <h2 style="margin:0">3 · 🤖 Plano das cenas</h2>
+      <p class="si-dica">A IA lê a narração e escolhe o que aparece e quando (cada coisa entra numa frase exata da fala). Depois você ajusta aqui e vê na prévia.</p>
+      <textarea id="instr" rows="2" placeholder="instruções extras (opcional): ex. use mãos de poker nos exemplos, 4 dicas no final, cor vermelha nos avisos…"></textarea>
+      <div class="si-linha">
+        <button class="si-ok" id="bIA">🤖 gerar plano com a IA</button>
+        <button class="si-mini si-sec" id="bSimples">📄 plano simples (sem IA)</button>
+        <button class="si-mini si-sec" id="bExemplo">🃏 exemplo: How to Play Poker</button>
+      </div>
+      <textarea id="plano" class="ex-plano" spellcheck="false"></textarea>
+      <div class="si-linha"><button id="bSalvar">💾 salvar e atualizar a prévia</button></div>
+      <details class="ex-ajuda"><summary>📖 os tipos de cena (o formato do plano)</summary><pre>{{ tipos }}</pre></details>
+    </div>
+  </div>
+  <div>
+    <div class="si-card">
+      <h2 style="margin:0">👁 Prévia (com o áudio)</h2>
+      <iframe id="tela" class="ex-tela"></iframe>
+      <div id="avisos"></div>
+      <table class="ex-cenas" id="cenas"></table>
+    </div>
+    <div class="si-card">
+      <h2 style="margin:0">4 · 🎞 Vídeo</h2>
+      <p class="si-dica">Cada cena vira um arquivo (vários em paralelo). 4K demora: no PC, ~3–6× a duração do vídeo com 2 trabalhadores.</p>
+      <div class="si-linha">
+        <button class="si-ok" id="bRender">🎞 renderizar MP4</button>
+        <button class="si-mini si-perigo" id="bParar">⏹ parar</button>
+        <a id="lBaixar" style="display:none" href="#">⬇ baixar MP4</a>
+        <button id="bEditor" style="display:none">🎬 mandar pro editor</button>
+      </div>
+      <video id="vid" controls style="width:100%;display:none;border-radius:10px;margin-top:8px"></video>
+      <div class="si-dica" id="stSaida"></div>
+    </div>
+    <div class="si-card">
+      <details><summary>📜 histórico</summary><div id="log" class="si-dica"></div></details>
+      <form method="post" action="/explicador/{{ p.id }}/excluir" onsubmit="return confirm('Apagar este vídeo?')"><button class="si-mini si-perigo">🗑 apagar</button></form>
+    </div>
+  </div>
+</div>
+<script>
+const PID = {{ p.id|tojson }};
+const OPS = ['estilo','resolucao','acento','fundo','simbolos','marca1','marca2','marca_simbolo','musica','volume_musica','sfx','barra_topo','trabalhadores','idioma'];
+let E = null;
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function pintar(d, plano) {
+  E = d; const p = d.projeto;
+  $('stLeg').textContent = d.n_legenda ? `📝 legenda: ${d.n_legenda} trechos` : '⚠ sem legenda';
+  $('stDur').textContent = '⏱ ' + fmt(p.duracao || 0);
+  OPS.forEach(k => { const el = $('o_' + k); if (!el) return; if (el.type === 'checkbox') el.checked = !!p.op[k]; else el.value = p.op[k] ?? ''; });
+  $('stMus').textContent = p.musica_arquivo ? '📁 ' + p.musica_arquivo : '';
+  if (plano !== false) { $('plano').value = JSON.stringify(p.plano || { cenas: [] }, null, 1); $('trechos').value = JSON.stringify(p.trechos || [], null, 1); }
+  $('listaMidia').innerHTML = (d.midia || []).map(m => `<span class="si-tag">${esc(m)}</span>`).join(' ') || 'nenhum arquivo ainda';
+  const r = d.resumo || {};
+  $('avisos').innerHTML = r.erro ? `<div class="ex-aviso">⚠ ${esc(r.erro)}</div>` : (r.avisos || []).map(a => `<div class="ex-aviso">⚠ ${esc(a)}</div>`).join('');
+  $('cenas').innerHTML = (r.cenas || []).map(c => `<tr data-t="${c.ini}"><td>${c.n}</td><td>${esc(c.tipo)}</td><td>${fmt(c.ini)} → ${fmt(c.fim)}</td></tr>`).join('');
+  $$cenas();
+  const s = p.saida || {};
+  $('lBaixar').style.display = s.mp4 ? '' : 'none'; $('bEditor').style.display = s.mp4 && d.editor_ok ? '' : 'none';
+  if (s.mp4) { $('lBaixar').href = `/explicador/${PID}/mp4?baixar=1`; $('stSaida').textContent = `✅ ${s.mp4} (${s.resolucao}, ${s.segundos || '?'} s pra renderizar)`;
+    const v = $('vid'); if (!v.src.includes(s.mp4)) { v.src = `/explicador/${PID}/mp4?v=${s.quando}`; } v.style.display = ''; }
+  if (p.editor && p.editor.job_id) $('stSaida').innerHTML += ` · <a href="/job/${p.editor.job_id}/edit-segments">🎬 abrir no editor</a>`;
+  $('log').innerHTML = (p.log || []).slice().reverse().map(x => esc(new Date(x[0] * 1000).toLocaleString() + ' · ' + x[1])).join('<br>');
+  $('bWhisper').style.display = d.transcrever ? '' : 'none';
+}
+function $$cenas() { document.querySelectorAll('#cenas tr').forEach(tr => tr.onclick = () => recarregarTela(+tr.dataset.t + 0.5)); }
+function recarregarTela(t) { $('tela').src = `/explicador/${PID}/previa/?t=${t || 0}&v=${Date.now()}`; }
+function ops() { const o = {}; OPS.forEach(k => { const el = $('o_' + k); if (!el) return; o[k] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? +el.value : el.value); }); return o; }
+async function carregar() { const d = await api(`/explicador/${PID}/estado`, undefined, 'GET'); pintar(d); if (d.tarefa && d.tarefa.rodando) acompanhar(); return d; }
+async function salvar(semPlano) {
+  const corpo = { op: ops() }; if (!semPlano) { corpo.plano = $('plano').value; corpo.trechos = $('trechos').value; }
+  const d = await api(`/explicador/${PID}/salvar`, corpo); pintar(d, semPlano ? false : undefined); return d;
+}
+async function acompanhar() {
+  for (;;) {
+    await new Promise(r => setTimeout(r, 1500));
+    let d; try { d = await api(`/explicador/${PID}/tarefa`, undefined, 'GET'); } catch (e) { barra('❌ ' + e.message, 'erro'); return; }
+    const t = d.tarefa; if (!t) return;
+    if (t.rodando) { barra('⏳ ' + t.rotulo + (t.prog ? ' — ' + t.prog : '')); continue; }
+    barra(t.erro ? '❌ ' + t.erro : '✅ ' + t.rotulo + ' — pronto', t.erro ? 'erro' : 'okk');
+    const e = await carregar(); if (!t.erro) recarregarTela(0); return;
+  }
+}
+async function tarefa(url, corpo) { try { await salvar(true); await api(url, corpo || {}); barra('⏳ começando…'); acompanhar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } }
+$('bSalvar').onclick = async () => { try { await salvar(); barra('💾 salvo', 'okk'); recarregarTela(0); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+OPS.forEach(k => { const el = $('o_' + k); if (el) el.onchange = async () => { try { await salvar(true); } catch (e) { barra('❌ ' + e.message, 'erro'); } }; });
+$('bIA').onclick = () => tarefa(`/explicador/${PID}/ia`, { instrucoes: $('instr').value });
+$('bWhisper').onclick = () => tarefa(`/explicador/${PID}/transcrever`);
+$('bRender').onclick = () => tarefa(`/explicador/${PID}/renderizar`);
+$('bParar').onclick = () => api(`/explicador/${PID}/parar`, {}).then(() => barra('⏹ parando…')).catch(e => barra('❌ ' + e.message, 'erro'));
+$('bSimples').onclick = async () => { try { pintar(await api(`/explicador/${PID}/plano_pronto`, { qual: 'simples' })); recarregarTela(0); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bExemplo').onclick = async () => { if (!confirm('Trocar o plano pelo exemplo do vídeo de poker? (as frases são da narração daquele vídeo)')) return;
+  try { pintar(await api(`/explicador/${PID}/plano_pronto`, { qual: 'exemplo_poker' })); recarregarTela(0); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bSrt').onclick = async () => { const f = $('fSrt').files[0]; if (!f) return barra('escolha o .srt', 'erro'); const fd = new FormData(); fd.append('srt', f);
+  try { pintar(await api(`/explicador/${PID}/srt`, fd), false); barra('📝 legenda carregada', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bMus').onclick = async () => { const f = $('fMus').files[0]; if (!f) return barra('escolha a música', 'erro'); const fd = new FormData(); fd.append('musica', f);
+  try { pintar(await api(`/explicador/${PID}/musica`, fd), false); barra('🎵 música carregada', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bMidia').onclick = async () => { const fs = $('fMidia').files; if (!fs.length) return barra('escolha os arquivos', 'erro'); const fd = new FormData(); for (const f of fs) fd.append('arquivos', f);
+  barra('⬆ enviando…'); try { const d = await api(`/explicador/${PID}/midia`, fd); pintar(d, false); barra(`📁 ${d.enviados} arquivo(s)`, 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bPreparar').onclick = async () => { try { await salvar(); await api(`/explicador/${PID}/preparar`, {}); barra('⏳ começando…'); acompanhar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+$('bEditor').onclick = async () => { try { const d = await api(`/explicador/${PID}/editor`, {}); location.href = d.link; } catch (e) { barra('❌ ' + e.message, 'erro'); } };
+carregar().then(d => { if ((d.projeto.plano || {}).cenas && d.projeto.plano.cenas.length) recarregarTela(0); }).catch(e => barra('❌ ' + e.message, 'erro'));
+</script>
+{% endif %}
+{% endblock %}

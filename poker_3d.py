@@ -140,7 +140,10 @@ function texCarta(cod) {
   const c = tela(100, 140), g = c.getContext('2d');
   g.fillStyle = '#f4efe4'; g.beginPath(); g.roundRect(1, 1, 98, 138, 9); g.fill();
   g.strokeStyle = '#0003'; g.lineWidth = 2; g.stroke();
-  if (cod === 'verso') {
+  if (cod === '??') {
+    g.fillStyle = '#d6d0c4'; g.beginPath(); g.roundRect(7, 7, 86, 126, 6); g.fill();
+    g.fillStyle = '#6b6258'; g.font = `900 90px ${FONTE}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 50, 74);
+  } else if (cod === 'verso') {
     g.fillStyle = T.verso1; g.beginPath(); g.roundRect(7, 7, 86, 126, 6); g.fill();
     g.strokeStyle = T.verso2; g.lineWidth = 5; for (let k = -140; k < 140; k += 13) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + 140, 140); g.stroke(); }
     g.strokeStyle = '#fff8'; g.lineWidth = 3; g.strokeRect(12, 12, 76, 116);
@@ -438,7 +441,7 @@ function render(t) {
     texto(st.allin[i] && sv <= 0.001 ? 'ALL-IN' : fmt(sv), x, y + 13 * UI, 10, T.valor, 'center', '#000c');
     let rot = st.ultima[i]; if (e.tipo === 'acao' && e.dados.quem === i) rot = p > 0.25 ? e.dados.rotulo : antes.ultima[i];
     if (venceu) rot = '+' + fmt(depois.ganhos[i]);
-    if (rot && UNI_L !== 'bb' && !venceu) rot = rot.replace(/(-?[\d.]+)$/, m0 => fmt(parseFloat(m0)));
+    if (rot && UNI_L !== 'bb' && !venceu && /^(BET|RAISE|CALL|ALL-IN)/.test(rot)) rot = rot.replace(/(-?[\d.]+)$/, m0 => fmt(parseFloat(m0)));
     if (rot) texto(rot, x, y - 13 * UI, 8, /^\+/.test(rot) ? '#111' : '#fff', 'center', COR_ACAO(rot));
     const eq = st.equidade[i];
     if (OP.equidade && eq != null && !st.fora[i] && !['vencedor', 'final', 'showdown'].includes(e.tipo) && (MODO !== 'pov' || povPeso > 0.5 || st.revelado[i]))
@@ -497,6 +500,13 @@ function render(t) {
       if (dc.spr != null) texto(`SPR ${f(dc.spr)}`, x, y + 36 * UI, 7, '#cbd5e1');
       ctx.globalAlpha = 1;
     } }
+  // 💀 fim: a mão foi interrompida
+  { const fe = e.tipo === 'fim' ? e : (e.tipo === 'final' && k > 0 && EV[k - 1].tipo === 'fim' ? EV[k - 1] : null);
+    if (fe) { const q = e.tipo === 'fim' ? p : 1;
+      ctx.fillStyle = `rgba(0,0,0,${Math.min(1, q * 3) * 0.85})`; ctx.fillRect(0, 0, cw, ch);
+      if (e.tipo === 'fim' && p < 0.06) { ctx.fillStyle = 'rgba(255,240,220,.5)'; ctx.fillRect(0, 0, cw, ch); }
+      ctx.globalAlpha = clamp((q - 0.2) * 3, 0, 1); const ls = fe.dados.texto.split(/(?<=[.!?…])\s+/), lh = (VERT ? 22 : 20) * UI;
+      ls.forEach((l, j) => texto(l, cw / 2, ch / 2 + (j - (ls.length - 1) / 2) * lh, VERT ? 13 : 14, '#fff', 'center', null, 900)); ctx.globalAlpha = 1; } }
   if (SH) { ctx.fillStyle = T.acento; ctx.fillRect(0, ch - 2 * UI, cw * clamp(t / D.duracao, 0, 1), 2 * UI); }
   if (flash) { ctx.fillStyle = `rgba(255,240,220,${flash})`; ctx.fillRect(0, 0, cw, ch); }
 }

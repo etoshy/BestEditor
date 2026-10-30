@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import tempfile
+import re
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
@@ -184,6 +185,22 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         return {"curtos_canais": lambda: CT.listar_canais(base_dir), "curtos_lista": lambda: CT.listar(base_dir)}
 
     # ------------------------------------------------------------------ hub
+    def _roteiro_pronto(rid: str) -> Optional[Dict[str, Any]]:
+        """✍ v84_283: veio do Roteiro de comentário (sem vídeo) → o roteiro entra como referência do curto."""
+        if not rid:
+            return None
+        try:
+            import roteiro_comentario as RC
+            r = RC.carregar(base_dir, rid)
+        except Exception:  # noqa: BLE001
+            return None
+        if not r.get("res"):
+            return None
+        return {"id": rid, "titulo": r.get("titulo") or "", "texto": RC.texto(r["res"], "en"), "segundos": int(round(RC.segundos(r["res"]))),
+                "lingua_post": r.get("lingua_post") or "en", "historia": r.get("historia") or "",
+                "link": (r.get("minerador") or {}).get("link") or "", "modelo": (r.get("minerador") or {}).get("modelo") or "",
+                "explicativo": (((r.get("minerador") or {}).get("assunto_explicativo") or "") + "\n\n" + RC.texto(r["res"], "en")).strip()}
+
     def _hub(foco: str = ""):
         CT.garantir_canais_prontos(base_dir)
         try:
@@ -197,6 +214,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                                linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES, modos_midia=CC.MODOS_MIDIA, estilos_ia=CT.ESTILOS_IA,
                                nichos=CN.nichos(), canais_nicho=CN.canais_de_nicho(base_dir), canal_sel=request.args.get("canal") or "",
                                tema_sel=request.args.get("tema") or "",
+                               roteiro_pronto=_roteiro_pronto(request.args.get("roteiro") or ""),
                                erro=request.args.get("erro"))
 
     @app.route("/curtos", methods=["GET"])
@@ -1218,6 +1236,202 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 prog(f"🎯 {len(r['pendentes'])} destaque(s) pra fazer à mão no 🎯 Rastrear objeto")
         return _mandar_pro_editor(pid, providers, prog)
 
+    # ------------------------------------------------------------------ 🔗 link → vídeo pronto (v84_286)
+    import curtos_link as CL
+
+    def _link_resumo(p: Dict[str, Any]) -> Dict[str, Any]:
+        lr = p.get("link_rapido") or {}
+        r = p.get("roteiro") or {}
+        t = TAREFAS.get(p["id"]) or {}
+        exp = p.get("exportado") or {}
+        info = CC.dados(p).get("info_link") or {}
+        return {"id": p["id"], "titulo": p.get("titulo") or "", "link": lr.get("link") or "", "modo": lr.get("modo") or "auto",
+                "modo_usado": CL.modo_escolhido(r.get("descricao_bruta") or r.get("descricao") or "", lr.get("modo") or "auto"),
+                "criado": lr.get("criado") or 0, "rodando": bool(t) and not t.get("fim"), "prog": t.get("prog") or "",
+                "erro": t.get("erro") or lr.get("erro") or "", "fim": t.get("fim"),
+                "roteiro": " ".join(CT.sem_tags(b.get("fala") or "") for b in r.get("blocos") or [])[:900],
+                "roteiro_tags": " ".join(b.get("fala") or "" for b in r.get("blocos") or [])[:900],
+                "titulos": CN.titulos_do_projeto(p), "descricao": CL.limpar_marca(r.get("descricao") or ""),
+                "hashtags": r.get("hashtags") or [], "n_comentarios": len(info.get("comentarios") or []),
+                "comentarios_erro": info.get("erro") or "", "pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
+                "editor": (p.get("editor") or {}).get("job_id") or "", "etapa": lr.get("etapa") or ""}
+
+    def _links(n: int = 30) -> List[Dict[str, Any]]:
+        out = []
+        for x in CT.listar(base_dir):
+            if x.get("modelo") != "comentario":
+                continue
+            try:
+                p = CT.carregar(base_dir, x["id"])
+            except CT.CurtoErro:
+                continue
+            if p.get("link_rapido"):
+                out.append(_link_resumo(p))
+        return sorted(out, key=lambda v: -(v["criado"] or 0))[:n]
+
+    def _link_etapa(pid: str, etapa: str, **kw: Any) -> None:
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            q.setdefault("link_rapido", {}).update(etapa=etapa, **kw)
+            CT.salvar(base_dir, q)
+
+    def _link_rodar(pid: str, slug: str, qualidade: str, exportar: bool, prog: Callable[[str], None]) -> str:
+        p = CT.carregar(base_dir, pid)
+        lr = p["link_rapido"]
+        url = lr["link"]
+        if not CC.clipes(base_dir, p):
+            _link_etapa(pid, "⬇ baixando")
+            CC.baixar_clipe(base_dir, pid, url, CB.get("baixar"), prog)
+        c = CC.dados(CT.carregar(base_dir, pid))
+        if not c.get("info_link"):
+            _link_etapa(pid, "💬 lendo os comentários")
+            prog("💬 lendo a legenda e os comentários do post…")
+            info = CL.baixar_info(url, 60) if not lr.get("so_colados") else {"comentarios": []}
+            colados = CL.comentarios_colados(lr.get("comentarios_colados") or "")
+            if colados:
+                info["comentarios"] = colados + [x for x in info.get("comentarios") or [] if x["texto"] not in {y["texto"] for y in colados}]
+            with CT._TRAVA:
+                q = CT.carregar(base_dir, pid)
+                CC.dados(q)["info_link"] = info
+                CC.dados(q)["modo_link"] = lr.get("modo") or "auto"
+                if info.get("titulo") and (q.get("titulo") or "").startswith("🔗"):
+                    q["titulo"] = info["titulo"][:120]
+                CT.salvar(base_dir, q)
+            prog(f"💬 {len(info.get('comentarios') or [])} comentários" + (f" ({info['erro']})" if info.get("erro") else ""))
+        _link_etapa(pid, "📝 roteiro → 🎙 narração → 🎬 edição")
+        msg = _fazer_tudo_comentario(pid, slug, None, prog)
+        with CT._TRAVA:  # o modo que a IA escolheu (no automático) fica marcado; a descrição sai limpa
+            q = CT.carregar(base_dir, pid)
+            r = q.get("roteiro") or {}
+            if r.get("descricao") and not r.get("descricao_bruta"):
+                r["descricao_bruta"] = r["descricao"]
+                r["descricao"] = CL.limpar_marca(r["descricao"])
+            CT.salvar(base_dir, q)
+        if not exportar:
+            _link_etapa(pid, "✅ no editor")
+            return msg
+        if not CB.get("exportar"):
+            raise CT.CurtoErro("A exportação automática não está disponível aqui — abra no editor e exporte.")
+        _link_etapa(pid, "🎬 exportando")
+        job_id = (CT.carregar(base_dir, pid).get("editor") or {}).get("job_id")
+        arq = CB["exportar"](job_id, qualidade, prog)
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            q["exportado"] = {"arquivo": arq, "quando": time.time(), "qualidade": qualidade, "job_id": job_id}
+            q["link_rapido"]["etapa"] = "✅ pronto"
+            CT.salvar(base_dir, q)
+        return "✅ vídeo pronto"
+
+    @app.route("/curtos/link", methods=["GET"])
+    def curtos_link_pagina():
+        try:
+            import anime2d as A
+            vozes_en = A.vozes_disponiveis("chatterbox_turbo")
+            vozes = A.vozes_disponiveis("chatterbox")
+        except Exception:  # noqa: BLE001
+            vozes_en, vozes = [], []
+        import qualidade_export
+        return render_template("curtos_link.html", modos=CL.MODOS, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
+                               vozes_en=vozes_en, vozes=vozes, resolucoes=qualidade_export.RESOLUCOES, ia=_ia_ligada(),
+                               tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")))
+
+    @app.route("/curtos/link/estado", methods=["GET"])
+    def curtos_link_estado():
+        return _ok(videos=_links())
+
+    @app.route("/curtos/link/novo", methods=["POST"])
+    def curtos_link_novo():
+        b = _corpo()
+        links = [u for u in re.split(r"\s+", str(b.get("link") or "")) if u.startswith("http")][:10]
+        if not links:
+            return _erro("Cole o link do vídeo (TikTok, Shorts, Reels, Kwai…).")
+        modo = b.get("modo") if b.get("modo") in CL.MODOS else "auto"
+        lp = b.get("lingua_post") if b.get("lingua_post") in CT.LINGUAS else "en"
+        narrar_pt = b.get("idioma") == "pt"
+        qualidade = str(b.get("qualidade") or "1080p")
+        exportar = b.get("exportar", True) not in (False, "0", "", "false")
+        criados = []
+        for url in links:  # 🔗 vários links = vários vídeos, um depois do outro
+            p = CT.criar(base_dir, CT.canal_do_modelo(base_dir, "comentario"), "🔗 " + url.split("?")[0][-60:], [], "", modelo="comentario")
+            pid = p["id"]
+            with CT._TRAVA:
+                p = CT.carregar(base_dir, pid)
+                c = CC.dados(p)
+                c["lingua_post"], c["idioma"] = lp, ("pt" if narrar_pt else "en")
+                narrada = "pt" if narrar_pt else lp
+                p["config"]["motor_perfil"] = "chatterbox_turbo" if narrada == "en" else "chatterbox"
+                if b.get("proporcao") in CT.PROPORCOES:
+                    p["config"]["proporcao"] = b["proporcao"]
+                try:
+                    dur = int(float(b.get("duracao") or 0))
+                    if dur:
+                        p["config"]["duracao_alvo_s"] = max(10, min(180, dur))
+                except (TypeError, ValueError):
+                    pass
+                if b.get("extra"):
+                    p["config"]["extra"] = str(b["extra"])[:2000]
+                if b.get("voz"):
+                    p["config"]["voz_tts"] = str(b["voz"])[:120]
+                p["config"]["takes"] = 1  # ⚡ automático: 1 take (os outros dá pra gerar depois na página do curto)
+                p["link_rapido"] = {"link": url, "modo": modo, "criado": time.time(), "qualidade": qualidade, "exportar": exportar,
+                                    "comentarios_colados": str(b.get("comentarios") or "")[:20000], "etapa": "na fila"}
+                CT.salvar(base_dir, p)
+            criados.append(pid)
+        slug = str(b.get("voz") or "")
+
+        def fila(prog: Callable[[str], None]) -> str:
+            feitos = 0
+            for k, pid in enumerate(criados, 1):
+                TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "começando…"}
+
+                def pr(m: str, pid=pid, k=k) -> None:
+                    TAREFAS[pid]["prog"] = (f"[{k}/{len(criados)}] " if len(criados) > 1 else "") + str(m)[:280]
+                    prog(m)
+                try:
+                    TAREFAS[pid]["msg"] = _link_rodar(pid, slug, qualidade, exportar, pr)
+                    feitos += 1
+                except Exception as exc:  # noqa: BLE001  (um link ruim não para os outros)
+                    TAREFAS[pid]["erro"] = str(exc)[:600]
+                    try:
+                        _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
+                    except Exception:  # noqa: BLE001
+                        pass
+                finally:
+                    TAREFAS[pid]["fim"] = time.time()
+            return f"{feitos}/{len(criados)} prontos"
+        for pid in criados[1:]:
+            TAREFAS[pid] = {"rotulo": "🔗 na fila", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "⏳ na fila"}
+        r = _rodar("link:" + criados[0], "🔗 link → vídeo", fila)
+        if isinstance(r, tuple):
+            return r
+        return _ok(criados=criados, videos=_links())
+
+    @app.route("/curtos/link/<pid>/refazer", methods=["POST"])
+    def curtos_link_refazer(pid: str):
+        """🔁 tenta de novo do ponto em que parou (o que já está feito e em dia é pulado)."""
+        p = _proj(pid)
+        lr = p.get("link_rapido") or {}
+        if not lr:
+            abort(404)
+        t = TAREFAS.get(pid)
+        if t and not t.get("fim"):
+            return _erro("Já está rodando.", 409)
+        TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "começando…"}
+        slug = (p.get("config") or {}).get("voz_tts") or ""
+
+        def corpo() -> None:
+            try:
+                TAREFAS[pid]["msg"] = _link_rodar(pid, slug, lr.get("qualidade") or "1080p", lr.get("exportar", True),
+                                                  lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+            except Exception as exc:  # noqa: BLE001
+                TAREFAS[pid]["erro"] = str(exc)[:600]
+                _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
+            finally:
+                TAREFAS[pid]["fim"] = time.time()
+        _link_etapa(pid, "🔁 de novo", erro="")
+        threading.Thread(target=corpo, daemon=True).start()
+        return _ok(videos=_links())
+
     def _novo_comentario():
         f = request.form
         modelo = f.get("modelo") if f.get("modelo") in CT.MODELOS_CLIPE else "comentario"
@@ -1262,6 +1476,15 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     p["config"]["so_fontes"] = f["midia"] == "minhas"
                 p["config"]["estilo_ia"] = f.get("estilo_ia") if f.get("estilo_ia") in CT.ESTILOS_IA else "realista"
             c["referencia"] = str(f.get("referencia") or "")[:20000]
+            if f.get("roteiro_pronto") and not expl:  # ✍ v84_283: o roteiro feito sem vídeo, já aprovado — narra como está
+                rp = _roteiro_pronto(str(f["roteiro_pronto"]))
+                if rp:
+                    p.setdefault("noticia", {})["texto"] = (
+                        "APPROVED SCRIPT — the creator already wrote and approved this narration. Use it WORD FOR WORD as the "
+                        "script (fala_en; keep any voice tags), only split it into blocks and match each line to the moment of "
+                        "the clip that shows it; translate it for fala_pt. Keep the hook and the final question exactly:\n"
+                        + rp["texto"])[:4000]
+                    c["roteiro_pronto"] = rp["id"]
             if f.get("voz"):
                 p["config"]["voz_tts"] = str(f["voz"])[:120]
             CT.salvar(base_dir, p)

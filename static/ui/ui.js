@@ -254,7 +254,8 @@
     lista.forEach(iconizarTexto);
     if (raiz.querySelectorAll) raiz.querySelectorAll('[title],[placeholder],[aria-label],option,optgroup,input[type=button],input[type=submit]').forEach(iconizarAtributos);
   }
-  function tituloSemEmoji() { if (RX_TEM.test(D.title)) D.title = semEmoji(D.title); }
+  function tituloSemEmoji() {  // só troca se mudou: um símbolo que fica (→) fazia o observador do <title> girar pra sempre
+    if (!RX_TEM.test(D.title)) return; const n = semEmoji(D.title); if (n !== D.title) D.title = n; }
 
   /* ======================================================================
      3. menu lateral

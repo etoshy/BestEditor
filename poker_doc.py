@@ -81,6 +81,9 @@ def novo(base: str, tema: str, infos: str = "", tipo: str = "documentario", idio
          "tipo": tipo if tipo in TIPOS else "documentario", "idioma": idioma or "pt",
          "minutos": max(1.0, min(40.0, float(minutos or 8))), "moeda": (str(moeda or "R$").strip() or "R$")[:6], "pesquisa": {"texto": "", "fontes": []}, "notas_pesquisa": "",
          "titulo": "", "blocos": [], "titulos": [], "checagem": None, "criado": time.time()}
+    if d["tipo"] == "shorts":   # ⚡ shorts já nasce vertical, rápido e com o ritmo de shorts
+        d.update(minutos=min(d["minutos"], 1.0), ritmo_pecas="rapido",
+                 op={"formato": "9:16", "estilo": "shorts", "mostrar": "pov", "pov": "auto", "zoom": True})
     salvar(base, d)
     return d
 
@@ -177,6 +180,9 @@ ROTEIRO_SYS = (
     "• ESTRATÉGIA (tutorial/explicação): mesa: estrategia=sim mostra na decisão quanto paga, a % que precisa (pot "
     "odds), a que tem, o EV do call e o SPR; 'range: Fulano AA-TT, AKs, AQo+, 22+' (ou 'top 15%') mostra a grade 13×13 "
     "do range dele com a mão real marcada — use pra explicar uma leitura.\n"
+    "• MÃO INTERROMPIDA / CARTA DESCONHECIDA: 'fim: \"texto\"' encerra a mão ali, sem showdown e sem vencedor (um "
+    "tiro, a polícia, a luz que acabou…); '??' é uma carta que ninguém sabe qual foi (ex.: 'jogador: Wild Bill 50 As Ac 8s "
+    "8c ??') — use em vez de inventar a carta. A mão com '??' que chega ao showdown precisa de 'fim:'.\n"
     "• ACORDOS: 'acordo: dividir' / 'acordo: equidade' / 'acordo: Fulano 60 Ciclano 40' (a mão acaba ali); RUN IT TWICE: "
     "'correr: 2' depois do all-in + 'board2: …' com as cartas que faltavam (cada board vale metade).\n"
     "• Na linha mesa: jogo=holdem|plo|plo5|6+|stud|draw (modalidade; Omaha já é pot-limit; limite=pl força; "
@@ -197,12 +203,29 @@ ROTEIRO_SYS = (
 )
 
 
+ESTRUTURA_SHORTS = (
+    "FORMATO SHORTS (30–60 s, ≈ 120–150 palavras), SEMPRE nesta estrutura, nesta ordem:\n"
+    "1) GANCHO — bloco 'narracao' com uma frase IMPACTANTE que prende nos 2 primeiros segundos, de preferência o que "
+    "disseram da jogada e a virada (ex.: \"'Que burro.' Foi o que disseram dessa jogada. Eles quebraram a cara.\" / "
+    "\"Ninguém acreditou quando ele fez isso.\" / \"Ele apostou a própria vida nessa mão.\"). grafico tipo 'gancho': "
+    "titulo = a frase curta que aparece GIGANTE na tela (2 a 6 palavras, ex.: 'QUE BURRO.'), subtitulo = o complemento "
+    "('foi o que disseram dessa jogada'), autor = quem disse (se for uma citação real).\n"
+    "2) CONTEXTO — 1 ou 2 blocos 'narracao' curtos: a partida, o que estava em jogo, quem são os jogadores. A PEÇA de cada "
+    "um segue esta prioridade: (a) se a pesquisa tem DADOS da partida (fichas, prêmio, placar, ranking, datas), mostre "
+    "eles — 'jogador' com os números, 'grafico'/'barras' das fichas, 'fato' com o valor; (b) se não tem dados mas é "
+    "sobre um jogador, use tipo '' e cite o NOME dele no texto (o site põe a foto dele, se o criador tiver); "
+    "(c) senão, 'titulo' ou 'citacao' (motion graphics).\n"
+    "3) A JOGADA — o bloco 'mao' (POV pra suspense, [zoom: …] no momento decisivo, emoção só se registrada); "
+    "contexto_antes curtíssimo, a narração DURANTE a mão, estrategia em 1 frase, contexto_depois em 1 frase.\n"
+    "4) FINAL — bloco 'narracao' com uma frase impactante de fechamento (a virada, a lição, a ironia), grafico 'gancho'.\n"
+    "Na mesa use ritmo=shorts e gancho=\"…\" (a mesma frase do gancho, curta)."
+)
+
+
 def _conteudo(d: Dict[str, Any]) -> str:
     partes = [f"TEMA: {d['tema']}", f"TIPO DE VÍDEO: {TIPOS.get(d['tipo'], d['tipo'])}"]
     if d.get("tipo") == "shorts":
-        partes.append("FORMATO SHORTS: 1 mão só, a jogada insana. Comece pelo gancho (a frase que prende nos 2 primeiros "
-                      "segundos — vai na mesa como gancho=\"...\" e ritmo=shorts), conte rapidinho o contexto, mostre a mão "
-                      "(POV pra criar suspense, zoom no all-in) e feche com a reação/o resultado. Narração curta (≈ 130 palavras).")
+        partes.append(ESTRUTURA_SHORTS)
     if d.get("infos"):
         partes.append(f"O QUE O CRIADOR SABE / QUER:\n{d['infos']}")
     if (d.get("pesquisa") or {}).get("texto"):

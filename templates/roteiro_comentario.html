@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}✍ Roteiro de comentário{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .rc-grid { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(360px, 1.3fr); gap: 14px; align-items: start; }
+  @media (max-width: 1000px) { .rc-grid { grid-template-columns: 1fr; } }
+  .rc-form label { display: flex; flex-direction: column; gap: 3px; font-weight: 600; font-size: .86rem; margin: 8px 0 0; }
+  .rc-form label.chk { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; }
+  .rc-form label.chk input { width: auto; margin: 0; }
+  .rc-form textarea { width: 100%; box-sizing: border-box; }
+  .rc-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 10px; }
+  .rc-parte { border-left: 4px solid var(--acento); padding: 4px 0 4px 10px; margin: 10px 0; }
+  .rc-parte h4 { margin: 0 0 4px; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mudo); }
+  .rc-parte textarea { width: 100%; box-sizing: border-box; font-size: .95rem; line-height: 1.45; margin: 0; resize: vertical; }
+  .rc-parte .pt { font-size: .82rem; color: var(--mudo); margin-top: 4px; }
+  .rc-parte .pt textarea { font-size: .82rem; }
+  .rc-op { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; border-bottom: 1px solid var(--borda); }
+  .rc-op.on { background: var(--acento-suave); border-radius: 8px; }
+  .rc-op .tx { flex: 1; font-size: .9rem; } .rc-op .tx small { display: block; color: var(--mudo); font-size: .78rem; margin-top: 2px; }
+  .rc-op button { flex: 0 0 auto; }
+  .rc-entendi { background: var(--acento-suave); border-radius: 10px; padding: 10px 12px; font-size: .88rem; }
+  .rc-conf { color: var(--erro); font-size: .84rem; margin: 6px 0 0; padding-left: 18px; }
+  .rc-carregando { display: none; align-items: center; gap: 10px; padding: 18px; font-size: .95rem; }
+  .rc-carregando.on { display: flex; }
+  .rc-gira { width: 22px; height: 22px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: rcg 1s linear infinite; }
+  @keyframes rcg { to { transform: rotate(360deg); } }
+  .rc-lista a { text-decoration: none; }
+</style>
+<h1>✍ Roteiro de comentário <span class="si-dica" style="font-weight:400">sem o vídeo: conte a história ou cole a transcrição → gancho, história e final com pergunta</span></h1>
+<div id="barra" class="si-barra{% if erro %} {{ 'okk' if erro.startswith('📥') else 'erro' }}{% endif %}">{{ erro or '' }}</div>
+<div class="si-passos"><span>1 · conte a história como pra um amigo</span><span>2 · escolha o tom</span><span>3 · abre no momento mais forte → conta rápido → final numa frase + pergunta</span><span>4 · leia e ajuste</span><span>5 · 💬 leve pro curto</span></div>
+
+{% macro campos(r) %}
+  <label>📖 A história <span class="si-dica" style="font-weight:400">— o que acontece no clipe, em palavras simples (ou cole a transcrição do short, mesmo bagunçada)</span>
+    <textarea name="historia" id="f_historia" rows="9" placeholder="A marathon runner collapses seconds before the finish line. A runner behind him stops to help him up, but then notices another runner catching up… (pode escrever em português)">{{ r.historia if r else '' }}</textarea></label>
+  <div class="rc-ops">
+    <label>Tom<select name="tom" id="f_tom">{% for k, v in tons.items() %}<option value="{{ k }}"{% if r and r.tom == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Postar em<select name="lingua_post" id="f_lingua">{% for k, v in linguas.items() %}<option value="{{ k }}"{% if r and r.lingua_post == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Duração<select name="duracao" id="f_duracao">{% for k, v in duracoes.items() %}<option value="{{ k }}"{% if r and r.duracao == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  </div>
+  <label class="chk"><input type="checkbox" name="tags" id="f_tags" value="1"{% if not r or r.tags %} checked{% endif %}> 🎙 tags de emoção do Chatterbox Turbo ([gasp], [laugh]…) — só em inglês</label>
+  <label>Pedido extra (opcional)<textarea name="extra" id="f_extra" rows="2" placeholder="ex.: mais engraçado, falar como um narrador de futebol, não citar o nome do atleta…">{{ r.extra if r else '' }}</textarea></label>
+{% endmacro %}
+
+{% if not r %}
+<div class="rc-grid">
+  <div class="si-card">
+    <h2 style="margin:0">➕ Novo roteiro</h2>
+    <form method="post" action="/curtos/roteiro-comentario/novo" class="rc-form">
+      <label>Nome (opcional)<input name="titulo" placeholder="ex.: maratonista que caiu na chegada"></label>
+      {{ campos(None) }}
+      <div class="si-linha" style="margin-top:10px"><button class="si-ok">✍ gerar roteiro</button>
+        {% if not ia %}<span class="si-dica">⚠ IA desligada pros curtos — dá pra usar o 📋 prompt numa outra IA e colar a resposta.</span>{% endif %}</div>
+    </form>
+  </div>
+  <div class="si-card rc-lista">
+    <h2 style="margin:0">📁 Roteiros</h2>
+    {% if not lista %}<p class="si-dica">Nenhum ainda.</p>{% endif %}
+    {% for x in lista %}
+    <div class="si-linha"><a href="/curtos/roteiro-comentario/{{ x.id }}">{{ '⛏' if x.minerado else '✍' }} {{ x.titulo }}</a>
+      {% if x.minerado %}<span class="si-tag">nota {{ x.nota }}</span><span class="si-tag">{{ modelos.get(x.modelo, x.modelo) }}</span>{% else %}<span class="si-tag">{{ tons.get(x.tom, x.tom) }}</span>{% endif %}
+      {% if x.pronto %}<span class="si-tag">✅</span>{% endif %}</div>
+    {% endfor %}
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">⛏ Importar do minerador</summary>
+      <p class="si-dica">O <code>minerador.py</code> manda sozinho cada vídeo aprovado pra cá (com o site aberto). Se o site estava fechado, suba o <code>aprovados.jsonl</code> ou o <code>pendentes_site.jsonl</code> da pasta <code>minerados</code>.</p>
+      <form method="post" action="/curtos/roteiro-comentario/importar" enctype="multipart/form-data" class="si-linha">
+        <input type="file" name="arquivo" accept=".jsonl,.json,.txt" required><button class="si-mini">📥 importar</button></form></details>
+    <p class="si-dica" style="margin-top:12px">Já tem o vídeo? O <a href="/curtos/modelo/comentario">💬 curto de comentário</a> faz tudo (roteiro, voz e edição). Aqui é só o roteiro — e dá pra levar ele pra lá depois.</p>
+  </div>
+</div>
+{% else %}
+<p><a href="/curtos/roteiro-comentario">← todos os roteiros</a></p>
+<div class="rc-grid">
+  <div>
+    <div class="si-card" id="c_min" style="display:none"><h2 style="margin:0">⛏ Do minerador</h2><div id="min"></div></div>
+    <div class="si-card rc-form">
+      <div class="si-linha"><label style="flex-direction:row;align-items:center;margin:0">Nome <input id="f_titulo" value="{{ r.titulo }}" style="min-width:220px"></label>
+        <form method="post" action="/curtos/roteiro-comentario/{{ r.id }}/apagar" onsubmit="return confirm('Apagar este roteiro?')" style="margin-left:auto">
+          <button class="si-mini si-perigo">🗑</button></form></div>
+      {{ campos(r) }}
+      <div class="si-linha" style="margin-top:10px"><button id="bgerar" class="si-ok" onclick="rcGerar()">🔄 gerar de novo</button>
+        <span class="si-dica">refaz tudo com a história e o tom acima</span></div>
+      <details style="margin-top:10px"><summary style="cursor:pointer">📋 usar numa outra IA (prompt / colar resposta)</summary>
+        <div class="si-linha"><button class="si-mini si-sec" onclick="rcCopiarPrompt()">📋 copiar o prompt</button>
+          <a href="/curtos/roteiro-comentario/{{ r.id }}/prompt" target="_blank" class="si-dica">ver</a></div>
+        <textarea id="colar" rows="5" placeholder="cole aqui o JSON que a outra IA respondeu"></textarea>
+        <button class="si-mini" onclick="rcColar()">📥 usar a resposta</button></details>
+    </div>
+  </div>
+  <div>
+    <div class="si-card">
+      <div id="carregando" class="rc-carregando"><div class="rc-gira"></div><span>✍ escrevendo o roteiro… (uns 30-60 s)</span></div>
+      <div id="vazio" class="si-dica">Nenhum roteiro ainda — clique em 🔄 gerar.</div>
+      <div id="res" style="display:none">
+        <div class="rc-entendi"><b>🧠 O que a IA entendeu</b> <span id="tom" class="si-tag"></span><div id="entendi"></div>
+          <ul id="conferir" class="rc-conf"></ul></div>
+        <h2 style="margin:14px 0 0">📝 Roteiro <span id="segs" class="si-tag"></span></h2>
+        <p class="si-dica">Leia e ajuste: tire palavras sobrando, troque o que não soa natural e confira se bate com o clipe. Depois 💾.</p>
+        <div id="partes"></div>
+        <div class="si-linha"><button class="si-mini" onclick="rcSalvar()">💾 salvar edições</button>
+          <button class="si-mini si-sec" onclick="rcCopiar('en')">📋 copiar roteiro</button>
+          <button class="si-mini si-sec" onclick="rcCopiar('pt')">📋 copiar em português</button>
+          <a id="levar" href="#"><button id="levar_b" class="si-mini si-ok">💬 levar pro curto de comentário</button></a></div>
+      </div>
+    </div>
+    <div class="si-card" id="c_angulo" style="display:none"><h2 style="margin:0">🔀 Outro ângulo <span id="ang_nome" class="si-tag"></span></h2>
+      <p id="ang_txt" style="font-size:.9rem"></p><small id="ang_pt" class="si-dica"></small>
+      <div class="si-linha"><button class="si-mini" onclick="rcEscolher('angulo', 0)">🔀 usar este ângulo</button><span class="si-dica">o atual vira o outro ângulo</span></div></div>
+    <div class="si-card" id="c_ganchos" style="display:none"><h2 style="margin:0">🪝 Ganchos <span class="si-dica" style="font-weight:400">— a 1ª frase; clique em usar pra trocar</span></h2>
+      <div id="ganchos"></div><button class="si-mini si-sec" onclick="rcMais('ganchos', this)">➕ mais 10 ganchos</button></div>
+    <div class="si-card" id="c_perguntas" style="display:none"><h2 style="margin:0">❓ Finais com pergunta <span class="si-dica" style="font-weight:400">— o último momento + a pergunta que puxa comentário</span></h2>
+      <div id="perguntas"></div><button class="si-mini si-sec" onclick="rcMais('perguntas', this)">➕ mais 10 finais</button></div>
+    <div class="si-card" id="c_post" style="display:none"><h2 style="margin:0">🏷 Postagem</h2>
+      <div id="titulos"></div><button class="si-mini si-sec" onclick="rcMais('titulos', this)">➕ mais 5 títulos</button>
+      <h4 style="margin:12px 0 4px">Descrição</h4><div id="descricao" style="white-space:pre-wrap;font-size:.9rem"></div>
+      <div class="si-linha"><span id="hashtags" class="si-dica"></span><button class="si-mini si-sec" onclick="rcCopiarPost()">📋 copiar descrição + hashtags</button></div></div>
+  </div>
+</div>
+<script>
+(() => {
+const RID = {{ r.id|tojson }};
+let R = null;
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3000); }
+async function post(url, corpo) {
+  const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida (' + r.status + ')'}));
+  if (!j.ok) throw new Error(j.erro || 'erro'); return j;
+}
+async function copiar(t) { try { await navigator.clipboard.writeText(t); aviso('📋 copiado', 'okk'); } catch (e) { prompt('Copie:', t); } }
+function config() { return {historia: el('f_historia').value, tom: el('f_tom').value, lingua_post: el('f_lingua').value, duracao: +el('f_duracao').value,
+  tags: el('f_tags').checked, extra: el('f_extra').value, titulo: el('f_titulo').value}; }
+const PARTES = [['gancho', '🪝 Gancho — abre no momento mais forte'], ['corpo', '📖 A história — rápido'], ['final', '🎯 Final — numa frase + a pergunta']];
+function lista(qual, alvo) {
+  const res = R.r.res, ops = res[qual] || [], esc_ = (res.escolhido || {})[qual] ?? 0, box = el(alvo); box.innerHTML = '';
+  ops.forEach((o, i) => { const d = document.createElement('div'); d.className = 'rc-op' + (i === esc_ ? ' on' : '');
+    d.innerHTML = `<div class="tx">${esc(o.en)}${o.pt && o.pt !== o.en ? `<small>🇧🇷 ${esc(o.pt)}</small>` : ''}</div>` +
+      (i === esc_ ? '<span class="si-tag">✔ no roteiro</span>' : `<button class="si-mini">usar</button>`) + `<button class="si-mini si-sec" title="copiar">📋</button>`;
+    const bs = d.querySelectorAll('button'); if (i !== esc_) bs[0].onclick = () => rcEscolher(qual, i); bs[bs.length - 1].onclick = () => copiar(o.en);
+    box.appendChild(d); });
+}
+function desenhar(j) {
+  R = j; const res = j.r.res;
+  el('vazio').style.display = res ? 'none' : ''; el('res').style.display = res ? '' : 'none';
+  ['c_ganchos', 'c_perguntas', 'c_post'].forEach(k => el(k).style.display = res ? '' : 'none');
+  if (!res) return;
+  el('entendi').textContent = res.entendi_pt || ''; el('tom').textContent = res.tom || ''; el('tom').style.display = res.tom ? '' : 'none';
+  el('conferir').innerHTML = (res.conferir_pt || []).map(x => `<li>⚠ ${esc(x)}</li>`).join('');
+  el('segs').textContent = `~${Math.round(j.segundos)} s narrado`;
+  const pp = el('partes'); pp.innerHTML = '';
+  PARTES.forEach(([k, rot]) => { const d = document.createElement('div'); d.className = 'rc-parte';
+    const lin = res[k].en.length > 160 ? 5 : 2;
+    d.innerHTML = `<h4>${rot}</h4><textarea data-p="${k}" data-l="en" rows="${lin}">${esc(res[k].en)}</textarea>
+      ${j.r.lingua_post === 'pt' ? '' : `<div class="pt">🇧🇷 <textarea data-p="${k}" data-l="pt" rows="${lin}">${esc(res[k].pt)}</textarea></div>`}`;
+    pp.appendChild(d); });
+  lista('ganchos', 'ganchos'); lista('perguntas', 'perguntas');
+  const tb = el('titulos'); tb.innerHTML = ''; const et = (res.escolhido || {}).titulos ?? 0;
+  (res.titulos || []).forEach((o, i) => { const d = document.createElement('div'); d.className = 'rc-op' + (i === et ? ' on' : '');
+    d.innerHTML = `<div class="tx">${esc(o.en)}${o.pt && o.pt !== o.en ? `<small>🇧🇷 ${esc(o.pt)}</small>` : ''}</div><button class="si-mini si-sec">📋</button>`;
+    d.querySelector('button').onclick = () => copiar(o.en); tb.appendChild(d); });
+  el('descricao').textContent = res.descricao || ''; el('hashtags').textContent = (res.hashtags || []).join(' ');
+  el('levar').href = j.destino.url; el('levar_b').textContent = j.destino.rotulo;
+  const b = res.angulo_b || {}, temB = b.corpo && b.corpo.en;
+  el('c_angulo').style.display = temB ? '' : 'none';
+  if (temB) { el('ang_nome').textContent = b.angulo || ''; el('ang_txt').textContent = [b.gancho, b.corpo, b.final].map(x => (x || {}).en || '').join(' ');
+    el('ang_pt').textContent = '🇧🇷 ' + [b.gancho, b.corpo, b.final].map(x => (x || {}).pt || '').join(' '); }
+  const m = j.r.minerador; el('c_min').style.display = m ? '' : 'none';
+  if (m) { const mt = m.metricas || {}, mf = m.momento_forte || {}, de = m.detalhe_escondido || {}, t2 = s => s == null ? '?' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    el('min').innerHTML = `<div class="si-linha"><a href="${esc(m.link)}" target="_blank">🔗 vídeo original</a><span class="si-tag">nota ${esc(m.nota)}/10</span>
+      <span class="si-tag">${esc(j.modelos[m.modelo] || m.modelo)}</span>${m.duracao_s ? `<span class="si-tag">${esc(m.duracao_s)} s</span>` : ''}</div>
+      <div class="si-dica">@${esc(m.autor)} · ❤ ${esc(mt.curtidas)} · 💬 ${esc(mt.comentarios)} · 🔖 ${esc(mt.salvos)} · ↗ ${esc(mt.compartilh)}</div>
+      <p style="font-size:.88rem;margin:6px 0">${esc(m.motivo)}</p>
+      ${mf.descricao ? `<p style="font-size:.88rem;margin:4px 0">⚡ <b>Momento forte ${t2(mf.tempo_s)}</b> — ${esc(mf.descricao)}</p>` : ''}
+      ${m.reviravolta ? `<p style="font-size:.88rem;margin:4px 0">🔄 <b>Reviravolta</b> — ${esc(m.reviravolta)}</p>` : ''}
+      ${de.descricao ? `<p style="font-size:.88rem;margin:4px 0">🎯 <b>Detalhe escondido ${t2(de.tempo_s)}</b> — ${esc(de.descricao)}</p>` : ''}
+      ${m.discussao_principal ? `<p style="font-size:.88rem;margin:4px 0">🔥 <b>O público discute</b> — ${esc(m.discussao_principal)}</p>` : ''}
+      ${(m.comentarios_uteis || []).length ? `<details open><summary style="cursor:pointer;font-weight:600">💬 Comentários que ajudam</summary>${m.comentarios_uteis.map(c => `<div class="rc-op"><div class="tx"><span class="si-tag">${esc(c.tipo)}</span> “${esc(c.texto)}” <small>❤ ${esc(c.curtidas)} · ↩ ${esc(c.respostas)} — ${esc(c.uso)}</small></div></div>`).join('')}</details>` : ''}
+      ${(m.perguntas_publico || []).length ? `<details><summary style="cursor:pointer;font-weight:600">❓ Perguntas do público</summary><ul style="font-size:.85rem">${m.perguntas_publico.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>` : ''}
+      ${(m.plano_edicao || []).length ? `<details><summary style="cursor:pointer;font-weight:600">✂ Plano de edição</summary><table style="font-size:.8rem;width:100%">${m.plano_edicao.map(p => `<tr><td>${esc(p.tempo_clipe)}</td><td><b>${esc(p.acao)}</b></td><td>${esc(p.alvo)}</td><td>${esc(p.detalhe)}</td></tr>`).join('')}</table></details>` : ''}
+      ${m.assunto_explicativo ? `<p style="font-size:.85rem;margin:6px 0">📚 <b>Também dá um explicativo:</b> ${esc(m.assunto_explicativo)}</p>` : ''}
+      ${m.ideia_longa ? `<p style="font-size:.85rem;margin:6px 0">🎞 <b>Ideia pra vídeo longo:</b> ${esc(m.ideia_longa)}</p>` : ''}
+      ${(m.alertas || []).length ? `<ul class="rc-conf">${m.alertas.map(x => `<li>⚠ ${esc(x)}</li>`).join('')}</ul>` : ''}`; }
+}
+function partesEditadas() { const out = {}; document.querySelectorAll('#partes textarea').forEach(t => { (out[t.dataset.p] ||= {})[t.dataset.l] = t.value; }); return out; }
+function carregando(on) { el('carregando').classList.toggle('on', on); el('bgerar').disabled = on; if (on) { el('vazio').style.display = 'none'; el('res').style.display = 'none'; } }
+window.rcGerar = async () => { carregando(true);
+  try { desenhar(await post(`/curtos/roteiro-comentario/${RID}/gerar`, config())); aviso('✅ roteiro pronto', 'okk'); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); if (R) desenhar(R); else el('vazio').style.display = ''; }
+  carregando(false); };
+window.rcSalvar = async () => { try { desenhar(await post(`/curtos/roteiro-comentario/${RID}/editar`, partesEditadas())); aviso('💾 salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.rcEscolher = async (qual, i) => { try { await post(`/curtos/roteiro-comentario/${RID}/editar`, partesEditadas());
+  desenhar(await post(`/curtos/roteiro-comentario/${RID}/escolher`, {qual, i})); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.rcMais = async (qual, b) => { b.disabled = true; const t = b.textContent; b.textContent = '⏳ pensando…';
+  try { const j = await post(`/curtos/roteiro-comentario/${RID}/mais`, {qual}); desenhar(j); aviso(`➕ ${j.novas} novas`, 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  b.disabled = false; b.textContent = t; };
+window.rcCopiar = async lado => { const p = partesEditadas(); copiar(PARTES.map(([k]) => (p[k] || {})[lado] ?? R.r.res[k][lado]).filter(Boolean).join(' ')); };
+window.rcCopiarPost = () => { const res = R.r.res, ti = (res.titulos || [])[(res.escolhido || {}).titulos || 0]; copiar([(ti || {}).en, res.descricao, (res.hashtags || []).join(' ')].filter(Boolean).join('\n\n')); };
+window.rcCopiarPrompt = async () => { await post(`/curtos/roteiro-comentario/${RID}/config`, config()); copiar(await (await fetch(`/curtos/roteiro-comentario/${RID}/prompt`)).text()); };
+window.rcColar = async () => { try { desenhar(await post(`/curtos/roteiro-comentario/${RID}/colar`, {resposta: el('colar').value})); el('colar').value = ''; aviso('✅ resposta usada', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+(async () => { const j = await (await fetch(`/curtos/roteiro-comentario/${RID}/estado`)).json(); desenhar(j);
+  if (!j.r.res && new URLSearchParams(location.search).get('gerar')) { history.replaceState(null, '', location.pathname); rcGerar(); } })();
+})();
+</script>
+{% endif %}
+{% endblock %}

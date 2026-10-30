@@ -12143,6 +12143,14 @@ import shorts_ia_rotas as _shorts_ia_rotas  # noqa: E402  🎌 Shorts de IA: sé
 _shorts_ia_rotas.registrar(app, BASE_DIR, _curto_transcrever)
 import poker_rotas as _poker_rotas  # noqa: E402  🃏 Poker: mesa animada, ranking, roteiros com pesquisa (v84_277)
 _poker_rotas.registrar(app, BASE_DIR, tts_gerar_audio_isolado, lambda t, m: na.limpar_texto_para_tts(t, motor=m))
+import explicador_rotas as _explicador_rotas  # noqa: E402  🎬 Explicador animado: narração → motion graphics (v84_278)
+_explicador_rotas.registrar(app, BASE_DIR, _react_criar_job, _job_dir, _curto_transcrever)
+import juntar_videos as _juntar_videos  # noqa: E402  🔗 Juntar vídeos: envia, ordena, junta e baixa (v84_282)
+_juntar_videos.registrar(app, BASE_DIR)
+import roteiro_comentario as _roteiro_comentario  # noqa: E402  ✍ Roteiro de comentário só com o texto (v84_283)
+_roteiro_comentario.registrar(app, BASE_DIR)
+import minerador_rotas as _minerador_rotas  # noqa: E402  ⛏ Minerador TikTok: rodar, config e os vídeos minerados (v84_285)
+_minerador_rotas.registrar(app, BASE_DIR)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)
@@ -12283,6 +12291,9 @@ def _padroes_excluidos_do_reloader() -> list:
         os.path.join(BASE_DIR, "pixabay_sons"),
         os.environ.get("SHORTS_IA_DIR") or os.path.join(BASE_DIR, "shorts_ia"),  # 🎌 shorts de IA: refs, quadros, vídeos
         os.environ.get("POKER_DIR") or os.path.join(BASE_DIR, "poker"),  # 🃏 poker: mãos, fotos, vídeos, roteiros
+        os.environ.get("EXPLICADOR_DIR") or os.path.join(BASE_DIR, "explicador"),  # 🎬 explicador animado: cenas, render
+        os.environ.get("JUNTAR_DIR") or os.path.join(BASE_DIR, "juntar"),  # 🔗 juntar vídeos: envios e o vídeo juntado
+        os.environ.get("ROTEIROS_COMENTARIO_DIR") or os.path.join(BASE_DIR, "roteiros_comentario"),  # ✍ roteiros de comentário
     ]
     # 🚀 v84_262: as bibliotecas instaladas (torch, transformers… milhares de arquivos) não mudam enquanto o site roda —
     # o reloader conferia a data de TODAS a cada segundo

@@ -508,3 +508,61 @@ def test_tempo_minimo_das_pecas():
     assert PG.tempo_minimo({"tipo": "titulo", "titulo": "x"}) >= 4.5
     longa = {"tipo": "citacao", "texto": "x" * 140}
     assert PG.tempo_minimo(longa) >= 12   # dá tempo de ler a frase inteira
+
+
+MAO_MORTO = '''mesa: jogo=draw blinds=1/2 unidade=$ titulo="A Mão do Homem Morto" estetica=noir
+jogador: Wild Bill 50 As Ac 8s 8c ?? heroi pais=US
+jogador: Carl Mann 50
+jogador: Charles Rich 50
+botao: Carl Mann
+preflop: Charles Rich call; Wild Bill call; Carl Mann check
+troca: Wild Bill 1
+fim: "Um tiro pelas costas. A mão nunca terminou."
+'''
+
+
+def test_fim_e_carta_desconhecida(tmp_path):
+    r = PM.simular(MAO_MORTO)
+    tipos = [e["tipo"] for e in r["eventos"]]
+    assert "fim" in tipos and "vencedor" not in tipos and tipos[-1] == "final"
+    assert r["jogadores"][0]["cartas"][-1] == "??" and r["eventos"][-1]["depois"]["pot"] > 0
+    assert next(e for e in r["eventos"] if e["tipo"] == "fim")["dados"]["texto"].startswith("Um tiro")
+    # sem o fim, a mão com ?? não dá pra decidir no showdown
+    with pytest.raises(PM.PokerErro, match="desconhecida"):
+        PM.simular(MAO_MORTO.replace('fim: "Um tiro pelas costas. A mão nunca terminou."\n', "pos: Charles Rich check; Wild Bill check; Carl Mann check\n")
+                   .replace("jogador: Carl Mann 50", "jogador: Carl Mann 50 2c 3c 4d 5h 9s").replace("jogador: Charles Rich 50", "jogador: Charles Rich 50 Kc Kd Qs Js 2d"))
+    # duas ?? não contam como carta repetida; inline no meio das ações também vale
+    r = PM.simular("jogador: A 10 ?? ??\njogador: B 10 ?? ??\nbotao: A\npreflop: A raise 3; [fim: \"acabou a luz\"]; B call\n")
+    assert [e["tipo"] for e in r["eventos"]].count("acao") == 1
+    import poker_3d as P3
+    _js_ok(PR.pagina(PM.simular(MAO_MORTO), PR.normalizar({"formato": "9:16"}), "/f", lambda a: "", "previa"), tmp_path)
+    _js_ok(P3.pagina(PM.simular(MAO_MORTO), PR.normalizar({"modo": "3d"}), "/f", lambda n: "", "previa"), tmp_path)
+
+
+def test_estrutura_shorts_poker(tmp_path, monkeypatch):
+    import poker_graficos as PG
+    import poker_montagem as PMo
+    monkeypatch.setenv("POKER_DIR", str(tmp_path / "poker"))
+    base = str(tmp_path)
+    d = PD.novo(base, "A mão do homem morto", tipo="shorts")
+    assert d["op"]["formato"] == "9:16" and d["ritmo_pecas"] == "rapido" and d["minutos"] <= 1
+    vistos = []
+
+    def chamar(recurso, sistema, conteudo, **kw):
+        vistos.append(conteudo)
+        return json.loads(json.dumps(ROTEIRO))
+    PD.escrever(base, d["id"], chamar=chamar)
+    assert "GANCHO" in vistos[0] and "FINAL" in vistos[0] and "prioridade" in vistos[0]
+    g = {"tipo": "gancho", "titulo": "QUE BURRO.", "subtitulo": "foi o que disseram", "autor": ""}
+    assert PG.tempo_minimo(g) >= 3
+    _js_ok(PG.pagina(g, PR.normalizar({"formato": "9:16"}), 4, "/f", "", "", "", "previa"), tmp_path)
+    # foto do jogador citado (pelo sobrenome) entra quando o bloco não tem dados
+    import poker_rotas as R
+    pa = R.pastas(base)["avatares"]
+    from PIL import Image
+    Image.new("RGB", (64, 64), "gray").save(os.path.join(pa, "wild_bill.jpg"))
+    PD.salvar_blocos(base, d["id"], [{"tipo": "narracao", "texto": "Wild Bill sentou de costas pra porta.", "grafico": {"tipo": ""}},
+                                     {"tipo": "mao", "texto": "x", "mao": {"titulo": "m", "mao": MAO_MORTO, "status": "ilustrativa"}}])
+    mt = PMo.Montador(base, d["id"], d["op"], lambda *a, **k: None, {"motor": "t"}, pasta_avatares=pa, kwargs_voz=lambda v: ("t", {}))
+    assert mt.foto_citada("E então Wild Bill sentou") .endswith("wild_bill.jpg")
+    assert mt.foto_citada("ninguém sabia") == ""

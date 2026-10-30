@@ -234,6 +234,8 @@ def trilha_sons(dados: Dict[str, Any], destino: str, pasta: str, shorts: bool = 
             pedacos.append(("fichas", t + 0.25))
         elif tipo == "showdown":
             pedacos.append(("virar", t + 0.2))
+        elif tipo == "fim":
+            pedacos += [("impacto", t + 0.05), ("suspense", t + 0.6)]
         elif tipo == "vencedor":
             pedacos.append(("vitoria", t + e["dur"] * 0.4))  # as fichas do pot empilhando na frente de quem ganhou
     if not pedacos:
@@ -463,6 +465,10 @@ function novaCarta(w) {
 function setCarta(c, cod) {
   if (c._cod === cod) return; c._cod = cod; const w = c._w; c._face.innerHTML = '';
   if (!cod) return;
+  if (cod === '??') {   // carta desconhecida: ninguém sabe qual foi
+    el('div', `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:${w * 0.8}px;font-weight:900;color:#9ca3af;background:repeating-linear-gradient(45deg,#f1f5f9 0 ${w * 0.08}px,#e2e8f0 ${w * 0.08}px ${w * 0.16}px)`, c._face).textContent = '?';
+    return;
+  }
   const r = cod[0] === 'T' ? '10' : cod[0], n = cod[1], cor = corNaipe(n);
   el('div', `font-size:${w * 0.42}px;color:${cor}`, c._face).className = 'r'; c._face.lastChild.textContent = r;
   el('div', `top:${w * 0.48}px;font-size:${w * 0.3}px;color:${cor}`, c._face).className = 'n1'; c._face.lastChild.textContent = SIMB[n];
@@ -573,6 +579,19 @@ function desenhaGrade(cels, mao, q, pulso) {
     g.fillStyle = on ? '#111' : '#9ca3af'; g.font = `700 ${c * 0.3}px DP Poppins, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(nome, j * c + c / 2, i * c + c / 2);
   }
+}
+// 💀 fim: a mão foi interrompida (sem showdown) — escurece tudo e o letreiro entra
+const fimVeu = el('div', 'position:absolute;inset:0;z-index:14;display:none;background:radial-gradient(ellipse at center, #000a, #000f)', palco);
+const fimTxt = el('div', `position:absolute;z-index:15;left:50%;top:50%;display:none;transform:translate(-50%,-50%);width:${W * 0.82}px;text-align:center;color:#fff;font-weight:900;font-size:${(VERT ? 64 : 58) * S}px;line-height:1.2;text-shadow:0 0 ${30 * S}px #000`, palco);
+function fimUI(t, e, p, k) {
+  const ev = e.tipo === 'fim' ? e : (e.tipo === 'final' && k > 0 && EV[k - 1].tipo === 'fim' ? EV[k - 1] : null);
+  if (!ev) { fimVeu.style.display = fimTxt.style.display = 'none'; return; }
+  const q = e.tipo === 'fim' ? p : 1;
+  fimVeu.style.display = fimTxt.style.display = 'block';
+  fimVeu.style.opacity = Math.min(1, q * 3) * 0.85;
+  fimTxt.textContent = ev.dados.texto; fimTxt.style.opacity = clamp((q - 0.2) * 3, 0, 1);
+  fimTxt.style.transform = `translate(-50%,-50%) scale(${1.08 - 0.08 * ease(clamp((q - 0.2) * 2, 0, 1))})`;
+  if (e.tipo === 'fim' && p < 0.08) { cena.style.transform = `translate(${Math.sin(t * 97) * 14 * S}px, ${Math.cos(t * 83) * 10 * S}px)`; }
 }
 function estrategiaUI(t, e, p) {
   painel.style.display = 'none'; gradeBox.style.display = 'none';
@@ -685,7 +704,7 @@ window.render = function (t) {
     let rot = st.ultima[i];
     if (e.tipo === 'acao' && e.dados.quem === i) rot = p > 0.25 ? e.dados.rotulo : antes.ultima[i];
     if (venceu) rot = '+' + fmt(depois.ganhos[i]);
-    if (rot && UNI_L !== 'bb' && !venceu) rot = rot.replace(/(-?[\d.]+)$/, (m0) => fmt(parseFloat(m0)));   // "ALL-IN 44.5" → "ALL-IN US$ 44,5"
+    if (rot && UNI_L !== 'bb' && !venceu && /^(BET|RAISE|CALL|ALL-IN)/.test(rot)) rot = rot.replace(/(-?[\d.]+)$/, (m0) => fmt(parseFloat(m0)));   // "ALL-IN 44.5" → "ALL-IN US$ 44,5"
     a.badge.textContent = rot || '';
     a.badge.style.display = rot ? 'block' : 'none';
     const corB = /FOLD/.test(rot) ? '#6b7280' : /ALL-IN/.test(rot) ? '#dc2626' : /RAISE|BET/.test(rot) ? '#f59e0b' : /CALL/.test(rot) ? '#22c55e' : /^\+/.test(rot) ? T.valor : '#64748b';
@@ -818,6 +837,7 @@ window.render = function (t) {
   else nota.style.display = 'none';
   titulo.style.opacity = e.tipo === 'intro' ? pe : (t < 6 ? 1 : 0.55);
   efeitos(t, e, p, pe, antes, depois);
+  fimUI(t, e, p, k);
 };
 function alvoZoom(alvo) {   // onde a câmera aproxima: um jogador (índice), o board ou o pot
   if (typeof alvo === 'number' && assentos[alvo]) return [assentos[alvo]._ax, assentos[alvo]._ay + 40 * S];
@@ -906,6 +926,9 @@ function efeitos(t, e, p, pe, antes, depois) {
   if (GANCHO && gq > 0 && gq < 1) titulo.style.opacity = 0;
   progresso.style.width = (100 * clamp(t / D.duracao, 0, 1)) + '%';
 }
+// onde cada coisa está na tela (pra quem embute a mesa num vídeo maior apontar setas e rótulos)
+window.lugaresTela = () => assentos.map(a => { const r = a.av.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+window.botaoTela = () => { const r = dealer.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
 window.render(0);
 window.pronto = true;
 

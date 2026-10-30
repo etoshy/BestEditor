@@ -56,8 +56,13 @@ POSICOES = {2: ["BTN", "BB"], 3: ["BTN", "SB", "BB"], 4: ["BTN", "SB", "BB", "UT
 
 
 # ------------------------------------------------------------------ cartas
+DESCONHECIDA = "??"   # carta que ninguém sabe qual foi (aparece com "?" e não entra na conta)
+
+
 def carta(c: str) -> str:
     c = str(c or "").strip().replace("10", "T")
+    if c in ("??", "?"):
+        return DESCONHECIDA
     m = re.fullmatch(r"([2-9TJQKAtjqka])([shdcSHDC♠♥♦♣])", c)
     if not m:
         raise PokerErro(f"Carta inválida: “{c}” (use As, Kd, Th, 9c…)")
@@ -68,7 +73,11 @@ def carta(c: str) -> str:
 def cartas(txt: Any) -> List[str]:
     if isinstance(txt, list):
         return [carta(x) for x in txt]
-    return [carta(x) for x in re.findall(r"(?:10|[2-9TJQKAtjqka])[shdcSHDC♠♥♦♣]", str(txt or ""))]
+    return [carta(x) for x in re.findall(r"\?\?|(?:10|[2-9TJQKAtjqka])[shdcSHDC♠♥♦♣]", str(txt or ""))]
+
+
+def conhecidas(cs: List[str]) -> bool:
+    return bool(cs) and DESCONHECIDA not in cs
 
 
 # ------------------------------------------------------------------ avaliador (7 cartas → melhor de 5)
@@ -236,7 +245,7 @@ def celula(r1: str, r2: str, naipe: str = "") -> str:
 
 
 def celula_da_mao(cs: List[str]) -> str:
-    if len(cs) != 2:
+    if len(cs) != 2 or DESCONHECIDA in cs:
         return ""
     return celula(cs[0][0], cs[1][0], "s" if cs[0][1] == cs[1][1] else "o")
 
@@ -384,6 +393,9 @@ def extra_de(chave: str, resto: str, apos: int = 0) -> Optional[Dict[str, Any]]:
         if m:
             texto = m.group(1).strip()
         return {"tipo": "acordo", "modo": modo, "partes": partes, "texto": texto[:120], "apos": apos}
+    if chave in ("fim", "interrompe", "interrompida", "fim_da_mao", "end"):
+        m = re.search(r"[\"“](.+?)[\"”]", resto)
+        return {"tipo": "fim", "texto": (m.group(1) if m else resto).strip()[:200], "apos": apos}
     if chave in ("range", "faixa", "ranges"):
         toks = resto.split(None, 1)
         return {"tipo": "range", "quem": toks[0] if toks else "", "spec": toks[1] if len(toks) > 1 else "", "apos": apos}
@@ -606,7 +618,7 @@ class _Mao:
         self.tipo = VARIANTES[self.var].get("tipo", "board")   # board (Hold'em/Omaha) · stud · draw
         self.js = [{"nome": n, "stack": round(_num(j.get("stack") or 0), 2), "cartas": cartas(j.get("cartas") or []),
                     "heroi": bool(j.get("heroi")), "avatar": j.get("avatar") or "", "pais": j.get("pais") or ""} for n, j in zip(nomes, js)]
-        usadas = [c for j in self.js for c in j["cartas"]] + [c for r in m.get("ruas") or [] for c in r.get("cartas") or []]
+        usadas = [c for j in self.js for c in j["cartas"] if c != DESCONHECIDA] + [c for r in m.get("ruas") or [] for c in r.get("cartas") or [] if c != DESCONHECIDA]
         if len(usadas) != len(set(usadas)):
             raise PokerErro("Tem carta repetida na mão.")
         if VARIANTES[self.var]["curto"] and any(c[0] in "2345" for c in usadas):
@@ -763,7 +775,7 @@ class _Mao:
         if self.tipo != "board":
             self.equidade = {}
             return
-        maos = {i: self.js[i]["cartas"] for i in self.ativos() if len(self.js[i]["cartas"]) == self.ncartas}
+        maos = {i: self.js[i]["cartas"] for i in self.ativos() if len(self.js[i]["cartas"]) == self.ncartas and conhecidas(self.js[i]["cartas"])}
         if len(maos) >= 2 and len(maos) == len(self.ativos()):
             mortas = [c for i, j in enumerate(self.js) if self.fora[i] for c in j["cartas"]]
             self.equidade = equidade(maos, list(self.board), mortas, var=self.var)
@@ -779,7 +791,8 @@ class _Mao:
         precisa = 100.0 * pagar / max(1e-9, pote + pagar)
         eq = None
         vivos = [i for i in range(len(self.js)) if not self.fora[i] or i == quem]
-        if self.tipo == "board" and all(len(self.js[i]["cartas"]) == self.ncartas for i in vivos) and len(vivos) >= 2:
+        if self.tipo == "board" and all(len(self.js[i]["cartas"]) == self.ncartas and conhecidas(self.js[i]["cartas"]) for i in vivos) \
+                and DESCONHECIDA not in self.board and len(vivos) >= 2:
             chave = (len(self.board), tuple(vivos))
             if chave not in self._eq_cache:
                 mortas = [c for i, j in enumerate(self.js) if i not in vivos for c in j["cartas"]]
@@ -959,6 +972,13 @@ class _Mao:
                 self.emocoes.append({"t0": round(self.t, 3), "dur": round(d, 3), "quem": self.idx(x["quem"]), "emoji": x["emoji"],
                                      "texto": x.get("texto") or ""})
                 self.evento("pausa", 0.5)
+            elif x["tipo"] == "fim":   # 💀 a mão acaba aqui, sem showdown e sem vencedor (interrompida)
+                self.vez = None
+                for i in self.ativos():
+                    if self.js[i]["cartas"] and (self.mostrar in ("todas", "pov") or self.js[i]["heroi"]):
+                        self.revelado[i] = True
+                self.evento("fim", 4.2, texto=x.get("texto") or "A mão nunca terminou.")
+                self.encerrada = True
             elif x["tipo"] == "range":
                 i = self.idx(x["quem"])
                 if x.get("spec"):
@@ -992,7 +1012,7 @@ class _Mao:
         if len(vivos) < 2:
             raise PokerErro("acordo: precisa de pelo menos 2 jogadores na mão.")
         if x["modo"] == "equidade":
-            if any(len(self.js[i]["cartas"]) != self.ncartas for i in vivos):
+            if any(len(self.js[i]["cartas"]) != self.ncartas or not conhecidas(self.js[i]["cartas"]) for i in vivos):
                 raise PokerErro("acordo: equidade precisa das cartas de todos que estão na mão.")
             mortas = [c for i, j in enumerate(self.js) if self.fora[i] for c in j["cartas"]]
             eq = equidade({i: self.js[i]["cartas"] for i in vivos}, list(self.board), mortas, var=self.var)
@@ -1058,6 +1078,10 @@ class _Mao:
             self.evento("vencedor", TEMPOS["vencedor"], quem=[g], pot=round(pot, 2), sem_showdown=True)
             return
         # completa o board se todo mundo foi all-in antes do river
+        misterio = [self.js[i]["nome"] for i in vivos if DESCONHECIDA in self.maos[i]] + (["o board"] if DESCONHECIDA in self.board else [])
+        if misterio:
+            raise PokerErro("Showdown com carta desconhecida (??) de " + ", ".join(misterio) + " — a mão não dá pra decidir: "
+                            "termine com fim: \"texto\" (ex.: a mão foi interrompida) ou ponha a carta.")
         if self.tipo == "board" and len(self.board) < 5:
             raise PokerErro("Mão com mais de um jogador até o fim precisa do board completo (flop, turn e river).")
         if self.tipo == "stud" and self.rua != "s7":

@@ -147,6 +147,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "canal": ("📊 Analisador de canal",
               "Lê os números, as miniaturas e as transcrições dos 20 vídeos recentes e dos 20 populares de um canal e diz o que "
               "funciona (títulos, capas, tipos de vídeo) e sugere vídeos novos.", True),
+    "explicador": ("🎬 Explicador animado: plano das cenas",
+                   "Na aba 🎬 Explicador animado: lê a narração com os tempos e monta o plano de motion graphics (textos, "
+                   "cartas, ranking, listas, dicas, mãos de poker no simulador) com cada coisa entrando na frase certa.", True),
     "marca": ("🎨 Identidade visual: batidas, poses novas e revisão",
               "Na aba 🎨 Identidade visual, divide a narração em batidas (tipo de imagem, pose do mascote, textos em alemão), "
               "traduz uma pose/emoção nova que você descreve e olha cada imagem gerada contra o guia da marca (mascote igual, "

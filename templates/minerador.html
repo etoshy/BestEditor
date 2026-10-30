@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}⛏ Minerador TikTok{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .mn-topo { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 1000px) { .mn-topo { grid-template-columns: 1fr; } }
+  .mn-log { background: #0b0d12; color: #cfe3cf; font: .74rem/1.4 ui-monospace, Consolas, monospace; border-radius: 10px; padding: 10px;
+            height: 300px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
+  .mn-cfg { width: 100%; box-sizing: border-box; min-height: 300px; font: .74rem/1.35 ui-monospace, Consolas, monospace; }
+  .mn-luz { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b; margin-right: 6px; }
+  .mn-luz.on { background: #16a34a; box-shadow: 0 0 8px #16a34a; animation: mnp 1.4s infinite; }
+  @keyframes mnp { 50% { opacity: .45; } }
+  .mn-filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+  .mn-filtros label { display: flex; flex-direction: column; font-size: .78rem; gap: 2px; margin: 0; }
+  .mn-filtros select, .mn-filtros input { margin: 0; width: auto; min-width: 120px; }
+  .mn-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+  .mn-v { border: 1px solid var(--borda); border-radius: 12px; overflow: hidden; background: var(--card); display: flex; flex-direction: column; }
+  .mn-v.descartado { opacity: .5; } .mn-v.usado { border-color: var(--ok); }
+  .mn-mini { display: flex; gap: 10px; padding: 10px; }
+  .mn-mini img, .mn-mini .sem { width: 92px; height: 164px; object-fit: cover; border-radius: 8px; background: var(--code-bg); flex: 0 0 auto; }
+  .mn-mini .sem { display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+  .mn-info { flex: 1; min-width: 0; font-size: .82rem; }
+  .mn-info b.t { display: block; font-size: .9rem; margin-bottom: 4px; }
+  .mn-nota { font-weight: 800; font-size: 1.05rem; }
+  .mn-nota.a { color: var(--ok); } .mn-nota.b { color: #d97706; }
+  .mn-q { font-style: italic; margin: 4px 0; }
+  .mn-acoes { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 10px; border-top: 1px solid var(--borda); margin-top: auto; }
+  .mn-acoes a { text-decoration: none; }
+  .mn-cont span { margin-right: 6px; }
+</style>
+<h1>⛏ Minerador TikTok <span class="si-dica" style="font-weight:400">o feed do TikTok → filtro → IA dá a nota e escolhe o modelo de vídeo → roteiro pronto aqui</span></h1>
+<div id="barra" class="si-barra"></div>
+
+<div class="mn-topo">
+  <div class="si-card">
+    <h2 style="margin:0"><span id="luz" class="mn-luz"></span>▶ Rodar <span id="st" class="si-dica" style="font-weight:400"></span></h2>
+    <div class="si-linha"><label>📁 Pasta do minerador <input id="pasta" placeholder="C:\Users\voce\tiktok_minerador" style="min-width:320px"></label>
+      <button class="si-mini si-sec" onclick="mnSalvarSite()">💾</button></div>
+    <p id="pasta_dica" class="si-dica">A pasta onde ficam o seu <code>tiktok_algo.py</code> e a persona. O config e a pasta <code>minerados</code> ficam nela.</p>
+    <div class="si-linha">
+      <label><input type="checkbox" id="mostrar" checked style="width:auto"> 👁 mostrar o navegador</label>
+      <label>⏱ horas <input id="horas" type="number" min="0" step="0.5" value="0" style="width:80px" title="0 = sem limite"></label>
+      <label><input type="checkbox" id="sem_claude" style="width:auto"> 🧪 teste sem IA (não gasta)</label>
+    </div>
+    <div class="si-linha">
+      <button id="biniciar" class="si-ok" onclick="mnIniciar()">▶ iniciar</button>
+      <button id="bparar" class="si-mini si-perigo" onclick="mnParar(false)" style="display:none">⏹ parar</button>
+      <button id="bforcar" class="si-mini si-perigo" onclick="mnParar(true)" style="display:none" title="mata na hora (perde o que não salvou)">✖ forçar</button>
+      <button id="breenviar" class="si-mini si-sec" onclick="mnIniciar(true)" style="display:none">📤 reenviar pendentes</button>
+      <button class="si-mini si-sec" onclick="mnLimparLog()" style="margin-left:auto">🧹 limpar log</button>
+    </div>
+    <div id="log" class="mn-log"></div>
+  </div>
+  <div class="si-card">
+    <h2 style="margin:0">⚙ Config <span class="si-dica" style="font-weight:400">config_minerador.json da pasta</span></h2>
+    <p class="si-dica">Principais: <code>filtro.min_curtidas</code>, <code>claude.nota_minima</code>, <code>claude.lingua_post</code>, <code>claude.modelos_aceitos</code>, <code>coleta.interesses</code> (3 no mínimo), <code>claude.max_roteiros_por_hora</code>. Vale na próxima vez que iniciar.</p>
+    <textarea id="cfg" class="mn-cfg" spellcheck="false"></textarea>
+    <div class="si-linha"><button class="si-mini" onclick="mnSalvarCfg()">💾 salvar config</button></div>
+  </div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🎞 Vídeos minerados <span id="cont" class="si-dica mn-cont" style="font-weight:400"></span></h2>
+  <div class="mn-filtros" style="margin-top:8px">
+    <label>Status<select id="f_status"><option value="">sem os descartados</option><option value="todos">todos</option>{% for k, v in status.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>Modelo<select id="f_modelo"><option value="">todos</option>{% for k, v in modelos.items() %}{% if k != 'descartar' %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</select></label>
+    <label>Nota mínima<select id="f_nota"><option value="0">qualquer</option><option value="7">7+</option><option value="8">8+</option><option value="9">9+</option></select></label>
+    <label>Nicho<select id="f_nicho"><option value="">todos</option></select></label>
+    <label>Ordem<select id="f_ordem"><option value="nota">maior nota</option><option value="recente">mais recente</option></select></label>
+    <label>Busca<input id="f_q" placeholder="cachorro, gol, poker…"></label>
+  </div>
+  <div id="grade" class="mn-grade"></div>
+</div>
+
+<script>
+(() => {
+const MODELOS = {{ modelos|tojson }}, STATUS = {{ status|tojson }};
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const mmss = s => s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3000); }
+async function post(url, corpo) {
+  const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'})); if (!j.ok) throw new Error(j.erro || 'erro'); return j;
+}
+let primeiro = true, estavaRodando = false, cfgMexido = false, timer = null;
+el('cfg').addEventListener('input', () => cfgMexido = true);
+function desenharEstado(j) {
+  const s = j.site || {};
+  if (primeiro) { el('pasta').value = s.pasta || ''; el('mostrar').checked = s.mostrar !== false; el('horas').value = s.horas || 0; el('sem_claude').checked = !!s.sem_claude; }
+  if (!cfgMexido && j.config !== undefined) el('cfg').value = j.config;
+  primeiro = false;
+  el('luz').classList.toggle('on', j.rodando);
+  el('st').textContent = j.rodando ? `rodando desde ${new Date(j.inicio * 1000).toLocaleTimeString()} · ${(j.args || []).filter(a => a.startsWith('--') && a !== '--config').join(' ')}`
+    : (j.codigo != null ? `parado (saiu com código ${j.codigo})` : 'parado');
+  el('biniciar').style.display = j.rodando ? 'none' : ''; el('bparar').style.display = el('bforcar').style.display = j.rodando ? '' : 'none';
+  el('breenviar').style.display = !j.rodando && j.pendentes ? '' : 'none'; el('breenviar').textContent = `📤 reenviar ${j.pendentes} pendente(s)`;
+  el('pasta_dica').innerHTML = !s.pasta ? 'Cole o caminho da pasta onde ficam o seu <code>tiktok_algo.py</code> e a persona.'
+    : !j.pasta_ok ? '❌ essa pasta não existe neste computador.' : !j.tem_tiktok_algo ? '⚠ não achei o <code>tiktok_algo.py</code> nessa pasta.'
+    : '✅ tiktok_algo.py encontrado. O config e a pasta <code>minerados</code> ficam aqui.';
+  const lg = el('log'), noFim = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
+  if (lg.textContent !== j.log) { lg.textContent = j.log || '(sem log ainda)'; if (noFim) lg.scrollTop = lg.scrollHeight; }
+  if (estavaRodando && !j.rodando) { aviso('⏹ o minerador parou', 'okk'); carregarVideos(); }
+  if (j.rodando && Math.random() < 0.25) carregarVideos();  // os aprovados chegam enquanto roda
+  estavaRodando = j.rodando;
+  clearTimeout(timer); timer = setTimeout(atualizar, j.rodando ? 2000 : 8000);
+}
+async function atualizar() { try { desenharEstado(await (await fetch('/minerador/estado')).json()); } catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 8000); } }
+function siteDados() { return {pasta: el('pasta').value, mostrar: el('mostrar').checked, horas: +el('horas').value || 0, sem_claude: el('sem_claude').checked}; }
+window.mnSalvarSite = async () => { try { cfgMexido = false; desenharEstado(await post('/minerador/site', siteDados())); aviso('💾 salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+['mostrar', 'horas', 'sem_claude'].forEach(k => el(k).addEventListener('change', () => post('/minerador/site', siteDados()).catch(() => {})));
+window.mnIniciar = async (reenviar) => {
+  try { await post('/minerador/site', siteDados()); desenharEstado(await post('/minerador/iniciar', Object.assign(siteDados(), {reenviar: !!reenviar})));
+    aviso(reenviar ? '📤 reenviando…' : (el('mostrar').checked ? '▶ iniciado — o navegador vai abrir' : '▶ iniciado (navegador escondido)'), 'okk'); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.mnParar = async (forcar) => { if (forcar && !confirm('Matar o minerador agora? O que não foi salvo se perde.')) return;
+  try { desenharEstado(await post('/minerador/parar', {forcar})); aviso(forcar ? '✖ parado' : '⏹ parando — termina o vídeo atual e salva…'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.mnSalvarCfg = async () => { try { await post('/minerador/config', {texto: el('cfg').value}); cfgMexido = false; aviso('💾 config salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.mnLimparLog = async () => { await post('/minerador/limpar-log'); el('log').textContent = ''; };
+
+// ---------------------------------------------------------------- vídeos
+const FILTROS = ['status', 'modelo', 'nota', 'nicho', 'ordem', 'q'];
+try { const sv = JSON.parse(localStorage.getItem('mn_filtros') || '{}'); FILTROS.forEach(k => { if (sv[k] != null) el('f_' + k).value = sv[k]; }); } catch (e) {}
+let tq = null;
+FILTROS.forEach(k => el('f_' + k).addEventListener(k === 'q' ? 'input' : 'change', () => { clearTimeout(tq); tq = setTimeout(carregarVideos, k === 'q' ? 350 : 0); }));
+async function carregarVideos() {
+  const f = {}; FILTROS.forEach(k => f[k] = el('f_' + k).value);
+  try { localStorage.setItem('mn_filtros', JSON.stringify(f)); } catch (e) {}
+  const j = await (await fetch('/minerador/videos?' + new URLSearchParams(f))).json();
+  const sel = el('f_nicho'), atual = sel.value;
+  sel.innerHTML = '<option value="">todos</option>' + (j.nichos || []).map(n => `<option${n === atual ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  el('cont').innerHTML = `${j.total} no total · mostrando ${j.videos.length}` + Object.entries(j.contagem || {}).map(([k, n]) => ` <span class="si-tag">${STATUS[k] || k} ${n}</span>`).join('');
+  const g = el('grade');
+  if (!j.videos.length) { g.innerHTML = `<p class="si-dica">${j.total ? 'Nenhum vídeo com esses filtros.' : 'Nenhum vídeo minerado ainda — ▶ inicie o minerador (os aprovados aparecem aqui sozinhos).'}</p>`; return; }
+  g.innerHTML = j.videos.map(v => { const mt = v.metricas || {}, n = +v.nota || 0;
+    return `<div class="mn-v ${esc(v.status)}" data-id="${v.id}">
+      <div class="mn-mini">${v.miniatura ? `<img src="/minerador/miniatura/${v.id}" loading="lazy" alt="">` : '<div class="sem">🎞</div>'}
+        <div class="mn-info"><div><span class="mn-nota ${n >= 8 ? 'a' : 'b'}">${esc(v.nota)}</span>/10 <span class="si-tag">${esc(MODELOS[v.modelo] || v.modelo)}</span> <span class="si-tag">${esc(STATUS[v.status] || v.status)}</span></div>
+          <b class="t">${esc(v.titulo)}</b>
+          <div class="si-dica" style="margin:0">@${esc(v.autor)} · ❤ ${esc(mt.curtidas)} · 💬 ${esc(mt.comentarios)}${v.duracao_s ? ' · ' + esc(v.duracao_s) + ' s' : ''}${v.nicho ? ' · ' + esc(v.nicho) : ''}</div>
+          <div class="mn-q">🪝 “${esc(v.gancho)}”</div>
+          ${v.momento ? `<div>⚡ ${esc(mmss(v.momento_s))} ${esc(v.momento)}</div>` : ''}
+          ${v.discussao ? `<div>🔥 ${esc(v.discussao)}</div>` : ''}
+          ${v.explicativo ? `<div>📚 ${esc(v.explicativo)}</div>` : ''}${v.longo ? `<div>🎞 ${esc(v.longo)}</div>` : ''}</div></div>
+      <div class="mn-acoes"><a href="/curtos/roteiro-comentario/${v.id}"><button class="si-mini">✍ roteiro</button></a>
+        <a href="${esc(v.destino.url)}" data-usar="${v.id}"><button class="si-mini si-ok" title="${esc(v.destino.rotulo)}">${v.modelo === 'explicativo' ? '📚 fazer explicativo' : v.modelo === 'explicador_poker' ? '🃏 explicador' : '💬 fazer o curto'}</button></a>
+        ${v.link ? `<a href="${esc(v.link)}" target="_blank"><button class="si-mini si-sec">🔗 TikTok</button></a>` : ''}
+        <button class="si-mini si-sec" data-st="depois" title="ver depois">⏳</button><button class="si-mini si-sec" data-st="usado" title="já usei">✅</button>
+        <button class="si-mini si-perigo" data-st="${v.status === 'descartado' ? 'novo' : 'descartado'}" title="${v.status === 'descartado' ? 'voltar' : 'descartar'}">${v.status === 'descartado' ? '↩' : '🗑'}</button></div></div>`; }).join('');
+  g.querySelectorAll('[data-st]').forEach(b => b.onclick = async () => { const id = b.closest('.mn-v').dataset.id;
+    try { await post(`/minerador/video/${id}/status`, {status: b.dataset.st}); carregarVideos(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  g.querySelectorAll('[data-usar]').forEach(a => a.onclick = () => { navigator.sendBeacon && navigator.sendBeacon(`/minerador/video/${a.dataset.usar}/status`,
+    new Blob([JSON.stringify({status: 'usado'})], {type: 'application/json'})); });
+}
+atualizar(); carregarVideos();
+})();
+</script>
+{% endblock %}

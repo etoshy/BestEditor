@@ -138,9 +138,9 @@
   <form method="post" action="/curtos/novo" enctype="multipart/form-data">
     <input type="hidden" name="modelo" value="explicativo"><input type="hidden" name="tem_so_fontes" value="1">
     <label>O que o vídeo explica <span class="ct-dica">(o assunto e os fatos — ex.: “por que o tetrápode de concreto segura as ondas: inventado por franceses em 1950, 4 braços, a água perde força nos espaços”)</span></label>
-    <textarea name="texto" rows="3">{{ tema_sel or '' }}</textarea>
+    <textarea name="texto" rows="3">{{ (roteiro_pronto.explicativo if roteiro_pronto and roteiro_pronto.modelo == 'explicativo' else tema_sel) or '' }}</textarea>
     <label>🔗 Links dos vídeos brutos <span class="ct-dica">(um por linha — ex.: 5 vídeos; YouTube, Shorts, TikTok, Instagram… — sem vídeo nenhum: escolha ✨ gerar tudo no Flow)</span></label>
-    <textarea name="link" rows="4" placeholder="https://www.youtube.com/shorts/…&#10;https://www.tiktok.com/@…/video/…"></textarea>
+    <textarea name="link" rows="4" placeholder="https://www.youtube.com/shorts/…&#10;https://www.tiktok.com/@…/video/…">{{ roteiro_pronto.link if roteiro_pronto and roteiro_pronto.modelo == 'explicativo' else '' }}</textarea>
     <label>…ou os arquivos<input type="file" name="clipe" accept="video/*" multiple></label>
     <label>📰 Link de matéria/artigo sobre o assunto <span class="ct-dica">(opcional, um por linha)</span></label>
     <textarea name="artigos" rows="1" placeholder="https://…"></textarea>
@@ -170,18 +170,26 @@
   <details{% if foco == 'comentario' %} open{% endif %}><summary style="cursor:pointer;font-weight:600;">+ Começar</summary>
   <form method="post" action="/curtos/novo" enctype="multipart/form-data">
     <input type="hidden" name="modelo" value="comentario">
+    {% if roteiro_pronto %}
+    <input type="hidden" name="roteiro_pronto" value="{{ roteiro_pronto.id }}">
+    <div style="border:1px solid var(--acento);background:var(--acento-suave);border-radius:10px;padding:8px 12px;margin:6px 0">
+      <b>✍ Roteiro pronto: {{ roteiro_pronto.titulo }}</b> <span class="ct-dica">(~{{ roteiro_pronto.segundos }} s) — vai ser narrado do jeito que está; a IA só divide nas frases e acha o pedaço do clipe de cada uma. Falta só o vídeo ⬇</span>
+      <div style="font-size:.88rem;margin-top:4px">{{ roteiro_pronto.texto }}</div></div>
+    {% else %}
+    <p class="ct-dica">✍ Só tem a transcrição ou a história, sem o vídeo? Faça o <a href="/curtos/roteiro-comentario">roteiro de comentário sem vídeo</a> primeiro.</p>
+    {% endif %}
     <div class="ct-row">
-      <label>Título (opcional)<input type="text" name="titulo" placeholder="ex.: o ciclista e a placa"></label>
-      <label style="max-width:140px">Duração (s)<input type="number" name="duracao" min="10" max="180" placeholder="da referência"></label>
-      <label style="max-width:150px">Postar em<select name="lingua_post">{% for k, v in linguas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>Título (opcional)<input type="text" name="titulo" placeholder="ex.: o ciclista e a placa" value="{{ roteiro_pronto.titulo if roteiro_pronto else '' }}"></label>
+      <label style="max-width:140px">Duração (s)<input type="number" name="duracao" min="10" max="180" placeholder="da referência" value="{{ roteiro_pronto.segundos if roteiro_pronto and roteiro_pronto.segundos >= 10 else '' }}"></label>
+      <label style="max-width:150px">Postar em<select name="lingua_post">{% for k, v in linguas.items() %}<option value="{{ k }}"{% if roteiro_pronto and roteiro_pronto.lingua_post == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
       <label style="max-width:170px">Narrar em<select name="idioma"><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
       <label style="max-width:150px">Formato<select name="proporcao">{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
     </div>
     <label>🔗 Link do vídeo original <span class="ct-dica">(YouTube Shorts, TikTok, Instagram, Kwai… — o site baixa; um por linha)</span></label>
-    <textarea name="link" rows="1" placeholder="https://www.youtube.com/shorts/…"></textarea>
+    <textarea name="link" rows="1" placeholder="https://www.youtube.com/shorts/…">{{ roteiro_pronto.link if roteiro_pronto else '' }}</textarea>
     <label>…ou 🎞 o arquivo (pode ser mais de um)<input type="file" name="clipe" accept="video/*" multiple></label>
     <label>O que acontece no clipe <span class="ct-dica">— com os segundos (“0:03 ele pega a placa”) vira a linha do tempo; <b>sem tempos</b> (a transcrição corrida do short, mesmo com [music] e letra de música) vira a referência e a IA olha o vídeo pra achar os segundos. Vazio: o site transcreve (🎙) ou a IA olha (👁)</span></label>
-    <textarea name="linhas" rows="4" placeholder="0:00 o ciclista passa pela torcida&#10;0:04 ele pega a placa da mão de um fã&#10;0:07 todo mundo vaia…"></textarea>
+    <textarea name="linhas" rows="4" placeholder="0:00 o ciclista passa pela torcida&#10;0:04 ele pega a placa da mão de um fã&#10;0:07 todo mundo vaia…">{{ roteiro_pronto.historia if roteiro_pronto else '' }}</textarea>
     <label>📺 Referência (opcional) <span class="ct-dica">— a transcrição do short original / de outro vídeo que fala desse clipe (o roteiro sai com o MESMO tamanho e ritmo, reescrito)</span></label>
     <textarea name="referencia" rows="3" placeholder="cole a transcrição (com ou sem tempos)"></textarea>
     <div class="ct-row"><label style="font-weight:400">…ou o link do vídeo que comenta o clipe<input type="text" name="referencia_link" placeholder="https://…"></label>

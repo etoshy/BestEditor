@@ -29,6 +29,7 @@
 
 <div class="si-card">
   <h2 style="margin:0">3 · ✍ Roteiro</h2>
+  {% if d.tipo == 'shorts' %}<p class="si-dica">⚡ <b>Estrutura do short de poker:</b> 1) 💥 <b>gancho</b> — a frase impactante gigante na tela ("QUE BURRO." · foi o que disseram dessa jogada… eles quebraram a cara) → 2) <b>contexto</b> da partida e dos jogadores: mostra os <b>dados da partida</b> se a pesquisa tiver (fichas, prêmio, números), senão a <b>foto do jogador</b> citado (📷 envie na aba Mesa), senão motion graphics → 3) 🃏 <b>a jogada</b> (POV, zoom no momento decisivo) → 4) 💥 <b>frase final</b> impactante. Vertical 9:16, ritmo rápido.</p>{% endif %}
   <div class="si-linha">
     <button id="bEscrever">✍ escrever com a IA</button>
     <label>máx. de mãos <input id="maxMaos" type="number" min="0" max="8" value="0" style="width:60px"></label>

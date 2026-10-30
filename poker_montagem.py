@@ -177,10 +177,44 @@ class Montador:
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", saida])
         return saida
 
-    def peca(self, g: Dict[str, Any], dur: float, frase: str, saida: str) -> str:
+    def nomes_conhecidos(self) -> List[str]:
+        """Os jogadores que aparecem no roteiro (das mãos e dos cartões) — pra achar a foto de quem o narrador cita."""
+        if getattr(self, "_nomes", None) is None:
+            nomes: List[str] = []
+            for b in PD.carregar(self.base, self.did).get("blocos") or []:
+                if b["tipo"] == "mao":
+                    try:
+                        nomes += [j.get("nome") or "" for j in PM.ler(b["mao"]["mao"]).get("jogadores") or []]
+                    except PM.PokerErro:
+                        pass
+                elif (b.get("grafico") or {}).get("tipo") == "jogador":
+                    nomes.append(b["grafico"].get("titulo") or "")
+            self._nomes = [n for n in dict.fromkeys(nomes) if n.strip()]
+        return self._nomes
+
+    def foto_citada(self, texto: str) -> str:
+        """📷 a foto de um jogador citado no texto (pelo nome ou sobrenome), se você enviou a foto dele."""
+        import poker_rotas as R
+        sl = "_" + R.slug(texto) + "_"
+        for nome in self.nomes_conhecidos():
+            partes = [R.slug(nome)] + [R.slug(p) for p in nome.split() if len(p) >= 4]
+            if any(p and f"_{p}_" in sl for p in partes):
+                a = R.avatar_de(self.base, nome)
+                if a and os.path.isfile(os.path.join(self.pa, a)):
+                    return os.path.join(self.pa, a)
+        if self.pa and os.path.isdir(self.pa):   # foto enviada com o nome de alguém que não está nas mãos
+            for f in sorted(os.listdir(self.pa)):
+                stem = os.path.splitext(f)[0]
+                if len(stem) >= 4 and f"_{stem}_" in sl:
+                    return os.path.join(self.pa, f)
+        return ""
+
+    def peca(self, g: Dict[str, Any], dur: float, frase: str, saida: str, foto_jogador: str = "") -> str:
         import poker_rotas as R
         g = PG.normalizar(g)
         midia = os.path.join(pasta_midia(self.base, self.did), g["arquivo"]) if g.get("arquivo") else ""
+        if foto_jogador and not (midia and os.path.isfile(midia)):   # sem dados/peça: a foto de quem está sendo citado
+            g, midia = dict(g, tipo="midia", texto=g.get("texto") or frase), foto_jogador
         if midia and os.path.isfile(midia) and midia.lower().endswith(EXT_VIDEO):
             return self._video_do_usuario(midia, dur, saida)
         foto = ""
@@ -204,11 +238,13 @@ class Montador:
         arq, d = self.fala(b["texto"])
         frase = re.split(r"(?<=[.!?])\s", b["texto"] or "")[0][:200]
         dur = max(d + PAUSA * 2, PG.tempo_minimo(b.get("grafico") or {}, frase, self.ritmo))   # a peça fica o tempo de ler
-        chave = _h("narr", b.get("texto"), b.get("grafico"), self.op, self.voz, d, dur)
+        g0 = PG.normalizar(b.get("grafico") or {})
+        foto_c = self.foto_citada(b["texto"]) if g0["tipo"] in ("", "midia") and not g0.get("arquivo") else ""
+        chave = _h("narr", b.get("texto"), b.get("grafico"), self.op, self.voz, d, dur, foto_c)
         saida = os.path.join(self.dir, f"b{k:03d}_{chave}.mp4")
         ini = PAUSA + min(0.6, max(0.0, dur - d - PAUSA * 2) / 2)   # sobrou tempo: a peça entra e o narrador começa logo depois
         if not os.path.isfile(saida):
-            v = self.peca(b.get("grafico") or {}, dur, frase, saida + ".v.mp4")
+            v = self.peca(b.get("grafico") or {}, dur, frase, saida + ".v.mp4", foto_c)
             self._com_audio(v, [(arq, ini)], dur, saida)
             os.remove(v)
         self.legendas += frases_legenda(b["texto"], t0 + ini, d)

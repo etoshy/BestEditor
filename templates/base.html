@@ -50,11 +50,15 @@
       {% endcall %}
       {% call grupo('curtos', 'mobile-screen-button', 'Vídeos curtos (Shorts, TikTok, Reels)') %}
         {{ item('/curtos', 'bolt', 'Todos os curtos', ['/curtos/canal']) }}
+        {{ item('/curtos/link', 'link', 'Link → vídeo pronto') }}
         {{ item('/curtos/modelo/noticia', 'newspaper', 'Notícia (Laestro)') }}
         {{ item('/curtos/modelo/explicativo', 'lightbulb', 'Explicativo (curiosidades)') }}
         {{ item('/curtos/modelo/comentario', 'comment-dots', 'Comentário de clipe') }}
+        {{ item('/curtos/roteiro-comentario', 'pen-nib', 'Roteiro de comentário (sem vídeo)') }}
+        {{ item('/minerador', 'person-digging', 'Minerador TikTok') }}
         {{ item('/shorts-ia', 'dragon', 'Shorts de IA (séries)', ['/shorts-ia/s']) }}
         {{ item('/poker', 'diamond', 'Poker (mesa, ranking, roteiros)', ['/poker/doc']) }}
+        {{ item('/explicador', 'film', 'Explicador animado (motion)') }}
         {{ item('/rastrear', 'crosshairs', 'Rastrear objeto') }}
       {% endcall %}
       {% call grupo('producao', 'industry', 'Produção') %}
@@ -76,6 +80,7 @@
       {% endcall %}
       {% call grupo('ferramentas', 'toolbox', 'Ferramentas') %}
         {{ item('/cortar-youtube', 'scissors', 'Cortar do YouTube') }}
+        {{ item('/juntar', 'link', 'Juntar vídeos') }}
         {{ item('/redes-sociais', 'mobile-screen-button', 'Baixar de outras redes') }}
         {{ item('/transcrever', 'closed-captioning', 'Transcrever') }}
         {{ item('/capturar-pagina', 'image', 'Capturar página') }}
