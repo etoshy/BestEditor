@@ -133,8 +133,6 @@ def test_aba_minerador_filtros_status_e_miniatura(tmp_path, monkeypatch):
     assert RC.importar(b, _pacote())["status"] == "descartado"  # reimportar não ressuscita
     with pytest.raises(RC.RoteiroErro):
         RC.marcar(b, a["id"], "xx")
-    with pytest.raises(RC.RoteiroErro):
-        MR.iniciar(b, str(tmp_path))  # sem tiktok_algo.py
 
 
 def test_minerador_um_clique_acha_o_tiktok_algo(tmp_path, monkeypatch):
@@ -150,5 +148,18 @@ def test_minerador_um_clique_acha_o_tiktok_algo(tmp_path, monkeypatch):
     monkeypatch.setattr(MR, "_candidatas", lambda base: [str(tmp_path / "vazio")])
     (algo / "tiktok_algo.py").unlink()
     assert MR.pasta_auto(str(b)) == str(algo)  # não achou de novo: fica a escolhida (o iniciar avisa)
-    with pytest.raises(RC.RoteiroErro, match="tiktok_algo"):
-        MR.iniciar(str(b), "")
+    import os as _os
+    assert _os.path.isfile(_os.path.join(MR.PADRAO_DIR, "tiktok_algo.py"))  # sem o seu: usa o incluso
+
+
+def test_tiktok_algo_incluso_numeros_e_js():
+    import importlib.util
+    import minerador_rotas as MR
+    spec = importlib.util.spec_from_file_location("tk_padrao", os.path.join(MR.PADRAO_DIR, "tiktok_algo.py"))
+    tk = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tk)
+    assert [tk.num(x) for x in ("12.3K", "1,2 mi", "3,4 mil", "1.2M", "980", "1,234", "", "Curtir")] == [12300, 1200000, 3400, 1200000, 980, 1234, 0, 0]
+    assert tk.duracao_da_barra("00:05 / 00:18") == 18 and tk.duracao_da_barra("") is None
+    for js in (tk.JS_EXTRAIR_VIDEO, tk.JS_EXPANDIR_DESC, tk.JS_CAPTCHA):
+        assert "__SELETORES__" not in js and js.startswith("()")
+    assert "const ativo" in tk.JS_HELPERS and "__SELETORES__" not in tk.JS_HELPERS

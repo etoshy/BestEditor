@@ -23,6 +23,7 @@ import roteiro_comentario as RC
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(AQUI, "minerador_tiktok", "minerador.py")
+PADRAO_DIR = os.path.join(AQUI, "minerador_tiktok", "padrao")  # 📦 o tiktok_algo.py incluso (o seu, se existir, vem antes)
 CONFIG_MODELO = os.path.join(AQUI, "minerador_tiktok", "config_minerador.json")
 _PROC: Dict[str, Any] = {"p": None, "inicio": None, "args": None}
 _TRAVA = threading.Lock()
@@ -118,7 +119,7 @@ def achar_tiktok_algo(base: str, profundidade: int = 3, limite_s: float = 8.0) -
             d, n = fila.pop(0)
             if time.time() - t0 > limite_s:
                 return ""
-            if os.path.isfile(os.path.join(d, "tiktok_algo.py")):
+            if os.path.isfile(os.path.join(d, "tiktok_algo.py")) and os.path.abspath(d) != os.path.abspath(PADRAO_DIR):
                 return d
             if n >= profundidade:
                 continue
@@ -145,6 +146,21 @@ def pasta_auto(base: str) -> str:
     return p
 
 
+def _garantir_pacote(nome: str, log: Any) -> None:
+    """📦 Falta a biblioteca? instala sozinho uma vez (pip) — pra ser só clicar em ▶."""
+    import importlib.util
+    if importlib.util.find_spec(nome):
+        return
+    log.write(f"📦 instalando o {nome} (uma vez só)…\n")
+    log.flush()
+    try:
+        r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", nome], capture_output=True, text=True, timeout=300)
+        log.write(("✅ instalado\n" if r.returncode == 0 else f"⚠ não deu pra instalar o {nome}: {(r.stderr or '')[-300:]}\n"))
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log.write(f"⚠ não deu pra instalar o {nome}: {exc}\n")
+    log.flush()
+
+
 def _chave_ia() -> str:
     try:
         import ia_servico
@@ -162,9 +178,8 @@ def iniciar(base: str, pasta: str, horas: float = 0, sem_claude: bool = False, m
             raise RC.RoteiroErro("O minerador já está rodando.")
         if not reenviar and not (pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))):
             pasta = pasta_auto(base)
-        if not reenviar and not (pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))):
-            raise RC.RoteiroErro("Não achei o tiktok_algo.py no computador. Use 📥 enviar o tiktok_algo.py (uma vez só) "
-                                 "ou cole a pasta dele.")
+        if not (pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))):
+            pasta = pasta_dados(base)  # 📦 sem o seu: usa o tiktok_algo.py que vem com o site (minerador_tiktok/padrao)
         if not pasta or not os.path.isdir(pasta):
             raise RC.RoteiroErro("Não achei a pasta do minerador.")
         if not os.path.isfile(cam_config(pasta)):
@@ -175,17 +190,19 @@ def iniciar(base: str, pasta: str, horas: float = 0, sem_claude: bool = False, m
             args.append("--reenviar")
         else:
             if horas and float(horas) > 0:
-                args += ["--horas", str(float(horas))]
+                args += ["--horas", f"{float(horas):.4f}"]  # ⏱ a página manda em minutos (÷ 60)
             if sem_claude:
                 args.append("--sem-claude")
             args.append("--mostrar" if mostrar else "--headless")
-        env = dict(os.environ, PYTHONPATH=pasta + os.pathsep + os.environ.get("PYTHONPATH", ""), PYTHONIOENCODING="utf-8",
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([pasta, PADRAO_DIR, os.environ.get("PYTHONPATH", "")]), PYTHONIOENCODING="utf-8",
                    PYTHONUNBUFFERED="1")
         if not env.get("ANTHROPIC_API_KEY") and _chave_ia():  # 🔑 a mesma chave da IA do site (Configurações)
             env["ANTHROPIC_API_KEY"] = _chave_ia()
         if not sem_claude and not reenviar and not env.get("ANTHROPIC_API_KEY"):
             raise RC.RoteiroErro("Falta a chave da IA: coloque a chave da Anthropic em Configurações → IA (ou marque 🧪 teste sem IA).")
         log = open(log_cam(base), "a", encoding="utf-8")
+        if not sem_claude and not reenviar:
+            _garantir_pacote("anthropic", log)
         log.write(f"\n===== {time.strftime('%d/%m %H:%M:%S')} ▶ {' '.join(args[2:])}\n")
         log.flush()
         kw: Dict[str, Any] = {}
@@ -224,7 +241,7 @@ def estado(base: str) -> Dict[str, Any]:
         with open(pend, encoding="utf-8", errors="replace") as f:
             n_pend = sum(1 for l in f if l.strip())
     return {"site": cs, "rodando": rodando(), "inicio": _PROC.get("inicio"), "args": _PROC.get("args"),
-            "codigo": (p.poll() if p else None), "tem_tiktok_algo": bool(pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))),
+            "codigo": (p.poll() if p else None), "tem_tiktok_algo": True, "algo_proprio": bool(pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))),
             "pasta_ok": bool(pasta and os.path.isdir(pasta)), "pendentes": n_pend, "log": cauda(base)}
 
 

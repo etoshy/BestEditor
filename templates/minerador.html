@@ -43,7 +43,7 @@
         <button class="si-mini si-sec" onclick="mnSalvarSite()">💾</button><button class="si-mini si-sec" onclick="mnAchar()">🔎 procurar de novo</button></div></details>
     <div class="si-linha">
       <label><input type="checkbox" id="mostrar" checked style="width:auto"> 👁 mostrar o navegador</label>
-      <label>⏱ horas <input id="horas" type="number" min="0" step="0.5" value="0" style="width:80px" title="0 = sem limite"></label>
+      <label>⏱ por <input id="minutos" type="number" min="0" step="5" value="0" style="width:80px" title="0 = sem limite"> minutos <span class="si-dica">(0 = até você parar)</span></label>
       <label><input type="checkbox" id="sem_claude" style="width:auto"> 🧪 teste sem IA (não gasta)</label>
     </div>
     <div class="si-linha">
@@ -91,7 +91,7 @@ let primeiro = true, estavaRodando = false, cfgMexido = false, timer = null;
 el('cfg').addEventListener('input', () => cfgMexido = true);
 function desenharEstado(j) {
   const s = j.site || {};
-  if (primeiro) { el('pasta').value = s.pasta || ''; el('mostrar').checked = s.mostrar !== false; el('horas').value = s.horas || 0; el('sem_claude').checked = !!s.sem_claude; }
+  if (primeiro) { el('pasta').value = s.pasta || ''; el('mostrar').checked = s.mostrar !== false; el('minutos').value = Math.round((s.horas || 0) * 60); el('sem_claude').checked = !!s.sem_claude; }
   if (!cfgMexido && j.config !== undefined) el('cfg').value = j.config;
   primeiro = false;
   el('luz').classList.toggle('on', j.rodando);
@@ -100,9 +100,9 @@ function desenharEstado(j) {
   el('biniciar').style.display = j.rodando ? 'none' : ''; el('bparar').style.display = el('bforcar').style.display = j.rodando ? '' : 'none';
   el('breenviar').style.display = !j.rodando && j.pendentes ? '' : 'none'; el('breenviar').textContent = `📤 reenviar ${j.pendentes} pendente(s)`;
   const achou = j.tem_tiktok_algo;
-  el('pasta_dica').innerHTML = achou ? `✅ pronto pra rodar — usando <code>${esc(s.pasta)}</code>` + (s.tem_chave ? '' : ' · ⚠ falta a chave da IA (Configurações → IA) — ou marque 🧪 teste sem IA')
+  el('pasta_dica').innerHTML = achou ? (j.algo_proprio ? `✅ pronto pra rodar — usando o seu tiktok_algo.py de <code>${esc(s.pasta)}</code>` : `✅ pronto pra rodar — com o tiktok_algo.py que vem com o site (persona e minerados em <code>${esc(s.dados)}</code>)`) + (s.tem_chave ? '' : ' · ⚠ falta a chave da IA (Configurações → IA) — ou marque 🧪 teste sem IA')
     : (s.pasta && !j.pasta_ok ? '❌ a pasta escolhida não existe neste computador. ' : '') + '⚠ não achei o <code>tiktok_algo.py</code> no computador — mande ele aqui embaixo (uma vez só).';
-  el('enviar_algo').style.display = achou ? 'none' : '';
+  el('enviar_algo').style.display = 'none';
   const lg = el('log'), noFim = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
   if (lg.textContent !== j.log) { lg.textContent = j.log || '(sem log ainda)'; if (noFim) lg.scrollTop = lg.scrollHeight; }
   if (estavaRodando && !j.rodando) { aviso('⏹ o minerador parou', 'okk'); carregarVideos(); }
@@ -111,9 +111,9 @@ function desenharEstado(j) {
   clearTimeout(timer); timer = setTimeout(atualizar, j.rodando ? 2000 : 8000);
 }
 async function atualizar() { try { desenharEstado(await (await fetch('/minerador/estado' + (primeiro ? '?achar=1' : ''))).json()); } catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 8000); } }
-function siteDados() { return {pasta: el('pasta').value.trim(), mostrar: el('mostrar').checked, horas: +el('horas').value || 0, sem_claude: el('sem_claude').checked}; }
+function siteDados() { return {pasta: el('pasta').value.trim(), mostrar: el('mostrar').checked, horas: (+el('minutos').value || 0) / 60, sem_claude: el('sem_claude').checked}; }
 window.mnSalvarSite = async () => { try { cfgMexido = false; desenharEstado(await post('/minerador/site', siteDados())); aviso('💾 salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
-['mostrar', 'horas', 'sem_claude'].forEach(k => el(k).addEventListener('change', () => post('/minerador/site', siteDados()).catch(() => {})));
+['mostrar', 'minutos', 'sem_claude'].forEach(k => el(k).addEventListener('change', () => post('/minerador/site', siteDados()).catch(() => {})));
 window.mnAchar = async () => { el('pasta_dica').textContent = '🔎 procurando…'; try { const j = await post('/minerador/achar'); primeiro = true; desenharEstado(j);
   aviso(j.achou ? '✅ achei o tiktok_algo.py' : '⚠ não achei — mande o arquivo', j.achou ? 'okk' : 'erro'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 el('arq_algo').addEventListener('change', async (ev) => { const fd = new FormData(); [...ev.target.files].forEach(f => fd.append('arquivos', f));
