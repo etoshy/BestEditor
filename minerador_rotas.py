@@ -85,14 +85,88 @@ def cauda(base: str, n: int = 250) -> str:
         return ""
 
 
+def pasta_dados(base: str) -> str:
+    """📁 Onde o minerador trabalha quando você não escolheu pasta: <BASE>/minerador_dados (config, persona, minerados)."""
+    d = os.path.join(base, "minerador_dados")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _candidatas(base: str) -> List[str]:
+    casa = os.path.expanduser("~")
+    raizes = [pasta_dados(base), base, AQUI, os.path.dirname(AQUI), os.path.dirname(os.path.dirname(AQUI))]
+    raizes += [os.path.join(casa, x) for x in ("Desktop", "Área de Trabalho", "OneDrive", "OneDrive/Desktop", "OneDrive/Área de Trabalho",
+                                              "Documents", "Documentos", "Downloads", "")]
+    out, vistos = [], set()
+    for r in raizes:
+        r = os.path.abspath(r)
+        if r not in vistos and os.path.isdir(r):
+            vistos.add(r)
+            out.append(r)
+    return out
+
+
+def achar_tiktok_algo(base: str, profundidade: int = 3, limite_s: float = 8.0) -> str:
+    """🔎 Procura o tiktok_algo.py sozinho (pasta do site, a de cima, Área de Trabalho, Documentos, Downloads… até 3 níveis).
+    Devolve a PASTA dele ('' se não achou)."""
+    t0 = time.time()
+    pular = {"node_modules", ".git", "__pycache__", "venv", ".venv", "env", "site-packages", "AppData", "Library", "jobs", "outputs",
+             "curtos", "poker", "shorts_ia", "explicador", "juntar", "Windows", "Program Files", "Program Files (x86)"}
+    for r in _candidatas(base):
+        fila = [(r, 0)]
+        while fila:
+            d, n = fila.pop(0)
+            if time.time() - t0 > limite_s:
+                return ""
+            if os.path.isfile(os.path.join(d, "tiktok_algo.py")):
+                return d
+            if n >= profundidade:
+                continue
+            try:
+                for e in sorted(os.scandir(d), key=lambda e: e.name.lower()):
+                    if e.is_dir(follow_symlinks=False) and e.name not in pular and not e.name.startswith("."):
+                        fila.append((e.path, n + 1))
+            except OSError:
+                continue
+    return ""
+
+
+def pasta_auto(base: str) -> str:
+    """A pasta escolhida; sem escolha (ou se sumiu), a do tiktok_algo.py que o site achar — e guarda pra próxima."""
+    cs = config_site(base)
+    p = cs.get("pasta") or ""
+    if p and os.path.isfile(os.path.join(p, "tiktok_algo.py")):
+        return p
+    achou = achar_tiktok_algo(base)
+    if achou:
+        cs["pasta"] = achou
+        salvar_config_site(base, cs)
+        return achou
+    return p
+
+
+def _chave_ia() -> str:
+    try:
+        import ia_servico
+        c = ia_servico.config()
+        if ia_servico.PROVEDORES.get(c.get("provedor"), {}).get("chave_env") == "ANTHROPIC_API_KEY":
+            return ia_servico.chave(c)
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def iniciar(base: str, pasta: str, horas: float = 0, sem_claude: bool = False, mostrar: bool = True, reenviar: bool = False) -> Dict[str, Any]:
     with _TRAVA:
         if rodando():
             raise RC.RoteiroErro("O minerador já está rodando.")
+        if not reenviar and not (pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))):
+            pasta = pasta_auto(base)
+        if not reenviar and not (pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))):
+            raise RC.RoteiroErro("Não achei o tiktok_algo.py no computador. Use 📥 enviar o tiktok_algo.py (uma vez só) "
+                                 "ou cole a pasta dele.")
         if not pasta or not os.path.isdir(pasta):
-            raise RC.RoteiroErro("Escolha a pasta onde está o seu tiktok_algo.py.")
-        if not reenviar and not os.path.isfile(os.path.join(pasta, "tiktok_algo.py")):
-            raise RC.RoteiroErro("Não achei o tiktok_algo.py nessa pasta.")
+            raise RC.RoteiroErro("Não achei a pasta do minerador.")
         if not os.path.isfile(cam_config(pasta)):
             with open(cam_config(pasta), "w", encoding="utf-8") as f:
                 f.write(ler_config(""))
@@ -107,12 +181,20 @@ def iniciar(base: str, pasta: str, horas: float = 0, sem_claude: bool = False, m
             args.append("--mostrar" if mostrar else "--headless")
         env = dict(os.environ, PYTHONPATH=pasta + os.pathsep + os.environ.get("PYTHONPATH", ""), PYTHONIOENCODING="utf-8",
                    PYTHONUNBUFFERED="1")
+        if not env.get("ANTHROPIC_API_KEY") and _chave_ia():  # 🔑 a mesma chave da IA do site (Configurações)
+            env["ANTHROPIC_API_KEY"] = _chave_ia()
+        if not sem_claude and not reenviar and not env.get("ANTHROPIC_API_KEY"):
+            raise RC.RoteiroErro("Falta a chave da IA: coloque a chave da Anthropic em Configurações → IA (ou marque 🧪 teste sem IA).")
         log = open(log_cam(base), "a", encoding="utf-8")
         log.write(f"\n===== {time.strftime('%d/%m %H:%M:%S')} ▶ {' '.join(args[2:])}\n")
         log.flush()
         kw: Dict[str, Any] = {}
         if os.name == "nt":
             kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        cs = config_site(base)
+        if cs.get("pasta") != pasta:
+            cs["pasta"] = pasta
+            salvar_config_site(base, cs)
         _PROC.update(p=subprocess.Popen(args, cwd=pasta, env=env, stdout=log, stderr=subprocess.STDOUT, **kw),
                      inicio=time.time(), args=args[2:])
         log.close()
@@ -135,6 +217,7 @@ def estado(base: str) -> Dict[str, Any]:
     cs = config_site(base)
     pasta = cs.get("pasta") or ""
     p = _PROC.get("p")
+    cs = dict(cs, dados=pasta_dados(base), tem_chave=bool(os.environ.get("ANTHROPIC_API_KEY") or _chave_ia()))
     pend = os.path.join(pasta_saida(pasta), "pendentes_site.jsonl") if pasta else ""
     n_pend = 0
     if pend and os.path.isfile(pend):
@@ -199,6 +282,8 @@ def registrar(app, base: str) -> None:
 
     @app.route("/minerador/estado")
     def minerador_estado():
+        if not config_site(base).get("pasta") and request.args.get("achar"):
+            pasta_auto(base)
         e = estado(base)
         e["config"] = ler_config(e["site"].get("pasta") or "")
         return _ok(**e)
@@ -207,7 +292,7 @@ def registrar(app, base: str) -> None:
     def minerador_site():
         d = request.get_json(silent=True) or {}
         cs = config_site(base)
-        if "pasta" in d:
+        if str(d.get("pasta") or "").strip():  # vazio = deixa o site achar sozinho (não apaga a que ele achou)
             pasta = os.path.expanduser(str(d.get("pasta") or "").strip().strip('"'))
             if pasta and not os.path.isdir(pasta):
                 return _erro("Essa pasta não existe neste computador.")
@@ -225,11 +310,35 @@ def registrar(app, base: str) -> None:
         e["config"] = ler_config(cs.get("pasta") or "")
         return _ok(**e)
 
+    @app.route("/minerador/achar", methods=["POST"])
+    def minerador_achar():
+        pasta = pasta_auto(base)
+        e = estado(base)
+        e["config"] = ler_config(pasta)
+        return _ok(achou=bool(pasta and os.path.isfile(os.path.join(pasta, "tiktok_algo.py"))), **e)
+
+    @app.route("/minerador/enviar-algo", methods=["POST"])
+    def minerador_enviar_algo():
+        """📥 O tiktok_algo.py (e, se quiser, a persona .json) vão pra pasta do minerador do site — uma vez só."""
+        d = pasta_dados(base)
+        n = 0
+        for arq in request.files.getlist("arquivos"):
+            nome = os.path.basename(arq.filename or "")
+            if nome == "tiktok_algo.py" or (nome.endswith(".json") and "persona" in nome.lower()) or nome == "config_minerador.json":
+                arq.save(os.path.join(d, nome))
+                n += 1
+        if not os.path.isfile(os.path.join(d, "tiktok_algo.py")):
+            return _erro("Mande o arquivo tiktok_algo.py.")
+        cs = config_site(base)
+        cs["pasta"] = d
+        salvar_config_site(base, cs)
+        e = estado(base)
+        e["config"] = ler_config(d)
+        return _ok(enviados=n, **e)
+
     @app.route("/minerador/config", methods=["POST"])
     def minerador_config():
-        pasta = config_site(base).get("pasta") or ""
-        if not pasta or not os.path.isdir(pasta):
-            return _erro("Escolha a pasta do minerador antes.")
+        pasta = config_site(base).get("pasta") or pasta_auto(base) or pasta_dados(base)
         txt = str((request.get_json(silent=True) or {}).get("texto") or "")
         try:
             j = json.loads(txt)

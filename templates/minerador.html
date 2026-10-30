@@ -35,9 +35,12 @@
 <div class="mn-topo">
   <div class="si-card">
     <h2 style="margin:0"><span id="luz" class="mn-luz"></span>▶ Rodar <span id="st" class="si-dica" style="font-weight:400"></span></h2>
-    <div class="si-linha"><label>📁 Pasta do minerador <input id="pasta" placeholder="C:\Users\voce\tiktok_minerador" style="min-width:320px"></label>
-      <button class="si-mini si-sec" onclick="mnSalvarSite()">💾</button></div>
-    <p id="pasta_dica" class="si-dica">A pasta onde ficam o seu <code>tiktok_algo.py</code> e a persona. O config e a pasta <code>minerados</code> ficam nela.</p>
+    <p id="pasta_dica" class="si-dica">🔎 procurando o seu <code>tiktok_algo.py</code>…</p>
+    <div id="enviar_algo" class="si-linha" style="display:none"><label>📥 Mande o <code>tiktok_algo.py</code> (e a persona .json, se tiver) — uma vez só
+      <input type="file" id="arq_algo" accept=".py,.json" multiple></label></div>
+    <details id="det_pasta"><summary class="si-dica" style="cursor:pointer">📁 outra pasta (opcional)</summary>
+      <div class="si-linha"><input id="pasta" placeholder="C:\Users\voce\tiktok_minerador" style="min-width:320px">
+        <button class="si-mini si-sec" onclick="mnSalvarSite()">💾</button><button class="si-mini si-sec" onclick="mnAchar()">🔎 procurar de novo</button></div></details>
     <div class="si-linha">
       <label><input type="checkbox" id="mostrar" checked style="width:auto"> 👁 mostrar o navegador</label>
       <label>⏱ horas <input id="horas" type="number" min="0" step="0.5" value="0" style="width:80px" title="0 = sem limite"></label>
@@ -96,9 +99,10 @@ function desenharEstado(j) {
     : (j.codigo != null ? `parado (saiu com código ${j.codigo})` : 'parado');
   el('biniciar').style.display = j.rodando ? 'none' : ''; el('bparar').style.display = el('bforcar').style.display = j.rodando ? '' : 'none';
   el('breenviar').style.display = !j.rodando && j.pendentes ? '' : 'none'; el('breenviar').textContent = `📤 reenviar ${j.pendentes} pendente(s)`;
-  el('pasta_dica').innerHTML = !s.pasta ? 'Cole o caminho da pasta onde ficam o seu <code>tiktok_algo.py</code> e a persona.'
-    : !j.pasta_ok ? '❌ essa pasta não existe neste computador.' : !j.tem_tiktok_algo ? '⚠ não achei o <code>tiktok_algo.py</code> nessa pasta.'
-    : '✅ tiktok_algo.py encontrado. O config e a pasta <code>minerados</code> ficam aqui.';
+  const achou = j.tem_tiktok_algo;
+  el('pasta_dica').innerHTML = achou ? `✅ pronto pra rodar — usando <code>${esc(s.pasta)}</code>` + (s.tem_chave ? '' : ' · ⚠ falta a chave da IA (Configurações → IA) — ou marque 🧪 teste sem IA')
+    : (s.pasta && !j.pasta_ok ? '❌ a pasta escolhida não existe neste computador. ' : '') + '⚠ não achei o <code>tiktok_algo.py</code> no computador — mande ele aqui embaixo (uma vez só).';
+  el('enviar_algo').style.display = achou ? 'none' : '';
   const lg = el('log'), noFim = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
   if (lg.textContent !== j.log) { lg.textContent = j.log || '(sem log ainda)'; if (noFim) lg.scrollTop = lg.scrollHeight; }
   if (estavaRodando && !j.rodando) { aviso('⏹ o minerador parou', 'okk'); carregarVideos(); }
@@ -106,14 +110,19 @@ function desenharEstado(j) {
   estavaRodando = j.rodando;
   clearTimeout(timer); timer = setTimeout(atualizar, j.rodando ? 2000 : 8000);
 }
-async function atualizar() { try { desenharEstado(await (await fetch('/minerador/estado')).json()); } catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 8000); } }
-function siteDados() { return {pasta: el('pasta').value, mostrar: el('mostrar').checked, horas: +el('horas').value || 0, sem_claude: el('sem_claude').checked}; }
+async function atualizar() { try { desenharEstado(await (await fetch('/minerador/estado' + (primeiro ? '?achar=1' : ''))).json()); } catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 8000); } }
+function siteDados() { return {pasta: el('pasta').value.trim(), mostrar: el('mostrar').checked, horas: +el('horas').value || 0, sem_claude: el('sem_claude').checked}; }
 window.mnSalvarSite = async () => { try { cfgMexido = false; desenharEstado(await post('/minerador/site', siteDados())); aviso('💾 salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 ['mostrar', 'horas', 'sem_claude'].forEach(k => el(k).addEventListener('change', () => post('/minerador/site', siteDados()).catch(() => {})));
+window.mnAchar = async () => { el('pasta_dica').textContent = '🔎 procurando…'; try { const j = await post('/minerador/achar'); primeiro = true; desenharEstado(j);
+  aviso(j.achou ? '✅ achei o tiktok_algo.py' : '⚠ não achei — mande o arquivo', j.achou ? 'okk' : 'erro'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+el('arq_algo').addEventListener('change', async (ev) => { const fd = new FormData(); [...ev.target.files].forEach(f => fd.append('arquivos', f));
+  const r = await fetch('/minerador/enviar-algo', {method: 'POST', body: fd}); const j = await r.json().catch(() => ({ok: false, erro: 'falhou'}));
+  if (j.ok) { primeiro = true; desenharEstado(j); aviso('📥 pronto — agora é só ▶ iniciar', 'okk'); } else aviso('❌ ' + j.erro, 'erro'); ev.target.value = ''; });
 window.mnIniciar = async (reenviar) => {
-  try { await post('/minerador/site', siteDados()); desenharEstado(await post('/minerador/iniciar', Object.assign(siteDados(), {reenviar: !!reenviar})));
+  try { const dd = siteDados(); if (!dd.pasta) delete dd.pasta; await post('/minerador/site', dd); desenharEstado(await post('/minerador/iniciar', Object.assign(siteDados(), {reenviar: !!reenviar})));
     aviso(reenviar ? '📤 reenviando…' : (el('mostrar').checked ? '▶ iniciado — o navegador vai abrir' : '▶ iniciado (navegador escondido)'), 'okk'); }
-  catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+  catch (e) { aviso('❌ ' + e.message, 'erro'); el('log').textContent = '❌ ' + e.message + '\n\n' + el('log').textContent; } };
 window.mnParar = async (forcar) => { if (forcar && !confirm('Matar o minerador agora? O que não foi salvo se perde.')) return;
   try { desenharEstado(await post('/minerador/parar', {forcar})); aviso(forcar ? '✖ parado' : '⏹ parando — termina o vídeo atual e salva…'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 window.mnSalvarCfg = async () => { try { await post('/minerador/config', {texto: el('cfg').value}); cfgMexido = false; aviso('💾 config salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };

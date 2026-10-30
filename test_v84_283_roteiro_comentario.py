@@ -135,3 +135,20 @@ def test_aba_minerador_filtros_status_e_miniatura(tmp_path, monkeypatch):
         RC.marcar(b, a["id"], "xx")
     with pytest.raises(RC.RoteiroErro):
         MR.iniciar(b, str(tmp_path))  # sem tiktok_algo.py
+
+
+def test_minerador_um_clique_acha_o_tiktok_algo(tmp_path, monkeypatch):
+    import minerador_rotas as MR
+    b = tmp_path / "site"
+    b.mkdir()
+    algo = tmp_path / "site" / "coisas" / "meu_tiktok"
+    algo.mkdir(parents=True)
+    (algo / "tiktok_algo.py").write_text("# falso")
+    monkeypatch.setattr(MR, "_candidatas", lambda base: [str(b)])
+    assert MR.achar_tiktok_algo(str(b)) == str(algo)
+    assert MR.pasta_auto(str(b)) == str(algo) and MR.config_site(str(b))["pasta"] == str(algo)  # guarda pra próxima
+    monkeypatch.setattr(MR, "_candidatas", lambda base: [str(tmp_path / "vazio")])
+    (algo / "tiktok_algo.py").unlink()
+    assert MR.pasta_auto(str(b)) == str(algo)  # não achou de novo: fica a escolhida (o iniciar avisa)
+    with pytest.raises(RC.RoteiroErro, match="tiktok_algo"):
+        MR.iniciar(str(b), "")
