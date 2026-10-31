@@ -3,9 +3,11 @@
 {% block content %}
 {% macro legenda_campos(pref) %}
     <label>@ do canal<input id="{{ pref }}arroba" placeholder="@seucanal"></label>
-    <label>Legenda<select id="{{ pref }}legenda_estilo">{% for e in estilos_legenda %}<option value="{{ e.id }}"{% if e.id == 'pop' %} selected{% endif %}>{{ e.nome }}</option>{% endfor %}</select></label>
+    <label>Legenda<select id="{{ pref }}legenda_estilo"><option value="">o do canal</option>{% for e in estilos_legenda %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
     <label>Tamanho da legenda<select id="{{ pref }}legenda_tamanho"><option value="0.04">pequena</option><option value="0.05" selected>média</option><option value="0.062">grande</option></select></label>
     <label>Posição da legenda<select id="{{ pref }}legenda_posicao"><option value="terco" selected>no terço de baixo</option><option value="base">embaixo</option><option value="meio">no meio</option><option value="topo">em cima</option></select></label>
+    <label>Altura da legenda (%)<input id="{{ pref }}legenda_altura" type="number" min="5" max="95" placeholder="pela posição"></label>
+    <label>Margem dos lados<select id="{{ pref }}legenda_margem"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1" selected>10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></label>
     <label class="my-chk" style="align-self:end"><input type="checkbox" id="{{ pref }}legenda_maiusculas" checked> MAIÚSCULAS</label>
 {% endmacro %}
 {% include "_shorts_ia_comum.html" %}
@@ -133,7 +135,11 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 window.myFormato = () => { const comp = (document.querySelector('input[name=formato]:checked') || {}).value === 'compilacao';
   el('so_comp').style.display = comp ? '' : 'none'; ['lb_modo', 'bx_modo', 'lb_n', 'lb_min', 'lb_max'].forEach(k => el(k).style.display = comp ? 'none' : ''); };
-const CAMPOS = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'duracao_short', 'n_cortes', 'dur_min', 'dur_max', 'enquadrar', 'ate', 'lingua_post', 'idioma', 'voz', 'qualidade'];
+const CAMPOS = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_altura', 'legenda_margem', 'duracao_short', 'n_cortes', 'dur_min', 'dur_max', 'enquadrar', 'ate', 'lingua_post', 'idioma', 'voz', 'qualidade'];
+(() => { const A = {{ acab|tojson }};  // 🎨 o acabamento padrão dos shorts (Link → vídeo pronto) é o ponto de partida
+  ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_margem'].forEach(k => { if (A[k] != null && A[k] !== '' && el(k)) el(k).value = String(A[k]); });
+  if (A.legenda_altura && el('legenda_altura')) el('legenda_altura').value = Math.round(A.legenda_altura * 100);
+  if (A.legenda_maiusculas != null && el('legenda_maiusculas')) el('legenda_maiusculas').checked = !!A.legenda_maiusculas; })();
 try { const sv = JSON.parse(localStorage.getItem('my_op') || '{}'); CAMPOS.forEach(k => { if (sv[k] != null && k !== 'voz') el(k).value = sv[k]; });
   vozes(); if (sv.voz) el('voz').value = sv.voz;
   if (sv.formato) { const f = document.querySelector(`input[name=formato][value="${sv.formato}"]`); if (f) f.checked = true; } if (sv.modo) { const r = document.querySelector(`input[name=modo][value="${sv.modo}"]`); if (r) r.checked = true; } } catch (e) { vozes(); }
@@ -145,7 +151,7 @@ window.myTestarVisao = async (b) => { await myVisao(); b.disabled = true; el('v_
   try { const j = await post('/momentos-yt/visao/testar'); el('v_teste').textContent = j.msg; } catch (e) { el('v_teste').textContent = '❌ ' + e.message; }
   b.disabled = false; };
 window.myVisual = async () => { const d = {legenda_maiusculas: el('pv_legenda_maiusculas').checked};
-  ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao'].forEach(k => d[k] = el('pv_' + k).value);
+  ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_altura', 'legenda_margem'].forEach(k => d[k] = el('pv_' + k).value);
   try { desenhar(await post(`/momentos-yt/${PID}/visual`, d)); aviso('💾 legenda e @ salvos — valem pros curtos (refaça o vídeo no editor se ele já estava montado)', 'okk'); }
   catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 window.myGo = async () => {
@@ -288,9 +294,10 @@ function desenhar(j) {
   </div>
   ${p.config.formato === 'compilacao' && (p.cortes || []).length ? painelComp(p) : ''}
   <div class="my-cortes">${(p.cortes || []).map(c => cardCorte(p, c)).join('')}</div>`;
-  if (el('pv_box')) { const c = p.config; el('pv_arroba').value = c.arroba || ''; el('pv_legenda_estilo').value = c.legenda_estilo || 'pop';
+  if (el('pv_box')) { const c = p.config; el('pv_arroba').value = c.arroba || ''; el('pv_legenda_estilo').value = c.legenda_estilo || '';
     el('pv_legenda_tamanho').value = String(c.legenda_tamanho || 0.05); el('pv_legenda_posicao').value = c.legenda_posicao || 'terco';
-    el('pv_legenda_maiusculas').checked = c.legenda_maiusculas !== false; }
+    el('pv_legenda_maiusculas').checked = c.legenda_maiusculas !== false; el('pv_legenda_altura').value = c.legenda_altura ? Math.round(c.legenda_altura * 100) : '';
+    el('pv_legenda_margem').value = String(c.legenda_margem ?? 0.1); }
   if (el('p_ate')) el('p_ate').value = ['exportar', 'editor', 'cortes'].includes(p.config.ate) ? p.config.ate : 'exportar';
   el('proj').querySelectorAll('.my-c').forEach(card => {
     const n = +card.dataset.n;

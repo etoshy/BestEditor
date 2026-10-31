@@ -54,6 +54,27 @@
     {% if not tem_tts %}<span class="si-dica">⚠ o gerador de voz não está disponível.</span>{% endif %}</div>
 </div>
 
+<div class="si-card lk-form">
+  <details id="acab"><summary style="cursor:pointer;font-weight:600">🎨 Acabamento de TODOS os shorts — @ do canal, legenda, efeitos sonoros</summary>
+    <p class="si-dica" style="margin:6px 0">Vale pros shorts novos de todas as abas (Link, Comentário, Explicativo, Momentos…). O vídeo do post sempre perde as
+      <b>bordas pretas</b> que ficam o tempo todo nele; a IA olha o vídeo, escreve o roteiro, escolhe os cortes, os destaques com rastreio e os sons.</p>
+    <div class="lk-ops">
+      <label>@ do canal<input id="a_arroba" placeholder="@seucanal"></label>
+      <label>Legenda<select id="a_legenda_estilo"><option value="">o do canal</option>{% for e in estilos_legenda %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
+      <label>Tamanho<select id="a_legenda_tamanho"><option value="0.04">pequena</option><option value="0.05">média</option><option value="0.062">grande</option></select></label>
+      <label>Posição<select id="a_legenda_posicao"><option value="terco">terço de baixo</option><option value="base">embaixo</option><option value="meio">no meio</option><option value="topo">em cima</option></select></label>
+      <label>Altura exata (% de cima pra baixo)<input id="a_legenda_altura" type="number" min="5" max="95" placeholder="vazio = pela posição"></label>
+      <label>Margem livre dos lados<select id="a_legenda_margem"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></label>
+    </div>
+    <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_legenda_maiusculas" style="width:auto;margin:0"> MAIÚSCULAS</label>
+    <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_sons_pixabay" style="width:auto;margin:0">
+      🔊 buscar no Pixabay os efeitos sonoros que o roteiro pedir (abre o navegador; na 1ª vez pode pedir a verificação “sou humano”) — desligado: usa os sons da base</label>
+    <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_aplicar_noticia" style="width:auto;margin:0">
+      aplicar a legenda também na 📰 Notícia (ela usa a legenda do canal modelado)</label>
+    <div class="si-linha"><button class="si-mini" onclick="lkAcab()">💾 salvar o acabamento</button></div>
+  </details>
+</div>
+
 <div class="si-card">
   <h2 style="margin:0">🎞 Vídeos</h2>
   <div id="lista"><p class="si-dica">Nenhum ainda.</p></div>
@@ -88,6 +109,13 @@ window.lkGo = async () => {
   catch (e) { aviso('❌ ' + e.message, 'erro'); }
   el('bgo').disabled = false; atualizar();
 };
+const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
+              'legenda_altura', 'legenda_margem'];
+(async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
+  ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
+    else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); }); } catch (e) {} })();
+window.lkAcab = async () => { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; });
+  try { await post('/curtos/acabamento', d); aviso('💾 acabamento salvo — vale pros próximos shorts', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 let timer = null;
 function desenhar(vs) {
   const L = el('lista');

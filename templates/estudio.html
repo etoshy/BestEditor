@@ -614,6 +614,11 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
         <label class="f"><span>Posição</span><select id="lgPos"><option value="base">Base</option><option value="meio">Meio</option><option value="topo">Topo</option><option value="terco">Terço de baixo</option></select></label>
         <label class="f"><span>Palavras por linha</span><input type="number" id="lgMax" min="1" max="10"></label>
       </div>
+      <div class="row">
+        <label class="f"><span>Altura <b id="lgAltTxt"></b></span><input type="range" id="lgAlt" min="0" max="95" step="1" title="0 = usa a Posição acima"></label>
+        <label class="f"><span>Margem dos lados <b id="lgMargTxt"></b></span><input type="range" id="lgMarg" min="0" max="25" step="1"></label>
+      </div>
+      <p class="hint">Altura: onde fica o CENTRO da legenda (0 = usa a Posição). Margem: o espaço livre em cada lado — a frase que não cabe diminui.</p>
       <label class="f"><span>Tamanho <b id="lgTamTxt"></b></span><input type="range" id="lgTam" min="0.03" max="0.12" step="0.002"></label>
       <label class="f"><span>Fonte</span><select id="lgFonte"></select></label>
       <div class="row">
@@ -3117,6 +3122,8 @@ function preencherLegendaUI() {
   $('lgAtiva').checked = !!leg.ativa;
   document.querySelectorAll('.seg3[data-campo]').forEach(g => g.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === leg[g.dataset.campo])));
   $('lgFonte').innerHTML = DPC.fontes.map(f => `<option ${f === leg.fonte ? 'selected' : ''}>${esc(f)}</option>`).join('');
+  $('lgAlt').value = leg.altura ? Math.round(leg.altura * 100) : 0; $('lgAltTxt').textContent = leg.altura ? Math.round(leg.altura * 100) + '%' : '(pela posição)';
+  $('lgMarg').value = Math.round((leg.margem ?? 0.10) * 100); $('lgMargTxt').textContent = Math.round((leg.margem ?? 0.10) * 100) + '%';
   $('lgPos').value = leg.posicao; $('lgMax').value = leg.max_palavras; $('lgTam').value = leg.tamanho; $('lgTamTxt').textContent = Math.round(leg.tamanho * 1000) / 10 + '%';
   $('lgCor').value = leg.cor_texto || '#FFFFFF'; $('lgCorAtiva').value = corAtivaLeg(); $('lgCorPaleta').checked = !leg.cor_ativa;
   $('lgMaius').checked = !!leg.maiusculas; $('lgContorno').checked = leg.contorno !== false;
@@ -3130,7 +3137,9 @@ function montarLegendas() {
   preencherLegendaUI();
   const muda = (fn) => (e) => { fn(e); marcarSujo(); desenharLgEstilos(); atualizarMonitor(true); };
   $('lgAtiva').addEventListener('change', muda((e) => { leg.ativa = e.target.checked; }));
-  $('lgPos').addEventListener('change', muda((e) => { leg.posicao = e.target.value; }));
+  $('lgPos').addEventListener('change', muda((e) => { leg.posicao = e.target.value; leg.altura = null; $('lgAlt').value = 0; $('lgAltTxt').textContent = '(pela posição)'; }));
+  $('lgAlt').addEventListener('input', muda((e) => { const v = +e.target.value; leg.altura = v >= 5 ? v / 100 : null; $('lgAltTxt').textContent = leg.altura ? v + '%' : '(pela posição)'; }));
+  $('lgMarg').addEventListener('input', muda((e) => { leg.margem = +e.target.value / 100; $('lgMargTxt').textContent = e.target.value + '%'; }));
   $('lgMax').addEventListener('change', muda((e) => { leg.max_palavras = clamp(parseInt(e.target.value) || 4, 1, 10); }));
   $('lgTam').addEventListener('input', muda((e) => { leg.tamanho = parseFloat(e.target.value); $('lgTamTxt').textContent = Math.round(leg.tamanho * 1000) / 10 + '%'; }));
   $('lgFonte').addEventListener('change', muda((e) => { leg.fonte = e.target.value; }));
@@ -3192,6 +3201,9 @@ function desenharLegenda(t) {
   L.style.paintOrder = 'stroke fill';
   L.style.top = leg.posicao === 'topo' ? '6%' : leg.posicao === 'meio' ? '50%' : leg.posicao === 'terco' ? '76%' : 'auto'; L.style.bottom = leg.posicao === 'base' ? '7%' : 'auto';
   L.style.transform = (leg.posicao === 'meio' || leg.posicao === 'terco') ? 'translateY(-50%)' : 'none';
+  if (leg.altura) { L.style.top = (leg.altura * 100) + '%'; L.style.bottom = 'auto'; L.style.transform = 'translateY(-50%)'; }  // 📐 altura exata
+  const mg = (leg.margem ?? 0.10) * 100; L.style.left = mg + '%'; L.style.right = mg + '%';  // 📐 margem livre dos lados
+  if (L.scrollWidth > L.clientWidth + 1) L.style.fontSize = Math.max(6, fs * L.clientWidth / L.scrollWidth) + 'px';  // não cabe: diminui (igual ao vídeo)
 }
 
 // ------------------------------------------------------------------ textos avulsos (mesmos estilos, texto livre)

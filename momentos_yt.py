@@ -60,7 +60,8 @@ CONFIG_PADRAO = {"n_cortes": 3, "dur_min": 20, "dur_max": 60, "modo": "auto", "e
                  "lingua_post": "en", "idioma": "en", "voz": "", "qualidade": "1080p", "alvo": "", "extra": "",
                  "transcricao_colada": "", "heatmap_colado": "", "usar_navegador": True, "formato": "separados", "assunto": "",
                  "referencia": "", "referencia_link": "", "duracao_short": 0, "arroba": "",
-                 "legenda_estilo": "pop", "legenda_tamanho": 0.05, "legenda_posicao": "terco", "legenda_maiusculas": True}
+                 "legenda_estilo": "", "legenda_tamanho": 0.05, "legenda_posicao": "terco", "legenda_maiusculas": True,
+                 "legenda_altura": None, "legenda_margem": 0.10}
 
 
 # ---------------------------------------------------------------------------------------------------- projeto
@@ -635,15 +636,32 @@ LEGENDA_TAMANHOS = {"0.04": "pequena", "0.05": "média", "0.062": "grande"}
 EVENTO_SOM = {"lancamento": ("whoosh", "fast whoosh throw"), "chegada": ("impacto", "basketball net swish hit")}
 
 
+def _altura_margem(d: Dict[str, Any]) -> Tuple[Optional[float], float]:
+    """Altura (o form manda em %: 70 → 0.70; vazio = pela posição) e margem dos lados (0..0.25)."""
+    try:
+        a = d.get("legenda_altura")
+        alt = None if a in (None, "", "0", 0) else round(max(0.05, min(0.95, float(a) / (100 if float(a) > 1 else 1))), 3)
+    except (TypeError, ValueError):
+        alt = None
+    try:
+        m = float(d.get("legenda_margem", 0.10))
+        mar = round(max(0.0, min(0.25, m / (100 if m > 1 else 1))), 3)
+    except (TypeError, ValueError):
+        mar = 0.10
+    return alt, mar
+
+
 def aplicar_visual(q: Dict[str, Any], cfg: Dict[str, Any]) -> None:
     """A legenda (estilo, tamanho, posição) e o @ do canal escolhidos aqui valem pro curto (por cima do perfil do canal)."""
     try:
         tam = max(0.03, min(0.09, float(cfg.get("legenda_tamanho") or 0.05)))
     except (TypeError, ValueError):
         tam = 0.05
-    q["config"]["legenda"] = {"estilo": cfg.get("legenda_estilo") or "pop", "tamanho": tam,
-                              "posicao": cfg.get("legenda_posicao") or "terco", "maiusculas": bool(cfg.get("legenda_maiusculas", True)),
-                              "max_palavras": 3 if (cfg.get("legenda_estilo") or "pop") != "palavra_unica" else 1}
+    q["config"]["legenda"] = {"tamanho": tam, "posicao": cfg.get("legenda_posicao") or "terco",
+                              "maiusculas": bool(cfg.get("legenda_maiusculas", True)),
+                              "altura": cfg.get("legenda_altura"), "margem": cfg.get("legenda_margem", 0.10)}
+    if cfg.get("legenda_estilo"):  # vazio = o estilo do canal
+        q["config"]["legenda"].update(estilo=cfg["legenda_estilo"], max_palavras=1 if cfg["legenda_estilo"] == "palavra_unica" else 3)
     arroba = str(cfg.get("arroba") or "").strip()
     if arroba:
         q["config"]["marca"] = {"ativa": True, "texto": arroba if arroba.startswith("@") else "@" + arroba}
@@ -810,7 +828,7 @@ def criar_compilacao(base: str, pid: str, transcrever: Optional[Callable[..., An
                 cp = os.path.join(tmp, f"c{c['n']}.mp4")
                 shutil.copy(os.path.join(d, "cortes", c["arquivo"]), cp)
                 m = CT.adicionar_midia(base, q, cp, "video", f"{c.get('titulo') or ''} — {c.get('motivo') or ''}"[:300], "M",
-                                       origem=f"https://youtu.be/{p['yt_id']}?t={int(c['t0'])}")
+                                       origem=f"https://youtu.be/{p['yt_id']}?t={int(c['t0'])}", aparar=False)
                 mids[c["n"]] = m["id"]
             cl = comp.get("climax") or {}
             largo = os.path.join(d, "cortes", "climax_largo.mp4")
@@ -1602,7 +1620,12 @@ def produzir_corte(base: str, pid: str, n: int, prog: Prog = lambda m: None, bai
             # 🎥 v84_296: o corte fica na proporção ORIGINAL + o MAPA de onde está cada objeto. O vertical sai DEPOIS do roteiro,
             # focando o que cada fala mostra (curtos_comentario.enquadrar_planos)
             import camera_virtual as CV
+            import curtos as CT
             cortar(video, c["t0"], c["t1"], saida, "scale='min(1920,iw)':-2")
+            if CT.aparar_bordas(saida):  # ⬛ v84_302: faixas pretas fixas fora ANTES do mapa (as posições valem pro vídeo sem elas)
+                prog("⬛ bordas pretas cortadas")
+                cru = cortar(saida, 0, dur, os.path.join(tmp, "cru2.mp4"), "scale=-2:720")
+                cenas = AF.trocas_de_cena(cru, 0.3)[1:]
             if alvo or papeis["acao"]:
                 prog("🗺 mapeando " + ", ".join([alvo] + papeis["acao"] + papeis["destino"]) + "…")
                 mapa = CV.analisar(visao, cru, dur, papeis, cenas, prog, passo=getattr(visao, "passo", 0.5))
@@ -1696,7 +1719,7 @@ def criar_curto(base: str, pid: str, n: int, transcrever: Optional[Callable[...,
     shutil.copy(arq, copia)
     with CT._TRAVA:
         q = CT.carregar(base, cid)
-        CT.adicionar_midia(base, q, copia, "video", (c.get("titulo") or "")[:300], "M", origem=link_t)
+        CT.adicionar_midia(base, q, copia, "video", (c.get("titulo") or "")[:300], "M", origem=link_t, aparar=False)
         cc = CC.dados(q)
         cc["lingua_post"] = cfg["lingua_post"] if cfg["lingua_post"] in CT.LINGUAS else "en"
         cc["idioma"] = "pt" if cfg.get("idioma") == "pt" else "en"
@@ -2037,6 +2060,13 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
         except Exception:  # noqa: BLE001
             return [{"id": "pop", "nome": "Pop"}]
 
+    def _acab() -> Dict[str, Any]:
+        try:
+            import curtos as CT
+            return CT.acabamento(base)
+        except Exception:  # noqa: BLE001
+            return {}
+
     @app.route("/momentos-yt")
     def mom_pagina():
         try:
@@ -2049,7 +2079,7 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             linguas = CT.LINGUAS
         except Exception:  # noqa: BLE001
             linguas = {"en": "English", "pt": "Português (Brasil)"}
-        return render_template("momentos_yt.html", lista=listar(base), formatos=FORMATOS, estilos_legenda=_estilos_legenda(), modos=MODOS, enquadrar=ENQUADRAR, ate=ATE, linguas=linguas,
+        return render_template("momentos_yt.html", lista=listar(base), formatos=FORMATOS, estilos_legenda=_estilos_legenda(), acab=_acab(), modos=MODOS, enquadrar=ENQUADRAR, ate=ATE, linguas=linguas,
                                vozes_en=vozes_en, vozes=vozes, visao=config_visao(base), padrao=CONFIG_PADRAO, pid=request.args.get("p") or "")
 
     @app.route("/momentos-yt/lista")
@@ -2072,13 +2102,14 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             cfg[k] = str(d.get(k) or CONFIG_PADRAO[k])[:2000]
         cfg["formato"] = d.get("formato") if d.get("formato") in FORMATOS else "separados"
         cfg["arroba"] = str(d.get("arroba") or "").strip()[:40]
-        cfg["legenda_estilo"] = str(d.get("legenda_estilo") or "pop")[:20]
+        cfg["legenda_estilo"] = str(d.get("legenda_estilo") or "")[:20]
         cfg["legenda_posicao"] = d.get("legenda_posicao") if d.get("legenda_posicao") in ("base", "meio", "topo", "terco") else "terco"
         try:
             cfg["legenda_tamanho"] = max(0.03, min(0.09, float(d.get("legenda_tamanho") or 0.05)))
         except (TypeError, ValueError):
             cfg["legenda_tamanho"] = 0.05
         cfg["legenda_maiusculas"] = d.get("legenda_maiusculas", True) not in (False, "0", "false")
+        cfg["legenda_altura"], cfg["legenda_margem"] = _altura_margem(d)
         cfg["referencia"] = str(d.get("referencia") or "")[:20000]
         try:
             cfg["duracao_short"] = max(0, min(180, int(d.get("duracao_short") or 0)))
@@ -2283,13 +2314,16 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             cfg = q["config"]
             if "arroba" in d:
                 cfg["arroba"] = str(d["arroba"] or "").strip()[:40]
-            for k in ("legenda_estilo", "legenda_posicao"):
-                if d.get(k):
-                    cfg[k] = str(d[k])[:20]
+            if "legenda_estilo" in d:
+                cfg["legenda_estilo"] = str(d["legenda_estilo"] or "")[:20]  # vazio = o do canal
+            if d.get("legenda_posicao"):
+                cfg["legenda_posicao"] = str(d["legenda_posicao"])[:20]
             if d.get("legenda_tamanho"):
                 cfg["legenda_tamanho"] = max(0.03, min(0.09, float(d["legenda_tamanho"])))
             if "legenda_maiusculas" in d:
                 cfg["legenda_maiusculas"] = bool(d["legenda_maiusculas"])
+            if "legenda_altura" in d or "legenda_margem" in d:
+                cfg["legenda_altura"], cfg["legenda_margem"] = _altura_margem(dict({"legenda_margem": cfg.get("legenda_margem", 0.1)}, **d))
         try:
             p = mudar(base, pid, up)
         except (TypeError, ValueError) as exc:

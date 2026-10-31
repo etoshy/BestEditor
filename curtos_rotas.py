@@ -1172,9 +1172,58 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         if not _ia_ligada():
             raise CT.CurtoErro("A IA está desligada (ou o recurso “⚡ Vídeos curtos” desligado em /ia).")
 
+    def _sons_do_pixabay(pid: str, prog: Callable[[str], None]) -> int:
+        """🔊 v84_302: as deixas de som do roteiro ganham um som do Pixabay pela busca que a IA escreveu ("basketball net swish",
+        "crowd cheer"…) — busca uma vez (o navegador abre; a Cloudflare pode pedir verificação na 1ª vez), guarda no catálogo e
+        reaproveita. Só com "sons do Pixabay" ligado no 🎨 acabamento. Devolve quantas deixas ganharam som."""
+        if not CT.acabamento(base_dir).get("sons_pixabay"):
+            return 0
+        p = CT.carregar(base_dir, pid)
+        termos = list(dict.fromkeys(d["busca"] for d in CT.deixas_de_som(p) if not d.get("escolhido") and d.get("busca")))[:4]
+        pasta_p = _pasta_pixabay(base_dir)
+        escolhidos: Dict[str, str] = {}
+        for termo in termos:
+            res = _resultados_pixabay(pasta_p, termo)
+            if not res:
+                prog(f"🔊 Pixabay: procurando “{termo}”…")
+                try:
+                    import pixabay_sons_teste as PT
+                    args = argparse.Namespace(termo=termo, paginas=1, limite=2, pasta=pasta_p, oculto=False, chrome=False, ia=False,
+                                              sem_baixar=False, html=None)
+                    (rodar_pixabay or PT.rodar)(args)
+                except Exception as exc:  # noqa: BLE001  (sem Pixabay: fica o som da base)
+                    prog(f"🔊 Pixabay falhou ({str(exc)[:80]}) — ficam os sons da base")
+                    continue
+                res = _resultados_pixabay(pasta_p, termo)
+            if res:
+                try:
+                    escolhidos[termo] = importar_pixabay(base_dir, str(res[0]["id"]), pasta_p)
+                except CT.CurtoErro:
+                    pass
+        if not escolhidos:
+            return 0
+        n = 0
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            for b in (q.get("roteiro") or {}).get("blocos") or []:
+                for sx in b.get("sfx") or []:
+                    termo = sx.get("busca") or CT.TIPOS_SFX.get(sx.get("tipo"), {}).get("pixabay")
+                    if not sx.get("som") and termo in escolhidos:
+                        sx["som"] = escolhidos[termo]
+                        n += 1
+            CT.salvar(base_dir, q)
+        prog(f"🔊 {n} efeito(s) sonoro(s) do Pixabay")
+        return n
+
+    CB["sons_pixabay"] = _sons_do_pixabay
+
     def _mandar_pro_editor(pid: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
         if not CB["para_estudio"]:
             raise CT.CurtoErro("O editor não está disponível aqui.")
+        try:
+            _sons_do_pixabay(pid, prog)
+        except Exception as exc:  # noqa: BLE001
+            prog(f"🔊 Pixabay: {str(exc)[:120]}")
         if CT.carregar(base_dir, pid).get("rastros_h"):  # 🎥 v84_296: o que faltar enquadrar no vertical (ex.: o roteiro mudou)
             try:
                 CC.enquadrar_planos(base_dir, pid, prog)
@@ -1336,6 +1385,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
     CB["rodar_link"] = _link_rodar  # 🔥 v84_291: os Momentos mais vistos usam o mesmo caminho (roteiro → voz → editor → MP4)
 
+    @app.route("/curtos/acabamento", methods=["GET", "POST"])
+    def curtos_acabamento():
+        """🎨 o acabamento padrão de TODOS os shorts novos: @ do canal, legenda, sons do Pixabay."""
+        if request.method == "POST":
+            return _ok(acabamento=CT.salvar_acabamento(base_dir, _corpo()))
+        return _ok(acabamento=CT.acabamento(base_dir))
+
     @app.route("/curtos/link", methods=["GET"])
     def curtos_link_pagina():
         try:
@@ -1345,7 +1401,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         except Exception:  # noqa: BLE001
             vozes_en, vozes = [], []
         import qualidade_export
+        import dp_legendas
         return render_template("curtos_link.html", modos=CL.MODOS, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
+                               estilos_legenda=[{"id": e["id"], "nome": e["nome"]} for e in dp_legendas.ESTILOS],
                                vozes_en=vozes_en, vozes=vozes, resolucoes=qualidade_export.RESOLUCOES, ia=_ia_ligada(),
                                tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")))
 

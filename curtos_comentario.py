@@ -764,8 +764,35 @@ def _quadro(video: str, t: float, destino: str) -> Optional[str]:
     return destino if os.path.isfile(destino) else None
 
 
-def achar_objeto(video: str, t: float, alvo: str, pasta_tmp: str, chamar: Optional[Callable[..., Any]] = None) -> Optional[List[float]]:
-    """[x, y, w, h] em px do vídeo, ou None."""
+def achar_com_moondream(base: str, video: str, t: float, alvo: str, pasta_tmp: str) -> Optional[List[float]]:
+    """🎯 v84_302: o Moondream (se estiver ligado em 🔥 Momentos → 👁) acha o objeto bem mais justo que o Claude na grade."""
+    try:
+        import momentos_yt as MY
+        if MY.config_visao(base).get("backend") != "hf":
+            return None
+        import rastreio
+        info = rastreio.sondar(video)
+        img = os.path.join(pasta_tmp, "quadro_md.jpg")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, t):.3f}", "-i", video, "-frames:v", "1", img], capture_output=True, timeout=60)
+        if not os.path.isfile(img):
+            return None
+        cs = MY.Visao(base).achar(img, alvo)
+        if not cs:
+            return None
+        x0, y0, x1, y1 = max(cs, key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))
+        W, H = info["largura"], info["altura"]
+        return [round(x0 * W, 1), round(y0 * H, 1), round((x1 - x0) * W, 1), round((y1 - y0) * H, 1)]
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def achar_objeto(video: str, t: float, alvo: str, pasta_tmp: str, chamar: Optional[Callable[..., Any]] = None,
+                 base: Optional[str] = None) -> Optional[List[float]]:
+    """[x, y, w, h] em px do vídeo, ou None. Com o Moondream ligado, ele acha primeiro; senão (ou não achou), o Claude."""
+    if base:
+        cx = achar_com_moondream(base, video, t, alvo, pasta_tmp)
+        if cx:
+            return cx
     import ia_servico
     import rastreio
     info = rastreio.sondar(video)
@@ -925,7 +952,7 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
         if not chaves:
             on_log(f"🎯 procurando “{d['alvo']}”…")
             try:
-                caixa = achar_objeto(pedaco, 0.25, d["alvo"], tmp, chamar)
+                caixa = achar_objeto(pedaco, 0.25, d["alvo"], tmp, chamar, base=base)
             except Exception:  # noqa: BLE001
                 caixa = None
             if caixa:
@@ -960,4 +987,9 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
         q = CT.carregar(base, pid)
         q["destaques_pendentes"] = pendentes
         CT.salvar(base, q)
+    try:  # 🧹 o Moondream (se usado pros destaques) sai da memória antes do editor/exportar
+        import momentos_yt as MY
+        MY.liberar_moondream()  # (quem estiver usando agora segura a referência dele; o próximo carrega de novo)
+    except Exception:  # noqa: BLE001
+        pass
     return {"feitos": feitos, "pendentes": pendentes}

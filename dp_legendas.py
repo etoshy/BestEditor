@@ -49,7 +49,7 @@ _FORMAS_SELO = {"selo_canto", "cartao_dado", "terco", "doc", "carimbo", "slab"}
 def padrao() -> Dict[str, Any]:
     return {"ativa": False, "estilo": "classico", "posicao": "base", "tamanho": 0.062, "maiusculas": False,
             "max_palavras": 4, "fonte": "DP Inter", "cor_texto": "#FFFFFF", "cor_ativa": None,
-            "sob_templates": "auto", "sob_destaques": "auto", "contorno": True}
+            "sob_templates": "auto", "sob_destaques": "auto", "contorno": True, "altura": None, "margem": 0.10}
 
 
 def normalizar(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -79,6 +79,17 @@ def normalizar(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     for k in ("sob_templates", "sob_destaques"):
         if c.get(k) in MODOS_SOB:
             out[k] = c[k]
+    # 📐 v84_303: a ALTURA exata (centro da legenda em fração da altura do vídeo; vazio = a "posição") e a MARGEM livre de cada
+    # lado (fração da largura; padrão 10%) — a frase que não cabe entre as margens diminui
+    try:
+        a = c.get("altura")
+        out["altura"] = None if a in (None, "", "auto") else round(max(0.05, min(0.95, float(a))), 3)
+    except (TypeError, ValueError):
+        out["altura"] = None
+    try:
+        out["margem"] = round(max(0.0, min(0.25, float(c.get("margem", out["margem"])))), 3)
+    except (TypeError, ValueError):
+        pass
     return out
 
 
@@ -209,11 +220,15 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
     an = {"base": 2, "meio": 5, "topo": 8, "terco": 5}[cfg["posicao"]]
     cx = W // 2
     cy = {"base": int(H * 0.93), "meio": H // 2, "topo": int(H * 0.06), "terco": int(H * 0.76)}[cfg["posicao"]]  # terço de baixo (v84_255)  # telinha: bottom 7% / top 6%
+    if cfg.get("altura") is not None:  # 📐 altura exata: o CENTRO da legenda fica ali
+        an, cy = 5, int(H * float(cfg["altura"]))
+    margem = float(cfg.get("margem") if cfg.get("margem") is not None else 0.10)
+    mlr = int(W * margem)
     bord = max(2, int(round(fs_css / 24))) if cfg["contorno"] else 0  # contorno da telinha: fs/14 centrado na borda da letra
     estilos_ass = [
-        f"Style: Leg,{fam},{fs},{branco},{branco},&H00000000,&H80000000,1,{1 if estilo == 'cinema' else 0},0,0,100,100,0,0,1,{bord},{1 if estilo != 'cinema' else 2},{an},20,20,0,1",
-        f"Style: Caixa,{fam},{fs},{branco},{branco},&H50000000,&H50000000,1,0,0,0,100,100,0,0,3,{max(4, fs // 5)},0,{an},20,20,0,1",
-        f"Style: Faixa,{fam},{fs},{_c(sobre_ativa)},{_c(sobre_ativa)},{_c(cor_ativa)},{_c(cor_ativa)},1,0,0,0,100,100,0,0,3,{max(4, fs // 5)},0,{an},20,20,0,1",
+        f"Style: Leg,{fam},{fs},{branco},{branco},&H00000000,&H80000000,1,{1 if estilo == 'cinema' else 0},0,0,100,100,0,0,1,{bord},{1 if estilo != 'cinema' else 2},{an},{mlr},{mlr},0,1",
+        f"Style: Caixa,{fam},{fs},{branco},{branco},&H50000000,&H50000000,1,0,0,0,100,100,0,0,3,{max(4, fs // 5)},0,{an},{mlr},{mlr},0,1",
+        f"Style: Faixa,{fam},{fs},{_c(sobre_ativa)},{_c(sobre_ativa)},{_c(cor_ativa)},{_c(cor_ativa)},1,0,0,0,100,100,0,0,3,{max(4, fs // 5)},0,{an},{mlr},{mlr},0,1",
     ]
     linhas_ass = ["[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}", "WrapStyle: 2", "ScaledBorderAndShadow: yes", "",
                   "[V4+ Styles]",
@@ -222,7 +237,7 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
     up = (lambda s: s.upper()) if cfg["maiusculas"] or estilo == "contorno" else (lambda s: s)
     esc = dp_destaques._esc
     pos = f"\\an{an}\\pos({cx},{cy})"
-    max_w = W * 0.88
+    max_w = W * (1 - 2 * margem)
 
     def ev(t0, t1, txt, style="Leg", layer=1):
         if t1 - t0 >= 0.02:
@@ -233,6 +248,9 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
             t0 = float(w["start"])
             t1 = max(float(w.get("end", t0)), min(float(palavras[k + 1]["start"]) if k + 1 < len(palavras) else t0 + 0.6, t0 + 1.0))
             fs2 = int(fs * 1.5)
+            wl1 = largura(up(w["word"]), fam, fs2) * 1.08  # (cresce 8% na animação)
+            if wl1 > max_w:  # palavra comprida ("APRESENTAÇÃO") não pode passar da margem
+                fs2 = max(8, int(fs2 * max_w / wl1))
             ev(t0, t1, f"{{{pos}\\fs{fs2}\\1c{_c(cor_ativa) if k % 3 == 1 else branco}\\fscx70\\fscy70\\t(0,90,\\fscx108\\fscy108)\\t(90,160,\\fscx100\\fscy100)}}{esc(up(w['word']))}")
     else:
         grupos = agrupar(palavras, cfg["max_palavras"])
@@ -245,7 +263,7 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
             textos = [up(w["word"]) for w in g]
             frase = " ".join(textos)
             fs_g = fs
-            wl = largura(frase, fam, fs_g)
+            wl = largura(frase, fam, fs_g) * (1.18 if estilo == "pop" else 1.0)  # (o pop cresce a palavra ativa)
             if wl > max_w:
                 fs_g = int(fs * max_w / wl)
                 wl = largura(frase, fam, fs_g)

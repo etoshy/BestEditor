@@ -1216,6 +1216,72 @@ def canal_do_modelo(base: str, modelo: str) -> str:
     return ""
 
 
+# ------------------------------------------------------------------ 🎨 v84_302: acabamento padrão de TODOS os shorts
+ACABAMENTO_PADRAO = {"arroba": "", "legenda_estilo": "", "legenda_tamanho": 0.05, "legenda_posicao": "terco",
+                     "legenda_maiusculas": True, "sons_pixabay": False, "aplicar_noticia": False,
+                     "legenda_altura": None, "legenda_margem": 0.10}
+
+
+def acabamento(base: str) -> Dict[str, Any]:
+    cam = os.path.join(raiz(base), "_acabamento.json")
+    out = dict(ACABAMENTO_PADRAO)
+    try:
+        with open(cam, encoding="utf-8") as f:
+            out.update({k: v for k, v in json.load(f).items() if k in ACABAMENTO_PADRAO})
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def salvar_acabamento(base: str, novos: Dict[str, Any]) -> Dict[str, Any]:
+    a = acabamento(base)
+    for k, v in (novos or {}).items():
+        if k not in ACABAMENTO_PADRAO:
+            continue
+        if k == "legenda_tamanho":
+            try:
+                v = round(max(0.03, min(0.09, float(v))), 3)
+            except (TypeError, ValueError):
+                continue
+        elif k in ("legenda_maiusculas", "sons_pixabay", "aplicar_noticia"):
+            v = v not in (False, "0", "false", "", None)
+        elif k == "legenda_altura":
+            try:
+                v = None if v in (None, "", "0", 0, "auto") else round(max(0.05, min(0.95, float(v) / (100 if float(v) > 1 else 1))), 3)
+            except (TypeError, ValueError):
+                v = None
+        elif k == "legenda_margem":
+            try:
+                v = round(max(0.0, min(0.25, float(v) / (100 if float(v) > 1 else 1))), 3)
+            except (TypeError, ValueError):
+                continue
+        elif k == "legenda_posicao":
+            v = v if v in ("base", "meio", "topo", "terco") else "terco"
+        else:
+            v = " ".join(str(v or "").split())[:40]
+        a[k] = v
+    os.makedirs(raiz(base), exist_ok=True)
+    with open(os.path.join(raiz(base), "_acabamento.json"), "w", encoding="utf-8") as f:
+        json.dump(a, f, ensure_ascii=False, indent=1)
+    return a
+
+
+def aplicar_acabamento(p: Dict[str, Any], a: Dict[str, Any]) -> None:
+    """O @ do canal e a legenda do acabamento padrão entram no projeto (o perfil do canal continua valendo pro resto: fonte,
+    cores…). Notícia (Laestro) só se marcado — ela tem a legenda do canal modelado."""
+    cfg = p.setdefault("config", {})
+    arroba = str(a.get("arroba") or "").strip()
+    if arroba:
+        cfg["marca"] = dict(cfg.get("marca") or {}, ativa=True, texto=arroba if arroba.startswith("@") else "@" + arroba)
+    if p.get("modelo") != "noticia" or a.get("aplicar_noticia"):
+        est = a.get("legenda_estilo") or ""  # vazio = o estilo do canal (só o tamanho/posição/margem mudam)
+        cfg["legenda"] = {"tamanho": float(a.get("legenda_tamanho") or 0.05), "posicao": a.get("legenda_posicao") or "terco",
+                          "maiusculas": bool(a.get("legenda_maiusculas", True)), "altura": a.get("legenda_altura"),
+                          "margem": a.get("legenda_margem", 0.10)}
+        if est:
+            cfg["legenda"].update(estilo=est, max_palavras=1 if est == "palavra_unica" else 3)
+
+
 def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] = (), texto: str = "",
           modelo: str = "noticia") -> Dict[str, Any]:
     if canal_id:
@@ -1233,6 +1299,7 @@ def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] 
         u = str(u or "").strip()
         if re.match(r"https?://", u) and len(p["noticia"]["fontes"]) < 8:
             p["noticia"]["fontes"].append({"url": u[:800], "estado": "na fila", "titulo": "", "texto": "", "erro": None})
+    aplicar_acabamento(p, acabamento(base))  # 🎨 @ do canal + legenda padrão
     salvar(base, p)
     return p
 
@@ -1341,8 +1408,57 @@ def _proximo_id(p: Dict[str, Any], letra: str) -> str:
     return f"{letra}{1 + max(n or [0])}"
 
 
+def bordas_pretas(video: str, minimo: float = 0.02) -> Optional[Tuple[int, int, int, int]]:
+    """⬛ v84_302: as faixas pretas que ficam no vídeo O TEMPO TODO (vídeo deitado dentro de um vertical, 4:3 dentro de 16:9…).
+    O cropdetect ACUMULADO no vídeo inteiro dá a área que tem imagem em algum momento — o resto é preto do começo ao fim.
+    → (w, h, x, y) pra cortar, ou None (sem borda, ou borda menor que `minimo` de cada lado)."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-an", "-vf", "fps=2,cropdetect=limit=24:round=2:reset=0",
+                        "-f", "null", "-"], capture_output=True, text=True, timeout=900)
+    achados = re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr or "")
+    if not achados:
+        return None
+    w, h, x, y = (int(v) for v in achados[-1])
+    p = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", video],
+                       capture_output=True, text=True, timeout=60)
+    try:
+        W, H = (int(v) for v in p.stdout.strip().split(",")[:2])
+    except ValueError:
+        return None
+    if w <= 0 or h <= 0 or w > W or h > H or w < W * 0.3 or h < H * 0.3:  # detecção estranha (vídeo escuro demais): não mexe
+        return None
+    if (W - w) < W * minimo * 2 and (H - h) < H * minimo * 2:
+        return None
+    return w, h, x, y
+
+
+def aparar_bordas(video: str) -> bool:
+    """Corta as bordas pretas permanentes do arquivo (no lugar). Devolve True se cortou."""
+    cr = bordas_pretas(video)
+    if not cr:
+        return False
+    w, h, x, y = cr
+    tmp = video + ".sem_bordas" + os.path.splitext(video)[1]
+    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", video, "-vf", f"crop={w}:{h}:{x}:{y}", "-c:v", "libx264", "-preset", "medium",
+                        "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", tmp],
+                       capture_output=True, timeout=1800)
+    if r.returncode != 0 or not os.path.isfile(tmp) or os.path.getsize(tmp) < 1000:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return False
+    os.replace(tmp, video)
+    return True
+
+
 def adicionar_midia(base: str, p: Dict[str, Any], caminho: str, tipo: str, descricao: str = "", letra: str = "M",
-                    origem: str = "") -> Dict[str, Any]:
+                    origem: str = "", aparar: Optional[bool] = None) -> Dict[str, Any]:
+    if tipo == "video" and (aparar if aparar is not None else letra == "M"):
+        try:
+            if aparar_bordas(caminho):  # ⬛ o clipe do post vem com faixas pretas fixas (TikTok/Reels de vídeo deitado…)
+                descricao = (descricao + " (bordas pretas cortadas)").strip()
+        except Exception:  # noqa: BLE001  (sem ffmpeg/arquivo estranho: segue com o original)
+            pass
     mid = _proximo_id(p, letra)
     d = os.path.join(pasta(base, p["id"]), "midias")
     os.makedirs(d, exist_ok=True)
@@ -2603,7 +2719,7 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
         trechos.append({"start": float(ws[0]["start"]), "end": float(ws[-1]["end"]), "text": a.get("falado") or b["fala"], "words": ws})
     leg = dict(perfil["legenda"])
     leg.update({k: v for k, v in ((p.get("config") or {}).get("legenda") or {}).items()
-                if k in ("estilo", "tamanho", "posicao", "maiusculas", "max_palavras", "fonte", "cor_texto", "cor_ativa")})  # 🔤 v84_292
+                if k in ("estilo", "tamanho", "posicao", "maiusculas", "max_palavras", "fonte", "cor_texto", "cor_ativa", "altura", "margem")})  # 🔤
     leg["ativa"] = perfil["legenda"].get("ativa", True) is not False
     prop = proporcao_do(p)
     if prop == "1:1":  # ⬛ quadrado: a letra (que é medida pela altura) cresce pra ocupar a mesma largura de antes
