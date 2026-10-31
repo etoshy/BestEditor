@@ -12151,6 +12151,8 @@ import roteiro_comentario as _roteiro_comentario  # noqa: E402  ✍ Roteiro de c
 _roteiro_comentario.registrar(app, BASE_DIR)
 import minerador_rotas as _minerador_rotas  # noqa: E402  ⛏ Minerador TikTok: rodar, config e os vídeos minerados (v84_285)
 _minerador_rotas.registrar(app, BASE_DIR)
+import achar_fonte as _achar_fonte  # noqa: E402  🔎 Achar a fonte: trocas de cena → prints → Google Lens (v84_289)
+_achar_fonte.registrar(app, BASE_DIR)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)
@@ -12293,6 +12295,7 @@ def _padroes_excluidos_do_reloader() -> list:
         os.environ.get("POKER_DIR") or os.path.join(BASE_DIR, "poker"),  # 🃏 poker: mãos, fotos, vídeos, roteiros
         os.environ.get("EXPLICADOR_DIR") or os.path.join(BASE_DIR, "explicador"),  # 🎬 explicador animado: cenas, render
         os.environ.get("JUNTAR_DIR") or os.path.join(BASE_DIR, "juntar"),  # 🔗 juntar vídeos: envios e o vídeo juntado
+        os.environ.get("FONTES_VIDEO_DIR") or os.path.join(BASE_DIR, "fontes_video"),  # 🔎 achar a fonte: vídeo e prints
         os.environ.get("ROTEIROS_COMENTARIO_DIR") or os.path.join(BASE_DIR, "roteiros_comentario"),  # ✍ roteiros de comentário
     ]
     # 🚀 v84_262: as bibliotecas instaladas (torch, transformers… milhares de arquivos) não mudam enquanto o site roda —

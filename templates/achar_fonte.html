@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}🔎 Achar a fonte{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .af-ops { position: sticky; top: 0; z-index: 9; background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 14px; margin-top: 12px;
+            display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .af-ops label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: .86rem; }
+  .af-ops label input[type=checkbox] { width: auto; margin: 0; }
+  .af-ops select { width: auto; margin: 0; }
+  .af-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; margin-top: 12px; }
+  .af-c { border: 1px solid var(--borda); border-radius: 12px; background: var(--card); overflow: hidden; display: flex; flex-direction: column; }
+  .af-c.achou { border-color: var(--ok); }
+  .af-cab { display: flex; gap: 8px; align-items: center; padding: 8px 10px; font-size: .84rem; border-bottom: 1px solid var(--borda); }
+  .af-prints { display: flex; gap: 6px; padding: 8px; }
+  .af-p { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .af-p img { width: 100%; aspect-ratio: 16/10; object-fit: contain; background: #000; border-radius: 8px; cursor: zoom-in; }
+  .af-bts { display: flex; gap: 3px; flex-wrap: wrap; }
+  .af-bts button { padding: 2px 7px !important; font-size: .74rem !important; }
+  .af-fonte { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .af-fonte input { margin: 0; font-size: .82rem; }
+  .af-zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 50; display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+  .af-zoom img { max-width: 94vw; max-height: 92vh; }
+  .af-lista a { text-decoration: none; }
+</style>
+<h1>🔎 Achar a fonte <span class="si-dica" style="font-weight:400">o vídeo → um print de cada troca de cena → Google Lens (normal, ↔ invertido ou sem as faixas)</span></h1>
+<div id="barra" class="si-barra{% if request.args.get('erro') %} erro{% endif %}">{{ request.args.get('erro') or '' }}</div>
+
+{% if not p %}
+<div class="si-card">
+  <h2 style="margin:0">➕ Novo vídeo</h2>
+  <form method="post" action="/achar-fonte/novo" enctype="multipart/form-data">
+    <div class="si-linha"><label style="flex:1">🔗 Link <input name="link" placeholder="https://www.youtube.com/… · TikTok · Reels · Shorts" style="min-width:420px;width:100%"></label></div>
+    <div class="si-linha"><label>…ou o arquivo <input type="file" name="arquivo" accept="video/*"></label></div>
+    <div class="si-linha">
+      <label>Sensibilidade da troca de cena <select name="sensibilidade"><option value="0.2">alta (pega cortes suaves)</option><option value="0.3" selected>normal</option><option value="0.45">baixa (só cortes secos)</option></select></label>
+      <label>Prints por cena <select name="por_cena"><option value="2" selected>até 2 (começo e meio)</option><option value="1">1</option></select></label>
+    </div>
+    <button class="si-ok">🔎 analisar</button>
+  </form>
+</div>
+<div class="si-card af-lista">
+  <h2 style="margin:0">📁 Vídeos analisados</h2>
+  {% if not lista %}<p class="si-dica">Nenhum ainda.</p>{% endif %}
+  {% for x in lista %}
+  <div class="si-linha"><a href="/achar-fonte/{{ x.id }}">🔎 {{ x.titulo }}</a><span class="si-tag">{{ x.cenas }} cenas</span>
+    {% if x.achadas %}<span class="si-tag">✅ {{ x.achadas }} fontes</span>{% endif %}</div>
+  {% endfor %}
+</div>
+{% else %}
+<p><a href="/achar-fonte">← todos</a></p>
+<div class="si-card">
+  <div class="si-linha"><b>{{ p.titulo }}</b>{% if p.link %}<a href="{{ p.link }}" target="_blank" class="si-dica">🔗 original</a>{% endif %}
+    <span id="resumo" class="si-tag"></span>
+    <a href="/achar-fonte/{{ p.id }}/lista.txt"><button class="si-mini si-sec">⬇ lista de fontes</button></a>
+    <form method="post" action="/achar-fonte/{{ p.id }}/apagar" onsubmit="return confirm('Apagar?')" style="margin-left:auto"><button class="si-mini si-perigo">🗑</button></form></div>
+  <div id="prog" class="si-dica"></div>
+  <details><summary class="si-dica" style="cursor:pointer">🔁 refazer com outra sensibilidade</summary>
+    <div class="si-linha"><select id="sens"><option value="0.2">alta (pega cortes suaves)</option><option value="0.3">normal</option><option value="0.45">baixa (só cortes secos)</option></select>
+      <select id="porc"><option value="2">até 2 prints por cena</option><option value="1">1 print por cena</option></select>
+      <button class="si-mini" onclick="afRefazer()">🔁 refazer</button></div></details>
+  <p class="si-dica" style="margin:6px 0 0">💡 No Lens, clique em <b>“Correspondências exatas”</b> (ou <b>“Encontrar a origem da imagem”</b>): é a lista das páginas que publicaram ESSA imagem — a mais antiga costuma ser a fonte original.
+    Não achou? tente ↔ <b>invertida</b> (muitos canais espelham o vídeo) e ✂ <b>sem as faixas</b> (legenda/título por cima atrapalha).</p>
+</div>
+
+<div class="af-ops">
+  <label><input type="checkbox" id="o_inv"> ↔ inverter a imagem</label>
+  <label>✂ recorte <select id="o_rec"><option value="">imagem inteira</option><option value="meio">sem as faixas de cima e de baixo</option><option value="centro">só o centro</option></select></label>
+  <label>Mostrar <select id="o_filtro"><option value="">todas as cenas</option><option value="falta">só as sem fonte</option><option value="achou">só as com fonte</option></select></label>
+  <span class="si-dica">os botões mandam a imagem do jeito escolhido aqui</span>
+</div>
+<div id="grade" class="af-grade"></div>
+<div id="zoom" class="af-zoom" onclick="this.style.display='none'"><img id="zoom_img" alt=""></div>
+
+<!-- formulários que mandam o ARQUIVO direto pros buscadores (abre numa aba nova) -->
+<form id="f_lens" method="post" enctype="multipart/form-data" target="_blank" style="display:none"><input type="file" name="encoded_image"></form>
+<form id="f_tineye" method="post" action="https://tineye.com/search" enctype="multipart/form-data" target="_blank" style="display:none"><input type="file" name="image"></form>
+<form id="f_bing" method="post" action="https://www.bing.com/images/search?view=detailv2&iss=sbiupload&FORM=SBIIDP" enctype="multipart/form-data" target="_blank" style="display:none"><input type="hidden" name="cbir" value="sbi"><input type="hidden" name="imageBin"></form>
+
+<script>
+(() => {
+const PID = {{ p.id|tojson }};
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3000); }
+let P = null, timer = null;
+try { const sv = JSON.parse(localStorage.getItem('af_op') || '{}'); el('o_inv').checked = !!sv.inv; el('o_rec').value = sv.rec || ''; } catch (e) {}
+const opQS = () => (el('o_inv').checked ? '&inverter=1' : '') + (el('o_rec').value ? '&recorte=' + el('o_rec').value : '');
+const urlImg = arq => `/achar-fonte/${PID}/img/${arq}?x=1${opQS()}`;
+['o_inv', 'o_rec', 'o_filtro'].forEach(k => el(k).addEventListener('change', () => {
+  try { localStorage.setItem('af_op', JSON.stringify({inv: el('o_inv').checked, rec: el('o_rec').value})); } catch (e) {} desenhar(); }));
+
+async function blobDe(arq) { const r = await fetch(urlImg(arq)); if (!r.ok) throw new Error('não deu pra pegar o print'); return await r.blob(); }
+function porNoInput(form, nome, blob, arq) {
+  const dt = new DataTransfer(); dt.items.add(new File([blob], arq.replace('.jpg', '') + (el('o_inv').checked ? '_inv' : '') + '.jpg', {type: 'image/jpeg'}));
+  form.querySelector(`input[name=${nome}]`).files = dt.files;
+}
+async function tamanho(blob) { try { const b = await createImageBitmap(blob); return [b.width, b.height]; } catch (e) { return [1280, 720]; } }
+const BUSCAS = {
+  lens: async (arq) => { const b = await blobDe(arq), [w, h] = await tamanho(b), f = el('f_lens');
+    f.action = `https://lens.google.com/v3/upload?hl=pt-BR&re=df&st=${Date.now()}&vpw=${w}&vph=${h}&ep=gsbubb`; porNoInput(f, 'encoded_image', b, arq); f.submit(); },
+  tineye: async (arq) => { const b = await blobDe(arq), f = el('f_tineye'); porNoInput(f, 'image', b, arq); f.submit(); },
+  bing: async (arq) => { const b = await blobDe(arq), f = el('f_bing');
+    const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(',')[1]); fr.readAsDataURL(b); });
+    f.querySelector('input[name=imageBin]').value = b64; f.submit(); },
+  yandex: async (arq) => { await BUSCAS.copiar(arq); window.open('https://yandex.com/images/', '_blank'); aviso('📋 imagem copiada — no Yandex clique na câmera e cole (Ctrl+V)', 'okk'); },
+  copiar: async (arq) => { const b = await blobDe(arq), bm = await createImageBitmap(b), c = document.createElement('canvas');
+    c.width = bm.width; c.height = bm.height; c.getContext('2d').drawImage(bm, 0, 0);
+    const png = await new Promise(r => c.toBlob(r, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({'image/png': png})]); aviso('📋 imagem copiada — cole com Ctrl+V no lens.google.com', 'okk'); },
+  baixar: async (arq) => { const a = document.createElement('a'); a.href = urlImg(arq) + '&baixar=1'; a.click(); },
+};
+async function buscar(qual, arq, btn) { btn.disabled = true; try { await BUSCAS[qual](arq); } catch (e) { aviso('❌ ' + e.message, 'erro'); } btn.disabled = false; }
+
+function desenhar() {
+  if (!P) return; const f = el('o_filtro').value;
+  const cenas = (P.cenas || []).filter(c => !f || (f === 'achou' ? c.fonte : !c.fonte));
+  el('resumo').textContent = `${(P.cenas || []).length} cenas · ✅ ${(P.cenas || []).filter(c => c.fonte).length} com fonte`;
+  const g = el('grade');
+  if (!(P.cenas || []).length) { g.innerHTML = ''; return; }
+  g.innerHTML = cenas.map(c => `<div class="af-c ${c.fonte ? 'achou' : ''}" data-n="${c.n}">
+    <div class="af-cab"><b>Cena ${c.n}</b><span class="si-dica">${mmss(c.t0)} – ${mmss(c.t1)} · ${(c.t1 - c.t0).toFixed(1)} s</span>${c.fonte ? '<span class="si-tag">✅ achou</span>' : ''}</div>
+    <div class="af-prints">${c.prints.map(pr => `<div class="af-p"><img src="${urlImg(pr.arq)}" loading="lazy" data-arq="${pr.arq}" alt="">
+      <div class="af-bts"><button class="si-mini" data-b="lens" data-arq="${pr.arq}" title="Google Lens">🔍 Lens</button>
+        <button class="si-mini si-sec" data-b="tineye" data-arq="${pr.arq}">TinEye</button><button class="si-mini si-sec" data-b="bing" data-arq="${pr.arq}">Bing</button>
+        <button class="si-mini si-sec" data-b="yandex" data-arq="${pr.arq}">Yandex</button>
+        <button class="si-mini si-sec" data-b="copiar" data-arq="${pr.arq}" title="copiar a imagem">📋</button><button class="si-mini si-sec" data-b="baixar" data-arq="${pr.arq}" title="baixar">⬇</button></div></div>`).join('')}</div>
+    <div class="af-fonte"><input placeholder="🔗 cole aqui a fonte que achou (link do vídeo/foto original)" value="${esc(c.fonte)}" data-campo="fonte">
+      <input placeholder="nota (ex.: Pexels, documentário da BBC, canal X)" value="${esc(c.nota)}" data-campo="nota">
+      ${c.fonte && /^https?:/.test(c.fonte) ? `<a href="${esc(c.fonte)}" target="_blank" class="si-dica">abrir a fonte ↗</a>` : ''}</div></div>`).join('');
+  g.querySelectorAll('[data-b]').forEach(b => b.onclick = () => buscar(b.dataset.b, b.dataset.arq, b));
+  g.querySelectorAll('img[data-arq]').forEach(im => im.onclick = () => { el('zoom_img').src = urlImg(im.dataset.arq); el('zoom').style.display = 'flex'; });
+  g.querySelectorAll('[data-campo]').forEach(inp => inp.addEventListener('change', async () => {
+    const n = +inp.closest('.af-c').dataset.n, d = {}; d[inp.dataset.campo] = inp.value;
+    const r = await fetch(`/achar-fonte/${PID}/cena/${n}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(d)});
+    const j = await r.json(); if (j.ok) { const c = P.cenas.find(x => x.n === n); Object.assign(c, j.cena); aviso('💾 salvo', 'okk'); desenhar(); } else aviso('❌ ' + j.erro, 'erro'); }));
+}
+async function atualizar() {
+  const j = await (await fetch(`/achar-fonte/${PID}/estado`)).json(); const t = j.tarefa, rod = t && t.rodando;
+  el('prog').innerHTML = rod ? `⏳ ${esc(t.prog)}` : (t && t.erro ? `<span style="color:var(--erro)">❌ ${esc(t.erro)}</span>` : '');
+  const mudou = !P || JSON.stringify(P.cenas) !== JSON.stringify(j.projeto.cenas);
+  P = j.projeto; if (mudou && !document.activeElement.matches('[data-campo]')) desenhar();
+  el('sens').value = String(P.sensibilidade || 0.3); el('porc').value = String(P.por_cena || 2);
+  clearTimeout(timer); if (rod) timer = setTimeout(atualizar, 1500);
+}
+window.afRefazer = async () => { const r = await fetch(`/achar-fonte/${PID}/refazer`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({sensibilidade: +el('sens').value, por_cena: +el('porc').value})}); const j = await r.json();
+  if (!j.ok) aviso('❌ ' + j.erro, 'erro'); else atualizar(); };
+atualizar();
+})();
+</script>
+{% endif %}
+{% endblock %}
