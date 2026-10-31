@@ -1812,6 +1812,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             with CT._TRAVA:
                 q = _proj(pid)
                 q["destaques_prontos"] = {}
+                q["destaques_rastreio"] = {}
                 CT.salvar(base_dir, q)
 
         def fn(prog):
@@ -1866,6 +1867,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             shutil.copy(os.path.join(RT.pasta(base_dir, r["id"]), r["saida"]), copia)
             mm = CT.adicionar_midia(base_dir, p, copia, "video", f"🎯 {cur.get('alvo')}", "R")
             p.setdefault("destaques_prontos", {})[cur["chave"]] = mm["id"]
+            p.setdefault("destaques_rastreio", {})[cur["chave"]] = r["id"]
             p["destaques_pendentes"] = [x for x in p.get("destaques_pendentes") or [] if x.get("chave") != cur["chave"]]
             CT.salvar(base_dir, p)
         return _ok(link=f"/curtos/{pid}")

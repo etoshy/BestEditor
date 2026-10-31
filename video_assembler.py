@@ -1112,27 +1112,32 @@ def detectar_bordas_pretas(path: str, duracao: Optional[float] = None) -> Option
         return None
     W0, H0 = tam
     dur = duracao if duracao is not None else _probe_duration(path)
-    achados = []
+    lados = {"t": [], "b": [], "l": [], "r": []}
     for frac in (0.2, 0.5, 0.8):  # 3 pontos do vídeo: não se engana com uma cena escura
         ss = max(0.0, dur * frac - 0.5)
-        r = subprocess.run(["ffmpeg", "-hide_banner", "-ss", f"{ss:.2f}", "-i", path, "-t", "1.2", "-vf", "cropdetect=limit=24:round=2:reset=0",
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-ss", f"{ss:.2f}", "-i", path, "-t", "1.2", "-vf", "fps=5,cropdetect=limit=24:round=2:reset=1",
                             "-an", "-f", "null", "-"], capture_output=True, text=True, timeout=120)
-        m = re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr)
-        if m:
-            achados.append(tuple(int(v) for v in m[-1]))
-    if not achados:
+        for m in re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr):
+            w, h, x, y = (int(v) for v in m)
+            if w < W0 * 0.3 or h < H0 * 0.3:  # quadro quase todo escuro: não conta
+                continue
+            lados["t"].append(y)
+            lados["b"].append(max(0, H0 - y - h))
+            lados["l"].append(x)
+            lados["r"].append(max(0, W0 - x - w))
+    if len(lados["t"]) < 3:
         return None
-    # o MAIOR retângulo entre as amostras (uma cena escura não pode comer imagem)
-    x0 = min(a[2] for a in achados)
-    y0 = min(a[3] for a in achados)
-    x1 = max(a[2] + a[0] for a in achados)
-    y1 = max(a[3] + a[1] for a in achados)
-    w, h = x1 - x0, y1 - y0
+
+    def faixa(vs):  # v84_304: a faixa que existe em ~90% dos quadros — um flash/transição não impede mais o corte
+        vs = sorted(vs)
+        return vs[min(len(vs) - 1, int(len(vs) * 0.10))]
+    t, b, l, rr = faixa(lados["t"]), faixa(lados["b"]), faixa(lados["l"]), faixa(lados["r"])
+    w, h = W0 - l - rr, H0 - t - b
     if w < W0 * 0.3 or h < H0 * 0.3:
         return None
     if w >= W0 * 0.96 and h >= H0 * 0.96:
         return None
-    return (w - w % 2, h - h % 2, x0, y0)
+    return (w - w % 2, h - h % 2, l, t)
 
 
 def _normalize_clip_smart(input_path: str, input_duration: float, target_duration: float, output_path: str,

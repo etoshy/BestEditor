@@ -1219,7 +1219,7 @@ def canal_do_modelo(base: str, modelo: str) -> str:
 # ------------------------------------------------------------------ 🎨 v84_302: acabamento padrão de TODOS os shorts
 ACABAMENTO_PADRAO = {"arroba": "", "legenda_estilo": "", "legenda_tamanho": 0.05, "legenda_posicao": "terco",
                      "legenda_maiusculas": True, "sons_pixabay": False, "aplicar_noticia": False,
-                     "legenda_altura": None, "legenda_margem": 0.10}
+                     "legenda_altura": None, "legenda_margem": 0.10, "sons_nivel": "poucos"}
 
 
 def acabamento(base: str) -> Dict[str, Any]:
@@ -1255,6 +1255,8 @@ def salvar_acabamento(base: str, novos: Dict[str, Any]) -> Dict[str, Any]:
                 v = round(max(0.0, min(0.25, float(v) / (100 if float(v) > 1 else 1))), 3)
             except (TypeError, ValueError):
                 continue
+        elif k == "sons_nivel":
+            v = v if v in ("nenhum", "poucos", "normal") else "poucos"
         elif k == "legenda_posicao":
             v = v if v in ("base", "meio", "topo", "terco") else "terco"
         else:
@@ -1270,6 +1272,7 @@ def aplicar_acabamento(p: Dict[str, Any], a: Dict[str, Any]) -> None:
     """O @ do canal e a legenda do acabamento padrão entram no projeto (o perfil do canal continua valendo pro resto: fonte,
     cores…). Notícia (Laestro) só se marcado — ela tem a legenda do canal modelado."""
     cfg = p.setdefault("config", {})
+    cfg["sons_nivel"] = a.get("sons_nivel") or "poucos"
     arroba = str(a.get("arroba") or "").strip()
     if arroba:
         cfg["marca"] = dict(cfg.get("marca") or {}, ativa=True, texto=arroba if arroba.startswith("@") else "@" + arroba)
@@ -1408,27 +1411,43 @@ def _proximo_id(p: Dict[str, Any], letra: str) -> str:
     return f"{letra}{1 + max(n or [0])}"
 
 
-def bordas_pretas(video: str, minimo: float = 0.02) -> Optional[Tuple[int, int, int, int]]:
-    """⬛ v84_302: as faixas pretas que ficam no vídeo O TEMPO TODO (vídeo deitado dentro de um vertical, 4:3 dentro de 16:9…).
-    O cropdetect ACUMULADO no vídeo inteiro dá a área que tem imagem em algum momento — o resto é preto do começo ao fim.
-    → (w, h, x, y) pra cortar, ou None (sem borda, ou borda menor que `minimo` de cada lado)."""
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-an", "-vf", "fps=2,cropdetect=limit=24:round=2:reset=0",
-                        "-f", "null", "-"], capture_output=True, text=True, timeout=900)
-    achados = re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr or "")
-    if not achados:
-        return None
-    w, h, x, y = (int(v) for v in achados[-1])
+def bordas_pretas(video: str, minimo: float = 0.02, quase_sempre: float = 0.90) -> Optional[Tuple[int, int, int, int]]:
+    """⬛ v84_302/304: as faixas pretas FIXAS do vídeo (vídeo deitado dentro de um vertical, 4:3 dentro de 16:9…).
+    Mede a faixa de cada lado em cada quadro (2 por segundo) e fica com a que existe em `quase_sempre` (90%) dos quadros —
+    um flash, uma transição ou um quadro de abertura não impede mais o corte; uma faixa que só aparece numa parte do vídeo
+    continua não sendo cortada. → (w, h, x, y) pra cortar, ou None."""
     p = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", video],
                        capture_output=True, text=True, timeout=60)
     try:
         W, H = (int(v) for v in p.stdout.strip().split(",")[:2])
     except ValueError:
         return None
-    if w <= 0 or h <= 0 or w > W or h > H or w < W * 0.3 or h < H * 0.3:  # detecção estranha (vídeo escuro demais): não mexe
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-an", "-vf", "fps=2,cropdetect=limit=24:round=2:reset=1",
+                        "-f", "null", "-"], capture_output=True, text=True, timeout=900)
+    lados: Dict[str, List[int]] = {"top": [], "bottom": [], "left": [], "right": []}
+    for m in re.finditer(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr or ""):
+        w, h, x, y = (int(v) for v in m.groups())
+        if w < W * 0.3 or h < H * 0.3 or w > W or h > H:  # quadro quase todo preto (fade): não conta
+            continue
+        lados["top"].append(y)
+        lados["bottom"].append(max(0, H - (y + h)))
+        lados["left"].append(x)
+        lados["right"].append(max(0, W - (x + w)))
+    if len(lados["top"]) < 3:
         return None
-    if (W - w) < W * minimo * 2 and (H - h) < H * minimo * 2:
+
+    def faixa(vs: List[int]) -> int:  # a faixa que existe em ~90% dos quadros (percentil 10)
+        vs = sorted(vs)
+        return vs[min(len(vs) - 1, int(len(vs) * (1 - quase_sempre)))]
+    t, b, l, rr = faixa(lados["top"]), faixa(lados["bottom"]), faixa(lados["left"]), faixa(lados["right"])
+    t, b = (t if t >= H * minimo else 0), (b if b >= H * minimo else 0)
+    l, rr = (l if l >= W * minimo else 0), (rr if rr >= W * minimo else 0)
+    if not (t or b or l or rr):
         return None
-    return w, h, x, y
+    w, h = (W - l - rr) // 2 * 2, (H - t - b) // 2 * 2
+    if w < W * 0.3 or h < H * 0.3:
+        return None
+    return w, h, l, t
 
 
 def aparar_bordas(video: str) -> bool:
@@ -2563,10 +2582,26 @@ def destaques_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List
     return out
 
 
+def poucos_sons(sons: List[Dict[str, Any]], dur: float = 0.0) -> List[Dict[str, Any]]:
+    """🔊 v84_304: só o que conta — no máx. 1 som a cada ~8 s e 1,2 s entre eles; os eventos da cena (bola lançada, chegada…)
+    têm prioridade sobre os sons que o roteiro pediu. Cada som tem "_t" (segundos)."""
+    dur = dur or max([e["_t"] for e in sons] + [10.0])
+    limite = max(2, int(dur / 8))
+    prio = sorted(sons, key=lambda e: (0 if str(e.get("curto", "")).startswith("evento:") else 1, e["_t"]))
+    fica: List[Dict[str, Any]] = []
+    for e in prio:
+        if len(fica) >= limite:
+            break
+        if all(abs(e["_t"] - f["_t"]) >= 1.2 for f in fica):
+            fica.append(e)
+    return fica
+
+
 def sfx_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Eventos do Estúdio (faixa Sons): o PICO do som cai na palavra da deixa (ou no começo do bloco)."""
     import dp_sons
-    if not perfil["sfx"].get("usa", True):
+    nivel = (p.get("config") or {}).get("sons_nivel") or "normal"  # (projetos antigos: como era)
+    if not perfil["sfx"].get("usa", True) or nivel == "nenhum":
         return []
     g = p["gravacao"]
     blocos = p["roteiro"]["blocos"]
@@ -2588,7 +2623,7 @@ def sfx_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List[Dict[
             if ev:
                 out.append({"id": uuid.uuid4().hex[:8], "som": som, "start": ev["inicio"], "volume": round(ev["volume"], 2),
                             "origem": "ia", "curto": f"{b['id']}:{s['tipo']}", "_t": t})
-    if perfil["sfx"].get("nos_cortes"):  # o canal põe som nas trocas de assunto: whoosh em cada bloco novo sem deixa
+    if perfil["sfx"].get("nos_cortes") and nivel != "poucos":  # o canal põe som nas trocas de assunto: whoosh em cada bloco novo
         tipo = next((t for t in perfil["sfx"]["tipos_preferidos"] if t in ("whoosh", "swipe", "glitch", "cinema")), "whoosh")
         ultimo = None
         for bi in range(1, len(blocos)):
@@ -2602,6 +2637,8 @@ def sfx_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List[Dict[
                 out.append({"id": uuid.uuid4().hex[:8], "som": som, "start": ev["inicio"], "volume": round(ev["volume"], 2),
                             "origem": "ia", "curto": f"B{bi + 1}:corte", "_t": t})
     out += sons_dos_eventos(p, planos_v, vol, out)
+    if nivel == "poucos":
+        out = poucos_sons(out, float(g.get("dur") or 0))
     for e in out:
         e.pop("_t", None)
     return sorted(out, key=lambda e: e["start"])
@@ -2662,6 +2699,9 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
         pronto = (p.get("destaques_prontos") or {}).get(chave_destaque(x))
         if pronto and any(m["id"] == pronto for m in p.get("midias") or []):
             x.update(query=pronto, destaque_pronto=pronto)
+            rid = (p.get("destaques_rastreio") or {}).get(chave_destaque(x))
+            if rid:
+                x["destaque_rastreio"] = rid
     # 🃏 cartões: um fundo escuro gerado aqui vira a mídia C1, C2… do projeto
     precisa_cartao = any(x["layout"] == "cartao" for x in planos_v)
     if precisa_cartao:
@@ -2734,7 +2774,10 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             "legendas": dp_legendas.normalizar(leg), "planos": planos_v, "idioma": idioma_narrado(p, perfil),
             "sons_volume": perfil["sfx"].get("volume"), "orientation": prop, "marca": marca_do(base, p),
             "so_flow": p.get("modelo") in MODELOS_CLIPE and (p.get("config") or {}).get("midia") == "flow",
-            "enquadramento": perfil.get("enquadramento") or ""}
+            # ⬛ v84_304: canal antigo sem "enquadramento" caía nas BARRAS PRETAS do editor — os shorts usam sempre o preencher
+            # inteligente (tira as faixas embutidas; proporção parecida → preenche cortando o mínimo; bem diferente → o próprio
+            # vídeo desfocado atrás, nunca barra preta)
+            "enquadramento": perfil.get("enquadramento") or "smart"}
 
 
 def bloco_do_momento(p: Dict[str, Any], mo: Dict[str, Any]) -> Optional[int]:

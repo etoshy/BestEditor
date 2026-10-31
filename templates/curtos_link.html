@@ -67,6 +67,8 @@
       <label>Margem livre dos lados<select id="a_legenda_margem"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></label>
     </div>
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_legenda_maiusculas" style="width:auto;margin:0"> MAIÚSCULAS</label>
+    <label>🔊 Efeitos sonoros<select id="a_sons_nivel"><option value="poucos">poucos — só nas ações que aparecem (máx. 1 a cada ~8 s)</option>
+      <option value="normal">normal — também nas trocas de assunto</option><option value="nenhum">nenhum</option></select></label>
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_sons_pixabay" style="width:auto;margin:0">
       🔊 buscar no Pixabay os efeitos sonoros que o roteiro pedir (abre o navegador; na 1ª vez pode pedir a verificação “sou humano”) — desligado: usa os sons da base</label>
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_aplicar_noticia" style="width:auto;margin:0">
@@ -110,7 +112,7 @@ window.lkGo = async () => {
   el('bgo').disabled = false; atualizar();
 };
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
-              'legenda_altura', 'legenda_margem'];
+              'legenda_altura', 'legenda_margem', 'sons_nivel'];
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
     else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); }); } catch (e) {} })();

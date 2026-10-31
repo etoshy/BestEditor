@@ -752,10 +752,12 @@ def usar_take(base: str, pid: str, k: int, transcrever, opcoes: Optional[Dict[st
 
 
 # ------------------------------------------------------------------ 🎯 destaques (a IA acha o objeto, o rastreio segue)
-CAIXA_SCHEMA = CT._o({"achou": CT._b(), "x": CT._n(), "y": CT._n(), "w": CT._n(), "h": CT._n()})
-CAIXA_SYS = ("You locate an object in a video frame for an automatic tracker. The image has a light grid every 10% of the width/height. "
-             "Return the bounding box of the requested object as FRACTIONS of the image (x,y = top-left, w,h = size, all 0..1), tight "
-             "around it. If it is not clearly visible, achou=false.")
+CAIXA_SCHEMA = CT._o({"achou": CT._b(), "certeza": CT._n(), "x": CT._n(), "y": CT._n(), "w": CT._n(), "h": CT._n()})
+CAIXA_SYS = ("You locate an object in a video frame for an automatic tracker that will draw a circle/arrow on it. The image has a light "
+             "grid every 10% of the width/height. Return the bounding box of the requested object as FRACTIONS of the image (x,y = "
+             "top-left, w,h = size, all 0..1), tight around it. 'certeza' 0..1 = how sure you are this box is THAT object (a small "
+             "dog in a crowd of sheep, a person far away: look carefully; 0.9+ only when you clearly see it). If it is not clearly "
+             "visible, achou=false. A wrong box is much worse than none.")
 
 
 def _quadro(video: str, t: float, destino: str) -> Optional[str]:
@@ -777,9 +779,11 @@ def achar_com_moondream(base: str, video: str, t: float, alvo: str, pasta_tmp: s
         if not os.path.isfile(img):
             return None
         cs = MY.Visao(base).achar(img, alvo)
-        if not cs:
+        if not cs or len(cs) > 1:  # 🎯 v84_304: vários parecidos (cão no meio das ovelhas) = ambíguo → o Claude decide qual é
             return None
-        x0, y0, x1, y1 = max(cs, key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))
+        x0, y0, x1, y1 = cs[0]
+        if (x1 - x0) * (y1 - y0) > 0.6:  # "achou" o quadro inteiro: não é o objeto
+            return None
         W, H = info["largura"], info["altura"]
         return [round(x0 * W, 1), round(y0 * H, 1), round((x1 - x0) * W, 1), round((y1 - y0) * H, 1)]
     except Exception:  # noqa: BLE001
@@ -799,13 +803,18 @@ def achar_objeto(video: str, t: float, alvo: str, pasta_tmp: str, chamar: Option
     q = _quadro(video, t, os.path.join(pasta_tmp, "quadro_alvo.jpg"))
     if not q:
         return None
-    b = ia_servico.imagem_bloco(q, largura=768)
+    b = ia_servico.imagem_bloco(q, largura=1280)  # 🎯 v84_304: mais resolução (objeto pequeno no meio de muita coisa)
     if not b:
         return None
     r = (chamar or ia_servico.chamar)("curtos", CAIXA_SYS, [b, {"type": "text", "text": f"Object: {alvo}"}], schema=CAIXA_SCHEMA,
                                       max_tokens=200)
     if not r or not r.get("achou"):
         return None
+    try:
+        if float(r.get("certeza", 1)) < 0.6:  # sem certeza: melhor sem círculo do que círculo no lugar errado
+            return None
+    except (TypeError, ValueError):
+        pass
     try:
         x, y, w, h = (max(0.0, min(1.0, float(r[k]))) for k in ("x", "y", "w", "h"))
     except (TypeError, ValueError, KeyError):
@@ -951,12 +960,15 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
         caixa = chaves[0]["caixa"] if chaves else None
         if not chaves:
             on_log(f"🎯 procurando “{d['alvo']}”…")
-            try:
-                caixa = achar_objeto(pedaco, 0.25, d["alvo"], tmp, chamar, base=base)
-            except Exception:  # noqa: BLE001
-                caixa = None
-            if caixa:
-                chaves = [{"t": 0.25, "caixa": caixa}]
+            dur_p = max(0.6, float(c["fim"]) - float(c["ini"]))
+            for tq in sorted({0.25, round(dur_p / 2, 2), round(max(0.3, dur_p - 0.3), 2)}):  # 3 momentos do pedaço, não 1
+                try:
+                    cx = achar_objeto(pedaco, tq, d["alvo"], tmp, chamar, base=base)
+                except Exception:  # noqa: BLE001
+                    cx = None
+                if cx:
+                    chaves.append({"t": tq, "caixa": cx})
+            caixa = chaves[0]["caixa"] if chaves else None
         if not caixa:
             pendentes.append({"chave": k, "alvo": d["alvo"], "bloco": x["bloco"], "mid": c["mid"], "ini": c["ini"], "fim": c["fim"],
                               "motivo": "a IA não achou (ou está desligada) — faça no 🎯 Rastrear objeto"})
@@ -980,6 +992,7 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
             shutil.copy(saida, novo)
             mm = CT.adicionar_midia(base, q, novo, "video", f"🎯 {d['alvo']} ({c['mid']} {c['ini']:.1f}-{c['fim']:.1f}s)", "R")
             q.setdefault("destaques_prontos", {})[k] = mm["id"]
+            q.setdefault("destaques_rastreio", {})[k] = r["id"]  # 🎯 v84_304: no editor dá pra tirar/mudar o texto (o rastreio guarda o vídeo limpo)
             CT.salvar(base, q)
             prontos[k] = mm["id"]
             feitos.append(mm["id"])

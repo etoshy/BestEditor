@@ -869,6 +869,17 @@ def pos_processar_clipe(entrada_path: str, saida_path: str, dur: float, W: int, 
             grafo.append(f.replace("{i}", str(idx)))
         idx += sum(1 for a in (ent or []) if a == "-i")
     gest = cadeia_gesto(entrada, saida, dur, W, H)
+    if gest and entrada and entrada != "none" and not (fundo_entrada and os.path.exists(fundo_entrada)):
+        # 🎬 v84_304: sem cena anterior (o 1º plano do vídeo) o gesto de entrada acontecia sobre o PRETO — e o flash do punch_in
+        # deixava a tela CINZA no começo. Agora o fundo é o próprio 1º quadro do clipe: o vídeo já abre com imagem.
+        q0 = os.path.join(pasta, f"_q0_{os.path.basename(saida_path)}.png")
+        try:
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", entrada_path, "-frames:v", "1", "-vf", f"scale={W}:{H}", q0],
+                           capture_output=True, timeout=120)
+            if os.path.isfile(q0):
+                fundo_entrada = q0
+        except Exception:  # noqa: BLE001
+            pass
     if gest:
         fundos = []
         for img, tipo, gid in ((fundo_entrada, "in", entrada), (fundo_saida, "out", saida)):

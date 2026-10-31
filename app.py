@@ -9928,6 +9928,10 @@ def confirm_segments(job_id: str):
             _nv["revisao"] = _velho["revisao"]  # editor clássico (sem o campo): mantém
         if _velho.get("youtube_link") and (_nv.get("override_source") or {}).get("value") == (_velho.get("override_source") or {}).get("value"):
             _nv["youtube_link"] = _velho["youtube_link"]
+        if (_nv.get("override_source") or {}).get("value") == (_velho.get("override_source") or {}).get("value"):
+            for _ck in ("rastreio", "_antes_rastreio", "curto_chave"):  # 🎯 v84_304: o trecho continua sabendo do rastreio dele
+                if _ck in _velho and _ck not in _nv:
+                    _nv[_ck] = _velho[_ck]
     # 🎞 v84_182: a animação do Flow fica no trecho (achada pelo id — o número muda quando divide/junta). O servidor é
     # quem manda nela: se o vídeo chegou enquanto a página estava aberta, o trecho fica com ele.
     _animacoes = {(_s.get("animacao") or {}).get("id"): _s for _s in _antigos if (_s.get("animacao") or {}).get("id")}
@@ -11946,6 +11950,49 @@ def _rastreio_clipe_do_trecho(job_id: str, i: int) -> str:
     return cam
 
 
+def _curto_ligar_rastreio(job_id: str, s_: dict, i: int, rid: str) -> None:
+    """🎯 v84_304: o trecho que veio com o destaque do curto sabe qual é o rastreio dele (abre no 🎯 pra mudar texto/forma) e
+    guarda o vídeo LIMPO (sem círculo) pra 🚫 Tirar o rastreio."""
+    import rastreio as _rt
+    try:
+        with _rt._TRAVA:
+            r = _rt.carregar(BASE_DIR, rid)
+            r["job"], r["trecho"] = job_id, i
+            _rt.salvar(BASE_DIR, r)
+        limpo = _rt.caminho_video(BASE_DIR, r)
+    except Exception:  # noqa: BLE001  (rastreio apagado: o trecho segue com o destaque pronto)
+        return
+    if os.path.isfile(limpo):
+        s_["rastreio"] = True
+        s_["_antes_rastreio"] = {"source": "local_file", "value": limpo, "kind": "video"}
+
+
+def _rastreio_tirar(job_id: str, i: int) -> None:
+    """🚫 o trecho i volta pro vídeo de antes do rastreio (sem o círculo/seta)."""
+    job = _JOBS.get(job_id)
+    if not job or not 0 <= i < len(job.get("pending_segments") or []):
+        raise ValueError("Trecho não encontrado.")
+    d = job["pending_segments"][i]
+    if not d.get("rastreio") or "_antes_rastreio" not in d:
+        raise ValueError("Esse trecho não tem rastreio.")
+    d["override_source"] = d.get("_antes_rastreio")
+    d["rastreio"] = False
+    previas = (list(job.get("segment_previews") or []) + [None] * len(job["pending_segments"]))[:len(job["pending_segments"])]
+    previas[i] = None
+    job["segment_previews"] = previas
+    _save_state(job_id)
+    _fetch_previews(job_id, job, [_segmento_obj(x) for x in job["pending_segments"]], retomar=True)
+
+
+@app.route("/job/<job_id>/segmento/<int:k>/tirar-rastreio", methods=["POST"])
+def segmento_tirar_rastreio(job_id: str, k: int):
+    try:
+        _rastreio_tirar(job_id, k)
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    return jsonify({"ok": True})
+
+
 def _rastreio_aplicar(job_id: str, i: int, caminho: str) -> None:
     """🎯 o vídeo com o círculo/seta seguindo o objeto entra no trecho i (a mídia de antes fica guardada pra voltar)."""
     job = _JOBS.get(job_id)
@@ -11956,7 +12003,8 @@ def _rastreio_aplicar(job_id: str, i: int, caminho: str) -> None:
     destino = os.path.join(destino_dir, f"trecho{i}_{uuid.uuid4().hex[:6]}.mp4")
     shutil.copy(caminho, destino)
     d = job["pending_segments"][i]
-    d.setdefault("_antes_rastreio", d.get("override_source"))
+    if not d.get("rastreio") or "_antes_rastreio" not in d:  # (refazer o rastreio mantém o vídeo LIMPO de antes)
+        d["_antes_rastreio"] = d.get("override_source")
     d["override_source"] = {"source": "local_file", "value": destino, "kind": "video"}
     d["media_type"] = "video"
     d["rastreio"] = True
@@ -12025,8 +12073,10 @@ def _curto_para_estudio(d: Dict[str, Any]) -> str:
     pend = job.get("pending_segments") or []
     if len(pend) == len(d.get("planos") or []):  # 🔁 cada trecho sabe de qual plano do roteiro veio (pra trocar a voz depois)
         import curtos as _ct
-        for s_, pl in zip(pend, d["planos"]):
+        for s_i, (s_, pl) in enumerate(zip(pend, d["planos"])):
             s_["curto_chave"] = _ct.chave_do_plano(pl)
+            if pl.get("destaque_rastreio"):  # 🎯 v84_304: o destaque (círculo/seta) fica ligado ao trecho — dá pra tirar ou refazer
+                _curto_ligar_rastreio(job_id, s_, s_i, pl["destaque_rastreio"])
     job["curto_alinhamento"] = [{"bloco": a["bloco"], "start": a["start"], "end": a["end"]}
                                 for a in (d["projeto"].get("gravacao") or {}).get("alinhamento") or []]
     import cenas_dp
