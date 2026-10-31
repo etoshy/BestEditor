@@ -119,8 +119,13 @@ const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 
 window.lkAcab = async () => { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; });
   try { await post('/curtos/acabamento', d); aviso('💾 acabamento salvo — vale pros próximos shorts', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 let timer = null;
+const IA = {{ 'true' if ia else 'false' }};
+const DIRS = '<option value="">direção…</option>' + Object.entries({{ direcoes_titulo|tojson }}).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
 function desenhar(vs) {
   const L = el('lista');
+  const foco = document.activeElement;  // ✍ escrevendo o direcionamento: a atualização automática espera
+  if (foco && L.contains(foco) && foco.matches('input, select, textarea')) return vs.some(v => v.rodando);
+  const digitado = {}; L.querySelectorAll('[data-tcom], [data-tdir]').forEach(e => { if (e.value) digitado[(e.dataset.tcom ? 'c' : 'd') + (e.dataset.tcom || e.dataset.tdir)] = e.value; });
   if (!vs.length) { L.innerHTML = '<p class="si-dica">Nenhum ainda.</p>'; return false; }
   const abertos = new Set([...document.querySelectorAll('.lk-v details[open]')].map(d => d.dataset.k));
   L.innerHTML = vs.map(v => { const cls = v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : '');
@@ -140,12 +145,30 @@ function desenhar(vs) {
             <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a></div></div>
         <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div><div class="si-linha"><button class="si-mini si-sec" data-copiar="${esc(v.roteiro)}">📋 roteiro</button></div>` : ''}
           ${v.titulos.length ? `<details data-k="t${v.id}"${abertos.has('t' + v.id) || v.pronto ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🏷 Títulos</summary>
-            ${v.titulos.map(t => `<div class="lk-tit"><button class="si-mini si-sec" data-copiar="${esc(t.en)}">📋</button><div>${esc(t.en)}${t.pt && t.pt !== t.en ? `<br><small>🇧🇷 ${esc(t.pt)}</small>` : ''}</div></div>`).join('')}</details>` : ''}
+            ${v.titulos.map(t => `<div class="lk-tit"><button class="si-mini si-sec" data-copiar="${esc(t.en)}">📋</button><div>${esc(t.en)}${t.pt && t.pt !== t.en ? `<br><small>🇧🇷 ${esc(t.pt)}</small>` : ''}</div></div>`).join('')}
+            ${IA ? `<div class="si-linha" style="flex-wrap:wrap;gap:4px;margin-top:4px"><select data-tdir="${v.id}" style="width:auto">${DIRS}</select>
+              <input data-tcom="${v.id}" placeholder="seu direcionamento (opcional): ex. focar no cachorro, tom de suspense…" style="flex:1;min-width:180px">
+              <button class="si-mini" data-tnovos="${v.id}">✨ 5 títulos novos</button></div>` : ''}</details>` : ''}
+          ${v.thumbs && v.thumbs.length ? `<details data-k="h${v.id}"${abertos.has('h' + v.id) || v.pronto ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🖼 Prints pra thumb</summary>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${v.thumbs.map(t => `<div><a href="/curtos/${v.id}/thumb/${t.k}.jpg" target="_blank"><img src="/curtos/${v.id}/thumb/${t.k}.jpg?v=${t.t}" style="width:100%;border-radius:6px" loading="lazy"></a>
+              <a href="/curtos/${v.id}/thumb/${t.k}.jpg?baixar=1"><button class="si-mini si-sec">⬇️ baixar</button></a>${t.por_que ? `<div class="si-dica" style="margin:2px 0">${esc(t.por_que)}</div>` : ''}</div>`).join('')}</div>
+            <button class="si-mini si-sec" data-thumbs="${v.id}">🔁 escolher outros</button></details>`
+            : (v.roteiro && !v.rodando ? `<div class="si-linha"><button class="si-mini si-sec" data-thumbs="${v.id}">🖼 tirar 3 prints pra thumb</button></div>` : '')}
           ${v.descricao ? `<details data-k="d${v.id}"${abertos.has('d' + v.id) ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">📝 Descrição + hashtags</summary>
             <div style="font-size:.88rem;white-space:pre-wrap">${esc(v.descricao)}\n${esc(v.hashtags.join(' '))}</div>
             <button class="si-mini si-sec" data-copiar="${esc(v.descricao + '\n\n' + v.hashtags.join(' '))}">📋 copiar</button></details>` : ''}</div></div>` : ''}</div>`; }).join('');
   L.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
+  L.querySelectorAll('[data-tnovos]').forEach(b => b.onclick = async () => { const id = b.dataset.tnovos;
+    const dir = L.querySelector(`[data-tdir="${id}"]`).value, com = L.querySelector(`[data-tcom="${id}"]`).value.trim();
+    if (!dir && !com) { aviso('Escolha uma direção ou escreva o que quer nos títulos', 'erro'); return; }
+    b.disabled = true; b.textContent = '⏳ escrevendo…';
+    try { const j = await post(`/curtos/${id}/titulos/novos`, { direcao: dir, comentario: com }); desenhar(j.videos); aviso(`🏷 ${j.novos.length} títulos novos (no topo da lista)`, 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '✨ 5 títulos novos'; } });
+  L.querySelectorAll('[data-thumbs]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = '⏳ escolhendo os prints…';
+    try { desenhar((await post(`/curtos/${b.dataset.thumbs}/thumbs`)).videos); aviso('🖼 prints prontos', 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '🖼 tirar 3 prints pra thumb'; } });
   L.querySelectorAll('[data-refazer]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/link/${b.dataset.refazer}/refazer`)).videos); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  Object.entries(digitado).forEach(([k, v]) => { const e = L.querySelector(k[0] === 'c' ? `[data-tcom="${k.slice(1)}"]` : `[data-tdir="${k.slice(1)}"]`); if (e) e.value = v; });
   return vs.some(v => v.rodando);
 }
 let tinha = new Set();

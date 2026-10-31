@@ -64,6 +64,15 @@ def _fmt_n(v: Any) -> str:
     return f"{v / 1e6:.1f}M" if v >= 1e6 else f"{v / 1e3:.1f}K" if v >= 1e3 else str(v)
 
 
+def _handle(j: Dict[str, Any]) -> str:
+    """O @ do criador (sem o @): o 1º que parece um usuário (sem espaço, não só número)."""
+    for k in ("uploader_id", "channel", "uploader", "creator"):
+        v = str(j.get(k) or "").strip().lstrip("@")
+        if v and " " not in v and not v.isdigit() and not (v.startswith("UC") and len(v) > 20):
+            return v[:60]
+    return ""
+
+
 def ler_info_ytdlp(j: Dict[str, Any], n: int = 60) -> Dict[str, Any]:
     """JSON do yt-dlp → descrição, números e os comentários principais (só os de 1º nível, os mais curtidos)."""
     coms = []
@@ -79,6 +88,7 @@ def ler_info_ytdlp(j: Dict[str, Any], n: int = 60) -> Dict[str, Any]:
     coms.sort(key=lambda c: -c["curtidas"])
     return {"titulo": str(j.get("title") or "")[:300], "descricao": str(j.get("description") or "")[:1500],
             "autor": str(j.get("uploader") or j.get("channel") or j.get("uploader_id") or "")[:80],
+            "autor_handle": _handle(j),
             "views": j.get("view_count"), "curtidas": j.get("like_count"), "n_comentarios": j.get("comment_count"),
             "duracao": j.get("duration"), "comentarios": coms[:n]}
 
@@ -142,3 +152,149 @@ def texto_para_ia(info: Dict[str, Any]) -> str:
         for c in coms[:50]:
             L.append(f"- ({_fmt_n(c.get('curtidas'))} likes){' [?]' if '?' in c['texto'] else ''} {c['texto']}")
     return "\n".join(L)
+
+
+# ---------------------------------------------------------------------------------------------------- 📌 fonte (v84_305)
+PLATAFORMAS = [("instagram.", "Instagram"), ("tiktok.", "TikTok"), ("youtube.", "YouTube"), ("youtu.be", "YouTube"),
+               ("kwai", "Kwai"), ("facebook.", "Facebook"), ("fb.watch", "Facebook"), ("twitter.", "X"), ("x.com", "X"),
+               ("reddit.", "Reddit"), ("vimeo.", "Vimeo"), ("threads.", "Threads"), ("pinterest.", "Pinterest")]
+
+
+def plataforma(url: str) -> str:
+    u = str(url or "").lower()
+    return next((nome for chave, nome in PLATAFORMAS if chave in u), "")
+
+
+def criador(url: str, info: Dict[str, Any]) -> str:
+    """@ do criador: do link (tiktok.com/@fulano, youtube.com/@canal) ou do que o yt-dlp leu."""
+    m = re.search(r"/@([A-Za-z0-9_.\-]{1,60})", str(url or ""))
+    if m:
+        return m.group(1)
+    return str((info or {}).get("autor_handle") or "").lstrip("@") or str((info or {}).get("autor") or "").strip()
+
+
+def linha_fonte(url: str, info: Dict[str, Any]) -> str:
+    """'Source (Instagram): @criador' — vai no fim da descrição do post."""
+    pf, quem = plataforma(url), criador(url, info)
+    if not (pf or quem):
+        return ""
+    alvo = ("@" + quem) if quem and " " not in quem else (quem or str(url or "").split("?")[0])
+    return f"Source ({pf}): {alvo}" if pf else f"Source: {alvo}"
+
+
+def com_fonte(descricao: str, url: str, info: Dict[str, Any]) -> str:
+    d = str(descricao or "").rstrip()
+    if not url or re.search(r"(?im)^source\b", d):
+        return d
+    f = linha_fonte(url, info)
+    return (d + "\n\n" + f).strip() if f else d
+
+
+# ---------------------------------------------------------------------------------------------------- 🖼 prints pra thumb (v84_305)
+THUMB_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["escolhidos"],
+                "properties": {"escolhidos": {"type": "array", "items": {
+                    "type": "object", "additionalProperties": False, "required": ["n", "por_que"],
+                    "properties": {"n": {"type": "integer"}, "por_que": {"type": "string"}}}}}}
+THUMB_SYS = ("You pick THUMBNAIL frames for a viral short. You get a contact sheet of numbered candidate frames from the video. "
+             "Choose the 3 most IMPACTFUL, attention-grabbing frames: the peak of the action, a strong facial expression, the "
+             "surprising moment, clear subject, sharp (no motion blur), not a transition/black/text-only frame, and the 3 different "
+             "from each other. 'por_que' = a few words in Brazilian Portuguese.")
+
+
+def _nota_quadro(img) -> float:
+    """Nitidez + contraste + cor (quadro borrado, escuro ou chapado vale pouco)."""
+    import cv2
+    import numpy as np
+    g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    nit = float(cv2.Laplacian(g, cv2.CV_64F).var())
+    con = float(g.std())
+    b, gr, r = [c.astype("float32") for c in cv2.split(img)]
+    rg, yb = np.abs(r - gr), np.abs(0.5 * (r + gr) - b)
+    cor = float(np.sqrt(rg.std() ** 2 + yb.std() ** 2) + 0.3 * np.sqrt(rg.mean() ** 2 + yb.mean() ** 2))
+    if g.mean() < 25 or g.mean() > 235:
+        return 0.0
+    return min(nit, 1500.0) / 15.0 + con + cor
+
+
+def prints_para_thumb(video: str, pasta: str, n: int = 3, candidatos: int = 16, chamar=None) -> List[Dict[str, Any]]:
+    """🖼 os n quadros mais impactantes do vídeo (pra thumb): {arquivo, t, por_que}. A IA escolhe numa folha de contato;
+    sem IA, os mais nítidos/contrastados/coloridos, espalhados pelo vídeo."""
+    import os
+    import cv2
+    cap = cv2.VideoCapture(video)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 30.0) or 30.0
+    if total <= 0:
+        cap.release()
+        raise ValueError("não consegui abrir o vídeo")
+    quadros = []
+    for k in range(candidatos):
+        f = int(total * (0.04 + 0.92 * k / max(1, candidatos - 1)))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, min(total - 1, f))
+        ok, img = cap.read()
+        if ok and img is not None:
+            quadros.append({"t": round(f / fps, 2), "img": img, "nota": _nota_quadro(img)})
+    cap.release()
+    if not quadros:
+        raise ValueError("não li nenhum quadro")
+    escolha: List[Dict[str, Any]] = []
+    if chamar is not False:
+        try:
+            escolha = _escolher_com_ia(quadros, n, chamar)
+        except Exception:  # noqa: BLE001  (sem IA: pela nota)
+            escolha = []
+    if len(escolha) < n:
+        dist = max(1.0, quadros[-1]["t"] / (n * 2))
+        for q in sorted(quadros, key=lambda q: -q["nota"]):
+            if len(escolha) >= n:
+                break
+            if q["nota"] > 0 and all(abs(q["t"] - e["t"]) >= dist for e in escolha):
+                escolha.append(dict(q, por_que=""))
+    os.makedirs(pasta, exist_ok=True)
+    for velho in os.listdir(pasta):
+        if velho.startswith("thumb_") and velho.endswith(".jpg"):
+            os.remove(os.path.join(pasta, velho))
+    out = []
+    for k, q in enumerate(sorted(escolha[:n], key=lambda e: e["t"]), 1):
+        nome = f"thumb_{k}.jpg"
+        cv2.imwrite(os.path.join(pasta, nome), q["img"], [cv2.IMWRITE_JPEG_QUALITY, 95])
+        out.append({"arquivo": nome, "t": q["t"], "por_que": q.get("por_que") or ""})
+    return out
+
+
+def _escolher_com_ia(quadros: List[Dict[str, Any]], n: int, chamar=None) -> List[Dict[str, Any]]:
+    import base64
+    import cv2
+    import numpy as np
+    import ia_servico
+    if chamar is None and not ia_servico.ativo("curtos"):
+        return []
+    larg = 320
+    mini = []
+    for k, q in enumerate(quadros, 1):
+        h, w = q["img"].shape[:2]
+        m = cv2.resize(q["img"], (larg, max(1, int(h * larg / w))))
+        cv2.rectangle(m, (0, 0), (46, 34), (0, 0, 0), -1)
+        cv2.putText(m, str(k), (6, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+        mini.append(m)
+    alt = max(m.shape[0] for m in mini)
+    mini = [cv2.copyMakeBorder(m, 0, alt - m.shape[0], 0, 0, cv2.BORDER_CONSTANT) for m in mini]
+    col = 4
+    while len(mini) % col:
+        mini.append(np.zeros_like(mini[0]))
+    folha = np.vstack([np.hstack(mini[i:i + col]) for i in range(0, len(mini), col)])
+    ok, buf = cv2.imencode(".jpg", folha, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not ok:
+        return []
+    bloco = {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64.b64encode(buf.tobytes()).decode()}}
+    r = (chamar or ia_servico.chamar)("curtos", THUMB_SYS, [bloco, {"type": "text", "text": f"{len(quadros)} frames. Pick {n}."}],
+                                      schema=THUMB_SCHEMA, max_tokens=400)
+    out = []
+    for e in (r or {}).get("escolhidos") or []:
+        try:
+            i = int(e.get("n")) - 1
+        except (TypeError, ValueError):
+            continue
+        if 0 <= i < len(quadros) and all(o["t"] != quadros[i]["t"] for o in out):
+            out.append(dict(quadros[i], por_que=str(e.get("por_que") or "")[:120]))
+    return out[:n]

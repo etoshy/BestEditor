@@ -208,6 +208,7 @@ def rodar(args, preparar_ctx=None) -> int:
         return 2
 
     todos: List[Dict[str, Any]] = []
+    termos = [t for t in (getattr(args, "termos", None) or [args.termo]) if t]
     with sync_playwright() as p:
         opc: Dict[str, Any] = dict(headless=bool(args.oculto), accept_downloads=True, locale="pt-BR",
                                    viewport={"width": 1280, "height": 900},
@@ -222,46 +223,49 @@ def rodar(args, preparar_ctx=None) -> int:
         ouvidos: List[str] = []
         page.on("request", lambda req: ouvidos.append(req.url) if PS.MP3_RE.search(req.url or "") and req.url not in ouvidos else None)
         try:
-            for pag in range(1, args.paginas + 1):
-                url = PS.url_busca(args.termo, pag)
-                log(f"\n🔎 página {pag}: {url}")
-                page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                if not esperar_resultados(page):
-                    log("   nenhum som nesta página (ou a verificação não foi resolvida) — parei")
-                    break
-                rolar_ate_o_fim(page)
-                linhas = PS.ler_resultados(page.content())
-                log(f"   {len(linhas)} som(ns) na página")
-                if not linhas:
-                    break
-                boot = mp3s_do_bootstrap(page, [x["id"] for x in linhas])
-                if boot:
-                    log(f"   📦 o JSON da página trouxe {len(boot)} link(s) .mp3")
-                for i, x in enumerate(linhas[: args.limite]):
-                    log(f"\n🎵 {x['titulo']}  ({x['autor']}) — {x['pagina']}")
-                    x["busca"], x["pagina_busca"] = args.termo, pag
-                    x["mp3"] = x.get("mp3") or boot.get(x["id"] or "") or mp3_clicando(page, i, ouvidos) or ""
-                    if not x["mp3"]:
-                        log("   ⚠ não achei o .mp3 desse")
+            for n_t, termo in enumerate(termos):  # 🔊 v84_305: vários termos na MESMA aba (o navegador abre uma vez só)
+                if n_t:
+                    page.wait_for_timeout(800)
+                for pag in range(1, args.paginas + 1):
+                    url = PS.url_busca(termo, pag)
+                    log(f"\n🔎 página {pag}: {url}")
+                    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                    if not esperar_resultados(page):
+                        log("   nenhum som nesta página (ou a verificação não foi resolvida) — parei")
+                        break
+                    rolar_ate_o_fim(page)
+                    linhas = PS.ler_resultados(page.content())
+                    log(f"   {len(linhas)} som(ns) na página")
+                    if not linhas:
+                        break
+                    boot = mp3s_do_bootstrap(page, [x["id"] for x in linhas])
+                    if boot:
+                        log(f"   📦 o JSON da página trouxe {len(boot)} link(s) .mp3")
+                    for i, x in enumerate(linhas[: args.limite]):
+                        log(f"\n🎵 {x['titulo']}  ({x['autor']}) — {x['pagina']}")
+                        x["busca"], x["pagina_busca"] = termo, pag
+                        x["mp3"] = x.get("mp3") or boot.get(x["id"] or "") or mp3_clicando(page, i, ouvidos) or ""
+                        if not x["mp3"]:
+                            log("   ⚠ não achei o .mp3 desse")
+                            todos.append(x)
+                            continue
+                        log(f"   🔗 {x['mp3']}")
+                        if args.sem_baixar:
+                            todos.append(x)
+                            continue
+                        destino = os.path.join(pasta, f"{x['id']}_{PS.slug(x['titulo'])}.mp3")
+                        try:
+                            if not os.path.isfile(destino):
+                                n = baixar(page, ctx, x["mp3"], destino)
+                                log(f"   ⬇ baixado ({n // 1024} KB)")
+                            x["arquivo_mp3"] = destino
+                            processar(x, pasta, args.ia)
+                            log(f"   ✂ {x['dur_original']:.2f} s → {x['dur']:.2f} s (corte {x['corte_de']:.2f}–{x['corte_ate']:.2f} s, pico em {x['pico']:.2f} s)"
+                                + (f" · a onda do Pixabay dizia {x['onda_em_segundos']}" if x.get("onda_em_segundos") else ""))
+                        except Exception as exc:  # noqa: BLE001
+                            log(f"   ❌ {exc}")
                         todos.append(x)
-                        continue
-                    log(f"   🔗 {x['mp3']}")
-                    if args.sem_baixar:
-                        todos.append(x)
-                        continue
-                    destino = os.path.join(pasta, f"{x['id']}_{PS.slug(x['titulo'])}.mp3")
-                    try:
-                        if not os.path.isfile(destino):
-                            n = baixar(page, ctx, x["mp3"], destino)
-                            log(f"   ⬇ baixado ({n // 1024} KB)")
-                        x["arquivo_mp3"] = destino
-                        processar(x, pasta, args.ia)
-                        log(f"   ✂ {x['dur_original']:.2f} s → {x['dur']:.2f} s (corte {x['corte_de']:.2f}–{x['corte_ate']:.2f} s, pico em {x['pico']:.2f} s)"
-                            + (f" · a onda do Pixabay dizia {x['onda_em_segundos']}" if x.get("onda_em_segundos") else ""))
-                    except Exception as exc:  # noqa: BLE001
-                        log(f"   ❌ {exc}")
-                    todos.append(x)
-                    page.wait_for_timeout(600)  # sem pressa: não martelar o site
+                        page.wait_for_timeout(600)  # sem pressa: não martelar o site
         finally:
             ctx.close()
     salvar_catalogo(pasta, todos)

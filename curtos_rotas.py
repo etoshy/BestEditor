@@ -1182,19 +1182,18 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         termos = list(dict.fromkeys(d["busca"] for d in CT.deixas_de_som(p) if not d.get("escolhido") and d.get("busca")))[:4]
         pasta_p = _pasta_pixabay(base_dir)
         escolhidos: Dict[str, str] = {}
+        faltam = [t for t in termos if not _resultados_pixabay(pasta_p, t)]
+        if faltam:  # 🔊 v84_305: o navegador abre UMA vez e busca todos os termos na mesma aba
+            prog("🔊 Pixabay: procurando " + ", ".join(f"“{t}”" for t in faltam) + "…")
+            try:
+                import pixabay_sons_teste as PT
+                args = argparse.Namespace(termo=faltam[0], termos=faltam, paginas=1, limite=2, pasta=pasta_p, oculto=False, chrome=False,
+                                          ia=False, sem_baixar=False, html=None)
+                (rodar_pixabay or PT.rodar)(args)
+            except Exception as exc:  # noqa: BLE001  (sem Pixabay: fica o som da base)
+                prog(f"🔊 Pixabay falhou ({str(exc)[:80]}) — ficam os sons da base")
         for termo in termos:
             res = _resultados_pixabay(pasta_p, termo)
-            if not res:
-                prog(f"🔊 Pixabay: procurando “{termo}”…")
-                try:
-                    import pixabay_sons_teste as PT
-                    args = argparse.Namespace(termo=termo, paginas=1, limite=2, pasta=pasta_p, oculto=False, chrome=False, ia=False,
-                                              sem_baixar=False, html=None)
-                    (rodar_pixabay or PT.rodar)(args)
-                except Exception as exc:  # noqa: BLE001  (sem Pixabay: fica o som da base)
-                    prog(f"🔊 Pixabay falhou ({str(exc)[:80]}) — ficam os sons da base")
-                    continue
-                res = _resultados_pixabay(pasta_p, termo)
             if res:
                 try:
                     escolhidos[termo] = importar_pixabay(base_dir, str(res[0]["id"]), pasta_p)
@@ -1312,7 +1311,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "erro": t.get("erro") or lr.get("erro") or "", "fim": t.get("fim"),
                 "roteiro": " ".join(CT.sem_tags(b.get("fala") or "") for b in r.get("blocos") or [])[:900],
                 "roteiro_tags": " ".join(b.get("fala") or "" for b in r.get("blocos") or [])[:900],
-                "titulos": CN.titulos_do_projeto(p), "descricao": CL.limpar_marca(r.get("descricao") or ""),
+                "titulos": CN.titulos_do_projeto(p),
+                "descricao": CL.com_fonte(CL.limpar_marca(r.get("descricao") or ""), lr.get("link") or "", info) if r.get("descricao") else "",
+                "thumbs": [dict(t, k=k) for k, t in enumerate(p.get("thumbs") or [], 1)
+                           if os.path.isfile(os.path.join(CT.pasta(base_dir, p["id"]), "thumbs", t["arquivo"]))],
                 "hashtags": r.get("hashtags") or [], "n_comentarios": len(info.get("comentarios") or []),
                 "comentarios_erro": info.get("erro") or "", "pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
                 "editor": (p.get("editor") or {}).get("job_id") or "", "etapa": lr.get("etapa") or ""}
@@ -1367,7 +1369,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             if r.get("descricao") and not r.get("descricao_bruta"):
                 r["descricao_bruta"] = r["descricao"]
                 r["descricao"] = CL.limpar_marca(r["descricao"])
+            if r.get("descricao"):  # 📌 v84_305: "Source (Instagram): @criador" no fim
+                r["descricao"] = CL.com_fonte(r["descricao"], url, CC.dados(q).get("info_link") or {})
             CT.salvar(base_dir, q)
+        _link_thumbs(pid, prog)
         if not exportar:
             _link_etapa(pid, "✅ no editor")
             return msg
@@ -1382,6 +1387,56 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             q["link_rapido"]["etapa"] = "✅ pronto"
             CT.salvar(base_dir, q)
         return "✅ vídeo pronto"
+
+    def _link_thumbs(pid: str, prog: Callable[[str], None]) -> int:
+        """🖼 v84_305: 3 prints impactantes do vídeo original (limpo, sem legenda) pra usar de thumb."""
+        p = CT.carregar(base_dir, pid)
+        cl = CC.clipes(base_dir, p)
+        if not cl:
+            return 0
+        prog("🖼 escolhendo 3 prints pra thumb…")
+        try:
+            ts = CL.prints_para_thumb(cl[0]["caminho"], os.path.join(CT.pasta(base_dir, pid), "thumbs"),
+                                      chamar=None if _ia_ligada() else False)
+        except Exception as exc:  # noqa: BLE001  (não atrapalha o vídeo)
+            prog(f"🖼 não deu pra tirar os prints: {str(exc)[:120]}")
+            return 0
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            q["thumbs"] = ts
+            CT.salvar(base_dir, q)
+        return len(ts)
+
+    @app.route("/curtos/<pid>/thumbs", methods=["POST"])
+    def curto_thumbs(pid: str):
+        _proj(pid)
+        n = _link_thumbs(pid, lambda m: None)
+        if not n:
+            return _erro("Não consegui tirar os prints (o vídeo original está no projeto?).")
+        return _ok(videos=_links())
+
+    @app.route("/curtos/<pid>/thumb/<int:k>.jpg", methods=["GET"])
+    def curto_thumb(pid: str, k: int):
+        ts = _proj(pid).get("thumbs") or []
+        if not 1 <= k <= len(ts):
+            abort(404)
+        cam = os.path.join(CT.pasta(base_dir, pid), "thumbs", ts[k - 1]["arquivo"])
+        if not os.path.isfile(cam):
+            abort(404)
+        return send_file(cam, mimetype="image/jpeg", as_attachment=request.args.get("baixar") == "1",
+                         download_name=f"thumb_{pid}_{k}.jpg", max_age=0)
+
+    @app.route("/curtos/<pid>/titulos/novos", methods=["POST"])
+    def curto_titulos_novos(pid: str):
+        """🏷 v84_305: 5 títulos novos — com uma direção pronta (curiosidade, pergunta, polêmico…) e/ou o seu comentário."""
+        _proj(pid)
+        b = _corpo()
+        try:
+            _ia_ou_erro()
+            novos = CC.mais_opcoes(base_dir, pid, "titulos", direcao=str(b.get("direcao") or ""), comentario=str(b.get("comentario") or ""))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(novos=novos, videos=_links())
 
     CB["rodar_link"] = _link_rodar  # 🔥 v84_291: os Momentos mais vistos usam o mesmo caminho (roteiro → voz → editor → MP4)
 
@@ -1402,7 +1457,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             vozes_en, vozes = [], []
         import qualidade_export
         import dp_legendas
-        return render_template("curtos_link.html", modos=CL.MODOS, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
+        return render_template("curtos_link.html", modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
                                estilos_legenda=[{"id": e["id"], "nome": e["nome"]} for e in dp_legendas.ESTILOS],
                                vozes_en=vozes_en, vozes=vozes, resolucoes=qualidade_export.RESOLUCOES, ia=_ia_ligada(),
                                tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")))

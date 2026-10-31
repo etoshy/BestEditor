@@ -602,8 +602,22 @@ def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = No
 MAIS_SCHEMA = CT._o({"opcoes": {"type": "array", "items": OPCAO}})
 
 
-def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., Any]] = None) -> List[Dict[str, str]]:
-    """➕ mais 5 ganchos (ou 5 finais), diferentes dos que já tem."""
+DIRECOES_TITULO = {  # 🏷 v84_305: direções prontas pros títulos novos
+    "curiosidade": ("🤔 curiosidade", "create a curiosity gap — make people NEED to watch to find out"),
+    "pergunta": ("❓ pergunta", "phrase it as a question people want to answer in the comments"),
+    "polemico": ("🔥 polêmico", "a bold, debatable take people will argue about (still honest, no fake claims)"),
+    "engracado": ("😂 engraçado", "funny, witty, playful"),
+    "emocao": ("🥹 emoção", "emotional / heartwarming / awe"),
+    "curto": ("✂ bem curto", "very short: 2 to 5 words"),
+    "numero": ("🔢 com número", "include a number, a stat or a concrete detail"),
+    "seo": ("🔎 SEO / busca", "clear searchable keywords of what happens (what people would type in search)"),
+    "emoji": ("✨ com emoji", "include 1 or 2 fitting emojis"),
+}
+
+
+def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., Any]] = None, direcao: str = "",
+                comentario: str = "") -> List[Dict[str, str]]:
+    """➕ mais 5 ganchos (ou 5 finais/títulos), diferentes dos que já tem. Títulos: com uma direção pronta e/ou o seu pedido."""
     if qual not in ("ganchos", "finais", "titulos"):
         raise CT.CurtoErro("Pedido inválido.")
     p = CT.carregar(base, pid)
@@ -618,7 +632,15 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
               "finais": f"Write 5 NEW engaging ENDINGS for this {tipo} — a question people argue about in the comments, or a last curious fact; one sentence.",
               "titulos": f"Write 5 NEW post TITLES for this {tipo} — short, curiosity, honest (no fake claims)."}[qual]
     tag = " (may use one voice tag like [gasp])" if lingua_post(p) == "en" and qual != "titulos" else ""
-    txt = f"{pedido}\nDifferent from these:\n{ja or '(none)'}\n\nSCRIPT:\n{corpo}\n\nEach with 'en' (in {lingua}{tag}) and 'pt' (Brazilian Portuguese)."
+    guia = ""
+    if qual == "titulos":
+        if direcao in DIRECOES_TITULO:
+            guia += f"\nSTYLE: {DIRECOES_TITULO[direcao][1]}."
+        comentario = " ".join(str(comentario or "").split())[:600]
+        if comentario:
+            guia += f"\nTHE CREATOR'S DIRECTION (follow it; it may be in Portuguese): {comentario}"
+    txt = (f"{pedido}{guia}\nDifferent from these:\n{ja or '(none)'}\n\nSCRIPT:\n{corpo}\n\n"
+           f"Each with 'en' (in {lingua}{tag}) and 'pt' (Brazilian Portuguese).")
     import ia_servico
     resp = (chamar or ia_servico.chamar)("curtos", sistema(p), txt, schema=MAIS_SCHEMA, max_tokens=1200, job=pid, cache_local=False)
     if not resp:
@@ -626,7 +648,10 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
     novas = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get("opcoes") or [] if o.get("en")]
     with CT._TRAVA:
         p = CT.carregar(base, pid)
-        p["roteiro"][qual] = (p["roteiro"].get(qual) or []) + novas
+        if qual == "titulos" and (direcao or comentario):  # os pedidos agora aparecem primeiro na lista
+            p["roteiro"][qual] = novas + (p["roteiro"].get(qual) or [])
+        else:
+            p["roteiro"][qual] = (p["roteiro"].get(qual) or []) + novas
         CT.salvar(base, p)
     return novas
 

@@ -247,7 +247,7 @@ def titulos_do_projeto(p: Dict[str, Any]) -> List[Dict[str, str]]:
     ts = [{"en": t.get("en") or "", "pt": t.get("pt") or ""} for t in r.get("titulos") or []]
     if r.get("titulo_video") and not any(t["en"] == r["titulo_video"] for t in ts):
         ts.insert(0, {"en": r["titulo_video"], "pt": r.get("titulo_pt") or ""})
-    return ts[:8]
+    return ts[:15]
 
 
 def texto_dos_titulos(base: str, lote: Dict[str, Any]) -> str:

@@ -88,7 +88,7 @@ def test_link_ate_o_roteiro_e_para_na_voz(tmp_path, monkeypatch):
         assert "voz" in v["erro"].lower(), v
         assert v["roteiro"].startswith("Two seconds") and "[gasp]" in v["roteiro_tags"]
         assert v["titulos"][0]["en"] == "The finish line choice" and v["n_comentarios"] == 2 and v["modo_usado"] == "explicar"
-        assert v["descricao"] == "How marathon rules work" and v["titulo"] == "He stopped"
+        assert v["descricao"] == "How marathon rules work\n\nSource (TikTok): @x" and v["titulo"] == "He stopped"  # 📌 v84_305
         roteiro = [t for t in vistos if "WHAT VIEWERS SAY" in t][-1]
         assert "is he ok?" in roteiro and "how is that allowed??" in roteiro and "EXPLAIN WHAT IS HAPPENING" in roteiro
         assert c.post(f"/curtos/link/{pid}/refazer").get_json()["ok"]
