@@ -85,3 +85,40 @@ def test_pixabay_varios_termos_numa_abertura(tmp_path, monkeypatch):
     assert aberturas == [["dog bark", "sheep bleat"]]  # 1 navegador pros 2 termos
     html = cl.get("/curtos/link").get_data(as_text=True)
     assert "direcao" not in html or "curiosidade" in html
+
+
+def test_varios_links_um_por_linha_um_de_cada_vez(tmp_path, monkeypatch):
+    """🔗 v84_306: um link por linha (repetidos saem) e duas listas coladas nunca geram 2 vídeos ao mesmo tempo."""
+    import threading
+    import time
+    import curtos_rotas as CR
+    from flask import Flask
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "c"))
+    base = str(tmp_path)
+    rodando, maximo, feitos = [0], [0], []
+    trava = threading.Lock()
+
+    def baixar_falso(b, pid, url, baixar, prog):
+        with trava:
+            rodando[0] += 1
+            maximo[0] = max(maximo[0], rodando[0])
+        time.sleep(0.15)
+        with trava:
+            rodando[0] -= 1
+            feitos.append(url)
+        raise CT.CurtoErro("parei aqui (teste)")
+    monkeypatch.setattr(CC, "clipes", lambda b, p: [])
+    monkeypatch.setattr(CC, "baixar_clipe", baixar_falso)
+    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(CT.__file__), "templates"))
+    CR.registrar(app, base)
+    cl = app.test_client()
+    r = cl.post("/curtos/link/novo", json={"link": "https://a.com/1\nhttps://a.com/2\n\nhttps://a.com/1\nlixo\nhttps://a.com/3"}).get_json()
+    assert r["ok"] and len(r["criados"]) == 3
+    r2 = cl.post("/curtos/link/novo", json={"link": "https://b.com/9"}).get_json()
+    assert r2["ok"]
+    for _ in range(100):
+        if len(feitos) == 4:
+            break
+        time.sleep(0.05)
+    assert sorted(feitos) == ["https://a.com/1", "https://a.com/2", "https://a.com/3", "https://b.com/9"]
+    assert maximo[0] == 1

@@ -31,8 +31,9 @@
 <div class="si-passos"><span>⬇ baixa o vídeo</span><span>💬 lê a legenda e os comentários</span><span>👁 a IA entende o vídeo</span><span>📝 roteiro + títulos</span><span>🎙 narração com tags</span><span>✂ edição + 🎯 destaques</span><span>🎬 MP4</span></div>
 
 <div class="si-card lk-form">
-  <label>🔗 Link do vídeo <span class="si-dica" style="font-weight:400">— TikTok, YouTube Shorts, Reels, Kwai… (vários? um por linha: faz um depois do outro)</span>
-    <textarea id="link" class="lk-link" rows="1" placeholder="https://www.tiktok.com/@…/video/…"></textarea></label>
+  <label>🔗 Links dos vídeos <span class="si-dica" style="font-weight:400">— TikTok, YouTube Shorts, Reels, Kwai, Reddit… <b>um por linha</b> (até 50): gera todos, um depois do outro</span>
+    <textarea id="link" class="lk-link" rows="5" style="resize:vertical;min-height:90px" placeholder="https://www.tiktok.com/@…/video/…&#10;https://www.instagram.com/reel/…&#10;https://youtube.com/shorts/…"></textarea>
+    <span class="si-dica" id="nLinks" style="font-weight:400"></span></label>
   <label>Como narrar</label>
   <div class="lk-modos">{% for k, v in modos.items() %}<label><input type="radio" name="modo" value="{{ k }}"{% if k == 'auto' %} checked{% endif %}> {{ v }}</label>{% endfor %}</div>
   <div class="lk-ops">
@@ -106,11 +107,15 @@ window.lkGo = async () => {
   try { localStorage.setItem('lk_op', JSON.stringify(Object.assign({}, d, {link: '', comentarios: '', extra: ''}))); } catch (e) {}
   if (!d.link) { aviso('Cole o link do vídeo.', 'erro'); return; }
   el('bgo').disabled = true;
-  try { const j = await post('/curtos/link/novo', d); el('link').value = ''; el('comentarios').value = ''; desenhar(j.videos);
+  try { const j = await post('/curtos/link/novo', d); el('link').value = ''; el('nLinks').textContent = ''; el('comentarios').value = ''; desenhar(j.videos);
     aviso(`🚀 começou${j.criados.length > 1 ? ` (${j.criados.length} vídeos, um depois do outro)` : ''} — pode sair da página, ele continua`, 'okk'); }
   catch (e) { aviso('❌ ' + e.message, 'erro'); }
   el('bgo').disabled = false; atualizar();
 };
+el('link').addEventListener('input', () => {  // 🔗 quantos links vão entrar na fila
+  const n = new Set(el('link').value.split(/\s+/).filter(u => u.startsWith('http'))).size;
+  el('nLinks').textContent = n > 1 ? `🔗 ${Math.min(n, 50)} vídeos na fila${n > 50 ? ' (só os 50 primeiros)' : ''} — um de cada vez; pode fechar a página` : '';
+});
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
               'legenda_altura', 'legenda_margem', 'sons_nivel'];
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};

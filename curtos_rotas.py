@@ -1319,7 +1319,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "comentarios_erro": info.get("erro") or "", "pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
                 "editor": (p.get("editor") or {}).get("job_id") or "", "etapa": lr.get("etapa") or ""}
 
-    def _links(n: int = 30) -> List[Dict[str, Any]]:
+    def _links(n: int = 60) -> List[Dict[str, Any]]:
         out = []
         for x in CT.listar(base_dir):
             if x.get("modelo") != "comentario":
@@ -1337,6 +1337,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             q = CT.carregar(base_dir, pid)
             q.setdefault("link_rapido", {}).update(etapa=etapa, **kw)
             CT.salvar(base_dir, q)
+
+    _UM_LINK_POR_VEZ = threading.Lock()
 
     def _link_rodar(pid: str, slug: str, qualidade: str, exportar: bool, prog: Callable[[str], None]) -> str:
         p = CT.carregar(base_dir, pid)
@@ -1469,7 +1471,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos/link/novo", methods=["POST"])
     def curtos_link_novo():
         b = _corpo()
-        links = [u for u in re.split(r"\s+", str(b.get("link") or "")) if u.startswith("http")][:10]
+        links = list(dict.fromkeys(u.strip("<>\"'(),;") for u in re.split(r"\s+", str(b.get("link") or ""))
+                                   if u.startswith("http")))[:50]  # 🔗 v84_306: até 50, um por linha (repetidos saem)
         if not links:
             return _erro("Cole o link do vídeo (TikTok, Shorts, Reels, Kwai…).")
         modo = b.get("modo") if b.get("modo") in CL.MODOS else "auto"
@@ -1509,13 +1512,16 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         def fila(prog: Callable[[str], None]) -> str:
             feitos = 0
             for k, pid in enumerate(criados, 1):
-                TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "começando…"}
+                TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                                "prog": "⏳ na fila (espera o vídeo que está gerando)"}
 
                 def pr(m: str, pid=pid, k=k) -> None:
                     TAREFAS[pid]["prog"] = (f"[{k}/{len(criados)}] " if len(criados) > 1 else "") + str(m)[:280]
                     prog(m)
                 try:
-                    TAREFAS[pid]["msg"] = _link_rodar(pid, slug, qualidade, exportar, pr)
+                    with _UM_LINK_POR_VEZ:  # 🔗 v84_306: outra lista colada depois espera esta (nunca 2 vídeos ao mesmo tempo)
+                        TAREFAS[pid]["prog"] = "começando…"
+                        TAREFAS[pid]["msg"] = _link_rodar(pid, slug, qualidade, exportar, pr)
                     feitos += 1
                 except Exception as exc:  # noqa: BLE001  (um link ruim não para os outros)
                     TAREFAS[pid]["erro"] = str(exc)[:600]
@@ -1526,7 +1532,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 finally:
                     TAREFAS[pid]["fim"] = time.time()
             return f"{feitos}/{len(criados)} prontos"
-        for pid in criados[1:]:
+        for pid in criados:
             TAREFAS[pid] = {"rotulo": "🔗 na fila", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "⏳ na fila"}
         r = _rodar("link:" + criados[0], "🔗 link → vídeo", fila)
         if isinstance(r, tuple):
@@ -1548,8 +1554,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
         def corpo() -> None:
             try:
-                TAREFAS[pid]["msg"] = _link_rodar(pid, slug, lr.get("qualidade") or "1080p", lr.get("exportar", True),
-                                                  lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+                TAREFAS[pid]["prog"] = "⏳ na fila (espera o vídeo que está gerando)"
+                with _UM_LINK_POR_VEZ:
+                    TAREFAS[pid]["msg"] = _link_rodar(pid, slug, lr.get("qualidade") or "1080p", lr.get("exportar", True),
+                                                      lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
             except Exception as exc:  # noqa: BLE001
                 TAREFAS[pid]["erro"] = str(exc)[:600]
                 _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
