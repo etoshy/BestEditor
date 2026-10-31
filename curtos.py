@@ -2456,9 +2456,36 @@ def sfx_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List[Dict[
             if ev:
                 out.append({"id": uuid.uuid4().hex[:8], "som": som, "start": ev["inicio"], "volume": round(ev["volume"], 2),
                             "origem": "ia", "curto": f"B{bi + 1}:corte", "_t": t})
+    out += sons_dos_eventos(p, planos_v, vol, out)
     for e in out:
         e.pop("_t", None)
     return sorted(out, key=lambda e: e["start"])
+
+
+def sons_dos_eventos(p: Dict[str, Any], planos_v: List[Dict[str, Any]], vol: float, ja: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """🔊 v84_292: o que ACONTECE no clipe ganha som (a câmera virtual marcou: a bola saiu da mão → whoosh, chegou na cesta →
+    impacto). O segundo do clipe vira o segundo do vídeo pelo plano que mostra aquele pedaço."""
+    import dp_sons
+    out: List[Dict[str, Any]] = []
+    ultimo = None
+    for k, ev in enumerate(p.get("eventos_som") or []):
+        for x in planos_v:
+            c = x.get("clipe")
+            if not c or c.get("mid") != ev.get("mid") or "ini" not in c:
+                continue
+            if not (float(c["ini"]) <= float(ev["t"]) < float(c["fim"])):
+                continue
+            t = float(x["start"]) + float(ev["t"]) - float(c["ini"])
+            if t >= float(x["end"]) or any(abs(float(e.get("_t", e["start"])) - t) < 0.35 for e in ja + out):
+                break
+            som = escolher_som(ev.get("tipo") or "whoosh", f"{p['id']}|ev|{k}", ultimo)
+            ultimo = som
+            evt = dp_sons.evento(som, t, vol * 0.9) if som else None
+            if evt:
+                out.append({"id": uuid.uuid4().hex[:8], "som": som, "start": evt["inicio"], "volume": round(evt["volume"], 2),
+                            "origem": "ia", "curto": f"evento:{ev.get('o_que') or ev.get('tipo')}", "_t": t})
+            break
+    return out
 
 
 def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -2531,6 +2558,9 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     dests = destaques_do_video(p, perfil, planos_v)
     resposta = {"busca_reserva": "breaking news background", "segments": segs, "highlights": dests,
                 "soundtrack_suggestion": perfil["musica"].get("descricao") if perfil["musica"].get("usa") else None}
+    cortes_reais = cortes_com_som_original(p)
+    if cortes_reais:
+        resposta["cutaway_suggestions"] = cortes_reais
     blocos = p["roteiro"]["blocos"]
     trechos = []
     for b, a in zip(blocos, g["alinhamento"]):
@@ -2539,6 +2569,8 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             continue
         trechos.append({"start": float(ws[0]["start"]), "end": float(ws[-1]["end"]), "text": a.get("falado") or b["fala"], "words": ws})
     leg = dict(perfil["legenda"])
+    leg.update({k: v for k, v in ((p.get("config") or {}).get("legenda") or {}).items()
+                if k in ("estilo", "tamanho", "posicao", "maiusculas", "max_palavras", "fonte", "cor_texto", "cor_ativa")})  # 🔤 v84_292
     leg["ativa"] = perfil["legenda"].get("ativa", True) is not False
     prop = proporcao_do(p)
     if prop == "1:1":  # ⬛ quadrado: a letra (que é medida pela altura) cresce pra ocupar a mesma largura de antes
@@ -2554,6 +2586,53 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             "sons_volume": perfil["sfx"].get("volume"), "orientation": prop, "marca": marca_do(base, p),
             "so_flow": p.get("modelo") in MODELOS_CLIPE and (p.get("config") or {}).get("midia") == "flow",
             "enquadramento": perfil.get("enquadramento") or ""}
+
+
+def bloco_do_momento(p: Dict[str, Any], mo: Dict[str, Any]) -> Optional[int]:
+    """O bloco que ANUNCIA o momento (a cena dele mostra o mesmo vídeo-fonte nesses segundos). Sem cena que bata: o último
+    bloco que usa aquela fonte; sem nenhum: o bloco no meio do vídeo."""
+    blocos = (p.get("roteiro") or {}).get("blocos") or []
+    if not blocos:
+        return None
+    mat, de, ate = str(mo.get("material") or ""), float(mo.get("de") or 0), float(mo.get("ate") or 0)
+    melhor, usa = None, None
+    for i, b in enumerate(blocos):
+        for cn in b.get("cenas") or []:
+            if str(cn.get("material") or "") != mat or not mat:
+                continue
+            usa = i
+            try:
+                c0, c1 = float(cn.get("de") or 0), float(cn.get("ate") or 0)
+            except (TypeError, ValueError):
+                continue
+            if ate > de and min(c1, ate) - max(c0, de) > 0:
+                melhor = i if melhor is None else min(melhor, i)
+    if melhor is not None:
+        return melhor
+    if usa is not None:
+        return usa
+    return max(0, len(blocos) // 2 - 1)
+
+
+def cortes_com_som_original(p: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """🔥 v84_291: o MOMENTO-CHAVE (ex.: a cesta do robô) toca com o SOM ORIGINAL logo depois da frase que o anuncia — a
+    narração para e volta depois. Vira um corte real do Estúdio ("cutaway", áudio "pause") com a mídia do projeto."""
+    mo = p.get("momento_original") or {}
+    if not mo.get("midia"):
+        return []
+    g = p.get("gravacao") or {}
+    al = g.get("alinhamento") or []
+    i = bloco_do_momento(p, mo)
+    if i is None or i >= len(al):
+        return []
+    dur = float(g.get("dur") or (al[-1]["end"] if al else 0))
+    t = min(dur, float(al[i]["end"]) + 0.15)
+    out = {"insertion_point": round(t, 3), "description": str(mo.get("descricao") or "momento com o som original")[:200],
+           "audio_mode": "pause", "midia": str(mo["midia"])}
+    for k in ("inicio", "fim"):
+        if mo.get(k) not in (None, ""):
+            out[k] = f"{float(mo[k]):.2f}"
+    return [out]
 
 
 # ------------------------------------------------------------------ tela

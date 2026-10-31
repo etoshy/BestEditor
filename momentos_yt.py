@@ -53,11 +53,14 @@ class MomentoErro(Exception):
 
 MODOS = {"auto": "🤖 a IA escolhe por corte", "comentario": "💬 comentar", "explicar": "🔍 explicar o que acontece"}
 ENQUADRAR = {"seguir": "🎯 vertical seguindo o alvo", "desfocado": "🌫 vertical com fundo desfocado", "original": "▭ manter o formato original"}
+FORMATOS = {"separados": "🎬 um short pra cada momento", "compilacao": "🎞 um short só com os melhores momentos (narrado)"}
 ATE = {"revisar": "👀 parar pra eu revisar os cortes", "cortes": "✂ só cortar (sem roteiro)",
        "editor": "📝 roteiro + voz → editor", "exportar": "🎬 até o MP4 pronto"}
 CONFIG_PADRAO = {"n_cortes": 3, "dur_min": 20, "dur_max": 60, "modo": "auto", "enquadrar": "seguir", "ate": "revisar",
                  "lingua_post": "en", "idioma": "en", "voz": "", "qualidade": "1080p", "alvo": "", "extra": "",
-                 "transcricao_colada": "", "heatmap_colado": "", "usar_navegador": True}
+                 "transcricao_colada": "", "heatmap_colado": "", "usar_navegador": True, "formato": "separados", "assunto": "",
+                 "referencia": "", "referencia_link": "", "duracao_short": 0, "arroba": "",
+                 "legenda_estilo": "pop", "legenda_tamanho": 0.05, "legenda_posicao": "terco", "legenda_maiusculas": True}
 
 
 # ---------------------------------------------------------------------------------------------------- projeto
@@ -520,6 +523,7 @@ def _o(props: Dict[str, Any]) -> Dict[str, Any]:
 S, N = {"type": "string"}, {"type": "number"}
 ESCOLHA_SCHEMA = _o({"cortes": {"type": "array", "items": _o({
     "candidato": N, "inicio": N, "fim": N, "titulo_pt": S, "motivo_pt": S, "alvo_en": S, "alvo_pt": S,
+    "acao_en": {"type": "array", "items": S}, "destino_en": {"type": "array", "items": S},
     "modo": {"type": "string", "enum": ["comentario", "explicar"]}, "ideia_gancho_pt": S})}})
 ESCOLHA_SYS = (
     "You pick the best moments of a LONG YouTube video to turn into vertical SHORTS (YouTube Shorts / TikTok / Reels). Each short is "
@@ -534,6 +538,13 @@ ESCOLHA_SYS = (
     "3. 'candidato' = the index of the candidate you used (-1 if you built a window from the transcript).\n"
     "4. 'alvo_en' = WHAT TO KEEP CENTERED when cropping to vertical 9:16 — a short, visual English noun phrase an object detector "
     "understands ('red humanoid robot', 'man in white shirt', 'basketball hoop'); 'alvo_pt' the same in Portuguese.\n"
+"4b. The vertical crop is a VIRTUAL CAMERA that follows what matters and changes focus. Give it the roles, as short visual English "
+    "noun phrases an object detector understands: 'acao_en' = 0-2 objects that may LEAVE the subject and steal the scene while they "
+    "move (a thrown ball, a frisbee, a kicked ball, a skateboard flying off, a car leaving the frame); "
+    "'destino_en' = 0-2 places that action goes to (the hoop, the goal, the net, the landing ramp, the owner catching it). Empty "
+    "lists when the scene has nothing like that (a talk, a close-up, a slow scene) — then the camera just follows 'alvo_en'. "
+    "Examples: basketball shot → alvo 'red humanoid robot', acao ['basketball'], destino ['basketball hoop']; dog fetching → alvo "
+    "'brown dog', acao ['frisbee'], destino ['man in blue shirt']; interview → alvo 'man speaking', acao [], destino [].\n"
     "5. 'modo': 'explicar' when people would ask HOW/WHY (a skill, a machine, a trick, a phenomenon, a rule); 'comentario' when the "
     "fun is the reaction, a decision, drama or something to argue about.\n"
     "6. 'ideia_gancho_pt': one line with the hook idea in Portuguese. 'titulo_pt' short; 'motivo_pt' why this moment works.")
@@ -548,7 +559,10 @@ def texto_escolha(p: Dict[str, Any]) -> str:
         L.append("Description: " + info["descricao"][:1200])
     if p.get("capitulos"):
         L.append("Chapters: " + " | ".join(f"{mmss(c['t0'])} {c['titulo']}" for c in p["capitulos"][:40]))
-    L += ["", f"WANT: {cfg['n_cortes']} clips, each {cfg['dur_min']}-{cfg['dur_max']} s."]
+    if cfg.get("formato") == "compilacao":
+        L += ["", "WANT: ONE short with the best moments (see the rules)."]
+    else:
+        L += ["", f"WANT: {cfg['n_cortes']} clips, each {cfg['dur_min']}-{cfg['dur_max']} s."]
     if cfg.get("alvo"):
         L.append(f"The creator wants this kept centered when possible: {cfg['alvo']}")
     if cfg.get("modo") in ("comentario", "explicar"):
@@ -592,6 +606,7 @@ def escolher_com_ia(p: Dict[str, Any], chamar: Optional[Callable[..., Any]] = No
         out.append(novo_corte(len(out) + 1, t0, t1, titulo=c.get("titulo_pt") or "", motivo=c.get("motivo_pt") or "",
                               alvo=c.get("alvo_en") or "", alvo_pt=c.get("alvo_pt") or "",
                               modo=cfg["modo"] if cfg["modo"] != "auto" else (c.get("modo") or "comentario"),
+                              acao=[str(x)[:60] for x in c.get("acao_en") or []][:2], destino=[str(x)[:60] for x in c.get("destino_en") or []][:2],
                               gancho=c.get("ideia_gancho_pt") or "", candidato=int(c.get("candidato", -1) or -1)))
         if len(out) >= int(cfg["n_cortes"]):
             break
@@ -601,7 +616,7 @@ def escolher_com_ia(p: Dict[str, Any], chamar: Optional[Callable[..., Any]] = No
 def novo_corte(n: int, t0: float, t1: float, **kw: Any) -> Dict[str, Any]:
     c = {"n": n, "t0": round(t0, 2), "t1": round(t1, 2), "titulo": "", "motivo": "", "alvo": "", "alvo_pt": "", "modo": "comentario",
          "gancho": "", "candidato": -1, "usar": True, "enquadrar": "", "estado": "", "erro": "", "arquivo": "", "curto": "",
-         "visual": [], "enquadramento": {}}
+         "visual": [], "enquadramento": {}, "acao": [], "destino": [], "rastros": {}, "eventos": []}
     c.update({k: v for k, v in kw.items() if k in c})
     return c
 
@@ -614,6 +629,270 @@ def escolher_sem_ia(p: Dict[str, Any]) -> List[Dict[str, Any]]:
                               motivo=f"pico do gráfico (força {c['valor']:.2f})", alvo=cfg.get("alvo") or "",
                               modo=cfg["modo"] if cfg["modo"] != "auto" else "comentario"))
     return out
+
+
+LEGENDA_TAMANHOS = {"0.04": "pequena", "0.05": "média", "0.062": "grande"}
+EVENTO_SOM = {"lancamento": ("whoosh", "fast whoosh throw"), "chegada": ("impacto", "basketball net swish hit")}
+
+
+def aplicar_visual(q: Dict[str, Any], cfg: Dict[str, Any]) -> None:
+    """A legenda (estilo, tamanho, posição) e o @ do canal escolhidos aqui valem pro curto (por cima do perfil do canal)."""
+    try:
+        tam = max(0.03, min(0.09, float(cfg.get("legenda_tamanho") or 0.05)))
+    except (TypeError, ValueError):
+        tam = 0.05
+    q["config"]["legenda"] = {"estilo": cfg.get("legenda_estilo") or "pop", "tamanho": tam,
+                              "posicao": cfg.get("legenda_posicao") or "terco", "maiusculas": bool(cfg.get("legenda_maiusculas", True)),
+                              "max_palavras": 3 if (cfg.get("legenda_estilo") or "pop") != "palavra_unica" else 1}
+    arroba = str(cfg.get("arroba") or "").strip()
+    if arroba:
+        q["config"]["marca"] = {"ativa": True, "texto": arroba if arroba.startswith("@") else "@" + arroba}
+
+
+def rastros_e_sons(q: Dict[str, Any], mid: str, c: Dict[str, Any]) -> List[str]:
+    """Guarda no curto o que a câmera virtual mediu: as caixas de cada objeto (o círculo do destaque segue a coisa CERTA) e os
+    eventos (lançamento, chegada) pros efeitos sonoros. Devolve os nomes dos objetos rastreados."""
+    if c.get("rastros"):
+        q.setdefault("rastros", {})[mid] = c["rastros"]
+    for e in c.get("eventos") or []:
+        tipo, busca = EVENTO_SOM.get(e.get("tipo"), ("whoosh", ""))
+        q.setdefault("eventos_som", []).append({"mid": mid, "t": float(e["t"]), "tipo": tipo, "busca": busca, "o_que": e.get("tipo")})
+    return list((c.get("rastros") or {}).keys())
+
+
+def regra_objetos(nomes: List[str]) -> str:
+    if not nomes:
+        return ""
+    return ("TRACKED OBJECTS in the clip(s): " + ", ".join(sorted(set(nomes))) + ". A 'destaque' (circle/arrow) can ONLY point at one "
+            "of these — use the EXACT name (e.g. talk about the shot/pass/throw → point at the ball, not at the player's legs). "
+            "Point at what the line is about at that moment.")
+
+
+# ---------------------------------------------------------------------------------------------------- 4b. 🎞 compilação (um short só)
+COMP_SCHEMA = _o({
+    "assunto_pt": S, "alvo_en": S, "gancho_pt": S, "fatos_pt": S,
+    "cortes": {"type": "array", "items": _o({"inicio": N, "fim": N, "titulo_pt": S, "mostra_pt": S, "alvo_en": S,
+                                             "acao_en": {"type": "array", "items": S}, "destino_en": {"type": "array", "items": S}})},
+    "climax": _o({"corte": N, "inicio": N, "fim": N, "por_que_pt": S})})
+COMP_SYS = (
+    "You plan ONE narrated SHORT (YouTube Shorts / TikTok / Reels, ~40-70 s) built from the BEST MOMENTS of a long YouTube video — "
+    "the format of viral 'curiosity' shorts: a narrator tells the story of ONE subject (e.g. a basketball robot) over a FAST collage "
+    "of the video's moments (a new shot every 1-3 s: wide shots, close-ups of details, the action, the crowd reacting), and at the "
+    "CLIMAX the narration STOPS and the key moment plays with its ORIGINAL SOUND for a few seconds, then the narrator comes back with "
+    "the twist/facts and ends with a provocative question for the comments.\n"
+    "You get the video info, candidates from YouTube's 'Most replayed' graph (heat 0..1) and the transcript.\n"
+    "Return:\n"
+    "- 'assunto_pt': what the short is about, one line in Portuguese (the creator may have told you).\n"
+    "- 'alvo_en': what to keep CENTERED when cropping to vertical (short visual English noun phrase an object detector understands).\n"
+    "- 'cortes': 4-10 SOURCE windows (seconds of the long video), each 6-30 s, that together give the narrator everything to show: "
+    "the entrance/setup, close-ups of the subject's details, the key action, the reaction, other skills. Prefer high-heat moments, "
+    "but cover the whole story; no overlaps. 'mostra_pt' = what is seen; 'alvo_en' per window (may differ: 'basketball', 'crowd').\n"
+    "- per window 'acao_en'/'destino_en': the VIRTUAL CAMERA roles — objects that may leave the subject and steal the scene while "
+    "they move (a thrown/kicked ball, a frisbee…) and where they go (the hoop, the goal, the person catching); [] when nothing like "
+    "that happens in the window.\n"
+    "- 'climax': THE single most impressive moment (index in 'cortes', and 'inicio'/'fim' in seconds of the long video, 3-8 s, "
+    "INSIDE that window): the payoff people re-watch (the shot going in, the trick landing). It will play with its original sound.\n"
+    "- 'fatos_pt': the concrete facts the narrator can use, in Portuguese — what the video/transcript/description says (names, "
+    "numbers, records, how it works) plus well-established public facts you are SURE about; mark anything uncertain with '(conferir)'.\n"
+    "- 'gancho_pt': the hook idea in Portuguese (e.g. 'O novo robô da Toyota simplesmente fez isso').")
+
+ESTILO_COMPILACAO = (
+    "FORMAT (follow this structure): 1) HOOK in the first 2 s over the most striking shot — a short claim that creates curiosity "
+    "('Toyota's new robot just did THIS.'). 2) BUILD-UP: tell what happened step by step with suspense, short sentences ('He walked "
+    "to the middle of the court, stopped in silence, faced the hoop and started calculating. Everyone in the arena thought it would "
+    "be just another clumsy tech demo…'). 3) NAME IT: who/what it is with 1-2 concrete facts. 4) The line that ANNOUNCES the climax "
+    "({CLIMAX}) — right after this line the narrator STOPS and the moment plays with its original sound; the cena of this line must "
+    "use material {MAT} with de/ate inside {DE:.1f}-{ATE:.1f}. 5) TWIST with facts ('And it wasn't luck: …'), one impressive number "
+    "per line. 6) WHAT'S NEW / bigger picture. 7) ENDING: a provocative, slightly unsettling question that makes people comment "
+    "('…what happens if one day they swap the ball for something else?') + a call to comment ('Tell me in the comments.'). "
+    "Cut fast: change the picture every 1-3 s, mixing wide shots and close-ups of the details the line mentions.")
+
+
+def escolher_compilacao(p: Dict[str, Any], chamar: Optional[Callable[..., Any]] = None) -> Optional[Dict[str, Any]]:
+    import ia_servico
+    cfg = p["config"]
+    texto = texto_escolha(p)
+    if cfg.get("assunto"):
+        texto += f"\n\nTHE SHORT IS ABOUT: {cfg['assunto']}"
+    if cfg.get("referencia"):
+        texto += "\n\nREFERENCE SHORT the creator wants to imitate (structure/tone — never copy):\n" + cfg["referencia"][:3000]
+    r = (chamar or ia_servico.chamar)("curtos", COMP_SYS, texto, schema=COMP_SCHEMA, max_tokens=3500, job=p["id"])
+    if not r or not r.get("cortes"):
+        return None
+    dur = float(p.get("dur") or 0) or 1e9
+    cortes: List[Dict[str, Any]] = []
+    mapa: Dict[int, int] = {}
+    for k, c in enumerate(r["cortes"]):
+        try:
+            t0, t1 = max(0.0, float(c["inicio"])), min(dur, float(c["fim"]))
+        except (TypeError, ValueError, KeyError):
+            continue
+        if t1 - t0 < 2 or any(min(t1, o["t1"]) - max(t0, o["t0"]) > 0.5 * (t1 - t0) for o in cortes):
+            continue
+        mapa[k] = len(cortes) + 1
+        cortes.append(novo_corte(len(cortes) + 1, t0, t1, titulo=c.get("titulo_pt") or "", motivo=c.get("mostra_pt") or "",
+                                 alvo=c.get("alvo_en") or r.get("alvo_en") or cfg.get("alvo") or "", modo="explicar",
+                                 acao=[str(x)[:60] for x in c.get("acao_en") or []][:2],
+                                 destino=[str(x)[:60] for x in c.get("destino_en") or []][:2]))
+    if not cortes:
+        return None
+    cl = r.get("climax") or {}
+    try:
+        n = mapa.get(int(cl.get("corte", -1)))
+        a, b = float(cl["inicio"]), float(cl["fim"])
+    except (TypeError, ValueError, KeyError):
+        n, a, b = None, 0.0, 0.0
+    if n is None:  # o Claude errou o índice: o corte que contém o momento (ou o 1º)
+        n = next((c["n"] for c in cortes if c["t0"] <= a < c["t1"]), cortes[0]["n"])
+    c = next(x for x in cortes if x["n"] == n)
+    a, b = max(c["t0"], a), min(c["t1"], b if b > a else a + 5)
+    if b - a < 2:
+        a, b = c["t0"] + (c["t1"] - c["t0"]) * 0.4, min(c["t1"], c["t0"] + (c["t1"] - c["t0"]) * 0.4 + 5)
+    return {"cortes": cortes, "assunto": r.get("assunto_pt") or cfg.get("assunto") or "", "fatos": r.get("fatos_pt") or "",
+            "gancho": r.get("gancho_pt") or "", "climax": {"n": n, "t0": round(a, 2), "t1": round(b, 2), "por_que": cl.get("por_que_pt") or ""}}
+
+
+def compilacao_sem_ia(p: Dict[str, Any]) -> Dict[str, Any]:
+    cs = (p.get("candidatos") or [])[:6]
+    cortes = [novo_corte(k + 1, c["t0"], c["t1"], titulo=f"Pico {k + 1} ({mmss(c['pico'])})", alvo=p["config"].get("alvo") or "",
+                         modo="explicar") for k, c in enumerate(cs)]
+    top = cs[0] if cs else {"pico": 0}
+    return {"cortes": cortes, "assunto": p["config"].get("assunto") or p.get("titulo") or "", "fatos": "", "gancho": "",
+            "climax": {"n": 1, "t0": round(max(cortes[0]["t0"], top["pico"] - 2.5), 2) if cortes else 0,
+                       "t1": round(min(cortes[0]["t1"], top["pico"] + 2.5), 2) if cortes else 0, "por_que": "o pico do gráfico"}}
+
+
+def criar_compilacao(base: str, pid: str, transcrever: Optional[Callable[..., Any]] = None, prog: Prog = lambda m: None) -> str:
+    """🎞 Os cortes (já verticais) viram as FONTES (M1, M2…) de um curto 📚 explicativo; o momento-chave entra cortado LARGO (W1)
+    pra tocar com o som original no meio da narração."""
+    import curtos as CT
+    import curtos_comentario as CC
+    p = carregar(base, pid)
+    cfg = p["config"]
+    comp = p.get("compilacao") or {}
+    if comp.get("curto"):
+        try:
+            CT.carregar(base, comp["curto"])
+            return comp["curto"]
+        except Exception:  # noqa: BLE001
+            pass
+    usar = [c for c in p["cortes"] if c.get("usar", True) and c.get("arquivo")]
+    if not usar:
+        raise MomentoErro("corte os trechos primeiro")
+    d = pasta(base, pid)
+    titulo = (comp.get("assunto") or p.get("titulo") or "melhores momentos")[:100]
+    q = CT.criar(base, CT.canal_do_modelo(base, "explicativo"), "🎞 " + titulo, [], "", modelo="explicativo")
+    cid = q["id"]
+    tmp = tempfile.mkdtemp(prefix="mom_comp_")
+    mids: Dict[int, str] = {}
+    try:
+        with CT._TRAVA:
+            q = CT.carregar(base, cid)
+            for c in usar:
+                cp = os.path.join(tmp, f"c{c['n']}.mp4")
+                shutil.copy(os.path.join(d, "cortes", c["arquivo"]), cp)
+                m = CT.adicionar_midia(base, q, cp, "video", f"{c.get('titulo') or ''} — {c.get('motivo') or ''}"[:300], "M",
+                                       origem=f"https://youtu.be/{p['yt_id']}?t={int(c['t0'])}")
+                mids[c["n"]] = m["id"]
+            cl = comp.get("climax") or {}
+            largo = os.path.join(d, "cortes", "climax_largo.mp4")
+            if cl.get("t1", 0) > cl.get("t0", 0) and os.path.isfile(largo):
+                cp = os.path.join(tmp, "climax.mp4")
+                shutil.copy(largo, cp)
+                w = CT.adicionar_midia(base, q, cp, "video", "🔊 momento-chave com o som original (formato largo)", "W")
+                c_cl = next((c for c in usar if c["n"] == cl.get("n")), None)
+                mat = mids.get(cl.get("n"), "")
+                de = max(0.0, cl["t0"] - c_cl["t0"]) if c_cl else 0.0
+                q["momento_original"] = {"midia": w["id"], "material": mat, "de": round(de, 2),
+                                         "ate": round(de + cl["t1"] - cl["t0"], 2), "descricao": cl.get("por_que") or "momento-chave"}
+            cc = CC.dados(q)
+            cc["lingua_post"] = cfg["lingua_post"] if cfg["lingua_post"] in CT.LINGUAS else "en"
+            cc["idioma"] = "pt" if cfg.get("idioma") == "pt" else "en"
+            narrada = "pt" if cc["idioma"] == "pt" else cc["lingua_post"]
+            q["config"].update(motor_perfil="chatterbox_turbo" if narrada == "en" else "chatterbox", proporcao="9:16", takes=1, midia="minhas")
+            if cfg.get("voz"):
+                q["config"]["voz_tts"] = str(cfg["voz"])[:120]
+            try:
+                q["config"]["duracao_alvo_s"] = max(0, min(180, int(cfg.get("duracao_short") or 0)))
+            except (TypeError, ValueError):
+                pass
+            mo = q.get("momento_original") or {}
+            estilo = ESTILO_COMPILACAO.replace("{CLIMAX}", cl.get("por_que") or "the key moment").replace("{MAT}", mo.get("material") or "M1")
+            estilo = estilo.replace("{DE:.1f}", f"{mo.get('de', 0):.1f}").replace("{ATE:.1f}", f"{mo.get('ate', 0):.1f}")
+            if not mo:
+                estilo = estilo.split(" 4) ")[0] + " 5) TWIST with facts, 6) bigger picture, 7) provocative question + call to comment."
+            extra = [estilo]
+            nomes = []
+            for c in usar:
+                nomes += rastros_e_sons(q, mids[c["n"]], c)
+            if regra_objetos(nomes):
+                extra.append(regra_objetos(nomes))
+            aplicar_visual(q, cfg)
+            if comp.get("gancho"):
+                extra.append(f"Hook idea (Portuguese): {comp['gancho']}")
+            if cfg.get("extra"):
+                extra.append(cfg["extra"])
+            q["config"]["extra"] = "\n".join(extra)[:3000]
+            topico = [f"ASSUNTO: {comp.get('assunto') or p.get('titulo')}", f"Vídeo original: {p.get('titulo')} — canal {(p.get('info') or {}).get('canal') or '?'}"]
+            if comp.get("fatos"):
+                topico += ["", "FATOS (do vídeo e conhecidos):", comp["fatos"]]
+            if (p.get("info") or {}).get("descricao"):
+                topico += ["", "Descrição do vídeo original:", p["info"]["descricao"][:1500]]
+            coms = [x["texto"] for x in (p.get("info") or {}).get("comentarios") or []][:12]
+            if coms:
+                topico += ["", "O que o público comenta:", *[f"- {x[:200]}" for x in coms]]
+            q["noticia"]["texto"] = "\n".join(topico)[:12000]
+            if cfg.get("referencia"):
+                cc["referencia"] = cfg["referencia"][:8000]
+            q["link_rapido"] = {"link": p["link"], "modo": "explicar", "criado": time.time(), "qualidade": cfg.get("qualidade") or "1080p",
+                                "exportar": cfg.get("ate") == "exportar", "comentarios_colados": "", "etapa": "✂ cortado",
+                                "momentos": {"projeto": pid, "compilacao": True}}
+            cc["info_link"] = {"titulo": p.get("titulo") or "", "comentarios": [], "ok": True}
+            CT.salvar(base, q)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    for c in usar:  # a linha do tempo de cada fonte: a fala do vídeo + o que o 👁 Moondream viu
+        fala, vis = linhas_do_corte(p, c)
+        if fala:
+            CC.salvar_texto_do_clipe(base, cid, fala, mids[c["n"]], "fala")
+        if vis:
+            CC.salvar_texto_do_clipe(base, cid, vis, mids[c["n"]], "visual")
+        else:  # sem Moondream: o Claude olha a fonte (o roteiro precisa saber o que cada pedaço MOSTRA)
+            try:
+                CC.descrever_clipe(base, cid, mids[c["n"]], on_log=prog)
+            except Exception as exc:  # noqa: BLE001
+                prog(f"👁 não deu pra descrever a fonte {c['n']}: {exc}")
+    mudar(base, pid, lambda pp: pp.setdefault("compilacao", {}).update(curto=cid))
+    return cid
+
+
+def cortar_climax(base: str, pid: str, prog: Prog = lambda m: None, baixador: Optional[Callable[[str, str], str]] = None) -> Optional[str]:
+    """O momento-chave no formato LARGO (o lance inteiro à vista), com o som original."""
+    p = carregar(base, pid)
+    cl = (p.get("compilacao") or {}).get("climax") or {}
+    if not cl or cl.get("t1", 0) - cl.get("t0", 0) < 1:
+        return None
+    video = garantir_video(base, pid, prog, baixador)
+    prog("🔊 cortando o momento-chave (largo, com o som original)…")
+    return cortar(video, cl["t0"], cl["t1"], os.path.join(pasta(base, pid), "cortes", "climax_largo.mp4"), "null")
+
+
+def referencia_do_link(base: str, link: str, transcrever: Optional[Callable[..., Any]], prog: Prog = lambda m: None) -> str:
+    """📺 Short de referência (ex.: um viral do mesmo assunto): baixa e transcreve (Whisper) — a estrutura/tom que o roteiro imita."""
+    if not link or not transcrever:
+        return ""
+    import curtos_comentario as CC
+    tmp = tempfile.mkdtemp(prefix="mom_ref_")
+    try:
+        prog("📺 baixando e transcrevendo o short de referência…")
+        cam = CC.baixar_link(link, tmp)
+        segs = transcrever(cam, language=None, word_timestamps=False, info={}) or []
+        return "\n".join(f"{float(s['start']):.1f} {str(s['text']).strip()}" for s in segs if str(s.get("text") or "").strip())
+    except Exception as exc:  # noqa: BLE001
+        prog(f"📺 não deu pra pegar a referência: {exc}")
+        return ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------------------------------- 5/6. 👁 Moondream2
@@ -701,6 +980,54 @@ class Visao:
         except Exception as exc:  # noqa: BLE001
             self.erro = str(exc)[:200]
             return None
+
+    def achar_varios_claude(self, img: str, objetos: List[str]) -> Dict[str, Tuple[float, float, float, float]]:
+        """Sem detect (Ollama/nenhum): o Claude acha TODOS os objetos de uma vez nesse quadro → {objeto: (x0,y0,x1,y1)}."""
+        import ia_servico
+        b = ia_servico.imagem_bloco(img, largura=768)
+        if not b:
+            return {}
+        schema = _o({"objetos": {"type": "array", "items": _o({"nome": S, "achou": {"type": "boolean"}, "x": N, "y": N, "w": N, "h": N})}})
+        sys_ = ("You locate objects in a video frame for a virtual camera. For EACH requested object return its tight bounding box as "
+                "FRACTIONS of the image (x,y = top-left, w,h = size, 0..1); achou=false when it is not clearly visible. Use the exact "
+                "names you were given.")
+        r = (self.chamar or ia_servico.chamar)("curtos", sys_, [b, {"type": "text", "text": "Objects: " + " | ".join(objetos)}],
+                                               schema=schema, max_tokens=500)
+        out: Dict[str, Tuple[float, float, float, float]] = {}
+        for o in (r or {}).get("objetos") or []:
+            try:
+                if not o.get("achou") or o.get("nome") not in objetos:
+                    continue
+                x, y, w, h = (max(0.0, min(1.0, float(o[k]))) for k in ("x", "y", "w", "h"))
+            except (TypeError, ValueError, KeyError):
+                continue
+            if w > 0.005 and h > 0.005:
+                out[o["nome"]] = (x, y, min(1.0, x + w), min(1.0, y + h))
+        return out
+
+    def testar(self) -> Dict[str, Any]:
+        """🧪 Carrega o Moondream e acha um objeto numa imagem de teste — mostra o erro de verdade se não der."""
+        import time as _t
+        from PIL import Image, ImageDraw
+        tmp = tempfile.mktemp(suffix=".jpg")
+        im = Image.new("RGB", (640, 360), (120, 120, 120))
+        ImageDraw.Draw(im).ellipse((280, 140, 360, 220), fill=(230, 120, 20))
+        im.save(tmp)
+        t0 = _t.time()
+        try:
+            if self.vc["backend"] == "nenhum":
+                return {"ok": True, "msg": "Moondream desligado — o Claude olha os quadros (mais lento e gasta IA)."}
+            d = self.descrever(tmp)
+            if d is None:
+                return {"ok": False, "msg": f"❌ {self.nome} não respondeu: {self.erro or 'sem resposta'}"}
+            caixas = self.achar(tmp, "orange ball")
+            det = ("acha objetos ✅" if caixas else "não achou a bola de teste ⚠") if caixas is not None else "não acha objetos (o Claude faz essa parte)"
+            return {"ok": True, "msg": f"✅ {self.nome} funcionando ({_t.time() - t0:.1f} s) — descreve ✅ · {det} · “{d[:80]}”"}
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
     def achar_claude(self, img: str, alvo: str) -> Optional[Tuple[float, float, float, float]]:
         import ia_servico
@@ -1024,6 +1351,21 @@ def analisar(base: str, pid: str, prog: Prog = lambda m: None, ytdlp_module: Any
         raise MomentoErro("Sem o gráfico de mais repetidos e sem transcrição — cole a transcrição ou o gráfico (HTML) e refaça.")
     # 4. o Claude escolhe
     etapa("🤖 escolhendo os cortes")
+    if cfg.get("formato") == "compilacao":
+        if cfg.get("referencia_link") and not cfg.get("referencia"):
+            ref = referencia_do_link(base, cfg["referencia_link"], transcrever, prog)
+            if ref:
+                p = mudar(base, pid, lambda q: q["config"].update(referencia=ref))
+        prog("🤖 o Claude está montando o short com os melhores momentos…")
+        comp = escolher_compilacao(p, chamar)
+        if not comp:
+            if not cands:
+                raise MomentoErro("A IA não respondeu e o vídeo não tem gráfico — ligue a IA (Configurações) ou cole o gráfico.")
+            prog("🤖 IA indisponível — usando os picos do gráfico")
+            comp = compilacao_sem_ia(p)
+        cortes = comp.pop("cortes")
+        p = mudar(base, pid, lambda q: q.update(cortes=cortes, compilacao=comp, etapa="👀 revise os cortes"))
+        return p
     prog("🤖 o Claude está escolhendo os melhores cortes…")
     cortes = escolher_com_ia(p, chamar)
     if not cortes:
@@ -1101,31 +1443,33 @@ def produzir_corte(base: str, pid: str, n: int, prog: Prog = lambda m: None, bai
         dur = sondar(cru)["dur"] or (c["t1"] - c["t0"])
         info = sondar(video)
         cenas = AF.trocas_de_cena(cru, 0.3)[1:]
-        trajeto: List[Tuple[float, float]] = []
-        achados = 0
-        if modo == "seguir":
-            if alvo:
-                pts = trajeto_do_alvo(visao, cru, dur, alvo, os.path.join(tmp, "alvo"), cenas, prog)
-                achados = sum(1 for _, x in pts if x is not None)
-                cw_frac = (int(info["h"] * 1080 / 1920) // 2 * 2) / max(1, info["w"])
-                trajeto = suavizar_trajeto(pts, dur, cenas, cw_frac) if achados else []
-            if not trajeto:
-                prog("🎯 alvo não achado — corte no meio do quadro" if alvo else "🎯 sem alvo — corte no meio do quadro")
-        prog("✂ cortando" + (" em vertical seguindo o alvo…" if trajeto else "…"))
         nome = f"corte_{n:02d}.mp4"
-        cortar(video, c["t0"], c["t1"], os.path.join(d, "cortes", nome), filtro_vertical(info, modo, trajeto))
+        saida = os.path.join(d, "cortes", nome)
+        cam: Dict[str, Any] = {}
+        papeis = {"principal": alvo, "acao": [a for a in c.get("acao") or [] if a], "destino": [x for x in c.get("destino") or [] if x]}
+        if modo == "seguir" and (alvo or papeis["acao"]):
+            import camera_virtual as CV
+            prog("🎥 câmera virtual: seguindo " + " → ".join([alvo] + papeis["acao"] + papeis["destino"]) + "…")
+            cam = CV.seguir(visao, cru, video, c["t0"], c["t1"], saida, papeis, cenas, prog)
+        else:
+            if modo == "seguir":
+                prog("🎯 sem alvo — corte no meio do quadro")
+            cortar(video, c["t0"], c["t1"], saida, filtro_vertical(info, modo, []))
         visual = []
         if visao.vc["backend"] != "nenhum":
             ctx = (p.get("titulo") or "")[:150]
-            visual = descrever_trecho(visao, cru, dur, os.path.join(tmp, "desc"), ctx, prog)
+            visual = descrever_trecho(visao, cru, dur, os.path.join(tmp, "desc"), ctx, prog, passo=2.0, maximo=40)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    achados = sum((cam.get("achados") or {}).values())
 
     def guarda(q: Dict[str, Any]) -> None:
         for x in q["cortes"]:
             if x["n"] == n:
                 x.update(arquivo=nome, visual=visual, estado="✂ cortado", erro="", feito=time.time(),
-                         enquadramento={"modo": modo, "alvo": alvo, "achados": achados, "pontos": len(trajeto), "visao": visao.nome})
+                         rastros=cam.get("rastros") or {}, eventos=cam.get("eventos") or [],
+                         enquadramento={"modo": modo, "alvo": alvo, "achados": achados, "por_objeto": cam.get("achados") or {},
+                                        "foco": cam.get("foco") or {}, "visao": visao.nome, "visao_erro": visao.erro})
     mudar(base, pid, guarda)
     return next(x for x in carregar(base, pid)["cortes"] if x["n"] == n)
 
@@ -1181,7 +1525,11 @@ def criar_curto(base: str, pid: str, n: int, transcrever: Optional[Callable[...,
             extra.append(f"Why this moment works (Portuguese): {c['motivo']}")
         if cfg.get("extra"):
             extra.append(cfg["extra"])
-        q["config"]["extra"] = "\n".join(extra)[:2000]
+        nomes = rastros_e_sons(q, "M1", c)
+        if regra_objetos(nomes):
+            extra.append(regra_objetos(nomes))
+        aplicar_visual(q, cfg)
+        q["config"]["extra"] = "\n".join(extra)[:2500]
         comentarios = [{"texto": x["texto"], "curtidas": x["curtidas"], "autor": ""}
                        for x in (p.get("info") or {}).get("comentarios_tempo") or [] if c["t0"] - 5 <= x["t"] <= c["t1"] + 5]
         comentarios += [x for x in (p.get("info") or {}).get("comentarios") or [] if x["texto"] not in {y["texto"] for y in comentarios}][:30]
@@ -1204,6 +1552,11 @@ def criar_curto(base: str, pid: str, n: int, transcrever: Optional[Callable[...,
             prog(f"🎙 não deu pra transcrever: {exc}")
     if vis:
         CC.salvar_texto_do_clipe(base, cid, vis, "M1", "visual")
+    else:
+        try:
+            CC.descrever_clipe(base, cid, "M1", on_log=prog)
+        except Exception as exc:  # noqa: BLE001
+            prog(f"👁 não deu pra descrever o corte: {exc}")
     mudar(base, pid, lambda pp: [x.update(curto=cid) for x in pp["cortes"] if x["n"] == n])
     return cid
 
@@ -1216,6 +1569,8 @@ def produzir(base: str, pid: str, prog: Prog = lambda m: None, so: Optional[List
     ate = ate or p["config"].get("ate") or "exportar"
     if ate == "revisar":
         ate = "exportar"
+    if p["config"].get("formato") == "compilacao":
+        return produzir_compilacao(base, pid, prog, ate, transcrever, rodar_link, baixador, chamar)
     alvo = [c for c in p["cortes"] if c.get("usar", True) and (so is None or c["n"] in so)]
     if not alvo:
         raise MomentoErro("nenhum corte marcado")
@@ -1251,6 +1606,46 @@ def produzir(base: str, pid: str, prog: Prog = lambda m: None, so: Optional[List
             pr(f"❌ corte {n}: {exc}")
     mudar(base, pid, lambda q: q.update(etapa=f"✅ {feitos}/{len(alvo)} prontos"))
     return f"{feitos}/{len(alvo)} prontos"
+
+
+def produzir_compilacao(base: str, pid: str, prog: Prog = lambda m: None, ate: str = "exportar",
+                        transcrever: Optional[Callable[..., Any]] = None, rodar_link: Optional[Callable[..., str]] = None,
+                        baixador: Optional[Callable[[str, str], str]] = None, chamar: Optional[Callable[..., Any]] = None) -> str:
+    """🎞 corta todas as fontes (verticais, seguindo o alvo) + o momento-chave largo → UM curto 📚 narrado → editor/MP4."""
+    def estado(e: str, erro: str = "") -> None:
+        mudar(base, pid, lambda q: q.setdefault("compilacao", {}).update(estado=e, erro=erro))
+    p = carregar(base, pid)
+    usar = [c for c in p["cortes"] if c.get("usar", True)]
+    if not usar:
+        raise MomentoErro("nenhum corte marcado")
+    visao = Visao(base, chamar)
+    try:
+        for k, c in enumerate(usar, 1):
+            estado(f"✂ cortando {k}/{len(usar)}")
+            mudar(base, pid, lambda q, n=c["n"]: [x.update(estado="✂ cortando", erro="") for x in q["cortes"] if x["n"] == n])
+            atual = next(x for x in carregar(base, pid)["cortes"] if x["n"] == c["n"])
+            if not (atual.get("arquivo") and os.path.isfile(os.path.join(pasta(base, pid), "cortes", atual["arquivo"]))):
+                produzir_corte(base, pid, c["n"], lambda m, k=k: prog(f"[fonte {k}/{len(usar)}] {m}"), baixador, chamar, visao)
+            mudar(base, pid, lambda q, n=c["n"]: [x.update(estado="✅ cortado") for x in q["cortes"] if x["n"] == n])
+        if not os.path.isfile(os.path.join(pasta(base, pid), "cortes", "climax_largo.mp4")):
+            cortar_climax(base, pid, prog, baixador)
+        if ate == "cortes":
+            estado("✅ fontes cortadas")
+            mudar(base, pid, lambda q: q.update(etapa="✅ fontes cortadas"))
+            return "fontes cortadas"
+        estado("🎞 montando o short")
+        cid = criar_compilacao(base, pid, transcrever, prog)
+        if rodar_link is None:
+            estado("✅ curto criado (abra pra continuar)")
+            return "curto criado"
+        estado("📝 roteiro → 🎙 voz → 🎬 edição" + (" → MP4" if ate == "exportar" else ""))
+        rodar_link(cid, p["config"].get("voz") or "", p["config"].get("qualidade") or "1080p", ate == "exportar", prog)
+        estado("✅ pronto" if ate == "exportar" else "✅ no editor")
+        mudar(base, pid, lambda q: q.update(etapa="✅ short pronto" if ate == "exportar" else "✅ no editor"))
+        return "pronto"
+    except Exception as exc:
+        estado("❌ erro", str(exc)[:500])
+        raise
 
 
 # ---------------------------------------------------------------------------------------------------- rotas
@@ -1324,7 +1719,7 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
         except Exception:  # noqa: BLE001
             CT = CR = None  # type: ignore
         for c in p.get("cortes") or []:
-            x = dict(c, visual=len(c.get("visual") or []))
+            x = dict(c, visual=len(c.get("visual") or []), rastros=list((c.get("rastros") or {}).keys()))
             if c.get("curto") and CT:
                 try:
                     q = CT.carregar(base, c["curto"])
@@ -1338,8 +1733,28 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
                 except Exception:  # noqa: BLE001
                     pass
             cortes.append(x)
-        return {"projeto": dict(p, cortes=cortes, legenda=len(p.get("legenda") or [])),
+        comp = dict(p.get("compilacao") or {})
+        if comp.get("curto") and CT:
+            try:
+                q = CT.carregar(base, comp["curto"])
+                tc = (CR.TAREFAS.get(comp["curto"]) or {}) if CR else {}
+                exp = q.get("exportado") or {}
+                r = q.get("roteiro") or {}
+                comp["curto_info"] = {"pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
+                                      "editor": (q.get("editor") or {}).get("job_id") or "", "prog": tc.get("prog") or "",
+                                      "roteiro": " ".join(CT.sem_tags(b.get("fala") or "") for b in r.get("blocos") or [])[:1500]}
+            except Exception:  # noqa: BLE001
+                pass
+        comp["tem_climax"] = os.path.isfile(os.path.join(pasta(base, p["id"]), "cortes", "climax_largo.mp4"))
+        return {"projeto": dict(p, cortes=cortes, legenda=len(p.get("legenda") or []), compilacao=comp),
                 "tarefa": dict(t, rodando=not t.get("fim")) if t else None}
+
+    def _estilos_legenda() -> List[Dict[str, str]]:
+        try:
+            import dp_legendas
+            return [{"id": e["id"], "nome": e["nome"]} for e in dp_legendas.ESTILOS]
+        except Exception:  # noqa: BLE001
+            return [{"id": "pop", "nome": "Pop"}]
 
     @app.route("/momentos-yt")
     def mom_pagina():
@@ -1353,7 +1768,7 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             linguas = CT.LINGUAS
         except Exception:  # noqa: BLE001
             linguas = {"en": "English", "pt": "Português (Brasil)"}
-        return render_template("momentos_yt.html", lista=listar(base), modos=MODOS, enquadrar=ENQUADRAR, ate=ATE, linguas=linguas,
+        return render_template("momentos_yt.html", lista=listar(base), formatos=FORMATOS, estilos_legenda=_estilos_legenda(), modos=MODOS, enquadrar=ENQUADRAR, ate=ATE, linguas=linguas,
                                vozes_en=vozes_en, vozes=vozes, visao=config_visao(base), padrao=CONFIG_PADRAO, pid=request.args.get("p") or "")
 
     @app.route("/momentos-yt/lista")
@@ -1372,8 +1787,22 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             return _erro("números inválidos")
         for k, opc in (("modo", MODOS), ("enquadrar", ENQUADRAR), ("ate", ATE)):
             cfg[k] = d.get(k) if d.get(k) in opc else CONFIG_PADRAO[k]
-        for k in ("lingua_post", "idioma", "voz", "qualidade", "alvo", "extra"):
+        for k in ("lingua_post", "idioma", "voz", "qualidade", "alvo", "extra", "assunto", "referencia_link"):
             cfg[k] = str(d.get(k) or CONFIG_PADRAO[k])[:2000]
+        cfg["formato"] = d.get("formato") if d.get("formato") in FORMATOS else "separados"
+        cfg["arroba"] = str(d.get("arroba") or "").strip()[:40]
+        cfg["legenda_estilo"] = str(d.get("legenda_estilo") or "pop")[:20]
+        cfg["legenda_posicao"] = d.get("legenda_posicao") if d.get("legenda_posicao") in ("base", "meio", "topo", "terco") else "terco"
+        try:
+            cfg["legenda_tamanho"] = max(0.03, min(0.09, float(d.get("legenda_tamanho") or 0.05)))
+        except (TypeError, ValueError):
+            cfg["legenda_tamanho"] = 0.05
+        cfg["legenda_maiusculas"] = d.get("legenda_maiusculas", True) not in (False, "0", "false")
+        cfg["referencia"] = str(d.get("referencia") or "")[:20000]
+        try:
+            cfg["duracao_short"] = max(0, min(180, int(d.get("duracao_short") or 0)))
+        except (TypeError, ValueError):
+            cfg["duracao_short"] = 0
         cfg["transcricao_colada"] = str(d.get("transcricao") or "")[:400000]
         cfg["heatmap_colado"] = str(d.get("heatmap") or "")[:400000]
         cfg["usar_navegador"] = d.get("usar_navegador", True) not in (False, "0", "false")
@@ -1416,7 +1845,7 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             for c in q["cortes"]:
                 if c["n"] != n:
                     continue
-                antes = (c["t0"], c["t1"], c.get("alvo"), c.get("enquadrar"))
+                antes = (c["t0"], c["t1"], c.get("alvo"), c.get("enquadrar"), tuple(c.get("acao") or []), tuple(c.get("destino") or []))
                 for k in ("t0", "t1"):
                     if k in d:
                         v = ler_tempo(d[k]) if isinstance(d[k], str) else float(d[k])
@@ -1434,12 +1863,18 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
                     c["enquadrar"] = d["enquadrar"]
                 if "usar" in d:
                     c["usar"] = bool(d["usar"])
-                if (c["t0"], c["t1"], c.get("alvo"), c.get("enquadrar")) != antes and c.get("arquivo"):
+                for k in ("acao", "destino"):
+                    if k in d:
+                        v = d[k] if isinstance(d[k], list) else str(d[k] or "").split(",")
+                        c[k] = [str(x).strip()[:60] for x in v if str(x).strip()][:2]
+                if (c["t0"], c["t1"], c.get("alvo"), c.get("enquadrar"), tuple(c.get("acao") or []), tuple(c.get("destino") or [])) != antes \
+                        and c.get("arquivo"):
                     try:
                         os.remove(os.path.join(pasta(base, pid), "cortes", c["arquivo"]))
                     except OSError:
                         pass
                     c.update(arquivo="", estado="✏ mudou — cortar de novo", visual=[], curto="")
+                    q.get("compilacao", {}).pop("curto", None)
                 return
             raise MomentoErro("corte não encontrado")
         try:
@@ -1447,6 +1882,45 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
         except (MomentoErro, ValueError) as exc:
             return _erro(exc)
         return _ok(**_estado(carregar(base, pid)))
+
+    @app.route("/momentos-yt/<pid>/climax", methods=["POST"])
+    def mom_climax(pid: str):
+        """🔊 O momento que toca com o som original (compilação): qual corte e os segundos (do vídeo longo)."""
+        _p(pid)
+        d = request.get_json(silent=True) or {}
+        t0, t1 = ler_tempo(str(d.get("t0") or "")), ler_tempo(str(d.get("t1") or ""))
+
+        def up(q: Dict[str, Any]) -> None:
+            comp = q.setdefault("compilacao", {})
+            cl = comp.setdefault("climax", {})
+            if d.get("n") not in (None, ""):
+                cl["n"] = int(d["n"])
+            if t0 is not None:
+                cl["t0"] = round(t0, 2)
+            if t1 is not None:
+                cl["t1"] = round(t1, 2)
+            if "por_que" in d:
+                cl["por_que"] = str(d["por_que"] or "")[:300]
+            if cl.get("t1", 0) - cl.get("t0", 0) < 1:
+                raise MomentoErro("o momento precisa ter pelo menos 1 s")
+            try:
+                os.remove(os.path.join(pasta(base, pid), "cortes", "climax_largo.mp4"))
+            except OSError:
+                pass
+            comp.pop("curto", None)
+        try:
+            mudar(base, pid, up)
+        except (MomentoErro, ValueError) as exc:
+            return _erro(exc)
+        return _ok(**_estado(carregar(base, pid)))
+
+    @app.route("/momentos-yt/<pid>/climax.mp4")
+    def mom_climax_video(pid: str):
+        _p(pid)
+        cam = os.path.join(pasta(base, pid), "cortes", "climax_largo.mp4")
+        if not os.path.isfile(cam):
+            abort(404)
+        return send_file(cam, conditional=True)
 
     @app.route("/momentos-yt/<pid>/corte/novo", methods=["POST"])
     def mom_corte_novo(pid: str):
@@ -1506,6 +1980,46 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             return _erro("Espere terminar.")
         shutil.rmtree(pasta(base, pid), ignore_errors=True)
         return _ok(lista=listar(base))
+
+    @app.route("/momentos-yt/visao/testar", methods=["POST"])
+    def mom_visao_testar():
+        try:
+            return _ok(**Visao(base).testar())
+        except Exception as exc:  # noqa: BLE001
+            return _ok(ok=False, msg=f"❌ {str(exc)[:400]}")
+
+    @app.route("/momentos-yt/<pid>/visual", methods=["POST"])
+    def mom_visual(pid: str):
+        """🔤 legenda e @ do canal do projeto — valem pros curtos novos e já vão pros curtos que ele criou."""
+        _p(pid)
+        d = request.get_json(silent=True) or {}
+
+        def up(q: Dict[str, Any]) -> None:
+            cfg = q["config"]
+            if "arroba" in d:
+                cfg["arroba"] = str(d["arroba"] or "").strip()[:40]
+            for k in ("legenda_estilo", "legenda_posicao"):
+                if d.get(k):
+                    cfg[k] = str(d[k])[:20]
+            if d.get("legenda_tamanho"):
+                cfg["legenda_tamanho"] = max(0.03, min(0.09, float(d["legenda_tamanho"])))
+            if "legenda_maiusculas" in d:
+                cfg["legenda_maiusculas"] = bool(d["legenda_maiusculas"])
+        try:
+            p = mudar(base, pid, up)
+        except (TypeError, ValueError) as exc:
+            return _erro(exc)
+        import curtos as CT
+        ids = [c.get("curto") for c in p.get("cortes") or [] if c.get("curto")] + [(p.get("compilacao") or {}).get("curto")]
+        for cid in [x for x in ids if x]:
+            try:
+                with CT._TRAVA:
+                    q = CT.carregar(base, cid)
+                    aplicar_visual(q, p["config"])
+                    CT.salvar(base, q)
+            except Exception:  # noqa: BLE001
+                pass
+        return _ok(**_estado(carregar(base, pid)))
 
     @app.route("/momentos-yt/visao", methods=["POST"])
     def mom_visao():

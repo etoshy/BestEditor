@@ -155,7 +155,7 @@ def test_analisar_escolher_cortar_vertical_e_virar_curto(tmp_path, monkeypatch):
     assert c["enquadramento"]["achados"] > 5 and c["visual"]
     # o robô fica no meio do vertical no começo E no fim (o recorte andou junto)
     from PIL import Image
-    for t in (0.5, 7.5):
+    for t in (2.5, 7.5):  # (o comecinho abre de propósito)
         q = str(tmp_path / f"q{t}.png")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", out, "-frames:v", "1", q], check=True)
         im = Image.open(q).convert("RGB")
@@ -251,3 +251,71 @@ def test_noticia_no_chatterbox_turbo_pede_ingles_com_tags(tmp_path, monkeypatch)
     r = CT.regra_tags_turbo(p)
     assert "INGLÊS" in r and "[gasp]" in r and "[laugh]" in r
     assert "INGLÊS (Chatterbox Turbo" in CT.conteudo_roteiro(str(tmp_path), p)
+
+
+# ---------------------------------------------------------------------------------------------------- 🎞 compilação
+def test_compilacao_um_short_com_os_melhores_momentos(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOMENTOS_YT_DIR", str(tmp_path / "my"))
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "curtos"))
+    base = str(tmp_path)
+    fonte = str(tmp_path / "longo.mp4")
+    _video_robo(fonte, 20)
+    YDLFalso.INFO = {"title": "CUE7 robot", "duration": 20, "heatmap": _heat(20, 12.0), "description": "Toyota CUE7"}
+    import shutil
+
+    def baixador(url, d):
+        cam = os.path.join(d, "x.mp4")
+        shutil.copy(fonte, cam)
+        return cam
+    pedidos = []
+
+    def chamar(recurso, system, conteudo, **kw):
+        pedidos.append((system, conteudo))
+        return {"assunto_pt": "o robô CUE7", "alvo_en": "red robot", "gancho_pt": "O novo robô da Toyota simplesmente fez isso",
+                "fatos_pt": "2 metros de altura; recorde de 2 mil acertos seguidos (conferir)",
+                "cortes": [{"inicio": 1, "fim": 7, "titulo_pt": "entrada", "mostra_pt": "o robô entra", "alvo_en": "red robot"},
+                           {"inicio": 9, "fim": 16, "titulo_pt": "o arremesso", "mostra_pt": "a cesta", "alvo_en": "red robot"}],
+                "climax": {"corte": 1, "inicio": 11, "fim": 14.5, "por_que_pt": "a bola entra sem tocar no aro"}}
+    p = M.novo(base, "https://www.youtube.com/watch?v=N2jUcdTBeIY",
+               {"formato": "compilacao", "assunto": "o robô", "usar_navegador": False, "referencia": "O novo robô da Toyota simplesmente fez isso…"})
+    p = M.analisar(base, p["id"], ytdlp_module=ModuloFalso, baixador=baixador, chamar=chamar)
+    assert "best moments" in pedidos[0][0].lower() and "simplesmente fez isso" in pedidos[0][1] and "THE SHORT IS ABOUT: o robô" in pedidos[0][1]
+    assert [c["n"] for c in p["cortes"]] == [1, 2] and p["compilacao"]["climax"] == {"n": 2, "t0": 11.0, "t1": 14.5, "por_que": "a bola entra sem tocar no aro"}
+
+    M.salvar_config_visao(base, {"backend": "nenhum"})
+    rodou = []
+    r = M.produzir(base, p["id"], ate="exportar", baixador=baixador, rodar_link=lambda cid, voz, q, exp, prog: rodou.append((cid, exp)))
+    assert r == "pronto" and rodou and rodou[0][1] is True
+    p = M.carregar(base, p["id"])
+    assert p["compilacao"]["estado"] == "✅ pronto"
+    largo = os.path.join(M.pasta(base, p["id"]), "cortes", "climax_largo.mp4")
+    assert (M.sondar(largo)["w"], round(M.sondar(largo)["dur"])) == (1920, 4)  # largo, com o tamanho do momento
+
+    import curtos as CT
+    import curtos_comentario as CC
+    q = CT.carregar(base, p["compilacao"]["curto"])
+    assert q["modelo"] == "explicativo" and q["config"]["midia"] == "minhas" and q["config"]["proporcao"] == "9:16"
+    assert [m["id"] for m in q["midias"]] == ["M1", "M2", "W1"] and [m["id"] for m in CC.clipes(base, q)] == ["M1", "M2"]
+    assert q["momento_original"] == {"midia": "W1", "material": "M2", "de": 2.0, "ate": 5.5, "descricao": "a bola entra sem tocar no aro"}
+    assert "material M2 with de/ate inside 2.0-5.5" in q["config"]["extra"] and "Tell me in the comments" in q["config"]["extra"]
+    assert "recorde de 2 mil" in q["noticia"]["texto"] and "simplesmente fez isso" in CC.dados(q)["referencia"]
+    assert "## YOUR VIDEO SOURCES" in CC.conteudo_roteiro(base, q)
+
+
+def test_som_original_entra_depois_da_frase_que_anuncia(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "curtos"))
+    import curtos as CT
+    p = {"momento_original": {"midia": "W1", "material": "M2", "de": 2.0, "ate": 5.5, "descricao": "a cesta"},
+         "roteiro": {"blocos": [{"cenas": [{"material": "M1", "de": 0, "ate": 3}]},
+                                {"cenas": [{"material": "M2", "de": 0, "ate": 2}, {"material": "M2", "de": 2.5, "ate": 4}]},
+                                {"cenas": [{"material": "M1", "de": 4, "ate": 6}]}]},
+         "gravacao": {"dur": 20, "alinhamento": [{"bloco": 0, "start": 0, "end": 5}, {"bloco": 1, "start": 5.2, "end": 11.0},
+                                                 {"bloco": 2, "start": 11.2, "end": 20}]}}
+    cs = CT.cortes_com_som_original(p)
+    assert cs == [{"insertion_point": 11.15, "description": "a cesta", "audio_mode": "pause", "midia": "W1"}]
+    p["momento_original"]["material"] = "M9"  # nenhuma cena bate: o bloco do meio
+    assert CT.cortes_com_som_original(p)[0]["insertion_point"] == 5.15
+    import prompt_builder
+    parsed = prompt_builder.parse_ai_response(json.dumps({"segments": [{"start": 0, "end": 20, "provider": "pexels", "query": "robot"}],
+                                                          "cutaway_suggestions": cs}), total_duration=20)
+    assert parsed.cutaway_suggestions[0]["midia"] == "W1" and parsed.cutaway_suggestions[0]["audio_mode"] == "pause"

@@ -789,6 +789,35 @@ def achar_objeto(video: str, t: float, alvo: str, pasta_tmp: str, chamar: Option
     return [round(x * W, 1), round(y * H, 1), round(min(w, 1 - x) * W, 1), round(min(h, 1 - y) * H, 1)]
 
 
+_VAZIAS = {"the", "a", "an", "of", "in", "on", "with", "and", "his", "her", "its", "o", "a", "do", "da", "de"}
+
+
+def _palavras(t: str) -> set:
+    return {w for w in re.findall(r"[a-zà-ú0-9]+", str(t or "").lower()) if w not in _VAZIAS and len(w) > 1}
+
+
+def objeto_rastreado(p: Dict[str, Any], mid: str, alvo: str) -> Optional[str]:
+    """O objeto que a câmera virtual já rastreou que bate com o alvo do destaque ("the ball" → "basketball")."""
+    rs = (p.get("rastros") or {}).get(mid) or {}
+    A = _palavras(alvo)
+    melhor, nota = None, 0.0
+    for nome in rs:
+        N = _palavras(nome)
+        comum = len(A & N) + 0.6 * sum(1 for a in A for n in N if a != n and (a in n or n in a))
+        if comum > nota:
+            melhor, nota = nome, comum
+    return melhor
+
+
+def chaves_dos_rastros(p: Dict[str, Any], mid: str, ini: float, fim: float, alvo: str) -> List[Dict[str, Any]]:
+    """As caixas que a câmera virtual mediu (px do vídeo vertical) dentro de [ini, fim] → chaves do 🎯 rastreio (tempo do pedaço)."""
+    nome = objeto_rastreado(p, mid, alvo)
+    if not nome:
+        return []
+    return [{"t": round(float(t) - ini, 3), "caixa": [x, y, w, h]} for t, x, y, w, h in p["rastros"][mid][nome]
+            if ini - 0.05 <= float(t) <= fim + 0.05 and w > 2 and h > 2]
+
+
 def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = None, chamar: Optional[Callable[..., Any]] = None,
                        on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
     """Pra cada plano com destaque: recorta o pedaço do clipe, a IA acha o objeto, o rastreio segue e desenha → a mídia
@@ -821,12 +850,16 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
         if not os.path.isfile(pedaco):
             pendentes.append({"chave": k, "alvo": d["alvo"], "motivo": "não consegui recortar o pedaço"})
             continue
-        on_log(f"🎯 procurando “{d['alvo']}”…")
-        caixa = None
-        try:
-            caixa = achar_objeto(pedaco, 0.25, d["alvo"], tmp, chamar)
-        except Exception:  # noqa: BLE001
-            caixa = None
+        chaves = chaves_dos_rastros(p, c["mid"], c["ini"], c["fim"], d["alvo"])  # 🎥 v84_292: o rastro que a câmera já mediu
+        caixa = chaves[0]["caixa"] if chaves else None
+        if not chaves:
+            on_log(f"🎯 procurando “{d['alvo']}”…")
+            try:
+                caixa = achar_objeto(pedaco, 0.25, d["alvo"], tmp, chamar)
+            except Exception:  # noqa: BLE001
+                caixa = None
+            if caixa:
+                chaves = [{"t": 0.25, "caixa": caixa}]
         if not caixa:
             pendentes.append({"chave": k, "alvo": d["alvo"], "bloco": x["bloco"], "mid": c["mid"], "ini": c["ini"], "fim": c["fim"],
                               "motivo": "a IA não achou (ou está desligada) — faça no 🎯 Rastrear objeto"})
@@ -835,7 +868,7 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
         try:
             r = rastreio.criar(base, pedaco, f"{p.get('titulo') or 'curto'} · {d['alvo']}")
             info = r["info"]
-            r["caixas"] = rastreio.rastrear(rastreio.caminho_video(base, r), [{"t": 0.25, "caixa": caixa}], 0, info["dur"], info["fps"])
+            r["caixas"] = rastreio.rastrear(rastreio.caminho_video(base, r), chaves, 0, info["dur"], info["fps"])
             r["estilo"] = rastreio.normalizar_estilo({"tipo": d.get("tipo") or "circulo", "texto": d.get("texto") or "", "cor": "#FF2D2D",
                                                        "direcao": "cima_esquerda", "entrada": "desenhar"})
             rastreio.salvar(base, r)
