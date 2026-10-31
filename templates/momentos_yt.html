@@ -39,6 +39,13 @@
   .my-campos .largo { grid-column: 1 / -1; }
   .my-rot { font-size: .85rem; line-height: 1.4; background: var(--code-bg); border-radius: 8px; padding: 6px 8px; max-height: 120px; overflow: auto; }
   .my-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; }
+  .my-andamento { margin: 8px 0; }
+  .my-trilho { height: 12px; border-radius: 99px; background: var(--code-bg); overflow: hidden; border: 1px solid var(--borda); }
+  .my-trilho > div { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--acento), var(--ok)); transition: width .8s ease;
+                     background-size: 200% 100%; animation: mybar 2.5s linear infinite; }
+  @keyframes mybar { from { background-position: 0 0; } to { background-position: -200% 0; } }
+  .my-andamento .linha { display: flex; justify-content: space-between; gap: 10px; font-size: .84rem; margin-top: 4px; flex-wrap: wrap; }
+  .my-andamento .linha b { font-variant-numeric: tabular-nums; }
   .my-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: myg 1s linear infinite; flex: 0 0 auto; }
   @keyframes myg { to { transform: rotate(360deg); } }
 </style>
@@ -180,6 +187,15 @@ function grafico(p) {
     <div class="si-dica" style="display:flex;justify-content:space-between"><span>0:00</span><span>📈 ${esc(p.heat_fonte || 'sem gráfico')} · 📝 ${esc(p.legenda_fonte || 'sem transcrição')} (${p.legenda} linhas) · cinza claro = candidatos do gráfico</span><span>${mmss(dur)}</span></div>`;
 }
 
+const dur = s => { s = Math.max(0, Math.round(s)); return s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min`
+  : s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : `${s} s`; };
+function barra(t) {
+  const pct = Math.max(1, Math.min(100, +t.pct || 0)), passou = Date.now() / 1000 - (+t.inicio || Date.now() / 1000);
+  const falta = pct >= 4 && pct < 100 ? passou / pct * (100 - pct) : null;
+  return `<div class="my-andamento"><div class="my-trilho"><div style="width:${pct}%"></div></div>
+    <div class="linha"><span><b>${Math.floor(pct)}%</b> · ${esc(t.rotulo)} — ${esc(t.prog)}</span>
+      <span class="si-dica">⏱ ${dur(passou)}${falta != null ? ` · falta ~${dur(falta)}` : ''}</span></div></div>`;
+}
 function painelComp(p) {
   const comp = p.compilacao || {}, cl = comp.climax || {}, ci = comp.curto_info || {}, rod = P && P._rodando;
   return `<div class="si-card" style="border-color:#f5a524">
@@ -187,7 +203,7 @@ function painelComp(p) {
       ${comp.estado ? `<span class="si-tag">${esc(comp.estado)}</span>` : ''}</div>
     ${comp.gancho ? `<div class="si-dica">🪝 ${esc(comp.gancho)}</div>` : ''}
     ${comp.erro ? `<div style="color:var(--erro)">❌ ${esc(comp.erro)}</div>` : ''}
-    ${rod && ci.prog ? `<div class="my-prog"><div class="my-gira"></div>${esc(ci.prog)}</div>` : ''}
+    ${rod && P._tarefa ? barra(P._tarefa) : ''}
     <div class="my-midia" style="margin-top:8px"><div>
       <b>🔊 Momento-chave com o som original</b> <span class="si-dica">— a narração para e o lance toca com o som dele</span>
       <div class="si-linha"><label>do corte <select id="cl_n">${(p.cortes || []).map(c => `<option value="${c.n}"${c.n === cl.n ? ' selected' : ''}>${c.n} · ${esc(c.titulo || '')}</option>`).join('')}</select></label>
@@ -246,14 +262,14 @@ function cardCorte(p, c) {
 }
 
 function desenhar(j) {
-  const p = j.projeto, t = j.tarefa, rod = t && t.rodando; P = p; P._rodando = rod;
+  const p = j.projeto, t = j.tarefa, rod = t && t.rodando; P = p; P._rodando = rod; P._tarefa = t;
   const foco = document.activeElement && document.activeElement.closest('.my-c') ? document.activeElement : null;
   if (foco && rod) return;  // não redesenha enquanto você digita
   el('proj').innerHTML = `<div class="si-card">
     <div class="si-linha"><b style="font-size:1.05rem">${esc(p.titulo || p.link)}</b><a href="${esc(p.link)}" target="_blank" class="si-dica">🔗 YouTube</a>
       <span class="si-tag">${esc(p.etapa)}</span>${p.dur ? `<span class="si-tag">${mmss(p.dur)}</span>` : ''}
       <button class="si-mini si-perigo" style="margin-left:auto" onclick="myApagar()">🗑</button></div>
-    ${rod ? `<div class="my-prog"><div class="my-gira"></div><span><b>${esc(t.rotulo)}</b> — ${esc(t.prog)}</span></div>` : ''}
+    ${rod && !(p.config.formato === 'compilacao' && (p.cortes || []).length) ? barra(t) : ''}
     ${!rod && (p.erro || (t && t.erro)) ? `<div style="color:var(--erro)">❌ ${esc(p.erro || t.erro)}</div>` : ''}
     ${p.dur ? grafico(p) : ''}
     ${(p.cortes || []).length ? `<div class="si-linha" style="margin-top:10px">
@@ -287,10 +303,14 @@ function desenhar(j) {
   });
   return rod || (p.cortes || []).some(c => c.curto_info && c.curto_info.prog && !c.curto_info.pronto && /roteiro|cortando|virando/.test(c.estado || ''));
 }
+let ultimoEstado = '';
 async function atualizar() {
   if (!PID) { el('proj').innerHTML = ''; return; }
   try { const j = await (await fetch(`/momentos-yt/${PID}/estado`)).json(); if (!j.ok) { el('proj').innerHTML = ''; return; }
-    const rod = desenhar(j); clearTimeout(timer); timer = setTimeout(atualizar, rod ? 2000 : 20000); if (!rod) lista(); }
+    const assin = JSON.stringify(j);  // nada mudou desde a última vez: não redesenha (nada pisca)
+    const rod = assin === ultimoEstado && el('proj').children.length ? !!(j.tarefa && j.tarefa.rodando) : desenhar(j);
+    ultimoEstado = assin;
+    clearTimeout(timer); timer = setTimeout(atualizar, rod ? 2000 : 20000); if (!rod) lista(); }
   catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 8000); }
 }
 window.myProduzir = async (so) => { try { desenhar(await post(`/momentos-yt/${PID}/produzir`, {ate: el('p_ate') ? el('p_ate').value : 'exportar', so: so || []}));

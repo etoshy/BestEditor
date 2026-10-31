@@ -242,3 +242,29 @@ def test_enquadrar_planos_usa_o_foco_do_roteiro(tmp_path, monkeypatch):
     assert [e["foco"] for e in enq] == ["hoop", "robot"] and [e["mid"] for e in enq] == ["V1", "V2"]
     assert CC.enquadrar_planos(base, p["id"]) == 0  # já feito: não refaz
     assert CC.objeto_no_mapa(q["rastros_h"]["M1"], "basket hoop") == "hoop"
+
+
+def test_modo_rapido_faz_bem_menos_buscas(tmp_path):
+    """⚡ principal a cada 1 s, ação a cada 0,5 s, destino a cada 3 s, interpolados — antes: os 3 a cada 0,5 s + rajadas."""
+    cena = str(tmp_path / "cena.mp4")
+    _cena(cena)
+    contagem = {}
+
+    class Conta(VisaoCores):
+        def achar(self, img, o):
+            contagem[o] = contagem.get(o, 0) + 1
+            return super().achar(img, o)
+    v = Conta()
+    m = CV.analisar(v, cena, 6, {"principal": "robot", "acao": ["ball"], "destino": ["hoop"]}, [])
+    assert contagem == {"robot": 6, "ball": 12, "hoop": 2}  # quadros de 0 a 5,5 s
+    assert [e["tipo"] for e in m["eventos"]] == ["lancamento", "chegada"]
+    v.gpu = False  # CPU: ainda menos
+    contagem.clear()
+    CV.analisar(v, cena, 6, {"principal": "robot", "acao": ["ball"], "destino": ["hoop"]}, [])
+    assert contagem == {"robot": 3, "ball": 6, "hoop": 2}
+
+
+def test_erro_1455_vira_instrucao():
+    import momentos_yt as M
+    msg = M.explicar_erro(OSError("[WinError 1455] O arquivo de paginação é muito pequeno para que esta operação seja concluída"))
+    assert "memória virtual" in msg and "Tamanho gerenciado pelo sistema" in msg

@@ -328,3 +328,43 @@ def test_som_original_entra_depois_da_frase_que_anuncia(tmp_path, monkeypatch):
     parsed = prompt_builder.parse_ai_response(json.dumps({"segments": [{"start": 0, "end": 20, "provider": "pexels", "query": "robot"}],
                                                           "cutaway_suggestions": cs}), total_duration=20)
     assert parsed.cutaway_suggestions[0]["midia"] == "W1" and parsed.cutaway_suggestions[0]["audio_mode"] == "pause"
+
+
+def test_moondream_sai_da_memoria_antes_da_voz(tmp_path, monkeypatch):
+    """O motor de voz travava (3221225477) com o Moondream ainda ocupando a memória: agora corta TUDO, libera, e só então a voz."""
+    monkeypatch.setenv("MOMENTOS_YT_DIR", str(tmp_path / "my"))
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "curtos"))
+    base = str(tmp_path)
+    fonte = str(tmp_path / "longo.mp4")
+    _video_robo(fonte, 8)
+    import shutil
+    ordem = []
+    monkeypatch.setattr(M, "liberar_moondream", lambda: ordem.append("liberar"))
+    real = M.produzir_corte
+    monkeypatch.setattr(M, "produzir_corte", lambda *a, **k: (ordem.append("cortar"), real(*a, **k))[1])
+    M.salvar_config_visao(base, {"backend": "nenhum"})
+    p = M.novo(base, "https://youtu.be/N2jUcdTBeIY", {"enquadrar": "desfocado"})
+    p["cortes"] = [M.novo_corte(1, 1, 4, titulo="a"), M.novo_corte(2, 4, 7, titulo="b")]
+    M.salvar(base, p)
+
+    def voz(cid, *a):
+        ordem.append("voz")
+        raise RuntimeError("O motor de voz travou o processo (código de saída 3221225477)")
+    M.produzir(base, p["id"], ate="editor", baixador=lambda u, d: shutil.copy(fonte, os.path.join(d, "v.mp4")), rodar_link=voz)
+    assert ordem == ["cortar", "cortar", "liberar", "voz", "voz"]
+    erro = M.carregar(base, p["id"])["cortes"][0]["erro"]
+    assert "continua da voz" in erro and "memória virtual" in erro
+
+
+def test_barra_de_andamento_sobe_com_as_etapas():
+    t = {"so_producao": True}
+    seq = ["[fonte 1/3] ⬇ baixando o vídeo (8:49)…", "[fonte 1/3] 🗺 mapeando basketball robot…", "[fonte 2/3] 🎯 Moondream: 21/60 buscas",
+           "[fonte 3/3] 🎯 Moondream: 50/60 buscas", "🔊 cortando o momento-chave (com o som original)…", "👁 a IA está olhando o M1…",
+           "📝 escrevendo o roteiro (English + português, 5 ganchos, 5 finais e 5 títulos)…", "🎙 take 1/1 — 🎙 bloco 3/12",
+           "🎙 take 1/1 — 🎙 bloco 12/12", "🎯 alinhando o take 1 ao roteiro (Whisper)…", "🎥 vertical 2/6: M1 3.0-5.0s focando “ball”…",
+           "🎬 montando no editor…", "🎞 gerando/buscando as mídias… 14/40", "🎬 exportando — legendas"]
+    vals = [M.estimar_andamento(m, t) for m in seq]
+    assert vals == sorted(vals) and vals[0] < 5 and 28 <= vals[4] <= 31 and 40 < vals[7] < 50 and vals[-1] > 90, vals
+    a = {"depois_produz": True}  # 🔥 analisar e já fazer: a análise vai até 20 %
+    assert M.estimar_andamento("🤖 o Claude está montando o short com os melhores momentos…", a) < 20
+    assert M.estimar_andamento("[corte 1/2] ✂ cortando", a) >= 20

@@ -166,6 +166,10 @@ def test_voz_tenta_de_novo_quando_o_motor_trava(tmp_path, monkeypatch):
     info = CT.gerar_voz_guia(base, p["id"], tts, lambda t, m: t, {"slug": "v", "motor": "chatterbox_turbo", "config": {}}, on_log=logs.append)
     assert falhas["n"] == 2 and len(info["por_bloco"]) == 2 and any("tentando de novo (3/3)" in m for m in logs)
     falhas["n"] = -10  # trava sempre: aí sim desiste, com o erro do motor
+    with CT._TRAVA:  # (v84_301: os blocos já gerados são reaproveitados — falas novas pra precisar do motor de novo)
+        q = CT.carregar(base, p["id"])
+        q["roteiro"] = CT.ler_roteiro({"blocos": [{"fala": "uma frase nova"}, {"fala": "outra nova"}]}, q)
+        CT.salvar(base, q)
 
     def sempre(motor, texto, saida, **kw):
         raise RuntimeError("crash nativo")

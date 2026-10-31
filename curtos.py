@@ -1767,25 +1767,44 @@ def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callabl
         raise CurtoErro("Escolha a voz da voz guia.")
     motor, kw = multivoz.kwargs_da_voz(voz)
     d = os.path.join(pasta(base, pid), sub)
-    shutil.rmtree(d, ignore_errors=True)
-    os.makedirs(d, exist_ok=True)
+    os.makedirs(d, exist_ok=True)  # 🎙 v84_301: NÃO apaga — o bloco já gerado (mesmo texto + mesma voz) é reaproveitado
     partes, por_bloco = [], []
+    assinatura_voz = json.dumps([motor, {k: v for k, v in sorted(kw.items()) if isinstance(v, (str, int, float, bool))}], ensure_ascii=False)
     silencio = os.path.join(d, "_pausa.wav")
     _rodar(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", f"{pausa:.3f}", silencio], 60)
     for i, b in enumerate(blocos):
         on_log(f"🎙 bloco {i + 1}/{len(blocos)}")
         bruto, arq = os.path.join(d, f"_b{i}.wav"), os.path.join(d, f"b{i}.wav")
-        for tentativa in range(1, 4):  # 🎙 o motor às vezes trava (crash nativo do PyTorch): tenta de novo antes de desistir
+        texto_tts = limpar(b["fala"], motor)
+        chave_b = format(zlib.crc32((assinatura_voz + "|" + texto_tts).encode("utf-8")), "08x")
+        marca = os.path.join(d, f"_b{i}.chave")
+        try:
+            with open(marca, encoding="utf-8") as f:
+                ja = f.read().strip() == chave_b and os.path.isfile(bruto) and os.path.getsize(bruto) > 1000
+        except OSError:
+            ja = False
+        if ja:
+            on_log(f"🎙 bloco {i + 1}/{len(blocos)} (já gerado)")
+        for tentativa in range(1, 4) if not ja else ():  # 🎙 o motor às vezes trava (crash nativo do PyTorch): tenta de novo
             try:
-                tts(motor, limpar(b["fala"], motor), bruto, **kw)
+                if os.path.isfile(marca):
+                    os.remove(marca)
+                tts(motor, texto_tts, bruto, **kw)
                 if os.path.isfile(bruto) and os.path.getsize(bruto) > 1000:
+                    with open(marca, "w", encoding="utf-8") as f:
+                        f.write(chave_b)
                     break
                 raise CurtoErro("o motor de voz não gerou o áudio")
             except Exception as exc:  # noqa: BLE001
                 if tentativa == 3:
                     raise
-                on_log(f"🎙 bloco {i + 1}: o motor de voz falhou ({str(exc)[:60]}…) — tentando de novo ({tentativa + 1}/3)")
-                time.sleep(3 * tentativa)
+                nativo = "3221225477" in str(exc) or "travou o processo" in str(exc)
+                espera = (10 if tentativa == 1 else 20) if nativo else 3 * tentativa
+                on_log(f"🎙 bloco {i + 1}: o motor de voz {'travou (memória?)' if nativo else 'falhou'} — esperando {espera} s e "
+                       f"tentando de novo ({tentativa + 1}/3)")
+                import gc
+                gc.collect()
+                time.sleep(espera)
         _rodar(["ffmpeg", "-v", "error", "-y", "-i", bruto, "-af",
                 "silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_duration=0.25:stop_threshold=-45dB",
                 "-ar", "48000", "-ac", "1", arq], 120)

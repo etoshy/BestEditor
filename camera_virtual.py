@@ -129,6 +129,46 @@ def detectar(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes:
     return out
 
 
+def detectar_rapido(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes: Sequence[float], pasta: str,
+                    prog: Prog = lambda m: None, passo: float = 0.5, largura: int = 960, gpu: bool = True) -> Dict[str, List[Tuple[float, Optional[Caixa]]]]:
+    """⚡ Poucas buscas do Moondream (a parte cara), interpoladas entre elas:
+         principal a cada 1 s (CPU 2 s) · ação a cada 0,5 s (CPU 1 s) · destino (cesta/gol, quase parado) a cada 3 s.
+    Antes eram ~2-9 buscas por segundo de vídeo; agora ~1-3,5. Onde o Moondream diz que o objeto NÃO está, o rastro some."""
+    principal = papeis.get("principal")
+    acoes = list(dict.fromkeys(o for o in papeis.get("acao") or [] if o))
+    destinos = list(dict.fromkeys(o for o in papeis.get("destino") or [] if o and o not in acoes))
+    ritmo = {}
+    if principal:
+        ritmo[principal] = 1.0 if gpu else 2.0
+    for o in acoes:
+        ritmo[o] = 0.5 if gpu else 1.0
+    for o in destinos:
+        ritmo.setdefault(o, 3.0)
+    if not ritmo:
+        return {}
+    menor = min(ritmo.values())
+    quadros = extrair_quadros(video, os.path.join(pasta, "det"), 1.0 / menor, largura, 0.0, dur)
+    chaves: Dict[str, List[Tuple[float, Optional[Caixa]]]] = {o: [] for o in ritmo}
+    total = sum(1 for t, _ in quadros for o, r in ritmo.items() if abs((t / r) - round(t / r)) < 1e-3)
+    feitas = 0
+    for t, img in quadros:
+        for o, r in ritmo.items():
+            if abs((t / r) - round(t / r)) > 1e-3:
+                continue
+            feitas += 1
+            if feitas % 10 == 1:
+                prog(f"🎯 Moondream: {feitas}/{total} buscas ({', '.join(ritmo)})…")
+            cs = visao.achar(img, o)
+            if cs is None:  # este 👁 não detecta → o Claude faz tudo
+                return detectar_com_claude(visao, video, dur, list(ritmo), cortes, pasta, prog)
+            ant = next((c for tt, c in reversed(chaves[o]) if c is not None and _plano_de(tt, cortes) == _plano_de(t, cortes)), None)
+            chaves[o].append((t, _melhor(cs, ant)))
+    amostras = [round(k * passo, 3) for k in range(int(dur / passo) + 1)]
+    # entre as buscas: interpolação (a câmera é suavizada de qualquer jeito; o rastreio fino fica pro círculo do destaque, que
+    # já usa o rastreador do OpenCV só no pedaço que precisa)
+    return {o: [(t, caixa_em(ks, t, cortes, max_gap=ritmo[o] * 1.6)) for t in amostras] for o, ks in chaves.items()}
+
+
 def detectar_com_claude(visao: Any, video: str, dur: float, objetos: List[str], cortes: Sequence[float], pasta: str,
                         prog: Prog, max_chamadas: int = 30) -> Dict[str, List[Tuple[float, Optional[Caixa]]]]:
     out: Dict[str, List[Tuple[float, Optional[Caixa]]]] = {o: [] for o in objetos}
@@ -195,7 +235,11 @@ def analisar(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes:
     → {"tracks": {obj: [[t, x0, y0, x1, y1] | [t, None]]}, "eventos": [...], "visivel": {obj: [[t0, t1], ...]}}"""
     pasta = tempfile.mkdtemp(prefix="mapa_")
     try:
-        tracks = detectar(visao, video, dur, papeis, cortes, pasta, prog, passo=passo, largura=960)
+        if getattr(visao, "rapido", True):
+            tracks = detectar_rapido(visao, video, dur, papeis, cortes, pasta, prog, passo=0.5, largura=960,
+                                     gpu=bool(getattr(visao, "gpu", True)))
+        else:
+            tracks = detectar(visao, video, dur, papeis, cortes, pasta, prog, passo=passo, largura=960)
     finally:
         shutil.rmtree(pasta, ignore_errors=True)
     principal = papeis.get("principal")

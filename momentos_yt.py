@@ -1028,6 +1028,28 @@ def _chamar_md(vc: Dict[str, Any], fn: Callable[[Any], Any]) -> Any:
         raise
 
 
+def explicar_erro(exc: Exception) -> str:
+    """Os erros do Windows/torch que aparecem ao carregar o Moondream, em português e com o que fazer."""
+    t = str(exc)
+    if "1455" in t or "paginação" in t.lower() or "paging file" in t.lower():
+        return ("a memória virtual do Windows acabou ao carregar o modelo (erro 1455). Aumente o arquivo de paginação: Iniciar → "
+                "“Exibir configurações avançadas do sistema” → Desempenho → Configurações → Avançado → Memória virtual → Alterar → "
+                "“Tamanho gerenciado pelo sistema” (ou 16000–32000 MB) no disco com espaço → OK e reinicie o PC. Enquanto isso, "
+                "feche o que usa muita memória (voz/Whisper rodando, muitas abas).")
+    if "out of memory" in t.lower() or "cuda error: out of memory" in t.lower():
+        return "a memória da placa de vídeo acabou — feche o que estiver usando a GPU (voz, Whisper, outro modelo) e tente de novo."
+    return t[:300]
+
+
+def explicar_erro_voz(exc: Exception) -> str:
+    t = str(exc)
+    if "3221225477" in t or "travou o processo" in t:
+        return ("O motor de voz travou (falta de memória/placa de vídeo na hora de gerar o áudio). O que já estava pronto ficou "
+                "salvo — clique de novo em 🎞/✂ fazer: ele continua da voz. Se repetir: feche outros programas pesados e confira "
+                "a memória virtual do Windows (o mesmo ajuste do erro 1455).")
+    return t[:500]
+
+
 class Visao:
     """O 👁 que olha os quadros. descrever(img) → frase; achar(img, alvo) → [(x0,y0,x1,y1) em fração] ou None (não sabe)."""
 
@@ -1035,6 +1057,21 @@ class Visao:
         self.vc = config_visao(base)
         self.chamar = chamar
         self.erro = ""
+
+    rapido = True  # ⚡ poucas buscas + rastreador entre elas (camera_virtual.detectar_rapido)
+
+    @property
+    def gpu(self) -> bool:
+        if self.vc["backend"] != "hf":
+            return True
+        g = _MD.get("gpu")
+        if g is None:
+            try:
+                import torch
+                g = torch.cuda.is_available()
+            except Exception:  # noqa: BLE001
+                g = False
+        return bool(g)
 
     @property
     def passo(self) -> float:
@@ -1072,7 +1109,7 @@ class Visao:
                 with urllib.request.urlopen(req, timeout=180) as r:
                     return str(json.loads(r.read())["response"]).strip()
         except Exception as exc:  # noqa: BLE001  (Moondream fora do ar → o Claude olha depois, no curto)
-            self.erro = str(exc)[:200]
+            self.erro = explicar_erro(exc)
         return None
 
     def achar(self, img: str, alvo: str) -> Optional[List[Tuple[float, float, float, float]]]:
@@ -1085,7 +1122,7 @@ class Visao:
             objs = _chamar_md(self.vc, lambda m: m.detect(im, alvo)).get("objects") or []
             return [(float(o["x_min"]), float(o["y_min"]), float(o["x_max"]), float(o["y_max"])) for o in objs]
         except Exception as exc:  # noqa: BLE001
-            self.erro = str(exc)[:200]
+            self.erro = explicar_erro(exc)
             return None
 
     def achar_varios_claude(self, img: str, objetos: List[str]) -> Dict[str, Tuple[float, float, float, float]]:
@@ -1116,6 +1153,9 @@ class Visao:
         """🧪 Carrega o Moondream e acha um objeto numa imagem de teste — mostra o erro de verdade se não der."""
         import time as _t
         from PIL import Image, ImageDraw
+        if self.vc["backend"] == "hf" and _MD.get("modelo") is None and any(not t.get("fim") for t in TAREFAS.values()):
+            return {"ok": False, "msg": "⏳ tem uma análise/produção rodando — teste quando ela terminar (carregar o modelo 2× "
+                                         "ao mesmo tempo enche a memória)."}
         tmp = tempfile.mktemp(suffix=".jpg")
         im = Image.new("RGB", (640, 360), (120, 120, 120))
         ImageDraw.Draw(im).ellipse((280, 140, 360, 220), fill=(230, 120, 20))
@@ -1572,7 +1612,9 @@ def produzir_corte(base: str, pid: str, n: int, prog: Prog = lambda m: None, bai
         else:
             cortar(video, c["t0"], c["t1"], saida, filtro_vertical(info, modo, []))
         visual = []
-        if visao.vc["backend"] != "nenhum":
+        if visao.vc["backend"] != "nenhum" and not _ia_ligada():
+            # ⚡ com a IA ligada, quem descreve o trecho é o Claude (1 chamada, folhas de quadros) quando vira curto — antes eram
+            # ~16 perguntas ao Moondream por corte. Sem a IA, o Moondream descreve.
             ctx = (p.get("titulo") or "")[:150]
             visual = descrever_trecho(visao, cru, dur, os.path.join(tmp, "desc"), ctx, prog, passo=2.0, maximo=40)
     finally:
@@ -1610,6 +1652,14 @@ def vertical_automatico(base: str, pid: str, n: int, ini: Optional[float] = None
     CV.enquadrar_pedaco(arq, ini, fim, saida, mapa.get("tracks") or {}, mapa.get("principal") or "", mapa.get("principal") or "",
                         mapa.get("cenas") or [], prog, acao=c.get("acao") or [], destino=c.get("destino") or [], abrir_inicio=ini == 0)
     return saida
+
+
+def _ia_ligada() -> bool:
+    try:
+        import ia_servico
+        return ia_servico.motivo_desligado("curtos") is None
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def linhas_do_corte(p: Dict[str, Any], c: Dict[str, Any]) -> Tuple[str, str]:
@@ -1716,38 +1766,52 @@ def produzir(base: str, pid: str, prog: Prog = lambda m: None, so: Optional[List
         raise MomentoErro("nenhum corte marcado")
     visao = Visao(base, chamar)
     feitos = 0
+    ok: List[int] = []
+
+    def estado(n: int, e: str, erro: str = "") -> None:
+        mudar(base, pid, lambda q: [x.update(estado=e, erro=erro) for x in q["cortes"] if x["n"] == n])
+    # FASE 1 — ✂ corta tudo (usa o Moondream)
     for k, c in enumerate(alvo, 1):
         n = c["n"]
-        pr = lambda m, k=k: prog(f"[{k}/{len(alvo)}] {m}")  # noqa: E731
-
-        def estado(e: str, erro: str = "", n=n) -> None:
-            mudar(base, pid, lambda q: [x.update(estado=e, erro=erro) for x in q["cortes"] if x["n"] == n])
+        pr = lambda m, k=k: prog(f"[corte {k}/{len(alvo)}] {m}")  # noqa: E731
         try:
-            estado("✂ cortando")
+            estado(n, "✂ cortando")
             atual = next(x for x in carregar(base, pid)["cortes"] if x["n"] == n)
             if not (atual.get("arquivo") and os.path.isfile(os.path.join(pasta(base, pid), "cortes", atual["arquivo"]))):
                 produzir_corte(base, pid, n, pr, baixador, chamar, visao)
             if ate == "cortes":
                 atual = next(x for x in carregar(base, pid)["cortes"] if x["n"] == n)
                 if atual.get("deitado"):
-                    estado("🎥 vertical automático")
+                    estado(n, "🎥 vertical automático")
                     v = vertical_automatico(base, pid, n, prog=pr)
                     mudar(base, pid, lambda q, n=n, v=v: [x.update(arquivo_vertical=os.path.basename(v)) for x in q["cortes"] if x["n"] == n])
-                estado("✅ cortado")
+                estado(n, "✅ cortado")
                 feitos += 1
                 continue
-            estado("💬 virando curto")
+            estado(n, "✂ cortado — esperando a voz")
+            ok.append(n)
+        except Exception as exc:  # noqa: BLE001  (um corte ruim não para os outros)
+            estado(n, "❌ erro", str(exc)[:500])
+            pr(f"❌ corte {n}: {exc}")
+    # 🧹 o Moondream sai da memória ANTES da voz: o motor de voz (outro processo) precisa da RAM/placa de vídeo — com os dois
+    # carregados ele travava (código 3221225477)
+    liberar_moondream()
+    # FASE 2 — 💬 curto → roteiro → voz → editor/MP4
+    for k, n in enumerate(ok, 1):
+        pr = lambda m, k=k: prog(f"[curto {k}/{len(ok)}] {m}")  # noqa: E731
+        try:
+            estado(n, "💬 virando curto")
             cid = criar_curto(base, pid, n, transcrever, pr)
             if rodar_link is None:
-                estado("✅ curto criado (abra pra continuar)")
+                estado(n, "✅ curto criado (abra pra continuar)")
                 feitos += 1
                 continue
-            estado("📝 roteiro → 🎙 voz → 🎬 edição" + (" → MP4" if ate == "exportar" else ""))
+            estado(n, "📝 roteiro → 🎙 voz → 🎬 edição" + (" → MP4" if ate == "exportar" else ""))
             rodar_link(cid, p["config"].get("voz") or "", p["config"].get("qualidade") or "1080p", ate == "exportar", pr)
-            estado("✅ pronto" if ate == "exportar" else "✅ no editor")
+            estado(n, "✅ pronto" if ate == "exportar" else "✅ no editor")
             feitos += 1
-        except Exception as exc:  # noqa: BLE001  (um corte ruim não para os outros)
-            estado("❌ erro", str(exc)[:500])
+        except Exception as exc:  # noqa: BLE001
+            estado(n, "❌ erro", explicar_erro_voz(exc))
             pr(f"❌ corte {n}: {exc}")
     mudar(base, pid, lambda q: q.update(etapa=f"✅ {feitos}/{len(alvo)} prontos"))
     return f"{feitos}/{len(alvo)} prontos"
@@ -1774,6 +1838,7 @@ def produzir_compilacao(base: str, pid: str, prog: Prog = lambda m: None, ate: s
             mudar(base, pid, lambda q, n=c["n"]: [x.update(estado="✅ cortado") for x in q["cortes"] if x["n"] == n])
         if not os.path.isfile(os.path.join(pasta(base, pid), "cortes", "climax_largo.mp4")):
             cortar_climax(base, pid, prog, baixador)
+        liberar_moondream()  # 🧹 antes da voz (ver produzir)
         if ate == "cortes":
             estado("✅ fontes cortadas")
             mudar(base, pid, lambda q: q.update(etapa="✅ fontes cortadas"))
@@ -1789,8 +1854,70 @@ def produzir_compilacao(base: str, pid: str, prog: Prog = lambda m: None, ate: s
         mudar(base, pid, lambda q: q.update(etapa="✅ short pronto" if ate == "exportar" else "✅ no editor"))
         return "pronto"
     except Exception as exc:
-        estado("❌ erro", str(exc)[:500])
+        estado("❌ erro", explicar_erro_voz(exc))
         raise
+
+
+# ---------------------------------------------------------------------------------------------------- 📊 barra de andamento
+_FRACAO = re.compile(r"(\d+)\s*/\s*(\d+)")
+_PREFIXO = re.compile(r"^\[(corte|curto|fonte) (\d+)/(\d+)\]\s*")
+ETAPAS_ANALISE = [(r"lendo o vídeo|yt-dlp", 0.00, 0.10), (r"gráfico|navegador|propaganda", 0.10, 0.15), (r"legenda", 0.15, 0.20),
+                  (r"⬇|baixando o vídeo|baixando", 0.20, 0.35), (r"whisper|transcrev", 0.35, 0.70), (r"referência", 0.70, 0.74),
+                  (r"🤖|claude|escolhendo|montando o short", 0.74, 0.97)]
+ETAPAS_CORTE = [(r"⬇|baixando", 0.00, 0.35), (r"cortando|mapeando|moondream|procurando|🗺|🎥|câmera|vertical", 0.35, 0.98)]
+ETAPAS_CURTO = [(r"alinhando", 0.50, 0.55), (r"virando curto|olhando|descrev|👁", 0.00, 0.05), (r"🎙|take|voz", 0.15, 0.50),
+                (r"roteiro|📝", 0.05, 0.15), (r"🎥|vertical|enquadr", 0.55, 0.68), (r"🎯|destaque|rastreando|procurando", 0.68, 0.74),
+                (r"montando no editor|🎬 montando no", 0.74, 0.77), (r"mídias", 0.77, 0.90), (r"exportando|montando e exportando", 0.90, 0.99)]
+
+
+def _na_tabela(msg: str, tabela: List[Tuple[str, float, float]]) -> Optional[float]:
+    m = msg.lower()
+    for rx, a, b in tabela:
+        if re.search(rx, m):
+            f = None
+            for x in _FRACAO.finditer(m):  # a última fração da mensagem ("bloco 3/12", "mídias 14/40")
+                k, n = int(x.group(1)), int(x.group(2))
+                if 0 < n < 100000 and 0 <= k <= n:
+                    f = k / n
+            return a + (b - a) * (f if f is not None else 0.3)
+    return None
+
+
+def estimar_andamento(msg: str, t: Dict[str, Any]) -> Optional[float]:
+    """0..100 a partir das mensagens de progresso (as etapas + as frações "3/12" que cada uma já escreve). Nunca volta."""
+    msg = str(msg or "")
+    p = _PREFIXO.match(msg)
+    resto = msg[p.end():] if p else msg
+    if p:
+        t["fase"] = "producao"
+        k, n = int(p.group(2)), max(1, int(p.group(3)))
+        if p.group(1) in ("corte", "fonte"):
+            f = _na_tabela(resto, ETAPAS_CORTE)
+            x = 0.30 * ((k - 1 + (f if f is not None else 0.3)) / n)
+        else:
+            f = _na_tabela(resto, ETAPAS_CURTO)
+            x = 0.30 + 0.70 * ((k - 1 + (f if f is not None else 0.0)) / n)
+    elif t.get("fase") == "producao" or t.get("so_producao"):
+        t["fase"] = "producao"
+        if re.search(r"🔊|momento-chave", resto.lower()):
+            x = 0.30
+        else:
+            f = _na_tabela(resto, ETAPAS_CURTO)
+            if f is None:
+                return t.get("pct")
+            x = 0.30 + 0.70 * f
+    else:
+        f = _na_tabela(resto, ETAPAS_ANALISE)
+        if f is None:
+            return t.get("pct")
+        x = f
+        if t.get("depois_produz"):
+            x *= 0.20
+    if t.get("depois_produz") and t.get("fase") == "producao":
+        x = 0.20 + 0.80 * x
+    pct = round(max(float(t.get("pct") or 0), min(99.0, x * 100)), 1)
+    t["pct"] = pct
+    return pct
 
 
 # ---------------------------------------------------------------------------------------------------- rotas
@@ -1829,11 +1956,18 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
         t = TAREFAS.get(pid)
         if t and not t.get("fim"):
             raise MomentoErro(f"Espere terminar: {t['rotulo']}")
-        TAREFAS[pid] = {"rotulo": rotulo, "inicio": time.time(), "fim": None, "erro": None, "prog": "começando…"}
+        TAREFAS[pid] = {"rotulo": rotulo, "inicio": time.time(), "fim": None, "erro": None, "prog": "começando…", "pct": 0.0,
+                        "so_producao": rotulo.startswith("✂"),
+                        "depois_produz": not rotulo.startswith("✂") and carregar(base, pid)["config"].get("ate") != "revisar"}
+
+        def anda(m: str) -> None:
+            TAREFAS[pid]["prog"] = str(m)[:300]
+            estimar_andamento(str(m), TAREFAS[pid])
 
         def corpo() -> None:
             try:
-                fn(lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+                fn(anda)
+                TAREFAS[pid]["pct"] = 100.0
             except Exception as exc:  # noqa: BLE001
                 msg = str(exc)[:600]
                 TAREFAS[pid]["erro"] = msg
