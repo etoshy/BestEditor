@@ -45,3 +45,31 @@ def test_analisar_inverter_marcar(tmp_path, monkeypatch):
     p = AF.analisar(b, p["id"])  # refazer mantém a fonte marcada
     assert p["cenas"][1]["fonte"].startswith("https://www.pexels")
     assert AF.listar(b)[0]["achadas"] == 1
+
+
+def test_buscar_no_navegador_envia_o_arquivo_e_clica_em_exatas(tmp_path, monkeypatch):
+    """O navegador do site abre a página do buscador, acha o campo de upload (clicando na câmera) e clica em 'Correspondências exatas'."""
+    import time as _t
+    monkeypatch.setenv("FONTES_VIDEO_DIR", str(tmp_path / "fv"))
+    monkeypatch.setenv("FONTE_NAVEGADOR_OCULTO", "1")
+    pagina = tmp_path / "lens.html"
+    pagina.write_text("""<!doctype html><html><body>
+<div role="button" aria-label="Pesquisar por imagem" onclick="document.getElementById('up').style.display='block'">cam</div>
+<div id="up" style="display:none"><input type="file" name="encoded_image" id="f"></div>
+<script>document.getElementById('f').addEventListener('change', e => { const n = e.target.files[0]; document.title = 'enviado:' + n.name;
+setTimeout(() => { const a = document.createElement('a'); a.href = '#x'; a.textContent = 'Correspondências exatas';
+a.onclick = () => { document.title = 'EXATAS:' + n.name; }; document.body.appendChild(a); }, 800); });</script></body></html>""", encoding="utf-8")
+    monkeypatch.setitem(AF.MOTORES, "lens", dict(AF.MOTORES["lens"], url=pagina.as_uri()))
+    b = str(tmp_path)
+    p = AF.novo(b, "", "t")
+    _video(os.path.join(AF.pasta(b, p["id"]), "video.mp4"))
+    p["video"] = "video.mp4"
+    AF.salvar(b, p)
+    p = AF.analisar(b, p["id"])
+    bid = AF.buscar_no_navegador(b, p["id"], p["cenas"][0]["prints"][0]["arq"], "lens", inverter=True)
+    for _ in range(150):
+        if AF._BUSCAS[bid]["estado"] in ("ok", "erro"):
+            break
+        _t.sleep(0.2)
+    assert AF._BUSCAS[bid]["estado"] == "ok", AF._BUSCAS[bid]
+    assert "Correspondências exatas" in AF._BUSCAS[bid]["msg"]

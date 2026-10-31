@@ -243,6 +243,165 @@ def lista_texto(p: Dict[str, Any]) -> str:
     return "\n".join(L) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------------- 🔍 buscar pelo navegador
+# O Lens/TinEye recusam imagem mandada por OUTRO site (403/405). Então o site abre uma janela de navegador de verdade
+# (fica aberta; os logins/cookies do Google ficam guardados nela), entra no buscador e coloca o print no campo de upload —
+# como se você tivesse escolhido o arquivo. No Lens dá pra já abrir em "Correspondências exatas" (onde a imagem foi publicada).
+MOTORES = {
+    "lens": {"nome": "Google Lens", "url": "https://images.google.com/?hl=pt-BR",
+             "camera": ['div[aria-label="Pesquisar por imagem"]', 'div[aria-label="Search by image"]', '[aria-label*="por imagem"]',
+                        '[aria-label*="by image"]', 'div[role=button] svg[viewBox="0 -960 960 960"]']},
+    "tineye": {"nome": "TinEye", "url": "https://tineye.com/", "camera": []},
+    "bing": {"nome": "Bing", "url": "https://www.bing.com/images?setlang=pt-br", "camera": ['#sb_sbi', '[aria-label*="isual"]', '#sbi_b']},
+    "yandex": {"nome": "Yandex", "url": "https://yandex.com/images/", "camera": ['button[aria-label*="image"]', '.input__cbir-button button',
+                                                                         '[class*="cbir"] button', 'button[aria-label*="картинк"]']},
+}
+EXATAS = [r"Correspondências exatas", r"Exact matches", r"Encontrar (a )?origem da imagem", r"Find image source"]
+_BUSCAS: Dict[str, Dict[str, Any]] = {}
+_FILA: "Any" = None
+_NAV: Dict[str, Any] = {"thread": None}
+
+
+def _trabalhador(base: str) -> None:
+    import queue
+    from playwright.sync_api import sync_playwright
+    ctx = None
+    with sync_playwright() as pw:
+        while True:
+            try:
+                job = _FILA.get(timeout=600)
+            except queue.Empty:
+                continue
+            b = _BUSCAS[job["id"]]
+            try:
+                if ctx is None or not _vivo(ctx):
+                    b["msg"] = "🌐 abrindo o navegador…"
+                    ctx = _abrir(pw, base)
+                _buscar_na_aba(ctx, job, b)
+                b.update(estado="ok", msg=b.get("msg") or "✅ aberto no navegador")
+            except Exception as exc:  # noqa: BLE001
+                b.update(estado="erro", msg=f"❌ {str(exc)[:300]}")
+                try:
+                    if ctx is not None and not _vivo(ctx):
+                        ctx = None
+                except Exception:  # noqa: BLE001
+                    ctx = None
+
+
+def _vivo(ctx: Any) -> bool:
+    try:
+        ctx.pages  # noqa: B018
+        return bool(ctx.browser is None or ctx.browser.is_connected()) and not getattr(ctx, "_fechou", False)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _abrir(pw: Any, base: str) -> Any:
+    perfil = os.path.join(raiz(base), "_navegador")
+    os.makedirs(perfil, exist_ok=True)
+    opc = dict(headless=os.environ.get("FONTE_NAVEGADOR_OCULTO") == "1", locale="pt-BR", viewport=None, no_viewport=True, accept_downloads=True,
+               args=["--start-maximized", "--disable-blink-features=AutomationControlled"])
+    ctx = None
+    for canal in ("chrome", "msedge", None):  # o Chrome do computador (melhor pro Google); sem ele, o Chromium do Playwright
+        try:
+            ctx = pw.chromium.launch_persistent_context(perfil, **(dict(opc, channel=canal) if canal else opc))
+            break
+        except Exception:  # noqa: BLE001
+            continue
+    if ctx is None:
+        raise FonteErro("Não consegui abrir o navegador (instale: python -m playwright install chromium).")
+    ctx.on("close", lambda *_: setattr(ctx, "_fechou", True))
+    return ctx
+
+
+def _buscar_na_aba(ctx: Any, job: Dict[str, Any], b: Dict[str, Any]) -> None:
+    m = MOTORES[job["motor"]]
+    vazias = [pg for pg in ctx.pages if pg.url in ("about:blank", "chrome://newtab/")]
+    page = vazias[0] if vazias else ctx.new_page()
+    b["msg"] = f"🌐 abrindo o {m['nome']}…"
+    page.goto(m["url"], wait_until="domcontentloaded", timeout=60000)
+    page.bring_to_front()
+    page.wait_for_timeout(1200)
+    for t in ("Aceitar tudo", "Accept all", "Concordo", "I agree", "Allow all", "Accept"):  # aviso de cookies
+        try:
+            bt = page.get_by_role("button", name=re.compile(rf"^{t}$", re.I)).first
+            if bt.count() and bt.is_visible():
+                bt.click(timeout=1500)
+                break
+        except Exception:  # noqa: BLE001
+            pass
+
+    def por_arquivo() -> bool:
+        inp = page.locator('input[type=file]')
+        if inp.count():
+            inp.first.set_input_files(job["arquivo"])
+            return True
+        return False
+    ok = False
+    try:
+        ok = por_arquivo()
+    except Exception:  # noqa: BLE001
+        ok = False
+    if not ok:
+        for sel in m["camera"]:
+            try:
+                el = page.locator(sel).first
+                if el.count() and el.is_visible():
+                    el.click(timeout=3000)
+                    page.wait_for_timeout(1000)
+                    if por_arquivo():
+                        ok = True
+                        break
+            except Exception:  # noqa: BLE001
+                continue
+    if not ok:
+        raise FonteErro(f"não achei onde enviar a imagem no {m['nome']} — use 📋 copiar e cole (Ctrl+V) na janela que abriu")
+    b["msg"] = f"🔍 {m['nome']}: procurando…"
+    if job["motor"] == "lens" and job.get("exatas"):
+        rx = re.compile("|".join(EXATAS), re.I)
+        for _ in range(30):  # espera o resultado do Lens e clica em "Correspondências exatas"
+            page.wait_for_timeout(700)
+            try:
+                alvo = page.get_by_role("link", name=rx).or_(page.get_by_role("tab", name=rx)).or_(page.get_by_text(rx)).first
+                if alvo.count() and alvo.is_visible():
+                    alvo.click(timeout=3000)
+                    b["msg"] = "✅ Lens aberto em “Correspondências exatas”"
+                    return
+            except Exception:  # noqa: BLE001
+                pass
+        b["msg"] = "✅ Lens aberto (não achei o botão “Correspondências exatas” — clique nele na janela)"
+        return
+    b["msg"] = f"✅ aberto no {m['nome']}"
+
+
+def buscar_no_navegador(base: str, pid: str, arq: str, motor: str = "lens", inverter: bool = False, recorte: str = "",
+                        exatas: bool = True) -> str:
+    """Põe a busca na fila do navegador do site. Devolve o id da busca (pra acompanhar)."""
+    import queue
+    global _FILA
+    if motor not in MOTORES:
+        raise FonteErro("buscador inválido")
+    dados = imagem(base, pid, arq, inverter, recorte)
+    tmp = os.path.join(raiz(base), "_busca")
+    os.makedirs(tmp, exist_ok=True)
+    for velho in os.listdir(tmp):  # limpa as antigas (mais de 1 h)
+        cam_v = os.path.join(tmp, velho)
+        if time.time() - os.path.getmtime(cam_v) > 3600:
+            os.remove(cam_v)
+    bid = uuid.uuid4().hex[:8]
+    cam = os.path.join(tmp, f"{os.path.splitext(arq)[0]}{'_inv' if inverter else ''}{'_' + recorte if recorte else ''}_{bid}.jpg")
+    with open(cam, "wb") as f:
+        f.write(dados)
+    if _FILA is None:
+        _FILA = queue.Queue()
+    if not (_NAV["thread"] and _NAV["thread"].is_alive()):
+        _NAV["thread"] = threading.Thread(target=_trabalhador, args=(base,), daemon=True, name="fonte:navegador")
+        _NAV["thread"].start()
+    _BUSCAS[bid] = {"estado": "fila", "msg": "⏳ na fila…", "motor": motor, "quando": time.time()}
+    _FILA.put({"id": bid, "motor": motor, "arquivo": cam, "exatas": exatas})
+    return bid
+
+
 # ---------------------------------------------------------------------------------------------------- rotas
 def registrar(app, base: str) -> None:
     from flask import Response, abort, jsonify, redirect, render_template, request, send_file
@@ -342,6 +501,26 @@ def registrar(app, base: str) -> None:
             suf = ("_invertida" if request.args.get("inverter") == "1" else "") + (f"_{request.args['recorte']}" if request.args.get("recorte") else "")
             r.headers["Content-Disposition"] = f"attachment; filename={os.path.splitext(arq)[0]}{suf}.jpg"
         return r
+
+    @app.route("/achar-fonte/<pid>/buscar", methods=["POST"])
+    def af_buscar(pid: str):
+        _p(pid)
+        d = request.get_json(silent=True) or {}
+        try:
+            bid = buscar_no_navegador(base, pid, str(d.get("arq") or ""), str(d.get("motor") or "lens"), bool(d.get("inverter")),
+                                      str(d.get("recorte") or ""), d.get("exatas", True) is not False)
+        except FonteErro as exc:
+            return _erro(exc)
+        except ImportError:
+            return _erro("O Playwright não está instalado (pip install playwright).")
+        return _ok(busca=bid)
+
+    @app.route("/achar-fonte/busca/<bid>")
+    def af_busca_estado(bid: str):
+        b = _BUSCAS.get(bid)
+        if not b:
+            return _erro("busca não encontrada", 404)
+        return _ok(**b)
 
     @app.route("/achar-fonte/<pid>/cena/<int:n>", methods=["POST"])
     def af_cena(pid: str, n: int):

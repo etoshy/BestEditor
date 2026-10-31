@@ -60,22 +60,18 @@
       <select id="porc"><option value="2">até 2 prints por cena</option><option value="1">1 print por cena</option></select>
       <button class="si-mini" onclick="afRefazer()">🔁 refazer</button></div></details>
   <p class="si-dica" style="margin:6px 0 0">💡 No Lens, clique em <b>“Correspondências exatas”</b> (ou <b>“Encontrar a origem da imagem”</b>): é a lista das páginas que publicaram ESSA imagem — a mais antiga costuma ser a fonte original.
-    Não achou? tente ↔ <b>invertida</b> (muitos canais espelham o vídeo) e ✂ <b>sem as faixas</b> (legenda/título por cima atrapalha).</p>
+    O botão já faz isso sozinho com a opção marcada lá embaixo. Não achou? tente ↔ <b>invertida</b> (muitos canais espelham o vídeo) e ✂ <b>sem as faixas</b> (legenda/título por cima atrapalha).</p>
 </div>
 
 <div class="af-ops">
   <label><input type="checkbox" id="o_inv"> ↔ inverter a imagem</label>
   <label>✂ recorte <select id="o_rec"><option value="">imagem inteira</option><option value="meio">sem as faixas de cima e de baixo</option><option value="centro">só o centro</option></select></label>
   <label>Mostrar <select id="o_filtro"><option value="">todas as cenas</option><option value="falta">só as sem fonte</option><option value="achou">só as com fonte</option></select></label>
-  <span class="si-dica">os botões mandam a imagem do jeito escolhido aqui</span>
+  <label><input type="checkbox" id="o_exatas" checked> Lens já em “Correspondências exatas”</label>
+  <span class="si-dica">os botões abrem uma janela de navegador e mandam a imagem do jeito escolhido aqui</span>
 </div>
 <div id="grade" class="af-grade"></div>
 <div id="zoom" class="af-zoom" onclick="this.style.display='none'"><img id="zoom_img" alt=""></div>
-
-<!-- formulários que mandam o ARQUIVO direto pros buscadores (abre numa aba nova) -->
-<form id="f_lens" method="post" enctype="multipart/form-data" target="_blank" style="display:none"><input type="file" name="encoded_image"></form>
-<form id="f_tineye" method="post" action="https://tineye.com/search" enctype="multipart/form-data" target="_blank" style="display:none"><input type="file" name="image"></form>
-<form id="f_bing" method="post" action="https://www.bing.com/images/search?view=detailv2&iss=sbiupload&FORM=SBIIDP" enctype="multipart/form-data" target="_blank" style="display:none"><input type="hidden" name="cbir" value="sbi"><input type="hidden" name="imageBin"></form>
 
 <script>
 (() => {
@@ -85,26 +81,27 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&
 const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3000); }
 let P = null, timer = null;
-try { const sv = JSON.parse(localStorage.getItem('af_op') || '{}'); el('o_inv').checked = !!sv.inv; el('o_rec').value = sv.rec || ''; } catch (e) {}
+try { const sv = JSON.parse(localStorage.getItem('af_op') || '{}'); el('o_inv').checked = !!sv.inv; el('o_rec').value = sv.rec || ''; if (sv.ex === false) el('o_exatas').checked = false; } catch (e) {}
 const opQS = () => (el('o_inv').checked ? '&inverter=1' : '') + (el('o_rec').value ? '&recorte=' + el('o_rec').value : '');
 const urlImg = arq => `/achar-fonte/${PID}/img/${arq}?x=1${opQS()}`;
-['o_inv', 'o_rec', 'o_filtro'].forEach(k => el(k).addEventListener('change', () => {
-  try { localStorage.setItem('af_op', JSON.stringify({inv: el('o_inv').checked, rec: el('o_rec').value})); } catch (e) {} desenhar(); }));
+['o_inv', 'o_rec', 'o_filtro', 'o_exatas'].forEach(k => el(k).addEventListener('change', () => {
+  try { localStorage.setItem('af_op', JSON.stringify({inv: el('o_inv').checked, rec: el('o_rec').value, ex: el('o_exatas').checked})); } catch (e) {} desenhar(); }));
 
 async function blobDe(arq) { const r = await fetch(urlImg(arq)); if (!r.ok) throw new Error('não deu pra pegar o print'); return await r.blob(); }
-function porNoInput(form, nome, blob, arq) {
-  const dt = new DataTransfer(); dt.items.add(new File([blob], arq.replace('.jpg', '') + (el('o_inv').checked ? '_inv' : '') + '.jpg', {type: 'image/jpeg'}));
-  form.querySelector(`input[name=${nome}]`).files = dt.files;
+async function noNavegador(motor, arq) {
+  const r = await fetch(`/achar-fonte/${PID}/buscar`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({arq, motor, inverter: el('o_inv').checked, recorte: el('o_rec').value, exatas: el('o_exatas').checked})});
+  const j = await r.json(); if (!j.ok) throw new Error(j.erro);
+  aviso('🌐 abrindo na janela do navegador…');
+  for (let k = 0; k < 120; k++) { await new Promise(res => setTimeout(res, 800));
+    const e = await (await fetch(`/achar-fonte/busca/${j.busca}`)).json();
+    if (e.estado === 'ok') { aviso(e.msg + ' — olhe a janela do navegador', 'okk'); return; }
+    if (e.estado === 'erro') throw new Error(e.msg.replace(/^❌ /, ''));
+    aviso(e.msg); }
 }
-async function tamanho(blob) { try { const b = await createImageBitmap(blob); return [b.width, b.height]; } catch (e) { return [1280, 720]; } }
 const BUSCAS = {
-  lens: async (arq) => { const b = await blobDe(arq), [w, h] = await tamanho(b), f = el('f_lens');
-    f.action = `https://lens.google.com/v3/upload?hl=pt-BR&re=df&st=${Date.now()}&vpw=${w}&vph=${h}&ep=gsbubb`; porNoInput(f, 'encoded_image', b, arq); f.submit(); },
-  tineye: async (arq) => { const b = await blobDe(arq), f = el('f_tineye'); porNoInput(f, 'image', b, arq); f.submit(); },
-  bing: async (arq) => { const b = await blobDe(arq), f = el('f_bing');
-    const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(',')[1]); fr.readAsDataURL(b); });
-    f.querySelector('input[name=imageBin]').value = b64; f.submit(); },
-  yandex: async (arq) => { await BUSCAS.copiar(arq); window.open('https://yandex.com/images/', '_blank'); aviso('📋 imagem copiada — no Yandex clique na câmera e cole (Ctrl+V)', 'okk'); },
+  lens: (arq) => noNavegador('lens', arq), tineye: (arq) => noNavegador('tineye', arq),
+  bing: (arq) => noNavegador('bing', arq), yandex: (arq) => noNavegador('yandex', arq),
   copiar: async (arq) => { const b = await blobDe(arq), bm = await createImageBitmap(b), c = document.createElement('canvas');
     c.width = bm.width; c.height = bm.height; c.getContext('2d').drawImage(bm, 0, 0);
     const png = await new Promise(r => c.toBlob(r, 'image/png'));
