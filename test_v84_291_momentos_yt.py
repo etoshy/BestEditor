@@ -289,7 +289,7 @@ def test_compilacao_um_short_com_os_melhores_momentos(tmp_path, monkeypatch):
     p = M.carregar(base, p["id"])
     assert p["compilacao"]["estado"] == "✅ pronto"
     largo = os.path.join(M.pasta(base, p["id"]), "cortes", "climax_largo.mp4")
-    assert (M.sondar(largo)["w"], round(M.sondar(largo)["dur"])) == (1920, 4)  # largo, com o tamanho do momento
+    assert (M.sondar(largo)["w"], round(M.sondar(largo)["dur"])) == (1080, 4)  # vertical (sem barras), com o tamanho do momento
 
     import curtos as CT
     import curtos_comentario as CC

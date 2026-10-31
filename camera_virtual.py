@@ -177,10 +177,12 @@ def velocidade(pts: Sequence[Tuple[float, Optional[Caixa]]], t: float, cortes: S
 
 # ---------------------------------------------------------------------------------------------------- 2. planejar
 def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dict[str, Any], dur: float, cortes: Sequence[float],
-             W: int, H: int, abrir_inicio: bool = True, passo: float = 0.1) -> Dict[str, Any]:
-    """→ {"alvos": [(t, cx, cy, vw)] (px do original, sem suavizar), "eventos": [...], "foco": [(t, nome)]}."""
+             W: int, H: int, abrir_inicio: bool = True, passo: float = 0.1, sem_barras: bool = True) -> Dict[str, Any]:
+    """→ {"alvos": [(t, cx, cy, vw)] (px do original, sem suavizar), "eventos": [...], "foco": [(t, nome)]}.
+    sem_barras (padrão): o vertical SEMPRE preenche a tela — o zoom fecha quando dá, mas nunca abre além da altura inteira do
+    vídeo; pra mostrar o que importa a câmera ANDA (pra frente/pra trás) em vez de abrir com barras."""
     cw = H * SAIDA_W / SAIDA_H  # a largura de um vertical que usa a altura inteira
-    vw_min, vw_max = cw * 0.62, float(W)
+    vw_min, vw_max = cw * 0.62, (min(float(W), cw) if sem_barras else float(W))
     principal = papeis.get("principal")
     acoes = [o for o in papeis.get("acao") or [] if o in tracks]
     destinos = [o for o in papeis.get("destino") or [] if o in tracks]
@@ -196,6 +198,7 @@ def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dic
     while t <= dur + 1e-6:
         P = caixa_em(tracks.get(principal) or [], t, cortes) if principal else None
         reg: Optional[Caixa] = None
+        obrig: Optional[Caixa] = None  # o que NÃO pode sair do quadro (a bola em voo; senão o principal)
         nome = "principal"
         ativa = None
         for o in acoes:
@@ -217,7 +220,7 @@ def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dic
                 em_voo, chegou = True, False
             if rapida:
                 acao_ativa_ate = max(acao_ativa_ate, t + 0.5)  # segura a câmera na bola um pouco depois (até ela cair/entrar)
-            reg, nome = A, o
+            reg, nome, obrig = A, o, A
             for dn in destinos:
                 D = caixa_em(tracks[dn], t, cortes)
                 if D is None:
@@ -231,7 +234,7 @@ def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dic
                         acao_ativa_ate = t + 0.8  # mostra a cesta um instante antes de voltar
         else:
             em_voo = False
-            reg = P
+            reg = obrig = P
             for o in acoes:  # a bola na mão do robô entra no quadro junto
                 A = caixa_em(tracks[o], t, cortes)
                 if A is not None and P is not None and _toca(A, _crescer(P, 1.4)):
@@ -249,9 +252,16 @@ def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dic
             precisa_h = (ry1 - ry0) * 1.30
             vw = max(precisa_w, precisa_h * SAIDA_W / SAIDA_H, vw_min)
         vw = min(vw_max, vw)
-        if abrir_inicio and t < 1.4:  # 🎬 o corte começa ABERTO e entra no assunto
+        if abrir_inicio and t < 1.4:  # 🎬 o corte começa ABERTO (o mais aberto que dá) e entra no assunto
             f = max(0.0, 1 - t / 1.4)
             vw = vw + (min(vw_max, max(vw, W * 0.95)) - vw) * f
+        if obrig is not None and reg is not None and (reg[2] - reg[0]) * W > vw * 0.9:
+            # não cabe tudo (bola + cesta mais largas que a tela): a câmera fica entre os dois, mas a bola nunca sai do quadro
+            m = vw * 0.08
+            ox0, ox1 = obrig[0] * W, obrig[2] * W
+            lo, hi = ox1 - vw / 2 + m, ox0 + vw / 2 - m
+            if lo <= hi:
+                cx = min(max(cx, lo), hi)
         alvos.append((round(t, 3), cx, cy, vw))
         foco_log.append((round(t, 3), nome))
         t += passo
@@ -415,7 +425,7 @@ def rastros_no_vertical(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], 
 
 
 def seguir(visao: Any, video_cru: str, video_original: str, t0: float, t1: float, saida: str, papeis: Dict[str, Any],
-           cortes: Sequence[float], prog: Prog = lambda m: None) -> Dict[str, Any]:
+           cortes: Sequence[float], prog: Prog = lambda m: None, passo: float = 0.5) -> Dict[str, Any]:
     """Tudo: detecta no `video_cru` (o trecho já recortado, leve) → planeja → renderiza do `video_original` (qualidade cheia)."""
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0",
                         video_original], capture_output=True, text=True, timeout=60)
@@ -425,7 +435,7 @@ def seguir(visao: Any, video_cru: str, video_original: str, t0: float, t1: float
     dur = t1 - t0
     pasta = tempfile.mkdtemp(prefix="cam_")
     try:
-        tracks = detectar(visao, video_cru, dur, papeis, cortes, pasta, prog)
+        tracks = detectar(visao, video_cru, dur, papeis, cortes, pasta, prog, passo=passo)
         plano = planejar(tracks, papeis, dur, cortes, W, H)
         caminho = suavizar(plano["alvos"], cortes, W, H, FPS, dur)
         renderizar(video_original, t0, t1, saida, caminho, W, H, prog)

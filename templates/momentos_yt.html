@@ -189,13 +189,13 @@ function painelComp(p) {
     ${comp.erro ? `<div style="color:var(--erro)">❌ ${esc(comp.erro)}</div>` : ''}
     ${rod && ci.prog ? `<div class="my-prog"><div class="my-gira"></div>${esc(ci.prog)}</div>` : ''}
     <div class="my-midia" style="margin-top:8px"><div>
-      <b>🔊 Momento-chave com o som original</b> <span class="si-dica">— a narração para e o lance toca inteiro (formato largo)</span>
+      <b>🔊 Momento-chave com o som original</b> <span class="si-dica">— a narração para e o lance toca com o som dele</span>
       <div class="si-linha"><label>do corte <select id="cl_n">${(p.cortes || []).map(c => `<option value="${c.n}"${c.n === cl.n ? ' selected' : ''}>${c.n} · ${esc(c.titulo || '')}</option>`).join('')}</select></label>
         <label>de <input id="cl_t0" value="${mmss(cl.t0 || 0)}" style="width:80px"></label><label>até <input id="cl_t1" value="${mmss(cl.t1 || 0)}" style="width:80px"></label>
         <button class="si-mini" onclick="myClimax()">💾</button></div>
       ${cl.por_que ? `<div class="si-dica">${esc(cl.por_que)}</div>` : ''}
       ${cl.t1 > cl.t0 ? `<iframe loading="lazy" allowfullscreen src="https://www.youtube.com/embed/${p.yt_id}?start=${Math.floor(cl.t0)}&end=${Math.ceil(cl.t1)}&rel=0" style="max-width:420px"></iframe>` : ''}</div>
-      ${comp.tem_climax ? `<video src="/momentos-yt/${p.id}/climax.mp4?v=${Date.now() % 1e6}" controls preload="metadata" style="width:220px;aspect-ratio:16/9"></video>` : ''}</div>
+      ${comp.tem_climax ? `<video src="/momentos-yt/${p.id}/climax.mp4?v=${Date.now() % 1e6}" controls preload="metadata" style="width:140px;aspect-ratio:9/16"></video>` : ''}</div>
     ${comp.fatos ? `<details style="margin-top:6px"><summary class="si-dica" style="cursor:pointer">📌 fatos que o narrador vai usar (confira os marcados “conferir”)</summary><div style="white-space:pre-wrap;font-size:.86rem">${esc(comp.fatos)}</div></details>` : ''}
     ${ci.roteiro ? `<div class="my-rot" style="max-height:none;margin-top:6px">${esc(ci.roteiro)}</div>` : ''}
     <div class="si-linha" style="margin-top:6px">

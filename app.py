@@ -12299,6 +12299,7 @@ def _padroes_excluidos_do_reloader() -> list:
         os.environ.get("JUNTAR_DIR") or os.path.join(BASE_DIR, "juntar"),  # 🔗 juntar vídeos: envios e o vídeo juntado
         os.environ.get("FONTES_VIDEO_DIR") or os.path.join(BASE_DIR, "fontes_video"),  # 🔎 achar a fonte: vídeo e prints
         os.environ.get("ROTEIROS_COMENTARIO_DIR") or os.path.join(BASE_DIR, "roteiros_comentario"),  # ✍ roteiros de comentário
+        os.environ.get("MOMENTOS_YT_DIR") or os.path.join(BASE_DIR, "momentos_yt"),  # 🔥 vídeos longos, cortes, quadros, navegador
     ]
     # 🚀 v84_262: as bibliotecas instaladas (torch, transformers… milhares de arquivos) não mudam enquanto o site roda —
     # o reloader conferia a data de TODAS a cada segundo

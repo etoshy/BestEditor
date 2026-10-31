@@ -59,11 +59,15 @@ def test_camera_segue_a_bola_ate_a_cesta_e_volta(tmp_path):
         f = str(tmp_path / f"q{t}.png")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", out, "-frames:v", "1", f], check=True)
         q[t] = f
+    from PIL import Image
     vermelho = lambda p: p[0] > 200 and p[1] < 60 and p[2] < 60  # noqa: E731
     azul = lambda p: p[2] > 200 and p[0] < 60 and p[1] < 60  # noqa: E731
-    from PIL import Image
-    # começa ABERTO: o quadro inteiro aparece (com o fundo desfocado) — robô e cesta juntos
-    assert _centro_x(q[0.1], vermelho) is not None and _centro_x(q[0.1], azul) is not None
+    # SEM BARRAS: o vertical sempre preenche a tela (o cinza do cenário chega até as bordas de cima e de baixo, nunca o fundo
+    # desfocado/escurecido)
+    for f in q.values():
+        im = Image.open(f).convert("RGB")
+        for y in (3, 960, 1916):
+            assert abs(im.getpixel((540, y))[0] - 96) < 25 or im.getpixel((540, y))[0] > 180 or im.getpixel((540, y))[2] > 180, (f, y)
     assert 300 < _centro_x(q[1.6], vermelho) < 780          # depois entra no robô (no meio)
     assert _centro_x(q[2.9], azul) is not None               # a bola chegando: a cesta aparece
     assert _centro_x(q[5.6], vermelho) is not None and _centro_x(q[5.6], azul) is None  # voltou pro robô
@@ -77,7 +81,7 @@ def test_sem_acao_so_segue_o_principal_e_o_zoom_acompanha_o_tamanho():
     cx, cy, vw = p["alvos"][20][1:]
     assert cx == pytest.approx(0.15 * 1920, abs=2) and vw >= 1080 * 0.7 * 1.3 * 9 / 16 * 0.99
     grande = {"robot": [(t / 2, (0.05, 0.0, 0.95, 1.0)) for t in range(10)]}  # assunto enorme (close) → abre
-    assert CV.planejar(grande, {"principal": "robot"}, 4.5, [], 1920, 1080, abrir_inicio=False)["alvos"][20][3] == 1920
+    assert CV.planejar(grande, {"principal": "robot"}, 4.5, [], 1920, 1080, abrir_inicio=False)["alvos"][20][3] == 1080 * 1080 / 1920  # nunca abre além da altura
 
 
 def test_destaque_usa_o_rastro_do_objeto_certo():
@@ -102,3 +106,56 @@ def test_som_do_evento_cai_no_segundo_certo_do_video(monkeypatch):
               {"start": 3.0, "end": 5.0, "clipe": {"mid": "M2", "ini": 0.0, "fim": 2.0}}]
     out = CT.sons_dos_eventos(p, planos, 0.8, [])
     assert [(e["som"], e["start"], e["curto"]) for e in out] == [("som/whoosh", 1.1, "evento:lancamento")]  # 9.0 s não aparece no vídeo
+
+
+def test_moondream_carrega_no_transformers_5(tmp_path):
+    """'HfMoondream' object has no attribute 'all_tied_weights_keys': código remoto feito pro transformers 4 no transformers 5."""
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    from transformers import PreTrainedModel, PretrainedConfig
+    if not hasattr(PreTrainedModel, "get_expanded_tied_weights_keys"):
+        pytest.skip("transformers 4 — o problema não existe")
+    import momentos_yt as M
+
+    class Cfg(PretrainedConfig):
+        model_type = "md_teste"
+
+    class Velho(PreTrainedModel):
+        config_class = Cfg
+        _tied_weights_keys = []
+
+        def __init__(self, config):
+            super().__init__(config)
+            self.lin = torch.nn.Linear(2, 2)  # sem post_init(), como o HfMoondream
+    Velho(Cfg()).save_pretrained(str(tmp_path / "m"))
+    M._compat_transformers()
+    assert isinstance(Velho.from_pretrained(str(tmp_path / "m")), Velho)
+
+
+def test_moondream_sai_da_memoria_e_cpu_usa_bfloat16(monkeypatch):
+    import momentos_yt as M
+    pedidos = []
+
+    class Falso:
+        pass
+
+    import types
+    torch = pytest.importorskip("torch")
+    fake_tf = types.SimpleNamespace(AutoModelForCausalLM=types.SimpleNamespace(from_pretrained=lambda nome, **kw: pedidos.append(kw) or Falso()),
+                                    PreTrainedModel=object)
+    monkeypatch.setitem(__import__("sys").modules, "transformers", fake_tf)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    M._MD.clear()
+    M._MD["modelo"] = None
+    assert isinstance(M._moondream_hf({"revisao_hf": ""}), Falso)
+    assert pedidos[0]["dtype"] == torch.bfloat16 and pedidos[0]["low_cpu_mem_usage"] is True
+    assert M.Visao.__dict__["passo"].fget(type("V", (), {"vc": {"backend": "hf"}})()) == 1.0  # CPU: procura a cada 1 s
+    M.liberar_moondream()
+    assert M._MD["modelo"] is None
+
+
+def test_reloader_ignora_a_pasta_dos_momentos():
+    src = open(os.path.join(os.path.dirname(CV.__file__), "app.py"), encoding="utf-8").read()
+    ini = src.index("def _padroes_excluidos_do_reloader")
+    trecho = src[ini:src.index("return [os.path.join(p, \"*\")", ini)]
+    assert '"momentos_yt"' in trecho

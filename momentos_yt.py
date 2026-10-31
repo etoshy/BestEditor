@@ -799,7 +799,7 @@ def criar_compilacao(base: str, pid: str, transcrever: Optional[Callable[..., An
             if cl.get("t1", 0) > cl.get("t0", 0) and os.path.isfile(largo):
                 cp = os.path.join(tmp, "climax.mp4")
                 shutil.copy(largo, cp)
-                w = CT.adicionar_midia(base, q, cp, "video", "🔊 momento-chave com o som original (formato largo)", "W")
+                w = CT.adicionar_midia(base, q, cp, "video", "🔊 momento-chave com o som original", "W")
                 c_cl = next((c for c in usar if c["n"] == cl.get("n")), None)
                 mat = mids.get(cl.get("n"), "")
                 de = max(0.0, cl["t0"] - c_cl["t0"]) if c_cl else 0.0
@@ -867,14 +867,21 @@ def criar_compilacao(base: str, pid: str, transcrever: Optional[Callable[..., An
 
 
 def cortar_climax(base: str, pid: str, prog: Prog = lambda m: None, baixador: Optional[Callable[[str, str], str]] = None) -> Optional[str]:
-    """O momento-chave no formato LARGO (o lance inteiro à vista), com o som original."""
+    """O momento-chave com o som original — tirado do PRÓPRIO corte vertical (a câmera virtual já segue a ação; sem barras).
+    Se aquele corte ainda não existe em vertical, sai do vídeo longo no meio do quadro."""
     p = carregar(base, pid)
     cl = (p.get("compilacao") or {}).get("climax") or {}
     if not cl or cl.get("t1", 0) - cl.get("t0", 0) < 1:
         return None
+    d = pasta(base, pid)
+    saida = os.path.join(d, "cortes", "climax_largo.mp4")
+    c = next((x for x in p.get("cortes") or [] if x["n"] == cl.get("n")), None)
+    prog("🔊 cortando o momento-chave (com o som original)…")
+    if c and c.get("arquivo") and os.path.isfile(os.path.join(d, "cortes", c["arquivo"])):
+        a = max(0.0, cl["t0"] - c["t0"])
+        return cortar(os.path.join(d, "cortes", c["arquivo"]), a, a + (cl["t1"] - cl["t0"]), saida, "null")
     video = garantir_video(base, pid, prog, baixador)
-    prog("🔊 cortando o momento-chave (largo, com o som original)…")
-    return cortar(video, cl["t0"], cl["t1"], os.path.join(pasta(base, pid), "cortes", "climax_largo.mp4"), "null")
+    return cortar(video, cl["t0"], cl["t1"], saida, filtro_vertical(sondar(video), "seguir", []))
 
 
 def referencia_do_link(base: str, link: str, transcrever: Optional[Callable[..., Any]], prog: Prog = lambda m: None) -> str:
@@ -923,18 +930,82 @@ def salvar_config_visao(base: str, novos: Dict[str, Any]) -> Dict[str, Any]:
     return c
 
 
+class _ChavesAmarradas:
+    """transformers 5 lê `model.all_tied_weights_keys`, que ele mesmo cria no `post_init()`. O Moondream2 (código remoto feito
+    pro transformers 4) não chama isso → "'HfMoondream' object has no attribute 'all_tied_weights_keys'". Aqui o atributo é
+    calculado na primeira leitura (descritor sem __set__: quando o post_init existe, o valor da instância vence)."""
+
+    def __get__(self, obj, tipo=None):
+        if obj is None:
+            return self
+        try:
+            v = obj.get_expanded_tied_weights_keys(all_submodels=False)
+        except Exception:  # noqa: BLE001
+            v = {}
+        obj.__dict__["all_tied_weights_keys"] = v
+        return v
+
+
+def _compat_transformers() -> None:
+    try:
+        from transformers import PreTrainedModel
+    except Exception:  # noqa: BLE001
+        return
+    if hasattr(PreTrainedModel, "get_expanded_tied_weights_keys") and "all_tied_weights_keys" not in PreTrainedModel.__dict__:
+        PreTrainedModel.all_tied_weights_keys = _ChavesAmarradas()
+
+
 def _moondream_hf(vc: Dict[str, Any]):
+    """Carrega o Moondream2 uma vez. GPU → float16; CPU → bfloat16 (metade da memória do float32: ~4 GB em vez de ~8 GB —
+    o float32 na CPU enchia a RAM e derrubava o site com MemoryError). Se o bfloat16 der erro nessa CPU, volta pro float32."""
     with _MD_TRAVA:
         if _MD["modelo"] is None:
             import torch
             from transformers import AutoModelForCausalLM
-            kw: Dict[str, Any] = {"trust_remote_code": True}
+            _compat_transformers()
+            kw: Dict[str, Any] = {"trust_remote_code": True, "low_cpu_mem_usage": True}
             if vc.get("revisao_hf"):
                 kw["revision"] = vc["revisao_hf"]
             if torch.cuda.is_available():
-                kw.update(device_map={"": "cuda"}, torch_dtype=torch.float16)
-            _MD["modelo"] = AutoModelForCausalLM.from_pretrained("vikhyatk/moondream2", **kw)
+                kw.update(device_map={"": "cuda"}, dtype=torch.float16)
+                _MD["dispositivo"] = "GPU (" + torch.cuda.get_device_name(0) + ")"
+            else:
+                kw["dtype"] = torch.float32 if _MD.get("cpu_fp32") else torch.bfloat16
+                _MD["dispositivo"] = "CPU " + ("float32" if _MD.get("cpu_fp32") else "bfloat16")
+            try:
+                _MD["modelo"] = AutoModelForCausalLM.from_pretrained("vikhyatk/moondream2", **kw)
+            except TypeError:  # transformers antigo: o parâmetro é torch_dtype
+                kw["torch_dtype"] = kw.pop("dtype")
+                _MD["modelo"] = AutoModelForCausalLM.from_pretrained("vikhyatk/moondream2", **kw)
+            _MD["gpu"] = torch.cuda.is_available()
         return _MD["modelo"]
+
+
+def liberar_moondream() -> None:
+    """Tira o Moondream da memória (no fim de cada análise/produção) — a RAM volta pro resto do site."""
+    with _MD_TRAVA:
+        if _MD.get("modelo") is None:
+            return
+        _MD["modelo"] = None
+    import gc
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _chamar_md(vc: Dict[str, Any], fn: Callable[[Any], Any]) -> Any:
+    try:
+        return fn(_moondream_hf(vc))
+    except Exception as exc:  # noqa: BLE001
+        if "bfloat16" in str(exc).lower() and not _MD.get("gpu") and not _MD.get("cpu_fp32"):
+            _MD["cpu_fp32"] = True  # essa CPU não roda bfloat16: recarrega em float32
+            liberar_moondream()
+            return fn(_moondream_hf(vc))
+        raise
 
 
 class Visao:
@@ -946,6 +1017,20 @@ class Visao:
         self.erro = ""
 
     @property
+    def passo(self) -> float:
+        """De quanto em quanto tempo procurar os objetos: GPU 0,5 s; CPU 1 s (cada busca na CPU leva segundos)."""
+        if self.vc["backend"] != "hf":
+            return 0.5
+        gpu = _MD.get("gpu")
+        if gpu is None:
+            try:
+                import torch
+                gpu = torch.cuda.is_available()
+            except Exception:  # noqa: BLE001
+                gpu = False
+        return 0.5 if gpu else 1.0
+
+    @property
     def nome(self) -> str:
         return {"hf": "Moondream2", "ollama": "Moondream (Ollama)"}.get(self.vc["backend"], "Claude")
 
@@ -955,7 +1040,8 @@ class Visao:
         try:
             if self.vc["backend"] == "hf":
                 from PIL import Image
-                return str(_moondream_hf(self.vc).query(Image.open(img).convert("RGB"), q)["answer"]).strip()
+                im = Image.open(img).convert("RGB")
+                return str(_chamar_md(self.vc, lambda m: m.query(im, q))["answer"]).strip()
             if self.vc["backend"] == "ollama":
                 import urllib.request
                 with open(img, "rb") as f:
@@ -975,7 +1061,8 @@ class Visao:
             return None
         try:
             from PIL import Image
-            objs = _moondream_hf(self.vc).detect(Image.open(img).convert("RGB"), alvo).get("objects") or []
+            im = Image.open(img).convert("RGB")
+            objs = _chamar_md(self.vc, lambda m: m.detect(im, alvo)).get("objects") or []
             return [(float(o["x_min"]), float(o["y_min"]), float(o["x_max"]), float(o["y_max"])) for o in objs]
         except Exception as exc:  # noqa: BLE001
             self.erro = str(exc)[:200]
@@ -1022,7 +1109,10 @@ class Visao:
                 return {"ok": False, "msg": f"❌ {self.nome} não respondeu: {self.erro or 'sem resposta'}"}
             caixas = self.achar(tmp, "orange ball")
             det = ("acha objetos ✅" if caixas else "não achou a bola de teste ⚠") if caixas is not None else "não acha objetos (o Claude faz essa parte)"
-            return {"ok": True, "msg": f"✅ {self.nome} funcionando ({_t.time() - t0:.1f} s) — descreve ✅ · {det} · “{d[:80]}”"}
+            onde = f" · rodando na {_MD.get('dispositivo')}" if self.vc["backend"] == "hf" and _MD.get("dispositivo") else ""
+            aviso = (" — ⚠ na CPU é lento (alguns segundos por quadro) e usa ~4 GB de RAM; com placa de vídeo NVIDIA + torch com CUDA "
+                     "fica muito mais rápido") if "CPU" in onde else ""
+            return {"ok": True, "msg": f"✅ {self.nome} funcionando ({_t.time() - t0:.1f} s){onde} — descreve ✅ · {det} · “{d[:80]}”{aviso}"}
         finally:
             try:
                 os.remove(tmp)
@@ -1450,7 +1540,7 @@ def produzir_corte(base: str, pid: str, n: int, prog: Prog = lambda m: None, bai
         if modo == "seguir" and (alvo or papeis["acao"]):
             import camera_virtual as CV
             prog("🎥 câmera virtual: seguindo " + " → ".join([alvo] + papeis["acao"] + papeis["destino"]) + "…")
-            cam = CV.seguir(visao, cru, video, c["t0"], c["t1"], saida, papeis, cenas, prog)
+            cam = CV.seguir(visao, cru, video, c["t0"], c["t1"], saida, papeis, cenas, prog, passo=getattr(visao, "passo", 0.5))
         else:
             if modo == "seguir":
                 prog("🎯 sem alvo — corte no meio do quadro")
@@ -1698,6 +1788,8 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
                     pass
             finally:
                 TAREFAS[pid]["fim"] = time.time()
+                if not any(not t.get("fim") for k, t in TAREFAS.items() if k != pid):
+                    liberar_moondream()  # 🧹 a RAM volta pro resto do site (voz, Whisper, editor)
         threading.Thread(target=corpo, daemon=True, name="momentos:" + pid).start()
 
     def _tudo(pid: str, analisar_antes: bool) -> Callable[[Prog], Any]:
@@ -1987,6 +2079,9 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
             return _ok(**Visao(base).testar())
         except Exception as exc:  # noqa: BLE001
             return _ok(ok=False, msg=f"❌ {str(exc)[:400]}")
+        finally:
+            if not any(not t.get("fim") for t in TAREFAS.values()):
+                liberar_moondream()
 
     @app.route("/momentos-yt/<pid>/visual", methods=["POST"])
     def mom_visual(pid: str):
