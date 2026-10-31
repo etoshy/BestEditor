@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}🔥 Momentos mais vistos{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .my-form label { display: flex; flex-direction: column; gap: 3px; font-weight: 600; font-size: .86rem; margin: 8px 0 0; }
+  .my-form textarea, .my-form input:not([type=checkbox]):not([type=radio]) { width: 100%; box-sizing: border-box; }
+  .my-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0 10px; }
+  .my-link { font-size: 1.05rem !important; padding: 12px !important; }
+  .my-modos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .my-modos label { flex-direction: row !important; align-items: center; gap: 6px !important; border: 1px solid var(--borda); border-radius: 10px;
+                    padding: 8px 12px; cursor: pointer; font-weight: 500 !important; margin: 0 !important; }
+  .my-modos label:has(input:checked) { border-color: var(--acento); background: var(--acento-suave); }
+  .my-modos input { width: auto !important; margin: 0; }
+  .my-chk { flex-direction: row !important; align-items: center; gap: 6px !important; font-weight: 400 !important; }
+  .my-chk input { width: auto !important; margin: 0; }
+  .my-lista a { text-decoration: none; display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-radius: 8px; }
+  .my-lista a:hover, .my-lista a.on { background: var(--acento-suave); }
+  .my-grafico { width: 100%; height: 130px; display: block; background: var(--code-bg); border-radius: 10px; margin-top: 8px; }
+  .my-cortes { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; margin-top: 10px; }
+  .my-c { border: 1px solid var(--borda); border-radius: 12px; background: var(--card); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .my-c.fora { opacity: .55; }
+  .my-c.ok { border-color: var(--ok); } .my-c.err { border-color: var(--erro); }
+  .my-cab { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .my-num { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .85rem; flex: 0 0 auto; }
+  .my-midia { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+  .my-midia iframe { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 8px; background: #000; }
+  .my-midia video { width: 140px; aspect-ratio: 9/16; border-radius: 8px; background: #000; object-fit: contain; }
+  .my-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+  .my-campos label { display: flex; flex-direction: column; font-size: .78rem; gap: 2px; margin: 0; }
+  .my-campos input, .my-campos select { margin: 0; font-size: .85rem; padding: 4px 6px; }
+  .my-campos .largo { grid-column: 1 / -1; }
+  .my-rot { font-size: .85rem; line-height: 1.4; background: var(--code-bg); border-radius: 8px; padding: 6px 8px; max-height: 120px; overflow: auto; }
+  .my-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; }
+  .my-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: myg 1s linear infinite; flex: 0 0 auto; }
+  @keyframes myg { to { transform: rotate(360deg); } }
+</style>
+<h1>🔥 Momentos mais vistos <span class="si-dica" style="font-weight:400">vídeo longo do YouTube → os trechos que o público mais repete → curtos verticais narrados</span></h1>
+<div id="barra" class="si-barra"></div>
+<div class="si-passos"><span>📈 gráfico “mais repetidos”</span><span>📝 transcrição</span><span>🤖 Claude escolhe os cortes</span><span>🎯 vertical seguindo o alvo</span><span>👁 Moondream descreve</span><span>📝 gancho + roteiro + pergunta</span><span>🎬 MP4</span></div>
+
+<div class="si-card my-form" id="form">
+  <label>🔗 Link do vídeo longo do YouTube
+    <input id="link" class="my-link" placeholder="https://www.youtube.com/watch?v=…"></label>
+  <label>Como narrar cada corte</label>
+  <div class="my-modos">{% for k, v in modos.items() %}<label><input type="radio" name="modo" value="{{ k }}"{% if k == 'auto' %} checked{% endif %}> {{ v }}</label>{% endfor %}</div>
+  <div class="my-ops">
+    <label>Quantos cortes<input id="n_cortes" type="number" min="1" max="10" value="{{ padrao.n_cortes }}"></label>
+    <label>Duração mín. (s)<input id="dur_min" type="number" min="5" max="170" value="{{ padrao.dur_min }}"></label>
+    <label>Duração máx. (s)<input id="dur_max" type="number" min="10" max="180" value="{{ padrao.dur_max }}"></label>
+    <label>Enquadramento<select id="enquadrar">{% for k, v in enquadrar.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>Até onde ir<select id="ate">{% for k, v in ate.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>Postar em<select id="lingua_post">{% for k, v in linguas.items() %}<option value="{{ k }}"{% if k == 'en' %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+    <label>Narrar em<select id="idioma"><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
+    <label>Voz<select id="voz"></select></label>
+    <label>Qualidade do download<select id="qualidade"><option>1080p</option><option>720p</option><option>1440p</option><option>2160p</option></select></label>
+  </div>
+  <label>🎯 O que manter no centro do vertical <span class="si-dica" style="font-weight:400">— opcional: vazio = o Claude decide em cada corte (ex.: “o robô vermelho”, “o jogador de camisa 7”)</span>
+    <input id="alvo" placeholder="ex.: o robô"></label>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ opcional: transcrição, gráfico colado e pedido extra</summary>
+    <label>📝 Transcrição <span class="si-dica" style="font-weight:400">— no YouTube: “…mais” embaixo do vídeo → <b>Mostrar transcrição</b> → selecione tudo e cole aqui. Vazio: o site pega a legenda do YouTube ou usa o Whisper só nos trechos.</span>
+      <textarea id="transcricao" rows="4" placeholder="0:00&#10;primeira frase&#10;0:05&#10;segunda frase…"></textarea></label>
+    <label>📈 Gráfico “mais repetidos” <span class="si-dica" style="font-weight:400">— só se o site não conseguir sozinho: no YouTube, passe o mouse na barra, botão direito na <b>onda branca</b> → Inspecionar → no código, clique com o direito no <code>&lt;svg class="ytp-heat-map-svg"…&gt;</code> → Copiar → Copiar outerHTML, e cole aqui</span>
+      <textarea id="heatmap" rows="3" placeholder='<svg class="ytp-heat-map-svg" viewBox="0 0 1000 100"><path class="ytp-heat-map-path" d="M 0.0,100.0 C …"></path></svg>'></textarea></label>
+    <label class="my-chk"><input type="checkbox" id="usar_navegador" checked> 🌐 se o yt-dlp não trouxer o gráfico, abrir o vídeo no navegador e ler o gráfico da barra</label>
+    <label>Pedido extra<textarea id="extra" rows="2" placeholder="ex.: só momentos engraçados, evitar a parte da entrevista…"></textarea></label>
+  </details>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">👁 Moondream2 (quem olha os quadros)</summary>
+    <div class="my-ops">
+      <label>Como rodar<select id="v_backend">
+        <option value="hf"{% if visao.backend == 'hf' %} selected{% endif %}>🤗 transformers (descreve + acha o alvo)</option>
+        <option value="ollama"{% if visao.backend == 'ollama' %} selected{% endif %}>🦙 Ollama (só descreve; o alvo o Claude acha)</option>
+        <option value="nenhum"{% if visao.backend == 'nenhum' %} selected{% endif %}>❌ sem Moondream (o Claude olha tudo)</option></select></label>
+      <label>Revisão (transformers)<input id="v_revisao_hf" value="{{ visao.revisao_hf }}"></label>
+      <label>Modelo (Ollama)<input id="v_modelo_ollama" value="{{ visao.modelo_ollama }}"></label>
+      <label>Endereço do Ollama<input id="v_url_ollama" value="{{ visao.url_ollama }}"></label>
+    </div>
+    <p class="si-dica">transformers: <code>pip install transformers torch pillow</code> (baixa o vikhyatk/moondream2 na 1ª vez; com placa de vídeo fica rápido). Ollama: <code>ollama pull moondream</code>.
+      <button class="si-mini si-sec" onclick="myVisao()">💾 salvar</button></p>
+  </details>
+  <div class="si-linha" style="margin-top:12px"><button id="bgo" class="si-ok" onclick="myGo()">🔥 achar os momentos</button>
+    <span class="si-dica">pode sair da página — ele continua</span></div>
+</div>
+
+<div class="si-card my-lista"><h2 style="margin:0">📁 Vídeos</h2><div id="lista"></div></div>
+<div id="proj"></div>
+
+<script>
+(() => {
+const VOZES_EN = {{ vozes_en|tojson }}, VOZES = {{ vozes|tojson }}, MODOS = {{ modos|tojson }}, ENQ = {{ enquadrar|tojson }}, ATE = {{ ate|tojson }};
+const CORES = ['#e5484d', '#3e9bff', '#30a46c', '#f5a524', '#8e4ec6', '#e54d9e', '#12a594', '#ff8b3e', '#6e56cf', '#ad7f58'];
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const mmss = t => { t = Math.round(+t || 0); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = String(t % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`; };
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3500); }
+async function post(url, corpo) { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'})); if (!j.ok) throw new Error(j.erro || 'erro'); return j; }
+function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post').value === 'en', vs = turbo ? VOZES_EN : VOZES, s = el('voz'), atual = s.value;
+  s.innerHTML = vs.length ? vs.map(v => `<option value="${esc(v.slug)}">${esc(v.grupo)} · ${esc(v.nome)}</option>`).join('') : '<option value="">(nenhuma voz cadastrada)</option>';
+  if ([...s.options].some(o => o.value === atual)) s.value = atual; }
+['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
+const CAMPOS = ['n_cortes', 'dur_min', 'dur_max', 'enquadrar', 'ate', 'lingua_post', 'idioma', 'voz', 'qualidade'];
+try { const sv = JSON.parse(localStorage.getItem('my_op') || '{}'); CAMPOS.forEach(k => { if (sv[k] != null && k !== 'voz') el(k).value = sv[k]; });
+  vozes(); if (sv.voz) el('voz').value = sv.voz; if (sv.modo) { const r = document.querySelector(`input[name=modo][value="${sv.modo}"]`); if (r) r.checked = true; } } catch (e) { vozes(); }
+
+window.myVisao = async () => { try { await post('/momentos-yt/visao', {backend: el('v_backend').value, revisao_hf: el('v_revisao_hf').value,
+  modelo_ollama: el('v_modelo_ollama').value, url_ollama: el('v_url_ollama').value}); aviso('💾 Moondream salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.myGo = async () => {
+  const d = {link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, alvo: el('alvo').value,
+    transcricao: el('transcricao').value, heatmap: el('heatmap').value, extra: el('extra').value, usar_navegador: el('usar_navegador').checked};
+  CAMPOS.forEach(k => d[k] = el(k).value);
+  try { localStorage.setItem('my_op', JSON.stringify(Object.fromEntries(CAMPOS.map(k => [k, d[k]]).concat([['modo', d.modo]])))); } catch (e) {}
+  if (!d.link) return aviso('Cole o link do vídeo.', 'erro');
+  el('bgo').disabled = true;
+  try { const j = await post('/momentos-yt/novo', d); el('link').value = ''; el('transcricao').value = ''; el('heatmap').value = '';
+    abrir(j.id); aviso('🔥 começou — pode sair da página, ele continua', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  el('bgo').disabled = false; lista();
+};
+
+let PID = {{ pid|tojson }}, P = null, timer = null;
+async function lista() {
+  const j = await (await fetch('/momentos-yt/lista')).json();
+  el('lista').innerHTML = (j.lista || []).length ? j.lista.map(x => `<a href="?p=${x.id}" data-id="${x.id}" class="${x.id === PID ? 'on' : ''}">
+    ${x.yt_id ? `<img src="https://i.ytimg.com/vi/${x.yt_id}/default.jpg" style="width:64px;border-radius:6px">` : ''}
+    <span><b>${esc(x.titulo)}</b><br><span class="si-dica">${x.rodando ? '⏳ ' : ''}${esc(x.etapa)}${x.cortes ? ` · ${x.cortes} cortes` : ''}</span></span></a>`).join('')
+    : '<p class="si-dica">Nenhum ainda.</p>';
+  el('lista').querySelectorAll('a[data-id]').forEach(a => a.onclick = ev => { ev.preventDefault(); abrir(a.dataset.id); });
+}
+function abrir(id) { PID = id; history.replaceState(null, '', '?p=' + id); P = null; atualizar(); lista(); }
+
+function grafico(p) {
+  const W = 1000, H = 100, dur = p.dur || 1, hm = p.heatmap || [];
+  let path = '';
+  if (hm.length) { path = `M0,${H} ` + hm.map(h => `L${((h[0] + h[1]) / 2 / dur * W).toFixed(1)},${(H - h[2] * (H - 8)).toFixed(1)}`).join(' ') + ` L${W},${H} Z`; }
+  const cands = (p.candidatos || []).map(c => `<rect x="${c.t0 / dur * W}" y="0" width="${Math.max(2, (c.t1 - c.t0) / dur * W)}" height="${H}" fill="currentColor" opacity=".07"/>`).join('');
+  const cortes = (p.cortes || []).map((c, i) => { const cor = CORES[(c.n - 1) % CORES.length], x = c.t0 / dur * W, w = Math.max(3, (c.t1 - c.t0) / dur * W);
+    return `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${cor}" opacity="${c.usar ? .28 : .1}"/><text x="${x + w / 2}" y="14" font-size="12" text-anchor="middle" fill="${cor}" font-weight="700">${c.n}</text>`; }).join('');
+  const marcas = (p.capitulos || []).map(c => `<line x1="${c.t0 / dur * W}" x2="${c.t0 / dur * W}" y1="${H - 6}" y2="${H}" stroke="currentColor" opacity=".5"/>`).join('');
+  return `<svg class="my-grafico" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cands}${path ? `<path d="${path}" fill="currentColor" opacity=".35"/>` : `<text x="${W / 2}" y="55" text-anchor="middle" font-size="11" fill="currentColor" opacity=".6">sem o gráfico “mais repetidos” — cortes escolhidos pela transcrição</text>`}${cortes}${marcas}</svg>
+    <div class="si-dica" style="display:flex;justify-content:space-between"><span>0:00</span><span>📈 ${esc(p.heat_fonte || 'sem gráfico')} · 📝 ${esc(p.legenda_fonte || 'sem transcrição')} (${p.legenda} linhas) · cinza claro = candidatos do gráfico</span><span>${mmss(dur)}</span></div>`;
+}
+
+function cardCorte(p, c) {
+  const cor = CORES[(c.n - 1) % CORES.length], ci = c.curto_info || {}, pronto = ci.pronto;
+  const rodando = /cortando|virando|roteiro/.test(c.estado || '') && P && P._rodando;
+  return `<div class="my-c ${c.usar ? '' : 'fora'} ${pronto ? 'ok' : (c.erro ? 'err' : '')}" data-n="${c.n}">
+    <div class="my-cab"><span class="my-num" style="background:${cor}">${c.n}</span><b>${esc(c.titulo || 'Corte ' + c.n)}</b>
+      <span class="si-tag">${mmss(c.t0)}–${mmss(c.t1)} · ${Math.round(c.t1 - c.t0)} s</span><span class="si-tag">${esc(MODOS[c.modo] || c.modo)}</span>
+      <label class="my-chk" style="margin-left:auto;font-size:.8rem"><input type="checkbox" data-f="usar" ${c.usar ? 'checked' : ''}> usar</label>
+      <button class="si-mini si-perigo" data-a="apagar" title="tirar este corte">🗑</button></div>
+    ${c.motivo ? `<div class="si-dica">💡 ${esc(c.motivo)}${c.gancho ? `<br>🪝 ${esc(c.gancho)}` : ''}</div>` : ''}
+    <div class="my-midia"><iframe loading="lazy" allow="encrypted-media; picture-in-picture" allowfullscreen
+        src="https://www.youtube.com/embed/${p.yt_id}?start=${Math.floor(c.t0)}&end=${Math.ceil(c.t1)}&rel=0"></iframe>
+      ${c.arquivo ? `<video src="/momentos-yt/${p.id}/corte/${c.n}/video?v=${encodeURIComponent(c.feito || '')}" controls preload="metadata"></video>` : ''}</div>
+    <div class="my-campos">
+      <label>Começo<input data-f="t0" value="${mmss(c.t0)}"></label><label>Fim<input data-f="t1" value="${mmss(c.t1)}"></label>
+      <label class="largo">🎯 Manter no centro (inglês funciona melhor no Moondream)<input data-f="alvo" value="${esc(c.alvo)}" placeholder="ex.: red humanoid robot">${c.alvo_pt ? `<span class="si-dica">${esc(c.alvo_pt)}</span>` : ''}</label>
+      <label>Narrar<select data-f="modo"><option value="comentario"${c.modo === 'comentario' ? ' selected' : ''}>💬 comentar</option><option value="explicar"${c.modo === 'explicar' ? ' selected' : ''}>🔍 explicar</option></select></label>
+      <label>Enquadrar<select data-f="enquadrar"><option value="">(o padrão do vídeo)</option>${Object.entries(ENQ).map(([k, v]) => `<option value="${k}"${c.enquadrar === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+    </div>
+    ${c.enquadramento && c.enquadramento.modo === 'seguir' ? `<div class="si-dica">🎯 ${esc(c.enquadramento.visao)}: alvo achado em ${c.enquadramento.achados} quadros${c.enquadramento.pontos ? '' : ' — ficou no meio do quadro'} · 👁 ${c.visual} momentos descritos</div>` : ''}
+    ${c.estado ? `<div class="my-prog">${rodando ? '<div class="my-gira"></div>' : ''}<b>${esc(c.estado)}</b>${ci.prog && rodando ? ' — ' + esc(ci.prog) : ''}</div>` : ''}
+    ${c.erro ? `<div style="color:var(--erro);font-size:.85rem">❌ ${esc(c.erro)}</div>` : ''}
+    ${ci.roteiro ? `<div class="my-rot">${esc(ci.roteiro)}</div>` : ''}
+    <div class="si-linha">
+      ${c.arquivo ? `<a href="/momentos-yt/${p.id}/corte/${c.n}/video?baixar=1"><button class="si-mini si-sec">⬇ corte</button></a>` : ''}
+      ${pronto ? `<a href="/curtos/${c.curto}/video.mp4"><button class="si-mini si-ok">⬇ MP4 narrado</button></a>` : ''}
+      ${ci.editor ? `<a href="/job/${ci.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
+      ${c.curto ? `<a href="/curtos/${c.curto}" target="_blank"><button class="si-mini si-sec">⚙ curto (ganchos, finais, voz)</button></a>` : ''}
+      <button class="si-mini" data-a="so" title="faz só este corte, até onde está escolhido lá em cima">▶ só este</button></div></div>`;
+}
+
+function desenhar(j) {
+  const p = j.projeto, t = j.tarefa, rod = t && t.rodando; P = p; P._rodando = rod;
+  const foco = document.activeElement && document.activeElement.closest('.my-c') ? document.activeElement : null;
+  if (foco && rod) return;  // não redesenha enquanto você digita
+  el('proj').innerHTML = `<div class="si-card">
+    <div class="si-linha"><b style="font-size:1.05rem">${esc(p.titulo || p.link)}</b><a href="${esc(p.link)}" target="_blank" class="si-dica">🔗 YouTube</a>
+      <span class="si-tag">${esc(p.etapa)}</span>${p.dur ? `<span class="si-tag">${mmss(p.dur)}</span>` : ''}
+      <button class="si-mini si-perigo" style="margin-left:auto" onclick="myApagar()">🗑</button></div>
+    ${rod ? `<div class="my-prog"><div class="my-gira"></div><span><b>${esc(t.rotulo)}</b> — ${esc(t.prog)}</span></div>` : ''}
+    ${!rod && (p.erro || (t && t.erro)) ? `<div style="color:var(--erro)">❌ ${esc(p.erro || t.erro)}</div>` : ''}
+    ${p.dur ? grafico(p) : ''}
+    ${(p.cortes || []).length ? `<div class="si-linha" style="margin-top:10px">
+      <select id="p_ate"><option value="exportar">🎬 até o MP4 pronto</option><option value="editor">📝 roteiro + voz → editor</option><option value="cortes">✂ só cortar</option></select>
+      <button class="si-ok" onclick="myProduzir()" ${rod ? 'disabled' : ''}>✂ fazer os cortes marcados</button>
+      <details style="display:inline-block"><summary class="si-mini si-sec" style="cursor:pointer;list-style:none">➕ corte meu</summary>
+        <div class="si-linha"><input id="n_t0" placeholder="começo 2:30" style="width:110px"><input id="n_t1" placeholder="fim 3:10" style="width:110px">
+          <input id="n_alvo" placeholder="alvo (opcional)" style="width:160px"><button class="si-mini" onclick="myNovoCorte()">➕</button></div></details></div>` : ''}
+    <details style="margin-top:8px"><summary class="si-dica" style="cursor:pointer">🔁 analisar de novo (colar transcrição / gráfico)</summary>
+      <textarea id="r_trans" rows="3" placeholder="transcrição do YouTube (Mostrar transcrição → copiar)"></textarea>
+      <textarea id="r_heat" rows="2" placeholder="outerHTML do <svg class=&quot;ytp-heat-map-svg&quot;>"></textarea>
+      <button class="si-mini" onclick="myReanalisar()" ${rod ? 'disabled' : ''}>🔁 analisar de novo</button></details>
+  </div>
+  <div class="my-cortes">${(p.cortes || []).map(c => cardCorte(p, c)).join('')}</div>`;
+  if (el('p_ate')) el('p_ate').value = ['exportar', 'editor', 'cortes'].includes(p.config.ate) ? p.config.ate : 'exportar';
+  el('proj').querySelectorAll('.my-c').forEach(card => {
+    const n = +card.dataset.n;
+    card.querySelectorAll('[data-f]').forEach(inp => inp.addEventListener('change', async () => {
+      const d = {}; d[inp.dataset.f] = inp.type === 'checkbox' ? inp.checked : inp.value;
+      try { desenhar(await post(`/momentos-yt/${PID}/corte/${n}`, d)); aviso('💾 salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }));
+    card.querySelector('[data-a=apagar]').onclick = async () => { if (!confirm('Tirar este corte?')) return;
+      try { desenhar(await post(`/momentos-yt/${PID}/corte/${n}/apagar`)); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+    card.querySelector('[data-a=so]').onclick = () => myProduzir([n]);
+  });
+  return rod || (p.cortes || []).some(c => c.curto_info && c.curto_info.prog && !c.curto_info.pronto && /roteiro|cortando|virando/.test(c.estado || ''));
+}
+async function atualizar() {
+  if (!PID) { el('proj').innerHTML = ''; return; }
+  try { const j = await (await fetch(`/momentos-yt/${PID}/estado`)).json(); if (!j.ok) { el('proj').innerHTML = ''; return; }
+    const rod = desenhar(j); clearTimeout(timer); timer = setTimeout(atualizar, rod ? 2000 : 20000); if (!rod) lista(); }
+  catch (e) { clearTimeout(timer); timer = setTimeout(atualizar, 8000); }
+}
+window.myProduzir = async (so) => { try { desenhar(await post(`/momentos-yt/${PID}/produzir`, {ate: el('p_ate') ? el('p_ate').value : 'exportar', so: so || []}));
+  aviso('✂ começou', 'okk'); setTimeout(atualizar, 800); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.myNovoCorte = async () => { try { desenhar(await post(`/momentos-yt/${PID}/corte/novo`, {t0: el('n_t0').value, t1: el('n_t1').value, alvo: el('n_alvo').value})); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.myReanalisar = async () => { const d = {}; if (el('r_trans').value.trim()) d.transcricao = el('r_trans').value; if (el('r_heat').value.trim()) d.heatmap = el('r_heat').value;
+  try { desenhar(await post(`/momentos-yt/${PID}/reanalisar`, d)); setTimeout(atualizar, 800); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.myApagar = async () => { if (!confirm('Apagar este vídeo e os cortes? (os curtos criados continuam)')) return;
+  try { await post(`/momentos-yt/${PID}/apagar`); PID = ''; history.replaceState(null, '', '?'); el('proj').innerHTML = ''; lista(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+lista(); atualizar();
+})();
+</script>
+{% endblock %}

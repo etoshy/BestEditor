@@ -12153,6 +12153,8 @@ import minerador_rotas as _minerador_rotas  # noqa: E402  ⛏ Minerador TikTok: 
 _minerador_rotas.registrar(app, BASE_DIR)
 import achar_fonte as _achar_fonte  # noqa: E402  🔎 Achar a fonte: trocas de cena → prints → Google Lens (v84_289)
 _achar_fonte.registrar(app, BASE_DIR)
+import momentos_yt as _momentos_yt  # noqa: E402  🔥 Momentos mais vistos (vídeo longo → curtos) (v84_291)
+_momentos_yt.registrar(app, BASE_DIR, _curto_transcrever)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)

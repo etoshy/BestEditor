@@ -57,7 +57,7 @@ def novo(base: str, link: str = "", titulo: str = "") -> Dict[str, Any]:
     pid = uuid.uuid4().hex[:10]
     os.makedirs(os.path.join(pasta(base, pid), "quadros"), exist_ok=True)
     p = {"id": pid, "link": link.strip(), "titulo": (titulo or "").strip()[:120] or (link.strip()[-60:] if link else "Vídeo"),
-         "criado": time.time(), "cenas": [], "video": "", "dur": 0, "sensibilidade": 0.3, "por_cena": 2}
+         "criado": time.time(), "cenas": [], "video": "", "dur": 0, "sensibilidade": 0.3, "por_cena": 2, "modo": "cenas"}
     salvar(base, p)
     return p
 
@@ -71,7 +71,8 @@ def listar(base: str) -> List[Dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
         out.append({"id": pid, "titulo": p.get("titulo"), "cenas": len(p.get("cenas") or []), "criado": p.get("criado") or 0,
-                    "achadas": sum(1 for c in p.get("cenas") or [] if c.get("fonte")), "link": p.get("link") or ""})
+                    "achadas": sum(1 for c in p.get("cenas") or [] if c.get("fonte")), "link": p.get("link") or "",
+                    "modo": p.get("modo") or "cenas"})
     return sorted(out, key=lambda x: -x["criado"])
 
 
@@ -140,9 +141,8 @@ def _quase_preto(cam: str) -> bool:
         return False
 
 
-def analisar(base: str, pid: str, prog: Callable[[str], None] = lambda m: None) -> Dict[str, Any]:
-    p = carregar(base, pid)
-    d = pasta(base, pid)
+def _garantir_video(base: str, p: Dict[str, Any], prog: Callable[[str], None]) -> str:
+    d = pasta(base, p["id"])
     cam = os.path.join(d, p.get("video") or "video.mp4")
     if not os.path.isfile(cam):
         if not p.get("link"):
@@ -157,6 +157,145 @@ def analisar(base: str, pid: str, prog: Callable[[str], None] = lambda m: None) 
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
         p["video"] = os.path.basename(cam)
+    return cam
+
+
+# ---------------------------------------------------------------------------------------------------- 📍 modo 3 momentos
+# Em vez de achar todas as trocas de cena, sorteia 3 momentos (um no começo, um no meio, um no fim). Cada momento dá pra
+# reposicionar (escolhe o ponto no player e tira o print de novo), sortear outro, e dá pra adicionar mais momentos.
+FAIXAS = [("começo", 0.03, 0.33), ("meio", 0.33, 0.66), ("fim", 0.66, 0.97)]
+
+
+def _faixa(nome: str) -> tuple:
+    for f in FAIXAS:
+        if f[0] == nome:
+            return f
+    return ("extra", 0.02, 0.98)
+
+
+def _print_momento(d: str, cam: str, n: int, t: float, aceita_preto: bool = False) -> Optional[Dict[str, Any]]:
+    q = os.path.join(d, "quadros")
+    os.makedirs(q, exist_ok=True)
+    nome = f"p{n:03d}_{int(round(t * 1000))}.jpg"
+    dest = os.path.join(q, nome)
+    if not tirar_print(cam, t, dest):
+        return None
+    if not aceita_preto and _quase_preto(dest):
+        os.remove(dest)
+        return None
+    _miniatura(dest, os.path.join(q, "m_" + nome))
+    return {"arq": nome, "t": round(t, 2)}
+
+
+def _apagar_prints(d: str, c: Dict[str, Any]) -> None:
+    for pr in c.get("prints") or []:
+        for nome in (pr["arq"], "m_" + pr["arq"]):
+            try:
+                os.remove(os.path.join(d, "quadros", os.path.basename(nome)))
+            except OSError:
+                pass
+
+
+def _sortear_print(d: str, cam: str, dur: float, n: int, faixa: str) -> Optional[Dict[str, Any]]:
+    import random
+    _, a, b = _faixa(faixa)
+    for _ in range(6):  # caiu num quadro preto (transição)? sorteia de novo
+        pr = _print_momento(d, cam, n, random.uniform(dur * a, dur * b))
+        if pr:
+            return pr
+    return _print_momento(d, cam, n, dur * (a + b) / 2, aceita_preto=True)
+
+
+def _cena_momento(n: int, faixa: str, pr: Dict[str, Any], velha: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    velha = velha or {}
+    return {"n": n, "t0": pr["t"], "t1": pr["t"], "momento": pr["t"], "faixa": faixa, "prints": [pr],
+            "fonte": velha.get("fonte", ""), "nota": velha.get("nota", "")}
+
+
+def analisar_momentos(base: str, pid: str, prog: Callable[[str], None] = lambda m: None) -> Dict[str, Any]:
+    p = carregar(base, pid)
+    d = pasta(base, pid)
+    cam = _garantir_video(base, p, prog)
+    dur = duracao(cam)
+    if dur <= 0:
+        raise FonteErro("não consegui ler a duração do vídeo")
+    prog("🎲 sorteando 3 momentos (começo, meio e fim)…")
+    velhas = {c["n"]: c for c in p.get("cenas") or [] if c.get("momento") is not None}  # fonte de cena não passa pra momento
+    for c in p.get("cenas") or []:
+        _apagar_prints(d, c)
+    cenas = []
+    for i, (nome, _, _) in enumerate(FAIXAS):
+        pr = _sortear_print(d, cam, dur, i + 1, nome)
+        if pr:
+            cenas.append(_cena_momento(i + 1, nome, pr, velhas.get(i + 1)))
+    p = carregar(base, pid)
+    p.update(cenas=cenas, dur=round(dur, 2), video=os.path.basename(cam), analisado=time.time(), modo="momentos")
+    salvar(base, p)
+    return p
+
+
+def mover_momento(base: str, pid: str, n: int, t: Optional[float] = None) -> Dict[str, Any]:
+    """Tira o print do momento n de novo: no segundo t (você escolheu no player) ou, sem t, sorteia outro na mesma faixa."""
+    p = carregar(base, pid)
+    d = pasta(base, pid)
+    cam = os.path.join(d, p.get("video") or "")
+    if not p.get("video") or not os.path.isfile(cam):
+        raise FonteErro("o vídeo ainda não foi baixado")
+    dur = float(p.get("dur") or duracao(cam))
+    for c in p.get("cenas") or []:
+        if c["n"] == n:
+            if t is None:
+                pr = _sortear_print(d, cam, dur, n, c.get("faixa") or "extra")
+            else:
+                pr = _print_momento(d, cam, n, max(0.0, min(float(t), max(0.0, dur - 0.05))), aceita_preto=True)
+            if not pr:
+                raise FonteErro("não consegui tirar o print nesse ponto")
+            _apagar_prints(d, c)
+            c.update(prints=[pr], t0=pr["t"], t1=pr["t"], momento=pr["t"])
+            salvar(base, p)
+            return c
+    raise FonteErro("momento não encontrado")
+
+
+def novo_momento(base: str, pid: str, t: Optional[float] = None) -> Dict[str, Any]:
+    p = carregar(base, pid)
+    d = pasta(base, pid)
+    cam = os.path.join(d, p.get("video") or "")
+    if not p.get("video") or not os.path.isfile(cam):
+        raise FonteErro("o vídeo ainda não foi baixado")
+    dur = float(p.get("dur") or duracao(cam))
+    n = max([c["n"] for c in p.get("cenas") or []] + [0]) + 1
+    if t is None:
+        pr = _sortear_print(d, cam, dur, n, "extra")
+    else:
+        pr = _print_momento(d, cam, n, max(0.0, min(float(t), max(0.0, dur - 0.05))), aceita_preto=True)
+    if not pr:
+        raise FonteErro("não consegui tirar o print nesse ponto")
+    c = _cena_momento(n, "extra", pr)
+    p.setdefault("cenas", []).append(c)
+    salvar(base, p)
+    return c
+
+
+def apagar_momento(base: str, pid: str, n: int) -> None:
+    p = carregar(base, pid)
+    d = pasta(base, pid)
+    resto = []
+    for c in p.get("cenas") or []:
+        if c["n"] == n:
+            _apagar_prints(d, c)
+        else:
+            resto.append(c)
+    p["cenas"] = resto
+    salvar(base, p)
+
+
+def analisar(base: str, pid: str, prog: Callable[[str], None] = lambda m: None) -> Dict[str, Any]:
+    p = carregar(base, pid)
+    if p.get("modo") == "momentos":
+        return analisar_momentos(base, pid, prog)
+    d = pasta(base, pid)
+    cam = _garantir_video(base, p, prog)
     dur = duracao(cam)
     prog(f"🎬 procurando as trocas de cena ({dur:.0f} s de vídeo)…")
     cortes = trocas_de_cena(cam, p.get("sensibilidade") or 0.3)
@@ -239,7 +378,11 @@ def _mmss(t: float) -> str:
 def lista_texto(p: Dict[str, Any]) -> str:
     L = [f"FONTES — {p.get('titulo')}", p.get("link") or "", ""]
     for c in p.get("cenas") or []:
-        L.append(f"Cena {c['n']:>3}  {_mmss(c['t0'])}-{_mmss(c['t1'])}  {c.get('fonte') or '(não achada)'}" + (f"  — {c['nota']}" if c.get("nota") else ""))
+        if c.get("momento") is not None:
+            cab = f"Momento {c['n']:>3}  {_mmss(c['momento'])} ({c.get('faixa') or 'extra'})"
+        else:
+            cab = f"Cena {c['n']:>3}  {_mmss(c['t0'])}-{_mmss(c['t1'])}"
+        L.append(f"{cab}  {c.get('fonte') or '(não achada)'}" + (f"  — {c['nota']}" if c.get("nota") else ""))
     return "\n".join(L) + "\n"
 
 
@@ -314,46 +457,104 @@ def _abrir(pw: Any, base: str) -> Any:
     return ctx
 
 
-def _buscar_na_aba(ctx: Any, job: Dict[str, Any], b: Dict[str, Any]) -> None:
-    m = MOTORES[job["motor"]]
-    vazias = [pg for pg in ctx.pages if pg.url in ("about:blank", "chrome://newtab/")]
-    page = vazias[0] if vazias else ctx.new_page()
+_SUBIR_TXT = re.compile(r"carregu?e um arquivo|enviar (um )?arquivo|fazer upload|upload a file|upload|escolher arquivo|browse", re.I)
+
+
+def _abrir_pagina(page: Any, m: Dict[str, Any], b: Dict[str, Any]) -> None:
     b["msg"] = f"🌐 abrindo o {m['nome']}…"
     page.goto(m["url"], wait_until="domcontentloaded", timeout=60000)
     page.bring_to_front()
-    page.wait_for_timeout(1200)
+    try:  # no 1º clique o navegador acabou de abrir: espera a página carregar de verdade (antes o clique na câmera se perdia)
+        page.wait_for_load_state("load", timeout=15000)
+    except Exception:  # noqa: BLE001
+        pass
+    page.wait_for_timeout(800)
     for t in ("Aceitar tudo", "Accept all", "Concordo", "I agree", "Allow all", "Accept"):  # aviso de cookies
         try:
             bt = page.get_by_role("button", name=re.compile(rf"^{t}$", re.I)).first
             if bt.count() and bt.is_visible():
                 bt.click(timeout=1500)
+                try:  # o aviso do Google recarrega a página: espera ela voltar
+                    page.wait_for_load_state("load", timeout=15000)
+                except Exception:  # noqa: BLE001
+                    pass
+                page.wait_for_timeout(800)
+                if m["url"].split("?")[0].rstrip("/") not in page.url:
+                    page.goto(m["url"], wait_until="load", timeout=60000)
                 break
         except Exception:  # noqa: BLE001
             pass
 
-    def por_arquivo() -> bool:
-        inp = page.locator('input[type=file]')
-        if inp.count():
-            inp.first.set_input_files(job["arquivo"])
-            return True
+
+def _enviar_arquivo(page: Any, m: Dict[str, Any], arquivo: str, camera_primeiro: bool = False) -> bool:
+    def por_arquivo(espera_ms: int) -> bool:
+        fim = time.time() + espera_ms / 1000
+        while True:
+            try:
+                inp = page.locator('input[type=file]')
+                if inp.count():
+                    inp.first.set_input_files(arquivo)
+                    return True
+            except Exception:  # noqa: BLE001
+                pass
+            if time.time() >= fim:
+                return False
+            page.wait_for_timeout(250)
+
+    def pelo_seletor_de_arquivo() -> bool:  # botão "carregue um arquivo" que abre a janela de escolher arquivo
+        try:
+            alvo = page.get_by_role("button", name=_SUBIR_TXT).or_(page.get_by_text(_SUBIR_TXT)).first
+            if alvo.count() and alvo.is_visible():
+                with page.expect_file_chooser(timeout=4000) as fc:
+                    alvo.click(timeout=3000)
+                fc.value.set_files(arquivo)
+                return True
+        except Exception:  # noqa: BLE001
+            pass
         return False
-    ok = False
-    try:
-        ok = por_arquivo()
-    except Exception:  # noqa: BLE001
-        ok = False
-    if not ok:
+
+    if not camera_primeiro and por_arquivo(0 if m["camera"] else 5000):
+        return True
+    for _ in range(3):  # o painel da câmera às vezes demora (navegador recém-aberto): tenta de novo com calma
         for sel in m["camera"]:
             try:
                 el = page.locator(sel).first
-                if el.count() and el.is_visible():
-                    el.click(timeout=3000)
-                    page.wait_for_timeout(1000)
-                    if por_arquivo():
-                        ok = True
-                        break
+                if not (el.count() and el.is_visible()):
+                    continue
+                el.click(timeout=3000)
             except Exception:  # noqa: BLE001
                 continue
+            if por_arquivo(6000) or pelo_seletor_de_arquivo():
+                return True
+            break  # clicou na câmera mas o painel não veio: NÃO clica em outro seletor (fecharia o painel) — espera e repete
+        page.wait_for_timeout(1200)
+        if por_arquivo(0):
+            return True
+    return pelo_seletor_de_arquivo()
+
+
+def _buscar_na_aba(ctx: Any, job: Dict[str, Any], b: Dict[str, Any]) -> None:
+    m = MOTORES[job["motor"]]
+    vazias = [pg for pg in ctx.pages if pg.url in ("about:blank", "chrome://newtab/", "chrome://new-tab-page/")]
+    page = vazias[0] if vazias else ctx.new_page()
+    ok = False
+    for tentativa in range(2):  # se a 1ª falhar (página ainda carregando), recarrega e tenta de novo sozinho
+        _abrir_pagina(page, m, b)
+        inicio = page.url
+        if not _enviar_arquivo(page, m, job["arquivo"], camera_primeiro=tentativa > 0):
+            b["msg"] = f"🔁 {m['nome']}: tentando de novo…"
+            continue
+        if job["motor"] != "lens" or not inicio.startswith("http"):
+            ok = True
+            break
+        for _ in range(40):  # o Lens só vale se saiu da página inicial (foi pro resultado)
+            page.wait_for_timeout(250)
+            if page.url != inicio:
+                ok = True
+                break
+        if ok:
+            break
+        b["msg"] = f"🔁 {m['nome']}: a imagem não subiu, tentando de novo…"
     if not ok:
         raise FonteErro(f"não achei onde enviar a imagem no {m['nome']} — use 📋 copiar e cole (Ctrl+V) na janela que abriu")
     b["msg"] = f"🔍 {m['nome']}: procurando…"
@@ -458,6 +659,7 @@ def registrar(app, base: str) -> None:
             p["por_cena"] = 1 if request.form.get("por_cena") == "1" else 2
         except ValueError:
             pass
+        p["modo"] = "momentos" if request.form.get("modo") == "momentos" else "cenas"
         if arq and arq.filename:
             nome = "video" + (os.path.splitext(secure_filename(arq.filename))[1] or ".mp4")
             arq.save(os.path.join(pasta(base, p["id"]), nome))
@@ -479,6 +681,8 @@ def registrar(app, base: str) -> None:
                 p["sensibilidade"] = max(0.05, min(0.9, float(d["sensibilidade"])))
             if "por_cena" in d:
                 p["por_cena"] = 1 if int(d["por_cena"]) == 1 else 2
+            if d.get("modo") in ("cenas", "momentos"):
+                p["modo"] = d["modo"]
             salvar(base, p)
             _rodar(pid)
         except (FonteErro, ValueError) as exc:
@@ -530,6 +734,45 @@ def registrar(app, base: str) -> None:
             return _ok(cena=marcar(base, pid, n, d.get("fonte"), d.get("nota")))
         except FonteErro as exc:
             return _erro(exc)
+
+    def _livre(pid: str) -> None:
+        t = TAREFAS.get(pid)
+        if t and not t.get("fim"):
+            raise FonteErro("Espere terminar de analisar.")
+
+    def _t(d: Dict[str, Any]) -> Optional[float]:
+        v = d.get("t")
+        return None if v is None or v == "" else float(v)
+
+    @app.route("/achar-fonte/<pid>/momento/<int:n>", methods=["POST"])
+    def af_momento(pid: str, n: int):
+        _p(pid)
+        d = request.get_json(silent=True) or {}
+        try:
+            _livre(pid)
+            return _ok(cena=mover_momento(base, pid, n, _t(d)))
+        except (FonteErro, ValueError) as exc:
+            return _erro(exc)
+
+    @app.route("/achar-fonte/<pid>/momento/novo", methods=["POST"])
+    def af_momento_novo(pid: str):
+        _p(pid)
+        d = request.get_json(silent=True) or {}
+        try:
+            _livre(pid)
+            return _ok(cena=novo_momento(base, pid, _t(d)))
+        except (FonteErro, ValueError) as exc:
+            return _erro(exc)
+
+    @app.route("/achar-fonte/<pid>/momento/<int:n>/apagar", methods=["POST"])
+    def af_momento_apagar(pid: str, n: int):
+        _p(pid)
+        try:
+            _livre(pid)
+            apagar_momento(base, pid, n)
+        except FonteErro as exc:
+            return _erro(exc)
+        return _ok()
 
     @app.route("/achar-fonte/<pid>/lista.txt")
     def af_lista_txt(pid: str):

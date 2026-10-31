@@ -1322,6 +1322,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             CT.salvar(base_dir, q)
         return "✅ vídeo pronto"
 
+    CB["rodar_link"] = _link_rodar  # 🔥 v84_291: os Momentos mais vistos usam o mesmo caminho (roteiro → voz → editor → MP4)
+
     @app.route("/curtos/link", methods=["GET"])
     def curtos_link_pagina():
         try:

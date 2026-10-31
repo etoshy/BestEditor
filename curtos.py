@@ -1526,6 +1526,40 @@ def _sys_roteiro(perfil: Dict[str, Any]) -> str:
             .replace("{destaque}", est))
 
 
+TAGS_TURBO = ("gasp", "laugh", "chuckle", "sigh", "groan", "sniff", "surprised", "sarcastic", "dramatic", "whispering", "happy")
+
+
+def usa_turbo(p: Dict[str, Any]) -> bool:
+    """🌍 a narração sai no Chatterbox Turbo (inglês, entende as tags de expressão [gasp], [laugh]…)?"""
+    cfg = p.get("config") or {}
+    slug = str(cfg.get("voz_tts") or "")
+    if slug and not slug.startswith("perfil:"):  # 🎭 voz do multi voice: vale o motor DELA
+        try:
+            import multivoz
+            v = next((x for x in multivoz.listar() if x.get("slug") == slug), None)
+            if v:
+                return v.get("motor") == "chatterbox_turbo"
+        except Exception:  # noqa: BLE001
+            pass
+    return (cfg.get("motor_perfil") or "") == "chatterbox_turbo"
+
+
+def regra_tags_turbo(p: Dict[str, Any]) -> str:
+    """📰 v84_291: notícia narrada no Chatterbox Turbo → a fala sai em INGLÊS com as tags de expressão."""
+    if not usa_turbo(p):
+        return ""
+    return ("\n\nVOZ — CHATTERBOX TURBO (inglês): escreva TODA a 'fala' de cada bloco em INGLÊS natural de shorts (mesmo que a "
+            "notícia ou o guia do canal estejam em outra língua; textos na tela e buscas também em inglês). Coloque de 1 a 4 tags de "
+            "expressão no vídeo inteiro, nos momentos certos, escolhidas destas: "
+            + ", ".join(f"[{t}]" for t in TAGS_TURBO)
+            + " (ex.: '[gasp] And then the unthinkable happened…', 'He said WHAT? [laugh]'). A tag fica DENTRO da fala, colada na frase "
+            "que ela colore; nunca outros colchetes; nada de tag em texto_tela.")
+
+
+def _sys_roteiro_do(p: Dict[str, Any], perfil: Dict[str, Any]) -> str:
+    return _sys_roteiro(perfil) + regra_tags_turbo(p)
+
+
 def palavras_alvo(perfil: Dict[str, Any], duracao: Optional[float] = None) -> int:
     d = float(duracao or perfil.get("duracao_alvo_s") or 45)
     return int(round(d * float(perfil["ritmo"].get("palavras_por_s") or 2.8)))
@@ -1536,6 +1570,8 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
     c = canal_do(base, p)
     dur = float((p.get("config") or {}).get("duracao_alvo_s") or 0) or perfil["duracao_alvo_s"]
     idioma = perfil.get("idioma") or (c or {}).get("idioma") or "o idioma da notícia"
+    if usa_turbo(p):
+        idioma = "INGLÊS (Chatterbox Turbo, com tags de expressão)"
     L = [f"CANAL: {(c or {}).get('nome') or '(sem canal — estilo padrão de shorts de notícia)'} · idioma da fala: {idioma}",
          f"DURAÇÃO DO VÍDEO: ~{int(dur)} s → cerca de {palavras_alvo(perfil, dur)} palavras de fala no total.",
          *([TEXTO_QUADRADO_PT] if proporcao_do(p) == "1:1" else []), "",
@@ -1562,7 +1598,7 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
 
 def prompt_roteiro(base: str, p: Dict[str, Any]) -> str:
     perfil = perfil_do(base, p)
-    return (_sys_roteiro(perfil) + "\n\n" + conteudo_roteiro(base, p) + "\n\nResponda APENAS com um JSON neste formato (sem ```):\n"
+    return (_sys_roteiro_do(p, perfil) + "\n\n" + conteudo_roteiro(base, p) + "\n\nResponda APENAS com um JSON neste formato (sem ```):\n"
             + json.dumps(_exemplo_schema(ROTEIRO_SCHEMA), ensure_ascii=False, indent=1))
 
 
@@ -1574,7 +1610,7 @@ def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = No
         import ia_servico
         chamar = ia_servico.chamar
     perfil = perfil_do(base, p)
-    r = chamar("curtos", _sys_roteiro(perfil), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=6000,
+    r = chamar("curtos", _sys_roteiro_do(p, perfil), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=6000,
                effort="medium", job=pid, cache_local=False)
     if not r:
         raise CurtoErro(motivo_ia() + " Use o 📋 prompt numa outra IA e cole a resposta.")

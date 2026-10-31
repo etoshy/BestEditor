@@ -107,6 +107,9 @@
   <h2><span class="ct-num">3</span> 🎙 Voz guia (TTS)</h2>
   <p class="ct-dica">Ouça o ritmo antes de gravar — ou use ela como a narração do vídeo.</p>
   <div class="ct-linha">
+    <label style="margin:0">Motor <select id="vMotor" title="o motor dos 🗣️ perfis de voz (as vozes 🎭 multi voice usam o motor delas)">
+      {% for k, n in [('xtts', 'XTTS (multilíngue)'), ('chatterbox', 'Chatterbox (multilíngue)'), ('chatterbox_turbo', '🌍 Chatterbox Turbo — inglês com tags [gasp] [laugh]…'), ('fish_s2', 'Fish S2')] %}
+      <option value="{{ k }}" {% if (p.config.motor_perfil or 'xtts') == k %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
     <select id="vVoz">{% for v in vozes %}<option value="{{ v.slug }}" {% if v.slug == p.config.voz_tts %}selected{% endif %}>{{ v.grupo }} · {{ v.nome }}</option>{% else %}<option value="">(nenhuma voz cadastrada — 🎙 Gerar voz)</option>{% endfor %}</select>
     <button id="bTTS" {% if not tem_tts %}disabled{% endif %}>🎙 Gerar voz guia</button>
     <button class="ct-sec" id="bUsarGuia">➡ Usar a voz guia no vídeo</button>
@@ -273,6 +276,10 @@ function desenharTTS() {
   $('tts').innerHTML = t ? `<div class="ct-linha"><audio controls src="${arq(t.arquivo)}?v=${t.quando}"></audio><span class="ct-dica">${t.dur.toFixed(1)} s${t.desatualizada ? ' · ⚠ o roteiro mudou depois' : ''}</span></div>` : '';
 }
 $('bTTS').onclick = () => rodar(BASE + '/tts', { voz: $('vVoz').value });
+$('vMotor').onchange = async () => {  // 🌍 v84_291: o motor muda a lista de vozes e, no Turbo, o roteiro sai em inglês com tags
+  try { await api(BASE + '/config', { motor_perfil: $('vMotor').value, voz_tts: '' });
+    barra($('vMotor').value === 'chatterbox_turbo' ? '🌍 Chatterbox Turbo: refaça o roteiro (2) pra ele sair em inglês com as tags de expressão' : '✅ motor trocado', 'okk');
+    setTimeout(() => location.reload(), 1200); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bUsarGuia').onclick = () => rodar(BASE + '/gravacao/usar-guia', opcoes());
 
 // ---------------------------------------------------------------- 4 gravação

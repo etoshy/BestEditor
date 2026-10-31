@@ -73,3 +73,60 @@ a.onclick = () => { document.title = 'EXATAS:' + n.name; }; document.body.append
         _t.sleep(0.2)
     assert AF._BUSCAS[bid]["estado"] == "ok", AF._BUSCAS[bid]
     assert "Correspondências exatas" in AF._BUSCAS[bid]["msg"]
+
+
+def test_3_momentos_sorteia_comeco_meio_fim_e_reposiciona(tmp_path, monkeypatch):
+    """📍 modo 3 momentos: um print no começo, um no meio e um no fim; dá pra mover, sortear, adicionar e apagar."""
+    monkeypatch.setenv("FONTES_VIDEO_DIR", str(tmp_path / "fv"))
+    b = str(tmp_path)
+    p = AF.novo(b, "", "t")
+    _video(os.path.join(AF.pasta(b, p["id"]), "video.mp4"))
+    p.update(video="video.mp4", modo="momentos")
+    AF.salvar(b, p)
+    p = AF.analisar(b, p["id"])
+    assert [c["faixa"] for c in p["cenas"]] == ["começo", "meio", "fim"]
+    dur = p["dur"]
+    for c, (_, a, z) in zip(p["cenas"], AF.FAIXAS):
+        assert dur * a - 0.05 <= c["momento"] <= dur * z + 0.05 and len(c["prints"]) == 1
+    velho = p["cenas"][1]["prints"][0]["arq"]
+    c = AF.mover_momento(b, p["id"], 2, 7.5)
+    assert c["momento"] == 7.5 and c["prints"][0]["arq"] != velho
+    assert not os.path.exists(os.path.join(AF.pasta(b, p["id"]), "quadros", velho))  # o print velho some
+    AF.marcar(b, p["id"], 2, "https://exemplo.com/v", "")
+    c = AF.mover_momento(b, p["id"], 2)  # 🎲 sorteia outro na mesma faixa e mantém a fonte marcada
+    assert dur * 0.33 - 0.05 <= c["momento"] <= dur * 0.66 + 0.05 and c["fonte"] == "https://exemplo.com/v"
+    n = AF.novo_momento(b, p["id"], 1.0)
+    assert n["n"] == 4 and n["faixa"] == "extra"
+    assert "Momento   4  0:01 (extra)" in AF.lista_texto(AF.carregar(b, p["id"]))
+    AF.apagar_momento(b, p["id"], 4)
+    assert len(AF.carregar(b, p["id"])["cenas"]) == 3
+
+
+def test_lens_no_primeiro_clique_com_painel_lento(tmp_path, monkeypatch):
+    """Navegador recém-aberto: o painel da câmera demora pra aparecer. Antes falhava e precisava clicar de novo."""
+    import time as _t
+    monkeypatch.setenv("FONTES_VIDEO_DIR", str(tmp_path / "fv"))
+    monkeypatch.setenv("FONTE_NAVEGADOR_OCULTO", "1")
+    pagina = tmp_path / "lens_lento.html"
+    pagina.write_text("""<!doctype html><html><body>
+<div role="button" aria-label="Pesquisar por imagem" onclick="setTimeout(() => { if (!document.getElementById('f')) {
+  const i = document.createElement('input'); i.type = 'file'; i.id = 'f'; document.body.appendChild(i);
+  i.addEventListener('change', e => { document.title = 'enviado:' + e.target.files[0].name;
+    const a = document.createElement('a'); a.href = '#x'; a.textContent = 'Correspondências exatas'; document.body.appendChild(a); }); } }, 2500)">cam</div>
+</body></html>""", encoding="utf-8")
+    monkeypatch.setitem(AF.MOTORES, "lens", dict(AF.MOTORES["lens"], url=pagina.as_uri()))
+    monkeypatch.setattr(AF, "_NAV", {"thread": None})
+    monkeypatch.setattr(AF, "_FILA", None)
+    b = str(tmp_path)
+    p = AF.novo(b, "", "t")
+    _video(os.path.join(AF.pasta(b, p["id"]), "video.mp4"))
+    p["video"] = "video.mp4"
+    AF.salvar(b, p)
+    p = AF.analisar(b, p["id"])
+    bid = AF.buscar_no_navegador(b, p["id"], p["cenas"][0]["prints"][0]["arq"], "lens")
+    for _ in range(200):
+        if AF._BUSCAS[bid]["estado"] in ("ok", "erro"):
+            break
+        _t.sleep(0.2)
+    assert AF._BUSCAS[bid]["estado"] == "ok", AF._BUSCAS[bid]
+    assert "Correspondências exatas" in AF._BUSCAS[bid]["msg"]
