@@ -84,7 +84,7 @@ def _melhor(caixas: List[Caixa], antes: Optional[Caixa]) -> Optional[Caixa]:
 
 
 def detectar(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes: Sequence[float], pasta: str,
-             prog: Prog = lambda m: None, passo: float = 0.5, max_claude: int = 30) -> Dict[str, List[Tuple[float, Optional[Caixa]]]]:
+             prog: Prog = lambda m: None, passo: float = 0.5, max_claude: int = 30, largura: int = 640) -> Dict[str, List[Tuple[float, Optional[Caixa]]]]:
     """{objeto: [(t, caixa | None)]} — `visao.achar(img, objeto)` (lista de caixas; None = não sabe detectar → o Claude acha
     todos os objetos de uma vez em 1-3 quadros por plano via `visao.achar_varios_claude`)."""
     objetos = [o for o in [papeis.get("principal")] + list(papeis.get("acao") or []) + list(papeis.get("destino") or []) if o]
@@ -92,7 +92,7 @@ def detectar(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes:
     out: Dict[str, List[Tuple[float, Optional[Caixa]]]] = {o: [] for o in objetos}
     if not objetos:
         return out
-    quadros = extrair_quadros(video, os.path.join(pasta, "det"), 1.0 / passo, 640, 0.0, dur)
+    quadros = extrair_quadros(video, os.path.join(pasta, "det"), 1.0 / passo, largura, 0.0, dur)
     sem_detect = False
     ult: Dict[str, Optional[Caixa]] = {o: None for o in objetos}
     for k, (t, img) in enumerate(quadros):
@@ -121,7 +121,7 @@ def detectar(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes:
                 continue
             if math.dist(_centro(a), _centro(b)) < 0.12:
                 continue
-            for q_t, q_img in extrair_quadros(video, os.path.join(pasta, f"fino_{o[:8]}_{int(ta * 100)}"), 8.0, 640, ta + 0.125, tb - ta - 0.1):
+            for q_t, q_img in extrair_quadros(video, os.path.join(pasta, f"fino_{o[:8]}_{int(ta * 100)}"), 8.0, largura, ta + 0.125, tb - ta - 0.1):
                 cs = visao.achar(q_img, o)
                 extra.append((q_t, _melhor(cs or [], a)))
         if extra:
@@ -175,9 +175,89 @@ def velocidade(pts: Sequence[Tuple[float, Optional[Caixa]]], t: float, cortes: S
     return math.dist(_centro(a), _centro(b)) / (2 * dt)
 
 
+def limpar_saltos(pts: List[Tuple[float, Optional[Caixa]]], cortes: Sequence[float], salto: float = 0.28) -> List[Tuple[float, Optional[Caixa]]]:
+    """Detecção que PULA pra longe e volta (o detector confundiu com outra coisa por um quadro) vira 'não achou'."""
+    out = list(pts)
+    for i in range(1, len(out) - 1):
+        (ta, a), (t, b), (tc, c) = out[i - 1], out[i], out[i + 1]
+        if a is None or b is None or c is None:
+            continue
+        if not (_plano_de(ta, cortes) == _plano_de(t, cortes) == _plano_de(tc, cortes)):
+            continue
+        if math.dist(_centro(a), _centro(b)) > salto and math.dist(_centro(c), _centro(b)) > salto and math.dist(_centro(a), _centro(c)) < salto:
+            out[i] = (t, None)
+    return out
+
+
+def analisar(visao: Any, video: str, dur: float, papeis: Dict[str, Any], cortes: Sequence[float], prog: Prog = lambda m: None,
+             passo: float = 0.5) -> Dict[str, Any]:
+    """🗺 O MAPA de objetos do clipe (deitado): onde cada um está a cada `passo` s + os eventos (lançamento, chegada).
+    → {"tracks": {obj: [[t, x0, y0, x1, y1] | [t, None]]}, "eventos": [...], "visivel": {obj: [[t0, t1], ...]}}"""
+    pasta = tempfile.mkdtemp(prefix="mapa_")
+    try:
+        tracks = detectar(visao, video, dur, papeis, cortes, pasta, prog, passo=passo, largura=960)
+    finally:
+        shutil.rmtree(pasta, ignore_errors=True)
+    principal = papeis.get("principal")
+    if principal in tracks:
+        tracks[principal] = limpar_saltos(tracks[principal], cortes)
+    plano = planejar(tracks, papeis, dur, cortes, 1920, 1080)
+    return {"tracks": {o: [[t, *c] if c else [t, None] for t, c in pts] for o, pts in tracks.items()},
+            "eventos": plano["eventos"], "visivel": {o: janelas_visiveis(pts) for o, pts in tracks.items()}}
+
+
+def janelas_visiveis(pts: Sequence[Tuple[float, Optional[Caixa]]], folga: float = 1.1) -> List[List[float]]:
+    out: List[List[float]] = []
+    for t, c in pts:
+        if c is None:
+            continue
+        if out and t - out[-1][1] <= folga:
+            out[-1][1] = t
+        else:
+            out.append([t, t])
+    return [[round(a, 1), round(b, 1)] for a, b in out]
+
+
+def tracks_do_mapa(mapa_tracks: Dict[str, Any]) -> Dict[str, List[Tuple[float, Optional[Caixa]]]]:
+    return {o: [(float(x[0]), tuple(x[1:5]) if len(x) >= 5 and x[1] is not None else None) for x in pts]  # type: ignore[misc]
+            for o, pts in (mapa_tracks or {}).items()}
+
+
+def enquadrar_pedaco(video: str, ini: float, fim: float, saida: str, mapa_tracks: Dict[str, Any], foco: str, principal: str,
+                     cortes: Sequence[float], prog: Prog = lambda m: None, acao: Sequence[str] = (), destino: Sequence[str] = (),
+                     abrir_inicio: bool = False) -> Dict[str, Any]:
+    """🎥 Um pedaço [ini, fim] do clipe DEITADO vira vertical focando `foco` (o objeto da fala); onde o foco não aparece, o
+    principal; onde nada aparece, a câmera fica parada onde estava. Usa o mapa já feito (não detecta de novo)."""
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                        video], capture_output=True, text=True, timeout=60)
+    w0, h0 = (int(v) for v in r.stdout.strip().split(",")[:2])
+    escala = min(1.0, 1920 / w0)
+    W, H = int(w0 * escala) // 2 * 2, int(h0 * escala) // 2 * 2
+    dur = max(0.1, fim - ini)
+    todos = tracks_do_mapa(mapa_tracks)
+    perto = {o: [(t - ini, c) for t, c in pts if ini - 2.0 <= t <= fim + 2.0] for o, pts in todos.items()}
+    cortes_p = [c - ini for c in cortes if ini < c < fim]
+    tem = lambda o: any(c is not None and 0 <= t <= dur for t, c in perto.get(o) or [])  # noqa: E731
+    alvo = foco if foco and tem(foco) else principal if principal and tem(principal) else ""
+    seguir_ = {"alvo": perto.get(alvo) or []}
+    if alvo and alvo != principal and principal:  # foco some no meio do pedaço → o principal cobre o buraco
+        pp = perto.get(principal) or []
+        seguir_["alvo"] = [(t, c if c is not None else caixa_em(pp, t, cortes_p, 0.8)) for t, c in seguir_["alvo"]]
+    for o in list(acao) + list(destino):  # modo automático (sem roteiro): a bola em voo ainda rouba a câmera
+        if o in perto:
+            seguir_[o] = perto[o]
+    plano = planejar(seguir_, {"principal": "alvo", "acao": [o for o in acao if o in perto], "destino": [o for o in destino if o in perto]},
+                     dur, cortes_p, W, H, abrir_inicio=abrir_inicio)
+    caminho = suavizar(plano["alvos"], cortes_p, W, H, FPS, dur)
+    renderizar(video, ini, fim, saida, caminho, W, H, prog)
+    visiveis = {o: pts for o, pts in perto.items()}
+    return {"rastros": rastros_no_vertical(visiveis, caminho, W, H), "foco": alvo, "eventos": plano["eventos"]}
+
+
 # ---------------------------------------------------------------------------------------------------- 2. planejar
 def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dict[str, Any], dur: float, cortes: Sequence[float],
-             W: int, H: int, abrir_inicio: bool = True, passo: float = 0.1, sem_barras: bool = True) -> Dict[str, Any]:
+             W: int, H: int, abrir_inicio: bool = True, passo: float = 0.1, sem_barras: bool = True,
+             segurar: bool = True) -> Dict[str, Any]:
     """→ {"alvos": [(t, cx, cy, vw)] (px do original, sem suavizar), "eventos": [...], "foco": [(t, nome)]}.
     sem_barras (padrão): o vertical SEMPRE preenche a tela — o zoom fecha quando dá, mas nunca abre além da altura inteira do
     vídeo; pra mostrar o que importa a câmera ANDA (pra frente/pra trás) em vez de abrir com barras."""
@@ -239,7 +319,9 @@ def planejar(tracks: Dict[str, List[Tuple[float, Optional[Caixa]]]], papeis: Dic
                 A = caixa_em(tracks[o], t, cortes)
                 if A is not None and P is not None and _toca(A, _crescer(P, 1.4)):
                     reg = _uniao(reg, A)
-        if reg is None:
+        if reg is None and segurar:  # sumiu da detecção: a câmera FICA onde estava (não sai passeando pela torcida)
+            reg = ultimo_reg
+        elif reg is None:
             reg = ultimo_reg if ultimo_reg is not None and _plano_de(t, cortes) == _plano_de(max(0.0, t - passo), cortes) else None
         if reg is None:
             cx, cy, vw = W / 2, H / 2, cw
@@ -436,6 +518,8 @@ def seguir(visao: Any, video_cru: str, video_original: str, t0: float, t1: float
     pasta = tempfile.mkdtemp(prefix="cam_")
     try:
         tracks = detectar(visao, video_cru, dur, papeis, cortes, pasta, prog, passo=passo)
+        if papeis.get("principal") in tracks:
+            tracks[papeis["principal"]] = limpar_saltos(tracks[papeis["principal"]], cortes)
         plano = planejar(tracks, papeis, dur, cortes, W, H)
         caminho = suavizar(plano["alvos"], cortes, W, H, FPS, dur)
         renderizar(video_original, t0, t1, saida, caminho, W, H, prog)

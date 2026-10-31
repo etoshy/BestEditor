@@ -1716,6 +1716,8 @@ def _trecho_da_cena(cn: Dict[str, Any]) -> Dict[str, Any]:
             out["ate"] = round(max(out["de"], float(cn.get("ate") if cn.get("ate") not in (None, "") else out["de"])), 2)
     except (TypeError, ValueError):
         pass
+    if _limpo(cn.get("foco"), 80):  # 🎥 v84_296: o objeto em que o vertical foca nessa cena (o que a fala está mostrando)
+        out["foco"] = _limpo(cn["foco"], 80)
     d = cn.get("destaque") if isinstance(cn.get("destaque"), dict) else {}
     if d.get("alvo"):
         import rastreio
@@ -2320,7 +2322,7 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
                                if cn["layout"] in LAYOUTS_ANIME else {}),
                             "entrada": (cn.get("entrada") if j == 0 else ("punch_in" if cn.get("entrada") in ("punch_in", "flash", "shake") else "none")) or "none",
                             **({"clipe": {"mid": cn["material"], "de": float(cn["de"]), "ate": float(cn.get("ate") or cn["de"]),
-                                          "off": round(limites[j] - s0, 3)},
+                                          "off": round(limites[j] - s0, 3), "foco": cn.get("foco") or ""},
                                 "efeito": (cn.get("efeito") or "") if j == 0 else
                                 (_efeito_seguinte(cn.get("efeito") or "", j) if contexto else ("zoom_in", "zoom_out", "zoom_respiro")[j % 3]),
                                 "entrada": (cn.get("entrada") or "none") if j == 0 else ("none" if contexto else "punch_in")} if clipe else {}),
@@ -2358,6 +2360,14 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
 def _efeito_seguinte(efeito: str, j: int) -> str:
     """Continuação de um momento longo do clipe: o movimento segue o sentido do anterior (aproxima → continua devagar; afasta → assenta)."""
     return {"zoom_in": "zoom_respiro", "zoom_rapido": "zoom_respiro", "zoom_out": "zoom_respiro", "": "zoom_respiro" if j % 2 else ""}.get(efeito, "zoom_respiro")
+
+
+def chave_enquadrado(x: Dict[str, Any]) -> str:
+    """🎥 v84_296: o pedaço vertical já enquadrado (no objeto da fala) de um plano de clipe deitado."""
+    c = x.get("clipe") or {}
+    if not c or "ini" not in c:
+        return ""
+    return f"{c.get('mid')}|{float(c['ini']):.2f}|{float(c['fim']):.2f}|{c.get('foco') or ''}"
 
 
 def chave_destaque(x: Dict[str, Any]) -> str:
@@ -2509,6 +2519,10 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     anime = anime_do(base, p)
     planos_v = planos_do_video(p, providers, perfil, anime["modo"])
     fixar_trechos_do_clipe(planos_v, {m["id"]: float(m.get("dur") or 0) for m in p.get("midias") or []})
+    for x in planos_v:  # 🎥 o pedaço vertical que focou no objeto da fala (curtos_comentario.enquadrar_planos)
+        v = ((p.get("enquadrados") or {}).get(chave_enquadrado(x)) or {}).get("mid")
+        if v and any(m["id"] == v for m in p.get("midias") or []):
+            x.update(query=v, enquadrado=v)
     for x in planos_v:  # 🎯 destaque já rastreado (curtos_comentario.preparar_destaques): o pedaço com o círculo/seta
         pronto = (p.get("destaques_prontos") or {}).get(chave_destaque(x))
         if pronto and any(m["id"] == pronto for m in p.get("midias") or []):

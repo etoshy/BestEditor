@@ -159,3 +159,86 @@ def test_reloader_ignora_a_pasta_dos_momentos():
     ini = src.index("def _padroes_excluidos_do_reloader")
     trecho = src[ini:src.index("return [os.path.join(p, \"*\")", ini)]
     assert '"momentos_yt"' in trecho
+
+
+def test_rota_testar_moondream(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOMENTOS_YT_DIR", str(tmp_path / "my"))
+    import momentos_yt as M
+    from flask import Flask
+    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(M.__file__), "templates"))
+    M.registrar(app, str(tmp_path))
+    cl = app.test_client()
+    for volta in ({"ok": True, "msg": "✅ funcionando"}, {"ok": False, "msg": "❌ não respondeu"}):
+        monkeypatch.setattr(M.Visao, "testar", lambda self, v=volta: v)
+        j = cl.post("/momentos-yt/visao/testar").get_json()
+        assert j == {"ok": True, "funcionou": volta["ok"], "msg": volta["msg"]}
+
+    def explode(self):
+        raise RuntimeError("sem memória")
+    monkeypatch.setattr(M.Visao, "testar", explode)
+    assert cl.post("/momentos-yt/visao/testar").get_json()["msg"] == "❌ sem memória"
+
+
+# ---------------------------------------------------------------------------------------------------- 🎥 v84_296: o roteiro decide o foco
+def _mapa_da_cena(cena):
+    r = CV.analisar(VisaoCores(), cena, 6, {"principal": "robot", "acao": ["ball"], "destino": ["hoop"]}, [], passo=0.5)
+    return r
+
+
+def test_mapa_e_pedaco_focando_o_objeto_da_fala(tmp_path):
+    cena = str(tmp_path / "cena.mp4")
+    _cena(cena)
+    mapa = _mapa_da_cena(cena)
+    assert [e["tipo"] for e in mapa["eventos"]] == ["lancamento", "chegada"]
+    assert mapa["visivel"]["robot"] == [[0.0, 5.5]] and mapa["visivel"]["hoop"]
+    vermelho = lambda p: p[0] > 200 and p[1] < 60 and p[2] < 60  # noqa: E731
+    azul = lambda p: p[2] > 200 and p[0] < 60 and p[1] < 60  # noqa: E731
+    # a fala é sobre o robô → o vertical fica nele, mesmo com a bola voando
+    a = str(tmp_path / "a.mp4")
+    CV.enquadrar_pedaco(cena, 1.5, 4.0, a, mapa["tracks"], "", "robot", [])
+    # a fala é sobre a cesta → o vertical vai pra cesta
+    b = str(tmp_path / "b.mp4")
+    r = CV.enquadrar_pedaco(cena, 1.5, 4.0, b, mapa["tracks"], "hoop", "robot", [])
+    assert r["foco"] == "hoop" and "hoop" in r["rastros"]
+    for arq, cor_sim, cor_nao in ((a, vermelho, azul), (b, azul, vermelho)):
+        f = str(tmp_path / "q.png")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "1.8", "-i", arq, "-frames:v", "1", f], check=True)
+        assert _centro_x(f, cor_sim) is not None and _centro_x(f, cor_nao) is None, arq
+
+
+def test_foco_que_nao_aparece_cai_no_principal_e_camera_nao_passeia(tmp_path):
+    tracks = {"robot": [[t / 2, 0.1, 0.4, 0.2, 0.9] if t not in (4, 5, 6) else [t / 2, None] for t in range(12)]}
+    pts = CV.tracks_do_mapa(tracks)["robot"]
+    # o robô some de 2,0 a 3,0 s: a câmera fica parada onde estava, não volta pro meio
+    p = CV.planejar({"robot": pts}, {"principal": "robot"}, 5.5, [], 1920, 1080, abrir_inicio=False)
+    xs = [cx for t, cx, cy, vw in p["alvos"] if 2.1 <= t <= 2.9]
+    assert xs and all(abs(x - 0.15 * 1920) < 5 for x in xs)
+    salto = [(0.0, (0.1, 0.4, 0.2, 0.9)), (0.5, (0.8, 0.1, 0.9, 0.3)), (1.0, (0.1, 0.4, 0.2, 0.9))]
+    assert CV.limpar_saltos(salto, [])[1] == (0.5, None)  # o detector confundiu por 1 quadro
+
+
+def test_enquadrar_planos_usa_o_foco_do_roteiro(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "curtos"))
+    import curtos as CT
+    import curtos_comentario as CC
+    import shutil
+    cena = str(tmp_path / "cena.mp4")
+    _cena(cena)
+    base = str(tmp_path)
+    p = CT.criar(base, "", "t", [], "", modelo="comentario")
+    cp = str(tmp_path / "c.mp4")
+    shutil.copy(cena, cp)
+    with CT._TRAVA:
+        q = CT.carregar(base, p["id"])
+        CT.adicionar_midia(base, q, cp, "video", "clipe", "M")
+        q["rastros_h"] = {"M1": dict(_mapa_da_cena(cena), principal="robot", cenas=[])}
+        CT.salvar(base, q)
+    planos = [{"start": 0, "end": 2, "bloco": "B1", "cena": 0, "parte": 0, "clipe": {"mid": "M1", "de": 1.5, "ate": 3.5, "foco": "the hoop"}},
+              {"start": 2, "end": 4, "bloco": "B2", "cena": 0, "parte": 0, "clipe": {"mid": "M1", "de": 0.0, "ate": 2.0, "foco": ""}}]
+    monkeypatch.setattr(CT, "planos_do_video", lambda *a, **k: [dict(x, clipe=dict(x["clipe"])) for x in planos])
+    assert CC.enquadrar_planos(base, p["id"]) == 2
+    q = CT.carregar(base, p["id"])
+    enq = list(q["enquadrados"].values())
+    assert [e["foco"] for e in enq] == ["hoop", "robot"] and [e["mid"] for e in enq] == ["V1", "V2"]
+    assert CC.enquadrar_planos(base, p["id"]) == 0  # já feito: não refaz
+    assert CC.objeto_no_mapa(q["rastros_h"]["M1"], "basket hoop") == "hoop"

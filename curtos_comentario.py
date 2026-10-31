@@ -293,7 +293,7 @@ ROTEIRO_SCHEMA = CT._o({
         "fala_en": CT._s(), "fala_pt": CT._s(),
         "cenas": {"type": "array", "items": CT._o({
             "layout": {"type": "string", "enum": ["clipe", "video", "foto", "ia", "ia_video"]}, "query": CT._s(),
-            "material": CT._s(), "de": CT._n(), "ate": CT._n(), "palavra": CT._s(),
+            "material": CT._s(), "de": CT._n(), "ate": CT._n(), "palavra": CT._s(), "foco": CT._s(),
             "efeito": {"type": "string", "enum": list(CT.EFEITOS_CURTOS) + [""]},
             "entrada": {"type": "string", "enum": list(CT.ENTRADAS_CURTOS)},
             "destaque": CT._o({"alvo": CT._s(), "tipo": {"type": "string", "enum": ["", "circulo", "seta", "quadrado", "mira", "holofote"]},
@@ -818,6 +818,65 @@ def chaves_dos_rastros(p: Dict[str, Any], mid: str, ini: float, fim: float, alvo
             if ini - 0.05 <= float(t) <= fim + 0.05 and w > 2 and h > 2]
 
 
+def enquadrar_planos(base: str, pid: str, on_log: Callable[[str], None] = lambda _m: None) -> int:
+    """🎥 v84_296: os clipes DEITADOS (com o mapa de objetos que a análise fez) viram pedaços VERTICAIS — um por plano, focando
+    o objeto da fala daquela cena ('foco' do roteiro; vazio = o assunto principal). Sem detectar de novo: usa o mapa.
+    Os pedaços entram como V1, V2… e o plano passa a usar eles (curtos.montar_dados_editor). Devolve quantos fez."""
+    import camera_virtual as CV
+    p = CT.carregar(base, pid)
+    rh = p.get("rastros_h") or {}
+    if not rh:
+        return 0
+    perfil = CT.perfil_do(base, p)
+    planos_v = CT.planos_do_video(p, (p.get("config") or {}).get("providers") or CT.PROVIDERS_PADRAO, perfil)
+    CT.fixar_trechos_do_clipe(planos_v, {m["id"]: float(m.get("dur") or 0) for m in p.get("midias") or []})
+    feitos = dict(p.get("enquadrados") or {})
+    novos = 0
+    alvo = [x for x in planos_v if (x.get("clipe") or {}).get("mid") in rh and CT.chave_enquadrado(x) not in feitos]
+    for k, x in enumerate(alvo, 1):
+        c = x["clipe"]
+        mapa = rh[c["mid"]]
+        m = next((mm for mm in clipes(base, p) if mm["id"] == c["mid"]), None)
+        if not m:
+            continue
+        foco = objeto_no_mapa(mapa, c.get("foco") or "") or mapa.get("principal") or ""
+        on_log(f"🎥 vertical {k}/{len(alvo)}: {c['mid']} {c['ini']:.1f}-{c['fim']:.1f}s focando “{foco or 'o meio'}”…")
+        tmp = os.path.join(CT.pasta(base, pid), "_enquadrar")
+        os.makedirs(tmp, exist_ok=True)
+        saida = os.path.join(tmp, "v.mp4")
+        try:
+            r = CV.enquadrar_pedaco(m["caminho"], float(c["ini"]), float(c["fim"]), saida, mapa.get("tracks") or {}, foco,
+                                    mapa.get("principal") or "", mapa.get("cenas") or [])
+        except Exception as exc:  # noqa: BLE001  (um pedaço ruim fica com o clipe como estava)
+            on_log(f"🎥 não deu pra enquadrar esse pedaço: {str(exc)[:120]}")
+            continue
+        with CT._TRAVA:
+            q = CT.carregar(base, pid)
+            mm = CT.adicionar_midia(base, q, saida, "video", f"🎥 {foco or 'meio'} ({c['mid']} {c['ini']:.1f}-{c['fim']:.1f}s)", "V")
+            q.setdefault("enquadrados", {})[CT.chave_enquadrado(x)] = {"mid": mm["id"], "rastros": r["rastros"], "foco": foco}
+            CT.salvar(base, q)
+            feitos = q["enquadrados"]
+        novos += 1
+    return novos
+
+
+def objeto_no_mapa(mapa: Dict[str, Any], nome: str) -> Optional[str]:
+    """O objeto do mapa que bate com o nome que o roteiro usou ("the ball" → "basketball")."""
+    if not nome:
+        return None
+    tr = mapa.get("tracks") or {}
+    if nome in tr:
+        return nome
+    A = _palavras(nome)
+    melhor, nota = None, 0.0
+    for o in tr:
+        N = _palavras(o)
+        comum = len(A & N) + 0.6 * sum(1 for a in A for n in N if a != n and (a in n or n in a))
+        if comum > nota:
+            melhor, nota = o, comum
+    return melhor
+
+
 def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = None, chamar: Optional[Callable[..., Any]] = None,
                        on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, Any]:
     """Pra cada plano com destaque: recorta o pedaço do clipe, a IA acha o objeto, o rastreio segue e desenha → a mídia
@@ -838,7 +897,18 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
             feitos.append(prontos[k])
             continue
         c, d = x["clipe"], x["destaque"]
-        m = next((mm for mm in clipes(base, p) if mm["id"] == c["mid"]), None)
+        enq = (p.get("enquadrados") or {}).get(CT.chave_enquadrado(x)) or {}
+        if enq.get("mid"):  # 🎥 o pedaço já vertical: o círculo vai em cima dele, com o rastro medido nele
+            mv = next((mm for mm in p.get("midias") or [] if mm["id"] == enq["mid"]), None)
+            cam_v = CT.caminho_midia(base, p, mv) if mv else None
+            if cam_v:
+                m = {"id": enq["mid"], "caminho": cam_v}
+                c = dict(c, mid=enq["mid"], ini=0.0, fim=float(mv.get("dur") or (c["fim"] - c["ini"])))
+                p = dict(p, rastros=dict(p.get("rastros") or {}, **{enq["mid"]: enq.get("rastros") or {}}))
+            else:
+                m = None
+        else:
+            m = next((mm for mm in clipes(base, p) if mm["id"] == c["mid"]), None)
         if not m:
             continue
         tmp = os.path.join(CT.pasta(base, pid), "_destaque")

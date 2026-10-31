@@ -652,12 +652,30 @@ def aplicar_visual(q: Dict[str, Any], cfg: Dict[str, Any]) -> None:
 def rastros_e_sons(q: Dict[str, Any], mid: str, c: Dict[str, Any]) -> List[str]:
     """Guarda no curto o que a câmera virtual mediu: as caixas de cada objeto (o círculo do destaque segue a coisa CERTA) e os
     eventos (lançamento, chegada) pros efeitos sonoros. Devolve os nomes dos objetos rastreados."""
-    if c.get("rastros"):
+    if c.get("deitado") and (c.get("mapa") or {}).get("tracks"):
+        q.setdefault("rastros_h", {})[mid] = {k: c["mapa"].get(k) for k in ("tracks", "cenas", "principal", "visivel")}
+    elif c.get("rastros"):
         q.setdefault("rastros", {})[mid] = c["rastros"]
     for e in c.get("eventos") or []:
         tipo, busca = EVENTO_SOM.get(e.get("tipo"), ("whoosh", ""))
         q.setdefault("eventos_som", []).append({"mid": mid, "t": float(e["t"]), "tipo": tipo, "busca": busca, "o_que": e.get("tipo")})
-    return list((c.get("rastros") or {}).keys())
+    return list(((c.get("mapa") or {}).get("tracks") or c.get("rastros") or {}).keys())
+
+
+def regra_foco(q: Dict[str, Any]) -> str:
+    """🎥 O roteiro decide o enquadramento: em cada cena de clipe, 'foco' = o objeto que a fala está mostrando."""
+    rh = q.get("rastros_h") or {}
+    if not rh:
+        return ""
+    L = ["VERTICAL FRAMING: the clips are WIDE (16:9) and will be cropped to vertical AFTER the script, following each cena's 'foco'. "
+         "In every clip cena set 'foco' = the EXACT name of the object the line is about at that moment (from the list below) — "
+         "'' = the main subject. Talk about the shot/pass/throw/ball → foco on the ball; about the hoop/goal → that; about the "
+         "crowd/people → '' unless listed. Pick de/ate where that object is VISIBLE (windows below, seconds of each clip)."]
+    for mid, m in rh.items():
+        vis = m.get("visivel") or {}
+        L.append(f"{mid}: main subject = '{m.get('principal') or '?'}'; " + "; ".join(
+            f"'{o}' visible " + (", ".join(f"{a:.1f}-{b:.1f}s" for a, b in js[:8]) or "never") for o, js in vis.items()))
+    return "\n".join(L)
 
 
 def regra_objetos(nomes: List[str]) -> str:
@@ -827,12 +845,14 @@ def criar_compilacao(base: str, pid: str, transcrever: Optional[Callable[..., An
                 nomes += rastros_e_sons(q, mids[c["n"]], c)
             if regra_objetos(nomes):
                 extra.append(regra_objetos(nomes))
+            if regra_foco(q):
+                extra.append(regra_foco(q))
             aplicar_visual(q, cfg)
             if comp.get("gancho"):
                 extra.append(f"Hook idea (Portuguese): {comp['gancho']}")
             if cfg.get("extra"):
                 extra.append(cfg["extra"])
-            q["config"]["extra"] = "\n".join(extra)[:3000]
+            q["config"]["extra"] = "\n".join(extra)[:4500]
             topico = [f"ASSUNTO: {comp.get('assunto') or p.get('titulo')}", f"Vídeo original: {p.get('titulo')} — canal {(p.get('info') or {}).get('canal') or '?'}"]
             if comp.get("fatos"):
                 topico += ["", "FATOS (do vídeo e conhecidos):", comp["fatos"]]
@@ -879,7 +899,7 @@ def cortar_climax(base: str, pid: str, prog: Prog = lambda m: None, baixador: Op
     prog("🔊 cortando o momento-chave (com o som original)…")
     if c and c.get("arquivo") and os.path.isfile(os.path.join(d, "cortes", c["arquivo"])):
         a = max(0.0, cl["t0"] - c["t0"])
-        return cortar(os.path.join(d, "cortes", c["arquivo"]), a, a + (cl["t1"] - cl["t0"]), saida, "null")
+        return vertical_automatico(base, pid, c["n"], a, a + (cl["t1"] - cl["t0"]), saida, prog)
     video = garantir_video(base, pid, prog, baixador)
     return cortar(video, cl["t0"], cl["t1"], saida, filtro_vertical(sondar(video), "seguir", []))
 
@@ -1536,14 +1556,20 @@ def produzir_corte(base: str, pid: str, n: int, prog: Prog = lambda m: None, bai
         nome = f"corte_{n:02d}.mp4"
         saida = os.path.join(d, "cortes", nome)
         cam: Dict[str, Any] = {}
+        mapa: Dict[str, Any] = {}
         papeis = {"principal": alvo, "acao": [a for a in c.get("acao") or [] if a], "destino": [x for x in c.get("destino") or [] if x]}
-        if modo == "seguir" and (alvo or papeis["acao"]):
+        if modo == "seguir":
+            # 🎥 v84_296: o corte fica na proporção ORIGINAL + o MAPA de onde está cada objeto. O vertical sai DEPOIS do roteiro,
+            # focando o que cada fala mostra (curtos_comentario.enquadrar_planos)
             import camera_virtual as CV
-            prog("🎥 câmera virtual: seguindo " + " → ".join([alvo] + papeis["acao"] + papeis["destino"]) + "…")
-            cam = CV.seguir(visao, cru, video, c["t0"], c["t1"], saida, papeis, cenas, prog, passo=getattr(visao, "passo", 0.5))
+            cortar(video, c["t0"], c["t1"], saida, "scale='min(1920,iw)':-2")
+            if alvo or papeis["acao"]:
+                prog("🗺 mapeando " + ", ".join([alvo] + papeis["acao"] + papeis["destino"]) + "…")
+                mapa = CV.analisar(visao, cru, dur, papeis, cenas, prog, passo=getattr(visao, "passo", 0.5))
+                mapa.update(cenas=cenas, principal=alvo)
+                cam = {"eventos": mapa.get("eventos") or [],
+                       "achados": {o: sum(1 for x in pts if x[1] is not None) for o, pts in (mapa.get("tracks") or {}).items()}}
         else:
-            if modo == "seguir":
-                prog("🎯 sem alvo — corte no meio do quadro")
             cortar(video, c["t0"], c["t1"], saida, filtro_vertical(info, modo, []))
         visual = []
         if visao.vc["backend"] != "nenhum":
@@ -1556,12 +1582,34 @@ def produzir_corte(base: str, pid: str, n: int, prog: Prog = lambda m: None, bai
     def guarda(q: Dict[str, Any]) -> None:
         for x in q["cortes"]:
             if x["n"] == n:
-                x.update(arquivo=nome, visual=visual, estado="✂ cortado", erro="", feito=time.time(),
-                         rastros=cam.get("rastros") or {}, eventos=cam.get("eventos") or [],
+                x.update(arquivo=nome, visual=visual, estado="✂ cortado", erro="", feito=time.time(), mapa=mapa, arquivo_vertical="",
+                         rastros={}, eventos=cam.get("eventos") or [], deitado=modo == "seguir",
                          enquadramento={"modo": modo, "alvo": alvo, "achados": achados, "por_objeto": cam.get("achados") or {},
-                                        "foco": cam.get("foco") or {}, "visao": visao.nome, "visao_erro": visao.erro})
+                                        "visivel": (mapa or {}).get("visivel") or {}, "visao": visao.nome, "visao_erro": visao.erro})
     mudar(base, pid, guarda)
     return next(x for x in carregar(base, pid)["cortes"] if x["n"] == n)
+
+
+def vertical_automatico(base: str, pid: str, n: int, ini: Optional[float] = None, fim: Optional[float] = None,
+                        saida: Optional[str] = None, prog: Prog = lambda m: None) -> str:
+    """Sem roteiro (✂ só cortar / o momento-chave): o vertical sai do corte deitado com a câmera automática (segue o principal;
+    a ação em movimento rouba a câmera) usando o mapa — sem barras."""
+    import camera_virtual as CV
+    p = carregar(base, pid)
+    c = next(x for x in p["cortes"] if x["n"] == n)
+    d = pasta(base, pid)
+    arq = os.path.join(d, "cortes", c["arquivo"])
+    mapa = c.get("mapa") or {}
+    dur = sondar(arq)["dur"]
+    ini = 0.0 if ini is None else ini
+    fim = dur if fim is None else fim
+    saida = saida or os.path.join(d, "cortes", f"corte_{n:02d}_vertical.mp4")
+    if not c.get("deitado"):  # já é vertical (enquadramento desfocado/original): só recorta
+        return cortar(arq, ini, fim, saida, "null")
+    prog("🎥 vertical automático…")
+    CV.enquadrar_pedaco(arq, ini, fim, saida, mapa.get("tracks") or {}, mapa.get("principal") or "", mapa.get("principal") or "",
+                        mapa.get("cenas") or [], prog, acao=c.get("acao") or [], destino=c.get("destino") or [], abrir_inicio=ini == 0)
+    return saida
 
 
 def linhas_do_corte(p: Dict[str, Any], c: Dict[str, Any]) -> Tuple[str, str]:
@@ -1618,8 +1666,10 @@ def criar_curto(base: str, pid: str, n: int, transcrever: Optional[Callable[...,
         nomes = rastros_e_sons(q, "M1", c)
         if regra_objetos(nomes):
             extra.append(regra_objetos(nomes))
+        if regra_foco(q):
+            extra.append(regra_foco(q))
         aplicar_visual(q, cfg)
-        q["config"]["extra"] = "\n".join(extra)[:2500]
+        q["config"]["extra"] = "\n".join(extra)[:3500]
         comentarios = [{"texto": x["texto"], "curtidas": x["curtidas"], "autor": ""}
                        for x in (p.get("info") or {}).get("comentarios_tempo") or [] if c["t0"] - 5 <= x["t"] <= c["t1"] + 5]
         comentarios += [x for x in (p.get("info") or {}).get("comentarios") or [] if x["texto"] not in {y["texto"] for y in comentarios}][:30]
@@ -1678,6 +1728,11 @@ def produzir(base: str, pid: str, prog: Prog = lambda m: None, so: Optional[List
             if not (atual.get("arquivo") and os.path.isfile(os.path.join(pasta(base, pid), "cortes", atual["arquivo"]))):
                 produzir_corte(base, pid, n, pr, baixador, chamar, visao)
             if ate == "cortes":
+                atual = next(x for x in carregar(base, pid)["cortes"] if x["n"] == n)
+                if atual.get("deitado"):
+                    estado("🎥 vertical automático")
+                    v = vertical_automatico(base, pid, n, prog=pr)
+                    mudar(base, pid, lambda q, n=n, v=v: [x.update(arquivo_vertical=os.path.basename(v)) for x in q["cortes"] if x["n"] == n])
                 estado("✅ cortado")
                 feitos += 1
                 continue
@@ -2058,7 +2113,7 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
     def mom_corte_video(pid: str, n: int):
         p = _p(pid)
         c = next((x for x in p["cortes"] if x["n"] == n), None)
-        cam = os.path.join(pasta(base, pid), "cortes", (c or {}).get("arquivo") or "_")
+        cam = os.path.join(pasta(base, pid), "cortes", ((c or {}).get("arquivo_vertical") if request.args.get("vertical") else (c or {}).get("arquivo")) or "_")
         if not c or not os.path.isfile(cam):
             abort(404)
         nome = re.sub(r"[^\w]+", "_", c.get("titulo") or "")[:40]
@@ -2076,9 +2131,10 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
     @app.route("/momentos-yt/visao/testar", methods=["POST"])
     def mom_visao_testar():
         try:
-            return _ok(**Visao(base).testar())
+            r = Visao(base).testar()
+            return jsonify({"ok": True, "funcionou": bool(r.get("ok")), "msg": r.get("msg") or ""})
         except Exception as exc:  # noqa: BLE001
-            return _ok(ok=False, msg=f"❌ {str(exc)[:400]}")
+            return jsonify({"ok": True, "funcionou": False, "msg": f"❌ {str(exc)[:400]}"})
         finally:
             if not any(not t.get("fim") for t in TAREFAS.values()):
                 liberar_moondream()

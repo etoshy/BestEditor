@@ -1175,6 +1175,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def _mandar_pro_editor(pid: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
         if not CB["para_estudio"]:
             raise CT.CurtoErro("O editor não está disponível aqui.")
+        if CT.carregar(base_dir, pid).get("rastros_h"):  # 🎥 v84_296: o que faltar enquadrar no vertical (ex.: o roteiro mudou)
+            try:
+                CC.enquadrar_planos(base_dir, pid, prog)
+            except Exception as exc:  # noqa: BLE001
+                prog(f"🎥 não deu pra enquadrar no vertical: {str(exc)[:160]}")
         prog("🎬 montando no editor…")
         d = CT.montar_dados_editor(base_dir, pid, providers or None)
         job_id = CB["para_estudio"](d)
@@ -1230,6 +1235,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                                int((p.get("config") or {}).get("takes") or 3), prog)
             prog("🎯 alinhando o take 1 ao roteiro (Whisper)…")
             CC.usar_take(base_dir, pid, int(CT.carregar(base_dir, pid).get("take_escolhido") or 1), _transcrever(), {}, prog)
+        if CT.carregar(base_dir, pid).get("rastros_h"):  # 🎥 v84_296: clipe deitado → vertical focando o que cada fala mostra
+            try:
+                n_v = CC.enquadrar_planos(base_dir, pid, prog)
+                if n_v:
+                    prog(f"🎥 {n_v} pedaço(s) enquadrado(s) no vertical")
+            except Exception as exc:  # noqa: BLE001
+                prog(f"🎥 não deu pra enquadrar no vertical: {str(exc)[:160]}")
         if _ia_ligada():
             r = CC.preparar_destaques(base_dir, pid, providers, on_log=prog)
             if r["pendentes"]:

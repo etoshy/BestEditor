@@ -151,17 +151,24 @@ def test_analisar_escolher_cortar_vertical_e_virar_curto(tmp_path, monkeypatch):
     c = M.produzir_corte(base, p["id"], 1, baixador=baixador, visao=VisaoVermelha())
     out = os.path.join(M.pasta(base, p["id"]), "cortes", c["arquivo"])
     info = M.sondar(out)
-    assert (info["w"], info["h"]) == (1080, 1920) and info["dur"] == pytest.approx(8, abs=0.3)
-    assert c["enquadramento"]["achados"] > 5 and c["visual"]
-    # o robô fica no meio do vertical no começo E no fim (o recorte andou junto)
+    # 🎥 v84_296: o corte fica DEITADO (proporção original) + o mapa de onde o robô está; o vertical sai depois do roteiro
+    assert (info["w"], info["h"]) == (1920, 1080) and info["dur"] == pytest.approx(8, abs=0.3)
+    assert c["deitado"] and c["enquadramento"]["achados"] > 5 and c["visual"]
+    pts = [x for x in c["mapa"]["tracks"]["red robot"] if x[1] is not None]
+    assert len(pts) > 5 and pts[0][1] < pts[-1][1]  # o mapa viu o robô andar pra direita
+    assert c["enquadramento"]["visivel"]["red robot"]
+
+    # ✂ só cortar: o vertical automático sai do corte deitado (sem barras, seguindo o robô)
+    v = M.vertical_automatico(base, p["id"], 1)
+    assert (M.sondar(v)["w"], M.sondar(v)["h"]) == (1080, 1920)
     from PIL import Image
-    for t in (2.5, 7.5):  # (o comecinho abre de propósito)
+    for t in (2.5, 7.5):
         q = str(tmp_path / f"q{t}.png")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", out, "-frames:v", "1", q], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", v, "-frames:v", "1", q], check=True)
         im = Image.open(q).convert("RGB")
         vermelho = [x for x in range(0, 1080, 8) if (lambda px: px[0] > 180 and px[1] < 80)(im.getpixel((x, 960)))]
         assert vermelho, f"robô sumiu do quadro em {t}s"
-        assert 200 < sum(vermelho) / len(vermelho) < 880, (t, sum(vermelho) / len(vermelho))
+        assert 150 < sum(vermelho) / len(vermelho) < 930, (t, sum(vermelho) / len(vermelho))
 
     import curtos as CT
     import curtos_comentario as CC
@@ -174,6 +181,8 @@ def test_analisar_escolher_cortar_vertical_e_virar_curto(tmp_path, monkeypatch):
     assert any(l["tipo"] == "visual" for l in linhas)
     assert any("the robot!!" in x["texto"] for x in CC.dados(q)["info_link"]["comentarios"])
     assert "Como ele anda?" in q["config"]["extra"]
+    assert q["rastros_h"]["M1"]["principal"] == "red robot" and "VERTICAL FRAMING" in q["config"]["extra"]
+    assert "'red robot' visible" in q["config"]["extra"]
     assert M.carregar(base, p["id"])["cortes"][0]["curto"] == cid
 
 

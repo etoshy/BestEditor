@@ -219,7 +219,8 @@ function cardCorte(p, c) {
     ${c.motivo ? `<div class="si-dica">💡 ${esc(c.motivo)}${c.gancho ? `<br>🪝 ${esc(c.gancho)}` : ''}</div>` : ''}
     <div class="my-midia"><iframe loading="lazy" allow="encrypted-media; picture-in-picture" allowfullscreen
         src="https://www.youtube.com/embed/${p.yt_id}?start=${Math.floor(c.t0)}&end=${Math.ceil(c.t1)}&rel=0"></iframe>
-      ${c.arquivo ? `<video src="/momentos-yt/${p.id}/corte/${c.n}/video?v=${encodeURIComponent(c.feito || '')}" controls preload="metadata"></video>` : ''}</div>
+      ${c.arquivo ? `<video src="/momentos-yt/${p.id}/corte/${c.n}/video?v=${encodeURIComponent(c.feito || '')}" controls preload="metadata"
+        ${c.deitado ? 'style="width:240px;aspect-ratio:16/9"' : ''}></video>` : ''}</div>
     <div class="my-campos">
       <label>Começo<input data-f="t0" value="${mmss(c.t0)}"></label><label>Fim<input data-f="t1" value="${mmss(c.t1)}"></label>
       <label class="largo">🎯 Manter no centro (inglês funciona melhor no Moondream)<input data-f="alvo" value="${esc(c.alvo)}" placeholder="ex.: red humanoid robot">${c.alvo_pt ? `<span class="si-dica">${esc(c.alvo_pt)}</span>` : ''}</label>
@@ -229,13 +230,15 @@ function cardCorte(p, c) {
       <label>Enquadrar<select data-f="enquadrar"><option value="">(o padrão do vídeo)</option>${Object.entries(ENQ).map(([k, v]) => `<option value="${k}"${c.enquadrar === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
     </div>
     ${c.enquadramento && c.enquadramento.modo === 'seguir' ? `<div class="si-dica">🎥 ${esc(c.enquadramento.visao)}: ${Object.entries(c.enquadramento.por_objeto || {}).map(([o, n]) => `${esc(o)} em ${n} quadros`).join(' · ') || 'nada achado — ficou no meio'}
-      ${Object.keys(c.enquadramento.foco || {}).length ? `<br>câmera em: ${Object.entries(c.enquadramento.foco).map(([o, s]) => `${esc(o === 'principal' ? (c.alvo || 'principal') : o)} ${s} s`).join(' · ')}` : ''}
+      ${Object.keys(c.enquadramento.visivel || {}).length ? `<br>🗺 aparece: ${Object.entries(c.enquadramento.visivel).map(([o, js]) => `${esc(o)} ${js.slice(0, 4).map(j => `${j[0]}–${j[1]}s`).join(', ') || 'nunca'}`).join(' · ')}
+        <br><span>o corte fica deitado; o vertical sai depois do roteiro, focando o que cada fala mostra</span>` : ''}
       · 👁 ${c.visual} momentos descritos${c.enquadramento.visao_erro ? `<br><span style="color:var(--erro)">⚠ Moondream: ${esc(c.enquadramento.visao_erro)}</span>` : ''}</div>` : ''}
     ${c.estado ? `<div class="my-prog">${rodando ? '<div class="my-gira"></div>' : ''}<b>${esc(c.estado)}</b>${ci.prog && rodando ? ' — ' + esc(ci.prog) : ''}</div>` : ''}
     ${c.erro ? `<div style="color:var(--erro);font-size:.85rem">❌ ${esc(c.erro)}</div>` : ''}
     ${ci.roteiro ? `<div class="my-rot">${esc(ci.roteiro)}</div>` : ''}
     <div class="si-linha">
-      ${c.arquivo ? `<a href="/momentos-yt/${p.id}/corte/${c.n}/video?baixar=1"><button class="si-mini si-sec">⬇ corte</button></a>` : ''}
+      ${c.arquivo ? `<a href="/momentos-yt/${p.id}/corte/${c.n}/video?baixar=1"><button class="si-mini si-sec">⬇ corte${c.deitado ? ' (16:9)' : ''}</button></a>` : ''}
+      ${c.arquivo_vertical ? `<a href="/momentos-yt/${p.id}/corte/${c.n}/video?baixar=1&vertical=1"><button class="si-mini si-sec">⬇ vertical</button></a>` : ''}
       ${pronto ? `<a href="/curtos/${c.curto}/video.mp4"><button class="si-mini si-ok">⬇ MP4 narrado</button></a>` : ''}
       ${ci.editor ? `<a href="/job/${ci.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
       ${c.curto ? `<a href="/curtos/${c.curto}" target="_blank"><button class="si-mini si-sec">⚙ curto (ganchos, finais, voz)</button></a>` : ''}
