@@ -1050,9 +1050,10 @@ def pagina(p: Dict[str, Any], C: Construtor, fontes: str, previa: bool = False, 
     bg = FUNDOS.get(op.get("fundo") or "verde", FUNDOS["verde"])
     tema = (f":root{{--ac:{ac};--ac-t:{_ac_texto(ac)};--bg1:{bg[0]};--bg2:{bg[1]};--bg3:{bg[2]};--card:{bg[3]}}}")
     doc = op.get("estilo") == "documentario"
-    if doc:
-        import explicador_doc as D
-        tema += D.DOC_CSS.replace("__F__", fontes)
+    import explicador_doc as D
+    tema += D.DOC_CSS.replace("__F__", fontes)  # 🎞 v84_291: foto/vídeo/capítulo também no estilo dinâmico (com a letra dele)
+    if not doc:
+        tema += D.DIN_CSS
     cfg = {"doc": doc, "SH": [] if doc else sorted({t for t, k in C.snd if k == "impact"}), "CH": C.capitulos if op.get("barra_topo") else [], "CH_END": C.cap_fim, "END": C.END,
            "simbolos": str(op.get("simbolos") or "")[:6], "acento": ac, "previa": previa, "audio_url": audio_url}
     return (open(MOTOR, encoding="utf-8").read().replace("/*FONTES*/", PR._fontes_css(fontes)).replace("/*TEMA*/", tema)
@@ -1067,7 +1068,11 @@ def pagina_mao(info: Dict[str, Any], fontes: str) -> str:
     op = PR.normalizar({"tema": info.get("tema") or "verde", "formato": "16:9", "mostrar": info.get("mostrar") or "heroi",
                         "equidade": bool(info.get("equidade")), "posicoes": True, "titulo": False, "zoom": False, "emocoes": False,
                         "sons": False, "estrategia": False})
-    return PR.pagina(info["dados"], op, fontes, lambda a: "", "gravar")
+    html = PR.pagina(info["dados"], op, fontes, lambda a: "", "gravar")
+    if (info.get("decimal") or ".") == ".":  # 🎬 v84_291: vídeo em inglês → 64.4% (não 64,4%)
+        html = html.replace("replace('.', ',')", "replace(',', '.')")
+        html = html.replace("'PRÉ-FLOP'", "'PRE-FLOP'").replace("'APOSTAS FINAIS'", "'FINAL BETS'").replace("'TROCA'", "'DRAW'")
+    return html
 
 
 def escrever_tela(p: Dict[str, Any], base: str, previa: bool = False, audio_url: str = "", fontes: str = FONTES_ARQ,

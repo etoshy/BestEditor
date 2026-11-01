@@ -1459,7 +1459,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             vozes_en, vozes = [], []
         import qualidade_export
         import dp_legendas
-        return render_template("curtos_link.html", modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
+        return render_template("curtos_link.html", fontes_legenda=CT.FONTES_LEGENDA, cores_legenda=CT.CORES_LEGENDA, modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
                                estilos_legenda=[{"id": e["id"], "nome": e["nome"]} for e in dp_legendas.ESTILOS],
                                vozes_en=vozes_en, vozes=vozes, resolucoes=qualidade_export.RESOLUCOES, ia=_ia_ligada(),
                                tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")))

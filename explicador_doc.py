@@ -234,6 +234,21 @@ def _kb_html(src: str, info: Dict[str, Any], efeito: str, foco: List[float], a: 
             f'src="{_e(src)}" style="width:{sw:.0f}px;height:{sh:.0f}px;margin-left:{-sw / 2:.0f}px;margin-top:{-sh / 2:.0f}px"></div>')
 
 
+# 🎞 v84_291: no estilo DINÂMICO as cenas de foto/vídeo/capítulo/citação usam a letra do dinâmico (sem serifa) e cantos redondos
+DIN_CSS = """
+body:not(.doc) .lt3 b{font-family:'DP Poppins','DP Inter',sans-serif;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+body:not(.doc) .lt3 span{font-family:'DP Inter','DP Poppins',sans-serif;font-weight:600;color:#ffffffd0}
+body:not(.doc) .capw small{font-family:'DP Poppins',sans-serif;font-weight:800;letter-spacing:10px}
+body:not(.doc) .capw b{font-family:'DP Poppins',sans-serif;font-weight:900;letter-spacing:0;text-transform:uppercase}
+body:not(.doc) .capw em{font-family:'DP Inter',sans-serif;font-style:normal;font-weight:600}
+body:not(.doc) .quote{font-family:'DP Poppins',sans-serif}
+body:not(.doc) .quote p{font-style:normal;font-weight:800}
+body:not(.doc) .quote cite{font-family:'DP Poppins',sans-serif}
+body:not(.doc) .tlp b{font-family:'DP Poppins',sans-serif;font-weight:900}
+body:not(.doc) .vbox .im:not(.cheia){border-radius:18px}
+"""
+
+
 def instalar(Construtor: Any, X: Any) -> None:
     """Liga os tipos de cena de documentário no Construtor do explicador."""
 

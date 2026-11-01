@@ -657,7 +657,8 @@ def aplicar_visual(q: Dict[str, Any], cfg: Dict[str, Any]) -> None:
         tam = max(0.03, min(0.09, float(cfg.get("legenda_tamanho") or 0.05)))
     except (TypeError, ValueError):
         tam = 0.05
-    q["config"]["legenda"] = {"tamanho": tam, "posicao": cfg.get("legenda_posicao") or "terco",
+    ant = q["config"].get("legenda") or {}  # 🎨 a fonte/cores do acabamento continuam
+    q["config"]["legenda"] = {**{k: ant[k] for k in ("fonte", "cor_texto", "cor_ativa") if ant.get(k)}, "tamanho": tam, "posicao": cfg.get("legenda_posicao") or "terco",
                               "maiusculas": bool(cfg.get("legenda_maiusculas", True)),
                               "altura": cfg.get("legenda_altura"), "margem": cfg.get("legenda_margem", 0.10)}
     if cfg.get("legenda_estilo"):  # vazio = o estilo do canal

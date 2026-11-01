@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}🗂 Busca em lista{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .bl-solta { border: 2px dashed var(--borda); border-radius: 12px; padding: 18px; text-align: center; color: var(--mudo); cursor: pointer; transition: .15s; }
+  .bl-solta.on { border-color: var(--acento); background: var(--acento-suave); color: inherit; }
+  .bl-termos textarea { width: 100%; min-height: 150px; font: 13px/1.5 ui-monospace, monospace; }
+  .bl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .bl-chip { border: 1px solid var(--borda); border-radius: 99px; padding: 3px 10px; font-size: .8rem; display: inline-flex; gap: 6px; align-items: center; background: var(--card); }
+  .bl-chip.ok { border-color: #2e9d57; } .bl-chip.vazia { border-color: #c0392b; opacity: .8; } .bl-chip.aberta { border-color: var(--acento); }
+  .bl-chip button { border: 0; background: none; cursor: pointer; padding: 0; font-size: .85rem; }
+  .bl-grupo { border-top: 1px solid var(--borda); padding-top: 10px; margin-top: 12px; }
+  .bl-grupo h3 { margin: 0 0 8px; font-size: 1rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .bl-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .bl-item { border: 1px solid var(--borda); border-radius: 10px; overflow: hidden; background: var(--card); display: flex; flex-direction: column; }
+  .bl-item.fora { opacity: .4; }
+  .bl-item .mid { aspect-ratio: 4/3; background: #111; display: flex; align-items: center; justify-content: center; }
+  .bl-item .mid img, .bl-item .mid video { width: 100%; height: 100%; object-fit: contain; }
+  .bl-item .info { padding: 6px; display: flex; flex-direction: column; gap: 4px; font-size: .75rem; }
+  .bl-item input.nome { width: 100%; font-size: .8rem; padding: 3px 5px; }
+  .bl-item .lin { display: flex; gap: 4px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .bl-barra { height: 8px; border-radius: 99px; background: var(--code-bg); overflow: hidden; margin: 6px 0; }
+  .bl-barra > div { height: 100%; width: 0; background: var(--acento); transition: width .3s; }
+  .bl-fila { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .bl-fila .f { display: grid; grid-template-columns: 1fr 220px auto; gap: 8px; align-items: center; font-size: .82rem; }
+</style>
+<h1>🗂 Busca em lista <span class="si-dica" style="font-weight:400">cole os termos, escolha as fotos no Google, renomeie e baixe tudo num zip com a lista</span></h1>
+<div id="barra" class="si-barra"></div>
+
+{% if not p %}
+<div class="si-card">
+  <h2 style="margin:0">➕ Nova busca em lista</h2>
+  <form method="post" action="/busca-lista/novo">
+    <div class="si-linha"><label>Nome <input name="titulo" placeholder="Archie Karas — fotos" style="min-width:280px"></label></div>
+    <div class="bl-termos"><label>Termos (um por linha)<textarea name="termos" placeholder="Archie Karas&#10;Binion's Horseshoe 1990s&#10;Stu Ungar&#10;craps table high roller"></textarea></label></div>
+    <button class="si-ok">➕ criar</button>
+  </form>
+</div>
+<div class="si-card">
+  <h2 style="margin:0">📁 Buscas</h2>
+  {% if not projetos %}<p class="si-dica">Nenhuma ainda.</p>{% endif %}
+  {% for x in projetos %}
+  <div class="si-linha"><a href="/busca-lista/{{ x.id }}">🗂 {{ x.titulo }}</a>
+    <span class="si-tag">{{ x.termos }} termos</span><span class="si-tag">{{ x.n }} arquivos</span></div>
+  {% endfor %}
+</div>
+{% else %}
+<p><a href="/busca-lista">← todas as buscas</a></p>
+<div class="si-card">
+  <div class="si-linha"><label>Nome <input id="titulo" value="{{ p.titulo }}" style="min-width:300px"></label>
+    <form method="post" action="/busca-lista/{{ p.id }}/apagar" onsubmit="return confirm('Apagar esta busca e todos os arquivos?')" style="margin-left:auto">
+      <button class="si-mini si-perigo">🗑 apagar</button></form></div>
+  <div class="bl-termos"><label>📝 Termos (um por linha) <textarea id="termos"></textarea></label></div>
+  <div class="si-linha"><button class="si-mini si-sec" onclick="blSalvar()">💾 salvar termos</button><span id="tresumo" class="si-dica"></span></div>
+  <div id="chips" class="bl-chips"></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🧲 Escolher no Google (guias)</h2>
+  <p class="si-dica">O site abre o Google Imagens no navegador dele (o <b>Brave com o script “Capturar links”</b>), uma guia por termo.
+    Em cada guia marque as fotos boas e clique em <b>Capturar e enviar ao site</b> — elas chegam aqui com o nome do termo.
+    Depois clique em <b>➡ Próximas guias</b> (aqui ou na própria guia): fecha as prontas e abre os próximos termos.</p>
+  <div class="si-linha">
+    <label>Guias por vez <input id="quantas" type="number" min="1" max="10" value="5" style="width:60px"></label>
+    <button class="si-ok" onclick="blGuias(false)">🧲 abrir as próximas</button>
+    <button class="si-mini si-sec" onclick="blGuias(true)">➡ fechar as prontas e abrir as próximas</button>
+    <button class="si-mini si-sec" onclick="blReabrir()" title="termos cuja guia foi fechada sem foto">↻ reabrir os sem foto</button>
+    <span id="nav" class="si-dica"></span>
+    <button class="si-mini si-sec" onclick="blPreparar()" title="só na primeira vez: instala a extensão e o script no navegador do site">⚙ preparar o navegador</button>
+  </div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🤖 Automático <span class="si-dica" style="font-weight:400">o site pesquisa e baixa sozinho as primeiras</span></h2>
+  <div class="si-linha">
+    {% for k, n in motores.items() %}<label><input type="checkbox" class="mot" value="{{ k }}"> {{ n }}</label>{% endfor %}
+  </div>
+  <div class="si-linha">
+    <label>Fotos por termo <input id="qtd" type="number" min="1" max="30" value="4" style="width:60px"></label>
+    <label>Formato <select id="orient">{% for k, n in orientacoes.items() %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></label>
+    <label>Com vários buscadores <select id="modo"><option value="completar">completar no próximo só o que faltou</option><option value="cada">pegar de cada um</option></select></label>
+    <label><input type="checkbox" id="mostrar"> mostrar o navegador</label>
+  </div>
+  <div class="si-linha">
+    <button id="bbuscar" class="si-ok" onclick="blBuscar(false)">🔎 buscar todos</button>
+    <button class="si-mini si-sec" onclick="blBuscar(true)">🔎 só os sem foto</button>
+    <button id="bparar" class="si-mini si-perigo" onclick="blParar()" style="display:none">⏹ parar</button>
+  </div>
+  <div id="prog" style="display:none"><div class="bl-barra"><div id="pb"></div></div><span id="pt" class="si-st"></span></div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">💻 Enviar do PC <span class="si-dica" style="font-weight:400">fotos ou vídeos — renomeie antes de enviar ou deixe o nome original</span></h2>
+  <div id="solta" class="bl-solta">📥 <b>Arraste fotos e vídeos aqui</b> ou clique pra escolher
+    <input id="arqs" type="file" accept="image/*,video/*,.heic,.mkv,.ts,.mts" multiple hidden></div>
+  <div id="fila" class="bl-fila"></div>
+  <div class="si-linha" id="filabot" style="display:none">
+    <label>Ligar ao termo <select id="ftermo"><option value="">(nenhum)</option></select></label>
+    <label><input type="checkbox" id="fnumerar"> nomear todos como <input id="fbase" placeholder="nome_base" style="width:150px"> _01, _02…</label>
+    <button class="si-ok" onclick="blEnviar()">⬆ enviar</button>
+    <button class="si-mini si-sec" onclick="blLimparFila()">✕ limpar</button>
+  </div>
+</div>
+
+<div class="si-card">
+  <h2 style="margin:0">🖼 Arquivos <span id="aresumo" class="si-dica" style="font-weight:400"></span></h2>
+  <div class="si-linha">
+    <a href="/busca-lista/{{ p.id }}/zip"><button class="si-ok">⬇ baixar ZIP (marcados + lista.txt)</button></a>
+    <a href="/busca-lista/{{ p.id }}/zip?todos=1"><button class="si-mini si-sec">⬇ ZIP com tudo</button></a>
+    <a href="/busca-lista/{{ p.id }}/lista.txt" target="_blank"><button class="si-mini si-sec">📄 ver lista.txt</button></a>
+    <button class="si-mini si-sec" onclick="blRenTermo()" title="as fotos de cada termo viram termo_01, termo_02… na ordem">🔤 renumerar pelo termo</button>
+  </div>
+  <div id="itens"></div>
+</div>
+
+<script>
+(() => {
+const PID = {{ p.id|tojson }};
+let E = null, timer = null, editando = false, filaPC = [];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function aviso(t, cls) { const b = $('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 4000); }
+async function api(url, corpo, metodo) {
+  const r = await fetch(url, corpo === undefined && !metodo ? {} : {method: metodo || 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'}));
+  if (!j.ok) throw new Error(j.erro || 'erro');
+  return j;
+}
+const semExt = n => n.replace(/\.[^.]+$/, '');
+const ICO = {aberta: '🧲', vazia: '∅', feita: '✔'};
+function desenhar(j) {
+  E = j; const p = j.projeto, cfg = p.config || {}, itens = p.itens || [];
+  if (!editando) $('termos').value = (p.termos || []).join('\n');
+  document.querySelectorAll('.mot').forEach(c => c.checked = (cfg.motores || ['brave']).includes(c.value));
+  if (!document.activeElement || !['qtd', 'orient', 'modo'].includes(document.activeElement.id)) {
+    $('qtd').value = cfg.qtd || 4; $('orient').value = cfg.orientacao || 'any'; $('modo').value = cfg.modo || 'completar'; $('mostrar').checked = !!cfg.mostrar; }
+  const ts = j.termos || [], com = ts.filter(t => t.fotos).length;
+  $('tresumo').textContent = ts.length ? `${ts.length} termos · ${com} com foto · ${ts.length - com} sem` : '';
+  $('chips').innerHTML = ts.map(t => `<span class="bl-chip ${t.fotos ? 'ok' : t.guia}" title="${esc(t.guia ? 'guia: ' + t.guia : '')}">
+      ${t.fotos ? '✅ ' + t.fotos : (ICO[t.guia] || '⏳')} ${esc(t.termo)}
+      <button title="abrir a guia deste termo" data-g="${esc(t.id)}">🧲</button><button title="buscar mais (automático)" data-b="${esc(t.termo)}">🔎</button></span>`).join('');
+  $('chips').querySelectorAll('[data-g]').forEach(b => b.onclick = () => blGuias(false, [b.dataset.g]));
+  $('chips').querySelectorAll('[data-b]').forEach(b => b.onclick = () => blBuscar(false, [b.dataset.b]));
+  const sel = $('ftermo'), atual = sel.value; sel.innerHTML = '<option value="">(nenhum)</option>' + (p.termos || []).map(t => `<option>${esc(t)}</option>`).join(''); sel.value = atual;
+  // arquivos agrupados por termo
+  const marc = itens.filter(i => i.usar !== false).length;
+  $('aresumo').textContent = itens.length ? `${itens.length} arquivos · ${marc} marcados pro zip` : '';
+  const ordem = [...(p.termos || [])]; itens.forEach(i => { if (i.termo && !ordem.includes(i.termo)) ordem.push(i.termo); });
+  const grupos = ordem.map(t => [t, itens.filter(i => i.termo === t)]).filter(g => g[1].length);
+  const soltos = itens.filter(i => !i.termo); if (soltos.length) grupos.push(['💻 enviados do PC', soltos]);
+  const box = $('itens');
+  const digitando = document.activeElement && document.activeElement.classList.contains('nome'); // não apaga o que está digitando
+  const chave = JSON.stringify(itens);
+  if (!digitando && chave !== box.dataset.chave) { box.dataset.chave = chave;
+  box.innerHTML = grupos.length ? '' : '<p class="si-dica">Nada ainda — abra as guias, use o automático ou envie do PC.</p>';
+  grupos.forEach(([t, its]) => {
+    const g = document.createElement('div'); g.className = 'bl-grupo';
+    g.innerHTML = `<h3>${esc(t)} <span class="si-tag">${its.length}</span></h3><div class="bl-grade"></div>`;
+    const grade = g.querySelector('.bl-grade');
+    its.forEach(i => {
+      const src = `/busca-lista/${PID}/arquivo/${encodeURIComponent(i.arq)}?v=${encodeURIComponent(i.arq)}`;
+      const d = document.createElement('div'); d.className = 'bl-item' + (i.usar === false ? ' fora' : '');
+      d.innerHTML = `<div class="mid">${i.tipo === 'video' ? `<video src="${src}#t=0.5" preload="metadata" controls muted></video>` : `<a href="${src}" target="_blank"><img src="${src}" loading="lazy"></a>`}</div>
+        <div class="info"><input class="nome" value="${esc(semExt(i.arq))}" title="renomear (Enter)">
+          <div class="lin"><span>${i.w ? i.w + '×' + i.h : (i.tipo === 'video' ? '🎞 vídeo' : '')} · ${esc(i.origem === 'pc' ? 'PC' : i.origem === 'guia' ? '🧲 Google' : (i.motor || ''))}</span>
+          ${i.pagina ? `<a href="${esc(i.pagina)}" target="_blank" title="${esc(i.pagina)}">🌐 fonte</a>` : ''}</div>
+          <div class="lin"><label><input type="checkbox" class="usar" ${i.usar === false ? '' : 'checked'}> no zip</label>
+          <button class="si-mini si-perigo apaga">🗑</button></div></div>`;
+      const inp = d.querySelector('.nome');
+      const ren = async () => { const n = inp.value.trim(); if (!n || n === semExt(i.arq)) return;
+        try { await api(`/busca-lista/${PID}/item/${i.id}`, {nome: n}); aviso('💾 renomeado', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } inp.blur(); atualizar(); };
+      inp.onkeydown = e => { if (e.key === 'Enter') ren(); if (e.key === 'Escape') { inp.value = semExt(i.arq); inp.blur(); } };
+      inp.onchange = ren;
+      d.querySelector('.usar').onchange = async e => { try { await api(`/busca-lista/${PID}/item/${i.id}`, {usar: e.target.checked}); atualizar(); } catch (x) { aviso('❌ ' + x.message, 'erro'); } };
+      d.querySelector('.apaga').onclick = async () => { try { await api(`/busca-lista/${PID}/item/${i.id}`, {}, 'DELETE'); atualizar(); } catch (x) { aviso('❌ ' + x.message, 'erro'); } };
+      grade.appendChild(d);
+    });
+    box.appendChild(g);
+  });
+  }
+  // tarefa automática
+  const t = j.tarefa, rod = t && t.rodando;
+  $('bbuscar').disabled = !!rod; $('bparar').style.display = rod ? '' : 'none'; $('prog').style.display = rod ? '' : 'none';
+  if (rod) { const e = t.estado || {}, pc = e.passos ? Math.round(e.passo / e.passos * 100) : 2;
+    $('pb').style.width = pc + '%'; $('pt').textContent = e.msg || 'buscando…'; }
+  if (t && t.fim && !t.visto) { t.visto = 1; if (t.erro) aviso('❌ ' + t.erro, 'erro'); else if (t.estado && t.estado.msg) aviso('✅ ' + t.estado.msg, 'okk'); }
+  clearTimeout(timer); timer = setTimeout(atualizar, rod ? 1200 : 4000);  // as guias mandam fotos a qualquer hora
+}
+async function atualizar() { try { desenhar(await api(`/busca-lista/${PID}/estado`)); } catch (e) { aviso('❌ ' + e.message, 'erro'); clearTimeout(timer); timer = setTimeout(atualizar, 6000); } }
+function cfgAtual() { return {motores: [...document.querySelectorAll('.mot:checked')].map(c => c.value), qtd: +$('qtd').value || 4,
+  orientacao: $('orient').value, modo: $('modo').value, mostrar: $('mostrar').checked}; }
+async function salvar() { editando = false;
+  try { desenhar(Object.assign(E || {}, await api(`/busca-lista/${PID}/config`, Object.assign({termos: $('termos').value, titulo: $('titulo').value}, cfgAtual())))); await atualizar(); aviso('💾 salvo', 'okk'); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+async function guias(trocar, termos) {
+  if (editando) await salvar();
+  try { const r = await api(`/busca-lista/${PID}/guias`, {trocar, quantas: +$('quantas').value || 5, termos: termos || []});
+    aviso(r.abertas ? `🧲 ${r.abertas} guia(s) abertas no ${r.navegador || 'navegador'}` + (r.faltam ? ` · faltam ${r.faltam}` : '') + (r.fechadas ? ` · ${r.fechadas} fechada(s)` : '') + (r.aviso ? ' · ⚠ ' + r.aviso : '')
+      : (r.msg || 'nada pra abrir'), 'okk'); atualizar(); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+async function reabrir() { try { await api(`/busca-lista/${PID}/guias`, {reabrir: true, quantas: +$('quantas').value || 5}).then(r => aviso(`🧲 ${r.abertas || 0} guia(s) abertas`, 'okk')); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+async function preparar() { try { await api('/navegador-imagens/preparar', {gerenciador: 'orangemonkey'}); aviso('⚙ abri o navegador do site: instale a extensão e depois o script (guia 2)', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+async function buscar(soFaltando, termos) {
+  try { await api(`/busca-lista/${PID}/config`, Object.assign(editando ? {termos: $('termos').value} : {}, cfgAtual())); editando = false;
+    await api(`/busca-lista/${PID}/buscar`, {so_faltando: soFaltando, termos: termos || null}); aviso('🔎 buscando…'); setTimeout(atualizar, 500); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+async function parar() { try { await api(`/busca-lista/${PID}/parar`, {}); } catch (e) {} setTimeout(atualizar, 600); }
+async function renTermo() { try { const r = await api(`/busca-lista/${PID}/renomear-por-termo`, {}); aviso(`🔤 ${r.n} renomeado(s)`, 'okk'); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+// 💻 envio do PC: escolhe → (renomeia na fila) → envia
+const solta = $('solta');
+solta.onclick = () => $('arqs').click();
+$('arqs').onchange = e => { addFila([...e.target.files]); $('arqs').value = ''; };
+['dragenter', 'dragover'].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.add('on'); }));
+['dragleave', 'drop'].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.remove('on'); }));
+solta.addEventListener('drop', e => addFila([...e.dataTransfer.files]));
+function addFila(fs) {
+  fs = fs.filter(f => /^(image|video)\//.test(f.type) || /\.(heic|heif|mkv|ts|mts|m4v|avif|webp)$/i.test(f.name));
+  fs.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+  fs.forEach(f => filaPC.push({f, nome: semExt(f.name)}));
+  desenharFila();
+}
+function desenharFila() {
+  $('filabot').style.display = filaPC.length ? '' : 'none';
+  $('fila').innerHTML = filaPC.map((x, k) => `<div class="f"><span>${esc(x.f.name)} <span class="si-dica">${(x.f.size / 1048576).toFixed(1)} MB</span></span>
+    <input data-k="${k}" value="${esc(x.nome)}" title="nome do arquivo (sem extensão)"><span data-st="${k}"></span></div>`).join('');
+  $('fila').querySelectorAll('input[data-k]').forEach(i => i.oninput = () => filaPC[+i.dataset.k].nome = i.value);
+}
+async function enviar() {
+  const base = $('fbase').value.trim(), num = $('fnumerar').checked && base, termo = $('ftermo').value;
+  for (let k = 0; k < filaPC.length; k++) {
+    const x = filaPC[k], st = document.querySelector(`[data-st="${k}"]`);
+    if (x.feito) continue;
+    const nome = num ? `${base}_${String(k + 1).padStart(2, '0')}` : x.nome;
+    st.innerHTML = '<div class="bl-barra" style="width:120px"><div></div></div>';
+    const barra = st.querySelector('div > div');
+    await new Promise(res => {
+      const r = new XMLHttpRequest(), fd = new FormData(); fd.append('arquivos', x.f); fd.append('nomes', nome); fd.append('termo', termo);
+      r.upload.onprogress = e => { if (e.lengthComputable) barra.style.width = (e.loaded / e.total * 100) + '%'; };
+      r.onload = () => { let j = {}; try { j = JSON.parse(r.responseText); } catch (_) {}
+        if (j.ok && !(j.erros || []).length) { st.textContent = '✅'; x.feito = true; } else st.textContent = '❌ ' + ((j.erros || [])[0] || j.erro || r.status); res(); };
+      r.onerror = () => { st.textContent = '❌ falha no envio'; res(); };
+      r.open('POST', `/busca-lista/${PID}/enviar`); r.send(fd);
+    });
+  }
+  filaPC = filaPC.filter(x => !x.feito); desenharFila(); atualizar();
+}
+$('termos').addEventListener('input', () => editando = true);
+$('titulo').addEventListener('change', salvar);
+['qtd', 'orient', 'modo', 'mostrar'].forEach(id => $(id).addEventListener('change', () => api(`/busca-lista/${PID}/config`, cfgAtual()).catch(e => aviso('❌ ' + e.message, 'erro'))));
+document.querySelectorAll('.mot').forEach(c => c.addEventListener('change', () => api(`/busca-lista/${PID}/config`, cfgAtual()).catch(e => aviso('❌ ' + e.message, 'erro'))));
+fetch('/navegador-imagens/estado').then(r => r.json()).then(j => { $('nav').textContent = j.navegador ? `navegador do site: ${j.navegador}${j.preparado ? '' : ' (clique em ⚙ preparar na 1ª vez)'}` : '⚠ não achei o Brave/Chrome — veja em ⚙ Configurações'; }).catch(() => {});
+Object.assign(window, {blSalvar: salvar, blGuias: guias, blReabrir: reabrir, blPreparar: preparar, blBuscar: buscar, blParar: parar,
+  blRenTermo: renTermo, blEnviar: enviar, blLimparFila: () => { filaPC = []; desenharFila(); }});
+atualizar();
+})();
+</script>
+{% endif %}
+{% endblock %}

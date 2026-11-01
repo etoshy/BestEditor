@@ -1219,7 +1219,18 @@ def canal_do_modelo(base: str, modelo: str) -> str:
 # ------------------------------------------------------------------ 🎨 v84_302: acabamento padrão de TODOS os shorts
 ACABAMENTO_PADRAO = {"arroba": "", "legenda_estilo": "", "legenda_tamanho": 0.05, "legenda_posicao": "terco",
                      "legenda_maiusculas": True, "sons_pixabay": False, "aplicar_noticia": False,
-                     "legenda_altura": None, "legenda_margem": 0.10, "sons_nivel": "poucos"}
+                     "legenda_altura": None, "legenda_margem": 0.10, "sons_nivel": "poucos",
+                     "legenda_fonte": "", "legenda_cor": "", "legenda_cor_ativa": "", "destaques": "precisa"}
+FONTES_LEGENDA = {"": "padrão (a do estilo)", "DP Inter": "Inter", "DP Poppins": "Poppins", "DP Montserrat": "Montserrat",
+                  "DP Anton": "Anton", "DP Bebas Neue": "Bebas Neue", "DP Oswald": "Oswald", "DP Archivo": "Archivo",
+                  "DP Barlow Condensed": "Barlow Condensed", "DP Roboto Condensed": "Roboto Condensed", "DP Fjalla One": "Fjalla One",
+                  "DP Staatliches": "Staatliches", "DP Teko": "Teko", "DP Rajdhani": "Rajdhani", "DP Work Sans": "Work Sans",
+                  "DP Alfa Slab One": "Alfa Slab One", "DP Abril Fatface": "Abril Fatface", "DP Playfair Display": "Playfair Display",
+                  "DP Merriweather": "Merriweather", "DP Lora": "Lora", "DP Eb Garamond": "EB Garamond", "DP Cinzel": "Cinzel",
+                  "DP Special Elite": "Special Elite (máquina de escrever)", "DP Jetbrains Mono": "JetBrains Mono"}
+CORES_LEGENDA = {"": "padrão", "#FFFFFF": "branco", "#FFD60A": "amarelo", "#FF9500": "laranja", "#FF3B30": "vermelho",
+                 "#FF2D55": "rosa", "#B388FF": "lilás", "#00E5FF": "ciano", "#39FF14": "verde neon", "#2ECC71": "verde",
+                 "#1E90FF": "azul", "#000000": "preto"}
 
 
 def acabamento(base: str) -> Dict[str, Any]:
@@ -1255,6 +1266,13 @@ def salvar_acabamento(base: str, novos: Dict[str, Any]) -> Dict[str, Any]:
                 v = round(max(0.0, min(0.25, float(v) / (100 if float(v) > 1 else 1))), 3)
             except (TypeError, ValueError):
                 continue
+        elif k == "legenda_fonte":
+            v = v if v in FONTES_LEGENDA else ""
+        elif k in ("legenda_cor", "legenda_cor_ativa"):
+            v = str(v or "").upper()
+            v = v if re.fullmatch(r"#[0-9A-F]{6}", v) else ""
+        elif k == "destaques":
+            v = v if v in ("precisa", "nunca", "livre") else "precisa"
         elif k == "sons_nivel":
             v = v if v in ("nenhum", "poucos", "normal") else "poucos"
         elif k == "legenda_posicao":
@@ -1273,6 +1291,7 @@ def aplicar_acabamento(p: Dict[str, Any], a: Dict[str, Any]) -> None:
     cores…). Notícia (Laestro) só se marcado — ela tem a legenda do canal modelado."""
     cfg = p.setdefault("config", {})
     cfg["sons_nivel"] = a.get("sons_nivel") or "poucos"
+    cfg["destaques"] = a.get("destaques") or "precisa"
     arroba = str(a.get("arroba") or "").strip()
     if arroba:
         cfg["marca"] = dict(cfg.get("marca") or {}, ativa=True, texto=arroba if arroba.startswith("@") else "@" + arroba)
@@ -1283,6 +1302,9 @@ def aplicar_acabamento(p: Dict[str, Any], a: Dict[str, Any]) -> None:
                           "margem": a.get("legenda_margem", 0.10)}
         if est:
             cfg["legenda"].update(estilo=est, max_palavras=1 if est == "palavra_unica" else 3)
+        for k_a, k_l in (("legenda_fonte", "fonte"), ("legenda_cor", "cor_texto"), ("legenda_cor_ativa", "cor_ativa")):
+            if a.get(k_a):  # 🎨 v84_308: vazio = o que o estilo/canal já usa (o padrão de hoje)
+                cfg["legenda"][k_l] = a[k_a]
 
 
 def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] = (), texto: str = "",

@@ -22,6 +22,7 @@ MODOS = {
     "auto": "🤖 a IA escolhe",
     "comentario": "💬 comentar (opinião, reviravolta, pergunta polêmica)",
     "explicar": "🔍 explicar o que está acontecendo",
+    "arte": "🎨 arte e criações (o artista, a técnica, a reação)",
 }
 REGRA_MODO = {
     "auto": ("APPROACH: choose what makes THIS clip perform best — COMMENTARY (retell + the narrator's opinion, the twist, a "
@@ -29,13 +30,35 @@ REGRA_MODO = {
              "physics, the animal behavior, the trick — step by step in sync with the clip, ending with the most surprising detail "
              "+ a question). Prefer EXPLAIN when the comments are full of 'how?'/'why?' questions or the clip shows a skill/trick/"
              "phenomenon; prefer COMMENTARY when people argue about a decision or a reaction. Start 'descricao' with "
-             "'[COMMENTARY]' or '[EXPLAIN]'."),
+             "'[COMMENTARY]' or '[EXPLAIN]' (or '[ART]' when the clip shows someone CREATING something: a painting, drawing, "
+             "sculpture, cake/jelly art, craft — then follow the ART approach: name the artist, explain the technique, react)."),
     "comentario": ("APPROACH: COMMENTARY — retell what happens with the narrator's own opinion, the twist nobody noticed, and end "
                    "with the question people argue about."),
     "explicar": ("APPROACH: EXPLAIN WHAT IS HAPPENING — tell viewers HOW/WHY what they see happens (the technique, the rule, the "
                  "physics, the animal behavior, the trick), step by step and in sync with the clip; the hook is the curious "
                  "question ('How did he…?' / 'Why does this…?'); end with the most surprising detail + a question. Only "
                  "well-established facts; if the reason is not clear from the clip and comments, say what it most likely is."),
+    "arte": ("APPROACH: ART & CREATIONS — a narrator who loves art watches an artist create and talks to the viewer like a friend "
+             "next to them: genuine, casual, enthusiastic ('look at that…', 'no way…', 'that's pure talent'), never formal.\n"
+             "- OPEN by presenting the ARTIST by name — the @ of the post (written so it can be read aloud: '@ariel.cy' → 'Ariel Cy') "
+             "+ where they are from if the caption says so — and what they are making / the material ('…presenting this dry pastel "
+             "piece'). A short catchphrase opener is fine ('Every day is a day to learn.').\n"
+             "- EXPLAIN THE TECHNIQUE in sync with the clip, step by step: the material (dry pastel, acrylic pour, colored pencil, "
+             "gelatin with a needle, clay…), what it is, WHY it creates this effect (light, contrast, 3D look, transparency), what "
+             "the artist controls and what is left to chance. Only what you can see or what is well-established about that technique; "
+             "if unsure, say 'probably'.\n"
+             "- THE SUBJECT: if WHAT is being made is unusual, weird or surprising (a portrait made of toast, a sculpture of an "
+             "odd creature, a hyper-real everyday object, a scene that tells a story), talk about IT too — what it is, the detail "
+             "that makes it strange or funny, what it reminds you of — and let that be the hook and the title. If the subject is "
+             "ordinary (a flower, a landscape), focus on the technique.\n"
+             "- REACT at the turns: doubt before ('that bottom part won't turn into anything…'), the REVEAL ('look what it became!'), "
+             "a light self-deprecating joke ('if I tried this it'd end up all over the floor'), a comparison people know ('like those "
+             "crystal-clear waters…'). At the big reveal use FEW words — let the image breathe.\n"
+             "- END: the finished piece + send people to the artist ('go check out her profile — link in the description') + a short "
+             "question ('would you hang this in your house?').\n"
+             "- Titles ('titulo_video', 'titulos'): catchy and about WHAT is being made or the TECHNIQUE ('She paints UNDERWATER light "
+             "with dry pastel', 'This is not a photo…', 'Flowers INSIDE a jelly cake'), honest. 'descricao': what it is + the "
+             "technique + credit the artist with their @. Always credit the artist; never claim the work as yours."),
 }
 
 
@@ -48,11 +71,13 @@ def modo_escolhido(descricao: str, pedido: str) -> str:
     if pedido in ("comentario", "explicar"):
         return pedido
     d = str(descricao or "").upper()
-    return "explicar" if "[EXPLAIN]" in d else "comentario" if "[COMMENTARY]" in d else ""
+    if pedido == "arte":
+        return "arte"
+    return "arte" if "[ART]" in d else "explicar" if "[EXPLAIN]" in d else "comentario" if "[COMMENTARY]" in d else ""
 
 
 def limpar_marca(descricao: str) -> str:
-    return re.sub(r"^\s*\[(COMMENTARY|EXPLAIN)\]\s*", "", str(descricao or ""))
+    return re.sub(r"^\s*\[(COMMENTARY|EXPLAIN|ART)\]\s*", "", str(descricao or ""))
 
 
 # ---------------------------------------------------------------------------------------------------- comentários

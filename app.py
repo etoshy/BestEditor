@@ -12205,6 +12205,8 @@ import achar_fonte as _achar_fonte  # noqa: E402  🔎 Achar a fonte: trocas de 
 _achar_fonte.registrar(app, BASE_DIR)
 import momentos_yt as _momentos_yt  # noqa: E402  🔥 Momentos mais vistos (vídeo longo → curtos) (v84_291)
 _momentos_yt.registrar(app, BASE_DIR, _curto_transcrever)
+import busca_lista as _busca_lista  # noqa: E402  🗂 Busca em lista: termos → guias do Google/automático → zip + lista.txt (v84_293)
+_busca_lista.registrar(app, BASE_DIR)
 import remover_fundo as _remover_fundo  # noqa: E402  🧽 Remover fundo (zip → o mesmo zip em PNG transparente, v84_240)
 _remover_fundo.registrar(app)
 import criador_rotas as _criador_rotas  # noqa: E402  🧬 Criador de personagens (aba Modelos de vídeo, v84_239)
@@ -12348,6 +12350,7 @@ def _padroes_excluidos_do_reloader() -> list:
         os.environ.get("EXPLICADOR_DIR") or os.path.join(BASE_DIR, "explicador"),  # 🎬 explicador animado: cenas, render
         os.environ.get("JUNTAR_DIR") or os.path.join(BASE_DIR, "juntar"),  # 🔗 juntar vídeos: envios e o vídeo juntado
         os.environ.get("FONTES_VIDEO_DIR") or os.path.join(BASE_DIR, "fontes_video"),  # 🔎 achar a fonte: vídeo e prints
+        os.environ.get("BUSCA_LISTA_DIR") or os.path.join(BASE_DIR, "busca_lista"),  # 🗂 busca em lista: fotos baixadas
         os.environ.get("ROTEIROS_COMENTARIO_DIR") or os.path.join(BASE_DIR, "roteiros_comentario"),  # ✍ roteiros de comentário
         os.environ.get("MOMENTOS_YT_DIR") or os.path.join(BASE_DIR, "momentos_yt"),  # 🔥 vídeos longos, cortes, quadros, navegador
     ]

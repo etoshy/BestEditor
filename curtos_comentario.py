@@ -446,7 +446,25 @@ def sistema(p: Dict[str, Any]) -> str:
     base_ = EXPLICATIVO_SYS if explicativo(p) else ROTEIRO_SYS
     return (base_.replace("{REGRA_LINGUA}", regra_lingua(p)).replace("{REGRA_OPCOES}", REGRA_OPCOES)
             .replace("{REGRA_FONTES}", _regra_fontes(p))
-            .replace("{LINGUA}", nome_lingua(lingua_post(p))))
+            .replace("{LINGUA}", nome_lingua(lingua_post(p)))) + regra_destaques(p)
+
+
+REGRA_DESTAQUE = {  # 🎯 v84_308: círculo/seta só quando precisa
+    "precisa": ("\n\nDESTAQUE (círculo/seta) — ONLY WHEN NEEDED: use 'destaque' only if the viewer could MISS what the line talks "
+                "about (small, far away, in a crowd, partly hidden, off to the side) AND the line points right at it. If the subject "
+                "is big, centered and obvious (most clips), leave alvo ''. Most videos need 0; never more than 1 per ~20 s."),
+    "nunca": "\n\nDESTAQUE: do NOT use 'destaque' in this video — alvo '' everywhere.",
+    "livre": "",
+}
+
+
+def nivel_destaques(p: Dict[str, Any]) -> str:
+    v = (p.get("config") or {}).get("destaques") or "livre"  # (projetos antigos: como era)
+    return v if v in REGRA_DESTAQUE else "livre"
+
+
+def regra_destaques(p: Dict[str, Any]) -> str:
+    return REGRA_DESTAQUE[nivel_destaques(p)]
 
 
 def _texto_linhas(base: str, p: Dict[str, Any]) -> str:
@@ -524,6 +542,11 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
             L += [bloco, ""]
         if c.get("modo_link"):
             L += ["## " + CL.regra_modo(c["modo_link"]), ""]
+            link = (p.get("link_rapido") or {}).get("link") or ""
+            quem = CL.criador(link, c.get("info_link") or {})
+            if quem and c["modo_link"] in ("arte", "auto"):  # 🎨 v84_309: o artista é o @ do link
+                L += [f"## THE CREATOR / ARTIST of this clip: @{quem.lstrip('@')}" + (f" ({CL.plataforma(link)})" if CL.plataforma(link) else "")
+                      + " — name them when you present the work (say it so it reads well aloud).", ""]
     if (p.get("config") or {}).get("extra"):
         L += ["## EXTRA REQUEST", p["config"]["extra"], ""]
     estilo = CT.texto_do_perfil(perfil)
@@ -950,10 +973,16 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
     CT.fixar_trechos_do_clipe(planos_v, {m["id"]: float(m.get("dur") or 0) for m in p.get("midias") or []})
     feitos, pendentes = [], []
     prontos = dict(p.get("destaques_prontos") or {})
+    nivel = nivel_destaques(p)
+    dur = float((p.get("gravacao") or {}).get("dur") or 0) or max([float(x.get("end") or 0) for x in planos_v] + [20.0])
+    cota = 0 if nivel == "nunca" else (max(1, int(dur // 20)) if nivel == "precisa" else 99)
     for x in planos_v:
         k = CT.chave_destaque(x)
         if not k:
             continue
+        if cota <= 0:  # 🎯 v84_308: só os que precisam (o roteiro já pede pouco; aqui é o teto)
+            continue
+        cota -= 1
         if k in prontos and any(m["id"] == prontos[k] for m in p.get("midias") or []):
             feitos.append(prontos[k])
             continue

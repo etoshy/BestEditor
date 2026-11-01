@@ -68,6 +68,14 @@
       <label>Margem livre dos lados<select id="a_legenda_margem"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></label>
     </div>
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_legenda_maiusculas" style="width:auto;margin:0"> MAIÚSCULAS</label>
+    <div class="lk-ops">
+      <label>Fonte da legenda<select id="a_legenda_fonte">{% for k, v in fontes_legenda.items() %}<option value="{{ k }}" style="font-family:'{{ k }}'">{{ v }}</option>{% endfor %}</select></label>
+      <label>Cor do texto<select id="a_legenda_cor">{% for k, v in cores_legenda.items() %}<option value="{{ k }}"{% if k %} style="background:{{ k }};color:{{ '#000' if k in ('#FFFFFF', '#FFD60A', '#00E5FF', '#39FF14') else '#fff' }}"{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      <label>Cor da palavra falada<select id="a_legenda_cor_ativa">{% for k, v in cores_legenda.items() %}<option value="{{ k }}"{% if k %} style="background:{{ k }};color:{{ '#000' if k in ('#FFFFFF', '#FFD60A', '#00E5FF', '#39FF14') else '#fff' }}"{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      <div id="a_previa_leg" style="align-self:end;padding:8px 14px;border-radius:8px;background:#222;font-weight:800;font-size:1.1rem"></div>
+    </div>
+    <label>🎯 Círculo/seta seguindo o objeto<select id="a_destaques"><option value="precisa">só quando precisa (objeto pequeno, longe ou no meio de outros)</option>
+      <option value="livre">a IA decide (como antes: 1 a 3 por vídeo)</option><option value="nunca">nunca</option></select></label>
     <label>🔊 Efeitos sonoros<select id="a_sons_nivel"><option value="poucos">poucos — só nas ações que aparecem (máx. 1 a cada ~8 s)</option>
       <option value="normal">normal — também nas trocas de assunto</option><option value="nenhum">nenhum</option></select></label>
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_sons_pixabay" style="width:auto;margin:0">
@@ -117,10 +125,17 @@ el('link').addEventListener('input', () => {  // 🔗 quantos links vão entrar 
   el('nLinks').textContent = n > 1 ? `🔗 ${Math.min(n, 50)} vídeos na fila${n > 50 ? ' (só os 50 primeiros)' : ''} — um de cada vez; pode fechar a página` : '';
 });
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
-              'legenda_altura', 'legenda_margem', 'sons_nivel'];
+              'legenda_altura', 'legenda_margem', 'sons_nivel', 'legenda_fonte', 'legenda_cor', 'legenda_cor_ativa', 'destaques'];
+function previaLeg() {  // 🎨 como fica: “ESSA [PALAVRA] AQUI”
+  const f = el('a_legenda_fonte').value, c = el('a_legenda_cor').value || '#FFFFFF', a = el('a_legenda_cor_ativa').value || '#FFD60A';
+  el('a_previa_leg').innerHTML = `<span style="font-family:'${f || 'DP Inter'}',sans-serif;color:${c};-webkit-text-stroke:1px #000">ESSA <span style="color:${a}">PALAVRA</span> AQUI</span>`;
+}
+['a_legenda_fonte', 'a_legenda_cor', 'a_legenda_cor_ativa'].forEach(i => el(i).addEventListener('change', previaLeg));
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
-    else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); }); } catch (e) {} })();
+    else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); });
+  if (!a.destaques) el('a_destaques').value = 'precisa'; } catch (e) {} previaLeg(); })();
+(() => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/dp-fontes.css'; document.head.appendChild(l); })();  // as fontes da prévia
 window.lkAcab = async () => { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; });
   try { await post('/curtos/acabamento', d); aviso('💾 acabamento salvo — vale pros próximos shorts', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 let timer = null;

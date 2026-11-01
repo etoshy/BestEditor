@@ -429,10 +429,14 @@
         onerror: pelaFetch, ontimeout: () => fim(null) });
     });
   }
+  // 🗂 v84_293: guia aberta pela Busca em lista (#bes com m:"lista") → as fotos vão pra /busca-lista/<id>
+  function baseDoDestino() {
+    return (DEST && DEST.m === 'lista') ? `/busca-lista/${encodeURIComponent(DEST.p)}` : `/modelos-video/${encodeURIComponent(DEST.p)}/fotos-roteiro`;
+  }
   async function enviarTudo() {
     const fila = resultados.filter((r) => !enviados.has(r.url));
     if (!fila.length) return;
-    const base = `/modelos-video/${encodeURIComponent(DEST.p)}/fotos-roteiro`;
+    const base = baseDoDestino();
     let ok = 0; const falhas = [];
     for (let i = 0; i < fila.length; i++) {
       const r = fila[i];
@@ -478,7 +482,7 @@
     await postar('/navegador-imagens/aba', { p: DEST.p, q: DEST.q || '', e: DEST.e || null, estado: estadoDaGuia(), marcadas: selecionados.size });
     status('➡ Fechando as prontas e abrindo as próximas…');
     const qtd = +(document.getElementById('gcl-qtd')?.value || 5);
-    const r = await postar(`/modelos-video/${encodeURIComponent(DEST.p)}/fotos-roteiro/guias`, { trocar: true, quantas: qtd });
+    const r = await postar(baseDoDestino() + '/guias', { trocar: true, quantas: qtd });
     if (b) b.disabled = false;
     if (!r.ok) return status('⚠ ' + r.erro);
     const d = r.d || {}, m = d.mantidas || [];
