@@ -71,6 +71,10 @@ def baixar_video(url: str, pasta_destino: Path, ytdlp_module: Any = None, reques
     """
     dominio = obter_dominio(url)
     baixador = FONTES_SUPORTADAS.get(dominio)
+    if baixador is None and "youtube" not in dominio and "youtu.be" not in dominio:
+        # 🌐 v84_311: Reddit, Vimeo, Pinterest, Threads, Bluesky… — o yt-dlp conhece milhares de sites: tenta direto
+        from ._ytdlp_base import baixar_com_ytdlp
+        return baixar_com_ytdlp(url, pasta_destino, ytdlp_module=ytdlp_module)
     if baixador is None:
         raise RedesSociaisError(
             f"Fonte '{dominio}' ainda não é suportada por aqui. "

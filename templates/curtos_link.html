@@ -37,6 +37,7 @@
   <label>Como narrar</label>
   <div class="lk-modos">{% for k, v in modos.items() %}<label><input type="radio" name="modo" value="{{ k }}"{% if k == 'auto' %} checked{% endif %}> {{ v }}</label>{% endfor %}</div>
   <div class="lk-ops">
+    <label>📺 Canal deste lote<select id="canal" title="o @ e a legenda do acabamento deste canal valem pra esta leva"></select></label>
     <label>Postar em<select id="lingua_post">{% for k, v in linguas.items() %}<option value="{{ k }}"{% if k == 'en' %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
     <label>Narrar em<select id="idioma"><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
     <label>Voz<select id="voz"></select></label>
@@ -74,6 +75,22 @@
       <label>Cor da palavra falada<select id="a_legenda_cor_ativa">{% for k, v in cores_legenda.items() %}<option value="{{ k }}"{% if k %} style="background:{{ k }};color:{{ '#000' if k in ('#FFFFFF', '#FFD60A', '#00E5FF', '#39FF14') else '#fff' }}"{% endif %}>{{ v }}</option>{% endfor %}</select></label>
       <div id="a_previa_leg" style="align-self:end;padding:8px 14px;border-radius:8px;background:#222;font-weight:800;font-size:1.1rem"></div>
     </div>
+    <div class="lk-ops" style="align-items:flex-start">
+      <label>Aplicar em<select id="a_escopo" title="o padrão vale pra todos; o do canal só pra ele (o que o canal não define segue o padrão)"></select></label>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div id="a_tela" title="como a legenda fica na tela (9:16)" style="position:relative;width:146px;height:260px;border-radius:12px;background:linear-gradient(#2b3a55,#0d1220);overflow:hidden;border:2px solid #444">
+          <div id="a_tela_leg" style="position:absolute;left:0;right:0;text-align:center;line-height:1.1;font-weight:900;white-space:normal;transform:translateY(-50%)"></div>
+          <div id="a_tela_marca" style="position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:700;color:#FF8FB1;transform:translateY(-50%)">@seucanal</div>
+        </div>
+        <span class="si-dica">prévia — a legenda (amarelo/azul) e o @ do canal (rosa)</span>
+      </div>
+    </div>
+    <div class="lk-ops" style="align-items:flex-end">
+      <label>🏷 Posição do @ do canal<select id="a_marca_posicao"><option value="">como o canal define (meio)</option><option value="meio">no meio</option><option value="topo">em cima</option><option value="base">embaixo</option><option value="terco">terço de baixo</option><option value="sup_esq">canto sup. esquerdo</option><option value="sup_dir">canto sup. direito</option><option value="inf_esq">canto inf. esquerdo</option><option value="inf_dir">canto inf. direito</option><option value="legenda">🔗 ligada à legenda (acima/abaixo dela)</option></select></label>
+      <label>ligada: lado<select id="a_marca_lado"><option value="acima">acima da legenda</option><option value="abaixo">abaixo da legenda</option></select></label>
+      <label>distância (% da altura)<input id="a_marca_distancia" type="number" min="1" max="40" step="1"></label>
+      <label>ou em pixels (0 = usa a %)<input id="a_marca_px" type="number" min="0" max="400" step="1"></label>
+    </div>
     <label>🎯 Círculo/seta seguindo o objeto<select id="a_destaques"><option value="precisa">só quando precisa (objeto pequeno, longe ou no meio de outros)</option>
       <option value="livre">a IA decide (como antes: 1 a 3 por vídeo)</option><option value="nunca">nunca</option></select></label>
     <label>🔊 Efeitos sonoros<select id="a_sons_nivel"><option value="poucos">poucos — só nas ações que aparecem (máx. 1 a cada ~8 s)</option>
@@ -109,7 +126,7 @@ try { const sv = JSON.parse(localStorage.getItem('lk_op') || '{}'); ['lingua_pos
   vozes(); if (sv.voz) el('voz').value = sv.voz; if (sv.modo) { const r = document.querySelector(`input[name=modo][value="${sv.modo}"]`); if (r) r.checked = true; }
   if (sv.exportar === false) el('exportar').checked = false; } catch (e) { vozes(); }
 window.lkGo = async () => {
-  const d = {link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked,
+  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked,
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   try { localStorage.setItem('lk_op', JSON.stringify(Object.assign({}, d, {link: '', comentarios: '', extra: ''}))); } catch (e) {}
@@ -125,33 +142,75 @@ el('link').addEventListener('input', () => {  // 🔗 quantos links vão entrar 
   el('nLinks').textContent = n > 1 ? `🔗 ${Math.min(n, 50)} vídeos na fila${n > 50 ? ' (só os 50 primeiros)' : ''} — um de cada vez; pode fechar a página` : '';
 });
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
-              'legenda_altura', 'legenda_margem', 'sons_nivel', 'legenda_fonte', 'legenda_cor', 'legenda_cor_ativa', 'destaques'];
+              'legenda_altura', 'legenda_margem', 'sons_nivel', 'legenda_fonte', 'legenda_cor', 'legenda_cor_ativa', 'destaques', 'marca_posicao', 'marca_lado', 'marca_distancia', 'marca_px'];
 function previaLeg() {  // 🎨 como fica: “ESSA [PALAVRA] AQUI”
   const f = el('a_legenda_fonte').value, c = el('a_legenda_cor').value || '#FFFFFF', a = el('a_legenda_cor_ativa').value || '#FFD60A';
+  const mp = el('a_marca_posicao').value, dist = parseFloat(el('a_marca_distancia').value) || 10, px = parseInt(el('a_marca_px').value) || 0;
+  el('a_marca_lado').disabled = mp !== 'legenda'; el('a_marca_distancia').disabled = mp !== 'legenda'; el('a_marca_px').disabled = mp !== 'legenda';
   el('a_previa_leg').innerHTML = `<span style="font-family:'${f || 'DP Inter'}',sans-serif;color:${c};-webkit-text-stroke:1px #000">ESSA <span style="color:${a}">PALAVRA</span> AQUI</span>`;
+  // 📱 a tela 9:16: a legenda onde ela cai de verdade (altura exata > posição; margem dos lados; tamanho = % da altura)
+  const H = 260, tela = el('a_tela'), alt = parseFloat(el('a_legenda_altura').value);
+  const pos = {topo: 0.16, terco: 0.66, meio: 0.5, base: 0.84}[el('a_legenda_posicao').value] ?? 0.66;
+  const y = (alt > 0 ? Math.min(95, Math.max(5, alt)) / 100 : pos) * H;
+  const m = parseFloat(el('a_legenda_margem').value); const mar = (isNaN(m) ? 0.1 : m) * 146;
+  const tam = Math.max(10, (parseFloat(el('a_legenda_tamanho').value) || 0.05) * H * 1.15);
+  const L = el('a_tela_leg'); L.style.top = y + 'px'; L.style.left = mar + 'px'; L.style.right = mar + 'px'; L.style.fontSize = tam + 'px';
+  L.style.fontFamily = `'${f || 'DP Inter'}',sans-serif`; L.style.color = c; L.style.textShadow = '0 0 3px #000, 0 0 3px #000';
+  const cap = el('a_legenda_maiusculas').checked;
+  L.innerHTML = `${cap ? 'ESSA' : 'Essa'} <span style="color:${a}">${cap ? 'PALAVRA' : 'palavra'}</span> ${cap ? 'AQUI' : 'aqui'}`;
+  el('a_tela').dataset.pos = el('a_legenda_posicao').value;
+  const M = el('a_tela_marca'), dH = px ? px / 260 : dist / 100, ac = el('a_marca_lado').value === 'acima' ? -1 : 1;
+  const yy = {meio: 0.5, topo: 0.05, base: 0.95, terco: 0.76, sup_esq: 0.04, sup_dir: 0.04, inf_esq: 0.96, inf_dir: 0.96}[mp];
+  const yMarca = mp === 'legenda' ? Math.max(0.02, Math.min(0.98, y / H + ac * dH)) : (yy ?? 0.5);
+  M.style.top = (yMarca * H) + 'px'; M.style.textAlign = ['sup_esq', 'inf_esq'].includes(mp) ? 'left' : ['sup_dir', 'inf_dir'].includes(mp) ? 'right' : 'center';
+  M.innerHTML = el('canal').selectedOptions[0] ? '@' + (el('canal').selectedOptions[0].text.replace(/[^a-z0-9_.]/gi, '').toLowerCase() || 'seucanal') : '@seucanal';
 }
-['a_legenda_fonte', 'a_legenda_cor', 'a_legenda_cor_ativa'].forEach(i => el(i).addEventListener('change', previaLeg));
+['a_legenda_fonte', 'a_legenda_cor', 'a_legenda_cor_ativa', 'a_legenda_posicao', 'a_legenda_altura', 'a_legenda_margem', 'a_legenda_tamanho', 'a_legenda_maiusculas'].forEach(i => el(i).addEventListener(i === 'a_legenda_altura' ? 'input' : 'change', previaLeg));
+let CANAIS = [];
+async function carregarAcab(cid) {  // o padrão (vazio) ou o do canal escolhido
+  const a = (await (await fetch('/curtos/acabamento' + (cid ? '?canal=' + encodeURIComponent(cid) : ''))).json()).acabamento || {};
+  ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
+    else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); });
+  if (!a.destaques) el('a_destaques').value = 'precisa';
+  previaLeg();
+}
+async function carregarCanais() {
+  try { CANAIS = (await (await fetch('/curtos/canais-link')).json()).canais || []; } catch (e) { CANAIS = []; }
+  const opts = CANAIS.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}${c.personalizado ? ' ✎' : ''}</option>`).join('');
+  el('canal').innerHTML = opts || '<option value="">(padrão do canal)</option>';
+  el('a_escopo').innerHTML = '<option value="">📚 padrão de todos os canais</option>' + CANAIS.map(c => `<option value="${esc(c.id)}">📺 só ${esc(c.nome)}</option>`).join('');
+  try { const ult = localStorage.getItem('lk_canal'); if (ult && CANAIS.some(c => c.id === ult)) el('canal').value = ult; } catch (e) {}
+  el('canal').addEventListener('change', () => { try { localStorage.setItem('lk_canal', el('canal').value); } catch (e) {} });
+  el('a_escopo').value = ''; 
+}
+el('a_escopo').addEventListener('change', () => carregarAcab(el('a_escopo').value));
+(async () => { try { await carregarCanais(); } catch (e) {} })();
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
     else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); });
   if (!a.destaques) el('a_destaques').value = 'precisa'; } catch (e) {} previaLeg(); })();
+(() => { el('a_marca_posicao').addEventListener('change', previaLeg); el('a_marca_lado').addEventListener('change', previaLeg); el('a_marca_distancia').addEventListener('input', previaLeg); el('a_marca_px').addEventListener('input', previaLeg); })();
 (() => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/dp-fontes.css'; document.head.appendChild(l); })();  // as fontes da prévia
-window.lkAcab = async () => { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; });
-  try { await post('/curtos/acabamento', d); aviso('💾 acabamento salvo — vale pros próximos shorts', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+window.lkAcab = async () => { const d = {canal_id: el('a_escopo').value}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; });
+  try { await post('/curtos/acabamento', d); aviso(d.canal_id ? `💾 acabamento do canal ${el('a_escopo').selectedOptions[0].text.replace('📺 só ', '')} salvo` : '💾 acabamento salvo — vale pros próximos shorts', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 let timer = null;
 const IA = {{ 'true' if ia else 'false' }};
 const DIRS = '<option value="">direção…</option>' + Object.entries({{ direcoes_titulo|tojson }}).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
 function desenhar(vs) {
   const L = el('lista');
+  const pend = vs.filter(v => v.pendente && !v.rodando).length;  // ▶ a fila que ficou pelo meio (o site caiu/reiniciou)
+  const barraRetomar = pend ? `<div class="aviso" style="margin-bottom:8px">⏸ ${pend} vídeo(s) ficaram pelo meio (o site fechou ou reiniciou). <button class="si-mini" id="btnRetomar">▶ retomar a fila</button></div>` : '';
   const foco = document.activeElement;  // ✍ escrevendo o direcionamento: a atualização automática espera
   if (foco && L.contains(foco) && foco.matches('input, select, textarea')) return vs.some(v => v.rodando);
   const digitado = {}; L.querySelectorAll('[data-tcom], [data-tdir]').forEach(e => { if (e.value) digitado[(e.dataset.tcom ? 'c' : 'd') + (e.dataset.tcom || e.dataset.tdir)] = e.value; });
   if (!vs.length) { L.innerHTML = '<p class="si-dica">Nenhum ainda.</p>'; return false; }
+  setTimeout(() => { const b = document.getElementById('btnRetomar'); if (b) b.onclick = async () => { b.disabled = true;
+    try { const j = await post('/curtos/link/retomar', {}); desenhar(j.videos); aviso(j.retomados ? `▶ retomando ${j.retomados} vídeo(s), um por vez` : 'nada pra retomar', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; } }; }, 0);
   const abertos = new Set([...document.querySelectorAll('.lk-v details[open]')].map(d => d.dataset.k));
-  L.innerHTML = vs.map(v => { const cls = v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : '');
+  L.innerHTML = barraRetomar + vs.map(v => { const cls = v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : '');
     const modo = v.modo_usado ? MODOS[v.modo_usado] : MODOS[v.modo];
     return `<div class="lk-v ${cls}">
-      <div class="lk-cab"><b>${esc(v.titulo)}</b><span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
+      <div class="lk-cab"><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
         ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
         <a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a></div>
       ${v.rodando ? `<div class="lk-prog"><div class="lk-gira"></div><span><b>${esc(v.etapa)}</b> — ${esc(v.prog)}</span></div>` : ''}

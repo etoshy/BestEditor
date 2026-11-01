@@ -5789,8 +5789,9 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 try:
                     import marca_canal
                     _pos_leg = (job.get("legendas") or {}).get("posicao") if (job.get("legendas") or {}).get("ativa") else ""
+                    _leg = job.get("legendas") if (job.get("legendas") or {}).get("ativa") else None
                     for _arq in {output_path, job.get("captioned_output_path")} - {None}:
-                        marca_canal.aplicar(_arq, job["marca"], _job_dir(job_id), _pos_leg)
+                        marca_canal.aplicar(_arq, job["marca"], _job_dir(job_id), _pos_leg, leg=_leg)
                 except Exception:  # noqa: BLE001
                     job["marca_erro"] = traceback.format_exc()[-800:]
             _capitulos_do_video_final(job_id, job, output_path, cutaways_to_apply)

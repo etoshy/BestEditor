@@ -2919,7 +2919,8 @@ def exportar(base: str, sid: str, eid: str, transcrever: Optional[Callable[..., 
     if marca.get("ativa") and marca.get("texto"):
         on_log("🏷 marca do canal…")
         import marca_canal
-        marca_canal.aplicar(atual, marca, tmp, op["legenda_pos"] if op.get("legenda") else "")
+        marca_canal.aplicar(atual, marca, tmp, op["legenda_pos"] if op.get("legenda") else "",
+                            leg={"posicao": op.get("legenda_pos"), "altura": op.get("legenda_altura")} if op.get("legenda") else None)
     final = os.path.join(pe, "export", f"{eid}_{op['qualidade']}.mp4")
     shutil.move(atual, final)
     shutil.rmtree(tmp, ignore_errors=True)

@@ -191,9 +191,30 @@ class TestBaixarVideoDispatcher:
         assert len(fake_requests.chamadas) == 2  # página + vídeo
 
     def test_fonte_nao_suportada_lista_as_disponiveis(self, tmp_path):
-        with pytest.raises(RedesSociaisError, match="ainda não é suportada") as exc:
-            baixar_video("https://www.pinterest.com/pin/1", str(tmp_path))
+        with pytest.raises(RedesSociaisError, match="ainda não é suportada") as exc:  # (YouTube tem a aba própria)
+            baixar_video("https://www.youtube.com/watch?v=x", str(tmp_path))
         assert "YouTube" in str(exc.value)  # dica de usar a aba do YouTube
+
+    def test_outros_sites_vao_direto_no_ytdlp(self, tmp_path):
+        """🌐 v84_311: Reddit, Pinterest, Vimeo… — o yt-dlp genérico tenta."""
+        pedidos = []
+
+        class YDL:
+            def __init__(self, o):
+                self.o = o
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def download(self, urls):
+                pedidos.append(urls[0])
+                open(self.o["outtmpl"].replace("%(ext)s", "mp4"), "wb").write(b"x")
+        fake = type("M", (), {"YoutubeDL": YDL})
+        cam = baixar_video("https://www.reddit.com/r/x/comments/1/a/", str(tmp_path), ytdlp_module=fake)
+        assert cam.endswith("original.mp4") and pedidos == ["https://www.reddit.com/r/x/comments/1/a/"]
 
 
 # --------------------------------------------------------------------------- #

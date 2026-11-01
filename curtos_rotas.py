@@ -1299,7 +1299,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     # ------------------------------------------------------------------ 🔗 link → vídeo pronto (v84_286)
     import curtos_link as CL
 
-    def _link_resumo(p: Dict[str, Any]) -> Dict[str, Any]:
+    def _link_resumo(p: Dict[str, Any], pend: Optional[set] = None) -> Dict[str, Any]:
         lr = p.get("link_rapido") or {}
         r = p.get("roteiro") or {}
         t = TAREFAS.get(p["id"]) or {}
@@ -1317,10 +1317,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                            if os.path.isfile(os.path.join(CT.pasta(base_dir, p["id"]), "thumbs", t["arquivo"]))],
                 "hashtags": r.get("hashtags") or [], "n_comentarios": len(info.get("comentarios") or []),
                 "comentarios_erro": info.get("erro") or "", "pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
-                "editor": (p.get("editor") or {}).get("job_id") or "", "etapa": lr.get("etapa") or ""}
+                "editor": (p.get("editor") or {}).get("job_id") or "", "etapa": lr.get("etapa") or "",
+                "canal": (CT.canal_do(base_dir, p) or {}).get("nome") or "", "canal_id": p.get("canal_id") or "",
+                "pendente": p["id"] in (pend if pend is not None else set())}
 
     def _links(n: int = 60) -> List[Dict[str, Any]]:
         out = []
+        pend = set(_link_pendentes())
         for x in CT.listar(base_dir):
             if x.get("modelo") != "comentario":
                 continue
@@ -1329,7 +1332,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             except CT.CurtoErro:
                 continue
             if p.get("link_rapido"):
-                out.append(_link_resumo(p))
+                out.append(_link_resumo(p, pend))
         return sorted(out, key=lambda v: -(v["criado"] or 0))[:n]
 
     def _link_etapa(pid: str, etapa: str, **kw: Any) -> None:
@@ -1339,6 +1342,71 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             CT.salvar(base_dir, q)
 
     _UM_LINK_POR_VEZ = threading.Lock()
+
+    def _link_pendentes() -> List[str]:
+        """🔁 v84_310: os links que ficaram pelo meio (o site fechou/reiniciou): sem erro guardado, sem terminar, sem tarefa."""
+        out = []
+        for x in CT.listar(base_dir):
+            if x.get("modelo") != "comentario":
+                continue
+            try:
+                p = CT.carregar(base_dir, x["id"])
+            except CT.CurtoErro:
+                continue
+            lr = p.get("link_rapido") or {}
+            if not lr or lr.get("erro") or lr.get("parado"):
+                continue
+            if lr.get("etapa") in ("✅ pronto", "✅ no editor"):
+                continue
+            t = TAREFAS.get(x["id"])
+            if t and not t.get("fim"):
+                continue
+            out.append(x["id"])
+        return out
+
+    def _vigia_links() -> None:
+        time.sleep(float(os.environ.get("CURTOS_VIGIA_INICIO_S") or 30))
+        while True:
+            try:
+                if not _UM_LINK_POR_VEZ.locked():
+                    for pid in _link_pendentes()[:1]:
+                        _retomar_link(pid)
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(60)
+
+    def _retomar_link(pid: str) -> None:
+        p = CT.carregar(base_dir, pid)
+        lr = p.get("link_rapido") or {}
+        TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                        "prog": "🔁 retomando depois da queda do site…"}
+
+        def corpo() -> None:
+            try:
+                with _UM_LINK_POR_VEZ:
+                    TAREFAS[pid]["msg"] = _link_rodar(pid, (p.get("config") or {}).get("voz_tts") or "",
+                                                      lr.get("qualidade") or "1080p", lr.get("exportar", True),
+                                                      lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+            except Exception as exc:  # noqa: BLE001
+                TAREFAS[pid]["erro"] = str(exc)[:600]
+                _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
+            finally:
+                TAREFAS[pid]["fim"] = time.time()
+        threading.Thread(target=corpo, daemon=True, name="link-" + pid).start()
+
+    @app.route("/curtos/link/retomar", methods=["POST"])
+    def curtos_link_retomar():
+        """▶ retoma a fila que ficou pelo meio (um por vez, sem duplicar)."""
+        pend = _link_pendentes()
+        if not pend:
+            return _ok(retomados=0, videos=_links())
+        for pid in pend[:1]:  # o vigia pega os outros, um por vez
+            _retomar_link(pid)
+        return _ok(retomados=len(pend), videos=_links())
+
+    import sys as _sys_l
+    if "pytest" not in _sys_l.modules and os.environ.get("CURTOS_VIGIA", "1") != "0":
+        threading.Thread(target=_vigia_links, daemon=True, name="vigia-links").start()
 
     def _link_rodar(pid: str, slug: str, qualidade: str, exportar: bool, prog: Callable[[str], None]) -> str:
         p = CT.carregar(base_dir, pid)
@@ -1445,9 +1513,29 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos/acabamento", methods=["GET", "POST"])
     def curtos_acabamento():
         """🎨 o acabamento padrão de TODOS os shorts novos: @ do canal, legenda, sons do Pixabay."""
+        cid = str(request.args.get("canal") or "")
         if request.method == "POST":
-            return _ok(acabamento=CT.salvar_acabamento(base_dir, _corpo()))
-        return _ok(acabamento=CT.acabamento(base_dir))
+            b = _corpo()
+            cid = str(b.pop("canal_id", "") or "")
+            try:
+                if cid:
+                    CT.carregar_canal(base_dir, cid)
+                return _ok(acabamento=CT.salvar_acabamento(base_dir, b, cid))
+            except CT.CurtoErro as exc:
+                return _erro(str(exc))
+        return _ok(acabamento=CT.acabamento(base_dir, cid))
+
+    @app.route("/curtos/canais-link", methods=["GET"])
+    def curtos_canais_link():
+        """🎚 v84_310: os canais (perfis) pra escolher no link — cada um com a própria legenda/@/destaques."""
+        out = []
+        for c in CT.listar_canais(base_dir):
+            try:
+                cc = CT.carregar_canal(base_dir, c["id"])
+            except CT.CurtoErro:
+                continue
+            out.append({"id": cc["id"], "nome": cc.get("nome") or cc["id"], "personalizado": bool(cc.get("acabamento"))})
+        return _ok(canais=out)
 
     @app.route("/curtos/link", methods=["GET"])
     def curtos_link_pagina():
@@ -1481,8 +1569,16 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         qualidade = str(b.get("qualidade") or "1080p")
         exportar = b.get("exportar", True) not in (False, "0", "", "false")
         criados = []
+        canal_escolhido = str(b.get("canal_id") or "")
+        try:
+            if canal_escolhido:
+                CT.carregar_canal(base_dir, canal_escolhido)
+            else:
+                canal_escolhido = CT.canal_do_modelo(base_dir, "comentario")
+        except CT.CurtoErro:
+            canal_escolhido = CT.canal_do_modelo(base_dir, "comentario")
         for url in links:  # 🔗 vários links = vários vídeos, um depois do outro
-            p = CT.criar(base_dir, CT.canal_do_modelo(base_dir, "comentario"), "🔗 " + url.split("?")[0][-60:], [], "", modelo="comentario")
+            p = CT.criar(base_dir, canal_escolhido, "🔗 " + url.split("?")[0][-60:], [], "", modelo="comentario")
             pid = p["id"]
             with CT._TRAVA:
                 p = CT.carregar(base_dir, pid)

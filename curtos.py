@@ -1155,13 +1155,14 @@ def idioma_narrado(p: Dict[str, Any], perfil: Optional[Dict[str, Any]] = None) -
 
 
 # ------------------------------------------------------------------ 🏷 marca do canal (@canal por cima do vídeo)
-MARCA_POSICOES = ("meio", "topo", "base", "terco", "sup_esq", "sup_dir", "inf_esq", "inf_dir")
+MARCA_POSICOES = ("meio", "topo", "base", "terco", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "legenda")  # legenda = ligada à legenda
 
 
 def marca_padrao(nome_canal: str = "") -> Dict[str, Any]:
     slug = re.sub(r"[^a-z0-9_.]+", "", unicodedata.normalize("NFKD", str(nome_canal or "")).encode("ascii", "ignore").decode().lower())
     return {"ativa": True, "texto": f"@{slug}" if slug else "@seucanal", "posicao": "meio", "tamanho": 0.035, "opacidade": 0.5,
-            "fonte": "DP Poppins", "cor": "#FFFFFF", "contorno": True, "desvio_y": 0.0}
+            "fonte": "DP Poppins", "cor": "#FFFFFF", "contorno": True, "desvio_y": 0.0,
+            "lado": "acima", "distancia": 0.10}  # (a ligação com a legenda só vale com posicao "legenda")
 
 
 def normalizar_marca(m: Any, nome_canal: str = "") -> Dict[str, Any]:
@@ -1183,6 +1184,17 @@ def normalizar_marca(m: Any, nome_canal: str = "") -> Dict[str, Any]:
             out["cor"] = m["cor"].upper()
         if str(m.get("fonte") or "").startswith("DP "):
             out["fonte"] = str(m["fonte"])[:40]
+        if m.get("lado") in ("acima", "abaixo"):  # 🏷 v84_311: com posicao "legenda": X% (distancia) ou N px (distancia_px) do centro da legenda
+            out["lado"] = m["lado"]
+        try:
+            if m.get("distancia_px") not in (None, "", 0, "0"):
+                out["distancia_px"] = max(4, min(400, int(float(m["distancia_px"]))))
+                out.pop("distancia", None)
+            elif m.get("distancia") not in (None, ""):
+                out["distancia"] = round(max(0.01, min(0.40, float(m["distancia"]) / (100 if float(m["distancia"]) > 1 else 1))), 3)
+                out.pop("distancia_px", None)
+        except (TypeError, ValueError):
+            pass
         if "contorno" in m:
             out["contorno"] = bool(m["contorno"])
     return out
@@ -1220,7 +1232,8 @@ def canal_do_modelo(base: str, modelo: str) -> str:
 ACABAMENTO_PADRAO = {"arroba": "", "legenda_estilo": "", "legenda_tamanho": 0.05, "legenda_posicao": "terco",
                      "legenda_maiusculas": True, "sons_pixabay": False, "aplicar_noticia": False,
                      "legenda_altura": None, "legenda_margem": 0.10, "sons_nivel": "poucos",
-                     "legenda_fonte": "", "legenda_cor": "", "legenda_cor_ativa": "", "destaques": "precisa"}
+                     "legenda_fonte": "", "legenda_cor": "", "legenda_cor_ativa": "", "destaques": "precisa",
+                     "marca_posicao": "", "marca_lado": "acima", "marca_distancia": 10, "marca_px": 0}  # 🏷 o @ do canal (vazio = como era)
 FONTES_LEGENDA = {"": "padrão (a do estilo)", "DP Inter": "Inter", "DP Poppins": "Poppins", "DP Montserrat": "Montserrat",
                   "DP Anton": "Anton", "DP Bebas Neue": "Bebas Neue", "DP Oswald": "Oswald", "DP Archivo": "Archivo",
                   "DP Barlow Condensed": "Barlow Condensed", "DP Roboto Condensed": "Roboto Condensed", "DP Fjalla One": "Fjalla One",
@@ -1233,7 +1246,8 @@ CORES_LEGENDA = {"": "padrão", "#FFFFFF": "branco", "#FFD60A": "amarelo", "#FF9
                  "#1E90FF": "azul", "#000000": "preto"}
 
 
-def acabamento(base: str) -> Dict[str, Any]:
+def acabamento(base: str, canal_id: str = "") -> Dict[str, Any]:
+    """O acabamento padrão de todos os shorts; com canal_id, o do canal (o que ele guardou por cima do padrão) — 🎚 v84_310."""
     cam = os.path.join(raiz(base), "_acabamento.json")
     out = dict(ACABAMENTO_PADRAO)
     try:
@@ -1241,11 +1255,17 @@ def acabamento(base: str) -> Dict[str, Any]:
             out.update({k: v for k, v in json.load(f).items() if k in ACABAMENTO_PADRAO})
     except (OSError, ValueError):
         pass
+    if canal_id:
+        try:
+            out.update(carregar_canal(base, canal_id).get("acabamento") or {})
+        except CurtoErro:
+            pass
     return out
 
 
-def salvar_acabamento(base: str, novos: Dict[str, Any]) -> Dict[str, Any]:
-    a = acabamento(base)
+def limpar_acabamento(novos: Dict[str, Any]) -> Dict[str, Any]:
+    """Só as chaves do acabamento, com os valores validados (fonte/cor/posição/altura/margem/sons…)."""
+    out: Dict[str, Any] = {}
     for k, v in (novos or {}).items():
         if k not in ACABAMENTO_PADRAO:
             continue
@@ -1266,20 +1286,43 @@ def salvar_acabamento(base: str, novos: Dict[str, Any]) -> Dict[str, Any]:
                 v = round(max(0.0, min(0.25, float(v) / (100 if float(v) > 1 else 1))), 3)
             except (TypeError, ValueError):
                 continue
+        elif k == "destaques":
+            v = v if v in ("precisa", "nunca", "livre") else "precisa"
+        elif k == "marca_posicao":
+            v = v if v in MARCA_POSICOES else ""
+        elif k == "marca_lado":
+            v = v if v in ("acima", "abaixo") else "acima"
+        elif k in ("marca_distancia", "marca_px"):
+            try:
+                v = max(0, min(400 if k == "marca_px" else 40, int(float(v))))
+            except (TypeError, ValueError):
+                v = 0 if k == "marca_px" else 10
         elif k == "legenda_fonte":
             v = v if v in FONTES_LEGENDA else ""
         elif k in ("legenda_cor", "legenda_cor_ativa"):
             v = str(v or "").upper()
             v = v if re.fullmatch(r"#[0-9A-F]{6}", v) else ""
-        elif k == "destaques":
-            v = v if v in ("precisa", "nunca", "livre") else "precisa"
         elif k == "sons_nivel":
             v = v if v in ("nenhum", "poucos", "normal") else "poucos"
         elif k == "legenda_posicao":
             v = v if v in ("base", "meio", "topo", "terco") else "terco"
         else:
             v = " ".join(str(v or "").split())[:40]
-        a[k] = v
+        out[k] = v
+    return out
+
+
+def salvar_acabamento(base: str, novos: Dict[str, Any], canal_id: str = "") -> Dict[str, Any]:
+    """Salva o padrão de todos (canal_id vazio) ou só o de um canal (o que não for dele segue o padrão)."""
+    limpos = limpar_acabamento(novos)
+    if canal_id:
+        with _TRAVA:
+            c = carregar_canal(base, canal_id)
+            c["acabamento"] = dict(c.get("acabamento") or {}, **limpos)
+            salvar_canal(base, c)
+        return acabamento(base, canal_id)
+    a = acabamento(base)
+    a.update(limpos)
     os.makedirs(raiz(base), exist_ok=True)
     with open(os.path.join(raiz(base), "_acabamento.json"), "w", encoding="utf-8") as f:
         json.dump(a, f, ensure_ascii=False, indent=1)
@@ -1292,6 +1335,17 @@ def aplicar_acabamento(p: Dict[str, Any], a: Dict[str, Any]) -> None:
     cfg = p.setdefault("config", {})
     cfg["sons_nivel"] = a.get("sons_nivel") or "poucos"
     cfg["destaques"] = a.get("destaques") or "precisa"
+    if a.get("marca_posicao"):  # 🏷 a posição do @ (ou ligada à legenda: X% ou N px acima/abaixo dela)
+        m_ = dict(cfg.get("marca") or {}, posicao=a["marca_posicao"])
+        if a["marca_posicao"] == "legenda":
+            m_["lado"] = a.get("marca_lado") or "acima"
+            if int(a.get("marca_px") or 0):
+                m_["distancia_px"] = int(a["marca_px"])
+                m_.pop("distancia", None)
+            else:
+                m_["distancia"] = float(a.get("marca_distancia") or 10) / 100
+                m_.pop("distancia_px", None)
+        cfg["marca"] = m_
     arroba = str(a.get("arroba") or "").strip()
     if arroba:
         cfg["marca"] = dict(cfg.get("marca") or {}, ativa=True, texto=arroba if arroba.startswith("@") else "@" + arroba)
@@ -1324,7 +1378,7 @@ def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] 
         u = str(u or "").strip()
         if re.match(r"https?://", u) and len(p["noticia"]["fontes"]) < 8:
             p["noticia"]["fontes"].append({"url": u[:800], "estado": "na fila", "titulo": "", "texto": "", "erro": None})
-    aplicar_acabamento(p, acabamento(base))  # 🎨 @ do canal + legenda padrão
+    aplicar_acabamento(p, acabamento(base, canal_id or ""))  # 🎨 @ do canal + legenda padrão (o do canal, se ele tiver)
     salvar(base, p)
     return p
 

@@ -25,7 +25,30 @@ def _cor(hexa: str) -> str:
     return f"&H00{h[4:6]}{h[2:4]}{h[0:2]}".upper()
 
 
-def ponto(cfg: Dict[str, Any], W: int, H: int, posicao_legenda: str = "") -> tuple:
+CENTRO_LEGENDA = {"base": 0.93, "meio": 0.5, "topo": 0.06, "terco": 0.76}  # onde a legenda fica (dp_legendas)
+
+
+def centro_legenda(leg: Optional[Dict[str, Any]]) -> Optional[float]:
+    """Centro da legenda em fração da altura (a altura exata manda; senão a posição). None se a legenda está desligada."""
+    if not leg or leg.get("ativa") is False:
+        return None
+    a = leg.get("altura")
+    try:
+        if a not in (None, "", "auto"):
+            return max(0.05, min(0.95, float(a)))
+    except (TypeError, ValueError):
+        pass
+    return CENTRO_LEGENDA.get(leg.get("posicao") or "terco", 0.76)
+
+
+def ponto(cfg: Dict[str, Any], W: int, H: int, posicao_legenda: str = "", leg_y: Optional[float] = None) -> tuple:
+    if (cfg.get("posicao") == "legenda") and leg_y is not None:  # 🏷 o @ LIGADO à legenda: X% (ou N px) acima/abaixo dela
+        try:
+            d = float(cfg.get("distancia_px") or 0) / H if cfg.get("distancia_px") else float(cfg.get("distancia") or 0.10)
+        except (TypeError, ValueError):
+            d = 0.10
+        fy = leg_y + (-d if (cfg.get("lado") or "acima") == "acima" else d)
+        return 5, int(W * 0.5), int(H * max(0.02, min(0.98, fy)))
     an, fx, fy = LUGARES.get(cfg.get("posicao") or "meio", LUGARES["meio"])
     fy += float(cfg.get("desvio_y") or 0)
     if posicao_legenda and _MESMO_LUGAR_DA_LEGENDA.get(cfg.get("posicao") or "") == posicao_legenda:
@@ -33,11 +56,12 @@ def ponto(cfg: Dict[str, Any], W: int, H: int, posicao_legenda: str = "") -> tup
     return an, int(W * fx), int(H * max(0.02, min(0.98, fy)))
 
 
-def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, posicao_legenda: str = "") -> str:
+def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, posicao_legenda: str = "",
+              leg_y: Optional[float] = None) -> str:
     fam = cfg.get("fonte") or "DP Poppins"
     fs = dp_destaques.fs_libass(fam, H * float(cfg.get("tamanho") or 0.035))
     alfa = format(int(round(255 * (1 - float(cfg.get("opacidade") or 0.5)))), "02X")
-    an, x, y = ponto(cfg, W, H, posicao_legenda)
+    an, x, y = ponto(cfg, W, H, posicao_legenda, leg_y)
     borda = max(1, int(round(fs / 18))) if cfg.get("contorno", True) else 0
     texto = str(cfg.get("texto") or "").replace("{", "(").replace("}", ")").replace("\\", "/")
 
@@ -57,7 +81,8 @@ def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, pos
     return caminho
 
 
-def aplicar(video: str, cfg: Optional[Dict[str, Any]], pasta_tmp: str, posicao_legenda: str = "") -> bool:
+def aplicar(video: str, cfg: Optional[Dict[str, Any]], pasta_tmp: str, posicao_legenda: str = "",
+            leg: Optional[Dict[str, Any]] = None) -> bool:
     """Queima a marca NO PRÓPRIO arquivo (troca no fim). False se está desligada / não deu."""
     if not cfg or not cfg.get("ativa") or not str(cfg.get("texto") or "").strip() or not os.path.isfile(video):
         return False
@@ -70,7 +95,8 @@ def aplicar(video: str, cfg: Optional[Dict[str, Any]], pasta_tmp: str, posicao_l
         W, H = (int(v) for v in r.stdout.strip().split(",")[:2])
     except ValueError:
         return False
-    ass = gerar_ass(cfg, W, H, float(_probe_duration(video) or 0), os.path.join(pasta_tmp, "marca.ass"), posicao_legenda)
+    ass = gerar_ass(cfg, W, H, float(_probe_duration(video) or 0), os.path.join(pasta_tmp, "marca.ass"), posicao_legenda,
+                    centro_legenda(leg) if leg else None)
     saida = os.path.join(pasta_tmp, "_com_marca" + os.path.splitext(video)[1])
     dp_legendas.queimar(video, ass, saida)
     if not os.path.isfile(saida) or os.path.getsize(saida) < 1000:

@@ -30,6 +30,56 @@ def verificar_ytdlp(ytdlp_module: Any = None) -> bool:
         return False
 
 
+NAVEGADORES = ["firefox", "edge", "chrome", "brave", "opera", "vivaldi", "chromium"]
+AJUDA_LOGIN = (
+    "A rede pediu login pra liberar esse vídeo (o Instagram faz isso muito). Como resolver: (1) abra o FIREFOX (ou o Edge), "
+    "entre na sua conta do Instagram/TikTok e tente de novo — o site usa os cookies dele sozinho (feche o Chrome antes, se "
+    "for usar o Chrome: aberto ele bloqueia a leitura); ou (2) exporte o cookies.txt com a extensão “Get cookies.txt "
+    "LOCALLY” com o site aberto e logado e envie em Configurações → YouTube (cookies.txt — vale pra todas as redes); "
+    "(3) atualize o yt-dlp: pip install -U \"yt-dlp[default]\"."
+)
+
+
+def pediu_login(exc: Any) -> bool:
+    m = str(exc).lower()
+    return any(k in m for k in ("empty media response", "login", "log in", "cookies", "rate-limit", "rate limit",
+                                "requested content is not available", "private", "not available", "sign in", "authentication"))
+
+
+def _prefs():
+    try:
+        import yt_cookies  # a pasta do site (o mesmo lugar dos cookies do YouTube)
+        return yt_cookies
+    except ImportError:
+        return None
+
+
+def _tentar_com_cookies(yt_dlp: Any, opcoes: Dict[str, Any], url: str, primeiro: Exception) -> None:
+    yc = _prefs()
+    tentativas = []
+    arq = yc.arquivo_cookies() if yc else None
+    if arq:
+        tentativas.append(("cookies.txt", {"cookiefile": arq}))
+    guardado = (yc.prefs().get("redes_navegador") if yc else None) or ""
+    for nav in ([guardado] if guardado in NAVEGADORES else []) + [n for n in NAVEGADORES if n != guardado]:
+        tentativas.append((nav, {"cookiesfrombrowser": (nav,)}))
+    erros = [f"sem cookies: {str(primeiro).strip()[:140]}"]
+    for nome, extra in tentativas:
+        try:
+            with yt_dlp.YoutubeDL(dict(opcoes, **extra)) as ydl:
+                ydl.download([url])
+        except Exception as exc:  # noqa: BLE001
+            erros.append(f"{nome}: {str(exc).strip()[:120]}")
+            continue
+        if yc and nome in NAVEGADORES:
+            try:
+                yc.salvar_prefs(redes_navegador=nome)
+            except Exception:  # noqa: BLE001
+                pass
+        return
+    raise RedesSociaisError(AJUDA_LOGIN + "\nTentativas: " + " ; ".join(erros))
+
+
 def baixar_com_ytdlp(
     url: str,
     pasta_destino: Path,
@@ -86,8 +136,15 @@ def baixar_com_ytdlp(
         opcoes.update(extra_opcoes)
 
     try:
-        with yt_dlp.YoutubeDL(opcoes) as ydl:
-            ydl.download([url])
+        try:
+            with yt_dlp.YoutubeDL(opcoes) as ydl:
+                ydl.download([url])
+        except Exception as exc0:  # noqa: BLE001
+            # 🍪 v84_311: o Instagram/TikTok/Facebook pediu login ("empty media response") → tenta com os cookies dos
+            # navegadores em que você está logado (o que funcionar fica guardado). Não mexe se já veio cookie de fora.
+            if ytdlp_module is not None or cookies_path or not pediu_login(exc0):
+                raise
+            _tentar_com_cookies(yt_dlp, opcoes, url, exc0)
     except RedesSociaisError:
         raise
     except Exception as exc:  # noqa: BLE001
