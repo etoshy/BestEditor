@@ -304,6 +304,19 @@ ROTEIRO_SCHEMA = CT._o({
     })},
 })
 
+
+def roteiro_schema(p: Dict[str, Any]) -> Dict[str, Any]:
+    """🎥 v84_322: com a câmera experimental, a cena ganha 'zoom_detalhe' e 'congelar' (sem ela: o schema de antes)."""
+    import camera_exp
+    if explicativo(p) or not camera_exp.ligada(p):
+        return ROTEIRO_SCHEMA
+    import copy
+    sc = copy.deepcopy(ROTEIRO_SCHEMA)
+    cena = sc["properties"]["blocos"]["items"]["properties"]["cenas"]["items"]
+    cena["properties"].update(camera_exp.schema_cena_extra(CT))
+    cena["required"] = list(cena["properties"])
+    return sc
+
 ROTEIRO_SYS = (
     "You write COMMENTARY SHORTS (YouTube Shorts / TikTok / Reels): a narrator retells and comments a viral clip while the clip plays. "
     "Follow this proven workflow:\n"
@@ -442,11 +455,84 @@ def _regra_fontes(p: Dict[str, Any]) -> str:
     return REGRA_SO_FONTES if _tem_fontes(p) else REGRA_FONTES_LIVRES
 
 
+# ------------------------------------------------------------------ ✨ v84_321: roteiro AUTÊNTICO (o padrão)
+# Fatos + opinião em vez de narrar o que já está na tela; gancho e final de um TIPO sorteado por vídeo (o lote não sai tudo igual).
+# O estilo antigo continua como opção ("classico"), desligada: só vale se você marcar.
+ESTILOS_ROTEIRO = {"autentico": "✨ autêntico (fatos + opinião, gancho e final variados)",
+                   "classico": "📜 clássico (narra o que acontece — o jeito antigo)"}
+
+TIPOS_GANCHO = {
+    "fato": "a SURPRISING FACT about the subject that makes THIS clip special or rare (e.g. 'Sloths almost never drink water. "
+            "So what you're about to see is rare.')",
+    "contradicao": "a CONTRADICTION — what everyone gets wrong about what they see (e.g. 'This looks lazy. It's actually a survival trick.')",
+    "opiniao": "a BOLD but honest OPINION the narrator will defend (e.g. 'This is the calmest animal on Earth, and this clip proves it.')",
+    "pergunta": "a SPECIFIC question the viewer can't answer yet and the video answers (e.g. 'Why would a sloth risk getting this close "
+                "to the water?') — never a vague 'Did you know…?'",
+    "detalhe": "point at the DETAIL most people miss, specifically (e.g. 'Ignore its face. Look at the green on its back.')",
+    "aposta": "a STAKES / tension setup — something could go wrong, or there is a reason this is harder than it looks (honest, no fake danger)",
+}
+TIPOS_FINAL = {
+    "debate": "a SPECIFIC either/or question about THIS clip that splits people in the comments (not a generic 'Would you ever…?')",
+    "fato_final": "keep the most surprising fact for the LAST line — the payoff that makes people rewatch or share",
+    "loop": "a last line that flows straight back into the first sentence, so the short loops seamlessly when it restarts",
+    "opiniao": "a strong, honest take + an invite to disagree ('Agree, or am I wrong?')",
+    "comentario": "ask for something concrete in the comments tied to the clip (guess, name it, tag the friend who…)",
+}
+
+REGRA_AUTENTICA = (
+    "\n\n✨ AUTHENTIC MODE — these rules OVERRIDE points 3, 4 and 5 above (the platforms demonetize narration that only describes the "
+    "clip, and templated, mass-produced scripts):\n"
+    "A. NO PLAY-BY-PLAY. Never just say what the viewer can already see ('it is moving… now it stretches… now it bends its neck'). "
+    "EVERY sentence must add something the image does NOT show: a fact, the context, the WHY/HOW, a comparison, the narrator's "
+    "opinion or a joke. You may name the moment in a few words to sync with the clip, but always add value in the same sentence.\n"
+    "B. At least 2 CONCRETE, well-established facts or pieces of context about the subject (the species and its behavior, the "
+    "technique, the place, the rule, the record…). Only what you are sure of or what the inputs support; if unsure say 'probably'; "
+    "never invent numbers, names or places.\n"
+    "C. At least 1 genuine first-person line from the narrator (an opinion, a reaction, a small self-deprecating joke) — a real "
+    "person talking, not a documentary voice.\n"
+    "D. HOOK (first sentence, under ~14 words, lands in the first 2 seconds): use the HOOK TYPE given in the content. It must be "
+    "SPECIFIC to this clip — click-worthy through curiosity, never through lies or fake claims.\n"
+    "E. ENDING: use the ENDING TYPE given in the content.\n"
+    "F. BANNED template phrases (they mark the video as mass-produced): 'Everyone thought', 'But look closer', 'You won't believe', "
+    "'Wait for it', 'Watch till the end', 'This is why…', 'so hard to forget', 'completely at peace', 'all the time in the world', "
+    "'Would you ever…?', 'What would you do?', 'Nobody expected', 'little did they know'. No empty dramatic adjectives.\n"
+    "G. 'ganchos': 5 hooks of 5 DIFFERENT hook types; 'finais': 5 endings of 5 DIFFERENT ending types (the first of each = the one "
+    "you used). 'titulos': curiosity + a concrete detail of the clip, honest.\n"
+    "H. 'descricao': 1-2 sentences with the most interesting fact + credit the original creator by @ when you know it (keep any [COMMENTARY]/[EXPLAIN]/[ART] tag the APPROACH asks for at the very start).")
+
+
+def estilo_roteiro(p: Dict[str, Any]) -> str:
+    """✨ v84_321: 'autentico' é o padrão (inclusive em projetos antigos); 'classico' só se você escolher."""
+    v = (p.get("config") or {}).get("estilo_roteiro") or "autentico"
+    return v if v in ESTILOS_ROTEIRO else "autentico"
+
+
+def tipos_do_video(p: Dict[str, Any]) -> tuple:
+    """🎲 o tipo de gancho e de final deste vídeo — sorteado pelo id (fixo pro mesmo vídeo, variado no lote)."""
+    import hashlib
+    h = int(hashlib.md5(str(p.get("id") or "").encode("utf-8")).hexdigest(), 16)
+    g = list(TIPOS_GANCHO)[h % len(TIPOS_GANCHO)]
+    f = list(TIPOS_FINAL)[(h // 7) % len(TIPOS_FINAL)]
+    return g, f
+
+
+def regra_tipos(p: Dict[str, Any]) -> str:
+    if explicativo(p) or estilo_roteiro(p) != "autentico":
+        return ""
+    g, f = tipos_do_video(p)
+    return f"## HOOK TYPE for this video: {TIPOS_GANCHO[g]}\n## ENDING TYPE for this video: {TIPOS_FINAL[f]}"
+
+
 def sistema(p: Dict[str, Any]) -> str:
     base_ = EXPLICATIVO_SYS if explicativo(p) else ROTEIRO_SYS
+    extra = REGRA_AUTENTICA if (not explicativo(p) and estilo_roteiro(p) == "autentico") else ""
+    import camera_exp
+    if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322
+        narrada = "Brazilian Portuguese" if dados(p).get("idioma") == "pt" else nome_lingua(lingua_post(p))
+        extra += camera_exp.REGRA_CAMERA.replace("{LINGUA}", narrada + " (the NARRATED language)")
     return (base_.replace("{REGRA_LINGUA}", regra_lingua(p)).replace("{REGRA_OPCOES}", REGRA_OPCOES)
             .replace("{REGRA_FONTES}", _regra_fontes(p))
-            .replace("{LINGUA}", nome_lingua(lingua_post(p)))) + regra_destaques(p)
+            .replace("{LINGUA}", nome_lingua(lingua_post(p)))) + extra + regra_destaques(p)
 
 
 REGRA_DESTAQUE = {  # 🎯 v84_308: círculo/seta só quando precisa
@@ -547,8 +633,11 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
             if quem and c["modo_link"] in ("arte", "auto"):  # 🎨 v84_309: o artista é o @ do link
                 L += [f"## THE CREATOR / ARTIST of this clip: @{quem.lstrip('@')}" + (f" ({CL.plataforma(link)})" if CL.plataforma(link) else "")
                       + " — name them when you present the work (say it so it reads well aloud).", ""]
+    tipos = regra_tipos(p)  # ✨ v84_321
+    if tipos:
+        L += [tipos, ""]
     if (p.get("config") or {}).get("extra"):
-        L += ["## EXTRA REQUEST", p["config"]["extra"], ""]
+        L += ["## EXTRA REQUEST (the creator's request wins over the hook/ending type)", p["config"]["extra"], ""]
     desc_canal = str((CT.canal_do(base, p) or {}).get("descricao") or "").strip()  # 📝 a descrição do canal (escrita por você)
     if desc_canal:
         L += ["## WHAT THIS CHANNEL IS ABOUT (the creator's own description — follow it)", desc_canal, ""]
@@ -560,7 +649,7 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
 
 def prompt_roteiro(base: str, p: Dict[str, Any]) -> str:
     return (sistema(p) + "\n\n" + conteudo_roteiro(base, p) + "\n\nAnswer ONLY with JSON in this format (no ```):\n"
-            + json.dumps(CT._exemplo_schema(ROTEIRO_SCHEMA), ensure_ascii=False, indent=1))
+            + json.dumps(CT._exemplo_schema(roteiro_schema(p)), ensure_ascii=False, indent=1))
 
 
 def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, Any]:
@@ -593,6 +682,9 @@ def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, A
                                   "alternativas": [], "material": "", "palavra": cn.get("palavra") or "", "efeito": cn.get("efeito") or "",
                                   "entrada": cn.get("entrada") or "none", "composicao": ""})
         blocos.append(dict(b, fala=fala, fala_en=en, fala_pt=pt, cenas=cenas))
+    import camera_exp
+    if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322: o teto de efeitos
+        camera_exp.aplicar_teto({"blocos": blocos})
     r = CT.ler_roteiro(dict(resp, blocos=blocos), p)
     for k in ("ganchos", "finais", "titulos"):
         r[k] = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get(k) or []
@@ -612,7 +704,7 @@ def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = No
     elif not dados(p)["linhas"] and not dados(p).get("referencia") and not (p.get("noticia") or {}).get("texto"):
         raise CT.CurtoErro("Diga o que acontece no clipe: a transcrição, uma descrição com os segundos, ou use 🎙/👁 pra tirar sozinho.")
     import ia_servico
-    r = (chamar or ia_servico.chamar)("curtos", sistema(p), conteudo_roteiro(base, p), schema=ROTEIRO_SCHEMA, max_tokens=12000,
+    r = (chamar or ia_servico.chamar)("curtos", sistema(p), conteudo_roteiro(base, p), schema=roteiro_schema(p), max_tokens=12000,
                                       **({} if chamar else {"timeout": 240.0}),
                                       effort="medium", job=pid, cache_local=False)
     if not r:
@@ -659,6 +751,11 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
               "titulos": f"Write 5 NEW post TITLES for this {tipo} — short, curiosity, honest (no fake claims)."}[qual]
     tag = " (may use one voice tag like [gasp])" if lingua_post(p) == "en" and qual != "titulos" else ""
     guia = ""
+    if qual in ("ganchos", "finais") and not explicativo(p) and estilo_roteiro(p) == "autentico":  # ✨ v84_321
+        tipos = TIPOS_GANCHO if qual == "ganchos" else TIPOS_FINAL
+        guia += ("\nEach one a DIFFERENT type from: " + "; ".join(f"{k} = {v}" for k, v in tipos.items())
+                 + "\nSpecific to this clip, click-worthy through curiosity, honest. Never: 'Everyone thought', 'But look closer', "
+                 "'You won't believe', 'Would you ever…?', 'What would you do?'.")
     if qual == "titulos":
         if direcao in DIRECOES_TITULO:
             guia += f"\nSTYLE: {DIRECOES_TITULO[direcao][1]}."
@@ -979,6 +1076,9 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
     nivel = nivel_destaques(p)
     dur = float((p.get("gravacao") or {}).get("dur") or 0) or max([float(x.get("end") or 0) for x in planos_v] + [20.0])
     cota = 0 if nivel == "nunca" else (max(1, int(dur // 20)) if nivel == "precisa" else 99)
+    import camera_exp
+    if camera_exp.ligada(p) and nivel != "nunca":  # 🎥 v84_322: até 2, amarrados aos fatos (o teto do roteiro já filtrou)
+        cota = camera_exp.MAX_DESTAQUES
     for x in planos_v:
         k = CT.chave_destaque(x)
         if not k:

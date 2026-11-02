@@ -16,6 +16,7 @@ import tempfile
 import re
 import threading
 import time
+import unicodedata
 from typing import Any, Callable, Dict, List, Optional
 
 from flask import abort, jsonify, redirect, render_template, request, send_file
@@ -32,6 +33,67 @@ _TRAVA_T = threading.Lock()
 
 def _pasta_pixabay(base_dir: str) -> str:
     return os.environ.get("CURTOS_PIXABAY_DIR") or os.path.join(base_dir, "pixabay_sons")
+
+
+MARCAS_LINK = {"": "— sem marca", "descartado": "🟥 descartado", "postado": "🟦 postado", "planejado": "🟨 com planos de postar"}
+
+
+def _log_link(lr: Dict[str, Any], texto: str) -> None:
+    """📜 o log do vídeo (o que aconteceu, com a hora) — continua existindo mesmo depois de apagar os arquivos."""
+    log = list(lr.get("log") or [])
+    log.append({"quando": time.time(), "texto": str(texto)[:200]})
+    lr["log"] = log[-60:]
+
+
+def _chave_grupo(nome: str) -> str:
+    """📂 o nome do grupo sem acento e sem maiúscula: 'Locais Incríveis' = 'locais incriveis'."""
+    s = unicodedata.normalize("NFKD", str(nome or "")).encode("ascii", "ignore").decode("ascii")
+    return " ".join(s.lower().split())
+
+
+def _nome_do_grupo(texto: str) -> str:
+    """📂 o nome do grupo: tira símbolos e pontuação das pontas (':', '-', '=', '#', '[', aspas…)."""
+    return re.sub(r"^[\W_]+|[\W_]+$", "", str(texto or "")).strip()
+
+
+def _separar_grupos(texto: str) -> List[tuple]:
+    """📂 Lê a lista colada: uma palavra vira o grupo dos links que vêm depois, com qualquer símbolo
+    depois (ou nenhum): 'Animais', 'Animais:', 'Animais -', '# Animais', '[Animais]'…
+    'Animais: https://…' também vale. Devolve [(link, grupo)] na ordem, sem repetir link."""
+    atual, out, vistos = "", [], set()
+    for linha in str(texto or "").splitlines():
+        if "http" in linha:
+            pref = _nome_do_grupo(linha[:linha.find("http")])
+            if pref:
+                atual = pref
+            for u in re.split(r"\s+", linha[linha.find("http"):]):
+                u = u.strip("<>\"'(),;")
+                if u.startswith("http") and u not in vistos:
+                    vistos.add(u)
+                    out.append((u, atual))
+        else:
+            nome = _nome_do_grupo(linha)
+            if nome:
+                atual = nome
+    return out
+
+
+def _grupos_ler(base: str) -> Dict[str, Dict[str, str]]:
+    try:
+        with open(os.path.join(CT.raiz(base), "grupos_link.json"), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _grupos_gravar(base: str, dados: Dict[str, Dict[str, str]]) -> None:
+    os.makedirs(CT.raiz(base), exist_ok=True)
+    caminho = os.path.join(CT.raiz(base), "grupos_link.json")
+    tmp = caminho + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, caminho)
 
 
 def _liberar_memoria_pesada() -> None:
@@ -806,6 +868,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     pass
             if "modo_anime" in b and (b["modo_anime"] in CT.MODOS_ANIME or b["modo_anime"] == ""):
                 cfg["modo_anime"] = b["modo_anime"]
+            if b.get("estilo_roteiro") in CC.ESTILOS_ROTEIRO:  # ✨ v84_321: vale pro próximo roteiro
+                cfg["estilo_roteiro"] = b["estilo_roteiro"]
+            if b.get("voz_modo") in ("minha", "tts"):  # 🎤 v84_325
+                cfg["voz_modo"] = b["voz_modo"]
+            if "camera_exp" in b:  # 🎥 v84_322: vale pro próximo roteiro/montagem
+                cfg["camera_exp"] = b["camera_exp"] not in (False, "0", "false", "", None)
             for k, n in (("extra", 3000), ("voz_tts", 120), ("motor_perfil", 20), ("anime_obras", 300)):
                 if k in b:
                     cfg[k] = str(b[k] or "")[:n]
@@ -1249,10 +1317,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             CT.salvar(base_dir, q)
         return f"pronto: {len(d['planos'])} planos em {d['dur']:.1f} s — abra no editor"
 
-    def _fazer_tudo_comentario(pid: str, slug: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
-        """🚀 💬 o que acontece (transcreve/descreve se faltar) → roteiro EN/PT → 3 takes → take 1 alinhado → 🎯 destaques → editor."""
+    # 🧩 v84_320: o caminho do vídeo de comentário dividido em etapas. O vídeo sozinho chama todas em sequência
+    # (_fazer_tudo_comentario); o lote "por etapa" chama cada etapa em todos os links antes da próxima. Cada etapa
+    # pula o que já está feito e lê a configuração do PRÓPRIO vídeo (voz, idioma, canal, duração…).
+    def _cm_preparar(pid: str, prog: Callable[[str], None]) -> List[str]:
+        """📰 lê a matéria (explicativo) e devolve os clipes que ainda não têm linha do tempo (se o roteiro ainda não existe)."""
         p = CT.carregar(base_dir, pid)
-        c = CC.dados(p)
         expl = CC.explicativo(p)
         if not expl and not CC.clipes(base_dir, p):
             raise CT.CurtoErro("Suba o vídeo cru (o clipe).")
@@ -1260,41 +1330,76 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             prog("📰 lendo a matéria…")
             CT.ler_noticias(base_dir, pid)
             p = CT.carregar(base_dir, pid)
-        if not (p.get("roteiro") or {}).get("blocos"):
-            for m in CC.clipes(base_dir, p):
-                if not CC.sem_linha_do_tempo(CT.carregar(base_dir, pid), m["id"]):
-                    continue
-                if CB["transcrever"] and not expl:  # 📚 a fala das fontes não importa (é a narração que manda): só o que se VÊ
-                    try:
-                        CC.transcrever_clipe(base_dir, pid, m["id"], CB["transcrever"], prog)
-                    except Exception:  # noqa: BLE001
-                        pass
-                if _ia_ligada():  # o que se VÊ também (clipe sem fala, ou pra completar)
-                    try:
-                        CC.descrever_clipe(base_dir, pid, m["id"], on_log=prog)
-                    except Exception as exc:  # noqa: BLE001
-                        prog(f"👁 não deu pra descrever {m['id']}: {exc}")
-            prog(f"📝 escrevendo o roteiro ({CT.LINGUAS[CC.lingua_post(p)]} + português, 5 ganchos, 5 finais e 5 títulos)…")
-            CC.gerar_roteiro(base_dir, pid)
-            p = CT.carregar(base_dir, pid)
-        chave = CT.chave_roteiro(p.get("roteiro"))
+        if (p.get("roteiro") or {}).get("blocos"):
+            return []
+        return [m["id"] for m in CC.clipes(base_dir, p) if CC.sem_linha_do_tempo(p, m["id"])]
+
+    def _cm_transcrever(pid: str, mids: List[str], prog: Callable[[str], None]) -> None:
+        """🎙 a fala dos clipes (Whisper). 📚 no explicativo a fala das fontes não importa (é a narração que manda)."""
+        if not mids or not CB["transcrever"] or CC.explicativo(CT.carregar(base_dir, pid)):
+            return
+        for mid in mids:
+            try:
+                CC.transcrever_clipe(base_dir, pid, mid, CB["transcrever"], prog)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _cm_roteiro(pid: str, mids: List[str], prog: Callable[[str], None]) -> None:
+        """👁 o que se VÊ nos clipes (IA) → 📝 o roteiro. Pula se o roteiro já existe."""
+        if (CT.carregar(base_dir, pid).get("roteiro") or {}).get("blocos"):
+            return
+        if _ia_ligada():
+            for mid in mids:
+                try:
+                    CC.descrever_clipe(base_dir, pid, mid, on_log=prog)
+                except Exception as exc:  # noqa: BLE001
+                    prog(f"👁 não deu pra descrever {mid}: {exc}")
+        p = CT.carregar(base_dir, pid)
+        prog(f"📝 escrevendo o roteiro ({CT.LINGUAS[CC.lingua_post(p)]} + português, 5 ganchos, 5 finais e 5 títulos)…")
+        CC.gerar_roteiro(base_dir, pid)
+
+    def _cm_precisa_voz(p: Dict[str, Any]) -> bool:
         g = p.get("gravacao") or {}
-        if not (g.get("arquivo") and g.get("chave_roteiro") == chave):
-            if not CB["tts"]:
-                raise CT.CurtoErro("O gerador de voz não está disponível aqui.")
-            takes = [t for t in p.get("takes") or [] if t.get("chave") == chave]
-            if not takes:
-                voz = _voz(p, slug)
-                if not voz:
-                    raise CT.CurtoErro("Nenhuma voz de TTS cadastrada (🎙 Gerar voz → vozes).")
-                with CT._TRAVA:
-                    q = CT.carregar(base_dir, pid)
-                    q["config"]["voz_tts"] = voz.get("slug") or slug
-                    CT.salvar(base_dir, q)
-                CC.gerar_takes(base_dir, pid, CB["tts"], limpar_tts or (lambda t_, m: t_), voz,
-                               int((p.get("config") or {}).get("takes") or 3), prog)
-            prog("🎯 alinhando o take 1 ao roteiro (Whisper)…")
-            CC.usar_take(base_dir, pid, int(CT.carregar(base_dir, pid).get("take_escolhido") or 1), _transcrever(), {}, prog)
+        return not (g.get("arquivo") and g.get("chave_roteiro") == CT.chave_roteiro(p.get("roteiro")))
+
+    def _cm_voz(pid: str, slug: str, prog: Callable[[str], None]) -> None:
+        """🎙 os takes da narração (TTS). Pula se já tem voz alinhada em dia ou takes do roteiro atual."""
+        p = CT.carregar(base_dir, pid)
+        if not _cm_precisa_voz(p):
+            return
+        if not CB["tts"]:
+            raise CT.CurtoErro("O gerador de voz não está disponível aqui.")
+        chave = CT.chave_roteiro(p.get("roteiro"))
+        if [t for t in p.get("takes") or [] if t.get("chave") == chave]:
+            return
+        voz = _voz(p, slug)
+        if not voz:
+            raise CT.CurtoErro("Nenhuma voz de TTS cadastrada (🎙 Gerar voz → vozes).")
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            q["config"]["voz_tts"] = voz.get("slug") or slug
+            CT.salvar(base_dir, q)
+        CC.gerar_takes(base_dir, pid, CB["tts"], limpar_tts or (lambda t_, m: t_), voz,
+                       int((p.get("config") or {}).get("takes") or 3), prog)
+
+    def _cm_alinhar(pid: str, prog: Callable[[str], None]) -> None:
+        """🎯 o take escolhido alinhado ao roteiro (Whisper)."""
+        if not _cm_precisa_voz(CT.carregar(base_dir, pid)):
+            return
+        prog("🎯 alinhando o take 1 ao roteiro (Whisper)…")
+        CC.usar_take(base_dir, pid, int(CT.carregar(base_dir, pid).get("take_escolhido") or 1), _transcrever(), {}, prog)
+
+    def _fazer_tudo_comentario(pid: str, slug: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
+        """🚀 💬 o que acontece (transcreve/descreve se faltar) → roteiro EN/PT → 3 takes → take 1 alinhado → 🎯 destaques → editor."""
+        mids = _cm_preparar(pid, prog)
+        _cm_transcrever(pid, mids, prog)
+        _cm_roteiro(pid, mids, prog)
+        _cm_voz(pid, slug, prog)
+        _cm_alinhar(pid, prog)
+        return _cm_final(pid, providers, prog)
+
+    def _cm_final(pid: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
+        """🎥 enquadra no vertical → 🎯 destaques → 🎬 editor."""
         if CT.carregar(base_dir, pid).get("rastros_h"):  # 🎥 v84_296: clipe deitado → vertical focando o que cada fala mostra
             try:
                 n_v = CC.enquadrar_planos(base_dir, pid, prog)
@@ -1306,6 +1411,14 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             r = CC.preparar_destaques(base_dir, pid, providers, on_log=prog)
             if r["pendentes"]:
                 prog(f"🎯 {len(r['pendentes'])} destaque(s) pra fazer à mão no 🎯 Rastrear objeto")
+        import camera_exp
+        if camera_exp.ligada(CT.carregar(base_dir, pid)):  # 🎥 v84_322: zoom no detalhe + congelar com cartão
+            try:
+                r = camera_exp.preparar(base_dir, pid, providers, chamar=None if _ia_ligada() else (lambda *a, **k: None), on_log=prog)
+                if r["feitos"] or r["pulados"]:
+                    prog(f"🎥 câmera: {len(r['feitos'])} efeito(s) pronto(s)" + (f", {len(r['pulados'])} pulado(s)" if r["pulados"] else ""))
+            except Exception as exc:  # noqa: BLE001  (a câmera nunca impede o vídeo)
+                prog(f"🎥 câmera experimental falhou, sigo sem ela: {str(exc)[:160]}")
         return _mandar_pro_editor(pid, providers, prog)
 
     # ------------------------------------------------------------------ 🔗 link → vídeo pronto (v84_286)
@@ -1331,7 +1444,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "comentarios_erro": info.get("erro") or "", "pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
                 "editor": (p.get("editor") or {}).get("job_id") or "", "etapa": lr.get("etapa") or "",
                 "canal": (CT.canal_do(base_dir, p) or {}).get("nome") or "", "canal_id": p.get("canal_id") or "",
-                "pendente": p["id"] in (pend if pend is not None else set())}
+                "pendente": p["id"] in (pend if pend is not None else set()),
+                "marca": lr.get("marca") or "", "comentario": lr.get("comentario") or "", "log": (lr.get("log") or [])[-60:],
+                "apagado": bool(lr.get("apagado")), "escolha": lr.get("escolha") or {}, "aguardando": bool(lr.get("aguardando")),
+                "aguardando_voz": bool(lr.get("aguardando_voz")), "minha_voz": (p.get("config") or {}).get("voz_modo") == "minha"}
 
     def _links(n: int = 60) -> List[Dict[str, Any]]:
         out = []
@@ -1351,6 +1467,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         with CT._TRAVA:
             q = CT.carregar(base_dir, pid)
             q.setdefault("link_rapido", {}).update(etapa=etapa, **kw)
+            if etapa.startswith(("✅", "❌")):
+                _log_link(q["link_rapido"], f"{etapa} {kw.get('erro') or ''}".strip())
             CT.salvar(base_dir, q)
 
     _UM_LINK_POR_VEZ = threading.Lock()
@@ -1366,7 +1484,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             except CT.CurtoErro:
                 continue
             lr = p.get("link_rapido") or {}
-            if not lr or lr.get("erro") or lr.get("parado"):
+            if not lr or lr.get("erro") or lr.get("parado") or lr.get("apagado") or lr.get("aguardando") or lr.get("aguardando_voz"):
                 continue
             if lr.get("etapa") in ("✅ pronto", "✅ no editor"):
                 continue
@@ -1379,24 +1497,27 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     _FILA_RETOMANDO = threading.Lock()
 
     def _retomar_fila() -> int:
-        """▶ retoma TODOS os que ficaram pelo meio, um depois do outro, numa só fila (não duplica o que já roda)."""
+        """▶ retoma TODOS os que ficaram pelo meio, um depois do outro, numa só fila.
+        A lista é fixada no clique e cada vídeo aparece como "na fila" já na resposta (não fica parecendo que nada aconteceu)."""
         if not _FILA_RETOMANDO.acquire(blocking=False):
             return 0  # já tem uma fila de retomada rodando
-        n = len(_link_pendentes())
+        ordem = _link_pendentes()
+        if not ordem:
+            _FILA_RETOMANDO.release()
+            return 0
+        for k, x in enumerate(ordem):
+            TAREFAS[x] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                          "prog": "🔁 retomando…" if k == 0 else f"⏳ na fila da retomada ({k + 1}/{len(ordem)})"}
 
         def corpo() -> None:
-            tentados: set = set()
             try:
-                while True:
-                    pend = [x for x in _link_pendentes() if x not in tentados]
-                    if not pend:
-                        break
-                    pid = pend[0]
-                    tentados.add(pid)
+                for pid in ordem:
                     p = CT.carregar(base_dir, pid)
                     lr = p.get("link_rapido") or {}
-                    TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
-                                    "prog": "🔁 retomando depois da queda do site…"}
+                    if lr.get("erro") or lr.get("apagado") or lr.get("etapa") in ("✅ pronto", "✅ no editor"):
+                        TAREFAS[pid]["fim"] = time.time()
+                        continue
+                    TAREFAS[pid]["prog"] = "🔁 retomando depois da queda do site…"
                     try:
                         with _UM_LINK_POR_VEZ:
                             _espera_memoria(lambda m, pid=pid: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
@@ -1412,7 +1533,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             finally:
                 _FILA_RETOMANDO.release()
         threading.Thread(target=corpo, daemon=True, name="retomar-fila").start()
-        return n
+        return len(ordem)
 
     def _vigia_links() -> None:
         time.sleep(float(os.environ.get("CURTOS_VIGIA_INICIO_S") or 30))
@@ -1427,14 +1548,44 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos/link/retomar", methods=["POST"])
     def curtos_link_retomar():
         """▶ retoma a fila que ficou pelo meio (um por vez, sem duplicar)."""
+        ocupado = _FILA_RETOMANDO.locked()  # já tinha uma fila rodando: não duplica
         n = _retomar_fila()
-        return _ok(retomados=n, videos=_links())
+        return _ok(retomados=n, ocupado=bool(ocupado and not n), videos=_links())
 
     import sys as _sys_l
     if "pytest" not in _sys_l.modules and os.environ.get("CURTOS_VIGIA", "1") != "0":
         threading.Thread(target=_vigia_links, daemon=True, name="vigia-links").start()
 
+    def _minha_voz(p: Dict[str, Any]) -> bool:
+        """🎤 v84_325: canal de voz própria — o roteiro sai, a voz é você que grava."""
+        return (p.get("config") or {}).get("voz_modo") == "minha"
+
+    def _esperar_minha_voz(pid: str, prog: Callable[[str], None]) -> Optional[str]:
+        """Com voz própria e sem a sua gravação em dia: faz o roteiro e PARA esperando você gravar (não é erro)."""
+        p = CT.carregar(base_dir, pid)
+        if not _minha_voz(p) or not _cm_precisa_voz(p):
+            return None
+        mids = _cm_preparar(pid, prog)
+        _cm_transcrever(pid, mids, prog)
+        _cm_roteiro(pid, mids, prog)
+        _link_etapa(pid, "🎤 grave a sua voz", aguardando_voz=True)
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            _log_link(q.setdefault("link_rapido", {}), "📝 roteiro pronto — esperando a sua voz (🎤 gravar)")
+            CT.salvar(base_dir, q)
+        return "🎤 roteiro pronto — grave a sua voz"
+
     def _link_rodar(pid: str, slug: str, qualidade: str, exportar: bool, prog: Callable[[str], None]) -> str:
+        _link_coletar(pid, prog)
+        espera = _esperar_minha_voz(pid, prog)
+        if espera:
+            return espera
+        _link_etapa(pid, "📝 roteiro → 🎙 narração → 🎬 edição", aguardando_voz=False)
+        msg = _fazer_tudo_comentario(pid, slug, None, prog)
+        return _link_finalizar(pid, msg, qualidade, exportar, prog)
+
+    def _link_coletar(pid: str, prog: Callable[[str], None]) -> None:
+        """⬇ o vídeo do link + 💬 a legenda e os comentários do post (rede; pula o que já tem)."""
         p = CT.carregar(base_dir, pid)
         lr = p["link_rapido"]
         url = lr["link"]
@@ -1457,8 +1608,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     q["titulo"] = info["titulo"][:120]
                 CT.salvar(base_dir, q)
             prog(f"💬 {len(info.get('comentarios') or [])} comentários" + (f" ({info['erro']})" if info.get("erro") else ""))
-        _link_etapa(pid, "📝 roteiro → 🎙 narração → 🎬 edição")
-        msg = _fazer_tudo_comentario(pid, slug, None, prog)
+
+    def _link_finalizar(pid: str, msg: str, qualidade: str, exportar: bool, prog: Callable[[str], None]) -> str:
+        """🧾 descrição limpa + fonte → 🖼 prints → 🎬 exporta (se pedido)."""
+        url = (CT.carregar(base_dir, pid).get("link_rapido") or {}).get("link") or ""
         with CT._TRAVA:  # o modo que a IA escolheu (no automático) fica marcado; a descrição sai limpa
             q = CT.carregar(base_dir, pid)
             r = q.get("roteiro") or {}
@@ -1481,6 +1634,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             q = CT.carregar(base_dir, pid)
             q["exportado"] = {"arquivo": arq, "quando": time.time(), "qualidade": qualidade, "job_id": job_id}
             q["link_rapido"]["etapa"] = "✅ pronto"
+            _log_link(q["link_rapido"], "✅ processado — vídeo pronto")
             CT.salvar(base_dir, q)
         return "✅ vídeo pronto"
 
@@ -1500,6 +1654,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         with CT._TRAVA:
             q = CT.carregar(base_dir, pid)
             q["thumbs"] = ts
+            if (q.get("link_rapido") or {}).get("escolha"):  # os prints mudaram: a capa escolhida antes não vale mais
+                q["link_rapido"]["escolha"].pop("capa", None)
             CT.salvar(base_dir, q)
         return len(ts)
 
@@ -1534,7 +1690,351 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             return _erro(str(exc))
         return _ok(novos=novos, videos=_links())
 
+    # ------------------------------------------------------------------ 🎤 v84_325: gravar a SUA voz (aos poucos)
+    import gravar_voz as GV
+
+    def _dono(pid: str) -> None:
+        """O curto ou a sessão avulsa (🎙 texto livre) dona da gravação — 404 se não existe."""
+        if GV.avulsa(pid):
+            try:
+                GV.sessao(base_dir, pid)
+            except CT.CurtoErro:
+                abort(404)
+        else:
+            _proj(pid)
+
+    @app.route("/gravar-voz", methods=["GET"])
+    def gravar_voz_lista():
+        """🎙 v84_325: gravar a sua voz em cima de QUALQUER texto (teste de microfone, narração avulsa)."""
+        return render_template("gravar_voz_lista.html", sessoes=GV.listar_avulsas(base_dir), erro=request.args.get("erro") or "")
+
+    @app.route("/gravar-voz/nova", methods=["POST"])
+    def gravar_voz_nova():
+        f = request.form if request.form else _corpo()
+        try:
+            s_ = GV.criar_avulsa(base_dir, f.get("titulo") or "", f.get("texto") or "", f.get("separar") or "linha")
+        except CT.CurtoErro as exc:
+            return redirect("/gravar-voz?erro=" + str(exc))
+        return redirect(f"/gravar-voz/{s_['id']}")
+
+    @app.route("/gravar-voz/<sid>", methods=["GET"])
+    def gravar_voz_sessao(sid: str):
+        if not GV.avulsa(sid):
+            abort(404)
+        _dono(sid)
+        s_ = GV.sessao(base_dir, sid)
+        return render_template("curto_gravar.html", p={"titulo": s_.get("titulo") or "", "id": sid}, pid=sid, estado=GV.resumo(base_dir, sid),
+                               tem_clipe=False, link=False, lingua="", avulsa=True, sessao=s_)
+
+    @app.route("/gravar-voz/<sid>/texto", methods=["POST"])
+    def gravar_voz_texto(sid: str):
+        if not GV.avulsa(sid):
+            abort(404)
+        b = _corpo()
+        try:
+            GV.trocar_texto(base_dir, sid, b.get("texto") or "", b.get("separar") or "linha")
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(estado=GV.resumo(base_dir, sid))
+
+    @app.route("/gravar-voz/<sid>/apagar", methods=["POST"])
+    def gravar_voz_apagar(sid: str):
+        if not GV.avulsa(sid):
+            abort(404)
+        try:
+            GV.apagar_avulsa(base_dir, sid)
+        except CT.CurtoErro:
+            abort(404)
+        return redirect("/gravar-voz")
+
+    @app.route("/curtos/<pid>/voz/juntar", methods=["POST"])
+    def curto_voz_juntar(pid: str):
+        """🧩 só junta as partes (com realce, se pedir) e devolve o áudio final pra ouvir/baixar."""
+        _dono(pid)
+        try:
+            GV.juntar(base_dir, pid, bool(_corpo().get("realce_em_tudo")))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(url=f"/curtos/{pid}/voz/final.wav?v={int(time.time())}", estado=GV.resumo(base_dir, pid))
+
+    @app.route("/curtos/<pid>/voz/final.wav", methods=["GET"])
+    def curto_voz_final(pid: str):
+        _dono(pid)
+        cam = os.path.join(GV.pasta(base_dir, pid), "final.wav")
+        if not os.path.isfile(cam):
+            abort(404)
+        return send_file(cam, mimetype="audio/wav", conditional=True, max_age=0, as_attachment=request.args.get("baixar") == "1",
+                         download_name="minha_voz.wav")
+
+    @app.route("/curtos/<pid>/gravar", methods=["GET"])
+    def curto_gravar_pagina(pid: str):
+        p = _proj(pid)
+        if not (p.get("roteiro") or {}).get("blocos"):
+            return redirect(f"/curtos/{pid}?erro=Faça o roteiro antes de gravar.")
+        clipe = next(iter(CC.clipes(base_dir, p)), None)
+        return render_template("curto_gravar.html", p=p, pid=pid, estado=GV.resumo(base_dir, pid), tem_clipe=bool(clipe),
+                               link=bool(p.get("link_rapido")), lingua=(p.get("roteiro") or {}).get("idioma") or "en")
+
+    @app.route("/curtos/<pid>/voz/estado", methods=["GET"])
+    def curto_voz_estado(pid: str):
+        _dono(pid)
+        return _ok(estado=GV.resumo(base_dir, pid), tarefa=TAREFAS.get(pid))
+
+    @app.route("/curtos/<pid>/voz/clipe", methods=["GET"])
+    def curto_voz_clipe(pid: str):
+        """🎞 o vídeo original, pra você ver enquanto lê."""
+        c = next(iter(CC.clipes(base_dir, _proj(pid))), None)
+        if not c:
+            abort(404)
+        return send_file(c["caminho"], conditional=True)
+
+    @app.route("/curtos/<pid>/voz/parte/<parte>", methods=["POST"])
+    def curto_voz_gravar(pid: str, parte: str):
+        _dono(pid)
+        arq = request.files.get("audio")
+        if not arq:
+            return _erro("Mande o áudio.")
+        import tempfile
+        ext = os.path.splitext(secure_filename(arq.filename or "a.webm"))[1].lower() or ".webm"
+        fd, tmp = tempfile.mkstemp(suffix=ext, dir=GV.pasta(base_dir, pid))
+        os.close(fd)
+        try:
+            arq.save(tmp)
+            r = GV.adicionar_take(base_dir, pid, parte, tmp)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        if request.form.get("realce") in ("1", "true"):
+            try:
+                GV.realce(base_dir, pid, parte, r["takeId"], True)
+            except CT.CurtoErro:
+                pass
+        return jsonify(dict(ok=True, estado=GV.resumo(base_dir, pid), **r))
+
+    @app.route("/curtos/<pid>/voz/parte/<parte>/<tid>/<acao>", methods=["POST"])
+    def curto_voz_take(pid: str, parte: str, tid: str, acao: str):
+        _dono(pid)
+        try:
+            if acao == "usar":
+                GV.usar_take(base_dir, pid, parte, tid)
+            elif acao == "apagar":
+                GV.apagar_take(base_dir, pid, parte, tid)
+            elif acao == "realce":
+                GV.realce(base_dir, pid, parte, tid, _corpo().get("usar", True) is not False)
+            else:
+                abort(404)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(estado=GV.resumo(base_dir, pid))
+
+    @app.route("/curtos/<pid>/voz/parte/<parte>/<tid>.wav", methods=["GET"])
+    def curto_voz_audio(pid: str, parte: str, tid: str):
+        _dono(pid)
+        try:
+            cam = GV.caminho_take(base_dir, pid, parte, tid, False if request.args.get("original") == "1" else None)
+        except CT.CurtoErro:
+            abort(404)
+        if not os.path.isfile(cam):
+            abort(404)
+        return send_file(cam, mimetype="audio/wav", conditional=True, max_age=0)
+
+    @app.route("/curtos/<pid>/voz/enviar", methods=["POST"])
+    def curto_voz_enviar(pid: str):
+        """✅ junta as partes → a sua voz alinhada ao roteiro → (link) segue a edição: câmera, editor, prints e MP4."""
+        p = _proj(pid)
+        b = _corpo()
+        t = TAREFAS.get(pid)
+        if t and not t.get("fim"):
+            return _erro("Já está rodando.", 409)
+        falta = GV.faltando(base_dir, pid)
+        if falta:
+            return _erro(f"Falta gravar {len(falta)} parte(s).")
+        try:
+            _transcrever()
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        realce_tudo = bool(b.get("realce_em_tudo"))
+        continuar = b.get("continuar", True) is not False
+        op = _opcoes()  # (lido aqui: a thread não tem o pedido)
+        lr = p.get("link_rapido") or {}
+        TAREFAS[pid] = {"rotulo": "🎤 sua voz → edição", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                        "prog": "⏳ na fila (espera o vídeo que está gerando)"}
+
+        def pr(m: str) -> None:
+            TAREFAS[pid]["prog"] = str(m)[:300]
+
+        def corpo() -> None:
+            try:
+                with _UM_LINK_POR_VEZ:
+                    pr("🧩 juntando as partes" + (" (com realce)" if realce_tudo else "") + "…")
+                    final = GV.juntar(base_dir, pid, realce_tudo)
+                    pr("🎯 lendo a sua voz (Whisper): tira pausas longas e repetições, alinha ao roteiro…")
+                    CT.processar_gravacao(base_dir, pid, _transcrever(), final, op, pr, fonte="gravacao")
+                    if lr:
+                        _link_etapa(pid, "🎤 voz recebida", aguardando_voz=False)
+                    if continuar and lr:
+                        TAREFAS[pid]["msg"] = _link_rodar(pid, "", lr.get("qualidade") or "1080p", lr.get("exportar", True), pr)
+                    elif continuar:
+                        TAREFAS[pid]["msg"] = _cm_final(pid, None, pr)
+                    else:
+                        TAREFAS[pid]["msg"] = "🎤 voz alinhada"
+            except Exception as exc:  # noqa: BLE001
+                TAREFAS[pid]["erro"] = str(exc)[:600]
+                if lr:
+                    _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
+            finally:
+                TAREFAS[pid]["fim"] = time.time()
+                _liberar_memoria_pesada()
+        threading.Thread(target=corpo, daemon=True, name="minha-voz").start()
+        return _ok(estado=GV.resumo(base_dir, pid))
+
     CB["rodar_link"] = _link_rodar  # 🔥 v84_291: os Momentos mais vistos usam o mesmo caminho (roteiro → voz → editor → MP4)
+
+    # ------------------------------------------------------------------ 🧩 v84_320: lote POR ETAPA
+    def _lote_paralelo() -> int:
+        try:
+            return max(1, min(4, int(os.environ.get("CURTOS_LOTE_PARALELO") or 2)))
+        except ValueError:
+            return 2
+
+    def _chave_compat(pid: str) -> tuple:
+        """🔑 o que obriga a trocar de modelo: motor de voz + voz + idioma. Quem bate fica junto (o modelo carrega 1 vez por sub-lote)."""
+        try:
+            p = CT.carregar(base_dir, pid)
+        except CT.CurtoErro:
+            return ("", "", "")
+        cfg = p.get("config") or {}
+        return (cfg.get("motor_perfil") or "", cfg.get("voz_tts") or "", CC.dados(p).get("idioma") or "")
+
+    def _lote_por_etapa(pids: List[str], prog_lote: Callable[[str], None]) -> str:
+        """🧩 cada etapa roda em TODOS os links antes da próxima. Cada vídeo mantém a própria configuração.
+        1 ⬇ baixar + 💬 comentários (rede) ......... em paralelo (CURTOS_LOTE_PARALELO, padrão 2), RAM checada antes de cada link
+        2 🎙 transcrever os clipes (Whisper) ......... um por vez, o Whisper carrega 1 vez
+        3 👁 descrever + 📝 roteiro (IA) ............ em paralelo
+        4 🎙 narração (TTS) .......................... um por vez, agrupado pela chave de compatibilidade (motor/voz/idioma)
+        5 🎯 alinhar (Whisper) ....................... um por vez
+        6 🎥 destaques → 🎬 editor → 🖼 prints → MP4 ... um por vez (a parte pesada), com a memória solta entre um e outro
+        Um link que falha sai do lote; os outros seguem. Se o site cair, a retomada normal continua cada um de onde parou."""
+        from concurrent.futures import ThreadPoolExecutor
+        n = len(pids)
+        falhou: Dict[str, str] = {}
+        mids: Dict[str, List[str]] = {}
+        num = {pid: k for k, pid in enumerate(pids, 1)}
+
+        def pr(pid: str) -> Callable[[str], None]:
+            def f(m: str) -> None:
+                TAREFAS[pid]["prog"] = f"[{num[pid]}/{n}] " + str(m)[:280]
+            return f
+
+        def falha(pid: str, exc: Exception) -> None:
+            falhou[pid] = str(exc)[:600]
+            TAREFAS[pid]["erro"] = falhou[pid]
+            TAREFAS[pid]["fim"] = time.time()
+            try:
+                _link_etapa(pid, "❌ erro", erro=falhou[pid])
+            except Exception:  # noqa: BLE001
+                pass
+
+        def etapa(k: int, nome: str, fn: Callable[[str], None], paralelo: int = 1, ram_cada: bool = False,
+                  ordem: Optional[Callable[[str], Any]] = None) -> None:
+            vivos = [p for p in pids if p not in falhou]
+            if ordem:
+                vivos = sorted(vivos, key=ordem)
+            if not vivos:
+                return
+            prog_lote(f"🧩 etapa {k}/6 · {nome} ({len(vivos)} vídeo(s))")
+            for p in vivos:
+                _link_etapa(p, f"🧩 {k}/6 · {nome}")
+                TAREFAS[p]["prog"] = f"[{num[p]}/{n}] ⏳ etapa {k}/6 · {nome} — na vez"
+
+            def um(p: str) -> None:
+                try:
+                    if ram_cada:
+                        _espera_memoria(pr(p))
+                    pr(p)(f"etapa {k}/6 · {nome}…")
+                    fn(p)
+                except Exception as exc:  # noqa: BLE001  (um link ruim não para os outros)
+                    falha(p, exc)
+            if paralelo > 1 and len(vivos) > 1:
+                with ThreadPoolExecutor(max_workers=paralelo, thread_name_prefix="lote-etapa") as ex:
+                    list(ex.map(um, vivos))
+            else:
+                for p in vivos:
+                    um(p)
+
+        def coletar(p: str) -> None:
+            _link_coletar(p, pr(p))
+            mids[p] = _cm_preparar(p, pr(p))
+
+        def roteiro(p: str) -> None:
+            _cm_roteiro(p, mids.get(p) or [], pr(p))
+
+        def slug_de(p: str) -> str:
+            return (CT.carregar(base_dir, p).get("config") or {}).get("voz_tts") or ""
+
+        par = _lote_paralelo()
+        esperando: set = set()  # 🎤 v84_325: voz própria — param depois do roteiro, esperando você gravar
+        etapa(1, "⬇ baixando + 💬 comentários", coletar, paralelo=par, ram_cada=True)
+        _espera_memoria(prog_lote)
+        etapa(2, "🎙 transcrevendo os clipes", lambda p: _cm_transcrever(p, mids.get(p) or [], pr(p)))
+        _liberar_memoria_pesada()  # o Whisper sai antes da IA/TTS
+        etapa(3, "👁 descrevendo + 📝 roteiro", roteiro, paralelo=par, ram_cada=True)
+        for p in [x for x in pids if x not in falhou]:
+            try:
+                q = CT.carregar(base_dir, p)
+                if _minha_voz(q) and _cm_precisa_voz(q):
+                    esperando.add(p)
+                    _link_etapa(p, "🎤 grave a sua voz", aguardando_voz=True)
+                    TAREFAS[p]["msg"] = "🎤 roteiro pronto — grave a sua voz"
+                    TAREFAS[p]["fim"] = time.time()
+            except Exception as exc:  # noqa: BLE001
+                falha(p, exc)
+        for p in esperando:
+            falhou.setdefault(p, "")  # sai das próximas etapas (sem erro: a tarefa já fechou como "esperando a voz")
+        _espera_memoria(prog_lote)
+        etapa(4, "🎙 narração", lambda p: _cm_voz(p, slug_de(p), pr(p)), ordem=_chave_compat)
+        _espera_memoria(prog_lote)
+        etapa(5, "🎯 alinhando a voz", lambda p: _cm_alinhar(p, pr(p)))
+        _liberar_memoria_pesada()
+
+        prontos = 0
+        for p in [x for x in pids if x not in falhou]:  # 6: a parte pesada, um por vez
+            try:
+                _espera_memoria(pr(p))
+                lr = CT.carregar(base_dir, p).get("link_rapido") or {}
+                _link_etapa(p, "🧩 6/6 · 🎬 edição → exportar")
+                msg = _cm_final(p, None, pr(p))
+                TAREFAS[p]["msg"] = _link_finalizar(p, msg, lr.get("qualidade") or "1080p", lr.get("exportar", True), pr(p))
+                prontos += 1
+            except Exception as exc:  # noqa: BLE001
+                falha(p, exc)
+            finally:
+                TAREFAS[p]["fim"] = TAREFAS[p].get("fim") or time.time()
+                _liberar_memoria_pesada()
+        erros = len([p for p in falhou if p not in esperando])
+        return (f"🧩 por etapa: {prontos}/{n} prontos" + (f" · {len(esperando)} esperando a sua voz" if esperando else "")
+                + (f" · {erros} com erro" if erros else ""))
+
+    def _iniciar_lote_por_etapa(pids: List[str]) -> Any:
+        """Põe o lote na fila geral (espera outro vídeo/lote que estiver rodando) e roda por etapa."""
+        for pid in pids:  # a tarefa vem ANTES de tirar o "aguardando" (o vigia da retomada não pega no meio)
+            TAREFAS[pid] = {"rotulo": "🧩 lote por etapa", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                            "prog": "⏳ na fila (lote por etapa)"}
+            _link_etapa(pid, "na fila", aguardando=False, lote_modo="etapa")
+
+        def corpo(prog: Callable[[str], None]) -> str:
+            try:
+                with _UM_LINK_POR_VEZ:  # nunca junto com outro vídeo/lote
+                    return _lote_por_etapa(pids, prog)
+            finally:
+                for pid in pids:  # nada fica "rodando" pra sempre se algo explodir fora das etapas
+                    if pid in TAREFAS and not TAREFAS[pid].get("fim"):
+                        TAREFAS[pid]["fim"] = time.time()
+        return _rodar("lote-etapa:" + pids[0], f"🧩 lote por etapa ({len(pids)} vídeo(s))", corpo)
 
     @app.route("/curtos/acabamento", methods=["GET", "POST"])
     def curtos_acabamento():
@@ -1551,6 +2051,34 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 return _erro(str(exc))
         return _ok(acabamento=CT.acabamento(base_dir, cid))
 
+    def _voz_link_de(c: Dict[str, Any]) -> Dict[str, str]:
+        """🎙 v84_322: idioma de postagem, idioma narrado e voz próprios do canal ('' = o do envio)."""
+        v = c.get("voz_link") if isinstance(c.get("voz_link"), dict) else {}
+        return {"lingua_post": v.get("lingua_post") if v.get("lingua_post") in CT.LINGUAS else "",
+                "idioma": v.get("idioma") if v.get("idioma") in ("en", "pt") else "",
+                "voz": str(v.get("voz") or "")[:120],
+                "modo": "minha" if v.get("modo") == "minha" else ""}  # 🎤 v84_325: "minha" = você grava a voz
+
+    def _canal_pelo_nome(grupo: str) -> str:
+        """📂 v84_325: o termo em cima dos links pode ser o NOME ou o @ do canal ('@AnimalIQ26', 'AnimalIQ26', 'Animal IQ 26')."""
+        alvo = re.sub(r"[^a-z0-9]", "", _chave_grupo(grupo))
+        if not alvo:
+            return ""
+        for c in CT.listar_canais(base_dir):
+            nomes = [c.get("nome") or "", c["id"]]
+            try:
+                nomes.append(str(CT.acabamento(base_dir, c["id"]).get("arroba") or ""))
+                nomes.append(str(CT.carregar_canal(base_dir, c["id"]).get("nome") or ""))
+            except Exception:  # noqa: BLE001
+                pass
+            if any(re.sub(r"[^a-z0-9]", "", _chave_grupo(x)) == alvo for x in nomes if x):
+                return c["id"]
+        return ""
+
+    def _gravar_voz_link(c: Dict[str, Any], b: Dict[str, Any]) -> None:
+        if isinstance(b.get("voz_link"), dict):
+            c["voz_link"] = _voz_link_de({"voz_link": b["voz_link"]})
+
     def _canais_out() -> list:
         out = []
         for c in CT.listar_canais(base_dir):
@@ -1559,7 +2087,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             except CT.CurtoErro:
                 continue
             out.append({"id": cc["id"], "nome": cc.get("nome") or cc["id"], "personalizado": bool(cc.get("acabamento")),
-                        "descricao": cc.get("descricao") or ""})
+                        "descricao": cc.get("descricao") or "", "voz_link": _voz_link_de(cc)})
         return out
 
     @app.route("/curtos/canais-link", methods=["GET"])
@@ -1574,6 +2102,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         try:
             with CT._TRAVA:
                 c = CT.criar_canal(base_dir, str(b.get("nome") or ""), "", str(b.get("descricao") or ""))
+                if isinstance(b.get("voz_link"), dict):
+                    _gravar_voz_link(c, b)
+                    CT.salvar_canal(base_dir, c)
         except CT.CurtoErro as exc:
             return _erro(str(exc))
         return _ok(id=c["id"], canais=_canais_out())
@@ -1589,6 +2120,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     c["nome"] = " ".join(str(b["nome"]).split())[:80]
                 if "descricao" in b:
                     c["descricao"] = str(b.get("descricao") or "").strip()[:1500]
+                _gravar_voz_link(c, b)
                 CT.salvar_canal(base_dir, c)
         except CT.CurtoErro as exc:
             return _erro(str(exc))
@@ -1613,11 +2145,45 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def curtos_link_estado():
         return _ok(videos=_links())
 
+    @app.route("/curtos/link/grupos", methods=["GET"])
+    def curtos_link_grupos():
+        """📂 os grupos (palavra → canal) que valem pra colar lista de links."""
+        out = []
+        for chave, g in _grupos_ler(base_dir).items():
+            try:
+                nome_canal = CT.carregar_canal(base_dir, g.get("canal_id") or "").get("nome") or ""
+            except CT.CurtoErro:
+                nome_canal = ""
+            out.append({"chave": chave, "nome": g.get("nome") or chave, "canal_id": g.get("canal_id") or "", "canal": nome_canal})
+        return _ok(grupos=sorted(out, key=lambda x: x["nome"].lower()))
+
+    @app.route("/curtos/link/grupos", methods=["POST"])
+    def curtos_link_grupos_salvar():
+        """📂 liga um grupo a um canal (ou tira a ligação se canal vier vazio)."""
+        b = _corpo()
+        nome = " ".join(_nome_do_grupo(b.get("nome")).split())[:60]
+        if not nome:
+            return _erro("Dê um nome ao grupo (ex.: Animais).")
+        chave = _chave_grupo(nome)
+        with CT._TRAVA:
+            dados = _grupos_ler(base_dir)
+            cid = str(b.get("canal_id") or "")
+            if cid:
+                try:
+                    CT.carregar_canal(base_dir, cid)
+                except CT.CurtoErro:
+                    return _erro("Esse canal não existe mais.")
+                dados[chave] = {"nome": nome, "canal_id": cid}
+            else:
+                dados.pop(chave, None)
+            _grupos_gravar(base_dir, dados)
+        return curtos_link_grupos()
+
     @app.route("/curtos/link/novo", methods=["POST"])
     def curtos_link_novo():
         b = _corpo()
-        links = list(dict.fromkeys(u.strip("<>\"'(),;") for u in re.split(r"\s+", str(b.get("link") or ""))
-                                   if u.startswith("http")))[:50]  # 🔗 v84_306: até 50, um por linha (repetidos saem)
+        pares = _separar_grupos(str(b.get("link") or ""))[:50]  # 🔗 v84_306: até 50; 📂 v84_318: cada grupo com o seu canal
+        links = [u for u, _ in pares]
         if not links:
             return _erro("Cole o link do vídeo (TikTok, Shorts, Reels, Kwai…).")
         modo = b.get("modo") if b.get("modo") in CL.MODOS else "auto"
@@ -1634,15 +2200,43 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 canal_escolhido = CT.canal_do_modelo(base_dir, "comentario")
         except CT.CurtoErro:
             canal_escolhido = CT.canal_do_modelo(base_dir, "comentario")
-        for url in links:  # 🔗 vários links = vários vídeos, um depois do outro
-            p = CT.criar(base_dir, canal_escolhido, "🔗 " + url.split("?")[0][-60:], [], "", modelo="comentario")
+        iniciar = bool(b.get("iniciar"))  # 🕐 v84_319: por padrão os links ficam aguardando; você inicia depois
+        por_etapa = bool(b.get("por_etapa")) and len(pares) > 1  # 🧩 v84_320: lote por etapa (só com 2+ links)
+        mapa = _grupos_ler(base_dir)
+        cache_canal: Dict[str, str] = {}
+        voz_canal: Dict[str, Dict[str, str]] = {}
+        cache_nome: Dict[str, str] = {}
+        for url, grupo in pares:  # 🔗 vários links = vários vídeos, um depois do outro
+            canal_do_link = canal_escolhido
+            g = mapa.get(_chave_grupo(grupo)) or {}
+            if not g.get("canal_id") and grupo:  # 📂 v84_325: o termo é o nome/@ de um canal → vai pra ele
+                cid_nome = cache_nome.setdefault(grupo, _canal_pelo_nome(grupo))
+                if cid_nome:
+                    g = {"canal_id": cid_nome}
+            if g.get("canal_id"):
+                if g["canal_id"] not in cache_canal:
+                    try:
+                        CT.carregar_canal(base_dir, g["canal_id"])
+                        cache_canal[g["canal_id"]] = g["canal_id"]
+                    except CT.CurtoErro:
+                        cache_canal[g["canal_id"]] = ""
+                canal_do_link = cache_canal[g["canal_id"]] or canal_escolhido
+            p = CT.criar(base_dir, canal_do_link, "🔗 " + url.split("?")[0][-60:], [], "", modelo="comentario")
             pid = p["id"]
+            if canal_do_link not in voz_canal:  # 🎙 v84_322: o canal pode ter idioma e voz próprios
+                try:
+                    voz_canal[canal_do_link] = _voz_link_de(CT.carregar_canal(base_dir, canal_do_link)) if canal_do_link else {}
+                except CT.CurtoErro:
+                    voz_canal[canal_do_link] = {}
+            vc = voz_canal[canal_do_link]
+            lp_ = vc.get("lingua_post") or lp
+            pt_ = (vc["idioma"] == "pt") if vc.get("idioma") else narrar_pt
             with CT._TRAVA:
                 p = CT.carregar(base_dir, pid)
                 c = CC.dados(p)
-                c["lingua_post"], c["idioma"] = lp, ("pt" if narrar_pt else "en")
-                narrada = "pt" if narrar_pt else lp
-                p["config"]["motor_perfil"] = "chatterbox_turbo" if narrada == "en" else "chatterbox"
+                c["lingua_post"], c["idioma"] = lp_, ("pt" if pt_ else "en")
+                narrada = "pt" if pt_ else lp_
+                p["config"]["motor_perfil"] = "chatterbox_turbo" if narrada == "en" else "chatterbox"  # 🇺🇸 inglês: o Turbo (tags de voz)
                 if b.get("proporcao") in CT.PROPORCOES:
                     p["config"]["proporcao"] = b["proporcao"]
                 try:
@@ -1653,11 +2247,19 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     pass
                 if b.get("extra"):
                     p["config"]["extra"] = str(b["extra"])[:2000]
-                if b.get("voz"):
-                    p["config"]["voz_tts"] = str(b["voz"])[:120]
+                if vc.get("voz"):
+                    p["config"]["voz_tts"] = str(vc["voz"])[:120]
+                elif b.get("voz") and (narrada == "en") == (("pt" if narrar_pt else lp) == "en"):
+                    p["config"]["voz_tts"] = str(b["voz"])[:120]  # a voz do envio só se for do mesmo motor
                 p["config"]["takes"] = 1  # ⚡ automático: 1 take (os outros dá pra gerar depois na página do curto)
+                p["config"]["estilo_roteiro"] = "classico" if b.get("roteiro_classico") is True else "autentico"  # ✨ v84_321
+                p["config"]["camera_exp"] = b.get("camera_exp", True) not in (False, "0", "false")  # 🎥 v84_322 (padrão: ligada)
+                if vc.get("modo") == "minha":  # 🎤 v84_325: o canal é de voz própria
+                    p["config"]["voz_modo"] = "minha"
                 p["link_rapido"] = {"link": url, "modo": modo, "criado": time.time(), "qualidade": qualidade, "exportar": exportar,
-                                    "comentarios_colados": str(b.get("comentarios") or "")[:20000], "etapa": "na fila"}
+                                    "comentarios_colados": str(b.get("comentarios") or "")[:20000],
+                                    "etapa": "na fila" if iniciar else "⏸ aguardando", "aguardando": not iniciar,
+                                    "lote_modo": "etapa" if por_etapa else "um"}
                 CT.salvar(base_dir, p)
             criados.append(pid)
         slug = str(b.get("voz") or "")
@@ -1675,7 +2277,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     with _UM_LINK_POR_VEZ:  # 🔗 v84_306: outra lista colada depois espera esta (nunca 2 vídeos ao mesmo tempo)
                         _espera_memoria(pr)  # 🧠 v84_313: RAM baixa → espera antes de começar
                         TAREFAS[pid]["prog"] = "começando…"
-                        TAREFAS[pid]["msg"] = _link_rodar(pid, slug, qualidade, exportar, pr)
+                        TAREFAS[pid]["msg"] = _link_rodar(pid, (CT.carregar(base_dir, pid).get("config") or {}).get("voz_tts") or slug,
+                                                          qualidade, exportar, pr)  # 🎙 v84_322: a voz do canal do link
                     feitos += 1
                 except Exception as exc:  # noqa: BLE001  (um link ruim não para os outros)
                     TAREFAS[pid]["erro"] = str(exc)[:600]
@@ -1687,12 +2290,194 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     TAREFAS[pid]["fim"] = time.time()
                     _liberar_memoria_pesada()  # 🧹 v84_313: solta a memória antes do próximo da lista
             return f"{feitos}/{len(criados)} prontos"
+        if not iniciar:
+            return _ok(criados=criados, videos=_links())
+        if por_etapa and len(criados) > 1:
+            r = _iniciar_lote_por_etapa(criados)
+            if isinstance(r, tuple):
+                return r
+            return _ok(criados=criados, videos=_links(), por_etapa=True)
         for pid in criados:
             TAREFAS[pid] = {"rotulo": "🔗 na fila", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "⏳ na fila"}
         r = _rodar("link:" + criados[0], "🔗 link → vídeo", fila)
         if isinstance(r, tuple):
             return r
         return _ok(criados=criados, videos=_links())
+
+    def _apagar_arquivos_link(pid: str) -> None:
+        """🗑 apaga os arquivos do vídeo (exportado, projeto do editor, clipes, prints). Fica só o link, as marcas, o comentário e o log."""
+        p = CT.carregar(base_dir, pid)
+        t = TAREFAS.get(pid) or {}
+        if t and not t.get("fim"):
+            raise CT.CurtoErro("Está sendo feito agora — espere terminar.")
+        lr = dict(p.get("link_rapido") or {})
+        apagados = []
+        arq = (p.get("exportado") or {}).get("arquivo") or ""
+        if arq and os.path.isfile(arq):
+            os.remove(arq)
+            apagados.append("vídeo exportado")
+        job_id = (p.get("editor") or {}).get("job_id") or ""
+        if job_id and CB.get("apagar_editor"):
+            CB["apagar_editor"](job_id)
+            apagados.append("projeto do editor")
+        pasta_p = CT.pasta(base_dir, pid)
+        for nome in os.listdir(pasta_p):
+            if nome == "projeto.json":
+                continue
+            caminho = os.path.join(pasta_p, nome)
+            if os.path.isdir(caminho):
+                shutil.rmtree(caminho, ignore_errors=True)
+            else:
+                os.remove(caminho)
+        apagados.append("clipes, áudios e prints")
+        _log_link(lr, "🗑 arquivos apagados: " + ", ".join(apagados) + " — ficou só o link e este log")
+        lr.update(apagado=True, apagado_em=time.time(), etapa="🗑 apagado", erro="", parado=False)
+        if lr.get("escolha"):
+            lr["escolha"].pop("capa", None)  # a capa escolhida foi apagada junto com os prints
+        novo = {k: p[k] for k in ("id", "titulo", "modelo", "criado", "canal_id") if k in p}
+        novo["link_rapido"] = lr
+        with CT._TRAVA:
+            CT.salvar(base_dir, novo)
+
+    @app.route("/curtos/link/<pid>/editar", methods=["POST"])
+    def curtos_link_editar(pid: str):
+        """🏷 marca (vermelho descartado · azul postado · amarelo com planos) e comentário, num vídeo já feito."""
+        p = _proj(pid)
+        if not p.get("link_rapido"):
+            abort(404)
+        b = _corpo()
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            lr = q["link_rapido"]
+            if "marca" in b:
+                m = str(b.get("marca") or "")
+                if m not in MARCAS_LINK:
+                    return _erro("Marca inválida.")
+                if m != (lr.get("marca") or ""):
+                    lr["marca"] = m
+                    _log_link(lr, "marcado como " + MARCAS_LINK[m])
+            if "comentario" in b:
+                c = str(b.get("comentario") or "").strip()[:1000]
+                if c != (lr.get("comentario") or ""):
+                    lr["comentario"] = c
+                    _log_link(lr, ("💬 comentário: " + c[:150]) if c else "comentário apagado")
+            CT.salvar(base_dir, q)
+        return _ok(videos=_links())
+
+    @app.route("/curtos/link/<pid>/escolha", methods=["POST"])
+    def curtos_link_escolha(pid: str):
+        """⭐ marca o título e a capa (print) que você quer num vídeo pronto — fica salvo e vai pro pacote de exportação."""
+        p = _proj(pid)
+        if not p.get("link_rapido"):
+            abort(404)
+        b = _corpo()
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            esc_ = dict((q["link_rapido"].get("escolha") or {}))
+            if "titulo" in b:
+                esc_["titulo"] = " ".join(str(b.get("titulo") or "").split())[:300]
+            if "capa" in b:
+                if b.get("capa") in (None, "", 0):
+                    esc_.pop("capa", None)
+                else:
+                    try:
+                        k = int(b["capa"])
+                    except (TypeError, ValueError):
+                        return _erro("Capa inválida.")
+                    if not 1 <= k <= len(q.get("thumbs") or []):
+                        return _erro("Essa capa não existe mais — tire os prints de novo.")
+                    esc_["capa"] = k
+            q["link_rapido"]["escolha"] = {x: y for x, y in esc_.items() if y}
+            CT.salvar(base_dir, q)
+        return _ok(videos=_links())
+
+    @app.route("/curtos/link/exportar-escolhidos", methods=["GET"])
+    def curtos_link_exportar_escolhidos():
+        """📦 exporta, de cada vídeo com título ou capa escolhidos: roteiro, títulos, título escolhido e a capa — em ZIP (pacote.json + capas) ou só JSON."""
+        import io
+        import zipfile
+        formato = request.args.get("formato") or "zip"
+        registros, arquivos = [], []
+        for v in _links(500):
+            esc_ = v.get("escolha") or {}
+            if not (esc_.get("titulo") or esc_.get("capa")):
+                continue
+            p = CT.carregar(base_dir, v["id"])
+            r = p.get("roteiro") or {}
+            rec = {"id": v["id"], "link": v["link"], "criado": v["criado"], "canal": v["canal"],
+                   "modo": v.get("modo_usado") or v["modo"], "marca": v["marca"], "comentario": v["comentario"],
+                   "apagado": v["apagado"], "titulo_escolhido": esc_.get("titulo") or "",
+                   "titulos": CN.titulos_do_projeto(p),
+                   "roteiro": " ".join(CT.sem_tags(b.get("fala") or "") for b in r.get("blocos") or []),
+                   "roteiro_com_tags": " ".join(b.get("fala") or "" for b in r.get("blocos") or []),
+                   "descricao": v["descricao"], "hashtags": r.get("hashtags") or [], "capa": None}
+            k = esc_.get("capa")
+            ts = p.get("thumbs") or []
+            if k and 1 <= k <= len(ts):
+                cam = os.path.join(CT.pasta(base_dir, v["id"]), "thumbs", ts[k - 1]["arquivo"])
+                if os.path.isfile(cam):
+                    nome = f"capas/{v['id']}_{k}.jpg"
+                    rec["capa"] = {"arquivo": nome, "por_que": ts[k - 1].get("por_que") or ""}
+                    arquivos.append((nome, cam))
+            registros.append(rec)
+        pacote = {"gerado_em": time.strftime("%Y-%m-%d %H:%M:%S"), "total": len(registros), "videos": registros}
+        texto = json.dumps(pacote, ensure_ascii=False, indent=2)
+        if formato == "json":
+            return send_file(io.BytesIO(texto.encode("utf-8")), mimetype="application/json", as_attachment=True,
+                             download_name="escolhidos.json")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("pacote.json", texto)
+            for nome, cam in arquivos:
+                z.write(cam, nome)
+        buf.seek(0)
+        return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="escolhidos.zip")
+
+    @app.route("/curtos/link/apagar-marcados", methods=["POST"])
+    def curtos_link_apagar_marcados():
+        """🗑 apaga os arquivos só dos vídeos marcados como descartado ou postado (não mexe nos planejados nem nos que estão rodando)."""
+        feitos, falhas = [], []
+        for v in _links(500):
+            if v["marca"] not in ("descartado", "postado") or v["apagado"] or v["rodando"] or v["pendente"]:
+                continue
+            try:
+                _apagar_arquivos_link(v["id"])
+                feitos.append(v["id"])
+            except Exception as exc:  # noqa: BLE001  (um que falha não para os outros)
+                falhas.append(f"{v['titulo'][:40] or v['id']}: {exc}")
+        return _ok(apagados=len(feitos), falhas=falhas, videos=_links())
+
+    @app.route("/curtos/link/iniciar-aguardando", methods=["POST"])
+    def curtos_link_iniciar_aguardando():
+        """▶ inicia todos os links que estão aguardando, um depois do outro."""
+        b = _corpo()
+        ids = [v["id"] for v in _links(500) if v["aguardando"] and not v["rodando"] and not v["apagado"]]
+        ids.reverse()  # _links vem do mais novo pro mais velho: o lote roda na ordem em que foram colados
+        if "por_etapa" in b:
+            por_etapa = bool(b.get("por_etapa"))
+        else:
+            por_etapa = any((CT.carregar(base_dir, pid).get("link_rapido") or {}).get("lote_modo") == "etapa" for pid in ids)
+        if por_etapa and len(ids) > 1:  # 🧩 v84_320
+            r = _iniciar_lote_por_etapa(ids)
+            if isinstance(r, tuple):
+                return r
+            return _ok(iniciados=len(ids), por_etapa=True, videos=_links())
+        for pid in ids:
+            _link_etapa(pid, "na fila", aguardando=False)
+        n = _retomar_fila() if ids else 0
+        return _ok(iniciados=n, videos=_links())
+
+    @app.route("/curtos/link/<pid>/remover", methods=["POST"])
+    def curtos_link_remover(pid: str):
+        """🗑 tira um link que ainda está aguardando da fila (não começou; a entrada some)."""
+        p = _proj(pid)
+        lr = p.get("link_rapido") or {}
+        t = TAREFAS.get(pid) or {}
+        if not lr.get("aguardando") or (t and not t.get("fim")):
+            return _erro("Só dá pra remover um link que ainda está aguardando.", 409)
+        with CT._TRAVA:
+            CT.excluir(base_dir, pid)
+        return _ok(videos=_links())
 
     @app.route("/curtos/link/<pid>/refazer", methods=["POST"])
     def curtos_link_refazer(pid: str):
@@ -1701,6 +2486,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         lr = p.get("link_rapido") or {}
         if not lr:
             abort(404)
+        if lr.get("apagado"):
+            return _erro("Este vídeo foi apagado (ficou só o link e o log).", 409)
         t = TAREFAS.get(pid)
         if t and not t.get("fim"):
             return _erro("Já está rodando.", 409)
@@ -1711,6 +2498,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             try:
                 TAREFAS[pid]["prog"] = "⏳ na fila (espera o vídeo que está gerando)"
                 with _UM_LINK_POR_VEZ:
+                    _espera_memoria(lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
                     TAREFAS[pid]["msg"] = _link_rodar(pid, slug, lr.get("qualidade") or "1080p", lr.get("exportar", True),
                                                       lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
             except Exception as exc:  # noqa: BLE001
@@ -1718,7 +2506,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
             finally:
                 TAREFAS[pid]["fim"] = time.time()
-        _link_etapa(pid, "🔁 de novo", erro="")
+                _liberar_memoria_pesada()  # 🧹 v84_314
+        _link_etapa(pid, "🔁 de novo", erro="", aguardando=False)
         threading.Thread(target=corpo, daemon=True).start()
         return _ok(videos=_links())
 

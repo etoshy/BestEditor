@@ -1368,7 +1368,8 @@ def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] 
         carregar_canal(base, canal_id)  # confere
     p = {"id": _novo_id(), "canal_id": canal_id or "", "titulo": " ".join(str(titulo or "").split())[:120] or "Novo curto",
          "criado": _hoje(), "noticia": {"fontes": [], "texto": str(texto or "")[:60000]}, "midias": [],
-         "config": {"duracao_alvo_s": 0, "extra": "", "providers": [], "voz_tts": "", "motor_perfil": "xtts"},
+         "config": {"duracao_alvo_s": 0, "extra": "", "providers": [], "voz_tts": "", "motor_perfil": "xtts",
+                    "camera_exp": True},  # 🎥 v84_322: câmera experimental ligada nos vídeos novos
          "roteiro": None, "tts": None, "gravacao": None, "editor": None, "modelo": modelo if modelo in MODELOS else "noticia"}
     if p["modelo"] in MODELOS_CLIPE:
         p["config"]["motor_perfil"] = "chatterbox_turbo"
@@ -1930,6 +1931,11 @@ def _trecho_da_cena(cn: Dict[str, Any]) -> Dict[str, Any]:
         pass
     if _limpo(cn.get("foco"), 80):  # 🎥 v84_296: o objeto em que o vertical foca nessa cena (o que a fala está mostrando)
         out["foco"] = _limpo(cn["foco"], 80)
+    if _limpo(cn.get("zoom_detalhe"), 120):  # 🎥 v84_322: a câmera aproxima nesse detalhe
+        out["zoom_detalhe"] = _limpo(cn["zoom_detalhe"], 120)
+    cg = cn.get("congelar") if isinstance(cn.get("congelar"), dict) else {}
+    if _limpo(cg.get("texto"), 60):  # ⏸ congela com o cartão
+        out["congelar"] = {"texto": _limpo(cg["texto"], 60)}
     d = cn.get("destaque") if isinstance(cn.get("destaque"), dict) else {}
     if d.get("alvo"):
         import rastreio
@@ -2557,7 +2563,10 @@ def planos_do_video(p: Dict[str, Any], providers: List[str], perfil: Optional[Di
                                 "efeito": (cn.get("efeito") or "") if j == 0 else
                                 (_efeito_seguinte(cn.get("efeito") or "", j) if contexto else ("zoom_in", "zoom_out", "zoom_respiro")[j % 3]),
                                 "entrada": (cn.get("entrada") or "none") if j == 0 else ("none" if contexto else "punch_in")} if clipe else {}),
-                            **({"destaque": cn["destaque"]} if clipe and j == 0 and (cn.get("destaque") or {}).get("alvo") else {})})
+                            **({"destaque": cn["destaque"]} if clipe and j == 0 and (cn.get("destaque") or {}).get("alvo") else {}),
+                            **({"zoom_detalhe": cn["zoom_detalhe"]} if clipe and j == 0 and cn.get("zoom_detalhe") else {}),
+                            **({"congelar": (cn.get("congelar") or {}).get("texto")}
+                               if clipe and j == 0 and (cn.get("congelar") or {}).get("texto") else {})})
     # sem buracos: cada plano termina onde o próximo começa, o último no fim
     out = [x for x in out if x["end"] - x["start"] >= 0.05]
     for i in range(len(out)):
@@ -2779,6 +2788,14 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
             rid = (p.get("destaques_rastreio") or {}).get(chave_destaque(x))
             if rid:
                 x["destaque_rastreio"] = rid
+    import camera_exp
+    if camera_exp.ligada(p):  # 🎥 v84_322: o pedaço com o zoom no detalhe / congelado com o cartão
+        for x in planos_v:
+            if x.get("destaque_pronto"):
+                continue
+            pronto = (p.get("camera_prontos") or {}).get(camera_exp.chave(x))
+            if pronto and any(m["id"] == pronto for m in p.get("midias") or []):
+                x.update(query=pronto, camera_pronto=pronto, efeito="")  # o movimento já está no pedaço
     # 🃏 cartões: um fundo escuro gerado aqui vira a mídia C1, C2… do projeto
     precisa_cartao = any(x["layout"] == "cartao" for x in planos_v)
     if precisa_cartao:

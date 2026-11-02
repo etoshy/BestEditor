@@ -1399,7 +1399,9 @@ class TestNarracoesGravacao:
             r = client.get(f"/narracoes/{pid}")
             assert b"abrirEditorAudio" in r.data
             assert b"Editar \xc3\xa1udio" in r.data or "Editar áudio".encode() in r.data
-            assert b"montarBufferEditado" in r.data  # o editor de forma de onda completo, nao o painel simples
+            assert b"editor_audio.js" in r.data  # v84_325: o editor de forma de onda completo mora em static/editor_audio.js
+            js = client.get("/static/editor_audio.js").data
+            assert b"montarBufferEditado" in js and b"function abrirEditorAudio" in js
         finally:
             client.post(f"/narracoes/{pid}/excluir")
 

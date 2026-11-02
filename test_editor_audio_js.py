@@ -20,7 +20,7 @@ import pytest
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node.js não disponível neste ambiente")
 
-_TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "narracao_detalhe.html")
+_TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "editor_audio.js")  # v84_325: saiu do template
 
 
 def _extrair_js_das_funcoes_puras():

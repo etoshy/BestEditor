@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}🎤 Gravar a sua voz{% endblock %}
+{% block content %}
+<style>
+  .gv-barra { position: sticky; top: 0; z-index: 20; background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 12px;
+              display: flex; gap: 10px 16px; align-items: center; flex-wrap: wrap; margin: 8px 0 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+  .gv-barra label { display: flex; gap: 6px; align-items: center; font-size: .86rem; margin: 0; }
+  .gv-barra input[type=checkbox] { width: auto; margin: 0; }
+  .gv-barra input[type=range] { width: 140px; }
+  .gv-parte { border: 2px solid var(--borda); border-radius: 14px; padding: 14px 16px; margin: 10px 0; background: var(--card); transition: border-color .15s; }
+  .gv-parte.atual { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); }
+  .gv-parte.feita { border-left: 6px solid var(--ok); }
+  .gv-parte.gravando { border-color: #e53935; box-shadow: 0 0 0 3px rgba(229,57,53,.25); }
+  .gv-texto { font-weight: 700; line-height: 1.35; margin: 4px 0 6px; font-size: var(--gv-fonte, 30px); }
+  .gv-trad { color: var(--mudo); font-size: calc(var(--gv-fonte, 30px) * .5); line-height: 1.3; margin-bottom: 6px; }
+  .gv-cab { display: flex; gap: 8px; align-items: center; font-size: .82rem; color: var(--mudo); }
+  .gv-acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .gv-rec { font-size: 1rem; padding: 8px 16px; }
+  .gv-rec.on { background: #e53935 !important; color: #fff; }
+  .gv-takes { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .gv-take { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: .84rem; padding: 6px 8px; border-radius: 8px; background: var(--code-bg); }
+  .gv-take.ativo { outline: 2px solid var(--ok); }
+  .gv-take audio { height: 32px; }
+  .gv-nivel { width: 120px; height: 8px; border-radius: 4px; background: var(--borda); overflow: hidden; display: inline-block; vertical-align: middle; }
+  .gv-nivel i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #43a047, #fdd835 70%, #e53935); }
+  .gv-rodape { position: sticky; bottom: 0; z-index: 20; background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 12px;
+               display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; box-shadow: 0 -4px 14px rgba(0,0,0,.12); }
+  .gv-clipe video { width: 220px; max-height: 390px; border-radius: 10px; background: #000; }
+  body.gv-leitura .gv-takes, body.gv-leitura .gv-trad { display: none; }
+  body.gv-leitura .gv-parte:not(.atual) { opacity: .35; }
+  .gv-mini { font-size: .8rem; padding: 3px 9px; }
+</style>
+
+<h1 style="margin-bottom:4px">🎤 Gravar a sua voz <span class="si-dica" style="font-weight:400">{{ p.titulo }}</span></h1>
+<div class="si-linha" style="gap:12px;flex-wrap:wrap">
+  <a href="{{ '/gravar-voz' if avulsa else ('/curtos/link' if link else '/curtos/' + pid) }}">← voltar</a>
+  <span class="si-dica">Grave aos poucos (uma parte por vez, quantos takes quiser) ou tudo de uma vez. Pausas longas e repetições saem sozinhas no fim.
+    Atalhos: <b>R</b> grava/para a parte atual · <b>↑ ↓</b> troca de parte.</span>
+</div>
+
+<div class="gv-barra" id="barra">
+  <button id="bMic" class="gv-mini">🎙 ativar microfone</button>
+  <label title="o microfone usado nas gravações (fica salvo neste navegador)">🎛 <select id="micSel" style="max-width:230px"><option value="">microfone padrão do sistema</option></select></label>
+  <span id="nivelBox" style="display:none">nível <span class="gv-nivel"><i id="nivel"></i></span></span>
+  <label>🔠 texto <button class="gv-mini" id="fMenos">A−</button><input type="range" id="fonte" min="16" max="72" step="2"><button class="gv-mini" id="fMais">A+</button><span id="fVal" class="si-dica"></span></label>
+  <label><input type="checkbox" id="optTrad" checked> tradução</label>
+  <label><input type="checkbox" id="optLeitura"> 📖 modo leitura</label>
+  <label title="3, 2, 1… antes de começar a gravar (dá tempo de respirar)"><input type="checkbox" id="optConta"> ⏱ contagem</label>
+  <label title="depois de parar, já pula pra próxima parte"><input type="checkbox" id="optAvancar" checked> ⏭ avançar sozinho</label>
+  <label title="cada take novo já sai com o realce (redução de ruído, equalização, compressão, volume) — o original fica guardado"><input type="checkbox" id="optRealce"> ✨ realce em cada take</label>
+  {% if tem_clipe %}<label><input type="checkbox" id="optClipe"> 🎞 ver o vídeo</label>{% endif %}
+</div>
+
+{% if tem_clipe %}<div class="gv-clipe" id="clipeBox" style="display:none;position:fixed;right:16px;bottom:90px;z-index:30">
+  <video src="/curtos/{{ pid }}/voz/clipe" controls muted playsinline></video></div>{% endif %}
+
+{% if avulsa %}<details class="gv-parte" style="padding:10px 14px" id="textoBox">
+  <summary style="cursor:pointer;font-weight:700">✏ trocar o texto <span class="si-dica" style="font-weight:400">(as partes são refeitas na ordem — a parte 3 continua com os takes dela)</span></summary>
+  <textarea id="txtNovo" rows="8" style="width:100%;box-sizing:border-box;margin-top:8px">{{ sessao.texto }}</textarea>
+  <div class="si-linha" style="gap:8px;margin-top:6px"><select id="txtSep" style="width:auto"><option value="linha">uma parte por linha</option><option value="frase">uma por frase</option><option value="paragrafo">uma por parágrafo</option></select>
+    <button class="gv-mini" id="bTexto">💾 salvar o texto</button></div>
+</details>{% endif %}
+<details id="tudoBox" class="gv-parte" style="padding:10px 14px">
+  <summary style="cursor:pointer;font-weight:700">🎙 ou grave o texto inteiro de uma vez <span class="si-dica" style="font-weight:400">(um take ativo aqui vale no lugar das partes)</span></summary>
+  <div id="parte-TUDO" data-parte="TUDO" style="margin-top:8px"></div>
+</details>
+<div id="partes"></div>
+
+<div class="gv-rodape">
+  <b id="progresso"></b>
+  <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="optRealceTudo" style="width:auto;margin:0"> ✨ realce em tudo ao juntar</label>
+  <button class="{{ 'si-ok' if avulsa else 'si-sec' }}" id="bJuntar" title="junta as partes num áudio só pra ouvir/baixar">🧩 juntar e gerar o áudio</button>
+  {% if not avulsa %}<button class="si-ok" id="bEnviar">✅ enviar e continuar a edição</button>{% endif %}
+  <span id="finalBox" style="display:none;gap:8px;align-items:center"><audio controls id="finalAudio" style="height:34px"></audio><a class="gv-mini" id="finalBaixar" href="#">⬇ baixar .wav</a></span>
+  <span id="status" class="si-dica"></span>
+</div>
+
+<script>
+const PID = {{ pid|tojson }}, LINK = {{ link|tojson }}, AVULSA = {{ (avulsa or false)|tojson }};
+let EST = {{ estado|tojson }}, ATUAL = 0, stream = null, rec = null, pedacos = [], gravando = null, t0 = 0, timer = null, audioCtx = null, analisador = null, rafNivel = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('gv_' + k); localStorage.setItem('gv_' + k, v); } catch (e) { return null; } };
+
+// ---- os ganchos que o editor de forma de onda (static/editor_audio.js) usa ----
+var GRAVACOES = {};
+function urlGravar(indice) { return `/curtos/${PID}/voz/parte/${indice}`; }
+function urlGerarRealce(indice, takeId) { return `/curtos/${PID}/voz/parte/${indice}/${takeId}/realce`; }
+function renderizarGravacoes(indice) { recarregar(); }
+function blocoDaFala(indice) { return document.getElementById('parte-' + indice); }
+
+// ---- fonte / opções ----
+function aplicarFonte(px) { px = Math.max(16, Math.min(72, +px || 30)); document.documentElement.style.setProperty('--gv-fonte', px + 'px'); $('fonte').value = px; $('fVal').textContent = px + 'px'; pref('fonte', px); }
+aplicarFonte(pref('fonte') || 30);
+$('fonte').oninput = e => aplicarFonte(e.target.value);
+$('fMenos').onclick = () => aplicarFonte(+$('fonte').value - 4);
+$('fMais').onclick = () => aplicarFonte(+$('fonte').value + 4);
+['optTrad', 'optLeitura', 'optConta', 'optAvancar', 'optRealce', 'optRealceTudo'].forEach(k => { const v = pref(k); if (v !== null) $(k).checked = v === '1'; $(k).addEventListener('change', () => { pref(k, $(k).checked ? '1' : '0'); aplicarOpcoes(); }); });
+function aplicarOpcoes() { document.body.classList.toggle('gv-leitura', $('optLeitura').checked); document.querySelectorAll('.gv-trad').forEach(e => e.style.display = $('optTrad').checked ? '' : 'none'); }
+if ($('optClipe')) $('optClipe').onchange = () => { $('clipeBox').style.display = $('optClipe').checked ? '' : 'none'; };
+
+// ---- desenho ----
+const fmt = s => (+s || 0).toFixed(1) + ' s';
+function takesHtml(pt) {
+  return (pt.takes || []).map((t, k) => `<div class="gv-take ${t.id === pt.ativo ? 'ativo' : ''}">
+      <b>take ${k + 1}</b> <span class="si-dica">${fmt(t.dur)}</span>
+      <audio controls preload="none" src="/curtos/${PID}/voz/parte/${pt.id}/${t.id}.wav?v=${t.usar_realce ? 'r' : 'o'}${t.quando}"></audio>
+      ${t.id === pt.ativo ? '<span style="color:var(--ok);font-weight:700">✔ em uso</span>' : `<button class="gv-mini" data-acao="usar" data-p="${pt.id}" data-t="${t.id}">✔ usar</button>`}
+      <button class="gv-mini" data-editar="${pt.id}" data-t="${t.id}" title="forma de onda: corte o começo/fim e trechos do meio (salva como take novo)">✂ editar</button>
+      <button class="gv-mini ${t.usar_realce ? 'si-ok' : ''}" data-acao="realce" data-p="${pt.id}" data-t="${t.id}" data-usar="${t.usar_realce ? 0 : 1}">${t.usar_realce ? '✨ com realce (tirar)' : '✨ realce'}</button>
+      <button class="gv-mini si-sec" data-acao="apagar" data-p="${pt.id}" data-t="${t.id}">🗑</button></div>`).join('');
+}
+function parteHtml(pt, i) {
+  const rec_ = gravando === pt.id;
+  return `<div class="gv-cab">${pt.id === 'TUDO' ? '' : `<b>${i}/${EST.partes.length - 1}</b>${pt.funcao ? ' · ' + esc(pt.funcao) : ''}`} <span class="gravacao-status"></span></div>
+    <div class="gv-texto">${esc(pt.texto)}</div>${pt.traducao ? `<div class="gv-trad">${esc(pt.traducao)}</div>` : ''}
+    <div class="gv-acoes"><button class="gv-rec ${rec_ ? 'on' : ''}" data-rec="${pt.id}">${rec_ ? '⏹ parar <span class="gv-tempo">0.0 s</span>' : (pt.takes.length ? '⏺ gravar outro take' : '⏺ gravar')}</button></div>
+    <div class="gv-takes">${takesHtml(pt)}</div>`;
+}
+function desenhar() {
+  const [tudo, ...ps] = EST.partes;
+  $('parte-TUDO').innerHTML = parteHtml(tudo, 0);
+  $('parte-TUDO').className = gravando === 'TUDO' ? 'gravando' : '';
+  $('partes').innerHTML = ps.map((pt, k) => `<div class="gv-parte ${k === ATUAL ? 'atual' : ''} ${pt.ativo ? 'feita' : ''} ${gravando === pt.id ? 'gravando' : ''}" id="parte-${pt.id}" data-parte="${pt.id}" data-k="${k}">${parteHtml(pt, k + 1)}</div>`).join('');
+  const feitas = ps.filter(x => x.ativo).length, tudoOk = !!tudo.ativo;
+  $('progresso').textContent = tudoOk ? `🎙 roteiro inteiro gravado (${fmt((tudo.takes.find(t => t.id === tudo.ativo) || {}).dur)})` : `${feitas}/${ps.length} parte(s) · ${fmt(EST.total_s)}`;
+  const falta = !!(EST.faltando || []).length || !!gravando;
+  if ($('bEnviar')) $('bEnviar').disabled = falta;
+  $('bJuntar').disabled = falta;
+  aplicarOpcoes();
+}
+async function recarregar() { try { EST = (await (await fetch(`/curtos/${PID}/voz/estado`)).json()).estado; } catch (e) {} desenhar(); }
+async function post(url, corpo) { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) throw new Error(j.erro || r.status); return j; }
+function status(t) { $('status').textContent = t; }
+
+// ---- microfone e gravação ----
+async function ligarMic() {
+  if (stream) return stream;
+  const dev = $('micSel').value;
+  stream = await navigator.mediaDevices.getUserMedia({audio: Object.assign({echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1},
+                                                                           dev ? {deviceId: {exact: dev}} : {})});
+  listarMics();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analisador = audioCtx.createAnalyser(); analisador.fftSize = 1024;
+  audioCtx.createMediaStreamSource(stream).connect(analisador);
+  const buf = new Float32Array(analisador.fftSize);
+  const loop = () => { analisador.getFloatTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v)); $('nivel').style.width = Math.min(100, m * 140) + '%'; rafNivel = requestAnimationFrame(loop); };
+  loop(); $('nivelBox').style.display = ''; $('bMic').textContent = '🎙 microfone ligado'; $('bMic').disabled = true;
+  return stream;
+}
+$('bMic').onclick = () => ligarMic().catch(e => status('❌ microfone: ' + e.message));
+async function listarMics() {  // 🎛 os nomes só aparecem depois da permissão do microfone
+  try { const ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); const s = $('micSel'), atual = s.value || pref('mic') || '';
+    s.innerHTML = '<option value="">microfone padrão do sistema</option>' + ds.filter(d => d.deviceId && d.deviceId !== 'default').map((d, k) => `<option value="${esc(d.deviceId)}">${esc(d.label || 'microfone ' + (k + 1))}</option>`).join('');
+    s.value = [...s.options].some(o => o.value === atual) ? atual : ''; } catch (e) {}
+}
+function desligarMic() { if (rafNivel) cancelAnimationFrame(rafNivel); if (stream) stream.getTracks().forEach(t => t.stop()); try { audioCtx && audioCtx.close(); } catch (e) {}
+  stream = null; audioCtx = null; $('bMic').disabled = false; $('bMic').textContent = '🎙 ativar microfone'; $('nivelBox').style.display = 'none'; }
+$('micSel').onchange = async () => { pref('mic', $('micSel').value); if (gravando) return; const ligado = !!stream; desligarMic();
+  if (ligado) { try { await ligarMic(); status('🎛 microfone trocado'); } catch (e) { status('❌ ' + e.message); } } };
+listarMics();
+const espera = ms => new Promise(r => setTimeout(r, ms));
+async function gravar(parte) {
+  if (gravando) { if (gravando === parte) return parar(); return; }
+  try { await ligarMic(); } catch (e) { status('❌ não consegui o microfone: ' + e.message); return; }
+  if ($('optConta').checked) { for (const n of [3, 2, 1]) { status(`⏱ ${n}…`); await espera(700); } }
+  const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  rec = new MediaRecorder(stream, tipo ? {mimeType: tipo} : undefined); pedacos = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) pedacos.push(e.data); };
+  rec.onstop = () => enviarTake(parte, new Blob(pedacos, {type: rec.mimeType || 'audio/webm'}));
+  rec.start(250); gravando = parte; t0 = Date.now(); status('⏺ gravando…'); desenhar();
+  timer = setInterval(() => document.querySelectorAll('.gv-tempo').forEach(e => e.textContent = ((Date.now() - t0) / 1000).toFixed(1) + ' s'), 100);
+}
+function parar() { if (!rec || rec.state === 'inactive') return; clearInterval(timer); rec.stop(); status('⬆ salvando…'); }
+async function enviarTake(parte, blob) {
+  const fd = new FormData(); fd.append('audio', blob, 'take.webm'); if ($('optRealce').checked) fd.append('realce', '1');
+  try { const r = await fetch(urlGravar(parte), {method: 'POST', body: fd}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.erro || r.status);
+    EST = j.estado; status(`✅ take salvo (${fmt(j.duracaoSegundos)})`);
+    if (parte !== 'TUDO' && $('optAvancar').checked) irPara(Math.min(ATUAL + 1, EST.partes.length - 2)); }
+  catch (e) { status('❌ ' + e.message); }
+  gravando = null; desenhar();
+}
+function irPara(k) { ATUAL = Math.max(0, Math.min(EST.partes.length - 2, k)); desenhar(); const e = document.querySelector(`.gv-parte[data-k="${ATUAL}"]`); if (e) e.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+
+// ---- cliques ----
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.rec) { const card = b.closest('.gv-parte'); if (card && card.dataset.k) ATUAL = +card.dataset.k; return gravar(b.dataset.rec); }
+  if (b.dataset.editar) { const t = b.dataset.t, p_ = b.dataset.editar; return abrirEditorAudio(p_, t, `/curtos/${PID}/voz/parte/${p_}/${t}.wav?original=1&v=${Date.now()}`, p_ === 'TUDO' ? 'roteiro inteiro' : 'parte ' + p_); }
+  if (b.dataset.acao) { b.disabled = true; if (b.dataset.acao === 'realce') status('✨ fazendo o realce…');
+    try { EST = (await post(`/curtos/${PID}/voz/parte/${b.dataset.p}/${b.dataset.t}/${b.dataset.acao}`, {usar: b.dataset.usar !== '0'})).estado; status(''); } catch (e) { status('❌ ' + e.message); }
+    desenhar(); }
+});
+document.addEventListener('click', ev => { const c = ev.target.closest('.gv-parte[data-k]'); if (c && !ev.target.closest('button, audio') && +c.dataset.k !== ATUAL) { ATUAL = +c.dataset.k; desenhar(); } });
+window.addEventListener('keydown', e => {
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || document.querySelector('div[style*="z-index: 1000"], div[style*="z-index:1000"]')) return;  // editor aberto
+  const pt = EST.partes[ATUAL + 1];
+  if (e.key === 'r' || e.key === 'R') { e.preventDefault(); if (pt) gravar(gravando || pt.id); }
+  else if (e.key === 'ArrowDown' && !gravando) { e.preventDefault(); irPara(ATUAL + 1); }
+  else if (e.key === 'ArrowUp' && !gravando) { e.preventDefault(); irPara(ATUAL - 1); }
+});
+
+// ---- enviar ----
+$('bJuntar').onclick = async () => {
+  $('bJuntar').disabled = true; status('🧩 juntando' + ($('optRealceTudo').checked ? ' (com realce)…' : '…'));
+  try { const j = await post(`/curtos/${PID}/voz/juntar`, {realce_em_tudo: $('optRealceTudo').checked}); EST = j.estado;
+    $('finalAudio').src = j.url; $('finalBaixar').href = j.url + '&baixar=1'; $('finalBox').style.display = 'inline-flex'; status('🎧 áudio pronto'); }
+  catch (e) { status('❌ ' + e.message); }
+  desenhar();
+};
+if ($('bTexto')) $('bTexto').onclick = async () => {
+  try { EST = (await post(`/gravar-voz/${PID}/texto`, {texto: $('txtNovo').value, separar: $('txtSep').value})).estado; ATUAL = 0; desenhar(); status('💾 texto salvo'); }
+  catch (e) { status('❌ ' + e.message); }
+};
+if (EST.final) { const u = `/curtos/${PID}/voz/final.wav?v=${Date.now()}`; $('finalAudio').src = u; $('finalBaixar').href = u + '&baixar=1'; $('finalBox').style.display = 'inline-flex'; }
+if ($('bEnviar')) $('bEnviar').onclick = async () => {
+  $('bEnviar').disabled = true;
+  try { await post(`/curtos/${PID}/voz/enviar`, {realce_em_tudo: $('optRealceTudo').checked}); status('🧩 juntando…'); acompanhar(); }
+  catch (e) { status('❌ ' + e.message); $('bEnviar').disabled = false; }
+};
+async function acompanhar() {
+  try { const j = await (await fetch(`/curtos/${PID}/voz/estado`)).json(); const t = j.tarefa || {};
+    if (t.fim) { status(t.erro ? '❌ ' + t.erro : '✅ ' + (t.msg || 'pronto') + (LINK ? ' — o vídeo segue na lista de links' : '')); if ($('bEnviar')) $('bEnviar').disabled = false; return; }
+    status('⏳ ' + (t.prog || '…')); } catch (e) {}
+  setTimeout(acompanhar, 1500);
+}
+desenhar();
+</script>
+<script src="{{ url_for('static', filename='editor_audio.js') }}"></script>
+{% endblock %}

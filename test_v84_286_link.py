@@ -77,7 +77,7 @@ def test_link_ate_o_roteiro_e_para_na_voz(tmp_path, monkeypatch):
     try:
         c = A.app.test_client()
         assert c.get("/curtos/link").status_code == 200
-        r = c.post("/curtos/link/novo", json={"link": "https://www.tiktok.com/@x/video/123", "modo": "explicar", "comentarios": "is he ok? 2K"}).get_json()
+        r = c.post("/curtos/link/novo", json={"link": "https://www.tiktok.com/@x/video/123", "modo": "explicar", "comentarios": "is he ok? 2K", "iniciar": True}).get_json()
         assert r["ok"], r
         pid = r["criados"][0]
         for _ in range(300):

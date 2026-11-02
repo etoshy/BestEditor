@@ -77,6 +77,8 @@
     <label>Título<input type="text" id="cTitulo" value="{{ p.titulo }}" style="min-width:260px"></label>
     <label>Duração (s, 0 = {{ 'o que o assunto pedir' if EXPL else 'a da referência' }})<input type="number" id="cDur" min="0" max="180" value="{{ p.config.duracao_alvo_s or 0 }}" style="width:90px"></label>
     <label style="flex:1;min-width:260px">Pedido extra pro roteiro (opcional)<input type="text" id="cExtra" value="{{ p.config.extra }}" placeholder="ex.: focar no fã; terminar perguntando quem estava certo"></label>
+    {% if not EXPL %}<label title="✨ autêntico (padrão): fatos + opinião, sem narrar o que já está na tela, gancho e final variados. 📜 clássico: o jeito antigo — só se você escolher.">Estilo do roteiro<select id="cEstiloRot"><option value="autentico"{% if (p.config.estilo_roteiro or 'autentico') != 'classico' %} selected{% endif %}>✨ autêntico (padrão)</option><option value="classico"{% if p.config.estilo_roteiro == 'classico' %} selected{% endif %}>📜 clássico (narra o clipe)</option></select></label>
+    <label style="flex-direction:row;align-items:center;gap:6px" title="Zoom no detalhe da fala, seta só onde precisa, congelar com cartão, ritmo do nicho e teto de efeitos. Vale pro próximo roteiro/montagem."><input type="checkbox" id="cCamera" style="width:auto;margin:0"{% if p.config.camera_exp %} checked{% endif %}> 🎥 câmera experimental</label>{% endif %}
     <button id="bSalvarCfg">💾</button>
   </div>
   <div class="ct-clipes" id="clipes"></div>
@@ -125,7 +127,7 @@
   <div class="ct-takes" id="takes"></div>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">🎤 ou a SUA voz</summary>
     <p class="ct-dica">Leia o roteiro (a versão narrada). Pausas, repetições e muletas saem sozinhas. Se o vídeo já está no editor, a voz é trocada lá mantendo as mídias.</p>
-    <div class="ct-linha"><button id="bGravar">⏺ Gravar</button><button id="bParar" class="ct-perigo" style="display:none">⏹ Parar e usar</button><span id="recInfo"></span>
+    <div class="ct-linha"><a class="ct-mini" href="/curtos/{{ p.id }}/gravar" style="text-decoration:none;font-weight:700" title="texto grande, grava parte por parte com takes, editor de forma de onda e realce">🎤 gravar aos poucos (texto grande)</a><button id="bGravar">⏺ Gravar</button><button id="bParar" class="ct-perigo" style="display:none">⏹ Parar e usar</button><span id="recInfo"></span>
       <label style="font-weight:400">ou suba o arquivo <input type="file" id="fAudio" accept="audio/*,video/*" style="width:auto"></label></div>
   </details>
   <div id="grav"></div>
@@ -199,7 +201,7 @@ function desenharClipes() {
   if (document.activeElement !== $('refTexto')) $('refTexto').value = ref;
   $('refInfo').textContent = ref ? `· ${ref.split(/\s+/).length} palavras` : '· (nenhuma)';
 }
-$('bSalvarCfg').onclick = async () => { try { await api(BASE + '/config', Object.assign({ titulo: $('cTitulo').value, duracao_alvo_s: +$('cDur').value || 0, extra: $('cExtra').value }, EXPL ? { texto_noticia: $('cTema').value } : {}));
+$('bSalvarCfg').onclick = async () => { try { await api(BASE + '/config', Object.assign({ titulo: $('cTitulo').value, duracao_alvo_s: +$('cDur').value || 0, extra: $('cExtra').value }, EXPL ? { texto_noticia: $('cTema').value } : { estilo_roteiro: $('cEstiloRot').value, camera_exp: $('cCamera').checked }));
     if (EXPL) await api(BASE + '/proporcao', { proporcao: (P && P.proporcao) || '9:16', midia: $('cMidia').value, estilo_ia: $('cEstilo').value }); $('tTitulo').textContent = $('cTitulo').value; barra('✅ salvo', 'okk'); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bClipe').onclick = async () => { const fd = new FormData(); for (const f of $('fClipe').files) fd.append('arquivos', f); try { await api(BASE + '/midia', fd); $('fClipe').value = ''; recarregar(); } catch (e) { barra('❌ ' + e.message, 'erro'); } };
 $('bLink').onclick = async () => { const us = $('cLink').value.split(/\s+/).filter(u => u.startsWith('http')); if (!us.length) return;

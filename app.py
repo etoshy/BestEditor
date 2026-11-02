@@ -12186,10 +12186,26 @@ def _curto_marca(job_id: str, cfg: Dict[str, Any]) -> None:
     _save_state(job_id)
 
 
+def _curto_apagar_arquivos(job_id: str) -> None:
+    """🗑 apaga o projeto do editor de UM vídeo marcado pra apagar: a pasta do job e os vídeos exportados com o id dele."""
+    if not job_id or os.path.basename(job_id) != job_id:
+        return
+    _JOBS.pop(job_id, None)
+    shutil.rmtree(os.path.join(JOBS_DIR, job_id), ignore_errors=True)
+    if os.path.isdir(OUTPUTS_DIR):
+        for nome in os.listdir(OUTPUTS_DIR):
+            if nome.startswith(job_id):
+                try:
+                    os.remove(os.path.join(OUTPUTS_DIR, nome))
+                except OSError:
+                    pass
+
+
 import curtos_rotas as _curtos_rotas  # noqa: E402  ⚡ Vídeos curtos (aba Modelos de vídeo, v84_246)
 _curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isolado,
                         lambda t, m: na.limpar_texto_para_tts(t, motor=m), _curto_para_estudio,
                         trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca, exportar=_curto_exportar)
+_curtos_rotas.CB["apagar_editor"] = _curto_apagar_arquivos  # 🗑 v84_316: apagar o projeto do editor do vídeo marcado
 import shorts_ia_rotas as _shorts_ia_rotas  # noqa: E402  🎌 Shorts de IA: série com elenco fixo + modelar viral (v84_263)
 _shorts_ia_rotas.registrar(app, BASE_DIR, _curto_transcrever)
 import poker_rotas as _poker_rotas  # noqa: E402  🃏 Poker: mesa animada, ranking, roteiros com pesquisa (v84_277)
@@ -12369,6 +12385,55 @@ def _padroes_excluidos_do_reloader() -> list:
     return [os.path.join(p, "*") for p in pastas_sem_codigo]
 
 
+def _reloader_enxuto() -> None:
+    """🧯 v84_322: o reloader do werkzeug varria TODO o sys.path a cada 2 s — inclusive o site-packages do usuário
+    (AppData\\Roaming\\Python…: torch, transformers… dezenas de milhares de .py), que ele não reconhece como "do sistema".
+    Com a RAM apertada (voz + Whisper + lote), essa varredura dava MemoryError, a thread do reloader morria e levava o
+    servidor junto (WinError 10038). Agora ele olha só os .py do PROJETO (sem as pastas de dados) e, se faltar memória
+    numa rodada, pula essa rodada em vez de derrubar o site."""
+    try:
+        from werkzeug import _reloader as _wr
+    except Exception:  # noqa: BLE001
+        return
+    excluidas = tuple(os.path.realpath(p[:-2]) for p in _padroes_excluidos_do_reloader() if p.endswith("*"))
+    nomes_fora = {"__pycache__", ".git", "node_modules", ".venv", "venv", "env", "site-packages", ".pytest_cache", "dist", "build"}
+    ultimo: Dict[str, Any] = {"paths": set()}
+
+    def _so_o_projeto(extra_files, exclude_patterns):
+        try:
+            paths = set()
+            tem_py = {os.path.dirname(BASE_DIR): True}
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if d not in nomes_fora
+                           and not os.path.realpath(os.path.join(root, d)).startswith(excluidas)]
+                achou = False
+                for n in files:
+                    if n.endswith(".py"):
+                        achou = True
+                        paths.add(os.path.join(root, n))
+                if not (achou or tem_py.get(os.path.dirname(root))):
+                    dirs.clear()  # pasta sem .py dentro de pasta sem .py: não desce mais
+                tem_py[root] = achou
+            for f_ in extra_files or ():
+                paths.add(os.path.abspath(f_))
+            ultimo["paths"] = paths
+            return paths
+        except MemoryError:
+            return ultimo["paths"]
+
+    _wr._find_stat_paths = _so_o_projeto
+    _passo = _wr.StatReloaderLoop.run_step
+
+    def _passo_seguro(self):
+        try:
+            _passo(self)
+        except MemoryError:
+            import gc
+            gc.collect()  # sem memória agora: pula esta conferida (o site continua de pé)
+
+    _wr.StatReloaderLoop.run_step = _passo_seguro
+
+
 if __name__ == "__main__":
     print("=== Narração → Vídeo v84 — 🎞️ Vídeos modelados · 📜 Roteiro do YouTube · 🌐 idioma do .zip · Flow em abas ===", flush=True)
     # Porta 5050 por padrão (não 5000) de propósito: 5000 é a porta
@@ -12382,5 +12447,7 @@ if __name__ == "__main__":
     # v84_259: SEM_RELOADER=1 desliga o reinício automático (pra lotes longos: o reloader varre as pastas a cada segundo e,
     # com a memória apertada — voz + Whisper + Flow —, é o primeiro a dar MemoryError e derrubar o site)
     _reloader = os.environ.get("SEM_RELOADER", "").strip() not in ("1", "true", "sim")
+    if _reloader:
+        _reloader_enxuto()
     app.run(debug=True, host="0.0.0.0", port=port, threaded=True, use_reloader=_reloader,
             exclude_patterns=_padroes_excluidos_do_reloader(), reloader_interval=2)

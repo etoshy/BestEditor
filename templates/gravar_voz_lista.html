@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}🎙 Gravar minha voz{% endblock %}
+{% block content %}
+<style>
+  .gl-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: .88rem; margin: 8px 0 0; }
+  .gl-form textarea, .gl-form input { width: 100%; box-sizing: border-box; }
+  .gl-item { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; margin-top: 8px; background: var(--card); }
+  .gl-item a.t { font-weight: 700; flex: 1; min-width: 200px; }
+</style>
+<h1>🎙 Gravar minha voz <span class="si-dica" style="font-weight:400">cole qualquer texto, escolha o microfone, grave parte por parte, edite e junte num áudio só</span></h1>
+{% if erro %}<div class="aviso">❌ {{ erro }}</div>{% endif %}
+<form class="gl-form" method="post" action="/gravar-voz/nova" style="max-width:900px">
+  <label>Título (opcional)<input name="titulo" maxlength="120" placeholder="ex.: teste do microfone novo"></label>
+  <label>O texto que você vai ler<textarea name="texto" rows="10" required placeholder="cole aqui — cada linha vira uma parte pra gravar (ou escolha separar por frase)"></textarea></label>
+  <label>Separar em partes<select name="separar" style="max-width:340px">
+    <option value="linha">uma parte por linha</option><option value="frase">uma parte por frase (. ! ?)</option><option value="paragrafo">uma parte por parágrafo (linha em branco)</option></select></label>
+  <div class="si-linha" style="margin-top:12px"><button class="si-ok" type="submit">🎙 começar a gravar</button></div>
+</form>
+<h2 style="margin-top:24px">Sessões</h2>
+{% for x in sessoes %}
+  <div class="gl-item"><a class="t" href="/gravar-voz/{{ x.id }}">{{ x.titulo }}</a><span class="si-dica">{{ x.partes }} parte(s){% if x.final %} · 🎧 áudio pronto{% endif %}</span>
+    {% if x.final %}<a class="si-mini" href="/curtos/{{ x.id }}/voz/final.wav?baixar=1">⬇ baixar</a>{% endif %}
+    <form method="post" action="/gravar-voz/{{ x.id }}/apagar" onsubmit="return confirm('Apagar esta sessão e as gravações dela?')" style="margin:0"><button class="si-mini si-sec">🗑</button></form></div>
+{% else %}<p class="si-dica">Nenhuma ainda.</p>{% endfor %}
+{% endblock %}

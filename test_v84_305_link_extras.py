@@ -112,9 +112,9 @@ def test_varios_links_um_por_linha_um_de_cada_vez(tmp_path, monkeypatch):
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(CT.__file__), "templates"))
     CR.registrar(app, base)
     cl = app.test_client()
-    r = cl.post("/curtos/link/novo", json={"link": "https://a.com/1\nhttps://a.com/2\n\nhttps://a.com/1\nlixo\nhttps://a.com/3"}).get_json()
+    r = cl.post("/curtos/link/novo", json={"link": "https://a.com/1\nhttps://a.com/2\n\nhttps://a.com/1\nlixo\nhttps://a.com/3", "iniciar": True}).get_json()
     assert r["ok"] and len(r["criados"]) == 3
-    r2 = cl.post("/curtos/link/novo", json={"link": "https://b.com/9"}).get_json()
+    r2 = cl.post("/curtos/link/novo", json={"link": "https://b.com/9", "iniciar": True}).get_json()
     assert r2["ok"]
     for _ in range(100):
         if len(feitos) == 4:
@@ -122,3 +122,8 @@ def test_varios_links_um_por_linha_um_de_cada_vez(tmp_path, monkeypatch):
         time.sleep(0.05)
     assert sorted(feitos) == ["https://a.com/1", "https://a.com/2", "https://a.com/3", "https://b.com/9"]
     assert maximo[0] == 1
+    todos = r["criados"] + r2["criados"]
+    for _ in range(200):  # espera a fila fechar (não deixa tarefa rodando pro próximo teste)
+        if all((CR.TAREFAS.get(p) or {}).get("fim") for p in todos):
+            break
+        time.sleep(0.02)
