@@ -275,6 +275,7 @@ async function canalSalvar() {
     await carregarCanais(); el('a_escopo').value = cid; el('canal').value = cid; canalPreencher(); aviso('💾 canal salvo', 'okk');
   } catch (e) { aviso('❌ ' + e.message, 'erro'); }
 }
+window.canalCriar = canalCriar; window.canalSalvar = canalSalvar;  // 📺 v84_328: os botões do HTML chamam por aqui (o script fica fechado num bloco)
 (async () => { try { await carregarCanais(); } catch (e) {} canalPreencher(); await carregarGrupos(); })();
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];

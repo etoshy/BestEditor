@@ -135,48 +135,79 @@ async function post(url, corpo) { const r = await fetch(url, {method: 'POST', he
 function status(t) { $('status').textContent = t; }
 
 // ---- microfone e gravação ----
+// 🎙 v84_327: o áudio é criado NO CLIQUE (senão o Chrome deixa ele pausado e não chega som), o gravador é um
+// AudioWorklet (WAV cru; o ScriptProcessor antigo fica de reserva) e o MediaRecorder grava junto como 2ª reserva.
+// No fim vale o que tiver som; se nada tiver, a mensagem diz o porquê.
+function garantirCtx() {  // chamado de dentro do clique, antes de qualquer await
+  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
 async function ligarMic() {
-  if (stream && stream.getAudioTracks().some(t => t.readyState === 'live')) { if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume(); return stream; }
-  if (stream) desligarMic();  // o microfone caiu (desconectou/trocou): pega de novo
+  garantirCtx();
+  if (stream && stream.getAudioTracks().some(t => t.readyState === 'live') && fonteMic) return stream;
+  if (stream) desligarMic(true);  // o microfone caiu (desconectou/trocou): pega de novo
   const dev = $('micSel').value;
   const base_ = {echoCancellation: false, noiseSuppression: false, autoGainControl: false};
   try { stream = await navigator.mediaDevices.getUserMedia({audio: Object.assign({}, base_, dev ? {deviceId: {exact: dev}} : {})}); }
   catch (e) { if (!dev) throw e; status('🎛 esse microfone não abriu — usando o padrão'); stream = await navigator.mediaDevices.getUserMedia({audio: base_}); }
   listarMics();
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analisador = audioCtx.createAnalyser(); analisador.fftSize = 1024;
+  garantirCtx();
+  analisador = audioCtx.createAnalyser(); analisador.fftSize = 1024;
   fonteMic = audioCtx.createMediaStreamSource(stream); fonteMic.connect(analisador);
-  if (audioCtx.state === 'suspended') await audioCtx.resume();
   const buf = new Float32Array(analisador.fftSize);
+  if (rafNivel) cancelAnimationFrame(rafNivel);
   const loop = () => { analisador.getFloatTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v)); $('nivel').style.width = Math.min(100, m * 140) + '%'; rafNivel = requestAnimationFrame(loop); };
   loop(); $('nivelBox').style.display = ''; $('bMic').textContent = '🎙 microfone ligado'; $('bMic').disabled = true;
   return stream;
 }
-$('bMic').onclick = () => ligarMic().catch(e => status('❌ microfone: ' + e.message));
+$('bMic').onclick = () => { garantirCtx(); ligarMic().catch(e => status('❌ microfone: ' + e.message)); };
 async function listarMics() {  // 🎛 os nomes só aparecem depois da permissão do microfone
   try { const ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); const s = $('micSel'), atual = s.value || pref('mic') || '';
     s.innerHTML = '<option value="">microfone padrão do sistema</option>' + ds.filter(d => d.deviceId && d.deviceId !== 'default').map((d, k) => `<option value="${esc(d.deviceId)}">${esc(d.label || 'microfone ' + (k + 1))}</option>`).join('');
     s.value = [...s.options].some(o => o.value === atual) ? atual : ''; } catch (e) {}
 }
-function desligarMic() { if (rafNivel) cancelAnimationFrame(rafNivel); if (stream) stream.getTracks().forEach(t => t.stop()); try { audioCtx && audioCtx.close(); } catch (e) {}
-  stream = null; audioCtx = null; fonteMic = null; $('bMic').disabled = false; $('bMic').textContent = '🎙 ativar microfone'; $('nivelBox').style.display = 'none'; }
-$('micSel').onchange = async () => { pref('mic', $('micSel').value); if (gravando) return; const ligado = !!stream; desligarMic();
+function desligarMic(manterCtx) { if (rafNivel) cancelAnimationFrame(rafNivel); rafNivel = null; if (stream) stream.getTracks().forEach(t => t.stop());
+  try { fonteMic && fonteMic.disconnect(); } catch (e) {}
+  if (!manterCtx) { try { audioCtx && audioCtx.close(); } catch (e) {} audioCtx = null; workletOk = null; }
+  stream = null; fonteMic = null; $('bMic').disabled = false; $('bMic').textContent = '🎙 ativar microfone'; $('nivelBox').style.display = 'none'; }
+$('micSel').onchange = async () => { pref('mic', $('micSel').value); if (gravando) return; const ligado = !!stream; desligarMic(true);
   if (ligado) { try { await ligarMic(); status('🎛 microfone trocado'); } catch (e) { status('❌ ' + e.message); } } };
 listarMics();
 const espera = ms => new Promise(r => setTimeout(r, ms));
+let workletOk = null;
+const WORKLET = `class GvGravador extends AudioWorkletProcessor { process(inp) { const c = inp[0] && inp[0][0]; if (c) this.port.postMessage(c.slice(0)); return true; } }
+registerProcessor('gv-gravador', GvGravador);`;
+async function carregarWorklet() {
+  if (workletOk !== null) return workletOk;
+  try { const url = URL.createObjectURL(new Blob([WORKLET], {type: 'application/javascript'})); await audioCtx.audioWorklet.addModule(url); workletOk = true; }
+  catch (e) { workletOk = false; }
+  return workletOk;
+}
 async function gravar(parte) {
   if (gravando) { if (gravando === parte) return parar(); return; }
+  garantirCtx();  // ainda dentro do clique
   try { await ligarMic(); } catch (e) { status('❌ não consegui o microfone: ' + e.message); return; }
   if ($('optConta').checked) { for (const n of [3, 2, 1]) { status(`⏱ ${n}…`); await espera(700); } }
-  // 🎙 v84_326: grava o som CRU em WAV pela Web Audio (sem o MediaRecorder — em alguns microfones/Chrome ele dá
-  // "NotSupportedError: There was an error starting the MediaRecorder"). Sem compressão: melhor pro Whisper e pro realce.
+  if (audioCtx.state !== 'running') { try { await Promise.race([audioCtx.resume(), espera(800)]); } catch (e) {} }
+  const r = {bufs: [], taxa: audioCtx.sampleRate, parte, nos: [], mr: null, mrPedacos: [], mrFim: null};
+  const mudo = audioCtx.createGain(); mudo.gain.value = 0; mudo.connect(audioCtx.destination); r.nos.push(mudo);  // processa sem tocar no alto-falante
   try {
-    const proc = audioCtx.createScriptProcessor(4096, 1, 1), bufs = [];
-    proc.onaudioprocess = e => { if (gravando) bufs.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
-    const mudo = audioCtx.createGain(); mudo.gain.value = 0;  // o processador só roda ligado na saída — no volume 0 (sem eco)
-    fonteMic.connect(proc); proc.connect(mudo); mudo.connect(audioCtx.destination);
-    rec = {proc, mudo, bufs, taxa: audioCtx.sampleRate, parte};
-  } catch (e) { status('❌ não consegui começar a gravar: ' + e.message); return; }
-  gravando = parte; t0 = Date.now(); status('⏺ gravando…'); desenhar();
+    if (await carregarWorklet()) {
+      const no = new AudioWorkletNode(audioCtx, 'gv-gravador'); no.port.onmessage = e => { if (gravando) r.bufs.push(e.data); };
+      fonteMic.connect(no); no.connect(mudo); r.nos.push(no);
+    } else {
+      const proc = audioCtx.createScriptProcessor(4096, 1, 1);
+      proc.onaudioprocess = e => { if (gravando) r.bufs.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+      fonteMic.connect(proc); proc.connect(mudo); r.nos.push(proc);
+    }
+  } catch (e) { status('⚠ gravador WAV não abriu (' + e.message + ') — uso o do navegador'); }
+  try {  // 2ª reserva: o gravador do navegador (sem forçar formato)
+    r.mr = new MediaRecorder(stream); r.mr.ondataavailable = e => { if (e.data && e.data.size) r.mrPedacos.push(e.data); };
+    r.mrFim = new Promise(res => { r.mr.onstop = res; }); r.mr.start(500);
+  } catch (e) { r.mr = null; }
+  if (r.nos.length < 2 && !r.mr) { status('❌ não consegui começar a gravar neste navegador'); return; }
+  rec = r; gravando = parte; t0 = Date.now(); status('⏺ gravando…'); desenhar();
   timer = setInterval(() => document.querySelectorAll('.gv-tempo').forEach(e => e.textContent = ((Date.now() - t0) / 1000).toFixed(1) + ' s'), 100);
 }
 function wavDe(bufs, taxa) {
@@ -188,17 +219,28 @@ function wavDe(bufs, taxa) {
   let o = 44; for (const b of bufs) for (let i = 0; i < b.length; i++) { const v = Math.max(-1, Math.min(1, b[i])); dv.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true); o += 2; }
   return new Blob([dv], {type: 'audio/wav'});
 }
+function diagnostico() {
+  const t = stream && stream.getAudioTracks()[0], st = t && t.getSettings ? t.getSettings() : {};
+  const motivo = !t ? 'sem microfone' : t.readyState !== 'live' ? 'o microfone desconectou' : t.muted ? 'o microfone está MUDO pro navegador (outro app segurando, ou privacidade do Windows → Microfone)'
+    : audioCtx && audioCtx.state !== 'running' ? `o áudio do navegador ficou "${audioCtx.state}" (clique em 🎙 ativar microfone e grave de novo)` : 'o microfone não mandou som';
+  return `${motivo} · ${t ? (t.label || 'microfone') : ''} ${st.sampleRate ? st.sampleRate + ' Hz' : ''} ${st.channelCount ? st.channelCount + ' canal(is)' : ''}`.trim();
+}
 function parar() {
   if (!rec || !gravando) return;
   clearInterval(timer); const r = rec, parte = gravando; rec = null;
-  setTimeout(() => {  // um respiro pra pegar o fim da última palavra
-    try { r.proc.disconnect(); r.mudo.disconnect(); fonteMic && fonteMic.disconnect(r.proc); } catch (e) {}
-    if (!r.bufs.length) { gravando = null; desenhar(); status('❌ não chegou som do microfone — confira o microfone escolhido (🎛) e o nível'); return; }
-    status('⬆ salvando…'); enviarTake(parte, wavDe(r.bufs, r.taxa));
-  }, 250);
+  setTimeout(async () => {  // um respiro pra pegar o fim da última palavra
+    r.nos.forEach(n => { try { n.disconnect(); } catch (e) {} });
+    try { r.nos.slice(1).forEach(n => fonteMic && fonteMic.disconnect(n)); } catch (e) {}
+    if (r.mr && r.mr.state !== 'inactive') { try { r.mr.stop(); await Promise.race([r.mrFim, espera(1500)]); } catch (e) {} }
+    const amostras = r.bufs.reduce((a, b) => a + b.length, 0);
+    const mrBlob = r.mrPedacos.length ? new Blob(r.mrPedacos, {type: (r.mr && r.mr.mimeType) || 'audio/webm'}) : null;
+    if (amostras >= r.taxa * 0.3) { status('⬆ salvando…'); return enviarTake(parte, wavDe(r.bufs, r.taxa), 'take.wav'); }
+    if (mrBlob && mrBlob.size > 2000) { status('⬆ salvando (gravador do navegador)…'); return enviarTake(parte, mrBlob, 'take.webm'); }
+    gravando = null; desenhar(); status('❌ não chegou som: ' + diagnostico());
+  }, 300);
 }
-async function enviarTake(parte, blob) {
-  const fd = new FormData(); fd.append('audio', blob, 'take.wav'); if ($('optRealce').checked) fd.append('realce', '1');
+async function enviarTake(parte, blob, nome) {
+  const fd = new FormData(); fd.append('audio', blob, nome || 'take.wav'); if ($('optRealce').checked) fd.append('realce', '1');
   try { const r = await fetch(urlGravar(parte), {method: 'POST', body: fd}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.erro || r.status);
     EST = j.estado; status(`✅ take salvo (${fmt(j.duracaoSegundos)})`);
     if (parte !== 'TUDO' && $('optAvancar').checked) irPara(Math.min(ATUAL + 1, EST.partes.length - 2)); }
