@@ -498,6 +498,9 @@ REGRA_AUTENTICA = (
     "'Would you ever…?', 'What would you do?', 'Nobody expected', 'little did they know'. No empty dramatic adjectives.\n"
     "G. 'ganchos': 5 hooks of 5 DIFFERENT hook types; 'finais': 5 endings of 5 DIFFERENT ending types (the first of each = the one "
     "you used). 'titulos': curiosity + a concrete detail of the clip, honest.\n"
+    "I. The facts and context are told OVER THE CLIP: every cena stays on the clip (layout 'clipe' with material/de/ate) — "
+    "never a stock/bank video for a fact. If other footage would really help, put it in that cena's 'sugestao' (it stays only a "
+    "suggestion).\n"
     "H. 'descricao': 1-2 sentences with the most interesting fact + credit the original creator by @ when you know it (keep any [COMMENTARY]/[EXPLAIN]/[ART] tag the APPROACH asks for at the very start).")
 
 
@@ -682,6 +685,8 @@ def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, A
                                   "alternativas": [], "material": "", "palavra": cn.get("palavra") or "", "efeito": cn.get("efeito") or "",
                                   "entrada": cn.get("entrada") or "none", "composicao": ""})
         blocos.append(dict(b, fala=fala, fala_en=en, fala_pt=pt, cenas=cenas))
+    if not explicativo(p) and so_fontes(p):  # 🎞 v84_330: "só com os meus vídeos" — nenhuma cena sai do clipe
+        segurar_no_clipe(p, blocos)
     import camera_exp
     if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322: o teto de efeitos
         camera_exp.aplicar_teto({"blocos": blocos})
@@ -691,6 +696,56 @@ def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, A
                 if isinstance(o, dict) and (o.get("en") or o.get("pt"))][:20]
     r["idioma"] = idioma
     return r
+
+
+_SUGESTAO_DE = {"video": "clipe_real", "foto": "foto_real", "ia": "ia", "ia_video": "ia_video"}
+
+
+def segurar_no_clipe(p: Dict[str, Any], blocos: List[Dict[str, Any]]) -> int:
+    """🎞 v84_330: num curto de comentário "só com os meus vídeos", a cena que a IA mandou buscar FORA do clipe (banco
+    de vídeo, foto, imagem gerada) volta pro clipe — o pedaço logo depois da cena anterior — e a ideia dela fica como
+    💡 sugestão (você aceita na página do curto, se quiser). Antes ela ia pros bancos e, sem achar, travava a exportação."""
+    clips = [m for m in p.get("midias") or [] if m.get("tipo") == "video" and str(m.get("id") or "").startswith("M")]
+    if not clips:
+        return 0
+    durs = {m["id"]: float(m.get("dur") or 0) for m in clips}
+    ultimo: Optional[Dict[str, Any]] = None
+    n = 0
+    for b in blocos:
+        novas = []
+        for cn in b.get("cenas") or []:
+            if cn.get("layout") == "materia" and cn.get("material"):
+                ultimo = cn
+                novas.append(cn)
+                continue
+            if cn.get("layout") not in _SUGESTAO_DE:  # cartão de texto etc.: fica como está
+                novas.append(cn)
+                continue
+            if ultimo:
+                mid = ultimo["material"]
+                total = durs.get(mid) or 0
+                try:
+                    de = float(ultimo.get("ate") if ultimo.get("ate") not in (None, "") else ultimo.get("de") or 0)
+                except (TypeError, ValueError):
+                    de = 0.0
+                if total and de >= total - 0.8:
+                    de = max(0.0, total - 2.5)
+                ate = min(total, de + 2.5) if total else de + 2.5
+            else:
+                mid, de = clips[0]["id"], 0.0
+                ate = min(durs.get(mid) or 3.0, 3.0)
+            q = str(cn.get("query") or cn.get("visual") or "").strip()
+            nova = {"layout": "materia", "query": "", "visual": cn.get("visual") or q, "alternativas": [], "material": mid,
+                    "de": round(de, 2), "ate": round(max(de, ate), 2), "palavra": cn.get("palavra") or "", "efeito": cn.get("efeito") or "",
+                    "entrada": cn.get("entrada") or "none", "composicao": ""}
+            if q:
+                nova["sugestao"] = {"layout": _SUGESTAO_DE.get(cn.get("layout"), "clipe_real"), "query": q[:160],
+                                    "por_que": "a IA quis mostrar isto fora do clipe (o vídeo segue no clipe; aceite se quiser)"}
+            novas.append(nova)
+            ultimo = nova
+            n += 1
+        b["cenas"] = novas
+    return n
 
 
 def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:

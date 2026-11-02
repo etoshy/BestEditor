@@ -1400,6 +1400,15 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
     def _cm_final(pid: str, providers: Optional[List[str]], prog: Callable[[str], None]) -> str:
         """🎥 enquadra no vertical → 🎯 destaques → 🎬 editor."""
+        q0 = CT.carregar(base_dir, pid)
+        if not CC.explicativo(q0) and CC.so_fontes(q0) and (q0.get("roteiro") or {}).get("blocos"):  # 🎞 v84_330 (roteiros já feitos)
+            with CT._TRAVA:
+                q = CT.carregar(base_dir, pid)
+                n_c = CC.segurar_no_clipe(q, q["roteiro"]["blocos"])
+                if n_c:
+                    CT.salvar(base_dir, q)
+            if n_c:
+                prog(f"🎞 {n_c} cena(s) que iam buscar fora do clipe voltaram pro clipe (a ideia ficou como 💡 sugestão)")
         if CT.carregar(base_dir, pid).get("rastros_h"):  # 🎥 v84_296: clipe deitado → vertical focando o que cada fala mostra
             try:
                 n_v = CC.enquadrar_planos(base_dir, pid, prog)
@@ -1948,15 +1957,19 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 return
             prog_lote(f"🧩 etapa {k}/6 · {nome} ({len(vivos)} vídeo(s))")
             for p in vivos:
-                _link_etapa(p, f"🧩 {k}/6 · {nome}")
-                TAREFAS[p]["prog"] = f"[{num[p]}/{n}] ⏳ etapa {k}/6 · {nome} — na vez"
+                _link_etapa(p, f"🧩 {k}/6 · {nome} — na fila desta etapa")
+                TAREFAS[p]["prog"] = f"[{num[p]}/{n}] ⏳ etapa {k}/6 · {nome} — esperando a vez"
 
             def um(p: str) -> None:
                 try:
                     if ram_cada:
                         _espera_memoria(pr(p))
+                    _link_etapa(p, f"🧩 {k}/6 · {nome}")
                     pr(p)(f"etapa {k}/6 · {nome}…")
                     fn(p)
+                    if p not in falhou:  # ✓ v84_329: terminou a etapa — fica claro que está esperando os outros, não travado
+                        _link_etapa(p, f"🧩 {k}/6 ✓ {nome} — esperando a próxima etapa")
+                        pr(p)(f"✓ etapa {k}/6 pronta — esperando os outros vídeos do lote terminarem esta etapa")
                 except Exception as exc:  # noqa: BLE001  (um link ruim não para os outros)
                     falha(p, exc)
             if paralelo > 1 and len(vivos) > 1:
@@ -2002,7 +2015,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _liberar_memoria_pesada()
 
         prontos = 0
-        for p in [x for x in pids if x not in falhou]:  # 6: a parte pesada, um por vez
+        fila6 = [x for x in pids if x not in falhou]
+        for k6, p in enumerate(fila6, 1):
+            _link_etapa(p, f"🧩 6/6 · 🎬 edição → exportar — na fila ({k6}/{len(fila6)})")
+            TAREFAS[p]["prog"] = f"[{num[p]}/{n}] ⏳ etapa 6/6 — exporta um por vez ({k6}º da fila)"
+        for p in fila6:  # 6: a parte pesada, um por vez
             try:
                 _espera_memoria(pr(p))
                 lr = CT.carregar(base_dir, p).get("link_rapido") or {}

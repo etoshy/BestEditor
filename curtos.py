@@ -46,6 +46,7 @@ import zlib
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import arquivo_seguro  # noqa: F401  (v84_99: os.replace sem WinError 5)
+import ffmpeg_sem_stdin  # noqa: E402,F401  (v84_329: ffmpeg nunca espera o teclado do console)
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _TRAVA = threading.RLock()
@@ -1972,6 +1973,17 @@ def duracao_audio(cam: str) -> float:
         return 0.0
 
 
+def _silencio_wav(cam: str, segundos: float, taxa: int = 48000) -> str:
+    """Um WAV de silêncio (mono, 16 bits) escrito direto em Python."""
+    import wave
+    with wave.open(cam, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taxa)
+        w.writeframes(b"\x00\x00" * max(1, int(round(segundos * taxa))))
+    return cam
+
+
 def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callable[[str, str], str] = lambda t, m: t,
                    voz: Optional[Dict[str, Any]] = None, pausa: float = 0.12,
                    on_log: Callable[[str], None] = lambda _m: None, sub: str = "tts", guardar: bool = True) -> Dict[str, Any]:
@@ -1989,7 +2001,7 @@ def gerar_voz_guia(base: str, pid: str, tts: Callable[..., Any], limpar: Callabl
     partes, por_bloco = [], []
     assinatura_voz = json.dumps([motor, {k: v for k, v in sorted(kw.items()) if isinstance(v, (str, int, float, bool))}], ensure_ascii=False)
     silencio = os.path.join(d, "_pausa.wav")
-    _rodar(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", f"{pausa:.3f}", silencio], 60)
+    _silencio_wav(silencio, pausa)  # 🧯 v84_329: sem ffmpeg (no Windows ele chegou a travar 60 s só pra isso)
     for i, b in enumerate(blocos):
         on_log(f"🎙 bloco {i + 1}/{len(blocos)}")
         bruto, arq = os.path.join(d, f"_b{i}.wav"), os.path.join(d, f"b{i}.wav")

@@ -77,6 +77,8 @@ def _tentar_com_cookies(yt_dlp: Any, opcoes: Dict[str, Any], url: str, primeiro:
             except Exception:  # noqa: BLE001
                 pass
         return
+    import re as _re
+    erros = [_re.sub(r"\x1b?\[[0-9;]{1,6}m", "", e_) for e_ in erros]  # 🧹 sem códigos de cor
     raise RedesSociaisError(AJUDA_LOGIN + "\nTentativas: " + " ; ".join(erros))
 
 
@@ -129,6 +131,8 @@ def baixar_com_ytdlp(
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
+        "no_color": True,  # 🧹 v84_329: sem os códigos de cor ([0;31m) no erro que aparece na página
+        "color": {"stdout": "no_color", "stderr": "no_color"},
     }
     if cookies_path:
         opcoes["cookiefile"] = cookies_path

@@ -31,7 +31,7 @@ def _falsos(base, monkeypatch, falhar_url=""):
         with trava:
             junto["agora"] += 1
             junto["max"] = max(junto["max"], junto["agora"])
-        time.sleep(0.05)
+        time.sleep(0.3)  # tempo pra 2 downloads se sobreporem mesmo com a máquina ocupada
         with trava:
             junto["agora"] -= 1
             log.append(("baixar", pid))

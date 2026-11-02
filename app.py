@@ -55,6 +55,7 @@ import json
 import re
 import os
 import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
+import ffmpeg_sem_stdin  # noqa: E402,F401  (v84_329: ffmpeg nunca espera o teclado do console)
 import shutil
 import subprocess
 import sys
