@@ -347,7 +347,7 @@ def resolver_itens(itens: List[Dict[str, Any]], transporte: Optional[Any] = None
     pend = [it for it in itens if eh_goto(it.get("url") or "")]
     if pend:
         from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=8) as ex:
+        with ThreadPoolExecutor(max_workers=3) as ex:
             res = list(ex.map(lambda it: resolver_goto(it["url"], transporte), pend))
         for it, real in zip(pend, res):
             if real:

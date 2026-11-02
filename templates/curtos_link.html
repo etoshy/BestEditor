@@ -76,6 +76,17 @@
       <div id="a_previa_leg" style="align-self:end;padding:8px 14px;border-radius:8px;background:#222;font-weight:800;font-size:1.1rem"></div>
     </div>
     <div class="lk-ops" style="align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:260px;flex:1">
+        <b style="font-size:.92rem">📺 Criar canal ou mudar o nome/descrição</b>
+        <input id="c_nome" placeholder="nome do canal (ex.: Arte Fantasia)" maxlength="80">
+        <textarea id="c_desc" rows="3" maxlength="1500" placeholder="descrição: do que é o canal, o tom, o que mostrar (a IA segue isso no roteiro)"></textarea>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="si-mini" onclick="canalCriar()">➕ criar canal</button>
+          <button class="si-mini" onclick="canalSalvar()">💾 salvar nome/descrição do canal selecionado</button>
+        </div>
+      </div>
+    </div>
+    <div class="lk-ops" style="align-items:flex-start">
       <label>Aplicar em<select id="a_escopo" title="o padrão vale pra todos; o do canal só pra ele (o que o canal não define segue o padrão)"></select></label>
       <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
         <div id="a_tela" title="como a legenda fica na tela (9:16)" style="position:relative;width:146px;height:260px;border-radius:12px;background:linear-gradient(#2b3a55,#0d1220);overflow:hidden;border:2px solid #444">
@@ -183,7 +194,27 @@ async function carregarCanais() {
   el('canal').addEventListener('change', () => { try { localStorage.setItem('lk_canal', el('canal').value); } catch (e) {} });
   el('a_escopo').value = ''; 
 }
-el('a_escopo').addEventListener('change', () => carregarAcab(el('a_escopo').value));
+el('a_escopo').addEventListener('change', () => { carregarAcab(el('a_escopo').value); canalPreencher(); });
+function canalPreencher() {  // mostra o nome e a descrição do canal escolhido pra você editar
+  const c = CANAIS.find(x => x.id === el('a_escopo').value);
+  el('c_nome').value = c ? c.nome : ''; el('c_desc').value = c ? (c.descricao || '') : '';
+}
+async function canalCriar() {
+  const nome = el('c_nome').value.trim(); if (!nome) return aviso('✏ Dê um nome ao canal', 'erro');
+  try {
+    const r = await post('/curtos/canais/novo', {nome, descricao: el('c_desc').value});
+    await carregarCanais(); el('a_escopo').value = r.id; el('canal').value = r.id;
+    try { localStorage.setItem('lk_canal', r.id); } catch (e) {}
+    await carregarAcab(r.id); canalPreencher();
+    aviso(`📺 canal ${nome} criado — ajuste a legenda e o @ dele aqui em cima`, 'okk');
+  } catch (e) { aviso('❌ ' + e.message, 'erro'); }
+}
+async function canalSalvar() {
+  const cid = el('a_escopo').value; if (!cid) return aviso('Escolha um canal em "Aplicar em" pra editar (ou crie um novo)', 'erro');
+  try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/editar', {nome: el('c_nome').value, descricao: el('c_desc').value});
+    await carregarCanais(); el('a_escopo').value = cid; el('canal').value = cid; canalPreencher(); aviso('💾 canal salvo', 'okk');
+  } catch (e) { aviso('❌ ' + e.message, 'erro'); }
+}
 (async () => { try { await carregarCanais(); } catch (e) {} })();
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];

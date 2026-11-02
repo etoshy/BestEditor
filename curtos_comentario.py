@@ -549,6 +549,9 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
                       + " — name them when you present the work (say it so it reads well aloud).", ""]
     if (p.get("config") or {}).get("extra"):
         L += ["## EXTRA REQUEST", p["config"]["extra"], ""]
+    desc_canal = str((CT.canal_do(base, p) or {}).get("descricao") or "").strip()  # 📝 a descrição do canal (escrita por você)
+    if desc_canal:
+        L += ["## WHAT THIS CHANNEL IS ABOUT (the creator's own description — follow it)", desc_canal, ""]
     estilo = CT.texto_do_perfil(perfil)
     if estilo:
         L += ["## CHANNEL STYLE", estilo]

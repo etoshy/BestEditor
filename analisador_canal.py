@@ -684,7 +684,7 @@ def analisar_com_ia(a: Dict[str, Any], com_miniaturas: bool = True) -> Optional[
     if com_miniaturas:
         conteudo.append({"type": "text", "text": "## Miniaturas (cada uma depois do id)"})
         vs = a.get("videos") or {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
             blocos = list(ex.map(lambda vid: (vid, ia.imagem_bloco(vs[vid].get("thumb") or "", largura=320)), list(vs)))
         for vid, b in blocos:
             if b:

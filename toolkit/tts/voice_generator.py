@@ -2874,6 +2874,20 @@ def _duracao_legivel(seg: float) -> str:
     return f"{seg:.0f}s"
 
 
+def _memoria_antes_do_processo() -> None:
+    """🧠 v84_313: o motor de voz roda num processo novo (carrega o modelo do zero): espera RAM livre e solta os outros modelos antes."""
+    try:
+        import os as _o
+        import sys as _s
+        _raiz = _o.path.dirname(_o.path.dirname(_o.path.dirname(_o.path.abspath(__file__))))
+        if _raiz not in _s.path:
+            _s.path.insert(0, _raiz)
+        import memoria_ram
+        memoria_ram.espera_ram()
+    except Exception:  # noqa: BLE001  (controle de memória nunca derruba a geração)
+        pass
+
+
 def gerar_audio_isolado(engine: str, texto: str, output_path: str, timeout: float = 7200.0, **kwargs: Any) -> str:
     """Mesma coisa que `gerar_audio()`, mas rodando o motor num
     PROCESSO SEPARADO — se o motor travar o interpretador Python
@@ -2904,6 +2918,7 @@ def gerar_audio_isolado(engine: str, texto: str, output_path: str, timeout: floa
     ctx = multiprocessing.get_context("spawn")
     fila: Any = ctx.Queue()
     processo = ctx.Process(target=_processo_gerar_audio, args=(engine, texto, output_path, kwargs, fila))
+    _memoria_antes_do_processo()
     processo.start()
     processo.join(timeout)
 
@@ -2981,6 +2996,7 @@ def gerar_audio_isolado_lote(itens, timeout_por_item: float = 7200.0, on_progres
     ctx = multiprocessing.get_context("spawn")
     fila: Any = ctx.Queue()
     processo = ctx.Process(target=_processo_gerar_lote, args=(itens, fila))
+    _memoria_antes_do_processo()
     processo.start()
     pendentes = set(range(len(itens)))
     try:
@@ -3103,6 +3119,7 @@ def gerar_audio_isolado_paralelo(itens, instancias: int = 2, timeout_por_item: f
     def iniciar() -> None:
         wid = len(procs) + 1
         pr = ctx.Process(target=_processo_trabalhador, args=(itens, tarefas, fila, wid))
+        _memoria_antes_do_processo()
         pr.start()
         procs[wid] = pr
 

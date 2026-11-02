@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional
 _MODEL_CACHE: Dict[tuple, Any] = {}
 
 # 🧹 v84_262: o modelo do Whisper ficava na memória PARA SEMPRE depois da 1ª transcrição (centenas de MB a alguns GB).
-# Agora, parado por WHISPER_OCIOSO_S segundos (padrão 5 min) e sem nenhuma transcrição rodando, ele é descarregado.
+# Agora, parado por WHISPER_OCIOSO_S segundos (padrão 1 min) e sem nenhuma transcrição rodando, ele é descarregado.
 import threading as _threading
 import time as _time
 
@@ -36,9 +36,9 @@ _LOCK = _threading.RLock()
 
 def _ocioso_s() -> float:
     try:
-        return float(os.environ.get("WHISPER_OCIOSO_S") or 300)
+        return float(os.environ.get("WHISPER_OCIOSO_S") or 60)
     except ValueError:
-        return 300.0
+        return 60.0
 
 
 def descarregar_modelos() -> bool:

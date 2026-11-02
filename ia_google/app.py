@@ -312,7 +312,7 @@ def tarefa_imagens_mais(n, quantidade, ja_vistas, min_lado, verificar):
                          "Faça uma busca de imagens primeiro e depois clique em “Mais imagens”.")
         novas = BuscadorImagens(n.ia).explorar_relacionadas(quantidade, ja_vistas=set(ja_vistas), min_lado=min_lado)
         if verificar and novas:
-            with cf.ThreadPoolExecutor(8) as ex:
+            with cf.ThreadPoolExecutor(3) as ex:
                 novas = list(ex.map(verificar_imagem, novas))
         log(f"Mais imagens: {len(novas)} novas das relacionadas.", "ok")
         return {"imagens": novas, "total": len(novas),

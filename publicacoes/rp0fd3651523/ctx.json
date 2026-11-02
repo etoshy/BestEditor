@@ -1,0 +1,45 @@
+{
+ "ctx": {
+  "idioma": {
+   "codigo": "pt",
+   "nome": "português do Brasil"
+  },
+  "canal": "",
+  "narracao": "VÍDEO REAGIDO: Teste\nTRANSCRIÇÃO: \n\nFALAS DO REACT:\n",
+  "personagens": [
+   {
+    "slug": "c44d3b7",
+    "nome": "Itachi Uchiha",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   },
+   {
+    "slug": "c97c57c",
+    "nome": "Sasuke",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   },
+   {
+    "slug": "c631eb1",
+    "nome": "Naruto",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": null
+   }
+  ],
+  "projeto": {
+   "tema": "React de Itachi Uchiha, Sasuke, Naruto a: Teste",
+   "roteiro": ""
+  },
+  "duracao": 120.0
+ },
+ "meta": {
+  "titulo": "🎭 Teste",
+  "tem_projeto": false,
+  "react": "rp0fd3651523",
+  "atualizado": 1793551611.9991918,
+  "criado": 1793551611.9991946
+ }
+}

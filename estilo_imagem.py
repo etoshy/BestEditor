@@ -207,7 +207,7 @@ def ordenar(itens: List[Any], miniatura: Callable[[Any], str], limite: int = 6, 
     def _um(it):
         u = miniatura(it) or ""
         return (f_est(u) if checar_estilo else ""), (f_fmt(u) if alvo else "")
-    with ThreadPoolExecutor(max_workers=min(6, len(olhar))) as ex:
+    with ThreadPoolExecutor(max_workers=min(3, len(olhar))) as ex:
         res = list(ex.map(_um, olhar))
     bons, meio, ruins = [], [], []
     for it, (mot, fmt) in zip(olhar, res):

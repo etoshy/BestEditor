@@ -86,7 +86,7 @@ def problemas_automaticos(trechos: List[Dict[str, Any]], orientacao: Optional[st
     import estilo_imagem as ei
     analisar = analisar or ei.analisar_url
     alvos = [t for t in trechos if not t["pulado"]]
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         analises = list(ex.map(lambda t: analisar(t["thumb"]) if t["thumb"] else {"estilo": "", "formato": ""}, alvos))
     vistos: Dict[str, int] = {}
     for t, a in zip(alvos, analises):

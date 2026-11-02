@@ -1,0 +1,31 @@
+{
+ "ctx": {
+  "idioma": {
+   "codigo": "pt",
+   "nome": "português do Brasil"
+  },
+  "canal": "",
+  "narracao": "VÍDEO REAGIDO: Dup\nTRANSCRIÇÃO: [0:01–0:02] a\n\nFALAS DO REACT:\n0:01 Goku: Oi!",
+  "personagens": [
+   {
+    "slug": "c8ba69d",
+    "nome": "Goku",
+    "visual_en": "",
+    "personalidade": "",
+    "ref": "/tmp/pytest-of-root/pytest-82/test_duplicar_mesa_tv_e_person0/react/rpd2016ff80f/refs/c8ba69d_ff212a.png"
+   }
+  ],
+  "projeto": {
+   "tema": "React de Goku a: Dup",
+   "roteiro": "0:01 Goku: Oi!"
+  },
+  "duracao": 10.0
+ },
+ "meta": {
+  "titulo": "🎭 Dup",
+  "tem_projeto": false,
+  "react": "rpd2016ff80f",
+  "atualizado": 1793551618.5104737,
+  "criado": 1793551618.5104773
+ }
+}

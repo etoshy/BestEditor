@@ -34,6 +34,18 @@ def _pasta_pixabay(base_dir: str) -> str:
     return os.environ.get("CURTOS_PIXABAY_DIR") or os.path.join(base_dir, "pixabay_sons")
 
 
+def _liberar_memoria_pesada() -> None:
+    """🧹 v84_313: ver memoria_ram.liberar_pesados."""
+    import memoria_ram
+    memoria_ram.liberar_pesados()
+
+
+def _espera_memoria(prog: Optional[Callable[[str], None]] = None) -> None:
+    """⏸ v84_313: ver memoria_ram.espera_ram."""
+    import memoria_ram
+    memoria_ram.espera_ram(prog)
+
+
 def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = None, tts: Optional[Callable[..., Any]] = None,
               limpar_tts: Optional[Callable[[str, str], str]] = None,
               para_estudio: Optional[Callable[[Dict[str, Any]], str]] = None,
@@ -1364,45 +1376,59 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             out.append(x["id"])
         return out
 
+    _FILA_RETOMANDO = threading.Lock()
+
+    def _retomar_fila() -> int:
+        """▶ retoma TODOS os que ficaram pelo meio, um depois do outro, numa só fila (não duplica o que já roda)."""
+        if not _FILA_RETOMANDO.acquire(blocking=False):
+            return 0  # já tem uma fila de retomada rodando
+        n = len(_link_pendentes())
+
+        def corpo() -> None:
+            tentados: set = set()
+            try:
+                while True:
+                    pend = [x for x in _link_pendentes() if x not in tentados]
+                    if not pend:
+                        break
+                    pid = pend[0]
+                    tentados.add(pid)
+                    p = CT.carregar(base_dir, pid)
+                    lr = p.get("link_rapido") or {}
+                    TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                                    "prog": "🔁 retomando depois da queda do site…"}
+                    try:
+                        with _UM_LINK_POR_VEZ:
+                            _espera_memoria(lambda m, pid=pid: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+                            TAREFAS[pid]["msg"] = _link_rodar(pid, (p.get("config") or {}).get("voz_tts") or "",
+                                                              lr.get("qualidade") or "1080p", lr.get("exportar", True),
+                                                              lambda m, pid=pid: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+                    except Exception as exc:  # noqa: BLE001  (um que falha não para a fila)
+                        TAREFAS[pid]["erro"] = str(exc)[:600]
+                        _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
+                    finally:
+                        TAREFAS[pid]["fim"] = time.time()
+                        _liberar_memoria_pesada()  # 🧹 v84_313
+            finally:
+                _FILA_RETOMANDO.release()
+        threading.Thread(target=corpo, daemon=True, name="retomar-fila").start()
+        return n
+
     def _vigia_links() -> None:
         time.sleep(float(os.environ.get("CURTOS_VIGIA_INICIO_S") or 30))
         while True:
             try:
-                if not _UM_LINK_POR_VEZ.locked():
-                    for pid in _link_pendentes()[:1]:
-                        _retomar_link(pid)
+                if _link_pendentes() and not _UM_LINK_POR_VEZ.locked():
+                    _retomar_fila()
             except Exception:  # noqa: BLE001
                 pass
             time.sleep(60)
 
-    def _retomar_link(pid: str) -> None:
-        p = CT.carregar(base_dir, pid)
-        lr = p.get("link_rapido") or {}
-        TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
-                        "prog": "🔁 retomando depois da queda do site…"}
-
-        def corpo() -> None:
-            try:
-                with _UM_LINK_POR_VEZ:
-                    TAREFAS[pid]["msg"] = _link_rodar(pid, (p.get("config") or {}).get("voz_tts") or "",
-                                                      lr.get("qualidade") or "1080p", lr.get("exportar", True),
-                                                      lambda m: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
-            except Exception as exc:  # noqa: BLE001
-                TAREFAS[pid]["erro"] = str(exc)[:600]
-                _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
-            finally:
-                TAREFAS[pid]["fim"] = time.time()
-        threading.Thread(target=corpo, daemon=True, name="link-" + pid).start()
-
     @app.route("/curtos/link/retomar", methods=["POST"])
     def curtos_link_retomar():
         """▶ retoma a fila que ficou pelo meio (um por vez, sem duplicar)."""
-        pend = _link_pendentes()
-        if not pend:
-            return _ok(retomados=0, videos=_links())
-        for pid in pend[:1]:  # o vigia pega os outros, um por vez
-            _retomar_link(pid)
-        return _ok(retomados=len(pend), videos=_links())
+        n = _retomar_fila()
+        return _ok(retomados=n, videos=_links())
 
     import sys as _sys_l
     if "pytest" not in _sys_l.modules and os.environ.get("CURTOS_VIGIA", "1") != "0":
@@ -1525,17 +1551,48 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 return _erro(str(exc))
         return _ok(acabamento=CT.acabamento(base_dir, cid))
 
-    @app.route("/curtos/canais-link", methods=["GET"])
-    def curtos_canais_link():
-        """🎚 v84_310: os canais (perfis) pra escolher no link — cada um com a própria legenda/@/destaques."""
+    def _canais_out() -> list:
         out = []
         for c in CT.listar_canais(base_dir):
             try:
                 cc = CT.carregar_canal(base_dir, c["id"])
             except CT.CurtoErro:
                 continue
-            out.append({"id": cc["id"], "nome": cc.get("nome") or cc["id"], "personalizado": bool(cc.get("acabamento"))})
-        return _ok(canais=out)
+            out.append({"id": cc["id"], "nome": cc.get("nome") or cc["id"], "personalizado": bool(cc.get("acabamento")),
+                        "descricao": cc.get("descricao") or ""})
+        return out
+
+    @app.route("/curtos/canais-link", methods=["GET"])
+    def curtos_canais_link():
+        """🎚 v84_310: os canais (perfis) pra escolher no link — cada um com a própria legenda/@/destaques."""
+        return _ok(canais=_canais_out())
+
+    @app.route("/curtos/canais/novo", methods=["POST"])
+    def curtos_canal_novo_link():
+        """➕ um canal novo: nome + descrição; a legenda/posição você ajusta no 🎨 acabamento dele."""
+        b = _corpo()
+        try:
+            with CT._TRAVA:
+                c = CT.criar_canal(base_dir, str(b.get("nome") or ""), "", str(b.get("descricao") or ""))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(id=c["id"], canais=_canais_out())
+
+    @app.route("/curtos/canais/<cid>/editar", methods=["POST"])
+    def curtos_canal_editar(cid: str):
+        """✎ muda o nome e/ou a descrição do canal."""
+        b = _corpo()
+        try:
+            with CT._TRAVA:
+                c = CT.carregar_canal(base_dir, cid)
+                if str(b.get("nome") or "").strip():
+                    c["nome"] = " ".join(str(b["nome"]).split())[:80]
+                if "descricao" in b:
+                    c["descricao"] = str(b.get("descricao") or "").strip()[:1500]
+                CT.salvar_canal(base_dir, c)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(canais=_canais_out())
 
     @app.route("/curtos/link", methods=["GET"])
     def curtos_link_pagina():
@@ -1616,6 +1673,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     prog(m)
                 try:
                     with _UM_LINK_POR_VEZ:  # 🔗 v84_306: outra lista colada depois espera esta (nunca 2 vídeos ao mesmo tempo)
+                        _espera_memoria(pr)  # 🧠 v84_313: RAM baixa → espera antes de começar
                         TAREFAS[pid]["prog"] = "começando…"
                         TAREFAS[pid]["msg"] = _link_rodar(pid, slug, qualidade, exportar, pr)
                     feitos += 1
@@ -1627,6 +1685,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                         pass
                 finally:
                     TAREFAS[pid]["fim"] = time.time()
+                    _liberar_memoria_pesada()  # 🧹 v84_313: solta a memória antes do próximo da lista
             return f"{feitos}/{len(criados)} prontos"
         for pid in criados:
             TAREFAS[pid] = {"rotulo": "🔗 na fila", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "⏳ na fila"}

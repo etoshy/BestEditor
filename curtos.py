@@ -211,11 +211,12 @@ def _ler_json(caminho: str) -> Any:
 
 
 # ------------------------------------------------------------------ 🧬 canais
-def criar_canal(base: str, nome: str, idioma: str = "") -> Dict[str, Any]:
+def criar_canal(base: str, nome: str, idioma: str = "", descricao: str = "") -> Dict[str, Any]:
     nome = " ".join(str(nome or "").split())[:80]
     if not nome:
         raise CurtoErro("Dê um nome ao canal.")
-    c = {"id": _novo_id(), "nome": nome, "idioma": str(idioma or "")[:8], "criado": _hoje(), "referencias": [],
+    c = {"id": _novo_id(), "nome": nome, "idioma": str(idioma or "")[:8], "descricao": str(descricao or "").strip()[:1500],
+         "criado": _hoje(), "referencias": [],
          "perfil": json.loads(json.dumps(PERFIL_PADRAO)), "perfil_ia": False, "metricas": {}, "atualizado": _hoje()}
     salvar_canal(base, c)
     return c

@@ -343,7 +343,7 @@ class BuscadorImagens:
 
         if verificar and imagens:
             self.ia.log(f"Verificando {len(imagens)} links de imagem…")
-            with cf.ThreadPoolExecutor(8) as ex:
+            with cf.ThreadPoolExecutor(3) as ex:
                 imagens = list(ex.map(verificar_imagem, imagens))
             quebradas = sum(1 for im in imagens if not im["verificada"])
             if quebradas:

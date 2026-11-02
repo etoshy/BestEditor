@@ -174,7 +174,7 @@ def julgar(candidatos: List[Dict[str, Any]], fala: str, ficha: Optional[Dict[str
     if not candidatos or not ia.ativo(recurso):
         return None
     lista = candidatos[:12]
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         imgs = list(ex.map(lambda c: ia.imagem_bloco(c.get(miniatura) or c.get("thumbnail") or c.get("miniatura_url") or "")
                            if (c.get(miniatura) or c.get("thumbnail") or c.get("miniatura_url")) else None, lista))
     conteudo: List[Dict[str, Any]] = [{"type": "text", "text":
@@ -252,7 +252,7 @@ def ordenar_youtube(resultados: List[Dict[str, Any]], fala: str, termo: str = ""
     conteudo: Any = txt
     if com_capas:
         lista = resultados[:min(com_capas, 12)]
-        with ThreadPoolExecutor(max_workers=6) as ex:
+        with ThreadPoolExecutor(max_workers=3) as ex:
             imgs = list(ex.map(lambda r: ia.imagem_bloco(r["miniatura_url"]) if r.get("miniatura_url") else None, lista))
         conteudo = [{"type": "text", "text": txt + "\n\n## CAPAS (na mesma numeração)"}]
         for i, im in enumerate(imgs, start=1):
