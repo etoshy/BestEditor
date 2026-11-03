@@ -120,6 +120,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
               exportar=exportar, limpar=limpar_tts)
 
     def _ok(**kw: Any):
+        if "videos" in kw:  # 📄 v84_344: a página da lista do Link vem com a contagem de tudo
+            try:
+                from flask import g as _g
+                if getattr(_g, "vista", None) is not None:
+                    kw.setdefault("vista", _g.vista)
+            except RuntimeError:
+                pass
         return jsonify(dict(ok=True, **kw))
 
     def _erro(msg: str, cod: int = 400):
@@ -1480,19 +1487,97 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         pt = " ".join(CT.sem_tags(b.get("fala_pt") or "") for b in bl if b.get("fala_pt"))
         return pt[:1200] if pt and CT.norm(pt) != CT.norm(fala) else ""
 
-    def _links(n: int = 60) -> List[Dict[str, Any]]:
-        out = []
-        pend = set(_link_pendentes())
-        for x in CT.listar(base_dir):
-            if x.get("modelo") != "comentario":
-                continue
+    _CACHE_PROJ: Dict[str, tuple] = {}
+
+    def _projetos_link() -> List[Dict[str, Any]]:
+        """⚡ v84_344: os projetos do Link, lidos do disco SÓ quando o projeto.json mudou (antes: a lista lia todos os projetos
+        2× a cada 2 s — com a gravação/alinhamento dentro, eram MBs por atualização)."""
+        d = os.path.join(CT.raiz(base_dir), "projetos")
+        out, vistos = [], set()
+        for pid in os.listdir(d) if os.path.isdir(d) else []:
+            cam = os.path.join(d, pid, "projeto.json")
             try:
-                p = CT.carregar(base_dir, x["id"])
-            except CT.CurtoErro:
+                mt = os.stat(cam).st_mtime_ns
+            except OSError:
                 continue
-            if p.get("link_rapido"):
-                out.append(_link_resumo(p, pend))
-        return sorted(out, key=lambda v: -(v["criado"] or 0))[:n]
+            vistos.add(pid)
+            c = _CACHE_PROJ.get(pid)
+            if not c or c[0] != mt:
+                try:
+                    p = CT.carregar(base_dir, pid)
+                except (CT.CurtoErro, OSError, ValueError):
+                    continue
+                c = _CACHE_PROJ[pid] = (mt, p if p.get("modelo") == "comentario" and p.get("link_rapido") else None)
+            if c[1] is not None:
+                out.append(c[1])
+        for pid in list(_CACHE_PROJ):
+            if pid not in vistos:
+                _CACHE_PROJ.pop(pid, None)
+        return out
+
+    def _leve(p: Dict[str, Any], pend: set) -> Dict[str, Any]:
+        """O mínimo de cada vídeo pra filtrar, contar e mostrar as barras (sem montar o cartão inteiro)."""
+        lr = p.get("link_rapido") or {}
+        t = TAREFAS.get(p["id"]) or {}
+        exp = p.get("exportado") or {}
+        rod = bool(t) and not t.get("fim")
+        return {"id": p["id"], "criado": lr.get("criado") or 0, "canal_id": p.get("canal_id") or "", "rodando": rod,
+                "aguardando": bool(lr.get("aguardando")), "aguardando_voz": bool(lr.get("aguardando_voz")), "link": lr.get("link") or "",
+                "pendente": p["id"] in pend, "marca": lr.get("marca") or "", "apagado": bool(lr.get("apagado")),
+                "escolha": bool((lr.get("escolha") or {}).get("titulo") or (lr.get("escolha") or {}).get("capa")),
+                "pronto": bool(exp.get("arquivo") and os.path.isfile(exp.get("arquivo") or "")),
+                "erro": bool((t.get("erro") or lr.get("erro")) and not rod)}
+
+    SITUACOES = {"": "todas", "andamento": "⏳ rodando", "prontos": "✅ prontos", "erro": "❌ com erro", "aguardando": "⏸ aguardando",
+                 "voz": "🎤 esperando a sua voz", "planejado": "🟡 planejados", "postado": "🔵 postados", "descartado": "🔴 descartados"}
+
+    def _situacao_ok(v: Dict[str, Any], sit: str) -> bool:
+        if not sit:
+            return True
+        return {"andamento": v["rodando"], "prontos": v["pronto"], "erro": v["erro"], "aguardando": (v["aguardando"] or v["pendente"]) and not v["rodando"],
+                "voz": v["aguardando_voz"] and not v["rodando"]}.get(sit, v["marca"] == sit)
+
+    def _links(n: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Sem `n`: a página pedida (?pagina=&por=&canal=&situacao=) — o cartão completo só dos vídeos dela; a contagem de
+        tudo vai em g.vista (o _ok manda junto). Com `n`: os n mais novos, completos (uso interno)."""
+        ps = _projetos_link()
+        pend = set(_link_pendentes(ps))
+        if n is not None:
+            return sorted((_link_resumo(p, pend) for p in ps), key=lambda v: -(v["criado"] or 0))[:n]
+        try:
+            a = request.args
+        except RuntimeError:
+            a = {}
+        try:
+            por = max(5, min(100, int(a.get("por") or 10)))
+            pag = max(1, int(a.get("pagina") or 1))
+        except (TypeError, ValueError):
+            por, pag = 10, 1
+        canal, sit = str(a.get("canal") or ""), str(a.get("situacao") or "")
+        leves = sorted(((_leve(p, pend), p) for p in ps), key=lambda x: -(x[0]["criado"] or 0))
+        canais: Dict[str, int] = {}
+        for v, _p in leves:
+            canais[v["canal_id"]] = canais.get(v["canal_id"], 0) + 1
+        filtrados = [(v, p) for v, p in leves if (not canal or v["canal_id"] == ("" if canal == "_sem" else canal)) and _situacao_ok(v, sit)]
+        paginas = max(1, -(-len(filtrados) // por))
+        pag = min(pag, paginas)
+        pagina = [_link_resumo(p, pend) for _v, p in filtrados[(pag - 1) * por: pag * por]]
+        todos = [v for v, _p in leves]
+        livre = [v for v in todos if not v["rodando"] and not v["apagado"]]
+        voz_ = [v for v in livre if v["aguardando_voz"]]
+        try:
+            from flask import g as _g
+            _g.vista = {"pagina": pag, "paginas": paginas, "por": por, "total": len(filtrados), "total_geral": len(todos), "canal": canal,
+                        "situacao": sit, "canais": canais, "rodando": sum(1 for v in todos if v["rodando"]),
+                        "aguardando_links": [v["link"] for v in livre if v["aguardando"]],
+                        "voz": len(voz_), "voz_mais_antigo": voz_[-1]["id"] if voz_ else "",
+                        "pendentes": sum(1 for v in todos if v["pendente"] and not v["rodando"]),
+                        "apagar": sum(1 for v in livre if v["marca"] in ("descartado", "postado") and not v["pendente"]),
+                        "exportar": sum(1 for v in todos if v["escolha"]),
+                        "limpaveis": sum(1 for v, _p in filtrados if not v["rodando"])}
+        except RuntimeError:
+            pass
+        return pagina
 
     def _link_etapa(pid: str, etapa: str, **kw: Any) -> None:
         with CT._TRAVA:
@@ -1504,16 +1589,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
     _UM_LINK_POR_VEZ = threading.Lock()
 
-    def _link_pendentes() -> List[str]:
+    def _link_pendentes(ps: Optional[List[Dict[str, Any]]] = None) -> List[str]:
         """🔁 v84_310: os links que ficaram pelo meio (o site fechou/reiniciou): sem erro guardado, sem terminar, sem tarefa."""
         out = []
-        for x in CT.listar(base_dir):
-            if x.get("modelo") != "comentario":
-                continue
-            try:
-                p = CT.carregar(base_dir, x["id"])
-            except CT.CurtoErro:
-                continue
+        for p in (ps if ps is not None else _projetos_link()):
+            x = p
             lr = p.get("link_rapido") or {}
             if not lr or lr.get("erro") or lr.get("parado") or lr.get("apagado") or lr.get("aguardando") or lr.get("aguardando_voz"):
                 continue
@@ -2383,7 +2463,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             except CT.CurtoErro:
                 continue
             out.append({"id": cc["id"], "nome": cc.get("nome") or cc["id"], "personalizado": bool(cc.get("acabamento")),
-                        "descricao": cc.get("descricao") or "", "voz_link": _voz_link_de(cc)})
+                        "descricao": cc.get("descricao") or "", "voz_link": _voz_link_de(cc), "persona": cc.get("persona") or ""})
         return out
 
     @app.route("/curtos/canais-link", methods=["GET"])
@@ -2456,6 +2536,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     c["nome"] = " ".join(str(b["nome"]).split())[:80]
                 if "descricao" in b:
                     c["descricao"] = str(b.get("descricao") or "").strip()[:1500]
+                if "persona" in b:  # 🎭 v84_345: a personalidade do narrador (o modo 🎭 do roteiro usa)
+                    c["persona"] = str(b.get("persona") or "").strip()[:1500]
                 _gravar_voz_link(c, b)
                 CT.salvar_canal(base_dir, c)
         except CT.CurtoErro as exc:
@@ -2478,7 +2560,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         import qualidade_export
         import dp_legendas
         import acabamento_extra as _AXr
-        return render_template("curtos_link.html", fontes_legenda=_AXr.familias(), cores_legenda=CT.CORES_LEGENDA, modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
+        return render_template("curtos_link.html", situacoes=SITUACOES, fontes_legenda=_AXr.familias(), cores_legenda=CT.CORES_LEGENDA, modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
                                estilos_legenda=[{"id": e["id"], "nome": e["nome"]} for e in dp_legendas.ESTILOS],
                                vozes_en=vozes_en, vozes=vozes, resolucoes=qualidade_export.RESOLUCOES, ia=_ia_ligada(),
                                tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")), so_personalizar=so_personalizar)
@@ -2597,7 +2679,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 elif b.get("voz") and (narrada == "en") == (("pt" if narrar_pt else lp) == "en"):
                     p["config"]["voz_tts"] = str(b["voz"])[:120]  # a voz do envio só se for do mesmo motor
                 p["config"]["takes"] = 1  # ⚡ automático: 1 take (os outros dá pra gerar depois na página do curto)
-                p["config"]["estilo_roteiro"] = "classico" if b.get("roteiro_classico") is True else "autentico"  # ✨ v84_321
+                p["config"]["estilo_roteiro"] = ("classico" if b.get("roteiro_classico") is True else
+                                                 "personalidade" if b.get("roteiro_personalidade") is True else "autentico")  # ✨ v84_321 · 🎭 v84_345
                 p["config"]["camera_exp"] = b.get("camera_exp", True) not in (False, "0", "false")  # 🎥 v84_322 (padrão: ligada)
                 if b.get("tambem_quadrado") is True and CT.proporcao_do(p) != "1:1":  # ⬛ v84_334: também a versão 1:1
                     p["config"]["tambem_quadrado"] = True
@@ -2853,15 +2936,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         threading.Thread(target=corpo, daemon=True, name="marcados").start()
         return _ok(iniciados=len(ids), pulados=pulados, por_etapa=False, videos=_links())
 
-    @app.route("/curtos/link/selecionados", methods=["POST"])
-    def curtos_link_selecionados():
-        """☑ v84_331: o que fazer com os vídeos marcados na lista — "apagar" os arquivos (fica o link e o log) ou "tirar"
-        da lista de vez (some tudo). Os que estão rodando ficam de fora."""
-        b = _corpo()
-        ids = [str(x) for x in (b.get("ids") or []) if CT._valido(str(x))][:500]
-        acao = b.get("acao")
-        if acao not in ("apagar", "tirar") or not ids:
-            return _erro("Marque os vídeos e escolha o que fazer.")
+    def _aplicar_acao_links(ids: List[str], acao: str) -> tuple:
+        """☑ apagar os arquivos (fica o link e o log) ou tirar da lista de vez. Os que estão rodando ficam de fora."""
         feitos, falhas = [], []
         for pid in ids:
             t = TAREFAS.get(pid) or {}
@@ -2892,6 +2968,40 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 feitos.append(pid)
             except Exception as exc:  # noqa: BLE001  (um que falha não para os outros)
                 falhas.append(f"{(p.get('titulo') or pid)[:40]}: {str(exc)[:120]}")
+        return feitos, falhas
+
+    @app.route("/curtos/link/limpar", methods=["POST"])
+    def curtos_link_limpar():
+        """🧹 v84_344: tira da lista (ou só apaga os arquivos de) TODOS os vídeos do filtro atual (canal/situação) — os que
+        estão rodando ficam. Pede confirmar=true com o número que você viu (pra não apagar a mais se a lista mudou)."""
+        b = _corpo()
+        acao = b.get("acao") if b.get("acao") in ("apagar", "tirar") else ""
+        if not acao:
+            return _erro("Escolha o que fazer.")
+        canal, sit = str(b.get("canal") or ""), str(b.get("situacao") or "")
+        ps = _projetos_link()
+        pend = set(_link_pendentes(ps))
+        ids = [v["id"] for v in (_leve(p, pend) for p in ps)
+               if not v["rodando"] and (not canal or v["canal_id"] == ("" if canal == "_sem" else canal)) and _situacao_ok(v, sit)]
+        try:
+            esperado = int(b.get("quantos"))
+        except (TypeError, ValueError):
+            esperado = -1
+        if esperado != len(ids):
+            return _erro(f"A lista mudou (agora são {len(ids)} vídeo(s) nesse filtro) — confira e tente de novo.", 409)
+        feitos, falhas = _aplicar_acao_links(ids, acao)
+        return _ok(feitos=len(feitos), falhas=falhas, videos=_links())
+
+    @app.route("/curtos/link/selecionados", methods=["POST"])
+    def curtos_link_selecionados():
+        """☑ v84_331: o que fazer com os vídeos marcados na lista — "apagar" os arquivos (fica o link e o log) ou "tirar"
+        da lista de vez (some tudo). Os que estão rodando ficam de fora."""
+        b = _corpo()
+        ids = [str(x) for x in (b.get("ids") or []) if CT._valido(str(x))][:500]
+        acao = b.get("acao")
+        if acao not in ("apagar", "tirar") or not ids:
+            return _erro("Marque os vídeos e escolha o que fazer.")
+        feitos, falhas = _aplicar_acao_links(ids, acao)
         return _ok(feitos=len(feitos), falhas=falhas, videos=_links())
 
     @app.route("/curtos/link/apagar-marcados", methods=["POST"])

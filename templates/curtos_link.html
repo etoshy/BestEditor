@@ -32,6 +32,11 @@
   .pz-aba { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--borda); background: transparent; color: inherit; cursor: pointer; font-weight: 600; }
   .pz-aba.on { background: var(--acento); color: #fff; border-color: var(--acento); } .pz-novo { border-style: dashed; }
   .lk-cor { display: flex; gap: 4px; align-items: center; } .lk-cor input:first-child { flex: 1; min-width: 0; } .lk-cor input[type=color] { width: 34px !important; height: 30px; padding: 0; border: 0; background: none; }
+  .lk-filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin: 8px 0; }
+  .lk-filtros label { display: flex; flex-direction: column; gap: 2px; font-size: .82rem; font-weight: 600; margin: 0; }
+  .lk-filtros select { width: auto; min-width: 120px; }
+  .lk-pag { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; font-size: .85rem; }
+  .lk-pag button { min-width: 32px; } .lk-pag button.on { background: var(--acento); color: #fff; border-color: var(--acento); }
   .lk-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; margin: 6px 0; }
   .lk-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: lkg 1s linear infinite; flex: 0 0 auto; }
   @keyframes lkg { to { transform: rotate(360deg); } }
@@ -97,6 +102,7 @@
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="iniciar_ja" style="width:auto;margin:0"> ▶ iniciar a fila logo ao colar (desmarcado: os links ficam aguardando pra você iniciar, copiar ou remover)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Zoom que aproxima no detalhe que a fala cita (seguindo o objeto), seta/círculo só em detalhe pequeno (máx. 2), congelar o momento-chave com um cartão de informação (máx. 1), movimentos no ritmo do nicho do canal e um teto de efeitos. Desmarcado: a montagem de antes."><input type="checkbox" id="camera_exp" checked style="width:auto;margin:0"> 🎥 câmera experimental (zoom no detalhe, seta só onde precisa, congelar com cartão, ritmo do nicho) — desmarque pra voltar à montagem anterior</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="O padrão (desmarcado) é o roteiro ✨ autêntico: fatos e contexto + uma opinião sua, sem narrar o que já está na tela, com gancho e final de tipos diferentes a cada vídeo — mais seguro pra monetização."><input type="checkbox" id="roteiro_classico" style="width:auto;margin:0"> 📜 roteiro no estilo antigo (narra o que acontece no clipe — desligado; o padrão é o ✨ autêntico: fatos + opinião, gancho e final variados)</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Experimental. Por cima do ✨ autêntico: um narrador com a PERSONALIDADE do canal (a que você escreve em 🎨 Personalização → Canal e voz, ou uma deduzida da descrição), uma opinião de verdade, uma comparação do dia a dia (sem inventar história pessoal), um detalhe que o vídeo não mostra, fala de gente, e sem repetir as aberturas e finais dos vídeos recentes do mesmo canal."><input type="checkbox" id="roteiro_personalidade" style="width:auto;margin:0"> 🎭 roteiro com mais personalidade (experimental — persona do canal, opinião forte, sem repetir os vídeos anteriores)</label>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ opcional: comentários à mão e pedido extra</summary>
     <label>💬 Comentários <span class="si-dica" style="font-weight:400">— o site tenta ler sozinho; se o TikTok não deixar, cole os principais aqui (um por linha, as curtidas no fim: “why did he stop?? 12K”)</span>
       <textarea id="comentarios" rows="4"></textarea></label>
@@ -302,6 +308,7 @@
         <b style="font-size:.92rem">📺 O canal selecionado — nome, descrição e voz</b> <span class="si-dica" id="c_qual">escolha um canal na aba lá em cima (ou em “Aplicar em”)</span>
         <input id="c_nome" placeholder="nome do canal (ex.: Arte Fantasia)" maxlength="80">
         <textarea id="c_desc" rows="3" maxlength="1500" placeholder="descrição: do que é o canal, o tom, o que mostrar (a IA segue isso no roteiro)"></textarea>
+        <textarea id="c_persona" rows="3" maxlength="1500" placeholder="🎭 a personalidade do narrador (usada no roteiro 🎭): ex. curioso e meio cético, humor seco, ama comida de rua, odeia desperdício, fala como amigo mandando o vídeo no zap, sempre compara com coisas do Brasil"></textarea>
         <div class="lk-ops" title="Vale pros links que caem neste canal (pelo grupo ou pelo canal do lote). Vazio = o que estiver escolhido no envio. Narrando em inglês usa o Chatterbox Turbo (aceita tags de voz como [laugh]); os outros idiomas, o Chatterbox multilíngue.">
           <label>🌍 Postar em (canal)<select id="c_lp"><option value="">(o do envio)</option>{% for k, v in linguas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
           <label>🎙 Narrar em<select id="c_idioma"><option value="">(o do envio)</option><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
@@ -344,7 +351,17 @@
 
 <div class="si-card"{% if so_personalizar %} style="display:none"{% endif %}>
   <h2 style="margin:0">🎞 Vídeos</h2>
+  <div class="lk-filtros" id="lkFiltros">
+    <label>📺 Canal<select id="fCanal"><option value="">todos os canais</option></select></label>
+    <label>Situação<select id="fSit">{% for k, v in situacoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>Por página<select id="fPor"><option>5</option><option selected>10</option><option>20</option><option>50</option></select></label>
+    <span class="lk-pag" id="lkPag"></span>
+    <span style="flex:1"></span>
+    <button type="button" class="si-mini si-sec" id="bLimparLista" title="apaga os arquivos ou tira da lista TODOS os vídeos do filtro de agora (os que estão rodando ficam)">🧹 limpar estes vídeos</button>
+  </div>
+  <div id="lkLimpar" class="aviso" style="display:none;margin:6px 0"></div>
   <div id="lista"><p class="si-dica">Nenhum ainda.</p></div>
+  <div class="lk-pag" id="lkPag2" style="margin-top:8px"></div>
 </div>
 
 <script>
@@ -353,8 +370,14 @@ const VOZES_EN = {{ vozes_en|tojson }}, VOZES = {{ vozes|tojson }}, MODOS = {{ m
 const el = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3500); }
-async function post(url, corpo) { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
-  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'})); if (!j.ok) throw new Error(j.erro || 'erro'); return j; }
+// 📄 v84_344: a página/filtro da lista vão em todo pedido (a resposta já volta com a página certa)
+let VISTA = null;
+const VER = (() => { let v = {pagina: 1, por: 10, canal: '', situacao: ''}; try { Object.assign(v, JSON.parse(localStorage.getItem('lk_vista') || '{}')); } catch (e) {} return v; })();
+const vistaQS = () => `pagina=${VER.pagina}&por=${VER.por}&canal=${encodeURIComponent(VER.canal)}&situacao=${encodeURIComponent(VER.situacao)}`;
+const comVista = url => url.startsWith('/curtos/') ? url + (url.includes('?') ? '&' : '?') + vistaQS() : url;
+function hashTxt(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return String(h >>> 0) + ':' + t.length; }
+async function post(url, corpo) { const r = await fetch(comVista(url), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+  const j = await r.json().catch(() => ({ok: false, erro: 'resposta inválida'})); if (!j.ok) throw new Error(j.erro || 'erro'); if (j.vista) VISTA = j.vista; return j; }
 async function copiar(t) { try { await navigator.clipboard.writeText(t); aviso('📋 copiado', 'okk'); } catch (e) { prompt('Copie:', t); } }
 function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post').value === 'en', vs = turbo ? VOZES_EN : VOZES, s = el('voz'), atual = s.value;
   s.innerHTML = vs.length ? vs.map(v => `<option value="${esc(v.slug)}">${esc(v.grupo)} · ${esc(v.nome)}</option>`).join('') : '<option value="">(nenhuma voz cadastrada)</option>';
@@ -362,7 +385,7 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
 // 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
-const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'tambem_quadrado'], OP_RADIOS = ['modo', 'lote_modo'];
+const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'tambem_quadrado'], OP_RADIOS = ['modo', 'lote_modo'];
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 const LIVRE = {};  // 📺 v84_340: o que VOCÊ tinha escolhido nos campos que o canal do lote trava (volta quando troca de canal)
 const valorLivre = k => (k in LIVRE ? LIVRE[k] : el(k).value);
@@ -409,9 +432,11 @@ async function aplicarCanalNoEnvio() {
 }
 el('canal').addEventListener('change', aplicarCanalNoEnvio);
 window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {} ['voz', 'lingua_post', 'idioma', 'proporcao'].forEach(soltar); aplicarOpcoes(PADRAO_OP); aplicarCanalNoEnvio(); el('link').dispatchEvent(new Event('input')); aviso('↺ opções de volta ao padrão', 'okk'); };
+el('roteiro_classico').addEventListener('change', () => { if (el('roteiro_classico').checked) el('roteiro_personalidade').checked = false; });
+el('roteiro_personalidade').addEventListener('change', () => { if (el('roteiro_personalidade').checked) el('roteiro_classico').checked = false; });
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
-  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
+  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   salvarOpcoes();
@@ -425,7 +450,44 @@ window.lkGo = async () => {
 el('link').addEventListener('input', atualizarGrupos);
 document.querySelectorAll('input[name=lote_modo]').forEach(r => r.addEventListener('change', () => el('link').dispatchEvent(new Event('input'))));
 let GRUPOS = {};
-let ULT = [];  // 📂 termo (sem acento, minúsculo) → id do canal ligado a ele
+let ULT = [];
+// 📄 v84_344: filtros e páginas da lista
+function desenharPaginas() {
+  const V = VISTA || {}, n = V.paginas || 1, a = V.pagina || 1;
+  if (V.por) { VER.pagina = a; }
+  const fc = el('fCanal'); if (fc && V.canais) { const atual = VER.canal;
+    const nomes = Object.fromEntries((CANAIS || []).map(c => [c.id, c.nome]));
+    const ops = Object.entries(V.canais).sort((x, y) => y[1] - x[1]).map(([id, q]) => `<option value="${esc(id || '_sem')}">${id ? esc(nomes[id] || id) : '(sem canal)'} (${q})</option>`).join('');
+    const html = `<option value="">todos os canais (${V.total_geral || 0})</option>` + ops + (atual && !(atual in V.canais) && atual !== '_sem' ? `<option value="${esc(atual)}">${esc(nomes[atual] || atual)} (0)</option>` : '');
+    if (fc.dataset.h !== hashTxt(html)) { fc.innerHTML = html; fc.dataset.h = hashTxt(html); } fc.value = atual; }
+  if (el('fSit')) el('fSit').value = VER.situacao; if (el('fPor')) el('fPor').value = String(VER.por);
+  const bt = (k, txt) => `<button type="button" class="si-mini si-sec${k === a ? ' on' : ''}" data-pag="${k}"${k < 1 || k > n ? ' disabled' : ''}>${txt}</button>`;
+  let h = '';
+  if (n > 1) { const ks = [...new Set([1, a - 2, a - 1, a, a + 1, a + 2, n])].filter(k => k >= 1 && k <= n).sort((x, y) => x - y);
+    h = bt(a - 1, '◀') + ks.map((k, i) => (i && k - ks[i - 1] > 1 ? '<span>…</span>' : '') + bt(k, k)).join('') + bt(a + 1, '▶'); }
+  h += `<span class="si-dica">${V.total ?? 0} vídeo(s)${V.canal || V.situacao ? ' no filtro' : ''}${V.rodando ? ` · ⏳ ${V.rodando} rodando` : ''}</span>`;
+  ['lkPag', 'lkPag2'].forEach(id => { const e = el(id); if (e && e.dataset.h !== hashTxt(h)) { e.innerHTML = h; e.dataset.h = hashTxt(h);
+    e.querySelectorAll('[data-pag]').forEach(b => b.onclick = () => irPagina(+b.dataset.pag)); } });
+  el('bLimparLista').textContent = `🧹 limpar estes ${V.limpaveis ?? ''} vídeo(s)`; el('bLimparLista').disabled = !V.limpaveis;
+}
+function guardarVista() { try { localStorage.setItem('lk_vista', JSON.stringify(VER)); } catch (e) {} }
+function irPagina(k) { VER.pagina = k; guardarVista(); clearTimeout(timer); atualizarJa(); el('lista').scrollIntoView({block: 'start'}); }
+function atualizarJa() { setTimeout(() => { try { atualizar(); } catch (e) {} }, 0); }
+el('fCanal').onchange = () => { VER.canal = el('fCanal').value; VER.pagina = 1; guardarVista(); atualizarJa(); };
+el('fSit').onchange = () => { VER.situacao = el('fSit').value; VER.pagina = 1; guardarVista(); atualizarJa(); };
+el('fPor').onchange = () => { VER.por = +el('fPor').value; VER.pagina = 1; guardarVista(); atualizarJa(); };
+el('bLimparLista').onclick = () => { const V = VISTA || {}, n = V.limpaveis || 0; if (!n) return;
+  const qual = (V.canal ? `do canal ${el('fCanal').selectedOptions[0].text.replace(/ \(\d+\)$/, '')}` : 'de todos os canais') + (V.situacao ? ` · ${el('fSit').selectedOptions[0].text}` : '');
+  const box = el('lkLimpar'); box.style.display = '';
+  box.innerHTML = `🧹 <b>${n} vídeo(s)</b> ${esc(qual)} (os que estão rodando ficam de fora):
+    <button class="si-mini si-sec" data-limpar="apagar" title="apaga vídeo, editor, clipes e prints — fica o link, as marcas e o log">🗑 só apagar os arquivos</button>
+    <button class="si-mini si-perigo" data-limpar="tirar" title="some tudo, inclusive o log — não dá pra desfazer">❌ tirar todos da lista</button>
+    <button class="si-mini si-sec" data-limpar="">cancelar</button>`;
+  box.querySelectorAll('[data-limpar]').forEach(b => b.onclick = async () => { if (!b.dataset.limpar) { box.style.display = 'none'; return; }
+    box.querySelectorAll('button').forEach(x => x.disabled = true);
+    try { const j = await post('/curtos/link/limpar', {acao: b.dataset.limpar, canal: V.canal, situacao: V.situacao, quantos: n});
+      box.style.display = 'none'; desenhar(j.videos); aviso(`🧹 ${j.feitos} vídeo(s) ${b.dataset.limpar === 'tirar' ? 'tirados da lista' : 'com os arquivos apagados'}` + (j.falhas.length ? ' · ' + j.falhas.slice(0, 3).join('; ') : ''), j.falhas.length ? 'erro' : 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); box.querySelectorAll('button').forEach(x => x.disabled = false); } }); };  // 📂 termo (sem acento, minúsculo) → id do canal ligado a ele
 function chaveG(n) { return String(n || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' '); }
 function separarG(t) {  // mesma regra do servidor: uma palavra (com ':' ou sem) vira o grupo dos links seguintes
   let atual = ''; const out = []; const vistos = new Set();
@@ -730,7 +792,7 @@ function canalVozes(atual, pre = 'c') {  // 🎙 v84_322: as vozes do motor que 
 }
 function canalPreencher() {  // mostra o nome, a descrição, o idioma e a voz do canal escolhido pra você editar
   const c = CANAIS.find(x => x.id === el('a_escopo').value), v = (c && c.voz_link) || {};
-  el('c_nome').value = c ? c.nome : ''; el('c_desc').value = c ? (c.descricao || '') : '';
+  el('c_nome').value = c ? c.nome : ''; el('c_desc').value = c ? (c.descricao || '') : ''; el('c_persona').value = c ? (c.persona || '') : '';
   el('c_lp').value = v.lingua_post || ''; el('c_idioma').value = v.idioma || ''; el('c_modo').value = v.modo || ''; canalVozes(v.voz || '');
   el('c_qual').textContent = c ? `editando: ${c.nome}` : '— escolha um canal na aba lá em cima (o 📚 padrão não tem nome); pra um canal novo use ➕ Criar um canal novo';
   el('bApagarCanal').style.display = c ? '' : 'none';
@@ -773,7 +835,7 @@ el('bApagarCanal').onclick = async () => { const b = el('bApagarCanal'), cid = e
   catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 async function canalSalvar() {
   const cid = el('a_escopo').value; if (!cid) return aviso('Escolha um canal em "Aplicar em" pra editar (ou crie um novo)', 'erro');
-  try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/editar', {nome: el('c_nome').value, descricao: el('c_desc').value, voz_link: vozLink()});
+  try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/editar', {nome: el('c_nome').value, descricao: el('c_desc').value, persona: el('c_persona').value, voz_link: vozLink()});
     await carregarCanais(); el('a_escopo').value = cid; el('canal').value = cid; canalPreencher(); aviso('💾 canal salvo', 'okk');
   } catch (e) { aviso('❌ ' + e.message, 'erro'); }
 }
@@ -835,14 +897,16 @@ function desenhar(vs) {
   const L = el('lista');
   ULT = vs;
   { const nl = new Set(el('link').value.split(/\s+/).filter(u => u.startsWith('http'))).size; const bx = el('loteModoBox'); if (bx) bx.style.display = nl > 1 || vs.filter(v => v.aguardando && !v.rodando && !v.apagado).length > 1 ? '' : 'none'; }
-  const aguard = vs.filter(v => v.aguardando && !v.rodando && !v.apagado);
+  const VI = VISTA || {};
+  const aguard = VI.aguardando_links ? VI.aguardando_links : vs.filter(v => v.aguardando && !v.rodando && !v.apagado).map(v => v.link);
   const barraAguardando = aguard.length ? `<div class="aviso" style="margin-bottom:8px">⏸ ${aguard.length} link(s) aguardando — nada começou ainda. <button class="si-mini" id="btnCopiarAguard">📋 copiar links</button> <button class="si-mini" id="btnIniciarAguard">▶ iniciar todos</button></div>` : '';
-  const voz_ = vs.filter(v => v.aguardando_voz && !v.rodando && !v.apagado);  // 🎤 v84_325: esperando a sua voz
-  const barraVoz = voz_.length ? `<div class="aviso" style="margin-bottom:8px">🎤 ${voz_.length} vídeo(s) com o roteiro pronto esperando a sua voz — <a href="/curtos/${voz_[voz_.length - 1].id}/gravar">gravar o mais antigo</a></div>` : '';
-  const pend = vs.filter(v => v.pendente && !v.rodando).length;  // ▶ a fila que ficou pelo meio (o site caiu/reiniciou)
-  const apagar = vs.filter(v => (v.marca === 'descartado' || v.marca === 'postado') && !v.apagado && !v.rodando && !v.pendente).length;
+  const nVoz = VI.voz ?? vs.filter(v => v.aguardando_voz && !v.rodando && !v.apagado).length;  // 🎤 v84_325: esperando a sua voz
+  const vozId = VI.voz_mais_antigo || ((vs.filter(v => v.aguardando_voz && !v.rodando && !v.apagado).slice(-1)[0]) || {}).id;
+  const barraVoz = nVoz ? `<div class="aviso" style="margin-bottom:8px">🎤 ${nVoz} vídeo(s) com o roteiro pronto esperando a sua voz — <a href="/curtos/${vozId}/gravar">gravar o mais antigo</a></div>` : '';
+  const pend = VI.pendentes ?? vs.filter(v => v.pendente && !v.rodando).length;  // ▶ a fila que ficou pelo meio (o site caiu/reiniciou)
+  const apagar = VI.apagar ?? vs.filter(v => (v.marca === 'descartado' || v.marca === 'postado') && !v.apagado && !v.rodando && !v.pendente).length;
   const barraApagar = apagar ? `<div class="aviso" style="margin-bottom:8px">🗑 ${apagar} vídeo(s) marcado(s) como descartado/postado — apaga os arquivos do PC e fica só o link e o log. <button class="si-mini" id="btnApagar">🗑 apagar marcados</button></div>` : '';
-  const exportar = vs.filter(v => v.escolha && (v.escolha.titulo || v.escolha.capa)).length;
+  const exportar = VI.exportar ?? vs.filter(v => v.escolha && (v.escolha.titulo || v.escolha.capa)).length;
   const barraExportar = exportar ? `<div class="aviso" style="margin-bottom:8px">📦 ${exportar} vídeo(s) com título ou capa escolhidos — exporta o roteiro, o título e a capa de cada um. <a href="/curtos/link/exportar-escolhidos?formato=zip"><button class="si-mini">📦 baixar ZIP (JSON + capas)</button></a> <a href="/curtos/link/exportar-escolhidos?formato=json"><button class="si-mini si-sec">só o JSON</button></a></div>` : '';
   const barraRetomar = pend ? `<div class="aviso" style="margin-bottom:8px">⏸ ${pend} vídeo(s) ficaram pelo meio (o site fechou ou reiniciou). <button class="si-mini" id="btnRetomar">▶ retomar a fila</button></div>` : '';
   const foco = document.activeElement;  // ✍ escrevendo o direcionamento: a atualização automática espera
@@ -850,9 +914,10 @@ function desenhar(vs) {
   const ids_ = new Set(vs.map(v => v.id)); [...SEL].forEach(id => { if (!ids_.has(id)) SEL.delete(id); });  // ☑ some da lista: sai da seleção
   const digitado = {}; L.querySelectorAll('[data-tcom], [data-tdir]').forEach(e => { if (e.value) digitado[(e.dataset.tcom ? 'c' : 'd') + (e.dataset.tcom || e.dataset.tdir)] = e.value; });
   const pedidos = {}; L.querySelectorAll('[data-rpedido]').forEach(e => { if (e.value) pedidos[e.dataset.rpedido] = e.value; });
-  const players = {}; L.querySelectorAll('video[data-orig]').forEach(e => { players[e.dataset.orig] = e; e.remove(); });  // 🎞 v84_343: o player continua onde estava
-  if (!vs.length) { L.innerHTML = '<p class="si-dica">Nenhum ainda.</p>'; return false; }
-  setTimeout(() => { const c = document.getElementById('btnCopiarAguard'); if (c) c.onclick = () => copiar(ULT.filter(v => v.aguardando && !v.rodando && !v.apagado).map(v => v.link).join('\n'));
+  const players = {};  // 🎞 v84_343: o player continua onde estava (só sai do cartão que for trocado)
+  desenharPaginas();
+  if (!vs.length) { L.innerHTML = VI.total_geral ? '<p class="si-dica">Nenhum vídeo nesse filtro.</p>' : '<p class="si-dica">Nenhum ainda.</p>'; return !!VI.rodando; }
+  setTimeout(() => { const c = document.getElementById('btnCopiarAguard'); if (c) c.onclick = () => copiar(aguard.join('\n'));
     const i = document.getElementById('btnIniciarAguard'); if (i) i.onclick = async () => { i.disabled = true; try { const j = await post('/curtos/link/iniciar-aguardando', {por_etapa: loteModo() === 'etapa'}); desenhar(j.videos); aviso(`▶ iniciando ${j.iniciados} link(s), ${j.por_etapa ? '🧩 por etapa' : 'um por vez'}`, 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); i.disabled = false; } }; }, 0);
   setTimeout(() => { const a = document.getElementById('btnApagar'); if (a) a.onclick = async () => { if (!confirm('Apagar os arquivos dos vídeos marcados como descartado/postado? Fica só o link e o log. Não dá pra desfazer.')) return; a.disabled = true;
     try { const j = await post('/curtos/link/apagar-marcados', {}); desenhar(j.videos); aviso(`🗑 ${j.apagados} apagado(s)` + (j.falhas.length ? ' · falhas: ' + j.falhas.join('; ') : ''), j.falhas.length ? 'erro' : 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); a.disabled = false; } }; }, 0);
@@ -869,9 +934,10 @@ function desenhar(vs) {
         <button class="si-mini" data-selexp="zip">📦 exportar ZIP (JSON + capas)</button><button class="si-mini si-sec" data-selexp="json">📄 só o JSON</button>
         <button class="si-mini si-sec" data-selacao="apagar" title="apaga vídeo, projeto do editor, clipes e prints — fica o link, as marcas e o log">🗑 apagar arquivos</button>
         <button class="si-mini si-perigo" data-selacao="tirar" title="tira da lista de vez (apaga tudo, inclusive o log)">❌ tirar da lista</button></span></div>`;
-  L.innerHTML = barraVoz + barraAguardando + barraRetomar + barraExportar + barraApagar + barraSel + vs.map(v => { const cls = v.marca || (v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : ''));
+  const topoHtml = barraVoz + barraAguardando + barraRetomar + barraExportar + barraApagar + barraSel;
+  const cardsHtml = vs.map(v => { const cls = v.marca || (v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : ''));
     const modo = v.modo_usado ? MODOS[v.modo_usado] : MODOS[v.modo];
-    return `<div class="lk-v ${cls}">
+    return `<div class="lk-v ${cls}" data-vid="${v.id}">
       <div class="lk-cab"><label class="lk-sel" title="marcar pra remover ou exportar junto"><input type="checkbox" data-sel="${v.id}"${SEL.has(v.id) ? ' checked' : ''}></label><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
         ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
         <a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a></div>
@@ -919,7 +985,17 @@ function desenhar(vs) {
             : (v.roteiro && !v.rodando ? `<div class="si-linha"><button class="si-mini si-sec" data-thumbs="${v.id}">🖼 tirar 3 prints pra thumb</button></div>` : '')}
           ${v.descricao ? `<details data-k="d${v.id}"${abertos.has('d' + v.id) ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">📝 Descrição + hashtags</summary>
             <div style="font-size:.88rem;white-space:pre-wrap">${esc(v.descricao)}\n${esc(v.hashtags.join(' '))}</div>
-            <button class="si-mini si-sec" data-copiar="${esc(v.descricao + '\n\n' + v.hashtags.join(' '))}">📋 copiar</button></details>` : ''}</div></div>` : ''}</div>`; }).join('');
+            <button class="si-mini si-sec" data-copiar="${esc(v.descricao + '\n\n' + v.hashtags.join(' '))}">📋 copiar</button></details>` : ''}</div></div>` : ''}</div>`; });
+  // ⚡ v84_344: só troca o cartão que MUDOU (antes recriava todos a cada 2 s — os players e as imagens recarregavam)
+  let topo = L.querySelector(':scope > #lkTopo'), caixa = L.querySelector(':scope > #lkCards');
+  if (!topo || !caixa) { L.innerHTML = '<div id="lkTopo"></div><div id="lkCards"></div>'; topo = L.querySelector('#lkTopo'); caixa = L.querySelector('#lkCards'); }
+  if (topo.dataset.h !== hashTxt(topoHtml)) { topo.innerHTML = topoHtml; topo.dataset.h = hashTxt(topoHtml); }
+  const velhos = new Map([...caixa.children].map(e => [e.dataset.vid, e])), novos = [];
+  cardsHtml.forEach((h, k) => { const id = vs[k].id, hh = hashTxt(h), e = velhos.get(id);
+    if (e && e.dataset.h === hh) { novos.push(e); return; }
+    if (e) e.querySelectorAll('video[data-orig]').forEach(vd => { players[vd.dataset.orig] = vd; vd.remove(); });
+    const t = document.createElement('template'); t.innerHTML = h.trim(); const n = t.content.firstElementChild; n.dataset.h = hh; novos.push(n); });
+  if (novos.length !== caixa.children.length || novos.some((n, k) => caixa.children[k] !== n)) caixa.replaceChildren(...novos);
   L.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
   // ☑ v84_331: seleção
   const selAtualiza = () => { guardarSel(); el('selN').textContent = SEL.size; const a = L.querySelector('.lk-selacoes'); if (a) a.style.cssText = SEL.size ? '' : 'opacity:.45;pointer-events:none';
@@ -973,7 +1049,7 @@ function desenhar(vs) {
     try { desenhar((await post(`/curtos/${b.dataset.thumbs}/thumbs`)).videos); aviso('🖼 prints prontos', 'okk'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '🖼 tirar 3 prints pra thumb'; } });
   L.querySelectorAll('[data-refazer]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/link/${b.dataset.refazer}/refazer`)).videos); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
-  L.querySelectorAll('[data-origph]').forEach(ph => { const id = ph.dataset.origph;
+  L.querySelectorAll('[data-origph]').forEach(ph => {  // (só os cartões novos ainda têm o lugar vazio) const id = ph.dataset.origph;
     const vd = players[id] || Object.assign(document.createElement('video'), {src: `/curtos/${id}/voz/clipe`, controls: true, preload: 'metadata', muted: false});
     vd.dataset.orig = id; vd.style.cssText = 'width:100%;max-height:340px;border-radius:8px;background:#000'; ph.replaceWith(vd); });
   Object.entries(pedidos).forEach(([k, v]) => { const e = L.querySelector(`[data-rpedido="${k}"]`); if (e) e.value = v; });
@@ -982,7 +1058,8 @@ function desenhar(vs) {
 }
 let tinha = new Set();
 async function atualizar() {
-  try { const j = await (await fetch('/curtos/link/estado')).json(); const rod = desenhar(j.videos || []);
+  if ({{ (so_personalizar or false)|tojson }}) return;  // ⚡ v84_344: a Personalização não mostra a lista — não fica pedindo
+  try { const j = await (await fetch(comVista('/curtos/link/estado'))).json(); if (j.vista) VISTA = j.vista; const rod = desenhar(j.videos || []);
     (j.videos || []).forEach(v => { if (tinha.has(v.id) && !v.rodando && v.pronto) aviso(`✅ pronto: ${v.titulo}`, 'okk'); });
     tinha = new Set((j.videos || []).filter(v => v.rodando).map(v => v.id));
     clearTimeout(timer); timer = setTimeout(atualizar, rod ? 2000 : 15000); }

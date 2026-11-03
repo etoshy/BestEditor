@@ -458,7 +458,8 @@ def _regra_fontes(p: Dict[str, Any]) -> str:
 # ------------------------------------------------------------------ ✨ v84_321: roteiro AUTÊNTICO (o padrão)
 # Fatos + opinião em vez de narrar o que já está na tela; gancho e final de um TIPO sorteado por vídeo (o lote não sai tudo igual).
 # O estilo antigo continua como opção ("classico"), desligada: só vale se você marcar.
-ESTILOS_ROTEIRO = {"autentico": "✨ autêntico (fatos + opinião, gancho e final variados)",
+ESTILOS_ROTEIRO = {"personalidade": "🎭 personalidade (experimental: persona do canal, opinião forte, sem repetir os vídeos anteriores)",
+                   "autentico": "✨ autêntico (fatos + opinião, gancho e final variados)",
                    "classico": "📜 clássico (narra o que acontece — o jeito antigo)"}
 
 TIPOS_GANCHO = {
@@ -504,6 +505,72 @@ REGRA_AUTENTICA = (
     "H. 'descricao': 1-2 sentences with the most interesting fact + credit the original creator by @ when you know it (keep any [COMMENTARY]/[EXPLAIN]/[ART] tag the APPROACH asks for at the very start).")
 
 
+REGRA_PERSONALIDADE = (
+    "\n\n🎭 PERSONALITY MODE (on top of the authentic rules — this is what makes the channel NOT look mass-produced):\n"
+    "P1. ONE NARRATOR, ONE VOICE: follow the CHANNEL PERSONA given in the content (tastes, humor, what they care about, how they "
+    "talk). Same person in every video of the channel — talking to ONE viewer, like a friend sending a clip with their take.\n"
+    "P2. A REAL TAKE: give a clear opinion or verdict about this clip (what impressed you, what you doubt, what you would or would "
+    "never do) and back it with a fact or a reason. You may respectfully disagree with the comments or with the creator.\n"
+    "P3. A PERSONAL ANGLE, HONEST: relate it to an everyday feeling or a comparison anyone has lived ('same energy as…', 'it's like "
+    "when…'), as opinion or hypothetical. NEVER invent biography or experiences (no 'when I worked at a winery', no fake memories).\n"
+    "P4. ONE INSIGHT THE CLIP DOESN'T GIVE: a non-obvious detail, why it works, a common misconception corrected, or what the "
+    "comments got right/wrong.\n"
+    "P5. IT MUST SOUND SPOKEN: contractions, short sentences mixed with one longer, one aside in the middle; at most one "
+    "exclamation; no announcer voice.\n"
+    "P6. NO TEMPLATE: do NOT reuse openings, punchlines, catchphrases, sentence structures or the ending style of this channel's "
+    "RECENT SCRIPTS (listed in the content). The persona is constant, the wording is new every time.\n"
+    "P7. The ending invites a genuine opinion about ONE specific point of this video (never a generic 'what do you think?').\n"
+    "P8. Same length and the same facts rule (only what you are sure of; 'probably' when unsure).")
+
+
+def autentico_ou_mais(p: Dict[str, Any]) -> bool:
+    return estilo_roteiro(p) in ("autentico", "personalidade")
+
+
+def persona_do_canal(c: Optional[Dict[str, Any]]) -> str:
+    """🎭 a personalidade do narrador do canal (o que você escreveu; sem ela, uma deduzida da descrição do canal)."""
+    c = c or {}
+    t = str(c.get("persona") or "").strip()
+    if t:
+        return t[:1500]
+    d = str(c.get("descricao") or "").strip()
+    nome = str(c.get("nome") or "the channel").strip()
+    return (f"(not written by the creator — build ONE consistent narrator for '{nome}' from the channel description"
+            + (f": {d[:600]}" if d else "") + ". Curious, a bit opinionated, warm, dry humor; and keep it consistent.)")
+
+
+def roteiros_recentes(base: str, p: Dict[str, Any], n: int = 6) -> List[str]:
+    """Os começos e os fins dos últimos roteiros DO MESMO CANAL (pra não repetir fórmula)."""
+    cid = p.get("canal_id") or ""
+    if not cid:
+        return []
+    d = os.path.join(CT.raiz(base), "projetos")
+    cands = []
+    for pid in os.listdir(d) if os.path.isdir(d) else []:
+        if pid == p.get("id"):
+            continue
+        cam = os.path.join(d, pid, "projeto.json")
+        try:
+            cands.append((os.stat(cam).st_mtime, pid))
+        except OSError:
+            continue
+    out = []
+    for _mt, pid in sorted(cands, reverse=True)[:80]:
+        try:
+            q = CT.carregar(base, pid)
+        except CT.CurtoErro:
+            continue
+        bl = (q.get("roteiro") or {}).get("blocos") or []
+        if q.get("canal_id") != cid or not bl:
+            continue
+        ini = CT.sem_tags(bl[0].get("fala_en") or bl[0].get("fala") or "")[:160]
+        fim = CT.sem_tags(bl[-1].get("fala_en") or bl[-1].get("fala") or "")[-160:] if len(bl) > 1 else ""
+        out.append(f"- starts: \"{ini}\"" + (f" | ends: \"{fim}\"" if fim else ""))
+        if len(out) >= n:
+            break
+    return out
+
+
 def estilo_roteiro(p: Dict[str, Any]) -> str:
     """✨ v84_321: 'autentico' é o padrão (inclusive em projetos antigos); 'classico' só se você escolher."""
     v = (p.get("config") or {}).get("estilo_roteiro") or "autentico"
@@ -520,7 +587,7 @@ def tipos_do_video(p: Dict[str, Any]) -> tuple:
 
 
 def regra_tipos(p: Dict[str, Any]) -> str:
-    if explicativo(p) or estilo_roteiro(p) != "autentico":
+    if explicativo(p) or not autentico_ou_mais(p):
         return ""
     g, f = tipos_do_video(p)
     return f"## HOOK TYPE for this video: {TIPOS_GANCHO[g]}\n## ENDING TYPE for this video: {TIPOS_FINAL[f]}"
@@ -528,7 +595,9 @@ def regra_tipos(p: Dict[str, Any]) -> str:
 
 def sistema(p: Dict[str, Any]) -> str:
     base_ = EXPLICATIVO_SYS if explicativo(p) else ROTEIRO_SYS
-    extra = REGRA_AUTENTICA if (not explicativo(p) and estilo_roteiro(p) == "autentico") else ""
+    extra = REGRA_AUTENTICA if (not explicativo(p) and autentico_ou_mais(p)) else ""
+    if not explicativo(p) and estilo_roteiro(p) == "personalidade":  # 🎭 v84_345
+        extra += REGRA_PERSONALIDADE
     import camera_exp
     if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322
         narrada = "Brazilian Portuguese" if dados(p).get("idioma") == "pt" else nome_lingua(lingua_post(p))
@@ -641,9 +710,15 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
         L += [tipos, ""]
     if (p.get("config") or {}).get("extra"):
         L += ["## EXTRA REQUEST (the creator's request wins over the hook/ending type)", p["config"]["extra"], ""]
-    desc_canal = str((CT.canal_do(base, p) or {}).get("descricao") or "").strip()  # 📝 a descrição do canal (escrita por você)
+    canal_ = CT.canal_do(base, p) or {}
+    desc_canal = str(canal_.get("descricao") or "").strip()  # 📝 a descrição do canal (escrita por você)
     if desc_canal:
         L += ["## WHAT THIS CHANNEL IS ABOUT (the creator's own description — follow it)", desc_canal, ""]
+    if not explicativo(p) and estilo_roteiro(p) == "personalidade":  # 🎭 v84_345: a persona + o que NÃO repetir
+        L += ["## CHANNEL PERSONA (the narrator)", persona_do_canal(canal_), ""]
+        rec = roteiros_recentes(base, p)
+        if rec:
+            L += ["## RECENT SCRIPTS OF THIS CHANNEL — do NOT repeat their openings, punchlines or structure", *rec, ""]
     estilo = CT.texto_do_perfil(perfil)
     if estilo:
         L += ["## CHANNEL STYLE", estilo]
@@ -884,7 +959,7 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
               "titulos": f"Write 5 NEW post TITLES for this {tipo} — short, curiosity, honest (no fake claims)."}[qual]
     tag = " (may use one voice tag like [gasp])" if lingua_post(p) == "en" and qual != "titulos" else ""
     guia = ""
-    if qual in ("ganchos", "finais") and not explicativo(p) and estilo_roteiro(p) == "autentico":  # ✨ v84_321
+    if qual in ("ganchos", "finais") and not explicativo(p) and autentico_ou_mais(p):  # ✨ v84_321
         tipos = TIPOS_GANCHO if qual == "ganchos" else TIPOS_FINAL
         guia += ("\nEach one a DIFFERENT type from: " + "; ".join(f"{k} = {v}" for k, v in tipos.items())
                  + "\nSpecific to this clip, click-worthy through curiosity, honest. Never: 'Everyone thought', 'But look closer', "

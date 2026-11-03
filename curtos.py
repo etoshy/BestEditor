@@ -1296,10 +1296,34 @@ def acabamento(base: str, canal_id: str = "") -> Dict[str, Any]:
         pass
     if canal_id:
         try:
-            out.update(carregar_canal(base, canal_id).get("acabamento") or {})
+            c = carregar_canal(base, canal_id)
         except CurtoErro:
-            pass
+            c = None
+        if c is not None:
+            proprio = dict(c.get("acabamento") or {})
+            out.update(proprio)
+            out["arroba"] = arroba_do_canal(c, proprio.get("arroba"), out_padrao_arroba(base))
     return out
+
+
+def out_padrao_arroba(base: str) -> str:
+    try:
+        with open(os.path.join(raiz(base), "_acabamento.json"), encoding="utf-8") as f:
+            return str(json.load(f).get("arroba") or "").strip()
+    except (OSError, ValueError):
+        return ""
+
+
+def arroba_do_canal(c: Dict[str, Any], proprio: Any, do_padrao: str = "") -> str:
+    """🏷 v84_344: o @ de um canal NUNCA vem do padrão de todos (antes o canal sem @ herdava o de outro canal — ex.: o
+    FoodYum2 saía com @RadicalWow). Sem @ próprio: vazio — aí vale a marca do perfil do canal (o @ do nome dele).
+    Um @ igual ao do padrão gravado num canal de outro nome é o erro antigo (a aba do canal mostrava o herdado e salvar
+    gravava ele): é ignorado."""
+    nome = str(c.get("nome") or "").strip()
+    proprio = str(proprio or "").strip()
+    if proprio and not (do_padrao and proprio.lower() == do_padrao.lower() and norm(proprio) != norm(nome)):
+        return proprio
+    return ""
 
 
 def limpar_acabamento(novos: Dict[str, Any]) -> Dict[str, Any]:
