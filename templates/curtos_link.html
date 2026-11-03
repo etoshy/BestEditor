@@ -849,6 +849,8 @@ function desenhar(vs) {
   if (foco && L.contains(foco) && foco.matches('input:not([type=checkbox]), select, textarea')) return vs.some(v => v.rodando);
   const ids_ = new Set(vs.map(v => v.id)); [...SEL].forEach(id => { if (!ids_.has(id)) SEL.delete(id); });  // ☑ some da lista: sai da seleção
   const digitado = {}; L.querySelectorAll('[data-tcom], [data-tdir]').forEach(e => { if (e.value) digitado[(e.dataset.tcom ? 'c' : 'd') + (e.dataset.tcom || e.dataset.tdir)] = e.value; });
+  const pedidos = {}; L.querySelectorAll('[data-rpedido]').forEach(e => { if (e.value) pedidos[e.dataset.rpedido] = e.value; });
+  const players = {}; L.querySelectorAll('video[data-orig]').forEach(e => { players[e.dataset.orig] = e; e.remove(); });  // 🎞 v84_343: o player continua onde estava
   if (!vs.length) { L.innerHTML = '<p class="si-dica">Nenhum ainda.</p>'; return false; }
   setTimeout(() => { const c = document.getElementById('btnCopiarAguard'); if (c) c.onclick = () => copiar(ULT.filter(v => v.aguardando && !v.rodando && !v.apagado).map(v => v.link).join('\n'));
     const i = document.getElementById('btnIniciarAguard'); if (i) i.onclick = async () => { i.disabled = true; try { const j = await post('/curtos/link/iniciar-aguardando', {por_etapa: loteModo() === 'etapa'}); desenhar(j.videos); aviso(`▶ iniciando ${j.iniciados} link(s), ${j.por_etapa ? '🧩 por etapa' : 'um por vez'}`, 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); i.disabled = false; } }; }, 0);
@@ -892,16 +894,28 @@ function desenhar(vs) {
           <div class="si-linha">${v.pronto ? `<a href="/curtos/${v.id}/video.mp4"><button class="si-ok si-mini">⬇️ baixar MP4</button></a>` : ''}${v.pronto_1x1 ? `<a href="/curtos/${v.id}/video_1x1.mp4"><button class="si-ok si-mini">⬛ baixar MP4 1:1</button></a>` : ''}
             ${v.editor ? `<a href="/job/${v.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
             <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a></div></div>
-        <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div><div class="si-linha"><button class="si-mini si-sec" data-copiar="${esc(v.roteiro)}">📋 roteiro</button></div>` : ''}
+        <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div>
+          ${v.roteiro_pt ? `<details data-k="p${v.id}"${abertos.has('p' + v.id) || v.roteiro_idioma !== 'pt' ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🇧🇷 tradução</summary><div class="lk-rot" style="opacity:.9">${esc(v.roteiro_pt)}</div></details>` : ''}
+          <div class="si-linha" style="flex-wrap:wrap;gap:4px"><button class="si-mini si-sec" data-copiar="${esc(v.roteiro)}">📋 roteiro</button>
+            ${!v.roteiro_pt && v.roteiro_idioma && v.roteiro_idioma !== 'pt' && IA ? `<button class="si-mini si-sec" data-traduzir="${v.id}">🇧🇷 traduzir</button>` : ''}
+            ${v.roteiro_versoes && !v.rodando ? `<button class="si-mini si-sec" data-rdesfazer="${v.id}" title="volta pro roteiro de antes da última mudança">↶ versão anterior</button>` : ''}</div>
+          ${v.roteiro_mudou && !v.rodando ? `<div class="aviso" style="margin:6px 0">✍ roteiro novo — o vídeo ainda é do anterior. <button class="si-mini" data-refazer="${v.id}">🔁 refazer o vídeo com ele</button>${v.minha_voz ? ' <span class="si-dica">(🎤 aí é só gravar a sua voz de novo)</span>' : ''}</div>` : ''}
+          ${IA && !v.rodando ? `<details data-k="r${v.id}"${abertos.has('r' + v.id) ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">✍ pedir mudança no roteiro</summary>
+            <textarea data-rpedido="${v.id}" rows="3" style="width:100%;box-sizing:border-box;margin-top:4px" placeholder="ex.: o gancho ficou fraco, comece pela surpresa · tira a parte do recheio · fala que é red velvet de verdade · deixa mais engraçado · termina com uma pergunta sobre o preço"></textarea>
+            <div class="si-linha"><button class="si-mini" data-rajustar="${v.id}">✍ reescrever com isso</button><span class="si-dica">a IA reescreve seguindo as regras do canal; o de antes fica guardado (↶)</span></div></details>` : ''}` : ''}
           ${v.titulos.length ? `<details data-k="t${v.id}"${abertos.has('t' + v.id) || v.pronto ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🏷 Títulos</summary>
             ${v.titulos.map(t => `<div class="lk-tit"><input type="radio" name="tit${v.id}" data-tit="${v.id}" value="${esc(t.en)}"${(v.escolha || {}).titulo === t.en ? ' checked' : ''} title="⭐ escolher este título pro pacote"><button class="si-mini si-sec" data-copiar="${esc(t.en)}">📋</button><div>${esc(t.en)}${t.pt && t.pt !== t.en ? `<br><small>🇧🇷 ${esc(t.pt)}</small>` : ''}</div></div>`).join('')}
             ${IA ? `<div class="si-linha" style="flex-wrap:wrap;gap:4px;margin-top:4px"><select data-tdir="${v.id}" style="width:auto">${DIRS}</select>
               <input data-tcom="${v.id}" placeholder="seu direcionamento (opcional): ex. focar no cachorro, tom de suspense…" style="flex:1;min-width:180px">
               <button class="si-mini" data-tnovos="${v.id}">✨ 5 títulos novos</button></div>` : ''}</details>` : ''}
-          ${v.thumbs && v.thumbs.length ? `<details data-k="h${v.id}"${abertos.has('h' + v.id) || v.pronto ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🖼 Prints pra thumb</summary>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${v.thumbs.map(t => `<div><label class="si-dica" style="display:block"><input type="radio" name="cap${v.id}" data-capa="${v.id}" value="${t.k}"${(v.escolha || {}).capa === t.k ? ' checked' : ''}> ⭐ esta é a capa</label><a href="/curtos/${v.id}/thumb/${t.k}.jpg" target="_blank"><img src="/curtos/${v.id}/thumb/${t.k}.jpg?v=${t.t}" style="width:100%;border-radius:6px" loading="lazy"></a>
-              <a href="/curtos/${v.id}/thumb/${t.k}.jpg?baixar=1"><button class="si-mini si-sec">⬇️ baixar</button></a>${t.por_que ? `<div class="si-dica" style="margin:2px 0">${esc(t.por_que)}</div>` : ''}</div>`).join('')}</div>
-            <button class="si-mini si-sec" data-thumbs="${v.id}">🔁 escolher outros</button></details>`
+          ${(v.thumbs && v.thumbs.length) || v.tem_original ? `<details data-k="h${v.id}"${abertos.has('h' + v.id) || (v.pronto && v.thumbs && v.thumbs.length) ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🖼 Prints pra thumb</summary>
+            ${v.tem_original ? `<div class="lk-orig"><div data-origph="${v.id}"></div>
+              <div class="si-linha" style="gap:6px;flex-wrap:wrap"><button class="si-mini si-ok" data-tsalvar="${v.id}">📸 salvar este momento</button>
+                <button class="si-mini si-sec" data-tpasso="${v.id}" data-d="-0.0333" title="um quadro pra trás">◀ quadro</button><button class="si-mini si-sec" data-tpasso="${v.id}" data-d="0.0333" title="um quadro pra frente">quadro ▶</button>
+                <span class="si-dica">▶ dê play, pause no momento certo (ou ande quadro a quadro) e salve — vai pra lista de prints</span></div></div>` : ''}
+            ${v.thumbs && v.thumbs.length ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${v.thumbs.map(t => `<div><label class="si-dica" style="display:block"><input type="radio" name="cap${v.id}" data-capa="${v.id}" value="${t.k}"${(v.escolha || {}).capa === t.k ? ' checked' : ''}> ⭐ esta é a capa</label><a href="/curtos/${v.id}/thumb/${t.k}.jpg" target="_blank"><img src="/curtos/${v.id}/thumb/${encodeURIComponent(t.k)}.jpg?v=${esc(t.arquivo)}${t.t}" style="width:100%;border-radius:6px" loading="lazy"></a>
+              <a href="/curtos/${v.id}/thumb/${t.k}.jpg?baixar=1"><button class="si-mini si-sec">⬇️ baixar</button></a> <button class="si-mini si-sec" data-tapagar="${v.id}" data-k="${t.k}" title="tirar da lista">🗑</button>${t.por_que ? `<div class="si-dica" style="margin:2px 0">${esc(t.por_que)}</div>` : ''}</div>`).join('')}</div>` : ''}
+            ${!v.rodando ? `<button class="si-mini si-sec" data-thumbs="${v.id}">${v.thumbs && v.thumbs.length ? '🔁 a IA escolhe outros (os seus ficam)' : '🖼 a IA tira 3 prints'}</button>` : ''}</details>`
             : (v.roteiro && !v.rodando ? `<div class="si-linha"><button class="si-mini si-sec" data-thumbs="${v.id}">🖼 tirar 3 prints pra thumb</button></div>` : '')}
           ${v.descricao ? `<details data-k="d${v.id}"${abertos.has('d' + v.id) ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">📝 Descrição + hashtags</summary>
             <div style="font-size:.88rem;white-space:pre-wrap">${esc(v.descricao)}\n${esc(v.hashtags.join(' '))}</div>
@@ -940,10 +954,29 @@ function desenhar(vs) {
     b.disabled = true; b.textContent = '⏳ escrevendo…';
     try { const j = await post(`/curtos/${id}/titulos/novos`, { direcao: dir, comentario: com }); desenhar(j.videos); aviso(`🏷 ${j.novos.length} títulos novos (no topo da lista)`, 'okk'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '✨ 5 títulos novos'; } });
+  L.querySelectorAll('[data-tsalvar]').forEach(b => b.onclick = async () => { const vd = L.querySelector(`video[data-orig="${b.dataset.tsalvar}"]`); if (!vd) return;
+    vd.pause(); b.disabled = true; const t = vd.currentTime;
+    try { desenhar((await post(`/curtos/${b.dataset.tsalvar}/thumb/salvar`, {t})).videos); aviso(`📸 momento ${t.toFixed(1)} s salvo nos prints`, 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; });
+  L.querySelectorAll('[data-tpasso]').forEach(b => b.onclick = () => { const vd = L.querySelector(`video[data-orig="${b.dataset.tpasso}"]`); if (!vd) return;
+    vd.pause(); vd.currentTime = Math.max(0, Math.min(vd.duration || 1e9, vd.currentTime + parseFloat(b.dataset.d))); });
+  L.querySelectorAll('[data-tapagar]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/${b.dataset.tapagar}/thumb/${b.dataset.k}/apagar`)).videos); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  L.querySelectorAll('[data-rajustar]').forEach(b => b.onclick = async () => { const id = b.dataset.rajustar, t = L.querySelector(`[data-rpedido="${id}"]`);
+    if (!t || !t.value.trim()) return aviso('✍ escreva o que mudar no roteiro', 'erro');
+    b.disabled = true; b.textContent = '⏳ reescrevendo…';
+    try { const j = await post(`/curtos/${id}/roteiro/ajustar`, {pedido: t.value}); t.value = ''; desenhar(j.videos); aviso('✍ roteiro reescrito — confira e clique em 🔁 refazer o vídeo com ele', 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '✍ reescrever com isso'; } });
+  L.querySelectorAll('[data-rdesfazer]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/${b.dataset.rdesfazer}/roteiro/desfazer`)).videos); aviso('↶ voltou a versão anterior do roteiro', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  L.querySelectorAll('[data-traduzir]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = '⏳ traduzindo…';
+    try { desenhar((await post(`/curtos/${b.dataset.traduzir}/roteiro/traduzir`)).videos); } catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '🇧🇷 traduzir'; } });
   L.querySelectorAll('[data-thumbs]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = '⏳ escolhendo os prints…';
     try { desenhar((await post(`/curtos/${b.dataset.thumbs}/thumbs`)).videos); aviso('🖼 prints prontos', 'okk'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '🖼 tirar 3 prints pra thumb'; } });
   L.querySelectorAll('[data-refazer]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/link/${b.dataset.refazer}/refazer`)).videos); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  L.querySelectorAll('[data-origph]').forEach(ph => { const id = ph.dataset.origph;
+    const vd = players[id] || Object.assign(document.createElement('video'), {src: `/curtos/${id}/voz/clipe`, controls: true, preload: 'metadata', muted: false});
+    vd.dataset.orig = id; vd.style.cssText = 'width:100%;max-height:340px;border-radius:8px;background:#000'; ph.replaceWith(vd); });
+  Object.entries(pedidos).forEach(([k, v]) => { const e = L.querySelector(`[data-rpedido="${k}"]`); if (e) e.value = v; });
   Object.entries(digitado).forEach(([k, v]) => { const e = L.querySelector(k[0] === 'c' ? `[data-tcom="${k.slice(1)}"]` : `[data-tdir="${k.slice(1)}"]`); if (e) e.value = v; });
   return vs.some(v => v.rodando);
 }

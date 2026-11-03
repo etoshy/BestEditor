@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import shutil
 import tempfile
 import re
@@ -1455,6 +1456,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "erro": t.get("erro") or lr.get("erro") or "", "fim": t.get("fim"),
                 "roteiro": " ".join(CT.sem_tags(b.get("fala") or "") for b in r.get("blocos") or [])[:900],
                 "roteiro_tags": " ".join(b.get("fala") or "" for b in r.get("blocos") or [])[:900],
+                "roteiro_pt": _roteiro_pt(r), "roteiro_versoes": len(p.get("roteiro_historico") or []),
+                "roteiro_mudou": bool(lr.get("roteiro_mudou")), "roteiro_idioma": r.get("idioma") or "",
+                "tem_original": bool(CC.clipes(base_dir, p)) if lr else False,
                 "titulos": CN.titulos_do_projeto(p),
                 "descricao": CL.com_fonte(CL.limpar_marca(r.get("descricao") or ""), lr.get("link") or "", info) if r.get("descricao") else "",
                 "thumbs": [dict(t, k=k) for k, t in enumerate(p.get("thumbs") or [], 1)
@@ -1468,6 +1472,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "apagado": bool(lr.get("apagado")), "escolha": lr.get("escolha") or {}, "aguardando": bool(lr.get("aguardando")),
                 "aguardando_voz": bool(lr.get("aguardando_voz")), "minha_voz": (p.get("config") or {}).get("voz_modo") == "minha",
                 "pronto_1x1": bool((p.get("exportado_quadrado") or {}).get("arquivo") and os.path.isfile((p.get("exportado_quadrado") or {}).get("arquivo") or ""))}
+
+    def _roteiro_pt(r: Dict[str, Any]) -> str:
+        """🇧🇷 v84_343: a tradução do roteiro (quando ele não é narrado em português)."""
+        bl = r.get("blocos") or []
+        fala = " ".join(CT.sem_tags(b.get("fala") or "") for b in bl)
+        pt = " ".join(CT.sem_tags(b.get("fala_pt") or "") for b in bl if b.get("fala_pt"))
+        return pt[:1200] if pt and CT.norm(pt) != CT.norm(fala) else ""
 
     def _links(n: int = 60) -> List[Dict[str, Any]]:
         out = []
@@ -1741,7 +1752,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             return 0
         with CT._TRAVA:
             q = CT.carregar(base_dir, pid)
-            q["thumbs"] = ts
+            q["thumbs"] = [t for t in q.get("thumbs") or [] if t.get("manual")] + ts  # ✋ v84_343: os que VOCÊ salvou ficam
             if (q.get("link_rapido") or {}).get("escolha"):  # os prints mudaram: a capa escolhida antes não vale mais
                 q["link_rapido"]["escolha"].pop("capa", None)
             CT.salvar(base_dir, q)
@@ -1753,6 +1764,102 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         n = _link_thumbs(pid, lambda m: None)
         if not n:
             return _erro("Não consegui tirar os prints (o vídeo original está no projeto?).")
+        return _ok(videos=_links())
+
+    @app.route("/curtos/<pid>/thumb/salvar", methods=["POST"])
+    def curto_thumb_salvar(pid: str):
+        """✋ v84_343: salva o quadro do vídeo original no segundo que você parou o player (resolução cheia)."""
+        p = _proj(pid)
+        cl = CC.clipes(base_dir, p)
+        if not cl:
+            return _erro("O vídeo original não está no projeto.")
+        try:
+            t = max(0.0, float(_corpo().get("t") or 0))
+        except (TypeError, ValueError):
+            return _erro("Tempo inválido.")
+        pasta = os.path.join(CT.pasta(base_dir, pid), "thumbs")
+        os.makedirs(pasta, exist_ok=True)
+        nome = f"manual_{int(round(t * 1000))}.jpg"
+        cam = os.path.join(pasta, nome)
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t:.3f}", "-i", cl[0]["caminho"], "-frames:v", "1", "-q:v", "2", cam],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode != 0 or not os.path.isfile(cam):
+            return _erro("Não consegui tirar esse quadro: " + (r.stderr or "")[-200:])
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            ts = [x for x in q.get("thumbs") or [] if x.get("arquivo") != nome]
+            ts.append({"arquivo": nome, "t": round(t, 2), "por_que": f"✋ escolhido por você ({t:.1f} s)", "manual": True})
+            q["thumbs"] = ts
+            CT.salvar(base_dir, q)
+        return _ok(videos=_links(), k=len(ts))
+
+    @app.route("/curtos/<pid>/thumb/<int:k>/apagar", methods=["POST"])
+    def curto_thumb_apagar(pid: str, k: int):
+        """🗑 tira um print da lista (e arruma a capa escolhida)."""
+        _proj(pid)
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            ts = q.get("thumbs") or []
+            if not 1 <= k <= len(ts):
+                return _erro("Print não encontrado.", 404)
+            fora = ts.pop(k - 1)
+            esc_ = (q.get("link_rapido") or {}).get("escolha") or {}
+            if esc_.get("capa") == k:
+                esc_.pop("capa", None)
+            elif isinstance(esc_.get("capa"), int) and esc_["capa"] > k:
+                esc_["capa"] -= 1
+            q["thumbs"] = ts
+            CT.salvar(base_dir, q)
+        try:
+            os.remove(os.path.join(CT.pasta(base_dir, pid), "thumbs", fora["arquivo"]))
+        except OSError:
+            pass
+        return _ok(videos=_links())
+
+    @app.route("/curtos/<pid>/roteiro/ajustar", methods=["POST"])
+    def curto_roteiro_ajustar(pid: str):
+        """✍ v84_343: você diz o que mudar (comentários, sugestões) e a IA reescreve o roteiro. O de antes fica guardado (↶)."""
+        _proj(pid)
+        t = TAREFAS.get(pid)
+        if t and not t.get("fim"):
+            return _erro("Espere o vídeo terminar a etapa atual.", 409)
+        pedido = str(_corpo().get("pedido") or "").strip()
+        if not pedido:
+            return _erro("Escreva o que você quer mudar no roteiro.")
+        try:
+            CC.revisar_roteiro(base_dir, pid, pedido)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            if q.get("link_rapido"):
+                _log_link(q["link_rapido"], "✍ roteiro reescrito: " + pedido[:120])
+                q["link_rapido"]["roteiro_mudou"] = True
+                CT.salvar(base_dir, q)
+        return _ok(videos=_links())
+
+    @app.route("/curtos/<pid>/roteiro/desfazer", methods=["POST"])
+    def curto_roteiro_desfazer(pid: str):
+        _proj(pid)
+        try:
+            CC.desfazer_roteiro(base_dir, pid)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            if q.get("link_rapido"):
+                q["link_rapido"]["roteiro_mudou"] = True
+                CT.salvar(base_dir, q)
+        return _ok(videos=_links())
+
+    @app.route("/curtos/<pid>/roteiro/traduzir", methods=["POST"])
+    def curto_roteiro_traduzir(pid: str):
+        """🇧🇷 traduz pro português os blocos que ainda não têm a tradução."""
+        _proj(pid)
+        try:
+            CC.traduzir_roteiro(base_dir, pid)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
         return _ok(videos=_links())
 
     @app.route("/curtos/<pid>/thumb/<int:k>.jpg", methods=["GET"])
@@ -2861,6 +2968,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             finally:
                 TAREFAS[pid]["fim"] = time.time()
                 _liberar_memoria_pesada()  # 🧹 v84_314
+        with CT._TRAVA:  # ✍ v84_343: o roteiro novo vai ser usado agora
+            q = CT.carregar(base_dir, pid)
+            if (q.get("link_rapido") or {}).pop("roteiro_mudou", None):
+                CT.salvar(base_dir, q)
         _link_etapa(pid, "🔁 de novo", erro="", aguardando=False)
         threading.Thread(target=corpo, daemon=True).start()
         return _ok(videos=_links())

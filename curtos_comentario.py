@@ -772,6 +772,84 @@ def gerar_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = No
     return p["roteiro"]
 
 
+def _guardar_versao(p: Dict[str, Any]) -> None:
+    if (p.get("roteiro") or {}).get("blocos"):
+        h = p.setdefault("roteiro_historico", [])
+        h.append(p["roteiro"])
+        del h[:-5]  # (as 5 últimas)
+
+
+def revisar_roteiro(base: str, pid: str, pedido: str, chamar: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    """✍ v84_343: reescreve o roteiro com os SEUS comentários/sugestões (mesmo prompt, mesmas regras do canal + o roteiro de
+    antes e o que mudar). O de antes vai pro histórico (↶ desfazer). A voz/edição ficam pra refazer com o roteiro novo."""
+    import copy
+    p = CT.carregar(base, pid)
+    r0 = p.get("roteiro") or {}
+    if not r0.get("blocos"):
+        raise CT.CurtoErro("Faça o roteiro antes.")
+    antes = "\n".join(f"{b.get('id') or k}: {b.get('fala_en') or b.get('fala') or ''}" for k, b in enumerate(r0["blocos"], 1))
+    p2 = copy.deepcopy(p)
+    extra = str((p2.get("config") or {}).get("extra") or "")
+    p2.setdefault("config", {})["extra"] = (extra + "\n\n" if extra else "") + (
+        "## REVISION — the creator reviewed the PREVIOUS SCRIPT below and wants changes. Rewrite the script applying EVERY "
+        "request, keep what they did not ask to change (same facts, structure and length unless asked), and still follow all "
+        "the rules above.\n### CREATOR'S CHANGES (may be in Portuguese)\n" + str(pedido)[:3000] + "\n### PREVIOUS SCRIPT\n" + antes)
+    import ia_servico
+    r = (chamar or ia_servico.chamar)("curtos", sistema(p2), conteudo_roteiro(base, p2), schema=roteiro_schema(p2), max_tokens=12000,
+                                      **({} if chamar else {"timeout": 240.0}), effort="medium", job=pid, cache_local=False)
+    if not r:
+        raise CT.CurtoErro(CT.motivo_ia())
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        _guardar_versao(p)
+        p["roteiro"] = ler_roteiro(r, p, (p.get("roteiro") or {}).get("idioma") or dados(p).get("idioma") or "en")
+        p["roteiro"]["pedido_revisao"] = str(pedido)[:3000]
+        p["tts"] = None
+        CT.salvar(base, p)
+    return p["roteiro"]
+
+
+def desfazer_roteiro(base: str, pid: str) -> Dict[str, Any]:
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        h = p.get("roteiro_historico") or []
+        if not h:
+            raise CT.CurtoErro("Não tem versão anterior do roteiro.")
+        p["roteiro"] = h.pop()
+        p["roteiro_historico"] = h
+        p["tts"] = None
+        CT.salvar(base, p)
+    return p["roteiro"]
+
+
+_TRAD_SCHEMA = CT._o({"blocos": {"type": "array", "items": CT._o({"id": CT._s(), "pt": CT._s()})}})
+
+
+def traduzir_roteiro(base: str, pid: str, chamar: Optional[Callable[..., Any]] = None) -> int:
+    """🇧🇷 v84_343: a tradução pro português dos blocos que não têm (roteiros antigos ou ajustados à mão)."""
+    p = CT.carregar(base, pid)
+    bl = (p.get("roteiro") or {}).get("blocos") or []
+    falta = [b for b in bl if CT.sem_tags(b.get("fala") or "").strip() and not str(b.get("fala_pt") or "").strip()]
+    if not falta:
+        return 0
+    import ia_servico
+    corpo = json.dumps([{"id": str(b.get("id")), "texto": CT.sem_tags(b.get("fala") or "")} for b in falta], ensure_ascii=False)
+    r = (chamar or ia_servico.chamar)("curtos", "Translate each line to natural Brazilian Portuguese (meaning, not word by word). "
+                                      "Return every id.", corpo, schema=_TRAD_SCHEMA, max_tokens=4000)
+    if not r:
+        raise CT.CurtoErro(CT.motivo_ia())
+    tr = {str(x.get("id")): str(x.get("pt") or "").strip() for x in (r.get("blocos") or []) if isinstance(x, dict)}
+    n = 0
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        for b in (p.get("roteiro") or {}).get("blocos") or []:
+            if tr.get(str(b.get("id"))) and not str(b.get("fala_pt") or "").strip():
+                b["fala_pt"] = tr[str(b.get("id"))]
+                n += 1
+        CT.salvar(base, p)
+    return n
+
+
 MAIS_SCHEMA = CT._o({"opcoes": {"type": "array", "items": OPCAO}})
 
 
