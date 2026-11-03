@@ -959,7 +959,8 @@ function desenhar(vs) {
         <div>${v.pronto ? `<video src="/curtos/${v.id}/video.mp4?baixar=0" controls preload="metadata"></video>` : '<div class="si-vazio">🎬 o vídeo aparece aqui quando exportar</div>'}
           <div class="si-linha">${v.pronto ? `<a href="/curtos/${v.id}/video.mp4"><button class="si-ok si-mini">⬇️ baixar MP4</button></a>` : ''}${v.pronto_1x1 ? `<a href="/curtos/${v.id}/video_1x1.mp4"><button class="si-ok si-mini">⬛ baixar MP4 1:1</button></a>` : ''}
             ${v.editor ? `<a href="/job/${v.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
-            <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a></div></div>
+            <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a>
+            ${v.pronto && !v.rodando ? `<button class="si-mini si-sec" data-refazer="${v.id}" title="exporta de novo com o @ e o acabamento de AGORA do canal (o que já está feito — vídeo, roteiro, voz — é reaproveitado)">🔁 exportar de novo</button>` : ''}</div></div>
         <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div>
           ${v.roteiro_pt ? `<details data-k="p${v.id}"${abertos.has('p' + v.id) || v.roteiro_idioma !== 'pt' ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🇧🇷 tradução</summary><div class="lk-rot" style="opacity:.9">${esc(v.roteiro_pt)}</div></details>` : ''}
           <div class="si-linha" style="flex-wrap:wrap;gap:4px"><button class="si-mini si-sec" data-copiar="${esc(v.roteiro)}">📋 roteiro</button>

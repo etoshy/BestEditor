@@ -520,7 +520,18 @@ REGRA_PERSONALIDADE = (
     "P6. NO TEMPLATE: do NOT reuse openings, punchlines, catchphrases, sentence structures or the ending style of this channel's "
     "RECENT SCRIPTS (listed in the content). The persona is constant, the wording is new every time.\n"
     "P7. The ending invites a genuine opinion about ONE specific point of this video (never a generic 'what do you think?').\n"
-    "P8. Same length and the same facts rule (only what you are sure of; 'probably' when unsure).")
+    "P8. Same length.\n"
+    "P9. FACT DISCIPLINE (stricter than the authentic mode): never give a reason or a purpose that only SOUNDS plausible "
+    "(e.g. 'the aprons keep them from slipping', 'they do it at night because it is cooler') — every why/how/what-for must be a "
+    "well-established fact. If you are not sure, CUT the claim instead of hedging with 'probably'. Fewer facts, all solid.\n"
+    "P10. DEPTH OF THE TAKE: the opinion needs a REASON and a CONTRAST — why the narrator thinks so, against what most people "
+    "assume or against the modern/industrial/usual way (e.g. 'machines do this faster, but…'). One elaborated take beats two "
+    "shallow ones.\n"
+    "P11. MAKE IT RELEVANT: when well-established, add one 'still today / where / who' fact (where it is still done, who does it, "
+    "how common or rare it is now) — it turns a curiosity into information.\n"
+    "P12. TIE EACH FACT TO THE IMAGE: every fact or explanation line points at something VISIBLE at that moment (the skins "
+    "breaking, the press, the juice in the channel…), so the edit can cut/zoom/highlight right then — and set that cena's "
+    "material/de/ate and zoom/destaque fields to that moment.")
 
 
 def autentico_ou_mais(p: Dict[str, Any]) -> bool:

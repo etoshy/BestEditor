@@ -1765,6 +1765,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             raise CT.CurtoErro("A exportação automática não está disponível aqui — abra no editor e exporte.")
         _link_etapa(pid, "🎬 exportando")
         job_id = (CT.carregar(base_dir, pid).get("editor") or {}).get("job_id")
+        if job_id and CB.get("marca"):  # 🏷 v84_347: o @ do projeto do editor = o do canal de agora (antes ficava o de quando criou)
+            try:
+                CB["marca"](job_id, CT.marca_do(base_dir, CT.carregar(base_dir, pid)))
+            except Exception:  # noqa: BLE001
+                pass
         arq = CB["exportar"](job_id, qualidade, prog)
         with CT._TRAVA:
             q = CT.carregar(base_dir, pid)
@@ -3462,6 +3467,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             p = _proj(pid)
             c = CT.canal_do(base_dir, p)
             m = CT.normalizar_marca(dict(CT.marca_do(base_dir, p), **(b.get("marca") or {})))
+            if "texto" in (b.get("marca") or {}):  # 🏷 v84_347: você mudou o @ DESTE vídeo — ele não segue mais o do canal
+                m["texto_manual"] = True
             p["config"]["marca"] = m
             CT.salvar(base_dir, p)
             if b.get("padrao_canal") and c:

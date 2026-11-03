@@ -1238,11 +1238,26 @@ def normalizar_marca(m: Any, nome_canal: str = "") -> Dict[str, Any]:
 
 
 def marca_do(base: str, p: Dict[str, Any]) -> Dict[str, Any]:
-    """A marca do vídeo: a do projeto (se você mexeu) por cima da do canal."""
+    """A marca do vídeo: a do projeto (se você mexeu) por cima da do canal.
+    🏷 v84_347: o TEXTO do @ sempre vem do canal de AGORA (o @ do acabamento dele; senão o do perfil/nome) — o projeto guarda
+    o @ de quando foi criado, e um @ errado (ex.: o @RadicalWow herdado no FoodYum2) não fica preso no vídeo. Só o @ que
+    você mudou neste vídeo de propósito (🏷 na página do curto: texto_manual) continua valendo."""
     c = canal_do(base, p)
     m = dict((c or {}).get("perfil", {}).get("marca") or {})
-    m.update((p.get("config") or {}).get("marca") or {})
-    return normalizar_marca(m, "" if (c or {}).get("perfil_origem") else (c or {}).get("nome") or "")  # canal pronto: @seucanal
+    cfg_m = dict((p.get("config") or {}).get("marca") or {})
+    if c and not cfg_m.get("texto_manual"):
+        cfg_m.pop("texto", None)
+        try:
+            arr = str(acabamento(base, c["id"]).get("arroba") or "").strip()
+        except Exception:  # noqa: BLE001
+            arr = ""
+        if arr:
+            m["texto"] = arr if arr.startswith("@") else "@" + arr
+    m.update(cfg_m)
+    out = normalizar_marca(m, "" if (c or {}).get("perfil_origem") else (c or {}).get("nome") or "")  # canal pronto: @seucanal
+    if cfg_m.get("texto_manual"):
+        out["texto_manual"] = True
+    return out
 
 
 def canal_do_modelo(base: str, modelo: str) -> str:

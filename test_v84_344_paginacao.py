@@ -95,3 +95,22 @@ def test_arroba_do_canal_nao_herda_do_padrao(tmp_path, monkeypatch):
     assert CT.acabamento(base, food["id"])["arroba"] == "@food.yum"
     p = CT.criar(base, food["id"], "x", modelo="comentario")
     assert p["config"]["marca"]["texto"] == "@food.yum"
+
+
+def test_v84_347_arroba_velho_no_projeto_segue_o_canal(tmp_path, monkeypatch):
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "c"))
+    base = str(tmp_path)
+    food = CT.criar_canal(base, "FoodYum2", "")
+    CT.salvar_canal(base, food)
+    p = CT.criar(base, food["id"], "x", modelo="comentario")
+    p["config"]["marca"] = {"ativa": True, "texto": "@RadicalWow", "fonte": "DP Anton"}  # criado antes da correção
+    CT.salvar(base, p)
+    m = CT.marca_do(base, p)
+    assert m["texto"].lower() == "@foodyum2" and m["fonte"] == "DP Anton"  # o resto do estilo do projeto continua
+    CT.salvar_acabamento(base, {"arroba": "@FoodYum2"}, food["id"])
+    assert CT.marca_do(base, p)["texto"] == "@FoodYum2"
+    p["config"]["marca"]["texto_manual"] = True  # mudou o @ deste vídeo de propósito: vale o dele
+    assert CT.marca_do(base, p)["texto"] == "@RadicalWow"
+    sem = CT.criar(base, "", "y", modelo="comentario")
+    sem["config"]["marca"] = {"ativa": True, "texto": "@meu"}
+    assert CT.marca_do(base, sem)["texto"] == "@meu"  # sem canal: o do projeto
