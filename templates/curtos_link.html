@@ -17,6 +17,11 @@
   .lk-v.descartado { border-color: #e53935; } .lk-v.postado { border-color: #1e88e5; } .lk-v.planejado { border-color: #fdd835; }
   .lk-cab { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .lk-cab b { font-size: .95rem; }
+  .lk-sel { display: inline-flex; align-items: center; margin: 0 !important; cursor: pointer; }
+  .lk-sel input { width: 18px !important; height: 18px; margin: 0; cursor: pointer; }
+  .lk-selbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: 6px 0;
+               border: 1px solid var(--borda); border-radius: 10px; background: var(--card); font-size: .88rem; }
+  .lk-selacoes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
   .lk-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; margin: 6px 0; }
   .lk-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: lkg 1s linear infinite; flex: 0 0 auto; }
   @keyframes lkg { to { transform: rotate(360deg); } }
@@ -60,6 +65,7 @@
     <label>Pedido extra<textarea id="extra" rows="2" placeholder="ex.: mais engraçado, falar como narrador de futebol, não citar o nome…"></textarea></label>
   </details>
   <div class="si-linha" style="margin-top:12px"><button id="bgo" class="si-ok" onclick="lkGo()">🚀 fazer o vídeo</button>
+    <button type="button" class="si-mini si-sec" onclick="lkPadrao()" title="as opções acima ficam como você deixou da última vez; isto volta todas pro padrão">↺ voltar ao padrão</button>
     {% if not ia %}<span class="si-dica">⚠ a IA está desligada pros curtos (Configurações) — sem ela não dá pra fazer sozinho.</span>{% endif %}
     {% if not tem_tts %}<span class="si-dica">⚠ o gerador de voz não está disponível.</span>{% endif %}</div>
 </div>
@@ -147,15 +153,28 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
   if ([...s.options].some(o => o.value === atual)) s.value = atual; }
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
-try { const sv = JSON.parse(localStorage.getItem('lk_op') || '{}'); ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'].forEach(k => { if (sv[k]) el(k).value = sv[k]; });
-  vozes(); if (sv.voz) el('voz').value = sv.voz; if (sv.modo) { const r = document.querySelector(`input[name=modo][value="${sv.modo}"]`); if (r) r.checked = true; }
-  if (sv.exportar === false) el('exportar').checked = false; } catch (e) { vozes(); }
+// 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
+const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico'], OP_RADIOS = ['modo', 'lote_modo'];
+const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
+const lerOpcoes = () => { const o = {}; OP_SELECTS.concat(['voz']).forEach(k => o[k] = el(k).value); OP_CHECKS.forEach(k => o[k] = el(k).checked); OP_RADIOS.forEach(n => o[n] = radio(n)); return o; };
+const PADRAO_OP = (() => { vozes(); return lerOpcoes(); })();  // o de fábrica (antes de aplicar o que estava salvo)
+function aplicarOpcoes(o) {
+  OP_SELECTS.forEach(k => { if (o[k] !== undefined && [...el(k).options].some(x => x.value === String(o[k]))) el(k).value = o[k]; });
+  vozes(); if (o.voz && [...el('voz').options].some(x => x.value === o.voz)) el('voz').value = o.voz;
+  OP_CHECKS.forEach(k => { if (typeof o[k] === 'boolean') el(k).checked = o[k]; });
+  OP_RADIOS.forEach(n => { const r = o[n] && document.querySelector(`input[name=${n}][value="${o[n]}"]`); if (r) r.checked = true; });
+}
+function salvarOpcoes() { try { localStorage.setItem('lk_op', JSON.stringify(lerOpcoes())); } catch (e) {} }
+try { aplicarOpcoes(JSON.parse(localStorage.getItem('lk_op') || '{}')); } catch (e) { vozes(); }
+OP_SELECTS.concat(['voz']).concat(OP_CHECKS).forEach(k => el(k).addEventListener('change', salvarOpcoes));
+document.querySelectorAll(OP_RADIOS.map(n => `input[name=${n}]`).join(',')).forEach(r => r.addEventListener('change', salvarOpcoes));
+window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {} aplicarOpcoes(PADRAO_OP); el('link').dispatchEvent(new Event('input')); aviso('↺ opções de volta ao padrão', 'okk'); };
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
   const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, camera_exp: el('camera_exp').checked, por_etapa: loteModo() === 'etapa',
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
-  try { localStorage.setItem('lk_op', JSON.stringify(Object.assign({}, d, {link: '', comentarios: '', extra: ''}))); } catch (e) {}
+  salvarOpcoes();
   if (!d.link) { aviso('Cole o link do vídeo.', 'erro'); return; }
   el('bgo').disabled = true;
   try { const j = await post('/curtos/link/novo', d); el('link').value = ''; el('nLinks').textContent = ''; el('comentarios').value = ''; desenhar(j.videos);
@@ -289,6 +308,8 @@ let timer = null;
 const IA = {{ 'true' if ia else 'false' }};
 const MARCAS = {'': '— sem marca', descartado: '🟥 descartado', postado: '🟦 postado', planejado: '🟨 com planos de postar'};
 const DIRS = '<option value="">direção…</option>' + Object.entries({{ direcoes_titulo|tojson }}).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+const SEL = new Set((() => { try { return JSON.parse(localStorage.getItem('lk_sel') || '[]'); } catch (e) { return []; } })());  // ☑ os marcados (ficam até você mudar)
+const guardarSel = () => { try { localStorage.setItem('lk_sel', JSON.stringify([...SEL])); } catch (e) {} };
 function desenhar(vs) {
   const L = el('lista');
   ULT = vs;
@@ -304,7 +325,8 @@ function desenhar(vs) {
   const barraExportar = exportar ? `<div class="aviso" style="margin-bottom:8px">📦 ${exportar} vídeo(s) com título ou capa escolhidos — exporta o roteiro, o título e a capa de cada um. <a href="/curtos/link/exportar-escolhidos?formato=zip"><button class="si-mini">📦 baixar ZIP (JSON + capas)</button></a> <a href="/curtos/link/exportar-escolhidos?formato=json"><button class="si-mini si-sec">só o JSON</button></a></div>` : '';
   const barraRetomar = pend ? `<div class="aviso" style="margin-bottom:8px">⏸ ${pend} vídeo(s) ficaram pelo meio (o site fechou ou reiniciou). <button class="si-mini" id="btnRetomar">▶ retomar a fila</button></div>` : '';
   const foco = document.activeElement;  // ✍ escrevendo o direcionamento: a atualização automática espera
-  if (foco && L.contains(foco) && foco.matches('input, select, textarea')) return vs.some(v => v.rodando);
+  if (foco && L.contains(foco) && foco.matches('input:not([type=checkbox]), select, textarea')) return vs.some(v => v.rodando);
+  const ids_ = new Set(vs.map(v => v.id)); [...SEL].forEach(id => { if (!ids_.has(id)) SEL.delete(id); });  // ☑ some da lista: sai da seleção
   const digitado = {}; L.querySelectorAll('[data-tcom], [data-tdir]').forEach(e => { if (e.value) digitado[(e.dataset.tcom ? 'c' : 'd') + (e.dataset.tcom || e.dataset.tdir)] = e.value; });
   if (!vs.length) { L.innerHTML = '<p class="si-dica">Nenhum ainda.</p>'; return false; }
   setTimeout(() => { const c = document.getElementById('btnCopiarAguard'); if (c) c.onclick = () => copiar(ULT.filter(v => v.aguardando && !v.rodando && !v.apagado).map(v => v.link).join('\n'));
@@ -314,10 +336,20 @@ function desenhar(vs) {
   setTimeout(() => { const b = document.getElementById('btnRetomar'); if (b) b.onclick = async () => { b.disabled = true;
     try { const j = await post('/curtos/link/retomar', {}); desenhar(j.videos); aviso(j.ocupado ? '⏳ já está retomando a fila — acompanhe nos vídeos' : j.retomados ? `▶ retomando ${j.retomados} vídeo(s), um por vez` : 'nada pra retomar', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; } }; }, 0);
   const abertos = new Set([...document.querySelectorAll('.lk-v details[open]')].map(d => d.dataset.k));
-  L.innerHTML = barraVoz + barraAguardando + barraRetomar + barraExportar + barraApagar + vs.map(v => { const cls = v.marca || (v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : ''));
+  const barraSel = `<div class="lk-selbar" id="selBar">☑ <b id="selN">${SEL.size}</b> marcado(s) ·
+      <button class="si-mini si-sec" data-selt="todos">todos</button><button class="si-mini si-sec" data-selt="nenhum">nenhum</button>
+      <select id="selFiltro" class="si-mini" style="width:auto"><option value="">marcar por…</option><option value="prontos">✅ prontos (MP4)</option><option value="erro">❌ com erro</option>
+        <option value="descartado">🟥 descartados</option><option value="postado">🟦 postados</option><option value="planejado">🟨 com planos</option><option value="aguardando">⏸ aguardando</option><option value="canal">📺 do canal do lote</option></select>
+      <span class="lk-selacoes" style="${SEL.size ? '' : 'opacity:.45;pointer-events:none'}">
+        <button class="si-mini si-ok" data-selini="1" title="começa os marcados que ainda estão na fila (⏸ aguardando, com erro ou parados) — do jeito escolhido em 🧩 Como rodar o lote">▶ produzir marcados</button>
+        <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400"><input type="checkbox" id="selEtapa" style="width:auto;margin:0"${loteModo() === 'etapa' ? ' checked' : ''}> 🧩 em paralelo (por etapa)</label>
+        <button class="si-mini" data-selexp="zip">📦 exportar ZIP (JSON + capas)</button><button class="si-mini si-sec" data-selexp="json">📄 só o JSON</button>
+        <button class="si-mini si-sec" data-selacao="apagar" title="apaga vídeo, projeto do editor, clipes e prints — fica o link, as marcas e o log">🗑 apagar arquivos</button>
+        <button class="si-mini si-perigo" data-selacao="tirar" title="tira da lista de vez (apaga tudo, inclusive o log)">❌ tirar da lista</button></span></div>`;
+  L.innerHTML = barraVoz + barraAguardando + barraRetomar + barraExportar + barraApagar + barraSel + vs.map(v => { const cls = v.marca || (v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : ''));
     const modo = v.modo_usado ? MODOS[v.modo_usado] : MODOS[v.modo];
     return `<div class="lk-v ${cls}">
-      <div class="lk-cab"><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
+      <div class="lk-cab"><label class="lk-sel" title="marcar pra remover ou exportar junto"><input type="checkbox" data-sel="${v.id}"${SEL.has(v.id) ? ' checked' : ''}></label><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
         ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
         <a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a></div>
       ${v.aguardando_voz && !v.rodando ? `<div class="lk-prog" style="font-weight:700">🎤 roteiro pronto — falta a sua voz <a class="si-mini si-ok" href="/curtos/${v.id}/gravar" style="text-decoration:none">🎤 gravar voz</a></div>` : ''}
@@ -354,6 +386,26 @@ function desenhar(vs) {
             <div style="font-size:.88rem;white-space:pre-wrap">${esc(v.descricao)}\n${esc(v.hashtags.join(' '))}</div>
             <button class="si-mini si-sec" data-copiar="${esc(v.descricao + '\n\n' + v.hashtags.join(' '))}">📋 copiar</button></details>` : ''}</div></div>` : ''}</div>`; }).join('');
   L.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
+  // ☑ v84_331: seleção
+  const selAtualiza = () => { guardarSel(); el('selN').textContent = SEL.size; const a = L.querySelector('.lk-selacoes'); if (a) a.style.cssText = SEL.size ? '' : 'opacity:.45;pointer-events:none';
+    L.querySelectorAll('[data-sel]').forEach(c => c.checked = SEL.has(c.dataset.sel)); };
+  L.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? SEL.add(c.dataset.sel) : SEL.delete(c.dataset.sel); selAtualiza(); });
+  L.querySelectorAll('[data-selt]').forEach(b => b.onclick = () => { if (b.dataset.selt === 'todos') ULT.forEach(v => SEL.add(v.id)); else SEL.clear(); selAtualiza(); });
+  el('selFiltro').onchange = e => { const f = e.target.value, cid = el('canal').value; e.target.value = '';
+    ULT.filter(v => f === 'prontos' ? v.pronto : f === 'erro' ? (v.erro && !v.rodando) : f === 'aguardando' ? v.aguardando : f === 'canal' ? v.canal_id === cid : v.marca === f).forEach(v => SEL.add(v.id)); selAtualiza(); };
+  const ini_ = L.querySelector('[data-selini]'); if (ini_) ini_.onclick = async () => { if (!SEL.size) return; ini_.disabled = true;
+    try { const j = await post('/curtos/link/iniciar-marcados', {ids: [...SEL], por_etapa: el('selEtapa').checked}); desenhar(j.videos);
+      aviso(j.iniciados ? `▶ ${j.iniciados} na produção, ${j.por_etapa ? '🧩 por etapa (em paralelo)' : 'um por vez'}` + (j.pulados ? ` · ${j.pulados} já feito(s)/rodando ficaram de fora` : '') : 'Nenhum marcado está na fila (já foram feitos ou estão rodando).', j.iniciados ? 'okk' : 'erro'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); ini_.disabled = false; } };
+  const et_ = L.querySelector('#selEtapa'); if (et_) et_.onchange = () => { const r = document.querySelector(`input[name=lote_modo][value="${et_.checked ? 'etapa' : 'um'}"]`); if (r) { r.checked = true; salvarOpcoes(); } };
+  L.querySelectorAll('[data-selexp]').forEach(b => b.onclick = () => { if (!SEL.size) return; location.href = `/curtos/link/exportar-escolhidos?formato=${b.dataset.selexp}&ids=${encodeURIComponent([...SEL].join(','))}`; });
+  L.querySelectorAll('[data-selacao]').forEach(b => b.onclick = async () => { if (!SEL.size) return; const tirar = b.dataset.selacao === 'tirar';
+    if (!confirm(tirar ? `Tirar ${SEL.size} vídeo(s) da lista DE VEZ? Apaga tudo (vídeo, projeto do editor, clipes, prints, roteiro e o log). Não dá pra desfazer.`
+                       : `Apagar os arquivos de ${SEL.size} vídeo(s)? Fica só o link, as marcas e o log. Não dá pra desfazer.`)) return;
+    b.disabled = true;
+    try { const j = await post('/curtos/link/selecionados', {ids: [...SEL], acao: b.dataset.selacao}); SEL.clear(); desenhar(j.videos);
+      aviso(`${tirar ? '❌ tirado(s) da lista' : '🗑 arquivos apagados'}: ${j.feitos}` + (j.falhas.length ? ' · ' + j.falhas.join('; ') : ''), j.falhas.length ? 'erro' : 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; } });
   L.querySelectorAll('[data-marca]').forEach(sel => sel.onchange = async () => { try { desenhar((await post(`/curtos/link/${sel.dataset.marca}/editar`, {marca: sel.value})).videos); aviso('🏷 marca salva', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
   L.querySelectorAll('[data-iniciar]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/link/${b.dataset.iniciar}/refazer`)).videos); aviso('▶ iniciado', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
   L.querySelectorAll('[data-remover]').forEach(b => b.onclick = async () => { if (!confirm('Tirar este link da fila? Ele ainda não começou, então só some a entrada.')) return; try { desenhar((await post(`/curtos/link/${b.dataset.remover}/remover`)).videos); aviso('🗑 removido da fila', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });

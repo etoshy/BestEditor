@@ -2414,10 +2414,14 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         import io
         import zipfile
         formato = request.args.get("formato") or "zip"
+        marcados = {x for x in str(request.args.get("ids") or "").split(",") if x}  # ☑ v84_331: os que você marcou na lista
         registros, arquivos = [], []
         for v in _links(500):
             esc_ = v.get("escolha") or {}
-            if not (esc_.get("titulo") or esc_.get("capa")):
+            if marcados:
+                if v["id"] not in marcados:
+                    continue
+            elif not (esc_.get("titulo") or esc_.get("capa")):
                 continue
             p = CT.carregar(base_dir, v["id"])
             r = p.get("roteiro") or {}
@@ -2436,6 +2440,14 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     nome = f"capas/{v['id']}_{k}.jpg"
                     rec["capa"] = {"arquivo": nome, "por_que": ts[k - 1].get("por_que") or ""}
                     arquivos.append((nome, cam))
+            elif marcados:  # ☑ marcado sem capa escolhida: vão os prints que ele tiver (você escolhe depois)
+                rec["prints"] = []
+                for j, t in enumerate(ts, 1):
+                    cam = os.path.join(CT.pasta(base_dir, v["id"]), "thumbs", t.get("arquivo") or "_")
+                    if os.path.isfile(cam):
+                        nome = f"capas/{v['id']}_print{j}.jpg"
+                        rec["prints"].append({"arquivo": nome, "por_que": t.get("por_que") or ""})
+                        arquivos.append((nome, cam))
             registros.append(rec)
         pacote = {"gerado_em": time.strftime("%Y-%m-%d %H:%M:%S"), "total": len(registros), "videos": registros}
         texto = json.dumps(pacote, ensure_ascii=False, indent=2)
@@ -2449,6 +2461,100 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 z.write(cam, nome)
         buf.seek(0)
         return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="escolhidos.zip")
+
+    @app.route("/curtos/link/iniciar-marcados", methods=["POST"])
+    def curtos_link_iniciar_marcados():
+        """▶ v84_332: produz os marcados que ainda estão na fila (aguardando, com erro ou parados no meio) — um por vez ou
+        🧩 por etapa (em paralelo). Os já prontos, apagados, rodando ou esperando a sua voz ficam de fora."""
+        b = _corpo()
+        pedidos = [str(x) for x in (b.get("ids") or []) if CT._valido(str(x))][:500]
+        ids, pulados = [], 0
+        por_data = sorted(pedidos, key=lambda x: ((CT.carregar(base_dir, x).get("link_rapido") or {}).get("criado") or 0)
+                          if os.path.isdir(CT.pasta(base_dir, x)) else 0)  # na ordem em que foram colados
+        for pid in por_data:
+            try:
+                p = CT.carregar(base_dir, pid)
+            except CT.CurtoErro:
+                continue
+            lr = p.get("link_rapido") or {}
+            t = TAREFAS.get(pid) or {}
+            if (not lr or lr.get("apagado") or lr.get("aguardando_voz") or (t and not t.get("fim"))
+                    or lr.get("etapa") in ("✅ pronto", "✅ no editor")):
+                pulados += 1
+                continue
+            ids.append(pid)
+        por_etapa = bool(b.get("por_etapa")) and len(ids) > 1
+        if not ids:
+            return _ok(iniciados=0, pulados=pulados, por_etapa=False, videos=_links())
+        for pid in ids:
+            _link_etapa(pid, "na fila", aguardando=False, erro="", parado=False)
+        if por_etapa:
+            r = _iniciar_lote_por_etapa(ids)
+            if isinstance(r, tuple):
+                return r
+            return _ok(iniciados=len(ids), pulados=pulados, por_etapa=True, videos=_links())
+        for k, pid in enumerate(ids, 1):
+            TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
+                            "prog": f"⏳ na fila dos marcados ({k}/{len(ids)})"}
+
+        def corpo() -> None:
+            for pid in ids:
+                pr = (lambda m, pid=pid: TAREFAS[pid].__setitem__("prog", str(m)[:300]))
+                try:
+                    with _UM_LINK_POR_VEZ:
+                        _espera_memoria(pr)
+                        p = CT.carregar(base_dir, pid)
+                        lr = p.get("link_rapido") or {}
+                        TAREFAS[pid]["msg"] = _link_rodar(pid, (p.get("config") or {}).get("voz_tts") or "", lr.get("qualidade") or "1080p",
+                                                          lr.get("exportar", True), pr)
+                except Exception as exc:  # noqa: BLE001  (um que falha não para os outros)
+                    TAREFAS[pid]["erro"] = str(exc)[:600]
+                    _link_etapa(pid, "❌ erro", erro=str(exc)[:600])
+                finally:
+                    TAREFAS[pid]["fim"] = time.time()
+                    _liberar_memoria_pesada()
+        threading.Thread(target=corpo, daemon=True, name="marcados").start()
+        return _ok(iniciados=len(ids), pulados=pulados, por_etapa=False, videos=_links())
+
+    @app.route("/curtos/link/selecionados", methods=["POST"])
+    def curtos_link_selecionados():
+        """☑ v84_331: o que fazer com os vídeos marcados na lista — "apagar" os arquivos (fica o link e o log) ou "tirar"
+        da lista de vez (some tudo). Os que estão rodando ficam de fora."""
+        b = _corpo()
+        ids = [str(x) for x in (b.get("ids") or []) if CT._valido(str(x))][:500]
+        acao = b.get("acao")
+        if acao not in ("apagar", "tirar") or not ids:
+            return _erro("Marque os vídeos e escolha o que fazer.")
+        feitos, falhas = [], []
+        for pid in ids:
+            t = TAREFAS.get(pid) or {}
+            try:
+                p = CT.carregar(base_dir, pid)
+            except CT.CurtoErro:
+                continue
+            if not p.get("link_rapido"):
+                continue
+            if t and not t.get("fim"):
+                falhas.append(f"{(p.get('titulo') or pid)[:40]}: está rodando agora")
+                continue
+            try:
+                if acao == "apagar":
+                    if not (p.get("link_rapido") or {}).get("apagado"):
+                        _apagar_arquivos_link(pid)
+                else:
+                    job_id = (p.get("editor") or {}).get("job_id") or ""
+                    arq = (p.get("exportado") or {}).get("arquivo") or ""
+                    if arq and os.path.isfile(arq):
+                        os.remove(arq)
+                    if job_id and CB.get("apagar_editor"):
+                        CB["apagar_editor"](job_id)
+                    with CT._TRAVA:
+                        CT.excluir(base_dir, pid)
+                    TAREFAS.pop(pid, None)
+                feitos.append(pid)
+            except Exception as exc:  # noqa: BLE001  (um que falha não para os outros)
+                falhas.append(f"{(p.get('titulo') or pid)[:40]}: {str(exc)[:120]}")
+        return _ok(feitos=len(feitos), falhas=falhas, videos=_links())
 
     @app.route("/curtos/link/apagar-marcados", methods=["POST"])
     def curtos_link_apagar_marcados():
