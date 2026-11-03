@@ -21,6 +21,8 @@
   .gv-take { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: .84rem; padding: 6px 8px; border-radius: 8px; background: var(--code-bg); }
   .gv-take.ativo { outline: 2px solid var(--ok); }
   .gv-take audio { height: 32px; }
+  .gv-onda { width: 240px; height: 34px; border-radius: 6px; background: rgba(0,0,0,.25); }
+  .gv-viva { display: block; width: 100%; height: 64px; margin-top: 8px; border-radius: 8px; background: rgba(229,57,53,.08); border: 1px solid rgba(229,57,53,.35); }
   .gv-nivel { width: 120px; height: 8px; border-radius: 4px; background: var(--borda); overflow: hidden; display: inline-block; vertical-align: middle; }
   .gv-nivel i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #43a047, #fdd835 70%, #e53935); }
   .gv-rodape { position: sticky; bottom: 0; z-index: 20; background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 12px;
@@ -104,6 +106,7 @@ const fmt = s => (+s || 0).toFixed(1) + ' s';
 function takesHtml(pt) {
   return (pt.takes || []).map((t, k) => `<div class="gv-take ${t.id === pt.ativo ? 'ativo' : ''}">
       <b>take ${k + 1}</b> <span class="si-dica">${fmt(t.dur)}</span>
+      <canvas class="gv-onda" width="240" height="34" data-onda="/curtos/${PID}/voz/parte/${pt.id}/${t.id}.wav?v=${t.usar_realce ? 'r' : 'o'}${t.quando}" title="a forma de onda deste take"></canvas>
       <audio controls preload="none" src="/curtos/${PID}/voz/parte/${pt.id}/${t.id}.wav?v=${t.usar_realce ? 'r' : 'o'}${t.quando}"></audio>
       ${t.id === pt.ativo ? '<span style="color:var(--ok);font-weight:700">✔ em uso</span>' : `<button class="gv-mini" data-acao="usar" data-p="${pt.id}" data-t="${t.id}">✔ usar</button>`}
       <button class="gv-mini" data-editar="${pt.id}" data-t="${t.id}" title="forma de onda: corte o começo/fim e trechos do meio (salva como take novo)">✂ editar</button>
@@ -115,6 +118,7 @@ function parteHtml(pt, i) {
   return `<div class="gv-cab">${pt.id === 'TUDO' ? '' : `<b>${i}/${EST.partes.length - 1}</b>${pt.funcao ? ' · ' + esc(pt.funcao) : ''}`} <span class="gravacao-status"></span></div>
     <div class="gv-texto">${esc(pt.texto)}</div>${pt.traducao ? `<div class="gv-trad">${esc(pt.traducao)}</div>` : ''}
     <div class="gv-acoes"><button class="gv-rec ${rec_ ? 'on' : ''}" data-rec="${pt.id}">${rec_ ? '⏹ parar <span class="gv-tempo">0.0 s</span>' : (pt.takes.length ? '⏺ gravar outro take' : '⏺ gravar')}</button></div>
+    ${rec_ ? '<canvas class="gv-viva" width="900" height="64" title="o que está chegando do microfone agora"></canvas>' : ''}
     <div class="gv-takes">${takesHtml(pt)}</div>`;
 }
 function desenhar() {
@@ -127,6 +131,7 @@ function desenhar() {
   const falta = !!(EST.faltando || []).length || !!gravando;
   if ($('bEnviar')) $('bEnviar').disabled = falta;
   $('bJuntar').disabled = falta;
+  desenharOndas();
   aplicarOpcoes();
 }
 async function recarregar() { try { EST = (await (await fetch(`/curtos/${PID}/voz/estado`)).json()).estado; } catch (e) {} desenhar(); }
@@ -190,15 +195,15 @@ async function gravar(parte) {
   try { await ligarMic(); } catch (e) { status('❌ não consegui o microfone: ' + e.message); return; }
   if ($('optConta').checked) { for (const n of [3, 2, 1]) { status(`⏱ ${n}…`); await espera(700); } }
   if (audioCtx.state !== 'running') { try { await Promise.race([audioCtx.resume(), espera(800)]); } catch (e) {} }
-  const r = {bufs: [], taxa: audioCtx.sampleRate, parte, nos: [], mr: null, mrPedacos: [], mrFim: null};
+  const r = {bufs: [], taxa: audioCtx.sampleRate, parte, nos: [], mr: null, mrPedacos: [], mrFim: null, picos: [], acc: 0, accMax: 0};
   const mudo = audioCtx.createGain(); mudo.gain.value = 0; mudo.connect(audioCtx.destination); r.nos.push(mudo);  // processa sem tocar no alto-falante
   try {
     if (await carregarWorklet()) {
-      const no = new AudioWorkletNode(audioCtx, 'gv-gravador'); no.port.onmessage = e => { if (gravando) r.bufs.push(e.data); };
+      const no = new AudioWorkletNode(audioCtx, 'gv-gravador'); no.port.onmessage = e => { if (gravando) { r.bufs.push(e.data); picoVivo(r, e.data); } };
       fonteMic.connect(no); no.connect(mudo); r.nos.push(no);
     } else {
       const proc = audioCtx.createScriptProcessor(4096, 1, 1);
-      proc.onaudioprocess = e => { if (gravando) r.bufs.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+      proc.onaudioprocess = e => { if (gravando) { const c = new Float32Array(e.inputBuffer.getChannelData(0)); r.bufs.push(c); picoVivo(r, c); } };
       fonteMic.connect(proc); proc.connect(mudo); r.nos.push(proc);
     }
   } catch (e) { status('⚠ gravador WAV não abriu (' + e.message + ') — uso o do navegador'); }
@@ -207,9 +212,39 @@ async function gravar(parte) {
     r.mrFim = new Promise(res => { r.mr.onstop = res; }); r.mr.start(500);
   } catch (e) { r.mr = null; }
   if (r.nos.length < 2 && !r.mr) { status('❌ não consegui começar a gravar neste navegador'); return; }
-  rec = r; gravando = parte; t0 = Date.now(); status('⏺ gravando…'); desenhar();
+  rec = r; gravando = parte; t0 = Date.now(); status('⏺ gravando…'); desenhar(); ondaViva(r);
   timer = setInterval(() => document.querySelectorAll('.gv-tempo').forEach(e => e.textContent = ((Date.now() - t0) / 1000).toFixed(1) + ' s'), 100);
 }
+// 〰 v84_337: a forma de onda AO VIVO (um pico a cada ~25 ms; a gravação inteira cabe na largura) e a de cada take salvo
+function picoVivo(r, c) {
+  const passo = Math.max(64, Math.round(r.taxa * 0.025));
+  for (let i = 0; i < c.length; i++) { const v = Math.abs(c[i]); if (v > r.accMax) r.accMax = v; if (++r.acc >= passo) { r.picos.push(r.accMax); r.acc = 0; r.accMax = 0; } }
+}
+function desenharPicos(cv, picos, cor, cheio) {
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
+  if (!picos.length) return;
+  const n = Math.max(W / 3, Math.min(picos.length, W / 2)), por = picos.length / n, larg = W / n;
+  g.fillStyle = cor;
+  for (let k = 0; k < n; k++) { let m = 0; for (let j = Math.floor(k * por); j < Math.max(Math.floor(k * por) + 1, Math.floor((k + 1) * por)); j++) m = Math.max(m, picos[j] || 0);
+    const h = Math.max(1, Math.min(1, m * 1.6) * (H - 4)); g.fillRect(k * larg, (H - h) / 2, Math.max(1, larg - (cheio ? 0 : 1)), h); }
+}
+function ondaViva(r) {
+  const passo = () => { if (rec !== r || !gravando) return; const cv = document.querySelector('.gv-viva');
+    if (cv) { desenharPicos(cv, r.picos, '#e53935', false); const g = cv.getContext('2d'); g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(cv.width - 2, 0, 2, cv.height); }
+    requestAnimationFrame(passo); };
+  requestAnimationFrame(passo);
+}
+const ONDAS = new Map(); let ctxOndas = null;
+async function picosDoArquivo(url, n) {
+  if (ONDAS.has(url)) return ONDAS.get(url);
+  const pr = (async () => { ctxOndas = ctxOndas || new (window.AudioContext || window.webkitAudioContext)();
+    const buf = await ctxOndas.decodeAudioData(await (await fetch(url)).arrayBuffer()); const d = buf.getChannelData(0), por = Math.max(1, Math.floor(d.length / n)), out = [];
+    for (let k = 0; k < n; k++) { let m = 0; for (let i = k * por, f = Math.min(d.length, (k + 1) * por); i < f; i += 4) { const v = Math.abs(d[i]); if (v > m) m = v; } out.push(m); }
+    return out; })();
+  ONDAS.set(url, pr); return pr;
+}
+function desenharOndas() { document.querySelectorAll('canvas[data-onda]').forEach(async cv => {
+  try { desenharPicos(cv, await picosDoArquivo(cv.dataset.onda, 120), cv.closest('.gv-take.ativo') ? '#43a047' : '#8e9aaf', false); } catch (e) {} }); }
 function wavDe(bufs, taxa) {
   const n = bufs.reduce((a, b) => a + b.length, 0), dv = new DataView(new ArrayBuffer(44 + n * 2));
   const txt = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };

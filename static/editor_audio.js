@@ -322,7 +322,10 @@ function abrirEditorAudio(indice, takeId, srcOriginal, rotulo) {
   var labelMelhoria = document.createElement('label');
   labelMelhoria.style.cssText = 'font-weight:normal;font-size:0.85rem;display:flex;align-items:center;gap:6px;margin-top:16px;';
   var checkMelhoria = document.createElement('input');
-  checkMelhoria.type = 'checkbox'; checkMelhoria.checked = true; checkMelhoria.style.width = 'auto';
+  checkMelhoria.type = 'checkbox'; checkMelhoria.style.width = 'auto';
+  // v84_337: DESLIGADA por padrão — liga se você marcar (e fica lembrado neste navegador)
+  try { checkMelhoria.checked = localStorage.getItem('editor_audio_melhoria') === '1'; } catch (e) { checkMelhoria.checked = false; }
+  checkMelhoria.addEventListener('change', function () { try { localStorage.setItem('editor_audio_melhoria', checkMelhoria.checked ? '1' : '0'); } catch (e) {} });
   labelMelhoria.appendChild(checkMelhoria);
   labelMelhoria.appendChild(document.createTextNode('✨ Aplicar melhoria de áudio automaticamente (redução de ruído, clareza) ao salvar'));
   corpo.appendChild(labelMelhoria);

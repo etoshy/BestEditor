@@ -1222,6 +1222,18 @@ def normalizar_marca(m: Any, nome_canal: str = "") -> Dict[str, Any]:
             pass
         if "contorno" in m:
             out["contorno"] = bool(m["contorno"])
+        if m.get("estilo") in ("caixa", "neon", "duplo", "3d"):  # 🎨 v84_338: estilos prontos do @
+            out["estilo"] = m["estilo"]
+        if re.fullmatch(r"#[0-9A-Fa-f]{6}", str(m.get("estilo_cor") or "")):
+            out["estilo_cor"] = m["estilo_cor"].upper()
+        for k_ in ("italico", "maiusculas"):
+            if m.get(k_):
+                out[k_] = True
+        try:
+            if m.get("espaco") not in (None, "", 0, "0"):
+                out["espaco"] = max(0, min(40, int(float(m["espaco"]))))
+        except (TypeError, ValueError):
+            pass
     return out
 
 

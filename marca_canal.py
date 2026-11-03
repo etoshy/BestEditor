@@ -80,6 +80,17 @@ def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, pos
     cor_borda = _cor(cfg.get("borda_cor") or "#000000")
     cor_sombra = _cor(cfg.get("sombra_cor") or "#000000").replace("&H00", "&H60", 1)
     texto = str(cfg.get("texto") or "").replace("{", "(").replace("}", ")").replace("\\", "/")
+    if cfg.get("maiusculas"):  # 🎨 v84_338
+        texto = texto.upper()
+    italico = 1 if cfg.get("italico") else 0
+    espaco = round(float(cfg.get("espaco") or 0) * escala, 1)
+    estilo = cfg.get("estilo") or ""
+    cor_estilo = cfg.get("estilo_cor") or ""
+    borda_style = 1
+    if estilo == "caixa":  # 📦 a caixa atrás do @ (BorderStyle 3 = caixa opaca na cor da borda)
+        borda_style = 3
+        borda = max(int(round(10 * escala)), borda)
+        cor_borda = _cor(cor_estilo or cfg.get("borda_cor") or "#000000")
 
     def t(s: float) -> str:
         s = max(0.0, s)
@@ -88,9 +99,11 @@ def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, pos
               "[V4+ Styles]",
               "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, "
               "StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-              f"Style: Marca,{fam},{fs},{_cor(cfg.get('cor'))},{_cor(cfg.get('cor'))},{cor_borda},{cor_sombra},1,0,0,0,100,100,0,0,1,{borda},{sombra},{an},0,0,0,1",
-              "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-              f"Dialogue: 0,{t(0)},{t(dur + 1)},Marca,,0,0,0,,{{\\pos({x},{y})\\alpha&H{alfa}&}}{texto}"]
+              f"Style: Marca,{fam},{fs},{_cor(cfg.get('cor'))},{_cor(cfg.get('cor'))},{cor_borda},{cor_sombra},1,{italico},0,0,100,100,{espaco},0,{borda_style},{borda},{sombra},{an},0,0,0,1",
+              "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
+    linhas += _camadas_de_baixo(estilo, cor_estilo or cfg.get("cor2") or cfg.get("cor") or "#FFFFFF", fs, borda, escala, x, y, alfa,
+                                texto, t(0), t(dur + 1))
+    linhas.append(f"Dialogue: 1,{t(0)},{t(dur + 1)},Marca,,0,0,0,,{{\\pos({x},{y})\\alpha&H{alfa}&}}{texto}")
     if cfg.get("gradiente") and cfg.get("cor2"):  # 🌈 v84_333: degradê — faixas finas por cima (com \clip), da cor 1 à cor 2
         linhas += _faixas_degrade(cfg, fam, px_css, an, x, y, texto, alfa, t(0), t(dur + 1))
     os.makedirs(os.path.dirname(os.path.abspath(caminho)), exist_ok=True)
@@ -129,7 +142,7 @@ def _faixas_degrade(cfg: Dict[str, Any], fam: str, px_css: float, an: int, x: in
         else:
             a_, b_ = x0 + (x1 - x0) * k / n, x0 + (x1 - x0) * (k + 1) / n
             clip = f"{int(a_)},{int(y0)},{int(b_) + 1},{int(y1) + 1}"
-        out.append(f"Dialogue: 1,{t0},{t1},Marca,,0,0,0,,{{\\pos({x},{y})\\alpha&H{alfa}&\\bord0\\shad0"
+        out.append(f"Dialogue: 2,{t0},{t1},Marca,,0,0,0,,{{\\pos({x},{y})\\alpha&H{alfa}&\\bord0\\shad0"
                    f"\\1c&H00{b:02X}{g:02X}{r:02X}&\\clip({clip})}}{texto}")
     return out
 
@@ -156,3 +169,26 @@ def aplicar(video: str, cfg: Optional[Dict[str, Any]], pasta_tmp: str, posicao_l
         return False
     shutil.move(saida, video)
     return True
+
+
+ESTILOS_MARCA = {"": "simples", "caixa": "📦 caixa atrás", "neon": "✨ brilho neon", "duplo": "⭕ contorno duplo", "3d": "🧱 3D (sombra longa)"}
+
+
+def _camadas_de_baixo(estilo: str, cor: str, fs: float, borda: int, escala: float, x: int, y: int, alfa: str, texto: str,
+                      t0: str, t1: str) -> list:
+    """🎨 v84_338: o que fica EMBAIXO do @ pra dar o estilo (o texto normal vai por cima, na camada 1)."""
+    h = str(cor or "#FFFFFF").lstrip("#").upper()
+    c = f"&H{h[4:6]}{h[2:4]}{h[0:2]}&"
+    ab = f"\\alpha&H{alfa}&"
+    if estilo == "neon":  # brilho: uma borda grossa e borrada na cor do brilho, sem o recheio
+        b, bl = max(4, int(fs / 7)), max(6, int(fs / 4))
+        return [f"Dialogue: 0,{t0},{t1},Marca,,0,0,0,,{{\\pos({x},{y}){ab}\\1a&HFF&\\shad0\\bord{b}\\blur{bl}\\3c{c}}}{texto}",
+                f"Dialogue: 0,{t0},{t1},Marca,,0,0,0,,{{\\pos({x},{y}){ab}\\1a&HFF&\\shad0\\bord{max(2, b // 2)}\\blur{max(2, bl // 3)}\\3c{c}}}{texto}"]
+    if estilo == "duplo":  # um 2º contorno, mais largo, por fora do 1º
+        b = max(borda, int(round(3 * escala))) * 2 + int(round(6 * escala))
+        return [f"Dialogue: 0,{t0},{t1},Marca,,0,0,0,,{{\\pos({x},{y}){ab}\\shad0\\bord{b}\\3c{c}\\1c{c}}}{texto}"]
+    if estilo == "3d":  # sombra longa: várias cópias deslocadas na diagonal
+        n, passo = 10, max(1.0, fs / 70)
+        return [f"Dialogue: 0,{t0},{t1},Marca,,0,0,0,,{{\\pos({x + round(k * passo)},{y + round(k * passo)}){ab}\\shad0\\bord{borda}"
+                f"\\1c{c}\\3c{c}}}{texto}" for k in range(n, 0, -1)]
+    return []

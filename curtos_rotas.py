@@ -2230,6 +2230,22 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             return _ok(fonte=it, fontes=AX.familias())
         return _ok(fontes=AX.familias())
 
+    @app.route("/curtos/fontes/google", methods=["GET", "POST"])
+    def curtos_fontes_google():
+        """🔤 v84_338: GET = o catálogo (com o que já está instalado); POST {nome} = baixa e instala uma do Google Fonts."""
+        import acabamento_extra as AX
+        import fontes_google as FG
+        if request.method == "POST":
+            nome = str((request.get_json(silent=True) or {}).get("nome") or "")
+            try:
+                it = FG.baixar(nome)
+            except FG.FonteErro as exc:
+                return _erro(str(exc))
+            except Exception as exc:  # noqa: BLE001  (sem internet, Google fora…)
+                return _erro(f"Não consegui baixar: {str(exc)[:200]}")
+            return _ok(fonte=it, fontes=AX.familias())
+        return _ok(catalogo=FG.catalogo(), fontes=AX.familias())
+
     def _canais_out() -> list:
         out = []
         for c in CT.listar_canais(base_dir):

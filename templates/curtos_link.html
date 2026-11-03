@@ -40,6 +40,29 @@
   .lk-rot { font-size: .9rem; line-height: 1.45; background: var(--code-bg); border-radius: 8px; padding: 8px 10px; }
   .lk-tit { display: flex; gap: 6px; align-items: flex-start; font-size: .88rem; padding: 3px 0; }
   .lk-tit small { color: var(--mudo); }
+  .pz-grade { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 16px; align-items: start; margin-top: 8px; }
+  @media (max-width: 900px) { .pz-grade { grid-template-columns: 1fr; } .pz-lado { position: static !important; } }
+  .pz-lado { position: sticky; top: 70px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; border: 1px solid var(--borda); border-radius: 12px; background: var(--card); max-height: calc(100vh - 80px); overflow: auto; }
+  .pz-lado > label { width: 100%; }
+  .pz-secs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--borda); padding-bottom: 8px; }
+  .pz-secb { padding: 6px 11px; border-radius: 9px; border: 1px solid var(--borda); background: transparent; color: inherit; cursor: pointer; font-weight: 600; font-size: .86rem; }
+  .pz-secb.on { background: var(--acento-suave); border-color: var(--acento); }
+  .pz-sec { display: none; padding-top: 6px; } .pz-sec.on { display: block; }
+  .pz-h { margin: 12px 0 2px; font-size: .9rem; }
+  .pz-acoes { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .pz-chk { flex-direction: row !important; align-items: center; gap: 6px !important; font-weight: 400 !important; margin-top: 22px !important; }
+  .pz-chk input { width: auto !important; margin: 0; }
+  .pz-fonte-linha { display: flex; gap: 6px; } .pz-fonte-linha select { flex: 1; } .pz-filtro { width: 170px !important; }
+  .pz-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; max-height: 250px; overflow: auto; margin-top: 6px; padding: 2px; }
+  .pz-fnt { display: flex !important; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; border: 1px solid var(--borda); border-radius: 9px; padding: 6px 8px; background: #1b1e27; color: #fff; cursor: pointer; text-align: left; overflow: hidden; }
+  .pz-fnt b { display: block; max-width: 100%; font-size: 20px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; }
+  .pz-fnt small { color: #9aa0ad; font-size: 11px; } .pz-fnt.on { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento); }
+  .pz-amostra { width: 100%; text-align: center; padding: 6px 8px; border-radius: 8px; background: #222; font-weight: 800; font-size: 1.05rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .pz-carga { position: absolute; right: 8px; top: 8px; background: rgba(0,0,0,.55); border-radius: 50%; padding: 5px; z-index: 3; }
+  .pz-gfcat { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; margin-top: 6px; }
+  .pz-gfg { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; } .pz-gfg > b { width: 100%; font-size: .85rem; }
+  .pz-gfg label { flex-direction: row !important; align-items: center; gap: 4px !important; font-weight: 400 !important; margin: 0 !important; font-size: .85rem; }
+  .pz-gfg label input { width: auto !important; margin: 0; } .pz-gfg .ok { color: var(--ok); }
 </style>
 {% if so_personalizar %}<h1>🎨 Personalização dos canais <span class="si-dica" style="font-weight:400">cada canal na sua aba: @, legenda, cores, fontes, tarja, formato, voz e idioma — vale pros vídeos novos dele</span></h1>
 <div class="si-linha" style="gap:10px"><a href="/curtos/link">← Link → vídeo pronto</a></div>
@@ -105,135 +128,200 @@
 </details>{% endif %}
 <div class="si-card lk-form">
   <details id="acab"{% if so_personalizar %} open{% endif %}><summary style="cursor:pointer;font-weight:600" id="acabTitulo">🎨 Acabamento de TODOS os shorts — @ do canal, legenda, efeitos sonoros</summary>
-    <p class="si-dica" style="margin:6px 0">Vale pros shorts novos de todas as abas (Link, Comentário, Explicativo, Momentos…). O vídeo do post sempre perde as
-      <b>bordas pretas</b> que ficam o tempo todo nele; a IA olha o vídeo, escreve o roteiro, escolhe os cortes, os destaques com rastreio e os sons.</p>
-    <div class="lk-ops">
-      <label>@ do canal<input id="a_arroba" placeholder="@seucanal"></label>
-      <label>Legenda<select id="a_legenda_estilo"><option value="">o do canal</option>{% for e in estilos_legenda %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
-      <label>Tamanho<select id="a_legenda_tamanho"><option value="0.04">pequena</option><option value="0.05">média</option><option value="0.062">grande</option></select></label>
-      <label>Posição<select id="a_legenda_posicao"><option value="terco">terço de baixo</option><option value="base">embaixo</option><option value="meio">no meio</option><option value="topo">em cima</option></select></label>
-      <label>Altura exata (% de cima pra baixo)<input id="a_legenda_altura" type="number" min="5" max="95" placeholder="vazio = pela posição"></label>
-      <label>Margem livre dos lados<select id="a_legenda_margem"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></label>
+    <p class="si-dica" style="margin:6px 0">Vale pros shorts novos de todas as abas (Link, Comentário, Explicativo, Momentos…). Mexa à esquerda e veja à direita —
+      a prévia fica sempre na tela. Vazio = como já era.</p>
+    <div class="pz-grade">
+    <div class="pz-ed">
+    <div class="pz-secs" id="pzSecs">
+      <button type="button" class="pz-secb" data-sec="marca">🏷 Nome do canal (@)</button>
+      <button type="button" class="pz-secb" data-sec="legenda">🔤 Legenda</button>
+      <button type="button" class="pz-secb" data-sec="cores">🎲 Cores e sorteio</button>
+      <button type="button" class="pz-secb" data-sec="fontes">🔠 Fontes</button>
+      <button type="button" class="pz-secb" data-sec="tarja">▭ Tarja</button>
+      <button type="button" class="pz-secb" data-sec="formato">📐 Formato e sons</button>
+      <button type="button" class="pz-secb" data-sec="canal">📺 Canal e voz</button>
     </div>
-    <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_legenda_maiusculas" style="width:auto;margin:0"> MAIÚSCULAS</label>
-    <div class="lk-ops">
-      <label>Fonte da legenda<select id="a_legenda_fonte">{% for k, v in fontes_legenda.items() %}<option value="{{ k }}" style="font-family:'{{ k }}'">{{ v }}</option>{% endfor %}</select></label>
-      <label>Cor do texto<span class="lk-cor"><input id="a_legenda_cor" list="lkCores" placeholder="padrão" maxlength="7"><input type="color" data-cor="a_legenda_cor" title="escolher a cor"></span></label>
-      <label>Cor da palavra falada<span class="lk-cor"><input id="a_legenda_cor_ativa" list="lkCores" placeholder="padrão" maxlength="7"><input type="color" data-cor="a_legenda_cor_ativa" title="escolher a cor"></span></label>
-      <datalist id="lkCores">{% for k, v in cores_legenda.items() %}{% if k %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</datalist>
-      <div id="a_previa_leg" style="align-self:end;padding:8px 14px;border-radius:8px;background:#222;font-weight:800;font-size:1.1rem"></div>
-    </div>
-    <div class="lk-ops" style="align-items:flex-start">
-      <div style="display:flex;flex-direction:column;gap:6px;min-width:260px;flex:1">
+
+    <!-- 🏷 O NOME DO CANAL (@) -->
+    <section class="pz-sec" data-sec="marca">
+      <div class="pz-acoes"><button type="button" class="si-mini" id="bSortearMarca" title="sorteia fonte, estilo pronto, borda, sombra, degradê e cores do @ — combinando com as cores da legenda">🎲 sortear só o @</button>
+        <button type="button" class="si-mini si-sec" id="bCoresMarca" title="troca só as cores do @ (combinando com a legenda)">🎨 só as cores do @</button></div>
+      <h4 class="pz-h">Texto e lugar</h4>
+      <div class="lk-ops">
+        <label>@ do canal<input id="a_arroba" placeholder="@seucanal"></label>
+        <label>Posição<select id="a_marca_posicao"><option value="">como o canal define (meio)</option><option value="meio">no meio</option><option value="topo">em cima</option><option value="base">embaixo</option><option value="terco">terço de baixo</option><option value="sup_esq">canto sup. esquerdo</option><option value="sup_dir">canto sup. direito</option><option value="inf_esq">canto inf. esquerdo</option><option value="inf_dir">canto inf. direito</option><option value="legenda">🔗 ligada à legenda (acima/abaixo dela)</option><option value="livre">↕ livre (arraste na prévia)</option></select></label>
+        <label>Altura livre (% de cima)<input id="a_marca_altura" type="number" min="2" max="98" step="0.5" placeholder="arraste na prévia"></label>
+        <label>Ligada: lado<select id="a_marca_lado"><option value="acima">acima da legenda</option><option value="abaixo">abaixo da legenda</option></select></label>
+        <label>Distância (% da altura)<input id="a_marca_distancia" type="number" min="1" max="40" step="1"></label>
+        <label>ou em pixels (0 = usa a %)<input id="a_marca_px" type="number" min="0" max="400" step="1"></label>
+        <label>Ajuste X (px)<input id="a_marca_x" type="number" min="-600" max="600" step="2"></label>
+        <label>Ajuste Y (px)<input id="a_marca_y" type="number" min="-600" max="600" step="2"></label>
+      </div>
+      <h4 class="pz-h">Fonte <span class="si-dica">— clique numa pra usar (mais fontes na aba 🔠 Fontes)</span></h4>
+      <div class="pz-fonte-linha"><select id="a_marca_fonte"><option value="">padrão (Poppins)</option>{% for k, v in fontes_legenda.items() %}{% if k %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</select>
+        <input class="pz-filtro" data-gal="galMarca" placeholder="🔎 filtrar fontes"></div>
+      <div class="pz-gal" id="galMarca" data-sel="a_marca_fonte"></div>
+      <h4 class="pz-h">Estilo</h4>
+      <div class="lk-ops">
+        <label>Estilo pronto<select id="a_marca_estilo"><option value="">simples</option><option value="caixa">📦 caixa atrás</option><option value="neon">✨ brilho neon</option><option value="duplo">⭕ contorno duplo</option><option value="3d">🧱 3D (sombra longa)</option></select></label>
+        <label>Cor do estilo <small>(caixa/brilho/2º contorno/3D)</small><span class="lk-cor"><input id="a_marca_estilo_cor" placeholder="automática" maxlength="7"><input type="color" data-cor="a_marca_estilo_cor" title="escolher a cor"></span></label>
+        <label>Cor<span class="lk-cor"><input id="a_marca_cor" placeholder="branco" maxlength="7"><input type="color" data-cor="a_marca_cor" title="escolher a cor"></span></label>
+        <label>Tamanho (% da altura)<input id="a_marca_tamanho" type="number" min="1" max="12" step="0.5" placeholder="3.5"></label>
+        <label>Opacidade (%)<input id="a_marca_opacidade" type="number" min="5" max="100" step="5" placeholder="50"></label>
+        <label>Espaço entre letras<input id="a_marca_espaco" type="number" min="0" max="40" step="1" placeholder="0"></label>
+        <label class="pz-chk"><input type="checkbox" id="a_marca_maiusculas"> MAIÚSCULAS</label>
+        <label class="pz-chk"><input type="checkbox" id="a_marca_italico"> <i>itálico</i></label>
+      </div>
+      <h4 class="pz-h">Borda, sombra e degradê</h4>
+      <div class="lk-ops">
+        <label>Borda (px)<input id="a_marca_borda" type="number" min="0" max="20" placeholder="auto"></label>
+        <label>Cor da borda<span class="lk-cor"><input id="a_marca_borda_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_marca_borda_cor" title="escolher a cor"></span></label>
+        <label>Sombra (px)<input id="a_marca_sombra" type="number" min="0" max="20" placeholder="0"></label>
+        <label>Cor da sombra<span class="lk-cor"><input id="a_marca_sombra_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_marca_sombra_cor" title="escolher a cor"></span></label>
+        <label class="pz-chk"><input type="checkbox" id="a_marca_gradiente"> 🌈 degradê</label>
+        <label>Cor 2 do degradê<span class="lk-cor"><input id="a_marca_cor2" placeholder="—" maxlength="7"><input type="color" data-cor="a_marca_cor2" title="escolher a cor"></span></label>
+        <label>Direção<select id="a_marca_grad_dir"><option value="horizontal">horizontal</option><option value="vertical">vertical</option></select></label>
+      </div>
+    </section>
+
+    <!-- 🔤 A LEGENDA -->
+    <section class="pz-sec" data-sec="legenda">
+      <div class="pz-acoes"><button type="button" class="si-mini" id="bSortearLeg" title="sorteia fonte, estilo, borda, sombra e cores da legenda — combinando com o @">🎲 sortear só a legenda</button>
+        <button type="button" class="si-mini si-sec" id="bCoresLeg" title="troca só as cores da legenda (combinando com o @)">🎨 só as cores da legenda</button></div>
+      <h4 class="pz-h">Estilo e lugar</h4>
+      <div class="lk-ops">
+        <label>Estilo<select id="a_legenda_estilo"><option value="">o do canal</option>{% for e in estilos_legenda %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
+        <label>Tamanho<select id="a_legenda_tamanho"><option value="0.04">pequena</option><option value="0.05">média</option><option value="0.062">grande</option></select></label>
+        <label>Posição<select id="a_legenda_posicao"><option value="terco">terço de baixo</option><option value="base">embaixo</option><option value="meio">no meio</option><option value="topo">em cima</option></select></label>
+        <label>Altura exata (% de cima)<input id="a_legenda_altura" type="number" min="5" max="95" placeholder="vazio = pela posição"></label>
+        <label>Margem livre dos lados<select id="a_legenda_margem"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1">10%</option><option value="0.15">15%</option><option value="0.2">20%</option></select></label>
+        <label class="pz-chk"><input type="checkbox" id="a_legenda_maiusculas"> MAIÚSCULAS</label>
+      </div>
+      <h4 class="pz-h">Fonte <span class="si-dica">— clique numa pra usar</span></h4>
+      <div class="pz-fonte-linha"><select id="a_legenda_fonte">{% for k, v in fontes_legenda.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+        <input class="pz-filtro" data-gal="galLeg" placeholder="🔎 filtrar fontes"></div>
+      <div class="pz-gal" id="galLeg" data-sel="a_legenda_fonte"></div>
+      <h4 class="pz-h">Cores, borda e sombra</h4>
+      <div class="lk-ops">
+        <label>Cor do texto<span class="lk-cor"><input id="a_legenda_cor" list="lkCores" placeholder="padrão" maxlength="7"><input type="color" data-cor="a_legenda_cor" title="escolher a cor"></span></label>
+        <label>Cor da palavra falada<span class="lk-cor"><input id="a_legenda_cor_ativa" list="lkCores" placeholder="padrão" maxlength="7"><input type="color" data-cor="a_legenda_cor_ativa" title="escolher a cor"></span></label>
+        <datalist id="lkCores">{% for k, v in cores_legenda.items() %}{% if k %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</datalist>
+        <label>Borda (px)<input id="a_legenda_borda" type="number" min="0" max="20" placeholder="a do estilo"></label>
+        <label>Cor da borda<span class="lk-cor"><input id="a_legenda_borda_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_legenda_borda_cor" title="escolher a cor"></span></label>
+        <label>Sombra (px)<input id="a_legenda_sombra" type="number" min="0" max="20" placeholder="a do estilo"></label>
+        <label>Cor da sombra<span class="lk-cor"><input id="a_legenda_sombra_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_legenda_sombra_cor" title="escolher a cor"></span></label>
+        <label>Opacidade do texto (%)<input id="a_legenda_opacidade" type="number" min="5" max="100" step="5" placeholder="100"></label>
+      </div>
+    </section>
+
+    <!-- 🎲 CORES E SORTEIO -->
+    <section class="pz-sec" data-sec="cores">
+      <p class="si-dica" style="margin:4px 0 8px">O sorteio usa <b>teoria das cores</b>: escolhe um esquema (opostas, vizinhas, tríade…) e um tom, e garante contraste
+        alto entre o texto e a borda — sempre legível e sempre combinando. Deixe em 🎲 pra variar, ou trave o esquema, o tom ou a cor base.</p>
+      <div class="lk-ops">
+        <label>🎨 Esquema<select id="corEsquema">
+          <option value="">🎲 qualquer</option><option value="complementar">complementar (opostas)</option><option value="analoga">análoga (vizinhas)</option>
+          <option value="triade">tríade</option><option value="dividida">complementar dividida</option><option value="mono">monocromática</option></select></label>
+        <label>Tom<select id="corTom">
+          <option value="">🎲 qualquer</option><option value="vibrante">vibrante</option><option value="neon">neon</option><option value="pastel">pastel</option><option value="sobrio">sóbrio</option><option value="quente">quente</option><option value="frio">frio</option></select></label>
+        <label title="a cor que manda na paleta (vazio = sorteada)">Cor base<span class="lk-cor"><input id="corBase" placeholder="sorteada" maxlength="7"><input type="color" data-cor="corBase"></span></label>
+      </div>
+      <div class="pz-acoes" style="margin-top:10px">
+        <button type="button" class="si-mini" id="bSortear" title="sorteia o @ e a legenda juntos, com a mesma paleta">🎲 sortear tudo (@ + legenda)</button>
+        <button type="button" class="si-mini" id="bSortearMarca2">🎲 só o @</button>
+        <button type="button" class="si-mini" id="bSortearLeg2">🎲 só a legenda</button>
+        <button type="button" class="si-mini si-sec" id="bSoCores" title="troca só as cores (mantém fontes, estilo e espessuras)">🎨 só as cores (tudo)</button>
+        <button type="button" class="si-mini si-sec" id="bDesfazer" title="volta pro que estava antes do último sorteio">↶ desfazer o sorteio</button>
+        <button type="button" class="si-mini si-sec" id="bLimparEstilo" title="esvazia borda, sombra, degradê, cores e fontes extras (volta ao jeito de antes)">↺ limpar o estilo</button>
+      </div>
+      <div style="margin-top:8px">Paleta: <span id="paletaVista" style="display:inline-flex;gap:3px;align-items:center"></span></div>
+    </section>
+
+    <!-- 🔠 FONTES -->
+    <section class="pz-sec" data-sec="fontes">
+      <h4 class="pz-h">📥 Baixar do Google Fonts <span class="si-dica">— grátis (licença livre); precisa de internet no PC</span></h4>
+      <div class="pz-acoes"><button type="button" class="si-mini si-ok" id="gfMarcadas">📥 baixar as marcadas</button>
+        <button type="button" class="si-mini si-sec" id="gfTodas" title="marca todas as que ainda não estão instaladas">marcar todas</button>
+        <button type="button" class="si-mini si-sec" id="gfNenhuma">desmarcar</button>
+        <span id="gfProg" class="si-dica"></span></div>
+      <div id="gfCat" class="pz-gfcat"><span class="si-dica">carregando o catálogo…</span></div>
+      <div class="pz-acoes" style="margin-top:8px"><input id="gfNome" placeholder="ou digite o nome de qualquer fonte do fonts.google.com (ex.: Bungee Spice)" style="flex:1;min-width:220px">
+        <button type="button" class="si-mini" id="gfBaixar">📥 baixar essa</button></div>
+      <h4 class="pz-h" style="margin-top:14px">⬆ Enviar uma fonte sua (.ttf / .otf)</h4>
+      <div class="pz-acoes"><input type="file" id="fonteArq" accept=".ttf,.otf"><input id="fonteNome" placeholder="nome (opcional)" maxlength="40" style="width:180px">
+        <button type="button" class="si-mini" id="bFonte">⬆ instalar a fonte</button></div>
+      <span class="si-dica">as fontes novas aparecem como “(sua)” ou “(Google)” na galeria do @ e da legenda</span>
+    </section>
+
+    <!-- ▭ TARJA -->
+    <section class="pz-sec" data-sec="tarja">
+      <p class="si-dica" style="margin:4px 0 8px">Esconde a legenda/texto que <b>já vem gravado</b> no vídeo original (o crédito do criador continua).</p>
+      <div class="lk-ops">
+        <label>Tarja<select id="a_tarja_modo"><option value="">nenhuma</option><option value="blur">desfoque</option><option value="solida">cor sólida</option></select></label>
+        <label>De (% de cima)<input id="a_tarja_y0" type="number" min="0" max="100" step="0.5" placeholder="ex.: 70"></label>
+        <label>Até (% de cima)<input id="a_tarja_y1" type="number" min="0" max="100" step="0.5" placeholder="ex.: 82"></label>
+        <label>Cor (sólida)<span class="lk-cor"><input id="a_tarja_cor" placeholder="#000000" maxlength="7"><input type="color" data-cor="a_tarja_cor" title="escolher a cor"></span></label>
+      </div>
+    </section>
+
+    <!-- 📐 FORMATO E SONS -->
+    <section class="pz-sec" data-sec="formato">
+      <div class="lk-ops" style="align-items:flex-end">
+        <label>📐 Formato do canal<select id="a_proporcao"><option value="">o do envio</option>{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+        <label class="pz-chk"><input type="checkbox" id="a_tambem_quadrado"> ⬛ também a versão 1:1</label>
+      </div>
+      <label>🎯 Círculo/seta seguindo o objeto<select id="a_destaques"><option value="precisa">só quando precisa (objeto pequeno, longe ou no meio de outros)</option>
+        <option value="livre">a IA decide (como antes: 1 a 3 por vídeo)</option><option value="nunca">nunca</option></select></label>
+      <label>🔊 Efeitos sonoros<select id="a_sons_nivel"><option value="poucos">poucos — só nas ações que aparecem (máx. 1 a cada ~8 s)</option>
+        <option value="normal">normal — também nas trocas de assunto</option><option value="nenhum">nenhum</option></select></label>
+      <label class="pz-chk"><input type="checkbox" id="a_sons_pixabay">
+        🔊 buscar no Pixabay os efeitos sonoros que o roteiro pedir (abre o navegador; na 1ª vez pode pedir a verificação “sou humano”) — desligado: usa os sons da base</label>
+      <label class="pz-chk"><input type="checkbox" id="a_aplicar_noticia">
+        aplicar a legenda também na 📰 Notícia (ela usa a legenda do canal modelado)</label>
+    </section>
+
+    <!-- 📺 CANAL E VOZ -->
+    <section class="pz-sec" data-sec="canal">
+      <div style="display:flex;flex-direction:column;gap:6px">
         <b style="font-size:.92rem">📺 Criar canal ou mudar o nome/descrição</b>
         <input id="c_nome" placeholder="nome do canal (ex.: Arte Fantasia)" maxlength="80">
         <textarea id="c_desc" rows="3" maxlength="1500" placeholder="descrição: do que é o canal, o tom, o que mostrar (a IA segue isso no roteiro)"></textarea>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end" title="Vale pros links que caem neste canal (pelo grupo ou pelo canal do lote). Vazio = o que estiver escolhido no envio. Narrando em inglês usa o Chatterbox Turbo (aceita tags de voz como [laugh]); os outros idiomas, o Chatterbox multilíngue.">
-          <label style="font-size:.85rem">🌍 Postar em (canal)<select id="c_lp"><option value="">(o do envio)</option>{% for k, v in linguas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
-          <label style="font-size:.85rem">🎙 Narrar em<select id="c_idioma"><option value="">(o do envio)</option><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
-          <label style="font-size:.85rem">Voz do canal<select id="c_voz"></select></label>
-          <label style="font-size:.85rem" title="🎤 minha voz: o site faz o roteiro e PARA; você grava na página 🎤 Gravar voz (texto grande, aos poucos, editor e realce) e ele continua a edição">Quem narra<select id="c_modo"><option value="">🤖 a IA (voz gerada)</option><option value="minha">🎤 eu gravo a minha voz</option></select></label>
+        <div class="lk-ops" title="Vale pros links que caem neste canal (pelo grupo ou pelo canal do lote). Vazio = o que estiver escolhido no envio. Narrando em inglês usa o Chatterbox Turbo (aceita tags de voz como [laugh]); os outros idiomas, o Chatterbox multilíngue.">
+          <label>🌍 Postar em (canal)<select id="c_lp"><option value="">(o do envio)</option>{% for k, v in linguas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+          <label>🎙 Narrar em<select id="c_idioma"><option value="">(o do envio)</option><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
+          <label>Voz do canal<select id="c_voz"></select></label>
+          <label title="🎤 minha voz: o site faz o roteiro e PARA; você grava na página 🎤 Gravar voz (texto grande, aos poucos, editor e realce) e ele continua a edição">Quem narra<select id="c_modo"><option value="">🤖 a IA (voz gerada)</option><option value="minha">🎤 eu gravo a minha voz</option></select></label>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="si-mini" onclick="canalCriar()">➕ criar canal</button>
           <button class="si-mini" onclick="canalSalvar()">💾 salvar nome/descrição/voz do canal selecionado</button>
         </div>
       </div>
+    </section>
     </div>
-    <div class="lk-ops" style="align-items:flex-start">
-      <label>Aplicar em<select id="a_escopo" title="o padrão vale pra todos; o do canal só pra ele (o que o canal não define segue o padrão)"></select></label>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <div id="a_tela" title="como a legenda fica na tela (9:16)" style="position:relative;width:146px;height:260px;border-radius:12px;background:linear-gradient(#2b3a55,#0d1220);overflow:hidden;border:2px solid #444">
-          <div id="a_tela_leg" style="position:absolute;left:0;right:0;text-align:center;line-height:1.1;font-weight:900;white-space:normal;transform:translateY(-50%)"></div>
-          <div id="a_tela_marca" style="position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:700;color:#FF8FB1;transform:translateY(-50%)">@seucanal</div>
-        </div>
-        <span class="si-dica">prévia — a legenda (amarelo/azul) e o @ do canal (rosa)</span>
+
+    <!-- 👁 A PRÉVIA — fica parada na tela enquanto você mexe -->
+    <aside class="pz-lado">
+      <label style="margin:0">Aplicar em<select id="a_escopo" title="o padrão vale pra todos; o do canal só pra ele (o que o canal não define segue o padrão)"></select></label>
+      <div id="a_previa_box" style="position:relative;width:240px;height:427px;border-radius:12px;overflow:hidden;border:2px solid #444;background:#111;touch-action:none;user-select:none">
+        <img id="a_previa_real" alt="prévia" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none">
+        <div class="lk-alca" data-alca="marca" title="arraste pra cima/baixo: a altura do @"><span>🏷 @</span></div>
+        <div class="lk-alca" data-alca="legenda" title="arraste pra cima/baixo: a altura da legenda"><span>🔤 legenda</span></div>
+        <div id="a_previa_carga" class="pz-carga" style="display:none"><span class="lk-gira"></span></div>
       </div>
-    </div>
-    <div class="lk-ops" style="align-items:flex-end">
-      <label>🏷 Posição do @ do canal<select id="a_marca_posicao"><option value="">como o canal define (meio)</option><option value="meio">no meio</option><option value="topo">em cima</option><option value="base">embaixo</option><option value="terco">terço de baixo</option><option value="sup_esq">canto sup. esquerdo</option><option value="sup_dir">canto sup. direito</option><option value="inf_esq">canto inf. esquerdo</option><option value="inf_dir">canto inf. direito</option><option value="legenda">🔗 ligada à legenda (acima/abaixo dela)</option><option value="livre">↕ livre (arraste na prévia)</option></select></label>
-      <label>altura livre do @ (% de cima)<input id="a_marca_altura" type="number" min="2" max="98" step="0.5" placeholder="arraste na prévia"></label>
-      <label>ligada: lado<select id="a_marca_lado"><option value="acima">acima da legenda</option><option value="abaixo">abaixo da legenda</option></select></label>
-      <label>distância (% da altura)<input id="a_marca_distancia" type="number" min="1" max="40" step="1"></label>
-      <label>ou em pixels (0 = usa a %)<input id="a_marca_px" type="number" min="0" max="400" step="1"></label>
-    </div>
-    <details id="acabExtra" style="margin-top:8px" open><summary style="cursor:pointer;font-weight:700">✨ Estilo do @ e da legenda — borda, sombra, degradê, sua fonte, tarja <span class="si-dica" style="font-weight:400">(vazio = como já era)</span></summary>
-    <div class="si-linha" style="gap:8px;flex-wrap:wrap;margin:6px 0">
-      <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400">🎨 Esquema<select id="corEsquema" style="width:auto">
-        <option value="">🎲 qualquer</option><option value="complementar">complementar (opostas)</option><option value="analoga">análoga (vizinhas)</option>
-        <option value="triade">tríade</option><option value="dividida">complementar dividida</option><option value="mono">monocromática</option></select></label>
-      <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400">Tom<select id="corTom" style="width:auto">
-        <option value="">🎲 qualquer</option><option value="vibrante">vibrante</option><option value="neon">neon</option><option value="pastel">pastel</option><option value="sobrio">sóbrio</option><option value="quente">quente</option><option value="frio">frio</option></select></label>
-      <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400" title="a cor que manda na paleta (vazio = sorteada)">Cor base<span class="lk-cor"><input id="corBase" placeholder="sorteada" maxlength="7" style="width:84px"><input type="color" data-cor="corBase"></span></label>
-      <button type="button" class="si-mini" id="bSortear" title="sorteia fonte, estilo da legenda, borda, sombra e as cores pela teoria das cores (esquema + tom) — salve se gostar">🎲 sortear um estilo</button>
-      <button type="button" class="si-mini si-sec" id="bSoCores" title="troca só as cores (mantém fontes, estilo e espessuras)">🎨 só as cores</button>
-      <span id="paletaVista" style="display:inline-flex;gap:3px;align-items:center"></span>
-      <button type="button" class="si-mini si-sec" id="bLimparEstilo" title="esvazia os campos desta seção (volta ao jeito de antes)">↺ limpar o estilo</button>
-    </div>
-    <b style="font-size:.9rem">🏷 O @ do canal</b>
-    <div class="lk-ops">
-      <label>Fonte<select id="a_marca_fonte"><option value="">padrão (Poppins)</option>{% for k, v in fontes_legenda.items() %}{% if k %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</select></label>
-      <label>Cor<span class="lk-cor"><input id="a_marca_cor" placeholder="branco" maxlength="7"><input type="color" data-cor="a_marca_cor" title="escolher a cor"></span></label>
-      <label>Tamanho (% da altura)<input id="a_marca_tamanho" type="number" min="1" max="12" step="0.5" placeholder="3.5"></label>
-      <label>Opacidade (%)<input id="a_marca_opacidade" type="number" min="5" max="100" step="5" placeholder="50"></label>
-      <label>Borda (px)<input id="a_marca_borda" type="number" min="0" max="20" placeholder="auto"></label>
-      <label>Cor da borda<span class="lk-cor"><input id="a_marca_borda_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_marca_borda_cor" title="escolher a cor"></span></label>
-      <label>Sombra (px)<input id="a_marca_sombra" type="number" min="0" max="20" placeholder="0"></label>
-      <label>Cor da sombra<span class="lk-cor"><input id="a_marca_sombra_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_marca_sombra_cor" title="escolher a cor"></span></label>
-      <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400;margin-top:22px"><input type="checkbox" id="a_marca_gradiente" style="width:auto;margin:0"> 🌈 degradê</label>
-      <label>Cor 2 do degradê<span class="lk-cor"><input id="a_marca_cor2" placeholder="—" maxlength="7"><input type="color" data-cor="a_marca_cor2" title="escolher a cor"></span></label>
-      <label>Direção<select id="a_marca_grad_dir"><option value="horizontal">horizontal</option><option value="vertical">vertical</option></select></label>
-      <label>Ajuste X (px)<input id="a_marca_x" type="number" min="-600" max="600" step="2"></label>
-      <label>Ajuste Y (px)<input id="a_marca_y" type="number" min="-600" max="600" step="2"></label>
-    </div>
-    <b style="font-size:.9rem">🔤 A legenda</b>
-    <div class="lk-ops">
-      <label>Borda (px)<input id="a_legenda_borda" type="number" min="0" max="20" placeholder="a do estilo"></label>
-      <label>Cor da borda<span class="lk-cor"><input id="a_legenda_borda_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_legenda_borda_cor" title="escolher a cor"></span></label>
-      <label>Sombra (px)<input id="a_legenda_sombra" type="number" min="0" max="20" placeholder="a do estilo"></label>
-      <label>Cor da sombra<span class="lk-cor"><input id="a_legenda_sombra_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_legenda_sombra_cor" title="escolher a cor"></span></label>
-      <label>Opacidade do texto (%)<input id="a_legenda_opacidade" type="number" min="5" max="100" step="5" placeholder="100"></label>
-    </div>
-    <b style="font-size:.9rem">▭ Tarja sobre a legenda que já vem no vídeo original</b> <span class="si-dica">— só pra legenda/texto gravado no clipe (o crédito do criador continua)</span>
-    <div class="lk-ops">
-      <label>Tarja<select id="a_tarja_modo"><option value="">nenhuma</option><option value="blur">desfoque</option><option value="solida">cor sólida</option></select></label>
-      <label>De (% de cima)<input id="a_tarja_y0" type="number" min="0" max="100" step="0.5" placeholder="ex.: 70"></label>
-      <label>Até (% de cima)<input id="a_tarja_y1" type="number" min="0" max="100" step="0.5" placeholder="ex.: 82"></label>
-      <label>Cor (sólida)<span class="lk-cor"><input id="a_tarja_cor" placeholder="#000000" maxlength="7"><input type="color" data-cor="a_tarja_cor" title="escolher a cor"></span></label>
-    </div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:10px">
-      <div style="display:flex;flex-direction:column;gap:6px;width:260px">
-        <b style="font-size:.9rem">🔤 Enviar uma fonte sua (.ttf / .otf)</b>
-        <input type="file" id="fonteArq" accept=".ttf,.otf">
-        <input id="fonteNome" placeholder="nome (opcional)" maxlength="40">
-        <button type="button" class="si-mini" id="bFonte">⬆ instalar a fonte</button>
-        <span class="si-dica">ela aparece como “(sua)” nas listas de fonte do @ e da legenda</span>
+      <span class="si-dica" id="a_previa_info">🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)</span>
+      <span class="si-dica">↕ arraste as alças 🏷 @ e 🔤 legenda</span>
+      <div id="a_previa_leg" class="pz-amostra"></div>
+      <div id="a_previa_marca" class="pz-amostra"></div>
+      <div class="pz-acoes" style="justify-content:center">
+        <button type="button" class="si-mini si-sec" id="bPrevia">🔄 atualizar</button>
+        <button type="button" class="si-mini" id="bSortearLado" title="sorteia o @ e a legenda juntos">🎲 sortear</button>
+        <button type="button" class="si-mini si-sec" id="bDesfazerLado" title="volta pro que estava antes do último sorteio">↶</button>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <div id="a_previa_box" style="position:relative;width:240px;height:427px;border-radius:12px;overflow:hidden;border:2px solid #444;background:#111;touch-action:none;user-select:none">
-          <img id="a_previa_real" alt="prévia" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none">
-          <div class="lk-alca" data-alca="marca" title="arraste pra cima/baixo: a altura do @"><span>🏷 @</span></div>
-          <div class="lk-alca" data-alca="legenda" title="arraste pra cima/baixo: a altura da legenda"><span>🔤 legenda</span></div>
-        </div>
-        <span class="si-dica">↕ arraste as alças 🏷 @ e 🔤 legenda pra cima ou pra baixo</span>
-        <span class="si-dica" id="a_previa_info">🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)</span>
-        <button type="button" class="si-mini si-sec" id="bPrevia">🔄 atualizar a prévia</button>
-      </div>
+      <button class="si-ok" style="width:100%" onclick="lkAcab()">💾 salvar o acabamento</button>
+      <div id="a_tela" style="display:none"><div id="a_tela_leg"></div><div id="a_tela_marca"></div></div>
+    </aside>
     </div>
-    </details>
-    <div class="lk-ops" style="align-items:flex-end">
-      <label>📐 Formato do canal<select id="a_proporcao"><option value="">o do envio</option>{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
-      <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_tambem_quadrado" style="width:auto;margin:0"> ⬛ também a versão 1:1</label>
-    </div>
-    <label>🎯 Círculo/seta seguindo o objeto<select id="a_destaques"><option value="precisa">só quando precisa (objeto pequeno, longe ou no meio de outros)</option>
-      <option value="livre">a IA decide (como antes: 1 a 3 por vídeo)</option><option value="nunca">nunca</option></select></label>
-    <label>🔊 Efeitos sonoros<select id="a_sons_nivel"><option value="poucos">poucos — só nas ações que aparecem (máx. 1 a cada ~8 s)</option>
-      <option value="normal">normal — também nas trocas de assunto</option><option value="nenhum">nenhum</option></select></label>
-    <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_sons_pixabay" style="width:auto;margin:0">
-      🔊 buscar no Pixabay os efeitos sonoros que o roteiro pedir (abre o navegador; na 1ª vez pode pedir a verificação “sou humano”) — desligado: usa os sons da base</label>
-    <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_aplicar_noticia" style="width:auto;margin:0">
-      aplicar a legenda também na 📰 Notícia (ela usa a legenda do canal modelado)</label>
-    <div class="si-linha"><button class="si-mini" onclick="lkAcab()">💾 salvar o acabamento</button></div>
   </details>
 </div>
 
@@ -329,13 +417,22 @@ const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 
               // 🎨 v84_333
               'marca_fonte', 'marca_cor', 'marca_tamanho', 'marca_opacidade', 'marca_borda', 'marca_borda_cor', 'marca_sombra', 'marca_sombra_cor',
               'marca_gradiente', 'marca_cor2', 'marca_grad_dir', 'marca_x', 'marca_y', 'legenda_borda', 'legenda_borda_cor', 'legenda_sombra',
-              'legenda_sombra_cor', 'legenda_opacidade', 'tarja_modo', 'tarja_y0', 'tarja_y1', 'tarja_cor', 'marca_altura', 'proporcao', 'tambem_quadrado'];
-const ESTILO_EXTRA = ACAB.slice(ACAB.indexOf('marca_fonte'));
+              'legenda_sombra_cor', 'legenda_opacidade', 'tarja_modo', 'tarja_y0', 'tarja_y1', 'tarja_cor', 'marca_altura', 'proporcao', 'tambem_quadrado',
+              // 🎨 v84_338
+              'marca_estilo', 'marca_estilo_cor', 'marca_italico', 'marca_maiusculas', 'marca_espaco'];
+const ESTILO_EXTRA = ACAB.slice(ACAB.indexOf('marca_fonte')).filter(k => !['proporcao', 'tambem_quadrado', 'marca_altura', 'tarja_modo', 'tarja_y0', 'tarja_y1', 'tarja_cor'].includes(k));
 function previaLeg() {  // 🎨 como fica: “ESSA [PALAVRA] AQUI”
   const f = el('a_legenda_fonte').value, c = el('a_legenda_cor').value || '#FFFFFF', a = el('a_legenda_cor_ativa').value || '#FFD60A';
   const mp = el('a_marca_posicao').value, dist = parseFloat(el('a_marca_distancia').value) || 10, px = parseInt(el('a_marca_px').value) || 0;
   el('a_marca_lado').disabled = mp !== 'legenda'; el('a_marca_distancia').disabled = mp !== 'legenda'; el('a_marca_px').disabled = mp !== 'legenda';
-  el('a_previa_leg').innerHTML = `<span style="font-family:'${f || 'DP Inter'}',sans-serif;color:${c};-webkit-text-stroke:1px #000">ESSA <span style="color:${a}">PALAVRA</span> AQUI</span>`;
+  const lb = el('a_legenda_borda_cor').value || '#000000';
+  el('a_previa_leg').innerHTML = `<span style="font-family:'${f || 'DP Inter'}',sans-serif;color:${c};-webkit-text-stroke:1px ${lb}">ESSA <span style="color:${a}">PALAVRA</span> AQUI</span>`;
+  el('a_previa_leg').title = 'legenda: ' + (el('a_legenda_fonte').selectedOptions[0] || {}).text;
+  const mf = el('a_marca_fonte').value || 'DP Poppins', mc = el('a_marca_cor').value || '#FFFFFF', mb = el('a_marca_borda_cor').value || '#000000';
+  let mt = el('a_arroba').value.trim() || '@seucanal'; if (!mt.startsWith('@')) mt = '@' + mt; if (el('a_marca_maiusculas').checked) mt = mt.toUpperCase();
+  el('a_previa_marca').innerHTML = `<span style="font-family:'${mf}',sans-serif;color:${mc};-webkit-text-stroke:1px ${mb};${el('a_marca_italico').checked ? 'font-style:italic;' : ''}letter-spacing:${(parseInt(el('a_marca_espaco').value) || 0) / 4}px">${esc(mt)}</span>`;
+  el('a_previa_marca').title = '@: ' + (el('a_marca_fonte').selectedOptions[0] || {}).text;
+  try { marcarGalerias(); } catch (e) {}
   // 📱 a tela 9:16: a legenda onde ela cai de verdade (altura exata > posição; margem dos lados; tamanho = % da altura)
   const H = 260, tela = el('a_tela'), alt = parseFloat(el('a_legenda_altura').value);
   const pos = {topo: 0.16, terco: 0.66, meio: 0.5, base: 0.84}[el('a_legenda_posicao').value] ?? 0.66;
@@ -354,7 +451,8 @@ function previaLeg() {  // 🎨 como fica: “ESSA [PALAVRA] AQUI”
   M.innerHTML = el('canal').selectedOptions[0] ? '@' + (el('canal').selectedOptions[0].text.replace(/[^a-z0-9_.]/gi, '').toLowerCase() || 'seucanal') : '@seucanal';
   try { posAlcas(); } catch (e) {}  // ↕ as alças da prévia acompanham
 }
-['a_legenda_fonte', 'a_legenda_cor', 'a_legenda_cor_ativa', 'a_legenda_posicao', 'a_legenda_altura', 'a_legenda_margem', 'a_legenda_tamanho', 'a_legenda_maiusculas'].forEach(i => el(i).addEventListener(i === 'a_legenda_altura' ? 'input' : 'change', previaLeg));
+['a_legenda_fonte', 'a_legenda_cor', 'a_legenda_cor_ativa', 'a_legenda_posicao', 'a_legenda_altura', 'a_legenda_margem', 'a_legenda_tamanho', 'a_legenda_maiusculas',
+ 'a_legenda_borda_cor', 'a_marca_fonte', 'a_marca_cor', 'a_marca_borda_cor', 'a_marca_maiusculas', 'a_marca_italico', 'a_marca_espaco', 'a_arroba'].forEach(i => el(i).addEventListener(el(i).tagName === 'INPUT' && el(i).type !== 'checkbox' ? 'input' : 'change', previaLeg));
 let CANAIS = [];
 async function carregarAcab(cid) {  // o padrão (vazio) ou o do canal escolhido
   const a = (await (await fetch('/curtos/acabamento' + (cid ? '?canal=' + encodeURIComponent(cid) : ''))).json()).acabamento || {};
@@ -369,9 +467,9 @@ document.querySelectorAll('[data-cor]').forEach(c => c.addEventListener('input',
 let tPrevia = null;
 function dadosAcab() { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; }); return d; }
 function pedirPrevia() { clearTimeout(tPrevia); tPrevia = setTimeout(() => {
-  const img = el('a_previa_real'); el('a_previa_info').textContent = '⏳ desenhando…';
-  img.onload = () => el('a_previa_info').textContent = '🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)';
-  img.onerror = () => el('a_previa_info').textContent = '❌ não consegui fazer a prévia';
+  const img = el('a_previa_real'); el('a_previa_info').textContent = '⏳ desenhando…'; el('a_previa_carga').style.display = '';
+  img.onload = () => { el('a_previa_carga').style.display = 'none'; el('a_previa_info').textContent = '🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)'; };
+  img.onerror = () => { el('a_previa_carga').style.display = 'none'; el('a_previa_info').textContent = '❌ não consegui fazer a prévia'; };
   img.src = `/curtos/acabamento/previa.jpg?canal=${encodeURIComponent(el('a_escopo').value)}&d=${encodeURIComponent(JSON.stringify(dadosAcab()))}&_=${Date.now()}`;
 }, 700); }
 ACAB.forEach(k => { const e = el('a_' + k); e.addEventListener(e.tagName === 'INPUT' && e.type !== 'checkbox' ? 'input' : 'change', pedirPrevia); });
@@ -445,25 +543,112 @@ function aplicarCores(p) {
   setA('marca_cor', p.marca); setA('marca_borda_cor', p.borda); setA('marca_sombra_cor', p.sombra); setA('marca_cor2', p.marca2);
   mostrarPaleta(p);
 }
-el('bSortear').onclick = () => {
-  const opts = id => [...el(id).options].map(o => o.value).filter(Boolean);
-  setA('marca_fonte', sorteia(opts('a_marca_fonte'))); setA('legenda_fonte', sorteia(opts('a_legenda_fonte')));
+// 🎲 v84_338: sorteio do @ e da legenda SEPARADOS (ou juntos) — o que você não sorteia vira a âncora da paleta, pra combinar
+let DESFAZER = null;
+const guardar = () => { DESFAZER = dadosAcab(); };
+el('bDesfazer').onclick = el('bDesfazerLado').onclick = () => { if (!DESFAZER) return aviso('Nada pra desfazer ainda', 'erro');
+  const d = DESFAZER; DESFAZER = null; ACAB.forEach(k => { if (k in d) setA(k, d[k]); }); sincronizarCores(); previaLeg(); pedirPrevia(); aviso('↶ voltei pro de antes do sorteio', 'okk'); };
+const optsDe = id => [...el(id).options].map(o => o.value).filter(Boolean);
+const hexOk = v => /^#[0-9a-f]{6}$/i.test(v || '');
+function paletaAncorada(ancora) {  // cor base travada > a cor do outro (o @ ou a legenda) > sorteada
+  if (hexOk(el('corBase').value) || !hexOk(ancora)) return gerarPaleta();
+  const v = el('corBase').value; el('corBase').value = ancora; const p = gerarPaleta(); el('corBase').value = v; return p;
+}
+function coresMarca(p) {
+  setA('marca_cor', p.marca); setA('marca_borda_cor', p.borda); setA('marca_sombra_cor', p.sombra); setA('marca_cor2', p.marca2);
+  const est = el('a_marca_estilo').value;
+  if (est === 'caixa') { setA('marca_estilo_cor', p.marca); setA('marca_cor', contraste(p.texto, p.marca) >= contraste(p.borda, p.marca) ? p.texto : p.borda); }
+  else if (est) setA('marca_estilo_cor', est === '3d' ? p.borda : sorteia([p.ativa, p.marca2]));
+  else setA('marca_estilo_cor', '');
+}
+function coresLeg(p) { setA('legenda_cor', p.texto); setA('legenda_cor_ativa', p.ativa); setA('legenda_borda_cor', p.borda); setA('legenda_sombra_cor', p.sombra); }
+function sortearMarca(p) {
+  setA('marca_fonte', sorteia(optsDe('a_marca_fonte')));
+  setA('marca_estilo', sorteia(['', '', 'caixa', 'neon', 'duplo', '3d']));
+  setA('marca_borda', 2 + Math.floor(Math.random() * 6)); setA('marca_sombra', Math.random() < 0.5 ? 0 : 2 + Math.floor(Math.random() * 5));
+  setA('marca_gradiente', el('a_marca_estilo').value !== 'caixa' && Math.random() < 0.35); setA('marca_grad_dir', sorteia(['horizontal', 'vertical']));
+  setA('marca_opacidade', sorteia([100, 100, 90, 80])); setA('marca_maiusculas', Math.random() < 0.3); setA('marca_italico', Math.random() < 0.15);
+  setA('marca_espaco', Math.random() < 0.25 ? 2 + Math.floor(Math.random() * 8) : '');
+  coresMarca(p);
+}
+function sortearLeg(p) {
+  setA('legenda_fonte', sorteia(optsDe('a_legenda_fonte')));
   setA('legenda_estilo', sorteia(['classico', 'destaque', 'pop', 'palavra_unica', 'preenchimento', 'contorno', 'rolante']));
-  setA('marca_borda', 2 + Math.floor(Math.random() * 7)); setA('marca_sombra', Math.random() < 0.4 ? 0 : 2 + Math.floor(Math.random() * 6));
-  setA('marca_gradiente', Math.random() < 0.45); setA('marca_grad_dir', sorteia(['horizontal', 'vertical'])); setA('marca_opacidade', sorteia([100, 100, 90, 80]));
   setA('legenda_borda', 3 + Math.floor(Math.random() * 8)); setA('legenda_sombra', Math.random() < 0.35 ? 0 : 2 + Math.floor(Math.random() * 6));
-  aplicarCores(gerarPaleta());
-  sincronizarCores(); previaLeg(); pedirPrevia(); aviso('🎲 estilo sorteado — mude o que quiser e 💾 salve o acabamento', 'okk');
-};
-el('bSoCores').onclick = () => { aplicarCores(gerarPaleta()); sincronizarCores(); previaLeg(); pedirPrevia(); };
-el('bLimparEstilo').onclick = () => { ESTILO_EXTRA.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = false; else e.value = k === 'marca_grad_dir' ? 'horizontal' : (k === 'marca_x' || k === 'marca_y') ? '0' : k === 'tarja_cor' ? '#000000' : ''; });
-  sincronizarCores(); pedirPrevia(); };
+  coresLeg(p);
+}
+const depois = msg => { sincronizarCores(); previaLeg(); pedirPrevia(); if (msg) aviso(msg + ' — ↶ desfaz; 💾 salve se gostar', 'okk'); };
+const tudo = () => { guardar(); const p = gerarPaleta(); sortearMarca(p); sortearLeg(p); mostrarPaleta(p); depois('🎲 @ e legenda sorteados'); };
+el('bSortear').onclick = el('bSortearLado').onclick = tudo;
+el('bSortearMarca').onclick = el('bSortearMarca2').onclick = () => { guardar(); const p = paletaAncorada(el('a_legenda_cor_ativa').value); sortearMarca(p); mostrarPaleta(p); depois('🎲 só o @ sorteado (combinando com a legenda)'); };
+el('bSortearLeg').onclick = el('bSortearLeg2').onclick = () => { guardar(); const p = paletaAncorada(el('a_marca_cor').value); sortearLeg(p); mostrarPaleta(p); depois('🎲 só a legenda sorteada (combinando com o @)'); };
+el('bCoresMarca').onclick = () => { guardar(); const p = paletaAncorada(el('a_legenda_cor_ativa').value); coresMarca(p); mostrarPaleta(p); depois(); };
+el('bCoresLeg').onclick = () => { guardar(); const p = paletaAncorada(el('a_marca_cor').value); coresLeg(p); mostrarPaleta(p); depois(); };
+el('bSoCores').onclick = () => { guardar(); const p = gerarPaleta(); coresMarca(p); coresLeg(p); mostrarPaleta(p); depois(); };
+el('bLimparEstilo').onclick = () => { guardar(); ESTILO_EXTRA.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = false; else e.value = k === 'marca_grad_dir' ? 'horizontal' : (k === 'marca_x' || k === 'marca_y') ? '0' : ''; });
+  depois('↺ estilo limpo'); };
+
+// 🔠 v84_338: as galerias de fonte (cada fonte escrita nela mesma) — clicar escolhe
+function galerias() { document.querySelectorAll('.pz-gal').forEach(g => {
+  const s_ = el(g.dataset.sel), marca = g.id === 'galMarca';
+  g.innerHTML = [...s_.options].map(o => { const fam = o.value || (marca ? 'DP Poppins' : 'DP Inter');
+    return `<button type="button" class="pz-fnt" data-v="${esc(o.value)}" data-nome="${esc(o.text.toLowerCase())}" title="${esc(o.text)}"><b style="font-family:'${esc(fam)}',sans-serif">${marca ? '@seucanal' : 'Essa PALAVRA'}</b><small>${esc(o.text)}</small></button>`; }).join('');
+  g.querySelectorAll('.pz-fnt').forEach(b => b.onclick = () => { s_.value = b.dataset.v; s_.dispatchEvent(new Event('change')); });
+}); amostrasGalerias(); marcarGalerias(); filtrarGalerias(); }
+function amostrasGalerias() { const t = el('a_arroba').value.trim(); const m = t ? (t.startsWith('@') ? t : '@' + t) : '@seucanal';
+  document.querySelectorAll('#galMarca .pz-fnt b').forEach(b => b.textContent = el('a_marca_maiusculas').checked ? m.toUpperCase() : m); }
+function marcarGalerias() { document.querySelectorAll('.pz-gal').forEach(g => { const v = el(g.dataset.sel).value;
+  g.querySelectorAll('.pz-fnt').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }); }
+function filtrarGalerias() { document.querySelectorAll('.pz-filtro').forEach(f => { const q = f.value.trim().toLowerCase();
+  el(f.dataset.gal).querySelectorAll('.pz-fnt').forEach(b => b.style.display = !q || b.dataset.nome.includes(q) ? '' : 'none'); }); }
+document.querySelectorAll('.pz-filtro').forEach(f => f.addEventListener('input', filtrarGalerias));
+['a_arroba', 'a_marca_maiusculas'].forEach(i => el(i).addEventListener(i === 'a_arroba' ? 'input' : 'change', amostrasGalerias));
+function recarregarCssFontes() { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/dp-fontes.css?_=' + Date.now(); document.head.appendChild(l); }
+function trocarFontes(fontes) {  // depois de instalar: as listas e as galerias ganham as novas
+  ['a_marca_fonte', 'a_legenda_fonte'].forEach(id => { const s_ = el(id), atual = s_.value, prim = s_.options[0].outerHTML;
+    s_.innerHTML = prim + Object.entries(fontes).filter(([k]) => k).map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join(''); s_.value = atual; });
+  recarregarCssFontes(); galerias();
+}
+
+// 📥 v84_338: Google Fonts — o catálogo pronto + qualquer nome
+async function catalogoGoogle() {
+  try { const j = await (await fetch('/curtos/fontes/google')).json(); const grupos = {};
+    (j.catalogo || []).forEach(f => (grupos[f.grupo] = grupos[f.grupo] || []).push(f));
+    el('gfCat').innerHTML = Object.entries(grupos).map(([g, fs]) => `<div class="pz-gfg"><b>${esc(g)}</b>` + fs.map(f => f.instalada
+      ? `<span class="ok" title="já instalada">✅ ${esc(f.nome)}</span>` : `<label><input type="checkbox" value="${esc(f.nome)}"> ${esc(f.nome)}</label>`).join('') + '</div>').join('');
+    const n = (j.catalogo || []).filter(f => f.instalada).length; el('gfProg').textContent = `${n}/${(j.catalogo || []).length} do catálogo instaladas`;
+  } catch (e) { el('gfCat').textContent = '❌ não consegui ler o catálogo'; }
+}
+async function baixarGoogle(nomes) {
+  if (!nomes.length) return aviso('Marque pelo menos uma fonte (ou digite o nome)', 'erro');
+  let ok = 0, falhas = [], fontes = null; ['gfMarcadas', 'gfBaixar'].forEach(b => el(b).disabled = true);
+  for (const [i, nome] of nomes.entries()) {
+    el('gfProg').textContent = `⏳ ${i + 1}/${nomes.length}: ${nome}…`;
+    try { const r = await fetch('/curtos/fontes/google', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nome})});
+      const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.erro || r.status); ok++; fontes = j.fontes; }
+    catch (e) { falhas.push(nome + ': ' + e.message); }
+  }
+  ['gfMarcadas', 'gfBaixar'].forEach(b => el(b).disabled = false);
+  if (fontes) trocarFontes(fontes);
+  await catalogoGoogle();
+  aviso(`📥 ${ok} fonte(s) instalada(s)` + (falhas.length ? ` · ❌ ${falhas.length} falhou: ${falhas.slice(0, 3).join(' · ')}` : ''), falhas.length && !ok ? 'erro' : 'okk');
+}
+el('gfMarcadas').onclick = () => baixarGoogle([...el('gfCat').querySelectorAll('input:checked')].map(c => c.value));
+el('gfTodas').onclick = () => el('gfCat').querySelectorAll('input').forEach(c => c.checked = true);
+el('gfNenhuma').onclick = () => el('gfCat').querySelectorAll('input').forEach(c => c.checked = false);
+el('gfBaixar').onclick = () => baixarGoogle(el('gfNome').value.split(',').map(x => x.trim()).filter(Boolean));
+
+// 🗂 v84_338: as abas de dentro (o @, a legenda, as cores…) — lembra a última
+function abrirSec(sec) { document.querySelectorAll('.pz-secb').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
+  document.querySelectorAll('.pz-sec').forEach(x => x.classList.toggle('on', x.dataset.sec === sec));
+  try { localStorage.setItem('pz_sec', sec); } catch (e) {} if (sec === 'fontes' && !el('gfCat').dataset.ok) { el('gfCat').dataset.ok = 1; catalogoGoogle(); } }
+document.querySelectorAll('.pz-secb').forEach(b => b.onclick = () => abrirSec(b.dataset.sec));
+(() => { let s0 = 'marca'; try { s0 = localStorage.getItem('pz_sec') || 'marca'; } catch (e) {} abrirSec(document.querySelector(`.pz-sec[data-sec="${s0}"]`) ? s0 : 'marca'); })();
 el('bFonte').onclick = async () => { const f = el('fonteArq').files[0]; if (!f) return aviso('Escolha o arquivo .ttf/.otf', 'erro');
   const fd = new FormData(); fd.append('fonte', f); fd.append('nome', el('fonteNome').value); el('bFonte').disabled = true;
   try { const r = await fetch('/curtos/fontes', {method: 'POST', body: fd}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.erro || r.status);
-    ['a_marca_fonte', 'a_legenda_fonte'].forEach(id => { const s_ = el(id), atual = s_.value, prim = s_.options[0].outerHTML;
-      s_.innerHTML = prim + Object.entries(j.fontes).filter(([k]) => k).map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join(''); s_.value = atual; });
-    el('a_marca_fonte').value = j.fonte.familia; aviso(`🔤 fonte ${j.fonte.familia} instalada`, 'okk'); pedirPrevia(); }
+    trocarFontes(j.fontes);
+    el('a_marca_fonte').value = j.fonte.familia; marcarGalerias(); aviso(`🔤 fonte ${j.fonte.familia} instalada`, 'okk'); pedirPrevia(); }
   catch (e) { aviso('❌ ' + e.message, 'erro'); }
   el('bFonte').disabled = false; };
 async function carregarCanais() {
@@ -545,13 +730,12 @@ function desenharAbas() {
     el('a_escopo').value = b.dataset.aba; el('a_escopo').dispatchEvent(new Event('change')); desenharAbas();
     try { localStorage.setItem('pz_aba', b.dataset.aba); } catch (e) {} });
 }
-if (PZ) { el('a_escopo').addEventListener('change', () => setTimeout(desenharAbas, 0));
-  setTimeout(() => { try { const ult = localStorage.getItem('pz_aba'); if (ult && CANAIS.some(c => c.id === ult)) { el('a_escopo').value = ult; el('a_escopo').dispatchEvent(new Event('change')); } } catch (e) {} desenharAbas(); }, 900); }  // 📺 v84_328: os botões do HTML chamam por aqui (o script fica fechado num bloco)
-(async () => { try { await carregarCanais(); } catch (e) {} canalPreencher(); await carregarGrupos(); })();
-(async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
-  ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
-    else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); });
-  if (!a.destaques) el('a_destaques').value = 'precisa'; } catch (e) {} previaLeg(); })();
+if (PZ) el('a_escopo').addEventListener('change', () => setTimeout(desenharAbas, 0));
+// ⏱ v84_338: em ordem (antes o padrão chegava DEPOIS e apagava o que o canal aberto tinha) — canais → a aba lembrada → o acabamento dela
+(async () => { try { await carregarCanais(); } catch (e) {}
+  let ini = ''; if (PZ) { try { const ult = localStorage.getItem('pz_aba'); if (ult && CANAIS.some(c => c.id === ult)) ini = ult; } catch (e) {} }
+  el('a_escopo').value = ini; try { await carregarAcab(ini); } catch (e) {} canalPreencher(); if (PZ) desenharAbas(); galerias();
+  try { await carregarGrupos(); } catch (e) {} })();
 (() => { el('a_marca_posicao').addEventListener('change', previaLeg); el('a_marca_lado').addEventListener('change', previaLeg); el('a_marca_distancia').addEventListener('input', previaLeg); el('a_marca_px').addEventListener('input', previaLeg); })();
 (() => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/dp-fontes.css'; document.head.appendChild(l); })();  // as fontes da prévia
 window.lkAcab = async () => { const d = {canal_id: el('a_escopo').value}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; });

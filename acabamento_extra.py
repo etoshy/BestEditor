@@ -21,6 +21,8 @@ PADRAO: Dict[str, Any] = {
     "marca_fonte": "", "marca_cor": "", "marca_tamanho": "", "marca_opacidade": "", "marca_borda": "", "marca_borda_cor": "",
     "marca_sombra": "", "marca_sombra_cor": "", "marca_gradiente": False, "marca_cor2": "", "marca_grad_dir": "horizontal",
     "marca_x": 0, "marca_y": 0, "marca_altura": "",  # ↕ v84_334: com a posição "livre" (arrastada na prévia), % de cima
+    # 🎨 v84_338: estilo pronto do @ (caixa, neon, contorno duplo, 3D) + itálico, MAIÚSCULAS e espaço entre letras
+    "marca_estilo": "", "marca_estilo_cor": "", "marca_italico": False, "marca_maiusculas": False, "marca_espaco": "",
     # 🔤 legenda
     "legenda_borda": "", "legenda_borda_cor": "", "legenda_sombra": "", "legenda_sombra_cor": "", "legenda_opacidade": "",
     # ▭ tarja sobre a legenda do vídeo original
@@ -54,10 +56,10 @@ def familias() -> Dict[str, str]:
     out = dict(CT.FONTES_LEGENDA)
     try:
         import dp_destaques
-        for v in dp_destaques.fontes_json().values():
+        for ch, v in dp_destaques.fontes_json().items():
             fam = str(v.get("familia") or "")
             if fam.startswith("DP ") and fam not in out:
-                out[fam] = fam[3:] + " (sua)"
+                out[fam] = fam[3:] + (" (Google)" if str(ch).startswith("gf_") else " (sua)")
     except Exception:  # noqa: BLE001
         pass
     return out
@@ -69,7 +71,13 @@ def limpar(k: str, v: Any) -> Any:
         return None
     if k in ("marca_fonte",):
         return v if v in familias() and v else ""
-    if k in ("marca_cor", "marca_borda_cor", "marca_sombra_cor", "marca_cor2", "legenda_borda_cor", "legenda_sombra_cor"):
+    if k == "marca_estilo":
+        return v if v in ("", "caixa", "neon", "duplo", "3d") else ""
+    if k in ("marca_italico", "marca_maiusculas"):
+        return v not in (False, "0", "false", "", None)
+    if k == "marca_espaco":
+        return _num(v, 0, 40)
+    if k in ("marca_cor", "marca_borda_cor", "marca_sombra_cor", "marca_cor2", "legenda_borda_cor", "legenda_sombra_cor", "marca_estilo_cor"):
         return _cor(v)
     if k == "tarja_cor":
         return _cor(v) or "#000000"
@@ -101,10 +109,13 @@ def limpar(k: str, v: Any) -> Any:
 def aplicar_no_projeto(cfg: Dict[str, Any], a: Dict[str, Any]) -> None:
     """As chaves novas do acabamento → config.marca / config.legenda / config.tarja do curto."""
     m = dict(cfg.get("marca") or {})
-    mapa = {"marca_fonte": "fonte", "marca_cor": "cor", "marca_borda_cor": "borda_cor", "marca_sombra_cor": "sombra_cor"}
+    mapa = {"marca_fonte": "fonte", "marca_cor": "cor", "marca_borda_cor": "borda_cor", "marca_sombra_cor": "sombra_cor",
+            "marca_estilo": "estilo", "marca_estilo_cor": "estilo_cor", "marca_italico": "italico", "marca_maiusculas": "maiusculas"}
     for ka, km in mapa.items():
         if a.get(ka):
             m[km] = a[ka]
+    if a.get("marca_espaco") not in (None, "", 0, "0"):
+        m["espaco"] = int(a["marca_espaco"])
     if a.get("marca_tamanho") not in (None, ""):
         m["tamanho"] = float(a["marca_tamanho"]) / 100
     if a.get("marca_opacidade") not in (None, ""):
@@ -183,7 +194,7 @@ def aplicar_tarja(video: str, t: Optional[Dict[str, Any]]) -> bool:
 
 
 # ------------------------------------------------------------------ 🔤 fontes enviadas
-def instalar_fonte(arquivo: str, nome: str) -> Dict[str, Any]:
+def instalar_fonte(arquivo: str, nome: str, prefixo: str = "usr_") -> Dict[str, Any]:
     """.ttf/.otf → fonte "DP <nome>" (o mesmo instalador do 📘 Guia: renomeia a família pro libass achar e registra)."""
     import dp_guia
     import dp_extras
@@ -198,7 +209,7 @@ def instalar_fonte(arquivo: str, nome: str) -> Dict[str, Any]:
     chave = re.sub(r"[^a-z0-9_]", "", re.sub(r"\s+", "_", nome.lower()))[:30] or "minha_fonte"
     if not re.match(r"[a-z0-9]", chave):
         chave = "f_" + chave
-    chave = "usr_" + chave
+    chave = (prefixo + chave)[:31]  # (o Guia aceita até 31 letras)
     try:
         it = dp_guia.adicionar_fonte(arquivo, chave, nome)
     except SystemExit as exc:  # o instalador do Guia avisa com SystemExit
