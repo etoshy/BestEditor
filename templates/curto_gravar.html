@@ -31,6 +31,7 @@
   body.gv-leitura .gv-takes, body.gv-leitura .gv-trad { display: none; }
   body.gv-leitura .gv-parte:not(.atual) { opacity: .35; }
   .gv-mini { font-size: .8rem; padding: 3px 9px; }
+  .gv-edtxt { width: 100%; box-sizing: border-box; font-size: 1.3rem; font-weight: 700; line-height: 1.35; padding: 10px; border-radius: 10px; }
 </style>
 
 <h1 style="margin-bottom:4px">🎤 Gravar a sua voz <span class="si-dica" style="font-weight:400">{{ p.titulo }}</span></h1>
@@ -81,6 +82,7 @@
 
 <script>
 const PID = {{ pid|tojson }}, LINK = {{ link|tojson }}, AVULSA = {{ (avulsa or false)|tojson }};
+let EDITANDO = null;  // ✏ v84_341: a parte com o texto aberto pra ajustar
 let EST = {{ estado|tojson }}, ATUAL = 0, stream = null, rec = null, fonteMic = null, pedacos = [], gravando = null, t0 = 0, timer = null, audioCtx = null, analisador = null, rafNivel = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -118,8 +120,14 @@ function takesHtml(pt) {
 function parteHtml(pt, i) {
   const rec_ = gravando === pt.id;
   return `<div class="gv-cab">${pt.id === 'TUDO' ? '' : `<b>${i}/${EST.partes.length - 1}</b>${pt.funcao ? ' · ' + esc(pt.funcao) : ''}`} <span class="gravacao-status"></span></div>
-    <div class="gv-texto">${esc(pt.texto)}</div>${pt.traducao ? `<div class="gv-trad">${esc(pt.traducao)}</div>` : ''}
-    <div class="gv-acoes"><button class="gv-rec ${rec_ ? 'on' : ''}" data-rec="${pt.id}">${rec_ ? '⏹ parar <span class="gv-tempo">0.0 s</span>' : (pt.takes.length ? '⏺ gravar outro take' : '⏺ gravar')}</button></div>
+    ${EDITANDO === pt.id ? `<textarea class="gv-edtxt" data-edtxt="${pt.id}" rows="3">${esc(pt.texto)}</textarea>
+      <div class="gv-acoes" style="margin-top:4px"><button class="gv-mini si-ok" data-salvartxt="${pt.id}">💾 salvar o texto</button>
+        <button class="gv-mini si-sec" data-cancelartxt="1">cancelar</button>
+        ${pt.editado ? `<button class="gv-mini si-sec" data-origtxt="${pt.id}" title="${esc(pt.original || '')}">↺ voltar ao do roteiro</button>` : ''}</div>`
+    : `<div class="gv-texto">${esc(pt.texto)}</div>${pt.editado ? `<div class="si-dica" title="${esc(pt.original || '')}">✏ ajustado por você — no envio vira o roteiro (a legenda usa este texto)</div>` : ''}`}
+    ${pt.traducao ? `<div class="gv-trad">${esc(pt.traducao)}</div>` : ''}
+    <div class="gv-acoes"><button class="gv-rec ${rec_ ? 'on' : ''}" data-rec="${pt.id}">${rec_ ? '⏹ parar <span class="gv-tempo">0.0 s</span>' : (pt.takes.length ? '⏺ gravar outro take' : '⏺ gravar')}</button>
+      ${pt.id !== 'TUDO' && !rec_ && EDITANDO !== pt.id ? `<button class="gv-mini si-sec" data-edtexto="${pt.id}" title="ficou estranho de falar? ajuste o texto desta parte e grave do seu jeito">✏ ajustar o texto</button>` : ''}</div>
     ${rec_ ? '<canvas class="gv-viva" width="900" height="64" title="o que está chegando do microfone agora"></canvas>' : ''}
     <div class="gv-takes">${takesHtml(pt)}</div>`;
 }
@@ -289,13 +297,19 @@ function irPara(k) { ATUAL = Math.max(0, Math.min(EST.partes.length - 2, k)); de
 // ---- cliques ----
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
-  if (b.dataset.rec) { const card = b.closest('.gv-parte'); if (card && card.dataset.k) ATUAL = +card.dataset.k; return gravar(b.dataset.rec); }
+  if (b.dataset.edtexto) { EDITANDO = b.dataset.edtexto; desenhar(); const t = document.querySelector(`[data-edtxt="${EDITANDO}"]`); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } return; }
+  if (b.dataset.cancelartxt) { EDITANDO = null; return desenhar(); }
+  if (b.dataset.salvartxt || b.dataset.origtxt) { const id_ = b.dataset.salvartxt || b.dataset.origtxt, t = document.querySelector(`[data-edtxt="${id_}"]`);
+    try { EST = (await post(`/curtos/${PID}/voz/texto/${id_}`, {texto: b.dataset.origtxt ? '' : (t ? t.value : '')})).estado; EDITANDO = null;
+      status(b.dataset.origtxt ? '↺ voltou ao texto do roteiro' : '✏ texto ajustado — grave do seu jeito; no envio ele vira o roteiro'); }
+    catch (e) { status('❌ ' + e.message); } return desenhar(); }
+  if (b.dataset.rec) { if (EDITANDO) { EDITANDO = null; } const card = b.closest('.gv-parte'); if (card && card.dataset.k) ATUAL = +card.dataset.k; return gravar(b.dataset.rec); }
   if (b.dataset.editar) { const t = b.dataset.t, p_ = b.dataset.editar; return abrirEditorAudio(p_, t, `/curtos/${PID}/voz/parte/${p_}/${t}.wav?original=1&v=${Date.now()}`, p_ === 'TUDO' ? 'roteiro inteiro' : 'parte ' + p_); }
   if (b.dataset.acao) { b.disabled = true; if (b.dataset.acao === 'realce') status('✨ fazendo o realce…');
     try { EST = (await post(`/curtos/${PID}/voz/parte/${b.dataset.p}/${b.dataset.t}/${b.dataset.acao}`, {usar: b.dataset.usar !== '0'})).estado; status(''); } catch (e) { status('❌ ' + e.message); }
     desenhar(); }
 });
-document.addEventListener('click', ev => { const c = ev.target.closest('.gv-parte[data-k]'); if (c && !ev.target.closest('button, audio') && +c.dataset.k !== ATUAL) { ATUAL = +c.dataset.k; desenhar(); } });
+document.addEventListener('click', ev => { const c = ev.target.closest('.gv-parte[data-k]'); if (c && !ev.target.closest('button, audio, textarea') && !EDITANDO && +c.dataset.k !== ATUAL) { ATUAL = +c.dataset.k; desenhar(); } });
 window.addEventListener('keydown', e => {
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || document.querySelector('div[style*="z-index: 1000"], div[style*="z-index:1000"]')) return;  // editor aberto

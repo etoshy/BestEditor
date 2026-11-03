@@ -2424,6 +2424,123 @@ def caixa_da_legenda(blocos: List[Dict[str, Any]], palavras: List[Dict[str, Any]
     return out
 
 
+def legenda_pelo_roteiro(blocos: List[Dict[str, Any]], palavras: List[Dict[str, Any]],
+                         gancho_maiusculas: bool = False, corrigir: Optional[Callable[[List[Dict[str, Any]]], Any]] = None
+                         ) -> List[Dict[str, Any]]:
+    """📝 v84_341: o Whisper dá o TEMPO, o roteiro dá o TEXTO. As palavras que o Whisper ouviu diferente ("blog" no lugar de
+    "bloco", "three" no lugar de "3", "red velvet" junto/separado) viram as do roteiro, no mesmo tempo; o que você falou
+    a mais (improviso, fora do roteiro) fica como o Whisper ouviu; o que está no roteiro e você NÃO falou não entra.
+    Trechos muito diferentes (você falou outra coisa) ficam com o Whisper — só troca quando o tamanho bate."""
+    crus = [w for b in blocos for w in sem_tags(b.get("fala") or "").split() if norm(w)]
+    S = [norm(w) for w in crus]
+    W = [norm(w.get("word")) for w in palavras]
+    if not palavras or not S:
+        return [dict(w) for w in palavras]
+    n0 = len([w for w in sem_tags(blocos[0].get("fala") or "").split() if norm(w)]) if blocos else 0
+    out: List[Dict[str, Any]] = []
+
+    def do_roteiro(si: int, w: Dict[str, Any]) -> Dict[str, Any]:
+        x = dict(w, word=crus[si], roteiro=True)
+        if gancho_maiusculas and si < n0:
+            x["word"] = crus[si].upper()
+        return x
+    sm = difflib.SequenceMatcher(None, S, W, autojunk=False)
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            out += [do_roteiro(i1 + k, palavras[j1 + k]) for k in range(i2 - i1)]
+        elif op == "insert":  # falou a mais: fica o que ouviu
+            out += [dict(palavras[j], livre=True) for j in range(j1, j2)]
+        elif op == "replace":
+            ns, nw = i2 - i1, j2 - j1
+            parecido = difflib.SequenceMatcher(None, "".join(S[i1:i2]), "".join(W[j1:j2]), autojunk=False).ratio()
+            if abs(ns - nw) <= max(1, min(ns, nw) // 2) and (max(ns, nw) <= 4 or parecido >= 0.45):
+                t0, t1 = float(palavras[j1]["start"]), float(palavras[j2 - 1]["end"])
+                pesos = [max(1, len(S[i])) for i in range(i1, i2)]
+                tot, acc = float(sum(pesos)), 0.0
+                for k, i in enumerate(range(i1, i2)):  # as palavras do roteiro dividem o tempo do trecho (pelo tamanho)
+                    a = t0 + (t1 - t0) * acc / tot
+                    acc += pesos[k]
+                    out.append(do_roteiro(i, {"word": "", "start": round(a, 3), "end": round(t0 + (t1 - t0) * acc / tot, 3)}))
+            else:
+                out += [dict(palavras[j], livre=True) for j in range(j1, j2)]
+        # "delete": está no roteiro e não foi falado — não entra na legenda
+    if corrigir:
+        out = _corrigir_trechos_livres(out, corrigir)
+    for w in out:
+        w.pop("livre", None)
+    return out
+
+
+def _corrigir_trechos_livres(out: List[Dict[str, Any]], corrigir: Callable[[List[Dict[str, Any]]], Any]) -> List[Dict[str, Any]]:
+    """✍ v84_342: SÓ o que você falou diferente do roteiro (ficou com o texto do Whisper) vai pra IA arrumar a ortografia,
+    os acentos e a pontuação — o tempo continua o do Whisper. A IA desligada/sem resposta: fica como o Whisper ouviu."""
+    trechos, k = [], 0
+    while k < len(out):
+        if not out[k].get("livre"):
+            k += 1
+            continue
+        j = k
+        while j < len(out) and out[j].get("livre"):
+            j += 1
+        trechos.append((k, j))
+        k = j
+    if not trechos:
+        return out
+    pedido = []
+    for n, (a, b) in enumerate(trechos[:60]):
+        pedido.append({"id": n, "texto": " ".join(str(w["word"]).strip() for w in out[a:b])[:600],
+                       "antes": " ".join(str(w["word"]).strip() for w in out[max(0, a - 8):a]),
+                       "depois": " ".join(str(w["word"]).strip() for w in out[b:b + 8])})
+    try:
+        r = corrigir(pedido)
+    except Exception:  # noqa: BLE001
+        r = None
+    certos = {}
+    for x in (r or {}).get("trechos", []) if isinstance(r, dict) else []:
+        try:
+            certos[int(x["id"])] = " ".join(str(x.get("texto") or "").split())
+        except (KeyError, TypeError, ValueError):
+            continue
+    novo: List[Dict[str, Any]] = []
+    fim_ant = 0
+    for n, (a, b) in enumerate(trechos):
+        novo += out[fim_ant:a]
+        fim_ant = b
+        orig = out[a:b]
+        ws = certos.get(n, "").split()
+        if not ws or len(ws) > 2 * len(orig) + 2:  # sem resposta (ou inventou demais): fica o do Whisper
+            novo += orig
+        elif len(ws) == len(orig):
+            novo += [dict(w, word=t, corrigido=True) for w, t in zip(orig, ws)]
+        else:  # juntou/separou palavras: divide o tempo do trecho entre as novas, pelo tamanho
+            t0, t1 = float(orig[0]["start"]), float(orig[-1]["end"])
+            pesos = [max(1, len(norm(t)) or 1) for t in ws]
+            tot, acc = float(sum(pesos)), 0.0
+            for t, pz in zip(ws, pesos):
+                a_ = t0 + (t1 - t0) * acc / tot
+                acc += pz
+                novo.append({"word": t, "start": round(a_, 3), "end": round(t0 + (t1 - t0) * acc / tot, 3), "corrigido": True})
+    novo += out[fim_ant:]
+    return novo
+
+
+_SISTEMA_ORTOGRAFIA = (
+    "You fix captions made by speech-to-text. Each fragment is something the narrator said that is NOT in the script, so the "
+    "words are what was really said. Fix ONLY spelling, accents, capitalization, punctuation and obvious mis-hearings that "
+    "the surrounding context (antes/depois) makes clear. Do NOT rephrase, translate, add or remove content, and keep the same "
+    "number of words whenever possible. Keep the fragment's language. Return every fragment by its id.")
+_SCHEMA_ORTOGRAFIA = {"type": "object", "properties": {"trechos": {"type": "array", "items": {
+    "type": "object", "properties": {"id": {"type": "integer"}, "texto": {"type": "string"}}, "required": ["id", "texto"],
+    "additionalProperties": False}}}, "required": ["trechos"], "additionalProperties": False}
+
+
+def corrigir_ortografia_ia(trechos: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """A chamada da IA (recurso "curtos"; respostas iguais ficam no cache local — montar de novo não paga de novo)."""
+    import ia_servico
+    return ia_servico.chamar("curtos", _SISTEMA_ORTOGRAFIA, json.dumps({"trechos": trechos}, ensure_ascii=False),
+                             schema=_SCHEMA_ORTOGRAFIA, max_tokens=4000, timeout=90.0)
+
+
 def tempo_da_palavra(blocos: List[Dict[str, Any]], bi: int, palavra: str, palavras: List[Dict[str, Any]],
                      mapa: Dict[int, int], al: List[Dict[str, Any]]) -> Optional[float]:
     """Instante (no áudio final) em que a `palavra` (ou expressão) do bloco `bi` é falada."""
@@ -2912,7 +3029,11 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     if prop == "1:1":  # ⬛ quadrado: a letra (que é medida pela altura) cresce pra ocupar a mesma largura de antes
         leg["tamanho"] = round(min(0.12, float(leg.get("tamanho") or 0.06) * 1.35), 4)
     mapa = {int(k): int(v) for k, v in (g.get("mapa") or {}).items()}
-    palavras_leg = caixa_da_legenda(blocos, g["palavras"], mapa, g["alinhamento"], bool(perfil.get("gancho_maiusculas")))
+    if (p.get("config") or {}).get("legenda_texto_roteiro", True) is not False:  # 📝 v84_341: texto do roteiro, tempo do Whisper
+        palavras_leg = legenda_pelo_roteiro(blocos, g["palavras"], bool(perfil.get("gancho_maiusculas")),
+                                            corrigir_ortografia_ia if (p.get("config") or {}).get("legenda_ortografia_ia", True) is not False else None)
+    else:
+        palavras_leg = caixa_da_legenda(blocos, g["palavras"], mapa, g["alinhamento"], bool(perfil.get("gancho_maiusculas")))
     for t in trechos:
         t["words"] = [w for w in palavras_leg if t["start"] - 0.01 <= float(w["start"]) <= t["end"] + 0.01]
     return {"projeto": p, "perfil": perfil, "providers": providers, "audio": os.path.join(pasta(base, pid), g["arquivo"]),

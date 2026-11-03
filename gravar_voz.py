@@ -148,7 +148,7 @@ def partes_de(base: str, pid: str) -> List[Dict[str, Any]]:
     """As partes pra ler: as do texto colado (avulsa) ou as do roteiro do curto."""
     if avulsa(pid):
         return [{"id": x["id"], "texto": x["texto"], "traducao": "", "funcao": ""} for x in sessao(base, pid).get("partes") or []]
-    return partes(CT.carregar(base, pid), divisao(base, pid))
+    return partes(CT.carregar(base, pid), divisao(base, pid), estado(base, pid).get("textos") or {})
 
 
 def _estado_cam(base: str, pid: str) -> str:
@@ -183,13 +183,13 @@ def _dividir(t: str, divisao: str) -> List[str]:
     return [t]
 
 
-def partes(p: Dict[str, Any], divisao: str = "bloco") -> List[Dict[str, Any]]:
+def partes(p: Dict[str, Any], divisao: str = "bloco", textos: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """O roteiro em partes pra ler: o bloco narrado + a tradução do lado. ✂ v84_339: com a divisão "frase"/"curta" cada
     bloco vira vários pedaços (B2_1, B2_2…) — o Whisper alinha a gravação inteira ao roteiro, então a legenda continua certa."""
     out = []
     idioma = (p.get("roteiro") or {}).get("idioma") or "en"
     for k, b in enumerate((p.get("roteiro") or {}).get("blocos") or [], 1):
-        fala = CT.sem_tags(b.get("fala") or "")
+        fala = CT.sem_tags(b.get("fala_base_partes") or b.get("fala") or "")  # (o texto de antes dos seus ajustes: as partes não mudam de id)
         outra = CT.sem_tags((b.get("fala_pt") if idioma == "en" else b.get("fala_en")) or "")
         outra = outra if outra and outra != fala else ""
         bid = re.sub(r"[^A-Za-z0-9_]", "", str(b.get("id") or f"B{k}"))[:30] or f"B{k}"
@@ -201,7 +201,73 @@ def partes(p: Dict[str, Any], divisao: str = "bloco") -> List[Dict[str, Any]]:
         for n, x in enumerate(pedacos, 1):  # a tradução vai junto se dividiu no mesmo número de pedaços; senão, inteira no 1º
             tr = trad[n - 1] if len(trad) == len(pedacos) else (outra if n == 1 else "")
             out.append({"id": f"{bid}_{n}", "texto": x, "traducao": tr, "funcao": b.get("funcao") or "", "bloco": bid})
-    return out
+    return _com_ajustes(out, textos)
+
+
+def _com_ajustes(ps: List[Dict[str, Any]], textos: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """✏ v84_341: o texto que você ajustou na hora de gravar (vale só se a parte ainda é a mesma de quando você ajustou)."""
+    for x in ps:
+        t = (textos or {}).get(x["id"])
+        if isinstance(t, dict) and t.get("de") == x["texto"] and str(t.get("para") or "").strip():
+            x.update(original=x["texto"], texto=t["para"], editado=True)
+    return ps
+
+
+def editar_texto(base: str, pid: str, parte: str, texto: str) -> Dict[str, Any]:
+    """✏ v84_341: muda o texto de UMA parte enquanto grava (ficou estranho de falar? ajuste e grave). Vazio = volta ao
+    original. No envio, os ajustes viram o roteiro — e a legenda usa o texto ajustado (o Whisper só dá o tempo)."""
+    parte = _valida(parte)
+    novo = " ".join(str(texto or "").split())[:2000]
+    if avulsa(pid):
+        s_ = sessao(base, pid)
+        for x in s_.get("partes") or []:
+            if x["id"] == parte:
+                if novo and novo != x["texto"]:
+                    s_["texto"] = str(s_.get("texto") or "").replace(x["texto"], novo, 1)
+                    x["texto"] = novo
+                break
+        else:
+            raise CT.CurtoErro("Parte não encontrada.")
+        _gravar_json(_sessao_cam(base, pid), s_)
+        return resumo(base, pid)
+    p = CT.carregar(base, pid)
+    orig = next((x for x in partes(p, divisao(base, pid)) if x["id"] == parte), None)
+    if not orig:
+        raise CT.CurtoErro("Parte não encontrada.")
+    d = estado(base, pid)
+    ts = d.setdefault("textos", {})
+    if not novo or novo == orig["texto"]:
+        ts.pop(parte, None)
+    else:
+        ts[parte] = {"de": orig["texto"], "para": novo}
+    _salvar(base, pid, d)
+    return resumo(base, pid)
+
+
+def aplicar_textos_no_roteiro(base: str, pid: str) -> int:
+    """No envio: os blocos com parte ajustada passam a falar o texto ajustado (o de antes fica em fala_base_partes, pra
+    as partes continuarem com o mesmo id). Devolve quantos blocos mudaram."""
+    if avulsa(pid):
+        return 0
+    with CT._TRAVA:
+        p = CT.carregar(base, pid)
+        ps = partes(p, divisao(base, pid), estado(base, pid).get("textos") or {})
+        mudou = 0
+        for k, b in enumerate((p.get("roteiro") or {}).get("blocos") or [], 1):
+            bid = re.sub(r"[^A-Za-z0-9_]", "", str(b.get("id") or f"B{k}"))[:30] or f"B{k}"
+            dele = [x for x in ps if (x.get("bloco") or x["id"]) == bid]
+            if any(x.get("editado") for x in dele):
+                b.setdefault("fala_base_partes", b.get("fala") or "")
+                novo = " ".join(x["texto"] for x in dele)
+                if novo != b.get("fala"):
+                    b["fala"] = novo
+                    mudou += 1
+            elif b.get("fala_base_partes") is not None:  # você desfez os ajustes: volta o texto de antes
+                b["fala"] = b.pop("fala_base_partes")
+                mudou += 1
+        if mudou:
+            CT.salvar(base, p)
+    return mudou
 
 
 def divisao(base: str, pid: str) -> str:

@@ -1868,6 +1868,15 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _dono(pid)
         return _ok(estado=GV.resumo(base_dir, pid), tarefa=TAREFAS.get(pid))
 
+    @app.route("/curtos/<pid>/voz/texto/<parte>", methods=["POST"])
+    def curto_voz_texto(pid: str, parte: str):
+        """✏ v84_341: ajusta o texto de uma parte enquanto grava (vazio = volta ao do roteiro)."""
+        _dono(pid)
+        try:
+            return _ok(estado=GV.editar_texto(base_dir, pid, parte, str(_corpo().get("texto") or "")))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+
     @app.route("/curtos/<pid>/voz/divisao", methods=["POST"])
     def curto_voz_divisao(pid: str):
         """✂ v84_339: gravar por bloco do roteiro, até o ponto ou em frases curtas (os takes já gravados ficam guardados)."""
@@ -1971,7 +1980,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 with _UM_LINK_POR_VEZ:
                     pr("🧩 juntando as partes" + (" (com realce)" if realce_tudo else "") + "…")
                     final = GV.juntar(base_dir, pid, realce_tudo)
-                    pr("🎯 lendo a sua voz (Whisper): tira pausas longas e repetições, alinha ao roteiro…")
+                    if GV.aplicar_textos_no_roteiro(base_dir, pid):  # ✏ v84_341: os seus ajustes viram o roteiro
+                        pr("✏ seus ajustes de texto entraram no roteiro")
+                    pr("🎯 lendo a sua voz (Whisper): tira pausas longas e repetições, alinha ao roteiro (a legenda usa o texto do roteiro)…")
                     CT.processar_gravacao(base_dir, pid, _transcrever(), final, op, pr, fonte="gravacao")
                     if lr:
                         _link_etapa(pid, "🎤 voz recebida", aguardando_voz=False)
