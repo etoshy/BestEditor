@@ -49,6 +49,12 @@ def ponto(cfg: Dict[str, Any], W: int, H: int, posicao_legenda: str = "", leg_y:
             d = 0.10
         fy = leg_y + (-d if (cfg.get("lado") or "acima") == "acima" else d)
         return 5, int(W * 0.5), int(H * max(0.02, min(0.98, fy)))
+    if cfg.get("posicao") == "livre":  # ↕ v84_334: a altura que você arrastou na prévia
+        try:
+            fy = float(cfg.get("altura") if cfg.get("altura") not in (None, "") else 0.5)
+        except (TypeError, ValueError):
+            fy = 0.5
+        return 5, int(W * 0.5), int(H * max(0.02, min(0.98, fy)))
     an, fx, fy = LUGARES.get(cfg.get("posicao") or "meio", LUGARES["meio"])
     fy += float(cfg.get("desvio_y") or 0)
     if posicao_legenda and _MESMO_LUGAR_DA_LEGENDA.get(cfg.get("posicao") or "") == posicao_legenda:
@@ -59,10 +65,20 @@ def ponto(cfg: Dict[str, Any], W: int, H: int, posicao_legenda: str = "", leg_y:
 def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, posicao_legenda: str = "",
               leg_y: Optional[float] = None) -> str:
     fam = cfg.get("fonte") or "DP Poppins"
-    fs = dp_destaques.fs_libass(fam, H * float(cfg.get("tamanho") or 0.035))
+    px_css = H * float(cfg.get("tamanho") or 0.035)
+    fs = dp_destaques.fs_libass(fam, px_css)
     alfa = format(int(round(255 * (1 - float(cfg.get("opacidade") or 0.5)))), "02X")
     an, x, y = ponto(cfg, W, H, posicao_legenda, leg_y)
-    borda = max(1, int(round(fs / 18))) if cfg.get("contorno", True) else 0
+    x += int(round(float(cfg.get("desvio_x_px") or 0) * W / 1080))  # 🎨 v84_333: ajuste fino (px num 1080×1920)
+    y += int(round(float(cfg.get("desvio_y_px") or 0) * H / 1920))
+    escala = H / 1920.0
+    if cfg.get("borda") not in (None, ""):  # 🎨 v84_333: a espessura que você escolheu (0 = sem borda)
+        borda = int(round(float(cfg["borda"]) * escala))
+    else:
+        borda = max(1, int(round(fs / 18))) if cfg.get("contorno", True) else 0
+    sombra = int(round(float(cfg.get("sombra") or 0) * escala))
+    cor_borda = _cor(cfg.get("borda_cor") or "#000000")
+    cor_sombra = _cor(cfg.get("sombra_cor") or "#000000").replace("&H00", "&H60", 1)
     texto = str(cfg.get("texto") or "").replace("{", "(").replace("}", ")").replace("\\", "/")
 
     def t(s: float) -> str:
@@ -72,13 +88,50 @@ def gerar_ass(cfg: Dict[str, Any], W: int, H: int, dur: float, caminho: str, pos
               "[V4+ Styles]",
               "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, "
               "StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-              f"Style: Marca,{fam},{fs},{_cor(cfg.get('cor'))},{_cor(cfg.get('cor'))},&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,{borda},0,{an},0,0,0,1",
+              f"Style: Marca,{fam},{fs},{_cor(cfg.get('cor'))},{_cor(cfg.get('cor'))},{cor_borda},{cor_sombra},1,0,0,0,100,100,0,0,1,{borda},{sombra},{an},0,0,0,1",
               "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
               f"Dialogue: 0,{t(0)},{t(dur + 1)},Marca,,0,0,0,,{{\\pos({x},{y})\\alpha&H{alfa}&}}{texto}"]
+    if cfg.get("gradiente") and cfg.get("cor2"):  # 🌈 v84_333: degradê — faixas finas por cima (com \clip), da cor 1 à cor 2
+        linhas += _faixas_degrade(cfg, fam, px_css, an, x, y, texto, alfa, t(0), t(dur + 1))
     os.makedirs(os.path.dirname(os.path.abspath(caminho)), exist_ok=True)
     with open(caminho, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas) + "\n")
     return caminho
+
+
+def _faixas_degrade(cfg: Dict[str, Any], fam: str, px_css: float, an: int, x: int, y: int, texto: str, alfa: str,
+                    t0: str, t1: str, n: int = 28) -> list:
+    """O libass não pinta degradê: o texto é redesenhado N vezes (sem borda/sombra), cada uma recortada numa faixa, com a
+    cor indo da cor 1 à cor 2. A primeira camada (com a borda e a sombra) fica embaixo."""
+    try:
+        w = dp_destaques.largura_no_navegador(texto, fam, px_css)
+    except Exception:  # noqa: BLE001
+        w = len(texto) * px_css * 0.6
+    h = px_css * 1.25
+    col, lin = (an - 1) % 3, (an - 1) // 3  # numpad: col 0 esq/1 centro/2 dir · lin 0 base/1 meio/2 topo
+    x0 = x - (0 if col == 0 else w / 2 if col == 1 else w)
+    y0 = y - (h if lin == 0 else h / 2 if lin == 1 else 0)
+    pad = px_css * 0.15
+    x0, y0, x1, y1 = x0 - pad, y0 - pad, x0 + w + pad, y0 + h + pad
+
+    def rgb(hx):
+        hx = str(hx or "#FFFFFF").lstrip("#")
+        return int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+    c1, c2 = rgb(cfg.get("cor")), rgb(cfg.get("cor2"))
+    vertical = cfg.get("grad_dir") == "vertical"
+    out = []
+    for k in range(n):
+        u = k / max(1, n - 1)
+        r, g, b = (int(round(c1[i] + (c2[i] - c1[i]) * u)) for i in range(3))
+        if vertical:
+            a_, b_ = y0 + (y1 - y0) * k / n, y0 + (y1 - y0) * (k + 1) / n
+            clip = f"{int(x0)},{int(a_)},{int(x1) + 1},{int(b_) + 1}"
+        else:
+            a_, b_ = x0 + (x1 - x0) * k / n, x0 + (x1 - x0) * (k + 1) / n
+            clip = f"{int(a_)},{int(y0)},{int(b_) + 1},{int(y1) + 1}"
+        out.append(f"Dialogue: 1,{t0},{t1},Marca,,0,0,0,,{{\\pos({x},{y})\\alpha&H{alfa}&\\bord0\\shad0"
+                   f"\\1c&H00{b:02X}{g:02X}{r:02X}&\\clip({clip})}}{texto}")
+    return out
 
 
 def aplicar(video: str, cfg: Optional[Dict[str, Any]], pasta_tmp: str, posicao_legenda: str = "",

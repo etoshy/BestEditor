@@ -35,6 +35,7 @@ ESTILOS = [
     {"id": "contorno", "nome": "Contorno forte", "tipo": "bloco"},
     {"id": "cinema", "nome": "Cinema", "tipo": "bloco"},
     {"id": "faixa", "nome": "Faixa colorida", "tipo": "bloco"},
+    {"id": "rolante", "nome": "Rolante (a frase desliza)", "tipo": "bloco"},  # 🎨 v84_333 (do shortmaker)
     {"id": "classico", "nome": "Clássico", "tipo": "karaoke"},
     {"id": "destaque", "nome": "Destaque", "tipo": "karaoke"},
     {"id": "pop", "nome": "Pop", "tipo": "karaoke"},
@@ -71,8 +72,24 @@ def normalizar(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         pass
     out["maiusculas"] = bool(c.get("maiusculas"))
     out["contorno"] = c.get("contorno", True) is not False
-    if c.get("fonte") in set(dp_destaques._FONTE.values()):
-        out["fonte"] = c["fonte"]
+    if c.get("fonte") in set(dp_destaques._FONTE.values()) or (str(c.get("fonte") or "").startswith("DP ")
+                                                               and c["fonte"] in {v.get("familia") for v in dp_destaques.fontes_json().values()}):
+        out["fonte"] = c["fonte"]  # (+ v84_333: as fontes que você enviou)
+    for k in ("borda", "sombra"):  # 🎨 v84_333: px na escala 1080×1920 (vazio = o do estilo)
+        try:
+            if c.get(k) not in (None, ""):
+                out[k] = max(0, min(20, int(float(c[k]))))
+        except (TypeError, ValueError):
+            pass
+    try:
+        if c.get("opacidade") not in (None, ""):
+            out["opacidade"] = max(5, min(100, int(float(c["opacidade"]))))
+    except (TypeError, ValueError):
+        pass
+    for k in ("borda_cor", "sombra_cor"):
+        v = str(c.get(k) or "")
+        if re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+            out[k] = v.upper()
     for k in ("cor_texto", "cor_ativa"):
         v = str(c.get(k) or "")
         out[k] = v.upper() if re.fullmatch(r"#[0-9a-fA-F]{6}", v) else (out[k] if k == "cor_texto" else None)
@@ -216,7 +233,8 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
     cor_ativa = cfg["cor_ativa"] or ((dp_cores.normalizar(paleta)["primaria"]) if dp_cores.vale_para(paleta, "legendas") else "#FFD60A")
     r, g, b = dp_cores.rgb(cor_ativa)
     sobre_ativa = "#111111" if (0.299 * r + 0.587 * g + 0.114 * b) > 140 else "#FFFFFF"
-    branco = _c(cfg["cor_texto"])
+    a_txt = int(round(255 * (1 - float(cfg.get("opacidade") or 100) / 100)))  # 🎨 v84_333: opacidade do texto
+    branco = _c(cfg["cor_texto"], a_txt)
     an = {"base": 2, "meio": 5, "topo": 8, "terco": 5}[cfg["posicao"]]
     cx = W // 2
     cy = {"base": int(H * 0.93), "meio": H // 2, "topo": int(H * 0.06), "terco": int(H * 0.76)}[cfg["posicao"]]  # terço de baixo (v84_255)  # telinha: bottom 7% / top 6%
@@ -225,8 +243,15 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
     margem = float(cfg.get("margem") if cfg.get("margem") is not None else 0.10)
     mlr = int(W * margem)
     bord = max(2, int(round(fs_css / 24))) if cfg["contorno"] else 0  # contorno da telinha: fs/14 centrado na borda da letra
+    if cfg.get("borda") is not None:  # 🎨 v84_333: a espessura que você escolheu (0 = sem borda)
+        bord = int(round(cfg["borda"] * H / 1920))
+    shad = 1 if estilo != "cinema" else 2
+    if cfg.get("sombra") is not None:
+        shad = int(round(cfg["sombra"] * H / 1920))
+    c_borda = _c(cfg.get("borda_cor") or "#000000")
+    c_sombra = _c(cfg.get("sombra_cor") or "#000000", 0x60 if cfg.get("sombra_cor") else 0x80)
     estilos_ass = [
-        f"Style: Leg,{fam},{fs},{branco},{branco},&H00000000,&H80000000,1,{1 if estilo == 'cinema' else 0},0,0,100,100,0,0,1,{bord},{1 if estilo != 'cinema' else 2},{an},{mlr},{mlr},0,1",
+        f"Style: Leg,{fam},{fs},{branco},{branco},{c_borda},{c_sombra},1,{1 if estilo == 'cinema' else 0},0,0,100,100,0,0,1,{bord},{shad},{an},{mlr},{mlr},0,1",
         f"Style: Caixa,{fam},{fs},{branco},{branco},&H50000000,&H50000000,1,0,0,0,100,100,0,0,3,{max(4, fs // 5)},0,{an},{mlr},{mlr},0,1",
         f"Style: Faixa,{fam},{fs},{_c(sobre_ativa)},{_c(sobre_ativa)},{_c(cor_ativa)},{_c(cor_ativa)},1,0,0,0,100,100,0,0,3,{max(4, fs // 5)},0,{an},{mlr},{mlr},0,1",
     ]
@@ -270,6 +295,10 @@ def gerar_ass(palavras: List[Dict[str, Any]], cfg: Dict[str, Any], W: int, H: in
             fs_tag = f"\\fs{fs_g}" if fs_g != fs else ""
             if estilo in ("seguir", "contorno", "cinema"):
                 ev(t_ini, t_fim, f"{{{pos}{fs_tag}\\fad(80,60)}}{esc(frase)}")
+            elif estilo == "rolante":  # 🎨 v84_333: a frase entra pela direita e desliza devagar pra esquerda
+                desl = int(W * 0.07)
+                ms = max(1, int((t_fim - t_ini) * 1000))
+                ev(t_ini, t_fim, f"{{\\an{an}\\move({cx + desl},{cy},{cx - desl},{cy},0,{ms}){fs_tag}\\fad(120,90)}}{esc(frase)}")
             elif estilo == "caixa":
                 ev(t_ini, t_fim, f"{{{pos}{fs_tag}\\fad(60,60)}}{esc(frase)}", "Caixa")
             elif estilo == "faixa":

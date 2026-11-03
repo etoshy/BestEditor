@@ -1157,7 +1157,7 @@ def idioma_narrado(p: Dict[str, Any], perfil: Optional[Dict[str, Any]] = None) -
 
 
 # ------------------------------------------------------------------ 🏷 marca do canal (@canal por cima do vídeo)
-MARCA_POSICOES = ("meio", "topo", "base", "terco", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "legenda")  # legenda = ligada à legenda
+MARCA_POSICOES = ("meio", "topo", "base", "terco", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "legenda", "livre")  # legenda = ligada à legenda; livre = altura exata (v84_334)
 
 
 def marca_padrao(nome_canal: str = "") -> Dict[str, Any]:
@@ -1186,6 +1186,29 @@ def normalizar_marca(m: Any, nome_canal: str = "") -> Dict[str, Any]:
             out["cor"] = m["cor"].upper()
         if str(m.get("fonte") or "").startswith("DP "):
             out["fonte"] = str(m["fonte"])[:40]
+        for k_ in ("borda", "sombra"):  # 🎨 v84_333: px na escala 1080×1920
+            try:
+                if m.get(k_) not in (None, ""):
+                    out[k_] = max(0, min(20, int(float(m[k_]))))
+            except (TypeError, ValueError):
+                pass
+        for k_ in ("borda_cor", "sombra_cor", "cor2"):
+            if re.fullmatch(r"#[0-9A-Fa-f]{6}", str(m.get(k_) or "")):
+                out[k_] = m[k_].upper()
+        if m.get("gradiente") and out.get("cor2"):
+            out["gradiente"] = True
+            out["grad_dir"] = m.get("grad_dir") if m.get("grad_dir") in ("horizontal", "vertical") else "horizontal"
+        try:  # ↕ v84_334: posição "livre" = o centro do @ nessa altura (fração de cima pra baixo), arrastada na prévia
+            if m.get("altura") not in (None, ""):
+                out["altura"] = round(max(0.02, min(0.98, float(m["altura"]))), 4)
+        except (TypeError, ValueError):
+            pass
+        for k_ in ("desvio_x_px", "desvio_y_px"):
+            try:
+                if m.get(k_) not in (None, "", 0, "0"):
+                    out[k_] = max(-600, min(600, int(float(m[k_]))))
+            except (TypeError, ValueError):
+                pass
         if m.get("lado") in ("acima", "abaixo"):  # 🏷 v84_311: com posicao "legenda": X% (distancia) ou N px (distancia_px) do centro da legenda
             out["lado"] = m["lado"]
         try:
@@ -1236,6 +1259,8 @@ ACABAMENTO_PADRAO = {"arroba": "", "legenda_estilo": "", "legenda_tamanho": 0.05
                      "legenda_altura": None, "legenda_margem": 0.10, "sons_nivel": "poucos",
                      "legenda_fonte": "", "legenda_cor": "", "legenda_cor_ativa": "", "destaques": "precisa",
                      "marca_posicao": "", "marca_lado": "acima", "marca_distancia": 10, "marca_px": 0}  # 🏷 o @ do canal (vazio = como era)
+import acabamento_extra as _AX  # noqa: E402  🎨 v84_333: borda/sombra/degradê/X-Y do @, borda/sombra/opacidade da legenda, tarja
+ACABAMENTO_PADRAO.update(_AX.PADRAO)
 FONTES_LEGENDA = {"": "padrão (a do estilo)", "DP Inter": "Inter", "DP Poppins": "Poppins", "DP Montserrat": "Montserrat",
                   "DP Anton": "Anton", "DP Bebas Neue": "Bebas Neue", "DP Oswald": "Oswald", "DP Archivo": "Archivo",
                   "DP Barlow Condensed": "Barlow Condensed", "DP Roboto Condensed": "Roboto Condensed", "DP Fjalla One": "Fjalla One",
@@ -1300,7 +1325,9 @@ def limpar_acabamento(novos: Dict[str, Any]) -> Dict[str, Any]:
             except (TypeError, ValueError):
                 v = 0 if k == "marca_px" else 10
         elif k == "legenda_fonte":
-            v = v if v in FONTES_LEGENDA else ""
+            v = v if v in _AX.familias() else ""  # (inclui as fontes que você enviou)
+        elif k in _AX.PADRAO:
+            v = _AX.limpar(k, v)
         elif k in ("legenda_cor", "legenda_cor_ativa"):
             v = str(v or "").upper()
             v = v if re.fullmatch(r"#[0-9A-F]{6}", v) else ""
@@ -1361,6 +1388,7 @@ def aplicar_acabamento(p: Dict[str, Any], a: Dict[str, Any]) -> None:
         for k_a, k_l in (("legenda_fonte", "fonte"), ("legenda_cor", "cor_texto"), ("legenda_cor_ativa", "cor_ativa")):
             if a.get(k_a):  # 🎨 v84_308: vazio = o que o estilo/canal já usa (o padrão de hoje)
                 cfg["legenda"][k_l] = a[k_a]
+    _AX.aplicar_no_projeto(cfg, a)  # 🎨 v84_333
 
 
 def criar(base: str, canal_id: str = "", titulo: str = "", links: Iterable[str] = (), texto: str = "",
@@ -2865,7 +2893,8 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
         trechos.append({"start": float(ws[0]["start"]), "end": float(ws[-1]["end"]), "text": a.get("falado") or b["fala"], "words": ws})
     leg = dict(perfil["legenda"])
     leg.update({k: v for k, v in ((p.get("config") or {}).get("legenda") or {}).items()
-                if k in ("estilo", "tamanho", "posicao", "maiusculas", "max_palavras", "fonte", "cor_texto", "cor_ativa", "altura", "margem")})  # 🔤
+                if k in ("estilo", "tamanho", "posicao", "maiusculas", "max_palavras", "fonte", "cor_texto", "cor_ativa", "altura", "margem",
+                         "borda", "borda_cor", "sombra", "sombra_cor", "opacidade")})  # 🔤 (+ v84_333)
     leg["ativa"] = perfil["legenda"].get("ativa", True) is not False
     prop = proporcao_do(p)
     if prop == "1:1":  # ⬛ quadrado: a letra (que é medida pela altura) cresce pra ocupar a mesma largura de antes

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}🔗 Link → vídeo pronto{% endblock %}
+{% block title %}{% if so_personalizar %}🎨 Personalização dos canais{% else %}🔗 Link → vídeo pronto{% endif %}{% endblock %}
 {% block content %}
 {% include "_shorts_ia_comum.html" %}
 <style>
@@ -22,6 +22,15 @@
   .lk-selbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: 6px 0;
                border: 1px solid var(--borda); border-radius: 10px; background: var(--card); font-size: .88rem; }
   .lk-selacoes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .lk-alca { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed rgba(255,255,255,.85); cursor: ns-resize; z-index: 2; }
+  .lk-alca::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 24px; }  /* área fácil de pegar */
+  .lk-alca span { position: absolute; right: 6px; top: -11px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: #7c3aed; color: #fff; pointer-events: none; }
+  .lk-alca[data-alca=legenda] { border-top-color: rgba(255,214,10,.95); } .lk-alca[data-alca=legenda] span { background: #b45309; left: 6px; right: auto; }
+  .lk-alca.arrastando { border-top-style: solid; }
+  .pz-abas { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; position: sticky; top: 0; z-index: 6; padding: 8px; border-radius: 12px; background: var(--card); border: 1px solid var(--borda); }
+  .pz-aba { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--borda); background: transparent; color: inherit; cursor: pointer; font-weight: 600; }
+  .pz-aba.on { background: var(--acento); color: #fff; border-color: var(--acento); } .pz-novo { border-style: dashed; }
+  .lk-cor { display: flex; gap: 4px; align-items: center; } .lk-cor input:first-child { flex: 1; min-width: 0; } .lk-cor input[type=color] { width: 34px !important; height: 30px; padding: 0; border: 0; background: none; }
   .lk-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; margin: 6px 0; }
   .lk-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: lkg 1s linear infinite; flex: 0 0 auto; }
   @keyframes lkg { to { transform: rotate(360deg); } }
@@ -32,11 +41,14 @@
   .lk-tit { display: flex; gap: 6px; align-items: flex-start; font-size: .88rem; padding: 3px 0; }
   .lk-tit small { color: var(--mudo); }
 </style>
-<h1>🔗 Link → vídeo pronto <span class="si-dica" style="font-weight:400">cole o link e espere: baixa, lê os comentários, roteiro, narração, edição e o MP4 pronto</span></h1>
+{% if so_personalizar %}<h1>🎨 Personalização dos canais <span class="si-dica" style="font-weight:400">cada canal na sua aba: @, legenda, cores, fontes, tarja, formato, voz e idioma — vale pros vídeos novos dele</span></h1>
+<div class="si-linha" style="gap:10px"><a href="/curtos/link">← Link → vídeo pronto</a></div>
+{% else %}<h1>🔗 Link → vídeo pronto <span class="si-dica" style="font-weight:400">cole o link e espere: baixa, lê os comentários, roteiro, narração, edição e o MP4 pronto</span></h1>
+<div class="si-linha" style="gap:10px;margin:-4px 0 6px"><a href="/curtos/personalizar">🎨 abrir a Personalização dos canais (uma aba pra cada canal)</a></div>{% endif %}
 <div id="barra" class="si-barra"></div>
-<div class="si-passos"><span>⬇ baixa o vídeo</span><span>💬 lê a legenda e os comentários</span><span>👁 a IA entende o vídeo</span><span>📝 roteiro + títulos</span><span>🎙 narração com tags</span><span>✂ edição + 🎯 destaques</span><span>🎬 MP4</span></div>
+<div class="si-passos"{% if so_personalizar %} style="display:none"{% endif %}><span>⬇ baixa o vídeo</span><span>💬 lê a legenda e os comentários</span><span>👁 a IA entende o vídeo</span><span>📝 roteiro + títulos</span><span>🎙 narração com tags</span><span>✂ edição + 🎯 destaques</span><span>🎬 MP4</span></div>
 
-<div class="si-card lk-form">
+<div class="si-card lk-form"{% if so_personalizar %} style="display:none"{% endif %}>
   <label>🔗 Links dos vídeos <span class="si-dica" style="font-weight:400">— TikTok, YouTube Shorts, Reels, Kwai, Reddit… <b>um por linha</b> (até 50): gera todos, um depois do outro</span>
     <textarea id="link" class="lk-link" rows="5" style="resize:vertical;min-height:90px" placeholder="https://www.tiktok.com/@…/video/…&#10;https://www.instagram.com/reel/…&#10;https://youtube.com/shorts/…"></textarea>
     <span class="si-dica" id="nLinks" style="font-weight:400"></span></label>
@@ -52,6 +64,7 @@
     <label>Formato<select id="proporcao">{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
     <label>Qualidade<select id="qualidade">{% for r in resolucoes %}<option value="{{ r }}"{% if r == '1080p' %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
   </div>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="depois do vídeo no formato escolhido, monta de novo em 1:1 (quadrado) e exporta também — dois MP4 por link"><input type="checkbox" id="tambem_quadrado" style="width:auto;margin:0"> ⬛ também gerar a versão 1:1 (quadrada) além da 9:16</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="exportar" checked style="width:auto;margin:0"> 🎬 exportar o MP4 no fim (desmarcado: para no editor pra você conferir)</label>
   <div id="loteModoBox" style="display:none;margin:6px 0"><span style="font-weight:600">🧩 Como rodar o lote</span>
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="radio" name="lote_modo" value="um" checked style="width:auto;margin:0"> ▶ um por vez (cada vídeo faz tudo antes do próximo — o 1º fica pronto mais cedo)</label>
@@ -70,8 +83,28 @@
     {% if not tem_tts %}<span class="si-dica">⚠ o gerador de voz não está disponível.</span>{% endif %}</div>
 </div>
 
+{% if so_personalizar %}<div class="pz-abas" id="pzAbas"></div>
+<details class="si-card" id="pzPacote" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">📦 Levar canais pra outro PC — exportar / importar <span class="si-dica" style="font-weight:400">(estilo, @, legenda, cores, formato, voz, idioma, descrição, memes do canal, fontes enviadas e grupos)</span></summary>
+  <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px">
+    <div style="flex:1;min-width:280px">
+      <b>📦 Exportar</b>
+      <div class="si-linha" style="gap:6px;margin:6px 0"><button type="button" class="si-mini si-sec" id="pkTodos">todos</button><button type="button" class="si-mini si-sec" id="pkNenhum">nenhum</button></div>
+      <div id="pkLista" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto"></div>
+      <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400;margin-top:8px"><input type="checkbox" id="pkPadrao" style="width:auto;margin:0"> levar também o 📚 padrão de todos</label>
+      <div class="si-linha" style="gap:6px;margin-top:8px"><button type="button" class="si-mini si-ok" id="pkZip">📦 baixar ZIP (com mídias e fontes)</button><button type="button" class="si-mini si-sec" id="pkJson">📄 só o JSON</button></div>
+    </div>
+    <div style="flex:1;min-width:280px">
+      <b>📥 Importar</b> <span class="si-dica">(o .zip ou .json exportado)</span>
+      <input type="file" id="pkArq" accept=".zip,.json" style="margin-top:6px">
+      <label style="margin-top:6px">Se o canal já existir aqui<select id="pkModo"><option value="copia">criar uma cópia (“… (importado)”)</option><option value="substituir">substituir pelo do pacote</option></select></label>
+      <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400;margin-top:6px"><input type="checkbox" id="pkImpPadrao" style="width:auto;margin:0"> trocar também o 📚 padrão de todos (se o pacote tiver)</label>
+      <button type="button" class="si-mini si-ok" id="pkImportar" style="margin-top:8px">📥 importar</button>
+      <div id="pkRes" class="si-dica" style="margin-top:6px"></div>
+    </div>
+  </div>
+</details>{% endif %}
 <div class="si-card lk-form">
-  <details id="acab"><summary style="cursor:pointer;font-weight:600">🎨 Acabamento de TODOS os shorts — @ do canal, legenda, efeitos sonoros</summary>
+  <details id="acab"{% if so_personalizar %} open{% endif %}><summary style="cursor:pointer;font-weight:600" id="acabTitulo">🎨 Acabamento de TODOS os shorts — @ do canal, legenda, efeitos sonoros</summary>
     <p class="si-dica" style="margin:6px 0">Vale pros shorts novos de todas as abas (Link, Comentário, Explicativo, Momentos…). O vídeo do post sempre perde as
       <b>bordas pretas</b> que ficam o tempo todo nele; a IA olha o vídeo, escreve o roteiro, escolhe os cortes, os destaques com rastreio e os sons.</p>
     <div class="lk-ops">
@@ -85,8 +118,9 @@
     <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_legenda_maiusculas" style="width:auto;margin:0"> MAIÚSCULAS</label>
     <div class="lk-ops">
       <label>Fonte da legenda<select id="a_legenda_fonte">{% for k, v in fontes_legenda.items() %}<option value="{{ k }}" style="font-family:'{{ k }}'">{{ v }}</option>{% endfor %}</select></label>
-      <label>Cor do texto<select id="a_legenda_cor">{% for k, v in cores_legenda.items() %}<option value="{{ k }}"{% if k %} style="background:{{ k }};color:{{ '#000' if k in ('#FFFFFF', '#FFD60A', '#00E5FF', '#39FF14') else '#fff' }}"{% endif %}>{{ v }}</option>{% endfor %}</select></label>
-      <label>Cor da palavra falada<select id="a_legenda_cor_ativa">{% for k, v in cores_legenda.items() %}<option value="{{ k }}"{% if k %} style="background:{{ k }};color:{{ '#000' if k in ('#FFFFFF', '#FFD60A', '#00E5FF', '#39FF14') else '#fff' }}"{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      <label>Cor do texto<span class="lk-cor"><input id="a_legenda_cor" list="lkCores" placeholder="padrão" maxlength="7"><input type="color" data-cor="a_legenda_cor" title="escolher a cor"></span></label>
+      <label>Cor da palavra falada<span class="lk-cor"><input id="a_legenda_cor_ativa" list="lkCores" placeholder="padrão" maxlength="7"><input type="color" data-cor="a_legenda_cor_ativa" title="escolher a cor"></span></label>
+      <datalist id="lkCores">{% for k, v in cores_legenda.items() %}{% if k %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</datalist>
       <div id="a_previa_leg" style="align-self:end;padding:8px 14px;border-radius:8px;background:#222;font-weight:800;font-size:1.1rem"></div>
     </div>
     <div class="lk-ops" style="align-items:flex-start">
@@ -117,10 +151,79 @@
       </div>
     </div>
     <div class="lk-ops" style="align-items:flex-end">
-      <label>🏷 Posição do @ do canal<select id="a_marca_posicao"><option value="">como o canal define (meio)</option><option value="meio">no meio</option><option value="topo">em cima</option><option value="base">embaixo</option><option value="terco">terço de baixo</option><option value="sup_esq">canto sup. esquerdo</option><option value="sup_dir">canto sup. direito</option><option value="inf_esq">canto inf. esquerdo</option><option value="inf_dir">canto inf. direito</option><option value="legenda">🔗 ligada à legenda (acima/abaixo dela)</option></select></label>
+      <label>🏷 Posição do @ do canal<select id="a_marca_posicao"><option value="">como o canal define (meio)</option><option value="meio">no meio</option><option value="topo">em cima</option><option value="base">embaixo</option><option value="terco">terço de baixo</option><option value="sup_esq">canto sup. esquerdo</option><option value="sup_dir">canto sup. direito</option><option value="inf_esq">canto inf. esquerdo</option><option value="inf_dir">canto inf. direito</option><option value="legenda">🔗 ligada à legenda (acima/abaixo dela)</option><option value="livre">↕ livre (arraste na prévia)</option></select></label>
+      <label>altura livre do @ (% de cima)<input id="a_marca_altura" type="number" min="2" max="98" step="0.5" placeholder="arraste na prévia"></label>
       <label>ligada: lado<select id="a_marca_lado"><option value="acima">acima da legenda</option><option value="abaixo">abaixo da legenda</option></select></label>
       <label>distância (% da altura)<input id="a_marca_distancia" type="number" min="1" max="40" step="1"></label>
       <label>ou em pixels (0 = usa a %)<input id="a_marca_px" type="number" min="0" max="400" step="1"></label>
+    </div>
+    <details id="acabExtra" style="margin-top:8px" open><summary style="cursor:pointer;font-weight:700">✨ Estilo do @ e da legenda — borda, sombra, degradê, sua fonte, tarja <span class="si-dica" style="font-weight:400">(vazio = como já era)</span></summary>
+    <div class="si-linha" style="gap:8px;flex-wrap:wrap;margin:6px 0">
+      <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400">🎨 Esquema<select id="corEsquema" style="width:auto">
+        <option value="">🎲 qualquer</option><option value="complementar">complementar (opostas)</option><option value="analoga">análoga (vizinhas)</option>
+        <option value="triade">tríade</option><option value="dividida">complementar dividida</option><option value="mono">monocromática</option></select></label>
+      <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400">Tom<select id="corTom" style="width:auto">
+        <option value="">🎲 qualquer</option><option value="vibrante">vibrante</option><option value="neon">neon</option><option value="pastel">pastel</option><option value="sobrio">sóbrio</option><option value="quente">quente</option><option value="frio">frio</option></select></label>
+      <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400" title="a cor que manda na paleta (vazio = sorteada)">Cor base<span class="lk-cor"><input id="corBase" placeholder="sorteada" maxlength="7" style="width:84px"><input type="color" data-cor="corBase"></span></label>
+      <button type="button" class="si-mini" id="bSortear" title="sorteia fonte, estilo da legenda, borda, sombra e as cores pela teoria das cores (esquema + tom) — salve se gostar">🎲 sortear um estilo</button>
+      <button type="button" class="si-mini si-sec" id="bSoCores" title="troca só as cores (mantém fontes, estilo e espessuras)">🎨 só as cores</button>
+      <span id="paletaVista" style="display:inline-flex;gap:3px;align-items:center"></span>
+      <button type="button" class="si-mini si-sec" id="bLimparEstilo" title="esvazia os campos desta seção (volta ao jeito de antes)">↺ limpar o estilo</button>
+    </div>
+    <b style="font-size:.9rem">🏷 O @ do canal</b>
+    <div class="lk-ops">
+      <label>Fonte<select id="a_marca_fonte"><option value="">padrão (Poppins)</option>{% for k, v in fontes_legenda.items() %}{% if k %}<option value="{{ k }}">{{ v }}</option>{% endif %}{% endfor %}</select></label>
+      <label>Cor<span class="lk-cor"><input id="a_marca_cor" placeholder="branco" maxlength="7"><input type="color" data-cor="a_marca_cor" title="escolher a cor"></span></label>
+      <label>Tamanho (% da altura)<input id="a_marca_tamanho" type="number" min="1" max="12" step="0.5" placeholder="3.5"></label>
+      <label>Opacidade (%)<input id="a_marca_opacidade" type="number" min="5" max="100" step="5" placeholder="50"></label>
+      <label>Borda (px)<input id="a_marca_borda" type="number" min="0" max="20" placeholder="auto"></label>
+      <label>Cor da borda<span class="lk-cor"><input id="a_marca_borda_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_marca_borda_cor" title="escolher a cor"></span></label>
+      <label>Sombra (px)<input id="a_marca_sombra" type="number" min="0" max="20" placeholder="0"></label>
+      <label>Cor da sombra<span class="lk-cor"><input id="a_marca_sombra_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_marca_sombra_cor" title="escolher a cor"></span></label>
+      <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400;margin-top:22px"><input type="checkbox" id="a_marca_gradiente" style="width:auto;margin:0"> 🌈 degradê</label>
+      <label>Cor 2 do degradê<span class="lk-cor"><input id="a_marca_cor2" placeholder="—" maxlength="7"><input type="color" data-cor="a_marca_cor2" title="escolher a cor"></span></label>
+      <label>Direção<select id="a_marca_grad_dir"><option value="horizontal">horizontal</option><option value="vertical">vertical</option></select></label>
+      <label>Ajuste X (px)<input id="a_marca_x" type="number" min="-600" max="600" step="2"></label>
+      <label>Ajuste Y (px)<input id="a_marca_y" type="number" min="-600" max="600" step="2"></label>
+    </div>
+    <b style="font-size:.9rem">🔤 A legenda</b>
+    <div class="lk-ops">
+      <label>Borda (px)<input id="a_legenda_borda" type="number" min="0" max="20" placeholder="a do estilo"></label>
+      <label>Cor da borda<span class="lk-cor"><input id="a_legenda_borda_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_legenda_borda_cor" title="escolher a cor"></span></label>
+      <label>Sombra (px)<input id="a_legenda_sombra" type="number" min="0" max="20" placeholder="a do estilo"></label>
+      <label>Cor da sombra<span class="lk-cor"><input id="a_legenda_sombra_cor" placeholder="preto" maxlength="7"><input type="color" data-cor="a_legenda_sombra_cor" title="escolher a cor"></span></label>
+      <label>Opacidade do texto (%)<input id="a_legenda_opacidade" type="number" min="5" max="100" step="5" placeholder="100"></label>
+    </div>
+    <b style="font-size:.9rem">▭ Tarja sobre a legenda que já vem no vídeo original</b> <span class="si-dica">— só pra legenda/texto gravado no clipe (o crédito do criador continua)</span>
+    <div class="lk-ops">
+      <label>Tarja<select id="a_tarja_modo"><option value="">nenhuma</option><option value="blur">desfoque</option><option value="solida">cor sólida</option></select></label>
+      <label>De (% de cima)<input id="a_tarja_y0" type="number" min="0" max="100" step="0.5" placeholder="ex.: 70"></label>
+      <label>Até (% de cima)<input id="a_tarja_y1" type="number" min="0" max="100" step="0.5" placeholder="ex.: 82"></label>
+      <label>Cor (sólida)<span class="lk-cor"><input id="a_tarja_cor" placeholder="#000000" maxlength="7"><input type="color" data-cor="a_tarja_cor" title="escolher a cor"></span></label>
+    </div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:10px">
+      <div style="display:flex;flex-direction:column;gap:6px;width:260px">
+        <b style="font-size:.9rem">🔤 Enviar uma fonte sua (.ttf / .otf)</b>
+        <input type="file" id="fonteArq" accept=".ttf,.otf">
+        <input id="fonteNome" placeholder="nome (opcional)" maxlength="40">
+        <button type="button" class="si-mini" id="bFonte">⬆ instalar a fonte</button>
+        <span class="si-dica">ela aparece como “(sua)” nas listas de fonte do @ e da legenda</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div id="a_previa_box" style="position:relative;width:240px;height:427px;border-radius:12px;overflow:hidden;border:2px solid #444;background:#111;touch-action:none;user-select:none">
+          <img id="a_previa_real" alt="prévia" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none">
+          <div class="lk-alca" data-alca="marca" title="arraste pra cima/baixo: a altura do @"><span>🏷 @</span></div>
+          <div class="lk-alca" data-alca="legenda" title="arraste pra cima/baixo: a altura da legenda"><span>🔤 legenda</span></div>
+        </div>
+        <span class="si-dica">↕ arraste as alças 🏷 @ e 🔤 legenda pra cima ou pra baixo</span>
+        <span class="si-dica" id="a_previa_info">🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)</span>
+        <button type="button" class="si-mini si-sec" id="bPrevia">🔄 atualizar a prévia</button>
+      </div>
+    </div>
+    </details>
+    <div class="lk-ops" style="align-items:flex-end">
+      <label>📐 Formato do canal<select id="a_proporcao"><option value="">o do envio</option>{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="a_tambem_quadrado" style="width:auto;margin:0"> ⬛ também a versão 1:1</label>
     </div>
     <label>🎯 Círculo/seta seguindo o objeto<select id="a_destaques"><option value="precisa">só quando precisa (objeto pequeno, longe ou no meio de outros)</option>
       <option value="livre">a IA decide (como antes: 1 a 3 por vídeo)</option><option value="nunca">nunca</option></select></label>
@@ -134,7 +237,7 @@
   </details>
 </div>
 
-<div class="si-card">
+<div class="si-card"{% if so_personalizar %} style="display:none"{% endif %}>
   <h2 style="margin:0">🎞 Vídeos</h2>
   <div id="lista"><p class="si-dica">Nenhum ainda.</p></div>
 </div>
@@ -154,7 +257,7 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
 // 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
-const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico'], OP_RADIOS = ['modo', 'lote_modo'];
+const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'tambem_quadrado'], OP_RADIOS = ['modo', 'lote_modo'];
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 const lerOpcoes = () => { const o = {}; OP_SELECTS.concat(['voz']).forEach(k => o[k] = el(k).value); OP_CHECKS.forEach(k => o[k] = el(k).checked); OP_RADIOS.forEach(n => o[n] = radio(n)); return o; };
 const PADRAO_OP = (() => { vozes(); return lerOpcoes(); })();  // o de fábrica (antes de aplicar o que estava salvo)
@@ -171,7 +274,7 @@ document.querySelectorAll(OP_RADIOS.map(n => `input[name=${n}]`).join(',')).forE
 window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {} aplicarOpcoes(PADRAO_OP); el('link').dispatchEvent(new Event('input')); aviso('↺ opções de volta ao padrão', 'okk'); };
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
-  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, camera_exp: el('camera_exp').checked, por_etapa: loteModo() === 'etapa',
+  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   salvarOpcoes();
@@ -222,7 +325,12 @@ el('link').addEventListener('input', () => {  // 🔗 quantos links vão entrar 
   el('loteModoBox').style.display = n > 1 || ULT.some(v => v.aguardando && !v.rodando && !v.apagado) ? '' : 'none';
 });
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
-              'legenda_altura', 'legenda_margem', 'sons_nivel', 'legenda_fonte', 'legenda_cor', 'legenda_cor_ativa', 'destaques', 'marca_posicao', 'marca_lado', 'marca_distancia', 'marca_px'];
+              'legenda_altura', 'legenda_margem', 'sons_nivel', 'legenda_fonte', 'legenda_cor', 'legenda_cor_ativa', 'destaques', 'marca_posicao', 'marca_lado', 'marca_distancia', 'marca_px',
+              // 🎨 v84_333
+              'marca_fonte', 'marca_cor', 'marca_tamanho', 'marca_opacidade', 'marca_borda', 'marca_borda_cor', 'marca_sombra', 'marca_sombra_cor',
+              'marca_gradiente', 'marca_cor2', 'marca_grad_dir', 'marca_x', 'marca_y', 'legenda_borda', 'legenda_borda_cor', 'legenda_sombra',
+              'legenda_sombra_cor', 'legenda_opacidade', 'tarja_modo', 'tarja_y0', 'tarja_y1', 'tarja_cor', 'marca_altura', 'proporcao', 'tambem_quadrado'];
+const ESTILO_EXTRA = ACAB.slice(ACAB.indexOf('marca_fonte'));
 function previaLeg() {  // 🎨 como fica: “ESSA [PALAVRA] AQUI”
   const f = el('a_legenda_fonte').value, c = el('a_legenda_cor').value || '#FFFFFF', a = el('a_legenda_cor_ativa').value || '#FFD60A';
   const mp = el('a_marca_posicao').value, dist = parseFloat(el('a_marca_distancia').value) || 10, px = parseInt(el('a_marca_px').value) || 0;
@@ -240,10 +348,11 @@ function previaLeg() {  // 🎨 como fica: “ESSA [PALAVRA] AQUI”
   L.innerHTML = `${cap ? 'ESSA' : 'Essa'} <span style="color:${a}">${cap ? 'PALAVRA' : 'palavra'}</span> ${cap ? 'AQUI' : 'aqui'}`;
   el('a_tela').dataset.pos = el('a_legenda_posicao').value;
   const M = el('a_tela_marca'), dH = px ? px / 260 : dist / 100, ac = el('a_marca_lado').value === 'acima' ? -1 : 1;
-  const yy = {meio: 0.5, topo: 0.05, base: 0.95, terco: 0.76, sup_esq: 0.04, sup_dir: 0.04, inf_esq: 0.96, inf_dir: 0.96}[mp];
+  const yy = mp === 'livre' ? (parseFloat(el('a_marca_altura').value) || 50) / 100 : {meio: 0.5, topo: 0.05, base: 0.95, terco: 0.76, sup_esq: 0.04, sup_dir: 0.04, inf_esq: 0.96, inf_dir: 0.96}[mp];
   const yMarca = mp === 'legenda' ? Math.max(0.02, Math.min(0.98, y / H + ac * dH)) : (yy ?? 0.5);
   M.style.top = (yMarca * H) + 'px'; M.style.textAlign = ['sup_esq', 'inf_esq'].includes(mp) ? 'left' : ['sup_dir', 'inf_dir'].includes(mp) ? 'right' : 'center';
   M.innerHTML = el('canal').selectedOptions[0] ? '@' + (el('canal').selectedOptions[0].text.replace(/[^a-z0-9_.]/gi, '').toLowerCase() || 'seucanal') : '@seucanal';
+  try { posAlcas(); } catch (e) {}  // ↕ as alças da prévia acompanham
 }
 ['a_legenda_fonte', 'a_legenda_cor', 'a_legenda_cor_ativa', 'a_legenda_posicao', 'a_legenda_altura', 'a_legenda_margem', 'a_legenda_tamanho', 'a_legenda_maiusculas'].forEach(i => el(i).addEventListener(i === 'a_legenda_altura' ? 'input' : 'change', previaLeg));
 let CANAIS = [];
@@ -252,13 +361,117 @@ async function carregarAcab(cid) {  // o padrão (vazio) ou o do canal escolhido
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
     else if (k === 'legenda_altura') e.value = a[k] ? Math.round(a[k] * 100) : ''; else e.value = String(a[k] ?? ''); });
   if (!a.destaques) el('a_destaques').value = 'precisa';
-  previaLeg();
+  sincronizarCores(); previaLeg(); pedirPrevia(); setTimeout(posAlcas, 0);
 }
+// 🎨 v84_333: as cores (texto + seletor), a prévia de verdade, o sorteio e a fonte enviada
+function sincronizarCores() { document.querySelectorAll('[data-cor]').forEach(c => { const t = el(c.dataset.cor); if (/^#[0-9a-f]{6}$/i.test(t.value)) c.value = t.value; }); }
+document.querySelectorAll('[data-cor]').forEach(c => c.addEventListener('input', () => { const t = el(c.dataset.cor); t.value = c.value.toUpperCase(); t.dispatchEvent(new Event('change')); }));
+let tPrevia = null;
+function dadosAcab() { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; }); return d; }
+function pedirPrevia() { clearTimeout(tPrevia); tPrevia = setTimeout(() => {
+  const img = el('a_previa_real'); el('a_previa_info').textContent = '⏳ desenhando…';
+  img.onload = () => el('a_previa_info').textContent = '🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)';
+  img.onerror = () => el('a_previa_info').textContent = '❌ não consegui fazer a prévia';
+  img.src = `/curtos/acabamento/previa.jpg?canal=${encodeURIComponent(el('a_escopo').value)}&d=${encodeURIComponent(JSON.stringify(dadosAcab()))}&_=${Date.now()}`;
+}, 700); }
+ACAB.forEach(k => { const e = el('a_' + k); e.addEventListener(e.tagName === 'INPUT' && e.type !== 'checkbox' ? 'input' : 'change', pedirPrevia); });
+el('bPrevia').onclick = pedirPrevia;
+// ↕ v84_334: as alças em cima da prévia — arrastar muda a ALTURA do @ (posição "livre") ou da legenda (altura exata)
+const Y_POS_LEG = {topo: 0.06, terco: 0.76, meio: 0.5, base: 0.93}, Y_POS_MARCA = {meio: 0.5, topo: 0.05, base: 0.95, terco: 0.76, sup_esq: 0.04, sup_dir: 0.04, inf_esq: 0.96, inf_dir: 0.96};
+function yLegenda() { const a = parseFloat(el('a_legenda_altura').value); return a > 0 ? a / 100 : (Y_POS_LEG[el('a_legenda_posicao').value] ?? 0.76); }
+function yMarca() {
+  const mp = el('a_marca_posicao').value, alt = parseFloat(el('a_marca_altura').value);
+  if (mp === 'livre') return alt > 0 ? alt / 100 : 0.5;
+  if (mp === 'legenda') { const px = parseInt(el('a_marca_px').value) || 0, d = px ? px / 1920 : (parseFloat(el('a_marca_distancia').value) || 10) / 100;
+    return yLegenda() + (el('a_marca_lado').value === 'acima' ? -d : d); }
+  return (Y_POS_MARCA[mp] ?? 0.5) + (parseInt(el('a_marca_y').value) || 0) / 1920;
+}
+function posAlcas() { const box = el('a_previa_box'), H = box.clientHeight;
+  box.querySelector('[data-alca=marca]').style.top = (Math.max(0.02, Math.min(0.98, yMarca())) * H) + 'px';
+  box.querySelector('[data-alca=legenda]').style.top = (Math.max(0.02, Math.min(0.98, yLegenda())) * H) + 'px'; }
+['a_marca_posicao', 'a_marca_altura', 'a_marca_y', 'a_marca_px', 'a_marca_distancia', 'a_marca_lado', 'a_legenda_altura', 'a_legenda_posicao'].forEach(i => el(i).addEventListener(el(i).tagName === 'INPUT' ? 'input' : 'change', posAlcas));
+el('a_previa_box').querySelectorAll('[data-alca]').forEach(h => h.addEventListener('pointerdown', ev => {
+  ev.preventDefault(); h.setPointerCapture(ev.pointerId); h.classList.add('arrastando');
+  const box = el('a_previa_box'), qual = h.dataset.alca;
+  const mover = e => { const r = box.getBoundingClientRect(); const f = Math.max(0.02, Math.min(0.98, (e.clientY - r.top) / r.height));
+    const pct = Math.round(f * 1000) / 10;
+    if (qual === 'marca') { el('a_marca_posicao').value = 'livre'; el('a_marca_altura').value = pct; el('a_marca_y').value = 0; }
+    else { el('a_legenda_altura').value = pct; }
+    h.style.top = (f * r.height) + 'px'; h.querySelector('span').textContent = (qual === 'marca' ? '🏷 @ ' : '🔤 legenda ') + pct + '%'; };
+  const soltar = () => { h.classList.remove('arrastando'); h.removeEventListener('pointermove', mover); h.removeEventListener('pointerup', soltar);
+    h.querySelector('span').textContent = qual === 'marca' ? '🏷 @' : '🔤 legenda'; previaLeg(); posAlcas(); pedirPrevia(); };
+  h.addEventListener('pointermove', mover); h.addEventListener('pointerup', soltar);
+}));
+
+// 🎨 v84_334: sorteio com TEORIA DAS CORES — esquema (complementar, análoga, tríade, dividida, mono) + tom; o texto e a borda
+// sempre com contraste alto (legível), a palavra falada e o @ com as cores de destaque do esquema.
+const sorteia = a => a[Math.floor(Math.random() * a.length)];
+function hslHex(h, s, l) { h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(1, s)); l = Math.max(0, Math.min(1, l));
+  const f = n => { const k = (n + h / 30) % 12, a = s * Math.min(l, 1 - l); return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))).toString(16).padStart(2, '0'); };
+  return ('#' + f(0) + f(8) + f(4)).toUpperCase(); }
+function hexHsl(hex) { const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn; let h = 0, s = 0;
+  if (d) { s = d / (1 - Math.abs(2 * l - 1)); h = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4); }
+  return [(h + 360) % 360, s, l]; }
+function lum(hex) { const c = [1, 3, 5].map(i => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+const contraste = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+function comContraste(h, s, l, fundo, minimo) {  // empurra a luminosidade até ter contraste com a borda
+  let c = hslHex(h, s, l); const subir = lum(fundo) < 0.4;
+  for (let i = 0; i < 20 && contraste(c, fundo) < minimo; i++) { l += subir ? 0.04 : -0.04; c = hslHex(h, s, l); }
+  return c; }
+const TONS = {vibrante: [0.85, 0.55], neon: [1.0, 0.58], pastel: [0.6, 0.8], sobrio: [0.35, 0.52], quente: [0.85, 0.56], frio: [0.75, 0.56]};
+const ESQUEMAS = {complementar: [0, 180, 180], analoga: [0, 30, -30], triade: [0, 120, 240], dividida: [0, 150, 210], mono: [0, 0, 0]};
+function gerarPaleta() {
+  const esq = el('corEsquema').value || sorteia(Object.keys(ESQUEMAS)), tom = el('corTom').value || sorteia(Object.keys(TONS));
+  const base = /^#[0-9a-f]{6}$/i.test(el('corBase').value) ? el('corBase').value : null;
+  let h = base ? hexHsl(base)[0] : Math.random() * 360;
+  if (!base && tom === 'quente') h = sorteia([0, 15, 30, 45, 330, 345]) + Math.random() * 12;
+  if (!base && tom === 'frio') h = 170 + Math.random() * 100;
+  const [s, l] = TONS[tom], [a, b, c] = ESQUEMAS[esq];
+  const borda = hslHex(h, Math.min(0.6, s), 0.09);                      // borda escura do mesmo matiz (segura o texto em qualquer fundo)
+  const texto = comContraste(h, 0.18, 0.96, borda, 12);                  // texto quase branco, tingido da cor base
+  const ativa = comContraste(h + b, s, esq === 'mono' ? 0.68 : l, borda, 4.5);  // a palavra falada: a 2ª cor do esquema
+  const marca = comContraste(h + (esq === 'mono' ? 0 : c), s, esq === 'mono' ? Math.min(0.85, l + 0.15) : l, borda, 4.5);
+  const marca2 = comContraste(h + a + (esq === 'mono' ? 0 : 20), s, esq === 'mono' ? Math.max(0.35, l - 0.12) : l, borda, 3);
+  return {esq, tom, texto, ativa, borda, marca, marca2, sombra: hslHex(h, 0.4, 0.04)};
+}
+const NOMES_ESQ = {complementar: 'complementar', analoga: 'análoga', triade: 'tríade', dividida: 'compl. dividida', mono: 'monocromática'};
+function mostrarPaleta(p) { el('paletaVista').innerHTML = [p.texto, p.ativa, p.marca, p.marca2, p.borda].map(c => `<span title="${c}" style="display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid #888;background:${c};opacity:1"></span>`).join('')
+  + `<small class="si-dica" style="margin-left:4px">${NOMES_ESQ[p.esq]} · ${p.tom}</small>`; }
+const setA = (k, v) => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!v; else e.value = v; };
+function aplicarCores(p) {
+  setA('legenda_cor', p.texto); setA('legenda_cor_ativa', p.ativa); setA('legenda_borda_cor', p.borda); setA('legenda_sombra_cor', p.sombra);
+  setA('marca_cor', p.marca); setA('marca_borda_cor', p.borda); setA('marca_sombra_cor', p.sombra); setA('marca_cor2', p.marca2);
+  mostrarPaleta(p);
+}
+el('bSortear').onclick = () => {
+  const opts = id => [...el(id).options].map(o => o.value).filter(Boolean);
+  setA('marca_fonte', sorteia(opts('a_marca_fonte'))); setA('legenda_fonte', sorteia(opts('a_legenda_fonte')));
+  setA('legenda_estilo', sorteia(['classico', 'destaque', 'pop', 'palavra_unica', 'preenchimento', 'contorno', 'rolante']));
+  setA('marca_borda', 2 + Math.floor(Math.random() * 7)); setA('marca_sombra', Math.random() < 0.4 ? 0 : 2 + Math.floor(Math.random() * 6));
+  setA('marca_gradiente', Math.random() < 0.45); setA('marca_grad_dir', sorteia(['horizontal', 'vertical'])); setA('marca_opacidade', sorteia([100, 100, 90, 80]));
+  setA('legenda_borda', 3 + Math.floor(Math.random() * 8)); setA('legenda_sombra', Math.random() < 0.35 ? 0 : 2 + Math.floor(Math.random() * 6));
+  aplicarCores(gerarPaleta());
+  sincronizarCores(); previaLeg(); pedirPrevia(); aviso('🎲 estilo sorteado — mude o que quiser e 💾 salve o acabamento', 'okk');
+};
+el('bSoCores').onclick = () => { aplicarCores(gerarPaleta()); sincronizarCores(); previaLeg(); pedirPrevia(); };
+el('bLimparEstilo').onclick = () => { ESTILO_EXTRA.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = false; else e.value = k === 'marca_grad_dir' ? 'horizontal' : (k === 'marca_x' || k === 'marca_y') ? '0' : k === 'tarja_cor' ? '#000000' : ''; });
+  sincronizarCores(); pedirPrevia(); };
+el('bFonte').onclick = async () => { const f = el('fonteArq').files[0]; if (!f) return aviso('Escolha o arquivo .ttf/.otf', 'erro');
+  const fd = new FormData(); fd.append('fonte', f); fd.append('nome', el('fonteNome').value); el('bFonte').disabled = true;
+  try { const r = await fetch('/curtos/fontes', {method: 'POST', body: fd}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.erro || r.status);
+    ['a_marca_fonte', 'a_legenda_fonte'].forEach(id => { const s_ = el(id), atual = s_.value, prim = s_.options[0].outerHTML;
+      s_.innerHTML = prim + Object.entries(j.fontes).filter(([k]) => k).map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join(''); s_.value = atual; });
+    el('a_marca_fonte').value = j.fonte.familia; aviso(`🔤 fonte ${j.fonte.familia} instalada`, 'okk'); pedirPrevia(); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  el('bFonte').disabled = false; };
 async function carregarCanais() {
   try { CANAIS = (await (await fetch('/curtos/canais-link')).json()).canais || []; } catch (e) { CANAIS = []; }
   const opts = CANAIS.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}${c.personalizado ? ' ✎' : ''}</option>`).join('');
   el('canal').innerHTML = opts || '<option value="">(padrão do canal)</option>';
   el('a_escopo').innerHTML = '<option value="">📚 padrão de todos os canais</option>' + CANAIS.map(c => `<option value="${esc(c.id)}">📺 só ${esc(c.nome)}</option>`).join('');
+  if (PZ) setTimeout(desenharAbas, 0);
   try { const ult = localStorage.getItem('lk_canal'); if (ult && CANAIS.some(c => c.id === ult)) el('canal').value = ult; } catch (e) {}
   el('canal').addEventListener('change', () => { try { localStorage.setItem('lk_canal', el('canal').value); } catch (e) {} });
   el('a_escopo').value = ''; 
@@ -294,7 +507,46 @@ async function canalSalvar() {
     await carregarCanais(); el('a_escopo').value = cid; el('canal').value = cid; canalPreencher(); aviso('💾 canal salvo', 'okk');
   } catch (e) { aviso('❌ ' + e.message, 'erro'); }
 }
-window.canalCriar = canalCriar; window.canalSalvar = canalSalvar;  // 📺 v84_328: os botões do HTML chamam por aqui (o script fica fechado num bloco)
+window.canalCriar = canalCriar; window.canalSalvar = canalSalvar;
+// 🎨 v84_335: a página de Personalização — uma aba pra cada canal (o mesmo editor do acabamento, com o escopo vindo da aba)
+const PZ = {{ (so_personalizar or false)|tojson }};
+function desenharPacote() {  // 📦 v84_336: a lista de canais pra exportar
+  const L = el('pkLista'); if (!L) return; const marc = new Set([...L.querySelectorAll('input:checked')].map(c => c.value));
+  L.innerHTML = CANAIS.map(c => `<label style="flex-direction:row;align-items:center;gap:6px;font-weight:400;margin:0"><input type="checkbox" value="${esc(c.id)}" style="width:auto;margin:0"${marc.has(c.id) || !marc.size ? ' checked' : ''}> 📺 ${esc(c.nome)}</label>`).join('') || '<span class="si-dica">nenhum canal ainda</span>';
+}
+if (PZ) {
+  const ids = () => [...el('pkLista').querySelectorAll('input:checked')].map(c => c.value);
+  el('pkTodos').onclick = () => el('pkLista').querySelectorAll('input').forEach(c => c.checked = true);
+  el('pkNenhum').onclick = () => el('pkLista').querySelectorAll('input').forEach(c => c.checked = false);
+  const baixar = fmt => { const i = ids(); if (!i.length) return aviso('Marque pelo menos um canal', 'erro');
+    location.href = `/curtos/canais/exportar?formato=${fmt}&ids=${i.join(',')}&padrao=${el('pkPadrao').checked ? 1 : 0}`; };
+  el('pkZip').onclick = () => baixar('zip'); el('pkJson').onclick = () => baixar('json');
+  el('pkImportar').onclick = async () => { const f = el('pkArq').files[0]; if (!f) return aviso('Escolha o arquivo do pacote', 'erro');
+    const fd = new FormData(); fd.append('pacote', f); fd.append('modo', el('pkModo').value); fd.append('padrao', el('pkImpPadrao').checked ? '1' : '');
+    el('pkImportar').disabled = true; el('pkRes').textContent = '⏳ importando…';
+    try { const r = await fetch('/curtos/canais/importar', {method: 'POST', body: fd}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.erro || r.status);
+      const R = j.resultado; el('pkRes').innerHTML = R.canais.map(c => `✅ ${esc(c.nome)} <small>(${c.acao})</small>`).join('<br>') +
+        (R.fontes.length ? `<br>🔤 fontes: ${R.fontes.map(esc).join(', ')}` : '') + (R.grupos ? `<br>📂 ${R.grupos} grupo(s)` : '') + (R.padrao ? '<br>📚 padrão de todos trocado' : '');
+      await carregarCanais(); await carregarGrupos(); aviso(`📥 ${R.canais.length} canal(is) importado(s)`, 'okk'); }
+    catch (e) { el('pkRes').textContent = '❌ ' + e.message; aviso('❌ ' + e.message, 'erro'); }
+    el('pkImportar').disabled = false; };
+}
+function desenharAbas() {
+  desenharPacote();
+  const box = el('pzAbas'); if (!box) return; const atual = el('a_escopo').value;
+  const cn = CANAIS.find(c => c.id === atual);
+  el('acabTitulo').textContent = cn ? `🎨 Personalizando o canal ${cn.nome} — o que ele não define segue o padrão de todos` : '🎨 Padrão de TODOS os canais — vale onde o canal não tem o próprio';
+  box.innerHTML = `<button class="pz-aba ${atual === '' ? 'on' : ''}" data-aba="">📚 padrão de todos</button>` +
+    CANAIS.map(c => `<button class="pz-aba ${atual === c.id ? 'on' : ''}" data-aba="${esc(c.id)}">📺 ${esc(c.nome)}${c.personalizado ? ' ✎' : ''}</button>`).join('') +
+    `<button class="pz-aba pz-novo" data-aba="__novo">➕ novo canal</button>`;
+  box.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => {
+    if (b.dataset.aba === '__novo') { el('a_escopo').value = ''; el('a_escopo').dispatchEvent(new Event('change')); el('c_nome').value = ''; el('c_desc').value = '';
+      el('c_nome').focus(); el('c_nome').scrollIntoView({behavior: 'smooth', block: 'center'}); aviso('➕ dê o nome e a descrição e clique em ➕ criar canal', 'okk'); desenharAbas(); return; }
+    el('a_escopo').value = b.dataset.aba; el('a_escopo').dispatchEvent(new Event('change')); desenharAbas();
+    try { localStorage.setItem('pz_aba', b.dataset.aba); } catch (e) {} });
+}
+if (PZ) { el('a_escopo').addEventListener('change', () => setTimeout(desenharAbas, 0));
+  setTimeout(() => { try { const ult = localStorage.getItem('pz_aba'); if (ult && CANAIS.some(c => c.id === ult)) { el('a_escopo').value = ult; el('a_escopo').dispatchEvent(new Event('change')); } } catch (e) {} desenharAbas(); }, 900); }  // 📺 v84_328: os botões do HTML chamam por aqui (o script fica fechado num bloco)
 (async () => { try { await carregarCanais(); } catch (e) {} canalPreencher(); await carregarGrupos(); })();
 (async () => { try { const a = (await (await fetch('/curtos/acabamento')).json()).acabamento || {};
   ACAB.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = !!a[k];
@@ -368,7 +620,7 @@ function desenhar(vs) {
       ${v.comentarios_erro && !v.n_comentarios ? `<div class="si-dica">💬 não deu pra ler os comentários (${esc(v.comentarios_erro)}) — o roteiro saiu só do vídeo.</div>` : ''}
       ${(v.roteiro || v.pronto) ? `<div class="lk-corpo">
         <div>${v.pronto ? `<video src="/curtos/${v.id}/video.mp4?baixar=0" controls preload="metadata"></video>` : '<div class="si-vazio">🎬 o vídeo aparece aqui quando exportar</div>'}
-          <div class="si-linha">${v.pronto ? `<a href="/curtos/${v.id}/video.mp4"><button class="si-ok si-mini">⬇️ baixar MP4</button></a>` : ''}
+          <div class="si-linha">${v.pronto ? `<a href="/curtos/${v.id}/video.mp4"><button class="si-ok si-mini">⬇️ baixar MP4</button></a>` : ''}${v.pronto_1x1 ? `<a href="/curtos/${v.id}/video_1x1.mp4"><button class="si-ok si-mini">⬛ baixar MP4 1:1</button></a>` : ''}
             ${v.editor ? `<a href="/job/${v.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
             <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a></div></div>
         <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div><div class="si-linha"><button class="si-mini si-sec" data-copiar="${esc(v.roteiro)}">📋 roteiro</button></div>` : ''}

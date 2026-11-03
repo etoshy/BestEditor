@@ -163,3 +163,6 @@ busca_lista/
 rastreios/
 publicacoes/
 gravar_voz/
+# 🔤 fontes que você envia pela página (v84_333) — ficam só no seu PC
+assets/fonts/dp/usr-*.ttf
+assets/darkplanner/extras/fontes.json

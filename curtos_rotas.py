@@ -475,6 +475,16 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             z.writestr("titulos.txt", CN.texto_dos_titulos(base_dir, lt))
         return send_file(cam, as_attachment=True, download_name=f"videos_{lt.get('canal_nome') or lid}.zip")
 
+    @app.route("/curtos/<pid>/video_1x1.mp4", methods=["GET"])
+    def curto_video_quadrado(pid: str):
+        """⬛ v84_334: a versão 1:1."""
+        p = _proj(pid)
+        arq = (p.get("exportado_quadrado") or {}).get("arquivo")
+        if not arq or not os.path.isfile(arq):
+            abort(404)
+        return send_file(arq, as_attachment=bool(request.args.get("baixar", "1") != "0"),
+                         download_name=f"{secure_filename(p.get('titulo') or 'video')[:60] or 'video'}_1x1.mp4", conditional=True)
+
     @app.route("/curtos/<pid>/video.mp4", methods=["GET"])
     def curto_video_exportado(pid: str):
         p = _proj(pid)
@@ -1456,7 +1466,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "pendente": p["id"] in (pend if pend is not None else set()),
                 "marca": lr.get("marca") or "", "comentario": lr.get("comentario") or "", "log": (lr.get("log") or [])[-60:],
                 "apagado": bool(lr.get("apagado")), "escolha": lr.get("escolha") or {}, "aguardando": bool(lr.get("aguardando")),
-                "aguardando_voz": bool(lr.get("aguardando_voz")), "minha_voz": (p.get("config") or {}).get("voz_modo") == "minha"}
+                "aguardando_voz": bool(lr.get("aguardando_voz")), "minha_voz": (p.get("config") or {}).get("voz_modo") == "minha",
+                "pronto_1x1": bool((p.get("exportado_quadrado") or {}).get("arquivo") and os.path.isfile((p.get("exportado_quadrado") or {}).get("arquivo") or ""))}
 
     def _links(n: int = 60) -> List[Dict[str, Any]]:
         out = []
@@ -1593,6 +1604,30 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         msg = _fazer_tudo_comentario(pid, slug, None, prog)
         return _link_finalizar(pid, msg, qualidade, exportar, prog)
 
+    def _link_tarja(pid: str, prog: Callable[[str], None]) -> int:
+        """▭ v84_333: a tarja do canal (desfoque/cor sólida numa faixa) por cima da legenda que JÁ VEM no vídeo original —
+        uma vez por clipe (o original fica guardado como _sem_tarja)."""
+        import acabamento_extra as AX
+        p = CT.carregar(base_dir, pid)
+        t = (p.get("config") or {}).get("tarja")
+        if not t:
+            return 0
+        n = 0
+        for m in CC.clipes(base_dir, p):
+            mm = next((x for x in p.get("midias") or [] if x["id"] == m["id"]), {})
+            if mm.get("tarja"):
+                continue
+            prog(f"▭ cobrindo a legenda do vídeo original ({m['id']})…")
+            if AX.aplicar_tarja(m["caminho"], t):
+                n += 1
+                with CT._TRAVA:
+                    q = CT.carregar(base_dir, pid)
+                    for x in q.get("midias") or []:
+                        if x["id"] == m["id"]:
+                            x["tarja"] = dict(t)
+                    CT.salvar(base_dir, q)
+        return n
+
     def _link_coletar(pid: str, prog: Callable[[str], None]) -> None:
         """⬇ o vídeo do link + 💬 a legenda e os comentários do post (rede; pula o que já tem)."""
         p = CT.carregar(base_dir, pid)
@@ -1601,6 +1636,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         if not CC.clipes(base_dir, p):
             _link_etapa(pid, "⬇ baixando")
             CC.baixar_clipe(base_dir, pid, url, CB.get("baixar"), prog)
+        _link_tarja(pid, prog)
         c = CC.dados(CT.carregar(base_dir, pid))
         if not c.get("info_link"):
             _link_etapa(pid, "💬 lendo os comentários")
@@ -1645,7 +1681,50 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             q["link_rapido"]["etapa"] = "✅ pronto"
             _log_link(q["link_rapido"], "✅ processado — vídeo pronto")
             CT.salvar(base_dir, q)
+        q = CT.carregar(base_dir, pid)
+        if (q.get("config") or {}).get("tambem_quadrado") and CT.proporcao_do(q) != "1:1":  # ⬛ v84_334: a versão 1:1 também
+            try:
+                _exportar_quadrado(pid, qualidade, prog)
+                return "✅ vídeo pronto (9:16 + 1:1)"
+            except Exception as exc:  # noqa: BLE001  (a 1:1 que falha não estraga a 9:16)
+                with CT._TRAVA:
+                    q = CT.carregar(base_dir, pid)
+                    _log_link(q["link_rapido"], f"⬛ a versão 1:1 não saiu: {str(exc)[:150]}")
+                    CT.salvar(base_dir, q)
+                prog(f"⬛ a versão 1:1 não saiu: {str(exc)[:150]}")
         return "✅ vídeo pronto"
+
+    def _exportar_quadrado(pid: str, qualidade: str, prog: Callable[[str], None]) -> str:
+        """⬛ v84_334: o mesmo curto montado de novo no formato 1:1 (o editor reenquadra; a legenda/@ se ajustam) e exportado."""
+        if not (CB.get("para_estudio") and CB.get("exportar")):
+            raise CT.CurtoErro("O editor/exportação não está disponível aqui.")
+        _link_etapa(pid, "⬛ montando a versão 1:1")
+        prog("⬛ montando a versão 1:1 (quadrada)…")
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            antes = (q.get("config") or {}).get("proporcao")
+            q["config"]["proporcao"] = "1:1"
+            CT.salvar(base_dir, q)
+        try:
+            d = CT.montar_dados_editor(base_dir, pid)
+            job2 = CB["para_estudio"](d)
+        finally:
+            with CT._TRAVA:
+                q = CT.carregar(base_dir, pid)
+                if antes:
+                    q["config"]["proporcao"] = antes
+                else:
+                    q["config"].pop("proporcao", None)
+                CT.salvar(base_dir, q)
+        _link_etapa(pid, "⬛ exportando a versão 1:1")
+        arq2 = CB["exportar"](job2, qualidade, prog)
+        with CT._TRAVA:
+            q = CT.carregar(base_dir, pid)
+            q["exportado_quadrado"] = {"arquivo": arq2, "quando": time.time(), "qualidade": qualidade, "job_id": job2}
+            q["link_rapido"]["etapa"] = "✅ pronto"
+            _log_link(q["link_rapido"], "⬛ versão 1:1 pronta")
+            CT.salvar(base_dir, q)
+        return arq2
 
     def _link_thumbs(pid: str, prog: Callable[[str], None]) -> int:
         """🖼 v84_305: 3 prints impactantes do vídeo original (limpo, sem legenda) pra usar de thumb."""
@@ -2096,6 +2175,61 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         if isinstance(b.get("voz_link"), dict):
             c["voz_link"] = _voz_link_de({"voz_link": b["voz_link"]})
 
+    @app.route("/curtos/acabamento/previa.jpg", methods=["GET"])
+    def curtos_acabamento_previa():
+        """🖼 v84_333: a prévia DE VERDADE — um quadro do canal com a tarja, a legenda e o @ queimados pelo mesmo libass do vídeo
+        final. Os valores da tela (ainda não salvos) vêm em ?d=<json>."""
+        import acabamento_extra as AX
+        cid = str(request.args.get("canal") or "")
+        try:
+            if cid:
+                CT.carregar_canal(base_dir, cid)
+        except CT.CurtoErro:
+            cid = ""
+        a = CT.acabamento(base_dir, cid)
+        try:
+            novos = json.loads(request.args.get("d") or "{}")
+            if isinstance(novos, dict):
+                a.update(CT.limpar_acabamento(novos))
+        except ValueError:
+            pass
+        import tempfile
+        tmp = tempfile.mkdtemp(prefix="previa_acab_", dir=os.path.join(CT.raiz(base_dir)) if os.path.isdir(CT.raiz(base_dir)) else None)
+        try:
+            cam = AX.previa(base_dir, a, cid, tmp)
+            with open(cam, "rb") as f_:
+                dados = f_.read()
+        except Exception as exc:  # noqa: BLE001
+            return _erro(f"Não consegui fazer a prévia: {str(exc)[:200]}", 500)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        import io
+        return send_file(io.BytesIO(dados), mimetype="image/jpeg", max_age=0)
+
+    @app.route("/curtos/fontes", methods=["GET", "POST"])
+    def curtos_fontes():
+        """🔤 v84_333: as fontes do @ e da legenda; POST = enviar uma .ttf/.otf sua (vira "DP <nome>")."""
+        import acabamento_extra as AX
+        if request.method == "POST":
+            arq = request.files.get("fonte")
+            if not arq or not arq.filename or os.path.splitext(arq.filename)[1].lower() not in (".ttf", ".otf"):
+                return _erro("Mande um arquivo .ttf ou .otf.")
+            import tempfile
+            fd, tmp = tempfile.mkstemp(suffix=os.path.splitext(arq.filename)[1].lower())
+            os.close(fd)
+            try:
+                arq.save(tmp)
+                it = AX.instalar_fonte(tmp, request.form.get("nome") or os.path.splitext(arq.filename)[0])
+            except Exception as exc:  # noqa: BLE001
+                return _erro(f"Não consegui instalar essa fonte: {str(exc)[:200]}")
+            finally:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            return _ok(fonte=it, fontes=AX.familias())
+        return _ok(fontes=AX.familias())
+
     def _canais_out() -> list:
         out = []
         for c in CT.listar_canais(base_dir):
@@ -2111,6 +2245,34 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def curtos_canais_link():
         """🎚 v84_310: os canais (perfis) pra escolher no link — cada um com a própria legenda/@/destaques."""
         return _ok(canais=_canais_out())
+
+    @app.route("/curtos/canais/exportar", methods=["GET"])
+    def curtos_canais_exportar():
+        """📦 v84_336: os canais (com estilo e tudo) num ZIP — mídias do canal + as fontes enviadas que ele usa — ou só o JSON."""
+        import io
+        import canais_pacote as PK
+        ids = [x for x in str(request.args.get("ids") or "").split(",") if CT._valido(x)]
+        formato = "json" if request.args.get("formato") == "json" else "zip"
+        try:
+            dados, nome = PK.exportar(base_dir, ids, formato, request.args.get("padrao") == "1")
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return send_file(io.BytesIO(dados), mimetype="application/json" if formato == "json" else "application/zip",
+                         as_attachment=True, download_name=nome)
+
+    @app.route("/curtos/canais/importar", methods=["POST"])
+    def curtos_canais_importar():
+        """📥 v84_336: o .zip/.json exportado em outro PC. modo: copia (padrão) ou substituir (mesmo id)."""
+        import canais_pacote as PK
+        arq = request.files.get("pacote")
+        if not arq:
+            return _erro("Mande o arquivo .zip ou .json do pacote.")
+        try:
+            r = PK.importar(base_dir, arq.read(), arq.filename or "", request.form.get("modo") or "copia",
+                            request.form.get("padrao") in ("1", "true", "on"))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        return _ok(resultado=r, canais=_canais_out())
 
     @app.route("/curtos/canais/novo", methods=["POST"])
     def curtos_canal_novo_link():
@@ -2143,8 +2305,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             return _erro(str(exc))
         return _ok(canais=_canais_out())
 
+    @app.route("/curtos/personalizar", methods=["GET"])
+    def curtos_personalizar():
+        """🎨 v84_335: a aba só de personalização — o mesmo editor do acabamento, com uma aba pra cada canal."""
+        return curtos_link_pagina(so_personalizar=True)
+
     @app.route("/curtos/link", methods=["GET"])
-    def curtos_link_pagina():
+    def curtos_link_pagina(so_personalizar: bool = False):
         try:
             import anime2d as A
             vozes_en = A.vozes_disponiveis("chatterbox_turbo")
@@ -2153,10 +2320,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             vozes_en, vozes = [], []
         import qualidade_export
         import dp_legendas
-        return render_template("curtos_link.html", fontes_legenda=CT.FONTES_LEGENDA, cores_legenda=CT.CORES_LEGENDA, modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
+        import acabamento_extra as _AXr
+        return render_template("curtos_link.html", fontes_legenda=_AXr.familias(), cores_legenda=CT.CORES_LEGENDA, modos=CL.MODOS, direcoes_titulo={k: v[0] for k, v in CC.DIRECOES_TITULO.items()}, linguas=CT.LINGUAS, proporcoes=CT.PROPORCOES,
                                estilos_legenda=[{"id": e["id"], "nome": e["nome"]} for e in dp_legendas.ESTILOS],
                                vozes_en=vozes_en, vozes=vozes, resolucoes=qualidade_export.RESOLUCOES, ia=_ia_ligada(),
-                               tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")))
+                               tem_tts=bool(CB["tts"]), tem_export=bool(CB.get("exportar")), so_personalizar=so_personalizar)
 
     @app.route("/curtos/link/estado", methods=["GET"])
     def curtos_link_estado():
@@ -2223,6 +2391,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         cache_canal: Dict[str, str] = {}
         voz_canal: Dict[str, Dict[str, str]] = {}
         cache_nome: Dict[str, str] = {}
+        acab_canal: Dict[str, Dict[str, Any]] = {}
         for url, grupo in pares:  # 🔗 vários links = vários vídeos, um depois do outro
             canal_do_link = canal_escolhido
             g = mapa.get(_chave_grupo(grupo)) or {}
@@ -2254,7 +2423,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 c["lingua_post"], c["idioma"] = lp_, ("pt" if pt_ else "en")
                 narrada = "pt" if pt_ else lp_
                 p["config"]["motor_perfil"] = "chatterbox_turbo" if narrada == "en" else "chatterbox"  # 🇺🇸 inglês: o Turbo (tags de voz)
-                if b.get("proporcao") in CT.PROPORCOES:
+                if canal_do_link not in acab_canal:  # 📐 v84_335: o canal com formato próprio manda no formato do envio
+                    acab_canal[canal_do_link] = CT.acabamento(base_dir, canal_do_link)
+                if b.get("proporcao") in CT.PROPORCOES and not acab_canal[canal_do_link].get("proporcao"):
                     p["config"]["proporcao"] = b["proporcao"]
                 try:
                     dur = int(float(b.get("duracao") or 0))
@@ -2271,6 +2442,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 p["config"]["takes"] = 1  # ⚡ automático: 1 take (os outros dá pra gerar depois na página do curto)
                 p["config"]["estilo_roteiro"] = "classico" if b.get("roteiro_classico") is True else "autentico"  # ✨ v84_321
                 p["config"]["camera_exp"] = b.get("camera_exp", True) not in (False, "0", "false")  # 🎥 v84_322 (padrão: ligada)
+                if b.get("tambem_quadrado") is True and CT.proporcao_do(p) != "1:1":  # ⬛ v84_334: também a versão 1:1
+                    p["config"]["tambem_quadrado"] = True
                 if vc.get("modo") == "minha":  # 🎤 v84_325: o canal é de voz própria
                     p["config"]["voz_modo"] = "minha"
                 p["link_rapido"] = {"link": url, "modo": modo, "criado": time.time(), "qualidade": qualidade, "exportar": exportar,
@@ -2333,10 +2506,17 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         if arq and os.path.isfile(arq):
             os.remove(arq)
             apagados.append("vídeo exportado")
+        arq_q = (p.get("exportado_quadrado") or {}).get("arquivo") or ""  # ⬛ v84_334
+        if arq_q and os.path.isfile(arq_q):
+            os.remove(arq_q)
+            apagados.append("versão 1:1")
         job_id = (p.get("editor") or {}).get("job_id") or ""
         if job_id and CB.get("apagar_editor"):
             CB["apagar_editor"](job_id)
             apagados.append("projeto do editor")
+        job_q = (p.get("exportado_quadrado") or {}).get("job_id") or ""
+        if job_q and CB.get("apagar_editor"):
+            CB["apagar_editor"](job_q)
         pasta_p = CT.pasta(base_dir, pid)
         for nome in os.listdir(pasta_p):
             if nome == "projeto.json":
@@ -2542,12 +2722,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     if not (p.get("link_rapido") or {}).get("apagado"):
                         _apagar_arquivos_link(pid)
                 else:
-                    job_id = (p.get("editor") or {}).get("job_id") or ""
-                    arq = (p.get("exportado") or {}).get("arquivo") or ""
-                    if arq and os.path.isfile(arq):
-                        os.remove(arq)
-                    if job_id and CB.get("apagar_editor"):
-                        CB["apagar_editor"](job_id)
+                    for exp_ in ("exportado", "exportado_quadrado"):
+                        arq = (p.get(exp_) or {}).get("arquivo") or ""
+                        if arq and os.path.isfile(arq):
+                            os.remove(arq)
+                    for jid_ in ((p.get("editor") or {}).get("job_id") or "", (p.get("exportado_quadrado") or {}).get("job_id") or ""):
+                        if jid_ and CB.get("apagar_editor"):
+                            CB["apagar_editor"](jid_)
                     with CT._TRAVA:
                         CT.excluir(base_dir, pid)
                     TAREFAS.pop(pid, None)
