@@ -255,12 +255,12 @@ def garantir_canais_prontos(base: str) -> List[str]:
     """Os canais de perfil pronto (ex.: Laestro) já existem desde o 1º uso — criados UMA vez (se você apagar, não volta).
     Devolve os ids criados agora."""
     marca = os.path.join(raiz(base), "prontos_criados.json")
-    try:
-        feitos = set(_ler_json(marca)) if os.path.isfile(marca) else set()
-    except (OSError, ValueError):
-        feitos = set()
     novos = []
-    with _TRAVA:
+    with _TRAVA:  # 🔒 v84_339: ler DENTRO da trava — duas abas/requisições juntas criavam o mesmo canal pronto 2-3 vezes
+        try:
+            feitos = set(_ler_json(marca)) if os.path.isfile(marca) else set()
+        except (OSError, ValueError):
+            feitos = set()
         for chave, pr in perfis_prontos().items():
             if chave in feitos:
                 _atualizar_pronto(base, chave, pr)

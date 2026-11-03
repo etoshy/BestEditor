@@ -41,10 +41,32 @@ def _sessao_cam(base: str, sid: str) -> str:
     return os.path.join(raiz_avulsas(base), _valida(sid), "sessao.json")
 
 
+DIVISOES = {"bloco": "um bloco do roteiro por parte", "frase": "✂ até o ponto (uma frase por parte)",
+            "curta": "✂✂ frases curtas (também na vírgula, ; e :)"}
+
+
+def frases_curtas(t: str, min_palavras: int = 3) -> List[str]:
+    """✂✂ v84_339: corta no ponto E na vírgula/;/:/— (pedaços curtos, fáceis de ler de uma vez); junta o que ficar
+    pequeno demais (menos de 3 palavras) com o vizinho."""
+    out: List[str] = []
+    for f in re.split(r"(?<=[.!?…])\s+(?=[^\s])", " ".join(str(t or "").split())):
+        pedacos = [x for x in re.split(r"(?<=[,;:—–])\s+(?=[^\s])", f) if x.strip()]
+        juntos: List[str] = []
+        for x in pedacos:
+            if juntos and (len(juntos[-1].split()) < min_palavras or len(x.split()) < min_palavras):
+                juntos[-1] = juntos[-1] + " " + x
+            else:
+                juntos.append(x)
+        out += juntos
+    return [x for x in out if x.strip()]
+
+
 def separar_texto(texto: str, modo: str = "linha") -> List[str]:
-    """O texto colado em partes: uma por linha (linhas vazias saem) ou uma por frase (. ! ? …)."""
+    """O texto colado em partes: uma por linha (linhas vazias saem), uma por frase (. ! ? …), frases curtas ou parágrafo."""
     t = str(texto or "").replace("\r", "")
-    if modo == "frase":
+    if modo == "curta":
+        pedacos = frases_curtas(t)
+    elif modo == "frase":
         t = " ".join(t.split())
         pedacos = re.split(r"(?<=[.!?…])\s+(?=[^\s])", t)
     elif modo == "paragrafo":
@@ -126,7 +148,7 @@ def partes_de(base: str, pid: str) -> List[Dict[str, Any]]:
     """As partes pra ler: as do texto colado (avulsa) ou as do roteiro do curto."""
     if avulsa(pid):
         return [{"id": x["id"], "texto": x["texto"], "traducao": "", "funcao": ""} for x in sessao(base, pid).get("partes") or []]
-    return partes(CT.carregar(base, pid))
+    return partes(CT.carregar(base, pid), divisao(base, pid))
 
 
 def _estado_cam(base: str, pid: str) -> str:
@@ -153,15 +175,48 @@ def _valida(x: str) -> str:
     return x
 
 
-def partes(p: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """O roteiro em partes pra ler: o bloco narrado + a tradução do lado."""
+def _dividir(t: str, divisao: str) -> List[str]:
+    if divisao == "curta":
+        return frases_curtas(t)
+    if divisao == "frase":
+        return separar_texto(t, "frase")
+    return [t]
+
+
+def partes(p: Dict[str, Any], divisao: str = "bloco") -> List[Dict[str, Any]]:
+    """O roteiro em partes pra ler: o bloco narrado + a tradução do lado. ✂ v84_339: com a divisão "frase"/"curta" cada
+    bloco vira vários pedaços (B2_1, B2_2…) — o Whisper alinha a gravação inteira ao roteiro, então a legenda continua certa."""
     out = []
     idioma = (p.get("roteiro") or {}).get("idioma") or "en"
     for k, b in enumerate((p.get("roteiro") or {}).get("blocos") or [], 1):
         fala = CT.sem_tags(b.get("fala") or "")
         outra = CT.sem_tags((b.get("fala_pt") if idioma == "en" else b.get("fala_en")) or "")
-        out.append({"id": str(b.get("id") or f"B{k}"), "texto": fala, "traducao": outra if outra and outra != fala else "", "funcao": b.get("funcao") or ""})
+        outra = outra if outra and outra != fala else ""
+        bid = re.sub(r"[^A-Za-z0-9_]", "", str(b.get("id") or f"B{k}"))[:30] or f"B{k}"
+        pedacos = [x for x in _dividir(fala, divisao) if x.strip()] or [fala]
+        if len(pedacos) == 1:
+            out.append({"id": bid, "texto": fala, "traducao": outra, "funcao": b.get("funcao") or ""})
+            continue
+        trad = _dividir(outra, divisao) if outra else []
+        for n, x in enumerate(pedacos, 1):  # a tradução vai junto se dividiu no mesmo número de pedaços; senão, inteira no 1º
+            tr = trad[n - 1] if len(trad) == len(pedacos) else (outra if n == 1 else "")
+            out.append({"id": f"{bid}_{n}", "texto": x, "traducao": tr, "funcao": b.get("funcao") or "", "bloco": bid})
     return out
+
+
+def divisao(base: str, pid: str) -> str:
+    d = estado(base, pid).get("divisao")
+    return d if d in DIVISOES else "bloco"
+
+
+def trocar_divisao(base: str, pid: str, nova: str) -> Dict[str, Any]:
+    """✂ muda como o roteiro é dividido pra gravar. Os takes já gravados ficam guardados (voltar a divisão traz de volta)."""
+    if nova not in DIVISOES:
+        raise CT.CurtoErro("Divisão inválida.")
+    d = estado(base, pid)
+    d["divisao"] = nova
+    _salvar(base, pid, d)
+    return resumo(base, pid)
 
 
 def _dur(cam: str) -> float:
@@ -311,4 +366,4 @@ def resumo(base: str, pid: str) -> Dict[str, Any]:
         out.append(dict(x, ativo=pt.get("ativo"), takes=pt.get("takes") or []))
     return {"partes": out, "faltando": faltando(base, pid), "total_s": round(sum(
         next((t["dur"] for t in y["takes"] if t["id"] == y["ativo"]), 0) for y in out[1:]), 1),
-            "final": os.path.isfile(os.path.join(pasta(base, pid), "final.wav"))}
+            "final": os.path.isfile(os.path.join(pasta(base, pid), "final.wav")), "divisao": d.get("divisao") if d.get("divisao") in DIVISOES else "bloco"}

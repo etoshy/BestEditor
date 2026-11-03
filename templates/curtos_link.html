@@ -27,6 +27,7 @@
   .lk-alca span { position: absolute; right: 6px; top: -11px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: #7c3aed; color: #fff; pointer-events: none; }
   .lk-alca[data-alca=legenda] { border-top-color: rgba(255,214,10,.95); } .lk-alca[data-alca=legenda] span { background: #b45309; left: 6px; right: auto; }
   .lk-alca.arrastando { border-top-style: solid; }
+  .pz-criar { margin-top: 10px; border-style: dashed; } .pz-criar.destaque { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento-suave); }
   .pz-abas { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; position: sticky; top: 0; z-index: 6; padding: 8px; border-radius: 12px; background: var(--card); border: 1px solid var(--borda); }
   .pz-aba { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--borda); background: transparent; color: inherit; cursor: pointer; font-weight: 600; }
   .pz-aba.on { background: var(--acento); color: #fff; border-color: var(--acento); } .pz-novo { border-style: dashed; }
@@ -87,6 +88,7 @@
     <label>Formato<select id="proporcao">{% for k, v in proporcoes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
     <label>Qualidade<select id="qualidade">{% for r in resolucoes %}<option value="{{ r }}"{% if r == '1080p' %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
   </div>
+  <div id="canalInfo" class="si-dica" style="display:none;margin:6px 0 0;padding:6px 10px;border:1px dashed var(--acento);border-radius:8px"></div>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="depois do vídeo no formato escolhido, monta de novo em 1:1 (quadrado) e exporta também — dois MP4 por link"><input type="checkbox" id="tambem_quadrado" style="width:auto;margin:0"> ⬛ também gerar a versão 1:1 (quadrada) além da 9:16</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="exportar" checked style="width:auto;margin:0"> 🎬 exportar o MP4 no fim (desmarcado: para no editor pra você conferir)</label>
   <div id="loteModoBox" style="display:none;margin:6px 0"><span style="font-weight:600">🧩 Como rodar o lote</span>
@@ -106,7 +108,21 @@
     {% if not tem_tts %}<span class="si-dica">⚠ o gerador de voz não está disponível.</span>{% endif %}</div>
 </div>
 
+{% macro criar_canal() %}<div class="si-card lk-form pz-criar" id="pzCriar">
+  <b style="font-size:1rem">➕ Criar um canal novo</b> <span class="si-dica">— dê o nome e a descrição; ele ganha a própria aba pra personalizar o @, a legenda e o resto</span>
+  <div class="lk-ops">
+    <label>Nome do canal<input id="n_nome" placeholder="ex.: Arte Fantasia" maxlength="80"></label>
+    <label>🌍 Postar em<select id="n_lp"><option value="">(o do envio)</option>{% for k, v in linguas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+    <label>🎙 Narrar em<select id="n_idioma"><option value="">(o do envio)</option><option value="en">🌍 idioma do post</option><option value="pt">🇧🇷 português</option></select></label>
+    <label>Voz do canal<select id="n_voz"></select></label>
+    <label title="🎤 minha voz: o site faz o roteiro e PARA; você grava na página 🎤 Gravar voz e ele continua a edição">Quem narra<select id="n_modo"><option value="">🤖 a IA (voz gerada)</option><option value="minha">🎤 eu gravo a minha voz</option></select></label>
+    <label title="o @, a legenda, as cores, as fontes e o formato começam iguais aos desse canal — depois você muda o que quiser">🎨 Começar com o estilo de<select id="n_copiar"><option value="">📚 o padrão de todos</option></select></label>
+  </div>
+  <label>Descrição <span class="si-dica" style="font-weight:400">— do que é o canal, o tom, o que mostrar (a IA segue isso no roteiro)</span><textarea id="n_desc" rows="3" maxlength="1500"></textarea></label>
+  <div class="pz-acoes" style="margin-top:8px"><button type="button" class="si-ok" id="bCriarCanal" onclick="canalCriar()">➕ criar canal</button><span class="si-dica" id="n_res"></span></div>
+</div>{% endmacro %}
 {% if so_personalizar %}<div class="pz-abas" id="pzAbas"></div>
+{{ criar_canal() }}
 <details class="si-card" id="pzPacote" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">📦 Levar canais pra outro PC — exportar / importar <span class="si-dica" style="font-weight:400">(estilo, @, legenda, cores, formato, voz, idioma, descrição, memes do canal, fontes enviadas e grupos)</span></summary>
   <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px">
     <div style="flex:1;min-width:280px">
@@ -283,7 +299,7 @@
     <!-- 📺 CANAL E VOZ -->
     <section class="pz-sec" data-sec="canal">
       <div style="display:flex;flex-direction:column;gap:6px">
-        <b style="font-size:.92rem">📺 Criar canal ou mudar o nome/descrição</b>
+        <b style="font-size:.92rem">📺 O canal selecionado — nome, descrição e voz</b> <span class="si-dica" id="c_qual">escolha um canal na aba lá em cima (ou em “Aplicar em”)</span>
         <input id="c_nome" placeholder="nome do canal (ex.: Arte Fantasia)" maxlength="80">
         <textarea id="c_desc" rows="3" maxlength="1500" placeholder="descrição: do que é o canal, o tom, o que mostrar (a IA segue isso no roteiro)"></textarea>
         <div class="lk-ops" title="Vale pros links que caem neste canal (pelo grupo ou pelo canal do lote). Vazio = o que estiver escolhido no envio. Narrando em inglês usa o Chatterbox Turbo (aceita tags de voz como [laugh]); os outros idiomas, o Chatterbox multilíngue.">
@@ -293,10 +309,11 @@
           <label title="🎤 minha voz: o site faz o roteiro e PARA; você grava na página 🎤 Gravar voz (texto grande, aos poucos, editor e realce) e ele continua a edição">Quem narra<select id="c_modo"><option value="">🤖 a IA (voz gerada)</option><option value="minha">🎤 eu gravo a minha voz</option></select></label>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="si-mini" onclick="canalCriar()">➕ criar canal</button>
-          <button class="si-mini" onclick="canalSalvar()">💾 salvar nome/descrição/voz do canal selecionado</button>
+          <button class="si-mini" onclick="canalSalvar()">💾 salvar nome/descrição/voz do canal</button>
+          <button type="button" class="si-mini si-sec" id="bApagarCanal" title="apaga o canal (os vídeos já feitos ficam)">🗑 apagar este canal</button>
         </div>
       </div>
+      {% if not so_personalizar %}<div style="margin-top:12px">{{ criar_canal() }}</div>{% endif %}
     </section>
     </div>
 
@@ -347,7 +364,9 @@ const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualida
 // 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
 const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'tambem_quadrado'], OP_RADIOS = ['modo', 'lote_modo'];
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
-const lerOpcoes = () => { const o = {}; OP_SELECTS.concat(['voz']).forEach(k => o[k] = el(k).value); OP_CHECKS.forEach(k => o[k] = el(k).checked); OP_RADIOS.forEach(n => o[n] = radio(n)); return o; };
+const LIVRE = {};  // 📺 v84_340: o que VOCÊ tinha escolhido nos campos que o canal do lote trava (volta quando troca de canal)
+const valorLivre = k => (k in LIVRE ? LIVRE[k] : el(k).value);
+const lerOpcoes = () => { const o = {}; OP_SELECTS.concat(['voz']).forEach(k => o[k] = valorLivre(k)); OP_CHECKS.forEach(k => o[k] = el(k).checked); OP_RADIOS.forEach(n => o[n] = radio(n)); return o; };
 const PADRAO_OP = (() => { vozes(); return lerOpcoes(); })();  // o de fábrica (antes de aplicar o que estava salvo)
 function aplicarOpcoes(o) {
   OP_SELECTS.forEach(k => { if (o[k] !== undefined && [...el(k).options].some(x => x.value === String(o[k]))) el(k).value = o[k]; });
@@ -359,7 +378,37 @@ function salvarOpcoes() { try { localStorage.setItem('lk_op', JSON.stringify(ler
 try { aplicarOpcoes(JSON.parse(localStorage.getItem('lk_op') || '{}')); } catch (e) { vozes(); }
 OP_SELECTS.concat(['voz']).concat(OP_CHECKS).forEach(k => el(k).addEventListener('change', salvarOpcoes));
 document.querySelectorAll(OP_RADIOS.map(n => `input[name=${n}]`).join(',')).forEach(r => r.addEventListener('change', salvarOpcoes));
-window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {} aplicarOpcoes(PADRAO_OP); el('link').dispatchEvent(new Event('input')); aviso('↺ opções de volta ao padrão', 'okk'); };
+// 📺 v84_340: o canal do lote manda no idioma, na narração, na voz, em quem narra e no formato — a tela mostra isso
+const NOME_LP = Object.fromEntries([...el('lingua_post').options].map(o => [o.value, o.text]));
+const NOME_PROP = Object.fromEntries([...el('proporcao').options].map(o => [o.value, o.text]));
+function travar(k, v, porque) {
+  const e = el(k); if (!(k in LIVRE)) LIVRE[k] = e.value;
+  if (k === 'voz' && v === '__minha') { e.innerHTML = '<option value="">🎤 a sua voz (você grava)</option>'; e.value = ''; }
+  else { if (k !== 'voz') vozes(); if ([...e.options].some(o => o.value === v)) e.value = v; }
+  e.disabled = true; e.title = porque; e.style.outline = '2px solid var(--acento)';
+}
+function soltar(k) { const e = el(k); if (!(k in LIVRE)) return; e.disabled = false; e.title = ''; e.style.outline = '';
+  const v = LIVRE[k]; delete LIVRE[k]; if (k === 'voz') vozes(); if ([...e.options].some(o => o.value === v)) e.value = v; }
+let VEZ_CANAL = 0;
+async function aplicarCanalNoEnvio() {
+  const vez = ++VEZ_CANAL, c = CANAIS.find(x => x.id === el('canal').value), v = (c && c.voz_link) || {};
+  let a = {}; if (c) { try { a = (await (await fetch('/curtos/acabamento?canal=' + encodeURIComponent(c.id))).json()).acabamento || {}; } catch (e) {} }
+  if (vez !== VEZ_CANAL) return;  // (trocou de novo no meio)
+  ['voz', 'lingua_post', 'idioma', 'proporcao'].forEach(soltar);
+  const info = [], por = c ? `definido no canal ${c.nome} — mude na 🎨 Personalização dos canais` : '';
+  if (c && v.lingua_post) { travar('lingua_post', v.lingua_post, por); info.push(`posta em ${NOME_LP[v.lingua_post] || v.lingua_post}`); }
+  if (c && v.idioma) { travar('idioma', v.idioma, por); info.push(v.idioma === 'pt' ? 'narra em português' : 'narra no idioma do post'); }
+  vozes();
+  if (c && v.modo === 'minha') { travar('voz', '__minha', por); info.push('🎤 <b>você grava a voz</b> (o site faz o roteiro e espera você gravar; a legenda sincroniza com a sua fala)'); }
+  else if (c && v.voz) { travar('voz', v.voz, por); info.push('voz ' + ((el('voz').selectedOptions[0] || {}).text || v.voz)); }
+  if (c && a.proporcao) { travar('proporcao', a.proporcao, por); info.push('formato ' + (NOME_PROP[a.proporcao] || a.proporcao)); }
+  const box = el('canalInfo');
+  box.style.display = info.length ? '' : 'none';
+  box.innerHTML = info.length ? `📺 <b>${esc(c.nome)}</b>: ${info.join(' · ')} — os campos marcados seguem o canal (<a href="/curtos/personalizar">mudar</a>).`
+    + ' <span>Links de um grupo ligado a outro canal seguem o canal dele.</span>' : '';
+}
+el('canal').addEventListener('change', aplicarCanalNoEnvio);
+window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {} ['voz', 'lingua_post', 'idioma', 'proporcao'].forEach(soltar); aplicarOpcoes(PADRAO_OP); aplicarCanalNoEnvio(); el('link').dispatchEvent(new Event('input')); aviso('↺ opções de volta ao padrão', 'okk'); };
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
   const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
@@ -466,12 +515,21 @@ function sincronizarCores() { document.querySelectorAll('[data-cor]').forEach(c 
 document.querySelectorAll('[data-cor]').forEach(c => c.addEventListener('input', () => { const t = el(c.dataset.cor); t.value = c.value.toUpperCase(); t.dispatchEvent(new Event('change')); }));
 let tPrevia = null;
 function dadosAcab() { const d = {}; ACAB.forEach(k => { const e = el('a_' + k); d[k] = e.type === 'checkbox' ? e.checked : e.value; }); return d; }
-function pedirPrevia() { clearTimeout(tPrevia); tPrevia = setTimeout(() => {
-  const img = el('a_previa_real'); el('a_previa_info').textContent = '⏳ desenhando…'; el('a_previa_carga').style.display = '';
-  img.onload = () => { el('a_previa_carga').style.display = 'none'; el('a_previa_info').textContent = '🖼 prévia de verdade (um quadro do canal, com o mesmo desenho do vídeo final)'; };
-  img.onerror = () => { el('a_previa_carga').style.display = 'none'; el('a_previa_info').textContent = '❌ não consegui fazer a prévia'; };
-  img.src = `/curtos/acabamento/previa.jpg?canal=${encodeURIComponent(el('a_escopo').value)}&d=${encodeURIComponent(JSON.stringify(dadosAcab()))}&_=${Date.now()}`;
-}, 700); }
+let PREV_CTRL = null, PREV_URL = '';
+function pedirPrevia() { clearTimeout(tPrevia); tPrevia = setTimeout(async () => {  // 🖼 v84_340: fetch (cancela o pedido velho e mostra o erro de verdade)
+  const img = el('a_previa_real'), info = el('a_previa_info'), d = dadosAcab();
+  const fm = (el('a_marca_fonte').selectedOptions[0] || {}).text || 'padrão', fl = (el('a_legenda_fonte').selectedOptions[0] || {}).text || 'padrão';
+  if (PREV_CTRL) PREV_CTRL.abort(); const ctrl = PREV_CTRL = new AbortController(), t0 = performance.now();
+  info.textContent = '⏳ desenhando…'; el('a_previa_carga').style.display = '';
+  try {
+    const r = await fetch(`/curtos/acabamento/previa.jpg?canal=${encodeURIComponent(el('a_escopo').value)}&d=${encodeURIComponent(JSON.stringify(d))}&_=${Date.now()}`, {signal: ctrl.signal, cache: 'no-store'});
+    if (!r.ok) { let m = 'HTTP ' + r.status; try { m = (await r.json()).erro || m; } catch (e) {} throw new Error(m); }
+    const u = URL.createObjectURL(await r.blob()); if (ctrl !== PREV_CTRL) return;
+    img.onload = () => { if (PREV_URL) URL.revokeObjectURL(PREV_URL); PREV_URL = u; }; img.src = u;
+    info.textContent = `🖼 prévia de verdade · @ em ${fm} · legenda em ${fl} · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  } catch (e) { if (e.name === 'AbortError') return; info.textContent = '❌ prévia: ' + e.message; }
+  if (ctrl === PREV_CTRL) el('a_previa_carga').style.display = 'none';
+}, 450); }
 ACAB.forEach(k => { const e = el('a_' + k); e.addEventListener(e.tagName === 'INPUT' && e.type !== 'checkbox' ? 'input' : 'change', pedirPrevia); });
 el('bPrevia').onclick = pedirPrevia;
 // ↕ v84_334: as alças em cima da prévia — arrastar muda a ALTURA do @ (posição "livre") ou da legenda (altura exata)
@@ -593,7 +651,7 @@ function galerias() { document.querySelectorAll('.pz-gal').forEach(g => {
   const s_ = el(g.dataset.sel), marca = g.id === 'galMarca';
   g.innerHTML = [...s_.options].map(o => { const fam = o.value || (marca ? 'DP Poppins' : 'DP Inter');
     return `<button type="button" class="pz-fnt" data-v="${esc(o.value)}" data-nome="${esc(o.text.toLowerCase())}" title="${esc(o.text)}"><b style="font-family:'${esc(fam)}',sans-serif">${marca ? '@seucanal' : 'Essa PALAVRA'}</b><small>${esc(o.text)}</small></button>`; }).join('');
-  g.querySelectorAll('.pz-fnt').forEach(b => b.onclick = () => { s_.value = b.dataset.v; s_.dispatchEvent(new Event('change')); });
+  g.querySelectorAll('.pz-fnt').forEach(b => b.onclick = () => { s_.value = b.dataset.v; s_.dispatchEvent(new Event('change')); previaLeg(); pedirPrevia(); });
 }); amostrasGalerias(); marcarGalerias(); filtrarGalerias(); }
 function amostrasGalerias() { const t = el('a_arroba').value.trim(); const m = t ? (t.startsWith('@') ? t : '@' + t) : '@seucanal';
   document.querySelectorAll('#galMarca .pz-fnt b').forEach(b => b.textContent = el('a_marca_maiusculas').checked ? m.toUpperCase() : m); }
@@ -657,14 +715,15 @@ async function carregarCanais() {
   el('canal').innerHTML = opts || '<option value="">(padrão do canal)</option>';
   el('a_escopo').innerHTML = '<option value="">📚 padrão de todos os canais</option>' + CANAIS.map(c => `<option value="${esc(c.id)}">📺 só ${esc(c.nome)}</option>`).join('');
   if (PZ) setTimeout(desenharAbas, 0);
+  opcoesCopiar(); if (!el('n_voz').options.length) canalVozes('', 'n');
   try { const ult = localStorage.getItem('lk_canal'); if (ult && CANAIS.some(c => c.id === ult)) el('canal').value = ult; } catch (e) {}
-  el('canal').addEventListener('change', () => { try { localStorage.setItem('lk_canal', el('canal').value); } catch (e) {} });
-  el('a_escopo').value = ''; 
+  el('canal').onchange = () => { try { localStorage.setItem('lk_canal', el('canal').value); } catch (e) {} };
+  el('a_escopo').value = ''; aplicarCanalNoEnvio();
 }
 el('a_escopo').addEventListener('change', () => { carregarAcab(el('a_escopo').value); canalPreencher(); });
-function canalVozes(atual) {  // 🎙 v84_322: as vozes do motor que o canal vai usar (inglês narrado = Turbo, com tags de voz)
-  const lp = el('c_lp').value || el('lingua_post').value, id_ = el('c_idioma').value || el('idioma').value;
-  const turbo = id_ === 'en' && lp === 'en', vs = turbo ? VOZES_EN : VOZES, s = el('c_voz');
+function canalVozes(atual, pre = 'c') {  // 🎙 v84_322: as vozes do motor que o canal vai usar (inglês narrado = Turbo, com tags de voz)
+  const lp = el(pre + '_lp').value || el('lingua_post').value, id_ = el(pre + '_idioma').value || el('idioma').value;
+  const turbo = id_ === 'en' && lp === 'en', vs = turbo ? VOZES_EN : VOZES, s = el(pre + '_voz');
   s.innerHTML = '<option value="">(a do envio)</option>' + vs.map(v => `<option value="${esc(v.slug)}">${esc(v.grupo)} · ${esc(v.nome)}</option>`).join('');
   s.value = [...s.options].some(o => o.value === atual) ? atual : '';
   s.title = turbo ? '🇺🇸 Chatterbox Turbo — aceita tags de voz ([laugh], [sigh]…)' : 'Chatterbox multilíngue';
@@ -673,19 +732,45 @@ function canalPreencher() {  // mostra o nome, a descrição, o idioma e a voz d
   const c = CANAIS.find(x => x.id === el('a_escopo').value), v = (c && c.voz_link) || {};
   el('c_nome').value = c ? c.nome : ''; el('c_desc').value = c ? (c.descricao || '') : '';
   el('c_lp').value = v.lingua_post || ''; el('c_idioma').value = v.idioma || ''; el('c_modo').value = v.modo || ''; canalVozes(v.voz || '');
+  el('c_qual').textContent = c ? `editando: ${c.nome}` : '— escolha um canal na aba lá em cima (o 📚 padrão não tem nome); pra um canal novo use ➕ Criar um canal novo';
+  el('bApagarCanal').style.display = c ? '' : 'none';
 }
 ['c_lp', 'c_idioma'].forEach(k => el(k).addEventListener('change', () => canalVozes(el('c_voz').value)));
 const vozLink = () => ({lingua_post: el('c_lp').value, idioma: el('c_idioma').value, voz: el('c_voz').value, modo: el('c_modo').value});
-async function canalCriar() {
-  const nome = el('c_nome').value.trim(); if (!nome) return aviso('✏ Dê um nome ao canal', 'erro');
+['n_lp', 'n_idioma'].forEach(k => el(k).addEventListener('change', () => canalVozes(el('n_voz').value, 'n')));
+function opcoesCopiar() { const s_ = el('n_copiar'), v = s_.value;
+  s_.innerHTML = '<option value="">📚 o padrão de todos</option>' + CANAIS.map(c => `<option value="${esc(c.id)}">📺 ${esc(c.nome)}</option>`).join('');
+  s_.value = [...s_.options].some(o => o.value === v) ? v : ''; }
+async function canalCriar() {  // ➕ v84_339: o cartão separado (n_*) — e, se pedir, já começa com o estilo de outro canal
+  const nome = el('n_nome').value.trim(); if (!nome) { el('n_nome').focus(); return aviso('✏ Dê um nome ao canal', 'erro'); }
+  if (CANAIS.some(c => c.nome.trim().toLowerCase() === nome.toLowerCase()) && el('bCriarCanal').dataset.dup !== nome) {
+    el('bCriarCanal').dataset.dup = nome; return aviso(`⚠ já existe um canal “${nome}” — clique em ➕ criar de novo se quiser outro com o mesmo nome`, 'erro'); }
+  el('bCriarCanal').disabled = true;
   try {
-    const r = await post('/curtos/canais/novo', {nome, descricao: el('c_desc').value, voz_link: vozLink()});
+    const r = await post('/curtos/canais/novo', {nome, descricao: el('n_desc').value,
+      voz_link: {lingua_post: el('n_lp').value, idioma: el('n_idioma').value, voz: el('n_voz').value, modo: el('n_modo').value}});
+    const de = el('n_copiar').value;
+    if (de) { const a = (await (await fetch('/curtos/acabamento?canal=' + encodeURIComponent(de))).json()).acabamento || {};
+      await post('/curtos/acabamento', Object.assign({}, a, {canal_id: r.id})); }
+    ['n_nome', 'n_desc'].forEach(k => el(k).value = ''); el('n_copiar').value = ''; delete el('bCriarCanal').dataset.dup;
     await carregarCanais(); el('a_escopo').value = r.id; el('canal').value = r.id;
-    try { localStorage.setItem('lk_canal', r.id); } catch (e) {}
-    await carregarAcab(r.id); canalPreencher();
-    aviso(`📺 canal ${nome} criado — ajuste a legenda e o @ dele aqui em cima`, 'okk');
+    try { localStorage.setItem('lk_canal', r.id); localStorage.setItem('pz_aba', r.id); } catch (e) {}
+    await carregarAcab(r.id); canalPreencher(); if (PZ) desenharAbas();
+    el('n_res').textContent = `✅ ${nome} criado`;
+    aviso(`📺 canal ${nome} criado${de ? ' com o estilo copiado' : ''} — já está aberto na aba dele pra personalizar`, 'okk');
+    const ac = el('acab'); if (ac) { ac.open = true; ac.scrollIntoView({behavior: 'smooth', block: 'start'}); }
   } catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  el('bCriarCanal').disabled = false;
 }
+el('bApagarCanal').onclick = async () => { const b = el('bApagarCanal'), cid = el('a_escopo').value, c = CANAIS.find(x => x.id === cid);
+  if (!c) return aviso('Escolha um canal (a aba dele) pra apagar', 'erro');
+  if (b.dataset.certeza !== cid) { b.dataset.certeza = cid; b.textContent = `⚠ clique de novo pra apagar “${c.nome}”`;
+    setTimeout(() => { if (b.dataset.certeza === cid) { delete b.dataset.certeza; b.textContent = '🗑 apagar este canal'; } }, 5000); return; }
+  delete b.dataset.certeza; b.textContent = '🗑 apagar este canal';
+  try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/apagar', {}); await carregarCanais();
+    try { localStorage.setItem('pz_aba', ''); } catch (e) {}
+    el('a_escopo').value = ''; await carregarAcab(''); canalPreencher(); if (PZ) desenharAbas(); aviso(`🗑 canal ${c.nome} apagado`, 'okk'); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); } };
 async function canalSalvar() {
   const cid = el('a_escopo').value; if (!cid) return aviso('Escolha um canal em "Aplicar em" pra editar (ou crie um novo)', 'erro');
   try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/editar', {nome: el('c_nome').value, descricao: el('c_desc').value, voz_link: vozLink()});
@@ -725,8 +810,8 @@ function desenharAbas() {
     CANAIS.map(c => `<button class="pz-aba ${atual === c.id ? 'on' : ''}" data-aba="${esc(c.id)}">📺 ${esc(c.nome)}${c.personalizado ? ' ✎' : ''}</button>`).join('') +
     `<button class="pz-aba pz-novo" data-aba="__novo">➕ novo canal</button>`;
   box.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => {
-    if (b.dataset.aba === '__novo') { el('a_escopo').value = ''; el('a_escopo').dispatchEvent(new Event('change')); el('c_nome').value = ''; el('c_desc').value = '';
-      el('c_nome').focus(); el('c_nome').scrollIntoView({behavior: 'smooth', block: 'center'}); aviso('➕ dê o nome e a descrição e clique em ➕ criar canal', 'okk'); desenharAbas(); return; }
+    if (b.dataset.aba === '__novo') { const cc = el('pzCriar'); cc.scrollIntoView({behavior: 'smooth', block: 'center'}); el('n_nome').focus();
+      cc.classList.add('destaque'); setTimeout(() => cc.classList.remove('destaque'), 1800); return; }
     el('a_escopo').value = b.dataset.aba; el('a_escopo').dispatchEvent(new Event('change')); desenharAbas();
     try { localStorage.setItem('pz_aba', b.dataset.aba); } catch (e) {} });
 }

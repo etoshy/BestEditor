@@ -45,6 +45,8 @@
   <label title="o microfone usado nas gravações (fica salvo neste navegador)">🎛 <select id="micSel" style="max-width:230px"><option value="">microfone padrão do sistema</option></select></label>
   <span id="nivelBox" style="display:none">nível <span class="gv-nivel"><i id="nivel"></i></span></span>
   <label>🔠 texto <button class="gv-mini" id="fMenos">A−</button><input type="range" id="fonte" min="16" max="72" step="2"><button class="gv-mini" id="fMais">A+</button><span id="fVal" class="si-dica"></span></label>
+  {% if not avulsa %}<label title="✂ divide o roteiro em pedaços menores pra gravar um de cada vez — a legenda continua sincronizada (o Whisper lê a gravação inteira)">✂ dividir
+    <select id="divisao" style="width:auto"><option value="bloco">por bloco do roteiro</option><option value="frase">até o ponto (frase)</option><option value="curta">frases curtas (vírgula também)</option></select></label>{% endif %}
   <label><input type="checkbox" id="optTrad" checked> tradução</label>
   <label><input type="checkbox" id="optLeitura"> 📖 modo leitura</label>
   <label title="3, 2, 1… antes de começar a gravar (dá tempo de respirar)"><input type="checkbox" id="optConta"> ⏱ contagem</label>
@@ -59,7 +61,7 @@
 {% if avulsa %}<details class="gv-parte" style="padding:10px 14px" id="textoBox">
   <summary style="cursor:pointer;font-weight:700">✏ trocar o texto <span class="si-dica" style="font-weight:400">(as partes são refeitas na ordem — a parte 3 continua com os takes dela)</span></summary>
   <textarea id="txtNovo" rows="8" style="width:100%;box-sizing:border-box;margin-top:8px">{{ sessao.texto }}</textarea>
-  <div class="si-linha" style="gap:8px;margin-top:6px"><select id="txtSep" style="width:auto"><option value="linha">uma parte por linha</option><option value="frase">uma por frase</option><option value="paragrafo">uma por parágrafo</option></select>
+  <div class="si-linha" style="gap:8px;margin-top:6px"><select id="txtSep" style="width:auto"><option value="linha">uma parte por linha</option><option value="frase">uma por frase (até o ponto)</option><option value="curta">frases curtas (vírgula também)</option><option value="paragrafo">uma por parágrafo</option></select>
     <button class="gv-mini" id="bTexto">💾 salvar o texto</button></div>
 </details>{% endif %}
 <details id="tudoBox" class="gv-parte" style="padding:10px 14px">
@@ -311,6 +313,14 @@ $('bJuntar').onclick = async () => {
   catch (e) { status('❌ ' + e.message); }
   desenhar();
 };
+if ($('txtSep') && {{ ((sessao or {}).get('modo') or 'linha')|tojson }}) $('txtSep').value = {{ ((sessao or {}).get('modo') or 'linha')|tojson }};
+if ($('divisao')) {  // ✂ v84_339: por bloco, até o ponto ou frases curtas — os takes de outra divisão ficam guardados
+  $('divisao').value = EST.divisao || 'bloco';
+  $('divisao').onchange = async () => { if (gravando) { $('divisao').value = EST.divisao || 'bloco'; return status('⏹ pare a gravação antes de mudar a divisão'); }
+    try { EST = (await post(`/curtos/${PID}/voz/divisao`, {divisao: $('divisao').value})).estado; ATUAL = 0; desenhar();
+      status(`✂ ${EST.partes.length - 1} parte(s) pra gravar — a legenda continua sincronizada com a sua fala`); }
+    catch (e) { status('❌ ' + e.message); $('divisao').value = EST.divisao || 'bloco'; } };
+}
 if ($('bTexto')) $('bTexto').onclick = async () => {
   try { EST = (await post(`/gravar-voz/${PID}/texto`, {texto: $('txtNovo').value, separar: $('txtSep').value})).estado; ATUAL = 0; desenhar(); status('💾 texto salvo'); }
   catch (e) { status('❌ ' + e.message); }

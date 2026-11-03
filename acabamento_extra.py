@@ -273,6 +273,32 @@ def _quadro_base(base: str, canal_id: str, destino: str) -> str:
     return destino
 
 
+_CACHE_FUNDO: Dict[tuple, tuple] = {}
+
+
+def _fundo_em_cache(base: str, canal_id: str, destino: str, validade_s: float = 300.0) -> str:
+    """⚡ v84_340: o quadro de fundo da prévia guardado por 5 min (antes: abria até 80 projetos e cortava o clipe a CADA
+    mudança — no Windows isso deixava a prévia lenta a ponto de parecer que a fonte não mudava)."""
+    import shutil
+    import time
+    chave = (os.path.abspath(base), canal_id or "")
+    c = _CACHE_FUNDO.get(chave)
+    if c and time.time() - c[0] < validade_s and os.path.isfile(c[1]):
+        shutil.copyfile(c[1], destino)
+        return destino
+    _quadro_base(base, canal_id, destino)
+    try:
+        import curtos as CT
+        pasta = os.path.join(CT.raiz(base), "_previa_fundos")
+        os.makedirs(pasta, exist_ok=True)
+        guardado = os.path.join(pasta, (re.sub(r"[^A-Za-z0-9_]", "", canal_id or "") or "_padrao") + ".jpg")
+        shutil.copyfile(destino, guardado)
+        _CACHE_FUNDO[chave] = (time.time(), guardado)
+    except OSError:
+        pass
+    return destino
+
+
 def previa(base: str, a: Dict[str, Any], canal_id: str, pasta_tmp: str, texto: str = "ESSA PALAVRA AQUI") -> str:
     """O quadro com a tarja + a legenda (a 2ª palavra falando) + o @ — renderizado pelo mesmo libass do vídeo final."""
     import curtos as CT
@@ -282,7 +308,7 @@ def previa(base: str, a: Dict[str, Any], canal_id: str, pasta_tmp: str, texto: s
     from video_assembler import _escape_path_for_ffmpeg_filter
     os.makedirs(pasta_tmp, exist_ok=True)
     W, H = 1080, 1920
-    fundo = _quadro_base(base, canal_id, os.path.join(pasta_tmp, "fundo.jpg"))
+    fundo = _fundo_em_cache(base, canal_id, os.path.join(pasta_tmp, "fundo.jpg"))
     p = {"id": "previa", "modelo": "comentario", "canal_id": canal_id, "config": {}}
     CT.aplicar_acabamento(p, a)
     cfg = p["config"]

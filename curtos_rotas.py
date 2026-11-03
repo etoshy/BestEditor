@@ -1868,6 +1868,17 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         _dono(pid)
         return _ok(estado=GV.resumo(base_dir, pid), tarefa=TAREFAS.get(pid))
 
+    @app.route("/curtos/<pid>/voz/divisao", methods=["POST"])
+    def curto_voz_divisao(pid: str):
+        """✂ v84_339: gravar por bloco do roteiro, até o ponto ou em frases curtas (os takes já gravados ficam guardados)."""
+        _dono(pid)
+        if GV.avulsa(pid):
+            return _erro("No texto livre a divisão é escolhida em ✏ trocar o texto.")
+        try:
+            return _ok(estado=GV.trocar_divisao(base_dir, pid, str(_corpo().get("divisao") or "")))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+
     @app.route("/curtos/<pid>/voz/clipe", methods=["GET"])
     def curto_voz_clipe(pid: str):
         """🎞 o vídeo original, pra você ver enquanto lê."""
@@ -2303,6 +2314,18 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         except CT.CurtoErro as exc:
             return _erro(str(exc))
         return _ok(id=c["id"], canais=_canais_out())
+
+    @app.route("/curtos/canais/<cid>/apagar", methods=["POST"])
+    def curtos_canal_apagar_link(cid: str):
+        """🗑 v84_339: apaga o canal (pela página de Personalização) — os vídeos já feitos ficam."""
+        if not CT._valido(cid):
+            return _erro("Canal inválido.")
+        try:
+            CT.carregar_canal(base_dir, cid)
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+        CT.excluir_canal(base_dir, cid)
+        return _ok(canais=_canais_out())
 
     @app.route("/curtos/canais/<cid>/editar", methods=["POST"])
     def curtos_canal_editar(cid: str):

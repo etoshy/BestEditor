@@ -104,3 +104,26 @@ def test_pagina_organizada(tmp_path, monkeypatch):
               'id="a_previa_marca"', 'id="a_previa_real"'):
         assert k in html, k
     assert html.count('id="a_escopo"') == 1 and html.count('id="a_marca_fonte"') == 1
+
+
+def test_criar_separado_apagar_e_prontos_sem_duplicar(tmp_path, monkeypatch):
+    import threading
+    cl = _app(tmp_path, monkeypatch)
+    html = cl.get("/curtos/personalizar").get_data(as_text=True)
+    assert 'id="pzCriar"' in html and 'id="n_nome"' in html and 'id="n_copiar"' in html and 'id="bApagarCanal"' in html
+    assert html.index('id="pzCriar"') < html.index('id="acab"')  # o cartão de criar fica fora (antes) do acabamento
+    link = cl.get("/curtos/link").get_data(as_text=True)
+    assert link.count('id="pzCriar"') == 1  # no Link: dentro da aba 📺 Canal e voz
+    base = str(tmp_path)
+    # 🔒 várias requisições juntas não criam o mesmo canal pronto 2 vezes
+    ts = [threading.Thread(target=CT.garantir_canais_prontos, args=(base,)) for _ in range(6)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    nomes = [c["nome"] for c in CT.listar_canais(base)]
+    assert len(nomes) == len(set(nomes)), nomes
+    r = cl.post("/curtos/canais/novo", json={"nome": "Teste Apagar"}).get_json()
+    assert any(c["id"] == r["id"] for c in r["canais"])
+    j = cl.post(f"/curtos/canais/{r['id']}/apagar", json={}).get_json()
+    assert j["ok"] and not any(c["id"] == r["id"] for c in j["canais"])
+    assert cl.post("/curtos/canais/naoexiste/apagar", json={}).status_code == 400
+    assert cl.post("/curtos/canais/..%2Fx/apagar", json={}).status_code in (400, 404)
