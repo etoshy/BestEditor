@@ -51,3 +51,18 @@ def test_link_e_canal(tmp_path, monkeypatch):
     html = cl.get("/curtos/link").get_data(as_text=True)
     assert 'id="roteiro_personalidade"' in html and 'id="c_persona"' in html
     assert 'id="roteiro_personalidade" style="width:auto;margin:0"> ' in html  # sem "checked"
+
+
+def test_projeto_vazio_nao_derruba_o_roteiro(tmp_path, monkeypatch):
+    import os
+    monkeypatch.setenv("CURTOS_DIR", str(tmp_path / "c"))
+    base = str(tmp_path)
+    c = CT.criar_canal(base, "FoodYum2", "")
+    CT.salvar_canal(base, c)
+    _p(base, c["id"], falas=("Old hook.", "Old end."))
+    ruim = os.path.join(CT.raiz(base), "projetos", "quebrado1")
+    os.makedirs(ruim)
+    open(os.path.join(ruim, "projeto.json"), "w").close()  # vazio: "Expecting value: line 1 column 1"
+    open(os.path.join(CT.raiz(base), "projetos", "quebrado1", "x"), "w").close()
+    novo = _p(base, c["id"], "personalidade")
+    assert "Old hook." in CC.conteudo_roteiro(base, novo)

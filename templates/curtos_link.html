@@ -1049,7 +1049,8 @@ function desenhar(vs) {
     try { desenhar((await post(`/curtos/${b.dataset.thumbs}/thumbs`)).videos); aviso('🖼 prints prontos', 'okk'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '🖼 tirar 3 prints pra thumb'; } });
   L.querySelectorAll('[data-refazer]').forEach(b => b.onclick = async () => { try { desenhar((await post(`/curtos/link/${b.dataset.refazer}/refazer`)).videos); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
-  L.querySelectorAll('[data-origph]').forEach(ph => {  // (só os cartões novos ainda têm o lugar vazio) const id = ph.dataset.origph;
+  // (só os cartões novos ainda têm o lugar vazio)
+  L.querySelectorAll('[data-origph]').forEach(ph => { const id = ph.dataset.origph;
     const vd = players[id] || Object.assign(document.createElement('video'), {src: `/curtos/${id}/voz/clipe`, controls: true, preload: 'metadata', muted: false});
     vd.dataset.orig = id; vd.style.cssText = 'width:100%;max-height:340px;border-radius:8px;background:#000'; ph.replaceWith(vd); });
   Object.entries(pedidos).forEach(([k, v]) => { const e = L.querySelector(`[data-rpedido="${k}"]`); if (e) e.value = v; });

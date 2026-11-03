@@ -558,7 +558,7 @@ def roteiros_recentes(base: str, p: Dict[str, Any], n: int = 6) -> List[str]:
     for _mt, pid in sorted(cands, reverse=True)[:80]:
         try:
             q = CT.carregar(base, pid)
-        except CT.CurtoErro:
+        except Exception:  # noqa: BLE001  (projeto.json vazio/corrompido ou sendo gravado: pula — nunca derruba o roteiro)
             continue
         bl = (q.get("roteiro") or {}).get("blocos") or []
         if q.get("canal_id") != cid or not bl:
