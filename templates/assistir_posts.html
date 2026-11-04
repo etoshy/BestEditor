@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}👀 Assistir posts{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .as-form textarea { width: 100%; box-sizing: border-box; font-family: monospace; }
+  .as-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; margin-top: 12px; }
+  .as-item { border: 1px solid var(--borda); border-radius: 12px; padding: 10px; background: var(--card); display: flex; flex-direction: column; gap: 6px; }
+  .as-item.erro { border-color: var(--erro); }
+  .as-cab { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-size: .88rem; }
+  .as-cab a { word-break: break-all; }
+  .as-info { font-size: .82rem; color: var(--mudo); max-height: 4.2em; overflow: hidden; }
+  .as-info.aberto { max-height: none; }
+  .as-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .as-vid { border-top: 1px dashed var(--borda); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .as-vid video { width: 100%; max-height: 520px; border-radius: 8px; background: #000; }
+  .as-vid textarea { width: 100%; box-sizing: border-box; min-height: 70px; font-size: .9rem; }
+  .as-barra { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .as-aviso { font-size: .85rem; padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--borda); }
+</style>
+<h1>👀 Assistir posts <span class="si-dica" style="font-weight:400">cole os links, assista aqui e anote — fechou a aba, some tudo</span></h1>
+<div id="barra" class="si-barra"></div>
+<div class="si-card as-form">
+  <label style="font-weight:600">🔗 Links (um por linha) — Instagram, TikTok, Shorts, Reels, Kwai…
+    <textarea id="links" rows="5" placeholder="https://www.instagram.com/reel/…&#10;https://www.instagram.com/p/… (carrossel: cada vídeo vira um player)&#10;https://www.tiktok.com/@…/video/…"></textarea></label>
+  <div class="as-barra" style="margin-top:8px">
+    <button class="si-ok" id="bAdd">▶ carregar os vídeos</button>
+    <button class="si-mini si-sec" id="bCopiar" title="copia os links com as suas notas (pra guardar ou colar em outro lugar)">📋 copiar links + notas</button>
+    <span class="as-aviso">⚠ é temporário: ao <b>fechar ou recarregar a aba</b>, os vídeos e as notas são apagados. Copie as notas antes, se quiser guardar.</span>
+  </div>
+</div>
+<div id="lista" class="as-lista"></div>
+<script>
+(() => {
+const SID = {{ sid|tojson }};
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 3000); }
+let ITENS = [], timer = null;
+const NOTAS = {};  // "k:n" → texto (só na página — nunca vai pro disco)
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const temNotas = () => Object.values(NOTAS).some(t => String(t || '').trim());
+
+function htmlItem(it) {
+  const inf = it.info || {}, quem = inf.autor_handle ? '@' + inf.autor_handle : (inf.autor || '');
+  const legenda = [inf.titulo, inf.descricao].filter(Boolean).join(' — ');
+  const varios = (it.videos || []).length > 1;
+  return `<div class="as-cab"><b>#${it.k}</b>${quem ? `<span>${esc(quem)}</span>` : ''}<a href="${esc(it.url)}" target="_blank" class="si-dica">🔗 abrir o post</a>
+      ${varios ? `<span class="si-tag">🎠 carrossel · ${it.videos.length} vídeos</span>` : ''}</div>
+    ${inf.musica || inf.local ? `<div class="as-tags">${inf.musica ? `<span class="si-tag">🎵 ${esc(inf.musica)}</span>` : ''}${inf.local ? `<span class="si-tag">📍 ${esc(inf.local)}</span>` : ''}</div>` : ''}
+    ${legenda ? `<div class="as-info" data-legenda title="clique pra ver tudo">${esc(legenda)}</div>` : ''}
+    <div data-vids></div>
+    <div class="si-dica" data-st></div>`;
+}
+function htmlVid(it, n, nome) {
+  const chave = `${it.k}:${n}`;
+  return `<div class="as-vid" data-vid="${chave}">
+    ${(it.videos || []).length > 1 ? `<b style="font-size:.85rem">🎞 vídeo ${n} de ${it.videos.length}</b>` : ''}
+    <video src="/assistir/${SID}/${it.k}/${esc(nome)}" controls preload="metadata" playsinline></video>
+    <div class="as-barra"><button class="si-mini" data-tempo="${chave}" title="põe o tempo de agora do player no fim das notas">⏱ pôr o tempo (<span data-t="${chave}">0:00</span>)</button>
+      <span class="si-dica">escreva o que quiser; o tempo entra no fim do que já está escrito</span></div>
+    <textarea data-nota="${chave}" placeholder="o que é este vídeo? o que acontece, ideia de roteiro, o momento bom…">${esc(NOTAS[chave] || '')}</textarea></div>`;
+}
+function desenhar() {
+  const L = el('lista');
+  ITENS.forEach(it => {
+    let card = L.querySelector(`[data-k="${it.k}"]`);
+    if (!card) { card = document.createElement('div'); card.className = 'as-item'; card.dataset.k = it.k; card.innerHTML = htmlItem(it); L.appendChild(card); }
+    if (card.dataset.info !== JSON.stringify(it.info || {})) {  // a legenda/música chegou depois: refaz só o cabeçalho
+      const vids = card.querySelector('[data-vids]'); card.innerHTML = htmlItem(it); card.querySelector('[data-vids]').replaceWith(vids); card.dataset.info = JSON.stringify(it.info || {}); }
+    card.classList.toggle('erro', it.estado === 'erro');
+    card.querySelector('[data-st]').textContent = it.estado === 'pronto' ? '' : it.estado === 'erro' ? '❌ ' + (it.erro || 'não deu pra baixar') :
+      it.estado === 'baixando' ? '⏳ baixando…' : '🕐 na fila…';
+    const caixa = card.querySelector('[data-vids]');
+    if (it.estado === 'pronto' && !caixa.childElementCount) caixa.innerHTML = it.videos.map((nome, i) => htmlVid(it, i + 1, nome)).join('');
+  });
+  L.querySelectorAll('[data-legenda]').forEach(d => d.onclick = () => d.classList.toggle('aberto'));
+}
+async function atualizar() {
+  try { const j = await (await fetch(`/assistir/${SID}/estado`)).json(); if (!j.viva) { aviso('⚠ a sessão expirou — recarregue a página', 'erro'); return; }
+    ITENS = j.itens || []; desenhar(); } catch (e) {}
+  clearTimeout(timer); if (ITENS.some(i => i.estado === 'na fila' || i.estado === 'baixando')) timer = setTimeout(atualizar, 1500);
+}
+el('bAdd').onclick = async () => {
+  const t = el('links').value.trim(); if (!t) return aviso('Cole pelo menos um link', 'erro');
+  el('bAdd').disabled = true;
+  try { const r = await fetch(`/assistir/${SID}/adicionar`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({links: t})});
+    const j = await r.json(); if (!j.ok) throw new Error(j.erro || r.status);
+    aviso(j.novos ? `⏳ carregando ${j.novos} post(s)…` : 'esses links já estão aqui', 'okk'); el('links').value = ''; ITENS = j.itens; desenhar(); atualizar(); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  el('bAdd').disabled = false;
+};
+document.addEventListener('input', ev => { const n = ev.target.dataset && ev.target.dataset.nota; if (n) NOTAS[n] = ev.target.value; });
+document.addEventListener('timeupdate', ev => { const v = ev.target; if (v.tagName !== 'VIDEO') return; const box = v.closest('[data-vid]'); if (!box) return;
+  const s = box.querySelector('[data-t]'); if (s) s.textContent = fmt(v.currentTime); }, true);
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-tempo]'); if (!b) return;
+  const chave = b.dataset.tempo, box = b.closest('[data-vid]'), v = box.querySelector('video'), t = box.querySelector('textarea');
+  const atual = t.value.replace(/\s+$/, '');
+  t.value = (atual ? atual + '\n' : '') + `[${fmt(v.currentTime)}] `;
+  NOTAS[chave] = t.value; t.focus(); t.setSelectionRange(t.value.length, t.value.length); });
+el('bCopiar').onclick = async () => {
+  const txt = ITENS.map(it => {
+    const vids = (it.videos || []).map((_, i) => { const nota = String(NOTAS[`${it.k}:${i + 1}`] || '').trim();
+      return nota ? ((it.videos.length > 1 ? `  🎞 vídeo ${i + 1}: ` : '  ') + nota.replace(/\n/g, '\n    ')) : ''; }).filter(Boolean);
+    const inf = it.info || {};
+    return [it.url, inf.musica ? `  🎵 ${inf.musica}` : '', inf.local ? `  📍 ${inf.local}` : '', ...vids].filter(Boolean).join('\n'); }).join('\n\n');
+  try { await navigator.clipboard.writeText(txt); aviso('📋 copiado', 'okk'); } catch (e) { prompt('Copie:', txt); } };
+// 🗑 fechou/recarregou a aba: apaga os vídeos desta sessão no servidor
+window.addEventListener('pagehide', () => { try { navigator.sendBeacon(`/assistir/${SID}/apagar`); } catch (e) {} });
+window.addEventListener('beforeunload', ev => { if (temNotas()) { ev.preventDefault(); ev.returnValue = ''; } });
+})();
+</script>
+{% endblock %}

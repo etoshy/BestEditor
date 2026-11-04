@@ -162,10 +162,7 @@ def carregar(base: str, pid: str) -> Dict[str, Any]:
 def salvar(base: str, p: Dict[str, Any]) -> None:
     os.makedirs(_pasta(base, p["id"]), exist_ok=True)
     p["atualizado"] = time.time()
-    tmp = _arquivo(base, p["id"]) + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(p, f, ensure_ascii=False, indent=2)
-    arquivo_seguro.trocar(tmp, _arquivo(base, p["id"]))
+    arquivo_seguro.gravar_json(_arquivo(base, p["id"]), p)  # 🔒 v84_350: temporário com nome único
 
 
 def listar(base: str) -> List[Dict[str, Any]]:

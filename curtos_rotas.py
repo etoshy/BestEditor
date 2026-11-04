@@ -148,6 +148,16 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def _corpo() -> Dict[str, Any]:
         return request.get_json(silent=True) or {}
 
+    def _reservar(chave: str, rotulo: str, prog: str = "") -> bool:
+        """🔒 v84_350 (idempotência): marca a tarefa como rodando SÓ se ela não está rodando — numa operação só, com trava.
+        Antes era "olha → marca" em dois passos: 2 cliques/2 abas passavam juntos e o mesmo vídeo rodava 2× (IA cobrando 2×)."""
+        with _TRAVA_T:
+            t = TAREFAS.get(chave)
+            if t and not t.get("fim"):
+                return False
+            TAREFAS[chave] = {"rotulo": rotulo, "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": prog}
+            return True
+
     def _rodar(chave: str, rotulo: str, fn: Callable[[Callable[[str], None]], Any]):
         with _TRAVA_T:
             t = TAREFAS.get(chave)
@@ -1479,6 +1489,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "roteiro_pt": _roteiro_pt(r), "roteiro_versoes": len(p.get("roteiro_historico") or []),
                 "roteiro_mudou": bool(lr.get("roteiro_mudou")), "roteiro_idioma": r.get("idioma") or "",
                 "links": lr.get("links") or [],
+                **_musica_local(lr, CC.dados(p)),
                 "tem_original": bool(CC.clipes(base_dir, p)) if lr else False,
                 "titulos": CN.titulos_do_projeto(p),
                 "descricao": CL.com_fonte(CL.limpar_marca(r.get("descricao") or ""), lr.get("link") or "", info) if r.get("descricao") else "",
@@ -1493,6 +1504,15 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "apagado": bool(lr.get("apagado")), "escolha": lr.get("escolha") or {}, "aguardando": bool(lr.get("aguardando")),
                 "aguardando_voz": bool(lr.get("aguardando_voz")), "minha_voz": (p.get("config") or {}).get("voz_modo") == "minha",
                 "pronto_1x1": bool((p.get("exportado_quadrado") or {}).get("arquivo") and os.path.isfile((p.get("exportado_quadrado") or {}).get("arquivo") or ""))}
+
+    def _musica_local(lr: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, str]:
+        """🎵📍 v84_351: a música e o local do post (o que você escreveu vale; senão o que a plataforma informou — no composto,
+        os de cada fonte, sem repetir). Pra indexar depois (painel de música) e dar contexto ao roteiro."""
+        infos = [i.get("info") or {} for i in c.get("info_links") or []] or [c.get("info_link") or {}]
+        juntar = lambda k: " | ".join(dict.fromkeys(str(i.get(k) or "").strip() for i in infos if str(i.get(k) or "").strip()))  # noqa: E731
+        return {"musica": lr.get("musica") if lr.get("musica") is not None else juntar("musica"),
+                "local": lr.get("local") if lr.get("local") is not None else juntar("local"),
+                "musica_editada": lr.get("musica") is not None, "local_editado": lr.get("local") is not None}
 
     def _roteiro_pt(r: Dict[str, Any]) -> str:
         """🇧🇷 v84_343: a tradução do roteiro (quando ele não é narrado em português)."""
@@ -1630,9 +1650,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         if not ordem:
             _FILA_RETOMANDO.release()
             return 0
-        for k, x in enumerate(ordem):
-            TAREFAS[x] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
-                          "prog": "🔁 retomando…" if k == 0 else f"⏳ na fila da retomada ({k + 1}/{len(ordem)})"}
+        ordem = [x for k, x in enumerate(ordem) if _reservar(x, "🔗 link → vídeo",
+                                                            "🔁 retomando…" if k == 0 else f"⏳ na fila da retomada ({k + 1}/{len(ordem)})")]
+        if not ordem:
+            _FILA_RETOMANDO.release()
+            return 0
 
         def corpo() -> None:
             try:
@@ -2221,8 +2243,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         continuar = b.get("continuar", True) is not False
         op = _opcoes()  # (lido aqui: a thread não tem o pedido)
         lr = p.get("link_rapido") or {}
-        TAREFAS[pid] = {"rotulo": "🎤 sua voz → edição", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
-                        "prog": "⏳ na fila (espera o vídeo que está gerando)"}
+        if not _reservar(pid, "🎤 sua voz → edição", "⏳ na fila (espera o vídeo que está gerando)"):
+            return _erro("Já está rodando.", 409)
 
         def pr(m: str) -> None:
             TAREFAS[pid]["prog"] = str(m)[:300]
@@ -2391,9 +2413,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
     def _iniciar_lote_por_etapa(pids: List[str]) -> Any:
         """Põe o lote na fila geral (espera outro vídeo/lote que estiver rodando) e roda por etapa."""
+        pids = [pid for pid in pids if _reservar(pid, "🧩 lote por etapa", "⏳ na fila (lote por etapa)")]  # (rodando: fica de fora)
+        if not pids:
+            return _erro("Esses vídeos já estão rodando.", 409)
         for pid in pids:  # a tarefa vem ANTES de tirar o "aguardando" (o vigia da retomada não pega no meio)
-            TAREFAS[pid] = {"rotulo": "🧩 lote por etapa", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
-                            "prog": "⏳ na fila (lote por etapa)"}
             _link_etapa(pid, "na fila", aguardando=False, lote_modo="etapa")
 
         def corpo(prog: Callable[[str], None]) -> str:
@@ -2668,10 +2691,22 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             _grupos_gravar(base_dir, dados)
         return curtos_link_grupos()
 
+    _ENVIOS_RECENTES: Dict[str, float] = {}
+
     @app.route("/curtos/link/novo", methods=["POST"])
     def curtos_link_novo():
         b = _corpo()
         pares = _separar_grupos(str(b.get("link") or ""))[:50]  # 🔗 v84_306: até 50; 📂 v84_318: cada grupo com o seu canal
+        agora_ = time.time()
+        with _TRAVA_T:  # 🔒 v84_350 (idempotência): o mesmo link mandado de novo em 30 s (clique duplo, 2 abas) não vira 2 vídeos
+            for k_ in [k_ for k_, t_ in _ENVIOS_RECENTES.items() if agora_ - t_ > 30]:
+                _ENVIOS_RECENTES.pop(k_, None)
+            repetidos = [u for u, _ in pares if u in _ENVIOS_RECENTES]
+            pares = [(u, g) for u, g in pares if u not in _ENVIOS_RECENTES]
+            for u, _ in pares:
+                _ENVIOS_RECENTES[u] = agora_
+        if repetidos and not pares:
+            return _erro(f"Esse(s) link(s) acabou(aram) de ser enviado(s) — {len(repetidos)} repetido(s) ignorado(s).", 409)
         links = [u for u, _ in pares]
         if not links:
             return _erro("Cole o link do vídeo (TikTok, Shorts, Reels, Kwai…).")
@@ -2863,6 +2898,13 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 if m != (lr.get("marca") or ""):
                     lr["marca"] = m
                     _log_link(lr, "marcado como " + MARCAS_LINK[m])
+            for k_ in ("musica", "local"):  # 🎵📍 v84_351: vazio = volta ao que a plataforma informou
+                if k_ in b:
+                    v_ = " ".join(str(b.get(k_) or "").split())[:160]
+                    if v_:
+                        lr[k_] = v_
+                    else:
+                        lr.pop(k_, None)
             if "comentario" in b:
                 c = str(b.get("comentario") or "").strip()[:1000]
                 if c != (lr.get("comentario") or ""):
@@ -2916,7 +2958,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             p = CT.carregar(base_dir, v["id"])
             r = p.get("roteiro") or {}
             rec = {"id": v["id"], "link": v["link"], "criado": v["criado"], "canal": v["canal"],
-                   "modo": v.get("modo_usado") or v["modo"], "marca": v["marca"], "comentario": v["comentario"],
+                   "modo": v.get("modo_usado") or v["modo"], "marca": v["marca"], "comentario": v["comentario"], "musica": v.get("musica") or "", "local": v.get("local") or "",
                    "apagado": v["apagado"], "titulo_escolhido": esc_.get("titulo") or "",
                    "titulos": CN.titulos_do_projeto(p),
                    "roteiro": " ".join(CT.sem_tags(b.get("fala") or "") for b in r.get("blocos") or []),
@@ -2983,9 +3025,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             if isinstance(r, tuple):
                 return r
             return _ok(iniciados=len(ids), pulados=pulados, por_etapa=True, videos=_links())
-        for k, pid in enumerate(ids, 1):
-            TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "",
-                            "prog": f"⏳ na fila dos marcados ({k}/{len(ids)})"}
+        reservados = [pid for k, pid in enumerate(ids, 1) if _reservar(pid, "🔗 link → vídeo", f"⏳ na fila dos marcados ({k}/{len(ids)})")]
+        pulados += len(ids) - len(reservados)  # 🔒 v84_350: quem começou a rodar entre o olhar e o marcar fica de fora
+        ids = reservados
 
         def corpo() -> None:
             for pid in ids:
@@ -3129,10 +3171,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             abort(404)
         if lr.get("apagado"):
             return _erro("Este vídeo foi apagado (ficou só o link e o log).", 409)
-        t = TAREFAS.get(pid)
-        if t and not t.get("fim"):
+        if not _reservar(pid, "🔗 link → vídeo", "começando…"):
             return _erro("Já está rodando.", 409)
-        TAREFAS[pid] = {"rotulo": "🔗 link → vídeo", "inicio": time.time(), "fim": None, "erro": None, "msg": "", "prog": "começando…"}
         slug = (p.get("config") or {}).get("voz_tts") or ""
 
         def corpo() -> None:
@@ -3626,15 +3666,16 @@ def importar_pixabay(base_dir: str, som_id: str, pasta_p: Optional[str] = None) 
     item = PS.item_da_base(meta, rel)
     os.makedirs(dp_extras.pasta(), exist_ok=True)
     extras = os.path.join(dp_extras.pasta(), "pixabay_sons.json")
-    try:
-        d = json.load(open(extras, encoding="utf-8")) if os.path.isfile(extras) else {}
-    except (OSError, ValueError):
-        d = {}
-    lista = [s for s in d.get("sons") or [] if s.get("id") != item["id"]]
-    lista.append(item)
-    d["sons"] = lista
-    with open(extras, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=1)
+    with CT._TRAVA:  # 🔒 v84_350: com trava e atômico (2 sons baixando juntos: um sumia; arquivo pela metade = base de sons quebrada)
+        try:
+            with open(extras, encoding="utf-8") as f_:
+                d = json.load(f_) if os.path.getsize(extras) else {}
+        except (OSError, ValueError):
+            d = {}
+        lista = [s for s in d.get("sons") or [] if s.get("id") != item["id"]]
+        lista.append(item)
+        d["sons"] = lista
+        CT._gravar_json(extras, d)
     dp_extras.recarregar()
     if not dp_sons.som(item["id"]):
         raise CT.CurtoErro("O som não entrou na base (veja os erros dos extras no 📘 Guia).")

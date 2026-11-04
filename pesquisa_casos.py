@@ -100,11 +100,8 @@ def carregar(base: str, pid: str) -> Dict[str, Any]:
 def salvar(base: str, p: Dict[str, Any]) -> None:
     os.makedirs(_pasta(base), exist_ok=True)
     p["atualizado"] = time.time()
-    caminho = _arquivo(base, p["id"])
-    tmp = caminho + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(p, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, caminho)
+    import arquivo_seguro  # 🔒 v84_350: nome único + à prova do "Acesso negado" do Windows
+    arquivo_seguro.gravar_json(_arquivo(base, p["id"]), p, indent=1)
 
 
 def listar(base: str) -> List[Dict[str, Any]]:

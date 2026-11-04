@@ -199,11 +199,10 @@ def pasta(base: str, pid: str) -> str:
 
 
 def _gravar_json(caminho: str, dados: Any) -> None:
-    os.makedirs(os.path.dirname(caminho), exist_ok=True)
-    tmp = caminho + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, caminho)
+    """🔒 v84_350: temporário com nome ÚNICO + troca à prova do "[WinError 5] Acesso negado" do Windows (antivírus, OneDrive
+    ou a própria página lendo o projeto na hora) — antes era sempre "projeto.json.tmp" e um os.replace sem nova tentativa."""
+    import arquivo_seguro
+    arquivo_seguro.gravar_json(caminho, dados, indent=1)
 
 
 def _ler_json(caminho: str) -> Any:
@@ -1401,11 +1400,10 @@ def salvar_acabamento(base: str, novos: Dict[str, Any], canal_id: str = "") -> D
             c["acabamento"] = dict(c.get("acabamento") or {}, **limpos)
             salvar_canal(base, c)
         return acabamento(base, canal_id)
-    a = acabamento(base)
-    a.update(limpos)
-    os.makedirs(raiz(base), exist_ok=True)
-    with open(os.path.join(raiz(base), "_acabamento.json"), "w", encoding="utf-8") as f:
-        json.dump(a, f, ensure_ascii=False, indent=1)
+    with _TRAVA:  # 🔒 v84_350: com trava e ATÔMICO (antes, um vídeo criado no meio do salvar lia o arquivo pela metade e caía
+        a = acabamento(base)  # no acabamento de fábrica sem avisar)
+        a.update(limpos)
+        _gravar_json(os.path.join(raiz(base), "_acabamento.json"), a)
     return a
 
 

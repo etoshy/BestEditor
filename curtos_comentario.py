@@ -758,6 +758,10 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
             bloco = CL.texto_para_ia(c.get("info_link") or {})
             if bloco:
                 L += [bloco, ""]
+        lr_ = p.get("link_rapido") or {}
+        if lr_.get("local") or lr_.get("musica"):  # 📍🎵 v84_351: o que VOCÊ escreveu no cartão vale mais que o do post
+            L += [x for x in (f"Location (written by the creator of this video — trust it): {lr_['local']}" if lr_.get("local") else "",
+                              f"Song on the post (context only): {lr_['musica']}" if lr_.get("musica") else "") if x] + [""]
         if c.get("modo_link"):
             L += ["## " + CL.regra_modo(c["modo_link"]), ""]
             link = (p.get("link_rapido") or {}).get("link") or ""

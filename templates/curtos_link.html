@@ -37,6 +37,8 @@
   .lk-filtros select { width: auto; min-width: 120px; }
   .lk-pag { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; font-size: .85rem; }
   .lk-pag button { min-width: 32px; } .lk-pag button.on { background: var(--acento); color: #fff; border-color: var(--acento); }
+  .lk-mlc { flex-direction: row !important; align-items: center; gap: 4px !important; margin: 0 !important; flex: 1; min-width: 180px; font-weight: 400 !important; }
+  .lk-mlc input { flex: 1; min-width: 0; font-size: .85rem; padding: 4px 8px; }
   .lk-prog { display: flex; gap: 8px; align-items: center; font-size: .86rem; margin: 6px 0; }
   .lk-gira { width: 16px; height: 16px; border: 3px solid var(--borda); border-top-color: var(--acento); border-radius: 50%; animation: lkg 1s linear infinite; flex: 0 0 auto; }
   @keyframes lkg { to { transform: rotate(360deg); } }
@@ -955,7 +957,11 @@ function desenhar(vs) {
       <div class="si-linha" style="flex-wrap:wrap;gap:6px;align-items:center">
         <select data-marca="${v.id}" style="width:auto" title="marque pra organizar e pra apagar depois">${Object.entries(MARCAS).map(([k, n]) => `<option value="${k}"${(v.marca || '') === k ? ' selected' : ''}>${n}</option>`).join('')}</select>
         <input data-comen="${v.id}" value="${esc(v.comentario || '')}" placeholder="seu comentário sobre este vídeo…" style="flex:1;min-width:200px">
-        <button class="si-mini si-sec" data-salvar-comen="${v.id}">💾 comentário</button></div>`}
+        <button class="si-mini si-sec" data-salvar-comen="${v.id}">💾 comentário</button></div>
+      <div class="si-linha lk-ml" style="flex-wrap:wrap;gap:6px;align-items:center" title="🎵 a música e 📍 o local do post — vêm da plataforma quando ela informa; corrija ou complete à mão (pra indexar e pro roteiro)">
+        <label class="lk-mlc">🎵<input data-musica="${v.id}" value="${esc(v.musica || '')}" placeholder="música (ex.: Floating in Reverie · Moayad Aljabal)"></label>
+        <label class="lk-mlc">📍<input data-local="${v.id}" value="${esc(v.local || '')}" placeholder="local (ex.: Ilhas Faroé)"></label>
+        <button class="si-mini si-sec" data-salvar-ml="${v.id}">💾</button></div>`}
       <details data-k="l${v.id}"><summary style="cursor:pointer;font-size:.88rem">📜 log (${(v.log || []).length})</summary>
         ${(v.log || []).slice().reverse().map(e => `<div class="si-dica">${new Date(e.quando * 1000).toLocaleString('pt-BR')} — ${esc(e.texto)}</div>`).join('') || '<div class="si-dica">sem registros</div>'}</details>
       ${v.rodando ? `<div class="lk-prog"><div class="lk-gira"></div><span><b>${esc(v.etapa)}</b> — ${esc(v.prog)}</span></div>` : ''}
@@ -1031,6 +1037,9 @@ function desenhar(vs) {
   L.querySelectorAll('[data-remover]').forEach(b => b.onclick = async () => { if (!confirm('Tirar este link da fila? Ele ainda não começou, então só some a entrada.')) return; try { desenhar((await post(`/curtos/link/${b.dataset.remover}/remover`)).videos); aviso('🗑 removido da fila', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
   L.querySelectorAll('[data-tit]').forEach(r => r.onchange = async () => { try { desenhar((await post(`/curtos/link/${r.dataset.tit}/escolha`, {titulo: r.value})).videos); aviso('⭐ título escolhido', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
   L.querySelectorAll('[data-capa]').forEach(r => r.onchange = async () => { try { desenhar((await post(`/curtos/link/${r.dataset.capa}/escolha`, {capa: Number(r.value)})).videos); aviso('⭐ capa escolhida', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  L.querySelectorAll('[data-salvar-ml]').forEach(b => b.onclick = async () => { const id = b.dataset.salvarMl;
+    try { desenhar((await post(`/curtos/link/${id}/editar`, {musica: L.querySelector(`[data-musica="${id}"]`).value, local: L.querySelector(`[data-local="${id}"]`).value})).videos); aviso('🎵📍 salvo', 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } });
   L.querySelectorAll('[data-salvar-comen]').forEach(b => b.onclick = async () => { const id = b.dataset.salvarComen; const t = L.querySelector(`[data-comen="${id}"]`).value;
     try { desenhar((await post(`/curtos/link/${id}/editar`, {comentario: t})).videos); aviso('💬 comentário salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
   L.querySelectorAll('[data-tnovos]').forEach(b => b.onclick = async () => { const id = b.dataset.tnovos;

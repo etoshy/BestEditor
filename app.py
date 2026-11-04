@@ -56,6 +56,8 @@ import re
 import os
 import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import ffmpeg_sem_stdin  # noqa: E402,F401  (v84_329: ffmpeg nunca espera o teclado do console)
+import arquivo_seguro as _arquivo_seguro  # noqa: E402
+_arquivo_seguro.instalar_no_windows()  # 🔒 v84_350: os.replace com nova tentativa no "Acesso negado" (só no Windows)
 import shutil
 import subprocess
 import sys
@@ -232,6 +234,41 @@ app.config["MAX_FORM_PARTS"] = None
 # também DIRETO na request, antes do formulário ser parseado — esses
 # atributos existem no Request do Werkzeug independente da versão do
 # Flask, então isso funciona mesmo quando o app.config é ignorado.
+_ORIGENS_LOCAIS = ("127.0.0.1", "localhost", "::1", "[::1]")
+
+
+def _rota_do_script_externo(caminho: str) -> bool:
+    """As rotas que o userscript no Google chama de OUTRA página (de propósito — têm CORS liberado lá embaixo)."""
+    if caminho in ("/navegador-imagens/aba", "/navegador-imagens/fechar"):
+        return True
+    fim = caminho.rsplit("/", 1)[-1]
+    if caminho.startswith("/modelos-video/") and "/fotos-roteiro/" in caminho and fim in ("link", "guia-feita", "guias"):
+        return True
+    return caminho.startswith("/busca-lista/") and fim in ("link", "guia-feita", "guias")
+
+
+@app.before_request
+def _bloquear_post_de_outro_site():
+    """🔒 v84_350 (CSRF): uma página QUALQUER aberta no seu navegador conseguia mandar um POST escondido pro site local
+    (limpar a lista, apagar canal, gastar a IA…). Agora um POST/PUT/DELETE que vem de OUTRO site é recusado — o próprio site,
+    o minerador (que roda no servidor, sem navegador) e o userscript do Google (rotas dele) continuam funcionando."""
+    if request.method in ("GET", "HEAD", "OPTIONS") or _rota_do_script_externo(request.path):
+        return None
+    de = request.headers.get("Origin") or request.headers.get("Referer") or ""
+    if not de:
+        return None
+    from urllib.parse import urlsplit
+    o = urlsplit(de)
+    if de == "null" or not o.netloc:
+        return ("Pedido recusado: veio de outra página (proteção contra CSRF).", 403)
+    meu = urlsplit("//" + request.host)
+    mesma = o.netloc == request.host or (
+        (o.hostname or "") in _ORIGENS_LOCAIS and (meu.hostname or "") in _ORIGENS_LOCAIS and o.port == meu.port)
+    if not mesma:
+        return ("Pedido recusado: veio de outro site (proteção contra CSRF).", 403)
+    return None
+
+
 @app.before_request
 def _relax_multipart_limits():
     # Versões diferentes de Flask/Werkzeug implementam isso de formas
@@ -11183,6 +11220,8 @@ import pesquisa_rotas as _pesquisa_rotas  # noqa: E402  (📰 v84_165: buscador 
 _pesquisa_rotas.registrar(app, BASE_DIR)
 import marca_rotas as _marca_rotas  # noqa: E402  (🎨 v84_168: identidade visual — imagens 100% IA na marca)
 _marca_rotas.registrar(app, BASE_DIR)
+import assistir_posts as _assistir  # noqa: E402  (👀 v84_351: links → players + notas, tudo temporário)
+_assistir.registrar(app, BASE_DIR)
 
 
 @app.after_request
@@ -12450,5 +12489,13 @@ if __name__ == "__main__":
     _reloader = os.environ.get("SEM_RELOADER", "").strip() not in ("1", "true", "sim")
     if _reloader:
         _reloader_enxuto()
-    app.run(debug=True, host="0.0.0.0", port=port, threaded=True, use_reloader=_reloader,
-            exclude_patterns=_padroes_excluidos_do_reloader(), reloader_interval=2)
+    # 🔒 v84_350: só no SEU PC por padrão (antes 0.0.0.0 = qualquer um na mesma rede/Wi-Fi abria o site, gastava a sua IA e
+    # apagava as suas coisas) e SEM o console do depurador do Werkzeug (ele roda Python no navegador). Pra abrir do celular na
+    # mesma rede: BESTEDITOR_HOST=0.0.0.0. Pra ter o console de erro de novo (só se souber o que está fazendo): BESTEDITOR_DEBUGGER=1.
+    _host = os.environ.get("BESTEDITOR_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    _console = os.environ.get("BESTEDITOR_DEBUGGER", "").strip() in ("1", "true", "sim")
+    if _host not in ("127.0.0.1", "localhost", "::1"):
+        print(f"⚠ ATENÇÃO: o site está aberto pra REDE ({_host}) — qualquer aparelho na mesma rede/Wi-Fi consegue usar. "
+              "Só use em rede de confiança.", flush=True)
+    app.run(debug=True, use_debugger=_console and _host in ("127.0.0.1", "localhost", "::1"), host=_host, port=port,
+            threaded=True, use_reloader=_reloader, exclude_patterns=_padroes_excluidos_do_reloader(), reloader_interval=2)

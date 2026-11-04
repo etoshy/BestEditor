@@ -89,6 +89,7 @@ def baixar_com_ytdlp(
     headers: Optional[Dict[str, str]] = None,
     extra_opcoes: Optional[Dict[str, Any]] = None,
     ytdlp_module: Any = None,
+    varios: bool = False,
 ) -> str:
     """Baixa qualquer vídeo suportado pelo yt-dlp e salva como 'original.mp4'
     dentro de `pasta_destino`, sempre na MELHOR qualidade disponível (sem
@@ -122,13 +123,15 @@ def baixar_com_ytdlp(
     # cada stream baixado, mas o merge_output_format="mp4" abaixo garante
     # que o arquivo final sempre vira "original.mp4".
     saida_template = str(pasta_destino / "original.%(ext)s")
+    if varios:  # 🎠 v84_351: post com VÁRIOS vídeos (carrossel do Instagram…): item_1.mp4, item_2.mp4… (devolve a pasta)
+        saida_template = str(pasta_destino / "item_%(playlist_index|1)s.%(ext)s")
 
     opcoes: Dict[str, Any] = {
         "outtmpl": saida_template,
         "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "http_headers": headers or HEADERS_PADRAO,
-        "noplaylist": True,
+        "noplaylist": not varios,
         "quiet": True,
         "no_warnings": True,
         "no_color": True,  # 🧹 v84_329: sem os códigos de cor ([0;31m) no erro que aparece na página
@@ -170,6 +173,10 @@ def baixar_com_ytdlp(
             "passe o caminho pelo parâmetro cookies_path."
         ) from exc
 
+    if varios:
+        if not any(pasta_destino.glob("item_*.mp4")):
+            raise RedesSociaisError("Não veio nenhum vídeo desse post (pode ser só foto, ou pedir login — veja os cookies).")
+        return str(pasta_destino)
     caminho_final = pasta_destino / "original.mp4"
     if not caminho_final.exists():
         raise RedesSociaisError(

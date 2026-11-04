@@ -26,7 +26,7 @@ def trocar(tmp: str, destino: str) -> None:
     erro: Exception = OSError("?")
     for _ in range(TENTATIVAS):
         try:
-            os.replace(tmp, destino)
+            (_REPLACE_ORIGINAL if os.replace is _replace_com_retentativa else os.replace)(tmp, destino)  # (sem somar tentativas)
             return
         except PermissionError as exc:  # WinError 5 (acesso negado) / 32 (em uso)
             erro = exc
@@ -66,3 +66,33 @@ def gravar_json(caminho: str, dados: Any, indent: int = 2) -> None:
                 os.remove(tmp)
             except OSError:
                 pass
+
+
+_REPLACE_ORIGINAL = os.replace
+
+
+def _replace_com_retentativa(src, dst, *a, **k):
+    """🔒 v84_350: o os.replace de TODO o projeto, no Windows, tenta de novo (~5 s) quando o destino está aberto por outro
+    programa (antivírus, OneDrive, indexador, a página lendo) — antes, só quem chamava `trocar()` tinha isso."""
+    espera, ultima = ESPERA, None
+    for _ in range(TENTATIVAS):
+        try:
+            return _REPLACE_ORIGINAL(src, dst, *a, **k)
+        except PermissionError as exc:
+            ultima = exc
+        except OSError as exc:
+            if getattr(exc, "winerror", None) not in (5, 32, 33):
+                raise
+            ultima = exc
+        time.sleep(espera)
+        espera = min(0.4, espera * 1.5)
+    raise ultima  # type: ignore[misc]
+
+
+def instalar_no_windows() -> bool:
+    """Chamado uma vez no começo do app (só no Windows — no Linux/Mac o os.replace já não sofre disso)."""
+    import sys
+    if not sys.platform.startswith("win") or os.replace is _replace_com_retentativa:
+        return False
+    os.replace = _replace_com_retentativa  # type: ignore[assignment]
+    return True

@@ -161,9 +161,7 @@ def _instalar_fontes(fontes: Dict[str, Any], arquivos: Dict[str, bytes]) -> List
         chave = re.sub(r"[^a-z0-9_]", "", str(info.get("chave") or "")) or "usr_importada"
         fs[chave] = {"familia": fam, "arquivos": arqs}
         ok.append(fam)
-    os.makedirs(dp_extras.pasta(), exist_ok=True)
-    with open(cam, "w", encoding="utf-8") as f:
-        json.dump(reg, f, ensure_ascii=False, indent=1)
+    CT._gravar_json(cam, reg)  # 🔒 v84_350: atômico (o arquivo nunca fica pela metade)
     try:
         dp_extras.carregar.cache_clear()
     except AttributeError:
@@ -250,7 +248,8 @@ def importar(base: str, dados: bytes, nome_arquivo: str = "", modo: str = "copia
         out.append({"id": destino_id, "nome": c.get("nome") or destino_id, "acao": acao})
     if not out:
         raise CT.CurtoErro("O pacote não tem nenhum canal.")
-    fontes = _instalar_fontes(man.get("fontes") or {}, arquivos_fonte)
+    with CT._TRAVA:  # 🔒 v84_350: o fontes.json é ler-mudar-gravar
+        fontes = _instalar_fontes(man.get("fontes") or {}, arquivos_fonte)
     gs = _grupos(base)
     n_g = 0
     for k, g in (man.get("grupos") or {}).items():

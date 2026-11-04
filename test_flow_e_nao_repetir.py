@@ -51,7 +51,8 @@ def config_path(tmp_path):
 class TestConfigFlow:
     def test_flow_e_um_provedor_e_fica_por_ultimo_na_prioridade(self):
         assert "flow" in ALL_PROVIDERS
-        assert DEFAULT_CONFIG["provider_priority"][-1] == "flow"
+        # (v84_350: o 🟣 Runpod — outro gerador de IA — entrou depois e também fica no fim; o Flow continua depois dos bancos)
+        assert DEFAULT_CONFIG["provider_priority"][-1] == "runpod" and "flow" in DEFAULT_CONFIG["provider_priority"]
 
     def test_defaults_do_flow(self):
         assert DEFAULT_CONFIG["flow_navegador"] == "auto"
@@ -63,12 +64,12 @@ class TestConfigFlow:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump({"provider_priority": antiga}, f)
         carregada = load_site_config(config_path)
-        assert carregada["provider_priority"] == antiga + ["flow", "moviepexels", "animepexels_online", "moviepexels_online"]  # v84: moviepexels também completa sozinho
+        assert carregada["provider_priority"] == antiga + ["flow", "moviepexels", "animepexels_online", "moviepexels_online", "runpod"]  # v84: moviepexels também completa sozinho (v84_350: + runpod, que entrou depois)
 
     def test_salvar_lista_antiga_sem_flow_completa_em_vez_de_dar_erro(self, config_path):
         antiga = ["mixkit", "pexels", "pixabay", "magnific", "vistacreate", "animepexels", "wikipedia"]
         salvo = save_site_config({"provider_priority": antiga}, config_path)
-        assert salvo["provider_priority"] == antiga + ["flow", "moviepexels", "animepexels_online", "moviepexels_online"]  # v84: moviepexels também completa sozinho
+        assert salvo["provider_priority"] == antiga + ["flow", "moviepexels", "animepexels_online", "moviepexels_online", "runpod"]  # v84: moviepexels também completa sozinho (v84_350: + runpod, que entrou depois)
 
     def test_lista_realmente_incompleta_continua_sendo_rejeitada(self, config_path):
         # falta "pixabay" etc — só o "flow" é completado sozinho
@@ -588,7 +589,7 @@ class TestPaginaConfiguracoes:
     def test_prioridade_antiga_sem_flow_salva_sem_erro(self, client):
         antiga = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "wikipedia"]
         r = client.post("/settings", data={"provider_priority": antiga})
-        assert r.status_code == 200 and load_site_config()["provider_priority"][-4:] == ["flow", "moviepexels", "animepexels_online", "moviepexels_online"]
+        assert r.status_code == 200 and load_site_config()["provider_priority"][-5:] == ["flow", "moviepexels", "animepexels_online", "moviepexels_online", "runpod"]
 
 
 class TestPaginaInicialEPrompt:

@@ -98,12 +98,13 @@ def sessao(base: str, sid: str) -> Dict[str, Any]:
 
 def trocar_texto(base: str, sid: str, texto: str, modo: str = "linha") -> Dict[str, Any]:
     """✏ texto novo: as partes são refeitas na ordem (a parte P3 continua P3, com os takes que já tinha)."""
-    s = sessao(base, sid)
     falas = separar_texto(texto, modo)
     if not falas:
         raise CT.CurtoErro("O texto ficou vazio.")
-    s.update(texto=str(texto or "")[:100000], modo=modo, partes=[{"id": f"P{k}", "texto": x} for k, x in enumerate(falas, 1)])
-    _gravar_json(_sessao_cam(base, sid), s)
+    with _TRAVA:
+        s = sessao(base, sid)
+        s.update(texto=str(texto or "")[:100000], modo=modo, partes=[{"id": f"P{k}", "texto": x} for k, x in enumerate(falas, 1)])
+        _gravar_json(_sessao_cam(base, sid), s)
     return s
 
 
@@ -131,10 +132,8 @@ def apagar_avulsa(base: str, sid: str) -> None:
 
 
 def _gravar_json(cam: str, d: Dict[str, Any]) -> None:
-    tmp = cam + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, cam)
+    import arquivo_seguro  # 🔒 v84_350: nome único + à prova do "Acesso negado" do Windows
+    arquivo_seguro.gravar_json(cam, d, indent=1)
 
 
 def pasta(base: str, pid: str) -> str:
@@ -219,28 +218,30 @@ def editar_texto(base: str, pid: str, parte: str, texto: str) -> Dict[str, Any]:
     parte = _valida(parte)
     novo = " ".join(str(texto or "").split())[:2000]
     if avulsa(pid):
-        s_ = sessao(base, pid)
-        for x in s_.get("partes") or []:
-            if x["id"] == parte:
-                if novo and novo != x["texto"]:
-                    s_["texto"] = str(s_.get("texto") or "").replace(x["texto"], novo, 1)
-                    x["texto"] = novo
-                break
-        else:
-            raise CT.CurtoErro("Parte não encontrada.")
-        _gravar_json(_sessao_cam(base, pid), s_)
+        with _TRAVA:
+            s_ = sessao(base, pid)
+            for x in s_.get("partes") or []:
+                if x["id"] == parte:
+                    if novo and novo != x["texto"]:
+                        s_["texto"] = str(s_.get("texto") or "").replace(x["texto"], novo, 1)
+                        x["texto"] = novo
+                    break
+            else:
+                raise CT.CurtoErro("Parte não encontrada.")
+            _gravar_json(_sessao_cam(base, pid), s_)
         return resumo(base, pid)
     p = CT.carregar(base, pid)
     orig = next((x for x in partes(p, divisao(base, pid)) if x["id"] == parte), None)
     if not orig:
         raise CT.CurtoErro("Parte não encontrada.")
-    d = estado(base, pid)
-    ts = d.setdefault("textos", {})
-    if not novo or novo == orig["texto"]:
-        ts.pop(parte, None)
-    else:
-        ts[parte] = {"de": orig["texto"], "para": novo}
-    _salvar(base, pid, d)
+    with _TRAVA:  # 🔒 v84_350: ler-mudar-gravar do estado.json sempre com a trava (dois cliques juntos perdiam um)
+        d = estado(base, pid)
+        ts = d.setdefault("textos", {})
+        if not novo or novo == orig["texto"]:
+            ts.pop(parte, None)
+        else:
+            ts[parte] = {"de": orig["texto"], "para": novo}
+        _salvar(base, pid, d)
     return resumo(base, pid)
 
 
@@ -279,9 +280,10 @@ def trocar_divisao(base: str, pid: str, nova: str) -> Dict[str, Any]:
     """✂ muda como o roteiro é dividido pra gravar. Os takes já gravados ficam guardados (voltar a divisão traz de volta)."""
     if nova not in DIVISOES:
         raise CT.CurtoErro("Divisão inválida.")
-    d = estado(base, pid)
-    d["divisao"] = nova
-    _salvar(base, pid, d)
+    with _TRAVA:
+        d = estado(base, pid)
+        d["divisao"] = nova
+        _salvar(base, pid, d)
     return resumo(base, pid)
 
 

@@ -210,8 +210,10 @@ def instalar_fonte(arquivo: str, nome: str, prefixo: str = "usr_") -> Dict[str, 
     if not re.match(r"[a-z0-9]", chave):
         chave = "f_" + chave
     chave = (prefixo + chave)[:31]  # (o Guia aceita até 31 letras)
+    import curtos as CT
     try:
-        it = dp_guia.adicionar_fonte(arquivo, chave, nome)
+        with CT._TRAVA:  # 🔒 v84_350: o fontes.json é ler-mudar-gravar (2 fontes instalando juntas perdiam uma)
+            it = dp_guia.adicionar_fonte(arquivo, chave, nome)
     except SystemExit as exc:  # o instalador do Guia avisa com SystemExit
         raise ValueError(str(exc)) from exc
     for f in ("carregar",):

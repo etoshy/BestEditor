@@ -56,10 +56,8 @@ def salvar(base: str, r: Dict[str, Any]) -> None:
     d = pasta(base, r["id"])
     os.makedirs(d, exist_ok=True)
     r["atualizado"] = time.time()
-    tmp = os.path.join(d, "rastreio.json.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(r, f, ensure_ascii=False)
-    os.replace(tmp, os.path.join(d, "rastreio.json"))
+    import arquivo_seguro  # 🔒 v84_350: nome único + à prova do "Acesso negado" do Windows
+    arquivo_seguro.gravar_json(os.path.join(d, "rastreio.json"), r, indent=None)
 
 
 def carregar(base: str, rid: str) -> Dict[str, Any]:

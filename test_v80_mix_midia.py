@@ -195,4 +195,5 @@ def test_montador_flow_video_cai_pra_imagem_quando_o_video_falha():
     import video_assembler as va
     import inspect
     src = inspect.getsource(va.assemble_video)
-    assert 'elif segment.provider == "flow":' in src and 'replace(segment, media_type="image")' in src
+    # (v84_350: a troca pra imagem agora leva o prompt de FOTO — query=q_foto; a regra é a mesma)
+    assert 'elif segment.provider == "flow":' in src and 'replace(segment, media_type="image", query=q_foto)' in src

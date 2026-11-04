@@ -243,7 +243,7 @@
       const div = document.createElement('div');
       div.className = 'mv-cel' + (e.status === 'aprovada' ? ' aprovada' : '');
       const st = e.status === 'aprovada' ? '✅ aprovada' : (e.status === 'candidatas' ? '👀 escolha uma' : (e.erro ? '⚠ erro' : 'falta gerar'));
-      div.innerHTML = `<header><input type="checkbox" ${SEL.has(c.id) ? 'checked' : ''}> ${c.nome}${c.extra ? ' <span title="pose criada por você">🆕</span>' : ''}<small>${st}</small></header>
+      div.innerHTML = `<header><input type="checkbox" ${SEL.has(c.id) ? 'checked' : ''}> ${String(c.nome ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]))}${c.extra ? ' <span title="pose criada por você">🆕</span>' : ''}<small>${st}</small></header>
         <div class="mv-hint" style="font-size:.75rem">${c.en}</div>
         ${(e.candidatas || []).length ? '' : `<img class="mv-ref" src="${arq('referencias/poses/pose_' + c.ref + '.png')}" title="referência usada (pose oficial ${c.ref})">`}
         <div class="mv-cands"></div>${e.erro ? `<div class="mv-hint" style="color:#c55">${e.erro}</div>` : ''}

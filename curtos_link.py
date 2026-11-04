@@ -115,7 +115,27 @@ def ler_info_ytdlp(j: Dict[str, Any], n: int = 60) -> Dict[str, Any]:
             "autor": str(j.get("uploader") or j.get("channel") or j.get("uploader_id") or "")[:80],
             "autor_handle": _handle(j),
             "views": j.get("view_count"), "curtidas": j.get("like_count"), "n_comentarios": j.get("comment_count"),
-            "duracao": j.get("duration"), "comentarios": coms[:n]}
+            "duracao": j.get("duration"), "comentarios": coms[:n],
+            "musica": musica_do_post(j), "local": local_do_post(j)}
+
+
+def musica_do_post(j: Dict[str, Any]) -> str:
+    """🎵 v84_351: a música do post, quando a plataforma informa (TikTok/Shorts/Reels via yt-dlp): 'Faixa · Artista'.
+    O "som original" de um usuário não conta como música (não dá pra indexar)."""
+    faixa = " ".join(str(j.get("track") or "").split())
+    artistas = j.get("artists") if isinstance(j.get("artists"), list) else [j.get("artist")] if j.get("artist") else []
+    artista = ", ".join(" ".join(str(a).split()) for a in artistas if a)
+    if not faixa or re.match(r"(?i)^(original sound|som original|sonido original|son original|suono originale)\b", faixa):
+        return ""
+    return (f"{faixa} · {artista}" if artista and artista.lower() not in faixa.lower() else faixa)[:160]
+
+
+def local_do_post(j: Dict[str, Any]) -> str:
+    """📍 v84_351: o local marcado no post (quando vem)."""
+    v = j.get("location")
+    if isinstance(v, dict):
+        v = v.get("name") or v.get("title") or ""
+    return " ".join(str(v or "").split())[:120]
 
 
 def baixar_info(url: str, n: int = 60, timeout: float = 90.0) -> Dict[str, Any]:
@@ -166,6 +186,10 @@ def texto_para_ia(info: Dict[str, Any]) -> str:
     L = ["## THE ORIGINAL POST (context — may be wrong or clickbait; the clip timeline above is what happens)"]
     if info.get("titulo") or info.get("descricao"):
         L.append(f"Caption: {(info.get('titulo') or '')} {(info.get('descricao') or '')}".strip()[:1500])
+    if info.get("local"):  # 📍 v84_351: o lugar marcado pelo criador (contexto confiável de ONDE foi filmado)
+        L.append(f"Location tagged by the creator: {info['local']} (use it to say where this is, if it helps)")
+    if info.get("musica"):
+        L.append(f"Song on the post: {info['musica']} (context only — never read lyrics; mention it only if it really matters)")
     nums = [f"{_fmt_n(info[k])} {r}" for k, r in (("views", "views"), ("curtidas", "likes"), ("n_comentarios", "comments")) if info.get(k)]
     if nums:
         L.append("Numbers: " + " · ".join(nums))
