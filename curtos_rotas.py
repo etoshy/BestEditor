@@ -57,14 +57,25 @@ def _nome_do_grupo(texto: str) -> str:
     return re.sub(r"^[\W_]+|[\W_]+$", "", str(texto or "")).strip()
 
 
-def _separar_grupos(texto: str) -> List[tuple]:
+def _termos_do_grupo(nome: str) -> List[str]:
+    """📂 v84_353: 'Comida, Food, Culinária' = 3 termos do mesmo grupo (sem ligar pra maiúscula/acento)."""
+    return [t for t in (" ".join(_nome_do_grupo(x).split()) for x in str(nome or "").split(",")) if t]
+
+
+def _separar_grupos(texto: str, eh_grupo: Optional[Callable[[str], bool]] = None,
+                    dicas: Optional[Dict[str, str]] = None) -> List[tuple]:
     """📂 Lê a lista colada: uma palavra vira o grupo dos links que vêm depois, com qualquer símbolo
     depois (ou nenhum): 'Animais', 'Animais:', 'Animais -', '# Animais', '[Animais]'…
-    'Animais: https://…' também vale. Devolve [(link, grupo)] na ordem, sem repetir link."""
+    'Animais: https://…' também vale. Devolve [(link, grupo)] na ordem, sem repetir link.
+    💡 v84_353: com `eh_grupo`, o texto ANTES do link na MESMA linha só vira grupo se for um grupo/canal que já existe;
+    senão é uma DICA pra IA sobre aquele vídeo ('Eclipse com skate: https://…') — vai em `dicas[link]`."""
     atual, out, vistos = "", [], set()
     for linha in str(texto or "").splitlines():
         if "http" in linha:
             pref = _nome_do_grupo(linha[:linha.find("http")])
+            dica_linha = ""
+            if pref and eh_grupo is not None and not eh_grupo(pref):
+                dica_linha, pref = " ".join(linha[:linha.find("http")].split()).rstrip(":-–— ").strip()[:300], ""
             if pref:
                 atual = pref
             resto = linha[linha.find("http"):]
@@ -79,12 +90,16 @@ def _separar_grupos(texto: str) -> List[tuple]:
                     if chave not in vistos:
                         vistos.add(chave)
                         out.append((chave, atual))
+                        if dica_linha and dicas is not None:
+                            dicas[chave] = dica_linha
                     continue
             for u in re.split(r"\s+", resto):
                 u = u.strip("<>\"'(),;")
                 if u.startswith("http") and u not in vistos:
                     vistos.add(u)
                     out.append((u, atual))
+                    if dica_linha and dicas is not None:
+                        dicas[u] = dica_linha
         else:
             nome = _nome_do_grupo(linha)
             if nome:
@@ -1488,7 +1503,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "roteiro_tags": " ".join(b.get("fala") or "" for b in r.get("blocos") or [])[:900],
                 "roteiro_pt": _roteiro_pt(r), "roteiro_versoes": len(p.get("roteiro_historico") or []),
                 "roteiro_mudou": bool(lr.get("roteiro_mudou")), "roteiro_idioma": r.get("idioma") or "",
-                "links": lr.get("links") or [],
+                "links": lr.get("links") or [], "dica": lr.get("dica") or "",
                 **_musica_local(lr, CC.dados(p)),
                 "tem_original": bool(CC.clipes(base_dir, p)) if lr else False,
                 "titulos": CN.titulos_do_projeto(p),
@@ -2472,6 +2487,17 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         if isinstance(b.get("voz_link"), dict):
             c["voz_link"] = _voz_link_de({"voz_link": b["voz_link"]})
 
+    @app.route("/curtos/acabamento/sugerir", methods=["POST"])
+    def curtos_acabamento_sugerir():
+        """🤖 v84_353: 5 estilos (@ + legenda) pelo nicho do canal — pra usar inteiros ou misturar."""
+        import acabamento_extra as AX
+        b = _corpo()
+        cid = str(b.get("canal_id") or "")
+        try:
+            return _ok(estilos=AX.sugerir_estilos(base_dir, cid, variar=str(b.get("variar") or "")[:40]))
+        except CT.CurtoErro as exc:
+            return _erro(str(exc))
+
     @app.route("/curtos/acabamento/previa.jpg", methods=["GET"])
     def curtos_acabamento_previa():
         """🖼 v84_333: a prévia DE VERDADE — um quadro do canal com a tarja, a legenda e o @ queimados pelo mesmo libass do vídeo
@@ -2686,8 +2712,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 except CT.CurtoErro:
                     return _erro("Esse canal não existe mais.")
                 dados[chave] = {"nome": nome, "canal_id": cid}
+                for termo in _termos_do_grupo(nome):  # 📂 v84_353: "Comida, Food" liga os dois termos (cada um sozinho também vale)
+                    dados[_chave_grupo(termo)] = {"nome": termo, "canal_id": cid}
             else:
                 dados.pop(chave, None)
+                for termo in _termos_do_grupo(nome):
+                    dados.pop(_chave_grupo(termo), None)
             _grupos_gravar(base_dir, dados)
         return curtos_link_grupos()
 
@@ -2696,7 +2726,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     @app.route("/curtos/link/novo", methods=["POST"])
     def curtos_link_novo():
         b = _corpo()
-        pares = _separar_grupos(str(b.get("link") or ""))[:50]  # 🔗 v84_306: até 50; 📂 v84_318: cada grupo com o seu canal
+        mapa_g = _grupos_ler(base_dir)
+        dicas_: Dict[str, str] = {}
+        pares = _separar_grupos(str(b.get("link") or ""), lambda t: any(_chave_grupo(x) in mapa_g or bool(_canal_pelo_nome(x))
+                                                                        for x in [t] + _termos_do_grupo(t)), dicas_)[:50]  # 🔗 v84_306: até 50; 📂 v84_318: cada grupo com o seu canal; 💡 v84_353: dicas
         agora_ = time.time()
         with _TRAVA_T:  # 🔒 v84_350 (idempotência): o mesmo link mandado de novo em 30 s (clique duplo, 2 abas) não vira 2 vídeos
             for k_ in [k_ for k_, t_ in _ENVIOS_RECENTES.items() if agora_ - t_ > 30]:
@@ -2734,10 +2767,16 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         for url, grupo in pares:  # 🔗 vários links = vários vídeos, um depois do outro
             canal_do_link = canal_escolhido
             g = mapa.get(_chave_grupo(grupo)) or {}
+            for termo in ([] if g.get("canal_id") else _termos_do_grupo(grupo)):  # 📂 v84_353: qualquer termo da lista vale
+                g = mapa.get(_chave_grupo(termo)) or {}
+                if g.get("canal_id"):
+                    break
             if not g.get("canal_id") and grupo:  # 📂 v84_325: o termo é o nome/@ de um canal → vai pra ele
-                cid_nome = cache_nome.setdefault(grupo, _canal_pelo_nome(grupo))
-                if cid_nome:
-                    g = {"canal_id": cid_nome}
+                for termo in [grupo] + _termos_do_grupo(grupo):
+                    cid_nome = cache_nome.setdefault(termo, _canal_pelo_nome(termo))
+                    if cid_nome:
+                        g = {"canal_id": cid_nome}
+                        break
             if g.get("canal_id"):
                 if g["canal_id"] not in cache_canal:
                     try:
@@ -2784,13 +2823,18 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 p["config"]["estilo_roteiro"] = ("classico" if b.get("roteiro_classico") is True else
                                                  "personalidade" if b.get("roteiro_personalidade") is True else "autentico")  # ✨ v84_321 · 🎭 v84_345
                 p["config"]["camera_exp"] = b.get("camera_exp", True) not in (False, "0", "false")  # 🎥 v84_322 (padrão: ligada)
+                p["config"]["retencao"] = b.get("retencao", True) not in (False, "0", "false")  # 🧲 v84_354 (padrão: ligado)
+                if b.get("final_loop") is True:  # 🔁 v84_354: só se você pedir
+                    p["config"]["final_loop"] = True
                 if b.get("tambem_quadrado") is True and CT.proporcao_do(p) != "1:1":  # ⬛ v84_334: também a versão 1:1
                     p["config"]["tambem_quadrado"] = True
                 if vc.get("modo") == "minha":  # 🎤 v84_325: o canal é de voz própria
                     p["config"]["voz_modo"] = "minha"
                 if len(fontes_) > 1:
                     p["config"]["composto"] = len(fontes_)
+                dica_ = dicas_.get(",".join(fontes_) if len(fontes_) > 1 else url) or ""
                 p["link_rapido"] = {"link": url, "modo": modo, "criado": time.time(), "qualidade": qualidade, "exportar": exportar,
+                                    **({"dica": dica_} if dica_ else {}),
                                     **({"links": fontes_} if len(fontes_) > 1 else {}),
                                     "comentarios_colados": str(b.get("comentarios") or "")[:20000],
                                     "etapa": "na fila" if iniciar else "⏸ aguardando", "aguardando": not iniciar,

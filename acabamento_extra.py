@@ -354,3 +354,72 @@ def previa(base: str, a: Dict[str, Any], canal_id: str, pasta_tmp: str, texto: s
 
 
 SORTEIO_DOC = "🎲 o sorteio é feito na página (JS): fonte, paleta, borda, sombra, degradê e estilo — você salva se gostar."
+
+
+# ------------------------------------------------------------------ 🤖 v84_353: estilos sugeridos pela IA (pelo nicho do canal)
+ESTILOS_MARCA_IA = {"": "simple text with outline", "caixa": "solid box behind the @", "neon": "neon glow", "duplo": "double outline",
+                    "3d": "3D long shadow"}
+_HEX_CURTO = {"type": "string", "description": "#RRGGBB"}
+SCHEMA_SUGESTOES = {"type": "object", "additionalProperties": False, "required": ["estilos"], "properties": {"estilos": {
+    "type": "array", "items": {"type": "object", "additionalProperties": False,
+                               "required": ["nome", "por_que", "marca", "legenda"], "properties": {
+        "nome": {"type": "string"}, "por_que": {"type": "string"},
+        "marca": {"type": "object", "additionalProperties": False,
+                  "required": ["fonte", "estilo", "cor", "estilo_cor", "borda", "borda_cor", "maiusculas", "italico"], "properties": {
+                      "fonte": {"type": "string"}, "estilo": {"type": "string"}, "cor": _HEX_CURTO, "estilo_cor": _HEX_CURTO,
+                      "borda": {"type": "integer"}, "borda_cor": _HEX_CURTO, "maiusculas": {"type": "boolean"},
+                      "italico": {"type": "boolean"}}},
+        "legenda": {"type": "object", "additionalProperties": False,
+                    "required": ["fonte", "estilo", "cor", "cor_ativa", "borda", "borda_cor", "maiusculas"], "properties": {
+                        "fonte": {"type": "string"}, "estilo": {"type": "string"}, "cor": _HEX_CURTO, "cor_ativa": _HEX_CURTO,
+                        "borda": {"type": "integer"}, "borda_cor": _HEX_CURTO, "maiusculas": {"type": "boolean"}}}}}}}}
+
+
+def _prompt_sugestoes(c: Dict[str, Any], fontes: List[str], estilos_leg: Dict[str, str], variar: str = "") -> tuple:
+    sis = ("You are a short-form video brand designer (TikTok/Reels/Shorts). Propose 5 DIFFERENT visual identities for a "
+           "channel: the channel handle (@) burned on the video and the word-by-word captions. Each must fit the channel's "
+           "NICHE and audience, be READABLE on any background (strong contrast between text and outline), and the @ and the "
+           "caption of the SAME identity must match each other. Make the 5 really different (mood, font family, palette). "
+           "Use ONLY the fonts, @ styles and caption styles listed. 'nome' and 'por_que' in Brazilian Portuguese (por_que: one "
+           "short sentence on why it fits the niche). Borders in px for a 1080x1920 video (2-10).")
+    p = (f"CHANNEL: {c.get('nome') or ''}\nDESCRIPTION: {c.get('descricao') or '(none)'}\n"
+         f"NARRATOR PERSONA: {c.get('persona') or '(none)'}\n"
+         f"NICHE: {((c.get('perfil') or {}).get('nicho') or {}).get('tema') if isinstance((c.get('perfil') or {}).get('nicho'), dict) else ''}\n\n"
+         f"FONTS (use the exact value): {', '.join(fontes)}\n"
+         f"@ STYLES: {'; '.join(f'{k or chr(34) + chr(34)} = {v}' for k, v in ESTILOS_MARCA_IA.items())}\n"
+         f"CAPTION STYLES: {'; '.join(f'{k} = {v}' for k, v in estilos_leg.items())}\n"
+         + (f"\n(New round — make them different from before: {variar})" if variar else ""))
+    return sis, p
+
+
+def sugerir_estilos(base: str, canal_id: str, chamar: Optional[Any] = None, variar: str = "") -> List[Dict[str, Any]]:
+    """5 identidades (o @ + a legenda) pro nicho do canal — cada uma vira 2 pedaços de acabamento (marca_* e legenda_*)
+    que dá pra usar juntos ou misturar (o @ de uma com a legenda de outra). Tudo validado (fonte/estilo/cor que existem)."""
+    import curtos as CT
+    import dp_legendas
+    c = CT.carregar_canal(base, canal_id) if canal_id else {"nome": "todos os canais", "descricao": ""}
+    fams = [k for k in familias() if k]
+    estilos_leg = {e["id"]: e["nome"] for e in dp_legendas.ESTILOS if e["id"] != "seguir"}
+    sis, prompt = _prompt_sugestoes(c, fams, estilos_leg, variar)
+    import ia_servico
+    r = (chamar or ia_servico.chamar)("curtos", sis, prompt, schema=SCHEMA_SUGESTOES, max_tokens=3000, timeout=90.0)
+    if not r:
+        raise CT.CurtoErro(CT.motivo_ia() + " — use o 🎲 sortear (teoria das cores) enquanto isso.")
+    out = []
+    for e in (r.get("estilos") or [])[:5]:
+        m, lg = e.get("marca") or {}, e.get("legenda") or {}
+        marca = CT.limpar_acabamento({
+            "marca_fonte": m.get("fonte") if m.get("fonte") in fams else "", "marca_estilo": m.get("estilo") or "",
+            "marca_cor": m.get("cor"), "marca_estilo_cor": m.get("estilo_cor"), "marca_borda": m.get("borda"),
+            "marca_borda_cor": m.get("borda_cor"), "marca_maiusculas": bool(m.get("maiusculas")), "marca_italico": bool(m.get("italico")),
+            "marca_opacidade": 100})
+        legenda = CT.limpar_acabamento({
+            "legenda_fonte": lg.get("fonte") if lg.get("fonte") in fams else "",
+            "legenda_estilo": lg.get("estilo") if lg.get("estilo") in estilos_leg else "classico",
+            "legenda_cor": lg.get("cor"), "legenda_cor_ativa": lg.get("cor_ativa"), "legenda_borda": lg.get("borda"),
+            "legenda_borda_cor": lg.get("borda_cor"), "legenda_maiusculas": bool(lg.get("maiusculas"))})
+        out.append({"nome": str(e.get("nome") or "estilo")[:60], "por_que": str(e.get("por_que") or "")[:200],
+                    "marca": marca, "legenda": legenda})
+    if not out:
+        raise CT.CurtoErro("A IA não sugeriu nenhum estilo — tente de novo.")
+    return out

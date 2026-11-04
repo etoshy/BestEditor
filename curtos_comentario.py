@@ -557,6 +557,29 @@ REGRA_COMPOSTO = (
     "honest thread you can and start 'descricao' with '⚠ as fontes não têm um tema claro em comum'.")
 
 
+PUBLICO_DA_LINGUA = {"en": "an English-speaking audience (mostly US/UK)", "pt": "a Brazilian audience", "es": "a Spanish-speaking audience",
+                     "it": "an Italian audience", "fr": "a French-speaking audience", "de": "a German-speaking audience"}
+
+
+def regra_localizar(p: Dict[str, Any]) -> str:
+    """🌍 v84_352: o roteiro pensa em QUEM vai assistir (o público da língua do post): explica o que é típico de outro lugar,
+    onde é comum, e converte medidas — sem explicar o óbvio pro público local."""
+    publico = PUBLICO_DA_LINGUA.get(lingua_post(p), PUBLICO_DA_LINGUA["en"])
+    return (
+        f"\n\n🌍 LOCALIZE FOR THE AUDIENCE — this video is for {publico}:\n"
+        "L1. Anything culture-specific they may not know (a dish, a festival, a slang word, a local sport, a brand, a tradition, a "
+        "place): keep the ORIGINAL name and explain it in a few words with a comparison they already know (e.g. 'pamonha — "
+        "basically a sweet corn tamale wrapped in the husk'). Once, the first time it appears; never a lecture.\n"
+        "L2. WHERE and WHEN it is common, when it is well-established (e.g. 'a staple at Brazil's June festivals'). Never invent "
+        "a region, a date or a custom — if unsure, leave it out.\n"
+        "L3. Numbers in the audience's system when it helps understanding (°F/°C, lb/kg, miles/km, feet/meters) — e.g. "
+        "'500 grams, about a pound'. Money: keep the original currency with the country ('20 reais in Brazil'); add an "
+        "approximate conversion ONLY if you are sure of the order of magnitude ('about four dollars').\n"
+        "L4. Do NOT explain what the audience already knows (for a Brazilian audience, never explain what pamonha is; for an "
+        "American audience, never explain a hot dog).\n"
+        "L5. The explanation counts as one of your facts — keep the same total length.")
+
+
 def composto(p: Dict[str, Any]) -> int:
     """🧩 v84_349: quantas fontes o vídeo composto tem (0 = vídeo de um link só)."""
     try:
@@ -625,8 +648,50 @@ def tipos_do_video(p: Dict[str, Any]) -> tuple:
     import hashlib
     h = int(hashlib.md5(str(p.get("id") or "").encode("utf-8")).hexdigest(), 16)
     g = list(TIPOS_GANCHO)[h % len(TIPOS_GANCHO)]
-    f = list(TIPOS_FINAL)[(h // 7) % len(TIPOS_FINAL)]
+    if final_loop(p):  # 🔁 v84_354: final em loop só se você ligar (aí é sempre loop)
+        return g, "loop"
+    finais = [k for k in TIPOS_FINAL if k != "loop"]
+    f = finais[(h // 7) % len(finais)]
     return g, f
+
+
+def final_loop(p: Dict[str, Any]) -> bool:
+    return bool((p.get("config") or {}).get("final_loop"))
+
+
+def retencao(p: Dict[str, Any]) -> bool:
+    """🧲 v84_354: modo retenção (gatilhos mentais honestos) — ligado por padrão; config.retencao = False desliga."""
+    return (p.get("config") or {}).get("retencao", True) is not False
+
+
+REGRA_RETENCAO = (
+    "\n\n🧲 MAXIMUM RETENTION (attention psychology — every trigger must be HONEST: a fake promise makes people leave and the "
+    "platform punishes it):\n"
+    "R1. FIRST WORD = HOOK. No intro, no 'so', 'hey guys', 'in this video', 'let me tell you'. The first cena opens on the "
+    "most striking seconds of the clip (choose its de/ate for that), not on the slow start.\n"
+    "R2. CURIOSITY GAP: the first sentence opens a specific question in the viewer's head; the full answer comes only in the "
+    "last 20% of the script. Never resolve it early.\n"
+    "R3. RE-HOOK at 30-50%: one honest 'open loop' line that promises something still coming ('but that's not even the "
+    "strangest part', 'and the reason is right here') — and you MUST deliver it later.\n"
+    "R4. PATTERN INTERRUPT every ~5-7 seconds of narration: a turn ('but', 'here's the thing'), a contrast, a concrete number, "
+    "a direct question, a change of focus — never a flat stretch of description.\n"
+    "R5. SPECIFIC beats vague: numbers, names, exact details (credibility + curiosity). Cut empty adjectives.\n"
+    "R6. STAKES / TENSION when real: what could go wrong, what it costs, why it is harder than it looks.\n"
+    "R7. DIRECT ADDRESS: talk to ONE viewer ('look at her left hand', 'you'd think…') and point their eyes to what matters.\n"
+    "R8. SOCIAL PROOF / DEBATE from the inputs only: 'half the comments swear that…' — never invented.\n"
+    "R9. RHYTHM: mostly short sentences (4-10 words), one idea each; delete every sentence that adds neither information nor "
+    "tension; no filler words.\n"
+    "R10. END ON THE PAYOFF: the last line is the answer/twist or a sharp, specific question — then stop. No 'follow for more', "
+    "no summary, no goodbye.")
+REGRA_SEM_LOOP = "\nR11. Do NOT write a loop ending (the last line must NOT flow back into the first one) — the creator does not want loops."
+REGRA_LOOP = ("\nR11. LOOP ENDING (asked by the creator): the last line flows straight into the first sentence, so when the short "
+              "restarts it feels like one continuous thought.")
+
+
+def regra_retencao(p: Dict[str, Any]) -> str:
+    if not retencao(p):
+        return REGRA_LOOP.replace("\nR11. ", "\n\n🔁 ") if final_loop(p) else ""
+    return REGRA_RETENCAO + (REGRA_LOOP if final_loop(p) else REGRA_SEM_LOOP)
 
 
 def regra_tipos(p: Dict[str, Any]) -> str:
@@ -645,6 +710,8 @@ def sistema(p: Dict[str, Any]) -> str:
         extra += REGRA_PERSONALIDADE
     if not explicativo(p) and composto(p):  # 🧩 v84_349
         extra += REGRA_COMPOSTO.replace("{N}", str(composto(p)))
+    extra += regra_localizar(p)  # 🌍 v84_352: em todos os estilos (e no explicativo)
+    extra += regra_retencao(p)  # 🧲 v84_354: gatilhos de atenção (e o 🔁 loop só se você ligar)
     import camera_exp
     if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322
         narrada = "Brazilian Portuguese" if dados(p).get("idioma") == "pt" else nome_lingua(lingua_post(p))
@@ -743,6 +810,10 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
               "come from the clip timeline above, not from here.", ref[:6000], ""]
     if (p.get("noticia") or {}).get("texto"):
         L += ["## NOTES FROM THE CREATOR", p["noticia"]["texto"][:4000], ""]
+    dica = str((p.get("link_rapido") or {}).get("dica") or "").strip()
+    if dica:  # 💡 v84_353: o que você escreveu antes do link ('Eclipse com skate: https://…')
+        L += ["## WHAT THE CREATOR SAYS THIS VIDEO IS ABOUT (written next to the link — trust it as the topic; it may be short or "
+              "in Portuguese)", dica[:300], ""]
     if c.get("info_link") or c.get("modo_link"):  # 🔗 v84_286: a legenda do post original e o que o público comenta
         import curtos_link as CL
         infos_ = c.get("info_links") or []

@@ -74,3 +74,40 @@ def test_v84_348_moldes_sem_assunto():
         assert "sloth" not in txt.lower() and "preguiça" not in txt.lower()
     p = {"id": "abc", "config": {}, "modelo": "comentario"}
     assert "never reuse a shape word for word" in CC.regra_tipos(p)
+
+
+def test_v84_352_localizar_pro_publico():
+    p_en = {"id": "a", "modelo": "comentario", "config": {}, "comentario": {"lingua_post": "en"}}
+    p_pt = {"id": "b", "modelo": "comentario", "config": {"estilo_roteiro": "classico"}, "comentario": {"lingua_post": "pt"}}
+    s_en, s_pt = CC.sistema(p_en), CC.sistema(p_pt)
+    assert "LOCALIZE FOR THE AUDIENCE" in s_en and "English-speaking audience" in s_en and "pamonha" in s_en
+    assert "Brazilian audience" in s_pt and "LOCALIZE FOR THE AUDIENCE" in s_pt  # vale em todos os estilos (até o clássico)
+    expl = {"id": "c", "modelo": "explicativo", "config": {}, "comentario": {"lingua_post": "es"}}
+    assert "Spanish-speaking audience" in CC.sistema(expl)
+
+
+def test_v84_354_retencao_e_loop_opcional():
+    base_p = {"modelo": "comentario", "comentario": {"lingua_post": "en"}}
+    # sem loop: o "loop" nunca sai no sorteio dos finais, em nenhum id
+    for k in range(60):
+        assert CC.tipos_do_video(dict(base_p, id=f"v{k}", config={}))[1] != "loop"
+    p = dict(base_p, id="a", config={})
+    s = CC.sistema(p)
+    assert "MAXIMUM RETENTION" in s and "CURIOSITY GAP" in s and "Do NOT write a loop ending" in s
+    pl = dict(base_p, id="a", config={"final_loop": True})
+    assert CC.tipos_do_video(pl)[1] == "loop" and "LOOP ENDING (asked by the creator)" in CC.sistema(pl)
+    off = dict(base_p, id="a", config={"retencao": False})
+    assert "MAXIMUM RETENTION" not in CC.sistema(off)
+    assert "LOOP ENDING" in CC.sistema(dict(base_p, id="a", config={"retencao": False, "final_loop": True}))
+
+
+def test_v84_354_envio_liga_retencao_por_padrao(tmp_path, monkeypatch):
+    cl = _app(tmp_path, monkeypatch)
+    base = str(tmp_path)
+    a = cl.post("/curtos/link/novo", json={"link": "https://a.com/1"}).get_json()["criados"][0]
+    b = cl.post("/curtos/link/novo", json={"link": "https://a.com/2", "retencao": False, "final_loop": True}).get_json()["criados"][0]
+    ca, cb = CT.carregar(base, a)["config"], CT.carregar(base, b)["config"]
+    assert ca["retencao"] is True and not ca.get("final_loop")
+    assert cb["retencao"] is False and cb["final_loop"] is True
+    html = cl.get("/curtos/link").get_data(as_text=True)
+    assert 'id="retencao" checked' in html and 'id="final_loop" style' in html

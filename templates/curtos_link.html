@@ -65,6 +65,12 @@
   .pz-fnt { display: flex !important; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; border: 1px solid var(--borda); border-radius: 9px; padding: 6px 8px; background: #1b1e27; color: #fff; cursor: pointer; text-align: left; overflow: hidden; }
   .pz-fnt b { display: block; max-width: 100%; font-size: 20px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; }
   .pz-fnt small { color: #9aa0ad; font-size: 11px; } .pz-fnt.on { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento); }
+  .pz-iaest { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 8px; }
+  .pz-iac { border: 1px solid var(--borda); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 5px; background: var(--card); }
+  .pz-iac img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 8px; background: #111; }
+  .pz-iac b { font-size: .9rem; } .pz-iac small { color: var(--mudo); font-size: .78rem; }
+  .pz-iac .pz-acoes button { flex: 1; } .pz-iac.usado-m { box-shadow: inset 0 0 0 2px #7c3aed; } .pz-iac.usado-l { box-shadow: inset 0 0 0 2px #b45309; }
+  .pz-iac.usado-m.usado-l { box-shadow: inset 0 0 0 2px var(--ok); }
   .pz-amostra { width: 100%; text-align: center; padding: 6px 8px; border-radius: 8px; background: #222; font-weight: 800; font-size: 1.05rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .pz-carga { position: absolute; right: 8px; top: 8px; background: rgba(0,0,0,.55); border-radius: 50%; padding: 5px; z-index: 3; }
   .pz-gfcat { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; margin-top: 6px; }
@@ -104,6 +110,8 @@
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="iniciar_ja" style="width:auto;margin:0"> ▶ iniciar a fila logo ao colar (desmarcado: os links ficam aguardando pra você iniciar, copiar ou remover)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Zoom que aproxima no detalhe que a fala cita (seguindo o objeto), seta/círculo só em detalhe pequeno (máx. 2), congelar o momento-chave com um cartão de informação (máx. 1), movimentos no ritmo do nicho do canal e um teto de efeitos. Desmarcado: a montagem de antes."><input type="checkbox" id="camera_exp" checked style="width:auto;margin:0"> 🎥 câmera experimental (zoom no detalhe, seta só onde precisa, congelar com cartão, ritmo do nicho) — desmarque pra voltar à montagem anterior</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="O padrão (desmarcado) é o roteiro ✨ autêntico: fatos e contexto + uma opinião sua, sem narrar o que já está na tela, com gancho e final de tipos diferentes a cada vídeo — mais seguro pra monetização."><input type="checkbox" id="roteiro_classico" style="width:auto;margin:0"> 📜 roteiro no estilo antigo (narra o que acontece no clipe — desligado; o padrão é o ✨ autêntico: fatos + opinião, gancho e final variados)</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Gatilhos de atenção HONESTOS no roteiro: gancho na primeira palavra e na imagem mais forte, pergunta aberta respondida só no fim, um 'ainda vem o mais estranho' no meio (que é cumprido), uma virada a cada 5-7 s, detalhes concretos, tensão real, falar com UMA pessoa, o que os comentários discutem, frases curtas e final no clímax (sem 'me segue')."><input type="checkbox" id="retencao" checked style="width:auto;margin:0"> 🧲 retenção máxima (gatilhos mentais: gancho no 1º segundo, curiosidade até o fim, virada a cada 5-7 s, final no clímax)</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="A última frase emenda na primeira — quando o short recomeça parece um pensamento só (aumenta o replay). Desligado: nunca termina em loop."><input type="checkbox" id="final_loop" style="width:auto;margin:0"> 🔁 final em loop (a última frase emenda na primeira — desligado)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Experimental. Por cima do ✨ autêntico: um narrador com a PERSONALIDADE do canal (a que você escreve em 🎨 Personalização → Canal e voz, ou uma deduzida da descrição), uma opinião de verdade, uma comparação do dia a dia (sem inventar história pessoal), um detalhe que o vídeo não mostra, fala de gente, e sem repetir as aberturas e finais dos vídeos recentes do mesmo canal."><input type="checkbox" id="roteiro_personalidade" style="width:auto;margin:0"> 🎭 roteiro com mais personalidade (experimental — persona do canal, opinião forte, sem repetir os vídeos anteriores)</label>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ opcional: comentários à mão e pedido extra</summary>
     <label>💬 Comentários <span class="si-dica" style="font-weight:400">— o site tenta ler sozinho; se o TikTok não deixar, cole os principais aqui (um por linha, as curtidas no fim: “why did he stop?? 12K”)</span>
@@ -168,7 +176,8 @@
 
     <!-- 🏷 O NOME DO CANAL (@) -->
     <section class="pz-sec" data-sec="marca">
-      <div class="pz-acoes"><button type="button" class="si-mini" id="bSortearMarca" title="sorteia fonte, estilo pronto, borda, sombra, degradê e cores do @ — combinando com as cores da legenda">🎲 sortear só o @</button>
+      <div class="pz-acoes"><button type="button" class="si-mini si-ok" data-ir-ia title="a IA sugere 5 estilos pelo nicho do canal (na aba Cores e sorteio)">🤖 estilos pela IA</button>
+        <button type="button" class="si-mini" id="bSortearMarca" title="sorteia fonte, estilo pronto, borda, sombra, degradê e cores do @ — combinando com as cores da legenda">🎲 sortear só o @</button>
         <button type="button" class="si-mini si-sec" id="bCoresMarca" title="troca só as cores do @ (combinando com a legenda)">🎨 só as cores do @</button></div>
       <h4 class="pz-h">Texto e lugar</h4>
       <div class="lk-ops">
@@ -259,6 +268,9 @@
         <button type="button" class="si-mini si-sec" id="bLimparEstilo" title="esvazia borda, sombra, degradê, cores e fontes extras (volta ao jeito de antes)">↺ limpar o estilo</button>
       </div>
       <div style="margin-top:8px">Paleta: <span id="paletaVista" style="display:inline-flex;gap:3px;align-items:center"></span></div>
+      <h4 class="pz-h" style="margin-top:16px">🤖 Estilos pela IA <span class="si-dica">— 5 identidades (@ + legenda) pensadas pro nicho do canal; use inteira ou misture o @ de uma com a legenda de outra</span></h4>
+      <div class="pz-acoes"><button type="button" class="si-mini si-ok" id="bIaEstilos">🤖 sugerir 5 estilos</button><span id="iaEstilosInfo" class="si-dica"></span></div>
+      <div id="iaEstilos" class="pz-iaest"></div>
     </section>
 
     <!-- 🔠 FONTES -->
@@ -387,7 +399,7 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
 // 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
-const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'tambem_quadrado'], OP_RADIOS = ['modo', 'lote_modo'];
+const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'tambem_quadrado', 'retencao', 'final_loop'], OP_RADIOS = ['modo', 'lote_modo'];
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 const LIVRE = {};  // 📺 v84_340: o que VOCÊ tinha escolhido nos campos que o canal do lote trava (volta quando troca de canal)
 const valorLivre = k => (k in LIVRE ? LIVRE[k] : el(k).value);
@@ -438,7 +450,7 @@ el('roteiro_classico').addEventListener('change', () => { if (el('roteiro_classi
 el('roteiro_personalidade').addEventListener('change', () => { if (el('roteiro_personalidade').checked) el('roteiro_classico').checked = false; });
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
-  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
+  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   salvarOpcoes();
@@ -491,12 +503,18 @@ el('bLimparLista').onclick = () => { const V = VISTA || {}, n = V.limpaveis || 0
       box.style.display = 'none'; desenhar(j.videos); aviso(`🧹 ${j.feitos} vídeo(s) ${b.dataset.limpar === 'tirar' ? 'tirados da lista' : 'com os arquivos apagados'}` + (j.falhas.length ? ' · ' + j.falhas.slice(0, 3).join('; ') : ''), j.falhas.length ? 'erro' : 'okk'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); box.querySelectorAll('button').forEach(x => x.disabled = false); } }); };  // 📂 termo (sem acento, minúsculo) → id do canal ligado a ele
 function chaveG(n) { return String(n || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' '); }
+function ehGrupoConhecido(t) {  // (vários termos com vírgula: vale se QUALQUER um for grupo/canal; sem ligar pra maiúscula/acento)
+  return [t, ...String(t).split(',')].map(x => x.trim()).filter(Boolean).some(x => { const k = chaveG(x), s = k.replace(/[^a-z0-9]/g, '');
+    return k in GRUPOS || (CANAIS || []).some(c => { const n = chaveG(c.nome).replace(/[^a-z0-9]/g, ''); return n && (n === s || '@' + n === s); }); }); }
+function contarDicas(t) { return String(t || '').split(/\r?\n/).filter(l => { const i = l.indexOf('http'); if (i <= 0) return false;
+  const pref = l.slice(0, i).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''); return pref && !ehGrupoConhecido(pref); }).length; }
 function separarG(t) {  // mesma regra do servidor: uma palavra (com ':' ou sem) vira o grupo dos links seguintes
   let atual = ''; const out = []; const vistos = new Set();
   String(t || '').split(/\r?\n/).forEach(linha => {
     const i = linha.indexOf('http');
     if (i >= 0) {
-      const pref = linha.slice(0, i).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      let pref = linha.slice(0, i).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      if (pref && !ehGrupoConhecido(pref)) pref = '';  // 💡 v84_353: na mesma linha, texto que não é grupo/canal = dica pra IA
       if (pref) atual = pref;
       linha.slice(i).split(/\s+/).forEach(u => { u = u.replace(/^[<"'(]+|[>"'),;]+$/g, ''); if (u.startsWith('http') && !vistos.has(u)) { vistos.add(u); out.push([u, atual]); } });
     } else {
@@ -516,7 +534,7 @@ function atualizarGrupos() {
   const ks = Object.keys(cont);
   if (!ks.length) { box.innerHTML = ''; return; }
   box.innerHTML = '<div class="si-dica">📂 grupos — cada termo vai pro canal ligado a ele (um canal pode ter vários termos; sem ligação, vai pro canal do lote):</div>' + ks.map(k => `<div class="si-linha" style="gap:6px;align-items:center;flex-wrap:wrap"><b>${esc(cont[k].nome)}</b> <small>(${cont[k].n} link(s))</small> →
-    <select data-grupo="${esc(k)}" data-nome="${esc(cont[k].nome)}" style="width:auto"><option value="">(canal do lote)</option>${CANAIS.map(c => `<option value="${esc(c.id)}"${GRUPOS[k] === c.id ? ' selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>`).join('');
+    <select data-grupo="${esc(k)}" data-nome="${esc(cont[k].nome)}" style="width:auto"><option value="">(canal do lote)</option>${CANAIS.map(c => `<option value="${esc(c.id)}"${(GRUPOS[k] || String(cont[k].nome).split(',').map(x => GRUPOS[chaveG(x.trim())]).find(Boolean)) === c.id ? ' selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>`).join('');
   box.querySelectorAll('[data-grupo]').forEach(sel => sel.onchange = async () => {
     try { await post('/curtos/link/grupos', {nome: sel.dataset.nome, canal_id: sel.value}); await carregarGrupos(); aviso('📂 grupo salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
 }
@@ -529,7 +547,8 @@ function contarVideos(txt) { let total = 0, compostos = 0; const vistos = new Se
 el('link').addEventListener('input', () => {  // 🔗 quantos links vão entrar na fila
   const nv = contarVideos(el('link').value), n = nv.total;  // 🧩 v84_349: "a, b, c" na linha = 1 vídeo composto
   el('nLinks').textContent = (n > 1 ? `🔗 ${Math.min(n, 50)} vídeos na fila${n > 50 ? ' (só os 50 primeiros)' : ''} — ${loteModo() === 'etapa' ? 'por etapa' : 'um de cada vez'}; pode fechar a página` : '')
-    + (nv.compostos ? ` · 🧩 ${nv.compostos} composto(s) (vários links → 1 vídeo de 60 s+)` : '');
+    + (nv.compostos ? ` · 🧩 ${nv.compostos} composto(s) (vários links → 1 vídeo de 60 s+)` : '')
+    + (contarDicas(el('link').value) ? ` · 💡 ${contarDicas(el('link').value)} com dica pra IA (o texto antes do link na mesma linha)` : '');
   el('loteModoBox').style.display = n > 1 || ULT.some(v => v.aguardando && !v.rodando && !v.apagado) ? '' : 'none';
 });
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
@@ -716,6 +735,30 @@ el('bCoresLeg').onclick = () => { guardar(); const p = paletaAncorada(el('a_marc
 el('bSoCores').onclick = () => { guardar(); const p = gerarPaleta(); coresMarca(p); coresLeg(p); mostrarPaleta(p); depois(); };
 el('bLimparEstilo').onclick = () => { guardar(); ESTILO_EXTRA.forEach(k => { const e = el('a_' + k); if (e.type === 'checkbox') e.checked = false; else e.value = k === 'marca_grad_dir' ? 'horizontal' : (k === 'marca_x' || k === 'marca_y') ? '0' : ''; });
   depois('↺ estilo limpo'); };
+
+// 🤖 v84_353: estilos pela IA — cada um vira o pedaço do @ (marca_*) e o da legenda (legenda_*): usa junto ou mistura
+let IA_EST = [], IA_RODADA = 0;
+document.querySelectorAll('[data-ir-ia]').forEach(b => b.onclick = () => { abrirSec('cores'); setTimeout(() => el('bIaEstilos').scrollIntoView({behavior: 'smooth', block: 'center'}), 50); if (!IA_EST.length) el('bIaEstilos').click(); });
+function previaCom(extra) { return `/curtos/acabamento/previa.jpg?canal=${encodeURIComponent(el('a_escopo').value)}&d=${encodeURIComponent(JSON.stringify(Object.assign(dadosAcab(), extra)))}&_=${Date.now()}`; }
+function desenharIaEstilos() {
+  el('iaEstilos').innerHTML = IA_EST.map((e, i) => `<div class="pz-iac" data-iac="${i}"><img loading="lazy" alt="prévia" src="${previaCom(Object.assign({}, e.marca, e.legenda))}">
+    <b>${esc(e.nome)}</b><small>${esc(e.por_que)}</small>
+    <div class="pz-acoes"><button type="button" class="si-mini si-ok" data-iause="tudo" data-i="${i}">✔ usar</button></div>
+    <div class="pz-acoes"><button type="button" class="si-mini si-sec" data-iause="marca" data-i="${i}" title="só o @ deste (a legenda fica a que está)">🏷 só o @</button>
+      <button type="button" class="si-mini si-sec" data-iause="legenda" data-i="${i}" title="só a legenda deste (o @ fica o que está)">🔤 só a legenda</button></div></div>`).join('');
+  el('iaEstilos').querySelectorAll('[data-iause]').forEach(b => b.onclick = () => { const e = IA_EST[+b.dataset.i], q = b.dataset.iause; guardar();
+    const vals = q === 'marca' ? e.marca : q === 'legenda' ? e.legenda : Object.assign({}, e.marca, e.legenda);
+    Object.entries(vals).forEach(([k, v]) => { if (el('a_' + k)) setA(k, v); });
+    el('iaEstilos').querySelectorAll('.pz-iac').forEach(c => { if (q !== 'legenda') c.classList.remove('usado-m'); if (q !== 'marca') c.classList.remove('usado-l'); });
+    const card = b.closest('.pz-iac'); if (q !== 'legenda') card.classList.add('usado-m'); if (q !== 'marca') card.classList.add('usado-l');
+    depois(q === 'marca' ? `🏷 o @ de “${e.nome}”` : q === 'legenda' ? `🔤 a legenda de “${e.nome}”` : `✔ “${e.nome}” aplicado`); });
+}
+el('bIaEstilos').onclick = async () => { const b = el('bIaEstilos'); b.disabled = true; el('iaEstilosInfo').textContent = '⏳ a IA está pensando nos estilos do nicho…';
+  try { const j = await post('/curtos/acabamento/sugerir', {canal_id: el('a_escopo').value, variar: IA_RODADA ? 'rodada ' + IA_RODADA : ''}); IA_RODADA++;
+    IA_EST = j.estilos || []; desenharIaEstilos(); el('iaEstilosInfo').textContent = '✔ clique em “usar” ou misture: 🏷 só o @ de um + 🔤 só a legenda de outro — 💾 salve o acabamento depois';
+    b.textContent = '🤖 sugerir outros 5'; }
+  catch (e) { el('iaEstilosInfo').textContent = '❌ ' + e.message; }
+  b.disabled = false; };
 
 // 🔠 v84_338: as galerias de fonte (cada fonte escrita nela mesma) — clicar escolhe
 function galerias() { document.querySelectorAll('.pz-gal').forEach(g => {
@@ -949,6 +992,7 @@ function desenhar(vs) {
     return `<div class="lk-v ${cls}" data-vid="${v.id}">
       <div class="lk-cab"><label class="lk-sel" title="marcar pra remover ou exportar junto"><input type="checkbox" data-sel="${v.id}"${SEL.has(v.id) ? ' checked' : ''}></label><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
         ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
+        ${v.dica ? `<span class="si-tag" title="a dica que você escreveu antes do link — a IA usa como o assunto do vídeo">💡 ${esc(v.dica)}</span>` : ''}
         ${v.links && v.links.length > 1 ? `<span class="si-tag" title="vídeo composto: um roteiro só com as ${v.links.length} fontes">🧩 composto · ${v.links.length} fontes</span>` + v.links.map((u, k) => `<a href="${esc(u)}" target="_blank" class="si-dica">🔗 fonte ${k + 1}</a>`).join(' ')
           : `<a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a>`}</div>
       ${v.aguardando_voz && !v.rodando ? `<div class="lk-prog" style="font-weight:700">🎤 roteiro pronto — falta a sua voz <a class="si-mini si-ok" href="/curtos/${v.id}/gravar" style="text-decoration:none">🎤 gravar voz</a></div>` : ''}
