@@ -67,7 +67,20 @@ def _separar_grupos(texto: str) -> List[tuple]:
             pref = _nome_do_grupo(linha[:linha.find("http")])
             if pref:
                 atual = pref
-            for u in re.split(r"\s+", linha[linha.find("http"):]):
+            resto = linha[linha.find("http"):]
+            if "," in resto:  # 🧩 v84_349: "link1, link2, link3" na mesma linha = UM vídeo composto com as 3 fontes
+                partes = []
+                for x in re.split(r",", resto):
+                    tok = (x.strip().split() or [""])[0].strip("<>\"'();")
+                    if tok.startswith("http") and tok not in partes:
+                        partes.append(tok)
+                if len(partes) >= 2:
+                    chave = ",".join(partes[:5])
+                    if chave not in vistos:
+                        vistos.add(chave)
+                        out.append((chave, atual))
+                    continue
+            for u in re.split(r"\s+", resto):
                 u = u.strip("<>\"'(),;")
                 if u.startswith("http") and u not in vistos:
                     vistos.add(u)
@@ -1465,6 +1478,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "roteiro_tags": " ".join(b.get("fala") or "" for b in r.get("blocos") or [])[:900],
                 "roteiro_pt": _roteiro_pt(r), "roteiro_versoes": len(p.get("roteiro_historico") or []),
                 "roteiro_mudou": bool(lr.get("roteiro_mudou")), "roteiro_idioma": r.get("idioma") or "",
+                "links": lr.get("links") or [],
                 "tem_original": bool(CC.clipes(base_dir, p)) if lr else False,
                 "titulos": CN.titulos_do_projeto(p),
                 "descricao": CL.com_fonte(CL.limpar_marca(r.get("descricao") or ""), lr.get("link") or "", info) if r.get("descricao") else "",
@@ -1724,10 +1738,52 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
         p = CT.carregar(base_dir, pid)
         lr = p["link_rapido"]
         url = lr["link"]
-        if not CC.clipes(base_dir, p):
+        fontes_ = [u for u in lr.get("links") or [] if u] or [url]
+        if len(fontes_) > 1:  # 🧩 v84_349: composto — baixa todas (uma que falha não para as outras; precisa de 2+)
+            ja = {m.get("origem") for m in CC.clipes(base_dir, p)}
+            falhas = []
+            for k, u in enumerate(fontes_, 1):
+                if u in ja:
+                    continue
+                _link_etapa(pid, f"⬇ baixando {k}/{len(fontes_)}")
+                try:
+                    CC.baixar_clipe(base_dir, pid, u, CB.get("baixar"), lambda m, k=k: prog(f"⬇ fonte {k}/{len(fontes_)} — {m}"))
+                except Exception as exc:  # noqa: BLE001
+                    falhas.append(f"{k}: {str(exc)[:120]}")
+            n_ok = len(CC.clipes(base_dir, CT.carregar(base_dir, pid)))
+            if falhas:
+                with CT._TRAVA:
+                    q = CT.carregar(base_dir, pid)
+                    _log_link(q["link_rapido"], f"🧩 {len(falhas)} fonte(s) não baixaram: " + " · ".join(falhas))
+                    CT.salvar(base_dir, q)
+            if n_ok < 2:
+                raise CT.CurtoErro(f"O vídeo composto precisa de 2+ fontes e só {n_ok} baixou ({' · '.join(falhas)}).")
+        elif not CC.clipes(base_dir, p):
             _link_etapa(pid, "⬇ baixando")
             CC.baixar_clipe(base_dir, pid, url, CB.get("baixar"), prog)
         _link_tarja(pid, prog)
+        c = CC.dados(CT.carregar(base_dir, pid))
+        if len(fontes_) > 1 and not c.get("info_links"):  # 💬 a legenda e os comentários de CADA fonte
+            _link_etapa(pid, "💬 lendo os comentários")
+            infos = []
+            for k, u in enumerate(fontes_, 1):
+                prog(f"💬 fonte {k}/{len(fontes_)}: legenda e comentários…")
+                try:
+                    infos.append({"url": u, "info": CL.baixar_info(u, 40) if not lr.get("so_colados") else {"comentarios": []}})
+                except Exception as exc:  # noqa: BLE001
+                    infos.append({"url": u, "info": {"comentarios": [], "erro": str(exc)[:200]}})
+            junto = dict(infos[0]["info"])
+            junto["comentarios"] = [x for i in infos for x in (i["info"].get("comentarios") or [])][:80]
+            colados = CL.comentarios_colados(lr.get("comentarios_colados") or "")
+            if colados:
+                junto["comentarios"] = colados + junto["comentarios"]
+            with CT._TRAVA:
+                q = CT.carregar(base_dir, pid)
+                CC.dados(q)["info_links"] = infos
+                CC.dados(q)["info_link"] = junto
+                CC.dados(q)["modo_link"] = lr.get("modo") or "auto"
+                CT.salvar(base_dir, q)
+            prog(f"💬 {len(junto['comentarios'])} comentários de {len(infos)} fontes")
         c = CC.dados(CT.carregar(base_dir, pid))
         if not c.get("info_link"):
             _link_etapa(pid, "💬 lendo os comentários")
@@ -1754,8 +1810,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             if r.get("descricao") and not r.get("descricao_bruta"):
                 r["descricao_bruta"] = r["descricao"]
                 r["descricao"] = CL.limpar_marca(r["descricao"])
-            if r.get("descricao"):  # 📌 v84_305: "Source (Instagram): @criador" no fim
-                r["descricao"] = CL.com_fonte(r["descricao"], url, CC.dados(q).get("info_link") or {})
+            if r.get("descricao"):  # 📌 v84_305: "Source (Instagram): @criador" no fim (🧩 composto: todas as fontes)
+                infos_ = CC.dados(q).get("info_links") or []
+                if infos_:
+                    r["descricao"] = CL.com_fontes(r["descricao"], [(i["url"], i.get("info") or {}) for i in infos_])
+                else:
+                    r["descricao"] = CL.com_fonte(r["descricao"], url, CC.dados(q).get("info_link") or {})
             CT.salvar(base_dir, q)
         _link_thumbs(pid, prog)
         if not exportar:
@@ -2651,7 +2711,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     except CT.CurtoErro:
                         cache_canal[g["canal_id"]] = ""
                 canal_do_link = cache_canal[g["canal_id"]] or canal_escolhido
-            p = CT.criar(base_dir, canal_do_link, "🔗 " + url.split("?")[0][-60:], [], "", modelo="comentario")
+            fontes_ = url.split(",") if "," in url else [url]  # 🧩 v84_349: vídeo composto (várias fontes)
+            url = fontes_[0]
+            p = CT.criar(base_dir, canal_do_link, ("🧩 " if len(fontes_) > 1 else "🔗 ") + url.split("?")[0][-60:], [], "", modelo="comentario")
             pid = p["id"]
             if canal_do_link not in voz_canal:  # 🎙 v84_322: o canal pode ter idioma e voz próprios
                 try:
@@ -2673,7 +2735,7 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     p["config"]["proporcao"] = b["proporcao"]
                 try:
                     dur = int(float(b.get("duracao") or 0))
-                    if dur:
+                    if dur and not (len(fontes_) > 1 and dur < 60):  # 🧩 o composto tem 60 s ou mais (abaixo disso: a IA decide, 60+)
                         p["config"]["duracao_alvo_s"] = max(10, min(180, dur))
                 except (TypeError, ValueError):
                     pass
@@ -2691,7 +2753,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     p["config"]["tambem_quadrado"] = True
                 if vc.get("modo") == "minha":  # 🎤 v84_325: o canal é de voz própria
                     p["config"]["voz_modo"] = "minha"
+                if len(fontes_) > 1:
+                    p["config"]["composto"] = len(fontes_)
                 p["link_rapido"] = {"link": url, "modo": modo, "criado": time.time(), "qualidade": qualidade, "exportar": exportar,
+                                    **({"links": fontes_} if len(fontes_) > 1 else {}),
                                     "comentarios_colados": str(b.get("comentarios") or "")[:20000],
                                     "etapa": "na fila" if iniciar else "⏸ aguardando", "aguardando": not iniciar,
                                     "lote_modo": "etapa" if por_etapa else "um"}

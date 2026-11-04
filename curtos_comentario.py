@@ -462,14 +462,15 @@ ESTILOS_ROTEIRO = {"personalidade": "🎭 personalidade (experimental: persona d
                    "autentico": "✨ autêntico (fatos + opinião, gancho e final variados)",
                    "classico": "📜 clássico (narra o que acontece — o jeito antigo)"}
 
-TIPOS_GANCHO = {
-    "fato": "a SURPRISING FACT about the subject that makes THIS clip special or rare (e.g. 'Sloths almost never drink water. "
-            "So what you're about to see is rare.')",
-    "contradicao": "a CONTRADICTION — what everyone gets wrong about what they see (e.g. 'This looks lazy. It's actually a survival trick.')",
-    "opiniao": "a BOLD but honest OPINION the narrator will defend (e.g. 'This is the calmest animal on Earth, and this clip proves it.')",
-    "pergunta": "a SPECIFIC question the viewer can't answer yet and the video answers (e.g. 'Why would a sloth risk getting this close "
-                "to the water?') — never a vague 'Did you know…?'",
-    "detalhe": "point at the DETAIL most people miss, specifically (e.g. 'Ignore its face. Look at the green on its back.')",
+TIPOS_GANCHO = {  # 🧩 v84_348: os moldes são SEM assunto (antes um exemplo de preguiça vazava pra vídeos de uva…)
+    "fato": "a SURPRISING FACT about THIS clip's subject that makes the clip special or rare (shape: '<surprising fact about the "
+            "subject>. So what you're about to see is <why it is rare>.')",
+    "contradicao": "a CONTRADICTION — what people get wrong about what they see (shape: 'This looks like <what it seems>. It's "
+                   "actually <what it really is>.')",
+    "opiniao": "a BOLD but honest OPINION the narrator will defend (shape: '<strong claim about the subject>, and this clip proves it.')",
+    "pergunta": "a SPECIFIC question the viewer can't answer yet and the video answers (shape: 'Why would <subject> <surprising "
+                "action>?') — never a vague 'Did you know…?'",
+    "detalhe": "point at the DETAIL most people miss, specifically (shape: 'Ignore <the obvious part>. Look at <the detail>.')",
     "aposta": "a STAKES / tension setup — something could go wrong, or there is a reason this is harder than it looks (honest, no fake danger)",
 }
 TIPOS_FINAL = {
@@ -532,6 +533,37 @@ REGRA_PERSONALIDADE = (
     "P12. TIE EACH FACT TO THE IMAGE: every fact or explanation line points at something VISIBLE at that moment (the skins "
     "breaking, the press, the juice in the channel…), so the edit can cut/zoom/highlight right then — and set that cena's "
     "material/de/ate and zoom/destaque fields to that moment.")
+
+
+REGRA_COMPOSTO = (
+    "\n\n🧩 COMPOSITE VIDEO — you have {N} clips (M1…M{N}) from DIFFERENT creators about the same theme. Build ONE NEW, "
+    "informative video out of them (this is the original value: nobody else made this video):\n"
+    "C1. NOT A LIST OR RANKING: no 'number one/two', no 'first video… next video', no 'here are 3…', no 'top'. The viewer must "
+    "feel one story, not a compilation.\n"
+    "C2. Choose the FORMAT that fits THIS material best and follow it all the way: (a) GUIDING QUESTION — one specific question "
+    "opens the video, the clips are the evidence and the answer builds until the end; (b) MINI-DOCUMENTARY — each clip shows a "
+    "different ANGLE of the same subject (what it is, the secret behind it, what nobody tells you); (c) STORY ARC — "
+    "beginning/middle/end, the clips ordered by the story (not by the order of the links); (d) THESIS — 'everyone thinks X, "
+    "but…': the clips support an argument the narrator defends.\n"
+    "C3. INTERCUT: the cenas jump between the clips (material M1/M2/M3…) wherever the narration needs it, using the BEST seconds "
+    "of each (de/ate) — never one clip played whole and then the next. Every clip appears at least once; the strongest image "
+    "opens the video.\n"
+    "C4. ONE THREAD: transitions are about the IDEA ('and this is where it gets strange', 'the reason is right here'), never about "
+    "the source ('in this other video').\n"
+    "C5. Places, people and names only when the inputs (captions/comments) make them clear — never invent where a clip was shot.\n"
+    "C6. LENGTH: 60 seconds or more (at least ≈160 words of narration), as long as the material honestly supports — usually "
+    "70-100 s, never above 170 s, never padded.\n"
+    "C7. 'descricao' credits ALL the creators (by @ when known). If the clips really do not share a theme, still build the best "
+    "honest thread you can and start 'descricao' with '⚠ as fontes não têm um tema claro em comum'.")
+
+
+def composto(p: Dict[str, Any]) -> int:
+    """🧩 v84_349: quantas fontes o vídeo composto tem (0 = vídeo de um link só)."""
+    try:
+        n = int((p.get("config") or {}).get("composto") or 0)
+    except (TypeError, ValueError):
+        n = 0
+    return n if n >= 2 else 0
 
 
 def autentico_ou_mais(p: Dict[str, Any]) -> bool:
@@ -601,7 +633,9 @@ def regra_tipos(p: Dict[str, Any]) -> str:
     if explicativo(p) or not autentico_ou_mais(p):
         return ""
     g, f = tipos_do_video(p)
-    return f"## HOOK TYPE for this video: {TIPOS_GANCHO[g]}\n## ENDING TYPE for this video: {TIPOS_FINAL[f]}"
+    return (f"## HOOK TYPE for this video: {TIPOS_GANCHO[g]}\n## ENDING TYPE for this video: {TIPOS_FINAL[f]}\n"
+            "(The shapes only show the STRUCTURE: fill every <…> with THIS clip's own subject and details. Never mention an animal, "
+            "object or topic that is not in this clip, and never reuse a shape word for word.)")
 
 
 def sistema(p: Dict[str, Any]) -> str:
@@ -609,6 +643,8 @@ def sistema(p: Dict[str, Any]) -> str:
     extra = REGRA_AUTENTICA if (not explicativo(p) and autentico_ou_mais(p)) else ""
     if not explicativo(p) and estilo_roteiro(p) == "personalidade":  # 🎭 v84_345
         extra += REGRA_PERSONALIDADE
+    if not explicativo(p) and composto(p):  # 🧩 v84_349
+        extra += REGRA_COMPOSTO.replace("{N}", str(composto(p)))
     import camera_exp
     if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322
         narrada = "Brazilian Portuguese" if dados(p).get("idioma") == "pt" else nome_lingua(lingua_post(p))
@@ -690,6 +726,9 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
     dur_clipes = sum(float(m.get("dur") or 0) for m in clipes(base, p))
     if pedido:
         alvo = f"LENGTH: about {int(pedido)} seconds of narration ≈ {int(pedido * 2.6)} words (asked by the creator)."
+    elif composto(p):  # 🧩 v84_349: 60+ — o que o material sustenta
+        alvo = (f"LENGTH: 60+ seconds — what the {composto(p)} clips honestly support (they last {dur_clipes:.0f} s together): at least "
+                "60 s ≈ 160 words, usually 70-100 s, never above 170 s.")
     elif dur_ref:
         alvo = f"LENGTH: close to the reference — about {int(dur_ref)} seconds ≈ {int(dur_ref * 2.6)} words."
     else:
@@ -706,9 +745,19 @@ def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
         L += ["## NOTES FROM THE CREATOR", p["noticia"]["texto"][:4000], ""]
     if c.get("info_link") or c.get("modo_link"):  # 🔗 v84_286: a legenda do post original e o que o público comenta
         import curtos_link as CL
-        bloco = CL.texto_para_ia(c.get("info_link") or {})
-        if bloco:
-            L += [bloco, ""]
+        infos_ = c.get("info_links") or []
+        if infos_:  # 🧩 v84_349: cada fonte com a sua legenda, o seu criador e os comentários
+            mid_de = {m.get("origem"): m["id"] for m in clipes(base, p)}
+            for i in infos_:
+                inf, u = i.get("info") or {}, i.get("url") or ""
+                quem = CL.criador(u, inf)
+                L.append(f"## SOURCE {mid_de.get(u, '?')} — by @{quem.lstrip('@')}" if quem else f"## SOURCE {mid_de.get(u, '?')}")
+                b_ = CL.texto_para_ia(dict(inf, comentarios=(inf.get("comentarios") or [])[:25]))
+                L += [b_.replace("## THE ORIGINAL POST", "### its post").replace("## WHAT VIEWERS SAY", "### what viewers say") if b_ else "(no caption/comments)", ""]
+        else:
+            bloco = CL.texto_para_ia(c.get("info_link") or {})
+            if bloco:
+                L += [bloco, ""]
         if c.get("modo_link"):
             L += ["## " + CL.regra_modo(c["modo_link"]), ""]
             link = (p.get("link_rapido") or {}).get("link") or ""

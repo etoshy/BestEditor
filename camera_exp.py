@@ -23,7 +23,7 @@ MAX_ENTRADAS = 3
 REGRA_CAMERA = (
     "\n\n🎥 CAMERA DIRECTION (experimental) — the camera must SHOW what the narrator says; effects serve the story, never decoration:\n"
     "1. 'zoom_detalhe' (clip cenas only): when the line states a fact about a SPECIFIC DETAIL visible in that moment (the green on "
-    "its back, the claw, the brush tip, the cracked board), write that detail in ENGLISH ('green algae on the sloth's back') — the "
+    "its back, the claw, the brush tip, the cracked board), write that detail in ENGLISH (shape: '<the detail> on/in <the subject>', with THIS clip's own words) — the "
     "camera pushes in on it and follows it. This is your MAIN camera tool — use it on the lines whose fact is about something "
     "visible (usually 1-3 per video, max 3). Only if it is clearly visible in that cena's seconds; otherwise ''.\n"
     "2. 'destaque' (circle/arrow): max 2 per video and ONLY when the detail is small or easy to miss AND the line points at it; "

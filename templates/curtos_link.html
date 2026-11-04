@@ -78,7 +78,7 @@
 <div class="si-passos"{% if so_personalizar %} style="display:none"{% endif %}><span>⬇ baixa o vídeo</span><span>💬 lê a legenda e os comentários</span><span>👁 a IA entende o vídeo</span><span>📝 roteiro + títulos</span><span>🎙 narração com tags</span><span>✂ edição + 🎯 destaques</span><span>🎬 MP4</span></div>
 
 <div class="si-card lk-form"{% if so_personalizar %} style="display:none"{% endif %}>
-  <label>🔗 Links dos vídeos <span class="si-dica" style="font-weight:400">— TikTok, YouTube Shorts, Reels, Kwai, Reddit… <b>um por linha</b> (até 50): gera todos, um depois do outro</span>
+  <label>🔗 Links dos vídeos <span class="si-dica" style="font-weight:400">— TikTok, YouTube Shorts, Reels, Kwai, Reddit… <b>um por linha</b> (até 50): gera todos, um depois do outro · 🧩 <b>2 a 5 links na mesma linha separados por vírgula</b> = UM vídeo informativo (60 s+) que junta as fontes</span>
     <textarea id="link" class="lk-link" rows="5" style="resize:vertical;min-height:90px" placeholder="https://www.tiktok.com/@…/video/…&#10;https://www.instagram.com/reel/…&#10;https://youtube.com/shorts/…"></textarea>
     <span class="si-dica" id="nLinks" style="font-weight:400"></span></label>
     <div id="grupos" style="margin-top:6px"></div>
@@ -518,9 +518,16 @@ function atualizarGrupos() {
   box.querySelectorAll('[data-grupo]').forEach(sel => sel.onchange = async () => {
     try { await post('/curtos/link/grupos', {nome: sel.dataset.nome, canal_id: sel.value}); await carregarGrupos(); aviso('📂 grupo salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
 }
+function contarVideos(txt) { let total = 0, compostos = 0; const vistos = new Set();
+  String(txt || '').split('\n').forEach(l => { const i = l.indexOf('http'); if (i < 0) return; const r = l.slice(i);
+    const partes = r.includes(',') ? r.split(',').map(x => (x.trim().split(/\s+/)[0] || '')).filter(x => x.startsWith('http')) : [];
+    if (partes.length >= 2) { const k = partes.join(','); if (!vistos.has(k)) { vistos.add(k); total++; compostos++; } return; }
+    r.split(/\s+/).filter(u => u.startsWith('http')).forEach(u => { if (!vistos.has(u)) { vistos.add(u); total++; } }); });
+  return {total, compostos}; }
 el('link').addEventListener('input', () => {  // 🔗 quantos links vão entrar na fila
-  const n = new Set(el('link').value.split(/\s+/).filter(u => u.startsWith('http'))).size;
-  el('nLinks').textContent = n > 1 ? `🔗 ${Math.min(n, 50)} vídeos na fila${n > 50 ? ' (só os 50 primeiros)' : ''} — ${loteModo() === 'etapa' ? 'por etapa' : 'um de cada vez'}; pode fechar a página` : '';
+  const nv = contarVideos(el('link').value), n = nv.total;  // 🧩 v84_349: "a, b, c" na linha = 1 vídeo composto
+  el('nLinks').textContent = (n > 1 ? `🔗 ${Math.min(n, 50)} vídeos na fila${n > 50 ? ' (só os 50 primeiros)' : ''} — ${loteModo() === 'etapa' ? 'por etapa' : 'um de cada vez'}; pode fechar a página` : '')
+    + (nv.compostos ? ` · 🧩 ${nv.compostos} composto(s) (vários links → 1 vídeo de 60 s+)` : '');
   el('loteModoBox').style.display = n > 1 || ULT.some(v => v.aguardando && !v.rodando && !v.apagado) ? '' : 'none';
 });
 const ACAB = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_maiusculas', 'sons_pixabay', 'aplicar_noticia',
@@ -940,7 +947,8 @@ function desenhar(vs) {
     return `<div class="lk-v ${cls}" data-vid="${v.id}">
       <div class="lk-cab"><label class="lk-sel" title="marcar pra remover ou exportar junto"><input type="checkbox" data-sel="${v.id}"${SEL.has(v.id) ? ' checked' : ''}></label><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
         ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
-        <a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a></div>
+        ${v.links && v.links.length > 1 ? `<span class="si-tag" title="vídeo composto: um roteiro só com as ${v.links.length} fontes">🧩 composto · ${v.links.length} fontes</span>` + v.links.map((u, k) => `<a href="${esc(u)}" target="_blank" class="si-dica">🔗 fonte ${k + 1}</a>`).join(' ')
+          : `<a href="${esc(v.link)}" target="_blank" class="si-dica">🔗 original</a>`}</div>
       ${v.aguardando_voz && !v.rodando ? `<div class="lk-prog" style="font-weight:700">🎤 roteiro pronto — falta a sua voz <a class="si-mini si-ok" href="/curtos/${v.id}/gravar" style="text-decoration:none">🎤 gravar voz</a></div>` : ''}
       ${v.aguardando && !v.rodando ? `<div class="lk-prog">⏸ aguardando — ainda não começou <button class="si-mini" data-iniciar="${v.id}">▶ iniciar este</button> <button class="si-mini si-sec" data-copiar="${esc(v.link)}">📋 copiar link</button> <button class="si-mini si-sec" data-remover="${v.id}">🗑 remover da fila</button></div>` : ''}
       ${v.apagado ? `<div class="si-dica">🗑 arquivos apagados — ficou o link e o log abaixo</div>` : `

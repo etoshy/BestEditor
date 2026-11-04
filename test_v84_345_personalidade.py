@@ -66,3 +66,11 @@ def test_projeto_vazio_nao_derruba_o_roteiro(tmp_path, monkeypatch):
     open(os.path.join(CT.raiz(base), "projetos", "quebrado1", "x"), "w").close()
     novo = _p(base, c["id"], "personalidade")
     assert "Old hook." in CC.conteudo_roteiro(base, novo)
+
+
+def test_v84_348_moldes_sem_assunto():
+    import camera_exp
+    for txt in list(CC.TIPOS_GANCHO.values()) + list(CC.TIPOS_FINAL.values()) + [camera_exp.REGRA_CAMERA]:
+        assert "sloth" not in txt.lower() and "preguiça" not in txt.lower()
+    p = {"id": "abc", "config": {}, "modelo": "comentario"}
+    assert "never reuse a shape word for word" in CC.regra_tipos(p)

@@ -207,6 +207,22 @@ def linha_fonte(url: str, info: Dict[str, Any]) -> str:
     return f"Source ({pf}): {alvo}" if pf else f"Source: {alvo}"
 
 
+def com_fontes(descricao: str, fontes: List[tuple]) -> str:
+    """🧩 v84_349: o crédito de TODAS as fontes do vídeo composto ('Sources: @a (TikTok) · @b (Instagram)')."""
+    d = str(descricao or "").rstrip()
+    if re.search(r"(?im)^sources?\b", d):
+        return d
+    linhas = [linha_fonte(u, i).replace("Source (", "").replace("Source: ", "") for u, i in fontes]
+    itens = []
+    for (u, i), l in zip(fontes, linhas):
+        if not l:
+            continue
+        pf, quem = plataforma(u), criador(u, i)
+        alvo = ("@" + quem) if quem and " " not in quem else (quem or str(u).split("?")[0])
+        itens.append(f"{alvo} ({pf})" if pf else alvo)
+    return (d + "\n\nSources: " + " · ".join(itens)).strip() if itens else d
+
+
 def com_fonte(descricao: str, url: str, info: Dict[str, Any]) -> str:
     d = str(descricao or "").rstrip()
     if not url or re.search(r"(?im)^source\b", d):
