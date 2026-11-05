@@ -142,7 +142,7 @@ async function desenharGrades() {
       box.innerHTML = `<div class="si-dica" style="margin-bottom:4px">📅 próximos dias (YouTube + fila)${j.proximo ? ` · o próximo vídeo vai pra <b>${quando(j.proximo)}</b>` : ''}</div>
         <table class="yt-fila">${j.dias.map(d => `<tr><td style="white-space:nowrap">${dia(d.data)}</td>${d.casas.map(c => `<td title="${esc(CASA[c.estado][1] + (c.titulo ? ': ' + c.titulo : ''))}"
           style="white-space:nowrap">${CASA[c.estado][0]} ${c.h}</td>`).join('')}${d.fora_do_horario ? `<td class="si-dica">+${d.fora_do_horario} fora do horário</td>` : '<td></td>'}</tr>`).join('')}</table>
-        <div class="si-dica">✅ saiu · 🗓 agendado no YouTube · 📤 enviado daqui · 🕐 na fila · ⬜ buraco livre (preenchido primeiro) · ➖ dia já cheio</div>`; }
+        <div class="si-dica">✅ saiu · 🗓 agendado no YouTube · 📤 enviado daqui · 🕐 na fila · ⬜ buraco livre (preenchido primeiro) · vídeos fora dos seus horários não ocupam a agenda</div>`; }
     catch (e) {} }
 }
 function desenharFila() {

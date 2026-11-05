@@ -212,8 +212,10 @@ def test_v84_356_ultimos_videos_e_agenda_respeita_o_canal(tmp_path, monkeypatch)
     assert YE.dicas(r["videos"], agora=time.time() + 2 * 86400)["top"][0]["id"] == "A"  # (vídeo com menos de 6 h ainda não conta)
     novos, pulados = YE.adicionar(b, [{"pid": "p1", "canal_id": "c1", "nome": "Novo vídeo"},
                                       {"pid": "p2", "canal_id": "c1", "nome": "GATO pula o muro"}], agora=agora)
-    # hoje já tem 1 (por dia = 1) e amanhã tem o agendado no Studio → vai pra depois de amanhã
-    assert [x["slot"] for x in novos] == [_ts(depois, 18)]
+    # v84_361: o de hoje saiu às 08:00 (fora do horário) → não ocupa as 18:00 de hoje; amanhã o agendado das 18:20 ocupa as 18:00
+    assert [x["slot"] for x in novos] == [_ts(hoje, 18)]
+    n2, _ = YE.adicionar(b, [{"pid": "p9", "canal_id": "c1", "nome": "Outro"}], agora=agora)
+    assert n2[0]["slot"] == _ts(depois, 18)
     assert "já tem um vídeo com esse título" in pulados[0]
     rr = YE._ler_recentes(b, "UC1")
     rr["dicas"] = YE.dicas(rr["videos"], agora=time.time() + 2 * 86400)
@@ -313,3 +315,19 @@ def test_v84_359_atrasados_nao_saem_todos_de_uma_vez(tmp_path, monkeypatch):
     x = dict(f["c"], slot=time.time() + 5 * 3600)  # (o relógio de verdade: a data marcada precisa estar no futuro)
     YE.enviar_item(b, x, lambda pid: {"titulo": pid, "video": v})
     assert corpos[0]["status"]["privacyStatus"] == "private" and YE._iso_ts(corpos[0]["status"]["publishAt"]) == int(x["slot"])
+
+
+def test_v84_361_programado_fora_do_horario_nao_ocupa(tmp_path):
+    b = _base(tmp_path)
+    YE.salvar_agenda(b, "c1", {"conta": "UC1", "por_dia": 3, "horarios": ["06:00", "12:00", "20:00"]})
+    hoje = dt.date.today()
+    agora = _ts(hoje, 5)
+    # programados no Studio às 09:00, 15:00 e 17:00 (fora dos seus horários) + um às 12:10 (esse ocupa o das 12)
+    vids = [{"id": k, "titulo": k, "quando": _ts(hoje, h, m), "agendado": _ts(hoje, h, m), "privacidade": "private"}
+            for k, h, m in (("a", 9, 0), ("b", 15, 0), ("c", 17, 0), ("d", 12, 10))]
+    with YE._TRAVA:
+        YE._gravar(b, os.path.join("recentes", "UC1.json"), {"buscado": time.time(), "videos": vids})
+    novos, _ = YE.adicionar(b, [{"pid": f"p{k}", "canal_id": "c1", "nome": f"v{k}"} for k in range(3)], agora=agora)
+    assert [x["slot"] for x in novos] == [_ts(hoje, 6), _ts(hoje, 20), _ts(hoje + dt.timedelta(days=1), 6)]
+    g = YE.grade(b, "c1", dias=1, agora=agora)["dias"][0]
+    assert [c["estado"] for c in g["casas"]] == ["fila", "agendado", "fila"] and g["fora_do_horario"] == 3

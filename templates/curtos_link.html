@@ -964,7 +964,9 @@ function desenhar(vs) {
   const barraRetomar = pend ? `<div class="aviso" style="margin-bottom:8px">⏸ ${pend} vídeo(s) ficaram pelo meio (o site fechou ou reiniciou). <button class="si-mini" id="btnRetomar">▶ retomar a fila</button></div>` : '';
   const foco = document.activeElement;  // ✍ escrevendo o direcionamento: a atualização automática espera
   if (foco && L.contains(foco) && foco.matches('input:not([type=checkbox]), select, textarea')) return vs.some(v => v.rodando);
-  const ids_ = new Set(vs.map(v => v.id)); [...SEL].forEach(id => { if (!ids_.has(id)) SEL.delete(id); });  // ☑ some da lista: sai da seleção
+  // ☑ v84_360: os marcados ficam mesmo recarregando ou trocando de página/filtro — só sai da seleção o que sumiu de vez
+  // (dá pra ter certeza só quando a lista inteira está na tela: sem filtro e numa página só)
+  if (vs.length && VI.total_geral != null && vs.length >= VI.total_geral) { const ids_ = new Set(vs.map(v => v.id)); [...SEL].forEach(id => { if (!ids_.has(id)) SEL.delete(id); }); guardarSel(); }
   const digitado = {}; L.querySelectorAll('[data-tcom], [data-tdir]').forEach(e => { if (e.value) digitado[(e.dataset.tcom ? 'c' : 'd') + (e.dataset.tcom || e.dataset.tdir)] = e.value; });
   const pedidos = {}; L.querySelectorAll('[data-rpedido]').forEach(e => { if (e.value) pedidos[e.dataset.rpedido] = e.value; });
   const players = {};  // 🎞 v84_343: o player continua onde estava (só sai do cartão que for trocado)
@@ -984,7 +986,7 @@ function desenhar(vs) {
       <span class="lk-selacoes" style="${SEL.size ? '' : 'opacity:.45;pointer-events:none'}">
         <button class="si-mini si-ok" data-selini="1" title="começa os marcados que ainda estão na fila (⏸ aguardando, com erro ou parados) — do jeito escolhido em 🧩 Como rodar o lote">▶ produzir marcados</button>
         <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400"><input type="checkbox" id="selEtapa" style="width:auto;margin:0"${loteModo() === 'etapa' ? ' checked' : ''}> 🧩 em paralelo (por etapa)</label>
-        <button class="si-mini si-ok" data-selyt="agenda" title="cada marcado (pronto) ganha o próximo horário livre da agenda do canal — configure em 📤 YouTube">📤 agendar no YouTube</button><button class="si-mini si-sec" data-selyt="agora" title="sobe os marcados prontos agora, um por vez">⏫ subir já</button>
+        <button class="si-mini si-ok" data-selyt="agenda" title="sobe os marcados (prontos) já e cada um fica PROGRAMADO no YouTube pro próximo horário livre da agenda do canal — configure em 📤 YouTube">📤 agendar no YouTube (programado)</button><button class="si-mini si-sec" data-selyt="agora" title="sem agenda: sobe e PUBLICA agora, um por vez">⏫ publicar agora (sem agenda)</button>
         <button class="si-mini" data-selexp="zip">📦 exportar ZIP (JSON + capas)</button><button class="si-mini si-sec" data-selexp="json">📄 só o JSON</button>
         <button class="si-mini si-sec" data-selacao="apagar" title="apaga vídeo, projeto do editor, clipes e prints — fica o link, as marcas e o log">🗑 apagar arquivos</button>
         <button class="si-mini si-perigo" data-selacao="tirar" title="tira da lista de vez (apaga tudo, inclusive o log)">❌ tirar da lista</button></span></div>`;
@@ -1082,7 +1084,8 @@ function desenhar(vs) {
       aviso(j.iniciados ? `▶ ${j.iniciados} na produção, ${j.por_etapa ? '🧩 por etapa (em paralelo)' : 'um por vez'}` + (j.pulados ? ` · ${j.pulados} já feito(s)/rodando ficaram de fora` : '') : 'Nenhum marcado está na fila (já foram feitos ou estão rodando).', j.iniciados ? 'okk' : 'erro'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); ini_.disabled = false; } };
   const et_ = L.querySelector('#selEtapa'); if (et_) et_.onchange = () => { const r = document.querySelector(`input[name=lote_modo][value="${et_.checked ? 'etapa' : 'um'}"]`); if (r) { r.checked = true; salvarOpcoes(); } };
-  L.querySelectorAll('[data-selyt]').forEach(b => b.onclick = async () => { if (!SEL.size) return; b.disabled = true;
+  L.querySelectorAll('[data-selyt]').forEach(b => b.onclick = async () => { if (!SEL.size) return;
+    if (b.dataset.selyt === 'agora' && !confirm(`Publicar ${SEL.size} vídeo(s) AGORA no YouTube, sem agenda? (pra programar nos horários, use 📤 agendar no YouTube)`)) return; b.disabled = true;
     try { const j = await post('/youtube/fila/adicionar', {ids: [...SEL], agora: b.dataset.selyt === 'agora'});
       const q = d => new Date(d * 1000).toLocaleString('pt-BR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
       aviso((j.novos.length ? (j.novos.some(x => x.publicar) ? `📤 ${j.novos.length} subindo pro YouTube — publicam em: ` : `📤 ${j.novos.length} na fila do YouTube: `) + j.novos.map(x => q(x.quando)).join(', ') : '📤 nenhum entrou na fila')

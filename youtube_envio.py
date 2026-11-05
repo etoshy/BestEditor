@@ -270,21 +270,19 @@ def _espalhar(a: Dict[str, Any]) -> List[str]:
     return sorted(hs)
 
 
-PERTO_S = 90 * 60  # um vídeo que já saiu (ou está agendado) no canal a menos de 1h30 de um horário: esse horário já foi
+PERTO_S = 30 * 60  # 📌 v84_361: só um vídeo do canal a menos de 30 min de um horário da agenda ocupa esse horário
 
 
 def proximo_horario(a: Dict[str, Any], ocupados: set, agora: Optional[float] = None, no_canal: Optional[List[float]] = None) -> float:
-    """O próximo horário livre. `no_canal`: quando saíram/vão sair os vídeos que JÁ estão no YouTube (postados por aqui ou
-    à mão no Studio) — o dia que já tem os 'por dia' dele não recebe mais, e horário colado num vídeo do canal é pulado."""
+    """O próximo horário livre DA AGENDA. `no_canal`: quando saíram/vão sair os vídeos que JÁ estão no YouTube (postados
+    por aqui ou à mão no Studio). 📌 v84_361: só ocupa um horário o vídeo que está NELE (±30 min) — vídeo publicado ou
+    programado em outro horário não conta: os horários que você definiu são preenchidos do mesmo jeito."""
     agora = agora or time.time()
     dia = _dt.date.fromtimestamp(agora)
     no_canal = [t for t in (no_canal or []) if t]
     for d in range(0, 400):
         data = dia + _dt.timedelta(days=d)
         do_dia = [t for t in no_canal if _dt.date.fromtimestamp(t) == data]
-        na_fila = sum(1 for t in ocupados if _dt.date.fromtimestamp(t) == data)
-        if len(do_dia) + na_fila >= a["por_dia"]:
-            continue
         for h in horarios_do_dia(a):
             hh, mm = map(int, h.split(":"))
             ts = time.mktime(_dt.datetime(data.year, data.month, data.day, hh, mm).timetuple())
@@ -864,11 +862,6 @@ def grade(base: str, canal_id: str, dias: int = 7, agora: Optional[float] = None
         prox = proximo_horario(a, ocupados, agora, _no_canal(vids, fila(base), canal_id))
     except YtErro:
         prox = 0
-    for dd in out:  # um dia "cheio" pelos vídeos fora do horário: as casas livres dele não recebem mais
-        if dd["cheio"]:
-            for c in dd["casas"]:
-                if c["estado"] == "livre":
-                    c["estado"] = "dia_cheio"
     return {"dias": out, "proximo": prox, "buscado": (_ler_recentes(base, a["conta"]) or {}).get("buscado", 0)}
 
 
