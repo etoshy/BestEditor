@@ -987,6 +987,7 @@ function desenhar(vs) {
         <button class="si-mini si-ok" data-selini="1" title="começa os marcados que ainda estão na fila (⏸ aguardando, com erro ou parados) — do jeito escolhido em 🧩 Como rodar o lote">▶ produzir marcados</button>
         <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400"><input type="checkbox" id="selEtapa" style="width:auto;margin:0"${loteModo() === 'etapa' ? ' checked' : ''}> 🧩 em paralelo (por etapa)</label>
         <button class="si-mini si-ok" data-selyt="agenda" title="sobe os marcados (prontos) já e cada um fica PROGRAMADO no YouTube pro próximo horário livre da agenda do canal — configure em 📤 YouTube">📤 agendar no YouTube (programado)</button><button class="si-mini si-sec" data-selyt="agora" title="sem agenda: sobe e PUBLICA agora, um por vez">⏫ publicar agora (sem agenda)</button>
+        <button class="si-mini" data-selsons="1" title="o verificador tira/troca os efeitos sonoros ruins ou desconexos dos marcados e exporta cada um de novo">🔊 corrigir sons + exportar de novo</button>
         <button class="si-mini" data-selexp="zip">📦 exportar ZIP (JSON + capas)</button><button class="si-mini si-sec" data-selexp="json">📄 só o JSON</button>
         <button class="si-mini si-sec" data-selacao="apagar" title="apaga vídeo, projeto do editor, clipes e prints — fica o link, as marcas e o log">🗑 apagar arquivos</button>
         <button class="si-mini si-perigo" data-selacao="tirar" title="tira da lista de vez (apaga tudo, inclusive o log)">❌ tirar da lista</button></span></div>`;
@@ -1017,11 +1018,14 @@ function desenhar(vs) {
       ${!v.rodando && v.pendente ? `<div class="lk-prog">⏸ ficou pelo meio (${esc(v.etapa || 'na fila')}) <button class="si-mini" data-refazer="${v.id}">▶ retomar este</button></div>` : ''}
       ${!v.rodando && !v.erro && !v.pronto && v.etapa ? `<div class="lk-prog">${esc(v.etapa)}</div>` : ''}
       ${v.comentarios_erro && !v.n_comentarios ? `<div class="si-dica">💬 não deu pra ler os comentários (${esc(v.comentarios_erro)}) — o roteiro saiu só do vídeo.</div>` : ''}
+      ${v.tem_original && !v.roteiro && !v.pronto && !v.apagado ? `<details data-k="o${v.id}" open><summary style="cursor:pointer;font-weight:600">🎞 vídeo original (já baixado — assista enquanto o roteiro sai)</summary>
+        <div class="lk-orig" style="max-width:380px"><div data-origph="${v.id}"></div></div></details>` : ''}
       ${(v.roteiro || v.pronto) ? `<div class="lk-corpo">
         <div>${v.pronto ? `<video src="/curtos/${v.id}/video.mp4?baixar=0" controls preload="metadata"></video>` : '<div class="si-vazio">🎬 o vídeo aparece aqui quando exportar</div>'}
           <div class="si-linha">${v.pronto ? `<a href="/curtos/${v.id}/video.mp4"><button class="si-ok si-mini">⬇️ baixar MP4</button></a>` : ''}${v.pronto_1x1 ? `<a href="/curtos/${v.id}/video_1x1.mp4"><button class="si-ok si-mini">⬛ baixar MP4 1:1</button></a>` : ''}
             ${v.editor ? `<a href="/job/${v.editor}/edit-segments" target="_blank"><button class="si-mini si-sec">🎬 editor</button></a>` : ''}
             <a href="/curtos/${v.id}" target="_blank"><button class="si-mini si-sec">⚙ ajustar</button></a>
+            ${v.tem_editor && !v.rodando ? `<button class="si-mini si-sec" data-sverif="${v.id}" title="olha cada efeito sonoro com a frase dita naquele momento: o que está desconexo, comprido, colado ou alto demais">🔊 verificar sons${v.sons_verificados ? ` (${v.sons_verificados.antes}→${v.sons_verificados.depois})` : ''}</button>` : ''}
             ${v.pronto && !v.rodando ? `<button class="si-mini si-sec" data-refazer="${v.id}" title="exporta de novo com o @ e o acabamento de AGORA do canal (o que já está feito — vídeo, roteiro, voz — é reaproveitado)">🔁 exportar de novo</button>` : ''}</div></div>
         <div>${v.roteiro ? `<div class="lk-rot">${esc(v.roteiro)}</div>
           ${v.roteiro_pt ? `<details data-k="p${v.id}"${abertos.has('p' + v.id) || v.roteiro_idioma !== 'pt' ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">🇧🇷 tradução</summary><div class="lk-rot" style="opacity:.9">${esc(v.roteiro_pt)}</div></details>` : ''}
@@ -1091,6 +1095,19 @@ function desenhar(vs) {
       aviso((j.novos.length ? (j.novos.some(x => x.publicar) ? `📤 ${j.novos.length} subindo pro YouTube — publicam em: ` : `📤 ${j.novos.length} na fila do YouTube: `) + j.novos.map(x => q(x.quando)).join(', ') : '📤 nenhum entrou na fila')
         + (j.pulados.length ? ' · ' + j.pulados.join(' · ') : '') + ' — veja em 📤 YouTube', j.novos.length ? 'okk' : 'erro'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; });
+  L.querySelectorAll('[data-selsons]').forEach(b => b.onclick = async () => { if (!SEL.size) return;
+    if (!confirm(`Corrigir os efeitos sonoros de ${SEL.size} vídeo(s) e exportar cada um de novo?`)) return; b.disabled = true; b.textContent = '⏳ verificando os sons…';
+    try { const j = await post('/curtos/link/sons/corrigir', {ids: [...SEL]}); desenhar(j.videos);
+      aviso(`🔊 ${j.feitos.length} corrigido(s): ` + j.feitos.map(f => `${f.antes}→${f.depois} sons`).join(', ') + (j.falhas.length ? ' · ' + j.falhas.join(' · ') : '') + ' — exportando de novo', j.feitos.length ? 'okk' : 'erro'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; b.textContent = '🔊 corrigir sons + exportar de novo'; });
+  L.querySelectorAll('[data-sverif]').forEach(b => b.onclick = async () => { const id = b.dataset.sverif; b.disabled = true; const t0 = b.textContent; b.textContent = '⏳ ouvindo…';
+    try { const j = await post(`/curtos/${id}/sons/verificar`);
+      const ac = {tirar: '❌ tirar', trocar: '🔁 trocar', abaixar: '🔉 abaixar', aviso: '⚠'};
+      const linhas = j.relatorio.length ? j.relatorio.map(r => `${r.t ? r.t.toFixed(1) + ' s' : ''} ${ac[r.acao] || r.acao} ${r.tipo || ''} — ${r.motivo}`).join('\n') : 'nada a corrigir 👍';
+      if (j.relatorio.some(r => r.acao !== 'aviso') && confirm(`🔊 ${j.antes} sons → ficariam ${j.depois}${j.ia ? ' (com IA)' : ''}\n\n${linhas}\n\nCorrigir e exportar de novo?`)) {
+        const k = await post('/curtos/link/sons/corrigir', {ids: [id]}); desenhar(k.videos); aviso('🔊 sons corrigidos — exportando de novo', 'okk'); }
+      else if (!j.relatorio.some(r => r.acao !== 'aviso')) aviso('🔊 ' + linhas, 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; b.textContent = t0; });
   L.querySelectorAll('[data-selexp]').forEach(b => b.onclick = () => { if (!SEL.size) return; location.href = `/curtos/link/exportar-escolhidos?formato=${b.dataset.selexp}&ids=${encodeURIComponent([...SEL].join(','))}`; });
   L.querySelectorAll('[data-selacao]').forEach(b => b.onclick = async () => { if (!SEL.size) return; const tirar = b.dataset.selacao === 'tirar';
     if (!confirm(tirar ? `Tirar ${SEL.size} vídeo(s) da lista DE VEZ? Apaga tudo (vídeo, projeto do editor, clipes, prints, roteiro e o log). Não dá pra desfazer.`

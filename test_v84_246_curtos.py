@@ -228,7 +228,7 @@ def test_gravacao_planos_destaques_sons(base, tmp_path, monkeypatch):
     assert any(s["provider"] == "pexels" and s["query"] == "money counting" for s in segs)
     hl = d["resposta"]["highlights"]
     assert hl and hl[0]["texto"] == "CORTE DE IMPOSTOS"
-    assert len(d["sfx"]) >= 2 and all(s["som"] for s in d["sfx"])
+    assert len(d["sfx"]) >= 1 and all(s["som"] for s in d["sfx"])  # (v84_362: 2 sons a ~1,2 s um do outro → o verificador deixa 1)
     assert d["legendas"]["ativa"] is True
     assert any(w["word"] == "HOJE" for w in d["palavras"])
     import prompt_builder as PB
@@ -257,7 +257,7 @@ def test_sons_do_tipo_e_escolha():
     sons = [{"id": "variados/whoosh_1"}, {"id": "variados/whoosh_3"}, {"id": "pop/pop_1"},
             {"id": "pixabay/123", "nome": "Swoosh rápido", "tags": ["whoosh"]}]
     assert [s["id"] for s in CT.sons_do_tipo("whoosh", sons)] == ["variados/whoosh_1", "variados/whoosh_3", "pixabay/123"]
-    assert CT.escolher_som("whoosh", "x", sons=sons) == "pixabay/123"  # os do Pixabay têm a preferência
+    assert CT.escolher_som("whoosh", "x", sons=sons) != "pixabay/123"  # v84_362: os da base do site primeiro (o do Pixabay vai pela deixa)
     assert CT.escolher_som("pop", "a", sons=sons) == "pop/pop_1"
     assert CT.escolher_som("riser", "a", sons=sons) is None
 

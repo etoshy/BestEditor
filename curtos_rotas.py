@@ -1518,6 +1518,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 "marca": lr.get("marca") or "", "comentario": lr.get("comentario") or "", "log": (lr.get("log") or [])[-60:],
                 "apagado": bool(lr.get("apagado")), "escolha": lr.get("escolha") or {}, "aguardando": bool(lr.get("aguardando")),
                 "aguardando_voz": bool(lr.get("aguardando_voz")), "minha_voz": (p.get("config") or {}).get("voz_modo") == "minha",
+                "sons_verificados": {k: (p.get("sons_verificados") or {}).get(k) for k in ("antes", "depois", "ia", "quando")} if p.get("sons_verificados") else None,
+                "tem_editor": bool((p.get("editor") or {}).get("job_id")),
                 "pronto_1x1": bool((p.get("exportado_quadrado") or {}).get("arquivo") and os.path.isfile((p.get("exportado_quadrado") or {}).get("arquivo") or ""))}
 
     def _musica_local(lr: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, str]:
@@ -1860,8 +1862,15 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             return msg
         if not CB.get("exportar"):
             raise CT.CurtoErro("A exportação automática não está disponível aqui — abra no editor e exporte.")
-        _link_etapa(pid, "🎬 exportando")
         job_id = (CT.carregar(base_dir, pid).get("editor") or {}).get("job_id")
+        try:  # 🔊 v84_362: o verificador de sons (regras + IA) antes de exportar — uma vez por faixa de sons
+            r_ = _verificar_sons(pid, usar_ia=_ia_ligada() and (CT.carregar(base_dir, pid).get("config") or {}).get("sons_verificar_ia", True) is not False,
+                                 aplicar=True, so_se_mudou=True)
+            if r_ and r_.get("relatorio"):
+                prog(f"🔊 sons: {r_['antes']} → {r_['depois']}")
+        except Exception:  # noqa: BLE001  (o verificador nunca impede o vídeo de sair)
+            pass
+        _link_etapa(pid, "🎬 exportando")
         if job_id and CB.get("marca"):  # 🏷 v84_347: o @ do projeto do editor = o do canal de agora (antes ficava o de quando criou)
             try:
                 CB["marca"](job_id, CT.marca_do(base_dir, CT.carregar(base_dir, pid)))
@@ -3236,6 +3245,72 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             CT.excluir(base_dir, pid)
         return _ok(videos=_links())
 
+    def _verificar_sons(pid: str, usar_ia: bool = True, aplicar: bool = False, so_se_mudou: bool = False) -> Optional[Dict[str, Any]]:
+        """🔊 v84_362: roda o verificador na faixa de sons do projeto do editor. aplicar=True grava a faixa corrigida."""
+        import sons_verificar as SV
+        p = CT.carregar(base_dir, pid)
+        job_id = (p.get("editor") or {}).get("job_id")
+        if not job_id or not CB.get("sons_ler"):
+            return None
+        evs = CB["sons_ler"](job_id)
+        if evs is None:
+            return None
+        if so_se_mudou and (p.get("sons_verificados") or {}).get("assinatura") == SV.assinatura(evs):
+            return None
+        r = SV.verificar(evs, p, usar_ia=usar_ia)
+        if aplicar:
+            if CB.get("sons_gravar"):
+                CB["sons_gravar"](job_id, r["eventos"])
+            with CT._TRAVA:
+                q = CT.carregar(base_dir, pid)
+                q["sons_verificados"] = {"assinatura": r["assinatura"], "quando": time.time(), "ia": r["ia"],
+                                         "antes": r["antes"], "depois": r["depois"], "relatorio": r["relatorio"][-40:]}
+                if q.get("link_rapido") is not None and r["relatorio"]:
+                    _log_link(q["link_rapido"], f"🔊 sons verificados: {r['antes']} → {r['depois']}" + (" (com IA)" if r["ia"] else ""))
+                CT.salvar(base_dir, q)
+        return r
+
+    @app.route("/curtos/<pid>/sons/verificar", methods=["POST"])
+    def curto_sons_verificar(pid: str):
+        """🔊 só olha (não muda nada): o que o verificador tiraria/trocaria."""
+        _proj(pid)
+        r = _verificar_sons(pid, usar_ia=_ia_ligada())
+        if r is None:
+            return _erro("Esse vídeo ainda não tem o projeto do editor (gere o vídeo antes).")
+        return _ok(antes=r["antes"], depois=r["depois"], relatorio=r["relatorio"], ia=r["ia"])
+
+    @app.route("/curtos/link/sons/corrigir", methods=["POST"])
+    def curtos_link_sons_corrigir():
+        """🛠 corrige os sons dos vídeos marcados (ou de um) e exporta cada um de novo."""
+        ids = [str(x) for x in (_corpo().get("ids") or [])][:100]
+        feitos, falhas = [], []
+        for pid in ids:
+            try:
+                r = _verificar_sons(pid, usar_ia=_ia_ligada(), aplicar=True)
+                if r is None:
+                    falhas.append(f"{pid}: ainda sem o projeto do editor")
+                    continue
+                p = CT.carregar(base_dir, pid)
+                if p.get("exportado") and _refazer(pid) is not True:
+                    falhas.append(f"{pid}: sons corrigidos, mas já está rodando — exporte de novo depois")
+                feitos.append({"id": pid, "antes": r["antes"], "depois": r["depois"]})
+            except CT.CurtoErro as exc:
+                falhas.append(f"{pid}: {exc}")
+        return _ok(feitos=feitos, falhas=falhas, videos=_links())
+
+    def _refazer(pid: str):
+        """Começa (de novo) um vídeo do link — True, ou a mensagem de por que não deu."""
+        p = CT.carregar(base_dir, pid)
+        lr = p.get("link_rapido") or {}
+        if not lr:
+            return "não é um vídeo do link"
+        if lr.get("apagado"):
+            return "Este vídeo foi apagado (ficou só o link e o log)."
+        if not _reservar(pid, "🔗 link → vídeo", "começando…"):
+            return "Já está rodando."
+        _refazer_corpo(pid, p, lr)
+        return True
+
     @app.route("/curtos/link/<pid>/refazer", methods=["POST"])
     def curtos_link_refazer(pid: str):
         """🔁 tenta de novo do ponto em que parou (o que já está feito e em dia é pulado)."""
@@ -3247,6 +3322,10 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             return _erro("Este vídeo foi apagado (ficou só o link e o log).", 409)
         if not _reservar(pid, "🔗 link → vídeo", "começando…"):
             return _erro("Já está rodando.", 409)
+        _refazer_corpo(pid, p, lr)
+        return _ok(videos=_links())
+
+    def _refazer_corpo(pid: str, p: Dict[str, Any], lr: Dict[str, Any]) -> None:
         slug = (p.get("config") or {}).get("voz_tts") or ""
 
         def corpo() -> None:
@@ -3268,7 +3347,6 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 CT.salvar(base_dir, q)
         _link_etapa(pid, "🔁 de novo", erro="", aguardando=False)
         threading.Thread(target=corpo, daemon=True).start()
-        return _ok(videos=_links())
 
     def _novo_comentario():
         f = request.form

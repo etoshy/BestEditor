@@ -394,7 +394,28 @@ def faltando(base: str, pid: str) -> List[str]:
     return [x["id"] for x in partes_de(base, pid) if not ((d.get("partes") or {}).get(x["id"]) or {}).get("ativo")]
 
 
-def juntar(base: str, pid: str, realce_em_tudo: bool = False) -> str:
+ALVO_LUFS = -16.0  # 🔊 v84_362: todo take fica nesse volume (um take mais baixo/alto não destoa dos outros)
+GANHO_MAX_DB = 24.0
+
+
+def lufs(cam: str) -> Optional[float]:
+    """O volume percebido do take (LUFS integrado, ffmpeg ebur128/loudnorm). None se não deu pra medir (mudo, curto demais)."""
+    try:
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", cam, "-af", "loudnorm=print_format=json", "-f", "null", "-"],
+                           capture_output=True, text=True, timeout=180)
+        m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr or "", re.S)
+        v = float(json.loads(m.group(0))["input_i"]) if m else None
+        return v if v is not None and v > -70 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def ganho_db(cam: str, alvo: float = ALVO_LUFS) -> float:
+    v = lufs(cam)
+    return 0.0 if v is None else max(-GANHO_MAX_DB, min(GANHO_MAX_DB, alvo - v))
+
+
+def juntar(base: str, pid: str, realce_em_tudo: bool = False, normalizar: bool = True) -> str:
     """🧩 os takes ativos, na ordem do roteiro (ou o TUDO), com uma pausa curta entre as partes → minha_voz/final.wav."""
     d = estado(base, pid)
     falta = faltando(base, pid)
@@ -409,15 +430,18 @@ def juntar(base: str, pid: str, realce_em_tudo: bool = False) -> str:
             d = estado(base, pid)
         arquivos.append(caminho_take(base, pid, parte, tid))
     saida = os.path.join(pasta(base, pid), "final.wav")
+    # 🔊 v84_362: cada take vai pro MESMO volume (mede o LUFS de cada um e acerta o ganho) + um limitador no fim (sem estourar)
+    ganhos = [ganho_db(a) if normalizar else 0.0 for a in arquivos]
+    limitador = ",alimiter=limit=0.89:level=false" if normalizar else ""
     if len(arquivos) == 1:
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", arquivos[0], "-ac", "1", "-ar", "48000", saida], capture_output=True,
-                       timeout=300, check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", arquivos[0], "-af", f"volume={ganhos[0]:.2f}dB{limitador}" if normalizar else "anull",
+                        "-ac", "1", "-ar", "48000", saida], capture_output=True, timeout=300, check=True)
         return saida
     entradas, filtro = [], []
     for k, a in enumerate(arquivos):
         entradas += ["-i", a]
-        filtro.append(f"[{k}:a]aresample=48000,aformat=channel_layouts=mono,apad=pad_dur={PAUSA_ENTRE_PARTES_S}[a{k}]")
-    filtro.append("".join(f"[a{k}]" for k in range(len(arquivos))) + f"concat=n={len(arquivos)}:v=0:a=1[s]")
+        filtro.append(f"[{k}:a]aresample=48000,aformat=channel_layouts=mono,volume={ganhos[k]:.2f}dB,apad=pad_dur={PAUSA_ENTRE_PARTES_S}[a{k}]")
+    filtro.append("".join(f"[a{k}]" for k in range(len(arquivos))) + f"concat=n={len(arquivos)}:v=0:a=1{limitador}[s]")
     r = subprocess.run(["ffmpeg", "-v", "error", "-y", *entradas, "-filter_complex", ";".join(filtro), "-map", "[s]",
                         "-ac", "1", "-ar", "48000", saida], capture_output=True, timeout=600)
     if r.returncode != 0 or not os.path.isfile(saida):

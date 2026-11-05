@@ -2627,8 +2627,10 @@ def escolher_som(tipo: str, semente: str, evitar: Optional[str] = None, sons: Op
     cands = sons_do_tipo(tipo, sons)
     if not cands:
         return None
-    pix = [s for s in cands if s["id"].startswith("pixabay/")]  # os que você trouxe do Pixabay têm a preferência
-    lista = pix or cands
+    # 🔊 v84_362: os da BASE do site primeiro — os do Pixabay foram buscados pra uma deixa específica ("torcida", "rede de
+    # basquete") e, caindo em qualquer "whoosh" de outro vídeo, ficavam desconexos. O do Pixabay entra pela própria deixa (s["som"]).
+    base_ = [s for s in cands if not s["id"].startswith("pixabay/")]
+    lista = base_ or cands
     k = zlib.crc32(semente.encode("utf-8")) % len(lista)
     if len(lista) > 1 and lista[k]["id"] == evitar:
         k = (k + 1) % len(lista)
@@ -2933,6 +2935,11 @@ def sfx_do_video(p: Dict[str, Any], perfil: Dict[str, Any], planos_v: List[Dict[
         out = poucos_sons(out, float(g.get("dur") or 0))
     for e in out:
         e.pop("_t", None)
+    try:  # 🔊 v84_362: as regras do verificador (comprido demais, colado, sons demais, alto demais) — sem IA
+        import sons_verificar
+        out, _ = sons_verificar.regras(out, p, float(g.get("dur") or 0))
+    except Exception:  # noqa: BLE001
+        pass
     return sorted(out, key=lambda e: e["start"])
 
 

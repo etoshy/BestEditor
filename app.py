@@ -12246,6 +12246,24 @@ _curtos_rotas.registrar(app, BASE_DIR, _curto_transcrever, tts_gerar_audio_isola
                         lambda t, m: na.limpar_texto_para_tts(t, motor=m), _curto_para_estudio,
                         trocar_no_estudio=_curto_trocar_voz, marca_no_estudio=_curto_marca, exportar=_curto_exportar)
 _curtos_rotas.CB["apagar_editor"] = _curto_apagar_arquivos  # 🗑 v84_316: apagar o projeto do editor do vídeo marcado
+
+
+def _curto_sons_ler(job_id: str):
+    """🔊 v84_362: a faixa de sons do projeto do editor (o que vai pro vídeo)."""
+    job = _JOBS.get(job_id)
+    return [dict(e) for e in job.get("sfx") or []] if job else None
+
+
+def _curto_sons_gravar(job_id: str, eventos) -> None:
+    job = _JOBS.get(job_id)
+    if job is None:
+        return
+    job["sfx"] = sorted(eventos, key=lambda x: float(x.get("start") or 0))
+    _save_state(job_id)
+
+
+_curtos_rotas.CB["sons_ler"] = _curto_sons_ler
+_curtos_rotas.CB["sons_gravar"] = _curto_sons_gravar
 import shorts_ia_rotas as _shorts_ia_rotas  # noqa: E402  🎌 Shorts de IA: série com elenco fixo + modelar viral (v84_263)
 _shorts_ia_rotas.registrar(app, BASE_DIR, _curto_transcrever)
 import poker_rotas as _poker_rotas  # noqa: E402  🃏 Poker: mesa animada, ranking, roteiros com pesquisa (v84_277)
