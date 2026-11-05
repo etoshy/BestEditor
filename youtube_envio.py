@@ -229,7 +229,14 @@ def limpar_agenda(d: Dict[str, Any]) -> Dict[str, Any]:
     priv = d.get("privacidade") if d.get("privacidade") in PRIVACIDADES else "public"
     return {"conta": str(d.get("conta") or ""), "horarios": hs or ["18:00"], "por_dia": por_dia, "privacidade": priv,
             "categoria": str(d.get("categoria") or "24") if re.fullmatch(r"\d{1,3}", str(d.get("categoria") or "24")) else "24",
-            "shorts_tag": bool(d.get("shorts_tag"))}
+            "shorts_tag": bool(d.get("shorts_tag")),
+            # 🗓 v84_358: "youtube" = sobe JÁ (privado + publishAt) e o YouTube publica no horário; "site" = o site sobe na hora
+            "modo": "site" if d.get("modo") == "site" else "youtube"}
+
+
+def _slot(x: Dict[str, Any]) -> float:
+    """O horário de PUBLICAÇÃO de um item da fila (no modo 'youtube' ele sobe antes e o YouTube publica nesse horário)."""
+    return float(x.get("slot") or x["quando"])
 
 
 def salvar_agenda(base: str, canal_id: str, d: Dict[str, Any]) -> Dict[str, Any]:
@@ -317,11 +324,13 @@ def adicionar(base: str, itens: List[Dict[str, Any]], agora_ja: bool = False, ag
             if ja:
                 pulados.append(f"{nome}: o canal já tem um vídeo com esse título ({time.strftime('%d/%m', time.localtime(ja.get('quando') or 0))}) — troque o título")
                 continue
-            ocupados = {int(x["quando"]) for x in f if x.get("canal_id") == it.get("canal_id") and x["estado"] not in ("cancelado", "enviado")}
+            ocupados = {int(_slot(x)) for x in f if x.get("canal_id") == it.get("canal_id") and x["estado"] not in ("cancelado", "enviado")}
             no_canal = _no_canal(no_yt.get(a["conta"]) or [], f, it.get("canal_id") or "")
-            quando = agora if agora_ja else proximo_horario(a, ocupados, agora, no_canal)
+            slot = agora if agora_ja else proximo_horario(a, ocupados, agora, no_canal)
+            publicar = a["modo"] == "youtube" and not agora_ja
+            quando = agora if publicar else slot  # 🗓 modo YouTube: sobe já, publica no horário
             x = {"id": secrets.token_hex(6), "pid": it["pid"], "canal_id": it.get("canal_id") or "", "canal": it.get("canal") or "",
-                 "nome": nome, "conta": a["conta"], "quando": quando, "estado": "na_fila", "tentativas": 0,
+                 "nome": nome, "conta": a["conta"], "quando": quando, "slot": slot, "publicar": publicar, "estado": "na_fila", "tentativas": 0,
                  "yt_id": "", "erro": "", "aviso": "", "log": [], "criado": agora}
             f.append(x)
             novos.append(x)
@@ -370,7 +379,7 @@ def _no_canal(vids: List[Dict[str, Any]], f: List[Dict[str, Any]], canal_id: str
     """Quando saíram/vão sair os vídeos do canal: os do YouTube (postados e AGENDADOS no Studio) + os enviados por aqui
     que a lista do YouTube ainda não mostra (sem contar o mesmo vídeo 2 vezes)."""
     ids = {v.get("id") for v in vids}
-    return [v.get("quando") for v in vids] + [x.get("enviado") or x["quando"] for x in f
+    return [v.get("quando") for v in vids] + [_slot(x) for x in f
                                               if x.get("canal_id") == canal_id and x["estado"] == "enviado" and x.get("yt_id") not in ids]
 
 
@@ -382,12 +391,14 @@ def reagendar(base: str, canal_id: str, agora: Optional[float] = None) -> int:
         f = fila(base)
         if not a:
             return 0
-        mover = sorted((x for x in f if x.get("canal_id") == canal_id and x["estado"] == "na_fila"), key=lambda x: x["quando"])
-        ocupados = {int(x["quando"]) for x in f if x.get("canal_id") == canal_id and x["estado"] == "enviando"}
+        mover = sorted((x for x in f if x.get("canal_id") == canal_id and x["estado"] == "na_fila"), key=_slot)
+        ocupados = {int(_slot(x)) for x in f if x.get("canal_id") == canal_id and x["estado"] == "enviando"}
         no_canal = _no_canal((_ler_recentes(base, a["conta"]) or {}).get("videos") or [], f, canal_id)
         for x in mover:
-            x["quando"] = proximo_horario(a, ocupados, agora, no_canal)
-            ocupados.add(int(x["quando"]))
+            x["slot"] = proximo_horario(a, ocupados, agora, no_canal)
+            x["publicar"] = a["modo"] == "youtube"
+            x["quando"] = agora if x["publicar"] else x["slot"]
+            ocupados.add(int(x["slot"]))
         _gravar(base, "fila.json", f)
         return len(mover)
 
@@ -408,7 +419,11 @@ def _tags(hashtags: List[str]) -> List[str]:
     return out
 
 
-def corpo_video(meta: Dict[str, Any], a: Dict[str, Any]) -> Dict[str, Any]:
+def _iso_utc(ts: float) -> str:
+    return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def corpo_video(meta: Dict[str, Any], a: Dict[str, Any], publicar_em: float = 0) -> Dict[str, Any]:
     titulo = meta.get("titulo") or ""
     if a.get("shorts_tag") and "#shorts" not in titulo.lower():
         titulo = titulo.rstrip() + " #shorts"
@@ -420,7 +435,9 @@ def corpo_video(meta: Dict[str, Any], a: Dict[str, Any]) -> Dict[str, Any]:
     while len(desc.encode("utf-8")) > 4900:
         desc = desc[:-50]
     return {"snippet": {"title": _texto_titulo(titulo), "description": desc, "tags": _tags(tags), "categoryId": a.get("categoria") or "24"},
-            "status": {"privacyStatus": a.get("privacidade") or "public", "selfDeclaredMadeForKids": False, "embeddable": True}}
+            "status": dict({"privacyStatus": a.get("privacidade") or "public", "selfDeclaredMadeForKids": False, "embeddable": True},
+                           # 🗓 agendado: o YouTube exige 'private' + publishAt no futuro (publica sozinho na hora)
+                           **({"privacyStatus": "private", "publishAt": _iso_utc(publicar_em)} if publicar_em > time.time() + 300 else {}))}
 
 
 def _com_token(base: str, conta: str, fazer: Callable[[str], Any]) -> Any:
@@ -532,7 +549,8 @@ def enviar_item(base: str, x: Dict[str, Any], meta_de: Callable[[str], Optional[
         if not meta or not meta.get("video") or not os.path.isfile(meta["video"]):
             return _mexer(base, iid, estado="erro", erro="O vídeo pronto não existe mais (foi apagado ou ainda não exportou).", _log="❌ sem o arquivo do vídeo")
         a = agenda(base, x.get("canal_id") or "") or limpar_agenda({})
-        corpo = corpo_video(meta, a)
+        pub = _slot(x) if x.get("publicar") else 0
+        corpo = corpo_video(meta, a, pub)
         yt_id = subir_video(base, conta, meta["video"], corpo,
                             progresso=lambda p: _mexer(base, iid, prog=round(p * 100)))
     except YtErro as e:
@@ -547,7 +565,9 @@ def enviar_item(base: str, x: Dict[str, Any], meta_de: Callable[[str], Optional[
         return _falha(base, x, str(e), temporario=e.status >= 500 or e.status == 0)
     except Exception as e:  # noqa: BLE001  (rede caiu, timeout…)
         return _falha(base, x, f"{type(e).__name__}: {e}"[:300], temporario=True)
-    _mexer(base, iid, estado="enviado", yt_id=yt_id, enviado=time.time(), prog=100, _log=f"✅ no YouTube: {yt_id}")
+    agendado = (corpo.get("status") or {}).get("publishAt")
+    _mexer(base, iid, estado="enviado", yt_id=yt_id, enviado=time.time(), prog=100, agendado_yt=bool(agendado),
+           _log=f"✅ no YouTube: {yt_id}" + (f" · 🗓 o YouTube publica em {time.strftime('%d/%m %H:%M', time.localtime(pub))}" if agendado else ""))
     aviso = ""
     if meta.get("thumb") and os.path.isfile(meta["thumb"]):
         try:
@@ -715,6 +735,88 @@ def contexto_titulos(base: str, canal_id: str) -> str:
             + ("\nAlready used recently (do NOT repeat or paraphrase): " + " | ".join(ultimos) if ultimos else ""))
 
 
+# ------------------------------------------------------------------ 📐 v84_357: o padrão do canal e os buracos da agenda
+def padrao(vids: List[Dict[str, Any]], agora: Optional[float] = None, dias: int = 30) -> Dict[str, Any]:
+    """Olha quando os vídeos saem (os publicados E os agendados dos últimos 30 dias) e acha os horários de costume do canal
+    e quantos por dia. Ex.: saem sempre ~06:00, ~12:00 e ~20:00 → horarios = [06:00, 12:00, 20:00], por_dia = 3."""
+    agora = agora or time.time()
+    ts = sorted(v.get("quando") or 0 for v in vids if v.get("quando") and agora - (v.get("quando") or 0) < dias * 86400)
+    if len(ts) < 3:
+        return {"horarios": [], "por_dia": 0, "n": len(ts), "motivo": "poucos vídeos pra achar um padrão (precisa de 3 ou mais)"}
+    minutos = sorted(time.localtime(t).tm_hour * 60 + time.localtime(t).tm_min for t in ts)
+    grupos: List[List[int]] = []
+    for m in minutos:  # junta horários a menos de 45 min um do outro
+        if grupos and m - grupos[-1][-1] <= 45:
+            grupos[-1].append(m)
+        else:
+            grupos.append([m])
+    if len(grupos) > 1 and (minutos[0] + 1440) - grupos[-1][-1] <= 45:  # 23:50 e 00:10 são o mesmo horário
+        grupos[0] = [m - 1440 for m in grupos.pop()] + grupos[0]
+    por_data: Dict[str, int] = {}
+    for t in ts:
+        k = time.strftime("%Y-%m-%d", time.localtime(t))
+        por_data[k] = por_data.get(k, 0) + 1
+    contagens = sorted(por_data.values())
+    por_dia = max(1, min(6, contagens[len(contagens) // 2]))
+    minimo = max(2, round(len(por_data) * 0.25))  # um horário de costume aparece em pelo menos 1/4 dos dias
+    fortes = sorted((g for g in grupos if len(g) >= minimo), key=len, reverse=True)[:max(por_dia, 1)]
+    if not fortes:
+        fortes = sorted(grupos, key=len, reverse=True)[:por_dia]
+    hs = []
+    for g in fortes:
+        m = int(round(sum(g) / len(g) / 5.0) * 5) % 1440
+        hs.append(f"{m // 60:02d}:{m % 60:02d}")
+    return {"horarios": sorted(set(hs)), "por_dia": max(por_dia, len(set(hs))) if len(set(hs)) <= 6 else por_dia,
+            "n": len(ts), "dias": len(por_data), "motivo": ""}
+
+
+def grade(base: str, canal_id: str, dias: int = 7, agora: Optional[float] = None) -> Dict[str, Any]:
+    """Os próximos dias, horário por horário: ✅ já tem vídeo no YouTube (postado/agendado), 📤 enviado por aqui,
+    🕐 na fila, ⬜ livre (o próximo vídeo vai pro 1º livre), ⏱ já passou."""
+    agora = agora or time.time()
+    a = agenda(base, canal_id)
+    if not a:
+        return {"dias": [], "proximo": 0}
+    vids = (_ler_recentes(base, a["conta"]) or {}).get("videos") or []
+    f = [x for x in fila(base) if x.get("canal_id") == canal_id and x["estado"] != "cancelado"]
+    hoje = _dt.date.fromtimestamp(agora)
+    out = []
+    for d in range(dias):
+        data = hoje + _dt.timedelta(days=d)
+        vids_dia = [v for v in vids if v.get("quando") and _dt.date.fromtimestamp(v["quando"]) == data]
+        fila_dia = [x for x in f if _dt.date.fromtimestamp(_slot(x)) == data]
+        usados_v, usados_f, casas = set(), set(), []
+        for h in horarios_do_dia(a):
+            hh, mm = map(int, h.split(":"))
+            ts = time.mktime(_dt.datetime(data.year, data.month, data.day, hh, mm).timetuple())
+            v = next((v for v in vids_dia if v["id"] not in usados_v and abs(v["quando"] - ts) < PERTO_S), None)
+            x = None if v else next((x for x in fila_dia if x["id"] not in usados_f and (x.get("yt_id") not in {w["id"] for w in vids})
+                                     and abs(_slot(x) - ts) < PERTO_S), None)
+            if v:
+                usados_v.add(v["id"])
+                casas.append({"h": h, "estado": "agendado" if v.get("agendado", 0) > agora else "youtube", "titulo": v.get("titulo") or ""})
+            elif x:
+                usados_f.add(x["id"])
+                casas.append({"h": h, "estado": {"enviado": "agendado" if x.get("agendado_yt") and _slot(x) > agora else "enviado", "erro": "erro"}.get(x["estado"], "fila"), "titulo": x.get("nome") or ""})
+            else:
+                casas.append({"h": h, "estado": "passou" if ts <= agora else "livre", "titulo": ""})
+        extras = len([v for v in vids_dia if v["id"] not in usados_v]) + len([x for x in fila_dia if x["id"] not in usados_f
+                                                                              and x.get("yt_id") not in {w["id"] for w in vids}])
+        cheio = len(vids_dia) + len([x for x in fila_dia if x.get("yt_id") not in {w["id"] for w in vids}]) >= a["por_dia"]
+        out.append({"data": data.isoformat(), "casas": casas, "fora_do_horario": extras, "cheio": cheio})
+    try:
+        ocupados = {int(_slot(x)) for x in f if x["estado"] not in ("enviado",)}
+        prox = proximo_horario(a, ocupados, agora, _no_canal(vids, fila(base), canal_id))
+    except YtErro:
+        prox = 0
+    for dd in out:  # um dia "cheio" pelos vídeos fora do horário: as casas livres dele não recebem mais
+        if dd["cheio"]:
+            for c in dd["casas"]:
+                if c["estado"] == "livre":
+                    c["estado"] = "dia_cheio"
+    return {"dias": out, "proximo": prox, "buscado": (_ler_recentes(base, a["conta"]) or {}).get("buscado", 0)}
+
+
 def resumo(base: str, agora: Optional[float] = None) -> Dict[str, Any]:
     agora = agora or time.time()
     cs = contas(base)
@@ -807,7 +909,7 @@ def registrar(app: Any, base_dir: str, meta_de: Callable[[str], Optional[Dict[st
         novos, p2 = adicionar(base_dir, itens, agora_ja=bool(b.get("agora")))
         if com_worker:
             iniciar_worker(base_dir, meta_de)
-        return jsonify({"ok": True, "novos": [{"nome": x["nome"], "quando": x["quando"], "canal": x["canal"]} for x in novos],
+        return jsonify({"ok": True, "novos": [{"nome": x["nome"], "quando": _slot(x), "publicar": x.get("publicar"), "canal": x["canal"]} for x in novos],
                         "pulados": pulados + p2})
 
     @app.route("/youtube/recentes/<conta>", methods=["POST"])
@@ -819,6 +921,27 @@ def registrar(app: Any, base_dir: str, meta_de: Callable[[str], Optional[Dict[st
         except YtErro as e:
             return _erro(e)
         return jsonify(dict(resumo(base_dir), ok=True, n=len(r["videos"])))
+
+    @app.route("/youtube/grade/<canal_id>", methods=["GET"])
+    def youtube_grade(canal_id: str):
+        a = agenda(base_dir, canal_id)
+        if a and a["conta"] in contas(base_dir) and request.args.get("buscar"):
+            try:
+                recentes(base_dir, a["conta"])  # (30 min de cache)
+            except Exception:  # noqa: BLE001
+                pass
+        return jsonify(dict(grade(base_dir, canal_id), ok=True))
+
+    @app.route("/youtube/padrao/<canal_id>", methods=["POST"])
+    def youtube_padrao(canal_id: str):
+        conta = str((request.get_json(silent=True) or {}).get("conta") or (agenda(base_dir, canal_id) or {}).get("conta") or "")
+        if conta not in contas(base_dir):
+            return _erro(YtErro("Escolha o canal do YouTube primeiro."))
+        try:
+            vids = recentes(base_dir, conta).get("videos") or []
+        except YtErro as e:
+            return _erro(e)
+        return jsonify(dict(padrao(vids), ok=True))
 
     @app.route("/youtube/fila/<iid>/<qual>", methods=["POST"])
     def youtube_fila_acao(iid: str, qual: str):

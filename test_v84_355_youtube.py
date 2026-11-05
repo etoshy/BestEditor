@@ -45,14 +45,14 @@ def test_agenda_proximos_horarios_livres(tmp_path):
     its = [{"pid": f"p{k}", "canal_id": "c1", "nome": f"v{k}"} for k in range(4)]
     novos, pulados = YE.adicionar(b, its, agora=agora)
     amanha = hoje + dt.timedelta(days=1)
-    assert [x["quando"] for x in novos] == [_ts(hoje, 18), _ts(hoje, 21), _ts(amanha, 12), _ts(amanha, 18)] and not pulados
+    assert [x["slot"] for x in novos] == [_ts(hoje, 18), _ts(hoje, 21), _ts(amanha, 12), _ts(amanha, 18)] and not pulados
     # o mesmo vídeo não entra 2 vezes; canal sem conta é pulado com motivo
     n2, p2 = YE.adicionar(b, [{"pid": "p0", "canal_id": "c1"}, {"pid": "z", "canal_id": "sem", "canal": "Outro"}], agora=agora)
     assert not n2 and len(p2) == 2 and "já está na fila" in p2[0] and "Outro" in p2[1]
     # 1 por dia com um horário só
     YE.salvar_agenda(b, "c1", {"conta": "UC1", "por_dia": 1, "horarios": ["09:30"]})
     assert YE.reagendar(b, "c1", agora=agora) == 4
-    qs = sorted(x["quando"] for x in YE.fila(b))
+    qs = sorted(x["slot"] for x in YE.fila(b))
     assert qs == [_ts(hoje + dt.timedelta(days=d), 9, 30) for d in (1, 2, 3, 4)]
     # 3 por dia mas só 1 horário → espalha a cada 3 h
     assert YE.horarios_do_dia(YE.limpar_agenda({"por_dia": 3, "horarios": ["12:00"]})) == ["12:00", "15:00", "18:00"]
@@ -209,15 +209,79 @@ def test_v84_356_ultimos_videos_e_agenda_respeita_o_canal(tmp_path, monkeypatch)
     monkeypatch.setattr(YE, "HTTP", _http_canal(vids))
     r = YE.recentes(b, "UC1", forcar=True)
     assert [v["id"] for v in r["videos"]][0] == "C" and r["inscritos"] == 120 and r["videos"][0]["duracao"] == 45
-    assert r["dicas"]["top"][0]["id"] == "A"
+    assert YE.dicas(r["videos"], agora=time.time() + 2 * 86400)["top"][0]["id"] == "A"  # (vídeo com menos de 6 h ainda não conta)
     novos, pulados = YE.adicionar(b, [{"pid": "p1", "canal_id": "c1", "nome": "Novo vídeo"},
                                       {"pid": "p2", "canal_id": "c1", "nome": "GATO pula o muro"}], agora=agora)
     # hoje já tem 1 (por dia = 1) e amanhã tem o agendado no Studio → vai pra depois de amanhã
-    assert [x["quando"] for x in novos] == [_ts(depois, 18)]
+    assert [x["slot"] for x in novos] == [_ts(depois, 18)]
     assert "já tem um vídeo com esse título" in pulados[0]
+    rr = YE._ler_recentes(b, "UC1")
+    rr["dicas"] = YE.dicas(rr["videos"], agora=time.time() + 2 * 86400)
+    with YE._TRAVA:
+        YE._gravar(b, os.path.join("recentes", "UC1.json"), rr)
     ctx = YE.contexto_titulos(b, "c1")
     assert "Gato pula o muro" in ctx and "never copy" in ctx
     import curtos_comentario as CC
     p = {"canal_id": "c1"}
     monkeypatch.setattr(CC, "CONTEXTO_TITULOS", lambda base, p: YE.contexto_titulos(base, p.get("canal_id")))
     assert "PERFORMED BEST" in CC._contexto_titulos(b, p)
+
+
+def test_v84_357_preenche_os_buracos_e_acha_o_padrao(tmp_path, monkeypatch):
+    b = _base(tmp_path)
+    YE.salvar_agenda(b, "c1", {"conta": "UC1", "por_dia": 3, "horarios": ["06:00", "12:00", "20:00"]})
+    hoje = dt.date.today()
+    d = [hoje + dt.timedelta(days=k) for k in range(4)]
+    agora = _ts(hoje, 5)
+    # no YouTube: agendados hoje e amanhã às 06:00 (faltam os das 12 e das 20)
+    vids = [{"id": "H", "titulo": "hoje 6", "quando": _ts(d[0], 6), "agendado": _ts(d[0], 6), "privacidade": "private"},
+            {"id": "A", "titulo": "amanha 6", "quando": _ts(d[1], 6, 2), "agendado": _ts(d[1], 6, 2), "privacidade": "private"}]
+    with YE._TRAVA:
+        YE._gravar(b, os.path.join("recentes", "UC1.json"), {"buscado": time.time(), "videos": vids})
+    novos, _ = YE.adicionar(b, [{"pid": f"p{k}", "canal_id": "c1", "nome": f"v{k}"} for k in range(5)], agora=agora)
+    assert [x["slot"] for x in novos] == [_ts(d[0], 12), _ts(d[0], 20), _ts(d[1], 12), _ts(d[1], 20), _ts(d[2], 6)]
+    g = YE.grade(b, "c1", dias=3, agora=agora)
+    assert [c["estado"] for c in g["dias"][0]["casas"]] == ["agendado", "fila", "fila"]
+    assert [c["estado"] for c in g["dias"][2]["casas"]] == ["fila", "livre", "livre"] and g["proximo"] == _ts(d[2], 12)
+    # o padrão: 10 dias saindo ~06:00, ~12:00 e ~20:00
+    hist = []
+    for k in range(1, 11):
+        dia = hoje - dt.timedelta(days=k)
+        hist += [{"quando": _ts(dia, 6, k % 3)}, {"quando": _ts(dia, 11, 55)}, {"quando": _ts(dia, 20, 5)}]
+    hist.append({"quando": _ts(hoje - dt.timedelta(days=4), 15, 0)})  # um fora do costume não vira horário
+    p = YE.padrao(hist, agora=agora)
+    assert p["horarios"] == ["06:00", "11:55", "20:05"] and p["por_dia"] == 3
+    assert YE.padrao([{"quando": agora - 100}], agora=agora)["horarios"] == []
+
+
+def test_v84_358_sobe_ja_e_o_youtube_publica_no_horario(tmp_path, monkeypatch):
+    b = _base(tmp_path)  # agenda sem 'modo' salvo → padrão é o YouTube agendar
+    assert YE.agenda(b, "c1")["modo"] == "youtube"
+    v, _ = _video(tmp_path, 100)
+    hoje = dt.date.today()
+    agora = time.time()
+    novos, _ = YE.adicionar(b, [{"pid": "p1", "canal_id": "c1"}, {"pid": "p2", "canal_id": "c1"}])
+    assert all(x["publicar"] and x["quando"] <= time.time() and x["slot"] > agora for x in novos)
+    assert novos[1]["slot"] > novos[0]["slot"]  # cada um no seu horário
+    corpos = []
+
+    def http(m, u, **k):
+        if u == YE.URL_UPLOAD:
+            corpos.append(json.loads(k["data"]))
+            return R(200, headers={"Location": "https://up/s"})
+        return R(200, {"id": f"V{len(corpos)}"})
+
+    monkeypatch.setattr(YE, "HTTP", http)
+    meta = lambda pid: {"titulo": pid, "video": v}
+    x1, x2 = YE.rodada(b, meta), YE.rodada(b, meta)  # os dois sobem JÁ, um atrás do outro
+    assert x1["estado"] == x2["estado"] == "enviado" and x1["agendado_yt"]
+    st = corpos[0]["status"]
+    assert st["privacyStatus"] == "private" and YE._iso_ts(st["publishAt"]) == novos[0]["slot"]
+    # o próximo vídeo não pega o horário dos que já subiram agendados
+    n3, _ = YE.adicionar(b, [{"pid": "p3", "canal_id": "c1"}])
+    assert n3[0]["slot"] not in (novos[0]["slot"], novos[1]["slot"]) and n3[0]["slot"] > novos[1]["slot"]
+    # modo antigo: o site sobe na hora (público)
+    YE.salvar_agenda(b, "c1", {"conta": "UC1", "horarios": ["12:00"], "modo": "site"})
+    n4, _ = YE.adicionar(b, [{"pid": "p4", "canal_id": "c1"}], agora=_ts(hoje, 10))
+    assert not n4[0]["publicar"] and n4[0]["quando"] == n4[0]["slot"]
+    assert "publishAt" not in YE.corpo_video({"titulo": "a"}, YE.agenda(b, "c1"), 0)["status"]

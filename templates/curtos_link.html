@@ -1085,7 +1085,7 @@ function desenhar(vs) {
   L.querySelectorAll('[data-selyt]').forEach(b => b.onclick = async () => { if (!SEL.size) return; b.disabled = true;
     try { const j = await post('/youtube/fila/adicionar', {ids: [...SEL], agora: b.dataset.selyt === 'agora'});
       const q = d => new Date(d * 1000).toLocaleString('pt-BR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
-      aviso((j.novos.length ? `📤 ${j.novos.length} na fila do YouTube: ` + j.novos.map(x => q(x.quando)).join(', ') : '📤 nenhum entrou na fila')
+      aviso((j.novos.length ? (j.novos.some(x => x.publicar) ? `📤 ${j.novos.length} subindo pro YouTube — publicam em: ` : `📤 ${j.novos.length} na fila do YouTube: `) + j.novos.map(x => q(x.quando)).join(', ') : '📤 nenhum entrou na fila')
         + (j.pulados.length ? ' · ' + j.pulados.join(' · ') : '') + ' — veja em 📤 YouTube', j.novos.length ? 'okk' : 'erro'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; });
   L.querySelectorAll('[data-selexp]').forEach(b => b.onclick = () => { if (!SEL.size) return; location.href = `/curtos/link/exportar-escolhidos?formato=${b.dataset.selexp}&ids=${encodeURIComponent([...SEL].join(','))}`; });

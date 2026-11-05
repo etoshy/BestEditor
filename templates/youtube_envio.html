@@ -107,28 +107,53 @@ function desenharAgendas(forcar) {
       <div class="yt-linha"><label>canal do YouTube <select data-f="conta"><option value="">— nenhum —</option>${EST.contas.map(k => `<option value="${esc(k.id)}"${k.id === a.conta ? ' selected' : ''}>${esc(k.titulo)}</option>`).join('')}</select></label></div>
       <div class="yt-linha"><label>por dia <select data-f="por_dia">${[1, 2, 3, 4, 5, 6].map(n => `<option${n === a.por_dia ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
         <label>${Object.entries(PRIV).map(([k, v]) => `<label><input type="radio" name="pv${esc(c.id)}" value="${k}"${a.privacidade === k ? ' checked' : ''} style="width:auto;margin:0"> ${v}</label>`).join(' ')}</label></div>
+      <div class="yt-linha"><label><input type="radio" name="md${esc(c.id)}" value="youtube"${a.modo !== 'site' ? ' checked' : ''} style="width:auto;margin:0"> 🗓 sobe já e o YouTube publica no horário (o PC pode estar desligado na hora)</label>
+        <label><input type="radio" name="md${esc(c.id)}" value="site"${a.modo === 'site' ? ' checked' : ''} style="width:auto;margin:0"> ⏰ o site sobe na hora</label></div>
       <div class="yt-linha yt-hs">horários ${hs.map(x => `<input type="time" data-h value="${esc(x)}">`).join('')}</div>
       <div class="yt-linha"><label><input type="checkbox" data-f="shorts_tag"${a.shorts_tag ? ' checked' : ''} style="width:auto;margin:0"> pôr #shorts no título</label>
         <label><input type="checkbox" data-f="reagendar" style="width:auto;margin:0"> mover os que já estão na fila pros horários novos</label></div>
       <button class="si-mini si-ok" data-salvar="${esc(c.id)}">💾 salvar a agenda</button>
-      <span class="si-dica">usa os primeiros horários (quantos o 'por dia' pedir); se faltar horário, espalha a cada 3 h</span></div>`; }).join('') || '<span class="si-dica">crie um canal na 🎨 Personalização primeiro</span>';
+      <button class="si-mini" data-padrao="${esc(c.id)}" title="olha quando os vídeos do canal saem (postados e agendados) e preenche os horários de costume">📐 usar o padrão do canal</button>
+      <span class="si-dica">usa os primeiros horários (quantos o 'por dia' pedir); se faltar horário, espalha a cada 3 h</span>
+      <div data-grade="${esc(c.id)}" style="margin-top:8px"></div></div>`; }).join('') || '<span class="si-dica">crie um canal na 🎨 Personalização primeiro</span>';
   el('agendas').querySelectorAll('[data-salvar]').forEach(b => b.onclick = async () => { const box = b.closest('[data-ag]'), cid = b.dataset.salvar;
     const pv = box.querySelector(`input[name="pv${CSS.escape(cid)}"]:checked`);
     const body = {conta: box.querySelector('[data-f=conta]').value, por_dia: Number(box.querySelector('[data-f=por_dia]').value),
       privacidade: pv ? pv.value : 'public', horarios: [...box.querySelectorAll('[data-h]')].map(i => i.value).filter(Boolean),
-      shorts_tag: box.querySelector('[data-f=shorts_tag]').checked, reagendar: box.querySelector('[data-f=reagendar]').checked};
+      shorts_tag: box.querySelector('[data-f=shorts_tag]').checked, modo: (box.querySelector(`input[name="md${CSS.escape(cid)}"]:checked`) || {}).value || 'youtube', reagendar: box.querySelector('[data-f=reagendar]').checked};
     try { EST = await post(`/youtube/agenda/${encodeURIComponent(cid)}`, body); aviso('💾 agenda salva' + (EST.reagendados ? ` · ${EST.reagendados} vídeo(s) foram pros horários novos` : ''), 'okk'); desenhar(true); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+  el('agendas').querySelectorAll('[data-padrao]').forEach(b => b.onclick = async () => { const box = b.closest('[data-ag]'); b.disabled = true;
+    try { const j = await post(`/youtube/padrao/${encodeURIComponent(b.dataset.padrao)}`, {conta: box.querySelector('[data-f=conta]').value});
+      if (!j.horarios.length) { aviso('📐 ' + (j.motivo || 'não achei um padrão'), 'erro'); b.disabled = false; return; }
+      const ins = [...box.querySelectorAll('[data-h]')]; ins.forEach((i, k) => i.value = j.horarios[k] || '');
+      box.querySelector('[data-f=por_dia]').value = String(Math.min(6, Math.max(1, j.por_dia)));
+      aviso(`📐 padrão de ${j.n} vídeos em ${j.dias} dias: ${j.por_dia} por dia às ${j.horarios.join(', ')} — confira e clique em 💾 salvar`, 'okk'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; });
+  desenharGrades();
+}
+const CASA = {youtube: ['✅', 'já saiu no YouTube'], agendado: ['🗓', 'agendado no YouTube'], enviado: ['📤', 'enviado por aqui'], fila: ['🕐', 'na fila daqui'],
+  erro: ['❌', 'deu erro'], livre: ['⬜', 'livre — o próximo vídeo vem pra cá'], passou: ['·', 'já passou'], dia_cheio: ['➖', 'o dia já tem os vídeos dele (fora do horário)']};
+async function desenharGrades() {
+  for (const box of el('agendas').querySelectorAll('[data-grade]')) { const cid = box.dataset.grade;
+    if (!(EST.agendas[cid] || {}).conta) { box.innerHTML = ''; continue; }
+    try { const j = await (await fetch(`/youtube/grade/${encodeURIComponent(cid)}?buscar=1`)).json(); if (!j.ok) continue;
+      const dia = s => new Date(s + 'T12:00').toLocaleDateString('pt-BR', {weekday: 'short', day: '2-digit', month: '2-digit'});
+      box.innerHTML = `<div class="si-dica" style="margin-bottom:4px">📅 próximos dias (YouTube + fila)${j.proximo ? ` · o próximo vídeo vai pra <b>${quando(j.proximo)}</b>` : ''}</div>
+        <table class="yt-fila">${j.dias.map(d => `<tr><td style="white-space:nowrap">${dia(d.data)}</td>${d.casas.map(c => `<td title="${esc(CASA[c.estado][1] + (c.titulo ? ': ' + c.titulo : ''))}"
+          style="white-space:nowrap">${CASA[c.estado][0]} ${c.h}</td>`).join('')}${d.fora_do_horario ? `<td class="si-dica">+${d.fora_do_horario} fora do horário</td>` : '<td></td>'}</tr>`).join('')}</table>
+        <div class="si-dica">✅ saiu · 🗓 agendado no YouTube · 📤 enviado daqui · 🕐 na fila · ⬜ buraco livre (preenchido primeiro) · ➖ dia já cheio</div>`; }
+    catch (e) {} }
 }
 function desenharFila() {
   const f = EST.fila, h = JSON.stringify(f);
-  if (h === hFila) return; hFila = h;
+  if (h === hFila) return; const mudou = hFila !== ''; hFila = h; if (mudou) desenharGrades();
   const nomeConta = id => (EST.contas.find(c => c.id === id) || {}).titulo || id;
   el('fila').innerHTML = f.length ? `<table class="yt-fila"><tr><th>vídeo</th><th>canal</th><th>quando</th><th>situação</th><th></th></tr>${f.map(x => `<tr class="${x.estado}">
       <td><b>${esc(x.nome)}</b>${x.yt_id ? `<br><a href="https://studio.youtube.com/video/${esc(x.yt_id)}/edit" target="_blank">abrir no Studio</a> · <a href="https://youtu.be/${esc(x.yt_id)}" target="_blank">youtu.be/${esc(x.yt_id)}</a>` : ''}
         ${x.log && x.log.length ? `<details><summary class="si-dica" style="cursor:pointer">histórico</summary><div class="yt-log">${esc(x.log.join('\n'))}</div></details>` : ''}</td>
       <td>${esc(x.canal)}<br><span class="si-dica">▶ ${esc(nomeConta(x.conta))}</span></td>
-      <td>${quando(x.quando)}</td>
+      <td>${quando(x.slot || x.quando)}<br><span class="si-dica">${x.publicar ? (x.estado === 'enviado' ? (x.agendado_yt ? '🗓 agendado no YouTube' : 'publicado ao subir') : '🗓 sobe já · o YouTube publica nesse horário') : (x.estado === 'na_fila' ? '⏰ o site sobe nesse horário' : '')}</span></td>
       <td>${ESTADO[x.estado] || esc(x.estado)}${x.estado === 'enviando' && x.prog != null ? ` ${x.prog}%` : ''}${x.erro ? `<br><span style="color:var(--erro)">${esc(x.erro)}</span>` : ''}${x.aviso ? `<br><span class="si-dica">${esc(x.aviso)}</span>` : ''}</td>
       <td>${['na_fila', 'erro', 'cancelado'].includes(x.estado) ? `<button class="si-mini" data-ac="agora" data-i="${x.id}">▶ subir agora</button>` : ''}
         ${x.estado === 'na_fila' ? `<button class="si-mini si-sec" data-ac="cancelar" data-i="${x.id}">⏹ cancelar</button>` : ''}
