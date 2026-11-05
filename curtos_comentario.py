@@ -782,7 +782,22 @@ def conteudo_explicativo(base: str, p: Dict[str, Any]) -> str:
     return "\n".join(L)
 
 
+# 📺 v84_356: os títulos que deram certo no canal do YouTube (o curtos_rotas liga isso no youtube_envio)
+CONTEXTO_TITULOS: Optional[Callable[[str, Dict[str, Any]], str]] = None
+
+
+def _contexto_titulos(base: str, p: Dict[str, Any]) -> str:
+    try:
+        return (CONTEXTO_TITULOS(base, p) or "") if CONTEXTO_TITULOS else ""
+    except Exception:  # noqa: BLE001  (sem isso o roteiro sai igual)
+        return ""
+
+
 def conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
+    return _conteudo_roteiro(base, p) + _contexto_titulos(base, p)
+
+
+def _conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
     if explicativo(p):
         return conteudo_explicativo(base, p)
     c = dados(p)
@@ -1105,6 +1120,7 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
         comentario = " ".join(str(comentario or "").split())[:600]
         if comentario:
             guia += f"\nTHE CREATOR'S DIRECTION (follow it; it may be in Portuguese): {comentario}"
+        guia += _contexto_titulos(base, p)
     txt = (f"{pedido}{guia}\nDifferent from these:\n{ja or '(none)'}\n\nSCRIPT:\n{corpo}\n\n"
            f"Each with 'en' (in {lingua}{tag}) and 'pt' (Brazilian Portuguese).")
     import ia_servico

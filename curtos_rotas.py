@@ -2984,6 +2984,36 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             CT.salvar(base_dir, q)
         return _ok(videos=_links())
 
+    # 📤 v84_355: enviar pro YouTube (API oficial) com a capa, na agenda de cada canal
+    import youtube_envio as YE
+
+    def _yt_meta(pid: str) -> Optional[Dict[str, Any]]:
+        try:
+            p = CT.carregar(base_dir, pid)
+        except CT.CurtoErro:
+            return None
+        v = _link_resumo(p)
+        r = p.get("roteiro") or {}
+        esc_ = v.get("escolha") or {}
+        titulo = esc_.get("titulo") or r.get("titulo_video") or next((t["en"] for t in v.get("titulos") or [] if t.get("en")), "") or v["titulo"]
+        ts = p.get("thumbs") or []
+        k = esc_.get("capa") if esc_.get("capa") and 1 <= esc_["capa"] <= len(ts) else (1 if ts else 0)  # sem capa escolhida: o 1º print
+        thumb = os.path.join(CT.pasta(base_dir, pid), "thumbs", ts[k - 1]["arquivo"]) if k else ""
+        return {"titulo": titulo, "descricao": v.get("descricao") or "", "hashtags": v.get("hashtags") or [],
+                "video": (p.get("exportado") or {}).get("arquivo") or "", "thumb": thumb if thumb and os.path.isfile(thumb) else ""}
+
+    def _yt_item(pid: str) -> Optional[Dict[str, Any]]:
+        try:
+            p = CT.carregar(base_dir, pid)
+        except CT.CurtoErro:
+            return None
+        v = _link_resumo(p)
+        return {"pid": pid, "canal_id": v.get("canal_id") or "", "canal": v.get("canal") or "", "nome": (_yt_meta(pid) or {}).get("titulo") or v["titulo"] or pid,
+                "pronto": v.get("pronto")}
+
+    YE.registrar(app, base_dir, meta_de=_yt_meta, item_de=_yt_item, canais=lambda: CT.listar_canais(base_dir))
+    CC.CONTEXTO_TITULOS = lambda b, p: YE.contexto_titulos(b, p.get("canal_id") or "")  # 📺 v84_356
+
     @app.route("/curtos/link/exportar-escolhidos", methods=["GET"])
     def curtos_link_exportar_escolhidos():
         """📦 exporta, de cada vídeo com título ou capa escolhidos: roteiro, títulos, título escolhido e a capa — em ZIP (pacote.json + capas) ou só JSON."""

@@ -22,6 +22,7 @@
   .lk-selbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: 6px 0;
                border: 1px solid var(--borda); border-radius: 10px; background: var(--card); font-size: .88rem; }
   .lk-selacoes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  #lkTopo, #lkCards { overflow-anchor: none; }  /* 📌 v84_355: quem segura a rolagem é o desenhar() */
   .lk-alca { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed rgba(255,255,255,.85); cursor: ns-resize; z-index: 2; }
   .lk-alca::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 24px; }  /* área fácil de pegar */
   .lk-alca span { position: absolute; right: 6px; top: -11px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: #7c3aed; color: #fff; pointer-events: none; }
@@ -983,6 +984,7 @@ function desenhar(vs) {
       <span class="lk-selacoes" style="${SEL.size ? '' : 'opacity:.45;pointer-events:none'}">
         <button class="si-mini si-ok" data-selini="1" title="começa os marcados que ainda estão na fila (⏸ aguardando, com erro ou parados) — do jeito escolhido em 🧩 Como rodar o lote">▶ produzir marcados</button>
         <label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-weight:400"><input type="checkbox" id="selEtapa" style="width:auto;margin:0"${loteModo() === 'etapa' ? ' checked' : ''}> 🧩 em paralelo (por etapa)</label>
+        <button class="si-mini si-ok" data-selyt="agenda" title="cada marcado (pronto) ganha o próximo horário livre da agenda do canal — configure em 📤 YouTube">📤 agendar no YouTube</button><button class="si-mini si-sec" data-selyt="agora" title="sobe os marcados prontos agora, um por vez">⏫ subir já</button>
         <button class="si-mini" data-selexp="zip">📦 exportar ZIP (JSON + capas)</button><button class="si-mini si-sec" data-selexp="json">📄 só o JSON</button>
         <button class="si-mini si-sec" data-selacao="apagar" title="apaga vídeo, projeto do editor, clipes e prints — fica o link, as marcas e o log">🗑 apagar arquivos</button>
         <button class="si-mini si-perigo" data-selacao="tirar" title="tira da lista de vez (apaga tudo, inclusive o log)">❌ tirar da lista</button></span></div>`;
@@ -1048,13 +1050,25 @@ function desenhar(vs) {
   // ⚡ v84_344: só troca o cartão que MUDOU (antes recriava todos a cada 2 s — os players e as imagens recarregavam)
   let topo = L.querySelector(':scope > #lkTopo'), caixa = L.querySelector(':scope > #lkCards');
   if (!topo || !caixa) { L.innerHTML = '<div id="lkTopo"></div><div id="lkCards"></div>'; topo = L.querySelector('#lkTopo'); caixa = L.querySelector('#lkCards'); }
+  // 📌 v84_355: a tela não pula — guarda qual cartão está no topo da tela e onde, troca o que mudou e põe de volta no lugar
+  const ancora = (() => { for (const c of caixa.children) { const r = c.getBoundingClientRect(); if (r.bottom > 70) return {id: c.dataset.vid, top: r.top}; } return null; })();
+  const altAntes = caixa.offsetHeight;
   if (topo.dataset.h !== hashTxt(topoHtml)) { topo.innerHTML = topoHtml; topo.dataset.h = hashTxt(topoHtml); }
   const velhos = new Map([...caixa.children].map(e => [e.dataset.vid, e])), novos = [];
   cardsHtml.forEach((h, k) => { const id = vs[k].id, hh = hashTxt(h), e = velhos.get(id);
     if (e && e.dataset.h === hh) { novos.push(e); return; }
     if (e) e.querySelectorAll('video[data-orig]').forEach(vd => { players[vd.dataset.orig] = vd; vd.remove(); });
     const t = document.createElement('template'); t.innerHTML = h.trim(); const n = t.content.firstElementChild; n.dataset.h = hh; novos.push(n); });
-  if (novos.length !== caixa.children.length || novos.some((n, k) => caixa.children[k] !== n)) caixa.replaceChildren(...novos);
+  if (novos.length !== caixa.children.length || novos.some((n, k) => caixa.children[k] !== n)) {
+    caixa.style.minHeight = altAntes + 'px';  // as imagens novas ainda não carregaram: segura a altura pra página não encolher
+    caixa.replaceChildren(...novos);
+    const imgs = [...caixa.querySelectorAll('img')].filter(i => !i.complete);
+    clearTimeout(caixa._solta); const soltar = () => { caixa.style.minHeight = ''; };
+    Promise.all(imgs.map(i => new Promise(r => { i.addEventListener('load', r, {once: true}); i.addEventListener('error', r, {once: true}); })))
+      .then(() => { clearTimeout(caixa._solta); soltar(); }); caixa._solta = setTimeout(soltar, 4000);
+  }
+  if (ancora) { const n = [...caixa.children].find(c => c.dataset.vid === ancora.id);
+    if (n) { const d = n.getBoundingClientRect().top - ancora.top; if (Math.abs(d) > 1) window.scrollBy({top: d, behavior: 'instant'}); } }
   L.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => copiar(b.dataset.copiar));
   // ☑ v84_331: seleção
   const selAtualiza = () => { guardarSel(); el('selN').textContent = SEL.size; const a = L.querySelector('.lk-selacoes'); if (a) a.style.cssText = SEL.size ? '' : 'opacity:.45;pointer-events:none';
@@ -1068,6 +1082,12 @@ function desenhar(vs) {
       aviso(j.iniciados ? `▶ ${j.iniciados} na produção, ${j.por_etapa ? '🧩 por etapa (em paralelo)' : 'um por vez'}` + (j.pulados ? ` · ${j.pulados} já feito(s)/rodando ficaram de fora` : '') : 'Nenhum marcado está na fila (já foram feitos ou estão rodando).', j.iniciados ? 'okk' : 'erro'); }
     catch (e) { aviso('❌ ' + e.message, 'erro'); ini_.disabled = false; } };
   const et_ = L.querySelector('#selEtapa'); if (et_) et_.onchange = () => { const r = document.querySelector(`input[name=lote_modo][value="${et_.checked ? 'etapa' : 'um'}"]`); if (r) { r.checked = true; salvarOpcoes(); } };
+  L.querySelectorAll('[data-selyt]').forEach(b => b.onclick = async () => { if (!SEL.size) return; b.disabled = true;
+    try { const j = await post('/youtube/fila/adicionar', {ids: [...SEL], agora: b.dataset.selyt === 'agora'});
+      const q = d => new Date(d * 1000).toLocaleString('pt-BR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+      aviso((j.novos.length ? `📤 ${j.novos.length} na fila do YouTube: ` + j.novos.map(x => q(x.quando)).join(', ') : '📤 nenhum entrou na fila')
+        + (j.pulados.length ? ' · ' + j.pulados.join(' · ') : '') + ' — veja em 📤 YouTube', j.novos.length ? 'okk' : 'erro'); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } b.disabled = false; });
   L.querySelectorAll('[data-selexp]').forEach(b => b.onclick = () => { if (!SEL.size) return; location.href = `/curtos/link/exportar-escolhidos?formato=${b.dataset.selexp}&ids=${encodeURIComponent([...SEL].join(','))}`; });
   L.querySelectorAll('[data-selacao]').forEach(b => b.onclick = async () => { if (!SEL.size) return; const tirar = b.dataset.selacao === 'tirar';
     if (!confirm(tirar ? `Tirar ${SEL.size} vídeo(s) da lista DE VEZ? Apaga tudo (vídeo, projeto do editor, clipes, prints, roteiro e o log). Não dá pra desfazer.`

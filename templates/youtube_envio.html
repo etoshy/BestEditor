@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}📤 YouTube — envio e agenda{% endblock %}
+{% block content %}
+{% include "_shorts_ia_comum.html" %}
+<style>
+  .yt-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .yt-linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  .yt-linha label { display: inline-flex; flex-direction: row; gap: 4px; align-items: center; margin: 0; white-space: nowrap; font-weight: 400; }
+  .yt-linha select { width: auto; }
+  .yt-fila { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .yt-fila td, .yt-fila th { border-bottom: 1px solid var(--borda); padding: 6px; text-align: left; vertical-align: top; }
+  .yt-fila tr.enviado td { opacity: .75; }
+  .yt-passos li { margin: 3px 0; }
+  .yt-cod { font-family: monospace; background: var(--acento-suave); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+  .yt-hs input { width: 128px; }
+  .yt-log { font-size: .78rem; color: var(--mudo); white-space: pre-wrap; }
+</style>
+<h1>📤 YouTube <span class="si-dica" style="font-weight:400">marque os vídeos no 🔗 Link → "📤 agendar no YouTube"; aqui você liga as contas e escolhe os horários</span></h1>
+<div id="barra" class="si-barra"></div>
+
+<div class="si-card" id="cCliente">
+  <h3 style="margin-top:0">1️⃣ Credencial do Google <span id="stCliente" class="si-tag"></span></h3>
+  <details id="dPassos"><summary style="cursor:pointer">Como criar (uma vez só, ~5 min)</summary>
+    <ol class="yt-passos">
+      <li>Em <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a>, crie um projeto.</li>
+      <li><b>APIs e serviços › Biblioteca</b> → ative a <b>YouTube Data API v3</b>.</li>
+      <li><b>Tela de consentimento OAuth</b> → tipo <b>Externo</b>; em <b>Usuários de teste</b> ponha o seu Gmail. Depois clique em
+        <b>Publicar app</b> (em produção) — no modo "Teste" o Google desconecta a conta a cada 7 dias.</li>
+      <li><b>Credenciais › Criar › ID do cliente OAuth</b> → tipo <b>Aplicativo da Web</b> → em <b>URIs de redirecionamento autorizados</b> cole:
+        <div class="yt-cod" id="redir">{{ redirect_uri }}</div>
+        <span class="si-dica">(tem que ser exatamente esse endereço — se você abre o site por outro, ex. localhost, use o daquele)</span></li>
+      <li>Baixe o JSON da credencial (⬇) e envie aqui embaixo.</li>
+    </ol>
+    <div class="as-aviso si-dica">⚠ Regra do Google: enquanto o projeto não passar pela <b>auditoria da API do YouTube</b>, todo vídeo enviado pela API fica
+      <b>privado</b> (dá pra mudar pra público no Studio à mão). A cota grátis permite até <b>100 envios por dia</b> por projeto (fora o limite do próprio canal).</div>
+  </details>
+  <div class="yt-linha"><input type="file" id="fCliente" accept=".json,application/json" style="width:auto"><button class="si-mini si-ok" id="bCliente">📥 enviar a credencial</button></div>
+</div>
+
+<div class="si-card">
+  <h3 style="margin-top:0">2️⃣ Canais do YouTube conectados</h3>
+  <div id="contas"></div>
+  <div class="yt-linha"><a href="/youtube/conectar" id="aConectar"><button class="si-mini si-ok">➕ conectar um canal do YouTube</button></a>
+    <span class="si-dica">abre o Google: escolha a conta/canal e permita "enviar vídeos". Repita para cada canal.</span></div>
+</div>
+
+<div class="si-card">
+  <h3 style="margin-top:0">3️⃣ Agenda de cada canal do site</h3>
+  <div class="yt-grade" id="agendas"></div>
+</div>
+
+<div class="si-card">
+  <h3 style="margin-top:0">📋 Fila <span class="si-dica" style="font-weight:400">sobe na hora marcada — o site precisa estar aberto no PC (os atrasados sobem assim que ele abrir)</span></h3>
+  <div id="fila"></div>
+</div>
+
+<script>
+(() => {
+const CANAIS = {{ canais|tojson }};
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function aviso(t, cls) { const b = el('barra'); b.className = 'si-barra ' + (cls || 'on'); b.textContent = t; if (cls === 'okk') setTimeout(() => b.className = 'si-barra', 4000); }
+const q = new URLSearchParams(location.search);
+if (q.get('erro')) aviso('❌ ' + q.get('erro'), 'erro'); else if (q.get('ok')) aviso(q.get('ok'), 'okk');
+if (q.get('erro') || q.get('ok')) history.replaceState(null, '', '/youtube');
+async function post(url, body) { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
+  const j = await r.json(); if (!j.ok) throw new Error(j.erro || r.status); return j; }
+const quando = ts => { const d = new Date(ts * 1000); return d.toLocaleString('pt-BR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}); };
+const ESTADO = {na_fila: '🕐 na fila', enviando: '⏫ subindo', enviado: '✅ enviado', erro: '❌ erro', cancelado: '⏹ cancelado'};
+const PRIV = {public: '🌍 público', unlisted: '🔗 não listado', private: '🔒 privado'};
+let EST = null, hFila = '', hAg = '', hContas = '', timer = null;
+
+function desenharContas() {
+  el('stCliente').textContent = EST.tem_cliente ? `✅ enviada (${EST.tipo_cliente === 'web' ? 'Aplicativo da Web' : 'App para computador'})` : '⚠ falta enviar';
+  if (!EST.tem_cliente) el('dPassos').open = true;
+  const hc = JSON.stringify(EST.contas); if (hc === hContas) return; hContas = hc;
+  const abertos = new Set([...el('contas').querySelectorAll('details[open]')].map(d => d.dataset.rc));
+  const fmtN = n => Number(n || 0).toLocaleString('pt-BR');
+  const tabela = c => { const r = c.recentes || {}, vs = r.videos || [], d = r.dicas || {};
+    if (!r.buscado) return '<span class="si-dica">ainda não buscado — clique em 🔄</span>';
+    const sit = v => v.agendado && v.agendado * 1000 > Date.now() ? `🗓 agendado ${quando(v.agendado)}` : `${PRIV[v.privacidade] || esc(v.privacidade)} ${quando(v.publicado)}`;
+    return `<div class="si-dica">${fmtN(r.inscritos)} inscritos · ${fmtN(r.total_videos)} vídeos · buscado ${quando(r.buscado)}</div>
+      ${d.n ? `<div class="as-aviso si-dica" style="margin:6px 0">📈 média de <b>${fmtN(d.media_views)}</b> views nos ${d.n} últimos públicos · melhores horários: <b>${(d.melhores_horas || []).join(', ')}</b>
+        · os títulos que mais deram view entram como referência pra IA escrever os próximos (sem copiar)</div>` : ''}
+      <table class="yt-fila"><tr><th>vídeo</th><th>quando</th><th>views</th><th>👍</th><th>💬</th></tr>${vs.map(v => `<tr>
+        <td><a href="https://studio.youtube.com/video/${esc(v.id)}/edit" target="_blank">${esc(v.titulo)}</a>${(d.top || []).some(t => t.id === v.id && t.views > d.media_views) ? ' 🔥' : ''}</td>
+        <td>${sit(v)}</td><td>${fmtN(v.views)}</td><td>${fmtN(v.likes)}</td><td>${fmtN(v.comentarios)}</td></tr>`).join('')}</table>`; };
+  el('contas').innerHTML = EST.contas.length ? EST.contas.map(c => `<div style="margin:6px 0"><div class="yt-linha"><b>▶ ${esc(c.titulo)}</b>
+      ${c.pausada_ate ? `<span class="si-tag">⏸ pausada até ${quando(c.pausada_ate)} — ${esc(c.motivo)}</span>` : c.motivo ? `<span class="si-tag">⚠ ${esc(c.motivo)}</span>` : ''}
+      <button class="si-mini" data-rec="${esc(c.id)}" title="busca os últimos vídeos (postados, agendados e privados) com views, likes e comentários">🔄 últimos vídeos</button>
+      <button class="si-mini si-sec" data-desc="${esc(c.id)}">desconectar</button></div>
+      <details data-rc="${esc(c.id)}"${abertos.has(c.id) ? ' open' : ''}><summary style="cursor:pointer">📺 últimos vídeos do canal (${((c.recentes || {}).videos || []).length})</summary>${tabela(c)}</details></div>`).join('')
+    : '<span class="si-dica">nenhum ainda</span>';
+  el('contas').querySelectorAll('[data-rec]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = '⏳ buscando…';
+    try { EST = await post(`/youtube/recentes/${b.dataset.rec}`); aviso(`📺 ${EST.n} vídeo(s) do canal`, 'okk'); hContas = ''; desenhar();
+      const d = el('contas').querySelector(`details[data-rc="${CSS.escape(b.dataset.rec)}"]`); if (d) d.open = true; }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; b.textContent = '🔄 últimos vídeos'; } });
+  el('contas').querySelectorAll('[data-desc]').forEach(b => b.onclick = async () => { if (!confirm('Desconectar esse canal do YouTube?')) return;
+    try { EST = await post(`/youtube/contas/${b.dataset.desc}/desconectar`); desenhar(true); } catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+}
+function desenharAgendas(forcar) {
+  const h = JSON.stringify([EST.contas.map(c => c.id), EST.agendas]);
+  if (!forcar && h === hAg) return; hAg = h;  // não redesenha enquanto você mexe
+  el('agendas').innerHTML = CANAIS.map(c => { const a = EST.agendas[c.id] || {horarios: ['18:00'], por_dia: 1, privacidade: 'public', conta: ''};
+    const hs = a.horarios.concat(Array(Math.max(0, 6 - a.horarios.length)).fill(''));
+    return `<div class="si-card" style="margin:0" data-ag="${esc(c.id)}"><b>${esc(c.nome)}</b>
+      <div class="yt-linha"><label>canal do YouTube <select data-f="conta"><option value="">— nenhum —</option>${EST.contas.map(k => `<option value="${esc(k.id)}"${k.id === a.conta ? ' selected' : ''}>${esc(k.titulo)}</option>`).join('')}</select></label></div>
+      <div class="yt-linha"><label>por dia <select data-f="por_dia">${[1, 2, 3, 4, 5, 6].map(n => `<option${n === a.por_dia ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label>${Object.entries(PRIV).map(([k, v]) => `<label><input type="radio" name="pv${esc(c.id)}" value="${k}"${a.privacidade === k ? ' checked' : ''} style="width:auto;margin:0"> ${v}</label>`).join(' ')}</label></div>
+      <div class="yt-linha yt-hs">horários ${hs.map(x => `<input type="time" data-h value="${esc(x)}">`).join('')}</div>
+      <div class="yt-linha"><label><input type="checkbox" data-f="shorts_tag"${a.shorts_tag ? ' checked' : ''} style="width:auto;margin:0"> pôr #shorts no título</label>
+        <label><input type="checkbox" data-f="reagendar" style="width:auto;margin:0"> mover os que já estão na fila pros horários novos</label></div>
+      <button class="si-mini si-ok" data-salvar="${esc(c.id)}">💾 salvar a agenda</button>
+      <span class="si-dica">usa os primeiros horários (quantos o 'por dia' pedir); se faltar horário, espalha a cada 3 h</span></div>`; }).join('') || '<span class="si-dica">crie um canal na 🎨 Personalização primeiro</span>';
+  el('agendas').querySelectorAll('[data-salvar]').forEach(b => b.onclick = async () => { const box = b.closest('[data-ag]'), cid = b.dataset.salvar;
+    const pv = box.querySelector(`input[name="pv${CSS.escape(cid)}"]:checked`);
+    const body = {conta: box.querySelector('[data-f=conta]').value, por_dia: Number(box.querySelector('[data-f=por_dia]').value),
+      privacidade: pv ? pv.value : 'public', horarios: [...box.querySelectorAll('[data-h]')].map(i => i.value).filter(Boolean),
+      shorts_tag: box.querySelector('[data-f=shorts_tag]').checked, reagendar: box.querySelector('[data-f=reagendar]').checked};
+    try { EST = await post(`/youtube/agenda/${encodeURIComponent(cid)}`, body); aviso('💾 agenda salva' + (EST.reagendados ? ` · ${EST.reagendados} vídeo(s) foram pros horários novos` : ''), 'okk'); desenhar(true); }
+    catch (e) { aviso('❌ ' + e.message, 'erro'); } });
+}
+function desenharFila() {
+  const f = EST.fila, h = JSON.stringify(f);
+  if (h === hFila) return; hFila = h;
+  const nomeConta = id => (EST.contas.find(c => c.id === id) || {}).titulo || id;
+  el('fila').innerHTML = f.length ? `<table class="yt-fila"><tr><th>vídeo</th><th>canal</th><th>quando</th><th>situação</th><th></th></tr>${f.map(x => `<tr class="${x.estado}">
+      <td><b>${esc(x.nome)}</b>${x.yt_id ? `<br><a href="https://studio.youtube.com/video/${esc(x.yt_id)}/edit" target="_blank">abrir no Studio</a> · <a href="https://youtu.be/${esc(x.yt_id)}" target="_blank">youtu.be/${esc(x.yt_id)}</a>` : ''}
+        ${x.log && x.log.length ? `<details><summary class="si-dica" style="cursor:pointer">histórico</summary><div class="yt-log">${esc(x.log.join('\n'))}</div></details>` : ''}</td>
+      <td>${esc(x.canal)}<br><span class="si-dica">▶ ${esc(nomeConta(x.conta))}</span></td>
+      <td>${quando(x.quando)}</td>
+      <td>${ESTADO[x.estado] || esc(x.estado)}${x.estado === 'enviando' && x.prog != null ? ` ${x.prog}%` : ''}${x.erro ? `<br><span style="color:var(--erro)">${esc(x.erro)}</span>` : ''}${x.aviso ? `<br><span class="si-dica">${esc(x.aviso)}</span>` : ''}</td>
+      <td>${['na_fila', 'erro', 'cancelado'].includes(x.estado) ? `<button class="si-mini" data-ac="agora" data-i="${x.id}">▶ subir agora</button>` : ''}
+        ${x.estado === 'na_fila' ? `<button class="si-mini si-sec" data-ac="cancelar" data-i="${x.id}">⏹ cancelar</button>` : ''}
+        ${x.estado !== 'enviando' ? `<button class="si-mini si-sec" data-ac="tirar" data-i="${x.id}" title="só tira desta lista (no YouTube nada muda)">🗑</button>` : ''}</td></tr>`).join('')}</table>`
+    : '<span class="si-dica">vazia — marque vídeos prontos no 🔗 Link e clique em "📤 agendar no YouTube"</span>';
+  el('fila').querySelectorAll('[data-ac]').forEach(b => b.onclick = async () => { b.disabled = true;
+    try { EST = await post(`/youtube/fila/${b.dataset.i}/${b.dataset.ac}`); desenhar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); b.disabled = false; } });
+}
+function desenhar(forcar) { desenharContas(); desenharAgendas(forcar); desenharFila(); }
+async function atualizar() {
+  try { EST = await (await fetch('/youtube/estado')).json(); desenhar(!hAg); } catch (e) {}
+  if (EST && !atualizar.buscou) { atualizar.buscou = true;  // 📺 ao abrir: os últimos vídeos de cada canal (se a lista tem mais de 30 min)
+    EST.contas.filter(c => !(c.recentes || {}).buscado || Date.now() / 1000 - c.recentes.buscado > 1800)
+      .forEach(c => post(`/youtube/recentes/${encodeURIComponent(c.id)}`).then(j => { EST = j; desenhar(); }).catch(() => {})); }
+  clearTimeout(timer); timer = setTimeout(atualizar, EST && EST.fila.some(x => x.estado === 'enviando') ? 3000 : 15000);
+}
+el('bCliente').onclick = async () => { const f = el('fCliente').files[0]; if (!f) return aviso('Escolha o arquivo JSON da credencial', 'erro');
+  const fd = new FormData(); fd.append('arquivo', f);
+  try { const j = await (await fetch('/youtube/cliente', {method: 'POST', body: fd})).json(); if (!j.ok) throw new Error(j.erro);
+    aviso('✅ credencial salva — agora conecte o canal do YouTube', 'okk'); atualizar(); } catch (e) { aviso('❌ ' + e.message, 'erro'); } };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizar(); });
+atualizar();
+})();
+</script>
+{% endblock %}
