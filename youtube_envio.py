@@ -330,7 +330,7 @@ def adicionar(base: str, itens: List[Dict[str, Any]], agora_ja: bool = False, ag
             publicar = a["modo"] == "youtube" and not agora_ja
             quando = agora if publicar else slot  # 🗓 modo YouTube: sobe já, publica no horário
             x = {"id": secrets.token_hex(6), "pid": it["pid"], "canal_id": it.get("canal_id") or "", "canal": it.get("canal") or "",
-                 "nome": nome, "conta": a["conta"], "quando": quando, "slot": slot, "publicar": publicar, "estado": "na_fila", "tentativas": 0,
+                 "nome": nome, "conta": a["conta"], "quando": quando, "slot": slot, "publicar": publicar, "ja": bool(agora_ja), "estado": "na_fila", "tentativas": 0,
                  "yt_id": "", "erro": "", "aviso": "", "log": [], "criado": agora}
             f.append(x)
             novos.append(x)
@@ -361,7 +361,7 @@ def acao(base: str, iid: str, qual: str) -> Dict[str, Any]:
         if qual == "agora":
             if x["estado"] not in ("na_fila", "erro", "cancelado"):
                 raise YtErro("Esse já está subindo ou já subiu.")
-            return _mexer(base, iid, estado="na_fila", quando=time.time(), erro="", tentativas=0, _log="▶ enviar agora")
+            return _mexer(base, iid, estado="na_fila", quando=time.time(), slot=time.time(), publicar=False, ja=True, erro="", tentativas=0, _log="▶ enviar agora")
         if qual == "cancelar":
             if x["estado"] == "enviando":
                 raise YtErro("Já está subindo — espere terminar.")
@@ -447,7 +447,8 @@ def _com_token(base: str, conta: str, fazer: Callable[[str], Any]) -> Any:
     return r
 
 
-def subir_video(base: str, conta: str, arquivo: str, corpo: Dict[str, Any], progresso: Optional[Callable[[float], None]] = None) -> str:
+def subir_video(base: str, conta: str, arquivo: str, corpo: Dict[str, Any], progresso: Optional[Callable[[float], None]] = None,
+                info: Optional[Dict[str, Any]] = None) -> str:
     total = os.path.getsize(arquivo)
     r = _com_token(base, conta, lambda tk: HTTP("POST", URL_UPLOAD, params={"uploadType": "resumable", "part": "snippet,status"},
                                                   headers={"Authorization": f"Bearer {tk}", "Content-Type": "application/json; charset=UTF-8",
@@ -466,7 +467,10 @@ def subir_video(base: str, conta: str, arquivo: str, corpo: Dict[str, Any], prog
                      headers={"Authorization": f"Bearer {_token(base, conta)}", "Content-Length": str(len(dados)),
                               "Content-Range": f"bytes {inicio}-{fim}/{total}"})
             if r.status_code in (200, 201):
-                vid = (r.json() or {}).get("id")
+                j = r.json() or {}
+                vid = j.get("id")
+                if info is not None:
+                    info.update(j.get("status") or {})  # o que o YouTube REALMENTE gravou (privacidade, publishAt)
                 if not vid:
                     raise YtErro("O YouTube terminou o envio mas não devolveu o id do vídeo.")
                 if progresso:
@@ -551,7 +555,8 @@ def enviar_item(base: str, x: Dict[str, Any], meta_de: Callable[[str], Optional[
         a = agenda(base, x.get("canal_id") or "") or limpar_agenda({})
         pub = _slot(x) if x.get("publicar") else 0
         corpo = corpo_video(meta, a, pub)
-        yt_id = subir_video(base, conta, meta["video"], corpo,
+        st_yt: Dict[str, Any] = {}
+        yt_id = subir_video(base, conta, meta["video"], corpo, info=st_yt,
                             progresso=lambda p: _mexer(base, iid, prog=round(p * 100)))
     except YtErro as e:
         if e.motivo in MOTIVOS_LIMITE_CANAL:
@@ -565,9 +570,13 @@ def enviar_item(base: str, x: Dict[str, Any], meta_de: Callable[[str], Optional[
         return _falha(base, x, str(e), temporario=e.status >= 500 or e.status == 0)
     except Exception as e:  # noqa: BLE001  (rede caiu, timeout…)
         return _falha(base, x, f"{type(e).__name__}: {e}"[:300], temporario=True)
-    agendado = (corpo.get("status") or {}).get("publishAt")
+    agendado = st_yt.get("publishAt") or (corpo.get("status") or {}).get("publishAt") if not st_yt else st_yt.get("publishAt")
     _mexer(base, iid, estado="enviado", yt_id=yt_id, enviado=time.time(), prog=100, agendado_yt=bool(agendado),
-           _log=f"✅ no YouTube: {yt_id}" + (f" · 🗓 o YouTube publica em {time.strftime('%d/%m %H:%M', time.localtime(pub))}" if agendado else ""))
+           status_yt=st_yt.get("privacyStatus") or "",
+           _log=f"✅ no YouTube: {yt_id}" + (f" · 🗓 o YouTube publica em {time.strftime('%d/%m %H:%M', time.localtime(_iso_ts(agendado) or pub))}" if agendado else "")
+           + (f" · o YouTube gravou: {st_yt.get('privacyStatus')}" if st_yt.get("privacyStatus") else ""))
+    if pub and pub > time.time() + 300 and st_yt and not st_yt.get("publishAt"):
+        _mexer(base, iid, aviso="⚠ o YouTube não aceitou a data marcada (publishAt) — veja no Studio", _log="⚠ o YouTube ignorou a data marcada")
     aviso = ""
     if meta.get("thumb") and os.path.isfile(meta["thumb"]):
         try:
@@ -606,7 +615,53 @@ def destravar(base: str) -> int:
         return n
 
 
+ATRASO_S = 15 * 60
+
+
+def ajustar_atrasados(base: str, agora: Optional[float] = None) -> int:
+    """📌 v84_359: o site ficou fechado e os horários passaram — os atrasados NÃO saem todos de uma vez (públicos):
+    cada um ganha o próximo buraco livre da agenda e segue o modo dela (🗓 sobe já com data marcada / ⏰ o site sobe na hora).
+    Também converte os itens antigos (sem 'publicar') pro modo atual da agenda. 'subir já' fica de fora."""
+    agora = agora or time.time()
+    n = 0
+    with _TRAVA:
+        f = fila(base)
+        por_canal: Dict[str, List[Dict[str, Any]]] = {}
+        for x in f:
+            if x["estado"] == "na_fila" and not x.get("ja"):
+                por_canal.setdefault(x.get("canal_id") or "", []).append(x)
+        for cid, itens in por_canal.items():
+            a = agenda(base, cid)
+            if not a:
+                continue
+            for x in sorted(itens, key=_slot):
+                velho = "publicar" not in x
+                atrasado = _slot(x) < agora - ATRASO_S
+                if not velho and not atrasado and x.get("publicar") == (a["modo"] == "youtube"):
+                    continue
+                if atrasado:
+                    ocupados = {int(_slot(y)) for y in f if y is not x and y.get("canal_id") == cid and y["estado"] not in ("cancelado", "enviado")}
+                    no_canal = _no_canal((_ler_recentes(base, a["conta"]) or {}).get("videos") or [], [y for y in f if y is not x], cid)
+                    antes = _slot(x)
+                    x["slot"] = proximo_horario(a, ocupados, agora, no_canal)
+                    x.setdefault("log", []).append(f"{time.strftime('%d/%m %H:%M')} ⏭ o horário de {time.strftime('%d/%m %H:%M', time.localtime(antes))} passou "
+                                                   f"com o site fechado — foi pro próximo livre: {time.strftime('%d/%m %H:%M', time.localtime(x['slot']))}")
+                else:
+                    x["slot"] = _slot(x)
+                era = bool(x.get("publicar"))
+                x["publicar"] = a["modo"] == "youtube"
+                if not x["publicar"]:
+                    x["quando"] = x["slot"]  # ⏰ o site sobe no horário (novo)
+                elif velho or not era:
+                    x["quando"] = agora  # 🗓 sobe já com a data marcada (uma nova tentativa com espera fica como estava)
+                n += 1
+        if n:
+            _gravar(base, "fila.json", f)
+    return n
+
+
 def rodada(base: str, meta_de: Callable[[str], Optional[Dict[str, Any]]], agora: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    ajustar_atrasados(base, agora)
     x = proximo_da_fila(base, agora)
     return enviar_item(base, x, meta_de, agora) if x else None
 

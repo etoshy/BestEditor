@@ -285,3 +285,31 @@ def test_v84_358_sobe_ja_e_o_youtube_publica_no_horario(tmp_path, monkeypatch):
     n4, _ = YE.adicionar(b, [{"pid": "p4", "canal_id": "c1"}], agora=_ts(hoje, 10))
     assert not n4[0]["publicar"] and n4[0]["quando"] == n4[0]["slot"]
     assert "publishAt" not in YE.corpo_video({"titulo": "a"}, YE.agenda(b, "c1"), 0)["status"]
+
+
+def test_v84_359_atrasados_nao_saem_todos_de_uma_vez(tmp_path, monkeypatch):
+    b = _base(tmp_path)
+    YE.salvar_agenda(b, "c1", {"conta": "UC1", "por_dia": 3, "horarios": ["06:00", "12:00", "20:00"]})
+    hoje = dt.date.today()
+    agora = _ts(hoje, 13)
+    # itens antigos (v84_357: sem 'publicar'), marcados pra 06:00 e 12:00 de hoje — o site estava fechado
+    with YE._TRAVA:
+        YE._gravar(b, "fila.json", [
+            {"id": "a", "pid": "p1", "canal_id": "c1", "conta": "UC1", "nome": "A", "quando": _ts(hoje, 6), "estado": "na_fila", "tentativas": 0, "log": []},
+            {"id": "b", "pid": "p2", "canal_id": "c1", "conta": "UC1", "nome": "B", "quando": _ts(hoje, 12), "estado": "na_fila", "tentativas": 0, "log": []},
+            {"id": "c", "pid": "p3", "canal_id": "c1", "conta": "UC1", "nome": "C", "quando": _ts(hoje + dt.timedelta(days=1), 6), "estado": "na_fila", "tentativas": 0, "log": []},
+            {"id": "d", "pid": "p4", "canal_id": "c1", "conta": "UC1", "nome": "D", "quando": agora - 7200, "slot": agora - 7200, "ja": True,
+             "publicar": False, "estado": "na_fila", "tentativas": 0, "log": []}])
+    assert YE.ajustar_atrasados(b, agora) == 3
+    f = {x["id"]: x for x in YE.fila(b)}
+    assert f["a"]["slot"] == _ts(hoje, 20) and f["b"]["slot"] == _ts(hoje + dt.timedelta(days=1), 12)
+    assert f["c"]["slot"] == _ts(hoje + dt.timedelta(days=1), 6)  # o que não passou fica no horário dele
+    assert all(f[k]["publicar"] and f[k]["quando"] <= agora for k in "abc")  # sobem já, com a data marcada
+    assert "passou" in f["a"]["log"][-1]
+    assert f["d"]["slot"] == agora - 7200 and not f["d"]["publicar"]  # 'subir já' não mexe
+    corpos = []
+    monkeypatch.setattr(YE, "HTTP", lambda m, u, **k: (corpos.append(json.loads(k["data"])) or R(200, headers={"Location": "https://s"})) if u == YE.URL_UPLOAD else R(200, {"id": "V"}))
+    v, _ = _video(tmp_path, 100)
+    x = dict(f["c"], slot=time.time() + 5 * 3600)  # (o relógio de verdade: a data marcada precisa estar no futuro)
+    YE.enviar_item(b, x, lambda pid: {"titulo": pid, "video": v})
+    assert corpos[0]["status"]["privacyStatus"] == "private" and YE._iso_ts(corpos[0]["status"]["publishAt"]) == int(x["slot"])
