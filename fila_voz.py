@@ -72,6 +72,7 @@ class Fila:
         self._rodando: Dict[str, Dict[str, Any]] = {}
         self._vram_cache: Dict[str, Any] = {"quando": 0.0, "v": None}
         self._thread: Optional[threading.Thread] = None
+        self.um_por_vez = False  # 🎙 v84_364: depois de um crash nativo com 2 juntas, o modo auto passa a 1 de cada vez
 
     # ---------------------------------------------------------------- consulta
     def vram(self) -> Optional[Dict[str, float]]:
@@ -84,7 +85,28 @@ class Fila:
         if modo in ("1", "2", "3"):
             return int(modo)
         # auto: com placa NVIDIA até 2 ao mesmo tempo (a conta da VRAM em _cabe decide); sem placa, 1
+        if self.um_por_vez:
+            return 1
         return MAX_AUTO if self.vram() else 1
+
+    def marcar_crash(self) -> bool:
+        """🎙 v84_364: um motor travou (crash nativo) com outra geração rodando junto → daqui pra frente, no modo auto, 1 de cada
+        vez (2 processos de PyTorch na mesma placa às vezes derrubam um ao outro). Devolve True se mudou agora."""
+        with self._cv:
+            mudou = not self.um_por_vez and len(self._rodando) > 1
+            if len(self._rodando) > 1:
+                self.um_por_vez = True
+            return mudou
+
+    def esperar_sozinho(self, jid: str, timeout: float = 3600) -> bool:
+        """Espera até `jid` ser a única geração rodando (pra tentar de novo sem ninguém junto na GPU)."""
+        fim = time.time() + timeout
+        with self._cv:
+            while time.time() < fim:
+                if all(k == jid for k in self._rodando):
+                    return True
+                self._cv.wait(timeout=5)
+        return False
 
     def _cabe(self, item: Dict[str, Any]) -> bool:
         if not self._rodando:
@@ -109,7 +131,7 @@ class Fila:
     def estado(self) -> Dict[str, Any]:
         with self._cv:
             v = self._vram_cache["v"]
-            return {"modo": str(self.modo_fn() or "auto"), "limite": self.limite(), "vram": v,
+            return {"modo": str(self.modo_fn() or "auto"), "limite": self.limite(), "vram": v, "um_por_vez": self.um_por_vez,
                     "rodando": [{"id": r["id"], "motor": r["motor"], "desde": r["inicio"]} for r in self._rodando.values()],
                     "fila": [{"id": f["id"], "motor": f["motor"], "posicao": k} for k, f in enumerate(self._fila, 1)]}
 

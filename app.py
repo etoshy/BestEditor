@@ -1214,6 +1214,19 @@ def gerar_voz_gerar():
 def _gerar_voz_e_avisar(job_id: str, *a: Any) -> None:
     try:
         _gerar_voz_em_background(job_id, *a)
+        st = _GERAR_VOZ_STATUS.get(job_id) or {}
+        # 🎙 v84_364: o motor travou (crash nativo, código 3221225477) — quase sempre 2 gerações juntas na GPU ou a memória
+        # acabando. Tenta de novo UMA vez, sozinho na placa, e o modo auto passa a gerar 1 de cada vez.
+        if st.get("erro") and "travou o processo" in str(st["erro"]) and not st.get("tentou_de_novo") and not st.get("cancelado"):
+            juntas = _FILA_VOZ.marcar_crash()
+            st.update(tentou_de_novo=True, erro=None, running=True, pronto=False)
+            st["log"] += ("\n🔁 O motor travou" + (" com outra geração rodando junto na placa — daqui pra frente a fila gera 1 de cada vez"
+                                                    if juntas else "") + ". Esperando a placa ficar livre e tentando de novo…\n")
+            _FILA_VOZ.esperar_sozinho(job_id)
+            import gc
+            gc.collect()
+            time.sleep(5)
+            _gerar_voz_em_background(job_id, *a)
     finally:
         st = _GERAR_VOZ_STATUS.get(job_id) or {}
         _avisar_fim("🎙️ Áudio “" + (st.get("texto_inicio") or "")[:50] + "…”", st.get("erro"), "/gerar-voz#historico", "voz",

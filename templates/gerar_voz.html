@@ -80,6 +80,10 @@
   {% if dossie_id %}<input type="hidden" name="dossie_id" value="{{ dossie_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#334155;">🕵️ Roteiro do modelo de vídeo — os capítulos ganham o tempo real do áudio, e o .zip leva o projeto: no <b>Novo vídeo</b> as imagens do tema entram sozinhas.</p>{% endif %}
   {% if venda_id %}<input type="hidden" name="venda_id" value="{{ venda_id }}"><p style="margin:4px 0;font-size:0.85rem;color:#047857;">🛒 Roteiro do projeto de venda — o .zip leva o projeto junto: no <b>Novo vídeo</b> as mídias do produto entram sozinhas.</p>{% endif %}
   <textarea name="texto" id="texto-narrar" rows="6" placeholder="Cole ou escreva aqui o texto que vai virar áudio...">{{ texto_inicial or '' }}</textarea>
+  <div id="roteiros-extra"></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:0.85rem;">
+    <button type="button" id="btn-mais-roteiro" style="width:auto;padding:4px 10px;font-size:0.82rem;" title="abre outra caixa de roteiro — cada caixa vira um áudio separado, com a mesma voz e as mesmas opções, e todos entram na fila de uma vez">➕ mais um roteiro</button>
+    <b id="varios-n" style="color:#7c3aed"></b></div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:0.82rem;">
     <button type="button" id="btn-tirar-cenas" style="width:auto;padding:4px 10px;font-size:0.8rem;">🧹 Tirar marcas de cena ([CENA 3]…)</button>
     <span id="tirar-cenas-info" style="color:#666;">As marcas de cena nunca são faladas — mesmo sem clicar, o site tira antes de gerar a voz.</span>
@@ -600,8 +604,53 @@ async function baixarVozPiperAgora(key, botao) {
   }
 }
 
+// 📚 v84_365: vários roteiros de uma vez (separados por uma linha ---): cada um vira um áudio, todos na fila
+// ➕ cada caixa é um roteiro → um áudio
+function roteirosSeparados() {
+  const caixas = [document.getElementById('texto-narrar'), ...document.querySelectorAll('#roteiros-extra textarea')];
+  return caixas.map(c => c.value.trim()).filter(t => t.split(/\s+/).length >= 2);
+}
+function variosInfo() {
+  const n = roteirosSeparados().length, extras = document.querySelectorAll('#roteiros-extra textarea').length;
+  document.getElementById('varios-n').textContent = n > 1 ? `📚 ${n} roteiros → ${n} áudios` : (extras ? 'escreva o roteiro na caixa nova' : '');
+  const b = document.getElementById('btn-gerar'); if (b && !b.dataset.rotulo) b.dataset.rotulo = b.textContent;
+  if (b) b.textContent = n > 1 ? `🎙 Gerar os ${n} áudios` : b.dataset.rotulo;
+  document.querySelectorAll('#roteiros-extra [data-num]').forEach((e, k) => e.textContent = `Roteiro ${k + 2}`);
+}
+document.getElementById('btn-mais-roteiro').addEventListener('click', () => {
+  const box = document.createElement('div'); box.style.marginTop = '8px';
+  box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.85rem;font-weight:600"><span data-num></span>
+    <button type="button" style="width:auto;padding:2px 8px;font-size:.8rem;background:#64748b" title="tirar esta caixa">✕</button></div>
+    <textarea rows="5" placeholder="Cole aqui o próximo roteiro…" style="width:100%;box-sizing:border-box"></textarea>`;
+  box.querySelector('button').onclick = () => { box.remove(); variosInfo(); };
+  box.querySelector('textarea').addEventListener('input', variosInfo);
+  document.getElementById('roteiros-extra').appendChild(box); variosInfo(); box.querySelector('textarea').focus();
+});
+document.getElementById('texto-narrar').addEventListener('input', variosInfo);
+async function gerarVarios(form) {
+  const textos = roteirosSeparados();
+  if (!textos.length) { mostrarErro('Não achei nenhum roteiro.'); return; }
+  const btn = document.getElementById('btn-gerar'); btn.disabled = true;
+  const log = document.getElementById('log-box'); document.getElementById('progresso-box').style.display = ''; log.textContent = '';
+  let ok = 0, ultimo = null; const erros = [];
+  for (let k = 0; k < textos.length; k++) {
+    const fd = new FormData(form); fd.set('texto', textos[k]);
+    log.textContent += `📚 ${k + 1}/${textos.length}: “${textos[k].slice(0, 60)}…” → `;
+    try { const r = await fetch("{{ url_for('gerar_voz_gerar') }}", { method: 'POST', body: fd }); const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || r.status); ok++; ultimo = d.job_id; log.textContent += `na fila${d.posicao ? ' (posição ' + d.posicao + ')' : ''}\n`; }
+    catch (e) { erros.push(`${k + 1}: ${e.message}`); log.textContent += `❌ ${e.message}\n`; }
+    verGeracoes();
+  }
+  log.textContent += `\n✅ ${ok} de ${textos.length} roteiros na fila — acompanhe cada um na 🎙 Fila de geração (e depois no histórico).` + (erros.length ? '\n' + erros.join('\n') : '');
+  btn.disabled = false;
+  if (erros.length && !ok) mostrarErro(erros.join(' · '));
+  if (ok && !erros.length) { document.getElementById('roteiros-extra').innerHTML = ''; variosInfo(); }
+  verGeracoes();
+}
+
 document.getElementById('form-gerar-voz').addEventListener('submit', async function (ev) {
   ev.preventDefault();
+  if (roteirosSeparados().length > 1) { document.getElementById('error-box').style.display = 'none'; document.getElementById('resultado-box').style.display = 'none'; return gerarVarios(ev.target); }
   document.getElementById('error-box').style.display = 'none';
   document.getElementById('resultado-box').style.display = 'none';
   document.getElementById('btn-gerar').disabled = true;
@@ -893,7 +942,7 @@ function filaInfo(f) {
   const sel = document.getElementById('fila-modo'); if (sel && document.activeElement !== sel) sel.value = f.modo || 'auto';
   const v = f.vram;
   document.getElementById('fila-info').textContent = (v ? `placa: ${v.nome} · ${v.total.toFixed(1)} GB de VRAM (${v.livre.toFixed(1)} GB livres)` : 'sem placa NVIDIA detectada: 1 por vez')
-    + ` · agora: até ${f.limite} ao mesmo tempo`;
+    + ` · agora: até ${f.limite} ao mesmo tempo` + (f.um_por_vez && f.modo === 'auto' ? ' (um motor travou com 2 juntas — o automático passou pra 1 de cada vez até reiniciar o site)' : '');
 }
 fetch('/gerar-voz/fila').then(r => r.json()).then(filaInfo).catch(() => {});
 document.getElementById('fila-modo').addEventListener('change', async (e) => {

@@ -2932,6 +2932,14 @@ def gerar_audio_isolado(engine: str, texto: str, output_path: str, timeout: floa
         )
 
     if processo.exitcode != 0:
+        if processo.exitcode in (3221225477, -1073741819, 3221226505, -1073740791, 3221225725, -1073741571):
+            raise VoiceGeneratorError(  # 🎙 v84_364: acesso inválido à memória / estouro de pilha (Windows)
+                f"O motor de voz travou o processo (código de saída {processo.exitcode}: acesso inválido à memória) antes de "
+                f"conseguir gerar o áudio. Quase sempre é a placa de vídeo com DUAS gerações ao mesmo tempo (2 processos de "
+                f"PyTorch na mesma GPU às vezes derrubam um ao outro) ou a memória (RAM/VRAM) acabando. O site tenta de novo "
+                f"sozinho, uma de cada vez. Se continuar: no Gerador de voz, em 'quantos ao mesmo tempo', escolha 1 e feche "
+                f"outros programas que usam a placa (jogos, navegador com muitas abas de vídeo)."
+            )
         raise VoiceGeneratorError(
             f"O motor de voz travou o processo (código de saída {processo.exitcode}) antes de "
             f"conseguir gerar o áudio — geralmente é um crash NATIVO (não uma exceção Python), "
