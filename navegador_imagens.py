@@ -238,7 +238,7 @@ def proximas(perguntas: List[Dict[str, Any]], enviadas: Dict[str, List[str]], qu
     return fila[:max(1, min(10, int(quantas or 5)))]
 
 
-def script(site: str = "http://localhost:5050", versao: str = "2.6.0") -> str:  # 2.5.x = 📰 modo pesquisa (v84_165/166) · 2.6 = 🗂 busca em lista (v84_293)
+def script(site: str = "http://localhost:5050", versao: str = "2.6.1") -> str:  # 2.5.x = 📰 modo pesquisa (v84_165/166) · 2.6 = 🗂 busca em lista (v84_293)
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "navegador_imagens.user.js")
     with open(caminho, encoding="utf-8") as fh:
         return fh.read().replace("__VERSAO__", versao).replace("__SITE__", site.rstrip("/"))
@@ -376,7 +376,13 @@ Se não abrir: no ícone da extensão → <b>Criar/Adicionar novo script</b>, ap
             try:
                 p = ds.carregar(base_dir, pid)
             except ds.DossieError:
-                return jsonify({"erro": "Projeto não encontrado."}), 404
+                import busca_lista as BL  # 🗂 v84_366: o script antigo manda a guia da Busca em lista pra cá
+                try:
+                    BL.guia_feita(base_dir, pid, qid if len(str(c.get("pergunta") or "")) <= 10 else str(c.get("pergunta"))[:20],
+                                  int(c.get("enviadas") or 0))
+                    return jsonify({"ok": True})
+                except Exception:  # noqa: BLE001
+                    return jsonify({"erro": "Projeto não encontrado."}), 404
             for q in (p.get("fotos_roteiro") or {}).get("perguntas") or []:
                 if q["id"] == qid:
                     q["guia"] = "feita" if int(c.get("enviadas") or 0) else "vazia"

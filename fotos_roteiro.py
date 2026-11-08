@@ -641,7 +641,22 @@ def registrar(app, base_dir: str) -> None:
         já conta como conferida. Com "pergunta", vira resposta dela."""
         c = _corpo()
         if not _carregar(pid):
-            return jsonify({"erro": "Projeto não encontrado."}), 404
+            # 🗂 v84_366: o script do Google ANTIGO (antes da 2.6) manda as fotos da 🗂 Busca em lista pra cá — é um id de lá
+            import busca_lista as BL
+            try:
+                BL.carregar(base_dir, pid)
+            except BL.ListaErro:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            try:
+                i = BL.receber_link(base_dir, pid, str(c.get("pergunta") or "")[:20], str(c.get("url") or ""),
+                                    str(c.get("dados_b64") or ""), str(c.get("pagina") or ""))
+            except BL.ListaErro as exc:
+                if "já está na lista" in str(exc):
+                    return jsonify({"ok": True, "repetida": True})
+                return jsonify({"ok": False, "erro": str(exc)}), 400
+            except Exception as exc:  # noqa: BLE001
+                return jsonify({"ok": False, "erro": f"não consegui baixar ({str(exc)[:120]})"}), 400
+            return jsonify({"ok": True, "item": i})
         url = str(c.get("url") or "").strip()
         try:
             if c.get("dados_b64"):  # 🧲 o navegador já baixou a imagem (o site dela barrou o servidor)
