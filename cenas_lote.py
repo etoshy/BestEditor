@@ -42,14 +42,17 @@ def _palavras(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def cortar_cenas(segments: List[Dict[str, Any]], intervalo: float = 5.0, total: Optional[float] = None) -> List[Dict[str, Any]]:
-    """[{start, end, fala}] cobrindo 0 → total, cada uma com ~`intervalo` s (entre 0,6× e 1,4×)."""
+def cortar_cenas(segments: List[Dict[str, Any]], intervalo: float = 5.0, total: Optional[float] = None,
+                 minimo: Optional[float] = None, maximo: Optional[float] = None) -> List[Dict[str, Any]]:
+    """[{start, end, fala}] cobrindo 0 → total, cada uma com ~`intervalo` s (entre 0,6× e 1,4×).
+    v84_367: `minimo`/`maximo` (s) trocam essa faixa — o canal pode pedir, por ex., de 5 a 10 s por imagem."""
     ws = _palavras(segments)
     if not ws:
         return []
     total = float(total if total is not None else max(float(segments[-1]["end"]), ws[-1]["end"]))
     intervalo = max(1.5, float(intervalo or 5.0))
-    minimo, maximo = intervalo * 0.6, intervalo * 1.4
+    minimo = max(1.0, min(float(minimo), intervalo)) if minimo else intervalo * 0.6
+    maximo = max(float(maximo), intervalo) if maximo else intervalo * 1.4
     cortes: List[float] = []
     inicio, ultimo_bom = 0.0, None
     for i, w in enumerate(ws[:-1]):

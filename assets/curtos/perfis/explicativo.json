@@ -1,0 +1,162 @@
+{
+ "formato": "besteditor-curtos-perfil",
+ "versao": 2,
+ "nome": "Explicativo (curiosidades)",
+ "idioma": "en",
+ "modelo": "explicativo",
+ "perfil": {
+  "resumo": "Explainer/curiosity shorts: one surprising thing explained (why the scythe became the symbol of death, the concrete shape that stops waves, the saw that stops on a finger) over a FAST collage of real videos — about 16 different sources in a 40 s short (one new source every ~2.6 s; 2 cuts in a row inside the same source are normal and sources come back). Signature: an animated red ARROW pointing at the object in the first second, one-word white bold lowercase captions in the lower third, slow zooms, a white flash when the topic turns, horizontal videos placed in the middle with the same video blurred behind, soft background music the whole time and a sound only where something happens.",
+  "idioma": "en",
+  "enquadramento": "smart",
+  "cortes_por_contexto": true,
+  "duracao_pelo_conteudo": true,
+  "ritmo": {
+   "plano_medio_s": 1.7,
+   "palavras_por_s": 2.9,
+   "cortes": "a cut on almost every sentence or idea; one new video about every 2-3 s; another moment of the same video in the next cut is fine; a source can come back later",
+   "pausa_max_s": 0.12
+  },
+  "gancho": {
+   "descricao": "a surprising question or claim about the object on screen, with the red arrow pointing at it in the first second",
+   "duracao_s": 3,
+   "exemplos": [
+    "Why did a farmer's tool become the symbol of death?",
+    "This weird concrete shape stops the most powerful waves on Earth.",
+    "This saw stops the moment it touches your finger."
+   ]
+  },
+  "estrutura": [
+   {
+    "funcao": "gancho",
+    "descricao": "surprising question/claim + red arrow on the object"
+   },
+   {
+    "funcao": "contexto",
+    "descricao": "what it looks like / what people believe"
+   },
+   {
+    "funcao": "fato",
+    "descricao": "the explanation, step by step, each sentence over a video that shows it"
+   },
+   {
+    "funcao": "virada",
+    "descricao": "the most surprising detail (a number, a hidden mechanism, the twist)"
+   },
+   {
+    "funcao": "final",
+    "descricao": "one last curious fact or a question for the comments"
+   }
+  ],
+  "tom": "curious, clear and fast; fascinated by the detail; never condescending",
+  "linguagem": "short spoken sentences, simple words, concrete numbers",
+  "composicoes": [
+   {
+    "id": "fonte",
+    "nome": "Video source",
+    "layout": "materia",
+    "descricao": "a piece of one of the creator's videos that shows exactly the sentence (horizontal videos in the middle, blurred copy behind)",
+    "quando": "almost every sentence"
+   },
+   {
+    "id": "banco",
+    "nome": "Stock video",
+    "layout": "video",
+    "descricao": "stock footage when no source shows it",
+    "quando": "gaps"
+   },
+   {
+    "id": "ia",
+    "nome": "AI image",
+    "layout": "ia",
+    "descricao": "an epic AI image for what cannot be filmed (the reaper, an angel, a historical scene)",
+    "quando": "1-3 per video, abstract moments"
+   },
+   {
+    "id": "flow_video",
+    "nome": "AI video (Flow)",
+    "layout": "ia_video",
+    "descricao": "a realistic generated ~8 s video when motion is the point",
+    "quando": "1 in 3 shots at most, when there are no sources"
+   }
+  ],
+  "textos_tela": {
+   "usa": false,
+   "descricao": "no big text: the one-word caption does the job",
+   "estilo_destaque": "branco",
+   "frequencia": ""
+  },
+  "legenda": {
+   "ativa": true,
+   "estilo": "palavra_unica",
+   "posicao": "terco",
+   "tamanho": 0.045,
+   "maiusculas": false,
+   "max_palavras": 1,
+   "fonte": "DP Poppins",
+   "cor_texto": "#FFFFFF",
+   "cor_ativa": "#FFFFFF",
+   "contorno": true
+  },
+  "sfx": {
+   "usa": true,
+   "nos_cortes": false,
+   "descricao": "sound in only ~25-45% of the cuts, where something happens (whoosh on a fast move, impact on a crash, pop when the arrow appears, boom on the reveal)",
+   "tipos_preferidos": [
+    "whoosh",
+    "pop",
+    "impacto",
+    "boom",
+    "swipe"
+   ],
+   "volume": 0.6
+  },
+  "musica": {
+   "usa": true,
+   "descricao": "soft curious/epic background track, low, the whole video"
+  },
+  "cta": {
+   "texto": "",
+   "onde": "final"
+  },
+  "gancho_maiusculas": false,
+  "ponto_de_vista": {
+   "usa": false,
+   "descricao": ""
+  },
+  "titulos": {
+   "descricao": "short curiosity question or claim",
+   "exemplos": [
+    "Why is the reaper holding a scythe?",
+    "The concrete shape that defeats the ocean",
+    "The saw that refuses to cut you"
+   ]
+  },
+  "evitar": [
+   "inventing numbers, dates or names",
+   "a shot that does not show what the sentence says",
+   "staying more than ~4 s on the same shot",
+   "intro, 'hey guys', asking to subscribe",
+   "sound on every cut"
+  ],
+  "anime": {
+   "modo": "nao",
+   "obras": ""
+  },
+  "estilo_ia": "realista"
+ },
+ "metricas": {
+  "videos": 4,
+  "dur": 43.5,
+  "fontes_por_video": 16,
+  "fonte_nova_a_cada_s": 2.6,
+  "plano_mediano_s": 1.7,
+  "sfx_nos_cortes": 0.3,
+  "obs": "medido em 4 shorts explicativos (8 q/s nos cortes, cada corte conferido quadro a quadro: ~20% dos cortes ficam no mesmo vídeo, ~10% dos planos voltam a uma fonte); os 3 de comentário foram descartados"
+ },
+ "atualiza": {
+  "2": [
+   "estilo_ia",
+   "composicoes"
+  ]
+ }
+}

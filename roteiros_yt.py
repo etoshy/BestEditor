@@ -704,23 +704,34 @@ REGRA_MARCAS = (
 )
 
 
-def regra_marcas(n_inscreva: Any = None) -> str:
-    """📣 v84_218: a regra das marcas com o número de [[INSCREVA]] do canal (o pacote pode pedir só 1)."""
+def regra_marcas(n_inscreva: Any = None, n_venda: Any = None) -> str:
+    """📣 v84_218: a regra das marcas com o número de [[INSCREVA]] do canal (o pacote pode pedir só 1).
+    v84_367: `n_venda=0` (o canal não vende nada) → a regra não pede [[VENDA]]."""
+    regra = REGRA_MARCAS
+    try:
+        sem_venda = int(n_venda) <= 0
+    except (TypeError, ValueError):
+        sem_venda = False
+    if sem_venda:
+        regra = (regra[:regra.index("- [[VENDA]]")] + regra[regra.index("- Nunca duas marcas"):]).replace(
+            "estas duas marcas", "esta marca").replace(" e de venda", "").replace(" nem fale de anúncio/patrocínio", "")
+        regra += "\n- NÃO use [[VENDA]]: este canal não tem anúncio nem venda no roteiro."
     try:
         n = int(n_inscreva)
     except (TypeError, ValueError):
-        return REGRA_MARCAS
+        return regra
     if n <= 0:
-        return REGRA_MARCAS.replace(REGRA_MARCAS[REGRA_MARCAS.index("- [[INSCREVA]]"):REGRA_MARCAS.index("- [[VENDA]]")], "")
+        fim = regra.index("- [[VENDA]]") if "- [[VENDA]]" in regra else regra.index("- Nunca duas marcas")
+        return regra.replace(regra[regra.index("- [[INSCREVA]]"):fim], "")
     if n == 1:
-        return REGRA_MARCAS.replace(
+        return regra.replace(
             "2 ou 3 no vídeo: uma logo depois do gancho/introdução "
             "(quando a pessoa já se interessou, nunca na 1ª frase), uma no meio num respiro natural, e uma perto do fim "
             "(antes da conclusão ou logo depois dela).",
             "UMA SÓ no vídeo inteiro (mais que isso quebra a imersão): num respiro natural entre dois blocos, depois que a "
             "pessoa já aprendeu algo (por volta de 25–40% do roteiro) — nunca no gancho, nunca no meio de uma explicação "
             "nem no fechamento.")
-    return REGRA_MARCAS
+    return regra
 
 
 REGRA_SEM_EXPERIENCIAS = (

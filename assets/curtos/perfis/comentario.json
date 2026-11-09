@@ -1,0 +1,138 @@
+{
+ "formato": "besteditor-curtos-perfil",
+ "versao": 2,
+ "nome": "Comentário (shorts virais)",
+ "idioma": "en",
+ "modelo": "comentario",
+ "perfil": {
+  "resumo": "Commentary shorts: a narrator retells and comments a viral clip WHILE the clip plays — same length/pacing/flow as the original short, but rewritten, with a stronger hook in the first second and an ending question that starts a debate in the comments. Visual: the raw clip itself, cut to follow every sentence, with quick zooms, a red tracking circle/arrow on the key object, one-word white captions with outline in the middle, a whoosh on the first cut and something changing every 3-4 s.",
+  "idioma": "en",
+  "ritmo": {
+   "plano_medio_s": 3.2,
+   "palavras_por_s": 2.7,
+   "cortes": "cut when the narration moves to another moment of the clip — decided by the story, not by a timer; zoom in on a detail/emotion, zoom out to reveal, still when the image speaks for itself; no silent gaps; the video ends exactly when the voice ends",
+   "pausa_max_s": 0.12
+  },
+  "gancho": {
+   "descricao": "first sentence = a curiosity/contradiction/surprising claim, landing fast on the first moment of the clip",
+   "duracao_s": 3,
+   "exemplos": [
+    "Everyone thought this young cyclist was being rude…",
+    "This guy found something nobody else at the stadium noticed.",
+    "[gasp] She had no idea the camera was still rolling."
+   ]
+  },
+  "estrutura": [
+   {
+    "funcao": "gancho",
+    "descricao": "the stronger hook over the first clip (< 3 s, punch-in + whoosh)"
+   },
+   {
+    "funcao": "contexto",
+    "descricao": "what people thought / what we see at first"
+   },
+   {
+    "funcao": "virada",
+    "descricao": "the twist nobody noticed — show it on the clip, red circle/arrow tracking the key object"
+   },
+   {
+    "funcao": "consequencia",
+    "descricao": "the payoff / the reaction"
+   },
+   {
+    "funcao": "pergunta",
+    "descricao": "ONE engaging question the comments will argue about — the video cuts the moment it ends"
+   }
+  ],
+  "tom": "storyteller who noticed what everyone missed: curious, warm, a little dramatic; never mean",
+  "linguagem": "spoken English, short sentences, one flowing paragraph; Chatterbox voice tags like [gasp] [surprised] at 1-4 natural moments",
+  "composicoes": [
+   {
+    "id": "clipe",
+    "nome": "The clip itself",
+    "layout": "materia",
+    "descricao": "the piece of the raw clip that shows exactly what the sentence says, full screen 9:16 (crop/zoom)",
+    "quando": "always — every sentence"
+   },
+   {
+    "id": "destaque",
+    "nome": "Tracking highlight",
+    "layout": "materia",
+    "descricao": "red circle (object) or arrow (person) tracking the thing the narrator points at",
+    "quando": "1-3 key moments"
+   }
+  ],
+  "textos_tela": {
+   "usa": false,
+   "descricao": "no big text: the one-word caption does the job",
+   "estilo_destaque": "branco",
+   "frequencia": ""
+  },
+  "legenda": {
+   "ativa": true,
+   "estilo": "palavra_unica",
+   "posicao": "meio",
+   "tamanho": 0.07,
+   "maiusculas": true,
+   "max_palavras": 1,
+   "fonte": "DP Montserrat",
+   "cor_texto": "#FFFFFF",
+   "cor_ativa": "#FFFFFF",
+   "contorno": true
+  },
+  "sfx": {
+   "usa": true,
+   "nos_cortes": false,
+   "descricao": "sound only where something HAPPENS in that moment (a fast transition, a hit, a reveal, a crowd reaction) — chosen by the context of each video, never the same pattern every time; a moment can have no sound",
+   "tipos_preferidos": [
+    "whoosh",
+    "swipe",
+    "pop",
+    "impacto"
+   ],
+   "volume": 0.7
+  },
+  "musica": {
+   "usa": true,
+   "descricao": "soft emotional/curious background track, low under the voice"
+  },
+  "cta": {
+   "texto": "",
+   "onde": "final"
+  },
+  "gancho_maiusculas": false,
+  "ponto_de_vista": {
+   "usa": false,
+   "descricao": ""
+  },
+  "titulos": {
+   "descricao": "short curiosity title in English",
+   "exemplos": []
+  },
+  "evitar": [
+   "copying the reference sentences word for word",
+   "silent gaps or a still frame without narration",
+   "talking about something while the screen shows something else",
+   "keeping the video running after the voice-over ends",
+   "inventing names/places not in the clip",
+   "intro, 'hey guys', asking to subscribe"
+  ],
+  "cortes_por_contexto": true,
+  "duracao_pelo_conteudo": true,
+  "enquadramento": "smart"
+ },
+ "metricas": {
+  "obs": "estrutura dos 2 tutoriais de shorts de comentário; tamanho, cortes, zoom e sons variam com cada vídeo (v84_253)"
+ },
+ "atualiza": {
+  "2": [
+   "enquadramento",
+   "cortes_por_contexto",
+   "duracao_pelo_conteudo",
+   "sfx",
+   "ritmo",
+   "gancho",
+   "estrutura"
+  ]
+ }
+}

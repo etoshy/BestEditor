@@ -198,3 +198,11 @@ shorts_ia/
 *.pth
 *.onnx
 !assets/**
+
+# ---------- dentro de assets/: o que continua so no seu PC ----------
+assets/fonts/pessoais/
+assets/sons/pixabay/
+assets/darkplanner/extras/pixabay_sons.json
+assets/darkplanner/extras/fontes.json
+assets/fonts/dp/usr-*.ttf
+assets/fonts/dp/gf-*.ttf

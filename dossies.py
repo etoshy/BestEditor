@@ -1173,7 +1173,8 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if cfg.get("marcar_chamadas", True) and fmt.get("minutos", 10) > 1:
         import roteiros_yt
         L.append("")
-        L.append(roteiros_yt.regra_marcas((mod.get("chamadas") or {}).get("inscreva")))  # 📣 v84_218: o canal pode pedir só 1
+        L.append(roteiros_yt.regra_marcas((mod.get("chamadas") or {}).get("inscreva"),  # 📣 v84_218: o canal pode pedir só 1
+                                          (mod.get("chamadas") or {}).get("venda")))  # v84_367: 0 = canal sem venda
         L.append("")
     if cfg.get("sugerir_produto"):
         L.append("- " + REGRA_PRODUTO)
@@ -1334,6 +1335,11 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         rot, _tir = _cp2.limitar_inscreva(rot, _max_insc)
         if _tir:
             avisos.append(f"📣 {_tir} [[INSCREVA]] a mais tirada(s) — o canal usa {_max_insc} por vídeo.")
+    if str((_modelo_cfg(p).get("chamadas") or {}).get("venda")) == "0":  # v84_367: canal sem venda → [[VENDA]] sai
+        _n_venda = len(re.findall(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", rot, re.I | re.M))
+        if _n_venda:
+            rot = re.sub(r"\n{3,}", "\n\n", re.sub(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", "", rot, flags=re.I | re.M)).strip()
+            avisos.append(f"📣 {_n_venda} [[VENDA]] tirada(s) — este canal não usa venda.")
     rot, _rep = _mr.tirar_repeticoes(rot)  # 🔁 v84_169: frase quase igual logo em seguida sai
     if _rep:
         avisos.append(f"🔁 {len(_rep)} frase(s) repetida(s) logo em seguida tirada(s): " + " · ".join(f"“{x[:70]}…”" for x in _rep[:3]))
@@ -1499,7 +1505,8 @@ def montar_partes(p: Dict[str, Any]) -> Dict[str, Any]:
     cfg = dict(CONFIG_PADRAO, **(p.get("config") or {}))
     _min, alvo, _ppm = alvo_tamanho(p)
     roteiro, caps = rp.montar(partes, cfg.get("marcar_chamadas", True) is not False, alvo,
-                              max_inscreva=(_modelo_cfg(p).get("chamadas") or {}).get("inscreva"))  # 📣 v84_218
+                              max_inscreva=(_modelo_cfg(p).get("chamadas") or {}).get("inscreva"),  # 📣 v84_218
+                              max_venda=(_modelo_cfg(p).get("chamadas") or {}).get("venda"))  # v84_367
     d = {k: res.get(k) for k in ("titulos", "ideias", "descricao", "tags", "fontes_usadas", "observacoes", "produto_sugerido", "plano",
                                  "afirmacoes", "thumbnails", "lore_registro", "escopo")}
     d.update(roteiro=roteiro, capitulos=caps, momentos=[], partes=partes)

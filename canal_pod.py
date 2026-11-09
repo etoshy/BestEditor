@@ -29,7 +29,9 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 PADRAO = {"pct": 100, "personagens": True, "fotos_do_roteiro": "referencia", "estilo_fotos": "", "ref_estilo": False,
-          "cenas": "canal", "texto_na_imagem": ""}  # 🖼 v84_191: "padrao" = as cenas como no roteiro sem canal (foto documental de sempre)
+          "cenas": "canal", "texto_na_imagem": "",
+          # ⏱ v84_367: de quanto em quanto tempo troca a imagem (média, mínimo, máximo em s); None = o do lote
+          "intervalo": None, "intervalo_min": None, "intervalo_max": None}  # 🖼 v84_191: "padrao" = as cenas como no roteiro sem canal (foto documental de sempre)
 BLOCO_IA = 20
 PARALELO_IA = 3
 
@@ -74,6 +76,7 @@ def config(m: Dict[str, Any]) -> Dict[str, Any]:
         c["pct"] = max(0, min(100, int(c["pct"])))
     except (TypeError, ValueError):
         c["pct"] = 100
+    c.update(intervalos(c))
     if c["texto_na_imagem"] not in ("", "setas_numeros"):  # "setas_numeros" = esquema só com setas/formas/números
         c["texto_na_imagem"] = ""
     if c["cenas"] not in ("canal", "padrao"):
@@ -84,6 +87,25 @@ def config(m: Dict[str, Any]) -> Dict[str, Any]:
         estilo = str(((m["guia"].get("generation_system") or {}).get("style_lock_en")) or "").lower()
         c["estilo_fotos"] = "foto" if ("photograph" in estilo or "photo " in estilo) else "ilustracao"
     return c
+
+
+def intervalos(c: Dict[str, Any]) -> Dict[str, Optional[float]]:
+    """⏱ v84_367: {"intervalo", "intervalo_min", "intervalo_max"} do pacote, limpos (2 a 30 s; min ≤ média ≤ max).
+    Só "intervalo_min"/"intervalo_max" → a média fica no meio."""
+    def num(v: Any) -> Optional[float]:
+        try:
+            return max(2.0, min(30.0, float(v)))
+        except (TypeError, ValueError):
+            return None
+    med, mn, mx = num(c.get("intervalo")), num(c.get("intervalo_min")), num(c.get("intervalo_max"))
+    if mn and mx and mn > mx:
+        mn, mx = mx, mn
+    if med is None and mn and mx:
+        med = round((mn + mx) / 2, 2)
+    if med is not None:
+        mn = min(mn, med) if mn else None
+        mx = max(mx, med) if mx else None
+    return {"intervalo": med, "intervalo_min": mn, "intervalo_max": mx}
 
 
 def personagens(m: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -99,8 +121,8 @@ def tipos_imagem(m: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, str]:
     import marca_visual
     # 🖼 sem "diagrama" nos canais de pacote — gráfico gerado sai com letras/números tortos; gráfico entra na edição
     # (as setas/números só valem no modo "padrao", o do canal do espaço)
-    t = {k: v for k, v in marca_visual.TIPOS_IMAGEM.items() if k not in ("mascote", "diagrama")}
-    if cfg.get("estilo_fotos") == "ilustracao":
+    t = {k: v for k, v in marca_visual.tipos_imagem_da_marca(m).items() if k not in ("mascote", "diagrama")}  # v84_367: a marca limita
+    if cfg.get("estilo_fotos") == "ilustracao" and len(t) > 1:
         t.pop("arquivo", None)  # canal desenhado: nada de "foto de arquivo monocromática"
     return t
 

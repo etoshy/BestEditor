@@ -378,7 +378,7 @@ def ler_parte(texto: str, parte: Dict[str, Any]) -> str:
 
 # ------------------------------------------------------------------ juntar
 def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_palavras: int = 0,
-          max_inscreva: Optional[int] = None) -> Tuple[str, List[Dict[str, str]]]:
+          max_inscreva: Optional[int] = None, max_venda: Optional[int] = None) -> Tuple[str, List[Dict[str, str]]]:
     """(roteiro inteiro com [[INSCREVA]]/[[VENDA]] entre as partes, capítulos com o começo exato).
     📣 v84_218: `max_inscreva=1` (o canal pede) → uma só, no 1º respiro entre partes depois de ~25% do vídeo."""
     blocos: List[str] = []
@@ -409,6 +409,8 @@ def montar(partes: List[Dict[str, Any]], marcar_chamadas: bool = True, total_pal
             continue
         elif i == n - 2 and n >= 4:
             blocos.append("[[INSCREVA]]")
+            continue
+        if max_venda is not None and int(max_venda) <= 0:  # v84_367: canal sem venda
             continue
         if acum / total >= 0.15 and acum - ultima_venda >= max(600, total // 4):  # v84_99: ~3 no vídeo, não 6
             blocos.append("[[VENDA]]")

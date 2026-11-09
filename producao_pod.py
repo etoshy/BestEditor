@@ -916,12 +916,19 @@ def _planejar_cenas(lid: str, iid: str) -> None:
         _gerar_zip(lid, iid)
         it = next(x for x in carregar(lid)["itens"] if x["id"] == iid)
     total = float(it.get("total") or segs[-1]["end"])  # = fim da legenda do .zip (o projeto usa esse tempo)
-    cenas = cenas_lote.cortar_cenas(segs, cfg_lote["intervalo"], total=total)
-    _mudar(lid, iid, _log=f"🎬 {len(cenas)} cenas de ~{cfg_lote['intervalo']:g} s")
-    roteiro = " ".join(str(s.get("text") or "").strip() for s in segs)
     import canal_pod
     marca = canal_pod.carregar(_BASE, canal_pod.slug_do_item(_BASE, it, cfg_lote))
     ccfg_m = canal_pod.config(marca) if marca else {}
+    if ccfg_m.get("intervalo"):  # ⏱ v84_367: o pacote do canal diz de quanto em quanto tempo troca a imagem
+        cenas = cenas_lote.cortar_cenas(segs, ccfg_m["intervalo"], total=total,
+                                        minimo=ccfg_m.get("intervalo_min"), maximo=ccfg_m.get("intervalo_max"))
+        _faixa = (f"{ccfg_m['intervalo_min']:g}–{ccfg_m['intervalo_max']:g} s" if ccfg_m.get("intervalo_min") and ccfg_m.get("intervalo_max")
+                  else f"~{ccfg_m['intervalo']:g} s")
+        _mudar(lid, iid, _log=f"🎬 {len(cenas)} cenas de {_faixa} (do pacote do canal)")
+    else:
+        cenas = cenas_lote.cortar_cenas(segs, cfg_lote["intervalo"], total=total)
+        _mudar(lid, iid, _log=f"🎬 {len(cenas)} cenas de ~{cfg_lote['intervalo']:g} s")
+    roteiro = " ".join(str(s.get("text") or "").strip() for s in segs)
     if marca and ccfg_m.get("cenas") == "padrao":
         # 🖼 v84_191: o canal pede as cenas de sempre (foto documental, sem personagem/narrador desenhado) — só a % e o
         # canal vêm do pacote; as personagens entram por cima no editor (🧍 Personagens)

@@ -70,6 +70,22 @@ TIPOS_IMAGEM = {
     "mascote": "cena com o mascote",
 }
 MOTORES = {"pod": "Pod (FLUX.2 klein com referências / Z-Image)", "flow": "Google Flow (1 referência)"}
+# como cada tipo de imagem entra no prompt (em inglês) — o brand_guide pode trocar (generation_system.image_types_en)
+TIPOS_IMAGEM_EN = {"arquivo": "monochrome archival photograph",
+                   "ilustracao": "explanatory vintage illustration without any lettering",
+                   "close": "symbolic close-up", "ambiente": "establishing environment shot",
+                   "diagrama": "symbolic still life of the concept made only of real objects (no chart, no letters, no numbers)"}
+
+
+def tipos_imagem_da_marca(m: Optional[Dict[str, Any]]) -> Dict[str, str]:
+    """🖼 v84_367: os tipos de imagem que a marca usa — generation_system.allowed_image_types no brand_guide limita a lista
+    (ex.: canal realista sem "arquivo" monocromático nem "ilustracao"); sem o campo, todos."""
+    perm = ((m or {}).get("guia", {}).get("generation_system") or {}).get("allowed_image_types")
+    if isinstance(perm, list) and perm:
+        filtrado = {k: v for k, v in TIPOS_IMAGEM.items() if k in perm or k == "mascote"}
+        if any(k != "mascote" for k in filtrado):
+            return filtrado
+    return dict(TIPOS_IMAGEM)
 PRESET_GRADING = "noir_vermelho_v1"
 
 
@@ -419,6 +435,8 @@ def registrar_modelos(base: str) -> List[str]:
                              **({"chamadas": {k: int(v) for k, v in d["chamadas"].items() if k in ("inscreva", "venda") and str(v).isdigit()}}
                                 if isinstance(d.get("chamadas"), dict) else {}),
                              **({"palavras_por_minuto": int(d["palavras_por_minuto"])} if d.get("palavras_por_minuto") else {}),
+                             # 🎯 v84_367: vídeo explicativo (menos fatos por capítulo, sem ler a fonte em voz alta)
+                             **({"escopo_enxuto": bool(d["escopo_enxuto"])} if "escopo_enxuto" in d else {}),
                              **({"direcao_sugerida": direcao} if direcao else {}),
                              # 🎭 v84_173: canal com personagens (falas multi voz, lore, histórico) e o roteiro exemplo do canal
                              **({"perfil_canal": x["slug"]} if os.path.isfile(os.path.join(m["dir"], "personagens.json")) else {}),
@@ -745,12 +763,16 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
         partes_p.append(SEM_TEXTO)
         p = " ".join(x for x in partes_p if x)
         tipo_img = cena.get("tipo_imagem") or ""
-        if tipo_img and tipo_img in TIPOS_IMAGEM and tipo_img != "mascote":
-            p += f" Image type: {({'arquivo': 'monochrome archival photograph', 'ilustracao': 'explanatory vintage illustration without any lettering', 'close': 'symbolic close-up', 'ambiente': 'establishing environment shot', 'diagrama': 'symbolic still life of the concept made only of real objects (no chart, no letters, no numbers)'})[tipo_img]}."
+        tipos_en = dict(TIPOS_IMAGEM_EN, **{k: str(v) for k, v in (gs.get("image_types_en") or {}).items()
+                                            if k in TIPOS_IMAGEM_EN and str(v or "").strip()})
+        if tipo_img and tipo_img in tipos_imagem_da_marca(m) and tipo_img != "mascote":
+            p += f" Image type: {tipos_en[tipo_img]}."
         infos = cena.get("fotos_info") or [{} for _ in cena.get("refs_extras") or []]
         for k, fi in enumerate(infos, 1):  # 📷 a pessoa/animal/estátua/objeto real: as características + como desenhar
             desc = (fi.get("descricao_en") or "").strip()
-            como = ("redrawn as a vintage hand-inked editorial illustration in the brand style, keeping every recognizable feature"
+            # v84_367: o brand_guide pode dizer como a pessoa/objeto real da foto entra (ex.: canal realista em cores)
+            como = (str(gs.get("real_subject_render_en")).strip().rstrip(".") if str(gs.get("real_subject_render_en") or "").strip() else
+                    "redrawn as a vintage hand-inked editorial illustration in the brand style, keeping every recognizable feature"
                     if fi.get("estilo") == "ilustracao" or tipo_img == "ilustracao" else
                     "rendered as a grayscale archival photograph with film grain, keeping every recognizable feature")
             idx = next((i + 1 for i, (papel, _c) in enumerate(refs or []) if papel == f"foto_{k}"), 0)
@@ -1194,7 +1216,7 @@ inteiro sem pular nada). Para cada batida decida (pipeline do guia, passos 1 e 2
 - "intencao_visual": em português, o que a imagem precisa mostrar e por quê (ideia central + função no argumento);
 - "emocao": curiosidade, surpresa, suspense, humor, revelação, reflexão…;
 - "objeto": o objeto/fenômeno concreto da cena;
-- "tipo_imagem": um de {list(TIPOS_IMAGEM)} ({'; '.join(f'{k} = {v}' for k, v in TIPOS_IMAGEM.items())});
+- "tipo_imagem": um de {list(tipos_imagem_da_marca(m))} ({'; '.join(f'{k} = {v}' for k, v in tipos_imagem_da_marca(m).items())});
 - "mascote": uma das poses abaixo OU null. O mascote é o guia curioso: aparece em ~1 de cada 3 batidas, sempre que a
   narração faz pergunta, reage a um fato surpreendente, explica, investiga ou volta ao gancho. Poses: {poses}.
   Nunca mais de UM mascote por imagem. {ms.get('role', '')}
@@ -1294,7 +1316,8 @@ def ler_batidas(texto: str, m: Optional[Dict[str, Any]] = None) -> List[Dict[str
         if isinstance(pose, str) and pose.strip() and pose not in catalogo and pose.lower() not in ("null", "none", "nenhum"):
             acao_livre, pose = pose.strip(), pose_mais_proxima(pose)  # 🆕 pose que não está no catálogo: vira ação livre
         pose = pose if isinstance(pose, str) and pose in catalogo else ""
-        tipo = b.get("tipo_imagem") if b.get("tipo_imagem") in TIPOS_IMAGEM else ("mascote" if pose else "arquivo")
+        _tipos = tipos_imagem_da_marca(m)
+        tipo = b.get("tipo_imagem") if b.get("tipo_imagem") in _tipos else ("mascote" if pose else ("arquivo" if "arquivo" in _tipos else next(iter(_tipos))))
         txt = b.get("texto_de") or []
         if isinstance(txt, str):
             txt = [x for x in txt.split("\n") if x.strip()]
@@ -1911,9 +1934,10 @@ EXEMPLO_PACOTE = {"formato": FORMATO_PACOTE, "versao": VERSAO_PACOTE, "slug": "m
                                              "vira personagem do canal e personagem falando aparece; fotos_do_roteiro = "
                                              "\"referencia\" (redesenha as fotos marcadas [I3] no estilo do canal) ou \"real\" (usa "
                                              "a foto como está); estilo_fotos = \"foto\" ou \"ilustracao\" (vazio = pela estética); "
-                                             "ref_estilo = manda a amostra de estilo como referência em toda cena",
+                                             "ref_estilo = manda a amostra de estilo como referência em toda cena; "
+                                             "intervalo/intervalo_min/intervalo_max = segundos por imagem (null = o do lote)",
                                    "pct": 100, "personagens": False, "fotos_do_roteiro": "referencia", "estilo_fotos": "",
-                                   "ref_estilo": False},
+                                   "ref_estilo": False, "intervalo": None, "intervalo_min": None, "intervalo_max": None},
                   # 🧍 v84_186: as personagens por cima do vídeo (aba 🧍 Personagens do Estúdio / projetos novos)
                   "personagens_editor": {"_sobre": "ativo = já põe as personagens nos projetos novos do canal; frequencia = quanto "
                                                    "dos momentos possíveis viram aparição (0.6 = os melhores ~60%; 1 = toda fala); "
@@ -1931,7 +1955,7 @@ EXEMPLO_REFORCOS = {
 EXEMPLO_POSES = {"poses": ["com lupa", "apontando", "lendo livro", "surpreso", "com ideia", "comemorando"]}
 EXEMPLO_MODELO = {
     "chave": "meu_canal", "nome": "🎨 Meu Canal — curiosidade explicada", "descricao": "Que tipo de vídeo o canal faz.",
-    "nome_canal": "Meu Canal", "palavras_por_minuto": 150,
+    "nome_canal": "Meu Canal", "palavras_por_minuto": 150, "chamadas": {"inscreva": 1, "venda": 0}, "escopo_enxuto": True,
     "formatos": {"longo": {"nome": "Vídeo longo", "minutos": 12, "estrutura": ["GANCHO: …", "VIRADA: …", "…", "FECHAMENTO: …"]},
                  "curto": {"nome": "Shorts", "minutos": 1, "estrutura": ["Fato estranho", "Explicação", "Pergunta final"]}},
     "regras": ["Falar o nome do canal no momento certo, sempre.", "Só fatos das fontes; lenda dita como lenda."]}
@@ -1995,7 +2019,8 @@ CHAVES_GUIA = {
               "consistency_protocol, prompt_lock_en, negative_prompt_en, canonical_reference_files",
     "generation_system": "style_lock_en, negative_prompt_global_en, base_prompt_template_en (com SUBJECT: [..] VISUAL QUESTION: [..] "
                          "COMPOSITION: [..] MASCOT: [..] BRAND STYLE: [..]), scene_prompt_template_en, thumbnail_prompt_template_en "
-                         "([topic]), quality_checklist",
+                         "([topic]), quality_checklist; opcionais (v84_367): allowed_image_types (ex.: [\"ambiente\", \"close\"]), "
+                         "image_types_en ({tipo: texto em inglês}), real_subject_render_en (como a pessoa/objeto da sua foto entra)",
 }
 
 

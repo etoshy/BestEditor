@@ -1,0 +1,206 @@
+{
+ "formato": "besteditor-curtos-perfil",
+ "versao": 2,
+ "nome": "Laestro",
+ "idioma": "pt",
+ "perfil": {
+  "resumo": "Notícia/treta do momento da internet e da política brasileira contada de um jeito rápido e irônico — mas que NÃO para na notícia: traz um contraponto (o outro lado, o que a manchete não conta, onde a reação geral pode estar errada) e fecha com uma pequena reflexão. É o que diferencia o canal de mais um canal genérico de fofoca. Visual: colagem frenética de clipes reais do assunto, MEMES DE REAÇÃO a cada frase, cartões cinza com fotinhas que trocam a cada 1-2 s, e uma legenda dourada no meio da tela que troca a cada ~0,7 s.",
+  "idioma": "pt",
+  "duracao_alvo_s": 50,
+  "ritmo": {
+   "plano_medio_s": 1.4,
+   "palavras_por_s": 3.2,
+   "cortes": "corte seco a cada ideia (às vezes uma fusão rapidíssima de ~0,25 s entre memes); a imagem troca a cada 1-2 s e a legenda a cada 2-3 palavras; nunca fica parado mais de ~3 s, a não ser no clipe real do assunto",
+   "pausa_max_s": 0.18
+  },
+  "gancho": {
+   "descricao": "0-3 s: o TÍTULO falado como uma afirmação chocante ou pergunta, em 2-3 cortes de meme/foto de reação em tela cheia, legenda TODA EM MAIÚSCULAS (ex.: o rosto do protagonista sorrindo + um meme rindo). Logo depois, 2-4 s do clipe real do protagonista. Não há introdução nem 'olá'.",
+   "duracao_s": 3,
+   "exemplos": [
+    "O PASTOR MIRIM / E BRIGOU COM UM ANJO",
+    "O LULA GANHOU / AS REDES SOCIAIS",
+    "VAI SER ANULADA?",
+    "O FELCA ENGANOU / SEM QUERER?",
+    "QUE ACUSOU UM UBER / PORQUE ELE NÃO QUERIA FALAR O SEU VOTO",
+    "DOS INFLUENCIADORES SOBRE O FIM DAS CASAS / FUNCIONOU?"
+   ]
+  },
+  "estrutura": [
+   {
+    "funcao": "gancho",
+    "descricao": "título falado em CAPS sobre memes/fotos de reação + clipe real do protagonista",
+    "segundos": 4
+   },
+   {
+    "funcao": "contexto",
+    "descricao": "'pois é gente' / 'a alguns dias atrás' — o contexto em frases curtas sobre o CARTÃO CINZA, uma fotinha nova (pessoa, print, meme) a cada frase",
+    "segundos": 7
+   },
+   {
+    "funcao": "fato",
+    "descricao": "o que aconteceu, com o clipe/print REAL do fato (debate, vídeo, tweet, notícia) e um meme de reação a cada virada",
+    "segundos": 14
+   },
+   {
+    "funcao": "contraponto",
+    "descricao": "'maaas…' / 'só que tem um detalhe' — o ponto de DISCORDÂNCIA: o outro lado, o que a manchete/a internet não está considerando, a pergunta incômoda; com meme forte (Vegeta lendo, Kevin Hart pensando)",
+    "segundos": 12
+   },
+   {
+    "funcao": "reflexao",
+    "descricao": "a pequena reflexão: o que isso diz sobre a gente/a internet/a política — uma frase que fica na cabeça, ainda no tom do canal (sem sermão)",
+    "segundos": 8
+   },
+   {
+    "funcao": "final",
+    "descricao": "fecha com uma pergunta pra quem assiste ('e você, concorda?') ou uma ironia curta — termina seco",
+    "segundos": 3
+   }
+  ],
+  "tom": "debochado e irônico, de amigo contando a fofoca — mas com cabeça: questiona a versão mais fácil, mostra o outro lado com honestidade e deixa uma reflexão curta; zoa todo mundo, sem virar panfleto de um lado; exagera a reação ('MUITA MERDA', 'bizarro', 'kkkkk')",
+  "linguagem": "português do Brasil bem coloquial de internet: 'pois é gente', 'tudin', 'maaas', 'BEEEM', 'bizarro', 'kkkk', 'só que tem um detalhe', 'agora pensa comigo'; frases curtas que cabem em 2-4 palavras de legenda; palavras de ênfase em MAIÚSCULAS (MUITO, TODO, NADA, NESSE CASO, GIGANTE); alonga vogais pra dar ênfase ('maaas', 'BEEEM')",
+  "composicoes": [
+   {
+    "id": "gancho_reacao",
+    "nome": "Gancho de reação",
+    "layout": "meme",
+    "descricao": "foto/meme de reação em tela cheia (soldado de capacete com olhar perdido, rosto do protagonista, John Cena gritando, homem rindo histericamente) com a legenda do título em CAPS no meio",
+    "quando": "os 3 primeiros segundos"
+   },
+   {
+    "id": "clipe_do_assunto",
+    "nome": "Clipe real do assunto",
+    "layout": "clipe_real",
+    "descricao": "trecho do vídeo/podcast/entrevista/live REAL do protagonista, tela cheia (vídeo 16:9 recortado ou empilhado), legenda por cima",
+    "quando": "logo depois do gancho e sempre que o fato é mostrado"
+   },
+   {
+    "id": "cartao_cinza",
+    "nome": "Cartão cinza",
+    "layout": "cartao_cinza",
+    "descricao": "fundo cinza liso com uma foto PEQUENA no centro (com sombra): rosto da pessoa, print, meme pequeno; a foto troca a cada frase",
+    "quando": "explicar o contexto, apresentar quem é quem, datas, listar casos ('pois é gente', 'a alguns dias atrás', 'aquela figura')"
+   },
+   {
+    "id": "meme_reacao",
+    "nome": "Meme de reação",
+    "layout": "meme",
+    "descricao": "meme em tela cheia que COMENTA a frase: Vegeta de óculos lendo um livro ('maaas', explicação), Joker sorrindo no mangá (plano maligno), caracóis monstro com dentes ('começou a…'), pitbull sério / samoieda de perto (julgamento), gato arregalado ('voltou à tona'), Kevin Hart pensando ('na verdade foi'), mulher de anime séria, homem careca de mangá encarando",
+    "quando": "a cada virada ou informação forte (e no contraponto: o meme 'pensando'/'na verdade…') — é o coração do estilo"
+   },
+   {
+    "id": "print_tweet",
+    "nome": "Print / tweet",
+    "layout": "foto_real",
+    "descricao": "print de tweet, post ou notícia sobre fundo escuro, às vezes ampliando o trecho",
+    "quando": "quando citar o que alguém postou"
+   },
+   {
+    "id": "foto_real",
+    "nome": "Foto do protagonista",
+    "layout": "foto_real",
+    "descricao": "foto real da pessoa/lugar com zoom lento (Lula com boné, Flávio Bolsonaro apontando)",
+    "quando": "nomear alguém real fora do cartão cinza"
+   },
+   {
+    "id": "risada_final",
+    "nome": "Risada / deboche",
+    "layout": "meme",
+    "descricao": "meme rindo ('TÃO ENGRAÇADO', 'até a plateia kkkk') ou gato/cachorro julgando",
+    "quando": "piadas e o final"
+   }
+  ],
+  "textos_tela": {
+   "usa": false,
+   "descricao": "não usa texto grande separado: a própria legenda (dourada, no meio) faz o papel, com as palavras fortes em MAIÚSCULAS; títulos de vídeo de terceiros às vezes aparecem em branco no alto",
+   "estilo_destaque": "branco",
+   "frequencia": "só no cartão de texto, se usar"
+  },
+  "legenda": {
+   "ativa": true,
+   "estilo": "contorno",
+   "posicao": "meio",
+   "tamanho": 0.05,
+   "maiusculas": false,
+   "max_palavras": 3,
+   "fonte": "DP Poppins",
+   "cor_texto": "#F2A81E",
+   "cor_ativa": "#F2A81E",
+   "sob_templates": "manter",
+   "sob_destaques": "auto",
+   "contorno": true
+  },
+  "sfx": {
+   "usa": true,
+   "nos_cortes": true,
+   "descricao": "cerca de metade dos cortes tem um som curto junto: whoosh/swipe na troca de meme, pop quando a fotinha do cartão cinza troca, impacto/boom no gancho e nas revelações; os memes às vezes entram com o próprio som (risada)",
+   "tipos_preferidos": [
+    "whoosh",
+    "pop",
+    "impacto",
+    "boom",
+    "swipe"
+   ],
+   "volume": 0.7
+  },
+  "musica": {
+   "usa": true,
+   "descricao": "trilha de fundo baixinha e contínua (beat/phonk/lo-fi tenso), por baixo da fala"
+  },
+  "cta": {
+   "texto": "",
+   "onde": "final"
+  },
+  "gancho_maiusculas": true,
+  "titulos": {
+   "descricao": "o próprio gancho: afirmação chocante ou pergunta curta em MAIÚSCULAS com o nome do protagonista",
+   "exemplos": [
+    "O PASTOR MIRIM BRIGOU COM UM ANJO",
+    "O LULA GANHOU AS REDES SOCIAIS",
+    "A ELEIÇÃO VAI SER ANULADA?",
+    "O FELCA CAGOU…",
+    "ELE FOI ACUSADO POR UM UBER",
+    "O MEME MAIS BIZARRO DA ELEIÇÃO",
+    "ESSE FOI O MAIOR SHOW DE COMÉDIA DO BRASIL?",
+    "O CHORO DOS INFLUENCIADORES"
+   ]
+  },
+  "evitar": [
+   "propaganda de curso/produto no final (o canal original termina vendendo o curso de cortes — aqui não)",
+   "introdução, 'olá pessoal' ou pedir inscrição no começo",
+   "plano parado por mais de 3 s fora do clipe real",
+   "frases longas e formais",
+   "tomar partido político explícito — o deboche é com todo mundo",
+   "texto grande separado da legenda",
+   "foto de banco genérica onde cabe um meme ou a foto real",
+   "usar o bordão 'relaxa e agacha que eu vou te explicar' (é do canal original, não é nosso)",
+   "só repetir a notícia sem contraponto nem reflexão — vira mais um canal genérico",
+   "sermão/lição de moral longa: a reflexão é UMA frase"
+  ],
+  "ponto_de_vista": {
+   "usa": true,
+   "descricao": "Todo vídeo, além de dar a notícia, traz PELO MENOS um ponto de discordância ou contraponto — o outro lado, o que a manchete não conta, o que a reação da internet está exagerando ou esquecendo, uma pergunta incômoda — e fecha com uma pequena reflexão. O contraponto tem que ser honesto (o melhor argumento do outro lado, não um espantalho), separado do fato (opinião soa como opinião: 'agora pensa comigo', 'o que ninguém tá falando é…') e nunca inventa fato, número ou declaração."
+  }
+ },
+ "metricas": {
+  "videos": 8,
+  "dur": 56.7,
+  "dur_sem_cta": 51,
+  "plano_mediano_s": 1.3,
+  "cortes_por_s": 0.55,
+  "sfx_nos_cortes": 0.5,
+  "legenda_troca_s": 0.7,
+  "obs": "medido aqui a 8 quadros/s; a fala foi lida das legendas queimadas (sem Whisper nesta análise)"
+ },
+ "atualiza": {
+  "2": [
+   "resumo",
+   "estrutura",
+   "composicoes",
+   "linguagem",
+   "tom",
+   "ponto_de_vista",
+   "evitar"
+  ]
+ }
+}
