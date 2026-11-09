@@ -123,8 +123,10 @@
 <script>document.getElementById('formAnime').addEventListener('submit', () => { const b = document.getElementById('btnAnime'); b.disabled = true; b.textContent = '⏳ criando…'; });</script>
 <script>document.getElementById('formReact').addEventListener('submit', () => { const b = document.getElementById('btnReact'); b.disabled = true; b.textContent = '⏳ criando…'; });</script>
 
+<div class="ds-card" style="background:#f5f3ff;border-color:#ddd6fe;"><b>📚 Texto bruto → vários vídeos</b> — mande uma transcrição de curso, aula, livro ou anotações: a 🤖 IA separa os temas (com o tempo de cada vídeo), você marca e o site cria um projeto por tema e escreve todos os roteiros ao mesmo tempo. <a href="/temas-bruto"><b>Abrir →</b></a></div>
+
 <div class="ds-card">
-  <h2 style="margin:0;">+ Novo projeto</h2>
+  <h2 style="margin:0;">+ Novo projeto <span style="font-weight:400;font-size:.85rem;color:#888;">(um tema só — ou use o 📚 Texto bruto acima pra vários)</span></h2>
   <form method="post" action="{{ url_for('dossies_novo') }}" id="formNovo">
     <label>Modelo</label>
     <select name="modelo">{% for k, m in modelos.items() %}<option value="{{ k }}">{{ m.nome }} — {{ m.descricao }}</option>{% endfor %}</select>

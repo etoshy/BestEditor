@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Thumbnails{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1000px; }
+  .ta-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .ta-item { display: flex; justify-content: space-between; align-items: center; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+</style>
+<h1>🖼 Thumbnails</h1>
+<p style="color:#555;">Thumbnails de <b>qualquer vídeo</b> — mesmo um que não é projeto do site. A 🤖 IA cria <b>5 ideias bem diferentes</b>
+  (rosto/emoção, objeto-símbolo, contraste, a cena mais dramática, mistério) com o prompt da imagem; a imagem sai no <b>Google Flow</b>
+  (sem texto) e o texto grande entra por cima, em 1280×720. Ou copie o prompt e cole no Flow à mão.
+  Nos 🕵️ Modelos de vídeo e no 📜 Roteiro do YouTube o mesmo quadro aparece dentro de cada projeto.</p>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+{% if not t %}
+<div class="ta-card">
+  <h2 style="margin:0;">Nova thumbnail</h2>
+  <form method="post" action="/thumbs-avulsas/nova" id="formNova">
+    <label>Título do vídeo</label>
+    <input type="text" name="titulo" required placeholder="ex.: Por que você mente pra si mesmo?">
+    <label>Sobre o vídeo <span style="font-weight:400;color:#888;">(o roteiro, um resumo ou a ideia — quanto mais, melhor)</span></label>
+    <textarea name="sobre" rows="5"></textarea>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label style="flex:2;min-width:240px;">Estilo do canal
+        <select name="canal"><option value="">Padrão (foto cinematográfica de documentário)</option>
+          {% for c in canais %}<option value="{{ c.slug }}">{{ c.nome }}</option>{% endfor %}</select></label>
+      <label style="flex:1;min-width:140px;">Idioma do texto
+        <select name="idioma"><option value="pt">Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="de">Alemão</option></select></label>
+    </div>
+    <button type="submit" id="btnNova">🤖 Criar 5 ideias</button>
+  </form>
+</div>
+<div class="ta-card">
+  <h2 style="margin:0;">Suas thumbnails</h2>
+  {% for x in lista %}
+  <div class="ta-item"><div><a href="/thumbs-avulsas/{{ x.id }}" style="font-weight:600;">{{ x.titulo }}</a>
+    <div style="font-size:.8rem;color:#777;">{{ x.itens }} ideias · {{ x.prontas }} prontas</div></div>
+    <form method="post" action="/thumbs-avulsas/{{ x.id }}/excluir" onsubmit="return confirm('Excluir estas thumbnails?')" style="margin:0;">
+      <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:.8rem;margin:0;">🗑</button></form></div>
+  {% else %}<p style="color:#888;">Nenhuma ainda.</p>{% endfor %}
+</div>
+<script>document.getElementById('formNova').addEventListener('submit', () => { const b = document.getElementById('btnNova'); b.disabled = true; b.textContent = '⏳ criando…'; });</script>
+{% else %}
+<p><a href="/thumbs-avulsas">← todas as thumbnails</a></p>
+<div class="ta-card"><h2 style="margin:0;">{{ t.titulo }}</h2>
+  {% if t.sobre %}<details style="margin-top:6px;"><summary style="cursor:pointer;color:#555;">sobre o vídeo</summary><div style="white-space:pre-wrap;font-size:.85rem;color:#444;">{{ t.sobre[:3000] }}</div></details>{% endif %}
+</div>
+{% set thumbs_base = '/thumbs/avulso/' ~ t.id %}{% include "_thumbs.html" %}
+{% endif %}
+{% endblock %}

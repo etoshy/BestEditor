@@ -219,6 +219,12 @@
       location.href = d.link;
     } catch (e) { err.textContent = '❌ ' + e.message; err.style.display = ''; b.disabled = false; b.textContent = '▶ Iniciar produção'; }
   });
+  // 📚 v84_368: /producao-pod?marcar=dossie:id,dossie:id (vindo do Texto bruto → vários vídeos) já marca os roteiros
+  (new URLSearchParams(location.search).get('marcar') || '').split(',').filter(Boolean).forEach(ch => {
+    const [origem, id] = ch.split(':');
+    const cb = document.querySelector(`.rot[data-origem="${origem}"][data-id="${id}"]`);
+    if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+  });
   desenhar();
 })();
 </script>

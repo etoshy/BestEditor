@@ -25,6 +25,9 @@ def registrar(app, base_dir: str) -> None:
             if origem == "roteiro_yt":
                 import roteiros_yt as ry
                 return list(((ry.carregar_projeto(base_dir, pid).get("resultado") or {}).get("thumbnails")) or [])
+            if origem == "avulso":  # 🖼 v84_368: thumbnail de qualquer vídeo — as ideias já moram no thumbs.json
+                d = tf.carregar(base_dir, origem, pid)
+                return [] if d.get("titulo") or d.get("itens") else None
             if origem == "canal":
                 import analisador_canal as ac
                 sug = ((ac.carregar(base_dir, pid).get("ia") or {}).get("sugestoes")) or []
@@ -42,7 +45,7 @@ def registrar(app, base_dir: str) -> None:
         if ideias is None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         d = tf.sincronizar(base_dir, origem, pid, ideias)
-        return jsonify(dict(tf.para_json(d, _url(origem, pid)), ok=True))
+        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
 
     @app.route("/thumbs/<origem>/<pid>/editar", methods=["POST"])
     def thumbs_editar(origem: str, pid: str):
@@ -53,7 +56,86 @@ def registrar(app, base_dir: str) -> None:
             d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar") if k in c})
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
-        return jsonify(dict(tf.para_json(d, _url(origem, pid)), ok=True))
+        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
+
+    # ------------------------------------------------------------------ 🤖 +5 ideias (v84_368) — qualquer projeto
+    def _contexto(origem: str, pid: str) -> Tuple[str, str, str]:
+        """(título, sobre o vídeo, idioma) pra IA criar as thumbnails."""
+        if origem == "dossie":
+            import dossies as ds
+            p = ds.carregar(base_dir, pid)
+            cfg = p.get("config") or {}
+            return ds.titulo_promessa(p), ds.roteiro_para_voz(p) or str(p.get("tema") or ""), str(cfg.get("idioma") or "pt")
+        if origem == "roteiro_yt":
+            import roteiros_yt as ry
+            p = ry.carregar_projeto(base_dir, pid)
+            return str(p.get("titulo") or ""), ry.roteiro_para_voz(p), "pt"
+        if origem == "avulso":
+            d = tf.carregar(base_dir, origem, pid)
+            return str(d.get("titulo") or ""), str(d.get("sobre") or ""), str(d.get("idioma") or "pt")
+        if origem == "canal":
+            ideias = _ideias(origem, pid) or []
+            return "Vídeos sugeridos pro canal", "\n".join(i.get("ideia", "") for i in ideias), "pt"
+        raise tf.ThumbErro("Projeto não encontrado.")
+
+    @app.route("/thumbs/<origem>/<pid>/ia", methods=["POST"])
+    def thumbs_ia(origem: str, pid: str):
+        """🤖 Mais N thumbnails bem diferentes (das que já existem também)."""
+        ideias = _ideias(origem, pid) if origem in tf.ORIGENS else None
+        if ideias is None:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = request.get_json(silent=True) or {}
+        try:
+            n = max(1, min(8, int(c.get("n") or tf.N_IDEIAS)))
+            d = tf.sincronizar(base_dir, origem, pid, ideias)
+            titulo, sobre, idioma = _contexto(origem, pid)
+            if not (titulo or sobre).strip():
+                raise tf.ThumbErro("Sem título nem roteiro pra IA se basear.")
+            novas = tf.pedir_ideias(titulo, sobre, d.get("itens") or [], n, idioma, tf.estilo(base_dir, origem, pid))
+            d = tf.adicionar_ideias(base_dir, origem, pid, novas)
+        except (tf.ThumbErro, ValueError) as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True, novas=len(novas)))
+
+    # ------------------------------------------------------------------ 🖼 thumbnail avulsa — página própria (v84_368)
+    @app.route("/thumbs-avulsas")
+    def thumbs_avulsas():
+        from flask import render_template
+        try:
+            import marca_visual
+            canais = marca_visual.listar(base_dir)
+        except Exception:  # noqa: BLE001
+            canais = []
+        return render_template("thumbs_avulsas.html", lista=tf.listar_avulsas(base_dir), canais=canais, t=None,
+                               erro=request.args.get("erro") or "")
+
+    @app.route("/thumbs-avulsas/nova", methods=["POST"])
+    def thumbs_avulsa_nova():
+        from flask import redirect
+        f = request.form
+        titulo = (f.get("titulo") or "").strip()
+        if not titulo:
+            return redirect("/thumbs-avulsas?erro=Escreva+o+t%C3%ADtulo+do+v%C3%ADdeo.")
+        pid = tf.criar_avulsa(base_dir, titulo, f.get("sobre") or "", f.get("canal") or "", f.get("idioma") or "pt")
+        return redirect(f"/thumbs-avulsas/{pid}?ia=1")
+
+    @app.route("/thumbs-avulsas/<pid>")
+    def thumbs_avulsa(pid: str):
+        from flask import redirect, render_template
+        if _ideias("avulso", pid) is None:
+            return redirect("/thumbs-avulsas?erro=N%C3%A3o+encontrada.")
+        d = tf.carregar(base_dir, "avulso", pid)
+        return render_template("thumbs_avulsas.html", t=dict(d, id=pid), lista=[], canais=[], erro="")
+
+    @app.route("/thumbs-avulsas/<pid>/excluir", methods=["POST"])
+    def thumbs_avulsa_excluir(pid: str):
+        import shutil
+        from flask import redirect
+        try:
+            shutil.rmtree(tf.pasta(base_dir, "avulso", pid), ignore_errors=True)
+        except tf.ThumbErro:
+            pass
+        return redirect("/thumbs-avulsas")
 
     @app.route("/thumbs/<origem>/<pid>/gerar", methods=["POST"])
     def thumbs_gerar(origem: str, pid: str):

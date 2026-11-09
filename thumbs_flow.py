@@ -23,7 +23,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 PASTA = "thumbs"
-ORIGENS = ("dossie", "roteiro_yt", "canal")
+ORIGENS = ("dossie", "roteiro_yt", "canal", "avulso")  # 🖼 v84_368: "avulso" = thumbnail de qualquer vídeo (página própria)
 _TRAVA = threading.Lock()
 
 ESTILO_PADRAO = ("YouTube documentary thumbnail, 16:9, cinematic photo, one clear focal subject, dramatic high-contrast lighting, "
@@ -117,10 +117,130 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
         return d
 
 
-def prompt_flow(it: Dict[str, Any], lado: str = "right") -> str:
-    """A cena (prompt da IA, em inglês, ou a ideia) + o estilo de thumbnail."""
+def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> str:
+    """A cena (prompt da IA, em inglês, ou a ideia) + o estilo de thumbnail (o do canal, quando tem — v84_368)."""
     cena = (it.get("prompt") or it.get("ideia") or "").strip().rstrip(".,")
-    return f"{cena}. {ESTILO_PADRAO.format(lado=lado)}"
+    return f"{cena}. {(estilo or ESTILO_PADRAO).format(lado=lado)}"
+
+
+# ------------------------------------------------------------------ 🎨 o estilo do canal (v84_368)
+def estilo_da_marca(base: str, slug: str) -> str:
+    """Thumbnail no jeito do canal do pacote: o style_lock do brand_guide + as regras de thumbnail (sem texto na imagem)."""
+    if not slug:
+        return ""
+    try:
+        import marca_visual
+        gs = (marca_visual.carregar(base, slug)["guia"].get("generation_system")) or {}
+    except Exception:  # noqa: BLE001 — canal apagado etc.
+        return ""
+    estilo = " ".join(str(gs.get("style_lock_en") or "").split())
+    if not estilo:
+        return ""
+    neg = " ".join(str(gs.get("negative_prompt_global_en") or "").split())
+    return ("YouTube thumbnail, 16:9, one strong focal subject, strong emotion, dramatic light and clear contrast, large empty "
+            "negative space on the {lado} third for a big title added later. " + estilo.replace("{", "(").replace("}", ")")
+            + " No text, no letters, no words, no watermark, no logo." + (f" Avoid: {neg.replace('{', '(').replace('}', ')')}." if neg else ""))
+
+
+def estilo(base: str, origem: str, pid: str) -> str:
+    """O estilo das thumbs deste projeto: o do canal escolhido na thumb avulsa ou o do 🕵️ modelo (pacote de canal)."""
+    d = carregar(base, origem, pid)
+    slug = str(d.get("canal") or "")
+    if not slug and origem == "dossie":
+        try:
+            import dossies as ds
+            p = ds.carregar(base, pid)
+            slug = str((ds.MODELOS.get((p.get("config") or {}).get("modelo") or "") or {}).get("identidade_visual") or "")
+        except Exception:  # noqa: BLE001
+            slug = ""
+    return estilo_da_marca(base, slug)
+
+
+# ------------------------------------------------------------------ 🤖 mais ideias pela IA (v84_368)
+N_IDEIAS = 5
+ANGULOS = ("rosto/emoção forte de uma pessoa da história", "um objeto-símbolo em close", "contraste/antes e depois ou dois lados",
+           "a cena mais dramática do vídeo", "mistério: algo escondido ou uma pergunta visual")
+
+
+def _schema_ideias() -> Dict[str, Any]:
+    from ia_midia import _S, _lista, _obj
+    return _obj({"thumbnails": _lista(_obj({"ideia": _S, "texto": _S, "prompt": _S, "angulo": _S}))})
+
+
+def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
+                 estilo_canal: str = "") -> List[Dict[str, str]]:
+    """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem)."""
+    import ia_servico as ia
+    motivo = ia.motivo_desligado("roteiros")
+    if motivo:
+        raise ThumbErro("IA: " + motivo + " — ligue em 🤖 IA (📝 Roteiros direto na IA).")
+    existentes = "\n".join(f"- {i.get('ideia')}" for i in ja if i.get("ideia"))[:3000]
+    system = f"""Você cria THUMBNAILS de YouTube que dão clique sem enganar. Para o vídeo abaixo, crie {n} thumbnails BEM
+DIFERENTES entre si — cada uma com um ângulo próprio (use estes, um por thumbnail, na ordem que fizer sentido:
+{'; '.join(ANGULOS)}). Nada de repetir a mesma cena com outra luz.
+Para cada uma:
+- "ideia": o que a thumbnail mostra e por que dá clique (1 frase, em português);
+- "texto": 2 a 4 palavras GRANDES que vão na miniatura (idioma do vídeo: {idioma}), que completam o título sem repeti-lo;
+- "prompt": a cena da imagem EM INGLÊS para o Google Flow: um assunto principal claro, expressão/ação, lugar, época, luz e
+  enquadramento, com espaço vazio de um lado pro título. NUNCA peça texto escrito, letras, setas, círculos ou marcações na
+  imagem (o texto entra depois, por cima). Sem violência gráfica. Pessoa real famosa: descreva (idade, roupa, época), sem o nome.
+- "angulo": qual dos ângulos acima ela usa.
+{('Estética do canal (a cena tem que caber nela): ' + estilo_canal[:900]) if estilo_canal else ''}
+{('Já existem estas (NÃO repita a ideia nem o ângulo delas):' + chr(10) + existentes) if existentes else ''}
+Responda só o JSON."""
+    conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
+    with ia.rotulo("🖼 Thumbs: " + (titulo or "")[:60]):
+        d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=4000, effort="low", timeout=300)
+    if not d:
+        raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
+    out = [t for t in (normalizar(x) for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
+    if not out:
+        raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
+    return out[:max(1, n)]
+
+
+def adicionar_ideias(base: str, origem: str, pid: str, ideias: List[Dict[str, str]]) -> Dict[str, Any]:
+    """As ideias novas entram no fim (as que já existem ficam)."""
+    with _TRAVA:
+        d = carregar(base, origem, pid)
+        itens = d.setdefault("itens", [])
+        conhecidas = {i.get("ideia") for i in itens}
+        prox = max([int(i.get("n") or 0) for i in itens] or [0]) + 1
+        for n in ideias:
+            if n["ideia"] in conhecidas:
+                continue
+            itens.append(dict(n, n=prox, status="", imagem="", final="", erro="", da_ia=True))
+            conhecidas.add(n["ideia"])
+            prox += 1
+        salvar(base, origem, pid, d)
+        return d
+
+
+# ------------------------------------------------------------------ 🖼 thumbnail avulsa (qualquer vídeo) — v84_368
+def criar_avulsa(base: str, titulo: str, sobre: str, canal: str = "", idioma: str = "pt") -> str:
+    import uuid
+    pid = uuid.uuid4().hex[:10]
+    salvar(base, "avulso", pid, {"titulo": " ".join(str(titulo or "").split())[:200], "sobre": str(sobre or "")[:20000],
+                                 "canal": str(canal or "")[:60], "idioma": str(idioma or "pt")[:10], "criado": time.time(),
+                                 "itens": []})
+    return pid
+
+
+def listar_avulsas(base: str) -> List[Dict[str, Any]]:
+    raiz = os.path.join(base, PASTA)
+    out = []
+    if not os.path.isdir(raiz):
+        return out
+    for nome in os.listdir(raiz):
+        if not nome.startswith("avulso_"):
+            continue
+        pid = nome[len("avulso_"):]
+        if not _valido("avulso", pid):
+            continue
+        d = carregar(base, "avulso", pid)
+        out.append({"id": pid, "titulo": d.get("titulo") or "(sem título)", "itens": len(d.get("itens") or []),
+                    "prontas": sum(1 for i in d.get("itens") or [] if i.get("final")), "criado": d.get("criado") or 0})
+    return sorted(out, key=lambda x: -x["criado"])
 
 
 # ------------------------------------------------------------------ o texto por cima
@@ -191,13 +311,15 @@ def gerar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, forc
         log("Nada pra gerar — todas já têm imagem.")
         return d
     cliente = cliente or cliente_padrao()
+    est = estilo(base, origem, pid)  # 🎨 v84_368: o estilo do canal (vazio = o padrão de documentário)
     feitas = 0
     for k, it in enumerate(alvo, start=1):
         n = int(it["n"])
         editar_status(base, origem, pid, n, status="gerando", erro="")
         log(f"🎨 thumbnail {k}/{len(alvo)}: {it.get('ideia', '')[:80]}")
         try:
-            fotos = cliente.gerar_imagem_prompt(prompt_flow(it), forcar=forcar or bool(it.get("imagem")))
+            pf = prompt_flow(it, estilo=est)
+            fotos = cliente.gerar_imagem_prompt(pf, forcar=forcar or bool(it.get("imagem")))
             origem_img = next((f.local_path for f in fotos if getattr(f, "local_path", "") and os.path.isfile(f.local_path)), None)
             if not origem_img:
                 raise ThumbErro("o Flow não devolveu a imagem")
@@ -206,7 +328,7 @@ def gerar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, forc
             destino = os.path.join(p, f"thumb_{n}_{int(time.time() * 1000)}{os.path.splitext(origem_img)[1] or '.png'}")
             shutil.copyfile(origem_img, destino)
             final = compor(destino, it.get("texto") or "", destino.rsplit(".", 1)[0] + "_final.jpg")
-            editar_status(base, origem, pid, n, status="pronto", imagem=destino, final=final, erro="", prompt_usado=prompt_flow(it))
+            editar_status(base, origem, pid, n, status="pronto", imagem=destino, final=final, erro="", prompt_usado=pf)
             feitas += 1
         except Exception as exc:  # noqa: BLE001 — uma que falha não para as outras
             editar_status(base, origem, pid, n, status="erro", erro=str(exc)[:300])
@@ -236,11 +358,12 @@ def iniciar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, fo
                               pagina=pagina)
 
 
-def para_json(d: Dict[str, Any], url_base: str) -> Dict[str, Any]:
-    """Pra página: sem caminhos do disco, com as URLs."""
+def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[str, Any]:
+    """Pra página: sem caminhos do disco, com as URLs (e o prompt completo pra colar no Flow à mão — v84_368)."""
     out = []
     for it in d.get("itens") or []:
         x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia")}
+        x["prompt_flow"] = prompt_flow(it, estilo=estilo_canal)
         x["url_imagem"] = f"{url_base}/{it['n']}/imagem?v={int(os.path.getmtime(it['imagem']))}" if it.get("imagem") and os.path.isfile(it["imagem"]) else ""
         x["url_final"] = f"{url_base}/{it['n']}/final?v={int(os.path.getmtime(it['final']))}" if it.get("final") and os.path.isfile(it["final"]) else ""
         out.append(x)
@@ -249,7 +372,8 @@ def para_json(d: Dict[str, Any], url_base: str) -> Dict[str, Any]:
 
 # ------------------------------------------------------------------ pra pôr nos prompts
 BLOCO_PROMPT = (
-    "THUMBNAILS: em \"thumbnails\", sugira 3 thumbnails diferentes pro vídeo, cada uma com: \"ideia\" (o que mostra e por que dá "
+    "THUMBNAILS: em \"thumbnails\", sugira 5 thumbnails BEM diferentes entre si pro vídeo (cada uma com um ângulo próprio: rosto/"
+    "emoção, objeto-símbolo em close, contraste/dois lados, a cena mais dramática, mistério/pergunta visual), cada uma com: \"ideia\" (o que mostra e por que dá "
     "clique, em 1 frase), \"texto\" (2 a 4 palavras GRANDES na miniatura, no idioma do vídeo, que completam o título sem repeti-lo) "
     "e \"prompt\" (a cena da imagem EM INGLÊS pra um gerador de imagem: um assunto principal claro, expressão/ação, lugar, luz, "
     "enquadramento — sem pedir texto escrito na imagem, sem violência gráfica). A imagem vai ser gerada no Google Flow e o texto "

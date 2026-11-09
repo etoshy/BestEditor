@@ -11227,6 +11227,8 @@ import elenco as _elenco  # noqa: E402  (🎭 v84_128: rostos e idades das fotos
 _elenco.registrar(app, BASE_DIR)
 import piloto as _piloto  # noqa: E402  (🚀 v84_157: piloto automático do Modelo de vídeo)
 _piloto.registrar(app, BASE_DIR)
+import temas_bruto_rotas as _temas_bruto  # noqa: E402  (📚 v84_368: texto bruto → vários vídeos)
+_temas_bruto.registrar(app, BASE_DIR)
 import navegador_imagens as _nav_img  # noqa: E402  (🧲 v84_150: Brave do site + userscript que manda os links)
 _nav_img.registrar(app, BASE_DIR)
 import pesquisa_rotas as _pesquisa_rotas  # noqa: E402  (📰 v84_165: buscador de casos e notícias)

@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Texto bruto → vários vídeos{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1000px; }
+  .tb-card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .tb-passos { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .tb-passos span { background: #f1f5f9; border: 1px solid #cbd5e1; color: #1e293b; border-radius: 999px; padding: 3px 10px; font-size: .8rem; }
+  .tb-tema { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .tb-tema.marcado { border-color: #8b5cf6; background: #faf5ff; }
+  .tb-topo { display: flex; gap: 10px; align-items: flex-start; }
+  .tb-topo input[type=checkbox] { width: auto; margin: 6px 0 0; transform: scale(1.25); }
+  .tb-titulo { flex: 1; font-weight: 700; margin: 0; }
+  .tb-forca { font-size: .75rem; border-radius: 999px; padding: 2px 8px; background: #ede9fe; color: #5b21b6; white-space: nowrap; }
+  .tb-tema ul { margin: 6px 0 6px 18px; padding: 0; color: #334155; font-size: .9rem; }
+  .tb-meta { color: #64748b; font-size: .83rem; margin-top: 4px; }
+  .tb-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .tb-linha select, .tb-linha input[type=number] { width: auto; margin: 0; }
+  .tb-status { font-size: .85rem; margin-top: 6px; }
+  .tb-barra { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e5e7eb; padding: 10px 0; margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .tb-barra button { width: auto; margin: 0; }
+</style>
+
+<h1>📚 Texto bruto → vários vídeos</h1>
+<p style="color:#555;">Mande um arquivo de texto bruto (transcrição de curso ou aula, livro, anotações). A 🤖 IA separa os <b>temas</b> que rendem um vídeo
+  cada, com o <b>tempo estimado</b> e o formato. Você marca os que quer e o site cria um <b>Modelo de vídeo</b> por tema e escreve
+  <b>todos os roteiros ao mesmo tempo</b>, em português e prontos pra narração. Depois é só mandar pra 🏭 Produção no pod.</p>
+<div class="tb-passos"><span>1 · arquivo + modelo</span><span>2 · 🤖 temas</span><span>3 · você marca</span><span>4 · 🚀 roteiros em paralelo</span><span>5 · 🏭 pod</span></div>
+{% if erro %}<div class="error">{{ erro }}</div>{% endif %}
+
+{% if not a %}
+<div class="tb-card">
+  <h2 style="margin:0;">Novo texto bruto</h2>
+  <form method="post" action="/temas-bruto/novo" enctype="multipart/form-data" id="formNovo">
+    <label>Modelo de vídeo</label>
+    <select name="modelo">{% for k, m in modelos.items() %}<option value="{{ k }}"{% if k == padrao %} selected{% endif %}>{{ m.nome }}</option>{% endfor %}</select>
+    <label>Arquivo <span style="font-weight:400;color:#888;">(.txt, .md, .pdf, .docx, .epub, .srt…)</span></label>
+    <input type="file" name="arquivo" accept=".txt,.md,.pdf,.epub,.docx,.srt,.vtt,.html,.htm,.rtf">
+    <label>…ou cole o texto</label>
+    <textarea name="texto" rows="4" placeholder="cole aqui a transcrição ou o texto"></textarea>
+    <label>Nome <span style="font-weight:400;color:#888;">(opcional — pra achar depois)</span></label>
+    <input type="text" name="nome" placeholder="ex.: Curso de filosofia — aula 1">
+    <button type="submit" id="btnNovo">📚 Enviar e separar os temas</button>
+  </form>
+</div>
+<div class="tb-card">
+  <h2 style="margin:0;">Seus textos</h2>
+  {% for x in lista %}
+  <div class="tb-tema" style="display:flex;justify-content:space-between;align-items:center;">
+    <div><a href="/temas-bruto/{{ x.id }}" style="font-weight:600;">{{ x.nome }}</a>
+      <div class="tb-meta">{{ x.modelo }} · {{ x.temas }} temas · {{ x.criados }} viraram projeto</div></div>
+  </div>
+  {% else %}<p style="color:#888;">Nenhum ainda.</p>{% endfor %}
+</div>
+<script>document.getElementById('formNovo').addEventListener('submit', () => { const b = document.getElementById('btnNovo'); b.disabled = true; b.textContent = '⏳ enviando…'; });</script>
+
+{% else %}
+<p><a href="/temas-bruto">← todos os textos</a></p>
+<div class="tb-card">
+  <h2 style="margin:0;">{{ a.nome }}</h2>
+  <div class="tb-meta">{{ a.modelo_nome }} · {{ a.palavras }} palavras{% if a.arquivo %} · {{ a.arquivo }}{% endif %}</div>
+  <div id="analise" class="tb-status"></div>
+  <div class="tb-linha">
+    <button type="button" id="btnAnalisar" style="width:auto;margin:0;"{% if ia_off %} disabled title="{{ ia_off }}"{% endif %}>🤖 {{ 'Separar os temas de novo' if a.temas else 'Separar os temas' }}</button>
+    <button type="button" id="btnPrompt" class="secondary" style="width:auto;margin:0;">📋 Copiar o pedido (pra outra IA)</button>
+    <form method="post" action="/temas-bruto/{{ a.id }}/excluir" onsubmit="return confirm('Excluir este texto e a lista de temas? Os projetos criados continuam.')" style="margin:0;">
+      <button type="submit" style="width:auto;margin:0;background:#ef4444;">🗑</button></form>
+  </div>
+  <details id="colar" style="margin-top:8px;"><summary style="cursor:pointer;">Colar a resposta de outra IA</summary>
+    <textarea id="resposta" rows="5" placeholder="cole aqui o JSON que a IA devolveu"></textarea>
+    <button type="button" id="btnLer" style="width:auto;">📥 Ler a resposta</button></details>
+  {% if ia_off %}<p class="tb-meta">🤖 IA desligada: {{ ia_off }}. Dá pra copiar o pedido e colar a resposta; pra gerar os roteiros sozinho, ligue em 🤖 IA.</p>{% endif %}
+</div>
+
+{% if a.temas %}
+<div class="tb-card">
+  <h2 style="margin:0;">Temas ({{ a.temas|length }})</h2>
+  <p class="tb-meta">Marque os que viram vídeo. Dá pra mudar o título, o formato e os minutos antes de gerar.</p>
+  {% for t in a.temas %}
+  <div class="tb-tema{% if t.marcado %} marcado{% endif %}" data-id="{{ t.id }}">
+    <div class="tb-topo">
+      <input type="checkbox" class="marca" {% if t.marcado or t.projeto %}checked{% endif %}>
+      <input type="text" class="tb-titulo campo" data-c="titulo" value="{{ t.titulo }}" style="margin:0;">
+      <span class="tb-forca">força {{ t.forca }}/10</span>
+    </div>
+    {% if t.tema %}<div style="margin-top:6px;">{{ t.tema }}</div>{% endif %}
+    {% if t.pontos %}<ul>{% for p in t.pontos %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+    {% if t.por_que %}<div class="tb-meta"><b>Por que funciona:</b> {{ t.por_que }}</div>{% endif %}
+    {% if t.abertura %}<div class="tb-meta"><b>Abertura:</b> {{ t.abertura }}</div>{% endif %}
+    {% if t.referencias %}<div class="tb-meta"><b>Referências:</b> {{ t.referencias|join(', ') }}</div>{% endif %}
+    <div class="tb-linha">
+      <select class="campo" data-c="formato">{% for k, f in formatos.items() %}<option value="{{ k }}"{% if k == t.formato %} selected{% endif %}>{{ f.nome }}</option>{% endfor %}</select>
+      <label style="margin:0;">⏱ <input type="number" class="campo" data-c="minutos" min="1" max="60" value="{{ t.minutos }}" style="width:70px;"> min</label>
+      {% if t.por_que_tempo %}<span class="tb-meta" style="margin:0;">{{ t.por_que_tempo }}</span>{% endif %}
+    </div>
+    <div class="tb-status" data-status>{{ t.msg }}{% if t.projeto %} · <a href="/modelos-video/{{ t.projeto }}" target="_blank">abrir o projeto →</a>{% endif %}</div>
+  </div>
+  {% endfor %}
+  <div class="tb-barra">
+    <button type="button" id="btnTodos" class="secondary">☑ marcar todos</button>
+    <label style="margin:0;"><input type="checkbox" id="revisar" checked style="width:auto;margin-right:4px;">🪄 revisar + 🎙 adaptar pro TTS</label>
+    <button type="button" id="btnGerar"{% if ia_off %} disabled title="{{ ia_off }}"{% endif %}>🚀 Criar os projetos e gerar os roteiros</button>
+    <button type="button" id="btnSoCriar" class="secondary"{% if ia_off %} disabled{% endif %}>📁 Só criar os projetos</button>
+    <a href="#" id="btnPod" class="button secondary" style="width:auto;margin:0;display:none;">🏭 Mandar os prontos pra Produção no pod →</a>
+    <span id="barraMsg" class="tb-meta" style="margin:0;"></span>
+  </div>
+</div>
+{% endif %}
+
+<script>
+(() => {
+  const AID = {{ a.id|tojson }};
+  const $ = s => document.querySelector(s);
+  let rodando = {{ 'true' if rodando else 'false' }}, analisando = {{ 'true' if a.estado == 'analisando' else 'false' }};
+  const post = async (url, corpo) => { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+
+  $('#btnPrompt').addEventListener('click', async () => {
+    const d = await (await fetch(`/temas-bruto/${AID}/prompt`)).json();
+    if (d.prompt) { await navigator.clipboard.writeText(d.prompt); $('#btnPrompt').textContent = '✅ copiado'; $('#colar').open = true; }
+  });
+  $('#btnLer').addEventListener('click', async () => {
+    try { await post(`/temas-bruto/${AID}/ler`, {texto: $('#resposta').value}); location.reload(); } catch (e) { alert('❌ ' + e.message); }
+  });
+  $('#btnAnalisar').addEventListener('click', async () => {
+    try { await post(`/temas-bruto/${AID}/analisar`); analisando = true; $('#analise').textContent = '⏳ a IA está lendo o texto e separando os temas…'; acompanhar(); }
+    catch (e) { alert('❌ ' + e.message); }
+  });
+
+  document.querySelectorAll('.tb-tema[data-id]').forEach(div => {
+    const id = div.dataset.id, cb = div.querySelector('.marca');
+    cb.addEventListener('change', () => { div.classList.toggle('marcado', cb.checked); post(`/temas-bruto/${AID}/tema/${id}`, {marcado: cb.checked}).catch(() => {}); });
+    div.querySelectorAll('.campo').forEach(c => c.addEventListener('change', () => post(`/temas-bruto/${AID}/tema/${id}`, {[c.dataset.c]: c.value}).catch(e => alert('❌ ' + e.message))));
+  });
+  const btnTodos = $('#btnTodos');
+  if (btnTodos) btnTodos.addEventListener('click', () => document.querySelectorAll('.marca').forEach(cb => { if (!cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); } }));
+
+  const marcados = () => [...document.querySelectorAll('.tb-tema[data-id]')].filter(d => d.querySelector('.marca').checked).map(d => d.dataset.id);
+  const gerar = async (comRoteiro) => {
+    const ids = marcados(); if (!ids.length) { alert('Marque pelo menos um tema.'); return; }
+    try { const d = await post(`/temas-bruto/${AID}/gerar`, {ids, gerar: comRoteiro, revisar: $('#revisar').checked});
+      $('#barraMsg').textContent = `⏳ ${d.temas} tema(s) na fila — pode fechar a página; chega um aviso no 🔔 quando terminar.`; rodando = true; acompanhar(); }
+    catch (e) { alert('❌ ' + e.message); }
+  };
+  if ($('#btnGerar')) { $('#btnGerar').addEventListener('click', () => gerar(true)); $('#btnSoCriar').addEventListener('click', () => gerar(false)); }
+
+  let timer = null;
+  async function acompanhar() {
+    clearTimeout(timer);
+    let d; try { d = await (await fetch(`/temas-bruto/${AID}/estado`)).json(); } catch (e) { timer = setTimeout(acompanhar, 5000); return; }
+    if (analisando) {
+      if (d.estado === 'temas') { location.reload(); return; }
+      if (d.estado === 'erro') { $('#analise').textContent = '❌ ' + (d.erro || 'deu erro'); analisando = false; }
+      else $('#analise').textContent = '⏳ a IA está lendo o texto e separando os temas… (pode fechar a página)';
+    }
+    const prontos = [];
+    (d.temas || []).forEach(t => {
+      const div = document.querySelector(`.tb-tema[data-id="${t.id}"]`); if (!div) return;
+      const st = div.querySelector('[data-status]');
+      st.innerHTML = '';
+      st.append(document.createTextNode(t.msg || ''));
+      if (t.projeto) { const a = document.createElement('a'); a.href = '/modelos-video/' + t.projeto; a.target = '_blank'; a.textContent = ' · abrir o projeto →'; st.append(a); }
+      if (t.estado === 'pronto' && t.projeto) prontos.push('dossie:' + t.projeto);
+    });
+    const pod = $('#btnPod');
+    if (pod) { pod.style.display = prontos.length ? '' : 'none'; pod.href = '/producao-pod?marcar=' + encodeURIComponent(prontos.join(','));
+               pod.textContent = `🏭 Mandar os ${prontos.length} pronto(s) pra Produção no pod →`; }
+    if (rodando && !d.rodando) { rodando = false; $('#barraMsg').textContent = '✅ terminou — veja o resultado de cada tema.'; }
+    if (rodando || analisando) timer = setTimeout(acompanhar, 4000);
+  }
+  if (analisando) $('#analise').textContent = '⏳ a IA está lendo o texto e separando os temas…';
+  {% if a.estado == 'erro' %}$('#analise').textContent = {{ ('❌ ' ~ (a.erro or 'deu erro'))|tojson }};{% endif %}
+  {% if a.estado == 'novo' and ia_off %}$('#analise').textContent = '🤖 IA desligada — copie o pedido, mande pra outra IA e cole a resposta aqui embaixo.';{% endif %}
+  acompanhar();
+})();
+</script>
+{% endif %}
+{% endblock %}
