@@ -852,10 +852,11 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
             from tts import expressivo as _exp
             texto_exp = ch.remover_marcadores(texto)
             if _exp.tem_tags(texto_exp):
-                eventos = _exp.montar_eventos(texto_exp)
+                eventos = _exp.montar_eventos(texto_exp, sons=kwargs.get("sons", "turbo"))
                 log("🎭 Modo expressivo: " + ", ".join(f"{sum(1 for e in eventos if e['tipo'] == t)} {n}" for t, n in
                                                      (("fala", "trecho(s) de fala"), ("som", "som(ns)"), ("respira", "respiração(ões)"), ("pausa", "pausa(s)")))
-                    + ". Sons pelo Chatterbox Turbo com a mesma voz.")
+                    + (". Sons falados na mesma frase." if kwargs.get("sons") == "falado" else ". Sons pelo Chatterbox Turbo com a mesma voz.")
+                    + " (montagem v84_372b: pontas cortadas pelo Whisper, sons nivelados, sem clip)")
             tts_gerar_audio_isolado(engine, texto_exp, output_path, **kwargs)
             texto = _exp.texto_sem_tags(texto)  # a legenda é do que foi FALADO, sem as tags
         elif tem_chamadas:
@@ -1053,6 +1054,8 @@ def gerar_voz_gerar():
             kwargs["expressivo"] = True
             if idioma == "pt" and request.form.get("chatterbox_variante") in ("pt-BR", "pt-PT"):
                 kwargs["variante"] = request.form["chatterbox_variante"]  # 🇵🇹 no pod: modelo base em vez do pacote pt-BR
+            if request.form.get("chatterbox_sons") in ("turbo", "falado"):
+                kwargs["sons"] = request.form["chatterbox_sons"]  # 🔊 som do Turbo ou 🗣 falado na mesma frase
 
         # O mesmo perfil de voz (VOICE_PROFILES_DIR) é compartilhado
         # entre XTTS e Chatterbox -- os dois só precisam de um áudio

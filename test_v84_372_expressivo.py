@@ -51,13 +51,30 @@ def test_normal_volta_pro_que_esta_na_tela():
     assert ev[1]["emocao"] == 0.62 and ev[1]["cfg"] == 0.41
 
 
-def test_enfase_divide_quando_da_e_usa_virgula_quando_curto():
-    ev = E.montar_eventos("O menino olhava pela janela da cozinha e *não estava sozinho* naquela tarde fria.")
-    assert [e["tipo"] for e in ev] == ["fala", "pausa", "fala"]
-    assert ev[1]["s"] == E.PAUSA_ENFASE
-    assert ev[2]["texto"].startswith("não estava sozinho") and ev[2]["emocao"] > ev[0]["emocao"]
-    curto = E.montar_eventos("Mudou *tudo*.")
-    assert len(curto) == 1 and curto[0]["texto"] == "Mudou, tudo."
+def test_enfase_nao_divide_a_frase():
+    ev = E.montar_eventos("Ele chegou cedo. A partir de hoje, só *produtos orgânicos*. São caros.")
+    assert [e["texto"] for e in ev] == ["Ele chegou cedo.", "A partir de hoje, só, produtos orgânicos.", "São caros."]
+    assert ev[1]["emocao"] == pytest.approx(0.5 + E.EXTRA_EMOCAO_ENFASE) and ev[0]["emocao"] == 0.5
+    ev = E.montar_eventos("E aquela noite... mudou *tudo*.")  # reticências não são fim de frase
+    assert [e["texto"] for e in ev] == ["E aquela noite... mudou, tudo."]
+
+
+def test_sons_falados_ficam_na_mesma_frase():
+    ev = E.montar_eventos("Recebeu um sonoro não. [risada] Foi embora. [respira] Depois voltou.", sons="falado")
+    assert ev[0]["texto"] == "Recebeu um sonoro não. Ha ha ha! Foi embora."
+    assert [e["tipo"] for e in ev] == ["fala", "respira", "fala"]  # respiração continua pelo Turbo
+
+
+def test_whisper_corta_ruido_antes_e_depois_da_frase(tmp_path, monkeypatch):
+    import numpy as np
+    monkeypatch.setattr(vg, "chatterbox_synthesize", lambda t, s, **k: _com_silencio(s, 1.0, 0.5, 1.0))
+    monkeypatch.setattr(E, "limites_falados", lambda c, i="pt": (0.9, 1.3))  # palavras: 0,9 a 1,3 s
+    saida = tmp_path / "o.wav"
+    E.sintetizar(vg, "Uma frase qualquer aqui.", str(saida))
+    assert len(E._carregar(str(saida))) / 24000 <= 0.15 + 0.4 + 0.3 + 0.01
+    x = np.zeros(24000 * 3, np.float32)
+    assert len(E.recortar(x, (1.0, 2.0))) == pytest.approx(1.45 * 24000, abs=2)
+    assert len(E.recortar(x, None)) == len(x)
 
 
 def test_texto_sem_tags_pra_legenda():
@@ -172,3 +189,37 @@ def test_rota_gerar_voz_manda_expressivo_e_texto_cru(monkeypatch):
     assert recebido["engine"] == "chatterbox" and recebido["kw"].get("expressivo") is True
     assert recebido["kw"].get("variante") == "pt-PT"
     assert recebido["texto"] == "[soprosa] Olá *mundo* [risada] tudo bem?"  # sem a limpeza que tira colchetes
+
+
+def _com_silencio(caminho, antes=0.8, tom=0.5, depois=0.9, volume=1.0):
+    """Tom com silêncio nas pontas, como o Chatterbox devolve."""
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anullsrc=r=24000:cl=mono:d={antes}",
+                    "-f", "lavfi", "-i", f"sine=frequency=300:duration={tom}", "-f", "lavfi", "-i", f"anullsrc=r=24000:cl=mono:d={depois}",
+                    "-filter_complex", f"[1]volume={volume}[t];[0][t][2]concat=n=3:v=0:a=1", "-ar", "24000", "-ac", "1", str(caminho)], check=True)
+    return str(caminho)
+
+
+def test_apara_pontas_nivela_sons_e_nao_clipa(tmp_path, monkeypatch):
+    import numpy as np
+    monkeypatch.setattr(vg, "chatterbox_synthesize", lambda t, s, **k: _com_silencio(s, volume=1.6))  # passa de 0 dBFS
+    monkeypatch.setattr(vg, "chatterbox_turbo_synthesize", lambda t, s, **k: _com_silencio(s, 0.3, 0.4, 0.5, volume=0.05))
+    saida = tmp_path / "o.wav"
+    E.sintetizar(vg, "Primeira frase do teste aqui. [pausa curta] Segunda frase do teste aqui. [risada]", str(saida))
+    x = E._carregar(str(saida))
+    # 2 falas de 0,5 s + pausa 0,25 + som 0,4 + margens (fala 0,16; som 0,24 + 0,2 de folga) — sem os ~1,7 s de
+    # silêncio que cada pedaço trazia
+    assert len(x) / 24000 == pytest.approx(2 * 0.66 + 0.25 + 0.08 + 0.64 + 0.12, abs=0.08)
+    assert 20 * np.log10(np.abs(x).max()) <= -1.4  # sem clip
+    pausa = x[int(24000 * 0.70):int(24000 * 0.88)]
+    assert 0 < np.sqrt(np.mean(pausa ** 2)) < 10 ** (-60 / 20)  # pausa tem "ar" bem baixinho, não zero digital
+    fala, som = E.nivel_voz(x[: 24000 // 2]), E.nivel_voz(x[-int(24000 * 0.5):])
+    assert 20 * np.log10(fala / som) == pytest.approx(E.SOM_DB_ABAIXO_DA_FALA, abs=2.0)  # som nivelado pela fala
+
+
+def test_aparar_limiar_relativo_nao_come_som_baixo():
+    import numpy as np
+    t = np.arange(int(24000 * 0.5)) / 24000
+    baixo = (0.003 * np.sin(2 * np.pi * 200 * t)).astype(np.float32)  # ~ -53 dBFS: o limiar fixo de -42 dB apagava
+    x = np.concatenate([np.zeros(12000, np.float32), baixo, np.zeros(12000, np.float32)])
+    y = E.aparar(x, abaixo_do_pico_db=45, piso_db=-65)
+    assert 0.5 <= len(y) / 24000 <= 0.75

@@ -80,13 +80,17 @@ SONS: Dict[str, str] = {
     "risota": "chuckle", "risinho": "chuckle", "tossidela": "cough", "pigarrear": "clear throat",
     "pigarreio": "clear throat", "fungadela": "sniff", "chiu": "shush", "gemer": "groan", "suspirar": "sigh",
 }
+# 🗣 modo "falado": o som vira texto na MESMA frase, narrado pelo próprio Chatterbox pt (mesma voz e clima;
+# soa menos "colado" que o som do Turbo, mas é uma leitura do som, não o som de verdade)
+SONS_FALADOS = {"laugh": "Ha ha ha!", "chuckle": "He he.", "sigh": "Ahh...", "cough": "Cof, cof.",
+                "clear throat": "Hum, hum.", "gasp": "Ah!", "groan": "Hmm...", "shush": "Shhh!"}
+MODOS_SONS = ("turbo", "falado")
 TURBO_SONS = {"laugh", "chuckle", "gasp", "cough", "sigh", "groan", "sniff", "shush", "clear throat"}
 
 PAUSAS = {"pausa": 0.45, "pausa curta": 0.25, "pausa longa": 1.0, "silencio": 0.8}
 PAUSA_PARAGRAFO = 0.6
 PAUSA_ENFASE = 0.14
-EXTRA_EMOCAO_ENFASE = 0.15
-MIN_CHARS_DIVIDIR_ENFASE = 18
+EXTRA_EMOCAO_ENFASE = 0.08
 
 TAG = re.compile(r"\[([^\[\]\n]{1,40})\]")
 ENFASE = re.compile(r"\*([^*\n]{1,60})\*")
@@ -155,7 +159,7 @@ def limpar_fala(t: str) -> str:
     return t.strip(" \t\n,;")
 
 
-def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5) -> List[Dict[str, Any]]:
+def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5, sons: str = "turbo") -> List[Dict[str, Any]]:
     """Roteiro com tags -> lista de eventos: fala / som / respira / pausa."""
     eventos: List[Dict[str, Any]] = []
     estado = {"estilo": "normal", "emocao": emocao_base, "cfg": cfg_base, "velocidade": 1.0}
@@ -165,7 +169,7 @@ def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5) 
         estado.update(estilo=nome, emocao=emocao_base if e is None else e, cfg=cfg_base if c is None else c, velocidade=v)
 
     def fala(trecho: str) -> None:
-        # ênfase: *palavra* -> divide em [antes] pausinha [palavra + resto com mais emoção]
+        # ênfase: *palavra* -> vírgula antes (pausinha) + mais emoção só na frase dela
         partes = ENFASE.split(trecho)  # [texto, enfase, texto, enfase, texto...]
         buffer = ""
         for i, p in enumerate(partes):
@@ -178,12 +182,14 @@ def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5) 
             dentro, depois = (resto[:m_fim.end()], resto[m_fim.end():]) if m_fim else (resto, "")
             if i + 1 < len(partes):
                 partes[i + 1] = ""
-            if len(limpar_fala(antes)) >= MIN_CHARS_DIVIDIR_ENFASE and len(limpar_fala(dentro)) >= MIN_CHARS_DIVIDIR_ENFASE:
-                _push_fala(antes)
-                eventos.append({"tipo": "pausa", "s": PAUSA_ENFASE})
-                _push_fala(dentro, extra=EXTRA_EMOCAO_ENFASE, enfase=p)
-            else:  # curto demais pra dividir (o Chatterbox trava com texto muito curto): vírgula antes = pausinha
-                _push_fala(antes.rstrip() + ", " + dentro.lstrip(), extra=EXTRA_EMOCAO_ENFASE / 2, enfase=p)
+            # v84_372b: NÃO divide mais em duas gerações (a 2ª parte, gerada sozinha, saía com entonação de frase
+            # solta — "produtos orgânicos." estranho). A frase fica inteira: vírgula antes da palavra = pausinha
+            # natural do próprio modelo, e só ESSA frase ganha um pouco mais de emoção.
+            corte = max((m.end() for m in re.finditer(r"(?<![.…])[.!?](\s|$)", antes)), default=0)
+            _push_fala(antes[:corte])
+            atual = antes[corte:].rstrip()
+            sep = "" if not atual or atual[-1] in ",;:—-" else ","
+            _push_fala(atual + sep + " " + dentro.lstrip(), extra=EXTRA_EMOCAO_ENFASE, enfase=p)
             buffer = depois
         _push_fala(buffer)
 
@@ -221,6 +227,8 @@ def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5) 
                     aplicar_estilo(info["estilo"])
                 else:
                     estado[info["nome"]] = info["valor"]
+            elif info["tipo"] == "som" and sons == "falado" and info["som"] in SONS_FALADOS:
+                pendente = pendente.rstrip() + " " + SONS_FALADOS[info["som"]] + " "
             else:
                 fala(pendente)
                 pendente = ""
@@ -231,17 +239,32 @@ def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5) 
     return eventos
 
 
-# ------------------------------------------------------------------ áudio (ffmpeg + wave, sem numpy)
-def _ffmpeg_pcm(entrada: str, saida: str, filtros: List[str], max_s: Optional[float] = None) -> None:
-    cmd = ["ffmpeg", "-y", "-v", "error", "-i", entrada]
+# ------------------------------------------------------------------ áudio (v84_372b: aparar, nivelar, sem clip)
+# O que a 1ª versão errava (medido num áudio de teste): cada fala do Chatterbox vem com ~0,3-1 s de silêncio/ruído
+# nas pontas, que somava com as nossas pausas (a pausinha da ênfase virava 0,8 s); os sons eram aparados com um
+# limiar fixo (-42 dB) que comia suspiro e risada inteiros; as pausas eram zero digital (o ruído de fundo da fala
+# "desligava" de repente); e picos em 0 dBFS (clip).
+QUADRO = 0.01            # análise em quadros de 10 ms
+MARGEM_INICIO = 0.04     # o que fica antes da 1ª sílaba
+MARGEM_FIM = 0.12        # o fim da palavra decai devagar
+FADE_IN, FADE_OUT = 0.008, 0.03
+RUIDO_SALA_DB = -68.0    # "ar" nas pausas em vez de zero digital
+PICO_MAX_DB = -1.5
+SOM_DB_ABAIXO_DA_FALA = 6.0
+RESPIRA_DB_ABAIXO_DA_FALA = 13.0
+
+
+def _carregar(entrada: str, filtros: Optional[List[str]] = None):
+    """Qualquer áudio -> numpy float32 mono 24 kHz (ffmpeg converte taxa, canais e velocidade)."""
+    import numpy as np
+    cmd = ["ffmpeg", "-v", "error", "-i", entrada]
     if filtros:
         cmd += ["-af", ",".join(filtros)]
-    if max_s:
-        cmd += ["-t", str(max_s)]
-    cmd += ["-ar", str(TAXA), "-ac", "1", "-c:a", "pcm_s16le", saida]
+    cmd += ["-ar", str(TAXA), "-ac", "1", "-f", "f32le", "-"]
     r = subprocess.run(cmd, capture_output=True, timeout=300)
-    if r.returncode != 0 or not os.path.exists(saida):
-        raise ExpressivoErro(f"ffmpeg falhou ao preparar um pedaço: {r.stderr.decode(errors='replace')[-300:]}")
+    if r.returncode != 0:
+        raise ExpressivoErro(f"ffmpeg falhou ao ler um pedaço: {r.stderr.decode(errors='replace')[-300:]}")
+    return np.frombuffer(r.stdout, dtype=np.float32).copy()
 
 
 def _filtro_tempo(v: float) -> List[str]:
@@ -250,22 +273,122 @@ def _filtro_tempo(v: float) -> List[str]:
     return [f"atempo={max(0.5, min(v, 2.0)):.3f}"]
 
 
-APARAR = ("silenceremove=start_periods=1:start_threshold=-42dB:start_silence=0.03,areverse,"
-          "silenceremove=start_periods=1:start_threshold=-42dB:start_silence=0.05,areverse")
+def _db(v: float) -> float:
+    import math
+    return 20 * math.log10(max(v, 1e-9))
 
 
-def _juntar(pedacos: List[Any], saida: str) -> None:
-    """pedacos: caminho de .wav (já 24k mono s16) ou float (segundos de silêncio)."""
+def _energia(x):
+    import numpy as np
+    h = int(TAXA * QUADRO)
+    n = len(x) // h
+    if n == 0:
+        return np.zeros(0)
+    q = x[:n * h].reshape(n, h)
+    return np.sqrt(np.mean(q ** 2, axis=1))
+
+
+def aparar(x, abaixo_do_pico_db: float = 38.0, piso_db: float = -55.0, margem_fim: float = MARGEM_FIM,
+           nucleo_db: float = 25.0, max_antes: float = 0.12, max_depois: float = 0.25):
+    """Corta silêncio/ruído das pontas com limiar RELATIVO ao pico do próprio pedaço (som baixo não some).
+    Acha o "núcleo" (quadros a até `nucleo_db` do pico) e só estende pra fora enquanto ainda há som acima de
+    `abaixo_do_pico_db` — no máximo `max_antes`/`max_depois` s (ruído/respiração longa do modelo fica de fora)."""
+    import numpy as np
+    e = _energia(x)
+    if not len(e) or e.max() <= 0:
+        return x[:0]
+    limiar = max(e.max() * 10 ** (-abaixo_do_pico_db / 20), 10 ** (piso_db / 20))
+    nucleo = np.where(e >= max(e.max() * 10 ** (-nucleo_db / 20), limiar))[0]
+    if not len(nucleo):
+        return x[:0]
+    i0, i1 = int(nucleo[0]), int(nucleo[-1])
+    lim_i0 = max(0, i0 - int(max_antes / QUADRO))
+    while i0 > lim_i0 and e[i0 - 1] >= limiar:
+        i0 -= 1
+    lim_i1 = min(len(e) - 1, i1 + int(max_depois / QUADRO))
+    while i1 < lim_i1 and e[i1 + 1] >= limiar:
+        i1 += 1
+    ini = max(0, int((i0 * QUADRO - MARGEM_INICIO) * TAXA))
+    fim = min(len(x), int(((i1 + 1) * QUADRO + margem_fim) * TAXA))
+    y = x[ini:fim].copy()
+    fi, fo = min(len(y), int(FADE_IN * TAXA)), min(len(y), int(FADE_OUT * TAXA))
+    if fi:
+        y[:fi] *= np.linspace(0, 1, fi, dtype=np.float32)
+    if fo:
+        y[-fo:] *= np.linspace(1, 0, fo, dtype=np.float32)
+    return y
+
+
+def limites_falados(caminho: str, idioma: str = "pt"):
+    """(início da 1ª palavra, fim da última) pelo Whisper — o Chatterbox às vezes solta ~1 s de ruído/"resmungo"
+    antes ou depois da frase (medido: antes de "produtos orgânicos", depois de "Voltamos ao estúdio"), alto
+    demais pra sair só pelo volume. None = sem Whisper (fica só o corte por volume)."""
+    if os.environ.get("EXPRESSIVO_SEM_WHISPER") == "1":
+        return None
+    try:
+        import sys
+        raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if raiz not in sys.path:
+            sys.path.insert(0, raiz)
+        import whisper_transcribe as wt  # type: ignore
+        segs = wt.transcribe_audio(caminho, model_size=os.environ.get("EXPRESSIVO_WHISPER", "base"),
+                                   language=(idioma or "pt")[:2], word_timestamps=True)
+        palavras = [w for sg in segs for w in sg.get("words", [])]
+        if not palavras:
+            return None
+        return float(palavras[0]["start"]), float(palavras[-1]["end"])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def recortar(x, limites, antes: float = 0.15, depois: float = 0.3):
+    """Recorta a janela das palavras (com folga: o Whisper costuma marcar o fim um pouco cedo)."""
+    if not limites:
+        return x
+    ini = max(0, int((limites[0] - antes) * TAXA))
+    fim = min(len(x), int((limites[1] + depois) * TAXA))
+    return x[ini:fim] if fim - ini > int(0.2 * TAXA) else x
+
+
+def nivel_voz(x) -> float:
+    """RMS da parte FALADA (quadros acima de -30 dB do pico) — referência pra nivelar sons e respiração."""
+    import numpy as np
+    e = _energia(x)
+    if not len(e) or e.max() <= 0:
+        return 0.0
+    voz = e[e >= e.max() * 10 ** (-30 / 20)]
+    return float(np.sqrt(np.mean(voz ** 2)))
+
+
+def _ajustar_nivel(x, alvo_rms: float):
+    if alvo_rms <= 0:
+        return x
+    atual = nivel_voz(x)
+    return x * (alvo_rms / atual) if atual > 0 else x
+
+
+def _ruido_sala(segundos: float):
+    import numpy as np
+    n = int(TAXA * float(segundos))
+    rng = np.random.default_rng(len(_RUIDO_SEMENTE) + n)
+    return (rng.standard_normal(n).astype(np.float32) * 10 ** (RUIDO_SALA_DB / 20))
+
+
+_RUIDO_SEMENTE = "expressivo"
+
+
+def _salvar(x, saida: str, limitar: bool = True) -> None:
+    import numpy as np
+    pico = float(np.abs(x).max()) if len(x) else 0.0
+    teto = 10 ** (PICO_MAX_DB / 20) if limitar else 1.0
+    if pico > teto:
+        x = x * (teto / pico)
+    pcm = (np.clip(x, -1, 1) * 32767).astype("<i2")
     with wave.open(saida, "wb") as out:
         out.setnchannels(1)
         out.setsampwidth(2)
         out.setframerate(TAXA)
-        for p in pedacos:
-            if isinstance(p, (int, float)):
-                out.writeframes(b"\x00\x00" * int(TAXA * float(p)))
-            else:
-                with wave.open(p, "rb") as w:
-                    out.writeframes(w.readframes(w.getnframes()))
+        out.writeframes(pcm.tobytes())
 
 
 def referencia_do_estilo(vg: Any, perfil: Optional[str], estilo: str) -> Optional[str]:
@@ -286,24 +409,25 @@ def referencia_do_estilo(vg: Any, perfil: Optional[str], estilo: str) -> Optiona
 def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speaker_wav: Optional[str] = None,
                voice_profile: Optional[str] = None, exaggeration: float = 0.5, cfg_weight: float = 0.5,
                use_gpu: Optional[bool] = None, on_log: Optional[Callable[[str], None]] = None,
-               variante: str = "") -> str:
+               variante: str = "", sons: str = "turbo") -> str:
     """Gera o .wav do roteiro com tags. `vg` = o módulo voice_generator (chatterbox_synthesize etc).
     `variante`: "pt-BR" ou "pt-PT" (no pod, pt-PT usa o modelo base em vez do pacote pt-BR)."""
+    import numpy as np
     log = on_log or (lambda s: None)
-    eventos = montar_eventos(texto, exaggeration, cfg_weight)
+    eventos = montar_eventos(texto, exaggeration, cfg_weight, sons=sons if sons in MODOS_SONS else "turbo")
     if not any(e["tipo"] == "fala" for e in eventos):
         raise ExpressivoErro("Não sobrou nenhuma fala depois das tags — escreva o texto a ser narrado.")
     tmp = os.path.join(os.path.dirname(os.path.abspath(output_path)) or ".", f"_expressivo_{uuid.uuid4().hex[:8]}")
     os.makedirs(tmp, exist_ok=True)
-    cache_som: Dict[str, str] = {}
+    cache_som: Dict[str, Any] = {}
     avisos: List[str] = []
     try:
-        pedacos: List[Any] = []
+        # 1) gera tudo (fala aparada nas pontas; som aparado com limiar relativo)
+        pedacos: List[Any] = []  # ("audio", array) | ("pausa", s) | ("som", array, tipo)
         for i, ev in enumerate(eventos):
             bruto = os.path.join(tmp, f"{i:04d}_bruto.wav")
-            pronto = os.path.join(tmp, f"{i:04d}.wav")
             if ev["tipo"] == "pausa":
-                pedacos.append(float(ev["s"]))
+                pedacos.append(("pausa", float(ev["s"])))
             elif ev["tipo"] == "fala":
                 kw: Dict[str, Any] = {"idioma": idioma, "exaggeration": ev["emocao"], "cfg_weight": ev["cfg"], "use_gpu": use_gpu}
                 if variante:
@@ -316,8 +440,13 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
                 elif voice_profile:
                     kw["voice_profile"] = voice_profile
                 vg.chatterbox_synthesize(ev["texto"], bruto, **kw)
-                _ffmpeg_pcm(bruto, pronto, _filtro_tempo(ev["velocidade"]))
-                pedacos.append(pronto)
+                lim = limites_falados(bruto, idioma)
+                bruto_x = recortar(_carregar(bruto), lim)
+                if abs(ev["velocidade"] - 1.0) >= 0.01:  # velocidade depois do recorte (os tempos do Whisper são do original)
+                    bruto_v = os.path.join(tmp, f"{i:04d}_rec.wav")
+                    _salvar(bruto_x, bruto_v, limitar=False)
+                    bruto_x = _carregar(bruto_v, _filtro_tempo(ev["velocidade"]))
+                pedacos.append(("audio", aparar(bruto_x)))
             else:  # som / respira: Turbo com a mesma voz
                 som = "gasp" if ev["tipo"] == "respira" else ev["som"]
                 try:
@@ -329,22 +458,47 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
                         elif voice_profile:
                             kw_t["voice_profile"] = voice_profile
                         vg.chatterbox_turbo_synthesize(f"[{som}]", bruto_som, **kw_t)
-                        cache_som[som] = bruto_som
-                    if ev["tipo"] == "respira":  # suspiro de susto bem baixinho e curto = uma inspiração
-                        _ffmpeg_pcm(cache_som[som], pronto, [APARAR, "volume=-14dB", "afade=t=in:d=0.08",
-                                                             "afade=t=out:st=0.35:d=0.12"], max_s=0.5)
-                        pedacos += [pronto, 0.08]
-                    else:
-                        _ffmpeg_pcm(cache_som[som], pronto, [APARAR, "volume=-3dB", "afade=t=out:st=2.3:d=0.2"], max_s=2.5)
-                        pedacos += [0.08, pronto, 0.12]
+                        a = aparar(_carregar(bruto_som), abaixo_do_pico_db=45, piso_db=-65, margem_fim=0.2)
+                        if not len(a):
+                            raise ExpressivoErro("o Turbo devolveu só silêncio")
+                        cache_som[som] = a
+                    pedacos.append(("som", cache_som[som], ev["tipo"]))
                 except Exception as exc:  # noqa: BLE001 — sem Turbo: vira pausa, o resto do áudio sai
                     aviso = f"som [{som}] não saiu ({str(exc)[:120]}) — virou pausa"
                     if aviso not in avisos:
                         avisos.append(aviso)
                         log("⚠ " + aviso)
-                    pedacos.append(0.35)
+                    pedacos.append(("pausa", 0.35))
+
+        # 2) nivela sons e respiração pelo volume da fala (o Turbo sai com outro volume)
+        niveis = [nivel_voz(p[1]) for p in pedacos if p[0] == "audio" and len(p[1])]
+        ref = float(np.median(niveis)) if niveis else 0.1
+        partes: List[Any] = []
+        anterior = None
+        for p in pedacos:
+            if p[0] == "pausa":
+                partes.append(_ruido_sala(p[1]))
+            elif p[0] == "audio":
+                if anterior == "audio":  # fala colada em fala (troca de estilo sem pausa): respiro mínimo
+                    partes.append(_ruido_sala(0.12))
+                partes.append(p[1])
+            elif p[2] == "respira":  # o "susto" bem baixo e curto = uma inspiração antes da frase
+                r = _ajustar_nivel(p[1][: int(TAXA * 0.55)], ref * 10 ** (-RESPIRA_DB_ABAIXO_DA_FALA / 20))
+                n_fade = min(len(r), int(TAXA * 0.12))
+                if n_fade:
+                    r = r.copy()
+                    r[-n_fade:] *= np.linspace(1, 0, n_fade, dtype=np.float32)
+                partes += [r, _ruido_sala(0.06)]
+            else:
+                som_x = _ajustar_nivel(p[1][: int(TAXA * 3.0)], ref * 10 ** (-SOM_DB_ABAIXO_DA_FALA / 20)).copy()
+                n_fade = min(len(som_x), int(TAXA * 0.15))  # som termina suave, não "corta"
+                if n_fade:
+                    som_x[-n_fade:] *= np.linspace(1, 0, n_fade, dtype=np.float32)
+                partes += [_ruido_sala(0.1), som_x, _ruido_sala(0.15)]
+            anterior = p[0]
+        x = np.concatenate([np.asarray(p, dtype=np.float32) for p in partes]) if partes else np.zeros(0, np.float32)
         os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
-        _juntar(pedacos, output_path)
+        _salvar(x, output_path)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return output_path

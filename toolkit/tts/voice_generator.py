@@ -1743,6 +1743,9 @@ def _salvar_audio_chatterbox(wav: Any, output_path: str, sample_rate: int) -> No
             dados = dados.T  # torch usa (canais, amostras) -- soundfile espera (amostras, canais)
             if dados.shape[1] == 1:
                 dados = dados[:, 0]  # mono: soundfile prefere 1D a uma coluna só
+        pico = float(np.abs(dados).max()) if dados.size else 0.0
+        if pico > 0.97:  # 🎭 v84_372: o modelo passa de 1.0 às vezes -> o WAV de 16 bits cortava (clip audível)
+            dados = dados * (0.94 / pico)
         sf.write(output_path, dados, sample_rate)
     except Exception:
         # soundfile indisponível ou tensor num formato inesperado --
@@ -1772,6 +1775,7 @@ def chatterbox_synthesize(
     use_gpu: Optional[bool] = None,
     expressivo: bool = False,
     variante: str = "",
+    sons: str = "turbo",
 ) -> str:
     """Gera um `.wav` com o Chatterbox TTS (Resemble AI) — clona voz
     por zero-shot igual o XTTS v2 (um áudio de referência curto), só
@@ -1822,7 +1826,8 @@ def chatterbox_synthesize(
             try:
                 return exp.sintetizar(sys.modules[__name__], texto, output_path, idioma=idioma, speaker_wav=speaker_wav,
                                       voice_profile=voice_profile, exaggeration=exaggeration, cfg_weight=cfg_weight,
-                                      use_gpu=use_gpu, on_log=lambda s: print(s, flush=True), variante=variante)
+                                      use_gpu=use_gpu, on_log=lambda s: print(s, flush=True), variante=variante,
+                                      sons=sons)
             except exp.ExpressivoErro as exc:
                 raise VoiceGeneratorError(f"🎭 Modo expressivo: {exc}") from exc
         texto = exp.texto_sem_tags(texto)
