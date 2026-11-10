@@ -703,6 +703,8 @@ def gerar_voz_page():
     return render_template(
         "gerar_voz.html",
         engines=tts_ENGINES,
+        expressivo_textos_teste=__import__("tts.expressivo", fromlist=["x"]).TEXTOS_TESTE,
+        expressivo_ajuda=__import__("tts.expressivo", fromlist=["x"]).AJUDA,
         piper_vozes=tts_PIPER_VOZES_SUGERIDAS,
         xtts_idiomas=sorted(tts_XTTS_IDIOMAS),
         xtts_checkpoints=tts_XTTS_CHECKPOINTS_CONHECIDOS,
@@ -844,6 +846,18 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
             except mv.MultiVozError as exc:
                 raise VoiceGeneratorError(str(exc)) from exc
             log(f"{r['falas']} fala(s), vozes: " + (", ".join(r["vozes"]) or "só a padrão") + ".")
+        elif engine == "chatterbox" and kwargs.get("expressivo"):
+            # 🎭 v84_372: o texto vai CRU (com as tags) — o expressivo.py limpa cada trecho; a limpeza normal tiraria
+            # os colchetes e os asteriscos. Um processo só (sem ⚡ blocos paralelos): a ordem dos pedaços importa.
+            from tts import expressivo as _exp
+            texto_exp = ch.remover_marcadores(texto)
+            if _exp.tem_tags(texto_exp):
+                eventos = _exp.montar_eventos(texto_exp)
+                log("🎭 Modo expressivo: " + ", ".join(f"{sum(1 for e in eventos if e['tipo'] == t)} {n}" for t, n in
+                                                     (("fala", "trecho(s) de fala"), ("som", "som(ns)"), ("respira", "respiração(ões)"), ("pausa", "pausa(s)")))
+                    + ". Sons pelo Chatterbox Turbo com a mesma voz.")
+            tts_gerar_audio_isolado(engine, texto_exp, output_path, **kwargs)
+            texto = _exp.texto_sem_tags(texto)  # a legenda é do que foi FALADO, sem as tags
         elif tem_chamadas:
             _salvar_chamadas_voz(status, output_path, _gerar_voz_com_chamadas(engine, partes_ch, output_path, kwargs, log,
                                                                               int(status.get("instancias") or 1)), log)
@@ -1035,6 +1049,10 @@ def gerar_voz_gerar():
             "idioma": idioma, "exaggeration": exaggeration, "cfg_weight": cfg_weight,
             "use_gpu": (False if forcar_cpu else None),
         }
+        if request.form.get("chatterbox_expressivo") == "on":  # 🎭 v84_372: tags pt-BR ([soprosa] [risada] *ênfase*...)
+            kwargs["expressivo"] = True
+            if idioma == "pt" and request.form.get("chatterbox_variante") in ("pt-BR", "pt-PT"):
+                kwargs["variante"] = request.form["chatterbox_variante"]  # 🇵🇹 no pod: modelo base em vez do pacote pt-BR
 
         # O mesmo perfil de voz (VOICE_PROFILES_DIR) é compartilhado
         # entre XTTS e Chatterbox -- os dois só precisam de um áudio

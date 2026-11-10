@@ -1601,7 +1601,7 @@ def _no_pod(engine: str) -> bool:
 
 def _narrar_no_pod(engine: str, texto: str, output_path: str, speaker_wav: Optional[str] = None,
                    voice_profile: Optional[str] = None, idioma: str = "pt", exaggeration: float = 0.5,
-                   cfg_weight: float = 0.5) -> str:
+                   cfg_weight: float = 0.5, variante: str = "") -> str:
     """Mesma voz (áudio enviado ou 1º clipe do perfil, igual ao local), só que gerada na GPU do pod."""
     if not (texto or "").strip():
         raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
@@ -1615,8 +1615,9 @@ def _narrar_no_pod(engine: str, texto: str, output_path: str, speaker_wav: Optio
         referencia = caminho_perfil_de_voz(voice_profile)[0]
     pod = _pod_studio()
     try:
+        extra = {"pacote_dedicado": False} if (variante or "").lower() == "pt-pt" and idioma == "pt" else {}
         pod.narrar(texto, output_path, motor=engine, idioma=idioma, referencia=referencia,
-                   exaggeration=exaggeration, cfg_weight=cfg_weight)
+                   exaggeration=exaggeration, cfg_weight=cfg_weight, **extra)
     except pod.PodErro as exc:
         raise VoiceGeneratorError(f"🖥️ Pod: {exc}") from exc
     finally:
@@ -1751,6 +1752,15 @@ def _salvar_audio_chatterbox(wav: Any, output_path: str, sample_rate: int) -> No
         ta.save(output_path, wav, sample_rate)
 
 
+def _modulo_expressivo():
+    """toolkit/tts/expressivo.py, importado como pacote (site) ou solto (testes)."""
+    try:
+        from tts import expressivo as exp  # type: ignore
+    except ImportError:
+        import expressivo as exp  # type: ignore
+    return exp
+
+
 def chatterbox_synthesize(
     texto: str,
     output_path: str,
@@ -1760,6 +1770,8 @@ def chatterbox_synthesize(
     exaggeration: float = 0.5,
     cfg_weight: float = 0.5,
     use_gpu: Optional[bool] = None,
+    expressivo: bool = False,
+    variante: str = "",
 ) -> str:
     """Gera um `.wav` com o Chatterbox TTS (Resemble AI) — clona voz
     por zero-shot igual o XTTS v2 (um áudio de referência curto), só
@@ -1804,9 +1816,20 @@ def chatterbox_synthesize(
             f"Idioma {idioma!r} não é suportado pelo Chatterbox TTS — use um de {sorted(CHATTERBOX_IDIOMAS)}."
         )
 
+    if expressivo:  # 🎭 v84_372: [soprosa] [risada] [pausa] *ênfase* ... (ver expressivo.py)
+        exp = _modulo_expressivo()
+        if exp.tem_tags(texto):
+            try:
+                return exp.sintetizar(sys.modules[__name__], texto, output_path, idioma=idioma, speaker_wav=speaker_wav,
+                                      voice_profile=voice_profile, exaggeration=exaggeration, cfg_weight=cfg_weight,
+                                      use_gpu=use_gpu, on_log=lambda s: print(s, flush=True), variante=variante)
+            except exp.ExpressivoErro as exc:
+                raise VoiceGeneratorError(f"🎭 Modo expressivo: {exc}") from exc
+        texto = exp.texto_sem_tags(texto)
+
     if _no_pod("chatterbox"):  # 🖥️ Meu pod: gera na GPU do pod (pt usa o modelo dedicado pt-BR, se marcado)
         return _narrar_no_pod("chatterbox", texto, output_path, speaker_wav=speaker_wav, voice_profile=voice_profile,
-                              idioma=idioma, exaggeration=exaggeration, cfg_weight=cfg_weight)
+                              idioma=idioma, exaggeration=exaggeration, cfg_weight=cfg_weight, variante=variante)
 
     modelo = chatterbox_load(use_gpu=use_gpu)
 

@@ -161,15 +161,16 @@ def narrar(texto: str, destino: str, motor: str = "chatterbox", idioma: str = "p
            referencia: Optional[str] = None, perfil: Optional[str] = None,
            exaggeration: float = 0.5, cfg_weight: float = 0.5, temperature: float = 0.8,
            cfg: Optional[Dict[str, Any]] = None, on_passo: Optional[Callable[[str], None]] = None,
-           timeout_s: float = 7200) -> str:
-    """Narra `texto` no pod e salva o .wav em `destino`. Voz: `referencia` (áudio deste PC, vai junto no pedido)
+           timeout_s: float = 7200, pacote_dedicado: Optional[bool] = None) -> str:
+    """Narra `texto` no pod e salva o .wav em `destino`. `pacote_dedicado` None = o da config (pacote pt-BR);
+    False = modelo multilíngue base (🇵🇹 pt-PT, v84_372). Voz: `referencia` (áudio deste PC, vai junto no pedido)
     ou `perfil` (nome de um perfil já importado no pod). Sem nenhum: voz padrão do modelo."""
     c = _cfg(cfg)
     dados = {"texto": texto, "motor": motor if motor in MOTORES_NO_POD else "chatterbox",
              "idioma": "en" if motor == "chatterbox_turbo" else (idioma or "pt"),
              "exaggeration": str(float(exaggeration)), "cfg_weight": str(float(cfg_weight)),
              "temperature": str(float(temperature)),
-             "pacote_dedicado": "true" if c.get("chatterbox_pod_ptbr", True) else "false",
+             "pacote_dedicado": "true" if (c.get("chatterbox_pod_ptbr", True) if pacote_dedicado is None else pacote_dedicado) else "false",
              "marcacoes": "false", "normalizar": "false", "legenda_srt": "false", "nome": "narracao"}
     if perfil and not referencia:
         dados["perfil"] = perfil

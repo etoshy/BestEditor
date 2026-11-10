@@ -227,6 +227,75 @@ E no final...</pre>
     <input type="number" name="chatterbox_cfg_weight" value="0.5" min="0" max="1" step="0.05">
     <p style="color:#666;font-size:0.8rem;">Valores mais altos de intensidade deixam a fala mais expressiva/dramática (e tendem a acelerar). Diminua a aderência (ex: 0.3) se a voz de referência falar rápido, ou se o idioma do texto for diferente do idioma da voz de referência.</p>
 
+    <!-- 🎭 v84_372: modo expressivo (tags em português, 🇧🇷 pt-BR ou 🇵🇹 pt-PT) -->
+    <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;padding:10px 12px;margin:10px 0;">
+      <label style="margin:0;font-weight:600;"><input type="checkbox" name="chatterbox_expressivo" id="cbExpressivo" style="width:auto;"> 🎭 Modo expressivo (tags em português)</label>
+      <div id="cbExpressivoAjuda" style="display:none;font-size:0.82rem;color:#4c1d95;margin-top:8px;line-height:1.5;">
+        <label style="margin:0 0 6px;font-weight:600;">Variante
+          <select name="chatterbox_variante" id="cbVariante" style="width:auto;display:inline-block;margin-left:6px;">
+            <option value="pt-BR">🇧🇷 Português do Brasil</option>
+            <option value="pt-PT">🇵🇹 Português de Portugal</option>
+          </select></label>
+        <div id="cbVarNota" style="color:#6b21a8;margin-bottom:6px;"></div>
+        {% for var, grupos in (expressivo_ajuda or {}).items() %}
+        <div class="cbAjudaVar" data-var="{{ var }}" style="display:none;">
+          {% for grupo, itens in grupos %}
+          <div style="font-weight:600;margin:8px 0 2px;">{{ grupo }}</div>
+          <table style="width:100%;border-collapse:collapse;">
+            {% for tag, exp in itens %}
+            <tr style="border-top:1px solid #ede9fe;">
+              <td style="padding:2px 8px 2px 0;white-space:nowrap;vertical-align:top;width:1%;">
+                {% if tag.startswith('[') or tag.startswith('*') %}<code class="cbTag" title="clique pra inserir no texto" style="cursor:pointer;">{{ tag }}</code>{% else %}<i>{{ tag }}</i>{% endif %}</td>
+              <td style="padding:2px 0;color:#4b5563;">{{ exp }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% endfor %}
+        </div>
+        {% endfor %}
+        <div style="color:#6b21a8;margin-top:8px;">💡 Clique numa tag pra inserir onde está o cursor. Para o estilo mudar de verdade o jeito da voz, crie perfis com a mesma voz falando naquele tom e o nome <code>&lt;perfil&gt;_&lt;estilo&gt;</code> (ex: <code>minhavoz_soprosa</code>) — o trecho usa essa referência automaticamente.
+          As tags das duas variantes funcionam nas duas. Os sons precisam do Chatterbox Turbo (no PC ou no pod); sem ele, viram pausa.</div>
+        <button type="button" id="cbExpressivoTeste" style="width:auto;margin-top:6px;padding:4px 10px;font-size:0.82rem;background:#7c3aed;">📝 Colocar o texto de teste</button>
+      </div>
+    </div>
+    <script>
+    (() => {
+      const TESTES = {{ expressivo_textos_teste|default({})|tojson }};
+      const NOTAS = {
+        'pt-BR': 'No pod: pacote dedicado pt-BR (se estiver ligado nas configurações).',
+        'pt-PT': 'No pod: modelo multilíngue base (sotaque de Portugal), sem o pacote pt-BR. No PC, o Chatterbox local já é o modelo base.',
+      };
+      const cb = document.getElementById('cbExpressivo'), aj = document.getElementById('cbExpressivoAjuda');
+      const sel = document.getElementById('cbVariante');
+      try { const v = localStorage.getItem('cbVariante'); if (v) sel.value = v; } catch (e) {}
+      const mostrar = () => {
+        aj.style.display = cb.checked ? '' : 'none';
+        document.querySelectorAll('.cbAjudaVar').forEach(d => { d.style.display = d.dataset.var === sel.value ? '' : 'none'; });
+        document.getElementById('cbVarNota').textContent = NOTAS[sel.value] || '';
+      };
+      cb.addEventListener('change', mostrar);
+      sel.addEventListener('change', () => { try { localStorage.setItem('cbVariante', sel.value); } catch (e) {} mostrar(); });
+      mostrar();
+      const texto = () => document.getElementById('texto-narrar');
+      document.querySelectorAll('.cbTag').forEach(c => c.addEventListener('click', () => {
+        const t = texto(), ini = t.selectionStart ?? t.value.length, fim = t.selectionEnd ?? ini;
+        let ins = c.textContent;
+        if (ins.startsWith('*')) ins = '*' + (t.value.slice(ini, fim) || 'palavra') + '*';
+        else ins += ' ';
+        t.value = t.value.slice(0, ini) + ins + t.value.slice(fim);
+        t.focus(); t.selectionStart = t.selectionEnd = ini + ins.length;
+        t.dispatchEvent(new Event('input'));
+      }));
+      document.getElementById('cbExpressivoTeste').addEventListener('click', () => {
+        const t = texto();
+        if (t.value.trim() && !confirm('Trocar o texto atual pelo texto de teste do modo expressivo?')) return;
+        t.value = TESTES[sel.value] || TESTES['pt-BR'] || '';
+        t.dispatchEvent(new Event('input'));
+        t.scrollIntoView({behavior: 'smooth', block: 'center'});
+      });
+    })();
+    </script>
+
     {% if perfis_de_voz %}
     <label>Usar um perfil de voz salvo</label>
     <select name="chatterbox_perfil" id="chatterbox-perfil-select" onchange="document.getElementById('bloco-upload-referencia-chatterbox').style.display = this.value ? 'none' : '';">
