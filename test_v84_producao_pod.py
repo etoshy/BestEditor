@@ -445,3 +445,31 @@ def test_so_voz_nao_pede_imagem_e_deixa_tudo_pendente(pod_falso):
     assert [t for t, _d in est["pedidos"]] == ["voz"]  # nenhuma imagem pedida
     segs = pod_falso["criados"][0]["resposta"]["segments"]
     assert segs and not any(s.get("provider") == "runpod" for s in segs)
+
+
+def test_esperar_as_fotos_pausa_e_continua(pod_falso):
+    """⏸ v84_371: narração pronta → o roteiro do Modelo de vídeo espera as fotos; ▶ Continuar planeja as cenas."""
+    pp = pod_falso["pp"]
+    import producao_pod as _pp
+    orig = _pp.texto_do_roteiro
+    _pp.texto_do_roteiro = lambda origem, pid, base=None: "Era uma vez um filósofo. Ele perguntava tudo a todos."
+    try:
+        lote = pp.criar([{"origem": "dossie", "id": "abc123", "titulo": "Sócrates", "idioma": "pt"}],
+                        {"intervalo": 5, "pct": 30, "esperar_fotos": True}, pod_url="https://x-8000.proxy.runpod.net")
+    finally:
+        _pp.texto_do_roteiro = orig
+    lid = lote["id"]
+    fim = time.time() + 10
+    while time.time() < fim and pp.carregar(lid)["itens"][0]["estado"] != "fotos":
+        time.sleep(0.05)
+    it = pp.carregar(lid)["itens"][0]
+    assert it["estado"] == "fotos" and "Continuar" in it["mensagem"]
+    assert pp.do_modelo("abc123")[0]["estado"] == "fotos"
+    time.sleep(0.3)
+    assert pp.carregar(lid)["itens"][0]["estado"] == "fotos"  # continua esperando
+    pp.continuar(lid, it["id"])
+    l = _esperar(pp, lid)
+    assert l["itens"][0]["estado"] == "pronto"
+    import pytest
+    with pytest.raises(pp.ProducaoErro):
+        pp.continuar(lid, it["id"])

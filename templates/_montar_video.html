@@ -1,0 +1,42 @@
+{# 🧭 v84_371: do roteiro ao vídeo — narra enquanto você busca as fotos. Incluir com {% set mv_pid = p.id %}{% include "_montar_video.html" %} #}
+<div id="mvGuia" class="ds-card" style="background:#f0fdf4;border-color:#bbf7d0;">
+  <h2 style="margin:0 0 4px;">🧭 Do roteiro ao vídeo <span style="font-weight:400;font-size:.82rem;color:#555;">(a voz narra enquanto você busca as fotos)</span></h2>
+  <ol style="margin:6px 0 0 18px;padding:0;font-size:.9rem;line-height:1.7;">
+    <li><b>🎙 Narrar</b> — <a href="/producao-pod?marcar=dossie:{{ mv_pid }}&esperar_fotos=1" target="_blank">abrir a Produção no pod com este roteiro</a>
+      (já com <b>⏸ Esperar as fotos</b>; escolha a voz e ▶ Iniciar). Narração no PC: marque também 🗣 Só a voz.
+      <span id="mvEstado" style="color:#166534;"></span></li>
+    <li><b>📸 Buscar as fotos</b> — <a href="#frCard" id="mvIrFotos">🤖 a IA pergunta o que o roteiro pede → 🧲 abre o Google em guias</a>; em cada guia marque as fotos e
+      “Capturar e enviar ao site”.</li>
+    <li><b>📍 Encaixar</b> — no mesmo bloco, <i>📍 2 · Posicionar</i>: a IA põe cada foto nos momentos certos do roteiro.</li>
+    <li><b>▶ Continuar</b> — <button type="button" id="mvContinuar" style="width:auto;margin:0;padding:3px 10px;font-size:.85rem;background:#16a34a;" disabled>▶ Fotos prontas — continuar a produção</button>
+      <span style="color:#555;">as fotos entram onde foram encaixadas e o que faltar é gerado (pod; no canal com pacote 100%, todas as cenas).</span>
+      <span id="mvSt" style="color:#555;"></span></li>
+  </ol>
+</div>
+<script>
+(() => {
+  const PIDG = {{ mv_pid|tojson }};
+  const $g = (id) => document.getElementById(id);
+  let timer = null;
+  async function ver() {
+    clearTimeout(timer);
+    let d; try { d = await (await fetch(`/producao-pod/modelo/${encodeURIComponent(PIDG)}`)).json(); } catch (e) { return; }
+    const x = (d.itens || [])[0];
+    const btn = $g('mvContinuar');
+    if (!x) { $g('mvEstado').textContent = ''; btn.disabled = true; return; }
+    const link = `<a href="/producao-pod/${x.lote}" target="_blank">ver o lote</a>`;
+    $g('mvEstado').innerHTML = ` · agora: <b>${x.rotulo}</b> (${link})` + (x.job_id ? ` · <a href="/job/${x.job_id}/edit-segments" target="_blank">📂 abrir no editor</a>` : '');
+    btn.disabled = !(d.itens || []).some(i => i.estado === 'fotos');
+    if (!['pronto', 'erro', 'cancelado'].includes(x.estado)) timer = setTimeout(ver, 8000);
+  }
+  $g('mvContinuar').addEventListener('click', async () => {
+    const b = $g('mvContinuar'); b.disabled = true; $g('mvSt').textContent = '⏳';
+    try { const r = await fetch(`/producao-pod/modelo/${encodeURIComponent(PIDG)}/continuar`, {method: 'POST'});
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      $g('mvSt').textContent = `✅ ${d.continuados} roteiro(s) seguiram pro planejamento das cenas`; ver(); }
+    catch (e) { $g('mvSt').textContent = '⚠ ' + e.message; b.disabled = false; }
+  });
+  $g('mvIrFotos').addEventListener('click', () => { const a = document.getElementById('frPassoA'); if (a) a.open = true; });
+  ver();
+})();
+</script>

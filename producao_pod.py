@@ -41,6 +41,7 @@ ESTADOS_FINAIS = ("pronto", "erro", "cancelado")
 ROTULOS = {
     "aguardando": "⏳ aguardando", "narrando": "🗣️ narrando no pod", "cenas": "🎬 planejando as cenas",
     "imagens": "🖼 gerando imagens no pod", "montando": "📂 criando o projeto", "pronto": "✅ pronto",
+    "fotos": "⏸ esperando as fotos",
     "erro": "❌ erro", "cancelado": "⏹ cancelado",
 }
 PADRAO_ITEM = {"idioma": "pt", "motor": "chatterbox", "perfil": "", "exaggeration": 0.5, "cfg_weight": 0.5}
@@ -186,6 +187,8 @@ def criar(itens: List[Dict[str, Any]], config: Dict[str, Any], pod_url: str = ""
     # 🗣 v84_370: só a voz — o "pod" é o Studio IA no seu PC (sem o worker de imagens): nenhuma imagem é pedida e todas as
     # cenas ficam ⏳ pendentes (banco de mídia, Google, motion graphics no editor)
     cfg["so_voz"] = bool(config.get("so_voz"))
+    # ⏸ v84_371: a narração termina e o roteiro ESPERA você buscar/encaixar as fotos (📸 no Modelo de vídeo) — ▶ Continuar
+    cfg["esperar_fotos"] = bool(config.get("esperar_fotos"))
     canal = str(config.get("canal") or "").strip()  # 🎨 v84_181: "" = o do 🕵️ Modelo de vídeo · "-" = nenhum · slug da marca
     cfg["canal"] = canal if canal == "-" or re.fullmatch(r"[a-z0-9_-]{1,60}", canal) else ""
     leg = config.get("legenda") if isinstance(config.get("legenda"), dict) else {}
@@ -788,8 +791,39 @@ def _gerar_zip(lid: str, iid: str) -> None:
     if not segs:
         raise ProducaoErro("a transcrição veio vazia")
     r = fn(item=it, lote=lote, wav=it["audio"], segments=segs)
-    _mudar(lid, iid, estado="cenas", gv_id=r["gv_id"], zip=r["zip"], total=r["total"],
-           _log="📜 narração + legenda no Histórico do Gerador de voz (.zip pronto)")
+    esperar = bool((lote.get("config") or {}).get("esperar_fotos")) and it.get("origem") == "dossie"
+    _mudar(lid, iid, estado="fotos" if esperar else "cenas", gv_id=r["gv_id"], zip=r["zip"], total=r["total"],
+           _log=("⏸ narração pronta (no Histórico do Gerador de voz) — busque e encaixe as fotos (📸 no Modelo de vídeo) "
+                 "e clique em ▶ Continuar") if esperar else "📜 narração + legenda no Histórico do Gerador de voz (.zip pronto)")
+
+
+def continuar(lid: str, iid: str) -> Dict[str, Any]:
+    """▶ v84_371: as fotos estão encaixadas — o roteiro que esperava sai pro planejamento das cenas (lê as marcas [I…] agora)."""
+    with _TRAVA:
+        lote = carregar(lid)
+        it = next((x for x in lote["itens"] if x["id"] == iid), None)
+        if not it:
+            raise ProducaoErro("Roteiro não encontrado no lote.")
+        if it["estado"] != "fotos":
+            raise ProducaoErro("Esse roteiro não está esperando as fotos.")
+        it.update(estado="cenas", mensagem="▶ continuando com as fotos encaixadas")
+        _log(it, "▶ fotos prontas — planejando as cenas")
+        lote["status"] = "rodando"
+        salvar(lote)
+    garantir_runner()
+    return lote
+
+
+def do_modelo(pid: str) -> List[Dict[str, Any]]:
+    """Onde está a produção deste 🕵️ Modelo de vídeo (os lotes que têm o roteiro dele), do mais novo pro mais velho."""
+    out = []
+    for lote in listar():
+        for it in lote.get("itens") or []:
+            if it.get("origem") == "dossie" and it.get("origem_id") == pid:
+                out.append({"lote": lote["id"], "item": it["id"], "estado": it["estado"],
+                            "rotulo": ROTULOS.get(it["estado"], it["estado"]), "mensagem": it.get("erro") or it.get("mensagem") or "",
+                            "job_id": it.get("job_id") or "", "criado": lote.get("criado") or 0})
+    return sorted(out, key=lambda x: -x["criado"])
 
 
 def _elenco_do_item(lid: str, iid: str, it: Dict[str, Any], cfg_lote: Dict[str, Any]) -> Optional[Dict[str, Any]]:

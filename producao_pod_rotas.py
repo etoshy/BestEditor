@@ -73,7 +73,7 @@ def registrar(app, base_dir: str) -> None:
         except pp.ProducaoErro:
             return jsonify({"erro": "lote não encontrado"}), 404
         itens = [{k: it.get(k) for k in ("id", "titulo", "estado", "mensagem", "job_id", "erro", "cenas", "idioma",
-                                          "motor", "perfil", "avisos", "inicio", "fim", "gv_id", "pod_img", "faltam_img", "baixadas", "recentes", "canal")}
+                                          "motor", "perfil", "avisos", "inicio", "fim", "gv_id", "pod_img", "faltam_img", "baixadas", "recentes", "canal", "origem_id")}
                  | {"rotulo": pp.ROTULOS.get(it["estado"], it["estado"]), "log": (it.get("log") or [])[-8:]}
                  for it in lote["itens"]]
         return jsonify({"status": lote["status"], "resumo": pp.resumo_lote(lote), "itens": itens, "pod_url": lote.get("pod_url") or ""})
@@ -132,6 +132,35 @@ def registrar(app, base_dir: str) -> None:
         except Exception:  # noqa: BLE001
             return "Roteiro não encontrado.", 404
         return render_template("producao_pod_galeria.html", lote=lote, it=it, imgs=pp.galeria(lid, iid))
+
+    @app.route("/producao-pod/<lid>/<iid>/continuar", methods=["POST"])
+    def producao_pod_continuar(lid: str, iid: str):
+        """▶ v84_371: as fotos estão encaixadas — o roteiro que esperava segue pro planejamento das cenas."""
+        try:
+            pp.continuar(lid, iid)
+        except pp.ProducaoErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify({"ok": True})
+
+    @app.route("/producao-pod/modelo/<pid>")
+    def producao_pod_do_modelo(pid: str):
+        """Onde está a produção deste 🕵️ Modelo de vídeo (pro guia da página do modelo)."""
+        return jsonify({"ok": True, "itens": pp.do_modelo(pid)})
+
+    @app.route("/producao-pod/modelo/<pid>/continuar", methods=["POST"])
+    def producao_pod_modelo_continuar(pid: str):
+        """▶ Continua TODOS os roteiros deste modelo que estão esperando as fotos."""
+        n = 0
+        for x in pp.do_modelo(pid):
+            if x["estado"] == "fotos":
+                try:
+                    pp.continuar(x["lote"], x["item"])
+                    n += 1
+                except pp.ProducaoErro:
+                    pass
+        if not n:
+            return jsonify({"erro": "Nenhuma produção deste modelo está esperando as fotos."}), 400
+        return jsonify({"ok": True, "continuados": n})
 
     @app.route("/producao-pod/<lid>/<iid>/parar", methods=["POST"])
     def producao_pod_parar(lid: str, iid: str):

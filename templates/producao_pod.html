@@ -76,6 +76,7 @@
         <option value="-">Nenhum — foto realista em todos</option>
       </select>
       <div style="font-size:.8rem;color:#888;">Roteiro de canal com pacote: a % de cenas no pod, a estética e os personagens vêm do zip do canal (pacote.json → "producao_pod"). O campo de % acima vale só pros roteiros sem canal.</div></div>
+    <div style="grid-column: span 2;"><label><input type="checkbox" id="esperar_fotos" style="width:auto;margin-right:4px;">⏸ <b>Esperar as fotos</b> <span style="font-weight:normal;color:#888;">(roteiros de 🕵️ Modelo de vídeo: a narração termina e o roteiro ESPERA você buscar e encaixar as fotos no modelo — 📸 Fotos pro roteiro → 🧲 Google → 📍 Posicionar — e clicar em ▶ Continuar; aí as fotos entram nos momentos certos e o resto é gerado)</span></label></div>
     <div style="grid-column: span 2;"><label><input type="checkbox" id="so_voz" style="width:auto;margin-right:4px;">🗣 <b>Só a voz</b> <span style="font-weight:normal;color:#888;">(o “pod” é o Studio IA no seu PC, sem GPU de imagens — nenhuma imagem é pedida; as cenas ficam ⏳ pendentes pro banco de mídia/Google no editor)</span></label></div>
     <div style="grid-column: span 2;"><label><input type="checkbox" id="rostos" checked style="width:auto;margin-right:4px;">🎭 Rosto das pessoas reais nas imagens do pod <span style="font-weight:normal;color:#888;">(roteiros de 🕵️ Modelo de vídeo: usa as fotos do elenco, na idade de cada cena — FLUX.2 klein; o resto continua no Z-Image)</span></label></div>
     <div style="grid-column: span 2;"><label><input type="checkbox" id="epoca" checked style="width:auto;margin-right:4px;">🎞 Visual da época em cada cena <span style="font-weight:normal;color:#888;">(a IA diz o ano em que cada cena se passa; a imagem sai com o jeito de foto daquele ano — filme dos anos 70, flash dos 80… — e carros/roupas da época)</span></label></div>
@@ -213,7 +214,7 @@
     try {
       const r = await fetch('/producao-pod/criar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
         pod_url: $('#pod-url').value.trim(), nome: $('#nome-lote').value.trim(),
-        config: {intervalo: $('#intervalo').value, pct: $('#pct').value, orientacao: $('#orientacao').value, estilo_extra: $('#estilo').value, rostos: $('#rostos').checked, epoca: $('#epoca').checked, canal: $('#canal').value, so_voz: $('#so_voz').checked,
+        config: {intervalo: $('#intervalo').value, pct: $('#pct').value, orientacao: $('#orientacao').value, estilo_extra: $('#estilo').value, rostos: $('#rostos').checked, epoca: $('#epoca').checked, canal: $('#canal').value, so_voz: $('#so_voz').checked, esperar_fotos: $('#esperar_fotos').checked,
                  legenda: {modo: $('#leg-modo').value, max_palavras: $('#leg-n').value}},
         itens: itens.map(({chave, palavras, ...resto}) => resto)})});
       const d = await r.json();
@@ -221,6 +222,7 @@
       location.href = d.link;
     } catch (e) { err.textContent = '❌ ' + e.message; err.style.display = ''; b.disabled = false; b.textContent = '▶ Iniciar produção'; }
   });
+  if (new URLSearchParams(location.search).get('esperar_fotos') === '1') $('#esperar_fotos').checked = true;  // ⏸ v84_371: vindo do guia do modelo
   // 📚 v84_368: /producao-pod?marcar=dossie:id,dossie:id (vindo do Texto bruto → vários vídeos) já marca os roteiros
   (new URLSearchParams(location.search).get('marcar') || '').split(',').filter(Boolean).forEach(ch => {
     const [origem, id] = ch.split(':');

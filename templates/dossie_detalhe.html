@@ -41,6 +41,7 @@
 <div style="margin:-4px 0 8px;"><button type="button" id="plLigar" style="display:none;width:auto;margin:0 8px 0 0;padding:4px 12px;font-size:.82rem;background:#4338ca;color:#fff;" title="roda sozinho o que falta: fontes → roteiro → revisão/checagem → perguntas de fotos e termos → prompt da checagem na internet; para pra você; depois fotos → elenco → TTS">🚀 Piloto automático</button>{% set cl_tipo = 'dossie' %}{% set cl_id = p.id %}{% include "_clonar.html" %}{% if p.clonado_de %}<span style="font-size:.8rem;color:#666;margin-left:8px;">📑 cópia de <a href="/modelos-video/{{ p.clonado_de }}">outro projeto</a></span>{% endif %}</div>
 
 {% set pl_pid = p.id %}{% include "_piloto.html" %}
+{% if (p.resultado or {}).roteiro %}{% set mv_pid = p.id %}{% include "_montar_video.html" %}{% endif %}
 <!-- 1 · tema e modelo -->
 <div class="ds-card" data-feito="{{ '1' if p.tema else '0' }}">
   <h2><span class="ds-num">1</span>Tema e modelo</h2>
