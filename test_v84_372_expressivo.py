@@ -37,7 +37,7 @@ def test_classifica_tags_pt():
 
 
 def test_eventos_estilo_sons_pausas_e_paragrafo():
-    ev = E.montar_eventos("[soprosa] Era uma vez um homem. [suspiro] Ele sumiu.\n\n[projetada] Compre já, compre agora!")
+    ev = E.montar_eventos("[soprosa] Era uma vez um homem. [suspiro] Ele sumiu.\n\n[projetada] Compre já, compre agora!", sons="turbo")
     tipos = [e["tipo"] for e in ev]
     assert tipos == ["fala", "som", "fala", "pausa", "fala"]
     assert ev[0]["estilo"] == "soprosa" and ev[0]["emocao"] == E.ESTILOS["soprosa"][0]
@@ -84,7 +84,7 @@ def test_texto_sem_tags_pra_legenda():
 
 
 def test_texto_de_teste_usa_tudo():
-    ev = E.montar_eventos(E.TEXTO_TESTE)
+    ev = E.montar_eventos(E.TEXTO_TESTE, sons="turbo")
     assert {"fala", "som", "respira", "pausa"} <= {e["tipo"] for e in ev}
     assert len({e.get("estilo") for e in ev if e["tipo"] == "fala"}) >= 8
     assert "[" not in E.texto_sem_tags(E.TEXTO_TESTE)
@@ -100,7 +100,7 @@ def test_pt_pt_tags_ajuda_e_texto():
                 assert explicacao
                 if tag.startswith("["):
                     assert E.classificar_tag(tag[1:-1]), (var, tag)
-        ev = E.montar_eventos(E.TEXTOS_TESTE[var])
+        ev = E.montar_eventos(E.TEXTOS_TESTE[var], sons="turbo")
         assert {"fala", "som", "respira", "pausa"} <= {e["tipo"] for e in ev}
 
 
@@ -132,7 +132,7 @@ def test_sintetizar_monta_o_audio_com_turbo_e_referencia_do_estilo(tmp_path, mon
     monkeypatch.setattr(vg, "listar_perfis_de_voz", lambda: ["minhavoz", "minhavoz_soprosa"])
     saida = tmp_path / "out.wav"
     E.sintetizar(vg, "[soprosa] Primeira frase bem longa aqui. [risada] [risada] [normal] Segunda frase normal. [pausa 1]"
-                     " Terceira frase com [respira] respiração.", str(saida), voice_profile="minhavoz")
+                     " Terceira frase com [respira] respiração.", str(saida), voice_profile="minhavoz", sons="turbo")
     mtl = [c for c in chamadas if c[0] == "mtl"]
     turbo = [c for c in chamadas if c[0] == "turbo"]
     assert mtl[0][2]["voice_profile"] == "minhavoz_soprosa"  # estilo com perfil próprio
@@ -152,7 +152,8 @@ def test_sem_turbo_o_som_vira_pausa(tmp_path, monkeypatch):
         raise vg.VoiceGeneratorError("Turbo não instalado")
     monkeypatch.setattr(vg, "chatterbox_turbo_synthesize", quebra)
     avisos = []
-    E.sintetizar(vg, "Frase de abertura do teste. [tosse] Frase final do teste.", str(tmp_path / "o.wav"), on_log=avisos.append)
+    E.sintetizar(vg, "Frase de abertura do teste. [tosse] Frase final do teste.", str(tmp_path / "o.wav"), on_log=avisos.append,
+                 sons="turbo")
     assert avisos and "virou pausa" in avisos[0]
     assert _dur(tmp_path / "o.wav") == pytest.approx(1.35, abs=0.05)
 
@@ -203,8 +204,9 @@ def test_apara_pontas_nivela_sons_e_nao_clipa(tmp_path, monkeypatch):
     import numpy as np
     monkeypatch.setattr(vg, "chatterbox_synthesize", lambda t, s, **k: _com_silencio(s, volume=1.6))  # passa de 0 dBFS
     monkeypatch.setattr(vg, "chatterbox_turbo_synthesize", lambda t, s, **k: _com_silencio(s, 0.3, 0.4, 0.5, volume=0.05))
+    monkeypatch.setattr(E, "parece_chiado", lambda x: False)  # o tom de teste é contínuo de propósito
     saida = tmp_path / "o.wav"
-    E.sintetizar(vg, "Primeira frase do teste aqui. [pausa curta] Segunda frase do teste aqui. [risada]", str(saida))
+    E.sintetizar(vg, "Primeira frase do teste aqui. [pausa curta] Segunda frase do teste aqui. [risada]", str(saida), sons="turbo")
     x = E._carregar(str(saida))
     # 2 falas de 0,5 s + pausa 0,25 + som 0,4 + margens (fala 0,16; som 0,24 + 0,2 de folga) — sem os ~1,7 s de
     # silêncio que cada pedaço trazia
@@ -223,3 +225,36 @@ def test_aparar_limiar_relativo_nao_come_som_baixo():
     x = np.concatenate([np.zeros(12000, np.float32), baixo, np.zeros(12000, np.float32)])
     y = E.aparar(x, abaixo_do_pico_db=45, piso_db=-65)
     assert 0.5 <= len(y) / 24000 <= 0.75
+
+
+def test_turbo_chiado_tenta_de_novo_e_depois_vira_pausa(tmp_path, monkeypatch):
+    import numpy as np
+    monkeypatch.setattr(vg, "chatterbox_synthesize", lambda t, s, **k: _tom(s, 0.5))
+    tentativas = []
+
+    def chiado(t, s, **k):  # ruído contínuo de 1,5 s, como a [risadinha] do teste real
+        tentativas.append(t)
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anoisesrc=d=1.5:a=0.03:r=24000", "-ac", "1", s], check=True)
+        return s
+    monkeypatch.setattr(vg, "chatterbox_turbo_synthesize", chiado)
+    avisos = []
+    E.sintetizar(vg, "Frase de abertura do teste. [risadinha] Frase final do teste.", str(tmp_path / "o.wav"),
+                 sons="turbo", on_log=avisos.append)
+    assert len(tentativas) == 2 and "chiado" in avisos[0]
+    t = np.arange(24000) / 24000
+    rajadas = (np.sin(2 * np.pi * 300 * t) * (np.sin(2 * np.pi * 4 * t) > 0)).astype(np.float32) * 0.3
+    assert E.parece_chiado(rajadas) is False
+
+
+def test_padrao_e_sons_falados():
+    assert E.montar_eventos("Recebeu um não. [risada]")[0]["texto"] == "Recebeu um não. Ha ha ha!"
+
+
+def test_normaliza_pra_16_lufs_sem_passar_do_pico():
+    import numpy as np
+    t = np.arange(24000 * 4) / 24000
+    voz = (0.06 * np.sin(2 * np.pi * 220 * t) * (1 + np.sin(2 * np.pi * 3 * t))).astype(np.float32)  # baixa (~-26 LUFS)
+    y = E.normalizar(voz)
+    assert E.medir_lufs(y) == pytest.approx(E.LOUDNESS_ALVO, abs=1.0)
+    assert 20 * np.log10(np.abs(y).max()) <= E.PICO_MAX_DB + 0.1 and len(y) == len(voz)
+    assert E.ESTILOS["camarada"][2] < 1.0

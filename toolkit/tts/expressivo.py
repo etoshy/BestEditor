@@ -33,23 +33,23 @@ from typing import Any, Callable, Dict, List, Optional
 TAXA = 24000  # Chatterbox (multilíngue e Turbo) gera em 24 kHz
 
 # estilo -> (emoção/exaggeration, aderência/cfg_weight, velocidade)
-ESTILOS: Dict[str, tuple] = {
+ESTILOS: Dict[str, tuple] = {  # v84_372c: um pouco mais de emoção (o teste saiu "sem emoção" na voz plena)
     "normal": (None, None, 1.0),
-    "linear": (0.30, 0.55, 1.0),
-    "calma": (0.35, 0.50, 0.95),
-    "soprosa": (0.40, 0.45, 0.95),
-    "carinhosa": (0.50, 0.45, 0.97),
-    "dramatica": (0.55, 0.35, 0.92),
-    "suspense": (0.50, 0.35, 0.90),
-    "plena": (0.45, 0.50, 1.0),
-    "seria": (0.40, 0.55, 1.0),
-    "sorridente": (0.65, 0.45, 1.03),
-    "alegre": (0.70, 0.45, 1.05),
-    "camarada": (0.55, 0.45, 1.0),
-    "ironica": (0.60, 0.45, 1.0),
-    "reportagem": (0.50, 0.50, 1.05),
-    "projetada": (0.80, 0.40, 1.06),
-    "agressiva": (0.85, 0.35, 1.08),
+    "linear": (0.35, 0.55, 1.0),
+    "calma": (0.40, 0.50, 0.95),
+    "soprosa": (0.45, 0.45, 0.95),
+    "carinhosa": (0.55, 0.45, 0.97),
+    "dramatica": (0.65, 0.35, 0.92),
+    "suspense": (0.55, 0.35, 0.90),
+    "plena": (0.55, 0.45, 1.0),
+    "seria": (0.50, 0.50, 1.0),
+    "sorridente": (0.70, 0.40, 1.0),
+    "alegre": (0.75, 0.40, 1.05),
+    "camarada": (0.58, 0.45, 0.93),  # v84_372d: saiu corrida (253 palavras/min) — emoção alta acelera
+    "ironica": (0.65, 0.42, 1.0),
+    "reportagem": (0.55, 0.45, 1.05),
+    "projetada": (0.85, 0.35, 1.06),
+    "agressiva": (0.90, 0.32, 1.08),
 }
 SINONIMOS_ESTILO = {
     "soproso": "soprosa", "sussurro": "soprosa", "sussurrada": "soprosa",
@@ -84,13 +84,13 @@ SONS: Dict[str, str] = {
 # soa menos "colado" que o som do Turbo, mas é uma leitura do som, não o som de verdade)
 SONS_FALADOS = {"laugh": "Ha ha ha!", "chuckle": "He he.", "sigh": "Ahh...", "cough": "Cof, cof.",
                 "clear throat": "Hum, hum.", "gasp": "Ah!", "groan": "Hmm...", "shush": "Shhh!"}
-MODOS_SONS = ("turbo", "falado")
+MODOS_SONS = ("falado", "turbo")  # v84_372c: falado é o padrão (o Turbo solto saiu chiado/baixo no teste)
 TURBO_SONS = {"laugh", "chuckle", "gasp", "cough", "sigh", "groan", "sniff", "shush", "clear throat"}
 
 PAUSAS = {"pausa": 0.45, "pausa curta": 0.25, "pausa longa": 1.0, "silencio": 0.8}
 PAUSA_PARAGRAFO = 0.6
 PAUSA_ENFASE = 0.14
-EXTRA_EMOCAO_ENFASE = 0.08
+EXTRA_EMOCAO_ENFASE = 0.12
 
 TAG = re.compile(r"\[([^\[\]\n]{1,40})\]")
 ENFASE = re.compile(r"\*([^*\n]{1,60})\*")
@@ -159,7 +159,7 @@ def limpar_fala(t: str) -> str:
     return t.strip(" \t\n,;")
 
 
-def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5, sons: str = "turbo") -> List[Dict[str, Any]]:
+def montar_eventos(texto: str, emocao_base: float = 0.5, cfg_base: float = 0.5, sons: str = "falado") -> List[Dict[str, Any]]:
     """Roteiro com tags -> lista de eventos: fala / som / respira / pausa."""
     eventos: List[Dict[str, Any]] = []
     estado = {"estilo": "normal", "emocao": emocao_base, "cfg": cfg_base, "velocidade": 1.0}
@@ -250,6 +250,7 @@ MARGEM_FIM = 0.12        # o fim da palavra decai devagar
 FADE_IN, FADE_OUT = 0.008, 0.03
 RUIDO_SALA_DB = -68.0    # "ar" nas pausas em vez de zero digital
 PICO_MAX_DB = -1.5
+LOUDNESS_ALVO = -16.0    # v84_372d: o teste saiu em -19 LUFS (baixo); -16 é o padrão de voz pra vídeo/podcast
 SOM_DB_ABAIXO_DA_FALA = 6.0
 RESPIRA_DB_ABAIXO_DA_FALA = 13.0
 
@@ -289,7 +290,7 @@ def _energia(x):
 
 
 def aparar(x, abaixo_do_pico_db: float = 38.0, piso_db: float = -55.0, margem_fim: float = MARGEM_FIM,
-           nucleo_db: float = 25.0, max_antes: float = 0.12, max_depois: float = 0.25):
+           nucleo_db: float = 20.0, max_antes: float = 0.12, max_depois: float = 0.25):
     """Corta silêncio/ruído das pontas com limiar RELATIVO ao pico do próprio pedaço (som baixo não some).
     Acha o "núcleo" (quadros a até `nucleo_db` do pico) e só estende pra fora enquanto ainda há som acima de
     `abaixo_do_pico_db` — no máximo `max_antes`/`max_depois` s (ruído/respiração longa do modelo fica de fora)."""
@@ -350,6 +351,17 @@ def recortar(x, limites, antes: float = 0.15, depois: float = 0.3):
     return x[ini:fim] if fim - ini > int(0.2 * TAXA) else x
 
 
+def parece_chiado(x) -> bool:
+    """Som "de verdade" (risada, tosse) tem rajadas: o volume sobe e desce. Chiado/ruído é contínuo
+    (medido no teste: a [risadinha] do Turbo saiu 1,8 s de chiado constante a -30 dB)."""
+    import numpy as np
+    e = _energia(x)
+    if len(e) < 8:
+        return False
+    d = 20 * np.log10(np.maximum(e, 10 ** (-70 / 20)))
+    return float(np.percentile(d, 90) - np.percentile(d, 25)) < 6.0 and len(e) * QUADRO > 0.6
+
+
 def nivel_voz(x) -> float:
     """RMS da parte FALADA (quadros acima de -30 dB do pico) — referência pra nivelar sons e respiração."""
     import numpy as np
@@ -391,6 +403,46 @@ def _salvar(x, saida: str, limitar: bool = True) -> None:
         out.writeframes(pcm.tobytes())
 
 
+def _ffmpeg_f32(x, filtro: str, saida_nula: bool = False):
+    """Passa o array pelo ffmpeg (stdin -> stdout, float32 24 kHz mono)."""
+    import numpy as np
+    cmd = ["ffmpeg", "-hide_banner", "-f", "f32le", "-ar", str(TAXA), "-ac", "1", "-i", "-", "-af", filtro]
+    cmd += ["-f", "null", "-"] if saida_nula else ["-f", "f32le", "-ar", str(TAXA), "-ac", "1", "-"]
+    r = subprocess.run(cmd, input=np.asarray(x, dtype=np.float32).tobytes(), capture_output=True, timeout=600)
+    if r.returncode != 0:
+        raise ExpressivoErro(r.stderr.decode(errors="replace")[-300:])
+    return r.stderr.decode(errors="replace") if saida_nula else np.frombuffer(r.stdout, dtype=np.float32).copy()
+
+
+def medir_lufs(x) -> Optional[float]:
+    """Loudness integrada (EBU R128) — None se não deu pra medir."""
+    try:
+        log = _ffmpeg_f32(x, "ebur128", saida_nula=True)
+        m = re.findall(r"I:\s+(-?\d+(?:\.\d+)?) LUFS", log)
+        v = float(m[-1]) if m else None
+        return v if v is not None and v > -70 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def normalizar(x, alvo_lufs: float = LOUDNESS_ALVO):
+    """Leva a voz a `alvo_lufs` e segura os picos em PICO_MAX_DB com um limitador (sem achatar a fala)."""
+    import numpy as np
+    lufs = medir_lufs(x)
+    if lufs is None or not len(x):
+        return x
+    ganho = max(-12.0, min(alvo_lufs - lufs, 12.0))
+    y = x * np.float32(10 ** (ganho / 20))
+    try:
+        teto = 10 ** (PICO_MAX_DB / 20)
+        y = _ffmpeg_f32(y, f"alimiter=limit={teto:.4f}:attack=3:release=60:level=0")
+        if len(y) != len(x):  # o limitador tem atraso de "lookahead": mantém o tamanho exato
+            y = np.concatenate([y, np.zeros(max(0, len(x) - len(y)), np.float32)])[:len(x)]
+    except Exception:  # noqa: BLE001 — sem limitador: _salvar ainda baixa o pico se precisar
+        pass
+    return y
+
+
 def referencia_do_estilo(vg: Any, perfil: Optional[str], estilo: str) -> Optional[str]:
     """Perfil 'minhavoz' + estilo 'soprosa' -> usa o perfil 'minhavoz_soprosa' se ele existir."""
     if not perfil or estilo == "normal":
@@ -409,12 +461,12 @@ def referencia_do_estilo(vg: Any, perfil: Optional[str], estilo: str) -> Optiona
 def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speaker_wav: Optional[str] = None,
                voice_profile: Optional[str] = None, exaggeration: float = 0.5, cfg_weight: float = 0.5,
                use_gpu: Optional[bool] = None, on_log: Optional[Callable[[str], None]] = None,
-               variante: str = "", sons: str = "turbo") -> str:
+               variante: str = "", sons: str = "falado") -> str:
     """Gera o .wav do roteiro com tags. `vg` = o módulo voice_generator (chatterbox_synthesize etc).
     `variante`: "pt-BR" ou "pt-PT" (no pod, pt-PT usa o modelo base em vez do pacote pt-BR)."""
     import numpy as np
     log = on_log or (lambda s: None)
-    eventos = montar_eventos(texto, exaggeration, cfg_weight, sons=sons if sons in MODOS_SONS else "turbo")
+    eventos = montar_eventos(texto, exaggeration, cfg_weight, sons=sons if sons in MODOS_SONS else "falado")
     if not any(e["tipo"] == "fala" for e in eventos):
         raise ExpressivoErro("Não sobrou nenhuma fala depois das tags — escreva o texto a ser narrado.")
     tmp = os.path.join(os.path.dirname(os.path.abspath(output_path)) or ".", f"_expressivo_{uuid.uuid4().hex[:8]}")
@@ -457,10 +509,15 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
                             kw_t["speaker_wav"] = speaker_wav
                         elif voice_profile:
                             kw_t["voice_profile"] = voice_profile
-                        vg.chatterbox_turbo_synthesize(f"[{som}]", bruto_som, **kw_t)
-                        a = aparar(_carregar(bruto_som), abaixo_do_pico_db=45, piso_db=-65, margem_fim=0.2)
-                        if not len(a):
-                            raise ExpressivoErro("o Turbo devolveu só silêncio")
+                        a = None
+                        for tentativa in range(2):  # o Turbo é aleatório: se sair chiado/silêncio, tenta mais uma vez
+                            vg.chatterbox_turbo_synthesize(f"[{som}]", bruto_som, **kw_t)
+                            a = aparar(_carregar(bruto_som), abaixo_do_pico_db=45, piso_db=-65, margem_fim=0.2)
+                            if len(a) and (som in ("shush", "sigh") or not parece_chiado(a)):  # "shh" é chiado mesmo
+                                break
+                            a = None
+                        if a is None:
+                            raise ExpressivoErro("o Turbo devolveu chiado/silêncio duas vezes")
                         cache_som[som] = a
                     pedacos.append(("som", cache_som[som], ev["tipo"]))
                 except Exception as exc:  # noqa: BLE001 — sem Turbo: vira pausa, o resto do áudio sai
@@ -494,11 +551,11 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
                 n_fade = min(len(som_x), int(TAXA * 0.15))  # som termina suave, não "corta"
                 if n_fade:
                     som_x[-n_fade:] *= np.linspace(1, 0, n_fade, dtype=np.float32)
-                partes += [_ruido_sala(0.1), som_x, _ruido_sala(0.15)]
+                partes += [_ruido_sala(0.06), som_x, _ruido_sala(0.1)]
             anterior = p[0]
         x = np.concatenate([np.asarray(p, dtype=np.float32) for p in partes]) if partes else np.zeros(0, np.float32)
         os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
-        _salvar(x, output_path)
+        _salvar(normalizar(x), output_path)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return output_path

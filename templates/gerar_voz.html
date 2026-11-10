@@ -239,8 +239,8 @@ E no final...</pre>
         <div id="cbVarNota" style="color:#6b21a8;margin-bottom:6px;"></div>
         <label style="margin:0 0 6px;font-weight:600;">Sons ([risada], [tosse]…)
           <select name="chatterbox_sons" id="cbSons" style="width:auto;display:inline-block;margin-left:6px;">
-            <option value="turbo">🔊 Som real (Chatterbox Turbo, colado no lugar)</option>
             <option value="falado">🗣 Falado na mesma frase (“Ha ha ha!”, “Cof, cof.” pelo Chatterbox pt)</option>
+            <option value="turbo">🔊 Som do Chatterbox Turbo (experimental: às vezes sai chiado)</option>
           </select></label>
         <div style="color:#6b7280;margin-bottom:6px;">O som real é mais convincente, mas pode soar “colado”. O falado mantém o clima da frase, mas é uma leitura do som. <code>[respira]</code> e <code>[fungada]</code> usam sempre o Turbo.</div>
         {% for var, grupos in (expressivo_ajuda or {}).items() %}
@@ -274,8 +274,8 @@ E no final...</pre>
       const cb = document.getElementById('cbExpressivo'), aj = document.getElementById('cbExpressivoAjuda');
       const sel = document.getElementById('cbVariante');
       const selSons = document.getElementById('cbSons');
-      try { const v = localStorage.getItem('cbVariante'); if (v) sel.value = v; const so = localStorage.getItem('cbSons'); if (so) selSons.value = so; } catch (e) {}
-      selSons.addEventListener('change', () => { try { localStorage.setItem('cbSons', selSons.value); } catch (e) {} });
+      try { const v = localStorage.getItem('cbVariante'); if (v) sel.value = v; const so = localStorage.getItem('cbSons2'); if (so) selSons.value = so; } catch (e) {}
+      selSons.addEventListener('change', () => { try { localStorage.setItem('cbSons2', selSons.value); } catch (e) {} });
       const mostrar = () => {
         aj.style.display = cb.checked ? '' : 'none';
         document.querySelectorAll('.cbAjudaVar').forEach(d => { d.style.display = d.dataset.var === sel.value ? '' : 'none'; });

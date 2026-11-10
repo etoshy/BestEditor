@@ -1775,7 +1775,7 @@ def chatterbox_synthesize(
     use_gpu: Optional[bool] = None,
     expressivo: bool = False,
     variante: str = "",
-    sons: str = "turbo",
+    sons: str = "falado",
 ) -> str:
     """Gera um `.wav` com o Chatterbox TTS (Resemble AI) — clona voz
     por zero-shot igual o XTTS v2 (um áudio de referência curto), só
