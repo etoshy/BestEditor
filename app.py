@@ -826,6 +826,9 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
     def log(linha: str) -> None:
         status["log"] += linha + "\n"
 
+    # 📊 v84_373: o motor grava "trecho N de M" aqui; a barra de % da tela lê pelo /gerar-voz/status
+    status["progresso_arquivo"] = output_path + ".progresso.json"
+    status.pop("fase", None)
     try:
         label = tts_ENGINES.get(engine, {}).get("label", engine)
         log(f"Motor escolhido: {label}.")
@@ -856,8 +859,8 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
                 log("🎭 Modo expressivo: " + ", ".join(f"{sum(1 for e in eventos if e['tipo'] == t)} {n}" for t, n in
                                                      (("fala", "trecho(s) de fala"), ("som", "som(ns)"), ("respira", "respiração(ões)"), ("pausa", "pausa(s)")))
                     + (". Sons pelo Chatterbox Turbo com a mesma voz." if kwargs.get("sons") == "turbo" else ". Sons falados na mesma frase.")
-                    + " (montagem v84_372d: pontas cortadas pelo Whisper, sons nivelados, -16 LUFS, sem clip)")
-            tts_gerar_audio_isolado(engine, texto_exp, output_path, **kwargs)
+                    + " (montagem v84_372c: pontas cortadas pelo Whisper, sons nivelados, sem clip)")
+            tts_gerar_audio_isolado(engine, texto_exp, output_path, **dict(kwargs, progresso_arquivo=status["progresso_arquivo"]))
             texto = _exp.texto_sem_tags(texto)  # a legenda é do que foi FALADO, sem as tags
         elif tem_chamadas:
             _salvar_chamadas_voz(status, output_path, _gerar_voz_com_chamadas(engine, partes_ch, output_path, kwargs, log,
@@ -868,7 +871,7 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
                 import tts_paralelo
                 tts_paralelo.gerar_texto(engine, texto_limpo, output_path, kwargs, int(status["instancias"]), log)
             else:
-                tts_gerar_audio_isolado(engine, texto_limpo, output_path, **kwargs)
+                tts_gerar_audio_isolado(engine, texto_limpo, output_path, **dict(kwargs, progresso_arquivo=status["progresso_arquivo"]))
         status["resultado_filename"] = os.path.basename(output_path)
         log("Pronto!")
 
@@ -882,6 +885,7 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
             # ✍️ o TTS não diz em que instante cada palavra é falada: o Whisper só MEDE o tempo; o texto da
             # legenda é o do roteiro (nomes, acentos, números e pontuação como você escreveu) — legenda_texto.py
             import legenda_texto as _lt
+            status["fase"] = "legenda"
             log("⏱ Medindo no áudio o tempo de cada palavra (o texto da legenda é o do seu roteiro)...")
             try:
                 segmentos = transcribe_audio(output_path, word_timestamps=True)
@@ -1250,6 +1254,11 @@ def _gerar_voz_e_avisar(job_id: str, *a: Any) -> None:
             _gerar_voz_em_background(job_id, *a)
     finally:
         st = _GERAR_VOZ_STATUS.get(job_id) or {}
+        try:  # 📊 o arquivo de andamento não serve mais
+            if st.get("progresso_arquivo"):
+                os.remove(st["progresso_arquivo"])
+        except OSError:
+            pass
         _avisar_fim("🎙️ Áudio “" + (st.get("texto_inicio") or "")[:50] + "…”", st.get("erro"), "/gerar-voz#historico", "voz",
                     "Ouça ou baixe no histórico do Gerador de voz.")
 
@@ -1378,6 +1387,38 @@ def multivoz_testar(slug: str):
     return jsonify({"ok": True, "job_id": job_id})
 
 
+def _progresso_voz(st: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """📊 v84_373: % real da geração — trechos prontos (gravados pelo motor) + quanto do trecho atual já deve ter
+    passado, pelo tempo médio dos anteriores. Áudio = 0–90%, legenda (Whisper) = 90–100%."""
+    if not st.get("running") or st.get("na_fila"):
+        return None
+    if st.get("fase") == "legenda":
+        return {"pct": 95, "texto": "📝 fazendo a legenda (Whisper)…"}
+    arq = st.get("progresso_arquivo")
+    try:
+        with open(arq, encoding="utf-8") as f:
+            d = json.load(f)
+        feito, total, t = int(d["feito"]), max(1, int(d["total"])), float(d["t"])
+    except Exception:  # noqa: BLE001 — ainda não começou (carregando o modelo) ou motor sem contagem
+        return {"pct": None, "texto": "⏳ carregando o modelo…" if arq else ""}
+    agora = time.time()
+    if feito == 0 and not st.get("prog_t0"):
+        st["prog_t0"] = t
+    t0 = st.get("prog_t0") or t
+    if d.get("etapa") == "montando" or feito >= total:
+        return {"pct": 90, "texto": "🎚 juntando os trechos…", "feito": total, "total": total}
+    media = (t - t0) / feito if feito else None
+    frac = min(0.9, (agora - t) / media) if media else 0.0
+    pct = int(round((feito + frac) / total * 90))
+    texto = f"{pct}% · trecho {feito + 1} de {total}"
+    if media:
+        resta = max(0, media * (total - feito) - (agora - t))
+        texto += f" · faltam ~{int(resta // 60)} min {int(resta % 60):02d} s" if resta >= 60 else f" · faltam ~{int(resta)} s"
+    else:
+        texto += " · calculando o tempo…"
+    return {"pct": pct, "texto": texto, "feito": feito, "total": total}
+
+
 @app.route("/gerar-voz/em-andamento", methods=["GET"])
 def gerar_voz_em_andamento():
     """Gerações rodando (e as que terminaram na última hora) — a página do Gerar voz
@@ -1391,7 +1432,7 @@ def gerar_voz_em_andamento():
                           "pronto": bool(st.get("pronto")) and not st.get("erro"), "engine": st.get("engine"),
                           "criado_em": criado, "texto_inicio": st.get("texto_inicio") or "", "palavras": st.get("palavras"),
                           "na_fila": bool(st.get("na_fila")), "posicao": st.get("posicao"), "cancelado": bool(st.get("cancelado")),
-                          "iniciou_em": st.get("iniciou_em")})
+                          "iniciou_em": st.get("iniciou_em"), "progresso": _progresso_voz(st)})
     itens.sort(key=lambda x: (not (x["running"] and not x["na_fila"]), not x["na_fila"], x["posicao"] or 0, -x["criado_em"]))
     return jsonify({"geracoes": itens[:30], "fila": _FILA_VOZ.estado()})
 
@@ -1512,6 +1553,7 @@ def gerar_voz_status(job_id: str):
         "running": status["running"], "log": status["log"], "erro": status["erro"],
         "pronto": status["pronto"], "resultado": resultado,
         "na_fila": bool(status.get("na_fila")), "posicao": status.get("posicao"),
+        "progresso": _progresso_voz(status),
     })
 
 

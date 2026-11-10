@@ -248,13 +248,3 @@ def test_turbo_chiado_tenta_de_novo_e_depois_vira_pausa(tmp_path, monkeypatch):
 
 def test_padrao_e_sons_falados():
     assert E.montar_eventos("Recebeu um não. [risada]")[0]["texto"] == "Recebeu um não. Ha ha ha!"
-
-
-def test_normaliza_pra_16_lufs_sem_passar_do_pico():
-    import numpy as np
-    t = np.arange(24000 * 4) / 24000
-    voz = (0.06 * np.sin(2 * np.pi * 220 * t) * (1 + np.sin(2 * np.pi * 3 * t))).astype(np.float32)  # baixa (~-26 LUFS)
-    y = E.normalizar(voz)
-    assert E.medir_lufs(y) == pytest.approx(E.LOUDNESS_ALVO, abs=1.0)
-    assert 20 * np.log10(np.abs(y).max()) <= E.PICO_MAX_DB + 0.1 and len(y) == len(voz)
-    assert E.ESTILOS["camarada"][2] < 1.0

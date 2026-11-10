@@ -1508,7 +1508,9 @@ def xtts_synthesize(
             raise VoiceGeneratorError(f"{prefixo_pedaco}Falha ao gerar áudio com o XTTS v2: {exc}") from exc
 
     if len(pedacos) == 1:
+        informar_progresso(0, 1, "gerando", interno=True)
         _gerar_um_pedaco(pedacos[0], output_path)
+        informar_progresso(1, 1, "gerando", interno=True)
         return output_path
 
     # texto maior que o limite por chamada do modelo -- gera cada
@@ -1521,7 +1523,9 @@ def xtts_synthesize(
         caminhos_pedacos = []
         for i, pedaco in enumerate(pedacos, start=1):
             caminho_pedaco = os.path.join(diretorio_tmp, f"pedaco_{i:03d}.wav")
+            informar_progresso(i - 1, len(pedacos), "gerando", interno=True)
             _gerar_um_pedaco(pedaco, caminho_pedaco, numero=i)
+            informar_progresso(i, len(pedacos), "gerando", interno=True)
             caminhos_pedacos.append(caminho_pedaco)
         _concatenar_wavs(caminhos_pedacos, output_path)
     finally:
@@ -1878,7 +1882,9 @@ def chatterbox_synthesize(
             raise VoiceGeneratorError(f"{prefixo_pedaco}Falha ao gerar áudio com o Chatterbox TTS: {exc}") from exc
 
     if len(pedacos) == 1:
+        informar_progresso(0, 1, "gerando", interno=True)
         _gerar_um_pedaco(pedacos[0], output_path)
+        informar_progresso(1, 1, "gerando", interno=True)
         return output_path
 
     # texto maior que o limite seguro por chamada (a "janela acústica"
@@ -1893,7 +1899,9 @@ def chatterbox_synthesize(
         caminhos_pedacos = []
         for i, pedaco in enumerate(pedacos, start=1):
             caminho_pedaco = os.path.join(diretorio_tmp, f"pedaco_{i:03d}.wav")
+            informar_progresso(i - 1, len(pedacos), "gerando", interno=True)
             _gerar_um_pedaco(pedaco, caminho_pedaco, numero=i)
+            informar_progresso(i, len(pedacos), "gerando", interno=True)
             caminhos_pedacos.append(caminho_pedaco)
         _concatenar_wavs(caminhos_pedacos, output_path)
     finally:
@@ -2110,7 +2118,9 @@ def chatterbox_turbo_synthesize(
             raise VoiceGeneratorError(f"{prefixo_pedaco}Falha ao gerar áudio com o Chatterbox Turbo: {exc}") from exc
 
     if len(pedacos) == 1:
+        informar_progresso(0, 1, "gerando", interno=True)
         _gerar_um_pedaco(pedacos[0], output_path)
+        informar_progresso(1, 1, "gerando", interno=True)
         return output_path
 
     diretorio_tmp = os.path.join(os.path.dirname(output_path) or ".", f"_chatterbox_turbo_pedacos_{uuid.uuid4().hex[:8]}")
@@ -2119,7 +2129,9 @@ def chatterbox_turbo_synthesize(
         caminhos_pedacos = []
         for i, pedaco in enumerate(pedacos, start=1):
             caminho_pedaco = os.path.join(diretorio_tmp, f"pedaco_{i:03d}.wav")
+            informar_progresso(i - 1, len(pedacos), "gerando", interno=True)
             _gerar_um_pedaco(pedaco, caminho_pedaco, numero=i)
+            informar_progresso(i, len(pedacos), "gerando", interno=True)
             caminhos_pedacos.append(caminho_pedaco)
         _concatenar_wavs(caminhos_pedacos, output_path)
     finally:
@@ -2825,6 +2837,26 @@ ENGINES: Dict[str, Dict[str, Any]] = {
 }
 
 
+# 📊 v84_373: andamento real da geração (trecho N de M), gravado num .json que o site lê pra barra de %.
+# O caminho vem em kwargs["progresso_arquivo"] (tirado antes de chamar o motor) e vale pro processo inteiro.
+_PROGRESSO: Dict[str, Any] = {"arq": None, "silenciar_trechos": False}
+
+
+def informar_progresso(feito: int, total: int, etapa: str = "", interno: bool = False) -> None:
+    """Grava {feito, total, etapa}. `interno` = pedaços de UM trecho (ignorado quando o modo expressivo já conta
+    os trechos dele). Nunca derruba a geração."""
+    arq = _PROGRESSO.get("arq")
+    if not arq or (interno and _PROGRESSO.get("silenciar_trechos")):
+        return
+    try:
+        tmp = f"{arq}.{os.getpid()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"feito": int(feito), "total": max(1, int(total)), "etapa": etapa, "t": time.time()}, f)
+        os.replace(tmp, arq)
+    except OSError:
+        pass
+
+
 def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str:
     """Ponto de entrada único: gera o áudio com o motor pedido.
 
@@ -2841,6 +2873,8 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
     """
     if not texto or not texto.strip():
         raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
+    if "progresso_arquivo" in kwargs:
+        _PROGRESSO["arq"] = kwargs.pop("progresso_arquivo") or None
 
     engine = (engine or "").strip().lower()
     if engine == "teste" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") == "1":  # só nos testes automatizados

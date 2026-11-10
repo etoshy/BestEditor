@@ -534,7 +534,16 @@ E no final...</pre>
 </style>
 
 <div id="progresso-box" style="display:none;margin-top:14px;">
-  <div class="progress-bar"><div class="progress-fill" id="progress-fill-indeterminate" style="width:40%;"></div></div>
+  <div class="progress-bar" id="pv-barra-ind"><div class="progress-fill" id="progress-fill-indeterminate" style="width:40%;"></div></div>
+  <!-- 📊 v84_373: barra com % real (trecho N de M) -->
+  <div id="pv-barra" style="display:none;">
+    <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px;">
+      <b id="pv-pct">0%</b><span id="pv-texto" style="color:#555;"></span>
+    </div>
+    <div style="height:14px;background:#e5e7eb;border-radius:7px;overflow:hidden;">
+      <div id="pv-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#2563eb);transition:width .8s ease;"></div>
+    </div>
+  </div>
   <pre id="log-box" style="background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.8rem;max-height:220px;overflow:auto;margin-top:10px;white-space:pre-wrap;"></pre>
 </div>
 <style>
@@ -775,7 +784,10 @@ async function verGeracoes() {
   if (!lista.length) { box.style.display = 'none'; return; }
   const hora = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const f = d.fila || {};
-  const estado = (g) => g.na_fila ? `⏳ <b>na fila</b> (posição ${g.posicao || '?'})` : g.running ? '▶ <b>gerando</b>' : g.cancelado ? '✖ cancelada' : g.erro ? '⚠ deu erro' : '✅ pronta';
+  const barrinha = (p) => (p && p.pct !== null && p.pct !== undefined)
+    ? ` <span style="display:inline-block;width:90px;height:8px;background:#e5e7eb;border-radius:4px;vertical-align:middle;overflow:hidden;"><span style="display:block;height:100%;width:${p.pct}%;background:#7c3aed;"></span></span> <b>${p.pct}%</b> <span style="color:#666;font-size:0.8rem;">${(p.texto || '').replace(/^\d+% · /, '')}</span>`
+    : (p && p.texto ? ` <span style="color:#666;font-size:0.8rem;">${p.texto}</span>` : '');
+  const estado = (g) => g.na_fila ? `⏳ <b>na fila</b> (posição ${g.posicao || '?'})` : g.running ? '▶ <b>gerando</b>' + barrinha(g.progresso) : g.cancelado ? '✖ cancelada' : g.erro ? '⚠ deu erro' : '✅ pronta';
   box.innerHTML = `<b>🎙 Fila de geração</b> — ${(f.rodando || []).length} gerando, ${(f.fila || []).length} esperando · até ${f.limite || 1} ao mesmo tempo (continua rodando mesmo se você fechar a página):` + lista.map(g =>
     `<div style="margin-top:6px;">${estado(g)} · ${hora(g.criado_em)} · ${g.engine || ''} · ${g.palavras || '?'} palavras · <i>“${(g.texto_inicio || '').replace(/</g, '&lt;')}…”</i>
       <button type="button" class="ver-geracao" data-id="${g.job_id}" style="width:auto;padding:2px 10px;font-size:0.8rem;margin-left:6px;">${g.running ? 'Acompanhar' : 'Ver resultado'}</button>
@@ -803,6 +815,18 @@ function mostrarErro(msg) {
   document.getElementById('btn-gerar').disabled = false;
 }
 
+function mostrarProgresso(p, rodando) {
+  const det = document.getElementById('pv-barra'), ind = document.getElementById('pv-barra-ind');
+  if (rodando && p && p.pct !== null && p.pct !== undefined) {
+    det.style.display = ''; ind.style.display = 'none';
+    document.getElementById('pv-fill').style.width = p.pct + '%';
+    document.getElementById('pv-pct').textContent = p.pct + '%';
+    document.getElementById('pv-texto').textContent = (p.texto || '').replace(/^\d+% · /, '');
+  } else {
+    det.style.display = 'none'; ind.style.display = '';
+    if (rodando && p && p.texto) { ind.title = p.texto; }
+  }
+}
 async function pollStatus(jobId) {
   let data;
   try {
@@ -814,6 +838,7 @@ async function pollStatus(jobId) {
   }
   document.getElementById('log-box').textContent = (data.na_fila ? `⏳ Na fila — posição ${data.posicao || '?'}. Pode pedir outro áudio enquanto isso.\n` : '') + (data.log || '');
   document.getElementById('log-box').scrollTop = document.getElementById('log-box').scrollHeight;
+  mostrarProgresso(data.running && !data.na_fila ? data.progresso : null, data.running);
 
   if (data.running) {
     if (acompanhando && acompanhando !== jobId) return;  // passou a acompanhar outra

@@ -43,9 +43,9 @@ ESTILOS: Dict[str, tuple] = {  # v84_372c: um pouco mais de emoção (o teste sa
     "suspense": (0.55, 0.35, 0.90),
     "plena": (0.55, 0.45, 1.0),
     "seria": (0.50, 0.50, 1.0),
-    "sorridente": (0.70, 0.40, 1.0),
+    "sorridente": (0.70, 0.40, 1.03),
     "alegre": (0.75, 0.40, 1.05),
-    "camarada": (0.58, 0.45, 0.93),  # v84_372d: saiu corrida (253 palavras/min) — emoção alta acelera
+    "camarada": (0.62, 0.42, 1.0),
     "ironica": (0.65, 0.42, 1.0),
     "reportagem": (0.55, 0.45, 1.05),
     "projetada": (0.85, 0.35, 1.06),
@@ -250,7 +250,6 @@ MARGEM_FIM = 0.12        # o fim da palavra decai devagar
 FADE_IN, FADE_OUT = 0.008, 0.03
 RUIDO_SALA_DB = -68.0    # "ar" nas pausas em vez de zero digital
 PICO_MAX_DB = -1.5
-LOUDNESS_ALVO = -16.0    # v84_372d: o teste saiu em -19 LUFS (baixo); -16 é o padrão de voz pra vídeo/podcast
 SOM_DB_ABAIXO_DA_FALA = 6.0
 RESPIRA_DB_ABAIXO_DA_FALA = 13.0
 
@@ -403,46 +402,6 @@ def _salvar(x, saida: str, limitar: bool = True) -> None:
         out.writeframes(pcm.tobytes())
 
 
-def _ffmpeg_f32(x, filtro: str, saida_nula: bool = False):
-    """Passa o array pelo ffmpeg (stdin -> stdout, float32 24 kHz mono)."""
-    import numpy as np
-    cmd = ["ffmpeg", "-hide_banner", "-f", "f32le", "-ar", str(TAXA), "-ac", "1", "-i", "-", "-af", filtro]
-    cmd += ["-f", "null", "-"] if saida_nula else ["-f", "f32le", "-ar", str(TAXA), "-ac", "1", "-"]
-    r = subprocess.run(cmd, input=np.asarray(x, dtype=np.float32).tobytes(), capture_output=True, timeout=600)
-    if r.returncode != 0:
-        raise ExpressivoErro(r.stderr.decode(errors="replace")[-300:])
-    return r.stderr.decode(errors="replace") if saida_nula else np.frombuffer(r.stdout, dtype=np.float32).copy()
-
-
-def medir_lufs(x) -> Optional[float]:
-    """Loudness integrada (EBU R128) — None se não deu pra medir."""
-    try:
-        log = _ffmpeg_f32(x, "ebur128", saida_nula=True)
-        m = re.findall(r"I:\s+(-?\d+(?:\.\d+)?) LUFS", log)
-        v = float(m[-1]) if m else None
-        return v if v is not None and v > -70 else None
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def normalizar(x, alvo_lufs: float = LOUDNESS_ALVO):
-    """Leva a voz a `alvo_lufs` e segura os picos em PICO_MAX_DB com um limitador (sem achatar a fala)."""
-    import numpy as np
-    lufs = medir_lufs(x)
-    if lufs is None or not len(x):
-        return x
-    ganho = max(-12.0, min(alvo_lufs - lufs, 12.0))
-    y = x * np.float32(10 ** (ganho / 20))
-    try:
-        teto = 10 ** (PICO_MAX_DB / 20)
-        y = _ffmpeg_f32(y, f"alimiter=limit={teto:.4f}:attack=3:release=60:level=0")
-        if len(y) != len(x):  # o limitador tem atraso de "lookahead": mantém o tamanho exato
-            y = np.concatenate([y, np.zeros(max(0, len(x) - len(y)), np.float32)])[:len(x)]
-    except Exception:  # noqa: BLE001 — sem limitador: _salvar ainda baixa o pico se precisar
-        pass
-    return y
-
-
 def referencia_do_estilo(vg: Any, perfil: Optional[str], estilo: str) -> Optional[str]:
     """Perfil 'minhavoz' + estilo 'soprosa' -> usa o perfil 'minhavoz_soprosa' se ele existir."""
     if not perfil or estilo == "normal":
@@ -476,7 +435,15 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
     try:
         # 1) gera tudo (fala aparada nas pontas; som aparado com limiar relativo)
         pedacos: List[Any] = []  # ("audio", array) | ("pausa", s) | ("som", array, tipo)
+        prog = getattr(vg, "informar_progresso", None) or (lambda *a, **k: None)
+        estado_prog = getattr(vg, "_PROGRESSO", {})
+        estado_prog["silenciar_trechos"] = True  # quem conta é o expressivo: trecho N de M
+        total_ev = sum(1 for e in eventos if e["tipo"] != "pausa") or 1
+        feitos = 0
+        prog(0, total_ev, "gerando")
         for i, ev in enumerate(eventos):
+            if ev["tipo"] != "pausa" and i:
+                prog(feitos, total_ev, "gerando")
             bruto = os.path.join(tmp, f"{i:04d}_bruto.wav")
             if ev["tipo"] == "pausa":
                 pedacos.append(("pausa", float(ev["s"])))
@@ -527,6 +494,10 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
                         log("⚠ " + aviso)
                     pedacos.append(("pausa", 0.35))
 
+            if ev["tipo"] != "pausa":
+                feitos += 1
+        prog(total_ev, total_ev, "montando")
+        estado_prog["silenciar_trechos"] = False
         # 2) nivela sons e respiração pelo volume da fala (o Turbo sai com outro volume)
         niveis = [nivel_voz(p[1]) for p in pedacos if p[0] == "audio" and len(p[1])]
         ref = float(np.median(niveis)) if niveis else 0.1
@@ -551,11 +522,11 @@ def sintetizar(vg: Any, texto: str, output_path: str, idioma: str = "pt", speake
                 n_fade = min(len(som_x), int(TAXA * 0.15))  # som termina suave, não "corta"
                 if n_fade:
                     som_x[-n_fade:] *= np.linspace(1, 0, n_fade, dtype=np.float32)
-                partes += [_ruido_sala(0.06), som_x, _ruido_sala(0.1)]
+                partes += [_ruido_sala(0.1), som_x, _ruido_sala(0.15)]
             anterior = p[0]
         x = np.concatenate([np.asarray(p, dtype=np.float32) for p in partes]) if partes else np.zeros(0, np.float32)
         os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
-        _salvar(normalizar(x), output_path)
+        _salvar(x, output_path)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return output_path
