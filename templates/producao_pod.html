@@ -76,6 +76,7 @@
         <option value="-">Nenhum — foto realista em todos</option>
       </select>
       <div style="font-size:.8rem;color:#888;">Roteiro de canal com pacote: a % de cenas no pod, a estética e os personagens vêm do zip do canal (pacote.json → "producao_pod"). O campo de % acima vale só pros roteiros sem canal.</div></div>
+    <div style="grid-column: span 2;"><label><input type="checkbox" id="so_voz" style="width:auto;margin-right:4px;">🗣 <b>Só a voz</b> <span style="font-weight:normal;color:#888;">(o “pod” é o Studio IA no seu PC, sem GPU de imagens — nenhuma imagem é pedida; as cenas ficam ⏳ pendentes pro banco de mídia/Google no editor)</span></label></div>
     <div style="grid-column: span 2;"><label><input type="checkbox" id="rostos" checked style="width:auto;margin-right:4px;">🎭 Rosto das pessoas reais nas imagens do pod <span style="font-weight:normal;color:#888;">(roteiros de 🕵️ Modelo de vídeo: usa as fotos do elenco, na idade de cada cena — FLUX.2 klein; o resto continua no Z-Image)</span></label></div>
     <div style="grid-column: span 2;"><label><input type="checkbox" id="epoca" checked style="width:auto;margin-right:4px;">🎞 Visual da época em cada cena <span style="font-weight:normal;color:#888;">(a IA diz o ano em que cada cena se passa; a imagem sai com o jeito de foto daquele ano — filme dos anos 70, flash dos 80… — e carros/roupas da época)</span></label></div>
     <div style="grid-column: span 2;"><label>Estilo extra nas imagens <span style="font-weight:normal;color:#888;">(inglês, opcional)</span></label><input type="text" id="estilo" placeholder="ex.: dark moody lighting, film grain"></div>
@@ -147,7 +148,7 @@
     const box = $('#estimativa');
     if (!itens.length) { box.style.display = 'none'; return; }
     const min = itens.reduce((a, it) => a + it.palavras / 150, 0);
-    const intervalo = parseFloat($('#intervalo').value) || 5, pct = (parseFloat($('#pct').value) || 0) / 100;
+    const intervalo = parseFloat($('#intervalo').value) || 5, pct = $('#so_voz').checked ? 0 : (parseFloat($('#pct').value) || 0) / 100;
     const imagens = Math.round(min * 60 / intervalo * pct);
     const vozMin = min * 0.35, vozMax = min * 0.7;  // Chatterbox na L40S/4090: ~0,35–0,7 min por minuto de fala
     const imgMin = imagens * 3 / 60;
@@ -194,7 +195,8 @@
     $('#colar-texto').value = ''; $('#colar-titulo').value = ''; desenhar();
   });
   $('#aplicar-todos').addEventListener('click', () => { const p = padrao(); itens.forEach(it => Object.assign(it, p)); desenhar(); });
-  ['#intervalo', '#pct'].forEach(s => $(s).addEventListener('input', estimar));
+  ['#intervalo', '#pct', '#so_voz'].forEach(s => $(s).addEventListener('input', estimar));
+  $('#so_voz').addEventListener('change', estimar);
 
   $('#pod-testar').addEventListener('click', async () => {
     const out = $('#pod-status'); out.textContent = '⏳ testando…';
@@ -211,7 +213,7 @@
     try {
       const r = await fetch('/producao-pod/criar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
         pod_url: $('#pod-url').value.trim(), nome: $('#nome-lote').value.trim(),
-        config: {intervalo: $('#intervalo').value, pct: $('#pct').value, orientacao: $('#orientacao').value, estilo_extra: $('#estilo').value, rostos: $('#rostos').checked, epoca: $('#epoca').checked, canal: $('#canal').value,
+        config: {intervalo: $('#intervalo').value, pct: $('#pct').value, orientacao: $('#orientacao').value, estilo_extra: $('#estilo').value, rostos: $('#rostos').checked, epoca: $('#epoca').checked, canal: $('#canal').value, so_voz: $('#so_voz').checked,
                  legenda: {modo: $('#leg-modo').value, max_palavras: $('#leg-n').value}},
         itens: itens.map(({chave, palavras, ...resto}) => resto)})});
       const d = await r.json();

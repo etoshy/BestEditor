@@ -183,6 +183,9 @@ def criar(itens: List[Dict[str, Any]], config: Dict[str, Any], pod_url: str = ""
     cfg["estilo_extra"] = " ".join(str(config.get("estilo_extra") or "").split())[:300]
     cfg["rostos"] = config.get("rostos", True) is not False  # 🎭 rosto das pessoas do elenco (FLUX.2 klein no pod)
     cfg["epoca"] = config.get("epoca", True) is not False  # 🎞 visual de foto do ano de cada cena
+    # 🗣 v84_370: só a voz — o "pod" é o Studio IA no seu PC (sem o worker de imagens): nenhuma imagem é pedida e todas as
+    # cenas ficam ⏳ pendentes (banco de mídia, Google, motion graphics no editor)
+    cfg["so_voz"] = bool(config.get("so_voz"))
     canal = str(config.get("canal") or "").strip()  # 🎨 v84_181: "" = o do 🕵️ Modelo de vídeo · "-" = nenhum · slug da marca
     cfg["canal"] = canal if canal == "-" or re.fullmatch(r"[a-z0-9_-]{1,60}", canal) else ""
     leg = config.get("legenda") if isinstance(config.get("legenda"), dict) else {}
@@ -611,6 +614,16 @@ def galeria(lid: str, iid: str) -> List[Dict[str, Any]]:
     return out
 
 
+def _foi_cancelado(lid: str, iid: str) -> bool:
+    """O roteiro (ou o lote inteiro) foi ⏹ cancelado/parado enquanto a etapa rodava?"""
+    try:
+        lote = carregar(lid)
+    except Exception:  # noqa: BLE001 — lote excluído no meio
+        return True
+    it = next((x for x in lote.get("itens") or [] if x.get("id") == iid), None)
+    return it is None or it.get("estado") == "cancelado" or (lote.get("status") == "cancelado" and it.get("estado") not in ("pronto",))
+
+
 def _em_segundo_plano(lid: str, iid: str, fn: Callable[[str, str], None]) -> None:
     """Etapas demoradas (IA, baixar imagens, criar o projeto) não travam o acompanhamento dos outros roteiros."""
     _OCUPADOS[iid] = True
@@ -619,6 +632,8 @@ def _em_segundo_plano(lid: str, iid: str, fn: Callable[[str, str], None]) -> Non
         try:
             fn(lid, iid)
         except Exception as exc:  # noqa: BLE001
+            if _foi_cancelado(lid, iid):  # v84_369: ⏹ cancelado/parado — a etapa que esperava o pod só para, sem virar "erro"
+                return
             traceback.print_exc()
             _mudar(lid, iid, estado="erro", erro=f"{type(exc).__name__}: {exc}", _log=f"❌ {exc}")
         finally:
@@ -929,7 +944,12 @@ def _planejar_cenas(lid: str, iid: str) -> None:
         cenas = cenas_lote.cortar_cenas(segs, cfg_lote["intervalo"], total=total)
         _mudar(lid, iid, _log=f"🎬 {len(cenas)} cenas de ~{cfg_lote['intervalo']:g} s")
     roteiro = " ".join(str(s.get("text") or "").strip() for s in segs)
-    if marca and ccfg_m.get("cenas") == "padrao":
+    if cfg_lote.get("so_voz"):  # 🗣 v84_370: só a voz — as cenas descritas (buscas pros bancos), nenhuma imagem no pod
+        _mudar(lid, iid, **({"canal": marca["slug"]} if marca else {}),
+               _log="🗣 só a voz: nenhuma imagem no pod — as cenas ficam ⏳ pendentes pro banco de mídia/Google no editor")
+        resposta, rostos, escolhidas, avisos, ficha = _planejar_padrao(lid, iid, it, dict(cfg_lote, pct=0), cenas, roteiro)
+        rostos = {}
+    elif marca and ccfg_m.get("cenas") == "padrao":
         # 🖼 v84_191: o canal pede as cenas de sempre (foto documental, sem personagem/narrador desenhado) — só a % e o
         # canal vêm do pacote; as personagens entram por cima no editor (🧍 Personagens)
         _mudar(lid, iid, canal=marca["slug"], _log=f"🖼 canal {marca['slug']}: cenas no estilo padrão (foto documental), "

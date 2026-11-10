@@ -432,3 +432,16 @@ def test_tentar_de_novo_nao_narra_duas_vezes(pod_falso, monkeypatch):
     pp.tentar_de_novo(lote["id"], it["id"])
     it2 = pp.carregar(lote["id"])["itens"][0]
     assert it2["estado"] == "narrando" and it2["pod_voz"] == voz and not enviados
+
+
+def test_so_voz_nao_pede_imagem_e_deixa_tudo_pendente(pod_falso):
+    """🗣 v84_370: o "pod" é o Studio IA no PC (sem worker de imagens) — só a narração vai pro pod."""
+    pp, est = pod_falso["pp"], pod_falso["estado"]
+    lote = pp.criar([{"origem": "texto", "titulo": "A", "texto": "Era uma vez um navio. Ninguém a bordo sabia.", "idioma": "pt"}],
+                    {"intervalo": 5, "pct": 80, "so_voz": True}, pod_url="http://localhost:8000")
+    l = _esperar(pp, lote["id"])
+    assert l["config"]["so_voz"] is True
+    assert l["status"] == "concluido" and l["itens"][0]["estado"] == "pronto"
+    assert [t for t, _d in est["pedidos"]] == ["voz"]  # nenhuma imagem pedida
+    segs = pod_falso["criados"][0]["resposta"]["segments"]
+    assert segs and not any(s.get("provider") == "runpod" for s in segs)
