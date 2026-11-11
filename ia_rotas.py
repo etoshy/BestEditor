@@ -68,7 +68,8 @@ def registrar(app, base_dir: str) -> None:
                        f"Translate the facts faithfully. Keep the JSON keys exactly as in the example.")
         texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=64000, effort="medium", timeout=900)
         if not texto:
-            raise RuntimeError("A IA não respondeu (" + (ia.motivo_desligado("roteiros") or "veja as últimas chamadas em 🤖 IA") + ").")
+            raise RuntimeError("A IA não respondeu: " + (ia.motivo_desligado("roteiros") or ia.ultimo_erro("roteiros")
+                                                          or "veja as últimas chamadas em 🤖 IA") + ".")
         return texto
 
     @app.route("/ia/gerar", methods=["POST"])

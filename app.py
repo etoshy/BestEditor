@@ -1558,6 +1558,26 @@ def gerar_voz_cancelar(job_id: str):
     return jsonify({"ok": True})
 
 
+def _nomes_projetos_voz() -> Dict[str, Tuple[str, str]]:
+    """"dossie_id:abc" -> ("🕵️ Nome do projeto", "/modelos-video/abc") — pro histórico do Gerador de voz."""
+    out: Dict[str, Tuple[str, str]] = {}
+    for mod, campo, rota, icone, chave_nome in (("dossies", "dossie_id", "/modelos-video/", "🕵️", "nome"),
+                                                 ("vendas", "venda_id", "/vendas/", "🛒", "nome")):
+        try:
+            m = __import__(mod)
+            for x in m.listar(BASE_DIR):
+                out[f"{campo}:{x['id']}"] = (f"{icone} {x.get(chave_nome) or x['id']}", rota + x["id"])
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        import roteiros_yt
+        for x in roteiros_yt.listar_projetos(BASE_DIR):
+            out[f"roteiro_id:{x['id']}"] = (f"📜 {x.get('titulo') or x['id']}", "/roteiros-yt/" + x["id"])
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
 @app.route("/gerar-voz/historico", methods=["GET"])
 def gerar_voz_historico():
     try:
@@ -1565,7 +1585,10 @@ def gerar_voz_historico():
     except ValueError:
         pagina = 0
     r = _hist_voz.listar(VOZES_DIR, q=request.args.get("q") or "", limite=50, pagina=pagina)
+    nomes = _nomes_projetos_voz() if any(it.get("projeto") for it in r["itens"]) else {}
     for it in r["itens"]:
+        if it.get("projeto") in nomes:  # 📂 v84_382: de qual projeto veio + link pra ele
+            it["projeto_nome"], it["projeto_url"] = nomes[it["projeto"]]
         if it.get("arquivo") and not it.get("sumiu"):
             it["audio_url"] = url_for("gerar_voz_audio", filename=it["arquivo"])
             if not it.get("erro"):

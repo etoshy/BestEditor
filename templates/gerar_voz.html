@@ -738,7 +738,8 @@ function variosInfo() {
   const n = roteirosSeparados().length, extras = document.querySelectorAll('#roteiros-extra textarea').length;
   document.getElementById('varios-n').textContent = n > 1 ? `📚 ${n} roteiros → ${n} áudios` : (extras ? 'escreva o roteiro na caixa nova' : '');
   const b = document.getElementById('btn-gerar'); if (b && !b.dataset.rotulo) b.dataset.rotulo = b.textContent;
-  if (b) b.textContent = n > 1 ? `🎙 Gerar os ${n} áudios` : b.dataset.rotulo;
+  const np = window.vpMarcadosN || 0;  // 📂 projetos marcados no painel: o botão gera eles
+  if (b) b.textContent = np ? `🎙 Gerar a voz dos ${np} projeto(s) marcados` : (n > 1 ? `🎙 Gerar os ${n} áudios` : b.dataset.rotulo);
   document.querySelectorAll('#roteiros-extra [data-num]').forEach((e, k) => e.textContent = `Roteiro ${k + 2}`);
 }
 document.getElementById('btn-mais-roteiro').addEventListener('click', () => {
@@ -787,6 +788,8 @@ document.querySelectorAll('.iaTagsBtn').forEach(btn => {
     document.getElementById('vpN').textContent = n ? `· ${n} marcado(s)` : '';
     const b = document.getElementById('vpGerar'); b.disabled = !n;
     b.textContent = n ? `🎙 Gerar a voz dos ${n} projeto(s) marcados` : '🎙 Gerar a voz dos marcados';
+    window.vpMarcadosN = n;
+    if (typeof variosInfo === 'function') variosInfo();  // o botão "Gerar áudio" de baixo também mostra
   }
   cbs().forEach(c => c.addEventListener('change', atualizar));
   document.getElementById('vpBusca').addEventListener('input', (e) => {
@@ -795,8 +798,11 @@ document.querySelectorAll('.iaTagsBtn').forEach(btn => {
   });
   document.getElementById('vpTodos').addEventListener('click', () => { document.querySelectorAll('.vpItem').forEach(l => { if (l.style.display !== 'none') l.querySelector('input').checked = true; }); atualizar(); });
   document.getElementById('vpNenhum').addEventListener('click', () => { cbs().forEach(c => c.checked = false); atualizar(); });
+  // ⬇ v84_381: o botão "Gerar áudio" de baixo também gera os projetos marcados (mesma função)
+  window.gerarProjetosMarcados = async () => document.getElementById('vpGerar').click();
   document.getElementById('vpGerar').addEventListener('click', async () => {
     const lista = marcados(); if (!lista.length) return;
+    const btnBaixo = document.getElementById('btn-gerar'); if (btnBaixo) btnBaixo.disabled = true;
     const form = document.getElementById('form-gerar-voz');
     const btn = document.getElementById('vpGerar'); btn.disabled = true;
     const log = document.getElementById('log-box'); document.getElementById('progresso-box').style.display = ''; log.textContent = '';
@@ -818,7 +824,7 @@ document.querySelectorAll('.iaTagsBtn').forEach(btn => {
       verGeracoes();
     }
     log.textContent += `\n✅ ${ok} de ${lista.length} projetos na fila — acompanhe na 🎙 Fila de geração. Depois, no 🎬 Início, marque os áudios em “Pegar do Gerador de voz” pra criar todos os vídeos de uma vez.` + (erros.length ? '\n' + erros.join('\n') : '');
-    btn.disabled = false; atualizar();
+    btn.disabled = false; if (btnBaixo) btnBaixo.disabled = false; atualizar();
   });
   atualizar();
 })();
@@ -845,6 +851,7 @@ async function gerarVarios(form) {
 
 document.getElementById('form-gerar-voz').addEventListener('submit', async function (ev) {
   ev.preventDefault();
+  if ((window.vpMarcadosN || 0) > 0 && window.gerarProjetosMarcados) { return window.gerarProjetosMarcados(); }
   if (roteirosSeparados().length > 1) { document.getElementById('error-box').style.display = 'none'; document.getElementById('resultado-box').style.display = 'none'; return gerarVarios(ev.target); }
   document.getElementById('error-box').style.display = 'none';
   document.getElementById('resultado-box').style.display = 'none';
@@ -1172,7 +1179,7 @@ async function carregarHistorico() {
   const quando = (t) => new Date(t * 1000).toLocaleString().slice(0, 16);
   document.getElementById('hist-lista').innerHTML = (d.itens || []).map(h => `
     <div class="hist-item">
-      <div><b>${h.erro ? '⚠ ' : ''}“${hEsc(h.texto_inicio)}…”</b>
+      <div>${h.projeto_nome ? `<div style="font-size:.82rem;margin-bottom:2px;"><a href="${h.projeto_url}" style="font-weight:600;color:#6d28d9;text-decoration:none;">${hEsc(h.projeto_nome)}</a> <a href="${h.projeto_url}" style="display:inline-block;margin-left:4px;padding:1px 8px;border-radius:10px;background:#ede9fe;color:#5b21b6;font-size:.75rem;text-decoration:none;">Ir para o projeto →</a></div>` : ''}<b>${h.erro ? '⚠ ' : ''}“${hEsc(h.texto_inicio)}…”</b>
         <div class="meta">${quando(h.criado)} · ${hEsc(h.motor)}${h.voz ? ' · ' + hEsc(h.voz) : ''}${h.idioma ? ' · ' + hEsc(h.idioma) : ''} · ${h.palavras || '?'} palavras · ⏱ ${hDur(h.duracao)}${h.levou ? ' · levou ' + Math.round(h.levou) + ' s' : ''}${h.multivoz ? ' · 🎭 multi voice' : ''}${h.erro ? ' · <span style="color:#991b1b">' + hEsc(h.erro).slice(0, 140) + '</span>' : ''}${h.sumiu ? ' · <i>arquivo apagado</i>' : ''}</div></div>
       <div class="acoes">
         ${h.audio_url ? `<audio controls preload="none" src="${h.audio_url}"></audio><a href="${h.audio_url}" download>⬇ WAV</a>` : ''}

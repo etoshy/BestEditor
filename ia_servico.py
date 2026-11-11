@@ -379,6 +379,14 @@ def _registrar_cache(recurso: str, job: Optional[str]) -> None:
             pass
 
 
+def ultimo_erro(recurso: Optional[str] = None) -> str:
+    """O erro de verdade da última chamada que falhou (pra mostrar na tela em vez de "a IA não respondeu")."""
+    for x in reversed(_RECENTES):
+        if not x.get("ok") and (recurso is None or x.get("recurso") == recurso):
+            return str(x.get("erro") or "")
+    return ""
+
+
 def _registrar(recurso: str, u: Dict[str, Any], custo: float, job: Optional[str], ok: bool, erro: str = "") -> None:
     with _TRAVA:
         d = gasto()
@@ -517,8 +525,52 @@ def pdf_bloco(dados: bytes) -> Dict[str, Any]:
 
 
 # ------------------------------------------------------------------ transporte (trocável nos testes)
+STREAM_ACIMA_DE_TOKENS = 16000  # v84_383: respostas grandes (roteiro, cenas de um vídeo longo) vão por streaming
+
+
+def _transporte_stream(payload: Dict[str, Any], chave_api: str, timeout: float) -> Tuple[int, Dict[str, Any]]:
+    """🌊 v84_383: mesma chamada, mas recebendo a resposta aos pedaços (SSE). Sem isso, uma resposta longa (a análise das
+    cenas de um vídeo de 10+ min) passava de 10 min numa conexão parada e caía — a API recomenda streaming nesses
+    casos. Devolve no MESMO formato da chamada normal (content/usage/stop_reason)."""
+    import requests
+    corpo_req = dict(payload, stream=True)
+    with requests.post(API_URL, json=corpo_req, stream=True, timeout=(30, max(120.0, min(timeout, 600.0))),
+                       headers={"x-api-key": chave_api, "anthropic-version": API_VERSAO, "content-type": "application/json",
+                                "accept": "text/event-stream"}) as r:
+        if r.status_code != 200:
+            try:
+                return r.status_code, r.json()
+            except ValueError:
+                return r.status_code, {"error": {"message": r.text[:300]}}
+        partes: List[str] = []
+        usage: Dict[str, Any] = {}
+        stop = None
+        for linha in r.iter_lines(decode_unicode=True):
+            if not linha or not linha.startswith("data:"):
+                continue
+            try:
+                ev = json.loads(linha[5:].strip())
+            except ValueError:
+                continue
+            tipo = ev.get("type")
+            if tipo == "message_start":
+                usage.update((ev.get("message") or {}).get("usage") or {})
+            elif tipo == "content_block_delta" and (ev.get("delta") or {}).get("type") == "text_delta":
+                partes.append(ev["delta"].get("text") or "")
+            elif tipo == "message_delta":
+                stop = (ev.get("delta") or {}).get("stop_reason") or stop
+                usage.update(ev.get("usage") or {})
+            elif tipo == "error":
+                err = ev.get("error") or {}
+                st = 529 if err.get("type") == "overloaded_error" else 500
+                return st, {"error": {"message": str(err.get("message") or err.get("type") or "erro no meio da resposta")}}
+    return 200, {"content": [{"type": "text", "text": "".join(partes)}], "usage": usage, "stop_reason": stop}
+
+
 def _transporte(payload: Dict[str, Any], chave_api: str, timeout: float) -> Tuple[int, Dict[str, Any]]:
     import requests
+    if int(payload.get("max_tokens") or 0) > STREAM_ACIMA_DE_TOKENS:
+        return _transporte_stream(payload, chave_api, timeout)
     r = requests.post(API_URL, json=payload, timeout=timeout,
                       headers={"x-api-key": chave_api, "anthropic-version": API_VERSAO, "content-type": "application/json"})
     try:
@@ -631,7 +683,9 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
     u = corpo.get("usage") or {}
     custo = _custo(u, m)
     if corpo.get("stop_reason") in ("refusal", "max_tokens"):
-        _registrar(recurso, u, custo, job, False, f"stop_reason={corpo.get('stop_reason')}")
+        _registrar(recurso, u, custo, job, False,
+                   "a resposta passou do tamanho máximo (max_tokens) — divida o pedido em partes"
+                   if corpo.get("stop_reason") == "max_tokens" else "a IA recusou o pedido (refusal)")
         return None
     texto = "".join(b.get("text", "") for b in corpo.get("content") or [] if b.get("type") == "text").strip()
     valor: Any = texto
