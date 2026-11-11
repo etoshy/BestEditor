@@ -1776,6 +1776,44 @@ def limite_duracao_fala(texto: str) -> float:
 _PROTECAO: Dict[str, Any] = {"ativa": True, "tentativa": 1}
 
 
+def trechos_sem_fala(caminho: str, min_s: float = 2.0) -> List[Tuple[float, float]]:
+    """🛡 v84_379: (início, duração) dos trechos com SOM CONTÍNUO sem cara de fala — zumbido, chiado, murmúrio.
+    Fala sobe e desce a cada sílaba (variação > 8 dB numa janela de 1 s); a alucinação do modelo é um som
+    "reto". Medido em narrações reais: pegou os 4 lixos de 3–5 s de um roteiro de 10 min e o de 24 s de outro,
+    e não acusou nada numa narração boa. Silêncio (abaixo de -45 dB) não conta."""
+    try:
+        import numpy as np
+        r = subprocess.run(["ffmpeg", "-v", "error", "-i", caminho, "-ar", "16000", "-ac", "1", "-f", "f32le", "-"],
+                           capture_output=True, timeout=120)
+        x = np.frombuffer(r.stdout, dtype=np.float32)
+    except Exception:  # noqa: BLE001 — sem numpy/ffmpeg: não acusa nada
+        return []
+    h = 320  # 20 ms
+    n = len(x) // h
+    if n < 60:
+        return []
+    e = np.sqrt(np.mean(x[:n * h].reshape(n, h) ** 2, axis=1))
+    d = 20 * np.log10(e + 1e-9)
+    w = 50  # 1 s
+    marca = np.zeros(n, dtype=bool)
+    for i in range(0, n - w, 5):
+        if np.sqrt(np.mean(e[i:i + w] ** 2)) > 10 ** (-45 / 20) and \
+                np.percentile(d[i:i + w], 90) - np.percentile(d[i:i + w], 10) < 8.0:
+            marca[i:i + w] = True
+    trechos, i = [], 0
+    while i < n:
+        if marca[i]:
+            j = i
+            while j < n and marca[j]:
+                j += 1
+            if (j - i) * 0.02 >= min_s:
+                trechos.append((round(i * 0.02, 2), round((j - i) * 0.02, 2)))
+            i = j
+        else:
+            i += 1
+    return trechos
+
+
 def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocidade: float = 1.0) -> None:
     """`gerar(texto, caminho)` grava o .wav. Repete se o áudio sair comprido demais pro texto (alucinação).
     `velocidade` < 1 (fala mais lenta de propósito) aumenta o limite na mesma proporção."""
@@ -1784,30 +1822,36 @@ def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocid
         gerar(texto, destino)
         return
     limite = limite_duracao_fala(texto) / max(0.3, float(velocidade or 1.0))
-    melhor = None
+    melhor = None  # nota da melhor tentativa até agora (0 = perfeita); a melhor fica sempre em `destino`
     for tentativa in range(1, CHATTERBOX_TENTATIVAS_ALUCINACAO + 1):
         alvo = destino if tentativa == 1 else f"{destino}.tent{tentativa}.wav"
         _PROTECAO["tentativa"] = tentativa  # motores com seed fixa (Fish) variam a seed na nova tentativa
         gerar(texto, alvo)
         dur = _duracao_audio_segundos(alvo)
-        if dur is None or dur <= limite:
+        excesso = max(0.0, (dur or 0.0) - limite)
+        lixo = trechos_sem_fala(alvo)  # zumbido/chiado contínuo no meio (v84_379)
+        nota = excesso + 10.0 * sum(b for _, b in lixo)
+        if nota == 0:
             if alvo != destino:
                 os.replace(alvo, destino)
             if tentativa > 1:
                 print(f"🛡 {rotulo}tentativa {tentativa} saiu certa ({dur or 0:.1f} s).", flush=True)
             return
-        print(f"🛡 {rotulo}o motor de voz se perdeu (alucinação): {dur:.1f} s pra {len(texto.strip())} letras "
-              f"(máximo {limite:.1f} s) — gerando de novo ({tentativa}/{CHATTERBOX_TENTATIVAS_ALUCINACAO}).", flush=True)
-        if melhor is None or dur < melhor:
+        motivo = (f"{dur:.1f} s pra {len(texto.strip())} letras (máximo {limite:.1f} s)" if excesso else "") + \
+                 ((" · " if excesso else "") + "som contínuo sem fala em " + ", ".join(f"{a_:.1f}s (+{b_:.1f}s)" for a_, b_ in lixo)
+                  if lixo else "")
+        print(f"🛡 {rotulo}o motor de voz se perdeu (alucinação): {motivo} — gerando de novo "
+              f"({tentativa}/{CHATTERBOX_TENTATIVAS_ALUCINACAO}).", flush=True)
+        if melhor is None or nota < melhor:
             if alvo != destino:
                 os.replace(alvo, destino)
-            melhor = dur
+            melhor = nota
         elif alvo != destino:
             try:
                 os.remove(alvo)
             except OSError:
                 pass
-    print(f"⚠ {rotulo}todas as tentativas saíram compridas — fiquei com a mais curta ({melhor:.1f} s).", flush=True)
+    print(f"⚠ {rotulo}as {CHATTERBOX_TENTATIVAS_ALUCINACAO} tentativas saíram com problema — fiquei com a menos ruim.", flush=True)
 
 
 def _modulo_expressivo():

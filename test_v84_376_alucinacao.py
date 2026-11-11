@@ -5,6 +5,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "toolkit"))
 from tts import voice_generator as vg  # noqa: E402
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _tom_de_teste_nao_e_zumbido(monkeypatch, request):
+    """Os testes de DURAÇÃO usam um tom puro (que é 'som contínuo'): aqui o detector de zumbido fica de fora."""
+    if "zumbido" not in request.node.name:
+        monkeypatch.setattr(vg, "trechos_sem_fala", lambda caminho, min_s=2.0: [])
 
 
 def _tom(caminho, s):
@@ -82,3 +90,25 @@ def test_rota_manda_a_opcao(monkeypatch):
         time.sleep(0.05)
     assert sorted(k["protecao_alucinacao"] for k in recebido) == [False, True]
     assert "🛡 Proteção contra alucinação" in c.get("/gerar-voz").get_data(as_text=True)
+
+
+def _fala_com_zumbido(caminho, zumbido_s):
+    """'Fala' (tom que liga e desliga 5x por segundo, como sílabas) + zumbido contínuo no meio."""
+    f = ("sine=frequency=220:duration=2,volume='if(lt(mod(t,0.2),0.1),1,0.02)':eval=frame")
+    partes = ["-f", "lavfi", "-i", f, "-f", "lavfi", "-i", f"anoisesrc=d={zumbido_s}:a=0.08:r=24000", "-f", "lavfi", "-i", f]
+    subprocess.run(["ffmpeg", "-y", "-v", "error", *partes, "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", "-ar", "24000",
+                    "-ac", "1", caminho], check=True)
+
+
+def test_zumbido_no_meio_e_detectado_e_gera_de_novo(tmp_path):
+    ruim = str(tmp_path / "ruim.wav")
+    _fala_com_zumbido(ruim, 3.0)
+    achou = vg.trechos_sem_fala(ruim)
+    assert len(achou) == 1 and 1.5 <= achou[0][0] <= 2.5 and achou[0][1] >= 2.0
+    bom = str(tmp_path / "bom.wav")
+    _fala_com_zumbido(bom, 0.3)
+    assert vg.trechos_sem_fala(bom) == []
+    seq = iter([3.0, 0.3])
+    chamadas = []
+    vg._gerar_com_guarda(lambda t, c: chamadas.append(c) or _fala_com_zumbido(c, next(seq)), "x" * 200, str(tmp_path / "a.wav"))
+    assert len(chamadas) == 2 and vg.trechos_sem_fala(str(tmp_path / "a.wav")) == []

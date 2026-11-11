@@ -181,6 +181,10 @@
       }
     }
     bots.forEach(b => b.addEventListener('click', async () => {
+      if (!pode) {  // 🔓 v84_378: confere de novo na hora do clique (o estado da abertura da página pode estar velho)
+        try { const j = await (await fetch('/ia/status', { cache: 'no-store' })).json(); pode = !!(j.pode && j.pode.roteiros); motivo = j.motivo || motivo; } catch (_) {}
+        if (pode) b.style.opacity = '';
+      }
       if (!pode) { dizEm(b, '⚠ A IA está desligada (' + motivo + ') — ligue em 🤖 IA nas buscas e modelos (link no topo).'); return; }
       const pr = el(b.dataset.iaPrompt), ger = el(b.dataset.iaGerar);
       b.disabled = true;

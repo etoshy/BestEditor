@@ -260,6 +260,27 @@ def modelo_info(c: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     return next(m for m in PROVEDORES[c["provedor"]]["modelos"] if m["id"] == c["modelo"])
 
 
+# 🔓 v84_378: um 401/sem crédito desligava a IA do site INTEIRO até alguém clicar em "Testar" — e um erro passageiro
+# (proxy, troca de chave, instabilidade) deixava tudo travado com a chave boa. Agora o bloqueio vale só pra MESMA
+# chave e só por alguns minutos: depois a próxima chamada tenta de novo (401 não cobra nada) e, se ainda for erro,
+# bloqueia de novo.
+SEM_CREDITO_EXPIRA_S = 600
+
+
+def _impressao_chave(k: str) -> str:
+    return hashlib.sha256((k or "").encode("utf-8")).hexdigest()[:12]
+
+
+def sem_credito_valendo(c: Optional[Dict[str, Any]] = None) -> bool:
+    c = c or config()
+    sc = c.get("sem_credito")
+    if not sc:
+        return False
+    if sc.get("chave") and sc["chave"] != _impressao_chave(chave(c)):
+        return False  # trocou a chave depois do erro
+    return time.time() - float(sc.get("quando") or 0) < SEM_CREDITO_EXPIRA_S
+
+
 def motivo_desligado(recurso: Optional[str] = None, c: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """None = pode usar. Senão, por que não (mostrado na página/avisos)."""
     c = c or config()
@@ -267,7 +288,7 @@ def motivo_desligado(recurso: Optional[str] = None, c: Optional[Dict[str, Any]] 
         return "a IA está desligada (🤖 IA nas configurações)"
     if not chave(c):
         return "falta a chave da API"
-    if c.get("sem_credito"):
+    if sem_credito_valendo(c):
         return "sem crédito / chave recusada: " + str(c["sem_credito"].get("erro") or "")[:160]
     if recurso and not c["recursos"].get(recurso, False):
         return f"o recurso “{RECURSOS.get(recurso, (recurso,))[0]}” está desligado"
@@ -426,7 +447,7 @@ def saldo() -> Dict[str, Any]:
 def _marcar_sem_credito(erro: str) -> None:
     with _TRAVA:
         c = config()
-        c["sem_credito"] = {"quando": time.time(), "erro": erro[:300]}
+        c["sem_credito"] = {"quando": time.time(), "erro": erro[:300], "chave": _impressao_chave(chave(c))}
         _gravar(CONFIG_PATH, c)
 
 
@@ -657,4 +678,4 @@ def resumo_publico() -> Dict[str, Any]:
             "chave_do_ambiente": bool(not c.get("chave") and chave(c)),
             "chave_suspeita": bool(chave(c)) and not chave(c).startswith(PROVEDORES[c["provedor"]].get("prefixo_chave") or ""),
             "recursos": c["recursos"], "nota_minima": c["nota_minima"], "candidatos": c["candidatos"], "limite_usd": c["limite_usd"],
-            "sem_credito": c["sem_credito"], "motivo": motivo_desligado(None, c), "gasto": g}
+            "sem_credito": c["sem_credito"] if sem_credito_valendo(c) else None, "motivo": motivo_desligado(None, c), "gasto": g}
