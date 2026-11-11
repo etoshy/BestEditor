@@ -462,6 +462,11 @@ E no final...</pre>
   <label>Velocidade da fala (Piper e Kokoro — 1.0 é o ritmo normal)</label>
   <input type="number" name="velocidade" value="1.0" min="0.5" max="2.0" step="0.05">
 
+  <div style="margin-top:16px;padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:0.85rem;">
+    <input type="hidden" name="protecao_alucinacao_enviado" value="1">
+    <label style="margin:0;font-weight:600;"><input type="checkbox" name="protecao_alucinacao" style="width:auto;" checked> 🛡 Proteção contra alucinação (recomendado)</label>
+    <div style="color:#4b5563;margin-top:2px;">Chatterbox, Chatterbox Turbo, XTTS e Fish às vezes “se perdem” e soltam murmúrio/zumbido no meio da fala. Com isto ligado, cada trecho que sair comprido demais pro texto é gerado de novo (até 3 vezes). Desligado: gera uma vez só, como antes. (Piper e Kokoro não têm esse problema.)</div>
+  </div>
   <label style="margin-top:16px;"><input type="checkbox" name="forcar_cpu" style="width:auto;"> Forçar CPU mesmo se houver GPU disponível (Piper e XTTS)</label>
 
   <div style="margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;">

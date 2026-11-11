@@ -42,3 +42,43 @@ def test_normal_gera_uma_vez_so(tmp_path):
     chamadas = []
     vg._gerar_com_guarda(lambda t, c: chamadas.append(c) or _tom(c, 2.0), "Frase normal de teste aqui.", str(tmp_path / "a.wav"))
     assert len(chamadas) == 1
+
+
+def test_desligada_gera_uma_vez_como_antes(tmp_path, monkeypatch):
+    monkeypatch.setitem(vg._PROTECAO, "ativa", False)
+    chamadas = []
+    vg._gerar_com_guarda(lambda t, c: chamadas.append(c) or _tom(c, 40.0), "Frase curta.", str(tmp_path / "a.wav"))
+    assert len(chamadas) == 1
+
+
+def test_gerar_audio_liga_e_desliga(tmp_path, monkeypatch):
+    vistos = []
+    monkeypatch.setattr(vg, "chatterbox_synthesize", lambda t, s, **k: vistos.append((dict(k), vg._PROTECAO["ativa"])) or s)
+    vg.gerar_audio("chatterbox", "Olá.", str(tmp_path / "a.wav"), protecao_alucinacao=False)
+    vg.gerar_audio("chatterbox", "Olá.", str(tmp_path / "a.wav"))
+    assert vistos == [({}, False), ({}, True)]  # a chave nunca chega no motor; padrão = ligada
+
+
+def test_velocidade_lenta_aumenta_o_limite(tmp_path):
+    chamadas = []
+    vg._gerar_com_guarda(lambda t, c: chamadas.append(c) or _tom(c, 7.0), "Frase curta de teste.", str(tmp_path / "a.wav"),
+                         velocidade=0.5)  # limite 4 s / 0,5 = 8 s
+    assert len(chamadas) == 1
+
+
+def test_rota_manda_a_opcao(monkeypatch):
+    import time
+    import app as A
+    recebido = []
+    monkeypatch.setattr(A, "tts_gerar_audio_isolado", lambda e, t, s, **kw: recebido.append(kw) or open(s, "wb").write(b"RIFF") or s)
+    c = A.app.test_client()
+    c.post("/gerar-voz/gerar", data={"engine": "chatterbox", "texto": "Um texto qualquer de teste.", "chatterbox_idioma": "pt",
+                                     "protecao_alucinacao_enviado": "1"})  # caixa desmarcada
+    c.post("/gerar-voz/gerar", data={"engine": "chatterbox", "texto": "Outro texto qualquer de teste.", "chatterbox_idioma": "pt",
+                                     "protecao_alucinacao_enviado": "1", "protecao_alucinacao": "on"})
+    for _ in range(100):
+        if len(recebido) == 2:
+            break
+        time.sleep(0.05)
+    assert sorted(k["protecao_alucinacao"] for k in recebido) == [False, True]
+    assert "🛡 Proteção contra alucinação" in c.get("/gerar-voz").get_data(as_text=True)

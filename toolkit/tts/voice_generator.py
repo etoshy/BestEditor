@@ -1509,7 +1509,7 @@ def xtts_synthesize(
 
     if len(pedacos) == 1:
         informar_progresso(0, 1, "gerando", interno=True)
-        _gerar_um_pedaco(pedacos[0], output_path)
+        _gerar_com_guarda(lambda t, c: _gerar_um_pedaco(t, c), pedacos[0], output_path)  # 🛡
         informar_progresso(1, 1, "gerando", interno=True)
         return output_path
 
@@ -1524,7 +1524,8 @@ def xtts_synthesize(
         for i, pedaco in enumerate(pedacos, start=1):
             caminho_pedaco = os.path.join(diretorio_tmp, f"pedaco_{i:03d}.wav")
             informar_progresso(i - 1, len(pedacos), "gerando", interno=True)
-            _gerar_um_pedaco(pedaco, caminho_pedaco, numero=i)
+            _gerar_com_guarda(lambda t, c, _i=i: _gerar_um_pedaco(t, c, numero=_i), pedaco, caminho_pedaco,
+                              f"(pedaço {i} de {len(pedacos)}) ")  # 🛡
             informar_progresso(i, len(pedacos), "gerando", interno=True)
             caminhos_pedacos.append(caminho_pedaco)
         _concatenar_wavs(caminhos_pedacos, output_path)
@@ -1770,12 +1771,23 @@ def limite_duracao_fala(texto: str) -> float:
     return max(4.0, len((texto or "").strip()) / 9.0 + 2.0)
 
 
-def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "") -> None:
-    """`gerar(texto, caminho)` grava o .wav. Repete se o áudio sair comprido demais pro texto (alucinação)."""
-    limite = limite_duracao_fala(texto)
+# 🛡 liga/desliga (v84_377): vem em kwargs["protecao_alucinacao"] (tirado em gerar_audio). Ligada por padrão;
+# desligada = gera uma vez só, exatamente como antes.
+_PROTECAO: Dict[str, Any] = {"ativa": True, "tentativa": 1}
+
+
+def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocidade: float = 1.0) -> None:
+    """`gerar(texto, caminho)` grava o .wav. Repete se o áudio sair comprido demais pro texto (alucinação).
+    `velocidade` < 1 (fala mais lenta de propósito) aumenta o limite na mesma proporção."""
+    if not _PROTECAO.get("ativa", True):
+        _PROTECAO["tentativa"] = 1
+        gerar(texto, destino)
+        return
+    limite = limite_duracao_fala(texto) / max(0.3, float(velocidade or 1.0))
     melhor = None
     for tentativa in range(1, CHATTERBOX_TENTATIVAS_ALUCINACAO + 1):
         alvo = destino if tentativa == 1 else f"{destino}.tent{tentativa}.wav"
+        _PROTECAO["tentativa"] = tentativa  # motores com seed fixa (Fish) variam a seed na nova tentativa
         gerar(texto, alvo)
         dur = _duracao_audio_segundos(alvo)
         if dur is None or dur <= limite:
@@ -1784,7 +1796,7 @@ def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "") -> None
             if tentativa > 1:
                 print(f"🛡 {rotulo}tentativa {tentativa} saiu certa ({dur or 0:.1f} s).", flush=True)
             return
-        print(f"🛡 {rotulo}o Chatterbox se perdeu: {dur:.1f} s pra {len(texto.strip())} letras "
+        print(f"🛡 {rotulo}o motor de voz se perdeu (alucinação): {dur:.1f} s pra {len(texto.strip())} letras "
               f"(máximo {limite:.1f} s) — gerando de novo ({tentativa}/{CHATTERBOX_TENTATIVAS_ALUCINACAO}).", flush=True)
         if melhor is None or dur < melhor:
             if alvo != destino:
@@ -1903,12 +1915,9 @@ def chatterbox_synthesize(
         raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
 
     def _gerar_um_pedaco(texto_pedaco: str, destino: str, numero: Optional[int] = None) -> None:
-        def _uma_vez(t: str, caminho: str) -> None:
-            wav = modelo.generate(t, **kwargs_geracao)
-            _salvar_audio_chatterbox(wav, caminho, modelo.sr)
         try:
-            _gerar_com_guarda(_uma_vez, texto_pedaco, destino,
-                              f"(pedaço {numero} de {len(pedacos)}) " if numero is not None else "")
+            wav = modelo.generate(texto_pedaco, **kwargs_geracao)
+            _salvar_audio_chatterbox(wav, destino, modelo.sr)
         except Exception as exc:  # noqa: BLE001
             mensagem = str(exc)
             prefixo_pedaco = f"(pedaço {numero} de {len(pedacos)}) " if numero is not None else ""
@@ -1927,7 +1936,7 @@ def chatterbox_synthesize(
 
     if len(pedacos) == 1:
         informar_progresso(0, 1, "gerando", interno=True)
-        _gerar_um_pedaco(pedacos[0], output_path)
+        _gerar_com_guarda(lambda t, c: _gerar_um_pedaco(t, c), pedacos[0], output_path)  # 🛡
         informar_progresso(1, 1, "gerando", interno=True)
         return output_path
 
@@ -1944,7 +1953,8 @@ def chatterbox_synthesize(
         for i, pedaco in enumerate(pedacos, start=1):
             caminho_pedaco = os.path.join(diretorio_tmp, f"pedaco_{i:03d}.wav")
             informar_progresso(i - 1, len(pedacos), "gerando", interno=True)
-            _gerar_um_pedaco(pedaco, caminho_pedaco, numero=i)
+            _gerar_com_guarda(lambda t, c, _i=i: _gerar_um_pedaco(t, c, numero=_i), pedaco, caminho_pedaco,
+                              f"(pedaço {i} de {len(pedacos)}) ")  # 🛡
             informar_progresso(i, len(pedacos), "gerando", interno=True)
             caminhos_pedacos.append(caminho_pedaco)
         _concatenar_wavs(caminhos_pedacos, output_path)
@@ -2103,8 +2113,10 @@ def chatterbox_turbo_synthesize(
     é dividido automaticamente, igual o modelo multilíngue.
     """
     if _no_pod("chatterbox_turbo"):  # 🖥️ Meu pod
-        return _narrar_no_pod("chatterbox_turbo", texto, output_path, speaker_wav=speaker_wav,
-                              voice_profile=voice_profile, idioma="en")
+        _gerar_com_guarda(lambda t, caminho: _narrar_no_pod("chatterbox_turbo", t, caminho, speaker_wav=speaker_wav,
+                                                            voice_profile=voice_profile, idioma="en"),
+                          texto, output_path, "(pod) ")
+        return output_path
 
     modelo = chatterbox_turbo_load(use_gpu=use_gpu)
 
@@ -2163,7 +2175,7 @@ def chatterbox_turbo_synthesize(
 
     if len(pedacos) == 1:
         informar_progresso(0, 1, "gerando", interno=True)
-        _gerar_um_pedaco(pedacos[0], output_path)
+        _gerar_com_guarda(lambda t, c: _gerar_um_pedaco(t, c), pedacos[0], output_path)  # 🛡
         informar_progresso(1, 1, "gerando", interno=True)
         return output_path
 
@@ -2174,7 +2186,8 @@ def chatterbox_turbo_synthesize(
         for i, pedaco in enumerate(pedacos, start=1):
             caminho_pedaco = os.path.join(diretorio_tmp, f"pedaco_{i:03d}.wav")
             informar_progresso(i - 1, len(pedacos), "gerando", interno=True)
-            _gerar_um_pedaco(pedaco, caminho_pedaco, numero=i)
+            _gerar_com_guarda(lambda t, c, _i=i: _gerar_um_pedaco(t, c, numero=_i), pedaco, caminho_pedaco,
+                              f"(pedaço {i} de {len(pedacos)}) ")  # 🛡
             informar_progresso(i, len(pedacos), "gerando", interno=True)
             caminhos_pedacos.append(caminho_pedaco)
         _concatenar_wavs(caminhos_pedacos, output_path)
@@ -2815,8 +2828,15 @@ def fish_s2_synthesize(
             if c["modo"] == "nuvem":
                 corpo["prosody"] = {"speed": max(0.5, min(2.0, float(velocidade or 1.0)))}
             destino = os.path.join(pasta_tmp, f"p{i:04d}.wav")
-            with open(destino, "wb") as f:
-                f.write(_fish_pedir(c, corpo, timeout_por_pedaco))
+
+            def _uma(_t: str, caminho: str, _corpo=corpo) -> None:
+                cp = dict(_corpo)
+                if _PROTECAO.get("tentativa", 1) > 1 and cp.get("seed") is not None:  # mesma seed = mesmo erro
+                    cp["seed"] = int(cp["seed"]) + 7919 * (_PROTECAO["tentativa"] - 1)
+                with open(caminho, "wb") as f:
+                    f.write(_fish_pedir(c, cp, timeout_por_pedaco))
+            _gerar_com_guarda(_uma, pedaco, destino, f"(pedaço {i + 1} de {len(pedacos)}) ",
+                              velocidade=float(velocidade or 1.0) if c["modo"] == "nuvem" else 1.0)  # 🛡
             partes.append(destino)
         if len(partes) > 1:  # pedaços podem vir com cabeçalhos diferentes: normaliza antes de juntar
             normalizados = []
@@ -2919,6 +2939,7 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
         raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
     if "progresso_arquivo" in kwargs:
         _PROGRESSO["arq"] = kwargs.pop("progresso_arquivo") or None
+    _PROTECAO["ativa"] = bool(kwargs.pop("protecao_alucinacao", True))  # 🛡 ligada por padrão
 
     engine = (engine or "").strip().lower()
     if engine == "teste" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") == "1":  # só nos testes automatizados

@@ -1054,6 +1054,8 @@ def gerar_voz_gerar():
     except ValueError:
         velocidade = 1.0
     forcar_cpu = request.form.get("forcar_cpu") == "on"
+    # 🛡 v84_377: proteção contra alucinação — ligada por padrão; só desliga se a tela mandou o campo desmarcado
+    protecao_alucinacao = not (request.form.get("protecao_alucinacao_enviado") and request.form.get("protecao_alucinacao") != "on")
 
     if not texto:
         return jsonify({"erro": "Escreva algum texto pra narrar antes de gerar o áudio."}), 400
@@ -1238,6 +1240,8 @@ def gerar_voz_gerar():
     # idioma da narração (vai no info.json do .zip): o escolhido na tela > o da voz > o do texto.
     # No multi voice cada fala pode ter outro motor: aí o texto manda.
     _idioma = idiomas.descobrir("" if multivoz_on else engine, kwargs, texto, request.form.get("idioma_narracao"))
+    if engine in ("chatterbox", "chatterbox_turbo", "xtts", "fish_s2"):
+        kwargs["protecao_alucinacao"] = protecao_alucinacao
     # 🤖🎭 v84_375: roteiro SEM tags + opção marcada → o Claude coloca antes de gerar (expressivo pt ou Turbo en)
     _ia_tags = None
     if engine == "chatterbox" and kwargs.get("expressivo") and request.form.get("chatterbox_ia_tags") == "on":
