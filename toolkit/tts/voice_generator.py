@@ -1759,6 +1759,45 @@ def _salvar_audio_chatterbox(wav: Any, output_path: str, sample_rate: int) -> No
         ta.save(output_path, wav, sample_rate)
 
 
+# 🛡 v84_376: o Chatterbox às vezes "se perde" no texto e não para: sai 10–30 s de murmúrio/gemido/zumbido no meio
+# da narração (no log: "forcing EOS", "Detected repetition"). Medido num roteiro real: 24 s de lixo aos 6 min.
+# Um trecho de N letras não leva mais que ~N/9 + 2 s pra ser falado (a fala normal fica em 14–18 letras/s): passou
+# disso, é alucinação → gera de novo (o modelo é aleatório, a 2ª quase sempre sai certa). Fica a mais curta.
+CHATTERBOX_TENTATIVAS_ALUCINACAO = 3
+
+
+def limite_duracao_fala(texto: str) -> float:
+    return max(4.0, len((texto or "").strip()) / 9.0 + 2.0)
+
+
+def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "") -> None:
+    """`gerar(texto, caminho)` grava o .wav. Repete se o áudio sair comprido demais pro texto (alucinação)."""
+    limite = limite_duracao_fala(texto)
+    melhor = None
+    for tentativa in range(1, CHATTERBOX_TENTATIVAS_ALUCINACAO + 1):
+        alvo = destino if tentativa == 1 else f"{destino}.tent{tentativa}.wav"
+        gerar(texto, alvo)
+        dur = _duracao_audio_segundos(alvo)
+        if dur is None or dur <= limite:
+            if alvo != destino:
+                os.replace(alvo, destino)
+            if tentativa > 1:
+                print(f"🛡 {rotulo}tentativa {tentativa} saiu certa ({dur or 0:.1f} s).", flush=True)
+            return
+        print(f"🛡 {rotulo}o Chatterbox se perdeu: {dur:.1f} s pra {len(texto.strip())} letras "
+              f"(máximo {limite:.1f} s) — gerando de novo ({tentativa}/{CHATTERBOX_TENTATIVAS_ALUCINACAO}).", flush=True)
+        if melhor is None or dur < melhor:
+            if alvo != destino:
+                os.replace(alvo, destino)
+            melhor = dur
+        elif alvo != destino:
+            try:
+                os.remove(alvo)
+            except OSError:
+                pass
+    print(f"⚠ {rotulo}todas as tentativas saíram compridas — fiquei com a mais curta ({melhor:.1f} s).", flush=True)
+
+
 def _modulo_expressivo():
     """toolkit/tts/expressivo.py, importado como pacote (site) ou solto (testes)."""
     try:
@@ -1837,8 +1876,10 @@ def chatterbox_synthesize(
         texto = exp.texto_sem_tags(texto)
 
     if _no_pod("chatterbox"):  # 🖥️ Meu pod: gera na GPU do pod (pt usa o modelo dedicado pt-BR, se marcado)
-        return _narrar_no_pod("chatterbox", texto, output_path, speaker_wav=speaker_wav, voice_profile=voice_profile,
-                              idioma=idioma, exaggeration=exaggeration, cfg_weight=cfg_weight, variante=variante)
+        _gerar_com_guarda(lambda t, caminho: _narrar_no_pod(
+            "chatterbox", t, caminho, speaker_wav=speaker_wav, voice_profile=voice_profile, idioma=idioma,
+            exaggeration=exaggeration, cfg_weight=cfg_weight, variante=variante), texto, output_path, "(pod) ")
+        return output_path
 
     modelo = chatterbox_load(use_gpu=use_gpu)
 
@@ -1862,9 +1903,12 @@ def chatterbox_synthesize(
         raise VoiceGeneratorError("Texto vazio — nada pra narrar.")
 
     def _gerar_um_pedaco(texto_pedaco: str, destino: str, numero: Optional[int] = None) -> None:
+        def _uma_vez(t: str, caminho: str) -> None:
+            wav = modelo.generate(t, **kwargs_geracao)
+            _salvar_audio_chatterbox(wav, caminho, modelo.sr)
         try:
-            wav = modelo.generate(texto_pedaco, **kwargs_geracao)
-            _salvar_audio_chatterbox(wav, destino, modelo.sr)
+            _gerar_com_guarda(_uma_vez, texto_pedaco, destino,
+                              f"(pedaço {numero} de {len(pedacos)}) " if numero is not None else "")
         except Exception as exc:  # noqa: BLE001
             mensagem = str(exc)
             prefixo_pedaco = f"(pedaço {numero} de {len(pedacos)}) " if numero is not None else ""
