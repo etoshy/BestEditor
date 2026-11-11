@@ -8,9 +8,22 @@
 
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
-<form method="post" action="{{ url_for('transcribe') }}" enctype="multipart/form-data">
+<form method="post" action="{{ url_for('transcribe') }}" enctype="multipart/form-data" id="formNovoVideo">
   <label>Arquivo de áudio (mp3, wav, m4a...) — ou um .zip com áudio + legenda (.srt), tipo o que o Gerador de Voz baixa: pula a transcrição e usa a legenda já pronta</label>
-  <input type="file" name="audio" accept="audio/*,.zip" required>
+  <input type="file" name="audio" accept="audio/*,.zip" required multiple id="audioNovo">
+  <p style="color:#666;font-size:0.8rem;margin:2px 0 6px;">📚 Pode escolher <b>vários arquivos</b> de uma vez: cada um vira um vídeo, com as mesmas opções abaixo.</p>
+
+  <!-- 🎙 v84_374: vários áudios do Gerador de voz de uma vez (sem baixar o .zip) -->
+  <details id="nvVozes" style="margin:0 0 10px;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;background:#eff6ff;">
+    <summary style="cursor:pointer;font-weight:600;">🎙 Pegar do Gerador de voz — marque <b>vários</b> áudios prontos <span id="nvN" style="color:#1d4ed8;"></span></summary>
+    <div style="font-size:.85rem;color:#555;margin:6px 0;">Cada áudio marcado vira um vídeo, com a legenda e o projeto que vieram com ele (igual a mandar o .zip). Não precisa baixar nada.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <input type="text" id="nvBusca" placeholder="🔎 filtrar pelo texto" style="flex:1;min-width:160px;margin:0;">
+      <button type="button" id="nvTodos" style="width:auto;margin:0;padding:4px 10px;font-size:.82rem;">☑ marcar os visíveis</button>
+      <button type="button" id="nvNenhum" style="width:auto;margin:0;padding:4px 10px;font-size:.82rem;background:#64748b;">☐ desmarcar</button>
+    </div>
+    <div id="nvLista" style="max-height:260px;overflow:auto;font-size:.88rem;">carregando…</div>
+  </details>
 
   <label>Trocar de vídeo a cada quantos segundos (em média)</label>
   <input type="number" name="interval_seconds" value="7" min="2" step="0.5">
@@ -122,8 +135,85 @@
     </div>
   </div>
 
-  <button type="submit">Transcrever e gerar prompt</button>
+  <button type="submit" id="btnNovoVideo">Transcrever e gerar prompt</button>
+  <pre id="nvLog" style="display:none;background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.82rem;white-space:pre-wrap;margin-top:10px;"></pre>
+  <div id="nvLinks" style="margin-top:6px;font-size:.9rem;"></div>
 </form>
+<script>
+// 📚 v84_374: vários vídeos de uma vez — vários arquivos e/ou vários áudios do Gerador de voz
+(function () {
+  const form = document.getElementById('formNovoVideo'), arqs = document.getElementById('audioNovo');
+  const NOMES = {};
+  {% for v in (_dossies or []) %}NOMES[{{ ('dossie_id:' ~ v.id)|tojson }}] = {{ v.nome|tojson }};{% endfor %}
+  {% for v in (_roteiros or []) %}NOMES[{{ ('roteiro_id:' ~ v.id)|tojson }}] = {{ v.titulo|tojson }};{% endfor %}
+  {% for v in (_vendas or []) %}NOMES[{{ ('venda_id:' ~ v.id)|tojson }}] = {{ v.nome|tojson }};{% endfor %}
+  let carregou = false;
+  const marcados = () => [...document.querySelectorAll('.nvCb:checked')];
+  function atualizar() {
+    const nv = marcados().length, nf = arqs.files.length, tot = nv + nf;
+    document.getElementById('nvN').textContent = nv ? `· ${nv} marcado(s)` : '';
+    arqs.required = !nv;
+    document.getElementById('btnNovoVideo').textContent = tot > 1 ? `🎬 Criar os ${tot} vídeos` : 'Transcrever e gerar prompt';
+  }
+  arqs.addEventListener('change', atualizar);
+  async function carregar() {
+    if (carregou) return; carregou = true;
+    const box = document.getElementById('nvLista');
+    let d; try { d = await (await fetch('/gerar-voz/historico?pagina=0')).json(); } catch (e) { box.textContent = 'Não consegui ler o histórico do Gerador de voz.'; return; }
+    const itens = (d.itens || []).filter(x => x.zip_url && !x.erro && !x.sumiu);
+    if (!itens.length) { box.textContent = 'Nenhum áudio pronto no Gerador de voz ainda.'; return; }
+    const hora = (t) => t ? new Date(t * 1000).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    box.innerHTML = itens.map(x => {
+      const proj = x.projeto && NOMES[x.projeto] ? ` · 📦 <b>${NOMES[x.projeto].replace(/</g, '&lt;')}</b>` : '';
+      return `<label class="nvItem" style="display:flex;gap:6px;align-items:flex-start;margin:0;font-weight:400;padding:3px 0;border-top:1px solid #dbeafe;">
+        <input type="checkbox" class="nvCb" value="${x.zip_url}" data-id="${x.id}" style="width:auto;margin:3px 0 0;">
+        <span><span style="color:#666;">${hora(x.terminou || x.criado)} · ${x.motor || ''}</span>${proj}<br><i>“${(x.texto_inicio || '').replace(/</g, '&lt;')}…”</i></span></label>`;
+    }).join('');
+    box.querySelectorAll('.nvCb').forEach(c => c.addEventListener('change', atualizar));
+  }
+  document.getElementById('nvVozes').addEventListener('toggle', (e) => { if (e.target.open) carregar(); });
+  document.getElementById('nvBusca').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    document.querySelectorAll('.nvItem').forEach(l => { l.style.display = !q || l.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+  });
+  document.getElementById('nvTodos').addEventListener('click', () => { document.querySelectorAll('.nvItem').forEach(l => { if (l.style.display !== 'none') l.querySelector('input').checked = true; }); atualizar(); });
+  document.getElementById('nvNenhum').addEventListener('click', () => { document.querySelectorAll('.nvCb').forEach(c => c.checked = false); atualizar(); });
+
+  form.addEventListener('submit', async (ev) => {
+    const vozes = marcados(), files = [...arqs.files];
+    if (vozes.length + files.length <= 1 && !vozes.length) return;  // 1 arquivo: envio normal de sempre
+    ev.preventDefault();
+    const btn = document.getElementById('btnNovoVideo'); btn.disabled = true;
+    const log = document.getElementById('nvLog'), links = document.getElementById('nvLinks');
+    log.style.display = ''; log.textContent = ''; links.innerHTML = '';
+    const varios = vozes.length + files.length > 1;
+    const fontes = [...files.map(f => ({ nome: f.name, pegar: async () => f })),
+                    ...vozes.map(c => ({ nome: 'voz ' + c.dataset.id.slice(0, 8) + '.zip', pegar: async () => {
+                      const r = await fetch(c.value); if (!r.ok) throw new Error('não consegui pegar o .zip (' + r.status + ')'); return await r.blob(); } }))];
+    let ok = 0;
+    for (let k = 0; k < fontes.length; k++) {
+      const f = fontes[k];
+      log.textContent += `🎬 ${k + 1}/${fontes.length}: ${f.nome} → `;
+      try {
+        const fd = new FormData(form);
+        fd.delete('audio'); fd.set('audio', await f.pegar(), f.nome);
+        if (varios) fd.set('projeto_midias', '');  // vários: cada .zip usa o projeto que veio com ele
+        const r = await fetch(form.action, { method: 'POST', body: fd });
+        if (!r.ok || !/\/transcrib|\/job\//.test(r.url)) {
+          const html = await r.text(); const m = html.match(/class="error"[^>]*>([^<]+)/);
+          throw new Error(m ? m[1].trim() : 'o site não criou o projeto (' + r.status + ')');
+        }
+        ok++; log.textContent += 'criado\n';
+        links.insertAdjacentHTML('beforeend', `<div>✅ <a href="${r.url}" target="_blank">${f.nome}</a></div>`);
+      } catch (e) { log.textContent += '❌ ' + e.message + '\n'; }
+    }
+    log.textContent += `\n${ok} de ${fontes.length} vídeo(s) criados — cada um segue sozinho; acompanhe na 🎞 Galeria de projetos.`;
+    links.insertAdjacentHTML('beforeend', `<div style="margin-top:4px;"><a href="/jobs">🎞 Abrir a Galeria de projetos →</a></div>`);
+    btn.disabled = false;
+  });
+  atualizar();
+})();
+</script>
 
 <hr style="margin:32px 0;">
 

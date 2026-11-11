@@ -753,6 +753,20 @@ def _projetos_para_voz() -> list:
     return out[:300]
 
 
+@app.route("/gerar-voz/texto-projeto", methods=["GET"])
+def gerar_voz_texto_projeto():
+    """📂 v84_374: o roteiro de UM projeto (pra gerar a voz de vários marcados de uma vez, na mesma fila)."""
+    param, _, pid = str(request.args.get("p") or "").partition(":")
+    pid = pid.strip()
+    if param not in ("dossie", "roteiro", "venda") or not re.fullmatch(r"[0-9a-f]{6,40}", pid):
+        return jsonify({"erro": "Projeto inválido."}), 400
+    texto = {"dossie": _texto_do_dossie, "roteiro": _texto_do_roteiro_yt, "venda": _texto_da_venda}[param](pid)
+    if not (texto or "").strip():
+        return jsonify({"erro": "Esse projeto ainda não tem roteiro."}), 404
+    return jsonify({"texto": texto, "campo": {"dossie": "dossie_id", "roteiro": "roteiro_id", "venda": "venda_id"}[param],
+                    "id": pid, "idioma": _idioma_do_projeto(pid if param == "venda" else None, pid if param == "dossie" else None)})
+
+
 def _normalizar_multivoz(entrada: str, saida: str) -> None:
     na.normalizar_volume_wav(Path(entrada), Path(saida))
     if not os.path.exists(saida) or os.path.getsize(saida) < 100:

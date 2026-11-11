@@ -68,6 +68,25 @@
       </optgroup>{% endfor %}
     </select>
   </div>
+  <!-- 📂 v84_374: vários projetos de uma vez — cada um vira um áudio na fila, com a voz e as opções escolhidas abaixo -->
+  <details id="variosProj" style="margin:0 0 10px;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;background:#faf5ff;" {% if request.args.get('varios') %}open{% endif %}>
+    <summary style="cursor:pointer;font-weight:600;">📂 Gerar a voz de <b>vários projetos</b> de uma vez <span id="vpN" style="color:#7c3aed;"></span></summary>
+    <div style="font-size:.85rem;color:#555;margin:6px 0;">Marque os projetos, escolha a voz e as opções abaixo e clique no botão: cada roteiro vira um áudio, todos entram na 🎙 Fila de geração (com os capítulos e o .zip ligados ao projeto, como quando você abre um só).</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <input type="text" id="vpBusca" placeholder="🔎 filtrar pelo nome" style="flex:1;min-width:160px;margin:0;" data-ui-sem-lembrar>
+      <button type="button" id="vpTodos" style="width:auto;margin:0;padding:4px 10px;font-size:.82rem;">☑ marcar os visíveis</button>
+      <button type="button" id="vpNenhum" style="width:auto;margin:0;padding:4px 10px;font-size:.82rem;background:#64748b;">☐ desmarcar</button>
+    </div>
+    <div id="vpLista" style="max-height:260px;overflow:auto;border-top:1px solid #ede9fe;padding-top:4px;">
+      {% for grupo in projetos_voz|groupby('grupo') %}
+      <div style="font-weight:600;font-size:.82rem;margin:6px 0 2px;color:#5b21b6;">{{ grupo.grouper }}</div>
+      {% for x in grupo.list|sort(attribute='atualizado', reverse=True) %}
+      <label class="vpItem" style="display:flex;gap:6px;align-items:center;margin:0;font-weight:400;font-size:.88rem;padding:2px 0;">
+        <input type="checkbox" class="vpCb" value="{{ x.param }}:{{ x.id }}" data-nome="{{ x.nome }}" style="width:auto;margin:0;" data-ui-sem-lembrar> {{ x.nome }}</label>
+      {% endfor %}{% endfor %}
+    </div>
+    <button type="button" id="vpGerar" style="width:auto;margin-top:8px;background:#7c3aed;" disabled>🎙 Gerar a voz dos marcados</button>
+  </details>
   <script>
     document.getElementById('projVoz').addEventListener('change', (e) => {
       const v = e.target.value; if (!v) { location.href = '/gerar-voz'; return; }
@@ -713,6 +732,51 @@ document.getElementById('btn-mais-roteiro').addEventListener('click', () => {
   document.getElementById('roteiros-extra').appendChild(box); variosInfo(); box.querySelector('textarea').focus();
 });
 document.getElementById('texto-narrar').addEventListener('input', variosInfo);
+// 📂 v84_374: vários PROJETOS de uma vez (cada um com o seu roteiro e o projeto ligado ao áudio)
+(function () {
+  const det = document.getElementById('variosProj'); if (!det) return;
+  const cbs = () => [...document.querySelectorAll('.vpCb')];
+  const marcados = () => cbs().filter(c => c.checked);
+  function atualizar() {
+    const n = marcados().length;
+    document.getElementById('vpN').textContent = n ? `· ${n} marcado(s)` : '';
+    const b = document.getElementById('vpGerar'); b.disabled = !n;
+    b.textContent = n ? `🎙 Gerar a voz dos ${n} projeto(s) marcados` : '🎙 Gerar a voz dos marcados';
+  }
+  cbs().forEach(c => c.addEventListener('change', atualizar));
+  document.getElementById('vpBusca').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    document.querySelectorAll('.vpItem').forEach(l => { l.style.display = !q || l.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+  });
+  document.getElementById('vpTodos').addEventListener('click', () => { document.querySelectorAll('.vpItem').forEach(l => { if (l.style.display !== 'none') l.querySelector('input').checked = true; }); atualizar(); });
+  document.getElementById('vpNenhum').addEventListener('click', () => { cbs().forEach(c => c.checked = false); atualizar(); });
+  document.getElementById('vpGerar').addEventListener('click', async () => {
+    const lista = marcados(); if (!lista.length) return;
+    const form = document.getElementById('form-gerar-voz');
+    const btn = document.getElementById('vpGerar'); btn.disabled = true;
+    const log = document.getElementById('log-box'); document.getElementById('progresso-box').style.display = ''; log.textContent = '';
+    document.getElementById('error-box').style.display = 'none';
+    let ok = 0; const erros = [];
+    for (let k = 0; k < lista.length; k++) {
+      const c = lista[k], nome = c.dataset.nome;
+      log.textContent += `📂 ${k + 1}/${lista.length}: ${nome} → `;
+      try {
+        const rt = await fetch('/gerar-voz/texto-projeto?p=' + encodeURIComponent(c.value)); const t = await rt.json();
+        if (!rt.ok) throw new Error(t.erro || rt.status);
+        const fd = new FormData(form);
+        ['dossie_id', 'roteiro_id', 'venda_id'].forEach(n => fd.delete(n));
+        fd.set('texto', t.texto); fd.set(t.campo, t.id);
+        const r = await fetch("{{ url_for('gerar_voz_gerar') }}", { method: 'POST', body: fd }); const d = await r.json();
+        if (!r.ok) throw new Error(d.erro || r.status);
+        ok++; log.textContent += `na fila${d.posicao ? ' (posição ' + d.posicao + ')' : ''}\n`;
+      } catch (e) { erros.push(`${nome}: ${e.message}`); log.textContent += `❌ ${e.message}\n`; }
+      verGeracoes();
+    }
+    log.textContent += `\n✅ ${ok} de ${lista.length} projetos na fila — acompanhe na 🎙 Fila de geração. Depois, no 🎬 Início, marque os áudios em “Pegar do Gerador de voz” pra criar todos os vídeos de uma vez.` + (erros.length ? '\n' + erros.join('\n') : '');
+    btn.disabled = false; atualizar();
+  });
+  atualizar();
+})();
 async function gerarVarios(form) {
   const textos = roteirosSeparados();
   if (!textos.length) { mostrarErro('Não achei nenhum roteiro.'); return; }
