@@ -19,6 +19,8 @@ import pytest
 # no import deste arquivo, antes de qualquer teste rodar -- nunca
 # definida em produção (só quando o pytest carrega este conftest.py).
 os.environ["VOICE_GENERATOR_DESATIVAR_ISOLAMENTO"] = "1"
+# 🛡 a guarda contra alucinação não chama o Whisper de verdade nos testes (os testes dela usam um falso)
+os.environ.setdefault("VOICE_GENERATOR_SEM_WHISPER_GUARDA", "1")
 # a suíte não deve carregar projetos de verdade de jobs/ ao importar o app
 os.environ["NARRATION_SITE_NAO_CARREGAR_PROJETOS"] = "1"
 # os testes usam o catálogo DE FÁBRICA: os seus extras (assets/darkplanner/extras) ficam de fora

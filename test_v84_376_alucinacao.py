@@ -13,6 +13,8 @@ def _tom_de_teste_nao_e_zumbido(monkeypatch, request):
     """Os testes de DURAÇÃO usam um tom puro (que é 'som contínuo'): aqui o detector de zumbido fica de fora."""
     if "zumbido" not in request.node.name:
         monkeypatch.setattr(vg, "trechos_sem_fala", lambda caminho, min_s=2.0: [])
+    if "whisper" in request.node.name:
+        monkeypatch.delenv("VOICE_GENERATOR_SEM_WHISPER_GUARDA", raising=False)
 
 
 def _tom(caminho, s):
@@ -112,3 +114,46 @@ def test_zumbido_no_meio_e_detectado_e_gera_de_novo(tmp_path):
     chamadas = []
     vg._gerar_com_guarda(lambda t, c: chamadas.append(c) or _fala_com_zumbido(c, next(seq)), "x" * 200, str(tmp_path / "a.wav"))
     assert len(chamadas) == 2 and vg.trechos_sem_fala(str(tmp_path / "a.wav")) == []
+
+
+def _fala_buraco_fala(caminho, buraco_s, buraco="anoisesrc=d={d}:a=0.05:r=24000"):
+    f = "sine=frequency=220:duration=2,volume='if(lt(mod(t,0.2),0.1),1,0.02)':eval=frame"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f, "-f", "lavfi", "-i", buraco.format(d=buraco_s),
+                    "-f", "lavfi", "-i", f, "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", "-ar", "24000", "-ac", "1",
+                    caminho], check=True)
+
+
+def _whisper_falso(monkeypatch, palavras):
+    import types
+    wt = types.SimpleNamespace(transcribe_audio=lambda *a, **k: [{"start": 0, "end": 9, "text": "x", "words": palavras}])
+    monkeypatch.setitem(sys.modules, "whisper_transcribe", wt)
+
+
+def test_whisper_acusa_som_sem_palavras_e_aceita_pausa_silenciosa(tmp_path, monkeypatch):
+    pal = [{"word": w, "start": i * 0.3, "end": i * 0.3 + 0.25} for i, w in enumerate("um dois tres quatro cinco seis".split())]
+    pal += [{"word": w, "start": 4.6 + i * 0.3, "end": 4.6 + i * 0.3 + 0.25} for i, w in enumerate("sete oito nove".split())]
+    _whisper_falso(monkeypatch, pal)
+    ruim = str(tmp_path / "r.wav")
+    _fala_buraco_fala(ruim, 2.5)  # lixo de 2,0 a 4,5 s
+    buracos, cob = vg.trechos_sem_palavras(ruim, "um dois tres quatro cinco seis sete oito nove", "pt")
+    assert len(buracos) == 1 and 1.6 <= buracos[0][0] <= 2.0 and buracos[0][1] >= 2.0 and cob == 1.0
+    calmo = str(tmp_path / "c.wav")
+    _fala_buraco_fala(calmo, 2.5, "anullsrc=r=24000:cl=mono:d={d}")  # pausa SILENCIOSA longa: não é lixo
+    assert vg.trechos_sem_palavras(calmo, "um dois tres quatro cinco seis sete oito nove", "pt")[0] == []
+
+
+def test_whisper_cobertura_baixa(tmp_path, monkeypatch):
+    _whisper_falso(monkeypatch, [{"word": "um", "start": 0.1, "end": 0.3}])
+    c = str(tmp_path / "a.wav")
+    _tom(c, 1.0)
+    assert vg.trechos_sem_palavras(c, "um dois tres quatro cinco seis", "pt")[1] < 0.6
+
+
+def test_whisper_tudo_com_lixo_corta_no_fim(tmp_path, monkeypatch):
+    monkeypatch.setattr(vg, "trechos_sem_palavras", lambda c, t, i=None, min_s=1.5: ([(2.0, 2.5)], 1.0))
+    chamadas = []
+    saida = str(tmp_path / "a.wav")
+    vg._gerar_com_guarda(lambda t, c: chamadas.append(c) or _fala_buraco_fala(c, 2.5), "x" * 100, saida)
+    assert len(chamadas) == 3
+    assert abs(vg._duracao_audio_segundos(saida) - (6.5 - 2.5 + 0.24)) < 0.1  # o lixo saiu, ficou a folga
+    assert sorted(os.listdir(tmp_path)) == ["a.wav"]

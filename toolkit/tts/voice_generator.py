@@ -1814,6 +1814,71 @@ def trechos_sem_fala(caminho: str, min_s: float = 2.0) -> List[Tuple[float, floa
     return trechos
 
 
+def _rms_db_trecho(caminho: str, ini: float, fim: float) -> float:
+    try:
+        import numpy as np
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(0.0, ini):.3f}", "-t", f"{max(0.05, fim - ini):.3f}",
+                            "-i", caminho, "-ar", "16000", "-ac", "1", "-f", "f32le", "-"], capture_output=True, timeout=60)
+        x = np.frombuffer(r.stdout, dtype=np.float32)
+        return float(20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-9)) if len(x) else -120.0
+    except Exception:  # noqa: BLE001
+        return -120.0
+
+
+def trechos_sem_palavras(caminho: str, texto: str, idioma: Optional[str] = None,
+                         min_s: float = 1.5) -> Tuple[List[Tuple[float, float]], float]:
+    """🛡 v84_380: o Whisper escuta o trecho. Devolve ([(início, duração) de som SEM palavras], cobertura) —
+    cobertura = palavras ouvidas / palavras do texto. Pega o lixo que "incha e desincha" (respiração, sopro,
+    murmúrio) que não é contínuo o bastante pro detector de zumbido. Sem Whisper: ([], 1.0) (não acusa nada)."""
+    if os.environ.get("VOICE_GENERATOR_SEM_WHISPER_GUARDA") == "1":
+        return [], 1.0
+    palavras_texto = len(re.findall(r"\w+", re.sub(r"\[[^\[\]]{1,40}\]", " ", texto or "")))
+    if palavras_texto < 3:
+        return [], 1.0
+    try:
+        raiz = os.path.dirname(os.path.dirname(_DIR))
+        if raiz not in sys.path:
+            sys.path.insert(0, raiz)
+        import whisper_transcribe as wt  # type: ignore
+        segs = wt.transcribe_audio(caminho, model_size=os.environ.get("GUARDA_WHISPER_MODELO", "base"),
+                                   language=(idioma or None) and str(idioma)[:2], word_timestamps=True)
+    except Exception as exc:  # noqa: BLE001
+        if "nenhuma fala" in str(exc).lower():  # o Whisper não ouviu NADA: é só lixo
+            dur = _duracao_audio_segundos(caminho) or 0.0
+            return ([(0.0, round(dur, 2))] if dur >= min_s else []), 0.0
+        return [], 1.0
+    pal = [w for sg in segs for w in sg.get("words", []) if str(w.get("word") or "").strip()]
+    cobertura = min(1.0, len(pal) / max(1, palavras_texto))
+    dur = _duracao_audio_segundos(caminho) or 0.0
+    marcas = [0.0] + [v for w in pal for v in (float(w["start"]), float(w["end"]))] + [dur]
+    buracos = []
+    for k in range(0, len(marcas) - 1, 2):  # (fim da anterior, início da próxima)
+        ini, fim = marcas[k], marcas[k + 1]
+        if fim - ini >= min_s and _rms_db_trecho(caminho, ini + 0.15, fim - 0.15) > -40.0:  # não é pausa silenciosa
+            buracos.append((round(ini, 2), round(fim - ini, 2)))
+    return buracos, cobertura
+
+
+def cortar_trechos(caminho: str, trechos: List[Tuple[float, float]], folga: float = 0.12) -> bool:
+    """✂ v84_380: tira do .wav os trechos sem palavras (deixa `folga` s de cada lado pra não comer sílaba).
+    Último recurso, quando nenhuma tentativa saiu limpa."""
+    cortes = [(a + folga, a + d - folga) for a, d in trechos if d - 2 * folga > 0.3]
+    if not cortes:
+        return False
+    expr = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in cortes)
+    tmp = caminho + ".cortado.wav"
+    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", caminho, "-af", f"aselect='not({expr})',asetpts=N/SR/TB",
+                        tmp], capture_output=True, timeout=300)
+    if r.returncode != 0 or not os.path.exists(tmp) or os.path.getsize(tmp) < 1000:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return False
+    os.replace(tmp, caminho)
+    return True
+
+
 def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocidade: float = 1.0) -> None:
     """`gerar(texto, caminho)` grava o .wav. Repete se o áudio sair comprido demais pro texto (alucinação).
     `velocidade` < 1 (fala mais lenta de propósito) aumenta o limite na mesma proporção."""
@@ -1830,7 +1895,10 @@ def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocid
         dur = _duracao_audio_segundos(alvo)
         excesso = max(0.0, (dur or 0.0) - limite)
         lixo = trechos_sem_fala(alvo)  # zumbido/chiado contínuo no meio (v84_379)
-        nota = excesso + 10.0 * sum(b for _, b in lixo)
+        buracos, cobertura = ([], 1.0) if (excesso or lixo) else trechos_sem_palavras(alvo, texto, _PROTECAO.get("idioma"))
+        lixo = lixo + buracos  # som sem palavras ouvido pelo Whisper (v84_380)
+        falta = max(0.0, 0.6 - cobertura)  # o Whisper ouviu menos de 60% das palavras: frase engolida/embolada
+        nota = excesso + 10.0 * sum(b for _, b in lixo) + 50.0 * falta
         if nota == 0:
             if alvo != destino:
                 os.replace(alvo, destino)
@@ -1838,8 +1906,8 @@ def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocid
                 print(f"🛡 {rotulo}tentativa {tentativa} saiu certa ({dur or 0:.1f} s).", flush=True)
             return
         motivo = (f"{dur:.1f} s pra {len(texto.strip())} letras (máximo {limite:.1f} s)" if excesso else "") + \
-                 ((" · " if excesso else "") + "som contínuo sem fala em " + ", ".join(f"{a_:.1f}s (+{b_:.1f}s)" for a_, b_ in lixo)
-                  if lixo else "")
+                 ((" · " if excesso else "") + "som sem palavras em " + ", ".join(f"{a_:.1f}s (+{b_:.1f}s)" for a_, b_ in lixo)
+                  if lixo else "") + (f" · só {cobertura:.0%} das palavras ouvidas" if falta else "")
         print(f"🛡 {rotulo}o motor de voz se perdeu (alucinação): {motivo} — gerando de novo "
               f"({tentativa}/{CHATTERBOX_TENTATIVAS_ALUCINACAO}).", flush=True)
         if melhor is None or nota < melhor:
@@ -1851,7 +1919,15 @@ def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocid
                 os.remove(alvo)
             except OSError:
                 pass
-    print(f"⚠ {rotulo}as {CHATTERBOX_TENTATIVAS_ALUCINACAO} tentativas saíram com problema — fiquei com a menos ruim.", flush=True)
+    # ✂ filtro final: na melhor das tentativas, corta o que não tem palavra (zumbido, sopro, murmúrio)
+    restos = trechos_sem_fala(destino)
+    if not restos:
+        restos = trechos_sem_palavras(destino, texto, _PROTECAO.get("idioma"))[0]
+    if restos and cortar_trechos(destino, restos):
+        print(f"✂ {rotulo}as {CHATTERBOX_TENTATIVAS_ALUCINACAO} tentativas vieram com lixo — cortei "
+              + ", ".join(f"{a:.1f}s (+{b:.1f}s)" for a, b in restos) + " da melhor delas.", flush=True)
+    else:
+        print(f"⚠ {rotulo}as {CHATTERBOX_TENTATIVAS_ALUCINACAO} tentativas saíram com problema — fiquei com a menos ruim.", flush=True)
 
 
 def _modulo_expressivo():
@@ -2984,6 +3060,7 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
     if "progresso_arquivo" in kwargs:
         _PROGRESSO["arq"] = kwargs.pop("progresso_arquivo") or None
     _PROTECAO["ativa"] = bool(kwargs.pop("protecao_alucinacao", True))  # 🛡 ligada por padrão
+    _PROTECAO["idioma"] = "en" if engine == "chatterbox_turbo" else (kwargs.get("idioma") or None)
 
     engine = (engine or "").strip().lower()
     if engine == "teste" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") == "1":  # só nos testes automatizados
