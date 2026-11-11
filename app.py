@@ -753,6 +753,26 @@ def _projetos_para_voz() -> list:
     return out[:300]
 
 
+@app.route("/gerar-voz/ia-tags", methods=["POST"])
+def gerar_voz_ia_tags():
+    """🤖🎭 v84_375: o Claude coloca as tags de emoção no texto (pra revisar antes de gerar)."""
+    import voz_tags_ia as vti
+    d = request.get_json(silent=True) or request.form
+    texto = str(d.get("texto") or "").strip()
+    modo = "en" if d.get("modo") == "en" else "pt"
+    if not texto:
+        return jsonify({"erro": "Escreva o roteiro primeiro."}), 400
+    motivo = vti.motivo_sem_ia()
+    if motivo:
+        return jsonify({"erro": f"A IA não está disponível: {motivo}."}), 400
+    avisos: List[str] = []
+    novo, info = vti.aplicar(texto, modo, str(d.get("variante") or "pt-BR"), on_log=avisos.append)
+    if not info["ok"]:
+        return jsonify({"erro": "A IA não conseguiu colocar as tags" + (" (ela mudou palavras do texto, então nada foi trocado)."
+                                                                         if info["recusados"] else ".")}), 502
+    return jsonify({"texto": novo, "info": info, "avisos": avisos, "ja_tinha": vti.tem_tags(texto, modo)})
+
+
 @app.route("/gerar-voz/texto-projeto", methods=["GET"])
 def gerar_voz_texto_projeto():
     """📂 v84_374: o roteiro de UM projeto (pra gerar a voz de vários marcados de uma vez, na mesma fila)."""
@@ -834,6 +854,28 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
                              multivoz: bool = False) -> None:
     status = _GERAR_VOZ_STATUS[job_id]
     import chamadas as ch
+    texto_legenda = None
+    if status.get("ia_tags") and not multivoz:  # 🤖🎭 v84_375: o Claude dirige a locução antes de gerar
+        import voz_tags_ia as _vti
+        _cfg_ia = status["ia_tags"]
+        if _vti.tem_tags(texto, _cfg_ia["modo"]):
+            status["log"] += "🤖🎭 O roteiro já tem tags — gerando como você escreveu.\n"
+        elif _vti.motivo_sem_ia():
+            status["log"] += f"⚠ 🤖 Tags pela IA: {_vti.motivo_sem_ia()} — gerando sem as tags.\n"
+        else:
+            status["log"] += "🤖🎭 O Claude está colocando as tags de emoção no roteiro…\n"
+            try:
+                _novo, _inf = _vti.aplicar(texto, _cfg_ia["modo"], _cfg_ia["variante"],
+                                           on_log=lambda s_: status.__setitem__("log", status["log"] + s_ + "\n"))
+                if _inf["ok"]:
+                    texto_legenda, texto = texto, _novo
+                    status["texto_com_tags"] = _novo
+                    status["log"] += (f"🤖🎭 Tags colocadas ({_inf['ok']} de {_inf['pedacos']} trecho(s)). Texto que foi narrado:\n"
+                                      + _novo[:4000] + ("…" if len(_novo) > 4000 else "") + "\n\n")
+                else:
+                    status["log"] += "⚠ 🤖 A IA não devolveu as tags — gerando sem elas.\n"
+            except Exception as exc_ia:  # noqa: BLE001 — sem tags, mas o áudio sai
+                status["log"] += f"⚠ 🤖 Tags pela IA falharam ({str(exc_ia)[:160]}) — gerando sem elas.\n"
     partes_ch = ch.dividir(texto)
     tem_chamadas = any(p["tipo"] for p in partes_ch)
 
@@ -887,6 +929,8 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
             else:
                 tts_gerar_audio_isolado(engine, texto_limpo, output_path, **dict(kwargs, progresso_arquivo=status["progresso_arquivo"]))
         status["resultado_filename"] = os.path.basename(output_path)
+        if texto_legenda is not None:  # a legenda é do roteiro (sem as tags que a IA pôs)
+            texto = texto_legenda
         log("Pronto!")
 
         # Legenda (SRT): sempre tenta gerar depois do áudio -- transcreve
@@ -1194,7 +1238,14 @@ def gerar_voz_gerar():
     # idioma da narração (vai no info.json do .zip): o escolhido na tela > o da voz > o do texto.
     # No multi voice cada fala pode ter outro motor: aí o texto manda.
     _idioma = idiomas.descobrir("" if multivoz_on else engine, kwargs, texto, request.form.get("idioma_narracao"))
+    # 🤖🎭 v84_375: roteiro SEM tags + opção marcada → o Claude coloca antes de gerar (expressivo pt ou Turbo en)
+    _ia_tags = None
+    if engine == "chatterbox" and kwargs.get("expressivo") and request.form.get("chatterbox_ia_tags") == "on":
+        _ia_tags = {"modo": "pt", "variante": kwargs.get("variante") or "pt-BR"}
+    elif engine == "chatterbox_turbo" and request.form.get("turbo_ia_tags") == "on":
+        _ia_tags = {"modo": "en", "variante": ""}
     _GERAR_VOZ_STATUS[job_id] = {
+        "ia_tags": _ia_tags,
         "running": True, "log": "", "erro": None, "pronto": False,
         "engine": engine, "resultado_filename": None, "resultado_srt_filename": None,
         "idioma": _idioma["codigo"], "idioma_origem": _idioma["origem"],

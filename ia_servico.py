@@ -93,6 +93,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "revisao": ("🎬 Revisão do diretor",
                 "No Estúdio (aba 🤖 IA), a IA olha a miniatura de cada trecho com a fala de antes e de depois e diz o que não "
                 "combina — e o que fazer: busca nova no buscador com mais chance, gráfico nativo, cartão ou \"procure na mão\".", True),
+    "voz_tags": ("🎭 Tags de emoção na voz",
+                 "No Gerador de voz (Chatterbox expressivo em português ou Turbo em inglês), o Claude lê o roteiro e coloca as "
+                 "tags de estilo, pausa, respiração, ênfase e sons onde fazem sentido — sem mudar nenhuma palavra.", True),
     "edicao": ("✂️ Prompt de edição direto na IA",
                "No Estúdio (aba 🤖 IA), um botão manda o prompt de edição (ou cada parte dele) pra IA e cola a resposta.", True),
     "flow_famosos": ("🚫 Flow recusou \"pessoa famosa\" → reescrever o comando",

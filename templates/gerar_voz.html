@@ -280,6 +280,13 @@ E no final...</pre>
         {% endfor %}
         <div style="color:#6b21a8;margin-top:8px;">💡 Clique numa tag pra inserir onde está o cursor. Para o estilo mudar de verdade o jeito da voz, crie perfis com a mesma voz falando naquele tom e o nome <code>&lt;perfil&gt;_&lt;estilo&gt;</code> (ex: <code>minhavoz_soprosa</code>) — o trecho usa essa referência automaticamente.
           As tags das duas variantes funcionam nas duas. Os sons precisam do Chatterbox Turbo (no PC ou no pod); sem ele, viram pausa.</div>
+        <div style="margin-top:8px;padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;">
+          <label style="margin:0;font-weight:600;"><input type="checkbox" name="chatterbox_ia_tags" class="iaTagsAuto" style="width:auto;" checked> 🤖 Roteiro sem tags? O Claude coloca as emoções antes de gerar</label>
+          <div style="color:#4b5563;margin-top:2px;">Ele lê o roteiro como um diretor de locução: estilo por trecho, palavras de valor, respirações, pausas e sons — sem mudar nenhuma palavra (se mudar, aquele trecho fica como estava). Se o texto já tiver tags, ele não mexe. Vale também pros vários projetos de uma vez.</div>
+          <button type="button" class="iaTagsBtn" data-modo="pt" style="width:auto;margin-top:6px;padding:4px 10px;font-size:0.82rem;background:#4f46e5;">🤖 Colocar as tags agora (pra eu revisar)</button>
+          <button type="button" class="iaTagsDesfazer" style="display:none;width:auto;margin-top:6px;padding:4px 10px;font-size:0.82rem;background:#64748b;">↩ Desfazer</button>
+          <span class="iaTagsSt" style="margin-left:6px;"></span>
+        </div>
         <button type="button" id="cbExpressivoTeste" style="width:auto;margin-top:6px;padding:4px 10px;font-size:0.82rem;background:#7c3aed;">📝 Colocar o texto de teste</button>
       </div>
     </div>
@@ -351,6 +358,13 @@ E no final...</pre>
   <div id="opcoes-chatterbox_turbo" class="engine-opcoes">
     <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:0.82rem;color:#78350f;">
       <strong>Só funciona em inglês</strong> — esse motor não tem seletor de idioma porque o modelo é treinado só pra isso. Pra português, use o "Chatterbox TTS" (multilíngue) acima.
+    </div>
+    <div style="margin:0 0 10px;padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;font-size:0.82rem;">
+      <label style="margin:0;font-weight:600;"><input type="checkbox" name="turbo_ia_tags" class="iaTagsAuto" style="width:auto;" checked> 🤖 Roteiro sem tags? O Claude coloca [laugh] [sigh] [whispering]… antes de gerar</label>
+      <div style="color:#4b5563;margin-top:2px;">Só insere tags, nunca muda o texto. Se o roteiro já tiver tags, ele não mexe.</div>
+      <button type="button" class="iaTagsBtn" data-modo="en" style="width:auto;margin-top:6px;padding:4px 10px;font-size:0.82rem;background:#4f46e5;">🤖 Colocar as tags agora (pra eu revisar)</button>
+      <button type="button" class="iaTagsDesfazer" style="display:none;width:auto;margin-top:6px;padding:4px 10px;font-size:0.82rem;background:#64748b;">↩ Desfazer</button>
+      <span class="iaTagsSt" style="margin-left:6px;"></span>
     </div>
 
     <p style="color:#666;font-size:0.85rem;"><strong>Tags especiais direto no texto</strong> — insira entre colchetes onde quiser que aconteça. Exemplo: <code>"Hi there [chuckle], welcome back!"</code></p>
@@ -732,6 +746,32 @@ document.getElementById('btn-mais-roteiro').addEventListener('click', () => {
   document.getElementById('roteiros-extra').appendChild(box); variosInfo(); box.querySelector('textarea').focus();
 });
 document.getElementById('texto-narrar').addEventListener('input', variosInfo);
+// 🤖🎭 v84_375: o Claude coloca as tags de emoção (botão pra revisar; a opção marcada faz sozinho ao gerar)
+document.querySelectorAll('.iaTagsBtn').forEach(btn => {
+  const box = btn.parentElement, st = box.querySelector('.iaTagsSt'), desf = box.querySelector('.iaTagsDesfazer');
+  let anterior = null;
+  btn.addEventListener('click', async () => {
+    const ta = document.getElementById('texto-narrar');
+    if (!ta.value.trim()) { st.textContent = '⚠ escreva o roteiro primeiro'; return; }
+    const variante = (document.getElementById('cbVariante') || {}).value || 'pt-BR';
+    btn.disabled = true; st.textContent = '⏳ o Claude está lendo o roteiro…';
+    try {
+      const r = await fetch('/gerar-voz/ia-tags', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: ta.value, modo: btn.dataset.modo, variante }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      anterior = ta.value; ta.value = d.texto; ta.dispatchEvent(new Event('input'));
+      desf.style.display = '';
+      st.textContent = '✅ tags colocadas — revise no texto' + (d.ja_tinha ? ' (o texto já tinha algumas)' : '') + ((d.avisos || []).length ? ' · ⚠ ' + d.avisos.length + ' trecho(s) ficaram sem tags' : '');
+    } catch (e) { st.textContent = '⚠ ' + e.message; }
+    btn.disabled = false;
+  });
+  desf.addEventListener('click', () => {
+    if (anterior === null) return;
+    const ta = document.getElementById('texto-narrar'); ta.value = anterior; ta.dispatchEvent(new Event('input'));
+    anterior = null; desf.style.display = 'none'; st.textContent = '↩ voltou o texto de antes';
+  });
+});
+
 // 📂 v84_374: vários PROJETOS de uma vez (cada um com o seu roteiro e o projeto ligado ao áudio)
 (function () {
   const det = document.getElementById('variosProj'); if (!det) return;
