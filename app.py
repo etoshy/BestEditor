@@ -11272,6 +11272,9 @@ _TRANSCRICAO_AVULSA_ARQUIVOS_PERMITIDOS = {
 }
 
 
+_TRANSCREVER_FILA = threading.Lock()
+
+
 @app.route("/transcrever", methods=["GET"])
 def transcrever_page():
     return render_template("transcrever.html", jobs=list(reversed(list(_TRANSCRICOES_AVULSAS_JOBS.values()))))
@@ -11288,6 +11291,8 @@ def transcrever_submit():
     device = (request.form.get("device") or "auto").strip()
     max_height_bruto = (request.form.get("max_height") or "").strip()
     max_height = int(max_height_bruto) if max_height_bruto.isdigit() else None
+    apagar_video = modo == "transcrever" and request.form.get("apagar_video") == "1"  # 🗑 v84_384
+    nome_arquivo = (arquivo.filename if tem_arquivo else "") or ""
 
     if bool(url) == tem_arquivo:
         return jsonify({"erro": "Informe um link OU envie um arquivo (não os dois, nem nenhum)."}), 400
@@ -11303,8 +11308,8 @@ def transcrever_submit():
         arquivo.save(arquivo_path)
 
     _TRANSCRICOES_AVULSAS_JOBS[job_id] = {
-        "id": job_id, "status": "processando", "log": "", "erro": None,
-        "criado_em": time.time(), "modo": modo, "url": url or None,
+        "id": job_id, "status": "na_fila", "log": "⏳ Na fila — começa quando o anterior terminar.\n", "erro": None,
+        "criado_em": time.time(), "modo": modo, "url": url or None, "nome": nome_arquivo[:120],
     }
 
     def _run():
@@ -11314,11 +11319,14 @@ def transcrever_submit():
             job["log"] += linha + "\n"
 
         try:
-            resultado = ta_avulso.processar(
-                pasta, url=url or None, arquivo_path=arquivo_path, modo=modo,
-                whisper_model=whisper_model, idioma=idioma, device=device,
-                max_height=max_height, on_log=log,
-            )
+            with _TRANSCREVER_FILA:  # 📚 v84_384: vários enviados de uma vez → um de cada vez (o Whisper usa a GPU toda)
+                job["status"] = "processando"
+                log("▶ Começou.")
+                resultado = ta_avulso.processar(
+                    pasta, url=url or None, arquivo_path=arquivo_path, modo=modo,
+                    whisper_model=whisper_model, idioma=idioma, device=device,
+                    max_height=max_height, on_log=log, apagar_video=apagar_video,
+                )
             job["status"] = "pronto"
             job["resultado"] = resultado
         except ta_avulso.TranscreverAvulsoError as exc:

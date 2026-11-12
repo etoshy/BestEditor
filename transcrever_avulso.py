@@ -142,6 +142,7 @@ def processar(
     on_log: Optional[Callable[[str], None]] = None,
     ytdlp_module: Any = None,
     requests_module: Any = None,
+    apagar_video: bool = False,
 ) -> Dict[str, Any]:
     """Baixa (de `url`) ou usa (`arquivo_path`) um vídeo e, se
     `modo="transcrever"` (padrão), também transcreve a fala com Whisper.
@@ -170,7 +171,11 @@ def processar(
         if not os.path.exists(arquivo_path):
             raise TranscreverAvulsoError(f"Arquivo não encontrado: {arquivo_path}")
         if os.path.abspath(arquivo_path) != os.path.abspath(video_final):
-            shutil.copy(arquivo_path, video_final)
+            # v84_384: o envio já está na pasta do trabalho — MOVE em vez de copiar (antes ficava 2× o tamanho no disco)
+            if os.path.dirname(os.path.abspath(arquivo_path)) == os.path.abspath(saida_dir):
+                os.replace(arquivo_path, video_final)
+            else:
+                shutil.copy(arquivo_path, video_final)
     else:
         video_final = baixar_de_qualquer_fonte(
             url, saida_dir, max_height=max_height, on_log=on_log,
@@ -223,6 +228,14 @@ def processar(
             "arquivo_segmentos": "transcricao.json",
         })
         os.remove(audio_path)  # só precisava pra transcrever, não pra guardar
+        if apagar_video:  # 🗑 v84_384: fica só a transcrição (txt, srt, json)
+            try:
+                tam = os.path.getsize(video_final)
+                os.remove(video_final)
+                resultado.update(video=None, video_apagado=True)
+                _log(on_log, f"🗑 Vídeo apagado ({tam / 1e6:.0f} MB liberados) — ficou só a transcrição.")
+            except OSError as exc:
+                _log(on_log, f"(não consegui apagar o vídeo: {exc})")
         _log(on_log, "Concluído.")
     else:
         _log(on_log, "Concluído (só download).")
