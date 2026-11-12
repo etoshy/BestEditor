@@ -245,9 +245,42 @@ def salvar_config(novos: Dict[str, Any]) -> Dict[str, Any]:
     return c
 
 
-def chave(c: Optional[Dict[str, Any]] = None) -> str:
+def _limpar_chave(k: Any) -> str:
+    """🔑 v84_385: tira o que vem junto ao colar — espaços/quebras no meio, aspas, caractere invisível, "x-api-key:"/"Bearer"."""
+    k = str(k or "")
+    k = re.sub(r"[\s\u200b\u200c\u200d\u2060\ufeff]+", "", k)
+    k = k.strip("\"'`“”‘’")
+    k = re.sub(r"^(?i:x-api-key:|bearer|authorization:)", "", k)
+    return k.strip("\"'`“”‘’")
+
+
+_CHAVE_BOA: Dict[str, str] = {}  # origem da chave que a API aceitou nesta sessão ("salva" ou "ambiente")
+
+
+def chaves_candidatas(c: Optional[Dict[str, Any]] = None) -> List[Tuple[str, str]]:
+    """[(origem, chave)] — a salva em 🤖 IA e a do Windows (ANTHROPIC_API_KEY), sem repetir. A que já funcionou vem 1º."""
     c = c or config()
-    return (c.get("chave") or os.environ.get(PROVEDORES[c["provedor"]]["chave_env"]) or "").strip()
+    lista: List[Tuple[str, str]] = []
+    env = (PROVEDORES.get(c.get("provedor")) or PROVEDORES["claude"])["chave_env"]
+    for origem, k in (("salva", c.get("chave")), ("ambiente", os.environ.get(env))):
+        k = _limpar_chave(k)
+        if k and k not in [x[1] for x in lista]:
+            lista.append((origem, k))
+    pref = _CHAVE_BOA.get("origem")
+    lista.sort(key=lambda x: x[0] != pref)
+    return lista
+
+
+ORIGEM_NOME = {"salva": "a chave salva em 🤖 IA", "ambiente": "a chave do Windows (ANTHROPIC_API_KEY)"}
+
+
+def chave(c: Optional[Dict[str, Any]] = None) -> str:
+    cs = chaves_candidatas(c)
+    return cs[0][1] if cs else ""
+
+
+def _mascara(k: str) -> str:
+    return (k[:10] + "…" + k[-4:]) if len(k) > 16 else (k[:4] + "…")
 
 
 def chave_mascarada(c: Optional[Dict[str, Any]] = None) -> str:
@@ -289,7 +322,7 @@ def motivo_desligado(recurso: Optional[str] = None, c: Optional[Dict[str, Any]] 
     if not chave(c):
         return "falta a chave da API"
     if sem_credito_valendo(c):
-        return "sem crédito / chave recusada: " + str(c["sem_credito"].get("erro") or "")[:160]
+        return "sem crédito / chave recusada: " + str(c["sem_credito"].get("erro") or "")[:500]
     if recurso and not c["recursos"].get(recurso, False):
         return f"o recurso “{RECURSOS.get(recurso, (recurso,))[0]}” está desligado"
     lim = float(c.get("limite_usd") or 0)
@@ -408,7 +441,7 @@ def _registrar(recurso: str, u: Dict[str, Any], custo: float, job: Optional[str]
             _gravar(USO_PATH, d)
         except OSError:
             pass
-        _RECENTES.append({"quando": time.time(), "recurso": recurso, "ok": ok, "usd": round(custo, 6), "erro": erro[:200],
+        _RECENTES.append({"quando": time.time(), "recurso": recurso, "ok": ok, "usd": round(custo, 6), "erro": erro[:600],
                           "entrada": int(u.get("input_tokens") or 0), "saida": int(u.get("output_tokens") or 0),
                           "cache_lido": int(u.get("cache_read_input_tokens") or 0)})
         del _RECENTES[:-40]
@@ -455,7 +488,7 @@ def saldo() -> Dict[str, Any]:
 def _marcar_sem_credito(erro: str) -> None:
     with _TRAVA:
         c = config()
-        c["sem_credito"] = {"quando": time.time(), "erro": erro[:300], "chave": _impressao_chave(chave(c))}
+        c["sem_credito"] = {"quando": time.time(), "erro": erro[:600], "chave": _impressao_chave(chave(c))}
         _gravar(CONFIG_PATH, c)
 
 
@@ -649,10 +682,13 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
             return guardado.get("v")
 
     tentativas, espera = 0, 2.0
+    candidatas = chaves_candidatas(c) or [("salva", "")]
+    ic = 0  # qual chave está sendo usada
+    recusadas: List[str] = []
     while True:
         tentativas += 1
         try:
-            status, corpo = _transporte(payload, chave(c), timeout)
+            status, corpo = _transporte(payload, candidatas[ic][1], timeout)
         except Exception as exc:  # noqa: BLE001 — rede caiu, timeout…
             if tentativas < 3:
                 time.sleep(espera)
@@ -673,11 +709,22 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
             time.sleep(espera)
             espera *= 2
             continue
+        if status == 401 and ic + 1 < len(candidatas):
+            # 🔑 v84_385: a API recusou ESTA chave — tenta a outra (a salva em 🤖 IA × a do Windows) antes de desistir
+            recusadas.append(f"{ORIGEM_NOME[candidatas[ic][0]]} ({_mascara(candidatas[ic][1])})")
+            ic += 1
+            continue
         if status != 200:
+            if status == 401:
+                recusadas.append(f"{ORIGEM_NOME[candidatas[ic][0]]} ({_mascara(candidatas[ic][1])})")
+                msg = f"{msg} — a Anthropic recusou " + " e ".join(recusadas) + \
+                      ". Crie uma chave nova em platform.claude.com → API keys e cole em 🤖 IA (ou apague a salva pra usar a do Windows)."
             if _sem_credito(status, msg):
                 _marcar_sem_credito(f"{status}: {msg}")
             _registrar(recurso, {}, 0.0, job, False, f"{status}: {msg}")
             return None
+        if candidatas[ic][0] != _CHAVE_BOA.get("origem"):
+            _CHAVE_BOA["origem"] = candidatas[ic][0]  # daqui pra frente começa por essa
         break
 
     u = corpo.get("usage") or {}
@@ -729,6 +776,7 @@ def resumo_publico() -> Dict[str, Any]:
     c = config()
     g = gasto()
     return {"ativo": c["ativo"], "provedor": c["provedor"], "modelo": c["modelo"], "chave": chave_mascarada(c),
+            "chaves": [{"origem": ORIGEM_NOME[o], "mascara": _mascara(k), "em_uso": i == 0} for i, (o, k) in enumerate(chaves_candidatas(c))],
             "chave_do_ambiente": bool(not c.get("chave") and chave(c)),
             "chave_suspeita": bool(chave(c)) and not chave(c).startswith(PROVEDORES[c["provedor"]].get("prefixo_chave") or ""),
             "recursos": c["recursos"], "nota_minima": c["nota_minima"], "candidatos": c["candidatos"], "limite_usd": c["limite_usd"],
