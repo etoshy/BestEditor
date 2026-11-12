@@ -155,7 +155,9 @@
     if (!bots.length) return;
     let pode = false, motivo = '';
     const pagina = location.pathname + location.search;
-    fetch('/ia/status').then(r => r.json()).then(j => { pode = !!(j.pode && j.pode.roteiros); motivo = j.motivo || 'o recurso “Roteiros direto na IA” está desligado';
+    // 🔓 v84_386: erro de chave/crédito GUARDADO não bloqueia o clique — o servidor tenta de novo de verdade
+    const soTrava = (j) => !!(j.sem_credito && (j.motivo || '').startsWith('sem crédito'));
+    fetch('/ia/status').then(r => r.json()).then(j => { pode = !!(j.pode && j.pode.roteiros) || soTrava(j); motivo = j.motivo || 'o recurso “Roteiros direto na IA” está desligado';
       bots.forEach(b => { b.style.display = ''; if (!pode) { b.style.opacity = '.6'; b.title = 'IA desligada: ' + motivo + ' — ligue em 🤖 IA nas buscas e modelos'; } }); }).catch(() => {});
     const el = (id) => id ? document.getElementById(id) : null;
     const statusDe = (b) => el(b.dataset.iaStatus) || b.nextElementSibling;
@@ -182,7 +184,7 @@
     }
     bots.forEach(b => b.addEventListener('click', async () => {
       if (!pode) {  // 🔓 v84_378: confere de novo na hora do clique (o estado da abertura da página pode estar velho)
-        try { const j = await (await fetch('/ia/status', { cache: 'no-store' })).json(); pode = !!(j.pode && j.pode.roteiros); motivo = j.motivo || motivo; } catch (_) {}
+        try { const j = await (await fetch('/ia/status', { cache: 'no-store' })).json(); pode = !!(j.pode && j.pode.roteiros) || soTrava(j); motivo = j.motivo || motivo; } catch (_) {}
         if (pode) b.style.opacity = '';
       }
       if (!pode) { dizEm(b, '⚠ A IA está desligada (' + motivo + ') — ligue em 🤖 IA nas buscas e modelos (link no topo).'); return; }

@@ -78,6 +78,11 @@ def registrar(app, base_dir: str) -> None:
         Com "bg": true roda em SEGUNDO PLANO (v84_87): devolve o id da tarefa — pode fechar a aba; ao voltar na página
         a resposta é colada sozinha (e chega um aviso no 🔔)."""
         motivo = ia.motivo_desligado("roteiros")
+        if motivo and ia.sem_credito_valendo():
+            # 🔓 v84_386: você CLICOU pra gerar — tenta de verdade (com as duas chaves) em vez de repetir o erro guardado;
+            # se a API recusar de novo, a trava volta sozinha (401 não cobra nada)
+            ia.salvar_config({"limpar_sem_credito": True})
+            motivo = ia.motivo_desligado("roteiros")
         if motivo:
             return jsonify({"erro": "IA: " + motivo + " — ligue em 🤖 IA nas buscas e modelos."}), 400
         corpo = request.get_json(silent=True) or {}
