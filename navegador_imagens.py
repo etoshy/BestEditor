@@ -210,8 +210,11 @@ def fechar_terminadas(pid: str, cfg: Optional[Dict[str, Any]] = None, espera_s: 
     return {"fechadas": fechadas, "mantidas": mantidas}
 
 
-def destino(site: str, pid: str, pergunta: str = "", elenco: Optional[Dict[str, str]] = None, rotulo: str = "") -> str:
+def destino(site: str, pid: str, pergunta: str = "", elenco: Optional[Dict[str, str]] = None, rotulo: str = "",
+            modo: str = "") -> str:
     d: Dict[str, Any] = {"u": site.rstrip("/"), "p": pid}
+    if modo:  # "lista" (🗂 Busca em lista), "estudio" (📸 Coisas do roteiro no Estúdio, v84_387)…
+        d["m"] = modo
     if pergunta:
         d["q"] = pergunta
     if elenco:
@@ -238,7 +241,7 @@ def proximas(perguntas: List[Dict[str, Any]], enviadas: Dict[str, List[str]], qu
     return fila[:max(1, min(10, int(quantas or 5)))]
 
 
-def script(site: str = "http://localhost:5050", versao: str = "2.6.1") -> str:  # 2.5.x = 📰 modo pesquisa (v84_165/166) · 2.6 = 🗂 busca em lista (v84_293)
+def script(site: str = "http://localhost:5050", versao: str = "2.7.0") -> str:  # 2.7 = 📸 Estúdio (v84_387)  # 2.5.x = 📰 modo pesquisa (v84_165/166) · 2.6 = 🗂 busca em lista (v84_293)
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "navegador_imagens.user.js")
     with open(caminho, encoding="utf-8") as fh:
         return fh.read().replace("__VERSAO__", versao).replace("__SITE__", site.rstrip("/"))

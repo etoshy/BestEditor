@@ -148,4 +148,4 @@ def test_automatico_completa_no_proximo_buscador(cli, monkeypatch):
 def test_script_manda_pra_busca_lista():
     import navegador_imagens as ni
     s = ni.script("http://localhost:5050")
-    assert "DEST.m === 'lista'" in s and "/busca-lista/" in s and "@version      2.6.1" in s
+    assert "DEST.m === 'lista'" in s and "/busca-lista/" in s and "@version      2.7.0" in s

@@ -462,6 +462,18 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
   </div>
   <div class="hgrp" title="Frames cortados do começo de cada clipe de vídeo">✂️<input type="number" id="gTrim" min="0" max="120" step="1"></div>
   <div class="spacer"></div>
+  <button id="btnFotosRoteiro" title="📸 A IA acha no roteiro as pessoas, lugares, obras e eventos que pedem imagem REAL; abre no Brave do site uma guia do Google Imagens pra cada; você marca e elas entram no lugar da cena ou como camada">📸 Coisas do roteiro</button>
+  <script>
+  document.getElementById('btnFotosRoteiro').addEventListener('click', async () => {
+    // salva antes de sair (a página das fotos mexe nos trechos e nas camadas do vídeo)
+    const est = document.getElementById('estadoSalvo'), sv = document.getElementById('btnSalvar');
+    if (est && sv && !/tudo salvo/.test(est.textContent)) {
+      sv.click();
+      for (let k = 0; k < 40 && !/tudo salvo/.test(est.textContent); k++) await new Promise(r => setTimeout(r, 250));
+    }
+    location.href = {{ url_for('fotos_editor_pagina', jid=job.job_id)|tojson }};
+  });
+  </script>
   <button id="btnChatIA" title="Conversar com a IA sobre a parte selecionada (ela muda efeitos, transições, destaques…)">💬 Falar com a IA</button>
   <span class="salvo" id="preBaixar" title="Os clipes que a montagem vai usar já vão sendo baixados enquanto você edita — na hora de montar, eles não baixam de novo" style="display:none"></span>
   <span class="salvo" id="estadoSalvo">tudo salvo</span>

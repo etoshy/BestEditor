@@ -30,4 +30,4 @@ def test_script_antigo_cai_na_lista(tmp_path, monkeypatch):
     e = c.get(f"/busca-lista/{pid}/estado").get_json()
     assert [i["arq"] for i in e["projeto"]["itens"]] == ["andy_beal_01.png"] and e["termos"][0]["fotos"] == 1
     assert c.post("/modelos-video/naoexiste99/fotos-roteiro/link", json=corpo).status_code == 404
-    assert "@version      2.6.1" in NI.script()
+    assert "@version      2.7.0" in NI.script()

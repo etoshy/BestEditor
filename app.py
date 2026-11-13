@@ -3665,6 +3665,32 @@ def _hint_idioma(language: Optional[str]) -> str:
     return idiomas.nome_para_prompt(idiomas.normalizar(language) or "pt")
 
 
+_FILA_NOVOS_VIDEOS = threading.Lock()
+
+
+def _auto_ia_montar(job_id: str, esperar_previas: bool = False) -> None:
+    """📚 v84_387: depois da transcrição, a IA escreve as cenas (o mesmo do botão 🤖 Gerar com a IA e já montar) e as
+    prévias começam. Na fila, só libera o próximo vídeo quando as prévias deste terminarem."""
+    job = _JOBS.get(job_id) or {}
+    if not job.get("auto_ia_montar") or job.get("status") != "aguardando_json" or not job.get("prompt"):
+        return
+    try:
+        job["fase"] = "🤖 A IA está escrevendo as cenas…"
+        import ia_rotas
+        texto = ia_rotas.gerar_roteiro(job["prompt"])
+        _aplicar_resposta_ia(job_id, texto)
+        _save_state(job_id)
+    except Exception as exc:  # noqa: BLE001 — fica parado no prompt, como se fosse à mão
+        job["fase"] = f"⚠ A IA não montou sozinha ({str(exc)[:300]}) — cole a resposta ou use o botão 🤖 nesta página."
+        _save_state(job_id)
+        _avisar_fim(f"🤖 Cenas de “{_nome_job(job_id)}”", str(exc)[:300], f"/job/{job_id}/prompt", "transcricao", "")
+        return
+    if esperar_previas:
+        fim = time.time() + 3 * 3600
+        while time.time() < fim and (_JOBS.get(job_id) or {}).get("status") == "buscando_previas":
+            time.sleep(5)
+
+
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     audio_file = request.files.get("audio")
@@ -3775,6 +3801,9 @@ def transcribe():
         "mix_midia": __import__("mix_midia").do_form(request.form),
         "bibliotecas": _bibliotecas_do_form(request.form, selected_providers),
         "chamadas": chamadas_do_zip,
+        # 📚 v84_387: vários vídeos do Início — um de cada vez (fila) e, se pedido, a IA já escreve as cenas e monta
+        "fila_sequencia": request.form.get("fila_sequencia") == "1",
+        "auto_ia_montar": request.form.get("auto_ia_montar") == "1",
     }
     # 🛒 venda / 🕵️ modelo de vídeo: o escolhido aqui ("venda:ID" / "dossie:ID"), ou o que veio no
     # info.json do .zip do Gerar voz
@@ -3911,7 +3940,18 @@ def transcribe():
                         _j.get("error") if str(_j.get("status", "")).startswith("erro") else None,
                         f"/job/{job_id}/transcribing", "transcricao", str(_j.get("fase") or ""))
 
-    threading.Thread(target=_run_transcription, daemon=True).start()
+    def _na_fila_e_automatico():
+        job0 = _JOBS[job_id]
+        if not job0.get("fila_sequencia"):
+            _run_transcription()
+            return _auto_ia_montar(job_id)
+        job0["fase"] = "⏳ Na fila — começa quando o vídeo anterior terminar."
+        with _FILA_NOVOS_VIDEOS:
+            job0["fase"] = "Transcrevendo…"
+            _run_transcription()
+            _auto_ia_montar(job_id, esperar_previas=True)
+
+    threading.Thread(target=_na_fila_e_automatico, daemon=True).start()
 
     return redirect(url_for("transcribing_status_page", job_id=job_id))
 
@@ -11394,6 +11434,8 @@ import temas_bruto_rotas as _temas_bruto  # noqa: E402  (📚 v84_368: texto bru
 _temas_bruto.registrar(app, BASE_DIR)
 import navegador_imagens as _nav_img  # noqa: E402  (🧲 v84_150: Brave do site + userscript que manda os links)
 _nav_img.registrar(app, BASE_DIR)
+import fotos_editor as _fotos_editor  # noqa: E402  (📸 v84_387: Coisas do roteiro no Estúdio — Brave → substituir/camada)
+_fotos_editor.registrar(app, BASE_DIR, _JOBS, _save_state, _job_dir, load_site_config)
 import pesquisa_rotas as _pesquisa_rotas  # noqa: E402  (📰 v84_165: buscador de casos e notícias)
 _pesquisa_rotas.registrar(app, BASE_DIR)
 import marca_rotas as _marca_rotas  # noqa: E402  (🎨 v84_168: identidade visual — imagens 100% IA na marca)
@@ -11404,7 +11446,9 @@ _assistir.registrar(app, BASE_DIR)
 
 @app.after_request
 def _cors_das_guias(resp):  # 🧲 o script no Google manda os links (fallback com fetch, sem GM_xmlhttpRequest)
-    if request.path in ("/navegador-imagens/aba", "/navegador-imagens/fechar") or (request.path.startswith("/modelos-video/") and any(
+    if request.path in ("/navegador-imagens/aba", "/navegador-imagens/fechar") or (
+            request.path.startswith("/job/") and ("/fotos-editor/link" in request.path or "/fotos-editor/guia-feita" in request.path)) or (
+            request.path.startswith("/modelos-video/") and any(
             k in request.path for k in ("/fotos-roteiro/link", "/fotos-roteiro/guia-feita", "/fotos-roteiro/guias"))):
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"

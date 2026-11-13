@@ -135,6 +135,16 @@
     </div>
   </div>
 
+  <!-- 📚 v84_387: vários vídeos — fontes de cada um, em sequência e já montando com a IA -->
+  <div id="nvVarios" style="display:none;margin:10px 0;border:1px solid #c7d2fe;background:#eef2ff;border-radius:8px;padding:10px 12px;font-size:.88rem;">
+    <b>📚 Vários vídeos</b>
+    <label style="margin:6px 0 0;font-weight:400;"><input type="checkbox" id="nvSeq" checked style="width:auto;"> ⏭ <b>Um de cada vez</b> (em sequência — o próximo começa quando o anterior terminar as prévias)</label>
+    <label style="margin:4px 0 0;font-weight:400;"><input type="checkbox" id="nvAuto" checked style="width:auto;"> 🤖 <b>Já escrever as cenas com a IA e montar</b> (o mesmo do botão “Gerar com a IA e já montar”; sem a IA, cada um para no prompt)</label>
+    <div style="margin-top:8px;font-weight:600;">Fontes de cada vídeo</div>
+    <div style="color:#555;margin-bottom:4px;">“As marcadas acima” = as fontes que estão marcadas nesta página. Ou escolha só algumas pra um vídeo.</div>
+    <div id="nvItens"></div>
+  </div>
+
   <button type="submit" id="btnNovoVideo">Transcrever e gerar prompt</button>
   <pre id="nvLog" style="display:none;background:#f7f7f7;padding:10px;border-radius:6px;font-size:0.82rem;white-space:pre-wrap;margin-top:10px;"></pre>
   <div id="nvLinks" style="margin-top:6px;font-size:.9rem;"></div>
@@ -149,7 +159,37 @@
   {% for v in (_vendas or []) %}NOMES[{{ ('venda_id:' ~ v.id)|tojson }}] = {{ v.nome|tojson }};{% endfor %}
   let carregou = false;
   const marcados = () => [...document.querySelectorAll('.nvCb:checked')];
+  const fontesDe = {};  // chave do vídeo → [providers] (só os que você escolheu pra ele)
+  const todasFontes = () => [...form.querySelectorAll('input[name="providers"]')].map(c => c.value);
+  const chaveArq = (f, k) => 'f' + k + ':' + f.name;
+  function itensAtuais() {
+    return [...[...arqs.files].map((f, k) => ({ chave: chaveArq(f, k), nome: f.name })),
+            ...marcados().map(c => ({ chave: 'v:' + c.dataset.id, nome: (c.closest('.nvItem') || {}).innerText ? c.closest('.nvItem').innerText.split('\n').pop().slice(0, 70) : 'voz ' + c.dataset.id }))];
+  }
+  function desenharItens() {
+    const its = itensAtuais(), box = document.getElementById('nvItens');
+    document.getElementById('nvVarios').style.display = its.length > 1 ? '' : 'none';
+    box.innerHTML = its.map((it, k) => {
+      const custom = fontesDe[it.chave];
+      return `<div class="nvFonte" data-chave="${it.chave.replace(/"/g, '&quot;')}" style="border-top:1px solid #c7d2fe;padding:4px 0;">
+        <b>${k + 1}.</b> ${it.nome.replace(/</g, '&lt;')} —
+        <select class="nvModo" style="width:auto;display:inline-block;margin:0;padding:2px 6px;font-size:.82rem;">
+          <option value="todas" ${custom ? '' : 'selected'}>as marcadas acima</option><option value="so" ${custom ? 'selected' : ''}>só estas…</option></select>
+        <span class="nvSo" style="${custom ? '' : 'display:none'}">${todasFontes().map(p => `<label style="display:inline-block;margin:0 6px 0 0;font-weight:400;font-size:.82rem;">
+          <input type="checkbox" value="${p}" ${custom && custom.includes(p) ? 'checked' : ''} style="width:auto;"> ${p}</label>`).join('')}</span></div>`;
+    }).join('');
+    box.querySelectorAll('.nvFonte').forEach(row => {
+      const ch = row.dataset.chave, sel = row.querySelector('.nvModo'), so = row.querySelector('.nvSo');
+      const ler = () => { fontesDe[ch] = [...so.querySelectorAll('input:checked')].map(c => c.value); };
+      sel.addEventListener('change', () => {
+        if (sel.value === 'so') { so.style.display = ''; if (!fontesDe[ch]) { so.querySelectorAll('input').forEach(c => { c.checked = !!form.querySelector(`input[name="providers"][value="${c.value}"]:checked`); }); } ler(); }
+        else { so.style.display = 'none'; delete fontesDe[ch]; }
+      });
+      so.addEventListener('change', ler);
+    });
+  }
   function atualizar() {
+    desenharItens();
     const nv = marcados().length, nf = arqs.files.length, tot = nv + nf;
     document.getElementById('nvN').textContent = nv ? `· ${nv} marcado(s)` : '';
     arqs.required = !nv;
@@ -187,8 +227,8 @@
     const log = document.getElementById('nvLog'), links = document.getElementById('nvLinks');
     log.style.display = ''; log.textContent = ''; links.innerHTML = '';
     const varios = vozes.length + files.length > 1;
-    const fontes = [...files.map(f => ({ nome: f.name, pegar: async () => f })),
-                    ...vozes.map(c => ({ nome: 'voz ' + c.dataset.id.slice(0, 8) + '.zip', pegar: async () => {
+    const fontes = [...files.map((f, k) => ({ nome: f.name, chave: chaveArq(f, k), pegar: async () => f })),
+                    ...vozes.map(c => ({ nome: 'voz ' + c.dataset.id.slice(0, 8) + '.zip', chave: 'v:' + c.dataset.id, pegar: async () => {
                       const r = await fetch(c.value); if (!r.ok) throw new Error('não consegui pegar o .zip (' + r.status + ')'); return await r.blob(); } }))];
     let ok = 0;
     for (let k = 0; k < fontes.length; k++) {
@@ -198,6 +238,12 @@
         const fd = new FormData(form);
         fd.delete('audio'); fd.set('audio', await f.pegar(), f.nome);
         if (varios) fd.set('projeto_midias', '');  // vários: cada .zip usa o projeto que veio com ele
+        if (fontesDe[f.chave]) {  // 📚 v84_387: as fontes que você escolheu só pra este vídeo
+          if (!fontesDe[f.chave].length) throw new Error('marque pelo menos uma fonte pra este vídeo');
+          fd.delete('providers'); fontesDe[f.chave].forEach(p => fd.append('providers', p));
+        }
+        if (varios && document.getElementById('nvSeq').checked) fd.set('fila_sequencia', '1');
+        if (varios && document.getElementById('nvAuto').checked) fd.set('auto_ia_montar', '1');
         const r = await fetch(form.action, { method: 'POST', body: fd });
         if (!r.ok || !/\/transcrib|\/job\//.test(r.url)) {
           const html = await r.text(); const m = html.match(/class="error"[^>]*>([^<]+)/);
@@ -207,7 +253,8 @@
         links.insertAdjacentHTML('beforeend', `<div>✅ <a href="${r.url}" target="_blank">${f.nome}</a></div>`);
       } catch (e) { log.textContent += '❌ ' + e.message + '\n'; }
     }
-    log.textContent += `\n${ok} de ${fontes.length} vídeo(s) criados — cada um segue sozinho; acompanhe na 🎞 Galeria de projetos.`;
+    log.textContent += `\n${ok} de ${fontes.length} vídeo(s) criados` + (document.getElementById('nvSeq').checked ? ' — eles rodam um de cada vez' : ' — cada um segue sozinho')
+      + (document.getElementById('nvAuto').checked ? ', e a IA já escreve as cenas e monta' : '') + '. Acompanhe na 🎞 Galeria de projetos (pode fechar esta página).';
     links.insertAdjacentHTML('beforeend', `<div style="margin-top:4px;"><a href="/jobs">🎞 Abrir a Galeria de projetos →</a></div>`);
     btn.disabled = false;
   });

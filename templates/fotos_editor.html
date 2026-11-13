@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Coisas do roteiro{% endblock %}
+{% block content %}
+<style>
+  .fe-item{border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin:10px 0;background:#fff}
+  .fe-item.tem{border-color:#c7d2fe}
+  .fe-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .fe-tipo{font-size:.75rem;padding:1px 8px;border-radius:10px;background:#f1f5f9;color:#334155}
+  .fe-tempo{font-family:monospace;color:#6b7280;font-size:.85rem}
+  .fe-frase{color:#4b5563;font-size:.85rem;margin:4px 0}
+  .fe-fotos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .fe-foto{position:relative;width:120px;height:80px;border-radius:6px;overflow:hidden;border:3px solid transparent;cursor:pointer;background:#111}
+  .fe-foto img{width:100%;height:100%;object-fit:cover}
+  .fe-foto.sel{border-color:#7c3aed}
+  .fe-foto .ok{position:absolute;top:2px;right:4px;background:#7c3aed;color:#fff;border-radius:8px;font-size:.7rem;padding:0 5px;display:none}
+  .fe-foto.sel .ok{display:block}
+  .fe-acoes{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .fe-acoes button,.fe-barra button{width:auto;margin:0;padding:5px 10px;font-size:.85rem}
+  .fe-feito{font-size:.8rem;color:#166534;margin-top:4px}
+  .fe-feito button{width:auto;margin:0 0 0 6px;padding:1px 8px;font-size:.75rem;background:#64748b}
+  .fe-barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+  .fe-ed input{margin:0;padding:3px 6px;font-size:.85rem}
+</style>
+
+<p><a href="{{ url_for('edit_segments_page', job_id=jid) }}">◀ Voltar ao Estúdio</a> (ele abre com as mudanças)</p>
+<h1>📸 Coisas do roteiro</h1>
+<p style="color:#555;margin-top:-6px">A IA lê a narração e lista o que pede <b>imagem real</b> — pessoas, lugares, obras, eventos históricos,
+documentos. O 🧲 Brave do site abre uma guia do Google Imagens pra cada item: marque as imagens certas e clique em
+<b>“Capturar e enviar ao site”</b>. Elas aparecem aqui; escolha <b>🔁 Substituir a cena</b> daquele momento ou <b>➕ Camada</b> por cima.</p>
+
+<div class="fe-barra">
+  <button type="button" id="feAnalisar" style="background:#4f46e5">🤖 Achar as coisas do roteiro</button>
+  <button type="button" id="feGuias" style="background:#7c3aed">🧲 Abrir no Brave (os que ainda não têm foto)</button>
+  <button type="button" id="feNovo" style="background:#64748b">➕ Item à mão</button>
+  <span id="feSt" style="color:#555"></span>
+</div>
+<p style="font-size:.82rem;color:#6b7280;margin-top:-4px">Primeira vez? Em 🧲 Navegador das imagens (Buscador de casos / Modelos de vídeo) faça o ⚙ Preparar — e <b>atualize o script</b> do Tampermonkey (versão 2.7) pra ele mandar as fotos pra cá.</p>
+
+<div id="feLista"></div>
+
+<script>
+(() => {
+  const JID = {{ jid|tojson }};
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const mmss = (s) => { s = Math.max(0, +s || 0); return Math.floor(s / 60) + ':' + (s % 60).toFixed(1).padStart(4, '0'); };
+  const segs = (t) => { const m = String(t).trim().match(/^(\d+):(\d+(?:[.,]\d+)?)$/); return m ? (+m[1]) * 60 + parseFloat(m[2].replace(',', '.')) : parseFloat(String(t).replace(',', '.')); };
+  const ICONE = {pessoa: '👤', lugar: '📍', obra: '🖼', evento: '⚔️', documento: '📜', objeto: '🏺', outro: '•'};
+  let estado = {itens: [], fotos: {}, feitos: {}}, timer = null;
+  const sel = {};  // item → Set(bib)
+
+  async function api(caminho, corpo) {
+    const r = await fetch(`/job/${JID}/fotos-editor${caminho}`, corpo === undefined ? {} :
+      {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)});
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+  }
+
+  function desenhar() {
+    const box = $('feLista');
+    if (!estado.itens.length) {
+      box.innerHTML = estado.analisando ? '<p>⏳ a IA está lendo a narração…</p>' :
+        '<p style="color:#666">Nada ainda — clique em 🤖 Achar as coisas do roteiro (ou ➕ Item à mão).</p>';
+      return;
+    }
+    box.innerHTML = estado.itens.map(it => {
+      const fotos = estado.fotos[it.id] || [], s = sel[it.id] || (sel[it.id] = new Set());
+      const feitos = estado.feitos[it.id] || [];
+      return `<div class="fe-item ${fotos.length ? 'tem' : ''}" data-id="${it.id}">
+        <div class="fe-top"><b>${ICONE[it.tipo] || '•'} ${esc(it.nome)}</b><span class="fe-tipo">${esc(it.tipo)}</span>
+          <span class="fe-tempo">${mmss(it.start)} → ${mmss(it.end)}</span>
+          <span class="fe-ed">🔎 <input class="fe-busca" value="${esc(it.busca)}" style="width:260px" title="o que o Google vai buscar">
+            ⏱ <input class="fe-a" value="${mmss(it.start)}" style="width:60px"> → <input class="fe-b" value="${mmss(it.end)}" style="width:60px"></span>
+          <button type="button" class="fe-salvar" style="width:auto;margin:0;padding:2px 8px;font-size:.78rem;background:#64748b">salvar</button>
+          <button type="button" class="fe-abrir" style="width:auto;margin:0;padding:2px 8px;font-size:.78rem;background:#7c3aed">🧲 abrir no Brave</button>
+          <button type="button" class="fe-apagar" style="width:auto;margin:0;padding:2px 8px;font-size:.78rem;background:#b91c1c" title="tirar este item">✕</button></div>
+        ${it.frase ? `<div class="fe-frase">“${esc(it.frase)}”${it.por_que ? ' — <i>' + esc(it.por_que) + '</i>' : ''}</div>` : ''}
+        <div class="fe-fotos">${fotos.length ? fotos.map(f => `<div class="fe-foto ${s.has(f.bib) ? 'sel' : ''}" data-bib="${f.bib}" title="clique pra marcar"><img src="${f.url}" loading="lazy"><span class="ok">✔</span></div>`).join('')
+          : '<span style="color:#9ca3af;font-size:.85rem">sem foto ainda — abra no Brave, marque e “Capturar e enviar ao site”</span>'}</div>
+        ${fotos.length ? `<div class="fe-acoes"><span style="font-size:.85rem">${s.size ? s.size + ' marcada(s):' : 'marque as fotos e:'}</span>
+          <button type="button" class="fe-subst" ${s.size ? '' : 'disabled'} style="background:#2563eb">🔁 Substituir a cena</button>
+          <button type="button" class="fe-cam" data-onde="canto" ${s.size ? '' : 'disabled'} style="background:#059669">➕ Camada no canto</button>
+          <button type="button" class="fe-cam" data-onde="centro" ${s.size ? '' : 'disabled'} style="background:#047857">➕ Camada no centro</button></div>` : ''}
+        ${feitos.map(f => `<div class="fe-feito">✅ ${f.modo === 'camada' ? '➕ camada' : '🔁 cena do trecho ' + (f.trecho + 1)} <button type="button" class="fe-desf" data-f="${f.id}">↩ desfazer</button></div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  async function carregar() {
+    try { estado = await api('/estado'); } catch (e) { $('feSt').textContent = '⚠ ' + e.message; return; }
+    if (estado.erro) $('feSt').textContent = '⚠ ' + estado.erro;
+    const ae = document.activeElement;
+    if (!(ae && ae.tagName === 'INPUT' && $('feLista').contains(ae))) desenhar();  // não apaga o que você está digitando
+    clearTimeout(timer); timer = setTimeout(carregar, estado.analisando ? 2500 : 5000);  // as fotos chegam das guias sozinhas
+  }
+
+  $('feAnalisar').onclick = async () => {
+    $('feSt').textContent = '⏳ a IA está lendo a narração…';
+    try { await api('/analisar', {}); estado.analisando = true; desenhar(); carregar(); } catch (e) { $('feSt').textContent = '⚠ ' + e.message; }
+  };
+  async function guias(ids) {
+    $('feSt').textContent = '🧲 abrindo o Brave…';
+    try { const d = await api('/guias', {ids: ids || []});
+      $('feSt').textContent = d.abertas ? `🧲 ${d.abertas} guia(s) abertas no ${d.navegador} — marque as imagens e clique em “Capturar e enviar ao site”. Elas aparecem aqui sozinhas.` + (d.aviso ? ' ⚠ ' + d.aviso : '') : (d.msg || 'nada pra abrir');
+    } catch (e) { $('feSt').textContent = '⚠ ' + e.message; }
+  }
+  $('feGuias').onclick = () => guias();
+  $('feNovo').onclick = async () => {
+    const nome = prompt('O que buscar? (ex.: Immanuel Kant portrait)'); if (!nome) return;
+    const a = prompt('Em que momento? (ex.: 1:23)', '0:00'); if (a === null) return;
+    try { estado = await api('/item', {nome, busca: nome, start: segs(a), end: segs(a) + 5}); desenhar(); } catch (e) { alert(e.message); }
+  };
+
+  $('feLista').addEventListener('click', async (ev) => {
+    const card = ev.target.closest('.fe-item'); if (!card) return;
+    const id = card.dataset.id, s = sel[id] || (sel[id] = new Set());
+    const foto = ev.target.closest('.fe-foto');
+    try {
+      if (foto) { s.has(foto.dataset.bib) ? s.delete(foto.dataset.bib) : s.add(foto.dataset.bib); desenhar(); return; }
+      if (ev.target.classList.contains('fe-abrir')) return guias([id]);
+      if (ev.target.classList.contains('fe-salvar')) {
+        estado = await api('/item', {id, busca: card.querySelector('.fe-busca').value, start: segs(card.querySelector('.fe-a').value), end: segs(card.querySelector('.fe-b').value)});
+        $('feSt').textContent = '💾 item salvo'; return desenhar();
+      }
+      if (ev.target.classList.contains('fe-apagar')) { if (!confirm('Tirar este item?')) return; estado = await api('/item', {id, apagar: true}); return desenhar(); }
+      if (ev.target.classList.contains('fe-subst') || ev.target.classList.contains('fe-cam')) {
+        const cam = ev.target.classList.contains('fe-cam');
+        estado = await api('/aplicar', {item: id, fotos: [...s], modo: cam ? 'camada' : 'substituir', onde: ev.target.dataset.onde || 'canto'});
+        s.clear(); $('feSt').textContent = cam ? '➕ camada adicionada — volte ao Estúdio pra ver' : '🔁 cena substituída — volte ao Estúdio pra ver';
+        return desenhar();
+      }
+      if (ev.target.classList.contains('fe-desf')) { estado = await api('/desfazer', {id: ev.target.dataset.f}); $('feSt').textContent = '↩ desfeito'; return desenhar(); }
+    } catch (e) { $('feSt').textContent = '⚠ ' + e.message; }
+  });
+  carregar();
+})();
+</script>
+{% endblock %}

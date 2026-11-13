@@ -6,6 +6,33 @@ from typing import Any
 import ia_servico as ia
 
 
+def gerar_roteiro(prompt: str) -> str:
+    """📝 Manda um prompt de roteiro/edição pra IA (o mesmo do botão 🤖 Gerar com a IA). v84_387: fora do registrar,
+    pra fila de vários vídeos do Início usar também."""
+    import ia_servico as ia
+    import re
+    # v84_99: prompts que pedem TEXTO PURO (🎙 adaptar pro TTS, ✍️ uma parte do roteiro) não podem receber o system de
+    # "só JSON" — a IA embrulhava o texto num JSON com uma chave qualquer e o site não achava o roteiro.
+    if re.search(r"sem JSON|TEXTO PURO|no JSON|plain text", prompt[-2500:], re.I):
+        system = ("Siga o pedido do usuário e responda SÓ com o texto pedido, em texto puro — sem JSON, sem ``` em volta, "
+                  "sem título e sem comentário antes ou depois.")
+    else:
+        system = "Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois, sem ``` em volta."
+    import idiomas
+    m = re.search(r"output language code: ([a-z]{2,3}(?:-[A-Za-z]{2})?)", prompt) or re.search(r"\(([a-z]{2})\) — roteiro", prompt)
+    cod = idiomas.normalizar(m.group(1)) if m else None
+    if cod and cod != "pt":  # 🌐 o idioma de saída vai também no system (a IA tende a seguir o idioma das instruções)
+        nome = idiomas.IDIOMAS.get(cod, (cod, cod))[1]
+        system += (f"\n\nOUTPUT LANGUAGE: {nome}. Every text value in the JSON (script/roteiro, titles, chapters, description, "
+                   f"tags, CTA, notes) MUST be written in {nome}, even though the instructions and the sources are in Portuguese. "
+                   f"Translate the facts faithfully. Keep the JSON keys exactly as in the example.")
+    texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=64000, effort="medium", timeout=900)
+    if not texto:
+        raise RuntimeError("A IA não respondeu: " + (ia.motivo_desligado("roteiros") or ia.ultimo_erro("roteiros")
+                                                      or "veja as últimas chamadas em 🤖 IA") + ".")
+    return texto
+
+
 def registrar(app, base_dir: str) -> None:
     from flask import jsonify, redirect, render_template, request, url_for
 
@@ -49,28 +76,7 @@ def registrar(app, base_dir: str) -> None:
         ia.salvar_config(novos)
         return _pagina(salvo=not aviso, aviso=aviso)
 
-    def _gerar_roteiro(prompt: str) -> str:
-        import re
-        # v84_99: prompts que pedem TEXTO PURO (🎙 adaptar pro TTS, ✍️ uma parte do roteiro) não podem receber o system de
-        # "só JSON" — a IA embrulhava o texto num JSON com uma chave qualquer e o site não achava o roteiro.
-        if re.search(r"sem JSON|TEXTO PURO|no JSON|plain text", prompt[-2500:], re.I):
-            system = ("Siga o pedido do usuário e responda SÓ com o texto pedido, em texto puro — sem JSON, sem ``` em volta, "
-                      "sem título e sem comentário antes ou depois.")
-        else:
-            system = "Siga o pedido do usuário e responda SÓ com o JSON pedido, sem texto antes ou depois, sem ``` em volta."
-        import idiomas
-        m = re.search(r"output language code: ([a-z]{2,3}(?:-[A-Za-z]{2})?)", prompt) or re.search(r"\(([a-z]{2})\) — roteiro", prompt)
-        cod = idiomas.normalizar(m.group(1)) if m else None
-        if cod and cod != "pt":  # 🌐 o idioma de saída vai também no system (a IA tende a seguir o idioma das instruções)
-            nome = idiomas.IDIOMAS.get(cod, (cod, cod))[1]
-            system += (f"\n\nOUTPUT LANGUAGE: {nome}. Every text value in the JSON (script/roteiro, titles, chapters, description, "
-                       f"tags, CTA, notes) MUST be written in {nome}, even though the instructions and the sources are in Portuguese. "
-                       f"Translate the facts faithfully. Keep the JSON keys exactly as in the example.")
-        texto = ia.chamar("roteiros", system, prompt, schema=None, max_tokens=64000, effort="medium", timeout=900)
-        if not texto:
-            raise RuntimeError("A IA não respondeu: " + (ia.motivo_desligado("roteiros") or ia.ultimo_erro("roteiros")
-                                                          or "veja as últimas chamadas em 🤖 IA") + ".")
-        return texto
+    _gerar_roteiro = gerar_roteiro
 
     @app.route("/ia/gerar", methods=["POST"])
     def ia_gerar():

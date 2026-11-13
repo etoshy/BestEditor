@@ -431,6 +431,7 @@
   }
   // 🗂 v84_293: guia aberta pela Busca em lista (#bes com m:"lista") → as fotos vão pra /busca-lista/<id>
   function baseDoDestino() {
+    if (DEST && DEST.m === 'estudio') return `/job/${encodeURIComponent(DEST.p)}/fotos-editor`;  // 📸 v84_387: Coisas do roteiro no Estúdio
     return (DEST && DEST.m === 'lista') ? `/busca-lista/${encodeURIComponent(DEST.p)}` : `/modelos-video/${encodeURIComponent(DEST.p)}/fotos-roteiro`;
   }
   async function enviarTudo() {
