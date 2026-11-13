@@ -244,6 +244,8 @@ def _rota_do_script_externo(caminho: str) -> bool:
     fim = caminho.rsplit("/", 1)[-1]
     if caminho.startswith("/modelos-video/") and "/fotos-roteiro/" in caminho and fim in ("link", "guia-feita", "guias"):
         return True
+    if caminho.startswith("/job/") and "/fotos-editor/" in caminho and fim in ("link", "guia-feita"):  # 📸 v84_387
+        return True
     return caminho.startswith("/busca-lista/") and fim in ("link", "guia-feita", "guias")
 
 

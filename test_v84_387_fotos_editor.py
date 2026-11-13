@@ -65,7 +65,7 @@ def test_rotas_link_e_aplicar(monkeypatch, tmp_path):
     import fotos_editor
     c = A.app.test_client()
     r = c.post("/job/jfe1/fotos-editor/link", data='{"pergunta": "it1", "url": "https://x/k.png", "dados_b64": "%s"}' % _png(),
-               content_type="text/plain")
+               content_type="text/plain", headers={"Origin": "https://www.google.com"})  # vem da guia do Google
     assert r.status_code == 200 and r.headers.get("Access-Control-Allow-Origin") == "*"
     st = c.get("/job/jfe1/fotos-editor/estado").get_json()
     bib = st["fotos"]["it1"][0]["bib"]
