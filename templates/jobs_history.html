@@ -49,6 +49,8 @@
         <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">Ver progresso</a>
         {% elif job.status == 'aguardando_termos_buscadores' %}
         <a href="{{ url_for('show_termos_buscadores', job_id=job.job_id) }}">Colar termos dos buscadores</a>
+        {% elif job.status == 'ia_escrevendo' %}
+        <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">🤖 IA escrevendo as cenas…</a>
         {% elif job.status == 'buscando_termos_buscadores' %}
         <a href="{{ url_for('transcribing_status_page', job_id=job.job_id) }}">Ver progresso</a>
         {% elif job.status == 'aguardando_json' %}

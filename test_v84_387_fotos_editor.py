@@ -116,3 +116,24 @@ def test_auto_ia_sem_ia_fica_no_prompt(monkeypatch):
     monkeypatch.setattr(ia_rotas, "gerar_roteiro", falha)
     A._auto_ia_montar("jx")
     assert job["status"] == "aguardando_json" and "não montou sozinha" in job["fase"]
+
+
+def test_pagina_de_espera_tempo_do_servidor_e_status_da_ia(monkeypatch):
+    import time
+    import app as A
+    job = {"job_id": "jt1", "status": "aguardando_json", "fase": "Transcrevendo…", "created_at": time.time() - 100,
+           "auto_ia_montar": True, "auto_ia_feito": False}
+    monkeypatch.setitem(A._JOBS, "jt1", job)
+    c = A.app.test_client()
+    d = c.get("/job/jt1/transcribing/status").get_json() if c.get("/job/jt1/transcribing/status").status_code == 200 else None
+    if d is None:
+        from flask import url_for
+        with A.app.test_request_context():
+            d = c.get(url_for("transcribing_status_api", job_id="jt1")).get_json()
+    assert d["status"] == "ia_escrevendo"  # não pula pro prompt antes da IA pegar
+    assert d["total_s"] >= 99 and d["na_etapa_s"] == 0
+    job["fase_desde"] = time.time() - 40
+    with A.app.test_request_context():
+        from flask import url_for
+        d = c.get(url_for("transcribing_status_api", job_id="jt1")).get_json()
+    assert d["na_etapa_s"] >= 39  # recarregar a página não zera: o tempo é do servidor

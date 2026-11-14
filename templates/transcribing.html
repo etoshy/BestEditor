@@ -25,11 +25,13 @@
 </style>
 
 <script>
-let elapsedSeconds = 0;
+// ⏱ v84_391: os segundos vêm do servidor (recarregar não zera): tempo nesta etapa + total desde o envio
+let naEtapa = 0, total = 0;
 const elapsedEl = document.getElementById('elapsed-text');
+const fmt = (s) => s >= 60 ? Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s' : s + ' s';
 setInterval(() => {
-  elapsedSeconds += 1;
-  elapsedEl.textContent = elapsedSeconds + 's';
+  naEtapa += 1; total += 1;
+  elapsedEl.textContent = fmt(naEtapa) + (total > naEtapa + 2 ? ' nesta etapa · ' + fmt(total) + ' no total' : '');
 }, 1000);
 
 async function poll() {
@@ -44,6 +46,11 @@ async function poll() {
 
   if (data.fase) {
     document.getElementById('fase-titulo').textContent = data.fase;
+  }
+  if (typeof data.na_etapa_s === 'number') { naEtapa = data.na_etapa_s; total = data.total_s || naEtapa; }
+  if (['buscando_previas', 'pronto_para_editar', 'previas_pausadas'].includes(data.status)) {
+    window.location.href = "{{ url_for('fetching_previews_page', job_id=job.job_id) }}";  // 🤖 automático: já está buscando as mídias
+    return;
   }
   if (data.status === 'aguardando_json') {
     window.location.href = "{{ url_for('show_prompt', job_id=job.job_id) }}";

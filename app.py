@@ -333,7 +333,8 @@ _JOBS: Dict[str, Dict[str, Any]] = {}
 _PERF_LOGS: Dict[str, PerfLog] = {}  # separado de _JOBS de propósito — PerfLog não é serializável em JSON,
 # e _save_state() faz json.dump(_JOBS[job_id]) direto, então nunca pode entrar ali dentro.
 
-_STATUS_EM_ANDAMENTO = ("transcrevendo", "buscando_termos_wikipedia", "buscando_termos_buscadores", "buscando_previas", "montando")
+_STATUS_EM_ANDAMENTO = ("transcrevendo", "buscando_termos_wikipedia", "buscando_termos_buscadores", "buscando_previas", "montando",
+                        "ia_escrevendo")  # 🤖 v84_391: o servidor caiu com a IA escrevendo → volta pro prompt
 
 
 def _carregar_projetos_salvos() -> int:
@@ -3675,14 +3676,20 @@ def _auto_ia_montar(job_id: str, esperar_previas: bool = False) -> None:
     prévias começam. Na fila, só libera o próximo vídeo quando as prévias deste terminarem."""
     job = _JOBS.get(job_id) or {}
     if not job.get("auto_ia_montar") or job.get("status") != "aguardando_json" or not job.get("prompt"):
+        job["auto_ia_feito"] = True
         return
+    job["auto_ia_feito"] = False
     try:
         job["fase"] = "🤖 A IA está escrevendo as cenas…"
+        job["status"] = "ia_escrevendo"  # v84_391: a página de espera fica nesta etapa (não pula pro prompt)
         import ia_rotas
         texto = ia_rotas.gerar_roteiro(job["prompt"])
         _aplicar_resposta_ia(job_id, texto)
+        job["auto_ia_feito"] = True
         _save_state(job_id)
     except Exception as exc:  # noqa: BLE001 — fica parado no prompt, como se fosse à mão
+        job["auto_ia_feito"] = True
+        job["status"] = "aguardando_json"
         job["fase"] = f"⚠ A IA não montou sozinha ({str(exc)[:300]}) — cole a resposta ou use o botão 🤖 nesta página."
         _save_state(job_id)
         _avisar_fim(f"🤖 Cenas de “{_nome_job(job_id)}”", str(exc)[:300], f"/job/{job_id}/prompt", "transcricao", "")
@@ -3983,7 +3990,17 @@ def transcribing_status_api(job_id: str):
     job = _JOBS.get(job_id)
     if not job:
         return jsonify({"error": "job não encontrado"}), 404
-    return jsonify({"status": job.get("status"), "error": job.get("error"), "fase": job.get("fase")})
+    # ⏱ v84_391: o tempo vem do SERVIDOR (recarregar a página não zera mais) — quando a etapa mudou e o total
+    fase = job.get("fase")
+    status = job.get("status")
+    if status == "aguardando_json" and job.get("auto_ia_montar") and not job.get("auto_ia_feito"):
+        status = "ia_escrevendo"  # a IA ainda vai pegar (o servidor está entre a transcrição e a IA)
+    if fase != job.get("_fase_vista"):
+        job["_fase_vista"], job["fase_desde"] = fase, time.time()
+    agora = time.time()
+    return jsonify({"status": status, "error": job.get("error"), "fase": fase,
+                    "na_etapa_s": int(agora - float(job.get("fase_desde") or agora)),
+                    "total_s": int(agora - float(job.get("created_at") or agora))})
 
 
 # --------------------------------------------------------------------- #
