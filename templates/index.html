@@ -137,12 +137,14 @@
 
   <!-- 📚 v84_387: vários vídeos — fontes de cada um, em sequência e já montando com a IA -->
   <div id="nvVarios" style="display:none;margin:10px 0;border:1px solid #c7d2fe;background:#eef2ff;border-radius:8px;padding:10px 12px;font-size:.88rem;">
-    <b>📚 Vários vídeos</b>
+    <b>🤖 Automático</b> <span style="color:#555">(vale pra um ou vários vídeos)</span>
     <label style="margin:6px 0 0;font-weight:400;"><input type="checkbox" id="nvSeq" checked style="width:auto;"> ⏭ <b>Um de cada vez</b> (em sequência — o próximo começa quando o anterior terminar as prévias)</label>
-    <label style="margin:4px 0 0;font-weight:400;"><input type="checkbox" id="nvAuto" checked style="width:auto;"> 🤖 <b>Já escrever as cenas com a IA e montar</b> (o mesmo do botão “Gerar com a IA e já montar”; sem a IA, cada um para no prompt)</label>
+    <label style="margin:4px 0 0;font-weight:400;"><input type="checkbox" id="nvAuto" checked style="width:auto;"> 🤖 <b>Fazer tudo sozinho:</b> transcreve, a IA escreve as cenas, o site busca as mídias e o projeto fica pronto no editor (o mesmo do botão “Gerar com a IA e já montar”; se a IA falhar, aquele vídeo para no prompt pra você)</label>
+    <div id="nvFontesCada">
     <div style="margin-top:8px;font-weight:600;">Fontes de cada vídeo</div>
     <div style="color:#555;margin-bottom:4px;">“As marcadas acima” = as fontes que estão marcadas nesta página. Ou escolha só algumas pra um vídeo.</div>
     <div id="nvItens"></div>
+    </div>
   </div>
 
   <button type="submit" id="btnNovoVideo">Transcrever e gerar prompt</button>
@@ -168,7 +170,8 @@
   }
   function desenharItens() {
     const its = itensAtuais(), box = document.getElementById('nvItens');
-    document.getElementById('nvVarios').style.display = its.length > 1 ? '' : 'none';
+    document.getElementById('nvVarios').style.display = its.length >= 1 ? '' : 'none';  // v84_390: com 1 também (o 🤖 automático)
+    const fc = document.getElementById('nvFontesCada'); if (fc) fc.style.display = its.length > 1 ? '' : 'none';
     box.innerHTML = its.map((it, k) => {
       const custom = fontesDe[it.chave];
       return `<div class="nvFonte" data-chave="${it.chave.replace(/"/g, '&quot;')}" style="border-top:1px solid #c7d2fe;padding:4px 0;">
@@ -221,7 +224,8 @@
 
   form.addEventListener('submit', async (ev) => {
     const vozes = marcados(), files = [...arqs.files];
-    if (vozes.length + files.length <= 1 && !vozes.length) return;  // 1 arquivo: envio normal de sempre
+    const autoLigado = document.getElementById('nvAuto').checked;
+    if (vozes.length + files.length <= 1 && !vozes.length && !autoLigado) return;  // 1 arquivo sem o 🤖: envio normal de sempre
     ev.preventDefault();
     const btn = document.getElementById('btnNovoVideo'); btn.disabled = true;
     const log = document.getElementById('nvLog'), links = document.getElementById('nvLinks');
@@ -243,7 +247,7 @@
           fd.delete('providers'); fontesDe[f.chave].forEach(p => fd.append('providers', p));
         }
         if (varios && document.getElementById('nvSeq').checked) fd.set('fila_sequencia', '1');
-        if (varios && document.getElementById('nvAuto').checked) fd.set('auto_ia_montar', '1');
+        if (autoLigado) fd.set('auto_ia_montar', '1');  // v84_390: também com um vídeo só
         const r = await fetch(form.action, { method: 'POST', body: fd });
         if (!r.ok || !/\/transcrib|\/job\//.test(r.url)) {
           const html = await r.text(); const m = html.match(/class="error"[^>]*>([^<]+)/);

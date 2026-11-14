@@ -174,13 +174,17 @@ def test_parse_rejects_incomplete_coverage():
 
 
 def test_parse_rejects_invalid_provider():
+    # v84_389: provedor fora da lista não derruba mais o JSON — o trecho vai pro banco principal marcado
     resp = json.dumps([{"start": 0.0, "end": 12.0, "provider": "youtube", "query": "x"}])
+    r = parse_ai_response(resp, valid_providers=["pexels", "pixabay"])
+    assert r.segments[0].provider == "pexels" and r.segments[0].query.startswith("x")
+    # só material/produto marcados: aí continua sendo erro (não tem banco pra onde mandar)
     try:
-        parse_ai_response(resp, valid_providers=["pexels", "pixabay"])
+        parse_ai_response(resp, valid_providers=["material"])
         raise AssertionError("deveria ter falhado")
     except PromptBuilderError:
         pass
-    print("OK: provedor fora da lista permitida é detectado.")
+    print("OK: provedor fora da lista permitida vai pro banco marcado.")
 
 
 def test_parse_rejects_missing_field():

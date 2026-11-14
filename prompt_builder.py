@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_PROVIDERS = ["pexels", "pixabay", "magnific", "mixkit", "vistacreate", "animepexels", "moviepexels", "animepexels_online", "moviepexels_online", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow", "runpod", "youtube"]
 PHOTO_SEARCH_PROVIDERS = {"pexels", "wikipedia", "bing", "brave", "yandex", "startpage", "google", "flow", "runpod"}  # provedores que suportam media_type="image" (busca de fotos de verdade)
@@ -1441,6 +1441,32 @@ def avisos_buscas(segmentos: List[Dict[str, Any]]) -> List[str]:
     return avisos
 
 
+_PROVEDORES_DO_PROJETO = ("material", "produto")
+
+
+def consertar_provedor(provider: str, query: str, validos: Any, overlay: bool = False) -> Tuple[str, str]:
+    """🔧 v84_389: a IA às vezes erra o campo "provider" — escreve a BUSCA nele ("anime daily life friends"), troca os dois
+    campos de lugar ou escreve o nome do banco com espaço ("anime pexels online"). Antes isso derrubava o JSON inteiro
+    ("provedor … não está entre os permitidos"). Agora: nome parecido → o banco certo; a busca no lugar do banco → vai
+    pro banco principal marcado (e vira a busca se a query estava vazia ou era o nome do banco)."""
+    validos = set(validos or ())
+    if not validos or provider in validos:
+        return provider, query
+    chave = lambda t: re.sub(r"[^a-z0-9]", "", str(t or "").lower())  # noqa: E731
+    por_chave = {chave(v): v for v in validos}
+    if chave(provider) in por_chave:  # "anime pexels online", "AnimePexels-Online"…
+        return por_chave[chave(provider)], query
+    if chave(query) in por_chave:  # os dois campos trocados
+        return por_chave[chave(query)], provider
+    principais = sorted(v for v in validos if v not in _PROVEDORES_DO_PROJETO)
+    if not principais:
+        return provider, query  # só material/produto: deixa o erro normal aparecer
+    # banco principal: o primeiro marcado que não é do projeto (com um só, é ele)
+    destino = principais[0]
+    nova_query = query if query.strip() else provider
+    return destino, nova_query
+
+
 def parse_ai_response(
     raw_text: str,
     valid_providers: Optional[List[str]] = None,
@@ -1569,6 +1595,7 @@ def parse_ai_response(
 
         provider = str(item["provider"]).strip().lower()
         query = str(item["query"]).strip()
+        provider, query = consertar_provedor(provider, query, valid_providers_set)  # v84_389: a IA trocou os campos
         if provider in _PROVEDORES_COM_LIMPEZA:
             query = limpar_query(query) or query
         alternativas = alternativas_do_item(item, query) if provider not in _PROVEDORES_SEM_ALTERNATIVA else []
@@ -1689,6 +1716,8 @@ def parse_ai_response(
         elif ov_media_type in ("image", "video"):
             ov_provider = str(ov.get("provider", "")).strip().lower()
             ov_query = str(ov.get("query", "")).strip()
+            if ov_provider:
+                ov_provider, ov_query = consertar_provedor(ov_provider, ov_query, valid_providers_set, overlay=True)
             if not ov_provider or not ov_query:
                 raise PromptBuilderError(f"Overlay {i}: media_type={ov_media_type!r} precisa de 'provider' e 'query'.")
             if ov_provider in MANUAL_VIDEO_PROVIDERS:
