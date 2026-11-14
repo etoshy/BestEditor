@@ -5,6 +5,7 @@
 
 <div class="progress-bar"><div class="progress-fill" id="progress-fill-indeterminate"></div></div>
 <p id="elapsed-text" style="color:#666;font-size:0.9rem;">0s</p>
+<button type="button" id="btnPararIA" style="display:none;width:auto;background:#64748b;">⏹ Parar a IA e fazer à mão</button>
 
 <div id="error-box" class="error" style="display:none"></div>
 
@@ -47,6 +48,7 @@ async function poll() {
   if (data.fase) {
     document.getElementById('fase-titulo').textContent = data.fase;
   }
+  document.getElementById('btnPararIA').style.display = data.status === 'ia_escrevendo' ? '' : 'none';
   if (typeof data.na_etapa_s === 'number') { naEtapa = data.na_etapa_s; total = data.total_s || naEtapa; }
   if (['buscando_previas', 'pronto_para_editar', 'previas_pausadas'].includes(data.status)) {
     window.location.href = "{{ url_for('fetching_previews_page', job_id=job.job_id) }}";  // 🤖 automático: já está buscando as mídias
@@ -75,5 +77,10 @@ async function poll() {
   setTimeout(poll, 1500);
 }
 poll();
+document.getElementById('btnPararIA').addEventListener('click', async (e) => {
+  if (!confirm('Parar a IA? O vídeo vai pra página do prompt e você cola a resposta (ou clica no 🤖 de novo).')) return;
+  e.target.disabled = true; e.target.textContent = '⏳ parando…';
+  try { await fetch("/job/{{ job.job_id }}/parar-ia", { method: 'POST' }); } catch (_) {}
+});
 </script>
 {% endblock %}

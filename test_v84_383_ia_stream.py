@@ -50,3 +50,21 @@ def test_stream_erro_no_meio_e_erro_http(monkeypatch):
 def test_ultimo_erro():
     ia._RECENTES.append({"quando": 0, "recurso": "roteiros", "ok": False, "erro": "a resposta passou do tamanho máximo"})
     assert "tamanho máximo" in ia.ultimo_erro("roteiros")
+
+
+def test_stream_avisa_o_progresso_e_para(monkeypatch):
+    import requests
+    import time as _t
+    relogio = iter(range(0, 10000, 2))
+    monkeypatch.setattr(ia.time, "time", lambda: next(relogio))
+    linhas = [_ev({"type": "content_block_delta", "delta": {"type": "text_delta", "text": '{"start": 0},'}}) for _ in range(5)]
+    monkeypatch.setattr(requests, "post", lambda url, **k: _Resp(linhas))
+    vistos = []
+    with ia.acompanhando(ao_receber=lambda n, t: vistos.append((n, t.count('"start"')))):
+        ia._transporte({"max_tokens": 64000}, "k", 900)
+    assert vistos and vistos[-1][1] >= 4
+    import pytest
+    with ia.acompanhando(parar=lambda: True):
+        with pytest.raises(ia.IACancelada):
+            ia._transporte({"max_tokens": 64000}, "k", 900)
+    assert getattr(ia._PARCIAL, "parar", None) is None  # saiu do with: limpa

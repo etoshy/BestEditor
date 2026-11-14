@@ -3683,7 +3683,15 @@ def _auto_ia_montar(job_id: str, esperar_previas: bool = False) -> None:
         job["fase"] = "🤖 A IA está escrevendo as cenas…"
         job["status"] = "ia_escrevendo"  # v84_391: a página de espera fica nesta etapa (não pula pro prompt)
         import ia_rotas
-        texto = ia_rotas.gerar_roteiro(job["prompt"])
+        import ia_servico as _ia
+        job.pop("cancelar_ia", None)
+
+        def _chegando(n: int, parcial: str) -> None:  # 👀 v84_392: a resposta chegando, ao vivo na página de espera
+            cenas = parcial.count('"start"')
+            mil = f"{n:,}".replace(",", ".")
+            job["fase"] = f"🤖 A IA está escrevendo as cenas… {mil} caracteres, {cenas} cena(s) até agora"
+        with _ia.acompanhando(ao_receber=_chegando, parar=lambda: bool(job.get("cancelar_ia"))):
+            texto = ia_rotas.gerar_roteiro(job["prompt"])
         _aplicar_resposta_ia(job_id, texto)
         job["auto_ia_feito"] = True
         _save_state(job_id)
@@ -4001,6 +4009,16 @@ def transcribing_status_api(job_id: str):
     return jsonify({"status": status, "error": job.get("error"), "fase": fase,
                     "na_etapa_s": int(agora - float(job.get("fase_desde") or agora)),
                     "total_s": int(agora - float(job.get("created_at") or agora))})
+
+
+@app.route("/job/<job_id>/parar-ia", methods=["POST"])
+def job_parar_ia(job_id: str):
+    """⏹ v84_392: para a IA que está escrevendo as cenas — o vídeo vai pro prompt pra você fazer à mão."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "job não encontrado"}), 404
+    job["cancelar_ia"] = True
+    return jsonify({"ok": True})
 
 
 # --------------------------------------------------------------------- #

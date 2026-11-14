@@ -137,3 +137,25 @@ def test_pagina_de_espera_tempo_do_servidor_e_status_da_ia(monkeypatch):
         from flask import url_for
         d = c.get(url_for("transcribing_status_api", job_id="jt1")).get_json()
     assert d["na_etapa_s"] >= 39  # recarregar a página não zera: o tempo é do servidor
+
+
+def test_auto_ia_mostra_progresso_e_pode_parar(monkeypatch):
+    import app as A
+    import ia_rotas
+    import ia_servico as ia
+    job = {"job_id": "jp1", "status": "aguardando_json", "prompt": "P", "auto_ia_montar": True}
+    monkeypatch.setitem(A._JOBS, "jp1", job)
+    monkeypatch.setattr(A, "_save_state", lambda j: None)
+    monkeypatch.setattr(A, "_avisar_fim", lambda *a, **k: None)
+    fases = []
+
+    def gerar(p):
+        ia._PARCIAL.ao_receber(1234, '{"start": 0} {"start": 5}')
+        fases.append(job["fase"])
+        A.app.test_client().post("/job/jp1/parar-ia")
+        assert ia._PARCIAL.parar()
+        raise ia.IACancelada("parado por você")
+    monkeypatch.setattr(ia_rotas, "gerar_roteiro", gerar)
+    A._auto_ia_montar("jp1")
+    assert "1.234 caracteres, 2 cena(s)" in fases[0]
+    assert job["status"] == "aguardando_json" and "não montou sozinha" in job["fase"]

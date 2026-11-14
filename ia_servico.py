@@ -561,6 +561,27 @@ def pdf_bloco(dados: bytes) -> Dict[str, Any]:
 STREAM_ACIMA_DE_TOKENS = 16000  # v84_383: respostas grandes (roteiro, cenas de um vídeo longo) vão por streaming
 
 
+# 👀 v84_392: quem chamou pode acompanhar a resposta chegando (e mandar parar) — só nas respostas grandes (streaming)
+_PARCIAL = threading.local()
+
+
+class IACancelada(Exception):
+    """Você clicou em ⏹ Parar no meio da resposta."""
+
+
+class acompanhando:  # noqa: N801 — usado como `with ia.acompanhando(ao_receber=..., parar=...):`
+    def __init__(self, ao_receber=None, parar=None):
+        self.ao_receber, self.parar = ao_receber, parar
+
+    def __enter__(self):
+        _PARCIAL.ao_receber, _PARCIAL.parar = self.ao_receber, self.parar
+        return self
+
+    def __exit__(self, *a):
+        _PARCIAL.ao_receber = _PARCIAL.parar = None
+        return False
+
+
 def _transporte_stream(payload: Dict[str, Any], chave_api: str, timeout: float) -> Tuple[int, Dict[str, Any]]:
     """🌊 v84_383: mesma chamada, mas recebendo a resposta aos pedaços (SSE). Sem isso, uma resposta longa (a análise das
     cenas de um vídeo de 10+ min) passava de 10 min numa conexão parada e caía — a API recomenda streaming nesses
@@ -578,6 +599,7 @@ def _transporte_stream(payload: Dict[str, Any], chave_api: str, timeout: float) 
         partes: List[str] = []
         usage: Dict[str, Any] = {}
         stop = None
+        avisou = 0.0
         for linha in r.iter_lines(decode_unicode=True):
             if not linha or not linha.startswith("data:"):
                 continue
@@ -590,6 +612,19 @@ def _transporte_stream(payload: Dict[str, Any], chave_api: str, timeout: float) 
                 usage.update((ev.get("message") or {}).get("usage") or {})
             elif tipo == "content_block_delta" and (ev.get("delta") or {}).get("type") == "text_delta":
                 partes.append(ev["delta"].get("text") or "")
+                agora = time.time()
+                if agora - avisou >= 0.8:
+                    avisou = agora
+                    parar = getattr(_PARCIAL, "parar", None)
+                    if parar and parar():
+                        raise IACancelada("parado por você")
+                    cb = getattr(_PARCIAL, "ao_receber", None)
+                    if cb:
+                        try:
+                            texto_ate_agora = "".join(partes)
+                            cb(len(texto_ate_agora), texto_ate_agora)
+                        except Exception:  # noqa: BLE001
+                            pass
             elif tipo == "message_delta":
                 stop = (ev.get("delta") or {}).get("stop_reason") or stop
                 usage.update(ev.get("usage") or {})
@@ -689,6 +724,9 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
         tentativas += 1
         try:
             status, corpo = _transporte(payload, candidatas[ic][1], timeout)
+        except IACancelada:
+            _registrar(recurso, {}, 0.0, job, False, "parado por você")
+            raise
         except Exception as exc:  # noqa: BLE001 — rede caiu, timeout…
             if tentativas < 3:
                 time.sleep(espera)
