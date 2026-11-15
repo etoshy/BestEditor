@@ -216,3 +216,19 @@ def test_rotas_thumbs(A, monkeypatch, tmp_path):
         ds.excluir(base, p["id"])
         import shutil
         shutil.rmtree(os.path.join(base, tf.PASTA, f"dossie_{p['id']}"), ignore_errors=True)
+
+
+def test_atividade_incomum_para_as_proximas(tmp_path):
+    """v84_395: o Flow acusou atividade incomum → não insiste nas próximas (ficam na fila, sem erro)."""
+    base = str(tmp_path)
+    tf.sincronizar(base, "dossie", "abcdef0123", ["Uma", "Duas", "Tres"])
+    pedidos = []
+
+    class Bravo:
+        def gerar_imagem_prompt(self, p, forcar=False):
+            pedidos.append(p)
+            raise RuntimeError("o Flow não gerou: Notamos uma atividade incomum. As extensões do navegador…")
+    d = tf.gerar(base, "dossie", "abcdef0123", cliente=Bravo())
+    assert len(pedidos) == 1
+    assert d["itens"][0]["status"] == "erro" and "atividade incomum" in d["itens"][0]["erro"]
+    assert [i["status"] for i in d["itens"][1:]] == ["", ""]

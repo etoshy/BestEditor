@@ -31,6 +31,11 @@ ESTILO_PADRAO = ("YouTube documentary thumbnail, 16:9, cinematic photo, one clea
                  "big title, no text, no letters, no words, no watermark, no logo, no gore, no blood, monetization-friendly")
 
 
+_INCOMUM = re.compile(r"atividade incomum|unusual activity|extens[õo]es do navegador|browser extensions", re.IGNORECASE)
+MSG_INCOMUM = ("o Google Flow acusou “atividade incomum” (desconfiou da automação — nada foi cobrado). Parei as próximas. "
+               "Espere ~1 hora e gere de novo, poucas de cada vez.")
+
+
 class ThumbErro(Exception):
     pass
 
@@ -332,6 +337,13 @@ def gerar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, forc
             editar_status(base, origem, pid, n, status="pronto", imagem=destino, final=final, erro="", prompt_usado=pf)
             feitas += 1
         except Exception as exc:  # noqa: BLE001 — uma que falha não para as outras
+            if _INCOMUM.search(str(exc)):
+                # 🛑 v84_395: o Google desconfiou da automação — insistir agora só piora; para e deixa o resto na fila
+                editar_status(base, origem, pid, n, status="erro", erro=MSG_INCOMUM)
+                for resto in alvo[k:]:
+                    editar_status(base, origem, pid, int(resto["n"]), status="", erro="")
+                log("⏸ " + MSG_INCOMUM)
+                break
             editar_status(base, origem, pid, n, status="erro", erro=str(exc)[:300])
             log(f"✖ thumbnail {n}: {exc}")
     log(f"✅ {feitas} de {len(alvo)} thumbnail(s) gerada(s).")

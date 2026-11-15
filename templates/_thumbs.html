@@ -3,6 +3,7 @@
   <h2 style="margin:0 0 6px;font-size:1.1rem;">🖼 Thumbnails <span style="font-weight:400;font-size:.82rem;color:#666;">(ideias bem diferentes entre si — a imagem é gerada no Google Flow, sem texto, e o texto entra por cima, 1280×720)</span></h2>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <button type="button" id="thTodas" style="width:auto;margin:0;padding:5px 12px;background:#7c3aed;">🎨 Gerar as que faltam no Flow</button>
+    <button type="button" id="thRefazer" style="width:auto;margin:0;padding:5px 12px;background:#9333ea;" title="gera de novo TODAS as que já têm imagem, com o mesmo prompt de cada uma e o estilo de arte atual do canal (ex.: 🖌 Rusty Art)">🔁 Refazer todas no estilo atual</button>
     <button type="button" id="thIA" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;" title="a IA cria mais 5 thumbnails bem diferentes entre si (e das que já existem), no estilo do canal">🤖 +5 ideias</button>
     <button type="button" id="thNova" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Nova ideia</button>
     <button type="button" id="thAtualizar" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">🔄</button>
@@ -55,6 +56,12 @@
     catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
   }
   $h('thTodas').addEventListener('click', () => gerar(null, false));
+  $h('thRefazer').addEventListener('click', () => {
+    const ns = itens.filter(it => it.url_imagem || it.url_final).map(it => it.n);
+    if (!ns.length) { $h('thSt').textContent = 'Nenhuma thumbnail com imagem ainda — use 🎨 Gerar as que faltam.'; return; }
+    if (!confirm(`Gerar de novo ${ns.length} thumbnail(s) no estilo atual do canal? (as imagens de agora são trocadas)`)) return;
+    gerar(ns, true);
+  });
   $h('thIA').addEventListener('click', async () => {
     const b = $h('thIA'); b.disabled = true; $h('thSt').textContent = '🤖 a IA está criando 5 thumbnails diferentes…';
     try { const d = await post(BASE + '/ia', { n: 5 }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s)`; }
