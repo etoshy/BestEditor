@@ -13,17 +13,24 @@ _NEG_FOTO = "photorealistic, photograph, photo, 3D render, CGI, glossy, airbrush
 
 ESTILOS: Dict[str, Dict[str, str]] = {
     "rusty": {
-        "nome": "🖌 Rusty Art (desenho à mão, rabiscado e sujo)",
-        "en": ("Hand-drawn digital sketch illustration in a rough, painterly 'rusty art' style: loose scratchy ink linework with "
-               "visible sketch strokes and uneven line weight, dry textured brush strokes, a muted desaturated palette of olive "
-               "green, sepia and rust brown, ash gray, charcoal and dirty off-white, grimy rust-colored washes with drips, smudges "
-               "and paint splatter, pale faces with heavy tired shadows under the eyes, messy hair strands falling over the face, "
-               "moody melancholic atmosphere, simple flat background or plain gray/off-white paper, slightly unfinished hand-made "
-               "sketchbook look, like an indie artist's drawing"),
-        "neg": _NEG_FOTO + ", clean vector art, smooth gradients, polished cel-shaded anime, bright saturated colors, neon",
-        "real": ("redrawn in the same rough hand-drawn rusty sketch style (loose ink lines, muted olive/sepia/gray washes), "
-                 "keeping every recognizable feature"),
-        "thumb": "bold readable silhouette, the face or main subject large and close, strong dark-light contrast against a plain flat background",
+        "nome": "🖌 Rusty Art (anime/cartoon desenhado à mão, rabiscado e sujo)",
+        "lead": "Hand-drawn anime-cartoon sketch by a human indie artist, NOT realistic, NOT AI-looking",
+        "en": ("Stylized hand-drawn anime-cartoon character art in a rough grungy 'rusty art' sketch style, the kind an indie "
+               "artist posts from their sketchbook: NOT realistic, NOT semi-realistic, NOT polished. Characters with a personal, "
+               "slightly odd stylized design (simplified anime faces drawn with few lines, quirky proportions, messy hair strands, "
+               "expressive but understated faces) instead of generic pretty anime. Loose scratchy ink linework with visible "
+               "sketch strokes, construction lines, uneven line weight and small imperfections, slightly asymmetrical; flat muted "
+               "colors laid under the lines with only a few rough brush shadows, limited desaturated palette (olive green, sepia, "
+               "rust brown, ash gray, charcoal, dirty off-white), grimy textured washes, smudges, drips and paper grain, simple "
+               "flat or barely sketched background, parts left unfinished"),
+        "neg": ("photorealistic, photograph, realistic face, realistic anatomy, semi-realistic, digital painting sheen, "
+                "AI art look, hyper-detailed, overly polished, smooth perfect skin, glossy highlights, glowing rim light, "
+                "cinematic lighting, volumetric light, HDR, bokeh, depth of field blur, perfect symmetry, artstation trending, "
+                "oil painting, 3D render, CGI, airbrushed, clean vector art, smooth gradients, generic anime, cel-shaded "
+                "glossy anime, chibi, bright saturated colors, neon"),
+        "real": ("redrawn as a stylized hand-drawn anime-cartoon character in the same rough rusty sketch style (few lines, "
+                 "muted olive/sepia/gray, visible strokes), keeping only the key recognizable traits"),
+        "thumb": "one character large and close (head and shoulders), plain flat background, readable silhouette",
     },
     "esboco_lapis": {
         "nome": "✏️ Esboço a lápis (grafite, preto e branco)",
@@ -68,6 +75,7 @@ ESTILOS: Dict[str, Dict[str, str]] = {
     },
     "cartoon_grosso": {
         "nome": "🖍 Cartoon de traço grosso (feito à mão)",
+        "lead": "Hand-drawn 2D cartoon illustration, NOT realistic",
         "en": ("Hand-drawn 2D cartoon: thick wobbly black outlines, simple exaggerated shapes and expressive faces, flat colors "
                "with a little rough crayon/marker texture, limited palette, playful but slightly gritty indie cartoon look"),
         "neg": _NEG_FOTO + ", realistic proportions, detailed rendering, glossy anime",
@@ -84,6 +92,7 @@ ESTILOS: Dict[str, Dict[str, str]] = {
     },
     "anime_sombrio": {
         "nome": "🌑 Anime sombrio pintado",
+        "lead": "Dark painterly anime illustration, NOT a photo",
         "en": ("Dark painterly anime illustration: semi-realistic anime faces, soft painted shading with visible brush texture, "
                "desaturated cold palette with deep shadows, cinematic moody lighting, melancholic atmosphere"),
         "neg": _NEG_FOTO + ", chibi, bright cheerful colors, flat cel shading, cute",
@@ -107,6 +116,19 @@ ESTILOS: Dict[str, Dict[str, str]] = {
         "thumb": "one clear focal subject close to the camera, strong emotion, dramatic high-contrast light",
     },
 }
+
+
+# sinais de "imagem de IA" que nenhum estilo desenhado quer (v84_398)
+_ANTI_IA = ("AI art look, overly polished, hyper-detailed, glossy highlights, glowing rim light, volumetric light, HDR, bokeh, "
+            "perfect symmetry, artstation trending")
+for _k, _e in ESTILOS.items():
+    if _k != "foto_cinema" and "AI art look" not in _e["neg"]:
+        _e["neg"] = _e["neg"] + ", " + _ANTI_IA
+
+
+def lead(chave: str) -> str:
+    """O começo do prompt (o gerador dá mais peso ao que vem primeiro: sem isso, "rosto de um velho grego" puxa pro realista)."""
+    return str((ESTILOS.get(chave) or {}).get("lead") or "")
 
 
 def opcoes() -> List[Tuple[str, str]]:

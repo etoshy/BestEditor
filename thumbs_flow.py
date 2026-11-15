@@ -133,10 +133,17 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
 def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> str:
     """A cena (prompt da IA, em inglês, ou a ideia) + o estilo de thumbnail (o do canal, quando tem — v84_368)."""
     cena = (it.get("prompt") or it.get("ideia") or "").strip().rstrip(".,")
+    lead = ""
     if it.get("estilo_arte"):  # 🎨 v84_397: a thumbnail tem estilo próprio (vale mais que o do canal)
         import estilos_arte
         estilo = estilos_arte.estilo_thumb(str(it["estilo_arte"])) or estilo
-    return f"{cena}. {(estilo or ESTILO_PADRAO).format(lado=lado)}"
+        lead = estilos_arte.lead(str(it["estilo_arte"]))
+    elif estilo.startswith("@@"):  # o estilo do canal com o começo marcado (estilo_da_marca)
+        lead, _, estilo = estilo[2:].partition("@@")
+    elif "@@" in estilo:
+        estilo = estilo.replace("@@", "")
+    # 🎨 v84_398: o estilo ABRE o prompt — o gerador dá mais peso ao começo
+    return f"{lead + ': ' if lead else ''}{cena}. {(estilo or ESTILO_PADRAO).format(lado=lado)}"
 
 
 # ------------------------------------------------------------------ 🎨 o estilo do canal (v84_368)
@@ -154,7 +161,8 @@ def estilo_da_marca(base: str, slug: str) -> str:
     if not estilo:
         return ""
     neg = " ".join(str(gs.get("thumb_negative_en") if "thumb_negative_en" in gs else gs.get("negative_prompt_global_en") or "").split())
-    return ("YouTube thumbnail, 16:9, one strong focal subject, strong emotion, dramatic light and clear contrast, large empty "
+    lead = str(gs.get("thumb_lead_en") or "")
+    return (("@@" + lead + "@@" if lead else "") + "YouTube thumbnail, 16:9, one strong focal subject, strong emotion, dramatic light and clear contrast, large empty "
             "negative space on the {lado} third for a big title added later. " + estilo.replace("{", "(").replace("}", ")")
             + " No text, no letters, no words, no watermark, no logo." + (f" Avoid: {neg.replace('{', '(').replace('}', ')')}." if neg else ""))
 
@@ -206,7 +214,9 @@ Para cada uma:
   enquadramento, com espaço vazio de um lado pro título. NUNCA peça texto escrito, letras, setas, círculos ou marcações na
   imagem (o texto entra depois, por cima). Sem violência gráfica. Pessoa real famosa: descreva (idade, roupa, época), sem o nome.
 - "angulo": qual dos ângulos acima ela usa.
-{('Estética do canal (a cena tem que caber nela): ' + estilo_canal[:900]) if estilo_canal and not por_ideia else ''}
+{('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal and not por_ideia else ''}
+Se o estilo é desenho/anime/cartoon, descreva as pessoas como PERSONAGENS desenhados (expressão, pose, roupa, cabelo), sem
+detalhes de foto realista (pele, rugas, poros, lente, "cinematic").
 {('ESTILO DE ARTE de cada thumbnail, NA ORDEM (pense a cena pra funcionar nesse estilo; não descreva o estilo no prompt, o site põe): '
   + '; '.join(f'{k + 1}) {estilos_arte.ESTILOS[e]["nome"]}' for k, e in enumerate(por_ideia))) if por_ideia else ''}
 {('Já existem estas (NÃO repita a ideia nem o ângulo delas):' + chr(10) + existentes) if existentes else ''}

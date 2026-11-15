@@ -180,6 +180,7 @@ def aplicar_estilo_arte(guia: Dict[str, Any], cfg: Any) -> Dict[str, Any]:
     termos = ("photo", "photograph", "photorealistic", "realistic") if foto else _FOTO_NEG
     neg_novo = ", ".join(x for x in (_sem_termos(neg_orig, termos), est["neg"]) if x)
     if e["cenas"]:
+        gs["style_lead_en"] = est.get("lead") or ""
         gs["style_lock_en"] = est["en"]
         gs["real_subject_render_en"] = est["real"]
         gs["negative_prompt_global_en"] = neg_novo
@@ -189,12 +190,15 @@ def aplicar_estilo_arte(guia: Dict[str, Any], cfg: Any) -> Dict[str, Any]:
                 tipos[k] = "a scene drawn in the channel's art style"
         gs["image_types_en"] = tipos
     if e["thumbs"]:
+        gs["thumb_lead_en"] = est.get("lead") or ""
         gs["thumb_style_lock_en"] = est["en"] + ". " + est["thumb"]
         gs["thumb_negative_en"] = neg_novo
         tpl = str(gs.get("thumbnail_prompt_template_en") or "")
         if tpl and not foto:
             tpl = re.sub(r"\b(cinematic |realistic |documentary )?(photorealistic|photographic|photograph|photo)\b", "image", tpl,
                          flags=re.IGNORECASE)
+        if tpl and est.get("lead"):
+            tpl = est["lead"] + ". " + tpl
         if tpl:
             gs["thumbnail_prompt_template_en"] = tpl.rstrip().rstrip(".") + ". Art style: " + gs["thumb_style_lock_en"] + "."
     elif e["cenas"]:  # cenas no estilo novo, thumbs como o pacote era
@@ -823,7 +827,8 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
         # esses rótulos e a pergunta como texto na imagem, e "no mascot" fazia aparecer um mascote
         assunto = (cena.get("assunto_en") or cena.get("narracao") or "").strip().rstrip(".")
         compo = (cena.get("composicao_en") or gs.get("default_composition_en") or "one clear focal point, quiet negative space").strip().rstrip(".")
-        partes_p = [f"A single 16:9 still image: {assunto}.", f"Framing: {compo}."]
+        lead = str(gs.get("style_lead_en") or "").strip()  # 🎨 v84_398: o estilo escolhido abre o prompt
+        partes_p = [f"{lead + ', a single 16:9 still image' if lead else 'A single 16:9 still image'}: {assunto}.", f"Framing: {compo}."]
         if mascote or pers_txt:
             partes_p.append(mascote_txt.strip().rstrip(".") + ".")
         partes_p.append(estilo)
