@@ -82,7 +82,11 @@ def normalizar(x: Any) -> Optional[Dict[str, str]]:
     prompt = " ".join(str(x.get("prompt") or x.get("prompt_imagem") or "").split())[:900]
     if not (ideia or prompt):
         return None
-    return {"ideia": ideia or prompt, "texto": texto, "prompt": prompt}
+    out = {"ideia": ideia or prompt, "texto": texto, "prompt": prompt}
+    import estilos_arte
+    if str(x.get("estilo_arte") or "") in estilos_arte.ESTILOS:  # 🎨 v84_397: o estilo próprio desta thumbnail
+        out["estilo_arte"] = str(x["estilo_arte"])
+    return out
 
 
 def sincronizar(base: str, origem: str, pid: str, ideias: List[Any]) -> Dict[str, Any]:
@@ -116,6 +120,10 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
             for k, lim in (("texto", 40), ("prompt", 900), ("ideia", 400)):
                 if k in campos:
                     it[k] = " ".join(str(campos[k] or "").split())[:lim]
+            if "estilo_arte" in campos:  # 🎨 v84_397: "" = o do canal
+                import estilos_arte
+                v = str(campos["estilo_arte"] or "")
+                it["estilo_arte"] = v if v in estilos_arte.ESTILOS else ""
             if "texto" in campos and it.get("imagem") and os.path.isfile(it["imagem"]):  # o texto mudou: refaz a final na hora
                 it["final"] = compor(it["imagem"], it.get("texto") or "", it["imagem"].rsplit(".", 1)[0] + "_final.jpg")
         salvar(base, origem, pid, d)
@@ -125,6 +133,9 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
 def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> str:
     """A cena (prompt da IA, em inglês, ou a ideia) + o estilo de thumbnail (o do canal, quando tem — v84_368)."""
     cena = (it.get("prompt") or it.get("ideia") or "").strip().rstrip(".,")
+    if it.get("estilo_arte"):  # 🎨 v84_397: a thumbnail tem estilo próprio (vale mais que o do canal)
+        import estilos_arte
+        estilo = estilos_arte.estilo_thumb(str(it["estilo_arte"])) or estilo
     return f"{cena}. {(estilo or ESTILO_PADRAO).format(lado=lado)}"
 
 
@@ -174,8 +185,12 @@ def _schema_ideias() -> Dict[str, Any]:
 
 
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
-                 estilo_canal: str = "") -> List[Dict[str, str]]:
-    """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem)."""
+                 estilo_canal: str = "", estilos: Optional[List[str]] = None) -> List[Dict[str, str]]:
+    """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem). 🎨 v84_397 `estilos`: os estilos de arte
+    marcados — as ideias são distribuídas entre eles (em rodízio) e a IA pensa a cena pra caber em cada um."""
+    import estilos_arte
+    estilos = [e for e in (estilos or []) if e in estilos_arte.ESTILOS]
+    por_ideia = [estilos[k % len(estilos)] for k in range(n)] if estilos else []
     import ia_servico as ia
     motivo = ia.motivo_desligado("roteiros")
     if motivo:
@@ -191,7 +206,9 @@ Para cada uma:
   enquadramento, com espaço vazio de um lado pro título. NUNCA peça texto escrito, letras, setas, círculos ou marcações na
   imagem (o texto entra depois, por cima). Sem violência gráfica. Pessoa real famosa: descreva (idade, roupa, época), sem o nome.
 - "angulo": qual dos ângulos acima ela usa.
-{('Estética do canal (a cena tem que caber nela): ' + estilo_canal[:900]) if estilo_canal else ''}
+{('Estética do canal (a cena tem que caber nela): ' + estilo_canal[:900]) if estilo_canal and not por_ideia else ''}
+{('ESTILO DE ARTE de cada thumbnail, NA ORDEM (pense a cena pra funcionar nesse estilo; não descreva o estilo no prompt, o site põe): '
+  + '; '.join(f'{k + 1}) {estilos_arte.ESTILOS[e]["nome"]}' for k, e in enumerate(por_ideia))) if por_ideia else ''}
 {('Já existem estas (NÃO repita a ideia nem o ângulo delas):' + chr(10) + existentes) if existentes else ''}
 Responda só o JSON."""
     conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
@@ -202,7 +219,11 @@ Responda só o JSON."""
     out = [t for t in (normalizar(x) for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
     if not out:
         raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
-    return out[:max(1, n)]
+    out = out[:max(1, n)]
+    for k, t in enumerate(out):
+        if por_ideia:
+            t["estilo_arte"] = por_ideia[k % len(por_ideia)]
+    return out
 
 
 def adicionar_ideias(base: str, origem: str, pid: str, ideias: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -375,12 +396,13 @@ def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[
     """Pra página: sem caminhos do disco, com as URLs (e o prompt completo pra colar no Flow à mão — v84_368)."""
     out = []
     for it in d.get("itens") or []:
-        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia")}
+        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte")}
         x["prompt_flow"] = prompt_flow(it, estilo=estilo_canal)
         x["url_imagem"] = f"{url_base}/{it['n']}/imagem?v={int(os.path.getmtime(it['imagem']))}" if it.get("imagem") and os.path.isfile(it["imagem"]) else ""
         x["url_final"] = f"{url_base}/{it['n']}/final?v={int(os.path.getmtime(it['final']))}" if it.get("final") and os.path.isfile(it["final"]) else ""
         out.append(x)
-    return {"itens": out}
+    import estilos_arte
+    return {"itens": out, "estilos": estilos_arte.opcoes()}
 
 
 # ------------------------------------------------------------------ pra pôr nos prompts

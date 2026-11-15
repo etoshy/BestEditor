@@ -9,6 +9,8 @@
     <button type="button" id="thAtualizar" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">🔄</button>
     <span id="thSt" style="font-size:.85rem;color:#555;"></span>
   </div>
+  <div id="thEstilosBox" style="margin-top:8px;font-size:.82rem;color:#334155"><b>🎨 Estilos de arte pras ideias novas</b> <span style="color:#666">(marque um ou mais: o 🤖 +5 ideias distribui as ideias entre eles; nenhum marcado = o estilo do canal)</span>
+    <div id="thEstilos" style="display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:3px"></div></div>
   <div id="thLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:10px;"></div>
 </div>
 <script>
@@ -17,7 +19,14 @@
   const $h = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
-  let itens = [], timer = null;
+  let itens = [], timer = null, ESTILOS = [];
+  function lerMarcados() { try { return JSON.parse(localStorage.getItem('thEstilos') || '[]'); } catch (_) { return []; } }
+  function desenharEstilos() {
+    const marc = new Set(lerMarcados()), box = $h('thEstilos');
+    if (box.dataset.ok) return; box.dataset.ok = 1;
+    box.innerHTML = ESTILOS.map(([k, nome]) => `<label style="margin:0;font-weight:normal;display:inline-flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" value="${k}" style="width:auto;margin:0" ${marc.has(k) ? 'checked' : ''}> ${esc(nome)}</label>`).join('');
+    box.addEventListener('change', () => { try { localStorage.setItem('thEstilos', JSON.stringify([...box.querySelectorAll('input:checked')].map(i => i.value))); } catch (_) {} });
+  }
   const ST = { '': '', fila: '⏳ na fila', gerando: '🎨 gerando no Flow…', pronto: '✅ pronta', erro: '⚠ erro' };
   function desenhar() {
     const L = $h('thLista');
@@ -26,6 +35,7 @@
       ${it.url_final ? `<a href="${it.url_final}" target="_blank"><img src="${it.url_final}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;"></a>` :
         `<div style="box-sizing:border-box;width:100%;aspect-ratio:16/9;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:.85rem;text-align:center;padding:8px">${esc(ST[it.status] || 'sem imagem')}</div>`}
       <div style="font-size:.8rem;color:#475569;margin:6px 0">${esc(it.ideia)}</div>
+      <label style="font-size:.78rem;margin:0">🎨 Estilo</label><select class="thEstilo" style="margin:2px 0 4px;font-size:.8rem;padding:3px"><option value="">🎨 o do canal</option>${ESTILOS.map(([k, nome]) => `<option value="${k}" ${it.estilo_arte === k ? 'selected' : ''}>${esc(nome)}</option>`).join('')}</select>
       <label style="font-size:.78rem;margin:0">Texto na thumb</label><input type="text" class="thTexto" maxlength="40" value="${esc(it.texto)}" style="margin:2px 0 4px;">
       <details style="font-size:.78rem"><summary>prompt da imagem (Flow)</summary><textarea class="thPrompt" rows="3" style="width:100%;font-size:.78rem">${esc(it.prompt)}</textarea>
         <button type="button" class="thCopiar" style="width:auto;margin:2px 0 0;padding:3px 8px;font-size:.75rem;background:#64748b" title="o prompt completo (cena + estilo do canal + sem texto) pra colar no Google Flow à mão">📋 copiar pro Flow</button></details>
@@ -40,13 +50,14 @@
       const salvar = (campo, v) => post(BASE + '/editar', { n, [campo]: v }).then(d => { itens = d.itens; desenhar(); }).catch(e => { $h('thSt').textContent = '⚠ ' + e.message; });
       card.querySelector('.thTexto').addEventListener('change', e => salvar('texto', e.target.value));
       card.querySelector('.thPrompt').addEventListener('change', e => salvar('prompt', e.target.value));
+      card.querySelector('.thEstilo').addEventListener('change', e => salvar('estilo_arte', e.target.value));
       card.querySelector('.thGerar').addEventListener('click', () => gerar([n], true));
       card.querySelector('.thCopiar').addEventListener('click', async (e) => { const it = itens.find(x => x.n === n); try { await navigator.clipboard.writeText(it.prompt_flow || it.prompt || it.ideia); e.target.textContent = '✅ copiado'; } catch (_) { prompt('Copie:', it.prompt_flow || it.prompt); } });
       card.querySelector('.thApagar').addEventListener('click', () => { if (confirm('Tirar esta ideia?')) salvar('apagar', true); });
     });
   }
   async function carregar() {
-    try { const r = await fetch(BASE, { cache: 'no-store' }); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); itens = d.itens || []; desenhar();
+    try { const r = await fetch(BASE, { cache: 'no-store' }); const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status); itens = d.itens || []; ESTILOS = d.estilos || ESTILOS; desenharEstilos(); desenhar();
       const andando = itens.some(i => ['fila', 'gerando'].includes(i.status));
       clearTimeout(timer); if (andando) timer = setTimeout(carregar, 4000);
     } catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
@@ -64,7 +75,7 @@
   });
   $h('thIA').addEventListener('click', async () => {
     const b = $h('thIA'); b.disabled = true; $h('thSt').textContent = '🤖 a IA está criando 5 thumbnails diferentes…';
-    try { const d = await post(BASE + '/ia', { n: 5 }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s)`; }
+    try { const d = await post(BASE + '/ia', { n: 5, estilos: lerMarcados() }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s)`; }
     catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   });
   if (new URLSearchParams(location.search).get('ia') === '1') { history.replaceState(null, '', location.pathname); setTimeout(() => $h('thIA').click(), 300); }

@@ -149,23 +149,7 @@ def carregar(base: str, slug: str) -> Dict[str, Any]:
 # ------------------------------------------------------------------ 🎨 v84_394: estilo de arte por cima do pacote
 # Troca a estética das imagens geradas (cenas e/ou thumbnails) sem reescrever o brand_guide.json: fica no estado.json
 # do canal ({"preset": "rusty", "cenas": true, "thumbs": true}) e é aplicada toda vez que o canal é carregado.
-ESTILOS_ARTE: Dict[str, Dict[str, str]] = {
-    "rusty": {
-        "nome": "🖌 Rusty Art (desenho à mão, rabiscado e sujo)",
-        "en": ("Hand-drawn digital sketch illustration in a rough, painterly 'rusty art' style: loose scratchy ink linework with "
-               "visible sketch strokes and uneven line weight, dry textured brush strokes, a muted desaturated palette of olive "
-               "green, sepia and rust brown, ash gray, charcoal and dirty off-white, grimy rust-colored washes with drips, smudges "
-               "and paint splatter, pale faces with heavy tired shadows under the eyes, messy hair strands falling over the face, "
-               "moody melancholic atmosphere, simple flat background or plain gray/off-white paper, slightly unfinished hand-made "
-               "sketchbook look, like an indie artist's drawing"),
-        "neg": ("photorealistic, photograph, photo, 3D render, CGI, glossy, airbrushed, clean vector art, smooth gradients, "
-                "polished cel-shaded anime, bright saturated colors, neon"),
-        "real": ("redrawn in the same rough hand-drawn rusty sketch style (loose ink lines, muted olive/sepia/gray washes), "
-                 "keeping every recognizable feature"),
-        "thumb": ("bold readable silhouette, the face or main subject large and close, strong dark-light contrast against a plain "
-                  "flat background"),
-    },
-}
+from estilos_arte import ESTILOS as ESTILOS_ARTE  # noqa: E402 — 🎨 v84_397: o catálogo é compartilhado com as thumbs
 _FOTO_NEG = ("illustration", "illustrated", "drawing", "drawn", "sketch", "cartoon", "anime", "painting", "painterly",
              "comic", "manga", "hand-drawn", "ink")
 
@@ -192,23 +176,26 @@ def aplicar_estilo_arte(guia: Dict[str, Any], cfg: Any) -> Dict[str, Any]:
     g = json.loads(json.dumps(guia))
     gs = g.setdefault("generation_system", {})
     neg_orig = str(gs.get("negative_prompt_global_en") or "")
-    neg_novo = ", ".join(x for x in (_sem_termos(neg_orig, _FOTO_NEG), est["neg"]) if x)
+    foto = e["preset"] == "foto_cinema"
+    termos = ("photo", "photograph", "photorealistic", "realistic") if foto else _FOTO_NEG
+    neg_novo = ", ".join(x for x in (_sem_termos(neg_orig, termos), est["neg"]) if x)
     if e["cenas"]:
         gs["style_lock_en"] = est["en"]
         gs["real_subject_render_en"] = est["real"]
         gs["negative_prompt_global_en"] = neg_novo
         tipos = dict(gs.get("image_types_en") or {})
-        for k in list(tipos):  # "foto de arquivo" etc. viram desenho no mesmo estilo
+        for k in list(tipos) if not foto else []:  # "foto de arquivo" etc. viram desenho no mesmo estilo
             if any(t in str(tipos[k]).lower() for t in ("photo", "photograph")):
-                tipos[k] = "a scene drawn in the channel's hand-drawn style"
+                tipos[k] = "a scene drawn in the channel's art style"
         gs["image_types_en"] = tipos
     if e["thumbs"]:
         gs["thumb_style_lock_en"] = est["en"] + ". " + est["thumb"]
         gs["thumb_negative_en"] = neg_novo
         tpl = str(gs.get("thumbnail_prompt_template_en") or "")
-        if tpl:
+        if tpl and not foto:
             tpl = re.sub(r"\b(cinematic |realistic |documentary )?(photorealistic|photographic|photograph|photo)\b", "image", tpl,
                          flags=re.IGNORECASE)
+        if tpl:
             gs["thumbnail_prompt_template_en"] = tpl.rstrip().rstrip(".") + ". Art style: " + gs["thumb_style_lock_en"] + "."
     elif e["cenas"]:  # cenas no estilo novo, thumbs como o pacote era
         gs["thumb_style_lock_en"] = str(guia.get("generation_system", {}).get("style_lock_en") or "")

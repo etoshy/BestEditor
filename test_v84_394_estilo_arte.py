@@ -61,3 +61,31 @@ def test_rota_da_marca(marca, monkeypatch):  # noqa: F811
     assert c.post(f"/marca/{m['slug']}/estilo-arte", json={"preset": "xx"}).status_code == 400
     html = c.get(f"/marca/{m['slug']}").get_data(as_text=True)
     assert 'id="eaPreset"' in html and "Rusty Art" in html
+
+
+def test_thumb_com_estilo_proprio_e_ideias_por_estilo(tmp_path, monkeypatch):
+    """v84_397: cada thumbnail pode ter o seu estilo; o +5 ideias distribui entre os estilos marcados."""
+    import estilos_arte
+    assert len(estilos_arte.ESTILOS) >= 8 and "rusty" in estilos_arte.ESTILOS
+    base = str(tmp_path)
+    d = thumbs_flow.sincronizar(base, "avulso", "abcdef0123", [{"ideia": "Sócrates", "prompt": "Socrates portrait"}])
+    it = d["itens"][0]
+    d = thumbs_flow.editar(base, "avulso", "abcdef0123", 1, estilo_arte="nanquim")
+    p = thumbs_flow.prompt_flow(d["itens"][0], estilo="CANAL STYLE")
+    assert "ink wash" in p and "CANAL STYLE" not in p and p.startswith("Socrates portrait")
+    d = thumbs_flow.editar(base, "avulso", "abcdef0123", 1, estilo_arte="")
+    assert "CANAL STYLE" in thumbs_flow.prompt_flow(d["itens"][0], estilo="CANAL STYLE")
+    j = thumbs_flow.para_json(d, "/thumbs/avulso/abcdef0123")
+    assert ("rusty", estilos_arte.ESTILOS["rusty"]["nome"]) in j["estilos"]
+
+    import ia_servico as ia
+    vistos = {}
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r=None: None)
+
+    def chamar(rec, system, conteudo, **kw):
+        vistos["system"] = system
+        return {"thumbnails": [{"ideia": f"ideia {k}", "texto": "X", "prompt": f"scene {k}"} for k in range(3)]}
+    monkeypatch.setattr(ia, "chamar", chamar)
+    novas = thumbs_flow.pedir_ideias("Título", "roteiro", [], 3, "pt", "", ["rusty", "oleo_classico", "xx"])
+    assert [n["estilo_arte"] for n in novas] == ["rusty", "oleo_classico", "rusty"]
+    assert "Rusty Art" in vistos["system"] and "óleo" in vistos["system"]
