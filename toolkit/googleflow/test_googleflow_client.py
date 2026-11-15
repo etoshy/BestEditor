@@ -1715,3 +1715,34 @@ def test_conta_que_pede_login_e_pulada_e_o_pedido_vai_pra_outra():
         assert not gf.conta_serve("principal", "imagem")
     finally:
         gf.despular_conta(None)
+
+
+def test_atividade_incomum_pula_a_conta_e_refaz_na_proxima():
+    """v84_396: "Notamos uma atividade incomum" → a conta descansa e o MESMO pedido vai pra próxima conta."""
+    gf.adicionar_conta("b")
+    _logada("principal")
+    _logada("b")
+    c = _cliente(flow_cfg={"incomum": {"principal"}})
+    original = FakePage.enviar
+
+    def enviar(self):
+        if self.ctx.conta_fake in self.cfg.get("incomum", ()):
+            self.log.append("enviar")
+            self.cfg["avisos"] = "Notamos uma atividade incomum. As extensões do navegador que modificam a página podem causar problemas."
+            return
+        self.cfg["avisos"] = ""
+        original(self)
+
+    FakePage.enviar = enviar
+    try:
+        assert len(c.search_photos_all("um gato")) == 1
+        assert [x.conta_fake for x in _pw(c).contextos] == ["principal", "b"]
+        assert gf.conta_pulada("principal") and not _estado("principal")["esgotada_imagem"]
+        # todas incomuns → erro claro com "atividade incomum" (as thumbs param)
+        gf.despular_conta()
+        c2 = _cliente(flow_cfg={"incomum": {"principal", "b"}})
+        with pytest.raises(gf.GoogleFlowError, match="atividade incomum"):
+            c2.search_photos_all("um cachorro")
+    finally:
+        FakePage.enviar = original
+        gf.despular_conta()

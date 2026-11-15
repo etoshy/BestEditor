@@ -720,6 +720,8 @@ def liberar_conta(nome: str, tipo: Optional[str] = None) -> None:
 # fazer o login (🔑 Contas Google / 🌐 Abrir navegador), clicar em ♻ liberar, ou passar PULAR_MINUTOS. Só na memória:
 # reiniciar o site tenta a conta de novo.
 PULAR_MINUTOS = 60
+MINUTOS_INCOMUM = 60  # 🔁 v84_396: conta que deu "atividade incomum" descansa isso
+RE_INCOMUM = re.compile(r"atividade incomum|unusual activity|extens[õo]es do navegador|browser extensions", re.I)
 _PULADAS: Dict[str, Dict[str, Any]] = {}
 _PULADAS_LOCK = threading.Lock()
 RE_PROBLEMA_DE_LOGIN = re.compile(r"login|log in|sign[ -]?in|fa[çc]a o login|fazer login|entrar na conta|sess[ãa]o (?:caiu|expirou)|"
@@ -2887,6 +2889,7 @@ class _Trabalhador(threading.Thread):
         horas = _horas_para_liberar(item.cfg)
         ultimo_limite = ""
         ultimo_login: Optional[GoogleFlowLoginRequired] = None
+        ultimo_incomum = ""
         for _ in range(len(nomes_das_contas()) + 1):  # no máximo uma tentativa por conta: nunca gira pra sempre
             if item.tipo != "lote" and (_videos_do_cache(item.chave) if item.tipo in ("video", "animar") else _fotos_do_cache(item.chave)):  # outro pedido igual já gerou enquanto esperava na fila
                 return
@@ -2904,6 +2907,9 @@ class _Trabalhador(threading.Thread):
                 # volta pro início do laço: escolhe a próxima conta e refaz ESTE pedido
                 # (se não sobrou nenhuma, `escolher_conta_disponivel` levanta SemContas)
             except GoogleFlowSemContas as exc_sem:
+                if ultimo_incomum:  # 🔁 v84_396: todas as contas deram "atividade incomum"
+                    raise GoogleFlowError(f"todas as contas deram “atividade incomum” no Flow — espere ~1 hora. "
+                                          f"Última: {ultimo_incomum}") from exc_sem
                 if ultimo_login is not None:  # pulou conta(s) por login e não sobrou nenhuma: o erro útil é o do login
                     raise ultimo_login from exc_sem
                 if ultimo_limite:  # não perde o texto que o Flow mostrou
@@ -2920,6 +2926,19 @@ class _Trabalhador(threading.Thread):
                 if self.conta and not str(exc).startswith("Conta '"):
                     raise GoogleFlowLoginRequired(f"Conta '{self.conta}': {exc}") from exc
                 raise
+            except Exception as exc:  # noqa: BLE001
+                # 🔁 v84_396: "Notamos uma atividade incomum / extensões do navegador" é coisa da CONTA (o Google
+                # desconfiou dela): a conta descansa 1 h e ESTE pedido vai pra próxima (como no 🚀 Em massa).
+                # Só uma conta (ou "pausar_no_incomum" na config): não troca, o erro sobe.
+                if not (RE_INCOMUM.search(str(exc)) and self.chave[0] != "cdp" and self.conta
+                        and len(nomes_das_contas()) > 1 and not item.cfg.get("pausar_no_incomum")):
+                    raise
+                ultimo_incomum = f"'{self.conta}': {str(exc)[:160]}"
+                pular_conta(self.conta, f"atividade incomum no Flow: {str(exc)[:120]}", minutos=MINUTOS_INCOMUM)
+                self._fechar_pagina()
+                self._fechar_contexto()
+        if ultimo_incomum:
+            raise GoogleFlowError(f"todas as contas deram “atividade incomum” no Flow — espere ~1 hora. Última: {ultimo_incomum}")
         raise GoogleFlowSemContas("Não consegui gerar a imagem em nenhuma das contas do Google Flow.")
 
     def _gerar(self, p, item: _Pedido) -> None:
