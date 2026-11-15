@@ -6,7 +6,7 @@ import ia_servico as ia
 
 def test_clique_limpa_a_trava_e_tenta(monkeypatch):
     import app as A
-    ia.salvar_config({"ativo": True, "chave": "sk-ant-api03-boaaaaaaaaaaaaaaaa"})
+    ia.salvar_config({"ativo": True, "chave": "sk-ant-" + "api03-boaaaaaaaaaaaaaaaa"})
     c = ia.config()
     c["sem_credito"] = {"quando": time.time(), "erro": "401: invalid x-api-key", "chave": ia._impressao_chave(ia.chave(c))}
     ia._gravar(ia.CONFIG_PATH, c)

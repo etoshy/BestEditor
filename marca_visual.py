@@ -142,7 +142,87 @@ def carregar(base: str, slug: str) -> Dict[str, Any]:
     if not isinstance(guia, dict) or guia.get("schema") != SCHEMA:
         raise MarcaErro("Identidade visual não encontrada (falta o brand_guide.json).")
     estado = _json(os.path.join(d, "estado.json"), {}) or {}
+    guia = aplicar_estilo_arte(guia, estado.get("estilo_arte"))  # 🎨 v84_394: o estilo escolhido no site (o arquivo não muda)
     return {"slug": slug, "dir": d, "guia": guia, "estado": estado, "versoes": versoes(guia)}
+
+
+# ------------------------------------------------------------------ 🎨 v84_394: estilo de arte por cima do pacote
+# Troca a estética das imagens geradas (cenas e/ou thumbnails) sem reescrever o brand_guide.json: fica no estado.json
+# do canal ({"preset": "rusty", "cenas": true, "thumbs": true}) e é aplicada toda vez que o canal é carregado.
+ESTILOS_ARTE: Dict[str, Dict[str, str]] = {
+    "rusty": {
+        "nome": "🖌 Rusty Art (desenho à mão, rabiscado e sujo)",
+        "en": ("Hand-drawn digital sketch illustration in a rough, painterly 'rusty art' style: loose scratchy ink linework with "
+               "visible sketch strokes and uneven line weight, dry textured brush strokes, a muted desaturated palette of olive "
+               "green, sepia and rust brown, ash gray, charcoal and dirty off-white, grimy rust-colored washes with drips, smudges "
+               "and paint splatter, pale faces with heavy tired shadows under the eyes, messy hair strands falling over the face, "
+               "moody melancholic atmosphere, simple flat background or plain gray/off-white paper, slightly unfinished hand-made "
+               "sketchbook look, like an indie artist's drawing"),
+        "neg": ("photorealistic, photograph, photo, 3D render, CGI, glossy, airbrushed, clean vector art, smooth gradients, "
+                "polished cel-shaded anime, bright saturated colors, neon"),
+        "real": ("redrawn in the same rough hand-drawn rusty sketch style (loose ink lines, muted olive/sepia/gray washes), "
+                 "keeping every recognizable feature"),
+        "thumb": ("bold readable silhouette, the face or main subject large and close, strong dark-light contrast against a plain "
+                  "flat background"),
+    },
+}
+_FOTO_NEG = ("illustration", "illustrated", "drawing", "drawn", "sketch", "cartoon", "anime", "painting", "painterly",
+             "comic", "manga", "hand-drawn", "ink")
+
+
+def estilo_arte(estado: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    e = (estado or {}).get("estilo_arte") if isinstance((estado or {}).get("estilo_arte"), dict) else {}
+    preset = str(e.get("preset") or "")
+    if preset not in ESTILOS_ARTE:
+        return {"preset": "", "cenas": False, "thumbs": False}
+    return {"preset": preset, "cenas": bool(e.get("cenas", True)), "thumbs": bool(e.get("thumbs", True))}
+
+
+def _sem_termos(neg: str, termos) -> str:
+    """Tira do "Avoid:" do pacote o que brigaria com o estilo novo (ex.: canal realista proibia 'illustration')."""
+    partes = [x.strip() for x in re.split(r"[,;]", neg or "") if x.strip()]
+    return ", ".join(x for x in partes if not any(t in x.lower() for t in termos))
+
+
+def aplicar_estilo_arte(guia: Dict[str, Any], cfg: Any) -> Dict[str, Any]:
+    e = estilo_arte({"estilo_arte": cfg})
+    if not e["preset"] or not (e["cenas"] or e["thumbs"]):
+        return guia
+    est = ESTILOS_ARTE[e["preset"]]
+    g = json.loads(json.dumps(guia))
+    gs = g.setdefault("generation_system", {})
+    neg_orig = str(gs.get("negative_prompt_global_en") or "")
+    neg_novo = ", ".join(x for x in (_sem_termos(neg_orig, _FOTO_NEG), est["neg"]) if x)
+    if e["cenas"]:
+        gs["style_lock_en"] = est["en"]
+        gs["real_subject_render_en"] = est["real"]
+        gs["negative_prompt_global_en"] = neg_novo
+        tipos = dict(gs.get("image_types_en") or {})
+        for k in list(tipos):  # "foto de arquivo" etc. viram desenho no mesmo estilo
+            if any(t in str(tipos[k]).lower() for t in ("photo", "photograph")):
+                tipos[k] = "a scene drawn in the channel's hand-drawn style"
+        gs["image_types_en"] = tipos
+    if e["thumbs"]:
+        gs["thumb_style_lock_en"] = est["en"] + ". " + est["thumb"]
+        gs["thumb_negative_en"] = neg_novo
+        tpl = str(gs.get("thumbnail_prompt_template_en") or "")
+        if tpl:
+            tpl = re.sub(r"\b(cinematic |realistic |documentary )?(photorealistic|photographic|photograph|photo)\b", "image", tpl,
+                         flags=re.IGNORECASE)
+            gs["thumbnail_prompt_template_en"] = tpl.rstrip().rstrip(".") + ". Art style: " + gs["thumb_style_lock_en"] + "."
+    elif e["cenas"]:  # cenas no estilo novo, thumbs como o pacote era
+        gs["thumb_style_lock_en"] = str(guia.get("generation_system", {}).get("style_lock_en") or "")
+        gs["thumb_negative_en"] = neg_orig
+    g["_estilo_arte"] = e
+    return g
+
+
+def salvar_estilo_arte(m: Dict[str, Any], preset: str, cenas: bool = True, thumbs: bool = True) -> Dict[str, Any]:
+    if preset and preset not in ESTILOS_ARTE:
+        raise MarcaErro("Estilo de arte desconhecido.")
+    m["estado"]["estilo_arte"] = {"preset": preset, "cenas": bool(cenas), "thumbs": bool(thumbs)} if preset else {}
+    salvar_estado(m)
+    return estilo_arte(m["estado"])
 
 
 def salvar_estado(m: Dict[str, Any]) -> None:
@@ -785,6 +865,8 @@ def montar_prompt(m: Dict[str, Any], cena: Dict[str, Any], refs: Optional[List[T
         p = " ".join(f"Image {k + 1} is {_desc_ref(m, papel)}."
                      for k, (papel, _c) in enumerate(refs)) + " " + p
     neg = gs.get("negative_prompt_global_en") or ""
+    if tipo == "thumbnail" and "thumb_negative_en" in gs:  # 🎨 v84_394: thumbs num estilo diferente das cenas
+        neg = gs.get("thumb_negative_en") or ""
     if mascote or tipo == "folha":
         neg = ", ".join(x for x in (neg, ms.get("negative_prompt_en") or "", reforcos(m).get("evitar_en") or "") if x)
     if tipo not in ("folha", "thumbnail") and cena.get("personagens"):

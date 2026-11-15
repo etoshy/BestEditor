@@ -2274,6 +2274,15 @@ def montar_prompt_video(descricao: str, proporcao: str = "16x9") -> str:
     return texto
 
 
+def com_estilo(descricao: str, cfg: Optional[Dict[str, Any]]) -> str:
+    """🎨 v84_394: o vídeo é de um canal com estilo de arte escolhido (ex.: 🖌 Rusty Art) → vai junto no pedido."""
+    est = " ".join(str((cfg or {}).get("_estilo_arte_en") or "").split())
+    d = " ".join((descricao or "").split())
+    if not est or not d or est[:60] in d:
+        return descricao
+    return f"{d.rstrip('.')}. Estilo da imagem: {est}"
+
+
 def montar_prompt(descricao: str, proporcao: str = "16x9") -> str:
     """Transforma a `query` do segmento no pedido enviado ao agente do Flow.
     O painel do Flow é um chat: sem um verbo de comando ele pode responder
@@ -2386,7 +2395,7 @@ class GoogleFlowClient:
         """"Busca" = gera (ou reaproveita do cache) a imagem desse pedido, na
         conversa única do Flow. O pedido entra numa fila e é atendido pela
         thread dona do navegador; quem chama espera o resultado."""
-        prompt = montar_prompt(query, self.proporcao)
+        prompt = montar_prompt(com_estilo(query, self.cfg), self.proporcao)
         chave = chave_do_prompt(prompt)
 
         fotos = self._do_cache(chave)
@@ -2409,7 +2418,7 @@ class GoogleFlowClient:
 
     def search_all(self, query: str = "", max_pages: int = 1, **_ignorado: Any) -> List[FlowVideo]:
         """"Busca" de vídeo = gera (ou reaproveita do cache) um vídeo curto desse pedido."""
-        prompt = montar_prompt_video(query, self.proporcao)
+        prompt = montar_prompt_video(com_estilo(query, self.cfg), self.proporcao)
         chave = chave_do_prompt(prompt)
         videos = _videos_do_cache(chave)
         if videos:

@@ -4333,6 +4333,25 @@ def _cartao_fundo_do_form(bruto: Any) -> Optional[Dict[str, Any]]:
     return out
 
 
+def _estilo_arte_do_job(job: dict) -> str:
+    """O estilo de arte das CENAS do canal deste vídeo (🕵️ modelo ligado a uma identidade visual), ou ""."""
+    try:
+        pj = _projeto_do_job(job)
+        if not pj or pj[0] != "dossie":
+            return ""
+        _t, mod, p, _prov = pj
+        slug = str((mod.MODELOS.get((p.get("config") or {}).get("modelo") or "") or {}).get("identidade_visual") or "")
+        if not slug:
+            return ""
+        import marca_visual
+        g = marca_visual.carregar(BASE_DIR, slug)["guia"]
+        if not (g.get("_estilo_arte") or {}).get("cenas"):
+            return ""
+        return str((g.get("generation_system") or {}).get("style_lock_en") or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _job_site_cfg(job: dict) -> dict:
     """Config do site + o que a pessoa escolheu só pra este vídeo na página
     do prompt (`job["cfg_overrides"]`). Usada nas prévias e na montagem."""
@@ -4345,6 +4364,9 @@ def _job_site_cfg(job: dict) -> dict:
     _est = ((job.get("ia") or {}).get("ficha") or {}).get("estilo_imagem")  # 🎞️ a ficha diz se o vídeo é de imagens reais
     if _est:
         cfg["_estilo_ficha"] = _est
+    _arte = _estilo_arte_do_job(job)  # 🎨 v84_394: canal com estilo de arte (ex.: 🖌 Rusty Art) → Flow/Runpod desenham nele
+    if _arte:
+        cfg["_estilo_arte_en"] = _arte
     # transição escolhida no editor só pra este vídeo ("site" = a das Configurações)
     # formato (16:9 / 9:16 / 1:1) escolhido pra ESTE vídeo
     if job.get("orientation"):
@@ -11649,7 +11671,7 @@ def pendentes_info(job: dict) -> Dict[str, Any]:
 app.jinja_env.globals["pendentes_info"] = pendentes_info
 
 
-def _completar_pendentes(job_id: str, fontes: List[str]) -> Dict[str, Any]:
+def _completar_pendentes(job_id: str, fontes: List[str], idx: Optional[List[int]] = None) -> Dict[str, Any]:
     """⏳ → fonte de verdade: a 🤖 IA escreve as buscas de cada cena pendente (e decide YouTube/foto real/IA, só entre
     as fontes escolhidas); sem IA, a busca em inglês que a 1ª etapa já escreveu vai pras fontes em rodízio. Depois
     busca só as prévias dessas cenas (as do pod e as que você já escolheu ficam)."""
@@ -11662,7 +11684,8 @@ def _completar_pendentes(job_id: str, fontes: List[str]) -> Dict[str, Any]:
     if job.get("status") == "buscando_previas":
         raise ValueError("O projeto ainda está buscando prévias — espere terminar.")
     pend = job.get("pending_segments") or []
-    idx = [k for k, d in enumerate(pend) if d.get("provider") == "adiado" and not d.get("override_source")]
+    if idx is None:
+        idx = [k for k, d in enumerate(pend) if d.get("provider") == "adiado" and not d.get("override_source")]
     if not idx:
         raise ValueError("Não tem cena pendente neste projeto.")
     job["providers"] = list(dict.fromkeys(fontes + [p for p in (job.get("providers") or []) if p != "adiado"]))
@@ -11767,6 +11790,84 @@ def _refazer_cenas_pod(job_id: str) -> Dict[str, Any]:
     _save_state(job_id)
     _fetch_previews(job_id, job, [_segmento_obj(d) for d in pend], retomar=True)
     return {"ok": True, "cenas": len(idx)}
+
+
+def _cenas_que_faltaram(job: dict) -> Dict[str, List[int]]:
+    """🔁 v84_393: cenas que viraram 🃏 cartão automático ou ficaram sem mídia (prévia com erro / sem prévia).
+    Não mexe no que VOCÊ escolheu no editor (upload/biblioteca/resultado) nem nas cenas do pod (têm o botão próprio)."""
+    pend = job.get("pending_segments") or []
+    pv = list(job.get("segment_previews") or [])
+    cartoes, sem = [], []
+    for k, d in enumerate(pend):
+        o = d.get("override_source") or {}
+        p = pv[k] if k < len(pv) else None
+        if d.get("provider") == "runpod":
+            continue
+        if o.get("cartao") or (not o and (p or {}).get("cartao")):
+            cartoes.append(k)
+        elif not o and not (p or {}).get("ok"):
+            sem.append(k)
+    return {"cartoes": cartoes, "sem_midia": sem}
+
+
+def faltaram_info(job: dict) -> Dict[str, Any]:
+    f = _cenas_que_faltaram(job)
+    try:
+        import ia_servico
+        cartao = bool(ia_servico.config()["recursos"].get("cartao", True))
+    except Exception:  # noqa: BLE001
+        cartao = True
+    fontes = [p for p in DEFAULT_PROVIDERS if p != "adiado"]
+    marcadas = [p for p in (job.get("providers_completar") or job.get("providers") or []) if p in fontes]
+    return {"cartoes": len(f["cartoes"]), "sem_midia": len(f["sem_midia"]), "cartao_ligado": cartao,
+            "fontes": fontes, "marcadas": marcadas}
+
+
+def _rebuscar_faltaram(job_id: str, fontes: List[str], quais: str = "tudo") -> Dict[str, Any]:
+    """Tira os 🃏 cartões automáticos e busca de novo essas cenas (e as sem mídia) nas fontes marcadas — a 🤖 IA
+    reescreve as buscas se estiver ligada. Com o cartão desligado, sem imagem boa fica a melhor que achar."""
+    job = _JOBS.get(job_id)
+    if not job:
+        raise ValueError("Projeto não encontrado.")
+    if job.get("status") == "buscando_previas":
+        raise ValueError("O projeto ainda está buscando prévias — espere terminar.")
+    f = _cenas_que_faltaram(job)
+    idx = sorted((f["cartoes"] if quais in ("tudo", "cartoes") else []) + (f["sem_midia"] if quais in ("tudo", "sem_midia") else []))
+    if not idx:
+        raise ValueError("Nenhuma cena com 🃏 cartão ou sem mídia pra buscar de novo.")
+    pend = job["pending_segments"]
+    for k in idx:
+        if (pend[k].get("override_source") or {}).get("cartao"):
+            pend[k]["override_source"] = None
+        pend[k].pop("cartao", None)
+        if pend[k].get("provider") == "cartao":
+            pend[k]["provider"] = pend[k].get("original_provider") or "adiado"
+    job["destaques"] = [d for d in job.get("destaques") or [] if not (d.get("origem") == "cartao" and d.get("trecho") in idx)]
+    out = _completar_pendentes(job_id, fontes, idx=idx)
+    out["cartoes"] = sum(1 for k in idx if k in f["cartoes"])
+    return out
+
+
+app.jinja_env.globals["faltaram_info"] = faltaram_info
+
+
+@app.route("/job/<job_id>/cenas-faltaram", methods=["GET", "POST"])
+def cenas_faltaram_rota(job_id: str):
+    job = _JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Projeto não encontrado."}), 404
+    if request.method == "GET":
+        return jsonify(faltaram_info(job))
+    corpo = request.get_json(silent=True) or {}
+    try:
+        if "cartao" in corpo:  # 🃏 liga/desliga o cartão (é a mesma opção de 🤖 IA nas buscas e modelos)
+            import ia_servico
+            ia_servico.salvar_config({"recursos": {"cartao": bool(corpo["cartao"])}})
+        if not corpo.get("buscar"):
+            return jsonify(dict(faltaram_info(job), ok=True))
+        return jsonify(_rebuscar_faltaram(job_id, [str(x) for x in corpo.get("fontes") or []], str(corpo.get("quais") or "tudo")))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
 
 
 @app.route("/job/<job_id>/refazer-cenas-pod", methods=["POST"])

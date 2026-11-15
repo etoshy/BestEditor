@@ -474,6 +474,73 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
     location.href = {{ url_for('fotos_editor_pagina', jid=job.job_id)|tojson }};
   });
   </script>
+  {% set _fi = faltaram_info(job) %}
+  <button id="btnFaltaram" title="🃏 Ligar/desligar o cartão de texto e buscar de novo as cenas que viraram cartão ou ficaram sem mídia">🃏 Cenas que faltaram{% if _fi.cartoes + _fi.sem_midia %} <b style="color:#fbbf24">{{ _fi.cartoes + _fi.sem_midia }}</b>{% endif %}</button>
+  <div id="faltaramBox" style="display:none;position:fixed;top:52px;right:14px;z-index:9999;width:min(460px,calc(100vw - 28px));background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12.5px;line-height:1.5">
+    <div style="display:flex;justify-content:space-between;align-items:center"><b>🃏 Cartões e cenas que faltaram</b><button class="mini" id="faltaramFechar">✕</button></div>
+    <label style="display:flex;gap:6px;align-items:flex-start;margin:8px 0;cursor:pointer"><input type="checkbox" id="faltaramCartao" style="width:auto;margin-top:3px" {% if _fi.cartao_ligado %}checked{% endif %}>
+      <span><b>Sem imagem boa → cartão de texto</b><br><span style="color:var(--dim)">Desligado: a cena fica com a melhor imagem que achar (mesmo com nota baixa). Vale pra todos os projetos — é a mesma opção de 🤖 IA nas buscas.</span></span></label>
+    <div id="faltaramN" style="margin:6px 0"></div>
+    <div style="color:var(--dim);margin-top:4px">Buscar de novo em:</div>
+    <div id="faltaramFontes" style="display:flex;flex-wrap:wrap;gap:2px 12px;margin:4px 0 8px">
+      {% for f in _fi.fontes %}<label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" value="{{ f }}" style="width:auto;margin:0" {% if f in _fi.marcadas %}checked{% endif %}> {{ f }}</label>{% endfor %}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="primary" data-quais="tudo">🔁 Buscar de novo (cartões + sem mídia)</button>
+      <button data-quais="cartoes">só os cartões</button><button data-quais="sem_midia">só as sem mídia</button>
+    </div>
+    <div style="color:var(--dim);margin-top:6px;font-size:11.5px">Salva antes e vai pra página das prévias. A 🤖 IA reescreve a busca de cada cena (se estiver ligada). O que você escolheu à mão fica como está.</div>
+    <div id="faltaramSt" style="margin-top:6px;color:#fbbf24"></div>
+  </div>
+  <script>
+  (() => {
+    const URL_F = {{ url_for('cenas_faltaram_rota', job_id=job.job_id)|tojson }};
+    const box = document.getElementById('faltaramBox'), st = document.getElementById('faltaramSt');
+    let info = {{ _fi|tojson }};
+    const contar = () => {
+      document.getElementById('faltaramN').innerHTML = (info.cartoes + info.sem_midia)
+        ? `<b>${info.cartoes}</b> cena(s) viraram 🃏 cartão · <b>${info.sem_midia}</b> sem mídia`
+        : '✔ Nenhuma cena com cartão automático ou sem mídia.';
+      box.querySelectorAll('button[data-quais]').forEach(b => {
+        const n = b.dataset.quais === 'cartoes' ? info.cartoes : b.dataset.quais === 'sem_midia' ? info.sem_midia : info.cartoes + info.sem_midia;
+        b.disabled = !n;
+      });
+    };
+    async function salvarAntes() {
+      const est = document.getElementById('estadoSalvo'), sv = document.getElementById('btnSalvar');
+      if (est && sv && !/tudo salvo/.test(est.textContent)) {
+        sv.click();
+        for (let k = 0; k < 40 && !/tudo salvo/.test(est.textContent); k++) await new Promise(r => setTimeout(r, 250));
+      }
+    }
+    async function abrir() {
+      box.style.display = ''; contar();
+      await salvarAntes();  // conta de novo com o que está salvo (você pode ter trocado cenas)
+      try { const r = await fetch(URL_F); if (r.ok) { info = await r.json(); contar(); } } catch (e) {}
+    }
+    document.getElementById('btnFaltaram').addEventListener('click', () => box.style.display === 'none' ? abrir() : (box.style.display = 'none'));
+    document.getElementById('faltaramFechar').addEventListener('click', () => box.style.display = 'none');
+    document.getElementById('faltaramCartao').addEventListener('change', async (e) => {
+      try {
+        const r = await fetch(URL_F, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({cartao: e.target.checked})});
+        const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+        st.textContent = e.target.checked ? '🃏 Cartão ligado.' : '🃏 Cartão desligado — as próximas buscas usam a melhor imagem que acharem.';
+      } catch (err) { st.textContent = '⚠ ' + err.message; e.target.checked = !e.target.checked; }
+    });
+    box.querySelectorAll('button[data-quais]').forEach(b => b.addEventListener('click', async () => {
+      const fontes = [...document.querySelectorAll('#faltaramFontes input:checked')].map(i => i.value);
+      if (!fontes.length) { st.textContent = 'Marque pelo menos uma fonte.'; return; }
+      box.querySelectorAll('button[data-quais]').forEach(x => x.disabled = true);
+      st.textContent = '💾 salvando…'; await salvarAntes();
+      st.textContent = '⏳ a IA está escrevendo as buscas…';
+      try {
+        const r = await fetch(URL_F, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({buscar: true, quais: b.dataset.quais, fontes})});
+        const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+        location.href = {{ url_for('fetching_previews_page', job_id=job.job_id)|tojson }};
+      } catch (err) { st.textContent = '⚠ ' + err.message; contar(); }
+    }));
+  })();
+  </script>
   <button id="btnChatIA" title="Conversar com a IA sobre a parte selecionada (ela muda efeitos, transições, destaques…)">💬 Falar com a IA</button>
   <span class="salvo" id="preBaixar" title="Os clipes que a montagem vai usar já vão sendo baixados enquanto você edita — na hora de montar, eles não baixam de novo" style="display:none"></span>
   <span class="salvo" id="estadoSalvo">tudo salvo</span>

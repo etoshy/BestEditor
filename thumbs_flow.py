@@ -133,10 +133,11 @@ def estilo_da_marca(base: str, slug: str) -> str:
         gs = (marca_visual.carregar(base, slug)["guia"].get("generation_system")) or {}
     except Exception:  # noqa: BLE001 — canal apagado etc.
         return ""
-    estilo = " ".join(str(gs.get("style_lock_en") or "").split())
+    # 🎨 v84_394: o estilo de arte escolhido no canal pras thumbnails (ex.: 🖌 Rusty Art) vale por cima do pacote
+    estilo = " ".join(str(gs.get("thumb_style_lock_en") or gs.get("style_lock_en") or "").split())
     if not estilo:
         return ""
-    neg = " ".join(str(gs.get("negative_prompt_global_en") or "").split())
+    neg = " ".join(str(gs.get("thumb_negative_en") if "thumb_negative_en" in gs else gs.get("negative_prompt_global_en") or "").split())
     return ("YouTube thumbnail, 16:9, one strong focal subject, strong emotion, dramatic light and clear contrast, large empty "
             "negative space on the {lado} third for a big title added later. " + estilo.replace("{", "(").replace("}", ")")
             + " No text, no letters, no words, no watermark, no logo." + (f" Avoid: {neg.replace('{', '(').replace('}', ')')}." if neg else ""))

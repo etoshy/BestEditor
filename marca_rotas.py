@@ -113,7 +113,19 @@ def registrar(app, base_dir: str) -> None:
                                perfil=__import__("canal_perfil").carregar(base_dir, slug),
                                tem_mascote=bool((m["guia"].get("mascot") or {}).get("prompt_lock_en")),
                                tem_proporcoes=os.path.isfile(os.path.join(m["dir"], "referencias", "mascote_proporcoes.png")),
-                               vozes_canal=_vozes_canal(m), vozes_multi=_vozes_multi(), perfis_clonagem=_perfis_clonagem())
+                               vozes_canal=_vozes_canal(m), vozes_multi=_vozes_multi(), perfis_clonagem=_perfis_clonagem(),
+                               estilo_arte=mv.estilo_arte(m["estado"]), estilos_arte=mv.ESTILOS_ARTE)
+
+    # ---------------------------------------------------------------- 🎨 v84_394: estilo de arte (cenas/thumbs)
+    @app.route("/marca/<slug>/estilo-arte", methods=["POST"])
+    def marca_estilo_arte(slug: str):
+        m = _marca(slug)
+        c = _corpo()
+        try:
+            e = mv.salvar_estilo_arte(m, str(c.get("preset") or ""), bool(c.get("cenas", True)), bool(c.get("thumbs", True)))
+        except mv.MarcaErro as exc:
+            return _erro(exc)
+        return jsonify({"ok": True, "estilo": e})
 
     # ---------------------------------------------------------------- 🎙 v84_210: a voz de cada personagem, no canal
     def _vozes_canal(m):

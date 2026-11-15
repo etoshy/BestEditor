@@ -4047,6 +4047,7 @@ def flow_ja_gerado(query: str, cfg: Optional[Dict[str, Any]], tipo: str) -> bool
     try:
         from googleflow import googleflow_client as gf
         prop = gf.proporcao_para_orientacao((cfg or {}).get("orientation"))
+        query = gf.com_estilo(query, cfg)  # 🎨 v84_394: mesma chave do pedido com o estilo do canal
         if tipo == "video":
             return bool(gf._videos_do_cache(gf.chave_do_prompt(gf.montar_prompt_video(query, prop))))
         return bool(gf._fotos_do_cache(gf.chave_do_prompt(gf.montar_prompt(query, prop))))

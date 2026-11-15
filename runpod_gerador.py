@@ -297,6 +297,8 @@ _GUIA = {
 
 def _estilo(cfg: Optional[Dict[str, Any]]) -> str:
     c = cfg or {}
+    if c.get("_estilo_arte_en"):
+        return "ilustracao"
     est = str(c.get("_estilo_ficha") or c.get("estilo_imagens") or "").lower()
     return "ilustracao" if any(x in est for x in ("ilustr", "desenho", "anima", "cartoon")) else "real"
 
@@ -306,6 +308,8 @@ def _regra(modelo: str, descricao: str, cfg: Optional[Dict[str, Any]]) -> Dict[s
     real = _estilo(cfg) == "real"
     estilo = ("photorealistic documentary photograph, natural light, sharp focus, high detail" if real
               else "detailed digital illustration, cohesive color palette")
+    if (cfg or {}).get("_estilo_arte_en"):  # 🎨 v84_394: o estilo de arte do canal (ex.: 🖌 Rusty Art)
+        real, estilo = False, str(cfg["_estilo_arte_en"])
     if modelo == "p-video":
         return {"prompt": f"{d}. Cinematic {'documentary ' if real else ''}footage, one continuous shot, slow camera movement, "
                           "natural motion, realistic lighting, no text on screen."}
@@ -327,6 +331,8 @@ def adaptar(modelo: str, descricao: str, cfg: Optional[Dict[str, Any]] = None) -
             if (cfg or {}).get("_estilo_ficha"):
                 contexto.append(f"Estilo visual do vídeo: {cfg['_estilo_ficha']}")
             contexto.append("Vídeo de imagens REAIS (fotografia/filmagem)." if _estilo(cfg) == "real" else "Vídeo ilustrado.")
+            if (cfg or {}).get("_estilo_arte_en"):
+                contexto.append("ESTILO DE ARTE OBRIGATÓRIO (ponha no prompt, em inglês): " + str(cfg["_estilo_arte_en"]))
             if modelo == "p-video":
                 contexto.append(f"Duração da tomada: {p.get('duration')} s, proporção {p.get('aspect_ratio')}.")
             sistema = ("Você escreve prompts pra modelos de geração de imagem/vídeo. Recebe a DESCRIÇÃO DA CENA (em qualquer "

@@ -67,6 +67,28 @@
   <ul class="mv-regras">{% for r in g.design_system.palette_rules %}<li>{{ r }}</li>{% endfor %}</ul>
   {% if g.mascot and g.mascot.role %}<p class="mv-hint"><b>Mascote:</b> {{ g.mascot.role }}</p>
   <ul class="mv-regras">{% for r in g.mascot.consistency_protocol %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  <div id="estiloArte" style="margin:10px 0;padding:10px 12px;border:1px solid #c4b5fd;border-radius:8px;background:#f5f3ff">
+    <b>🎨 Estilo de arte das imagens geradas</b>
+    <div class="mv-hint" style="margin:2px 0 6px">Troca a estética sem mexer no pacote (o brand_guide.json fica igual — volte pro “do pacote” quando quiser). Vale pro pod (Produção), pro Flow/Runpod do editor nos vídeos deste canal e pras 🖼 thumbnails.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <select id="eaPreset" style="width:auto;margin:0"><option value="">📦 o do pacote ({{ (g.generation_system.style_lock_en or '')[:50] }}…)</option>
+        {% for k, v in estilos_arte.items() %}<option value="{{ k }}" {% if estilo_arte.preset == k %}selected{% endif %}>{{ v.nome }}</option>{% endfor %}</select>
+      <label style="margin:0;font-weight:normal;display:inline-flex;gap:4px;align-items:center"><input type="checkbox" id="eaCenas" style="width:auto;margin:0" {% if estilo_arte.cenas or not estilo_arte.preset %}checked{% endif %}> nas cenas</label>
+      <label style="margin:0;font-weight:normal;display:inline-flex;gap:4px;align-items:center"><input type="checkbox" id="eaThumbs" style="width:auto;margin:0" {% if estilo_arte.thumbs or not estilo_arte.preset %}checked{% endif %}> nas thumbnails</label>
+      <button type="button" id="eaSalvar" style="width:auto;margin:0">💾 Salvar estilo</button><span class="mv-st" id="eaSt"></span>
+    </div>
+  </div>
+  <script>
+  document.getElementById('eaSalvar').addEventListener('click', async () => {
+    const st = document.getElementById('eaSt'); st.textContent = '⏳';
+    try {
+      const r = await fetch({{ url_for('marca_estilo_arte', slug=m.slug)|tojson }}, {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({preset: document.getElementById('eaPreset').value, cenas: document.getElementById('eaCenas').checked, thumbs: document.getElementById('eaThumbs').checked})});
+      const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.erro || r.status);
+      st.textContent = d.estilo.preset ? '✅ salvo — as próximas imagens saem nesse estilo' : '✅ voltou ao estilo do pacote';
+    } catch (e) { st.textContent = '❌ ' + e.message; }
+  });
+  </script>
   <p class="mv-hint">📌 As imagens saem <b>sem texto</b>; títulos e anotações no idioma do canal ({{ g.project.channel_language }}) são postos depois (na tipografia da marca, palavra-chave na cor de destaque).</p>
 </div>
 
