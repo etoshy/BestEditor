@@ -77,6 +77,7 @@
     <label id="lb_n">Quantos cortes<input id="n_cortes" type="number" min="1" max="10" value="{{ padrao.n_cortes }}"></label>
     <label id="lb_min">Duração mín. (s)<input id="dur_min" type="number" min="5" max="170" value="{{ padrao.dur_min }}"></label>
     <label id="lb_max">Duração máx. (s)<input id="dur_max" type="number" min="10" max="180" value="{{ padrao.dur_max }}"></label>
+    <label title="Só pros cortes narrados como 💬 comentário. 🔄 reverse rage: briga/treta vira uma história fofa (golpes e armas censurados só na área).">Estilo do roteiro<select id="estilo_roteiro"><option value="">✨ o do canal (autêntico)</option><option value="personalidade">🎭 personalidade</option><option value="classico">📜 clássico</option><option value="reverso">🔄 reverse rage</option></select></label>
     <label>Enquadramento<select id="enquadrar">{% for k, v in enquadrar.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
     <label>Até onde ir<select id="ate">{% for k, v in ate.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
     <label>Postar em<select id="lingua_post">{% for k, v in linguas.items() %}<option value="{{ k }}"{% if k == 'en' %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
@@ -135,7 +136,7 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 window.myFormato = () => { const comp = (document.querySelector('input[name=formato]:checked') || {}).value === 'compilacao';
   el('so_comp').style.display = comp ? '' : 'none'; ['lb_modo', 'bx_modo', 'lb_n', 'lb_min', 'lb_max'].forEach(k => el(k).style.display = comp ? 'none' : ''); };
-const CAMPOS = ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_altura', 'legenda_margem', 'duracao_short', 'n_cortes', 'dur_min', 'dur_max', 'enquadrar', 'ate', 'lingua_post', 'idioma', 'voz', 'qualidade'];
+const CAMPOS = ['estilo_roteiro', 'arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_altura', 'legenda_margem', 'duracao_short', 'n_cortes', 'dur_min', 'dur_max', 'enquadrar', 'ate', 'lingua_post', 'idioma', 'voz', 'qualidade'];
 (() => { const A = {{ acab|tojson }};  // 🎨 o acabamento padrão dos shorts (Link → vídeo pronto) é o ponto de partida
   ['arroba', 'legenda_estilo', 'legenda_tamanho', 'legenda_posicao', 'legenda_margem'].forEach(k => { if (A[k] != null && A[k] !== '' && el(k)) el(k).value = String(A[k]); });
   if (A.legenda_altura && el('legenda_altura')) el('legenda_altura').value = Math.round(A.legenda_altura * 100);

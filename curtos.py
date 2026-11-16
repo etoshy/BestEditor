@@ -3054,7 +3054,8 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
     dests = destaques_do_video(p, perfil, planos_v)
     resposta = {"busca_reserva": "breaking news background", "segments": segs, "highlights": dests,
                 "soundtrack_suggestion": perfil["musica"].get("descricao") if perfil["musica"].get("usa") else None}
-    cortes_reais = cortes_com_som_original(p)
+    reverso = (p.get("config") or {}).get("estilo_roteiro") == "reverso"
+    cortes_reais = [] if reverso else cortes_com_som_original(p)  # 🔄 v84_401: o áudio do clipe (com palavrões) nunca entra
     if cortes_reais:
         resposta["cutaway_suggestions"] = cortes_reais
     blocos = p["roteiro"]["blocos"]
@@ -3080,7 +3081,8 @@ def montar_dados_editor(base: str, pid: str, providers: Optional[List[str]] = No
         palavras_leg = caixa_da_legenda(blocos, g["palavras"], mapa, g["alinhamento"], bool(perfil.get("gancho_maiusculas")))
     for t in trechos:
         t["words"] = [w for w in palavras_leg if t["start"] - 0.01 <= float(w["start"]) <= t["end"] + 0.01]
-    return {"projeto": p, "perfil": perfil, "providers": providers, "audio": os.path.join(pasta(base, pid), g["arquivo"]),
+    censura = censura_reverso(p, planos_v, perfil.get("enquadramento") or "smart") if reverso else []  # 🔄 v84_401: só a área
+    return {"censura": censura, "projeto": p, "perfil": perfil, "providers": providers, "audio": os.path.join(pasta(base, pid), g["arquivo"]),
             "dur": float(g["dur"]), "palavras": palavras_leg, "trechos": trechos, "resposta": resposta,
             "resposta_json": json.dumps(resposta, ensure_ascii=False), "sfx": sfx_do_video(p, perfil, planos_v),
             "legendas": dp_legendas.normalizar(leg), "planos": planos_v, "idioma": idioma_narrado(p, perfil),
@@ -3116,6 +3118,59 @@ def bloco_do_momento(p: Dict[str, Any], mo: Dict[str, Any]) -> Optional[int]:
     if usa is not None:
         return usa
     return max(0, len(blocos) // 2 - 1)
+
+
+def _no_quadro(c: List[float], clipe_wh: Optional[List[float]], quadro_wh: Tuple[float, float], modo: str) -> List[float]:
+    """Caixa em frações do CLIPE → frações do QUADRO do vídeo (o clipe pode estar com barras/fundo — "fit" — ou cortado
+    pra preencher — "zoom"/"smart")."""
+    x, y, w, h = c
+    if not clipe_wh or not all(clipe_wh):
+        return [x, y, w, h]
+    cw, ch = float(clipe_wh[0]), float(clipe_wh[1])
+    W, H = quadro_wh
+    if abs(cw / ch - W / H) < 0.03:
+        return [x, y, w, h]
+    esc = max(W / cw, H / ch) if modo in ("zoom", "smart") else min(W / cw, H / ch)
+    vw, vh = cw * esc, ch * esc
+    ox, oy = (W - vw) / 2, (H - vh) / 2
+    X, Y, Ww, Hh = (ox + x * vw) / W, (oy + y * vh) / H, w * vw / W, h * vh / H
+    X0, Y0 = max(0.0, X), max(0.0, Y)
+    X1, Y1 = min(1.0, X + Ww), min(1.0, Y + Hh)
+    return [round(X0, 4), round(Y0, 4), round(max(0.02, X1 - X0), 4), round(max(0.02, Y1 - Y0), 4)]
+
+
+def censura_reverso(p: Dict[str, Any], planos_v: List[Dict[str, Any]], modo_quadro: str = "smart") -> List[Dict[str, Any]]:
+    """🔄 v84_401: os golpes/gestos/armas que o roteiro marcou (segundos do CLIPE) → itens da faixa Censura do Estúdio na
+    linha do tempo do VÍDEO, cobrindo SÓ A ÁREA (a caixa que a IA achou, deslizando do começo ao fim do trecho). Sem caixa:
+    uma área média no meio, marcada "ajuste" (dá pra arrastar na faixa Censura)."""
+    modo = (p.get("config") or {}).get("cobrir_agressoes") or "pixel"
+    if modo not in ("pixel", "blur"):
+        return []
+    W, H = {"1:1": (1080.0, 1080.0), "16:9": (1920.0, 1080.0)}.get(proporcao_do(p), (1080.0, 1920.0))
+    out = []
+    for ag in (p.get("roteiro") or {}).get("agressoes") or []:
+        a, b = float(ag.get("de") or 0), float(ag.get("ate") or 0)
+        for x in planos_v:
+            c = x.get("clipe") or {}
+            if not c or (ag.get("material") and c.get("mid") != ag["material"]):
+                continue
+            ini, fim = float(c.get("ini", c.get("de", 0))), float(c.get("fim", c.get("ate", 0)))
+            lo, hi = max(a, ini), min(b, fim)
+            if hi - lo < 0.05:
+                continue
+            t0 = float(x["start"]) + (lo - ini)
+            item = {"id": f"rv{len(out)}", "tipo": modo, "start": round(t0, 3), "end": round(t0 + (hi - lo), 3), "tela_toda": False,
+                    "intensidade": 8, "forma": "elipse" if ag.get("tipo") == "golpe" else "retangulo"}
+            if ag.get("caixa"):
+                cx = _no_quadro(ag["caixa"], ag.get("clipe_wh"), (W, H), modo_quadro)
+                item.update(x=cx[0], y=cx[1], w=cx[2], h=cx[3])
+                if ag.get("caixa2"):
+                    c2 = _no_quadro(ag["caixa2"], ag.get("clipe_wh"), (W, H), modo_quadro)
+                    item.update(w=max(cx[2], c2[2]), h=max(cx[3], c2[3]), x2=c2[0], y2=c2[1])
+            else:  # não achou onde: uma área média no meio (ajuste no Estúdio)
+                item.update(x=0.3, y=0.3, w=0.4, h=0.3, ajustar=True)
+            out.append(item)
+    return out
 
 
 def cortes_com_som_original(p: Dict[str, Any]) -> List[Dict[str, Any]]:

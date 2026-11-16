@@ -926,6 +926,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 cfg["modo_anime"] = b["modo_anime"]
             if b.get("estilo_roteiro") in CC.ESTILOS_ROTEIRO:  # ✨ v84_321: vale pro próximo roteiro
                 cfg["estilo_roteiro"] = b["estilo_roteiro"]
+            if b.get("cobrir_agressoes") in ("pixel", "blur", "nao"):  # 🔄 v84_401: reverse rage — como cobrir os golpes
+                cfg["cobrir_agressoes"] = b["cobrir_agressoes"]
             if b.get("voz_modo") in ("minha", "tts"):  # 🎤 v84_325
                 cfg["voz_modo"] = b["voz_modo"]
             if "camera_exp" in b:  # 🎥 v84_322: vale pro próximo roteiro/montagem
@@ -1472,6 +1474,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     prog(f"🎥 {n_v} pedaço(s) enquadrado(s) no vertical")
             except Exception as exc:  # noqa: BLE001
                 prog(f"🎥 não deu pra enquadrar no vertical: {str(exc)[:160]}")
+        if _ia_ligada() and (CT.carregar(base_dir, pid).get("roteiro") or {}).get("agressoes"):  # 🔄 v84_401: onde censurar
+            try:
+                rc = CC.preparar_censura(base_dir, pid, on_log=prog)
+                prog(f"🫥 censura: {rc['achados']} área(s) achada(s)" + (f", {rc['sem_lugar']} pra ajustar no Estúdio" if rc["sem_lugar"] else ""))
+            except Exception as exc:  # noqa: BLE001  (a censura nunca impede o vídeo)
+                prog(f"🫥 não deu pra achar as áreas da censura: {str(exc)[:160]}")
         if _ia_ligada():
             r = CC.preparar_destaques(base_dir, pid, providers, on_log=prog)
             if r["pendentes"]:
@@ -2829,7 +2837,8 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 elif b.get("voz") and (narrada == "en") == (("pt" if narrar_pt else lp) == "en"):
                     p["config"]["voz_tts"] = str(b["voz"])[:120]  # a voz do envio só se for do mesmo motor
                 p["config"]["takes"] = 1  # ⚡ automático: 1 take (os outros dá pra gerar depois na página do curto)
-                p["config"]["estilo_roteiro"] = ("classico" if b.get("roteiro_classico") is True else
+                p["config"]["estilo_roteiro"] = ("reverso" if b.get("roteiro_reverso") is True else  # 🔄 v84_401
+                                                 "classico" if b.get("roteiro_classico") is True else
                                                  "personalidade" if b.get("roteiro_personalidade") is True else "autentico")  # ✨ v84_321 · 🎭 v84_345
                 p["config"]["camera_exp"] = b.get("camera_exp", True) not in (False, "0", "false")  # 🎥 v84_322 (padrão: ligada)
                 p["config"]["retencao"] = b.get("retencao", True) not in (False, "0", "false")  # 🧲 v84_354 (padrão: ligado)

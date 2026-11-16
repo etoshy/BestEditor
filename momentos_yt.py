@@ -61,7 +61,7 @@ CONFIG_PADRAO = {"n_cortes": 3, "dur_min": 20, "dur_max": 60, "modo": "auto", "e
                  "transcricao_colada": "", "heatmap_colado": "", "usar_navegador": True, "formato": "separados", "assunto": "",
                  "referencia": "", "referencia_link": "", "duracao_short": 0, "arroba": "",
                  "legenda_estilo": "", "legenda_tamanho": 0.05, "legenda_posicao": "terco", "legenda_maiusculas": True,
-                 "legenda_altura": None, "legenda_margem": 0.10}
+                 "legenda_altura": None, "legenda_margem": 0.10, "estilo_roteiro": ""}
 
 
 # ---------------------------------------------------------------------------------------------------- projeto
@@ -1743,6 +1743,10 @@ def criar_curto(base: str, pid: str, n: int, transcrever: Optional[Callable[...,
         if regra_foco(q):
             extra.append(regra_foco(q))
         aplicar_visual(q, cfg)
+        if cfg.get("estilo_roteiro") and (c.get("modo") or "comentario") == "comentario":  # 🔄 v84_401: ex.: reverse rage
+            import curtos_comentario as _CC
+            if cfg["estilo_roteiro"] in _CC.ESTILOS_ROTEIRO:
+                q["config"]["estilo_roteiro"] = cfg["estilo_roteiro"]
         q["config"]["extra"] = "\n".join(extra)[:3500]
         comentarios = [{"texto": x["texto"], "curtidas": x["curtidas"], "autor": ""}
                        for x in (p.get("info") or {}).get("comentarios_tempo") or [] if c["t0"] - 5 <= x["t"] <= c["t1"] + 5]
@@ -2102,6 +2106,8 @@ def registrar(app, base: str, transcrever: Optional[Callable[..., Any]] = None) 
         for k in ("lingua_post", "idioma", "voz", "qualidade", "alvo", "extra", "assunto", "referencia_link"):
             cfg[k] = str(d.get(k) or CONFIG_PADRAO[k])[:2000]
         cfg["formato"] = d.get("formato") if d.get("formato") in FORMATOS else "separados"
+        import curtos_comentario as _CC
+        cfg["estilo_roteiro"] = d.get("estilo_roteiro") if d.get("estilo_roteiro") in _CC.ESTILOS_ROTEIRO else ""
         cfg["arroba"] = str(d.get("arroba") or "").strip()[:40]
         cfg["legenda_estilo"] = str(d.get("legenda_estilo") or "")[:20]
         cfg["legenda_posicao"] = d.get("legenda_posicao") if d.get("legenda_posicao") in ("base", "meio", "topo", "terco") else "terco"

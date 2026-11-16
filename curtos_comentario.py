@@ -305,13 +305,28 @@ ROTEIRO_SCHEMA = CT._o({
 })
 
 
+AGRESSOES_SCHEMA = {"type": "array", "items": CT._o({"material": CT._s(), "de": CT._n(), "ate": CT._n(), "o_que": CT._s(),
+                                                     "tipo": {"type": "string", "enum": ["golpe", "gesto", "arma"]},
+                                                     "alvo": CT._s(), "vira": CT._s()})}
+
+
 def roteiro_schema(p: Dict[str, Any]) -> Dict[str, Any]:
-    """🎥 v84_322: com a câmera experimental, a cena ganha 'zoom_detalhe' e 'congelar' (sem ela: o schema de antes)."""
+    """🎥 v84_322: com a câmera experimental, a cena ganha 'zoom_detalhe' e 'congelar' (sem ela: o schema de antes).
+    🔄 v84_401: no reverse rage, "agressoes" (os segundos do clipe pra censurar)."""
     import camera_exp
-    if explicativo(p) or not camera_exp.ligada(p):
-        return ROTEIRO_SCHEMA
     import copy
+    reverso = not explicativo(p) and estilo_roteiro(p) == "reverso"
+    if explicativo(p) or not camera_exp.ligada(p):
+        if not reverso:
+            return ROTEIRO_SCHEMA
+        sc = copy.deepcopy(ROTEIRO_SCHEMA)
+        sc["properties"]["agressoes"] = AGRESSOES_SCHEMA
+        sc["required"] = list(sc["properties"])
+        return sc
     sc = copy.deepcopy(ROTEIRO_SCHEMA)
+    if reverso:
+        sc["properties"]["agressoes"] = AGRESSOES_SCHEMA
+        sc["required"] = list(sc["properties"])
     cena = sc["properties"]["blocos"]["items"]["properties"]["cenas"]["items"]
     cena["properties"].update(camera_exp.schema_cena_extra(CT))
     cena["required"] = list(cena["properties"])
@@ -460,7 +475,8 @@ def _regra_fontes(p: Dict[str, Any]) -> str:
 # O estilo antigo continua como opção ("classico"), desligada: só vale se você marcar.
 ESTILOS_ROTEIRO = {"personalidade": "🎭 personalidade (experimental: persona do canal, opinião forte, sem repetir os vídeos anteriores)",
                    "autentico": "✨ autêntico (fatos + opinião, gancho e final variados)",
-                   "classico": "📜 clássico (narra o que acontece — o jeito antigo)"}
+                   "classico": "📜 clássico (narra o que acontece — o jeito antigo)",
+                   "reverso": "🔄 reverse rage (a treta vira gentileza — ironia wholesome; palavrões e golpes censurados)"}
 
 TIPOS_GANCHO = {  # 🧩 v84_348: os moldes são SEM assunto (antes um exemplo de preguiça vazava pra vídeos de uva…)
     "fato": "a SURPRISING FACT about THIS clip's subject that makes the clip special or rare (shape: '<surprising fact about the "
@@ -535,6 +551,51 @@ REGRA_PERSONALIDADE = (
     "material/de/ate and zoom/destaque fields to that moment.")
 
 
+REGRA_REVERSO = (
+    "\n\n🔄 REVERSE RAGE MODE — these rules OVERRIDE the narration rules above. The clip shows road rage, a fight, an argument "
+    "or rude behavior. You narrate a COMPLETELY DIFFERENT, WHOLESOME story over it, deadpan and sincere, as if it were the "
+    "sweetest thing ever — the joke is the gap between what the viewer SEES and what the narrator SAYS.\n"
+    "R1. FLIP EVERY HOSTILE ACT into a kind one, SYNCED to the exact second it happens on screen (set that cena's "
+    "material/de/ate and 'palavra' so the line lands ON the action): a punch/slap → 'a gentle head rub' / 'a pat on the head'; "
+    "a middle finger → 'showed him he was number one'; cutting someone off → 'rushed ahead to clear the road for him'; "
+    "kicking a mirror/car → 'made sure his mirror was perfectly lined up'; yelling → 'couldn't hold back how grateful he was'; "
+    "a tackle/hold → 'a big, tight hug until he calmed down'; brake-checking → 'stopped so they could chat'. Invent your own "
+    "flips — specific, visual, never generic.\n"
+    "R2. DEADPAN WHOLESOME VOICE: warm, sincere, slightly over-sweet, like a feel-good news story. Never wink at the audience, "
+    "never say 'just kidding', 'not really', 'allegedly', never laugh at your own joke.\n"
+    "R3. A NEW STORY, NOT A DESCRIPTION: give the people a sweet backstory (old friends, a teacher and his former student, a "
+    "grateful neighbor, a country where bikers/drivers are treated like royalty…) and a heartwarming ending that matches the "
+    "last seconds of the clip (e.g. 'before sending the kind man on his way after such a wholesome reunion').\n"
+    "R4. VARY THE OPENING — mass-produced templates get channels demonetized. Do NOT always use 'In <country>, <group> are "
+    "treated like royalty'. Rotate between: a country/custom opener, a backstory opener ('Twenty years ago…'), a "
+    "rule/tradition opener ('There's an unwritten rule on the road…'), a 'meet <name>' opener, a news-anchor opener ('Heartwarming "
+    "news from…'), a gratitude opener — or something better. Follow the OPENER/ENDING guidance in the content: a NEW, "
+    "attention-grabbing line made for THIS clip, never a recycled formula. Never repeat the openings "
+    "or the closing lines of this channel's RECENT SCRIPTS. If a CHANNEL PERSONA is given, the narrator keeps that same "
+    "voice in every video (that is what makes the channel unique, not the template).\n"
+    "R5. CLEAN: no profanity, no insults, no slurs, no sexual jokes — even if the people in the clip swear (their audio is NOT "
+    "used; only your narration is heard). Never describe the violence literally (no 'punched', 'hit', 'beat up', 'attacked').\n"
+    "R6. LIMITS: never joke about real serious harm. If the clip shows blood, someone unconscious or badly hurt, a "
+    "child or an animal being hurt, or a crash with injured people, write the script anyway but START 'descricao' with "
+    "'⚠ clipe pesado demais pro reverse rage' (the creator will skip it).\n"
+    "R7. 'agressoes': list EVERY moment to censor — the editor pixelates ONLY THAT AREA of the frame (not the whole screen), "
+    "so the viewer still sees the scene:\n"
+    "  • tipo 'golpe' (slap, punch, kick, shove, spit, someone knocked down): de/ate = the impact moment (brief, pad 0.2 s); "
+    "'alvo' = in English, exactly WHERE it lands (e.g. 'the bald man's face being slapped', 'the biker's helmet being kicked').\n"
+    "  • tipo 'gesto' (middle finger, obscene gesture): de/ate = while it is shown; 'alvo' = 'the raised middle finger of the driver'.\n"
+    "  • tipo 'arma' (gun, knife, bat, machete, any weapon): de/ate = the WHOLE time it is visible; 'alvo' = the weapon "
+    "('the pistol in the man's right hand'); 'vira' = the HARMLESS object your narration says it is — something that fits the "
+    "scene and makes the joke (a water pistol, a baguette, a TV remote, a bouquet of flowers, an umbrella, a selfie stick…). "
+    "The narration MUST call it that object, never a weapon.\n"
+    "  {material (M1…), de, ate (seconds of the CLIP), o_que (a few words), tipo, alvo, vira ('' if not a weapon)}. Empty list "
+    "if there is none.\n"
+    "R8. LENGTH: the same as the clip (the narration covers the whole clip, about 2.6 words per second).\n"
+    "R9. Every cena stays ON THE CLIP (layout 'clipe' with material/de/ate) — no stock footage.\n"
+    "R10. 'ganchos': 5 openings of 5 DIFFERENT opener types (R4); 'finais': 5 wholesome closing lines; 'titulos': ironic "
+    "wholesome titles (e.g. 'Such a wholesome reunion 🥹'); 'descricao': 1 sentence + credit the original creator by @ when "
+    "known; hashtags light (#wholesome #roadrage #funny…).")
+
+
 REGRA_COMPOSTO = (
     "\n\n🧩 COMPOSITE VIDEO — you have {N} clips (M1…M{N}) from DIFFERENT creators about the same theme. Build ONE NEW, "
     "informative video out of them (this is the original value: nobody else made this video):\n"
@@ -555,6 +616,17 @@ REGRA_COMPOSTO = (
     "70-100 s, never above 170 s, never padded.\n"
     "C7. 'descricao' credits ALL the creators (by @ when known). If the clips really do not share a theme, still build the best "
     "honest thread you can and start 'descricao' with '⚠ as fontes não têm um tema claro em comum'.")
+
+
+REGRA_COMPOSTO_REVERSO = (
+    "\n\n🧩🔄 REVERSE RAGE WITH {N} CLIPS (M1…M{N}, different creators): ONE wholesome story that links them — not a "
+    "compilation. Pick a thread that makes the clips feel like one world: 'a day of kindness on the roads', a town where "
+    "everyone is unusually polite, the same 'kind stranger' showing up again, a 'tradition' that spreads from one place to the next…\n"
+    "RC1. Each clip gets its own flips (R1) at the exact seconds, but the narration flows from one clip to the next through "
+    "the story ('Meanwhile, across town, another act of kindness…'), never 'in this other video'.\n"
+    "RC2. Order the clips by the story (the strongest/funniest flip near the end), intercut only if it helps the joke.\n"
+    "RC3. LENGTH: the sum of the clips you use (about 2.6 words/s) — each clip mostly shown whole, the best seconds.\n"
+    "RC4. 'agressoes' covers the moments of EVERY clip (with its own material id). 'descricao' credits ALL the creators.")
 
 
 PUBLICO_DA_LINGUA = {"en": "an English-speaking audience (mostly US/UK)", "pt": "a Brazilian audience", "es": "a Spanish-speaking audience",
@@ -643,6 +715,28 @@ def estilo_roteiro(p: Dict[str, Any]) -> str:
     return v if v in ESTILOS_ROTEIRO else "autentico"
 
 
+# 🔄 v84_401: os tipos de abertura e de final do reverse rage (sorteados por vídeo, como nos outros shorts)
+TIPOS_GANCHO_REVERSO = {
+    "pais": "a COUNTRY/CUSTOM opener — '<place>, where <group> are <loved/respected/treated like royalty>…' (only if no recent "
+            "script of the channel used it)",
+    "passado": "a BACKSTORY opener — '<N> years ago, <person> <did something kind for> <person>. Today…'",
+    "regra": "an UNWRITTEN RULE opener — 'There's an unwritten rule <on the road / at the gas station / …>: <sweet rule>.'",
+    "personagem": "a 'MEET <NAME>' opener — give the main person a name and a sweet trait ('Meet Gary. Gary loves bikers.')",
+    "noticia": "a NEWS-ANCHOR opener — 'Heartwarming news from <place>: …' in a calm, sincere anchor voice",
+    "gratidao": "a GRATITUDE opener — 'Some people just can't hide how grateful they are.' then straight into the clip",
+    "ciencia": "a FAKE-SWEET STUDY opener — 'Studies show <drivers/neighbors> who <kind action> live longer. This man knows it.' "
+               "(obviously sweet, never a real-sounding statistic)",
+}
+TIPOS_FINAL_REVERSO = {
+    "abraco": "a WARM GOODBYE — they part ways after such a <wholesome reunion / beautiful moment>",
+    "licao": "a TINY LIFE LESSON, over-sincere — 'And that's why we should always <kind thing>.'",
+    "volta": "a CALLBACK to the opener (the rule / the backstory / the country) closing the circle",
+    "futuro": "a SWEET FUTURE — 'They still meet every Sunday for <something>.'",
+    "plaquinha": "a DEADPAN NOTE — 'He later sent a thank-you card.' / 'The mirror has never been straighter.'",
+    "pergunta": "a WHOLESOME QUESTION to the viewer about ONE detail — 'Who would you give a head rub to?'",
+}
+
+
 def tipos_do_video(p: Dict[str, Any]) -> tuple:
     """🎲 o tipo de gancho e de final deste vídeo — sorteado pelo id (fixo pro mesmo vídeo, variado no lote)."""
     import hashlib
@@ -695,6 +789,14 @@ def regra_retencao(p: Dict[str, Any]) -> str:
 
 
 def regra_tipos(p: Dict[str, Any]) -> str:
+    if not explicativo(p) and estilo_roteiro(p) == "reverso":  # 🔄 v84_401: sem sorteio — a abertura mais chamativa PRA ESTE clipe
+        return ("## OPENER — invent a NEW one for THIS clip (no fixed formula): the line that grabs attention fastest, built on "
+                "the most absurd contrast of this specific clip (the rudest act → the sweetest reading). Lands in the first 2 "
+                "seconds, under ~14 words. Ideas to get you going (NOT a menu to rotate through — beat them if you can): "
+                + "; ".join(TIPOS_GANCHO_REVERSO.values()) + ".\n"
+                "## ENDING — the punchline that pays off THIS story (often a callback to the opener). Ideas: "
+                + "; ".join(TIPOS_FINAL_REVERSO.values()) + ".\n"
+                "Use the strongest of your 5 'ganchos' as the first line and the strongest of your 5 'finais' as the last.")
     if explicativo(p) or not autentico_ou_mais(p):
         return ""
     g, f = tipos_do_video(p)
@@ -706,10 +808,12 @@ def regra_tipos(p: Dict[str, Any]) -> str:
 def sistema(p: Dict[str, Any]) -> str:
     base_ = EXPLICATIVO_SYS if explicativo(p) else ROTEIRO_SYS
     extra = REGRA_AUTENTICA if (not explicativo(p) and autentico_ou_mais(p)) else ""
+    if not explicativo(p) and estilo_roteiro(p) == "reverso":  # 🔄 v84_401: reverse rage
+        extra = REGRA_REVERSO
     if not explicativo(p) and estilo_roteiro(p) == "personalidade":  # 🎭 v84_345
         extra += REGRA_PERSONALIDADE
-    if not explicativo(p) and composto(p):  # 🧩 v84_349
-        extra += REGRA_COMPOSTO.replace("{N}", str(composto(p)))
+    if not explicativo(p) and composto(p):  # 🧩 v84_349 · 🔄 v84_401: no reverse rage, uma história fofa ligando os clipes
+        extra += (REGRA_COMPOSTO_REVERSO if estilo_roteiro(p) == "reverso" else REGRA_COMPOSTO).replace("{N}", str(composto(p)))
     extra += regra_localizar(p)  # 🌍 v84_352: em todos os estilos (e no explicativo)
     extra += regra_retencao(p)  # 🧲 v84_354: gatilhos de atenção (e o 🔁 loop só se você ligar)
     import camera_exp
@@ -864,9 +968,10 @@ def _conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
     desc_canal = str(canal_.get("descricao") or "").strip()  # 📝 a descrição do canal (escrita por você)
     if desc_canal:
         L += ["## WHAT THIS CHANNEL IS ABOUT (the creator's own description — follow it)", desc_canal, ""]
-    if not explicativo(p) and estilo_roteiro(p) == "personalidade":  # 🎭 v84_345: a persona + o que NÃO repetir
-        L += ["## CHANNEL PERSONA (the narrator)", persona_do_canal(canal_), ""]
-        rec = roteiros_recentes(base, p)
+    if not explicativo(p) and estilo_roteiro(p) in ("personalidade", "reverso"):  # 🎭 v84_345 · 🔄 v84_401: o que NÃO repetir
+        if estilo_roteiro(p) == "personalidade" or (canal_.get("persona") and estilo_roteiro(p) == "reverso"):
+            L += ["## CHANNEL PERSONA (the narrator)", persona_do_canal(canal_), ""]
+        rec = roteiros_recentes(base, p, 15 if estilo_roteiro(p) == "reverso" else 6)  # 🔄 mais memória: quase nunca repete
         if rec:
             L += ["## RECENT SCRIPTS OF THIS CHANNEL — do NOT repeat their openings, punchlines or structure", *rec, ""]
     estilo = CT.texto_do_perfil(perfil)
@@ -895,6 +1000,9 @@ def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, A
         if not isinstance(b, dict):
             continue
         en, pt = str(b.get("fala_en") or b.get("fala") or "").strip(), str(b.get("fala_pt") or "").strip()
+        if not explicativo(p) and estilo_roteiro(p) == "reverso":  # 🔄 v84_401: a narração nunca xinga
+            import palavroes
+            en, pt = palavroes.limpar(en), palavroes.limpar(pt)
         fala = en if idioma == "en" or not pt else pt
         cenas = []
         for cn in b.get("cenas") or []:
@@ -920,6 +1028,20 @@ def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, A
         r[k] = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get(k) or []
                 if isinstance(o, dict) and (o.get("en") or o.get("pt"))][:20]
     r["idioma"] = idioma
+    if not explicativo(p) and estilo_roteiro(p) == "reverso":  # 🔄 v84_401: os golpes/gestos pra censurar (segundos do clipe)
+        ids = {m.get("id") for m in p.get("midias") or []}
+        ag = []
+        for x in resp.get("agressoes") or []:
+            try:
+                a, b = float(x.get("de") or 0), float(x.get("ate") or 0)
+            except (AttributeError, TypeError, ValueError):
+                continue
+            mid = str(x.get("material") or "").strip()
+            if b > a and (mid in ids or not ids):
+                tipo = x.get("tipo") if x.get("tipo") in ("golpe", "gesto", "arma") else "golpe"
+                ag.append({"material": mid, "de": round(max(0.0, a - 0.2), 2), "ate": round(b + 0.2, 2), "o_que": str(x.get("o_que") or "")[:80],
+                           "tipo": tipo, "alvo": str(x.get("alvo") or x.get("o_que") or "")[:160], "vira": str(x.get("vira") or "")[:80]})
+        r["agressoes"] = ag
     return r
 
 
@@ -1109,7 +1231,11 @@ def mais_opcoes(base: str, pid: str, qual: str, chamar: Optional[Callable[..., A
               "titulos": f"Write 5 NEW post TITLES for this {tipo} — short, curiosity, honest (no fake claims)."}[qual]
     tag = " (may use one voice tag like [gasp])" if lingua_post(p) == "en" and qual != "titulos" else ""
     guia = ""
-    if qual in ("ganchos", "finais") and not explicativo(p) and autentico_ou_mais(p):  # ✨ v84_321
+    if qual in ("ganchos", "finais") and not explicativo(p) and estilo_roteiro(p) == "reverso":  # 🔄 v84_401
+        tipos = TIPOS_GANCHO_REVERSO if qual == "ganchos" else TIPOS_FINAL_REVERSO
+        guia += ("\nREVERSE RAGE: deadpan, sincere, WHOLESOME reinterpretation of the rude/violent clip (never describe the "
+                 "violence, never swear). Each one a DIFFERENT type from: " + "; ".join(f"{k} = {v}" for k, v in tipos.items()))
+    elif qual in ("ganchos", "finais") and not explicativo(p) and autentico_ou_mais(p):  # ✨ v84_321
         tipos = TIPOS_GANCHO if qual == "ganchos" else TIPOS_FINAL
         guia += ("\nEach one a DIFFERENT type from: " + "; ".join(f"{k} = {v}" for k, v in tipos.items())
                  + "\nSpecific to this clip, click-worthy through curiosity, honest. Never: 'Everyone thought', 'But look closer', "
@@ -1418,6 +1544,73 @@ def objeto_no_mapa(mapa: Dict[str, Any], nome: str) -> Optional[str]:
         if comum > nota:
             melhor, nota = o, comum
     return melhor
+
+
+ALVO_PADRAO = {"golpe": "the spot where the hit lands (face/head/body of the person being hit)",
+               "gesto": "the hand making the obscene gesture", "arma": "the weapon"}
+
+
+def preparar_censura(base: str, pid: str, chamar: Optional[Callable[..., Any]] = None,
+                     on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, int]:
+    """🔄 v84_401: reverse rage — pra cada golpe/gesto/arma que o roteiro marcou, a IA (Moondream se ligado, senão o Claude)
+    acha ONDE está no quadro (no começo e no fim do trecho) → só aquela ÁREA é pixelada, acompanhando o movimento.
+    Não achou: fica marcado pra ajustar à mão na faixa Censura do Estúdio (uma área média no meio)."""
+    import rastreio
+    p = CT.carregar(base, pid)
+    ags = (p.get("roteiro") or {}).get("agressoes") or []
+    if not ags:
+        return {"achados": 0, "sem_lugar": 0}
+    cl = {m["id"]: m for m in clipes(base, p)}
+    tmp = os.path.join(CT.pasta(base, pid), "_censura")
+    os.makedirs(tmp, exist_ok=True)
+    achados = sem = 0
+    for ag in ags:
+        if "caixa" in ag:  # já procurado
+            continue
+        m = cl.get(ag.get("material")) or (next(iter(cl.values())) if len(cl) == 1 else None)
+        if not m:
+            ag["caixa"] = None
+            continue
+        try:
+            info = rastreio.sondar(m["caminho"])
+            W, H = float(info["largura"]), float(info["altura"])
+        except Exception:  # noqa: BLE001
+            ag["caixa"] = None
+            continue
+        alvo = ag.get("alvo") or ALVO_PADRAO.get(ag.get("tipo"), ALVO_PADRAO["golpe"])
+        a, b = float(ag["de"]), float(ag["ate"])
+        caixas = []
+        for t in ((a + b) / 2,) if b - a < 0.9 else (a + (b - a) * 0.2, a + (b - a) * 0.8):
+            try:
+                cx = achar_objeto(m["caminho"], t, alvo, tmp, chamar, base)
+            except Exception:  # noqa: BLE001
+                cx = None
+            if cx:
+                caixas.append([cx[0] / W, cx[1] / H, cx[2] / W, cx[3] / H])
+        if caixas:
+            achados += 1
+            folga = 0.35 if ag.get("tipo") == "golpe" else 0.15  # o golpe: a área em volta do impacto também
+            def _abrir(c):
+                x, y, w, h = c
+                dw, dh = max(w * folga, 0.03), max(h * folga, 0.03)
+                w2, h2 = min(1.0, max(0.12, w + 2 * dw)), min(1.0, max(0.08, h + 2 * dh))
+                return [round(max(0.0, min(1 - w2, x - (w2 - w) / 2)), 4), round(max(0.0, min(1 - h2, y - (h2 - h) / 2)), 4),
+                        round(w2, 4), round(h2, 4)]
+            ag["caixa"] = _abrir(caixas[0])
+            if len(caixas) > 1:
+                ag["caixa2"] = _abrir(caixas[-1])
+            ag["clipe_wh"] = [W, H]
+        else:
+            sem += 1
+            ag["caixa"] = None
+            ag["clipe_wh"] = [W, H]
+        on_log(f"🫥 {ag.get('o_que') or ag.get('tipo')}: " + ("área achada" if ag.get("caixa") else "não achei onde — ajuste na faixa Censura"))
+    with CT._TRAVA:
+        q = CT.carregar(base, pid)
+        if (q.get("roteiro") or {}).get("agressoes") is not None:
+            q["roteiro"]["agressoes"] = ags
+            CT.salvar(base, q)
+    return {"achados": achados, "sem_lugar": sem}
 
 
 def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = None, chamar: Optional[Callable[..., Any]] = None,

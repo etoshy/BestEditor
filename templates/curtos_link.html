@@ -114,6 +114,7 @@
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Gatilhos de atenção HONESTOS no roteiro: gancho na primeira palavra e na imagem mais forte, pergunta aberta respondida só no fim, um 'ainda vem o mais estranho' no meio (que é cumprido), uma virada a cada 5-7 s, detalhes concretos, tensão real, falar com UMA pessoa, o que os comentários discutem, frases curtas e final no clímax (sem 'me segue')."><input type="checkbox" id="retencao" checked style="width:auto;margin:0"> 🧲 retenção máxima (gatilhos mentais: gancho no 1º segundo, curiosidade até o fim, virada a cada 5-7 s, final no clímax)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="A última frase emenda na primeira — quando o short recomeça parece um pensamento só (aumenta o replay). Desligado: nunca termina em loop."><input type="checkbox" id="final_loop" style="width:auto;margin:0"> 🔁 final em loop (a última frase emenda na primeira — desligado)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Experimental. Por cima do ✨ autêntico: um narrador com a PERSONALIDADE do canal (a que você escreve em 🎨 Personalização → Canal e voz, ou uma deduzida da descrição), uma opinião de verdade, uma comparação do dia a dia (sem inventar história pessoal), um detalhe que o vídeo não mostra, fala de gente, e sem repetir as aberturas e finais dos vídeos recentes do mesmo canal."><input type="checkbox" id="roteiro_personalidade" style="width:auto;margin:0"> 🎭 roteiro com mais personalidade (experimental — persona do canal, opinião forte, sem repetir os vídeos anteriores)</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Pra clipes de briga de trânsito, discussão, gente mal-educada: a narração conta uma história totalmente nova e FOFA por cima (o soco vira 'cafuné', o dedo do meio vira 'mostrou que ele é o número um'). O áudio do clipe não entra (os palavrões somem), os golpes são pixelados e a abertura/final variam a cada vídeo."><input type="checkbox" id="roteiro_reverso" style="width:auto;margin:0"> 🔄 reverse rage (a treta vira gentileza — ironia wholesome; palavrões e golpes censurados)</label>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ opcional: comentários à mão e pedido extra</summary>
     <label>💬 Comentários <span class="si-dica" style="font-weight:400">— o site tenta ler sozinho; se o TikTok não deixar, cole os principais aqui (um por linha, as curtidas no fim: “why did he stop?? 12K”)</span>
       <textarea id="comentarios" rows="4"></textarea></label>
@@ -400,7 +401,7 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
 // 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
-const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'tambem_quadrado', 'retencao', 'final_loop'], OP_RADIOS = ['modo', 'lote_modo'];
+const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'roteiro_reverso', 'tambem_quadrado', 'retencao', 'final_loop'], OP_RADIOS = ['modo', 'lote_modo'];
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 const LIVRE = {};  // 📺 v84_340: o que VOCÊ tinha escolhido nos campos que o canal do lote trava (volta quando troca de canal)
 const valorLivre = k => (k in LIVRE ? LIVRE[k] : el(k).value);
@@ -447,11 +448,12 @@ async function aplicarCanalNoEnvio() {
 }
 el('canal').addEventListener('change', aplicarCanalNoEnvio);
 window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {} ['voz', 'lingua_post', 'idioma', 'proporcao'].forEach(soltar); aplicarOpcoes(PADRAO_OP); aplicarCanalNoEnvio(); el('link').dispatchEvent(new Event('input')); aviso('↺ opções de volta ao padrão', 'okk'); };
-el('roteiro_classico').addEventListener('change', () => { if (el('roteiro_classico').checked) el('roteiro_personalidade').checked = false; });
-el('roteiro_personalidade').addEventListener('change', () => { if (el('roteiro_personalidade').checked) el('roteiro_classico').checked = false; });
+['roteiro_classico', 'roteiro_personalidade', 'roteiro_reverso'].forEach(id => el(id).addEventListener('change', () => {
+  if (el(id).checked) ['roteiro_classico', 'roteiro_personalidade', 'roteiro_reverso'].forEach(o => { if (o !== id) el(o).checked = false; });
+}));
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
-  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
+  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, roteiro_reverso: el('roteiro_reverso').checked, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   salvarOpcoes();

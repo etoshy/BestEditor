@@ -12471,6 +12471,8 @@ def _curto_para_estudio(d: Dict[str, Any]) -> str:
         _save_state(job_id)
         raise
     job["legendas"], job["sfx"] = d["legendas"], d["sfx"]
+    if d.get("censura"):  # 🔄 v84_401: reverse rage — os golpes pixelados na faixa Censura (dá pra ajustar no Estúdio)
+        job["censura"] = __import__("dp_censura").normalizar(d["censura"], float(d["dur"]))
     if d.get("enquadramento"):  # 💬📚 vídeo de outra proporção: o próprio vídeo desfocado atrás (não barra preta)
         job["editor_defaults"] = dict(job.get("editor_defaults") or {}, aspect_fill=d["enquadramento"], trim_start_frames=0)
     pend = job.get("pending_segments") or []
@@ -12533,6 +12535,9 @@ def _curto_trocar_voz(job_id: str, d: Dict[str, Any]) -> Dict[str, Any]:
                pending_segments=segs, segment_previews=[dict(p_, index=k) if p_ else None for k, p_ in enumerate(prevs)],
                destaques=sorted(ia_d + meus_d, key=lambda x: float(x["start"])),
                sfx=sorted(d["sfx"] + meus_s, key=lambda x: float(x["start"])), curto_alinhamento=novo, marca=d.get("marca"))
+    if d.get("censura"):  # 🔄 v84_401: voz trocada → os golpes pixelados nos tempos novos (os seus continuam)
+        meus_c = [c for c in job.get("censura") or [] if not str(c.get("id") or "").startswith("rv")]
+        job["censura"] = __import__("dp_censura").normalizar(d["censura"] + meus_c, float(d["dur"]))
     try:
         wf = os.path.join(jd, "waveform.png")
         generate_waveform_image(audio, wf)
