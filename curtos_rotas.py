@@ -3775,6 +3775,8 @@ def _resultados_pixabay(pasta_p: str, termo: str) -> List[Dict[str, Any]]:
     for x in itens:
         if t and " ".join(str(x.get("busca") or "").lower().split()) != t:
             continue
+        if x.get("tipo") == "musica":  # 🎵 v84_399: as músicas do sound design não viram efeito dos curtos
+            continue
         cort = x.get("arquivo_cortado")
         if not cort or not os.path.isfile(cort):
             continue

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Sound design{% endblock %}
+{% block content %}
+{% if p %}
+<p><a href="{{ url_for('sd_pagina') }}">◀ Sound design</a></p>
+<h1>🎧 {{ p.nome }}</h1>
+<p style="color:#555;margin-top:-6px">{{ '🎬 vídeo' if p.video else '🔊 áudio' }} · {{ '%d:%02d'|format((p.total_duration or 0)//60, (p.total_duration or 0)%60) }} ·
+  <span style="font-size:.85rem">{{ p.fonte }}</span></p>
+{% set sd_base = '/sound-design/' ~ p.id %}{% set sd_avulso = true %}{% include "_sound_design.html" %}
+<form method="post" action="{{ url_for('sd_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este projeto de sound design? (o arquivo original fica)')" style="margin-top:14px">
+  <button type="submit" style="width:auto;background:#94a3b8">🗑 excluir este projeto</button></form>
+{% else %}
+<h1>🎧 Sound design</h1>
+<p style="color:#555;margin-top:-6px">Pra qualquer vídeo ou áudio do site (curtos, react, poker, anime, explicador, Gerador de voz, dublagem…) ou um
+arquivo seu: a IA lê a narração e dá a cada parte uma <b>emoção-alvo</b>; entram <b>ambiente</b>, <b>música</b> que troca com a
+emoção (e abaixa quando a voz fala), <b>acentos</b> só nos momentos-chave e a <b>mixagem</b> pelos níveis. Os áudios vêm do
+Pixabay. Sai uma <b>cópia</b> — o original fica. (No Estúdio do vídeo longo o mesmo painel fica no botão 🎧 da barra de cima.)</p>
+{% if erro %}<p style="color:#b91c1c">⚠ {{ erro }}</p>{% endif %}
+{% if url %}
+<form method="post" action="{{ url_for('sd_novo') }}" style="border:2px solid #7c3aed;border-radius:10px;padding:12px;margin:10px 0">
+  <b>🎧 Este arquivo do site:</b> <code style="font-size:.85rem">{{ url }}</code>
+  <input type="hidden" name="url" value="{{ url }}">
+  <div><button type="submit" style="width:auto;background:#7c3aed">Começar o sound design deste</button></div>
+</form>
+{% endif %}
+
+<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+  <form method="post" action="{{ url_for('sd_novo') }}" enctype="multipart/form-data" style="flex:1;min-width:280px;border:1px solid #e5e7eb;border-radius:10px;padding:12px">
+    <b>📤 Enviar um arquivo</b>
+    <input type="file" name="arquivo" accept="video/*,audio/*" required>
+    <button type="submit" style="width:auto">Começar</button>
+  </form>
+  <form method="post" action="{{ url_for('sd_novo') }}" style="flex:2;min-width:320px;border:1px solid #e5e7eb;border-radius:10px;padding:12px">
+    <b>📂 Ou um que o site gerou</b> <span style="color:#666;font-size:.85rem">(os mais novos primeiro)</span>
+    <select name="caminho" required style="margin:6px 0">
+      <option value="">— escolha —</option>
+      {% for r in recentes %}<option value="{{ r.caminho }}" {% if preencher and preencher == r.caminho %}selected{% endif %}>{{ '🎬' if r.video else '🔊' }} {{ r.rel }} · {{ r.mb }} MB</option>{% endfor %}
+    </select>
+    <button type="submit" style="width:auto">Começar</button>
+  </form>
+</div>
+
+<h2 style="margin-top:18px">Projetos</h2>
+{% for x in projetos %}
+<div style="padding:6px 0;border-bottom:1px solid #eee"><a href="{{ url_for('sd_projeto', pid=x.id) }}">{{ '🎬' if x.video else '🔊' }} {{ x.nome }}</a>
+  <span style="color:#666;font-size:.85rem">· {{ x.blocos }} bloco(s) de emoção{% if x.pronto %} · ✅ cópia pronta{% endif %}</span></div>
+{% else %}<p style="color:#666">Nenhum ainda.</p>{% endfor %}
+{% endif %}
+{% endblock %}

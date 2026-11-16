@@ -5418,6 +5418,10 @@ def assemble_video(
     for item in sfx or []:
         if dp_sons.som(item.get("som")):
             eventos_sons.append({"som": item["som"], "inicio": max(0.0, float(item.get("start", 0))), "volume": float(item.get("volume", 1.0))})
+    _sd = cfg.get("_sound_design")  # 🎧 v84_399: os acentos dos momentos-chave (riser/reverse → impacto)
+    if _sd:
+        import sound_design
+        eventos_sons += sound_design.eventos_acentos(_sd)
     if eventos_sons:
         if on_progress:
             on_progress("sons", total, total)
@@ -5425,7 +5429,8 @@ def assemble_video(
             try:
                 audio_path = dp_sons.mixar(audio_path, eventos_sons, os.path.join(work_dir, "_narracao_com_sons.wav"),
                                            volume_sfx=float(cfg.get("sons_volume", 0.55)),
-                                           preservar=bool(cfg.get("audio_original")))
+                                           preservar=bool(cfg.get("audio_original")),
+                                           reverb=bool(_sd and _sd.get("mix")))
             except Exception as exc:  # noqa: BLE001
                 raise VideoAssemblyError(f"Falha ao mixar os efeitos sonoros: {str(exc)[-300:]}") from exc
 
@@ -5437,6 +5442,14 @@ def assemble_video(
                 audio_path = com_bip
         except Exception as exc:  # noqa: BLE001
             raise VideoAssemblyError(f"A censura de áudio (bip) falhou: {str(exc)[-300:]}") from exc
+
+    if _sd:  # 🎧 v84_399: ambiente + música por emoção (com ducking e os respiros antes dos impactos)
+        try:
+            import sound_design
+            audio_path = sound_design.aplicar(audio_path, _sd, os.path.join(work_dir, "_narracao_sound_design.wav"),
+                                              tem_trilha=bool(music_path and os.path.exists(music_path)))
+        except Exception as exc:  # noqa: BLE001
+            raise VideoAssemblyError(f"O sound design (ambiente/música) falhou: {str(exc)[-300:]}") from exc
 
     if on_progress:
         on_progress("sincronizando_audio", total, total)

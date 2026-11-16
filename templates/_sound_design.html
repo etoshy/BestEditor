@@ -1,0 +1,163 @@
+{# 🎧 v84_399 — painel do sound design (Estúdio e página 🎧 Sound design). Incluir com:
+   {% set sd_base = '/job/<jid>/sound-design' (ou '/sound-design/<pid>') %}{% set sd_avulso = true/false %}{% include "_sound_design.html" %} #}
+<style>
+  .sdp{background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.45}
+  .sdp b{color:#fff}
+  .sdp .sd-dim{color:#9ca3af}
+  .sdp button{width:auto;margin:0;padding:5px 10px;font-size:12.5px;border-radius:6px;border:1px solid #4b5563;background:#1f2937;color:#e5e7eb;cursor:pointer}
+  .sdp button.sd-pri{background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:600}
+  .sdp button:disabled{opacity:.45;cursor:not-allowed}
+  .sdp input,.sdp select{margin:0;padding:3px 6px;font-size:12.5px;background:#0b1220;color:#e5e7eb;border:1px solid #374151;border-radius:5px;width:auto}
+  .sdp .sd-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+  .sdp .sd-faixa{position:relative;height:26px;border-radius:6px;overflow:hidden;background:#0b1220;margin:8px 0 14px}
+  .sdp .sd-faixa .b{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;white-space:nowrap;overflow:hidden;border-right:1px solid #0b1220}
+  .sdp .sd-faixa .m{position:absolute;top:-2px;bottom:-2px;width:3px;background:#fde047;box-shadow:0 0 4px #fde047}
+  .sdp table{width:100%;border-collapse:collapse;margin-top:4px}
+  .sdp td,.sdp th{padding:4px;border-bottom:1px solid #1f2937;vertical-align:middle;text-align:left;font-weight:normal}
+  .sdp th{color:#9ca3af;font-size:11.5px}
+  .sdp .ok{color:#4ade80}.sdp .nok{color:#fbbf24}
+  .sdp audio{height:26px;width:150px;vertical-align:middle}
+  .sdp .sd-log{font-family:monospace;font-size:11px;color:#9ca3af;max-height:120px;overflow:auto;white-space:pre-wrap}
+</style>
+<div class="sdp" id="sdPainel">
+  <div class="sd-row" style="justify-content:space-between">
+    <b>🎧 Sound design</b>
+    <span class="sd-dim" style="font-size:12px">emoção-alvo por parte → ambiente + música + acentos, mixados pelos níveis (fonte: Pixabay)</span>
+  </div>
+  <div class="sd-row">
+    <button type="button" id="sdTranscrever" style="display:none">📝 1. Transcrever a narração</button>
+    <button type="button" id="sdAnalisar" class="sd-pri">🤖 Ler as emoções</button>
+    <button type="button" id="sdBuscar">🔊 Buscar os áudios no Pixabay</button>
+    <button type="button" id="sdAplicar" style="display:none" class="sd-pri">🎬 Gerar a cópia com o som novo</button>
+    <span id="sdSaida"></span>
+  </div>
+  <div class="sd-row">
+    <span class="sd-dim">Camadas:</span>
+    <label><input type="checkbox" data-camada="ambiente"> 🌫 Ambiente</label>
+    <label><input type="checkbox" data-camada="musica"> 🎵 Música</label>
+    <label><input type="checkbox" data-camada="acentos"> 💥 Acentos</label>
+    <label title="reverb leve nos efeitos e limitador no fim — nada estoura"><input type="checkbox" data-camada="mix"> 🎚 Mixagem</label>
+    <label title="o CLAP (modelo local) OUVE cada candidato e escolhe o que mais soa como a emoção — recusa o desconexo"><input type="checkbox" data-camada="juiz"> 🎯 Juiz de áudio</label>
+    <label title="quando o Pixabay não tem nada que preste pra um EFEITO, tenta o MyInstants (só efeitos; os estourados são recusados)"><input type="checkbox" data-camada="memes"> 📣 MyInstants de reserva</label>
+  </div>
+  <div id="sdJuiz" class="sd-dim" style="font-size:12px"></div>
+  <div id="sdSt" class="nok" style="min-height:18px"></div>
+  <div id="sdNota" class="sd-dim" style="font-size:12px"></div>
+  <div class="sd-faixa" id="sdFaixa"></div>
+  <div id="sdBlocos"></div>
+  <div class="sd-row" style="margin-top:10px"><b>💥 Momentos-chave</b> <span class="sd-dim" id="sdMomInfo"></span>
+    <button type="button" id="sdNovoMom" style="margin-left:auto">➕ momento</button></div>
+  <div id="sdMomentos"></div>
+  <div id="sdAcentos" class="sd-row"></div>
+  <details style="margin-top:8px"><summary class="sd-dim">o que aconteceu</summary><div class="sd-log" id="sdLog"></div></details>
+</div>
+<script>
+(() => {
+  const BASE = {{ sd_base|tojson }}, AVULSO = {{ (sd_avulso or false)|tojson }};
+  const $s = (id) => document.getElementById(id);
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const mmss = (s) => { s = Math.max(0, +s || 0); return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
+  const segs = (t) => { const m = String(t).trim().match(/^(\d+):(\d+(?:[.,]\d+)?)$/); return m ? (+m[1]) * 60 + parseFloat(m[2].replace(',', '.')) : parseFloat(String(t).replace(',', '.')) || 0; };
+  let E = null, timer = null, salvarT = null;
+
+  async function api(c, corpo) {
+    const r = await fetch(BASE + c, corpo === undefined ? {cache: 'no-store'} :
+      {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Pagina': location.pathname}, body: JSON.stringify(corpo)});
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d;
+  }
+  const rodando = () => E && E.tarefa && E.tarefa.status === 'rodando';
+
+  function desenhar() {
+    if (!E) return;
+    const emo = E.emocoes, dur = E.duracao || 1;
+    document.querySelectorAll('#sdPainel [data-camada]').forEach(c => c.checked = !!E.camadas[c.dataset.camada]);
+    $s('sdTranscrever').style.display = AVULSO && !E.tem_texto ? '' : 'none';
+    $s('sdAplicar').style.display = AVULSO ? '' : 'none';
+    ['sdAnalisar', 'sdBuscar', 'sdAplicar', 'sdTranscrever'].forEach(id => $s(id).disabled = rodando());
+    $s('sdAnalisar').disabled = rodando() || !E.tem_texto;
+    $s('sdBuscar').disabled = rodando() || !E.blocos.length;
+    $s('sdAplicar').disabled = rodando() || !E.blocos.length;
+    const t = E.tarefa;
+    $s('sdSt').textContent = t ? (t.status === 'rodando' ? '⏳ ' + (t.progresso || t.titulo) : t.status === 'erro' ? '⚠ ' + (t.erro || 'deu erro') : '') : '';
+    const falta = (E.faltando.efeitos || []).length + (E.faltando.musica || []).length;
+    $s('sdNota').innerHTML = !E.tem_texto ? (AVULSO ? 'Primeiro transcreva a narração (📝).' : 'Este projeto ainda não tem a transcrição.') :
+      !E.blocos.length ? 'Clique em 🤖 <b>Ler as emoções</b>: a IA divide o vídeo em blocos com a emoção-alvo e marca os momentos-chave.' :
+      falta ? `Faltam <b>${falta}</b> áudio(s) — clique em 🔊 (abre o navegador do site no Pixabay; se aparecer a verificação "sou humano", resolva uma vez).` :
+      (AVULSO ? 'Tudo pronto — 🎬 gera uma cópia do arquivo com o som novo (o original fica).' : '✅ Tudo pronto — entra quando você montar o vídeo (🎬 Montar). A música abaixa sozinha quando a voz fala.');
+    if (E.saida) $s('sdSaida').innerHTML = (E.video ? `<video src="${E.saida}" controls style="max-width:260px;vertical-align:middle"></video>` : `<audio src="${E.saida}" controls></audio>`) + ` <a href="${E.saida}?baixar=1">⬇ baixar</a>`;
+    // a faixa colorida: os blocos + os momentos
+    $s('sdFaixa').innerHTML = E.blocos.map(b => `<div class="b" style="left:${b.start / dur * 100}%;width:${(b.end - b.start) / dur * 100}%;background:${(emo[b.emocao] || {}).cor}" title="${esc((emo[b.emocao] || {}).nome)} ${mmss(b.start)}–${mmss(b.end)}">${esc(((emo[b.emocao] || {}).nome || '').split(' ')[0])}</div>`).join('')
+      + E.momentos.map(m => `<div class="m" style="left:${m.t / dur * 100}%" title="${esc(E.tipos_momento[m.tipo])} ${mmss(m.t)} (força ${m.forca})"></div>`).join('');
+    const opEmo = (v) => Object.entries(emo).map(([k, x]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(x.nome)}</option>`).join('');
+    const ouvir = (tipo, termo) => `<audio controls preload="none" src="${BASE}/ouvir?chave=${encodeURIComponent(tipo + ':' + termo)}"></audio>`;
+    const selo = (inf, chave) => !inf ? '' : `${inf.fonte === 'myinstants' ? '<span title="MyInstants (reserva)">📣</span> ' : ''}`
+      + (inf.nota != null ? `<span class="${inf.aviso ? 'nok' : 'ok'}" title="${esc((inf.soa_como || []).length ? 'soa como: ' + inf.soa_como.join(', ') : '')}${inf.aviso ? ' — ' + esc(inf.aviso) : ''}">🎯 ${inf.nota}%</span> ` : '')
+      + `<button type="button" class="sdTrocar" data-chave="${esc(chave)}" title="não gostei: o próximo 🔊 escolhe outro" style="padding:1px 6px">🔁</button>`;
+    $s('sdJuiz').textContent = !E.camadas.juiz ? '🎯 juiz de áudio desligado' : E.juiz_falta ? '🎯 juiz de áudio indisponível neste PC: ' + E.juiz_falta + ' — escolhe pelo título/duração' : '🎯 juiz de áudio (CLAP, local) — escuta cada candidato';
+    $s('sdBlocos').innerHTML = E.blocos.length ? `<table><tr><th>quando</th><th>emoção</th><th>🌫 ambiente (busca)</th><th>🎵 música (busca)</th></tr>` +
+      E.blocos.map((b, i) => `<tr data-i="${i}">
+        <td style="white-space:nowrap"><input class="sdA" value="${mmss(b.start)}" style="width:52px"> – ${mmss(b.end)}</td>
+        <td><select class="sdE">${opEmo(b.emocao)}</select>${b.por_que ? `<div class="sd-dim" style="font-size:11px">${esc(b.por_que)}</div>` : ''}</td>
+        <td><input class="sdAmb" value="${esc(b.ambiente_en)}" style="width:150px"> ${b.ambiente_en ? (b.ambiente_ok ? '<span class="ok" title="' + esc(b.ambiente_titulo) + '">✔</span> ' + ouvir('efeitos', b.ambiente_en) + ' ' + selo(b.ambiente_info, 'efeitos:' + b.ambiente_en) : '<span class="nok">⏳</span>') : ''}</td>
+        <td><input class="sdMus" value="${esc(b.musica_en)}" style="width:150px" placeholder="(sem música)"> ${b.musica_en ? (b.musica_ok ? '<span class="ok" title="' + esc(b.musica_titulo) + '">✔</span> ' + ouvir('musica', b.musica_en) + ' ' + selo(b.musica_info, 'musica:' + b.musica_en) : '<span class="nok">⏳</span>') : ''}</td></tr>`).join('') + '</table>' : '';
+    $s('sdMomInfo').textContent = `(antecipação → respiro → impacto; no máximo ~${E.max_momentos} no vídeo — se todo momento é especial, nenhum é)` + (E.acentos_ok.length ? '' : E.momentos.length ? ' · ⏳ os sons de acento ainda não foram buscados' : '');
+    const opTipo = (v) => Object.entries(E.tipos_momento).map(([k, n]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(n)}</option>`).join('');
+    $s('sdMomentos').innerHTML = E.momentos.map((m, i) => `<div class="sd-row" data-m="${i}"><input class="sdMt" value="${mmss(m.t)}" style="width:52px">
+      <select class="sdMtipo">${opTipo(m.tipo)}</select>
+      <select class="sdMf"><option value="1" ${m.forca == 1 ? 'selected' : ''}>força 1 · só um impacto sutil</option><option value="2" ${m.forca == 2 ? 'selected' : ''}>força 2 · reverse → impacto</option><option value="3" ${m.forca == 3 ? 'selected' : ''}>força 3 · riser → boom (clímax)</option></select>
+      <span class="sd-dim" style="flex:1;min-width:120px">${esc(m.frase)}</span><button type="button" class="sdMx" title="tirar">✕</button></div>`).join('') || '<div class="sd-dim">nenhum ainda</div>';
+    $s('sdLog').textContent = (E.log || []).join('\n');
+    $s('sdAcentos').innerHTML = (E.acentos || []).map(a => `<span style="margin-right:10px">${esc(a.nome)}: ${ouvir('efeitos', a.termo)} ${selo(a, a.chave)}</span>`).join('');
+  }
+
+  function coletar() {
+    const blocos = E.blocos.map((b, i) => {
+      const tr = document.querySelector(`#sdBlocos tr[data-i="${i}"]`);
+      return tr ? {id: b.id, start: segs(tr.querySelector('.sdA').value), end: b.end, emocao: tr.querySelector('.sdE').value,
+                   ambiente_en: tr.querySelector('.sdAmb').value, musica_en: tr.querySelector('.sdMus').value} : b;
+    });
+    const momentos = E.momentos.map((m, i) => {
+      const r = document.querySelector(`#sdMomentos [data-m="${i}"]`);
+      return r ? {t: segs(r.querySelector('.sdMt').value), tipo: r.querySelector('.sdMtipo').value, forca: +r.querySelector('.sdMf').value, frase: m.frase} : m;
+    });
+    const camadas = {}; document.querySelectorAll('#sdPainel [data-camada]').forEach(c => camadas[c.dataset.camada] = c.checked);
+    return {blocos, momentos, camadas};
+  }
+  async function salvar(corpo) {
+    try { E = Object.assign(E, await api('/salvar', corpo || coletar())); $s('sdSt').textContent = '💾 salvo'; desenhar(); }
+    catch (e) { $s('sdSt').textContent = '⚠ ' + e.message; }
+  }
+  $s('sdPainel').addEventListener('change', (ev) => {
+    if (ev.target.matches('input,select')) { clearTimeout(salvarT); salvarT = setTimeout(() => salvar(), 300); }
+  });
+  $s('sdPainel').addEventListener('click', async (ev) => {
+    const tr = ev.target.closest('.sdTrocar');
+    if (tr) { try { E = Object.assign(E, await api('/trocar', {chave: tr.dataset.chave})); $s('sdSt').textContent = '🔁 vai escolher outro no próximo 🔊'; desenhar(); } catch (e) { $s('sdSt').textContent = '⚠ ' + e.message; } return; }
+    const x = ev.target.closest('.sdMx'); if (!x) return;
+    const c = coletar(); c.momentos.splice(+x.closest('[data-m]').dataset.m, 1); salvar(c);
+  });
+  $s('sdNovoMom').addEventListener('click', () => {
+    const t = prompt('Em que momento? (ex.: 2:35)'); if (!t) return;
+    const c = coletar(); c.momentos.push({t: segs(t), tipo: 'revelacao', forca: 2, frase: ''}); salvar(c);
+  });
+  async function etapa(rota, pergunta) {
+    if (pergunta && !confirm(pergunta)) return;
+    try { await api(rota, {}); await carregar(); } catch (e) { $s('sdSt').textContent = '⚠ ' + e.message; }
+  }
+  $s('sdTranscrever').onclick = () => etapa('/transcrever', null);
+  $s('sdAnalisar').onclick = () => etapa('/analisar', E && E.blocos.length ? 'Ler as emoções de novo? (troca os blocos e os momentos de agora)' : null);
+  $s('sdBuscar').onclick = () => etapa('/buscar', null);
+  $s('sdAplicar').onclick = () => etapa('/aplicar', null);
+
+  async function carregar() {
+    try {
+      E = await api('/estado');
+      const ae = document.activeElement, tocando = [...document.querySelectorAll('#sdPainel audio')].some(a => !a.paused);
+      if (!(ae && $s('sdPainel').contains(ae) && ae.matches('input,select')) && !tocando) desenhar();  // não apaga o que você digita/ouve
+    } catch (e) { $s('sdSt').textContent = '⚠ ' + e.message; }
+    clearTimeout(timer); timer = setTimeout(carregar, rodando() ? 2000 : 8000);
+  }
+  window.sdCarregar = carregar;
+  carregar();
+})();
+</script>

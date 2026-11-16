@@ -93,6 +93,7 @@
         {{ item('/busca-lista', 'list-check', 'Busca em lista (fotos)') }}
         {{ item('/redes-sociais', 'mobile-screen-button', 'Baixar de outras redes') }}
         {{ item('/transcrever', 'closed-captioning', 'Transcrever') }}
+        {{ item('/sound-design', 'headphones', 'Sound design') }}
         {{ item('/capturar-pagina', 'image', 'Capturar página') }}
         {{ item('/remover-fundo', 'eraser', 'Remover fundo') }}
         {{ item('/extrair-links-canal', 'link', 'Extrair links de canal') }}
@@ -216,5 +217,33 @@
     }).catch(() => {});
   })();
   </script>
+<script>
+/* 🎧 v84_399: em QUALQUER vídeo/áudio do site (≥ 15 s, com controles) aparece o atalho pro Sound design — vale pra todas
+   as ferramentas que geram áudio, sem cada página precisar saber onde o arquivo fica. */
+(function () {
+  if (location.pathname.indexOf('/sound-design') === 0) return;
+  function marcar(el) {
+    if (el.dataset.sdChip || !el.controls || el.closest('.sdp')) return;
+    const src = el.currentSrc || el.src || (el.querySelector('source') || {}).src || '';
+    if (!src || src.indexOf('blob:') === 0 || src.indexOf('data:') === 0) return;
+    let u; try { u = new URL(src, location.href); } catch (_) { return; }
+    if (u.origin !== location.origin) return;
+    const por = () => {
+      if (el.dataset.sdChip || !(el.duration >= 15)) return;
+      el.dataset.sdChip = '1';
+      const a = document.createElement('a');
+      a.href = '/sound-design?url=' + encodeURIComponent(u.pathname + u.search);
+      a.textContent = '🎧 Sound design'; a.title = 'Ambiente, música por emoção, acentos e mixagem neste arquivo (gera uma cópia)';
+      a.style.cssText = 'display:inline-block;margin:4px 6px;font-size:.8rem;padding:2px 8px;border-radius:10px;background:#ede9fe;color:#5b21b6;text-decoration:none;vertical-align:middle';
+      el.insertAdjacentElement('afterend', a);
+    };
+    if (el.readyState >= 1) por(); else el.addEventListener('loadedmetadata', por, {once: true});
+  }
+  function varrer() { document.querySelectorAll('video[controls],audio[controls]').forEach(marcar); }
+  let t = null;
+  new MutationObserver(() => { clearTimeout(t); t = setTimeout(varrer, 400); }).observe(document.documentElement, {childList: true, subtree: true});
+  document.addEventListener('DOMContentLoaded', varrer); varrer();
+})();
+</script>
 </body>
 </html>

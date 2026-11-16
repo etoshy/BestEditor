@@ -72,3 +72,8 @@ fonttools>=4.40
 # sem ele o recorte ainda funciona, só mais simples
 opencv-python-headless>=4.8
 psutil>=5.9
+
+# --- 🎯 Juiz de áudio do 🎧 Sound design (CLAP, roda no PC — opcional) ---
+# Ouve cada efeito/música candidato e escolhe o que mais soa como a emoção do trecho.
+# Usa o PyTorch que já vem com o Whisper; o modelo (~600 MB) baixa sozinho na 1ª vez.
+transformers>=4.40.0

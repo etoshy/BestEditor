@@ -96,6 +96,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "voz_tags": ("🎭 Tags de emoção na voz",
                  "No Gerador de voz (Chatterbox expressivo em português ou Turbo em inglês), o Claude lê o roteiro e coloca as "
                  "tags de estilo, pausa, respiração, ênfase e sons onde fazem sentido — sem mudar nenhuma palavra.", True),
+    "sound_design": ("🎧 Sound design: a emoção de cada parte",
+                     "No Estúdio e na página 🎧 Sound design, a IA lê a narração, divide em blocos com a emoção-alvo "
+                     "(tensão, tristeza, alegria…), escreve as buscas de ambiente e música pro Pixabay e marca os poucos "
+                     "momentos-chave que ganham riser/reverse → impacto.", True),
     "edicao": ("✂️ Prompt de edição direto na IA",
                "No Estúdio (aba 🤖 IA), um botão manda o prompt de edição (ou cada parte dele) pra IA e cola a resposta.", True),
     "flow_famosos": ("🚫 Flow recusou \"pessoa famosa\" → reescrever o comando",

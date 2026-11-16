@@ -5977,7 +5977,7 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
                 perf_log=perf,
                 cancel_check=lambda: job.get("cancel_requested", False),
                 overlays=resolved_overlays,
-                site_cfg=_job_site_cfg(job),
+                site_cfg=dict(_job_site_cfg(job), _sound_design=__import__("sound_design").para_montar(job)),  # 🎧 v84_399
                 image_search_cache=job.setdefault("imagens_buscadores", {}),
                 falas_por_trecho=_falas[0],
                 palavras_por_trecho=_falas[1],
@@ -11495,6 +11495,8 @@ import navegador_imagens as _nav_img  # noqa: E402  (🧲 v84_150: Brave do site
 _nav_img.registrar(app, BASE_DIR)
 import fotos_editor as _fotos_editor  # noqa: E402  (📸 v84_387: Coisas do roteiro no Estúdio — Brave → substituir/camada)
 _fotos_editor.registrar(app, BASE_DIR, _JOBS, _save_state, _job_dir, load_site_config)
+import sound_design_rotas as _sound_design_rotas  # noqa: E402  (🎧 v84_399: sound design no Estúdio e em qualquer áudio/vídeo)
+_sound_design_rotas.registrar(app, BASE_DIR, _JOBS, _save_state, _job_dir)
 import pesquisa_rotas as _pesquisa_rotas  # noqa: E402  (📰 v84_165: buscador de casos e notícias)
 _pesquisa_rotas.registrar(app, BASE_DIR)
 import marca_rotas as _marca_rotas  # noqa: E402  (🎨 v84_168: identidade visual — imagens 100% IA na marca)

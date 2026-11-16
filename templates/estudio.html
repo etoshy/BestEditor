@@ -474,6 +474,15 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;
     location.href = {{ url_for('fotos_editor_pagina', jid=job.job_id)|tojson }};
   });
   </script>
+  <button id="btnSoundDesign" title="🎧 Sound design: a emoção de cada parte → ambiente, música, acentos e mixagem (Pixabay) — entra na montagem">🎧 Sound design</button>
+  <div id="sdBox" style="display:none;position:fixed;top:52px;right:14px;z-index:9999;width:min(860px,calc(100vw - 28px));max-height:calc(100vh - 70px);overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:10px">
+    <div style="text-align:right;margin-bottom:-6px"><button class="mini" id="sdFechar" style="position:relative;top:6px;right:6px;z-index:2">✕</button></div>
+    {% set sd_base = '/job/' ~ job.job_id ~ '/sound-design' %}{% set sd_avulso = false %}{% include "_sound_design.html" %}
+  </div>
+  <script>
+  document.getElementById('btnSoundDesign').addEventListener('click', () => { const b = document.getElementById('sdBox'); b.style.display = b.style.display === 'none' ? '' : 'none'; if (b.style.display === '' && window.sdCarregar) window.sdCarregar(); });
+  document.getElementById('sdFechar').addEventListener('click', () => document.getElementById('sdBox').style.display = 'none');
+  </script>
   {% set _fi = faltaram_info(job) %}
   <button id="btnFaltaram" title="🃏 Ligar/desligar o cartão de texto e buscar de novo as cenas que viraram cartão ou ficaram sem mídia">🃏 Cenas que faltaram{% if _fi.cartoes + _fi.sem_midia %} <b style="color:#fbbf24">{{ _fi.cartoes + _fi.sem_midia }}</b>{% endif %}</button>
   <div id="faltaramBox" style="display:none;position:fixed;top:52px;right:14px;z-index:9999;width:min(460px,calc(100vw - 28px));background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12.5px;line-height:1.5">

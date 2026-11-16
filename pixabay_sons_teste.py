@@ -227,7 +227,7 @@ def rodar(args, preparar_ctx=None) -> int:
                 if n_t:
                     page.wait_for_timeout(800)
                 for pag in range(1, args.paginas + 1):
-                    url = PS.url_busca(termo, pag)
+                    url = PS.url_busca(termo, pag, tipo=getattr(args, "tipo", "sound-effects") or "sound-effects")
                     log(f"\n🔎 página {pag}: {url}")
                     page.goto(url, wait_until="domcontentloaded", timeout=60000)
                     if not esperar_resultados(page):
@@ -244,6 +244,7 @@ def rodar(args, preparar_ctx=None) -> int:
                     for i, x in enumerate(linhas[: args.limite]):
                         log(f"\n🎵 {x['titulo']}  ({x['autor']}) — {x['pagina']}")
                         x["busca"], x["pagina_busca"] = termo, pag
+                        x["tipo"] = "musica" if getattr(args, "tipo", "") == "music" else "efeitos"  # 🎵 v84_399
                         x["mp3"] = x.get("mp3") or boot.get(x["id"] or "") or mp3_clicando(page, i, ouvidos) or ""
                         if not x["mp3"]:
                             log("   ⚠ não achei o .mp3 desse")
@@ -253,7 +254,7 @@ def rodar(args, preparar_ctx=None) -> int:
                         if args.sem_baixar:
                             todos.append(x)
                             continue
-                        destino = os.path.join(pasta, f"{x['id']}_{PS.slug(x['titulo'])}.mp3")
+                        destino = os.path.join(pasta, ("musica_" if x["tipo"] == "musica" else "") + f"{x['id']}_{PS.slug(x['titulo'])}.mp3")
                         try:
                             if not os.path.isfile(destino):
                                 n = baixar(page, ctx, x["mp3"], destino)

@@ -27,10 +27,12 @@ MP3_RE = re.compile(r"https?://cdn\.pixabay\.com/(?:download/)?audio/[^\s\"'<>\\
 
 
 # ------------------------------------------------------------------ busca
-def url_busca(termo: str, pagina: int = 1, idioma: str = "pt") -> str:
-    """https://pixabay.com/pt/sound-effects/search/whoosh%20tall/  (página 2: ...?pagi=2)."""
+def url_busca(termo: str, pagina: int = 1, idioma: str = "pt", tipo: str = "sound-effects") -> str:
+    """https://pixabay.com/pt/sound-effects/search/whoosh%20tall/  (página 2: ...?pagi=2).
+    🎵 v84_399 tipo="music": a busca de MÚSICA (https://pixabay.com/pt/music/search/sad%20piano/)."""
     termo = " ".join(str(termo or "").split())
-    u = f"{BASE_URL}/{idioma}/sound-effects/search/{quote(termo, safe='')}/"
+    secao = "music" if tipo == "music" else "sound-effects"
+    u = f"{BASE_URL}/{idioma}/{secao}/search/{quote(termo, safe='')}/"
     return u + (f"?pagi={int(pagina)}" if int(pagina) > 1 else "")
 
 

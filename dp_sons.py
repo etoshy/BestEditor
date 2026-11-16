@@ -176,11 +176,21 @@ def _taxa(caminho_audio: str) -> int:
         return 48000
 
 
-def mixar(narracao: str, eventos: List[Dict[str, Any]], saida: str, volume_sfx: float = 0.55, preservar: bool = False) -> str:
+def _arquivo_do_evento(e: Dict[str, Any]) -> Optional[str]:
+    """🎧 v84_399: o evento pode trazer o arquivo direto ("arquivo", ex.: os acentos do sound design) em vez do id da base."""
+    a = e.get("arquivo")
+    if a:
+        return a if os.path.isfile(a) else None
+    c = caminho(e.get("som")) if e.get("som") else None
+    return c if c and os.path.exists(c) else None
+
+
+def mixar(narracao: str, eventos: List[Dict[str, Any]], saida: str, volume_sfx: float = 0.55, preservar: bool = False,
+          reverb: bool = False) -> str:
     """Narração + efeitos sonoros num WAV só (a narração não muda de volume).
     preservar (🎭 react: o áudio é a música original): a música fica na taxa dela, sem limitador — só os efeitos
-    entram por cima."""
-    eventos = [e for e in eventos if caminho(e.get("som")) and os.path.exists(caminho(e["som"]))]
+    entram por cima. reverb (🎧 v84_399): um eco curto e leve nos efeitos (som de estúdio soa "seco" no vídeo)."""
+    eventos = [e for e in eventos if _arquivo_do_evento(e)]
     if not eventos:
         return narracao
     eventos = sorted(eventos, key=lambda e: e["inicio"])[:400]
@@ -188,12 +198,13 @@ def mixar(narracao: str, eventos: List[Dict[str, Any]], saida: str, volume_sfx: 
     args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", narracao]
     partes = []
     for k, e in enumerate(eventos, start=1):
-        args += ["-i", caminho(e["som"])]
+        args += ["-i", _arquivo_do_evento(e)]
         atraso = int(round(float(e["inicio"]) * 1000))
         vol = max(0.0, min(3.0, float(e.get("volume", 1.0)) * volume_sfx))
         partes.append(f"[{k}:a]aresample={taxa},aformat=channel_layouts=stereo,volume={vol:.3f},adelay={atraso}|{atraso}[s{k}]")
     rot = "".join(f"[s{k}]" for k in range(1, len(eventos) + 1))
-    partes.append(f"{rot}amix=inputs={len(eventos)}:normalize=0:dropout_transition=0[sfx]")
+    partes.append(f"{rot}amix=inputs={len(eventos)}:normalize=0:dropout_transition=0"
+                  + (",aecho=0.8:0.6:45|90:0.18|0.10" if reverb else "") + "[sfx]")
     if preservar:
         partes.append("[0:a]aformat=channel_layouts=stereo[nar]")
         partes.append("[nar][sfx]amix=inputs=2:duration=first:normalize=0[out]")
