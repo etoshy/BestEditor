@@ -157,6 +157,19 @@ def _baixador_padrao(url: str, pasta_dest: str) -> str:
 
 def baixar_link(url: str, destino_dir: str, baixador: Optional[Callable[[str, str], str]] = None) -> str:
     url = str(url or "").strip()
+    import curtos_link as _CL
+    if _CL.eh_arquivo(url):  # 📤 v84_402: o arquivo que você enviou (não baixa nada)
+        import shutil as _sh
+        try:
+            orig = _CL.caminho_envio(url)
+        except ValueError:
+            raise CT.CurtoErro("Arquivo enviado inválido.")
+        if not os.path.isfile(orig):
+            raise CT.CurtoErro("O arquivo enviado não está mais na pasta de envios — envie de novo.")
+        os.makedirs(destino_dir, exist_ok=True)
+        cam = os.path.join(destino_dir, os.path.basename(orig))
+        _sh.copy(orig, cam)
+        return cam
     if not re.match(r"https?://", url):
         raise CT.CurtoErro("Link inválido.")
     os.makedirs(destino_dir, exist_ok=True)

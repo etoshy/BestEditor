@@ -91,6 +91,15 @@
     <textarea id="link" class="lk-link" rows="5" style="resize:vertical;min-height:90px" placeholder="https://www.tiktok.com/@…/video/…&#10;https://www.instagram.com/reel/…&#10;https://youtube.com/shorts/…"></textarea>
     <span class="si-dica" id="nLinks" style="font-weight:400"></span></label>
     <div id="grupos" style="margin-top:6px"></div>
+  <details id="envBox" style="margin:6px 0 4px"><summary style="cursor:pointer">📤 O link não baixa (idade, privado…)? <b>Envie o arquivo</b> — com a transcrição, se tiver</summary>
+    <div style="display:grid;gap:6px;margin-top:6px">
+      <input type="file" id="envArq" accept="video/*" multiple>
+      <label style="font-weight:400;flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="envJuntar" style="width:auto;margin:0"> 🧩 vários arquivos = UM vídeo só (composto)</label>
+      <input id="envLink" placeholder="link original (opcional — só pro crédito @ e os comentários; pode falhar sem problema)">
+      <textarea id="envTransc" rows="3" placeholder="transcrição do vídeo (opcional — com ou sem tempos, ex.: 0:03 he gets out of the car…). Sem ela, o site transcreve e descreve sozinho."></textarea>
+      <div><button type="button" id="bEnviar" class="si-mini">📤 Enviar e criar</button> <span class="si-dica" style="font-weight:400">usa as mesmas opções abaixo (canal, estilo do roteiro, exportar…)</span></div>
+    </div>
+  </details>
   <label>Como narrar</label>
   <div class="lk-modos">{% for k, v in modos.items() %}<label><input type="radio" name="modo" value="{{ k }}"{% if k == 'auto' %} checked{% endif %}> {{ v }}</label>{% endfor %}</div>
   <div class="lk-ops">
@@ -463,6 +472,21 @@ window.lkGo = async () => {
     aviso(d.iniciar ? `🚀 começou${j.criados.length > 1 ? ` (${j.criados.length} vídeos, ${j.por_etapa ? 'por etapa' : 'um depois do outro'})` : ''} — pode sair da página, ele continua` : `⏸ ${j.criados.length} link(s) aguardando — inicie quando quiser`, 'okk'); }
   catch (e) { aviso('❌ ' + e.message, 'erro'); }
   el('bgo').disabled = false; atualizar();
+};
+el('bEnviar').onclick = async () => {  // 📤 v84_402
+  const fs = el('envArq').files; if (!fs.length) { aviso('Escolha o arquivo do vídeo.', 'erro'); return; }
+  const d = {canal_id: el('canal').value, link: '', modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, roteiro_reverso: el('roteiro_reverso').checked, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked,
+    comentarios: el('comentarios').value, extra: el('extra').value};
+  SALVAR.forEach(k => d[k] = el(k).value);
+  const fd = new FormData(); [...fs].forEach(f => fd.append('arquivo', f));
+  fd.append('opcoes', JSON.stringify(d)); fd.append('transcricao', el('envTransc').value); fd.append('link_original', el('envLink').value.trim());
+  if (el('envJuntar').checked) fd.append('juntar', '1');
+  el('bEnviar').disabled = true; el('bEnviar').textContent = '⏳ enviando…';
+  try { const r = await fetch('/curtos/link/enviar', {method: 'POST', body: fd}); const j = await r.json(); if (!r.ok || j.erro) throw new Error(j.erro || r.status);
+    el('envArq').value = ''; el('envTransc').value = ''; el('envLink').value = ''; desenhar(j.videos);
+    aviso(d.iniciar ? `🚀 começou (${j.criados.length} vídeo(s))` : `⏸ ${j.criados.length} vídeo(s) aguardando — inicie quando quiser`, 'okk'); }
+  catch (e) { aviso('❌ ' + e.message, 'erro'); }
+  el('bEnviar').disabled = false; el('bEnviar').textContent = '📤 Enviar e criar'; atualizar();
 };
 el('link').addEventListener('input', atualizarGrupos);
 document.querySelectorAll('input[name=lote_modo]').forEach(r => r.addEventListener('change', () => el('link').dispatchEvent(new Event('input'))));

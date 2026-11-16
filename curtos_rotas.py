@@ -160,6 +160,9 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
     def _erro(msg: str, cod: int = 400):
         return jsonify({"ok": False, "erro": str(msg)}), cod
 
+    import curtos_link as _CL_envios
+    _CL_envios.PASTA_ENVIOS = os.path.join(CT.raiz(base_dir), "envios")  # 📤 v84_402: os arquivos enviados no Link → vídeo
+
     def _corpo() -> Dict[str, Any]:
         return request.get_json(silent=True) or {}
 
@@ -1807,7 +1810,11 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 raise CT.CurtoErro(f"O vídeo composto precisa de 2+ fontes e só {n_ok} baixou ({' · '.join(falhas)}).")
         elif not CC.clipes(base_dir, p):
             _link_etapa(pid, "⬇ baixando")
-            CC.baixar_clipe(base_dir, pid, url, CB.get("baixar"), prog)
+            mid_ = CC.baixar_clipe(base_dir, pid, url, CB.get("baixar"), prog)
+            transc_ = CL.meta_envio(url).get("transcricao") if CL.eh_arquivo(url) else ""
+            if transc_ and not [l for l in CC.dados(CT.carregar(base_dir, pid))["linhas"] if l.get("mid") == mid_]:
+                CC.salvar_texto_do_clipe(base_dir, pid, transc_, mid_, "fala")  # 📤 a transcrição que veio junto
+                prog("📝 usei a transcrição que você mandou junto")
         _link_tarja(pid, prog)
         c = CC.dados(CT.carregar(base_dir, pid))
         if len(fontes_) > 1 and not c.get("info_links"):  # 💬 a legenda e os comentários de CADA fonte
@@ -2742,7 +2749,36 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
 
     @app.route("/curtos/link/novo", methods=["POST"])
     def curtos_link_novo():
-        b = _corpo()
+        return _criar_links(_corpo())
+
+    @app.route("/curtos/link/enviar", methods=["POST"])
+    def curtos_link_enviar():
+        """📤 v84_402: o vídeo não baixa pelo link (idade, privado…)? Envie o ARQUIVO (+ a transcrição e o link original,
+        opcionais). Cada arquivo vira um vídeo do 🔗 Link → vídeo, com as mesmas opções."""
+        import tempfile
+        try:
+            b = json.loads(request.form.get("opcoes") or "{}")
+        except ValueError:
+            b = {}
+        arqs = [f for f in request.files.getlist("arquivo") if f and f.filename]
+        if not arqs:
+            return _erro("Escolha o arquivo do vídeo.")
+        transc = str(request.form.get("transcricao") or "")
+        link_orig = str(request.form.get("link_original") or "")
+        links = []
+        try:
+            for f in arqs[:20]:
+                fd, tmp = tempfile.mkstemp(suffix=os.path.splitext(f.filename)[1])
+                os.close(fd)
+                f.save(tmp)
+                links.append(CL.guardar_envio(tmp, f.filename, transc if len(arqs) == 1 else "", link_orig if len(arqs) == 1 else ""))
+        except ValueError as exc:
+            return _erro(str(exc))
+        juntar = bool(request.form.get("juntar")) and len(links) > 1
+        b["link"] = (", ".join(links[:5]) if juntar else "\n".join(links))
+        return _criar_links(b)
+
+    def _criar_links(b: Dict[str, Any]):
         mapa_g = _grupos_ler(base_dir)
         dicas_: Dict[str, str] = {}
         pares = _separar_grupos(str(b.get("link") or ""), lambda t: any(_chave_grupo(x) in mapa_g or bool(_canal_pelo_nome(x))

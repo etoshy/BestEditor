@@ -12,6 +12,10 @@ Modo do roteiro:
 """
 from __future__ import annotations
 
+import shutil
+
+import os
+
 import json
 import re
 import subprocess
@@ -138,7 +142,67 @@ def local_do_post(j: Dict[str, Any]) -> str:
     return " ".join(str(v or "").split())[:120]
 
 
+# ---------------------------------------------------------------------------------------------------- 📤 arquivo enviado (v84_402)
+# Quando o link não baixa (vídeo com restrição de idade, privado, rede que bloqueia…), você ENVIA o arquivo: ele vira um
+# "link" interno http://arquivo.local/<nome> e segue o MESMO caminho (roteiro, voz, edição…). Junto pode ir a transcrição e
+# o link original (só pro crédito/comentários).
+ARQ_PREFIXO = "http://arquivo.local/"
+PASTA_ENVIOS = ""  # o curtos_rotas define (base/curtos_envios)
+
+
+def eh_arquivo(url: str) -> bool:
+    return str(url or "").startswith(ARQ_PREFIXO)
+
+
+def _nome_envio(url: str) -> str:
+    nome = os.path.basename(str(url or "")[len(ARQ_PREFIXO):].split("?")[0])
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{3,160}", nome or ""):
+        raise ValueError("arquivo inválido")
+    return nome
+
+
+def caminho_envio(url: str) -> str:
+    return os.path.join(PASTA_ENVIOS, _nome_envio(url))
+
+
+def meta_envio(url: str) -> Dict[str, Any]:
+    try:
+        with open(os.path.splitext(caminho_envio(url))[0] + ".json", encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def guardar_envio(origem: str, nome_original: str, transcricao: str = "", link_original: str = "") -> str:
+    """Move o arquivo enviado pra pasta de envios → o "link" interno."""
+    import uuid
+    os.makedirs(PASTA_ENVIOS, exist_ok=True)
+    ext = os.path.splitext(nome_original or "")[1].lower()
+    if ext not in (".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"):
+        raise ValueError("Envie um vídeo (mp4, mov, mkv, webm…).")
+    base_nome = re.sub(r"[^A-Za-z0-9_-]+", "_", os.path.splitext(os.path.basename(nome_original))[0])[:60].strip("_") or "video"
+    nome = f"{uuid.uuid4().hex[:8]}_{base_nome}{ext}"
+    shutil.move(origem, os.path.join(PASTA_ENVIOS, nome))
+    lo = str(link_original or "").strip()
+    meta = {"nome_original": os.path.basename(nome_original or "")[:160], "transcricao": str(transcricao or "")[:60000],
+            "link_original": lo if re.match(r"https?://", lo) and not eh_arquivo(lo) else ""}
+    with open(os.path.join(PASTA_ENVIOS, os.path.splitext(nome)[0] + ".json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False)
+    return ARQ_PREFIXO + nome
+
+
+def link_de_credito(url: str) -> str:
+    """O link que aparece no crédito: o original que você informou (arquivo enviado sem link: nenhum)."""
+    return (meta_envio(url).get("link_original") or "") if eh_arquivo(url) else url
+
+
 def baixar_info(url: str, n: int = 60, timeout: float = 90.0) -> Dict[str, Any]:
+    if eh_arquivo(url):  # 📤 arquivo enviado: comentários/descrição só se você deu o link original (pode falhar — tudo bem)
+        lo = meta_envio(url).get("link_original")
+        if not lo:
+            return {"comentarios": []}
+        url = lo
     """yt-dlp sem baixar o vídeo: a descrição, os números e os comentários. Demorou/falhou → volta vazio (o vídeo segue)."""
     cmd = [sys.executable, "-m", "yt_dlp", "--skip-download", "--dump-single-json", "--no-warnings", "--write-comments",
            "--extractor-args", f"youtube:max_comments={max(20, n * 2)},all,0,0;comment_sort=top", url]
@@ -236,6 +300,8 @@ def com_fontes(descricao: str, fontes: List[tuple]) -> str:
     d = str(descricao or "").rstrip()
     if re.search(r"(?im)^sources?\b", d):
         return d
+    fontes = [(link_de_credito(u), i) for u, i in fontes]  # 📤 v84_402
+    fontes = [(u, i) for u, i in fontes if u]
     linhas = [linha_fonte(u, i).replace("Source (", "").replace("Source: ", "") for u, i in fontes]
     itens = []
     for (u, i), l in zip(fontes, linhas):
@@ -249,6 +315,7 @@ def com_fontes(descricao: str, fontes: List[tuple]) -> str:
 
 def com_fonte(descricao: str, url: str, info: Dict[str, Any]) -> str:
     d = str(descricao or "").rstrip()
+    url = link_de_credito(url)  # 📤 v84_402
     if not url or re.search(r"(?im)^source\b", d):
         return d
     f = linha_fonte(url, info)
