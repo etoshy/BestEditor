@@ -52,7 +52,7 @@ def test_ia_ve_as_fotos_com_as_observacoes(tmp_path):
     assert r["com_ia"] and r["prompt"] == "Two friends toasting in a bar, pose from image 1."
     textos = [c["text"] for c in visto["conteudo"] if c["type"] == "text"]
     assert visto["recurso"] == "flow_montar" and "Reference image 1 — POSE — note: só a posição" in textos[0]
-    assert "name: Ana" in textos[1] and "GENERAL NOTE: os dois brindando" in textos[-1]
+    assert "name: Ana" in textos[1] and "GENERAL NOTE: os dois brindando" in textos[-2]
     assert sum(1 for c in visto["conteudo"] if c["type"] == "image") == 3
     # IA desligada / sem resposta → o comando básico
     r2 = FM.montar_prompt(pac, lambda *a, **k: None, lambda f: None)

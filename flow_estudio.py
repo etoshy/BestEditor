@@ -584,7 +584,8 @@ def registrar(app, base_dir: str) -> None:
         return render_template("flow_estudio.html", contas=[c["nome"] for c in gf.listar_contas()], cfg=cfg,
                                modelos_imagem=fd.MODELOS_IMAGEM, modelos_video=fd.MODELOS_VIDEO, proporcoes=fd.PROPORCOES,
                                modo_direto=gf.modo_direto(cfg), ocioso_min=OCIOSO_S // 60,
-                               max_refs=__import__("flow_montar").MAX_REFS, papeis=__import__("flow_montar").PAPEIS)
+                               max_refs=__import__("flow_montar").MAX_REFS, papeis=__import__("flow_montar").PAPEIS,
+                               estilos_finais=__import__("flow_montar").estilos())
 
     @app.route("/flow/teste")
     def flow_teste_page():  # o link antigo (v84_74) cai na aba nova
@@ -708,8 +709,9 @@ def registrar(app, base_dir: str) -> None:
                 ent = _salvar_entrada(gf, f"r{k}")
                 if ent:
                     itens.append({"papel": f.get(f"r{k}_papel") or "outro", "nome": f.get(f"r{k}_nome") or "",
-                                  "obs": f.get(f"r{k}_obs") or "", "arquivo": ent["arquivo"]})
-            pac = FM.novo_pacote(pasta_galeria(), itens, f.get("obs_geral") or "")
+                                  "obs": f.get(f"r{k}_obs") or "", "arquivo": ent["arquivo"],
+                                  "marcas": f.get(f"r{k}_marcas") or "", "cena": f.get(f"r{k}_cena") or ""})
+            pac = FM.novo_pacote(pasta_galeria(), itens, f.get("obs_geral") or "", f.get("estilo") or "")
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
         r = FM.montar_prompt(pac)
@@ -721,6 +723,99 @@ def registrar(app, base_dir: str) -> None:
         if not re.fullmatch(r"\d{8}_\d{6}_[0-9a-f]{6}", pid) or not re.fullmatch(r"[\w.\-]+", nome) or nome.endswith(".json"):
             return "nome inválido", 400
         return send_from_directory(os.path.join(FM.pasta_pacotes(pasta_galeria()), pid), nome)
+
+    # ---------------------------------------------------------- ✏️ v84_407: rascunho da pose (foto → esboço a lápis)
+    def _guardar_rascunho(caminho: str, prompt: str) -> Dict[str, Any]:
+        gid = time.strftime("%Y%m%d_%H%M%S") + "_" + secrets.token_hex(3)
+        nome = gid + ".png"
+        import shutil
+        shutil.copy(caminho, os.path.join(pasta_galeria(), nome))
+        e = {"id": gid, "tipo": "imagem", "arquivo": nome, "media_id": "", "prompt": prompt, "modelo": "", "proporcao": "",
+             "origem": "rascunho", "frames": False, "referencia": True, "conta": None, "projeto": None,
+             "criado": time.time(), "rotulo": "rascunho"}
+        adicionar_na_galeria(e)
+        return e
+
+    @app.route("/flow/rascunho/local", methods=["POST"])
+    def flow_rascunho_local():
+        """⚡ o filtro de lápis no PC (na hora, sem crédito) → entra na 🖼 galeria."""
+        import flow_rascunho as FR
+        from googleflow import googleflow_client as gf
+        try:
+            ent = _salvar_entrada(gf, "foto")
+            if not ent:
+                return jsonify({"erro": "Mande a foto."}), 400
+            tmp = os.path.join(str(gf.pasta_dados()), "teste_entrada", f"rascunho_{secrets.token_hex(3)}.png")
+            FR.rascunho_local(ent["arquivo"], tmp)
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        e = _guardar_rascunho(tmp, "✏️ rascunho rápido (filtro de lápis)")
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return jsonify({"ok": True, "item": e})
+
+    @app.route("/flow/rascunho/flow", methods=["POST"])
+    def flow_rascunho_flow():
+        """🎨 o Flow redesenha a foto como rascunho a lápis (bonecos sem rosto, mesma pose) — mesma fila do ✨ Gerar."""
+        import flow_rascunho as FR
+        from googleflow import flow_direto as fd
+        from googleflow import googleflow_client as gf
+        from site_config import load_site_config
+        f = request.form
+        try:
+            ent = _salvar_entrada(gf, "foto")
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if not ent:
+            return jsonify({"erro": "Mande a foto."}), 400
+        extra = " ".join((f.get("extra") or "").split())[:500]
+        with _TRAVA:
+            if _ESTADO["rodando"]:
+                return jsonify({"erro": "Já tem algo rodando no Flow — espere ou clique em Parar."}), 409
+            try:
+                import flow_lote
+                motivo = flow_lote.ocupado()
+            except Exception:  # noqa: BLE001
+                motivo = None
+            if motivo:
+                return jsonify({"erro": motivo}), 409
+            opcoes: Dict[str, Any] = {
+                "modo": "gerar", "visivel": f.get("visivel") == "on", "simular": False,
+                "trocar_conta": f.get("trocar_conta", "on") == "on", "conta": (f.get("conta") or "").strip(),
+                "novo_projeto": False, "tipo": "imagem", "prompt": FR.PROMPT_FLOW + (" " + extra if extra else ""),
+                "modelo": "", "proporcao": f.get("proporcao") if f.get("proporcao") in fd.PROPORCOES else "16:9",
+                "quantidade": "x1", "referencia": ent}
+            _ESTADO.update(rodando=True, passos=[], resultados=[], erro=None, inicio=time.time(), fim=None, modo="gerar",
+                           parar=False, diagnostico=None, detalhe_erro=None,
+                           opcoes={k: (v if not isinstance(v, (dict, list)) else True) for k, v in opcoes.items()})
+            _enviar("gerar", load_site_config(), opcoes)
+        return jsonify({"ok": True})
+
+    @app.route("/flow/rascunho/figuras", methods=["POST"])
+    def flow_rascunho_figuras():
+        """🤖 a IA lê a cena INTEIRA (de preferência a FOTO original): cada pessoa, cada objeto, o cenário, a câmera e o
+        estilo — cada parte vira uma linha pra trocar. Aceita a foto (multipart "foto") ou {"galeria": id}."""
+        import flow_rascunho as FR
+        from googleflow import googleflow_client as gf
+        arq = None
+        if request.files.get("foto"):
+            try:
+                ent = _salvar_entrada(gf, "foto")
+            except ValueError as exc:
+                return jsonify({"erro": str(exc)}), 400
+            arq = ent["arquivo"] if ent else None
+        if not arq:
+            gid = (request.get_json(silent=True) or {}).get("galeria") or request.form.get("galeria") or ""
+            e = item_da_galeria(str(gid))
+            if not e or e.get("tipo") != "imagem":
+                return jsonify({"erro": "Essa imagem não está na galeria."}), 404
+            arq = os.path.join(pasta_galeria(), e["arquivo"])
+        r = FR.entender_cena(arq)
+        if not r["marcas"]:
+            return jsonify({"erro": "A IA não respondeu (ou está desligada) — clique em cada pessoa/objeto pra marcar."}), 400
+        return jsonify(dict(r, ok=True))
 
     @app.route("/flow/montar/gerar", methods=["POST"])
     def flow_montar_gerar():

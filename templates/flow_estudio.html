@@ -78,6 +78,21 @@
   .fl-mt-refs img { width:120px; height:90px; object-fit:cover; border-radius:6px; display:block; }
   .fl-montar .mini { width:auto !important; margin:0 !important; font-size:.8rem; padding:4px 10px; }
   @media (max-width:700px) { .fl-mt-linha { grid-template-columns:1fr; } }
+  .fl-rc-area { display:grid; grid-template-columns:minmax(260px,1.3fr) 1fr; gap:12px; align-items:start; }
+  .fl-rc-img { position:relative; cursor:crosshair; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff; }
+  .fl-rc-img img { width:100%; display:block; user-select:none; -webkit-user-drag:none; }
+  .fl-rc-pin { position:absolute; width:28px; height:28px; margin:-14px 0 0 -14px; border-radius:50%; background:#dc2626; color:#fff; font-weight:700; display:grid; place-items:center; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); font-size:.85rem; pointer-events:none; }
+  .fl-rc-pin span { position:absolute; left:30px; top:2px; white-space:nowrap; color:#dc2626; background:#fff; padding:0 5px; border-radius:4px; font-size:.75rem; }
+  .fl-rc-cena { display:grid; gap:4px; margin:8px 0; padding:8px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
+  .fl-rc-cena label { margin:0; font-size:.82rem; } .fl-rc-cena input { margin:2px 0 0; font-size:.84rem; }
+  .fl-rc-pin.obj { background:#2563eb; } .fl-rc-pin.obj span { color:#2563eb; }
+  .fl-rc-m.obj b { background:#2563eb; }
+  .fl-rc-m select { margin:0 0 4px; font-size:.8rem; width:auto; }
+  .fl-rc-marcas .fl-rc-m { display:grid; grid-template-columns:28px 1fr auto; gap:6px; align-items:start; margin-top:6px; }
+  .fl-rc-m b { width:24px; height:24px; border-radius:50%; background:#dc2626; color:#fff; display:grid; place-items:center; font-size:.8rem; margin-top:6px; }
+  .fl-rc-m input, .fl-rc-m textarea { margin:0 0 4px; font-size:.84rem; font-family:inherit; }
+  .fl-rc-m button { width:auto !important; margin:4px 0 0 !important; padding:2px 8px; font-size:.78rem; background:#fff; color:#b91c1c; border:1px solid #fecaca; }
+  @media (max-width:760px) { .fl-rc-area { grid-template-columns:1fr; } }
 </style>
 
 <h1>🎬 Google Flow</h1>
@@ -126,6 +141,36 @@
   </div>
 </div>
 
+<div class="fl-box fl-montar" id="rascunho">
+  <h3 style="margin-top:0">✏️ Rascunho da cena <span class="fl-hint">(foto → esboço a lápis pra usar de base e trocar o que quiser)</span></h3>
+  <p class="fl-hint">Mande a foto inteira: ela vira um rascunho da cena (pessoas viram bonecos sem rosto; carro, móveis e fundo viram contornos simples, tudo no mesmo lugar e no mesmo ângulo). Clique em <b>🤖 entender a cena</b>: a IA lista cada pessoa, cada objeto, o cenário, a câmera e o estilo. Diga o que entra no lugar de cada um (ou deixe vazio pra manter) e use como base na 🧩 Montar cena, onde dá pra pôr a foto de cada personagem novo.</p>
+  <div class="fl-row">
+    <label>Foto <input type="file" accept="image/*" id="rcFoto" style="width:auto"></label>
+    <label style="flex:1;min-width:220px">Pedido extra <span class="fl-hint">(opcional, só no Flow)</span><input type="text" id="rcExtra" placeholder="ex.: traço mais grosso, estilo mangá"></label>
+  </div>
+  <div class="fl-row" style="margin-top:6px">
+    <button type="button" class="primary" id="rcFlow" title="O Flow redesenha a foto: bonecos simples, linhas soltas (gasta 1 crédito de imagem)">🎨 Desenhar pelo Flow</button>
+    <button type="button" id="rcLocal" title="Filtro de lápis aqui no PC: na hora e sem crédito, mas é um traçado da foto (com mais detalhe)">⚡ Rascunho rápido (no PC)</button>
+    <span class="fl-hint" id="rcSt">Já tem um rascunho? Na 🖼 Galeria, clique em ✏️ marcar.</span>
+  </div>
+  <div id="rcEditor" style="display:none;margin-top:10px">
+    <div class="fl-rc-area"><div class="fl-rc-img" id="rcImg" title="Clique na cabeça de cada pessoa pra numerar"><img alt="rascunho"></div>
+      <div class="fl-rc-lado">
+        <div class="fl-row"><button type="button" class="yt-sec mini" id="rcAchar">🤖 entender a cena</button>
+          <button type="button" class="yt-sec mini" id="rcLimpar">limpar as marcas</button>
+          <span class="fl-hint">clique no desenho: 🔴 pessoa · troque pra 🔵 objeto na lista</span></div>
+        <div class="fl-rc-cena">
+          <label>🎥 Câmera <input type="text" id="rcCamera" placeholder="ex.: de cima pra baixo, corpo inteiro"></label>
+          <label>🏞 Cenário <input type="text" id="rcCenario" placeholder="o que tem no fundo (a IA preenche)"></label>
+          <label>↪ trocar o cenário por <input type="text" id="rcCenarioNovo" placeholder="vazio = mantém (ex.: rua de Tóquio à noite)"></label>
+          <label>🎨 Estilo da foto <span class="fl-hint" id="rcEstiloTxt">—</span></label>
+        </div>
+        <div id="rcMarcas" class="fl-rc-marcas"><p class="fl-hint">Clique na cabeça de cada pessoa no desenho.</p></div>
+        <button type="button" class="primary" id="rcUsar" style="margin-top:8px">➡ Usar como base na Montar cena</button>
+      </div></div>
+  </div>
+</div>
+
 <div class="fl-box fl-montar" id="montar">
   <h3 style="margin-top:0">🧩 Montar cena com pose e personagens <span class="fl-hint">(a IA junta tudo num comando)</span></h3>
   <p class="fl-hint">Mande a <b>pose</b> (opcional) e a foto de cada <b>personagem</b>. Diga quem é quem e, se quiser, uma observação em cada foto e uma no geral. A IA olha as fotos e escreve o comando dizendo o que vem de cada imagem (a pose da 1, o rosto da Ana da 2…). Depois o Flow gera com todas as imagens na caixa, na mesma ordem. Até {{ max_refs }} imagens.</p>
@@ -144,6 +189,7 @@
   <div class="fl-row" style="margin-top:6px">
     <label>Proporção <select id="mtProporcao">{% for p in proporcoes %}<option {% if p == '16:9' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
     <label>Quantidade <select id="mtQuantidade"><option>x1</option><option>x2</option><option>x3</option><option>x4</option></select></label>
+    <label>🎨 Estilo da imagem final <select id="mtEstilo"><option value="">(livre — o das fotos)</option>{% for e in estilos_finais %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
     <label>Modelo <select id="mtModelo"><option value="">(o padrão das Configurações)</option>{% for m in modelos_imagem %}<option>{{ m }}</option>{% endfor %}</select></label>
   </div>
   <div class="fl-row" style="margin-top:8px">
@@ -376,10 +422,11 @@
       ${e.tipo === 'video' ? `<video src="/flow/arquivo/${e.arquivo}" controls muted preload="metadata"></video>` : `<img src="/flow/arquivo/${e.arquivo}" alt="" loading="lazy">`}
       <div class="tx">${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
       <div class="ac"><a href="/flow/arquivo/${e.arquivo}?baixar=1">⬇ baixar</a>
-        ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button><button type="button" data-montar="${i}" title="usar na 🧩 Montar cena (como personagem, pose…)">🧩 montar</button>` : ''}
+        ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button><button type="button" data-montar="${i}" title="usar na 🧩 Montar cena (como personagem, pose…)">🧩 montar</button><button type="button" data-rascunho="${i}" title="numerar as pessoas e usar como pose (✏️ Rascunho da pose)">✏️ marcar</button>` : ''}
         <button type="button" data-prompt="${i}" title="usar este prompt de novo">↺ prompt</button>
         <button type="button" class="apagar" data-apagar="${e.id}">🗑</button></div></div>`).join('') || '<p class="fl-hint">Nada gerado ainda.</p>';
     document.querySelectorAll('[data-usar]').forEach(b => b.addEventListener('click', () => usarDaGaleria(b.dataset.usar, galItens[+b.dataset.i])));
+    document.querySelectorAll('[data-rascunho]').forEach(b => b.addEventListener('click', () => document.dispatchEvent(new CustomEvent('fl-rascunho-abrir', { detail: galItens[+b.dataset.rascunho] }))));
     document.querySelectorAll('[data-montar]').forEach(b => b.addEventListener('click', () => document.dispatchEvent(new CustomEvent('fl-montar-usar', { detail: galItens[+b.dataset.montar] }))));
     document.querySelectorAll('[data-prompt]').forEach(b => b.addEventListener('click', () => {
       const e = galItens[+b.dataset.prompt]; mudarTipo(e.tipo); $('prompt').value = e.prompt || '';
@@ -421,7 +468,8 @@
       || '<li class="fl-hint">Nenhum erro guardado.</li>';
   }
   $('diagnosticos').addEventListener('toggle', () => { if ($('diagnosticos').open) carregarDiagnosticos(); });
-  document.addEventListener('fl-acompanhar', () => { rodava = true; status(); });  // 🧩 a montagem começou a gerar
+  document.addEventListener('fl-acompanhar', () => { rodava = true; status(); });
+  document.addEventListener('fl-galeria', () => carregarGaleria());  // 🧩 a montagem começou a gerar
   carregarGaleria(); status();
 })();
 </script>
@@ -562,13 +610,14 @@
   const linhas = () => [...document.querySelectorAll('#montar .fl-mt-linha')];
   function contar() {
     const n = linhas().filter(l => l._gal || (l.querySelector('input[type=file]').files || [])[0]).length;
-    $('mtConta').textContent = `${n}/${MAX} imagem(ns)`;
-    $('mtMaisPers').disabled = $('mtMaisOutra').disabled = linhas().length >= MAX;
+    $('mtConta').textContent = `${n}/${MAX} imagem(ns)` + (n > MAX ? ' — tire alguma foto (o Flow aceita até ' + MAX + ')' : '') + ' · linha sem foto vira texto no comando';
+    $('mtConta').style.color = n > MAX ? '#b91c1c' : '';
+    $('mtMaisPers').disabled = $('mtMaisOutra').disabled = linhas().length >= 14;
   }
   function prevFoto(l) {
     const box = l.querySelector('.esc'), inp = l.querySelector('input[type=file]'), f = (inp.files || [])[0];
-    if (l._gal) { box.innerHTML = `<img src="/flow/arquivo/${l._gal.arquivo}" alt=""> da galeria <button type="button" class="yt-sec mini" data-limpa>✕</button>`; inp.style.display = 'none'; }
-    else if (f) { box.innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`; inp.style.display = ''; }
+    if (l._gal) { box.innerHTML = `<img src="/flow/arquivo/${l._gal.arquivo}" alt=""> ${l._marcas && l._marcas.length ? '✏️ rascunho com ' + l._marcas.length + ' marca(s)' : 'da galeria'} <button type="button" class="yt-sec mini" data-limpa>✕</button>`; inp.style.display = 'none'; }
+    else if (f) { box.innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`; inp.style.display = ''; l._marcas = null; }
     else { box.innerHTML = ''; inp.style.display = ''; }
     const lp = box.querySelector('[data-limpa]'); if (lp) lp.onclick = () => { l._gal = null; prevFoto(l); contar(); };
     pacote = null; contar();
@@ -579,13 +628,13 @@
     l.querySelectorAll('textarea,input[type=text],select').forEach(e => e.addEventListener('input', () => { pacote = null; }));
   }
   function novaLinha(papel, gal) {
-    if (linhas().length >= MAX) { alert(`No máximo ${MAX} imagens por cena.`); return null; }
+    if (linhas().length >= 14) { alert('Linhas demais nesta cena.'); return null; }
     const d = document.createElement('div'); d.className = 'fl-mt-linha'; d.dataset.papel = papel;
     const pers = papel === 'personagem';
     if (pers) nPers++;
     d.innerHTML = `<div class="fl-mt-foto"><b>${pers ? '🧍 Personagem' : '🖼 Outra foto'}</b>
         ${pers ? `<input type="text" class="fl-mt-nome" placeholder="nome (ex.: Ana, o barman)" value="${pers ? 'Personagem ' + nPers : ''}">`
-               : `<select class="fl-mt-papel">${Object.entries(PAPEIS).filter(([k]) => !['pose', 'personagem'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>`}
+               : `<select class="fl-mt-papel">${Object.entries(PAPEIS).filter(([k]) => !['pose', 'personagem'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select><input type="text" class="fl-mt-nome" placeholder="o que é (ex.: moto vermelha)">`}
         <input type="file" accept="image/*"><div class="esc"></div></div>
       <textarea rows="2" class="fl-mt-obs" placeholder="${pers ? 'observação (opcional): ex. mantém a jaqueta; ela fica no lugar da pessoa da esquerda da pose; sorrindo' : 'observação (opcional): o que pegar desta foto'}"></textarea>
       <button type="button" class="tirar" title="tirar esta foto">✕</button>`;
@@ -597,6 +646,32 @@
   novaLinha('personagem');
   $('mtMaisPers').onclick = () => novaLinha('personagem');
   $('mtMaisOutra').onclick = () => novaLinha('outro');
+  document.addEventListener('fl-montar-pose', (e) => {  // ✏️ o rascunho vira a POSE + uma linha por pessoa/objeto/cenário
+    const { item, marcas, cena, estilo } = e.detail, pose = document.querySelector('#montar .fl-mt-pose');
+    pose._gal = item; pose._marcas = marcas; pose._cena = cena; prevFoto(pose);
+    pose.querySelector('.fl-mt-obs').value = pose.querySelector('.fl-mt-obs').value || 'só a pose, o enquadramento e o lugar de cada coisa (rascunho)';
+    linhas().filter(l => l !== pose && !l._gal && !(l.querySelector('input[type=file]').files || [])[0]).forEach(l => l.remove());
+    nPers = 0;
+    marcas.forEach(m => {
+      if (m.tipo === 'objeto') {
+        if (!m.nome) return;  // objeto sem troca: fica como está no rascunho
+        const l = novaLinha('outro'); if (!l) return;
+        l.querySelector('.fl-mt-papel').value = 'objeto'; l.querySelector('.fl-mt-nome').value = m.nome;
+        l.querySelector('.fl-mt-obs').value = `no lugar do elemento ${m.n} do rascunho` + (m.obs ? ` (${m.obs})` : '');
+        return;
+      }
+      const l = novaLinha('personagem'); if (!l) return;
+      l.querySelector('.fl-mt-nome').value = m.nome || ('Personagem ' + m.n);
+      l.querySelector('.fl-mt-obs').value = `fica no lugar da figura ${m.n} do rascunho` + (m.obs ? ` (${m.obs})` : '');
+    });
+    if (cena && cena.cenario_novo) {
+      const l = novaLinha('outro');
+      if (l) { l.querySelector('.fl-mt-papel').value = 'cenario'; l.querySelector('.fl-mt-nome').value = cena.cenario_novo;
+               l.querySelector('.fl-mt-obs').value = 'o fundo novo no lugar do cenário do rascunho (foto opcional)'; }
+    }
+    if (estilo && [...$('mtEstilo').options].some(o => o.value === estilo) && !$('mtEstilo').value) $('mtEstilo').value = estilo;
+    $('montar').scrollIntoView({ behavior: 'smooth' });
+  });
   document.addEventListener('fl-montar-usar', (e) => {  // 🧩 da galeria
     const it = e.detail; if (!it) return;
     const vazia = linhas().find(l => l.dataset.papel === 'personagem' && !l._gal && !(l.querySelector('input[type=file]').files || [])[0]);
@@ -604,18 +679,27 @@
     $('montar').scrollIntoView({ behavior: 'smooth' });
   });
   function dados() {
-    const fd = new FormData(); let k = 0;
+    const fd = new FormData(); let k = 0; const semFoto = [];
     linhas().forEach(l => {
       const f = (l.querySelector('input[type=file]').files || [])[0];
-      if (!l._gal && !f) return;
+      if (!l._gal && !f) {  // sem foto: o que foi escrito vai como texto na observação geral
+        const nome = ((l.querySelector('.fl-mt-nome') || {}).value || '').trim(), obs = (l.querySelector('.fl-mt-obs').value || '').trim();
+        const papel = l.dataset.papel === 'outro' ? l.querySelector('.fl-mt-papel').value : l.dataset.papel;
+        if (papel !== 'pose' && (nome || obs) && !(papel === 'personagem' && /^Personagem \d+$/.test(nome) && !obs))
+          semFoto.push(`${PAPEIS[papel] || papel}: ${nome}${obs ? ' — ' + obs : ''} (sem foto: descreva)`);
+        return;
+      }
       const papel = l.dataset.papel === 'outro' ? l.querySelector('.fl-mt-papel').value : l.dataset.papel;
       fd.append(`r${k}_papel`, papel);
       fd.append(`r${k}_nome`, (l.querySelector('.fl-mt-nome') || {}).value || '');
       fd.append(`r${k}_obs`, l.querySelector('.fl-mt-obs').value || '');
       if (l._gal) fd.append(`r${k}_galeria`, l._gal.id); else fd.append(`r${k}`, f);
+      if (l._marcas && l._gal) fd.append(`r${k}_marcas`, JSON.stringify(l._marcas));
+      if (l._cena && l._gal) fd.append(`r${k}_cena`, JSON.stringify(l._cena));
       k++;
     });
-    fd.append('n', k); fd.append('obs_geral', $('mtGeral').value);
+    fd.append('n', k); fd.append('obs_geral', [$('mtGeral').value.trim(), ...semFoto].filter(Boolean).join(' · '));
+    fd.append('estilo', $('mtEstilo').value);
     return k ? fd : null;
   }
   $('mtMontar').onclick = async () => {
@@ -641,6 +725,91 @@
     const d = await r.json(); if (!r.ok) { alert(d.erro || 'falhou'); return; }
     $('painel').style.display = ''; $('painel').scrollIntoView({ behavior: 'smooth' });
     document.dispatchEvent(new Event('fl-acompanhar'));
+  };
+})();
+</script>
+<script>
+/* ✏️ v84_407: rascunho da cena — foto → esboço (Flow ou filtro no PC) → a IA entende cada pessoa/objeto/cenário/câmera/estilo
+   → você diz o que troca → base da Montar cena */
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const NOMES_ESTILO = { foto: '📷 foto realista', anime: '🌸 anime', manga: '📖 mangá', cartoon: '🎨 cartoon / 3D', quadrinho: '💥 quadrinho', pixel: '👾 pixel art' };
+  let item = null, marcas = [], estilo = '';
+  function abrir(it, msg) {
+    item = it; marcas = []; $('rcEditor').style.display = '';
+    $('rcImg').querySelector('img').src = '/flow/arquivo/' + it.arquivo; desenhar();
+    $('rcSt').textContent = msg || '✅ rascunho pronto — clique em 🤖 entender a cena (ou marque clicando no desenho).';
+    $('rascunho').scrollIntoView({ behavior: 'smooth' });
+  }
+  const rotPin = (m) => m.n + (m.nome ? `<span>${esc(m.nome)}</span>` : '');
+  function desenhar() {
+    const img = $('rcImg'); img.querySelectorAll('.fl-rc-pin').forEach(p => p.remove());
+    marcas.forEach((m, i) => { m.n = i + 1; const p = document.createElement('div'); p.className = 'fl-rc-pin' + (m.tipo === 'objeto' ? ' obj' : '');
+      p.style.left = (m.x * 100) + '%'; p.style.top = (m.y * 100) + '%'; p.innerHTML = rotPin(m); img.appendChild(p); });
+    $('rcMarcas').innerHTML = marcas.length ? marcas.map((m, i) => `<div class="fl-rc-m${m.tipo === 'objeto' ? ' obj' : ''}" data-i="${i}"><b>${m.n}</b>
+      <div><select data-k="tipo"><option value="pessoa"${m.tipo !== 'objeto' ? ' selected' : ''}>🧍 pessoa</option><option value="objeto"${m.tipo === 'objeto' ? ' selected' : ''}>📦 objeto</option></select>
+        <input type="text" data-k="nome" value="${esc(m.nome)}" placeholder="${m.tipo === 'objeto' ? 'trocar por (vazio = mantém) ex.: moto vermelha' : 'quem fica aqui (ex.: Ana)'}">
+        <textarea rows="1" data-k="obs" placeholder="o que é / observação (opcional)">${esc(m.obs)}</textarea></div>
+      <button type="button" data-tira="${i}">✕</button></div>`).join('') : '<p class="fl-hint">Clique em cada pessoa (na cabeça) e em cada objeto no desenho — ou 🤖 entender a cena.</p>';
+    $('rcMarcas').querySelectorAll('[data-k]').forEach(e => e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', () => {
+      const m = marcas[+e.closest('.fl-rc-m').dataset.i]; m[e.dataset.k] = e.value;
+      if (e.dataset.k === 'tipo') desenhar(); else if (e.dataset.k === 'nome') $('rcImg').querySelectorAll('.fl-rc-pin').forEach((p, i) => p.innerHTML = rotPin(marcas[i]));
+    }));
+    $('rcMarcas').querySelectorAll('[data-tira]').forEach(b => b.onclick = () => { marcas.splice(+b.dataset.tira, 1); desenhar(); });
+  }
+  $('rcImg').addEventListener('click', (e) => {
+    if (marcas.length >= 12) { alert('No máximo 12 marcas.'); return; }
+    const r = $('rcImg').getBoundingClientRect();
+    marcas.push({ x: +((e.clientX - r.left) / r.width).toFixed(4), y: +((e.clientY - r.top) / r.height).toFixed(4), tipo: 'pessoa', nome: '', obs: '' });
+    desenhar(); const ult = $('rcMarcas').querySelectorAll('input[data-k=nome]'); if (ult.length) ult[ult.length - 1].focus();
+  });
+  $('rcLimpar').onclick = () => { marcas = []; desenhar(); };
+  $('rcAchar').onclick = async () => {
+    if (!item) return; $('rcAchar').disabled = true; $('rcSt').textContent = '🤖 a IA está lendo a cena (pessoas, objetos, cenário, câmera, estilo)…';
+    try {
+      const f = ($('rcFoto').files || [])[0]; let r;  // de preferência a FOTO original (entende melhor que o rascunho)
+      if (f) { const fd = new FormData(); fd.append('foto', f); fd.append('galeria', item.id); r = await fetch('/flow/rascunho/figuras', { method: 'POST', body: fd }); }
+      else r = await fetch('/flow/rascunho/figuras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ galeria: item.id }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      marcas = d.marcas; desenhar();
+      $('rcCamera').value = d.cena.camera || ''; $('rcCenario').value = d.cena.cenario || '';
+      estilo = d.estilo || ''; $('rcEstiloTxt').textContent = NOMES_ESTILO[estilo] || '—';
+      const np = marcas.filter(m => m.tipo !== 'objeto').length;
+      $('rcSt').textContent = `✅ ${np} pessoa(s) e ${marcas.length - np} objeto(s) — diga quem/o que entra no lugar de cada um.`;
+    } catch (e) { $('rcSt').textContent = '⚠ ' + e.message; }
+    $('rcAchar').disabled = false;
+  };
+  $('rcLocal').onclick = async () => {
+    const f = ($('rcFoto').files || [])[0]; if (!f) { alert('Escolha a foto.'); return; }
+    const fd = new FormData(); fd.append('foto', f); $('rcSt').textContent = '⚡ desenhando…';
+    try { const r = await fetch('/flow/rascunho/local', { method: 'POST', body: fd }), d = await r.json();
+      if (!r.ok) throw new Error(d.erro || r.status); abrir(d.item); document.dispatchEvent(new Event('fl-galeria'));
+    } catch (e) { $('rcSt').textContent = '⚠ ' + e.message; }
+  };
+  $('rcFlow').onclick = async () => {
+    const f = ($('rcFoto').files || [])[0]; if (!f) { alert('Escolha a foto.'); return; }
+    const fd = new FormData(); fd.append('foto', f); fd.append('extra', $('rcExtra').value);
+    fd.append('conta', ($('conta') || {}).value || ''); fd.append('trocar_conta', ($('trocarConta') || {}).checked === false ? 'off' : 'on');
+    const r = await fetch('/flow/rascunho/flow', { method: 'POST', body: fd }), d = await r.json();
+    if (!r.ok) { $('rcSt').textContent = '⚠ ' + (d.erro || r.status); return; }
+    $('rcSt').textContent = '🎨 o Flow está desenhando o rascunho… (o andamento aparece lá embaixo)';
+    document.dispatchEvent(new Event('fl-acompanhar'));
+    for (;;) {
+      await new Promise(ok => setTimeout(ok, 2500));
+      let st; try { st = await (await fetch('/flow/status')).json(); } catch (_) { continue; }
+      if (st.rodando) continue;
+      const img = (st.resultados || []).find(x => x.tipo === 'imagem');
+      if (st.erro || !img) { $('rcSt').textContent = '⚠ ' + (st.erro || 'o Flow não devolveu a imagem'); return; }
+      abrir(img); return;
+    }
+  };
+  document.addEventListener('fl-rascunho-abrir', (e) => abrir(e.detail, '✏️ clique em 🤖 entender a cena, ou marque cada pessoa/objeto clicando no desenho.'));
+  $('rcUsar').onclick = () => {
+    if (!item) return;
+    const cena = { camera: $('rcCamera').value.trim(), cenario: $('rcCenario').value.trim(), cenario_novo: $('rcCenarioNovo').value.trim() };
+    if (!marcas.length && !cena.cenario_novo && !confirm('Nada marcado — usar o rascunho só como pose/composição?')) return;
+    document.dispatchEvent(new CustomEvent('fl-montar-pose', { detail: { item, marcas: marcas.map(m => ({ ...m })), cena, estilo } }));
   };
 })();
 </script>

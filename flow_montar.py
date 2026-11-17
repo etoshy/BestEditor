@@ -29,6 +29,40 @@ PAPEIS = {
 }
 _PACOTES: Dict[str, Dict[str, Any]] = {}
 
+# 🎨 v84_407: o estilo de arte da imagem FINAL (os da 🎨 Identidade visual entram também)
+ESTILOS_BASE = {
+    "foto": ("📷 Foto realista", "photorealistic photograph, natural skin texture, real lighting, shot on a full-frame camera"),
+    "anime": ("🌸 Anime", "modern anime illustration, clean cel shading, expressive eyes, vibrant colors, anime key visual"),
+    "manga": ("📖 Mangá (preto e branco)", "black and white manga panel, ink lines, screentone shading, dynamic manga composition"),
+    "cartoon": ("🎨 Cartoon / animação 3D", "stylized 3D animated movie look, soft lighting, appealing cartoon proportions"),
+    "quadrinho": ("💥 Quadrinho americano", "american comic book art, bold ink outlines, flat colors with halftone shading"),
+    "pixel": ("👾 Pixel art", "detailed pixel art, limited palette, crisp pixels, retro game scene"),
+}
+
+
+def estilos() -> List[Dict[str, str]]:
+    out = [{"id": k, "nome": v[0]} for k, v in ESTILOS_BASE.items()]
+    try:
+        import estilos_arte
+        out += [{"id": "arte:" + k, "nome": n} for k, n in estilos_arte.opcoes()]
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def estilo_en(eid: str) -> str:
+    eid = str(eid or "")
+    if eid in ESTILOS_BASE:
+        return ESTILOS_BASE[eid][1]
+    if eid.startswith("arte:"):
+        try:
+            import estilos_arte
+            e = estilos_arte.ESTILOS.get(eid[5:])
+            return " ".join(str((e or {}).get("en") or "").split())[:900]
+        except Exception:  # noqa: BLE001
+            return ""
+    return ""
+
 
 class MontarErro(ValueError):
     pass
@@ -55,7 +89,7 @@ def _limpar_velhos(base: str, horas: float = 48) -> None:
             pass
 
 
-def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "") -> Dict[str, Any]:
+def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "", estilo: str = "") -> Dict[str, Any]:
     """itens = [{papel, nome, obs, arquivo (caminho de origem)}] na ordem em que vão pro Flow (a pose primeiro).
     Copia as imagens pra uma pasta só deste pacote e guarda."""
     _limpar_velhos(base)
@@ -74,8 +108,24 @@ def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "") -> 
         dest = os.path.join(pasta, f"{k:02d}_{i.get('papel') or 'outro'}{ext}")
         shutil.copy(i["arquivo"], dest)
         papel = i.get("papel") if i.get("papel") in PAPEIS else "outro"
-        refs.append({"n": k, "papel": papel, "nome": _limpo(i.get("nome"), 60), "obs": _limpo(i.get("obs")), "arquivo": dest})
-    pac = {"id": pid, "refs": refs, "obs_geral": _limpo(obs_geral, 1500), "criado": time.time()}
+        r = {"n": k, "papel": papel, "nome": _limpo(i.get("nome"), 60), "obs": _limpo(i.get("obs")), "arquivo": dest}
+        if papel == "pose" and (i.get("marcas") or i.get("cena")):  # ✏️ v84_407: figuras numeradas do rascunho → quem fica em cada uma
+            import flow_rascunho as FR
+            marcas = FR.limpar_marcas(i.get("marcas") or [])
+            cena = FR.limpar_cena(i.get("cena") or {})
+            if marcas or any(cena.values()):
+                r["marcas"] = marcas
+                extra = "; ".join(x for x in (FR.texto_cena(cena), FR.texto_marcas(marcas)) if x)
+                r["obs"] = _limpo((r["obs"] + " · " if r["obs"] else "") + "Na cena: " + extra, 1600)
+                try:
+                    if marcas:
+                        r["arquivo_ia"] = FR.desenhar_marcas(dest, os.path.join(pasta, f"{k:02d}_pose_numerada.png"),
+                                                             marcas)
+                except Exception:  # noqa: BLE001 — sem a cópia numerada, a IA lê só a observação
+                    pass
+        refs.append(r)
+    pac = {"id": pid, "refs": refs, "obs_geral": _limpo(obs_geral, 1500), "criado": time.time(),
+           "estilo": estilo if estilo_en(estilo) else "", "estilo_en": estilo_en(estilo)}
     with open(os.path.join(pasta, "pacote.json"), "w", encoding="utf-8") as f:
         json.dump(pac, f, ensure_ascii=False, indent=1)
     _PACOTES[pid] = pac
@@ -129,6 +179,8 @@ def prompt_basico(pac: Dict[str, Any]) -> str:
         partes.append(frase[0].upper() + frase[1:] + (f" (note: {r['obs']})" if r["obs"] else "") + ".")
     if pac.get("obs_geral"):
         partes.append("Scene: " + pac["obs_geral"] + ".")
+    if pac.get("estilo_en"):
+        partes.append("Art style of the final image: " + pac["estilo_en"].rstrip(".") + ".")
     partes.append("Keep every character's identity consistent with their reference; natural, coherent result.")
     return " ".join(partes)
 
@@ -145,7 +197,13 @@ a general note (often in Portuguese). Your prompt must:
   decide sensibly and say it);
 - describe the identity features you SEE in each character photo in a few words (helps consistency), without naming real
   people or celebrities even if you recognize them;
+- a POSE image may come to YOU with numbered circles (red = person, blue = object) and a note saying who goes in figure
+  1, 2…, what replaces each object and whether the scenery changes; Flow gets the CLEAN image (no numbers), so describe each
+  place by position/pose ("the figure on the left leaning in", "the car behind them"), never by the number; a replaced
+  object/scenery keeps the place and size of the original unless a note says otherwise; "mantém" = keep it as in the sketch;
 - follow every note; the general note wins on scene/mood/action;
+- render the FINAL ART STYLE given (realistic photo, anime, manga…) and say it clearly in the prompt; the identities stay
+  recognizable in that style; a pencil-sketch pose image never sets the style;
 - be concrete about the final image (action, expressions, setting, light, lens) in natural English, 60–160 words;
 - no markdown, no lists, no quotes around the prompt.
 Also give "explicacao": 1–3 short sentences in Brazilian Portuguese saying how you used each image, and "avisos": problems
@@ -162,10 +220,12 @@ def conteudo_ia(pac: Dict[str, Any], bloco_imagem: Callable[[str], Optional[Dict
         c.append({"type": "text", "text": f"Reference image {r['n']} — {r['papel'].upper()}"
                                          + (f" — name: {r['nome']}" if r["nome"] else "")
                                          + (f" — note: {r['obs']}" if r["obs"] else "")})
-        b = bloco_imagem(r["arquivo"])
+        b = bloco_imagem(r.get("arquivo_ia") or r["arquivo"])
         if b:
             c.append(b)
     c.append({"type": "text", "text": "GENERAL NOTE: " + (pac.get("obs_geral") or "(none)")})
+    c.append({"type": "text", "text": "FINAL ART STYLE: " + (pac.get("estilo_en") or "(not chosen — keep the look of the character "
+                                                                                    "photos; a pencil sketch pose is NOT the style)")})
     return c
 
 
