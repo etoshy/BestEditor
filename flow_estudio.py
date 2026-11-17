@@ -340,14 +340,22 @@ class _Sessao(threading.Thread):
         while True:
             try:
                 return fd.gerar_um(self.page, trab, on_passo, timeout)
-            except (fd.FlowLimite, fd.FlowLogin) as exc:
+            except fd.FlowPassoErro as exc:
+                # 🔁 v84_408e: "Notamos uma atividade incomum / extensões do navegador" é coisa da CONTA: ela descansa
+                # (MINUTOS_INCOMUM) e o MESMO pedido vai pra próxima conta — como no resto do site (v84_396)
+                incomum = bool(gf.RE_INCOMUM.search(str(getattr(exc, "mensagem", "") or exc)))
+                if not isinstance(exc, (fd.FlowLimite, fd.FlowLogin)) and not (incomum and len(gf.nomes_das_contas()) > 1):
+                    raise
                 conta = self.conta or gf.CONTA_PADRAO
                 tentadas.append(conta)
-                login = isinstance(exc, fd.FlowLogin)  # ⏭ v84_110: pediu login → pula a conta e segue na próxima
+                login = isinstance(exc, fd.FlowLogin) or incomum  # ⏭ v84_110: pediu login → pula a conta e segue na próxima
                 pode_trocar = opcoes.get("trocar_conta", True) and str(cfg.get("flow_navegador") or "auto").lower() != "cdp"
                 tipo_lim = gf.tipo_do_limite(trab.get("tipo"))  # v84_105: sem crédito de vídeo ≠ sem crédito de imagem
                 try:
-                    if login:
+                    if incomum:
+                        if pode_trocar:
+                            gf.pular_conta(conta, f"atividade incomum no Flow: {exc.mensagem[:120]}", minutos=gf.MINUTOS_INCOMUM)
+                    elif login:
                         if pode_trocar:
                             gf.pular_conta(conta, f"pediu login: {exc.mensagem[:160]}")
                     else:
@@ -362,13 +370,17 @@ class _Sessao(threading.Thread):
                     gf.salvar_diagnostico(getattr(exc, "page", None) or self.page, str(exc))
                 except Exception:  # noqa: BLE001
                     pass
-                motivo = (f"🔒 a conta “{conta}” pediu login ({exc.mensagem[:140]}) — pulando ela" if login else
+                motivo = (f"⚠ a conta “{conta}” deu “atividade incomum” — ela descansa {gf.MINUTOS_INCOMUM} min" if incomum else
+                          f"🔒 a conta “{conta}” pediu login ({exc.mensagem[:140]}) — pulando ela" if login else
                           f"🔁 a conta “{conta}” está sem créditos de {'vídeo' if tipo_lim == 'video' else 'imagem'} "
                           f"({exc.mensagem[:140]}) — ela continua valendo pra {'imagem' if tipo_lim == 'video' else 'vídeo'}")
                 while True:  # a próxima conta também pode pedir login ao abrir: pula e tenta a seguinte
                     try:
                         proxima = gf.escolher_conta_disponivel(tipo=tipo_lim)
                     except Exception as exc_sem:  # noqa: BLE001 — GoogleFlowSemContas
+                        if incomum:
+                            raise fd.FlowPassoErro(exc.passo, f"todas as contas deram “atividade incomum” no Flow — espere ~1 hora. "
+                                                              f"Última: {exc.mensagem[:200]}") from exc
                         cls = fd.FlowLogin if login else fd.FlowLimite
                         novo = cls(exc.passo, f"{exc.mensagem} — e não sobrou outra conta: {exc_sem}",
                                    page=getattr(exc, "page", None))
@@ -394,6 +406,8 @@ class _Sessao(threading.Thread):
                         trab[k] = {"arquivo": f["arquivo"]}
                     elif isinstance(f, dict) and f.get("media_id") and not f.get("arquivo"):
                         trab.pop(k, None)
+                if trab.get("referencias"):  # 🧩 as várias imagens: sobem de novo pelo arquivo
+                    trab["referencias"] = [{"arquivo": r["arquivo"]} for r in trab["referencias"] if r.get("arquivo")]
 
     # -- um comando
     def _executar(self, tipo: str, cfg: Dict[str, Any], opcoes: Dict[str, Any]) -> None:
