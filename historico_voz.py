@@ -90,6 +90,18 @@ def listar(pasta: str, q: str = "", limite: int = 100, pagina: int = 0) -> Dict[
     return {"total": total, "itens": itens[pagina * limite:(pagina + 1) * limite]}
 
 
+def marcar_faixas(pasta: str, jid: str, faixas: List[Dict[str, Any]]) -> None:
+    """🎛 v84_404: as faixas com EQ geradas depois (troca a do mesmo preset)."""
+    with _TRAVA:
+        itens = _ler(pasta)
+        for x in itens:
+            if x.get("id") == jid:
+                novas = {f["preset"]: f for f in x.get("faixas_eq") or []}
+                novas.update({f["preset"]: f for f in faixas})
+                x["faixas_eq"] = list(novas.values())
+        _gravar(pasta, itens)
+
+
 def obter(pasta: str, jid: str) -> Optional[Dict[str, Any]]:
     return next((x for x in _ler(pasta) if x.get("id") == jid), None)
 
@@ -102,8 +114,7 @@ def apagar(pasta: str, jid: str, apagar_arquivos: bool = True) -> bool:
             return False
         _gravar(pasta, [x for x in itens if x.get("id") != jid])
     if apagar_arquivos:
-        for k in ("arquivo", "srt", "chamadas"):
-            nome = e.get(k)
+        for nome in [e.get(k) for k in ("arquivo", "srt", "chamadas")] + [f.get("arquivo") for f in e.get("faixas_eq") or []]:
             if nome and re.fullmatch(r"[\w.\-]+", nome):
                 try:
                     os.remove(os.path.join(pasta, nome))

@@ -3176,10 +3176,24 @@ def censura_reverso(p: Dict[str, Any], planos_v: List[Dict[str, Any]], modo_quad
 def cortes_com_som_original(p: Dict[str, Any]) -> List[Dict[str, Any]]:
     """🔥 v84_291: o MOMENTO-CHAVE (ex.: a cesta do robô) toca com o SOM ORIGINAL logo depois da frase que o anuncia — a
     narração para e volta depois. Vira um corte real do Estúdio ("cutaway", áudio "pause") com a mídia do projeto."""
+    g = p.get("gravacao") or {}
+    mos = (p.get("roteiro") or {}).get("momentos_originais") or []
+    if mos and (p.get("config") or {}).get("som_original") == "intercalado":  # 🎙 v84_403: vários, depois de cada bloco
+        al = g.get("alinhamento") or []
+        dur = float(g.get("dur") or (al[-1]["end"] if al else 0))
+        out = []
+        for mo_ in mos:
+            i = int(mo_.get("depois_do_bloco") or 0) - 1
+            if not (0 <= i < len(al)) or not mo_.get("material"):
+                continue
+            t = min(dur, float(al[i]["end"]) + 0.15)
+            out.append({"insertion_point": round(t, 3), "description": ("🎙 " + str(mo_.get("por_que") or "som original"))[:200],
+                        "audio_mode": "pause", "midia": str(mo_["material"]),
+                        "inicio": f"{float(mo_['de']):.2f}", "fim": f"{float(mo_['ate']):.2f}"})
+        return out
     mo = p.get("momento_original") or {}
     if not mo.get("midia"):
         return []
-    g = p.get("gravacao") or {}
     al = g.get("alinhamento") or []
     i = bloco_do_momento(p, mo)
     if i is None or i >= len(al):

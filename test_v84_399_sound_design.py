@@ -242,3 +242,28 @@ def test_atalho_em_qualquer_video_do_site(tmp_path):
         SR.criar_de_url(mini, str(tmp_path), "/pagina")
     src = open("templates/base.html", encoding="utf-8").read()
     assert "/sound-design?url=" in src and "item('/sound-design'" in src
+
+
+def test_drop_da_musica_cai_no_climax(tmp_path):
+    """🎵 v84_403: música calma 10 s → forte depois; o clímax do bloco em 6 s → a música começa ~4 s depois do 0."""
+    mus = str(tmp_path / "drop.wav")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=f=220:d=10", "-f", "lavfi", "-i", "sine=f=220:d=10",
+                    "-filter_complex", "[0]volume=0.05[a];[1]volume=0.9[b];[a][b]concat=n=2:v=0:a=1", "-ar", "48000", mus], check=True)
+    pico = SD.pico_musica(mus)
+    assert 9 <= pico <= 11
+    plano = {"blocos": [{"start": 0, "end": 12, "ambiente": "", "musica": mus, "climax": 6.0, "pico_musica": pico}], "momentos": []}
+    ent = []
+    partes, _a, mus_r = SD._filtro_camadas(plano, False, ent)
+    assert mus_r and f"atrim={pico - 6.0:.3f}" in partes[0] and "if(lt(t," in partes[0]
+    nar = _tom(str(tmp_path / "nar.wav"), 12)
+    out = SD.aplicar(nar, plano, str(tmp_path / "o.wav"))
+    assert abs(_dur(out) - 12) < 0.3
+    # sem clímax no bloco: do começo, sem curva
+    plano["blocos"][0]["climax"] = None
+    partes, _a, _m = SD._filtro_camadas(plano, False, [])
+    assert "atrim=0.000" in partes[0] and "if(lt" not in partes[0]
+    sd = SD.vazio()
+    sd["blocos"] = [SD.novo_bloco(0, 30, "tensao", "", "suspense")]
+    sd["momentos"] = [SD.novo_momento(10, "virada", 2), SD.novo_momento(22, "revelacao", 3)]
+    sd["audios"] = {"musica:suspense": {"arquivo": mus, "pico_musica": pico}}
+    assert SD.para_montar({"sound_design": sd})["blocos"][0]["climax"] == 22.0  # o mais forte

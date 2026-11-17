@@ -1245,6 +1245,11 @@ def gerar_voz_gerar():
     _idioma = idiomas.descobrir("" if multivoz_on else engine, kwargs, texto, request.form.get("idioma_narracao"))
     if engine in ("chatterbox", "chatterbox_turbo", "xtts", "fish_s2"):
         kwargs["protecao_alucinacao"] = protecao_alucinacao
+    if request.form.get("polimento_enviado"):  # 🎚 v84_404: takes / silêncio morto / EQ (a tela manda; sem a tela: a config salva)
+        from tts import voz_polimento as _vpol
+        kwargs["polimento"] = _vpol.normalizar({"takes": request.form.get("pol_takes"),
+                                                "cortar_silencios": request.form.get("pol_cortar") == "on",
+                                                "eq": request.form.get("pol_eq") or ""})
     # 🤖🎭 v84_375: roteiro SEM tags + opção marcada → o Claude coloca antes de gerar (expressivo pt ou Turbo en)
     _ia_tags = None
     if engine == "chatterbox" and kwargs.get("expressivo") and request.form.get("chatterbox_ia_tags") == "on":
@@ -1598,7 +1603,45 @@ def gerar_voz_historico():
                 it["zip_url"] = url_for("gerar_voz_baixar_zip", job_id=it["id"])
         if it.get("srt") and os.path.exists(os.path.join(VOZES_DIR, it["srt"])):
             it["srt_url"] = url_for("gerar_voz_legenda", filename=it["srt"])
+        it["faixas_eq"] = [dict(f, url=url_for("gerar_voz_audio", filename=f["arquivo"]))  # 🎛 v84_404
+                           for f in it.get("faixas_eq") or [] if os.path.exists(os.path.join(VOZES_DIR, f.get("arquivo") or "_"))]
     return jsonify(r)
+
+
+@app.route("/gerar-voz/polimento", methods=["GET", "POST"])
+def gerar_voz_polimento():
+    """🎚 v84_404: o padrão de takes / corte do silêncio morto / EQ — vale pra TODA voz gerada no site (Gerador, curtos,
+    narrações…). Tudo desligado de fábrica."""
+    from tts import voz_polimento as _vpol
+    from site_config import load_site_config, save_site_config
+    if request.method == "POST":
+        b = request.get_json(silent=True) or {}
+        save_site_config({"voz_polimento": _vpol.normalizar(b)})
+    return jsonify({"ok": True, "polimento": _vpol.normalizar(load_site_config().get("voz_polimento")), "eqs": _vpol.opcoes_eq(),
+                    "takes_max": _vpol.TAKES_MAX})
+
+
+@app.route("/gerar-voz/historico/<job_id>/eq", methods=["POST"])
+def gerar_voz_historico_eq(job_id: str):
+    """🎛 v84_404: faixas EXTRAS com EQ (uma por preset) de um áudio já gerado — a original não muda."""
+    from tts import voz_polimento as _vpol
+    it = _hist_voz.obter(VOZES_DIR, job_id)
+    if not it or not it.get("arquivo") or not os.path.exists(os.path.join(VOZES_DIR, it["arquivo"])):
+        return jsonify({"erro": "Não achei esse áudio no histórico."}), 404
+    presets = [p for p in ((request.get_json(silent=True) or {}).get("presets") or []) if p in _vpol.EQ_PRESETS]
+    if not presets:
+        return jsonify({"erro": "Escolha pelo menos um EQ."}), 400
+    feitos = []
+    for p_ in presets:
+        nome = os.path.basename(_vpol.caminho_faixa(it["arquivo"], p_))
+        try:
+            _vpol.aplicar_eq(os.path.join(VOZES_DIR, it["arquivo"]), os.path.join(VOZES_DIR, nome), p_)
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"erro": str(exc)[:300]}), 500
+        feitos.append({"preset": p_, "arquivo": nome})
+    _hist_voz.marcar_faixas(VOZES_DIR, job_id, feitos)
+    return jsonify({"ok": True, "faixas": [dict(f, url=url_for("gerar_voz_audio", filename=f["arquivo"]),
+                                                nome=_vpol.EQ_PRESETS[f["preset"]]["nome"]) for f in feitos]})
 
 
 @app.route("/gerar-voz/historico/<job_id>/apagar", methods=["POST"])

@@ -124,6 +124,9 @@
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="A última frase emenda na primeira — quando o short recomeça parece um pensamento só (aumenta o replay). Desligado: nunca termina em loop."><input type="checkbox" id="final_loop" style="width:auto;margin:0"> 🔁 final em loop (a última frase emenda na primeira — desligado)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Experimental. Por cima do ✨ autêntico: um narrador com a PERSONALIDADE do canal (a que você escreve em 🎨 Personalização → Canal e voz, ou uma deduzida da descrição), uma opinião de verdade, uma comparação do dia a dia (sem inventar história pessoal), um detalhe que o vídeo não mostra, fala de gente, e sem repetir as aberturas e finais dos vídeos recentes do mesmo canal."><input type="checkbox" id="roteiro_personalidade" style="width:auto;margin:0"> 🎭 roteiro com mais personalidade (experimental — persona do canal, opinião forte, sem repetir os vídeos anteriores)</label>
   <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Pra clipes de briga de trânsito, discussão, gente mal-educada: a narração conta uma história totalmente nova e FOFA por cima (o soco vira 'cafuné', o dedo do meio vira 'mostrou que ele é o número um'). O áudio do clipe não entra (os palavrões somem), os golpes são pixelados e a abertura/final variam a cada vídeo."><input type="checkbox" id="roteiro_reverso" style="width:auto;margin:0"> 🔄 reverse rage (a treta vira gentileza — ironia wholesome; palavrões e golpes censurados)</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Estilo bodycam/resgate/campainha: a narração entra só nos momentos-chave e, entre elas, toca o SOM ORIGINAL do clipe (as falas, o cachorro, a porta quebrando). Os palavrões desse som ganham bip automático. (Não vale junto com o reverse rage.)"><input type="checkbox" id="som_intercalado" style="width:auto;margin:0"> 🎙 narração intercalada (o som original do clipe entre as falas, com bip nos palavrões)</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="No primeiro segundo, uma seta animada aponta quem/o que a primeira frase cita (“este instrutor…”) e some rápido."><input type="checkbox" id="seta_abertura" style="width:auto;margin:0"> 🏹 seta animada na abertura</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400" title="Clipe baixado em qualidade baixa: aumenta pra 1080 e deixa mais nítido (antes de editar).">🔍 nitidez do clipe <select id="nitidez" style="width:auto;margin:0"><option value="">não</option><option value="leve">leve</option><option value="forte">forte</option></select></label>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ opcional: comentários à mão e pedido extra</summary>
     <label>💬 Comentários <span class="si-dica" style="font-weight:400">— o site tenta ler sozinho; se o TikTok não deixar, cole os principais aqui (um por linha, as curtidas no fim: “why did he stop?? 12K”)</span>
       <textarea id="comentarios" rows="4"></textarea></label>
@@ -344,6 +347,17 @@
           <button class="si-mini" onclick="canalSalvar()">💾 salvar nome/descrição/voz do canal</button>
           <button type="button" class="si-mini si-sec" id="bApagarCanal" title="apaga o canal (os vídeos já feitos ficam)">🗑 apagar este canal</button>
         </div>
+        <details id="concBox" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">📊 Estilo dos concorrentes — escrever como os canais que bombam</summary>
+          <div class="si-dica" style="margin:4px 0">Cole o link de 3 a 5 canais do mesmo nicho. O site pega os ~20 shorts mais vistos de cada, lê a legenda (sem legenda, o Whisper ouve) e a IA escreve o “manual de escrita” deles: ganchos, ritmo, estrutura, tom, fechamento. Os roteiros deste canal seguem a <b>técnica</b>, sem copiar frase.</div>
+          <textarea id="concLinks" rows="3" placeholder="https://www.youtube.com/@canal1&#10;https://www.youtube.com/@canal2&#10;https://www.youtube.com/@canal3"></textarea>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            <button type="button" class="si-mini" id="bConc">📊 aprender o estilo deles</button>
+            <label style="flex-direction:row;align-items:center;gap:6px;font-weight:400;margin:0"><input type="checkbox" id="concOff" style="width:auto;margin:0"> não usar no roteiro</label>
+            <span class="si-dica" id="concSt"></span>
+          </div>
+          <textarea id="concManual" rows="8" style="margin-top:6px;display:none" placeholder="o manual aparece aqui (dá pra editar)"></textarea>
+          <button type="button" class="si-mini si-sec" id="bConcSalvar" style="display:none">💾 salvar o manual</button>
+        </details>
       </div>
       {% if not so_personalizar %}<div style="margin-top:12px">{{ criar_canal() }}</div>{% endif %}
     </section>
@@ -410,7 +424,7 @@ function vozes() { const turbo = el('idioma').value === 'en' && el('lingua_post'
 ['idioma', 'lingua_post'].forEach(k => el(k).addEventListener('change', vozes));
 const SALVAR = ['lingua_post', 'idioma', 'voz', 'duracao', 'proporcao', 'qualidade'];
 // 💾 v84_332: TODAS as opções do envio ficam como você deixou (até mudar) — "↺ voltar ao padrão" volta pro de fábrica
-const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'roteiro_reverso', 'tambem_quadrado', 'retencao', 'final_loop'], OP_RADIOS = ['modo', 'lote_modo'];
+const OP_SELECTS = ['lingua_post', 'idioma', 'duracao', 'proporcao', 'qualidade'], OP_CHECKS = ['exportar', 'iniciar_ja', 'camera_exp', 'roteiro_classico', 'roteiro_personalidade', 'roteiro_reverso', 'som_intercalado', 'seta_abertura', 'tambem_quadrado', 'retencao', 'final_loop'], OP_RADIOS = ['modo', 'lote_modo'];
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 const LIVRE = {};  // 📺 v84_340: o que VOCÊ tinha escolhido nos campos que o canal do lote trava (volta quando troca de canal)
 const valorLivre = k => (k in LIVRE ? LIVRE[k] : el(k).value);
@@ -462,7 +476,7 @@ window.lkPadrao = () => { try { localStorage.removeItem('lk_op'); } catch (e) {}
 }));
 const loteModo = () => (document.querySelector('input[name=lote_modo]:checked') || {}).value || 'um';
 window.lkGo = async () => {
-  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, roteiro_reverso: el('roteiro_reverso').checked, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
+  const d = {canal_id: el('canal').value, link: el('link').value.trim(), modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, roteiro_reverso: el('roteiro_reverso').checked, som_intercalado: el('som_intercalado').checked, seta_abertura: el('seta_abertura').checked, nitidez: el('nitidez').value, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked, por_etapa: loteModo() === 'etapa',
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   salvarOpcoes();
@@ -475,7 +489,7 @@ window.lkGo = async () => {
 };
 el('bEnviar').onclick = async () => {  // 📤 v84_402
   const fs = el('envArq').files; if (!fs.length) { aviso('Escolha o arquivo do vídeo.', 'erro'); return; }
-  const d = {canal_id: el('canal').value, link: '', modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, roteiro_reverso: el('roteiro_reverso').checked, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked,
+  const d = {canal_id: el('canal').value, link: '', modo: document.querySelector('input[name=modo]:checked').value, exportar: el('exportar').checked, iniciar: el('iniciar_ja').checked, roteiro_classico: el('roteiro_classico').checked, roteiro_personalidade: el('roteiro_personalidade').checked, roteiro_reverso: el('roteiro_reverso').checked, som_intercalado: el('som_intercalado').checked, seta_abertura: el('seta_abertura').checked, nitidez: el('nitidez').value, retencao: el('retencao').checked, final_loop: el('final_loop').checked, camera_exp: el('camera_exp').checked, tambem_quadrado: el('tambem_quadrado').checked,
     comentarios: el('comentarios').value, extra: el('extra').value};
   SALVAR.forEach(k => d[k] = el(k).value);
   const fd = new FormData(); [...fs].forEach(f => fd.append('arquivo', f));
@@ -874,7 +888,7 @@ function canalPreencher() {  // mostra o nome, a descrição, o idioma e a voz d
   el('c_nome').value = c ? c.nome : ''; el('c_desc').value = c ? (c.descricao || '') : ''; el('c_persona').value = c ? (c.persona || '') : '';
   el('c_lp').value = v.lingua_post || ''; el('c_idioma').value = v.idioma || ''; el('c_modo').value = v.modo || ''; canalVozes(v.voz || '');
   el('c_qual').textContent = c ? `editando: ${c.nome}` : '— escolha um canal na aba lá em cima (o 📚 padrão não tem nome); pra um canal novo use ➕ Criar um canal novo';
-  el('bApagarCanal').style.display = c ? '' : 'none';
+  el('bApagarCanal').style.display = c ? '' : 'none'; concPreencher();
 }
 ['c_lp', 'c_idioma'].forEach(k => el(k).addEventListener('change', () => canalVozes(el('c_voz').value)));
 const vozLink = () => ({lingua_post: el('c_lp').value, idioma: el('c_idioma').value, voz: el('c_voz').value, modo: el('c_modo').value});
@@ -919,6 +933,28 @@ async function canalSalvar() {
   } catch (e) { aviso('❌ ' + e.message, 'erro'); }
 }
 window.canalCriar = canalCriar; window.canalSalvar = canalSalvar;
+// 📊 v84_403: estilo dos concorrentes
+function concPreencher() { const c = CANAIS.find(x => x.id === el('a_escopo').value), e = (c && c.concorrentes) || {};
+  el('concBox').style.display = c ? '' : 'none'; if (!c) return;
+  el('concLinks').value = (e.canais || []).join('\n'); el('concOff').checked = !!e.desligado;
+  el('concManual').value = e.manual || ''; el('concManual').style.display = el('bConcSalvar').style.display = e.manual ? '' : 'none';
+  el('concSt').textContent = e.manual ? `✅ ${e.n_transcricoes} roteiros lidos${e.quando ? ' em ' + new Date(e.quando * 1000).toLocaleDateString() : ''}${e.desligado ? ' · desligado' : ''}` : 'ainda não aprendido'; }
+async function concAcompanhar(cid) {
+  for (;;) { await new Promise(r => setTimeout(r, 2500));
+    const r = await (await fetch('/curtos/canais/' + encodeURIComponent(cid) + '/concorrentes')).json(), t = r.tarefa || {};
+    if (!t.fim) { el('concSt').textContent = t.prog || '…'; continue; }
+    el('bConc').disabled = false;
+    if (t.erro) { el('concSt').textContent = '❌ ' + t.erro; return aviso('❌ ' + t.erro, 'erro'); }
+    await carregarCanais(); el('a_escopo').value = cid; canalPreencher(); aviso(t.msg || '📊 manual pronto', 'okk'); return; } }
+el('bConc').onclick = async () => { const cid = el('a_escopo').value; if (!cid) return aviso('Escolha um canal', 'erro');
+  const links = el('concLinks').value.split(/[\s,]+/).filter(Boolean); if (!links.length) return aviso('Cole os links dos canais', 'erro');
+  el('bConc').disabled = true;
+  try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/concorrentes', {canais: links}); concAcompanhar(cid); }
+  catch (e) { el('bConc').disabled = false; aviso('❌ ' + e.message, 'erro'); } };
+async function concSalvar() { const cid = el('a_escopo').value; if (!cid) return;
+  try { await post('/curtos/canais/' + encodeURIComponent(cid) + '/concorrentes', {manual: el('concManual').value, desligado: el('concOff').checked});
+    await carregarCanais(); el('a_escopo').value = cid; canalPreencher(); aviso('💾 manual salvo', 'okk'); } catch (e) { aviso('❌ ' + e.message, 'erro'); } }
+el('bConcSalvar').onclick = concSalvar; el('concOff').onchange = concSalvar;
 // 🎨 v84_335: a página de Personalização — uma aba pra cada canal (o mesmo editor do acabamento, com o escopo vindo da aba)
 const PZ = {{ (so_personalizar or false)|tojson }};
 function desenharPacote() {  // 📦 v84_336: a lista de canais pra exportar

@@ -412,6 +412,10 @@ def limpar_texto_para_tts(texto: str, preservar_tags_chatterbox_turbo: bool = Fa
 
     t = re.sub(r"[\"'\u201c\u201d\u2018\u2019\u201e\u201f\u00ab\u00bb`´]", "", t)
     t = re.sub(r"[()\[\]{}]", "", t)
+    if motor in ("chatterbox", "chatterbox_turbo") and _guardar_reticencias():
+        # 🎚 v84_404: com o ✂ corte de silêncio ligado, "..." fica (o Chatterbox faz a pausa/hesitação e o corte
+        # sabe que ela é de propósito); \x01 protege das trocas de ponto abaixo
+        t = re.sub(r"(?:\u2026|\.{2,})", "\x01", t)
     t = t.replace("\u2026", ",")
     t = re.sub(r"\.{2,}", ",", t)
     t = re.sub(r"(?<!\d)\.(?!\d)", ",", t)  # ponto solto (não decimal) -> vírgula, pausa em vez de "ponto"
@@ -425,7 +429,15 @@ def limpar_texto_para_tts(texto: str, preservar_tags_chatterbox_turbo: bool = Fa
 
     for i, tag in enumerate(tags_preservadas):
         resultado = resultado.replace(f"\x00TAG{i}\x00", tag)
-    return resultado
+    return resultado.replace("\x01", "...")
+
+
+def _guardar_reticencias() -> bool:
+    try:
+        from site_config import load_site_config
+        return bool((load_site_config().get("voz_polimento") or {}).get("cortar_silencios"))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 # ============================================================ #

@@ -931,6 +931,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 cfg["estilo_roteiro"] = b["estilo_roteiro"]
             if b.get("cobrir_agressoes") in ("pixel", "blur", "nao"):  # 🔄 v84_401: reverse rage — como cobrir os golpes
                 cfg["cobrir_agressoes"] = b["cobrir_agressoes"]
+            if b.get("som_original") in ("", "intercalado"):  # 🎙 v84_403: narração intercalada com o som original
+                cfg["som_original"] = b["som_original"]
+            if b.get("seta_abertura") is not None:  # 🏹 v84_403
+                cfg["seta_abertura"] = bool(b["seta_abertura"])
+            if b.get("nitidez") in ("", "leve", "forte"):  # 🔍 v84_403
+                cfg["nitidez"] = b["nitidez"]
             if b.get("voz_modo") in ("minha", "tts"):  # 🎤 v84_325
                 cfg["voz_modo"] = b["voz_modo"]
             if "camera_exp" in b:  # 🎥 v84_322: vale pro próximo roteiro/montagem
@@ -1477,6 +1483,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                     prog(f"🎥 {n_v} pedaço(s) enquadrado(s) no vertical")
             except Exception as exc:  # noqa: BLE001
                 prog(f"🎥 não deu pra enquadrar no vertical: {str(exc)[:160]}")
+        if CC.intercalado(CT.carregar(base_dir, pid)) and CB["transcrever"]:  # 🎙 v84_403: bip nos palavrões do som original
+            for m_ in CC.clipes(base_dir, CT.carregar(base_dir, pid)):
+                try:
+                    CC.bip_no_clipe(base_dir, pid, m_["id"], CB["transcrever"], prog)
+                except Exception as exc:  # noqa: BLE001  (sem bip: segue — o roteiro já evita trechos com palavrão)
+                    prog(f"🤐 não deu pra pôr o bip em {m_['id']}: {str(exc)[:160]}")
         if _ia_ligada() and (CT.carregar(base_dir, pid).get("roteiro") or {}).get("agressoes"):  # 🔄 v84_401: onde censurar
             try:
                 rc = CC.preparar_censura(base_dir, pid, on_log=prog)
@@ -2601,8 +2613,58 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
             except CT.CurtoErro:
                 continue
             out.append({"id": cc["id"], "nome": cc.get("nome") or cc["id"], "personalizado": bool(cc.get("acabamento")),
-                        "descricao": cc.get("descricao") or "", "voz_link": _voz_link_de(cc), "persona": cc.get("persona") or ""})
+                        "descricao": cc.get("descricao") or "", "voz_link": _voz_link_de(cc), "persona": cc.get("persona") or "",
+                        "concorrentes": _conc_out(cc)})
         return out
+
+    def _conc_out(cc: Dict[str, Any]) -> Dict[str, Any]:
+        e = cc.get("estilo_concorrentes") or {}
+        return {"canais": e.get("canais") or [], "manual": e.get("manual") or "", "quando": e.get("quando"),
+                "n_transcricoes": e.get("n_transcricoes") or 0, "exemplos": e.get("exemplos") or [],
+                "desligado": bool(e.get("desligado"))}
+
+    @app.route("/curtos/canais/<cid>/concorrentes", methods=["GET", "POST"])
+    def curtos_canal_concorrentes(cid: str):
+        """📊 v84_403: aprende o jeito de escrever dos canais que bombam (20 shorts mais vistos de cada) → manual no roteiro.
+        POST {canais:[links]} começa; POST {manual, desligado} só edita; GET = estado + tarefa."""
+        import estilo_concorrentes as EC
+        if not CT._valido(cid):
+            return _erro("Canal inválido.")
+        c = _canal(cid)
+        if request.method == "GET":
+            return _ok(concorrentes=_conc_out(c), tarefa=TAREFAS.get("conc:" + cid))
+        b = _corpo()
+        links = b.get("canais")
+        if isinstance(links, str):
+            links = [x for x in re.split(r"[\s,]+", links) if x]
+        if not links:  # só editar o manual / ligar-desligar
+            with CT._TRAVA:
+                c = CT.carregar_canal(base_dir, cid)
+                e = dict(c.get("estilo_concorrentes") or {})
+                if "manual" in b:
+                    e["manual"] = str(b.get("manual") or "").strip()[:4000]
+                if "desligado" in b:
+                    e["desligado"] = bool(b.get("desligado"))
+                c["estilo_concorrentes"] = e
+                CT.salvar_canal(base_dir, c)
+            return _ok(concorrentes=_conc_out(c))
+        try:
+            links = [EC.url_shorts(x)[:-len("/shorts")] for x in links][:EC.MAX_CANAIS]
+        except ValueError as exc:
+            return _erro(str(exc))
+
+        def fazer(prog):
+            pasta = EC.pasta_tmp()
+            try:
+                r = EC.aprender(links, pasta, prog, transcrever=CB["transcrever"] or None)
+            finally:
+                shutil.rmtree(pasta, ignore_errors=True)
+            with CT._TRAVA:
+                c2 = CT.carregar_canal(base_dir, cid)
+                c2["estilo_concorrentes"] = r
+                CT.salvar_canal(base_dir, c2)
+            return f"✅ manual pronto ({r['n_transcricoes']} roteiros lidos)"
+        return _rodar("conc:" + cid, "📊 estilo dos concorrentes", fazer)
 
     @app.route("/curtos/canais-link", methods=["GET"])
     def curtos_canais_link():
@@ -2873,6 +2935,12 @@ def registrar(app, base_dir: str, transcrever: Optional[Callable[..., Any]] = No
                 elif b.get("voz") and (narrada == "en") == (("pt" if narrar_pt else lp) == "en"):
                     p["config"]["voz_tts"] = str(b["voz"])[:120]  # a voz do envio só se for do mesmo motor
                 p["config"]["takes"] = 1  # ⚡ automático: 1 take (os outros dá pra gerar depois na página do curto)
+                if b.get("som_intercalado") is True:  # 🎙 v84_403
+                    p["config"]["som_original"] = "intercalado"
+                if b.get("seta_abertura") is True:  # 🏹 v84_403
+                    p["config"]["seta_abertura"] = True
+                if b.get("nitidez") in ("leve", "forte"):  # 🔍 v84_403
+                    p["config"]["nitidez"] = b["nitidez"]
                 p["config"]["estilo_roteiro"] = ("reverso" if b.get("roteiro_reverso") is True else  # 🔄 v84_401
                                                  "classico" if b.get("roteiro_classico") is True else
                                                  "personalidade" if b.get("roteiro_personalidade") is True else "autentico")  # ✨ v84_321 · 🎭 v84_345

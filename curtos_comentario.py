@@ -179,6 +179,39 @@ def baixar_link(url: str, destino_dir: str, baixador: Optional[Callable[[str, st
     return cam
 
 
+def nitidez_no_arquivo(cam: str, nivel: str) -> bool:
+    """🔍 v84_403: clipe baixado em qualidade baixa → aumenta (lado menor pra 1080, lanczos) e deixa mais nítido
+    (leve: só nitidez; forte: tira o ruído antes e nitidez mais forte). Troca o arquivo no lugar. Devolve se mudou."""
+    if nivel not in ("leve", "forte") or not os.path.isfile(cam):
+        return False
+    r_ = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", cam],
+                        capture_output=True, text=True, timeout=60)
+    try:
+        w, h = (int(x) for x in r_.stdout.strip().split(",")[:2])
+    except ValueError:
+        return False
+    filtros = []
+    if min(w, h) < 1080:
+        esc = 1080.0 / min(w, h)
+        filtros.append(f"scale={int(round(w * esc / 2) * 2)}:{int(round(h * esc / 2) * 2)}:flags=lanczos")
+    if nivel == "forte":
+        filtros.append("hqdn3d=1.5:1.5:6:6")
+    filtros.append("unsharp=5:5:" + ("1.1" if nivel == "forte" else "0.6") + ":3:3:0.0")
+    saida = os.path.splitext(cam)[0] + "_nitido.mp4"
+    r_ = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cam, "-vf", ",".join(filtros), "-c:v", "libx264", "-preset", "veryfast",
+                         "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy", saida], capture_output=True, timeout=3600)
+    if r_.returncode != 0 or not os.path.isfile(saida):
+        return False
+    final = os.path.splitext(cam)[0] + ".mp4"
+    os.replace(saida, final)
+    if final != cam:
+        try:
+            os.remove(cam)
+        except OSError:
+            pass
+    return True
+
+
 def baixar_clipe(base: str, pid: str, url: str, baixador: Optional[Callable[[str, str], str]] = None,
                  on_log: Callable[[str], None] = lambda _m: None) -> str:
     """⬇ O link do vídeo original (Shorts, TikTok, Reels…) vira o clipe M1, M2…"""
@@ -186,6 +219,12 @@ def baixar_clipe(base: str, pid: str, url: str, baixador: Optional[Callable[[str
     on_log("⬇ baixando o vídeo do link…")
     d = tempfile.mkdtemp(prefix="curto_link_")
     cam = baixar_link(url, d, baixador)
+    nivel = (CT.carregar(base, pid).get("config") or {}).get("nitidez") or ""
+    if nivel in ("leve", "forte"):  # 🔍 v84_403
+        on_log(f"🔍 deixando o clipe mais nítido ({nivel})…")
+        antes = cam
+        if nitidez_no_arquivo(cam, nivel):
+            cam = os.path.splitext(antes)[0] + ".mp4"
     with CT._TRAVA:
         p = CT.carregar(base, pid)
         if any(m.get("origem") == url for m in p["midias"]):
@@ -318,6 +357,15 @@ ROTEIRO_SCHEMA = CT._o({
 })
 
 
+def intercalado(p: Dict[str, Any]) -> bool:
+    """🎙 v84_403: narração só nos momentos-chave e o SOM ORIGINAL do clipe entre elas (não junta com o reverse rage)."""
+    return (not explicativo(p) and (p.get("config") or {}).get("som_original") == "intercalado"
+            and estilo_roteiro(p) != "reverso")
+
+
+MOMENTOS_ORIGINAIS_SCHEMA = {"type": "array", "items": CT._o({"material": CT._s(), "de": CT._n(), "ate": CT._n(),
+                                                               "depois_do_bloco": {"type": "integer"}, "por_que": CT._s()})}
+
 AGRESSOES_SCHEMA = {"type": "array", "items": CT._o({"material": CT._s(), "de": CT._n(), "ate": CT._n(), "o_que": CT._s(),
                                                      "tipo": {"type": "string", "enum": ["golpe", "gesto", "arma"]},
                                                      "alvo": CT._s(), "vira": CT._s()})}
@@ -329,17 +377,20 @@ def roteiro_schema(p: Dict[str, Any]) -> Dict[str, Any]:
     import camera_exp
     import copy
     reverso = not explicativo(p) and estilo_roteiro(p) == "reverso"
+    inter = intercalado(p)
+
+    def _extras(sc_):
+        if reverso:
+            sc_["properties"]["agressoes"] = AGRESSOES_SCHEMA
+        if inter:
+            sc_["properties"]["momentos_originais"] = MOMENTOS_ORIGINAIS_SCHEMA
+        sc_["required"] = list(sc_["properties"])
+        return sc_
     if explicativo(p) or not camera_exp.ligada(p):
-        if not reverso:
+        if not (reverso or inter):
             return ROTEIRO_SCHEMA
-        sc = copy.deepcopy(ROTEIRO_SCHEMA)
-        sc["properties"]["agressoes"] = AGRESSOES_SCHEMA
-        sc["required"] = list(sc["properties"])
-        return sc
-    sc = copy.deepcopy(ROTEIRO_SCHEMA)
-    if reverso:
-        sc["properties"]["agressoes"] = AGRESSOES_SCHEMA
-        sc["required"] = list(sc["properties"])
+        return _extras(copy.deepcopy(ROTEIRO_SCHEMA))
+    sc = _extras(copy.deepcopy(ROTEIRO_SCHEMA))
     cena = sc["properties"]["blocos"]["items"]["properties"]["cenas"]["items"]
     cena["properties"].update(camera_exp.schema_cena_extra(CT))
     cena["required"] = list(cena["properties"])
@@ -631,6 +682,28 @@ REGRA_COMPOSTO = (
     "honest thread you can and start 'descricao' with '⚠ as fontes não têm um tema claro em comum'.")
 
 
+REGRA_SETA_ABERTURA = (
+    "\n\n🏹 OPENING ARROW (exception to the DESTAQUE rule below): the FIRST cena of the FIRST block is SHORT (1-2 s, on the "
+    "clip) and has destaque {alvo: the person/thing the hook names, in English, findable in the frame (e.g. 'the instructor "
+    "in the green shirt'), tipo: 'seta'} — an animated arrow points at it while the hook is said. Only there.")
+
+
+REGRA_INTERCALADO = (
+    "\n\n🎙 INTERCUT MODE (bodycam / rescue / doorbell style) — the clip's ORIGINAL SOUND is part of the story:\n"
+    "I1. Narrate only the KEY MOMENTS: short lines (1-2 sentences) that set up what comes next or add the context the viewer "
+    "can't get from the image. Between them the narration STOPS and the viewer hears the clip itself (people talking, the "
+    "dog barking, the door breaking).\n"
+    "I2. 'momentos_originais': the stretches of the clip played WITH THEIR ORIGINAL SOUND — {material, de, ate (seconds of the "
+    "CLIP, 2-8 s each), depois_do_bloco (the NUMBER of the narration block it comes right after, 1 = the first block), "
+    "por_que}. Pick moments where the sound matters (a line of dialogue, a shout for help, a reaction). 2 to 5 of them; "
+    "together at most about half of the video.\n"
+    "I3. Each narration block sets up its moment ('He realized the door was locked…' → the glass breaking) and the next "
+    "block picks the story up AFTER that moment (the cenas continue from 'ate').\n"
+    "I4. The FIRST line is still the hook (narrated, never original sound). The last moment can be original sound before a "
+    "short closing line.\n"
+    "I5. Swearing in the original sound is bleeped automatically — still prefer moments without it.")
+
+
 REGRA_COMPOSTO_REVERSO = (
     "\n\n🧩🔄 REVERSE RAGE WITH {N} CLIPS (M1…M{N}, different creators): ONE wholesome story that links them — not a "
     "compilation. Pick a thread that makes the clips feel like one world: 'a day of kindness on the roads', a town where "
@@ -825,9 +898,13 @@ def sistema(p: Dict[str, Any]) -> str:
         extra = REGRA_REVERSO
     if not explicativo(p) and estilo_roteiro(p) == "personalidade":  # 🎭 v84_345
         extra += REGRA_PERSONALIDADE
+    if intercalado(p):  # 🎙 v84_403: o som original do clipe entre as falas
+        extra += REGRA_INTERCALADO
     if not explicativo(p) and composto(p):  # 🧩 v84_349 · 🔄 v84_401: no reverse rage, uma história fofa ligando os clipes
         extra += (REGRA_COMPOSTO_REVERSO if estilo_roteiro(p) == "reverso" else REGRA_COMPOSTO).replace("{N}", str(composto(p)))
     extra += regra_localizar(p)  # 🌍 v84_352: em todos os estilos (e no explicativo)
+    if not explicativo(p) and (p.get("config") or {}).get("seta_abertura"):  # 🏹 v84_403
+        extra += REGRA_SETA_ABERTURA
     extra += regra_retencao(p)  # 🧲 v84_354: gatilhos de atenção (e o 🔁 loop só se você ligar)
     import camera_exp
     if not explicativo(p) and camera_exp.ligada(p):  # 🎥 v84_322
@@ -893,6 +970,11 @@ def conteudo_explicativo(base: str, p: Dict[str, Any]) -> str:
     if ni.get("tema"):
         L += ["## CHANNEL NICHE", f"{ni['tema']}" + (f" — typical shots: {ni['visual']}" if ni.get("visual") else "")
               + (f" — hashtags: {' '.join(ni.get('hashtags') or [])}" if ni.get("hashtags") else ""), ""]
+    if not explicativo(p):  # 📊 v84_403: o jeito de escrever que funciona no nicho (aprendido dos concorrentes)
+        import estilo_concorrentes as _EC
+        b_ = _EC.bloco_roteiro(canal_)
+        if b_:
+            L += [b_, ""]
     estilo = CT.texto_do_perfil(perfil)
     if estilo:
         L += ["## CHANNEL STYLE", estilo]
@@ -987,6 +1069,11 @@ def _conteudo_roteiro(base: str, p: Dict[str, Any]) -> str:
         rec = roteiros_recentes(base, p, 15 if estilo_roteiro(p) == "reverso" else 6)  # 🔄 mais memória: quase nunca repete
         if rec:
             L += ["## RECENT SCRIPTS OF THIS CHANNEL — do NOT repeat their openings, punchlines or structure", *rec, ""]
+    if not explicativo(p):  # 📊 v84_403: o jeito de escrever que funciona no nicho (aprendido dos concorrentes)
+        import estilo_concorrentes as _EC
+        b_ = _EC.bloco_roteiro(canal_)
+        if b_:
+            L += [b_, ""]
     estilo = CT.texto_do_perfil(perfil)
     if estilo:
         L += ["## CHANNEL STYLE", estilo]
@@ -1041,6 +1128,20 @@ def ler_roteiro(resp: Any, p: Dict[str, Any], idioma: str = "en") -> Dict[str, A
         r[k] = [{"en": str(o.get("en") or "")[:400], "pt": str(o.get("pt") or "")[:400]} for o in resp.get(k) or []
                 if isinstance(o, dict) and (o.get("en") or o.get("pt"))][:20]
     r["idioma"] = idioma
+    if intercalado(p):  # 🎙 v84_403: os trechos com o som original (segundos do clipe) e depois de qual bloco
+        ids_m = {m.get("id") for m in p.get("midias") or []}
+        mos = []
+        for x in resp.get("momentos_originais") or []:
+            try:
+                a, b_ = float(x.get("de") or 0), float(x.get("ate") or 0)
+                k = int(x.get("depois_do_bloco") or 0)
+            except (AttributeError, TypeError, ValueError):
+                continue
+            mid = str(x.get("material") or "").strip() or (next(iter(ids_m)) if len(ids_m) == 1 else "")
+            if b_ - a >= 0.8 and 1 <= k <= len(r.get("blocos") or []) and (mid in ids_m or not ids_m):
+                mos.append({"material": mid, "de": round(a, 2), "ate": round(min(b_, a + 10), 2), "depois_do_bloco": k,
+                            "por_que": str(x.get("por_que") or "")[:160]})
+        r["momentos_originais"] = sorted(mos, key=lambda m: (m["depois_do_bloco"], m["de"]))[:6]
     if not explicativo(p) and estilo_roteiro(p) == "reverso":  # 🔄 v84_401: os golpes/gestos pra censurar (segundos do clipe)
         ids = {m.get("id") for m in p.get("midias") or []}
         ag = []
@@ -1563,6 +1664,58 @@ ALVO_PADRAO = {"golpe": "the spot where the hit lands (face/head/body of the per
                "gesto": "the hand making the obscene gesture", "arma": "the weapon"}
 
 
+def bip_no_clipe(base: str, pid: str, mid: str, transcrever: Callable[..., Any],
+                 on_log: Callable[[str], None] = lambda _m: None) -> int:
+    """🎙 v84_403: o som original vai tocar (narração intercalada) → o Whisper marca cada palavra do clipe e os palavrões
+    ganham bip DIRETO no arquivo do clipe (a imagem não é recodificada). Uma vez por clipe. Devolve quantos bips."""
+    import palavroes
+    import dp_censura
+    p = CT.carregar(base, pid)
+    m = next((x for x in clipes(base, p) if x["id"] == mid), None)
+    if not m or next((x for x in p["midias"] if x["id"] == mid), {}).get("bip_feito"):
+        return 0
+    pasta_ = os.path.join(CT.pasta(base, pid), "voz")
+    os.makedirs(pasta_, exist_ok=True)
+    wav = os.path.join(pasta_, f"_bip_{mid}.wav")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", m["caminho"], "-vn", "-ac", "1", "-ar", "16000", wav], capture_output=True, timeout=600)
+    segs = transcrever(wav, language=None, word_timestamps=True, info={}) if os.path.isfile(wav) else []
+    itens = []
+    for sg in segs or []:
+        for w in sg.get("words") or []:
+            if palavroes.achar(str(w.get("word") or "")):
+                a, b_ = float(w.get("start") or 0), float(w.get("end") or 0)
+                itens.append({"tipo": "bip", "start": max(0.0, a - 0.05), "end": b_ + 0.05, "volume": 0.3})
+    n = 0
+    if itens:
+        dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", m["caminho"]],
+                                   capture_output=True, text=True, timeout=60).stdout.strip() or 0)
+        limpo = os.path.join(pasta_, f"_bip_{mid}_limpo.wav")
+        if dp_censura.aplicar_audio(m["caminho"], limpo, dp_censura.normalizar(itens, dur), dur):
+            novo = os.path.splitext(m["caminho"])[0] + "_bip" + os.path.splitext(m["caminho"])[1]
+            r_ = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", m["caminho"], "-i", limpo, "-map", "0:v:0", "-map", "1:a:0",
+                                 "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", novo], capture_output=True, timeout=900)
+            if r_.returncode == 0 and os.path.isfile(novo):
+                os.replace(novo, m["caminho"])
+                n = len(itens)
+        for f in (limpo,):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+    try:
+        os.remove(wav)
+    except OSError:
+        pass
+    with CT._TRAVA:
+        q = CT.carregar(base, pid)
+        for x in q["midias"]:
+            if x["id"] == mid:
+                x["bip_feito"] = True
+        CT.salvar(base, q)
+    on_log(f"🤐 {mid}: {n} palavrão(ões) com bip no som original" if n else f"🤐 {mid}: nenhum palavrão no som original")
+    return n
+
+
 def preparar_censura(base: str, pid: str, chamar: Optional[Callable[..., Any]] = None,
                      on_log: Callable[[str], None] = lambda _m: None) -> Dict[str, int]:
     """🔄 v84_401: reverse rage — pra cada golpe/gesto/arma que o roteiro marcou, a IA (Moondream se ligado, senão o Claude)
@@ -1641,6 +1794,8 @@ def preparar_destaques(base: str, pid: str, providers: Optional[List[str]] = Non
     nivel = nivel_destaques(p)
     dur = float((p.get("gravacao") or {}).get("dur") or 0) or max([float(x.get("end") or 0) for x in planos_v] + [20.0])
     cota = 0 if nivel == "nunca" else (max(1, int(dur // 20)) if nivel == "precisa" else 99)
+    if (p.get("config") or {}).get("seta_abertura"):  # 🏹 v84_403: a seta da abertura conta por fora
+        cota += 1
     import camera_exp
     if camera_exp.ligada(p) and nivel != "nunca":  # 🎥 v84_322: até 2, amarrados aos fatos (o teto do roteiro já filtrou)
         cota = camera_exp.MAX_DESTAQUES

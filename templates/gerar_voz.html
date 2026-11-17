@@ -467,6 +467,19 @@ E no final...</pre>
     <label style="margin:0;font-weight:600;"><input type="checkbox" name="protecao_alucinacao" style="width:auto;" checked> 🛡 Proteção contra alucinação (recomendado)</label>
     <div style="color:#4b5563;margin-top:2px;">Chatterbox, Chatterbox Turbo, XTTS e Fish às vezes “se perdem” e soltam murmúrio/zumbido no meio da fala. Com isto ligado, cada trecho que sair comprido demais pro texto é gerado de novo (até 3 vezes). Desligado: gera uma vez só, como antes. (Piper e Kokoro não têm esse problema.)</div>
   </div>
+  <div id="pol-box" style="margin-top:12px;padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;font-size:0.85rem;">
+    <input type="hidden" name="polimento_enviado" value="1">
+    <b>🎚 Acabamento da voz</b> <span style="color:#4b5563;">(tudo desligado por padrão)</span>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+      <label style="margin:0;" title="Chatterbox e Chatterbox Turbo (com ou sem 🎭 expressivo): cada trecho de 2–3 frases sai em 2 ou 3 versões; o Whisper ouve todas e fica a que falou o texto mais certinho (sem engolir, repetir ou trocar palavra, sem sopro/zumbido). Demora 2–3x mais.">🎬 Takes por trecho
+        <select name="pol_takes" id="pol-takes" style="width:auto;"><option value="1">1 (normal)</option><option value="2">2 — fica o melhor</option><option value="3">3 — fica o melhor</option></select></label>
+      <label style="margin:0;font-weight:400;" title="Chatterbox e Chatterbox Turbo: encolhe os buracos compridos entre as frases (o motor às vezes deixa 1–2 s mudos). As pausas de propósito ficam: '...', '—', [pausa] (até 1,2 s), e as [pausa] do 🎭 expressivo nunca são tocadas."><input type="checkbox" name="pol_cortar" id="pol-cortar" style="width:auto;"> ✂ Cortar silêncio morto (mantém as pausas de propósito)</label>
+      <label style="margin:0;" title="Equalização aplicada no áudio final (qualquer motor). Dá pra gerar faixas com EQ depois, no 📜 Histórico, sem mexer na original.">🎛 EQ
+        <select name="pol_eq" id="pol-eq" style="width:auto;"><option value="">nenhum</option></select></label>
+      <button type="button" id="pol-salvar" style="padding:3px 10px;font-size:.8rem;" title="vale pra toda voz gerada no site: Link → vídeo, narrações, projetos…">💾 usar como padrão no site todo</button>
+      <span id="pol-st" style="color:#4b5563;"></span>
+    </div>
+  </div>
   <label style="margin-top:16px;"><input type="checkbox" name="forcar_cpu" style="width:auto;"> Forçar CPU mesmo se houver GPU disponível (Piper e XTTS)</label>
 
   <div style="margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;">
@@ -1185,9 +1198,21 @@ async function carregarHistorico() {
         ${h.audio_url ? `<audio controls preload="none" src="${h.audio_url}"></audio><a href="${h.audio_url}" download>⬇ WAV</a>` : ''}
         ${h.srt_url ? `<a href="${h.srt_url}" download>⬇ SRT</a>` : ''}
         ${h.zip_url ? `<a href="${h.zip_url}" download title="narração + legenda + idioma (e chamadas/projeto) — é o .zip que vai no Novo vídeo">⬇ ZIP</a>` : ''}
+        ${h.audio_url && !h.erro ? `<details class="hist-eq"><summary style="cursor:pointer;font-size:.82rem;">🎛 faixas com EQ${(h.faixas_eq || []).length ? ' (' + h.faixas_eq.length + ')' : ''}</summary>
+          ${(h.faixas_eq || []).map(f => `<div style="font-size:.8rem;">${hEsc(EQ_NOMES[f.preset] || f.preset)} <audio controls preload="none" src="${f.url}" style="height:28px;"></audio> <a href="${f.url}" download>⬇</a></div>`).join('')}
+          <div style="font-size:.8rem;">${EQS.map(e => `<label style="display:inline;font-weight:400;margin-right:6px;" title="${hEsc(e.dica)}"><input type="checkbox" value="${e.id}" style="width:auto;"> ${hEsc(e.nome)}</label>`).join('')}
+          <button type="button" class="hist-eq-gerar" data-id="${h.id}" style="padding:2px 8px;font-size:.78rem;">gerar faixa(s)</button></div></details>` : ''}
         <button type="button" class="hist-apagar" data-id="${h.id}" style="background:#dc2626;">Apagar</button>
       </div>
     </div>`).join('') || '<p style="color:#888;font-size:0.85rem;">Nenhum áudio ainda.</p>';
+  document.querySelectorAll('.hist-eq-gerar').forEach(b => b.addEventListener('click', async () => {
+    const presets = [...b.closest('details').querySelectorAll('input:checked')].map(c => c.value);
+    if (!presets.length) { alert('Marque pelo menos um EQ'); return; }
+    b.disabled = true; b.textContent = 'gerando…';
+    const r = await fetch('/gerar-voz/historico/' + b.dataset.id + '/eq', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({presets}) });
+    if (!r.ok) { alert((await r.json()).erro || 'não deu'); b.disabled = false; b.textContent = 'gerar faixa(s)'; return; }
+    await carregarHistorico();
+  }));
   document.querySelectorAll('.hist-apagar').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('Apagar este áudio (e a legenda) do histórico e do disco?')) return;
     const r = await fetch('/gerar-voz/historico/' + b.dataset.id + '/apagar', { method: 'POST' });
@@ -1196,6 +1221,25 @@ async function carregarHistorico() {
   document.getElementById('hist-ant').style.display = histPagina > 0 ? '' : 'none';
   document.getElementById('hist-prox').style.display = (histPagina + 1) * 50 < d.total ? '' : 'none';
 }
+// 🎚 v84_404: acabamento da voz (takes, silêncio morto, EQ)
+let EQS = [], EQ_NOMES = {};
+(async () => {
+  try {
+    const d = await (await fetch('/gerar-voz/polimento')).json();
+    EQS = d.eqs || []; EQS.forEach(e => EQ_NOMES[e.id] = e.nome);
+    document.getElementById('pol-eq').innerHTML = '<option value="">nenhum</option>' + EQS.map(e => `<option value="${e.id}" title="${hEsc(e.dica)}">${hEsc(e.nome)}</option>`).join('');
+    const p = d.polimento || {};
+    document.getElementById('pol-takes').value = String(p.takes || 1);
+    document.getElementById('pol-cortar').checked = !!p.cortar_silencios;
+    document.getElementById('pol-eq').value = p.eq || '';
+    if (typeof carregarHistorico === 'function') carregarHistorico();
+  } catch (_) {}
+})();
+document.getElementById('pol-salvar').addEventListener('click', async () => {
+  const corpo = {takes: +document.getElementById('pol-takes').value, cortar_silencios: document.getElementById('pol-cortar').checked, eq: document.getElementById('pol-eq').value};
+  const r = await fetch('/gerar-voz/polimento', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)});
+  document.getElementById('pol-st').textContent = r.ok ? '✅ salvo — vale pra toda voz gerada no site' : '❌ não salvou';
+});
 document.getElementById('hist-q').addEventListener('input', () => { clearTimeout(histT); histT = setTimeout(() => { histPagina = 0; carregarHistorico(); }, 300); });
 document.getElementById('hist-ant').addEventListener('click', () => { histPagina = Math.max(0, histPagina - 1); carregarHistorico(); });
 document.getElementById('hist-prox').addEventListener('click', () => { histPagina++; carregarHistorico(); });

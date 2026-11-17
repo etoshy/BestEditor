@@ -1879,7 +1879,85 @@ def cortar_trechos(caminho: str, trechos: List[Tuple[float, float]], folga: floa
     return True
 
 
+# 🎚 v84_404: o acabamento (takes, silêncio morto, EQ) — vem em kwargs["polimento"] ou da config do site; tudo desligado
+_POLIMENTO: Dict[str, Any] = {"takes": 1, "cortar_silencios": False, "eq": "", "engine": ""}
+
+
+def _modulo_polimento():
+    try:
+        from tts import voz_polimento as vp  # type: ignore
+    except ImportError:
+        import voz_polimento as vp  # type: ignore
+    return vp
+
+
+def _polimento_salvo() -> Dict[str, Any]:
+    try:
+        raiz = os.path.dirname(os.path.dirname(_DIR))
+        if raiz not in sys.path:
+            sys.path.insert(0, raiz)
+        from site_config import load_site_config  # type: ignore
+        return dict(load_site_config().get("voz_polimento") or {})
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _ouvir_palavras(caminho: str) -> List[str]:
+    raiz = os.path.dirname(os.path.dirname(_DIR))
+    if raiz not in sys.path:
+        sys.path.insert(0, raiz)
+    import whisper_transcribe as wt  # type: ignore
+    idioma = _PROTECAO.get("idioma")
+    try:
+        segs = wt.transcribe_audio(caminho, model_size=os.environ.get("GUARDA_WHISPER_MODELO", "base"),
+                                   language=(idioma or None) and str(idioma)[:2], word_timestamps=True)
+    except Exception as exc:  # noqa: BLE001
+        if "nenhuma fala" in str(exc).lower():
+            return []
+        raise
+    return [str(w.get("word") or "") for sg in segs for w in sg.get("words", [])] or \
+        [str(sg.get("text") or "") for sg in segs]
+
+
 def _gerar_com_guarda(gerar, texto: str, destino: str, rotulo: str = "", velocidade: float = 1.0) -> None:
+    """🛡 a guarda de sempre + 🎚 v84_404: N takes (fica o melhor, pelo Whisper) e o corte do silêncio morto."""
+    pol = _POLIMENTO
+    ligado = pol.get("engine") in ("chatterbox", "chatterbox_turbo")
+    n_pal = len(re.findall(r"\w+", re.sub(r"\[[^\[\]]{1,40}\]", " ", texto or "")))
+    takes = int(pol.get("takes") or 1) if ligado and n_pal >= 3 else 1
+    _gerar_com_guarda_um(gerar, texto, destino, rotulo, velocidade)
+    if takes > 1:
+        vp = _modulo_polimento()
+        alts = [destino]
+        for k in range(2, takes + 1):
+            alt = f"{destino}.take{k}.wav"
+            try:
+                _gerar_com_guarda_um(gerar, texto, alt, f"{rotulo}(take {k}) ", velocidade)
+                alts.append(alt)
+            except Exception as exc:  # noqa: BLE001 — um take a menos não para a narração
+                print(f"🎬 {rotulo}take {k} falhou: {exc}", flush=True)
+        if len(alts) > 1:
+            limite = limite_duracao_fala(texto) / max(0.3, float(velocidade or 1.0))
+            melhor, notas = vp.escolher_take(texto, alts, _ouvir_palavras, lambda c: _duracao_audio_segundos(c) or 0.0, limite,
+                                             lambda c: sum(b for _, b in trechos_sem_fala(c, 1.0)))
+            print(f"🎬 {rotulo}{len(alts)} takes, notas " + " / ".join(f"{n:.0f}" for n in notas) + f" → fica o take {melhor + 1}.",
+                  flush=True)
+            if melhor:
+                os.replace(alts[melhor], destino)
+            for c in alts[1:]:
+                if os.path.exists(c):
+                    try:
+                        os.remove(c)
+                    except OSError:
+                        pass
+    if ligado and pol.get("cortar_silencios") and n_pal >= 3:
+        try:
+            _modulo_polimento().cortar_silencios(destino, texto, lambda m: print(f"{rotulo}{m}", flush=True))
+        except Exception as exc:  # noqa: BLE001
+            print(f"✂ {rotulo}não deu pra cortar o silêncio: {exc}", flush=True)
+
+
+def _gerar_com_guarda_um(gerar, texto: str, destino: str, rotulo: str = "", velocidade: float = 1.0) -> None:
     """`gerar(texto, caminho)` grava o .wav. Repete se o áudio sair comprido demais pro texto (alucinação).
     `velocidade` < 1 (fala mais lenta de propósito) aumenta o limite na mesma proporção."""
     if not _PROTECAO.get("ativa", True):
@@ -3063,6 +3141,20 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
     _PROTECAO["idioma"] = "en" if engine == "chatterbox_turbo" else (kwargs.get("idioma") or None)
 
     engine = (engine or "").strip().lower()
+    _pol = kwargs.pop("polimento", None)
+    _vp = _modulo_polimento()
+    _POLIMENTO.update(_vp.normalizar(_pol if isinstance(_pol, dict) else _polimento_salvo()), engine=engine)
+    saida = _gerar_audio_motor(engine, texto, output_path, **kwargs)
+    if _POLIMENTO.get("eq") and engine != "teste" and os.path.exists(output_path):  # 🎛 v84_404: EQ no arquivo final
+        try:
+            _vp.aplicar_eq(output_path, output_path, _POLIMENTO["eq"])
+            print(f"🎛 EQ “{_vp.EQ_PRESETS[_POLIMENTO['eq']]['nome']}” aplicado.", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"🎛 não deu pra aplicar o EQ: {exc}", flush=True)
+    return saida
+
+
+def _gerar_audio_motor(engine: str, texto: str, output_path: str, **kwargs: Any) -> str:
     if engine == "teste" and os.environ.get("VOICE_GENERATOR_TESTE_MOTOR_FALSO") == "1":  # só nos testes automatizados
         _gerar_teste_falso(texto, output_path)
         return output_path

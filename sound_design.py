@@ -372,6 +372,30 @@ def escolher(pd: Dict[str, Any], cands: List[Dict[str, Any]], ouvido: Any = None
     return dict(c, nota=None, soa_como=[], aviso="")
 
 
+def pico_musica(caminho: str, ignorar_inicio: float = 3.0) -> Optional[float]:
+    """🎵 v84_403: o segundo do "drop" — onde a música fica mais forte (energia média em 2 s, depois da introdução)."""
+    try:
+        import numpy as np
+        r_ = subprocess.run(["ffmpeg", "-v", "error", "-i", caminho, "-t", "600", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                            capture_output=True, timeout=300)
+        x = np.frombuffer(r_.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+    except Exception:  # noqa: BLE001
+        return None
+    q = 4000  # janelas de 0,5 s
+    n = len(x) // q
+    if n < 8:
+        return None
+    rms = np.sqrt((x[: n * q].reshape(n, q) ** 2).mean(axis=1) + 1e-9)
+    suave = np.convolve(rms, np.ones(4) / 4, mode="same")
+    ini = min(n - 1, int(ignorar_inicio * 2))
+    # o drop = a maior SUBIDA de energia (não só o mais alto): compara cada janela com a de 2 s antes
+    idx = np.arange(ini, n)
+    antes = suave[np.maximum(0, idx - 4)]
+    subida = suave[ini:] - antes
+    k = int(np.argmax(subida + 0.5 * suave[ini:]))
+    return round((ini + k) * 0.5, 2)
+
+
 def guardar(sd: Dict[str, Any], pd: Dict[str, Any], c: Dict[str, Any], pasta_job: str,
             normalizar: Optional[Callable[[str, str], str]] = None) -> None:
     """Copia o escolhido pra pasta do projeto JÁ NORMALIZADO (volume de referência) — os níveis da mixagem valem pra
@@ -394,7 +418,8 @@ def guardar(sd: Dict[str, Any], pd: Dict[str, Any], c: Dict[str, Any], pasta_job
         "pagina": str(c.get("pagina") or ""), "dur": float(c.get("dur") or 0), "pico": float(c.get("pico") or 0),
         "id": str(c.get("id") or ""), "fonte": c.get("fonte") or "pixabay", "nota": c.get("nota"),
         "soa_como": c.get("soa_como") or [], "aviso": c.get("aviso") or "",
-        "lufs": q.get("lufs"), "estourado": bool(q.get("estourado"))}
+        "lufs": q.get("lufs"), "estourado": bool(q.get("estourado")),
+        "pico_musica": pico_musica(arq) if pd["tipo"] == "musica" else None}
 
 
 def buscar_audios(sd: Dict[str, Any], pasta_p: str, pasta_job: str, prog: Callable[[str], None] = lambda s: None,
@@ -498,9 +523,17 @@ def para_montar(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     def arq(chave: str) -> str:
         a = (aud.get(chave) or {}).get("arquivo") or ""
         return a if a and os.path.isfile(a) else ""
+    def climax(b: Dict[str, Any]) -> Optional[float]:  # 🎵 v84_403: o momento mais forte do bloco (o drop da música cai nele)
+        ms = [m for m in sd.get("momentos") or [] if b["start"] <= float(m["t"]) < b["end"] and int(m.get("forca") or 1) >= 2]
+        if not ms:
+            return None
+        m = max(ms, key=lambda m: (int(m.get("forca") or 1), float(m["t"])))
+        return round(float(m["t"]) - float(b["start"]), 2)
     blocos = [{"start": b["start"], "end": b["end"], "emocao": b["emocao"],
                "ambiente": arq("efeitos:" + b["ambiente_en"]) if sd["camadas"]["ambiente"] and b.get("ambiente_en") else "",
-               "musica": arq("musica:" + b["musica_en"]) if sd["camadas"]["musica"] and b.get("musica_en") else ""}
+               "musica": arq("musica:" + b["musica_en"]) if sd["camadas"]["musica"] and b.get("musica_en") else "",
+               "climax": climax(b) if sd["camadas"]["musica"] else None,
+               "pico_musica": (aud.get("musica:" + b["musica_en"]) or {}).get("pico_musica") if b.get("musica_en") else None}
               for b in sd["blocos"]]
     acentos = {k: dict(aud.get("efeitos:" + v) or {}) for k, v in ACENTOS_BUSCA.items() if arq("efeitos:" + v)}
     plano = {"blocos": blocos, "momentos": list(sd["momentos"]) if sd["camadas"]["acentos"] else [],
@@ -543,8 +576,18 @@ def _filtro_camadas(plano: Dict[str, Any], tem_trilha: bool, entradas: List[str]
             k = len(entradas)
             fd = min(FADE, dur_b / 3)
             nome = f"{tipo[0]}{k}"
-            partes.append(f"[{k}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:{dur_b:.3f},asetpts=PTS-STARTPTS,"
-                          f"afade=t=in:d={fd:.2f},afade=t=out:st={max(0.0, dur_b - fd):.3f}:d={fd:.2f},"
+            ini, curva = 0.0, ""
+            if tipo == "musica" and b.get("climax") is not None:  # 🎵 v84_403: o drop da música cai no clímax
+                pico = b.get("pico_musica")
+                if pico is None:
+                    pico = pico_musica(b[tipo])
+                if pico is not None:
+                    ini = max(0.0, float(pico) - float(b["climax"]))  # (a entrada está em loop: começar depois do 0 é seguro)
+                    c_ = float(b["climax"])
+                    # antes do clímax a música fica mais baixa e sobe nele (segura uns segundos e volta ao normal)
+                    curva = (f",volume='if(lt(t,{max(0.0, c_ - 0.3):.2f}),0.7,if(lt(t,{c_ + 4:.2f}),1.25,1.0))':eval=frame")
+            partes.append(f"[{k}:a]aresample=48000,aformat=channel_layouts=stereo,atrim={ini:.3f}:{ini + dur_b:.3f},asetpts=PTS-STARTPTS"
+                          f"{curva},afade=t=in:d={fd:.2f},afade=t=out:st={max(0.0, dur_b - fd):.3f}:d={fd:.2f},"
                           f"volume={vol:.3f},adelay={atraso}|{atraso}[{nome}]")
             rot.append(f"[{nome}]")
     return partes, rot_amb, rot_mus
