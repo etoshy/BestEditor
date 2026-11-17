@@ -129,3 +129,28 @@ def test_estilo_final_e_cena_no_pacote(tmp_path):
     textos = [c.get("text", "") for c in FM.conteudo_ia(pac, lambda f: None)]
     assert any(t.startswith("FINAL ART STYLE: modern anime") for t in textos)
     assert FM.novo_pacote(str(tmp_path), [{"papel": "pose", "arquivo": _foto(tmp_path / "q.png")}], "", "inventado")["estilo"] == ""
+
+
+def test_foto_base_sem_converter_e_pessoa_inteira(tmp_path):
+    """v84_407c: a própria foto como base (composição + cores), cores da original opcionais e a troca da pessoa INTEIRA."""
+    pac = FM.novo_pacote(str(tmp_path), [
+        {"papel": "personagem", "nome": "Ana", "arquivo": _foto(tmp_path / "a.png")},
+        {"papel": "base", "arquivo": _foto(tmp_path / "b.png"), "marcas": json.dumps([{"x": 0.2, "y": 0.3, "nome": "Ana"}])},
+        {"papel": "cores", "nome": "foto original", "arquivo": _foto(tmp_path / "c.png")}])
+    assert [r["papel"] for r in pac["refs"]] == ["base", "personagem", "cores"]  # a base é a imagem 1
+    assert pac["refs"][0].get("arquivo_ia") and "figura 1" in pac["refs"][0]["obs"]
+    p = FM.prompt_basico(pac)
+    assert "BASE of the composition" in p and "replaced ENTIRELY" in p
+    assert "Ana replaces the WHOLE figure" in p and "clothes and their colors" in p
+    assert "ONLY the color palette and lighting from reference image 3" in p
+    assert "BASE image" in FM.SISTEMA and "never just the" in FM.SISTEMA
+
+
+def test_rota_foto_original(ctx, tmp_path):
+    c, FE = ctx
+    foto = open(_foto(tmp_path / "f.png"), "rb").read()
+    j = c.post("/flow/rascunho/original", data={"foto": (io.BytesIO(foto), "f.png")}, content_type="multipart/form-data").get_json()
+    assert j["ok"] and j["item"]["rotulo"] == "base"
+    assert open(os.path.join(FE.pasta_galeria(), j["item"]["arquivo"]), "rb").read() == foto  # sem converter
+    h = c.get("/flow").get_data(as_text=True)
+    assert 'id="rcOriginal"' in h and 'id="rcCores"' in h

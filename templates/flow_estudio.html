@@ -144,6 +144,7 @@
   </div>
 </div>
 
+<p class="fl-hint" style="margin:14px 0 0">🎬 Quer refazer um <b>vídeo</b> (a mesma cena com outros personagens, cenário ou falas)? Use o <a href="/flow/refazer"><b>🎬 Refazer cena</b></a>.</p>
 <div class="fl-box fl-montar" id="rascunho">
   <h3 style="margin-top:0">✏️ Rascunho da cena <span class="fl-hint">(foto → esboço a lápis pra usar de base e trocar o que quiser)</span></h3>
   <p class="fl-hint">Mande a foto inteira: ela vira um rascunho da cena (pessoas viram bonecos sem rosto; carro, móveis e fundo viram contornos simples, tudo no mesmo lugar e no mesmo ângulo). Clique em <b>🤖 entender a cena</b>: a IA lista cada pessoa, cada objeto, o cenário, a câmera e o estilo. Em cada um, escreva quem/o que entra no lugar e mande a 📷 foto (ou deixe vazio pra manter) — depois clique em ➡ Montar a cena com estas trocas.</p>
@@ -154,6 +155,7 @@
   <div class="fl-row" style="margin-top:6px">
     <button type="button" class="primary" id="rcFlow" title="O Flow redesenha a foto: bonecos simples, linhas soltas (gasta 1 crédito de imagem)">🎨 Desenhar pelo Flow</button>
     <button type="button" id="rcLocal" title="Filtro de lápis aqui no PC: na hora e sem crédito, mas é um traçado da foto (com mais detalhe)">⚡ Rascunho rápido (no PC)</button>
+    <button type="button" id="rcOriginal" title="Não converte: a própria foto vira a base (composição, cenário e CORES); as pessoas marcadas são trocadas por inteiro">📷 Usar a foto sem converter</button>
     <span class="fl-hint" id="rcSt">Já tem um rascunho? Na 🖼 Galeria, clique em ✏️ marcar.</span>
   </div>
   <div id="rcEditor" style="display:none;margin-top:10px">
@@ -168,6 +170,8 @@
           <label>↪ trocar o cenário por <input type="text" id="rcCenarioNovo" placeholder="vazio = mantém (ex.: rua de Tóquio à noite)"></label>
           <label>📷 foto do cenário novo <span class="fl-hint">(opcional)</span><input type="file" accept="image/*" id="rcCenarioFoto"></label>
           <label>🎨 Estilo da foto <span class="fl-hint" id="rcEstiloTxt">—</span></label>
+          <label id="rcCoresBox" style="font-weight:400"><input type="checkbox" id="rcCores" style="width:auto;margin:0"> 🎨 manter as cores e a luz da foto original <span class="fl-hint">(o rascunho dá a composição; a foto, só a paleta)</span></label>
+          <span class="fl-hint" id="rcBaseTxt" style="display:none">📷 base = a própria foto: composição, cenário e cores ficam; as pessoas marcadas são trocadas por inteiro.</span>
         </div>
         <div id="rcMarcas" class="fl-rc-marcas"><p class="fl-hint">Clique na cabeça de cada pessoa no desenho.</p></div>
         <button type="button" class="primary" id="rcUsar" style="margin-top:8px">➡ Montar a cena com estas trocas</button>
@@ -194,7 +198,7 @@
   <div class="fl-row" style="margin-top:6px">
     <label>Proporção <select id="mtProporcao">{% for p in proporcoes %}<option {% if p == '16:9' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
     <label>Quantidade <select id="mtQuantidade"><option>x1</option><option>x2</option><option>x3</option><option>x4</option></select></label>
-    <label>🎨 Estilo da imagem final <select id="mtEstilo"><option value="">(livre — o das fotos)</option>{% for e in estilos_finais %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
+    <label>🎨 Estilo da imagem final <select id="mtEstilo"><option value="">(o mesmo dos personagens novos)</option>{% for e in estilos_finais %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
     <label>Modelo <select id="mtModelo"><option value="">(o padrão das Configurações)</option>{% for m in modelos_imagem %}<option>{{ m }}</option>{% endfor %}</select></label>
   </div>
   <div class="fl-row" style="margin-top:8px">
@@ -639,7 +643,7 @@
     if (pers) nPers++;
     d.innerHTML = `<div class="fl-mt-foto"><b>${pers ? '🧍 Personagem' : '🖼 Outra foto'}</b>
         ${pers ? `<input type="text" class="fl-mt-nome" placeholder="nome (ex.: Ana, o barman)" value="${pers ? 'Personagem ' + nPers : ''}">`
-               : `<select class="fl-mt-papel">${Object.entries(PAPEIS).filter(([k]) => !['pose', 'personagem'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select><input type="text" class="fl-mt-nome" placeholder="o que é (ex.: moto vermelha)">`}
+               : `<select class="fl-mt-papel">${Object.entries(PAPEIS).filter(([k]) => !['pose', 'personagem', 'base'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select><input type="text" class="fl-mt-nome" placeholder="o que é (ex.: moto vermelha)">`}
         <input type="file" accept="image/*"><div class="esc"></div></div>
       <textarea rows="2" class="fl-mt-obs" placeholder="${pers ? 'observação (opcional): ex. mantém a jaqueta; ela fica no lugar da pessoa da esquerda da pose; sorrindo' : 'observação (opcional): o que pegar desta foto'}"></textarea>
       <button type="button" class="tirar" title="tirar esta foto">✕</button>`;
@@ -654,8 +658,13 @@
   document.addEventListener('fl-montar-pose', (e) => {  // ✏️ o rascunho vira a POSE + uma linha por pessoa/objeto/cenário
     const { item, marcas, cena, estilo } = e.detail, fotos = e.detail.fotos || [], pose = document.querySelector('#montar .fl-mt-pose');
     const comFoto = (l, f) => { if (!l || !f) return; try { const dt = new DataTransfer(); dt.items.add(f); l.querySelector('input[type=file]').files = dt.files; prevFoto(l); } catch (_) {} };
-    pose._gal = item; pose._marcas = marcas; pose._cena = cena; prevFoto(pose);
-    pose.querySelector('.fl-mt-obs').value = pose.querySelector('.fl-mt-obs').value || 'só a pose, o enquadramento e o lugar de cada coisa (rascunho)';
+    pose._gal = item; pose._marcas = marcas; pose._cena = cena;
+    const ehFoto = e.detail.base === 'foto';
+    pose.dataset.papel = ehFoto ? 'base' : 'pose';
+    pose.querySelector('.fl-mt-foto b').textContent = ehFoto ? '📷 Foto base (composição e cores)' : '🕺 Pose / composição';
+    prevFoto(pose);
+    pose.querySelector('.fl-mt-obs').value = ehFoto ? 'a composição, o cenário e as cores desta foto; as pessoas daqui são trocadas por inteiro'
+      : 'só a pose, o enquadramento e o lugar de cada coisa (rascunho)';
     linhas().filter(l => l !== pose && !l._gal && !(l.querySelector('input[type=file]').files || [])[0]).forEach(l => l.remove());
     nPers = 0;
     marcas.forEach((m, i) => {
@@ -668,7 +677,7 @@
       }
       const l = novaLinha('personagem'); if (!l) return;
       l.querySelector('.fl-mt-nome').value = m.nome || ('Personagem ' + m.n);
-      l.querySelector('.fl-mt-obs').value = `fica no lugar da figura ${m.n} do rascunho` + (m.obs ? ` (${m.obs})` : '');
+      l.querySelector('.fl-mt-obs').value = `troca a figura ${m.n} INTEIRA (rosto, cabelo, corpo, roupa e cores da foto dela), na mesma pose` + (m.obs ? ` — era: ${m.obs}` : '');
       comFoto(l, fotos[i]);
     });
     if (cena && (cena.cenario_novo || e.detail.fotoCenario)) {
@@ -676,7 +685,12 @@
       if (l) { l.querySelector('.fl-mt-papel').value = 'cenario'; l.querySelector('.fl-mt-nome').value = cena.cenario_novo || '';
                l.querySelector('.fl-mt-obs').value = 'o fundo novo no lugar do cenário do rascunho'; comFoto(l, e.detail.fotoCenario); }
     }
-    if (estilo && [...$('mtEstilo').options].some(o => o.value === estilo) && !$('mtEstilo').value) $('mtEstilo').value = estilo;
+    if (e.detail.manterCores && e.detail.fotoOriginal) {  // 🎨 as cores/luz da foto original (o rascunho dá só a composição)
+      const l = novaLinha('outro');
+      if (l) { l.querySelector('.fl-mt-papel').value = 'cores'; l.querySelector('.fl-mt-nome').value = 'foto original';
+               l.querySelector('.fl-mt-obs').value = 'só as cores, a luz e a paleta desta foto (não as pessoas nem a composição)'; comFoto(l, e.detail.fotoOriginal); }
+    }
+    // o estilo fica no padrão: o dos personagens novos (o da foto original não manda — v84_407d)
     $('montar').scrollIntoView({ behavior: 'smooth' });
   });
   document.addEventListener('fl-montar-usar', (e) => {  // 🧩 da galeria
@@ -692,7 +706,7 @@
       if (!l._gal && !f) {  // sem foto: o que foi escrito vai como texto na observação geral
         const nome = ((l.querySelector('.fl-mt-nome') || {}).value || '').trim(), obs = (l.querySelector('.fl-mt-obs').value || '').trim();
         const papel = l.dataset.papel === 'outro' ? l.querySelector('.fl-mt-papel').value : l.dataset.papel;
-        if (papel !== 'pose' && (nome || obs) && !(papel === 'personagem' && /^Personagem \d+$/.test(nome) && !obs))
+        if (!['pose', 'base'].includes(papel) && (nome || obs) && !(papel === 'personagem' && /^Personagem \d+$/.test(nome) && !obs))
           semFoto.push(`${PAPEIS[papel] || papel}: ${nome}${obs ? ' — ' + obs : ''} (sem foto: descreva)`);
         return;
       }
@@ -742,9 +756,10 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const NOMES_ESTILO = { foto: '📷 foto realista', anime: '🌸 anime', manga: '📖 mangá', cartoon: '🎨 cartoon / 3D', quadrinho: '💥 quadrinho', pixel: '👾 pixel art' };
-  let item = null, marcas = [], estilo = '';
-  function abrir(it, msg) {
-    item = it; marcas = []; $('rcEditor').style.display = '';
+  let item = null, marcas = [], estilo = '', base = 'rascunho';
+  function abrir(it, msg, tipo) {
+    item = it; marcas = []; base = tipo || (it.rotulo === 'base' ? 'foto' : 'rascunho'); $('rcEditor').style.display = '';
+    $('rcCoresBox').style.display = base === 'foto' ? 'none' : ''; $('rcBaseTxt').style.display = base === 'foto' ? '' : 'none';
     $('rcImg').querySelector('img').src = '/flow/arquivo/' + it.arquivo; desenhar();
     $('rcSt').textContent = msg || '✅ rascunho pronto — clique em 🤖 entender a cena (ou marque clicando no desenho).';
     $('rascunho').scrollIntoView({ behavior: 'smooth' });
@@ -756,10 +771,10 @@
       p.style.left = (m.x * 100) + '%'; p.style.top = (m.y * 100) + '%'; p.innerHTML = rotPin(m); img.appendChild(p); });
     $('rcMarcas').innerHTML = marcas.length ? marcas.map((m, i) => `<div class="fl-rc-m${m.tipo === 'objeto' ? ' obj' : ''}" data-i="${i}"><b>${m.n}</b>
       <div><select data-k="tipo"><option value="pessoa"${m.tipo !== 'objeto' ? ' selected' : ''}>🧍 pessoa</option><option value="objeto"${m.tipo === 'objeto' ? ' selected' : ''}>📦 objeto</option></select>
-        <input type="text" data-k="nome" value="${esc(m.nome)}" placeholder="${m.tipo === 'objeto' ? 'trocar por (vazio = mantém) ex.: moto vermelha' : 'quem fica aqui (ex.: Ana)'}">
+        <input type="text" data-k="nome" value="${esc(m.nome)}" placeholder="${m.tipo === 'objeto' ? 'trocar por (vazio = mantém) ex.: moto vermelha' : 'quem entra aqui — a pessoa inteira (ex.: Ana)'}">
         <textarea rows="1" data-k="obs" placeholder="o que é / observação (opcional)">${esc(m.obs)}</textarea>
         <div class="fl-rc-foto">${m._url ? `<img src="${m._url}" alt=""> <button type="button" class="yt-sec mini" data-semfoto="${i}">trocar foto</button>`
-          : `<label>📷 foto ${m.tipo === 'objeto' ? 'do objeto novo' : 'de quem entra aqui'} <span class="fl-hint">(opcional)</span><input type="file" accept="image/*" data-foto="${i}"></label>`}</div></div>
+          : `<label>📷 foto ${m.tipo === 'objeto' ? 'do objeto novo' : 'da pessoa nova (de preferência de corpo inteiro: rosto, roupa e cores vêm dela)'} <span class="fl-hint">(opcional)</span><input type="file" accept="image/*" data-foto="${i}"></label>`}</div></div>
       <button type="button" data-tira="${i}">✕</button></div>`).join('') : '<p class="fl-hint">Clique em cada pessoa (na cabeça) e em cada objeto no desenho — ou 🤖 entender a cena.</p>';
     $('rcMarcas').querySelectorAll('[data-k]').forEach(e => e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', () => {
       const m = marcas[+e.closest('.fl-rc-m').dataset.i]; m[e.dataset.k] = e.value;
@@ -800,6 +815,15 @@
       if (!r.ok) throw new Error(d.erro || r.status); abrir(d.item); document.dispatchEvent(new Event('fl-galeria'));
     } catch (e) { $('rcSt').textContent = '⚠ ' + e.message; }
   };
+  $('rcOriginal').onclick = async () => {
+    const f = ($('rcFoto').files || [])[0]; if (!f) { alert('Escolha a foto.'); return; }
+    const fd = new FormData(); fd.append('foto', f);
+    try { const r = await fetch('/flow/rascunho/original', { method: 'POST', body: fd }), d = await r.json();
+      if (!r.ok) throw new Error(d.erro || r.status);
+      abrir(d.item, '📷 a foto é a base (com as cores) — clique em 🤖 entender a cena ou marque cada pessoa/objeto pra trocar.', 'foto');
+      document.dispatchEvent(new Event('fl-galeria'));
+    } catch (e) { $('rcSt').textContent = '⚠ ' + e.message; }
+  };
   $('rcFlow').onclick = async () => {
     const f = ($('rcFoto').files || [])[0]; if (!f) { alert('Escolha a foto.'); return; }
     const fd = new FormData(); fd.append('foto', f); fd.append('extra', $('rcExtra').value);
@@ -824,7 +848,11 @@
     const fotoCenario = ($('rcCenarioFoto').files || [])[0] || null;
     if (!marcas.length && !cena.cenario_novo && !fotoCenario && !confirm('Nada marcado — usar o rascunho só como pose/composição?')) return;
     const limpas = marcas.map(m => ({ n: m.n, x: m.x, y: m.y, tipo: m.tipo, nome: m.nome, obs: m.obs }));
-    document.dispatchEvent(new CustomEvent('fl-montar-pose', { detail: { item, marcas: limpas, fotos: marcas.map(m => m._file || null), cena, fotoCenario, estilo } }));
+    const manterCores = base !== 'foto' && $('rcCores').checked;
+    const fotoOriginal = ($('rcFoto').files || [])[0] || null;
+    if (manterCores && !fotoOriginal) { alert('Pra manter as cores, escolha de novo a foto original no campo Foto (lá em cima).'); return; }
+    document.dispatchEvent(new CustomEvent('fl-montar-pose', { detail: { item, marcas: limpas, fotos: marcas.map(m => m._file || null), cena,
+      fotoCenario, estilo, base, manterCores, fotoOriginal } }));
   };
 })();
 </script>

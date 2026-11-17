@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Refazer cena{% endblock %}
+{% block content_attrs %}data-sem-secoes{% endblock %}
+{% block content %}
+<style>
+  .rf-box { border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin:12px 0; background:#fff; }
+  .rf-hint { color:#666; font-size:.84rem; margin:4px 0; }
+  .rf-row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  .rf-row label { margin:0; font-size:.86rem; }
+  .rf-row input, .rf-row select { width:auto; margin:4px 0 0; }
+  .rf-btn { width:auto !important; margin:0 !important; }
+  .rf-sec { background:#fff !important; color:#334155 !important; border:1px solid #cbd5e1 !important; }
+  .rf-mini { width:auto !important; margin:0 !important; font-size:.78rem; padding:4px 9px; }
+  .rf-estado { padding:10px 12px; border-radius:8px; background:#eef2ff; border:1px solid #c7d2fe; font-size:.9rem; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .rf-estado.erro { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+  .rf-pessoas { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+  .rf-p { border:1px solid #e5e7eb; border-radius:10px; padding:10px; background:#fafafa; }
+  .rf-p .id { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:#dc2626; color:#fff; font-weight:700; margin-right:6px; }
+  .rf-p input[type=text], .rf-p textarea { margin:4px 0; font-size:.85rem; font-family:inherit; }
+  .rf-p img { width:64px; height:64px; object-fit:cover; border-radius:8px; vertical-align:middle; }
+  .rf-planos { display:grid; gap:12px; }
+  .rf-pl { border:1px solid #e5e7eb; border-radius:12px; padding:10px; background:#fff; display:grid; grid-template-columns:minmax(240px,1fr) minmax(260px,1.3fr); gap:12px; }
+  .rf-pl .midia { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .rf-pl figure { margin:0; font-size:.74rem; color:#64748b; }
+  .rf-pl figure img, .rf-pl figure video { width:100%; border-radius:6px; background:#000; display:block; aspect-ratio:16/9; object-fit:contain; }
+  .rf-pl.vert figure img, .rf-pl.vert figure video { aspect-ratio:9/16; max-height:300px; }
+  .rf-pl textarea, .rf-pl input[type=text] { margin:3px 0; font-size:.84rem; font-family:inherit; }
+  .rf-pl .cab { font-weight:600; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .rf-pl .erro { color:#b91c1c; font-size:.82rem; }
+  .rf-tag { display:inline-block; font-size:.74rem; padding:1px 7px; border-radius:999px; background:#f1f5f9; color:#334155; }
+  .rf-tag.ok { background:#dcfce7; color:#166534; }
+  .rf-lista { display:flex; gap:8px; flex-wrap:wrap; }
+  .rf-lista button { width:auto; margin:0; font-size:.82rem; padding:5px 10px; }
+  @media (max-width:800px) { .rf-pl { grid-template-columns:1fr; } }
+</style>
+
+<h1>🎬 Refazer cena</h1>
+<p class="rf-hint">Mande uma cena de vídeo: a IA separa os planos, vê quem é quem, a ação, a câmera e as falas. Você diz <b>uma vez</b> quem entra no lugar de cada pessoa (a pessoa inteira, pela foto), o cenário novo, o estilo e as falas. O Flow refaz cada plano: primeiro o <b>quadro novo</b> (com a 🧩 Montar cena) e depois o <b>vídeo</b> (Veo, começando nesse quadro). No fim, junta tudo na ordem.</p>
+<p class="rf-hint">⚠ O Veo <b>recria</b> o movimento pela descrição (a mesma ação, não o gesto idêntico) e cada vídeo dele tem até ~8 s — por isso os planos longos viram dois. Cada plano gasta 1 imagem + 1 vídeo de crédito.</p>
+
+<div class="rf-box">
+  <b>➕ Nova cena</b>
+  <div class="rf-row" style="margin-top:6px">
+    <label>Vídeo <input type="file" id="rfVideo" accept="video/*"></label>
+    <label>Nome <input type="text" id="rfNome" placeholder="ex.: briga no bar"></label>
+    <button type="button" class="rf-btn" id="rfEnviar">⬆ Enviar e analisar</button>
+    <span class="rf-hint" id="rfEnviarSt"></span>
+  </div>
+  <div style="margin-top:10px"><b style="font-size:.88rem">Cenas que você já mandou</b> <div class="rf-lista" id="rfLista"></div></div>
+</div>
+
+<div id="rfEditor" style="display:none">
+  <div class="rf-estado" id="rfEstado"><span id="rfEstadoTxt"></span>
+    <button type="button" class="rf-mini rf-sec" id="rfParar" style="display:none">⏹ parar</button>
+    <button type="button" class="rf-mini rf-sec" id="rfReanalisar">🤖 analisar de novo</button>
+    <button type="button" class="rf-mini rf-sec" id="rfApagar" style="margin-left:auto">🗑 apagar esta cena</button>
+  </div>
+
+  <div class="rf-box">
+    <div class="rf-row"><b id="rfTitulo" style="font-size:1.05rem"></b><span class="rf-tag" id="rfInfo"></span></div>
+    <video id="rfOriginal" controls muted style="max-width:420px;width:100%;border-radius:8px;margin-top:8px;background:#000"></video>
+  </div>
+
+  <div class="rf-box">
+    <b>👥 Quem entra no lugar de cada pessoa</b> <span class="rf-hint">— a pessoa inteira: rosto, cabelo, corpo, roupa e cores vêm da foto (de corpo inteiro é melhor). Sem foto e sem nome, a pessoa fica como está.</span>
+    <div class="rf-pessoas" id="rfPessoas" style="margin-top:8px"></div>
+  </div>
+
+  <div class="rf-box">
+    <div class="rf-row">
+      <label style="flex:1;min-width:240px">🏞 Cenário <span class="rf-hint" id="rfCenOrig"></span><input type="text" id="rfCenNovo" placeholder="trocar por… (vazio = mantém)" style="width:100%"></label>
+      <label>📷 foto do cenário novo <input type="file" id="rfCenFoto" accept="image/*"></label><span id="rfCenFotoVer"></span>
+    </div>
+    <div class="rf-row" style="margin-top:10px">
+      <label>🎨 Estilo <select id="rfEstilo"><option value="">(o mesmo dos personagens novos)</option>{% for e in estilos_finais %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
+      <label>🗣 Falas <select id="rfFalasModo"><option value="manter">as mesmas</option><option value="novas">novas (editadas / escritas pela IA)</option><option value="sem">sem fala</option></select></label>
+      <label>Pedido pras falas novas <input type="text" id="rfFalasPedido" placeholder="ex.: mais engraçado, em português"></label>
+      <label>Idioma <input type="text" id="rfFalasIdioma" placeholder="ex.: português" style="width:120px"></label>
+      <button type="button" class="rf-btn rf-sec" id="rfFalasIA">🤖 escrever falas novas</button>
+    </div>
+  </div>
+
+  <div class="rf-box">
+    <div class="rf-row">
+      <button type="button" class="rf-btn rf-sec" id="rfSalvar">💾 salvar</button>
+      <button type="button" class="rf-btn" id="rfQuadros" title="Só os quadros novos — confira antes de gastar vídeo">🖼 1º: fazer os quadros novos</button>
+      <button type="button" class="rf-btn" id="rfAnimar" title="Anima os quadros novos no Veo e junta">🎞 2º: animar e juntar</button>
+      <button type="button" class="rf-btn rf-sec" id="rfTudo">🎬 tudo de uma vez</button>
+      <button type="button" class="rf-btn rf-sec" id="rfJuntar">🧩 só juntar</button>
+      <label><input type="checkbox" id="rfVisivel" style="width:auto"> 👁 mostrar o navegador</label>
+    </div>
+    <div id="rfFinal" style="margin-top:10px"></div>
+  </div>
+
+  <h3>Planos</h3>
+  <div class="rf-planos" id="rfPlanos"></div>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let P = null, timer = null, sujo = false;
+  async function api(url, corpo, form) {
+    const r = await fetch(url, form ? { method: 'POST', body: corpo } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || r.status); return d;
+  }
+  async function lista() {
+    const d = await (await fetch('/flow/refazer/lista')).json();
+    $('rfLista').innerHTML = (d.projetos || []).map(x => `<button type="button" class="rf-sec" data-abrir="${x.id}">${esc(x.nome)} · ${x.planos} plano(s)${x.final ? ' · ✅' : ''}</button>`).join('') || '<span class="rf-hint">nenhuma ainda</span>';
+    $('rfLista').querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(b.dataset.abrir));
+  }
+  async function abrir(pid) {
+    try { localStorage.setItem('rf-ultimo', pid); } catch (_) {}
+    const d = await (await fetch('/flow/refazer/' + pid)).json(); if (!d.projeto) return;
+    P = d.projeto; sujo = false; desenhar(); acompanhar();
+  }
+  function falasTxt(pl) { return (pl.fala || []).map(f => `${f.id}: ${f.texto}`).join('\n'); }
+  function nomeDe(id) { const x = (P.personagens || []).find(p => p.id === id); return x && x.nome ? `${x.nome} (${id})` : id; }
+  function desenhar() {
+    $('rfEditor').style.display = '';
+    $('rfTitulo').textContent = P.nome; $('rfInfo').textContent = `${P.planos.length} plano(s) · ${P.dur.toFixed(1)} s · ${P.proporcao}`;
+    if ($('rfOriginal').dataset.src !== P.video_url) { $('rfOriginal').src = P.video_url; $('rfOriginal').dataset.src = P.video_url; }
+    $('rfPessoas').innerHTML = (P.personagens || []).map(x => `<div class="rf-p" data-id="${x.id}"><span class="id">${x.id}</span><span class="rf-hint">${esc(x.descricao)}</span>
+      <input type="text" data-k="nome" value="${esc(x.nome)}" placeholder="quem entra aqui (ex.: Ana)">
+      <textarea rows="1" data-k="obs" placeholder="observação (opcional)">${esc(x.obs)}</textarea>
+      <div>${x.foto_url ? `<img src="${x.foto_url}" alt=""> <button type="button" class="rf-mini rf-sec" data-tirafoto="${x.id}">trocar foto</button>`
+        : `<label style="font-size:.8rem">📷 foto da pessoa nova <input type="file" accept="image/*" data-foto="${x.id}"></label>`}</div></div>`).join('')
+      || '<p class="rf-hint">A IA ainda não separou as pessoas (espere a análise ou clique em 🤖 analisar de novo).</p>';
+    $('rfCenOrig').textContent = P.cenario.descricao ? '— agora: ' + P.cenario.descricao : '';
+    if (!sujo) { $('rfCenNovo').value = P.cenario.novo || ''; $('rfEstilo').value = P.estilo || ''; $('rfFalasModo').value = P.falas_modo || 'manter'; }
+    $('rfCenFotoVer').innerHTML = P.cenario.foto_url ? `<img src="${P.cenario.foto_url}" style="width:56px;height:56px;object-fit:cover;border-radius:6px"> <button type="button" class="rf-mini rf-sec" id="rfCenTira">tirar</button>` : '';
+    const vert = P.proporcao === '9:16';
+    $('rfPlanos').innerHTML = P.planos.map(pl => `<div class="rf-pl${vert ? ' vert' : ''}" data-n="${pl.n}">
+      <div><div class="cab">Plano ${pl.n} <span class="rf-tag">${pl.ini.toFixed(1)}–${pl.fim.toFixed(1)} s</span>
+        ${pl.quadro_novo ? '<span class="rf-tag ok">🖼 quadro novo</span>' : ''}${pl.video_novo ? '<span class="rf-tag ok">🎞 vídeo</span>' : ''}
+        ${(pl.pessoas || []).map(q => `<span class="rf-tag">${esc(nomeDe(q.id))}</span>`).join('')}</div>
+        <div class="midia" style="margin-top:6px"><figure><img src="${pl.quadro_url}" alt="">original</figure>
+          <figure>${pl.video_novo_url ? `<video src="${pl.video_novo_url}" controls muted preload="metadata"></video>novo (vídeo)` : pl.quadro_novo_url ? `<img src="${pl.quadro_novo_url}" alt="">novo (quadro)` : '<div class="rf-hint" style="padding:20px 6px">ainda não feito</div>'}</figure></div>
+        ${pl.erro ? `<div class="erro">⚠ ${esc(pl.erro)}</div>` : ''}</div>
+      <div><label style="margin:0;font-size:.8rem">🎬 ação (inglês, pro Veo)<textarea rows="2" data-k="acao_en">${esc(pl.acao_en)}</textarea></label>
+        <label style="margin:0;font-size:.8rem">🎥 câmera<input type="text" data-k="camera_en" value="${esc(pl.camera_en)}"></label>
+        <label style="margin:0;font-size:.8rem">🗣 falas (uma por linha, <code>A: texto</code>)<textarea rows="2" data-k="fala">${esc(falasTxt(pl))}</textarea></label>
+        <div class="rf-row" style="margin-top:4px"><button type="button" class="rf-mini rf-sec" data-gera="quadro">🖼 refazer quadro</button>
+          <button type="button" class="rf-mini rf-sec" data-gera="video">🎞 animar</button><button type="button" class="rf-mini rf-sec" data-gera="tudo">🔁 refazer tudo</button></div></div></div>`).join('');
+    $('rfFinal').innerHTML = P.final_url ? `<b>✅ Cena pronta</b><br><video src="${P.final_url}" controls style="max-width:520px;width:100%;border-radius:8px;margin-top:6px"></video><br><a href="${P.final_url}?baixar=1">⬇ baixar o vídeo</a>` : '';
+    ligar(); estado();
+  }
+  function estado() {
+    const e = P.estado || {}, b = $('rfEstado');
+    b.classList.toggle('erro', !!e.erro && !e.rodando);
+    $('rfEstadoTxt').textContent = e.rodando ? '⏳ ' + (e.msg || 'rodando…') : e.erro ? '⚠ ' + e.erro : (e.msg || (P.analisado ? '✅ pronto' : '⏳ esperando a análise'));
+    $('rfParar').style.display = e.rodando ? '' : 'none';
+    ['rfQuadros', 'rfAnimar', 'rfTudo', 'rfJuntar', 'rfFalasIA', 'rfReanalisar'].forEach(id => $(id).disabled = !!e.rodando);
+  }
+  function ligar() {
+    document.querySelectorAll('#rfEditor input[type=text], #rfEditor textarea, #rfEditor select').forEach(e => e.addEventListener('input', () => { sujo = true; }));
+    document.querySelectorAll('[data-foto]').forEach(inp => inp.addEventListener('change', async () => {
+      const f = inp.files[0]; if (!f) return; await salvar();
+      const fd = new FormData(); fd.append('alvo', 'personagem:' + inp.dataset.foto); fd.append('foto', f);
+      try { P = (await api(`/flow/refazer/${P.id}/foto`, fd, true)).projeto; desenhar(); } catch (e) { alert(e.message); }
+    }));
+    document.querySelectorAll('[data-tirafoto]').forEach(b => b.onclick = async () => {
+      await salvar({ personagens: [{ id: b.dataset.tirafoto, nome: (document.querySelector(`.rf-p[data-id="${b.dataset.tirafoto}"] [data-k=nome]`) || {}).value || '', tirar_foto: true }] });
+    });
+    const ct = $('rfCenTira'); if (ct) ct.onclick = () => salvar({ cenario: { novo: $('rfCenNovo').value, tirar_foto: true } });
+    document.querySelectorAll('[data-gera]').forEach(b => b.onclick = () => gerar(b.dataset.gera, [+b.closest('.rf-pl').dataset.n]));
+  }
+  function coletar() {
+    const pers = [...document.querySelectorAll('.rf-p')].map(d => ({ id: d.dataset.id, nome: d.querySelector('[data-k=nome]').value, obs: d.querySelector('[data-k=obs]').value }));
+    const planos = [...document.querySelectorAll('.rf-pl')].map(d => ({ n: +d.dataset.n, acao_en: d.querySelector('[data-k=acao_en]').value, camera_en: d.querySelector('[data-k=camera_en]').value,
+      fala: d.querySelector('[data-k=fala]').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^([A-Za-z0-9]{1,3})\s*:\s*(.+)$/); return m ? { id: m[1], texto: m[2] } : { id: '?', texto: l }; }) }));
+    const modo = $('rfFalasModo').value;
+    return { personagens: pers, cenario: { novo: $('rfCenNovo').value }, estilo: $('rfEstilo').value, falas_modo: modo, planos: modo === 'manter' ? planos.map(p => ({ n: p.n, acao_en: p.acao_en, camera_en: p.camera_en })) : planos };
+  }
+  async function salvar(extra) {
+    if (!P) return;
+    try { P = (await api(`/flow/refazer/${P.id}/salvar`, Object.assign(coletar(), extra || {}))).projeto; sujo = false; desenhar(); } catch (e) { alert(e.message); }
+  }
+  async function gerar(etapa, planos) {
+    await salvar();
+    try { await api(`/flow/refazer/${P.id}/gerar`, { etapa, planos: planos || [], visivel: $('rfVisivel').checked }); acompanhar(true); } catch (e) { alert(e.message); }
+  }
+  async function acompanhar(ja) {
+    clearTimeout(timer);
+    if (!P) return;
+    if (ja) { P.estado = Object.assign({}, P.estado, { rodando: true, msg: 'começando…' }); estado(); }
+    const d = await (await fetch('/flow/refazer/' + P.id)).json(); if (!d.projeto) return;
+    const antes = JSON.stringify((P.planos || []).map(x => [x.quadro_novo, x.video_novo, x.erro])) + P.final + P.analisado + (P.personagens || []).length;
+    const depois = JSON.stringify(d.projeto.planos.map(x => [x.quadro_novo, x.video_novo, x.erro])) + d.projeto.final + d.projeto.analisado + (d.projeto.personagens || []).length;
+    const rodando = d.projeto.estado.rodando;
+    if (antes !== depois && !sujo) { P = d.projeto; desenhar(); } else { P.estado = d.projeto.estado; estado(); }
+    if (rodando || ja) timer = setTimeout(() => acompanhar(false), rodando ? 3000 : 1500);
+    else lista();
+  }
+  $('rfEnviar').onclick = async () => {
+    const f = $('rfVideo').files[0]; if (!f) { alert('Escolha o vídeo.'); return; }
+    const fd = new FormData(); fd.append('video', f); fd.append('nome', $('rfNome').value);
+    $('rfEnviar').disabled = true; $('rfEnviarSt').textContent = '⬆ enviando e achando os planos…';
+    try { P = (await api('/flow/refazer/novo', fd, true)).projeto; $('rfEnviarSt').textContent = ''; try { localStorage.setItem('rf-ultimo', P.id); } catch (_) {}
+      desenhar(); acompanhar(true); lista(); } catch (e) { $('rfEnviarSt').textContent = '⚠ ' + e.message; }
+    $('rfEnviar').disabled = false;
+  };
+  $('rfSalvar').onclick = () => salvar();
+  $('rfQuadros').onclick = () => gerar('quadro');
+  $('rfAnimar').onclick = () => gerar('video');
+  $('rfTudo').onclick = () => { if (confirm('Faz os quadros e anima todos os planos de uma vez (gasta 1 imagem + 1 vídeo por plano). Continuar?')) gerar('tudo'); };
+  $('rfJuntar').onclick = async () => { try { P = (await api(`/flow/refazer/${P.id}/juntar`)).projeto; desenhar(); } catch (e) { alert(e.message); } };
+  $('rfParar').onclick = () => api(`/flow/refazer/${P.id}/parar`).catch(() => {});
+  $('rfReanalisar').onclick = async () => { try { await api(`/flow/refazer/${P.id}/analisar`); acompanhar(true); } catch (e) { alert(e.message); } };
+  $('rfFalasIA').onclick = async () => { await salvar(); try { await api(`/flow/refazer/${P.id}/falas`, { pedido: $('rfFalasPedido').value, idioma: $('rfFalasIdioma').value }); acompanhar(true); } catch (e) { alert(e.message); } };
+  $('rfApagar').onclick = async () => { if (!confirm('Apagar esta cena (e os quadros/vídeos feitos)?')) return;
+    try { await api(`/flow/refazer/${P.id}/apagar`); P = null; $('rfEditor').style.display = 'none'; lista(); } catch (e) { alert(e.message); } };
+  $('rfCenFoto').addEventListener('change', async () => {
+    const f = $('rfCenFoto').files[0]; if (!f || !P) return; await salvar();
+    const fd = new FormData(); fd.append('alvo', 'cenario'); fd.append('foto', f);
+    try { P = (await api(`/flow/refazer/${P.id}/foto`, fd, true)).projeto; $('rfCenFoto').value = ''; desenhar(); } catch (e) { alert(e.message); }
+  });
+  ['rfCenNovo', 'rfEstilo', 'rfFalasModo'].forEach(id => $(id).addEventListener('input', () => { sujo = true; }));
+  lista();
+  try { const u = localStorage.getItem('rf-ultimo'); if (u) abrir(u); } catch (_) {}
+})();
+</script>
+{% endblock %}

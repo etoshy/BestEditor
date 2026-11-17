@@ -20,6 +20,8 @@ MAX_REFS = 6          # o Flow aceita várias imagens na caixa; mais que isso co
 MAX_OBS = 600
 PAPEIS = {
     "pose": "pose / composição",
+    "base": "foto base (composição)",
+    "cores": "cores e luz",
     "personagem": "personagem",
     "cenario": "cenário / lugar",
     "roupa": "roupa / figurino",
@@ -98,7 +100,7 @@ def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "", est
         raise MontarErro("Mande pelo menos uma foto (a pose ou um personagem).")
     if len(ok) > MAX_REFS:
         raise MontarErro(f"No máximo {MAX_REFS} imagens por cena (o Flow se confunde com mais).")
-    ok.sort(key=lambda i: 0 if i.get("papel") == "pose" else 1)  # a pose sempre é a imagem 1
+    ok.sort(key=lambda i: 0 if i.get("papel") in ("pose", "base") else 1)  # a pose/base sempre é a imagem 1
     pid = time.strftime("%Y%m%d_%H%M%S") + "_" + secrets.token_hex(3)
     pasta = os.path.join(pasta_pacotes(base), pid)
     os.makedirs(pasta, exist_ok=True)
@@ -109,7 +111,7 @@ def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "", est
         shutil.copy(i["arquivo"], dest)
         papel = i.get("papel") if i.get("papel") in PAPEIS else "outro"
         r = {"n": k, "papel": papel, "nome": _limpo(i.get("nome"), 60), "obs": _limpo(i.get("obs")), "arquivo": dest}
-        if papel == "pose" and (i.get("marcas") or i.get("cena")):  # ✏️ v84_407: figuras numeradas do rascunho → quem fica em cada uma
+        if papel in ("pose", "base") and (i.get("marcas") or i.get("cena")):  # ✏️ v84_407: figuras numeradas do rascunho → quem fica em cada uma
             import flow_rascunho as FR
             marcas = FR.limpar_marcas(i.get("marcas") or [])
             cena = FR.limpar_cena(i.get("cena") or {})
@@ -155,11 +157,15 @@ def _quem(r: Dict[str, Any]) -> str:
 # ------------------------------------------------------------------ sem IA: o comando básico
 _REGRA_PAPEL = {
     "pose": "copy ONLY the body pose, framing and camera angle from reference image {n} — not the person, clothes or background",
-    "personagem": "{nome} must look exactly like the person in reference image {n} (same face, hair, skin tone and build)",
+    "base": "use reference image {n} as the BASE of the composition: same framing, camera angle, positions and poses, and the same "
+            "scenery and objects unless replaced below; the people in it are only placeholders and are replaced ENTIRELY",
+    "personagem": "{nome} replaces the WHOLE figure: face, hair, body type, skin tone, clothes and their colors all come from the "
+                  "person in reference image {n} — only the place and pose come from the base",
     "cenario": "use the location/background from reference image {n}",
     "roupa": "dress {alvo} in the outfit shown in reference image {n}",
     "objeto": "include the object from reference image {n}",
     "estilo": "match the lighting, colors and art style of reference image {n}",
+    "cores": "take ONLY the color palette and lighting from reference image {n} (not its people, objects or composition)",
     "outro": "use reference image {n} as described",
 }
 
@@ -181,6 +187,10 @@ def prompt_basico(pac: Dict[str, Any]) -> str:
         partes.append("Scene: " + pac["obs_geral"] + ".")
     if pac.get("estilo_en"):
         partes.append("Art style of the final image: " + pac["estilo_en"].rstrip(".") + ".")
+    elif pers:  # sem estilo escolhido: segue o dos personagens novos (desenho → cena desenhada; foto → realista)
+        partes.append("Art style of the final image: the SAME look as the new character reference images (if they are "
+                      "drawings/anime, render the whole scene in that drawn style; if they are photos, photorealistic) — "
+                      "never the style of the base or pose image.")
     partes.append("Keep every character's identity consistent with their reference; natural, coherent result.")
     return " ".join(partes)
 
@@ -190,9 +200,11 @@ SISTEMA = """You write ONE image-generation prompt for Google Flow (Nano Banana 
 images below IN THIS ORDER (reference image 1, 2, 3…). The user said what each image is for and may add notes per image and
 a general note (often in Portuguese). Your prompt must:
 - say explicitly what to take from each reference by its number: a POSE image gives only body pose / framing / camera
-  angle (never its identity, clothes or background); a CHARACTER image gives that person's identity (face, hair, skin, build,
-  and outfit unless a note says otherwise) — call the character by the given name; SCENERY gives the place; OUTFIT the
-  clothes; OBJECT the object; STYLE the light/colors/art style;
+  angle (never its identity, clothes or background); a BASE image (a real photo used as base) gives the whole composition —
+  framing, positions, poses, scenery and objects unless replaced — but its PEOPLE are placeholders replaced entirely; a
+  CHARACTER image replaces the WHOLE figure (face, hair, body type, skin tone, clothes AND their colors — never just the
+  face; keep the base pose) — call the character by the given name; SCENERY gives the place; OUTFIT the clothes; OBJECT
+  the object; STYLE the light/colors/art style; COLORS gives ONLY the palette and lighting;
 - when there is a pose and several characters, say who takes which position in the pose (follow the notes; if unsaid,
   decide sensibly and say it);
 - describe the identity features you SEE in each character photo in a few words (helps consistency), without naming real
@@ -203,7 +215,9 @@ a general note (often in Portuguese). Your prompt must:
   object/scenery keeps the place and size of the original unless a note says otherwise; "mantém" = keep it as in the sketch;
 - follow every note; the general note wins on scene/mood/action;
 - render the FINAL ART STYLE given (realistic photo, anime, manga…) and say it clearly in the prompt; the identities stay
-  recognizable in that style; a pencil-sketch pose image never sets the style;
+  recognizable in that style; when no style is chosen, the style comes from the NEW CHARACTER images (a drawn character makes
+  the whole scene drawn in that same style, a photo makes it photorealistic) — a base photo or a pencil-sketch pose never
+  sets the style;
 - be concrete about the final image (action, expressions, setting, light, lens) in natural English, 60–160 words;
 - no markdown, no lists, no quotes around the prompt.
 Also give "explicacao": 1–3 short sentences in Brazilian Portuguese saying how you used each image, and "avisos": problems
@@ -224,8 +238,10 @@ def conteudo_ia(pac: Dict[str, Any], bloco_imagem: Callable[[str], Optional[Dict
         if b:
             c.append(b)
     c.append({"type": "text", "text": "GENERAL NOTE: " + (pac.get("obs_geral") or "(none)")})
-    c.append({"type": "text", "text": "FINAL ART STYLE: " + (pac.get("estilo_en") or "(not chosen — keep the look of the character "
-                                                                                    "photos; a pencil sketch pose is NOT the style)")})
+    c.append({"type": "text", "text": "FINAL ART STYLE: " + (pac.get("estilo_en") or "(not chosen — use the SAME style as the NEW "
+                                                                                    "CHARACTER images: drawn/anime characters → the whole scene "
+                                                                                    "drawn in that style; photos → photorealistic. The base/pose "
+                                                                                    "image never sets the style)")})
     return c
 
 

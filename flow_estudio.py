@@ -27,6 +27,7 @@ import arquivo_seguro  # noqa: E402  (v84_99: os.replace sem WinError 5)
 import queue
 import re
 import secrets
+import sys
 import threading
 import time
 import traceback
@@ -575,6 +576,12 @@ def registrar(app, base_dir: str) -> None:
     except Exception:  # noqa: BLE001
         traceback.print_exc()
 
+    try:  # 🎬 v84_408: refazer cena (vídeo) — os planos refeitos no Flow com outros personagens/cenário/falas
+        import refazer_cena
+        refazer_cena.registrar(app, sys.modules[__name__])
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+
     @app.route("/flow")
     def flow_page():
         from googleflow import flow_direto as fd
@@ -727,7 +734,7 @@ def registrar(app, base_dir: str) -> None:
     # ---------------------------------------------------------- ✏️ v84_407: rascunho da pose (foto → esboço a lápis)
     def _guardar_rascunho(caminho: str, prompt: str) -> Dict[str, Any]:
         gid = time.strftime("%Y%m%d_%H%M%S") + "_" + secrets.token_hex(3)
-        nome = gid + ".png"
+        nome = gid + (os.path.splitext(caminho)[1].lower() if os.path.splitext(caminho)[1].lower() in EXT_IMAGEM else ".png")
         import shutil
         shutil.copy(caminho, os.path.join(pasta_galeria(), nome))
         e = {"id": gid, "tipo": "imagem", "arquivo": nome, "media_id": "", "prompt": prompt, "modelo": "", "proporcao": "",
@@ -754,6 +761,20 @@ def registrar(app, base_dir: str) -> None:
             os.remove(tmp)
         except OSError:
             pass
+        return jsonify({"ok": True, "item": e})
+
+    @app.route("/flow/rascunho/original", methods=["POST"])
+    def flow_rascunho_original():
+        """📷 a foto SEM converter vira a base (composição + cores) — entra na 🖼 galeria como está."""
+        from googleflow import googleflow_client as gf
+        try:
+            ent = _salvar_entrada(gf, "foto")
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if not ent:
+            return jsonify({"erro": "Mande a foto."}), 400
+        e = _guardar_rascunho(ent["arquivo"], "📷 foto base (sem converter)")
+        e["rotulo"] = "base"
         return jsonify({"ok": True, "item": e})
 
     @app.route("/flow/rascunho/flow", methods=["POST"])
@@ -953,3 +974,55 @@ def gerar_imagem_e_esperar(prompt: str, referencia: Optional[str] = None, propor
     if not saidas:
         raise RuntimeError("O Flow terminou sem imagem.")
     return saidas
+
+
+def rodar_e_esperar(pedido: Dict[str, Any], timeout_s: float = 1200, esperar_livre_s: float = 900,
+                    parar: Optional[Callable[[], bool]] = None) -> List[Dict[str, Any]]:
+    """🎬 v84_408: um pedido ao Flow pelo código, esperando terminar — imagem (com `referencias`) ou vídeo (com `inicio`).
+    Se o Flow estiver ocupado (outra geração, o lote), ESPERA ficar livre (até `esperar_livre_s`). → os itens da galeria."""
+    from googleflow import flow_direto as fd
+    from site_config import load_site_config
+    limite_livre = time.time() + esperar_livre_s
+    while True:
+        if parar and parar():
+            raise RuntimeError("Parado.")
+        with _TRAVA:
+            try:
+                import flow_lote
+                motivo = flow_lote.ocupado()
+            except Exception:  # noqa: BLE001
+                motivo = None
+            if not _ESTADO["rodando"] and not motivo:
+                tipo = "video" if pedido.get("tipo") == "video" else "imagem"
+                opcoes: Dict[str, Any] = {
+                    "modo": "gerar", "visivel": bool(pedido.get("visivel")), "simular": False,
+                    "trocar_conta": pedido.get("trocar_conta", True) is not False, "conta": str(pedido.get("conta") or ""),
+                    "novo_projeto": False, "tipo": tipo, "prompt": " ".join(str(pedido.get("prompt") or "").split())[:4000],
+                    "modelo": str(pedido.get("modelo") or "")[:60],
+                    "proporcao": pedido.get("proporcao") if pedido.get("proporcao") in fd.PROPORCOES else "16:9",
+                    "quantidade": "x1"}
+                for k in ("inicio", "referencia", "referencias"):
+                    if pedido.get(k):
+                        opcoes[k] = pedido[k]
+                _ESTADO.update(rodando=True, passos=[], resultados=[], erro=None, inicio=time.time(), fim=None, modo="gerar",
+                               parar=False, diagnostico=None, detalhe_erro=None,
+                               opcoes={k: (v if not isinstance(v, (dict, list)) else True) for k, v in opcoes.items()})
+                _enviar("gerar", load_site_config(), opcoes)
+                break
+        if time.time() > limite_livre:
+            raise RuntimeError("O Flow ficou ocupado tempo demais (outra geração ou o lote).")
+        time.sleep(4)
+    fim = time.time() + timeout_s
+    time.sleep(1.0)
+    while _ESTADO["rodando"]:
+        if parar and parar():
+            _ESTADO["parar"] = True
+        if time.time() > fim:
+            raise RuntimeError(f"O Flow não terminou em {int(timeout_s)} s.")
+        time.sleep(1.5)
+    if _ESTADO.get("erro"):
+        raise RuntimeError(str(_ESTADO["erro"]))
+    res = [dict(e, caminho=os.path.join(pasta_galeria(), e["arquivo"])) for e in _ESTADO.get("resultados") or []]
+    if not res:
+        raise RuntimeError("O Flow terminou sem resultado.")
+    return res
