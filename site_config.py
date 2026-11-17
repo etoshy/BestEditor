@@ -301,6 +301,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "chatterbox_onde": "local",    # Chatterbox e Chatterbox Turbo: "local" (este PC) | "pod" (a GPU do seu pod)
     "chatterbox_pod_ptbr": True,   # no pod, português sai pelo modelo dedicado pt-BR (senão o multilíngue)
     "runpod_reserva_flow": False,  # Flow sem crédito (vídeo/foto) → gera no Runpod antes de ir pra pesquisa  # ⚡ exportação em pedaços paralelos ("1" = desligada; export_paralelo.py)
+    "interface": os.environ.get("BESTEDITOR_UI_PADRAO") or "nova",  # 🧭 v84_405: "nova" (padrão) ou "classica"
     "voz_polimento": {},        # 🎚 v84_404: takes / corte do silêncio morto / EQ da voz gerada (tts/voz_polimento.py) — vazio = desligado
     "voz_instancias": "1",      # ⚡ geração rápida: cópias do motor num MESMO áudio ("1" = desligada; tts_paralelo.py)
     # ⛔ lista negra de sites (lista_negra.py): imagem/vídeo de lá nunca entra (marca d'água); editável em Configurações

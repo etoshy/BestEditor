@@ -298,3 +298,22 @@ def test_recusa_pessoa_famosa_reescreve_e_tenta_de_novo(sim, navegador, monkeypa
     novo = fd.sem_famosos("Portrait of Fritz Haarmann and Hans Grans in Hanover")
     assert "Haarmann" not in novo and "Grans" not in novo and "Hanover" in novo and "no real or recognizable person" in novo
     assert fd.recusa("esperar", "Esse comando pode violar nossas políticas").motivo == "politica"
+
+
+def test_imagem_com_varias_referencias_montar_cena(sim, navegador, tmp_path):
+    """🧩 v84_406: pose + personagens → todas sobem na caixa, na ordem, e o resultado não é nenhuma delas."""
+    from PIL import Image
+    fotos = []
+    for k, cor in enumerate(("red", "blue", "yellow")):
+        c = str(tmp_path / f"ref{k}.png")
+        Image.new("RGB", (200, 200), cor).save(c)
+        fotos.append(c)
+    ctx = navegador.new_context(viewport={"width": 1400, "height": 900})
+    passos = []
+    page = fd.preparar_projeto(ctx, sim, True, {}, lambda n, e, d: passos.append((n, e, d)))
+    r = fd.gerar_um(page, {"tipo": "imagem", "prompt": "the pose of image 1 with the people of images 2 and 3",
+                           "proporcao": "16:9", "referencias": [{"arquivo": f} for f in fotos]},
+                    lambda n, e, d: passos.append((n, e, d)), 30)
+    assert len(r) == 1 and r[0]["tipo"] == "imagem"
+    assert sum(1 for n, e, _ in passos if n == "referencia" and e == "ok") == 3
+    ctx.close()

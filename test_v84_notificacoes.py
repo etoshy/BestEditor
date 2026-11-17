@@ -58,7 +58,7 @@ def test_rotas_sino_e_historico(cliente):
 
 def test_sino_no_estudio_e_nas_paginas_avulsas():
     base = os.path.dirname(os.path.abspath(__file__))
-    for t in ("estudio.html", "textos.html", "base.html"):
+    for t in ("estudio.html", "textos.html", "base_classica.html", "base_nova.html"):  # v84_405: as duas interfaces
         assert '{% include "_sino.html" %}' in open(os.path.join(base, "templates", t), encoding="utf-8").read()
 
 

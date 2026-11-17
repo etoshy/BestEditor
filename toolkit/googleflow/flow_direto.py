@@ -1045,6 +1045,16 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
             info = _ULTIMA_MIDIA.pop(id(page), None) or {}
             ref_tokens += list(info.get("ids") or [])
             r["_media_id"] = max(info.get("ids") or [""], key=len) or r.get("media_id") or ""
+    # 🧩 v84_406: imagem com VÁRIAS referências (montar cena: pose + personagens…) — sobem na ordem do comando
+    if tipo == "imagem" and trab.get("referencias") and not (ref.get("arquivo") or ref.get("media_id")):
+        for r in (trab.get("referencias") or [])[:6]:
+            if not (r.get("arquivo") or r.get("media_id")):
+                continue
+            incluir_referencia(page, r.get("arquivo"), r.get("media_id") or "", on_passo)
+            info = _ULTIMA_MIDIA.pop(id(page), None) or {}
+            ref_tokens += list(info.get("ids") or [])
+            if r.get("media_id"):
+                ref_tokens.append(r["media_id"])
     if tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")):
         incluir_referencia(page, ref.get("arquivo"), ref.get("media_id") or "", on_passo)
         info = _ULTIMA_MIDIA.pop(id(page), None) or {}

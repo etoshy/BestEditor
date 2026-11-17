@@ -240,7 +240,7 @@ def test_atalho_em_qualquer_video_do_site(tmp_path):
     assert not p["video"] and p["fonte"].endswith("original.wav") and os.path.isfile(p["fonte"]) and abs(p["total_duration"] - 2) < 0.2
     with pytest.raises(ValueError):
         SR.criar_de_url(mini, str(tmp_path), "/pagina")
-    src = open("templates/base.html", encoding="utf-8").read()
+    src = "".join(open("templates/" + n, encoding="utf-8").read() for n in ("base_classica.html", "_base_scripts.html"))  # v84_405
     assert "/sound-design?url=" in src and "item('/sound-design'" in src
 
 

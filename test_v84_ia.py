@@ -429,7 +429,7 @@ def test_gerar_roteiro_com_a_ia(api):
     raiz = os.path.dirname(os.path.abspath(__file__))
     for t in ("dossie_detalhe.html", "venda_detalhe.html", "roteiro_yt_detalhe.html", "modelado_detalhe.html"):
         assert "data-ia-gerar" in open(os.path.join(raiz, "templates", t), encoding="utf-8").read(), t
-    assert "/ia/gerar" in open(os.path.join(raiz, "templates", "base.html"), encoding="utf-8").read()
+    assert "/ia/gerar" in open(os.path.join(raiz, "templates", "_base_scripts.html"), encoding="utf-8").read()  # v84_405: os scripts das duas interfaces
 
 
 def test_idioma_de_saida_no_fim_e_no_system(api):

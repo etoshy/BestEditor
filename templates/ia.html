@@ -72,17 +72,17 @@ vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PD
 
 <div class="ia-card">
   <h3 style="margin-top:0">Gasto</h3>
-  <p>Total: <b>US$ {{ '%.4f'|format(r.gasto.usd) }}</b> em {{ r.gasto.chamadas }} chamadas
+  <p>Total: <b>US$ {{ '%.4f'|format((r.gasto.usd or 0)) }}</b> em {{ r.gasto.chamadas }} chamadas
     {% if r.limite_usd %}— limite US$ {{ '%.2f'|format(r.limite_usd) }}{% endif %}</p>
   {% if r.gasto.por_recurso %}
   <table class="ia-t"><tr><th>Recurso</th><th>Chamadas</th><th>US$</th><th>Tokens do cache lidos</th></tr>
-    {% for k, v in r.gasto.por_recurso.items() %}<tr><td>{{ recursos[k][0] if k in recursos else k }}</td><td>{{ v.chamadas }}</td><td>{{ '%.4f'|format(v.usd) }}</td><td>{{ v.cache_lido }}</td></tr>{% endfor %}
+    {% for k, v in r.gasto.por_recurso.items() %}<tr><td>{{ recursos[k][0] if k in recursos else k }}</td><td>{{ v.chamadas }}</td><td>{{ '%.4f'|format(v.usd or 0) }}</td><td>{{ v.cache_lido }}</td></tr>{% endfor %}
   </table>{% endif %}
   <form method="post" action="{{ url_for('ia_zerar_gasto') }}" onsubmit="return confirm('Zerar a contagem de gasto?')"><button type="submit" style="background:#6b7280;font-size:.85rem;padding:6px 12px">Zerar a contagem</button></form>
   {% if recentes %}
   <h4>Últimas chamadas</h4>
   <table class="ia-t"><tr><th>Recurso</th><th>OK</th><th>Entrada</th><th>Saída</th><th>Cache</th><th>US$</th><th>Erro</th></tr>
-    {% for x in recentes %}<tr><td>{{ x.recurso }}</td><td>{{ '💾' if x.cache_local else ('✔' if x.ok else '✖') }}</td><td>{{ x.entrada }}</td><td>{{ x.saida }}</td><td>{{ x.cache_lido }}</td><td>{{ '%.5f'|format(x.usd) }}</td><td>{{ x.erro }}</td></tr>{% endfor %}
+    {% for x in recentes %}<tr><td>{{ x.recurso }}</td><td>{{ '💾' if x.cache_local else ('✔' if x.ok else '✖') }}</td><td>{{ x.entrada }}</td><td>{{ x.saida }}</td><td>{{ x.cache_lido }}</td><td>{{ '%.5f'|format(x.usd or 0) }}</td><td>{{ x.erro }}</td></tr>{% endfor %}
   </table>
   <p class="hint">💾 = resposta guardada (cache local, de graça). "Cache" = tokens lidos do cache da API (quase de graça).</p>
   {% endif %}

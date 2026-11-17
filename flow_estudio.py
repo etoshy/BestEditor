@@ -437,6 +437,8 @@ class _Sessao(threading.Thread):
                 for k in ("inicio", "fim", "referencia"):
                     if opcoes.get(k):
                         trab[k] = opcoes[k]
+                if opcoes.get("referencias") and trab["tipo"] == "imagem":  # 🧩 v84_406: várias imagens, na ordem
+                    trab["referencias"] = [dict(r) for r in opcoes["referencias"]]
                 if trab["tipo"] == "video":
                     trab["tipo_video"] = "Frames" if (trab.get("inicio") or trab.get("fim")) else "Elementos"
                 r = self._gerar(trab, cfg, opcoes, on_passo, atual, timeout)
@@ -581,7 +583,8 @@ def registrar(app, base_dir: str) -> None:
         cfg = load_site_config()
         return render_template("flow_estudio.html", contas=[c["nome"] for c in gf.listar_contas()], cfg=cfg,
                                modelos_imagem=fd.MODELOS_IMAGEM, modelos_video=fd.MODELOS_VIDEO, proporcoes=fd.PROPORCOES,
-                               modo_direto=gf.modo_direto(cfg), ocioso_min=OCIOSO_S // 60)
+                               modo_direto=gf.modo_direto(cfg), ocioso_min=OCIOSO_S // 60,
+                               max_refs=__import__("flow_montar").MAX_REFS, papeis=__import__("flow_montar").PAPEIS)
 
     @app.route("/flow/teste")
     def flow_teste_page():  # o link antigo (v84_74) cai na aba nova
@@ -687,6 +690,77 @@ def registrar(app, base_dir: str) -> None:
         if not re.fullmatch(r"[\w.\-]+", nome) or nome.endswith(".json"):
             return "nome inválido", 400
         return send_from_directory(pasta_galeria(), nome, as_attachment=request.args.get("baixar") == "1")
+
+    # ---------------------------------------------------------- 🧩 v84_406: montar cena (pose + personagens)
+    @app.route("/flow/montar/prompt", methods=["POST"])
+    def flow_montar_prompt():
+        """r{k} (arquivo) ou r{k}_galeria, r{k}_papel, r{k}_nome, r{k}_obs (k = 0..n-1) + obs_geral → comando pela IA."""
+        import flow_montar as FM
+        from googleflow import googleflow_client as gf
+        f = request.form
+        try:
+            n = max(0, min(FM.MAX_REFS + 2, int(f.get("n") or 0)))
+        except ValueError:
+            n = 0
+        itens = []
+        try:
+            for k in range(n):
+                ent = _salvar_entrada(gf, f"r{k}")
+                if ent:
+                    itens.append({"papel": f.get(f"r{k}_papel") or "outro", "nome": f.get(f"r{k}_nome") or "",
+                                  "obs": f.get(f"r{k}_obs") or "", "arquivo": ent["arquivo"]})
+            pac = FM.novo_pacote(pasta_galeria(), itens, f.get("obs_geral") or "")
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        r = FM.montar_prompt(pac)
+        return jsonify(dict(r, ok=True, pacote=pac["id"], refs=FM.resumo(pac)))
+
+    @app.route("/flow/montar/<pid>/<nome>")
+    def flow_montar_arquivo(pid: str, nome: str):
+        import flow_montar as FM
+        if not re.fullmatch(r"\d{8}_\d{6}_[0-9a-f]{6}", pid) or not re.fullmatch(r"[\w.\-]+", nome) or nome.endswith(".json"):
+            return "nome inválido", 400
+        return send_from_directory(os.path.join(FM.pasta_pacotes(pasta_galeria()), pid), nome)
+
+    @app.route("/flow/montar/gerar", methods=["POST"])
+    def flow_montar_gerar():
+        """O comando (editado ou não) + as imagens do pacote, na ordem → uma imagem no Flow (a mesma fila do ✨ Gerar)."""
+        import flow_montar as FM
+        from googleflow import flow_direto as fd
+        from site_config import load_site_config
+        b = request.get_json(silent=True) or {}
+        try:
+            pac = FM.carregar_pacote(pasta_galeria(), str(b.get("pacote") or ""))
+        except FM.MontarErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        prompt = " ".join(str(b.get("prompt") or "").split())[:4000]
+        if not prompt:
+            return jsonify({"erro": "O comando está vazio."}), 400
+        refs = [r for r in FM.referencias_flow(pac) if os.path.isfile(r["arquivo"])]
+        if not refs:
+            return jsonify({"erro": "As fotos dessa montagem sumiram — monte de novo."}), 400
+        with _TRAVA:
+            if _ESTADO["rodando"]:
+                return jsonify({"erro": "Já tem algo rodando no Flow — espere ou clique em Parar."}), 409
+            try:
+                import flow_lote
+                motivo = flow_lote.ocupado()
+            except Exception:  # noqa: BLE001
+                motivo = None
+            if motivo:
+                return jsonify({"erro": motivo}), 409
+            opcoes: Dict[str, Any] = {
+                "modo": "gerar", "visivel": bool(b.get("visivel")), "simular": False,
+                "trocar_conta": b.get("trocar_conta", True) is not False, "conta": str(b.get("conta") or "").strip(),
+                "novo_projeto": False, "tipo": "imagem", "prompt": prompt, "modelo": str(b.get("modelo") or "").strip()[:60],
+                "proporcao": b.get("proporcao") if b.get("proporcao") in fd.PROPORCOES else "16:9",
+                "quantidade": b.get("quantidade") if b.get("quantidade") in ("x1", "x2", "x3", "x4") else "x1",
+                "referencias": refs, "montagem": pac["id"]}
+            _ESTADO.update(rodando=True, passos=[], resultados=[], erro=None, inicio=time.time(), fim=None, modo="gerar",
+                           parar=False, diagnostico=None, detalhe_erro=None,
+                           opcoes={k: (v if not isinstance(v, (dict, list)) else True) for k, v in opcoes.items()})
+            _enviar("gerar", load_site_config(), opcoes)
+        return jsonify({"ok": True})
 
     @app.route("/flow/diagnosticos")
     def flow_diagnosticos():

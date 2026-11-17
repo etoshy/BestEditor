@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Início{% endblock %}
+{% block content_attrs %}data-sem-secoes{% endblock %}
+{% block content %}
+<div class="nv-inicio">
+  <section class="nv-hero">
+    <h1>O que vamos fazer hoje?</h1>
+    <p>Escolha um caminho abaixo ou escreva o que precisa: o site mostra a ferramenta certa.</p>
+    <div class="nv-hero-busca">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="search" id="nvFiltro" placeholder="ex.: narração, short de um link, thumbnail, cortar vídeo, legenda…" autocomplete="off">
+    </div>
+  </section>
+
+  <section class="nv-bloco" id="nvComece">
+    <h2 class="nv-bloco-tit">Comece por aqui</h2>
+    <div class="nv-atalhos">
+      {% for it in atalhos %}
+      <a class="nv-atalho" href="{{ it.url }}" style="--g-cor: {{ it.cor }}">
+        <span class="nv-atalho-ico"><i class="fa-solid fa-{{ it.icone }}"></i></span>
+        <span class="nv-atalho-txt"><b>{{ it.nome }}</b><small>{{ it.desc }}</small></span>
+        <i class="fa-solid fa-arrow-right nv-atalho-seta"></i>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="nv-bloco nv-continuar" id="nvContinuar">
+    <h2 class="nv-bloco-tit">Continuar de onde parou</h2>
+    <div class="nv-continuar-colunas">
+      <div class="nv-cartao">
+        <div class="nv-cartao-tit"><i class="fa-solid fa-photo-film"></i> Últimos vídeos <a href="/jobs">ver todos →</a></div>
+        {% if recentes %}
+        <ul class="nv-lista">
+          {% for j in recentes %}
+          <li><a href="/job/{{ j.id }}/transcribing">{{ j.nome }}</a> <span class="nv-status">{{ j.status }}</span></li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="nv-vazio">Nenhum vídeo ainda. <a href="/novo-video">Comece o primeiro →</a></p>{% endif %}
+      </div>
+      <div class="nv-cartao">
+        <div class="nv-cartao-tit"><i class="fa-solid fa-clock-rotate-left"></i> Páginas que você abriu</div>
+        <ul class="nv-lista" id="nvRecentes"><li class="nv-vazio">As ferramentas que você usar aparecem aqui.</li></ul>
+      </div>
+      <div class="nv-cartao">
+        <div class="nv-cartao-tit"><i class="fa-solid fa-bell"></i> Avisos <a href="/historico">ver todos →</a></div>
+        <ul class="nv-lista" id="nvAvisos"><li class="nv-vazio">Nada rodando agora.</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="nv-bloco" id="nvTudo">
+    <h2 class="nv-bloco-tit">Tudo o que dá pra fazer</h2>
+    <p class="nv-sem-resultado" id="nvNada" hidden>Nada com esse nome. Tente outra palavra (ex.: “voz”, “capa”, “baixar”).</p>
+    {% for g in grupos %}
+    <div class="nv-grupo" id="g-{{ g.id }}" style="--g-cor: {{ g.cor }}">
+      <div class="nv-grupo-cab"><span class="nv-grupo-ico"><i class="fa-solid fa-{{ g.icone }}"></i></span>
+        <div><h3>{{ g.nome }}</h3><p>{{ g.desc }}</p></div></div>
+      <div class="nv-cartoes">
+        {% for it in g.itens %}
+        <a class="nv-item" href="{{ it.url }}" data-busca="{{ (it.nome ~ ' ' ~ it.desc ~ ' ' ~ (it.palavras or '') ~ ' ' ~ g.nome)|lower }}">
+          <i class="fa-solid fa-{{ it.icone }}"></i>
+          <span><b>{{ it.nome }}</b><small>{{ it.desc }}</small></span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <p class="nv-rodape">Prefere o visual antigo? <a href="/settings#aparencia">Configurações → Aparência</a>.</p>
+</div>
+<script>
+(function () {
+  const sem = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // 🔎 filtra os cartões enquanto digita (Enter abre o primeiro)
+  const q = document.getElementById('nvFiltro'), itens = [...document.querySelectorAll('.nv-item')];
+  itens.forEach(a => a.dataset.b = sem(a.dataset.busca));
+  function filtrar() {
+    const termos = sem(q.value).split(/\s+/).filter(Boolean);
+    let n = 0;
+    itens.forEach(a => { const ok = termos.every(t => a.dataset.b.includes(t)); a.hidden = !ok; if (ok) n++; });
+    document.querySelectorAll('.nv-grupo').forEach(g => g.hidden = !g.querySelector('.nv-item:not([hidden])'));
+    document.getElementById('nvNada').hidden = n > 0;
+    ['nvComece', 'nvContinuar'].forEach(id => document.getElementById(id).hidden = termos.length > 0);
+  }
+  q.addEventListener('input', filtrar);
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const a = itens.find(x => !x.hidden); if (a) location.href = a.href; } });
+  // 🕘 páginas abertas por último (guardadas pelo nova.js)
+  let rec = [];
+  try { rec = JSON.parse(localStorage.getItem('nv-recentes') || '[]'); } catch (_) {}
+  if (rec.length) document.getElementById('nvRecentes').innerHTML = rec.slice(0, 6).map(r =>
+    `<li><a href="${r.u}"><i class="fa-solid fa-${r.i || 'circle'}"></i> ${r.n.replace(/[<>&]/g, '')}</a></li>`).join('');
+  // 🔔 o que está rodando / terminou
+  fetch('/tarefas?limite=6', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(d => {
+    const ts = (d && d.tarefas) || []; if (!ts.length) return;
+    const ico = {rodando: '⏳', pronto: '✅', erro: '⚠'};
+    document.getElementById('nvAvisos').innerHTML = ts.slice(0, 6).map(t =>
+      `<li>${ico[t.status] || '•'} ${t.pagina ? `<a href="${t.pagina}">` : ''}${String(t.titulo || t.tipo || 'tarefa').replace(/[<>&]/g, '').slice(0, 70)}${t.pagina ? '</a>' : ''}</li>`).join('');
+  }).catch(() => {});
+})();
+</script>
+{% endblock %}

@@ -528,9 +528,74 @@ def _save_state(job_id: str) -> None:
 # Página 1: upload do áudio + configuração
 # --------------------------------------------------------------------- #
 
+def _ui_interface() -> str:
+    """🧭 v84_405: "nova" (padrão) ou "classica" — escolhida em ⚙ Configurações → Aparência."""
+    try:
+        v = str(load_site_config().get("interface") or "nova")
+    except Exception:  # noqa: BLE001
+        v = "nova"
+    return v if v in ("nova", "classica") else "nova"
+
+
+@app.context_processor
+def _ui_ctx():
+    import ui_catalogo
+    ui = _ui_interface()
+    if ui != "nova":
+        return {"ui_interface": ui}
+    try:
+        atual = ui_catalogo.atual(request.path)
+    except Exception:  # noqa: BLE001
+        atual = None
+    return {"ui_interface": ui, "ui_grupos": ui_catalogo.GRUPOS, "ui_atual": atual, "ui_busca": ui_catalogo.busca_json()}
+
+
+@app.route("/ui/interface", methods=["POST"])
+def ui_trocar_interface():
+    """🧭 v84_405: troca entre a interface nova e a clássica (vale na hora, pra todas as páginas)."""
+    b = request.get_json(silent=True) or request.form
+    v = str(b.get("interface") or "")
+    if v not in ("nova", "classica"):
+        return jsonify({"erro": "Escolha nova ou classica."}), 400
+    save_site_config({"interface": v})
+    return jsonify({"ok": True, "interface": v})
+
+
+def _inicio_recentes() -> List[Dict[str, Any]]:
+    """Os últimos vídeos (pra continuar de onde parou na tela inicial)."""
+    out = []
+    for j in sorted(_JOBS.values(), key=lambda j: j.get("created_at", 0), reverse=True)[:6]:
+        jid = j.get("id") or j.get("job_id")
+        if not jid:
+            continue
+        nome = j.get("nome_projeto") or j.get("titulo") or j.get("original_filename") or jid
+        out.append({"id": jid, "nome": str(nome)[:80], "status": str(j.get("status") or ""), "quando": j.get("created_at")})
+    return out
+
+
 @app.route("/", methods=["GET"])
 def index():
+    if _ui_interface() == "nova":  # 🧭 v84_405: na nova, a tela inicial mostra tudo o que dá pra fazer
+        return inicio()
     return render_template("index.html", providers=DEFAULT_PROVIDERS)
+
+
+@app.route("/novo-video", methods=["GET"])
+def novo_video():
+    """O formulário de vídeo novo (na interface clássica ele é a página inicial)."""
+    return render_template("index.html", providers=DEFAULT_PROVIDERS)
+
+
+@app.route("/inicio", methods=["GET"])
+def inicio():
+    import ui_catalogo
+    try:
+        recentes = _inicio_recentes()
+    except Exception:  # noqa: BLE001
+        recentes = []
+    return render_template("inicio.html", grupos=ui_catalogo.GRUPOS,
+                           atalhos=[x for x in (ui_catalogo.item(u) for u in ui_catalogo.ATALHOS_INICIO) if x],
+                           recentes=recentes)
 
 
 @app.route("/jobs", methods=["GET"])
@@ -2745,7 +2810,8 @@ def settings_page():
                            runpod=__import__("runpod_gerador").resumo(rede=False),
                            sites_bloqueados=lista_negra.sites(), sites_padrao=lista_negra.PADRAO,
                            provedores_bloqueados=[p for p in ALL_PROVIDERS if lista_negra.provedor_bloqueado(p)],
-                           vinhetas={t: os.path.basename(__import__("canal").clipe_padrao(t) or "") for t in __import__("canal").VINHETAS})
+                           vinhetas={t: os.path.basename(__import__("canal").clipe_padrao(t) or "") for t in __import__("canal").VINHETAS},
+                           ui_ajustes=__import__("ui_catalogo").ajustes_json())
 
 
 @app.route("/youtube-cookies", methods=["GET"])
@@ -2896,12 +2962,12 @@ def save_settings():
         new_values["flow_configurar_projeto"] = request.form.get("flow_configurar_projeto") == "on"
     try:
         saved = save_site_config(new_values)
-        return render_template("settings.html", config=saved, all_providers=ALL_PROVIDERS, success=True,
+        return render_template("settings.html", config=saved, all_providers=ALL_PROVIDERS, success=True, ui_ajustes=__import__("ui_catalogo").ajustes_json(),
                                runpod=__import__("runpod_gerador").resumo(rede=False))
     except SiteConfigError as exc:
         # devolve o que a pessoa tentou salvar (não o que já estava no
         # disco), pra ela ver exatamente o que causou o erro e corrigir.
-        return render_template("settings.html", config={**load_site_config(), **new_values}, all_providers=ALL_PROVIDERS, error=str(exc),
+        return render_template("settings.html", config={**load_site_config(), **new_values}, all_providers=ALL_PROVIDERS, error=str(exc), ui_ajustes=__import__("ui_catalogo").ajustes_json(),
                                runpod=__import__("runpod_gerador").resumo(rede=False))
 
 

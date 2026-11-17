@@ -66,6 +66,18 @@
   .fl-fila li button { width:auto !important; margin:0 !important; font-size:.74rem; padding:2px 7px; border-radius:5px; border:1px solid #cbd5e1; background:#fff; color:#1f2937; line-height:1.3; cursor:pointer; }
   .fl-log { font-family:ui-monospace,Consolas,monospace; font-size:.76rem; max-height:220px; overflow:auto; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:8px; white-space:pre-wrap; }
   .fl-log .erro { color:#fca5a5; } .fl-log .aviso { color:#fcd34d; } .fl-log .ok { color:#86efac; }
+  .fl-montar { border-color:#c4b5fd; background:linear-gradient(135deg,#f5f3ff,#fff); }
+  .fl-mt-linha { display:grid; grid-template-columns:minmax(220px,1fr) 2fr auto; gap:8px; align-items:start; border:1px dashed #cbd5e1; border-radius:8px; padding:8px; margin-top:8px; background:#fff; }
+  .fl-mt-linha textarea { margin:0; font-family:inherit; font-size:.85rem; }
+  .fl-mt-linha input[type=text], .fl-mt-linha select { margin:4px 0 0; }
+  .fl-mt-foto .esc img { width:72px; height:72px; object-fit:cover; border-radius:6px; }
+  .fl-mt-foto .esc { display:flex; gap:6px; align-items:center; font-size:.8rem; margin-top:4px; }
+  .fl-mt-linha .tirar { width:auto !important; margin:0 !important; padding:3px 8px; font-size:.8rem; background:#fff; color:#b91c1c; border:1px solid #fecaca; }
+  .fl-mt-refs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .fl-mt-refs figure { margin:0; width:120px; font-size:.75rem; color:#475569; }
+  .fl-mt-refs img { width:120px; height:90px; object-fit:cover; border-radius:6px; display:block; }
+  .fl-montar .mini { width:auto !important; margin:0 !important; font-size:.8rem; padding:4px 10px; }
+  @media (max-width:700px) { .fl-mt-linha { grid-template-columns:1fr; } }
 </style>
 
 <h1>🎬 Google Flow</h1>
@@ -111,6 +123,41 @@
     <button type="button" id="btnGerar" class="primary">✨ Gerar</button>
     <label><input type="checkbox" id="gerarVisivel" style="width:auto"> 👁 mostrar o navegador</label>
     <label><input type="checkbox" id="novoProjeto" style="width:auto"> começar um projeto novo no Flow</label>
+  </div>
+</div>
+
+<div class="fl-box fl-montar" id="montar">
+  <h3 style="margin-top:0">🧩 Montar cena com pose e personagens <span class="fl-hint">(a IA junta tudo num comando)</span></h3>
+  <p class="fl-hint">Mande a <b>pose</b> (opcional) e a foto de cada <b>personagem</b>. Diga quem é quem e, se quiser, uma observação em cada foto e uma no geral. A IA olha as fotos e escreve o comando dizendo o que vem de cada imagem (a pose da 1, o rosto da Ana da 2…). Depois o Flow gera com todas as imagens na caixa, na mesma ordem. Até {{ max_refs }} imagens.</p>
+  <div class="fl-mt-linha fl-mt-pose" data-papel="pose">
+    <div class="fl-mt-foto"><b>🕺 Pose / composição</b> <span class="fl-hint">(opcional)</span><input type="file" accept="image/*"><div class="esc"></div></div>
+    <textarea rows="2" class="fl-mt-obs" placeholder="observação (opcional): ex. só a posição dos corpos; a câmera mais baixa; quem fica à esquerda é a Ana"></textarea>
+  </div>
+  <div id="mtLinhas"></div>
+  <div class="fl-row" style="margin-top:6px">
+    <button type="button" class="yt-sec mini" id="mtMaisPers">➕ personagem</button>
+    <button type="button" class="yt-sec mini" id="mtMaisOutra">➕ outra foto (cenário, roupa, objeto, estilo)</button>
+    <span class="fl-hint" id="mtConta"></span>
+  </div>
+  <label style="margin-top:8px">📝 Observação geral <span class="fl-hint">(opcional — a cena, o clima, a ação)</span>
+    <textarea id="mtGeral" rows="2" placeholder="ex.: os dois brindando num bar à noite, clima de comemoração, luz quente, foto realista"></textarea></label>
+  <div class="fl-row" style="margin-top:6px">
+    <label>Proporção <select id="mtProporcao">{% for p in proporcoes %}<option {% if p == '16:9' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+    <label>Quantidade <select id="mtQuantidade"><option>x1</option><option>x2</option><option>x3</option><option>x4</option></select></label>
+    <label>Modelo <select id="mtModelo"><option value="">(o padrão das Configurações)</option>{% for m in modelos_imagem %}<option>{{ m }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="fl-row" style="margin-top:8px">
+    <button type="button" id="mtMontar" class="primary">🤖 Montar o comando</button>
+    <span class="fl-hint" id="mtSt"></span>
+  </div>
+  <div id="mtResultado" style="display:none;margin-top:8px">
+    <div class="fl-mt-refs" id="mtRefs"></div>
+    <label>Comando pro Flow <span class="fl-hint">(dá pra editar)</span><textarea id="mtPrompt" rows="5"></textarea></label>
+    <div class="fl-hint" id="mtExplica"></div>
+    <div class="fl-row" style="margin-top:6px">
+      <button type="button" id="mtGerar" class="primary">🎨 Gerar no Flow</button>
+      <label><input type="checkbox" id="mtVisivel" style="width:auto"> 👁 mostrar o navegador</label>
+    </div>
   </div>
 </div>
 
@@ -329,10 +376,11 @@
       ${e.tipo === 'video' ? `<video src="/flow/arquivo/${e.arquivo}" controls muted preload="metadata"></video>` : `<img src="/flow/arquivo/${e.arquivo}" alt="" loading="lazy">`}
       <div class="tx">${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
       <div class="ac"><a href="/flow/arquivo/${e.arquivo}?baixar=1">⬇ baixar</a>
-        ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button>` : ''}
+        ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button><button type="button" data-montar="${i}" title="usar na 🧩 Montar cena (como personagem, pose…)">🧩 montar</button>` : ''}
         <button type="button" data-prompt="${i}" title="usar este prompt de novo">↺ prompt</button>
         <button type="button" class="apagar" data-apagar="${e.id}">🗑</button></div></div>`).join('') || '<p class="fl-hint">Nada gerado ainda.</p>';
     document.querySelectorAll('[data-usar]').forEach(b => b.addEventListener('click', () => usarDaGaleria(b.dataset.usar, galItens[+b.dataset.i])));
+    document.querySelectorAll('[data-montar]').forEach(b => b.addEventListener('click', () => document.dispatchEvent(new CustomEvent('fl-montar-usar', { detail: galItens[+b.dataset.montar] }))));
     document.querySelectorAll('[data-prompt]').forEach(b => b.addEventListener('click', () => {
       const e = galItens[+b.dataset.prompt]; mudarTipo(e.tipo); $('prompt').value = e.prompt || '';
       if (e.proporcao) $('proporcao').value = e.proporcao; $('gerar').scrollIntoView({ behavior: 'smooth' });
@@ -373,6 +421,7 @@
       || '<li class="fl-hint">Nenhum erro guardado.</li>';
   }
   $('diagnosticos').addEventListener('toggle', () => { if ($('diagnosticos').open) carregarDiagnosticos(); });
+  document.addEventListener('fl-acompanhar', () => { rodava = true; status(); });  // 🧩 a montagem começou a gerar
   carregarGaleria(); status();
 })();
 </script>
@@ -501,6 +550,98 @@
     else if (b.dataset.limpar) { if (b.dataset.limpar !== 'tudo' || confirm('Esvaziar a fila inteira?')) { await post('/flow/lote/limpar', { quais: b.dataset.limpar }); estado(); } }
   });
   estado();
+})();
+</script>
+<script>
+/* 🧩 v84_406: montar cena — pose + personagens (+ outras fotos), cada uma com observação; a IA escreve o comando */
+(function () {
+  const $ = id => document.getElementById(id), MAX = {{ max_refs }};
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const PAPEIS = {{ papeis|tojson }};
+  let pacote = null, nPers = 0;
+  const linhas = () => [...document.querySelectorAll('#montar .fl-mt-linha')];
+  function contar() {
+    const n = linhas().filter(l => l._gal || (l.querySelector('input[type=file]').files || [])[0]).length;
+    $('mtConta').textContent = `${n}/${MAX} imagem(ns)`;
+    $('mtMaisPers').disabled = $('mtMaisOutra').disabled = linhas().length >= MAX;
+  }
+  function prevFoto(l) {
+    const box = l.querySelector('.esc'), inp = l.querySelector('input[type=file]'), f = (inp.files || [])[0];
+    if (l._gal) { box.innerHTML = `<img src="/flow/arquivo/${l._gal.arquivo}" alt=""> da galeria <button type="button" class="yt-sec mini" data-limpa>✕</button>`; inp.style.display = 'none'; }
+    else if (f) { box.innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`; inp.style.display = ''; }
+    else { box.innerHTML = ''; inp.style.display = ''; }
+    const lp = box.querySelector('[data-limpa]'); if (lp) lp.onclick = () => { l._gal = null; prevFoto(l); contar(); };
+    pacote = null; contar();
+  }
+  function ligar(l) {
+    l.querySelector('input[type=file]').addEventListener('change', () => { l._gal = null; prevFoto(l); });
+    const t = l.querySelector('.tirar'); if (t) t.onclick = () => { l.remove(); pacote = null; contar(); };
+    l.querySelectorAll('textarea,input[type=text],select').forEach(e => e.addEventListener('input', () => { pacote = null; }));
+  }
+  function novaLinha(papel, gal) {
+    if (linhas().length >= MAX) { alert(`No máximo ${MAX} imagens por cena.`); return null; }
+    const d = document.createElement('div'); d.className = 'fl-mt-linha'; d.dataset.papel = papel;
+    const pers = papel === 'personagem';
+    if (pers) nPers++;
+    d.innerHTML = `<div class="fl-mt-foto"><b>${pers ? '🧍 Personagem' : '🖼 Outra foto'}</b>
+        ${pers ? `<input type="text" class="fl-mt-nome" placeholder="nome (ex.: Ana, o barman)" value="${pers ? 'Personagem ' + nPers : ''}">`
+               : `<select class="fl-mt-papel">${Object.entries(PAPEIS).filter(([k]) => !['pose', 'personagem'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>`}
+        <input type="file" accept="image/*"><div class="esc"></div></div>
+      <textarea rows="2" class="fl-mt-obs" placeholder="${pers ? 'observação (opcional): ex. mantém a jaqueta; ela fica no lugar da pessoa da esquerda da pose; sorrindo' : 'observação (opcional): o que pegar desta foto'}"></textarea>
+      <button type="button" class="tirar" title="tirar esta foto">✕</button>`;
+    $('mtLinhas').appendChild(d); ligar(d);
+    if (gal) { d._gal = gal; prevFoto(d); }
+    contar(); return d;
+  }
+  ligar(document.querySelector('#montar .fl-mt-pose'));
+  novaLinha('personagem');
+  $('mtMaisPers').onclick = () => novaLinha('personagem');
+  $('mtMaisOutra').onclick = () => novaLinha('outro');
+  document.addEventListener('fl-montar-usar', (e) => {  // 🧩 da galeria
+    const it = e.detail; if (!it) return;
+    const vazia = linhas().find(l => l.dataset.papel === 'personagem' && !l._gal && !(l.querySelector('input[type=file]').files || [])[0]);
+    if (vazia) { vazia._gal = it; prevFoto(vazia); } else novaLinha('personagem', it);
+    $('montar').scrollIntoView({ behavior: 'smooth' });
+  });
+  function dados() {
+    const fd = new FormData(); let k = 0;
+    linhas().forEach(l => {
+      const f = (l.querySelector('input[type=file]').files || [])[0];
+      if (!l._gal && !f) return;
+      const papel = l.dataset.papel === 'outro' ? l.querySelector('.fl-mt-papel').value : l.dataset.papel;
+      fd.append(`r${k}_papel`, papel);
+      fd.append(`r${k}_nome`, (l.querySelector('.fl-mt-nome') || {}).value || '');
+      fd.append(`r${k}_obs`, l.querySelector('.fl-mt-obs').value || '');
+      if (l._gal) fd.append(`r${k}_galeria`, l._gal.id); else fd.append(`r${k}`, f);
+      k++;
+    });
+    fd.append('n', k); fd.append('obs_geral', $('mtGeral').value);
+    return k ? fd : null;
+  }
+  $('mtMontar').onclick = async () => {
+    const fd = dados(); if (!fd) { alert('Mande pelo menos uma foto (a pose ou um personagem).'); return; }
+    $('mtMontar').disabled = true; $('mtSt').textContent = '🤖 a IA está olhando as fotos e escrevendo o comando…';
+    try {
+      const r = await fetch('/flow/montar/prompt', { method: 'POST', body: fd }), d = await r.json();
+      if (!r.ok) throw new Error(d.erro || r.status);
+      pacote = d.pacote; $('mtPrompt').value = d.prompt;
+      $('mtExplica').innerHTML = (d.com_ia ? '🤖 ' : '📝 ') + esc(d.explicacao) + (d.avisos || []).map(a => `<div style="color:#b45309">⚠ ${esc(a)}</div>`).join('');
+      $('mtRefs').innerHTML = d.refs.map(x => `<figure><img src="/flow/montar/${d.pacote}/${x.arquivo}" alt=""><figcaption><b>${x.n}.</b> ${esc(x.quem)}${x.obs ? ' — ' + esc(x.obs) : ''}</figcaption></figure>`).join('');
+      $('mtResultado').style.display = ''; $('mtSt').textContent = '';
+    } catch (e) { $('mtSt').textContent = '⚠ ' + e.message; }
+    $('mtMontar').disabled = false;
+  };
+  $('mtGerar').onclick = async () => {
+    if (!pacote) { alert('Mudou alguma foto ou observação — clique em 🤖 Montar o comando de novo.'); return; }
+    if (!$('mtPrompt').value.trim()) { alert('O comando está vazio.'); return; }
+    const corpo = { pacote, prompt: $('mtPrompt').value, proporcao: $('mtProporcao').value, quantidade: $('mtQuantidade').value,
+                    modelo: $('mtModelo').value, visivel: $('mtVisivel').checked, conta: ($('conta') || {}).value || '',
+                    trocar_conta: ($('trocarConta') || {}).checked !== false };
+    const r = await fetch('/flow/montar/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const d = await r.json(); if (!r.ok) { alert(d.erro || 'falhou'); return; }
+    $('painel').style.display = ''; $('painel').scrollIntoView({ behavior: 'smooth' });
+    document.dispatchEvent(new Event('fl-acompanhar'));
+  };
 })();
 </script>
 {% endblock %}

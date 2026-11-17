@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Galeria de projetos</h1>
-<p style="color:#666;">Todos os projetos ficam salvos (inclusive depois de reiniciar o servidor) — abra pra continuar ou editar de novo, dê um nome, ou apague quando não precisar mais (apaga a narração e todos os arquivos do servidor). <a href="{{ url_for('index') }}">← Começar um vídeo novo</a></p>
+<p style="color:#666;">Todos os projetos ficam salvos (inclusive depois de reiniciar o servidor) — abra pra continuar ou editar de novo, dê um nome, ou apague quando não precisar mais (apaga a narração e todos os arquivos do servidor). <a href="{{ url_for('novo_video') }}">← Começar um vídeo novo</a></p>
 {% if apagado %}<p style="background:#ecfdf5;border:1px solid #6ee7b7;padding:8px 12px;border-radius:6px;">🗑 Projeto “{{ apagado }}” apagado, junto com os arquivos dele.</p>{% endif %}
 
 {% if not jobs %}
-<p>Nenhum job ainda. <a href="{{ url_for('index') }}">Comece um vídeo novo</a>.</p>
+<p>Nenhum job ainda. <a href="{{ url_for('novo_video') }}">Comece um vídeo novo</a>.</p>
 {% else %}
 
 <style>

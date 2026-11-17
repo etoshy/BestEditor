@@ -38,6 +38,8 @@ os.environ.pop("GEMINI_API_KEY", None)  # 🔷 o Gemini dos testes também come�
 os.environ.pop("GOOGLE_API_KEY", None)
 # ⬇ sem pré-download em segundo plano nos testes (não baixa nada da internet)
 os.environ["NARRATION_SEM_PREBAIXAR"] = "1"
+# 🧭 v84_405: os testes antigos olham a interface CLÁSSICA (os da nova ligam ela no próprio teste)
+os.environ.setdefault("BESTEDITOR_UI_PADRAO", "classica")
 # 🔁 projetos novos com os padrões de fábrica (sem herdar idioma/canal/voz do teste anterior)
 os.environ["ULTIMAS_ESCOLHAS_DESLIGADO"] = "1"
 

@@ -1,18 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Configurações</h1>
-<p><a href="{{ url_for('index') }}">&larr; voltar</a></p>
+<p class="nv-so-classica"><a href="{{ url_for('index') }}">&larr; voltar</a></p>
 
 {% if success %}<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px;margin-top:16px;">Configuração salva.</div>{% endif %}
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
 {% set _ia = ia_resumo() %}
-<div style="margin-top:16px;padding:12px 14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:8px;">
+<div data-nv-aba="contas" style="margin-top:16px;padding:12px 14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:8px;">
   <b>🤖 IA na edição e nos Modelos de vídeo</b> —
   {% if _ia.motivo %}desligada ({{ _ia.motivo }}){% else %}ligada: {{ _ia.modelo }}{% endif %}.
   <a href="{{ url_for('ia_page') }}">Configurar →</a>
   <div style="font-size:.84rem;color:#555;margin-top:4px">Buscas melhores, juiz das miniaturas, YouTube pelo momento certo, leitura das imagens e PDFs dos Modelos de vídeo. Desligada ou sem crédito, o site usa a lógica de sempre.</div>
 </div>
+
+<h2 style="margin-top:32px;" id="aparencia">🎨 Aparência</h2>
+<p style="font-size:.88rem;color:#555;margin:4px 0 0;">Vale na hora, pra todas as páginas. Dá pra trocar quando quiser — nada do que você fez muda.</p>
+<div class="nv-interface" id="nvInterface">
+  <label><input type="radio" name="ui_interface" value="nova"{% if ui_interface == 'nova' %} checked{% endif %}>
+    <span><b>✨ Interface nova</b><small>Menu pelo que você quer fazer, tela inicial com atalhos, busca de ferramentas (Ctrl+K), favoritos e Configurações em abas.</small></span></label>
+  <label><input type="radio" name="ui_interface" value="classica"{% if ui_interface != 'nova' %} checked{% endif %}>
+    <span><b>🗂 Interface clássica</b><small>O visual de antes, com o menu antigo e o formulário de vídeo novo como página inicial.</small></span></label>
+</div>
+<span id="nvInterfaceSt" style="font-size:.85rem;"></span>
+<script>
+document.querySelectorAll('input[name="ui_interface"]').forEach(r => r.addEventListener('change', async () => {
+  const st = document.getElementById('nvInterfaceSt'); st.textContent = '💾 trocando…';
+  try {
+    const x = await fetch('/ui/interface', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({interface: r.value})});
+    if (!x.ok) throw new Error((await x.json()).erro || x.status);
+    st.textContent = '✔ pronto — recarregando…'; setTimeout(() => location.reload(), 400);
+  } catch (e) { st.textContent = '⚠ não trocou: ' + e.message; }
+}));
+</script>
 
 <form method="post" action="{{ url_for('save_settings') }}">
 
@@ -255,7 +275,7 @@
   <p style="color:#666;font-size:0.82rem;">Em vez de pagar cada imagem, ligue um pod seu na RunPod com o servidor <code>studio-ia</code> (Z-Image Turbo + Chatterbox), gere tudo e desligue. O pod é cobrado por hora. Cole aqui o endereço que o <code>start.sh</code> mostra.</p>
   <label>De onde vêm as imagens da fonte <code>runpod</code></label>
   <select name="runpod_modo">
-    <option value="endpoints" {% if config.runpod_modo != 'pod' %}selected{% endif %}>Public Endpoints (pago por imagem, usa a chave abaixo)</option>
+    <option value="endpoints" {% if config.runpod_modo != 'pod' %}selected{% endif %}>Endpoints públicos (pago por imagem, usa a chave abaixo)</option>
     <option value="pod" {% if config.runpod_modo == 'pod' %}selected{% endif %}>🖥️ Meu pod (Z-Image Turbo no seu pod)</option>
   </select>
   <label>Endereço do pod</label>
@@ -278,7 +298,7 @@
     });
   })();
   </script>
-  <h3 style="margin-top:16px;">Public Endpoints (pago por geração)</h3>
+  <h3 style="margin-top:16px;">Endpoints públicos (pago por geração)</h3>
   <div id="runpod-saldo" style="padding:8px 12px;border-radius:8px;background:#f5f3ff;border:1px solid #ddd6fe;font-size:.9rem;margin:6px 0;">
     {% if runpod.tem_chave %}
       💰 Saldo: <b id="runpod-saldo-valor">{% if runpod.saldo is not none %}US$ {{ '%.2f'|format(runpod.saldo) }}{% else %}—{% endif %}</b>
@@ -413,7 +433,7 @@
 </form>
 {% endfor %}
 
-<h2 style="margin-top:32px;" id="youtube-cookies">YouTube — “Sign in to confirm you’re not a bot”</h2>
+<h2 style="margin-top:32px;" id="youtube-cookies">YouTube pedindo login (“Sign in to confirm you’re not a bot” — confirme que não é um robô)</h2>
 <p style="color:#555;font-size:0.85rem;">Quando o YouTube pede login (Roteiro do YouTube, Cortar do YouTube, painel do YouTube no editor), o site usa os cookies de um navegador em que você está logado no YouTube. Se você não escolher nada, ele tenta sozinho Firefox, Edge, Chrome, Brave, Opera e Vivaldi e guarda o que funcionou. O mais garantido: <strong>Firefox logado no YouTube</strong>, ou um <strong>cookies.txt</strong> (extensão “Get cookies.txt LOCALLY” no Chrome/Edge, com youtube.com aberto e logado → Export). Feche o Chrome antes — aberto, ele bloqueia a leitura dos cookies.</p>
 <p style="font-size:0.85rem;">Agora: <strong id="ytck-agora">…</strong></p>
 <form method="post" action="{{ url_for('youtube_cookies_salvar') }}" enctype="multipart/form-data" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;">
@@ -497,4 +517,8 @@ fetch("{{ url_for('youtube_cookies_status') }}").then(r => r.json()).then(d => {
   }
 })();
 </script>
+{% if ui_interface == 'nova' %}
+<script id="nvAjustes" type="application/json">{{ ui_ajustes|tojson }}</script>
+<script src="{{ url_for('static', filename='ui/nova_ajustes.js') }}?v=84405"></script>
+{% endif %}
 {% endblock %}

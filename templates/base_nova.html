@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-br" data-tema="escuro" class="ui-nova">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}BestEditor{% endblock %}</title>
+  <script>
+  /* tema e menu antes de desenhar (sem piscar) — ver static/ui/ui.js */
+  (function () { var h = document.documentElement, t = null, m = null;
+    try { t = localStorage.getItem('ui-tema'); m = localStorage.getItem('ui-menu-mini'); } catch (e) {}
+    h.setAttribute('data-tema', t === 'claro' ? 'claro' : 'escuro'); if (m === '1') h.classList.add('menu-mini'); })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" data-ui-base>
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui/tema.css') }}?v=84170" data-ui-base>
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui/nova.css') }}?v=84405" data-ui-base>
+  <script src="{{ url_for('static', filename='ui/midia_estavel.js') }}?v=84298"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+{%- set _atual = ui_atual -%}
+{%- macro item(it) -%}
+  {%- set _p = request.path -%}
+  {%- set ns = namespace(a=(_p == it.url or _p.startswith(it.url.rstrip('/') + '/'))) -%}
+  {%- for pre in (it.ativo_em or []) %}{% if _p.startswith(pre) %}{% set ns.a = true %}{% endif %}{% endfor -%}
+  {%- if _atual and _atual.url != it.url %}{% set ns.a = false %}{% endif -%}
+  <li><a class="item{% if ns.a %} ativo{% endif %}" href="{{ it.url }}" title="{{ it.desc }}"><i class="ii fa-solid fa-{{ it.icone }}"></i><span class="itxt">{{ it.nome }}</span></a></li>
+{%- endmacro %}
+  <aside class="app-sidebar" data-ui-base aria-label="Menu">
+    <div class="app-marca">
+      <a href="/"><span class="logo"><i class="fa-solid fa-clapperboard"></i></span><span class="nome">BestEditor</span></a>
+      <button type="button" class="fechar-menu" data-ui-fechar-menu title="Fechar o menu"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <button type="button" class="nv-busca-btn" data-nv-busca title="Procurar qualquer ferramenta (Ctrl+K)">
+      <i class="fa-solid fa-magnifying-glass"></i><span class="itxt">Procurar ferramenta…</span><kbd>Ctrl K</kbd>
+    </button>
+    <nav class="app-nav">
+      <ul class="itens" style="margin-top:4px">
+        <li><a class="item destaque-ini{% if request.path in ('/', '/inicio') %} ativo{% endif %}" href="/" title="Tela inicial: o que dá pra fazer"><i class="ii fa-solid fa-house"></i><span class="itxt">Início</span></a></li>
+      </ul>
+      <div class="grupo nv-favs" data-grupo="favoritos" hidden>
+        <button type="button" class="grupo-tit" title="Favoritos"><i class="gi fa-solid fa-star"></i><span class="gtxt">Favoritos</span><i class="seta fa-solid fa-chevron-down"></i></button>
+        <ul class="itens" data-nv-favs></ul>
+      </div>
+      {% for g in ui_grupos %}
+      <div class="grupo" data-grupo="nv-{{ g.id }}" style="--g-cor: {{ g.cor }}">
+        <button type="button" class="grupo-tit" title="{{ g.desc }}"><i class="gi fa-solid fa-{{ g.icone }}"></i><span class="gtxt">{{ g.nome }}</span><i class="seta fa-solid fa-chevron-down"></i></button>
+        <ul class="itens">{% for it in g.itens %}{{ item(it) }}{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </nav>
+  </aside>
+  <div class="app-veu" data-ui-fechar-menu></div>
+  <div class="app-main">
+    <header class="app-topo" data-ui-base>
+      <button type="button" class="topo-btn icone abrir-menu" data-ui-abrir-menu title="Abrir o menu" aria-label="Abrir o menu"><i class="fa-solid fa-bars"></i></button>
+      <button type="button" class="topo-btn icone mini-menu" data-ui-mini-menu title="Recolher / abrir o menu lateral" aria-label="Recolher o menu"><i class="fa-solid fa-bars-staggered"></i></button>
+      <nav class="nv-trilha" aria-label="Onde você está">
+        <a href="/"><i class="fa-solid fa-house"></i></a>
+        {% if _atual %}<i class="fa-solid fa-chevron-right sep"></i><a href="/#g-{{ _atual.grupo }}">{{ _atual.grupo_nome }}</a>
+        <i class="fa-solid fa-chevron-right sep"></i><span class="topo-tit">{{ _atual.nome }}</span>
+        {% else %}<i class="fa-solid fa-chevron-right sep"></i><span class="topo-tit">{{ self.title() }}</span>{% endif %}
+      </nav>
+      <div class="espaco"></div>
+      {% block topo_acoes %}{% endblock %}
+      <button type="button" class="topo-btn icone nv-busca-topo" data-nv-busca title="Procurar ferramenta (Ctrl+K)" aria-label="Procurar ferramenta"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <div id="saldoBox" style="position:relative">
+        <button type="button" class="topo-btn" id="saldoBtn" title="Uso do Claude"><i class="fa-solid fa-coins"></i><span class="rot-longo">Claude</span><span class="rot-curto">—</span></button>
+        <div class="topo-painel" id="saldoPainel" role="dialog" aria-label="Uso do Claude"></div>
+      </div>
+      <button type="button" class="topo-btn icone" data-ui-tema-btn title="Mudar o tema" aria-label="Mudar entre modo claro e escuro"><i data-ui-tema-ico class="fa-solid fa-sun"></i></button>
+      {% include "_sino.html" %}
+    </header>
+    <main class="app-content" {% block content_attrs %}{% endblock %}>
+    {% if _atual %}
+    <div class="nv-sobre" data-ui-base>
+      <span class="nv-sobre-ico" style="--g-cor: {{ _atual.cor }}"><i class="fa-solid fa-{{ _atual.icone }}"></i></span>
+      <span class="nv-sobre-txt"><b>{{ _atual.nome }}</b> — {{ _atual.desc }}</span>
+      <span class="nv-sobre-acoes">
+        {% for anc, rot in (_atual.ajustes or []) %}<a class="nv-chip" href="/settings#{{ anc }}" title="Ajustes guardados em Configurações"><i class="fa-solid fa-sliders"></i> Ajustes: {{ rot }}</a>{% endfor %}
+        <button type="button" class="nv-chip nv-fav" data-nv-fav="{{ _atual.url }}" data-nome="{{ _atual.nome }}" data-icone="{{ _atual.icone }}" title="Guardar nos favoritos do menu"><i class="fa-regular fa-star"></i> <span>Favoritar</span></button>
+      </span>
+    </div>
+    {% endif %}
+  {% block content %}{% endblock %}
+    </main>
+  </div>
+  <div class="nv-paleta" id="nvPaleta" hidden role="dialog" aria-label="Procurar ferramenta" data-ui-base>
+    <div class="nv-paleta-caixa">
+      <div class="nv-paleta-campo"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="nvPaletaQ" placeholder="O que você quer fazer? (ex.: narração, short, thumbnail, cortar)" autocomplete="off"><kbd>Esc</kbd></div>
+      <ul class="nv-paleta-lista" id="nvPaletaLista"></ul>
+      <div class="nv-paleta-pe">↑↓ escolher · Enter abrir · <a href="/settings#aparencia">voltar ao visual antigo</a></div>
+    </div>
+  </div>
+  <script id="nvIndice" type="application/json">{{ ui_busca|tojson }}</script>
+  <script src="{{ url_for('static', filename='ui/nova.js') }}?v=84405"></script>
+  {% include "_base_scripts.html" %}
+</body>
+</html>
