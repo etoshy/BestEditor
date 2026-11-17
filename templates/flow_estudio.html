@@ -83,6 +83,9 @@
   .fl-rc-img img { width:100%; display:block; user-select:none; -webkit-user-drag:none; }
   .fl-rc-pin { position:absolute; width:28px; height:28px; margin:-14px 0 0 -14px; border-radius:50%; background:#dc2626; color:#fff; font-weight:700; display:grid; place-items:center; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); font-size:.85rem; pointer-events:none; }
   .fl-rc-pin span { position:absolute; left:30px; top:2px; white-space:nowrap; color:#dc2626; background:#fff; padding:0 5px; border-radius:4px; font-size:.75rem; }
+  .fl-rc-foto { margin:2px 0 4px; font-size:.8rem; } .fl-rc-foto label { margin:0; font-weight:600; font-size:.8rem; }
+  .fl-rc-foto input { margin:2px 0 0; font-size:.78rem; }
+  .fl-rc-foto img { width:56px; height:56px; object-fit:cover; border-radius:6px; vertical-align:middle; }
   .fl-rc-cena { display:grid; gap:4px; margin:8px 0; padding:8px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
   .fl-rc-cena label { margin:0; font-size:.82rem; } .fl-rc-cena input { margin:2px 0 0; font-size:.84rem; }
   .fl-rc-pin.obj { background:#2563eb; } .fl-rc-pin.obj span { color:#2563eb; }
@@ -143,7 +146,7 @@
 
 <div class="fl-box fl-montar" id="rascunho">
   <h3 style="margin-top:0">✏️ Rascunho da cena <span class="fl-hint">(foto → esboço a lápis pra usar de base e trocar o que quiser)</span></h3>
-  <p class="fl-hint">Mande a foto inteira: ela vira um rascunho da cena (pessoas viram bonecos sem rosto; carro, móveis e fundo viram contornos simples, tudo no mesmo lugar e no mesmo ângulo). Clique em <b>🤖 entender a cena</b>: a IA lista cada pessoa, cada objeto, o cenário, a câmera e o estilo. Diga o que entra no lugar de cada um (ou deixe vazio pra manter) e use como base na 🧩 Montar cena, onde dá pra pôr a foto de cada personagem novo.</p>
+  <p class="fl-hint">Mande a foto inteira: ela vira um rascunho da cena (pessoas viram bonecos sem rosto; carro, móveis e fundo viram contornos simples, tudo no mesmo lugar e no mesmo ângulo). Clique em <b>🤖 entender a cena</b>: a IA lista cada pessoa, cada objeto, o cenário, a câmera e o estilo. Em cada um, escreva quem/o que entra no lugar e mande a 📷 foto (ou deixe vazio pra manter) — depois clique em ➡ Montar a cena com estas trocas.</p>
   <div class="fl-row">
     <label>Foto <input type="file" accept="image/*" id="rcFoto" style="width:auto"></label>
     <label style="flex:1;min-width:220px">Pedido extra <span class="fl-hint">(opcional, só no Flow)</span><input type="text" id="rcExtra" placeholder="ex.: traço mais grosso, estilo mangá"></label>
@@ -158,15 +161,17 @@
       <div class="fl-rc-lado">
         <div class="fl-row"><button type="button" class="yt-sec mini" id="rcAchar">🤖 entender a cena</button>
           <button type="button" class="yt-sec mini" id="rcLimpar">limpar as marcas</button>
-          <span class="fl-hint">clique no desenho: 🔴 pessoa · troque pra 🔵 objeto na lista</span></div>
+          <span class="fl-hint">clique no desenho pra marcar cada pessoa/objeto · em cada um: o nome e a 📷 foto de quem/o que entra no lugar</span></div>
         <div class="fl-rc-cena">
           <label>🎥 Câmera <input type="text" id="rcCamera" placeholder="ex.: de cima pra baixo, corpo inteiro"></label>
           <label>🏞 Cenário <input type="text" id="rcCenario" placeholder="o que tem no fundo (a IA preenche)"></label>
           <label>↪ trocar o cenário por <input type="text" id="rcCenarioNovo" placeholder="vazio = mantém (ex.: rua de Tóquio à noite)"></label>
+          <label>📷 foto do cenário novo <span class="fl-hint">(opcional)</span><input type="file" accept="image/*" id="rcCenarioFoto"></label>
           <label>🎨 Estilo da foto <span class="fl-hint" id="rcEstiloTxt">—</span></label>
         </div>
         <div id="rcMarcas" class="fl-rc-marcas"><p class="fl-hint">Clique na cabeça de cada pessoa no desenho.</p></div>
-        <button type="button" class="primary" id="rcUsar" style="margin-top:8px">➡ Usar como base na Montar cena</button>
+        <button type="button" class="primary" id="rcUsar" style="margin-top:8px">➡ Montar a cena com estas trocas</button>
+        <div class="fl-hint">Leva o rascunho e as fotos pra 🧩 Montar cena (logo abaixo): lá você escolhe o estilo final e clica em 🤖 Montar o comando.</div>
       </div></div>
   </div>
 </div>
@@ -647,27 +652,29 @@
   $('mtMaisPers').onclick = () => novaLinha('personagem');
   $('mtMaisOutra').onclick = () => novaLinha('outro');
   document.addEventListener('fl-montar-pose', (e) => {  // ✏️ o rascunho vira a POSE + uma linha por pessoa/objeto/cenário
-    const { item, marcas, cena, estilo } = e.detail, pose = document.querySelector('#montar .fl-mt-pose');
+    const { item, marcas, cena, estilo } = e.detail, fotos = e.detail.fotos || [], pose = document.querySelector('#montar .fl-mt-pose');
+    const comFoto = (l, f) => { if (!l || !f) return; try { const dt = new DataTransfer(); dt.items.add(f); l.querySelector('input[type=file]').files = dt.files; prevFoto(l); } catch (_) {} };
     pose._gal = item; pose._marcas = marcas; pose._cena = cena; prevFoto(pose);
     pose.querySelector('.fl-mt-obs').value = pose.querySelector('.fl-mt-obs').value || 'só a pose, o enquadramento e o lugar de cada coisa (rascunho)';
     linhas().filter(l => l !== pose && !l._gal && !(l.querySelector('input[type=file]').files || [])[0]).forEach(l => l.remove());
     nPers = 0;
-    marcas.forEach(m => {
+    marcas.forEach((m, i) => {
       if (m.tipo === 'objeto') {
-        if (!m.nome) return;  // objeto sem troca: fica como está no rascunho
+        if (!m.nome && !fotos[i]) return;  // objeto sem troca: fica como está no rascunho
         const l = novaLinha('outro'); if (!l) return;
         l.querySelector('.fl-mt-papel').value = 'objeto'; l.querySelector('.fl-mt-nome').value = m.nome;
         l.querySelector('.fl-mt-obs').value = `no lugar do elemento ${m.n} do rascunho` + (m.obs ? ` (${m.obs})` : '');
-        return;
+        comFoto(l, fotos[i]); return;
       }
       const l = novaLinha('personagem'); if (!l) return;
       l.querySelector('.fl-mt-nome').value = m.nome || ('Personagem ' + m.n);
       l.querySelector('.fl-mt-obs').value = `fica no lugar da figura ${m.n} do rascunho` + (m.obs ? ` (${m.obs})` : '');
+      comFoto(l, fotos[i]);
     });
-    if (cena && cena.cenario_novo) {
+    if (cena && (cena.cenario_novo || e.detail.fotoCenario)) {
       const l = novaLinha('outro');
-      if (l) { l.querySelector('.fl-mt-papel').value = 'cenario'; l.querySelector('.fl-mt-nome').value = cena.cenario_novo;
-               l.querySelector('.fl-mt-obs').value = 'o fundo novo no lugar do cenário do rascunho (foto opcional)'; }
+      if (l) { l.querySelector('.fl-mt-papel').value = 'cenario'; l.querySelector('.fl-mt-nome').value = cena.cenario_novo || '';
+               l.querySelector('.fl-mt-obs').value = 'o fundo novo no lugar do cenário do rascunho'; comFoto(l, e.detail.fotoCenario); }
     }
     if (estilo && [...$('mtEstilo').options].some(o => o.value === estilo) && !$('mtEstilo').value) $('mtEstilo').value = estilo;
     $('montar').scrollIntoView({ behavior: 'smooth' });
@@ -750,13 +757,19 @@
     $('rcMarcas').innerHTML = marcas.length ? marcas.map((m, i) => `<div class="fl-rc-m${m.tipo === 'objeto' ? ' obj' : ''}" data-i="${i}"><b>${m.n}</b>
       <div><select data-k="tipo"><option value="pessoa"${m.tipo !== 'objeto' ? ' selected' : ''}>🧍 pessoa</option><option value="objeto"${m.tipo === 'objeto' ? ' selected' : ''}>📦 objeto</option></select>
         <input type="text" data-k="nome" value="${esc(m.nome)}" placeholder="${m.tipo === 'objeto' ? 'trocar por (vazio = mantém) ex.: moto vermelha' : 'quem fica aqui (ex.: Ana)'}">
-        <textarea rows="1" data-k="obs" placeholder="o que é / observação (opcional)">${esc(m.obs)}</textarea></div>
+        <textarea rows="1" data-k="obs" placeholder="o que é / observação (opcional)">${esc(m.obs)}</textarea>
+        <div class="fl-rc-foto">${m._url ? `<img src="${m._url}" alt=""> <button type="button" class="yt-sec mini" data-semfoto="${i}">trocar foto</button>`
+          : `<label>📷 foto ${m.tipo === 'objeto' ? 'do objeto novo' : 'de quem entra aqui'} <span class="fl-hint">(opcional)</span><input type="file" accept="image/*" data-foto="${i}"></label>`}</div></div>
       <button type="button" data-tira="${i}">✕</button></div>`).join('') : '<p class="fl-hint">Clique em cada pessoa (na cabeça) e em cada objeto no desenho — ou 🤖 entender a cena.</p>';
     $('rcMarcas').querySelectorAll('[data-k]').forEach(e => e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', () => {
       const m = marcas[+e.closest('.fl-rc-m').dataset.i]; m[e.dataset.k] = e.value;
       if (e.dataset.k === 'tipo') desenhar(); else if (e.dataset.k === 'nome') $('rcImg').querySelectorAll('.fl-rc-pin').forEach((p, i) => p.innerHTML = rotPin(marcas[i]));
     }));
     $('rcMarcas').querySelectorAll('[data-tira]').forEach(b => b.onclick = () => { marcas.splice(+b.dataset.tira, 1); desenhar(); });
+    $('rcMarcas').querySelectorAll('[data-foto]').forEach(inp => inp.addEventListener('change', () => {
+      const f = (inp.files || [])[0], m = marcas[+inp.dataset.foto]; if (!f) return;
+      m._file = f; m._url = URL.createObjectURL(f); desenhar(); }));
+    $('rcMarcas').querySelectorAll('[data-semfoto]').forEach(b => b.onclick = () => { const m = marcas[+b.dataset.semfoto]; m._file = null; m._url = null; desenhar(); });
   }
   $('rcImg').addEventListener('click', (e) => {
     if (marcas.length >= 12) { alert('No máximo 12 marcas.'); return; }
@@ -808,8 +821,10 @@
   $('rcUsar').onclick = () => {
     if (!item) return;
     const cena = { camera: $('rcCamera').value.trim(), cenario: $('rcCenario').value.trim(), cenario_novo: $('rcCenarioNovo').value.trim() };
-    if (!marcas.length && !cena.cenario_novo && !confirm('Nada marcado — usar o rascunho só como pose/composição?')) return;
-    document.dispatchEvent(new CustomEvent('fl-montar-pose', { detail: { item, marcas: marcas.map(m => ({ ...m })), cena, estilo } }));
+    const fotoCenario = ($('rcCenarioFoto').files || [])[0] || null;
+    if (!marcas.length && !cena.cenario_novo && !fotoCenario && !confirm('Nada marcado — usar o rascunho só como pose/composição?')) return;
+    const limpas = marcas.map(m => ({ n: m.n, x: m.x, y: m.y, tipo: m.tipo, nome: m.nome, obs: m.obs }));
+    document.dispatchEvent(new CustomEvent('fl-montar-pose', { detail: { item, marcas: limpas, fotos: marcas.map(m => m._file || null), cena, fotoCenario, estilo } }));
   };
 })();
 </script>
