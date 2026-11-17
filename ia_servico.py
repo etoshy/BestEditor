@@ -127,6 +127,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                     "No Estúdio (aba 🧍 Personagens) e nos projetos novos de um canal com personagens: escolhe os MELHORES "
                     "momentos pra cada personagem aparecer (não todas as falas), a pose que combina com o que ela diz e a "
                     "animação de entrada/saída.", True),
+    "flow_juiz": ("🎯 Flow: escolher a melhor variação",
+                  "Na aba 🎬 Google Flow (🧩 Montar cena e 🎬 Refazer cena): o Flow gera 2 variações e a IA escolhe a mais fiel "
+                  "(pose, expressão, personagem certo no lugar certo, estilo) — e no Refazer cena confere o quadro antes de "
+                  "gastar um vídeo do Veo.", True),
     "refazer_cena": ("🎬 Flow: refazer cena (vídeo)",
                      "Na aba 🎬 Refazer cena: olha 3 quadros de cada plano do vídeo e as falas, separa quem é quem (A, B, C…), a ação, "
                      "a câmera e as falas de cada plano — e, se pedir, reescreve as falas com a mesma ideia.", True),

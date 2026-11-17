@@ -408,30 +408,67 @@ def _copiar_pro_projeto(base: str, pid: str, origem: str, nome: str) -> str:
 
 def gerar(base: str, gal_base: str, pid: str, ns: List[int], etapa: str, rodar: Callable[..., List[Dict[str, Any]]],
           montar: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None, parar: Callable[[], bool] = lambda: False,
-          prog: Callable[[str], None] = lambda s: None) -> Dict[str, Any]:
-    """etapa: "quadro" (só os quadros novos, pra você conferir), "video" (anima os quadros que já existem) ou "tudo"."""
+          prog: Callable[[str], None] = lambda s: None, pular_prontos: bool = False,
+          julgar: Optional[Callable[..., Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """etapa: "quadro" (só os quadros novos, pra você conferir), "video" (anima os quadros que já existem) ou "tudo".
+    ⏭ v84_409: `pular_prontos` — retomar de onde parou (o plano que já tem o que a etapa faz fica como está).
+    🎯 `variacoes` (no projeto): o quadro sai em 2 e a IA escolhe; ✔ `conferir`: quadro ruim não vai pro Veo — refaz 1x."""
     import flow_montar as FM
+    import flow_juiz as FJ
     montar = montar or FM.montar_prompt
+    julgar = julgar or FJ.julgar
     p = carregar(base, pid)
     alvos = [pl for pl in p["planos"] if not ns or pl["n"] in ns]
+    if pular_prontos:
+        alvos = [pl for pl in alvos if not (pl.get("video_novo") if etapa in ("video", "tudo") else pl.get("quadro_novo"))]
+        if not alvos:
+            prog("✅ todos os planos já estavam prontos")
     for k, pl in enumerate(alvos, 1):
         if parar():
             raise RefazerErro("Parado por você.")
         n = pl["n"]
+        etapa_pl = etapa
+        if pular_prontos and etapa == "tudo" and pl.get("quadro_novo") and (pl.get("juiz") or {}).get("ok", True):
+            etapa_pl = "video"  # ⏭ retomar: o quadro bom que já existe fica; só anima
         try:
-            if etapa in ("quadro", "tudo") or (etapa == "video" and not pl.get("quadro_novo")):
+            if etapa_pl in ("quadro", "tudo") or (etapa_pl == "video" and not pl.get("quadro_novo")):
                 prog(f"🖼 plano {n} ({k}/{len(alvos)}): montando o quadro novo…")
                 pac = pacote_do_plano(base, p, pl, gal_base)
                 pr = montar(pac)["prompt"]
-                res = rodar({"tipo": "imagem", "prompt": pr, "referencias": FM.referencias_flow(pac), "proporcao": p["proporcao"]})
-                img = next((r for r in res if r.get("tipo") == "imagem"), None)
-                if not img:
-                    raise RefazerErro("o Flow não devolveu a imagem")
+                variacoes, conferir = p.get("variacoes", True), p.get("conferir", True)
+                juiz: Dict[str, Any] = {}
+                for tentativa in (1, 2):
+                    res = rodar({"tipo": "imagem", "prompt": pr, "referencias": FM.referencias_flow(pac), "proporcao": p["proporcao"],
+                                 "quantidade": "x2" if variacoes else "x1"})
+                    imgs = [r for r in res if r.get("tipo") == "imagem"]
+                    if not imgs:
+                        raise RefazerErro("o Flow não devolveu a imagem")
+                    if not (variacoes or conferir):
+                        juiz = {"melhor": 0, "notas": [None], "problemas": [""], "ok": True, "resumo": "", "com_ia": False}
+                        break
+                    prog(f"🎯 plano {n}: a IA está conferindo {'as variações' if len(imgs) > 1 else 'o quadro'}…")
+                    juiz = julgar(pr, FJ.refs_do_pacote(pac), [r["caminho"] for r in imgs])
+                    if juiz["ok"] or not conferir or tentativa == 2:
+                        break
+                    prob = juiz["problemas"][juiz["melhor"]] or "it did not follow the base image"
+                    prog(f"🔁 plano {n}: o quadro não ficou bom (nota {juiz['notas'][juiz['melhor']]}) — refazendo: {prob[:80]}")
+                    pr = pr + " Fix: " + prob
+                img = imgs[juiz["melhor"]]
                 rel = _copiar_pro_projeto(base, pid, img["caminho"], f"q{n:02d}_{secrets.token_hex(2)}")
+                alts = [_copiar_pro_projeto(base, pid, r["caminho"], f"q{n:02d}_alt{i}_{secrets.token_hex(2)}")
+                        for i, r in enumerate(imgs) if i != juiz["melhor"]]
+                nota_q = juiz["notas"][juiz["melhor"]]
+                aviso = "" if juiz["ok"] else f"⚠ o quadro ainda não ficou bom (nota {nota_q}): {juiz['problemas'][juiz['melhor']][:160]}"
                 p = _mudar(base, pid, lambda q: next(x for x in q["planos"] if x["n"] == n).update(
-                    quadro_novo=rel, prompt_quadro=pr, video_novo="", erro=""))
+                    quadro_novo=rel, quadros_alt=alts, prompt_quadro=pr, video_novo="", erro="",
+                    juiz={"nota": nota_q, "resumo": juiz.get("resumo") or "", "ok": juiz["ok"], "com_ia": juiz.get("com_ia")}))
                 pl = next(x for x in p["planos"] if x["n"] == n)
-            if etapa in ("video", "tudo"):
+                if not juiz["ok"] and conferir and etapa_pl == "tudo":
+                    p = _mudar(base, pid, lambda q: next(x for x in q["planos"] if x["n"] == n).update(erro=aviso + " — não animei; "
+                                                                                                       "confira e clique em 🎞 animar"))
+                    continue
+                pl = next(x for x in p["planos"] if x["n"] == n)
+            if etapa_pl in ("video", "tudo"):
                 prog(f"🎞 plano {n} ({k}/{len(alvos)}): animando no Veo…")
                 pv = prompt_video(p, pl)
                 res = rodar({"tipo": "video", "prompt": pv, "inicio": {"arquivo": os.path.join(pasta(base, pid), pl["quadro_novo"])},
@@ -536,6 +573,7 @@ def publico(p: Dict[str, Any], url: Callable[[str], str]) -> Dict[str, Any]:
         pl["quadro_url"] = url(pl["quadro"])
         pl["quadro_novo_url"] = url(pl["quadro_novo"]) if pl.get("quadro_novo") else ""
         pl["video_novo_url"] = url(pl["video_novo"]) if pl.get("video_novo") else ""
+        pl["alt_urls"] = [{"rel": a, "url": url(a)} for a in pl.get("quadros_alt") or []]
     for x in out.get("personagens") or []:
         x["foto_url"] = url(x["foto"]) if x.get("foto") else ""
     c = out.get("cenario") or {}
@@ -655,6 +693,15 @@ def registrar(app, FE) -> None:
                 p["cenario"]["novo"] = " ".join(str(b["cenario"].get("novo") or "").split())[:300]
                 if b["cenario"].get("tirar_foto"):
                     p["cenario"]["foto"] = ""
+            for k_ in ("variacoes", "conferir"):  # 🎯 v84_409
+                if k_ in b:
+                    p[k_] = bool(b[k_])
+            if b.get("usar_alt"):  # trocar o quadro pela outra variação
+                n_, rel_ = int(b["usar_alt"].get("n") or 0), str(b["usar_alt"].get("rel") or "")
+                pl_ = next((x for x in p["planos"] if x["n"] == n_), None)
+                if pl_ and rel_ in (pl_.get("quadros_alt") or []):
+                    pl_["quadros_alt"] = [a for a in pl_["quadros_alt"] if a != rel_] + ([pl_["quadro_novo"]] if pl_.get("quadro_novo") else [])
+                    pl_["quadro_novo"], pl_["video_novo"] = rel_, ""
             if "estilo" in b:
                 import flow_montar as FM
                 p["estilo"] = b["estilo"] if FM.estilo_en(b.get("estilo") or "") else ""
@@ -739,7 +786,8 @@ def registrar(app, FE) -> None:
 
             def fazer(prog, parar_):
                 gerar(base(), FE.pasta_galeria(), pid, ns, etapa_,
-                      lambda pedido: FE.rodar_e_esperar(dict(pedido, **opc), parar=parar_), parar=parar_, prog=prog)
+                      lambda pedido: FE.rodar_e_esperar(dict(pedido, **opc), parar=parar_), parar=parar_, prog=prog,
+                      pular_prontos=bool(b.get("pular_prontos")))
                 if etapa_ in ("video", "tudo") and not ns:
                     prog("🎬 juntando os planos…")
                     juntar(base(), pid)

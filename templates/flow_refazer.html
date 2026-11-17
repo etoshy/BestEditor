@@ -85,8 +85,10 @@
       <button type="button" class="rf-btn rf-sec" id="rfSalvar">💾 salvar</button>
       <button type="button" class="rf-btn" id="rfQuadros" title="Só os quadros novos — confira antes de gastar vídeo">🖼 1º: fazer os quadros novos</button>
       <button type="button" class="rf-btn" id="rfAnimar" title="Anima os quadros novos no Veo e junta">🎞 2º: animar e juntar</button>
-      <button type="button" class="rf-btn rf-sec" id="rfTudo">🎬 tudo de uma vez</button>
+      <button type="button" class="rf-btn rf-sec" id="rfTudo" title="Retoma de onde parou: os planos já prontos ficam">🎬 tudo de uma vez</button>
       <button type="button" class="rf-btn rf-sec" id="rfJuntar">🧩 só juntar</button>
+      <label title="Cada quadro sai em 2 variações e a IA escolhe a mais fiel (1 imagem a mais por plano)"><input type="checkbox" id="rfVariacoes" style="width:auto"> 🎯 2 variações e a IA escolhe</label>
+      <label title="Antes de gastar o vídeo do Veo, a IA confere o quadro; se ficou ruim, refaz 1x com o motivo — e se ainda ficar ruim, não anima"><input type="checkbox" id="rfConferir" style="width:auto"> ✔ conferir o quadro antes de animar</label>
       <label><input type="checkbox" id="rfVisivel" style="width:auto"> 👁 mostrar o navegador</label>
     </div>
     <div id="rfFinal" style="margin-top:10px"></div>
@@ -129,6 +131,7 @@
         : `<label style="font-size:.8rem">📷 foto da pessoa nova <input type="file" accept="image/*" data-foto="${x.id}"></label>`}</div></div>`).join('')
       || '<p class="rf-hint">A IA ainda não separou as pessoas (espere a análise ou clique em 🤖 analisar de novo).</p>';
     $('rfCenOrig').textContent = P.cenario.descricao ? '— agora: ' + P.cenario.descricao : '';
+    $('rfVariacoes').checked = P.variacoes !== false; $('rfConferir').checked = P.conferir !== false;
     if (!sujo) { $('rfCenNovo').value = P.cenario.novo || ''; $('rfEstilo').value = P.estilo || ''; $('rfFalasModo').value = P.falas_modo || 'manter'; }
     $('rfCenFotoVer').innerHTML = P.cenario.foto_url ? `<img src="${P.cenario.foto_url}" style="width:56px;height:56px;object-fit:cover;border-radius:6px"> <button type="button" class="rf-mini rf-sec" id="rfCenTira">tirar</button>` : '';
     const vert = P.proporcao === '9:16';
@@ -139,6 +142,8 @@
 
         <div class="midia" style="margin-top:6px"><figure><img src="${pl.quadro_url}" alt="">original</figure>
           <figure>${pl.video_novo_url ? `<video src="${pl.video_novo_url}" controls muted preload="metadata"></video>novo (vídeo)` : pl.quadro_novo_url ? `<img src="${pl.quadro_novo_url}" alt="">novo (quadro)` : '<div class="rf-hint" style="padding:20px 6px">ainda não feito</div>'}</figure></div>
+        ${pl.juiz && pl.juiz.nota != null ? `<div class="rf-hint">🎯 nota ${pl.juiz.nota}${pl.juiz.resumo ? ' — ' + esc(pl.juiz.resumo) : ''}</div>` : ''}
+        ${(pl.alt_urls || []).length ? `<div class="rf-hint">outras variações: ${pl.alt_urls.map(a => `<a href="#" data-alt="${esc(a.rel)}" title="usar esta"><img src="${a.url}" style="width:56px;height:42px;object-fit:cover;border-radius:4px;vertical-align:middle"></a>`).join(' ')}</div>` : ''}
         ${pl.erro ? `<div class="erro">⚠ ${esc(pl.erro)}</div>` : ''}</div>
       <div><label style="margin:0;font-size:.8rem">🎬 ação (inglês, pro Veo)<textarea rows="2" data-k="acao_en">${esc(pl.acao_en)}</textarea></label>
         <label style="margin:0;font-size:.8rem">🎥 câmera<input type="text" data-k="camera_en" value="${esc(pl.camera_en)}"></label>
@@ -168,6 +173,8 @@
     });
     const ct = $('rfCenTira'); if (ct) ct.onclick = () => salvar({ cenario: { novo: $('rfCenNovo').value, tirar_foto: true } });
     document.querySelectorAll('[data-gera]').forEach(b => b.onclick = () => gerar(b.dataset.gera, [+b.closest('.rf-pl').dataset.n]));
+    document.querySelectorAll('[data-alt]').forEach(a => a.onclick = (e) => { e.preventDefault();
+      if (confirm('Usar esta variação como o quadro novo deste plano? (o vídeo dele precisa ser animado de novo)')) salvar({ usar_alt: { n: +a.closest('.rf-pl').dataset.n, rel: a.dataset.alt } }); });
   }
   function coletar() {
     const pers = [...document.querySelectorAll('.rf-p')].map(d => ({ id: d.dataset.id, nome: d.querySelector('[data-k=nome]').value, obs: d.querySelector('[data-k=obs]').value, troca: d.querySelector('[data-k=troca]').value }));
@@ -175,7 +182,8 @@
       emocoes: Object.fromEntries([...d.querySelectorAll('[data-emocao]')].map(i => [i.dataset.emocao, i.value])),
       fala: d.querySelector('[data-k=fala]').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^([A-Za-z0-9]{1,3})\s*:\s*(.+)$/); return m ? { id: m[1], texto: m[2] } : { id: '?', texto: l }; }) }));
     const modo = $('rfFalasModo').value;
-    return { personagens: pers, cenario: { novo: $('rfCenNovo').value }, estilo: $('rfEstilo').value, falas_modo: modo, planos: modo === 'manter' ? planos.map(p => ({ n: p.n, acao_en: p.acao_en, camera_en: p.camera_en, emocoes: p.emocoes })) : planos };
+    return { personagens: pers, cenario: { novo: $('rfCenNovo').value }, estilo: $('rfEstilo').value, falas_modo: modo,
+      variacoes: $('rfVariacoes').checked, conferir: $('rfConferir').checked, planos: modo === 'manter' ? planos.map(p => ({ n: p.n, acao_en: p.acao_en, camera_en: p.camera_en, emocoes: p.emocoes })) : planos };
   }
   async function salvar(extra) {
     if (!P) return;
@@ -183,7 +191,8 @@
   }
   async function gerar(etapa, planos) {
     await salvar();
-    try { await api(`/flow/refazer/${P.id}/gerar`, { etapa, planos: planos || [], visivel: $('rfVisivel').checked }); acompanhar(true); } catch (e) { alert(e.message); }
+    try { await api(`/flow/refazer/${P.id}/gerar`, { etapa, planos: planos || [], visivel: $('rfVisivel').checked, pular_prontos: !planos });  // ⏭ retoma de onde parou
+      acompanhar(true); } catch (e) { alert(e.message); }
   }
   async function acompanhar(ja) {
     clearTimeout(timer);

@@ -338,7 +338,8 @@ def montar_prompt(pac: Dict[str, Any], chamar: Optional[Callable[..., Any]] = No
 
 def referencias_flow(pac: Dict[str, Any]) -> List[Dict[str, str]]:
     """As imagens na ordem certa pro Flow (a mesma numeração do comando)."""
-    return [{"arquivo": r["arquivo"]} for r in pac["refs"]]
+    return [dict({"arquivo": r["arquivo"], "papel": r["papel"]}, **({"marcas": r["marcas"]} if r.get("marcas") else {}))
+            for r in pac["refs"]]
 
 
 def resumo(pac: Dict[str, Any]) -> List[Dict[str, Any]]:

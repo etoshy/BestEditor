@@ -66,6 +66,13 @@
   .fl-fila li button { width:auto !important; margin:0 !important; font-size:.74rem; padding:2px 7px; border-radius:5px; border:1px solid #cbd5e1; background:#fff; color:#1f2937; line-height:1.3; cursor:pointer; }
   .fl-log { font-family:ui-monospace,Consolas,monospace; font-size:.76rem; max-height:220px; overflow:auto; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:8px; white-space:pre-wrap; }
   .fl-log .erro { color:#fca5a5; } .fl-log .aviso { color:#fcd34d; } .fl-log .ok { color:#86efac; }
+  .fl-saude { width:100%; font-size:.82rem; border-collapse:collapse; margin-top:8px; }
+  .fl-saude th, .fl-saude td { border-bottom:1px solid #f1f5f9; padding:5px 6px; text-align:left; vertical-align:top; }
+  .fl-saude .barra { display:inline-block; width:60px; height:8px; border-radius:4px; background:#e5e7eb; vertical-align:middle; overflow:hidden; }
+  .fl-saude .barra i { display:block; height:100%; }
+  .fl-saude button { width:auto !important; margin:0 !important; font-size:.75rem; padding:2px 8px; }
+  .fl-fila li .res img { width:56px; height:42px; object-fit:cover; border-radius:4px; margin-right:3px; }
+  .fl-fila li .res img.melhor { outline:2px solid #f59e0b; }
   .fl-montar { border-color:#c4b5fd; background:linear-gradient(135deg,#f5f3ff,#fff); }
   .fl-mt-linha { display:grid; grid-template-columns:minmax(220px,1fr) 2fr auto; gap:8px; align-items:start; border:1px dashed #cbd5e1; border-radius:8px; padding:8px; margin-top:8px; background:#fff; }
   .fl-mt-linha textarea { margin:0; font-family:inherit; font-size:.85rem; }
@@ -155,6 +162,7 @@
   <div class="fl-row" style="margin-top:6px">
     <button type="button" class="primary" id="rcFlow" title="O Flow redesenha a foto: bonecos simples, linhas soltas (gasta 1 crédito de imagem)">🎨 Desenhar pelo Flow</button>
     <button type="button" id="rcLocal" title="Filtro de lápis aqui no PC: na hora e sem crédito, mas é um traçado da foto (com mais detalhe)">⚡ Rascunho rápido (no PC)</button>
+    <button type="button" id="rcFila" title="O desenho pelo Flow entra na 📥 Fila (roda sozinho quando chegar a vez)">📥 Flow na fila</button>
     <button type="button" id="rcOriginal" title="Não converte: a própria foto vira a base (composição, cenário e CORES); as pessoas marcadas são trocadas por inteiro">📷 Usar a foto sem converter</button>
     <span class="fl-hint" id="rcSt">Já tem um rascunho? Na 🖼 Galeria, clique em ✏️ marcar.</span>
   </div>
@@ -211,10 +219,31 @@
     <div class="fl-hint" id="mtExplica"></div>
     <div class="fl-row" style="margin-top:6px">
       <button type="button" id="mtGerar" class="primary">🎨 Gerar no Flow</button>
+      <button type="button" id="mtFila" title="Não roda agora: entra na 📥 Fila e roda sozinho quando chegar a vez">📥 pôr na fila</button>
+      <label title="O Flow gera 2 variações e a IA escolhe a mais fiel (gasta 1 imagem a mais)"><input type="checkbox" id="mtEscolher" checked style="width:auto"> 🎯 2 variações e a IA escolhe</label>
       <label><input type="checkbox" id="mtVisivel" style="width:auto"> 👁 mostrar o navegador</label>
     </div>
   </div>
 </div>
+
+<div class="fl-box" id="fila">
+  <div class="fl-row" style="justify-content:space-between"><h3 style="margin:0">📥 Fila <span class="fl-hint" id="filaInfo"></span></h3>
+    <button type="button" class="yt-sec mini" id="filaLimpar" style="width:auto;margin:0">limpar os prontos</button></div>
+  <p class="fl-hint">Montagens e rascunhos que você pôs na fila rodam um atrás do outro, sozinhos (com o mesmo ritmo, rodízio e troca de conta). Pode fechar a aba.</p>
+  <ul class="fl-fila" id="filaLista"><li class="fl-hint">vazia</li></ul>
+</div>
+
+<details class="fl-box" id="saude">
+  <summary style="cursor:pointer;font-weight:600">🩺 Saúde das contas e ritmo <span class="fl-hint">(pra cair menos em “atividade incomum”)</span></summary>
+  <div id="saudeAviso"></div>
+  <div class="fl-row" style="margin-top:8px">
+    <label title="espera aleatória entre um pedido e outro">⏱ pausa entre pedidos <input type="number" id="rtMin" min="0" max="300" step="1" style="width:70px"> a <input type="number" id="rtMax" min="0" max="600" step="1" style="width:70px"> s</label>
+    <label title="depois de N gerações seguidas na mesma conta, a próxima assume (0 = desligado)">🔄 trocar de conta a cada <input type="number" id="rtCada" min="0" max="100" style="width:60px"> gerações</label>
+    <label title="no máximo N gerações por hora em cada conta (0 = sem teto)">🧯 máx. por hora/conta <input type="number" id="rtHora" min="0" max="500" style="width:70px"></label>
+    <button type="button" class="yt-sec mini" id="rtSalvar" style="width:auto;margin:0">💾 salvar</button>
+  </div>
+  <div style="overflow-x:auto"><table class="fl-saude" id="saudeTab"></table></div>
+</details>
 
 <div class="fl-box fl-lote" id="lote">
   <div class="fl-row" style="justify-content:space-between">
@@ -367,6 +396,10 @@
       resumo = sim ? '<div class="fl-ok">✅ A automação passou por todas as telas até antes do "Iniciar geração" (nenhum crédito gasto). Desmarque "sem gerar" pra testar gerando de verdade.</div>'
         : `<div class="fl-ok">✅ Flow funcionando: ${r.has('foto') ? '🖼 foto ✔' : '🖼 foto ✖'} · ${r.has('video_texto') ? '🎬 vídeo ✔' : '🎬 vídeo ✖'} · ${r.has('video_frames') ? '🎞 vídeo com Início/Fim ✔' : '🎞 vídeo com Início/Fim ✖'}</div>`;
     }
+    if (d.juiz && d.juiz.arquivos && d.juiz.arquivos.length) {  // 🎯 v84_409
+      resumo += `<div class="fl-ok">🎯 ${d.juiz.com_ia ? 'A IA escolheu a variação mais fiel' : 'Sem a IA pra escolher — fica a primeira'}: <b>${d.juiz.arquivos.indexOf(d.juiz.melhor) + 1}ª</b>`
+        + (d.juiz.notas || []).map((n, i) => n == null ? '' : ` · ${i + 1}ª = ${n}`).join('') + (d.juiz.resumo ? ` — ${esc(d.juiz.resumo)}` : '') + ' (⭐ na galeria)</div>';
+    }
     $('resumo').innerHTML = resumo;
     $('passos').innerHTML = d.passos.map(p => `<li><span class="ic">${IC[p.estado] || '•'}</span><span class="nm">${esc(rotulo(p.nome))}</span>`
       + `<span class="dt">${esc(p.detalhe)}</span><span class="sg">${p.segundos ? p.segundos + 's' : ''}</span>`
@@ -429,7 +462,7 @@
     const quando = t => new Date(t * 1000).toLocaleString().slice(0, 16);
     $('galGrade').innerHTML = galItens.map((e, i) => `<div class="fl-card">
       ${e.tipo === 'video' ? `<video src="/flow/arquivo/${e.arquivo}" controls muted preload="metadata"></video>` : `<img src="/flow/arquivo/${e.arquivo}" alt="" loading="lazy">`}
-      <div class="tx">${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
+      <div class="tx">${e.escolhida ? '⭐ ' : ''}${e.nota != null ? `<b>${e.nota}</b> · ` : ''}${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
       <div class="ac"><a href="/flow/arquivo/${e.arquivo}?baixar=1">⬇ baixar</a>
         ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button><button type="button" data-montar="${i}" title="usar na 🧩 Montar cena (como personagem, pose…)">🧩 montar</button><button type="button" data-rascunho="${i}" title="numerar as pessoas e usar como pose (✏️ Rascunho da pose)">✏️ marcar</button>` : ''}
         <button type="button" data-prompt="${i}" title="usar este prompt de novo">↺ prompt</button>
@@ -740,10 +773,20 @@
     } catch (e) { $('mtSt').textContent = '⚠ ' + e.message; }
     $('mtMontar').disabled = false;
   };
+  $('mtFila').onclick = async () => {
+    if (!pacote) { alert('Clique em 🤖 Montar o comando primeiro (ou de novo, se mudou alguma foto).'); return; }
+    try {
+      const r = await fetch('/flow/fila/montar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        pacote, prompt: $('mtPrompt').value, proporcao: $('mtProporcao').value, quantidade: $('mtQuantidade').value, modelo: $('mtModelo').value,
+        escolher: $('mtEscolher').checked, conta: ($('conta') || {}).value || '', trocar_conta: ($('trocarConta') || {}).checked !== false }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      document.dispatchEvent(new Event('fl-fila')); $('mtSt').textContent = '📥 na fila — pode montar a próxima';
+    } catch (e) { alert(e.message); }
+  };
   $('mtGerar').onclick = async () => {
     if (!pacote) { alert('Mudou alguma foto ou observação — clique em 🤖 Montar o comando de novo.'); return; }
     if (!$('mtPrompt').value.trim()) { alert('O comando está vazio.'); return; }
-    const corpo = { pacote, prompt: $('mtPrompt').value, proporcao: $('mtProporcao').value, quantidade: $('mtQuantidade').value,
+    const corpo = { pacote, prompt: $('mtPrompt').value, proporcao: $('mtProporcao').value, quantidade: $('mtQuantidade').value, escolher: $('mtEscolher').checked,
                     modelo: $('mtModelo').value, visivel: $('mtVisivel').checked, conta: ($('conta') || {}).value || '',
                     trocar_conta: ($('trocarConta') || {}).checked !== false };
     const r = await fetch('/flow/montar/gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
@@ -819,6 +862,13 @@
       if (!r.ok) throw new Error(d.erro || r.status); abrir(d.item); document.dispatchEvent(new Event('fl-galeria'));
     } catch (e) { $('rcSt').textContent = '⚠ ' + e.message; }
   };
+  $('rcFila').onclick = async () => {
+    const f = ($('rcFoto').files || [])[0]; if (!f) { alert('Escolha a foto.'); return; }
+    const fd = new FormData(); fd.append('foto', f); fd.append('extra', $('rcExtra').value);
+    try { const r = await fetch('/flow/fila/rascunho', { method: 'POST', body: fd }), d = await r.json(); if (!r.ok) throw new Error(d.erro || r.status);
+      $('rcSt').textContent = '📥 na fila — quando sair, abra pela 🖼 Galeria (✏️ marcar)'; document.dispatchEvent(new Event('fl-fila'));
+    } catch (e) { $('rcSt').textContent = '⚠ ' + e.message; }
+  };
   $('rcOriginal').onclick = async () => {
     const f = ($('rcFoto').files || [])[0]; if (!f) { alert('Escolha a foto.'); return; }
     const fd = new FormData(); fd.append('foto', f);
@@ -858,6 +908,54 @@
     document.dispatchEvent(new CustomEvent('fl-montar-pose', { detail: { item, marcas: limpas, fotos: marcas.map(m => m._file || null), cena,
       fotoCenario, estilo, base, manterCores, fotoOriginal } }));
   };
+})();
+</script>
+<script>
+/* 📥 fila + 🩺 saúde das contas (v84_409) */
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (u, b) => { const r = await fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || r.status); return d; };
+  const EST = { esperando: '⏳ esperando', rodando: '▶ rodando', pronto: '✅ pronto', erro: '❌ erro', cancelado: '⏹ cancelado' };
+  let tFila = null;
+  async function fila() {
+    clearTimeout(tFila);
+    let d; try { d = await (await fetch('/flow/fila')).json(); } catch (_) { tFila = setTimeout(fila, 8000); return; }
+    $('filaInfo').textContent = d.esperando || d.rodando ? `· ${d.esperando} esperando${d.rodando ? ' · rodando: ' + d.rodando.slice(0, 50) : ''}` : '';
+    $('filaLista').innerHTML = (d.itens || []).map(x => `<li><span class="ic">${(EST[x.estado] || x.estado).split(' ')[0]}</span>
+      <span class="pr">${esc(x.rotulo)}<small>${EST[x.estado] || x.estado}${x.erro ? ' — ' + esc(x.erro.slice(0, 160)) : ''}${x.msg ? ' — 🎯 ' + esc(x.msg) : ''}</small>
+      <span class="res">${(x.resultados || []).map(a => /\.mp4$/.test(a) ? `<a href="/flow/arquivo/${a}" target="_blank">🎬</a>` : `<a href="/flow/arquivo/${a}" target="_blank"><img src="/flow/arquivo/${a}" class="${a === x.melhor ? 'melhor' : ''}" alt=""></a>`).join('')}</span></span>
+      ${['esperando', 'rodando'].includes(x.estado) ? `<button type="button" data-tira="${x.id}">✕</button>` : ''}</li>`).join('') || '<li class="fl-hint">vazia</li>';
+    $('filaLista').querySelectorAll('[data-tira]').forEach(b => b.onclick = async () => { await post(`/flow/fila/${b.dataset.tira}/tirar`); fila(); });
+    tFila = setTimeout(fila, d.esperando || d.rodando ? 4000 : 20000);
+  }
+  $('filaLimpar').onclick = async () => { await post('/flow/fila/limpar'); fila(); };
+  document.addEventListener('fl-fila', fila);
+  const quando = t => t ? new Date(typeof t === 'number' ? t * 1000 : t).toLocaleString().slice(0, 16) : '';
+  async function saude() {
+    let d; try { d = await (await fetch('/flow/saude')).json(); } catch (_) { return; }
+    const r = d.ritmo || {}; $('rtMin').value = r.pausa_min; $('rtMax').value = r.pausa_max; $('rtCada').value = r.rodizio_cada; $('rtHora').value = r.max_hora;
+    $('saudeAviso').innerHTML = d.aviso_extensoes ? `<div class="fl-erro" style="margin-top:8px">🧩 ${esc(d.aviso_extensoes)}</div>` : '';
+    $('saudeTab').innerHTML = '<tr><th>conta</th><th>saúde</th><th>hoje</th><th>agora</th><th>situação</th><th>extensões</th><th></th></tr>' + (d.contas || []).map(c => {
+      const cor = c.saude >= 75 ? '#22c55e' : c.saude >= 45 ? '#f59e0b' : '#ef4444', h = c.dia || {};
+      const sit = [c.fora ? '🚫 fora do rodízio' : c.pulada ? `⏸ ${esc(c.pulada)} (até ${quando(c.pulada_ate)})` : '',
+        c.esgotada_video ? `🎬 sem vídeo até ${quando(c.video_ate)}` : '', c.esgotada_imagem ? `🖼 sem imagem até ${quando(c.imagem_ate)}` : '',
+        c.ultimo_incomum ? `último “incomum”: ${quando(c.ultimo_incomum)}` : ''].filter(Boolean).join('<br>') || '✅ ok';
+      const ext = Object.entries(c.extensoes || {}).map(([nav, n]) => `${esc(nav)}: ${n ? '<b style="color:#b91c1c">' + n + '</b>' : '0'}`).join('<br>') || '—';
+      return `<tr><td><b>${esc(c.nome)}</b><br><span class="fl-hint">${esc(c.email)}</span></td>
+        <td><span class="barra"><i style="width:${c.saude}%;background:${cor}"></i></span> ${c.saude}</td>
+        <td>${h.geracao || 0} gerações · ${h.incomum || 0} incomum · ${h.login || 0} login · ${(h.erro || 0) + (h.passageiro || 0)} erros${h.famosos ? ' · ' + h.famosos + ' famosos' : ''}</td>
+        <td>${c.na_hora} na última hora · ${c.seguidas} seguidas</td><td>${sit}</td><td>${ext}</td>
+        <td><button type="button" class="yt-sec" data-fora="${esc(c.nome)}" data-v="${c.fora ? '0' : '1'}">${c.fora ? '↩ voltar pro rodízio' : '🚫 tirar do rodízio'}</button></td></tr>`;
+    }).join('');
+    $('saudeTab').querySelectorAll('[data-fora]').forEach(b => b.onclick = async () => { await post('/flow/saude/rodizio', { conta: b.dataset.fora, fora: b.dataset.v === '1' }); saude(); });
+  }
+  $('rtSalvar').onclick = async () => {
+    try { await post('/flow/saude/ritmo', { pausa_min: +$('rtMin').value, pausa_max: +$('rtMax').value, rodizio_cada: +$('rtCada').value, max_hora: +$('rtHora').value }); saude(); }
+    catch (e) { alert(e.message); }
+  };
+  $('saude').addEventListener('toggle', () => { if ($('saude').open) saude(); });
+  fila();
 })();
 </script>
 {% endblock %}

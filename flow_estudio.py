@@ -341,9 +341,46 @@ class _Sessao(threading.Thread):
             try:
                 return fd.gerar_um(self.page, trab, on_passo, timeout)
             except fd.FlowPassoErro as exc:
+                import flow_saude as FS
+                msg_ = str(getattr(exc, "mensagem", "") or exc)
                 # 🔁 v84_408e: "Notamos uma atividade incomum / extensões do navegador" é coisa da CONTA: ela descansa
                 # (MINUTOS_INCOMUM) e o MESMO pedido vai pra próxima conta — como no resto do site (v84_396)
-                incomum = bool(gf.RE_INCOMUM.search(str(getattr(exc, "mensagem", "") or exc)))
+                incomum = bool(gf.RE_INCOMUM.search(msg_))
+                FS.registrar(self.conta or gf.CONTA_PADRAO, "incomum" if incomum else "login" if isinstance(exc, fd.FlowLogin)
+                             else "limite" if isinstance(exc, fd.FlowLimite)
+                             else "famosos" if getattr(exc, "motivo", "") == "famosos" else "recusa" if isinstance(exc, fd.FlowRecusou)
+                             else "passageiro" if FS.RE_PASSAGEIRO.search(msg_) else "erro", msg_[:150])
+                # 🙈 v84_409: "pessoa famosa" mesmo depois de tirar o nome → é a FOTO base: borra os rostos dela e tenta 1x
+                if isinstance(exc, fd.FlowRecusou) and getattr(exc, "motivo", "") == "famosos" and trab.get("referencias") \
+                        and not trab.get("_anonimizado"):
+                    trab["_anonimizado"] = True
+                    feito = False
+                    for r_ in trab["referencias"]:
+                        if r_.get("papel") in ("base", "pose") and r_.get("arquivo") and os.path.isfile(r_["arquivo"]):
+                            novo = os.path.splitext(r_["arquivo"])[0] + "_anonima.png"
+                            if FS.anonimizar(r_["arquivo"], novo, r_.get("marcas")):
+                                r_["arquivo"], feito = novo, True
+                    if feito:
+                        on_passo("prompt", "andando", "🙈 o Flow recusou por PESSOA FAMOSA na foto base — borrei os rostos dela "
+                                                      "(a pose, a cena e a descrição da expressão ficam) e tentando de novo…")
+                        trab["referencias"] = [{k: v for k, v in r_.items() if k != "_media_id"} for r_ in trab["referencias"]]
+                        continue
+                # 🔁 v84_409: erro passageiro (tempo esgotado, a página fechou…) → 1x de novo na MESMA conta, num projeto novo
+                if FS.RE_PASSAGEIRO.search(msg_) and not isinstance(exc, (fd.FlowLimite, fd.FlowLogin, fd.FlowRecusou)) \
+                        and not incomum and int(trab.get("_passageiro") or 0) < 1:
+                    trab["_passageiro"] = int(trab.get("_passageiro") or 0) + 1
+                    on_passo("tentar", "andando", f"🔁 erro passageiro ({msg_[:100]}) — tentando de novo num projeto novo…")
+                    self._fechar_pagina()
+                    try:
+                        self._garantir_navegador(cfg, bool(opcoes.get("visivel")), self.conta or gf.CONTA_PADRAO)
+                        self._garantir_projeto(cfg, True, on_passo, atual)
+                    except fd.FlowPassoErro:
+                        raise exc
+                    for k in ("inicio", "fim", "referencia"):
+                        f = trab.get(k)
+                        if isinstance(f, dict) and f.get("arquivo"):
+                            trab[k] = {"arquivo": f["arquivo"]}
+                    continue
                 if not isinstance(exc, (fd.FlowLimite, fd.FlowLogin)) and not (incomum and len(gf.nomes_das_contas()) > 1):
                     raise
                 conta = self.conta or gf.CONTA_PADRAO
@@ -407,7 +444,8 @@ class _Sessao(threading.Thread):
                     elif isinstance(f, dict) and f.get("media_id") and not f.get("arquivo"):
                         trab.pop(k, None)
                 if trab.get("referencias"):  # 🧩 as várias imagens: sobem de novo pelo arquivo
-                    trab["referencias"] = [{"arquivo": r["arquivo"]} for r in trab["referencias"] if r.get("arquivo")]
+                    trab["referencias"] = [{k_: v_ for k_, v_ in r.items() if k_ in ("arquivo", "papel", "marcas")}
+                                           for r in trab["referencias"] if r.get("arquivo")]
 
     # -- um comando
     def _executar(self, tipo: str, cfg: Dict[str, Any], opcoes: Dict[str, Any]) -> None:
@@ -456,7 +494,26 @@ class _Sessao(threading.Thread):
                     trab["referencias"] = [dict(r) for r in opcoes["referencias"]]
                 if trab["tipo"] == "video":
                     trab["tipo_video"] = "Frames" if (trab.get("inicio") or trab.get("fim")) else "Elementos"
-                r = self._gerar(trab, cfg, opcoes, on_passo, atual, timeout)
+                import flow_saude as FS  # 🩺 v84_409: ritmo humano + rodízio de contas
+                esperou = FS.pausa_antes(cfg, parar=lambda: bool(_ESTADO.get("parar")))
+                if esperou:
+                    on_passo("ritmo", "ok", f"⏱ pausa de {esperou:.0f} s entre pedidos (pra parecer gente, não robô)")
+                motivo_troca = FS.precisa_trocar(self.conta, cfg) if (opcoes.get("trocar_conta", True) and not opcoes.get("conta_fixa")
+                                                                     and str(cfg.get("flow_navegador") or "auto").lower() != "cdp") else ""
+                if motivo_troca:
+                    prox = FS.proxima_conta(self.conta, gf.tipo_do_limite(trab["tipo"]))
+                    if prox:
+                        on_passo("conta", "andando", f"🔄 rodízio: “{self.conta}” já fez {motivo_troca} — passando a vez pra “{prox}”")
+                        FS.registrar(self.conta, "rodizio", motivo_troca)
+                        self._fechar_pagina()
+                        self._garantir_navegador(cfg, bool(opcoes.get("visivel")), prox)
+                        self._garantir_projeto(cfg, True, on_passo, atual)
+                        on_passo("conta", "ok", f"agora na conta “{prox}”")
+                try:
+                    r = self._gerar(trab, cfg, opcoes, on_passo, atual, timeout)
+                finally:
+                    FS.marcar_fim()
+                FS.registrar(self.conta, "geracao", trab["tipo"])
                 self._baixar(r, trab, "gerar", "resultado", on_passo)
         except _Parado:
             est["erro"] = "Parado por você."
@@ -581,6 +638,12 @@ def registrar(app, base_dir: str) -> None:
         from googleflow import googleflow_client as _gf
         if guardar_da_geracao not in _gf.AO_SALVAR:
             _gf.AO_SALVAR.append(guardar_da_geracao)
+    except Exception:  # noqa: BLE001
+        pass
+
+    try:  # 🩺 v84_409: as contas que você tirou do rodízio continuam de fora depois de reiniciar
+        import flow_saude
+        flow_saude.aplicar_fora()
     except Exception:  # noqa: BLE001
         pass
 
@@ -853,6 +916,100 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "A IA não respondeu (ou está desligada) — clique em cada pessoa/objeto pra marcar."}), 400
         return jsonify(dict(r, ok=True))
 
+    # ---------------------------------------------------------- 🩺 v84_409: saúde das contas, ritmo e 📥 fila
+    @app.route("/flow/saude")
+    def flow_saude_ver():
+        import flow_saude as FS
+        contas = FS.resumo()
+        com_ext = [f"{c['nome']} ({n} no {nav})" for c in contas for nav, n in (c.get("extensoes") or {}).items() if n]
+        return jsonify({"ok": True, "contas": contas, "ritmo": FS.config(),
+                        "aviso_extensoes": ("O aviso de “atividade incomum” do Google cita extensões do navegador — estes perfis "
+                                            "do Flow têm extensões instaladas: " + ", ".join(com_ext) +
+                                            ". Abra o navegador da conta (🌐 no 🚀 Em massa) e desligue/remova as extensões.")
+                        if com_ext else ""})
+
+    @app.route("/flow/saude/rodizio", methods=["POST"])
+    def flow_saude_rodizio():
+        import flow_saude as FS
+        from googleflow import googleflow_client as gf
+        b = request.get_json(silent=True) or {}
+        conta = str(b.get("conta") or "")
+        if conta not in gf.nomes_das_contas():
+            return jsonify({"erro": "Conta não encontrada."}), 404
+        FS.tirar_do_rodizio(conta, bool(b.get("fora")))
+        return jsonify({"ok": True, "contas": FS.resumo()})
+
+    @app.route("/flow/saude/ritmo", methods=["POST"])
+    def flow_saude_ritmo():
+        import flow_saude as FS
+        from site_config import save_site_config
+        b = request.get_json(silent=True) or {}
+        novo = {k: b[k] for k in FS.PADRAO if k in b}
+        save_site_config({"flow_ritmo": novo})
+        return jsonify({"ok": True, "ritmo": FS.config()})
+
+    @app.route("/flow/fila")
+    def flow_fila_ver():
+        import flow_fila as FF
+        r = FF.resumo()
+        if r["esperando"]:
+            FF.garantir_trabalhador()  # reiniciou o site com coisa na fila: continua
+        return jsonify(dict(r, ok=True))
+
+    @app.route("/flow/fila/montar", methods=["POST"])
+    def flow_fila_montar():
+        """📥 a montagem (pacote + comando) entra na fila em vez de rodar agora."""
+        import flow_montar as FM
+        import flow_juiz as FJ
+        import flow_fila as FF
+        from googleflow import flow_direto as fd
+        b = request.get_json(silent=True) or {}
+        try:
+            pac = FM.carregar_pacote(pasta_galeria(), str(b.get("pacote") or ""))
+        except FM.MontarErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        prompt = " ".join(str(b.get("prompt") or "").split())[:4000]
+        if not prompt:
+            return jsonify({"erro": "O comando está vazio."}), 400
+        escolher = bool(b.get("escolher"))
+        qtd = b.get("quantidade") if b.get("quantidade") in ("x1", "x2", "x3", "x4") else "x1"
+        pedido = {"tipo": "imagem", "prompt": prompt, "referencias": FM.referencias_flow(pac), "modelo": str(b.get("modelo") or "")[:60],
+                  "proporcao": b.get("proporcao") if b.get("proporcao") in fd.PROPORCOES else "16:9",
+                  "quantidade": "x2" if escolher and qtd == "x1" else qtd, "conta": str(b.get("conta") or ""),
+                  "trocar_conta": b.get("trocar_conta", True) is not False}
+        nomes = ", ".join(r["nome"] for r in pac["refs"] if r.get("nome")) or "cena"
+        it = FF.adicionar(f"🧩 {nomes} — {prompt[:60]}", pedido, escolher, [list(x) for x in FJ.refs_do_pacote(pac)])
+        return jsonify({"ok": True, "item": it})
+
+    @app.route("/flow/fila/rascunho", methods=["POST"])
+    def flow_fila_rascunho():
+        import flow_fila as FF
+        import flow_rascunho as FR
+        from googleflow import flow_direto as fd
+        from googleflow import googleflow_client as gf
+        try:
+            ent = _salvar_entrada(gf, "foto")
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if not ent:
+            return jsonify({"erro": "Mande a foto."}), 400
+        extra = " ".join((request.form.get("extra") or "").split())[:500]
+        pedido = {"tipo": "imagem", "prompt": FR.PROMPT_FLOW + (" " + extra if extra else ""), "referencia": ent,
+                  "proporcao": request.form.get("proporcao") if request.form.get("proporcao") in fd.PROPORCOES else "16:9"}
+        it = FF.adicionar("✏️ rascunho da cena — " + (request.files["foto"].filename if request.files.get("foto") else "foto"), pedido)
+        return jsonify({"ok": True, "item": it})
+
+    @app.route("/flow/fila/<iid>/tirar", methods=["POST"])
+    def flow_fila_tirar(iid: str):
+        import flow_fila as FF
+        return jsonify({"ok": FF.tirar(iid)})
+
+    @app.route("/flow/fila/limpar", methods=["POST"])
+    def flow_fila_limpar():
+        import flow_fila as FF
+        FF.limpar_prontos()
+        return jsonify({"ok": True})
+
     @app.route("/flow/montar/gerar", methods=["POST"])
     def flow_montar_gerar():
         """O comando (editado ou não) + as imagens do pacote, na ordem → uma imagem no Flow (a mesma fila do ✨ Gerar)."""
@@ -880,17 +1037,24 @@ def registrar(app, base_dir: str) -> None:
                 motivo = None
             if motivo:
                 return jsonify({"erro": motivo}), 409
-            opcoes: Dict[str, Any] = {
-                "modo": "gerar", "visivel": bool(b.get("visivel")), "simular": False,
-                "trocar_conta": b.get("trocar_conta", True) is not False, "conta": str(b.get("conta") or "").strip(),
-                "novo_projeto": False, "tipo": "imagem", "prompt": prompt, "modelo": str(b.get("modelo") or "").strip()[:60],
-                "proporcao": b.get("proporcao") if b.get("proporcao") in fd.PROPORCOES else "16:9",
-                "quantidade": b.get("quantidade") if b.get("quantidade") in ("x1", "x2", "x3", "x4") else "x1",
-                "referencias": refs, "montagem": pac["id"]}
-            _ESTADO.update(rodando=True, passos=[], resultados=[], erro=None, inicio=time.time(), fim=None, modo="gerar",
-                           parar=False, diagnostico=None, detalhe_erro=None,
-                           opcoes={k: (v if not isinstance(v, (dict, list)) else True) for k, v in opcoes.items()})
-            _enviar("gerar", load_site_config(), opcoes)
+            quantidade = b.get("quantidade") if b.get("quantidade") in ("x1", "x2", "x3", "x4") else "x1"
+        escolher = bool(b.get("escolher"))
+        if escolher and quantidade == "x1":
+            quantidade = "x2"  # 🎯 v84_409: 2 variações e a IA escolhe a mais fiel
+        pedido = {"tipo": "imagem", "prompt": prompt, "modelo": str(b.get("modelo") or "").strip()[:60],
+                  "proporcao": b.get("proporcao") if b.get("proporcao") in fd.PROPORCOES else "16:9", "quantidade": quantidade,
+                  "referencias": refs, "visivel": bool(b.get("visivel")), "conta": str(b.get("conta") or "").strip(),
+                  "trocar_conta": b.get("trocar_conta", True) is not False}
+
+        def fazer():
+            try:
+                res = rodar_e_esperar(pedido, esperar_livre_s=30)
+            except Exception:  # noqa: BLE001 — o erro já está no _ESTADO (o andamento mostra)
+                return
+            if escolher and len([r for r in res if r.get("tipo") == "imagem"]) > 1:
+                julgar_resultados(prompt, __import__("flow_juiz").refs_do_pacote(pac), res)
+        threading.Thread(target=fazer, daemon=True).start()
+        time.sleep(0.3)
         return jsonify({"ok": True})
 
     @app.route("/flow/diagnosticos")
@@ -991,6 +1155,24 @@ def gerar_imagem_e_esperar(prompt: str, referencia: Optional[str] = None, propor
     return saidas
 
 
+def julgar_resultados(prompt: str, referencias: List[Any], res: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """🎯 v84_409: a IA escolhe a melhor das variações; marca na 🖼 galeria (⭐ + nota) e no andamento (_ESTADO["juiz"])."""
+    import flow_juiz as FJ
+    imgs = [r for r in res if r.get("tipo") == "imagem"]
+    j = FJ.julgar(prompt, referencias, [r["caminho"] for r in imgs])
+    with _TRAVA_GALERIA:
+        itens = galeria()
+        for k, r in enumerate(imgs):
+            for e in itens:
+                if e.get("id") == r.get("id"):
+                    e["nota"] = j["notas"][k]
+                    e["escolhida"] = k == j["melhor"]
+        _gravar_galeria(itens)
+    _ESTADO["juiz"] = {"melhor": imgs[j["melhor"]]["arquivo"] if imgs else "", "notas": j["notas"], "resumo": j["resumo"],
+                       "com_ia": j["com_ia"], "arquivos": [r["arquivo"] for r in imgs]}
+    return j
+
+
 def rodar_e_esperar(pedido: Dict[str, Any], timeout_s: float = 1200, esperar_livre_s: float = 900,
                     parar: Optional[Callable[[], bool]] = None) -> List[Dict[str, Any]]:
     """🎬 v84_408: um pedido ao Flow pelo código, esperando terminar — imagem (com `referencias`) ou vídeo (com `inicio`).
@@ -1015,12 +1197,12 @@ def rodar_e_esperar(pedido: Dict[str, Any], timeout_s: float = 1200, esperar_liv
                     "novo_projeto": False, "tipo": tipo, "prompt": " ".join(str(pedido.get("prompt") or "").split())[:4000],
                     "modelo": str(pedido.get("modelo") or "")[:60],
                     "proporcao": pedido.get("proporcao") if pedido.get("proporcao") in fd.PROPORCOES else "16:9",
-                    "quantidade": "x1"}
+                    "quantidade": pedido.get("quantidade") if pedido.get("quantidade") in ("x1", "x2", "x3", "x4") else "x1"}
                 for k in ("inicio", "referencia", "referencias"):
                     if pedido.get(k):
                         opcoes[k] = pedido[k]
                 _ESTADO.update(rodando=True, passos=[], resultados=[], erro=None, inicio=time.time(), fim=None, modo="gerar",
-                               parar=False, diagnostico=None, detalhe_erro=None,
+                               parar=False, diagnostico=None, detalhe_erro=None, juiz=None,
                                opcoes={k: (v if not isinstance(v, (dict, list)) else True) for k, v in opcoes.items()})
                 _enviar("gerar", load_site_config(), opcoes)
                 break
