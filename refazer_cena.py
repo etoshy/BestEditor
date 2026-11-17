@@ -361,7 +361,7 @@ def pacote_do_plano(base: str, p: Dict[str, Any], pl: Dict[str, Any], gal_base: 
         if x.get("foto") and q["id"] not in ja and os.path.isfile(os.path.join(d, x["foto"])):
             ja.add(q["id"])
             itens.append({"papel": "personagem", "nome": nome or f"pessoa {q['id']}", "obs": x.get("obs") or "",
-                          "arquivo": os.path.join(d, x["foto"])})
+                          "arquivo": os.path.join(d, x["foto"]), "troca": x.get("troca") or "auto"})
     cen = p.get("cenario") or {}
     if cen.get("foto") and os.path.isfile(os.path.join(d, cen["foto"])):
         itens.append({"papel": "cenario", "nome": cen.get("novo") or "", "obs": "o cenário novo", "arquivo": os.path.join(d, cen["foto"])})
@@ -648,6 +648,7 @@ def registrar(app, FE) -> None:
                 if alvo:
                     alvo["nome"] = " ".join(str(x.get("nome") or "").split())[:60]
                     alvo["obs"] = " ".join(str(x.get("obs") or "").split())[:300]
+                    alvo["troca"] = x.get("troca") if x.get("troca") in ("rosto", "inteira") else "auto"
                     if x.get("tirar_foto"):
                         alvo["foto"] = ""
             if isinstance(b.get("cenario"), dict):

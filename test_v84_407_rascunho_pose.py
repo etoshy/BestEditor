@@ -134,13 +134,13 @@ def test_estilo_final_e_cena_no_pacote(tmp_path):
 def test_foto_base_sem_converter_e_pessoa_inteira(tmp_path):
     """v84_407c: a própria foto como base (composição + cores), cores da original opcionais e a troca da pessoa INTEIRA."""
     pac = FM.novo_pacote(str(tmp_path), [
-        {"papel": "personagem", "nome": "Ana", "arquivo": _foto(tmp_path / "a.png")},
+        {"papel": "personagem", "nome": "Ana", "troca": "inteira", "arquivo": _foto(tmp_path / "a.png")},
         {"papel": "base", "arquivo": _foto(tmp_path / "b.png"), "marcas": json.dumps([{"x": 0.2, "y": 0.3, "nome": "Ana"}])},
         {"papel": "cores", "nome": "foto original", "arquivo": _foto(tmp_path / "c.png")}])
     assert [r["papel"] for r in pac["refs"]] == ["base", "personagem", "cores"]  # a base é a imagem 1
     assert pac["refs"][0].get("arquivo_ia") and "figura 1" in pac["refs"][0]["obs"]
     p = FM.prompt_basico(pac)
-    assert "BASE of the composition" in p and "replaced ENTIRELY" in p
+    assert "BASE of the composition" in p and "the whole figure, or only" in p
     assert "Ana replaces the WHOLE figure" in p and "clothes and their colors" in p and "FACIAL EXPRESSION" in p
     assert "ORIGINAL" in FM.SISTEMA and "never the expression of the character photo" in FM.SISTEMA
     assert "ONLY the color palette and lighting from reference image 3" in p
@@ -155,3 +155,24 @@ def test_rota_foto_original(ctx, tmp_path):
     assert open(os.path.join(FE.pasta_galeria(), j["item"]["arquivo"]), "rb").read() == foto  # sem converter
     h = c.get("/flow").get_data(as_text=True)
     assert 'id="rcOriginal"' in h and 'id="rcCores"' in h
+
+
+def test_trocar_so_o_rosto(tmp_path):
+    """v84_408c: "mantém a cena, só a cara do personagem" — e a foto do personagem não manda pose, joinha nem caneco."""
+    pac = FM.novo_pacote(str(tmp_path), [
+        {"papel": "base", "arquivo": _foto(tmp_path / "b.png"), "marcas": json.dumps([{"x": 0.6, "y": 0.4, "nome": "Mascote", "troca": "rosto"}])},
+        {"papel": "personagem", "nome": "Mascote", "troca": "rosto", "arquivo": _foto(tmp_path / "m.png")}])
+    assert pac["refs"][1]["troca"] == "rosto" and "trocar SÓ o rosto/cabeça" in pac["refs"][0]["obs"]
+    p = FM.prompt_basico(pac)
+    assert p.startswith("Keep reference image 1 exactly as it is") and "replace ONLY the face/head" in p
+    assert "IGNORE the pose, gesture, hand position, objects it holds" in p and "Keep the look of reference image 1 exactly" in p
+    assert any("SWAP FACE/HEAD ONLY" in c.get("text", "") for c in FM.conteudo_ia(pac, lambda f: None))
+    # pessoa inteira: refaz o quadro igual (enquadramento, expressão…) com o personagem no lugar
+    pac2 = FM.novo_pacote(str(tmp_path), [{"papel": "base", "arquivo": _foto(tmp_path / "b2.png")},
+                                          {"papel": "personagem", "nome": "Mascote", "arquivo": _foto(tmp_path / "m2.png")}])
+    p2 = FM.prompt_basico(pac2)
+    assert p2.startswith("Recreate reference image 1 shot-for-shot") and "takes the place of that figure" in p2
+    assert "DESIGNED to match both Mascote's look" in p2 and pac2["refs"][1]["troca"] == "auto"  # 🤖 o padrão: completa o que falta
+    assert any("SWAP: AUTOMATIC" in c.get("text", "") for c in FM.conteudo_ia(pac2, lambda f: None))
+    assert "CONTEXT FIRST" in FM.SISTEMA
+    assert "THE MOST COMMON FAILURE" in FM.SISTEMA and "SWAP FACE/HEAD ONLY" in FM.SISTEMA

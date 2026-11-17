@@ -717,7 +717,8 @@ def registrar(app, base_dir: str) -> None:
                 if ent:
                     itens.append({"papel": f.get(f"r{k}_papel") or "outro", "nome": f.get(f"r{k}_nome") or "",
                                   "obs": f.get(f"r{k}_obs") or "", "arquivo": ent["arquivo"],
-                                  "marcas": f.get(f"r{k}_marcas") or "", "cena": f.get(f"r{k}_cena") or ""})
+                                  "marcas": f.get(f"r{k}_marcas") or "", "cena": f.get(f"r{k}_cena") or "",
+                                  "troca": f.get(f"r{k}_troca") or ""})
             pac = FM.novo_pacote(pasta_galeria(), itens, f.get("obs_geral") or "", f.get("estilo") or "")
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400

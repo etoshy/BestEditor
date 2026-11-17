@@ -642,7 +642,7 @@
     const pers = papel === 'personagem';
     if (pers) nPers++;
     d.innerHTML = `<div class="fl-mt-foto"><b>${pers ? '🧍 Personagem' : '🖼 Outra foto'}</b>
-        ${pers ? `<input type="text" class="fl-mt-nome" placeholder="nome (ex.: Ana, o barman)" value="${pers ? 'Personagem ' + nPers : ''}">`
+        ${pers ? `<input type="text" class="fl-mt-nome" placeholder="nome (ex.: Ana, o barman)" value="${pers ? 'Personagem ' + nPers : ''}"><select class="fl-mt-troca" title="o que troca na figura da base"><option value="auto">🤖 automático (a IA completa o que faltar)</option><option value="inteira">🧍 troca a pessoa inteira</option><option value="rosto">🙂 troca só o rosto (o resto da cena fica)</option></select>`
                : `<select class="fl-mt-papel">${Object.entries(PAPEIS).filter(([k]) => !['pose', 'personagem', 'base'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select><input type="text" class="fl-mt-nome" placeholder="o que é (ex.: moto vermelha)">`}
         <input type="file" accept="image/*"><div class="esc"></div></div>
       <textarea rows="2" class="fl-mt-obs" placeholder="${pers ? 'observação (opcional): ex. mantém a jaqueta; ela fica no lugar da pessoa da esquerda da pose; sorrindo' : 'observação (opcional): o que pegar desta foto'}"></textarea>
@@ -663,7 +663,7 @@
     pose.dataset.papel = ehFoto ? 'base' : 'pose';
     pose.querySelector('.fl-mt-foto b').textContent = ehFoto ? '📷 Foto base (composição e cores)' : '🕺 Pose / composição';
     prevFoto(pose);
-    pose.querySelector('.fl-mt-obs').value = ehFoto ? 'a composição, o cenário e as cores desta foto; as pessoas daqui são trocadas por inteiro'
+    pose.querySelector('.fl-mt-obs').value = ehFoto ? 'a composição, o cenário e as cores desta foto; cada pessoa marcada troca como diz a linha dela (inteira ou só o rosto)'
       : 'só a pose, o enquadramento e o lugar de cada coisa (rascunho)';
     linhas().filter(l => l !== pose && !l._gal && !(l.querySelector('input[type=file]').files || [])[0]).forEach(l => l.remove());
     nPers = 0;
@@ -677,7 +677,10 @@
       }
       const l = novaLinha('personagem'); if (!l) return;
       l.querySelector('.fl-mt-nome').value = m.nome || ('Personagem ' + m.n);
-      l.querySelector('.fl-mt-obs').value = `troca a figura ${m.n} INTEIRA (rosto, cabelo, corpo, roupa e cores da foto dela), na mesma pose e com a MESMA expressão/emoção da original` + (m.obs ? ` — era: ${m.obs}` : '');
+      l.querySelector('.fl-mt-troca').value = ['rosto', 'inteira'].includes(m.troca) ? m.troca : 'auto';
+      l.querySelector('.fl-mt-obs').value = (m.troca === 'rosto' ? `troca SÓ o rosto/cabeça da figura ${m.n} (o corpo e a cena ficam como estão), com a MESMA expressão da original`
+        : m.troca === 'inteira' ? `troca a figura ${m.n} INTEIRA (rosto, cabelo, corpo, roupa e cores da foto dela), na mesma pose e com a MESMA expressão/emoção da original`
+        : `entra no lugar da figura ${m.n}, na mesma pose e com a MESMA expressão; o que a foto não mostra (roupa, corpo…) a IA cria combinando com ela e com a cena`) + (m.obs ? ` — era: ${m.obs}` : '');
       comFoto(l, fotos[i]);
     });
     if (cena && (cena.cenario_novo || e.detail.fotoCenario)) {
@@ -714,6 +717,7 @@
       fd.append(`r${k}_papel`, papel);
       fd.append(`r${k}_nome`, (l.querySelector('.fl-mt-nome') || {}).value || '');
       fd.append(`r${k}_obs`, l.querySelector('.fl-mt-obs').value || '');
+      if (l.querySelector('.fl-mt-troca')) fd.append(`r${k}_troca`, l.querySelector('.fl-mt-troca').value);
       if (l._gal) fd.append(`r${k}_galeria`, l._gal.id); else fd.append(`r${k}`, f);
       if (l._marcas && l._gal) fd.append(`r${k}_marcas`, JSON.stringify(l._marcas));
       if (l._cena && l._gal) fd.append(`r${k}_cena`, JSON.stringify(l._cena));
@@ -770,7 +774,7 @@
     marcas.forEach((m, i) => { m.n = i + 1; const p = document.createElement('div'); p.className = 'fl-rc-pin' + (m.tipo === 'objeto' ? ' obj' : '');
       p.style.left = (m.x * 100) + '%'; p.style.top = (m.y * 100) + '%'; p.innerHTML = rotPin(m); img.appendChild(p); });
     $('rcMarcas').innerHTML = marcas.length ? marcas.map((m, i) => `<div class="fl-rc-m${m.tipo === 'objeto' ? ' obj' : ''}" data-i="${i}"><b>${m.n}</b>
-      <div><select data-k="tipo"><option value="pessoa"${m.tipo !== 'objeto' ? ' selected' : ''}>🧍 pessoa</option><option value="objeto"${m.tipo === 'objeto' ? ' selected' : ''}>📦 objeto</option></select>
+      <div><select data-k="tipo"><option value="pessoa"${m.tipo !== 'objeto' ? ' selected' : ''}>🧍 pessoa</option><option value="objeto"${m.tipo === 'objeto' ? ' selected' : ''}>📦 objeto</option></select>${m.tipo !== 'objeto' ? `<select data-k="troca"><option value="auto"${!['rosto', 'inteira'].includes(m.troca) ? ' selected' : ''}>🤖 automático (a IA completa)</option><option value="inteira"${m.troca === 'inteira' ? ' selected' : ''}>🧍 troca a pessoa inteira</option><option value="rosto"${m.troca === 'rosto' ? ' selected' : ''}>🙂 só o rosto</option></select>` : ''}
         <input type="text" data-k="nome" value="${esc(m.nome)}" placeholder="${m.tipo === 'objeto' ? 'trocar por (vazio = mantém) ex.: moto vermelha' : 'quem entra aqui — a pessoa inteira (ex.: Ana)'}">
         <textarea rows="1" data-k="obs" placeholder="o que é / observação (opcional)">${esc(m.obs)}</textarea>
         <div class="fl-rc-foto">${m._url ? `<img src="${m._url}" alt=""> <button type="button" class="yt-sec mini" data-semfoto="${i}">trocar foto</button>`
@@ -778,7 +782,7 @@
       <button type="button" data-tira="${i}">✕</button></div>`).join('') : '<p class="fl-hint">Clique em cada pessoa (na cabeça) e em cada objeto no desenho — ou 🤖 entender a cena.</p>';
     $('rcMarcas').querySelectorAll('[data-k]').forEach(e => e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', () => {
       const m = marcas[+e.closest('.fl-rc-m').dataset.i]; m[e.dataset.k] = e.value;
-      if (e.dataset.k === 'tipo') desenhar(); else if (e.dataset.k === 'nome') $('rcImg').querySelectorAll('.fl-rc-pin').forEach((p, i) => p.innerHTML = rotPin(marcas[i]));
+      if (e.dataset.k === 'tipo' || e.dataset.k === 'troca') { if (e.dataset.k === 'tipo') desenhar(); } else if (e.dataset.k === 'nome') $('rcImg').querySelectorAll('.fl-rc-pin').forEach((p, i) => p.innerHTML = rotPin(marcas[i]));
     }));
     $('rcMarcas').querySelectorAll('[data-tira]').forEach(b => b.onclick = () => { marcas.splice(+b.dataset.tira, 1); desenhar(); });
     $('rcMarcas').querySelectorAll('[data-foto]').forEach(inp => inp.addEventListener('change', () => {
@@ -847,7 +851,7 @@
     const cena = { camera: $('rcCamera').value.trim(), cenario: $('rcCenario').value.trim(), cenario_novo: $('rcCenarioNovo').value.trim() };
     const fotoCenario = ($('rcCenarioFoto').files || [])[0] || null;
     if (!marcas.length && !cena.cenario_novo && !fotoCenario && !confirm('Nada marcado — usar o rascunho só como pose/composição?')) return;
-    const limpas = marcas.map(m => ({ n: m.n, x: m.x, y: m.y, tipo: m.tipo, nome: m.nome, obs: m.obs }));
+    const limpas = marcas.map(m => ({ n: m.n, x: m.x, y: m.y, tipo: m.tipo, troca: m.troca || 'auto', nome: m.nome, obs: m.obs }));
     const manterCores = base !== 'foto' && $('rcCores').checked;
     const fotoOriginal = ($('rcFoto').files || [])[0] || null;
     if (manterCores && !fotoOriginal) { alert('Pra manter as cores, escolha de novo a foto original no campo Foto (lá em cima).'); return; }

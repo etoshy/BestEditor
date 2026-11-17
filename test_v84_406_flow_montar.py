@@ -30,7 +30,7 @@ def test_pacote_pose_primeiro_e_comando_basico(tmp_path):
     assert all(os.path.isfile(r["arquivo"]) for r in pac["refs"])
     assert FM.carregar_pacote(str(tmp_path), pac["id"])["obs_geral"] == "os dois brindando num bar à noite"
     p = FM.prompt_basico(pac)
-    assert "pose" in p and "reference image 1" in p and "Ana replaces the WHOLE figure" in p and "person in reference image 2" in p
+    assert "pose" in p and "reference image 1" in p and "Ana (look from reference image 2) takes the place of that figure" in p
     assert "sorrindo, mantém a jaqueta" in p and "brindando" in p
     assert [r["arquivo"] for r in FM.referencias_flow(pac)] == [r["arquivo"] for r in pac["refs"]]
     with pytest.raises(FM.MontarErro):

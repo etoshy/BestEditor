@@ -123,6 +123,7 @@
     if ($('rfOriginal').dataset.src !== P.video_url) { $('rfOriginal').src = P.video_url; $('rfOriginal').dataset.src = P.video_url; }
     $('rfPessoas').innerHTML = (P.personagens || []).map(x => `<div class="rf-p" data-id="${x.id}"><span class="id">${x.id}</span><span class="rf-hint">${esc(x.descricao)}</span>
       <input type="text" data-k="nome" value="${esc(x.nome)}" placeholder="quem entra aqui (ex.: Ana)">
+      <select data-k="troca" style="margin:2px 0;font-size:.82rem"><option value="auto"${!['rosto', 'inteira'].includes(x.troca) ? ' selected' : ''}>🤖 automático (a IA completa roupa/corpo que faltar)</option><option value="inteira"${x.troca === 'inteira' ? ' selected' : ''}>🧍 troca a pessoa inteira</option><option value="rosto"${x.troca === 'rosto' ? ' selected' : ''}>🙂 só o rosto (corpo, roupa e cena ficam)</option></select>
       <textarea rows="1" data-k="obs" placeholder="observação (opcional)">${esc(x.obs)}</textarea>
       <div>${x.foto_url ? `<img src="${x.foto_url}" alt=""> <button type="button" class="rf-mini rf-sec" data-tirafoto="${x.id}">trocar foto</button>`
         : `<label style="font-size:.8rem">📷 foto da pessoa nova <input type="file" accept="image/*" data-foto="${x.id}"></label>`}</div></div>`).join('')
@@ -169,7 +170,7 @@
     document.querySelectorAll('[data-gera]').forEach(b => b.onclick = () => gerar(b.dataset.gera, [+b.closest('.rf-pl').dataset.n]));
   }
   function coletar() {
-    const pers = [...document.querySelectorAll('.rf-p')].map(d => ({ id: d.dataset.id, nome: d.querySelector('[data-k=nome]').value, obs: d.querySelector('[data-k=obs]').value }));
+    const pers = [...document.querySelectorAll('.rf-p')].map(d => ({ id: d.dataset.id, nome: d.querySelector('[data-k=nome]').value, obs: d.querySelector('[data-k=obs]').value, troca: d.querySelector('[data-k=troca]').value }));
     const planos = [...document.querySelectorAll('.rf-pl')].map(d => ({ n: +d.dataset.n, acao_en: d.querySelector('[data-k=acao_en]').value, camera_en: d.querySelector('[data-k=camera_en]').value,
       emocoes: Object.fromEntries([...d.querySelectorAll('[data-emocao]')].map(i => [i.dataset.emocao, i.value])),
       fala: d.querySelector('[data-k=fala]').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^([A-Za-z0-9]{1,3})\s*:\s*(.+)$/); return m ? { id: m[1], texto: m[2] } : { id: '?', texto: l }; }) }));

@@ -69,6 +69,7 @@ def limpar_marcas(marcas: Any) -> List[Dict[str, Any]]:
         if 0 <= x <= 1 and 0 <= y <= 1:
             out.append({"n": len(out) + 1, "x": round(x, 4), "y": round(y, 4),
                         "tipo": "objeto" if m.get("tipo") == "objeto" else "pessoa",
+                        "troca": m.get("troca") if m.get("troca") in ("rosto", "inteira") else "auto",
                         "nome": " ".join(str(m.get("nome") or "").split())[:80],
                         "obs": " ".join(str(m.get("obs") or "").split())[:300]})
         if len(out) >= 12:
@@ -91,6 +92,7 @@ def texto_marcas(marcas: List[Dict[str, Any]]) -> str:
                           + (f"trocar por: {m['nome']}" if m["nome"] else "mantém"))
         else:
             partes.append(f"figura {m['n']} (pessoa, {lugar(m)}) = {m['nome'] or 'personagem ' + str(m['n'])}"
+                          + {"rosto": " — trocar SÓ o rosto/cabeça", "inteira": " — trocar a pessoa inteira"}.get(m.get("troca") or "", "")
                           + (f" — {m['obs']}" if m["obs"] else ""))
     return "; ".join(partes)
 
