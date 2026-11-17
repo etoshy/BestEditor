@@ -193,7 +193,9 @@ Return:
   description (clothes, build, role) — the SAME person keeps the same id in every shot; never identify real people;
 - "cenario": the place, in Portuguese;
 - "planos": for EVERY shot n: "pessoas" = who is visible in its FIRST frame with a point on their head (x,y fractions 0..1
-  from the top-left); "acao_en" = what happens in the shot (movements, gestures, expressions, interactions) in concrete
+  from the top-left) and "emocao_en" = the facial expression / emotion of that person in the shot and how it changes (e.g.
+  "smug half-smile, then raises an eyebrow", "terrified, mouth open") — the remake keeps these EXACT emotions on the new
+  faces; "acao_en" = what happens in the shot (movements, gestures, expressions, interactions) in concrete
   English for a video model, 1–3 sentences, describing people by role/position (not by real names); "camera_en" = the
   camera (static, slow push-in, pan left, handheld…); "fala" = the lines spoken in the shot attributed to the ids, in the
   original language (empty list if none)."""
@@ -204,8 +206,9 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["persona
     "planos": {"type": "array", "items": {"type": "object", "additionalProperties": False,
                                           "required": ["n", "pessoas", "acao_en", "camera_en", "fala"], "properties": {
         "n": {"type": "integer"}, "acao_en": {"type": "string"}, "camera_en": {"type": "string"},
-        "pessoas": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["id", "x", "y"],
-                                               "properties": {"id": {"type": "string"}, "x": {"type": "number"}, "y": {"type": "number"}}}},
+        "pessoas": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["id", "x", "y", "emocao_en"],
+                                               "properties": {"id": {"type": "string"}, "x": {"type": "number"}, "y": {"type": "number"},
+                                                              "emocao_en": {"type": "string"}}}},
         "fala": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["id", "texto"],
                                             "properties": {"id": {"type": "string"}, "texto": {"type": "string"}}}}}}}}}
 
@@ -273,7 +276,8 @@ def ler_analise(p: Dict[str, Any], r: Dict[str, Any]) -> None:
             except (TypeError, ValueError):
                 continue
             if i in ids and 0 <= x_ <= 1 and 0 <= y_ <= 1:
-                pl["pessoas"].append({"id": i, "x": round(x_, 4), "y": round(y_, 4)})
+                pl["pessoas"].append({"id": i, "x": round(x_, 4), "y": round(y_, 4),
+                                      "emocao_en": " ".join(str(q.get("emocao_en") or "").split())[:200]})
         pl["fala"] = [{"id": re.sub(r"[^A-Z0-9]", "", str(f.get("id") or "").upper())[:3] or "?",
                        "texto": " ".join(str(f.get("texto") or "").split())[:400]} for f in a.get("fala") or [] if str(f.get("texto") or "").strip()]
         pl["fala_original"] = [dict(f) for f in pl["fala"]]
@@ -348,8 +352,12 @@ def pacote_do_plano(base: str, p: Dict[str, Any], pl: Dict[str, Any], gal_base: 
     for q in pl.get("pessoas") or []:
         x = pers.get(q["id"]) or {}
         nome = x.get("nome") or ""
+        expr = q.get("emocao_en") or ""
         marcas.append({"x": q["x"], "y": q["y"], "tipo": "pessoa", "nome": nome or f"pessoa {q['id']}",
-                       "obs": ("mantém como está" if not (nome or x.get("foto")) else "") + (x.get("obs") or "")})
+                       "obs": "; ".join(t for t in (("mantém como está" if not (nome or x.get("foto")) else ""),
+                                                    (f"MESMA expressão/emoção do original: {expr}" if expr else
+                                                     "MESMA expressão/emoção da pessoa original deste quadro"),
+                                                    x.get("obs") or "") if t)})
         if x.get("foto") and q["id"] not in ja and os.path.isfile(os.path.join(d, x["foto"])):
             ja.add(q["id"])
             itens.append({"papel": "personagem", "nome": nome or f"pessoa {q['id']}", "obs": x.get("obs") or "",
@@ -369,6 +377,9 @@ def prompt_video(p: Dict[str, Any], pl: Dict[str, Any]) -> str:
     partes = ["Start exactly from the given first frame and keep every character's look identical to it."]
     if pl.get("acao_en"):
         partes.append(pl["acao_en"])
+    expr = [f'{nomes.get(q["id"], "the person " + q["id"])}: {q["emocao_en"]}' for q in pl.get("pessoas") or [] if q.get("emocao_en")]
+    if expr:  # 🎭 a emoção é a dos personagens ORIGINAIS (o rosto é o novo)
+        partes.append("Facial expressions exactly as in the original scene — " + "; ".join(expr) + ".")
     if pl.get("camera_en"):
         partes.append("Camera: " + pl["camera_en"].rstrip(".") + ".")
     modo = p.get("falas_modo") or "manter"
@@ -660,6 +671,10 @@ def registrar(app, FE) -> None:
                     pl["acao_en"] = " ".join(str(x.get("acao_en") or "").split())[:800]
                 if "camera_en" in x:
                     pl["camera_en"] = " ".join(str(x.get("camera_en") or "").split())[:200]
+                if isinstance(x.get("emocoes"), dict):
+                    for q in pl.get("pessoas") or []:
+                        if q["id"] in x["emocoes"]:
+                            q["emocao_en"] = " ".join(str(x["emocoes"][q["id"]] or "").split())[:200]
                 if isinstance(x.get("fala"), list):
                     pl["fala"] = [{"id": str(f.get("id") or "?")[:3].upper(), "texto": " ".join(str(f.get("texto") or "").split())[:400]}
                                   for f in x["fala"] if str(f.get("texto") or "").strip()]

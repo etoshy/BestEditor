@@ -160,7 +160,8 @@ _REGRA_PAPEL = {
     "base": "use reference image {n} as the BASE of the composition: same framing, camera angle, positions and poses, and the same "
             "scenery and objects unless replaced below; the people in it are only placeholders and are replaced ENTIRELY",
     "personagem": "{nome} replaces the WHOLE figure: face, hair, body type, skin tone, clothes and their colors all come from the "
-                  "person in reference image {n} — only the place and pose come from the base",
+                  "person in reference image {n} — only the place, the pose and the FACIAL EXPRESSION (the emotion of the "
+                  "figure being replaced) come from the base",
     "cenario": "use the location/background from reference image {n}",
     "roupa": "dress {alvo} in the outfit shown in reference image {n}",
     "objeto": "include the object from reference image {n}",
@@ -203,7 +204,8 @@ a general note (often in Portuguese). Your prompt must:
   angle (never its identity, clothes or background); a BASE image (a real photo used as base) gives the whole composition —
   framing, positions, poses, scenery and objects unless replaced — but its PEOPLE are placeholders replaced entirely; a
   CHARACTER image replaces the WHOLE figure (face, hair, body type, skin tone, clothes AND their colors — never just the
-  face; keep the base pose) — call the character by the given name; SCENERY gives the place; OUTFIT the clothes; OBJECT
+  face; keep the base pose AND the facial expression/emotion of the figure being replaced — the new face shows the ORIGINAL
+  emotion, never the expression of the character photo) — call the character by the given name; SCENERY gives the place; OUTFIT the clothes; OBJECT
   the object; STYLE the light/colors/art style; COLORS gives ONLY the palette and lighting;
 - when there is a pose and several characters, say who takes which position in the pose (follow the notes; if unsaid,
   decide sensibly and say it);

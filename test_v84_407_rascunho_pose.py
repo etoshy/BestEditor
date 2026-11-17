@@ -141,7 +141,8 @@ def test_foto_base_sem_converter_e_pessoa_inteira(tmp_path):
     assert pac["refs"][0].get("arquivo_ia") and "figura 1" in pac["refs"][0]["obs"]
     p = FM.prompt_basico(pac)
     assert "BASE of the composition" in p and "replaced ENTIRELY" in p
-    assert "Ana replaces the WHOLE figure" in p and "clothes and their colors" in p
+    assert "Ana replaces the WHOLE figure" in p and "clothes and their colors" in p and "FACIAL EXPRESSION" in p
+    assert "ORIGINAL" in FM.SISTEMA and "never the expression of the character photo" in FM.SISTEMA
     assert "ONLY the color palette and lighting from reference image 3" in p
     assert "BASE image" in FM.SISTEMA and "never just the" in FM.SISTEMA
 

@@ -677,7 +677,7 @@
       }
       const l = novaLinha('personagem'); if (!l) return;
       l.querySelector('.fl-mt-nome').value = m.nome || ('Personagem ' + m.n);
-      l.querySelector('.fl-mt-obs').value = `troca a figura ${m.n} INTEIRA (rosto, cabelo, corpo, roupa e cores da foto dela), na mesma pose` + (m.obs ? ` — era: ${m.obs}` : '');
+      l.querySelector('.fl-mt-obs').value = `troca a figura ${m.n} INTEIRA (rosto, cabelo, corpo, roupa e cores da foto dela), na mesma pose e com a MESMA expressão/emoção da original` + (m.obs ? ` — era: ${m.obs}` : '');
       comFoto(l, fotos[i]);
     });
     if (cena && (cena.cenario_novo || e.detail.fotoCenario)) {

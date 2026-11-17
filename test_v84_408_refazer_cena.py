@@ -45,9 +45,9 @@ def _criado(tmp_path):
 def _resp():
     return {"personagens": [{"id": "A", "descricao": "homem de terno"}, {"id": "b", "descricao": "mulher de vermelho"}],
             "cenario": "bar à noite",
-            "planos": [{"n": 1, "pessoas": [{"id": "A", "x": 0.3, "y": 0.2}, {"id": "B", "x": 0.7, "y": 0.25}],
+            "planos": [{"n": 1, "pessoas": [{"id": "A", "x": 0.3, "y": 0.2, "emocao_en": "smug half-smile"}, {"id": "B", "x": 0.7, "y": 0.25, "emocao_en": ""}],
                         "acao_en": "The man raises his glass.", "camera_en": "static", "fala": [{"id": "A", "texto": "Saúde!"}]},
-                       {"n": 2, "pessoas": [{"id": "B", "x": 0.5, "y": 0.3}, {"id": "Z", "x": 0.1, "y": 0.1}],
+                       {"n": 2, "pessoas": [{"id": "B", "x": 0.5, "y": 0.3, "emocao_en": "laughing"}, {"id": "Z", "x": 0.1, "y": 0.1, "emocao_en": ""}],
                         "acao_en": "She laughs.", "camera_en": "slow push-in", "fala": []}]}
 
 
@@ -64,7 +64,7 @@ def _analisado(tmp_path):
     assert vistos["recurso"] == "refazer_cena" and vistos["n_img"] == 3 * len(p["planos"])
     assert "speech: Saúde!" in vistos["txt"][0] and "no speech" in vistos["txt"][2]
     assert [x["id"] for x in q["personagens"]] == ["A", "B"] and q["cenario"]["descricao"] == "bar à noite"
-    assert q["planos"][1]["pessoas"] == [{"id": "B", "x": 0.5, "y": 0.3}]  # o "Z" (que não existe) sai
+    assert q["planos"][1]["pessoas"] == [{"id": "B", "x": 0.5, "y": 0.3, "emocao_en": "laughing"}]  # o "Z" (que não existe) sai
     assert q["planos"][0]["fala_original"] == [{"id": "A", "texto": "Saúde!"}] and q["analisado"]
     # reanalisar não perde o que você escolheu
     RC._mudar(base, p["id"], lambda x: x["personagens"][0].update(nome="Ana", foto="fotos/a.png"))
@@ -89,7 +89,9 @@ def test_pacote_prompt_e_gerar(tmp_path):
     pac = RC.pacote_do_plano(base, p, p["planos"][0], gal)
     assert [r["papel"] for r in pac["refs"]] == ["base", "personagem"]  # B sem nome/foto: fica como está (sem foto extra)
     assert "figura 1 (pessoa" in pac["refs"][0]["obs"] and "= Ana" in pac["refs"][0]["obs"] and "trocar por: praia" in pac["refs"][0]["obs"]
+    assert "MESMA expressão/emoção do original: smug half-smile" in pac["refs"][0]["obs"]
     pv = RC.prompt_video(p, p["planos"][0])
+    assert "Facial expressions exactly as in the original scene — Ana: smug half-smile" in pv
     assert 'Ana says: "Saúde!"' in pv and "The man raises his glass." in pv and "Setting: praia." in pv and "anime" in pv
     p["estilo"] = ""
     assert "Keep exactly the art style of the first frame." in RC.prompt_video(p, p["planos"][0])
@@ -148,9 +150,10 @@ def test_rotas(ctx, monkeypatch, tmp_path):
                content_type="multipart/form-data").get_json()
     assert r["projeto"]["personagens"][0]["foto_url"]
     r = c.post(f"/flow/refazer/{pid}/salvar", json={"personagens": [{"id": "A", "nome": "Ana"}], "cenario": {"novo": "praia"},
-                                                   "estilo": "manga", "falas_modo": "novas", "planos": [{"n": 1, "fala": [{"id": "A", "texto": "Oi!"}]}]}).get_json()
+                                                   "estilo": "manga", "falas_modo": "novas", "planos": [{"n": 1, "fala": [{"id": "A", "texto": "Oi!"}], "emocoes": {"A": "furious"}}]}).get_json()
     pj = r["projeto"]
     assert pj["personagens"][0]["nome"] == "Ana" and pj["estilo"] == "manga" and pj["planos"][0]["fala"] == [{"id": "A", "texto": "Oi!"}]
+    assert pj["planos"][0]["pessoas"][0]["emocao_en"] == "furious"
     # gerar: usa o rodar_e_esperar do Flow (falso aqui)
     pedidos = []
     monkeypatch.setattr(FE, "rodar_e_esperar", lambda ped, **k: pedidos.append(ped) or (
