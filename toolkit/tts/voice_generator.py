@@ -3141,6 +3141,17 @@ def gerar_audio(engine: str, texto: str, output_path: str, **kwargs: Any) -> str
     _PROTECAO["idioma"] = "en" if engine == "chatterbox_turbo" else (kwargs.get("idioma") or None)
 
     engine = (engine or "").strip().lower()
+    _por_extenso = kwargs.pop("numeros_por_extenso", True)
+    if engine in ("chatterbox", "xtts", "fish_s2") and str(kwargs.get("idioma") or "").lower().startswith("pt") and _por_extenso:
+        # 🔢 v84_410: o Chatterbox pt lia "1815" errado/arrastado e "XIV" letra por letra — vai por extenso
+        try:
+            try:
+                from tts import numeros_pt as _npt  # type: ignore
+            except ImportError:
+                import numeros_pt as _npt  # type: ignore
+            texto = _npt.por_extenso(texto)
+        except Exception:  # noqa: BLE001 — sem isso, narra como veio
+            pass
     _pol = kwargs.pop("polimento", None)
     _vp = _modulo_polimento()
     _POLIMENTO.update(_vp.normalizar(_pol if isinstance(_pol, dict) else _polimento_salvo()), engine=engine)

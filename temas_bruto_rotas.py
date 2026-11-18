@@ -138,6 +138,7 @@ def registrar(app, base_dir: str) -> None:
         mods = _modelos()
         padrao = next((k for k in mods if k == "marca_cenariom"), next((k for k, m in mods.items() if m.get("do_pacote")), ""))
         return render_template("temas_bruto.html", a=None, lista=TB.listar(base_dir), modelos=mods, padrao=padrao,
+                               divisoes=TB.DIVISOES, divisao=TB.DIVISAO_PADRAO,
                                erro=request.args.get("erro") or "")
 
     @app.route("/temas-bruto/novo", methods=["POST"])
@@ -151,7 +152,8 @@ def registrar(app, base_dir: str) -> None:
         else:
             return redirect(url_for("temas_bruto_lista", erro="Envie o arquivo ou cole o texto."))
         try:
-            a = TB.criar(base_dir, request.form.get("nome") or "", request.form.get("modelo") or "", conteudo, nome_arq)
+            a = TB.criar(base_dir, request.form.get("nome") or "", request.form.get("modelo") or "", conteudo, nome_arq,
+                         request.form.get("divisao") or "")
         except TB.TemasErro as exc:
             return redirect(url_for("temas_bruto_lista", erro=str(exc)))
         import ia_servico as ia
@@ -175,6 +177,7 @@ def registrar(app, base_dir: str) -> None:
         mods = _modelos()
         return render_template("temas_bruto.html", a=a, lista=[], modelos=mods, padrao=a["modelo"],
                                formatos=TB._formatos(a["modelo"]), ia_off=ia.motivo_desligado("roteiros") or "",
+                               divisoes=TB.DIVISOES, divisao=TB.divisao(a), parecidos=TB.parecidos(a.get("temas") or []),
                                rodando=bool(_RODANDO.get(aid)), erro=request.args.get("erro") or "")
 
     @app.route("/temas-bruto/<aid>/estado")
@@ -192,8 +195,37 @@ def registrar(app, base_dir: str) -> None:
         motivo = ia.motivo_desligado("roteiros")
         if motivo:
             return jsonify({"erro": "IA: " + motivo + " — use 📋 Copiar o pedido."}), 400
-        TB.mexer(base_dir, aid, lambda a: a.update(estado="analisando", erro=""))
+        dv = str((request.get_json(silent=True) or {}).get("divisao") or "")
+        TB.mexer(base_dir, aid, lambda a: a.update(estado="analisando", erro="",
+                                                   **({"divisao": dv} if dv in TB.DIVISOES else {})))
         return jsonify({"ok": True, "tarefa": _iniciar_analise(aid)})
+
+    @app.route("/temas-bruto/<aid>/juntar", methods=["POST"])
+    def temas_bruto_juntar(aid: str):
+        """🧩 Junta os temas parecidos da lista atual (sem ler o texto de novo)."""
+        import ia_servico as ia
+        import tarefas_bg
+        motivo = ia.motivo_desligado("roteiros")
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo}), 400
+        try:
+            a = TB.carregar(base_dir, aid)
+        except TB.TemasErro as exc:
+            return jsonify({"erro": str(exc)}), 404
+        if sum(1 for t in a.get("temas") or [] if not t.get("projeto")) < 2:
+            return jsonify({"erro": "Precisa de pelo menos 2 temas que ainda não viraram projeto."}), 400
+        dv = str((request.get_json(silent=True) or {}).get("divisao") or "")
+        TB.mexer(base_dir, aid, lambda x: x.update(estado="analisando", erro="",
+                                                   **({"divisao": dv} if dv in TB.DIVISOES else {})))
+
+        def rodar(t):
+            try:
+                return {"temas": TB.juntar_parecidos(base_dir, aid, t.progresso)}
+            except Exception as exc:
+                TB.mexer(base_dir, aid, lambda x: x.update(estado="erro", erro=str(exc)[:400]))
+                raise
+        return jsonify({"ok": True, "tarefa": tarefas_bg.iniciar("temas_bruto", "🧩 Juntar temas: " + a["nome"][:80], rodar,
+                                                                pagina=f"/temas-bruto/{aid}")})
 
     @app.route("/temas-bruto/<aid>/prompt")
     def temas_bruto_prompt(aid: str):

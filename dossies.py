@@ -464,7 +464,19 @@ REGRA_SEM_PESSOAL = (
     "e histórias pessoais deles (\"quando eu era criança\", \"aconteceu comigo\", \"minha mãe\", \"no meu trabalho\"), "
     "citações a vídeos e conteúdos anteriores (\"como falei no vídeo passado\", \"no meu canal\", \"parte 2\", \"link aqui em "
     "cima\"), menções a inscritos, lives, patrocinadores ou ao canal deles, nem detalhes muito pessoais/íntimos de alguém que "
-    "não são necessários pra contar a história. Use só os FATOS; se uma ideia importa, reescreva de forma neutra e geral.")
+    "não são necessários pra contar a história. Use só os FATOS; se uma ideia importa, reescreva de forma neutra e geral. "
+    # 🩹 v84_410: o roteiro dizia "segundo a leitura das notas", "como propõem as notas" — quem assiste não sabe que notas são
+    "NUNCA fale com quem assiste sobre o MATERIAL de onde o roteiro saiu (\"segundo as notas\", \"como propõem as notas\", "
+    "\"a transcrição diz\", \"o texto\", \"o material\", \"as anotações\", \"a fonte\") e NÃO credite quem fez a fonte "
+    "(o professor da aula, o autor do vídeo/texto/curso de onde o roteiro saiu: nada de \"segundo o professor X\", \"como "
+    "explica o autor\" — esse crédito vai em outro lugar): diga as ideias dele direto, como o próprio narrador. "
+    # 🩹 v84_410d: citações históricas ficam — com nome, obra e contexto, como num bom documentário
+    "CITAÇÕES HISTÓRICAS FICAM: frases célebres e ideias de pensadores, escritores e figuras históricas (ex.: \"o filósofo "
+    "espanhol José Ortega y Gasset deixou uma frase conhecida: eu sou eu e minha circunstância\"; \"Louis Ratisbonne "
+    "registrou em Journal d'un poète uma frase que atribuiu a Alfred de Vigny: ...\") mantêm o nome de quem disse, e a obra "
+    "quando a fonte traz — apresente quem é em poucas palavras, cite a frase e depois explique o que ela quer dizer na "
+    "prática. Não invente atribuição: se a fonte não diz de quem é, não ponha nome; se a autoria é duvidosa, diga "
+    "\"atribuída a\".")
 REGRA_PRODUTO = (
     "PRODUTO SUGERIDO: sugira UM produto real que combine de verdade com o tema e com o público deste vídeo (ex.: um livro sobre "
     "o caso/assunto, um documentário, um item útil ligado ao tema — nunca algo de mau gosto em relação às vítimas). Ele "
