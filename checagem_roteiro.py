@@ -312,8 +312,10 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
          "- Idade × ano, duração de pena × datas de saída, data do crime × data da prisão/julgamento/execução: faça a conta.",
          "", "## 2. 📚 CHECAGEM DAS ALEGAÇÕES HISTÓRICAS",
          "- Cada afirmação factual importante contra as fontes desta conversa/abaixo. Fonte diz outra coisa → corrija. Nenhuma "
-         "fonte sustenta → atribua a quem diz (\"segundo o investigador X\", \"de acordo com reportagem da Y\"), suavize ou "
-         "corte. NUNCA invente um dado novo pra tapar o buraco.",
+         "fonte sustenta → " + ("atribua a quem diz (\"segundo o investigador X\", \"de acordo com reportagem da Y\"), "
+                                "suavize ou corte. NUNCA invente um dado novo pra tapar o buraco."
+                                if __import__("checagem_resolver").politica() == "suavizar"
+                                else __import__("checagem_resolver").regra_sem_fonte(__import__("checagem_resolver").politica(), False)),
          "- FATO × ALEGAÇÃO: o que o acusado, a polícia, um jornalista ou um investigador AFIRMOU é alegação — sempre com o "
          "nome de quem afirmou, nunca narrado como fato.",
          "- NÚMEROS QUE NÃO SÃO A MESMA COISA: o número pelo qual foi CONDENADO, o da ACUSAÇÃO, os casos que a polícia LIGOU, "
@@ -388,7 +390,8 @@ def ler(resposta: str) -> Dict[str, Any]:
             if c.get("para") is None and st not in ("falso", "repeticao"):
                 continue  # "para": null = a IA não mandou o texto novo (não apaga o trecho por engano)
             trocas.append({"de": str(c["de"]), "para": str(c.get("para") or ""), "item": str(c.get("item") or "").replace(" ", "").upper()[:6],
-                           "status": st if st in ("corrigido", "falso", "sem_fonte", "repeticao") else "corrigido",
+                           "status": st if st in ("corrigido", "falso", "sem_fonte", "repeticao", "atualizado", "trocado", "hipotetico",
+                                                    "tirado") else "corrigido",
                            "motivo": (_eixo(c.get("eixo") or c.get("tipo")) + (": " + str(c.get("problema")) if c.get("problema") else ""))[:200],
                            "eixo": _eixo(c.get("eixo") or c.get("tipo")),
                            "fonte": str(c.get("fonte") or "")[:300]})
@@ -493,8 +496,7 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
          "1. Para cada item abaixo, PESQUISE NA INTERNET em fontes confiáveis (jornais, arquivos, documentos oficiais, "
          "processos, livros, Wikipedia só como ponto de partida) e confira: anos, datas, idades, números, nomes, lugares, "
          "e se cada alegação está atribuída a quem alega.",
-         "2. Errado → corrija. Sem confirmação → atribua (\"segundo…\", \"de acordo com…\"), suavize ou tire o detalhe. "
-         "NUNCA invente um dado pra tapar buraco.",
+         "2. " + __import__("checagem_resolver").regra_sem_fonte(__import__("checagem_resolver").politica(), True),
          "3. Repetições: deixe uma vez só, no lugar mais forte (no outro: apague com \"para\": \"\" ou reduza à meia frase "
          "que traga algo novo).",
          "4. Só esses três focos (ano/cronologia, alegações/fatos, repetições). Não mexa no estilo.",
@@ -505,7 +507,9 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
          "- \"para\": o trecho corrigido, na MESMA língua e no mesmo tom (ou \"\" pra apagar uma repetição).",
          "- \"fonte\": o LINK (URL) que confirma a correção.",
          "- \"status\" de cada correção: \"corrigido\" (dado errado, trocado pelo certo), \"falso\" (não aconteceu / não "
-         "se sustenta — tirado do texto), \"sem_fonte\" (não achei confirmação — atribuído/suavizado) ou \"repeticao\".",
+         "se sustenta — tirado do texto), \"sem_fonte\" (não achei confirmação — atribuído/suavizado), \"atualizado\" "
+         "(dado velho trocado pelo mais recente), \"trocado\" (caso sem fonte trocado por um equivalente confirmado), "
+         "\"hipotetico\" (virou exemplo assumido), \"tirado\" (saiu do roteiro) ou \"repeticao\".",
          "- Item que está CERTO: ponha em \"conferidos\" com o link que confirma (assim eu sei que foi checado).",
          "- RESPONDA TODOS os itens: cada um vai em \"correcoes\" (com o \"item\") OU em \"conferidos\". Item sem resposta "
          "eu mando de novo.",
@@ -517,7 +521,7 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
           *[f"L{n}: {texto_de[n]}" for n in linhas], "",
           "## Resposta — SOMENTE um JSON válido, assim (sem texto antes ou depois):",
           json.dumps({"correcoes": [{"item": "C1", "de": "trecho exato", "para": "trecho corrigido (ou \"\")",
-                                     "status": "corrigido | falso | sem_fonte | repeticao",
+                                     "status": "corrigido | falso | sem_fonte | atualizado | trocado | hipotetico | tirado | repeticao",
                                      "eixo": "cronologia | alegacao | repeticao", "problema": "o que estava errado",
                                      "fonte": "https://…"}],
                       "conferidos": [{"item": "V2", "ok": True, "fonte": "https://…", "nota": "o que a fonte diz"}],

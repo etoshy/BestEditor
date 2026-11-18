@@ -731,7 +731,9 @@ def registrar(app, base_dir: str) -> None:
         # v84_156: corrigido também é resolvido (antes só os "conferidos" marcavam ✔ — o corrigido ficava pendente)
         feitos = {x.get("item") for x in d["trocas"] if x.get("item") and any(x["de"][:200] == t["de"] for t in r["aplicadas"])}
         _NOTA = {"corrigido": "✏ corrigido", "falso": "✖ falso — tirado do texto", "sem_fonte": "❔ sem confirmação — atribuído/suavizado",
-                 "repeticao": "✂ repetição tirada"}
+                 "repeticao": "✂ repetição tirada", "atualizado": "🔄 atualizado pelo dado mais recente",
+                 "trocado": "🔁 trocado por um caso confirmado", "hipotetico": "🧪 virou exemplo hipotético",
+                 "tirado": "✂ tirado do roteiro"}
         for it in feitos:
             if it.startswith("V") and it[1:].isdigit() and 0 <= int(it[1:]) - 1 < len(ver):
                 tr = next((x for x in d["trocas"] if x.get("item") == it), {})
@@ -855,6 +857,87 @@ def registrar(app, base_dir: str) -> None:
         reg["rep_ignoradas"] = list(dict.fromkeys(ign))[-300:]
         _guardar(origem, pid, "checagem", reg)
         return jsonify({"ok": True, "ignoradas": len(reg["rep_ignoradas"])})
+
+    # ------------------------------------------------------------------ 🧭 v84_414: o que não se confirmou
+    @app.route("/checagem/politica", methods=["GET", "POST"])
+    def checagem_politica():
+        import checagem_resolver as cr
+        if request.method == "POST":
+            v = str((request.get_json(silent=True) or {}).get("politica") or "")
+            if v not in cr.POLITICAS:
+                return jsonify({"erro": "Política inválida."}), 400
+            from site_config import save_site_config
+            save_site_config({"checagem_sem_fonte": v})
+        return jsonify({"ok": True, "politica": cr.politica(), "politicas": cr.POLITICAS,
+                        "acoes": {k: v[0] for k, v in cr.ACOES.items()}})
+
+    @app.route("/checagem/<origem>/<pid>/resolver", methods=["POST"])
+    def checagem_resolver(origem: str, pid: str):
+        """🧭 Faz a ação escolhida (atualizar / equivalente / hipotético / tirar / manter) nos itens da lista "conferir"."""
+        import json as _json
+
+        import checagem_resolver as cr
+        import idiomas
+        import revisao_roteiro as rv
+        c = request.get_json(silent=True) or {}
+        acao = str(c.get("acao") or "")
+        if acao not in cr.ACOES:
+            return jsonify({"erro": "Ação inválida."}), 400
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception:  # noqa: BLE001
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        reg = p.get("checagem") or {}
+        ver = reg.get("verificar") or []
+        idx = sorted({int(i) for i in c.get("itens") or [] if str(i).lstrip("-").isdigit() and 0 <= int(i) < len(ver)})
+        if not idx:
+            return jsonify({"erro": "Escolha pelo menos um item."}), 400
+        if acao == "manter":
+            for i in idx:
+                ver[i].update(conferido=True, status_web="mantido", nota_web="✔ mantido por você")
+            reg["verificar"] = ver
+            _guardar(origem, pid, "checagem", reg)
+            return jsonify({"ok": True, "aplicadas": 0, "itens": idx})
+        try:
+            pr = cr.prompt_resolver(texto, [(i, ver[i]) for i in idx], acao,
+                                    idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"))
+            nome = str(p.get("tema") or p.get("titulo") or p.get("nome") or "roteiro")[:60]
+            resposta, quem = cr.chamar_ia(pr, acao, f"🧭 {cr.ACOES[acao][0]}: {nome}")
+            trocas = cr.ler(resposta)
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"erro": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001 — Gemini fora do ar etc.
+            return jsonify({"erro": f"A IA não respondeu: {exc}"}), 502
+        r = rv.aplicar(texto, _json.dumps({"trocas": trocas}, ensure_ascii=False))
+        g = {}
+        if r["aplicadas"]:
+            g = _gravar(origem, pid, p, r["texto"], None, [], chave_antes="-",
+                        hist=("🧭 checagem", f"{cr.ACOES[acao][0]}: {len(r['aplicadas'])} trecho(s) · "
+                                            f"{r['palavras_antes']} → {r['palavras_depois']} palavras"))
+            p, _t, _pad = _roteiro(origem, pid)
+            reg = p.get("checagem") or reg
+            ver = reg.get("verificar") or ver
+        aplicados = {t["de"] for t in r["aplicadas"]}
+        _NOTA = {"atualizado": "🔄 atualizado pelo dado mais recente", "trocado": "🔁 trocado por um caso confirmado",
+                 "hipotetico": "🧪 virou exemplo hipotético", "tirado": "✂ tirado do roteiro", "corrigido": "✏ corrigido"}
+        feitos = []
+        for t in trocas:
+            if t["de"][:200] not in aplicados:
+                continue
+            it = t.get("item") or ""
+            alvo = [int(it[1:]) - 1] if it.startswith("V") and it[1:].isdigit() else ([idx[0]] if len(idx) == 1 else [])
+            for i in alvo:
+                if i in idx and 0 <= i < len(ver):
+                    st = t.get("status") or cr.ACOES[acao][1]
+                    ver[i].update(conferido=True, status_web=st, fonte_web=t.get("fonte") or "",
+                                  nota_web=_NOTA.get(st, st) + (": " + t["motivo"] if t.get("motivo") else ""),
+                                  de=t["de"][:300], para=t["para"][:300])
+                    feitos.append(i)
+        reg["verificar"] = ver
+        reg.setdefault("aplicadas", []).extend(dict(t, eixo="alegacao") for t in r["aplicadas"])
+        _guardar(origem, pid, "checagem", reg)
+        return jsonify({"ok": True, "aplicadas": len(r["aplicadas"]), "nao_achadas": r["nao_achadas"], "itens": feitos,
+                        "quem": quem, "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"], **g})
 
     @app.route("/checagem/<origem>/<pid>/verificar/<int:i>", methods=["POST"])
     def checagem_conferido(origem: str, pid: str, i: int):

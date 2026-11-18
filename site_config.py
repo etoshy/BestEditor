@@ -242,6 +242,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "pixabay_api_fallback_to_browser": True,
     "magnific_only_free": True,
     "evitar_repeticao_clipes": True,
+    "max_usos_clipe": 3,  # 🔁 v84_415: o mesmo clipe/cena no máximo N vezes por vídeo (quando não tem outro)
     "buscadores_imagem_paralelo": True,
     "templates_cena_ia": True,
     "sons_auto": {"transicoes": True, "cenas": True, "destaques": True, "editoriais": True},
@@ -489,6 +490,10 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
     if not (1 <= concurrency <= 10):
         raise SiteConfigError(f"preview_fetch_concurrency precisa estar entre 1 e 10, recebi {concurrency}.")
     current["preview_fetch_concurrency"] = concurrency
+    try:  # 🔁 v84_415
+        current["max_usos_clipe"] = max(1, min(20, int(current.get("max_usos_clipe") or 3)))
+    except (TypeError, ValueError):
+        current["max_usos_clipe"] = 3
 
     try:
         assembly_concurrency = int(current["assembly_fetch_concurrency"])

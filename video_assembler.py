@@ -483,6 +483,48 @@ def _tracker_para(provider: Optional[str], used_tracker: Optional["UsedClipsTrac
     return None if provider in NO_REPEAT_EXEMPT_PROVIDERS else used_tracker
 
 
+MAX_USOS_CLIPE = 3  # 🔁 v84_415: o mesmo clipe (ou a mesma cena, frame quase igual) no máximo 3 vezes por vídeo
+_DHASH_CACHE: Dict[str, Optional[int]] = {}
+_DHASH_TRAVA = threading.Lock()
+
+
+def _dhash_url(url: Optional[str]) -> Optional[int]:
+    """Impressão digital (dHash 8×8) da miniatura — pra achar a MESMA cena com id diferente (bibliotecas que cortam
+    um plano em vários clipes). None se não deu pra baixar/ler (aí vale só o id)."""
+    if not url or not isinstance(url, str) or not url.startswith(("http://", "https://", "/")):
+        return None
+    with _DHASH_TRAVA:
+        if url in _DHASH_CACHE:
+            return _DHASH_CACHE[url]
+    h = None
+    try:
+        import io
+
+        from PIL import Image
+        if url.startswith("/"):
+            if not os.path.isfile(url):
+                return None
+            img = Image.open(url)
+        else:
+            import requests
+            r = requests.get(url, timeout=4)
+            r.raise_for_status()
+            img = Image.open(io.BytesIO(r.content))
+        g = img.convert("L").resize((9, 8))
+        px = list(g.getdata())
+        h = 0
+        for y in range(8):
+            for x in range(8):
+                h = (h << 1) | (1 if px[y * 9 + x] > px[y * 9 + x + 1] else 0)
+    except Exception:  # noqa: BLE001
+        h = None
+    with _DHASH_TRAVA:
+        if len(_DHASH_CACHE) > 5000:
+            _DHASH_CACHE.clear()
+        _DHASH_CACHE[url] = h
+    return h
+
+
 class UsedClipsTracker:
     """Rastreia quais vídeos já foram usados em QUALQUER segmento desta
     montagem — evita que a mesma cena apareça repetida em partes
@@ -494,11 +536,19 @@ class UsedClipsTracker:
     lock) — senão dois segmentos concorrentes poderiam escolher a
     MESMA cena ao mesmo tempo, antes de qualquer um dos dois ter
     registrado o uso.
+
+    🔁 v84_415: além do "já usado", CONTA os usos (do clipe e da cena — miniatura quase igual) pra nunca passar de
+    `maximo` (padrão 3) vezes no mesmo vídeo.
     """
 
-    def __init__(self):
+    LIMIAR_CENA = 6  # bits diferentes no dHash (de 64) pra contar como a mesma cena
+
+    def __init__(self, maximo: int = MAX_USOS_CLIPE):
         self._used: set = set()
+        self._usos: Dict[str, int] = {}
+        self._cenas: List[List[int]] = []  # [hash, usos]
         self._lock = threading.Lock()
+        self.maximo = max(1, int(maximo or MAX_USOS_CLIPE))
 
     @staticmethod
     def _chave(video_id: Any, provider: Optional[str]) -> str:
@@ -517,6 +567,21 @@ class UsedClipsTracker:
             if key in self._used:
                 return False
             self._used.add(key)
+            self._usos[key] = self._usos.get(key, 0) + 1
+            return True
+
+    def usos(self, video_id: Any, provider: Optional[str] = None) -> int:
+        with self._lock:
+            return self._usos.get(self._chave(video_id, provider), 0)
+
+    def usar_de_novo(self, video_id: Any, provider: Optional[str] = None) -> bool:
+        """Repete um clipe já usado — só se ainda não chegou no máximo."""
+        key = self._chave(video_id, provider)
+        with self._lock:
+            if self._usos.get(key, 0) >= self.maximo:
+                return False
+            self._usos[key] = self._usos.get(key, 0) + 1
+            self._used.add(key)
             return True
 
     def release(self, video_id: Any, provider: Optional[str] = None) -> None:
@@ -525,8 +590,38 @@ class UsedClipsTracker:
         uma reserva feita mas nunca concretizada bloquearia esse vídeo
         pra sempre, mesmo sem ele nunca ter aparecido no vídeo final.
         """
+        key = self._chave(video_id, provider)
         with self._lock:
-            self._used.discard(self._chave(video_id, provider))
+            n = self._usos.get(key, 0) - 1
+            if n > 0:
+                self._usos[key] = n
+            else:
+                self._usos.pop(key, None)
+                self._used.discard(key)
+
+    # --- a mesma CENA com outro id (miniatura quase igual)
+    def _achar_cena(self, h: int) -> Optional[List[int]]:
+        for c in self._cenas:
+            if bin(c[0] ^ h).count("1") <= self.LIMIAR_CENA:
+                return c
+        return None
+
+    def usos_cena(self, h: Optional[int]) -> int:
+        if h is None:
+            return 0
+        with self._lock:
+            c = self._achar_cena(h)
+            return c[1] if c else 0
+
+    def marcar_cena(self, h: Optional[int], delta: int = 1) -> None:
+        if h is None:
+            return
+        with self._lock:
+            c = self._achar_cena(h)
+            if c:
+                c[1] = max(0, c[1] + delta)
+            elif delta > 0:
+                self._cenas.append([h, delta])
 
 
 def _search_and_download_filling_duration(
@@ -657,6 +752,8 @@ def _search_and_download_filling_duration(
             for video in already_used_candidates:
                 if len(collected) >= max_clips:
                     break
+                if used_tracker is not None and not used_tracker.usar_de_novo(getattr(video, "id", None), segment.provider):
+                    continue  # 🔁 v84_415: esse clipe já apareceu o máximo de vezes (3) neste vídeo
                 result = _try_download(video)
                 if result is None:
                     continue
@@ -3423,20 +3520,44 @@ def _escolher_candidato_previa(candidates: List[Dict[str, Any]], tracker: Option
                                evitar: Optional[set] = None) -> Optional[Dict[str, Any]]:
     """Qual candidato mostrar na prévia. Sem tracker: o melhor (o 1º), se
     tiver thumbnail — comportamento de sempre. Com tracker ("não repetir"):
-    o melhor que AINDA NÃO foi usado em outro trecho — se o 1º já foi, olha o
-    2º, o 3º... e assim por diante; só se TODOS já foram usados é que repete
-    o melhor (preferível a deixar o trecho sem prévia)."""
+    o melhor que AINDA NÃO foi usado em outro trecho (nem uma cena quase igual) — se o 1º já foi, olha o 2º, o 3º...
+    🔁 v84_415: se TODOS já foram usados, repete o menos usado — mas NUNCA mais de `tracker.maximo` (3) vezes o mesmo
+    clipe ou a mesma cena. Passou disso: None (a prévia tenta a próxima busca / o próximo banco)."""
     if evitar:
         # timeline 2 ("2ª opção"): o que a timeline 1 já mostra fica de fora
         candidates = [c for c in candidates if (c.get("url") or c.get("id")) not in evitar and c.get("url") not in evitar]
     if tracker is None:
         return candidates[0] if candidates and candidates[0].get("thumbnail") else None
     com_thumb = [c for c in candidates if c.get("thumbnail")]
-    for c in com_thumb:
+    cena_conta = provider in BIBLIOTECAS_LOCAIS  # acervos cortam o mesmo plano em vários clipes
+    hashes: Dict[int, Optional[int]] = {}
+
+    def h(k: int) -> Optional[int]:
+        if k not in hashes:
+            hashes[k] = _dhash_url(com_thumb[k].get("thumbnail")) if cena_conta else None
+        return hashes[k]
+
+    for k, c in enumerate(com_thumb):  # 1) nunca usado (nem a cena)
         cid = c.get("id")
-        if not cid or tracker.try_claim(cid, provider):
+        if not cid:
             return c
-    return com_thumb[0] if com_thumb else None
+        if tracker.usos(cid, provider) == 0 and tracker.usos_cena(h(k)) == 0 and tracker.try_claim(cid, provider):
+            tracker.marcar_cena(h(k))
+            c["_cena"] = h(k)
+            return c
+    # 2) todos já usados: o menos usado que ainda não chegou no máximo (clipe E cena)
+    ordem = sorted(range(len(com_thumb)), key=lambda k: (max(tracker.usos(com_thumb[k].get("id"), provider),
+                                                             tracker.usos_cena(h(k))), k))
+    for k in ordem:
+        c = com_thumb[k]
+        if tracker.usos_cena(h(k)) >= tracker.maximo:
+            continue
+        if tracker.usar_de_novo(c.get("id"), provider):
+            tracker.marcar_cena(h(k))
+            c["_cena"] = h(k)
+            c["repetido"] = True
+            return c
+    return None
 
 
 def _estilo_conta(provider: Optional[str]) -> bool:
@@ -3663,6 +3784,7 @@ def fetch_segment_preview_lightweight(
                     if tracker is not None and c.get("id"):
                         try:
                             tracker.release(c["id"], provider)  # não usou: libera pra outro trecho
+                            tracker.marcar_cena(c.get("_cena"), -1)
                         except Exception:  # noqa: BLE001
                             pass
                     if reprovada is None:

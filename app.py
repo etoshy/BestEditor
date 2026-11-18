@@ -2880,6 +2880,7 @@ def save_settings():
         "pixabay_api_fallback_to_browser": request.form.get("pixabay_api_fallback_to_browser") == "on",
         "magnific_only_free": request.form.get("magnific_only_free") == "on",
         "evitar_repeticao_clipes": request.form.get("evitar_repeticao_clipes") == "on",
+        "max_usos_clipe": request.form.get("max_usos_clipe") or 3,
         "transition_type": request.form.get("transition_type", "none"),
         "transition_duration": float(request.form.get("transition_duration", 0.6) or 0.6),
         # A tela mostra "Ocultar o navegador" (marcado = oculto); o campo-marcador
@@ -4177,6 +4178,29 @@ def jobs_reiniciar_parados():
     return jsonify({"ok": True, "reiniciados": ok, "falhas": falhas[:10]})
 
 
+def _registrar_previas_no_tracker(tracker, previas: list, ignorar) -> int:
+    """🔁 v84_415: as prévias já escolhidas contam como usadas (id do clipe + cena), pra a busca dos outros trechos
+    respeitar o máximo de 3 vezes o mesmo clipe."""
+    import video_assembler as _va
+    ign = set(ignorar or [])
+    n = 0
+    for i, pv in enumerate(previas):
+        if i in ign or not isinstance(pv, dict) or not pv.get("ok") or not pv.get("result_url"):
+            continue
+        url, prov = str(pv["result_url"]), pv.get("provider")
+        m = re.search(r"/clip/([^/?#]+)", url) or re.search(r"(\d+)/?(?:[?#].*)?$", url)
+        if not m:
+            continue
+        cid = m.group(1)
+        if not tracker.try_claim(cid, prov):
+            tracker.usar_de_novo(cid, prov)
+        if prov in _va.BIBLIOTECAS_LOCAIS:
+            th = pv.get("thumbnail_path") or (pv.get("thumbnail_url") if str(pv.get("thumbnail_url") or "").startswith("http") else None)
+            tracker.marcar_cena(_va._dhash_url(th))
+        n += 1
+    return n
+
+
 @app.route("/job/<job_id>/limpar-erro", methods=["POST"])
 def limpar_erro_montagem(job_id: str):
     """✕ no aviso "A montagem anterior falhou" do Estúdio: tira o aviso (o erro continua no log da montagem)."""
@@ -5298,7 +5322,9 @@ def _fetch_previews(job_id: str, job: dict, segments: List[VideoSegment], retoma
         cfg = _job_site_cfg(job)
         # "não repetir": UM tracker pra todas as prévias do vídeo — se o melhor
         # resultado já apareceu num trecho, o próximo mostra o 2º melhor, etc.
-        tracker = UsedClipsTracker() if cfg.get("evitar_repeticao_clipes", True) else None
+        tracker = UsedClipsTracker(cfg.get("max_usos_clipe") or 3) if cfg.get("evitar_repeticao_clipes", True) else None
+        if tracker is not None:  # 🔁 v84_415: as prévias que já existem (retomar / buscar de novo) contam nos 3 usos
+            _registrar_previas_no_tracker(tracker, job.get("segment_previews") or [], faltam)
         perf = _PERF_LOGS.get(job_id)
         # 🤖 com a IA ligada: ficha do vídeo + buscas melhores ANTES de buscar; contexto pro juiz
         ctxs = _ia_preparar_buscas(job_id, job, segments)
