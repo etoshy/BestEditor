@@ -83,6 +83,10 @@ def normalizar(x: Any) -> Optional[Dict[str, str]]:
     if not (ideia or prompt):
         return None
     out = {"ideia": ideia or prompt, "texto": texto, "prompt": prompt}
+    if str(x.get("modo") or x.get("estilo") or "").lower() in ("albert", "palavra", "palavra_gigante"):  # 🔥 v84_417
+        out["modo"] = "albert"
+        out["texto"] = re.sub(r"[^\w-]", "", (texto or str(x.get("palavra") or "")).split()[0] if (texto or x.get("palavra")) else "",
+                              flags=re.UNICODE).upper()[:14]
     import estilos_arte
     if str(x.get("estilo_arte") or "") in estilos_arte.ESTILOS:  # 🎨 v84_397: o estilo próprio desta thumbnail
         out["estilo_arte"] = str(x["estilo_arte"])
@@ -124,8 +128,11 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
                 import estilos_arte
                 v = str(campos["estilo_arte"] or "")
                 it["estilo_arte"] = v if v in estilos_arte.ESTILOS else ""
-            if "texto" in campos and it.get("imagem") and os.path.isfile(it["imagem"]):  # o texto mudou: refaz a final na hora
-                it["final"] = compor(it["imagem"], it.get("texto") or "", it["imagem"].rsplit(".", 1)[0] + "_final.jpg")
+            if "modo" in campos:  # 🔥 v84_417: "albert" (palavra na imagem) ou "" (texto por cima, o de sempre)
+                it["modo"] = "albert" if campos["modo"] == "albert" else ""
+            if ("texto" in campos or "modo" in campos) and it.get("imagem") and os.path.isfile(it["imagem"]):  # refaz a final na hora
+                it["final"] = compor(it["imagem"], "" if it.get("modo") == "albert" else (it.get("texto") or ""),
+                                     it["imagem"].rsplit(".", 1)[0] + "_final.jpg")
         salvar(base, origem, pid, d)
         return d
 
@@ -143,7 +150,19 @@ def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> st
     elif "@@" in estilo:
         estilo = estilo.replace("@@", "")
     # 🎨 v84_398: o estilo ABRE o prompt — o gerador dá mais peso ao começo
-    return f"{lead + ': ' if lead else ''}{cena}. {(estilo or ESTILO_PADRAO).format(lado=lado)}"
+    est = (estilo or ESTILO_PADRAO).format(lado=lado)
+    if it.get("modo") == "albert":  # 🔥 v84_417: a palavra gigante vai DENTRO da imagem, atrás do personagem
+        palavra = str(it.get("texto") or "").upper().strip()
+        est = re.sub(r"(?i)large empty negative space on the \w+ third for a (big )?title( added later)?|\bno (text|letters|words)\b",
+                     "", est)
+        est = re.sub(r"\s*([,.])(\s*[,.])+", r"\1", est).strip(" ,.")
+        letras = (f'Huge bold condensed RED capital letters spelling exactly "{palavra}" fill the whole width of the image '
+                  "behind the main subject, slightly distressed/dripping edges; the subject stands in the center IN FRONT of "
+                  "the word, covering part of the middle letters, the word still readable. Centered symmetrical composition, "
+                  "saturated colors, high contrast, studio lighting, clean background. Only that one word, no other text"
+                  if palavra else "Centered symmetrical composition, saturated colors, high contrast, studio lighting")
+        return f"{lead + ': ' if lead else ''}{cena}. {letras}. {est}"
+    return f"{lead + ': ' if lead else ''}{cena}. {est}"
 
 
 # ------------------------------------------------------------------ 🎨 o estilo do canal (v84_368)
@@ -181,6 +200,35 @@ def estilo(base: str, origem: str, pid: str) -> str:
     return estilo_da_marca(base, slug)
 
 
+# ------------------------------------------------------------------ 🔥 v84_417: estilo "palavra gigante + ironia"
+N_ALBERT = 2  # além das 5 de sempre, 2 nesse estilo (0 = desliga — Configurações)
+REGRA_ALBERT = (
+    "ESTILO PALAVRA GIGANTE (o das thumbs de canais de psicologia/comportamento que explodem — ex.: MEDO, MORTE, TRAIÇÃO, "
+    "STALKER): UMA palavra só, o TEMA do vídeo em MAIÚSCULAS (4 a 10 letras, no idioma do vídeo), ENORME, em vermelho forte "
+    "(letras grossas e condensadas, às vezes escorrendo/rachadas), ocupando a largura da imagem ATRÁS do assunto principal; o "
+    "assunto fica no CENTRO, na frente da palavra, cobrindo um pedaço das letras do meio (a palavra continua legível). A "
+    "graça é a IRONIA: o personagem com uma expressão que CONTRADIZ o tema (sorrindo, fazendo joinha, posando tranquilo) "
+    "junto de um objeto-símbolo pesado do assunto (uma corda, uma arma de brinquedo apontada pra própria cabeça com cartas "
+    "na mão, o próprio rosto servido num prato, um casal improvável na cama, uma auréola). Fundo limpo ou um cenário simples "
+    "ligado ao tema, cores saturadas, contraste alto, iluminação de estúdio. O personagem é o do canal (o narrador/apresentador "
+    "do estilo de arte do canal) — o ESTILO DE ARTE do canal não muda. Nada de pessoa real famosa, sangue de verdade, nudez "
+    "ou violência gráfica (tem que ser monetizável).")
+
+
+def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
+    """Quantas thumbs/títulos a mais no estilo palavra gigante (Configurações → 0 desliga)."""
+    if cfg is None:
+        try:
+            from site_config import load_site_config
+            cfg = load_site_config()
+        except Exception:  # noqa: BLE001
+            cfg = {}
+    try:
+        return max(0, min(4, int((cfg or {}).get("thumbs_albert", N_ALBERT))))
+    except (TypeError, ValueError):
+        return N_ALBERT
+
+
 # ------------------------------------------------------------------ 🤖 mais ideias pela IA (v84_368)
 N_IDEIAS = 5
 ANGULOS = ("rosto/emoção forte de uma pessoa da história", "um objeto-símbolo em close", "contraste/antes e depois ou dois lados",
@@ -193,7 +241,7 @@ def _schema_ideias() -> Dict[str, Any]:
 
 
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
-                 estilo_canal: str = "", estilos: Optional[List[str]] = None) -> List[Dict[str, str]]:
+                 estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0) -> List[Dict[str, str]]:
     """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem). 🎨 v84_397 `estilos`: os estilos de arte
     marcados — as ideias são distribuídas entre eles (em rodízio) e a IA pensa a cena pra caber em cada um."""
     import estilos_arte
@@ -214,6 +262,11 @@ Para cada uma:
   enquadramento, com espaço vazio de um lado pro título. NUNCA peça texto escrito, letras, setas, círculos ou marcações na
   imagem (o texto entra depois, por cima). Sem violência gráfica. Pessoa real famosa: descreva (idade, roupa, época), sem o nome.
 - "angulo": qual dos ângulos acima ela usa.
+{(f"""
+E MAIS {albert} thumbnail(s) a mais (depois das {n}), com "modo": "albert", neste estilo:
+{REGRA_ALBERT}
+Nelas: "texto" = a PALAVRA gigante (só ela); "prompt" = a cena EM INGLÊS (o personagem, a expressão irônica, o objeto-símbolo,
+o fundo) — NÃO descreva as letras no prompt, o site põe; "ideia" = qual é a ironia. Cada uma com uma ironia diferente.""") if albert else ''}
 {('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal and not por_ideia else ''}
 Se o estilo é desenho/anime/cartoon, descreva as pessoas como PERSONAGENS desenhados (expressão, pose, roupa, cabelo), sem
 detalhes de foto realista (pele, rugas, poros, lente, "cinematic").
@@ -229,11 +282,14 @@ Responda só o JSON."""
     out = [t for t in (normalizar(x) for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
     if not out:
         raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
-    out = out[:max(1, n)]
-    for k, t in enumerate(out):
+    normais = [t for t in out if t.get("modo") != "albert"][:max(1, n)]
+    alb = [t for t in out if t.get("modo") == "albert"][:albert]
+    if albert and len(normais) > n - 1 and not alb and len(out) > n:  # a IA esqueceu o "modo": as que passaram das n são as albert
+        alb = [dict(t, modo="albert") for t in out[n:n + albert]]
+    for k, t in enumerate(normais):
         if por_ideia:
             t["estilo_arte"] = por_ideia[k % len(por_ideia)]
-    return out
+    return normais + alb
 
 
 def adicionar_ideias(base: str, origem: str, pid: str, ideias: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -364,7 +420,8 @@ def gerar(base: str, origem: str, pid: str, ns: Optional[List[int]] = None, forc
             os.makedirs(p, exist_ok=True)
             destino = os.path.join(p, f"thumb_{n}_{int(time.time() * 1000)}{os.path.splitext(origem_img)[1] or '.png'}")
             shutil.copyfile(origem_img, destino)
-            final = compor(destino, it.get("texto") or "", destino.rsplit(".", 1)[0] + "_final.jpg")
+            final = compor(destino, "" if it.get("modo") == "albert" else (it.get("texto") or ""),
+                           destino.rsplit(".", 1)[0] + "_final.jpg")  # 🔥 albert: a palavra já vem na imagem
             editar_status(base, origem, pid, n, status="pronto", imagem=destino, final=final, erro="", prompt_usado=pf)
             feitas += 1
         except Exception as exc:  # noqa: BLE001 — uma que falha não para as outras
@@ -406,7 +463,7 @@ def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[
     """Pra página: sem caminhos do disco, com as URLs (e o prompt completo pra colar no Flow à mão — v84_368)."""
     out = []
     for it in d.get("itens") or []:
-        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte")}
+        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte", "modo")}
         x["prompt_flow"] = prompt_flow(it, estilo=estilo_canal)
         x["url_imagem"] = f"{url_base}/{it['n']}/imagem?v={int(os.path.getmtime(it['imagem']))}" if it.get("imagem") and os.path.isfile(it["imagem"]) else ""
         x["url_final"] = f"{url_base}/{it['n']}/final?v={int(os.path.getmtime(it['final']))}" if it.get("final") and os.path.isfile(it["final"]) else ""
@@ -423,5 +480,17 @@ BLOCO_PROMPT = (
     "e \"prompt\" (a cena da imagem EM INGLÊS pra um gerador de imagem: um assunto principal claro, expressão/ação, lugar, luz, "
     "enquadramento — sem pedir texto escrito na imagem, sem violência gráfica). A imagem vai ser gerada no Google Flow e o texto "
     "entra por cima.")
+
+
+def bloco_prompt(albert: Optional[int] = None) -> str:
+    """O pedido das thumbnails nos prompts do roteiro — as 5 de sempre + as do 🔥 estilo palavra gigante (v84_417)."""
+    a = ativo_albert() if albert is None else albert
+    if not a:
+        return BLOCO_PROMPT
+    return (BLOCO_PROMPT + f" DEPOIS dessas 5, mais {a} thumbnail(s) com \"modo\": \"albert\" — {REGRA_ALBERT} Nelas, \"texto\" "
+            "= a PALAVRA gigante (só ela) e o \"prompt\" descreve a cena (personagem, expressão irônica, objeto-símbolo, fundo) "
+            "sem descrever as letras — o site põe.")
+
+
 EXEMPLO_JSON = [{"ideia": "o que a thumbnail mostra e por que dá clique", "texto": "2-4 PALAVRAS",
                  "prompt": "in English: the image scene for an AI image generator (no text in the image)"}]

@@ -27,7 +27,7 @@ mágica nem manipulação):
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Optional, Any, Dict, List, Tuple
 
 _BASE = [
     "OBJETIVO COMUM: descubra por que a pessoa clicou (o que ela quer levar do vídeo) e faça o objetivo do vídeo ser o mesmo. "
@@ -191,7 +191,33 @@ def bloco_titulos(qtd: int = 5, idioma: str = "") -> str:
             "colchetes pelo tema real"
             + (f"; escreva em {idioma}, adaptando a fórmula ao idioma" if idioma else "") + "):\n" + formulas + "\n"
             "- NUNCA minta no título: clique enganado vira saída rápida, e o YouTube para de recomendar o vídeo. Só prometa o "
-            "que o roteiro entrega (números, nomes e fatos que estão no vídeo).")
+            "que o roteiro entrega (números, nomes e fatos que estão no vídeo)." + bloco_titulos_albert(idioma))
+
+
+TITULOS_ALBERT = [  # 🔥 v84_417: o estilo "Tema. Pergunta?" dos canais de psicologia/comportamento que explodem
+    ("[Tema]. O que há na cabeça deles?", "Stalkers. O que há na cabeça deles?"),
+    ("[Tema]. Por que é um tabu?", "Traição. Por que é um tabu?"),
+    ("[Tema]. Como desligar isso?", "Medo. Como desligar isso?"),
+    ("[Tema]. O que vem depois?", "Morte. O que vem depois?"),
+    ("[Tema]. De onde vem [o desejo/a ideia]?", "Fetiches. De onde vem o desejo?"),
+    ("[Tema]. Como nós [o] matamos?", "Amor. Como nós o matamos?"),
+    ("[Tema]. Como se livrar [dele/deles]?", "Complexos. Como se livrar deles?"),
+    ("[Tema]. Como criar [algo]?", "Religião. Como criar Deus?"),
+]
+
+
+def bloco_titulos_albert(idioma: str = "", qtd: Optional[int] = None) -> str:
+    try:
+        import thumbs_flow
+        n = thumbs_flow.ativo_albert() if qtd is None else qtd
+    except Exception:  # noqa: BLE001
+        n = 0
+    if not n:
+        return ""
+    f = "\n".join(f"  - {a}  (ex.: {b})" for a, b in TITULOS_ALBERT)
+    return (f"\n- DEPOIS dos títulos acima, mais {n} no ESTILO TEMA-PONTO-PERGUNTA: o tema em UMA ou duas palavras (de "
+            "preferência no plural ou um substantivo forte), ponto final, e uma pergunta curta e provocativa que o vídeo "
+            "responde de verdade" + (f" (em {idioma})" if idioma else "") + ". Fórmulas:\n" + f)
 
 
 def titulo_ok(t: str) -> bool:

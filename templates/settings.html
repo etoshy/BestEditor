@@ -122,6 +122,8 @@ document.querySelectorAll('input[name="ui_interface"]').forEach(r => r.addEventL
   <label style="margin-top:8px;"><input type="checkbox" name="evitar_repeticao_clipes" {% if config.evitar_repeticao_clipes %}checked{% endif %} style="width:auto;"> Evitar repetição de cenas/fotos — nunca deixar a mesma cena aparecer em dois trechos do vídeo (prefere sempre uma nova, só repete se a busca esgotar de verdade)</label>
   <label style="margin-top:4px;font-weight:400;">🔁 Quando não tiver outro, o mesmo clipe (ou a mesma cena, com frame quase igual) pode aparecer no máximo
     <input type="number" name="max_usos_clipe" min="1" max="20" value="{{ config.max_usos_clipe or 3 }}" style="width:70px;display:inline-block;"> vez(es) por vídeo</label>
+  <label style="margin-top:8px;font-weight:400;">🔥 Thumbnails e títulos no estilo palavra gigante (UMA palavra enorme em vermelho atrás do personagem + uma ironia; títulos “Tema. Pergunta?”): além das 5 de sempre, mais
+    <input type="number" name="thumbs_albert" min="0" max="4" value="{{ config.thumbs_albert if config.thumbs_albert is not none else 2 }}" style="width:60px;display:inline-block;"> (0 = desliga)</label>
 
   <input type="hidden" name="buscadores_imagem_paralelo_enviado" value="1">
   <label style="margin-top:8px;"><input type="checkbox" name="buscadores_imagem_paralelo" {% if config.buscadores_imagem_paralelo %}checked{% endif %} style="width:auto;"> Buscadores de imagem (Bing/Brave/Yandex/Startpage/Google): rodar os buscadores ao mesmo tempo — cada um usa só 1 navegador e pesquisa todos os termos nele. Desmarcado = um buscador de cada vez (1 navegador aberto no total: mais lento, menos RAM)</label>

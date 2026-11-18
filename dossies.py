@@ -1256,7 +1256,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append(json.dumps({
             "plano": metodo_roteiro.PLANO_JSON,
             "escopo": metodo_roteiro.ESCOPO_JSON,
-            "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
+            "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)" + (" + os do estilo palavra gigante, no fim" if __import__("thumbs_flow").ativo_albert() else "")],
             "capitulos": roteiro_partes.exemplo_capitulos(),
             "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
             "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
@@ -1271,7 +1271,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         }, ensure_ascii=False, indent=2))
         if _perfil:
             L.append(__import__("canal_perfil").bloco_registro())
-        L.append("NÃO inclua \"roteiro\" nesta resposta — só o plano. " + __import__("thumbs_flow").BLOCO_PROMPT)
+        L.append("NÃO inclua \"roteiro\" nesta resposta — só o plano. " + __import__("thumbs_flow").bloco_prompt())
         L.append("")
         L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))
         return "\n".join(L)
@@ -1279,7 +1279,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         "roteiro": "Texto narrado COMPLETO, no tamanho pedido... [I3] frase em que a imagem I3 aparece...",
         "plano": metodo_roteiro.PLANO_JSON,
         "escopo": metodo_roteiro.ESCOPO_JSON,
-        "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)"],
+        "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)" + (" + os do estilo palavra gigante, no fim" if __import__("thumbs_flow").ativo_albert() else "")],
         "ideias": ["ideias de ganchos / vídeos derivados"],
         "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
         "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
@@ -1299,7 +1299,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if _perfil:
         L.append(__import__("canal_perfil").bloco_registro())
     L.append("O 1º capítulo começa no início do roteiro. 5 a 15 capítulos (Shorts: nenhum).")
-    L.append(__import__("thumbs_flow").BLOCO_PROMPT)
+    L.append(__import__("thumbs_flow").bloco_prompt())
     L.append("")
     L.append(idiomas.lembrete_final(idiomas.normalizar(cfg.get("idioma")) or "pt"))  # 🌐 o idioma de novo, no FIM (a IA respeita mais)
     return "\n".join(L)
@@ -1378,7 +1378,7 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             "tags": [str(x)[:60] for x in d.get("tags") or [] if str(x).strip()][:30],
             "fontes_usadas": [str(x)[:10] for x in d.get("fontes_usadas") or []][:30],
             "afirmacoes": _afirmacoes(d.get("afirmacoes")),
-            "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
+            "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:10]) if t],
             **({"partes": d["partes"]} if isinstance(d.get("partes"), list) and d["partes"] else {}),
             "observacoes": str(d.get("observacoes") or "").strip()[:2000], "avisos": avisos, "gerado_em": time.time(),
             **({"lore_registro": d["lore_registro"]} if isinstance(d.get("lore_registro"), dict) else {}),
@@ -1414,7 +1414,7 @@ def _resultado_plano(d: Dict[str, Any], p: Dict[str, Any]) -> Dict[str, Any]:
             "gerado_em": time.time(), "produto_sugerido": _produto(d.get("produto_sugerido")),
             "plano": __import__("metodo_roteiro").ler_plano(d.get("plano")),
             "afirmacoes": afirm,
-            "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
+            "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:10]) if t],
             "partes": partes, "chamadas": {"inscreva": 0, "venda": 0},
             **({"lore_registro": d["lore_registro"]} if isinstance(d.get("lore_registro"), dict) else {})}
 

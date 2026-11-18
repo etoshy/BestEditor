@@ -1110,7 +1110,7 @@ def prompt_acoes(p: Dict[str, Any], acoes: List[str], idioma: str = "en", extra:
     if {"titulos", "descricao"} & set(acoes):
         import metodo_roteiro
         tarefas.append("Títulos:\n" + metodo_roteiro.bloco_titulos(5).split("\n", 1)[1])
-        tarefas.append(__import__("thumbs_flow").BLOCO_PROMPT)
+        tarefas.append(__import__("thumbs_flow").bloco_prompt())
     if (extra or "").strip():
         tarefas.append("Pedido extra de quem está editando (siga com prioridade): " + extra.strip()[:1500])
     if {"sem_cenas", "sem_experiencias", "traduzir"} & set(acoes) or (extra or "").strip():
@@ -1240,7 +1240,7 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "ctas": _lista("ctas", ["tipo", "texto", "depois_de"]),
         "cenas": cenas,
         "titulos": [str(t).strip()[:150] for t in (d.get("titulos") or []) if str(t).strip()][:10],
-        "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:6]) if t],
+        "thumbnails": [t for t in (__import__("thumbs_flow").normalizar(x) for x in (d.get("thumbnails") or [])[:10]) if t],
         "titulo_original": str(d.get("titulo_original") or "").strip()[:200],
         "descricao": str(d.get("descricao") or "").strip()[:4500],
         "capitulos": _capitulos(d.get("capitulos"), ref, palavras, avisos),

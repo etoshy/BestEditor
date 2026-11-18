@@ -242,6 +242,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "pixabay_api_fallback_to_browser": True,
     "magnific_only_free": True,
     "evitar_repeticao_clipes": True,
+    "thumbs_albert": 2,  # 🔥 v84_417: além das 5 thumbs/títulos, N no estilo palavra gigante (0 = desliga)
     "max_usos_clipe": 3,  # 🔁 v84_415: o mesmo clipe/cena no máximo N vezes por vídeo (quando não tem outro)
     "buscadores_imagem_paralelo": True,
     "templates_cena_ia": True,
@@ -490,6 +491,10 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
     if not (1 <= concurrency <= 10):
         raise SiteConfigError(f"preview_fetch_concurrency precisa estar entre 1 e 10, recebi {concurrency}.")
     current["preview_fetch_concurrency"] = concurrency
+    try:  # 🔥 v84_417
+        current["thumbs_albert"] = max(0, min(4, int(current.get("thumbs_albert", 2))))
+    except (TypeError, ValueError):
+        current["thumbs_albert"] = 2
     try:  # 🔁 v84_415
         current["max_usos_clipe"] = max(1, min(20, int(current.get("max_usos_clipe") or 3)))
     except (TypeError, ValueError):

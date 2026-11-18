@@ -53,7 +53,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         c = request.get_json(silent=True) or {}
         try:
-            d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar", "estilo_arte") if k in c})
+            d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar", "estilo_arte", "modo") if k in c})
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
@@ -91,8 +91,9 @@ def registrar(app, base_dir: str) -> None:
             titulo, sobre, idioma = _contexto(origem, pid)
             if not (titulo or sobre).strip():
                 raise tf.ThumbErro("Sem título nem roteiro pra IA se basear.")
+            alb = max(0, min(4, int(c["albert"]))) if str(c.get("albert", "")).strip().isdigit() else tf.ativo_albert()
             novas = tf.pedir_ideias(titulo, sobre, d.get("itens") or [], n, idioma, tf.estilo(base_dir, origem, pid),
-                                    [str(e) for e in c.get("estilos") or []])
+                                    [str(e) for e in c.get("estilos") or []], albert=alb)
             d = tf.adicionar_ideias(base_dir, origem, pid, novas)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
