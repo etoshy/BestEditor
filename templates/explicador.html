@@ -37,7 +37,7 @@
   {% for x in projetos %}
   <div class="si-linha"><a href="/explicador/{{ x.id }}">🎬 {{ x.titulo }}</a>
     <span class="si-tag">{{ '%d:%02d' % ((x.duracao or 0) // 60, (x.duracao or 0) % 60) }}</span>
-    <span class="si-tag">{{ x.cenas }} cenas</span>{% if x.mp4 %}<span class="si-tag">✅ MP4</span>{% endif %}</div>
+    <span class="si-tag">{{ x.cenas }} cenas</span>{% if x.mp4 %}<span class="si-tag">✅ MP4</span>{% endif %} {{ tempo(x) }}</div>
   {% endfor %}
 </div>
 {% else %}

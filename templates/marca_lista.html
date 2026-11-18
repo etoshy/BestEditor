@@ -23,7 +23,7 @@
 <div class="mv-card">
   <h2>🗂 Canais</h2>
   {% for x in marcas %}
-  <a class="mv-item" href="{{ url_for('marca_detalhe', slug=x.slug) }}"><b style="flex:1">{{ x.nome }}</b><small class="mv-hint">{{ x.slogan }} · {{ x.idioma }}{% if x.folha_aprovada %} · ✅ folha mestra aprovada{% endif %}</small></a>
+  <a class="mv-item" href="{{ url_for('marca_detalhe', slug=x.slug) }}"><b style="flex:1">{{ x.nome }}</b><small class="mv-hint">{{ x.slogan }} · {{ x.idioma }}{% if x.folha_aprovada %} · ✅ folha mestra aprovada{% endif %} · {{ tempo(x) }}</small></a>
   {% else %}<p class="mv-hint">Nenhum canal ainda — importe um pacote acima.</p>{% endfor %}
 </div>
 {% endblock %}

@@ -111,7 +111,7 @@
   <div class="pp-lote">
     <div style="min-width:0;">
       <a href="/producao-pod/{{ l.id }}" style="font-weight:600;">{{ l.nome }}</a>
-      <div style="font-size:.8rem;color:#666;">{{ l.resumo.prontos }}/{{ l.resumo.total }} prontos · {{ l.status }} · {{ l.resumo.minutos }} min</div>
+      <div style="font-size:.8rem;color:#666;">{{ l.resumo.prontos }}/{{ l.resumo.total }} prontos · {{ l.status }} · {{ l.resumo.minutos }} min · {{ tempo(l) }}</div>
     </div>
     <a href="/producao-pod/{{ l.id }}" style="white-space:nowrap;">abrir →</a>
   </div>

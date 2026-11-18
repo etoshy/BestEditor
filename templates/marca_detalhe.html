@@ -223,7 +223,7 @@
     <button type="submit" style="margin-top:8px">➕ Criar</button>
   </form>
   {% for x in projetos %}
-  <a class="mv-proj" href="/marca/{{ m.slug }}/p/{{ x.id }}"><b style="flex:1">{{ x.titulo }}</b><small class="mv-hint">{{ x.batidas }} batidas · {{ x.geradas }} geradas · {{ x.aprovadas }} aprovadas</small></a>
+  <a class="mv-proj" href="/marca/{{ m.slug }}/p/{{ x.id }}"><b style="flex:1">{{ x.titulo }}</b><small class="mv-hint">{{ x.batidas }} batidas · {{ x.geradas }} geradas · {{ x.aprovadas }} aprovadas · {{ tempo(x) }}</small></a>
   {% endfor %}
 </div>
 

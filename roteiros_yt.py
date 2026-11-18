@@ -113,7 +113,7 @@ def listar_projetos(base: str) -> List[Dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
         out.append({"id": pid, "titulo": p.get("titulo") or p.get("url") or "(sem título)", "url": p.get("url"),
-                    "etapa": etapa(p), "atualizado": p.get("atualizado", 0)})
+                    "etapa": etapa(p), "atualizado": p.get("atualizado", 0), "criado": p.get("criado") or 0})
     return sorted(out, key=lambda x: -x["atualizado"])
 
 

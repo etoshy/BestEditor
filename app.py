@@ -537,6 +537,9 @@ def _ui_interface() -> str:
     return v if v in ("nova", "classica") else "nova"
 
 
+__import__("tempo_ui").registrar(app)  # 🕒 v84_413: {{ tempo(item) }} em todas as listas
+
+
 @app.context_processor
 def _ui_ctx():
     import ui_catalogo
@@ -623,7 +626,8 @@ def jobs_history_page():
         display["tem_video"] = bool(job.get("output_path") and os.path.exists(job["output_path"]))
         display["em_andamento"] = job.get("status") in _STATUS_EM_ANDAMENTO
         jobs_for_display.append(display)
-    return render_template("jobs_history.html", jobs=jobs_for_display, apagado=request.args.get("apagado"))
+    return render_template("jobs_history.html", jobs=jobs_for_display, apagado=request.args.get("apagado"),
+                           erro=request.args.get("erro") or "")
 
 
 @app.route("/jobs/<job_id>/renomear", methods=["POST"])
@@ -3817,6 +3821,118 @@ def _auto_ia_montar(job_id: str, esperar_previas: bool = False) -> None:
             time.sleep(5)
 
 
+def _rodar_transcricao(job_id: str, *, audio_path: str, segments_do_zip, language, add_word_captions: bool,
+                       usar_wikipedia_inteligente: bool, usar_buscadores_inteligente: bool, selected_providers,
+                       interval_seconds, ritmo_cenas, extra_instructions, perf) -> None:
+    """📝 Transcreve (ou usa a legenda do .zip) e monta o prompt — do upload e do 🔄 Reiniciar (v84_412)."""
+    import idiomas
+    try:
+        if segments_do_zip is not None:
+            # .zip com áudio + .srt prontos -- pula a transcrição
+            # inteira. O .srt não tem timestamp por palavra (só por
+            # bloco/linha), então legenda-por-palavra não tem como
+            # funcionar nesse caminho -- desliga em vez de travar ou
+            # fingir que funcionou; a pessoa ainda ganhou a
+            # transcrição pronta, que era o pedido principal.
+            segments = segments_do_zip
+            if add_word_captions:
+                job_tmp = _JOBS[job_id]
+                job_tmp["add_word_captions"] = False
+                job_tmp["aviso_legenda_palavra_desligada"] = (
+                    "Legenda palavra-por-palavra desligada: o .srt enviado não tem "
+                    "timestamp por palavra (só por bloco), então não dá pra gerar esse "
+                    "tipo de legenda a partir dele."
+                )
+        else:
+            whisper_device = load_site_config().get("whisper_device", "auto")
+            with perf.timed("transcricao", device=whisper_device):
+                _info_whisper: Dict[str, Any] = {}
+                segments = transcribe_audio(
+                    audio_path, model_size="base", language=language, word_timestamps=add_word_captions,
+                    device=whisper_device, info=_info_whisper,
+                )
+            if not language:  # "Automático" com áudio solto: o idioma que o Whisper detectou
+                _det = idiomas.normalizar(_info_whisper.get("language")) or idiomas.detectar_do_texto(
+                    " ".join(sg["text"] for sg in segments))
+                if _det:
+                    _JOBS[job_id]["language"] = _det
+                    _JOBS[job_id]["language_origem"] = "whisper"
+        total_duration = segments[-1]["end"]
+        job = _JOBS[job_id]
+        job["segments"] = segments
+        job["total_duration"] = total_duration
+        if job["add_word_captions"]:
+            job["word_timestamps"] = [w for seg in segments for w in seg.get("words", [])]
+
+        if usar_wikipedia_inteligente:
+            # Modo "fontes da Wikipedia": em vez da heurística de texto
+            # decidir sozinha quais termos pesquisar, é a PRÓPRIA IA
+            # (que lê o roteiro inteiro com contexto) quem sugere --
+            # gera esse prompt intermediário e PARA aqui; o resto
+            # (buscar de verdade na Wikipedia + montar o prompt
+            # principal) só continua depois que o usuário colar a
+            # resposta dessa etapa (ver job_colar_termos_wikipedia()).
+            with perf.timed("montar_prompt_termos_wikipedia"):
+                job["prompt_termos_wikipedia"] = build_wikipedia_search_terms_prompt(
+                    segments, language_hint=_hint_idioma(_JOBS[job_id]["language"]),
+                )
+            job["status"] = "aguardando_termos_wikipedia"
+            job["fase"] = "Pronto! Cole a resposta da IA com os termos de busca da Wikipedia."
+        elif usar_buscadores_inteligente:
+            # Mesma ideia do modo Wikipedia acima, mas pros 4
+            # buscadores de imagem por navegador (bing/brave/yandex/
+            # startpage) -- ver buscadores_enrichment.py. Se os dois
+            # checkboxes foram marcados ao mesmo tempo, o Wikipedia
+            # tem prioridade (ramo acima) e este aqui nem roda.
+            with perf.timed("montar_prompt_termos_buscadores"):
+                job["prompt_termos_buscadores"] = build_buscadores_search_terms_prompt(
+                    segments, language_hint=_hint_idioma(_JOBS[job_id]["language"]),
+                )
+            job["status"] = "aguardando_termos_buscadores"
+            job["fase"] = "Pronto! Cole a resposta da IA com os termos de busca pros buscadores de imagem."
+        else:
+            with perf.timed("montar_prompt"):
+                if __import__("acervos").so_acervo(selected_providers):
+                    # único banco marcado é o acervo local de anime —
+                    # usa o prompt DEDICADO (orientação sobre queries
+                    # concretas, keyword_weight/semantic_weight, etc.)
+                    # em vez do genérico pensado pra stock footage real.
+                    prompt_text = build_animepexels_prompt(
+                        segments,
+                        interval_seconds=interval_seconds, ritmo=ritmo_cenas,
+                        language_hint=_hint_idioma(_JOBS[job_id]["language"]),
+                        extra_instructions=extra_instructions, bibliotecas=_bibliotecas_prompt(job_id), provider=_JOBS[job_id]["providers"][0] if job_id in _JOBS else "animepexels")
+                else:
+                    prompt_text = build_prompt(
+                        segments,
+                        interval_seconds=interval_seconds, ritmo=ritmo_cenas,
+                        providers=selected_providers,
+                        language_hint=_hint_idioma(_JOBS[job_id]["language"]),
+                        extra_instructions=extra_instructions, usar_templates=_usa_templates_cena(),
+                        mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
+            job["prompt"] = _com_produto(job, prompt_text)
+            if job.get("texto_falas"):  # 🧍 v84_185: canal com personagens (multi voz): elas já entram quando falam
+                try:
+                    __import__("personagens_editor").auto(job, _job_dir(job_id), BASE_DIR, _palavras_da_narracao(job))
+                except Exception:  # noqa: BLE001
+                    pass
+            job["status"] = "aguardando_json"
+            job["fase"] = "Pronto!"
+    except TranscriptionError as exc:
+        _JOBS[job_id]["status"] = "erro_transcricao"
+        _JOBS[job_id]["error"] = str(exc)
+    except Exception:  # noqa: BLE001
+        _JOBS[job_id]["status"] = "erro_transcricao"
+        _JOBS[job_id]["error"] = f"Erro inesperado na transcrição:\n{traceback.format_exc()}"
+    finally:
+        perf.save()
+        _save_state(job_id)
+        _j = _JOBS.get(job_id) or {}
+        _avisar_fim(f"📝 Transcrição de “{_nome_job(job_id)}”",
+                    _j.get("error") if str(_j.get("status", "")).startswith("erro") else None,
+                    f"/job/{job_id}/transcribing", "transcricao", str(_j.get("fase") or ""))
+
+
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     audio_file = request.files.get("audio")
@@ -3959,112 +4075,15 @@ def transcribe():
     _PERF_LOGS[job_id] = perf
     _save_state(job_id)
 
-    def _run_transcription():
-        try:
-            if segments_do_zip is not None:
-                # .zip com áudio + .srt prontos -- pula a transcrição
-                # inteira. O .srt não tem timestamp por palavra (só por
-                # bloco/linha), então legenda-por-palavra não tem como
-                # funcionar nesse caminho -- desliga em vez de travar ou
-                # fingir que funcionou; a pessoa ainda ganhou a
-                # transcrição pronta, que era o pedido principal.
-                segments = segments_do_zip
-                if add_word_captions:
-                    job_tmp = _JOBS[job_id]
-                    job_tmp["add_word_captions"] = False
-                    job_tmp["aviso_legenda_palavra_desligada"] = (
-                        "Legenda palavra-por-palavra desligada: o .srt enviado não tem "
-                        "timestamp por palavra (só por bloco), então não dá pra gerar esse "
-                        "tipo de legenda a partir dele."
-                    )
-            else:
-                whisper_device = load_site_config().get("whisper_device", "auto")
-                with perf.timed("transcricao", device=whisper_device):
-                    _info_whisper: Dict[str, Any] = {}
-                    segments = transcribe_audio(
-                        audio_path, model_size="base", language=language, word_timestamps=add_word_captions,
-                        device=whisper_device, info=_info_whisper,
-                    )
-                if not language:  # "Automático" com áudio solto: o idioma que o Whisper detectou
-                    _det = idiomas.normalizar(_info_whisper.get("language")) or idiomas.detectar_do_texto(
-                        " ".join(sg["text"] for sg in segments))
-                    if _det:
-                        _JOBS[job_id]["language"] = _det
-                        _JOBS[job_id]["language_origem"] = "whisper"
-            total_duration = segments[-1]["end"]
-            job = _JOBS[job_id]
-            job["segments"] = segments
-            job["total_duration"] = total_duration
-            if job["add_word_captions"]:
-                job["word_timestamps"] = [w for seg in segments for w in seg.get("words", [])]
+    _kw_transcricao = dict(audio_path=audio_path, segments_do_zip=segments_do_zip, language=language,
+                           add_word_captions=add_word_captions, usar_wikipedia_inteligente=usar_wikipedia_inteligente,
+                           usar_buscadores_inteligente=usar_buscadores_inteligente,
+                           selected_providers=selected_providers, interval_seconds=interval_seconds,
+                           ritmo_cenas=ritmo_cenas, extra_instructions=extra_instructions, perf=perf)
+    _JOBS[job_id]["language_pedido"] = language_escolhido or ""
 
-            if usar_wikipedia_inteligente:
-                # Modo "fontes da Wikipedia": em vez da heurística de texto
-                # decidir sozinha quais termos pesquisar, é a PRÓPRIA IA
-                # (que lê o roteiro inteiro com contexto) quem sugere --
-                # gera esse prompt intermediário e PARA aqui; o resto
-                # (buscar de verdade na Wikipedia + montar o prompt
-                # principal) só continua depois que o usuário colar a
-                # resposta dessa etapa (ver job_colar_termos_wikipedia()).
-                with perf.timed("montar_prompt_termos_wikipedia"):
-                    job["prompt_termos_wikipedia"] = build_wikipedia_search_terms_prompt(
-                        segments, language_hint=_hint_idioma(_JOBS[job_id]["language"]),
-                    )
-                job["status"] = "aguardando_termos_wikipedia"
-                job["fase"] = "Pronto! Cole a resposta da IA com os termos de busca da Wikipedia."
-            elif usar_buscadores_inteligente:
-                # Mesma ideia do modo Wikipedia acima, mas pros 4
-                # buscadores de imagem por navegador (bing/brave/yandex/
-                # startpage) -- ver buscadores_enrichment.py. Se os dois
-                # checkboxes foram marcados ao mesmo tempo, o Wikipedia
-                # tem prioridade (ramo acima) e este aqui nem roda.
-                with perf.timed("montar_prompt_termos_buscadores"):
-                    job["prompt_termos_buscadores"] = build_buscadores_search_terms_prompt(
-                        segments, language_hint=_hint_idioma(_JOBS[job_id]["language"]),
-                    )
-                job["status"] = "aguardando_termos_buscadores"
-                job["fase"] = "Pronto! Cole a resposta da IA com os termos de busca pros buscadores de imagem."
-            else:
-                with perf.timed("montar_prompt"):
-                    if __import__("acervos").so_acervo(selected_providers):
-                        # único banco marcado é o acervo local de anime —
-                        # usa o prompt DEDICADO (orientação sobre queries
-                        # concretas, keyword_weight/semantic_weight, etc.)
-                        # em vez do genérico pensado pra stock footage real.
-                        prompt_text = build_animepexels_prompt(
-                            segments,
-                            interval_seconds=interval_seconds, ritmo=ritmo_cenas,
-                            language_hint=_hint_idioma(_JOBS[job_id]["language"]),
-                            extra_instructions=extra_instructions, bibliotecas=_bibliotecas_prompt(job_id), provider=_JOBS[job_id]["providers"][0] if job_id in _JOBS else "animepexels")
-                    else:
-                        prompt_text = build_prompt(
-                            segments,
-                            interval_seconds=interval_seconds, ritmo=ritmo_cenas,
-                            providers=selected_providers,
-                            language_hint=_hint_idioma(_JOBS[job_id]["language"]),
-                            extra_instructions=extra_instructions, usar_templates=_usa_templates_cena(),
-                            mix_midia=job.get("mix_midia"), formato=_orientacao_do_job(job), bibliotecas=_bibliotecas_prompt(job_id))
-                job["prompt"] = _com_produto(job, prompt_text)
-                if job.get("texto_falas"):  # 🧍 v84_185: canal com personagens (multi voz): elas já entram quando falam
-                    try:
-                        __import__("personagens_editor").auto(job, _job_dir(job_id), BASE_DIR, _palavras_da_narracao(job))
-                    except Exception:  # noqa: BLE001
-                        pass
-                job["status"] = "aguardando_json"
-                job["fase"] = "Pronto!"
-        except TranscriptionError as exc:
-            _JOBS[job_id]["status"] = "erro_transcricao"
-            _JOBS[job_id]["error"] = str(exc)
-        except Exception:  # noqa: BLE001
-            _JOBS[job_id]["status"] = "erro_transcricao"
-            _JOBS[job_id]["error"] = f"Erro inesperado na transcrição:\n{traceback.format_exc()}"
-        finally:
-            perf.save()
-            _save_state(job_id)
-            _j = _JOBS.get(job_id) or {}
-            _avisar_fim(f"📝 Transcrição de “{_nome_job(job_id)}”",
-                        _j.get("error") if str(_j.get("status", "")).startswith("erro") else None,
-                        f"/job/{job_id}/transcribing", "transcricao", str(_j.get("fase") or ""))
+    def _run_transcription():
+        _rodar_transcricao(job_id, **_kw_transcricao)
 
     def _na_fila_e_automatico():
         job0 = _JOBS[job_id]
@@ -4080,6 +4099,82 @@ def transcribe():
     threading.Thread(target=_na_fila_e_automatico, daemon=True).start()
 
     return redirect(url_for("transcribing_status_page", job_id=job_id))
+
+
+def _reiniciar_transcricao(job_id: str) -> Optional[str]:
+    """🔄 v84_412 — refaz a transcrição de um projeto que parou (servidor reiniciou, erro) com o áudio que já está salvo.
+    Devolve None se começou, ou o motivo de não dar."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return "projeto não encontrado"
+    if job.get("status") != "erro_transcricao":
+        return "esse projeto não está parado na transcrição"
+    job_dir = _job_dir(job_id)
+    zip_path = os.path.join(job_dir, "upload.zip")
+    segments_do_zip = None
+    audio_path = job.get("audio_path") or ""
+    language = job.get("language_pedido") or (job.get("language") if job.get("language_origem") in ("escolhido", "zip", "srt")
+                                              else None)
+    if os.path.isfile(zip_path):
+        try:
+            audio_path, segments_do_zip = _extrair_audio_e_srt_do_zip(zip_path, job_dir)
+            segments_do_zip, _ch_srt = __import__("chamadas").do_srt(segments_do_zip)
+            job["chamadas"] = _chamadas_do_zip(zip_path) + _ch_srt
+        except lg.LegendaError as exc:
+            return f"não consegui ler o .zip de novo: {exc}"
+    if not audio_path or not os.path.isfile(audio_path):
+        return "o áudio deste projeto não está mais no servidor — envie de novo"
+    job.update(status="transcrevendo", fase="Transcrevendo o áudio...", error="", cancel_requested=False, audio_path=audio_path)
+    perf = _PERF_LOGS.get(job_id) or PerfLog(job_dir, job_id=job_id)
+    _PERF_LOGS[job_id] = perf
+    _save_state(job_id)
+    kw = dict(audio_path=audio_path, segments_do_zip=segments_do_zip, language=language,
+              add_word_captions=bool(job.get("add_word_captions")),
+              usar_wikipedia_inteligente=bool(job.get("usar_wikipedia_inteligente")),
+              usar_buscadores_inteligente=bool(job.get("usar_buscadores_inteligente")),
+              selected_providers=job.get("providers") or DEFAULT_PROVIDERS,
+              interval_seconds=job.get("interval_seconds") or 7, ritmo_cenas=job.get("ritmo_cenas") or "livre",
+              extra_instructions=job.get("extra_instructions") or "", perf=perf)
+
+    def _rodar():
+        if job.get("fila_sequencia"):
+            job["fase"] = "⏳ Na fila — começa quando o vídeo anterior terminar."
+            with _FILA_NOVOS_VIDEOS:
+                job["fase"] = "Transcrevendo…"
+                _rodar_transcricao(job_id, **kw)
+                _auto_ia_montar(job_id, esperar_previas=True)
+        else:
+            _rodar_transcricao(job_id, **kw)
+            _auto_ia_montar(job_id)
+    threading.Thread(target=_rodar, name="reiniciar-" + job_id, daemon=True).start()
+    return None
+
+
+@app.route("/job/<job_id>/reiniciar", methods=["POST"])
+def job_reiniciar(job_id: str):
+    motivo = _reiniciar_transcricao(job_id)
+    if request.headers.get("Accept", "").startswith("application/json") or request.is_json:
+        return (jsonify({"ok": True, "pagina": url_for("transcribing_status_page", job_id=job_id)}) if not motivo
+                else (jsonify({"ok": False, "erro": motivo}), 400))
+    if motivo:
+        return redirect(url_for("jobs_history_page", erro=motivo))
+    return redirect(url_for("transcribing_status_page", job_id=job_id))
+
+
+@app.route("/jobs/reiniciar-parados", methods=["POST"])
+def jobs_reiniciar_parados():
+    """🔄 Reinicia TODOS os projetos parados na transcrição (um atrás do outro, pela fila)."""
+    ids = sorted((j for j, x in list(_JOBS.items()) if x.get("status") == "erro_transcricao"),
+                 key=lambda j: _JOBS[j].get("created_at") or 0)
+    ok, falhas = 0, []
+    for jid in ids:
+        _JOBS[jid]["fila_sequencia"] = True  # todos de uma vez: um de cada vez, pra não travar o PC
+        m = _reiniciar_transcricao(jid)
+        if m:
+            falhas.append(m)
+        else:
+            ok += 1
+    return jsonify({"ok": True, "reiniciados": ok, "falhas": falhas[:10]})
 
 
 @app.route("/job/<job_id>/limpar-erro", methods=["POST"])

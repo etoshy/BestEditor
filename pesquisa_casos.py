@@ -116,7 +116,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
         except PesquisaErro:
             continue
         rs = p.get("resultados") or []
-        out.append({"id": p["id"], "tema": p["tema"], "termo": p.get("termo"), "atualizado": p.get("atualizado") or 0,
+        out.append({"id": p["id"], "tema": p["tema"], "termo": p.get("termo"), "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0,
                     "resultados": len(rs), "marcados": sum(1 for r in rs if r.get("marcado", True)),
                     "videos_yt": len(((p.get("youtube") or {}).get("videos")) or []),
                     "sugestao_min": (p.get("youtube") or {}).get("sugestao_min")})

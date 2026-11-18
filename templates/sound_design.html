@@ -43,7 +43,7 @@ Pixabay. Sai uma <b>cópia</b> — o original fica. (No Estúdio do vídeo longo
 <h2 style="margin-top:18px">Projetos</h2>
 {% for x in projetos %}
 <div style="padding:6px 0;border-bottom:1px solid #eee"><a href="{{ url_for('sd_projeto', pid=x.id) }}">{{ '🎬' if x.video else '🔊' }} {{ x.nome }}</a>
-  <span style="color:#666;font-size:.85rem">· {{ x.blocos }} bloco(s) de emoção{% if x.pronto %} · ✅ cópia pronta{% endif %}</span></div>
+  <span style="color:#666;font-size:.85rem">· {{ x.blocos }} bloco(s) de emoção{% if x.pronto %} · ✅ cópia pronta{% endif %} · {{ tempo(x) }}</span></div>
 {% else %}<p style="color:#666">Nenhum ainda.</p>{% endfor %}
 {% endif %}
 {% endblock %}

@@ -34,7 +34,7 @@
     <td><input type="checkbox" class="esChk" value="{{ it.id }}" data-b="{{ it.bytes }}" {% if it.em_uso %}disabled{% endif %}></td>
     <td><b>{{ it.nome }}</b>{% if it.nome != it.id %} <span class="hint">{{ it.id }}</span>{% endif %}
       {% if it.em_uso %}<span class="es-tag">em andamento</span>{% endif %}{% if it.pasta %}<span class="hint"> 📁</span>{% endif %}
-      {% if it.detalhe %}<div class="hint">{{ it.detalhe }}</div>{% endif %}</td>
+      {% if it.detalhe %}<div class="hint">{{ it.detalhe }}</div>{% endif %}<div>{{ tempo(it) }}</div></td>
     <td class="num"><b>{{ fmt(it.bytes) }}</b></td>
     <td class="num hint">{{ time.strftime('%d/%m/%Y %H:%M', time.localtime(it.quando)) if it.quando else '' }}</td>
     <td class="num"><button class="es-b es-um" data-id="{{ it.id }}" data-nome="{{ it.nome }}" {% if it.em_uso %}disabled title="em andamento"{% endif %}>Apagar</button></td>

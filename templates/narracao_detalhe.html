@@ -261,7 +261,7 @@
 {% else %}
 {% for g in geracoes %}
 <div style="border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
-  <p style="margin:0;color:#666;font-size:0.85rem;">{{ g.quantidadeFalas }} fala(s) · {{ g.duracaoSegundos }}s · motor: {{ g.motor }}</p>
+  <p style="margin:0;color:#666;font-size:0.85rem;">{{ g.quantidadeFalas }} fala(s) · {{ g.duracaoSegundos }}s · motor: {{ g.motor }} · {{ tempo(g) }}</p>
   <audio controls style="width:100%;margin-top:8px;" src="{{ url_for('narracao_baixar_geracao', projeto_id=projeto.projetoId, geracao_id=g.id) }}"></audio>
   <div style="margin-top:8px;display:flex;gap:10px;">
     <a href="{{ url_for('narracao_baixar_geracao', projeto_id=projeto.projetoId, geracao_id=g.id) }}" download>⬇ Baixar .mp3</a>

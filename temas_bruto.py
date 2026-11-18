@@ -107,7 +107,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
             continue
         out.append({"id": aid, "nome": a.get("nome") or aid, "modelo": a.get("modelo_nome") or "", "estado": a.get("estado"),
                     "temas": len(a.get("temas") or []), "criados": sum(1 for t in a.get("temas") or [] if t.get("projeto")),
-                    "atualizado": a.get("atualizado") or 0})
+                    "atualizado": a.get("atualizado") or 0, "criado": a.get("criado") or 0})
     return sorted(out, key=lambda x: -x["atualizado"])
 
 

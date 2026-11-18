@@ -59,7 +59,7 @@
   {% if not lista %}<p class="si-dica">Nenhum ainda.</p>{% endif %}
   {% for x in lista %}
   <div class="si-linha"><a href="/achar-fonte/{{ x.id }}">{{ '📍' if x.modo == 'momentos' else '🔎' }} {{ x.titulo }}</a><span class="si-tag">{{ x.cenas }} {{ 'momentos' if x.modo == 'momentos' else 'cenas' }}</span>
-    {% if x.achadas %}<span class="si-tag">✅ {{ x.achadas }} fontes</span>{% endif %}</div>
+    {% if x.achadas %}<span class="si-tag">✅ {{ x.achadas }} fontes</span>{% endif %} {{ tempo(x) }}</div>
   {% endfor %}
 </div>
 {% else %}

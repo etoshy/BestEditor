@@ -276,7 +276,7 @@ def listar_avulsas(base: str) -> List[Dict[str, Any]]:
             continue
         d = carregar(base, "avulso", pid)
         out.append({"id": pid, "titulo": d.get("titulo") or "(sem título)", "itens": len(d.get("itens") or []),
-                    "prontas": sum(1 for i in d.get("itens") or [] if i.get("final")), "criado": d.get("criado") or 0})
+                    "prontas": sum(1 for i in d.get("itens") or [] if i.get("final")), "criado": d.get("criado") or 0, "atualizado": d.get("atualizado") or 0})
     return sorted(out, key=lambda x: -x["criado"])
 
 

@@ -1267,7 +1267,7 @@ def listar_projetos(m: Dict[str, Any]) -> List[Dict[str, Any]]:
             except MarcaErro:
                 continue
             bs = p.get("batidas") or []
-            out.append({"id": pid, "titulo": p["titulo"], "atualizado": p.get("atualizado") or 0, "batidas": len(bs),
+            out.append({"id": pid, "titulo": p["titulo"], "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0, "batidas": len(bs),
                         "aprovadas": sum(1 for b in bs if b.get("qa_status") == "approved"),
                         "geradas": sum(1 for b in bs if b.get("arquivo_master"))})
     return sorted(out, key=lambda x: -x["atualizado"])

@@ -2,6 +2,22 @@
 {% block content %}
 <h1>Galeria de projetos</h1>
 <p style="color:#666;">Todos os projetos ficam salvos (inclusive depois de reiniciar o servidor) — abra pra continuar ou editar de novo, dê um nome, ou apague quando não precisar mais (apaga a narração e todos os arquivos do servidor). <a href="{{ url_for('novo_video') }}">← Começar um vídeo novo</a></p>
+{% if erro %}<p style="background:#fef2f2;border:1px solid #fca5a5;padding:8px 12px;border-radius:6px;">❌ {{ erro }}</p>{% endif %}
+{% set _parados = jobs|selectattr('status', 'equalto', 'erro_transcricao')|list if jobs else [] %}
+{% if _parados|length > 1 %}
+<p><button type="button" id="btnReiniciarTodos" class="btn-reiniciar" style="padding:8px 14px;">🔄 Reiniciar os {{ _parados|length }} parados (um de cada vez)</button>
+  <span id="msgReiniciar" style="color:#666;margin-left:8px;"></span></p>
+<script>
+document.getElementById('btnReiniciarTodos').addEventListener('click', async (ev) => {
+  const b = ev.currentTarget; b.disabled = true; b.textContent = '⏳ reiniciando…';
+  try {
+    const d = await (await fetch('/jobs/reiniciar-parados', {method: 'POST', headers: {'Accept': 'application/json'}})).json();
+    document.getElementById('msgReiniciar').textContent = `✅ ${d.reiniciados} reiniciado(s)` + (d.falhas && d.falhas.length ? ` · ❌ ${d.falhas.length}: ${d.falhas[0]}` : '');
+    setTimeout(() => location.reload(), 1500);
+  } catch (e) { b.disabled = false; b.textContent = '🔄 tentar de novo'; }
+});
+</script>
+{% endif %}
 {% if apagado %}<p style="background:#ecfdf5;border:1px solid #6ee7b7;padding:8px 12px;border-radius:6px;">🗑 Projeto “{{ apagado }}” apagado, junto com os arquivos dele.</p>{% endif %}
 
 {% if not jobs %}
@@ -23,6 +39,8 @@
   .renomear input { margin-top:0; font-size:.8rem; padding:4px 6px; }
   .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
   .status-concluido { background: #dcfce7; color: #166534; }
+  .btn-reiniciar { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:5px 10px; font-size:.8rem; cursor:pointer; width:auto; margin:0; }
+  .btn-reiniciar:hover { background:#1d4ed8; }
   .status-erro, .status-erro_transcricao { background: #fee2e2; color: #991b1b; }
   .status-transcrevendo, .status-buscando_previas, .status-montando, .status-buscando_termos_wikipedia, .status-buscando_termos_buscadores { background: #dbeafe; color: #1e40af; }
   .status-aguardando_json, .status-pronto_para_editar, .status-previas_pausadas, .status-aguardando_termos_wikipedia, .status-aguardando_termos_buscadores { background: #fef3c7; color: #92400e; }
@@ -34,7 +52,7 @@
     <div class="proj-capa" {% if job.capa_url %}style="background-image:url('{{ job.capa_url }}');"{% endif %}>{% if not job.capa_url %}🎬{% endif %}</div>
     <div class="proj-corpo">
       <div class="proj-nome">{{ job.nome_projeto or job.original_filename or job.job_id }}</div>
-      <div class="proj-meta">{{ job.created_at_display or "—" }}{% if job.duracao_display %} · {{ job.duracao_display }}{% endif %}{% if job.num_trechos %} · {{ job.num_trechos }} trechos{% endif %}</div>
+      <div class="proj-meta">{{ tempo(job) or job.created_at_display or "—" }}{% if job.duracao_display %} · {{ job.duracao_display }}{% endif %}{% if job.num_trechos %} · {{ job.num_trechos }} trechos{% endif %}</div>
       <div><span class="status-badge status-{{ job.status }}">{{ job.status }}</span>
         {% if job.status == 'pronto_para_editar' and job.assembly_error %}
         <br><span style="color:#991b1b;font-size:0.75rem;">montagem anterior falhou</span>
@@ -63,6 +81,9 @@
         <a href="{{ url_for('job_status_page', job_id=job.job_id) }}">Ver resultado</a>
         {% elif job.status == 'erro_transcricao' %}
         <span style="color:#991b1b;font-size:0.85rem;">{{ job.error[:80] if job.error else 'erro na transcrição' }}</span>
+        <form method="post" action="{{ url_for('job_reiniciar', job_id=job.job_id) }}" style="margin:6px 0 0;">
+          <button type="submit" class="btn-reiniciar" title="refaz a transcrição com o áudio que já está salvo — não precisa enviar de novo">🔄 Reiniciar</button>
+        </form>
         {% endif %}
         {% if job.pending_segments and job.status in ('concluido', 'erro') %}
         <a href="{{ url_for('edit_segments_page', job_id=job.job_id) }}">✏️ Editar de novo</a>

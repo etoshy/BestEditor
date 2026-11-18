@@ -19,7 +19,7 @@
   <div style="border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
     <a href="{{ url_for('narracao_detalhe', projeto_id=p.projetoId) }}" style="font-weight:600;text-decoration:none;color:#2563eb;">{{ p.nome }}</a>
     <p style="color:#666;font-size:0.85rem;margin:6px 0 0;">
-      {{ p.quantidadeFalas }} fala(s) · {{ p.quantidadeGeracoes }} áudio(s) gerado(s) · motor: {{ p.motor }}
+      {{ p.quantidadeFalas }} fala(s) · {{ p.quantidadeGeracoes }} áudio(s) gerado(s) · motor: {{ p.motor }} · {{ tempo(p) }}
     </p>
     <form method="post" action="{{ url_for('narracoes_excluir', projeto_id=p.projetoId) }}" onsubmit="return confirm('Excluir este projeto e todos os áudios gerados dele?');" style="margin-top:8px;">
       <button type="submit" style="background:#dc2626;padding:6px 12px;font-size:0.85rem;margin-top:0;">Excluir</button>

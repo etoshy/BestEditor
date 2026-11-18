@@ -38,7 +38,7 @@
   <div class="ry-proj">
     <div style="min-width:0;">
       <a href="{{ url_for('roteiro_yt_detalhe', pid=p.id) }}" style="font-weight:600;">{{ p.titulo }}</a>
-      <span class="ry-etapa">{{ p.etapa }}</span>
+      <span class="ry-etapa">{{ p.etapa }}</span> {{ tempo(p) }}
       {% if p.url %}<div style="font-size:0.78rem;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.url }}</div>{% endif %}
     </div>
     <form method="post" action="{{ url_for('roteiro_yt_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este roteiro?')" style="margin:0;">

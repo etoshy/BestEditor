@@ -50,7 +50,7 @@
   {% for x in lista %}
   <div class="tb-tema" style="display:flex;justify-content:space-between;align-items:center;">
     <div><a href="/temas-bruto/{{ x.id }}" style="font-weight:600;">{{ x.nome }}</a>
-      <div class="tb-meta">{{ x.modelo }} · {{ x.temas }} temas · {{ x.criados }} viraram projeto</div></div>
+      <div class="tb-meta">{{ x.modelo }} · {{ x.temas }} temas · {{ x.criados }} viraram projeto · {{ tempo(x) }}</div></div>
   </div>
   {% else %}<p style="color:#888;">Nenhum ainda.</p>{% endfor %}
 </div>
@@ -60,7 +60,7 @@
 <p><a href="/temas-bruto">← todos os textos</a></p>
 <div class="tb-card">
   <h2 style="margin:0;">{{ a.nome }}</h2>
-  <div class="tb-meta">{{ a.modelo_nome }} · {{ a.palavras }} palavras{% if a.arquivo %} · {{ a.arquivo }}{% endif %}</div>
+  <div class="tb-meta">{{ a.modelo_nome }} · {{ a.palavras }} palavras{% if a.arquivo %} · {{ a.arquivo }}{% endif %} · {{ tempo(a) }}</div>
   <div id="analise" class="tb-status"></div>
   <div class="tb-linha">
     <select name="divisao" id="divisao" style="width:auto;margin:0;">{% for k, d in divisoes.items() %}<option value="{{ k }}"{% if k == divisao %} selected{% endif %}>{{ d.nome }}</option>{% endfor %}</select>

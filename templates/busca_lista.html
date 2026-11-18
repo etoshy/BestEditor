@@ -42,7 +42,7 @@
   {% if not projetos %}<p class="si-dica">Nenhuma ainda.</p>{% endif %}
   {% for x in projetos %}
   <div class="si-linha"><a href="/busca-lista/{{ x.id }}">🗂 {{ x.titulo }}</a>
-    <span class="si-tag">{{ x.termos }} termos</span><span class="si-tag">{{ x.n }} arquivos</span></div>
+    <span class="si-tag">{{ x.termos }} termos</span><span class="si-tag">{{ x.n }} arquivos</span> {{ tempo(x) }}</div>
   {% endfor %}
 </div>
 {% else %}

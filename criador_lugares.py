@@ -188,7 +188,7 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
         foto = next((v.get("arquivo") for f in p["fotos"] for v in [f] if v.get("arquivo") and v.get("aprovada")), None) \
             or next((f.get("arquivo") for f in p["fotos"] if f.get("arquivo")), None)
         out.append({"id": p["id"], "nome": p["nome"], "escala": ESCALAS[p["escala"]][0], "pai": p["pai"],
-                    "miniatura": foto, "atualizado": p.get("atualizado") or 0, "nivel": ORDEM_ESCALAS.index(p["escala"])})
+                    "miniatura": foto, "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0, "nivel": ORDEM_ESCALAS.index(p["escala"])})
     return sorted(out, key=lambda x: (-x["nivel"], -x["atualizado"]))
 
 

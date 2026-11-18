@@ -92,6 +92,7 @@ def _gravar_galeria(itens: List[Dict[str, Any]]) -> None:
 
 
 def adicionar_na_galeria(entrada: Dict[str, Any]) -> None:
+    entrada.setdefault("criado", time.time())  # 🕒 v84_413: toda imagem/vídeo da galeria tem data e hora
     with _TRAVA_GALERIA:
         itens = galeria()
         itens.insert(0, entrada)

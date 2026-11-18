@@ -112,7 +112,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
             p = carregar(pid, base)
         except Exception:  # noqa: BLE001
             continue
-        out.append({"id": pid, "titulo": p["titulo"], "criado": p.get("criado", 0), "duracao": p.get("duracao", 0),
+        out.append({"id": pid, "titulo": p["titulo"], "criado": p.get("criado", 0), "atualizado": p.get("atualizado") or 0, "duracao": p.get("duracao", 0),
                     "cenas": len((p.get("plano") or {}).get("cenas") or []), "mp4": bool((p.get("saida") or {}).get("mp4"))})
     return sorted(out, key=lambda x: -x["criado"])
 

@@ -164,7 +164,7 @@
     <div>
       <a href="{{ url_for('modelado_detalhe', pid=p.id) }}" style="font-weight:600;color:#2563eb;text-decoration:none;">{{ p.nome }}</a>
       <span class="md-etapa">{{ {'roteiro':'1 · roteiro','audio':'2 · áudio','ajuste':'3 · ajuste','frames':'4 · frames','animacao':'5 · animação','pronto':'✔ pronto'}.get(p.etapa, p.etapa) }}</span>
-      <div style="color:#666;font-size:0.82rem;">{{ p.estilo_id }} · {{ p.formato }}{% if p.duracao %} · {{ '%.0f'|format(p.duracao) }}s{% endif %}{% if p.cenas %} · {{ p.videos }}/{{ p.cenas }} cenas animadas{% endif %}{% if p.job_id %} · no Estúdio{% endif %}</div>
+      <div style="color:#666;font-size:0.82rem;">{{ p.estilo_id }} · {{ p.formato }}{% if p.duracao %} · {{ '%.0f'|format(p.duracao) }}s{% endif %}{% if p.cenas %} · {{ p.videos }}/{{ p.cenas }} cenas animadas{% endif %}{% if p.job_id %} · no Estúdio{% endif %} · {{ tempo(p) }}</div>
     </div>
     <form method="post" action="{{ url_for('modelado_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este projeto (áudio, frames e vídeos)?');">
       <button type="submit" class="md-mini" style="background:#dc2626;">Excluir</button>

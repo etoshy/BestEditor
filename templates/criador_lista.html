@@ -33,7 +33,7 @@
   <a class="cr-item" href="/criador-personagens/{{ x.id }}">
     {% if x.miniatura %}<img src="/criador-personagens/{{ x.id }}/arquivo/design/{{ x.miniatura }}" alt="">{% else %}<div class="vazio">🧬</div>{% endif %}
     <div style="font-weight:600;margin-top:4px;">{{ x.nome }}</div>
-    <div class="cr-dica">{{ x.fase }}</div>
+    <div class="cr-dica">{{ x.fase }}</div><div class="cr-dica">{{ tempo(x) }}</div>
   </a>
   {% endfor %}
 </div>
@@ -67,7 +67,7 @@
   <a class="cr-item" href="/criador-lugares/{{ x.id }}">
     {% if x.miniatura %}<img src="/criador-lugares/{{ x.id }}/arquivo/fotos/{{ x.miniatura }}" alt="" style="object-fit:cover">{% else %}<div class="vazio">🗺</div>{% endif %}
     <div style="font-weight:600;margin-top:4px;">{{ x.nome }}</div>
-    <div class="cr-dica">{{ x.escala }}</div>
+    <div class="cr-dica">{{ x.escala }}</div><div class="cr-dica">{{ tempo(x) }}</div>
   </a>
   {% endfor %}
 </div>

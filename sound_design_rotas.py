@@ -123,7 +123,7 @@ def listar_projetos(base_dir: str) -> List[Dict[str, Any]]:
                 p = carregar_projeto(base_dir, pid)
             except ValueError:
                 continue
-            out.append({"id": pid, "nome": p.get("nome"), "criado": p.get("criado") or 0, "video": p.get("video"),
+            out.append({"id": pid, "nome": p.get("nome"), "criado": p.get("criado") or 0, "atualizado": p.get("atualizado") or 0, "video": p.get("video"),
                         "pronto": bool(p.get("saida") and os.path.isfile(p["saida"])),
                         "blocos": len((p.get("sound_design") or {}).get("blocos") or [])})
     out.sort(key=lambda x: -x["criado"])

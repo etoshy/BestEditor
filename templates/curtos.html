@@ -208,7 +208,7 @@
   <h2 style="margin:0;">🧬 Canais (o estilo)</h2>
   {% for c in canais %}
   <div class="ct-lin"><div><a href="/curtos/canal/{{ c.id }}"><b>🧬 {{ c.nome }}</b></a>
-    <div class="ct-dica">{{ c.refs }} vídeo(s) de referência · {{ c.analisadas }} analisado(s){% if c.perfil_ia %} · ✅ perfil escrito pela IA{% endif %}</div></div></div>
+    <div class="ct-dica">{{ c.refs }} vídeo(s) de referência · {{ c.analisadas }} analisado(s){% if c.perfil_ia %} · ✅ perfil escrito pela IA{% endif %} · {{ tempo(c) }}</div></div></div>
   {% else %}<p class="ct-dica">Nenhum canal ainda.</p>{% endfor %}
   <details{% if not canais %} open{% endif %} style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;">+ Novo canal</summary>
     <form method="post" action="/curtos/canal/novo" enctype="multipart/form-data">

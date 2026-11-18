@@ -60,7 +60,7 @@
     {% for x in lista %}
     <div class="si-linha"><a href="/curtos/roteiro-comentario/{{ x.id }}">{{ '⛏' if x.minerado else '✍' }} {{ x.titulo }}</a>
       {% if x.minerado %}<span class="si-tag">nota {{ x.nota }}</span><span class="si-tag">{{ modelos.get(x.modelo, x.modelo) }}</span>{% else %}<span class="si-tag">{{ tons.get(x.tom, x.tom) }}</span>{% endif %}
-      {% if x.pronto %}<span class="si-tag">✅</span>{% endif %}</div>
+      {% if x.pronto %}<span class="si-tag">✅</span>{% endif %} {{ tempo(x) }}</div>
     {% endfor %}
     <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">⛏ Importar do minerador</summary>
       <p class="si-dica">O <code>minerador.py</code> manda sozinho cada vídeo aprovado pra cá (com o site aberto). Se o site estava fechado, suba o <code>aprovados.jsonl</code> ou o <code>pendentes_site.jsonl</code> da pasta <code>minerados</code>.</p>

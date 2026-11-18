@@ -566,7 +566,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
         out.append({"id": p["id"], "nome": nome_do_projeto(p), "modelo": (MODELOS.get(p["config"]["modelo"]) or {}).get("nome", ""),
-                    "atualizado": p.get("atualizado") or 0, "fontes": len(p.get("fontes") or []),
+                    "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0, "fontes": len(p.get("fontes") or []),
                     "midias": len(p.get("midias") or []), "tem_roteiro": bool(p.get("resultado"))})
     return sorted(out, key=lambda x: -x["atualizado"])
 

@@ -145,7 +145,7 @@
   <div class="ds-proj">
     <div style="min-width:0;">
       <a href="{{ url_for('dossie_detalhe', pid=p.id) }}" style="font-weight:600;">{{ p.nome }}</a>
-      <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ p.modelo }} · {{ p.fontes }} fontes · {{ p.midias }} materiais {% if p.tem_roteiro %}<span class="ds-tag">✔ roteiro pronto</span>{% endif %}</div>
+      <div style="font-size:0.8rem;color:#777;margin-top:2px;">{{ p.modelo }} · {{ p.fontes }} fontes · {{ p.midias }} materiais {% if p.tem_roteiro %}<span class="ds-tag">✔ roteiro pronto</span>{% endif %} {{ tempo(p) }}</div>
     </div>
     <form method="post" action="{{ url_for('dossie_excluir', pid=p.id) }}" onsubmit="return confirm('Excluir este projeto e TODAS as imagens baixadas?')">
       <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:0.8rem;">🗑</button>

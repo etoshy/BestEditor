@@ -260,7 +260,7 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
         ap = aprovada(p)
-        out.append({"id": n, "nome": p["nome"], "atualizado": p.get("atualizado") or 0,
+        out.append({"id": n, "nome": p["nome"], "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0,
                     "miniatura": ap.get("arquivo") if ap else None,
                     "fase": "🧍 poses" if p["poses"].get("pod") else "✔ aprovado" if ap else
                             "🎨 design" if p["design"]["variacoes"] else "📝 ficha" if p["ficha"].get("aparencia_en") else "📥 começo"})

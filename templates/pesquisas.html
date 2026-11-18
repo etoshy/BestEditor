@@ -39,7 +39,7 @@
     {% for x in pesquisas %}
     <a class="pq-item" href="{{ url_for('pesquisa_detalhe', pid=x.id) }}">
       <b>{{ x.tema }}{% if x.termo and x.termo != x.tema %} <span style="font-weight:400;color:var(--mudo)">· {{ x.termo }}</span>{% endif %}</b>
-      <small>{{ x.marcados }} de {{ x.resultados }} links{% if x.videos_yt %} · ▶ {{ x.videos_yt }} vídeos{% endif %}{% if x.sugestao_min %} · ⏱ ~{{ x.sugestao_min }} min{% endif %}</small>
+      <small>{{ x.marcados }} de {{ x.resultados }} links{% if x.videos_yt %} · ▶ {{ x.videos_yt }} vídeos{% endif %}{% if x.sugestao_min %} · ⏱ ~{{ x.sugestao_min }} min{% endif %} · {{ tempo(x) }}</small>
     </a>
     {% endfor %}
   </div>

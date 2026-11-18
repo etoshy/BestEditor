@@ -174,7 +174,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
             p = carregar(base, pid)
         except Exception:  # noqa: BLE001
             continue
-        out.append({"id": p["id"], "nome": nome_do_projeto(p), "atualizado": p.get("atualizado") or 0,
+        out.append({"id": p["id"], "nome": nome_do_projeto(p), "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0,
                     "midias": len(p.get("midias") or []), "tem_roteiro": bool(p.get("roteiro"))})
     return sorted(out, key=lambda x: -x["atualizado"])
 

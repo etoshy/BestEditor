@@ -20,7 +20,7 @@
   <a class="pb-card" href="/publicacoes/{{ it.id }}" data-busca="{{ (it.titulo ~ ' ' ~ it.canal ~ ' ' ~ it.idioma)|lower }}">
     <div class="pb-capa">{% if it.capa %}<img src="{{ it.capa }}" loading="lazy">{% else %}📣{% endif %}</div>
     <div class="pb-txt"><b>{{ it.titulo }}</b>
-      <span class="pb-meta">{% if it.canal %}{{ it.canal }} · {% endif %}{{ it.idioma }} · {{ it.titulos }} título(s) · {{ it.capas }} capa(s){% if not it.tem_projeto %} · 🗂 projeto apagado{% endif %}</span></div>
+      <span class="pb-meta">{% if it.canal %}{{ it.canal }} · {% endif %}{{ it.idioma }} · {{ it.titulos }} título(s) · {{ it.capas }} capa(s){% if not it.tem_projeto %} · 🗂 projeto apagado{% endif %}</span> {{ tempo(it) }}</div>
   </a>
   {% else %}
   <p style="color:#888;">Nenhuma publicação ainda — abra um vídeo no Estúdio e use a aba 📣 Publicação.</p>

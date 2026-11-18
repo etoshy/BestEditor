@@ -1057,7 +1057,7 @@ function desenhar(vs) {
   const cardsHtml = vs.map(v => { const cls = v.marca || (v.pronto ? 'ok' : (v.erro && !v.rodando ? 'err' : ''));
     const modo = v.modo_usado ? MODOS[v.modo_usado] : MODOS[v.modo];
     return `<div class="lk-v ${cls}" data-vid="${v.id}">
-      <div class="lk-cab"><label class="lk-sel" title="marcar pra remover ou exportar junto"><input type="checkbox" data-sel="${v.id}"${SEL.has(v.id) ? ' checked' : ''}></label><b>${esc(v.titulo)}</b>${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
+      <div class="lk-cab"><label class="lk-sel" title="marcar pra remover ou exportar junto"><input type="checkbox" data-sel="${v.id}"${SEL.has(v.id) ? ' checked' : ''}></label><b>${esc(v.titulo)}</b>${window.beTempo ? ' ' + beTempo(v) : ''}${v.canal ? `<span class="si-tag">📺 ${esc(v.canal)}</span>` : ''}<span class="si-tag">${esc(modo)}${v.modo === 'auto' && v.modo_usado ? ' (a IA escolheu)' : ''}</span>
         ${v.n_comentarios ? `<span class="si-tag">💬 ${v.n_comentarios} comentários lidos</span>` : ''}
         ${v.dica ? `<span class="si-tag" title="a dica que você escreveu antes do link — a IA usa como o assunto do vídeo">💡 ${esc(v.dica)}</span>` : ''}
         ${v.links && v.links.length > 1 ? `<span class="si-tag" title="vídeo composto: um roteiro só com as ${v.links.length} fontes">🧩 composto · ${v.links.length} fontes</span>` + v.links.map((u, k) => `<a href="${esc(u)}" target="_blank" class="si-dica">🔗 fonte ${k + 1}</a>`).join(' ')

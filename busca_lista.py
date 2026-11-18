@@ -92,7 +92,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
             p = carregar(base, nome)
         except Exception:  # noqa: BLE001
             continue
-        out.append({"id": p["id"], "titulo": p["titulo"], "criado": p.get("criado") or 0, "termos": len(p.get("termos") or []),
+        out.append({"id": p["id"], "titulo": p["titulo"], "criado": p.get("criado") or 0, "atualizado": p.get("atualizado") or 0, "termos": len(p.get("termos") or []),
                     "n": len(p.get("itens") or [])})
     return sorted(out, key=lambda x: -x["criado"])
 

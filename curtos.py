@@ -311,7 +311,7 @@ def listar_canais(base: str) -> List[Dict[str, Any]]:
         refs = c.get("referencias") or []
         out.append({"id": c["id"], "nome": c["nome"], "refs": len(refs),
                     "analisadas": sum(1 for r in refs if r.get("estado") == "pronta"),
-                    "perfil_ia": bool(c.get("perfil_ia")), "atualizado": c.get("atualizado") or 0,
+                    "perfil_ia": bool(c.get("perfil_ia")), "atualizado": c.get("atualizado") or 0, "criado": c.get("criado") or 0,
                     "modelo": c.get("modelo") or "noticia"})
     return sorted(out, key=lambda x: -x["atualizado"])
 
@@ -1490,7 +1490,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
         g = p.get("gravacao") or {}
         out.append({"id": p["id"], "titulo": p.get("titulo") or "", "canal": canais.get(p.get("canal_id") or "", ""),
                     "blocos": len((p.get("roteiro") or {}).get("blocos") or []), "gravado": bool(g.get("arquivo")),
-                    "dur": g.get("dur"), "editor": (p.get("editor") or {}).get("job_id"), "atualizado": p.get("atualizado") or 0,
+                    "dur": g.get("dur"), "editor": (p.get("editor") or {}).get("job_id"), "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0,
                     "modelo": p.get("modelo") or "noticia"})
     return sorted(out, key=lambda x: -x["atualizado"])
 

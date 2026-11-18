@@ -109,7 +109,7 @@
   }
   async function lista() {
     const d = await (await fetch('/flow/refazer/lista')).json();
-    $('rfLista').innerHTML = (d.projetos || []).map(x => `<button type="button" class="rf-sec" data-abrir="${x.id}">${esc(x.nome)} · ${x.planos} plano(s)${x.final ? ' · ✅' : ''}</button>`).join('') || '<span class="rf-hint">nenhuma ainda</span>';
+    $('rfLista').innerHTML = (d.projetos || []).map(x => `<button type="button" class="rf-sec" data-abrir="${x.id}">${esc(x.nome)} · ${x.planos} plano(s)${x.final ? ' · ✅' : ''}${window.beTempo ? ' · ' + beTempo(x) : ''}</button>`).join('') || '<span class="rf-hint">nenhuma ainda</span>';
     $('rfLista').querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(b.dataset.abrir));
   }
   async function abrir(pid) {

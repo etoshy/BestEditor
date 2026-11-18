@@ -462,7 +462,7 @@
     const quando = t => new Date(t * 1000).toLocaleString().slice(0, 16);
     $('galGrade').innerHTML = galItens.map((e, i) => `<div class="fl-card">
       ${e.tipo === 'video' ? `<video src="/flow/arquivo/${e.arquivo}" controls muted preload="metadata"></video>` : `<img src="/flow/arquivo/${e.arquivo}" alt="" loading="lazy">`}
-      <div class="tx">${e.escolhida ? '⭐ ' : ''}${e.nota != null ? `<b>${e.nota}</b> · ` : ''}${esc((e.prompt || '').slice(0, 140))}<div class="meta">${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
+      <div class="tx">${e.escolhida ? '⭐ ' : ''}${e.nota != null ? `<b>${e.nota}</b> · ` : ''}${esc((e.prompt || '').slice(0, 140))}<div class="meta">${window.beTempo ? beTempo(e) + ' · ' : ''}${e.tipo === 'video' ? '🎬' : '🖼'} ${esc(e.modelo || 'modelo padrão')}${e.proporcao ? ' · ' + esc(e.proporcao) : ''}${e.frames ? ' · Início/Fim' : ''}${e.origem === 'teste' ? ' · 🧪 teste' : e.origem === 'video' ? ' · 🎞 gerado pra um vídeo' : ''} · ${quando(e.criado)}</div></div>
       <div class="ac"><a href="/flow/arquivo/${e.arquivo}?baixar=1">⬇ baixar</a>
         ${e.tipo === 'imagem' ? `<button type="button" data-usar="inicio" data-i="${i}" title="vídeo começando nesta imagem">🎬 animar</button><button type="button" data-usar="fim" data-i="${i}" title="vídeo terminando nesta imagem">🏁 como Fim</button><button type="button" data-usar="referencia" data-i="${i}" title="nova imagem a partir desta">🖼 modificar</button><button type="button" data-montar="${i}" title="usar na 🧩 Montar cena (como personagem, pose…)">🧩 montar</button><button type="button" data-rascunho="${i}" title="numerar as pessoas e usar como pose (✏️ Rascunho da pose)">✏️ marcar</button>` : ''}
         <button type="button" data-prompt="${i}" title="usar este prompt de novo">↺ prompt</button>
@@ -558,7 +558,7 @@
       const r = (j.resultados || [])[0];
       const midia = r ? (r.tipo === 'video' ? `<video src="/flow/arquivo/${r.arquivo}" muted preload="metadata"></video>` : `<a href="/flow/arquivo/${r.arquivo}" target="_blank"><img src="/flow/arquivo/${r.arquivo}" loading="lazy" alt=""></a>`) : '';
       const tags = (j.tipo === 'video' ? '🎬' : '🖼') + (j.convertido ? ` <span class="fl-tag av" title="era vídeo: ${esc(j.prompt_original)}">🔁 era vídeo · ${j.reescrito_por === 'ia_site' ? '🤖 IA' : j.reescrito_por === 'ia_google' ? '🔎 IA do Google' : 'regra'}</span>` : '')
-        + (j.conta ? ` <span class="fl-tag">${esc(j.conta)}</span>` : '') + ((j.resultados || []).length > 1 ? ` <span class="fl-tag">${j.resultados.length} arquivos</span>` : '');
+        + (window.beTempo ? ' ' + beTempo(j) : '') + (j.conta ? ` <span class="fl-tag">${esc(j.conta)}</span>` : '') + ((j.resultados || []).length > 1 ? ` <span class="fl-tag">${j.resultados.length} arquivos</span>` : '');
       const acoes = (j.estado === 'ok' || j.estado === 'erro' ? `<button type="button" data-refazer="${j.id}" title="gerar de novo">↻</button>` : '')
         + (j.estado !== 'rodando' && j.estado !== 'convertendo' ? `<button type="button" data-remover="${j.id}" title="tirar da fila">✖</button>` : '');
       return `<li><span class="ic">${IC[j.estado] || '•'}</span><span class="pr">${esc(j.prompt.slice(0, 220))}<small>${tags}${j.erro ? ' · <span style="color:#b91c1c">' + esc(j.erro.slice(0, 220)) + '</span>' : ''}</small></span>${midia}${acoes}</li>`;
@@ -923,7 +923,7 @@
     let d; try { d = await (await fetch('/flow/fila')).json(); } catch (_) { tFila = setTimeout(fila, 8000); return; }
     $('filaInfo').textContent = d.esperando || d.rodando ? `· ${d.esperando} esperando${d.rodando ? ' · rodando: ' + d.rodando.slice(0, 50) : ''}` : '';
     $('filaLista').innerHTML = (d.itens || []).map(x => `<li><span class="ic">${(EST[x.estado] || x.estado).split(' ')[0]}</span>
-      <span class="pr">${esc(x.rotulo)}<small>${EST[x.estado] || x.estado}${x.erro ? ' — ' + esc(x.erro.slice(0, 160)) : ''}${x.msg ? ' — 🎯 ' + esc(x.msg) : ''}</small>
+      <span class="pr">${esc(x.rotulo)}<small>${EST[x.estado] || x.estado}${x.erro ? ' — ' + esc(x.erro.slice(0, 160)) : ''}${x.msg ? ' — 🎯 ' + esc(x.msg) : ''} ${window.beTempo ? beTempo(x) : ''}</small>
       <span class="res">${(x.resultados || []).map(a => /\.mp4$/.test(a) ? `<a href="/flow/arquivo/${a}" target="_blank">🎬</a>` : `<a href="/flow/arquivo/${a}" target="_blank"><img src="/flow/arquivo/${a}" class="${a === x.melhor ? 'melhor' : ''}" alt=""></a>`).join('')}</span></span>
       ${['esperando', 'rodando'].includes(x.estado) ? `<button type="button" data-tira="${x.id}">✕</button>` : ''}</li>`).join('') || '<li class="fl-hint">vazia</li>';
     $('filaLista').querySelectorAll('[data-tira]').forEach(b => b.onclick = async () => { await post(`/flow/fila/${b.dataset.tira}/tirar`); fila(); });

@@ -17,7 +17,7 @@
   {% for c in conversas %}
   <div style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
     <a href="{{ url_for('conversa_detalhe', conversa_id=c.conversaId) }}"><strong>{{ c.nome }}</strong></a>
-    <span style="color:#666;font-size:0.8rem;">{{ c.falas|length }} fala(s)</span>
+    <span style="color:#666;font-size:0.8rem;">{{ c.falas|length }} fala(s) · {{ tempo(c) }}</span>
   </div>
   {% endfor %}
 </div>

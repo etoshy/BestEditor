@@ -35,7 +35,7 @@
   <h2 style="margin:0;">Suas thumbnails</h2>
   {% for x in lista %}
   <div class="ta-item"><div><a href="/thumbs-avulsas/{{ x.id }}" style="font-weight:600;">{{ x.titulo }}</a>
-    <div style="font-size:.8rem;color:#777;">{{ x.itens }} ideias · {{ x.prontas }} prontas</div></div>
+    <div style="font-size:.8rem;color:#777;">{{ x.itens }} ideias · {{ x.prontas }} prontas · {{ tempo(x) }}</div></div>
     <form method="post" action="/thumbs-avulsas/{{ x.id }}/excluir" onsubmit="return confirm('Excluir estas thumbnails?')" style="margin:0;">
       <button type="submit" style="width:auto;background:#ef4444;padding:4px 10px;font-size:.8rem;margin:0;">🗑</button></form></div>
   {% else %}<p style="color:#888;">Nenhuma ainda.</p>{% endfor %}
