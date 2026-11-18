@@ -69,14 +69,15 @@
                  atualizado: ['🔄 atualizado', '#0e7490'], trocado: ['🔁 trocado por caso confirmado', '#0f766e'], hipotetico: ['🧪 exemplo hipotético', '#6d28d9'],
                  tirado: ['✂ tirado do roteiro', '#b91c1c'], mantido: ['✔ mantido por você', '#475569'] };
   // 🧭 v84_414: o que fazer com o que não se confirmou
-  const ACOES_V = [['atualizar', '🔄 atualizar', 'dado velho (a aula pode ter 20–30 anos): troca pelo mais recente confirmado, com o ano'],
+  const ACOES_V = [['auto', '🧭 automático', 'a IA pesquisa na internet e escolhe pra cada um: atualizar, trocar por caso confirmado, virar hipotético ou tirar'],
+                   ['atualizar', '🔄 atualizar', 'dado velho (a aula pode ter 20–30 anos): troca pelo mais recente confirmado, com o ano'],
                    ['equivalente', '🔁 caso confirmado', 'troca a história/o caso sem fonte por um caso REAL documentado que mostra o mesmo ponto (melhor com o 🔷 Gemini)'],
                    ['hipotetico', '🧪 hipotético', 'vira exemplo assumido: “Imagine uma estudante de medicina…” — sem fingir que aconteceu'],
                    ['tirar', '✂ tirar', 'sai do roteiro, costurando a frase de antes com a de depois'],
                    ['manter', '✔ manter', 'você conferiu ou é opinião assumida: fica como está']];
   const pendente = (v) => !v.conferido || ['sem_fonte', 'nao_confirmado'].includes(v.status_web);
   const botoesV = (i) => `<span class="chkAcoes" style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-top:3px">${ACOES_V.map(([k, n, t]) =>
-    `<button type="button" class="chkResolver" data-i="${i}" data-acao="${k}" title="${esc(t)}" style="width:auto;margin:0;padding:1px 8px;font-size:.74rem;background:${k === 'tirar' ? '#b91c1c' : k === 'manter' ? '#64748b' : '#0f766e'};color:#fff">${n}</button>`).join('')}</span>`;
+    `<button type="button" class="chkResolver" data-i="${i}" data-acao="${k}" title="${esc(t)}" style="width:auto;margin:0;padding:1px 8px;font-size:.74rem;background:${k === 'tirar' ? '#b91c1c' : k === 'manter' ? '#64748b' : k === 'auto' ? '#4338ca' : '#0f766e'};color:#fff">${n}</button>`).join('')}</span>`;
   const selo = (st) => { const x = SELO[st] || [st, '#475569']; return `<span style="font-size:.74rem;font-weight:700;color:#fff;background:${x[1]};border-radius:999px;padding:0 7px;">${esc(x[0])}</span>`; };
   function desenhar(d) {
     const a = d.local || {}, cr = d.cronologia || {}, u = d.ultima;
@@ -110,8 +111,15 @@
       c2 += '<div style="margin-bottom:4px">Conferir fora (citar uma fonte no texto não confirma a afirmação):</div>' + ver.map((v, i) =>
         `<label style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin:4px 0"><input type="checkbox" class="chkVer" data-i="${i}" ${v.conferido ? 'checked' : ''} style="width:auto;margin-top:3px"><span><b>${esc(v.afirmacao)}</b>${v.por_que ? ` — ${esc(v.por_que)}` : ''}${v.como ? `<br><i style="color:#555">🔍 ${esc(v.como)}</i>` : ''}${v.status_web ? ' ' + selo(v.status_web) : ''}${v.fonte_web || v.nota_web ? `<br><span style="color:#0f766e">🌐 ${esc(v.nota_web || 'confirmado')}${v.fonte_web ? ` — <a href="${esc(v.fonte_web)}" target="_blank" rel="noopener">fonte</a>` : ''}</span>` : ''}${v.para !== undefined && v.de ? `<br><span style="font-size:.78rem;color:#555">antes: <s>${esc(v.de.slice(0, 160))}</s>${v.para ? `<br>agora: ${esc(v.para.slice(0, 200))}` : ''}</span>` : ''}${pendente(v) ? '<br>' + botoesV(i) : ''}</span></label>`).join('')
         + (ver.filter(pendente).length > 1 ? `<div style="margin-top:6px;padding:6px 8px;background:#f0fdfa;border-radius:6px;font-size:.82rem">Todos os ${ver.filter(pendente).length} pendentes de uma vez:
-            ${ACOES_V.filter(a => a[0] !== 'manter').map(([k, n, t]) => `<button type="button" class="chkResolverTodos" data-acao="${k}" title="${esc(t)}" style="width:auto;margin:0 2px;padding:2px 10px;font-size:.78rem;background:${k === 'tirar' ? '#b91c1c' : '#0f766e'};color:#fff">${n}</button>`).join('')}
-            <span id="chkResolverSt"></span></div>` : '<div id="chkResolverSt" style="font-size:.82rem"></div>');
+            ${ACOES_V.filter(a => a[0] !== 'manter').map(([k, n, t]) => `<button type="button" class="chkResolverTodos" data-acao="${k}" title="${esc(t)}" style="width:auto;margin:0 2px;padding:2px 10px;font-size:.78rem;background:${k === 'tirar' ? '#b91c1c' : k === 'auto' ? '#4338ca' : '#0f766e'};color:#fff">${n}</button>`).join('')}
+            <span id="chkResolverSt"></span></div>` : '<div id="chkResolverSt" style="font-size:.82rem"></div>')
+        + (ver.some(pendente) ? `<details style="margin-top:6px;font-size:.82rem"><summary style="cursor:pointer">📋 Fazer numa outra IA com internet (ChatGPT, Perplexity, Claude.ai…) — quando o Gemini/Claude daqui não dá</summary>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">o que pedir:
+              <select id="chkRpAcao" style="width:auto;margin:0;font-size:.8rem">${ACOES_V.filter(a => a[0] !== 'manter').map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>
+              <button type="button" id="chkRpGerar" style="width:auto;margin:0;padding:2px 10px;font-size:.8rem">📋 Copiar o prompt com os ${ver.filter(pendente).length} pendentes</button><span id="chkRpSt"></span></div>
+            <textarea id="chkRpPrompt" rows="3" readonly style="display:none;width:100%;margin-top:4px;font-family:monospace;font-size:.75rem"></textarea>
+            <textarea id="chkRpResp" rows="3" style="width:100%;margin-top:4px;font-size:.8rem" placeholder='cole aqui o JSON que a outra IA devolveu: { "correcoes": [ { "item": "V1", "de": "...", "para": "...", "status": "atualizado", "fonte": "https://..." } ] }'></textarea>
+            <button type="button" id="chkRpLer" style="width:auto;margin:2px 0 0;padding:3px 10px;font-size:.8rem">📥 Ajustar o roteiro com a resposta</button></details>` : '');
     } else c2 += '<div style="color:#666">Rode a checagem pra ter a lista do que precisa ser conferido.</div>';
     const nums = (a.numeros || []).filter(x => x.vezes >= 1).slice(0, 10);
     if (nums.length) c2 += `<details style="margin-top:4px"><summary style="cursor:pointer">Números citados (condenado × acusado × alegado × estimado não são a mesma coisa)</summary>${nums.map(x => `<div>• <b>${esc(x.valor)}</b>: ${x.onde.map(o => `linha ${o.linha}: ${esc(o.frase.slice(0, 110))}`).join(' | ')}</div>`).join('')}</details>`;
@@ -135,10 +143,10 @@
       const stEl = $c('chkResolverSt');
       if (acao === 'tirar' && !confirm(`Tirar ${itens.length} afirmação(ões) do roteiro? (dá pra voltar pelo 🕘 histórico)`)) return;
       document.querySelectorAll('.chkResolver, .chkResolverTodos').forEach(b => b.disabled = true);
-      if (stEl) stEl.textContent = acao === 'manter' ? '' : '⏳ a IA está ajustando o roteiro…' + (['atualizar', 'equivalente'].includes(acao) ? ' (pesquisando na internet)' : '');
+      if (stEl) stEl.textContent = acao === 'manter' ? '' : '⏳ a IA está ajustando o roteiro…' + (['atualizar', 'equivalente', 'auto'].includes(acao) ? ' (pesquisando na internet — pode levar 1 a 3 min)' : '');
       try {
         const r = await post(BASE + '/resolver', { itens, acao });
-        if (stEl) stEl.textContent = acao === 'manter' ? '✔ mantido' : `✔ ${r.aplicadas} trecho(s) ajustado(s) · ${r.palavras_antes} → ${r.palavras_depois} palavras` + ((r.nao_achadas || []).length ? ` · ⚠ ${r.nao_achadas.length} não bateram com o texto` : '') + (r.quem === 'gemini' ? ' · 🔷 Gemini' : '');
+        if (stEl) stEl.textContent = acao === 'manter' ? '✔ mantido' : `✔ ${r.aplicadas} trecho(s) ajustado(s) · ${r.palavras_antes} → ${r.palavras_depois} palavras` + ((r.nao_achadas || []).length ? ` · ⚠ ${r.nao_achadas.length} não bateram com o texto` : '') + (r.quem === 'gemini' ? ' · 🔷 Gemini' : r.quem === 'ia_site' ? ' · 🤖 Claude' : '') + ((r.sem_resposta || []).length ? ` · ${r.sem_resposta.length} sem resposta` : '');
         if (r.aplicadas && window.atualizarRoteiro) window.atualizarRoteiro();
         carregar();
       } catch (e) { if (stEl) stEl.textContent = '❌ ' + e.message; document.querySelectorAll('.chkResolver, .chkResolverTodos').forEach(b => b.disabled = false); }
@@ -146,6 +154,26 @@
     document.querySelectorAll('#chkLocal .chkResolver').forEach(b => b.addEventListener('click', (ev) => { ev.preventDefault(); resolver([+b.dataset.i], b.dataset.acao, b); }));
     document.querySelectorAll('#chkLocal .chkResolverTodos').forEach(b => b.addEventListener('click', () =>
       resolver(ver.map((v, i) => pendente(v) ? i : -1).filter(i => i >= 0), b.dataset.acao, b)));
+    let rpItens = null, rpAcao = null;
+    if ($c('chkRpGerar')) $c('chkRpGerar').addEventListener('click', async () => {
+      try {
+        const d = await post(BASE + '/resolver/prompt', { pendentes: true, acao: $c('chkRpAcao').value });
+        rpItens = d.itens; rpAcao = $c('chkRpAcao').value;
+        const ta = $c('chkRpPrompt'); ta.style.display = 'block'; ta.value = d.prompt; ta.select();
+        try { await navigator.clipboard.writeText(d.prompt); $c('chkRpSt').textContent = '✔ copiado — cole numa IA com a pesquisa na web ligada e traga o JSON'; }
+        catch (e) { $c('chkRpSt').textContent = 'selecione e copie (Ctrl+C)'; }
+      } catch (e) { $c('chkRpSt').textContent = '❌ ' + e.message; }
+    });
+    if ($c('chkRpLer')) $c('chkRpLer').addEventListener('click', async () => {
+      const st = $c('chkRpSt');
+      try {
+        const r = await post(BASE + '/resolver/ler', rpItens ? { itens: rpItens, acao: rpAcao, texto: $c('chkRpResp').value }
+                                                            : { pendentes: true, acao: $c('chkRpAcao').value, texto: $c('chkRpResp').value });
+        st.textContent = `✔ ${r.aplicadas} trecho(s) ajustado(s) · ${r.itens.length} item(ns) resolvido(s)` + ((r.nao_achadas || []).length ? ` · ⚠ ${r.nao_achadas.length} não bateram com o texto` : '') + ((r.sem_resposta || []).length ? ` · ${r.sem_resposta.length} sem resposta` : '');
+        if (r.aplicadas && window.atualizarRoteiro) window.atualizarRoteiro();
+        setTimeout(carregar, 1200);
+      } catch (e) { st.textContent = '❌ ' + e.message; }
+    });
     const st = (t) => { const e = $c('chkRepSt'); if (e) e.innerHTML = t; };
     const fim = (r) => { st(`✔ ${r.aplicadas} trecho(s) corrigido(s) · ${r.nao_e_repeticao || 0} par(es) não eram repetição · ${r.palavras_antes} → ${r.palavras_depois} palavras` + ((r.nao_achadas || []).length ? ` · ⚠ ${r.nao_achadas.length} não bateram com o texto` : '')); if (window.atualizarRoteiro) window.atualizarRoteiro(); setTimeout(carregar, 1500); };
     if ($c('chkRepIa')) $c('chkRepIa').addEventListener('click', async () => {

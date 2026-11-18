@@ -871,44 +871,41 @@ def registrar(app, base_dir: str) -> None:
         return jsonify({"ok": True, "politica": cr.politica(), "politicas": cr.POLITICAS,
                         "acoes": {k: v[0] for k, v in cr.ACOES.items()}})
 
-    @app.route("/checagem/<origem>/<pid>/resolver", methods=["POST"])
-    def checagem_resolver(origem: str, pid: str):
-        """🧭 Faz a ação escolhida (atualizar / equivalente / hipotético / tirar / manter) nos itens da lista "conferir"."""
+    def _resolver_pedido(origem: str, pid: str, c: Dict[str, Any]):
+        """(p, texto, pad, reg, ver, idx, acao) do pedido — ou levanta ValueError/LookupError."""
+        import checagem_resolver as cr
+        acao = str(c.get("acao") or "")
+        if acao not in cr.ACOES:
+            raise ValueError("Ação inválida.")
+        try:
+            p, texto, pad = _roteiro(origem, pid)
+        except Exception as exc:  # noqa: BLE001
+            raise LookupError("Projeto não encontrado.") from exc
+        reg = p.get("checagem") or {}
+        ver = reg.get("verificar") or []
+        if c.get("pendentes"):  # 📋 todos os que ainda não se resolveram
+            idx = [i for i, v in enumerate(ver) if not v.get("conferido") or v.get("status_web") in ("sem_fonte", "nao_confirmado")]
+        else:
+            idx = sorted({int(i) for i in c.get("itens") or [] if str(i).lstrip("-").isdigit() and 0 <= int(i) < len(ver)})
+        if not idx:
+            raise ValueError("Nenhum item pendente pra resolver.")
+        return p, texto, pad, reg, ver, idx, acao
+
+    def _resolver_prompt(texto, pad, ver, idx, acao, com_web=True):
+        import checagem_resolver as cr
+        import idiomas
+        return cr.prompt_resolver(texto, [(i, ver[i]) for i in idx], acao,
+                                  idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"), com_web=com_web)
+
+    def _resolver_aplicar(origem, pid, p, texto, reg, ver, idx, acao, resposta, quem):
         import json as _json
 
         import checagem_resolver as cr
-        import idiomas
         import revisao_roteiro as rv
-        c = request.get_json(silent=True) or {}
-        acao = str(c.get("acao") or "")
-        if acao not in cr.ACOES:
-            return jsonify({"erro": "Ação inválida."}), 400
-        try:
-            p, texto, pad = _roteiro(origem, pid)
-        except Exception:  # noqa: BLE001
-            return jsonify({"erro": "Projeto não encontrado."}), 404
-        reg = p.get("checagem") or {}
-        ver = reg.get("verificar") or []
-        idx = sorted({int(i) for i in c.get("itens") or [] if str(i).lstrip("-").isdigit() and 0 <= int(i) < len(ver)})
-        if not idx:
-            return jsonify({"erro": "Escolha pelo menos um item."}), 400
-        if acao == "manter":
-            for i in idx:
-                ver[i].update(conferido=True, status_web="mantido", nota_web="✔ mantido por você")
-            reg["verificar"] = ver
-            _guardar(origem, pid, "checagem", reg)
-            return jsonify({"ok": True, "aplicadas": 0, "itens": idx})
-        try:
-            pr = cr.prompt_resolver(texto, [(i, ver[i]) for i in idx], acao,
-                                    idiomas.nome_para_prompt(idiomas.normalizar(pad["idioma"]) or "pt"))
-            nome = str(p.get("tema") or p.get("titulo") or p.get("nome") or "roteiro")[:60]
-            resposta, quem = cr.chamar_ia(pr, acao, f"🧭 {cr.ACOES[acao][0]}: {nome}")
-            trocas = cr.ler(resposta)
-        except (ValueError, RuntimeError) as exc:
-            return jsonify({"erro": str(exc)}), 400
-        except Exception as exc:  # noqa: BLE001 — Gemini fora do ar etc.
-            return jsonify({"erro": f"A IA não respondeu: {exc}"}), 502
-        r = rv.aplicar(texto, _json.dumps({"trocas": trocas}, ensure_ascii=False))
+        trocas = cr.ler(resposta)
+        confirmados = [t for t in trocas if t.get("status") == "confirmado" or t["de"].strip() == t["para"].strip()]
+        mudar = [t for t in trocas if t not in confirmados]
+        r = rv.aplicar(texto, _json.dumps({"trocas": mudar}, ensure_ascii=False))
         g = {}
         if r["aplicadas"]:
             g = _gravar(origem, pid, p, r["texto"], None, [], chave_antes="-",
@@ -919,25 +916,80 @@ def registrar(app, base_dir: str) -> None:
             ver = reg.get("verificar") or ver
         aplicados = {t["de"] for t in r["aplicadas"]}
         _NOTA = {"atualizado": "🔄 atualizado pelo dado mais recente", "trocado": "🔁 trocado por um caso confirmado",
-                 "hipotetico": "🧪 virou exemplo hipotético", "tirado": "✂ tirado do roteiro", "corrigido": "✏ corrigido"}
+                 "hipotetico": "🧪 virou exemplo hipotético", "tirado": "✂ tirado do roteiro", "corrigido": "✏ corrigido",
+                 "falso": "✖ falso — tirado do texto", "sem_fonte": "❔ sem confirmação — atribuído/suavizado",
+                 "confirmado": "✔ confirmado"}
         feitos = []
         for t in trocas:
-            if t["de"][:200] not in aplicados:
+            ok_conf = t in confirmados
+            if not ok_conf and t["de"][:200] not in aplicados:
                 continue
             it = t.get("item") or ""
             alvo = [int(it[1:]) - 1] if it.startswith("V") and it[1:].isdigit() else ([idx[0]] if len(idx) == 1 else [])
             for i in alvo:
                 if i in idx and 0 <= i < len(ver):
-                    st = t.get("status") or cr.ACOES[acao][1]
+                    st = "confirmado" if ok_conf else (t.get("status") or cr.ACOES[acao][1])
                     ver[i].update(conferido=True, status_web=st, fonte_web=t.get("fonte") or "",
                                   nota_web=_NOTA.get(st, st) + (": " + t["motivo"] if t.get("motivo") else ""),
-                                  de=t["de"][:300], para=t["para"][:300])
+                                  **({} if ok_conf else {"de": t["de"][:300], "para": t["para"][:300]}))
                     feitos.append(i)
         reg["verificar"] = ver
         reg.setdefault("aplicadas", []).extend(dict(t, eixo="alegacao") for t in r["aplicadas"])
         _guardar(origem, pid, "checagem", reg)
-        return jsonify({"ok": True, "aplicadas": len(r["aplicadas"]), "nao_achadas": r["nao_achadas"], "itens": feitos,
-                        "quem": quem, "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"], **g})
+        return {"ok": True, "aplicadas": len(r["aplicadas"]), "nao_achadas": r["nao_achadas"], "itens": feitos,
+                "sem_resposta": [i for i in idx if i not in feitos], "quem": quem,
+                "palavras_antes": r["palavras_antes"], "palavras_depois": r["palavras_depois"], **g}
+
+    @app.route("/checagem/<origem>/<pid>/resolver", methods=["POST"])
+    def checagem_resolver(origem: str, pid: str):
+        """🧭 Faz a ação escolhida (automático / atualizar / equivalente / hipotético / tirar / manter) nos itens."""
+        import checagem_resolver as cr
+        try:
+            p, texto, pad, reg, ver, idx, acao = _resolver_pedido(origem, pid, request.get_json(silent=True) or {})
+        except LookupError as exc:
+            return jsonify({"erro": str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+        if acao == "manter":
+            for i in idx:
+                ver[i].update(conferido=True, status_web="mantido", nota_web="✔ mantido por você")
+            reg["verificar"] = ver
+            _guardar(origem, pid, "checagem", reg)
+            return jsonify({"ok": True, "aplicadas": 0, "itens": idx})
+        try:
+            pr = _resolver_prompt(texto, pad, ver, idx, acao)
+            nome = str(p.get("tema") or p.get("titulo") or p.get("nome") or "roteiro")[:60]
+            resposta, quem = cr.chamar_ia(pr, acao, f"🧭 {cr.ACOES[acao][0]}: {nome}")
+            return jsonify(_resolver_aplicar(origem, pid, p, texto, reg, ver, idx, acao, resposta, quem))
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"erro": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"erro": f"A IA não respondeu: {exc}"}), 502
+
+    @app.route("/checagem/<origem>/<pid>/resolver/prompt", methods=["POST"])
+    def checagem_resolver_prompt(origem: str, pid: str):
+        """📋 O pedido pra colar numa outra IA com internet (ChatGPT, Perplexity, Claude.ai…)."""
+        try:
+            _p, texto, pad, _reg, ver, idx, acao = _resolver_pedido(origem, pid, request.get_json(silent=True) or {})
+            if acao == "manter":
+                raise ValueError("“Manter” não precisa de IA.")
+            return jsonify({"ok": True, "prompt": _resolver_prompt(texto, pad, ver, idx, acao), "itens": idx})
+        except LookupError as exc:
+            return jsonify({"erro": str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
+
+    @app.route("/checagem/<origem>/<pid>/resolver/ler", methods=["POST"])
+    def checagem_resolver_ler(origem: str, pid: str):
+        """📥 A resposta (JSON) que a outra IA devolveu → ajusta o roteiro."""
+        c = request.get_json(silent=True) or {}
+        try:
+            p, texto, _pad, reg, ver, idx, acao = _resolver_pedido(origem, pid, c)
+            return jsonify(_resolver_aplicar(origem, pid, p, texto, reg, ver, idx, acao, str(c.get("texto") or ""), "colado"))
+        except LookupError as exc:
+            return jsonify({"erro": str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({"erro": str(exc)}), 400
 
     @app.route("/checagem/<origem>/<pid>/verificar/<int:i>", methods=["POST"])
     def checagem_conferido(origem: str, pid: str, i: int):

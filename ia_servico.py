@@ -694,7 +694,7 @@ def _sem_credito(status: int, msg: str) -> bool:
 
 def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, Any]] = None, max_tokens: int = 800,
            effort: str = "low", pensar: bool = False, job: Optional[str] = None, cache_local: bool = True,
-           timeout: float = 90.0, forcar: bool = False) -> Optional[Any]:
+           timeout: float = 90.0, forcar: bool = False, web: bool = False) -> Optional[Any]:
     """Uma chamada à IA. Com `schema`: devolve o objeto (dict/list). Sem: o texto.
     None em QUALQUER problema (desligada, sem crédito, erro, recusa) — quem chamou segue sem a IA.
     `forcar`: ignora o liga/desliga do recurso (botão "Testar")."""
@@ -720,6 +720,9 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
         payload["output_config"] = oc
     if not pensar and "thinking" not in _SEM_PARAM:
         payload["thinking"] = {"type": "disabled"}
+    if web:  # 🌐 v84_416: a busca na internet da própria Anthropic (cobra ~US$ 0,01 por busca)
+        payload["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 8}]
+        cache_local = False
 
     k = _chave_cache(payload) if cache_local else ""
     if k:
@@ -757,6 +760,13 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
             if not payload.get("output_config"):
                 payload.pop("output_config", None)
             continue
+        if status == 400 and web and "web_search" in msg and payload.get("tools") and tentativas < 3:
+            payload.pop("tools", None)  # a conta não tem a busca na internet liberada: vai sem
+            continue
+        if status == 200 and (corpo or {}).get("stop_reason") == "pause_turn" and tentativas < 6:
+            # a busca na internet pausou no meio (turno longo): manda o que já veio e deixa continuar
+            payload["messages"] = payload["messages"][:1] + [{"role": "assistant", "content": corpo.get("content") or []}]
+            continue
         if status in (429, 500, 502, 503, 504, 529) and tentativas < 4:
             time.sleep(espera)
             espera *= 2
@@ -780,7 +790,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
         break
 
     u = corpo.get("usage") or {}
-    custo = _custo(u, m)
+    custo = _custo(u, m) + 0.01 * int(((u.get("server_tool_use") or {}).get("web_search_requests")) or 0)
     if corpo.get("stop_reason") in ("refusal", "max_tokens"):
         _registrar(recurso, u, custo, job, False,
                    "a resposta passou do tamanho máximo (max_tokens) — divida o pedido em partes"

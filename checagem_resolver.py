@@ -18,6 +18,7 @@ import json
 from typing import Any, Dict, List, Tuple
 
 ACOES = {
+    "auto": ("🧭 automático (a IA escolhe)", "corrigido"),
     "atualizar": ("🔄 atualizar", "atualizado"),
     "equivalente": ("🔁 trocar por caso confirmado", "trocado"),
     "hipotetico": ("🧪 virar exemplo hipotético", "hipotetico"),
@@ -30,7 +31,7 @@ POLITICAS = {
     "tirar": "✂ tirar tudo que não se confirma",
 }
 POLITICA_PADRAO = "auto"
-STATUS_NOVOS = ("atualizado", "trocado", "hipotetico", "tirado", "mantido")
+STATUS_NOVOS = ("atualizado", "trocado", "hipotetico", "tirado", "mantido", "confirmado", "falso", "sem_fonte")
 
 FONTE_ANTIGA = ("O material de origem pode ser uma aula/curso de 20 a 30 anos atrás: número, estatística, \"hoje em dia\", "
                 "\"atualmente\", recorde, \"o maior/mais recente\" e o estado de uma pesquisa podem estar DESATUALIZADOS — "
@@ -95,6 +96,9 @@ def prompt_resolver(roteiro: str, itens: List[Tuple[int, Dict[str, Any]]], acao:
            "livros) e ponha o link em \"fonte\"." if com_web else
            "Você está SEM internet: use só o que é muito conhecido e bem documentado, e diga em \"fonte\" onde conferir.")
     o_que = {
+        "auto": "Para CADA item, escolha o melhor caminho e diga qual em \"status\":\n   "
+                + regra_sem_fonte("auto", com_web) + "\n   Se o item estiver CERTO (você confirmou), não mexa: devolva \"de\" = "
+                "\"para\" com status \"confirmado\" e o link.",
         "atualizar": "ATUALIZE o dado pelo MAIS RECENTE que você confirmar, dizendo o ano (\"segundo dados de 2023…\"). Se "
                      "não houver dado novo confiável, deixe o antigo DATADO (\"nos anos 1990, estimava-se…\").",
         "equivalente": "TROQUE o caso/a história por um caso REAL e documentado que mostre o MESMO ponto (mesma função no "
@@ -137,20 +141,35 @@ def ler(resposta: str) -> List[Dict[str, Any]]:
 
 
 def chamar_ia(prompt: str, acao: str, rotulo: str) -> Tuple[str, str]:
-    """(resposta, quem): com a busca do Google (🔷 Gemini) quando precisa de internet e tem chave; senão a 🤖 IA do site."""
+    """(resposta, quem). Precisa de internet (atualizar / caso confirmado / automático): 🔷 Gemini → se ele falhar
+    (cota, sem chave) → 🤖 Claude do site COM a busca na internet. Sem internet (hipotético / tirar): Claude → Gemini."""
     import gemini_servico as gm
-    precisa_web = acao in ("atualizar", "equivalente")
-    if precisa_web and gm.chave():
-        r = gm.checar(prompt, rotulo=rotulo)
-        return str(r.get("texto") or ""), "gemini"
     import ia_servico as ia
-    if ia.motivo_desligado("roteiros") is None:
-        with ia.rotulo(rotulo):
-            r = ia.chamar("roteiros", "Responda só o JSON pedido.", prompt, max_tokens=6000, effort="low", timeout=300)
-        if r:
-            return str(r), "ia_site"
-    if gm.chave():
+    precisa_web = acao in ("atualizar", "equivalente", "auto")
+    erros = []
+
+    def gemini():
         r = gm.checar(prompt, rotulo=rotulo)
-        return str(r.get("texto") or ""), "gemini"
-    raise RuntimeError("Sem IA pra isso: ligue a 🤖 IA do site (Roteiros) ou cole a chave do 🔷 Gemini na checagem."
-                       + (" Pra atualizar/trocar por caso confirmado o melhor é o Gemini (tem a busca do Google)." if precisa_web else ""))
+        return str(r.get("texto") or "")
+
+    def claude():
+        if ia.motivo_desligado("roteiros") is not None:
+            raise RuntimeError("a 🤖 IA do site está desligada (" + str(ia.motivo_desligado("roteiros")) + ")")
+        with ia.rotulo(rotulo):
+            r = ia.chamar("roteiros", "Responda só o JSON pedido.", prompt, max_tokens=8000, effort="low", timeout=420,
+                          web=precisa_web)
+        if not r:
+            raise RuntimeError("o Claude não respondeu (veja as últimas chamadas em 🤖 IA)")
+        return str(r)
+
+    ordem = ([("gemini", gemini)] if gm.chave() else []) + [("ia_site", claude)] if precisa_web else \
+        [("ia_site", claude)] + ([("gemini", gemini)] if gm.chave() else [])
+    for quem, f in ordem:
+        try:
+            t = f()
+            if t.strip():
+                return t, quem
+        except Exception as exc:  # noqa: BLE001 — cota do Gemini, rede…
+            erros.append(f"{'🔷 Gemini' if quem == 'gemini' else '🤖 Claude'}: {str(exc)[:200]}")
+    raise RuntimeError("Nenhuma IA respondeu — " + " · ".join(erros or ["ligue a 🤖 IA do site ou cole a chave do 🔷 Gemini"])
+                       + ". Dá pra usar 📋 o prompt numa outra IA com internet e colar a resposta.")

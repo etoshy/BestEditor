@@ -50,3 +50,54 @@ def test_rota_resolver(monkeypatch):
         assert c.get("/checagem/politica").get_json()["politica"] in cr.POLITICAS
     finally:
         ds.excluir(A.BASE_DIR, p["id"])
+
+
+def test_gemini_sem_cota_cai_pro_claude_com_internet(monkeypatch):
+    import gemini_servico as gm
+    import ia_servico as ia
+    monkeypatch.setattr(gm, "chave", lambda c=None: "k")
+    monkeypatch.setattr(gm, "checar", lambda *a, **k: (_ for _ in ()).throw(gm.GeminiErro("passou do limite")))
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r, c=None: None)
+    pedidos = {}
+    monkeypatch.setattr(ia, "chamar", lambda *a, **k: pedidos.update(k) or '{"correcoes": []}')
+    t, quem = cr.chamar_ia("p", "auto", "x")
+    assert quem == "ia_site" and pedidos.get("web") is True
+    monkeypatch.setattr(ia, "chamar", lambda *a, **k: None)
+    import pytest
+    with pytest.raises(RuntimeError) as e:
+        cr.chamar_ia("p", "auto", "x")
+    assert "Gemini" in str(e.value) and "📋" in str(e.value)
+
+
+def test_web_search_vai_no_pedido_da_anthropic(monkeypatch):
+    import ia_servico as ia
+    visto = {}
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r, c=None: None)
+    monkeypatch.setattr(ia, "chaves_candidatas", lambda c=None: [("salva", "sk")])
+    monkeypatch.setattr(ia, "_transporte", lambda payload, k, t: (visto.update(payload) or 200,
+                        {"content": [{"type": "text", "text": "oi"}], "usage": {"server_tool_use": {"web_search_requests": 2}}}))
+    assert ia.chamar("roteiros", "s", "c", web=True, cache_local=False) == "oi"
+    assert visto["tools"][0]["type"] == "web_search_20250305"
+
+
+def test_prompt_e_colar_resposta(monkeypatch):
+    import app as A
+    import dossies as ds
+    p = ds.criar(A.BASE_DIR, tema="Teste colar")
+    p["resultado"] = {"roteiro": "Começo.\n\nEm 1990, 30% das pessoas usavam isso.\n\nFim."}
+    p["checagem"] = {"verificar": [{"afirmacao": "Em 1990, 30% das pessoas usavam isso", "conferido": False},
+                                   {"afirmacao": "Algo confirmado", "conferido": True, "status_web": "confirmado"}]}
+    ds.salvar(A.BASE_DIR, p)
+    c = A.app.test_client()
+    try:
+        d = c.post(f"/checagem/dossie/{p['id']}/resolver/prompt", json={"pendentes": True, "acao": "auto"}).get_json()
+        assert d["itens"] == [0] and "### V1" in d["prompt"] and "Algo confirmado" not in d["prompt"].split("## Roteiro")[0]
+        resp = json.dumps({"correcoes": [{"item": "V1", "de": "Em 1990, 30% das pessoas usavam isso.",
+                                          "para": "Em 1990, 30% das pessoas usavam isso; em 2023, eram 55%.",
+                                          "status": "atualizado", "fonte": "https://exemplo.org"}]})
+        r = c.post(f"/checagem/dossie/{p['id']}/resolver/ler", json={"itens": d["itens"], "acao": "auto", "texto": resp}).get_json()
+        assert r["aplicadas"] == 1 and r["itens"] == [0]
+        q = ds.carregar(A.BASE_DIR, p["id"])
+        assert "em 2023, eram 55%" in q["resultado"]["roteiro"] and q["checagem"]["verificar"][0]["status_web"] == "atualizado"
+    finally:
+        ds.excluir(A.BASE_DIR, p["id"])
