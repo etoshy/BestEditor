@@ -91,6 +91,10 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                       "Aponta as marcas [I3] em frases que não combinam com a imagem e sugere outra.", True),
     "venda_imagens": ("🛒 Vídeo de venda: ficha das fotos do produto",
                       "Diz o ângulo, se mostra o produto em uso, a embalagem, os detalhes e se tem texto/preço na imagem.", True),
+    "fontes_descricao": ("📚 Fontes na descrição (links conferidos)",
+                         "Depois de cada roteiro, a IA procura na internet um link pra cada referência histórica (citação, "
+                         "obra, evento, estudo) e o site abre cada link: só entra o que está no ar e fala do assunto. "
+                         "Vai na descrição em \"📚 Fontes e referências\". Uns US$ 0,05 a 0,15 por roteiro pela API (busca).", True),
     "roteiros": ("📝 Roteiros direto na IA",
                  "Botão 🤖 Gerar com a IA nos Modelos de vídeo, Vídeo de venda, Roteiro do YouTube e Vídeos modelados: gera o "
                  "prompt, manda pra IA e já lê a resposta (sem copiar e colar).", True),

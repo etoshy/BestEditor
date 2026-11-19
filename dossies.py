@@ -477,6 +477,20 @@ REGRA_SEM_PESSOAL = (
     "quando a fonte traz — apresente quem é em poucas palavras, cite a frase e depois explique o que ela quer dizer na "
     "prática. Não invente atribuição: se a fonte não diz de quem é, não ponha nome; se a autoria é duvidosa, diga "
     "\"atribuída a\".")
+# ✍ v84_432: o que apareceu no roteiro do náufrago (bastidor no ar, imagem de abertura repetida, citação com página)
+REGRA_FALA = (
+    "TEXTO DE FALA, NÃO DE BASTIDOR: quem assiste não sabe que o roteiro tem partes, título ou tese. NUNCA escreva \"a parte "
+    "anterior\", \"a parte seguinte\", \"o próximo bloco\", \"o roteiro propõe\", \"a tese do título\", \"este roteiro\" — "
+    "faça a ponte com a própria ideia (\"e é aqui que…\", \"lembra da pergunta de agora há pouco?\"). "
+    "IMAGEM QUE VOLTA: se uma imagem/cena da abertura (ex.: o náufrago) volta mais tarde, ASSUMA o retorno (\"Lembra do "
+    "náufrago do começo? Volta pra ele.\") — nunca a apresente de novo como se fosse nova — e de preferência FECHE o vídeo "
+    "com ela, amarrando o fim com o começo, em vez de trazer uma imagem nova só no final. "
+    "CITAÇÃO NA FALA: autor + obra (ex.: \"Louis Lavelle, em A Intimidade Espiritual\") — sem ano, página, edição ou nome "
+    "do capítulo/ensaio; esses detalhes vão nas fontes da descrição. "
+    "ANALOGIA tem que fechar: uma comparação só entra se for clara na primeira ouvida (quem, o quê, por que é parecido); "
+    "se precisar de explicação, troque por outra ou corte. "
+    "RESSALVA CURTA: no máximo uma ressalva quando muda o sentido — nada de empilhar \"não é X, mas um exemplo para pensar\", "
+    "\"alguns filósofos argumentam…, mas isso não significa…\".")
 REGRA_PRODUTO = (
     "PRODUTO SUGERIDO: sugira UM produto real que combine de verdade com o tema e com o público deste vídeo (ex.: um livro sobre "
     "o caso/assunto, um documentário, um item útil ligado ao tema — nunca algo de mau gosto em relação às vítimas). Ele "
@@ -1176,6 +1190,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append(f"- Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
     if cfg.get("sem_experiencias", True):
         L.append("- " + REGRA_SEM_PESSOAL)
+    L.append("- " + REGRA_FALA)
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     if _perfil:  # 🎭 v84_173: canal com personagens — falas multi voz, emoção por fala, lore, continuidade, histórico
         import canal_perfil
@@ -1248,6 +1263,10 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         if _fv:
             L.append("")
             L.append(_fv)
+    _ev = __import__("estrutura_video").bloco(cfg.get("estrutura"), curto=minutos <= 1 or cfg.get("formato") == "curto")
+    if _ev:  # 🎲 v84_433: abertura, arco e fecho mudam de vídeo pra vídeo
+        L.append("")
+        L.append(_ev)
     L.append("")
     _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
     L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
@@ -1451,8 +1470,12 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
                 regras.append(_fv.split("\n", 1)[-1][:3000])
         except Exception:  # noqa: BLE001
             pass
+    _ev = __import__("estrutura_video").bloco(cfg.get("estrutura"))
+    if _ev:  # 🎲 v84_433: a abertura vale na 1ª parte, o fecho na última, o arco no meio
+        regras.append(_ev.split("\n", 1)[-1] + "\n(A ABERTURA é só da 1ª parte; o FECHO e a CHAMADA, só da última.)")
     if cfg.get("sem_experiencias", True):  # 🧹 v84_418: a regra (sem "segundo as notas", sem crédito da fonte) vale em cada parte
         regras.append(REGRA_SEM_PESSOAL)
+    regras.append(REGRA_FALA)  # ✍ v84_432: cada parte sem "a parte anterior", com o retorno assumido
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     _pb = ""
     if _perfil:
@@ -1821,10 +1844,16 @@ def descricao_completa(p: Dict[str, Any]) -> str:
     else:
         txt = roteiros_yt.descricao_com_capitulos(res)
     usadas = set(res.get("fontes_usadas") or [])
-    fontes = [f for f in p.get("fontes") or [] if f.get("titulo") and (not usadas or f["id"] in usadas)]
+    import fontes_web
+    fw = fontes_web.bloco(res.get("fontes_web"))  # 📚 v84_432: as referências históricas, com links conferidos
+    ja = {i.get("url") for i in (res.get("fontes_web") or {}).get("itens") or []}
+    # 📚 v84_432: só fontes com LINK (arquivo enviado — notas, transcrição da aula — não é fonte pra quem assiste)
+    fontes = [f for f in p.get("fontes") or [] if f.get("titulo") and f.get("url") and f["url"] not in ja
+              and (not usadas or f["id"] in usadas)]
     if fontes:
-        txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']}" + (f" ({f.get('site') or ''}): {f['url']}" if f.get("url") else "")
-                                             for f in fontes)
+        txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']}" + f" ({f.get('site') or ''}): {f['url']}" for f in fontes)
+    if fw:
+        txt += "\n\n" + fw
     return txt.strip()
 
 

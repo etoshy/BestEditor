@@ -113,6 +113,57 @@ def sincronizar(base: str, origem: str, pid: str, ideias: List[Any]) -> Dict[str
         return d
 
 
+# ------------------------------------------------------------------ ✏ v84_433: pedir uma mudança numa thumb ("em pé", "uma criança")
+def ajustar(base: str, origem: str, pid: str, n: int, pedido: str, chamar=None) -> Dict[str, Any]:
+    """A IA reescreve o prompt DESTA thumb aplicando o pedido (pessoa, idade, pose, roupa, cenário, objeto, expressão…) e
+    mantendo o resto da cena, a ironia, a palavra e o estilo. Devolve os itens."""
+    pedido = " ".join(str(pedido or "").split())[:600]
+    if not pedido:
+        raise ThumbErro("Escreva o que mudar (ex.: \"em vez da mulher velha, uma garota\", \"em pé, não deitada\").")
+    d = carregar(base, origem, pid)
+    it = next((i for i in d.get("itens") or [] if int(i.get("n") or 0) == int(n)), None)
+    if not it:
+        raise ThumbErro("Thumbnail não encontrada.")
+    import ia_servico as ia
+    if chamar is None:
+        motivo = ia.motivo_desligado("roteiros")
+        if motivo:
+            raise ThumbErro("IA: " + motivo)
+    from ia_midia import _S, _obj
+    system = ("Você ajusta o PROMPT de imagem de UMA thumbnail de YouTube (vai pro Google Flow). Aplique EXATAMENTE a mudança "
+              "pedida (pessoa, idade, gênero, pose, roupa, expressão, cenário, objeto, enquadramento, luz…) e mantenha TODO o "
+              "resto: a mesma cena, a mesma ironia/ideia, o mesmo enquadramento quando não pedirem pra mudar. "
+              "O prompt continua EM INGLÊS, só a cena (o estilo de arte o site põe; NÃO descreva letras nem texto na imagem). "
+              "Se o pedido trocar a pessoa, ajuste tudo que dependia dela (pose, roupa, expressão) pra ficar coerente. "
+              "Criança: descreva de forma neutra e apropriada (roupa comum, situação segura). Sem violência gráfica. "
+              "\"ideia\": a ideia da thumb em 1 frase em português, já com a mudança. \"texto\": a palavra/texto da thumb — "
+              "igual ao de antes, a menos que o pedido mande mudar. Responda só o JSON.")
+    ant = it.get("ajustes") or []
+    conteudo = (f"IDEIA ATUAL: {it.get('ideia') or ''}\nTEXTO ATUAL: {it.get('texto') or ''}\n"
+                f"PROMPT ATUAL (inglês): {it.get('prompt') or it.get('ideia') or ''}\n"
+                + (("PEDIDOS ANTERIORES (continuam valendo): " + " | ".join(ant[-4:]) + "\n") if ant else "")
+                + f"\nMUDANÇA PEDIDA AGORA: {pedido}")
+    with ia.rotulo("✏ Ajustar thumb"):
+        r = (chamar or ia.chamar)("roteiros", system, conteudo, schema=_obj({"prompt": _S, "ideia": _S, "texto": _S}),
+                                  max_tokens=1200, effort="low", timeout=180, cache_local=False)
+    if not isinstance(r, dict) or not str(r.get("prompt") or "").strip():
+        raise ThumbErro("a IA não devolveu o prompt novo (veja as últimas chamadas em 🤖 IA)")
+    with _TRAVA:
+        d = carregar(base, origem, pid)
+        it = next((i for i in d.get("itens") or [] if int(i.get("n") or 0) == int(n)), None)
+        if not it:
+            raise ThumbErro("Thumbnail não encontrada.")
+        it["prompt_antes"] = it.get("prompt") or ""
+        it["prompt"] = " ".join(str(r["prompt"]).split())[:900]
+        if str(r.get("ideia") or "").strip():
+            it["ideia"] = " ".join(str(r["ideia"]).split())[:400]
+        if str(r.get("texto") or "").strip():
+            it["texto"] = " ".join(str(r["texto"]).split())[:40]
+        it["ajustes"] = (ant + [pedido])[-8:]
+        salvar(base, origem, pid, d)
+        return d
+
+
 def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str, Any]:
     with _TRAVA:
         d = carregar(base, origem, pid)
@@ -275,12 +326,26 @@ def _schema_ideias() -> Dict[str, Any]:
 
 
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
-                 estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0) -> List[Dict[str, str]]:
+                 estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0,
+                 estilo_albert: str = "marcado") -> List[Dict[str, str]]:
     """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem). 🎨 v84_397 `estilos`: os estilos de arte
     marcados — as ideias são distribuídas entre eles (em rodízio) e a IA pensa a cena pra caber em cada um."""
     import estilos_arte
     estilos = [e for e in (estilos or []) if e in estilos_arte.ESTILOS]
     por_ideia = [estilos[k % len(estilos)] for k in range(n)] if estilos else []
+    # 🎨 v84_431: as de palavra gigante seguem o estilo MARCADO abaixo (automático) ou o estilo do canal
+    por_alb = [estilos[k % len(estilos)] for k in range(albert)] if estilos and estilo_albert != "canal" else []
+    txt_alb = ("ESTILO DE ARTE de cada thumbnail palavra gigante, NA ORDEM (pense a cena pra funcionar nesse estilo; não descreva "
+               "o estilo no prompt, o site põe): " + "; ".join(f"{k + 1}) {estilos_arte.ESTILOS[e]['nome']}"
+                                                              for k, e in enumerate(por_alb))) if por_alb else ""
+
+    def _pos_alb(lst):
+        for k, t in enumerate(lst):
+            if por_alb:
+                t["estilo_arte"] = por_alb[k % len(por_alb)]
+            elif estilo_albert == "canal":
+                t["estilo_arte"] = ""
+        return lst
     import ia_servico as ia
     motivo = ia.motivo_desligado("roteiros")
     if motivo:
@@ -298,7 +363,8 @@ Para cada uma:
   o fundo) — NÃO descreva as letras, o site põe;
 - "modo": "albert";
 - "titulos": 2 títulos pra ESTA thumbnail. {REGRA_TITULOS_THUMB}
-{('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal else ''}
+{('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal and not por_alb else ''}
+{txt_alb}
 Se o estilo é desenho/anime/cartoon, descreva o personagem como desenho (expressão, pose, roupa), sem detalhes de foto.
 {('Já existem estas (NÃO repita a PALAVRA entre colchetes nem a ideia da cena):' + chr(10) + existentes) if existentes else ''}
 Responda só o JSON."""
@@ -312,7 +378,7 @@ Responda só o JSON."""
                            for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
         if not out:
             raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
-        return out[:albert]
+        return _pos_alb(out[:albert])
     system = f"""Você cria THUMBNAILS de YouTube que dão clique sem enganar. Para o vídeo abaixo, crie {n} thumbnails BEM
 DIFERENTES entre si — cada uma com um ângulo próprio (use estes, um por thumbnail, na ordem que fizer sentido:
 {'; '.join(ANGULOS)}). Nada de repetir a mesma cena com outra luz.
@@ -328,7 +394,8 @@ Para cada uma:
 E MAIS {albert} thumbnail(s) a mais (depois das {n}), com "modo": "albert", neste estilo:
 {REGRA_ALBERT}
 Nelas: "texto" = a PALAVRA gigante (só ela); "prompt" = a cena EM INGLÊS (o personagem, a expressão irônica, o objeto-símbolo,
-o fundo) — NÃO descreva as letras no prompt, o site põe; "ideia" = qual é a ironia. Cada uma com uma ironia diferente.""") if albert else ''}
+o fundo) — NÃO descreva as letras no prompt, o site põe; "ideia" = qual é a ironia. Cada uma com uma ironia diferente.
+{txt_alb}""") if albert else ''}
 {('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal and not por_ideia else ''}
 Se o estilo é desenho/anime/cartoon, descreva as pessoas como PERSONAGENS desenhados (expressão, pose, roupa, cabelo), sem
 detalhes de foto realista (pele, rugas, poros, lente, "cinematic").
@@ -352,7 +419,7 @@ Responda só o JSON."""
     for k, t in enumerate(normais):
         if por_ideia:
             t["estilo_arte"] = por_ideia[k % len(por_ideia)]
-    return normais + alb
+    return normais + _pos_alb(alb)
 
 
 def adicionar_ideias(base: str, origem: str, pid: str, ideias: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -526,7 +593,8 @@ def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[
     """Pra página: sem caminhos do disco, com as URLs (e o prompt completo pra colar no Flow à mão — v84_368)."""
     out = []
     for it in d.get("itens") or []:
-        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte", "modo", "titulos")}
+        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte", "modo", "titulos",
+                                    "ajustes")}
         x["prompt_flow"] = prompt_flow(it, estilo=estilo_canal)
         x["url_imagem"] = f"{url_base}/{it['n']}/imagem?v={int(os.path.getmtime(it['imagem']))}" if it.get("imagem") and os.path.isfile(it["imagem"]) else ""
         x["url_final"] = f"{url_base}/{it['n']}/final?v={int(os.path.getmtime(it['final']))}" if it.get("final") and os.path.isfile(it["final"]) else ""

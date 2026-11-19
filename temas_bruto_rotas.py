@@ -67,12 +67,20 @@ def registrar(app, base_dir: str) -> None:
                 pid = p["id"]
                 _estado(aid, tid, "criando", "📁 projeto criado", projeto=pid)
             p = ds.carregar(base_dir, pid)
-            if not any(str(f.get("arquivo") or "").startswith(f"F") and "notas_" in str(f.get("arquivo")) for f in p.get("fontes") or []):
-                _estado(aid, tid, "notas", "📝 a IA está separando o que o texto diz sobre o tema…")
-                notas = TB.gerar_notas(base_dir, a, t)
+            if not any(str(f.get("arquivo") or "").startswith(f"F") and ("notas_" in str(f.get("arquivo"))
+                                                                         or "bruto_" in str(f.get("arquivo")))
+                       for f in p.get("fontes") or []):
+                if TB.base_video(a) == "lapidado" and (a.get("fatias") or {}).get("dono"):  # 💎 v84_431
+                    _estado(aid, tid, "notas", "💎 lapidando os trechos da aula deste vídeo…")
+                    notas = TB.lapidar(base_dir, a, t, progresso=lambda m: _estado(aid, tid, "notas", m))
+                    nome_fonte = f"bruto_{tid}.md"
+                else:
+                    _estado(aid, tid, "notas", "📝 a IA está separando o que o texto diz sobre o tema…")
+                    notas = TB.gerar_notas(base_dir, a, t)
+                    nome_fonte = f"notas_{tid}.md"
                 with dossies_rotas._TRAVA:
                     p = ds.carregar(base_dir, pid)
-                    f = ds.adicionar_fonte_arquivo(base_dir, p, f"notas_{tid}.md", notas.encode("utf-8"))
+                    f = ds.adicionar_fonte_arquivo(base_dir, p, nome_fonte, notas.encode("utf-8"))
                     ds.salvar(base_dir, p)
                 ds.processar_fonte(base_dir, pid, f["id"], dossies_rotas._TRAVA)
             if not gerar:
@@ -120,6 +128,26 @@ def registrar(app, base_dir: str) -> None:
         import notificacoes
         _RODANDO[aid] = True
         try:
+            a = TB.carregar(base_dir, aid)
+            if TB.base_video(a) == "lapidado":  # 💎 v84_431: divide a aula entre os vídeos ANTES (um trecho → um vídeo)
+                fz = a.get("fatias") or {}
+                falta = [t["id"] for t in a.get("temas") or [] if t["id"] in ids and not t.get("projeto")]
+                if falta and (not fz.get("dono") or sorted(fz.get("ids") or []) != sorted(
+                        t["id"] for t in a.get("temas") or [] if t.get("marcado") or t["id"] in ids)):
+                    todos = [t["id"] for t in a.get("temas") or [] if t.get("marcado") or t["id"] in ids]
+                    for tid in ids:
+                        _estado(aid, tid, "fila", "✂ dividindo a aula entre os vídeos…")
+                    try:
+                        TB.distribuir(base_dir, aid, todos,
+                                      progresso=lambda m: [_estado(aid, x, "fila", m) for x in ids])
+                    except Exception as exc:  # noqa: BLE001 — sem a divisão, cai nas notas
+                        TB.mexer(base_dir, aid, lambda x: x.update(base="notas"))
+                        for tid in ids:
+                            _estado(aid, tid, "fila", f"⚠ não deu pra dividir a aula ({exc}) — indo pelas notas")
+                cont = TB.resumo_fatias(TB.carregar(base_dir, aid))
+                for tid in ids:
+                    if cont.get(tid):
+                        _estado(aid, tid, "fila", f"✂ {cont[tid]} palavras da aula ficaram com este vídeo", palavras_aula=cont[tid])
             with ThreadPoolExecutor(max_workers=PARALELO) as ex:
                 list(ex.map(lambda tid: _um_tema(aid, tid, gerar, revisar), ids))
             a = TB.carregar(base_dir, aid)
@@ -177,7 +205,8 @@ def registrar(app, base_dir: str) -> None:
         mods = _modelos()
         return render_template("temas_bruto.html", a=a, lista=[], modelos=mods, padrao=a["modelo"],
                                formatos=TB._formatos(a["modelo"]), ia_off=ia.motivo_desligado("roteiros") or "",
-                               divisoes=TB.DIVISOES, divisao=TB.divisao(a), parecidos=TB.parecidos(a.get("temas") or []),
+                               divisoes=TB.DIVISOES, divisao=TB.divisao(a), bases=TB.BASES,
+                               base_video=TB.base_video(a), fatias=TB.resumo_fatias(a), parecidos=TB.parecidos(a.get("temas") or []),
                                rodando=bool(_RODANDO.get(aid)), erro=request.args.get("erro") or "")
 
     @app.route("/temas-bruto/<aid>/estado")
@@ -257,6 +286,7 @@ def registrar(app, base_dir: str) -> None:
         ids = [str(x) for x in c.get("ids") or []]
         gerar = c.get("gerar", True) is not False
         revisar = c.get("revisar", True) is not False
+        base_v = str(c.get("base") or "")
         if not ids:
             return jsonify({"erro": "Marque pelo menos um tema."}), 400
         if _RODANDO.get(aid):
@@ -270,8 +300,9 @@ def registrar(app, base_dir: str) -> None:
         except TB.TemasErro as exc:
             return jsonify({"erro": str(exc)}), 404
         validos = [t["id"] for t in a.get("temas") or [] if t["id"] in ids]
-        TB.mexer(base_dir, aid, lambda x: [t.update(estado="fila", msg="⏳ na fila", marcado=True)
-                                            for t in x.get("temas") or [] if t["id"] in validos])
+        TB.mexer(base_dir, aid, lambda x: ([t.update(estado="fila", msg="⏳ na fila", marcado=True)
+                                             for t in x.get("temas") or [] if t["id"] in validos],
+                                            x.update(base=base_v) if base_v in TB.BASES else None))
         threading.Thread(target=_rodar_todos, args=(aid, validos, gerar, revisar), daemon=True).start()
         return jsonify({"ok": True, "temas": len(validos)})
 

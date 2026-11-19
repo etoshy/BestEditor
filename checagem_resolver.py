@@ -49,8 +49,20 @@ def politica(cfg: Dict[str, Any] = None) -> str:
     return p if p in POLITICAS else POLITICA_PADRAO
 
 
+# ✍ v84_432: a correção trocava a frase e deixava a velha do lado ("Um emprego, um relacionamento…" duas vezes seguidas)
+REGRA_TROCA = (" CADA CORREÇÃO SUBSTITUI o trecho (\"de\" = a frase inteira como está, \"para\" = a frase nova): nunca "
+               "deixe a frase velha e a nova juntas, nem repita na frase nova o que a frase vizinha já diz. Mantenha o tamanho e "
+               "o ritmo de fala; no máximo UMA ressalva curta — nada de \"não é uma reação automática, mas um exemplo para "
+               "pensar\", \"alguns filósofos argumentam…, mas isso não significa…\". Citação: autor + obra na fala; ano e "
+               "página não entram (vão nas fontes da descrição).")
+
+
 def regra_sem_fonte(pol: str, com_web: bool) -> str:
     """O passo 2 do prompt da checagem: o que fazer com o que está errado, velho ou sem confirmação."""
+    return _regra_sem_fonte(pol, com_web) + REGRA_TROCA
+
+
+def _regra_sem_fonte(pol: str, com_web: bool) -> str:
     if pol == "suavizar":
         return ("Errado → corrija. Sem confirmação → atribua (\"segundo…\", \"de acordo com…\"), suavize ou tire o detalhe. "
                 "NUNCA invente um dado pra tapar buraco.")

@@ -126,6 +126,7 @@ document.querySelectorAll('input[name="ui_interface"]').forEach(r => r.addEventL
     <input type="number" name="thumbs_albert" min="0" max="4" value="{{ config.thumbs_albert if config.thumbs_albert is not none else 2 }}" style="width:60px;display:inline-block;"> (0 = desliga)</label>
   <label style="margin-top:8px;font-weight:400;">🚫 Nomes que NUNCA entram no roteiro (nem como autor, fonte ou "segundo…"; separe com vírgula)
     <input type="text" name="nomes_proibidos" value="{{ config.nomes_proibidos if config.nomes_proibidos is not none else 'Olavo de Carvalho' }}" placeholder="ex.: Olavo de Carvalho" style="width:100%"></label>
+  <label style="margin-top:8px;font-weight:400;"><input type="checkbox" name="variar_estrutura" {% if config.variar_estrutura is none or config.variar_estrutura %}checked{% endif %} style="width:auto;margin-right:6px;">🎲 Variar a estrutura de cada roteiro (abertura, arco e fecho mudam de vídeo pra vídeo — o tom e a clareza ficam; ajuda contra o “conteúdo não autêntico” do YouTube)</label>
 
   <input type="hidden" name="buscadores_imagem_paralelo_enviado" value="1">
   <label style="margin-top:8px;"><input type="checkbox" name="buscadores_imagem_paralelo" {% if config.buscadores_imagem_paralelo %}checked{% endif %} style="width:auto;"> Buscadores de imagem (Bing/Brave/Yandex/Startpage/Google): rodar os buscadores ao mesmo tempo — cada um usa só 1 navegador e pesquisa todos os termos nele. Desmarcado = um buscador de cada vez (1 navegador aberto no total: mais lento, menos RAM)</label>

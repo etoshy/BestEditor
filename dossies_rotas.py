@@ -27,6 +27,60 @@ def registrar(app, base_dir: str) -> None:
         except ds.DossieError:
             return None
 
+    def _fontes_web_bg(p: Dict[str, Any]) -> None:
+        """📚 v84_432: roteiro novo → as fontes da descrição em segundo plano (links conferidos)."""
+        try:
+            if ((p.get("resultado") or {}).get("roteiro") or "").strip():
+                __import__("fontes_web").ao_gerar_roteiro(base_dir, p["id"], _TRAVA)
+        except Exception:  # noqa: BLE001 — sem as fontes o roteiro continua valendo
+            pass
+
+    @app.route("/modelos-video/<pid>/estrutura", methods=["POST"])
+    def dossie_estrutura(pid: str):
+        """🎲 v84_433: trocar a abertura/arco/fecho (ou sortear outra: {"sortear": true})."""
+        import estrutura_video as ev
+        c = request.get_json(silent=True) or {}
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            if c.get("sortear"):
+                p.setdefault("config", {}).pop("estrutura", None)
+                ev.garantir(base_dir, p)
+            else:
+                ev.mudar(p, c)
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "estrutura": p["config"]["estrutura"]})
+
+    @app.route("/modelos-video/<pid>/fontes-web", methods=["POST"])
+    def dossie_fontes_web(pid: str):
+        """📚 v84_432: (re)procurar as fontes da descrição agora."""
+        import fontes_web
+        import ia_servico as ia
+        import tarefas_bg
+        p = _proj(pid)
+        if not p or not ((p.get("resultado") or {}).get("roteiro") or "").strip():
+            return jsonify({"erro": "Ainda não tem roteiro."}), 404
+        motivo = ia.motivo_desligado(fontes_web.RECURSO)
+        if motivo:
+            return jsonify({"erro": "IA: " + motivo}), 400
+        tid = tarefas_bg.iniciar("fontes_web", "📚 Fontes da descrição",
+                                 lambda t: fontes_web.para_projeto(base_dir, pid, _TRAVA, t.progresso),
+                                 pagina=f"/modelos-video/{pid}")
+        return jsonify({"ok": True, "tarefa": tid})
+
+    @app.route("/modelos-video/<pid>/fontes-web/tirar", methods=["POST"])
+    def dossie_fontes_web_tirar(pid: str):
+        url = str((request.get_json(silent=True) or {}).get("url") or "")
+        with _TRAVA:
+            p = _proj(pid)
+            if not p:
+                return jsonify({"erro": "Projeto não encontrado."}), 404
+            fw = (p.get("resultado") or {}).get("fontes_web") or {}
+            fw["itens"] = [i for i in fw.get("itens") or [] if i.get("url") != url]
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, "projeto": _json_proj(p)})
+
     def _json_proj(p: Dict[str, Any]) -> Dict[str, Any]:
         out = dict(p)
         import midia_transcricao as mt
@@ -127,7 +181,8 @@ def registrar(app, base_dir: str) -> None:
                                ordem={k: list(m["formatos"]) for k, m in ds.MODELOS.items()},
                                idiomas=[(k, v[0]) for k, v in idiomas.IDIOMAS.items()],
                                nome_canal_global=__import__("canal").nome_global(), perfis_voz=_perfis_voz(),
-                               vozes_multi=_vozes_multi(), perfis_clonagem=_perfis_clonagem())
+                               vozes_multi=_vozes_multi(), perfis_clonagem=_perfis_clonagem(),
+                               estruturas=__import__("estrutura_video").opcoes())
 
     def _vozes_multi():
         return [{"slug": v["slug"], "nome": v["nome"], "motor": v.get("motor"), "genero": v.get("genero") or "",
@@ -589,6 +644,12 @@ def registrar(app, base_dir: str) -> None:
         p = _proj(pid)
         if not p:
             return jsonify({"erro": "Projeto não encontrado."}), 404
+        import estrutura_video as ev
+        if ev.ativo() and not (p.get("config") or {}).get("estrutura"):  # 🎲 v84_433: sorteia a estrutura deste vídeo
+            with _TRAVA:
+                p = _proj(pid)
+                ev.garantir(base_dir, p)
+                ds.salvar(base_dir, p)
         try:
             texto = ds.prompt_roteiro(p, base=base_dir)
         except ds.DossieError as exc:
@@ -618,6 +679,7 @@ def registrar(app, base_dir: str) -> None:
             ds.salvar(base_dir, p)
         if ((p.get("resultado") or {}).get("roteiro") or "").strip():
             __import__("formatos_video").ao_gerar_roteiro(base_dir, p)  # 📐 v84_421: formato ativo aprende com ele
+            _fontes_web_bg(p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
     # ------------------------------------------------------------------ ✍️ roteiro em partes (v84_97)
@@ -673,6 +735,7 @@ def registrar(app, base_dir: str) -> None:
             ds.marcar_mudanca(p, "✍️ partes montadas", "as partes juntadas num roteiro só")
             ds.salvar(base_dir, p)
         __import__("formatos_video").ao_gerar_roteiro(base_dir, p)  # 📐 v84_421
+        _fontes_web_bg(p)
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
     @app.route("/modelos-video/<pid>/partes/ia", methods=["POST"])
@@ -726,6 +789,7 @@ def registrar(app, base_dir: str) -> None:
                     ds.marcar_mudanca(q, "✍️ partes montadas", "🤖 a IA escreveu as partes")
                     ds.salvar(base_dir, q)
                     __import__("formatos_video").ao_gerar_roteiro(base_dir, q)  # 📐 v84_421
+                    _fontes_web_bg(q)
             return {"partes": feitas}
 
         tid = tarefas_bg.iniciar("roteiro_partes", "✍️ Roteiro em partes (🤖 IA)", rodar, pagina=f"/modelos-video/{pid}")

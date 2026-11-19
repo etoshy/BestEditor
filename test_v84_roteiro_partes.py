@@ -132,6 +132,8 @@ def test_rotas_partes_e_ia(A, monkeypatch):
         chamadas = []
 
         def falso(recurso, system, prompt, **k):
+            if recurso == "fontes_descricao":  # 📚 v84_432: as fontes da descrição rodam depois, em segundo plano
+                return {"fontes": []}
             chamadas.append(prompt)
             return _texto(alvo + 40, f"KI{len(chamadas)}")
         monkeypatch.setattr(ia_servico, "ativo", lambda r=None: True)

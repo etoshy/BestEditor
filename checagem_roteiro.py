@@ -314,6 +314,7 @@ def prompt(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = "", fo
          "- Cada afirmação factual importante contra as fontes desta conversa/abaixo. Fonte diz outra coisa → corrija. Nenhuma "
          "fonte sustenta → " + ("atribua a quem diz (\"segundo o investigador X\", \"de acordo com reportagem da Y\"), "
                                 "suavize ou corte. NUNCA invente um dado novo pra tapar o buraco."
+                                + __import__("checagem_resolver").REGRA_TROCA
                                 if __import__("checagem_resolver").politica() == "suavizar"
                                 else __import__("checagem_resolver").regra_sem_fonte(__import__("checagem_resolver").politica(), False)),
          "- FATO × ALEGAÇÃO: o que o acusado, a polícia, um jornalista ou um investigador AFIRMOU é alegação — sempre com o "

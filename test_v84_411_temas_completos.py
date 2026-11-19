@@ -17,7 +17,7 @@ def test_padrao_e_poucos_completos_e_regra_no_pedido(monkeypatch):
     s = TB.system_analise(a, "texto")
     assert "GRANDES eixos" in s and "de 2 a 5" in s and "QUALQUER parte" in s and "SOBREPOSIÇÃO" in s
     assert "de_onde" in s
-    assert TB.divisao({}) == "completo"
+    assert TB.divisao({}) == "denso"  # v84_431
     assert TB.divisao({"temas": [{"id": "x"}]}) == "maximo"  # análise antiga continua igual
     assert "de 4 a 15" in TB.system_analise({"modelo": "teste_fil", "divisao": "maximo"}, "t")
 

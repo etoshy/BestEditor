@@ -33,11 +33,13 @@ MAX_TEMAS = 30
 # 🧩 v84_411 — quantos vídeos sair de um texto. Antes: "de 4 a 15 temas" → uma aula virava 12 vídeos quase iguais, cada um
 # com um pedaço; agora o padrão é POUCOS vídeos COMPLETOS, cada um juntando o que a aula diz sobre o eixo em qualquer parte.
 DIVISOES = {
+    "denso": {"nome": "💎 Vídeos densos (6 a 8)", "faixa": (6, 8), "min": (18, 35), "palavras": (2500, 5000)},
+    "auto": {"nome": "🤖 A IA escolhe a quantidade", "faixa": (2, 10), "min": (12, 35), "palavras": (1500, 5000)},
     "completo": {"nome": "🧩 Poucos vídeos, completos (2 a 5)", "faixa": (2, 5), "min": (14, 30), "palavras": (1500, 3500)},
     "equilibrado": {"nome": "⚖ Equilibrado (4 a 8)", "faixa": (4, 8), "min": (10, 20), "palavras": (900, 2400)},
     "maximo": {"nome": "📚 O máximo de vídeos (até 15)", "faixa": (4, 15), "min": (6, 20), "palavras": (600, 1800)},
 }
-DIVISAO_PADRAO = "completo"
+DIVISAO_PADRAO = "denso"  # v84_431: era "completo"
 
 
 def divisao(a: Dict[str, Any]) -> str:
@@ -204,6 +206,17 @@ def _regra_divisao(a: Dict[str, Any]) -> str:
                 f"as objeções desse eixo. Devolva de {lo} a {hi} vídeos — prefira MENOS vídeos mais ricos a muitos vídeos "
                 f"parecidos. Se o texto só tem um eixo forte, devolva {lo} mesmo assim só se o segundo se sustentar; senão 1.\n"
                 + comum)
+    if d == "denso":
+        return (f"- Primeiro faça o MAPA do texto inteiro. Devolva de {lo} a {hi} vídeos DENSOS: cada um é um eixo que o texto "
+                f"desenvolve de verdade, com base teórica, exemplos, exercícios, objeções e conclusão — material pra "
+                f"{DIVISOES[d]['min'][0]} a {DIVISOES[d]['min'][1]} minutos SEM enrolar. Cada trecho do texto vai alimentar "
+                f"um vídeo só, então divida o texto inteiro entre eles (o que é logística ou repetição fica de fora).\n"
+                + comum)
+    if d == "auto":
+        return (f"- Primeiro faça o MAPA do texto inteiro e VOCÊ decide quantos vídeos ele sustenta (de {lo} a {hi}): um "
+                f"vídeo só existe se tiver material próprio pra pelo menos {DIVISOES[d]['min'][0]} minutos densos, sem "
+                f"repetir outro. Texto longo e rico → mais vídeos; texto curto ou com um eixo só → poucos. Em por_que_tempo, "
+                f"diga em uma frase por que essa quantidade.\n" + comum)
     if d == "equilibrado":
         return f"- Separe os temas que o texto realmente desenvolve: de {lo} a {hi} vídeos.\n" + comum
     return f"- Separe tudo o que o texto realmente desenvolve: em geral de {lo} a {hi} temas (no máximo {MAX_TEMAS}).\n" + comum
@@ -521,3 +534,191 @@ def _trechos_do_tema(tx: str, t: Dict[str, Any]) -> str:
     nota = [(sum(norm(b).count(c) for c in chaves), k) for k, b in enumerate(blocos)]
     escolhidos = sorted(k for _n, k in sorted(nota, reverse=True)[:max(1, BLOCO_ANALISE // tam)])
     return "\n\n[…]\n\n".join(blocos[k] for k in escolhidos)
+
+
+# ------------------------------------------------------------------ 3. 💎 v84_431 — base "lapidada": o próprio texto da aula
+# Em vez de um RESUMO (as notas), cada vídeo recebe os TRECHOS da aula que são dele — divididos sem sobreposição (um trecho
+# vai pra um vídeo só) — e esses trechos são LAPIDADOS (limpos e organizados, sem resumir). O roteiro sai bem mais denso.
+BASES = {"lapidado": "💎 Trechos da aula, divididos entre os vídeos e lapidados (mais denso)",
+         "notas": "📝 Notas (um resumo do que a aula diz sobre o tema)"}
+BASE_PADRAO = "lapidado"
+FATIA_PALAVRAS = 400
+LAPIDAR_PALAVRAS = 5000  # pedaço máximo lapidado de uma vez
+
+
+def base_video(a: Dict[str, Any]) -> str:
+    b = str((a or {}).get("base") or "")
+    return b if b in BASES else BASE_PADRAO
+
+
+def fatiar(tx: str, alvo: int = FATIA_PALAVRAS) -> List[str]:
+    """O texto em trechos de ~`alvo` palavras, cortando no fim de uma frase."""
+    frases = re.split(r"(?<=[.!?…])\s+|\n{2,}", tx or "")
+    out: List[str] = []
+    atual: List[str] = []
+    n = 0
+    for f in frases:
+        f = f.strip()
+        if not f:
+            continue
+        atual.append(f)
+        n += len(f.split())
+        if n >= alvo:
+            out.append(" ".join(atual))
+            atual, n = [], 0
+    if atual:
+        if out and n < alvo // 3:
+            out[-1] += " " + " ".join(atual)
+        else:
+            out.append(" ".join(atual))
+    return out
+
+
+def _schema_fatias() -> Dict[str, Any]:
+    from ia_midia import _S, _lista, _obj
+    return _obj({"fatias": _lista(_obj({"c": _S, "video": _S}))})
+
+
+def system_distribuir(temas: List[Dict[str, Any]]) -> str:
+    vids = "\n".join(f"- {t['id']}: {t['titulo']} — {t.get('tema') or ''} (cobre: {'; '.join(t.get('pontos') or [])})"
+                     for t in temas)
+    return f"""Você divide uma aula (transcrição) entre os vídeos de uma série. O texto vem em TRECHOS numerados [C1], [C2]…
+Para CADA trecho, diga a qual vídeo ele pertence. Regras:
+- Cada trecho vai para UM vídeo só (o que ele mais desenvolve). Nada de sobreposição.
+- Não deixe o vídeo magro: tudo o que serve de base, exemplo, explicação, objeção ou citação de um vídeo vai pra ele.
+- "fora" só para o que não serve a nenhum: avisos, logística do curso, intervalos, cumprimentos, repetição pura do que
+  já foi dito, conversa que não é conteúdo.
+- Responda TODOS os trechos, na ordem.
+
+Vídeos (use o id):
+{vids}
+- fora: nenhum vídeo"""
+
+
+def distribuir(base: str, aid: str, ids: List[str], progresso=None) -> Dict[str, Any]:
+    """Divide os trechos da aula entre os temas `ids` (uma vez por geração). Guarda em a["fatias"]."""
+    import ia_servico as ia
+    a = carregar(base, aid)
+    temas = [t for t in a.get("temas") or [] if t["id"] in ids]
+    if not temas:
+        raise TemasErro("nenhum tema marcado")
+    fatias = fatiar(texto(base, aid))
+    validos = {t["id"] for t in temas}
+    dono: Dict[str, str] = {}
+    blocos: List[List[int]] = [[]]
+    tam = 0
+    for i, f in enumerate(fatias):
+        if tam + len(f) > BLOCO_ANALISE and blocos[-1]:
+            blocos.append([])
+            tam = 0
+        blocos[-1].append(i)
+        tam += len(f)
+    for nb, bl in enumerate(blocos, 1):
+        if progresso:
+            progresso(f"✂ dividindo a aula entre os vídeos ({nb}/{len(blocos)})…")
+        conteudo = "\n\n".join(f"[C{i + 1}] {fatias[i]}" for i in bl)
+        with ia.rotulo(f"✂ Dividir a aula: {a['nome'][:50]}"):
+            d = ia.chamar("roteiros", system_distribuir(temas), conteudo, schema=_schema_fatias(), max_tokens=8000,
+                          effort="low", timeout=600)
+        for x in (d or {}).get("fatias") or []:
+            c = str(x.get("c") or "").strip().upper().lstrip("[").rstrip("]")
+            v = str(x.get("video") or "").strip()
+            if c.startswith("C") and c[1:].isdigit():
+                dono[c] = v if v in validos else ("fora" if v.lower() == "fora" else "")
+    # o que a IA pulou vai pro tema com mais palavras em comum (pra não perder conteúdo)
+    chaves = {t["id"]: _palavras_chave(t) for t in temas}
+    sem = 0
+    for i, f in enumerate(fatias):
+        c = f"C{i + 1}"
+        if dono.get(c):
+            continue
+        sem += 1
+        import unicodedata
+        n = unicodedata.normalize("NFKD", f.lower()).encode("ascii", "ignore").decode()
+        pal = {w[:7] for w in re.findall(r"[a-z]{5,}", n)}
+        dono[c] = max(temas, key=lambda t: len(chaves[t["id"]] & pal))["id"]
+    res = {"trechos": fatias, "dono": dono, "ids": sorted(validos), "em": time.time(), "adivinhados": sem}
+    mexer(base, aid, lambda x: x.update(fatias=res))
+    return res
+
+
+def bruto_do_tema(a: Dict[str, Any], tid: str) -> str:
+    fz = a.get("fatias") or {}
+    tr, dono = fz.get("trechos") or [], fz.get("dono") or {}
+    return "\n\n".join(tr[i] for i in range(len(tr)) if dono.get(f"C{i + 1}") == tid)
+
+
+def resumo_fatias(a: Dict[str, Any]) -> Dict[str, Any]:
+    fz = a.get("fatias") or {}
+    tr, dono = fz.get("trechos") or [], fz.get("dono") or {}
+    cont: Dict[str, int] = {}
+    for i, f in enumerate(tr):
+        k = dono.get(f"C{i + 1}") or "fora"
+        cont[k] = cont.get(k, 0) + len(f.split())
+    return cont
+
+
+def system_lapidar(a: Dict[str, Any], t: Dict[str, Any]) -> str:
+    return f"""Você LAPIDA o material bruto de UM vídeo de YouTube: trechos de uma aula (transcrição) que já foram separados
+para este vídeo. O resultado é a base que o roteirista vai ler — quanto mais conteúdo, melhor o vídeo.
+
+Vídeo: {t['titulo']}
+Ideia central: {t.get('tema') or ''}
+
+Regras:
+- NÃO RESUMA. Mantenha TODAS as ideias, argumentos, explicações, exemplos, analogias, distinções, termos técnicos,
+  autores, obras e citações (com o que o texto atribui a cada um). O resultado fica com 70% a 90% do tamanho do original
+  — só sai o que é ruído.
+- Tire o ruído da fala: hesitações, repetições, "né", "então", frases quebradas, idas e vindas.
+- Corrija os erros óbvios de transcrição pelo contexto; o que não der pra entender, deixe de fora.
+- Organize na ordem LÓGICA (não precisa ser a ordem da fala), juntando o que fala da mesma coisa, com subtítulos curtos.
+- NADA do evento: não mencione curso, aula, palestra, professor, alunos, perguntas do público, datas, nem o nome de quem
+  fala. Nada de histórias pessoais de quem fala sobre a própria vida. O que for tese própria de quem fala (não de um autor
+  clássico), escreva como "uma leitura possível: …".
+- Não acrescente fatos, datas, citações ou estudos que não estão nos trechos.
+- Texto puro (tópicos e parágrafos), em português claro. Sem JSON, sem comentários seus."""
+
+
+def _pedacos(txt: str, maximo: int = LAPIDAR_PALAVRAS) -> List[str]:
+    paras = [x for x in txt.split("\n\n") if x.strip()]
+    out: List[str] = []
+    atual: List[str] = []
+    n = 0
+    for p in paras:
+        if atual and n + len(p.split()) > maximo:
+            out.append("\n\n".join(atual))
+            atual, n = [], 0
+        atual.append(p)
+        n += len(p.split())
+    if atual:
+        out.append("\n\n".join(atual))
+    return out
+
+
+def lapidar(base: str, a: Dict[str, Any], t: Dict[str, Any], progresso=None) -> str:
+    """O bruto do tema, lapidado (pedaços de até LAPIDAR_PALAVRAS palavras)."""
+    import ia_servico as ia
+    bruto = bruto_do_tema(a, t["id"])
+    if len(bruto.split()) < 80:
+        raise TemasErro("nenhum trecho da aula ficou com este vídeo — refaça a divisão ou junte com outro tema")
+    pedacos = _pedacos(bruto)
+    saida: List[str] = []
+    for k, pd in enumerate(pedacos, 1):
+        if progresso:
+            progresso(f"💎 lapidando o material ({k}/{len(pedacos)})…")
+        pedido = ("Lapide este material (parte {k} de {n} — as outras partes são lapidadas à parte; não escreva introdução "
+                  "nem conclusão geral):\n\n" if len(pedacos) > 1 else "Lapide este material:\n\n").format(k=k, n=len(pedacos)) + pd
+        r = ""
+        for _tent in range(2):
+            with ia.rotulo("💎 Lapidar: " + t["titulo"][:60]):
+                r = str(ia.chamar("roteiros", system_lapidar(a, t), pedido, max_tokens=16000, effort="low", timeout=900,
+                                  cache_local=not _tent) or "").strip()
+            if len(r.split()) >= 0.5 * len(pd.split()):
+                break  # encolheu demais = resumiu: tenta de novo uma vez
+        if len(r.split()) < 40:
+            r = pd  # a IA falhou: fica o bruto mesmo (melhor que perder o trecho)
+        saida.append(r)
+    extra = ""
+    if t.get("referencias"):
+        extra = "\n\nReferências citadas: " + ", ".join(t["referencias"])
+    return "\n\n".join(saida).strip() + extra

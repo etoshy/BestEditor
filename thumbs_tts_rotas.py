@@ -95,11 +95,23 @@ def registrar(app, base_dir: str) -> None:
             if n == 0 and not alb:
                 alb = tf.N_ALBERT
             novas = tf.pedir_ideias(titulo, sobre, d.get("itens") or [], n, idioma, tf.estilo(base_dir, origem, pid),
-                                    [str(e) for e in c.get("estilos") or []], albert=alb)
+                                    [str(e) for e in c.get("estilos") or []], albert=alb,
+                                    estilo_albert="canal" if c.get("estilo_albert") == "canal" else "marcado")
             d = tf.adicionar_ideias(base_dir, origem, pid, novas)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True, novas=len(novas)))
+
+    @app.route("/thumbs/<origem>/<pid>/<int:n>/ajustar", methods=["POST"])
+    def thumbs_ajustar(origem: str, pid: str, n: int):
+        """✏ v84_433: "em vez da mulher velha, uma garota", "em pé, não deitada" → a IA reescreve o prompt desta thumb."""
+        if origem not in tf.ORIGENS or _ideias(origem, pid) is None:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        try:
+            d = tf.ajustar(base_dir, origem, pid, n, str((request.get_json(silent=True) or {}).get("pedido") or ""))
+        except tf.ThumbErro as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
 
     @app.route("/thumbs/<origem>/<pid>/titulos", methods=["POST"])
     def thumbs_titulos(origem: str, pid: str):

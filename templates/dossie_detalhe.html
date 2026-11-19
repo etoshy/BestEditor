@@ -149,6 +149,14 @@
 <!-- 4 · prompt e resultado -->
 <div class="ds-card" data-feito="{{ '1' if (p.resultado or {}).roteiro else '0' }}">
   <h2><span class="ds-num">4</span>Prompt pra IA → roteiro</h2>
+  {% set _e = (p.config or {}).estrutura or {} %}
+  <div class="ds-row" id="estBox" style="font-size:.84rem;gap:6px;flex-wrap:wrap;" title="🎲 a forma muda de vídeo pra vídeo (o canal não fica com cara de fórmula); o tom e a clareza ficam. Vazio = sorteia ao gerar o prompt">
+    <b>🎲 Estrutura:</b>
+    <select data-est="abertura" style="width:auto;margin:0;"><option value="">abertura: sortear</option>{% for k, n in estruturas.aberturas.items() %}<option value="{{ k }}"{% if _e.abertura == k %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    <select data-est="arco" style="width:auto;margin:0;"><option value="">arco: sortear</option>{% for k, n in estruturas.arcos.items() %}<option value="{{ k }}"{% if _e.arco == k %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    <select data-est="fecho" style="width:auto;margin:0;"><option value="">fecho: sortear</option>{% for k, n in estruturas.fechos.items() %}<option value="{{ k }}"{% if _e.fecho == k %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    <button type="button" class="ds-mini ds-sec" id="estSortear">🎲 sortear outra</button><span class="ds-hint" id="estSt"></span>
+  </div>
   <div class="ds-row"><label style="font-weight:400;font-size:0.85rem;">🌐 Sai em <select id="cIdioma2" style="width:auto;margin:0;"></select></label><button class="ds-mini" id="btnPrompt">📝 Gerar prompt</button><button type="button" class="ds-mini" data-ia-gerar="btnPrompt" data-ia-prompt="prompt" data-ia-resp="resp" data-ia-ler="btnLerResp" data-ia-status="promptSt" style="display:none;background:#4338ca;color:#fff">🤖 Gerar com a IA</button><button class="ds-mini ds-sec" id="btnCopiar" style="display:none;">📋 Copiar</button><span class="ds-hint" id="promptSt"></span></div>
   <textarea id="prompt" rows="6" readonly class="ds-mono" style="display:none;margin-top:6px;"></textarea>
   <label style="margin-top:10px;">Resposta da IA (JSON)</label>
@@ -585,6 +593,12 @@ function desenharResultado() {
     </div>
     <label style="margin-top:10px;">Descrição do YouTube (caso + capítulos${(R.capitulos_video || {}).capitulos ? ' no tempo do VÍDEO FINAL, já com as chamadas e cortes' : R.audio ? ' com o tempo REAL do áudio — ao montar o vídeo ficam no tempo do vídeo final' : ' estimados — ficam exatos sozinhos ao gerar a voz e ao montar o vídeo'} + fontes)</label>
     <textarea id="rDesc" rows="9">${esc(P.descricao_pronta || '')}</textarea>
+    <div style="margin:8px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;">
+      <b>📚 Fontes e referências</b> <span class="ds-hint">(links conferidos: no ar, falam do assunto e de site confiável — vão no fim da descrição)</span>
+      ${((R.fontes_web || {}).itens || []).length ? `<ul style="margin:4px 0;">${R.fontes_web.itens.map(i => `<li style="font-size:.86rem;">${esc(i.referencia)} — <a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.url.replace(/^https?:\/\//, '').slice(0, 70))}</a> <button class="ds-mini ds-sec fwTirar" data-url="${esc(i.url)}" title="tirar da descrição" style="padding:0 6px;">✕</button></li>`).join('')}</ul>` : `<div class="ds-hint">${R.fontes_web ? 'Nenhum link passou na conferência.' : 'Ainda não procurou (acontece sozinho depois de cada roteiro).'}</div>`}
+      ${((R.fontes_web || {}).sem_link || []).length ? `<details><summary class="ds-hint">⚠ ${R.fontes_web.sem_link.length} referência(s) sem link confiável</summary><ul>${R.fontes_web.sem_link.map(i => `<li class="ds-hint">${esc(i.referencia)} — ${esc(i.motivo)}</li>`).join('')}</ul></details>` : ''}
+      <div class="ds-row"><button class="ds-mini ds-sec" id="btnFontesWeb">📚 Procurar as fontes ${R.fontes_web ? 'de novo' : 'agora'}</button><span class="ds-hint" id="fwSt"></span></div>
+    </div>
     <div class="ds-row"><button class="ds-mini ds-sec" id="cpDesc">📋 Copiar descrição</button>${(R.tags || []).length ? `<button class="ds-mini ds-sec" id="cpTags">📋 Copiar tags</button>` : ''}</div>
     ${R.produto_sugerido ? `<div style="margin-top:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:10px 12px;">
       <b>🛒 Produto sugerido pela IA:</b> ${esc(R.produto_sugerido.nome)}
@@ -619,6 +633,14 @@ function desenharResultado() {
     } catch (e) { $('prodSt').innerHTML = `<span class="ds-erro">⚠ ${esc(e.message)}</span>`; }
   });
   $('cpDesc').addEventListener('click', (e) => copiar($('rDesc').value, e.target));
+  // 📚 v84_432: fontes da descrição
+  document.querySelectorAll('.fwTirar').forEach(b => b.addEventListener('click', async () => {
+    try { const d = await api(`/modelos-video/${PID}/fontes-web/tirar`, { url: b.dataset.url }); P = d.projeto; desenharResultado(); } catch (err) { alertaFw(err); }
+  }));
+  if ($('btnFontesWeb')) $('btnFontesWeb').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try { const d = await api(`/modelos-video/${PID}/fontes-web`, {}); acompanharFontes(d.tarefa); } catch (err) { alertaFw(err); e.target.disabled = false; }
+  });
   if ($('cpTags')) $('cpTags').addEventListener('click', (e) => copiar((R.tags || []).join(', '), e.target));
 }
 // ------------------------------------------------------------------ ✍️ roteiro em partes (v84_97)
@@ -669,6 +691,19 @@ function ligarPartes(R) {
     catch (err) { $('ptSt').innerHTML = `<span class="ds-erro">⚠ ${esc(err.message)}</span>`; e.target.disabled = false; }
   });
 }
+function alertaFw(err) { if ($('fwSt')) $('fwSt').innerHTML = `<span class="ds-erro">⚠ ${esc(err.message || err)}</span>`; }
+async function acompanharFontes(tid) {
+  while (true) {
+    let t = null; try { t = await (await fetch('/tarefas/' + tid, { cache: 'no-store' })).json(); } catch (_) {}
+    if (!t || t.status !== 'rodando') {
+      try { const d = await (await fetch(`/modelos-video/${PID}/dados`, { cache: 'no-store' })).json(); if (d && d.resultado) { P = d; desenharResultado(); } } catch (_) {}
+      if (t && t.status === 'erro') alertaFw(t.erro || 'falhou');
+      return;
+    }
+    if ($('fwSt')) $('fwSt').textContent = '⏳ ' + (t.progresso || 'procurando…');
+    await new Promise(r => setTimeout(r, 4000));
+  }
+}
 async function acompanharPartes(tid) {
   while (true) {
     let t = null; try { t = await (await fetch('/tarefas/' + tid, { cache: 'no-store' })).json(); } catch (_) {}
@@ -683,6 +718,18 @@ $('btnLerResp').addEventListener('click', async () => {
   catch (e) { $('resBox').innerHTML = `<p class="ds-erro">⚠ ${esc(e.message)}</p>`; }
 });
 desenharResultado();
+// 🎲 v84_433: estrutura do vídeo
+(function () {
+  const box = $('estBox'); if (!box) return;
+  const st = (t) => { $('estSt').textContent = t; };
+  const pintar = (e) => box.querySelectorAll('select[data-est]').forEach(s => { s.value = (e || {})[s.dataset.est] || ''; });
+  box.querySelectorAll('select[data-est]').forEach(s => s.addEventListener('change', async () => {
+    try { const d = await api(`/modelos-video/${PID}/estrutura`, { [s.dataset.est]: s.value }); pintar(d.estrutura); st('✔ salvo — vale no próximo prompt'); } catch (e) { st('⚠ ' + e.message); }
+  }));
+  $('estSortear').addEventListener('click', async () => {
+    try { const d = await api(`/modelos-video/${PID}/estrutura`, { sortear: true }); pintar(d.estrutura); st('🎲 sorteada — vale no próximo prompt'); } catch (e) { st('⚠ ' + e.message); }
+  });
+})();
 // 🌐 o idioma de saída aparece também do lado do "Gerar prompt" (os dois ficam iguais)
 (function () {
   const a = $('cIdioma'), b = $('cIdioma2'); if (!a || !b) return;

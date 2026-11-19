@@ -574,10 +574,38 @@ _RE_META_FONTE = [
 ]
 
 
+# ✍ v84_432: bastidor que escapa na costura das partes ("no fim da parte anterior", "o roteiro propõe uma interpretação")
+_BASTIDOR = [
+    (re.compile(r",\s*no fim da (?:parte|seção|etapa|sessão) anterior,", re.I), ", agora há pouco,"),
+    (re.compile(r"\s*no fim da (?:parte|seção|etapa|sessão) anterior\b", re.I), " agora há pouco"),
+    (re.compile(r"\bque (?:a|na) (?:parte|seção|etapa) seguinte vai\b", re.I), "que vamos"),
+    (re.compile(r"\bque (?:a|na) próxima (?:parte|seção|etapa) vai\b", re.I), "que vamos"),
+    (re.compile(r"\b(?:na|da) (?:parte|seção|etapa) anterior\b", re.I), "antes"),
+    (re.compile(r"\b(?:a|na) (?:parte|seção|etapa) seguinte\b", re.I), "o que vem a seguir"),
+    (re.compile(r"\b(?:a|na) próxima (?:parte|seção|etapa)\b", re.I), "o que vem a seguir"),
+    (re.compile(r"\bo roteiro (?:propõe|sugere|faz|traz) uma (?:interpretação|leitura)\b", re.I), "uma leitura possível"),
+    (re.compile(r"\b(?:este|esse) roteiro\b", re.I), "este vídeo"),
+    (re.compile(r"\bneste roteiro\b", re.I), "neste vídeo"),
+    (re.compile(r"\bo roteiro (?=propõe|defende|sugere|vai|mostra|mostrou|quer)", re.I), "o vídeo "),
+    (re.compile(r"\b(a|da) tese do título\b", re.I), lambda m: m.group(1) + " tese deste vídeo"),
+]
+
+
+def tirar_bastidor(texto: str) -> str:
+    t = orig = str(texto or "")
+    for rx, novo in _BASTIDOR:
+        t = rx.sub(novo, t)
+    if t == orig:
+        return t
+    t = re.sub(r"(^|[.!?]\s+)([a-zà-ú])", lambda m: m.group(1) + m.group(2).upper(), t, flags=re.M)
+    t = re.sub(r",\s*,", ",", t)
+    return re.sub(r" {2,}", " ", t)
+
+
 def tirar_meta_fonte(texto: str) -> str:
     """Tira as menções ao MATERIAL de origem que escapam da IA ("segundo a leitura das notas, …", "como propõem as notas")
     e acerta a maiúscula da frase que sobrou."""
-    t = str(texto or "")
+    t = tirar_bastidor(texto)
     if not re.search(_MAT, t, re.I):
         return t
     for rx in _RE_META_FONTE:

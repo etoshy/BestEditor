@@ -104,6 +104,9 @@
   {% endfor %}
   <div class="tb-barra">
     <button type="button" id="btnTodos" class="secondary">☑ marcar todos</button>
+    <label style="margin:0;" title="💎 trechos: cada trecho da aula vai pra UM vídeo só e é lapidado sem resumir (mais denso). 📝 notas: um resumo por tema (o jeito antigo).">Base de cada vídeo:
+      <select id="baseVideo" style="width:auto;margin:0;">{% for k, n in bases.items() %}<option value="{{ k }}"{% if k == base_video %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+    {% if fatias %}<span class="tb-meta" style="margin:0;">✂ aula dividida{% if fatias.fora %} · {{ fatias.fora }} palavras ficaram de fora (avisos, repetição){% endif %}</span>{% endif %}
     <label style="margin:0;"><input type="checkbox" id="revisar" checked style="width:auto;margin-right:4px;">🪄 revisar + 🎙 adaptar pro TTS</label>
     <button type="button" id="btnGerar"{% if ia_off %} disabled title="{{ ia_off }}"{% endif %}>🚀 Criar os projetos e gerar os roteiros</button>
     <button type="button" id="btnSoCriar" class="secondary"{% if ia_off %} disabled{% endif %}>📁 Só criar os projetos</button>
@@ -149,7 +152,7 @@
   const marcados = () => [...document.querySelectorAll('.tb-tema[data-id]')].filter(d => d.querySelector('.marca').checked).map(d => d.dataset.id);
   const gerar = async (comRoteiro) => {
     const ids = marcados(); if (!ids.length) { alert('Marque pelo menos um tema.'); return; }
-    try { const d = await post(`/temas-bruto/${AID}/gerar`, {ids, gerar: comRoteiro, revisar: $('#revisar').checked});
+    try { const d = await post(`/temas-bruto/${AID}/gerar`, {ids, gerar: comRoteiro, revisar: $('#revisar').checked, base: ($('#baseVideo') || {}).value || ''});
       $('#barraMsg').textContent = `⏳ ${d.temas} tema(s) na fila — pode fechar a página; chega um aviso no 🔔 quando terminar.`; rodando = true; acompanhar(); }
     catch (e) { alert('❌ ' + e.message); }
   };
