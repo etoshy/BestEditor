@@ -203,16 +203,30 @@ def estilo(base: str, origem: str, pid: str) -> str:
 # ------------------------------------------------------------------ 🔥 v84_417: estilo "palavra gigante + ironia"
 N_ALBERT = 2  # além das 5 de sempre, 2 nesse estilo (0 = desliga — Configurações)
 REGRA_ALBERT = (
-    "ESTILO PALAVRA GIGANTE (o das thumbs de canais de psicologia/comportamento que explodem — ex.: MEDO, MORTE, TRAIÇÃO, "
-    "STALKER): UMA palavra só, o TEMA do vídeo em MAIÚSCULAS (4 a 10 letras, no idioma do vídeo), ENORME, em vermelho forte "
-    "(letras grossas e condensadas, às vezes escorrendo/rachadas), ocupando a largura da imagem ATRÁS do assunto principal; o "
-    "assunto fica no CENTRO, na frente da palavra, cobrindo um pedaço das letras do meio (a palavra continua legível). A "
-    "graça é a IRONIA: o personagem com uma expressão que CONTRADIZ o tema (sorrindo, fazendo joinha, posando tranquilo) "
-    "junto de um objeto-símbolo pesado do assunto (uma corda, uma arma de brinquedo apontada pra própria cabeça com cartas "
-    "na mão, o próprio rosto servido num prato, um casal improvável na cama, uma auréola). Fundo limpo ou um cenário simples "
-    "ligado ao tema, cores saturadas, contraste alto, iluminação de estúdio. O personagem é o do canal (o narrador/apresentador "
-    "do estilo de arte do canal) — o ESTILO DE ARTE do canal não muda. Nada de pessoa real famosa, sangue de verdade, nudez "
-    "ou violência gráfica (tem que ser monetizável).")
+    "ESTILO PALAVRA GIGANTE — PROVOCATIVO (o dos canais de psicologia/comportamento que explodem: ZOÓFILO, CANIBAL, "
+    "NECRÓFILO, TRAIÇÃO, MEDO, MORTE). Regras:\n"
+    "1) A PALAVRA: UMA só, o rótulo mais FORTE, tabu ou acusatório do tema — de preferência um rótulo de PESSOA que o "
+    "espectador teme ser ou julga (MENTIROSO, HIPÓCRITA, COVARDE, ESCRAVO, VICIADO, ZUMBI, FRACASSADO, MARIONETE, PAPAGAIO) "
+    "ou o tabu em si (MORTE, LOUCURA, INVEJA, TRAIÇÃO). NUNCA frase (\"ESTOU BEM\") nem palavra morna/abstrata "
+    "(\"SILÊNCIO\", \"LINGUAGEM\", \"REFLEXÃO\"). 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
+    "2) A CENA: o personagem do canal VIVE o tema de forma LITERAL, absurda e escandalosa — o corpo dele vira a metáfora ou "
+    "ele está numa situação que dá vergonha alheia. Não é \"personagem ao lado de um objeto\": é ele SENDO o problema. "
+    "Exemplos do nível certo: deitado na cama abraçado com um cachorro (ZOÓFILO); o próprio rosto servido num prato com "
+    "talheres (CANIBAL); casando com um esqueleto de véu (NECRÓFILO); sorrindo e fazendo joinha com uma corda no pescoço "
+    "(MORTE); de lingerie rosa num palco com a plateia apontando e rindo (MEDO); de látex, de quatro, com coleira e "
+    "corrente (FETICHE); com a boca costurada por fios dourados e um sorriso forçado (MENTIROSO); pendurado por fios de "
+    "marionete presos na língua, puxados por mãos gigantes (MARIONETE); com um nariz de Pinóquio enorme atravessando a "
+    "palavra (HIPÓCRITA).\n"
+    "3) A IRONIA: expressão que CONTRADIZ a cena — sorriso largo, confiante ou debochado, olhando direto pra câmera, como "
+    "se fosse normal. O choque vem do contraste.\n"
+    "4) LEITURA EM 1 SEGUNDO no celular: um só assunto grande no centro, na frente da palavra (cobrindo um pedaço das "
+    "letras do meio), fundo limpo ou com poucos elementos do tema (mãos apontando, multidão julgando, o lugar do tema), "
+    "cores saturadas, contraste alto, luz de estúdio.\n"
+    "5) RUIM (não faça): cartaz ou plaquinha escrita na imagem; objetos soltos sem relação com o corpo dele (\"ao lado de "
+    "um dicionário e uma corda\"); personagem só posando calmo; cena genérica de \"pessoa pensativa\".\n"
+    "6) Limites (tem que ser monetizável): sugestivo, nunca explícito — nada de nudez, sexo, sangue de verdade, ferimento "
+    "realista ou pessoa real famosa; nada envolvendo crianças. O personagem é o do canal, no ESTILO DE ARTE do canal (que "
+    "não muda). Antes de responder, pense em umas 6 opções e entregue SÓ as mais provocativas e mais diferentes entre si.")
 
 
 def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
@@ -237,7 +251,7 @@ ANGULOS = ("rosto/emoção forte de uma pessoa da história", "um objeto-símbol
 
 def _schema_ideias() -> Dict[str, Any]:
     from ia_midia import _S, _lista, _obj
-    return _obj({"thumbnails": _lista(_obj({"ideia": _S, "texto": _S, "prompt": _S, "angulo": _S}))})
+    return _obj({"thumbnails": _lista(_obj({"ideia": _S, "texto": _S, "prompt": _S, "angulo": _S, "modo": _S}))})
 
 
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
@@ -252,6 +266,30 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
     if motivo:
         raise ThumbErro("IA: " + motivo + " — ligue em 🤖 IA (📝 Roteiros direto na IA).")
     existentes = "\n".join(f"- {i.get('ideia')}" for i in ja if i.get("ideia"))[:3000]
+    if n <= 0 and albert:  # 🔥 v84_418: só as de palavra gigante
+        system = f"""Você cria THUMBNAILS de YouTube que dão MUITO clique sem enganar. Para o vídeo abaixo, crie {albert} thumbnails
+no estilo PALAVRA GIGANTE, cada uma com "modo": "albert".
+{REGRA_ALBERT}
+Para cada uma:
+- "ideia": a cena e qual é a ironia/o choque (1 frase, em português);
+- "texto": a PALAVRA gigante (só ela, no idioma do vídeo: {idioma});
+- "prompt": a cena EM INGLÊS pro Google Flow (o personagem, o que o corpo/a situação dele mostra, a expressão irônica,
+  o fundo) — NÃO descreva as letras, o site põe;
+- "modo": "albert".
+{('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal else ''}
+Se o estilo é desenho/anime/cartoon, descreva o personagem como desenho (expressão, pose, roupa), sem detalhes de foto.
+{('Já existem estas (NÃO repita a palavra nem a cena):' + chr(10) + existentes) if existentes else ''}
+Responda só o JSON."""
+        conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
+        with ia.rotulo("🔥 Thumbs palavra gigante: " + (titulo or "")[:60]):
+            d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=3000, effort="medium", timeout=300)
+        if not d:
+            raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
+        out = [t for t in (normalizar(dict(x, modo="albert") if isinstance(x, dict) else x)
+                           for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
+        if not out:
+            raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
+        return out[:albert]
     system = f"""Você cria THUMBNAILS de YouTube que dão clique sem enganar. Para o vídeo abaixo, crie {n} thumbnails BEM
 DIFERENTES entre si — cada uma com um ângulo próprio (use estes, um por thumbnail, na ordem que fizer sentido:
 {'; '.join(ANGULOS)}). Nada de repetir a mesma cena com outra luz.

@@ -47,3 +47,42 @@ def test_titulos_e_bloco(monkeypatch):
     assert "\"modo\": \"albert\"" in tf.bloco_prompt()
     monkeypatch.setattr(tf, "ativo_albert", lambda cfg=None: 0)
     assert "TEMA-PONTO" not in mr.bloco_titulos(5) and tf.bloco_prompt() == tf.BLOCO_PROMPT
+
+
+def test_so_palavra_gigante(monkeypatch):
+    import ia_servico as ia
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r, c=None: None)
+    visto = {}
+    monkeypatch.setattr(ia, "chamar", lambda rec, system, conteudo, **k: visto.update(s=system) or {"thumbnails": [
+        {"ideia": "boca costurada sorrindo", "texto": "MENTIROSO", "prompt": "p"},
+        {"ideia": "marionete", "texto": "Marionete", "prompt": "p"}, {"ideia": "x", "texto": "X", "prompt": "p"}]})
+    out = tf.pedir_ideias("Linguagem", "roteiro", [], 0, albert=2)
+    assert len(out) == 2 and all(t["modo"] == "albert" for t in out) and out[1]["texto"] == "MARIONETE"
+    assert "NUNCA frase" in visto["s"] and "RUIM" in visto["s"] and "SENDO o problema" in visto["s"]
+
+
+def test_rota_so_albert(monkeypatch):
+    import app as A
+    import dossies as ds
+    monkeypatch.setattr(tf, "pedir_ideias", lambda *a, **k: [{"ideia": "i", "texto": "MEDO", "prompt": "p", "modo": "albert"}]
+                        if a[3] == 0 and k.get("albert") == 3 else [])
+    p = ds.criar(A.BASE_DIR, tema="Medo")
+    p["resultado"] = {"roteiro": "um roteiro sobre o medo " * 20, "titulos": ["Medo"]}
+    ds.salvar(A.BASE_DIR, p)
+    try:
+        r = A.app.test_client().post(f"/thumbs/dossie/{p['id']}/ia", json={"n": 0, "albert": 3})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()["novas"] == 1 and r.get_json()["itens"][-1]["modo"] == "albert"
+    finally:
+        ds.excluir(A.BASE_DIR, p["id"])
+
+
+def test_tira_segundo_as_notas():
+    import metodo_roteiro as mr
+    import roteiro_partes as rp
+    t = ("Segundo a leitura das notas, essas fontes repetem ideias. Parece pouco, mas, como propõem as notas, treinar-se é "
+         "o primeiro passo. Segundo a crítica apresentada nas notas, perder a música é perder a sinceridade.")
+    out = mr.tirar_meta_fonte(t)
+    assert "notas" not in out and out.startswith("Essas fontes") and "mas treinar-se" in out and "Perder a música" in out
+    assert "notas" not in rp.ler_parte("Segundo as notas, o medo é antigo.", {"titulo": "x"})
+    assert mr.tirar_meta_fonte("Ele tirou boas notas na escola.") == "Ele tirou boas notas na escola."

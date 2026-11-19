@@ -1352,6 +1352,7 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
         if _n_venda:
             rot = re.sub(r"\n{3,}", "\n\n", re.sub(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", "", rot, flags=re.I | re.M)).strip()
             avisos.append(f"📣 {_n_venda} [[VENDA]] tirada(s) — este canal não usa venda.")
+    rot = _mr.tirar_meta_fonte(rot)  # 🧹 v84_418: "segundo as notas…" não vai pro vídeo
     rot, _rep = _mr.tirar_repeticoes(rot)  # 🔁 v84_169: frase quase igual logo em seguida sai
     if _rep:
         avisos.append(f"🔁 {len(_rep)} frase(s) repetida(s) logo em seguida tirada(s): " + " · ".join(f"“{x[:70]}…”" for x in _rep[:3]))
@@ -1432,6 +1433,8 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
         regras.append(f"Tom: {cfg['tom'].strip()[:400]}")
     if (cfg.get("extra") or "").strip():
         regras.append(f"Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
+    if cfg.get("sem_experiencias", True):  # 🧹 v84_418: a regra (sem "segundo as notas", sem crédito da fonte) vale em cada parte
+        regras.append(REGRA_SEM_PESSOAL)
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     _pb = ""
     if _perfil:

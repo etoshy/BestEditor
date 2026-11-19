@@ -283,7 +283,8 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
                      "fonte em voz alta, ela vai na descrição; hipótese e estimativa ditas como tal, em palavras simples):")
         else:
             L.append("Fatos desta parte (use TODOS, desenvolvidos — quem/quando/onde/como/por quê; diga a fonte no texto quando for "
-                     "uma afirmação importante; alegação sempre atribuída a quem alega; interpretação marcada como tal):")
+                     "uma afirmação importante — a fonte REAL (jornal, livro, autor histórico), NUNCA \"as notas\", \"o texto\", "
+                     "\"o material\" ou \"a transcrição\"; alegação sempre atribuída a quem alega; interpretação marcada como tal):")
         L += [f"- {f['fato']}" + (f" ({f['fonte']}" + (f", {f['tipo']})" if f.get("tipo") != "fato" else ")") if f.get("fonte") else "") for f in p["fatos"]]
     mids = contexto.get("midias") or {}
     meus = [m for m in p.get("midias") or [] if m in mids]
@@ -369,6 +370,7 @@ def ler_parte(texto: str, parte: Dict[str, Any]) -> str:
         linhas.pop(0)
     t = "\n".join(linhas).strip()
     t = _MARCA_CHAMADA.sub("", t)
+    t = __import__("metodo_roteiro").tirar_meta_fonte(t)  # 🧹 v84_418: "segundo as notas…" não vai pro vídeo
     t = re.sub(r"\*\*(.+?)\*\*", r"\1", t)
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
     if not t:

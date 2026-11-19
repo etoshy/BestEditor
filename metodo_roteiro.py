@@ -557,3 +557,33 @@ def tirar_repeticoes(texto: str, janela: int = 3, limite: float = 0.72) -> Tuple
                 ficam.append(f)
         out.append(" ".join(ficam))
     return "".join(out), tiradas
+
+
+# ------------------------------------------------------------------ 🧹 v84_418: "segundo as notas" nunca chega no vídeo
+_MAT = r"(?:notas|anota[çc][õo]es|transcri[çc][ãa]o|material(?: de apoio)?|fonte(?:s)? do projeto|texto(?: de origem| base)?)"
+_RE_META_FONTE = [
+    # "Segundo a leitura das notas, X" / "Segundo a crítica apresentada nas notas, X" / "Segundo as notas, X"
+    re.compile(r"\b(?:segundo|conforme|de acordo com)\s+(?:a|o|as|os)?\s*(?:\w+\s+){0,3}?(?:d|n)?(?:as|os|a|o)\s+" + _MAT
+               + r"\s*,\s*", re.I),
+    re.compile(r"\b(?:segundo|conforme|de acordo com)\s+(?:as|os|a|o)\s+" + _MAT + r"\s*,\s*", re.I),
+    # ", como propõem as notas," / "como dizem as notas,"
+    re.compile(r",?\s*como\s+(?:prop[õo]em|propõe|dizem|diz|sugerem|sugere|explicam|explica|mostram|mostra|apontam|aponta)\s+"
+               r"(?:as|os|a|o)\s+" + _MAT + r"\s*,?", re.I),
+    # "..., segundo as notas." no fim da frase
+    re.compile(r",\s*(?:segundo|conforme|de acordo com)\s+(?:as|os|a|o)\s+" + _MAT + r"(?=\s*[.!?;])", re.I),
+]
+
+
+def tirar_meta_fonte(texto: str) -> str:
+    """Tira as menções ao MATERIAL de origem que escapam da IA ("segundo a leitura das notas, …", "como propõem as notas")
+    e acerta a maiúscula da frase que sobrou."""
+    t = str(texto or "")
+    if not re.search(_MAT, t, re.I):
+        return t
+    for rx in _RE_META_FONTE:
+        t = rx.sub(lambda m: " " if m.group(0).strip().startswith(",") else
+                   m.group(0)[:len(m.group(0)) - len(m.group(0).lstrip())] + "\x00", t)
+    t = re.sub(r"\x00\s*(\w)", lambda m: m.group(1).upper(), t).replace("\x00", "")
+    t = re.sub(r" {2,}", " ", t)
+    t = re.sub(r"\s+([,.;:!?])", r"\1", t)
+    return t

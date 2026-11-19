@@ -86,12 +86,14 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         c = request.get_json(silent=True) or {}
         try:
-            n = max(1, min(8, int(c.get("n") or tf.N_IDEIAS)))
+            n = max(0, min(8, int(c["n"]))) if str(c.get("n", "")).strip().isdigit() else tf.N_IDEIAS
             d = tf.sincronizar(base_dir, origem, pid, ideias)
             titulo, sobre, idioma = _contexto(origem, pid)
             if not (titulo or sobre).strip():
                 raise tf.ThumbErro("Sem título nem roteiro pra IA se basear.")
             alb = max(0, min(4, int(c["albert"]))) if str(c.get("albert", "")).strip().isdigit() else tf.ativo_albert()
+            if n == 0 and not alb:
+                alb = tf.N_ALBERT
             novas = tf.pedir_ideias(titulo, sobre, d.get("itens") or [], n, idioma, tf.estilo(base_dir, origem, pid),
                                     [str(e) for e in c.get("estilos") or []], albert=alb)
             d = tf.adicionar_ideias(base_dir, origem, pid, novas)
