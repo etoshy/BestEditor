@@ -207,30 +207,29 @@ def estilo(base: str, origem: str, pid: str) -> str:
 # ------------------------------------------------------------------ 🔥 v84_417: estilo "palavra gigante + ironia"
 N_ALBERT = 2  # além das 5 de sempre, 2 nesse estilo (0 = desliga — Configurações)
 REGRA_ALBERT = (
-    "ESTILO PALAVRA GIGANTE — PROVOCATIVO (o dos canais de psicologia/comportamento que explodem: ZOÓFILO, CANIBAL, "
-    "NECRÓFILO, TRAIÇÃO, MEDO, MORTE). Regras:\n"
-    "1) A PALAVRA: UMA só, o rótulo mais FORTE, tabu ou acusatório do tema — de preferência um rótulo de PESSOA que o "
-    "espectador teme ser ou julga (MENTIROSO, HIPÓCRITA, COVARDE, ESCRAVO, VICIADO, ZUMBI, FRACASSADO, MARIONETE, PAPAGAIO) "
-    "ou o tabu em si (MORTE, LOUCURA, INVEJA, TRAIÇÃO). NUNCA frase (\"ESTOU BEM\") nem palavra morna/abstrata "
-    "(\"SILÊNCIO\", \"LINGUAGEM\", \"REFLEXÃO\"). 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
-    "2) A CENA: o personagem do canal VIVE o tema de forma LITERAL, absurda e escandalosa — o corpo dele vira a metáfora ou "
-    "ele está numa situação que dá vergonha alheia. Não é \"personagem ao lado de um objeto\": é ele SENDO o problema. "
-    "Exemplos do nível certo: deitado na cama abraçado com um cachorro (ZOÓFILO); o próprio rosto servido num prato com "
-    "talheres (CANIBAL); casando com um esqueleto de véu (NECRÓFILO); sorrindo e fazendo joinha com uma corda no pescoço "
-    "(MORTE); de lingerie rosa num palco com a plateia apontando e rindo (MEDO); de látex, de quatro, com coleira e "
-    "corrente (FETICHE); com a boca costurada por fios dourados e um sorriso forçado (MENTIROSO); pendurado por fios de "
-    "marionete presos na língua, puxados por mãos gigantes (MARIONETE); com um nariz de Pinóquio enorme atravessando a "
-    "palavra (HIPÓCRITA).\n"
-    "3) A IRONIA: expressão que CONTRADIZ a cena — sorriso largo, confiante ou debochado, olhando direto pra câmera, como "
-    "se fosse normal. O choque vem do contraste.\n"
-    "4) LEITURA EM 1 SEGUNDO no celular: um só assunto grande no centro, na frente da palavra (cobrindo um pedaço das "
-    "letras do meio), fundo limpo ou com poucos elementos do tema (mãos apontando, multidão julgando, o lugar do tema), "
-    "cores saturadas, contraste alto, luz de estúdio.\n"
-    "5) RUIM (não faça): cartaz ou plaquinha escrita na imagem; objetos soltos sem relação com o corpo dele (\"ao lado de "
-    "um dicionário e uma corda\"); personagem só posando calmo; cena genérica de \"pessoa pensativa\".\n"
-    "6) Limites (tem que ser monetizável): sugestivo, nunca explícito — nada de nudez, sexo, sangue de verdade, ferimento "
-    "realista ou pessoa real famosa; nada envolvendo crianças. O personagem é o do canal, no ESTILO DE ARTE do canal (que "
-    "não muda). Antes de responder, pense em umas 6 opções e entregue SÓ as mais provocativas e mais diferentes entre si.")
+    "ESTILO PALAVRA GIGANTE — PROVOCATIVO, no jeito do canal Albert (psicologia/comportamento, thumbs que explodem). "
+    "COMO ELE PENSA (aplique ao ROTEIRO DESTE vídeo — não copie palavras nem cenas de exemplo nenhum):\n"
+    "1) LEIA o roteiro e ache o NERVO: qual é a verdade incômoda, a acusação ou o tabu que o vídeo revela sobre quem "
+    "assiste (\"você é X sem saber\", \"todo mundo faz Y e finge que não\")? A thumb vende ESSE incômodo.\n"
+    "2) A PALAVRA: UMA só, o rótulo mais forte desse nervo — um nome de PESSOA que ninguém quer ser (um \"-ado\", um "
+    "\"-ista\", um \"-filo\", um defeito, um vício, uma condição) ou o tabu cru. Ela tem que sair DESTE roteiro, ser "
+    "chocante pra quem lê em 1 segundo e diferente em cada thumb. Nada de frase, nada de palavra morna ou abstrata "
+    "(\"linguagem\", \"reflexão\", \"silêncio\", \"memória\"). 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
+    "3) A CENA: o personagem do canal VIVENDO a palavra de forma LITERAL, absurda e meio escandalosa — o corpo, a roupa ou "
+    "a situação dele É a metáfora (não \"ele ao lado de um objeto\"). Pergunte: se essa palavra virasse uma foto ridícula "
+    "e chocante do personagem, como seria? Pra calibrar o NÍVEL (são de OUTROS temas — NÃO repita): ZOÓFILO = ele na "
+    "cama abraçado com um cachorro; CANIBAL = o próprio rosto dele servido num prato; NECRÓFILO = ele casando com um "
+    "esqueleto de véu; MORTE = sorrindo e fazendo joinha segurando uma corda.\n"
+    "4) A IRONIA: expressão que CONTRADIZ a cena — sorriso largo, confiante ou debochado, olhando pra câmera, como se "
+    "fosse normal.\n"
+    "5) LEITURA EM 1 SEGUNDO no celular: um só assunto grande no centro, na frente da palavra; fundo simples ligado ao "
+    "tema; o elemento absurdo GRANDE e óbvio.\n"
+    "6) RUIM: cartaz/plaquinha escrita; objetos soltos sem relação com o corpo dele; personagem só posando; cena genérica; "
+    "repetir a mesma palavra ou a mesma ideia de cena em duas thumbs; usar palavra que o roteiro não sustenta.\n"
+    "7) Limites (monetizável): sugestivo, nunca explícito — nada de nudez, sexo, sangue de verdade, ferimento realista, "
+    "pessoa real famosa ou crianças. O personagem é o do canal, no ESTILO DE ARTE do canal (que não muda).\n"
+    "Antes de responder, liste pra você umas 8 palavras candidatas tiradas do roteiro, descarte as mornas e as repetidas, "
+    "e entregue SÓ as mais provocativas e mais diferentes entre si, cada uma com uma cena própria.")
 
 
 def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
@@ -269,7 +268,8 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
     motivo = ia.motivo_desligado("roteiros")
     if motivo:
         raise ThumbErro("IA: " + motivo + " — ligue em 🤖 IA (📝 Roteiros direto na IA).")
-    existentes = "\n".join(f"- {i.get('ideia')}" for i in ja if i.get("ideia"))[:3000]
+    existentes = "\n".join(f"- {('[' + i['texto'] + '] ') if i.get('modo') == 'albert' and i.get('texto') else ''}{i.get('ideia')}"
+                           for i in ja if i.get("ideia"))[:3000]
     if n <= 0 and albert:  # 🔥 v84_418: só as de palavra gigante
         system = f"""Você cria THUMBNAILS de YouTube que dão MUITO clique sem enganar. Para o vídeo abaixo, crie {albert} thumbnails
 no estilo PALAVRA GIGANTE, cada uma com "modo": "albert".
@@ -282,11 +282,12 @@ Para cada uma:
 - "modo": "albert".
 {('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal else ''}
 Se o estilo é desenho/anime/cartoon, descreva o personagem como desenho (expressão, pose, roupa), sem detalhes de foto.
-{('Já existem estas (NÃO repita a palavra nem a cena):' + chr(10) + existentes) if existentes else ''}
+{('Já existem estas (NÃO repita a PALAVRA entre colchetes nem a ideia da cena):' + chr(10) + existentes) if existentes else ''}
 Responda só o JSON."""
         conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
         with ia.rotulo("🔥 Thumbs palavra gigante: " + (titulo or "")[:60]):
-            d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=3000, effort="medium", timeout=300)
+            d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=3000, effort="medium", timeout=300,
+                         cache_local=False)  # 🔁 v84_420: clicar de novo traz ideias NOVAS (não a mesma resposta guardada)
         if not d:
             raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
         out = [t for t in (normalizar(dict(x, modo="albert") if isinstance(x, dict) else x)
@@ -318,7 +319,8 @@ detalhes de foto realista (pele, rugas, poros, lente, "cinematic").
 Responda só o JSON."""
     conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
     with ia.rotulo("🖼 Thumbs: " + (titulo or "")[:60]):
-        d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=4000, effort="low", timeout=300)
+        d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=4000, effort="low", timeout=300,
+                         cache_local=False)
     if not d:
         raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
     out = [t for t in (normalizar(x) for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]

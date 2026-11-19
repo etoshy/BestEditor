@@ -58,7 +58,7 @@ def test_so_palavra_gigante(monkeypatch):
         {"ideia": "marionete", "texto": "Marionete", "prompt": "p"}, {"ideia": "x", "texto": "X", "prompt": "p"}]})
     out = tf.pedir_ideias("Linguagem", "roteiro", [], 0, albert=2)
     assert len(out) == 2 and all(t["modo"] == "albert" for t in out) and out[1]["texto"] == "MARIONETE"
-    assert "NUNCA frase" in visto["s"] and "RUIM" in visto["s"] and "SENDO o problema" in visto["s"]
+    assert "NERVO" in visto["s"] and "RUIM" in visto["s"] and "NÃO repita" in visto["s"] and "MENTIROSO" not in visto["s"]
 
 
 def test_rota_so_albert(monkeypatch):
