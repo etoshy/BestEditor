@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Formatos de vídeo{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 1000px; }
+  .fv-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-top: 12px; background: #fff; }
+  .fv-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .fv-linha button, .fv-linha select { width: auto; margin: 0; }
+  .fv-meta { color: #64748b; font-size: .84rem; }
+  .fv-num { display: inline-block; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; font-size: .82rem; margin-right: 4px; }
+  .fv-tog { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; margin: 0; cursor: pointer; }
+  .fv-tog input { width: auto; margin: 0; transform: scale(1.3); }
+  .fv-bloco { border-left: 3px solid #8b5cf6; padding: 4px 10px; margin: 6px 0; font-size: .88rem; }
+  .fv-bloco b { color: #5b21b6; }
+  .fv-criado { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: .88rem; }
+  textarea.fv-texto { width: 100%; min-height: 240px; font-size: .84rem; font-family: inherit; }
+</style>
+
+<h1>📐 Formatos de vídeo</h1>
+<p class="fv-meta">A 🤖 IA lê os roteiros que já saíram de um modelo (os feitos de texto bruto são a referência de profundidade) e
+  monta a <b>ficha do formato</b>: a estrutura de começo, meio e fim com o peso de cada parte, a abertura, o fechamento, os
+  recursos que se repetem, a densidade, o tom e o que nunca aparece. A ficha entra em todo roteiro novo desse modelo. E dá
+  pra criar um vídeo <b>só com um tema</b>: a IA pesquisa na internet e monta uma base do tamanho de uma aula antes de escrever.</p>
+
+{% if not r %}
+<div class="fv-card">Nenhum 🕵️ Modelo de vídeo ainda.</div>
+{% else %}
+<div class="fv-card">
+  <div class="fv-linha" style="margin-top:0">
+    <label style="margin:0">Modelo do canal</label>
+    <select id="fvModelo">{% for k, n in modelos.items() %}<option value="{{ k }}"{% if k == sel %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+  </div>
+  <div class="fv-linha">
+    <span class="fv-num">📜 {{ r.roteiros }} roteiro(s) prontos</span>
+    <span class="fv-num">🔎 {{ r.analisados }} analisado(s)</span>
+    {% if r.pendentes %}<span class="fv-num" style="background:#fef3c7">🆕 {{ r.pendentes }} novo(s) pra analisar</span>{% endif %}
+    <span class="fv-meta">{{ tempo(criado=None, editado=r.atualizado) }}</span>
+  </div>
+  <div class="fv-linha">
+    <label class="fv-tog" title="ligado: lê todos os roteiros que faltam agora e, daqui pra frente, cada roteiro novo deste modelo entra na ficha sozinho"><input type="checkbox" id="fvAtivo" {% if r.ativo %}checked{% endif %}> 🔁 Aprender sozinho com cada roteiro novo</label>
+    <button type="button" id="fvAtualizar" style="background:#0f766e">🔄 Atualizar com os novos</button>
+    <button type="button" id="fvRefazer" class="secondary" title="lê TODOS os roteiros de novo e refaz a ficha do zero">♻ Refazer tudo</button>
+    <span id="fvSt" class="fv-meta">{{ r.msg }}</span>
+  </div>
+</div>
+
+<div class="fv-card">
+  <h2 style="margin:0">🧩 Ficha do formato {% if r.manual %}<span class="fv-meta">(editada por você)</span>{% endif %}</h2>
+  {% if r.ficha %}
+  {% if r.ficha.resumo %}<p style="margin:6px 0"><b>Fórmula:</b> {{ r.ficha.resumo }}</p>{% endif %}
+  {% for b in r.ficha.estrutura or [] %}
+  <div class="fv-bloco"><b>{{ loop.index }}. {{ b.bloco }}</b> <span class="fv-meta">~{{ b.pct }}%</span> — {{ b.funcao }}<div class="fv-meta">{{ b.como }}</div></div>
+  {% endfor %}
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">✏ Ver / editar o texto que vai no pedido do roteiro</summary>
+    <textarea id="fvTexto" class="fv-texto">{{ r.texto }}</textarea>
+    <div class="fv-linha">
+      <button type="button" id="fvSalvar">💾 Salvar</button>
+      {% if r.manual %}<button type="button" id="fvVoltar" class="secondary">↩ Voltar pro texto da IA</button>{% endif %}
+    </div>
+  </details>
+  <label class="fv-tog" style="margin-top:10px;font-weight:400"><input type="checkbox" id="fvUsar" {% if r.usar %}checked{% endif %}> usar esta ficha em todo roteiro novo deste modelo</label>
+  {% else %}
+  <p class="fv-meta">Ainda sem ficha — clique em 🔄 Atualizar (ou ligue o 🔁) pra IA ler os {{ r.roteiros }} roteiro(s).</p>
+  {% endif %}
+</div>
+
+<div class="fv-card">
+  <h2 style="margin:0">💡 Vídeo novo só com o tema</h2>
+  <p class="fv-meta">Um tema por linha. Pra cada um, a IA pesquisa na internet (🤖 Claude com busca; se não der, 🔷 Gemini) e monta as
+    notas de pesquisa no padrão das que saem de um texto bruto. Depois ela cria o projeto e escreve o roteiro com o formato do
+    canal{% if r.ficha %} (a ficha acima){% endif %}. Roda um de cada vez, em segundo plano.</p>
+  <textarea id="fvTemas" rows="3" style="width:100%" placeholder="ex.: Inveja: por que a gente sente e o que ela esconde&#10;Medo da morte"></textarea>
+  <div class="fv-linha">
+    <label style="margin:0">⏱ <input type="number" id="fvMin" min="0" max="60" step="1" value="0" style="width:70px"> min <span class="fv-meta">(0 = o do modelo)</span></label>
+    <label style="margin:0;font-weight:400"><input type="checkbox" id="fvRevisar" checked style="width:auto;margin-right:4px">🪄 revisar + 🎙 adaptar pro TTS</label>
+    <button type="button" id="fvCriar" style="background:#7c3aed">🚀 Pesquisar e escrever</button>
+  </div>
+  <div id="fvCriados">
+  {% for x in r.criados %}
+    <div class="fv-criado"><b>{{ x.tema }}</b> — <span>{{ x.msg }}</span>{% if x.projeto %} · <a href="/modelos-video/{{ x.projeto }}" target="_blank">abrir o projeto →</a>{% endif %}
+      <div class="fv-meta">{{ tempo(x) }}</div></div>
+  {% endfor %}
+  </div>
+</div>
+
+<script>
+(() => {
+  const M = {{ sel|tojson }};
+  const $ = s => document.querySelector(s);
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  const base = '/formatos/' + encodeURIComponent(M);
+  const st = t => { $('#fvSt').textContent = t; };
+  $('#fvModelo').addEventListener('change', e => { location.href = '/formatos?modelo=' + encodeURIComponent(e.target.value); });
+  let timer = null;
+  const acompanhar = async () => {
+    clearTimeout(timer);
+    try {
+      const d = await (await fetch(base + '/estado', { cache: 'no-store' })).json();
+      st(d.msg || '');
+      const rodandoCriar = (d.criados || []).some(x => !['pronto', 'erro'].includes(x.estado));
+      if (d.rodando || d.estado === 'analisando' || rodandoCriar) {
+        if (rodandoCriar) $('#fvCriados').innerHTML = (d.criados || []).map(x => `<div class="fv-criado"><b>${x.tema.replace(/</g, '&lt;')}</b> — <span>${(x.msg || '').replace(/</g, '&lt;')}</span>${x.projeto ? ` · <a href="/modelos-video/${x.projeto}" target="_blank">abrir o projeto →</a>` : ''}</div>`).join('');
+        timer = setTimeout(acompanhar, 4000);
+      } else if (window.__fvEsperando) { location.reload(); }
+    } catch (e) { timer = setTimeout(acompanhar, 6000); }
+  };
+  const comeca = () => { window.__fvEsperando = true; acompanhar(); };
+  $('#fvAtivo').addEventListener('change', async e => {
+    try { const d = await post(base + '/ativo', { ativo: e.target.checked });
+      st(e.target.checked ? (d.tarefa ? '⏳ lendo todos os roteiros…' : '🔁 ligado — cada roteiro novo entra na ficha') : '⏸ desligado — use 🔄 Atualizar quando quiser');
+      if (d.tarefa) comeca();
+    } catch (err) { alert('❌ ' + err.message); e.target.checked = !e.target.checked; }
+  });
+  const atualizar = async (refazer) => {
+    if (refazer && !confirm('Ler TODOS os roteiros de novo e refazer a ficha do zero?')) return;
+    try { await post(base + '/atualizar', { refazer }); st('⏳ começando…'); comeca(); } catch (e) { st('❌ ' + e.message); }
+  };
+  $('#fvAtualizar').addEventListener('click', () => atualizar(false));
+  $('#fvRefazer').addEventListener('click', () => atualizar(true));
+  if ($('#fvSalvar')) $('#fvSalvar').addEventListener('click', async () => { try { await post(base + '/salvar', { texto: $('#fvTexto').value }); location.reload(); } catch (e) { alert('❌ ' + e.message); } });
+  if ($('#fvVoltar')) $('#fvVoltar').addEventListener('click', async () => { try { await post(base + '/salvar', { texto: '' }); location.reload(); } catch (e) { alert('❌ ' + e.message); } });
+  if ($('#fvUsar')) $('#fvUsar').addEventListener('change', e => post(base + '/salvar', { usar: e.target.checked }).catch(err => alert('❌ ' + err.message)));
+  $('#fvCriar').addEventListener('click', async () => {
+    const b = $('#fvCriar'); b.disabled = true;
+    try { const d = await post(base + '/criar', { temas: $('#fvTemas').value, minutos: Number($('#fvMin').value || 0), revisar: $('#fvRevisar').checked });
+      $('#fvTemas').value = ''; st(`🚀 ${d.novos} tema(s) na fila`); comeca();
+    } catch (e) { alert('❌ ' + e.message); } finally { b.disabled = false; }
+  });
+  {% if r.estado == 'analisando' or r.rodando %}comeca();{% endif %}
+  {% for x in r.criados %}{% if x.estado not in ('pronto', 'erro') %}comeca();{% endif %}{% endfor %}
+})();
+</script>
+{% endif %}
+{% endblock %}

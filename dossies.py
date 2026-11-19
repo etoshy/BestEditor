@@ -1240,6 +1240,14 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if _canal:
         L.append("")
         L.append(metodo_roteiro.bloco_canal(_canal, curto=minutos <= 1 or cfg.get("formato") == "curto"))
+    if base:  # 📐 v84_421: a fórmula do canal aprendida dos roteiros que ficaram bons (📐 Formatos de vídeo)
+        try:
+            _fv = __import__("formatos_video").bloco_prompt(base, cfg.get("modelo") or "")
+        except Exception:  # noqa: BLE001
+            _fv = ""
+        if _fv:
+            L.append("")
+            L.append(_fv)
     L.append("")
     _cod = idiomas.normalizar(cfg.get("idioma")) or "pt"
     L.append(metodo_roteiro.bloco_titulos(5, "" if _cod == "pt" else nome_idioma))
@@ -1433,6 +1441,13 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
         regras.append(f"Tom: {cfg['tom'].strip()[:400]}")
     if (cfg.get("extra") or "").strip():
         regras.append(f"Pedido extra (siga com prioridade): {cfg['extra'].strip()[:1500]}")
+    if base or __import__("formatos_video").BASE:  # 📐 v84_421: a fórmula do canal vale em cada parte (o lugar desta parte na estrutura, recursos, densidade)
+        try:
+            _fv = __import__("formatos_video").bloco_prompt(base or __import__("formatos_video").BASE, cfg.get("modelo") or "")
+            if _fv:
+                regras.append(_fv.split("\n", 1)[-1][:3000])
+        except Exception:  # noqa: BLE001
+            pass
     if cfg.get("sem_experiencias", True):  # 🧹 v84_418: a regra (sem "segundo as notas", sem crédito da fonte) vale em cada parte
         regras.append(REGRA_SEM_PESSOAL)
     _perfil = perfil_do_modelo(cfg.get("modelo"))

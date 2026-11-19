@@ -60,6 +60,7 @@ thumbs/
 modelados/
 # 📚 Texto bruto → vários vídeos (v84_368): os textos enviados e a lista de temas
 temas_bruto/
+formatos/
 chamadas_padrao/
 downloads/
 .chrome_downloads/

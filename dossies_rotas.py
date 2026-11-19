@@ -616,6 +616,8 @@ def registrar(app, base_dir: str) -> None:
                 return jsonify({"erro": str(exc)}), 400
             ds.marcar_mudanca(p, "🤖 resposta da IA", "roteiro lido da resposta da IA")
             ds.salvar(base_dir, p)
+        if ((p.get("resultado") or {}).get("roteiro") or "").strip():
+            __import__("formatos_video").ao_gerar_roteiro(base_dir, p)  # 📐 v84_421: formato ativo aprende com ele
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
     # ------------------------------------------------------------------ ✍️ roteiro em partes (v84_97)
@@ -670,6 +672,7 @@ def registrar(app, base_dir: str) -> None:
             p["resultado"] = ds.montar_partes(p)
             ds.marcar_mudanca(p, "✍️ partes montadas", "as partes juntadas num roteiro só")
             ds.salvar(base_dir, p)
+        __import__("formatos_video").ao_gerar_roteiro(base_dir, p)  # 📐 v84_421
         return jsonify({"ok": True, "projeto": _json_proj(p)})
 
     @app.route("/modelos-video/<pid>/partes/ia", methods=["POST"])
@@ -722,6 +725,7 @@ def registrar(app, base_dir: str) -> None:
                     q["resultado"] = ds.montar_partes(q)
                     ds.marcar_mudanca(q, "✍️ partes montadas", "🤖 a IA escreveu as partes")
                     ds.salvar(base_dir, q)
+                    __import__("formatos_video").ao_gerar_roteiro(base_dir, q)  # 📐 v84_421
             return {"partes": feitas}
 
         tid = tarefas_bg.iniciar("roteiro_partes", "✍️ Roteiro em partes (🤖 IA)", rodar, pagina=f"/modelos-video/{pid}")
