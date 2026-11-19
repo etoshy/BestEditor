@@ -156,12 +156,16 @@ def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> st
         est = re.sub(r"(?i)large empty negative space on the \w+ third for a (big )?title( added later)?|\bno (text|letters|words)\b",
                      "", est)
         est = re.sub(r"\s*([,.])(\s*[,.])+", r"\1", est).strip(" ,.")
-        letras = (f'Huge bold condensed RED capital letters spelling exactly "{palavra}" fill the whole width of the image '
-                  "behind the main subject, slightly distressed/dripping edges; the subject stands in the center IN FRONT of "
-                  "the word, covering part of the middle letters, the word still readable. Centered symmetrical composition, "
-                  "saturated colors, high contrast, studio lighting, clean background. Only that one word, no other text"
-                  if palavra else "Centered symmetrical composition, saturated colors, high contrast, studio lighting")
-        return f"{lead + ': ' if lead else ''}{cena}. {letras}. {est}"
+        letras = (f'Huge bold condensed capital letters spelling exactly "{palavra}" fill the whole width of the image behind '
+                  "the main subject: SOLID, BRIGHT, fully saturated pure red (#E50914), 100% opaque, crisp sharp edges, the "
+                  "brightest and most contrasting element of the image (a few small drips only at the bottom edge), set "
+                  "against a darker background so it pops; the subject stands in the center IN FRONT of the word, covering "
+                  "only part of the middle letters, the word still easy to read. Only that one word, no other text"
+                  if palavra else "")
+        # 🎨 v84_419: o estilo de arte do canal ABRE o prompt (no fim, depois das letras, o Flow ignorava e fazia foto)
+        return (f"{lead + ': ' if lead else ''}{est}. SCENE: {cena}. The absurd/ironic element of the scene is big, obvious "
+                f"and readable at thumbnail size; centered composition, high contrast. {letras}. "
+                "Keep EXACTLY the art style described at the start (same rendering, not a different style).").replace(". .", ".")
     return f"{lead + ': ' if lead else ''}{cena}. {est}"
 
 
