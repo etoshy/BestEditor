@@ -96,9 +96,12 @@ def test_titulos_casados_com_a_thumb(monkeypatch):
         {"n": 7, "titulos": ["Contradição. Por que você foge do que quer?", "Contradição. Quem desiste de si mesmo?"]},
         {"n": 99, "titulos": ["não pedido"]}]})
     itens = [{"n": 7, "texto": "CONTRADIÇÃO", "modo": "albert", "ideia": "sorrindo segurando a própria lápide"}]
-    out = tf.pedir_titulos("O Maior Erro de Quem Desiste", "roteiro", itens)
+    out = tf.pedir_titulos("O Maior Erro de Quem Desiste", "roteiro", itens,
+                           originais=["Por que a História Universal Não Existe?"])
     assert out == {7: ["Contradição. Por que você foge do que quer?", "Contradição. Quem desiste de si mesmo?"]}
-    assert "Palavra. Pergunta" in visto["s"] and "CONTRADIÇÃO" in visto["c"] and "Não mude a palavra" in visto["s"]
+    assert "Assunto. Pergunta" in visto["s"] and "CONTRADIÇÃO" in visto["c"] and "Não mude a palavra" in visto["s"]
+    assert "Títulos ORIGINAIS" in visto["c"] and "História Universal Não Existe" in visto["c"]
+    assert "NUNCA explique a metáfora" in visto["s"]
     assert tf.normalizar({"ideia": "x", "texto": "MEDO", "prompt": "p", "titulos": ["Medo. Como desligar isso?", "b"]})["titulos"][0] == "Medo. Como desligar isso?"
     assert "titulos" in tf.bloco_prompt(2) and "titulos" in tf.bloco_prompt(0)
 
@@ -110,7 +113,7 @@ def test_rota_titulos(monkeypatch):
     p["resultado"] = {"roteiro": "um roteiro " * 50, "titulos": ["O Maior Erro"],
                       "thumbnails": [{"ideia": "i", "texto": "CONTRADIÇÃO", "prompt": "p", "modo": "albert"}]}
     ds.salvar(A.BASE_DIR, p)
-    monkeypatch.setattr(tf, "pedir_titulos", lambda titulo, sobre, alvo, idioma="pt": {int(alvo[0]["n"]): ["Contradição. Por quê?", "Outro"]})
+    monkeypatch.setattr(tf, "pedir_titulos", lambda titulo, sobre, alvo, idioma="pt", originais=None: {int(alvo[0]["n"]): ["Contradição. Por quê?", "Outro"]})
     try:
         r = A.app.test_client().post(f"/thumbs/dossie/{p['id']}/titulos", json={})
         assert r.status_code == 200, r.get_json()

@@ -113,7 +113,18 @@ def registrar(app, base_dir: str) -> None:
             ns = {int(x) for x in c.get("ns") or [] if str(x).isdigit()}
             alvo = [it for it in d.get("itens") or [] if int(it["n"]) in ns] if ns else list(d.get("itens") or [])
             titulo, sobre, idioma = _contexto(origem, pid)
-            tits = tf.pedir_titulos(titulo, sobre, alvo, idioma)
+            originais: List[str] = []
+            try:  # os títulos que vieram com o roteiro (a base dos títulos de cada thumb)
+                if origem == "dossie":
+                    import dossies as ds
+                    originais = list((ds.carregar(base_dir, pid).get("resultado") or {}).get("titulos") or [])
+                elif origem == "roteiro_yt":
+                    import roteiros_yt as ry
+                    q = ry.carregar_projeto(base_dir, pid)
+                    originais = list((q.get("resultado") or {}).get("titulos") or (q.get("analise") or {}).get("titulos") or [])
+            except Exception:  # noqa: BLE001
+                originais = []
+            tits = tf.pedir_titulos(titulo, sobre, alvo, idioma, originais)
             d = tf.gravar_titulos(base_dir, origem, pid, tits)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400

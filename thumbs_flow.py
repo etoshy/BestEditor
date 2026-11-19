@@ -238,12 +238,15 @@ REGRA_ALBERT = (
 
 
 REGRA_TITULOS_THUMB = (
-    "TÍTULOS DA THUMB: cada thumbnail vem com 2 títulos (\"titulos\") feitos PRA ELA — a thumb e o título se completam, um "
-    "não repete o outro à toa e juntos fazem quem rola o feed precisar clicar (a thumb mostra o choque/a emoção, o título "
-    "promete a resposta). Até ~60 caracteres, no idioma do vídeo, honestos (o vídeo entrega). Na thumb de PALAVRA GIGANTE, "
-    "o 1º título é no jeito \"Palavra. Pergunta curta?\" com a MESMA palavra da thumb (ex.: MEDO → \"Medo. Como desligar "
-    "isso?\"; CONTRADIÇÃO → \"Contradição. Por que você foge do que quer?\") e o 2º uma variação com outra pergunta. Nas "
-    "outras, os títulos completam o texto da thumb sem repetir as palavras dele.")
+    "TÍTULOS DA THUMB: cada thumbnail vem com 2 títulos (\"titulos\") que servem pro VÍDEO e conversam com ESTA thumb. "
+    "Ordem de prioridade: (1) o título diz DO QUE o vídeo trata — quem lê só o título entende o ASSUNTO (ex.: \"história "
+    "universal\"), e ele cumpre a promessa do vídeo; (2) ele parte dos títulos do vídeo (os títulos originais são a base: "
+    "ajuste um deles pra casar com a thumb, sem perder o assunto); (3) a thumb COMPLEMENTA: ela mostra a emoção/o choque, o "
+    "título dá o assunto e a promessa. NUNCA explique a metáfora da thumb no título (thumb COSTURA num vídeo sobre história "
+    "universal → ruim: \"Costura. Quem está fazendo esse remendo?\"; bom: \"A História Universal é um Remendo?\" ou "
+    "\"História Universal. Quem Costurou Essa Versão?\"). A palavra da thumb só entra se couber natural no assunto. O jeito "
+    "\"Assunto. Pergunta?\" usa o ASSUNTO real do vídeo antes do ponto (\"História Universal. Por Que Ela Não Existe?\"), "
+    "não a palavra da thumb. Até ~60 caracteres, no idioma do vídeo, honestos (o vídeo entrega).")
 
 
 def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
@@ -565,7 +568,8 @@ def _schema_titulos() -> Dict[str, Any]:
     return _obj({"thumbs": _lista(_obj({"n": _I, "titulos": _lista(_S)}))})
 
 
-def pedir_titulos(titulo: str, contexto: str, itens: List[Dict[str, Any]], idioma: str = "pt") -> Dict[int, List[str]]:
+def pedir_titulos(titulo: str, contexto: str, itens: List[Dict[str, Any]], idioma: str = "pt",
+                  originais: Optional[List[str]] = None) -> Dict[int, List[str]]:
     """{n: [2 títulos]} pras thumbnails pedidas — a palavra e a imagem da thumb NÃO mudam."""
     import ia_servico as ia
     motivo = ia.motivo_desligado("roteiros")
@@ -577,15 +581,17 @@ def pedir_titulos(titulo: str, contexto: str, itens: List[Dict[str, Any]], idiom
     formulas = "\n".join(f"  - {a}  (ex.: {b})" for a, b in mr.TITULOS_ALBERT)
     lista = "\n".join(f"- n={it['n']}: {'PALAVRA GIGANTE' if it.get('modo') == 'albert' else 'texto na thumb'} „{it.get('texto') or ''}“"
                        f" — cena: {it.get('ideia') or it.get('prompt') or ''}" for it in itens)
-    system = f"""Você escreve TÍTULOS de YouTube casados com a THUMBNAIL — como os canais de psicologia/comportamento que
-explodem: a thumb e o título se completam e juntos dão o clique.
+    system = f"""Você escreve TÍTULOS de YouTube pro VÍDEO que conversam com a THUMBNAIL — como os canais de psicologia/
+comportamento que explodem: a thumb dá a emoção, o título dá o assunto e a promessa, e juntos dão o clique.
 {REGRA_TITULOS_THUMB}
-Fórmulas do jeito "Palavra. Pergunta?" (adapte ao tema real):
+Fórmulas do jeito "Assunto. Pergunta?" (o ASSUNTO do vídeo antes do ponto — adapte):
 {formulas}
 Pra cada thumbnail da lista, devolva "n" e 2 "titulos" (idioma: {idioma}). Não mude a palavra nem a cena da thumb.
 Responda só o JSON."""
-    conteudo = (f"Título atual do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:9000]}\n\n"
-                f"Thumbnails:\n{lista}")
+    orig = [t for t in (originais or []) if str(t).strip()] or ([titulo] if titulo else [])
+    conteudo = ("Títulos ORIGINAIS do vídeo (a base — o dono gostou deles; mantenha o assunto e a promessa):\n"
+                + "\n".join(f"- {t}" for t in orig[:8])
+                + f"\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:9000]}\n\nThumbnails:\n{lista}")
     with ia.rotulo("🏷 Títulos das thumbs: " + (titulo or "")[:50]):
         d = ia.chamar("roteiros", system, conteudo, schema=_schema_titulos(), max_tokens=2500, effort="low", timeout=240,
                       cache_local=False)
