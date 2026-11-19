@@ -2882,6 +2882,7 @@ def save_settings():
         "evitar_repeticao_clipes": request.form.get("evitar_repeticao_clipes") == "on",
         "max_usos_clipe": request.form.get("max_usos_clipe") or 3,
         "thumbs_albert": request.form.get("thumbs_albert") if request.form.get("thumbs_albert") not in (None, "") else 2,
+        **({"nomes_proibidos": request.form.get("nomes_proibidos", "")} if "nomes_proibidos" in request.form else {}),
         "transition_type": request.form.get("transition_type", "none"),
         "transition_duration": float(request.form.get("transition_duration", 0.6) or 0.6),
         # A tela mostra "Ocultar o navegador" (marcado = oculto); o campo-marcador

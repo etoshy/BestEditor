@@ -290,10 +290,10 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
             p = carregar(n, base)
         except Exception:  # noqa: BLE001
             continue
-        out.append({"id": n, "titulo": p.get("titulo"), "atualizado": p.get("atualizado", 0),
+        out.append({"criado": p.get("criado") or p.get("criado_em") or 0, "id": n, "titulo": p.get("titulo"), "atualizado": p.get("atualizado", 0),
                     "personagens": len(p["personagens"]), "falas": len((p["roteiro"] or {}).get("falas") or []),
                     "tem_video": bool(_video_local(p, base)), "job": (p.get("editor") or {}).get("job_id")})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(pid: str, base: str = _BASE) -> None:

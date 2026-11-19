@@ -264,7 +264,7 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
                     "miniatura": ap.get("arquivo") if ap else None,
                     "fase": "🧍 poses" if p["poses"].get("pod") else "✔ aprovado" if ap else
                             "🎨 design" if p["design"]["variacoes"] else "📝 ficha" if p["ficha"].get("aparencia_en") else "📥 começo"})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(pid: str, base: str = _BASE) -> None:

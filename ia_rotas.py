@@ -46,8 +46,15 @@ def registrar(app, base_dir: str) -> None:
         return {"ia_resumo": ia_resumo}
 
     def _pagina(**extra: Any):
+        import ia_assinatura as ias
+        c = ia.config()
         return render_template("ia.html", r=ia.resumo_publico(), provedores=ia.PROVEDORES, recursos=ia.RECURSOS,
-                               recentes=ia.recentes()[:15], **extra)
+                               recentes=ia.recentes()[:15], ass_modos=ias.MODOS, ass_modelos=ias.MODELOS_CLAUDE,
+                               loc=__import__("ia_local").config(c), loc_recursos=__import__("ia_local").RECURSOS_LOCAIS,
+                               ass={"via": c.get("texto_via") or "api", "modelo": c.get("assinatura_modelo") or "sonnet",
+                                    "reserva": c.get("assinatura_reserva_api", True),
+                                    "tem_claude": bool(ias.executavel("claude")), "tem_codex": bool(ias.executavel("chatgpt"))},
+                               **extra)
 
     @app.route("/ia", methods=["GET"])
     def ia_page():
@@ -61,6 +68,14 @@ def registrar(app, base_dir: str) -> None:
             "recursos": {k: f.get(f"rec_{k}") == "on" for k in ia.RECURSOS},
             "nota_minima": f.get("nota_minima", 7), "candidatos": f.get("candidatos", 10), "limite_usd": f.get("limite_usd", 5),
         }
+        if f.get("local_enviado"):  # 🖥 v84_424
+            import ia_local
+            novos["local"] = {"ativo": f.get("local_ativo") == "on", "url": (f.get("local_url") or "").strip() or ia_local.PADRAO["url"],
+                              "modelo": (f.get("local_modelo") or "").strip(), "modelo_visao": (f.get("local_modelo_visao") or "").strip(),
+                              "recursos": [k for k in ia_local.RECURSOS_LOCAIS if f.get(f"local_rec_{k}") == "on"]}
+        if f.get("texto_via"):  # 🟠🟢 v84_423
+            novos.update(texto_via=f.get("texto_via"), assinatura_modelo=f.get("assinatura_modelo") or "sonnet",
+                         assinatura_reserva_api=f.get("assinatura_reserva_api") == "on")
         aviso = None
         chave = (f.get("chave") or "").strip()
         if chave:  # em branco = mantém a salva
@@ -75,6 +90,52 @@ def registrar(app, base_dir: str) -> None:
             novos["chave"] = ""
         ia.salvar_config(novos)
         return _pagina(salvo=not aviso, aviso=aviso)
+
+    import threading as _th  # 💸 v84_425: o recomendado entra sozinho na 1ª vez (sem travar a abertura do site)
+    _th.Thread(target=lambda: __import__("ia_economia").migrar_uma_vez(), name="ia-economia", daemon=True).start()
+
+    # ------------------------------------------------------------------ 💸 v84_425: aba Economia de IA
+    @app.route("/ia/economia")
+    def ia_economia_pagina():
+        import ia_economia as ie
+        return render_template("ia_economia.html", e=ie.estado())
+
+    @app.route("/ia/economia/salvar", methods=["POST"])
+    def ia_economia_salvar():
+        import ia_economia as ie
+        return jsonify({"ok": True, **ie.salvar(request.get_json(silent=True) or {})})
+
+    @app.route("/ia/economia/recomendado", methods=["POST"])
+    def ia_economia_recomendado():
+        import ia_economia as ie
+        return jsonify({"ok": True, **ie.recomendado()})
+
+    @app.route("/ia/economia/voltar", methods=["POST"])
+    def ia_economia_voltar():
+        import ia_economia as ie
+        return jsonify({"ok": True, **ie.voltar()})
+
+    @app.route("/ia/economia/testar", methods=["POST"])
+    def ia_economia_testar():
+        import ia_economia as ie
+        return jsonify({"ok": True, "itens": ie.testar_tudo()})
+
+    @app.route("/ia/local/testar", methods=["POST"])
+    def ia_local_testar():
+        """🔌 Vê se o Ollama/LM Studio responde e se os modelos escolhidos funcionam."""
+        import ia_local
+        c = ia.config()
+        b = request.get_json(silent=True) or {}
+        if b:
+            c = dict(c, local=dict(c.get("local") or {}, **{k: b[k] for k in ("url", "modelo", "modelo_visao") if k in b}, ativo=True))
+        return jsonify(ia_local.testar(c))
+
+    @app.route("/ia/assinatura/testar", methods=["POST"])
+    def ia_assinatura_testar():
+        """🔌 Testa o Claude Code / Codex com a sua conta (uma pergunta mínima)."""
+        import ia_assinatura as ias
+        c = request.get_json(silent=True) or {}
+        return jsonify(ias.testar(str(c.get("modo") or ""), str(c.get("modelo") or "sonnet")))
 
     _gerar_roteiro = gerar_roteiro
 

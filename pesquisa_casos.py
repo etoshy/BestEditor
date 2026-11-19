@@ -120,7 +120,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
                     "resultados": len(rs), "marcados": sum(1 for r in rs if r.get("marcado", True)),
                     "videos_yt": len(((p.get("youtube") or {}).get("videos")) or []),
                     "sugestao_min": (p.get("youtube") or {}).get("sugestao_min")})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(base: str, pid: str) -> None:

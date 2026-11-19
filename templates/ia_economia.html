@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Economia de IA{% endblock %}
+{% block content %}
+<style>
+  .app-content { max-width: 960px; }
+  .ec-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-top: 12px; background: #fff; }
+  .ec-lin { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+  .ec-lin:last-child { border-bottom: 0; }
+  .ec-lin .n { flex: 1; min-width: 240px; }
+  .ec-lin .d { color: #64748b; font-size: .82rem; }
+  .ec-sw { position: relative; width: 46px; height: 26px; flex: none; }
+  .ec-sw input { opacity: 0; width: 0; height: 0; }
+  .ec-sw span { position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: .2s; }
+  .ec-sw span:before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .ec-sw input:checked + span { background: #16a34a; }
+  .ec-sw input:checked + span:before { transform: translateX(20px); }
+  .ec-barra { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .ec-barra button { width: auto; margin: 0; }
+  .ec-t { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+  .ec-t.ok { border-color: #86efac; background: #f0fdf4; } .ec-t.erro { border-color: #fca5a5; background: #fef2f2; }
+  .ec-t pre { white-space: pre-wrap; background: #1e293b; color: #e2e8f0; padding: 8px; border-radius: 6px; font-size: .78rem; margin: 6px 0; }
+  .ec-passos { margin: 6px 0 0 18px; padding: 0; font-size: .86rem; }
+  .ec-passos code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
+  .ec-tag { font-size: .74rem; border-radius: 999px; padding: 1px 8px; background: #f1f5f9; color: #334155; }
+</style>
+
+<h1>💸 Economia de IA</h1>
+<p class="d" style="color:#555">Aqui ficam os atalhos pra gastar menos com a IA, cada um com o seu interruptor (salva na hora). Se um programa não
+  estiver instalado, o site usa a API no lugar sozinho, sem travar nada. <b>🧪 Testar tudo</b> mostra o que está funcionando e o que falta,
+  com o passo a passo.</p>
+
+<div class="ec-barra">
+  <button type="button" id="ecRecomendado" style="background:#16a34a">✨ Aplicar o recomendado</button>
+  <button type="button" id="ecTestar" style="background:#2563eb">🧪 Testar tudo</button>
+  <button type="button" id="ecVoltar" class="secondary" title="tudo pela API (a chave), IA local desligada — como era antes">↩ Voltar como era antes</button>
+  <span id="ecSt" class="d"></span>
+</div>
+
+<div class="ec-card" style="border-color:#fca5a5">
+  <h2 style="margin:0">⚖️ Juiz visual das cenas <span class="ec-tag" style="background:#fee2e2;color:#991b1b">o que mais gasta</span></h2>
+  <p class="d">Ele olha umas 10 miniaturas em cada trecho de cada vídeo pra escolher a melhor.
+    {% if e.gasto_juiz.chamadas %}Até agora: <b>{{ e.gasto_juiz.chamadas }} chamadas, US$ {{ '%.2f'|format(e.gasto_juiz.usd) }}</b>
+    ({{ (100 * e.gasto_juiz.usd / e.gasto_juiz.total)|round|int if e.gasto_juiz.total else 0 }}% de tudo que a IA gastou).{% endif %}</p>
+  {% for k, n in e.juiz_modos.items() %}
+  <label class="ec-lin" style="cursor:pointer;margin:0;font-weight:400"><input type="radio" name="ecJuiz" value="{{ k }}" style="width:auto;margin:0" {% if k == e.juiz_modo %}checked{% endif %}> <span class="n">{{ n }}</span></label>
+  {% endfor %}
+  <div id="ecJuizAviso" style="display:none;margin-top:8px;padding:10px 12px;border:2px solid #dc2626;background:#fef2f2;border-radius:8px;color:#7f1d1d">
+    <div id="ecJuizAvisoTxt"></div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" id="ecJuizSim" style="width:auto;margin:0;background:#dc2626">⚠ Entendi, ligar o juiz mesmo assim</button>
+      <button type="button" id="ecJuizNao" class="secondary" style="width:auto;margin:0">Cancelar (deixar desligado)</button></div>
+  </div>
+  {% if e.juiz_modo == 'local' and not e.local.modelo_visao %}<p class="d" style="color:#b45309">⚠ Falta o “Modelo com visão” lá embaixo — sem ele o juiz não roda (fica o 1º resultado).</p>{% endif %}
+</div>
+
+<div class="ec-card">
+  <h2 style="margin:0">🟠 Texto pela sua assinatura</h2>
+  <p class="d">Roteiro, partes, revisão, checagem, TTS, tags de emoção, ideias de thumbnail e título, temas e formatos saem da cota do seu
+    plano, em vez de serem pagos por uso. O que olha imagem continua na API.</p>
+  <div class="ec-lin"><div class="n"><b>Texto vai por</b><div class="d">Claude Code {{ '✅ instalado' if e.tem_claude else '❌ não instalado' }} · Codex {{ '✅ instalado' if e.tem_codex else '❌ não instalado' }}</div></div>
+    <select id="ecVia" style="width:auto;margin:0">{% for k, n in e.modos.items() %}<option value="{{ k }}" {% if k == e.texto_via %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+  <div class="ec-lin"><div class="n"><b>Modelo do Claude</b><div class="d">Sonnet: melhor qualidade sem pagar a mais (só gasta a cota mais rápido)</div></div>
+    <select id="ecModelo" style="width:auto;margin:0">{% for k, n in e.modelos_claude.items() %}<option value="{{ k }}" {% if k == e.assinatura_modelo %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+  <div class="ec-lin"><div class="n"><b>Se a assinatura falhar, usar a API</b><div class="d">limite de 5 horas, não logado, programa fechado…</div></div>
+    <label class="ec-sw"><input type="checkbox" id="ecReserva" {% if e.assinatura_reserva_api %}checked{% endif %}><span></span></label></div>
+</div>
+
+<div class="ec-card">
+  <h2 style="margin:0">🖥 IA local (Qwen, grátis, no seu PC)</h2>
+  <p class="d">Ollama ou LM Studio. Ela divide a placa de vídeo com a voz: evite buscar as prévias enquanto a voz está gerando.</p>
+  <div class="ec-lin"><div class="n"><b>Ligar a IA local</b></div><label class="ec-sw"><input type="checkbox" id="ecLocal" {% if e.local.ativo %}checked{% endif %}><span></span></label></div>
+  <div class="ec-lin"><div class="n"><b>Endereço</b><div class="d">Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1</div></div>
+    <input type="text" id="ecUrl" value="{{ e.local.url }}" style="width:260px;margin:0"></div>
+  <div class="ec-lin"><div class="n"><b>Modelo de texto</b></div><input type="text" id="ecMod" value="{{ e.local.modelo }}" placeholder="qwen2.5:7b" style="width:200px;margin:0"></div>
+  <div class="ec-lin"><div class="n"><b>Modelo com visão</b><div class="d">pro juiz das cenas — vazio = o juiz continua na API</div></div>
+    <input type="text" id="ecVis" value="{{ e.local.modelo_visao }}" placeholder="qwen2.5vl:7b" style="width:200px;margin:0"></div>
+  {% for k, n in e.recursos_locais.items() %}
+  <div class="ec-lin"><div class="n">{{ n }}</div><label class="ec-sw"><input type="checkbox" class="ecRec" value="{{ k }}" {% if k in e.local.recursos %}checked{% endif %}><span></span></label></div>
+  {% endfor %}
+</div>
+
+<div class="ec-card">
+  <h2 style="margin:0">💸 Sempre ligado</h2>
+  <div class="ec-lin"><div class="n">Notas do texto bruto gravam o cache da IA uma vez só <span class="ec-tag">sem interruptor — só economiza</span></div></div>
+</div>
+
+<div class="ec-card" id="ecResBox" style="display:none">
+  <h2 style="margin:0">🧪 Resultado do teste</h2>
+  <div id="ecRes"></div>
+</div>
+
+<script>
+(() => {
+  const INSTR = {{ e.instrucoes|tojson }};
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = async (url, corpo) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+    const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
+  const st = t => { $('#ecSt').textContent = t; if (t) setTimeout(() => { if ($('#ecSt').textContent === t) $('#ecSt').textContent = ''; }, 2500); };
+  const salvar = async corpo => { try { await post('/ia/economia/salvar', corpo); st('✔ salvo'); } catch (e) { st('❌ ' + e.message); } };
+  const local = () => ({ ativo: $('#ecLocal').checked, url: $('#ecUrl').value.trim(), modelo: $('#ecMod').value.trim(), modelo_visao: $('#ecVis').value.trim(),
+                         recursos: [...document.querySelectorAll('.ecRec')].filter(x => x.checked).map(x => x.value) });
+  $('#ecVia').addEventListener('change', e => salvar({ texto_via: e.target.value }));
+  const JUIZ_ATUAL = {{ e.juiz_modo|tojson }};
+  document.querySelectorAll('input[name=ecJuiz]').forEach(x => x.addEventListener('change', async () => {
+    const box = $('#ecJuizAviso');
+    if (x.value === 'off') { box.style.display = 'none'; await salvar({ juiz_modo: 'off' }); location.reload(); return; }
+    // ligar: aviso em vermelho + confirmação (volta a seleção até você confirmar)
+    document.querySelector(`input[name=ecJuiz][value="${JUIZ_ATUAL}"]`).checked = true;
+    box.dataset.modo = x.value;
+    $('#ecJuizAvisoTxt').innerHTML = x.value === 'api'
+      ? '<b>O juiz pela API foi o que mais gastou: mais da metade de tudo que a IA custou.</b> Ele manda umas 10 miniaturas de CADA trecho de CADA vídeo pra IA (um vídeo de 80 trechos ≈ 800 imagens). Pra clipes de anime, a busca da biblioteca já costuma acertar sozinha.'
+      : '<b>O juiz no Qwen roda na sua placa de vídeo</b> — junto com a voz (Chatterbox) e o Whisper. Buscar as prévias enquanto a voz gera deixa os dois bem mais lentos. Precisa de um Qwen com VISÃO (ex.: qwen2.5vl:7b) no campo “Modelo com visão”.';
+    box.style.display = 'block';
+  }));
+  $('#ecJuizSim').addEventListener('click', async () => { await salvar({ juiz_modo: $('#ecJuizAviso').dataset.modo }); location.reload(); });
+  $('#ecJuizNao').addEventListener('click', () => { $('#ecJuizAviso').style.display = 'none'; });
+  $('#ecModelo').addEventListener('change', e => salvar({ assinatura_modelo: e.target.value }));
+  $('#ecReserva').addEventListener('change', e => salvar({ assinatura_reserva_api: e.target.checked }));
+  ['#ecLocal', '#ecUrl', '#ecMod', '#ecVis'].forEach(s => $(s).addEventListener('change', () => salvar({ local: local() })));
+  document.querySelectorAll('.ecRec').forEach(x => x.addEventListener('change', () => salvar({ local: local() })));
+  $('#ecRecomendado').addEventListener('click', async () => { try { await post('/ia/economia/recomendado'); location.reload(); } catch (e) { st('❌ ' + e.message); } });
+  $('#ecVoltar').addEventListener('click', async () => { if (!confirm('Voltar tudo pela API e desligar a IA local?')) return;
+    try { await post('/ia/economia/voltar'); location.reload(); } catch (e) { st('❌ ' + e.message); } });
+  const passos = k => INSTR[k] ? `<details ${'open'}><summary style="cursor:pointer;font-weight:600">📘 ${esc(INSTR[k].titulo)}</summary><ol class="ec-passos">${INSTR[k].passos.map(p => `<li>${esc(p).replace(/(npm install[^—]*|claude(?= —)|\/exit|codex login|ollama pull [\w.:]+|http:\/\/localhost:\d+\/v1)/g, '<code>$1</code>')}</li>`).join('')}</ol></details>` : '';
+  $('#ecTestar').addEventListener('click', async () => {
+    const b = $('#ecTestar'); b.disabled = true; $('#ecResBox').style.display = 'block'; $('#ecRes').innerHTML = '⏳ testando cada parte (pode levar 1 a 2 min — o Claude e o Qwen respondem de verdade)…';
+    try {
+      const d = await post('/ia/economia/testar');
+      const vistos = new Set();
+      $('#ecRes').innerHTML = d.itens.map((x, i) => {
+        const cls = x.ok === true ? 'ok' : x.ok === false ? 'erro' : '';
+        const ic = x.ok === true ? '✅' : x.ok === false ? '❌' : '⚪';
+        const instr = x.instrucao && !vistos.has(x.instrucao) && x.ok !== true ? (vistos.add(x.instrucao), passos(x.instrucao)) : '';
+        const sug = (x.sugestoes || []).length && x.campo ? `<div class="d">instalados: ${x.sugestoes.map(m => `<button type="button" class="ecUsar" data-campo="${x.campo}" data-m="${esc(m)}" style="width:auto;margin:2px;padding:1px 8px;font-size:.76rem">usar ${esc(m)}</button>`).join('')}</div>` : '';
+        return `<div class="ec-t ${cls}"><b>${ic} ${esc(x.nome)}</b> <span class="d">${esc(x.msg)}</span>
+          ${x.erro ? `<pre id="ecErro${i}">${esc(x.erro)}</pre><button type="button" class="ecCopiar" data-i="${i}" style="width:auto;margin:0;padding:2px 10px;font-size:.78rem;background:#475569">📋 copiar o erro</button>` : ''}${sug}${instr}</div>`;
+      }).join('');
+      document.querySelectorAll('.ecCopiar').forEach(bt => bt.addEventListener('click', async () => {
+        const t = $('#ecErro' + bt.dataset.i).textContent;
+        try { await navigator.clipboard.writeText(t); bt.textContent = '✅ copiado — cole aqui no chat'; } catch (e) { prompt('Copie o erro:', t); }
+      }));
+      document.querySelectorAll('.ecUsar').forEach(bt => bt.addEventListener('click', async () => {
+        $(bt.dataset.campo === 'modelo' ? '#ecMod' : '#ecVis').value = bt.dataset.m;
+        if (bt.dataset.campo === 'modelo_visao') document.querySelectorAll('.ecRec').forEach(x => { if (['juiz', 'juiz_manual'].includes(x.value)) x.checked = true; });
+        await salvar({ local: local() }); bt.textContent = '✅ usando'; }));
+    } catch (e) { $('#ecRes').innerHTML = `<div class="ec-t erro"><b>❌ o teste falhou</b><pre>${esc(e.message)}</pre></div>`; }
+    finally { b.disabled = false; }
+  });
+})();
+</script>
+{% endblock %}

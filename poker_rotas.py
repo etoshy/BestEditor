@@ -206,7 +206,7 @@ def listar_maos(base: str) -> list:
                 out.append(carregar_mao(base, f[:-5]))
             except PM.PokerErro:
                 pass
-    return sorted(out, key=lambda m: -float(m.get("atualizado") or 0))
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def registrar(app, base_dir: str, tts: Optional[Callable[..., Any]] = None, limpar_tts: Optional[Callable[[str, str], str]] = None) -> None:

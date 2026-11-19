@@ -371,6 +371,8 @@ def ler_parte(texto: str, parte: Dict[str, Any]) -> str:
     t = "\n".join(linhas).strip()
     t = _MARCA_CHAMADA.sub("", t)
     t = __import__("metodo_roteiro").tirar_meta_fonte(t)  # 🧹 v84_418: "segundo as notas…" não vai pro vídeo
+    _mr_ = __import__("metodo_roteiro")
+    t = _mr_.tirar_nomes(t, _mr_.nomes_proibidos())[0]  # 🚫 v84_427
     t = re.sub(r"\*\*(.+?)\*\*", r"\1", t)
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
     if not t:

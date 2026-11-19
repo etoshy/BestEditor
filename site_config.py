@@ -242,6 +242,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "pixabay_api_fallback_to_browser": True,
     "magnific_only_free": True,
     "evitar_repeticao_clipes": True,
+    "nomes_proibidos": "Olavo de Carvalho",  # 🚫 v84_427: nomes que NUNCA entram no roteiro (vírgula separa)
     "thumbs_albert": 2,  # 🔥 v84_417: além das 5 thumbs/títulos, N no estilo palavra gigante (0 = desliga)
     "max_usos_clipe": 3,  # 🔁 v84_415: o mesmo clipe/cena no máximo N vezes por vídeo (quando não tem outro)
     "buscadores_imagem_paralelo": True,

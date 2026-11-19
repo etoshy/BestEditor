@@ -1270,7 +1270,7 @@ def listar_projetos(m: Dict[str, Any]) -> List[Dict[str, Any]]:
             out.append({"id": pid, "titulo": p["titulo"], "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0, "batidas": len(bs),
                         "aprovadas": sum(1 for b in bs if b.get("qa_status") == "approved"),
                         "geradas": sum(1 for b in bs if b.get("arquivo_master"))})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def prompt_batidas(m: Dict[str, Any], narracao: str, alvo: int = 0, elenco: Optional[Dict[str, Any]] = None) -> str:

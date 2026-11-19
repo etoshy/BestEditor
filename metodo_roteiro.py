@@ -587,3 +587,65 @@ def tirar_meta_fonte(texto: str) -> str:
     t = re.sub(r" {2,}", " ", t)
     t = re.sub(r"\s+([,.;:!?])", r"\1", t)
     return t
+
+
+# ------------------------------------------------------------------ 🚫 v84_427: nomes que NUNCA entram no roteiro
+NOMES_PROIBIDOS_PADRAO = "Olavo de Carvalho"
+
+
+def nomes_proibidos(cfg_projeto: Optional[dict] = None) -> list:
+    """A lista de Configurações (site) + a do projeto (config["nao_citar"])."""
+    try:
+        from site_config import load_site_config
+        txt = str(load_site_config().get("nomes_proibidos", NOMES_PROIBIDOS_PADRAO) or "")
+    except Exception:  # noqa: BLE001
+        txt = NOMES_PROIBIDOS_PADRAO
+    nomes = [n.strip() for n in re.split(r"[,;\n]", txt) if n.strip()]
+    nomes += [n.strip() for n in ((cfg_projeto or {}).get("nao_citar") or []) if str(n).strip()]
+    return list(dict.fromkeys(nomes))
+
+
+def regra_nomes(nomes: list) -> str:
+    if not nomes:
+        return ""
+    lista = ", ".join(f"\"{n}\"" for n in nomes)
+    return ("🚫 NOMES PROIBIDOS: NUNCA escreva " + lista + " no texto — nem como autor, nem como fonte, nem pra atribuir "
+            "uma ideia (\"segundo a leitura de…\", \"tese defendida por…\", \"retomada por…\"). Se uma ideia é dessa pessoa, "
+            "diga como ideia do próprio narrador ou como \"uma leitura possível\"; se ela vem de um pensador histórico (Platão, "
+            "Santo Anselmo…), cite ESSE pensador. Isso vale também na checagem: nunca resolva uma falta de fonte atribuindo a "
+            "ideia a esses nomes.")
+
+
+def tirar_nomes(texto: str, nomes: list) -> tuple:
+    """Tira as atribuições a nomes proibidos ("segundo a leitura de X,", "defendida por X", "retomada por X a partir de…").
+    Devolve (texto, [trechos onde o nome AINDA aparece — pra avisar])."""
+    t = str(texto or "")
+    if not nomes or not t:
+        return t, []
+    for n in nomes:
+        nome = r"\s+".join(re.escape(p) for p in n.split())
+        alvo = rf"(?:o\s+professor\s+|o\s+filósofo\s+|do\s+filósofo\s+|de\s+|do\s+|por\s+)?{nome}"
+        regras = [
+            # "Segundo (a leitura de|a visão de)? X, ..." / ", segundo X," / "de acordo com X,"
+            (rf"\b(?:segundo|conforme|de acordo com|para|na visão de|na leitura de)\s+(?:a\s+(?:leitura|visão|interpretação|tese)\s+de\s+)?{nome}\s*,\s*", "\x00"),
+            (rf",\s*(?:segundo|conforme|de acordo com|para)\s+(?:a\s+(?:leitura|visão)\s+de\s+)?{nome}\s*(?=[,.;:!?])", ""),
+            # "uma tese defendida por X" / "retomada por X(, a partir de Y)" / "proposta por X"
+            (rf"\s*,?\s*(?:defendid[ao]s?|retomad[ao]s?|propost[ao]s?|formulad[ao]s?|apresentad[ao]s?|explicad[ao]s?)\s+por\s+{nome}"
+             r"(?=\s*[,.;:!?]|\s+a\s+partir)", ""),
+        ]
+        def troca(m, novo):
+            if novo != "\x00":
+                return novo
+            antes = m.string[:m.start()].rstrip()
+            ini_frase = not antes or antes[-1] in ".!?…\n:"  # no começo da frase: a próxima palavra vira maiúscula
+            return m.group(0)[:len(m.group(0)) - len(m.group(0).lstrip())] + ("\x00" if ini_frase else "")
+        for rx, novo in regras:
+            t = re.sub(rx, lambda m, novo=novo: troca(m, novo), t, flags=re.I)
+    t = re.sub(r"\x00\s*(\w)", lambda m: m.group(1).upper(), t).replace("\x00", "")
+    t = re.sub(r" {2,}", " ", t)
+    t = re.sub(r"\s+([,.;:!?])", r"\1", t)
+    restos = []
+    for n in nomes:
+        for m in re.finditer(r"\s+".join(re.escape(p) for p in n.split()), t, re.I):
+            restos.append(t[max(0, m.start() - 60):m.end() + 40].replace("\n", " "))
+    return t, restos

@@ -142,9 +142,9 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
             p = carregar(n, base)
         except CineErro:
             continue
-        out.append({"id": n, "titulo": p["titulo"], "planos": len(p["planos"]), "dur": round(duracao_total(p), 1),
+        out.append({"criado": p.get("criado") or p.get("criado_em") or 0, "id": n, "titulo": p["titulo"], "planos": len(p["planos"]), "dur": round(duracao_total(p), 1),
                     "video": bool((p.get("saida") or {}).get("mp4")), "atualizado": p.get("atualizado") or 0})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(pid: str, base: str = _BASE) -> None:

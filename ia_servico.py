@@ -64,7 +64,8 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
                "Lê o roteiro uma vez (quem é quem, lugares, época, o que evitar) e reescreve as buscas de cada trecho, "
                "da mais específica pra mais genérica, em inglês pros bancos.", True),
     "juiz": ("⚖️ Juiz visual nas prévias",
-             "Olha as miniaturas dos candidatos de cada trecho e escolhe a melhor (não a 1ª). Nota 5–6 = usa com ⚠.", True),
+             "Olha as miniaturas dos candidatos de cada trecho e escolhe a melhor (não a 1ª). Nota 5–6 = usa com ⚠. "
+             "💸 DESLIGADO por padrão (v84_426): é o que mais gasta — umas 10 imagens por trecho de cada vídeo.", False),
     "juiz_manual": ("🔎 Nota no botão Buscar do editor",
                     "Quando você busca à mão no editor, os resultados vêm ordenados pela nota, com o motivo.", True),
     "nova_busca": ("🔁 Reescrever a busca quando nada presta",
@@ -179,6 +180,12 @@ PADRAO: Dict[str, Any] = {
     "nota_minima": 7, "candidatos": 10, "limite_usd": 5.0,
     "credito_usd": 0.0,  # 🪙 v84_161: quanto você pôs de crédito na conta (pro saldo ao lado do sininho); 0 = só mostra o gasto
     "sem_credito": None,  # {"quando": ts, "erro": "..."} — desliga sozinho até você tentar de novo
+    # 🟠🟢 v84_423: pedidos de TEXTO pela sua assinatura (Claude Code / Codex) em vez da API; imagem continua na API
+    # 💸 v84_425: o recomendado já vem ligado (sem o programa instalado, cai direto na API, sem atrasar nada)
+    "texto_via": "claude", "assinatura_modelo": "sonnet", "assinatura_reserva_api": True, "antes_economia": None, "economia_aplicada": False,
+    # 🖥 v84_424: IA local (Ollama/LM Studio — ex.: Qwen) pras partes simples (buscas, Wikipedia, YouTube, juiz com visão)
+    "local": {"ativo": True, "url": "http://localhost:11434/v1", "modelo": "qwen2.5:7b", "modelo_visao": "",
+              "recursos": ["buscas", "nova_busca", "wikipedia", "youtube_ordem", "youtube_momento", "sound_design"]},
 }
 
 _RECENTES: List[Dict[str, Any]] = []  # últimas chamadas (mostradas na página /ia)
@@ -216,6 +223,11 @@ def config() -> Dict[str, Any]:
                 c["recursos"].update({r: bool(x) for r, x in v.items() if r in RECURSOS})
             elif k in c:
                 c[k] = v
+    if os.environ.get("BESTEDITOR_IA_SO_API") == "1" and not (isinstance(salvo, dict) and "texto_via" in salvo):
+        c["texto_via"] = "api"  # testes: o padrão novo (assinatura/local) só quando a config pede
+        c["local"] = dict(c["local"], ativo=False)
+        if not (isinstance(salvo, dict) and "juiz" in (salvo.get("recursos") or {})):
+            c["recursos"]["juiz"] = True  # os testes antigos do juiz esperam ele ligado
     if c["provedor"] not in PROVEDORES:
         c["provedor"] = "claude"
     if c["modelo"] not in {m["id"] for m in PROVEDORES[c["provedor"]]["modelos"]}:
@@ -233,6 +245,20 @@ def salvar_config(novos: Dict[str, Any]) -> Dict[str, Any]:
             c["provedor"] = novos["provedor"]
         if novos.get("modelo") in {m["id"] for m in PROVEDORES[c["provedor"]]["modelos"]}:
             c["modelo"] = novos["modelo"]
+        if "antes_economia" in novos:  # 💸 v84_425: como estava antes do "recomendado"
+            c["antes_economia"] = novos["antes_economia"]
+        if "economia_aplicada" in novos:
+            c["economia_aplicada"] = bool(novos["economia_aplicada"])
+        if isinstance(novos.get("local"), dict):  # 🖥 v84_424
+            import ia_local
+            lc = ia_local.config({"local": dict(c.get("local") or {}, **novos["local"])})
+            c["local"] = {k: lc[k] for k in ia_local.PADRAO}
+        if novos.get("texto_via") in ("api", "claude", "chatgpt"):
+            c["texto_via"] = novos["texto_via"]
+        if novos.get("assinatura_modelo") in ("sonnet", "opus", "haiku"):
+            c["assinatura_modelo"] = novos["assinatura_modelo"]
+        if "assinatura_reserva_api" in novos:
+            c["assinatura_reserva_api"] = bool(novos["assinatura_reserva_api"])
         if "chave" in novos and novos["chave"] is not None:
             c["chave"] = str(novos["chave"]).strip()
         if isinstance(novos.get("recursos"), dict):
@@ -333,14 +359,16 @@ def motivo_desligado(recurso: Optional[str] = None, c: Optional[Dict[str, Any]] 
     c = c or config()
     if not c.get("ativo"):
         return "a IA está desligada (🤖 IA nas configurações)"
-    if not chave(c):
+    via_assinatura = c.get("texto_via") in ("claude", "chatgpt") or (
+        bool(recurso) and bool((c.get("local") or {}).get("ativo")) and recurso in ((c.get("local") or {}).get("recursos") or []))
+    if not chave(c) and not via_assinatura:
         return "falta a chave da API"
-    if sem_credito_valendo(c):
+    if sem_credito_valendo(c) and not via_assinatura:
         return "sem crédito / chave recusada: " + str(c["sem_credito"].get("erro") or "")[:500]
     if recurso and not c["recursos"].get(recurso, False):
         return f"o recurso “{RECURSOS.get(recurso, (recurso,))[0]}” está desligado"
     lim = float(c.get("limite_usd") or 0)
-    if lim and gasto()["usd"] >= lim:
+    if lim and gasto()["usd"] >= lim and not via_assinatura:
         return f"chegou no limite de gasto de US$ {lim:.2f} (mude em 🤖 IA)"
     return None
 
@@ -704,6 +732,14 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
     if forcar and not chave(c):
         return None
     m = modelo_info(c)
+    if recurso in ("roteiros", "voz_tags") and isinstance(system, str):  # 🚫 v84_427: em TODO pedido de texto (roteiro, partes,
+        try:                                                              # revisão, checagem, TTS, notas…): os nomes proibidos
+            import metodo_roteiro as _mr
+            _rn = _mr.regra_nomes(_mr.nomes_proibidos())
+            if _rn and _rn not in system:
+                system = system + "\n\n" + _rn
+        except Exception:  # noqa: BLE001
+            pass
     if isinstance(conteudo, str):
         conteudo = [{"type": "text", "text": conteudo}]
     payload: Dict[str, Any] = {
@@ -732,6 +768,40 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
                               "entrada": 0, "saida": 0, "cache_lido": 0})
             _registrar_cache(recurso, job)
             return guardado.get("v")
+
+    import ia_local  # 🖥 v84_424: a IA local primeiro, nos recursos marcados (grátis)
+    _ml = ia_local.vai_local(recurso, conteudo, c)
+    _so_local = ia_local.so_local(recurso, c)  # 💸 v84_425: ex. o juiz das cenas "só no Qwen" — falhou, pula (sem gastar na API)
+    if _ml and ia_local.fora_do_ar():  # 🔌 caiu há pouco: nem tenta (não atrasa cada pedido)
+        _ml = None
+    if _so_local and not _ml:
+        return None
+    if _ml:
+        try:
+            v = ia_local.chamar(_ml, system, conteudo, schema=schema, max_tokens=max_tokens, timeout=max(timeout, 180), c=c)
+            _registrar(recurso + "·local", {}, 0.0, job, True)
+            if k:
+                _cache_gravar(k, {"v": v, "quando": time.time()})
+            return v
+        except ia_local.LocalErro as exc:
+            if ia_local.marcar_falha(exc):  # servidor fechado: registra uma vez e pausa a local por uns minutos
+                _registrar(recurso + "·local", {}, 0.0, job, False, f"local: {exc}")
+            if _so_local:
+                return None
+    if c.get("texto_via") in ("claude", "chatgpt"):  # 🟠🟢 v84_423: a sua assinatura (só texto)
+        import ia_assinatura
+        if not ia_assinatura.tem_imagem(conteudo) and ia_assinatura.executavel(c["texto_via"]):  # não instalado: API direto
+            try:
+                v = ia_assinatura.chamar(c["texto_via"], system, conteudo, schema=schema, web=web,
+                                         modelo_claude=c.get("assinatura_modelo") or "sonnet", timeout=max(timeout, 300))
+                _registrar(recurso + "·assinatura", {}, 0.0, job, True)
+                if k:
+                    _cache_gravar(k, {"v": v, "quando": time.time()})
+                return v
+            except ia_assinatura.AssinaturaErro as exc:
+                _registrar(recurso + "·assinatura", {}, 0.0, job, False, f"assinatura: {exc}")
+                if not (c.get("assinatura_reserva_api", True) and chave(c)):
+                    return None  # sem reserva: não cai na API
 
     tentativas, espera = 0, 2.0
     candidatas = chaves_candidatas(c) or [("salva", "")]

@@ -176,7 +176,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
             continue
         out.append({"id": p["id"], "nome": nome_do_projeto(p), "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0,
                     "midias": len(p.get("midias") or []), "tem_roteiro": bool(p.get("roteiro"))})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(base: str, pid: str) -> None:

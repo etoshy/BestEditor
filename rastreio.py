@@ -76,9 +76,9 @@ def listar(base: str) -> List[Dict[str, Any]]:
             r = carregar(base, rid)
         except (RastreioErro, OSError, ValueError):
             continue
-        out.append({"id": r["id"], "nome": r.get("nome") or "", "saida": bool(r.get("saida")), "job": r.get("job"),
+        out.append({"criado": r.get("criado") or r.get("criado_em") or 0, "id": r["id"], "nome": r.get("nome") or "", "saida": bool(r.get("saida")), "job": r.get("job"),
                     "trecho": r.get("trecho"), "atualizado": r.get("atualizado") or 0})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(base: str, rid: str) -> None:

@@ -313,7 +313,7 @@ def listar_canais(base: str) -> List[Dict[str, Any]]:
                     "analisadas": sum(1 for r in refs if r.get("estado") == "pronta"),
                     "perfil_ia": bool(c.get("perfil_ia")), "atualizado": c.get("atualizado") or 0, "criado": c.get("criado") or 0,
                     "modelo": c.get("modelo") or "noticia"})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir_canal(base: str, cid: str) -> None:
@@ -1492,7 +1492,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
                     "blocos": len((p.get("roteiro") or {}).get("blocos") or []), "gravado": bool(g.get("arquivo")),
                     "dur": g.get("dur"), "editor": (p.get("editor") or {}).get("job_id"), "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0,
                     "modelo": p.get("modelo") or "noticia"})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(base: str, pid: str) -> None:

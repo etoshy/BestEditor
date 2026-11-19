@@ -40,6 +40,7 @@ os.environ.pop("GOOGLE_API_KEY", None)
 os.environ["NARRATION_SEM_PREBAIXAR"] = "1"
 # 🧭 v84_405: os testes antigos olham a interface CLÁSSICA (os da nova ligam ela no próprio teste)
 os.environ.setdefault("BESTEDITOR_UI_PADRAO", "classica")
+os.environ.setdefault("BESTEDITOR_IA_SO_API", "1")  # 💸 v84_425: os testes antigos esperam tudo pela API (sem assinatura/local)
 # 🔁 projetos novos com os padrões de fábrica (sem herdar idioma/canal/voz do teste anterior)
 os.environ["ULTIMAS_ESCOLHAS_DESLIGADO"] = "1"
 

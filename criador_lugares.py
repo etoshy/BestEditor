@@ -189,7 +189,7 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
             or next((f.get("arquivo") for f in p["fotos"] if f.get("arquivo")), None)
         out.append({"id": p["id"], "nome": p["nome"], "escala": ESCALAS[p["escala"]][0], "pai": p["pai"],
                     "miniatura": foto, "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0, "nivel": ORDEM_ESCALAS.index(p["escala"])})
-    return sorted(out, key=lambda x: (-x["nivel"], -x["atualizado"]))
+    return sorted(out, key=lambda x: (-x["nivel"], __import__("tempo_ui").mais_novo(x)))  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(lid: str, base: str = _BASE) -> None:

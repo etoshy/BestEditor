@@ -568,7 +568,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
         out.append({"id": p["id"], "nome": nome_do_projeto(p), "modelo": (MODELOS.get(p["config"]["modelo"]) or {}).get("nome", ""),
                     "atualizado": p.get("atualizado") or 0, "criado": p.get("criado") or 0, "fontes": len(p.get("fontes") or []),
                     "midias": len(p.get("midias") or []), "tem_roteiro": bool(p.get("resultado"))})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(base: str, pid: str) -> None:
@@ -1361,6 +1361,9 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             rot = re.sub(r"\n{3,}", "\n\n", re.sub(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", "", rot, flags=re.I | re.M)).strip()
             avisos.append(f"📣 {_n_venda} [[VENDA]] tirada(s) — este canal não usa venda.")
     rot = _mr.tirar_meta_fonte(rot)  # 🧹 v84_418: "segundo as notas…" não vai pro vídeo
+    rot, _restos = _mr.tirar_nomes(rot, _mr.nomes_proibidos(p.get("config") or {}))  # 🚫 v84_427: nomes que não entram
+    if _restos:
+        avisos.insert(0, "🚫 O roteiro ainda cita um nome proibido — revise: " + " · ".join(f"“…{x}…”" for x in _restos[:3]))
     rot, _rep = _mr.tirar_repeticoes(rot)  # 🔁 v84_169: frase quase igual logo em seguida sai
     if _rep:
         avisos.append(f"🔁 {len(_rep)} frase(s) repetida(s) logo em seguida tirada(s): " + " · ".join(f"“{x[:70]}…”" for x in _rep[:3]))

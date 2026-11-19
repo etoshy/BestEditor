@@ -95,7 +95,7 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
         out.append(dict(p, resumo=resumo(p)))
-    return sorted(out, key=lambda x: -x.get("atualizado", 0))
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(pid: str, base: str = _BASE) -> None:

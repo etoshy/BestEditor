@@ -243,11 +243,11 @@ def listar(base: str = _BASE) -> List[Dict[str, Any]]:
             p = carregar(n, base)
         except AnimeErro:
             continue
-        out.append({"id": n, "titulo": p["titulo"], "estilo": ESTILOS.get(p["estilo"], ("?",))[0],
+        out.append({"criado": p.get("criado") or p.get("criado_em") or 0, "id": n, "titulo": p["titulo"], "estilo": ESTILOS.get(p["estilo"], ("?",))[0],
                     "personagens": len(p["personagens"]), "cenas": len(p["cenas"]),
                     "momentos": sum(len(c.get("momentos") or []) for c in p["cenas"]),
                     "job": (p.get("editor") or {}).get("job_id"), "atualizado": p.get("atualizado", 0)})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(pid: str, base: str = _BASE) -> None:

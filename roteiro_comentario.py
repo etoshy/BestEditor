@@ -113,9 +113,9 @@ def listar(base: str) -> List[Dict[str, Any]]:
             except Exception:  # noqa: BLE001
                 continue
             m = r.get("minerador") or {}
-            out.append({"id": r["id"], "titulo": r.get("titulo"), "tom": r.get("tom"), "pronto": bool(r.get("res")), "mudou": r.get("mudou") or 0,
+            out.append({"criado": r.get("criado") or r.get("criado_em") or 0, "id": r["id"], "titulo": r.get("titulo"), "tom": r.get("tom"), "pronto": bool(r.get("res")), "mudou": r.get("mudou") or 0,
                         "minerado": bool(m), "nota": m.get("nota"), "modelo": m.get("modelo") or "", "status": r.get("status") or ("novo" if m else "")})
-    return sorted(out, key=lambda x: -x["mudou"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def apagar(base: str, rid: str) -> None:

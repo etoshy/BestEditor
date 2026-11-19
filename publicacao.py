@@ -105,7 +105,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
                     "titulos": len(d["textos"].get("titulos") or []), "capas": len(d["capas"]),
                     "capa": f"/publicacoes/{pid}/api/capa/{capa['n']}/final" if capa else "",
                     "atualizado": meta.get("atualizado") or os.path.getmtime(pdir), "tem_projeto": bool(meta.get("tem_projeto"))})
-    return sorted(out, key=lambda x: -float(x["atualizado"] or 0))
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def carregar(job_dir: str) -> Dict[str, Any]:

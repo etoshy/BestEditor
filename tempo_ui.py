@@ -92,3 +92,10 @@ def registrar(app) -> None:
     app.jinja_env.globals["tempo"] = tempo
     app.jinja_env.filters["data_hora"] = data_hora
     app.jinja_env.filters["ha_quanto"] = ha_quanto
+
+
+def mais_novo(item: Any) -> float:
+    """🔝 v84_422: chave de ordenação "o mais NOVO em cima" — pela data de CRIAÇÃO (sem ela, a da última edição).
+    Use: sorted(lista, key=tempo_ui.mais_novo)."""
+    c = _pegar(item, CHAVES_CRIADO) if item is not None else 0.0
+    return -(c or (_pegar(item, CHAVES_EDITADO) if item is not None else 0.0))

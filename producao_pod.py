@@ -140,7 +140,7 @@ def roteiros_disponiveis(base: str = _BASE) -> List[Dict[str, Any]]:
                             "idioma": d["config"].get("idioma") or "", "atualizado": p.get("atualizado", 0)})
     except Exception:  # noqa: BLE001
         pass
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def texto_do_roteiro(origem: str, pid: str, base: str = _BASE) -> str:

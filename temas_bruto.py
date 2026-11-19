@@ -108,7 +108,7 @@ def listar(base: str) -> List[Dict[str, Any]]:
         out.append({"id": aid, "nome": a.get("nome") or aid, "modelo": a.get("modelo_nome") or "", "estado": a.get("estado"),
                     "temas": len(a.get("temas") or []), "criados": sum(1 for t in a.get("temas") or [] if t.get("projeto")),
                     "atualizado": a.get("atualizado") or 0, "criado": a.get("criado") or 0})
-    return sorted(out, key=lambda x: -x["atualizado"])
+    return sorted(out, key=__import__("tempo_ui").mais_novo)  # 🔝 v84_422: o mais novo em cima
 
 
 def excluir(base: str, aid: str) -> None:
@@ -474,11 +474,33 @@ def pedido_notas(t: Dict[str, Any], outros: Optional[List[Dict[str, Any]]] = Non
             "\n\nEscreva as notas de pesquisa deste tema (texto puro).")
 
 
+_CACHE_NOTAS: Dict[str, Dict[str, Any]] = {}  # 💸 v84_424: aula → {"trava", "quente" (quando o cache da IA ficou pronto)}
+_TRAVA_CACHE = threading.Lock()
+CACHE_VALE_S = 50 * 60  # o cache do texto na IA vale 1 h; 50 min pra ter folga
+
+
 def gerar_notas(base: str, a: Dict[str, Any], t: Dict[str, Any]) -> str:
+    """As notas de um tema. 💸 v84_424: o texto inteiro da aula vai no cache da IA (as notas seguintes leem por ~10% do
+    preço). Com vários temas ao mesmo tempo, o PRIMEIRO grava o cache e os outros esperam por ele — antes os 3 primeiros
+    gravavam juntos e cada um pagava a gravação (2×)."""
     import ia_servico as ia
     tx = texto(base, a["id"])
-    if len(tx) > BLOCO_ANALISE:  # texto enorme: as notas leem os blocos que mais falam do tema
+    if len(tx) > BLOCO_ANALISE:  # texto enorme: as notas leem os blocos que mais falam do tema (system diferente por tema)
         tx = _trechos_do_tema(tx, t)
+        return _notas(ia, a, t, tx)
+    with _TRAVA_CACHE:
+        st = _CACHE_NOTAS.setdefault(a["id"], {"trava": threading.Lock(), "quente": 0.0})
+    if time.time() - st["quente"] < CACHE_VALE_S:
+        return _notas(ia, a, t, tx)
+    with st["trava"]:  # o primeiro grava o cache; os outros esperam aqui
+        if time.time() - st["quente"] >= CACHE_VALE_S:
+            notas = _notas(ia, a, t, tx)
+            st["quente"] = time.time()
+            return notas
+    return _notas(ia, a, t, tx)
+
+
+def _notas(ia, a: Dict[str, Any], t: Dict[str, Any], tx: str) -> str:
     with ia.rotulo("📚 Notas: " + t["titulo"][:60]):
         notas = ia.chamar("roteiros", system_notas(a, tx), pedido_notas(t, a.get("temas")), max_tokens=12000, effort="low", timeout=600)
     if not notas or len(str(notas).split()) < 80:

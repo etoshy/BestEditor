@@ -14,6 +14,7 @@
   .ok { background: #dcfce7; color: #166534; padding: 10px; border-radius: 6px; margin-top: 12px; }
 </style>
 <h1>🤖 IA nas buscas, no editor e nos Modelos de vídeo</h1>
+<p style="margin:4px 0 10px"><a href="/ia/economia" style="font-weight:600">💸 Economia de IA</a> — assinatura do Claude no texto, Qwen local nas buscas, 🧪 testar tudo</p>
 <p class="hint">Com a IA ligada, o site <b>entende o roteiro</b> antes de buscar: monta a ficha do vídeo (quem é quem, lugares, época),
 escreve buscas melhores, <b>olha as miniaturas</b> e escolhe a melhor (não a 1ª), corrige a busca quando nada presta, ordena os
 vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PDFs dos 🕵️ Modelos de vídeo.
@@ -51,10 +52,68 @@ vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PD
   </div>
 
   <div class="ia-card">
+    <h3 style="margin-top:0">🖥 IA local (grátis, no seu PC) nas partes simples</h3>
+    <input type="hidden" name="local_enviado" value="1">
+    <p class="hint">Um modelo seu (ex.: <b>Qwen</b>) rodando no <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>
+      ou no LM Studio faz as buscas de vídeo e imagem, a Wikipedia e o YouTube, e até o juiz das cenas se tiver um modelo
+      com <b>visão</b> (ex.: <code>qwen2.5vl:7b</code>). Se a IA local não responder, o pedido segue pela assinatura ou pela API.
+      Ela divide a placa de vídeo com a voz (Chatterbox): gerando junto, os dois ficam mais lentos.</p>
+    <label style="font-weight:normal"><input type="checkbox" name="local_ativo" style="width:auto" {% if loc.ativo %}checked{% endif %}> Ligar a IA local</label>
+    <div class="ia-num">
+      <label>Endereço <input type="text" name="local_url" id="locUrl" value="{{ loc.url }}" style="width:260px" title="Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1"></label>
+      <label>Modelo (texto) <input type="text" name="local_modelo" id="locModelo" value="{{ loc.modelo }}" style="width:180px" placeholder="qwen2.5:7b"></label>
+      <label>Modelo com visão <input type="text" name="local_modelo_visao" id="locVisao" value="{{ loc.modelo_visao }}" style="width:180px" placeholder="qwen2.5vl:7b (vazio = imagem vai pra API)"></label>
+    </div>
+    <div style="margin:6px 0">{% for k, n in loc_recursos.items() %}<label style="font-weight:normal;display:block;margin:2px 0"><input type="checkbox" name="local_rec_{{ k }}" style="width:auto" {% if k in loc.recursos %}checked{% endif %}> {{ n }}</label>{% endfor %}</div>
+    <button type="button" id="locTestar" style="background:#334155">🔌 Testar a IA local</button> <span id="locRes" class="hint"></span>
+    <script>
+    document.getElementById('locTestar').addEventListener('click', async () => {
+      const res = document.getElementById('locRes'); res.textContent = '⏳ testando…';
+      try { const d = await (await fetch('/ia/local/testar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: document.getElementById('locUrl').value, modelo: document.getElementById('locModelo').value, modelo_visao: document.getElementById('locVisao').value }) })).json();
+        res.textContent = d.erro ? '❌ ' + d.erro : `texto: ${d.modelo || '—'} · visão: ${d.modelo_visao || '—'}` + (d.modelos ? ` · instalados: ${d.modelos.slice(0, 8).join(', ')}` : '');
+      } catch (e) { res.textContent = '❌ ' + e.message; }
+    });
+    </script>
+  </div>
+
+  <div class="ia-card">
+    <h3 style="margin-top:0">🟠🟢 Usar a minha assinatura nos pedidos de texto</h3>
+    <p class="hint">Roteiros, revisão, checagem, TTS, ideias de thumbnail e título, temas e formatos podem ir pela sua assinatura do
+      Claude (Claude Code) ou do ChatGPT (Codex). Assim saem da cota do plano em vez de serem pagos por uso. O que olha
+      <b>imagem</b> (o juiz das cenas, a revisão do diretor, as fichas de foto) continua pela API. A assinatura tem limite a
+      cada 5 horas e por semana: com muitos vídeos em lote, ela acaba e a API faz o resto, se a reserva estiver ligada.</p>
+    <div class="ia-num">
+      <label>Texto vai por <select name="texto_via" id="assVia">{% for k, n in ass_modos.items() %}<option value="{{ k }}" {% if k == ass.via %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+      <label>Modelo do Claude <select name="assinatura_modelo" id="assModelo">{% for k, n in ass_modelos.items() %}<option value="{{ k }}" {% if k == ass.modelo %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+    </div>
+    <label style="font-weight:normal"><input type="checkbox" name="assinatura_reserva_api" style="width:auto" {% if ass.reserva %}checked{% endif %}> se a assinatura falhar (limite, não logado), usar a API no lugar</label>
+    <div class="hint" style="margin:6px 0">
+      Claude Code: {% if ass.tem_claude %}✅ achei no PC{% else %}❌ não achei — instale com <code>npm install -g @anthropic-ai/claude-code</code> e rode <code>claude</code> uma vez num terminal pra entrar com a sua conta{% endif %}<br>
+      Codex: {% if ass.tem_codex %}✅ achei no PC{% else %}❌ não achei — instale com <code>npm install -g @openai/codex</code> e rode <code>codex login</code> com a conta do ChatGPT{% endif %}
+    </div>
+    <button type="button" id="assTestar" style="background:#ea580c">🔌 Testar a assinatura escolhida</button> <span id="assRes" class="hint">(salve antes, se mudou)</span>
+    <script>
+    document.getElementById('assTestar').addEventListener('click', async () => {
+      const modo = document.getElementById('assVia').value, res = document.getElementById('assRes');
+      if (modo === 'api') { res.textContent = 'escolha uma assinatura no “Texto vai por”'; return; }
+      res.textContent = '⏳ perguntando…';
+      try { const d = await (await fetch('/ia/assinatura/testar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modo, modelo: document.getElementById('assModelo').value }) })).json();
+        res.textContent = d.ok ? '✅ funcionou — os pedidos de texto vão pela sua assinatura' : '❌ ' + (d.erro || 'não respondeu');
+      } catch (e) { res.textContent = '❌ ' + e.message; }
+    });
+    </script>
+  </div>
+
+  <div class="ia-card">
     <h3 style="margin-top:0">O que a IA faz</h3>
     {% for k, rec in recursos.items() %}
     <div class="ia-rec"><input type="checkbox" id="rec_{{ k }}" name="rec_{{ k }}" {% if r.recursos.get(k) %}checked{% endif %}>
-      <label for="rec_{{ k }}">{{ rec[0] }}</label><p>{{ rec[1] }}</p></div>
+      <label for="rec_{{ k }}">{{ rec[0] }}</label><p>{{ rec[1] }}</p>
+      {% if k == 'juiz' %}<p id="juizAviso" style="display:none;color:#b91c1c;font-weight:600;border:2px solid #dc2626;background:#fef2f2;padding:6px 8px;border-radius:6px">⚠ O juiz visual foi o que mais gastou (mais da metade do custo da IA): umas 10 miniaturas por trecho de cada vídeo. Pra gastar zero, use ele no Qwen com visão em 💸 Economia de IA.</p>
+      <script>(() => { const cb = document.getElementById('rec_juiz'), av = document.getElementById('juizAviso');
+        cb.addEventListener('change', () => { if (!cb.checked) { av.style.display = 'none'; return; } av.style.display = 'block';
+          if (!confirm('⚠ O juiz visual é o que mais gasta: mais da metade do custo da IA (umas 10 imagens por trecho de cada vídeo).\n\nLigar mesmo assim?')) { cb.checked = false; } }); })();</script>{% endif %}</div>
     {% endfor %}
   </div>
 

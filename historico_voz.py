@@ -79,7 +79,7 @@ def registrar(pasta: str, jid: str, status: Dict[str, Any], voz: str = "") -> Di
 
 
 def listar(pasta: str, q: str = "", limite: int = 100, pagina: int = 0) -> Dict[str, Any]:
-    itens = _ler(pasta)
+    itens = sorted(_ler(pasta), key=lambda x: -float(x.get("criado") or x.get("terminou") or 0))  # 🔝 v84_422: o mais novo em cima
     for it in itens:  # arquivo apagado por fora (ex.: 🧹 Espaço em disco)
         it["sumiu"] = bool(it.get("arquivo")) and not os.path.exists(os.path.join(pasta, it["arquivo"]))
     if q:
