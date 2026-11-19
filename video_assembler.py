@@ -3624,6 +3624,8 @@ def julgar_candidatos_ia(candidates: List[Dict[str, Any]], ia_ctx: Optional[Dict
                          recurso: str = "juiz", miniatura: str = "thumbnail") -> Optional[Dict[str, Any]]:
     """🤖 Fase 2 (juiz visual): None sem IA; senão {"lista": candidatos na ordem da nota (com ia_nota/ia_motivo),
     "nova_busca": str}."""
+    if recurso == "juiz" and ia_ctx and ia_ctx.get("recurso_juiz"):  # ⚡ v84_428: o vídeo curto tem o juiz próprio
+        recurso = str(ia_ctx["recurso_juiz"])
     if not candidates or not ia_ctx or not _ia_pode(recurso):
         return None
     try:
@@ -3701,7 +3703,8 @@ def fetch_segment_preview_lightweight(
     acervo_confiavel = segment.provider in BIBLIOTECAS_LOCAIS and bool(getattr(segment, "obra", None) or getattr(segment, "personagem", None))
     # 🖥️ imagem gerada no SEU pod pra essa cena (Produção no pod / Meu pod): foi feita sob medida — o juiz não troca por
     # cartão nem pede "nova busca" (que geraria outra imagem no pod)
-    usar_ia = bool(ia_ctx) and not acervo_confiavel and segment.provider != "runpod" and _ia_pode("juiz")
+    usar_ia = bool(ia_ctx) and not acervo_confiavel and segment.provider != "runpod" and \
+        _ia_pode((ia_ctx or {}).get("recurso_juiz") or "juiz")  # ⚡ v84_428: curto = "juiz_curtos"
     ia_c = _ia_cfg() if usar_ia else {}
     reprovada: Optional[Dict[str, Any]] = None
     novas_buscas = 0

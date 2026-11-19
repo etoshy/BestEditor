@@ -46,7 +46,7 @@ def test_titulos_e_bloco(monkeypatch):
     assert "mais 2 no ESTILO TEMA-PONTO-PERGUNTA" in t and "O que há na cabeça deles?" in t
     assert "\"modo\": \"albert\"" in tf.bloco_prompt()
     monkeypatch.setattr(tf, "ativo_albert", lambda cfg=None: 0)
-    assert "TEMA-PONTO" not in mr.bloco_titulos(5) and tf.bloco_prompt() == tf.BLOCO_PROMPT
+    assert "TEMA-PONTO" not in mr.bloco_titulos(5) and tf.bloco_prompt().startswith(tf.BLOCO_PROMPT) and "albert" not in tf.bloco_prompt()
 
 
 def test_so_palavra_gigante(monkeypatch):
@@ -86,3 +86,34 @@ def test_tira_segundo_as_notas():
     assert "notas" not in out and out.startswith("Essas fontes") and "mas treinar-se" in out and "Perder a música" in out
     assert "notas" not in rp.ler_parte("Segundo as notas, o medo é antigo.", {"titulo": "x"})
     assert mr.tirar_meta_fonte("Ele tirou boas notas na escola.") == "Ele tirou boas notas na escola."
+
+
+def test_titulos_casados_com_a_thumb(monkeypatch):
+    import ia_servico as ia
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r, c=None: None)
+    visto = {}
+    monkeypatch.setattr(ia, "chamar", lambda rec, system, conteudo, **k: visto.update(s=system, c=conteudo) or {"thumbs": [
+        {"n": 7, "titulos": ["Contradição. Por que você foge do que quer?", "Contradição. Quem desiste de si mesmo?"]},
+        {"n": 99, "titulos": ["não pedido"]}]})
+    itens = [{"n": 7, "texto": "CONTRADIÇÃO", "modo": "albert", "ideia": "sorrindo segurando a própria lápide"}]
+    out = tf.pedir_titulos("O Maior Erro de Quem Desiste", "roteiro", itens)
+    assert out == {7: ["Contradição. Por que você foge do que quer?", "Contradição. Quem desiste de si mesmo?"]}
+    assert "Palavra. Pergunta" in visto["s"] and "CONTRADIÇÃO" in visto["c"] and "Não mude a palavra" in visto["s"]
+    assert tf.normalizar({"ideia": "x", "texto": "MEDO", "prompt": "p", "titulos": ["Medo. Como desligar isso?", "b"]})["titulos"][0] == "Medo. Como desligar isso?"
+    assert "titulos" in tf.bloco_prompt(2) and "titulos" in tf.bloco_prompt(0)
+
+
+def test_rota_titulos(monkeypatch):
+    import app as A
+    import dossies as ds
+    p = ds.criar(A.BASE_DIR, tema="Contradição")
+    p["resultado"] = {"roteiro": "um roteiro " * 50, "titulos": ["O Maior Erro"],
+                      "thumbnails": [{"ideia": "i", "texto": "CONTRADIÇÃO", "prompt": "p", "modo": "albert"}]}
+    ds.salvar(A.BASE_DIR, p)
+    monkeypatch.setattr(tf, "pedir_titulos", lambda titulo, sobre, alvo, idioma="pt": {int(alvo[0]["n"]): ["Contradição. Por quê?", "Outro"]})
+    try:
+        r = A.app.test_client().post(f"/thumbs/dossie/{p['id']}/titulos", json={})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()["itens"][0]["titulos"] == ["Contradição. Por quê?", "Outro"]
+    finally:
+        ds.excluir(A.BASE_DIR, p["id"])

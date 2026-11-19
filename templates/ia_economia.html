@@ -54,6 +54,16 @@
 </div>
 
 <div class="ec-card">
+  <h2 style="margin:0">⚡ Juiz visual nos vídeos curtos</h2>
+  <p class="d">Só nos projetos que vêm dos ⚡ Vídeos curtos: poucos trechos (10 a 20) e imagens de Pexels, Bing e Wikipedia, que erram mais
+    que a sua biblioteca de anime. Vale ligar mesmo com o juiz dos vídeos longos desligado.</p>
+  {% for k, n in e.juiz_curtos_modos.items() %}
+  <label class="ec-lin" style="cursor:pointer;margin:0;font-weight:400"><input type="radio" name="ecJuizCurtos" value="{{ k }}" style="width:auto;margin:0" {% if k == e.juiz_curtos_modo %}checked{% endif %}> <span class="n">{{ n }}</span></label>
+  {% endfor %}
+  {% if e.juiz_curtos_modo == 'local' and not e.local.modelo_visao %}<p class="d" style="color:#b45309">⚠ Falta o “Modelo com visão” na IA local — sem ele o juiz dos curtos não roda.</p>{% endif %}
+</div>
+
+<div class="ec-card">
   <h2 style="margin:0">🟠 Texto pela sua assinatura</h2>
   <p class="d">Roteiro, partes, revisão, checagem, TTS, tags de emoção, ideias de thumbnail e título, temas e formatos saem da cota do seu
     plano, em vez de serem pagos por uso. O que olha imagem continua na API.</p>
@@ -101,6 +111,7 @@
   const local = () => ({ ativo: $('#ecLocal').checked, url: $('#ecUrl').value.trim(), modelo: $('#ecMod').value.trim(), modelo_visao: $('#ecVis').value.trim(),
                          recursos: [...document.querySelectorAll('.ecRec')].filter(x => x.checked).map(x => x.value) });
   $('#ecVia').addEventListener('change', e => salvar({ texto_via: e.target.value }));
+  document.querySelectorAll('input[name=ecJuizCurtos]').forEach(x => x.addEventListener('change', async () => { await salvar({ juiz_curtos_modo: x.value }); location.reload(); }));
   const JUIZ_ATUAL = {{ e.juiz_modo|tojson }};
   document.querySelectorAll('input[name=ecJuiz]').forEach(x => x.addEventListener('change', async () => {
     const box = $('#ecJuizAviso');

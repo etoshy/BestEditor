@@ -20,12 +20,13 @@ RECURSOS_LOCAIS = {
     "nova_busca": "🔁 Reescrever a busca quando nada presta (texto)",
     "juiz": "⚖️ Juiz visual nas prévias (precisa de modelo com VISÃO, ex.: qwen2.5vl)",
     "juiz_manual": "🔎 Nota no botão Buscar do editor (precisa de VISÃO)",
+    "juiz_curtos": "⚖️ Juiz visual nos ⚡ vídeos curtos (precisa de VISÃO)",
     "wikipedia": "📚 Wikipedia: desfazer ambiguidades (texto)",
     "youtube_ordem": "🎬 Ordenar os vídeos do YouTube (texto)",
     "youtube_momento": "🎯 Achar o momento certo pela legenda (texto)",
     "sound_design": "🎧 Sound design: a emoção de cada parte (texto)",
 }
-VISAO = ("juiz", "juiz_manual")
+VISAO = ("juiz", "juiz_manual", "juiz_curtos")
 PADRAO = {"ativo": True, "url": "http://localhost:11434/v1", "modelo": "qwen2.5:7b", "modelo_visao": "", "so_local": [],
           "recursos": ["buscas", "nova_busca", "wikipedia", "youtube_ordem", "youtube_momento", "sound_design"]}
 

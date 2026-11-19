@@ -66,7 +66,8 @@ def estado() -> Dict[str, Any]:
             "tem_chave": bool(ia.chave(c)), "ia_ligada": bool(c.get("ativo")),
             "modos": ias.MODOS, "modelos_claude": ias.MODELOS_CLAUDE, "recursos_locais": il.RECURSOS_LOCAIS,
             "instrucoes": INSTRUCOES, "salvo_antes": bool(c.get("antes_economia")), "juiz_modo": juiz_modo(c),
-            "juiz_modos": JUIZ_MODOS, "gasto_juiz": _gasto("juiz")}
+            "juiz_modos": JUIZ_MODOS, "gasto_juiz": _gasto("juiz"),
+            "juiz_curtos_modo": juiz_modo(c, "juiz_curtos"), "juiz_curtos_modos": JUIZ_CURTOS_MODOS}
 
 
 def _gasto(recurso: str) -> Dict[str, Any]:
@@ -76,33 +77,39 @@ def _gasto(recurso: str) -> Dict[str, Any]:
     return {"usd": float(r.get("usd") or 0), "chamadas": int(r.get("chamadas") or 0), "total": float(g.get("usd") or 0)}
 
 
+JUIZ_CURTOS_MODOS = {"api": "🔑 na API (o padrão) — uns US$ 0,01 por curto",
+                     "local": "🖥 no Qwen com visão (grátis; se ele falhar, fica o resultado da busca, sem gastar na API)",
+                     "off": "⏸ desligado — fica o melhor resultado da busca que ainda não foi usado"}
 JUIZ_MODOS = {"off": "⏸ desligado (o padrão) — fica o melhor resultado da busca que ainda não foi usado (sem repetir clipe)",
               "local": "🖥 no Qwen com visão (grátis; se ele falhar, o trecho fica com o resultado da busca, sem gastar na API)",
               "api": "🔑 na API (o que mais gasta — umas 10 imagens por trecho)"}
 
 
-def juiz_modo(c: Dict[str, Any]) -> str:
+def juiz_modo(c: Dict[str, Any], rec: str = "juiz") -> str:
+    """rec = "juiz" (vídeos longos) ou "juiz_curtos" (⚡ vídeos curtos)."""
     import ia_local as il
-    if not (c.get("recursos") or {}).get("juiz", True):
+    if not (c.get("recursos") or {}).get(rec, rec == "juiz_curtos"):
         return "off"
     lc = il.config(c)
-    if lc["ativo"] and "juiz" in lc["recursos"] and (lc.get("modelo_visao") or "").strip():
+    if lc["ativo"] and rec in lc["recursos"] and (lc.get("modelo_visao") or "").strip():
         return "local"
     return "api"
 
 
-def _campos_juiz(modo: str, c: Dict[str, Any]) -> Dict[str, Any]:
+def _campos_juiz(modo: str, c: Dict[str, Any], rec: str = "juiz") -> Dict[str, Any]:
     import ia_local as il
     lc = il.config(c)
-    rec_local = [r for r in lc["recursos"] if r not in ("juiz", "juiz_manual")]
-    so = [r for r in lc["so_local"] if r not in ("juiz", "juiz_manual")]
+    junto = ("juiz", "juiz_manual") if rec == "juiz" else ("juiz_curtos",)
+    rec_local = [r for r in lc["recursos"] if r not in junto]
+    so = [r for r in lc["so_local"] if r not in junto]
     if modo == "local":
-        rec_local += ["juiz", "juiz_manual"]
-        so += ["juiz"]
-    rec = dict(c.get("recursos") or {})
-    rec["juiz"] = modo != "off"
-    rec["nova_busca"] = modo != "off"  # a nova busca depende das notas do juiz
-    return {"recursos": rec, "local": {"recursos": rec_local, "so_local": so, **({"ativo": True} if modo == "local" else {})}}
+        rec_local += list(junto)
+        so += [rec]
+    rs = dict(c.get("recursos") or {})
+    rs[rec] = modo != "off"
+    outro = "juiz_curtos" if rec == "juiz" else "juiz"
+    rs["nova_busca"] = rs[rec] or bool(rs.get(outro, outro == "juiz_curtos"))  # a nova busca depende das notas de algum juiz
+    return {"recursos": rs, "local": {"recursos": rec_local, "so_local": so, **({"ativo": True} if modo == "local" else {})}}
 
 
 def salvar(campos: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,6 +125,8 @@ def salvar(campos: Dict[str, Any]) -> Dict[str, Any]:
         ia.salvar_config(novos)
     if campos.get("juiz_modo") in JUIZ_MODOS:
         ia.salvar_config(_campos_juiz(campos["juiz_modo"], ia.config()))
+    if campos.get("juiz_curtos_modo") in JUIZ_CURTOS_MODOS:
+        ia.salvar_config(_campos_juiz(campos["juiz_curtos_modo"], ia.config(), "juiz_curtos"))
     return estado()
 
 

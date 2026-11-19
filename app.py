@@ -5148,7 +5148,8 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
     melhores de cada trecho (query = a 1ª, alternativas = as outras + a busca original). Devolve o
     contexto de cada trecho pro juiz (ou None sem IA). Qualquer falha: segue com as buscas de sempre."""
     import ia_servico
-    if not (ia_servico.ativo("juiz") or ia_servico.ativo("buscas")):
+    rec_juiz = "juiz_curtos" if job.get("curto_id") else "juiz"  # ⚡ v84_428: os curtos têm o juiz próprio (ligado por padrão)
+    if not (ia_servico.ativo(rec_juiz) or ia_servico.ativo("buscas")):
         return None
     info = job.setdefault("ia", {})
     blocos = [b for b in job.get("segments") or [] if (b.get("text") or "").strip()]
@@ -5222,7 +5223,7 @@ def _ia_preparar_buscas(job_id: str, job: dict, segments: List[VideoSegment]) ->
             sg._frase_tela = pend[k].get("frase_tela") or ""
     return [{"ficha": ficha, "fala": falas[k], "anterior": falas[k - 1] if k else "",
              "seguinte": falas[k + 1] if k + 1 < len(falas) else "", "visual": getattr(segments[k], "visual", None) or "",
-             "job": job_id} for k in range(len(segments))]
+             "job": job_id, "recurso_juiz": rec_juiz} for k in range(len(segments))]
 
 
 def _ia_escolher_imagem(res: dict, ctx: Optional[dict], cache: dict, termo: str, termo_unico: bool) -> dict:

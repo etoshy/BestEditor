@@ -53,7 +53,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         c = request.get_json(silent=True) or {}
         try:
-            d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar", "estilo_arte", "modo") if k in c})
+            d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar", "estilo_arte", "modo", "titulos") if k in c})
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
@@ -100,6 +100,24 @@ def registrar(app, base_dir: str) -> None:
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True, novas=len(novas)))
+
+    @app.route("/thumbs/<origem>/<pid>/titulos", methods=["POST"])
+    def thumbs_titulos(origem: str, pid: str):
+        """🏷 v84_429: 2 títulos casados com cada thumbnail (a palavra e a imagem dela não mudam)."""
+        ideias = _ideias(origem, pid) if origem in tf.ORIGENS else None
+        if ideias is None:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        c = request.get_json(silent=True) or {}
+        try:
+            d = tf.sincronizar(base_dir, origem, pid, ideias)
+            ns = {int(x) for x in c.get("ns") or [] if str(x).isdigit()}
+            alvo = [it for it in d.get("itens") or [] if int(it["n"]) in ns] if ns else list(d.get("itens") or [])
+            titulo, sobre, idioma = _contexto(origem, pid)
+            tits = tf.pedir_titulos(titulo, sobre, alvo, idioma)
+            d = tf.gravar_titulos(base_dir, origem, pid, tits)
+        except (tf.ThumbErro, ValueError) as exc:
+            return jsonify({"erro": str(exc)}), 400
+        return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True, feitos=len(tits)))
 
     # ------------------------------------------------------------------ 🖼 thumbnail avulsa — página própria (v84_368)
     @app.route("/thumbs-avulsas")

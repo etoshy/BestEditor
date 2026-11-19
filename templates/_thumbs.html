@@ -7,6 +7,7 @@
     <button type="button" id="thIA" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;" title="a IA cria mais 5 thumbnails bem diferentes entre si (e das que já existem), no estilo do canal — e mais as 🔥 de palavra gigante, se marcado">🤖 +5 ideias</button>
     <label style="margin:0;font-weight:400;font-size:.84rem;display:inline-flex;gap:4px;align-items:center" title="além das 5: thumbs com UMA palavra gigante em vermelho atrás do personagem + uma ironia (sorrindo com uma corda, o rosto num prato…). O estilo de arte do canal não muda"><input type="checkbox" id="thAlbert" style="width:auto;margin:0" checked> + <input type="number" id="thAlbertN" min="1" max="4" value="2" style="width:46px;margin:0;padding:2px"> 🔥 palavra gigante</label>
     <button type="button" id="thSoAlbert" style="width:auto;margin:0;padding:5px 12px;background:#dc2626;" title="a IA cria SÓ thumbnails no estilo palavra gigante, bem provocativas: UMA palavra-rótulo enorme atrás do personagem, ele vivendo o tema de um jeito absurdo e sorrindo como se fosse normal">🔥 Só palavra gigante</button>
+    <button type="button" id="thTitTodas" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;" title="2 títulos novos pra CADA thumbnail, casados com a palavra e a cena dela (a thumb não muda)">🏷 Títulos pra todas as thumbs</button>
     <button type="button" id="thNova" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Nova ideia</button>
     <button type="button" id="thAtualizar" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">🔄</button>
     <span id="thSt" style="font-size:.85rem;color:#555;"></span>
@@ -42,6 +43,10 @@
       <label style="font-size:.76rem;margin:0 0 4px;font-weight:400;display:flex;gap:4px;align-items:center" title="ligado: a palavra vai DENTRO da imagem, atrás do personagem (gere de novo depois de mudar). Desligado: o texto entra por cima, do jeito de sempre — use se o Flow errar as letras"><input type="checkbox" class="thModo" style="width:auto;margin:0" ${it.modo === 'albert' ? 'checked' : ''}> 🔥 palavra gigante atrás do personagem</label>
       <details style="font-size:.78rem"><summary>prompt da imagem (Flow)</summary><textarea class="thPrompt" rows="3" style="width:100%;font-size:.78rem">${esc(it.prompt)}</textarea>
         <button type="button" class="thCopiar" style="width:auto;margin:2px 0 0;padding:3px 8px;font-size:.75rem;background:#64748b" title="o prompt completo (cena + estilo do canal + sem texto) pra colar no Google Flow à mão">📋 copiar pro Flow</button></details>
+      <div style="margin:6px 0 2px;padding:6px 8px;background:#f8fafc;border-radius:6px;font-size:.8rem">
+        <b>🏷 Títulos pra esta thumb</b>${(it.titulos || []).length ? (it.titulos || []).map((t, i) => `<div style="display:flex;gap:4px;align-items:center;margin-top:3px"><span style="flex:1">${esc(t)}</span><button type="button" class="thCopTit" data-t="${esc(t)}" style="width:auto;margin:0;padding:1px 7px;font-size:.72rem;background:#64748b" title="copiar o título">📋</button></div>`).join('')
+          : '<div style="color:#64748b">nenhum ainda</div>'}
+        <button type="button" class="thTitulos" style="width:auto;margin:4px 0 0;padding:2px 9px;font-size:.75rem;background:#0f766e">${(it.titulos || []).length ? '🔁 outros 2 títulos' : '🏷 2 títulos pra esta thumb'}</button></div>
       ${it.erro ? `<div style="color:#b91c1c;font-size:.78rem">⚠ ${esc(it.erro)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
         <button type="button" class="thGerar" style="width:auto;margin:0;padding:4px 10px;font-size:.8rem;background:#7c3aed" ${['fila', 'gerando'].includes(it.status) ? 'disabled' : ''}>${it.url_imagem ? '🔁 Outra imagem' : '🎨 Gerar no Flow'}</button>
@@ -58,6 +63,9 @@
       card.querySelector('.thGerar').addEventListener('click', () => gerar([n], true));
       card.querySelector('.thCopiar').addEventListener('click', async (e) => { const it = itens.find(x => x.n === n); try { await navigator.clipboard.writeText(it.prompt_flow || it.prompt || it.ideia); e.target.textContent = '✅ copiado'; } catch (_) { prompt('Copie:', it.prompt_flow || it.prompt); } });
       card.querySelector('.thApagar').addEventListener('click', () => { if (confirm('Tirar esta ideia?')) salvar('apagar', true); });
+      card.querySelector('.thTitulos').addEventListener('click', async (e) => { e.target.disabled = true; e.target.textContent = '⏳ pensando…';
+        try { const d = await post(BASE + '/titulos', { ns: [n] }); itens = d.itens; desenhar(); } catch (er) { $h('thSt').textContent = '⚠ ' + er.message; e.target.disabled = false; } });
+      card.querySelectorAll('.thCopTit').forEach(b => b.addEventListener('click', async () => { try { await navigator.clipboard.writeText(b.dataset.t); b.textContent = '✅'; } catch (_) { prompt('Copie:', b.dataset.t); } }));
     });
   }
   async function carregar() {
@@ -76,6 +84,11 @@
     if (!ns.length) { $h('thSt').textContent = 'Nenhuma thumbnail com imagem ainda — use 🎨 Gerar as que faltam.'; return; }
     if (!confirm(`Gerar de novo ${ns.length} thumbnail(s) no estilo atual do canal? (as imagens de agora são trocadas)`)) return;
     gerar(ns, true);
+  });
+  $h('thTitTodas').addEventListener('click', async () => {
+    const b = $h('thTitTodas'); b.disabled = true; $h('thSt').textContent = '🏷 a IA está casando 2 títulos com cada thumbnail…';
+    try { const d = await post(BASE + '/titulos', {}); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ títulos pra ${d.feitos} thumb(s)`; }
+    catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   });
   $h('thSoAlbert').addEventListener('click', async () => {
     const b = $h('thSoAlbert'); b.disabled = true; const q = Number($h('thAlbertN').value || 3) || 3;

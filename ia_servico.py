@@ -66,6 +66,9 @@ RECURSOS: Dict[str, Tuple[str, str, bool]] = {
     "juiz": ("⚖️ Juiz visual nas prévias",
              "Olha as miniaturas dos candidatos de cada trecho e escolhe a melhor (não a 1ª). Nota 5–6 = usa com ⚠. "
              "💸 DESLIGADO por padrão (v84_426): é o que mais gasta — umas 10 imagens por trecho de cada vídeo.", False),
+    "juiz_curtos": ("⚖️ Juiz visual nos ⚡ vídeos curtos",
+                    "O mesmo juiz, só nos projetos que vêm dos ⚡ Vídeos curtos (10 a 20 trechos, imagens de Pexels/Bing/"
+                    "Wikipedia que erram mais): uns US$ 0,01 por curto pela API — ou grátis no Qwen com visão.", True),
     "juiz_manual": ("🔎 Nota no botão Buscar do editor",
                     "Quando você busca à mão no editor, os resultados vêm ordenados pela nota, com o motivo.", True),
     "nova_busca": ("🔁 Reescrever a busca quando nada presta",

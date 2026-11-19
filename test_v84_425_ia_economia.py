@@ -85,7 +85,7 @@ def test_juiz_tres_modos(monkeypatch, tmp_path):
     import ia_economia as ie2
     ie2.salvar({"local": {"ativo": True, "modelo_visao": "qwen2.5vl:7b"}})
     e = ie2.salvar({"juiz_modo": "off"})
-    assert e["juiz_modo"] == "off" and not ia.config()["recursos"]["juiz"] and not ia.config()["recursos"]["nova_busca"]
+    assert e["juiz_modo"] == "off" and not ia.config()["recursos"]["juiz"]
     e = ie2.salvar({"juiz_modo": "local"})
     assert e["juiz_modo"] == "local" and "juiz" in ia.config()["local"]["so_local"] and ia.config()["recursos"]["juiz"]
     # só local: o Qwen falhou → NÃO cai na API

@@ -87,6 +87,9 @@ def normalizar(x: Any) -> Optional[Dict[str, str]]:
         out["modo"] = "albert"
         out["texto"] = re.sub(r"[^\w-]", "", (texto or str(x.get("palavra") or "")).split()[0] if (texto or x.get("palavra")) else "",
                               flags=re.UNICODE).upper()[:14]
+    tits = [" ".join(str(t).split())[:100] for t in (x.get("titulos") or []) if str(t).strip()][:3]
+    if tits:  # 🏷 v84_429: os títulos que combinam com ESTA thumbnail
+        out["titulos"] = tits
     import estilos_arte
     if str(x.get("estilo_arte") or "") in estilos_arte.ESTILOS:  # 🎨 v84_397: o estilo próprio desta thumbnail
         out["estilo_arte"] = str(x["estilo_arte"])
@@ -128,6 +131,8 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
                 import estilos_arte
                 v = str(campos["estilo_arte"] or "")
                 it["estilo_arte"] = v if v in estilos_arte.ESTILOS else ""
+            if "titulos" in campos:  # 🏷 v84_429
+                it["titulos"] = [" ".join(str(t).split())[:100] for t in (campos["titulos"] or []) if str(t).strip()][:3]
             if "modo" in campos:  # 🔥 v84_417: "albert" (palavra na imagem) ou "" (texto por cima, o de sempre)
                 it["modo"] = "albert" if campos["modo"] == "albert" else ""
             if ("texto" in campos or "modo" in campos) and it.get("imagem") and os.path.isfile(it["imagem"]):  # refaz a final na hora
@@ -232,6 +237,15 @@ REGRA_ALBERT = (
     "e entregue SÓ as mais provocativas e mais diferentes entre si, cada uma com uma cena própria.")
 
 
+REGRA_TITULOS_THUMB = (
+    "TÍTULOS DA THUMB: cada thumbnail vem com 2 títulos (\"titulos\") feitos PRA ELA — a thumb e o título se completam, um "
+    "não repete o outro à toa e juntos fazem quem rola o feed precisar clicar (a thumb mostra o choque/a emoção, o título "
+    "promete a resposta). Até ~60 caracteres, no idioma do vídeo, honestos (o vídeo entrega). Na thumb de PALAVRA GIGANTE, "
+    "o 1º título é no jeito \"Palavra. Pergunta curta?\" com a MESMA palavra da thumb (ex.: MEDO → \"Medo. Como desligar "
+    "isso?\"; CONTRADIÇÃO → \"Contradição. Por que você foge do que quer?\") e o 2º uma variação com outra pergunta. Nas "
+    "outras, os títulos completam o texto da thumb sem repetir as palavras dele.")
+
+
 def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
     """Quantas thumbs/títulos a mais no estilo palavra gigante (Configurações → 0 desliga)."""
     if cfg is None:
@@ -254,7 +268,7 @@ ANGULOS = ("rosto/emoção forte de uma pessoa da história", "um objeto-símbol
 
 def _schema_ideias() -> Dict[str, Any]:
     from ia_midia import _S, _lista, _obj
-    return _obj({"thumbnails": _lista(_obj({"ideia": _S, "texto": _S, "prompt": _S, "angulo": _S, "modo": _S}))})
+    return _obj({"thumbnails": _lista(_obj({"ideia": _S, "texto": _S, "prompt": _S, "angulo": _S, "modo": _S, "titulos": _lista(_S)}))})
 
 
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
@@ -279,7 +293,8 @@ Para cada uma:
 - "texto": a PALAVRA gigante (só ela, no idioma do vídeo: {idioma});
 - "prompt": a cena EM INGLÊS pro Google Flow (o personagem, o que o corpo/a situação dele mostra, a expressão irônica,
   o fundo) — NÃO descreva as letras, o site põe;
-- "modo": "albert".
+- "modo": "albert";
+- "titulos": 2 títulos pra ESTA thumbnail. {REGRA_TITULOS_THUMB}
 {('Estética do canal (a cena tem que caber nela): ' + estilo_canal.replace('@@', ' ')[:900]) if estilo_canal else ''}
 Se o estilo é desenho/anime/cartoon, descreva o personagem como desenho (expressão, pose, roupa), sem detalhes de foto.
 {('Já existem estas (NÃO repita a PALAVRA entre colchetes nem a ideia da cena):' + chr(10) + existentes) if existentes else ''}
@@ -305,6 +320,7 @@ Para cada uma:
   enquadramento, com espaço vazio de um lado pro título. NUNCA peça texto escrito, letras, setas, círculos ou marcações na
   imagem (o texto entra depois, por cima). Sem violência gráfica. Pessoa real famosa: descreva (idade, roupa, época), sem o nome.
 - "angulo": qual dos ângulos acima ela usa.
+- "titulos": 2 títulos pra ESTA thumbnail. {REGRA_TITULOS_THUMB}
 {(f"""
 E MAIS {albert} thumbnail(s) a mais (depois das {n}), com "modo": "albert", neste estilo:
 {REGRA_ALBERT}
@@ -507,7 +523,7 @@ def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[
     """Pra página: sem caminhos do disco, com as URLs (e o prompt completo pra colar no Flow à mão — v84_368)."""
     out = []
     for it in d.get("itens") or []:
-        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte", "modo")}
+        x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte", "modo", "titulos")}
         x["prompt_flow"] = prompt_flow(it, estilo=estilo_canal)
         x["url_imagem"] = f"{url_base}/{it['n']}/imagem?v={int(os.path.getmtime(it['imagem']))}" if it.get("imagem") and os.path.isfile(it["imagem"]) else ""
         x["url_final"] = f"{url_base}/{it['n']}/final?v={int(os.path.getmtime(it['final']))}" if it.get("final") and os.path.isfile(it["final"]) else ""
@@ -527,14 +543,74 @@ BLOCO_PROMPT = (
 
 
 def bloco_prompt(albert: Optional[int] = None) -> str:
-    """O pedido das thumbnails nos prompts do roteiro — as 5 de sempre + as do 🔥 estilo palavra gigante (v84_417)."""
+    """O pedido das thumbnails nos prompts do roteiro — as 5 de sempre + as do 🔥 estilo palavra gigante (v84_417)
+    + 🏷 2 títulos casados com cada uma (v84_429)."""
     a = ativo_albert() if albert is None else albert
     if not a:
-        return BLOCO_PROMPT
+        return BLOCO_PROMPT + " " + REGRA_TITULOS_THUMB
     return (BLOCO_PROMPT + f" DEPOIS dessas 5, mais {a} thumbnail(s) com \"modo\": \"albert\" — {REGRA_ALBERT} Nelas, \"texto\" "
             "= a PALAVRA gigante (só ela) e o \"prompt\" descreve a cena (personagem, expressão irônica, objeto-símbolo, fundo) "
-            "sem descrever as letras — o site põe.")
+            "sem descrever as letras — o site põe. " + REGRA_TITULOS_THUMB)
 
 
 EXEMPLO_JSON = [{"ideia": "o que a thumbnail mostra e por que dá clique", "texto": "2-4 PALAVRAS",
-                 "prompt": "in English: the image scene for an AI image generator (no text in the image)"}]
+                 "prompt": "in English: the image scene for an AI image generator (no text in the image)",
+                 "titulos": ["título 1 que casa com esta thumb", "título 2"]}]
+
+
+
+# ------------------------------------------------------------------ 🏷 v84_429: 2 títulos pra cada thumbnail que já existe
+def _schema_titulos() -> Dict[str, Any]:
+    from ia_midia import _I, _S, _lista, _obj
+    return _obj({"thumbs": _lista(_obj({"n": _I, "titulos": _lista(_S)}))})
+
+
+def pedir_titulos(titulo: str, contexto: str, itens: List[Dict[str, Any]], idioma: str = "pt") -> Dict[int, List[str]]:
+    """{n: [2 títulos]} pras thumbnails pedidas — a palavra e a imagem da thumb NÃO mudam."""
+    import ia_servico as ia
+    motivo = ia.motivo_desligado("roteiros")
+    if motivo:
+        raise ThumbErro("IA: " + motivo)
+    if not itens:
+        raise ThumbErro("Nenhuma thumbnail pra dar título.")
+    import metodo_roteiro as mr
+    formulas = "\n".join(f"  - {a}  (ex.: {b})" for a, b in mr.TITULOS_ALBERT)
+    lista = "\n".join(f"- n={it['n']}: {'PALAVRA GIGANTE' if it.get('modo') == 'albert' else 'texto na thumb'} „{it.get('texto') or ''}“"
+                       f" — cena: {it.get('ideia') or it.get('prompt') or ''}" for it in itens)
+    system = f"""Você escreve TÍTULOS de YouTube casados com a THUMBNAIL — como os canais de psicologia/comportamento que
+explodem: a thumb e o título se completam e juntos dão o clique.
+{REGRA_TITULOS_THUMB}
+Fórmulas do jeito "Palavra. Pergunta?" (adapte ao tema real):
+{formulas}
+Pra cada thumbnail da lista, devolva "n" e 2 "titulos" (idioma: {idioma}). Não mude a palavra nem a cena da thumb.
+Responda só o JSON."""
+    conteudo = (f"Título atual do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:9000]}\n\n"
+                f"Thumbnails:\n{lista}")
+    with ia.rotulo("🏷 Títulos das thumbs: " + (titulo or "")[:50]):
+        d = ia.chamar("roteiros", system, conteudo, schema=_schema_titulos(), max_tokens=2500, effort="low", timeout=240,
+                      cache_local=False)
+    if not isinstance(d, dict):
+        raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
+    pedidos = {int(it["n"]) for it in itens}
+    out: Dict[int, List[str]] = {}
+    for x in d.get("thumbs") or []:
+        try:
+            n = int(x.get("n"))
+        except (TypeError, ValueError):
+            continue
+        tits = [" ".join(str(t).split())[:100] for t in x.get("titulos") or [] if str(t).strip()][:3]
+        if n in pedidos and tits:
+            out[n] = tits
+    if not out:
+        raise ThumbErro("a IA não devolveu títulos")
+    return out
+
+
+def gravar_titulos(base: str, origem: str, pid: str, titulos: Dict[int, List[str]]) -> Dict[str, Any]:
+    with _TRAVA:
+        d = carregar(base, origem, pid)
+        for it in d.get("itens") or []:
+            if int(it.get("n") or 0) in titulos:
+                it["titulos"] = titulos[int(it["n"])]
+        salvar(base, origem, pid, d)
+        return d
