@@ -172,7 +172,7 @@ def test_trocar_so_o_rosto(tmp_path):
                                           {"papel": "personagem", "nome": "Mascote", "arquivo": _foto(tmp_path / "m2.png")}])
     p2 = FM.prompt_basico(pac2)
     assert p2.startswith("Recreate reference image 1 shot-for-shot") and "takes the place of that figure" in p2
-    assert "DESIGNED to match both Mascote's look" in p2 and pac2["refs"][1]["troca"] == "auto"  # 🤖 o padrão: completa o que falta
+    assert "WEARING Mascote's OWN OUTFIT" in p2 and "original figure's clothes are NOT kept" in p2 and pac2["refs"][1]["troca"] == "auto"  # 🤖 o padrão: completa o que falta
     assert any("SWAP: AUTOMATIC" in c.get("text", "") for c in FM.conteudo_ia(pac2, lambda f: None))
     assert "CONTEXT FIRST" in FM.SISTEMA
     assert "THE MOST COMMON FAILURE" in FM.SISTEMA and "SWAP FACE/HEAD ONLY" in FM.SISTEMA

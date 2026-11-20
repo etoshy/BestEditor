@@ -13,7 +13,10 @@ NOTA_MINIMA = 60
 SISTEMA = """You judge image-generation results. You get the REQUEST (the prompt, and what each reference image was for), the
 REFERENCE images (the base/pose and the new characters) and the CANDIDATES. Score each candidate 0–100 for how faithfully it
 does what was asked: same framing/pose/expression as the base or pose image, each new character recognizable and in the
-right place (and NOT pasted with the pose/props of its own reference photo), the requested style, no extra or missing people,
+right place (and NOT pasted with the pose/props of its own reference photo), each REPLACED figure wearing the NEW
+character's own look and an outfit that fits that character (its reference clothes, or clothes designed in its own colors
+and style) — a candidate where only the face/hair changed and the ORIGINAL figure's clothes stayed (unless that figure was
+marked "face/head only") is a big failure (score it 40 or less), the requested style, no extra or missing people,
 no broken anatomy, no text artifacts. Pick the best. "problemas": short, concrete, in English (they go into a retry prompt as
 "Fix: …"), empty if none. "resumo": one short sentence in Brazilian Portuguese."""
 SCHEMA = {"type": "object", "additionalProperties": False, "required": ["candidatos", "melhor", "resumo"], "properties": {

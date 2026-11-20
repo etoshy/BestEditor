@@ -482,9 +482,16 @@ REGRA_FALA = (
     "TEXTO DE FALA, NÃO DE BASTIDOR: quem assiste não sabe que o roteiro tem partes, título ou tese. NUNCA escreva \"a parte "
     "anterior\", \"a parte seguinte\", \"o próximo bloco\", \"o roteiro propõe\", \"a tese do título\", \"este roteiro\" — "
     "faça a ponte com a própria ideia (\"e é aqui que…\", \"lembra da pergunta de agora há pouco?\"). "
-    "IMAGEM QUE VOLTA: se uma imagem/cena da abertura (ex.: o náufrago) volta mais tarde, ASSUMA o retorno (\"Lembra do "
-    "náufrago do começo? Volta pra ele.\") — nunca a apresente de novo como se fosse nova — e de preferência FECHE o vídeo "
-    "com ela, amarrando o fim com o começo, em vez de trazer uma imagem nova só no final. "
+    "IMAGEM QUE VOLTA: se uma imagem/cena DA SUA ABERTURA volta mais tarde, ASSUMA o retorno (\"Lembra de <a imagem que "
+    "abriu ESTE vídeo>?\") — nunca a apresente de novo como se fosse nova — e de preferência FECHE o vídeo com ela. Só "
+    "\"lembre\" o que este roteiro realmente contou antes: NUNCA invente um retorno a algo que não apareceu. "
+    "UM GANCHO SÓ: a pergunta-gancho ao público (\"Você já reparou/percebeu/sentiu…?\") abre o VÍDEO, não cada bloco — "
+    "os blocos seguintes começam continuando a ideia. "
+    "UM PEDIDO DE COMENTÁRIO SÓ, no fim do vídeo. "
+    "EXEMPLO COM NOME FICA COM NOME: o personagem, a obra, o autor, o caso real ou o episódio que a FONTE traz entra com o "
+    "nome e o detalhe (\"em <obra>, de <autor>, o personagem <nome>…\") — nunca vire \"imagine um personagem…\" nem \"em certas "
+    "interpretações…\"; exemplo inventado (\"imagine…\") só quando a fonte não tem um real. "
+    "UMA TESE SÓ: a do título, dita do mesmo jeito no começo e no fim. "
     "CITAÇÃO NA FALA: autor + obra (ex.: \"Louis Lavelle, em A Intimidade Espiritual\") — sem ano, página, edição ou nome "
     "do capítulo/ensaio; esses detalhes vão nas fontes da descrição. "
     "ANALOGIA tem que fechar: uma comparação só entra se for clara na primeira ouvida (quem, o quê, por que é parecido); "
@@ -1380,6 +1387,9 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
             rot = re.sub(r"\n{3,}", "\n\n", re.sub(r"^[ \t]*\[\[\s*VENDA[^\]]*\]\][ \t]*$", "", rot, flags=re.I | re.M)).strip()
             avisos.append(f"📣 {_n_venda} [[VENDA]] tirada(s) — este canal não usa venda.")
     rot = _mr.tirar_meta_fonte(rot)  # 🧹 v84_418: "segundo as notas…" não vai pro vídeo
+    rot, _ctas = _mr.uma_chamada_comentario(rot)  # ✍ v84_440: um "comenta aí" só, no fim
+    if _ctas:
+        avisos.append(f"💬 {len(_ctas)} pedido(s) de comentário a mais tirado(s) — ficou só o último.")
     rot, _restos = _mr.tirar_nomes(rot, _mr.nomes_proibidos(p.get("config") or {}))  # 🚫 v84_427: nomes que não entram
     if _restos:
         avisos.insert(0, "🚫 O roteiro ainda cita um nome proibido — revise: " + " · ".join(f"“…{x}…”" for x in _restos[:3]))

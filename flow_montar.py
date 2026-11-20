@@ -213,10 +213,10 @@ _REGRA_PAPEL = {
     "roupa": "dress {alvo} in the outfit shown in reference image {n}",
     "objeto": "include the object from reference image {n}",
     "personagem_auto": "{nome} (look from reference image {n}) takes the place of that figure, in the same pose, place and "
-                       "expression; whatever the scene shows of that figure that reference image {n} does not (body, clothes, "
-                       "hands, shoes…) is DESIGNED to match both {nome}'s look (palette, style, personality) and the scene's "
-                       "context (place, era, action), and anything in reference image {n} the scene does not need (its pose, "
-                       "props, background) is left out",
+                       "expression, WEARING {nome}'s OWN OUTFIT — the clothes shown in reference image {n}, and whatever it "
+                       "does not show (the rest of the body, clothes, shoes…) DESIGNED in {nome}'s own colors and style so it "
+                       "fits {nome} and the scene (place, era, action); the original figure's clothes are NOT kept; anything "
+                       "in reference image {n} the scene does not need (its pose, props, background) is left out",
     "personagem_rosto": "ONLY the face/head of the figure is replaced by {nome}'s face/head design from reference image {n} "
                         "(its features, colors and head shape) — everything else in the base stays exactly as it is: body, "
                         "clothes, hands, surroundings, framing and light; the new face makes the SAME expression, gaze and head "
@@ -342,7 +342,11 @@ Your prompt must also:
   otherwise; "mantém" = keep it as in the sketch;
 - REPLACING MEANS REPLACING: when a figure is replaced (whole or automatic), NEVER describe the ORIGINAL person's face,
   hair, hair color or outfit as the target — describe the NEW character's look and say plainly that the original person is
-  completely replaced (only the place, pose and expression stay). An object that has its OWN reference photo is REPLACED by
+  completely replaced (only the place, pose and expression stay). THE OUTFIT IS THE CHARACTER'S: describe the clothes the
+  new character wears in its reference (colors, pieces) and, for what the reference does not show, an outfit you DESIGN
+  in that character's own palette and style — e.g. a boy with glasses in a dark shirt keeps a dark shirt and tie, a girl in
+  a pink cardigan keeps the pink cardigan — and write explicitly "not the original figure's clothes (<the original
+  outfit>)" so the model does not copy the base clothes. An object that has its OWN reference photo is REPLACED by
   the object in that photo (adapted to the place/size), even when its note only describes the original;
 - follow every note; the general note wins on scene/mood/action;
 - render the FINAL ART STYLE given (realistic photo, anime, manga…) and say it clearly in the prompt; the identities stay

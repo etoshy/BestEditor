@@ -19,7 +19,7 @@ def test_tira_o_bastidor_da_fala():
 def test_regras_no_prompt_e_na_checagem():
     import checagem_resolver as cr
     import dossies as ds
-    assert "IMAGEM QUE VOLTA" in ds.REGRA_FALA and "Lembra do" in ds.REGRA_FALA and "página" in ds.REGRA_FALA
+    assert "IMAGEM QUE VOLTA" in ds.REGRA_FALA and "Lembra de" in ds.REGRA_FALA and "página" in ds.REGRA_FALA
     for pol in ("auto", "suavizar", "tirar"):
         assert "SUBSTITUI" in cr.regra_sem_fonte(pol, True)
 
@@ -114,3 +114,13 @@ def test_v84_436_sem_link_vai_pra_wikipedia():
         return R(404)
     r = fw.gerar("rot", "T", chamar=chamar, baixar=baixar)
     assert r["itens"] and "Filosofia_Primeira" in r["itens"][0]["url"] and not r["sem_link"]
+
+
+def test_v84_440_um_comentario_e_mais_bastidor():
+    t = "A.\n\nComenta aí, nos comentários: x\n\nB.\n\nComplete esta frase nos comentários: z\n\nE você? Conta nos comentários."
+    novo, tirados = mr.uma_chamada_comentario(t)
+    assert novo == "A.\n\nB.\n\nE você? Conta nos comentários." and len(tirados) == 2
+    s = mr.tirar_meta_fonte("O que isso acrescenta à pergunta do título é o seguinte: a cultura perde. Voltando ao título: será?")
+    assert "título" not in s and s.startswith("A cultura perde")
+    import dossies as ds
+    assert "náufrago" not in ds.REGRA_FALA and "UM GANCHO SÓ" in ds.REGRA_FALA

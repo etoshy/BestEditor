@@ -588,7 +588,31 @@ _BASTIDOR = [
     (re.compile(r"\bneste roteiro\b", re.I), "neste vídeo"),
     (re.compile(r"\bo roteiro (?=propõe|defende|sugere|vai|mostra|mostrou|quer)", re.I), "o vídeo "),
     (re.compile(r"\b(a|da) tese do título\b", re.I), lambda m: m.group(1) + " tese deste vídeo"),
+    # ✍ v84_440: o que escapou no roteiro da psicologização
+    (re.compile(r"\b(?:O|o) que isso acrescenta à pergunta do título é o seguinte:\s*", re.I), ""),
+    (re.compile(r"\b(a|da|na) pergunta do título\b", re.I), lambda m: m.group(1) + " pergunta deste vídeo"),
+    (re.compile(r"\bvoltando ao título\b", re.I), "voltando à pergunta do começo"),
+    (re.compile(r"\b(?:na|pela) leitura defendida (?:aqui|neste vídeo)\b", re.I), "numa leitura possível"),
+    (re.compile(r"\buma crítica defendida neste vídeo é que\b", re.I), "uma crítica possível é que"),
+    (re.compile(r"\bComeça com uma coisa que já estava no ar:\s*", re.I), ""),
 ]
+
+
+# ✍ v84_440: cada parte terminava com o seu próprio "comenta aí" — fica SÓ o último pedido de comentário
+_RE_CTA = re.compile(r"\b(coment[ea] aí|nos comentários|conta (?:aí )?nos comentários|escreve aí|deixa (?:aí )?nos comentários)\b", re.I)
+
+
+def uma_chamada_comentario(texto: str):
+    """Parágrafos curtos que só pedem comentário: fica o ÚLTIMO; os outros saem. → (texto, tirados)."""
+    pars = re.split(r"(\n\s*\n)", str(texto or ""))
+    idx = [i for i, t in enumerate(pars) if t.strip() and _RE_CTA.search(t) and len(t.split()) <= 45]
+    if len(idx) <= 1:
+        return texto, []
+    tirados = [pars[i].strip() for i in idx[:-1]]
+    for i in idx[:-1]:
+        pars[i] = ""
+    t = re.sub(r"\n{3,}", "\n\n", "".join(pars)).strip()
+    return t, tirados
 
 
 def tirar_bastidor(texto: str) -> str:

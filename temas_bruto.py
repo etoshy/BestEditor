@@ -670,7 +670,13 @@ Regras:
   autores, obras e citações (com o que o texto atribui a cada um). O resultado fica com 70% a 90% do tamanho do original
   — só sai o que é ruído.
 - Tire o ruído da fala: hesitações, repetições, "né", "então", frases quebradas, idas e vindas.
-- Corrija os erros óbvios de transcrição pelo contexto; o que não der pra entender, deixe de fora.
+- Corrija os erros óbvios de transcrição pelo contexto. NOMES deformados pelo reconhecimento de voz (autor, obra,
+  personagem, lugar, evento) você RECONSTRÓI pelo contexto e pelo que você sabe (o som parecido + o assunto) e escreve
+  certo — não descarte um exemplo só porque o nome veio torto. Só deixe de fora o que for realmente incompreensível.
+- EXEMPLOS CONCRETOS FICAM CONCRETOS: personagem, obra, autor, caso real, episódio contado (ex.: "numa prova, a maioria
+  escolheu <tal personagem> de <tal livro>") ficam COM o nome e o detalhe — nunca vire "imagine um personagem…" ou "em certas
+  interpretações…". É o que deixa o vídeo denso.
+- Mantenha também o PORQUÊ que o texto dá (a explicação/a causa que quem fala propõe), não só a constatação.
 - Organize na ordem LÓGICA (não precisa ser a ordem da fala), juntando o que fala da mesma coisa, com subtítulos curtos.
 - NADA do evento: não mencione curso, aula, palestra, professor, alunos, perguntas do público, datas, nem o nome de quem
   fala. Nada de histórias pessoais de quem fala sobre a própria vida. O que for tese própria de quem fala (não de um autor
