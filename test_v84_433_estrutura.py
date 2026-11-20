@@ -71,3 +71,16 @@ def test_ajustar_thumb(tmp_path, monkeypatch):
     import pytest
     with pytest.raises(tf.ThumbErro):
         tf.ajustar("", "dossie", "x", 1, "  ", chamar=chamar)
+
+
+def test_palavra_gigante_sem_repetir_e_regra_de_rotulo(monkeypatch):
+    import ia_servico as ia
+    import thumbs_flow as tf
+    assert "será que EU sou isso?" in tf.REGRA_ALBERT and "peneira" in tf.REGRA_ALBERT and "ACUSAÇÃO" in tf.REGRA_TITULOS_THUMB
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r: "")
+    monkeypatch.setattr(ia, "chamar", lambda *a, **k: {"thumbnails": [
+        {"ideia": "a", "texto": "PEDRA", "prompt": "x", "modo": "albert", "titulos": ["a", "b"]},
+        {"ideia": "b", "texto": "Pedra", "prompt": "y", "modo": "albert", "titulos": ["a", "b"]},
+        {"ideia": "c", "texto": "ACOMODADO", "prompt": "z", "modo": "albert", "titulos": ["a", "b"]}]})
+    out = tf.pedir_ideias("T", "c", [{"ideia": "v", "texto": "ACOMODADO", "modo": "albert"}], 0, albert=3)
+    assert [t["texto"] for t in out] == ["PEDRA"]

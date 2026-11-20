@@ -24,7 +24,7 @@ def test_pedir_ideias_vem_5_mais_2(monkeypatch):
     def falso(rec, system, conteudo, **k):
         visto["s"] = system
         return {"thumbnails": [{"ideia": f"n{i}", "texto": "X", "prompt": "p"} for i in range(5)]
-                + [{"ideia": f"a{i}", "texto": "MEDO", "prompt": "p", "modo": "albert"} for i in range(2)]}
+                + [{"ideia": f"a{i}", "texto": f"MEDO{i}", "prompt": "p", "modo": "albert"} for i in range(2)]}
     monkeypatch.setattr(ia, "chamar", falso)
     out = tf.pedir_ideias("Medo", "roteiro", [], 5, albert=2)
     assert len(out) == 7 and [t.get("modo") for t in out].count("albert") == 2

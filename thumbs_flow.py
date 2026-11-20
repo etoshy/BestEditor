@@ -267,10 +267,13 @@ REGRA_ALBERT = (
     "COMO ELE PENSA (aplique ao ROTEIRO DESTE vídeo — não copie palavras nem cenas de exemplo nenhum):\n"
     "1) LEIA o roteiro e ache o NERVO: qual é a verdade incômoda, a acusação ou o tabu que o vídeo revela sobre quem "
     "assiste (\"você é X sem saber\", \"todo mundo faz Y e finge que não\")? A thumb vende ESSE incômodo.\n"
-    "2) A PALAVRA: UMA só, o rótulo mais forte desse nervo — um nome de PESSOA que ninguém quer ser (um \"-ado\", um "
-    "\"-ista\", um \"-filo\", um defeito, um vício, uma condição) ou o tabu cru. Ela tem que sair DESTE roteiro, ser "
-    "chocante pra quem lê em 1 segundo e diferente em cada thumb. Nada de frase, nada de palavra morna ou abstrata "
-    "(\"linguagem\", \"reflexão\", \"silêncio\", \"memória\"). 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
+    "2) A PALAVRA: UMA só — um RÓTULO DE PESSOA, a acusação que o nervo faz a quem assiste: um defeito, um vício, uma "
+    "condição, um tipo de gente que ninguém quer ser (adjetivo ou substantivo de pessoa: um \"-ado\", um \"-ista\", um "
+    "\"-ente\"), ou o tabu cru. TESTE: quem lê pensa \"será que EU sou isso?\" e sente um soco. "
+    "A palavra vem do NERVO do vídeo, NÃO das imagens do roteiro: NUNCA use um objeto, um lugar ou uma metáfora que o "
+    "roteiro usou pra explicar (peneira, pedra, régua, ampulheta, caverna, náufrago, relógio, trilho — isso é ilustração, "
+    "não acusação), nem conceito técnico ou abstrato (concessão, finitude, reflexão, linguagem, memória, silêncio). "
+    "Nada de frase. 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
     "3) A CENA: o personagem do canal VIVENDO a palavra de forma LITERAL, absurda e meio escandalosa — o corpo, a roupa ou "
     "a situação dele É a metáfora (não \"ele ao lado de um objeto\"). Pergunte: se essa palavra virasse uma foto ridícula "
     "e chocante do personagem, como seria? Pra calibrar o NÍVEL (são de OUTROS temas — NÃO repita): ZOÓFILO = ele na "
@@ -284,8 +287,11 @@ REGRA_ALBERT = (
     "repetir a mesma palavra ou a mesma ideia de cena em duas thumbs; usar palavra que o roteiro não sustenta.\n"
     "7) Limites (monetizável): sugestivo, nunca explícito — nada de nudez, sexo, sangue de verdade, ferimento realista, "
     "pessoa real famosa ou crianças. O personagem é o do canal, no ESTILO DE ARTE do canal (que não muda).\n"
-    "Antes de responder, liste pra você umas 8 palavras candidatas tiradas do roteiro, descarte as mornas e as repetidas, "
-    "e entregue SÓ as mais provocativas e mais diferentes entre si, cada uma com uma cena própria.")
+    "8) O TÍTULO conversa com a palavra: ele diz o ASSUNTO do vídeo e faz a MESMA acusação (a palavra ou o sentido dela "
+    "aparece no título, como pergunta ou afirmação incômoda) — palavra e título são o mesmo soco.\n"
+    "Antes de responder, liste pra você umas 10 palavras candidatas (rótulos de pessoa que o nervo do vídeo sustenta), "
+    "dê a cada uma uma nota de 0 a 10 no teste \"será que eu sou isso?\", descarte objetos, metáforas, mornas e "
+    "repetidas, e entregue SÓ as de nota mais alta e mais diferentes entre si, cada uma com uma cena própria.")
 
 
 REGRA_TITULOS_THUMB = (
@@ -297,7 +303,9 @@ REGRA_TITULOS_THUMB = (
     "universal → ruim: \"Costura. Quem está fazendo esse remendo?\"; bom: \"A História Universal é um Remendo?\" ou "
     "\"História Universal. Quem Costurou Essa Versão?\"). A palavra da thumb só entra se couber natural no assunto. O jeito "
     "\"Assunto. Pergunta?\" usa o ASSUNTO real do vídeo antes do ponto (\"História Universal. Por Que Ela Não Existe?\"), "
-    "não a palavra da thumb. Até ~60 caracteres, no idioma do vídeo, honestos (o vídeo entrega).")
+    "não a palavra da thumb. Nas thumbs PALAVRA GIGANTE, pelo menos 1 dos 2 títulos junta o ASSUNTO com a ACUSAÇÃO da "
+    "palavra (a palavra ou o sentido dela, dirigido a quem assiste — \"você\") — provocativo, sem perder o assunto. "
+    "Até ~60 caracteres, no idioma do vídeo, honestos (o vídeo entrega).")
 
 
 def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
@@ -340,6 +348,16 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
                                                               for k, e in enumerate(por_alb))) if por_alb else ""
 
     def _pos_alb(lst):
+        # 🔁 v84_435: a mesma PALAVRA em duas thumbs (ex.: PEDRA e PEDRA) — fica só a primeira
+        vistas = {str(i.get("texto") or "").strip().upper() for i in ja if i.get("modo") == "albert" and i.get("texto")}
+        unicas = []
+        for t in lst:
+            w = str(t.get("texto") or "").strip().upper()
+            if w and w in vistas:
+                continue
+            vistas.add(w)
+            unicas.append(t)
+        lst[:] = unicas or lst[:1]
         for k, t in enumerate(lst):
             if por_alb:
                 t["estilo_arte"] = por_alb[k % len(por_alb)]
