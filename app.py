@@ -11727,6 +11727,8 @@ import temas_bruto_rotas as _temas_bruto  # noqa: E402  (📚 v84_368: texto bru
 _temas_bruto.registrar(app, BASE_DIR)
 import formatos_rotas as _formatos  # noqa: E402  (📐 v84_421: Formatos de vídeo — a fórmula do canal aprendida dos roteiros)
 _formatos.registrar(app, BASE_DIR)
+import fontes_confianca_rotas as _fontes_conf  # noqa: E402  (🛡 v84_437: Fontes confiáveis — sites testados, avaliados e aprendidos)
+_fontes_conf.registrar(app, BASE_DIR)
 import navegador_imagens as _nav_img  # noqa: E402  (🧲 v84_150: Brave do site + userscript que manda os links)
 _nav_img.registrar(app, BASE_DIR)
 import fotos_editor as _fotos_editor  # noqa: E402  (📸 v84_387: Coisas do roteiro no Estúdio — Brave → substituir/camada)

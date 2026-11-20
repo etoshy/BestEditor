@@ -17,6 +17,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 MAX_REFS = 6          # o Flow aceita várias imagens na caixa; mais que isso confunde o modelo
+MAX_REFS_PRANCHA = 12  # 🗂 v84_438: com a prancha (as referências juntas numa imagem só, numeradas) cabem até 12
 MAX_OBS = 600
 PAPEIS = {
     "pose": "pose / composição",
@@ -91,15 +92,32 @@ def _limpar_velhos(base: str, horas: float = 48) -> None:
             pass
 
 
-def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "", estilo: str = "") -> Dict[str, Any]:
+def _alvo(obs: str) -> str:
+    """"entra no lugar da figura 1…" / "no lugar do elemento 3…" → "1" / "3" (o número da marca na base)."""
+    m = re.search(r"(?:figura|elemento|pessoa|objeto)\s+(\d{1,2})\b", str(obs or ""), re.I)
+    return m.group(1) if m else ""
+
+
+def _img(r: Dict[str, Any], pac: Dict[str, Any]) -> str:
+    """Como o comando chama esta referência no Flow: "reference image 3" ou (prancha) "the panel marked 3 on the
+    reference sheet (reference image 2)"."""
+    if pac.get("prancha") and r.get("painel"):
+        return f"the panel marked {r['painel']} on the reference sheet (reference image {pac.get('prancha_n') or 2})"
+    return f"reference image {r['n']}"
+
+
+def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "", estilo: str = "",
+                base_numerada: bool = False, prancha: bool = False) -> Dict[str, Any]:
     """itens = [{papel, nome, obs, arquivo (caminho de origem)}] na ordem em que vão pro Flow (a pose primeiro).
     Copia as imagens pra uma pasta só deste pacote e guarda."""
     _limpar_velhos(base)
     ok = [i for i in itens if i.get("arquivo") and os.path.isfile(i["arquivo"])]
     if not ok:
         raise MontarErro("Mande pelo menos uma foto (a pose ou um personagem).")
-    if len(ok) > MAX_REFS:
-        raise MontarErro(f"No máximo {MAX_REFS} imagens por cena (o Flow se confunde com mais).")
+    if len(ok) > MAX_REFS_PRANCHA:
+        raise MontarErro(f"No máximo {MAX_REFS_PRANCHA} imagens por cena (com a 🗂 prancha).")
+    if len(ok) > MAX_REFS:  # 🗂 v84_438: mais de 6 → as referências vão juntas numa prancha numerada
+        prancha = True
     ok.sort(key=lambda i: 0 if i.get("papel") in ("pose", "base") else 1)  # a pose/base sempre é a imagem 1
     pid = time.strftime("%Y%m%d_%H%M%S") + "_" + secrets.token_hex(3)
     pasta = os.path.join(pasta_pacotes(base), pid)
@@ -124,12 +142,38 @@ def novo_pacote(base: str, itens: List[Dict[str, Any]], obs_geral: str = "", est
                 try:
                     if marcas:
                         r["arquivo_ia"] = FR.desenhar_marcas(dest, os.path.join(pasta, f"{k:02d}_pose_numerada.png"),
-                                                             marcas)
+                                                             marcas, ao_lado=True)
+                        if base_numerada:  # 📍 v84_438: o Flow recebe a base COM os números (ao lado, sem cobrir) e apaga
+                            r["arquivo_flow"] = FR.desenhar_marcas(dest, os.path.join(pasta, f"{k:02d}_base_numerada.png"),
+                                                                   marcas, ao_lado=True, com_nomes=False)
                 except Exception:  # noqa: BLE001 — sem a cópia numerada, a IA lê só a observação
                     pass
         refs.append(r)
     pac = {"id": pid, "refs": refs, "obs_geral": _limpo(obs_geral, 1500), "criado": time.time(),
-           "estilo": estilo if estilo_en(estilo) else "", "estilo_en": estilo_en(estilo)}
+           "estilo": estilo if estilo_en(estilo) else "", "estilo_en": estilo_en(estilo),
+           "base_numerada": any(r.get("arquivo_flow") for r in refs)}
+    resto = [r for r in refs if r["papel"] not in ("pose", "base")]
+    if prancha and len(resto) >= 2:  # 🗂 v84_438: as referências numa imagem só — o número de cada quadro = a marca da base
+        import flow_rascunho as FR
+        letras = iter("ABCDEFGHIJKL")
+        usados = set()
+        for r in resto:
+            a = _alvo(r["obs"])
+            r["painel"] = a if a and a not in usados else next(letras)
+            usados.add(r["painel"])
+        try:
+            pac["prancha"] = FR.montar_prancha(
+                [{"n": r["painel"], "arquivo": r["arquivo"],
+                  "rotulo": (r["nome"] or PAPEIS[r["papel"]]) + (f" → {'figura' if r['papel'] == 'personagem' else 'elemento'} "
+                                                                f"{r['painel']}" if r["painel"].isdigit() else "")}
+                 for r in resto], os.path.join(pasta, "prancha.png"))
+            pac["prancha_n"] = 2 if any(r["papel"] in ("pose", "base") for r in refs) else 1
+        except Exception:  # noqa: BLE001 — sem a prancha, vai do jeito normal (se couber)
+            pac.pop("prancha", None)
+            for r in resto:
+                r.pop("painel", None)
+            if len(refs) > MAX_REFS:
+                raise MontarErro(f"Não consegui juntar as imagens na prancha — mande no máximo {MAX_REFS}.")
     with open(os.path.join(pasta, "pacote.json"), "w", encoding="utf-8") as f:
         json.dump(pac, f, ensure_ascii=False, indent=1)
     _PACOTES[pid] = pac
@@ -183,6 +227,13 @@ _REGRA_PAPEL = {
 }
 
 
+BASE_NUMERADA_EN = ("Reference image 1 has small numbered circles with thin lines pointing at each figure/object: they are "
+                    "ONLY labels to tell which figure is which — use them, then REMOVE them completely: no numbers, circles, "
+                    "lines or any text in the final image.")
+PRANCHA_EN = ("Reference image {n} is a REFERENCE SHEET: several separate pictures, each inside a bordered frame with a dark "
+              "label strip on top; the number on the strip is the number of the figure/element on the base it goes to "
+              "(letters = general references). Use each framed picture only for its own target; never reproduce the sheet, "
+              "its frames, labels or numbers.")
 IGNORAR_REF = ("From the character reference images take ONLY what the character looks like (face/head design, body shape, "
                "colors, outfit, art style) — IGNORE the pose, gesture, hand position, objects it holds and facial expression "
                "shown in those references unless a note asks to keep them.")
@@ -216,10 +267,18 @@ def prompt_basico(pac: Dict[str, Any]) -> str:
         regra = r["papel"]
         if r["papel"] == "personagem":
             regra = {"rosto": "personagem_rosto", "inteira": "personagem"}.get(r.get("troca") or "auto", "personagem_auto")
-        frase = _REGRA_PAPEL[regra].format(n=r["n"], nome=r["nome"] or f"the character from image {r['n']}", alvo=alvo)
+        frase = _REGRA_PAPEL[regra].replace("reference image {n}", "{img}").format(
+            n=r["n"], img=_img(r, pac), nome=r["nome"] or f"the character from image {r['n']}", alvo=alvo)
         partes.append(frase[0].upper() + frase[1:] + (f" (note: {r['obs']})" if r["obs"] else "") + ".")
     if pers:
         partes.append(IGNORAR_REF)
+        if any((r.get("troca") or "auto") != "rosto" for r in pers):  # 🩹 v84_438: o Flow mantinha a pessoa original
+            partes.append("The original people of the base are COMPLETELY replaced: do not keep their face, hair, hair color, "
+                          "skin or outfit — only their place, pose and expression stay.")
+    if pac.get("base_numerada"):
+        partes.append(BASE_NUMERADA_EN)
+    if pac.get("prancha"):
+        partes.append(PRANCHA_EN.format(n=pac.get("prancha_n") or 2))
     so_rosto = bool(pers) and all(r.get("troca") == "rosto" for r in pers)
     if pac.get("obs_geral"):
         partes.append("Scene: " + pac["obs_geral"] + ".")
@@ -277,9 +336,14 @@ Your prompt must also:
 - describe the identity features you SEE in each character photo in a few words (helps consistency), without naming real
   people or celebrities even if you recognize them;
 - a POSE image may come to YOU with numbered circles (red = person, blue = object) and a note saying who goes in figure
-  1, 2…, what replaces each object and whether the scenery changes; Flow gets the CLEAN image (no numbers), so describe each
-  place by position/pose ("the figure on the left leaning in", "the car behind them"), never by the number; a replaced
-  object/scenery keeps the place and size of the original unless a note says otherwise; "mantém" = keep it as in the sketch;
+  1, 2…, what replaces each object and whether the scenery changes; unless told below that Flow ALSO gets the numbers, Flow
+  gets the CLEAN image, so describe each place by position/pose ("the figure on the left leaning in", "the car behind
+  them"), never by the number; a replaced object/scenery keeps the place and size of the original unless a note says
+  otherwise; "mantém" = keep it as in the sketch;
+- REPLACING MEANS REPLACING: when a figure is replaced (whole or automatic), NEVER describe the ORIGINAL person's face,
+  hair, hair color or outfit as the target — describe the NEW character's look and say plainly that the original person is
+  completely replaced (only the place, pose and expression stay). An object that has its OWN reference photo is REPLACED by
+  the object in that photo (adapted to the place/size), even when its note only describes the original;
 - follow every note; the general note wins on scene/mood/action;
 - render the FINAL ART STYLE given (realistic photo, anime, manga…) and say it clearly in the prompt; the identities stay
   recognizable in that style; when no style is chosen, the style comes from the NEW CHARACTER images (a drawn character makes
@@ -308,6 +372,18 @@ def conteudo_ia(pac: Dict[str, Any], bloco_imagem: Callable[[str], Optional[Dict
         b = bloco_imagem(r.get("arquivo_ia") or r["arquivo"])
         if b:
             c.append(b)
+    como = []
+    if pac.get("base_numerada"):
+        como.append("Flow ALSO gets the base WITH the numbered labels beside each figure/object: you MAY refer to them as "
+                    "\"the figure labeled 1\", and the prompt MUST end with: " + BASE_NUMERADA_EN)
+    if pac.get("prancha"):
+        mapa = "; ".join(f"reference image {r['n']} → panel {r['painel']}" for r in pac["refs"] if r.get("painel"))
+        como.append(f"Flow does NOT get the references one by one: they are joined in ONE reference sheet, which is reference "
+                    f"image {pac.get('prancha_n') or 2} for Flow ({mapa}). In the prompt call each one \"the panel marked X "
+                    f"on the reference sheet\" — never \"reference image N\" for them — and include: "
+                    + PRANCHA_EN.format(n=pac.get("prancha_n") or 2))
+    if como:
+        c.append({"type": "text", "text": "HOW FLOW RECEIVES THE IMAGES: " + " ".join(como)})
     c.append({"type": "text", "text": "GENERAL NOTE: " + (pac.get("obs_geral") or "(none)")})
     c.append({"type": "text", "text": "FINAL ART STYLE: " + (pac.get("estilo_en") or "(not chosen — use the SAME style as the NEW "
                                                                                     "CHARACTER images: drawn/anime characters → the whole scene "
@@ -337,9 +413,17 @@ def montar_prompt(pac: Dict[str, Any], chamar: Optional[Callable[..., Any]] = No
 
 
 def referencias_flow(pac: Dict[str, Any]) -> List[Dict[str, str]]:
-    """As imagens na ordem certa pro Flow (a mesma numeração do comando)."""
-    return [dict({"arquivo": r["arquivo"], "papel": r["papel"]}, **({"marcas": r["marcas"]} if r.get("marcas") else {}))
-            for r in pac["refs"]]
+    """As imagens na ordem certa pro Flow (a mesma numeração do comando). 📍 base numerada → vai a cópia com os números;
+    🗂 prancha → a base + UMA imagem com todas as outras."""
+    out = []
+    for r in pac["refs"]:
+        if pac.get("prancha") and r.get("painel"):
+            continue
+        out.append(dict({"arquivo": r.get("arquivo_flow") if r.get("arquivo_flow") and os.path.isfile(r["arquivo_flow"])
+                         else r["arquivo"], "papel": r["papel"]}, **({"marcas": r["marcas"]} if r.get("marcas") else {})))
+    if pac.get("prancha") and os.path.isfile(pac["prancha"]):
+        out.insert(int(pac.get("prancha_n") or 2) - 1, {"arquivo": pac["prancha"], "papel": "prancha"})
+    return out
 
 
 def resumo(pac: Dict[str, Any]) -> List[Dict[str, Any]]:

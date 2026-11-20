@@ -117,24 +117,59 @@ def texto_cena(cena: Dict[str, str]) -> str:
     return "; ".join(t)
 
 
-def desenhar_marcas(entrada: str, saida: str, marcas: List[Dict[str, Any]]) -> str:
-    """Uma CÓPIA com os números (e nomes) em cima de cada figura — só pra IA ler; o Flow recebe o rascunho limpo."""
-    from PIL import Image, ImageDraw, ImageFont
+def _fonte(tam: int):
+    from PIL import ImageFont
+    for nome in ("DejaVuSans-Bold.ttf", "arialbd.ttf", "Arial Bold.ttf", "C:/Windows/Fonts/arialbd.ttf"):
+        try:
+            return ImageFont.truetype(nome, tam)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def _lugar_da_etiqueta(m: Dict[str, Any], todas: List[Dict[str, Any]], W: int, H: int, r: float):
+    """📍 v84_438: onde pôr o número SEM cobrir a figura — ao lado, pra fora do centro da imagem, longe das outras
+    etiquetas (com uma linha fina até o ponto marcado)."""
+    cx, cy = m["x"] * W, m["y"] * H
+    dist = r * 3.2
+    cands = []
+    for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)):
+        ex, ey = cx + dx * dist, cy + dy * dist
+        if not (r + 2 <= ex <= W - r - 2 and r + 2 <= ey <= H - r - 2):
+            continue
+        # prefere: pra fora do centro, longe dos outros pontos marcados
+        fora = (dx * (cx - W / 2) + dy * (cy - H / 2)) / max(W, H)
+        perto = min([((ex - o["x"] * W) ** 2 + (ey - o["y"] * H) ** 2) ** 0.5 for o in todas if o is not m] or [9e9])
+        cands.append((fora * 2 + min(perto, dist * 3) / (dist * 3), ex, ey))
+    if not cands:
+        return cx, cy
+    _n, ex, ey = max(cands)
+    return ex, ey
+
+
+def desenhar_marcas(entrada: str, saida: str, marcas: List[Dict[str, Any]], ao_lado: bool = False,
+                    com_nomes: bool = True) -> str:
+    """Uma CÓPIA com os números (e nomes) de cada figura. `ao_lado` (📍 v84_438): o número fica AO LADO da figura, com uma
+    linha fina até ela, sem cobrir o rosto/o objeto — é a versão que pode ir pro Flow ("use os números e apague-os")."""
+    from PIL import Image, ImageDraw
     im = Image.open(entrada).convert("RGB")
     d = ImageDraw.Draw(im)
-    r = max(14, int(min(im.size) * 0.035))
-    try:
-        fonte = ImageFont.truetype("DejaVuSans-Bold.ttf", int(r * 1.1))
-    except OSError:
-        fonte = ImageFont.load_default()
+    r = max(14, int(min(im.size) * (0.028 if ao_lado else 0.035)))
+    fonte = _fonte(int(r * 1.1))
     for m in marcas:
         cx, cy = m["x"] * im.width, m["y"] * im.height
         cor = (37, 99, 235) if m.get("tipo") == "objeto" else (220, 38, 38)  # 🔵 objeto · 🔴 pessoa
+        if ao_lado:
+            ex, ey = _lugar_da_etiqueta(m, marcas, im.width, im.height, r)
+            d.line([cx, cy, ex, ey], fill=(255, 255, 255), width=5)
+            d.line([cx, cy, ex, ey], fill=cor, width=2)
+            d.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=cor, outline=(255, 255, 255), width=1)
+            cx, cy = ex, ey
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=cor, outline=(255, 255, 255), width=3)
         t = str(m["n"])
         bb = d.textbbox((0, 0), t, font=fonte)
         d.text((cx - (bb[2] - bb[0]) / 2, cy - (bb[3] - bb[1]) / 2 - bb[1]), t, fill="white", font=fonte)
-        if m.get("nome"):
+        if m.get("nome") and com_nomes:
             d.text((cx + r + 4, cy - r), m["nome"], fill=cor, font=fonte, stroke_width=3, stroke_fill="white")
     im.save(saida)
     return saida
@@ -189,3 +224,39 @@ def achar_figuras(arquivo: str, chamar: Optional[Callable[..., Any]] = None,
                   bloco_imagem: Optional[Callable[[str], Optional[Dict[str, Any]]]] = None) -> List[Dict[str, Any]]:
     """(compatível) só as marcas."""
     return entender_cena(arquivo, chamar, bloco_imagem)["marcas"]
+
+
+# ------------------------------------------------------------------ 🗂 v84_438: prancha de referências (mais de 6 imagens)
+def montar_prancha(itens: List[Dict[str, Any]], saida: str, largura: int = 2048) -> str:
+    """Junta várias referências numa imagem só: cada uma num quadro com BORDA e o NÚMERO numa faixa em cima do quadro
+    (fora da imagem, pra nunca cobrir o personagem/objeto). itens = [{n, arquivo, rotulo}]."""
+    from PIL import Image, ImageDraw
+    import math
+    k = len(itens)
+    cols = 2 if k <= 4 else 3 if k <= 9 else 4
+    linhas = math.ceil(k / cols)
+    gap, faixa = 18, 54
+    cel = (largura - gap * (cols + 1)) // cols
+    alt_img = int(cel * 0.9)
+    H = gap + linhas * (faixa + alt_img + gap)
+    folha = Image.new("RGB", (largura, H), (255, 255, 255))
+    d = ImageDraw.Draw(folha)
+    fonte = _fonte(34)
+    fonte_p = _fonte(24)
+    for i, it in enumerate(itens):
+        c, l = i % cols, i // cols
+        x0 = gap + c * (cel + gap)
+        y0 = gap + l * (faixa + alt_img + gap)
+        d.rectangle([x0, y0, x0 + cel, y0 + faixa], fill=(17, 24, 39))
+        d.text((x0 + 14, y0 + 8), f"{it['n']}", fill=(255, 255, 255), font=fonte)
+        if it.get("rotulo"):
+            d.text((x0 + 70, y0 + 15), str(it["rotulo"])[:34], fill=(209, 213, 219), font=fonte_p)
+        try:
+            im = Image.open(it["arquivo"]).convert("RGB")
+            im.thumbnail((cel - 8, alt_img - 8))
+            folha.paste(im, (x0 + (cel - im.width) // 2, y0 + faixa + (alt_img - im.height) // 2))
+        except Exception:  # noqa: BLE001
+            pass
+        d.rectangle([x0, y0, x0 + cel, y0 + faixa + alt_img], outline=(17, 24, 39), width=6)
+    folha.save(saida)
+    return saida

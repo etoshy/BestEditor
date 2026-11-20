@@ -190,7 +190,7 @@
 
 <div class="fl-box fl-montar" id="montar">
   <h3 style="margin-top:0">🧩 Montar cena com pose e personagens <span class="fl-hint">(a IA junta tudo num comando)</span></h3>
-  <p class="fl-hint">Mande a <b>pose</b> (opcional) e a foto de cada <b>personagem</b>. Diga quem é quem e, se quiser, uma observação em cada foto e uma no geral. A IA olha as fotos e escreve o comando dizendo o que vem de cada imagem (a pose da 1, o rosto da Ana da 2…). Depois o Flow gera com todas as imagens na caixa, na mesma ordem. Até {{ max_refs }} imagens.</p>
+  <p class="fl-hint">Mande a <b>pose</b> (opcional) e a foto de cada <b>personagem</b>. Diga quem é quem e, se quiser, uma observação em cada foto e uma no geral. A IA olha as fotos e escreve o comando dizendo o que vem de cada imagem (a pose da 1, o rosto da Ana da 2…). Depois o Flow gera com todas as imagens na caixa, na mesma ordem. Até {{ max_refs }} imagens — ou até {{ max_refs_prancha }} com a 🗂 prancha.</p>
   <div class="fl-mt-linha fl-mt-pose" data-papel="pose">
     <div class="fl-mt-foto"><b>🕺 Pose / composição</b> <span class="fl-hint">(opcional)</span><input type="file" accept="image/*"><div class="esc"></div></div>
     <textarea rows="2" class="fl-mt-obs" placeholder="observação (opcional): ex. só a posição dos corpos; a câmera mais baixa; quem fica à esquerda é a Ana"></textarea>
@@ -208,6 +208,10 @@
     <label>Quantidade <select id="mtQuantidade"><option>x1</option><option>x2</option><option>x3</option><option>x4</option></select></label>
     <label>🎨 Estilo da imagem final <select id="mtEstilo"><option value="">(o mesmo dos personagens novos)</option>{% for e in estilos_finais %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></label>
     <label>Modelo <select id="mtModelo"><option value="">(o padrão das Configurações)</option>{% for m in modelos_imagem %}<option>{{ m }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="fl-row" style="margin-top:6px">
+    <label style="font-weight:400" title="o Flow recebe a foto base COM os números ao lado de cada figura/objeto (com uma linha fina, sem cobrir o rosto) e o comando manda usar e apagar os números — ajuda o Flow a saber quem é quem"><input type="checkbox" id="mtBaseNum" style="width:auto;margin-right:4px">📍 mandar a base numerada (o Flow usa os números e apaga)</label>
+    <label style="font-weight:400" title="as fotos dos personagens/objetos vão juntas numa imagem só, cada uma num quadro com borda e o número da marca em cima (fora da foto). Liga sozinho com mais de {{ max_refs }} imagens — até {{ max_refs_prancha }}"><input type="checkbox" id="mtPrancha" style="width:auto;margin-right:4px">🗂 juntar as referências numa prancha numerada</label>
   </div>
   <div class="fl-row" style="margin-top:8px">
     <button type="button" id="mtMontar" class="primary">🤖 Montar o comando</button>
@@ -645,15 +649,16 @@
 <script>
 /* 🧩 v84_406: montar cena — pose + personagens (+ outras fotos), cada uma com observação; a IA escreve o comando */
 (function () {
-  const $ = id => document.getElementById(id), MAX = {{ max_refs }};
+  const $ = id => document.getElementById(id), MAX = {{ max_refs }}, MAXP = {{ max_refs_prancha }};
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const PAPEIS = {{ papeis|tojson }};
   let pacote = null, nPers = 0;
   const linhas = () => [...document.querySelectorAll('#montar .fl-mt-linha')];
   function contar() {
     const n = linhas().filter(l => l._gal || (l.querySelector('input[type=file]').files || [])[0]).length;
-    $('mtConta').textContent = `${n}/${MAX} imagem(ns)` + (n > MAX ? ' — tire alguma foto (o Flow aceita até ' + MAX + ')' : '') + ' · linha sem foto vira texto no comando';
-    $('mtConta').style.color = n > MAX ? '#b91c1c' : '';
+    $('mtConta').textContent = `${n}/${MAXP} imagem(ns)` + (n > MAXP ? ' — tire alguma foto (até ' + MAXP + ')' : n > MAX ? ' — 🗂 mais de ' + MAX + ': vão numa prancha numerada' : '') + ' · linha sem foto vira texto no comando';
+    $('mtConta').style.color = n > MAXP ? '#b91c1c' : '';
+    if ($('mtPrancha') && n > MAX) $('mtPrancha').checked = true;
     $('mtMaisPers').disabled = $('mtMaisOutra').disabled = linhas().length >= 14;
   }
   function prevFoto(l) {
@@ -758,6 +763,8 @@
     });
     fd.append('n', k); fd.append('obs_geral', [$('mtGeral').value.trim(), ...semFoto].filter(Boolean).join(' · '));
     fd.append('estilo', $('mtEstilo').value);
+    fd.append('base_numerada', $('mtBaseNum') && $('mtBaseNum').checked ? '1' : '');
+    fd.append('prancha', $('mtPrancha') && $('mtPrancha').checked ? '1' : '');
     return k ? fd : null;
   }
   $('mtMontar').onclick = async () => {

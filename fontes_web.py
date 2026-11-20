@@ -87,8 +87,8 @@ Campos de cada fonte:
   "Platão — Fédon (a filosofia como preparação para a morte)"; "Antonio Machado — «Retrato», em Campos de Castilla (1912)");
 - "url": o link;
 - "trecho": a frase do roteiro que usa essa referência (curta, copiada do roteiro);
-- "termos": 2 a 4 palavras que TÊM que aparecer na página (o sobrenome do autor, uma palavra do título da obra, o nome do
-  evento) — sem acentos não importa.
+- "termos": 2 a 4 palavras que aparecem NA PÁGINA do link, ESCRITAS COMO NA PÁGINA (na língua dela: numa página em inglês,
+  "Spinoza", não "Espinosa"). O 1º termo é SEMPRE o nome principal (o sobrenome do autor ou o nome do evento/obra).
 Responda só o JSON."""
 
 
@@ -97,6 +97,18 @@ def pedir(roteiro: str, titulo: str = "", rejeitados: Optional[List[Dict[str, An
     import ia_servico as ia
     chamar = chamar or ia.chamar
     conteudo = (f"Título do vídeo: {titulo}\n\n" if titulo else "") + "ROTEIRO:\n" + str(roteiro or "")[:60000]
+    try:  # 🛡 v84_437: os sites que você aprovou (ou que a IA avaliou bem) também valem — e os bloqueados, nunca
+        import fontes_confianca as fc
+        d = fc.carregar()
+        extras = [k for k, v in d["regras"].items() if v == "confiar"] + [
+            h for h, x in d["dominios"].items() if int(x.get("nota") or 0) >= fc.NOTA_MIN_IA and h not in d["regras"]]
+        bloq = [k for k, v in d["regras"].items() if v == "bloquear"]
+        if extras:
+            conteudo += "\n\nSITES QUE TAMBÉM VALEM (aprovados): " + ", ".join(extras[:40])
+        if bloq:
+            conteudo += "\nSITES PROIBIDOS: " + ", ".join(bloq[:40])
+    except Exception:  # noqa: BLE001
+        pass
     if rejeitados:
         conteudo += ("\n\nESTES LINKS NÃO SERVEM (fora do ar ou não falam do assunto) — ache OUTRO link só para estas "
                      "referências e devolva só elas:\n" + "\n".join(f"- {r['referencia']} — {r.get('url') or ''} ({r['motivo']})"
@@ -123,6 +135,52 @@ def _texto_html(h: str) -> Tuple[str, str]:
     return titulo, re.sub(r"\s+", " ", corpo)
 
 
+# 🩹 v84_436: o mesmo nome em outras línguas (a página em inglês diz "Spinoza", o roteiro diz "Espinosa")
+NOMES_OUTRAS_LINGUAS = {
+    "espinosa": ["spinoza", "espinoza", "spinoza"], "platao": ["plato", "platon", "platone"], "aristoteles": ["aristotle", "aristote"],
+    "socrates": ["socrate"], "agostinho": ["augustine", "augustin", "agostino", "augustinus"], "aquino": ["aquinas", "aquin"],
+    "epicteto": ["epictetus", "epictete"], "seneca": ["seneque"], "marco aurelio": ["marcus aurelius", "marc aurele"],
+    "epicuro": ["epicurus", "epicure"], "heraclito": ["heraclitus", "heraclite"], "parmenides": ["parmenide"],
+    "pitagoras": ["pythagoras", "pythagore"], "confucio": ["confucius"], "tales": ["thales"], "plotino": ["plotinus", "plotin"],
+    "boecio": ["boethius", "boece"], "anselmo": ["anselm"], "ockham": ["occam"], "maquiavel": ["machiavelli", "machiavel"],
+    "rousseau": [], "descartes": [], "pascal": [], "kant": [], "hegel": [], "schopenhauer": [], "nietzsche": [],
+    "kierkegaard": [], "berkeley": [], "hume": [], "locke": [], "hobbes": [], "montaigne": [], "voltaire": [],
+    "tomas": ["thomas"], "joao": ["john", "jean", "johann"], "guilherme": ["william", "wilhelm"], "luis": ["louis", "luigi"],
+    "francisco": ["francis", "francois", "franz"], "jose": ["jose", "josep", "joseph"], "homero": ["homer", "homere"],
+    "virgilio": ["virgil", "virgile"], "ovidio": ["ovid", "ovide"], "dante": [], "camoes": ["camoens"], "erasmo": ["erasmus", "erasme"],
+}
+
+
+def _variantes(t: str) -> List[str]:
+    n = _norm(t).strip()
+    out = [n] + NOMES_OUTRAS_LINGUAS.get(n, [])
+    for pt, outras in NOMES_OUTRAS_LINGUAS.items():
+        if n in outras:
+            out.append(pt)
+    return [x for x in dict.fromkeys(out) if x]
+
+
+def _principal(f: Dict[str, Any]) -> str:
+    """O nome principal: o 1º termo, ou o que vem antes do " — " na referência (o autor)."""
+    ts = [t for t in f.get("termos") or [] if len(_norm(t)) >= 3]
+    if ts:
+        return ts[0]
+    autor = re.split(r"\s+[—–-]\s+", f.get("referencia") or "")[0]
+    nomes = re.findall(r"\b[A-ZÀ-Ý][\wÀ-ÿ'-]{2,}", autor)
+    return nomes[-1] if nomes else autor
+
+
+def _tem(t: str, alvo: str) -> int:
+    """Quantas vezes o termo (ou o mesmo nome em outra língua) aparece; nomes compostos valem pela última palavra."""
+    best = 0
+    for v in _variantes(t):
+        best = max(best, alvo.count(v))
+        partes = v.split()
+        if len(partes) > 1 and len(partes[-1]) >= 4:
+            best = max(best, alvo.count(partes[-1]))
+    return best
+
+
 def _termos(f: Dict[str, Any]) -> List[str]:
     ts = [t for t in f.get("termos") or [] if len(_norm(t)) >= 3]
     if not ts:  # sem termos: os nomes próprios da referência
@@ -137,8 +195,13 @@ def conferir(f: Dict[str, Any], baixar: Optional[Callable[[str], Any]] = None) -
     host = (u.netloc or "").lower()
     if not host or any(b in host for b in _PROIBIDOS_URL):
         return False, "não é página de referência (busca, loja, rede social ou vídeo)", ""
-    if not confiavel(host):
-        return False, f"{host} não é fonte confiável (enciclopédia, biblioteca, universidade, revista acadêmica, jornal sério)", ""
+    import fontes_confianca as fc  # 🛡 v84_437: a lista fixa + as suas decisões + o que a IA avaliou
+    dec = fc.decidir(url, confiavel(host))
+    if dec == "bloquear":
+        return False, f"{host} está bloqueado (🛡 Fontes confiáveis)", ""
+    if dec != "confiar":
+        return False, (f"{host} ainda não é fonte confiável — ficou como candidato em 🛡 Fontes confiáveis (teste, avalie "
+                       "e decida lá)"), ""
     if u.path in ("", "/") and not u.query:
         return False, "é a página inicial do site, não a página do assunto", ""
     if baixar is None:
@@ -170,16 +233,49 @@ def conferir(f: Dict[str, Any], baixar: Optional[Callable[[str], Any]] = None) -
     if _SOFT_404.search(titulo) and len(corpo) < 4000:
         return False, f"página de erro (“{titulo[:60]}”)", titulo
     alvo = _norm(titulo + " " + corpo[:400_000])
-    achou = [t for t in termos if _norm(t) in alvo]
-    precisa = max(1, (len(termos) + 1) // 2)  # 2 termos → 1; 3 ou 4 → 2
-    if termos and len(achou) < precisa:
-        return False, "a página não fala disso (faltam: " + ", ".join(t for t in termos if t not in achou)[:80] + ")", titulo
+    # 🩹 v84_436: antes exigia metade dos termos (em português, numa página em inglês: "faltam: Espinosa, imaginação…").
+    # Agora: o NOME PRINCIPAL (autor/obra/evento, em qualquer língua) está no título da página ou aparece 3+ vezes no texto —
+    # ou aparece 1+ vez junto com outro termo.
+    nome = _principal(f)
+    no_titulo = _tem(nome, _norm(titulo)) > 0
+    vezes = _tem(nome, alvo)
+    outros = sum(1 for t in termos[1:] if _tem(t, alvo))
+    if not (no_titulo or vezes >= 3 or (vezes >= 1 and outros >= 1)):
+        return False, f"a página não fala de {nome}" + (f" (só cita {vezes} vez)" if vezes else ""), titulo
     return True, "", titulo
+
+
+# ------------------------------------------------------------------ 🩹 v84_436: sem link bom → a Wikipedia do autor/obra
+def _wikipedia(f: Dict[str, Any], baixar) -> Optional[Dict[str, Any]]:
+    import json as _json
+    from urllib.parse import quote
+    ref = f.get("referencia") or ""
+    partes = [x.strip() for x in re.split(r"\s+[—–]\s+", ref) if x.strip()]
+    obra = re.sub(r"\s*\(.*?\)|[«»“”\"]", "", partes[1]).split(",")[0].strip() if len(partes) > 1 else ""
+    buscas = [b for b in (obra, partes[0] if partes else "") if b and len(b) >= 3]
+    for busca in buscas:
+        for lang in ("pt", "en"):
+            try:
+                r = baixar(f"https://{lang}.wikipedia.org/w/api.php?action=opensearch&limit=1&namespace=0&format=json"
+                           f"&search={quote(busca)}")
+                d = r.json() if hasattr(r, "json") else _json.loads(getattr(r, "text", "") or "[]")
+                url = (d[3] or [None])[0] if isinstance(d, list) and len(d) > 3 else None
+            except Exception:  # noqa: BLE001
+                url = None
+            if not url:
+                continue
+            autor = _principal(dict(f, termos=[]))
+            g = dict(f, url=url, termos=[obra, autor] if busca == obra else [autor])  # a página da obra cita a obra e o autor
+            ok, _m, tit = conferir(g, baixar)
+            if ok:
+                return dict(g, titulo_pagina=tit[:160], conferido_em=time.time(), wikipedia=True)
+    return None
 
 
 # ------------------------------------------------------------------ o processo todo
 def gerar(roteiro: str, titulo: str = "", nomes_proibidos: Optional[List[str]] = None, progresso=None,
           chamar=None, baixar=None) -> Dict[str, Any]:
+    import fontes_confianca as fc
     prog = progresso or (lambda m: None)
     prog("📚 a IA está procurando as fontes do roteiro…")
     candidatos = pedir(roteiro, titulo, nomes_proibidos=nomes_proibidos, chamar=chamar)
@@ -196,10 +292,23 @@ def gerar(roteiro: str, titulo: str = "", nomes_proibidos: Optional[List[str]] =
                 continue
             vistos.add(f["url"])
             prog(f"🔗 conferindo o link {k} de {len(candidatos)}…")
+            mem = fc.lembrada(f["referencia"])  # 🧠 v84_437: essa referência já teve um link aprovado → tenta ele primeiro
+            if mem and mem.get("url") and mem["url"] != f["url"] and mem["url"] not in vistos:
+                vistos.add(mem["url"])
+                g = dict(f, url=mem["url"])
+                ok, motivo, tit = conferir(g, baixar)
+                fc.registrar(g["url"], ok, motivo, g["referencia"])
+                if ok:
+                    if not any(a["referencia"].lower() == f["referencia"].lower() for a in aprovados):
+                        aprovados.append(dict(g, titulo_pagina=tit[:160], conferido_em=time.time(), lembrada=True))
+                    fc.lembrar(f["referencia"], g["url"])
+                    continue
             ok, motivo, tit = conferir(f, baixar)
+            fc.registrar(f["url"], ok, motivo, f["referencia"])
             if ok:
                 if not any(a["referencia"].lower() == f["referencia"].lower() for a in aprovados):
                     aprovados.append(dict(f, titulo_pagina=tit[:160], conferido_em=time.time()))
+                fc.lembrar(f["referencia"], f["url"])
             else:
                 rej_rodada.append(dict(f, motivo=motivo))
         rejeitados += rej_rodada
@@ -209,9 +318,30 @@ def gerar(roteiro: str, titulo: str = "", nomes_proibidos: Optional[List[str]] =
         prog(f"🔁 {len(falta)} link(s) não serviram — a IA vai procurar outros…")
         candidatos = pedir(roteiro, titulo, rejeitados=falta, nomes_proibidos=nomes_proibidos, chamar=chamar)
     ok_refs = {a["referencia"].lower() for a in aprovados}
+    # 🩹 v84_436: o que ficou sem link → a página da obra (ou do autor) na Wikipedia, conferida do mesmo jeito
+    sem = []
+    for r in rejeitados:
+        if r["referencia"].lower() in ok_refs or r["referencia"].lower() in {x["referencia"].lower() for x in sem}:
+            continue
+        sem.append(r)
+    b = baixar
+    if b is None:
+        import requests
+
+        def b(x):
+            return requests.get(x, headers={"User-Agent": UA}, timeout=15, allow_redirects=True)
+    for r in sem:
+        if len(aprovados) >= MAX_FONTES:
+            break
+        prog(f"📚 procurando {r['referencia'][:50]} na Wikipedia…")
+        w = _wikipedia(r, b)
+        if w and w["url"] not in {a["url"] for a in aprovados}:
+            aprovados.append(w)
+            ok_refs.add(r["referencia"].lower())
+            fc.lembrar(r["referencia"], w["url"])
     return {"itens": aprovados[:MAX_FONTES], "em": time.time(),
             "sem_link": [{"referencia": r["referencia"], "url": r.get("url"), "motivo": r["motivo"]}
-                         for r in rejeitados if r["referencia"].lower() not in ok_refs][:20]}
+                         for r in sem if r["referencia"].lower() not in ok_refs][:20]}
 
 
 def bloco(fw: Optional[Dict[str, Any]]) -> str:

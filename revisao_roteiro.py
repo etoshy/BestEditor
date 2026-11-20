@@ -211,6 +211,42 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", str(s or "")).strip()
 
 
+def _norm_cmp(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s.lower()).encode("ascii", "ignore").decode()
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", s).split())
+
+
+def trecho_parecido(texto: str, de: str, minimo: float = 0.82):
+    """(início, fim, nota) do pedaço do texto mais parecido com `de` (janelas de palavras do mesmo tamanho, ±2)."""
+    import difflib
+    alvo = _norm_cmp(de)
+    n = len(alvo.split())
+    if n < 4:
+        return None
+    toks = [(m.start(), m.end()) for m in re.finditer(r"\S+", texto)]
+    sm = difflib.SequenceMatcher(None, "", alvo, autojunk=False)
+    melhor = None
+    for tam in range(max(3, n - 2), n + 3):
+        for i in range(0, len(toks) - tam + 1):
+            ini, fim = toks[i][0], toks[i + tam - 1][1]
+            pedaco = texto[ini:fim]
+            if "[" in pedaco or "\n\n" in pedaco:
+                continue  # não troca por cima de marca de imagem/chamada nem atravessa parágrafo
+            sm.set_seq1(_norm_cmp(pedaco))
+            if sm.real_quick_ratio() < minimo or sm.quick_ratio() < minimo:
+                continue
+            nota = sm.ratio()
+            if nota >= minimo and (not melhor or nota > melhor[2]):
+                melhor = (ini, fim, nota)
+    if melhor:  # a pontuação do fim do trecho fica (o "para" costuma trazer a dele)
+        ini, fim, nota = melhor
+        while fim > ini and texto[fim - 1] in ".,;:!?…" and not de.rstrip()[-1:] in ".,;:!?…":
+            fim -= 1
+        melhor = (ini, fim, nota)
+    return melhor
+
+
 def aplicar(roteiro: str, resposta: str, apagar: bool = True) -> Dict[str, Any]:
     """Aplica as trocas (exatas; ou ignorando espaços/quebras). → {texto, aplicadas, nao_achadas, palavras_antes/depois}."""
     import json_ia
@@ -239,6 +275,15 @@ def aplicar(roteiro: str, resposta: str, apagar: bool = True) -> Dict[str, Any]:
         if m:
             texto = texto[:m.start()] + para + texto[m.end():]
             aplicadas.append({"de": de[:200], "para": para[:300], "motivo": str(t.get("motivo") or "")[:40]})
+            continue
+        # 🩹 v84_437: a IA de fora costuma copiar o RESUMO do item (ou corrigir uma letra: "Koiakowski") em vez da frase
+        # exata — acha a frase (ou 2–3 seguidas) do roteiro mais parecida e troca, se for parecida de verdade
+        ach = trecho_parecido(texto, de)
+        if ach:
+            ini, fim, nota = ach
+            texto = texto[:ini] + para + texto[fim:]
+            aplicadas.append({"de": de[:200], "para": para[:300], "motivo": (str(t.get("motivo") or "") + " ≈")[:40],
+                              "aproximado": round(nota, 2)})
         else:
             nao.append({"de": de[:120], "motivo": "trecho não achado no roteiro"})
 

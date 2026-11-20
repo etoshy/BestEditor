@@ -36,7 +36,7 @@ def test_pacote_pose_primeiro_e_comando_basico(tmp_path):
     with pytest.raises(FM.MontarErro):
         FM.novo_pacote(str(tmp_path), [], "")
     with pytest.raises(FM.MontarErro):
-        FM.novo_pacote(str(tmp_path), [{"papel": "personagem", "arquivo": _png(tmp_path / f"x{k}.png")} for k in range(FM.MAX_REFS + 1)])
+        FM.novo_pacote(str(tmp_path), [{"papel": "personagem", "arquivo": _png(tmp_path / f"x{k}.png")} for k in range(FM.MAX_REFS_PRANCHA + 1)])
     with pytest.raises(FM.MontarErro):
         FM.carregar_pacote(str(tmp_path), "../etc")
 

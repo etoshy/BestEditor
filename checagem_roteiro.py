@@ -503,7 +503,9 @@ def prompt_web(roteiro: str, idioma: str = "o idioma do roteiro", tema: str = ""
          "4. Só esses três focos (ano/cronologia, alegações/fatos, repetições). Não mexa no estilo.",
          "",
          "## Regras das correções",
-         "- \"de\": trecho COPIADO EXATAMENTE dos TRECHOS abaixo (uma frase ou poucas), na língua do roteiro.",
+         "- \"de\": trecho COPIADO EXATAMENTE dos TRECHOS DO ROTEIRO lá embaixo (as linhas L…), letra por letra, uma frase "
+         "ou poucas — NUNCA o texto dos itens (o item é um resumo do que conferir, não está no roteiro) e sem corrigir nada "
+         "dentro do \"de\" (nem nome escrito errado: a correção vai no \"para\").",
          "- NÃO inclua no \"de\" as marcas entre colchetes ([I3], [[INSCREVA]], [CENA 2]) — escolha um pedaço que não passe por elas.",
          "- \"para\": o trecho corrigido, na MESMA língua e no mesmo tom (ou \"\" pra apagar uma repetição).",
          "- \"fonte\": o LINK (URL) que confirma a correção.",

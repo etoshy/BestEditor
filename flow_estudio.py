@@ -669,7 +669,7 @@ def registrar(app, base_dir: str) -> None:
         return render_template("flow_estudio.html", contas=[c["nome"] for c in gf.listar_contas()], cfg=cfg,
                                modelos_imagem=fd.MODELOS_IMAGEM, modelos_video=fd.MODELOS_VIDEO, proporcoes=fd.PROPORCOES,
                                modo_direto=gf.modo_direto(cfg), ocioso_min=OCIOSO_S // 60,
-                               max_refs=__import__("flow_montar").MAX_REFS, papeis=__import__("flow_montar").PAPEIS,
+                               max_refs=__import__("flow_montar").MAX_REFS, max_refs_prancha=__import__("flow_montar").MAX_REFS_PRANCHA, papeis=__import__("flow_montar").PAPEIS,
                                estilos_finais=__import__("flow_montar").estilos())
 
     @app.route("/flow/teste")
@@ -785,7 +785,7 @@ def registrar(app, base_dir: str) -> None:
         from googleflow import googleflow_client as gf
         f = request.form
         try:
-            n = max(0, min(FM.MAX_REFS + 2, int(f.get("n") or 0)))
+            n = max(0, min(FM.MAX_REFS_PRANCHA + 2, int(f.get("n") or 0)))
         except ValueError:
             n = 0
         itens = []
@@ -797,7 +797,8 @@ def registrar(app, base_dir: str) -> None:
                                   "obs": f.get(f"r{k}_obs") or "", "arquivo": ent["arquivo"],
                                   "marcas": f.get(f"r{k}_marcas") or "", "cena": f.get(f"r{k}_cena") or "",
                                   "troca": f.get(f"r{k}_troca") or ""})
-            pac = FM.novo_pacote(pasta_galeria(), itens, f.get("obs_geral") or "", f.get("estilo") or "")
+            pac = FM.novo_pacote(pasta_galeria(), itens, f.get("obs_geral") or "", f.get("estilo") or "",
+                                 base_numerada=f.get("base_numerada") == "1", prancha=f.get("prancha") == "1")
         except ValueError as exc:
             return jsonify({"erro": str(exc)}), 400
         r = FM.montar_prompt(pac)

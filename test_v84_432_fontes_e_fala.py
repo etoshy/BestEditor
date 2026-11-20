@@ -82,3 +82,35 @@ def test_descricao_tem_as_fontes_e_nao_os_arquivos():
 def test_recurso_registrado():
     import ia_servico as ia
     assert ia.RECURSOS["fontes_descricao"][2] is True
+
+
+def test_v84_436_nome_em_outra_lingua_e_termos_traduzidos():
+    f = {"referencia": "Espinosa — Ética (imaginação e conhecimento racional)", "url": "https://plato.stanford.edu/entries/spinoza/",
+         "termos": ["Espinosa", "imaginação", "conhecimento racional"]}
+    assert fw.conferir(f, lambda u: R(200, "<title>Baruch Spinoza (Stanford Encyclopedia)</title> Spinoza's Ethics", u))[0]
+    g = {"referencia": "George Berkeley — Tratado sobre os princípios do conhecimento humano", "termos": ["Berkeley", "ideias"],
+         "url": "https://en.wikipedia.org/wiki/A_Treatise_Concerning_the_Principles_of_Human_Knowledge"}
+    assert fw.conferir(g, lambda u: R(200, "<title>A Treatise Concerning the Principles of Human Knowledge</title> "
+                                          "a work by George Berkeley. Berkeley argues… Berkeley", u))[0]
+
+
+def test_v84_436_sem_link_vai_pra_wikipedia():
+    import json
+
+    class J(R):
+        def json(self):
+            return json.loads(self.text)
+
+    def chamar(rec, system, conteudo, **k):
+        return {"fontes": [{"referencia": "René Descartes — Meditações Metafísicas (dúvida metódica)",
+                            "url": "https://morto.edu/x", "termos": ["Descartes"]}]}
+
+    def baixar(u):
+        if "opensearch" in u and "pt.wikipedia" in u:
+            return J(200, json.dumps(["Meditações Metafísicas", ["Meditações sobre Filosofia Primeira"], [""],
+                                      ["https://pt.wikipedia.org/wiki/Medita%C3%A7%C3%B5es_sobre_Filosofia_Primeira"]]))
+        if "Filosofia_Primeira" in u:
+            return R(200, "<title>Meditações sobre Filosofia Primeira – Wikipédia</title> Meditações Metafísicas de Descartes", u)
+        return R(404)
+    r = fw.gerar("rot", "T", chamar=chamar, baixar=baixar)
+    assert r["itens"] and "Filosofia_Primeira" in r["itens"][0]["url"] and not r["sem_link"]
