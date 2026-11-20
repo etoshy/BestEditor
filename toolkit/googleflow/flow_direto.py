@@ -450,11 +450,48 @@ def abrir_flow(context, url: str = FLOW_URL, headless: bool = True, on_passo: Pa
     return page
 
 
+def clicar_forte(page, loc, on_passo: Passo = _nada, passo: str = "", tentativa_s: float = 8.0) -> str:
+    """🩹 v84_434: clique que não trava 30 s quando algo está POR CIMA do botão (aviso de novidades, termos, um fundo
+    escuro de diálogo) ou o botão ainda está "acordando" (mat-ripple-loader-uninitialized). Tenta: clique normal →
+    fecha avisos/Esc e tenta de novo → clique forçado → clique por JavaScript. Devolve como clicou."""
+    erros = []
+    for jeito in ("normal", "depois_de_fechar", "forcado", "js"):
+        try:
+            if jeito == "depois_de_fechar":
+                fechar_novidades(page, on_passo)
+                for sel in (".cdk-overlay-backdrop", "[role=dialog] button[aria-label*='ech' i]", "[role=dialog] button[aria-label*='los' i]"):
+                    try:
+                        b = page.locator(sel).first
+                        if b.count() and b.is_visible():
+                            b.click(timeout=2_000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                try:
+                    page.keyboard.press("Escape")
+                except Exception:  # noqa: BLE001
+                    pass
+                loc.scroll_into_view_if_needed(timeout=3_000)
+            if jeito == "js":
+                loc.evaluate("el => el.click()")
+            else:
+                loc.click(timeout=int(tentativa_s * 1000), force=(jeito == "forcado"))
+            if jeito != "normal":
+                on_passo(passo or "clique", "andando", f"o clique normal não passou — cliquei do jeito “{jeito}”")
+            return jeito
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc).splitlines()
+            erros.append(next((l.strip() for l in msg if "intercepts pointer events" in l), msg[0] if msg else str(exc))[:200])
+    raise FlowPassoErro(passo or "clique", "não consegui clicar: " + " | ".join(dict.fromkeys(erros))[:500],
+                        page=page if hasattr(page, "goto") else None)
+
+
 def novo_projeto(page, context=None, on_passo: Passo = _nada):
     """Clica em "Novo projeto" e devolve a página do projeto (mesma aba ou aba nova)."""
     on_passo("novo_projeto", "andando", "")
     antes = set(context.pages) if context is not None else set()
-    _primeiro(page, S["novo_projeto"], 15, "novo_projeto", 'não achei o botão "Novo projeto"').click()
+    fechar_novidades(page, on_passo)  # 🩹 v84_434: aviso por cima do botão = clique travava 30 s
+    clicar_forte(page, _primeiro(page, S["novo_projeto"], 15, "novo_projeto", 'não achei o botão "Novo projeto"'), on_passo,
+                 "novo_projeto")
     alvo = [page]
     fim = time.monotonic() + 30
     abriu = False

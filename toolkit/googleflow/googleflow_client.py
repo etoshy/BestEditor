@@ -893,7 +893,13 @@ def abrir_novo_projeto(context, headless: bool = False):
     _dispensar_dialogos_de_boas_vindas(page)
 
     paginas_antes = set(context.pages)
-    botao.click()
+    # 🩹 v84_434: o clique normal travava 30 s ("Locator.click: Timeout 30000ms exceeded") quando algo cobria o botão
+    # (aviso de novidades/termos, fundo de diálogo) — agora tenta normal → fecha avisos → forçado → JavaScript
+    from googleflow import flow_direto as _fd
+    try:
+        _fd.clicar_forte(page, botao, passo="novo_projeto")
+    except _fd.FlowPassoErro as exc:
+        raise GoogleFlowError(f'não consegui clicar em "Novo projeto" no Flow: {exc}') from exc
 
     time.sleep(PAUSA_APOS_NOVO_PROJETO_S)
     novas = [p for p in context.pages if p not in paginas_antes]
