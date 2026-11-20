@@ -54,7 +54,9 @@ REGRA_TROCA = (" CADA CORREÇÃO SUBSTITUI o trecho (\"de\" = a frase inteira co
                "deixe a frase velha e a nova juntas, nem repita na frase nova o que a frase vizinha já diz. Mantenha o tamanho e "
                "o ritmo de fala; no máximo UMA ressalva curta — nada de \"não é uma reação automática, mas um exemplo para "
                "pensar\", \"alguns filósofos argumentam…, mas isso não significa…\". Citação: autor + obra na fala; ano e "
-               "página não entram (vão nas fontes da descrição).")
+               "página não entram (vão nas fontes da descrição). A correção NÃO desmonta a tese do vídeo: se a tese precisa de "
+               "ressalva, a ressalva é curta e o texto em volta continua coerente com ela (nada de uma frase solta que "
+               "contradiz o resto); e não repita um parágrafo inteiro com outras palavras ao lado do original.")
 
 
 def regra_sem_fonte(pol: str, com_web: bool) -> str:

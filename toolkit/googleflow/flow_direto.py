@@ -832,10 +832,43 @@ def _escolher_midia(page, arquivo: Optional[str], media_id: str, nome: str, pass
             raise FlowPassoErro(passo, "escolhi a imagem mas ela não entrou na caixa (nem prévia, nem o menu fechou).",
                                 page=page if hasattr(page, "goto") else None)
     if estado["via"] == "previa":
-        _primeiro(page, S["midia_incluir"], 10, passo, 'não achei o botão "Incluir no comando".').click()
-        if not _esperar(lambda: not _visivel(page, S["menu_midia"]), 8):
-            raise FlowPassoErro(passo, 'cliquei em "Incluir no comando" mas o menu de mídia não fechou.')
+        _clicar_incluir(page, passo)
     return origem
+
+
+def _clicar_incluir(page, passo: str, limite_s: float = 25.0) -> None:
+    """🩹 v84_442: "Incluir no comando" travava 30 s (Locator.click: Timeout) — o botão da prévia some/re-renderiza no meio
+    do clique, ou o Flow já incluiu sozinho e fechou o menu. Agora: tenta de 3 em 3 s (clique normal → forçado → JS) e,
+    se o menu de mídia fechou, a imagem já entrou: segue."""
+    fim = time.monotonic() + limite_s
+    erros = []
+    jeitos = ("normal", "forcado", "js")
+    k = 0
+    while time.monotonic() < fim:
+        if not _visivel(page, S["menu_midia"]):
+            return  # o menu fechou: a imagem entrou na caixa
+        b = _primeiro(page, S["midia_incluir"], 2)
+        if b is None:
+            if not _visivel(page, S["midia_previa"]) and not _visivel(page, S["menu_midia"]):
+                return
+            time.sleep(0.4)
+            continue
+        jeito = jeitos[min(k, len(jeitos) - 1)]
+        k += 1
+        try:
+            if jeito == "js":
+                b.evaluate("el => el.click()")
+            else:
+                b.click(timeout=3_000, force=(jeito == "forcado"))
+        except Exception as exc:  # noqa: BLE001
+            erros.append(str(exc).splitlines()[0][:120])
+            continue
+        if _esperar(lambda: not _visivel(page, S["menu_midia"]), 6):
+            return
+    if not _visivel(page, S["menu_midia"]):
+        return
+    raise FlowPassoErro(passo, 'não consegui clicar em "Incluir no comando" (o botão sumia ou estava coberto): '
+                        + " | ".join(dict.fromkeys(erros))[:300], page=page if hasattr(page, "goto") else None)
 
 
 def definir_frame(page, qual: str = "Início", arquivo: Optional[str] = None, media_id: str = "",

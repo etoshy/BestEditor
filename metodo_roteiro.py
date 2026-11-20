@@ -595,6 +595,17 @@ _BASTIDOR = [
     (re.compile(r"\b(?:na|pela) leitura defendida (?:aqui|neste vídeo)\b", re.I), "numa leitura possível"),
     (re.compile(r"\buma crítica defendida neste vídeo é que\b", re.I), "uma crítica possível é que"),
     (re.compile(r"\bComeça com uma coisa que já estava no ar:\s*", re.I), ""),
+    # ✍ v84_443: mais costuras que escaparam no lote de 6 roteiros
+    (re.compile(r"\bo ponto que o título pede\b", re.I), "o ponto central"),
+    (re.compile(r"\b(?:a|à) resposta (?:a|à)o título\b", re.I), "a resposta"),
+    (re.compile(r"\bresponde à pergunta do título\b", re.I), "responde à pergunta do começo"),
+    (re.compile(r"\b(?:Esse|Este) é o ponto do título:\s*", re.I), ""),
+    (re.compile(r"\bA parte anterior (falou|mostrou|tratou)", re.I), lambda m: "Agora há pouco a gente " + {"falou": "falou",
+                "mostrou": "viu", "tratou": "falou"}.get(m.group(1).lower(), "viu")),
+    (re.compile(r",?\s*e as partes anteriores ajudam a mostrar por quê", re.I), ", e o que vimos até aqui mostra por quê"),
+    (re.compile(r"\bessa parte quer destrinchar\b", re.I), "a gente vai destrinchar agora"),
+    (re.compile(r"\b(?:é )?a interpretação crítica defendida pelo vídeo\b", re.I), "é uma interpretação crítica"),
+    (re.compile(r"\bNa leitura proposta aqui,\s*", re.I), "Numa leitura possível, "),
 ]
 
 

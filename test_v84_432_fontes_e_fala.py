@@ -124,3 +124,11 @@ def test_v84_440_um_comentario_e_mais_bastidor():
     assert "título" not in s and s.startswith("A cultura perde")
     import dossies as ds
     assert "náufrago" not in ds.REGRA_FALA and "UM GANCHO SÓ" in ds.REGRA_FALA
+
+
+def test_v84_443_mais_costuras():
+    s = mr.tirar_meta_fonte("E aqui está o ponto que o título pede. A parte anterior falou de algo. "
+                            "Por isso, a resposta ao título é esta: não.")
+    assert "título" not in s and "parte anterior" not in s
+    import temas_bruto as TB
+    assert "bater com TUDO" in TB.system_lapidar({}, {"titulo": "x"})

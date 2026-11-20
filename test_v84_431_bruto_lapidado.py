@@ -81,3 +81,15 @@ def test_palavra_gigante_usa_o_estilo_marcado_ou_o_do_canal(monkeypatch):
     assert out[0]["estilo_arte"] == e and estilos_arte.ESTILOS[e]["nome"] in pedidos[-1]
     out = tf.pedir_ideias("T", "c", [], 0, estilos=[e], albert=1, estilo_albert="canal")
     assert not out[0].get("estilo_arte") and estilos_arte.ESTILOS[e]["nome"] not in pedidos[-1]
+
+
+def test_v84_441_minutos_cabem_no_material(monkeypatch, tmp_path):
+    _modelo(monkeypatch)
+    a = TB.criar(str(tmp_path), "Aula", "teste_fil", ("palavra boa aqui. " * 400).encode(), "aula.txt")
+    TB.mexer(str(tmp_path), a["id"], lambda x: x.update(
+        temas=[{"id": "t1", "titulo": "A", "minutos": 24}, {"id": "t2", "titulo": "B", "minutos": 10}],
+        fatias={"trechos": ["p " * 2000, "q " * 1800], "dono": {"C1": "t1", "C2": "t2"}}))
+    m = TB.ajustar_minutos(str(tmp_path), a["id"], ["t1", "t2"])
+    assert m == {"t1": (24.0, 11.0, 2000)}  # 2000 palavras sustentam ~11 min; o de 10 min fica como está
+    t1 = TB.carregar(str(tmp_path), a["id"])["temas"][0]
+    assert t1["minutos"] == 11 and t1["minutos_pedidos"] == 24

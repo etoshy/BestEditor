@@ -672,7 +672,10 @@ Regras:
 - Tire o ruído da fala: hesitações, repetições, "né", "então", frases quebradas, idas e vindas.
 - Corrija os erros óbvios de transcrição pelo contexto. NOMES deformados pelo reconhecimento de voz (autor, obra,
   personagem, lugar, evento) você RECONSTRÓI pelo contexto e pelo que você sabe (o som parecido + o assunto) e escreve
-  certo — não descarte um exemplo só porque o nome veio torto. Só deixe de fora o que for realmente incompreensível.
+  certo — não descarte um exemplo só porque o nome veio torto. MAS o nome reconstruído tem que bater com TUDO o que o
+  trecho conta (o que a pessoa/o personagem fez, a obra, a época): um nome que só soa parecido e não combina com a
+  história contada é ERRO — nesse caso conte o exemplo sem o nome ("um personagem da literatura brasileira que…").
+  Só deixe de fora o que for realmente incompreensível.
 - EXEMPLOS CONCRETOS FICAM CONCRETOS: personagem, obra, autor, caso real, episódio contado (ex.: "numa prova, a maioria
   escolheu <tal personagem> de <tal livro>") ficam COM o nome e o detalhe — nunca vire "imagine um personagem…" ou "em certas
   interpretações…". É o que deixa o vídeo denso.
@@ -728,3 +731,33 @@ def lapidar(base: str, a: Dict[str, Any], t: Dict[str, Any], progresso=None) -> 
     if t.get("referencias"):
         extra = "\n\nReferências citadas: " + ", ".join(t["referencias"])
     return "\n\n".join(saida).strip() + extra
+
+
+# ------------------------------------------------------------------ ⏱ v84_441: os minutos cabem no material
+PALAVRAS_POR_MIN = 150
+APROVEITA = 0.85  # do bruto que ficou com o vídeo, quanto vira roteiro (sai o ruído da fala; entram explicações/exemplos)
+
+
+def minutos_possiveis(palavras_aula: int) -> float:
+    return round(palavras_aula * APROVEITA / PALAVRAS_POR_MIN, 1)
+
+
+def ajustar_minutos(base: str, aid: str, ids: List[str]) -> Dict[str, Any]:
+    """Depois da divisão: se a aula tem pouco sobre um tema pros minutos pedidos (ex.: 24 min com ~2.000 palavras = um
+    roteiro de 11 min "esticado" em vão), baixa os minutos pro que o material sustenta e avisa. Nunca sobe."""
+    cont = resumo_fatias(carregar(base, aid))
+    mudou: Dict[str, Any] = {}
+
+    def f(a):
+        for t in a.get("temas") or []:
+            if t["id"] not in ids or t.get("projeto") or not cont.get(t["id"]):
+                continue
+            pode = minutos_possiveis(cont[t["id"]])
+            pediu = float(t.get("minutos") or 0)
+            if pediu and pode and pediu > pode * 1.15:
+                novo = max(3.0, round(pode))
+                t.setdefault("minutos_pedidos", pediu)
+                t["minutos"] = novo
+                mudou[t["id"]] = (pediu, novo, cont[t["id"]])
+    mexer(base, aid, f)
+    return mudou

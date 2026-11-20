@@ -145,9 +145,15 @@ def registrar(app, base_dir: str) -> None:
                         for tid in ids:
                             _estado(aid, tid, "fila", f"⚠ não deu pra dividir a aula ({exc}) — indo pelas notas")
                 cont = TB.resumo_fatias(TB.carregar(base_dir, aid))
+                ajust = TB.ajustar_minutos(base_dir, aid, ids) if TB.carregar(base_dir, aid).get("ajustar_minutos", True) else {}
                 for tid in ids:
-                    if cont.get(tid):
-                        _estado(aid, tid, "fila", f"✂ {cont[tid]} palavras da aula ficaram com este vídeo", palavras_aula=cont[tid])
+                    if tid in ajust:
+                        pediu, novo, pal = ajust[tid]
+                        _estado(aid, tid, "fila", f"✂ {pal} palavras da aula ficaram com este vídeo — ⏱ dá ~{novo:g} min "
+                                f"densos (não {pediu:g}): ajustei pra não esticar", palavras_aula=pal)
+                    elif cont.get(tid):
+                        _estado(aid, tid, "fila", f"✂ {cont[tid]} palavras da aula ficaram com este vídeo "
+                                f"(~{TB.minutos_possiveis(cont[tid]):g} min)", palavras_aula=cont[tid])
             with ThreadPoolExecutor(max_workers=PARALELO) as ex:
                 list(ex.map(lambda tid: _um_tema(aid, tid, gerar, revisar), ids))
             a = TB.carregar(base_dir, aid)

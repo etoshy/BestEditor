@@ -37,3 +37,27 @@ def test_clique_forte(monkeypatch):
     assert fd.clicar_forte(Page(), Loc(2)) == "forcado"
     loc = Loc(9)
     assert fd.clicar_forte(Page(), loc) == "js" and loc.cliques == ["normal", "normal", "forcado", "js"]
+
+
+def test_incluir_no_comando_nao_trava(monkeypatch):
+    estado = {"menu": True, "cliques": 0}
+
+    class B:
+        def click(self, timeout=0, force=False):
+            estado["cliques"] += 1
+            if not force:
+                raise Exception("Timeout 3000ms exceeded.")
+            estado["menu"] = False
+
+        def evaluate(self, js):
+            estado["menu"] = False
+
+    monkeypatch.setattr(fd, "_visivel", lambda page, sel: estado["menu"] if sel == fd.S["menu_midia"] else True)
+    monkeypatch.setattr(fd, "_primeiro", lambda page, sel, t=0, *a: B())
+    monkeypatch.setattr(fd, "_esperar", lambda f, t: f())
+    fd._clicar_incluir(object(), "ref", limite_s=5)
+    assert estado["cliques"] == 2 and not estado["menu"]
+    estado["menu"] = False  # o Flow já incluiu sozinho: nem clica
+    estado["cliques"] = 0
+    fd._clicar_incluir(object(), "ref", limite_s=5)
+    assert estado["cliques"] == 0
