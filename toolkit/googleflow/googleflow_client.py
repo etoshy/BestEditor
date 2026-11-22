@@ -1399,9 +1399,10 @@ PISTAS = {
                ".cdk-overlay-pane:has(flow-toggles):not(:has(.settings-content)):not(:has(#agent-settings-confirm-policy-label))",
                ".cdk-overlay-pane:has(.mat-button-toggle-group):not(:has(.settings-content))"],
     # painel lateral "Configurações do agente" (o do projeto): fecha com Salvar ou com o X
-    "agente_painel": ["#agent-settings-confirm-policy-label", ".settings-content", ".confirm-policy-group"],
+    "agente_painel": ["#agent-settings-confirm-policy-label", ".settings-content", ".confirm-policy-group",
+                      "flow-unified-settings-view"],  # v84_455: as configurações agora abrem dentro do painel
     "agente_salvar": ["button.settings-save-button", ".save-container button"],
-    "agente_fechar": ['button[aria-label="Fechar"]', 'button[aria-label*="echar"]', 'button[aria-label*="Close"]',
+    "agente_fechar": ['flow-agent-panel button[aria-label="Voltar"]', 'button[aria-label="Fechar"]', 'button[aria-label*="echar"]', 'button[aria-label*="Close"]',
                       'button:has(mat-icon:text-is("close"))'],
     "editor": [".ProseMirror", '[contenteditable="true"]', "textarea"],
     "gerar": ["button.generate-icon-button", 'button[aria-label="Iniciar geração"]', 'button[aria-label*="eração"]',

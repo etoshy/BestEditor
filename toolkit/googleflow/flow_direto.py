@@ -57,6 +57,7 @@ S = {
                     'flow-prompt-box button:has-text("Agente"):not([aria-label])'),
     "agente_config": ('flow-prompt-box .agent-footer-actions button[aria-label="Configurações do agente"], '
                       '.agent-footer-actions button[aria-label="Configurações do agente"], '
+                      'flow-agent-panel .agent-panel-header button[aria-label="Configurações do agente"], '
                       'flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
                       'flow-agent-panel .agent-footer-actions button[aria-label="Configurações"], '
                       'flow-creative-agent-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
@@ -71,7 +72,13 @@ S = {
                       'flow-agent-panel .agent-panel-header button[aria-label="Fechar"], flow-agent-panel button[aria-label="Fechar"], '
                       'flow-agent-panel button:has(mat-icon:text-is("right_panel_close")), '
                       'button.header-action[aria-label="Fechar"]'),
-    "agente_painel": "flow-settings-view",
+    "agente_painel": "flow-settings-view, flow-unified-settings-view",
+    # v84_455 (HTML real, nov/2026): as configurações do agente abrem DENTRO do painel (flow-unified-settings-view), com
+    # "Sempre/Nunca" em botões toggle (sem rádio, sem "Salvar" — grava na hora) e um "Voltar" no lugar do X
+    "agente_unificado": "flow-agent-panel flow-unified-settings-view, flow-unified-settings-view",
+    "agente_nunca_toggle": ('flow-toggles[aria-label="Confirmar antes de gerar"] button[role="radio"]:has-text("Nunca"), '
+                            'flow-unified-settings-view button[role="radio"]:has-text("Nunca")'),
+    "painel_voltar": 'flow-agent-panel .agent-panel-header button[aria-label="Voltar"], flow-agent-panel button[aria-label="Voltar"]',
     "agente_nunca": '.confirm-policy-group mat-radio-button:has(input[value="2"])',
     "agente_nunca_input": '.confirm-policy-group input[value="2"]',
     "agente_salvar": "button.settings-save-button",
@@ -616,8 +623,20 @@ def configurar_agente(page, img_proporcao: str = "16:9", img_quantidade: str = "
 def _configurar_agente(page, passo: str, img_proporcao: str, img_quantidade: str, img_modelo: str, vid_proporcao: str,
                        vid_quantidade: str, vid_modelo: str) -> None:
     ligar_agente(page, True)
-    _primeiro(page, S["agente_config"], 10, passo, 'não achei o botão "Configurações" (ícone tune) do agente.').click()
+    if not _visivel(page, S["agente_painel"]):
+        _primeiro(page, S["agente_config"], 10, passo, 'não achei o botão "Configurações" (ícone tune) do agente.').click()
     painel = _primeiro(page, S["agente_painel"], 10, passo, 'o painel "Configurações do agente" não abriu.')
+    if _visivel(page, S["agente_unificado"]):  # 🩹 v84_455: o jeito novo (dentro do painel do agente)
+        nunca = _primeiro(page, S["agente_nunca_toggle"], 5, passo, 'não achei a opção "Nunca" em "Confirmar antes de gerar".')
+        for _ in range(3):
+            if _marcado(nunca):
+                break
+            nunca.click()
+            _esperar(lambda: _marcado(nunca), 2)
+        if not _marcado(nunca):
+            raise FlowPassoErro(passo, '"Confirmar antes de gerar" não ficou em "Nunca".')
+        _sair_config_agente(page)
+        return
     nunca = _primeiro(painel, S["agente_nunca"], 5, passo, 'não achei a opção "Nunca" em "Confirmar antes de gerar".')
     for _ in range(3):
         if painel.locator(S["agente_nunca_input"]).first.is_checked():
@@ -643,9 +662,24 @@ def _configurar_agente(page, passo: str, img_proporcao: str, img_quantidade: str
         raise FlowPassoErro(passo, 'cliquei em "Salvar" mas o painel do agente não fechou.')
 
 
+def _sair_config_agente(page) -> bool:
+    """🩹 v84_455: se as configurações do agente ficaram abertas DENTRO do painel (só tem "Voltar", sem o X), volta."""
+    if not (_visivel(page, S["agente_unificado"]) or (_visivel(page, S["painel_voltar"]) and not _visivel(page, S["painel_fechar"]))):
+        return False
+    for _ in range(2):
+        b = _primeiro(page, S["painel_voltar"], 3)
+        if b is None:
+            break
+        b.click()
+        if _esperar(lambda: not _visivel(page, S["agente_unificado"]), 5):
+            return True
+    return not _visivel(page, S["agente_unificado"])
+
+
 def ligar_agente(page, ligado: bool) -> None:
     """Liga/desliga o Agente. Dois jeitos do Flow: o chip "Agente" na caixa, ou (janela larga) o PAINEL do agente
     à direita — aberto = ligado; fechar no X = desligado."""
+    _sair_config_agente(page)
     chip = _primeiro(page, S["agente_chip"], 6)
     largura = 0
     if chip is None and _visivel(page, S["painel_sessao"]):
@@ -1124,16 +1158,20 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
     tipo = "video" if trab.get("tipo") in ("video", "animar") else "imagem"
     frames = tipo == "video" and bool(trab.get("inicio") or trab.get("fim") or
                                       ((trab.get("tipo_video") or "Frames") == "Frames" and not trab.get("referencias")))
-    configurar_caixa(page, tipo, trab.get("proporcao") or "16:9", trab.get("modelo") or "", trab.get("quantidade") or "x1",
-                     ("Frames" if frames else "Elementos") if tipo == "video" else "", on_passo=on_passo,
-                     duracao=trab.get("duracao") or "", resolucao=trab.get("resolucao") or "")
+    # 🛟 v84_455: aqui a caixa ainda está vazia → dá pra recarregar a página e refazer sem perder nada
+    com_recuperacao(page, "configurar", lambda: configurar_caixa(
+        page, tipo, trab.get("proporcao") or "16:9", trab.get("modelo") or "", trab.get("quantidade") or "x1",
+        ("Frames" if frames else "Elementos") if tipo == "video" else "", on_passo=on_passo,
+        duracao=trab.get("duracao") or "", resolucao=trab.get("resolucao") or ""), on_passo,
+        depois_de_recarregar=lambda: desligar_agente(page, on_passo))
     ja_subiu: Dict[str, str] = {}  # 🎞 v84_202: Fim = a MESMA imagem do Início → reusa a mídia (o Flow não sobe repetida)
     for qual, chave in (("Início", "inicio"), ("Fim", "fim")):
         f = trab.get(chave) or {}
         if tipo == "video" and (f.get("arquivo") or f.get("media_id")):
             mid = f.get("media_id") or ja_subiu.get(os.path.abspath(f["arquivo"]) if f.get("arquivo") else "", "")
             _ULTIMA_MIDIA.pop(id(page), None)
-            definir_frame(page, qual, f.get("arquivo"), mid, on_passo)
+            com_recuperacao(page, "frame", lambda qual=qual, f=f, mid=mid: definir_frame(page, qual, f.get("arquivo"), mid, on_passo),
+                            on_passo, recarregar=False)
             info = _ULTIMA_MIDIA.pop(id(page), None) or {}
             if f.get("arquivo") and info.get("ids"):
                 ja_subiu[os.path.abspath(f["arquivo"])] = max(info["ids"], key=len)
@@ -1146,7 +1184,8 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         for r in (trab.get("referencias") or [])[:3]:
             if not (r.get("arquivo") or r.get("media_id")):
                 continue
-            incluir_referencia(page, r.get("arquivo"), r.get("media_id") or "", on_passo)
+            com_recuperacao(page, "referencia", lambda r=r: incluir_referencia(page, r.get("arquivo"), r.get("media_id") or "", on_passo),
+                            on_passo, recarregar=False)
             info = _ULTIMA_MIDIA.pop(id(page), None) or {}
             ref_tokens += list(info.get("ids") or [])
             r["_media_id"] = max(info.get("ids") or [""], key=len) or r.get("media_id") or ""
@@ -1155,13 +1194,15 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         for r in (trab.get("referencias") or [])[:6]:
             if not (r.get("arquivo") or r.get("media_id")):
                 continue
-            incluir_referencia(page, r.get("arquivo"), r.get("media_id") or "", on_passo)
+            com_recuperacao(page, "referencia", lambda r=r: incluir_referencia(page, r.get("arquivo"), r.get("media_id") or "", on_passo),
+                            on_passo, recarregar=False)
             info = _ULTIMA_MIDIA.pop(id(page), None) or {}
             ref_tokens += list(info.get("ids") or [])
             if r.get("media_id"):
                 ref_tokens.append(r["media_id"])
     if tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")):
-        incluir_referencia(page, ref.get("arquivo"), ref.get("media_id") or "", on_passo)
+        com_recuperacao(page, "referencia", lambda: incluir_referencia(page, ref.get("arquivo"), ref.get("media_id") or "", on_passo),
+                        on_passo, recarregar=False)
         info = _ULTIMA_MIDIA.pop(id(page), None) or {}
         ref_tokens = list(info.get("ids") or [])
         if ref.get("media_id"):
@@ -1179,7 +1220,7 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         pass
     if ref_tokens and tipo == "imagem" and (ref.get("arquivo") or ref.get("media_id")) and not trab["_ref_midia"].get("media_id"):
         trab["_ref_midia"]["media_id"] = ref_tokens[0]
-    escrever_prompt(page, trab["prompt"], on_passo)
+    com_recuperacao(page, "prompt", lambda: escrever_prompt(page, trab["prompt"], on_passo), on_passo, recarregar=False)
     if trab.get("simular"):  # 🧪 teste sem gastar crédito: para aqui, antes do clique em gerar
         on_passo("gerar", "pulado", "modo teste sem gerar (nenhum crédito gasto)")
         return []
@@ -1200,12 +1241,71 @@ def gerar_um(page, trab: Dict[str, Any], on_passo: Passo = _nada, timeout_s: flo
         return gerar_um(page, dict(trab, prompt=novo, _sem_famosos=True, prompt_original=trab["prompt"]), on_passo, timeout_s)
 
 
+# ------------------------------------------------------------------ 🛟 v84_455: recuperação de imprevistos
+# O Flow muda a tela sem aviso (pop-up de novidades, painel que ficou aberto, configurações por cima, menu aberto,
+# a caixa que demora a voltar). Antes, QUALQUER botão que não aparecesse parava a geração. Agora cada passo de
+# preparo tenta de novo depois de LIMPAR a tela — e, se ainda falhar, recarrega a página do projeto e refaz.
+# Não repete o que não é imprevisto de tela: limite/sem crédito, login, recusa do Google.
+_NAO_RECUPERA = (FlowLimite, FlowLogin, FlowRecusou)
+
+
+def limpar_tela(page, on_passo: Passo = _nada) -> None:
+    """Fecha o que pode estar na frente: novidades/boas-vindas, configurações do agente, pop-up da caixa, menus."""
+    for acao in (lambda: fechar_novidades(page, on_passo),
+                 lambda: passar_boas_vindas(page, on_passo),
+                 lambda: _sair_config_agente(page),
+                 lambda: fechar_popup(page) if _visivel(page, S["popup"]) else None,
+                 lambda: _visivel(page, S["menu_midia"]) and page.keyboard.press("Escape"),
+                 lambda: page.locator(".cdk-overlay-backdrop").first.click(timeout=1500)
+                 if page.locator(".cdk-overlay-backdrop").count() else None,
+                 lambda: page.keyboard.press("Escape")):
+        try:
+            acao()
+        except Exception:  # noqa: BLE001 — limpar nunca pode virar erro novo
+            pass
+
+
+def recarregar_projeto(page, on_passo: Passo = _nada) -> None:
+    on_passo("recuperar", "andando", "recarregando a página do projeto")
+    page.reload(wait_until="domcontentloaded")
+    _esperar(lambda: _visivel(page, "flow-prompt-box") or _visivel(page, S["painel_sessao"]), 25)
+    limpar_tela(page, on_passo)
+
+
+def com_recuperacao(page, nome: str, fn: Callable[[], Any], on_passo: Passo = _nada, recarregar: bool = True,
+                    depois_de_recarregar: Optional[Callable[[], Any]] = None):
+    """Roda `fn`; se der FlowPassoErro de tela, limpa e tenta de novo; se falhar de novo (e `recarregar`), recarrega a
+    página, roda `depois_de_recarregar` (ex.: desligar o agente) e tenta uma última vez."""
+    tentativas = 3 if recarregar else 2
+    for k in range(tentativas):
+        try:
+            return fn()
+        except _NAO_RECUPERA:
+            raise
+        except FlowPassoErro as exc:
+            if k == tentativas - 1:
+                raise
+            if k == 0:
+                on_passo(nome, "andando", f"🛟 imprevisto ({exc.mensagem[:120]}) — limpando a tela e tentando de novo")
+                limpar_tela(page, on_passo)
+            else:
+                on_passo(nome, "andando", f"🛟 ainda não deu ({exc.mensagem[:120]}) — recarregando e tentando de novo")
+                try:
+                    recarregar_projeto(page, on_passo)
+                    if depois_de_recarregar:
+                        depois_de_recarregar()
+                except _NAO_RECUPERA:
+                    raise
+                except Exception:  # noqa: BLE001
+                    pass
+
+
 def preparar_projeto(context, url: str = FLOW_URL, headless: bool = True, agente: Optional[Dict[str, str]] = None,
                      on_passo: Passo = _nada):
     """Abre o Flow, cria um projeto, configura o agente (se `agente` vier) e desliga o agente. → página do projeto."""
     page = abrir_flow(context, url, headless, on_passo)
     page = novo_projeto(page, context, on_passo)
     if agente is not None:
-        configurar_agente(page, on_passo=on_passo, **agente)
-    desligar_agente(page, on_passo)
+        com_recuperacao(page, "config_agente", lambda: configurar_agente(page, on_passo=on_passo, **agente), on_passo)
+    com_recuperacao(page, "desligar_agente", lambda: desligar_agente(page, on_passo), on_passo)
     return page
