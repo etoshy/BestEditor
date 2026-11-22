@@ -57,7 +57,7 @@ class TestTexto:
         ch = []
         r = mv.gerar("Abertura. [ricardo] Fala do Ricardo. [ana_clara] Fala da Ana.", str(tmp_path / "o.wav"), "piper", {"nome_voz": "pt_BR-x"},
                      fake_gerar(ch), lambda t, turbo: t)
-        assert r == {"falas": 3, "vozes": ["ricardo", "ana_clara"]}
+        assert r == {"falas": 3, "vozes": ["ricardo", "ana_clara"], "reaproveitadas": 0}
         assert [c[0] for c in ch] == ["piper", "piper", "kokoro"] and all("[" not in c[1] for c in ch)
         assert ch[1][2] == "pt_BR-faber-medium" and ch[2][2] == "pf_dora"
         dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(tmp_path / "o.wav")],
@@ -88,6 +88,14 @@ class TestApp:
         assert c.post("/gerar-voz/gerar", data={"texto": "[zé] oi", "engine": "piper", "multivoz": "on"}).status_code == 400
         ch = []
         monkeypatch.setattr(A, "tts_gerar_audio_isolado", fake_gerar(ch))
+
+        def _lote(itens, on_progresso=None, _g=fake_gerar(ch)):  # ⚡ v84_458: o multi voice gera em lote (1 processo)
+            for i, (m, t, saida, kw) in enumerate(itens):
+                _g(m, t, saida, **kw)
+                if on_progresso:
+                    on_progresso(i, None)
+            return {}
+        monkeypatch.setattr(A, "tts_gerar_audio_isolado_lote", _lote)
         monkeypatch.setattr(A, "transcribe_audio", lambda *a, **k: [])
         j = c.post("/gerar-voz/gerar", data={"texto": "Sem tag. [narrador] Era uma vez. [ricardo] Oi!", "engine": "piper", "piper_voz": "pt_BR-y", "multivoz": "on"}).get_json()
         for _ in range(100):
@@ -96,7 +104,7 @@ class TestApp:
                 break
             time.sleep(0.1)
         assert st["resultado"] and not st["erro"], st
-        assert [x[2] for x in ch] == ["pt_BR-y", "pm_alex", "pt_BR-faber-medium"]
+        assert sorted(x[2] for x in ch) == sorted(["pt_BR-y", "pm_alex", "pt_BR-faber-medium"])  # em lote: agrupadas por voz
         # sem o modo, o texto vai inteiro (com as tags limpas como pontuação) pra uma voz só
         ch.clear()
         j = c.post("/gerar-voz/gerar", data={"texto": "[ricardo] Oi!", "engine": "piper"}).get_json()

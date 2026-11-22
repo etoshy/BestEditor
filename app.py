@@ -984,7 +984,8 @@ def _gerar_voz_em_background(job_id: str, engine: str, texto: str, output_path: 
             try:
                 r = mv.gerar(ch.remover_marcadores(texto), output_path, engine, kwargs, tts_gerar_audio_isolado,
                              lambda t, m: na.limpar_texto_para_tts(t, motor=m if isinstance(m, str) else ("chatterbox_turbo" if m else "")),
-                             pausa_troca=float((legenda_kwargs or {}).get("pausa_troca", 0.35)), on_log=log, normalizar_fn=_normalizar_multivoz)
+                             pausa_troca=float((legenda_kwargs or {}).get("pausa_troca", 0.35)), on_log=log, normalizar_fn=_normalizar_multivoz,
+                             lote_fn=tts_gerar_audio_isolado_lote)  # ⚡ v84_458: o modelo carrega 1 vez pra todas as falas
             except mv.MultiVozError as exc:
                 raise VoiceGeneratorError(str(exc)) from exc
             log(f"{r['falas']} fala(s), vozes: " + (", ".join(r["vozes"]) or "só a padrão") + ".")

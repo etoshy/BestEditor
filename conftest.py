@@ -34,6 +34,7 @@ shutil.rmtree(_IA_DADOS, ignore_errors=True)
 os.makedirs(_IA_DADOS, exist_ok=True)
 os.environ["IA_DADOS_DIR"] = _IA_DADOS
 os.environ["FONTES_CONFIANCA_DIR"] = _IA_DADOS  # 🛡 v84_437: o registro de sites dos testes não vai pro projeto
+os.environ["MULTIVOZ_CACHE_DIR"] = os.path.join(_IA_DADOS, "falas_prontas_%d" % os.getpid())  # 💾 v84_458
 os.environ.pop("ANTHROPIC_API_KEY", None)
 os.environ.pop("GEMINI_API_KEY", None)  # 🔷 o Gemini dos testes também começa sem chave
 os.environ.pop("GOOGLE_API_KEY", None)

@@ -466,8 +466,10 @@ def concatenar(arquivos: List[str], saida: str, pausas: List[float], pasta: str)
 def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, Any],
           gerar_fn: Callable[..., Any], limpar_fn: Callable[[str, bool], str],
           pausa_troca: float = 0.35, pausa_mesma: float = 0.12, on_log: Optional[Callable[[str], None]] = None,
-          normalizar_fn: Optional[Callable[[str, str], None]] = None) -> Dict[str, Any]:
-    """Gera o texto inteiro trocando de voz nas tags. `gerar_fn(motor, texto, saida, **kwargs)`."""
+          normalizar_fn: Optional[Callable[[str, str], None]] = None, lote_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    """Gera o texto inteiro trocando de voz nas tags. `gerar_fn(motor, texto, saida, **kwargs)`.
+    ⚡ v84_458 `lote_fn` (gerar_audio_isolado_lote): todas as falas num processo só, com o modelo carregado UMA vez
+    (antes: um processo novo e o modelo carregado de novo em CADA fala — era o que deixava o multi voice lento)."""
     log = on_log or (lambda _m: None)
     vozes = por_slug()
     d = dividir(texto, vozes, padrao=motor_padrao)  # padrao = o motor da voz padrão (pros sons [tosse]…)
@@ -484,8 +486,11 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
     pasta = os.path.splitext(saida)[0] + "_multi"
     shutil.rmtree(pasta, ignore_errors=True)
     os.makedirs(pasta, exist_ok=True)
+    cache = pasta_cache(saida)
+    reaproveitadas = 0
     try:
         arquivos, pausas, anterior = [], [], "__inicio__"
+        pend: List[Dict[str, Any]] = []
         for k, f in enumerate(d["falas"], start=1):
             if f["slug"]:
                 motor, kw = kwargs_da_voz(vozes[f["slug"]])
@@ -493,15 +498,31 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
             else:
                 motor, kw, quem = motor_padrao, kwargs_padrao, "voz padrão"
             kw = aplicar_ajustes(motor, kw, f.get("ajustes"))
-            aj = " ".join(f"{a}={v}" for a, v in (f.get("ajustes") or {}).items())
-            log(f"[{k}/{len(d['falas'])}] {quem} ({motor}{' · ' + aj if aj else ''}): \"{f['texto'][:60]}\"")
-            bruto = os.path.join(pasta, f"f{k:04d}_bruto.wav")
-            gerar_fn(motor, limpar_fn(f["texto"], motor), bruto, **kw)
+            texto_limpo = limpar_fn(f["texto"], motor)
+            # 💾 v84_458: cada fala pronta fica guardada (voz + configuração + texto): se o motor travar no meio, a nova
+            # tentativa — ou você clicando em gerar de novo — continua de onde parou
+            guardada = os.path.join(cache, chave_fala(motor, kw, texto_limpo) + ".wav")
             wav = os.path.join(pasta, f"f{k:04d}.wav")
-            _wav_padrao(bruto, wav)
+            if os.path.isfile(guardada) and os.path.getsize(guardada) > 1000:
+                shutil.copy(guardada, wav)
+                reaproveitadas += 1
+            else:
+                pend.append({"k": k, "motor": motor, "kw": kw, "texto": texto_limpo, "quem": quem, "wav": wav,
+                             "guardada": guardada, "bruto": os.path.join(pasta, f"f{k:04d}_bruto.wav"),
+                             "aj": " ".join(f"{a}={v}" for a, v in (f.get("ajustes") or {}).items())})
             arquivos.append(wav)
             pausas.append(pausa_troca if f["slug"] != anterior else pausa_mesma)
             anterior = f["slug"]
+        total = len(d["falas"])
+        if reaproveitadas:
+            log(f"♻ {reaproveitadas} de {total} fala(s) já estavam prontas (de uma tentativa anterior) — gerando só as {len(pend)} que faltam.")
+        if pend and lote_fn is not None:
+            _gerar_em_lote(pend, lote_fn, total, log)
+        else:
+            for p in pend:
+                log(f"[{p['k']}/{total}] {p['quem']} ({p['motor']}{' · ' + p['aj'] if p['aj'] else ''}): \"{p['texto'][:60]}\"")
+                _gerar_fala_com_retentativa(gerar_fn, p["motor"], p["texto"], p["bruto"], p["kw"], log)
+                _guardar_fala(p)
         log(f"Juntando {len(arquivos)} fala(s) de {len(set(f['slug'] for f in d['falas']))} voz(es)...")
         juntado = os.path.join(pasta, "juntado.wav")
         concatenar(arquivos, juntado, pausas, pasta)
@@ -511,7 +532,107 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
             shutil.copy(juntado, saida)
     finally:
         shutil.rmtree(pasta, ignore_errors=True)
-    return {"falas": len(d["falas"]), "vozes": d["usadas"]}
+    return {"falas": len(d["falas"]), "vozes": d["usadas"], "reaproveitadas": reaproveitadas}
+
+
+CACHE_DIAS = 5
+
+
+def pasta_cache(saida: str) -> str:
+    """As falas prontas do multi voice (ao lado dos áudios). As de mais de CACHE_DIAS dias são apagadas."""
+    import time as _t
+    c = os.environ.get("MULTIVOZ_CACHE_DIR") or os.path.join(os.path.dirname(os.path.abspath(saida)), "_falas_prontas")
+    os.makedirs(c, exist_ok=True)
+    limite = _t.time() - CACHE_DIAS * 86400
+    try:
+        for n in os.listdir(c):
+            a = os.path.join(c, n)
+            if os.path.getmtime(a) < limite:
+                os.remove(a)
+    except OSError:
+        pass
+    return c
+
+
+def chave_fala(motor: str, kw: Dict[str, Any], texto: str) -> str:
+    import hashlib
+    cfg = json.dumps({k: kw[k] for k in sorted(kw) if k not in ("on_progresso", "on_log", "progresso_arquivo")},
+                     sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha1(f"{motor}\n{cfg}\n{texto}".encode("utf-8")).hexdigest()[:24]
+
+
+def _guardar_fala(p: Dict[str, Any]) -> None:
+    _wav_padrao(p["bruto"], p["wav"])
+    try:
+        shutil.copy(p["wav"], p["guardada"] + ".tmp")
+        os.replace(p["guardada"] + ".tmp", p["guardada"])
+    except OSError:
+        pass
+
+
+def _eh_crash(txt: str) -> bool:
+    t = str(txt or "").lower()
+    return any(x in t for x in ("travou", "3221225477", "fechou sozinho", "crash", "memória", "memory", "terminou sem gerar"))
+
+
+def _gerar_em_lote(pend: List[Dict[str, Any]], lote_fn, total: int, log, rodadas: int = 4) -> None:
+    """As falas que faltam num processo só, AGRUPADAS POR VOZ (troca de perfil o mínimo). Se o motor travar, as que já
+    saíram ficam guardadas e uma rodada nova (processo novo) faz só as que faltaram."""
+    import gc
+    import time as _t
+    faltam = sorted(pend, key=lambda p: (p["motor"], json.dumps(p["kw"], sort_keys=True, default=str), p["k"]))
+    for rodada in range(1, rodadas + 1):
+        feitas = {"n": 0}
+        log(f"⚡ gerando {len(faltam)} fala(s) num processo só (o modelo carrega uma vez)"
+            + (f" — rodada {rodada}/{rodadas}" if rodada > 1 else "") + "…")
+
+        def prog(i, erro, lista=faltam):
+            p = lista[i]
+            if erro:
+                log(f"   ⚠ [{p['k']}/{total}] {p['quem']}: {str(erro)[:160]}")
+                return
+            try:
+                _guardar_fala(p)
+            except Exception as exc:  # noqa: BLE001
+                log(f"   ⚠ [{p['k']}/{total}] não consegui preparar o áudio: {exc}")
+                return
+            feitas["n"] += 1
+            log(f"[{p['k']}/{total}] ✔ {p['quem']} ({p['motor']}{' · ' + p['aj'] if p['aj'] else ''}): \"{p['texto'][:50]}\"")
+        erros = lote_fn([(p["motor"], p["texto"], p["bruto"], p["kw"]) for p in faltam], on_progresso=prog) or {}
+        ruins = [faltam[i] for i in sorted(erros) if 0 <= i < len(faltam)]
+        ruins += [p for p in faltam if p not in ruins and not os.path.isfile(p["wav"])]
+        if not ruins:
+            return
+        if not all(_eh_crash(erros.get(faltam.index(p), "terminou sem gerar")) for p in ruins) or rodada == rodadas:
+            raise MultiVozError(f"{len(ruins)} fala(s) não saíram: " + str(next(iter(erros.values()), "o motor parou"))[:300]
+                                + " — as que já saíram ficaram guardadas: clique em gerar de novo que ele continua de onde parou.")
+        espera = 10 * rodada
+        log(f"🔁 o motor travou ({len(ruins)} fala(s) faltando). {sum(1 for p in pend if os.path.isfile(p['wav']))} já estão "
+            f"guardadas. Esperando {espera} s a placa liberar e continuando só com as que faltam…")
+        gc.collect()
+        _t.sleep(espera)
+        faltam = ruins
+
+
+def _gerar_fala_com_retentativa(gerar_fn, motor: str, texto: str, saida: str, kw: Dict[str, Any], log, tentativas: int = 4) -> None:
+    """🔁 v84_458: o motor travou (crash nativo da placa/memória) NUMA fala → tenta de novo SÓ essa fala (processo novo),
+    esperando a placa esvaziar. Antes, o crash de uma fala jogava fora as horas de falas já prontas."""
+    import gc
+    import time as _t
+    for n in range(1, tentativas + 1):
+        try:
+            gerar_fn(motor, texto, saida, **kw)
+            return
+        except Exception as exc:  # noqa: BLE001
+            txt = str(exc)
+            crash = "travou o processo" in txt or "3221225477" in txt or "memória" in txt.lower() or "out of memory" in txt.lower()
+            if not crash or n == tentativas:
+                raise
+            espera = 10 * n
+            log(f"   🔁 o motor travou nesta fala (tentativa {n}/{tentativas}) — esperando {espera} s a placa liberar e "
+                "tentando de novo SÓ esta fala (as anteriores estão guardadas)")
+            gc.collect()
+            _t.sleep(espera)
 
 
 def instrucao_para_ia(vozes: Optional[List[Dict[str, Any]]] = None) -> str:

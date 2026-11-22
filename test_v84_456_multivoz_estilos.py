@@ -48,3 +48,55 @@ def test_tags_de_som():
     marcio, mabel = d["falas"][0]["texto"], d["falas"][1]["texto"]
     assert "pigarro" not in marcio and "Cof, cof." in marcio and "[" not in marcio  # chatterbox: a leitura do som
     assert "[cough]" in mabel and "[laughing]" in mabel  # Fish S2: a tag em inglês
+
+
+def test_crash_numa_fala_nao_perde_as_outras(tmp_path, monkeypatch):
+    import wave
+    monkeypatch.setattr(mv, "por_slug", lambda: VOZES)
+    monkeypatch.setattr(mv, "kwargs_da_voz", lambda v: (v["motor"], {"voz": v["slug"]}))
+    monkeypatch.setattr(mv, "_wav_padrao", lambda a, b: __import__("shutil").copy(a, b))
+    monkeypatch.setattr(mv, "concatenar", lambda arqs, saida, pausas, pasta: open(saida, "wb").write(b"x" * 2000))
+    import time as _t
+    monkeypatch.setattr(_t, "sleep", lambda s: None)
+    feitas, falhou = [], {"n": 0}
+
+    def gerar_fn(motor, texto, saida, **kw):
+        if "Terceira" in texto and falhou["n"] < 1:
+            falhou["n"] += 1
+            raise RuntimeError("O motor de voz travou o processo (código de saída 3221225477)")
+        feitas.append(texto)
+        open(saida, "wb").write(b"w" * 2000)
+    texto = "[marcio] Primeira fala. [mabel_cezar_2] Segunda fala. [marcio] Terceira fala."
+    saida = str(tmp_path / "voz.wav")
+    r = mv.gerar(texto, saida, "chatterbox", {}, gerar_fn, lambda t, m: t)
+    assert r["falas"] == 3 and len(feitas) == 3 and falhou["n"] == 1  # só a 3ª foi refeita
+    feitas.clear()
+    r2 = mv.gerar(texto, saida, "chatterbox", {}, gerar_fn, lambda t, m: t)  # de novo: tudo vem guardado
+    assert r2["reaproveitadas"] == 3 and feitas == []
+
+
+def test_lote_um_processo_e_crash_no_meio(tmp_path, monkeypatch):
+    monkeypatch.setattr(mv, "por_slug", lambda: VOZES)
+    monkeypatch.setattr(mv, "kwargs_da_voz", lambda v: (v["motor"], {"voz": v["slug"]}))
+    monkeypatch.setattr(mv, "_wav_padrao", lambda a, b: __import__("shutil").copy(a, b))
+    monkeypatch.setattr(mv, "concatenar", lambda arqs, saida, pausas, pasta: open(saida, "wb").write(b"x" * 2000))
+    import time as _t
+    monkeypatch.setattr(_t, "sleep", lambda s: None)
+    chamadas = []
+
+    def lote(itens, on_progresso=None):
+        chamadas.append([t for _m, t, _s, _k in itens])
+        erros = {}
+        for i, (_m, t, saida, _k) in enumerate(itens):
+            if len(chamadas) == 1 and i == 1:  # 1ª rodada: o motor cai na 2ª fala
+                for j in range(i, len(itens)):
+                    erros[j] = "O motor de voz fechou sozinho (código 3221225477 — crash nativo do motor?)."
+                break
+            open(saida, "wb").write(b"w" * 2000)
+            on_progresso(i, None)
+        return erros
+    texto = "[marcio] Um. [mabel_cezar_2] Dois. [marcio] Três. [mabel_cezar_2] Quatro."
+    r = mv.gerar(texto, str(tmp_path / "v.wav"), "chatterbox", {}, None, lambda t, m: t, lote_fn=lote)
+    assert r["falas"] == 4 and len(chamadas) == 2
+    assert chamadas[0][:2] == ["Um.", "Três."]  # agrupadas por voz (o perfil troca o mínimo)
+    assert len(chamadas[1]) == 3  # a 2ª rodada só com as que faltaram
