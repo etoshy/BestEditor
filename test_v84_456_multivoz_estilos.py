@@ -40,3 +40,11 @@ def test_roteiro_do_usuario_divide_sem_erro():
     assert d["desconhecidas"] == []
     assert [f["slug"] for f in d["falas"]] == ["wagner_moura", "wagner_moura", "marcio_seixas", "mabel_cezar_2", "marcio_seixas"]
     assert d["falas"][-1]["ajustes"]["vel"] == 1.1
+
+
+def test_tags_de_som():
+    d = mv.dividir("[marcio] [pigarro] Bem. [tosse] Hum. [respira] Vamos. [mabel_cezar_2] [tosse] Oi [risada]", VOZES)
+    assert d["desconhecidas"] == []
+    marcio, mabel = d["falas"][0]["texto"], d["falas"][1]["texto"]
+    assert "pigarro" not in marcio and "Cof, cof." in marcio and "[" not in marcio  # chatterbox: a leitura do som
+    assert "[cough]" in mabel and "[laughing]" in mabel  # Fish S2: a tag em inglês

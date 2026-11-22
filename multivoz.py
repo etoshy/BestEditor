@@ -276,6 +276,37 @@ def criar_vozes_dos_perfis(desconhecidas: List[str]) -> List[Dict[str, Any]]:
     return feitas
 
 
+_SONS_EXTRA = {"respira": "breath", "respirando": "breath", "respiracao": "breath", "respiro": "breath", "inspira": "breath",
+               "respiração": "breath", "ofegante": "breath", "bocejo": "breath"}
+_FISH_SOM = {"laugh": "laughing", "chuckle": "chuckle", "sigh": "sigh", "cough": "cough", "clear throat": "clearing throat",
+             "gasp": "gasp", "groan": "sigh", "sniff": "breath", "shush": "whisper", "breath": "breath"}
+
+
+def _sons() -> Tuple[Dict[str, str], Dict[str, str]]:
+    """🔊 v84_457: tags de SOM em português ([tosse], [pigarro], [respira], [risada]…) → (som em pt → tag em inglês, falados)."""
+    import sys
+    pasta = os.path.join(_AQUI, "toolkit")
+    if pasta not in sys.path:
+        sys.path.insert(0, pasta)
+    try:
+        from tts.expressivo import SONS, SONS_FALADOS
+    except Exception:  # noqa: BLE001
+        SONS, SONS_FALADOS = {}, {}
+    sons = {slugify(k): v for k, v in SONS.items()}
+    sons.update({slugify(k): v for k, v in _SONS_EXTRA.items()})
+    return sons, dict(SONS_FALADOS)
+
+
+def som_para_motor(som: str, motor: str, falados: Dict[str, str]) -> str:
+    """O som do jeito que cada motor entende: Fish S2 = [tag em inglês]; Chatterbox Turbo = [tag do Turbo];
+    os outros não fazem som → vira a leitura do som ("Cof, cof.") ou some (respiração)."""
+    if motor == "fish_s2":
+        return f"[{_FISH_SOM.get(som, som)}] "
+    if motor == "chatterbox_turbo" and som != "breath":
+        return f"[{som}] "
+    return (falados.get(som, "") + " ") if falados.get(som) else ""
+
+
 def sugerir(desconhecidas: List[str], vozes: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, str]:
     """[Marcio_Seixas] sem voz → a voz cadastrada mais parecida (pelo slug ou pelo nome), se houver uma bem parecida."""
     import difflib
@@ -303,6 +334,7 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
     texto = _ch.remover_marcadores(texto or "")  # [[INSCREVA: ...]] não é tag de voz (ver chamadas.py)
     extras = _tags_extras()
     estilos = _estilos()
+    sons, falados = _sons()
     falas: List[Dict[str, Any]] = []
     desconhecidas: List[str] = []
     atual = voz_inicial
@@ -338,6 +370,11 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
             pos = m.end()
             if atual and (vozes.get(atual) or {}).get("motor") == "fish_s2":
                 buf += m.group(0)  # o Fish S2 entende instrução entre colchetes: a tag fica no texto dele
+        elif s in sons and not mods:  # 🔊 v84_457: [tosse] [pigarro] [respira] — som, não voz
+            buf += texto[pos:m.start()]
+            motor = (vozes.get(atual) or {}).get("motor") if atual else (padrao or "")
+            buf += som_para_motor(sons[s], str(motor or ""), falados)
+            pos = m.end()
         elif re.fullmatch(r"(?i)(velocidade|vel|speed)\s*[=:]?\s*\d+(?:[.,]\d+)?x?", bruto):  # [velocidade 0.9]
             buf += texto[pos:m.start()]
             fecha()
@@ -433,12 +470,12 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
     """Gera o texto inteiro trocando de voz nas tags. `gerar_fn(motor, texto, saida, **kwargs)`."""
     log = on_log or (lambda _m: None)
     vozes = por_slug()
-    d = dividir(texto, vozes)
+    d = dividir(texto, vozes, padrao=motor_padrao)  # padrao = o motor da voz padrão (pros sons [tosse]…)
     if d["desconhecidas"] and perfis_das_tags(d["desconhecidas"]):  # 🗣️ v84_456: tem perfil com esse nome → cria a voz
         for v in criar_vozes_dos_perfis(d["desconhecidas"]):
             log(f"🗣️ criei a voz [{v['slug']}] a partir do perfil {v['config'].get('vozPerfil')} ({v['motor']})")
         vozes = por_slug()
-        d = dividir(texto, vozes)
+        d = dividir(texto, vozes, padrao=motor_padrao)
     if d["desconhecidas"]:
         raise MultiVozError("Tag(s) sem voz cadastrada: " + ", ".join(f"[{x}]" for x in d["desconhecidas"])
                             + ". Cadastre a voz com esse slug (🎭 Vozes) ou corrija o texto — senão o nome seria lido em voz alta.")
