@@ -19,9 +19,9 @@ class="mdc-button settings-trigger-button"><span class="settings-summary"> Víde
 </flow-generate-icon-button></div></div></div></flow-base-prompt-box></flow-prompt-box></flow-project-page>
 <script>window.x = 1</script><svg><path d="M0"/></svg></body></html>"""
 MOTIVO = '[config_agente] não achei o botão "Configurações" (ícone tune) do agente.'
-DE = """    "agente_config": ('flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], '"""
-PARA = """    "agente_config": ('flow-prompt-box button[aria-label="Configurações do agente"], '
-                      'flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], '"""
+DE = """    "agente_config": ('flow-prompt-box .agent-footer-actions button[aria-label="Configurações do agente"], '"""
+PARA = """    "agente_config": ('flow-prompt-box button[data-teste-v236="1"], '
+                      'flow-prompt-box .agent-footer-actions button[aria-label="Configurações do agente"], '"""
 
 
 def _hash(caminho):
@@ -71,7 +71,7 @@ def test_correcao_vai_na_copia_testa_ativa_e_volta(amb):
     assert _hash(original) == h0  # o original NUNCA muda
     copia = FC.pasta_copia(x["id"])
     assert os.path.isfile(os.path.join(copia, "flow_direto.py")) and os.path.isfile(os.path.join(copia, "googleflow_client.py"))
-    assert x["mudancas"][0]["aplicada"] and not x["compilacao"] and "Configurações do agente" in x["diffs"]["flow_direto.py"]
+    assert x["mudancas"][0]["aplicada"] and not x["compilacao"] and 'data-teste-v236' in x["diffs"]["flow_direto.py"]
     th = x["testes"]["html"]  # testado sozinho no HTML guardado do erro
     assert [e["achou"] for e in th["esperados"]] == [1, 1] and th["ok"] and x["estado"] == "testada"
     linha = next(l for l in th["linhas"] if l["seletor"] == "flow_direto.py: S[agente_config]")
@@ -81,7 +81,7 @@ def test_correcao_vai_na_copia_testa_ativa_e_volta(amb):
     assert r["agora"]
     import googleflow
     from googleflow import flow_direto as fd
-    assert googleflow.__path__[0] == os.path.abspath(copia) and "Configurações do agente" in fd.S["agente_config"]
+    assert googleflow.__path__[0] == os.path.abspath(copia) and 'data-teste-v236' in fd.S["agente_config"]
     assert FC.catalogo()["ativa"] == x["id"]
     # uma 2ª correção é feita EM CIMA da ativa
     y = FC.criar({"diagnostico": "outra", "causa": "", "confianca": "baixa", "seletores_esperados": [], "observacoes": "",
@@ -93,7 +93,7 @@ def test_correcao_vai_na_copia_testa_ativa_e_volta(amb):
         FC.apagar(x["id"])  # está ativa
     FC.ativar(None)
     from googleflow import flow_direto as fd2
-    assert googleflow.__path__ == [os.path.abspath(FC.ORIGINAL)] and "Configurações do agente" not in fd2.S["agente_config"]
+    assert googleflow.__path__ == [os.path.abspath(FC.ORIGINAL)] and 'data-teste-v236' not in fd2.S["agente_config"]
     c = FC.catalogo()
     assert c["ativa"] is None and FC.item(c, x["id"])["estado"] == "revertida"
     assert [h["o_que"][:2] for h in FC.item(c, x["id"])["historico"]][-2:] == ["✔ ", "↩ "]

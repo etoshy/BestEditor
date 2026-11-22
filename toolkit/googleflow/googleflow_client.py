@@ -1407,7 +1407,8 @@ PISTAS = {
     "gerar": ["button.generate-icon-button", 'button[aria-label="Iniciar geração"]', 'button[aria-label*="eração"]',
               'button[aria-label*="enerate"]', 'button[type="submit"]:has(mat-icon:text-is("arrow_forward"))',
               'button[type="submit"]'],
-    "agente": ["flow-agent-mode-toggle-chip button", "button.agent-mode-chip", 'button:has(.agent-mode-chip-label)'],
+    "agente": ["flow-agent-mode-switch button.switch", 'button[aria-label="Agente do Flow"]',  # v84_453: o interruptor novo
+               "flow-agent-mode-toggle-chip button", "button.agent-mode-chip", 'button:has(.agent-mode-chip-label)'],
     "modelo": ['button[aria-label="Selecionar família de modelos"]', 'button[aria-label*="modelo"]', 'button[aria-label*="odel"]',
                "button.mat-mdc-menu-trigger:has(.model-select-trigger-content)", "button:has(.model-select-trigger-content)"],
     "chip_inicio": ["flow-ingredient-bar .frame-trigger", ".frame-trigger", 'button.empty-chip:text-is("Início")',

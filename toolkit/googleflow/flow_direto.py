@@ -48,10 +48,16 @@ S = {
     "editor": ('flow-prompt-box .ProseMirror[contenteditable="true"], .base-prompt-box .ProseMirror[contenteditable="true"], '
                'flow-rich-text-editor [contenteditable="true"]'),
     "gerar": 'flow-prompt-box button[aria-label="Iniciar geração"]',
-    "agente_chip": ("flow-prompt-box flow-agent-mode-toggle-chip button.agent-mode-chip, "
+    # v84_453 (HTML real, nov/2026): o chip virou um INTERRUPTOR — flow-agent-mode-switch button.switch
+    # aria-label="Agente do Flow" aria-pressed="true|false"; com ele ligado, o "modelo · x1" fica [hidden]
+    "agente_chip": ('flow-prompt-box flow-agent-mode-switch button.switch, flow-prompt-box button[aria-label="Agente do Flow"], '
+                    'flow-agent-mode-switch button[aria-pressed], '
+                    "flow-prompt-box flow-agent-mode-toggle-chip button.agent-mode-chip, "
                     "flow-prompt-box button.agent-mode-chip, flow-prompt-box button:has(.agent-mode-chip-label), "
                     'flow-prompt-box button:has-text("Agente"):not([aria-label])'),
-    "agente_config": ('flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
+    "agente_config": ('flow-prompt-box .agent-footer-actions button[aria-label="Configurações do agente"], '
+                      '.agent-footer-actions button[aria-label="Configurações do agente"], '
+                      'flow-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
                       'flow-agent-panel .agent-footer-actions button[aria-label="Configurações"], '
                       'flow-creative-agent-prompt-box .agent-footer-actions button[aria-label="Configurações"], '
                       '.base-prompt-box .agent-footer-actions button[aria-label="Configurações"]'),
@@ -67,7 +73,9 @@ S = {
     "agente_salvar": "button.settings-save-button",
     "agente_modelo_imagem": "button.image-model-picker-button",
     "agente_modelo_video": "button.video-model-picker-button",
-    "gatilho": 'flow-prompt-box button.settings-trigger-button',
+    # v84_453: + reservas (o botão "modelo · x1" às vezes vem sem a classe, ou fora do flow-prompt-box)
+    "gatilho": ('flow-prompt-box button.settings-trigger-button, flow-prompt-box button:has(.settings-summary), '
+                'button.settings-trigger-button'),
     "resumo": "flow-prompt-box .settings-summary",
     "popup": "flow-prompt-box-settings",
     "popup_modelo": 'flow-prompt-box-settings button[aria-label="Selecionar família de modelos"]',
@@ -667,8 +675,31 @@ def desligar_agente(page, on_passo: Passo = _nada) -> None:
     fechar_novidades(page, on_passo)  # v84_107: o aviso de novidades (e as boas-vindas) pode aparecer a qualquer hora
     on_passo("desligar_agente", "andando", "")
     ligar_agente(page, False)
-    _primeiro(page, S["gatilho"], 8, "desligar_agente",
-              'desliguei o Agente mas o botão de configurações da caixa (modelo · x1) não apareceu.')
+    if _primeiro(page, S["gatilho"], 8) is None:
+        # 🩹 v84_453: às vezes a caixa demora pra voltar, ou um pop-up/painel ficou por cima → limpa e tenta de novo;
+        # se ainda não aparecer, recarrega a página do projeto uma vez (antes: o erro parava a thumb na hora)
+        for tentativa in range(2):
+            on_passo("desligar_agente", "andando", "a caixa não voltou — " + ("limpando a tela" if not tentativa else "recarregando a página"))
+            try:
+                if tentativa:
+                    page.reload(wait_until="domcontentloaded")
+                    _esperar(lambda: _visivel(page, "flow-prompt-box") or _visivel(page, S["painel_sessao"]), 20)
+                else:
+                    page.keyboard.press("Escape")
+                    page.mouse.click(5, 5)
+            except Exception:  # noqa: BLE001
+                pass
+            fechar_novidades(page, on_passo)
+            try:
+                ligar_agente(page, False)
+            except FlowPassoErro:
+                pass
+            if _primeiro(page, S["gatilho"], 12) is not None:
+                break
+        else:
+            _primeiro(page, S["gatilho"], 2, "desligar_agente",
+                      'desliguei o Agente mas o botão de configurações da caixa (modelo · x1) não apareceu '
+                      '(tentei de novo e recarreguei a página).')
     on_passo("desligar_agente", "ok", "")
 
 
