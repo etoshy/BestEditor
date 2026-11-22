@@ -90,6 +90,8 @@ def normalizar(x: Any) -> Optional[Dict[str, str]]:
     tits = [" ".join(str(t).split())[:100] for t in (x.get("titulos") or []) if str(t).strip()][:3]
     if tits:  # 🏷 v84_429: os títulos que combinam com ESTA thumbnail
         out["titulos"] = tits
+    if str(x.get("cor_fundo") or "") in CORES_FUNDO or x.get("cor_fundo") == "livre":
+        out["cor_fundo"] = str(x["cor_fundo"])
     import estilos_arte
     if str(x.get("estilo_arte") or "") in estilos_arte.ESTILOS:  # 🎨 v84_397: o estilo próprio desta thumbnail
         out["estilo_arte"] = str(x["estilo_arte"])
@@ -103,9 +105,14 @@ def sincronizar(base: str, origem: str, pid: str, ideias: List[Any]) -> Dict[str
         itens = d.setdefault("itens", [])
         conhecidas = {i.get("ideia") for i in itens}
         prox = max([int(i.get("n") or 0) for i in itens] or [0]) + 1
+        _outros = None
         for x in ideias or []:
             n = normalizar(x)
             if n and n["ideia"] not in conhecidas:
+                if _outros is None:
+                    _outros = outras_thumbs(base, origem, pid)
+                if repete_outro_video(n, _outros):  # 🔁 v84_451: as que vieram com o roteiro também — avisa no card
+                    n["repetida"] = True
                 itens.append(dict(n, n=prox, status="", imagem="", final="", erro="", da_ia=True))
                 conhecidas.add(n["ideia"])
                 prox += 1
@@ -182,6 +189,9 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
                 import estilos_arte
                 v = str(campos["estilo_arte"] or "")
                 it["estilo_arte"] = v if v in estilos_arte.ESTILOS else ""
+            if "cor_fundo" in campos:  # 🌈 v84_452
+                v = str(campos["cor_fundo"] or "")
+                it["cor_fundo"] = v if v in CORES_FUNDO or v == "livre" else "amarelo"
             if "titulos" in campos:  # 🏷 v84_429
                 it["titulos"] = [" ".join(str(t).split())[:100] for t in (campos["titulos"] or []) if str(t).strip()][:3]
             if "modo" in campos:  # 🔥 v84_417: "albert" (palavra na imagem) ou "" (texto por cima, o de sempre)
@@ -193,9 +203,33 @@ def editar(base: str, origem: str, pid: str, n: int, **campos: Any) -> Dict[str,
         return d
 
 
+# 🌈 v84_452: as thumbs que dão clique (o PAPAGAIO no amarelo) têm fundo de UMA cor viva e clara; as outras saíam opacas
+# (cinza/oliva/marrom — a paleta suja do Rusty Art + o "fundo escuro pro vermelho saltar"). Agora o fundo é uma cor viva.
+CORES_FUNDO = {
+    "amarelo": ("🟡 amarelo", "warm sunny yellow (#FFD23F)"),
+    "ciano": ("🩵 azul-céu", "bright sky cyan blue (#4CC9F0)"),
+    "rosa": ("🩷 rosa", "hot bubblegum pink (#FF8FB1)"),
+    "lima": ("🟢 verde-limão", "fresh lime green (#B5E550)"),
+    "creme": ("🤍 creme", "clean warm cream white (#FFF1C9)"),
+    "turquesa": ("💎 turquesa", "vivid turquoise (#2EC4B6)"),
+}
+ORDEM_CORES = ("amarelo", "ciano", "rosa", "lima", "creme", "turquesa")
+_TIRAR_OPACO = re.compile(r"(?i)\s*,?\s*(flat )?muted colou?rs?[^,.;]*|\s*,?\s*limited desaturated palette \([^)]*\)|"
+                          r"\s*,?\s*grimy textured washes|\s*,?\s*bright saturated colou?rs|\s*,?\s*\bneon\b|"
+                          r"\s*,?\s*muted olive/sepia/gray|\s*,?\s*dark heavy shading on one side for contrast")
+
+
+def cor_fundo_de(it: Dict[str, Any]) -> str:
+    c = str(it.get("cor_fundo") or "amarelo")
+    return c if c in CORES_FUNDO or c == "livre" else "amarelo"
+
+
 def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> str:
     """A cena (prompt da IA, em inglês, ou a ideia) + o estilo de thumbnail (o do canal, quando tem — v84_368)."""
     cena = (it.get("prompt") or it.get("ideia") or "").strip().rstrip(".,")
+    if it.get("modo") == "albert":  # 👍 v84_452: o joinha em TODAS as thumbs — sai da cena (o gesto vem da própria cena)
+        cena = re.sub(r"(?i),?\s*(and\s+|while\s+)?(giving|doing|making|flashing|with)\s+(a\s+|an\s+)?(big\s+|enthusiastic\s+|"
+                      r"confident\s+|cheerful\s+)?thumbs?[- ]up( gesture| sign)?|,?\s*(fazendo|dando|com)\s+(um\s+)?joinha", "", cena)
     lead = ""
     if it.get("estilo_arte"):  # 🎨 v84_397: a thumbnail tem estilo próprio (vale mais que o do canal)
         import estilos_arte
@@ -211,16 +245,26 @@ def prompt_flow(it: Dict[str, Any], lado: str = "right", estilo: str = "") -> st
         palavra = str(it.get("texto") or "").upper().strip()
         est = re.sub(r"(?i)large empty negative space on the \w+ third for a (big )?title( added later)?|\bno (text|letters|words)\b",
                      "", est)
-        est = re.sub(r"\s*([,.])(\s*[,.])+", r"\1", est).strip(" ,.")
+        cor = cor_fundo_de(it)
+        if cor != "livre":  # 🌈 v84_452: tira a paleta opaca do estilo (o traço do estilo fica)
+            est = _TIRAR_OPACO.sub("", est)
+        est = re.sub(r"\s*([,.;])(\s*[,.;])+", r"\1", est).strip(" ,.")
+        cores = ("" if cor == "livre" else
+                 f"COLORS (thumbnail that must pop on a phone): keep the SAME line art style, but the colors are BRIGHT, clean and "
+                 f"saturated with flat fills — the background is ONE solid, light, vivid {CORES_FUNDO[cor][1]} (a flat color with "
+                 "just a little paper texture; NEVER dark, gray, olive, brown, sepia or muddy); the character and the absurd element "
+                 "in clear saturated colors that separate from the background (no dull, washed-out or grayish tones). ")
         letras = (f'Huge bold condensed capital letters spelling exactly "{palavra}" fill the whole width of the image behind '
                   "the main subject: SOLID, BRIGHT, fully saturated pure red (#E50914), 100% opaque, crisp sharp edges, the "
                   "brightest and most contrasting element of the image (a few small drips only at the bottom edge), set "
-                  "against a darker background so it pops; the subject stands in the center IN FRONT of the word, covering "
+                  + ("against a darker background so it pops" if cor == "livre" else f"against the bright {CORES_FUNDO[cor][1]} background")
+                  + "; the subject stands in the center IN FRONT of the word, covering "
                   "only part of the middle letters, the word still easy to read. Only that one word, no other text"
                   if palavra else "")
         # 🎨 v84_419: o estilo de arte do canal ABRE o prompt (no fim, depois das letras, o Flow ignorava e fazia foto)
         return (f"{lead + ': ' if lead else ''}{est}. SCENE: {cena}. The absurd/ironic element of the scene is big, obvious "
-                f"and readable at thumbnail size; centered composition, high contrast. {letras}. "
+                f"and readable at thumbnail size; centered composition, high contrast. {cores}{letras}. "
+                "NO thumbs-up gesture (the hands do what the scene says, never a thumbs up). "
                 "Keep EXACTLY the art style described at the start (same rendering, not a different style).").replace(". .", ".")
     return f"{lead + ': ' if lead else ''}{cena}. {est}"
 
@@ -282,11 +326,15 @@ REGRA_ALBERT = (
     "a situação dele É a metáfora (não \"ele ao lado de um objeto\"). Pergunte: se essa palavra virasse uma foto ridícula "
     "e chocante do personagem, como seria? Pra calibrar o NÍVEL (são de OUTROS temas — NÃO repita): ZOÓFILO = ele na "
     "cama abraçado com um cachorro; CANIBAL = o próprio rosto dele servido num prato; NECRÓFILO = ele casando com um "
-    "esqueleto de véu; MORTE = sorrindo e fazendo joinha segurando uma corda.\n"
+    "esqueleto de véu; MORTE = sorrindo tranquilo segurando uma corda.\n"
     "4) A IRONIA: expressão que CONTRADIZ a cena — sorriso largo, confiante ou debochado, olhando pra câmera, como se "
-    "fosse normal.\n"
+    "fosse normal. O GESTO muda de thumb pra thumb e nasce da cena (dar de ombros, braços cruzados, mãos na cintura, "
+    "acenar, apontar pra quem assiste, tomar um café, tirar selfie, mão no queixo, posar de vencedor…). NUNCA o "
+    "\"joinha\" (polegar pra cima): virou a marca repetida de todas as thumbs e cansa.\n"
     "5) LEITURA EM 1 SEGUNDO no celular: um só assunto grande no centro, na frente da palavra; fundo simples ligado ao "
-    "tema; o elemento absurdo GRANDE e óbvio.\n"
+    "tema; o elemento absurdo GRANDE e óbvio. O FUNDO é CLARO e de uma cor viva (o site escolhe a cor): no prompt, nada de "
+    "fundo escuro, noite, fumaça, fogo tomando a cena, quarto sombrio ou paleta cinza/marrom — o choque vem da cena, não do "
+    "escuro; no máximo um ou dois objetos do lugar, desenhados leves.\n"
     "6) RUIM: cartaz/plaquinha escrita; objetos soltos sem relação com o corpo dele; personagem só posando; cena genérica; "
     "repetir a mesma palavra ou a mesma ideia de cena em duas thumbs; usar palavra que o roteiro não sustenta.\n"
     "7) Limites (monetizável): sugestivo, nunca explícito — nada de nudez, sexo, sangue de verdade, ferimento realista, "
@@ -363,6 +411,75 @@ def _palavra_vazada(palavra: str, ctx: str) -> bool:
     return raiz not in ctx
 
 
+# 🔁 v84_451: a MESMA ideia de thumb em vídeos diferentes (PAPAGAIO num, PAPAGAIO no outro) dá cara de vídeo duplicado
+_PALAVRAS_VAZIAS = set("""personagem canal sorri sorrindo sorriso camera câmera olhando olha confiante orgulhoso orgulhosamente
+debochado ironia irônica choque como fosse fosse está esta estão cena fundo ele ela dele dela pra para com sem uma umas uns
+que quem onde mais muito todo toda todos isso esse essa este esta numa num dentro fora frente atrás sobre entre tivesse
+normal absurdo absurda enorme gigante grande pequeno meio""".split())
+
+
+def outras_thumbs(base: str, origem: str = "", pid: str = "", projetos: int = 40, limite: int = 160) -> List[Dict[str, str]]:
+    """As ideias de thumb dos OUTROS vídeos (dos projetos mais recentes pros mais antigos)."""
+    raiz = os.path.join(base, PASTA)
+    try:
+        pastas = [os.path.join(raiz, x) for x in os.listdir(raiz) if x != f"{origem}_{pid}"]
+    except OSError:
+        return []
+    arqs = sorted((a for a in (os.path.join(x, "thumbs.json") for x in pastas) if os.path.isfile(a)),
+                  key=lambda a: -os.path.getmtime(a))[:projetos]
+    out: List[Dict[str, str]] = []
+    for a in arqs:
+        try:
+            with open(a, encoding="utf-8") as f:
+                d = json.load(f) or {}
+        except (OSError, ValueError):
+            continue
+        for it in reversed(d.get("itens") or []):
+            if it.get("ideia"):
+                out.append({"texto": str(it.get("texto") or ""), "ideia": str(it["ideia"])[:220], "modo": str(it.get("modo") or "")})
+        if len(out) >= limite:
+            break
+    return out[:limite]
+
+
+def _raiz(w: str) -> str:
+    w = _sem_acento(str(w or "")).strip().lower()
+    return w[:5] if len(w) > 5 else w  # PAPAGAIO/PAPAGAIOS, COVARDE/COVARDIA → a mesma
+
+
+def _termos(ideia: str) -> set:
+    return {_sem_acento(w).lower() for w in re.findall(r"[\wÀ-ú]{4,}", str(ideia or "")) if w.lower() not in _PALAVRAS_VAZIAS
+            and _sem_acento(w).lower() not in _PALAVRAS_VAZIAS}
+
+
+def repete_outro_video(t: Dict[str, Any], outros: List[Dict[str, str]]) -> bool:
+    """A palavra gigante (ou a raiz dela) já saiu em outro vídeo, ou a CENA é quase a mesma (termos em comum)."""
+    if t.get("modo") == "albert" and t.get("texto"):
+        r = _raiz(t["texto"])
+        if any(o.get("modo") == "albert" and o.get("texto") and _raiz(o["texto"]) == r for o in outros):
+            return True
+    a = _termos(t.get("ideia") or "")
+    if len(a) < 4:
+        return False
+    for o in outros:
+        b = _termos(o.get("ideia") or "")
+        if len(b) >= 4 and len(a & b) / len(a | b) >= 0.45:
+            return True
+    return False
+
+
+def bloco_outros(outros: List[Dict[str, str]]) -> str:
+    if not outros:
+        return ""
+    pal = list(dict.fromkeys(o["texto"].upper() for o in outros if o.get("modo") == "albert" and o.get("texto")))[:70]
+    cenas = [o["ideia"][:140] for o in outros][:40]
+    return ("JÁ USADAS EM OUTROS VÍDEOS DO CANAL — PROIBIDO repetir (o canal fica com cara de vídeo duplicado): "
+            + (("as PALAVRAS " + ", ".join(pal) + " (nem a mesma palavra, nem sinônimo, nem o mesmo bicho/objeto/fantasia com "
+                "outro nome); ") if pal else "")
+            + "e estas CENAS (nem a mesma metáfora com outra roupa):\n" + "\n".join("- " + c for c in cenas)
+            + "\nSeja CRIATIVO: ache um ângulo, um rótulo e uma imagem que este canal ainda NÃO usou.")
+
+
 MODELOS_MELHORES = (("claude-sonnet-5-5", "Sonnet 5.5"), ("claude-opus-5-5", "Opus 5.5"))
 MODELOS_CLAUDE_CODE = (("cc:opus", "Claude Code · Opus (sua assinatura)"), ("cc:sonnet", "Claude Code · Sonnet (sua assinatura)"))
 
@@ -381,10 +498,12 @@ def estimar_custos(contexto: str, n: int = 5, albert: int = 3, n_titulos: int = 
 
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
                  estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0,
-                 estilo_albert: str = "marcado", modelo: str = "") -> List[Dict[str, str]]:
+                 estilo_albert: str = "marcado", modelo: str = "",
+                 outros: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
     """🔁 v84_448: pediu 3 e vieram 1 (a IA mandou menos, ou os filtros tiraram repetidas/vazadas) → pede de novo SÓ as que
     faltam (até 2 vezes), sem repetir as que já vieram."""
-    out = _pedir_ideias_uma(titulo, contexto, ja, n, idioma, estilo_canal, estilos, albert, estilo_albert, modelo)
+    outros = list(outros or [])
+    out = _pedir_ideias_uma(titulo, contexto, ja, n, idioma, estilo_canal, estilos, albert, estilo_albert, modelo, outros)
     for _ in range(2):
         f_n = max(0, n - sum(1 for t in out if t.get("modo") != "albert"))
         f_a = max(0, albert - sum(1 for t in out if t.get("modo") == "albert"))
@@ -392,7 +511,7 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
             break
         try:
             mais = _pedir_ideias_uma(titulo, contexto, list(ja) + out, f_n, idioma, estilo_canal, estilos, f_a,
-                                     estilo_albert, modelo)
+                                     estilo_albert, modelo, outros)
         except ThumbErro:
             break
         ideias_ja = {str(t.get("ideia") or "").strip().lower() for t in out}
@@ -405,7 +524,8 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
 
 def _pedir_ideias_uma(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
                       estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0,
-                      estilo_albert: str = "marcado", modelo: str = "") -> List[Dict[str, str]]:
+                      estilo_albert: str = "marcado", modelo: str = "",
+                      outros: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
     """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem). 🎨 v84_397 `estilos`: os estilos de arte
     marcados — as ideias são distribuídas entre eles (em rodízio) e a IA pensa a cena pra caber em cada um."""
     import estilos_arte
@@ -441,7 +561,10 @@ def _pedir_ideias_uma(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: i
                     t["titulos"] = [x for x in ts if not _mr.titulo_academico(x)] + [x for x in ts if _mr.titulo_academico(x)]
         except Exception:  # noqa: BLE001
             pass
+        _usadas = [str(i.get("cor_fundo")) for i in ja if i.get("modo") == "albert" and i.get("cor_fundo")]
+        _fila = [c for c in ORDEM_CORES if c not in _usadas] + [c for c in ORDEM_CORES if c in _usadas]
         for k, t in enumerate(lst):
+            t.setdefault("cor_fundo", _fila[k % len(_fila)])  # 🌈 v84_452: cada uma num fundo vivo (sem repetir no vídeo)
             if por_alb:
                 t["estilo_arte"] = por_alb[k % len(por_alb)]
             elif estilo_albert == "canal":
@@ -451,6 +574,7 @@ def _pedir_ideias_uma(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: i
     motivo = None if str(locals().get("modelo") or "").startswith("cc:") else ia.motivo_desligado("roteiros")
     if motivo:
         raise ThumbErro("IA: " + motivo + " — ligue em 🤖 IA (📝 Roteiros direto na IA).")
+    _bo = bloco_outros(outros or [])
     existentes = "\n".join(f"- {('[' + i['texto'] + '] ') if i.get('modo') == 'albert' and i.get('texto') else ''}{i.get('ideia')}"
                            for i in ja if i.get("ideia"))[:3000]
     if n <= 0 and albert:  # 🔥 v84_418: só as de palavra gigante
@@ -468,6 +592,7 @@ Para cada uma:
 {txt_alb}
 Se o estilo é desenho/anime/cartoon, descreva o personagem como desenho (expressão, pose, roupa), sem detalhes de foto.
 {('Já existem estas (NÃO repita a PALAVRA entre colchetes nem a ideia da cena):' + chr(10) + existentes) if existentes else ''}
+{_bo}
 Responda só o JSON."""
         conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
         with ia.rotulo("🔥 Thumbs palavra gigante: " + (titulo or "")[:60]):
@@ -479,7 +604,11 @@ Responda só o JSON."""
                            for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
         if not out:
             raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
-        return _pos_alb(out[:albert])
+        _mq = ia.ultimo_modelo()
+        out = [t for t in out if not repete_outro_video(t, outros or [])]  # 🔁 v84_451 (as que faltarem, pede de novo)
+        if not out:
+            return []
+        return [dict(t, modelo_ia=_mq) if _mq else t for t in _pos_alb(out[:albert])]
     system = f"""Você cria THUMBNAILS de YouTube que dão clique sem enganar. Para o vídeo abaixo, crie {n} thumbnails BEM
 DIFERENTES entre si — cada uma com um ângulo próprio (use estes, um por thumbnail, na ordem que fizer sentido:
 {'; '.join(ANGULOS)}). Nada de repetir a mesma cena com outra luz.
@@ -503,6 +632,7 @@ detalhes de foto realista (pele, rugas, poros, lente, "cinematic").
 {('ESTILO DE ARTE de cada thumbnail, NA ORDEM (pense a cena pra funcionar nesse estilo; não descreva o estilo no prompt, o site põe): '
   + '; '.join(f'{k + 1}) {estilos_arte.ESTILOS[e]["nome"]}' for k, e in enumerate(por_ideia))) if por_ideia else ''}
 {('Já existem estas (NÃO repita a ideia nem o ângulo delas):' + chr(10) + existentes) if existentes else ''}
+{_bo}
 Responda só o JSON."""
     conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
     with ia.rotulo("🖼 Thumbs: " + (titulo or "")[:60]):
@@ -513,6 +643,7 @@ Responda só o JSON."""
     out = [t for t in (normalizar(x) for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
     if not out:
         raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
+    out = [t for t in out if not repete_outro_video(t, outros or [])]  # 🔁 v84_451
     normais = [t for t in out if t.get("modo") != "albert"][:n]
     alb = [t for t in out if t.get("modo") == "albert"][:albert]
     if albert and len(normais) > n - 1 and not alb and len(out) > n:  # a IA esqueceu o "modo": as que passaram das n são as albert
@@ -520,7 +651,8 @@ Responda só o JSON."""
     for k, t in enumerate(normais):
         if por_ideia:
             t["estilo_arte"] = por_ideia[k % len(por_ideia)]
-    return normais + _pos_alb(alb)
+    _mq = ia.ultimo_modelo()
+    return [dict(t, modelo_ia=_mq) if _mq else t for t in normais + _pos_alb(alb)]
 
 
 def adicionar_ideias(base: str, origem: str, pid: str, ideias: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -695,13 +827,14 @@ def para_json(d: Dict[str, Any], url_base: str, estilo_canal: str = "") -> Dict[
     out = []
     for it in d.get("itens") or []:
         x = {k: it.get(k) for k in ("n", "ideia", "texto", "prompt", "status", "erro", "da_ia", "estilo_arte", "modo", "titulos",
-                                    "ajustes")}
+                                    "ajustes", "modelo_ia", "titulos_modelo", "repetida", "cor_fundo")}
         x["prompt_flow"] = prompt_flow(it, estilo=estilo_canal)
         x["url_imagem"] = f"{url_base}/{it['n']}/imagem?v={int(os.path.getmtime(it['imagem']))}" if it.get("imagem") and os.path.isfile(it["imagem"]) else ""
         x["url_final"] = f"{url_base}/{it['n']}/final?v={int(os.path.getmtime(it['final']))}" if it.get("final") and os.path.isfile(it["final"]) else ""
         out.append(x)
     import estilos_arte
-    return {"itens": out, "estilos": estilos_arte.opcoes()}
+    return {"itens": out, "estilos": estilos_arte.opcoes(),
+            "cores_fundo": dict({k: v[0] for k, v in CORES_FUNDO.items()}, livre="🎨 a do estilo (sem forçar)")}
 
 
 # ------------------------------------------------------------------ pra pôr nos prompts
@@ -781,11 +914,13 @@ Responda só o JSON."""
     return out
 
 
-def gravar_titulos(base: str, origem: str, pid: str, titulos: Dict[int, List[str]]) -> Dict[str, Any]:
+def gravar_titulos(base: str, origem: str, pid: str, titulos: Dict[int, List[str]], modelo_ia: str = "") -> Dict[str, Any]:
     with _TRAVA:
         d = carregar(base, origem, pid)
         for it in d.get("itens") or []:
             if int(it.get("n") or 0) in titulos:
                 it["titulos"] = titulos[int(it["n"])]
+                if modelo_ia:
+                    it["titulos_modelo"] = modelo_ia
         salvar(base, origem, pid, d)
         return d

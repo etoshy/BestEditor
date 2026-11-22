@@ -775,6 +775,8 @@ def registrar(app, base_dir: str) -> None:
                     parte = next((x for x in (q["resultado"].get("partes") or []) if x["k"] == k), None)
                     if parte is not None:
                         parte["tentativas"] = ja_tentou + 1
+                        if ia.ultimo_modelo():  # 🏷 v84_450: qual modelo escreveu esta parte
+                            parte["modelo_ia"] = ia.ultimo_modelo()
                         if parte["status"] in ("curta", "longa") and parte["tentativas"] >= 2:
                             parte["status"] = "pronta"  # tentou 2x: aceita e segue (avisa na lista)
                             parte["aceita_curta"] = True
@@ -785,8 +787,11 @@ def registrar(app, base_dir: str) -> None:
             with _TRAVA:
                 q = _proj(pid)
                 if q and (q.get("resultado") or {}).get("partes") and all(x.get("texto") for x in q["resultado"]["partes"]):
+                    _mods = list(dict.fromkeys(x.get("modelo_ia") for x in q["resultado"]["partes"] if x.get("modelo_ia")))
                     q["resultado"] = ds.montar_partes(q)
-                    ds.marcar_mudanca(q, "✍️ partes montadas", "🤖 a IA escreveu as partes")
+                    if _mods:
+                        q["resultado"]["modelo_ia"] = " + ".join(_mods)
+                    ds.marcar_mudanca(q, "✍️ partes montadas", "🤖 a IA escreveu as partes" + (f" ({' + '.join(_mods)})" if _mods else ""))
                     ds.salvar(base_dir, q)
                     __import__("formatos_video").ao_gerar_roteiro(base_dir, q)  # 📐 v84_421
                     _fontes_web_bg(q)

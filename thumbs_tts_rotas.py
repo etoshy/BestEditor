@@ -53,7 +53,7 @@ def registrar(app, base_dir: str) -> None:
             return jsonify({"erro": "Projeto não encontrado."}), 404
         c = request.get_json(silent=True) or {}
         try:
-            d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar", "estilo_arte", "modo", "titulos") if k in c})
+            d = tf.editar(base_dir, origem, pid, int(c.get("n") or 0), **{k: c[k] for k in ("texto", "prompt", "ideia", "novo", "apagar", "estilo_arte", "modo", "titulos", "cor_fundo") if k in c})
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True))
@@ -97,7 +97,8 @@ def registrar(app, base_dir: str) -> None:
             novas = tf.pedir_ideias(titulo, sobre, d.get("itens") or [], n, idioma, tf.estilo(base_dir, origem, pid),
                                     [str(e) for e in c.get("estilos") or []], albert=alb,
                                     estilo_albert="canal" if c.get("estilo_albert") == "canal" else "marcado",
-                                    modelo=_modelo_pedido(c))
+                                    modelo=_modelo_pedido(c),
+                                    outros=tf.outras_thumbs(base_dir, origem, pid) if c.get("nao_repetir", True) else [])
             d = tf.adicionar_ideias(base_dir, origem, pid, novas)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
@@ -106,6 +107,12 @@ def registrar(app, base_dir: str) -> None:
     def _modelo_pedido(c: Dict[str, Any]) -> str:
         m = str(c.get("modelo") or "")
         return m if m in {x for x, _ in tf.MODELOS_MELHORES + tf.MODELOS_CLAUDE_CODE} else ""
+
+    @app.route("/ia/cota-claude")
+    def ia_cota_claude():
+        """🟠 v84_450: quanto ainda dá pra usar da assinatura do Claude (5 horas / semana / só Opus)."""
+        import cota_claude
+        return jsonify(cota_claude.ler(forcar=request.args.get("forcar") == "1"))
 
     @app.route("/thumbs/<origem>/<pid>/custos")
     def thumbs_custos(origem: str, pid: str):
@@ -150,7 +157,8 @@ def registrar(app, base_dir: str) -> None:
             except Exception:  # noqa: BLE001
                 originais = []
             tits = tf.pedir_titulos(titulo, sobre, alvo, idioma, originais, modelo=_modelo_pedido(c))
-            d = tf.gravar_titulos(base_dir, origem, pid, tits)
+            import ia_servico as _ia
+            d = tf.gravar_titulos(base_dir, origem, pid, tits, _ia.ultimo_modelo())
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True, feitos=len(tits)))

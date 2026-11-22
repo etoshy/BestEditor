@@ -93,7 +93,29 @@ vídeos do YouTube e acha o momento certo pela legenda, e lê as imagens e os PD
       Codex: {% if ass.tem_codex %}✅ achei no PC{% else %}❌ não achei — instale com <code>npm install -g @openai/codex</code> e rode <code>codex login</code> com a conta do ChatGPT{% endif %}
     </div>
     <button type="button" id="assTestar" style="background:#ea580c">🔌 Testar a assinatura escolhida</button> <span id="assRes" class="hint">(salve antes, se mudou)</span>
+    <div style="margin-top:10px"><b>🟠 Quanto ainda dá pra usar da assinatura do Claude</b> <a href="#" id="assCotaAt" title="ler de novo">🔄</a>
+      <div id="assCota" class="hint">⏳ lendo…</div>
+      <div class="hint" style="font-size:.72rem">O mesmo que o <code>/usage</code> do Claude Code mostra (lido com o seu login do Claude Code; não é uma API oficial — se parar de funcionar, nada mais quebra).</div></div>
     <script>
+  // 🟠 v84_450: a "banda" da assinatura (o mesmo que o /usage do Claude Code mostra)
+  window.cotaClaudeHTML = window.cotaClaudeHTML || function (d) {
+    if (!d || !d.ok) return '<span style="color:#b45309">⚠ ' + String((d && d.erro) || 'não consegui ler a cota').replace(/</g, '&lt;') + '</span>';
+    const zera = t => { if (!t) return ''; const ms = new Date(t) - new Date(); if (!(ms > 0)) return '';
+      const h = Math.floor(ms / 3600000), m = Math.round((ms % 3600000) / 60000);
+      return ' · zera em ' + (h >= 24 ? Math.floor(h / 24) + 'd ' + (h % 24) + 'h' : h ? h + 'h ' + m + 'min' : m + 'min'); };
+    return d.janelas.map(j => {
+      const cor = j.livre < 15 ? '#dc2626' : j.livre < 40 ? '#d97706' : '#16a34a';
+      return `<div style="display:flex;gap:6px;align-items:center;margin:2px 0;font-size:.78rem"><span style="min-width:150px">${j.nome}</span>
+        <span style="flex:0 0 140px;height:9px;background:#e5e7eb;border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:${j.usado}%;background:${cor}"></span></span>
+        <span><b>${Math.round(j.livre)}% livre</b> (${Math.round(j.usado)}% usado)${zera(j.zera_em)}</span></div>`; }).join('')
+      + (d.plano ? `<div style="font-size:.72rem;color:#64748b">plano: ${String(d.plano).replace(/</g, '&lt;')}</div>` : '');
+  };
+
+    (function () {
+      const ler = (f) => fetch('/ia/cota-claude' + (f ? '?forcar=1' : '')).then(r => r.json())
+        .then(d => { document.getElementById('assCota').innerHTML = window.cotaClaudeHTML(d); }).catch(() => {});
+      ler(false); document.getElementById('assCotaAt').addEventListener('click', e => { e.preventDefault(); ler(true); });
+    })();
     document.getElementById('assTestar').addEventListener('click', async () => {
       const modo = document.getElementById('assVia').value, res = document.getElementById('assRes');
       if (modo === 'api') { res.textContent = 'escolha uma assinatura no “Texto vai por”'; return; }

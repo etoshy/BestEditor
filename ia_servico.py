@@ -392,6 +392,19 @@ def ativo(recurso: Optional[str] = None) -> bool:
         return False
 
 
+def _marcar_modelo(nome: str) -> None:
+    _CTX.ultimo_modelo = nome
+
+
+def _nome_curto(m: Dict[str, Any]) -> str:
+    return str(m.get("nome") or m.get("id") or "").split(" (")[0].replace("Claude ", "")
+
+
+def ultimo_modelo() -> str:
+    """🏷 v84_450: qual modelo respondeu a última chamada DESTA thread (pra marcar o que cada um gerou)."""
+    return str(getattr(_CTX, "ultimo_modelo", "") or "")
+
+
 def claude_code_instalado() -> bool:
     try:
         import ia_assinatura
@@ -428,6 +441,7 @@ def _chamar_claude_code(recurso: str, system: str, conteudo: Any, schema: Option
         _registrar(recurso + "·claude-code", {}, 0.0, job, False, f"Claude Code ({apelido}): {exc}")
         return None
     _registrar(recurso + "·claude-code", {}, 0.0, job, True)
+    _marcar_modelo(f"Claude Code · {apelido.capitalize()} (assinatura)")
     return v
 
 
@@ -798,6 +812,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
     None em QUALQUER problema (desligada, sem crédito, erro, recusa) — quem chamou segue sem a IA.
     `forcar`: ignora o liga/desliga do recurso (botão "Testar")."""
     c = config()
+    _CTX.ultimo_modelo = ""
     if str(modelo or "").startswith("cc:"):  # 🟠 v84_449: SÓ esta chamada pelo Claude Code da sua assinatura (sem cobrar a API)
         return _chamar_claude_code(recurso, system, conteudo, schema, web, modelo[3:] or "opus", job, timeout)
     if not forcar and motivo_desligado(recurso, c) is not None:
@@ -843,6 +858,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
             _RECENTES.append({"quando": time.time(), "recurso": recurso, "ok": True, "usd": 0.0, "erro": "", "cache_local": True,
                               "entrada": 0, "saida": 0, "cache_lido": 0})
             _registrar_cache(recurso, job)
+            _marcar_modelo("resposta guardada (cache)")
             return guardado.get("v")
 
     import ia_local  # 🖥 v84_424: a IA local primeiro, nos recursos marcados (grátis)
@@ -856,6 +872,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
         try:
             v = ia_local.chamar(_ml, system, conteudo, schema=schema, max_tokens=max_tokens, timeout=max(timeout, 180), c=c)
             _registrar(recurso + "·local", {}, 0.0, job, True)
+            _marcar_modelo(f"local · {_ml}")
             if k:
                 _cache_gravar(k, {"v": v, "quando": time.time()})
             return v
@@ -871,6 +888,8 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
                 v = ia_assinatura.chamar(c["texto_via"], system, conteudo, schema=schema, web=web,
                                          modelo_claude=_modelo_assinatura(modelo, c), timeout=max(timeout, 300))
                 _registrar(recurso + "·assinatura", {}, 0.0, job, True)
+                _marcar_modelo(f"Claude Code · {_modelo_assinatura(modelo, c).capitalize()} (assinatura)"
+                               if c["texto_via"] == "claude" else "Codex (assinatura ChatGPT)")
                 if k:
                     _cache_gravar(k, {"v": v, "quando": time.time()})
                 return v
@@ -955,6 +974,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
                 _registrar(recurso, u, custo, job, False, "resposta sem JSON")
                 return None
     _registrar(recurso, u, custo, job, True)
+    _marcar_modelo(f"{_nome_curto(m)} (API · US$ {custo:.3f})")
     if k:
         _cache_gravar(k, {"v": valor, "quando": time.time()})
     return valor
