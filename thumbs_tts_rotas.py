@@ -96,11 +96,24 @@ def registrar(app, base_dir: str) -> None:
                 alb = tf.N_ALBERT
             novas = tf.pedir_ideias(titulo, sobre, d.get("itens") or [], n, idioma, tf.estilo(base_dir, origem, pid),
                                     [str(e) for e in c.get("estilos") or []], albert=alb,
-                                    estilo_albert="canal" if c.get("estilo_albert") == "canal" else "marcado")
+                                    estilo_albert="canal" if c.get("estilo_albert") == "canal" else "marcado",
+                                    modelo=_modelo_pedido(c))
             d = tf.adicionar_ideias(base_dir, origem, pid, novas)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
         return jsonify(dict(tf.para_json(d, _url(origem, pid), tf.estilo(base_dir, origem, pid)), ok=True, novas=len(novas)))
+
+    def _modelo_pedido(c: Dict[str, Any]) -> str:
+        m = str(c.get("modelo") or "")
+        return m if m in {x for x, _ in tf.MODELOS_MELHORES + tf.MODELOS_CLAUDE_CODE} else ""
+
+    @app.route("/thumbs/<origem>/<pid>/custos")
+    def thumbs_custos(origem: str, pid: str):
+        """💲 v84_448: estimativa de quanto cada botão custa no modelo padrão × nos maiores."""
+        if origem not in tf.ORIGENS or _ideias(origem, pid) is None:
+            return jsonify({"erro": "Projeto não encontrado."}), 404
+        _t, sobre, _i = _contexto(origem, pid)
+        return jsonify(tf.estimar_custos(sobre, albert=tf.ativo_albert() or tf.N_ALBERT))
 
     @app.route("/thumbs/<origem>/<pid>/<int:n>/ajustar", methods=["POST"])
     def thumbs_ajustar(origem: str, pid: str, n: int):
@@ -136,7 +149,7 @@ def registrar(app, base_dir: str) -> None:
                     originais = list((q.get("resultado") or {}).get("titulos") or (q.get("analise") or {}).get("titulos") or [])
             except Exception:  # noqa: BLE001
                 originais = []
-            tits = tf.pedir_titulos(titulo, sobre, alvo, idioma, originais)
+            tits = tf.pedir_titulos(titulo, sobre, alvo, idioma, originais, modelo=_modelo_pedido(c))
             d = tf.gravar_titulos(base_dir, origem, pid, tits)
         except (tf.ThumbErro, ValueError) as exc:
             return jsonify({"erro": str(exc)}), 400
@@ -749,6 +762,8 @@ def registrar(app, base_dir: str) -> None:
         a0 = ch.analisar(texto, str(p.get("tema") or p.get("titulo") or ""), set(reg0.get("rep_ignoradas") or []))
         reps0 = a0.get("repeticoes") or []  # os R1, R2… do prompt (antes de aplicar)
         r = rv.aplicar(texto, _json.dumps({"trocas": d["trocas"]}, ensure_ascii=False))
+        r, _t2 = _reacertar(p, pid, r, d["trocas"])  # 🎯 v84_448: o "de" que não bateu — 2ª tentativa
+        d["trocas"] = d["trocas"] + _t2
         g = {}
         if r["aplicadas"]:
             avisos = [f"🌐 {len(r['nao_achadas'])} correção(ões) da checagem na internet não bateram com o texto."] if r["nao_achadas"] else []
@@ -915,6 +930,55 @@ def registrar(app, base_dir: str) -> None:
         return jsonify({"ok": True, "politica": cr.politica(), "politicas": cr.POLITICAS,
                         "acoes": {k: v[0] for k, v in cr.ACOES.items()}})
 
+    def _reacertar(p: Dict[str, Any], pid: str, r: Dict[str, Any], mudar: List[Dict[str, Any]]):
+        """(r atualizado, as trocas novas) — 2ª tentativa só das correções cujo "de" não foi achado no texto."""
+        import json as _json
+
+        import checagem_resolver as cr
+        import revisao_roteiro as rv
+        _ok = {a["de"] for a in r["aplicadas"]}
+        erradas = [t for t in mudar if t["de"][:200] not in _ok and str(t.get("para") or "").strip() != t["de"].strip()][:15]
+        if not erradas:
+            return r, []
+        try:
+            import ia_servico as _ia
+            import idiomas
+            if _ia.motivo_desligado("roteiros") is not None:
+                return r, []
+            with _ia.rotulo("🎯 Checagem: achar o trecho certo"):
+                resp = _ia.chamar("roteiros", "Responda só o JSON pedido.",
+                                  cr.prompt_reacertar(r["texto"], erradas,
+                                                      idiomas.nome_para_prompt(idiomas.normalizar(_pad_idioma(p)) or "pt")),
+                                  max_tokens=4000, effort="low", job=pid, cache_local=False, timeout=240)
+            if not resp:
+                return r, []
+            t2 = cr.ler(resp if isinstance(resp, str) else _json.dumps(resp, ensure_ascii=False))
+            for t in t2:  # o item/status/fonte/eixo vêm da correção original
+                orig = next((e for e in erradas if e.get("item") and e["item"] == t.get("item")),
+                            erradas[0] if len(erradas) == 1 else {})
+                for k in ("item", "status", "fonte", "motivo", "eixo"):
+                    if orig.get(k) and not t.get(k):
+                        t[k] = orig[k]
+                if orig.get("status"):
+                    t["status"] = orig["status"]
+            if not t2:
+                return r, []
+            r2 = rv.aplicar(r["texto"], _json.dumps({"trocas": t2}, ensure_ascii=False))
+            if not r2["aplicadas"]:
+                return r, []
+            ach = [e for e in erradas if any(t.get("item") == e.get("item") for t in t2)] if all(e.get("item") for e in erradas) else erradas
+            return dict(r, texto=r2["texto"], aplicadas=r["aplicadas"] + r2["aplicadas"], palavras_depois=r2["palavras_depois"],
+                        nao_achadas=[x for x in r["nao_achadas"] if not any(x["de"][:60] == e["de"][:60] for e in ach)]
+                        + r2["nao_achadas"]), t2
+        except Exception:  # noqa: BLE001 — sem a 2ª tentativa fica como antes (⚠ não bateram)
+            return r, []
+
+    def _pad_idioma(p: Dict[str, Any]) -> str:
+        try:
+            return str((p.get("config") or {}).get("idioma") or p.get("idioma") or "pt")
+        except Exception:  # noqa: BLE001
+            return "pt"
+
     def _resolver_pedido(origem: str, pid: str, c: Dict[str, Any]):
         """(p, texto, pad, reg, ver, idx, acao) do pedido — ou levanta ValueError/LookupError."""
         import checagem_resolver as cr
@@ -947,9 +1011,15 @@ def registrar(app, base_dir: str) -> None:
         import checagem_resolver as cr
         import revisao_roteiro as rv
         trocas = cr.ler(resposta)
+        if not trocas:
+            raise ValueError("Não achei nenhuma correção no JSON (precisa de uma lista \"correcoes\" com \"de\" e \"para\").")
         confirmados = [t for t in trocas if t.get("status") == "confirmado" or t["de"].strip() == t["para"].strip()]
         mudar = [t for t in trocas if t not in confirmados]
         r = rv.aplicar(texto, _json.dumps({"trocas": mudar}, ensure_ascii=False))
+        # 🎯 v84_448: o "de" não bateu (a IA copiou a afirmação resumida, não a frase do roteiro) → a IA do site acha a
+        # frase de verdade no parágrafo e a correção entra (antes ficava só "⚠ não bateram" e nada mudava)
+        r, t2 = _reacertar(p, pid, r, mudar)
+        trocas = trocas + t2
         g = {}
         if r["aplicadas"]:
             g = _gravar(origem, pid, p, r["texto"], None, [], chave_antes="-",

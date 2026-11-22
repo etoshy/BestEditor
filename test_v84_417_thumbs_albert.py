@@ -113,7 +113,7 @@ def test_rota_titulos(monkeypatch):
     p["resultado"] = {"roteiro": "um roteiro " * 50, "titulos": ["O Maior Erro"],
                       "thumbnails": [{"ideia": "i", "texto": "CONTRADIÇÃO", "prompt": "p", "modo": "albert"}]}
     ds.salvar(A.BASE_DIR, p)
-    monkeypatch.setattr(tf, "pedir_titulos", lambda titulo, sobre, alvo, idioma="pt", originais=None: {int(alvo[0]["n"]): ["Contradição. Por quê?", "Outro"]})
+    monkeypatch.setattr(tf, "pedir_titulos", lambda titulo, sobre, alvo, idioma="pt", originais=None, **kw: {int(alvo[0]["n"]): ["Contradição. Por quê?", "Outro"]})
     try:
         r = A.app.test_client().post(f"/thumbs/dossie/{p['id']}/titulos", json={})
         assert r.status_code == 200, r.get_json()

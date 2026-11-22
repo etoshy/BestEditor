@@ -261,7 +261,7 @@ def estilo(base: str, origem: str, pid: str) -> str:
 
 
 # ------------------------------------------------------------------ 🔥 v84_417: estilo "palavra gigante + ironia"
-N_ALBERT = 2  # além das 5 de sempre, 2 nesse estilo (0 = desliga — Configurações)
+N_ALBERT = 3  # além das 5 de sempre, 3 nesse estilo (v84_448; era 2) (0 = desliga — Configurações)
 REGRA_ALBERT = (
     "ESTILO PALAVRA GIGANTE — PROVOCATIVO, no jeito do canal Albert (psicologia/comportamento, thumbs que explodem). "
     "COMO ELE PENSA (aplique ao ROTEIRO DESTE vídeo — não copie palavras nem cenas de exemplo nenhum):\n"
@@ -273,11 +273,10 @@ REGRA_ALBERT = (
     "A palavra vem do NERVO do vídeo, NÃO das imagens do roteiro: NUNCA use um objeto, um lugar ou uma metáfora que o "
     "roteiro usou pra explicar (peneira, pedra, régua, ampulheta, caverna, náufrago, relógio, trilho — isso é ilustração, "
     "não acusação), nem conceito técnico ou abstrato (concessão, finitude, reflexão, linguagem, memória, silêncio). "
-    "PALAVRA DO POVO: tem que ser uma palavra que QUALQUER brasileiro usa e entende na hora — xingamento leve, "
-    "apelido, rótulo de briga de família (ex. de NÍVEL, não copie: OTÁRIO, COVARDE, VICIADO, FINGIDO, MANIPULADO, "
-    "ESCRAVO, FRACASSADO, CARENTE — essas são só a RÉGUA de simplicidade; a palavra certa sai do nervo DESTE vídeo e só "
-    "pode ser uma delas se o roteiro pedir exatamente isso). NUNCA palavra rara, culta ou inventada (impassivo, armadilhado, resignado, alienado, "
-    "guardião, letárgico) — se uma pessoa comum precisaria perguntar o que significa, está ERRADA. "
+    "PALAVRA DO POVO: uma palavra que QUALQUER brasileiro usa e entende na hora — do tipo xingamento leve, apelido ou "
+    "rótulo de briga de família — e que diga o defeito que ESTE roteiro aponta em quem assiste (ela tem que caber numa "
+    "frase do próprio vídeo: \"você é ___ quando…\"). NUNCA palavra rara, culta ou inventada (impassivo, armadilhado, "
+    "resignado, alienado, letárgico) — se uma pessoa comum precisaria perguntar o que significa, está ERRADA. "
     "Nada de frase. 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
     "3) A CENA: o personagem do canal VIVENDO a palavra de forma LITERAL, absurda e meio escandalosa — o corpo, a roupa ou "
     "a situação dele É a metáfora (não \"ele ao lado de um objeto\"). Pergunte: se essa palavra virasse uma foto ridícula "
@@ -327,7 +326,10 @@ def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
         except Exception:  # noqa: BLE001
             cfg = {}
     try:
-        return max(0, min(4, int((cfg or {}).get("thumbs_albert", N_ALBERT))))
+        v = int((cfg or {}).get("thumbs_albert", N_ALBERT))
+        if v == 2 and not (cfg or {}).get("thumbs_albert_v448"):  # o 2 antigo (padrão de antes) vira o 3 novo
+            v = N_ALBERT
+        return max(0, min(4, v))
     except (TypeError, ValueError):
         return N_ALBERT
 
@@ -343,9 +345,67 @@ def _schema_ideias() -> Dict[str, Any]:
     return _obj({"thumbnails": _lista(_obj({"ideia": _S, "texto": _S, "prompt": _S, "angulo": _S, "modo": _S, "titulos": _lista(_S)}))})
 
 
+PALAVRAS_EXEMPLO = ("OTARIO", "COVARDE", "VICIADO", "FINGIDO", "MANIPULADO", "ESCRAVO", "FRACASSADO", "CARENTE",
+                    "ZOOFILO", "CANIBAL", "NECROFILO")
+
+
+def _sem_acento(t: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
+
+def _palavra_vazada(palavra: str, ctx: str) -> bool:
+    """A palavra é uma das que já apareceram como exemplo nas regras e o roteiro não fala dela (nem da raiz)."""
+    w = _sem_acento(palavra).strip().upper()
+    if w not in PALAVRAS_EXEMPLO:
+        return False
+    raiz = w.lower()[:max(4, len(w) - 3)]  # FINGIDO → fing (finge, fingir…); CARENTE → care (carência…)
+    return raiz not in ctx
+
+
+MODELOS_MELHORES = (("claude-sonnet-5-5", "Sonnet 5.5"), ("claude-opus-5-5", "Opus 5.5"))
+MODELOS_CLAUDE_CODE = (("cc:opus", "Claude Code · Opus (sua assinatura)"), ("cc:sonnet", "Claude Code · Sonnet (sua assinatura)"))
+
+
+def estimar_custos(contexto: str, n: int = 5, albert: int = 3, n_titulos: int = 8) -> Dict[str, Any]:
+    """💲 v84_448: quanto custa (mais ou menos) cada botão em cada modelo — pelo tamanho do roteiro deste vídeo."""
+    import ia_servico as ia
+    ent = 3500 + min(len(contexto or ""), 12000) // 3  # as regras (~3,5 mil tokens) + o roteiro (corta em 12 mil letras)
+    acoes = {"ideias": 900 * (n + albert) + 600, "albert": 1200 * albert + 500, "titulos": 250 * n_titulos + 400}
+    modelos = [("claude-haiku-5-5", "Haiku 5.5 (padrão)")] + list(MODELOS_MELHORES)
+    tab = {mid: {a: round(ia.estimar_usd(mid, ent, sai), 4) for a, sai in acoes.items()} for mid, _ in modelos}
+    return {"modelos": [{"id": mid, "nome": nome, "usd": tab[mid]} for mid, nome in modelos],
+            "claude_code": [{"id": mid, "nome": nome} for mid, nome in MODELOS_CLAUDE_CODE],
+            "claude_code_instalado": ia.claude_code_instalado(), "assinatura": ia.via_assinatura()}
+
+
 def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
                  estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0,
-                 estilo_albert: str = "marcado") -> List[Dict[str, str]]:
+                 estilo_albert: str = "marcado", modelo: str = "") -> List[Dict[str, str]]:
+    """🔁 v84_448: pediu 3 e vieram 1 (a IA mandou menos, ou os filtros tiraram repetidas/vazadas) → pede de novo SÓ as que
+    faltam (até 2 vezes), sem repetir as que já vieram."""
+    out = _pedir_ideias_uma(titulo, contexto, ja, n, idioma, estilo_canal, estilos, albert, estilo_albert, modelo)
+    for _ in range(2):
+        f_n = max(0, n - sum(1 for t in out if t.get("modo") != "albert"))
+        f_a = max(0, albert - sum(1 for t in out if t.get("modo") == "albert"))
+        if not (f_n or f_a):
+            break
+        try:
+            mais = _pedir_ideias_uma(titulo, contexto, list(ja) + out, f_n, idioma, estilo_canal, estilos, f_a,
+                                     estilo_albert, modelo)
+        except ThumbErro:
+            break
+        ideias_ja = {str(t.get("ideia") or "").strip().lower() for t in out}
+        mais = [t for t in mais if str(t.get("ideia") or "").strip().lower() not in ideias_ja]
+        if not mais:
+            break
+        out += [t for t in mais if t.get("modo") != "albert"][:f_n] + [t for t in mais if t.get("modo") == "albert"][:f_a]
+    return out
+
+
+def _pedir_ideias_uma(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = N_IDEIAS, idioma: str = "pt",
+                      estilo_canal: str = "", estilos: Optional[List[str]] = None, albert: int = 0,
+                      estilo_albert: str = "marcado", modelo: str = "") -> List[Dict[str, str]]:
     """🤖 `n` thumbnails BEM diferentes entre si (e das que já existem). 🎨 v84_397 `estilos`: os estilos de arte
     marcados — as ideias são distribuídas entre eles (em rodízio) e a IA pensa a cena pra caber em cada um."""
     import estilos_arte
@@ -358,6 +418,10 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
                                                               for k, e in enumerate(por_alb))) if por_alb else ""
 
     def _pos_alb(lst):
+        # 🚫 v84_447: palavra que só existia como EXEMPLO numa versão das regras (CARENTE num vídeo sobre ler clássicos):
+        # fica só se o roteiro sustenta (a raiz dela aparece no texto do vídeo)
+        _ctx = _sem_acento(str(contexto or "") + " " + str(titulo or "")).lower()
+        lst[:] = [t for t in lst if not _palavra_vazada(str(t.get("texto") or ""), _ctx)] or lst[:1]
         # 🔁 v84_435: a mesma PALAVRA em duas thumbs (ex.: PEDRA e PEDRA) — fica só a primeira
         vistas = {str(i.get("texto") or "").strip().upper() for i in ja if i.get("modo") == "albert" and i.get("texto")}
         unicas = []
@@ -384,7 +448,7 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
                 t["estilo_arte"] = ""
         return lst
     import ia_servico as ia
-    motivo = ia.motivo_desligado("roteiros")
+    motivo = None if str(locals().get("modelo") or "").startswith("cc:") else ia.motivo_desligado("roteiros")
     if motivo:
         raise ThumbErro("IA: " + motivo + " — ligue em 🤖 IA (📝 Roteiros direto na IA).")
     existentes = "\n".join(f"- {('[' + i['texto'] + '] ') if i.get('modo') == 'albert' and i.get('texto') else ''}{i.get('ideia')}"
@@ -407,8 +471,8 @@ Se o estilo é desenho/anime/cartoon, descreva o personagem como desenho (expres
 Responda só o JSON."""
         conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
         with ia.rotulo("🔥 Thumbs palavra gigante: " + (titulo or "")[:60]):
-            d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=3000, effort="medium", timeout=300,
-                         cache_local=False)  # 🔁 v84_420: clicar de novo traz ideias NOVAS (não a mesma resposta guardada)
+            d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=1500 + 1200 * albert, effort="medium",
+                         timeout=300, cache_local=False, modelo=modelo)  # 🔁 v84_420: clicar de novo traz ideias NOVAS (não a mesma resposta guardada)
         if not d:
             raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
         out = [t for t in (normalizar(dict(x, modo="albert") if isinstance(x, dict) else x)
@@ -442,14 +506,14 @@ detalhes de foto realista (pele, rugas, poros, lente, "cinematic").
 Responda só o JSON."""
     conteudo = f"Título do vídeo: {titulo}\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:12000]}"
     with ia.rotulo("🖼 Thumbs: " + (titulo or "")[:60]):
-        d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=4000, effort="low", timeout=300,
-                         cache_local=False)
+        d = ia.chamar("roteiros", system, conteudo, schema=_schema_ideias(), max_tokens=max(4000, 900 * (n + albert) + 1000),
+                      effort="medium" if modelo else "low", timeout=300, cache_local=False, modelo=modelo)
     if not d:
         raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
     out = [t for t in (normalizar(x) for x in (d.get("thumbnails") if isinstance(d, dict) else d) or []) if t]
     if not out:
         raise ThumbErro("a IA não sugeriu nenhuma thumbnail")
-    normais = [t for t in out if t.get("modo") != "albert"][:max(1, n)]
+    normais = [t for t in out if t.get("modo") != "albert"][:n]
     alb = [t for t in out if t.get("modo") == "albert"][:albert]
     if albert and len(normais) > n - 1 and not alb and len(out) > n:  # a IA esqueceu o "modo": as que passaram das n são as albert
         alb = [dict(t, modo="albert") for t in out[n:n + albert]]
@@ -674,10 +738,10 @@ def _schema_titulos() -> Dict[str, Any]:
 
 
 def pedir_titulos(titulo: str, contexto: str, itens: List[Dict[str, Any]], idioma: str = "pt",
-                  originais: Optional[List[str]] = None) -> Dict[int, List[str]]:
+                  originais: Optional[List[str]] = None, modelo: str = "") -> Dict[int, List[str]]:
     """{n: [2 títulos]} pras thumbnails pedidas — a palavra e a imagem da thumb NÃO mudam."""
     import ia_servico as ia
-    motivo = ia.motivo_desligado("roteiros")
+    motivo = None if str(locals().get("modelo") or "").startswith("cc:") else ia.motivo_desligado("roteiros")
     if motivo:
         raise ThumbErro("IA: " + motivo)
     if not itens:
@@ -698,8 +762,8 @@ Responda só o JSON."""
                 + "\n".join(f"- {t}" for t in orig[:8])
                 + f"\n\nSobre o vídeo / roteiro:\n{(contexto or '')[:9000]}\n\nThumbnails:\n{lista}")
     with ia.rotulo("🏷 Títulos das thumbs: " + (titulo or "")[:50]):
-        d = ia.chamar("roteiros", system, conteudo, schema=_schema_titulos(), max_tokens=2500, effort="low", timeout=240,
-                      cache_local=False)
+        d = ia.chamar("roteiros", system, conteudo, schema=_schema_titulos(), max_tokens=max(2500, 250 * len(itens) + 800),
+                      effort="medium" if modelo else "low", timeout=240, cache_local=False, modelo=modelo)
     if not isinstance(d, dict):
         raise ThumbErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
     pedidos = {int(it["n"]) for it in itens}

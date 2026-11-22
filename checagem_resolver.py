@@ -152,14 +152,56 @@ def ler(resposta: str) -> List[Dict[str, Any]]:
     except ValueError as exc:
         raise ValueError(f"Não consegui ler o JSON: {exc}") from exc
     out = []
-    for c in (d.get("correcoes") if isinstance(d, dict) else d) or []:
-        if not isinstance(c, dict) or not str(c.get("de") or "").strip() or c.get("para") is None:
+    lista = d
+    if isinstance(d, dict):  # 🩹 v84_448: o JSON colado de outra IA às vezes vem com outra chave ("trocas", "correções"…)
+        lista = next((d[k] for k in ("correcoes", "correções", "trocas", "corrections", "itens", "items") if isinstance(d.get(k), list)),
+                     [d] if str(d.get("de") or "").strip() else [])
+    for c in lista or []:
+        if not isinstance(c, dict) or not str(c.get("de") or c.get("trecho") or "").strip():
             continue
+        if "de" not in c:
+            c = dict(c, de=c.get("trecho"))
         st = str(c.get("status") or "").strip().lower().split()[0] if str(c.get("status") or "").strip() else ""
+        if c.get("para") is None:  # null = apagar só quando a IA disse que tirou; senão é resposta incompleta
+            if st not in ("tirado", "falso"):
+                continue
+            c = dict(c, para="")
         out.append({"item": str(c.get("item") or "").replace(" ", "").upper()[:6], "de": str(c["de"]), "para": str(c["para"]),
                     "status": st if st in STATUS_NOVOS + ("corrigido",) else "", "fonte": str(c.get("fonte") or "")[:300],
                     "motivo": str(c.get("problema") or "")[:200], "eixo": "alegacao"})
     return out
+
+
+def paragrafo_parecido(roteiro: str, trecho: str) -> str:
+    """O parágrafo do roteiro mais parecido com um "de" que não bateu (pra IA copiar certo na 2ª tentativa)."""
+    import difflib
+
+    import checagem_roteiro as ch
+    pars = [t for _n, t in ch.paragrafos(roteiro)]
+    if not pars:
+        return ""
+    alvo = set(str(trecho or "").lower().split())
+
+    def nota(t: str) -> float:
+        pal = set(t.lower().split())
+        return len(alvo & pal) / max(1, len(alvo)) + 0.3 * difflib.SequenceMatcher(None, trecho.lower(), t.lower()).ratio()
+    return max(pars, key=nota)
+
+
+def prompt_reacertar(roteiro: str, erradas: List[Dict[str, Any]], idioma: str = "português") -> str:
+    """🎯 v84_448: a correção veio certa mas o "de" não bateu com o texto (a IA copiou a AFIRMAÇÃO resumida, não a frase
+    do roteiro) → mostra o parágrafo de verdade e pede o "de" copiado letra por letra."""
+    L = [f"Você ajusta um roteiro em {idioma}. Estas correções estão CERTAS, mas o trecho \"de\" não foi achado no roteiro "
+         "(foi resumido ou reescrito). Para CADA uma: ache no PARÁGRAFO dado a frase (ou frases) que a correção muda e devolva "
+         "\"de\" COPIADO LETRA POR LETRA desse parágrafo (sem as marcas [[…]] / [I3]), e \"para\" = essa mesma frase já "
+         "corrigida, no mesmo tom. Se a correção não se aplica a esse parágrafo, não devolva o item.", ""]
+    for k, t in enumerate(erradas, 1):
+        L += [f"### C{k} (item {t.get('item') or '—'})", f"\"de\" que não bateu: {t['de']}", f"Correção pedida: {t['para'] or '(apagar)'}",
+              f"Parágrafo do roteiro:\n{paragrafo_parecido(roteiro, t['de'])}", ""]
+    L += ["## Resposta — SOMENTE um JSON válido:",
+          json.dumps({"correcoes": [{"item": "V1", "de": "frase COPIADA do parágrafo", "para": "a frase corrigida",
+                                     "status": "corrigido", "fonte": "", "problema": ""}]}, ensure_ascii=False, indent=1)]
+    return "\n".join(L)
 
 
 def chamar_ia(prompt: str, acao: str, rotulo: str) -> Tuple[str, str]:

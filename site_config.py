@@ -244,7 +244,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "evitar_repeticao_clipes": True,
     "nomes_proibidos": "Olavo de Carvalho",
     "variar_estrutura": True,  # 🎲 v84_433: abertura/arco/fecho mudam de vídeo pra vídeo  # 🚫 v84_427: nomes que NUNCA entram no roteiro (vírgula separa)
-    "thumbs_albert": 2,  # 🔥 v84_417: além das 5 thumbs/títulos, N no estilo palavra gigante (0 = desliga)
+    "thumbs_albert": 3,  # 🔥 v84_417: além das 5 thumbs/títulos, N no estilo palavra gigante (0 = desliga) — 3 desde v84_448
+    "thumbs_albert_v448": False,  # True = você salvou o número nas Configurações depois do v84_448 (o 2 antigo vira 3 até lá)
     "max_usos_clipe": 3,  # 🔁 v84_415: o mesmo clipe/cena no máximo N vezes por vídeo (quando não tem outro)
     "buscadores_imagem_paralelo": True,
     "templates_cena_ia": True,
@@ -494,9 +495,9 @@ def save_site_config(new_values: Dict[str, Any], path: Optional[str] = None) -> 
         raise SiteConfigError(f"preview_fetch_concurrency precisa estar entre 1 e 10, recebi {concurrency}.")
     current["preview_fetch_concurrency"] = concurrency
     try:  # 🔥 v84_417
-        current["thumbs_albert"] = max(0, min(4, int(current.get("thumbs_albert", 2))))
+        current["thumbs_albert"] = max(0, min(4, int(current.get("thumbs_albert", 3))))
     except (TypeError, ValueError):
-        current["thumbs_albert"] = 2
+        current["thumbs_albert"] = 3
     try:  # 🔁 v84_415
         current["max_usos_clipe"] = max(1, min(20, int(current.get("max_usos_clipe") or 3)))
     except (TypeError, ValueError):

@@ -1183,12 +1183,17 @@ document.getElementById('fila-modo').addEventListener('change', async (e) => {
 
 // ---------------- 📜 histórico
 let histPagina = 0, histT = null;
+let histSoId = (new URLSearchParams(location.search).get('voz') || '').replace(/[^0-9a-zA-Z_-]/g, '');  // 🎙 v84_448: vindo da Galeria
 const hEsc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const hDur = (s) => s == null ? '?' : Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
 async function carregarHistorico() {
   let d;
-  try { d = await (await fetch('/gerar-voz/historico?pagina=' + histPagina + '&q=' + encodeURIComponent(document.getElementById('hist-q').value))).json(); } catch (_) { return; }
-  document.getElementById('hist-total').textContent = d.total + ' áudio(s)';
+  try { d = await (await fetch('/gerar-voz/historico?pagina=' + histPagina + '&q=' + encodeURIComponent(document.getElementById('hist-q').value)
+                               + (histSoId ? '&id=' + encodeURIComponent(histSoId) : ''))).json(); } catch (_) { return; }
+  document.getElementById('hist-total').innerHTML = hEsc(d.total + ' áudio(s)')
+    + (histSoId ? ' · 🎙 só a narração do vídeo que você abriu — <a href="#historico" id="hist-todos">ver todas</a>' : '');
+  const _ht = document.getElementById('hist-todos');
+  if (_ht) _ht.addEventListener('click', (e) => { e.preventDefault(); histSoId = ''; histPagina = 0; carregarHistorico(); });
   const quando = (t) => new Date(t * 1000).toLocaleString().slice(0, 16);
   document.getElementById('hist-lista').innerHTML = (d.itens || []).map(h => `
     <div class="hist-item">

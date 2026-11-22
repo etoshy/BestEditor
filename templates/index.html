@@ -209,7 +209,7 @@
     box.innerHTML = itens.map(x => {
       const proj = x.projeto && NOMES[x.projeto] ? ` · 📦 <b>${NOMES[x.projeto].replace(/</g, '&lt;')}</b>` : '';
       return `<label class="nvItem" style="display:flex;gap:6px;align-items:flex-start;margin:0;font-weight:400;padding:3px 0;border-top:1px solid #dbeafe;">
-        <input type="checkbox" class="nvCb" value="${x.zip_url}" data-id="${x.id}" style="width:auto;margin:3px 0 0;">
+        <input type="checkbox" class="nvCb" value="${x.zip_url}" data-id="${x.id}" data-nome="${(x.projeto && NOMES[x.projeto] ? NOMES[x.projeto] : '').replace(/"/g, '&quot;')}" style="width:auto;margin:3px 0 0;">
         <span><span style="color:#666;">${hora(x.terminou || x.criado)} · ${x.motor || ''}</span>${proj}<br><i>“${(x.texto_inicio || '').replace(/</g, '&lt;')}…”</i></span></label>`;
     }).join('');
     box.querySelectorAll('.nvCb').forEach(c => c.addEventListener('change', atualizar));
@@ -232,7 +232,7 @@
     log.style.display = ''; log.textContent = ''; links.innerHTML = '';
     const varios = vozes.length + files.length > 1;
     const fontes = [...files.map((f, k) => ({ nome: f.name, chave: chaveArq(f, k), pegar: async () => f })),
-                    ...vozes.map(c => ({ nome: 'voz ' + c.dataset.id.slice(0, 8) + '.zip', chave: 'v:' + c.dataset.id, pegar: async () => {
+                    ...vozes.map(c => ({ nome: (c.dataset.nome ? c.dataset.nome.replace(/[/\\:*?"<>|]/g, ' ').slice(0, 80) + ' · ' : 'voz ') + c.dataset.id.slice(0, 8) + '.zip', chave: 'v:' + c.dataset.id, pegar: async () => {
                       const r = await fetch(c.value); if (!r.ok) throw new Error('não consegui pegar o .zip (' + r.status + ')'); return await r.blob(); } }))];
     let ok = 0;
     for (let k = 0; k < fontes.length; k++) {
@@ -242,6 +242,7 @@
         const fd = new FormData(form);
         fd.delete('audio'); fd.set('audio', await f.pegar(), f.nome);
         if (varios) fd.set('projeto_midias', '');  // vários: cada .zip usa o projeto que veio com ele
+        if (f.chave.startsWith('v:')) fd.set('voz_id', f.chave.slice(2));  // 🎙 v84_448: o link pra narração no card da Galeria
         if (fontesDe[f.chave]) {  // 📚 v84_387: as fontes que você escolheu só pra este vídeo
           if (!fontesDe[f.chave].length) throw new Error('marque pelo menos uma fonte pra este vídeo');
           fd.delete('providers'); fontesDe[f.chave].forEach(p => fd.append('providers', p));

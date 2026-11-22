@@ -613,8 +613,19 @@ def jobs_history_page():
 
     jobs_sorted = sorted(_JOBS.values(), key=lambda j: j.get("created_at", 0), reverse=True)
     jobs_for_display = []
+    _cache_tit: Dict[str, str] = {}
     for job in jobs_sorted:
         display = dict(job)  # cópia rasa — não mexe no dicionário original do job
+        if not job.get("nome_projeto"):  # 🏷 v84_448: os antigos sem nome — o título do roteiro ligado
+            display["titulo_auto"] = _titulo_do_projeto_ligado(job, _cache_tit)
+        display["link_roteiro"] = next((rota + str(job[campo]) for campo, rota in
+                                        (("dossie_id", "/modelos-video/"), ("roteiro_id", "/roteiros-yt/"), ("venda_id", "/vendas/"))
+                                        if job.get(campo)), "")
+        _vz = str(job.get("voz_id") or "")
+        if not _vz:  # os antigos: o "voz 3ead6ef6.zip" traz o começo do id da narração
+            _m = re.match(r"^(?:voz |.* · )([0-9a-zA-Z_-]{8})\.zip$", str(job.get("original_filename") or ""))
+            _vz = _m.group(1) if _m else ""
+        display["link_narracao"] = f"/gerar-voz?voz={_vz}#historico" if _vz else ""
         created_at = job.get("created_at")
         display["created_at_display"] = (
             datetime.datetime.fromtimestamp(created_at).strftime("%d/%m %H:%M") if created_at else None
@@ -1655,13 +1666,42 @@ def _nomes_projetos_voz() -> Dict[str, Tuple[str, str]]:
     return out
 
 
+def _titulo_do_projeto_ligado(job: dict, cache: Optional[Dict[str, str]] = None) -> str:
+    """🏷 v84_448: o título do vídeo pro card da Galeria quando o áudio veio do Gerador de voz ("voz 3ead6ef6.zip" não
+    diz nada): o 1º título do roteiro do modelo de vídeo / Roteiro do YouTube ligado, senão o nome do projeto."""
+    for campo, mod in (("dossie_id", "dossies"), ("roteiro_id", "roteiros_yt"), ("venda_id", "vendas")):
+        pid = str(job.get(campo) or "")
+        if not pid:
+            continue
+        chave = f"{campo}:{pid}"
+        if cache is not None and chave in cache:
+            return cache[chave]
+        t = ""
+        try:
+            m = __import__(mod)
+            q = m.carregar_projeto(BASE_DIR, pid) if mod == "roteiros_yt" else m.carregar(BASE_DIR, pid)
+            res = q.get("resultado") or {}
+            tits = [str(x).strip() for x in (res.get("titulos") or (q.get("analise") or {}).get("titulos") or []) if str(x).strip()]
+            t = tits[0] if tits else str(q.get("titulo") or q.get("nome") or q.get("tema") or "")
+        except Exception:  # noqa: BLE001
+            t = ""
+        t = " ".join(t.split())[:120]
+        if cache is not None:
+            cache[chave] = t
+        if t:
+            return t
+    return ""
+
+
 @app.route("/gerar-voz/historico", methods=["GET"])
 def gerar_voz_historico():
     try:
         pagina = max(0, int(request.args.get("pagina") or 0))
     except ValueError:
         pagina = 0
-    r = _hist_voz.listar(VOZES_DIR, q=request.args.get("q") or "", limite=50, pagina=pagina)
+    _idv = request.args.get("id") or ""
+    r = _hist_voz.listar(VOZES_DIR, q=request.args.get("q") or "", limite=50, pagina=pagina,
+                         id_=_idv if re.fullmatch(r"[0-9a-zA-Z_-]{6,64}", _idv) else "")
     nomes = _nomes_projetos_voz() if any(it.get("projeto") for it in r["itens"]) else {}
     for it in r["itens"]:
         if it.get("projeto") in nomes:  # 📂 v84_382: de qual projeto veio + link pra ele
@@ -2881,7 +2921,8 @@ def save_settings():
         "magnific_only_free": request.form.get("magnific_only_free") == "on",
         "evitar_repeticao_clipes": request.form.get("evitar_repeticao_clipes") == "on",
         "max_usos_clipe": request.form.get("max_usos_clipe") or 3,
-        "thumbs_albert": request.form.get("thumbs_albert") if request.form.get("thumbs_albert") not in (None, "") else 2,
+        "thumbs_albert": request.form.get("thumbs_albert") if request.form.get("thumbs_albert") not in (None, "") else 3,
+        "thumbs_albert_v448": True,
         **({"nomes_proibidos": request.form.get("nomes_proibidos", "")} if "nomes_proibidos" in request.form else {}),
         **({"variar_estrutura": request.form.get("variar_estrutura") == "on"} if "nomes_proibidos" in request.form else {}),
         "transition_type": request.form.get("transition_type", "none"),
@@ -4075,6 +4116,13 @@ def transcribe():
             _JOBS[job_id]["roteiro_id"] = _rid
     if _formato_do_form(request.form):
         _JOBS[job_id]["orientation"] = _formato_do_form(request.form)
+    _vz = (request.form.get("voz_id") or "").strip()
+    if re.fullmatch(r"[0-9a-zA-Z_-]{6,64}", _vz):  # 🎙 v84_448: de qual narração do Gerador de voz veio (link no card)
+        _JOBS[job_id]["voz_id"] = _vz
+    if not _JOBS[job_id].get("nome_projeto"):  # 🏷 v84_448: o título do vídeo no lugar de "voz 3ead6ef6.zip"
+        _tit = _titulo_do_projeto_ligado(_JOBS[job_id])
+        if _tit:
+            _JOBS[job_id]["nome_projeto"] = _tit
     perf = PerfLog(_job_dir(job_id), job_id=job_id)
     _PERF_LOGS[job_id] = perf
     _save_state(job_id)

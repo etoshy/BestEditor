@@ -23,4 +23,12 @@ def test_copiou_exemplo():
     assert m.copiou_exemplo("Por Que Ninguém Lê Mais?")
     assert not m.copiou_exemplo("Você Não Escolhe o Que Ama")
     assert "nunca use estes" in tf.REGRA_TITULOS_THUMB
-    assert "RÉGUA" in tf.REGRA_ALBERT
+    assert "CARENTE" not in tf.REGRA_ALBERT and "OTÁRIO" not in tf.REGRA_ALBERT
+
+
+def test_palavra_vazada():
+    ctx = "voce finge que leu os classicos e se perde no indice".lower()
+    assert tf._palavra_vazada("CARENTE", ctx)
+    assert not tf._palavra_vazada("FINGIDO", ctx)
+    assert not tf._palavra_vazada("PREGUIÇOSO", ctx)
+    assert not tf._palavra_vazada("CARENTE", "a carencia afetiva de quem")

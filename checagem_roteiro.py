@@ -382,10 +382,12 @@ def ler(resposta: str) -> Dict[str, Any]:
         d = json_ia.carregar(resposta)
     except ValueError as exc:
         raise ValueError(f"Não consegui ler o JSON da checagem: {exc}") from exc
+    if isinstance(d, list):  # 🩹 v84_448: só a lista de correções, sem o {"correcoes": …} em volta
+        d = {"correcoes": d}
     if not isinstance(d, dict):
         raise ValueError("A checagem tem que ser um JSON com \"correcoes\".")
     trocas = []
-    for c in d.get("correcoes") or d.get("trocas") or []:
+    for c in (d.get("correcoes") or d.get("correções") or d.get("trocas") or d.get("corrections") or []):
         if isinstance(c, dict) and str(c.get("de") or "").strip():
             st = str(c.get("status") or "").strip().lower().replace(" ", "_")
             if c.get("para") is None and st not in ("falso", "repeticao"):

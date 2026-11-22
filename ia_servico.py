@@ -54,6 +54,11 @@ PROVEDORES: Dict[str, Dict[str, Any]] = {
             # preços em US$ por 1 milhão de tokens (até 100 mil tokens no pedido; acima: *_longo)
             {"id": "claude-haiku-5-5", "nome": "Claude Haiku 5.5 (rápido e barato — o recomendado)",
              "entrada": 0.10, "saida": 0.50, "cache_leitura": 0.01, "entrada_longo": 0.50, "saida_longo": 2.50},
+            # 🧠 v84_448: os maiores (botão "modelo melhor" nas thumbs/títulos) — preço fixo, sem faixa longa
+            {"id": "claude-sonnet-5-5", "nome": "Claude Sonnet 5.5 (melhor, ~20× o Haiku)",
+             "entrada": 2.0, "saida": 10.0, "cache_leitura": 0.10, "entrada_longo": 2.0, "saida_longo": 10.0},
+            {"id": "claude-opus-5-5", "nome": "Claude Opus 5.5 (o mais forte, ~40× o Haiku)",
+             "entrada": 4.0, "saida": 20.0, "cache_leitura": 0.20, "entrada_longo": 4.0, "saida_longo": 20.0},
         ],
     },
 }
@@ -385,6 +390,65 @@ def ativo(recurso: Optional[str] = None) -> bool:
         return motivo_desligado(recurso) is None
     except Exception:  # noqa: BLE001
         return False
+
+
+def claude_code_instalado() -> bool:
+    try:
+        import ia_assinatura
+        return bool(ia_assinatura.executavel("claude"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _chamar_claude_code(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, Any]], web: bool,
+                        apelido: str, job: Optional[str], timeout: float) -> Optional[Any]:
+    """🟠 v84_449: o botão "Claude Code (assinatura)": vai direto no `claude -p` com o modelo pedido. Se falhar, NÃO cai na
+    API escondido (você escolheu não gastar) — registra o erro em 🤖 IA e devolve None."""
+    import ia_assinatura
+    if apelido not in ("opus", "sonnet", "haiku"):
+        apelido = "opus"
+    if recurso in ("roteiros", "voz_tags") and isinstance(system, str):
+        try:
+            import metodo_roteiro as _mr
+            _rn = _mr.regra_nomes(_mr.nomes_proibidos())
+            if _rn and _rn not in system:
+                system = system + "\n\n" + _rn
+        except Exception:  # noqa: BLE001
+            pass
+    if isinstance(conteudo, str):
+        conteudo = [{"type": "text", "text": conteudo}]
+    if not ia_assinatura.executavel("claude"):
+        _registrar(recurso + "·claude-code", {}, 0.0, job, False,
+                   "o Claude Code não está instalado (npm install -g @anthropic-ai/claude-code e depois rode claude uma vez pra entrar)")
+        return None
+    try:
+        v = ia_assinatura.chamar("claude", system, conteudo, schema=schema, web=web, modelo_claude=apelido,
+                                 timeout=max(timeout, 300))
+    except ia_assinatura.AssinaturaErro as exc:
+        _registrar(recurso + "·claude-code", {}, 0.0, job, False, f"Claude Code ({apelido}): {exc}")
+        return None
+    _registrar(recurso + "·claude-code", {}, 0.0, job, True)
+    return v
+
+
+def _modelo_assinatura(modelo: str, c: Dict[str, Any]) -> str:
+    """Na assinatura (Claude Code), o modelo maior pedido vira o apelido do CLI (opus/sonnet)."""
+    for apelido in ("opus", "sonnet", "haiku"):
+        if apelido in str(modelo or ""):
+            return apelido
+    return c.get("assinatura_modelo") or "sonnet"
+
+
+def estimar_usd(modelo_id: str, entrada: int, saida: int) -> float:
+    """Quanto custa uma chamada de `entrada`/`saida` tokens nesse modelo (sem cache)."""
+    c = config()
+    m = next((x for x in PROVEDORES[c["provedor"]]["modelos"] if x["id"] == modelo_id), None) or modelo_info(c)
+    return _custo({"input_tokens": int(entrada), "output_tokens": int(saida)}, m)
+
+
+def via_assinatura() -> bool:
+    c = config()
+    return c.get("texto_via") in ("claude", "chatgpt")
 
 
 # ------------------------------------------------------------------ uso e custo
@@ -729,16 +793,21 @@ def _sem_credito(status: int, msg: str) -> bool:
 
 def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, Any]] = None, max_tokens: int = 800,
            effort: str = "low", pensar: bool = False, job: Optional[str] = None, cache_local: bool = True,
-           timeout: float = 90.0, forcar: bool = False, web: bool = False) -> Optional[Any]:
+           timeout: float = 90.0, forcar: bool = False, web: bool = False, modelo: str = "") -> Optional[Any]:
     """Uma chamada à IA. Com `schema`: devolve o objeto (dict/list). Sem: o texto.
     None em QUALQUER problema (desligada, sem crédito, erro, recusa) — quem chamou segue sem a IA.
     `forcar`: ignora o liga/desliga do recurso (botão "Testar")."""
     c = config()
+    if str(modelo or "").startswith("cc:"):  # 🟠 v84_449: SÓ esta chamada pelo Claude Code da sua assinatura (sem cobrar a API)
+        return _chamar_claude_code(recurso, system, conteudo, schema, web, modelo[3:] or "opus", job, timeout)
     if not forcar and motivo_desligado(recurso, c) is not None:
         return None
     if forcar and not chave(c):
         return None
     m = modelo_info(c)
+    _ids = {x["id"]: x for x in PROVEDORES[c["provedor"]]["modelos"]}
+    if modelo and modelo in _ids:  # 🧠 v84_448: só ESTA chamada num modelo maior (ex.: thumbs e títulos)
+        m = _ids[modelo]
     if recurso in ("roteiros", "voz_tags") and isinstance(system, str):  # 🚫 v84_427: em TODO pedido de texto (roteiro, partes,
         try:                                                              # revisão, checagem, TTS, notas…): os nomes proibidos
             import metodo_roteiro as _mr
@@ -750,7 +819,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
     if isinstance(conteudo, str):
         conteudo = [{"type": "text", "text": conteudo}]
     payload: Dict[str, Any] = {
-        "model": c["modelo"], "max_tokens": int(max_tokens),
+        "model": m["id"], "max_tokens": int(max_tokens),
         "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
         "messages": [{"role": "user", "content": conteudo}],
     }
@@ -777,7 +846,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
             return guardado.get("v")
 
     import ia_local  # 🖥 v84_424: a IA local primeiro, nos recursos marcados (grátis)
-    _ml = ia_local.vai_local(recurso, conteudo, c)
+    _ml = None if modelo else ia_local.vai_local(recurso, conteudo, c)  # pediu o modelo maior: não cai na local
     _so_local = ia_local.so_local(recurso, c)  # 💸 v84_425: ex. o juiz das cenas "só no Qwen" — falhou, pula (sem gastar na API)
     if _ml and ia_local.fora_do_ar():  # 🔌 caiu há pouco: nem tenta (não atrasa cada pedido)
         _ml = None
@@ -800,7 +869,7 @@ def chamar(recurso: str, system: str, conteudo: Any, schema: Optional[Dict[str, 
         if not ia_assinatura.tem_imagem(conteudo) and ia_assinatura.executavel(c["texto_via"]):  # não instalado: API direto
             try:
                 v = ia_assinatura.chamar(c["texto_via"], system, conteudo, schema=schema, web=web,
-                                         modelo_claude=c.get("assinatura_modelo") or "sonnet", timeout=max(timeout, 300))
+                                         modelo_claude=_modelo_assinatura(modelo, c), timeout=max(timeout, 300))
                 _registrar(recurso + "·assinatura", {}, 0.0, job, True)
                 if k:
                     _cache_gravar(k, {"v": v, "quando": time.time()})

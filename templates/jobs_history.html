@@ -51,7 +51,7 @@ document.getElementById('btnReiniciarTodos').addEventListener('click', async (ev
   <div class="proj">
     <div class="proj-capa" {% if job.capa_url %}style="background-image:url('{{ job.capa_url }}');"{% endif %}>{% if not job.capa_url %}🎬{% endif %}</div>
     <div class="proj-corpo">
-      <div class="proj-nome">{{ job.nome_projeto or job.original_filename or job.job_id }}</div>
+      <div class="proj-nome">{{ job.nome_projeto or job.titulo_auto or job.original_filename or job.job_id }}</div>{% if not job.nome_projeto and job.titulo_auto and job.original_filename %}<div style="font-size:.72rem;color:#94a3b8">{{ job.original_filename }}</div>{% endif %}{% if job.link_roteiro or job.link_narracao %}<div style="font-size:.78rem;margin:2px 0;display:flex;gap:8px;flex-wrap:wrap">{% if job.link_roteiro %}<a href="{{ job.link_roteiro }}" title="o projeto do roteiro (modelo de vídeo / Roteiro do YouTube) que gerou este vídeo">📜 Roteiro</a>{% endif %}{% if job.link_narracao %}<a href="{{ job.link_narracao }}" title="a narração no Gerador de voz (ouvir, baixar, EQ)">🎙 Narração</a>{% endif %}</div>{% endif %}
       <div class="proj-meta">{{ tempo(job) or job.created_at_display or "—" }}{% if job.duracao_display %} · {{ job.duracao_display }}{% endif %}{% if job.num_trechos %} · {{ job.num_trechos }} trechos{% endif %}</div>
       <div><span class="status-badge status-{{ job.status }}">{{ job.status }}</span>
         {% if job.status == 'pronto_para_editar' and job.assembly_error %}

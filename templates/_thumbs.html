@@ -5,13 +5,18 @@
     <button type="button" id="thTodas" style="width:auto;margin:0;padding:5px 12px;background:#7c3aed;">🎨 Gerar as que faltam no Flow</button>
     <button type="button" id="thRefazer" style="width:auto;margin:0;padding:5px 12px;background:#9333ea;" title="gera de novo TODAS as que já têm imagem, com o mesmo prompt de cada uma e o estilo de arte atual do canal (ex.: 🖌 Rusty Art)">🔁 Refazer todas no estilo atual</button>
     <button type="button" id="thIA" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;" title="a IA cria mais 5 thumbnails bem diferentes entre si (e das que já existem), no estilo do canal — e mais as 🔥 de palavra gigante, se marcado">🤖 +5 ideias</button>
-    <label style="margin:0;font-weight:400;font-size:.84rem;display:inline-flex;gap:4px;align-items:center" title="além das 5: thumbs com UMA palavra gigante em vermelho atrás do personagem + uma ironia (sorrindo com uma corda, o rosto num prato…). O estilo de arte do canal não muda"><input type="checkbox" id="thAlbert" style="width:auto;margin:0" checked> + <input type="number" id="thAlbertN" min="1" max="4" value="2" style="width:46px;margin:0;padding:2px"> 🔥 palavra gigante</label>
+    <label style="margin:0;font-weight:400;font-size:.84rem;display:inline-flex;gap:4px;align-items:center" title="além das 5: thumbs com UMA palavra gigante em vermelho atrás do personagem + uma ironia (sorrindo com uma corda, o rosto num prato…). O estilo de arte do canal não muda"><input type="checkbox" id="thAlbert" style="width:auto;margin:0" checked> + <input type="number" id="thAlbertN" min="1" max="4" value="3" style="width:46px;margin:0;padding:2px"> 🔥 palavra gigante</label>
     <select id="thAlbertEstilo" style="width:auto;margin:0;padding:2px 4px;font-size:.82rem" title="estilo de arte das thumbs palavra gigante"><option value="marcado">🎨 estilo: o marcado abaixo</option><option value="canal">📺 estilo: o do canal</option></select>
     <button type="button" id="thSoAlbert" style="width:auto;margin:0;padding:5px 12px;background:#dc2626;" title="a IA cria SÓ thumbnails no estilo palavra gigante, bem provocativas: UMA palavra-rótulo enorme atrás do personagem, ele vivendo o tema de um jeito absurdo e sorrindo como se fosse normal">🔥 Só palavra gigante</button>
     <button type="button" id="thTitTodas" style="width:auto;margin:0;padding:5px 12px;background:#0f766e;" title="2 títulos novos pra CADA thumbnail, casados com a palavra e a cena dela (a thumb não muda)">🏷 Títulos pra todas as thumbs</button>
     <button type="button" id="thNova" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">➕ Nova ideia</button>
     <button type="button" id="thAtualizar" style="width:auto;margin:0;padding:5px 12px;background:#64748b;">🔄</button>
     <span id="thSt" style="font-size:.85rem;color:#555;"></span>
+  </div>
+  <div style="margin-top:6px;font-size:.82rem;color:#334155;display:flex;gap:6px;align-items:center;flex-wrap:wrap" title="🧠 v84_448: as ideias de thumb e os títulos podem sair de um modelo maior (pensa melhor a palavra, a ironia e o título). Vale só pros botões desta caixa — o resto do site continua no modelo padrão.">
+    <b>🧠 Modelo pras ideias e títulos:</b>
+    <select id="thModelo" style="width:auto;margin:0;padding:2px 4px;font-size:.82rem"><option value="">padrão (Haiku)</option></select>
+    <span id="thCusto" style="color:#666"></span>
   </div>
   <div id="thEstilosBox" style="margin-top:8px;font-size:.82rem;color:#334155"><b>🎨 Estilos de arte pras ideias novas</b> <span style="color:#666">(marque um ou mais: o 🤖 +5 ideias distribui as ideias entre eles; nenhum marcado = o estilo do canal)</span>
     <div id="thEstilos" style="display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:3px"></div></div>
@@ -97,18 +102,18 @@
   });
   $h('thTitTodas').addEventListener('click', async () => {
     const b = $h('thTitTodas'); b.disabled = true; $h('thSt').textContent = '🏷 a IA está casando 2 títulos com cada thumbnail…';
-    try { const d = await post(BASE + '/titulos', {}); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ títulos pra ${d.feitos} thumb(s)`; }
+    try { const d = await post(BASE + '/titulos', { modelo: $h('thModelo').value }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ títulos pra ${d.feitos} thumb(s)`; }
     catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   });
   $h('thSoAlbert').addEventListener('click', async () => {
     const b = $h('thSoAlbert'); b.disabled = true; const q = Number($h('thAlbertN').value || 3) || 3;
     $h('thSt').textContent = `🔥 a IA está criando ${q} thumbnails de palavra gigante…`;
-    try { const d = await post(BASE + '/ia', { n: 0, albert: q, estilos: lerMarcados(), estilo_albert: $h('thAlbertEstilo').value }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s) 🔥`; }
+    try { const d = await post(BASE + '/ia', { n: 0, albert: q, estilos: lerMarcados(), estilo_albert: $h('thAlbertEstilo').value, modelo: $h('thModelo').value }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s) 🔥`; }
     catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   });
   $h('thIA').addEventListener('click', async () => {
     const b = $h('thIA'); b.disabled = true; $h('thSt').textContent = '🤖 a IA está criando 5 thumbnails diferentes…';
-    try { const d = await post(BASE + '/ia', { n: 5, estilos: lerMarcados(), albert: $h('thAlbert').checked ? Number($h('thAlbertN').value || 2) : 0, estilo_albert: $h('thAlbertEstilo').value }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s)`; }
+    try { const d = await post(BASE + '/ia', { n: 5, estilos: lerMarcados(), albert: $h('thAlbert').checked ? Number($h('thAlbertN').value || 3) : 0, estilo_albert: $h('thAlbertEstilo').value, modelo: $h('thModelo').value }); itens = d.itens; desenhar(); $h('thSt').textContent = `✅ ${d.novas} ideia(s) nova(s)`; }
     catch (e) { $h('thSt').textContent = '⚠ ' + e.message; } finally { b.disabled = false; }
   });
   if (new URLSearchParams(location.search).get('ia') === '1') { history.replaceState(null, '', location.pathname); setTimeout(() => $h('thIA').click(), 300); }
@@ -118,6 +123,37 @@
     const texto = prompt('Texto grande na thumb (2 a 4 palavras):', '') || '';
     try { const d = await post(BASE + '/editar', { novo: true, ideia, texto }); itens = d.itens; desenhar(); } catch (e) { $h('thSt').textContent = '⚠ ' + e.message; }
   });
+  // 💲 v84_448: o custo estimado de cada botão em cada modelo (pelo tamanho do roteiro deste vídeo)
+  let custos = null;
+  const usd = v => v < 0.01 ? 'menos de US$ 0,01' : 'US$ ' + v.toFixed(2).replace('.', ',');
+  function mostrarCusto() {
+    if (!custos) return;
+    const v = $h('thModelo').value || '';
+    if (v.startsWith('cc:')) {
+      $h('thCusto').innerHTML = custos.claude_code_instalado
+        ? '🟠 pela sua assinatura do Claude: <b>não cobra na API</b> — só usa a cota do seu plano (demora um pouco mais)'
+        : '⚠ o Claude Code não foi achado neste PC — <a href="/ia#assinatura">veja como conectar em 🤖 IA</a>';
+      return;
+    }
+    const m = custos.modelos.find(x => x.id === (v || 'claude-haiku-5-5')) || custos.modelos[0];
+    const base = custos.modelos[0];
+    const extra = k => m.usd[k] - base.usd[k];
+    $h('thCusto').textContent = custos.assinatura
+      ? '(você usa a assinatura: não cobra na API — só gasta mais da cota)'
+      : `+5 ideias ≈ ${usd(m.usd.ideias)} · 🔥 só palavra gigante ≈ ${usd(m.usd.albert)} · 🏷 títulos ≈ ${usd(m.usd.titulos)}`
+        + (m.id !== base.id ? ` (a mais que o padrão: ≈ ${usd(extra('ideias'))} / ${usd(extra('albert'))} / ${usd(extra('titulos'))})` : '');
+  }
+  fetch(BASE + '/custos').then(r => r.json()).then(d => {
+    if (!d || !d.modelos) return; custos = d;
+    const sel = $h('thModelo');
+    d.modelos.slice(1).forEach(x => { const o = document.createElement('option'); o.value = x.id;
+      o.textContent = `🧠 ${x.nome} pela API (+5 ideias ≈ ${usd(x.usd.ideias)})`; sel.appendChild(o); });
+    (d.claude_code || []).forEach(x => { const o = document.createElement('option'); o.value = x.id;
+      o.textContent = `🟠 ${x.nome}` + (d.claude_code_instalado ? ' — sem custo de API' : ' — não instalado'); sel.appendChild(o); });
+    try { const v = localStorage.getItem('thModelo'); if (v && [...sel.options].some(o => o.value === v)) sel.value = v; } catch (e) {}
+    mostrarCusto();
+  }).catch(() => {});
+  $h('thModelo').addEventListener('change', () => { try { localStorage.setItem('thModelo', $h('thModelo').value); } catch (e) {} mostrarCusto(); });
   window.thumbsRecarregar = carregar;
   carregar();
 })();

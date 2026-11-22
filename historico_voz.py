@@ -78,8 +78,10 @@ def registrar(pasta: str, jid: str, status: Dict[str, Any], voz: str = "") -> Di
     return e
 
 
-def listar(pasta: str, q: str = "", limite: int = 100, pagina: int = 0) -> Dict[str, Any]:
+def listar(pasta: str, q: str = "", limite: int = 100, pagina: int = 0, id_: str = "") -> Dict[str, Any]:
     itens = sorted(_ler(pasta), key=lambda x: -float(x.get("criado") or x.get("terminou") or 0))  # 🔝 v84_422: o mais novo em cima
+    if id_:  # 🎙 v84_448: só esta narração (vindo do card da Galeria) — o id inteiro ou o começo dele ("voz 3ead6ef6.zip")
+        itens = [x for x in itens if str(x.get("id") or "").startswith(id_)]
     for it in itens:  # arquivo apagado por fora (ex.: 🧹 Espaço em disco)
         it["sumiu"] = bool(it.get("arquivo")) and not os.path.exists(os.path.join(pasta, it["arquivo"]))
     if q:
