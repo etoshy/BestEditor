@@ -1122,10 +1122,32 @@ function mvPrevia() {
     if (!texto.trim()) { box.innerHTML = ''; return; }
     const r = await fetch('/gerar-voz/vozes/conferir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) });
     const d = await r.json();
-    box.innerHTML = (d.desconhecidas && d.desconhecidas.length ? `<div class="mv-aviso">⚠ Tag sem voz cadastrada: ${d.desconhecidas.map(x => '<code>[' + mvEsc(x) + ']</code>').join(', ')} — cadastre a voz com esse slug ou corrija (senão não dá pra gerar).</div>` : '')
+    const sug = d.sugestoes || {};
+    box.innerHTML = (d.desconhecidas && d.desconhecidas.length ? `<div class="mv-aviso">⚠ Tag sem voz cadastrada: ${d.desconhecidas.map(x => '<code>[' + mvEsc(x) + ']</code>'
+        + (sug[x] ? ` <button type="button" class="mv-trocar" data-de="${mvEsc(x)}" data-para="${mvEsc(sug[x])}" style="width:auto;margin:0 2px;padding:0 6px;font-size:.75rem" title="troca todas as [${mvEsc(x)}] do texto">→ usar [${mvEsc(sug[x])}]</button>` : '')).join(', ')}
+        — cadastre a voz com esse slug (em 🎭 Vozes com slug) ou corrija${Object.keys(sug).length ? ' (o botão → troca pela voz cadastrada mais parecida)' : ''}. Senão não dá pra gerar.
+        ${Object.keys(d.perfis || {}).length ? `<div style="margin-top:4px">🗣️ ${Object.keys(d.perfis).map(x => '<code>[' + mvEsc(x) + ']</code>').join(', ')} ${Object.keys(d.perfis).length > 1 ? 'têm' : 'tem'} perfil de voz com o mesmo nome — <button type="button" id="mv-criar-perfis" data-tags="${mvEsc(JSON.stringify(Object.keys(d.perfis)))}" style="width:auto;margin:0 2px;padding:1px 8px;font-size:.78rem;background:#16a34a;color:#fff">➕ criar ${Object.keys(d.perfis).length > 1 ? 'essas vozes' : 'essa voz'} (${mvEsc(d.motor_perfis || 'chatterbox')}, igual às outras)</button> <span style="font-size:.75rem;color:#666">(ou só gere: o site cria sozinho)</span></div>` : ''}
+        ${d.desconhecidas.length > Object.keys(sug).length + Object.keys(d.perfis || {}).length ? ' <button type="button" id="mv-tirar-desc" style="width:auto;margin:0 2px;padding:0 6px;font-size:.75rem" title="apaga do texto as tags sem voz (o trecho continua na voz de antes)">✂ tirar as tags sem voz</button>' : ''}</div>` : '')
       + (d.falas || []).map(f => `<div class="mv-fala" style="border-left-color:${f.cor}"><b style="color:${f.cor}">${mvEsc(f.nome)}</b> ${mvEsc(f.texto.length > 160 ? f.texto.slice(0, 160) + '…' : f.texto)}</div>`).join('');
   }, 350);
 }
+document.getElementById('mv-previa').addEventListener('click', (e) => {  // 🎭 v84_456: corrigir as tags sem voz
+  const ta = document.getElementById('texto-narrar');
+  const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (e.target.classList.contains('mv-trocar')) {
+    ta.value = ta.value.replace(new RegExp('\\[\\s*' + esc(e.target.dataset.de) + '\\s*\\]', 'g'), '[' + e.target.dataset.para + ']');
+  } else if (e.target.id === 'mv-criar-perfis') {
+    e.target.disabled = true;
+    fetch('/gerar-voz/vozes/dos-perfis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: JSON.parse(e.target.dataset.tags) }) })
+      .then(r => r.json()).then(d => { if (d.vozes && typeof mvDesenhar === 'function') mvDesenhar(d); mvPrevia(); }).catch(() => { e.target.disabled = false; });
+    return;
+  } else if (e.target.id === 'mv-tirar-desc') {
+    [...e.target.closest('.mv-aviso').querySelectorAll('code')].map(c => c.textContent.slice(1, -1))
+      .filter(x => !e.target.closest('.mv-aviso').querySelector(`.mv-trocar[data-de="${CSS.escape(x)}"]`))
+      .forEach(x => { ta.value = ta.value.replace(new RegExp('\\[\\s*' + esc(x) + '\\s*\\]\\s*', 'g'), ''); });
+  } else return;
+  ta.dispatchEvent(new Event('input'));
+});
 document.getElementById('texto-narrar').addEventListener('input', mvPrevia);
 document.getElementById('mv-ativo').addEventListener('change', (e) => { document.getElementById('mv-detalhes').style.display = e.target.checked ? '' : 'none'; mvPrevia(); });
 fetch('/gerar-voz/vozes').then(r => r.json()).then(mvDesenhar);

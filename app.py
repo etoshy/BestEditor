@@ -1514,7 +1514,21 @@ def multivoz_conferir():
         v = vozes.get(f["slug"]) if f["slug"] else None
         f["nome"] = v["nome"] if v else "voz padrão"
         f["cor"] = v["cor"] if v else "#9AA0A6"
-    return jsonify({"ok": True, **d})
+    return jsonify({"ok": True, **d, "sugestoes": mv.sugerir(d["desconhecidas"], vozes),
+                    "perfis": mv.perfis_das_tags(d["desconhecidas"]), "motor_perfis": mv.motor_dos_perfis(vozes)})
+
+
+@app.route("/gerar-voz/vozes/dos-perfis", methods=["POST"])
+def multivoz_dos_perfis():
+    """🗣️ v84_456: cria as vozes com slug das tags que têm um perfil de voz com o mesmo nome ([Marcio_Seixas])."""
+    import multivoz as mv
+    corpo = request.get_json(silent=True) or {}
+    try:
+        feitas = mv.criar_vozes_dos_perfis([str(x) for x in corpo.get("tags") or []])
+    except mv.MultiVozError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    return jsonify({"ok": True, "feitas": [{"slug": v["slug"], "nome": v["nome"], "motor": v["motor"]} for v in feitas],
+                    "vozes": _vozes_json()})
 
 
 @app.route("/gerar-voz/vozes/<slug>/testar", methods=["POST"])

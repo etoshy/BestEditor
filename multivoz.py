@@ -223,6 +223,75 @@ def _tags_extras() -> set:
         return set()
 
 
+def _estilos() -> Dict[str, Dict[str, float]]:
+    """🎭 v84_456: as tags de ESTILO do Expressivo ([dramatica], [ironica], [seria], [suspense], [agressiva], [camarada]…)
+    valem no multi voice: viram a emoção/velocidade da fala (não são nome de voz)."""
+    import sys
+    pasta = os.path.join(_AQUI, "toolkit")
+    if pasta not in sys.path:
+        sys.path.insert(0, pasta)
+    try:
+        from tts.expressivo import ESTILOS, SINONIMOS_ESTILO
+    except Exception:  # noqa: BLE001
+        return {}
+    out: Dict[str, Dict[str, float]] = {}
+    for nome in list(ESTILOS) + list(SINONIMOS_ESTILO):
+        e, c, v = ESTILOS[SINONIMOS_ESTILO.get(nome, nome)]
+        out[slugify(nome)] = {k: x for k, x in (("exag", e), ("cfg", c), ("vel", v)) if x is not None}
+    return out
+
+
+def _perfis() -> List[str]:
+    import sys
+    pasta = os.path.join(_AQUI, "toolkit")
+    if pasta not in sys.path:
+        sys.path.insert(0, pasta)
+    try:
+        from tts.voice_generator import listar_perfis_de_voz
+        return list(listar_perfis_de_voz())
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def perfis_das_tags(desconhecidas: List[str], perfis: Optional[List[str]] = None) -> Dict[str, str]:
+    """🗣️ v84_456: [Marcio_Seixas] sem voz com slug, mas existe o PERFIL de voz "Marcio_Seixas" → dá pra criar a voz dele."""
+    perfis = _perfis() if perfis is None else perfis
+    por = {slugify(p): p for p in perfis}
+    return {d: por[slugify(d)] for d in desconhecidas if slugify(d) in por}
+
+
+def motor_dos_perfis(vozes: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
+    """O motor que as suas vozes de PERFIL já usam (a nova sai igual às outras); senão o Chatterbox."""
+    vozes = por_slug() if vozes is None else vozes
+    ms = [v.get("motor") for v in vozes.values() if (v.get("config") or {}).get("vozPerfil") and v.get("motor") in MOTORES]
+    return max(set(ms), key=ms.count) if ms else "chatterbox"
+
+
+def criar_vozes_dos_perfis(desconhecidas: List[str]) -> List[Dict[str, Any]]:
+    """Cria (com o motor das outras vozes de perfil) as vozes das tags que têm perfil com o mesmo nome."""
+    motor = motor_dos_perfis()
+    feitas = []
+    for _tag, perfil in perfis_das_tags(desconhecidas).items():
+        feitas.append(voz_de_perfil(perfil, motor))
+    return feitas
+
+
+def sugerir(desconhecidas: List[str], vozes: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, str]:
+    """[Marcio_Seixas] sem voz → a voz cadastrada mais parecida (pelo slug ou pelo nome), se houver uma bem parecida."""
+    import difflib
+    vozes = por_slug() if vozes is None else vozes
+    alvos = {slugify(v.get("nome") or s): s for s, v in vozes.items()} | {s: s for s in vozes}
+    out = {}
+    for d in desconhecidas:
+        sd = slugify(d)
+        m = difflib.get_close_matches(sd, list(alvos), n=1, cutoff=0.6)
+        if not m:  # "marcio" ⊂ "marcio_seixas" e vice-versa
+            m = [a for a in alvos if sd and (sd in a or a in sd) and min(len(a), len(sd)) >= 4][:1]
+        if m:
+            out[d] = alvos[m[0]]
+    return out
+
+
 def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padrao: Optional[str] = None,
             voz_inicial: Optional[str] = None) -> Dict[str, Any]:
     """Quebra o texto nas tags de voz. Devolve {"falas": [{"slug", "texto"}],
@@ -233,6 +302,7 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
     import chamadas as _ch
     texto = _ch.remover_marcadores(texto or "")  # [[INSCREVA: ...]] não é tag de voz (ver chamadas.py)
     extras = _tags_extras()
+    estilos = _estilos()
     falas: List[Dict[str, Any]] = []
     desconhecidas: List[str] = []
     atual = voz_inicial
@@ -260,6 +330,18 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
             fecha()
             atual = s
             ajustes = ler_ajustes(mods)  # 🎭 v84_173: emoção desta fala — [mira|exag=0.7|cfg=0.3|vel=1.05]
+            pos = m.end()
+        elif s in estilos and not mods:  # 🎭 v84_456: [dramatica] → a emoção desta fala (até a próxima tag)
+            buf += texto[pos:m.start()]
+            fecha()
+            ajustes = dict(estilos[s])
+            pos = m.end()
+            if atual and (vozes.get(atual) or {}).get("motor") == "fish_s2":
+                buf += m.group(0)  # o Fish S2 entende instrução entre colchetes: a tag fica no texto dele
+        elif re.fullmatch(r"(?i)(velocidade|vel|speed)\s*[=:]?\s*\d+(?:[.,]\d+)?x?", bruto):  # [velocidade 0.9]
+            buf += texto[pos:m.start()]
+            fecha()
+            ajustes = dict(ajustes, **ler_ajustes("vel=" + re.search(r"\d+(?:[.,]\d+)?", bruto).group(0)))
             pos = m.end()
         elif bruto.lower() in extras or " " in bruto.strip():
             continue  # tag de emoção (Chatterbox Turbo / Fish S2, ex.: [excited], [whisper in small voice]): fica no texto
@@ -352,6 +434,11 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
     log = on_log or (lambda _m: None)
     vozes = por_slug()
     d = dividir(texto, vozes)
+    if d["desconhecidas"] and perfis_das_tags(d["desconhecidas"]):  # 🗣️ v84_456: tem perfil com esse nome → cria a voz
+        for v in criar_vozes_dos_perfis(d["desconhecidas"]):
+            log(f"🗣️ criei a voz [{v['slug']}] a partir do perfil {v['config'].get('vozPerfil')} ({v['motor']})")
+        vozes = por_slug()
+        d = dividir(texto, vozes)
     if d["desconhecidas"]:
         raise MultiVozError("Tag(s) sem voz cadastrada: " + ", ".join(f"[{x}]" for x in d["desconhecidas"])
                             + ". Cadastre a voz com esse slug (🎭 Vozes) ou corrija o texto — senão o nome seria lido em voz alta.")
