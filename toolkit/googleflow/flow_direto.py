@@ -64,8 +64,12 @@ S = {
     # janela larga: o Agente vira um PAINEL à direita ("Sessão sem título" / "Olá, … O que você quer criar?") com a
     # própria caixa e SEM o chip "Agente"; fechar o painel (X) = agente desligado → volta a caixa principal.
     "painel_sessao": ('flow-agent-panel:has(button.header-action[aria-label="Iniciar nova sessão"]), '
+                      'flow-agent-panel:has(.agent-panel-header), flow-agent-panel:has(button[aria-label="Abrir histórico de sessões"]), '
                       'flow-agent-panel:has(flow-creative-agent-prompt-box)'),
+    # v84_454 (HTML real, nov/2026): o X do painel perdeu a classe "header-action" (ícone right_panel_close)
     "painel_fechar": ('flow-agent-panel button.header-action[aria-label="Fechar"], '
+                      'flow-agent-panel .agent-panel-header button[aria-label="Fechar"], flow-agent-panel button[aria-label="Fechar"], '
+                      'flow-agent-panel button:has(mat-icon:text-is("right_panel_close")), '
                       'button.header-action[aria-label="Fechar"]'),
     "agente_painel": "flow-settings-view",
     "agente_nunca": '.confirm-policy-group mat-radio-button:has(input[value="2"])',

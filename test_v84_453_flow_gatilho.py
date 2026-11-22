@@ -81,3 +81,20 @@ def test_interruptor_novo_do_agente_html_real():
         assert page.get_attribute('flow-agent-mode-switch button', 'aria-pressed') == 'false'
         assert fd._primeiro(page, fd.S["gatilho"], 2) is not None
         b.close()
+
+
+def test_painel_do_agente_fecha_html_real():
+    """HTML real (nov/2026): janela larga abre o PAINEL do agente; o X dele perdeu a classe header-action."""
+    import os
+    from playwright.sync_api import sync_playwright
+    html = open(os.path.join(os.path.dirname(__file__), "testes_dados", "flow_painel_agente_2026-11.html"), encoding="utf-8").read()
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page(viewport={"width": 1400, "height": 900})
+        page.set_content(html)
+        page.evaluate("""() => { const x = document.querySelector('flow-agent-panel button[aria-label="Fechar"]');
+          x.addEventListener('click', () => document.querySelector('flow-agent-panel').remove()); }""")
+        assert fd._primeiro(page, fd.S["painel_sessao"], 1) is not None
+        fd.ligar_agente(page, False)  # antes: 'não achei o X ("Fechar") do painel do agente'
+        assert page.locator("flow-agent-panel").count() == 0
+        b.close()
