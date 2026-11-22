@@ -465,6 +465,9 @@ REGRA_SEM_PESSOAL = (
     "citações a vídeos e conteúdos anteriores (\"como falei no vídeo passado\", \"no meu canal\", \"parte 2\", \"link aqui em "
     "cima\"), menções a inscritos, lives, patrocinadores ou ao canal deles, nem detalhes muito pessoais/íntimos de alguém que "
     "não são necessários pra contar a história. Use só os FATOS; se uma ideia importa, reescreva de forma neutra e geral. "
+    # 🚫 v84_444: um vídeo inteiro virou a briga de quem deu a aula com um professor da USP (com nome e acusações)
+    "POLÊMICAS DE QUEM FALA COM PESSOAS VIVAS (um colega, um professor, um jornalista, um político que ele critica pelo "
+    "nome) NÃO entram: nem o nome do alvo, nem as acusações. Se há uma IDEIA por trás, ela entra sozinha, sem o alvo. "
     # 🩹 v84_410: o roteiro dizia "segundo a leitura das notas", "como propõem as notas" — quem assiste não sabe que notas são
     "NUNCA fale com quem assiste sobre o MATERIAL de onde o roteiro saiu (\"segundo as notas\", \"como propõem as notas\", "
     "\"a transcrição diz\", \"o texto\", \"o material\", \"as anotações\", \"a fonte\") e NÃO credite quem fez a fonte "
@@ -495,6 +498,9 @@ REGRA_FALA = (
     "pergunta do vídeo duas vezes seguidas). "
     "O VÍDEO TERMINA DE VERDADE: o último bloco fecha a ideia, faz o pedido de comentário e a despedida do canal — "
     "nunca acaba seco no meio de um raciocínio. "
+    "FONTES NA DESCRIÇÃO: perto do fim (antes do pedido de comentário), UMA frase curta e natural dizendo que as fontes "
+    "e referências do vídeo — e qualquer correção, se aparecer — estão na descrição (ex.: \"as fontes que usei estão na "
+    "descrição, e se algo precisar de correção, é lá que ela vai estar\"); só uma vez no vídeo. "
     "EXEMPLO DO DIA A DIA NÃO SE REPETE: a mesma situação (o amigo de anos, a porta trancada…) entra UMA vez; para a "
     "próxima ideia, use outra situação. "
     "CITAÇÃO NA FALA: autor + obra (ex.: \"Louis Lavelle, em A Intimidade Espiritual\") — sem ano, página, edição ou nome "
@@ -1295,7 +1301,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         L.append(json.dumps({
             "plano": metodo_roteiro.PLANO_JSON,
             "escopo": metodo_roteiro.ESCOPO_JSON,
-            "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)" + (" + os do estilo palavra gigante, no fim" if __import__("thumbs_flow").ativo_albert() else "")],
+            "titulos": ["5 títulos (até ~50 caracteres, curtos e chamativos, cada um numa fórmula diferente da lista de títulos)" + (" + os do estilo palavra gigante, no fim" if __import__("thumbs_flow").ativo_albert() else "")],
             "capitulos": roteiro_partes.exemplo_capitulos(),
             "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
             "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
@@ -1318,7 +1324,7 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
         "roteiro": "Texto narrado COMPLETO, no tamanho pedido... [I3] frase em que a imagem I3 aparece...",
         "plano": metodo_roteiro.PLANO_JSON,
         "escopo": metodo_roteiro.ESCOPO_JSON,
-        "titulos": ["5 títulos (até ~60 caracteres, cada um numa fórmula diferente da lista de títulos)" + (" + os do estilo palavra gigante, no fim" if __import__("thumbs_flow").ativo_albert() else "")],
+        "titulos": ["5 títulos (até ~50 caracteres, curtos e chamativos, cada um numa fórmula diferente da lista de títulos)" + (" + os do estilo palavra gigante, no fim" if __import__("thumbs_flow").ativo_albert() else "")],
         "ideias": ["ideias de ganchos / vídeos derivados"],
         "thumbnails": __import__("thumbs_flow").EXEMPLO_JSON,
         "descricao": "descrição do caso pra descrição do YouTube (2-4 parágrafos, sem os capítulos — o site monta os tempos)",
@@ -1416,7 +1422,18 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     _lg = metodo_roteiro.aviso_longo(metodo_roteiro.palavras_do_texto(voz), _alvo, _min, _ppm)
     if _lg:
         avisos.insert(0, "📏 " + _lg)
-    return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": bool(_av), "longo": bool(_lg)},"titulos": [str(x)[:150] for x in d.get("titulos") or [] if str(x).strip()][:10],
+    _tits = [" ".join(str(x).split())[:150] for x in d.get("titulos") or [] if str(x).strip()][:10]
+    _tits = [t for t in _tits if not _mr.copiou_exemplo(t)] or _tits  # 🚫 v84_446: título copiado do exemplo da regra
+    _longos = [t for t in _tits if len(t) > _mr.TITULO_MAX + 10]
+    if _longos:  # ✍ v84_445: os curtos primeiro; os longos ficam no fim, com aviso
+        _tits = [t for t in _tits if t not in _longos] + _longos
+        avisos.append(f"🏷 {len(_longos)} título(s) longo(s) demais (mais de {_mr.TITULO_MAX + 10} caracteres — no celular são "
+                      "cortados): ficaram no fim da lista.")
+    _acad = [t for t in _tits if _mr.titulo_academico(t) and t not in _longos]
+    if _acad and len(_acad) < len(_tits):  # 🗣 v84_445: "Determinismo e Liberdade: …" — com cara de aula vai pro fim
+        _tits = [t for t in _tits if t not in _acad and t not in _longos] + _acad + _longos
+        avisos.append(f"🗣 {len(_acad)} título(s) com palavra de aula (o público médio não clica): ficaram no fim da lista.")
+    return {"alvo": {"minutos": _min, "palavras": _alvo, "ppm": _ppm, "curto": bool(_av), "longo": bool(_lg)},"titulos": _tits,
             "ideias": _ideias_com_escopo(d.get("ideias"), _esc),
             **({"escopo": _esc} if _esc else {}),
             "descricao": str(d.get("descricao") or "").strip()[:5000], "capitulos": caps, "palavras": n_pal,
@@ -1869,6 +1886,8 @@ def descricao_completa(p: Dict[str, Any]) -> str:
         txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']}" + f" ({f.get('site') or ''}): {f['url']}" for f in fontes)
     if fw:
         txt += "\n\n" + fw
+    if (fw or fontes) and "Correç" not in txt:  # 📌 v84_444: o vídeo diz que as correções ficam aqui
+        txt += "\n\n📌 Correções: se algum detalhe deste vídeo precisar de correção, ela fica aqui na descrição."
     return txt.strip()
 
 

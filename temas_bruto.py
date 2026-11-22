@@ -237,7 +237,11 @@ datas de aula, apresentações) e as histórias pessoais.
 
 Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozinho (quem nunca viu o canal entende).
 {_regra_divisao(a)}
-- "titulo": o título do vídeo em português, chamativo e honesto (estilo YouTube; pergunta ou promessa clara), até 80 caracteres.
+- NÃO é tema: a tese ou a polêmica PESSOAL de quem dá a aula (as brigas dele com um professor, um jornalista, uma
+  universidade, um político, citados pelo nome) nem a análise do próprio discurso de quem fala. O tema é a IDEIA (um
+  pensador, um conceito, uma obra, um problema), contada pelo narrador do canal, sem dono e sem alvo.
+- "titulo": o título do vídeo em português, CURTO (até 50 caracteres), chamativo e honesto (estilo YouTube: uma ideia só,
+  palavras concretas, curiosidade ou conflito — nada de "filosofia", "interpretação", "análise" nem duas partes coladas).
 - "tema": em uma frase, a ideia central do vídeo.
 - "pontos": de 3 a 7 tópicos curtos do que o vídeo cobre, NA ORDEM em que o vídeo contaria, com o que o texto diz
   (argumentos, exemplos, autores e obras citados).

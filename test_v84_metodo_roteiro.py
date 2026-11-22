@@ -77,9 +77,9 @@ def test_short_e_ate_60_segundos():
 
 def test_titulos_sempre_nas_formulas_do_kit():
     """v84_52: todo título que o site pede segue as 20 fórmulas (Kit Iniciante YouTube, cap. 05)."""
-    assert len(mr.FORMULAS_TITULO) == 20 and mr.TITULO_MAX == 60
+    assert len(mr.FORMULAS_TITULO) == 25 and mr.TITULO_MAX == 50  # v84_445
     b = mr.bloco_titulos(5)
-    for chave in ("[Tema] Explicado em [N] Minutos", "O Lado Sombrio de [algo]", "Eu Testei [X] por [tempo]", "até ~60 caracteres",
+    for chave in ("[Tema] Explicado em [N] Minutos", "O Lado Sombrio de [algo]", "Eu Testei [X] por [tempo]", "de 25 a 50 caracteres",
                   "PALAVRA PRINCIPAL no começo", "PROMESSA", "NUNCA minta no título", "fórmulas DIFERENTES"):
         assert chave in b, chave
     p = {"id": "x", "produto": {"titulo": "Garrafa"}, "config": {}, "midias": [], "link": ""}

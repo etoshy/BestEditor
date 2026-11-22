@@ -293,6 +293,9 @@ def aplicar(roteiro: str, resposta: str, apagar: bool = True) -> Dict[str, Any]:
     import marcas_seguras  # 🔒 marca de imagem/cena que sumiu numa troca volta pro mesmo ponto
     texto, _volta = marcas_seguras.restaurar(str(roteiro or ""), texto, chamadas=False)
     import metodo_roteiro  # 🔁 v84_169: frase quase igual logo em seguida sai (mesmo se a IA não pegou)
+    # 🚫 v84_444: a checagem (às vezes a IA de fora, com internet) achava de quem é a aula e punha o nome de volta
+    texto = metodo_roteiro.tirar_meta_fonte(texto)
+    texto, _restos_nome = metodo_roteiro.tirar_nomes(texto, metodo_roteiro.nomes_proibidos())
     texto, repetidas = metodo_roteiro.tirar_repeticoes(texto)
     for x in repetidas:
         aplicadas.append({"de": x[:200], "para": "", "motivo": "repetição (site)"})

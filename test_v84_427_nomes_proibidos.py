@@ -17,7 +17,7 @@ def test_tira_as_atribuicoes_dos_roteiros_reais():
         t, restos = mr.tirar_nomes(antes, n)
         assert t == depois and not restos
     t, restos = mr.tirar_nomes("Olavo de Carvalho dizia que a filosofia é viva.", n)
-    assert restos  # não dá pra tirar sem quebrar a frase: avisa
+    assert t == "Há quem diga que a filosofia é viva." and not restos  # v84_444: tira também quando é o sujeito
 
 
 def test_regra_vai_em_todo_pedido_de_texto(monkeypatch):
@@ -45,3 +45,23 @@ def test_parte_e_resultado_limpam(monkeypatch):
     import roteiro_partes as rp
     monkeypatch.setattr(mr, "nomes_proibidos", lambda cfg=None: ["Olavo de Carvalho"])
     assert "Olavo" not in rp.ler_parte("Segundo Olavo de Carvalho, a filosofia é viva.", {"titulo": "x"})
+
+
+def test_v84_444_todas_as_formas_do_nome():
+    n = ["Olavo de Carvalho"]
+    casos = ["Na interpretação de Olavo de Carvalho, a ciência recorta.",
+             "Conforme essa interpretação atribuída a Olavo de Carvalho na aula de 13 de junho de 2009, um grupo ocupou.",
+             "Olavo recorre a Antonio Gramsci, e isso é interpretação de Olavo.",
+             "Para Olavo, a palavra remeteria. A tese de Olavo de Carvalho parte da ideia."]
+    for c in casos:
+        t, restos = mr.tirar_nomes(c, n)
+        assert "Olavo" not in t and not restos, t
+    assert "Olavo Bilac" in mr.tirar_nomes("O poeta Olavo Bilac escreveu.", n)[0]
+
+
+def test_v84_444_checagem_aplicada_tambem_tira():
+    import json
+    import revisao_roteiro as rr
+    d = rr.aplicar("Uma ideia forte sobre a ciência aqui.", json.dumps({"trocas": [
+        {"de": "Uma ideia forte sobre a ciência aqui.", "para": "Segundo Olavo de Carvalho, uma ideia forte sobre a ciência aqui."}]}))
+    assert "Olavo" not in d["texto"]

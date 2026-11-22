@@ -259,7 +259,8 @@ def prompt_parte(contexto: Dict[str, Any], partes: List[Dict[str, Any]], k: int,
         papel = ("ABERTURA: depois do gancho, apresente a tese do título com as palavras dele e mostre de relance os assuntos "
                  "que vêm como provas." if k == 1 else
                  "FECHAMENTO: volte à pergunta do vídeo e RESPONDA a ela somando as provas das partes anteriores (com os "
-                 "fatos; sem inventar pra confirmar) e termine com UMA pergunta/pedido de comentário ao público (um só)." if k == n else
+                 "fatos; sem inventar pra confirmar), diga numa frase curta que as fontes — e qualquer correção — estão na descrição, "
+                 "e termine com UMA pergunta/pedido de comentário ao público (um só)." if k == n else
                  "Comece com uma FRASE-PONTE que liga o assunto da parte anterior a este (nada de pulo seco) — CONTINUANDO a "
                  "conversa: NÃO abra com outra pergunta-gancho ao público (\"Você já reparou/percebeu/sentiu…?\"), isso é só "
                  "da abertura — e termine com uma frase que liga esta ideia à tese do vídeo, dita com as próprias ideias "

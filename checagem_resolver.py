@@ -61,7 +61,15 @@ REGRA_TROCA = (" CADA CORREÇÃO SUBSTITUI o trecho (\"de\" = a frase inteira co
 
 def regra_sem_fonte(pol: str, com_web: bool) -> str:
     """O passo 2 do prompt da checagem: o que fazer com o que está errado, velho ou sem confirmação."""
-    return _regra_sem_fonte(pol, com_web) + REGRA_TROCA
+    extra = ""
+    try:  # 🚫 v84_444: a IA de fora (com internet) descobria de quem é a aula e atribuía a tese a ele
+        import metodo_roteiro as _mr
+        extra = " " + _mr.regra_nomes(_mr.nomes_proibidos()) + (
+            " NUNCA diga de onde o roteiro saiu (aula, palestra, curso, data, \"o falante\", \"o trecho\"): uma tese sem "
+            "autor histórico fica como \"uma leitura possível\", na voz do narrador.")
+    except Exception:  # noqa: BLE001
+        pass
+    return _regra_sem_fonte(pol, com_web) + REGRA_TROCA + extra
 
 
 def _regra_sem_fonte(pol: str, com_web: bool) -> str:

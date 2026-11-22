@@ -171,6 +171,12 @@ FORMULAS_TITULO = [
     ("[Tema] do Pior ao Melhor", "Todos os Shreks do Pior ao Melhor"),
     ("[Tema]: a História Real", "Titanic: a História Real"),
     ("O Mistério de [caso]", "O Mistério do Navio Fantasma"),
+    # ✍ v84_445: as que funcionam em filosofia/comportamento (curtas, concretas, com "você" ou com conflito)
+    ("Você Não [verbo] — Você [verdade incômoda]", "Você Não Ama — Você Tem Medo"),
+    ("[Pensador] Estava Certo Sobre [coisa do dia a dia]", "Platão Estava Certo Sobre o Instagram"),
+    ("O Erro que Todo Mundo Comete Sobre [tema]", "O Erro que Todo Mundo Comete Sobre a Morte"),
+    ("A Ideia Mais Perigosa de [pensador]", "A Ideia Mais Perigosa de Nietzsche"),
+    ("Por que [coisa comum] Te Deixa [estado]", "Por que Ter Opção Te Deixa Infeliz"),
     ("Como [algo] Realmente Funciona", "Como a Bolsa Realmente Funciona"),
     ("[N] Sinais de que [situação]", "7 Sinais de que Seu Cachorro te Ama"),
     ("Eu Testei [X] por [tempo]", "Eu Testei Acordar às 5h por 30 Dias"),
@@ -178,15 +184,56 @@ FORMULAS_TITULO = [
     ("[Coisa] que Você Usa Errado", "5 Coisas que Você Usa Errado na Cozinha"),
     ("O Lado Sombrio de [algo]", "O Lado Sombrio da Disney"),
 ]
-TITULO_MAX = 60
+TITULO_MAX = 50  # ✍ v84_445: era 60 — no celular corta perto de 50 e título longo perde o clique
+
+
+# 🗣 v84_445: o público é o brasileiro MÉDIO — título e palavra da thumb em português de conversa, não de faculdade
+REGRA_POVO = (
+    "LINGUAGEM DO POVO: escreva pro brasileiro médio que rola o feed no celular — nada de palavra que ele não usa no dia a dia. "
+    "PROIBIDO no título: nome de corrente ou conceito acadêmico (determinismo, livre-arbítrio, existencialismo, "
+    "epistemologia, ontologia, metafísica, niilismo, dialética, estoicismo, hermenêutica, fenomenologia, cultura, "
+    "herança, conhecimento, sociedade…) e abrir com \"Tema e Tema:\" ou \"Tema. \". Troque o conceito pela SITUAÇÃO que "
+    "ele descreve, dita como gente fala (\"Determinismo e Liberdade\" → \"Você Não Escolhe Nada\"; \"Cultura e "
+    "Herança\" → \"Por Que Ninguém Lê Mais\" — esses dois são só pra mostrar a TROCA; NUNCA use esses títulos nem copie as "
+    "palavras deles: o título sai do assunto DESTE vídeo). Nome de pensador famoso (Nietzsche, Platão, Freud, Jung) pode, como "
+    "isca, mas o resto do título é fala do dia a dia. TESTE: sua mãe, seu tio ou um adolescente entenderiam na hora e "
+    "ficariam curiosos? Se não, reescreva.")
+_ACADEMICO = re.compile(r"\b(determinismo|livre[- ]arb[ií]trio|existencialis\w*|epistemolog\w*|ontolog\w*|metaf[ií]sic\w*|"
+                        r"niilis\w*|dial[ée]tic\w*|estoicis\w*|hermen[êe]utic\w*|fenomenolog\w*|teleolog\w*|"
+                        r"contempor[âa]ne\w*|paradigma\w*|dicotomia\w*|transcend[êe]nci\w*|imanen\w*|axiolog\w*)\b", re.I)
+
+
+# títulos que só existem como EXEMPLO nas regras — se a IA devolver igual, foi cópia (cai fora)
+EXEMPLOS_TITULO = ("Você Não Escolhe Nada", "Por Que Ninguém Lê Mais", "Você Não Escolhe Nada — e Gosta",
+                   "Por Que Você Só Finge Que Lê")
+
+
+def copiou_exemplo(t: str) -> bool:
+    n = re.sub(r"[^\wÀ-ú ]", "", str(t or "")).lower().split()
+    return any(n == re.sub(r"[^\wÀ-ú ]", "", e).lower().split() for e in EXEMPLOS_TITULO)
+
+
+def titulo_academico(t: str) -> bool:
+    """Título com cara de aula: termo acadêmico, ou o formato \"Tema e Tema: …\" / \"Conceito. Pergunta?\" abstrato."""
+    t = str(t or "")
+    return bool(_ACADEMICO.search(t) or re.match(r"^\s*[A-ZÀ-Ú][\wÀ-ú]+ (e|ou) [A-ZÀ-Ú]?[\wÀ-ú]+\s*[:.]", t)
+                or re.match(r"^\s*(conhecimento|cultura|sociedade|linguagem|raz[ãa]o|consci[êe]ncia|exist[êe]ncia|liberdade|"
+                            r"heran[çc]a|moral|[ée]tica|ideologia|identidade|subjetividade|tradi[çc][ãa]o|hist[óo]ria)\s*[:.]", t, re.I))
 
 
 def bloco_titulos(qtd: int = 5, idioma: str = "") -> str:
     """Regras + fórmulas de título pra pôr no prompt (todo título que o site pede à IA)."""
     formulas = "\n".join(f"  - {f}  (ex.: {e})" for f, e in FORMULAS_TITULO)
     return ("## 🏷 Títulos — SEMPRE nesta estrutura\n"
-            f"- Cada título: curto (até ~{TITULO_MAX} caracteres), com a PALAVRA PRINCIPAL no começo e uma PROMESSA que o vídeo "
-            "cumpre de verdade.\n"
+            f"- Cada título: CURTO — de 25 a {TITULO_MAX} caracteres (no celular o resto é cortado) —, com a PALAVRA PRINCIPAL "
+            "no começo e uma PROMESSA que o vídeo cumpre de verdade.\n"
+            "- UMA ideia só por título: nada de duas partes coladas (\"X: o que Y e por que Z\"), nada de subtítulo explicando. "
+            "Palavras CONCRETAS e com emoção (medo, mentira, erro, morte, dinheiro, amor, você), nunca vocabulário de "
+            "aula (\"filosofia\", \"interpretação\", \"leitura\", \"análise\", \"conceito\", \"perspectiva\", "
+            "\"reflexão\", \"contemporâneo\"). Um título bom cria uma CURIOSIDADE ou um CONFLITO que só o vídeo resolve.\n"
+            "- " + REGRA_POVO + "\n"
+            "- Teste de cada um: dá pra ler em 2 segundos e dá vontade de clicar sem saber nada do canal? Pense em uns 12, "
+            "jogue fora os longos e os mornos e entregue só os melhores.\n"
             f"- Os {qtd} títulos usam fórmulas DIFERENTES desta lista (escolha as que combinam com o assunto; troque os "
             "colchetes pelo tema real"
             + (f"; escreva em {idioma}, adaptando a fórmula ao idioma" if idioma else "") + "):\n" + formulas + "\n"
@@ -606,6 +653,13 @@ _BASTIDOR = [
     (re.compile(r"\bessa parte quer destrinchar\b", re.I), "a gente vai destrinchar agora"),
     (re.compile(r"\b(?:é )?a interpretação crítica defendida pelo vídeo\b", re.I), "é uma interpretação crítica"),
     (re.compile(r"\bNa leitura proposta aqui,\s*", re.I), "Numa leitura possível, "),
+    # 🚫 v84_444: a checagem tratou o roteiro como análise de um discurso ("o falante", "o trecho", "a aula de 13 de junho")
+    (re.compile(r"\bo falante\b", re.I), "quem defende essa tese"),
+    (re.compile(r"\b(?:apresentad[oa]s?\s+)?no trecho\b", re.I), ""),
+    (re.compile(r"\b(O|o) trecho (não traz|traz|não mostra|mostra)\b"), lambda m: ("Esse" if m.group(1) == "O" else "esse")
+     + " argumento " + m.group(2)),
+    (re.compile(r"\bSegundo o argumento do trecho,\s*", re.I), "Segundo esse argumento, "),
+    (re.compile(r"\b(?:na|numa) aula de \d{1,2} de \w+ de \d{4}\b", re.I), ""),
 ]
 
 
@@ -634,6 +688,7 @@ def tirar_bastidor(texto: str) -> str:
         return t
     t = re.sub(r"(^|[.!?]\s+)([a-zà-ú])", lambda m: m.group(1) + m.group(2).upper(), t, flags=re.M)
     t = re.sub(r",\s*,", ",", t)
+    t = re.sub(r"[ \t]+([,.;:!?])", r"\1", t)
     return re.sub(r" {2,}", " ", t)
 
 
@@ -679,6 +734,36 @@ def regra_nomes(nomes: list) -> str:
             "ideia a esses nomes.")
 
 
+def _variantes_nome(n: str) -> list:
+    """O nome inteiro e o primeiro nome sozinho ("Olavo"), quando não vem colado a outro nome ("Olavo Bilac" fica)."""
+    partes = n.split()
+    vs = [r"\s+".join(re.escape(p) for p in partes)]
+    if len(partes) > 1 and len(partes[0]) >= 4:
+        vs.append(re.escape(partes[0]) + r"(?!\s+(?:de\s+|da\s+|do\s+)?[A-ZÀ-Ý])")
+    return vs
+
+
+def _tirar_nomes_resto(t: str, nomes: list) -> str:
+    for n in nomes:
+        for nome in _variantes_nome(n):
+            aula = r"(?:\s+(?:na|numa|em)\s+(?:aula|palestra|curso)[^,.;:!?]*)?"
+            regras = [
+                (rf"\s*,?\s*atribuíd[ao]s?\s+a\s+{nome}{aula}", ""),                       # "interpretação atribuída a X na aula de…"
+                (rf"\b(Para|Segundo|Conforme|Na\s+visão\s+de|Na\s+interpretação\s+de|Na\s+leitura\s+de)\s+{nome}{aula}\s*,",
+                 "Nessa leitura,"),
+                (rf"\b(tese|interpretação|leitura|visão|ideia|argumento|crítica|análise|hipótese|formulação|proposta)\s+(?:de|do)\s+"
+                 rf"{nome}{aula}", r"\1"),                                                    # "a tese de X" → "a tese"
+                (rf"(^|[.!?]\s+){nome}\s+(?:dizia|diz|afirma|afirmava|defende|defendia|sustenta|sustentava|lembra|lembrava)\s+que",
+                 r"\1Há quem diga que"),
+                (rf"(^|[.!?]\s+){nome}\b", r"\1Essa leitura"),                                  # "Olavo recorre a…"
+                (rf"\b{nome}\b", "essa leitura"),
+            ]
+            for rx, novo in regras:
+                t = re.sub(rx, novo, t, flags=re.M)
+    t = re.sub(r"\b(?:na|numa)\s+aula\s+de\s+\d{1,2}\s+de\s+\w+\s+de\s+\d{4}", "", t)
+    return t
+
+
 def tirar_nomes(texto: str, nomes: list) -> tuple:
     """Tira as atribuições a nomes proibidos ("segundo a leitura de X,", "defendida por X", "retomada por X a partir de…").
     Devolve (texto, [trechos onde o nome AINDA aparece — pra avisar])."""
@@ -705,6 +790,7 @@ def tirar_nomes(texto: str, nomes: list) -> tuple:
         for rx, novo in regras:
             t = re.sub(rx, lambda m, novo=novo: troca(m, novo), t, flags=re.I)
     t = re.sub(r"\x00\s*(\w)", lambda m: m.group(1).upper(), t).replace("\x00", "")
+    t = _tirar_nomes_resto(t, nomes)  # 🚫 v84_444: o que sobrou ("Na interpretação de X", "Para Olavo,", "X recorre a…")
     t = re.sub(r" {2,}", " ", t)
     t = re.sub(r"\s+([,.;:!?])", r"\1", t)
     restos = []

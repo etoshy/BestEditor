@@ -273,6 +273,11 @@ REGRA_ALBERT = (
     "A palavra vem do NERVO do vídeo, NÃO das imagens do roteiro: NUNCA use um objeto, um lugar ou uma metáfora que o "
     "roteiro usou pra explicar (peneira, pedra, régua, ampulheta, caverna, náufrago, relógio, trilho — isso é ilustração, "
     "não acusação), nem conceito técnico ou abstrato (concessão, finitude, reflexão, linguagem, memória, silêncio). "
+    "PALAVRA DO POVO: tem que ser uma palavra que QUALQUER brasileiro usa e entende na hora — xingamento leve, "
+    "apelido, rótulo de briga de família (ex. de NÍVEL, não copie: OTÁRIO, COVARDE, VICIADO, FINGIDO, MANIPULADO, "
+    "ESCRAVO, FRACASSADO, CARENTE — essas são só a RÉGUA de simplicidade; a palavra certa sai do nervo DESTE vídeo e só "
+    "pode ser uma delas se o roteiro pedir exatamente isso). NUNCA palavra rara, culta ou inventada (impassivo, armadilhado, resignado, alienado, "
+    "guardião, letárgico) — se uma pessoa comum precisaria perguntar o que significa, está ERRADA. "
     "Nada de frase. 4 a 10 letras, MAIÚSCULAS, no idioma do vídeo.\n"
     "3) A CENA: o personagem do canal VIVENDO a palavra de forma LITERAL, absurda e meio escandalosa — o corpo, a roupa ou "
     "a situação dele É a metáfora (não \"ele ao lado de um objeto\"). Pergunte: se essa palavra virasse uma foto ridícula "
@@ -305,7 +310,12 @@ REGRA_TITULOS_THUMB = (
     "\"Assunto. Pergunta?\" usa o ASSUNTO real do vídeo antes do ponto (\"História Universal. Por Que Ela Não Existe?\"), "
     "não a palavra da thumb. Nas thumbs PALAVRA GIGANTE, pelo menos 1 dos 2 títulos junta o ASSUNTO com a ACUSAÇÃO da "
     "palavra (a palavra ou o sentido dela, dirigido a quem assiste — \"você\") — provocativo, sem perder o assunto. "
-    "Até ~60 caracteres, no idioma do vídeo, honestos (o vídeo entrega).")
+    "NADA de abrir com o nome acadêmico do tema (\"Determinismo e Liberdade: …\", \"Cultura e Herança: …\", "
+    "\"Conhecimento. …\"): diga a SITUAÇÃO como gente fala (só pra mostrar o JEITO, nunca use estes: \"Você Não Escolhe "
+    "Nada — e Gosta\", \"Por Que Você Só Finge Que Lê\"). Teste: o brasileiro médio, rolando o feed, entende e fica curioso em 2 segundos? "
+    "CURTOS: até ~50 caracteres (no celular o resto é cortado), UMA ideia só, palavras concretas e com emoção — nada de "
+    "vocabulário de aula (\"filosofia\", \"interpretação\", \"análise\", \"reflexão\"). No idioma do vídeo, honestos "
+    "(o vídeo entrega).")
 
 
 def ativo_albert(cfg: Optional[Dict[str, Any]] = None) -> int:
@@ -358,6 +368,15 @@ def pedir_ideias(titulo: str, contexto: str, ja: List[Dict[str, Any]], n: int = 
             vistas.add(w)
             unicas.append(t)
         lst[:] = unicas or lst[:1]
+        try:  # 🗣 v84_445: título com cara de aula ("Determinismo e Liberdade: …") vai pro fim
+            import metodo_roteiro as _mr
+            for t in lst:
+                ts = [x for x in t.get("titulos") or [] if isinstance(x, str)]
+                if ts:
+                    ts = [x for x in ts if not _mr.copiou_exemplo(x)] or ts
+                    t["titulos"] = [x for x in ts if not _mr.titulo_academico(x)] + [x for x in ts if _mr.titulo_academico(x)]
+        except Exception:  # noqa: BLE001
+            pass
         for k, t in enumerate(lst):
             if por_alb:
                 t["estilo_arte"] = por_alb[k % len(por_alb)]
