@@ -100,3 +100,21 @@ def test_lote_um_processo_e_crash_no_meio(tmp_path, monkeypatch):
     assert r["falas"] == 4 and len(chamadas) == 2
     assert chamadas[0][:2] == ["Um.", "Três."]  # agrupadas por voz (o perfil troca o mínimo)
     assert len(chamadas[1]) == 3  # a 2ª rodada só com as que faltaram
+
+
+def test_pausas_viram_silencio():
+    d = mv.dividir("[marcio] Aviso. [pausa curta] Isto é sátira. [pausa longa] [mabel_cezar_2] Oi. [pausa] Tchau.", VOZES)
+    assert [(f["slug"], f.get("pausa_antes"), f["texto"]) for f in d["falas"]] == [
+        ("marcio", None, "Aviso."), ("marcio", 0.25, "Isto é sátira."), ("mabel_cezar_2", 1.0, "Oi."), ("mabel_cezar_2", 0.45, "Tchau.")]
+    assert all("pausa" not in f["texto"] for f in d["falas"])
+
+
+def test_pausas_entram_no_audio(tmp_path, monkeypatch):
+    monkeypatch.setattr(mv, "por_slug", lambda: VOZES)
+    monkeypatch.setattr(mv, "kwargs_da_voz", lambda v: (v["motor"], {"voz": v["slug"]}))
+    monkeypatch.setattr(mv, "_wav_padrao", lambda a, b: __import__("shutil").copy(a, b))
+    visto = {}
+    monkeypatch.setattr(mv, "concatenar", lambda arqs, saida, pausas, pasta: (visto.update(p=pausas), open(saida, "wb").write(b"x" * 2000)))
+    mv.gerar("[marcio] Um. [pausa longa] Dois.", str(tmp_path / "v.wav"), "chatterbox", {},
+             lambda m, t, s, **k: open(s, "wb").write(b"w" * 2000), lambda t, m: t)
+    assert visto["p"][1] == 0.12 + 1.0  # a pausa da mesma voz + o [pausa longa]

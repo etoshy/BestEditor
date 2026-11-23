@@ -276,6 +276,8 @@ def criar_vozes_dos_perfis(desconhecidas: List[str]) -> List[Dict[str, Any]]:
     return feitas
 
 
+_PAUSAS_SLUG = {"pausa": 0.45, "pausa_curta": 0.25, "pausa_longa": 1.0, "pausa_media": 0.45, "silencio": 0.8,
+                "pausa_dramatica": 1.4, "pausa_bem_longa": 1.6, "pause": 0.45, "short_pause": 0.25, "long_pause": 1.0}
 _SONS_EXTRA = {"respira": "breath", "respirando": "breath", "respiracao": "breath", "respiro": "breath", "inspira": "breath",
                "respiração": "breath", "ofegante": "breath", "bocejo": "breath"}
 _FISH_SOM = {"laugh": "laughing", "chuckle": "chuckle", "sigh": "sigh", "cough": "cough", "clear throat": "clearing throat",
@@ -342,15 +344,18 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
     buf = ""
 
     ajustes: Dict[str, float] = {}
+    pausa_pendente = 0.0  # ⏸ v84_459: [pausa] / [pausa curta] / [pausa longa] viram SILÊNCIO de verdade entre as falas
 
     def fecha():
-        nonlocal buf
+        nonlocal buf, pausa_pendente
         t = re.sub(r"\s+", " ", buf).strip()
-        if t:
-            if falas and falas[-1]["slug"] == atual and falas[-1].get("ajustes", {}) == ajustes:
+        if t and re.search(r"\w", t):
+            if falas and falas[-1]["slug"] == atual and falas[-1].get("ajustes", {}) == ajustes and not pausa_pendente:
                 falas[-1]["texto"] += " " + t
             else:
-                falas.append({"slug": atual, "texto": t, **({"ajustes": dict(ajustes)} if ajustes else {})})
+                falas.append({"slug": atual, "texto": t, **({"ajustes": dict(ajustes)} if ajustes else {}),
+                              **({"pausa_antes": round(pausa_pendente, 2)} if pausa_pendente and falas else {})})
+                pausa_pendente = 0.0
         buf = ""
 
     for m in _RE_TAG.finditer(texto or ""):
@@ -370,6 +375,11 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
             pos = m.end()
             if atual and (vozes.get(atual) or {}).get("motor") == "fish_s2":
                 buf += m.group(0)  # o Fish S2 entende instrução entre colchetes: a tag fica no texto dele
+        elif slugify(bruto) in _PAUSAS_SLUG and not mods:  # ⏸ v84_459: silêncio de verdade (antes o colchete sumia e a pausa junto)
+            buf += texto[pos:m.start()]
+            fecha()
+            pausa_pendente += _PAUSAS_SLUG[slugify(bruto)]
+            pos = m.end()
         elif s in sons and not mods:  # 🔊 v84_457: [tosse] [pigarro] [respira] — som, não voz
             buf += texto[pos:m.start()]
             motor = (vozes.get(atual) or {}).get("motor") if atual else (padrao or "")
@@ -511,7 +521,7 @@ def gerar(texto: str, saida: str, motor_padrao: str, kwargs_padrao: Dict[str, An
                              "guardada": guardada, "bruto": os.path.join(pasta, f"f{k:04d}_bruto.wav"),
                              "aj": " ".join(f"{a}={v}" for a, v in (f.get("ajustes") or {}).items())})
             arquivos.append(wav)
-            pausas.append(pausa_troca if f["slug"] != anterior else pausa_mesma)
+            pausas.append((pausa_troca if f["slug"] != anterior else pausa_mesma) + float(f.get("pausa_antes") or 0))
             anterior = f["slug"]
         total = len(d["falas"])
         if reaproveitadas:
