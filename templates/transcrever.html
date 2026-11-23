@@ -238,19 +238,37 @@ function mostrarResultado(jobId, resultado) {
 </script>
 
 <h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
+{% if jobs %}<p style="font-size:.85rem;margin:0 0 6px"><label style="display:inline;font-weight:400"><input type="checkbox" id="hist-esconder" style="width:auto;margin:0"> esconder os marcados como feitos</label>
+  <span style="color:#666"> · {{ jobs|selectattr('feito')|list|length }} de {{ jobs|length }} feitos</span></p>{% endif %}
 {% if not jobs %}<p style="color:#666;font-size:.85rem;">Nada ainda — pode começar um e fechar a aba: quando terminar chega um aviso no 🔔 e fica tudo aqui.</p>{% endif %}
 {% for j in jobs %}
-<div class="hist-item" id="j-{{ j.id }}" style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;">
+<div class="hist-item{% if j.feito %} feito{% endif %}" id="j-{{ j.id }}" style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;">
+  <label style="display:inline;font-weight:400;margin:0 6px 0 0" title="✔ marque o que você já usou (fica salvo)"><input type="checkbox" class="hist-feito" data-id="{{ j.id }}" style="width:auto;margin:0" {% if j.feito %}checked{% endif %}> feito</label>
   <span class="hist-data" data-t="{{ (j.criado_em or 0) | int }}"></span> ·
-  {{ 'Transcrever' if j.modo == 'transcrever' else 'Só baixar' }} — {{ (j.url or j.nome or 'arquivo enviado')[:80] }} — <b>{{ 'na fila' if j.status == 'na_fila' else j.status }}</b>
+  {{ 'Transcrever' if j.modo == 'transcrever' else 'Só baixar' }} — {% if j.resultado and j.resultado.titulo %}<b>{{ j.resultado.titulo[:80] }}</b> <span style="color:#94a3b8">{{ (j.url or '')[:50] }}</span>{% else %}{{ (j.url or j.nome or 'arquivo enviado')[:80] }}{% endif %} — <b>{{ 'na fila' if j.status == 'na_fila' else j.status }}</b>
   {% if j.status == 'pronto' %}<button type="button" onclick="abrirDoHistorico('{{ j.id }}')" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">abrir</button>{% endif %}
   {% if j.status in ('processando', 'na_fila') %}<button type="button" onclick="acompanhar('{{ j.id }}');document.getElementById('progresso-box').style.display='block'" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">acompanhar</button>{% endif %}
   {% if j.erro %}<div style="color:#b91c1c;">{{ j.erro[:200] }}</div>{% endif %}
 </div>
 {% endfor %}
-<style>.hist-item:target{background:#eff6ff;border-color:#2563eb!important}</style>
+<style>.hist-item:target{background:#eff6ff;border-color:#2563eb!important}
+.hist-item.feito{background:#f0fdf4;border-color:#bbf7d0!important;color:#64748b}
+body.esconder-feitos .hist-item.feito{display:none}</style>
 <script>
 document.querySelectorAll('.hist-data').forEach(e => { e.textContent = new Date(parseInt(e.dataset.t) * 1000).toLocaleString('pt-BR'); });
+// ✔ v84_463: marcar o que já foi usado (salvo no servidor) + esconder os feitos (lembrado neste navegador)
+document.querySelectorAll('.hist-feito').forEach(c => c.addEventListener('change', async () => {
+  const item = document.getElementById('j-' + c.dataset.id);
+  item.classList.toggle('feito', c.checked);
+  try { await fetch(`/transcrever/${c.dataset.id}/feito`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feito: c.checked }) }); }
+  catch (e) { c.checked = !c.checked; item.classList.toggle('feito', c.checked); }
+}));
+(function () {
+  const e = document.getElementById('hist-esconder'); if (!e) return;
+  try { e.checked = localStorage.getItem('transcrever_esconder_feitos') === '1'; } catch (_) {}
+  const ap = () => { document.body.classList.toggle('esconder-feitos', e.checked); try { localStorage.setItem('transcrever_esconder_feitos', e.checked ? '1' : '0'); } catch (_) {} };
+  e.addEventListener('change', ap); ap();
+})();
 async function abrirDoHistorico(id) {
   const j = await (await fetch(`/transcrever/${id}/status`)).json();
   if (j.status === 'pronto') { mostrarResultado(id, j.resultado); document.getElementById('resultado-box').scrollIntoView({behavior: 'smooth'}); }

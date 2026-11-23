@@ -125,6 +125,14 @@ def baixar_de_qualquer_fonte(
         except redes_sociais.RedesSociaisError as exc:
             raise TranscreverAvulsoError(str(exc)) from exc
 
+    try:  # 📝 v84_463: o nome do vídeo (pros arquivos baixados terem o mesmo nome)
+        _tit = (locals().get("info") or {}).get("titulo") if isinstance(locals().get("info"), dict) else ""
+        _tit = _tit or os.path.splitext(os.path.basename(caminho_baixado))[0]
+        if _tit and _tit.lower() not in ("video", "download"):
+            with open(os.path.join(saida_dir, "_titulo.txt"), "w", encoding="utf-8") as f:
+                f.write(str(_tit)[:200])
+    except OSError:
+        pass
     if os.path.abspath(caminho_baixado) != os.path.abspath(destino_final):
         shutil.move(caminho_baixado, destino_final)
     return destino_final
@@ -191,8 +199,14 @@ def processar(
     if aviso_resolucao_baixa:
         _log(on_log, f"[AVISO] O vídeo está em baixa resolução ({dimensoes[0]}x{dimensoes[1]}).")
 
+    titulo = ""
+    try:
+        with open(os.path.join(saida_dir, "_titulo.txt"), encoding="utf-8") as f:
+            titulo = f.read().strip()
+    except OSError:
+        pass
     resultado: Dict[str, Any] = {
-        "modo": modo, "video": "video.mp4",
+        "modo": modo, "video": "video.mp4", **({"titulo": titulo} if titulo else {}),
         "largura": dimensoes[0] if dimensoes else None,
         "altura": dimensoes[1] if dimensoes else None,
         "aviso_resolucao_baixa": aviso_resolucao_baixa,

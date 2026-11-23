@@ -11794,7 +11794,33 @@ def transcrever_arquivo(job_id: str, nome: str):
     caminho = os.path.join(TRANSCRICOES_AVULSAS_DIR, job_id, nome)
     if not os.path.exists(caminho):
         return "Arquivo não encontrado.", 404
-    return send_file(caminho, as_attachment=True, download_name=nome)
+    # 📝 v84_463: baixa com o NOME do vídeo (o arquivo enviado / o vídeo do link), não "transcricao.srt"
+    return send_file(caminho, as_attachment=True, download_name=_nome_base_transcricao(job) + os.path.splitext(nome)[1])
+
+
+def _nome_base_transcricao(job: Dict[str, Any]) -> str:
+    import unicodedata
+    from urllib.parse import parse_qs, urlparse
+    base = os.path.splitext(str(job.get("nome") or ""))[0].strip() or str((job.get("resultado") or {}).get("titulo") or "").strip()
+    if not base and job.get("url"):
+        u = urlparse(str(job["url"]))
+        partes = [x for x in u.path.split("/") if x]
+        base = (parse_qs(u.query).get("v") or [""])[0] or (partes[-1] if partes else "")
+    base = unicodedata.normalize("NFC", base)
+    base = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", base)
+    base = re.sub(r"\s+", " ", base).strip(" .")[:120]
+    return base or f"transcricao_{job.get('id') or ''}"
+
+
+@app.route("/transcrever/<job_id>/feito", methods=["POST"])
+def transcrever_feito(job_id: str):
+    """✔ v84_463: marcar/desmarcar "já usei" (fica salvo no histórico)."""
+    job = _TRANSCRICOES_AVULSAS_JOBS.get(job_id)
+    if not job:
+        return jsonify({"erro": "Não encontrado."}), 404
+    job["feito"] = bool((request.get_json(silent=True) or {}).get("feito"))
+    _historico_salvar(TRANSCRICOES_AVULSAS_DIR, job)
+    return jsonify({"ok": True, "feito": job["feito"]})
 
 
 # --------------------------------------------------------------------- #
