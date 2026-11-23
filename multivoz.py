@@ -276,6 +276,14 @@ def criar_vozes_dos_perfis(desconhecidas: List[str]) -> List[Dict[str, Any]]:
     return feitas
 
 
+def _pausa_em_segundos(bruto: str) -> Optional[float]:
+    """"pausa 3" → 3.0; "pausa 1,5s" → 1.5; "silêncio 2 segundos" → 2.0 (no máximo 10 s). None = não é pausa com número."""
+    m = re.fullmatch(r"(?i)\s*(?:pausa|pause|sil[eê]ncio|silence)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:s|seg|segundos?|seconds?)?\s*", bruto or "")
+    if not m:
+        return None
+    return round(max(0.05, min(10.0, float(m.group(1).replace(",", ".")))), 2)
+
+
 _PAUSAS_SLUG = {"pausa": 0.45, "pausa_curta": 0.25, "pausa_longa": 1.0, "pausa_media": 0.45, "silencio": 0.8,
                 "pausa_dramatica": 1.4, "pausa_bem_longa": 1.6, "pause": 0.45, "short_pause": 0.25, "long_pause": 1.0}
 _SONS_EXTRA = {"respira": "breath", "respirando": "breath", "respiracao": "breath", "respiro": "breath", "inspira": "breath",
@@ -375,6 +383,11 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
             pos = m.end()
             if atual and (vozes.get(atual) or {}).get("motor") == "fish_s2":
                 buf += m.group(0)  # o Fish S2 entende instrução entre colchetes: a tag fica no texto dele
+        elif _pausa_em_segundos(bruto) is not None and not mods:  # ⏸ [pausa 3] / [pausa 1.5s] / [silêncio 2]
+            buf += texto[pos:m.start()]
+            fecha()
+            pausa_pendente += _pausa_em_segundos(bruto)
+            pos = m.end()
         elif slugify(bruto) in _PAUSAS_SLUG and not mods:  # ⏸ v84_459: silêncio de verdade (antes o colchete sumia e a pausa junto)
             buf += texto[pos:m.start()]
             fecha()
@@ -389,6 +402,11 @@ def dividir(texto: str, vozes: Optional[Dict[str, Dict[str, Any]]] = None, padra
             buf += texto[pos:m.start()]
             fecha()
             ajustes = dict(ajustes, **ler_ajustes("vel=" + re.search(r"\d+(?:[.,]\d+)?", bruto).group(0)))
+            pos = m.end()
+        elif (bruto.lower() in extras or " " in bruto.strip()) and \
+                ((vozes.get(atual) or {}).get("motor") if atual else (padrao or "")) not in ("", None, "fish_s2", "chatterbox_turbo"):
+            # 🧹 v84_460: tag de emoção/efeito que ESTE motor não entende — sai do texto (senão ele lê "pausa 3" em voz alta)
+            buf += texto[pos:m.start()]
             pos = m.end()
         elif bruto.lower() in extras or " " in bruto.strip():
             continue  # tag de emoção (Chatterbox Turbo / Fish S2, ex.: [excited], [whisper in small voice]): fica no texto
@@ -562,6 +580,35 @@ def pasta_cache(saida: str) -> str:
     except OSError:
         pass
     return c
+
+
+def info_cache(pasta_audios: str) -> Dict[str, Any]:
+    c = os.environ.get("MULTIVOZ_CACHE_DIR") or os.path.join(pasta_audios, "_falas_prontas")
+    n, tam = 0, 0
+    try:
+        for x in os.listdir(c):
+            if x.endswith(".wav"):
+                n += 1
+                tam += os.path.getsize(os.path.join(c, x))
+    except OSError:
+        pass
+    return {"falas": n, "mb": round(tam / 1e6, 1), "pasta": c}
+
+
+def limpar_cache(pasta_audios: str) -> int:
+    """🗑 v84_460: apaga as falas guardadas (pra gerar tudo do zero)."""
+    c = info_cache(pasta_audios)["pasta"]
+    n = 0
+    try:
+        for x in os.listdir(c):
+            try:
+                os.remove(os.path.join(c, x))
+                n += 1
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return n
 
 
 def chave_fala(motor: str, kw: Dict[str, Any], texto: str) -> str:

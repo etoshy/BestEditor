@@ -150,6 +150,10 @@ E no final...</pre>
       <p class="mv-hint">Ex.: <code>[narrador] Era noite em Berlim. [ricardo] Você ouviu isso? [ana] Ouvi.</code> — o que vem antes da primeira tag usa a voz escolhida abaixo. A voz continua até a próxima tag. Clique numa voz em <b>🎭 Vozes com slug</b> pra inserir a tag no cursor.</p>
       <label style="font-size:0.85rem;">Pausa quando troca de voz: <span id="mv-pausa-valor">0.35</span>s</label>
       <input type="range" name="multivoz_pausa" min="0" max="1.5" step="0.05" value="0.35" style="width:100%;" oninput="document.getElementById('mv-pausa-valor').textContent=this.value">
+      <div style="font-size:.8rem;color:#475569;margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap" title="💾 cada fala pronta fica guardada: se o motor travar, gerar de novo continua de onde parou (e só refaz as falas que você mudou). Apague pra gerar TUDO do zero.">
+        💾 <span id="mv-cache-info">falas guardadas: …</span>
+        <button type="button" id="mv-cache-limpar" style="width:auto;margin:0;padding:1px 8px;font-size:.76rem;background:#64748b">🗑 apagar (gerar do zero)</button>
+      </div>
       <div id="mv-previa"></div>
     </div>
   </div>
@@ -1149,6 +1153,18 @@ document.getElementById('mv-previa').addEventListener('click', (e) => {  // 🎭
   ta.dispatchEvent(new Event('input'));
 });
 document.getElementById('texto-narrar').addEventListener('input', mvPrevia);
+function mvCacheInfo(d) {
+  const el = document.getElementById('mv-cache-info'); if (!el || !d) return;
+  el.textContent = d.falas ? `${d.falas} fala(s) guardada(s) (${d.mb} MB) — gerar de novo reaproveita as que não mudaram` : 'nenhuma fala guardada';
+}
+fetch('/gerar-voz/falas-prontas').then(r => r.json()).then(mvCacheInfo).catch(() => {});
+document.getElementById('mv-cache-limpar').addEventListener('click', async (e) => {
+  if (!confirm('Apagar todas as falas guardadas do multi voice? A próxima geração faz tudo do zero.')) return;
+  e.target.disabled = true;
+  try { const d = await (await fetch('/gerar-voz/falas-prontas', { method: 'POST' })).json(); mvCacheInfo(d);
+        document.getElementById('mv-cache-info').textContent = `🗑 ${d.apagadas} fala(s) apagada(s) — a próxima geração é do zero`; }
+  finally { e.target.disabled = false; }
+});
 document.getElementById('mv-ativo').addEventListener('change', (e) => { document.getElementById('mv-detalhes').style.display = e.target.checked ? '' : 'none'; mvPrevia(); });
 fetch('/gerar-voz/vozes').then(r => r.json()).then(mvDesenhar);
 

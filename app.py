@@ -1519,6 +1519,16 @@ def multivoz_conferir():
                     "perfis": mv.perfis_das_tags(d["desconhecidas"]), "motor_perfis": mv.motor_dos_perfis(vozes)})
 
 
+@app.route("/gerar-voz/falas-prontas", methods=["GET", "POST"])
+def multivoz_falas_prontas():
+    """💾 v84_460: as falas do multi voice guardadas pra continuar de onde parou — ver quantas / apagar (gerar do zero)."""
+    import multivoz as mv
+    if request.method == "POST":
+        apagadas = mv.limpar_cache(VOZES_DIR)
+        return jsonify({"ok": True, "apagadas": apagadas, **mv.info_cache(VOZES_DIR)})
+    return jsonify({"ok": True, **mv.info_cache(VOZES_DIR)})
+
+
 @app.route("/gerar-voz/vozes/dos-perfis", methods=["POST"])
 def multivoz_dos_perfis():
     """🗣️ v84_456: cria as vozes com slug das tags que têm um perfil de voz com o mesmo nome ([Marcio_Seixas])."""

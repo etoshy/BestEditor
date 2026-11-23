@@ -118,3 +118,19 @@ def test_pausas_entram_no_audio(tmp_path, monkeypatch):
     mv.gerar("[marcio] Um. [pausa longa] Dois.", str(tmp_path / "v.wav"), "chatterbox", {},
              lambda m, t, s, **k: open(s, "wb").write(b"w" * 2000), lambda t, m: t)
     assert visto["p"][1] == 0.12 + 1.0  # a pausa da mesma voz + o [pausa longa]
+
+
+def test_pausa_com_numero_e_tag_estranha():
+    d = mv.dividir("[marcio] Um. [pausa 3] Dois. [pausa 1,5s] Três. [olhando pro lado] Quatro.", VOZES)
+    assert [f.get("pausa_antes") for f in d["falas"]] == [None, 3.0, 1.5]
+    assert all("pausa" not in f["texto"] and "[" not in f["texto"] and "olhando" not in f["texto"] for f in d["falas"])
+    assert mv._pausa_em_segundos("silêncio 20") == 10.0 and mv._pausa_em_segundos("pausa longa") is None
+
+
+def test_limpar_cache(tmp_path, monkeypatch):
+    monkeypatch.setenv("MULTIVOZ_CACHE_DIR", str(tmp_path / "c"))
+    os_ = __import__("os")
+    os_.makedirs(tmp_path / "c")
+    (tmp_path / "c" / "a.wav").write_bytes(b"x" * 10)
+    assert mv.info_cache(str(tmp_path))["falas"] == 1
+    assert mv.limpar_cache(str(tmp_path)) == 1 and mv.info_cache(str(tmp_path))["falas"] == 0
