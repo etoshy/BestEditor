@@ -69,6 +69,85 @@ def registrar(app, base_dir: str) -> None:
                                  pagina=f"/modelos-video/{pid}")
         return jsonify({"ok": True, "tarefa": tid})
 
+    # ------------------------------------------------------------------ 📖 v84_462: livros com link de afiliado
+    def _livros_acao(pid: str, fn):
+        import livros_afiliado as la
+        with _TRAVA:
+            p = _proj(pid)
+            if not p or not (p.get("resultado") or {}).get("roteiro"):
+                return jsonify({"erro": "Ainda não tem roteiro."}), 404
+            try:
+                extra = fn(p, la) or {}
+            except la.LivroErro as exc:
+                return jsonify({"erro": str(exc)}), 400
+            ds.salvar(base_dir, p)
+        return jsonify({"ok": True, **extra, "projeto": _json_proj(p),
+                        "comentario": la.comentario_fixado(p.get("resultado") or {})})
+
+    @app.route("/modelos-video/<pid>/livros/sugerir", methods=["POST"])
+    def dossie_livros_sugerir(pid: str):
+        return _livros_acao(pid, lambda p, la: {"livros": la.sugerir(p)})
+
+    @app.route("/modelos-video/<pid>/livros/link", methods=["POST"])
+    def dossie_livros_link(pid: str):
+        c = request.get_json(silent=True) or {}
+        sug = int(c["sugerido"]) if str(c.get("sugerido", "")).lstrip("-").isdigit() else None
+        return _livros_acao(pid, lambda p, la: {"livro": la.adicionar(base_dir, p, str(c.get("link") or ""), sug)})
+
+    @app.route("/modelos-video/<pid>/livros/remover", methods=["POST"])
+    def dossie_livros_remover(pid: str):
+        lid = str((request.get_json(silent=True) or {}).get("id") or "")
+        return _livros_acao(pid, lambda p, la: la.remover(p, lid))
+
+    @app.route("/modelos-video/<pid>/livros/destino", methods=["POST"])
+    def dossie_livros_destino(pid: str):
+        v = str((request.get_json(silent=True) or {}).get("destino") or "")
+
+        def f(p, la):
+            if v not in la.DESTINOS:
+                raise la.LivroErro("Destino inválido.")
+            la.estado(p)["destino"] = v
+        return _livros_acao(pid, f)
+
+    @app.route("/modelos-video/<pid>/livros/tag", methods=["GET", "POST"])
+    def dossie_livros_tag(pid: str):
+        """O seu código de afiliado (ex.: seunome-20) — vai em todo link da Amazon que ainda não tiver."""
+        import re as _re
+        from site_config import save_site_config
+        if request.method == "GET":
+            import livros_afiliado as la
+            return jsonify({"ok": True, "tag": la.tag_afiliado()})
+        tag = str((request.get_json(silent=True) or {}).get("tag") or "").strip()
+        if tag and not _re.fullmatch(r"[A-Za-z0-9_.-]{2,40}", tag):
+            return jsonify({"erro": "Código inválido (ex.: seunome-20)."}), 400
+        save_site_config({"amazon_tag": tag})
+        return jsonify({"ok": True, "tag": tag})
+
+    @app.route("/modelos-video/<pid>/livros/adaptar", methods=["POST"])
+    def dossie_livros_adaptar(pid: str):
+        """✍️ O roteiro COM os livros (a versão sem fica guardada) — e já passa a usar essa versão."""
+        def f(p, la):
+            novo = la.adaptar(p)
+            p["resultado"] = ds.roteiro_editado(p, novo)
+            la.estado(p)["ativo"] = True
+            ds.marcar_mudanca(p, "📖 livros no roteiro", ", ".join(x["titulo_curto"] for x in la.estado(p)["escolhidos"]))
+        return _livros_acao(pid, f)
+
+    @app.route("/modelos-video/<pid>/livros/versao", methods=["POST"])
+    def dossie_livros_versao(pid: str):
+        """🔁 Alterna entre o roteiro COM livros e o SEM livros (gere a voz de novo depois)."""
+        qual = str((request.get_json(silent=True) or {}).get("versao") or "")
+
+        def f(p, la):
+            res = p["resultado"]
+            alvo = res.get("roteiro_com_livros") if qual == "com" else res.get("roteiro_sem_livros")
+            if not alvo:
+                raise la.LivroErro("Essa versão ainda não existe — use ✍️ Adaptar o roteiro primeiro.")
+            p["resultado"] = ds.roteiro_editado(p, alvo)
+            la.estado(p)["ativo"] = qual == "com"
+            ds.marcar_mudanca(p, "📖 roteiro " + ("COM" if qual == "com" else "SEM") + " livros")
+        return _livros_acao(pid, f)
+
     @app.route("/modelos-video/<pid>/fontes-web/tirar", methods=["POST"])
     def dossie_fontes_web_tirar(pid: str):
         url = str((request.get_json(silent=True) or {}).get("url") or "")
@@ -94,6 +173,8 @@ def registrar(app, base_dir: str) -> None:
             out["midias"].append(item)
         if p.get("resultado"):
             out["descricao_pronta"] = ds.descricao_completa(p)
+            import livros_afiliado
+            out["comentario_livros"] = livros_afiliado.comentario_fixado(p["resultado"])
         return out
 
     @app.context_processor

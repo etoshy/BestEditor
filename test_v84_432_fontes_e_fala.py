@@ -76,7 +76,11 @@ def test_descricao_tem_as_fontes_e_nao_os_arquivos():
          "fontes": [{"id": "F1", "titulo": "notas_t1.md", "arquivo": "F1_notas_t1.md"},
                     {"id": "F2", "titulo": "Matéria", "url": "https://bbc.com/a", "site": "BBC"}]}
     d = ds.descricao_completa(p)
-    assert "notas_t1" not in d and "https://bbc.com/a" in d and "📚 Fontes e referências:\n- Platão — Fédon: https://x.edu/f" in d
+    assert "notas_t1" not in d and "📚 Fontes e referências:\n- Platão — Fédon: https://x.edu/f" in d
+    assert "https://bbc.com/a" not in d  # 📚 v84_461: com as referências conferidas, só elas (as do material não entram)
+    del p["resultado"]["fontes_web"]
+    d = ds.descricao_completa(p)  # sem as conferidas: as fontes com link do projeto (menos o vídeo do YouTube de origem)
+    assert "https://bbc.com/a" in d and "notas_t1" not in d
 
 
 def test_recurso_registrado():

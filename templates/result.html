@@ -48,6 +48,9 @@
 
 <p id="download-link" style="display:none">
   <a href="{{ url_for('download_result', job_id=job.job_id) }}"><button type="button">Baixar vídeo final</button></a>
+  <a href="{{ url_for('job_legenda_srt', job_id=job.job_id) }}" title="a legenda do vídeo final em .srt (no tempo do vídeo, já com as chamadas)"><button type="button" style="background:#0f766e">📝 Baixar legenda (.srt)</button></a>
+  {% if link_roteiro %}<a href="{{ link_roteiro }}" title="o projeto do roteiro deste vídeo"><button type="button" style="background:#64748b">📜 Ir pro roteiro</button></a>{% endif %}
+  {% if link_narracao %}<a href="{{ link_narracao }}" title="a narração no Gerador de voz"><button type="button" style="background:#64748b">🎙 Ir pra narração</button></a>{% endif %}
   {% if job.captioned_output_path %}
   <a href="{{ url_for('download_captioned_result', job_id=job.job_id) }}"><button type="button">Baixar versão com legenda</button></a>
   {% elif job.add_word_captions and job.captions_error %}

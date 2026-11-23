@@ -601,6 +601,17 @@ def inicio():
                            recentes=recentes)
 
 
+def _links_do_job(job: dict) -> Tuple[str, str]:
+    """(link do projeto do roteiro, link da narração no Gerador de voz) — "" quando não tem."""
+    rot = next((rota + str(job[campo]) for campo, rota in
+                (("dossie_id", "/modelos-video/"), ("roteiro_id", "/roteiros-yt/"), ("venda_id", "/vendas/")) if job.get(campo)), "")
+    vz = str(job.get("voz_id") or "")
+    if not vz:  # os antigos: o "voz 3ead6ef6.zip" traz o começo do id da narração
+        m = re.match(r"^(?:voz |.* · )([0-9a-zA-Z_-]{8})\.zip$", str(job.get("original_filename") or ""))
+        vz = m.group(1) if m else ""
+    return rot, (f"/gerar-voz?voz={vz}#historico" if vz else "")
+
+
 @app.route("/jobs", methods=["GET"])
 def jobs_history_page():
     """Lista todos os jobs desta sessão do servidor (em memória — reinicia
@@ -618,14 +629,7 @@ def jobs_history_page():
         display = dict(job)  # cópia rasa — não mexe no dicionário original do job
         if not job.get("nome_projeto"):  # 🏷 v84_448: os antigos sem nome — o título do roteiro ligado
             display["titulo_auto"] = _titulo_do_projeto_ligado(job, _cache_tit)
-        display["link_roteiro"] = next((rota + str(job[campo]) for campo, rota in
-                                        (("dossie_id", "/modelos-video/"), ("roteiro_id", "/roteiros-yt/"), ("venda_id", "/vendas/"))
-                                        if job.get(campo)), "")
-        _vz = str(job.get("voz_id") or "")
-        if not _vz:  # os antigos: o "voz 3ead6ef6.zip" traz o começo do id da narração
-            _m = re.match(r"^(?:voz |.* · )([0-9a-zA-Z_-]{8})\.zip$", str(job.get("original_filename") or ""))
-            _vz = _m.group(1) if _m else ""
-        display["link_narracao"] = f"/gerar-voz?voz={_vz}#historico" if _vz else ""
+        display["link_roteiro"], display["link_narracao"] = _links_do_job(job)
         created_at = job.get("created_at")
         display["created_at_display"] = (
             datetime.datetime.fromtimestamp(created_at).strftime("%d/%m %H:%M") if created_at else None
@@ -6473,6 +6477,29 @@ def _start_assembly(job_id: str, job: dict, segments: List[VideoSegment]) -> Non
     threading.Thread(target=_run, daemon=True).start()
 
 
+@app.route("/job/<job_id>/legenda.srt")
+def job_legenda_srt(job_id: str):
+    """📝 v84_461: a legenda (.srt) do vídeo final — as palavras da narração, empurradas pelas chamadas/cortes."""
+    job = _JOBS.get(job_id)
+    if not job:
+        return "Projeto não encontrado.", 404
+    import capitulos_video
+    import legendas as _lg
+    from flask import Response
+    palavras = [dict(w, start=capitulos_video.tempo_no_video(float(w["start"]), job.get("cortes_video") or []),
+                     end=capitulos_video.tempo_no_video(float(w.get("end", w["start"])), job.get("cortes_video") or []))
+                for w in _palavras_da_narracao(job) if str(w.get("word", "")).strip()]
+    if not palavras:
+        return "Este vídeo não tem a narração com tempo pra montar a legenda.", 404
+    try:
+        srt = _lg.gerar_srt([{"words": palavras}], modo="legenda", max_palavras=8)
+    except _lg.LegendaError as exc:
+        return str(exc), 400
+    nome = secure_filename(str(job.get("nome_projeto") or job.get("original_filename") or job_id).rsplit(".", 1)[0])[:60] or job_id
+    return Response(srt, mimetype="application/x-subrip",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}.srt"'})
+
+
 def _capitulos_do_video_final(job_id: str, job: dict, output_path: str, cortes_aplicados: List[Dict[str, Any]]) -> None:
     """📑 Vídeo de um 🕵️ modelo de vídeo ou 📝 Roteiro do YouTube: capítulos da descrição no tempo do VÍDEO FINAL (a narração
     deste vídeo + o empurrão das chamadas/cortes). Nunca derruba a montagem."""
@@ -6484,6 +6511,7 @@ def _capitulos_do_video_final(job_id: str, job: dict, output_path: str, cortes_a
         import capitulos_video
         cortes = [{"insertion_point": c["insertion_point"], "remove_ate": c.get("remove_ate"),
                    "duration": _probe_media_duration(c["resolved_path"])} for c in cortes_aplicados or []]
+        job["cortes_video"] = cortes  # 📝 v84_461: o .srt do vídeo final usa o mesmo deslocamento
         r = capitulos_video.para_job(job, BASE_DIR, _palavras_da_narracao(job), cortes, _probe_media_duration(output_path))
         if r:
             job["capitulos_video"], job["descricao_youtube"] = r
@@ -11076,7 +11104,8 @@ def job_status_page(job_id: str):
     job = _JOBS.get(job_id)
     if not job:
         return "Job não encontrado.", 404
-    return render_template("result.html", job=job)
+    _lr, _ln = _links_do_job(job)
+    return render_template("result.html", job=job, link_roteiro=_lr, link_narracao=_ln)
 
 
 @app.route("/job/<job_id>/status", methods=["GET"])

@@ -87,7 +87,8 @@ def normalizar(x: Any) -> Optional[Dict[str, str]]:
         out["modo"] = "albert"
         out["texto"] = re.sub(r"[^\w-]", "", (texto or str(x.get("palavra") or "")).split()[0] if (texto or x.get("palavra")) else "",
                               flags=re.UNICODE).upper()[:14]
-    tits = [" ".join(str(t).split())[:100] for t in (x.get("titulos") or []) if str(t).strip()][:3]
+    import metodo_roteiro as _mr
+    tits = [_mr.aspas_duplas(" ".join(str(t).split())[:100]) for t in (x.get("titulos") or []) if str(t).strip()][:3]
     if tits:  # 🏷 v84_429: os títulos que combinam com ESTA thumbnail
         out["titulos"] = tits
     if str(x.get("cor_fundo") or "") in CORES_FUNDO or x.get("cor_fundo") == "livre":
@@ -919,7 +920,8 @@ def gravar_titulos(base: str, origem: str, pid: str, titulos: Dict[int, List[str
         d = carregar(base, origem, pid)
         for it in d.get("itens") or []:
             if int(it.get("n") or 0) in titulos:
-                it["titulos"] = titulos[int(it["n"])]
+                import metodo_roteiro as _mr
+                it["titulos"] = [_mr.aspas_duplas(t) for t in titulos[int(it["n"])]]
                 if modelo_ia:
                     it["titulos_modelo"] = modelo_ia
         salvar(base, origem, pid, d)

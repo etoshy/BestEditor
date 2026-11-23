@@ -267,6 +267,14 @@ def bloco_titulos_albert(idioma: str = "", qtd: Optional[int] = None) -> str:
             "responde de verdade" + (f" (em {idioma})" if idioma else "") + ". Fórmulas:\n" + f)
 
 
+_ASPAS_SIMPLES = re.compile(r"(?<![\wÀ-ú])['‘’]([^'‘’\n]{1,160}?)['‘’](?![\wÀ-ú])")
+
+
+def aspas_duplas(t: str) -> str:
+    """🔤 v84_461: 'assim' → "assim" (em títulos e descrições). Apóstrofo dentro de palavra (d'água, rock'n'roll) fica."""
+    return _ASPAS_SIMPLES.sub(lambda m: '"' + m.group(1) + '"', str(t or ""))
+
+
 def titulo_ok(t: str) -> bool:
     return 0 < len(str(t or "").strip()) <= TITULO_MAX + 10
 

@@ -1422,7 +1422,7 @@ def ler_resultado(texto: str, p: Dict[str, Any]) -> Dict[str, Any]:
     _lg = metodo_roteiro.aviso_longo(metodo_roteiro.palavras_do_texto(voz), _alvo, _min, _ppm)
     if _lg:
         avisos.insert(0, "📏 " + _lg)
-    _tits = [" ".join(str(x).split())[:150] for x in d.get("titulos") or [] if str(x).strip()][:10]
+    _tits = [_mr.aspas_duplas(" ".join(str(x).split())[:150]) for x in d.get("titulos") or [] if str(x).strip()][:10]
     _tits = [t for t in _tits if not _mr.copiou_exemplo(t)] or _tits  # 🚫 v84_446: título copiado do exemplo da regra
     _longos = [t for t in _tits if len(t) > _mr.TITULO_MAX + 10]
     if _longos:  # ✍ v84_445: os curtos primeiro; os longos ficam no fim, com aviso
@@ -1687,7 +1687,13 @@ def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
     d["capitulos"] = [{"titulo": c["titulo"], "comeca_em": c.get("comeca_em")} for c in res.get("capitulos") or []]
     d["momentos"] = [m for m in res.get("momentos") or [] if not m.get("inicio")]
     d["roteiro"] = novo
-    return ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+    novo_res = ler_resultado(_json.dumps(d, ensure_ascii=False), p)
+    # v84_462: o que não sai do JSON do roteiro e não pode sumir numa edição (fontes conferidas, livros, versões, "voltar"s…)
+    for k in ("fontes_web", "livros", "roteiro_sem_livros", "roteiro_com_livros", "roteiro_antes_tts", "roteiro_antes_revisao",
+              "roteiro_antes_correcao", "checagem", "audio"):
+        if k in res and k not in novo_res:
+            novo_res[k] = res[k]
+    return novo_res
 
 
 def aplicar_padroes_do_modelo(cfg: Dict[str, Any], modelo: str) -> None:
@@ -1875,20 +1881,30 @@ def descricao_completa(p: Dict[str, Any]) -> str:
         txt = "\n\n".join(x for x in (res.get("descricao") or "", capitulos_video.linhas(cv["capitulos"], cv.get("duracao"))) if x).strip()
     else:
         txt = roteiros_yt.descricao_com_capitulos(res)
+    import livros_afiliado
+    _lv = livros_afiliado.bloco_descricao(res)  # 📖 v84_462: no TOPO (as 2 primeiras linhas são as que aparecem)
+    if _lv:
+        txt = _lv + "\n\n" + txt
     usadas = set(res.get("fontes_usadas") or [])
     import fontes_web
     fw = fontes_web.bloco(res.get("fontes_web"))  # 📚 v84_432: as referências históricas, com links conferidos
     ja = {i.get("url") for i in (res.get("fontes_web") or {}).get("itens") or []}
     # 📚 v84_432: só fontes com LINK (arquivo enviado — notas, transcrição da aula — não é fonte pra quem assiste)
-    fontes = [f for f in p.get("fontes") or [] if f.get("titulo") and f.get("url") and f["url"] not in ja
-              and (not usadas or f["id"] in usadas)]
+    # 📚 v84_461: as fontes do MATERIAL (o link da aula/vídeo de onde o roteiro saiu) não entram mais — só as referências
+    # históricas que a IA achou e o site conferiu (fontes_web, com link); o material de origem não é crédito pro vídeo
+    # (sem as referências conferidas — ex.: projetos de true crime com as notícias da pesquisa — ficam as fontes com link,
+    # menos vídeo do YouTube, que é o material de origem e não referência)
+    fontes = [] if fw else [f for f in p.get("fontes") or [] if f.get("titulo") and f.get("url") and f["url"] not in ja
+                            and (not usadas or f["id"] in usadas)
+                            and not re.search(r"(?i)(youtube\.com|youtu\.be)/", str(f["url"]))]
     if fontes:
         txt += "\n\nFontes:\n" + "\n".join(f"- {f['titulo']}" + f" ({f.get('site') or ''}): {f['url']}" for f in fontes)
     if fw:
         txt += "\n\n" + fw
     if (fw or fontes) and "Correç" not in txt:  # 📌 v84_444: o vídeo diz que as correções ficam aqui
         txt += "\n\n📌 Correções: se algum detalhe deste vídeo precisar de correção, ela fica aqui na descrição."
-    return txt.strip()
+    import metodo_roteiro as _mr
+    return _mr.aspas_duplas(txt.strip())
 
 
 def aplicar_tempos_do_audio(base: str, pid: str, palavras: List[Dict[str, Any]], duracao: Optional[float], origem: str = "") -> Optional[Dict[str, Any]]:

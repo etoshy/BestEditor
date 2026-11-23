@@ -341,6 +341,9 @@ def gerar_textos(job_dir: str, ctx: Dict[str, Any], tipos: Optional[List[str]] =
         for t in tipos:
             novos = [re.sub(r"\s+", " ", str(x)).strip() if t != "descricoes" else str(x).strip()
                      for x in r.get(t) or [] if str(x).strip()]
+            if t in ("titulos", "descricoes"):  # 🔤 v84_461: 'assim' → "assim"
+                import metodo_roteiro as _mr
+                novos = [_mr.aspas_duplas(x) for x in novos]
             if t == "tags":
                 novos = [x.lstrip("#").strip() for x in novos]
             if t == "hashtags":

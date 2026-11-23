@@ -229,7 +229,7 @@
       const l = d.textos[t] || [];
       const lista = (t === 'tags' || t === 'hashtags')
         ? `<div class="pub-chips">${l.map((x, k) => `<span class="pub-chip">${esc(x)}<i data-del="${t}:${k}" title="apagar">✕</i></span>`).join('') || '<span class="pub-hint">nada ainda</span>'}</div>`
-        : (l.map((x, k) => `<div class="pub-op">${t === 'descricoes' ? `<textarea data-ed="${t}:${k}">${esc(x)}</textarea>` : `<input type="text" data-ed="${t}:${k}" value="${esc(x)}">`}<button class="pub-mini" type="button" data-cp="${t}:${k}" title="copiar">📋</button><button class="pub-mini" type="button" data-del="${t}:${k}" title="apagar">✕</button></div>`).join('') || '<span class="pub-hint">nada ainda</span>');
+        : (l.map((x, k) => `<div class="pub-op">${t === 'descricoes' ? `<textarea data-ed="${t}:${k}">${esc(x)}</textarea>` : `<input type="text" data-ed="${t}:${k}" value="${esc(x)}">`}<button class="pub-mini" type="button" data-cp="${t}:${k}" title="copiar">📋</button>${t === 'titulos' ? `<button class="pub-mini" type="button" data-cpmai="${t}:${k}" title="copiar EM MAIÚSCULAS">🔠</button>` : ''}<button class="pub-mini" type="button" data-del="${t}:${k}" title="apagar">✕</button></div>`).join('') || '<span class="pub-hint">nada ainda</span>');
       const todas = t === 'tags' || t === 'hashtags' ? `<button class="pub-mini" type="button" data-cptodas="${t}" title="${t === 'tags' ? 'separadas por vírgula (cole no campo de tags do YouTube)' : 'separadas por espaço'}">📋 todas</button>` : '';
       return `<div class="pub-sec"><div class="cab"><b>${TIT[t]} <span class="pub-hint">(${l.length})</span></b>${todas}<button class="pub-mini" type="button" data-mais="${t}" title="a IA traz opções NOVAS, sem repetir estas">➕ mais alternativas</button></div>${lista}</div>`;
     }).join('');
@@ -297,6 +297,7 @@
   $('pubTextos').addEventListener('click', (e) => {
     const m = e.target.closest('[data-mais]'); if (m) return textos({ tipos: [m.dataset.mais], mais: true }, TIT[m.dataset.mais].toLowerCase());
     const cp = e.target.closest('[data-cp]'); if (cp) { const [t, k] = cp.dataset.cp.split(':'); return copiar(P.d.textos[t][+k]); }
+    const cm = e.target.closest('[data-cpmai]'); if (cm) { const [t, k] = cm.dataset.cpmai.split(':'); return copiar(String(P.d.textos[t][+k]).toLocaleUpperCase('pt-BR')); }
     const ct = e.target.closest('[data-cptodas]'); if (ct) { const t = ct.dataset.cptodas; return copiar((P.d.textos[t] || []).join(t === 'tags' ? ', ' : ' ')); }
     const dl = e.target.closest('[data-del]'); if (dl) { const [t, k] = dl.dataset.del.split(':');
       req(`/textos/${t}/${k}`, { apagar: true }).then(d => { P.d = d; desenhar(); }).catch(er => avisar('⚠ ' + er.message)); }

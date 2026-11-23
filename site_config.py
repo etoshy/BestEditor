@@ -245,7 +245,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "nomes_proibidos": "Olavo de Carvalho",
     "variar_estrutura": True,  # 🎲 v84_433: abertura/arco/fecho mudam de vídeo pra vídeo  # 🚫 v84_427: nomes que NUNCA entram no roteiro (vírgula separa)
     "thumbs_albert": 3,  # 🔥 v84_417: além das 5 thumbs/títulos, N no estilo palavra gigante (0 = desliga) — 3 desde v84_448
-    "thumbs_albert_v448": False,  # True = você salvou o número nas Configurações depois do v84_448 (o 2 antigo vira 3 até lá)
+    "thumbs_albert_v448": False,
+    "amazon_tag": "",  # 📖 v84_462: o seu código de afiliado da Amazon (ex.: seunome-20) — vai nos links dos livros  # True = você salvou o número nas Configurações depois do v84_448 (o 2 antigo vira 3 até lá)
     "max_usos_clipe": 3,  # 🔁 v84_415: o mesmo clipe/cena no máximo N vezes por vídeo (quando não tem outro)
     "buscadores_imagem_paralelo": True,
     "templates_cena_ia": True,
