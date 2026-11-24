@@ -89,3 +89,17 @@ def test_v475_projeto_antigo_acha_historias(tmp_path):
     hs = [{"resumo": "parou de fumar correndo", "palavras": ["cigarro"]}]
     tb.mexer(str(tmp_path), a["id"], lambda x: x.update(historias=hs, temas=[{"id": "t1", "titulo": "t", "projeto": p["id"]}]))
     assert tb.historias_do_projeto(str(tmp_path), p["id"]) == hs
+
+
+def test_v476_um_video_so_e_criterio(tmp_path, monkeypatch):
+    import ia_servico as ia
+    a = tb.criar(str(tmp_path), "aula", "raciocinio_maldito", ("palavra " * 400).encode(), "a.txt", "um")
+    s = tb.system_analise(tb.carregar(str(tmp_path), a["id"]), "x")
+    assert "O QUE É UM BOM TEMA" in s and "público é LEIGO" in s
+    tres = {"historias": [], "temas": [{"titulo": f"T{k}", "tema": "x", "pontos": [f"p{k}"], "forca": k, "minutos": 10}
+                                       for k in (1, 2, 3)]}
+    monkeypatch.setattr(ia, "motivo_desligado", lambda r: "")
+    monkeypatch.setattr(ia, "chamar", lambda *x, **k: tres)
+    assert tb.analisar(str(tmp_path), a["id"]) == 1
+    t = tb.carregar(str(tmp_path), a["id"])["temas"][0]
+    assert t["titulo"] == "T3" and "T1" in t["pontos"] and "p1" in t["pontos"]

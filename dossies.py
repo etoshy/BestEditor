@@ -468,6 +468,13 @@ MODELOS: Dict[str, Dict[str, Any]] = {
                 "Pergunta"]},
         },
         "exemplos_proprios": True,  # v84_467: a aula dá a IDEIA; os exemplos são criados do zero
+        # 🧠 v84_476: o que rende vídeo NESTE canal (o público é leigo, não estudante de psicologia/neuro)
+        "criterio_temas": ("- NESTE CANAL o público é LEIGO e curioso sobre a própria cabeça: tema = medo, vício, culpa, "
+                           "autoestima, relacionamentos, procrastinação, memória, trauma, vergonha, manipulação, hábitos, "
+                           "\"por que eu faço X mesmo sabendo que é ruim\". Neurociência e biologia entram como a explicação "
+                           "por trás disso, nunca como aula (\"como funciona o neurônio\" ✗ → \"por que um susto de anos "
+                           "atrás ainda te trava\" ✓ — exemplo só do JEITO, não copie). Recomendação de livro, como estudar neurociência e assuntos de "
+                           "faculdade NÃO são tema."),
         "regras": [
             "EXEMPLOS DO ZERO (a regra mais importante deste canal): da aula/fonte você pega SÓ a ideia — o conceito, a "
             "profundidade, o raciocínio, os dados e os estudos de verdade. Os EXEMPLOS, casos, analogias, situações e "

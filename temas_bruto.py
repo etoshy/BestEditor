@@ -468,6 +468,12 @@ datas de aula, apresentações) e as histórias pessoais.
 
 Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozinho (quem nunca viu o canal entende).
 {_regra_varios(a)}{_regra_divisao(a)}
+- O QUE É UM BOM TEMA: a resposta a uma pergunta que o PÚBLICO do canal já se fez ou sente na pele (\"por que eu…?\",
+  \"por que as pessoas…?\"). Conteúdo técnico do texto (célula, íons, anatomia, capítulos de livro, como estudar a
+  matéria) NÃO é tema sozinho: ele entra como a EXPLICAÇÃO dentro de um tema assim. Conselho pro aluno/profissional
+  (como estudar, que livro ler, como atender) só é tema se o público do canal for esse. Curiosidade de UMA frase no texto
+  não vira vídeo (nem Shorts). Melhor 2 temas fortes que 6 fracos.
+{mod.get('criterio_temas') or ''}
 - NÃO é tema: a tese ou a polêmica PESSOAL de quem dá a aula (as brigas dele com um professor, um jornalista, uma
   universidade, um político, citados pelo nome) nem a análise do próprio discurso de quem fala. O tema é a IDEIA (um
   pensador, um conceito, uma obra, um problema), contada pelo narrador do canal, sem dono e sem alvo.
@@ -563,6 +569,24 @@ def _juntar(temas: List[Dict[str, Any]], a: Dict[str, Any], de_partes: bool = Tr
     return ler_temas(r, a["modelo"], a) if r else temas
 
 
+def fundir_em_um(temas: List[Dict[str, Any]], a: Dict[str, Any]) -> Dict[str, Any]:
+    """🎯 v84_476: junta vários temas num só (o mais forte dá o título/abertura; o resto soma pontos e referências)."""
+    base = dict(max(temas, key=lambda t: t.get("forca") or 0))
+    outros = [t for t in temas if t is not base and t.get("id") != base.get("id")]
+    pontos, refs = list(base.get("pontos") or []), list(base.get("referencias") or [])
+    for t in outros:
+        pontos.append(t.get("titulo") or "")
+        pontos += [p for p in t.get("pontos") or [] if p not in pontos]
+        refs += [r for r in t.get("referencias") or [] if r not in refs]
+    base["pontos"] = [p for p in pontos if p][:14]
+    base["referencias"] = refs[:12]
+    base["de_onde"] = "; ".join(x for x in [base.get("de_onde")] + [t.get("de_onde") for t in outros] if x)[:300]
+    fixo = minutos_alvo(a)
+    base["minutos"] = fixo or int(min(MINUTOS_MAX, sum(float(t.get("minutos") or 0) for t in temas) or base.get("minutos") or 15))
+    base["por_que_tempo"] = f"um vídeo só juntando {len(temas)} eixos do material"
+    return base
+
+
 def _palavras_chave(t: Dict[str, Any]) -> set:
     import unicodedata
     txt = " ".join([t.get("titulo") or "", t.get("tema") or ""] + list(t.get("pontos") or []) + list(t.get("referencias") or []))
@@ -637,6 +661,8 @@ def analisar(base: str, aid: str, progresso=None) -> int:
                 if progresso:
                     progresso("juntando os temas que se sobrepõem…")
                 temas = _juntar(temas, a, de_partes=len(blocos) > 1)
+            if divisao(a) == "um" and len(temas) > 1:  # 🎯 v84_476: "um vídeo só" é UM — mesmo se a IA devolver vários
+                temas = [fundir_em_um(temas, a)]
         if so_ideia and temas:
             a = mexer(base, aid, lambda x: x.update(historias=historias[:20]))
             temas = tirar_historias(a, temas, progresso)
