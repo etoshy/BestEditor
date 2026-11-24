@@ -61,3 +61,22 @@ def test_v473_completar_proprios():
     import inspect, temas_bruto_rotas
     src = inspect.getsource(temas_bruto_rotas)
     assert "_completar_tamanho(aid, tid, pid, t)" in src and "prompt-completar" in src
+
+
+def test_v474_canal_proibidas_e_marcas(tmp_path, monkeypatch):
+    import dossies as ds
+    import ultimas_escolhas as ue
+    monkeypatch.setattr(ue, "ler", lambda base: {"nome_canal": "CenarioM"})
+    p = ds.criar(str(tmp_path), tema="x", modelo="raciocinio_maldito")
+    assert p["config"]["nome_canal"] == "Raciocínio Maldito"
+    cfg = {"nome_canal": "CenarioM"}
+    ds.aplicar_padroes_do_modelo(cfg, "raciocinio_maldito")
+    assert cfg["nome_canal"] == "Raciocínio Maldito"
+    p["config"]["historias_proibidas"] = [{"resumo": "parou de fumar correndo", "palavras": ["cigarro", "corrida"]}]
+    p["roteiro_base"] = "ideia " * 200
+    pr = ds.prompt_roteiro(p)
+    assert "PROIBIDAS" in pr and "cigarro" in pr and "AS NOTAS NÃO SÃO FALA" in pr and "EXEMPLOS VARIADOS" in pr
+    p["resultado"] = {"roteiro": "bla " * 500}
+    p["config"]["minutos"] = 20
+    c = ds.prompt_completar(p)
+    assert "PROIBIDAS" in c and "AS NOTAS NÃO SÃO FALA" in c

@@ -62,6 +62,8 @@ def registrar(app, base_dir: str) -> None:
                     cfg["minutos"] = float(t.get("minutos") or cfg.get("minutos") or 10)
                     cfg["titulo"] = t["titulo"]
                     cfg["idioma"] = "pt"
+                    if a.get("historias"):  # 🧠 v84_474: o roteiro também recebe as histórias proibidas da aula
+                        cfg["historias_proibidas"] = a["historias"]
                     ds.marcar_mudanca(p, "📚 texto bruto", f"criado a partir de “{a['nome']}”")
                     ds.salvar(base_dir, p)
                 pid = p["id"]

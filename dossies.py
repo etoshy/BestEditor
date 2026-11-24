@@ -571,6 +571,29 @@ REGRA_FALA = (
 _EXEMPLO_COM_NOME = re.compile(r"EXEMPLO COM NOME FICA COM NOME:.*?só quando a fonte não tem um real\. ", re.S)
 
 
+REGRA_MARCAS_DAS_NOTAS = (
+    "AS NOTAS NÃO SÃO FALA: \"uma leitura possível: …\", \"[o texto ilustra…]\", \"segundo o texto\" são anotações pra "
+    "VOCÊ — nunca vão pro roteiro assim. Diga com naturalidade e variando (\"há quem explique assim…\", \"uma explicação "
+    "é que…\", ou simplesmente afirme com cuidado). \"O que a pesquisa sugere\" sem dizer QUAL pesquisa também não: "
+    "cite o estudo/autor real ou diga a ideia sem fingir que é pesquisa.")
+
+REGRA_VARIAR_EXEMPLOS = (
+    "EXEMPLOS VARIADOS: no máximo 2 exemplos começando com \"imagine\" no vídeo inteiro — os outros entram de outros "
+    "jeitos (\"sabe quando você…\", uma cena direta no presente, uma pergunta, um dado real). Cada exemplo de uma área "
+    "diferente da vida (trabalho, relacionamento, celular, comida, dinheiro, estudo…), nunca dois do mesmo hábito.")
+
+
+def bloco_historias_proibidas(cfg: Dict[str, Any]) -> str:
+    """🧠 v84_474: as histórias da aula (achadas na análise do texto bruto) — o roteiro, o completar e a revisão
+    recebem a lista: nem a história, nem o mesmo hábito/objeto dela, nem disfarçada."""
+    hs = [h for h in cfg.get("historias_proibidas") or [] if isinstance(h, dict) and h.get("resumo")]
+    if not hs:
+        return ""
+    return ("HISTÓRIAS DA FONTE ORIGINAL — PROIBIDAS no roteiro (nem recontadas, nem disfarçadas como \"imagine alguém "
+            "que…\", nem usando o MESMO hábito/objeto/esporte/doença delas como exemplo): " + " | ".join(
+                h["resumo"] + (f" (proibido: {', '.join(h.get('palavras') or [])})" if h.get("palavras") else "") for h in hs[:20]))
+
+
 def regra_fala(mod: Optional[Dict[str, Any]] = None) -> str:
     """🧠 v84_467: no canal de "exemplos do zero" (Raciocínio Maldito) os exemplos da fonte NÃO entram — a regra geral
     (o exemplo com nome da fonte fica com nome) vira a do canal; obra, autor e estudo reais continuam com nome."""
@@ -617,7 +640,7 @@ def criar(base: str, tema: str = "", modelo: str = "true_crime") -> Dict[str, An
     ult = ue.ler(base)
     if ult.get("idioma"):
         cfg["idioma"] = ult["idioma"]
-    if "nome_canal" in ult:
+    if "nome_canal" in ult and not canal_do_modelo(cfg["modelo"]):  # 🧠 v84_474: modelo com canal próprio usa o DELE
         cfg["nome_canal"] = ult["nome_canal"]
     aplicar_padroes_do_modelo(cfg, cfg["modelo"])
     p = {"id": pid, "criado": time.time(), "atualizado": time.time(), "tema": (tema or "").strip()[:300],
@@ -1280,6 +1303,11 @@ def prompt_roteiro(p: Dict[str, Any], base: Optional[str] = None) -> str:
     if cfg.get("sem_experiencias", True):
         L.append("- " + REGRA_SEM_PESSOAL)
     L.append("- " + regra_fala(mod))
+    L.append("- " + REGRA_MARCAS_DAS_NOTAS)
+    if mod.get("exemplos_proprios"):
+        L.append("- " + REGRA_VARIAR_EXEMPLOS)
+    if bloco_historias_proibidas(cfg):
+        L.append("- " + bloco_historias_proibidas(cfg))
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     if _perfil:  # 🎭 v84_173: canal com personagens — falas multi voz, emoção por fala, lore, continuidade, histórico
         import canal_perfil
@@ -1579,6 +1607,11 @@ def _contexto_partes(p: Dict[str, Any], base: Optional[str] = None) -> Dict[str,
     if cfg.get("sem_experiencias", True):  # 🧹 v84_418: a regra (sem "segundo as notas", sem crédito da fonte) vale em cada parte
         regras.append(REGRA_SEM_PESSOAL)
     regras.append(regra_fala(mod))  # ✍ v84_432: cada parte sem "a parte anterior", com o retorno assumido
+    regras.append(REGRA_MARCAS_DAS_NOTAS)
+    if mod.get("exemplos_proprios"):
+        regras.append(REGRA_VARIAR_EXEMPLOS)
+    if bloco_historias_proibidas(cfg):
+        regras.append(bloco_historias_proibidas(cfg))
     _perfil = perfil_do_modelo(cfg.get("modelo"))
     _pb = ""
     if _perfil:
@@ -1724,7 +1757,9 @@ def prompt_completar(p: Dict[str, Any]) -> str:
         res["roteiro"], metodo_roteiro.palavras_do_texto(res.get("roteiro_final") or res["roteiro"]), alvo, minutos,
         [c.get("comeca_em") for c in res.get("capitulos") or [] if c.get("comeca_em")],
         idiomas.nome_para_prompt(idiomas.normalizar(cfg.get("idioma")) or "pt"),
-        regras_extra=REGRAS_COMPLETAR_PROPRIOS if (MODELOS.get(cfg.get("modelo")) or {}).get("exemplos_proprios") else None)
+        regras_extra=((REGRAS_COMPLETAR_PROPRIOS + [REGRA_VARIAR_EXEMPLOS])
+                      if (MODELOS.get(cfg.get("modelo")) or {}).get("exemplos_proprios") else [])
+        + [REGRA_MARCAS_DAS_NOTAS] + ([bloco_historias_proibidas(cfg)] if bloco_historias_proibidas(cfg) else []))
 
 
 # 🧠 v84_473: no canal de exemplos do zero a fonte só tem as IDEIAS (as histórias da aula saíram) — o tamanho vem de
@@ -1782,14 +1817,28 @@ def roteiro_editado(p: Dict[str, Any], novo: str) -> Dict[str, Any]:
     return novo_res
 
 
+def _canais_de_outros_modelos(modelo: str) -> set:
+    out = set()
+    for k in MODELOS:
+        if k != modelo:
+            try:
+                c = canal_do_modelo(k)
+            except Exception:  # noqa: BLE001
+                c = ""
+            if c and c != canal_do_modelo(modelo):
+                out.add(c)
+    return out
+
+
 def aplicar_padroes_do_modelo(cfg: Dict[str, Any], modelo: str) -> None:
     """Modelo de canal: o roteiro exemplo do pacote entra no 📐 (se você ainda não pôs outro) e o nome do canal."""
     mod = MODELOS.get(modelo or "") or {}
     if mod.get("referencia_padrao") and not str(cfg.get("referencia") or "").strip():
         cfg["referencia"] = mod["referencia_padrao"]
         cfg["referencia_modo"] = mod.get("referencia_modo_padrao") or "modelar"
-    if canal_do_modelo(modelo) and not str(cfg.get("nome_canal") or "").strip():
-        cfg["nome_canal"] = canal_do_modelo(modelo)
+    atual = str(cfg.get("nome_canal") or "").strip()
+    if canal_do_modelo(modelo) and (not atual or mod.get("nome_canal") or atual in _canais_de_outros_modelos(modelo)):
+        cfg["nome_canal"] = canal_do_modelo(modelo)  # 🧠 v84_474: "CenarioM" num vídeo do Raciocínio Maldito → troca
     if mod.get("perfil_canal") and not cfg.get("vozes_personagens"):
         cfg["vozes_personagens"] = vozes_lembradas(modelo)
 
