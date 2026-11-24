@@ -292,6 +292,33 @@ def _regra_varios(a: Dict[str, Any]) -> str:
             "que deixa o vídeo mais completo. O que dois textos repetem conta UMA vez; quando se complementam, some os dois.\n")
 
 
+def _so_ideias(a: Dict[str, Any]) -> bool:
+    """🟠 v84_470 — modelos com exemplos_proprios (🧠 Raciocínio Maldito): do texto só sai a IDEIA, nunca a história."""
+    import dossies as ds
+    return bool((ds.MODELOS.get(a.get("modelo") or "") or {}).get("exemplos_proprios"))
+
+
+REGRA_SO_IDEIA_TEMAS = """- SÓ A IDEIA, NUNCA A HISTÓRIA DO TEXTO (regra mais importante deste canal): quem fala costuma explicar a ideia com
+  uma história dele (como ele parou de fumar, a faculdade dele, um paciente, um conhecido) ou com um caso/exemplo próprio.
+  Essa história é só o VEÍCULO — o vídeo NUNCA reconta ela, nem disfarçada ("um homem que fumava…", "um jovem que…",
+  "narrativa de superação"). Tire dela só o MECANISMO geral (ex.: em vez de "como parei de fumar correndo" → "por que
+  trocar um vício por outra recompensa funciona melhor que só largar").
+- "titulo", "tema" e "pontos" falam do MECANISMO/da ideia, nunca do caso contado no texto (nada de "como X parou de…",
+  nem os detalhes da história: a cidade, a faculdade, a doença, a distância, o esporte específico dele).
+- "abertura": uma situação NOVA, criada do zero, com outro cenário, outra pessoa e outro hábito/problema que o do texto
+  — ou um estudo/experimento real e conhecido. PROIBIDO reaproveitar a história, o caso ou o exemplo do texto.
+- Estudos, autores, dados e conceitos científicos citados no texto PODEM entrar (são ideias, não histórias).
+"""
+
+REGRA_SO_IDEIA_NOTAS = """- SÓ A IDEIA, NUNCA A HISTÓRIA (regra mais importante deste canal): toda história, caso, paciente, conhecido ou
+  exemplo contado no texto (inclusive em 3ª pessoa) NÃO entra. No lugar dele, escreva só O QUE ele ilustra, em termos
+  gerais e sem detalhes ("[o texto ilustra com um caso pessoal: trocar um hábito ruim por outro que dá recompensa maior
+  faz o ruim perder a graça]") — sem cidade, idade, doença, esporte, faculdade, números ou falas da história. O
+  roteirista vai criar exemplos NOVOS do zero; ele não pode ver a história original.
+- Estudos, autores, dados, regiões do cérebro e conceitos citados FICAM (são ideias, não histórias).
+"""
+
+
 def system_analise(a: Dict[str, Any], texto_bruto: str, parte: str = "") -> str:
     import dossies as ds
     mod = ds.MODELOS.get(a["modelo"]) or {}
@@ -318,7 +345,7 @@ Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozi
 - "por_que": por que esse tema funciona em vídeo (prático? polêmico? curiosidade? exercício que gera comentário?).
 - "abertura": uma ideia de abertura fria pro vídeo — uma história real, um caso, um experimento ou uma pergunta concreta
   que encarna o tema (pode vir de fora do texto, se for conhecido e verdadeiro).
-- "formato": a chave do formato do modelo que melhor combina:
+{REGRA_SO_IDEIA_TEMAS if _so_ideias(a) else ""}- "formato": a chave do formato do modelo que melhor combina:
 {fmts}
 - "minutos": a duração IDEAL do vídeo, pelo tanto que o texto rende sobre o tema (sem enrolação), em geral entre
   {faixa_minutos(a)[0]} e {faixa_minutos(a)[1]} min. Shorts = 1.
@@ -546,7 +573,7 @@ Regras das notas:
   trecho onde o tema aparece primeiro.
 - Formato: texto puro em tópicos e parágrafos curtos, de {faixa_palavras(a)[0]} a
   {faixa_palavras(a)[1]} palavras conforme o material. Sem JSON.
-
+{REGRA_SO_IDEIA_NOTAS if _so_ideias(a) else ""}
 === TEXTO BRUTO ===
 {texto_bruto}
 === FIM DO TEXTO ==="""
@@ -734,6 +761,15 @@ def resumo_fatias(a: Dict[str, Any]) -> Dict[str, Any]:
     return cont
 
 
+def _regra_exemplos_lapidar(a: Dict[str, Any]) -> str:
+    if _so_ideias(a):
+        return REGRA_SO_IDEIA_NOTAS.replace("NÃO entra.", "NÃO entra (mesmo que fique bem mais curto que o original).")
+    return """- EXEMPLOS CONCRETOS FICAM CONCRETOS: personagem, obra, autor, caso real, episódio contado (ex.: "numa prova, a maioria
+  escolheu <tal personagem> de <tal livro>") ficam COM o nome e o detalhe — nunca vire "imagine um personagem…" ou "em certas
+  interpretações…". É o que deixa o vídeo denso.
+"""
+
+
 def system_lapidar(a: Dict[str, Any], t: Dict[str, Any]) -> str:
     return f"""Você LAPIDA o material bruto de UM vídeo de YouTube: trechos de uma aula (transcrição) que já foram separados
 para este vídeo. O resultado é a base que o roteirista vai ler — quanto mais conteúdo, melhor o vídeo.
@@ -744,7 +780,7 @@ Ideia central: {t.get('tema') or ''}
 Regras:
 - NÃO RESUMA. Mantenha TODAS as ideias, argumentos, explicações, exemplos, analogias, distinções, termos técnicos,
   autores, obras e citações (com o que o texto atribui a cada um). O resultado fica com 70% a 90% do tamanho do original
-  — só sai o que é ruído.
+  — só sai o que é ruído{" (e as histórias/casos do texto, que viram só a ideia que ilustram — veja abaixo)" if _so_ideias(a) else ""}.
 - Tire o ruído da fala: hesitações, repetições, "né", "então", frases quebradas, idas e vindas.
 - Corrija os erros óbvios de transcrição pelo contexto. NOMES deformados pelo reconhecimento de voz (autor, obra,
   personagem, lugar, evento) você RECONSTRÓI pelo contexto e pelo que você sabe (o som parecido + o assunto) e escreve
@@ -752,10 +788,7 @@ Regras:
   trecho conta (o que a pessoa/o personagem fez, a obra, a época): um nome que só soa parecido e não combina com a
   história contada é ERRO — nesse caso conte o exemplo sem o nome ("um personagem da literatura brasileira que…").
   Só deixe de fora o que for realmente incompreensível.
-- EXEMPLOS CONCRETOS FICAM CONCRETOS: personagem, obra, autor, caso real, episódio contado (ex.: "numa prova, a maioria
-  escolheu <tal personagem> de <tal livro>") ficam COM o nome e o detalhe — nunca vire "imagine um personagem…" ou "em certas
-  interpretações…". É o que deixa o vídeo denso.
-- Mantenha também o PORQUÊ que o texto dá (a explicação/a causa que quem fala propõe), não só a constatação.
+{_regra_exemplos_lapidar(a)}- Mantenha também o PORQUÊ que o texto dá (a explicação/a causa que quem fala propõe), não só a constatação.
 - Organize na ordem LÓGICA (não precisa ser a ordem da fala), juntando o que fala da mesma coisa, com subtítulos curtos.
 - NADA do evento: não mencione curso, aula, palestra, professor, alunos, perguntas do público, datas, nem o nome de quem
   fala. Nada de histórias pessoais de quem fala sobre a própria vida. O que for tese própria de quem fala (não de um autor
