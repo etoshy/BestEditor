@@ -227,12 +227,117 @@ def _formatos(modelo: str) -> Dict[str, Dict[str, Any]]:
     return (ds.MODELOS.get(modelo) or {}).get("formatos") or {}
 
 
-def _schema_temas() -> Dict[str, Any]:
+def _schema_temas(com_historias: bool = False) -> Dict[str, Any]:
     from ia_midia import _I, _S, _lista, _obj
     tema = _obj({"titulo": _S, "tema": _S, "pontos": _lista(_S), "por_que": _S, "abertura": _S, "formato": _S,
                  "minutos": _I, "por_que_tempo": _S, "forca": _I, "referencias": _lista(_S),
                  "de_onde": _S})
+    if com_historias:
+        return _obj({"historias": _lista(_obj({"resumo": _S, "palavras": _lista(_S)})), "temas": _lista(tema)})
     return _obj({"temas": _lista(tema)})
+
+
+# 🟠 v84_471 — Raciocínio Maldito: a análise lista as HISTÓRIAS do texto e uma 2ª passada reescreve os temas sem elas
+# (a regra sozinha no prompt não bastou: a IA recontava a história de quem fala no título e na abertura). A lista também vai pras
+# notas e pra lapidação, e as palavras concretas de cada história são conferidas no título/tema/pontos/abertura.
+def norm(s: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
+
+
+def ler_historias(d: Any) -> List[Dict[str, Any]]:
+    out = []
+    for h in (d.get("historias") if isinstance(d, dict) else None) or []:
+        if isinstance(h, dict) and str(h.get("resumo") or "").strip():
+            pal = [" ".join(str(p).split())[:40] for p in h.get("palavras") or [] if len(str(p).strip()) >= 3][:12]
+            out.append({"resumo": " ".join(str(h["resumo"]).split())[:300], "palavras": pal})
+    return out[:20]
+
+
+def bloco_historias(a: Dict[str, Any]) -> str:
+    hs = a.get("historias") or []
+    if not hs:
+        return ""
+    return ("\nHISTÓRIAS/CASOS DO TEXTO — NÃO podem aparecer, nem disfarçados, nem com os detalhes concretos deles "
+            "(no lugar, só a ideia geral que ilustram):\n" + "\n".join(
+                f"- {h['resumo']}" + (f" (detalhes proibidos: {', '.join(h['palavras'])})" if h.get("palavras") else "")
+                for h in hs) + "\n")
+
+
+def _campos_texto(t: Dict[str, Any]) -> str:
+    return " ".join([t.get("titulo") or "", t.get("tema") or "", t.get("abertura") or ""] + list(t.get("pontos") or []))
+
+
+def vazamentos(t: Dict[str, Any], historias: List[Dict[str, Any]]) -> List[str]:
+    """As palavras concretas das histórias do texto que sobraram no tema (título, tema, pontos, abertura)."""
+    alvo = " " + norm(_campos_texto(t)) + " "
+    achou = []
+    for h in historias or []:
+        for p in h.get("palavras") or []:
+            n = norm(p).strip()
+            if len(n) >= 4 and re.search(r"(?<![a-z0-9])" + re.escape(n), alvo) and p not in achou:
+                achou.append(p)
+    return achou
+
+
+def _schema_reescrita() -> Dict[str, Any]:
+    from ia_midia import _S, _lista, _obj
+    return _obj({"temas": _lista(_obj({"id": _S, "titulo": _S, "tema": _S, "pontos": _lista(_S), "por_que": _S,
+                                       "abertura": _S, "referencias": _lista(_S)}))})
+
+
+def system_sem_historias(a: Dict[str, Any]) -> str:
+    return f"""Você revisa os TEMAS de vídeos de um canal de YouTube de psicologia/comportamento. Os temas foram tirados de
+uma transcrição em que quem fala explica as ideias contando histórias DELE (ou de conhecidos/pacientes). O canal NUNCA
+reconta essas histórias: usa só a IDEIA geral e cria exemplos NOVOS do zero.
+{bloco_historias(a)}
+Reescreva CADA tema:
+- "titulo": até 50 caracteres, sobre o MECANISMO (o porquê do comportamento), em linguagem do povo, chamativo. Sem nenhum
+  detalhe das histórias acima (nem o objeto, o hábito, o lugar, a doença, as pessoas delas). Em vez de "Como <alguém>
+  fez <tal coisa>" → "Por que <o mecanismo> pega todo mundo".
+- "tema" e "pontos": a ideia e os passos do raciocínio em termos GERAIS. Ponto que só conta a história ("exemplo de como X
+  fez Y") vira o princípio que ela mostra ou sai.
+- "abertura": uma cena NOVA criada do zero — outra pessoa, outro cenário e OUTRO hábito/problema que os das histórias
+  acima (ou um experimento/estudo real e conhecido). Nunca o mesmo vício/hábito da história.
+- "por_que": sem citar "gancho pessoal" nem a história.
+- "referencias": só conceitos, estudos, autores e áreas do cérebro (nada de pessoa da história).
+Mantenha o "id" de cada tema. Responda só o JSON."""
+
+
+def tirar_historias(a: Dict[str, Any], temas: List[Dict[str, Any]], progresso=None) -> List[Dict[str, Any]]:
+    """2ª passada: reescreve os temas sem as histórias do texto (até 2 vezes se ainda sobrar detalhe concreto)."""
+    import ia_servico as ia
+    hs = a.get("historias") or []
+    for tent in range(2):
+        alvo = temas if tent == 0 else [t for t in temas if vazamentos(t, hs)]
+        if not alvo:
+            break
+        if progresso:
+            progresso("🧠 tirando as histórias da aula dos temas…")
+        envio = [{k: t.get(k) for k in ("id", "titulo", "tema", "pontos", "por_que", "abertura", "referencias")} for t in alvo]
+        pedido = "Reescreva estes temas:\n" + json.dumps(envio, ensure_ascii=False, indent=1)
+        if tent:
+            pedido += "\n\nAINDA sobraram detalhes das histórias: " + "; ".join(
+                f"{t['titulo']}: {', '.join(vazamentos(t, hs))}" for t in alvo) + ". Tire TODOS."
+        try:
+            with ia.rotulo("🧠 Temas sem histórias: " + a["nome"][:50]):
+                d = ia.chamar("roteiros", system_sem_historias(a), pedido, schema=_schema_reescrita(), max_tokens=12000,
+                              effort="medium", timeout=600, cache_local=False)
+        except Exception:  # noqa: BLE001 — a revisão é extra: se falhar, ficam os temas da análise
+            break
+        novos = {str(x.get("id")): x for x in (d or {}).get("temas") or [] if isinstance(x, dict)}
+        for t in temas:
+            x = novos.get(t["id"])
+            if not x or not str(x.get("titulo") or "").strip():
+                continue
+            t["titulo"] = " ".join(str(x["titulo"]).split())[:120]
+            for k, lim in (("tema", 400), ("por_que", 400), ("abertura", 500)):
+                if str(x.get(k) or "").strip():
+                    t[k] = str(x[k]).strip()[:lim]
+            for k, lim in (("pontos", 10), ("referencias", 12)):
+                if isinstance(x.get(k), list) and x[k]:
+                    t[k] = [str(p).strip()[:400] for p in x[k] if str(p).strip()][:lim]
+    return temas
 
 
 def _regra_divisao(a: Dict[str, Any]) -> str:
@@ -299,21 +404,27 @@ def _so_ideias(a: Dict[str, Any]) -> bool:
 
 
 REGRA_SO_IDEIA_TEMAS = """- SÓ A IDEIA, NUNCA A HISTÓRIA DO TEXTO (regra mais importante deste canal): quem fala costuma explicar a ideia com
-  uma história dele (como ele parou de fumar, a faculdade dele, um paciente, um conhecido) ou com um caso/exemplo próprio.
-  Essa história é só o VEÍCULO — o vídeo NUNCA reconta ela, nem disfarçada ("um homem que fumava…", "um jovem que…",
-  "narrativa de superação"). Tire dela só o MECANISMO geral (ex.: em vez de "como parei de fumar correndo" → "por que
-  trocar um vício por outra recompensa funciona melhor que só largar").
-- "titulo", "tema" e "pontos" falam do MECANISMO/da ideia, nunca do caso contado no texto (nada de "como X parou de…",
-  nem os detalhes da história: a cidade, a faculdade, a doença, a distância, o esporte específico dele).
+  uma história dele (algo que ele viveu, a família, a escola/faculdade, um paciente, um conhecido) ou com um caso/exemplo
+  próprio. Essa história é só o VEÍCULO — o vídeo NUNCA reconta ela, nem disfarçada ("um homem que…", "um jovem que…",
+  "narrativa de superação"). Tire dela só o MECANISMO geral: em vez de "como <alguém> fez <tal coisa>" → "por que
+  <o mecanismo> acontece com qualquer pessoa".
+- "titulo", "tema" e "pontos" falam do MECANISMO/da ideia, nunca do caso contado no texto (nada de "como X conseguiu…",
+  nem os detalhes da história: os objetos, o hábito, o lugar, a doença, os números, as pessoas dela).
 - "abertura": uma situação NOVA, criada do zero, com outro cenário, outra pessoa e outro hábito/problema que o do texto
   — ou um estudo/experimento real e conhecido. PROIBIDO reaproveitar a história, o caso ou o exemplo do texto.
 - Estudos, autores, dados e conceitos científicos citados no texto PODEM entrar (são ideias, não histórias).
 """
 
+REGRA_LISTAR_HISTORIAS = """- "historias" (ANTES dos temas): liste TODAS as histórias, casos e exemplos concretos do texto (pessoais de quem
+  fala, de pacientes, conhecidos, alunos — os estudos científicos NÃO entram aqui). Cada uma: "resumo" (1 frase) e
+  "palavras" (3 a 8 detalhes CONCRETOS e próprios dela: o objeto, o hábito, o esporte, o lugar, a doença, a distância —
+  os substantivos que só aquela história tem; nunca o conceito geral que ela ilustra, como "medo", "vício", "hábito").
+"""
+
 REGRA_SO_IDEIA_NOTAS = """- SÓ A IDEIA, NUNCA A HISTÓRIA (regra mais importante deste canal): toda história, caso, paciente, conhecido ou
   exemplo contado no texto (inclusive em 3ª pessoa) NÃO entra. No lugar dele, escreva só O QUE ele ilustra, em termos
-  gerais e sem detalhes ("[o texto ilustra com um caso pessoal: trocar um hábito ruim por outro que dá recompensa maior
-  faz o ruim perder a graça]") — sem cidade, idade, doença, esporte, faculdade, números ou falas da história. O
+  gerais e sem detalhes ("[o texto ilustra com um caso pessoal: <o princípio, em uma frase>]") — sem lugar, idade,
+  doença, objetos, números, pessoas ou falas da história. O
   roteirista vai criar exemplos NOVOS do zero; ele não pode ver a história original.
 - Estudos, autores, dados, regiões do cérebro e conceitos citados FICAM (são ideias, não histórias).
 """
@@ -345,7 +456,7 @@ Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozi
 - "por_que": por que esse tema funciona em vídeo (prático? polêmico? curiosidade? exercício que gera comentário?).
 - "abertura": uma ideia de abertura fria pro vídeo — uma história real, um caso, um experimento ou uma pergunta concreta
   que encarna o tema (pode vir de fora do texto, se for conhecido e verdadeiro).
-{REGRA_SO_IDEIA_TEMAS if _so_ideias(a) else ""}- "formato": a chave do formato do modelo que melhor combina:
+{(REGRA_SO_IDEIA_TEMAS + REGRA_LISTAR_HISTORIAS) if _so_ideias(a) else ""}- "formato": a chave do formato do modelo que melhor combina:
 {fmts}
 - "minutos": a duração IDEAL do vídeo, pelo tanto que o texto rende sobre o tema (sem enrolação), em geral entre
   {faixa_minutos(a)[0]} e {faixa_minutos(a)[1]} min. Shorts = 1.
@@ -485,6 +596,7 @@ def analisar(base: str, aid: str, progresso=None) -> int:
     tx = texto(base, aid)
     blocos = [tx[i:i + BLOCO_ANALISE] for i in range(0, len(tx), BLOCO_ANALISE)] or [tx]
     temas: List[Dict[str, Any]] = []
+    so_ideia, historias = _so_ideias(a), []  # type: ignore[var-annotated]
     try:
         with ia.rotulo("📚 Temas: " + a["nome"][:60]):
             for k, bl in enumerate(blocos, 1):
@@ -492,15 +604,19 @@ def analisar(base: str, aid: str, progresso=None) -> int:
                     progresso(f"lendo o texto{f' (parte {k} de {len(blocos)})' if len(blocos) > 1 else ''}…")
                 parte = f"parte {k} de {len(blocos)}" if len(blocos) > 1 else ""
                 d = ia.chamar("roteiros", system_analise(a, bl, parte), "Separe os temas deste texto.",
-                              schema=_schema_temas(), max_tokens=16000, effort="medium", timeout=900)
+                              schema=_schema_temas(so_ideia), max_tokens=16000, effort="medium", timeout=900)
                 if d is None:
                     raise TemasErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
                 temas += ler_temas(d, a["modelo"], a)
+                historias += ler_historias(d)
             hi = DIVISOES[divisao(a)]["faixa"][1]
             if temas and (len(blocos) > 1 or len(temas) > hi or (divisao(a) != "maximo" and parecidos(temas))):
                 if progresso:
                     progresso("juntando os temas que se sobrepõem…")
                 temas = _juntar(temas, a, de_partes=len(blocos) > 1)
+        if so_ideia and temas:
+            a = mexer(base, aid, lambda x: x.update(historias=historias[:20]))
+            temas = tirar_historias(a, temas, progresso)
     except Exception as exc:
         mexer(base, aid, lambda x: x.update(estado="erro", erro=str(exc)[:400]))
         raise
@@ -573,7 +689,7 @@ Regras das notas:
   trecho onde o tema aparece primeiro.
 - Formato: texto puro em tópicos e parágrafos curtos, de {faixa_palavras(a)[0]} a
   {faixa_palavras(a)[1]} palavras conforme o material. Sem JSON.
-{REGRA_SO_IDEIA_NOTAS if _so_ideias(a) else ""}
+{(REGRA_SO_IDEIA_NOTAS + bloco_historias(a)) if _so_ideias(a) else ""}
 === TEXTO BRUTO ===
 {texto_bruto}
 === FIM DO TEXTO ==="""
@@ -763,7 +879,8 @@ def resumo_fatias(a: Dict[str, Any]) -> Dict[str, Any]:
 
 def _regra_exemplos_lapidar(a: Dict[str, Any]) -> str:
     if _so_ideias(a):
-        return REGRA_SO_IDEIA_NOTAS.replace("NÃO entra.", "NÃO entra (mesmo que fique bem mais curto que o original).")
+        return (REGRA_SO_IDEIA_NOTAS.replace("NÃO entra.", "NÃO entra (mesmo que fique bem mais curto que o original).")
+                + bloco_historias(a))
     return """- EXEMPLOS CONCRETOS FICAM CONCRETOS: personagem, obra, autor, caso real, episódio contado (ex.: "numa prova, a maioria
   escolheu <tal personagem> de <tal livro>") ficam COM o nome e o detalhe — nunca vire "imagine um personagem…" ou "em certas
   interpretações…". É o que deixa o vídeo denso.
@@ -831,7 +948,7 @@ def lapidar(base: str, a: Dict[str, Any], t: Dict[str, Any], progresso=None) -> 
             with ia.rotulo("💎 Lapidar: " + t["titulo"][:60]):
                 r = str(ia.chamar("roteiros", system_lapidar(a, t), pedido, max_tokens=16000, effort="low", timeout=900,
                                   cache_local=not _tent) or "").strip()
-            if len(r.split()) >= 0.5 * len(pd.split()):
+            if len(r.split()) >= (0.15 if _so_ideias(a) else 0.5) * len(pd.split()):
                 break  # encolheu demais = resumiu: tenta de novo uma vez
         if len(r.split()) < 40:
             r = pd  # a IA falhou: fica o bruto mesmo (melhor que perder o trecho)
