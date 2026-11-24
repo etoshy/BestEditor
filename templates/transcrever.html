@@ -237,6 +237,39 @@ function mostrarResultado(jobId, resultado) {
 }
 </script>
 
+<div style="margin-top:24px;padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;font-size:.88rem">
+  <b>📦 Transcrições do YouTube em lote (.zip)</b> — pelo script do navegador do site (o mesmo das imagens do Google): sem baixar vídeo nem usar o Whisper.
+  <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <button type="button" id="ytAbrir" style="width:auto;margin:0;padding:4px 12px;font-size:.84rem">▶ Abrir o YouTube no navegador do site</button>
+    <a href="/navegador-imagens/instalar" target="_blank" style="font-size:.84rem">⚙ instalar/atualizar o script</a>
+    <span id="ytSt" style="color:#555"></span></div>
+  <div style="color:#555;font-size:.8rem;margin-top:4px">Lá: numa playlist/canal clique em <b>📦 Transcrições</b> (canto de baixo) → ➕ Pegar os vídeos desta página → escolha <b>só as transcrições</b>, <b>🎬 vídeos + transcrições</b> ou <b>🎧 só o áudio (melhor qualidade) + transcrições</b>. Com vídeo/áudio, quem baixa é o site (aqui embaixo aparece o andamento e o .zip).</div>
+  <div id="lotes" style="margin-top:8px"></div>
+</div>
+<script>
+async function desenharLotes() {
+  let d; try { d = await (await fetch('/transcrever/lotes')).json(); } catch (e) { return; }
+  const box = document.getElementById('lotes'), L = d.lotes || [];
+  const nomes = { video: '🎬 vídeos', audio: '🎧 áudios', transcricao: '📄 transcrições' };
+  box.innerHTML = L.map(l => `<div id="lote-${l.id}" style="border-top:1px solid #bfdbfe;padding:5px 0">
+    <b>📦 ${nomes[l.modo] || l.modo}</b> · ${new Date(l.criado * 1000).toLocaleString('pt-BR')} · ${l.prontos} de ${l.total} prontos ·
+    ${l.estado === 'pronto' ? `<a href="/transcrever/lote/${l.id}/zip"><b>⬇ baixar o .zip</b></a>` : l.estado === 'baixando' || l.estado === 'na_fila'
+      ? `⏳ ${l.estado === 'na_fila' ? 'na fila' : 'baixando'}${(l.itens.find(i => i.estado === 'baixando') || {}).titulo ? ': ' + (l.itens.find(i => i.estado === 'baixando').titulo || '').replace(/</g, '&lt;') : ''} <button type="button" onclick="fetch('/transcrever/lote/${l.id}/parar',{method:'POST'})" style="width:auto;margin:0;padding:1px 8px;font-size:.75rem">⏹ parar</button>`
+      : '⚠ ' + l.estado}
+    ${l.itens.some(i => i.erro) ? `<details><summary style="font-size:.78rem;color:#b45309">${l.itens.filter(i => i.erro).length} com erro</summary>${l.itens.filter(i => i.erro).map(i => `<div style="font-size:.75rem;color:#b91c1c">${(i.titulo || i.url).replace(/</g, '&lt;')}: ${String(i.erro).slice(0, 200).replace(/</g, '&lt;')}</div>`).join('')}</details>` : ''}</div>`).join('');
+  if (L.some(l => l.estado === 'baixando' || l.estado === 'na_fila')) setTimeout(desenharLotes, 4000);
+}
+desenharLotes();
+</script>
+<script>
+document.getElementById('ytAbrir').addEventListener('click', async () => {
+  const st = document.getElementById('ytSt'); st.textContent = 'abrindo…';
+  try { const r = await fetch('/navegador-imagens/youtube', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const d = await r.json(); st.textContent = r.ok ? '✔ aberto no navegador do site' : '⚠ ' + (d.erro || r.status); }
+  catch (e) { st.textContent = '⚠ ' + e.message; }
+});
+</script>
+
 <h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
 {% if jobs %}<p style="font-size:.85rem;margin:0 0 6px"><label style="display:inline;font-weight:400"><input type="checkbox" id="hist-esconder" style="width:auto;margin:0"> esconder os marcados como feitos</label>
   <span style="color:#666"> · {{ jobs|selectattr('feito')|list|length }} de {{ jobs|length }} feitos</span></p>{% endif %}

@@ -261,6 +261,23 @@ def registrar(app, base_dir: str) -> None:
     def navegador_imagens_script():
         return Response(script(_site()), mimetype="text/javascript; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
+    @app.route("/navegador-imagens/youtube-transcricao.user.js")
+    def navegador_youtube_transcricao():
+        """📄 v84_464: o script do YouTube (copiar/baixar a transcrição + 📦 várias num .zip) — o MESMO navegador do site."""
+        cam = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "youtube_transcricao.user.js")
+        with open(cam, encoding="utf-8") as fh:
+            return Response(fh.read().replace("__SITE__", _site()), mimetype="text/javascript; charset=utf-8",
+                            headers={"Cache-Control": "no-cache"})
+
+    @app.route("/navegador-imagens/youtube", methods=["POST"])
+    def navegador_youtube_abrir():
+        """Abre o YouTube no navegador do site (onde o script está instalado) — pra baixar as transcrições em lote."""
+        url = str((request.get_json(silent=True) or {}).get("url") or "https://www.youtube.com/")
+        if not url.startswith("https://www.youtube.com/") and not url.startswith("https://youtube.com/"):
+            url = "https://www.youtube.com/"
+        r = abrir(base_dir, [url], load_site_config())
+        return jsonify(r), (200 if r.get("ok") else 400)
+
     @app.route("/navegador-imagens/instalar")
     def navegador_imagens_instalar():
         """Página de instalação: link do .user.js (Tampermonkey/OrangeMonkey abrem sozinhos) + o código pra colar."""
@@ -274,7 +291,12 @@ def registrar(app, base_dir: str) -> None:
 Se não abrir: no ícone da extensão → <b>Criar/Adicionar novo script</b>, apague o que vier e cole o código abaixo (<button onclick="navigator.clipboard.writeText(document.getElementById('c').value);this.textContent='✔ copiado'">📋 copiar</button>), salve.</li>
 <li>Se a extensão pedir, ative <b>"Permitir scripts de usuário"</b> (chrome://extensions → Detalhes da extensão).</li>
 <li>Se o script já existia (versão antiga sem o envio ao site), substitua pelo novo.</li></ol>
-<textarea id="c" style="width:100%;height:340px;font:12px monospace">{_h.escape(cod)}</textarea></body>"""
+<textarea id="c" style="width:100%;height:340px;font:12px monospace">{_h.escape(cod)}</textarea>
+<h2 style="margin-top:28px">📄 Script "YouTube — Copiar / Baixar Transcrição" (opcional)</h2>
+<p>Botão <b>📄 Transcrição</b> nos vídeos e <b>📦 Transcrições</b> nas playlists/canais: várias transcrições de uma vez num .zip.
+Instala na MESMA extensão: clique em <a href="/navegador-imagens/youtube-transcricao.user.js"><b>instalar o script do YouTube</b></a>
+(se não abrir: Criar novo script → cole o código de <a href="/navegador-imagens/youtube-transcricao.user.js" target="_blank">aqui</a> → salvar).
+Se você já tinha a versão 1.2 ou 1.3, substitua pela 1.4 (é ela que manda os vídeos/áudios pro site baixar).</p></body>"""
         return Response(pag, mimetype="text/html; charset=utf-8")
 
     @app.route("/navegador-imagens/estado")

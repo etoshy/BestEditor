@@ -18,3 +18,12 @@ def test_nome_e_feito(tmp_path, monkeypatch):
     assert os.path.isfile(tmp_path / "abc123456789" / "_job.json")
     assert "hist-feito" in c.get("/transcrever").get_data(as_text=True)
     A._TRANSCRICOES_AVULSAS_JOBS.pop("abc123456789", None)
+
+
+def test_script_youtube_servido():
+    import app as A
+    c = A.app.test_client()
+    r = c.get("/navegador-imagens/youtube-transcricao.user.js")
+    assert r.status_code == 200 and "@version      1.4.0" in r.get_data(as_text=True) and "makeZip" in r.get_data(as_text=True)
+    assert "youtube-transcricao.user.js" in c.get("/navegador-imagens/instalar").get_data(as_text=True)
+    assert "ytAbrir" in c.get("/transcrever").get_data(as_text=True)

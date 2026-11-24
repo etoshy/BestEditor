@@ -464,6 +464,62 @@ def _nome_cliente(cliente: Optional[List[str]]) -> str:
     return "padrão" if not cliente else "+".join(cliente)
 
 
+def baixar_audio(url: str, output_dir: str, ytdlp_module: Any = None, on_log: Optional[Any] = None) -> Dict[str, Any]:
+    """🎧 v84_464: SÓ o som, na melhor qualidade que o YouTube tem (o "bestaudio", sem recomprimir: opus/m4a como vem).
+    Devolve {"caminho", "titulo", "duracao_segundos", "url", "id", "cliente"}."""
+    log = on_log or (lambda _m: None)
+    if ytdlp_module is not None:
+        yt_dlp = ytdlp_module
+    else:
+        try:
+            import yt_dlp  # type: ignore
+        except ImportError as exc:
+            raise YoutubeClipperError("yt-dlp não está instalado. Rode: pip install yt-dlp") from exc
+    os.makedirs(output_dir, exist_ok=True)
+    ffmpeg = shutil.which("ffmpeg")
+    erros: List[str] = []
+
+    def _rodada(ck: Dict[str, Any]) -> Dict[str, Any]:
+        for k, cliente in enumerate(CLIENTES_YOUTUBE):
+            pasta = os.path.join(output_dir, f"_audio_{k}")
+            os.makedirs(pasta, exist_ok=True)
+            opcoes: Dict[str, Any] = {**(ck or {}), "format": "bestaudio/best", "outtmpl": os.path.join(pasta, "%(id)s.%(ext)s"),
+                                      "quiet": True, "no_warnings": True, "noplaylist": True,
+                                      "format_sort": ["abr", "asr"]}
+            if ffmpeg:  # tira o áudio do contêiner (webm → .opus, mp4 → .m4a) SEM recomprimir
+                opcoes["ffmpeg_location"] = os.path.dirname(ffmpeg)
+                opcoes["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "best"}]
+            if cliente:
+                opcoes["extractor_args"] = {"youtube": {"player_client": list(cliente)}}
+            try:
+                with yt_dlp.YoutubeDL(opcoes) as ydl:
+                    info = ydl.extract_info(url, download=True)
+            except Exception as exc:  # noqa: BLE001
+                erros.append(f"cliente {_nome_cliente(cliente)}: {exc}")
+                shutil.rmtree(pasta, ignore_errors=True)
+                continue
+            arqs = [os.path.join(pasta, x) for x in os.listdir(pasta) if not x.endswith((".part", ".ytdl"))]
+            if not arqs:
+                erros.append(f"cliente {_nome_cliente(cliente)}: o arquivo não apareceu")
+                shutil.rmtree(pasta, ignore_errors=True)
+                continue
+            cam = max(arqs, key=os.path.getsize)
+            destino = os.path.join(output_dir, os.path.basename(cam))
+            shutil.move(cam, destino)
+            shutil.rmtree(pasta, ignore_errors=True)
+            log(f"  ✔ áudio baixado ({os.path.splitext(destino)[1][1:]}, {info.get('abr') or '?'} kbps, cliente {_nome_cliente(cliente)})")
+            return {"caminho": destino, "titulo": info.get("title") or url, "duracao_segundos": info.get("duration"),
+                    "url": url, "id": info.get("id"), "cliente": _nome_cliente(cliente)}
+        bloq = [e for e in erros[-len(CLIENTES_YOUTUBE):] if yt_cookies.eh_bloqueio(e)]
+        raise YoutubeClipperError(bloq[-1] if bloq else (erros[-1] if erros else "nenhum cliente baixou o áudio"))
+
+    import yt_cookies
+    try:
+        return yt_cookies.tentar(_rodada, log)
+    except yt_cookies.YoutubeBloqueado as exc:
+        raise YoutubeClipperError(str(exc)) from exc
+
+
 def baixar_video(url: str, output_dir: str, qualidade: str = QUALIDADE_PADRAO, ytdlp_module: Any = None,
                  on_log: Optional[Any] = None) -> Dict[str, Any]:
     """Baixa `url` (precisa ser um vídeo, não uma playlist/canal) pra

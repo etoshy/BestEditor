@@ -11812,6 +11812,10 @@ def _nome_base_transcricao(job: Dict[str, Any]) -> str:
     return base or f"transcricao_{job.get('id') or ''}"
 
 
+import transcrever_lote as _transcrever_lote  # noqa: E402  (📦 v84_464: lote do YouTube vindo do script)
+_transcrever_lote.registrar(app, TRANSCRICOES_AVULSAS_DIR)
+
+
 @app.route("/transcrever/<job_id>/feito", methods=["POST"])
 def transcrever_feito(job_id: str):
     """✔ v84_463: marcar/desmarcar "já usei" (fica salvo no histórico)."""
