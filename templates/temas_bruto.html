@@ -36,8 +36,10 @@
     <select name="modelo">{% for k, m in modelos.items() %}<option value="{{ k }}"{% if k == padrao %} selected{% endif %}>{{ m.nome }}</option>{% endfor %}</select>
     <label>Quantos vídeos <span style="font-weight:400;color:#888;">(poucos e completos junta tudo que a aula diz sobre cada eixo, do começo ao fim)</span></label>
     <select name="divisao" id="divisao">{% for k, d in divisoes.items() %}<option value="{{ k }}"{% if k == divisao %} selected{% endif %}>{{ d.nome }}</option>{% endfor %}</select>
-    <label>Arquivo <span style="font-weight:400;color:#888;">(.txt, .md, .pdf, .docx, .epub, .srt…)</span></label>
-    <input type="file" name="arquivo" accept=".txt,.md,.pdf,.epub,.docx,.srt,.vtt,.html,.htm,.rtf">
+    <div id="minBox" style="display:none"><label>Minutos de cada vídeo <span style="font-weight:400;color:#888;" id="minDica"></span></label>
+      <input type="number" name="minutos_alvo" id="minutosAlvo" min="1" max="120" placeholder="ex.: 12" style="width:120px"></div>
+    <label>Arquivo(s) <span style="font-weight:400;color:#888;">(.txt, .md, .pdf, .docx, .epub, .srt… — pode escolher <b>vários</b>: 🧩 viram um material só, mais completo)</span></label>
+    <input type="file" name="arquivo" multiple accept=".txt,.md,.pdf,.epub,.docx,.srt,.vtt,.html,.htm,.rtf">
     <label>…ou cole o texto</label>
     <textarea name="texto" rows="4" placeholder="cole aqui a transcrição ou o texto"></textarea>
     <label>Nome <span style="font-weight:400;color:#888;">(opcional — pra achar depois)</span></label>
@@ -54,16 +56,24 @@
   </div>
   {% else %}<p style="color:#888;">Nenhum ainda.</p>{% endfor %}
 </div>
-<script>document.getElementById('formNovo').addEventListener('submit', () => { const b = document.getElementById('btnNovo'); b.disabled = true; b.textContent = '⏳ enviando…'; });</script>
+<script>document.getElementById('formNovo').addEventListener('submit', () => { const b = document.getElementById('btnNovo'); b.disabled = true; b.textContent = '⏳ enviando…'; });
+(function () {  // ⏱/🎯 v84_468: o tempo de cada vídeo
+  const dv = document.getElementById('divisao'), box = document.getElementById('minBox'), dica = document.getElementById('minDica'), mi = document.getElementById('minutosAlvo');
+  const sync = () => { box.style.display = (dv.value === 'tempo' || dv.value === 'um') ? '' : 'none';
+    dica.textContent = dv.value === 'tempo' ? '(obrigatório — a IA só pega os assuntos que rendem esse tempo)' : '(opcional — vazio = o tamanho que o material todo render)';
+    mi.required = dv.value === 'tempo'; };
+  dv.addEventListener('change', sync); sync();
+})();</script>
 
 {% else %}
 <p><a href="/temas-bruto">← todos os textos</a></p>
 <div class="tb-card">
   <h2 style="margin:0;">{{ a.nome }}</h2>
-  <div class="tb-meta">{{ a.modelo_nome }} · {{ a.palavras }} palavras{% if a.arquivo %} · {{ a.arquivo }}{% endif %} · {{ tempo(a) }}</div>
+  <div class="tb-meta">{{ a.modelo_nome }} · {{ a.palavras }} palavras{% if (a.textos or 1) > 1 %} · 🧩 {{ a.textos }} textos juntos{% endif %}{% if a.arquivo %} · {{ a.arquivo }}{% endif %}{% if a.minutos_alvo and divisao in ('tempo', 'um') %} · ⏱ {{ a.minutos_alvo }} min{% endif %} · {{ tempo(a) }}</div>
   <div id="analise" class="tb-status"></div>
   <div class="tb-linha">
     <select name="divisao" id="divisao" style="width:auto;margin:0;">{% for k, d in divisoes.items() %}<option value="{{ k }}"{% if k == divisao %} selected{% endif %}>{{ d.nome }}</option>{% endfor %}</select>
+    <input type="number" id="minutosAlvo" min="1" max="120" value="{{ a.minutos_alvo or '' }}" placeholder="min" title="⏱ minutos de cada vídeo (⏱ tamanho escolhido / 🎯 um vídeo só)" style="width:80px;margin:0;{% if divisao not in ('tempo', 'um') %}display:none{% endif %}">
     <button type="button" id="btnAnalisar" style="width:auto;margin:0;"{% if ia_off %} disabled title="{{ ia_off }}"{% endif %}>🤖 {{ 'Separar os temas de novo' if a.temas else 'Separar os temas' }}</button>
     {% if a.temas and a.temas|length > 1 %}<button type="button" id="btnJuntar" class="secondary" style="width:auto;margin:0;"{% if ia_off %} disabled{% endif %} title="a IA junta os temas que se sobrepõem num vídeo só, mais completo (os que já viraram projeto ficam)">🧩 Juntar os parecidos</button>{% endif %}
     <button type="button" id="btnPrompt" class="secondary" style="width:auto;margin:0;">📋 Copiar o pedido (pra outra IA)</button>
@@ -120,6 +130,8 @@
 (() => {
   const AID = {{ a.id|tojson }};
   const $ = s => document.querySelector(s);
+  if ($('#minutosAlvo') && $('#divisao')) $('#divisao').addEventListener('change', () => {
+    $('#minutosAlvo').style.display = ['tempo', 'um'].includes($('#divisao').value) ? '' : 'none'; });
   let rodando = {{ 'true' if rodando else 'false' }}, analisando = {{ 'true' if a.estado == 'analisando' else 'false' }};
   const post = async (url, corpo) => { const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo || {})});
     const d = await r.json().catch(() => ({})); if (!r.ok || d.erro) throw new Error(d.erro || r.status); return d; };
@@ -137,7 +149,7 @@
     catch (e) { alert('❌ ' + e.message); }
   });
   $('#btnAnalisar').addEventListener('click', async () => {
-    try { await post(`/temas-bruto/${AID}/analisar`, {divisao: $('#divisao').value}); analisando = true; $('#analise').textContent = '⏳ a IA está lendo o texto e separando os temas…'; acompanhar(); }
+    try { await post(`/temas-bruto/${AID}/analisar`, {divisao: $('#divisao').value, minutos_alvo: ($('#minutosAlvo') || {}).value || ''}); analisando = true; $('#analise').textContent = '⏳ a IA está lendo o texto e separando os temas…'; acompanhar(); }
     catch (e) { alert('❌ ' + e.message); }
   });
 

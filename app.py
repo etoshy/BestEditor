@@ -11745,7 +11745,24 @@ def transcrever_submit():
     _TRANSCRICOES_AVULSAS_JOBS[job_id] = {
         "id": job_id, "status": "na_fila", "log": "⏳ Na fila — começa quando o anterior terminar.\n", "erro": None,
         "criado_em": time.time(), "modo": modo, "url": url or None, "nome": nome_arquivo[:120],
+        # 💾 v84_469: o pedido fica salvo JÁ — se o site fechar no meio, dá pra continuar (ou apagar) depois
+        "params": {"arquivo_path": arquivo_path, "whisper_model": whisper_model, "idioma": idioma, "device": device,
+                   "max_height": max_height, "apagar_video": apagar_video},
     }
+    _historico_salvar(TRANSCRICOES_AVULSAS_DIR, _TRANSCRICOES_AVULSAS_JOBS[job_id])
+    _transcrever_iniciar(job_id)
+    return jsonify({"ok": True, "job_id": job_id})
+
+
+def _transcrever_iniciar(job_id: str) -> None:
+    """Põe o pedido na fila (um de cada vez) — o 1º envio ou o ▶ continuar de um interrompido."""
+    job0 = _TRANSCRICOES_AVULSAS_JOBS[job_id]
+    pr = job0.get("params") or {}
+    pasta = os.path.join(TRANSCRICOES_AVULSAS_DIR, job_id)
+    url, modo = job0.get("url"), job0.get("modo") or "transcrever"
+    arquivo_path = pr.get("arquivo_path")
+    whisper_model, idioma, device = pr.get("whisper_model") or "base", pr.get("idioma"), pr.get("device") or "auto"
+    max_height, apagar_video = pr.get("max_height"), bool(pr.get("apagar_video"))
 
     def _run():
         job = _TRANSCRICOES_AVULSAS_JOBS[job_id]
@@ -11772,7 +11789,99 @@ def transcrever_submit():
             job["erro"] = f"Falha inesperada:\n{traceback.format_exc()}"
 
     _thread_com_aviso(_run, lambda: _TRANSCRICOES_AVULSAS_JOBS.get(job_id), "📝 " + ("Transcrição" if modo == "transcrever" else "Download") + " avulsa", f"/transcrever#j-{job_id}", "transcrever", ao_fim=lambda: _historico_salvar(TRANSCRICOES_AVULSAS_DIR, _TRANSCRICOES_AVULSAS_JOBS.get(job_id)))
-    return jsonify({"ok": True, "job_id": job_id})
+
+
+def _transcricoes_sobras() -> None:
+    """🧹 v84_469: o site fechou no meio — pedidos na fila/processando viram "interrompido" e as pastas SEM registro
+    (envio de antes desta versão, que não salvava o pedido) aparecem também, com o tamanho, pra continuar ou apagar."""
+    for j in _TRANSCRICOES_AVULSAS_JOBS.values():
+        if j.get("status") in ("na_fila", "processando") or (j.get("status") == "erro" and "fechado enquanto" in str(j.get("erro") or "")):
+            j.update(status="interrompido", erro=None)
+    try:
+        nomes = os.listdir(TRANSCRICOES_AVULSAS_DIR)
+    except OSError:
+        return
+    for n in nomes:
+        d = os.path.join(TRANSCRICOES_AVULSAS_DIR, n)
+        if n in _TRANSCRICOES_AVULSAS_JOBS or not re.fullmatch(r"[0-9a-f]{12}", n) or not os.path.isdir(d):
+            continue
+        if os.path.isfile(os.path.join(d, "_job.json")):
+            continue
+        env = [x for x in os.listdir(d) if x.startswith("enviado_")]
+        _TRANSCRICOES_AVULSAS_JOBS[n] = {
+            "id": n, "status": "interrompido", "erro": None, "log": "", "modo": "transcrever", "url": None,
+            "criado_em": os.path.getmtime(d), "nome": (env[0][len("enviado_"):] if env else "(sem arquivo)")[:120],
+            "params": {"arquivo_path": os.path.join(d, env[0]) if env else None, "apagar_video": True}, "sobra": True}
+
+
+def _tamanho_pasta(d: str) -> int:
+    total = 0
+    for raiz, _ds, arqs in os.walk(d):
+        for a in arqs:
+            try:
+                total += os.path.getsize(os.path.join(raiz, a))
+            except OSError:
+                pass
+    return total
+
+
+_transcricoes_sobras()
+
+
+@app.route("/transcrever/<job_id>/apagar", methods=["POST"])
+def transcrever_apagar(job_id: str):
+    """🗑 Apaga o pedido e a pasta dele (o vídeo enviado, a transcrição…)."""
+    job = _TRANSCRICOES_AVULSAS_JOBS.get(job_id)
+    if not job or not re.fullmatch(r"[0-9a-f]{12}", job_id):
+        return jsonify({"erro": "Não encontrado."}), 404
+    if job.get("status") == "processando":
+        return jsonify({"erro": "Está rodando agora — espere terminar."}), 400
+    d = os.path.join(TRANSCRICOES_AVULSAS_DIR, job_id)
+    tam = _tamanho_pasta(d)
+    shutil.rmtree(d, ignore_errors=True)
+    _TRANSCRICOES_AVULSAS_JOBS.pop(job_id, None)
+    return jsonify({"ok": True, "liberado_mb": round(tam / 1e6)})
+
+
+@app.route("/transcrever/<job_id>/continuar", methods=["POST"])
+def transcrever_continuar(job_id: str):
+    """▶ Continua um pedido interrompido (o vídeo enviado ainda está lá)."""
+    job = _TRANSCRICOES_AVULSAS_JOBS.get(job_id)
+    if not job or job.get("status") != "interrompido":
+        return jsonify({"erro": "Só dá pra continuar os interrompidos."}), 400
+    arq = (job.get("params") or {}).get("arquivo_path")
+    if not job.get("url") and not (arq and os.path.isfile(arq) and os.path.getsize(arq) > 0):
+        return jsonify({"erro": "O arquivo enviado não está mais lá (o envio não terminou) — apague e envie de novo."}), 400
+    job.update(status="na_fila", erro=None, log="⏳ Na fila de novo (continuando).\n")
+    _historico_salvar(TRANSCRICOES_AVULSAS_DIR, job)
+    _transcrever_iniciar(job_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/transcrever/interrompidos", methods=["GET", "POST"])
+def transcrever_interrompidos():
+    """GET: quantos e quanto ocupam. POST {acao: apagar|continuar}: em todos de uma vez."""
+    ids = [k for k, j in list(_TRANSCRICOES_AVULSAS_JOBS.items()) if j.get("status") == "interrompido"]
+    if request.method == "GET":
+        return jsonify({"n": len(ids), "mb": round(sum(_tamanho_pasta(os.path.join(TRANSCRICOES_AVULSAS_DIR, k)) for k in ids) / 1e6)})
+    acao = str((request.get_json(silent=True) or {}).get("acao") or "")
+    feitos, liberado = 0, 0
+    for k in ids:
+        if acao == "apagar":
+            d = os.path.join(TRANSCRICOES_AVULSAS_DIR, k)
+            liberado += _tamanho_pasta(d)
+            shutil.rmtree(d, ignore_errors=True)
+            _TRANSCRICOES_AVULSAS_JOBS.pop(k, None)
+            feitos += 1
+        elif acao == "continuar":
+            j = _TRANSCRICOES_AVULSAS_JOBS[k]
+            arq = (j.get("params") or {}).get("arquivo_path")
+            if j.get("url") or (arq and os.path.isfile(arq) and os.path.getsize(arq) > 0):
+                j.update(status="na_fila", erro=None, log="⏳ Na fila de novo (continuando).\n")
+                _historico_salvar(TRANSCRICOES_AVULSAS_DIR, j)
+                _transcrever_iniciar(k)
+                feitos += 1
+    return jsonify({"ok": True, "feitos": feitos, "liberado_mb": round(liberado / 1e6)})
 
 
 @app.route("/transcrever/<job_id>/status", methods=["GET"])

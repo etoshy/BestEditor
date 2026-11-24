@@ -21,7 +21,7 @@ import re
 import threading
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import arquivo_seguro  # noqa: F401  (os.replace sem WinError 5)
 
@@ -38,7 +38,35 @@ DIVISOES = {
     "completo": {"nome": "🧩 Poucos vídeos, completos (2 a 5)", "faixa": (2, 5), "min": (14, 30), "palavras": (1500, 3500)},
     "equilibrado": {"nome": "⚖ Equilibrado (4 a 8)", "faixa": (4, 8), "min": (10, 20), "palavras": (900, 2400)},
     "maximo": {"nome": "📚 O máximo de vídeos (até 15)", "faixa": (4, 15), "min": (6, 20), "palavras": (600, 1800)},
+    # 🎯 v84_468: juntar TUDO num vídeo só, ou vídeos do tamanho que você escolher
+    "um": {"nome": "🎯 Um vídeo só, com TODO o conteúdo", "faixa": (1, 1), "min": (15, 90), "palavras": (3000, 14000)},
+    "tempo": {"nome": "⏱ Vídeos do tamanho que eu escolher (só os assuntos que rendem esse tempo)", "faixa": (1, 15),
+              "min": (8, 30), "palavras": (1200, 6000)},
 }
+MINUTOS_MAX = 120
+
+
+def minutos_alvo(a: Dict[str, Any]) -> int:
+    try:
+        v = int(float((a or {}).get("minutos_alvo") or 0))
+    except (TypeError, ValueError):
+        return 0
+    return max(1, min(MINUTOS_MAX, v)) if v > 0 else 0
+
+
+def faixa_palavras(a: Dict[str, Any]) -> Tuple[int, int]:
+    n = minutos_alvo(a)
+    if n and divisao(a) in ("tempo", "um"):
+        return (int(n * 150 * 0.9), int(n * 150 * 1.1))
+    return DIVISOES[divisao(a)]["palavras"]
+
+
+def faixa_minutos(a: Dict[str, Any]) -> Tuple[int, int]:
+    """Os minutos que a IA mira: o tamanho que você escolheu (⏱ / 🎯 com tempo) ou a faixa da divisão."""
+    n = minutos_alvo(a)
+    if n and divisao(a) in ("tempo", "um"):
+        return (n, n)
+    return DIVISOES[divisao(a)]["min"]
 DIVISAO_PADRAO = "denso"  # v84_431: era "completo"
 
 
@@ -142,35 +170,50 @@ def limpar(texto_bruto: str) -> str:
     return re.sub(r"[ \t]+", " ", t).strip()
 
 
-def criar(base: str, nome: str, modelo: str, conteudo: bytes, nome_arquivo: str, divisao_: str = "") -> Dict[str, Any]:
+def criar(base: str, nome: str, modelo: str, conteudo: bytes, nome_arquivo: str, divisao_: str = "",
+          extras: Optional[List[Tuple[bytes, str]]] = None, minutos_alvo_: Any = None) -> Dict[str, Any]:
+    """📚 Um texto bruto — ou VÁRIOS (🧩 v84_468: `extras` = mais transcrições do mesmo assunto, juntas num material só)."""
     import dossies as ds
     if modelo not in ds.MODELOS:
         raise TemasErro("Escolha um modelo de vídeo.")
-    ext = os.path.splitext(nome_arquivo or "")[1].lower() or ".txt"
-    if ext not in ds.EXT_ARQUIVO_FONTE:
-        raise TemasErro("Arquivo: " + ", ".join(ds.EXT_ARQUIVO_FONTE) + ".")
+    arquivos = [(conteudo, nome_arquivo)] + [x for x in (extras or []) if x and x[0]]
+    for _c, n in arquivos:
+        ext = os.path.splitext(n or "")[1].lower() or ".txt"
+        if ext not in ds.EXT_ARQUIVO_FONTE:
+            raise TemasErro("Arquivo: " + ", ".join(ds.EXT_ARQUIVO_FONTE) + f" ({n}).")
     aid = uuid.uuid4().hex[:10]
     d = _pasta(base, aid)
     os.makedirs(d, exist_ok=True)
-    orig = os.path.join(d, "original" + ext)
-    with open(orig, "wb") as f:
-        f.write(conteudo)
-    if ext in (".txt", ".md", ".srt", ".vtt"):
-        bruto = conteudo.decode("utf-8-sig", errors="replace")
+    pedacos = []
+    for k, (cont, n) in enumerate(arquivos, 1):
+        ext = os.path.splitext(n or "")[1].lower() or ".txt"
+        orig = os.path.join(d, ("original" if k == 1 else f"original_{k}") + ext)
+        with open(orig, "wb") as f:
+            f.write(cont)
+        if ext in (".txt", ".md", ".srt", ".vtt"):
+            bruto = cont.decode("utf-8-sig", errors="replace")
+        else:
+            try:
+                bruto = ds.ler_arquivo(orig)["texto"]
+            except ds.DossieError as exc:
+                excluir(base, aid)
+                raise TemasErro(f"{n}: {exc}") from exc
+        t = limpar(bruto)
+        if t.strip():
+            pedacos.append((n, t))
+    if len(pedacos) > 1:  # cada transcrição marcada (a IA sabe que são várias, do mesmo assunto)
+        limpo = "\n\n".join(f"=== TEXTO {k} de {len(pedacos)}: {os.path.splitext(os.path.basename(n or ''))[0][:80]} ===\n{t}"
+                             for k, (n, t) in enumerate(pedacos, 1))[:MAX_TEXTO]
     else:
-        try:
-            bruto = ds.ler_arquivo(orig)["texto"]
-        except ds.DossieError as exc:
-            excluir(base, aid)
-            raise TemasErro(str(exc)) from exc
-    limpo = limpar(bruto)[:MAX_TEXTO]
+        limpo = (pedacos[0][1] if pedacos else "")[:MAX_TEXTO]
     if len(limpo.split()) < 150:
         excluir(base, aid)
         raise TemasErro("O texto é curto demais pra separar em vários vídeos (menos de 150 palavras).")
     with open(os.path.join(d, "texto.txt"), "w", encoding="utf-8") as f:
         f.write(limpo)
     a = {"id": aid, "nome": (nome or os.path.splitext(os.path.basename(nome_arquivo))[0] or "Texto bruto")[:160],
-         "arquivo": os.path.basename(nome_arquivo or "")[:160], "modelo": modelo,
+         "arquivo": ", ".join(os.path.basename(n or "")[:80] for n, _t in pedacos)[:400], "textos": len(pedacos),
+         "modelo": modelo, **({"minutos_alvo": minutos_alvo({"minutos_alvo": minutos_alvo_})} if minutos_alvo_ else {}),
          "modelo_nome": ds.sem_emoji(ds.MODELOS[modelo].get("nome") or modelo), "palavras": len(limpo.split()),
          "estado": "novo", "erro": "", "temas": [], "criado": time.time(),
          "divisao": divisao_ if divisao_ in DIVISOES else DIVISAO_PADRAO}
@@ -200,6 +243,24 @@ def _regra_divisao(a: Dict[str, Any]) -> str:
              "eles viram UM vídeo. Tema raso ou só citado de passagem não entra.\n"
              "- Aulas e palestras VOLTAM aos assuntos: um tema começa no início, reaparece no meio e fecha no fim. Junte "
              "tudo o que o texto diz sobre o tema em QUALQUER parte — não corte o texto em fatias pela ordem.")
+    n = minutos_alvo(a)
+    if d == "um":
+        return ("- Devolva UM tema só: o vídeo COMPLETO que junta TUDO o que o material tem de bom — todos os eixos, na ordem "
+                "em que um vídeo contaria (do mais básico ao mais profundo), costurados numa história só. O que o material "
+                "repete entra uma vez. Nada de deixar eixo forte de fora.\n"
+                + (f"- O vídeo deve ter ~{n} minutos: se o material rende MAIS, escolha o melhor e deixe o resto de fora (diga "
+                   f"o que ficou de fora em por_que_tempo); se rende MENOS, não estique — diga em por_que_tempo quanto ele "
+                   f"sustenta de verdade.\n" if n else
+                   "- \"minutos\": o tamanho que o material inteiro sustenta SEM enrolar (pode passar de 30 min, se render).\n")
+                + comum)
+    if d == "tempo":
+        n = n or 12
+        return (f"- TODOS os vídeos têm ~{n} minutos (entre {round(n * 0.85)} e {round(n * 1.15)}): é o tamanho que o canal "
+                f"quer. Primeiro faça o MAPA do material. Só devolva temas que o material SUSTENTA nesse tamanho, densos e sem "
+                f"enrolar: tema que não chega a {n} min junta com o parecido mais próximo ou fica de fora; tema que passaria "
+                f"muito de {n} min vira dois vídeos de {n} min (cada um com começo, meio e fim, e sem repetir o outro). "
+                f"Quantos vídeos sair do material (até {DIVISOES['tempo']['faixa'][1]}) — melhor poucos e bons. Em "
+                f"por_que_tempo, diga por que este tema dá {n} min.\n" + comum)
     if d == "completo":
         return (f"- Primeiro faça o MAPA do texto inteiro: quais são os GRANDES eixos (não os subtópicos). Cada vídeo é um eixo "
                 f"COMPLETO, com começo, desenvolvimento e conclusão, reunindo a base teórica, os exemplos, os exercícios e "
@@ -222,6 +283,15 @@ def _regra_divisao(a: Dict[str, Any]) -> str:
     return f"- Separe tudo o que o texto realmente desenvolve: em geral de {lo} a {hi} temas (no máximo {MAX_TEMAS}).\n" + comum
 
 
+def _regra_varios(a: Dict[str, Any]) -> str:
+    n = int((a or {}).get("textos") or 1)
+    if n < 2:
+        return ""
+    return (f"- O material junta {n} TEXTOS (transcrições) do mesmo assunto, separados por \"=== TEXTO k de {n} ===\". Trate "
+            "como UM material só: um vídeo pode (e deve) juntar o que textos diferentes dizem sobre o mesmo tema — é isso "
+            "que deixa o vídeo mais completo. O que dois textos repetem conta UMA vez; quando se complementam, some os dois.\n")
+
+
 def system_analise(a: Dict[str, Any], texto_bruto: str, parte: str = "") -> str:
     import dossies as ds
     mod = ds.MODELOS.get(a["modelo"]) or {}
@@ -236,7 +306,7 @@ nem das experiências pessoais de quem fala. Ignore a parte de organização (av
 datas de aula, apresentações) e as histórias pessoais.
 
 Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozinho (quem nunca viu o canal entende).
-{_regra_divisao(a)}
+{_regra_varios(a)}{_regra_divisao(a)}
 - NÃO é tema: a tese ou a polêmica PESSOAL de quem dá a aula (as brigas dele com um professor, um jornalista, uma
   universidade, um político, citados pelo nome) nem a análise do próprio discurso de quem fala. O tema é a IDEIA (um
   pensador, um conceito, uma obra, um problema), contada pelo narrador do canal, sem dono e sem alvo.
@@ -251,7 +321,7 @@ Sua tarefa: separar os TEMAS que rendem, cada um, UM vídeo que se sustenta sozi
 - "formato": a chave do formato do modelo que melhor combina:
 {fmts}
 - "minutos": a duração IDEAL do vídeo, pelo tanto que o texto rende sobre o tema (sem enrolação), em geral entre
-  {DIVISOES[divisao(a)]['min'][0]} e {DIVISOES[divisao(a)]['min'][1]} min. Shorts = 1.
+  {faixa_minutos(a)[0]} e {faixa_minutos(a)[1]} min. Shorts = 1.
 - "de_onde": de que partes do texto o vídeo tira o material (ex.: "começo da aula + exemplo do meio + conclusão do fim").
 - "por_que_tempo": a justificativa do tempo em uma frase (ex.: "um exercício prático + duas bases filosóficas").
 - "forca": de 1 a 10, o potencial do vídeo no YouTube (interesse, clareza, gancho).
@@ -280,8 +350,10 @@ def _num(v: Any, padrao: float, a: float, b: float) -> float:
         return padrao
 
 
-def ler_temas(d: Any, modelo: str) -> List[Dict[str, Any]]:
-    """Limpa a lista de temas que a IA devolveu."""
+def ler_temas(d: Any, modelo: str, a: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Limpa a lista de temas que a IA devolveu. Com ⏱/🎯 + tempo escolhido, os minutos ficam no tamanho pedido."""
+    fixo = minutos_alvo(a) if a and divisao(a) in ("tempo", "um") else 0
+    teto = MINUTOS_MAX if a and divisao(a) == "um" else 60
     if isinstance(d, dict):
         d = d.get("temas")
     fmts = _formatos(modelo)
@@ -293,7 +365,7 @@ def ler_temas(d: Any, modelo: str) -> List[Dict[str, Any]]:
         fmt = str(x.get("formato") or "")
         if fmt not in fmts:
             fmt = padrao_fmt
-        minutos = _num(x.get("minutos"), float((fmts.get(fmt) or {}).get("minutos") or 10), 1, 60)
+        minutos = fixo or _num(x.get("minutos"), float((fmts.get(fmt) or {}).get("minutos") or 10), 1, teto)
         out.append({"id": uuid.uuid4().hex[:8], "titulo": " ".join(str(x["titulo"]).split())[:120],
                     "tema": str(x.get("tema") or "").strip()[:400],
                     "pontos": [str(p).strip()[:400] for p in x.get("pontos") or [] if str(p).strip()][:10],
@@ -327,7 +399,7 @@ def _juntar(temas: List[Dict[str, Any]], a: Dict[str, Any], de_partes: bool = Tr
               f"Devolva de {lo} a {hi} vídeos (prefira menos e mais ricos), do mais forte pro mais fraco, no mesmo formato. "
               "Só o JSON.")
     r = ia.chamar("roteiros", system, lista, schema=_schema_temas(), max_tokens=16000, effort="medium", timeout=600)
-    return ler_temas(r, a["modelo"]) if r else temas
+    return ler_temas(r, a["modelo"], a) if r else temas
 
 
 def _palavras_chave(t: Dict[str, Any]) -> set:
@@ -396,7 +468,7 @@ def analisar(base: str, aid: str, progresso=None) -> int:
                               schema=_schema_temas(), max_tokens=16000, effort="medium", timeout=900)
                 if d is None:
                     raise TemasErro("a IA não respondeu (veja as últimas chamadas em 🤖 IA)")
-                temas += ler_temas(d, a["modelo"])
+                temas += ler_temas(d, a["modelo"], a)
             hi = DIVISOES[divisao(a)]["faixa"][1]
             if temas and (len(blocos) > 1 or len(temas) > hi or (divisao(a) != "maximo" and parecidos(temas))):
                 if progresso:
@@ -425,7 +497,7 @@ def ler_resposta(base: str, aid: str, resposta: str) -> int:
     except Exception as exc:  # noqa: BLE001
         raise TemasErro(f"Não consegui ler o JSON: {exc}") from exc
     a = carregar(base, aid)
-    temas = ler_temas(d, a["modelo"])
+    temas = ler_temas(d, a["modelo"], a)
     if not temas:
         raise TemasErro("Não achei nenhum tema na resposta.")
     mexer(base, aid, lambda x: x.update(estado="temas", erro="", temas=_manter_criados(x.get("temas") or [], temas)))
@@ -472,8 +544,8 @@ Regras das notas:
   tema num vídeo leve — marcados como sugestão.
 - O texto VOLTA aos assuntos: junte tudo o que ele diz sobre o tema em QUALQUER parte (começo, meio e fim), não só o
   trecho onde o tema aparece primeiro.
-- Formato: texto puro em tópicos e parágrafos curtos, de {DIVISOES[divisao(a)]['palavras'][0]} a
-  {DIVISOES[divisao(a)]['palavras'][1]} palavras conforme o material. Sem JSON.
+- Formato: texto puro em tópicos e parágrafos curtos, de {faixa_palavras(a)[0]} a
+  {faixa_palavras(a)[1]} palavras conforme o material. Sem JSON.
 
 === TEXTO BRUTO ===
 {texto_bruto}

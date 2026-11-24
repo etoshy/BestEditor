@@ -271,6 +271,12 @@ document.getElementById('ytAbrir').addEventListener('click', async () => {
 </script>
 
 <h2 id="historico" style="margin-top:32px;">🕘 Histórico</h2>
+{% set interr = jobs|selectattr('status', 'equalto', 'interrompido')|list %}
+{% if interr %}<div style="margin:0 0 8px;padding:8px 12px;border:1px solid #fcd34d;background:#fffbeb;border-radius:8px;font-size:.86rem">
+  ⚠ <b>{{ interr|length }} pedido(s) interrompido(s)</b> (o site fechou no meio) — ocupando <b id="interrMb">…</b>.
+  <button type="button" onclick="todosInterr('continuar')" style="width:auto;margin:0 0 0 6px;padding:3px 10px;font-size:.8rem;background:#2563eb">▶ continuar todos</button>
+  <button type="button" onclick="todosInterr('apagar')" style="width:auto;margin:0 0 0 4px;padding:3px 10px;font-size:.8rem;background:#dc2626">🗑 apagar todos (e os vídeos enviados)</button>
+  <span id="interrSt" style="color:#555"></span></div>{% endif %}
 {% if jobs %}<p style="font-size:.85rem;margin:0 0 6px"><label style="display:inline;font-weight:400"><input type="checkbox" id="hist-esconder" style="width:auto;margin:0"> esconder os marcados como feitos</label>
   <span style="color:#666"> · {{ jobs|selectattr('feito')|list|length }} de {{ jobs|length }} feitos</span></p>{% endif %}
 {% if not jobs %}<p style="color:#666;font-size:.85rem;">Nada ainda — pode começar um e fechar a aba: quando terminar chega um aviso no 🔔 e fica tudo aqui.</p>{% endif %}
@@ -281,6 +287,9 @@ document.getElementById('ytAbrir').addEventListener('click', async () => {
   {{ 'Transcrever' if j.modo == 'transcrever' else 'Só baixar' }} — {% if j.resultado and j.resultado.titulo %}<b>{{ j.resultado.titulo[:80] }}</b> <span style="color:#94a3b8">{{ (j.url or '')[:50] }}</span>{% else %}{{ (j.url or j.nome or 'arquivo enviado')[:80] }}{% endif %} — <b>{{ 'na fila' if j.status == 'na_fila' else j.status }}</b>
   {% if j.status == 'pronto' %}<button type="button" onclick="abrirDoHistorico('{{ j.id }}')" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">abrir</button>{% endif %}
   {% if j.status in ('processando', 'na_fila') %}<button type="button" onclick="acompanhar('{{ j.id }}');document.getElementById('progresso-box').style.display='block'" style="margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;">acompanhar</button>{% endif %}
+  {% if j.status == 'interrompido' %}<span style="color:#b45309"> ⚠ o site fechou antes de terminar{% if j.sobra %} (envio antigo){% endif %}</span>
+    <button type="button" onclick="histAcao('{{ j.id }}','continuar')" style="width:auto;margin:0 0 0 8px;padding:3px 10px;font-size:.8rem;background:#2563eb">▶ continuar</button>{% endif %}
+  {% if j.status != 'processando' %}<button type="button" onclick="histAcao('{{ j.id }}','apagar')" title="apaga o pedido e os arquivos dele (vídeo enviado, transcrição)" style="width:auto;margin:0 0 0 6px;padding:3px 8px;font-size:.8rem;background:#94a3b8">🗑</button>{% endif %}
   {% if j.erro %}<div style="color:#b91c1c;">{{ j.erro[:200] }}</div>{% endif %}
 </div>
 {% endfor %}
@@ -289,6 +298,23 @@ document.getElementById('ytAbrir').addEventListener('click', async () => {
 body.esconder-feitos .hist-item.feito{display:none}</style>
 <script>
 document.querySelectorAll('.hist-data').forEach(e => { e.textContent = new Date(parseInt(e.dataset.t) * 1000).toLocaleString('pt-BR'); });
+// 🧹 v84_469: interrompidos (o site fechou no meio) — continuar ou apagar (libera o espaço do vídeo enviado)
+async function histAcao(id, acao) {
+  if (acao === 'apagar' && !confirm('Apagar este pedido e os arquivos dele (vídeo enviado e transcrição)?')) return;
+  const r = await fetch(`/transcrever/${id}/${acao}`, { method: 'POST' }); const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.erro) { alert(d.erro || ('erro ' + r.status)); return; }
+  location.reload();
+}
+async function todosInterr(acao) {
+  if (acao === 'apagar' && !confirm('Apagar TODOS os interrompidos e os vídeos enviados deles?')) return;
+  const st = document.getElementById('interrSt'); st.textContent = '…';
+  const r = await fetch('/transcrever/interrompidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao }) });
+  const d = await r.json().catch(() => ({}));
+  st.textContent = acao === 'apagar' ? `🗑 ${d.feitos} apagado(s), ${d.liberado_mb} MB liberados` : `▶ ${d.feitos} de volta na fila`;
+  setTimeout(() => location.reload(), 1200);
+}
+if (document.getElementById('interrMb')) fetch('/transcrever/interrompidos').then(r => r.json()).then(d => {
+  document.getElementById('interrMb').textContent = d.mb >= 1000 ? (d.mb / 1000).toFixed(1) + ' GB' : d.mb + ' MB'; }).catch(() => {});
 // ✔ v84_463: marcar o que já foi usado (salvo no servidor) + esconder os feitos (lembrado neste navegador)
 document.querySelectorAll('.hist-feito').forEach(c => c.addEventListener('change', async () => {
   const item = document.getElementById('j-' + c.dataset.id);

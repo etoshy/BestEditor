@@ -177,17 +177,18 @@ def registrar(app, base_dir: str) -> None:
 
     @app.route("/temas-bruto/novo", methods=["POST"])
     def temas_bruto_novo():
-        arq = request.files.get("arquivo")
+        # 🧩 v84_468: VÁRIOS arquivos (e/ou o texto colado) viram um material só
+        arquivos = [(f.read(), f.filename) for f in request.files.getlist("arquivo") if f and f.filename]
         colado = (request.form.get("texto") or "").strip()
-        if arq and arq.filename:
-            conteudo, nome_arq = arq.read(), arq.filename
-        elif colado:
-            conteudo, nome_arq = colado.encode("utf-8"), "texto_colado.txt"
-        else:
+        if colado:
+            arquivos.append((colado.encode("utf-8"), "texto_colado.txt"))
+        if not arquivos:
             return redirect(url_for("temas_bruto_lista", erro="Envie o arquivo ou cole o texto."))
+        conteudo, nome_arq = arquivos[0]
         try:
             a = TB.criar(base_dir, request.form.get("nome") or "", request.form.get("modelo") or "", conteudo, nome_arq,
-                         request.form.get("divisao") or "")
+                         request.form.get("divisao") or "", extras=arquivos[1:],
+                         minutos_alvo_=request.form.get("minutos_alvo") or None)
         except TB.TemasErro as exc:
             return redirect(url_for("temas_bruto_lista", erro=str(exc)))
         import ia_servico as ia
@@ -230,9 +231,12 @@ def registrar(app, base_dir: str) -> None:
         motivo = ia.motivo_desligado("roteiros")
         if motivo:
             return jsonify({"erro": "IA: " + motivo + " — use 📋 Copiar o pedido."}), 400
-        dv = str((request.get_json(silent=True) or {}).get("divisao") or "")
+        c = request.get_json(silent=True) or {}
+        dv = str(c.get("divisao") or "")
+        mn = TB.minutos_alvo({"minutos_alvo": c.get("minutos_alvo")}) if str(c.get("minutos_alvo") or "").strip() else 0
         TB.mexer(base_dir, aid, lambda a: a.update(estado="analisando", erro="",
-                                                   **({"divisao": dv} if dv in TB.DIVISOES else {})))
+                                                   **({"divisao": dv} if dv in TB.DIVISOES else {}),
+                                                   **({"minutos_alvo": mn} if mn else {})))
         return jsonify({"ok": True, "tarefa": _iniciar_analise(aid)})
 
     @app.route("/temas-bruto/<aid>/juntar", methods=["POST"])
